@@ -1,0 +1,18 @@
+BasedOnStyle: "LLVM"
+
+BreakBeforeBraces: Linux
+Standard: Cpp11
+ColumnLimit: 80
+
+MaxEmptyLinesToKeep: 2
+
+NamespaceIndentation: All
+
+AlignAfterOpenBracket: true
+AlwaysBreakTemplateDeclarations: true
+BinPackArguments: false
+BinPackParameters: false
+PointerAlignment: Right
+AllowShortFunctionsOnASingleLine: Empty
+
+BreakConstructorInitializersBeforeComma: true
