@@ -49,6 +49,7 @@ namespace ryujin
   TimeLoop<dim>::TimeLoop()
       : ParameterAcceptor("A - TimeLoop")
       , discretization("B - Discretization")
+      , offline_data(discretization, "C - OfflineData")
   {
     base_name_ = "test";
     add_parameter("basename", base_name_, "base name for all output files");
@@ -58,11 +59,12 @@ namespace ryujin
   template <int dim>
   void TimeLoop<dim>::run()
   {
-    initialize();
+    initialize_deallog();
 
     /* Compute offline data: */
 
-    compute_offline_data();
+    print_head("compute offline data");
+    offline_data.prepare();
 
     // FIXME The loop ...
 
@@ -77,7 +79,7 @@ namespace ryujin
    * Set up deallog output, read in parameters and initialize all objects.
    */
   template <int dim>
-  void TimeLoop<dim>::initialize()
+  void TimeLoop<dim>::initialize_deallog()
   {
     deallog.pop();
 
@@ -132,17 +134,6 @@ namespace ryujin
     deallog << "TimeLoop<dim>::run()" << std::endl;
     ParameterAcceptor::prm.log_parameters(deallog);
   }
-
-
-  /**
-   * Compute offline data
-   */
-  template <int dim>
-  void TimeLoop<dim>::compute_offline_data()
-  {
-    print_head("compute offline data");
-  }
-
 
 } // namespace ryujin
 

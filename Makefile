@@ -51,6 +51,6 @@ Makefile:
 	
 
 %: $(BUILDDIR)/$(MAKE_FILE)
-	@cd $(BUILDDIR) && ninja $@
+	@cd $(BUILDDIR) && $(MAKE_COMMAND) $@
 
 .PHONY: rebuild_cache edit_cache release debug

@@ -2,6 +2,7 @@
 #define TIMELOOP_H
 
 #include <discretization.h>
+#include <offline_data.h>
 
 #include <deal.II/base/parameter_acceptor.h>
 
@@ -20,14 +21,14 @@ namespace ryujin
   private:
     /* Private methods for run(): */
 
-    virtual void initialize();
-    virtual void compute_offline_data();
+    virtual void initialize_deallog();
 
     /* Data: */
 
     std::string base_name_;
 
     grendel::Discretization<dim> discretization;
+    grendel::OfflineData<dim> offline_data;
 
     std::unique_ptr<std::ofstream> filestream;
 
