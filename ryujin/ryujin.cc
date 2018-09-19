@@ -1,9 +1,13 @@
 #include "timeloop.h"
 
+#include <deal.II/base/utilities.h>
+
 #include <fstream>
 
-int main()
+int main (int argc, char *argv[])
 {
+  dealii::Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv);
+
   ryujin::TimeLoop<DIM> time_loop;
 
   /*
