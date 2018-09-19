@@ -18,11 +18,6 @@ namespace grendel
     Discretization(const std::string &subsection = "Discretization");
     virtual ~Discretization() final = default;
 
-    A_RO(triangulation)
-    A_RO(mapping)
-    A_RO(finite_element)
-    A_RO(quadrature)
-
     void parse_parameters_callback();
 
   protected:
@@ -34,9 +29,16 @@ namespace grendel
     unsigned int order_quadrature_;
 
     std::unique_ptr<dealii::Triangulation<dim>> triangulation_;
+    A_RO(triangulation)
+
     std::unique_ptr<const dealii::Mapping<dim>> mapping_;
+    A_RO(mapping)
+
     std::unique_ptr<const dealii::FiniteElement<dim>> finite_element_;
+    A_RO(finite_element)
+
     std::unique_ptr<const dealii::Quadrature<dim>> quadrature_;
+    A_RO(quadrature)
   };
 
 } /* namespace grendel */
