@@ -2,6 +2,13 @@
 #define OFFLINE_DATA_TEMPLATE_H
 
 #include "offline_data.h"
+#include "scratch_data.h"
+
+#include <deal.II/base/work_stream.h>
+#include <deal.II/dofs/dof_renumbering.h>
+#include <deal.II/dofs/dof_tools.h>
+#include <deal.II/fe/fe_values.h>
+#include <deal.II/lac/dynamic_sparsity_pattern.h>
 
 namespace grendel
 {
@@ -21,7 +28,28 @@ namespace grendel
   template <int dim>
   void OfflineData<dim>::setup()
   {
-    deallog << "OfflineData<dim>::setup_system()" << std::endl;
+    deallog << "OfflineData<dim>::setup()" << std::endl;
+
+    dof_handler_.initialize(discretization_->triangulation(),
+                            discretization_->finite_element());
+
+    deallog << "        " << dof_handler_.n_dofs() << " DoFs" << std::endl;
+
+    DoFRenumbering::Cuthill_McKee(dof_handler_);
+
+    affine_constraints_.clear();
+    affine_constraints_.close();
+
+    DynamicSparsityPattern c_sparsity(dof_handler_.n_dofs(),
+                                      dof_handler_.n_dofs());
+    DoFTools::make_sparsity_pattern(
+        dof_handler_, c_sparsity, affine_constraints_, false);
+    sparsity_pattern_.copy_from(c_sparsity);
+
+    mass_matrix_.reinit(sparsity_pattern_);
+    lumped_mass_matrix_.reinit(sparsity_pattern_);
+    for (auto &matrix : cij_matrix_)
+      matrix.reinit(sparsity_pattern_);
   }
 
 
@@ -29,6 +57,88 @@ namespace grendel
   void OfflineData<dim>::assemble()
   {
     deallog << "OfflineData<dim>::assemble()" << std::endl;
+
+    mass_matrix_ = 0.;
+    lumped_mass_matrix_ = 0.;
+    for (auto &matrix : cij_matrix_)
+      matrix = 0.;
+
+    const unsigned int dofs_per_cell =
+        discretization_->finite_element().dofs_per_cell;
+
+    const unsigned int n_q_points = discretization_->quadrature().size();
+
+    /* The local, per-cell assembly routine: */
+
+    auto local_assemble_system =
+        [&](const auto &cell, auto &scratch, auto &copy) {
+          auto &local_dof_indices = copy.local_dof_indices_;
+          auto &cell_mass_matrix = copy.cell_mass_matrix_;
+          auto &cell_lumped_mass_matrix = copy.cell_lumped_mass_matrix_;
+          auto &cell_cij_matrix = copy.cell_cij_matrix_;
+
+          auto &fe_values = scratch.fe_values_;
+
+          cell_mass_matrix.reinit(dofs_per_cell, dofs_per_cell);
+          cell_lumped_mass_matrix.reinit(dofs_per_cell, dofs_per_cell);
+          for (auto &matrix : cell_cij_matrix)
+            matrix.reinit(dofs_per_cell, dofs_per_cell);
+
+          fe_values.reinit(cell);
+          local_dof_indices.resize(dofs_per_cell);
+          cell->get_dof_indices(local_dof_indices);
+
+          for (unsigned int q_point = 0; q_point < n_q_points; ++q_point) {
+            const auto JxW = fe_values.JxW(q_point);
+
+            for (unsigned int j = 0; j < dofs_per_cell; ++j) {
+
+              const auto value_JxW = fe_values.shape_value(j, q_point) * JxW;
+              const auto grad_JxW = fe_values.shape_grad(j, q_point) * JxW;
+
+              cell_lumped_mass_matrix(j, j) += value_JxW;
+
+              for (unsigned int i = 0; i < dofs_per_cell; ++i) {
+
+                const auto value = fe_values.shape_value(i, q_point);
+
+                cell_mass_matrix(i, j) += value * value_JxW;
+
+                for (unsigned int d = 0; d < dim; ++d)
+                  cell_cij_matrix[d](i, j) += (value * grad_JxW)[d];
+
+              } /* for i */
+            }   /* for j */
+          }     /* for q */
+        };
+
+    /* The local, per-cell assembly routine: */
+
+    auto copy_local_to_global = [&](const auto &copy) {
+      const auto &local_dof_indices = copy.local_dof_indices_;
+      const auto &cell_mass_matrix = copy.cell_mass_matrix_;
+      const auto &cell_lumped_mass_matrix = copy.cell_lumped_mass_matrix_;
+      const auto &cell_cij_matrix = copy.cell_cij_matrix_;
+
+      affine_constraints_.distribute_local_to_global(
+          cell_mass_matrix, local_dof_indices, mass_matrix_);
+
+      affine_constraints_.distribute_local_to_global(
+          cell_lumped_mass_matrix, local_dof_indices, lumped_mass_matrix_);
+
+      for (int k = 0; k < dim; ++k)
+        affine_constraints_.distribute_local_to_global(
+            cell_cij_matrix[k], local_dof_indices, cij_matrix_[k]);
+    };
+
+    /* And run a workstream to assemble the matrix: */
+
+    WorkStream::run(dof_handler_.begin_active(),
+                    dof_handler_.end(),
+                    local_assemble_system,
+                    copy_local_to_global,
+                    AssemblyScratchData<dim>(*discretization_),
+                    AssemblyCopyData<dim>());
   }
 
 
@@ -44,8 +154,6 @@ namespace grendel
 
     for (auto &matrix : cij_matrix_)
       matrix.clear();
-
-    data_out_.clear();
   }
 
 } /* namespace grendel */

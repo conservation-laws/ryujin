@@ -31,9 +31,10 @@ namespace grendel
       assemble();
     }
 
-    virtual void setup();
-    virtual void assemble();
-    virtual void clear();
+    void setup();
+    void assemble();
+
+    void clear();
 
   protected:
     dealii::SmartPointer<const grendel::Discretization<dim>> discretization_;
@@ -58,9 +59,6 @@ namespace grendel
 
     std::array<dealii::SparseMatrix<double>, dim> cij_matrix_;
     A_RO(cij_matrix)
-
-    dealii::DataOut<dim> data_out_;
-    A_RO(data_out)
   };
 
 } /* namespace grendel */

@@ -53,6 +53,8 @@ namespace grendel
     triangulation.clear();
     dealii::GridGenerator::hyper_cube(triangulation, 0.0, 1.0);
 
+    triangulation.refine_global(refinement_);
+
     mapping_.reset(new MappingQ<dim>(order_mapping_));
 
     finite_element_.reset(new FE_Q<dim>(order_finite_element_));
