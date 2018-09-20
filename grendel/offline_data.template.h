@@ -4,6 +4,7 @@
 #include "offline_data.h"
 #include "scratch_data.h"
 
+#include <deal.II/base/graph_coloring.h>
 #include <deal.II/base/work_stream.h>
 #include <deal.II/dofs/dof_renumbering.h>
 #include <deal.II/dofs/dof_tools.h>
@@ -131,10 +132,24 @@ namespace grendel
             cell_cij_matrix[k], local_dof_indices, cij_matrix_[k]);
     };
 
-    /* And run a workstream to assemble the matrix: */
+    /*
+     * And run a workstream to assemble the matrix.
+     *
+     * We need a graph coloring for the cells exactly once (the TimeStep
+     * iterates over degrees of freedom without conflicts). Thus, construct
+     * a graph coloring locally instead of caching it.
+     */
 
-    WorkStream::run(dof_handler_.begin_active(),
-                    dof_handler_.end(),
+    const auto get_conflict_indices = [&](auto &cell) {
+      std::vector<types::global_dof_index> local_dof_indices(dofs_per_cell);
+      cell->get_dof_indices(local_dof_indices);
+      return local_dof_indices;
+    };
+
+    const auto graph = GraphColoring::make_graph_coloring(
+        dof_handler_.begin_active(), dof_handler_.end(), get_conflict_indices);
+
+    WorkStream::run(graph,
                     local_assemble_system,
                     copy_local_to_global,
                     AssemblyScratchData<dim>(*discretization_),
