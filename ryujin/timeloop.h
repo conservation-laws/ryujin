@@ -3,6 +3,7 @@
 
 #include <discretization.h>
 #include <offline_data.h>
+#include <time_step.h>
 
 #include <deal.II/base/parameter_acceptor.h>
 
@@ -31,6 +32,7 @@ namespace ryujin
 
     grendel::Discretization<dim> discretization;
     grendel::OfflineData<dim> offline_data;
+    grendel::TimeStep<dim> time_step;
 
     std::unique_ptr<std::ofstream> filestream;
 

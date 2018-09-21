@@ -52,6 +52,7 @@ namespace ryujin
       , mpi_communicator(mpi_comm)
       , discretization(mpi_communicator, "B - Discretization")
       , offline_data(mpi_communicator, discretization, "C - OfflineData")
+      , time_step(mpi_communicator, offline_data, "D - TimeStep")
   {
     base_name_ = "test";
     add_parameter("basename", base_name_, "base name for all output files");
