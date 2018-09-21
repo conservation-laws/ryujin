@@ -15,14 +15,18 @@ namespace grendel
   class Model : public dealii::ParameterAcceptor
   {
   public:
+    static constexpr unsigned int problem_dimension = 2 + dim;
+    typedef dealii::Tensor<1, problem_dimension, double> rank1_type;
+
     Model(const std::string &subsection = "Model");
     virtual ~Model() final = default;
 
     void parse_parameters_callback();
 
-    //     std::function<double(const dealii::Point<dim> &,
-    //                          const dealii::types::material_id &)>
-    //         epsilon;
+    static constexpr auto lambda =
+        [](rank1_type, rank1_type, dealii::Tensor<1, dim>) { return 0.; };
+
+  private:
   };
 
 } /* namespace grendel */
