@@ -87,19 +87,14 @@ namespace grendel
      * used in a matrix-vector product, and in order to avoid unnecessary
      * overhead, we simply assemble these parts into a local
      * dealii::SparseMatrix<dim>.
-     *
-     * One caveat of this approach, though, is the fact that we have to do
-     * a bit of index computations by hand: We use a "local index" on each
-     * MPI processor that runs from [0,n_elements) and has to be mapped to
-     * the corresponding global index with the locally_relevant_ index set.
      */
 
     {
-      const auto n_locally_relevant = locally_relevant_.n_elements();
+      const auto n_dofs = locally_relevant_.size();
       const auto dofs_per_cell =
           discretization_->finite_element().dofs_per_cell;
 
-      DynamicSparsityPattern dsp(n_locally_relevant, n_locally_relevant);
+      DynamicSparsityPattern dsp(n_dofs, n_dofs);
 
       std::vector<types::global_dof_index> dof_indices(dofs_per_cell);
 
@@ -109,13 +104,6 @@ namespace grendel
           continue;
 
         cell->get_dof_indices(dof_indices);
-        std::transform(dof_indices.begin(),
-                       dof_indices.end(),
-                       dof_indices.begin(),
-                       [&](auto index) {
-                         return locally_relevant_.index_within_set(index);
-                       });
-
         affine_constraints_.add_entries_local_to_global(dof_indices, dsp, true);
       }
 
@@ -168,12 +156,6 @@ namespace grendel
           local_dof_indices.resize(dofs_per_cell);
 
           cell->get_dof_indices(local_dof_indices);
-          std::transform(local_dof_indices.begin(),
-                         local_dof_indices.end(),
-                         local_dof_indices.begin(),
-                         [&](auto index) {
-                           return locally_relevant_.index_within_set(index);
-                         });
 
           for (unsigned int q_point = 0; q_point < n_q_points; ++q_point) {
             const auto JxW = fe_values.JxW(q_point);
