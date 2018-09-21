@@ -38,12 +38,15 @@ namespace grendel
 
     DoFRenumbering::Cuthill_McKee(dof_handler_);
 
-    locally_owned_dofs_ = dof_handler_.locally_owned_dofs();
-    locally_relevant_dofs_.clear();
-    DoFTools::extract_locally_relevant_dofs(dof_handler_,
-                                            locally_relevant_dofs_);
+    locally_owned_ = dof_handler_.locally_owned_dofs();
+    locally_relevant_.clear();
+    DoFTools::extract_locally_relevant_dofs(dof_handler_, locally_relevant_);
 
     {
+      /*
+       * Print out the DoF distribution
+       */
+
       deallog << "        " << dof_handler_.n_dofs()
               << " global DoFs, local DoF distribution:" << std::endl;
 
@@ -51,6 +54,7 @@ namespace grendel
           Utilities::MPI::this_mpi_process(mpi_communicator_);
       const auto n_mpi_processes =
           Utilities::MPI::n_mpi_processes(mpi_communicator_);
+      unsigned int n_locally_owned_dofs = dof_handler_.n_locally_owned_dofs();
 
       if (this_mpi_process > 0) {
         MPI_Send(
@@ -71,25 +75,57 @@ namespace grendel
       deallog << " )" << std::endl;
     }
 
+    /*
+     * We are not doing anything with constraints (yet).
+     */
+
     affine_constraints_.clear();
     affine_constraints_.close();
 
-//     const auto n_locally_relevant_dofs = locally_relevant_dofs_.size();
-//     DynamicSparsityPattern c_sparsity(n_locally_relevant_dofs,
-//                                       n_locally_relevant_dofs);
-//     DoFTools::make_sparsity_pattern(
-//         dof_handler_,
-//         c_sparsity,
-//         affine_constraints_,
-//         true,
-//         Utilities::MPI::this_mpi_process(mpi_communicator_));
+    /*
+     * We need a local view of a couple of matrices. Because they are never
+     * used in a matrix-vector product, and in order to avoid unnecessary
+     * overhead, we simply assemble these parts into a local
+     * dealii::SparseMatrix<dim>.
+     *
+     * One caveat of this approach, though, is the fact that we have to do
+     * a bit of index computations by hand: We use a "local index" on each
+     * MPI processor that runs from [0,n_elements) and has to be mapped to
+     * the corresponding global index with the locally_relevant_ index set.
+     */
 
-//     sparsity_pattern_.copy_from(c_sparsity);
+    {
+      const auto n_locally_relevant = locally_relevant_.n_elements();
+      const auto dofs_per_cell =
+          discretization_->finite_element().dofs_per_cell;
 
-//     mass_matrix_.reinit(sparsity_pattern_);
-//     lumped_mass_matrix_.reinit(sparsity_pattern_);
-//     for (auto &matrix : cij_matrix_)
-//       matrix.reinit(sparsity_pattern_);
+      DynamicSparsityPattern dsp(n_locally_relevant, n_locally_relevant);
+
+      std::vector<types::global_dof_index> dof_indices(dofs_per_cell);
+
+      for (auto cell : dof_handler_.active_cell_iterators()) {
+        /* iterate over locally owned cells and the ghost layer */
+        if (cell->is_artificial())
+          continue;
+
+        cell->get_dof_indices(dof_indices);
+        std::transform(dof_indices.begin(),
+                       dof_indices.end(),
+                       dof_indices.begin(),
+                       [&](auto index) {
+                         return locally_relevant_.index_within_set(index);
+                       });
+
+        affine_constraints_.add_entries_local_to_global(dof_indices, dsp, true);
+      }
+
+      sparsity_pattern_.copy_from(dsp);
+    }
+
+    mass_matrix_.reinit(sparsity_pattern_);
+    lumped_mass_matrix_.reinit(sparsity_pattern_);
+    for (auto &matrix : cij_matrix_)
+      matrix.reinit(sparsity_pattern_);
   }
 
 
@@ -112,6 +148,10 @@ namespace grendel
 
     auto local_assemble_system =
         [&](const auto &cell, auto &scratch, auto &copy) {
+          /* iterate over locally owned cells and the ghost layer */
+          if (cell->is_artificial())
+            return;
+
           auto &local_dof_indices = copy.local_dof_indices_;
           auto &cell_mass_matrix = copy.cell_mass_matrix_;
           auto &cell_lumped_mass_matrix = copy.cell_lumped_mass_matrix_;
@@ -126,7 +166,14 @@ namespace grendel
 
           fe_values.reinit(cell);
           local_dof_indices.resize(dofs_per_cell);
+
           cell->get_dof_indices(local_dof_indices);
+          std::transform(local_dof_indices.begin(),
+                         local_dof_indices.end(),
+                         local_dof_indices.begin(),
+                         [&](auto index) {
+                           return locally_relevant_.index_within_set(index);
+                         });
 
           for (unsigned int q_point = 0; q_point < n_q_points; ++q_point) {
             const auto JxW = fe_values.JxW(q_point);
@@ -180,6 +227,9 @@ namespace grendel
      */
 
     const auto get_conflict_indices = [&](auto &cell) {
+      if (cell->is_artificial())
+        return std::vector<types::global_dof_index>();
+
       std::vector<types::global_dof_index> local_dof_indices(dofs_per_cell);
       cell->get_dof_indices(local_dof_indices);
       return local_dof_indices;

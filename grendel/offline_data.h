@@ -29,7 +29,7 @@ namespace grendel
     virtual void prepare()
     {
       setup();
-//       assemble();
+      assemble();
     }
 
     void setup();
@@ -49,11 +49,11 @@ namespace grendel
     dealii::DoFHandler<dim> dof_handler_;
     A_RO(dof_handler)
 
-    dealii::IndexSet locally_owned_dofs_;
-    A_RO(locally_owned_dofs)
+    dealii::IndexSet locally_owned_;
+    A_RO(locally_owned)
 
-    dealii::IndexSet locally_relevant_dofs_;
-    A_RO(locally_relevant_dofs)
+    dealii::IndexSet locally_relevant_;
+    A_RO(locally_relevant)
 
     dealii::SparsityPattern sparsity_pattern_;
     A_RO(sparsity_pattern)
