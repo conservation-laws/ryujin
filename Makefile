@@ -7,15 +7,16 @@ GENERATOR:=Ninja
 MAKE_COMMAND:=ninja
 MAKE_FILE:=build.ninja
 
+MPIRUN:=mpirun -np 2
 EXECUTABLE:=ryujin
 PARAMETER_FILE:=$(EXECUTABLE).prm
 
 edit: all
-	@if [ \! -f $(BUILDDIR)/run/$(PARAMETER_FILE) ]; then cd $(BUILDDIR)/run; ./$(EXECUTABLE); fi
+	@if [ \! -f $(BUILDDIR)/run/$(PARAMETER_FILE) ]; then cd $(BUILDDIR)/run; $(MPIRUN) ./$(EXECUTABLE); fi
 	@vim $(BUILDDIR)/run/$(PARAMETER_FILE)
 
 run: all
-	@cd $(BUILDDIR)/run && time ./$(EXECUTABLE)
+	@cd $(BUILDDIR)/run && time $(MPIRUN) ./$(EXECUTABLE)
 
 run_clean:
 	@rm -f $(BUILDDIR)/run/*.(vtk|vtu|log|txt|gnuplot)
