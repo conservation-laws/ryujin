@@ -18,7 +18,8 @@ namespace grendel
   class OfflineData : public dealii::ParameterAcceptor
   {
   public:
-    OfflineData(const grendel::Discretization<dim> &discretization,
+    OfflineData(const MPI_Comm &mpi_communicator,
+                const grendel::Discretization<dim> &discretization,
                 const std::string &subsection = "OfflineData");
 
     virtual ~OfflineData() final = default;
@@ -28,7 +29,7 @@ namespace grendel
     virtual void prepare()
     {
       setup();
-      assemble();
+//       assemble();
     }
 
     void setup();
@@ -37,6 +38,9 @@ namespace grendel
     void clear();
 
   protected:
+
+    const MPI_Comm &mpi_communicator_;
+
     dealii::SmartPointer<const grendel::Discretization<dim>> discretization_;
     A_RO(discretization)
 
@@ -44,6 +48,12 @@ namespace grendel
 
     dealii::DoFHandler<dim> dof_handler_;
     A_RO(dof_handler)
+
+    dealii::IndexSet locally_owned_dofs_;
+    A_RO(locally_owned_dofs)
+
+    dealii::IndexSet locally_relevant_dofs_;
+    A_RO(locally_relevant_dofs)
 
     dealii::SparsityPattern sparsity_pattern_;
     A_RO(sparsity_pattern)

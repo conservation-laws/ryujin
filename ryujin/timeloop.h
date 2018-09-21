@@ -13,7 +13,7 @@ namespace ryujin
   class TimeLoop : public dealii::ParameterAcceptor
   {
   public:
-    TimeLoop();
+    TimeLoop(const MPI_Comm &mpi_comm);
     virtual ~TimeLoop() final = default;
 
     virtual void run();
@@ -21,9 +21,11 @@ namespace ryujin
   private:
     /* Private methods for run(): */
 
-    virtual void initialize_deallog();
+    virtual void initialize();
 
     /* Data: */
+
+    const MPI_Comm &mpi_communicator;
 
     std::string base_name_;
 

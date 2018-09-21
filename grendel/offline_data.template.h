@@ -18,9 +18,11 @@ namespace grendel
 
   template <int dim>
   OfflineData<dim>::OfflineData(
+      const MPI_Comm &mpi_communicator,
       const grendel::Discretization<dim> &discretization,
       const std::string &subsection /*= "OfflineData"*/)
       : ParameterAcceptor(subsection)
+      , mpi_communicator_(mpi_communicator)
       , discretization_(&discretization)
   {
   }
@@ -34,23 +36,60 @@ namespace grendel
     dof_handler_.initialize(discretization_->triangulation(),
                             discretization_->finite_element());
 
-    deallog << "        " << dof_handler_.n_dofs() << " DoFs" << std::endl;
-
     DoFRenumbering::Cuthill_McKee(dof_handler_);
+
+    locally_owned_dofs_ = dof_handler_.locally_owned_dofs();
+    locally_relevant_dofs_.clear();
+    DoFTools::extract_locally_relevant_dofs(dof_handler_,
+                                            locally_relevant_dofs_);
+
+    {
+      deallog << "        " << dof_handler_.n_dofs()
+              << " global DoFs, local DoF distribution:" << std::endl;
+
+      const auto this_mpi_process =
+          Utilities::MPI::this_mpi_process(mpi_communicator_);
+      const auto n_mpi_processes =
+          Utilities::MPI::n_mpi_processes(mpi_communicator_);
+
+      if (this_mpi_process > 0) {
+        MPI_Send(
+            &n_locally_owned_dofs, 1, MPI_UNSIGNED, 0, 0, mpi_communicator_);
+      } else {
+        deallog << "        ( " << n_locally_owned_dofs << std::flush;
+        for (unsigned int p = 1; p < n_mpi_processes; ++p) {
+          MPI_Recv(&n_locally_owned_dofs,
+                   1,
+                   MPI_UNSIGNED,
+                   p,
+                   0,
+                   mpi_communicator_,
+                   MPI_STATUS_IGNORE);
+          deallog << " + " << n_locally_owned_dofs << std::flush;
+        }
+      }
+      deallog << " )" << std::endl;
+    }
 
     affine_constraints_.clear();
     affine_constraints_.close();
 
-    DynamicSparsityPattern c_sparsity(dof_handler_.n_dofs(),
-                                      dof_handler_.n_dofs());
-    DoFTools::make_sparsity_pattern(
-        dof_handler_, c_sparsity, affine_constraints_, false);
-    sparsity_pattern_.copy_from(c_sparsity);
+//     const auto n_locally_relevant_dofs = locally_relevant_dofs_.size();
+//     DynamicSparsityPattern c_sparsity(n_locally_relevant_dofs,
+//                                       n_locally_relevant_dofs);
+//     DoFTools::make_sparsity_pattern(
+//         dof_handler_,
+//         c_sparsity,
+//         affine_constraints_,
+//         true,
+//         Utilities::MPI::this_mpi_process(mpi_communicator_));
 
-    mass_matrix_.reinit(sparsity_pattern_);
-    lumped_mass_matrix_.reinit(sparsity_pattern_);
-    for (auto &matrix : cij_matrix_)
-      matrix.reinit(sparsity_pattern_);
+//     sparsity_pattern_.copy_from(c_sparsity);
+
+//     mass_matrix_.reinit(sparsity_pattern_);
+//     lumped_mass_matrix_.reinit(sparsity_pattern_);
+//     for (auto &matrix : cij_matrix_)
+//       matrix.reinit(sparsity_pattern_);
   }
 
 

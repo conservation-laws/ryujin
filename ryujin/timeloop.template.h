@@ -5,6 +5,7 @@
 
 #include <deal.II/base/logstream.h>
 #include <deal.II/base/revision.h>
+#include <deal.II/grid/grid_out.h>
 
 #include <iomanip>
 #include <type_traits>
@@ -46,10 +47,11 @@ namespace
 namespace ryujin
 {
   template <int dim>
-  TimeLoop<dim>::TimeLoop()
+  TimeLoop<dim>::TimeLoop(const MPI_Comm &mpi_comm)
       : ParameterAcceptor("A - TimeLoop")
-      , discretization("B - Discretization")
-      , offline_data(discretization, "C - OfflineData")
+      , mpi_communicator(mpi_comm)
+      , discretization(mpi_communicator, "B - Discretization")
+      , offline_data(mpi_communicator, discretization, "C - OfflineData")
   {
     base_name_ = "test";
     add_parameter("basename", base_name_, "base name for all output files");
@@ -59,7 +61,16 @@ namespace ryujin
   template <int dim>
   void TimeLoop<dim>::run()
   {
-    initialize_deallog();
+    initialize();
+
+    {
+      deallog << "        output triangulation" << std::endl;
+      std::ofstream output(
+          base_name_ + "-triangulation-p" +
+          std::to_string(Utilities::MPI::this_mpi_process(mpi_communicator)) +
+          ".inp");
+      GridOut().write_ucd(discretization.triangulation(), output);
+    }
 
     /* Compute offline data: */
 
@@ -70,8 +81,11 @@ namespace ryujin
 
     /* Detach deallog: */
 
-    deallog.pop();
-    deallog.detach();
+    if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
+    {
+      deallog.pop();
+      deallog.detach();
+    }
   }
 
 
@@ -79,21 +93,28 @@ namespace ryujin
    * Set up deallog output, read in parameters and initialize all objects.
    */
   template <int dim>
-  void TimeLoop<dim>::initialize_deallog()
+  void TimeLoop<dim>::initialize()
   {
-    deallog.pop();
-
     /* Read in parameters and initialize all objects: */
 
-    deallog << "[Init] Initiating Flux Capacitor... [ OK ]" << std::endl;
-    deallog << "[Init] Bringing Warp Core online... [ OK ]" << std::endl;
+    if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0) {
+      deallog.pop();
 
-    deallog << "[Init] Reading parameters and allocating objects... "
-            << std::flush;
+      deallog << "[Init] Initiating Flux Capacitor... [ OK ]" << std::endl;
+      deallog << "[Init] Bringing Warp Core online... [ OK ]" << std::endl;
 
-    ParameterAcceptor::initialize("ryujin.prm");
+      deallog << "[Init] Reading parameters and allocating objects... "
+              << std::flush;
 
-    deallog << "[ OK ]" << std::endl;
+      ParameterAcceptor::initialize("ryujin.prm");
+
+      deallog << "[ OK ]" << std::endl;
+
+    } else {
+
+      ParameterAcceptor::initialize("ryujin.prm");
+      return;
+    }
 
     /* Print out parameters to a prm file: */
 

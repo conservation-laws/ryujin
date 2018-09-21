@@ -19,8 +19,10 @@ namespace grendel
   using namespace dealii;
 
   template <int dim>
-  Discretization<dim>::Discretization(const std::string &subsection)
-      : dealii::ParameterAcceptor(subsection)
+  Discretization<dim>::Discretization(const MPI_Comm &mpi_communicator,
+                                      const std::string &subsection)
+      : ParameterAcceptor(subsection)
+      , mpi_communicator_(mpi_communicator)
   {
     ParameterAcceptor::parse_parameters_call_back.connect(
         std::bind(&Discretization::parse_parameters_callback, this));
@@ -48,7 +50,9 @@ namespace grendel
   void Discretization<dim>::parse_parameters_callback()
   {
     if (!triangulation_)
-      triangulation_.reset(new Triangulation<dim>);
+      triangulation_.reset(
+          new parallel::distributed::Triangulation<dim>(mpi_communicator_));
+
     auto &triangulation = *triangulation_;
     triangulation.clear();
     dealii::GridGenerator::hyper_cube(triangulation, 0.0, 1.0);

@@ -7,7 +7,7 @@
 #include <deal.II/base/quadrature.h>
 #include <deal.II/fe/fe.h>
 #include <deal.II/fe/mapping.h>
-#include <deal.II/grid/tria.h>
+#include <deal.II/distributed/tria.h>
 
 namespace grendel
 {
@@ -15,12 +15,15 @@ namespace grendel
   class Discretization : public dealii::ParameterAcceptor
   {
   public:
-    Discretization(const std::string &subsection = "Discretization");
+    Discretization(const MPI_Comm &mpi_communicator,
+                   const std::string &subsection = "Discretization");
     virtual ~Discretization() final = default;
 
     void parse_parameters_callback();
 
   protected:
+
+    const MPI_Comm &mpi_communicator_;
 
     unsigned int refinement_;
 
@@ -28,7 +31,8 @@ namespace grendel
     unsigned int order_mapping_;
     unsigned int order_quadrature_;
 
-    std::unique_ptr<dealii::Triangulation<dim>> triangulation_;
+    std::unique_ptr<dealii::parallel::distributed::Triangulation<dim>>
+        triangulation_;
     A_RO(triangulation)
 
     std::unique_ptr<const dealii::Mapping<dim>> mapping_;
