@@ -137,15 +137,18 @@ namespace grendel
     auto local_assemble_system =
         [&](const auto &cell, auto &scratch, auto &copy) {
           /* iterate over locally owned cells and the ghost layer */
-          if (cell->is_artificial())
-            return;
 
+          auto &is_artificial = copy.is_artificial_;
           auto &local_dof_indices = copy.local_dof_indices_;
           auto &cell_mass_matrix = copy.cell_mass_matrix_;
           auto &cell_lumped_mass_matrix = copy.cell_lumped_mass_matrix_;
           auto &cell_cij_matrix = copy.cell_cij_matrix_;
 
           auto &fe_values = scratch.fe_values_;
+
+          is_artificial = cell->is_artificial();
+          if (is_artificial)
+            return;
 
           cell_mass_matrix.reinit(dofs_per_cell, dofs_per_cell);
           cell_lumped_mass_matrix.reinit(dofs_per_cell, dofs_per_cell);
@@ -184,10 +187,15 @@ namespace grendel
     /* The local, per-cell assembly routine: */
 
     auto copy_local_to_global = [&](const auto &copy) {
+
+      const auto &is_artificial = copy.is_artificial_;
       const auto &local_dof_indices = copy.local_dof_indices_;
       const auto &cell_mass_matrix = copy.cell_mass_matrix_;
       const auto &cell_lumped_mass_matrix = copy.cell_lumped_mass_matrix_;
       const auto &cell_cij_matrix = copy.cell_cij_matrix_;
+
+      if(is_artificial)
+        return;
 
       affine_constraints_.distribute_local_to_global(
           cell_mass_matrix, local_dof_indices, mass_matrix_);

@@ -43,6 +43,7 @@ namespace grendel
   class AssemblyCopyData
   {
   public:
+    bool is_artificial_;
     std::vector<dealii::types::global_dof_index> local_dof_indices_;
     dealii::FullMatrix<double> cell_mass_matrix_;
     dealii::FullMatrix<double> cell_lumped_mass_matrix_;
