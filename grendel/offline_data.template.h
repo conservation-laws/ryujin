@@ -231,6 +231,8 @@ namespace grendel
      * a graph coloring locally instead of caching it.
      */
 
+    deallog << "        construct graph" << std::endl;
+
     const auto get_conflict_indices = [&](auto &cell) {
       if (cell->is_artificial())
         return std::vector<types::global_dof_index>();
@@ -255,7 +257,11 @@ namespace grendel
      * Second part: Compute norms and n_ijs
      */
 
-    auto local_compute_norms = [&](const auto &row_index) {
+    const auto local_compute_norms = [&](const auto &it,
+                                         auto &,
+                                         auto &) {
+      const auto row_index = *it;
+
       std::for_each(sparsity_pattern_.begin(row_index),
                     sparsity_pattern_.end(row_index),
                     [&](const auto &it) {
@@ -267,7 +273,6 @@ namespace grendel
                       }
                       norm_matrix_(row_index, col_index) = std::sqrt(norm);
                     });
-
       for (auto &matrix : nij_matrix_) {
         auto nij_entry = matrix.begin(row_index);
         std::for_each(norm_matrix_.begin(row_index),
@@ -282,9 +287,14 @@ namespace grendel
 
     deallog << "        compute ||c_ij||s and n_ijs" << std::endl;
 
-    std::for_each(locally_relevant_.begin(),
-                  locally_relevant_.end(),
-                  local_compute_norms);
+    WorkStream::run(locally_relevant_.begin(),
+                    locally_relevant_.end(),
+                    local_compute_norms,
+                    [](const auto &) {},
+                    double(),
+                    double());
+
+    deallog << "        done" << std::endl;
   }
 
 
