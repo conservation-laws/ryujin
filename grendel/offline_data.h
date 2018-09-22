@@ -67,8 +67,14 @@ namespace grendel
     dealii::SparseMatrix<double> lumped_mass_matrix_;
     A_RO(lumped_mass_matrix)
 
+    dealii::SparseMatrix<double> norm_matrix_;
+    A_RO(norm_matrix)
+
     std::array<dealii::SparseMatrix<double>, dim> cij_matrix_;
     A_RO(cij_matrix)
+
+    std::array<dealii::SparseMatrix<double>, dim> nij_matrix_;
+    A_RO(nij_matrix)
   };
 
 } /* namespace grendel */

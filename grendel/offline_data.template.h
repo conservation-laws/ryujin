@@ -5,11 +5,14 @@
 #include "scratch_data.h"
 
 #include <deal.II/base/graph_coloring.h>
+#include <deal.II/base/parallel.h>
 #include <deal.II/base/work_stream.h>
 #include <deal.II/dofs/dof_renumbering.h>
 #include <deal.II/dofs/dof_tools.h>
 #include <deal.II/fe/fe_values.h>
 #include <deal.II/lac/dynamic_sparsity_pattern.h>
+
+#include <boost/range/iterator_range.hpp>
 
 namespace grendel
 {
@@ -112,7 +115,10 @@ namespace grendel
 
     mass_matrix_.reinit(sparsity_pattern_);
     lumped_mass_matrix_.reinit(sparsity_pattern_);
+    norm_matrix_.reinit(sparsity_pattern_);
     for (auto &matrix : cij_matrix_)
+      matrix.reinit(sparsity_pattern_);
+    for (auto &matrix : nij_matrix_)
       matrix.reinit(sparsity_pattern_);
   }
 
@@ -124,7 +130,10 @@ namespace grendel
 
     mass_matrix_ = 0.;
     lumped_mass_matrix_ = 0.;
+    norm_matrix_ = 0.;
     for (auto &matrix : cij_matrix_)
+      matrix = 0.;
+    for (auto &matrix : nij_matrix_)
       matrix = 0.;
 
     const unsigned int dofs_per_cell =
@@ -132,9 +141,13 @@ namespace grendel
 
     const unsigned int n_q_points = discretization_->quadrature().size();
 
+    /*
+     * First part: Assemble mass matrices and cij matrices:
+     */
+
     /* The local, per-cell assembly routine: */
 
-    auto local_assemble_system =
+    const auto local_assemble_system =
         [&](const auto &cell, auto &scratch, auto &copy) {
           /* iterate over locally owned cells and the ghost layer */
 
@@ -186,8 +199,7 @@ namespace grendel
 
     /* The local, per-cell assembly routine: */
 
-    auto copy_local_to_global = [&](const auto &copy) {
-
+    const auto copy_local_to_global = [&](const auto &copy) {
       const auto &is_artificial = copy.is_artificial_;
       const auto &local_dof_indices = copy.local_dof_indices_;
       const auto &cell_mass_matrix = copy.cell_mass_matrix_;
@@ -203,9 +215,12 @@ namespace grendel
       affine_constraints_.distribute_local_to_global(
           cell_lumped_mass_matrix, local_dof_indices, lumped_mass_matrix_);
 
-      for (int k = 0; k < dim; ++k)
+      for (int k = 0; k < dim; ++k) {
         affine_constraints_.distribute_local_to_global(
             cell_cij_matrix[k], local_dof_indices, cij_matrix_[k]);
+        affine_constraints_.distribute_local_to_global(
+            cell_cij_matrix[k], local_dof_indices, nij_matrix_[k]);
+      }
     };
 
     /*
@@ -228,11 +243,48 @@ namespace grendel
     const auto graph = GraphColoring::make_graph_coloring(
         dof_handler_.begin_active(), dof_handler_.end(), get_conflict_indices);
 
+    deallog << "        assemble mass matrices and c_ijs" << std::endl;
+
     WorkStream::run(graph,
                     local_assemble_system,
                     copy_local_to_global,
                     AssemblyScratchData<dim>(*discretization_),
                     AssemblyCopyData<dim>());
+
+    /*
+     * Second part: Compute norms and n_ijs
+     */
+
+    auto local_compute_norms = [&](const auto &row_index) {
+      std::for_each(sparsity_pattern_.begin(row_index),
+                    sparsity_pattern_.end(row_index),
+                    [&](const auto &it) {
+                      const auto col_index = it.column();
+                      double norm = 0;
+                      for (const auto &matrix : cij_matrix_) {
+                        const auto value = matrix(row_index, col_index);
+                        norm += value * value;
+                      }
+                      norm_matrix_(row_index, col_index) = std::sqrt(norm);
+                    });
+
+      for (auto &matrix : nij_matrix_) {
+        auto nij_entry = matrix.begin(row_index);
+        std::for_each(norm_matrix_.begin(row_index),
+                      norm_matrix_.end(row_index),
+                      [&](const auto &it) {
+                        const auto norm = it.value();
+                        nij_entry->value() /= norm;
+                        ++nij_entry;
+                      });
+      }
+    };
+
+    deallog << "        compute ||c_ij||s and n_ijs" << std::endl;
+
+    std::for_each(locally_relevant_.begin(),
+                  locally_relevant_.end(),
+                  local_compute_norms);
   }
 
 
