@@ -7,7 +7,8 @@ GENERATOR:=Ninja
 MAKE_COMMAND:=ninja
 MAKE_FILE:=build.ninja
 
-MPIRUN:=mpirun -np 2
+NP:=2
+MPIRUN:=mpirun -np $(NP)
 EXECUTABLE:=ryujin
 PARAMETER_FILE:=$(EXECUTABLE).prm
 
@@ -17,6 +18,9 @@ edit: all
 
 run: all
 	@cd $(BUILDDIR)/run && time $(MPIRUN) ./$(EXECUTABLE)
+
+rum:
+	@echo "... and a bottle of rum"
 
 run_clean:
 	@rm -f $(BUILDDIR)/run/*.(vtk|vtu|log|txt|gnuplot)
