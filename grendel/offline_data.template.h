@@ -231,6 +231,8 @@ namespace grendel
      * a graph coloring locally instead of caching it.
      */
 
+#if 0
+    // FIXME: The graph coloring is slow
     deallog << "        construct graph" << std::endl;
 
     const auto get_conflict_indices = [&](auto &cell) {
@@ -244,10 +246,12 @@ namespace grendel
 
     const auto graph = GraphColoring::make_graph_coloring(
         dof_handler_.begin_active(), dof_handler_.end(), get_conflict_indices);
+#endif
 
     deallog << "        assemble mass matrices and c_ijs" << std::endl;
 
-    WorkStream::run(graph,
+    WorkStream::run(dof_handler_.begin_active(),
+                    dof_handler_.end(),
                     local_assemble_system,
                     copy_local_to_global,
                     AssemblyScratchData<dim>(*discretization_),
