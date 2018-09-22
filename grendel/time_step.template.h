@@ -10,7 +10,7 @@ namespace grendel
 
   template <int dim>
   TimeStep<dim>::TimeStep(const MPI_Comm &mpi_communicator,
-                          const dealii::TimerOutput &computing_timer,
+                          dealii::TimerOutput &computing_timer,
                           const grendel::OfflineData<dim> &offline_data,
                           const std::string &subsection /*= "TimeStep"*/)
       : ParameterAcceptor(subsection)

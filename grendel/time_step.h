@@ -15,7 +15,7 @@ namespace grendel
   {
   public:
     TimeStep(const MPI_Comm &mpi_communicator,
-             const dealii::TimerOutput &computing_timer,
+             dealii::TimerOutput &computing_timer,
              const grendel::OfflineData<dim> &offline_data,
              const std::string &subsection = "TimeStep");
 
@@ -24,7 +24,7 @@ namespace grendel
   protected:
 
     const MPI_Comm &mpi_communicator_;
-    const dealii::TimerOutput &computing_timer_;
+    dealii::TimerOutput &computing_timer_;
 
     dealii::SmartPointer<const grendel::OfflineData<dim>> offline_data_;
     A_RO(offline_data)

@@ -20,7 +20,7 @@ namespace grendel
 
   template <int dim>
   Discretization<dim>::Discretization(const MPI_Comm &mpi_communicator,
-                                      const dealii::TimerOutput &computing_timer,
+                                      dealii::TimerOutput &computing_timer,
                                       const std::string &subsection)
       : ParameterAcceptor(subsection)
       , mpi_communicator_(mpi_communicator)
@@ -49,6 +49,8 @@ namespace grendel
   void Discretization<dim>::create_triangulation()
   {
     deallog << "Discretization<dim>::create_triangulation()" << std::endl;
+    TimerOutput::Scope t(computing_timer_,
+                         "discretization - create_triangulation");
 
     if (!triangulation_)
       triangulation_.reset(

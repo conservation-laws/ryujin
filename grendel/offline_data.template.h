@@ -22,7 +22,7 @@ namespace grendel
   template <int dim>
   OfflineData<dim>::OfflineData(
       const MPI_Comm &mpi_communicator,
-      const dealii::TimerOutput &computing_timer,
+      dealii::TimerOutput &computing_timer,
       const grendel::Discretization<dim> &discretization,
       const std::string &subsection /*= "OfflineData"*/)
       : ParameterAcceptor(subsection)
@@ -41,13 +41,14 @@ namespace grendel
     dof_handler_.initialize(discretization_->triangulation(),
                             discretization_->finite_element());
 
-    DoFRenumbering::Cuthill_McKee(dof_handler_);
-
-    locally_owned_ = dof_handler_.locally_owned_dofs();
-    locally_relevant_.clear();
-    DoFTools::extract_locally_relevant_dofs(dof_handler_, locally_relevant_);
-
     {
+      TimerOutput::Scope t(computing_timer_, "offline_data - distribute dofs");
+      DoFRenumbering::Cuthill_McKee(dof_handler_);
+
+      locally_owned_ = dof_handler_.locally_owned_dofs();
+      locally_relevant_.clear();
+      DoFTools::extract_locally_relevant_dofs(dof_handler_, locally_relevant_);
+
       /*
        * Print out the DoF distribution
        */
@@ -95,6 +96,8 @@ namespace grendel
      */
 
     {
+      TimerOutput::Scope t(computing_timer_,
+                           "offline_data - create sparsity pattern");
       const auto n_dofs = locally_relevant_.size();
       const auto dofs_per_cell =
           discretization_->finite_element().dofs_per_cell;
@@ -115,13 +118,17 @@ namespace grendel
       sparsity_pattern_.copy_from(dsp);
     }
 
-    mass_matrix_.reinit(sparsity_pattern_);
-    lumped_mass_matrix_.reinit(sparsity_pattern_);
-    norm_matrix_.reinit(sparsity_pattern_);
-    for (auto &matrix : cij_matrix_)
-      matrix.reinit(sparsity_pattern_);
-    for (auto &matrix : nij_matrix_)
-      matrix.reinit(sparsity_pattern_);
+    {
+      TimerOutput::Scope t(computing_timer_,
+                           "offline_data - setup matrices");
+      mass_matrix_.reinit(sparsity_pattern_);
+      lumped_mass_matrix_.reinit(sparsity_pattern_);
+      norm_matrix_.reinit(sparsity_pattern_);
+      for (auto &matrix : cij_matrix_)
+        matrix.reinit(sparsity_pattern_);
+      for (auto &matrix : nij_matrix_)
+        matrix.reinit(sparsity_pattern_);
+    }
   }
 
 
