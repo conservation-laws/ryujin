@@ -6,6 +6,9 @@
 #include <time_step.h>
 
 #include <deal.II/base/parameter_acceptor.h>
+#include <deal.II/base/timer.h>
+
+#include <sstream>
 
 namespace ryujin
 {
@@ -27,8 +30,10 @@ namespace ryujin
     /* Data: */
 
     const MPI_Comm &mpi_communicator;
+    std::ostringstream timer_output;
+    dealii::TimerOutput computing_timer;
 
-    std::string base_name_;
+    std::string base_name;
 
     grendel::Discretization<dim> discretization;
     grendel::OfflineData<dim> offline_data;

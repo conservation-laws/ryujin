@@ -50,12 +50,16 @@ namespace ryujin
   TimeLoop<dim>::TimeLoop(const MPI_Comm &mpi_comm)
       : ParameterAcceptor("A - TimeLoop")
       , mpi_communicator(mpi_comm)
+      , computing_timer(mpi_communicator,
+                        timer_output,
+                        TimerOutput::never,
+                        TimerOutput::wall_times)
       , discretization(mpi_communicator, "B - Discretization")
       , offline_data(mpi_communicator, discretization, "C - OfflineData")
       , time_step(mpi_communicator, offline_data, "D - TimeStep")
   {
-    base_name_ = "test";
-    add_parameter("basename", base_name_, "base name for all output files");
+    base_name = "test";
+    add_parameter("basename", base_name, "base name for all output files");
   }
 
 
@@ -69,7 +73,7 @@ namespace ryujin
     {
       deallog << "        output triangulation" << std::endl;
       std::ofstream output(
-          base_name_ + "-triangulation-p" +
+          base_name + "-triangulation-p" +
           std::to_string(Utilities::MPI::this_mpi_process(mpi_communicator)) +
           ".inp");
       GridOut().write_ucd(discretization.triangulation(), output);
@@ -82,10 +86,12 @@ namespace ryujin
 
     // FIXME The loop ...
 
+    computing_timer.print_summary();
+    deallog << timer_output.str() << std::endl;
+
     /* Detach deallog: */
 
-    if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
-    {
+    if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0) {
       deallog.pop();
       deallog.detach();
     }
@@ -121,7 +127,7 @@ namespace ryujin
 
     /* Print out parameters to a prm file: */
 
-    std::ofstream output(base_name_ + "-parameter.prm");
+    std::ofstream output(base_name + "-parameter.prm");
     ParameterAcceptor::prm.print_parameters(output, ParameterHandler::Text);
 
     /* Prepare deallog: */
@@ -133,11 +139,11 @@ namespace ryujin
 #else
     deallog.depth_console(4);
 #endif
-    deallog.push(base_name_);
+    deallog.push(base_name);
 
     /* Prepare and attach logfile: */
 
-    filestream.reset(new std::ofstream(base_name_ + "-deallog.log"));
+    filestream.reset(new std::ofstream(base_name + "-deallog.log"));
     deallog.attach(*filestream);
 
     /* Output commit and library informations: */
