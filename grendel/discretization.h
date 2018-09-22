@@ -19,7 +19,7 @@ namespace grendel
                    const std::string &subsection = "Discretization");
     virtual ~Discretization() final = default;
 
-    void parse_parameters_callback();
+    void create_triangulation();
 
   protected:
 

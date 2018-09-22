@@ -21,8 +21,6 @@ namespace grendel
     Model(const std::string &subsection = "Model");
     virtual ~Model() final = default;
 
-    void parse_parameters_callback();
-
     static constexpr auto lambda =
         [](rank1_type, rank1_type, dealii::Tensor<1, dim>) { return 0.; };
 

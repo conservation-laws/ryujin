@@ -19,11 +19,6 @@ namespace grendel
 //         "the problem description to use; valid options are \"dipole\" and \"waveguide\"");
   }
 
-  template <int dim>
-  void Model<dim>::parse_parameters_callback()
-  {
-  }
-
 } /* namespace grendel */
 
 #endif /* MODEL_TEMPLATE_H */

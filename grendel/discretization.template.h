@@ -24,9 +24,6 @@ namespace grendel
       : ParameterAcceptor(subsection)
       , mpi_communicator_(mpi_communicator)
   {
-    ParameterAcceptor::parse_parameters_call_back.connect(
-        std::bind(&Discretization::parse_parameters_callback, this));
-
     refinement_ = 5;
     add_parameter("initial refinement",
                   refinement_,
@@ -47,8 +44,10 @@ namespace grendel
 
 
   template <int dim>
-  void Discretization<dim>::parse_parameters_callback()
+  void Discretization<dim>::create_triangulation()
   {
+    deallog << "Discretization<dim>::create_triangulation()" << std::endl;
+
     if (!triangulation_)
       triangulation_.reset(
           new parallel::distributed::Triangulation<dim>(mpi_communicator_));

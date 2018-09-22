@@ -64,6 +64,8 @@ namespace ryujin
   {
     initialize();
 
+    discretization.create_triangulation();
+
     {
       deallog << "        output triangulation" << std::endl;
       std::ofstream output(
