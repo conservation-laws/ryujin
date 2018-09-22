@@ -206,8 +206,6 @@ namespace grendel
           }     /* for q */
         };
 
-    /* The local, per-cell assembly routine: */
-
     const auto copy_local_to_global = [&](const auto &copy) {
       const auto &is_artificial = copy.is_artificial_;
       const auto &local_dof_indices = copy.local_dof_indices_;
@@ -257,14 +255,17 @@ namespace grendel
         dof_handler_.begin_active(), dof_handler_.end(), get_conflict_indices);
 #endif
 
-    deallog << "        assemble mass matrices and c_ijs" << std::endl;
+    {
+      deallog << "        assemble mass matrices and c_ijs" << std::endl;
+      TimerOutput::Scope t(computing_timer_, "offline_data - assemble c_ij");
 
-    WorkStream::run(dof_handler_.begin_active(),
-                    dof_handler_.end(),
-                    local_assemble_system,
-                    copy_local_to_global,
-                    AssemblyScratchData<dim>(*discretization_),
-                    AssemblyCopyData<dim>());
+      WorkStream::run(dof_handler_.begin_active(),
+                      dof_handler_.end(),
+                      local_assemble_system,
+                      copy_local_to_global,
+                      AssemblyScratchData<dim>(*discretization_),
+                      AssemblyCopyData<dim>());
+    }
 
     /*
      * Second part: Compute norms and n_ijs
@@ -298,14 +299,18 @@ namespace grendel
       }
     };
 
-    deallog << "        compute ||c_ij||s and n_ijs" << std::endl;
+    {
+      deallog << "        compute |c_ij|s and n_ijs" << std::endl;
+      TimerOutput::Scope t(computing_timer_,
+                           "offline_data - compute |c_ij| and n_ij");
 
-    WorkStream::run(locally_relevant_.begin(),
-                    locally_relevant_.end(),
-                    local_compute_norms,
-                    [](const auto &) {},
-                    double(),
-                    double());
+      WorkStream::run(locally_relevant_.begin(),
+                      locally_relevant_.end(),
+                      local_compute_norms,
+                      [](const auto &) {},
+                      double(),
+                      double());
+    }
 
     deallog << "        done" << std::endl;
   }
