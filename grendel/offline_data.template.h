@@ -22,10 +22,12 @@ namespace grendel
   template <int dim>
   OfflineData<dim>::OfflineData(
       const MPI_Comm &mpi_communicator,
+      const dealii::TimerOutput &computing_timer,
       const grendel::Discretization<dim> &discretization,
       const std::string &subsection /*= "OfflineData"*/)
       : ParameterAcceptor(subsection)
       , mpi_communicator_(mpi_communicator)
+      , computing_timer_(computing_timer)
       , discretization_(&discretization)
   {
   }

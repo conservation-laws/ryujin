@@ -5,9 +5,10 @@
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/quadrature.h>
+#include <deal.II/base/timer.h>
+#include <deal.II/distributed/tria.h>
 #include <deal.II/fe/fe.h>
 #include <deal.II/fe/mapping.h>
-#include <deal.II/distributed/tria.h>
 
 namespace grendel
 {
@@ -16,6 +17,7 @@ namespace grendel
   {
   public:
     Discretization(const MPI_Comm &mpi_communicator,
+                   const dealii::TimerOutput &computing_timer,
                    const std::string &subsection = "Discretization");
     virtual ~Discretization() final = default;
 
@@ -24,6 +26,7 @@ namespace grendel
   protected:
 
     const MPI_Comm &mpi_communicator_;
+    const dealii::TimerOutput &computing_timer_;
 
     unsigned int refinement_;
 

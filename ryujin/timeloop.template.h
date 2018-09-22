@@ -53,10 +53,14 @@ namespace ryujin
       , computing_timer(mpi_communicator,
                         timer_output,
                         TimerOutput::never,
-                        TimerOutput::wall_times)
-      , discretization(mpi_communicator, "B - Discretization")
-      , offline_data(mpi_communicator, discretization, "C - OfflineData")
-      , time_step(mpi_communicator, offline_data, "D - TimeStep")
+                        TimerOutput::cpu_and_wall_times)
+      , discretization(mpi_communicator, computing_timer, "B - Discretization")
+      , offline_data(mpi_communicator,
+                     computing_timer,
+                     discretization,
+                     "C - OfflineData")
+      , time_step(
+            mpi_communicator, computing_timer, offline_data, "D - TimeStep")
   {
     base_name = "test";
     add_parameter("basename", base_name, "base name for all output files");

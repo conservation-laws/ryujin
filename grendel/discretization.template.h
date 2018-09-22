@@ -20,9 +20,11 @@ namespace grendel
 
   template <int dim>
   Discretization<dim>::Discretization(const MPI_Comm &mpi_communicator,
+                                      const dealii::TimerOutput &computing_timer,
                                       const std::string &subsection)
       : ParameterAcceptor(subsection)
       , mpi_communicator_(mpi_communicator)
+      , computing_timer_(computing_timer)
   {
     refinement_ = 5;
     add_parameter("initial refinement",

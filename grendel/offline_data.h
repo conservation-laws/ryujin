@@ -5,6 +5,7 @@
 #include "discretization.h"
 
 #include <deal.II/base/parameter_acceptor.h>
+#include <deal.II/base/timer.h>
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/lac/affine_constraints.h>
 #include <deal.II/lac/sparse_matrix.h>
@@ -19,6 +20,7 @@ namespace grendel
   {
   public:
     OfflineData(const MPI_Comm &mpi_communicator,
+                const dealii::TimerOutput &computing_timer,
                 const grendel::Discretization<dim> &discretization,
                 const std::string &subsection = "OfflineData");
 
@@ -40,6 +42,7 @@ namespace grendel
   protected:
 
     const MPI_Comm &mpi_communicator_;
+    const dealii::TimerOutput &computing_timer_;
 
     dealii::SmartPointer<const grendel::Discretization<dim>> discretization_;
     A_RO(discretization)
