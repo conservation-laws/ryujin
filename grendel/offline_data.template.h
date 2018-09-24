@@ -271,9 +271,7 @@ namespace grendel
      * Second part: Compute norms and n_ijs
      */
 
-    const auto local_compute_norms = [&](const auto &it,
-                                         auto &,
-                                         auto &) {
+    const auto local_compute_norms = [&](const auto &it, auto &, auto &) {
       const auto row_index = *it;
 
       std::for_each(sparsity_pattern_.begin(row_index),
@@ -287,6 +285,7 @@ namespace grendel
                       }
                       norm_matrix_(row_index, col_index) = std::sqrt(norm);
                     });
+
       for (auto &matrix : nij_matrix_) {
         auto nij_entry = matrix.begin(row_index);
         std::for_each(norm_matrix_.begin(row_index),
