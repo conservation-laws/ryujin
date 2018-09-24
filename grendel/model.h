@@ -154,7 +154,7 @@ namespace grendel
 
 
     /**
-     * FIXME: Description and naming.
+     * FIXME: Write a lengthy explanation.
      *
      * See [1], page 912, (3.4).
      */
@@ -172,8 +172,36 @@ namespace grendel
 
       } else {
 
-        const auto tmp = std::pow(p / p_Z, (gamma_ - 1.0) / 2.0 / gamma_) - 1.0;
-        return 2.0 * a_Z * (1.0 - b_ * rho_Z) / (gamma_ - 1.0) * tmp;
+        const auto tmp = std::pow(p / p_Z, (gamma_ - 1.) / 2. / gamma_) - 1.;
+        return 2. * a_Z * (1. - b_ * rho_Z) / (gamma_ - 1.) * tmp;
+      }
+    }
+
+
+    /**
+     * FIXME: Write a lengthy explanation.
+     *
+     * See [1], page 912, (3.4). FIXME find equation defining the
+     */
+    DEAL_II_ALWAYS_INLINE inline double
+    df_Z(const dealii::Tensor<1, 6> &primitive_state, const double &p) const
+    {
+      const auto &rho_Z = primitive_state[0];
+      const auto &p_Z = primitive_state[2];
+      const auto &a_Z = primitive_state[3];
+      const auto &A_Z = primitive_state[4];
+      const auto &B_Z = primitive_state[5];
+
+      if (p >= p_Z) {
+        /* Derivative of (p - p_Z) * std::sqrt(A_Z / (p + B_Z)): */
+        return std::sqrt(A_Z / (p + B_Z)) * (1. - 0.5 * (p - p_Z) / (p + B_Z));
+
+      } else {
+
+        /* Derivative of std::pow(p / p_Z, (gamma_ - 1.) / 2. / gamma_) - 1.*/
+        const auto tmp = (gamma_ - 1.) / 2. / gamma_ *
+                         std::pow(p / p_Z, (-1. - gamma_) / 2. / gamma_) / p_Z;
+        return 2. * a_Z * (1. - b_ * rho_Z) / (gamma_ - 1.) * tmp;
       }
     }
 
@@ -191,6 +219,21 @@ namespace grendel
       const auto &u_i = primitive_state_i[1];
       const auto &u_j = primitive_state_j[1];
       return f_Z(primitive_state_i, p) + f_Z(primitive_state_j, p) + u_i - u_j;
+    }
+
+
+    /**
+     * FIXME: Write a lengthy explanation.
+     *
+     * See [1], page 912, (3.3). FIXME find equation defining the
+     * derivative.
+     */
+    DEAL_II_ALWAYS_INLINE inline double
+    dphi(const dealii::Tensor<1, 6> &primitive_state_i,
+         const dealii::Tensor<1, 6> &primitive_state_j,
+         const double &p) const
+    {
+      return df_Z(primitive_state_i, p) + df_Z(primitive_state_j, p);
     }
 
 
@@ -227,10 +270,11 @@ namespace grendel
       return u_Z + a_Z * std::sqrt(1.0 + factor * tmp);
     }
 
+
     /**
-     * Two-rarefaction approximation to p_star computed from two primitive
-     * states.
-     * see [1], page 914, (4.3)
+     * Two-rarefaction approximation to p_star computed for two primitive
+     * states <code>primitive_state_i</code> and
+     * <code>primitive_state_j</code>. See [1], page 914, (4.3)
      */
     DEAL_II_ALWAYS_INLINE inline double
     p_star_two_rarefaction(const dealii::Tensor<1, 6> &primitive_state_i,
@@ -248,12 +292,14 @@ namespace grendel
       /*
        * Notar bene (cf. [1, (4.3)]):
        *   a_Z^0 * sqrt(1 - b * rho_Z) = a_Z * (1 - b * rho_Z)
-       * We have computed a_Z already, so we simply going to use this
+       * We have computed a_Z already, so we are simply going to use this
        * identity below:
        */
 
       const auto tmp_i = 1. - b_ * rho_i;
       const auto tmp_j = 1. - b_ * rho_j;
+
+      // FIXME: Eliminate one std::pow call
 
       const auto numerator =
           a_i * tmp_i + a_j * tmp_j - (gamma_ - 1.) / 2. * (u_j - u_i);
@@ -262,6 +308,49 @@ namespace grendel
           a_j * tmp_j * std::pow(p_j, -1. * (gamma_ - 1.0) / 2.0 / gamma_);
 
       return std::pow(numerator / denominator, 2. * gamma_ / (gamma_ - 1));
+    }
+
+
+    /**
+     * For two given primitive states <code>primitive_state_i</code> and
+     * <code>primitive_state_j</code>, and two guesses p_1 < p_2, compute
+     * the gap in lambda between both guesses.
+     *
+     * See [1], page 914, (4.4a), (4.4b), (4.5), and (4.6)
+     */
+    DEAL_II_ALWAYS_INLINE inline std::array<double, 2>
+    compute_gap(const dealii::Tensor<1, 6> &primitive_state_i,
+                const dealii::Tensor<1, 6> &primitive_state_j,
+                const double p_1,
+                const double p_2) const
+    {
+      const auto nu_11 = lambda1_minus(primitive_state_i, p_2 /*SIC!*/);
+      const auto nu_12 = lambda1_minus(primitive_state_i, p_1 /*SIC!*/);
+
+      const auto nu_31 = lambda3_plus(primitive_state_j, p_1);
+      const auto nu_32 = lambda3_plus(primitive_state_j, p_2);
+
+      const auto lambda_min =
+          std::max(positive_part(nu_31), negative_part(nu_12));
+      const auto lambda_max =
+          std::max(positive_part(nu_32), negative_part(nu_11));
+
+      /*
+       * We have to deal with the fact that lambda_min >= lambda_max due to
+       * round-off errors. In this case, accept the guess and report a gap
+       * of size 0.
+       */
+      if (lambda_min >= lambda_max)
+        return {0., lambda_max};
+
+      /*
+       * In case lambda_min <= 0. we haven't converged. Just return a large
+       * value to continue iterating.
+       */
+      if (lambda_min <= 0.0)
+        return {1., lambda_max};
+
+      return {lambda_max / lambda_min - 1.0, lambda_max};
     }
 
 
@@ -311,40 +400,83 @@ namespace grendel
         const double p_star = 0.;
         const auto lambda1 = lambda1_minus(primitive_state_i, p_star);
         const auto lambda3 = lambda3_plus(primitive_state_j, p_star);
-
-        return std::max(std::abs(lambda1), std::abs(lambda3));
+        const auto lambda_max = std::max(std::abs(lambda1), std::abs(lambda3));
+        return lambda_max;
       }
 
       const auto phi_p_max = phi(primitive_state_i, primitive_state_j, p_max);
 
       if(phi_p_max == 0.) {
         const auto p_star = p_max;
-
         const auto lambda1 = lambda1_minus(primitive_state_i, p_star);
         const auto lambda3 = lambda3_plus(primitive_state_j, p_star);
-
-        return std::max(std::abs(lambda1), std::abs(lambda3));
+        const auto lambda_max = std::max(std::abs(lambda1), std::abs(lambda3));
+        return lambda_max;
       }
 
       /*
-       * Step 3: Newton Secant method.
+       * Step 3: Prepare Newton secant method.
+       *
+       * We need a good upper and lower bound, p_1 < p_star < p_2, for the
+       * Newton secant method. (Ideally, for a moderate tolerance we might
+       * not iterate at all.)
        */
 
       const auto p_star_tilde =
           p_star_two_rarefaction(primitive_state_i, primitive_state_j);
 
-      const auto p_1 = (phi_p_max < 0.) ? p_max : p_min;
-      const auto p_2 =
+      auto p_1 = (phi_p_max < 0.) ? p_max : p_min;
+      auto p_2 =
           (phi_p_max < 0.) ? p_star_tilde : std::min(p_max, p_star_tilde);
 
-      // computelambdamax(p1, p2);
+      auto [gap, lambda_max] =
+          compute_gap(primitive_state_i, primitive_state_j, p_1, p_2);
 
-      return p_star_tilde;
+      /*
+       * Step 4: Perform Newton secant iteration.
+       */
+
+      while(gap > eps_)
+      {
+        const auto phi_p_1 = phi(primitive_state_i, primitive_state_j, p_1);
+        const auto dphi_p_1 = dphi(primitive_state_i, primitive_state_j, p_1);
+
+        // phi is monote increasing and concave down, the derivative has to
+        // be positive:
+        Assert(dphi_p_1 <= 0.,
+               dealii::ExcMessage("Houston, we are in trouble!"));
+
+        /* Update left point with Newton step: */
+        p_1 = p_1 - phi_p_1 / dphi_p_1;
+
+        /* We have found our root (up to roundoff errros): */
+        if (p_1 >= p_2)
+          break;
+
+        const auto phi_p_2 = phi(primitive_state_i, primitive_state_j, p_2);
+
+        // phi is monote increasing and concave down, so both values have
+        // to be different:
+        Assert(phi_p_1 >= phi_p_2,
+               dealii::ExcMessage("Houston, we are in trouble!"));
+
+        /* Update right point with Secant method: */
+        const auto slope = (phi_p_2 - phi_p_1) / (p_2 - p_1);
+        p_2 = p_1 - phi_p_1 / slope;
+
+        // FIXME
+//         std::tie(gap, lambda_max) =
+//             compute_gap(primitive_state_i, primitive_state_j, p_1, p_2);
+      }
+
+      return lambda_max;
     }
 
   private:
     double gamma_;
     double b_;
+
+    double eps_;
   };
 
 } /* namespace grendel */
