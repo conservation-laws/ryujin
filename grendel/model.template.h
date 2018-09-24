@@ -11,12 +11,11 @@ namespace grendel
   Model<dim>::Model(const std::string &subsection)
       : ParameterAcceptor(subsection)
   {
-//     add_parameter(
-//         &description_,
-//         "description",
-//         "dipole",
-//         Patterns::Selection("dipole|waveguide"),
-//         "the problem description to use; valid options are \"dipole\" and \"waveguide\"");
+    gamma_ = 1.4;
+    add_parameter("gamma", gamma_, "Gamma");
+
+    b_ = 0.0;
+    add_parameter("b", b_, "b aka bcovol");
   }
 
 } /* namespace grendel */
