@@ -429,15 +429,17 @@ namespace grendel
       auto p_2 =
           (phi_p_max < 0.) ? p_star_tilde : std::min(p_max, p_star_tilde);
 
-      auto [gap, lambda_max] =
-          compute_gap(primitive_state_i, primitive_state_j, p_1, p_2);
-
       /*
        * Step 4: Perform Newton secant iteration.
        */
 
-      while(gap > eps_)
-      {
+      for (unsigned int i = 0; i < max_iter_; ++i) {
+        const auto [gap, lambda_max] =
+            compute_gap(primitive_state_i, primitive_state_j, p_1, p_2);
+
+        if(gap < eps_)
+          return lambda_max;
+
         const auto phi_p_1 = phi(primitive_state_i, primitive_state_j, p_1);
         const auto dphi_p_1 = dphi(primitive_state_i, primitive_state_j, p_1);
 
@@ -463,13 +465,11 @@ namespace grendel
         /* Update right point with Secant method: */
         const auto slope = (phi_p_2 - phi_p_1) / (p_2 - p_1);
         p_2 = p_1 - phi_p_1 / slope;
-
-        // FIXME
-//         std::tie(gap, lambda_max) =
-//             compute_gap(primitive_state_i, primitive_state_j, p_1, p_2);
       }
 
-      return lambda_max;
+      Assert(false,
+             dealii::ExcMessage("Newton secant method did not converge."));
+      return 0.;
     }
 
   private:
@@ -477,6 +477,7 @@ namespace grendel
     double b_;
 
     double eps_;
+    unsigned int max_iter_;
   };
 
 } /* namespace grendel */

@@ -16,6 +16,14 @@ namespace grendel
 
     b_ = 0.0;
     add_parameter("b", b_, "b aka bcovol");
+
+    eps_ = 1.e-10;
+    add_parameter("newton eps", eps_, "Tolerance of the Newton secant solver");
+
+    max_iter_ = 10;
+    add_parameter("newton max iter",
+                  max_iter_,
+                  "Maximal number of iterations for the Newton secant solver");
   }
 
 } /* namespace grendel */
