@@ -218,7 +218,8 @@ namespace grendel
     {
       const auto &u_i = primitive_state_i[1];
       const auto &u_j = primitive_state_j[1];
-      return f_Z(primitive_state_i, p) + f_Z(primitive_state_j, p) + u_i - u_j;
+
+      return f_Z(primitive_state_i, p) + f_Z(primitive_state_j, p) + u_j - u_i;
     }
 
 
@@ -382,8 +383,8 @@ namespace grendel
       const auto primitive_state_j =
           primitive_state_from_projected_state(projected_U_j);
 
-      const auto p_min = std::min(primitive_state_i[0], primitive_state_j[0]);
-      const auto p_max = std::max(primitive_state_i[0], primitive_state_j[0]);
+      const auto p_min = std::min(primitive_state_i[2], primitive_state_j[2]);
+      const auto p_max = std::max(primitive_state_i[2], primitive_state_j[2]);
 
       /*
        * Step 2: Shortcuts.
