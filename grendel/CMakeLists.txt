@@ -1,6 +1,6 @@
 ADD_LIBRARY(grendel SHARED
   discretization.cc
-  model.cc
+  riemann_solver.cc
   offline_data.cc
   time_step.cc
   )

@@ -2,6 +2,7 @@
 #define TIMELOOP_H
 
 #include <discretization.h>
+#include <riemann_solver.h>
 #include <offline_data.h>
 #include <time_step.h>
 
@@ -36,6 +37,7 @@ namespace ryujin
     std::string base_name;
 
     grendel::Discretization<dim> discretization;
+    grendel::RiemannSolver<dim> riemann_solver;
     grendel::OfflineData<dim> offline_data;
     grendel::TimeStep<dim> time_step;
 

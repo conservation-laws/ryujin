@@ -1,5 +1,5 @@
-#ifndef Model_H
-#define Model_H
+#ifndef RIEMANN_SOLVER_H
+#define RIEMANN_SOLVER_H
 
 #include "boilerplate.h"
 
@@ -40,18 +40,19 @@ namespace grendel
    * field, and E is the total Energy.
    */
   template <int dim>
-  class Model : public dealii::ParameterAcceptor
+  class RiemannSolver : public dealii::ParameterAcceptor
   {
   public:
     static constexpr unsigned int problem_dimension = 2 + dim;
     typedef dealii::Tensor<1, problem_dimension, double> rank1_type;
 
-    Model(const std::string &subsection = "Model");
-    virtual ~Model() final = default;
+    RiemannSolver(const std::string &subsection = "RiemannSolver");
+    virtual ~RiemannSolver() final = default;
 
     /*
      * HERE BE DRAGONS!
      */
+
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, return
@@ -74,7 +75,7 @@ namespace grendel
     static DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, 3>
     projected_state(const rank1_type &U, const dealii::Tensor<1, dim> &n_ij)
     {
-      dealii::Tensor<1, 1 + 2> result;
+      dealii::Tensor<1, 3> result;
 
       // rho:
       result[0] = U[0];
@@ -161,11 +162,7 @@ namespace grendel
     DEAL_II_ALWAYS_INLINE inline double
     f_Z(const std::array<double, 6> &primitive_state, const double &p) const
     {
-      const auto &rho_Z = primitive_state[0];
-      const auto &p_Z = primitive_state[2];
-      const auto &a_Z = primitive_state[3];
-      const auto &A_Z = primitive_state[4];
-      const auto &B_Z = primitive_state[5];
+      const auto &[rho_Z, u_Z, p_Z, a_Z, A_Z, B_Z] = primitive_state;
 
       if (p >= p_Z) {
         return (p - p_Z) * std::sqrt(A_Z / (p + B_Z));
@@ -186,11 +183,7 @@ namespace grendel
     DEAL_II_ALWAYS_INLINE inline double
     df_Z(const std::array<double, 6> &primitive_state, const double &p) const
     {
-      const auto &rho_Z = primitive_state[0];
-      const auto &p_Z = primitive_state[2];
-      const auto &a_Z = primitive_state[3];
-      const auto &A_Z = primitive_state[4];
-      const auto &B_Z = primitive_state[5];
+      const auto &[rho_Z, u_Z, p_Z, a_Z, A_Z, B_Z] = primitive_state;
 
       if (p >= p_Z) {
         /* Derivative of (p - p_Z) * std::sqrt(A_Z / (p + B_Z)): */
@@ -245,9 +238,7 @@ namespace grendel
     lambda1_minus(const std::array<double, 6> &primitive_state,
                   const double p_star) const
     {
-      const auto &u_Z = primitive_state[1];
-      const auto &p_Z = primitive_state[2];
-      const auto &a_Z = primitive_state[3];
+      const auto &[rho_Z, u_Z, p_Z, a_Z, A_Z, B_Z] = primitive_state;
 
       const auto factor = (gamma_ + 1.0) / 2.0 / gamma_;
       const auto tmp = positive_part((p_star - p_Z) / p_Z);
@@ -262,9 +253,7 @@ namespace grendel
     lambda3_plus(const std::array<double, 6> &primitive_state,
                  const double p_star) const
     {
-      const auto &u_Z = primitive_state[1];
-      const auto &p_Z = primitive_state[2];
-      const auto &a_Z = primitive_state[3];
+      const auto &[rho_Z, u_Z, p_Z, a_Z, A_Z, B_Z] = primitive_state;
 
       const auto factor = (gamma_ + 1.0) / 2.0 / gamma_;
       const auto tmp = positive_part((p_star - p_Z) / p_Z);
@@ -281,14 +270,8 @@ namespace grendel
     p_star_two_rarefaction(const std::array<double, 6> &primitive_state_i,
                            const std::array<double, 6> &primitive_state_j) const
     {
-      const auto &rho_i = primitive_state_i[0];
-      const auto &u_i = primitive_state_i[1];
-      const auto &p_i = primitive_state_i[2];
-      const auto &a_i = primitive_state_i[3];
-      const auto &rho_j = primitive_state_j[0];
-      const auto &u_j = primitive_state_j[1];
-      const auto &p_j = primitive_state_j[2];
-      const auto &a_j = primitive_state_j[3];
+      const auto &[rho_i, u_i, p_i, a_i, A_i, B_i] = primitive_state_i;
+      const auto &[rho_j, u_j, p_j, a_j, A_j, B_j] = primitive_state_j;
 
       /*
        * Notar bene (cf. [1, (4.3)]):
@@ -482,4 +465,4 @@ namespace grendel
 
 } /* namespace grendel */
 
-#endif /* Model_H */
+#endif /* RIEMANN_SOLVER_H */
