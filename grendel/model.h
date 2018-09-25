@@ -14,6 +14,7 @@ namespace grendel
   /**
    * Return the positive part of value number.
    */
+  DEAL_II_ALWAYS_INLINE inline
   double positive_part(const double number)
   {
     return (std::abs(number) + number) / 2.0;
@@ -24,6 +25,7 @@ namespace grendel
    *
    * Return the negative part of value number.
    */
+  DEAL_II_ALWAYS_INLINE inline
   double negative_part(const double number)
   {
     return (std::fabs(number) - number) / 2.0;
