@@ -368,10 +368,9 @@ namespace grendel
      *   [1] J.-L. Guermond, B. Popov. Fast estimation from above fo the
      *       maximum wave speed in the Riemann problem for the Euler equations.
      */
-    DEAL_II_ALWAYS_INLINE double
-    lambda(const rank1_type &U_i,
-           const rank1_type &U_j,
-           const dealii::Tensor<1, dim> &n_ij) const
+    double lambda(const rank1_type &U_i,
+                  const rank1_type &U_j,
+                  const dealii::Tensor<1, dim> &n_ij) const
     {
       /*
        * Step 1: Compute projected 1D states and phi.
@@ -447,8 +446,8 @@ namespace grendel
 
         // phi is monote increasing and concave down, the derivative has to
         // be positive:
-        Assert(dphi_p_1 <= 0.,
-               dealii::ExcMessage("Houston, we are in trouble!"));
+        AssertThrow(dphi_p_1 > 0.,
+                    dealii::ExcMessage("Houston, we are in trouble!"));
 
         /* Update left point with Newton step: */
         p_1 = p_1 - phi_p_1 / dphi_p_1;
@@ -461,16 +460,16 @@ namespace grendel
 
         // phi is monote increasing and concave down, so both values have
         // to be different:
-        Assert(phi_p_1 >= phi_p_2,
-               dealii::ExcMessage("Houston, we are in trouble!"));
+        AssertThrow(phi_p_1 < phi_p_2,
+                    dealii::ExcMessage("Houston, we are in trouble!"));
 
         /* Update right point with Secant method: */
         const auto slope = (phi_p_2 - phi_p_1) / (p_2 - p_1);
         p_2 = p_1 - phi_p_1 / slope;
       }
 
-      Assert(false,
-             dealii::ExcMessage("Newton secant method did not converge."));
+      AssertThrow(false,
+                  dealii::ExcMessage("Newton secant method did not converge."));
       return 0.;
     }
 
