@@ -14,8 +14,7 @@ namespace grendel
   /**
    * Return the positive part of value number.
    */
-  DEAL_II_ALWAYS_INLINE inline
-  double positive_part(const double number)
+  DEAL_II_ALWAYS_INLINE inline double positive_part(const double number)
   {
     return (std::abs(number) + number) / 2.0;
   }
@@ -25,8 +24,7 @@ namespace grendel
    *
    * Return the negative part of value number.
    */
-  DEAL_II_ALWAYS_INLINE inline
-  double negative_part(const double number)
+  DEAL_II_ALWAYS_INLINE inline double negative_part(const double number)
   {
     return (std::fabs(number) - number) / 2.0;
   }
@@ -131,11 +129,11 @@ namespace grendel
      *
      * FIXME: Describe state in more detail.
      */
-    DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, 6>
+    DEAL_II_ALWAYS_INLINE inline std::array<double, 6>
     primitive_state_from_projected_state(
         const dealii::Tensor<1, 3> &projected_U) const
     {
-      dealii::Tensor<1, 6> result;
+      std::array<double, 6> result;
 
       // rho_Z:
       result[0] = projected_U[0];
@@ -161,7 +159,7 @@ namespace grendel
      * See [1], page 912, (3.4).
      */
     DEAL_II_ALWAYS_INLINE inline double
-    f_Z(const dealii::Tensor<1, 6> &primitive_state, const double &p) const
+    f_Z(const std::array<double, 6> &primitive_state, const double &p) const
     {
       const auto &rho_Z = primitive_state[0];
       const auto &p_Z = primitive_state[2];
@@ -186,7 +184,7 @@ namespace grendel
      * See [1], page 912, (3.4). FIXME find equation defining the
      */
     DEAL_II_ALWAYS_INLINE inline double
-    df_Z(const dealii::Tensor<1, 6> &primitive_state, const double &p) const
+    df_Z(const std::array<double, 6> &primitive_state, const double &p) const
     {
       const auto &rho_Z = primitive_state[0];
       const auto &p_Z = primitive_state[2];
@@ -214,8 +212,8 @@ namespace grendel
      * See [1], page 912, (3.3).
      */
     DEAL_II_ALWAYS_INLINE inline double
-    phi(const dealii::Tensor<1, 6> &primitive_state_i,
-        const dealii::Tensor<1, 6> &primitive_state_j,
+    phi(const std::array<double, 6> &primitive_state_i,
+        const std::array<double, 6> &primitive_state_j,
         const double &p) const
     {
       const auto &u_i = primitive_state_i[1];
@@ -231,8 +229,8 @@ namespace grendel
      * derivative.
      */
     DEAL_II_ALWAYS_INLINE inline double
-    dphi(const dealii::Tensor<1, 6> &primitive_state_i,
-         const dealii::Tensor<1, 6> &primitive_state_j,
+    dphi(const std::array<double, 6> &primitive_state_i,
+         const std::array<double, 6> &primitive_state_j,
          const double &p) const
     {
       return df_Z(primitive_state_i, p) + df_Z(primitive_state_j, p);
@@ -243,7 +241,7 @@ namespace grendel
      * see [1], page 912, (3.7)
      */
     DEAL_II_ALWAYS_INLINE inline double
-    lambda1_minus(const dealii::Tensor<1, 6> &primitive_state,
+    lambda1_minus(const std::array<double, 6> &primitive_state,
                   const double p_star) const
     {
       const auto &u_Z = primitive_state[1];
@@ -260,8 +258,8 @@ namespace grendel
      * see [1], page 912, (3.8)
      */
     DEAL_II_ALWAYS_INLINE inline double
-        lambda3_plus(const dealii::Tensor<1, 6> &primitive_state,
-                     const double p_star) const
+    lambda3_plus(const std::array<double, 6> &primitive_state,
+                 const double p_star) const
     {
       const auto &u_Z = primitive_state[1];
       const auto &p_Z = primitive_state[2];
@@ -279,8 +277,8 @@ namespace grendel
      * <code>primitive_state_j</code>. See [1], page 914, (4.3)
      */
     DEAL_II_ALWAYS_INLINE inline double
-    p_star_two_rarefaction(const dealii::Tensor<1, 6> &primitive_state_i,
-                           const dealii::Tensor<1, 6> &primitive_state_j) const
+    p_star_two_rarefaction(const std::array<double, 6> &primitive_state_i,
+                           const std::array<double, 6> &primitive_state_j) const
     {
       const auto &rho_i = primitive_state_i[0];
       const auto &u_i = primitive_state_i[1];
@@ -321,8 +319,8 @@ namespace grendel
      * See [1], page 914, (4.4a), (4.4b), (4.5), and (4.6)
      */
     DEAL_II_ALWAYS_INLINE inline std::array<double, 2>
-    compute_gap(const dealii::Tensor<1, 6> &primitive_state_i,
-                const dealii::Tensor<1, 6> &primitive_state_j,
+    compute_gap(const std::array<double, 6> &primitive_state_i,
+                const std::array<double, 6> &primitive_state_j,
                 const double p_1,
                 const double p_2) const
     {
@@ -407,7 +405,7 @@ namespace grendel
 
       const auto phi_p_max = phi(primitive_state_i, primitive_state_j, p_max);
 
-      if(phi_p_max == 0.) {
+      if (phi_p_max == 0.) {
         const auto p_star = p_max;
         const auto lambda1 = lambda1_minus(primitive_state_i, p_star);
         const auto lambda3 = lambda3_plus(primitive_state_j, p_star);
@@ -438,7 +436,7 @@ namespace grendel
         const auto [gap, lambda_max] =
             compute_gap(primitive_state_i, primitive_state_j, p_1, p_2);
 
-        if(gap < eps_)
+        if (gap < eps_)
           return lambda_max;
 
         const auto phi_p_1 = phi(primitive_state_i, primitive_state_j, p_1);
