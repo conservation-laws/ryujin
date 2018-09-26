@@ -52,12 +52,13 @@ namespace grendel
     RiemannSolver(const std::string &subsection = "RiemannSolver");
     virtual ~RiemannSolver() final = default;
 
-  private:
+
     /*
      * HERE BE DRAGONS!
      */
 
 
+  private:
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, return
      * the momentum vector <code>[U[1], ..., U[1+dim]]</code>.
@@ -297,7 +298,8 @@ namespace grendel
               std::pow(p_i / p_j, -1. * (gamma_ - 1.0) / 2.0 / gamma_) +
           a_j * tmp_j;
 
-      return p_j * std::pow(numerator / denominator, 2. * gamma_ / (gamma_ - 1));
+      return p_j *
+             std::pow(numerator / denominator, 2. * gamma_ / (gamma_ - 1));
     }
 
 
@@ -344,7 +346,6 @@ namespace grendel
     }
 
   public:
-
     /**
      * FIXME: Description
      *
@@ -353,13 +354,17 @@ namespace grendel
      *
      * See [1], page 915, Algorithm 1
      *
+     * Returns a tuple consisting of lambda max and the number of Newton
+     * iterations used in the solver to find it.
+     *
      * References:
      *   [1] J.-L. Guermond, B. Popov. Fast estimation from above fo the
      *       maximum wave speed in the Riemann problem for the Euler equations.
      */
-    double lambda_max(const rank1_type &U_i,
-                      const rank1_type &U_j,
-                      const dealii::Tensor<1, dim> &n_ij) const
+    std::tuple<double /*lambda_max*/, unsigned int /*iteration*/>
+    lambda_max(const rank1_type &U_i,
+               const rank1_type &U_j,
+               const dealii::Tensor<1, dim> &n_ij) const
     {
       /*
        * Step 1: Compute projected 1D states and phi.
@@ -391,7 +396,7 @@ namespace grendel
         const auto lambda1 = lambda1_minus(primitive_state_i, p_star);
         const auto lambda3 = lambda3_plus(primitive_state_j, p_star);
         const auto lambda_max = std::max(std::abs(lambda1), std::abs(lambda3));
-        return lambda_max;
+        return {lambda_max, 0};
       }
 
       const auto phi_p_max = phi(primitive_state_i, primitive_state_j, p_max);
@@ -401,7 +406,7 @@ namespace grendel
         const auto lambda1 = lambda1_minus(primitive_state_i, p_star);
         const auto lambda3 = lambda3_plus(primitive_state_j, p_star);
         const auto lambda_max = std::max(std::abs(lambda1), std::abs(lambda3));
-        return lambda_max;
+        return {lambda_max, 0};
       }
 
       /*
@@ -428,7 +433,7 @@ namespace grendel
             compute_gap(primitive_state_i, primitive_state_j, p_1, p_2);
 
         if (gap < eps_)
-          return lambda_max;
+          return {lambda_max, i};
 
         const auto phi_p_1 = phi(primitive_state_i, primitive_state_j, p_1);
         const auto dphi_p_1 = dphi(primitive_state_i, primitive_state_j, p_1);
@@ -459,7 +464,7 @@ namespace grendel
 
       AssertThrow(false,
                   dealii::ExcMessage("Newton secant method did not converge."));
-      return 0.;
+      return {0., std::numeric_limits<unsigned int>::max()};
     }
 
   private:
