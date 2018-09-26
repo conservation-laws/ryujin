@@ -86,11 +86,11 @@ namespace grendel
       result[0] = U[0];
 
       // m:
-      const double m = momentum_vector(U);
+      const auto m = momentum_vector(U);
       result[1] = n_ij * m;
 
       // E:
-      const double perpendicular_m = m - result[1] * n_ij;
+      const auto perpendicular_m = m - result[1] * n_ij;
       result[2] = U[1 + dim] - 0.5 * perpendicular_m.norm_square() / U[0];
 
       return result;
@@ -369,12 +369,12 @@ namespace grendel
        * Step 1: Compute projected 1D states and phi.
        */
 
-      const double projected_U_i = projected_state(U_i, n_ij);
-      const double projected_U_j = projected_state(U_j, n_ij);
+      const auto projected_U_i = projected_state(U_i, n_ij);
+      const auto projected_U_j = projected_state(U_j, n_ij);
 
-      const double primitive_state_i =
+      const auto primitive_state_i =
           primitive_state_from_projected_state(projected_U_i);
-      const double primitive_state_j =
+      const auto primitive_state_j =
           primitive_state_from_projected_state(projected_U_j);
 
       const double p_min = std::min(primitive_state_i[2], primitive_state_j[2]);
