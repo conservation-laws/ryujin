@@ -14,6 +14,14 @@ ENDIF()
 
 IF(CMAKE_CXX_COMPILER MATCHES "clang")
   SET(DEAL_II_CXX_FLAGS "${DEAL_II_CXX_FLAGS} -Xclang -fcolor-diagnostics -Qunused-arguments")
+  SET(DEAL_II_LINKER_FLAGS "${DEAL_II_LINKER_FLAGS} -Wl,-as-needed")
+
+  SET(DEAL_II_CXX_FLAGS_DEBUG
+    "${DEAL_II_CXX_FLAGS_DEBUG} -fsanitize=address -fsanitize-address-use-after-scope"
+    )
+  SET(DEAL_II_LINKER_FLAGS_DEBUG
+    "${DEAL_II_LINKER_FLAGS_DEBUG} -fsanitize=address -fsanitize-address-use-after-scope"
+    )
 ENDIF()
 
 PROJECT(ryujin CXX)
