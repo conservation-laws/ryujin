@@ -12,11 +12,18 @@ namespace grendel
   TimeStep<dim>::TimeStep(const MPI_Comm &mpi_communicator,
                           dealii::TimerOutput &computing_timer,
                           const grendel::OfflineData<dim> &offline_data,
+                          const grendel::RiemannSolver<dim> &riemann_solver,
                           const std::string &subsection /*= "TimeStep"*/)
       : ParameterAcceptor(subsection)
       , mpi_communicator_(mpi_communicator)
       , computing_timer_(computing_timer)
       , offline_data_(&offline_data)
+      , riemann_solver_(&riemann_solver)
+  {
+  }
+
+  template <int dim>
+  void TimeStep<dim>::setup()
   {
   }
 
