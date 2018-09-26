@@ -11,22 +11,25 @@
 
 namespace grendel
 {
-  /**
-   * Return the positive part of value number.
-   */
-  DEAL_II_ALWAYS_INLINE inline double positive_part(const double number)
+  namespace
   {
-    return (std::abs(number) + number) / 2.0;
-  }
+    /**
+     * Return the positive part of value number.
+     */
+    DEAL_II_ALWAYS_INLINE inline double positive_part(const double number)
+    {
+      return (std::abs(number) + number) / 2.0;
+    }
 
 
-  /**
-   *
-   * Return the negative part of value number.
-   */
-  DEAL_II_ALWAYS_INLINE inline double negative_part(const double number)
-  {
-    return (std::fabs(number) - number) / 2.0;
+    /**
+     *
+     * Return the negative part of value number.
+     */
+    DEAL_II_ALWAYS_INLINE inline double negative_part(const double number)
+    {
+      return (std::fabs(number) - number) / 2.0;
+    }
   }
 
 
@@ -49,6 +52,7 @@ namespace grendel
     RiemannSolver(const std::string &subsection = "RiemannSolver");
     virtual ~RiemannSolver() final = default;
 
+  private:
     /*
      * HERE BE DRAGONS!
      */
@@ -287,11 +291,13 @@ namespace grendel
 
       const auto numerator =
           a_i * tmp_i + a_j * tmp_j - (gamma_ - 1.) / 2. * (u_j - u_i);
-      const auto denominator =
-          a_i * tmp_i * std::pow(p_i, -1. * (gamma_ - 1.0) / 2.0 / gamma_) +
-          a_j * tmp_j * std::pow(p_j, -1. * (gamma_ - 1.0) / 2.0 / gamma_);
 
-      return std::pow(numerator / denominator, 2. * gamma_ / (gamma_ - 1));
+      const auto denominator =
+          a_i * tmp_i *
+              std::pow(p_i / p_j, -1. * (gamma_ - 1.0) / 2.0 / gamma_) +
+          a_j * tmp_j;
+
+      return p_j * std::pow(numerator / denominator, 2. * gamma_ / (gamma_ - 1));
     }
 
 
@@ -337,6 +343,7 @@ namespace grendel
       return {lambda_max / lambda_min - 1.0, lambda_max};
     }
 
+  public:
 
     /**
      * FIXME: Description
@@ -350,9 +357,9 @@ namespace grendel
      *   [1] J.-L. Guermond, B. Popov. Fast estimation from above fo the
      *       maximum wave speed in the Riemann problem for the Euler equations.
      */
-    double lambda(const rank1_type &U_i,
-                  const rank1_type &U_j,
-                  const dealii::Tensor<1, dim> &n_ij) const
+    double lambda_max(const rank1_type &U_i,
+                      const rank1_type &U_j,
+                      const dealii::Tensor<1, dim> &n_ij) const
     {
       /*
        * Step 1: Compute projected 1D states and phi.
