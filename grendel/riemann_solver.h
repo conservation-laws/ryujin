@@ -86,11 +86,11 @@ namespace grendel
       result[0] = U[0];
 
       // m:
-      const auto m = momentum_vector(U);
+      const double m = momentum_vector(U);
       result[1] = n_ij * m;
 
       // E:
-      const auto perpendicular_m = m - result[1] * n_ij;
+      const double perpendicular_m = m - result[1] * n_ij;
       result[2] = U[1 + dim] - 0.5 * perpendicular_m.norm_square() / U[0];
 
       return result;
@@ -122,8 +122,8 @@ namespace grendel
     DEAL_II_ALWAYS_INLINE inline double speed_of_sound_from_projected_state(
         const dealii::Tensor<1, 3> &projected_U) const
     {
-      const auto rho = projected_U[0];
-      const auto p = pressure_from_projected_state(projected_U);
+      const double rho = projected_U[0];
+      const double p = pressure_from_projected_state(projected_U);
 
       return std::sqrt(gamma_ * p / rho / (1.0 - b_ * rho));
     }
@@ -174,7 +174,7 @@ namespace grendel
 
       } else {
 
-        const auto tmp = std::pow(p / p_Z, (gamma_ - 1.) / 2. / gamma_) - 1.;
+        const double tmp = std::pow(p / p_Z, (gamma_ - 1.) / 2. / gamma_) - 1.;
         return 2. * a_Z * (1. - b_ * rho_Z) / (gamma_ - 1.) * tmp;
       }
     }
@@ -197,8 +197,9 @@ namespace grendel
       } else {
 
         /* Derivative of std::pow(p / p_Z, (gamma_ - 1.) / 2. / gamma_) - 1.*/
-        const auto tmp = (gamma_ - 1.) / 2. / gamma_ *
-                         std::pow(p / p_Z, (-1. - gamma_) / 2. / gamma_) / p_Z;
+        const double tmp = (gamma_ - 1.) / 2. / gamma_ *
+                           std::pow(p / p_Z, (-1. - gamma_) / 2. / gamma_) /
+                           p_Z;
         return 2. * a_Z * (1. - b_ * rho_Z) / (gamma_ - 1.) * tmp;
       }
     }
@@ -214,8 +215,8 @@ namespace grendel
         const std::array<double, 6> &primitive_state_j,
         const double &p) const
     {
-      const auto &u_i = primitive_state_i[1];
-      const auto &u_j = primitive_state_j[1];
+      const double &u_i = primitive_state_i[1];
+      const double &u_j = primitive_state_j[1];
 
       return f_Z(primitive_state_i, p) + f_Z(primitive_state_j, p) + u_j - u_i;
     }
@@ -245,8 +246,8 @@ namespace grendel
     {
       const auto &[rho_Z, u_Z, p_Z, a_Z, A_Z, B_Z] = primitive_state;
 
-      const auto factor = (gamma_ + 1.0) / 2.0 / gamma_;
-      const auto tmp = positive_part((p_star - p_Z) / p_Z);
+      const double factor = (gamma_ + 1.0) / 2.0 / gamma_;
+      const double tmp = positive_part((p_star - p_Z) / p_Z);
       return u_Z - a_Z * std::sqrt(1.0 + factor * tmp);
     }
 
@@ -260,8 +261,8 @@ namespace grendel
     {
       const auto &[rho_Z, u_Z, p_Z, a_Z, A_Z, B_Z] = primitive_state;
 
-      const auto factor = (gamma_ + 1.0) / 2.0 / gamma_;
-      const auto tmp = positive_part((p_star - p_Z) / p_Z);
+      const double factor = (gamma_ + 1.0) / 2.0 / gamma_;
+      const double tmp = positive_part((p_star - p_Z) / p_Z);
       return u_Z + a_Z * std::sqrt(1.0 + factor * tmp);
     }
 
@@ -285,18 +286,16 @@ namespace grendel
        * identity below:
        */
 
-      const auto tmp_i = 1. - b_ * rho_i;
-      const auto tmp_j = 1. - b_ * rho_j;
+      const double tmp_i = 1. - b_ * rho_i;
+      const double tmp_j = 1. - b_ * rho_j;
 
-      // FIXME: Eliminate one std::pow call
-
-      const auto numerator =
+      const double numerator =
           a_i * tmp_i + a_j * tmp_j - (gamma_ - 1.) / 2. * (u_j - u_i);
 
-      const auto denominator =
+      const double denominator =
           a_i * tmp_i *
               std::pow(p_i / p_j, -1. * (gamma_ - 1.0) / 2.0 / gamma_) +
-          a_j * tmp_j;
+          a_j * tmp_j * 1.;
 
       return p_j *
              std::pow(numerator / denominator, 2. * gamma_ / (gamma_ - 1));
@@ -316,15 +315,15 @@ namespace grendel
                 const double p_1,
                 const double p_2) const
     {
-      const auto nu_11 = lambda1_minus(primitive_state_i, p_2 /*SIC!*/);
-      const auto nu_12 = lambda1_minus(primitive_state_i, p_1 /*SIC!*/);
+      const double nu_11 = lambda1_minus(primitive_state_i, p_2 /*SIC!*/);
+      const double nu_12 = lambda1_minus(primitive_state_i, p_1 /*SIC!*/);
 
-      const auto nu_31 = lambda3_plus(primitive_state_j, p_1);
-      const auto nu_32 = lambda3_plus(primitive_state_j, p_2);
+      const double nu_31 = lambda3_plus(primitive_state_j, p_1);
+      const double nu_32 = lambda3_plus(primitive_state_j, p_2);
 
-      const auto lambda_min =
+      const double lambda_min =
           std::max(positive_part(nu_31), negative_part(nu_12));
-      const auto lambda_max =
+      const double lambda_max =
           std::max(positive_part(nu_32), negative_part(nu_11));
 
       /*
@@ -370,16 +369,16 @@ namespace grendel
        * Step 1: Compute projected 1D states and phi.
        */
 
-      const auto projected_U_i = projected_state(U_i, n_ij);
-      const auto projected_U_j = projected_state(U_j, n_ij);
+      const double projected_U_i = projected_state(U_i, n_ij);
+      const double projected_U_j = projected_state(U_j, n_ij);
 
-      const auto primitive_state_i =
+      const double primitive_state_i =
           primitive_state_from_projected_state(projected_U_i);
-      const auto primitive_state_j =
+      const double primitive_state_j =
           primitive_state_from_projected_state(projected_U_j);
 
-      const auto p_min = std::min(primitive_state_i[2], primitive_state_j[2]);
-      const auto p_max = std::max(primitive_state_i[2], primitive_state_j[2]);
+      const double p_min = std::min(primitive_state_i[2], primitive_state_j[2]);
+      const double p_max = std::max(primitive_state_i[2], primitive_state_j[2]);
 
       /*
        * Step 2: Shortcuts.
@@ -389,43 +388,47 @@ namespace grendel
        * away.
        */
 
-      const auto phi_p_min = phi(primitive_state_i, primitive_state_j, p_min);
+      const double phi_p_min = phi(primitive_state_i, primitive_state_j, p_min);
 
       if (phi_p_min >= 0.) {
         const double p_star = 0.;
-        const auto lambda1 = lambda1_minus(primitive_state_i, p_star);
-        const auto lambda3 = lambda3_plus(primitive_state_j, p_star);
-        const auto lambda_max = std::max(std::abs(lambda1), std::abs(lambda3));
+        const double lambda1 = lambda1_minus(primitive_state_i, p_star);
+        const double lambda3 = lambda3_plus(primitive_state_j, p_star);
+        const double lambda_max =
+            std::max(std::abs(lambda1), std::abs(lambda3));
         return {lambda_max, 0};
       }
 
-      const auto phi_p_max = phi(primitive_state_i, primitive_state_j, p_max);
+      const double phi_p_max = phi(primitive_state_i, primitive_state_j, p_max);
 
       if (phi_p_max == 0.) {
-        const auto p_star = p_max;
-        const auto lambda1 = lambda1_minus(primitive_state_i, p_star);
-        const auto lambda3 = lambda3_plus(primitive_state_j, p_star);
-        const auto lambda_max = std::max(std::abs(lambda1), std::abs(lambda3));
+        const double p_star = p_max;
+        const double lambda1 = lambda1_minus(primitive_state_i, p_star);
+        const double lambda3 = lambda3_plus(primitive_state_j, p_star);
+        const double lambda_max =
+            std::max(std::abs(lambda1), std::abs(lambda3));
         return {lambda_max, 0};
       }
 
       /*
-       * Step 3: Prepare Newton secant method.
+       * Step 3: Prepare quadratic Newton method.
        *
        * We need a good upper and lower bound, p_1 < p_star < p_2, for the
-       * Newton secant method. (Ideally, for a moderate tolerance we might
-       * not iterate at all.)
+       * Newton method. (Ideally, for a moderate tolerance we might not
+       * iterate at all.)
        */
 
-      const auto p_star_tilde =
+      const double p_star_tilde =
           p_star_two_rarefaction(primitive_state_i, primitive_state_j);
 
-      auto p_1 = (phi_p_max < 0.) ? p_max : p_min;
-      auto p_2 =
+      double p_1 = (phi_p_max < 0.) ? p_max : p_min;
+      double p_2 =
           (phi_p_max < 0.) ? p_star_tilde : std::min(p_max, p_star_tilde);
 
       /*
-       * Step 4: Perform Newton secant iteration.
+       * Step 4: Perform quadratic Newton iteration.
+       *
+       * See [1], p. 915f (4.8) and (4.9)
        */
 
       for (unsigned int i = 0; i < max_iter_; ++i) {
@@ -435,31 +438,61 @@ namespace grendel
         if (gap < eps_)
           return {lambda_max, i};
 
-        const auto phi_p_1 = phi(primitive_state_i, primitive_state_j, p_1);
-        const auto dphi_p_1 = dphi(primitive_state_i, primitive_state_j, p_1);
+        /*
+         * This is expensive:
+         */
 
-        // phi is monote increasing and concave down, the derivative has to
-        // be positive:
-        AssertThrow(dphi_p_1 > 0.,
-                    dealii::ExcMessage("Houston, we are in trouble!"));
+        const double phi_p_1 = phi(primitive_state_i, primitive_state_j, p_1);
+        const double dphi_p_1 = dphi(primitive_state_i, primitive_state_j, p_1);
+        const double phi_p_2 = phi(primitive_state_i, primitive_state_j, p_2);
+        const double dphi_p_2 = dphi(primitive_state_i, primitive_state_j, p_2);
 
-        /* Update left point with Newton step: */
-        p_1 = p_1 - phi_p_1 / dphi_p_1;
+        /*
+         * Sanity checks:
+         *  * phi is monotone increasing and concave down: the derivative
+         *    has to be positive, both function values have to be different
+         *  * p_1 < p_2
+         */
 
-        /* We have found our root (up to roundoff errros): */
+        Assert(dphi_p_1 > 0.,
+               dealii::ExcMessage("Houston, we are in trouble!"));
+        Assert(dphi_p_2 > 0.,
+               dealii::ExcMessage("Houston, we are in trouble!"));
+        Assert(phi_p_1 < phi_p_2,
+               dealii::ExcMessage("Houston, we are in trouble!"));
+        Assert(p_1 < p_2, dealii::ExcMessage("Houston, we are in trouble!"));
+
+        /*
+         * Compute divided differences
+         */
+
+        const double dd_11 = dphi_p_1;
+        const double dd_12 = (phi_p_2 - phi_p_1) / (p_2 - p_1);
+        const double dd_22 = dphi_p_2;
+
+        const double dd_112 = (dd_12 - dd_11) / (p_2 - p_1);
+        const double dd_122 = (dd_22 - dd_12) / (p_2 - p_1);
+
+        /* Update left point: */
+        const double discriminant_1 =
+            dphi_p_1 * dphi_p_1 - 4. * phi_p_1 * dd_112;
+        Assert(discriminant_1 > 0.,
+               dealii::ExcMessage("Houston, we are in trouble!"));
+
+        p_1 = p_1 - 2. * phi_p_1 / (dphi_p_1 + std::sqrt(discriminant_1));
+
+        /* Update right point: */
+        const double discriminant_2 =
+            dphi_p_2 * dphi_p_2 - 4. * phi_p_2 * dd_122;
+        Assert(discriminant_2 > 0.,
+               dealii::ExcMessage("Houston, we are in trouble!"));
+
+        p_2 = p_2 - 2. * phi_p_2 / (dphi_p_2 + std::sqrt(discriminant_2));
+
+
+        /* We have found our root (up to roundoff erros): */
         if (p_1 >= p_2)
-          break;
-
-        const auto phi_p_2 = phi(primitive_state_i, primitive_state_j, p_2);
-
-        // phi is monote increasing and concave down, so both values have
-        // to be different:
-        AssertThrow(phi_p_1 < phi_p_2,
-                    dealii::ExcMessage("Houston, we are in trouble!"));
-
-        /* Update right point with Secant method: */
-        const auto slope = (phi_p_2 - phi_p_1) / (p_2 - p_1);
-        p_2 = p_1 - phi_p_1 / slope;
+          return {lambda_max, i + 1};
       }
 
       AssertThrow(false,
