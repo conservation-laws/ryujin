@@ -8,6 +8,34 @@ namespace grendel
   using namespace dealii;
 
 
+  /*
+   * It's magic
+   */
+  template <typename T1, std::size_t k, typename T2>
+  inline DEAL_II_ALWAYS_INLINE dealii::Tensor<1, k>
+  gather(const std::array<T1, k> &U, const T2 i)
+  {
+    dealii::Tensor<1, k> result;
+    for (unsigned int j = 0; j < k; ++j)
+      result[j] = U[j][i];
+    return result;
+  }
+
+
+  /*
+   * It's magic
+   */
+  template <typename T1, std::size_t k, typename T2, typename T3>
+  inline DEAL_II_ALWAYS_INLINE dealii::Tensor<1, k>
+  gather(const std::array<T1, k> &U, const T2 i, const T3 l)
+  {
+    dealii::Tensor<1, k> result;
+    for (unsigned int j = 0; j < k; ++j)
+      result[j] = U[j](i, l);
+    return result;
+  }
+
+
   template <int dim>
   TimeStep<dim>::TimeStep(
       const MPI_Comm &mpi_communicator,
@@ -75,7 +103,7 @@ namespace grendel
           const unsigned int pos = std::distance(f_i_.begin(), it);
           const auto i = locally_owned.nth_index_in_set(pos);
 
-          const auto &U_i = U_old[i];
+          const auto U_i = gather(U_old, i);
 
           /* Populate f_i */
           *it = problem_description_->f(U_i);
@@ -85,11 +113,8 @@ namespace grendel
                ++jt) {
             const auto j = jt->column();
 
-            const auto &U_j = U_old[j];
-
-            dealii::Tensor<1, dim> n_ij;
-            for (unsigned int k = 0; k < dim; ++k)
-              n_ij = nij_matrix_[k](i, j);
+            const auto U_j = gather(U_old, j);
+            const auto n_ij = gather(nij_matrix_, i, j);
 
             // benchmark
 

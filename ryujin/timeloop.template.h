@@ -100,6 +100,12 @@ namespace ryujin
 
 
     // FIXME The loop ...
+    {
+      using vector_type = typename TimeStep<dim>::vector_type;
+      const auto &locally_owned = offline_data.locally_owned();
+      const auto &locally_relevant = offline_data.locally_relevant();
+//       vector_type U(locally_owned, locally_relevant, mpi_communicator);
+    }
 
 
     computing_timer.print_summary();
