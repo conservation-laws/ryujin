@@ -17,7 +17,7 @@ namespace grendel
     /**
      * Return the positive part of value number.
      */
-    DEAL_II_ALWAYS_INLINE inline double positive_part(const double number)
+    inline DEAL_II_ALWAYS_INLINE double positive_part(const double number)
     {
       return (std::abs(number) + number) / 2.0;
     }
@@ -27,7 +27,7 @@ namespace grendel
      *
      * Return the negative part of value number.
      */
-    DEAL_II_ALWAYS_INLINE inline double negative_part(const double number)
+    inline DEAL_II_ALWAYS_INLINE double negative_part(const double number)
     {
       return (std::fabs(number) - number) / 2.0;
     }
@@ -66,7 +66,7 @@ namespace grendel
      * (normalized) "direction" n_ij, return the corresponding projected
      * state in the corresponding 1D Riemann problem.
      */
-    static DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, 3>
+    static inline DEAL_II_ALWAYS_INLINE dealii::Tensor<1, 3>
     projected_state(const rank1_type &U, const dealii::Tensor<1, dim> &n_ij)
     {
       dealii::Tensor<1, 3> result;
@@ -93,7 +93,7 @@ namespace grendel
      * Recall that
      *   p = (gamma - 1.0)*rho*e = (gamma - 1.0)*(E - 0.5*m^2/rho)
      */
-    DEAL_II_ALWAYS_INLINE inline double
+    inline DEAL_II_ALWAYS_INLINE double
     pressure_from_projected_state(const dealii::Tensor<1, 3> &projected_U) const
     {
       return (gamma_ - 1.0) *
@@ -109,7 +109,7 @@ namespace grendel
      * Recall that
      *   c^2 = gamma * p / rho / (1 - b * rho)
      */
-    DEAL_II_ALWAYS_INLINE inline double speed_of_sound_from_projected_state(
+    inline DEAL_II_ALWAYS_INLINE double speed_of_sound_from_projected_state(
         const dealii::Tensor<1, 3> &projected_U) const
     {
       const double rho = projected_U[0];
@@ -125,7 +125,7 @@ namespace grendel
      *
      * FIXME: Describe state in more detail.
      */
-    DEAL_II_ALWAYS_INLINE inline std::array<double, 6>
+    inline DEAL_II_ALWAYS_INLINE std::array<double, 6>
     primitive_state_from_projected_state(
         const dealii::Tensor<1, 3> &projected_U) const
     {
@@ -154,7 +154,7 @@ namespace grendel
      *
      * See [1], page 912, (3.4).
      */
-    DEAL_II_ALWAYS_INLINE inline double
+    inline DEAL_II_ALWAYS_INLINE double
     f_Z(const std::array<double, 6> &primitive_state, const double &p) const
     {
       const auto &[rho_Z, u_Z, p_Z, a_Z, A_Z, B_Z] = primitive_state;
@@ -175,7 +175,7 @@ namespace grendel
      *
      * See [1], page 912, (3.4). FIXME find equation defining the
      */
-    DEAL_II_ALWAYS_INLINE inline double
+    inline DEAL_II_ALWAYS_INLINE double
     df_Z(const std::array<double, 6> &primitive_state, const double &p) const
     {
       const auto &[rho_Z, u_Z, p_Z, a_Z, A_Z, B_Z] = primitive_state;
@@ -200,7 +200,7 @@ namespace grendel
      *
      * See [1], page 912, (3.3).
      */
-    DEAL_II_ALWAYS_INLINE inline double
+    inline DEAL_II_ALWAYS_INLINE double
     phi(const std::array<double, 6> &primitive_state_i,
         const std::array<double, 6> &primitive_state_j,
         const double &p) const
@@ -218,7 +218,7 @@ namespace grendel
      * See [1], page 912, (3.3). FIXME find equation defining the
      * derivative.
      */
-    DEAL_II_ALWAYS_INLINE inline double
+    inline DEAL_II_ALWAYS_INLINE double
     dphi(const std::array<double, 6> &primitive_state_i,
          const std::array<double, 6> &primitive_state_j,
          const double &p) const
@@ -230,7 +230,7 @@ namespace grendel
     /**
      * see [1], page 912, (3.7)
      */
-    DEAL_II_ALWAYS_INLINE inline double
+    inline DEAL_II_ALWAYS_INLINE double
     lambda1_minus(const std::array<double, 6> &primitive_state,
                   const double p_star) const
     {
@@ -245,7 +245,7 @@ namespace grendel
     /**
      * see [1], page 912, (3.8)
      */
-    DEAL_II_ALWAYS_INLINE inline double
+    inline DEAL_II_ALWAYS_INLINE double
     lambda3_plus(const std::array<double, 6> &primitive_state,
                  const double p_star) const
     {
@@ -262,7 +262,7 @@ namespace grendel
      * states <code>primitive_state_i</code> and
      * <code>primitive_state_j</code>. See [1], page 914, (4.3)
      */
-    DEAL_II_ALWAYS_INLINE inline double
+    inline DEAL_II_ALWAYS_INLINE double
     p_star_two_rarefaction(const std::array<double, 6> &primitive_state_i,
                            const std::array<double, 6> &primitive_state_j) const
     {
@@ -299,7 +299,7 @@ namespace grendel
      *
      * See [1], page 914, (4.4a), (4.4b), (4.5), and (4.6)
      */
-    DEAL_II_ALWAYS_INLINE inline std::array<double, 2>
+    inline DEAL_II_ALWAYS_INLINE std::array<double, 2>
     compute_gap(const std::array<double, 6> &primitive_state_i,
                 const std::array<double, 6> &primitive_state_j,
                 const double p_1,

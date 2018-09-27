@@ -65,7 +65,9 @@ namespace grendel
       if (this_mpi_process > 0) {
         MPI_Send(
             &n_locally_owned_dofs, 1, MPI_UNSIGNED, 0, 0, mpi_communicator_);
+
       } else {
+
         deallog << "        ( " << n_locally_owned_dofs << std::flush;
         for (unsigned int p = 1; p < n_mpi_processes; ++p) {
           MPI_Recv(&n_locally_owned_dofs,
@@ -77,8 +79,8 @@ namespace grendel
                    MPI_STATUS_IGNORE);
           deallog << " + " << n_locally_owned_dofs << std::flush;
         }
+        deallog << " )" << std::endl;
       }
-      deallog << " )" << std::endl;
     }
 
     /*
@@ -311,7 +313,6 @@ namespace grendel
                       double());
     }
 
-    deallog << "        done" << std::endl;
   }
 
 

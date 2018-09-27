@@ -34,7 +34,7 @@ namespace grendel
     /**
      * rank1_type denotes the storage type used for a state vector
      */
-    typedef std::array<double, problem_dimension> rank1_type;
+    typedef dealii::Tensor<1, problem_dimension> rank1_type;
 
 
     /**
@@ -64,7 +64,7 @@ namespace grendel
     /**
      * FIXME: Description and comments
      */
-    inline DEAL_II_ALWAYS_INLINE rank2_type f(const rank1_type &U)
+    inline DEAL_II_ALWAYS_INLINE rank2_type f(const rank1_type &U) const
     {
       const double rho = U[0];
       const auto m = momentum_vector(U);
