@@ -76,20 +76,22 @@ namespace grendel
           const unsigned int pos = std::distance(f_i_.begin(), it);
           const auto i = locally_owned.nth_index_in_set(pos);
 
-          const auto U_i = gather(U_old, i);
+          auto U_i = gather(U_old, i);
+          U_i += dealii::Tensor<1, problem_dimension>{
+              {2.21953, 1.09817, 0., 5.09217}};
 
           /* Populate f_i */
-          *it = problem_description_->f(U_i);
+          *it = 1.;//problem_description_->f(U_i);
 
           for (auto jt = sparsity_pattern.begin(i);
                jt != sparsity_pattern.end(i);
                ++jt) {
             const auto j = jt->column();
 
-            const auto U_j = gather(U_old, j);
-            const auto n_ij = gather(nij_matrix_, i, j);
-
-            // benchmark
+            auto U_j = gather(U_old, j);
+            U_j += dealii::Tensor<1, problem_dimension>{{1.4, 0., 0., 2.5}};
+            auto n_ij = gather(nij_matrix_, i, j);
+            n_ij = dealii::Tensor<1, dim>{{0.948683, -0.316228}};
 
             const auto [lambda_max, n_iterations] =
                 riemann_solver_->lambda_max(U_i, U_j, n_ij);
@@ -100,6 +102,7 @@ namespace grendel
       parallel::apply_to_subranges(
           f_i_.begin(), f_i_.end(), on_subranges, 4096);
     }
+    return {vector_type(), 0.};
   }
 
 } /* namespace grendel */

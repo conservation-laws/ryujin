@@ -2,6 +2,8 @@
 #define DISCRETIZATION_TEMPLATE_H
 
 #include "discretization.h"
+// FIXME
+// #include "geometry_helper.h"
 
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/fe/fe_q.h>
@@ -26,6 +28,26 @@ namespace grendel
       , mpi_communicator_(mpi_communicator)
       , computing_timer_(computing_timer)
   {
+    geometry_ = "shard";
+    add_parameter(
+        "geometry", geometry_, "Geometry. Valid names are \"shard\".");
+
+    length_ = 3.;
+    add_parameter("geometry length",
+                  length_,
+                  "Length of geometry (interpretation depends on geometry)");
+
+    height_ = 3.;
+    add_parameter("geometry height",
+                  height_,
+                  "Height of geometry (interpretation depends on geometry)");
+
+    object_height_ = 1.;
+    add_parameter(
+        "object height",
+        height_,
+        "Height of immersed object (interpretation depends on geometry)");
+
     refinement_ = 5;
     add_parameter("initial refinement",
                   refinement_,
@@ -58,7 +80,13 @@ namespace grendel
 
     auto &triangulation = *triangulation_;
     triangulation.clear();
-    dealii::GridGenerator::hyper_cube(triangulation, 0.0, 1.0);
+
+    if (geometry_ == "shard") {
+    // FIXME
+//       create_coarse_grid_shard(triangulation, length_, height_, object_height_);
+    } else {
+      AssertThrow(false, dealii::ExcMessage("Unknown geometry name."));
+    }
 
     triangulation.refine_global(refinement_);
 

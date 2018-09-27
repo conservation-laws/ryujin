@@ -28,6 +28,11 @@ namespace grendel
     const MPI_Comm &mpi_communicator_;
     dealii::TimerOutput &computing_timer_;
 
+    std::string geometry_;
+    double length_;
+    double height_;
+    double object_height_;
+
     unsigned int refinement_;
 
     unsigned int order_finite_element_;

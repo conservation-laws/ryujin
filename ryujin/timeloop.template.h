@@ -107,8 +107,10 @@ namespace ryujin
 
       vector_type U;
       U[0].reinit(locally_owned, locally_relevant, mpi_communicator);
-      for (auto &it : U)
+      for (auto &it : U) {
         it.reinit(U[0]);
+        it.update_ghost_values();
+      }
 
       double t = 0.;
 
