@@ -9,6 +9,7 @@
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/timer.h>
 #include <deal.II/lac/vector.templates.h>
+#include <deal.II/lac/la_parallel_vector.h>
 
 namespace grendel
 {
@@ -23,7 +24,7 @@ namespace grendel
     using rank1_type = typename ProblemDescription<dim>::rank1_type;
     using rank2_type = typename ProblemDescription<dim>::rank2_type;
 
-    typedef dealii::Vector<rank1_type> vector_type;
+    typedef dealii::LinearAlgebra::distributed::Vector<rank1_type> vector_type;
 
     TimeStep(const MPI_Comm &mpi_communicator,
              dealii::TimerOutput &computing_timer,
