@@ -315,25 +315,6 @@ namespace grendel
       const double lambda_max =
           std::max(positive_part(nu_32), negative_part(nu_11));
 
-#if 0
-      const double lambda_min =
-          std::max(positive_part(nu_31), negative_part(nu_12));
-      /*
-       * We have to deal with the fact that lambda_min >= lambda_max due to
-       * round-off errors. In this case, accept the guess and report a gap
-       * of size 0.
-       */
-      if (lambda_min >= lambda_max)
-        return {0., lambda_max};
-
-      /*
-       * In case lambda_min <= 0. we haven't converged. Just return a large
-       * value to continue iterating.
-       */
-      if (lambda_min <= 0.0)
-        return {1., lambda_max};
-#endif
-
       const double gap =
           std::max(std::abs(nu_32 - nu_31), std::abs(nu_12 - nu_11));
 
