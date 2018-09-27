@@ -2,6 +2,7 @@
 #define RIEMANN_SOLVER_H
 
 #include "boilerplate.h"
+#include "problem_description.h"
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/point.h>
@@ -34,22 +35,23 @@ namespace grendel
 
 
   /**
-   * The nD compressible Euler problem
+   * A fast approximative Riemann problem solver for the nD compressible
+   * Euler problem.
    *
    * FIXME: Desciption
-   *
-   * We have a (2 + n) dimensional state space [rho, m_1, ..., m_n, E],
-   * where rho denotes the pressure, [m_1, ..., m_n] is the momentum vector
-   * field, and E is the total Energy.
    */
   template <int dim>
   class RiemannSolver : public dealii::ParameterAcceptor
   {
   public:
-    static constexpr unsigned int problem_dimension = 2 + dim;
-    typedef dealii::Tensor<1, problem_dimension, double> rank1_type;
+    static constexpr unsigned int problem_dimension =
+        ProblemDescription<dim>::problem_dimension;
 
-    RiemannSolver(const std::string &subsection = "RiemannSolver");
+    using rank1_type = typename ProblemDescription<dim>::rank1_type;
+
+    RiemannSolver(const grendel::ProblemDescription<dim> &problem_description,
+                  const std::string &subsection = "RiemannSolver");
+
     virtual ~RiemannSolver() final = default;
 
 
@@ -500,9 +502,14 @@ namespace grendel
       return {0., std::numeric_limits<unsigned int>::max()};
     }
 
+  protected:
+    dealii::SmartPointer<const grendel::ProblemDescription<dim>>
+        problem_description_;
+    A_RO(problem_description)
+
   private:
-    double gamma_;
-    double b_;
+    const double &gamma_;
+    const double &b_;
 
     double eps_;
     unsigned int max_iter_;

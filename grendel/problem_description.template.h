@@ -1,7 +1,7 @@
 #ifndef PROBLEM_DESCRIPTION_TEMPLATE_H
 #define PROBLEM_DESCRIPTION_TEMPLATE_H
 
-#include "compressible_euler.h"
+#include "problem_description.h"
 
 namespace grendel
 {

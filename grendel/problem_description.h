@@ -11,6 +11,12 @@
 
 namespace grendel
 {
+  /*
+   *
+   * We have a (2 + n) dimensional state space [rho, m_1, ..., m_n, E],
+   * where rho denotes the pressure, [m_1, ..., m_n] is the momentum vector
+   * field, and E is the total Energy.
+   */
   template <int dim>
   class ProblemDescription : public dealii::ParameterAcceptor
   {

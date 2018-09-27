@@ -60,12 +60,13 @@ namespace ryujin
                      computing_timer,
                      discretization,
                      "C - OfflineData")
-      , riemann_solver("D - RiemannSolver")
+      , problem_description("D - ProblemDescription")
+      , riemann_solver(problem_description, "E - RiemannSolver")
       , time_step(mpi_communicator,
                   computing_timer,
                   offline_data,
                   riemann_solver,
-                  "E - TimeStep")
+                  "F - TimeStep")
   {
     base_name = "test";
     add_parameter("basename", base_name, "base name for all output files");

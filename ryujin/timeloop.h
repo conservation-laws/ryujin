@@ -3,6 +3,7 @@
 
 #include <discretization.h>
 #include <offline_data.h>
+#include <problem_description.h>
 #include <riemann_solver.h>
 #include <time_step.h>
 
@@ -38,6 +39,7 @@ namespace ryujin
 
     grendel::Discretization<dim> discretization;
     grendel::OfflineData<dim> offline_data;
+    grendel::ProblemDescription<dim> problem_description;
     grendel::RiemannSolver<dim> riemann_solver;
     grendel::TimeStep<dim> time_step;
 
