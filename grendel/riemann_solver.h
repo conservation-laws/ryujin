@@ -312,11 +312,12 @@ namespace grendel
       const double nu_31 = lambda3_plus(riemann_data_j, p_1);
       const double nu_32 = lambda3_plus(riemann_data_j, p_2);
 
-      const double lambda_min =
-          std::max(positive_part(nu_31), negative_part(nu_12));
       const double lambda_max =
           std::max(positive_part(nu_32), negative_part(nu_11));
 
+#if 0
+      const double lambda_min =
+          std::max(positive_part(nu_31), negative_part(nu_12));
       /*
        * We have to deal with the fact that lambda_min >= lambda_max due to
        * round-off errors. In this case, accept the guess and report a gap
@@ -331,8 +332,12 @@ namespace grendel
        */
       if (lambda_min <= 0.0)
         return {1., lambda_max};
+#endif
 
-      return {lambda_max / lambda_min - 1.0, lambda_max};
+      const double gap =
+          std::max(std::abs(nu_32 - nu_31), std::abs(nu_12 - nu_11));
+
+      return {gap, lambda_max};
     }
 
   public:
