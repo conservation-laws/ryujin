@@ -62,19 +62,6 @@ namespace grendel
 
   private:
     /**
-     * For a given (2+dim dimensional) state vector <code>U</code>, return
-     * the momentum vector <code>[U[1], ..., U[1+dim]]</code>.
-     */
-    static DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, dim>
-    momentum_vector(const rank1_type &U)
-    {
-      dealii::Tensor<1, dim> result;
-      std::copy(&U[1], &U[1 + dim], &result[0]);
-      return result;
-    }
-
-
-    /**
      * For a given (2+dim dimensional) state vector <code>U</code>, and a
      * (normalized) "direction" n_ij, return the corresponding projected
      * state in the corresponding 1D Riemann problem.
@@ -88,7 +75,7 @@ namespace grendel
       result[0] = U[0];
 
       // m:
-      const auto m = momentum_vector(U);
+      const auto m = ProblemDescription<dim>::momentum_vector(U);
       result[1] = n_ij * m;
 
       // E:
@@ -113,6 +100,7 @@ namespace grendel
              (projected_U[2] -
               0.5 * projected_U[1] * projected_U[1] / projected_U[0]);
     }
+
 
     /**
      * For a projected state <code>projected_U</code> compute the
