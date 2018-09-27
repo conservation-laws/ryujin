@@ -93,7 +93,7 @@ namespace grendel
             auto n_ij = gather(nij_matrix_, i, j);
             n_ij = dealii::Tensor<1, dim>{{0.948683, -0.316228}};
 
-            const auto [lambda_max, n_iterations] =
+            const auto [lambda_max, p_star, n_iterations] =
                 riemann_solver_->lambda_max(U_i, U_j, n_ij);
           }
         }

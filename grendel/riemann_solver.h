@@ -121,12 +121,13 @@ namespace grendel
 
     /**
      * For a given projected state <code>projected_U</code> compute the
-     * primitive state [rho_Z, u_Z, p_Z, a_Z, A_Z, B_Z]:
+     * Riemann data [rho_Z, u_Z, p_Z, a_Z, A_Z, B_Z] (used in the
+     * approximative Riemman solver).
      *
      * FIXME: Describe state in more detail.
      */
     inline DEAL_II_ALWAYS_INLINE std::array<double, 6>
-    primitive_state_from_projected_state(
+    riemann_data_from_projected_state(
         const dealii::Tensor<1, 3> &projected_U) const
     {
       std::array<double, 6> result;
@@ -201,14 +202,14 @@ namespace grendel
      * See [1], page 912, (3.3).
      */
     inline DEAL_II_ALWAYS_INLINE double
-    phi(const std::array<double, 6> &primitive_state_i,
-        const std::array<double, 6> &primitive_state_j,
+    phi(const std::array<double, 6> &riemann_data_i,
+        const std::array<double, 6> &riemann_data_j,
         const double &p) const
     {
-      const double &u_i = primitive_state_i[1];
-      const double &u_j = primitive_state_j[1];
+      const double &u_i = riemann_data_i[1];
+      const double &u_j = riemann_data_j[1];
 
-      return f_Z(primitive_state_i, p) + f_Z(primitive_state_j, p) + u_j - u_i;
+      return f_Z(riemann_data_i, p) + f_Z(riemann_data_j, p) + u_j - u_i;
     }
 
 
@@ -219,11 +220,11 @@ namespace grendel
      * derivative.
      */
     inline DEAL_II_ALWAYS_INLINE double
-    dphi(const std::array<double, 6> &primitive_state_i,
-         const std::array<double, 6> &primitive_state_j,
+    dphi(const std::array<double, 6> &riemann_data_i,
+         const std::array<double, 6> &riemann_data_j,
          const double &p) const
     {
-      return df_Z(primitive_state_i, p) + df_Z(primitive_state_j, p);
+      return df_Z(riemann_data_i, p) + df_Z(riemann_data_j, p);
     }
 
 
@@ -259,15 +260,15 @@ namespace grendel
 
     /**
      * Two-rarefaction approximation to p_star computed for two primitive
-     * states <code>primitive_state_i</code> and
-     * <code>primitive_state_j</code>. See [1], page 914, (4.3)
+     * states <code>riemann_data_i</code> and
+     * <code>riemann_data_j</code>. See [1], page 914, (4.3)
      */
     inline DEAL_II_ALWAYS_INLINE double
-    p_star_two_rarefaction(const std::array<double, 6> &primitive_state_i,
-                           const std::array<double, 6> &primitive_state_j) const
+    p_star_two_rarefaction(const std::array<double, 6> &riemann_data_i,
+                           const std::array<double, 6> &riemann_data_j) const
     {
-      const auto &[rho_i, u_i, p_i, a_i, A_i, B_i] = primitive_state_i;
-      const auto &[rho_j, u_j, p_j, a_j, A_j, B_j] = primitive_state_j;
+      const auto &[rho_i, u_i, p_i, a_i, A_i, B_i] = riemann_data_i;
+      const auto &[rho_j, u_j, p_j, a_j, A_j, B_j] = riemann_data_j;
 
       /*
        * Notar bene (cf. [1, (4.3)]):
@@ -293,23 +294,23 @@ namespace grendel
 
 
     /**
-     * For two given primitive states <code>primitive_state_i</code> and
-     * <code>primitive_state_j</code>, and two guesses p_1 < p_2, compute
+     * For two given primitive states <code>riemann_data_i</code> and
+     * <code>riemann_data_j</code>, and two guesses p_1 < p_2, compute
      * the gap in lambda between both guesses.
      *
      * See [1], page 914, (4.4a), (4.4b), (4.5), and (4.6)
      */
     inline DEAL_II_ALWAYS_INLINE std::array<double, 2>
-    compute_gap(const std::array<double, 6> &primitive_state_i,
-                const std::array<double, 6> &primitive_state_j,
+    compute_gap(const std::array<double, 6> &riemann_data_i,
+                const std::array<double, 6> &riemann_data_j,
                 const double p_1,
                 const double p_2) const
     {
-      const double nu_11 = lambda1_minus(primitive_state_i, p_2 /*SIC!*/);
-      const double nu_12 = lambda1_minus(primitive_state_i, p_1 /*SIC!*/);
+      const double nu_11 = lambda1_minus(riemann_data_i, p_2 /*SIC!*/);
+      const double nu_12 = lambda1_minus(riemann_data_i, p_1 /*SIC!*/);
 
-      const double nu_31 = lambda3_plus(primitive_state_j, p_1);
-      const double nu_32 = lambda3_plus(primitive_state_j, p_2);
+      const double nu_31 = lambda3_plus(riemann_data_j, p_1);
+      const double nu_32 = lambda3_plus(riemann_data_j, p_2);
 
       const double lambda_min =
           std::max(positive_part(nu_31), negative_part(nu_12));
@@ -350,37 +351,41 @@ namespace grendel
      *   [1] J.-L. Guermond, B. Popov. Fast estimation from above fo the
      *       maximum wave speed in the Riemann problem for the Euler equations.
      */
-    std::tuple<double /*lambda_max*/, unsigned int /*iteration*/>
+    std::tuple<double /*lambda_max*/,
+               double /*p_star*/,
+               unsigned int /*iteration*/>
     lambda_max(const rank1_type &U_i,
                const rank1_type &U_j,
                const dealii::Tensor<1, dim> &n_ij) const
     {
       /*
-       * Step 1: Compute projected 1D states and phi.
+       * Step 1: Compute projected 1D states.
        */
-
       const auto projected_U_i = projected_state(U_i, n_ij);
       const auto projected_U_j = projected_state(U_j, n_ij);
 
-      const auto primitive_state_i =
-          primitive_state_from_projected_state(projected_U_i);
-      const auto primitive_state_j =
-          primitive_state_from_projected_state(projected_U_j);
+      const auto riemann_data_i =
+          riemann_data_from_projected_state(projected_U_i);
+      const auto riemann_data_j =
+          riemann_data_from_projected_state(projected_U_j);
 
-      return lambda_max(primitive_state_i, primitive_state_j);
+
+      return lambda_max(riemann_data_i, riemann_data_j);
     }
 
 
     /**
-     * Variant of above function that takes two arrays of projected
-     * primitive states as input instead of two nD states.
+     * Variant of above function that takes two arrays as input describing
+     * the Riemann data instead of two nD states.
      */
-    std::tuple<double /*lambda_max*/, unsigned int /*iteration*/>
-    lambda_max(const std::array<double, 6> &primitive_state_i,
-               const std::array<double, 6> &primitive_state_j) const
+    std::tuple<double /*lambda_max*/,
+               double /*p_star*/,
+               unsigned int /*iteration*/>
+    lambda_max(const std::array<double, 6> &riemann_data_i,
+               const std::array<double, 6> &riemann_data_j) const
     {
-      const double p_min = std::min(primitive_state_i[2], primitive_state_j[2]);
-      const double p_max = std::max(primitive_state_i[2], primitive_state_j[2]);
+      const double p_min = std::min(riemann_data_i[2], riemann_data_j[2]);
+      const double p_max = std::max(riemann_data_i[2], riemann_data_j[2]);
 
       /*
        * Step 2: Shortcuts.
@@ -390,26 +395,26 @@ namespace grendel
        * away.
        */
 
-      const double phi_p_min = phi(primitive_state_i, primitive_state_j, p_min);
+      const double phi_p_min = phi(riemann_data_i, riemann_data_j, p_min);
 
       if (phi_p_min >= 0.) {
         const double p_star = 0.;
-        const double lambda1 = lambda1_minus(primitive_state_i, p_star);
-        const double lambda3 = lambda3_plus(primitive_state_j, p_star);
+        const double lambda1 = lambda1_minus(riemann_data_i, p_star);
+        const double lambda3 = lambda3_plus(riemann_data_j, p_star);
         const double lambda_max =
             std::max(std::abs(lambda1), std::abs(lambda3));
-        return {lambda_max, 0};
+        return {lambda_max, p_star, 0};
       }
 
-      const double phi_p_max = phi(primitive_state_i, primitive_state_j, p_max);
+      const double phi_p_max = phi(riemann_data_i, riemann_data_j, p_max);
 
       if (phi_p_max == 0.) {
         const double p_star = p_max;
-        const double lambda1 = lambda1_minus(primitive_state_i, p_star);
-        const double lambda3 = lambda3_plus(primitive_state_j, p_star);
+        const double lambda1 = lambda1_minus(riemann_data_i, p_star);
+        const double lambda3 = lambda3_plus(riemann_data_j, p_star);
         const double lambda_max =
             std::max(std::abs(lambda1), std::abs(lambda3));
-        return {lambda_max, 0};
+        return {lambda_max, p_star, 0};
       }
 
       /*
@@ -421,7 +426,7 @@ namespace grendel
        */
 
       const double p_star_tilde =
-          p_star_two_rarefaction(primitive_state_i, primitive_state_j);
+          p_star_two_rarefaction(riemann_data_i, riemann_data_j);
 
       double p_1 = (phi_p_max < 0.) ? p_max : p_min;
       double p_2 =
@@ -435,19 +440,19 @@ namespace grendel
 
       for (unsigned int i = 0; i < max_iter_; ++i) {
         const auto [gap, lambda_max] =
-            compute_gap(primitive_state_i, primitive_state_j, p_1, p_2);
+            compute_gap(riemann_data_i, riemann_data_j, p_1, p_2);
 
         if (gap < eps_)
-          return {lambda_max, i};
+          return {lambda_max, (p_1 + p_2) / 2., i};
 
         /*
          * This is expensive:
          */
 
-        const double phi_p_1 = phi(primitive_state_i, primitive_state_j, p_1);
-        const double dphi_p_1 = dphi(primitive_state_i, primitive_state_j, p_1);
-        const double phi_p_2 = phi(primitive_state_i, primitive_state_j, p_2);
-        const double dphi_p_2 = dphi(primitive_state_i, primitive_state_j, p_2);
+        const double phi_p_1 = phi(riemann_data_i, riemann_data_j, p_1);
+        const double dphi_p_1 = dphi(riemann_data_i, riemann_data_j, p_1);
+        const double phi_p_2 = phi(riemann_data_i, riemann_data_j, p_2);
+        const double dphi_p_2 = dphi(riemann_data_i, riemann_data_j, p_2);
 
         /*
          * Sanity checks:
@@ -494,11 +499,11 @@ namespace grendel
 
         /* We have found our root (up to roundoff erros): */
         if (p_1 >= p_2)
-          return {lambda_max, i + 1};
+          return {lambda_max, (p_1 + p_2) / 2., i + 1};
       }
 
       AssertThrow(false, dealii::ExcMessage("Newton method did not converge."));
-      return {0., std::numeric_limits<unsigned int>::max()};
+      return {0., 0., std::numeric_limits<unsigned int>::max()};
     }
 
 

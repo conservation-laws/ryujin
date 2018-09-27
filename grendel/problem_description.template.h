@@ -11,7 +11,7 @@ namespace grendel
   ProblemDescription<dim>::ProblemDescription(const std::string &subsection)
       : ParameterAcceptor(subsection)
   {
-    gamma_ = 1.4;
+    gamma_ = 5./3.;
     add_parameter("gamma", gamma_, "Gamma");
 
     b_ = 0.0;

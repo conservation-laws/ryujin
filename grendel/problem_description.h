@@ -38,6 +38,17 @@ namespace grendel
 
 
     /**
+     * rank2_type denotes the storage type used for the range of f.
+     */
+    typedef dealii::Tensor<1, problem_dimension, dealii::Tensor<1, dim>>
+        rank2_type;
+
+    ProblemDescription(const std::string &subsection = "ProblemDescription");
+
+    virtual ~ProblemDescription() final = default;
+
+
+    /**
      * For a given (2+dim dimensional) state vector <code>U</code>, return
      * the momentum vector <code>[U[1], ..., U[1+dim]]</code>.
      */
@@ -48,17 +59,6 @@ namespace grendel
       std::copy(&U[1], &U[1 + dim], &result[0]);
       return result;
     }
-
-
-    /**
-     * rank2_type denotes the storage type used for the range of f.
-     */
-    typedef dealii::Tensor<1, problem_dimension, dealii::Tensor<1, dim>>
-        rank2_type;
-
-    ProblemDescription(const std::string &subsection = "ProblemDescription");
-
-    virtual ~ProblemDescription() final = default;
 
 
     /**
