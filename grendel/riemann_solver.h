@@ -443,7 +443,7 @@ namespace grendel
             compute_gap(riemann_data_i, riemann_data_j, p_1, p_2);
 
         if (gap < eps_)
-          return {lambda_max, (p_1 + p_2) / 2., i};
+          return {lambda_max, p_2, i};
 
         /*
          * This is expensive:
@@ -499,7 +499,7 @@ namespace grendel
 
         /* We have found our root (up to roundoff erros): */
         if (p_1 >= p_2)
-          return {lambda_max, (p_1 + p_2) / 2., i + 1};
+          return {lambda_max, p_2, i + 1};
       }
 
       AssertThrow(false, dealii::ExcMessage("Newton method did not converge."));

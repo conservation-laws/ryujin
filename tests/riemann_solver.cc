@@ -16,8 +16,8 @@ int main()
   ParameterAcceptor::prm.leave_subsection();
 
   ParameterAcceptor::prm.enter_subsection("RiemannSolver");
-  ParameterAcceptor::prm.set("newton eps", "1.e-15");
-  ParameterAcceptor::prm.set("newton max iter", "100");
+  ParameterAcceptor::prm.set("newton eps", "1.e-10");
+  ParameterAcceptor::prm.set("newton max iter", "10");
   ParameterAcceptor::prm.leave_subsection();
 
   const auto riemann_data = [&](const auto &state) {
@@ -55,7 +55,7 @@ int main()
   };
 
   /* Leblanc:*/
-  test({1., 0., 0.666666666e-1}, {1.e-3, 0., 0.6666666666e-10});
+  test({1., 0., 2. / 3.}, {1.e-3, 0., 2. / 3. * 1.e-10});
   /* Sod:*/
   test({1., 0., 1.}, {0.125, 0., 0.1});
   /* Lax:*/
