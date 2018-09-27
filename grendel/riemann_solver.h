@@ -486,7 +486,7 @@ namespace grendel
       }
 
       AssertThrow(false,
-                  dealii::ExcMessage("Newton secant method did not converge."));
+                  dealii::ExcMessage("Newton method did not converge."));
       return {0., std::numeric_limits<unsigned int>::max()};
     }
 
