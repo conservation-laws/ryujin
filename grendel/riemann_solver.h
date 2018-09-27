@@ -367,6 +367,18 @@ namespace grendel
       const auto primitive_state_j =
           primitive_state_from_projected_state(projected_U_j);
 
+      return lambda_max(primitive_state_i, primitive_state_j);
+    }
+
+
+    /**
+     * Variant of above function that takes two arrays of projected
+     * primitive states as input instead of two nD states.
+     */
+    std::tuple<double /*lambda_max*/, unsigned int /*iteration*/>
+    lambda_max(const std::array<double, 6> &primitive_state_i,
+               const std::array<double, 6> &primitive_state_j) const
+    {
       const double p_min = std::min(primitive_state_i[2], primitive_state_j[2]);
       const double p_max = std::max(primitive_state_i[2], primitive_state_j[2]);
 
@@ -485,10 +497,10 @@ namespace grendel
           return {lambda_max, i + 1};
       }
 
-      AssertThrow(false,
-                  dealii::ExcMessage("Newton method did not converge."));
+      AssertThrow(false, dealii::ExcMessage("Newton method did not converge."));
       return {0., std::numeric_limits<unsigned int>::max()};
     }
+
 
   protected:
     dealii::SmartPointer<const grendel::ProblemDescription<dim>>
