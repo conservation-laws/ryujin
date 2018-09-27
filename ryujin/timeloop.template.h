@@ -104,9 +104,16 @@ namespace ryujin
       using vector_type = typename TimeStep<dim>::vector_type;
       const auto &locally_owned = offline_data.locally_owned();
       const auto &locally_relevant = offline_data.locally_relevant();
-//       vector_type U(locally_owned, locally_relevant, mpi_communicator);
-    }
 
+      vector_type U;
+      U[0].reinit(locally_owned, locally_relevant, mpi_communicator);
+      for (auto &it : U)
+        it.reinit(U[0]);
+
+      double t = 0.;
+
+      const auto [U_new, t_new] = time_step.compute_step(U, t);
+    }
 
     computing_timer.print_summary();
     deallog << timer_output.str() << std::endl;
