@@ -149,6 +149,8 @@ namespace grendel
 
     const unsigned int dofs_per_cell =
         discretization_->finite_element().dofs_per_cell;
+    const unsigned int dofs_per_face =
+        discretization_->finite_element().dofs_per_face;
 
     const unsigned int n_q_points = discretization_->quadrature().size();
 
@@ -164,6 +166,7 @@ namespace grendel
 
           auto &is_artificial = copy.is_artificial_;
           auto &local_dof_indices = copy.local_dof_indices_;
+          auto &local_boundary_dof_indices = copy.local_boundary_dof_indices_;
           auto &cell_mass_matrix = copy.cell_mass_matrix_;
           auto &cell_lumped_mass_matrix = copy.cell_lumped_mass_matrix_;
           auto &cell_cij_matrix = copy.cell_cij_matrix_;
@@ -206,17 +209,34 @@ namespace grendel
               } /* for i */
             }   /* for j */
           }     /* for q */
+
+          local_boundary_dof_indices.resize(0);
+          for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f) {
+            const auto face = cell->face(f);
+            if (!face->at_boundary())
+              continue;
+            std::vector<types::global_dof_index> indices(dofs_per_face);
+            face->get_dof_indices(indices);
+            local_boundary_dof_indices.insert(local_boundary_dof_indices.end(),
+                                              indices.begin(),
+                                              indices.end());
+          }
+
         };
 
     const auto copy_local_to_global = [&](const auto &copy) {
       const auto &is_artificial = copy.is_artificial_;
       const auto &local_dof_indices = copy.local_dof_indices_;
+      const auto &local_boundary_dof_indices = copy.local_boundary_dof_indices_;
       const auto &cell_mass_matrix = copy.cell_mass_matrix_;
       const auto &cell_lumped_mass_matrix = copy.cell_lumped_mass_matrix_;
       const auto &cell_cij_matrix = copy.cell_cij_matrix_;
 
       if(is_artificial)
         return;
+
+      boundary_list_.insert(local_boundary_dof_indices.begin(),
+                            local_boundary_dof_indices.end());
 
       affine_constraints_.distribute_local_to_global(
           cell_mass_matrix, local_dof_indices, mass_matrix_);
@@ -313,21 +333,6 @@ namespace grendel
                       double());
     }
 
-  }
-
-
-  template <int dim>
-  void OfflineData<dim>::clear()
-  {
-    dof_handler_.clear();
-    sparsity_pattern_.reinit(0, 0, 0);
-    affine_constraints_.clear();
-
-    mass_matrix_.clear();
-    lumped_mass_matrix_.clear();
-
-    for (auto &matrix : cij_matrix_)
-      matrix.clear();
   }
 
 } /* namespace grendel */

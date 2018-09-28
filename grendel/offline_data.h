@@ -37,8 +37,6 @@ namespace grendel
     void setup();
     void assemble();
 
-    void clear();
-
   protected:
 
     const MPI_Comm &mpi_communicator_;
@@ -60,6 +58,9 @@ namespace grendel
 
     dealii::SparsityPattern sparsity_pattern_;
     A_RO(sparsity_pattern)
+
+    std::set<dealii::types::global_dof_index> boundary_list_;
+    A_RO(boundary_list)
 
     dealii::AffineConstraints<double> affine_constraints_;
     A_RO(affine_constraints)

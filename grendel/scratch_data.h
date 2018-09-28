@@ -45,6 +45,7 @@ namespace grendel
   public:
     bool is_artificial_;
     std::vector<dealii::types::global_dof_index> local_dof_indices_;
+    std::vector<dealii::types::global_dof_index> local_boundary_dof_indices_;
     dealii::FullMatrix<double> cell_mass_matrix_;
     dealii::FullMatrix<double> cell_lumped_mass_matrix_;
     std::array<dealii::FullMatrix<double>, dim> cell_cij_matrix_;
