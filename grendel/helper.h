@@ -8,11 +8,11 @@ namespace grendel
   /*
    * It's magic
    */
-  template <typename T1, std::size_t k, typename T2>
+  template <typename T1, std::size_t k1, int k2, typename T2>
   inline DEAL_II_ALWAYS_INLINE void
-  scatter(std::array<T1, k> &U, const dealii::Tensor<1, k> result, const T2 i)
+  scatter(std::array<T1, k1> &U, const dealii::Tensor<1, k2> result, const T2 i)
   {
-    for (unsigned int j = 0; j < k; ++j)
+    for (unsigned int j = 0; j < k1; ++j)
       U[j][i] = result[j];
   }
 
