@@ -88,6 +88,7 @@ namespace grendel
                ++jt) {
             const auto j = jt->column();
 
+            // Do something
             auto U_j = gather(U_old, j);
             U_j += dealii::Tensor<1, problem_dimension>{{1.4, 0., 0., 2.5}};
             auto n_ij = gather(nij_matrix_, i, j);

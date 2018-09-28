@@ -2,8 +2,7 @@
 #define DISCRETIZATION_TEMPLATE_H
 
 #include "discretization.h"
-// FIXME
-// #include "geometry_helper.h"
+#include "geometry_helper.h"
 
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/fe/fe_q.h>
@@ -45,7 +44,7 @@ namespace grendel
     object_height_ = 1.;
     add_parameter(
         "object height",
-        height_,
+        object_height_,
         "Height of immersed object (interpretation depends on geometry)");
 
     refinement_ = 5;
@@ -82,8 +81,7 @@ namespace grendel
     triangulation.clear();
 
     if (geometry_ == "shard") {
-    // FIXME
-//       create_coarse_grid_shard(triangulation, length_, height_, object_height_);
+      create_coarse_grid_shard(triangulation, length_, height_, object_height_);
     } else {
       AssertThrow(false, dealii::ExcMessage("Unknown geometry name."));
     }

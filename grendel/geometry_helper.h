@@ -1,146 +1,69 @@
 #ifndef GEOMETRY_HELPER_H
 #define GEOMETRY_HELPER_H
 
+#include <deal.II/grid/grid_generator.h>
+#include <deal.II/grid/grid_tools.h>
+
 namespace grendel
 {
 
-  template <int dim, typename T>
-  void create_coarse_grid_shard(T &triangulation,
-                                const double length_,
-                                const double height_,
-                                const double object_height_)
+  template <int dim>
+  void
+  create_coarse_grid_shard(dealii::parallel::distributed::Triangulation<dim> &,
+                           const double,
+                           const double,
+                           const double)
   {
+    AssertThrow(false, dealii::ExcNotImplemented());
+  }
+
+  template <>
+  void create_coarse_grid_shard<2>(
+      dealii::parallel::distributed::Triangulation<2> &triangulation,
+      const double length,
+      const double height,
+      const double object_height)
+  {
+    constexpr int dim = 2;
+
     using namespace dealii;
 
-    const double baserect = length_;
-    const double heighrect = height_;
-    const double triangheight = object_height_;
-    const double triangside = object_height_ / std::cos(M_PI / 6.0);
-    const double tiptriang = object_height_;
+    const double object_length = object_height * std::sqrt(3) / 2.;
 
-    Triangulation<dim> tria1; // left rectangle
-    Triangulation<dim> tria2; // lower irregular quadrilateral
-    Triangulation<dim> tria3; // upper irregular quadrilateral
-    Triangulation<dim> tria4; // right lowest regular quadrilateral
-    Triangulation<dim> tria5; // right middle regular quadrilateral
-    Triangulation<dim> tria6; // upper regular quadrilateral
+    const std::vector<Point<dim>> vertices{
+        {0., 0.},                                     // 0, bottom left
+        {(length - object_length) / 2., 0.},          // 1, bottom center left
+        {(length + object_length) / 2., 0.},          // 2, bottom center right
+        {length, 0.},                                 // 3, bottom right
+        {0., height / 2.},                            // 4, middle left
+        {(length - object_length) / 2., height / 2.}, // 5, middle center left
+        {(length + object_length) / 2.,
+         (height - object_height) / 2.},         // 6, middle lower center right
+        {length, (height - object_height) / 2.}, // 7, middle lower right
+        {(length + object_length) / 2.,
+         (height + object_height) / 2.},         // 8, middle upper center right
+        {length, (height + object_height) / 2.}, // 9, middle upper right
+        {0., height},                            // 10, top left
+        {(length - object_length) / 2., height}, // 11, top center left
+        {(length + object_length) / 2., height}, // 12, top center right
+        {length, height}                         // 13, top right
+    };
 
-    Triangulation<dim> merge1;
-    Triangulation<dim> merge2;
-
+    std::vector<CellData<dim>> cells(7);
     {
-      std::vector<unsigned int> repetitions(2);
-      repetitions[0] = 1;
-      repetitions[1] = 2;
-      GridGenerator::subdivided_hyper_rectangle(tria1,
-                                                repetitions,
-                                                Point<2>(0.0, 0.0),
-                                                Point<2>(tiptriang, heighrect));
+      const auto assign = [](auto b, std::array<unsigned int, 4> a) {
+        std::copy(a.begin(), a.end(), b);
+      };
+      assign(cells[0].vertices, {0, 1, 4, 5});
+      assign(cells[1].vertices, {1, 2, 5, 6});
+      assign(cells[2].vertices, {2, 3, 6, 7});
+      assign(cells[3].vertices, {4, 5, 10, 11});
+      assign(cells[4].vertices, {5, 8, 11, 12});
+      assign(cells[5].vertices, {8, 9, 12, 13});
+      assign(cells[6].vertices, {6, 7, 8, 9});
     }
 
-    {
-      std::vector<unsigned int> repetitions(2);
-      repetitions[0] = 1;
-      repetitions[1] = 1;
-      GridGenerator::subdivided_hyper_rectangle(
-          tria4,
-          repetitions,
-          Point<2>(tiptriang + triangheight, 0.0),
-          Point<2>(baserect, 0.5 * (heighrect - triangside)));
-    }
-
-    {
-      std::vector<unsigned int> repetitions(2);
-      repetitions[0] = 1;
-      repetitions[1] = 1;
-      GridGenerator::subdivided_hyper_rectangle(
-          tria5,
-          repetitions,
-          Point<2>(tiptriang + triangheight, 0.5 * (heighrect - triangside)),
-          Point<2>(baserect, 0.5 * (heighrect + triangside)));
-    }
-
-    {
-      std::vector<unsigned int> repetitions(2);
-      repetitions[0] = 1;
-      repetitions[1] = 1;
-      GridGenerator::subdivided_hyper_rectangle(
-          tria6,
-          repetitions,
-          Point<2>(tiptriang + triangheight, 0.5 * (heighrect + triangside)),
-          Point<2>(baserect, heighrect));
-    }
-
-    {
-      static const Point<2> vertices1[] = {
-          Point<dim>(0.0, 0.0),
-          Point<dim>(triangheight, 0.0),
-          Point<dim>(0.0, 0.5 * heighrect),
-          Point<dim>(triangheight, 0.5 * (heighrect - triangside))};
-
-      const unsigned int n_vertices = sizeof(vertices1) / sizeof(vertices1[0]);
-      const std::vector<Point<dim>> vertices(&vertices1[0],
-                                             &vertices1[n_vertices]);
-
-      static const int cell_vertices[][GeometryInfo<dim>::vertices_per_cell] = {
-          {0, 1, 2, 3}};
-      const unsigned int n_cells =
-          sizeof(cell_vertices) / sizeof(cell_vertices[0]);
-
-      std::vector<CellData<dim>> cells(n_cells, CellData<dim>());
-      for (unsigned int i = 0; i < n_cells; ++i) {
-        for (unsigned int j = 0; j < GeometryInfo<dim>::vertices_per_cell; ++j)
-          cells[i].vertices[j] = cell_vertices[i][j];
-        cells[i].material_id = 0;
-      }
-
-      tria2.create_triangulation(vertices, cells, SubCellData());
-
-      Tensor<1, dim> moveright;
-      moveright[0] = tiptriang;
-      moveright[1] = 0.0;
-      GridTools::shift(moveright, tria2);
-    }
-
-    {
-      static const Point<2> vertices1[] = {
-          Point<dim>(0.0, 0.0),
-          Point<dim>(triangheight, 0.0),
-          Point<dim>(0.0, -0.5 * heighrect),
-          Point<dim>(triangheight, -0.5 * (heighrect - triangside))};
-
-      const unsigned int n_vertices = sizeof(vertices1) / sizeof(vertices1[0]);
-      const std::vector<Point<dim>> vertices(&vertices1[0],
-                                             &vertices1[n_vertices]);
-
-      static const int cell_vertices[][GeometryInfo<dim>::vertices_per_cell] = {
-          {2, 3, 0, 1}};
-      const unsigned int n_cells =
-          sizeof(cell_vertices) / sizeof(cell_vertices[0]);
-
-      std::vector<CellData<dim>> cells(n_cells, CellData<dim>());
-      for (unsigned int i = 0; i < n_cells; ++i) {
-        for (unsigned int j = 0; j < GeometryInfo<dim>::vertices_per_cell; ++j)
-          cells[i].vertices[j] = cell_vertices[i][j];
-        cells[i].material_id = 0;
-      }
-
-      tria3.create_triangulation(vertices, cells, SubCellData());
-
-      Tensor<1, dim> moveright;
-      moveright[0] = tiptriang;
-      moveright[1] = heighrect;
-      GridTools::shift(moveright, tria3);
-    }
-
-    GridGenerator::merge_triangulations(tria1, tria3, merge1);
-    GridGenerator::merge_triangulations(merge1, tria2, merge2);
-    merge1.clear();
-    GridGenerator::merge_triangulations(merge2, tria4, merge1);
-    merge2.clear();
-    GridGenerator::merge_triangulations(merge1, tria5, merge2);
-    merge1.clear();
-    GridGenerator::merge_triangulations(merge2, tria6, triangulation);
+    triangulation.create_triangulation(vertices, cells, SubCellData());
   }
 
 } // namespace grendel
