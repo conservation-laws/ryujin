@@ -34,12 +34,8 @@ int main()
     result[3] = std::sqrt(gamma * p / rho / (1.0 - b * rho));
     result[4] = 2.0 * (1.0 - b * rho) / (gamma + 1.0) / rho;
     result[5] = (gamma - 1.0) / (gamma + 1.0) * result[2];
-
     return result;
   };
-
-  std::cout << std::setprecision(16);
-  std::cout << std::scientific;
 
   const auto test = [&](const std::array<double, 3> &U_i,
                         const std::array<double, 3> &U_j) {
@@ -48,11 +44,14 @@ int main()
     const auto rd_i = riemann_data(U_i);
     const auto rd_j = riemann_data(U_j);
     const auto [lambda_max, p_star, n_iterations] =
-        riemann_solver.lambda_max(rd_i, rd_j);
+        riemann_solver.compute(rd_i, rd_j);
     std::cout << lambda_max << std::endl;
     std::cout << p_star << std::endl;
     std::cout << n_iterations << std::endl << std::endl;
   };
+
+  std::cout << std::setprecision(16);
+  std::cout << std::scientific;
 
   /* Leblanc:*/
   test({1., 0., 2. / 30.}, {1.e-3, 0., 2. / 3. * 1.e-10});

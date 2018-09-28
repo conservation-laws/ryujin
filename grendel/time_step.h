@@ -58,7 +58,7 @@ namespace grendel
     A_RO(riemann_solver)
 
   private:
-    dealii::Vector<double> f_i_;
+    std::vector<rank2_type> f_i_;
     dealii::SparseMatrix<double> dij_matrix_;
   };
 

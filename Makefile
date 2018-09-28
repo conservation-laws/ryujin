@@ -17,7 +17,7 @@ edit: all
 	@vim $(BUILDDIR)/run/$(PARAMETER_FILE)
 
 run: all
-	@cd $(BUILDDIR)/run && time $(MPIRUN) ./$(EXECUTABLE)
+	@cd $(BUILDDIR)/run && time ASAN_OPTIONS=detect_leaks=0 $(MPIRUN) ./$(EXECUTABLE)
 
 rum:
 	@echo "... and a bottle of rum"

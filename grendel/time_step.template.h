@@ -37,7 +37,7 @@ namespace grendel
     const auto &locally_owned = offline_data_->locally_owned();
     const auto &sparsity_pattern = offline_data_->sparsity_pattern();
 
-    f_i_.reinit(locally_owned.n_elements());
+    f_i_.resize(locally_owned.n_elements());
     dij_matrix_.reinit(sparsity_pattern);
   }
 
@@ -76,26 +76,32 @@ namespace grendel
           const unsigned int pos = std::distance(f_i_.begin(), it);
           const auto i = locally_owned.nth_index_in_set(pos);
 
+          // FIXME: const and remove
           auto U_i = gather(U_old, i);
           U_i += dealii::Tensor<1, problem_dimension>{
               {2.21953, 1.09817, 0., 5.09217}};
 
-          /* Populate f_i */
-          *it = 1.;//problem_description_->f(U_i);
+          /* Populate f_i_: */
+          *it = problem_description_->f(U_i);
 
+          /* Populate dij_: */
           for (auto jt = sparsity_pattern.begin(i);
                jt != sparsity_pattern.end(i);
                ++jt) {
             const auto j = jt->column();
 
-            // Do something
+            /* Iterate over subdiagonal */
+            if (j >= i)
+              continue;
+
+            // FIXME: const and remove
             auto U_j = gather(U_old, j);
-            U_j += dealii::Tensor<1, problem_dimension>{{1.4, 0., 0., 2.5}};
             auto n_ij = gather(nij_matrix_, i, j);
+            U_j += dealii::Tensor<1, problem_dimension>{{1.4, 0., 0., 2.5}};
             n_ij = dealii::Tensor<1, dim>{{0.948683, -0.316228}};
 
             const auto [lambda_max, p_star, n_iterations] =
-                riemann_solver_->lambda_max(U_i, U_j, n_ij);
+                riemann_solver_->compute(U_i, U_j, n_ij);
           }
         }
       };

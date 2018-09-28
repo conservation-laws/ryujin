@@ -340,9 +340,9 @@ namespace grendel
     std::tuple<double /*lambda_max*/,
                double /*p_star*/,
                unsigned int /*iteration*/>
-    lambda_max(const rank1_type &U_i,
-               const rank1_type &U_j,
-               const dealii::Tensor<1, dim> &n_ij) const
+    compute(const rank1_type &U_i,
+            const rank1_type &U_j,
+            const dealii::Tensor<1, dim> &n_ij) const
     {
       /*
        * Step 1: Compute projected 1D states.
@@ -356,7 +356,7 @@ namespace grendel
           riemann_data_from_projected_state(projected_U_j);
 
 
-      return lambda_max(riemann_data_i, riemann_data_j);
+      return compute(riemann_data_i, riemann_data_j);
     }
 
 
@@ -367,8 +367,8 @@ namespace grendel
     std::tuple<double /*lambda_max*/,
                double /*p_star*/,
                unsigned int /*iteration*/>
-    lambda_max(const std::array<double, 6> &riemann_data_i,
-               const std::array<double, 6> &riemann_data_j) const
+    compute(const std::array<double, 6> &riemann_data_i,
+            const std::array<double, 6> &riemann_data_j) const
     {
       const double p_min = std::min(riemann_data_i[2], riemann_data_j[2]);
       const double p_max = std::max(riemann_data_i[2], riemann_data_j[2]);
