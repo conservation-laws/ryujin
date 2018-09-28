@@ -48,19 +48,23 @@ namespace grendel
   {
     deallog << "TimeStep<dim>::compute_step()" << std::endl;
 
+    const auto &locally_owned = offline_data_->locally_owned();
+    const auto &sparsity_pattern = offline_data_->sparsity_pattern();
+    const auto &norm_matrix = offline_data_->norm_matrix();
+    const auto &nij_matrix = offline_data_->nij_matrix();
+    const auto &boundary_normal_map = offline_data_->boundary_normal_map();
+
     /*
-     * Step 1: Compute d_ij and f_i
+     * Step 1: Update d_ij and f_i
      */
+
+    /* Clear out matrix entries: */
+    dij_matrix_ = 0.;
 
     {
       deallog << "        compute d_ij and f_i" << std::endl;
       TimerOutput::Scope t(computing_timer_,
                            "time_step - compute d_ij and f_i");
-
-      const auto &locally_owned = offline_data_->locally_owned();
-      const auto &sparsity_pattern = offline_data_->sparsity_pattern();
-      const auto &norm_matrix_ = offline_data_->norm_matrix();
-      const auto &nij_matrix_ = offline_data_->nij_matrix();
 
       /*
        * FIXME: Workaround: IndexSet does not have an iterator with
@@ -81,10 +85,16 @@ namespace grendel
           U_i += dealii::Tensor<1, problem_dimension>{
               {2.21953, 1.09817, 0., 5.09217}};
 
-          /* Populate f_i_: */
+          /*
+           * Populate f_i_:
+           */
+
           *it = problem_description_->f(U_i);
 
-          /* Populate dij_: */
+          /*
+           * Populate dij_:
+           */
+
           for (auto jt = sparsity_pattern.begin(i);
                jt != sparsity_pattern.end(i);
                ++jt) {
@@ -96,12 +106,36 @@ namespace grendel
 
             // FIXME: const and remove
             auto U_j = gather(U_old, j);
-            auto n_ij = gather(nij_matrix_, i, j);
             U_j += dealii::Tensor<1, problem_dimension>{{1.4, 0., 0., 2.5}};
-            n_ij = dealii::Tensor<1, dim>{{0.948683, -0.316228}};
+            const auto n_ij = gather(nij_matrix, i, j);
+            const double norm = norm_matrix(i, j);
 
             const auto [lambda_max, p_star, n_iterations] =
                 riemann_solver_->compute(U_i, U_j, n_ij);
+
+            double d = norm * lambda_max;
+
+            /*
+             * In case both dofs are located at the boundary we have to
+             * symmetrize.
+             */
+            if (boundary_normal_map.find(i) != boundary_normal_map.end() &&
+                boundary_normal_map.find(j) != boundary_normal_map.end()) {
+              const auto n_ji = gather(nij_matrix, j, i);
+              auto [lambda_max_2, p_star_2, n_iterations_2] =
+                  riemann_solver_->compute(U_j, U_i, n_ji);
+              const double norm_2 = norm_matrix(j, i);
+              d = std::max(d, norm_2 * lambda_max_2);
+            }
+
+            /*
+             * Set symmetrized off-diagonal values and subtract the value
+             * from both diagonal entries:
+             */
+            dij_matrix_(i, j) = d;
+            dij_matrix_(j, i) = d;
+            dij_matrix_(i, i) -= d;
+            dij_matrix_(j, j) -= d;
           }
         }
       };
@@ -109,6 +143,11 @@ namespace grendel
       parallel::apply_to_subranges(
           f_i_.begin(), f_i_.end(), on_subranges, 4096);
     }
+
+    /*
+     * Step 2: Compute time step
+     */
+
     return {vector_type(), 0.};
   }
 
