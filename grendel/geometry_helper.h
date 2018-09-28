@@ -8,17 +8,17 @@ namespace grendel
 {
 
   template <int dim>
-  void
-  create_coarse_grid_shard(dealii::parallel::distributed::Triangulation<dim> &,
-                           const double,
-                           const double,
-                           const double)
+  void create_coarse_grid_triangle(
+      dealii::parallel::distributed::Triangulation<dim> &,
+      const double,
+      const double,
+      const double)
   {
     AssertThrow(false, dealii::ExcNotImplemented());
   }
 
   template <>
-  void create_coarse_grid_shard<2>(
+  void create_coarse_grid_triangle<2>(
       dealii::parallel::distributed::Triangulation<2> &triangulation,
       const double length,
       const double height,

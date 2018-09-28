@@ -27,9 +27,10 @@ namespace grendel
       , mpi_communicator_(mpi_communicator)
       , computing_timer_(computing_timer)
   {
-    geometry_ = "shard";
-    add_parameter(
-        "geometry", geometry_, "Geometry. Valid names are \"shard\".");
+    geometry_ = "immersed triangle";
+    add_parameter("geometry",
+                  geometry_,
+                  "Geometry. Valid names are \"immersed triangle\".");
 
     length_ = 3.;
     add_parameter("geometry length",
@@ -80,9 +81,12 @@ namespace grendel
     auto &triangulation = *triangulation_;
     triangulation.clear();
 
-    if (geometry_ == "shard") {
-      create_coarse_grid_shard(triangulation, length_, height_, object_height_);
+    if (geometry_ == "immersed triangle") {
+      create_coarse_grid_triangle(
+          triangulation, length_, height_, object_height_);
+
     } else {
+
       AssertThrow(false, dealii::ExcMessage("Unknown geometry name."));
     }
 
