@@ -166,12 +166,13 @@ namespace grendel
 
           auto &is_artificial = copy.is_artificial_;
           auto &local_dof_indices = copy.local_dof_indices_;
-          auto &local_boundary_dof_indices = copy.local_boundary_dof_indices_;
+          auto &local_boundary_normal_map = copy.local_boundary_normal_map_;
           auto &cell_mass_matrix = copy.cell_mass_matrix_;
           auto &cell_lumped_mass_matrix = copy.cell_lumped_mass_matrix_;
           auto &cell_cij_matrix = copy.cell_cij_matrix_;
 
           auto &fe_values = scratch.fe_values_;
+          auto &fe_face_values = scratch.fe_face_values_;
 
           is_artificial = cell->is_artificial();
           if (is_artificial)
@@ -210,24 +211,34 @@ namespace grendel
             }   /* for j */
           }     /* for q */
 
-          local_boundary_dof_indices.resize(0);
+          local_boundary_normal_map.clear();
           for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f) {
             const auto face = cell->face(f);
             if (!face->at_boundary())
               continue;
+
+            fe_face_values.reinit(cell, f);
+            const unsigned int n_face_q_points =
+                scratch.face_quadrature_.size();
+
             std::vector<types::global_dof_index> indices(dofs_per_face);
             face->get_dof_indices(indices);
-            local_boundary_dof_indices.insert(local_boundary_dof_indices.end(),
-                                              indices.begin(),
-                                              indices.end());
-          }
 
+            for (unsigned int i = 0; i < dofs_per_face; ++i) {
+              dealii::Tensor<1, dim> normal;
+              for (unsigned int q = 0; q < n_face_q_points; ++q)
+                normal += fe_face_values.normal_vector(q) *
+                          fe_face_values.shape_value(i, q);
+
+              local_boundary_normal_map[indices[i]] = normal;
+            }
+          }
         };
 
     const auto copy_local_to_global = [&](const auto &copy) {
       const auto &is_artificial = copy.is_artificial_;
       const auto &local_dof_indices = copy.local_dof_indices_;
-      const auto &local_boundary_dof_indices = copy.local_boundary_dof_indices_;
+      const auto &local_boundary_normal_map = copy.local_boundary_normal_map_;
       const auto &cell_mass_matrix = copy.cell_mass_matrix_;
       const auto &cell_lumped_mass_matrix = copy.cell_lumped_mass_matrix_;
       const auto &cell_cij_matrix = copy.cell_cij_matrix_;
@@ -235,8 +246,8 @@ namespace grendel
       if(is_artificial)
         return;
 
-      boundary_list_.insert(local_boundary_dof_indices.begin(),
-                            local_boundary_dof_indices.end());
+      for(const auto &it : local_boundary_normal_map)
+        boundary_normal_map_[it.first] += it.second;
 
       affine_constraints_.distribute_local_to_global(
           cell_mass_matrix, local_dof_indices, mass_matrix_);
@@ -331,6 +342,12 @@ namespace grendel
                       [](const auto &) {},
                       double(),
                       double());
+
+      /*
+       * And also normalize our boundary normals:
+       */
+      for (auto &it : boundary_normal_map_)
+        it.second /= it.second.norm();
     }
 
   }

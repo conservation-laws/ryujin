@@ -59,8 +59,9 @@ namespace grendel
     dealii::SparsityPattern sparsity_pattern_;
     A_RO(sparsity_pattern)
 
-    std::set<dealii::types::global_dof_index> boundary_list_;
-    A_RO(boundary_list)
+    std::map<dealii::types::global_dof_index, dealii::Tensor<1, dim>>
+        boundary_normal_map_;
+    A_RO(boundary_normal_map)
 
     dealii::AffineConstraints<double> affine_constraints_;
     A_RO(affine_constraints)

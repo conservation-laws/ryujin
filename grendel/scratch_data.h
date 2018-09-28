@@ -32,11 +32,19 @@ namespace grendel
                      dealii::update_values | dealii::update_gradients |
                          dealii::update_quadrature_points |
                          dealii::update_JxW_values)
+        , face_quadrature_(3) // FIXME
+        , fe_face_values_(discretization_.mapping(),
+                          discretization_.finite_element(),
+                          face_quadrature_,
+                          dealii::update_normal_vectors |
+                              dealii::update_values | dealii::update_JxW_values)
     {
     }
 
     const grendel::Discretization<dim> &discretization_;
     dealii::FEValues<dim> fe_values_;
+    const dealii::QGauss<dim - 1> face_quadrature_;
+    dealii::FEFaceValues<dim> fe_face_values_;
   };
 
   template <int dim>
@@ -45,7 +53,8 @@ namespace grendel
   public:
     bool is_artificial_;
     std::vector<dealii::types::global_dof_index> local_dof_indices_;
-    std::vector<dealii::types::global_dof_index> local_boundary_dof_indices_;
+    std::map<dealii::types::global_dof_index, dealii::Tensor<1, dim>>
+        local_boundary_normal_map_;
     dealii::FullMatrix<double> cell_mass_matrix_;
     dealii::FullMatrix<double> cell_lumped_mass_matrix_;
     std::array<dealii::FullMatrix<double>, dim> cell_cij_matrix_;
