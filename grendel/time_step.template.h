@@ -119,6 +119,7 @@ namespace grendel
              * In case both dofs are located at the boundary we have to
              * symmetrize.
              */
+
             if (boundary_normal_map.find(i) != boundary_normal_map.end() &&
                 boundary_normal_map.find(j) != boundary_normal_map.end()) {
               const auto n_ji = gather(nij_matrix, j, i);
@@ -132,6 +133,7 @@ namespace grendel
              * Set symmetrized off-diagonal values and subtract the value
              * from both diagonal entries:
              */
+
             dij_matrix_(i, j) = d;
             dij_matrix_(j, i) = d;
             dij_matrix_(i, i) -= d;

@@ -8,7 +8,7 @@ MAKE_COMMAND:=ninja
 MAKE_FILE:=build.ninja
 
 NP:=2
-MPIRUN:=mpirun -np $(NP)
+MPIRUN:=mpirun --oversubscribe -np $(NP)
 EXECUTABLE:=ryujin
 PARAMETER_FILE:=$(EXECUTABLE).prm
 
