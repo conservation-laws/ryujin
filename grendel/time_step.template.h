@@ -4,6 +4,8 @@
 #include "helper.h"
 #include "time_step.h"
 
+#include <atomic>
+
 namespace grendel
 {
   using namespace dealii;
@@ -50,13 +52,16 @@ namespace grendel
 
     const auto &locally_owned = offline_data_->locally_owned();
     const auto &sparsity_pattern = offline_data_->sparsity_pattern();
+    const auto &lumped_mass_matrix = offline_data_->lumped_mass_matrix();
     const auto &norm_matrix = offline_data_->norm_matrix();
     const auto &nij_matrix = offline_data_->nij_matrix();
     const auto &boundary_normal_map = offline_data_->boundary_normal_map();
 
     /*
-     * Step 1: Update d_ij and f_i
+     * Step 1: Update d_ij and f_i, and compute maximal time-step size:
      */
+
+    std::atomic<double> t_max{std::numeric_limits<double>::infinity()};
 
     /* Clear out matrix entries: */
     dij_matrix_ = 0.;
@@ -74,6 +79,8 @@ namespace grendel
        */
 
       const auto on_subranges = [&](const auto it1, const auto it2) {
+        double t_max_local = std::numeric_limits<double>::infinity();
+
         /* [it1, it2) is an iterator range over f_i_ */
         for (auto it = it1; it != it2; ++it) {
           /* Determine absolute position of it in vector: */
@@ -135,22 +142,42 @@ namespace grendel
              */
 
             dij_matrix_(i, j) = d;
-            dij_matrix_(j, i) = d;
+            dij_matrix_(j, i) = d; // not accessed concurrently
             dij_matrix_(i, i) -= d;
-            dij_matrix_(j, j) -= d;
           }
+
+          const double cfl = problem_description_->cfl_constant();
+          const double mass = lumped_mass_matrix(i, i);
+          const double dii = dij_matrix_(i, i);
+          const double t = cfl * mass / dii;
+          t_max_local = std::min(t_max_local, t);
         }
+
+        /*
+         * Lock-free update of the t_max value:
+         */
+
+        double current_t_max = t_max.load();
+        while (current_t_max < t_max_local &&
+               !t_max.compare_exchange_strong(current_t_max, t_max_local))
+          ;
       };
 
       parallel::apply_to_subranges(
           f_i_.begin(), f_i_.end(), on_subranges, 4096);
+
+      /*
+       * ... and finally synchronize t_max over all MPI processes:
+       */
+
+      t_max.store(Utilities::MPI::min(t_max.load(), mpi_communicator_));
     }
 
     /*
-     * Step 2: Compute time step
+     * Step 2:
      */
 
-    return {vector_type(), 0.};
+    return {vector_type(), t_old + t_max};
   }
 
 } /* namespace grendel */

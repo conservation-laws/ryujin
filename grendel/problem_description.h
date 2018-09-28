@@ -98,6 +98,9 @@ namespace grendel
 
     double b_;
     A_RO(b)
+
+    double cfl_constant_;
+    A_RO(cfl_constant)
   };
 
 } /* namespace grendel */
