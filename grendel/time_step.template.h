@@ -45,15 +45,17 @@ namespace grendel
 
   template <int dim>
   std::tuple<typename TimeStep<dim>::vector_type, double>
-  TimeStep<dim>::compute_step(const vector_type &U_old, const double t_old)
+  TimeStep<dim>::euler_step(const vector_type &U_old, const double t_old)
   {
-    deallog << "TimeStep<dim>::compute_step()" << std::endl;
+    deallog << "TimeStep<dim>::euler_step()" << std::endl;
 
     const auto &locally_relevant = offline_data_->locally_relevant();
+    const auto &locally_owned = offline_data_->locally_owned();
     const auto &sparsity_pattern = offline_data_->sparsity_pattern();
     const auto &lumped_mass_matrix = offline_data_->lumped_mass_matrix();
     const auto &norm_matrix = offline_data_->norm_matrix();
     const auto &nij_matrix = offline_data_->nij_matrix();
+    const auto &cij_matrix = offline_data_->cij_matrix();
     const auto &boundary_normal_map = offline_data_->boundary_normal_map();
 
     /*
@@ -192,10 +194,70 @@ namespace grendel
     }
 
     /*
-     * Step 3:
+     * Step 3: Perform update *yay*
      */
 
-    return {vector_type(), t_old + tau_max};
+    {
+      deallog << "        perform time-step" << std::endl;
+      TimerOutput::Scope t(computing_timer_, "time_step - perform time-step");
+
+      vector_type U_new;
+      for (auto &it : U_new)
+        it.reinit(U_old[0]);
+
+      const double t_new = t_old + tau_max;
+
+      const auto on_subranges = [&](const auto it1, const auto it2) {
+        /* [it1, it2) is an iterator range over f_i_ */
+        for (auto it = it1; it != it2; ++it) {
+          /* Determine absolute position of it in vector: */
+          const unsigned int pos_i = std::distance(f_i_.begin(), it);
+          const auto i = locally_relevant.nth_index_in_set(pos_i);
+
+          if (!locally_owned.is_element(i))
+            continue;
+
+          const auto U_i = gather(U_old, i);
+
+          dealii::Tensor<1, problem_dimension> Unew_i = U_i;
+
+          const auto f_i = *it; // This is f_i_[pos_i]
+          const double m_i = lumped_mass_matrix(i, i);
+
+          for (auto jt = sparsity_pattern.begin(i);
+               jt != sparsity_pattern.end(i);
+               ++jt) {
+            const auto j = jt->column();
+
+            if (j == i)
+              continue;
+
+            const unsigned int pos_j = locally_relevant.index_within_set(j);
+
+            const auto c_ij = gather(cij_matrix, i, j);
+            const auto d_ij = dij_matrix_(i, j);
+            const auto f_j = f_i_[pos_j];
+            const auto U_j = gather(U_old, j);
+
+            for (unsigned int k = 0; k < problem_dimension; ++k)
+              Unew_i[k] +=
+                  tau_max / m_i *
+                  (-(f_j[k] - f_i[k]) * c_ij + d_ij * (U_j[k] - U_i[k]));
+          }
+
+          scatter(U_new, Unew_i, i);
+        }
+      };
+
+      parallel::apply_to_subranges(
+          f_i_.begin(), f_i_.end(), on_subranges, 4096);
+
+      /* Synchronize U_new over all MPI processes: */
+      for (auto &it : U_new)
+        it.update_ghost_values();
+
+      return {U_new, t_new};
+    }
   }
 
 

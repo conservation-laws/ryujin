@@ -39,8 +39,8 @@ namespace grendel
 
     void setup();
 
-    std::tuple<vector_type, double> compute_step(const vector_type &U_old,
-                                                 const double t_old);
+    std::tuple<vector_type, double> euler_step(const vector_type &U_old,
+                                               const double t_old);
 
   protected:
 
@@ -58,6 +58,7 @@ namespace grendel
     A_RO(riemann_solver)
 
   private:
+    /* Scratch data: */
     std::vector<rank2_type> f_i_;
     dealii::SparseMatrix<double> dij_matrix_;
   };

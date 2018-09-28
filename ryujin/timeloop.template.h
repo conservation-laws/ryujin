@@ -114,7 +114,7 @@ namespace ryujin
 
       double t = 0.;
 
-      const auto [U_new, t_new] = time_step.compute_step(U, t);
+      const auto [U_new, t_new] = time_step.euler_step(U, t);
     }
 
     computing_timer.print_summary();

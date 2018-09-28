@@ -9,6 +9,18 @@ namespace grendel
    * It's magic
    */
   template <typename T1, std::size_t k, typename T2>
+  inline DEAL_II_ALWAYS_INLINE void
+  scatter(std::array<T1, k> &U, const dealii::Tensor<1, k> result, const T2 i)
+  {
+    for (unsigned int j = 0; j < k; ++j)
+      U[j][i] = result[j];
+  }
+
+
+  /*
+   * It's magic
+   */
+  template <typename T1, std::size_t k, typename T2>
   inline DEAL_II_ALWAYS_INLINE dealii::Tensor<1, k>
   gather(const std::array<T1, k> &U, const T2 i)
   {
