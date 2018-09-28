@@ -33,13 +33,12 @@ namespace grendel
   void TimeStep<dim>::setup()
   {
     deallog << "TimeStep<dim>::setup()" << std::endl;
-    TimerOutput::Scope t(computing_timer_,
-                         "time_step - setup scratch space");
+    TimerOutput::Scope t(computing_timer_, "time_step - setup scratch space");
 
-    const auto &locally_owned = offline_data_->locally_owned();
+    const auto &locally_relevant = offline_data_->locally_relevant();
     const auto &sparsity_pattern = offline_data_->sparsity_pattern();
 
-    f_i_.resize(locally_owned.n_elements());
+    f_i_.resize(locally_relevant.n_elements());
     dij_matrix_.reinit(sparsity_pattern);
   }
 
@@ -50,7 +49,7 @@ namespace grendel
   {
     deallog << "TimeStep<dim>::compute_step()" << std::endl;
 
-    const auto &locally_owned = offline_data_->locally_owned();
+    const auto &locally_relevant = offline_data_->locally_relevant();
     const auto &sparsity_pattern = offline_data_->sparsity_pattern();
     const auto &lumped_mass_matrix = offline_data_->lumped_mass_matrix();
     const auto &norm_matrix = offline_data_->norm_matrix();
@@ -58,10 +57,8 @@ namespace grendel
     const auto &boundary_normal_map = offline_data_->boundary_normal_map();
 
     /*
-     * Step 1: Update d_ij and f_i, and compute maximal time-step size:
+     * Step 1: Compute off-diagonal d_ij and f_i:
      */
-
-    std::atomic<double> t_max{std::numeric_limits<double>::infinity()};
 
     /* Clear out matrix entries: */
     dij_matrix_ = 0.;
@@ -79,29 +76,21 @@ namespace grendel
        */
 
       const auto on_subranges = [&](const auto it1, const auto it2) {
-        double t_max_local = std::numeric_limits<double>::infinity();
-
         /* [it1, it2) is an iterator range over f_i_ */
         for (auto it = it1; it != it2; ++it) {
           /* Determine absolute position of it in vector: */
           const unsigned int pos = std::distance(f_i_.begin(), it);
-          const auto i = locally_owned.nth_index_in_set(pos);
+          const auto i = locally_relevant.nth_index_in_set(pos);
 
           // FIXME: const and remove
           auto U_i = gather(U_old, i);
           U_i += dealii::Tensor<1, problem_dimension>{
               {2.21953, 1.09817, 0., 5.09217}};
 
-          /*
-           * Populate f_i_:
-           */
-
+          /* Populate f_i_: */
           *it = problem_description_->f(U_i);
 
-          /*
-           * Populate dij_:
-           */
-
+          /* Populate off-diagonal dij_: */
           for (auto jt = sparsity_pattern.begin(i);
                jt != sparsity_pattern.end(i);
                ++jt) {
@@ -136,49 +125,79 @@ namespace grendel
               d = std::max(d, norm_2 * lambda_max_2);
             }
 
-            /*
-             * Set symmetrized off-diagonal values and subtract the value
-             * from both diagonal entries:
-             */
-
+            /* Set symmetrized off-diagonal values: */
             dij_matrix_(i, j) = d;
-            dij_matrix_(j, i) = d; // not accessed concurrently
-            dij_matrix_(i, i) -= d;
+            dij_matrix_(j, i) = d;
           }
+        }
+      };
+
+      parallel::apply_to_subranges(
+          f_i_.begin(), f_i_.end(), on_subranges, 4096);
+    }
+
+    /*
+     * Step 2: Compute diagonal of d_ij and maximal time-step size:
+     */
+
+    std::atomic<double> tau_max{std::numeric_limits<double>::infinity()};
+
+    {
+      deallog << "        compute diagonal and tau_max" << std::endl;
+      TimerOutput::Scope t(computing_timer_,
+                           "time_step - compute diagonal and tau_max");
+
+      const auto on_subranges = [&](const auto it1, const auto it2) {
+        double tau_max_on_subrange = std::numeric_limits<double>::infinity();
+
+        /* [it1, it2) is an iterator range over f_i_ */
+        for (auto it = it1; it != it2; ++it) {
+          /* Determine absolute position of it in vector: */
+          const unsigned int pos = std::distance(f_i_.begin(), it);
+          const auto i = locally_relevant.nth_index_in_set(pos);
+
+          /* Compute sum of d_ijs for index i: */
+          double d_sum = 0.;
+          for (auto jt = sparsity_pattern.begin(i);
+               jt != sparsity_pattern.end(i);
+               ++jt) {
+            const auto j = jt->column();
+
+            if (j == i)
+              continue;
+
+            d_sum -= dij_matrix_(i, j);
+          }
+
+          dij_matrix_(i, i) = d_sum;
 
           const double cfl = problem_description_->cfl_constant();
           const double mass = lumped_mass_matrix(i, i);
-          const double dii = dij_matrix_(i, i);
-          const double t = cfl * mass / dii;
-          t_max_local = std::min(t_max_local, t);
+          const double tau = cfl * mass / (-2. * d_sum);
+          tau_max_on_subrange = std::min(tau_max_on_subrange, tau);
         }
 
-        /*
-         * Lock-free update of the t_max value:
-         */
-
-        double current_t_max = t_max.load();
-        while (current_t_max < t_max_local &&
-               !t_max.compare_exchange_strong(current_t_max, t_max_local))
+        double current_tau_max = tau_max.load();
+        while (current_tau_max > tau_max_on_subrange &&
+               !tau_max.compare_exchange_weak(current_tau_max,
+                                              tau_max_on_subrange))
           ;
       };
 
       parallel::apply_to_subranges(
           f_i_.begin(), f_i_.end(), on_subranges, 4096);
 
-      /*
-       * ... and finally synchronize t_max over all MPI processes:
-       */
-
-      t_max.store(Utilities::MPI::min(t_max.load(), mpi_communicator_));
+      /* Synchronize tau_max over all MPI processes: */
+      tau_max.store(Utilities::MPI::min(tau_max.load(), mpi_communicator_));
     }
 
     /*
-     * Step 2:
+     * Step 3:
      */
 
-    return {vector_type(), t_old + t_max};
+    return {vector_type(), t_old + tau_max};
   }
+
 
 } /* namespace grendel */
 
