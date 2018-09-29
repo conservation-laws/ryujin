@@ -188,6 +188,8 @@ namespace grendel
 
           cell->get_dof_indices(local_dof_indices);
 
+          local_boundary_normal_map.clear();
+
           for (unsigned int q_point = 0; q_point < n_q_points; ++q_point) {
             const auto JxW = fe_values.JxW(q_point);
 

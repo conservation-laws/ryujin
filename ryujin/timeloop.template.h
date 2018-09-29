@@ -217,7 +217,7 @@ namespace ryujin
   TimeLoop<dim>::interpolate_initial_values()
   {
     deallog << "TimeLoop<dim>::interpolate_initial_values()" << std::endl;
-    TimerOutput::Scope t(computing_timer, "time_step - setup scratch space");
+    TimerOutput::Scope t(computing_timer, "time_loop - setup scratch space");
 
     vector_type U;
 
@@ -252,7 +252,7 @@ namespace ryujin
                              const std::string &name)
   {
     deallog << "TimeLoop<dim>::output()" << std::endl;
-    TimerOutput::Scope t(computing_timer, "time_step - output");
+    TimerOutput::Scope t(computing_timer, "time_loop - output");
 
     constexpr auto problem_dimension =
         ProblemDescription<dim>::problem_dimension;

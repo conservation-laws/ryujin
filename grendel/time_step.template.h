@@ -251,7 +251,7 @@ namespace grendel
             /* On boundray 1 we reflect: */
             if (id == 1) {
               auto m = ProblemDescription<dim>::momentum_vector(Unew_i);
-              m -= (m * normal) * normal;
+              m -= 1. * (m * normal) * normal;
               for (unsigned int i = 0; i < dim; ++i)
                 Unew_i[i + 1] = m[i];
             }
