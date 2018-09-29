@@ -84,10 +84,7 @@ namespace grendel
           const unsigned int pos = std::distance(f_i_.begin(), it);
           const auto i = locally_relevant.nth_index_in_set(pos);
 
-          // FIXME: const and remove
-          auto U_i = gather(U_old, i);
-          U_i += dealii::Tensor<1, problem_dimension>{
-              {2.21953, 1.09817, 0., 5.09217}};
+          const auto U_i = gather(U_old, i);
 
           /* Populate f_i_: */
           *it = problem_description_->f(U_i);
@@ -102,9 +99,7 @@ namespace grendel
             if (j >= i)
               continue;
 
-            // FIXME: const and remove
-            auto U_j = gather(U_old, j);
-            U_j += dealii::Tensor<1, problem_dimension>{{1.4, 0., 0., 2.5}};
+            const auto U_j = gather(U_old, j);
             const auto n_ij = gather(nij_matrix, i, j);
             const double norm = norm_matrix(i, j);
 
