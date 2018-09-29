@@ -113,8 +113,8 @@ namespace grendel
              * symmetrize.
              */
 
-            if (boundary_normal_map.find(i) != boundary_normal_map.end() &&
-                boundary_normal_map.find(j) != boundary_normal_map.end()) {
+            if (boundary_normal_map.count(i) != 0 &&
+                boundary_normal_map.count(j) != 0) {
               const auto n_ji = gather(nij_matrix, j, i);
               auto [lambda_max_2, p_star_2, n_iterations_2] =
                   riemann_solver_->compute(U_j, U_i, n_ji);
@@ -239,6 +239,27 @@ namespace grendel
                   tau_max / m_i *
                   (-(f_j[k] - f_i[k]) * c_ij + d_ij * (U_j[k] - U_i[k]));
           }
+
+          /*
+           * Treat boundary points:
+           */
+
+          const auto bnm_it = boundary_normal_map.find(i);
+          if (bnm_it != boundary_normal_map.end()) {
+            const auto [normal, id] = bnm_it->second;
+
+            /* On boundray 1 we reflect: */
+            if (id == 1) {
+              auto m = ProblemDescription<dim>::momentum_vector(Unew_i);
+              m -= (m * normal) * normal;
+              for (unsigned int i = 0; i < dim; ++i)
+                Unew_i[i + 1] = m[i];
+            }
+          }
+
+          /*
+           * And write to global vector:
+           */
 
           scatter(U_new, Unew_i, i);
         }

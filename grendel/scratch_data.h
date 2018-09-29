@@ -53,7 +53,8 @@ namespace grendel
   public:
     bool is_artificial_;
     std::vector<dealii::types::global_dof_index> local_dof_indices_;
-    std::map<dealii::types::global_dof_index, dealii::Tensor<1, dim>>
+    std::map<dealii::types::global_dof_index,
+             std::tuple<dealii::Tensor<1, dim>, dealii::types::boundary_id>>
         local_boundary_normal_map_;
     dealii::FullMatrix<double> cell_mass_matrix_;
     dealii::FullMatrix<double> cell_lumped_mass_matrix_;

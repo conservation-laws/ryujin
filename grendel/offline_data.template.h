@@ -214,8 +214,11 @@ namespace grendel
           local_boundary_normal_map.clear();
           for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f) {
             const auto face = cell->face(f);
+
             if (!face->at_boundary())
               continue;
+
+            const auto id = face->boundary_id();
 
             fe_face_values.reinit(cell, f);
             const unsigned int n_face_q_points =
@@ -225,12 +228,17 @@ namespace grendel
             face->get_dof_indices(indices);
 
             for (unsigned int i = 0; i < dofs_per_face; ++i) {
+
+              if (!discretization_->finite_element().has_support_on_face(i, f))
+                continue;
+
               dealii::Tensor<1, dim> normal;
               for (unsigned int q = 0; q < n_face_q_points; ++q)
                 normal += fe_face_values.normal_vector(q) *
                           fe_face_values.shape_value(i, q);
 
-              local_boundary_normal_map[indices[i]] = normal;
+              local_boundary_normal_map[indices[i]] =
+                  std::make_tuple(normal, id);
             }
           }
         };
@@ -246,8 +254,11 @@ namespace grendel
       if(is_artificial)
         return;
 
-      for(const auto &it : local_boundary_normal_map)
-        boundary_normal_map_[it.first] += it.second;
+      for (const auto &it : local_boundary_normal_map) {
+        auto &jt = boundary_normal_map_[it.first];
+        std::get<0>(jt) += std::get<0>(it.second);
+        std::get<1>(jt) = std::get<1>(it.second);
+      }
 
       affine_constraints_.distribute_local_to_global(
           cell_mass_matrix, local_dof_indices, mass_matrix_);
@@ -346,8 +357,10 @@ namespace grendel
       /*
        * And also normalize our boundary normals:
        */
-      for (auto &it : boundary_normal_map_)
-        it.second /= it.second.norm();
+      for (auto &it : boundary_normal_map_) {
+        auto &[normal, id] = it.second;
+        normal /= normal.norm();
+      }
     }
 
   }
