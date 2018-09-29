@@ -3,10 +3,13 @@
 
 #include "timeloop.h"
 
-#include <deal.II/base/work_stream.h>
+#include <helper.h>
+
 #include <deal.II/base/logstream.h>
 #include <deal.II/base/revision.h>
+#include <deal.II/base/work_stream.h>
 #include <deal.II/grid/grid_out.h>
+#include <deal.II/numerics/vector_tools.h>
 
 #include <iomanip>
 #include <type_traits>
@@ -79,6 +82,10 @@ namespace ryujin
   {
     initialize();
 
+    /*
+     * Create triangulation:
+     */
+
     discretization.create_triangulation();
 
     {
@@ -90,7 +97,9 @@ namespace ryujin
       GridOut().write_ucd(discretization.triangulation(), output);
     }
 
-    /* Compute offline data: */
+    /*
+     * Compute offline data:
+     */
 
     print_head("compute offline data");
     offline_data.prepare();
@@ -98,22 +107,43 @@ namespace ryujin
     print_head("set up time step");
     time_step.setup();
 
+    /*
+     * Interpolate initial values:
+     */
+
+    print_head("interpolate initial values");
+
+    using vector_type = typename TimeStep<dim>::vector_type;
+    vector_type U;
+    double t = 0.;
+    {
+      const auto &locally_owned = offline_data.locally_owned();
+      const auto &locally_relevant = offline_data.locally_relevant();
+      U[0].reinit(locally_owned, locally_relevant, mpi_communicator);
+      for (auto &it : U)
+        it.reinit(U[0]);
+
+      const auto problem_dimension = ProblemDescription<dim>::problem_dimension;
+      const auto callable = [&](const auto &p) {
+        return problem_description.initial_state(p);
+      };
+      for (unsigned int i = 0; i < problem_dimension; ++i)
+        VectorTools::interpolate(offline_data.dof_handler(),
+                                 to_function<dim, double>(callable, i),
+                                 U[i]);
+
+      for (auto &it : U)
+        it.update_ghost_values();
+    }
+
+
+    /*
+     * Loop:
+     */
+
 
     // FIXME The loop ...
     {
-      using vector_type = typename TimeStep<dim>::vector_type;
-      const auto &locally_owned = offline_data.locally_owned();
-      const auto &locally_relevant = offline_data.locally_relevant();
-
-      vector_type U;
-      U[0].reinit(locally_owned, locally_relevant, mpi_communicator);
-      for (auto &it : U) {
-        it.reinit(U[0]);
-        it.update_ghost_values();
-      }
-
-      double t = 0.;
-
       const auto [U_new, t_new] = time_step.euler_step(U, t);
     }
 
