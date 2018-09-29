@@ -20,7 +20,7 @@ namespace grendel
     b_ = 0.0;
     add_parameter("b", b_, "b aka bcovol");
 
-    cfl_constant_ = 0.35;
+    cfl_constant_ = 1.00;
     add_parameter("cfl constant", cfl_constant_, "CFL constant C");
 
     initial_state_ = "shock front";
