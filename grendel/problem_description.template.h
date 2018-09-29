@@ -28,7 +28,7 @@ namespace grendel
                   initial_state_,
                   "Initial state. Valid names are \"shock front\".");
 
-    initial_shock_front_mach_number_ = 1.0;
+    initial_shock_front_mach_number_ = 2.0;
     add_parameter("shock front - mach number",
                   initial_shock_front_mach_number_,
                   "Shock Front: Mach number");

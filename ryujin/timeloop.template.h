@@ -113,13 +113,19 @@ namespace ryujin
     /*
      * Loop:
      */
-
+    for(unsigned int cycle = 1; t < t_final; ++cycle)
     {
-      unsigned int cycle = 1;
-      deallog << "--> t=" << t << std::endl;
+      print_head("Cycle  " + Utilities::int_to_string(cycle, 6));
+
+      deallog << "        at time t=" << t << " (" << std::setprecision(1)
+              << std::fixed << t / t_final * 100 << "%)" << std::endl;
+
       const auto [U_new, t_new] = time_step.euler_step(U, t);
-      deallog << "--> t=" << t_new << std::endl;
+
       output(U, base_name + "-solution-" + Utilities::int_to_string(cycle, 6));
+
+      t = t_new;
+      U = U_new;
     }
 
     computing_timer.print_summary();
