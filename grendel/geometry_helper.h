@@ -64,6 +64,22 @@ namespace grendel
     }
 
     triangulation.create_triangulation(vertices, cells, SubCellData());
+
+    /* Set boundary ids of the triangle to 1: */
+
+    for (auto cell : triangulation.active_cell_iterators()) {
+      for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f) {
+        const auto face = cell->face(f);
+
+        if (!face->at_boundary())
+          continue;
+
+        const auto center = face->center();
+        if (center[0] > 0. && center[0] < length && //
+            center[1] > 0. && center[1] < height)
+          face->set_boundary_id(1);
+      }
+    }
   }
 
 } // namespace grendel
