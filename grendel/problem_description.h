@@ -47,17 +47,34 @@ namespace grendel
 
     virtual ~ProblemDescription() final = default;
 
+    void parse_parameters_callback();
+
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, return
      * the momentum vector <code>[U[1], ..., U[1+dim]]</code>.
      */
-    static DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, dim>
+    static inline DEAL_II_ALWAYS_INLINE dealii::Tensor<1, dim>
     momentum_vector(const rank1_type &U)
     {
       dealii::Tensor<1, dim> result;
       std::copy(&U[1], &U[1 + dim], &result[0]);
       return result;
+    }
+
+
+    /**
+     * FIXME: Description and comments
+     */
+    inline DEAL_II_ALWAYS_INLINE rank1_type
+    initial_state(const dealii::Point<dim> &point) const
+    {
+      if ((point - initial_shock_front_position_) *
+              initial_shock_front_direction_ >
+          0.)
+        return initial_shock_front_state_R_;
+      else
+        return initial_shock_front_state_L_;
     }
 
 
@@ -92,7 +109,7 @@ namespace grendel
     }
 
 
-  private:
+  protected:
     double gamma_;
     A_RO(gamma)
 
@@ -101,6 +118,14 @@ namespace grendel
 
     double cfl_constant_;
     A_RO(cfl_constant)
+
+  private:
+    std::string initial_state_;
+    double initial_shock_front_mach_number_;
+    dealii::Tensor<1, dim> initial_shock_front_direction_;
+    dealii::Point<dim> initial_shock_front_position_;
+    rank1_type initial_shock_front_state_L_;
+    rank1_type initial_shock_front_state_R_;
   };
 
 } /* namespace grendel */

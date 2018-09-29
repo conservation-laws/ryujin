@@ -32,21 +32,20 @@ namespace grendel
                   geometry_,
                   "Geometry. Valid names are \"immersed triangle\".");
 
-    length_ = 3.;
-    add_parameter("geometry length",
-                  length_,
-                  "Length of geometry (interpretation depends on geometry)");
+    immersed_triangle_length_ = 3.;
+    add_parameter("immersed triangle - length",
+                  immersed_triangle_length_,
+                  "Immersed Triangle: length of computational domain");
 
-    height_ = 3.;
-    add_parameter("geometry height",
-                  height_,
-                  "Height of geometry (interpretation depends on geometry)");
+    immersed_triangle_height_ = 3.;
+    add_parameter("immersed triangle - height",
+                  immersed_triangle_height_,
+                  "Immersed Triangle: height of computational domain");
 
-    object_height_ = 1.;
-    add_parameter(
-        "object height",
-        object_height_,
-        "Height of immersed object (interpretation depends on geometry)");
+    immersed_triangle_object_height_ = 1.;
+    add_parameter("immersed triangle - object height",
+                  immersed_triangle_object_height_,
+                  "Immersed Triangle: height of immersed triangle");
 
     refinement_ = 5;
     add_parameter("initial refinement",
@@ -82,8 +81,10 @@ namespace grendel
     triangulation.clear();
 
     if (geometry_ == "immersed triangle") {
-      create_coarse_grid_triangle(
-          triangulation, length_, height_, object_height_);
+      create_coarse_grid_triangle(triangulation,
+                                  immersed_triangle_length_,
+                                  immersed_triangle_height_,
+                                  immersed_triangle_object_height_);
 
     } else {
 

@@ -29,9 +29,9 @@ namespace grendel
     dealii::TimerOutput &computing_timer_;
 
     std::string geometry_;
-    double length_;
-    double height_;
-    double object_height_;
+    double immersed_triangle_length_;
+    double immersed_triangle_height_;
+    double immersed_triangle_object_height_;
 
     unsigned int refinement_;
 
