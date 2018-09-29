@@ -22,12 +22,12 @@ namespace ryujin
     TimeLoop(const MPI_Comm &mpi_comm);
     virtual ~TimeLoop() final = default;
 
-    virtual void run();
+    void run();
 
   private:
     /* Private methods for run(): */
 
-    virtual void initialize();
+    void initialize();
 
     /* Data: */
 
@@ -36,6 +36,7 @@ namespace ryujin
     dealii::TimerOutput computing_timer;
 
     std::string base_name;
+    double t_final;
 
     grendel::Discretization<dim> discretization;
     grendel::OfflineData<dim> offline_data;

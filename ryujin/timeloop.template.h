@@ -73,7 +73,10 @@ namespace ryujin
                   "F - TimeStep")
   {
     base_name = "test";
-    add_parameter("basename", base_name, "base name for all output files");
+    add_parameter("basename", base_name, "Base name for all output files");
+
+    t_final = 4.;
+    add_parameter("final time", t_final, "Final time");
   }
 
 
@@ -144,7 +147,9 @@ namespace ryujin
 
     // FIXME The loop ...
     {
+      deallog << "--> t=" << t << std::endl;
       const auto [U_new, t_new] = time_step.euler_step(U, t);
+      deallog << "--> t=" << t_new << std::endl;
     }
 
     computing_timer.print_summary();
