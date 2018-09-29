@@ -166,6 +166,7 @@ namespace grendel
 
           auto &is_artificial = copy.is_artificial_;
           auto &local_dof_indices = copy.local_dof_indices_;
+
           auto &local_boundary_normal_map = copy.local_boundary_normal_map_;
           auto &cell_mass_matrix = copy.cell_mass_matrix_;
           auto &cell_lumped_mass_matrix = copy.cell_lumped_mass_matrix_;
@@ -185,10 +186,14 @@ namespace grendel
 
           fe_values.reinit(cell);
           local_dof_indices.resize(dofs_per_cell);
-
           cell->get_dof_indices(local_dof_indices);
 
+          /* clear out copy data: */
           local_boundary_normal_map.clear();
+          cell_mass_matrix = 0.;
+          cell_lumped_mass_matrix = 0.;
+          for (auto &matrix : cell_cij_matrix)
+            matrix = 0.;
 
           for (unsigned int q_point = 0; q_point < n_q_points; ++q_point) {
             const auto JxW = fe_values.JxW(q_point);
