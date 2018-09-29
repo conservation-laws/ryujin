@@ -30,7 +30,6 @@ namespace grendel
      */
     static constexpr unsigned int problem_dimension = 2 + dim;
 
-
     /**
      * rank1_type denotes the storage type used for a state vector
      */

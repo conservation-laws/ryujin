@@ -19,6 +19,8 @@ namespace ryujin
   class TimeLoop : public dealii::ParameterAcceptor
   {
   public:
+    using vector_type = typename grendel::TimeStep<dim>::vector_type;
+
     TimeLoop(const MPI_Comm &mpi_comm);
     virtual ~TimeLoop() final = default;
 
@@ -28,6 +30,9 @@ namespace ryujin
     /* Private methods for run(): */
 
     void initialize();
+
+    vector_type interpolate_initial_values();
+    void output(const vector_type &U, const std::string &name);
 
     /* Data: */
 

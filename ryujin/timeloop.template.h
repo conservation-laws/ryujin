@@ -9,10 +9,10 @@
 #include <deal.II/base/revision.h>
 #include <deal.II/base/work_stream.h>
 #include <deal.II/grid/grid_out.h>
+#include <deal.II/numerics/data_out.h>
 #include <deal.II/numerics/vector_tools.h>
 
 #include <iomanip>
-#include <type_traits>
 
 
 using namespace dealii;
@@ -85,10 +85,7 @@ namespace ryujin
   {
     initialize();
 
-    /*
-     * Create triangulation:
-     */
-
+    print_head("create triangulation");
     discretization.create_triangulation();
 
     {
@@ -100,56 +97,29 @@ namespace ryujin
       GridOut().write_ucd(discretization.triangulation(), output);
     }
 
-    /*
-     * Compute offline data:
-     */
-
     print_head("compute offline data");
     offline_data.prepare();
 
     print_head("set up time step");
     time_step.setup();
 
-    /*
-     * Interpolate initial values:
-     */
-
     print_head("interpolate initial values");
 
-    using vector_type = typename TimeStep<dim>::vector_type;
-    vector_type U;
+    auto U = interpolate_initial_values();
     double t = 0.;
-    {
-      const auto &locally_owned = offline_data.locally_owned();
-      const auto &locally_relevant = offline_data.locally_relevant();
-      U[0].reinit(locally_owned, locally_relevant, mpi_communicator);
-      for (auto &it : U)
-        it.reinit(U[0]);
 
-      const auto problem_dimension = ProblemDescription<dim>::problem_dimension;
-      const auto callable = [&](const auto &p) {
-        return problem_description.initial_state(p);
-      };
-      for (unsigned int i = 0; i < problem_dimension; ++i)
-        VectorTools::interpolate(offline_data.dof_handler(),
-                                 to_function<dim, double>(callable, i),
-                                 U[i]);
-
-      for (auto &it : U)
-        it.update_ghost_values();
-    }
-
+    output(U, base_name + "-solution-" + Utilities::int_to_string(0, 6));
 
     /*
      * Loop:
      */
 
-
-    // FIXME The loop ...
     {
+      unsigned int cycle = 1;
       deallog << "--> t=" << t << std::endl;
       const auto [U_new, t_new] = time_step.euler_step(U, t);
       deallog << "--> t=" << t_new << std::endl;
+      output(U, base_name + "-solution-" + Utilities::int_to_string(cycle, 6));
     }
 
     computing_timer.print_summary();
@@ -229,6 +199,96 @@ namespace ryujin
 
     deallog << "TimeLoop<dim>::run()" << std::endl;
     ParameterAcceptor::prm.log_parameters(deallog);
+  }
+
+
+  /**
+   * Return a vector populated with initial values:
+   */
+  template <int dim>
+  typename TimeLoop<dim>::vector_type
+  TimeLoop<dim>::interpolate_initial_values()
+  {
+    deallog << "TimeLoop<dim>::interpolate_initial_values()" << std::endl;
+    TimerOutput::Scope t(computing_timer, "time_step - setup scratch space");
+
+    vector_type U;
+
+    const auto &locally_owned = offline_data.locally_owned();
+    const auto &locally_relevant = offline_data.locally_relevant();
+    U[0].reinit(locally_owned, locally_relevant, mpi_communicator);
+    for (auto &it : U)
+      it.reinit(U[0]);
+
+    constexpr auto problem_dimension =
+        ProblemDescription<dim>::problem_dimension;
+    const auto callable = [&](const auto &p) {
+      return problem_description.initial_state(p);
+    };
+    for (unsigned int i = 0; i < problem_dimension; ++i)
+      VectorTools::interpolate(offline_data.dof_handler(),
+                               to_function<dim, double>(callable, i),
+                               U[i]);
+
+    for (auto &it : U)
+      it.update_ghost_values();
+
+    return U;
+  }
+
+
+  /**
+   * FIXME: Description
+   */
+  template <int dim>
+  void TimeLoop<dim>::output(const typename TimeLoop<dim>::vector_type &U,
+                             const std::string &name)
+  {
+    deallog << "TimeLoop<dim>::output()" << std::endl;
+    TimerOutput::Scope t(computing_timer, "time_step - output");
+
+    constexpr auto problem_dimension =
+        ProblemDescription<dim>::problem_dimension;
+
+    const auto &dof_handler = offline_data.dof_handler();
+    const auto &triangulation = discretization.triangulation();
+    const auto &mapping = discretization.mapping();
+
+    // FIXME
+    std::vector<std::string> component_names = {"rho", "m_1", "m_2", "E"};
+
+    dealii::DataOut<dim> data_out;
+    data_out.attach_dof_handler(dof_handler);
+
+    for (unsigned int i = 0; i < problem_dimension; ++i)
+      data_out.add_data_vector(U[i], component_names[i]);
+
+    data_out.build_patches(mapping);
+
+    const auto filename = [&](const unsigned int i) -> std::string {
+      const auto seq = dealii::Utilities::int_to_string(i, 4);
+      return name + "-" + seq + ".vtu";
+    };
+
+    {
+      /* Write out local vtu: */
+      const unsigned int i = triangulation.locally_owned_subdomain();
+      std::ofstream output(filename(i));
+      data_out.write_vtu(output);
+    }
+
+    if (dealii::Utilities::MPI::this_mpi_process(mpi_communicator) == 0) {
+      /* Write out pvtu control file: */
+
+      const unsigned int n_mpi_processes =
+          dealii::Utilities::MPI::n_mpi_processes(mpi_communicator);
+      std::vector<std::string> filenames;
+      for (unsigned int i = 0; i < n_mpi_processes; ++i)
+        filenames.push_back(filename(i));
+
+      std::ofstream output(name + ".pvtu");
+      data_out.write_pvtu_record(output, filenames);
+    }
   }
 
 } // namespace ryujin
