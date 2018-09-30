@@ -283,22 +283,20 @@ namespace ryujin
 
     data_out.build_patches(mapping);
 
+    DataOutBase::VtkFlags flags(
+        t, cycle, true, DataOutBase::VtkFlags::no_compression);
+    data_out.set_flags(flags);
+
     const auto filename = [&](const unsigned int i) -> std::string {
       const auto seq = dealii::Utilities::int_to_string(i, 4);
       return name + "-" + Utilities::int_to_string(cycle, 6) + "-" + seq +
              ".vtu";
     };
 
-    {
-      /* Write out local vtu: */
-      const unsigned int i = triangulation.locally_owned_subdomain();
-      std::ofstream output(filename(i));
-
-      DataOutBase::VtkFlags flags(
-          t, cycle, true, DataOutBase::VtkFlags::no_compression);
-      data_out.set_flags(flags);
-      data_out.write_vtu(output);
-    }
+    /* Write out local vtu: */
+    const unsigned int i = triangulation.locally_owned_subdomain();
+    std::ofstream output(filename(i));
+    data_out.write_vtu(output);
 
     if (dealii::Utilities::MPI::this_mpi_process(mpi_communicator) == 0) {
       /* Write out pvtu control file: */
