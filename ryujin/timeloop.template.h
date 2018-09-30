@@ -113,7 +113,7 @@ namespace ryujin
     double t = 0.;
     double last_output = 0.;
 
-    output(U, base_name + "-solution-" + Utilities::int_to_string(0, 6));
+    output(U, base_name + "-solution", t, 0);
 
     /*
      * Loop:
@@ -128,14 +128,13 @@ namespace ryujin
 
       const auto [U_new, t_new] = time_step.euler_step(U, t);
 
-      if(t - last_output > output_granularity) {
-        output(U,
-               base_name + "-solution-" + Utilities::int_to_string(cycle, 6));
-        last_output = t;
-      }
-
       U = std::move(U_new);
       t = t_new;
+
+      if (t - last_output > output_granularity) {
+        output(U, base_name + "-solution", t, cycle);
+        last_output = t;
+      }
     }
 
     computing_timer.print_summary();
@@ -226,7 +225,8 @@ namespace ryujin
   TimeLoop<dim>::interpolate_initial_values()
   {
     deallog << "TimeLoop<dim>::interpolate_initial_values()" << std::endl;
-    TimerOutput::Scope t(computing_timer, "time_loop - setup scratch space");
+    TimerOutput::Scope timer(computing_timer,
+                             "time_loop - setup scratch space");
 
     vector_type U;
 
@@ -258,10 +258,12 @@ namespace ryujin
    */
   template <int dim>
   void TimeLoop<dim>::output(const typename TimeLoop<dim>::vector_type &U,
-                             const std::string &name)
+                             const std::string &name,
+                             double t,
+                             unsigned int cycle)
   {
     deallog << "TimeLoop<dim>::output()" << std::endl;
-    TimerOutput::Scope t(computing_timer, "time_loop - output");
+    TimerOutput::Scope timer(computing_timer, "time_loop - output");
 
     constexpr auto problem_dimension =
         ProblemDescription<dim>::problem_dimension;
@@ -283,13 +285,18 @@ namespace ryujin
 
     const auto filename = [&](const unsigned int i) -> std::string {
       const auto seq = dealii::Utilities::int_to_string(i, 4);
-      return name + "-" + seq + ".vtu";
+      return name + "-" + Utilities::int_to_string(cycle, 6) + "-" + seq +
+             ".vtu";
     };
 
     {
       /* Write out local vtu: */
       const unsigned int i = triangulation.locally_owned_subdomain();
       std::ofstream output(filename(i));
+
+      DataOutBase::VtkFlags flags(
+          t, cycle, true, DataOutBase::VtkFlags::no_compression);
+      data_out.set_flags(flags);
       data_out.write_vtu(output);
     }
 

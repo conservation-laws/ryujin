@@ -32,7 +32,10 @@ namespace ryujin
     void initialize();
 
     vector_type interpolate_initial_values();
-    void output(const vector_type &U, const std::string &name);
+    void output(const vector_type &U,
+                const std::string &name,
+                double t,
+                unsigned int cycle);
 
     /* Data: */
 
