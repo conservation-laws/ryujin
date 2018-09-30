@@ -77,6 +77,10 @@ namespace ryujin
 
     t_final = 4.;
     add_parameter("final time", t_final, "Final time");
+
+    output_granularity = 0.02;
+    add_parameter(
+        "output granularity", output_granularity, "time interval for output");
   }
 
 
@@ -107,6 +111,7 @@ namespace ryujin
 
     auto U = interpolate_initial_values();
     double t = 0.;
+    double last_output = 0.;
 
     output(U, base_name + "-solution-" + Utilities::int_to_string(0, 6));
 
@@ -123,10 +128,14 @@ namespace ryujin
 
       const auto [U_new, t_new] = time_step.euler_step(U, t);
 
-      output(U, base_name + "-solution-" + Utilities::int_to_string(cycle, 6));
+      if(t - last_output > output_granularity) {
+        output(U,
+               base_name + "-solution-" + Utilities::int_to_string(cycle, 6));
+        last_output = t;
+      }
 
+      U = std::move(U_new);
       t = t_new;
-      U = U_new;
     }
 
     computing_timer.print_summary();
