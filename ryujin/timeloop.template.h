@@ -121,8 +121,10 @@ namespace ryujin
     for(unsigned int cycle = 1; t < t_final; ++cycle)
     {
       std::ostringstream head;
-      head << "Cycle  " << Utilities::int_to_string(cycle, 6) //
-           << "  (" << std::setprecision(1) << t / t_final * 100 << "%)";
+      head << "Cycle  " << Utilities::int_to_string(cycle, 6)         //
+           << "  ("                                                   //
+           << std::fixed << std::setprecision(1) << t / t_final * 100 //
+           << "%)";
       print_head(head.str());
 
       deallog << "        at time t="                    //
