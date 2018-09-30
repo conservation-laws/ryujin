@@ -149,8 +149,6 @@ namespace grendel
 
     const unsigned int dofs_per_cell =
         discretization_->finite_element().dofs_per_cell;
-    const unsigned int dofs_per_face =
-        discretization_->finite_element().dofs_per_face;
 
     const unsigned int n_q_points = discretization_->quadrature().size();
 
@@ -218,23 +216,18 @@ namespace grendel
             }   /* for j */
           }     /* for q */
 
-          local_boundary_normal_map.clear();
           for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f) {
             const auto face = cell->face(f);
+            const auto id = face->boundary_id();
 
             if (!face->at_boundary())
               continue;
-
-            const auto id = face->boundary_id();
 
             fe_face_values.reinit(cell, f);
             const unsigned int n_face_q_points =
                 scratch.face_quadrature_.size();
 
-            std::vector<types::global_dof_index> indices(dofs_per_face);
-            face->get_dof_indices(indices);
-
-            for (unsigned int i = 0; i < dofs_per_face; ++i) {
+            for (unsigned int i = 0; i < dofs_per_cell; ++i) {
 
               if (!discretization_->finite_element().has_support_on_face(i, f))
                 continue;
@@ -244,7 +237,7 @@ namespace grendel
                 normal += fe_face_values.normal_vector(q) *
                           fe_face_values.shape_value(i, q);
 
-              local_boundary_normal_map[indices[i]] =
+              local_boundary_normal_map[local_dof_indices[i]] =
                   std::make_tuple(normal, id);
             }
           }
