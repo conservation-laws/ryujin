@@ -120,13 +120,14 @@ namespace ryujin
      */
     for(unsigned int cycle = 1; t < t_final; ++cycle)
     {
-      print_head("Cycle  " + Utilities::int_to_string(cycle, 6) + "  time  " +
-                 Utilities::to_string(t, 6));
+      std::ostringstream head;
+      head << "Cycle  " << Utilities::int_to_string(cycle, 6) //
+           << "  (" << std::setprecision(1) << t / t_final * 100 << "%)";
+      print_head(head.str());
 
-      deallog << "        at time t="                                      //
-              << std::setprecision(4) << std::fixed << t                   //
-              << " (" << std::setprecision(1) << t / t_final * 100 << "%)" //
-              << std::setprecision(6) << std::endl;
+      deallog << "        at time t="                    //
+              << std::setprecision(4) << std::fixed << t //
+              << std::endl;
 
       const auto [U_new, t_new] = time_step.euler_step(U, t);
 
