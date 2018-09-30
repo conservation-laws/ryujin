@@ -69,7 +69,7 @@ namespace grendel
                          ((gamma_ - 1.) * mach * mach + 2.);
     const double u_L =  (1. - rho_R / rho_L) * S3 + rho_R / rho_L * u_R;
     const double p_L =
-        p_R * (2. * gamma_ * mach * mach - (gamma_ - 1.) / (gamma_ + 1.));
+        p_R * (2. * gamma_ * mach * mach - (gamma_ - 1.)) / (gamma_ + 1.);
 
     /*
      * And translate to 3D states:
