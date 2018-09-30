@@ -307,7 +307,8 @@ namespace ryujin
       for (unsigned int i = 0; i < n_mpi_processes; ++i)
         filenames.push_back(filename(i));
 
-      std::ofstream output(name + ".pvtu");
+      std::ofstream output(name + "-" + Utilities::int_to_string(cycle, 6) +
+                           ".pvtu");
       data_out.write_pvtu_record(output, filenames);
     }
   }
