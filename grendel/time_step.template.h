@@ -122,7 +122,14 @@ namespace grendel
             }
 
             /* Set symmetrized off-diagonal values: */
-            dij_matrix_(i, j) = d; // FIXME index access suboptimal
+
+            {
+              // FIXME explain this
+              const auto global_index = jt->global_index();
+              const typename SparseMatrix<double>::iterator matrix_iterator(
+                  &dij_matrix_, global_index);
+              matrix_iterator->value() = d;
+            }
             dij_matrix_(j, i) = d; // FIXME index access suboptimal
           }
         }

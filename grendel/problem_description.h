@@ -119,10 +119,10 @@ namespace grendel
     A_RO(cfl_constant)
 
     rank1_type initial_shock_front_state_L_;
-    A_RO(initial_shock_from_state_L)
+    A_RO(initial_shock_front_state_L)
 
     rank1_type initial_shock_front_state_R_;
-    A_RO(initial_shock_from_state_R)
+    A_RO(initial_shock_front_state_R)
 
   private:
     std::string initial_state_;
