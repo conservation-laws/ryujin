@@ -290,7 +290,7 @@ namespace ryujin
     data_out.build_patches(mapping);
 
     DataOutBase::VtkFlags flags(
-        t, cycle, true, DataOutBase::VtkFlags::no_compression);
+        t, cycle, true, DataOutBase::VtkFlags::best_speed);
     data_out.set_flags(flags);
 
     const auto filename = [&](const unsigned int i) -> std::string {
