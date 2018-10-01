@@ -65,7 +65,7 @@ namespace grendel
 
     triangulation.create_triangulation(vertices, cells, SubCellData());
 
-    /* Set boundary ids of the triangle to 1: */
+    /* Set boundary ids: */
 
     for (auto cell : triangulation.active_cell_iterators()) {
       for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f) {
@@ -74,9 +74,13 @@ namespace grendel
         if (!face->at_boundary())
           continue;
 
-//         const auto center = face->center();
-//         if (center[0] > 0. && center[0] < length && //
-//             center[1] > 0. && center[1] < height)
+        /*
+         * We want reflective boundary conditions (i.e. indicator 1) at top
+         * bottom and on the triangle. On the left and right side we leave
+         * the boundary indicator at 0, i.e. do nothing.
+         */
+        const auto center = face->center();
+        if (center[0] > 0. && center[0] < length)
           face->set_boundary_id(1);
       }
     }
