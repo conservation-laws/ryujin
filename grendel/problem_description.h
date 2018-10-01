@@ -70,7 +70,7 @@ namespace grendel
     {
       if ((point - initial_shock_front_position_) *
               initial_shock_front_direction_ >
-          0. && point[0] > 0.2)
+          0.)
         return initial_shock_front_state_R_;
       else
         return initial_shock_front_state_L_;

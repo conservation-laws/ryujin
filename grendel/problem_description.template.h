@@ -49,10 +49,18 @@ namespace grendel
   void ProblemDescription<dim>::parse_parameters_callback()
   {
     /*
+     * Let's normalize the direction:
+     */
+
+    AssertThrow(initial_shock_front_direction_.norm() != 0.,
+                ExcMessage("no direction, initial shock front direction is set "
+                           "to the zero vector."));
+    initial_shock_front_direction_ /= initial_shock_front_direction_.norm();
+
+    /*
      * Let's compute the two initial states:
      */
 
-    // FIXME: Validate
     // FIXME: Add reference to literature
 
     const double mach = initial_shock_front_mach_number_;
@@ -62,8 +70,8 @@ namespace grendel
     const double p_R = 1.;
 
     /*   c^2 = gamma * p / rho / (1 - b * rho) */
-    const double c_R = std::sqrt(gamma_ * p_R / rho_R / (1. - b_ * rho_R));
-    const double S3 = mach * c_R;
+    const double a_R = std::sqrt(gamma_ * p_R / rho_R / (1. - b_ * rho_R));
+    const double S3 = mach * a_R;
 
     const double rho_L = rho_R * (gamma_ + 1.) * mach * mach /
                          ((gamma_ - 1.) * mach * mach + 2.);
