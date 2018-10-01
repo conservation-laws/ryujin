@@ -51,19 +51,19 @@ namespace grendel
 
     const auto &locally_relevant = offline_data_->locally_relevant();
     const auto &locally_owned = offline_data_->locally_owned();
-    const auto &sparsity_pattern = offline_data_->sparsity_pattern();
+    const auto &sparsity = offline_data_->sparsity_pattern();
     const auto &lumped_mass_matrix = offline_data_->lumped_mass_matrix();
     const auto &norm_matrix = offline_data_->norm_matrix();
     const auto &nij_matrix = offline_data_->nij_matrix();
     const auto &cij_matrix = offline_data_->cij_matrix();
     const auto &boundary_normal_map = offline_data_->boundary_normal_map();
 
+    /* Clear out matrix entries: */
+    dij_matrix_ = 0.;
+
     /*
      * Step 1: Compute off-diagonal d_ij and f_i:
      */
-
-    /* Clear out matrix entries: */
-    dij_matrix_ = 0.;
 
     {
       deallog << "        compute d_ij and f_i" << std::endl;
@@ -71,7 +71,7 @@ namespace grendel
                            "time_step - compute d_ij and f_i");
 
       /*
-       * FIXME: Workaround: IndexSet does not have an iterator with
+       * FIXME Workaround: IndexSet does not have an iterator with
        * complete operater arithmetic (that is required for tbb). We
        * iterate over the local vector f_i_ instead and do a bit of index
        * juggling...
@@ -81,8 +81,9 @@ namespace grendel
         /* [it1, it2) is an iterator range over f_i_ */
         for (auto it = it1; it != it2; ++it) {
           /* Determine absolute position of it in vector: */
-          const unsigned int pos = std::distance(f_i_.begin(), it);
-          const auto i = locally_relevant.nth_index_in_set(pos);
+          const unsigned int pos_i = std::distance(f_i_.begin(), it);
+          /* Determine global index i from  pos_i: */
+          const auto i = locally_relevant.nth_index_in_set(pos_i);
 
           const auto U_i = gather(U_old, i);
 
@@ -90,9 +91,7 @@ namespace grendel
           *it = problem_description_->f(U_i);
 
           /* Populate off-diagonal dij_: */
-          for (auto jt = sparsity_pattern.begin(i);
-               jt != sparsity_pattern.end(i);
-               ++jt) {
+          for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
             const auto j = jt->column();
 
             /* Iterate over subdiagonal */
@@ -100,8 +99,8 @@ namespace grendel
               continue;
 
             const auto U_j = gather(U_old, j);
-            const auto n_ij = gather(nij_matrix, i, j);
-            const double norm = norm_matrix(i, j);
+            const auto n_ij = gather_get_entry(nij_matrix, jt);
+            const double norm = get_entry(norm_matrix, jt);
 
             const auto [lambda_max, p_star, n_iterations] =
                 riemann_solver_->compute(U_i, U_j, n_ij);
@@ -123,8 +122,8 @@ namespace grendel
             }
 
             /* Set symmetrized off-diagonal values: */
-            dij_matrix_(i, j) = d;
-            dij_matrix_(j, i) = d;
+            dij_matrix_(i, j) = d; // FIXME index access suboptimal
+            dij_matrix_(j, i) = d; // FIXME index access suboptimal
           }
         }
       };
@@ -150,26 +149,24 @@ namespace grendel
         /* [it1, it2) is an iterator range over f_i_ */
         for (auto it = it1; it != it2; ++it) {
           /* Determine absolute position of it in vector: */
-          const unsigned int pos = std::distance(f_i_.begin(), it);
-          const auto i = locally_relevant.nth_index_in_set(pos);
+          const unsigned int pos_i = std::distance(f_i_.begin(), it);
+          /* Determine global index i from  pos_i: */
+          const auto i = locally_relevant.nth_index_in_set(pos_i);
 
           /* Compute sum of d_ijs for index i: */
           double d_sum = 0.;
-          for (auto jt = sparsity_pattern.begin(i);
-               jt != sparsity_pattern.end(i);
-               ++jt) {
+          for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
             const auto j = jt->column();
-
             if (j == i)
               continue;
 
-            d_sum -= dij_matrix_(i, j);
+            d_sum -= get_entry(dij_matrix_, jt);
           }
 
-          dij_matrix_(i, i) = d_sum;
+          dij_matrix_.diag_element(i) = d_sum;
 
           const double cfl = problem_description_->cfl_constant();
-          const double mass = lumped_mass_matrix(i, i);
+          const double mass = lumped_mass_matrix.diag_element(i);
           const double tau = cfl * mass / (-2. * d_sum);
           tau_max_on_subrange = std::min(tau_max_on_subrange, tau);
         }
@@ -205,10 +202,10 @@ namespace grendel
       const auto on_subranges = [&](const auto it1, const auto it2) {
         /* [it1, it2) is an iterator range over f_i_ */
         for (auto it = it1; it != it2; ++it) {
-          /* Determine absolute position of it in vector: */
           const unsigned int pos_i = std::distance(f_i_.begin(), it);
           const auto i = locally_relevant.nth_index_in_set(pos_i);
 
+          /* Only iterate over locally owned subset */
           if (!locally_owned.is_element(i))
             continue;
 
@@ -217,22 +214,21 @@ namespace grendel
           dealii::Tensor<1, problem_dimension> Unew_i = U_i;
 
           const auto f_i = *it; // This is f_i_[pos_i]
-          const double m_i = lumped_mass_matrix(i, i);
+          const double m_i = lumped_mass_matrix.diag_element(i);
 
-          for (auto jt = sparsity_pattern.begin(i);
-               jt != sparsity_pattern.end(i);
-               ++jt) {
+          for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
             const auto j = jt->column();
 
             if (j == i)
               continue;
 
-            const unsigned int pos_j = locally_relevant.index_within_set(j);
-
-            const auto c_ij = gather(cij_matrix, i, j);
-            const auto d_ij = dij_matrix_(i, j);
-            const auto f_j = f_i_[pos_j];
             const auto U_j = gather(U_old, j);
+
+            const unsigned int pos_j = locally_relevant.index_within_set(j);
+            const auto f_j = f_i_[pos_j];
+
+            const auto c_ij = gather_get_entry(cij_matrix, jt);
+            const auto d_ij = get_entry(dij_matrix_, jt);
 
             for (unsigned int k = 0; k < problem_dimension; ++k)
               Unew_i[k] +=

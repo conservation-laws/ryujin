@@ -7,14 +7,49 @@
 namespace grendel
 {
   /*
+   * It's magic.
+   *
+   * There is no native functionality to access a matrix entry by providing
+   * an iterator over the sparsity pattern. This is silly: The sparsity
+   * pattern iterator alreay *knows* the exact location in the matrix
+   * vector. Thus, this little workaround.
+   */
+  template <typename Matrix, typename Iterator>
+  inline DEAL_II_ALWAYS_INLINE double get_entry(const Matrix &matrix,
+                                                const Iterator &it)
+  {
+    const auto global_index = it->global_index();
+    const typename Matrix::const_iterator matrix_iterator(&matrix,
+                                                          global_index);
+    return matrix_iterator->value();
+  }
+
+
+  /*
    * It's magic
    */
-  template <typename T1, std::size_t k1, int k2, typename T2>
-  inline DEAL_II_ALWAYS_INLINE void
-  scatter(std::array<T1, k1> &U, const dealii::Tensor<1, k2> result, const T2 i)
+  template <typename T1, std::size_t k, typename T2>
+  inline DEAL_II_ALWAYS_INLINE dealii::Tensor<1, k>
+  gather_get_entry(const std::array<T1, k> &U, const T2 it)
   {
-    for (unsigned int j = 0; j < k1; ++j)
-      U[j][i] = result[j];
+    dealii::Tensor<1, k> result;
+    for (unsigned int j = 0; j < k; ++j)
+      result[j] = get_entry(U[j], it);
+    return result;
+  }
+
+
+  /*
+   * It's magic
+   */
+  template <typename T1, std::size_t k, typename T2, typename T3>
+  inline DEAL_II_ALWAYS_INLINE dealii::Tensor<1, k>
+  gather(const std::array<T1, k> &U, const T2 i, const T3 l)
+  {
+    dealii::Tensor<1, k> result;
+    for (unsigned int j = 0; j < k; ++j)
+      result[j] = U[j](i, l);
+    return result;
   }
 
 
@@ -35,14 +70,12 @@ namespace grendel
   /*
    * It's magic
    */
-  template <typename T1, std::size_t k, typename T2, typename T3>
-  inline DEAL_II_ALWAYS_INLINE dealii::Tensor<1, k>
-  gather(const std::array<T1, k> &U, const T2 i, const T3 l)
+  template <typename T1, std::size_t k1, int k2, typename T2>
+  inline DEAL_II_ALWAYS_INLINE void
+  scatter(std::array<T1, k1> &U, const dealii::Tensor<1, k2> result, const T2 i)
   {
-    dealii::Tensor<1, k> result;
-    for (unsigned int j = 0; j < k; ++j)
-      result[j] = U[j](i, l);
-    return result;
+    for (unsigned int j = 0; j < k1; ++j)
+      U[j][i] = result[j];
   }
 
 
