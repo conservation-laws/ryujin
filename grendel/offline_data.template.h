@@ -40,10 +40,10 @@ namespace grendel
 
     {
       TimerOutput::Scope t(computing_timer_, "offline_data - distribute dofs");
-      DoFRenumbering::Cuthill_McKee(dof_handler_);
 
       dof_handler_.initialize(discretization_->triangulation(),
                               discretization_->finite_element());
+      DoFRenumbering::Cuthill_McKee(dof_handler_);
 
       locally_owned_ = dof_handler_.locally_owned_dofs();
       locally_relevant_.clear();
