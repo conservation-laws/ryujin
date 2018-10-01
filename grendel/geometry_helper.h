@@ -74,9 +74,9 @@ namespace grendel
         if (!face->at_boundary())
           continue;
 
-        const auto center = face->center();
-        if (center[0] > 0. && center[0] < length && //
-            center[1] > 0. && center[1] < height)
+//         const auto center = face->center();
+//         if (center[0] > 0. && center[0] < length && //
+//             center[1] > 0. && center[1] < height)
           face->set_boundary_id(1);
       }
     }
