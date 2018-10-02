@@ -37,7 +37,7 @@ namespace grendel
 
     virtual ~TimeStep() final = default;
 
-    void setup();
+    void prepare();
 
     /**
      * Given a reference to an previous state vector U_old compute a new

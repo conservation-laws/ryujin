@@ -30,7 +30,7 @@ namespace grendel
 
 
   template <int dim>
-  void TimeStep<dim>::setup()
+  void TimeStep<dim>::prepare()
   {
     deallog << "TimeStep<dim>::setup()" << std::endl;
     TimerOutput::Scope t(computing_timer_, "time_step - setup scratch space");

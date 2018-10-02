@@ -110,7 +110,7 @@ namespace ryujin
     offline_data.prepare();
 
     print_head("set up time step");
-    time_step.setup();
+    time_step.prepare();
 
     /*
      * Interpolate initial values and prepare U_new and U_output vectors:
