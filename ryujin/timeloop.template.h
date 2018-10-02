@@ -158,6 +158,11 @@ namespace ryujin
     computing_timer.print_summary();
     deallog << timer_output.str() << std::endl;
 
+    /* Wait for output thread: */
+
+    if (output_thread.joinable())
+      output_thread.join();
+
     /* Detach deallog: */
 
     if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0) {
