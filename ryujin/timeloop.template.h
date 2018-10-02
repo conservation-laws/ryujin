@@ -285,9 +285,8 @@ namespace ryujin
     /*
      * Offload output to a worker thread.
      *
-     * We raise a mutex here in order to guard output_vector from being
-     * overwritten while in use for output; but also mainly in order to
-     * avoid spawning too many writeback threads simultaneously.
+     * We raise a mutex here solely to avoid spawning too many writeback
+     * threads simultaneously.
      */
 
     if (!output_mutex.try_lock()) {
@@ -297,13 +296,8 @@ namespace ryujin
       output_mutex.lock();
     }
 
-    /*
-     * Copy vector:
-     */
-
-    std::copy(U.begin(), U.end(), output_vector.begin());
-
-    const auto output_worker = [this, name, t, cycle]() {
+    /* capture U, name, t, cycle by value */
+    const auto output_worker = [this, U, name, t, cycle]() {
       TimerOutput::Scope timer(computing_timer, "time_loop - output");
 
       constexpr auto problem_dimension =
@@ -320,7 +314,7 @@ namespace ryujin
       data_out.attach_dof_handler(dof_handler);
 
       for (unsigned int i = 0; i < problem_dimension; ++i)
-        data_out.add_data_vector(output_vector[i], component_names[i]);
+        data_out.add_data_vector(U[i], component_names[i]);
 
       data_out.build_patches(mapping);
 
