@@ -32,6 +32,8 @@ namespace grendel
     double immersed_triangle_length_;
     double immersed_triangle_height_;
     double immersed_triangle_object_height_;
+    double tube_length_;
+    double tube_diameter_;
 
     unsigned int refinement_;
 

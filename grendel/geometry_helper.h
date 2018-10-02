@@ -86,6 +86,59 @@ namespace grendel
     }
   }
 
+
+  template <int dim>
+  void create_coarse_grid_tube(
+      dealii::parallel::distributed::Triangulation<dim> &,
+      const double,
+      const double)
+  {
+    AssertThrow(false, dealii::ExcNotImplemented());
+  }
+
+
+  template <>
+  void create_coarse_grid_tube<1>(
+      dealii::parallel::distributed::Triangulation<1> &triangulation,
+      const double length,
+      const double /*diameter*/)
+  {
+    dealii::GridGenerator::hyper_cube(triangulation, 0., length);
+  }
+
+
+  template <>
+  void create_coarse_grid_tube<2>(
+      dealii::parallel::distributed::Triangulation<2> &triangulation,
+      const double length,
+      const double diameter)
+  {
+    using namespace dealii;
+
+    GridGenerator::hyper_rectangle(
+        triangulation, Point<2>(0., 0.), Point<2>(length, diameter));
+
+    /* Set boundary ids: */
+
+    for (auto cell : triangulation.active_cell_iterators()) {
+      for (unsigned int f = 0; f < GeometryInfo<2>::faces_per_cell; ++f) {
+        const auto face = cell->face(f);
+
+        if (!face->at_boundary())
+          continue;
+
+        /*
+         * We want reflective boundary conditions (i.e. indicator 1) at top
+         * and bottom of the rectangle. On the left and right side we leave
+         * the boundary indicator at 0, i.e. do nothing.
+         */
+        const auto center = face->center();
+        if (center[0] > 0. && center[0] < length)
+          face->set_boundary_id(1);
+      }
+    }
+  }
+
 } // namespace grendel
 
 #endif /* GEOMETRY_HELPER_H */

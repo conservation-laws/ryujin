@@ -30,7 +30,7 @@ namespace grendel
     geometry_ = "immersed triangle";
     add_parameter("geometry",
                   geometry_,
-                  "Geometry. Valid names are \"immersed triangle\".");
+                  "Geometry. Valid names are \"immersed triangle\", \"tube\".");
 
     immersed_triangle_length_ = 3.;
     add_parameter("immersed triangle - length",
@@ -46,6 +46,16 @@ namespace grendel
     add_parameter("immersed triangle - object height",
                   immersed_triangle_object_height_,
                   "Immersed Triangle: height of immersed triangle");
+
+    tube_length_ = 1.;
+    add_parameter("tube - length",
+                  tube_length_,
+                  "Shock tube: length of computational domain");
+
+    tube_diameter_ = 1.;
+    add_parameter("tube - diameter",
+                  tube_diameter_,
+                  "Shock tube: diameter of tube (ignored in 1D)");
 
     refinement_ = 5;
     add_parameter("initial refinement",
@@ -85,6 +95,10 @@ namespace grendel
                                   immersed_triangle_length_,
                                   immersed_triangle_height_,
                                   immersed_triangle_object_height_);
+
+    } else if (geometry_ == "tube") {
+
+      create_coarse_grid_tube(triangulation, tube_length_, tube_diameter_);
 
     } else {
 
