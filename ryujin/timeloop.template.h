@@ -294,7 +294,8 @@ namespace ryujin
 
     /* capture U, name, t, cycle by value */
     const auto output_worker = [this, U, name, t, cycle]() {
-      TimerOutput::Scope timer(computing_timer, "time_loop - output");
+      // FIXME: account for elapsed time in this thread as well.
+      // TimerOutput::Scope timer(computing_timer, "time_loop - output");
 
       constexpr auto problem_dimension =
           ProblemDescription<dim>::problem_dimension;
