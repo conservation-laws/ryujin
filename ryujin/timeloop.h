@@ -56,9 +56,7 @@ namespace ryujin
     std::unique_ptr<std::ofstream> filestream;
 
     /* Data for output management: */
-
     std::thread output_thread;
-    std::mutex output_mutex;
 
   };
 

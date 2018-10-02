@@ -285,16 +285,7 @@ namespace ryujin
     /*
      * Offload output to a worker thread.
      *
-     * We raise a mutex here solely to avoid spawning too many writeback
-     * threads simultaneously.
      */
-
-    if (!output_mutex.try_lock()) {
-      deallog
-          << "        !!! OUTPUT STALLED !!! - waiting for previous write back."
-          << std::endl;
-      output_mutex.lock();
-    }
 
     /* capture U, name, t, cycle by value */
     const auto output_worker = [this, U, name, t, cycle]() {
@@ -350,15 +341,19 @@ namespace ryujin
       /*
        * Release output mutex:
        */
-      output_mutex.unlock();
       deallog << "        Commit output for cycle = " << cycle << std::endl;
     };
 
     /*
-     * Spawn thread:
+     * Spawn thread. We wait for a previous thread to finish before we
+     * schedule a new one.
      */
 
     deallog << "        Schedule output for cycle = " << cycle << std::endl;
+    if (output_thread.joinable()) {
+      TimerOutput::Scope timer(computing_timer, "time_loop - stalled output");
+      output_thread.join();
+    }
     output_thread = std::move(std::thread (output_worker));
   }
 
