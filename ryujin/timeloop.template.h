@@ -58,7 +58,7 @@ namespace ryujin
       , computing_timer(mpi_communicator,
                         timer_output,
                         TimerOutput::never,
-                        TimerOutput::cpu_and_wall_times)
+                        TimerOutput::cpu_times)
       , discretization(mpi_communicator, computing_timer, "B - Discretization")
       , offline_data(mpi_communicator,
                      computing_timer,
