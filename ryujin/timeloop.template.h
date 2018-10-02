@@ -113,7 +113,7 @@ namespace ryujin
     time_step.setup();
 
     /*
-     * Interpolate initial values and prepare second vector U_new:
+     * Interpolate initial values and prepare U_new and U_output vectors:
      */
 
     print_head("interpolate initial values");
@@ -281,54 +281,91 @@ namespace ryujin
                              unsigned int cycle)
   {
     deallog << "TimeLoop<dim>::output()" << std::endl;
-    TimerOutput::Scope timer(computing_timer, "time_loop - output");
 
-    constexpr auto problem_dimension =
-        ProblemDescription<dim>::problem_dimension;
+    /*
+     * Offload output to a worker thread.
+     *
+     * We raise a mutex here in order to guard output_vector from being
+     * overwritten while in use for output; but also mainly in order to
+     * avoid spawning too many writeback threads simultaneously.
+     */
 
-    const auto &dof_handler = offline_data.dof_handler();
-    const auto &triangulation = discretization.triangulation();
-    const auto &mapping = discretization.mapping();
+    if (!output_mutex.try_lock()) {
+      deallog
+          << "        !!! OUTPUT STALLED !!! - waiting for previous write back."
+          << std::endl;
+      output_mutex.lock();
+    }
 
-    // FIXME
-    std::vector<std::string> component_names = {"rho", "m_1", "m_2", "E"};
+    /*
+     * Copy vector:
+     */
 
-    dealii::DataOut<dim> data_out;
-    data_out.attach_dof_handler(dof_handler);
+    std::copy(U.begin(), U.end(), output_vector.begin());
 
-    for (unsigned int i = 0; i < problem_dimension; ++i)
-      data_out.add_data_vector(U[i], component_names[i]);
+    const auto output_worker = [this, name, t, cycle]() {
+      TimerOutput::Scope timer(computing_timer, "time_loop - output");
 
-    data_out.build_patches(mapping);
+      constexpr auto problem_dimension =
+          ProblemDescription<dim>::problem_dimension;
 
-    DataOutBase::VtkFlags flags(
-        t, cycle, true, DataOutBase::VtkFlags::best_speed);
-    data_out.set_flags(flags);
+      const auto &dof_handler = offline_data.dof_handler();
+      const auto &triangulation = discretization.triangulation();
+      const auto &mapping = discretization.mapping();
 
-    const auto filename = [&](const unsigned int i) -> std::string {
-      const auto seq = dealii::Utilities::int_to_string(i, 4);
-      return name + "-" + Utilities::int_to_string(cycle, 6) + "-" + seq +
-             ".vtu";
+      // FIXME
+      std::vector<std::string> component_names = {"rho", "m_1", "m_2", "E"};
+
+      dealii::DataOut<dim> data_out;
+      data_out.attach_dof_handler(dof_handler);
+
+      for (unsigned int i = 0; i < problem_dimension; ++i)
+        data_out.add_data_vector(output_vector[i], component_names[i]);
+
+      data_out.build_patches(mapping);
+
+      DataOutBase::VtkFlags flags(
+          t, cycle, true, DataOutBase::VtkFlags::best_speed);
+      data_out.set_flags(flags);
+
+      const auto filename = [&](const unsigned int i) -> std::string {
+        const auto seq = dealii::Utilities::int_to_string(i, 4);
+        return name + "-" + Utilities::int_to_string(cycle, 6) + "-" + seq +
+               ".vtu";
+      };
+
+      /* Write out local vtu: */
+      const unsigned int i = triangulation.locally_owned_subdomain();
+      std::ofstream output(filename(i));
+      data_out.write_vtu(output);
+
+      if (dealii::Utilities::MPI::this_mpi_process(mpi_communicator) == 0) {
+        /* Write out pvtu control file: */
+
+        const unsigned int n_mpi_processes =
+            dealii::Utilities::MPI::n_mpi_processes(mpi_communicator);
+        std::vector<std::string> filenames;
+        for (unsigned int i = 0; i < n_mpi_processes; ++i)
+          filenames.push_back(filename(i));
+
+        std::ofstream output(name + "-" + Utilities::int_to_string(cycle, 6) +
+                             ".pvtu");
+        data_out.write_pvtu_record(output, filenames);
+      }
+
+      /*
+       * Release output mutex:
+       */
+      output_mutex.unlock();
+      deallog << "        Commit output for cycle = " << cycle << std::endl;
     };
 
-    /* Write out local vtu: */
-    const unsigned int i = triangulation.locally_owned_subdomain();
-    std::ofstream output(filename(i));
-    data_out.write_vtu(output);
+    /*
+     * Spawn thread:
+     */
 
-    if (dealii::Utilities::MPI::this_mpi_process(mpi_communicator) == 0) {
-      /* Write out pvtu control file: */
-
-      const unsigned int n_mpi_processes =
-          dealii::Utilities::MPI::n_mpi_processes(mpi_communicator);
-      std::vector<std::string> filenames;
-      for (unsigned int i = 0; i < n_mpi_processes; ++i)
-        filenames.push_back(filename(i));
-
-      std::ofstream output(name + "-" + Utilities::int_to_string(cycle, 6) +
-                           ".pvtu");
-      data_out.write_pvtu_record(output, filenames);
-    }
+    deallog << "        Schedule output for cycle = " << cycle << std::endl;
+    output_thread = std::move(std::thread (output_worker));
   }
 
 } // namespace ryujin
