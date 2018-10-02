@@ -24,24 +24,25 @@ namespace grendel
     add_parameter("cfl constant", cfl_constant_, "CFL constant C");
 
     initial_state_ = "shock front";
-    add_parameter("initial state",
-                  initial_state_,
-                  "Initial state. Valid names are \"shock front\".");
+    add_parameter(
+        "initial state",
+        initial_state_,
+        "Initial state. Valid names are \"shock front\", or \"contrast\".");
+
+    initial_direction_[0] = 1.;
+    add_parameter("initial - direction",
+                  initial_direction_,
+                  "Initial direction of shock front, or  contrast");
+
+    initial_position_[0] = 1.;
+    add_parameter("initial - position",
+                  initial_position_,
+                  "Initial position of shock front, or  contrast");
 
     initial_shock_front_mach_number_ = 2.0;
     add_parameter("shock front - mach number",
                   initial_shock_front_mach_number_,
                   "Shock Front: Mach number");
-
-    initial_shock_front_direction_[0] = 1.;
-    add_parameter("shock front - direction",
-                  initial_shock_front_direction_,
-                  "Shock Front: direction");
-
-    initial_shock_front_position_[0] = 1.;
-    add_parameter("shock front - position",
-                  initial_shock_front_position_,
-                  "Shock Front: position");
   }
 
 
@@ -49,52 +50,65 @@ namespace grendel
   void ProblemDescription<dim>::parse_parameters_callback()
   {
     /*
-     * Let's normalize the direction:
+     * First, let's normalize the direction:
      */
 
-    AssertThrow(initial_shock_front_direction_.norm() != 0.,
+    AssertThrow(initial_direction_.norm() != 0.,
                 ExcMessage("no direction, initial shock front direction is set "
                            "to the zero vector."));
-    initial_shock_front_direction_ /= initial_shock_front_direction_.norm();
+    initial_direction_ /= initial_direction_.norm();
 
     /*
-     * Let's compute the two initial states:
+     * Now compute the initial states:
      */
 
-    // FIXME: Add reference to literature
+    double rho_R = 0., u_R = 0., p_R = 0., rho_L = 0., u_L = 0., p_L = 0.;
 
-    const double mach = initial_shock_front_mach_number_;
+    if (initial_state_ == "shock front") {
 
-    const double rho_R = gamma_;
-    const double u_R = 0.;
-    const double p_R = 1.;
+      // FIXME: Add reference to literature
 
-    /*   c^2 = gamma * p / rho / (1 - b * rho) */
-    const double a_R = std::sqrt(gamma_ * p_R / rho_R / (1. - b_ * rho_R));
-    const double S3 = mach * a_R;
+      rho_R = gamma_;
+      u_R = 0.;
+      p_R = 1.;
 
-    const double rho_L = rho_R * (gamma_ + 1.) * mach * mach /
-                         ((gamma_ - 1.) * mach * mach + 2.);
-    const double u_L =  (1. - rho_R / rho_L) * S3 + rho_R / rho_L * u_R;
-    const double p_L =
-        p_R * (2. * gamma_ * mach * mach - (gamma_ - 1.)) / (gamma_ + 1.);
+      /*   c^2 = gamma * p / rho / (1 - b * rho) */
+      const double a_R = std::sqrt(gamma_ * p_R / rho_R / (1. - b_ * rho_R));
+      const double mach = initial_shock_front_mach_number_;
+      const double S3 = mach * a_R;
+
+      rho_L = rho_R * (gamma_ + 1.) * mach * mach /
+              ((gamma_ - 1.) * mach * mach + 2.);
+      u_L = (1. - rho_R / rho_L) * S3 + rho_R / rho_L * u_R;
+      p_L = p_R * (2. * gamma_ * mach * mach - (gamma_ - 1.)) / (gamma_ + 1.);
+
+    } else if (initial_state_ == "contrast") {
+
+      /* Contrast of the Sod shock tube: */
+      rho_L = 1.0;
+      u_L = 0.0;
+      p_L = 1.0;
+      rho_R = 0.125;
+      u_R = 0.0;
+      p_R = 0.1;
+
+    } else {
+
+      AssertThrow(false, dealii::ExcMessage("Unknown initial state."));
+    }
 
     /*
      * And translate to 3D states:
      */
 
-    initial_shock_front_state_L_[0] = rho_L;
-    initial_shock_front_state_R_[0] = rho_R;
+    initial_state_L_[0] = rho_L;
+    initial_state_R_[0] = rho_R;
     for (unsigned int i = 0; i < dim; ++i) {
-      initial_shock_front_state_L_[1 + i] =
-          rho_L * initial_shock_front_direction_[i] * u_L;
-      initial_shock_front_state_R_[1 + i] =
-          rho_R * initial_shock_front_direction_[i] * u_R;
+      initial_state_L_[1 + i] = rho_L * initial_direction_[i] * u_L;
+      initial_state_R_[1 + i] = rho_R * initial_direction_[i] * u_R;
     }
-    initial_shock_front_state_L_[dim + 1] =
-        p_L / (gamma_ - 1.) + 0.5 * rho_L * u_L * u_L;
-    initial_shock_front_state_R_[dim + 1] =
-        p_R / (gamma_ - 1.) + 0.5 * rho_R * u_R * u_R;
+    initial_state_L_[dim + 1] = p_L / (gamma_ - 1.) + 0.5 * rho_L * u_L * u_L;
+    initial_state_R_[dim + 1] = p_R / (gamma_ - 1.) + 0.5 * rho_R * u_R * u_R;
   }
 
 
@@ -102,12 +116,12 @@ namespace grendel
   typename ProblemDescription<dim>::rank1_type
   ProblemDescription<dim>::initial_state(const dealii::Point<dim> &point) const
   {
-    if ((point - initial_shock_front_position_) *
-            initial_shock_front_direction_ >
-        0.)
-      return initial_shock_front_state_R_;
+    const double position = (point - initial_position_) * initial_direction_;
+
+    if (position > 0.)
+      return initial_state_R_;
     else
-      return initial_shock_front_state_L_;
+      return initial_state_L_;
   }
 
 } /* namespace grendel */

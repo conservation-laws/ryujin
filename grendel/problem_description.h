@@ -97,17 +97,17 @@ namespace grendel
     double cfl_constant_;
     A_RO(cfl_constant)
 
-    rank1_type initial_shock_front_state_L_;
-    A_RO(initial_shock_front_state_L)
+    rank1_type initial_state_L_;
+    A_RO(initial_state_L)
 
-    rank1_type initial_shock_front_state_R_;
-    A_RO(initial_shock_front_state_R)
+    rank1_type initial_state_R_;
+    A_RO(initial_state_R)
 
   private:
     std::string initial_state_;
+    dealii::Tensor<1, dim> initial_direction_;
+    dealii::Point<dim> initial_position_;
     double initial_shock_front_mach_number_;
-    dealii::Tensor<1, dim> initial_shock_front_direction_;
-    dealii::Point<dim> initial_shock_front_position_;
   };
 
 
