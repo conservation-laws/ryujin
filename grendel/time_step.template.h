@@ -57,9 +57,6 @@ namespace grendel
     const auto &cij_matrix = offline_data_->cij_matrix();
     const auto &boundary_normal_map = offline_data_->boundary_normal_map();
 
-    /* Clear out matrix entries: */
-    dij_matrix_ = 0.;
-
     /*
      * Step 1: Compute off-diagonal d_ij and f_i:
      */
