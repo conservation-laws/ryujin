@@ -91,7 +91,7 @@ namespace ryujin
     initialize();
 
     print_head("create triangulation");
-    discretization.create_triangulation();
+    discretization.prepare();
 
     {
       deallog << "        output triangulation" << std::endl;

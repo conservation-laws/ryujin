@@ -12,21 +12,77 @@
 
 namespace grendel
 {
+  /**
+   * This class serves as a container for data related to the
+   * discretization.This includes the triangulation, finite element,
+   * mapping, and quadrature.
+   *
+   * This class uses dealii::ParameterAcceptor to handle parameters. After
+   * @p prepare() was called, the getter functions
+   * Discretization::triangulation(), Discretization::finite_element(),
+   * Discretization::mapping(), and Discretization::quadrature() return
+   * valid const references.
+   */
   template <int dim>
   class Discretization : public dealii::ParameterAcceptor
   {
   public:
+
+    /**
+     * Constructor.
+     */
     Discretization(const MPI_Comm &mpi_communicator,
                    dealii::TimerOutput &computing_timer,
                    const std::string &subsection = "Discretization");
+
+    /**
+     * Destructor. We prevent the creation of derived classes by declaring
+     * the destructor to be <code>final</code>.
+     */
     virtual ~Discretization() final = default;
 
-    void create_triangulation();
+    /**
+     * Create the triangulation and set up the finite element, mapping and
+     * quadrature objects.
+     */
+    void prepare();
 
   protected:
 
+    /*
+     * The triangulation and a getter function returning a const reference.
+     */
+    std::unique_ptr<dealii::parallel::distributed::Triangulation<dim>>
+        triangulation_;
+    A_RO(triangulation)
+
+    /*
+     * The mapping and a getter function returning a const reference.
+     */
+    std::unique_ptr<const dealii::Mapping<dim>> mapping_;
+    A_RO(mapping)
+
+    /*
+     * The underlying finite element space.
+     */
+    std::unique_ptr<const dealii::FiniteElement<dim>> finite_element_;
+    A_RO(finite_element)
+
+    /*
+     * The quadrature used to for assembly.
+     */
+    std::unique_ptr<const dealii::Quadrature<dim>> quadrature_;
+    A_RO(quadrature)
+
+  private:
+
     const MPI_Comm &mpi_communicator_;
     dealii::TimerOutput &computing_timer_;
+
+    /*
+     * Configuration data used to create the triangulation and set up
+     * finite element, mapping and quadrature.
+     */
 
     std::string geometry_;
     double immersed_triangle_length_;
@@ -40,19 +96,6 @@ namespace grendel
     unsigned int order_finite_element_;
     unsigned int order_mapping_;
     unsigned int order_quadrature_;
-
-    std::unique_ptr<dealii::parallel::distributed::Triangulation<dim>>
-        triangulation_;
-    A_RO(triangulation)
-
-    std::unique_ptr<const dealii::Mapping<dim>> mapping_;
-    A_RO(mapping)
-
-    std::unique_ptr<const dealii::FiniteElement<dim>> finite_element_;
-    A_RO(finite_element)
-
-    std::unique_ptr<const dealii::Quadrature<dim>> quadrature_;
-    A_RO(quadrature)
   };
 
 } /* namespace grendel */

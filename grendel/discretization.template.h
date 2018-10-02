@@ -77,11 +77,11 @@ namespace grendel
 
 
   template <int dim>
-  void Discretization<dim>::create_triangulation()
+  void Discretization<dim>::prepare()
   {
-    deallog << "Discretization<dim>::create_triangulation()" << std::endl;
+    deallog << "Discretization<dim>::prepare()" << std::endl;
     TimerOutput::Scope t(computing_timer_,
-                         "discretization - create_triangulation");
+                         "discretization - prepare");
 
     if (!triangulation_)
       triangulation_.reset(
