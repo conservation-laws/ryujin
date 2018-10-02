@@ -39,8 +39,13 @@ namespace grendel
 
     void setup();
 
-    std::tuple<vector_type, double> euler_step(const vector_type &U_old,
-                                               const double t_old);
+    /**
+     * Given a reference to an previous state vector U_old compute a new
+     * vector U_New by performing one explicit euler step. The function
+     * return the chosen time step size tau and populates U_new by
+     * reference.
+     */
+    double euler_step(vector_type &U_new, const vector_type &U_old);
 
   protected:
 

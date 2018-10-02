@@ -44,8 +44,7 @@ namespace grendel
 
 
   template <int dim>
-  std::tuple<typename TimeStep<dim>::vector_type, double>
-  TimeStep<dim>::euler_step(const vector_type &U_old, const double t_old)
+  double TimeStep<dim>::euler_step(vector_type &U_new, const vector_type &U_old)
   {
     deallog << "TimeStep<dim>::euler_step()" << std::endl;
 
@@ -200,12 +199,6 @@ namespace grendel
       deallog << "        perform time-step" << std::endl;
       TimerOutput::Scope t(computing_timer_, "time_step - perform time-step");
 
-      vector_type U_new;
-      for (auto &it : U_new)
-        it.reinit(U_old[0]);
-
-      const double t_new = t_old + tau_max;
-
       const auto on_subranges = [&](const auto it1, const auto it2) {
         /* [it1, it2) is an iterator range over f_i_ */
         for (auto it = it1; it != it2; ++it) {
@@ -275,7 +268,7 @@ namespace grendel
       for (auto &it : U_new)
         it.update_ghost_values();
 
-      return {U_new, t_new};
+      return tau_max;
     }
   }
 

@@ -102,11 +102,19 @@ namespace ryujin
       GridOut().write_ucd(discretization.triangulation(), output);
     }
 
+    /*
+     * Prepare offline data:
+     */
+
     print_head("compute offline data");
     offline_data.prepare();
 
     print_head("set up time step");
     time_step.setup();
+
+    /*
+     * Interpolate initial values and prepare second vector U_new:
+     */
 
     print_head("interpolate initial values");
 
@@ -116,9 +124,14 @@ namespace ryujin
 
     output(U, base_name + "-solution", t, 0);
 
+    vector_type U_new;
+    for (auto &it : U_new)
+      it.reinit(U[0]);
+
     /*
      * Loop:
      */
+
     for(unsigned int cycle = 1; t < t_final; ++cycle)
     {
       std::ostringstream head;
@@ -132,10 +145,9 @@ namespace ryujin
               << std::setprecision(4) << std::fixed << t //
               << std::endl;
 
-      const auto [U_new, t_new] = time_step.euler_step(U, t);
-
-      U = std::move(U_new);
-      t = t_new;
+      const auto tau = time_step.euler_step(U_new, U);
+      t += tau;
+      U.swap(U_new);
 
       if (t - last_output > output_granularity) {
         output(U, base_name + "-solution", t, cycle);
