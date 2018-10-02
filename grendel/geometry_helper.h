@@ -17,6 +17,7 @@ namespace grendel
     AssertThrow(false, dealii::ExcNotImplemented());
   }
 
+
   template <>
   void create_coarse_grid_triangle<2>(
       dealii::parallel::distributed::Triangulation<2> &triangulation,
