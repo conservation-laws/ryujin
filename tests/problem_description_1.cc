@@ -14,13 +14,13 @@ int main()
   ParameterAcceptor::prm.enter_subsection("ProblemDescription");
   const double &gamma = problem_description.gamma();
   const double &b = problem_description.b();
-  const auto &state_L = problem_description.initial_shock_front_state_L();
-  const auto &state_R = problem_description.initial_shock_front_state_R();
+  const auto &state_L = problem_description.initial_state_L();
+  const auto &state_R = problem_description.initial_state_R();
 
   ParameterAcceptor::prm.set("gamma", "1.4");
   ParameterAcceptor::prm.set("b", "0.");
   ParameterAcceptor::prm.set("shock front - mach number", "1.34");
-  ParameterAcceptor::prm.set("shock front - direction", "1., 0.");
+  ParameterAcceptor::prm.set("initial - direction", "1., 0.");
   problem_description.parse_parameters_callback();
 
   std::cout << gamma << std::endl;
@@ -28,7 +28,7 @@ int main()
   std::cout << state_L << std::endl;
   std::cout << state_R << std::endl << std::endl;
 
-  ParameterAcceptor::prm.set("shock front - direction", "42., 0.");
+  ParameterAcceptor::prm.set("initial - direction", "42., 0.");
   problem_description.parse_parameters_callback();
 
   std::cout << gamma << std::endl;
@@ -37,7 +37,7 @@ int main()
   std::cout << state_R << std::endl << std::endl;
 
   ParameterAcceptor::prm.set("gamma", "2.0");
-  ParameterAcceptor::prm.set("shock front - direction", "1., 1.");
+  ParameterAcceptor::prm.set("initial - direction", "1., 1.");
   problem_description.parse_parameters_callback();
 
   std::cout << gamma << std::endl;
