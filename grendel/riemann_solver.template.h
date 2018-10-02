@@ -420,12 +420,24 @@ namespace grendel
      * See [1], p. 915f (4.8) and (4.9)
      */
 
-    for (unsigned int i = 0; i < max_iter_; ++i) {
+    unsigned int i = 0;
+    do {
       const auto [gap, lambda_max] =
           compute_gap(gamma, riemann_data_i, riemann_data_j, p_1, p_2);
 
+      /*
+       * We return our current guess if we either reach the tolerance...
+       */
       if (gap < eps_)
         return {lambda_max, p_2, i};
+
+      /*
+       * ... or if we reached the number of allowed Newton iteratoins.
+       * lambda_max is a guaranteed upper bound, in the worst case we
+       * overestimated the result.
+       */
+      if (i + 1 >= max_iter_)
+        return {lambda_max, p_2, std::numeric_limits<unsigned int>::max()};
 
       /*
        * This is expensive:
@@ -480,9 +492,8 @@ namespace grendel
       /* We have found our root (up to roundoff erros): */
       if (p_1 >= p_2)
         return {lambda_max, p_2, i + 1};
-    }
+    } while (i++ < max_iter_);
 
-    throw dealii::ExcMessage("Newton method did not converge.");
     __builtin_unreachable();
   }
 
