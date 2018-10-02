@@ -97,6 +97,19 @@ namespace grendel
         p_R / (gamma_ - 1.) + 0.5 * rho_R * u_R * u_R;
   }
 
+
+  template <int dim>
+  typename ProblemDescription<dim>::rank1_type
+  ProblemDescription<dim>::initial_state(const dealii::Point<dim> &point) const
+  {
+    if ((point - initial_shock_front_position_) *
+            initial_shock_front_direction_ >
+        0.)
+      return initial_shock_front_state_R_;
+    else
+      return initial_shock_front_state_L_;
+  }
+
 } /* namespace grendel */
 
 #endif /* PROBLEM_DESCRIPTION_TEMPLATE_H */
