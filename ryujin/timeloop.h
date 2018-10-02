@@ -57,6 +57,7 @@ namespace ryujin
 
     /* Data for output management: */
     std::thread output_thread;
+    vector_type output_vector;
 
   };
 

@@ -290,15 +290,32 @@ namespace ryujin
     /*
      * Offload output to a worker thread.
      *
+     * We wait for a previous thread to finish before we schedule a new
+     * one. This logic also serves as a mutex for output_vector.
      */
 
-    /* capture U, name, t, cycle by value */
-    const auto output_worker = [this, U, name, t, cycle]() {
+    deallog << "        Schedule output for cycle = " << cycle << std::endl;
+    if (output_thread.joinable()) {
+      TimerOutput::Scope timer(computing_timer, "time_loop - stalled output");
+      output_thread.join();
+    }
+
+    /*
+     * Copy the current state vector over to output_vector:
+     */
+
+    constexpr auto problem_dimension =
+        ProblemDescription<dim>::problem_dimension;
+    for (unsigned int i = 0; i < problem_dimension; ++i) {
+      /* This also copies ghost elements: */
+      output_vector[i] = U[i];
+    }
+
+
+    /* capture name, t, cycle by value */
+    const auto output_worker = [this, name, t, cycle]() {
       // FIXME: account for elapsed time in this thread as well.
       // TimerOutput::Scope timer(computing_timer, "time_loop - output");
-
-      constexpr auto problem_dimension =
-          ProblemDescription<dim>::problem_dimension;
 
       const auto &dof_handler = offline_data.dof_handler();
       const auto &triangulation = discretization.triangulation();
@@ -311,7 +328,7 @@ namespace ryujin
       data_out.attach_dof_handler(dof_handler);
 
       for (unsigned int i = 0; i < problem_dimension; ++i)
-        data_out.add_data_vector(U[i], component_names[i]);
+        data_out.add_data_vector(output_vector[i], component_names[i]);
 
       data_out.build_patches(mapping);
 
@@ -351,15 +368,8 @@ namespace ryujin
     };
 
     /*
-     * Spawn thread. We wait for a previous thread to finish before we
-     * schedule a new one.
+     * And spawn the thread:
      */
-
-    deallog << "        Schedule output for cycle = " << cycle << std::endl;
-    if (output_thread.joinable()) {
-      TimerOutput::Scope timer(computing_timer, "time_loop - stalled output");
-      output_thread.join();
-    }
     output_thread = std::move(std::thread (output_worker));
   }
 
