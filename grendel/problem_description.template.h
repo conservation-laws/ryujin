@@ -98,7 +98,7 @@ namespace grendel
     }
 
     /*
-     * And translate to 3D states:
+     * And translate to nD states:
      */
 
     initial_state_L_[0] = rho_L;
@@ -116,12 +116,25 @@ namespace grendel
   typename ProblemDescription<dim>::rank1_type
   ProblemDescription<dim>::initial_state(const dealii::Point<dim> &point) const
   {
-    const double position = (point - initial_position_) * initial_direction_;
+    const double x = point[0];
+    const double x_0 = 0.1;
+    const double x_1 = 0.3;
+    const double t = 0.;
 
-    if (position > 0.)
-      return initial_state_R_;
-    else
-      return initial_state_L_;
+    double rho = 1.;
+    if(x - t > x_0  && x - t < x_1)
+      rho = 1. + 64. * std::pow(x_1 - x_0, -6.) * std::pow(x - t - x_0, 3) *
+                     std::pow(x_1 - x + t, 3);
+    const double u = 1.;
+    const double p = 1.;
+
+    rank1_type state;
+
+    state[0] = rho;
+    state[1] = rho * u;
+    state[dim + 1] = p / (gamma_ - 1.) + 0.5 * rho * u * u;
+
+    return state;
   }
 
 } /* namespace grendel */
