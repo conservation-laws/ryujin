@@ -1,5 +1,5 @@
-#include <problem_description.template.h>
-#include <riemann_solver.template.h>
+#include <problem_description.h>
+#include <riemann_solver.h>
 
 using namespace grendel;
 using namespace dealii;
