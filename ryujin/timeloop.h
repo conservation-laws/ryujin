@@ -46,6 +46,7 @@ namespace ryujin
     std::string base_name;
     double t_final;
     double output_granularity;
+    bool enable_deallog_output;
 
     grendel::Discretization<dim> discretization;
     grendel::OfflineData<dim> offline_data;

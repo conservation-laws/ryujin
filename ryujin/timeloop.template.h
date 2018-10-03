@@ -82,6 +82,11 @@ namespace ryujin
     output_granularity = 0.02;
     add_parameter(
         "output granularity", output_granularity, "time interval for output");
+
+    enable_deallog_output = true;
+    add_parameter("enable deallog output",
+                  enable_deallog_output,
+                  "Flag to control whether we output to deallog");
   }
 
 
@@ -181,6 +186,7 @@ namespace ryujin
     /* Read in parameters and initialize all objects: */
 
     if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0) {
+
       deallog.pop();
 
       deallog << "[Init] Initiating Flux Capacitor... [ OK ]" << std::endl;
@@ -192,6 +198,12 @@ namespace ryujin
       ParameterAcceptor::initialize("ryujin.prm");
 
       deallog << "[ OK ]" << std::endl;
+
+      if (!enable_deallog_output) {
+        deallog.push("SILENT");
+        deallog.depth_console(0);
+        return;
+      }
 
     } else {
 
