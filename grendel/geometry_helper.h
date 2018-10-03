@@ -105,6 +105,8 @@ namespace grendel
       const double /*diameter*/)
   {
     dealii::GridGenerator::hyper_cube(triangulation, 0., length);
+    triangulation.begin_active()->face(0)->set_boundary_id(0);
+    triangulation.begin_active()->face(1)->set_boundary_id(0);
   }
 
 
