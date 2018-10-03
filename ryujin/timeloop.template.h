@@ -172,12 +172,16 @@ namespace ryujin
       t += tau;
       U.swap(U_new);
 
-      if (enable_compute_error)
-        error_norm = std::max(error_norm, compute_error(U, t));
-
       if (t - last_output > output_granularity) {
           output(U, base_name + "-solution", t, output_cycle++);
           last_output = t;
+
+          /*
+           * Let's compute intermediate errors with the same granularity
+           * with what we produce output.
+           */
+          if (enable_compute_error)
+            error_norm = std::max(error_norm, compute_error(U, t));
       }
     } /* end of loop */
 
