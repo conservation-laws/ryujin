@@ -87,13 +87,29 @@ namespace ryujin
     add_parameter("enable deallog output",
                   enable_deallog_output,
                   "Flag to control whether we output to deallog");
+
+    enable_compute_error = false;
+    add_parameter("enable compute error",
+                  enable_compute_error,
+                  "Flag to control whether we compute the Linfty norm of the "
+                  "difference to an analytic solution. Implemented only for "
+                  "certain initial state configurations.");
   }
 
 
   template <int dim>
   void TimeLoop<dim>::run()
   {
+    /*
+     * Initialize deallog:
+     */
+
     initialize();
+
+    /*
+     * Create distributed triangulation and output the triangulation to inp
+     * files:
+     */
 
     print_head("create triangulation");
     discretization.prepare();
@@ -118,7 +134,7 @@ namespace ryujin
     time_step.prepare();
 
     /*
-     * Interpolate initial values and prepare U_new and U_output vectors:
+     * Interpolate initial values and prepare U_new vector:
      */
 
     print_head("interpolate initial values");
@@ -137,6 +153,7 @@ namespace ryujin
      * Loop:
      */
 
+    double error_norm = 0.;
     unsigned int output_cycle = 1;
     for(unsigned int cycle = 1; t < t_final; ++cycle)
     {
@@ -155,11 +172,14 @@ namespace ryujin
       t += tau;
       U.swap(U_new);
 
+      if (enable_compute_error)
+        error_norm = std::max(error_norm, compute_error(U, t));
+
       if (t - last_output > output_granularity) {
-        output(U, base_name + "-solution", t, output_cycle++);
-        last_output = t;
+          output(U, base_name + "-solution", t, output_cycle++);
+          last_output = t;
       }
-    }
+    } /* end of loop */
 
     computing_timer.print_summary();
     deallog << timer_output.str() << std::endl;
@@ -168,6 +188,12 @@ namespace ryujin
 
     if (output_thread.joinable())
       output_thread.join();
+
+    /* Output final error: */
+    if (enable_compute_error) {
+      deallog << "Maximal error over all timesteps: " << error_norm
+              << std::endl;
+    }
 
     /* Detach deallog: */
 
@@ -253,9 +279,6 @@ namespace ryujin
   }
 
 
-  /**
-   * Return a vector populated with initial values:
-   */
   template <int dim>
   typename TimeLoop<dim>::vector_type
   TimeLoop<dim>::interpolate_initial_values()
@@ -274,9 +297,11 @@ namespace ryujin
 
     constexpr auto problem_dimension =
         ProblemDescription<dim>::problem_dimension;
+
     const auto callable = [&](const auto &p) {
       return problem_description.initial_state(p, /*t=*/0.);
     };
+
     for (unsigned int i = 0; i < problem_dimension; ++i)
       VectorTools::interpolate(offline_data.dof_handler(),
                                to_function<dim, double>(callable, i),
@@ -289,9 +314,40 @@ namespace ryujin
   }
 
 
-  /**
-   * FIXME: Description
-   */
+  template <int dim>
+  double
+  TimeLoop<dim>::compute_error(const typename TimeLoop<dim>::vector_type &U,
+                               const double t)
+  {
+    deallog << "TimeLoop<dim>::compute_error()" << std::endl;
+    TimerOutput::Scope timer(computing_timer, "time_loop - compute error");
+
+    dealii::LinearAlgebra::distributed::Vector<double> error(U[0]);
+
+    constexpr auto problem_dimension =
+        ProblemDescription<dim>::problem_dimension;
+
+    const auto callable = [&](const auto &p) {
+      return problem_description.initial_state(p, t);
+    };
+
+    // FIXME: Explain why we use a summed Linfty norm.
+
+    double norm = 0.;
+    for (unsigned int i = 0; i < problem_dimension; ++i) {
+      VectorTools::interpolate(offline_data.dof_handler(),
+                               to_function<dim, double>(callable, i),
+                               error);
+      error -= U[i];
+      double norm_local = error.linfty_norm();
+      norm += Utilities::MPI::sum(norm_local, mpi_communicator);
+    }
+
+    deallog << "        error norm for t=" << t << ": " << norm << std::endl;
+    return norm;
+  }
+
+
   template <int dim>
   void TimeLoop<dim>::output(const typename TimeLoop<dim>::vector_type &U,
                              const std::string &name,

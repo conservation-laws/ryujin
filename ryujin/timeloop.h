@@ -32,6 +32,9 @@ namespace ryujin
     void initialize();
 
     vector_type interpolate_initial_values();
+
+    double compute_error(const vector_type &U, double t);
+
     void output(const vector_type &U,
                 const std::string &name,
                 double t,
@@ -47,6 +50,7 @@ namespace ryujin
     double t_final;
     double output_granularity;
     bool enable_deallog_output;
+    bool enable_compute_error;
 
     grendel::Discretization<dim> discretization;
     grendel::OfflineData<dim> offline_data;
