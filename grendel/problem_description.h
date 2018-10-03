@@ -24,7 +24,6 @@ namespace grendel
   class ProblemDescription : public dealii::ParameterAcceptor
   {
   public:
-
     /**
      * The dimension of the state space.
      */
@@ -75,8 +74,8 @@ namespace grendel
 
 
     /**
-     * Given a position @p point return the corresponding initial state.
-     * This function is used to interpolate initial values.
+     * Given a position @p point return the corresponding (conserved)
+     * initial state. This function is used to interpolate initial values.
      */
     rank1_type initial_state(const dealii::Point<dim> &point) const;
 
@@ -97,17 +96,21 @@ namespace grendel
     double cfl_constant_;
     A_RO(cfl_constant)
 
-    rank1_type initial_state_L_;
-    A_RO(initial_state_L)
-
-    rank1_type initial_state_R_;
-    A_RO(initial_state_R)
-
   private:
     std::string initial_state_;
     dealii::Tensor<1, dim> initial_direction_;
     dealii::Point<dim> initial_position_;
     double initial_shock_front_mach_number_;
+
+    /*
+     * We use two internal function objects to compute "left" and "right"
+     * initial 1d states. The @ref initial_states() function translates the
+     * result into 3D conserved states according to the chosen initial
+     * position and direction.
+     */
+
+    std::function<std::array<double, 3>(double)> state_1d_L_;
+    std::function<std::array<double, 3>(double)> state_1d_R_;
   };
 
 
