@@ -344,7 +344,7 @@ namespace ryujin
                                error);
       error -= U[i];
       double norm_local = error.linfty_norm();
-      norm += Utilities::MPI::sum(norm_local, mpi_communicator);
+      norm += Utilities::MPI::max(norm_local, mpi_communicator);
     }
 
     deallog << "        error norm for t=" << t << ": " << norm << std::endl;
