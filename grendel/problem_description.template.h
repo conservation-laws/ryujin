@@ -14,7 +14,7 @@ namespace grendel
     ParameterAcceptor::parse_parameters_call_back.connect(
         std::bind(&ProblemDescription<dim>::parse_parameters_callback, this));
 
-    gamma_ = 7./5.;
+    gamma_ = 7. / 5.;
     add_parameter("gamma", gamma_, "Gamma");
 
     b_ = 0.0;
@@ -96,7 +96,7 @@ namespace grendel
         return {rho_R, u_R, p_R};
       };
 
-    } else if (initial_state_ == "contrast") {
+    } else if (initial_state_ == "sod contrast") {
 
       /* Contrast of the Sod shock tube: */
 
@@ -150,8 +150,7 @@ namespace grendel
      * state:
      */
 
-    const double position_1d =
-        (point - initial_position_) * initial_direction_;
+    const double position_1d = (point - initial_position_) * initial_direction_;
 
     const auto [rho, u, p] = (position_1d > 0.) ? state_1d_R_(position_1d, t)
                                                 : state_1d_L_(position_1d, t);
