@@ -137,6 +137,7 @@ namespace ryujin
      * Loop:
      */
 
+    unsigned int output_cycle = 1;
     for(unsigned int cycle = 1; t < t_final; ++cycle)
     {
       std::ostringstream head;
@@ -155,7 +156,7 @@ namespace ryujin
       U.swap(U_new);
 
       if (t - last_output > output_granularity) {
-        output(U, base_name + "-solution", t, cycle);
+        output(U, base_name + "-solution", t, output_cycle++);
         last_output = t;
       }
     }
