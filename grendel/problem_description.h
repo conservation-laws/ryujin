@@ -76,8 +76,13 @@ namespace grendel
     /**
      * Given a position @p point return the corresponding (conserved)
      * initial state. This function is used to interpolate initial values.
+     *
+     * The additional time parameter "t" is for validation purposes.
+     * Sometimes we know the (analytic) solution of a test tube
+     * configuration and want to compare the numerical computation against
+     * it.
      */
-    rank1_type initial_state(const dealii::Point<dim> &point) const;
+    rank1_type initial_state(const dealii::Point<dim> &point, double t) const;
 
 
     /**
@@ -109,8 +114,8 @@ namespace grendel
      * position and direction.
      */
 
-    std::function<std::array<double, 3>(double)> state_1d_L_;
-    std::function<std::array<double, 3>(double)> state_1d_R_;
+    std::function<std::array<double, 3>(double x, double t)> state_1d_L_;
+    std::function<std::array<double, 3>(double x, double t)> state_1d_R_;
   };
 
 

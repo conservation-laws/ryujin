@@ -23,21 +23,22 @@ namespace grendel
     cfl_constant_ = 1.00;
     add_parameter("cfl constant", cfl_constant_, "CFL constant C");
 
+
     initial_state_ = "shock front";
     add_parameter("initial state",
                   initial_state_,
                   "Initial state. Valid names are \"shock front\", "
-                  "\"contrast\", or \"smooth\".");
+                  "\"sod contrast\", or \"smooth solution\".");
 
     initial_direction_[0] = 1.;
     add_parameter("initial - direction",
                   initial_direction_,
-                  "Initial direction of shock front, or  contrast");
+                  "Initial direction of shock, or contrast front");
 
     initial_position_[0] = 1.;
     add_parameter("initial - position",
                   initial_position_,
-                  "Initial position of shock front, or  contrast");
+                  "Initial position of shock, or contrast front");
 
     initial_shock_front_mach_number_ = 2.0;
     add_parameter("shock front - mach number",
@@ -81,11 +82,17 @@ namespace grendel
       double p_L =
           p_R * (2. * gamma_ * mach * mach - (gamma_ - 1.)) / (gamma_ + 1.);
 
-      state_1d_L_ = [=](const double &) -> std::array<double, 3> {
+      state_1d_L_ = [=](const double, const double t) -> std::array<double, 3> {
+        AssertThrow(t == 0.,
+                    ExcMessage("No analytic solution for t > 0. available"));
+
         return {rho_L, u_L, p_L};
       };
 
-      state_1d_R_ = [=](const double &) -> std::array<double, 3> {
+      state_1d_R_ = [=](const double, const double t) -> std::array<double, 3> {
+        AssertThrow(t == 0.,
+                    ExcMessage("No analytic solution for t > 0. available"));
+
         return {rho_R, u_R, p_R};
       };
 
@@ -93,22 +100,28 @@ namespace grendel
 
       /* Contrast of the Sod shock tube: */
 
-      state_1d_L_ = [](const double &) -> std::array<double, 3> {
+      state_1d_L_ = [](const double, const double t) -> std::array<double, 3> {
+        AssertThrow(t == 0.,
+                    ExcMessage("No analytic solution for t > 0. available"));
+
         // rho, u, p
         return {1.0, 0.0, 1.0};
       };
 
-      state_1d_R_ = [](const double &) -> std::array<double, 3> {
+      state_1d_R_ = [](const double, const double t) -> std::array<double, 3> {
+        AssertThrow(t == 0.,
+                    ExcMessage("No analytic solution for t > 0. available"));
+
         // rho, u, p
         return {0.125, 0.0, 0.1};
       };
 
     } else if (initial_state_ == "smooth") {
 
-      state_1d_L_ = [](const double &x) -> std::array<double, 3> {
+      state_1d_L_ = [](const double x,
+                       const double t) -> std::array<double, 3> {
         const double x_0 = -0.1; // 0.1;
         const double x_1 = 0.1;  // 0.3;
-        const double t = 0.;
 
         double rho = 1.;
         if (x - t > x_0 && x - t < x_1)
@@ -129,7 +142,8 @@ namespace grendel
 
   template <int dim>
   typename ProblemDescription<dim>::rank1_type
-  ProblemDescription<dim>::initial_state(const dealii::Point<dim> &point) const
+  ProblemDescription<dim>::initial_state(const dealii::Point<dim> &point,
+                                         double t) const
   {
     /*
      * Translate to conserved quantities and return the corresponding
@@ -139,8 +153,8 @@ namespace grendel
     const double position_1d =
         (point - initial_position_) * initial_direction_;
 
-    const auto [rho, u, p] = (position_1d > 0.) ? state_1d_R_(position_1d)
-                                                : state_1d_L_(position_1d);
+    const auto [rho, u, p] = (position_1d > 0.) ? state_1d_R_(position_1d, t)
+                                                : state_1d_L_(position_1d, t);
 
     rank1_type state;
 

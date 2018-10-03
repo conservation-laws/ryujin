@@ -275,7 +275,7 @@ namespace ryujin
     constexpr auto problem_dimension =
         ProblemDescription<dim>::problem_dimension;
     const auto callable = [&](const auto &p) {
-      return problem_description.initial_state(p);
+      return problem_description.initial_state(p, /*t=*/0.);
     };
     for (unsigned int i = 0; i < problem_dimension; ++i)
       VectorTools::interpolate(offline_data.dof_handler(),
