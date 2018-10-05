@@ -73,6 +73,9 @@ namespace grendel
     momentum_vector(const rank1_type &U);
 
 
+    // FIXME: Add pressure extractor
+
+
     /**
      * Given a position @p point return the corresponding (conserved)
      * initial state. This function is used to interpolate initial values.
@@ -133,7 +136,7 @@ namespace grendel
   {
     dealii::Tensor<1, dim> result;
     std::copy(&U[1], &U[1 + dim], &result[0]);
-    return result;
+    return std::move(result);
   }
 
 
@@ -163,7 +166,7 @@ namespace grendel
     }
     result[dim + 1] = m / rho * (E + p);
 
-    return result;
+    return std::move(result);
   }
 
 } /* namespace grendel */
