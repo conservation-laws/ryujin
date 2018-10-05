@@ -49,20 +49,20 @@ namespace grendel
 
   protected:
 
-    /*
+    /**
      * The triangulation and a getter function returning a const reference.
      */
     std::unique_ptr<dealii::parallel::distributed::Triangulation<dim>>
         triangulation_;
     A_RO(triangulation)
 
-    /*
+    /**
      * The mapping and a getter function returning a const reference.
      */
     std::unique_ptr<const dealii::Mapping<dim>> mapping_;
     A_RO(mapping)
 
-    /*
+    /**
      * The underlying finite element space.
      */
     std::unique_ptr<const dealii::FiniteElement<dim>> finite_element_;
