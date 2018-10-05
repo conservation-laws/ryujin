@@ -391,6 +391,7 @@ namespace grendel
     const double phi_p_max =
         phi(gamma, b, riemann_data_i, riemann_data_j, p_max);
 
+    // FIXME The == is a bit of a problem here
     if (phi_p_max == 0.) {
       const double p_star = p_max;
       const double lambda1 = lambda1_minus(gamma, riemann_data_i, p_star);
@@ -488,10 +489,17 @@ namespace grendel
 
       p_2 = p_2 - 2. * phi_p_2 / (dphi_p_2 + std::sqrt(discriminant_2));
 
-
       /* We have found our root (up to roundoff erros): */
-      if (p_1 >= p_2)
+      if (p_1 >= p_2) {
+        /*
+         * p_1 has changed position with p_2, it is now on the right side,
+         * so call the compute_gap function with reversed parameters:
+         */
+        const auto [gap, lambda_max] = compute_gap(
+            gamma, riemann_data_i, riemann_data_j, p_2 /*SIC!*/, p_1 /*SIC!*/);
         return {lambda_max, p_2, i + 1};
+      }
+
     } while (i++ < max_iter_);
 
     __builtin_unreachable();
