@@ -54,25 +54,25 @@ namespace grendel
      */
     std::unique_ptr<dealii::parallel::distributed::Triangulation<dim>>
         triangulation_;
-    A_RO(triangulation)
+    ACCESSOR_READ_ONLY(triangulation)
 
     /**
      * The mapping and a getter function returning a const reference.
      */
     std::unique_ptr<const dealii::Mapping<dim>> mapping_;
-    A_RO(mapping)
+    ACCESSOR_READ_ONLY(mapping)
 
     /**
      * The underlying finite element space.
      */
     std::unique_ptr<const dealii::FiniteElement<dim>> finite_element_;
-    A_RO(finite_element)
+    ACCESSOR_READ_ONLY(finite_element)
 
     /*
      * The quadrature used to for assembly.
      */
     std::unique_ptr<const dealii::Quadrature<dim>> quadrature_;
-    A_RO(quadrature)
+    ACCESSOR_READ_ONLY(quadrature)
 
   private:
 

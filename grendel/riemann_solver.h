@@ -71,7 +71,7 @@ namespace grendel
   protected:
     dealii::SmartPointer<const grendel::ProblemDescription<dim>>
         problem_description_;
-    A_RO(problem_description)
+    ACCESSOR_READ_ONLY(problem_description)
 
   private:
     double eps_;

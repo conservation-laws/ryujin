@@ -53,14 +53,14 @@ namespace grendel
     dealii::TimerOutput &computing_timer_;
 
     dealii::SmartPointer<const grendel::OfflineData<dim>> offline_data_;
-    A_RO(offline_data)
+    ACCESSOR_READ_ONLY(offline_data)
 
     dealii::SmartPointer<const grendel::ProblemDescription<dim>>
         problem_description_;
-    A_RO(problem_description)
+    ACCESSOR_READ_ONLY(problem_description)
 
     dealii::SmartPointer<const grendel::RiemannSolver<dim>> riemann_solver_;
-    A_RO(riemann_solver)
+    ACCESSOR_READ_ONLY(riemann_solver)
 
   private:
     /* Scratch data: */

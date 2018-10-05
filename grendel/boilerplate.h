@@ -40,7 +40,7 @@ namespace
 } /* anonymous namespace */
 
 
-#define A_RO(member)                                                           \
+#define ACCESSOR_READ_ONLY(member)                                                           \
 public:                                                                        \
   decltype(dereference(member##_)) &member() const                             \
   {                                                                            \

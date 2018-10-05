@@ -93,13 +93,13 @@ namespace grendel
 
   protected:
     double gamma_;
-    A_RO(gamma)
+    ACCESSOR_READ_ONLY(gamma)
 
     double b_;
-    A_RO(b)
+    ACCESSOR_READ_ONLY(b)
 
     double cfl_constant_;
-    A_RO(cfl_constant)
+    ACCESSOR_READ_ONLY(cfl_constant)
 
   private:
     std::string initial_state_;
