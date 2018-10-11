@@ -10,8 +10,7 @@ namespace grendel
 {
 
   /*
-   * internal scratch data for parallelized assembly, time-stepping and
-   * updates
+   * internal scratch data for parallelized assembly.
    */
 
   template <int dim>
