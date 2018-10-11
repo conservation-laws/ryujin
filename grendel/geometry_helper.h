@@ -6,13 +6,26 @@
 
 namespace grendel
 {
+  /*
+   * This header file contains a number of helper functions to create
+   * varios different meshes.  It is used in the Discretization class.
+   */
 
+
+  /**
+   * Create a 2D triangulation consisting of a rectangle with a prescribed
+   * length and height with an insribed obstacle given by a centered,
+   * equilateral triangle.
+   *
+   * Even though this function has a template parameter @p dim, it is only
+   * implemented for dimension 2.
+   */
   template <int dim>
   void create_coarse_grid_triangle(
       dealii::parallel::distributed::Triangulation<dim> &,
-      const double,
-      const double,
-      const double)
+      const double /*length*/,
+      const double /*height*/,
+      const double /*object_height*/)
   {
     AssertThrow(false, dealii::ExcNotImplemented());
   }
@@ -66,7 +79,9 @@ namespace grendel
 
     triangulation.create_triangulation(vertices, cells, SubCellData());
 
-    /* Set boundary ids: */
+    /*
+     * Set boundary ids:
+     */
 
     for (auto cell : triangulation.active_cell_iterators()) {
       for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f) {
@@ -88,11 +103,20 @@ namespace grendel
   }
 
 
+  /**
+   * Create an nD tube with a given length and diameter. More precisely,
+   * this is a line in 1D, a rectangle in 2D, and a cylinder in 3D.
+   *
+   * We set boundary indicator 0 on the left and right side to indicate "do
+   * nothing" boundary conditions, and boundary indicator 1 at the top and
+   * bottom side in 2D, as well as the curved portion of the boundary in 3D
+   * to indicate "reflective boundary conditions".
+   */
   template <int dim>
-  void create_coarse_grid_tube(
-      dealii::parallel::distributed::Triangulation<dim> &,
-      const double,
-      const double)
+  void
+  create_coarse_grid_tube(dealii::parallel::distributed::Triangulation<dim> &,
+                          const double /*length*/,
+                          const double /*diameter*/)
   {
     AssertThrow(false, dealii::ExcNotImplemented());
   }
@@ -121,7 +145,9 @@ namespace grendel
     GridGenerator::hyper_rectangle(
         triangulation, Point<2>(0., 0.), Point<2>(length, diameter));
 
-    /* Set boundary ids: */
+    /*
+     * Set boundary ids:
+     */
 
     for (auto cell : triangulation.active_cell_iterators()) {
       for (unsigned int f = 0; f < GeometryInfo<2>::faces_per_cell; ++f) {
@@ -135,6 +161,7 @@ namespace grendel
          * and bottom of the rectangle. On the left and right side we leave
          * the boundary indicator at 0, i.e. do nothing.
          */
+
         const auto center = face->center();
         if (center[0] > 0. && center[0] < length)
           face->set_boundary_id(1);
