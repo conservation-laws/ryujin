@@ -91,6 +91,7 @@ namespace grendel
     triangulation.clear();
 
     if (geometry_ == "immersed triangle") {
+
       create_coarse_grid_triangle(triangulation,
                                   immersed_triangle_length_,
                                   immersed_triangle_height_,

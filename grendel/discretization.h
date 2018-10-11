@@ -14,11 +14,11 @@ namespace grendel
 {
   /**
    * This class serves as a container for data related to the
-   * discretization.This includes the triangulation, finite element,
+   * discretization. This includes the triangulation, finite element,
    * mapping, and quadrature.
    *
    * This class uses dealii::ParameterAcceptor to handle parameters. After
-   * @p prepare() was called, the getter functions
+   * @p prepare() is called, the getter functions
    * Discretization::triangulation(), Discretization::finite_element(),
    * Discretization::mapping(), and Discretization::quadrature() return
    * valid const references.
@@ -34,12 +34,6 @@ namespace grendel
     Discretization(const MPI_Comm &mpi_communicator,
                    dealii::TimerOutput &computing_timer,
                    const std::string &subsection = "Discretization");
-
-    /**
-     * Destructor. We prevent the creation of derived classes by declaring
-     * the destructor to be <code>final</code>.
-     */
-    virtual ~Discretization() final = default;
 
     /**
      * Create the triangulation and set up the finite element, mapping and
