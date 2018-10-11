@@ -95,6 +95,11 @@ namespace grendel
      * used in a matrix-vector product, and in order to avoid unnecessary
      * overhead, we simply assemble these parts into a local
      * dealii::SparseMatrix<dim>.
+     *
+     * These sparse matrices have to store values for all _locally
+     * relevant_ degrees of freedom that couple. Unfortunately, the deal.II
+     * library doesn't have a helper function to record such a sparsity
+     * pattern, so we quickly do the grunt work by hand:
      */
 
     {
@@ -119,6 +124,10 @@ namespace grendel
 
       sparsity_pattern_.copy_from(dsp);
     }
+
+    /*
+     * Next we can (re)initialize all local matrices:
+     */
 
     {
       TimerOutput::Scope t(computing_timer_,
