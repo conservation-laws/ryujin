@@ -1,7 +1,7 @@
 #ifndef PROBLEM_DESCRIPTION_H
 #define PROBLEM_DESCRIPTION_H
 
-#include "boilerplate.h"
+#include "helper.h"
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/tensor.h>

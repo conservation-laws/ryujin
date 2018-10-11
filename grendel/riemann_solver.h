@@ -1,7 +1,7 @@
 #ifndef RIEMANN_SOLVER_H
 #define RIEMANN_SOLVER_H
 
-#include "boilerplate.h"
+#include "helper.h"
 #include "problem_description.h"
 
 #include <deal.II/base/parameter_acceptor.h>

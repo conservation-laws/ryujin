@@ -4,6 +4,8 @@
 #include <deal.II/base/tensor.h>
 #include <deal.II/base/function.h>
 
+#include <type_traits>
+
 namespace grendel
 {
   /*
@@ -116,6 +118,72 @@ namespace grendel
   }
 
 } // namespace grendel
+
+
+/*
+ * A convenience macro that automatically writes out an accessor (or
+ * getter) function:
+ *
+ *   const Foo& bar() const
+ *   {
+ *      return bar_;
+ *   }
+ *
+ * or
+ *
+ *   const Foo& bar() const
+ *   {
+ *      return *bar_;
+ *   }
+ *
+ * depending on whether bar_ can be dereferenced, or not.
+ */
+
+namespace
+{
+  template <typename T>
+  class is_dereferenciable
+  {
+    template <typename C>
+    static auto test(...) -> std::false_type;
+
+    template <typename C>
+    static auto test(C *) -> decltype(*std::declval<C>(), std::true_type());
+
+  public:
+    typedef decltype(test<T>(nullptr)) type;
+    static constexpr auto value = type::value;
+  };
+
+  template <typename T, typename>
+  auto dereference(T &t) -> decltype(dereference(*t)) &;
+
+  template <
+      typename T,
+      typename = typename std::enable_if<!is_dereferenciable<T>::value>::type>
+  const T &dereference(T &t)
+  {
+    return t;
+  }
+
+  template <
+      typename T,
+      typename = typename std::enable_if<is_dereferenciable<T>::value>::type>
+  auto dereference(T &t) -> const decltype(*t) &
+  {
+    return *t;
+  }
+} /* anonymous namespace */
+
+#define ACCESSOR_READ_ONLY(member)                                             \
+public:                                                                        \
+  decltype(dereference(member##_)) &member() const                             \
+  {                                                                            \
+    return dereference(member##_);                                             \
+  }                                                                            \
+                                                                               \
+protected:
+
 
 
 #endif /* HELPER_H */

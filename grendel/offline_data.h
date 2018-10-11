@@ -1,8 +1,8 @@
 #ifndef OFFLINE_DATA_H
 #define OFFLINE_DATA_H
 
-#include "boilerplate.h"
 #include "discretization.h"
+#include "helper.h"
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/timer.h>

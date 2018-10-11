@@ -1,7 +1,7 @@
 #ifndef DISCRETIZATION_H
 #define DISCRETIZATION_H
 
-#include "boilerplate.h"
+#include "helper.h"
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/quadrature.h>
