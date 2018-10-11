@@ -17,8 +17,9 @@ namespace grendel
    * discretization. This includes the triangulation, finite element,
    * mapping, and quadrature.
    *
-   * This class uses dealii::ParameterAcceptor to handle parameters. After
-   * @p prepare() is called, the getter functions
+   * This class uses dealii::ParameterAcceptor to handle parameters.
+   *
+   * After @p prepare() is called, the getter functions
    * Discretization::triangulation(), Discretization::finite_element(),
    * Discretization::mapping(), and Discretization::quadrature() return
    * valid const references.
