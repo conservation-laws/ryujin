@@ -42,17 +42,25 @@ namespace grendel
                 const grendel::Discretization<dim> &discretization,
                 const std::string &subsection = "OfflineData");
 
-    virtual ~OfflineData() final = default;
-
-    /* Interface for computation: */
-
-    virtual void prepare()
+    /**
+     * Prepare offline data. A call to @ref prepare() internally calls @ref
+     * setup() and @ref assemble().
+     */
+    void prepare()
     {
       setup();
       assemble();
     }
 
+    /**
+     * Set up DoFHandler, all IndexSet objects and the SparsityPattern.
+     * Initialize matrix storage.
+     */
     void setup();
+
+    /**
+     * Assemble all matrices.
+     */
     void assemble();
 
   protected:
@@ -85,13 +93,21 @@ namespace grendel
     ACCESSOR_READ_ONLY(locally_relevant)
 
     /**
-     * The SparsityPattern of our FiniteElement ansatz.
+     * The SparsityPattern.
      */
     dealii::SparsityPattern sparsity_pattern_;
     ACCESSOR_READ_ONLY(sparsity_pattern)
 
     /**
-     * 
+     * The boundary map.
+     *
+     * For every degree of freedom that has nonzero support at the boundary
+     * we record the global degree of freedom index along with a weighted
+     * boundary normal and the associated boundary id.
+     *
+     * This map is later used in @ref OfflineData to handle boundary
+     * degrees of freedom after every time step (for example to implement
+     * reflective boundary conditions).
      */
     std::map<dealii::types::global_dof_index,
              std::tuple<dealii::Tensor<1, dim>, dealii::types::boundary_id>>
