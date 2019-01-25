@@ -119,14 +119,17 @@ namespace grendel
 
             /* Set symmetrized off-diagonal values: */
 
+            // Set the d_ij value:
             {
-              // FIXME explain this
+              // FIXME Refactor into a scatter function into helper.h
               const auto global_index = jt->global_index();
               const typename SparseMatrix<double>::iterator matrix_iterator(
                   &dij_matrix_, global_index);
               matrix_iterator->value() = d;
             }
-            dij_matrix_(j, i) = d; // FIXME index access suboptimal
+            // Set the d_ji value:
+            // FIXME this index access is suboptimal.
+            dij_matrix_(j, i) = d;
           }
         }
       };
@@ -244,6 +247,7 @@ namespace grendel
             /* On boundray 1 we reflect: */
             if (id == 1) {
               auto m = ProblemDescription<dim>::momentum_vector(Unew_i);
+              // FIXME:
               m -= 1. * (m * normal) * normal;
               for (unsigned int i = 0; i < dim; ++i)
                 Unew_i[i + 1] = m[i];
