@@ -148,13 +148,16 @@ namespace grendel
      * We use two internal function objects to compute "left" and "right"
      * initial 1d states. The @ref initial_states() function translates the
      * result into 3D conserved states according to the chosen initial
-     * position and direction.
+     * position and direction. EJT: Note that there will be some cases where we
+     * just have a general exact solution so the "left" and "right" state set up
+     * makes life messy. Need to generalize.
      */
 
     std::function<std::array<double, 3>(double x, double t)> state_1d_L_;
     std::function<std::array<double, 3>(double x, double t)> state_1d_R_;
-    std::function<std::array<double, 4>(double x, double t)> state_2d_L_;
-    std::function<std::array<double, 4>(double x, double t)> state_2d_R_;
+    std::function<std::array<double, 4>(double x, double y, double t)>
+        initial_state_2D; // Adding 2D at the end to avoid confusion with
+                          // initial_state_
   };
 
 
