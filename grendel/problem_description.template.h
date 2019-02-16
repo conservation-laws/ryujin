@@ -152,6 +152,42 @@ namespace grendel
       };
       state_1d_R_ = state_1d_L_;
 
+    } else if (initial_state_ == "vortex") {
+
+      // 2D isentropic vortex problem. See section 5.6 of Euler-convex limiting
+      // paper by Guermond et al.
+      const double PI = std::atan(1.0) * 4;
+      state_1d_L_ = [](const double x,
+                       const double y,
+                       const double t) -> std::array<double, 4> {
+        const double xBar =
+            x - 2.0 * t - 5.0; // x position of vortex, initialized at 5
+        const double yBar = y; // y position of vortex, initialized at 0
+        const double rSquared = std::pow(xBar, 2.0) + std::pow(yBar, 2.0);
+        // free stream values, Inf for infinity
+        const double rhoInf = 1.0;
+        const double pInf = 1.0;
+        const double uInf = 2.0;
+        const double vInf = 0.0;
+        const double TInf = 1.0;
+        // vortex stuff here
+        const double beta = 5.0; // vortex strength
+        // define flow perturbuations here
+        double deltaU = beta / (2.0 * PI) * exp(1.0 - rSquared) * -yBar;
+        double deltaV = beta / (2.0 * PI) * exp(1.0 - rSquared) * xBar;
+        double deltaT = -(gamma_ - 1) * std::pow(beta, 2.0) /
+                        (8.0 * gamma_ * std::pow(PI, 2.0)) *
+                        exp(1.0 - rSquared);
+        // exact functions defined here
+        double rho = std::pow((Tinf + deltaT), 1 / (gamma_1 - 1));
+        double u = uInf + deltaU;
+        double v = vInf + deltaV;
+        double p = std::pow(rho, gamma_);
+        // rho, u, v, p
+        return {rho, u, v, p};
+      };
+      state_1d_R_ = state_1d_L_;
+
     } else {
 
       AssertThrow(false, dealii::ExcMessage("Unknown initial state."));
