@@ -31,7 +31,7 @@ namespace grendel
     add_parameter("initial state",
                   initial_state_,
                   "Initial state. Valid names are \"shock front\", "
-                  "\"sod contrast\", \"uniform\", or \"smooth solution\".");
+                  "\"sod contrast\", \"uniform\", \"smooth solution\", or \"vortex\".");
 
     initial_direction_[0] = 1.;
     add_parameter("initial - direction",
@@ -156,13 +156,12 @@ namespace grendel
 
       // 2D isentropic vortex problem. See section 5.6 of Euler-convex limiting
       // paper by Guermond et al.
-      const double PI = std::atan(1.0) * 4;
-      state_1d_L_ = [](const double x,
-                       const double y,
-                       const double t) -> std::array<double, 4> {
+      state_1d_L_ = [&](const double x,
+                        const double t) -> std::array<double, 3> {
+        const double PI = std::atan(1.0) * 4; // define PI
         const double xBar =
             x - 2.0 * t - 5.0; // x position of vortex, initialized at 5
-        const double yBar = y; // y position of vortex, initialized at 0
+        const double yBar = x; // y position of vortex, initialized at 0
         const double rSquared = std::pow(xBar, 2.0) + std::pow(yBar, 2.0);
         // free stream values, Inf for infinity
         const double rhoInf = 1.0;
@@ -175,24 +174,23 @@ namespace grendel
         // define flow perturbuations here
         double deltaU = beta / (2.0 * PI) * exp(1.0 - rSquared) * -yBar;
         double deltaV = beta / (2.0 * PI) * exp(1.0 - rSquared) * xBar;
-        double deltaT = -(gamma_ - 1) * std::pow(beta, 2.0) /
+        double deltaT = -1.0 * (gamma_ - 1) * std::pow(beta, 2.0) /
                         (8.0 * gamma_ * std::pow(PI, 2.0)) *
                         exp(1.0 - rSquared);
         // exact functions defined here
-        double rho = std::pow((Tinf + deltaT), 1 / (gamma_1 - 1));
+        double rho = rhoInf + std::pow((TInf + deltaT), 1 / (gamma_ - 1));
         double u = uInf + deltaU;
         double v = vInf + deltaV;
-        double p = std::pow(rho, gamma_);
+        double p = pInf + std::pow(rho, gamma_);
         // rho, u, v, p
-        return {rho, u, v, p};
+        return {rho, u, p};
       };
       state_1d_R_ = state_1d_L_;
-
     } else {
 
       AssertThrow(false, dealii::ExcMessage("Unknown initial state."));
     }
-  }
+  } // namespace grendel
 
 
   template <int dim>
