@@ -155,36 +155,38 @@ namespace grendel
 
     } else if (initial_state_ == "vortex") {
 
-      // 2D isentropic vortex problem. See section 5.6 of Euler-convex limiting
-      // paper by Guermond et al. Note this is not in the framework of
-      // left/right states
+      /*
+        2D isentropic vortex problem. See section 5.6 of Euler-convex limiting
+        paper by Guermond et al. Note that the paper might have types. Also note
+        this is not in the framework of left/right states.
+      */
       initial_state_2D = [=](const double x,
                              const double y,
                              const double t) -> std::array<double, 4> {
-        const double PI = std::atan(1.0) * 4; // define PI
-        const double xBar =
-            x - 2.0 * t - 5.0;     // x position of vortex, initialized at x=5
-        const double yBar = y - 5; // y position of vortex, initialized at y=5
-        const double rSquared = std::pow(xBar, 2.0) + std::pow(yBar, 2.0);
+        // define PI
+        const double PI = std::atan(1.0) * 4.0;
+        // set center point vortex center initialized at (5,5) and set
+        // definition of r^2
+        const double xBar = x - 5.0 - 2.0 * t;
+        const double yBar = y - 5.0;
+        const double rSquared = std::pow(xBar, 2) + std::pow(yBar, 2);
         // free stream values, Inf for infinity
-        const double rhoInf = 1.0;
-        const double pInf = 1.0;
         const double uInf = 2.0;
         const double vInf = 0.0;
         const double TInf = 1.0;
         // vortex strength
         const double beta = 5.0;
         // define flow perturbuations here
-        double deltaU = beta / (2.0 * PI) * exp(1.0 - rSquared) * -yBar;
-        double deltaV = beta / (2.0 * PI) * exp(1.0 - rSquared) * xBar;
-        double deltaT = -1.0 * (gamma_ - 1) * std::pow(beta, 2.0) /
-                        (8.0 * gamma_ * std::pow(PI, 2.0)) *
-                        exp(1.0 - rSquared);
+        double deltaU = -beta / (2.0 * PI) * exp((1.0 - rSquared) / 2.0) * yBar;
+        double deltaV = beta / (2.0 * PI) * exp((1.0 - rSquared) / 2.0) * xBar;
+        double deltaT = -(gamma_ - 1.0) * std::pow(beta, 2) /
+                        (8.0 * gamma_ * std::pow(PI, 2)) * exp(1.0 - rSquared);
         // exact functions defined here
-        double rho = rhoInf + std::pow((TInf + deltaT), 1 / (gamma_ - 1));
+        double Temp = TInf + deltaT;
+        double rho = std::pow(Temp, 1.0 / (gamma_ - 1.0));
         double u = uInf + deltaU;
         double v = vInf + deltaV;
-        double p = pInf + std::pow(rho, gamma_);
+        double p = std::pow(rho, gamma_);
         // rho, u, v, p
         return {rho, u, v, p};
       };
