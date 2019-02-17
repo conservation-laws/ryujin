@@ -155,7 +155,9 @@ namespace grendel
 
     std::function<std::array<double, 3>(double x, double t)> state_1d_L_;
     std::function<std::array<double, 3>(double x, double t)> state_1d_R_;
-    std::function<std::array<double, 4>(double x, double y, double t)>
+    std::function<std::array<double, 4>(double x,
+                                        double y,
+                                        double t)>
         initial_state_2D; // Adding 2D at the end to avoid confusion with
                           // initial_state_
   };

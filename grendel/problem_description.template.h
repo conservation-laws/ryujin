@@ -2,6 +2,7 @@
 #define PROBLEM_DESCRIPTION_TEMPLATE_H
 
 #include "problem_description.h"
+#include <iostream>
 
 namespace grendel
 {
@@ -155,14 +156,15 @@ namespace grendel
     } else if (initial_state_ == "vortex") {
 
       // 2D isentropic vortex problem. See section 5.6 of Euler-convex limiting
-      // paper by Guermond et al.
+      // paper by Guermond et al. Note this is not in the framework of
+      // left/right states
       initial_state_2D = [=](const double x,
-                             double y,
+                             const double y,
                              const double t) -> std::array<double, 4> {
         const double PI = std::atan(1.0) * 4; // define PI
         const double xBar =
-            x - 2.0 * t - 5.0; // x position of vortex, initialized at x=5
-        const double yBar = y; // y position of vortex, initialized at y=0
+            x - 2.0 * t - 5.0;     // x position of vortex, initialized at x=5
+        const double yBar = y - 5; // y position of vortex, initialized at y=5
         const double rSquared = std::pow(xBar, 2.0) + std::pow(yBar, 2.0);
         // free stream values, Inf for infinity
         const double rhoInf = 1.0;
@@ -203,18 +205,25 @@ namespace grendel
      * state:
      */
 
+    rank1_type state;
     const double position_1d = (point - initial_position_) * initial_direction_;
 
-    const auto [rho, u, p] = (position_1d > 0.) ? state_1d_R_(position_1d, t)
-                                                : state_1d_L_(position_1d, t);
-
-    rank1_type state;
-
-    state[0] = rho;
-    for (unsigned int i = 0; i < dim; ++i)
-      state[1 + i] = rho * u * initial_direction_[i];
-    state[dim + 1] = p / (gamma_ - 1.) + 0.5 * rho * u * u;
-
+    if (initial_state_ != "vortex") {
+      const auto [rho, u, p] = (position_1d > 0.) ? state_1d_R_(position_1d, t)
+                                                  : state_1d_L_(position_1d, t);
+      state[0] = rho;
+      for (unsigned int i = 0; i < dim; ++i) {
+        state[1 + i] = rho * u * initial_direction_[i];
+        state[dim + 1] = p / (gamma_ - 1.) + 0.5 * rho * u * u;
+      }
+    } else {
+      const auto [rho2d, u2d, v2d, p2d] =
+          initial_state_2D(point[0], point[1], t);
+      state[0] = rho2d;
+      state[1] = rho2d * u2d;
+      state[2] = rho2d * v2d;
+      state[3] = p2d / (gamma_ - 1.) + 0.5 * rho2d * (u2d * u2d + v2d * v2d);
+    }
     return state;
   }
 
