@@ -157,7 +157,7 @@ namespace grendel
 
       /*
         2D isentropic vortex problem. See section 5.6 of Euler-convex limiting
-        paper by Guermond et al. Note that the paper might have types. Also note
+        paper by Guermond et al. Note that the paper might have typos. Also note
         this is not in the framework of left/right states.
       */
       initial_state_2D = [=](const double x,
