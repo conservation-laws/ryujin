@@ -169,7 +169,7 @@ namespace grendel
         // definition of r^2
         const double xBar = x - 5.0 - 2.0 * t;
         const double yBar = y - 5.0;
-        const double rSquared = std::pow(xBar, 2) + std::pow(yBar, 2);
+        const double rSquared = std::pow(xBar, 2.0) + std::pow(yBar, 2.0);
         // free stream values, Inf for infinity
         const double uInf = 2.0;
         const double vInf = 0.0;
@@ -179,8 +179,9 @@ namespace grendel
         // define flow perturbuations here
         double deltaU = -beta / (2.0 * PI) * exp((1.0 - rSquared) / 2.0) * yBar;
         double deltaV = beta / (2.0 * PI) * exp((1.0 - rSquared) / 2.0) * xBar;
-        double deltaT = -(gamma_ - 1.0) * std::pow(beta, 2) /
-                        (8.0 * gamma_ * std::pow(PI, 2)) * exp(1.0 - rSquared);
+        double deltaT = -(gamma_ - 1.0) * std::pow(beta, 2.0) /
+                        (8.0 * gamma_ * std::pow(PI, 2.0)) *
+                        exp(1.0 - rSquared);
         // exact functions defined here
         double Temp = TInf + deltaT;
         double rho = std::pow(Temp, 1.0 / (gamma_ - 1.0));

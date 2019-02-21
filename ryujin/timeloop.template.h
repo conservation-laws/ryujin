@@ -347,7 +347,7 @@ namespace ryujin
     // EJT: Need to implement the normalized error from eq (5.1) in euler convex
     // paper
     std::vector<double> max_of_analytic_solution(problem_dimension);
-    std::vector<double> max_of_error(problem_dimension);
+    std::vector<double> max_of_Linf_error(problem_dimension);
 
     double norm = 0.;
     double norm_each = 0;
@@ -355,20 +355,20 @@ namespace ryujin
       VectorTools::interpolate(offline_data.dof_handler(),
                                to_function<dim, double>(callable, i),
                                error);
-      double max_value_local = error.linfty_norm();
+      double max_value_local_lInf = error.linfty_norm();
       max_of_analytic_solution[i] =
-          Utilities::MPI::max(max_value_local, mpi_communicator);
+          Utilities::MPI::max(max_value_local_lInf, mpi_communicator);
       error -= U[i];
-      double error_local = error.linfty_norm() / max_of_analytic_solution[i];
-      norm += Utilities::MPI::max(error_local, mpi_communicator);
-      norm_each = Utilities::MPI::max(error_local, mpi_communicator);
-      max_of_error[i] = norm_each;
+      double LInf_error_local = error.linfty_norm() / max_of_analytic_solution[i];
+      norm += Utilities::MPI::max(LInf_error_local, mpi_communicator);
+      norm_each = Utilities::MPI::max(LInf_error_local, mpi_communicator);
+      max_of_Linf_error[i] = norm_each;
     }
     // used this for a sanity check
-    double sum_of_component_errors =
-        std::accumulate(max_of_error.begin(), max_of_error.end(), 0.0);
+    double sum_of_component_Linferrors =
+        std::accumulate(max_of_Linf_error.begin(), max_of_Linf_error.end(), 0.0);
 
-    deallog << "        error norm for t=" << t << ": " << norm << std::endl;
+    // deallog << "        error norm for t=" << t << ": " << norm << std::endl;
     return norm;
   }
 
