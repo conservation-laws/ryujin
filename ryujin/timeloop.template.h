@@ -157,6 +157,7 @@ namespace ryujin
      */
 
     double error_norm = 0.;
+    double error_at_final_time = 0;
     unsigned int output_cycle = 1;
     for (unsigned int cycle = 1; t < t_final; ++cycle) {
       std::ostringstream head;
@@ -183,6 +184,7 @@ namespace ryujin
          */
         if (enable_compute_error)
           error_norm = std::max(error_norm, compute_error(U, t));
+        error_at_final_time = compute_error(U, t);
       }
     } /* end of loop */
 
@@ -201,6 +203,8 @@ namespace ryujin
     if (enable_compute_error) {
       deallog << "Maximal error over all timesteps: " << error_norm
               << std::endl;
+      deallog << "Normalized consolidated error at final timestep: "
+              << error_at_final_time << std::endl;
     }
 
     /* Detach deallog: */
@@ -360,12 +364,11 @@ namespace ryujin
       norm_each = Utilities::MPI::max(error_local, mpi_communicator);
       max_of_error[i] = norm_each;
     }
+    // used this for a sanity check
+    double sum_of_component_errors =
+        std::accumulate(max_of_error.begin(), max_of_error.end(), 0.0);
 
     deallog << "        error norm for t=" << t << ": " << norm << std::endl;
-    deallog << "        error2 norm for t=" << t << ": "
-            << max_of_error[0] + max_of_error[1] + max_of_error[2] +
-                   max_of_error[3]
-            << std::endl;
     return norm;
   }
 
