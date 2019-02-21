@@ -12,8 +12,8 @@
 #include <deal.II/numerics/data_out.h>
 #include <deal.II/numerics/vector_tools.h>
 
-#include <iomanip>
 #include <fstream>
+#include <iomanip>
 
 
 using namespace dealii;
@@ -158,8 +158,7 @@ namespace ryujin
 
     double error_norm = 0.;
     unsigned int output_cycle = 1;
-    for(unsigned int cycle = 1; t < t_final; ++cycle)
-    {
+    for (unsigned int cycle = 1; t < t_final; ++cycle) {
       std::ostringstream head;
       head << "Cycle  " << Utilities::int_to_string(cycle, 6)         //
            << "  ("                                                   //
@@ -175,15 +174,15 @@ namespace ryujin
       t += tau;
 
       if (t - last_output > output_granularity) {
-          output(U, base_name + "-solution", t, output_cycle++);
-          last_output = t;
+        output(U, base_name + "-solution", t, output_cycle++);
+        last_output = t;
 
-          /*
-           * Let's compute intermediate errors with the same granularity
-           * with what we produce output.
-           */
-          if (enable_compute_error)
-            error_norm = std::max(error_norm, compute_error(U, t));
+        /*
+         * Let's compute intermediate errors with the same granularity
+         * with what we produce output.
+         */
+        if (enable_compute_error)
+          error_norm = std::max(error_norm, compute_error(U, t));
       }
     } /* end of loop */
 
@@ -341,18 +340,32 @@ namespace ryujin
     };
 
     // FIXME: Explain why we use a summed Linfty norm.
+    // EJT: Need to implement the normalized error from eq (5.1) in euler convex
+    // paper
+    std::vector<double> max_of_analytic_solution(problem_dimension);
+    std::vector<double> max_of_error(problem_dimension);
 
     double norm = 0.;
+    double norm_each = 0;
     for (unsigned int i = 0; i < problem_dimension; ++i) {
       VectorTools::interpolate(offline_data.dof_handler(),
                                to_function<dim, double>(callable, i),
                                error);
+      double max_value_local = error.linfty_norm();
+      max_of_analytic_solution[i] =
+          Utilities::MPI::max(max_value_local, mpi_communicator);
       error -= U[i];
-      double norm_local = error.linfty_norm();
-      norm += Utilities::MPI::max(norm_local, mpi_communicator);
+      double error_local = error.linfty_norm() / max_of_analytic_solution[i];
+      norm += Utilities::MPI::max(error_local, mpi_communicator);
+      norm_each = Utilities::MPI::max(error_local, mpi_communicator);
+      max_of_error[i] = norm_each;
     }
 
     deallog << "        error norm for t=" << t << ": " << norm << std::endl;
+    deallog << "        error2 norm for t=" << t << ": "
+            << max_of_error[0] + max_of_error[1] + max_of_error[2] +
+                   max_of_error[3]
+            << std::endl;
     return norm;
   }
 
@@ -455,7 +468,7 @@ namespace ryujin
     /*
      * And spawn the thread:
      */
-    output_thread = std::move(std::thread (output_worker));
+    output_thread = std::move(std::thread(output_worker));
   }
 
 } // namespace ryujin
