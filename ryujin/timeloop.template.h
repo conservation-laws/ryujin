@@ -95,11 +95,12 @@ namespace ryujin
                   "Flag to control whether we output to deallog");
 
     enable_compute_error = false;
-    add_parameter("enable compute error",
-                  enable_compute_error,
-                  "Flag to control whether we compute the Linfty norm of the "
-                  "difference to an analytic solution. Implemented only for "
-                  "certain initial state configurations.");
+    add_parameter(
+        "enable compute error",
+        enable_compute_error,
+        "Flag to control whether we compute the Linfty Linf_norm of the "
+        "difference to an analytic solution. Implemented only for "
+        "certain initial state configurations.");
   }
 
 
@@ -335,6 +336,8 @@ namespace ryujin
     TimerOutput::Scope timer(computing_timer, "time_loop - compute error");
 
     dealii::LinearAlgebra::distributed::Vector<double> error(U[0]);
+    dealii::LinearAlgebra::distributed::Vector<double> zeroVec(U[0]);
+    zeroVec = 0.0;
 
     constexpr auto problem_dimension =
         ProblemDescription<dim>::problem_dimension;
@@ -343,33 +346,85 @@ namespace ryujin
       return problem_description.initial_state(p, t);
     };
 
-    // FIXME: Explain why we use a summed Linfty norm.
-    // EJT: Need to implement the normalized error from eq (5.1) in euler convex
-    // paper
+    /*
+       EJT: Implementation of normalized Linf, L1, L2 error from eq (5.1) in
+       euler convex paper
+    */
+    Vector<float> difference_per_cell(
+        offline_data.discretization().triangulation().n_active_cells());
+    // for Linf
     std::vector<double> max_of_analytic_solution(problem_dimension);
     std::vector<double> max_of_Linf_error(problem_dimension);
+    double Linf_norm = 0.;
+    // double Linf_norm_each = 0;
+    // for L1
+    std::vector<double> L1_of_analytic_solution(problem_dimension);
+    std::vector<double> L1_of_each_component(problem_dimension);
+    double L1_norm = 0;
+    // double L1_norm_each = 0;
 
-    double norm = 0.;
-    double norm_each = 0;
     for (unsigned int i = 0; i < problem_dimension; ++i) {
       VectorTools::interpolate(offline_data.dof_handler(),
                                to_function<dim, double>(callable, i),
                                error);
+      /*
+        here we define local Linf,L1
+        errors of analytical solutions. note that we use dealii integrate
+        difference with 0 ie (u_exact - 0.0)
+      */
+      VectorTools::integrate_difference(offline_data.dof_handler(),
+                                        zeroVec,
+                                        to_function<dim, double>(callable, i),
+                                        difference_per_cell,
+                                        QGauss<dim>(3),
+                                        VectorTools::L1_norm);
       double max_value_local_lInf = error.linfty_norm();
+      double local_L1_analytical = difference_per_cell.l1_norm();
+      /* and then take the maximum/sum over all processors*/
       max_of_analytic_solution[i] =
           Utilities::MPI::max(max_value_local_lInf, mpi_communicator);
+      L1_of_analytic_solution[i] =
+          Utilities::MPI::sum(local_L1_analytical, mpi_communicator);
+      /*
+        here we define (component wise) the difference of the analytical
+        solution and approximate solution
+      */
       error -= U[i];
-      double LInf_error_local = error.linfty_norm() / max_of_analytic_solution[i];
-      norm += Utilities::MPI::max(LInf_error_local, mpi_communicator);
-      norm_each = Utilities::MPI::max(LInf_error_local, mpi_communicator);
-      max_of_Linf_error[i] = norm_each;
+      /*
+        here we define the normalized local Linf and L1 errors and take max
+        over processors
+      */
+      // Linf
+      double local_Linf_error =
+          error.linfty_norm() / max_of_analytic_solution[i];
+      Linf_norm += Utilities::MPI::max(local_Linf_error, mpi_communicator);
+      // L1
+      VectorTools::integrate_difference(offline_data.dof_handler(),
+                                        error,
+                                        ZeroFunction<dim, double>(error.size()),
+                                        difference_per_cell,
+                                        QGauss<dim>(3),
+                                        VectorTools::L1_norm);
+      const double local_L1_error =
+          difference_per_cell.l1_norm() / L1_of_analytic_solution[i];
+      L1_norm += Utilities::MPI::sum(local_L1_error, mpi_communicator);
+
+      // as a sanity check we define the errors component wise as well
+      // Linf_norm_each = Utilities::MPI::max(local_Linf_error,
+      // mpi_communicator); max_of_Linf_error[i] = Linf_norm_each; L1_norm_each
+      // = Utilities::MPI::sum(local_L1_error, mpi_communicator);
+      // L1_of_each_component[i] = L1_norm_each;
     }
     // used this for a sanity check
-    double sum_of_component_Linferrors =
-        std::accumulate(max_of_Linf_error.begin(), max_of_Linf_error.end(), 0.0);
+    // double sum_of_component_Linferrors = std::accumulate(
+    //     max_of_Linf_error.begin(), max_of_Linf_error.end(), 0.0);
 
-    // deallog << "        error norm for t=" << t << ": " << norm << std::endl;
-    return norm;
+    deallog << "        error Linf_norm for t=" << t << ": " << Linf_norm
+            << std::endl;
+    deallog << "        error L1_norm for t=" << t << ": " << L1_norm
+            << std::endl;
+
+    return Linf_norm;
   }
 
 
