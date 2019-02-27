@@ -40,8 +40,8 @@ namespace grendel
     void prepare();
 
     /**
-     * Given a reference to a previous state vector U_old compute a new
-     * vector U_New by performing one explicit euler step. The function
+     * Given a reference to a previous state vector U perform an explicit
+     * euler step (and store the result in U). The function
      *
      *  - returns the computed maximal time step size tau_max
      *
@@ -51,7 +51,18 @@ namespace grendel
      *    time step size and tau is the optional third parameter.
      */
     double
-    euler_step(vector_type &U_new, const vector_type &U_old, double tau = 0.);
+    euler_step(vector_type &U, double tau = 0.);
+
+    /**
+     * Given a reference to a previous state vector U compute
+     * perform an explicit SSP RK(3) step (and store the result in U).
+     *
+     * [Shu & Osher, Efficient Implementation of Essentially
+     * Non-oscillatory Shock-Capturing Schemes JCP 77:439-471 (1988), Eq.
+     * 2.18]
+     */
+    double
+    rkk_step(vector_type &U);
 
   protected:
 
@@ -70,8 +81,13 @@ namespace grendel
 
   private:
     /* Scratch data: */
+
     std::vector<rank2_type> f_i_;
+
     dealii::SparseMatrix<double> dij_matrix_;
+
+    vector_type temp_euler;
+    vector_type temp_rkk;
   };
 
 } /* namespace grendel */

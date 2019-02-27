@@ -134,7 +134,7 @@ namespace ryujin
     time_step.prepare();
 
     /*
-     * Interpolate initial values and prepare U_new vector:
+     * Interpolate initial values:
      */
 
     print_head("interpolate initial values");
@@ -144,10 +144,6 @@ namespace ryujin
     double last_output = 0.;
 
     output(U, base_name + "-solution", t, 0);
-
-    vector_type U_new;
-    for (auto &it : U_new)
-      it.reinit(U[0]);
 
     /*
      * Loop:
@@ -168,9 +164,8 @@ namespace ryujin
               << std::setprecision(4) << std::fixed << t //
               << std::endl;
 
-      const auto tau = time_step.euler_step(U_new, U);
+      const auto tau = time_step.euler_step(U);
       t += tau;
-      U.swap(U_new);
 
       if (t - last_output > output_granularity) {
           output(U, base_name + "-solution", t, output_cycle++);

@@ -35,16 +35,23 @@ namespace grendel
     deallog << "TimeStep<dim>::setup()" << std::endl;
     TimerOutput::Scope t(computing_timer_, "time_step - setup scratch space");
 
+    const auto &locally_owned = offline_data_->locally_owned();
     const auto &locally_relevant = offline_data_->locally_relevant();
     const auto &sparsity_pattern = offline_data_->sparsity_pattern();
 
     f_i_.resize(locally_relevant.n_elements());
     dij_matrix_.reinit(sparsity_pattern);
+
+    temp_euler[0].reinit(locally_owned, locally_relevant, mpi_communicator_);
+    for (auto &it : temp_euler)
+      it.reinit(temp_euler[0]);
+    for (auto &it : temp_rkk)
+      it.reinit(temp_euler[0]);
   }
 
 
   template <int dim>
-  double TimeStep<dim>::euler_step(vector_type &U_new, const vector_type &U_old, double tau)
+  double TimeStep<dim>::euler_step(vector_type &U, double tau)
   {
     deallog << "TimeStep<dim>::euler_step()" << std::endl;
 
@@ -81,7 +88,7 @@ namespace grendel
           /* Determine global index i from  pos_i: */
           const auto i = locally_relevant.nth_index_in_set(pos_i);
 
-          const auto U_i = gather(U_old, i);
+          const auto U_i = gather(U, i);
 
           /* Populate f_i_: */
           *it = problem_description_->f(U_i);
@@ -94,7 +101,7 @@ namespace grendel
             if (j >= i)
               continue;
 
-            const auto U_j = gather(U_old, j);
+            const auto U_j = gather(U, j);
             const auto n_ij = gather_get_entry(nij_matrix, jt);
             const double norm = get_entry(norm_matrix, jt);
 
@@ -212,7 +219,7 @@ namespace grendel
           if (!locally_owned.is_element(i))
             continue;
 
-          const auto U_i = gather(U_old, i);
+          const auto U_i = gather(U, i);
 
           dealii::Tensor<1, problem_dimension> Unew_i = U_i;
 
@@ -225,7 +232,7 @@ namespace grendel
             if (j == i)
               continue;
 
-            const auto U_j = gather(U_old, j);
+            const auto U_j = gather(U, j);
 
             const unsigned int pos_j = locally_relevant.index_within_set(j);
             const auto f_j = f_i_[pos_j];
@@ -258,22 +265,64 @@ namespace grendel
           }
 
           /*
-           * And write to global vector:
+           * And write to global scratch vector:
            */
-
-          scatter(U_new, Unew_i, i);
+          scatter(temp_euler, Unew_i, i);
         }
       };
 
       parallel::apply_to_subranges(
           f_i_.begin(), f_i_.end(), on_subranges, 4096);
 
-      /* Synchronize U_new over all MPI processes: */
-      for (auto &it : U_new)
+      /* Synchronize temp over all MPI processes: */
+
+      for (auto &it : temp_euler)
         it.update_ghost_values();
+
+      /* And finally update the result: */
+
+      U.swap(temp_euler);
 
       return tau_max;
     }
+  }
+
+
+  template <int dim>
+  double TimeStep<dim>::rkk_step(vector_type &U)
+  {
+    /* This also copies ghost elements: */
+    for (unsigned int i = 0; i < problem_dimension; ++i)
+      temp_rkk[i] = U[i];
+
+    // Step 1: U1 = U_old + tau * L(U_old)
+
+    const double tau_1 = euler_step(U);
+
+    // Step 2: U2 = 3/4 U_old + 1/4 (U1 + tau L(U1))
+
+    const double tau_2 = euler_step(U, tau_1);
+
+    AssertThrow(tau_2 >= tau_1,
+                ExcMessage("Problem performing SSP RK(3) time step: "
+                           "Insufficient CFL condition."));
+
+    for(unsigned int i = 0; i < problem_dimension; ++i)
+      U[i].sadd(0.25, 0.75, temp_rkk[i]);
+
+
+    // Step 3: U_new = 1/3 U_old + 2/3 (U2+ tau L(U2))
+
+    const double tau_3 = euler_step(U, tau_1);
+
+    AssertThrow(tau_3 >= tau_1,
+                ExcMessage("Problem performing SSP RK(3) time step: "
+                           "Insufficient CFL condition."));
+
+    for(unsigned int i = 0; i < problem_dimension; ++i)
+      U[i].sadd(2./3., 1./3., temp_rkk[i]);
+
+    return tau_1;
   }
 
 
