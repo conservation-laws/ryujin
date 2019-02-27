@@ -40,12 +40,18 @@ namespace grendel
     void prepare();
 
     /**
-     * Given a reference to an previous state vector U_old compute a new
+     * Given a reference to a previous state vector U_old compute a new
      * vector U_New by performing one explicit euler step. The function
-     * return the chosen time step size tau and populates U_new by
-     * reference.
+     *
+     *  - returns the computed maximal time step size tau_max
+     *
+     *  - performs a time step and populates the vector U_new by the
+     *    result. The time step is performed with either tau_max (if tau ==
+     *    0), or tau (if tau != 0). Here, tau_max is the computed maximal
+     *    time step size and tau is the optional third parameter.
      */
-    double euler_step(vector_type &U_new, const vector_type &U_old);
+    double
+    euler_step(vector_type &U_new, const vector_type &U_old, double tau = 0.);
 
   protected:
 

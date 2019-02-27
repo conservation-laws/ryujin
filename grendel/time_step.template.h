@@ -44,7 +44,7 @@ namespace grendel
 
 
   template <int dim>
-  double TimeStep<dim>::euler_step(vector_type &U_new, const vector_type &U_old)
+  double TimeStep<dim>::euler_step(vector_type &U_new, const vector_type &U_old, double tau)
   {
     deallog << "TimeStep<dim>::euler_step()" << std::endl;
 
@@ -189,6 +189,8 @@ namespace grendel
 
       /* Synchronize tau_max over all MPI processes: */
       tau_max.store(Utilities::MPI::min(tau_max.load(), mpi_communicator_));
+
+      deallog << "        computed tau_max = " << tau_max << std::endl;
     }
 
     /*
@@ -196,7 +198,8 @@ namespace grendel
      */
 
     {
-      deallog << "        perform time-step" << std::endl;
+      tau = tau == 0 ? tau_max.load() : tau;
+      deallog << "        perform time-step with tau = " << tau << std::endl;
       TimerOutput::Scope t(computing_timer_, "time_step - perform time-step");
 
       const auto on_subranges = [&](const auto it1, const auto it2) {
@@ -232,7 +235,7 @@ namespace grendel
 
             for (unsigned int k = 0; k < problem_dimension; ++k)
               Unew_i[k] +=
-                  tau_max / m_i *
+                  tau / m_i *
                   (-(f_j[k] - f_i[k]) * c_ij + d_ij * (U_j[k] - U_i[k]));
           }
 
