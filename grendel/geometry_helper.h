@@ -116,10 +116,7 @@ namespace grendel
   void
   create_coarse_grid_tube(dealii::parallel::distributed::Triangulation<dim> &,
                           const double /*length*/,
-                          const double /*diameter*/)
-  {
-    AssertThrow(false, dealii::ExcNotImplemented());
-  }
+                          const double /*diameter*/) = delete;
 
 
   template <>
@@ -142,8 +139,9 @@ namespace grendel
   {
     using namespace dealii;
 
-    GridGenerator::hyper_rectangle(
-        triangulation, Point<2>(0., 0.), Point<2>(length, diameter));
+    GridGenerator::hyper_rectangle(triangulation,
+                                   Point<2>(-length / 2., 0.),
+                                   Point<2>(length / 2., diameter));
 
     /*
      * Set boundary ids:
@@ -163,7 +161,42 @@ namespace grendel
          */
 
         const auto center = face->center();
-        if (center[0] > 0. && center[0] < length)
+        if (center[0] > -length / 2. && center[0] < length / 2.)
+          face->set_boundary_id(1);
+      }
+    }
+  }
+
+
+  template <>
+  void create_coarse_grid_tube<3>(
+      dealii::parallel::distributed::Triangulation<3> &triangulation,
+      const double length,
+      const double diameter)
+  {
+    using namespace dealii;
+
+    GridGenerator::cylinder(triangulation, diameter / 2., length / 2.);
+
+    /*
+     * Set boundary ids:
+     */
+
+    for (auto cell : triangulation.active_cell_iterators()) {
+      for (unsigned int f = 0; f < GeometryInfo<2>::faces_per_cell; ++f) {
+        const auto face = cell->face(f);
+
+        if (!face->at_boundary())
+          continue;
+
+        /*
+         * We want reflective boundary conditions (i.e. indicator 1) at top
+         * and bottom of the rectangle. On the left and right side we leave
+         * the boundary indicator at 0, i.e. do nothing.
+         */
+
+        const auto center = face->center();
+        if (center[0] > -length / 2. && center[0] < length / 2.)
           face->set_boundary_id(1);
       }
     }
