@@ -1,8 +1,8 @@
 #ifndef HELPER_H
 #define HELPER_H
 
-#include <deal.II/base/tensor.h>
 #include <deal.II/base/function.h>
+#include <deal.II/base/tensor.h>
 
 #include <type_traits>
 
@@ -183,7 +183,6 @@ public:                                                                        \
   }                                                                            \
                                                                                \
 protected:
-
 
 
 #endif /* HELPER_H */

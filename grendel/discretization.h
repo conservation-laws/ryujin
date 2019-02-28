@@ -28,7 +28,6 @@ namespace grendel
   class Discretization : public dealii::ParameterAcceptor
   {
   public:
-
     /**
      * Constructor.
      */
@@ -43,7 +42,6 @@ namespace grendel
     void prepare();
 
   protected:
-
     /**
      * The triangulation and a getter function returning a const reference.
      */
@@ -70,7 +68,6 @@ namespace grendel
     ACCESSOR_READ_ONLY(quadrature)
 
   private:
-
     const MPI_Comm &mpi_communicator_;
     dealii::TimerOutput &computing_timer_;
 

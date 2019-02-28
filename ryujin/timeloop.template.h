@@ -94,6 +94,12 @@ namespace ryujin
                   "Flag to control whether we compute the Linfty norm of the "
                   "difference to an analytic solution. Implemented only for "
                   "certain initial state configurations.");
+
+    use_ssprk = false;
+    add_parameter(
+        "use SSP RK",
+        use_ssprk,
+        "If enabled, use SSP RK(3) instead of the forward Euler scheme.");
   }
 
 

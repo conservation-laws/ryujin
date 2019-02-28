@@ -130,8 +130,7 @@ namespace grendel
      */
 
     {
-      TimerOutput::Scope t(computing_timer_,
-                           "offline_data - setup matrices");
+      TimerOutput::Scope t(computing_timer_, "offline_data - setup matrices");
       mass_matrix_.reinit(sparsity_pattern_);
       lumped_mass_matrix_.reinit(sparsity_pattern_);
       norm_matrix_.reinit(sparsity_pattern_);
@@ -167,90 +166,90 @@ namespace grendel
 
     /* The local, per-cell assembly routine: */
 
-    const auto local_assemble_system =
-        [&](const auto &cell, auto &scratch, auto &copy) {
-          /* iterate over locally owned cells and the ghost layer */
+    const auto local_assemble_system = [&](const auto &cell,
+                                           auto &scratch,
+                                           auto &copy) {
+      /* iterate over locally owned cells and the ghost layer */
 
-          auto &is_artificial = copy.is_artificial_;
-          auto &local_dof_indices = copy.local_dof_indices_;
+      auto &is_artificial = copy.is_artificial_;
+      auto &local_dof_indices = copy.local_dof_indices_;
 
-          auto &local_boundary_normal_map = copy.local_boundary_normal_map_;
-          auto &cell_mass_matrix = copy.cell_mass_matrix_;
-          auto &cell_lumped_mass_matrix = copy.cell_lumped_mass_matrix_;
-          auto &cell_cij_matrix = copy.cell_cij_matrix_;
+      auto &local_boundary_normal_map = copy.local_boundary_normal_map_;
+      auto &cell_mass_matrix = copy.cell_mass_matrix_;
+      auto &cell_lumped_mass_matrix = copy.cell_lumped_mass_matrix_;
+      auto &cell_cij_matrix = copy.cell_cij_matrix_;
 
-          auto &fe_values = scratch.fe_values_;
-          auto &fe_face_values = scratch.fe_face_values_;
+      auto &fe_values = scratch.fe_values_;
+      auto &fe_face_values = scratch.fe_face_values_;
 
-          is_artificial = cell->is_artificial();
-          if (is_artificial)
-            return;
+      is_artificial = cell->is_artificial();
+      if (is_artificial)
+        return;
 
-          cell_mass_matrix.reinit(dofs_per_cell, dofs_per_cell);
-          cell_lumped_mass_matrix.reinit(dofs_per_cell, dofs_per_cell);
-          for (auto &matrix : cell_cij_matrix)
-            matrix.reinit(dofs_per_cell, dofs_per_cell);
+      cell_mass_matrix.reinit(dofs_per_cell, dofs_per_cell);
+      cell_lumped_mass_matrix.reinit(dofs_per_cell, dofs_per_cell);
+      for (auto &matrix : cell_cij_matrix)
+        matrix.reinit(dofs_per_cell, dofs_per_cell);
 
-          fe_values.reinit(cell);
-          local_dof_indices.resize(dofs_per_cell);
-          cell->get_dof_indices(local_dof_indices);
+      fe_values.reinit(cell);
+      local_dof_indices.resize(dofs_per_cell);
+      cell->get_dof_indices(local_dof_indices);
 
-          /* clear out copy data: */
-          local_boundary_normal_map.clear();
-          cell_mass_matrix = 0.;
-          cell_lumped_mass_matrix = 0.;
-          for (auto &matrix : cell_cij_matrix)
-            matrix = 0.;
+      /* clear out copy data: */
+      local_boundary_normal_map.clear();
+      cell_mass_matrix = 0.;
+      cell_lumped_mass_matrix = 0.;
+      for (auto &matrix : cell_cij_matrix)
+        matrix = 0.;
 
-          for (unsigned int q_point = 0; q_point < n_q_points; ++q_point) {
-            const auto JxW = fe_values.JxW(q_point);
+      for (unsigned int q_point = 0; q_point < n_q_points; ++q_point) {
+        const auto JxW = fe_values.JxW(q_point);
 
-            for (unsigned int j = 0; j < dofs_per_cell; ++j) {
+        for (unsigned int j = 0; j < dofs_per_cell; ++j) {
 
-              const auto value_JxW = fe_values.shape_value(j, q_point) * JxW;
-              const auto grad_JxW = fe_values.shape_grad(j, q_point) * JxW;
+          const auto value_JxW = fe_values.shape_value(j, q_point) * JxW;
+          const auto grad_JxW = fe_values.shape_grad(j, q_point) * JxW;
 
-              cell_lumped_mass_matrix(j, j) += value_JxW;
+          cell_lumped_mass_matrix(j, j) += value_JxW;
 
-              for (unsigned int i = 0; i < dofs_per_cell; ++i) {
+          for (unsigned int i = 0; i < dofs_per_cell; ++i) {
 
-                const auto value = fe_values.shape_value(i, q_point);
+            const auto value = fe_values.shape_value(i, q_point);
 
-                cell_mass_matrix(i, j) += value * value_JxW;
+            cell_mass_matrix(i, j) += value * value_JxW;
 
-                for (unsigned int d = 0; d < dim; ++d)
-                  cell_cij_matrix[d](i, j) += (value * grad_JxW)[d];
+            for (unsigned int d = 0; d < dim; ++d)
+              cell_cij_matrix[d](i, j) += (value * grad_JxW)[d];
 
-              } /* for i */
-            }   /* for j */
-          }     /* for q */
+          } /* for i */
+        }   /* for j */
+      }     /* for q */
 
-          for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f) {
-            const auto face = cell->face(f);
-            const auto id = face->boundary_id();
+      for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f) {
+        const auto face = cell->face(f);
+        const auto id = face->boundary_id();
 
-            if (!face->at_boundary())
-              continue;
+        if (!face->at_boundary())
+          continue;
 
-            fe_face_values.reinit(cell, f);
-            const unsigned int n_face_q_points =
-                scratch.face_quadrature_.size();
+        fe_face_values.reinit(cell, f);
+        const unsigned int n_face_q_points = scratch.face_quadrature_.size();
 
-            for (unsigned int i = 0; i < dofs_per_cell; ++i) {
+        for (unsigned int i = 0; i < dofs_per_cell; ++i) {
 
-              if (!discretization_->finite_element().has_support_on_face(i, f))
-                continue;
+          if (!discretization_->finite_element().has_support_on_face(i, f))
+            continue;
 
-              dealii::Tensor<1, dim> normal;
-              for (unsigned int q = 0; q < n_face_q_points; ++q)
-                normal += fe_face_values.normal_vector(q) *
-                          fe_face_values.shape_value(i, q);
+          dealii::Tensor<1, dim> normal;
+          for (unsigned int q = 0; q < n_face_q_points; ++q)
+            normal += fe_face_values.normal_vector(q) *
+                      fe_face_values.shape_value(i, q);
 
-              local_boundary_normal_map[local_dof_indices[i]] =
-                  std::make_tuple(normal, id);
-            }
-          }
-        };
+          local_boundary_normal_map[local_dof_indices[i]] =
+              std::make_tuple(normal, id);
+        }
+      }
+    };
 
     const auto copy_local_to_global = [&](const auto &copy) {
       const auto &is_artificial = copy.is_artificial_;
@@ -260,7 +259,7 @@ namespace grendel
       const auto &cell_lumped_mass_matrix = copy.cell_lumped_mass_matrix_;
       const auto &cell_cij_matrix = copy.cell_cij_matrix_;
 
-      if(is_artificial)
+      if (is_artificial)
         return;
 
       for (const auto &it : local_boundary_normal_map) {
@@ -371,7 +370,6 @@ namespace grendel
         normal /= normal.norm();
       }
     }
-
   }
 
 } /* namespace grendel */

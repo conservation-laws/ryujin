@@ -100,10 +100,10 @@ namespace grendel
      * Recall that
      *   c^2 = gamma * p / rho / (1 - b * rho)
      */
-    inline DEAL_II_ALWAYS_INLINE double speed_of_sound_from_projected_state(
-        const double gamma,
-        const double b,
-        const dealii::Tensor<1, 3> &projected_U)
+    inline DEAL_II_ALWAYS_INLINE double
+    speed_of_sound_from_projected_state(const double gamma,
+                                        const double b,
+                                        const dealii::Tensor<1, 3> &projected_U)
     {
       const double rho = projected_U[0];
       const double p = pressure_from_projected_state(gamma, projected_U);
@@ -120,10 +120,9 @@ namespace grendel
      * FIXME: Describe state in more detail.
      */
     inline DEAL_II_ALWAYS_INLINE std::array<double, 6>
-    riemann_data_from_projected_state(
-        const double gamma,
-        const double b,
-        const dealii::Tensor<1, 3> &projected_U)
+    riemann_data_from_projected_state(const double gamma,
+                                      const double b,
+                                      const dealii::Tensor<1, 3> &projected_U)
     {
       std::array<double, 6> result;
 

@@ -8,8 +8,8 @@
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/timer.h>
-#include <deal.II/lac/vector.templates.h>
 #include <deal.II/lac/la_parallel_vector.templates.h>
+#include <deal.II/lac/vector.templates.h>
 
 namespace grendel
 {
@@ -50,8 +50,7 @@ namespace grendel
      *    0), or tau (if tau != 0). Here, tau_max is the computed maximal
      *    time step size and tau is the optional third parameter.
      */
-    double
-    euler_step(vector_type &U, double tau = 0.);
+    double euler_step(vector_type &U, double tau = 0.);
 
     /**
      * Given a reference to a previous state vector U compute
@@ -61,11 +60,9 @@ namespace grendel
      * Non-oscillatory Shock-Capturing Schemes JCP 77:439-471 (1988), Eq.
      * 2.18]
      */
-    double
-    rkk_step(vector_type &U);
+    double ssprk_step(vector_type &U);
 
   protected:
-
     const MPI_Comm &mpi_communicator_;
     dealii::TimerOutput &computing_timer_;
 
@@ -87,7 +84,7 @@ namespace grendel
     dealii::SparseMatrix<double> dij_matrix_;
 
     vector_type temp_euler;
-    vector_type temp_rkk;
+    vector_type temp_ssprk;
   };
 
 } /* namespace grendel */

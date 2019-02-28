@@ -45,7 +45,7 @@ namespace grendel
     temp_euler[0].reinit(locally_owned, locally_relevant, mpi_communicator_);
     for (auto &it : temp_euler)
       it.reinit(temp_euler[0]);
-    for (auto &it : temp_rkk)
+    for (auto &it : temp_ssprk)
       it.reinit(temp_euler[0]);
   }
 
@@ -289,11 +289,11 @@ namespace grendel
 
 
   template <int dim>
-  double TimeStep<dim>::rkk_step(vector_type &U)
+  double TimeStep<dim>::ssprk_step(vector_type &U)
   {
     /* This also copies ghost elements: */
     for (unsigned int i = 0; i < problem_dimension; ++i)
-      temp_rkk[i] = U[i];
+      temp_ssprk[i] = U[i];
 
     // Step 1: U1 = U_old + tau * L(U_old)
 
@@ -307,8 +307,8 @@ namespace grendel
                 ExcMessage("Problem performing SSP RK(3) time step: "
                            "Insufficient CFL condition."));
 
-    for(unsigned int i = 0; i < problem_dimension; ++i)
-      U[i].sadd(0.25, 0.75, temp_rkk[i]);
+    for (unsigned int i = 0; i < problem_dimension; ++i)
+      U[i].sadd(0.25, 0.75, temp_ssprk[i]);
 
 
     // Step 3: U_new = 1/3 U_old + 2/3 (U2+ tau L(U2))
@@ -319,8 +319,8 @@ namespace grendel
                 ExcMessage("Problem performing SSP RK(3) time step: "
                            "Insufficient CFL condition."));
 
-    for(unsigned int i = 0; i < problem_dimension; ++i)
-      U[i].sadd(2./3., 1./3., temp_rkk[i]);
+    for (unsigned int i = 0; i < problem_dimension; ++i)
+      U[i].sadd(2. / 3., 1. / 3., temp_ssprk[i]);
 
     return tau_1;
   }

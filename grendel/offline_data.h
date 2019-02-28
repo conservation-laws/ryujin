@@ -64,7 +64,6 @@ namespace grendel
     void assemble();
 
   protected:
-
     const MPI_Comm &mpi_communicator_;
     dealii::TimerOutput &computing_timer_;
 
