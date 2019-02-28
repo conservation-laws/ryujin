@@ -15,12 +15,10 @@ int main (int argc, char *argv[])
    * If necessary, create empty parameter file and exit:
    */
 
-  const auto filename = "ryujin.prm";
-  if (!std::ifstream(filename)) {
-    std::ofstream file(filename);
-    dealii::ParameterAcceptor::prm.print_parameters(
-        file, dealii::ParameterHandler::OutputStyle::Text);
-    return 0;
+  try{
+    dealii::ParameterAcceptor::initialize("ryujin.prm");
+  } catch (...) {
+    return 1;
   }
 
   time_loop.run();

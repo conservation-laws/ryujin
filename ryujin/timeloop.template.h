@@ -170,7 +170,9 @@ namespace ryujin
               << std::setprecision(4) << std::fixed << t //
               << std::endl;
 
-      const auto tau = time_step.euler_step(U);
+      const auto tau =
+          use_ssprk ? time_step.ssprk_step(U) : time_step.euler_step(U);
+
       t += tau;
 
       if (t - last_output > output_granularity) {
