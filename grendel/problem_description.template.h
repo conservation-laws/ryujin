@@ -20,8 +20,11 @@ namespace grendel
     b_ = 0.0;
     add_parameter("b", b_, "b aka bcovol");
 
-    cfl_constant_ = 1.00;
-    add_parameter("cfl constant", cfl_constant_, "CFL constant C");
+    cfl_update_ = 1.00;
+    add_parameter("cfl update", cfl_update_, "CFL constant used for update");
+
+    cfl_max_ = 1.00;
+    add_parameter("cfl max", cfl_max_, "Maximal admissible CFL constant");
 
 
     initial_state_ = "shock front";

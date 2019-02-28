@@ -101,8 +101,11 @@ namespace grendel
     double b_;
     ACCESSOR_READ_ONLY(b)
 
-    double cfl_constant_;
-    ACCESSOR_READ_ONLY(cfl_constant)
+    double cfl_update_;
+    ACCESSOR_READ_ONLY(cfl_update)
+
+    double cfl_max_;
+    ACCESSOR_READ_ONLY(cfl_max)
 
   private:
     std::string initial_state_;

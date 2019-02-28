@@ -178,7 +178,7 @@ namespace grendel
 
           dij_matrix_.diag_element(i) = d_sum;
 
-          const double cfl = problem_description_->cfl_constant();
+          const double cfl = problem_description_->cfl_update();
           const double mass = lumped_mass_matrix.diag_element(i);
           const double tau = cfl * mass / (-2. * d_sum);
           tau_max_on_subrange = std::min(tau_max_on_subrange, tau);
@@ -291,6 +291,7 @@ namespace grendel
   template <int dim>
   double TimeStep<dim>::ssprk_step(vector_type &U)
   {
+
     /* This also copies ghost elements: */
     for (unsigned int i = 0; i < problem_dimension; ++i)
       temp_ssprk[i] = U[i];
@@ -303,7 +304,9 @@ namespace grendel
 
     const double tau_2 = euler_step(U, tau_1);
 
-    AssertThrow(tau_2 >= tau_1,
+    const double ratio =
+        problem_description_->cfl_max() / problem_description_->cfl_update();
+    AssertThrow(ratio * tau_2 >= tau_1,
                 ExcMessage("Problem performing SSP RK(3) time step: "
                            "Insufficient CFL condition."));
 
@@ -315,7 +318,7 @@ namespace grendel
 
     const double tau_3 = euler_step(U, tau_1);
 
-    AssertThrow(tau_3 >= tau_1,
+    AssertThrow(ratio * tau_3 >= tau_1,
                 ExcMessage("Problem performing SSP RK(3) time step: "
                            "Insufficient CFL condition."));
 
