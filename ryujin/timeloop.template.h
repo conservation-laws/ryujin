@@ -382,6 +382,8 @@ namespace ryujin
 
     constexpr auto problem_dimension =
         ProblemDescription<dim>::problem_dimension;
+    const auto &component_names = ProblemDescription<dim>::component_names;
+
     for (unsigned int i = 0; i < problem_dimension; ++i) {
       /* This also copies ghost elements: */
       output_vector[i] = U[i];
@@ -396,9 +398,6 @@ namespace ryujin
       const auto &dof_handler = offline_data.dof_handler();
       const auto &triangulation = discretization.triangulation();
       const auto &mapping = discretization.mapping();
-
-      // FIXME
-      std::vector<std::string> component_names = {"rho", "m_1", "m_2", "E"};
 
       dealii::DataOut<dim> data_out;
       data_out.attach_dof_handler(dof_handler);

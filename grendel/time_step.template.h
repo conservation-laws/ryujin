@@ -291,7 +291,6 @@ namespace grendel
   template <int dim>
   double TimeStep<dim>::ssprk_step(vector_type &U)
   {
-
     /* This also copies ghost elements: */
     for (unsigned int i = 0; i < problem_dimension; ++i)
       temp_ssprk[i] = U[i];

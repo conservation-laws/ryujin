@@ -29,6 +29,11 @@ namespace grendel
      */
     static constexpr unsigned int problem_dimension = 2 + dim;
 
+    /**
+     * An array holding all component names as a string.
+     */
+    const static std::array<std::string, dim + 2> component_names;
+
 
     /**
      * rank1_type denotes the storage type used for a state vector
