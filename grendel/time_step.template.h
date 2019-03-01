@@ -326,10 +326,10 @@ namespace grendel
                            "Insufficient CFL condition."));
 
     for (unsigned int i = 0; i < problem_dimension; ++i)
-      U[i].sadd(0.25, 0.75, temp_ssprk[i]);
+      U[i].sadd(1. / 4., 3. / 4., temp_ssprk[i]);
 
 
-    // Step 3: U_new = 1/3 U_old + 2/3 (U2+ tau L(U2))
+    // Step 3: U_new = 1/3 U_old + 2/3 (U2 + tau L(U2))
 
     const double tau_3 = euler_step(U, tau_1);
 
