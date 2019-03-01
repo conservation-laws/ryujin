@@ -62,6 +62,13 @@ namespace grendel
      */
     double ssprk_step(vector_type &U);
 
+    /**
+     * Given a reference to a previous state vector U perform an explicit
+     * time step (and store the result in U). The function returns the
+     * chosen time step.
+     */
+    double step(vector_type &U);
+
   protected:
     const MPI_Comm &mpi_communicator_;
     dealii::TimerOutput &computing_timer_;
@@ -85,6 +92,11 @@ namespace grendel
 
     vector_type temp_euler;
     vector_type temp_ssprk;
+
+    /* Options: */
+
+    bool use_ssprk;
+    bool use_helim;
   };
 
 } /* namespace grendel */

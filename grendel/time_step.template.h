@@ -26,6 +26,17 @@ namespace grendel
       , problem_description_(&problem_description)
       , riemann_solver_(&riemann_solver)
   {
+    use_ssprk = false;
+    add_parameter(
+        "use SSP RK",
+        use_ssprk,
+        "If enabled, use SSP RK(3) instead of the forward Euler scheme.");
+
+    use_helim = false;
+    add_parameter(
+        "use high order limiter",
+        use_helim,
+        "If enabled, the high order limiter (for the third order scheme).");
   }
 
 
@@ -307,6 +318,8 @@ namespace grendel
   template <int dim>
   double TimeStep<dim>::ssprk_step(vector_type &U)
   {
+    deallog << "TimeStep<dim>::ssprk_step()" << std::endl;
+
     /* This also copies ghost elements: */
     for (unsigned int i = 0; i < problem_dimension; ++i)
       temp_ssprk[i] = U[i];
@@ -342,6 +355,17 @@ namespace grendel
 
     return tau_1;
   }
+
+
+  template <int dim>
+  double TimeStep<dim>::step(vector_type &U)
+  {
+    deallog << "TimeStep<dim>::step()" << std::endl;
+
+    return use_ssprk ? ssprk_step(U) : euler_step(U);
+  }
+
+
 
 
 } /* namespace grendel */

@@ -94,12 +94,6 @@ namespace ryujin
                   "Flag to control whether we compute the Linfty norm of the "
                   "difference to an analytic solution. Implemented only for "
                   "certain initial state configurations.");
-
-    use_ssprk = false;
-    add_parameter(
-        "use SSP RK",
-        use_ssprk,
-        "If enabled, use SSP RK(3) instead of the forward Euler scheme.");
   }
 
 
@@ -170,9 +164,7 @@ namespace ryujin
               << std::setprecision(4) << std::fixed << t //
               << std::endl;
 
-      const auto tau =
-          use_ssprk ? time_step.ssprk_step(U) : time_step.euler_step(U);
-
+      const auto tau = time_step.step(U);
       t += tau;
 
       if (t - last_output > output_granularity) {
@@ -444,7 +436,8 @@ namespace ryujin
       SchlierenPostprocessor<dim> schlieren_postprocessor;
       data_out.add_data_vector(output_vector[0], schlieren_postprocessor);
 
-      data_out.build_patches(mapping, 1);
+      data_out.build_patches(mapping,
+                             discretization.finite_element().degree + 2);
 
       DataOutBase::VtkFlags flags(
           t, cycle, true, DataOutBase::VtkFlags::best_speed);

@@ -51,7 +51,6 @@ namespace ryujin
     double output_granularity;
     bool enable_deallog_output;
     bool enable_compute_error;
-    bool use_ssprk;
 
     grendel::Discretization<dim> discretization;
     grendel::OfflineData<dim> offline_data;
