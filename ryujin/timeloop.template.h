@@ -356,9 +356,9 @@ namespace ryujin
           const DataPostprocessorInputs::Scalar<dim> &inputs,
           std::vector<Vector<double>> &computed_quantities) const override
       {
-        const unsigned int n_quadrature_points = inputs.solution_values.size();
+        const unsigned int n = inputs.solution_values.size();
 
-        for (unsigned int q = 0; q < n_quadrature_points; ++q) {
+        for (unsigned int q = 0; q < n; ++q) {
           computed_quantities[q](0) =
               inputs.solution_gradients[q] * inputs.solution_gradients[q];
         }
