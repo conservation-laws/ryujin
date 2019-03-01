@@ -82,12 +82,16 @@ namespace grendel
 
       const auto on_subranges = [&](const auto it1, const auto it2) {
         /* [it1, it2) is an iterator range over f_i_ */
-        for (auto it = it1; it != it2; ++it) {
-          /* Determine absolute position of it in vector: */
-          const unsigned int pos_i = std::distance(f_i_.begin(), it);
-          /* Determine global index i from  pos_i: */
-          const auto i = locally_relevant.nth_index_in_set(pos_i);
 
+        /* Create an iterator for the index set: */
+        const unsigned int pos = std::distance(f_i_.begin(), it1);
+        auto set_iterator =
+            locally_relevant.at(locally_relevant.nth_index_in_set(pos));
+
+        for (auto it = it1; it != it2; ++it, ++set_iterator) {
+          /* Determine global index i from  pos_i: */
+
+          const auto i = *set_iterator;
           const auto U_i = gather(U, i);
 
           /* Populate f_i_: */
@@ -160,11 +164,16 @@ namespace grendel
         double tau_max_on_subrange = std::numeric_limits<double>::infinity();
 
         /* [it1, it2) is an iterator range over f_i_ */
-        for (auto it = it1; it != it2; ++it) {
-          /* Determine absolute position of it in vector: */
-          const unsigned int pos_i = std::distance(f_i_.begin(), it);
+
+        /* Create an iterator for the index set: */
+        const unsigned int pos = std::distance(f_i_.begin(), it1);
+        auto set_iterator =
+            locally_relevant.at(locally_relevant.nth_index_in_set(pos));
+
+        for (auto it = it1; it != it2; ++it, ++set_iterator) {
           /* Determine global index i from  pos_i: */
-          const auto i = locally_relevant.nth_index_in_set(pos_i);
+
+          const auto i = *set_iterator;
 
           /* Compute sum of d_ijs for index i: */
           double d_sum = 0.;
@@ -211,9 +220,16 @@ namespace grendel
 
       const auto on_subranges = [&](const auto it1, const auto it2) {
         /* [it1, it2) is an iterator range over f_i_ */
-        for (auto it = it1; it != it2; ++it) {
-          const unsigned int pos_i = std::distance(f_i_.begin(), it);
-          const auto i = locally_relevant.nth_index_in_set(pos_i);
+
+        /* Create an iterator for the index set: */
+        const unsigned int pos = std::distance(f_i_.begin(), it1);
+        auto set_iterator =
+            locally_relevant.at(locally_relevant.nth_index_in_set(pos));
+
+        for (auto it = it1; it != it2; ++it, ++set_iterator) {
+          /* Determine global index i from  pos_i: */
+
+          const auto i = *set_iterator;
 
           /* Only iterate over locally owned subset */
           if (!locally_owned.is_element(i))
