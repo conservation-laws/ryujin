@@ -354,6 +354,44 @@ namespace ryujin
     return norm;
   }
 
+  namespace
+  {
+    template<int dim>
+    class SchlierenPostprocessor : public DataPostprocessor<dim>
+    {
+    public:
+      virtual void evaluate_scalar_field(
+          const DataPostprocessorInputs::Scalar<dim> &inputs,
+          std::vector<Vector<double>> &computed_quantities) const override
+      {
+        const unsigned int n_quadrature_points = inputs.solution_values.size();
+
+        for (unsigned int q = 0; q < n_quadrature_points; ++q) {
+          computed_quantities[q](0) =
+              inputs.solution_gradients[q] * inputs.solution_gradients[q];
+        }
+      }
+
+      virtual std::vector<std::string> get_names() const override
+      {
+        return {"schlieren_plot"};
+      }
+
+      virtual std::vector<
+          DataComponentInterpretation::DataComponentInterpretation>
+      get_data_component_interpretation() const override
+      {
+        return {DataComponentInterpretation::component_is_scalar};
+      }
+
+      virtual UpdateFlags get_needed_update_flags() const override
+      {
+        return update_values | update_gradients;
+      }
+    };
+
+  } // namespace
+
 
   template <int dim>
   void TimeLoop<dim>::output(const typename TimeLoop<dim>::vector_type &U,
@@ -402,6 +440,10 @@ namespace ryujin
 
       for (unsigned int i = 0; i < problem_dimension; ++i)
         data_out.add_data_vector(output_vector[i], component_names[i]);
+
+      /* Add Schlieren plot */
+      SchlierenPostprocessor<dim> schlieren_postprocessor;
+      data_out.add_data_vector(output_vector[0], schlieren_postprocessor);
 
       data_out.build_patches(mapping);
 
