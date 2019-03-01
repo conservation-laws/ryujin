@@ -392,8 +392,6 @@ namespace ryujin
 
     /* capture name, t, cycle by value */
     const auto output_worker = [this, name, t, cycle]() {
-      // FIXME: account for elapsed time in this thread as well.
-      // TimerOutput::Scope timer(computing_timer, "time_loop - output");
 
       const auto &dof_handler = offline_data.dof_handler();
       const auto &triangulation = discretization.triangulation();
