@@ -360,7 +360,7 @@ namespace ryujin
     class SchlierenPostprocessor : public DataPostprocessor<dim>
     {
     public:
-      virtual void evaluate_scalar_field(
+      void evaluate_scalar_field(
           const DataPostprocessorInputs::Scalar<dim> &inputs,
           std::vector<Vector<double>> &computed_quantities) const override
       {
@@ -372,19 +372,18 @@ namespace ryujin
         }
       }
 
-      virtual std::vector<std::string> get_names() const override
+      std::vector<std::string> get_names() const override
       {
         return {"schlieren_plot"};
       }
 
-      virtual std::vector<
-          DataComponentInterpretation::DataComponentInterpretation>
+      std::vector<DataComponentInterpretation::DataComponentInterpretation>
       get_data_component_interpretation() const override
       {
         return {DataComponentInterpretation::component_is_scalar};
       }
 
-      virtual UpdateFlags get_needed_update_flags() const override
+      UpdateFlags get_needed_update_flags() const override
       {
         return update_values | update_gradients;
       }
@@ -445,7 +444,7 @@ namespace ryujin
       SchlierenPostprocessor<dim> schlieren_postprocessor;
       data_out.add_data_vector(output_vector[0], schlieren_postprocessor);
 
-      data_out.build_patches(mapping);
+      data_out.build_patches(mapping, 1);
 
       DataOutBase::VtkFlags flags(
           t, cycle, true, DataOutBase::VtkFlags::best_speed);
