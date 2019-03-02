@@ -424,7 +424,7 @@ namespace ryujin
     deallog << "        error L1_norm for t=" << t << ": " << L1_norm
             << std::endl;
 
-    return Linf_norm;
+    return L1_norm;
   }
 
 
