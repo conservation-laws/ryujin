@@ -349,9 +349,15 @@ namespace ryujin
   namespace
   {
     template<int dim>
-    class SchlierenPostprocessor : public DataPostprocessor<dim>
+    class SchlierenPostprocessor : public DataPostprocessorScalar<dim>
     {
     public:
+      SchlierenPostprocessor()
+          : DataPostprocessorScalar<dim>("schlieren_plot",
+                                         update_values | update_gradients)
+      {
+      }
+
       void evaluate_scalar_field(
           const DataPostprocessorInputs::Scalar<dim> &inputs,
           std::vector<Vector<double>> &computed_quantities) const override
@@ -362,22 +368,6 @@ namespace ryujin
           computed_quantities[q](0) =
               inputs.solution_gradients[q] * inputs.solution_gradients[q];
         }
-      }
-
-      std::vector<std::string> get_names() const override
-      {
-        return {"schlieren_plot"};
-      }
-
-      std::vector<DataComponentInterpretation::DataComponentInterpretation>
-      get_data_component_interpretation() const override
-      {
-        return {DataComponentInterpretation::component_is_scalar};
-      }
-
-      UpdateFlags get_needed_update_flags() const override
-      {
-        return update_values | update_gradients;
       }
     };
 
