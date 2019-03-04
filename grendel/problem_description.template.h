@@ -211,6 +211,9 @@ namespace grendel
     rank1_type state;
     const double position_1d = (point - initial_position_) * initial_direction_;
 
+    /*
+        For the test cases in the left/right state framework.
+    */
     if (initial_state_ != "vortex") {
       const auto [rho, u, p] = (position_1d > 0.) ? state_1d_R_(position_1d, t)
                                                   : state_1d_L_(position_1d, t);
@@ -219,6 +222,10 @@ namespace grendel
         state[1 + i] = rho * u * initial_direction_[i];
         state[dim + 1] = p / (gamma_ - 1.) + 0.5 * rho * u * u;
       }
+      /*
+          For the test cases with a general initial state framework. Vortex only
+          problem implemented at the moment
+      */
     } else {
       const auto [rho2d, u2d, v2d, p2d] =
           initial_state_2D(point[0], point[1], t);
