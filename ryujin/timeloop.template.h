@@ -183,9 +183,9 @@ namespace ryujin
          * Let's compute intermediate errors with the same granularity
          * with what we produce output.
          */
-        if (enable_compute_error)
-          // error_norm = std::max(error_norm, compute_error(U, t));
-          error_at_final_time = compute_error(U, t);
+        // if (enable_compute_error)
+        // error_norm = std::max(error_norm, compute_error(U, t));
+        // error_at_final_time = compute_error(U, t);
       }
     } /* end of loop */
 
@@ -202,10 +202,7 @@ namespace ryujin
 
     /* Output final error: */
     if (enable_compute_error) {
-      // deallog << "Maximal error over all timesteps: " << error_norm
-      //         << std::endl;
-      deallog << "Normalized consolidated error at final timestep: "
-              << error_at_final_time << std::endl;
+      error_at_final_time = compute_error(U, t);
     }
 
     /* Detach deallog: */
@@ -354,19 +351,20 @@ namespace ryujin
         offline_data.discretization().triangulation().n_active_cells());
     // for Linf
     std::vector<double> Linf_of_analytic_solution(problem_dimension);
-    // std::vector<double> max_of_Linf_error(problem_dimension);
     double Linf_norm = 0.;
     // for L1
     std::vector<double> L1_of_analytic_solution(problem_dimension);
-    // std::vector<double> L1_of_each_component(problem_dimension);
     double L1_norm = 0;
+    // for L2
+    std::vector<double> L2_of_analytic_solution(problem_dimension);
+    double L2_norm = 0;
 
     for (unsigned int i = 0; i < problem_dimension; ++i) {
       VectorTools::interpolate(offline_data.dof_handler(),
                                to_function<dim, double>(callable, i),
                                error);
       /*
-        here we define local Linf,L1
+        here we define local Linf,L1,L2
         errors of analytical solutions. note that we use dealii integrate
         difference with 0 ie (u_exact - 0.0)
       */
@@ -378,11 +376,20 @@ namespace ryujin
                                         QGauss<dim>(3),
                                         VectorTools::L1_norm);
       double local_L1_analytical = difference_per_cell.l1_norm();
+      VectorTools::integrate_difference(offline_data.dof_handler(),
+                                        error,
+                                        ZeroFunction<dim, double>(),
+                                        difference_per_cell,
+                                        QGauss<dim>(3),
+                                        VectorTools::L2_norm);
+      double local_L2_analytical = difference_per_cell.l2_norm();
       /* and then take the maximum/sum over all processors*/
       Linf_of_analytic_solution[i] =
           Utilities::MPI::max(local_linf_analytical, mpi_communicator);
       L1_of_analytic_solution[i] =
           Utilities::MPI::sum(local_L1_analytical, mpi_communicator);
+      L2_of_analytic_solution[i] =
+          Utilities::MPI::sum(local_L2_analytical, mpi_communicator);
       /*
         here we define (component wise) the difference of the analytical
         solution and approximate solution
@@ -406,7 +413,16 @@ namespace ryujin
       const double local_L1_error =
           difference_per_cell.l1_norm() / L1_of_analytic_solution[i];
       L1_norm += Utilities::MPI::sum(local_L1_error, mpi_communicator);
-
+      // L2
+      VectorTools::integrate_difference(offline_data.dof_handler(),
+                                        error,
+                                        ZeroFunction<dim, double>(),
+                                        difference_per_cell,
+                                        QGauss<dim>(3),
+                                        VectorTools::L2_norm);
+      const double local_L2_error =
+          difference_per_cell.l2_norm() / L2_of_analytic_solution[i];
+      L2_norm += Utilities::MPI::sum(local_L2_error, mpi_communicator);
       // as a sanity check we define the errors component wise as well
       // Linf_norm_each = Utilities::MPI::max(local_Linf_error,
       // mpi_communicator); max_of_Linf_error[i] = Linf_norm_each; L1_norm_each
@@ -416,10 +432,16 @@ namespace ryujin
     // used this for a sanity check
     // double sum_of_component_Linferrors = std::accumulate(
     //     max_of_Linf_error.begin(), max_of_Linf_error.end(), 0.0);
-
-    deallog << "        error Linf_norm for t=" << t << ": " << Linf_norm
+    deallog << "        Normalized consolidated Linf, L1, and L2" << std::endl;
+    deallog << "        errors at final timestep"
+            << " with " << offline_data.dof_handler().n_dofs()
+            << " global DoFs." << std::endl;
+    deallog << "                                                " << std::endl;
+    deallog << "        Linf_norm error for t=" << t << ": " << Linf_norm
             << std::endl;
-    deallog << "        error L1_norm for t=" << t << ": " << L1_norm
+    deallog << "        L1_norm error for t=" << t << ": " << L1_norm
+            << std::endl;
+    deallog << "        L2_norm error for t=" << t << ": " << L2_norm
             << std::endl;
 
     return L1_norm;
