@@ -184,8 +184,8 @@ namespace ryujin
          * with what we produce output.
          */
         if (enable_compute_error)
-          error_norm = std::max(error_norm, compute_error(U, t));
-        error_at_final_time = compute_error(U, t);
+          // error_norm = std::max(error_norm, compute_error(U, t));
+          error_at_final_time = compute_error(U, t);
       }
     } /* end of loop */
 
@@ -202,8 +202,8 @@ namespace ryujin
 
     /* Output final error: */
     if (enable_compute_error) {
-      deallog << "Maximal error over all timesteps: " << error_norm
-              << std::endl;
+      // deallog << "Maximal error over all timesteps: " << error_norm
+      //         << std::endl;
       deallog << "Normalized consolidated error at final timestep: "
               << error_at_final_time << std::endl;
     }
@@ -353,15 +353,13 @@ namespace ryujin
     Vector<float> difference_per_cell(
         offline_data.discretization().triangulation().n_active_cells());
     // for Linf
-    std::vector<double> max_of_analytic_solution(problem_dimension);
-    std::vector<double> max_of_Linf_error(problem_dimension);
+    std::vector<double> Linf_of_analytic_solution(problem_dimension);
+    // std::vector<double> max_of_Linf_error(problem_dimension);
     double Linf_norm = 0.;
-    // double Linf_norm_each = 0;
     // for L1
     std::vector<double> L1_of_analytic_solution(problem_dimension);
-    std::vector<double> L1_of_each_component(problem_dimension);
+    // std::vector<double> L1_of_each_component(problem_dimension);
     double L1_norm = 0;
-    // double L1_norm_each = 0;
 
     for (unsigned int i = 0; i < problem_dimension; ++i) {
       VectorTools::interpolate(offline_data.dof_handler(),
@@ -372,17 +370,17 @@ namespace ryujin
         errors of analytical solutions. note that we use dealii integrate
         difference with 0 ie (u_exact - 0.0)
       */
+      double local_linf_analytical = error.linfty_norm();
       VectorTools::integrate_difference(offline_data.dof_handler(),
-                                        zeroVec,
-                                        to_function<dim, double>(callable, i),
+                                        error,
+                                        ZeroFunction<dim, double>(),
                                         difference_per_cell,
                                         QGauss<dim>(3),
                                         VectorTools::L1_norm);
-      double max_value_local_lInf = error.linfty_norm();
       double local_L1_analytical = difference_per_cell.l1_norm();
       /* and then take the maximum/sum over all processors*/
-      max_of_analytic_solution[i] =
-          Utilities::MPI::max(max_value_local_lInf, mpi_communicator);
+      Linf_of_analytic_solution[i] =
+          Utilities::MPI::max(local_linf_analytical, mpi_communicator);
       L1_of_analytic_solution[i] =
           Utilities::MPI::sum(local_L1_analytical, mpi_communicator);
       /*
@@ -396,12 +394,12 @@ namespace ryujin
       */
       // Linf
       double local_Linf_error =
-          error.linfty_norm() / max_of_analytic_solution[i];
+          error.linfty_norm() / Linf_of_analytic_solution[i];
       Linf_norm += Utilities::MPI::max(local_Linf_error, mpi_communicator);
       // L1
       VectorTools::integrate_difference(offline_data.dof_handler(),
                                         error,
-                                        ZeroFunction<dim, double>(error.size()),
+                                        ZeroFunction<dim, double>(),
                                         difference_per_cell,
                                         QGauss<dim>(3),
                                         VectorTools::L1_norm);
