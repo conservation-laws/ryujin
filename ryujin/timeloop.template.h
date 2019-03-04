@@ -427,7 +427,7 @@ namespace ryujin
       data_out.add_data_vector(output_vector[0], schlieren_postprocessor);
 
       data_out.build_patches(mapping,
-                             discretization.finite_element().degree + 2);
+                             discretization.finite_element().degree - 0);
 
       DataOutBase::VtkFlags flags(
           t, cycle, true, DataOutBase::VtkFlags::best_speed);
