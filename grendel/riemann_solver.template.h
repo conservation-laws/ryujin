@@ -390,8 +390,7 @@ namespace grendel
     const double phi_p_max =
         phi(gamma, b, riemann_data_i, riemann_data_j, p_max);
 
-    // FIXME The == is a bit of a problem here
-    if (phi_p_max == 0.) {
+    if (std::abs(phi_p_max) <= eps_) {
       const double p_star = p_max;
       const double lambda1 = lambda1_minus(gamma, riemann_data_i, p_star);
       const double lambda3 = lambda3_plus(gamma, riemann_data_j, p_star);
@@ -457,11 +456,11 @@ namespace grendel
        *  * p_1 < p_2
        */
 
-      Assert(dphi_p_1 > 0., dealii::ExcMessage("Houston, we are in trouble!"));
-      Assert(dphi_p_2 > 0., dealii::ExcMessage("Houston, we are in trouble!"));
+      Assert(dphi_p_1 > 0., dealii::ExcMessage("Houston, we have a problem!"));
+      Assert(dphi_p_2 > 0., dealii::ExcMessage("Houston, we have a problem!"));
       Assert(phi_p_1 < phi_p_2,
-             dealii::ExcMessage("Houston, we are in trouble!"));
-      Assert(p_1 < p_2, dealii::ExcMessage("Houston, we are in trouble!"));
+             dealii::ExcMessage("Houston, we have a problem!"));
+      Assert(p_1 < p_2, dealii::ExcMessage("Houston, we have a problem!"));
 
       /*
        * Compute divided differences
@@ -477,14 +476,14 @@ namespace grendel
       /* Update left point: */
       const double discriminant_1 = dphi_p_1 * dphi_p_1 - 4. * phi_p_1 * dd_112;
       Assert(discriminant_1 > 0.,
-             dealii::ExcMessage("Houston, we are in trouble!"));
+             dealii::ExcMessage("Houston, we have a problem!"));
 
       p_1 = p_1 - 2. * phi_p_1 / (dphi_p_1 + std::sqrt(discriminant_1));
 
       /* Update right point: */
       const double discriminant_2 = dphi_p_2 * dphi_p_2 - 4. * phi_p_2 * dd_122;
       Assert(discriminant_2 > 0.,
-             dealii::ExcMessage("Houston, we are in trouble!"));
+             dealii::ExcMessage("Houston, we have a problem!"));
 
       p_2 = p_2 - 2. * phi_p_2 / (dphi_p_2 + std::sqrt(discriminant_2));
 
