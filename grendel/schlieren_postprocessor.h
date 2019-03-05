@@ -48,7 +48,7 @@ namespace grendel
 
     /* Scratch data: */
 
-    std::vector<double> r_i_;
+    dealii::Vector<double> r_i_;
 
     /* Options: */
 

@@ -4,6 +4,8 @@
 #include "helper.h"
 #include "schlieren_postprocessor.h"
 
+#include <atomic>
+
 namespace grendel
 {
   using namespace dealii;
@@ -43,7 +45,7 @@ namespace grendel
     const auto &locally_owned = offline_data_->locally_owned();
     const auto &locally_relevant = offline_data_->locally_relevant();
 
-    r_i_.resize(locally_relevant.n_elements());
+    r_i_.reinit(locally_relevant.n_elements());
     schlieren_.reinit(locally_owned, locally_relevant, mpi_communicator_);
   }
 
@@ -63,11 +65,17 @@ namespace grendel
     const auto &cij_matrix = offline_data_->cij_matrix();
 
     /*
-     * Step 1: Compute r_i
+     * Step 1: Compute r_i and r_i_max, r_i_min:
      */
+
+    std::atomic<double> r_i_max{0.};
+    std::atomic<double> r_i_min{std::numeric_limits<double>::infinity()};
 
     {
       const auto on_subranges = [&](const auto it1, const auto it2) {
+        double r_i_max_on_subrange = 0.;
+        double r_i_min_on_subrange = std::numeric_limits<double>::infinity();
+
         /* [it1, it2) is an iterator range over r_i_ */
 
         /* Create an iterator for the index set: */
@@ -82,26 +90,50 @@ namespace grendel
           if (!locally_owned.is_element(i))
             continue;
 
-          double r_i = 0.;
+          Tensor<1, dim> r_i;
 
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
             const auto j = jt->column();
 
+            if (i == j)
+              continue;
+
             const auto U_js = U[schlieren_index_][j];
             const auto c_ij = gather_get_entry(cij_matrix, jt);
 
-            r_i += c_ij.norm_square() * U_js * U_js;
+            r_i += c_ij * U_js;
           }
 
           const double m_i = lumped_mass_matrix.diag_element(i);
-          r_i = sqrt(r_i) / m_i;
+          *it = r_i.norm() / m_i;
 
-          *it = r_i;
+          r_i_max_on_subrange = std::max(r_i_max_on_subrange, *it);
+          r_i_min_on_subrange = std::min(r_i_min_on_subrange, *it);
         }
+
+        /* Synchronize over all threads: */
+
+        double current_r_i_max = r_i_max.load();
+        while (current_r_i_max < r_i_max_on_subrange &&
+               !r_i_max.compare_exchange_weak(current_r_i_max,
+                                              r_i_max_on_subrange))
+          ;
+
+        double current_r_i_min = r_i_min.load();
+        while (current_r_i_min > r_i_min_on_subrange &&
+               !r_i_min.compare_exchange_weak(current_r_i_min,
+                                              r_i_min_on_subrange))
+          ;
       };
+
       parallel::apply_to_subranges(
           r_i_.begin(), r_i_.end(), on_subranges, 4096);
     }
+
+    /* And synchronize over all processors: */
+
+    r_i_max.store(Utilities::MPI::max(r_i_max.load(), mpi_communicator_));
+    r_i_min.store(Utilities::MPI::min(r_i_min.load(), mpi_communicator_));
 
     /*
      * Step 2: Compute schlieren:
@@ -121,31 +153,16 @@ namespace grendel
 
           const auto r_i = *it;
 
-          /* Only iterate over locally owned subset */
-          if (!locally_owned.is_element(i))
-            continue;
-
-          double max_r_i = 0.;
-          double min_r_i = std::numeric_limits<double>::max();
-
-          for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
-            const auto j = jt->column();
-
-            const unsigned int pos_j = locally_relevant.index_within_set(j);
-            const auto r_j = r_i_[pos_j];
-
-            max_r_i = std::max(max_r_i, r_j);
-            min_r_i = std::min(min_r_i, r_j);
-          }
-
-          schlieren_[i] =
-              std::exp(-schlieren_beta_ * (r_i - min_r_i) / (max_r_i - min_r_i));
+          schlieren_[i] = std::exp(-schlieren_beta_ * (r_i - r_i_min) /
+                                   (r_i_max - r_i_min));
         }
       };
 
       parallel::apply_to_subranges(
           r_i_.begin(), r_i_.end(), on_subranges, 4096);
     }
+
+    schlieren_.update_ghost_values();
   }
 
 } /* namespace grendel */

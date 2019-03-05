@@ -387,7 +387,7 @@ namespace ryujin
       output_vector[i] = U[i];
     }
 
-    schlieren_postprocessor.compute_schlieren(U);
+    schlieren_postprocessor.compute_schlieren(output_vector);
 
     /* capture name, t, cycle by value */
     const auto output_worker = [this, name, t, cycle]() {
@@ -403,7 +403,7 @@ namespace ryujin
         data_out.add_data_vector(output_vector[i], component_names[i]);
 
       data_out.add_data_vector(schlieren_postprocessor.schlieren(),
-                               "schlieren plot");
+                               "schlieren_plot");
 
       data_out.build_patches(mapping,
                              discretization.finite_element().degree - 1);
