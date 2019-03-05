@@ -32,11 +32,10 @@ namespace grendel
         use_ssprk,
         "If enabled, use SSP RK(3) instead of the forward Euler scheme.");
 
-    use_helim = false;
-    add_parameter(
-        "use high order limiter",
-        use_helim,
-        "If enabled, the high order limiter (for the third order scheme).");
+    use_smoothness_indicator = false;
+    add_parameter("use smoothness indicator",
+                  use_smoothness_indicator,
+                  "If enabled, use a smoothness indicator for limiting.");
   }
 
 

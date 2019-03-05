@@ -96,7 +96,7 @@ namespace grendel
     /* Options: */
 
     bool use_ssprk;
-    bool use_helim;
+    bool use_smoothness_indicator;
   };
 
 } /* namespace grendel */
