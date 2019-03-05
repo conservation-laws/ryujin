@@ -423,15 +423,7 @@ namespace ryujin
       const double local_L2_error =
           difference_per_cell.l2_norm() / L2_of_analytic_solution[i];
       L2_norm += Utilities::MPI::sum(local_L2_error, mpi_communicator);
-      // as a sanity check we define the errors component wise as well
-      // Linf_norm_each = Utilities::MPI::max(local_Linf_error,
-      // mpi_communicator); max_of_Linf_error[i] = Linf_norm_each; L1_norm_each
-      // = Utilities::MPI::sum(local_L1_error, mpi_communicator);
-      // L1_of_each_component[i] = L1_norm_each;
     }
-    // used this for a sanity check
-    // double sum_of_component_Linferrors = std::accumulate(
-    //     max_of_Linf_error.begin(), max_of_Linf_error.end(), 0.0);
     deallog << "        Normalized consolidated Linf, L1, and L2" << std::endl;
     deallog << "        errors at final timestep"
             << " with " << offline_data.dof_handler().n_dofs()
