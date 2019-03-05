@@ -89,8 +89,7 @@ namespace grendel
     std::vector<rank2_type> f_i_;
     dealii::Vector<double> alpha_i_;
 
-    dealii::SparseMatrix<double> dij_matrix_l_;
-    dealii::SparseMatrix<double> dij_matrix_h_;
+    dealii::SparseMatrix<double> dij_matrix_;
 
     vector_type temp_euler_;
     vector_type temp_ssprk_;
@@ -100,6 +99,8 @@ namespace grendel
     bool use_ssprk_;
     bool use_smoothness_indicator_;
     unsigned int smoothness_index_;
+    unsigned int smoothness_power_;
+
     double eps_;
   };
 

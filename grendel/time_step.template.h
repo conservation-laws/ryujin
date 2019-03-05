@@ -38,10 +38,15 @@ namespace grendel
                   "If enabled, use a smoothness indicator for limiting.");
 
     smoothness_index_ = 0;
-    add_parameter("smoothness component",
+    add_parameter("smoothness index",
                   smoothness_index_,
                   "Use the corresponding component of the state vector for the "
                   "smoothness indicator");
+
+    smoothness_power_ = 3;
+    add_parameter("smoothness power",
+                  smoothness_index_,
+                  "Sets the exponent for the smoothness indicator");
 
     eps_ = 1.e-14;
   }
@@ -59,8 +64,7 @@ namespace grendel
 
     f_i_.resize(locally_relevant.n_elements());
     alpha_i_.reinit(locally_relevant.n_elements());
-    dij_matrix_l_.reinit(sparsity_pattern);
-    dij_matrix_h_.reinit(sparsity_pattern);
+    dij_matrix_.reinit(sparsity_pattern);
 
     temp_euler_[0].reinit(locally_owned, locally_relevant, mpi_communicator_);
     for (auto &it : temp_euler_)
@@ -155,12 +159,12 @@ namespace grendel
               // FIXME Refactor into a scatter function into helper.h
               const auto global_index = jt->global_index();
               const typename SparseMatrix<double>::iterator matrix_iterator(
-                  &dij_matrix_l_, global_index);
+                  &dij_matrix_, global_index);
               matrix_iterator->value() = d;
             }
             // Set the d_ji value:
             // FIXME this index access is suboptimal.
-            dij_matrix_l_(j, i) = d;
+            dij_matrix_(j, i) = d;
           }
         }
       };
@@ -202,10 +206,10 @@ namespace grendel
             if (j == i)
               continue;
 
-            d_sum -= get_entry(dij_matrix_l_, jt);
+            d_sum -= get_entry(dij_matrix_, jt);
           }
 
-          dij_matrix_l_.diag_element(i) = d_sum;
+          dij_matrix_.diag_element(i) = d_sum;
 
           const double cfl = problem_description_->cfl_update();
           const double mass = lumped_mass_matrix.diag_element(i);
@@ -267,7 +271,10 @@ namespace grendel
             denominator += std::abs(U_js - U_is) + eps_ * std::abs(U_js);
           }
 
-          alpha_i_[i] = numerator / denominator;
+          // FIXME: Allow to set psi as an option in ProblemDescription
+          const unsigned int pos_i = locally_relevant.index_within_set(i);
+          alpha_i_[pos_i] =
+              std::pow(std::abs(numerator) / denominator, smoothness_power_);
         }
       };
 
@@ -306,6 +313,9 @@ namespace grendel
           dealii::Tensor<1, problem_dimension> Unew_i = U_i;
 
           const auto f_i = *it; // This is f_i_[pos_i]
+          const unsigned int pos_i = locally_relevant.index_within_set(i);
+          const auto alpha_i = alpha_i_[pos_i];
+
           const double m_i = lumped_mass_matrix.diag_element(i);
 
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
@@ -318,14 +328,18 @@ namespace grendel
 
             const unsigned int pos_j = locally_relevant.index_within_set(j);
             const auto f_j = f_i_[pos_j];
+            const auto alpha_j = alpha_i_[pos_j];
 
             const auto c_ij = gather_get_entry(cij_matrix, jt);
-            const auto d_ij_l = get_entry(dij_matrix_l_, jt);
+            auto d_ij = get_entry(dij_matrix_, jt);
+
+            if(use_smoothness_indicator_)
+              d_ij *= std::max(alpha_i, alpha_j);
 
             for (unsigned int k = 0; k < problem_dimension; ++k)
               Unew_i[k] +=
                   tau / m_i *
-                  (-(f_j[k] - f_i[k]) * c_ij + d_ij_l * (U_j[k] - U_i[k]));
+                  (-(f_j[k] - f_i[k]) * c_ij + d_ij * (U_j[k] - U_i[k]));
           }
 
           /*
