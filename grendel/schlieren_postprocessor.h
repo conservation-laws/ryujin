@@ -43,10 +43,12 @@ namespace grendel
     ACCESSOR_READ_ONLY(offline_data)
 
   private:
-    /* Scratch data: */
-
     dealii::LinearAlgebra::distributed::Vector<double> schlieren_;
     ACCESSOR_READ_ONLY(schlieren)
+
+    /* Scratch data: */
+
+    std::vector<double> r_i_;
 
     /* Options: */
 
