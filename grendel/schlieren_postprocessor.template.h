@@ -63,6 +63,7 @@ namespace grendel
     const auto &sparsity = offline_data_->sparsity_pattern();
     const auto &lumped_mass_matrix = offline_data_->lumped_mass_matrix();
     const auto &cij_matrix = offline_data_->cij_matrix();
+    const auto &boundary_normal_map = offline_data_->boundary_normal_map();
 
     /*
      * Step 1: Compute r_i and r_i_max, r_i_min:
@@ -102,6 +103,16 @@ namespace grendel
             const auto c_ij = gather_get_entry(cij_matrix, jt);
 
             r_i += c_ij * U_js;
+          }
+
+          /*
+           * On boundaries remove the normal component of r_i:
+           */
+
+          const auto bnm_it = boundary_normal_map.find(i);
+          if (bnm_it != boundary_normal_map.end()) {
+            const auto [normal, id] = bnm_it->second;
+            r_i -= 1. * (r_i * normal) * normal;
           }
 
           const double m_i = lumped_mass_matrix.diag_element(i);
@@ -153,8 +164,8 @@ namespace grendel
 
           const auto r_i = *it;
 
-          schlieren_[i] = std::exp(-schlieren_beta_ * (r_i - r_i_min) /
-                                   (r_i_max - r_i_min));
+          schlieren_[i] = 1. - std::exp(-schlieren_beta_ * (r_i - r_i_min) /
+                                        (r_i_max - r_i_min));
         }
       };
 
