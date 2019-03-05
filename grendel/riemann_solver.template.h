@@ -269,6 +269,12 @@ namespace grendel
      * Two-rarefaction approximation to p_star computed for two primitive
      * states <code>riemann_data_i</code> and
      * <code>riemann_data_j</code>. See [1], page 914, (4.3)
+     *
+     * Note: Instead of returning \lambda_RR directly, we also compute
+     * another upper bound
+     *   lambda_tilde =
+     *   2 * max(|U_i|, |U_j|) + max(1, 2 / (gamma - 1)) * max(a_i, a_j)
+     * and return min(lambda_RR, lambda_tilde).
      */
     inline DEAL_II_ALWAYS_INLINE double
     p_star_two_rarefaction(const double gamma,
@@ -293,10 +299,17 @@ namespace grendel
           a_i * tmp_i + a_j * tmp_j - (gamma - 1.) / 2. * (u_j - u_i);
 
       const double denominator =
-          a_i * tmp_i * std::pow(p_i / p_j, -1. * (gamma - 1.0) / 2.0 / gamma) +
+          a_i * tmp_i * std::pow(p_i / p_j, -1. * (gamma - 1.) / 2. / gamma) +
           a_j * tmp_j * 1.;
 
-      return p_j * std::pow(numerator / denominator, 2. * gamma / (gamma - 1));
+      const double lambda_RR =
+          p_j * std::pow(numerator / denominator, 2. * gamma / (gamma - 1.));
+
+      const double lambda_tilde = 2. * std::max(std::abs(u_i), std::abs(u_j)) +
+                                  std::max(1., 2. / (gamma - 1.)) *
+                                      std::max(std::abs(a_i), std::abs(a_j));
+
+      return std::min(lambda_tilde, lambda_RR);
     }
 
 
