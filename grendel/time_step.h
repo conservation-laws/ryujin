@@ -87,6 +87,7 @@ namespace grendel
     /* Scratch data: */
 
     std::vector<rank2_type> f_i_;
+    dealii::Vector<double> alpha_i_;
 
     dealii::SparseMatrix<double> dij_matrix_l_;
     dealii::SparseMatrix<double> dij_matrix_h_;
@@ -96,8 +97,10 @@ namespace grendel
 
     /* Options: */
 
-    bool use_ssprk;
-    bool use_smoothness_indicator;
+    bool use_ssprk_;
+    bool use_smoothness_indicator_;
+    unsigned int smoothness_index_;
+    double eps_;
   };
 
 } /* namespace grendel */

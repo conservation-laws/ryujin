@@ -26,16 +26,24 @@ namespace grendel
       , problem_description_(&problem_description)
       , riemann_solver_(&riemann_solver)
   {
-    use_ssprk = false;
+    use_ssprk_ = false;
     add_parameter(
         "use SSP RK",
-        use_ssprk,
+        use_ssprk_,
         "If enabled, use SSP RK(3) instead of the forward Euler scheme.");
 
-    use_smoothness_indicator = false;
+    use_smoothness_indicator_ = false;
     add_parameter("use smoothness indicator",
-                  use_smoothness_indicator,
+                  use_smoothness_indicator_,
                   "If enabled, use a smoothness indicator for limiting.");
+
+    smoothness_index_ = 0;
+    add_parameter("smoothness component",
+                  smoothness_index_,
+                  "Use the corresponding component of the state vector for the "
+                  "smoothness indicator");
+
+    eps_ = 1.e-14;
   }
 
 
@@ -50,6 +58,7 @@ namespace grendel
     const auto &sparsity_pattern = offline_data_->sparsity_pattern();
 
     f_i_.resize(locally_relevant.n_elements());
+    alpha_i_.reinit(locally_relevant.n_elements());
     dij_matrix_l_.reinit(sparsity_pattern);
     dij_matrix_h_.reinit(sparsity_pattern);
 
@@ -221,6 +230,52 @@ namespace grendel
     }
 
     /*
+     * Step 2b: Compute smoothness indicator
+     */
+
+    if (use_smoothness_indicator_) {
+      deallog << "        compute smoothness indicator" << std::endl;
+      TimerOutput::Scope t(computing_timer_,
+                           "time_step - compute smoothness indicator");
+
+      const auto on_subranges = [&](const auto it1, const auto it2) {
+        /* [it1, it2) is an iterator range over f_i_ */
+
+        /* Create an iterator for the index set: */
+        const unsigned int pos = std::distance(f_i_.begin(), it1);
+        auto set_iterator =
+            locally_relevant.at(locally_relevant.nth_index_in_set(pos));
+
+        for (auto it = it1; it != it2; ++it, ++set_iterator) {
+          /* Determine global index i from  pos_i: */
+
+          const auto i = *set_iterator;
+          const auto U_is = U[smoothness_index_][i];
+
+          double numerator = 0.;
+          double denominator = 0.;
+
+          for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
+            const auto j = jt->column();
+
+            if (j == i)
+              continue;
+
+            const auto U_js = U[smoothness_index_][j];
+
+            numerator += (U_js - U_is);
+            denominator += std::abs(U_js - U_is) + eps_ * std::abs(U_js);
+          }
+
+          alpha_i_[i] = numerator / denominator;
+        }
+      };
+
+      parallel::apply_to_subranges(
+          f_i_.begin(), f_i_.end(), on_subranges, 4096);
+    }
+
+    /*
      * Step 3: Perform update *yay*
      */
 
@@ -362,7 +417,7 @@ namespace grendel
   {
     deallog << "TimeStep<dim>::step()" << std::endl;
 
-    return use_ssprk ? ssprk_step(U) : euler_step(U);
+    return use_ssprk_ ? ssprk_step(U) : euler_step(U);
   }
 
 
