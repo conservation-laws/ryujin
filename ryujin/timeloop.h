@@ -6,6 +6,7 @@
 #include <problem_description.h>
 #include <riemann_solver.h>
 #include <time_step.h>
+#include <schlieren_postprocessor.h>
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/timer.h>
@@ -57,6 +58,7 @@ namespace ryujin
     grendel::ProblemDescription<dim> problem_description;
     grendel::RiemannSolver<dim> riemann_solver;
     grendel::TimeStep<dim> time_step;
+    grendel::SchlierenPostprocessor<dim> schlieren_postprocessor;
 
     std::unique_ptr<std::ofstream> filestream;
 

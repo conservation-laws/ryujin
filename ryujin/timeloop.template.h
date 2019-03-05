@@ -72,6 +72,10 @@ namespace ryujin
                   problem_description,
                   riemann_solver,
                   "F - TimeStep")
+      , schlieren_postprocessor(mpi_communicator,
+                                computing_timer,
+                                offline_data,
+                                "G - SchlierenPostprocessor")
   {
     base_name = "test";
     add_parameter("basename", base_name, "Base name for all output files");
@@ -132,6 +136,7 @@ namespace ryujin
 
     print_head("set up time step");
     time_step.prepare();
+    schlieren_postprocessor.prepare();
 
     /*
      * Interpolate initial values:
@@ -359,7 +364,8 @@ namespace ryujin
      * Offload output to a worker thread.
      *
      * We wait for a previous thread to finish before we schedule a new
-     * one. This logic also serves as a mutex for output_vector.
+     * one. This logic also serves as a mutex for output_vector and
+     * schlieren_postprocessor.
      */
 
     deallog << "        Schedule output for cycle = " << cycle << std::endl;
@@ -381,6 +387,7 @@ namespace ryujin
       output_vector[i] = U[i];
     }
 
+    schlieren_postprocessor.compute_schlieren(U);
 
     /* capture name, t, cycle by value */
     const auto output_worker = [this, name, t, cycle]() {
@@ -394,6 +401,9 @@ namespace ryujin
 
       for (unsigned int i = 0; i < problem_dimension; ++i)
         data_out.add_data_vector(output_vector[i], component_names[i]);
+
+      data_out.add_data_vector(schlieren_postprocessor.schlieren(),
+                               "schlieren plot");
 
       data_out.build_patches(mapping,
                              discretization.finite_element().degree - 1);

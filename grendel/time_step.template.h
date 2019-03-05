@@ -45,7 +45,7 @@ namespace grendel
 
     smoothness_power_ = 3;
     add_parameter("smoothness power",
-                  smoothness_index_,
+                  smoothness_power_,
                   "Sets the exponent for the smoothness indicator");
 
     eps_ = 1.e-14;
@@ -55,8 +55,8 @@ namespace grendel
   template <int dim>
   void TimeStep<dim>::prepare()
   {
-    deallog << "TimeStep<dim>::setup()" << std::endl;
-    TimerOutput::Scope t(computing_timer_, "time_step - setup scratch space");
+    deallog << "TimeStep<dim>::prepare()" << std::endl;
+    TimerOutput::Scope t(computing_timer_, "time_step - prepare scratch space");
 
     const auto &locally_owned = offline_data_->locally_owned();
     const auto &locally_relevant = offline_data_->locally_relevant();
