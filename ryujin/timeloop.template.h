@@ -346,33 +346,6 @@ namespace ryujin
     return norm;
   }
 
-  namespace
-  {
-    template<int dim>
-    class SchlierenPostprocessor : public DataPostprocessorScalar<dim>
-    {
-    public:
-      SchlierenPostprocessor()
-          : DataPostprocessorScalar<dim>("schlieren_plot",
-                                         update_values | update_gradients)
-      {
-      }
-
-      void evaluate_scalar_field(
-          const DataPostprocessorInputs::Scalar<dim> &inputs,
-          std::vector<Vector<double>> &computed_quantities) const override
-      {
-        const unsigned int n = inputs.solution_values.size();
-
-        for (unsigned int q = 0; q < n; ++q) {
-          computed_quantities[q](0) =
-              inputs.solution_gradients[q] * inputs.solution_gradients[q];
-        }
-      }
-    };
-
-  } // namespace
-
 
   template <int dim>
   void TimeLoop<dim>::output(const typename TimeLoop<dim>::vector_type &U,
@@ -422,12 +395,8 @@ namespace ryujin
       for (unsigned int i = 0; i < problem_dimension; ++i)
         data_out.add_data_vector(output_vector[i], component_names[i]);
 
-      /* Add Schlieren plot */
-      SchlierenPostprocessor<dim> schlieren_postprocessor;
-      data_out.add_data_vector(output_vector[0], schlieren_postprocessor);
-
       data_out.build_patches(mapping,
-                             discretization.finite_element().degree - 0);
+                             discretization.finite_element().degree - 1);
 
       DataOutBase::VtkFlags flags(
           t, cycle, true, DataOutBase::VtkFlags::best_speed);
