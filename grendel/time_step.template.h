@@ -350,10 +350,9 @@ namespace grendel
           if (bnm_it != boundary_normal_map.end()) {
             const auto [normal, id] = bnm_it->second;
 
-            /* On boundray 1 we reflect: */
+            /* On boundray 1 remove the normal component of the momentum: */
             if (id == 1) {
               auto m = ProblemDescription<dim>::momentum_vector(Unew_i);
-              // FIXME:
               m -= 1. * (m * normal) * normal;
               for (unsigned int i = 0; i < dim; ++i)
                 Unew_i[i + 1] = m[i];
