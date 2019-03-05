@@ -50,13 +50,14 @@ namespace grendel
     const auto &sparsity_pattern = offline_data_->sparsity_pattern();
 
     f_i_.resize(locally_relevant.n_elements());
-    dij_matrix_.reinit(sparsity_pattern);
+    dij_matrix_l_.reinit(sparsity_pattern);
+    dij_matrix_h_.reinit(sparsity_pattern);
 
-    temp_euler[0].reinit(locally_owned, locally_relevant, mpi_communicator_);
-    for (auto &it : temp_euler)
-      it.reinit(temp_euler[0]);
-    for (auto &it : temp_ssprk)
-      it.reinit(temp_euler[0]);
+    temp_euler_[0].reinit(locally_owned, locally_relevant, mpi_communicator_);
+    for (auto &it : temp_euler_)
+      it.reinit(temp_euler_[0]);
+    for (auto &it : temp_ssprk_)
+      it.reinit(temp_euler_[0]);
   }
 
 
@@ -145,12 +146,12 @@ namespace grendel
               // FIXME Refactor into a scatter function into helper.h
               const auto global_index = jt->global_index();
               const typename SparseMatrix<double>::iterator matrix_iterator(
-                  &dij_matrix_, global_index);
+                  &dij_matrix_l_, global_index);
               matrix_iterator->value() = d;
             }
             // Set the d_ji value:
             // FIXME this index access is suboptimal.
-            dij_matrix_(j, i) = d;
+            dij_matrix_l_(j, i) = d;
           }
         }
       };
@@ -192,10 +193,10 @@ namespace grendel
             if (j == i)
               continue;
 
-            d_sum -= get_entry(dij_matrix_, jt);
+            d_sum -= get_entry(dij_matrix_l_, jt);
           }
 
-          dij_matrix_.diag_element(i) = d_sum;
+          dij_matrix_l_.diag_element(i) = d_sum;
 
           const double cfl = problem_description_->cfl_update();
           const double mass = lumped_mass_matrix.diag_element(i);
@@ -264,12 +265,12 @@ namespace grendel
             const auto f_j = f_i_[pos_j];
 
             const auto c_ij = gather_get_entry(cij_matrix, jt);
-            const auto d_ij = get_entry(dij_matrix_, jt);
+            const auto d_ij_l = get_entry(dij_matrix_l_, jt);
 
             for (unsigned int k = 0; k < problem_dimension; ++k)
               Unew_i[k] +=
                   tau / m_i *
-                  (-(f_j[k] - f_i[k]) * c_ij + d_ij * (U_j[k] - U_i[k]));
+                  (-(f_j[k] - f_i[k]) * c_ij + d_ij_l * (U_j[k] - U_i[k]));
           }
 
           /*
@@ -293,7 +294,7 @@ namespace grendel
           /*
            * And write to global scratch vector:
            */
-          scatter(temp_euler, Unew_i, i);
+          scatter(temp_euler_, Unew_i, i);
         }
       };
 
@@ -302,12 +303,12 @@ namespace grendel
 
       /* Synchronize temp over all MPI processes: */
 
-      for (auto &it : temp_euler)
+      for (auto &it : temp_euler_)
         it.update_ghost_values();
 
       /* And finally update the result: */
 
-      U.swap(temp_euler);
+      U.swap(temp_euler_);
 
       return tau_max;
     }
@@ -321,7 +322,7 @@ namespace grendel
 
     /* This also copies ghost elements: */
     for (unsigned int i = 0; i < problem_dimension; ++i)
-      temp_ssprk[i] = U[i];
+      temp_ssprk_[i] = U[i];
 
     // Step 1: U1 = U_old + tau * L(U_old)
 
@@ -338,7 +339,7 @@ namespace grendel
                            "Insufficient CFL condition."));
 
     for (unsigned int i = 0; i < problem_dimension; ++i)
-      U[i].sadd(1. / 4., 3. / 4., temp_ssprk[i]);
+      U[i].sadd(1. / 4., 3. / 4., temp_ssprk_[i]);
 
 
     // Step 3: U_new = 1/3 U_old + 2/3 (U2 + tau L(U2))
@@ -350,7 +351,7 @@ namespace grendel
                            "Insufficient CFL condition."));
 
     for (unsigned int i = 0; i < problem_dimension; ++i)
-      U[i].sadd(2. / 3., 1. / 3., temp_ssprk[i]);
+      U[i].sadd(2. / 3., 1. / 3., temp_ssprk_[i]);
 
     return tau_1;
   }

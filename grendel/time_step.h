@@ -88,10 +88,11 @@ namespace grendel
 
     std::vector<rank2_type> f_i_;
 
-    dealii::SparseMatrix<double> dij_matrix_;
+    dealii::SparseMatrix<double> dij_matrix_l_;
+    dealii::SparseMatrix<double> dij_matrix_h_;
 
-    vector_type temp_euler;
-    vector_type temp_ssprk;
+    vector_type temp_euler_;
+    vector_type temp_ssprk_;
 
     /* Options: */
 
