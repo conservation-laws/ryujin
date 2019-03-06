@@ -35,7 +35,14 @@ namespace grendel
     use_smoothness_indicator_ = false;
     add_parameter("use smoothness indicator",
                   use_smoothness_indicator_,
-                  "If enabled, use a smoothness indicator for limiting.");
+                  "If enabled, use a smoothness indicator for the high-order "
+                  "approximation.");
+
+    use_limiter_ = false;
+    add_parameter(
+        "use limiter",
+        use_limiter_,
+        "If enabled, use a convex limiter for the high-order approximation..");
 
     smoothness_index_ = 0;
     add_parameter("smoothness index",
