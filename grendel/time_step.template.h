@@ -76,11 +76,11 @@ namespace grendel
       alpha_i_.reinit(locally_relevant.n_elements());
       for (auto &it : pij_matrix_)
         it.reinit(sparsity_pattern);
-      for (auto &it : uij_bar_matrix_)
-        it.reinit(sparsity_pattern);
     }
 
     if (use_limiter_) {
+      for (auto &it : uij_bar_matrix_)
+        it.reinit(sparsity_pattern);
       lij_matrix_.reinit(sparsity_pattern);
     }
 
@@ -348,12 +348,13 @@ namespace grendel
               U_ij_bar[k] = 1. / 2. * (U_i[k] + U_j[k]) -
                             1. / 2. * (f_j[k] - f_i[k]) * c_ij / d_ij;
 
-
             Unew_i += tau / m_i * 2. * d_ij * (U_ij_bar - U_i);
 
-            if (use_smoothness_indicator_) {
+            if (use_limiter_) {
               scatter_set_entry(uij_bar_matrix_, jt, U_ij_bar);
+            }
 
+            if (use_smoothness_indicator_ || use_limiter_) {
               const auto p_ij = tau / m_i / lambda * d_ij *
                                 (std::max(alpha_i, alpha_j) - 1.) * (U_j - U_i);
               scatter_set_entry(pij_matrix_, jt, p_ij);

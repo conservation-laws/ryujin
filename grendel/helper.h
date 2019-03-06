@@ -64,7 +64,7 @@ namespace grendel
       std::array<T1, k> &U, const T2 it, const dealii::Tensor<1, l> &V)
   {
     for (unsigned int j = 0; j < k; ++j)
-      set_entry(U[j], it, V[k]);
+      set_entry(U[j], it, V[j]);
   }
 
 
