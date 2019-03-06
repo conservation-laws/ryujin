@@ -27,6 +27,16 @@ namespace grendel
   }
 
 
+  template <typename Matrix, typename Iterator>
+  inline DEAL_II_ALWAYS_INLINE void
+  set_entry(Matrix &matrix, const Iterator &it, double value)
+  {
+    const auto global_index = it->global_index();
+    typename Matrix::iterator matrix_iterator(&matrix, global_index);
+    matrix_iterator->value() = value;
+  }
+
+
   /*
    * It's magic
    */

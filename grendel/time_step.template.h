@@ -120,8 +120,6 @@ namespace grendel
             locally_relevant.at(locally_relevant.nth_index_in_set(pos));
 
         for (auto it = it1; it != it2; ++it, ++set_iterator) {
-          /* Determine global index i from  pos_i: */
-
           const auto i = *set_iterator;
           const auto U_i = gather(U, i);
 
@@ -161,16 +159,9 @@ namespace grendel
 
             /* Set symmetrized off-diagonal values: */
 
-            // Set the d_ij value:
-            {
-              // FIXME Refactor into a scatter function into helper.h
-              const auto global_index = jt->global_index();
-              const typename SparseMatrix<double>::iterator matrix_iterator(
-                  &dij_matrix_, global_index);
-              matrix_iterator->value() = d;
-            }
-            // Set the d_ji value:
-            // FIXME this index access is suboptimal.
+            // FIXME this index access for d_ji is suboptimal.
+
+            set_entry(dij_matrix_, jt, d);
             dij_matrix_(j, i) = d;
           }
         }
