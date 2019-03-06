@@ -284,16 +284,22 @@ namespace grendel
 
     /*
      * Step 4: Perform low-order update and compute limiter:
+     *
+     *   \bar U_ij = 1/2 d_ij^L (U_i + U_j) - 1/2 (f_j - f_i) c_ij
+     *        P_ij = tau / m_i / lambda (d_ij^H - d_ij^L) + [...]
+     *
+     *   Low-order update: += tau / m_i * 2 d_ij^L (\bar U_ij - U_i)
      */
 
     {
       TimerOutput::Scope t(computing_timer_,
-                           "time_step - perform low-order time-step");
+                           "time_step - perform low-order update");
 
       const auto on_subranges = [&](const auto it1, const auto it2) {
         /* [it1, it2) is an iterator range over f_i_ */
 
         std::vector<rank1_type> U_ij_bar;
+        std::vector<rank1_type> P_ij;
 
         /* Create an iterator for the index set: */
         const unsigned int pos = std::distance(f_i_.begin(), it1);
@@ -308,22 +314,31 @@ namespace grendel
             continue;
 
           const auto U_i = gather(U, i);
-          const auto f_i = *it; // This is f_i_[pos_i]
           const double m_i = lumped_mass_matrix.diag_element(i);
+          const auto f_i = *it; // This is f_i_[pos_i]
+          const unsigned int pos_i = locally_relevant.index_within_set(i);
+          const auto alpha_i = alpha_i_[pos_i];
 
           dealii::Tensor<1, problem_dimension> Unew_i = U_i;
 
-          U_ij_bar.resize(std::distance(sparsity.begin(i), sparsity.end(i)));
+          const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
+          U_ij_bar.resize(size);
+          P_ij.resize(size);
 
           auto U_ij_bar_it = U_ij_bar.begin();
+          auto P_ij_it = P_ij.begin();
+
+          const double lambda = 1. / (U_ij_bar.size() - 1.);
+
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i);
-               ++jt, ++U_ij_bar_it) {
+               ++jt, ++U_ij_bar_it, ++P_ij_it) {
             const auto j = jt->column();
 
             const auto U_j = gather(U, j);
 
             const unsigned int pos_j = locally_relevant.index_within_set(j);
             const auto f_j = f_i_[pos_j];
+            const auto alpha_j = alpha_i_[pos_j];
 
             const auto c_ij = gather_get_entry(cij_matrix, jt);
             const auto d_ij = get_entry(dij_matrix_, jt);
@@ -331,6 +346,9 @@ namespace grendel
             for (unsigned int k = 0; k < problem_dimension; ++k)
               (*U_ij_bar_it)[k] = 1. / 2. * (U_i[k] + U_j[k]) -
                                   1. / 2. * (f_j[k] - f_i[k]) * c_ij / d_ij;
+
+            *P_ij_it = tau / m_i / lambda * d_ij *
+                       (std::max(alpha_i, alpha_j) - 1.) * (U_j - U_i);
 
             Unew_i += tau / m_i * 2. * d_ij * (*U_ij_bar_it - U_i);
           }
@@ -350,9 +368,61 @@ namespace grendel
 
     /*
      * Step 5: Perform high-order update:
+     *
+     *   P_ij = tau / m_i / lambda (d_ij^H - d_ij^L) + [...]
+     *
+     *   High-order update: += l_ij * lambda * P_ij
      */
 
-    // FIXME
+    if (use_smoothness_indicator_) {
+      TimerOutput::Scope t(computing_timer_,
+                           "time_step - perform high-order update");
+
+      const auto on_subranges = [&](const auto it1, const auto it2) {
+        /* [it1, it2) is an iterator range over f_i_ */
+
+        /* Create an iterator for the index set: */
+        const unsigned int pos = std::distance(f_i_.begin(), it1);
+        auto set_iterator =
+            locally_relevant.at(locally_relevant.nth_index_in_set(pos));
+
+        for (auto it = it1; it != it2; ++it, ++set_iterator) {
+          const auto i = *set_iterator;
+
+          /* Only iterate over locally owned subset */
+          if (!locally_owned.is_element(i))
+            continue;
+
+          const auto U_i = gather(U, i);
+          const double m_i = lumped_mass_matrix.diag_element(i);
+          const unsigned int pos_i = locally_relevant.index_within_set(i);
+          const auto alpha_i = alpha_i_[pos_i];
+
+          dealii::Tensor<1, problem_dimension> Unew_i = gather(temp_euler_, i);
+
+          for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
+            const auto j = jt->column();
+            const auto U_j = gather(U, j);
+
+            const unsigned int pos_j = locally_relevant.index_within_set(j);
+            const auto alpha_j = alpha_i_[pos_j];
+            const auto d_ij = get_entry(dij_matrix_, jt);
+            const auto l_ij = use_limiter_ ? get_entry(lij_matrix_, jt) : 1.;
+
+            Unew_i += tau / m_i * l_ij * d_ij *
+                      (std::max(alpha_i, alpha_j) - 1.) * (U_j - U_i);
+          }
+
+          /*
+           * And write to global scratch vector:
+           */
+          scatter(temp_euler_, Unew_i, i);
+        }
+      };
+
+      parallel::apply_to_subranges(
+          f_i_.begin(), f_i_.end(), on_subranges, 4096);
+    }
 
     /*
      * Step 6: Fix up boundary states and finish up step:
