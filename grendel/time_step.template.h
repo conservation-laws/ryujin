@@ -235,6 +235,10 @@ namespace grendel
 
     /*
      * Step 2b: Compute smoothness indicator
+     *
+     * If enabled we compute the smoothness indicator
+     *
+     *   \alpha_i = \|\sum_j U_i[s] - U_j[s] \| / \sum_j \| U_i[s] - U_j[s] \|
      */
 
     if (use_smoothness_indicator_) {
@@ -271,7 +275,6 @@ namespace grendel
             denominator += std::abs(U_js - U_is) + eps_ * std::abs(U_js);
           }
 
-          // FIXME: Allow to set psi as an option in ProblemDescription
           const unsigned int pos_i = locally_relevant.index_within_set(i);
           alpha_i_[pos_i] =
               std::pow(std::abs(numerator) / denominator, smoothness_power_);
