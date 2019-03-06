@@ -73,6 +73,9 @@ namespace grendel
     alpha_i_.reinit(locally_relevant.n_elements());
     dij_matrix_.reinit(sparsity_pattern);
 
+    if (use_limiter_)
+      lij_matrix_.reinit(sparsity_pattern);
+
     temp_euler_[0].reinit(locally_owned, locally_relevant, mpi_communicator_);
     for (auto &it : temp_euler_)
       it.reinit(temp_euler_[0]);
@@ -159,10 +162,8 @@ namespace grendel
 
             /* Set symmetrized off-diagonal values: */
 
-            // FIXME this index access for d_ji is suboptimal.
-
             set_entry(dij_matrix_, jt, d);
-            dij_matrix_(j, i) = d;
+            dij_matrix_(j, i) = d; // FIXME: Suboptimal
           }
         }
       };
@@ -182,10 +183,9 @@ namespace grendel
       TimerOutput::Scope t(computing_timer_,
                            "time_step - compute diagonal and tau_max");
 
+      /* [it1, it2) is an iterator range over f_i_ */
       const auto on_subranges = [&](const auto it1, const auto it2) {
         double tau_max_on_subrange = std::numeric_limits<double>::infinity();
-
-        /* [it1, it2) is an iterator range over f_i_ */
 
         /* Create an iterator for the index set: */
         const unsigned int pos = std::distance(f_i_.begin(), it1);
@@ -193,8 +193,6 @@ namespace grendel
             locally_relevant.at(locally_relevant.nth_index_in_set(pos));
 
         for (auto it = it1; it != it2; ++it, ++set_iterator) {
-          /* Determine global index i from  pos_i: */
-
           const auto i = *set_iterator;
 
           /* Compute sum of d_ijs for index i: */
@@ -232,7 +230,7 @@ namespace grendel
     }
 
     /*
-     * Step 2b: Compute smoothness indicator
+     * Step 3: Compute smoothness indicator
      *
      * If enabled we compute the smoothness indicator
      *
@@ -244,8 +242,8 @@ namespace grendel
       TimerOutput::Scope t(computing_timer_,
                            "time_step - compute smoothness indicator");
 
+      /* [it1, it2) is an iterator range over f_i_ */
       const auto on_subranges = [&](const auto it1, const auto it2) {
-        /* [it1, it2) is an iterator range over f_i_ */
 
         /* Create an iterator for the index set: */
         const unsigned int pos = std::distance(f_i_.begin(), it1);
@@ -253,8 +251,6 @@ namespace grendel
             locally_relevant.at(locally_relevant.nth_index_in_set(pos));
 
         for (auto it = it1; it != it2; ++it, ++set_iterator) {
-          /* Determine global index i from  pos_i: */
-
           const auto i = *set_iterator;
           const auto U_is = U[smoothness_index_][i];
 
@@ -283,17 +279,21 @@ namespace grendel
           f_i_.begin(), f_i_.end(), on_subranges, 4096);
     }
 
+    tau = tau == 0 ? tau_max.load() : tau;
+    deallog << "        perform time-step with tau = " << tau << std::endl;
+
     /*
-     * Step 3: Perform update *yay*
+     * Step 4: Perform low-order update and compute limiter:
      */
 
     {
-      tau = tau == 0 ? tau_max.load() : tau;
-      deallog << "        perform time-step with tau = " << tau << std::endl;
-      TimerOutput::Scope t(computing_timer_, "time_step - perform time-step");
+      TimerOutput::Scope t(computing_timer_,
+                           "time_step - perform low-order time-step");
 
       const auto on_subranges = [&](const auto it1, const auto it2) {
         /* [it1, it2) is an iterator range over f_i_ */
+
+        std::vector<rank1_type> U_ij_bar;
 
         /* Create an iterator for the index set: */
         const unsigned int pos = std::distance(f_i_.begin(), it1);
@@ -301,8 +301,6 @@ namespace grendel
             locally_relevant.at(locally_relevant.nth_index_in_set(pos));
 
         for (auto it = it1; it != it2; ++it, ++set_iterator) {
-          /* Determine global index i from  pos_i: */
-
           const auto i = *set_iterator;
 
           /* Only iterate over locally owned subset */
@@ -310,55 +308,34 @@ namespace grendel
             continue;
 
           const auto U_i = gather(U, i);
+          const auto f_i = *it; // This is f_i_[pos_i]
+          const double m_i = lumped_mass_matrix.diag_element(i);
 
           dealii::Tensor<1, problem_dimension> Unew_i = U_i;
 
-          const auto f_i = *it; // This is f_i_[pos_i]
-          const unsigned int pos_i = locally_relevant.index_within_set(i);
-          const auto alpha_i = alpha_i_[pos_i];
+          U_ij_bar.resize(std::distance(sparsity.begin(i), sparsity.end(i)));
 
-          const double m_i = lumped_mass_matrix.diag_element(i);
-
-          for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
+          auto U_ij_bar_it = U_ij_bar.begin();
+          for (auto jt = sparsity.begin(i); jt != sparsity.end(i);
+               ++jt, ++U_ij_bar_it) {
             const auto j = jt->column();
-
-            if (j == i)
-              continue;
 
             const auto U_j = gather(U, j);
 
             const unsigned int pos_j = locally_relevant.index_within_set(j);
             const auto f_j = f_i_[pos_j];
-            const auto alpha_j = alpha_i_[pos_j];
 
             const auto c_ij = gather_get_entry(cij_matrix, jt);
-            auto d_ij = get_entry(dij_matrix_, jt);
-
-            if(use_smoothness_indicator_)
-              d_ij *= std::max(alpha_i, alpha_j);
+            const auto d_ij = get_entry(dij_matrix_, jt);
 
             for (unsigned int k = 0; k < problem_dimension; ++k)
-              Unew_i[k] +=
-                  tau / m_i *
-                  (-(f_j[k] - f_i[k]) * c_ij + d_ij * (U_j[k] - U_i[k]));
+              (*U_ij_bar_it)[k] = 1. / 2. * (U_i[k] + U_j[k]) -
+                                  1. / 2. * (f_j[k] - f_i[k]) * c_ij / d_ij;
+
+            Unew_i += tau / m_i * 2. * d_ij * (*U_ij_bar_it - U_i);
           }
 
-          /*
-           * Treat boundary points:
-           */
-
-          const auto bnm_it = boundary_normal_map.find(i);
-          if (bnm_it != boundary_normal_map.end()) {
-            const auto [normal, id] = bnm_it->second;
-
-            /* On boundray 1 remove the normal component of the momentum: */
-            if (id == 1) {
-              auto m = ProblemDescription<dim>::momentum_vector(Unew_i);
-              m -= 1. * (m * normal) * normal;
-              for (unsigned int i = 0; i < dim; ++i)
-                Unew_i[i + 1] = m[i];
-            }
-          }
+          //FIXME: Call limiter to compute l_ij
 
           /*
            * And write to global scratch vector:
@@ -369,18 +346,70 @@ namespace grendel
 
       parallel::apply_to_subranges(
           f_i_.begin(), f_i_.end(), on_subranges, 4096);
-
-      /* Synchronize temp over all MPI processes: */
-
-      for (auto &it : temp_euler_)
-        it.update_ghost_values();
-
-      /* And finally update the result: */
-
-      U.swap(temp_euler_);
-
-      return tau_max;
     }
+
+    /*
+     * Step 5: Perform high-order update:
+     */
+
+    // FIXME
+
+    /*
+     * Step 6: Fix up boundary states and finish up step:
+     */
+
+    {
+      TimerOutput::Scope t(computing_timer_,
+                           "time_step - update boundary states");
+
+      /* [it1, it2) is an iterator range over f_i_ */
+      const auto on_subranges = [&](const auto it1, const auto it2) {
+
+        /* Create an iterator for the index set: */
+        const unsigned int pos = std::distance(f_i_.begin(), it1);
+        auto set_iterator =
+            locally_relevant.at(locally_relevant.nth_index_in_set(pos));
+
+        for (auto it = it1; it != it2; ++it, ++set_iterator) {
+          const auto i = *set_iterator;
+
+          const auto bnm_it = boundary_normal_map.find(i);
+          if (bnm_it != boundary_normal_map.end()) {
+
+            /* Only iterate over locally owned subset */
+            if (!locally_owned.is_element(i))
+              continue;
+
+            auto Unew_i = gather(temp_euler_, i);
+            const auto [normal, id] = bnm_it->second;
+
+            /* On boundray 1 remove the normal component of the momentum: */
+            if (id == 1) {
+              auto m = ProblemDescription<dim>::momentum_vector(Unew_i);
+              m -= 1. * (m * normal) * normal;
+              for (unsigned int i = 0; i < dim; ++i)
+                Unew_i[i + 1] = m[i];
+            }
+
+            scatter(temp_euler_, Unew_i, i);
+          }
+        }
+      };
+
+      parallel::apply_to_subranges(
+          f_i_.begin(), f_i_.end(), on_subranges, 4096);
+    }
+
+    /* Synchronize temp over all MPI processes: */
+
+    for (auto &it : temp_euler_)
+      it.update_ghost_values();
+
+    /* And finally update the result: */
+
+    U.swap(temp_euler_);
+
+    return tau_max;
   }
 
 
