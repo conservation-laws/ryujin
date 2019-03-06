@@ -27,6 +27,9 @@ namespace grendel
   }
 
 
+  /*
+   * It's magic
+   */
   template <typename Matrix, typename Iterator>
   inline DEAL_II_ALWAYS_INLINE void
   set_entry(Matrix &matrix, const Iterator &it, double value)
@@ -48,6 +51,20 @@ namespace grendel
     for (unsigned int j = 0; j < k; ++j)
       result[j] = get_entry(U[j], it);
     return result;
+  }
+
+
+  /*
+   * It's magic
+   *
+   * FIXME: k versus l
+   */
+  template <typename T1, std::size_t k, int l, typename T2>
+  inline DEAL_II_ALWAYS_INLINE void scatter_set_entry(
+      std::array<T1, k> &U, const T2 it, const dealii::Tensor<1, l> &V)
+  {
+    for (unsigned int j = 0; j < k; ++j)
+      set_entry(U[j], it, V[k]);
   }
 
 
