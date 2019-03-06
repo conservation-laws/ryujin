@@ -93,6 +93,7 @@ namespace grendel
 
     dealii::SparseMatrix<double> lij_matrix_;
     std::array<dealii::SparseMatrix<double>, problem_dimension> pij_matrix_;
+    std::array<dealii::SparseMatrix<double>, problem_dimension> uij_bar_matrix_;
 
     vector_type temp_euler_;
     vector_type temp_ssprk_;

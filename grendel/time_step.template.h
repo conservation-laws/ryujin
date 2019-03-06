@@ -76,6 +76,8 @@ namespace grendel
       alpha_i_.reinit(locally_relevant.n_elements());
       for (auto &it : pij_matrix_)
         it.reinit(sparsity_pattern);
+      for (auto &it : uij_bar_matrix_)
+        it.reinit(sparsity_pattern);
     }
 
     if (use_limiter_) {
@@ -305,9 +307,6 @@ namespace grendel
       const auto on_subranges = [&](const auto it1, const auto it2) {
         /* [it1, it2) is an iterator range over f_i_ */
 
-        std::vector<rank1_type> U_ij_bar;
-        std::vector<rank1_type> P_ij;
-
         /* Create an iterator for the index set: */
         const unsigned int pos = std::distance(f_i_.begin(), it1);
         auto set_iterator =
@@ -329,15 +328,10 @@ namespace grendel
           dealii::Tensor<1, problem_dimension> Unew_i = U_i;
 
           const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
-          U_ij_bar.resize(size);
-          P_ij.resize(size);
-
-          auto U_ij_bar_it = U_ij_bar.begin();
-
-          const double lambda = 1. / (U_ij_bar.size() - 1.);
+          const double lambda = 1. / (size - 1.);
 
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i);
-               ++jt, ++U_ij_bar_it) {
+               ++jt) {
             const auto j = jt->column();
 
             const auto U_j = gather(U, j);
@@ -349,13 +343,17 @@ namespace grendel
             const auto c_ij = gather_get_entry(cij_matrix, jt);
             const auto d_ij = get_entry(dij_matrix_, jt);
 
+            dealii::Tensor<1, problem_dimension> U_ij_bar;
             for (unsigned int k = 0; k < problem_dimension; ++k)
-              (*U_ij_bar_it)[k] = 1. / 2. * (U_i[k] + U_j[k]) -
-                                  1. / 2. * (f_j[k] - f_i[k]) * c_ij / d_ij;
+              U_ij_bar[k] = 1. / 2. * (U_i[k] + U_j[k]) -
+                            1. / 2. * (f_j[k] - f_i[k]) * c_ij / d_ij;
 
-            Unew_i += tau / m_i * 2. * d_ij * (*U_ij_bar_it - U_i);
+
+            Unew_i += tau / m_i * 2. * d_ij * (U_ij_bar - U_i);
 
             if (use_smoothness_indicator_) {
+              scatter_set_entry(uij_bar_matrix_, jt, U_ij_bar);
+
               const auto p_ij = tau / m_i / lambda * d_ij *
                                 (std::max(alpha_i, alpha_j) - 1.) * (U_j - U_i);
               scatter_set_entry(pij_matrix_, jt, p_ij);
@@ -401,12 +399,17 @@ namespace grendel
 
           auto Unew_i = gather(temp_euler_, i);
 
-          if (use_smoothness_indicator_)
+          if (use_smoothness_indicator_) {
+
+            const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
+            const double lambda = 1. / (size - 1.);
+
             for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
               const auto p_ij = gather_get_entry(pij_matrix_, jt);
               const auto l_ij = use_limiter_ ? get_entry(lij_matrix_, jt) : 1.;
-              Unew_i += l_ij * p_ij;
+              Unew_i += l_ij * lambda * p_ij;
             }
+          }
 
           const auto bnm_it = boundary_normal_map.find(i);
           if (bnm_it != boundary_normal_map.end()) {
