@@ -87,13 +87,13 @@ namespace grendel
     /* Scratch data: */
 
     std::vector<rank2_type> f_i_;
-    dealii::Vector<double> alpha_i_;
-
     dealii::SparseMatrix<double> dij_matrix_;
 
-    dealii::SparseMatrix<double> lij_matrix_;
-    std::array<dealii::SparseMatrix<double>, problem_dimension> pij_matrix_;
-    std::array<dealii::SparseMatrix<double>, problem_dimension> uij_bar_matrix_;
+    dealii::LinearAlgebra::distributed::Vector<double> alpha_i_;
+
+    dealii::SparseMatrix<double> lij_matrix_; // FIXME
+    std::array<dealii::SparseMatrix<double>, problem_dimension> pij_matrix_; // FIXME
+    std::array<dealii::SparseMatrix<double>, problem_dimension> uij_bar_matrix_; // FIXME
 
     vector_type temp_euler_;
     vector_type temp_ssprk_;

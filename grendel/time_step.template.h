@@ -77,13 +77,14 @@ namespace grendel
     }
 
     f_i_.resize(locally_relevant.n_elements());
-    alpha_i_.reinit(locally_relevant.n_elements());
 
     if (use_limiter_) {
       for (auto &it : uij_bar_matrix_)
         it.reinit(sparsity_pattern);
       lij_matrix_.reinit(sparsity_pattern);
     }
+
+    alpha_i_.reinit(locally_owned, locally_relevant, mpi_communicator_);
 
     temp_euler_[0].reinit(locally_owned, locally_relevant, mpi_communicator_);
     for (auto &it : temp_euler_)
@@ -233,9 +234,11 @@ namespace grendel
           }
 
           dij_matrix_.diag_element(i) = d_sum;
-          const unsigned int pos_i = locally_relevant.index_within_set(i);
-          alpha_i_[pos_i] =
-              std::pow(std::abs(numerator) / denominator, smoothness_power_);
+
+          if (locally_owned.is_element(i)) {
+            alpha_i_[i] =
+                std::pow(std::abs(numerator) / denominator, smoothness_power_);
+          }
 
           const double mass = lumped_mass_matrix.diag_element(i);
           const double tau = cfl * mass / (-2. * d_sum);
@@ -251,6 +254,9 @@ namespace grendel
 
       parallel::apply_to_subranges(
           f_i_.begin(), f_i_.end(), on_subranges, 4096);
+
+      /* Synchronize alpha_i_t over all MPI processes: */
+      alpha_i_.update_ghost_values();
 
       /* Synchronize tau_max over all MPI processes: */
       tau_max.store(Utilities::MPI::min(tau_max.load(), mpi_communicator_));
@@ -293,8 +299,7 @@ namespace grendel
           const auto U_i = gather(U, i);
           const double m_i = lumped_mass_matrix.diag_element(i);
           const auto f_i = *it; // This is f_i_[pos_i]
-          const unsigned int pos_i = locally_relevant.index_within_set(i);
-          const auto alpha_i = use_smoothness_indicator_ ? alpha_i_[pos_i] : 1.;
+          const auto alpha_i = use_smoothness_indicator_ ? alpha_i_[i] : 1.;
 
           dealii::Tensor<1, problem_dimension> Unew_i = U_i;
 
@@ -309,8 +314,7 @@ namespace grendel
 
             const unsigned int pos_j = locally_relevant.index_within_set(j);
             const auto f_j = f_i_[pos_j];
-            const auto alpha_j =
-                use_smoothness_indicator_ ? alpha_i_[pos_j] : 1.;
+            const auto alpha_j = use_smoothness_indicator_ ? alpha_i_[j] : 1.;
 
             const auto c_ij = gather_get_entry(cij_matrix, jt);
             const auto d_ij = get_entry(dij_matrix_, jt);
