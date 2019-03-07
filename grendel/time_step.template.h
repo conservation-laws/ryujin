@@ -109,7 +109,7 @@ namespace grendel
     const auto &boundary_normal_map = offline_data_->boundary_normal_map();
 
     /*
-     * Step 1: Compute off-diagonal d_ij and f_i:
+     * Step 1: Compute off-diagonal d_ij, and f_i:
      */
 
     {
