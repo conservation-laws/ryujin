@@ -185,6 +185,9 @@ namespace ryujin
       }
     } /* end of loop */
 
+    /* Final output: */
+    output(U, base_name + "-solution", t, output_cycle);
+
     computing_timer.print_summary();
     deallog << timer_output.str() << std::endl;
 
