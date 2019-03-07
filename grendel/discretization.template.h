@@ -129,11 +129,19 @@ namespace grendel
                                   immersed_triangle_height_,
                                   immersed_triangle_object_height_);
 
+      triangulation.refine_global(refinement_);
+
     } else if (geometry_ == "tube") {
 
       create_coarse_grid_tube(triangulation, tube_length_, tube_diameter_);
 
+      triangulation.refine_global(refinement_);
+
     } else if (geometry_ == "step") {
+
+      AssertThrow(refinement_ >= 4,
+                  dealii::ExcMessage("The mach step geometry requires at least "
+                                     "4 levels of refinement"));
 
       create_coarse_grid_step(triangulation,
                               mach_step_length_,
@@ -141,12 +149,13 @@ namespace grendel
                               mach_step_step_position_,
                               mach_step_step_height_);
 
+      triangulation.refine_global(refinement_ - 4);
+
     } else {
 
       AssertThrow(false, dealii::ExcMessage("Unknown geometry name."));
     }
 
-    triangulation.refine_global(refinement_);
 
     mapping_.reset(new MappingQ<dim>(order_mapping_));
 

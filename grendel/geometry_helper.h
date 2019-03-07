@@ -4,6 +4,8 @@
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/grid/grid_tools.h>
 
+#include <deal.II/grid/manifold_lib.h>
+
 namespace grendel
 {
   /*
@@ -267,6 +269,48 @@ namespace grendel
         const auto center = face->center();
         if (center[0] > 0. + length / 15. && center[0] < length - length / 15.)
           face->set_boundary_id(1);
+      }
+    }
+
+    /*
+     * Refine four times and round off corner with radius 0.0125:
+     */
+
+    triangulation.refine_global(4);
+
+    Point<dim> point(step_position + 0.0125, step_height - 0.0125);
+    triangulation.set_manifold(1, SphericalManifold<dim>(point));
+
+    for (auto cell : triangulation.active_cell_iterators())
+      for (unsigned int v = 0; v < GeometryInfo<dim>::vertices_per_cell; ++v) {
+        double distance =
+            (cell->vertex(v) - Point<dim>(step_position, step_height)).norm();
+        if (distance < 1.e-6) {
+          for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f) {
+            const auto face = cell->face(f);
+            if(face->at_boundary())
+              face->set_manifold_id(1);
+            cell->set_manifold_id(1); // temporarily for second loop
+          }
+        }
+      }
+
+    for (auto cell : triangulation.active_cell_iterators()) {
+      if (cell->manifold_id() != 1)
+        continue;
+
+      cell->set_manifold_id(0); // reset manifold id again
+
+      for (unsigned int v = 0; v < GeometryInfo<dim>::vertices_per_cell; ++v) {
+        auto &vertex = cell->vertex(v);
+
+        if (std::abs(vertex[0] - step_position) < 1.e-6 &&
+            vertex[1] > step_height - 1.e-6)
+          vertex[0] = step_position + 0.0125 * (1 - std::sqrt(1. / 2.));
+
+        if (std::abs(vertex[1] - step_height) < 1.e-6 &&
+            vertex[0] < step_position + 0.005)
+          vertex[1] = step_height - 0.0125 * (1 - std::sqrt(1. / 2.));
       }
     }
   }
