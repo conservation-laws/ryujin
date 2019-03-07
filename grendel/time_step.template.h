@@ -415,14 +415,21 @@ namespace grendel
 
           const auto bnm_it = boundary_normal_map.find(i);
           if (bnm_it != boundary_normal_map.end()) {
-            const auto [normal, id, _] = bnm_it->second;
+            const auto &[normal, id, position] = bnm_it->second;
 
             /* On boundray 1 remove the normal component of the momentum: */
+
             if (id == 1) {
               auto m = ProblemDescription<dim>::momentum_vector(Unew_i);
               m -= 1. * (m * normal) * normal;
               for (unsigned int i = 0; i < dim; ++i)
                 Unew_i[i + 1] = m[i];
+            }
+
+            /* On boundray 2 enforce initial conditions: */
+
+            if (id == 2) {
+              Unew_i = problem_description_->initial_state(position, 0.);
             }
           }
 
