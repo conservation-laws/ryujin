@@ -69,14 +69,15 @@ namespace grendel
     const auto &locally_relevant = offline_data_->locally_relevant();
     const auto &sparsity_pattern = offline_data_->sparsity_pattern();
 
-    f_i_.resize(locally_relevant.n_elements());
     dij_matrix_.reinit(sparsity_pattern);
 
     if (use_smoothness_indicator_) {
-      alpha_i_.reinit(locally_relevant.n_elements());
       for (auto &it : pij_matrix_)
         it.reinit(sparsity_pattern);
     }
+
+    f_i_.resize(locally_relevant.n_elements());
+    alpha_i_.reinit(locally_relevant.n_elements());
 
     if (use_limiter_) {
       for (auto &it : uij_bar_matrix_)
