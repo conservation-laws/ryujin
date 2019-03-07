@@ -356,9 +356,9 @@ namespace grendel
      */
 
     {
-      deallog << "        high-order update and boundary" << std::endl;
+      deallog << "        high-order update" << std::endl;
       TimerOutput::Scope t(computing_timer_,
-                           "time_step - 4 high-order update and boundary");
+                           "time_step - 4 high-order update");
 
       const auto on_subranges = [&](const auto it1, const auto it2) {
         /* [it1, it2) is an iterator range over f_i_ */
@@ -389,32 +389,54 @@ namespace grendel
             }
           }
 
-          const auto bnm_it = boundary_normal_map.find(i);
-          if (bnm_it != boundary_normal_map.end()) {
-            const auto &[normal, id, position] = bnm_it->second;
-
-            /* On boundray 1 remove the normal component of the momentum: */
-
-            if (id == 1) {
-              auto m = ProblemDescription<dim>::momentum_vector(Unew_i);
-              m -= 1. * (m * normal) * normal;
-              for (unsigned int i = 0; i < dim; ++i)
-                Unew_i[i + 1] = m[i];
-            }
-
-            /* On boundray 2 enforce initial conditions: */
-
-            if (id == 2) {
-              Unew_i = problem_description_->initial_state(position, 0.);
-            }
-          }
-
           scatter(temp_euler_, Unew_i, i);
         }
       };
 
       parallel::apply_to_subranges(
           f_i_.begin(), f_i_.end(), on_subranges, 4096);
+    }
+
+    /*
+     * Step 5: Fix boundary:
+     */
+
+    {
+      deallog << "        fix up boundary states" << std::endl;
+      TimerOutput::Scope t(computing_timer_,
+                           "time_step - 5 fix boundary states");
+
+      const auto on_subranges = [&](const auto it1, const auto it2) {
+        for (auto it = it1; it != it2; ++it) {
+          const auto i = it->first;
+          const auto &[normal, id, position] = it->second;
+
+          if (!locally_owned.is_element(i))
+            continue;
+
+          auto U_i = gather(temp_euler_, i);
+
+          /* On boundray 1 remove the normal component of the momentum: */
+
+          if (id == 1) {
+            auto m = ProblemDescription<dim>::momentum_vector(U_i);
+            m -= 1. * (m * normal) * normal;
+            for (unsigned int k = 0; k < dim; ++k)
+              U_i[k + 1] = m[k];
+          }
+
+          /* On boundray 2 enforce initial conditions: */
+
+          if (id == 2) {
+            U_i = problem_description_->initial_state(position, 0.);
+          }
+
+          scatter(temp_euler_, U_i, i);
+        }
+      };
+
+      //FIXME: This is currently not parallel:
+      on_subranges(boundary_normal_map.begin(), boundary_normal_map.end());
     }
 
     /* Synchronize temp over all MPI processes: */
