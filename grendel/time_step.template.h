@@ -114,7 +114,7 @@ namespace grendel
     {
       deallog << "        compute d_ij and f_i" << std::endl;
       TimerOutput::Scope t(computing_timer_,
-                           "time_step - compute d_ij and f_i");
+                           "time_step - 1 compute d_ij and f_i");
 
       /*
        * FIXME Workaround: IndexSet does not have an iterator with
@@ -182,19 +182,24 @@ namespace grendel
     }
 
     /*
-     * Step 2: Compute diagonal of d_ij and maximal time-step size:
+     * Step 2: Compute diagonal of d_ij and maximal time-step size, and
+     *         smoothness indicator:
+     *
+     *   \alpha_i = \|\sum_j U_i[s] - U_j[s] \| / \sum_j \| U_i[s] - U_j[s] \|
      */
 
     std::atomic<double> tau_max{std::numeric_limits<double>::infinity()};
 
     {
-      deallog << "        compute diagonal and tau_max" << std::endl;
+      deallog << "        compute d_ii, tau_max, and alpha_i" << std::endl;
       TimerOutput::Scope t(computing_timer_,
-                           "time_step - compute diagonal and tau_max");
+                           "time_step - 2 compute d_ii, tau_max, and alpha_i");
 
       /* [it1, it2) is an iterator range over f_i_ */
       const auto on_subranges = [&](const auto it1, const auto it2) {
+
         double tau_max_on_subrange = std::numeric_limits<double>::infinity();
+        const double cfl = problem_description_->cfl_update();
 
         /* Create an iterator for the index set: */
         const unsigned int pos = std::distance(f_i_.begin(), it1);
@@ -203,20 +208,34 @@ namespace grendel
 
         for (auto it = it1; it != it2; ++it, ++set_iterator) {
           const auto i = *set_iterator;
+          const auto U_is = U[smoothness_index_][i];
 
-          /* Compute sum of d_ijs for index i: */
+          /* Let's compute the sum of the off-diagonal d_ijs and alpha_i for
+           * index i: */
+
           double d_sum = 0.;
+          double numerator = 0.;
+          double denominator = 0.;
+
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
+
             const auto j = jt->column();
+
             if (j == i)
               continue;
 
+            const auto U_js = U[smoothness_index_][j];
+
             d_sum -= get_entry(dij_matrix_, jt);
+            numerator += (U_js - U_is);
+            denominator += std::abs(U_js - U_is) + eps_ * std::abs(U_js);
           }
 
           dij_matrix_.diag_element(i) = d_sum;
+          const unsigned int pos_i = locally_relevant.index_within_set(i);
+          alpha_i_[pos_i] =
+              std::pow(std::abs(numerator) / denominator, smoothness_power_);
 
-          const double cfl = problem_description_->cfl_update();
           const double mass = lumped_mass_matrix.diag_element(i);
           const double tau = cfl * mass / (-2. * d_sum);
           tau_max_on_subrange = std::min(tau_max_on_subrange, tau);
@@ -238,61 +257,11 @@ namespace grendel
       deallog << "        computed tau_max = " << tau_max << std::endl;
     }
 
-    /*
-     * Step 3: Compute smoothness indicator
-     *
-     * If enabled we compute the smoothness indicator
-     *
-     *   \alpha_i = \|\sum_j U_i[s] - U_j[s] \| / \sum_j \| U_i[s] - U_j[s] \|
-     */
-
-    if (use_smoothness_indicator_) {
-      deallog << "        compute smoothness indicator" << std::endl;
-      TimerOutput::Scope t(computing_timer_,
-                           "time_step - compute smoothness indicator");
-
-      /* [it1, it2) is an iterator range over f_i_ */
-      const auto on_subranges = [&](const auto it1, const auto it2) {
-
-        /* Create an iterator for the index set: */
-        const unsigned int pos = std::distance(f_i_.begin(), it1);
-        auto set_iterator =
-            locally_relevant.at(locally_relevant.nth_index_in_set(pos));
-
-        for (auto it = it1; it != it2; ++it, ++set_iterator) {
-          const auto i = *set_iterator;
-          const auto U_is = U[smoothness_index_][i];
-
-          double numerator = 0.;
-          double denominator = 0.;
-
-          for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
-            const auto j = jt->column();
-
-            if (j == i)
-              continue;
-
-            const auto U_js = U[smoothness_index_][j];
-
-            numerator += (U_js - U_is);
-            denominator += std::abs(U_js - U_is) + eps_ * std::abs(U_js);
-          }
-
-          const unsigned int pos_i = locally_relevant.index_within_set(i);
-          alpha_i_[pos_i] =
-              std::pow(std::abs(numerator) / denominator, smoothness_power_);
-        }
-      };
-
-      parallel::apply_to_subranges(
-          f_i_.begin(), f_i_.end(), on_subranges, 4096);
-    }
-
     tau = tau == 0 ? tau_max.load() : tau;
     deallog << "        perform time-step with tau = " << tau << std::endl;
 
     /*
-     * Step 4: Perform low-order update and compute limiter:
+     * Step 3: Perform low-order update and compute limiter:
      *
      *   \bar U_ij = 1/2 d_ij^L (U_i + U_j) - 1/2 (f_j - f_i) c_ij
      *        P_ij = tau / m_i / lambda (d_ij^H - d_ij^L) + [...]
@@ -301,8 +270,9 @@ namespace grendel
      */
 
     {
+      deallog << "        low-order update and limiter" << std::endl;
       TimerOutput::Scope t(computing_timer_,
-                           "time_step - low-order update and limiter");
+                           "time_step - 3 low-order update and limiter");
 
       const auto on_subranges = [&](const auto it1, const auto it2) {
         /* [it1, it2) is an iterator range over f_i_ */
@@ -373,7 +343,7 @@ namespace grendel
     }
 
     /*
-     * Step 5: Perform high-order and fix boundary:
+     * Step 4: Perform high-order and fix boundary:
      *
      *   P_ij = tau / m_i / lambda (d_ij^H - d_ij^L) + [...]
      *
@@ -381,8 +351,9 @@ namespace grendel
      */
 
     {
+      deallog << "        high-order update and boundary" << std::endl;
       TimerOutput::Scope t(computing_timer_,
-                           "time_step - high-order update and boundary");
+                           "time_step - 4 high-order update and boundary");
 
       const auto on_subranges = [&](const auto it1, const auto it2) {
         /* [it1, it2) is an iterator range over f_i_ */
