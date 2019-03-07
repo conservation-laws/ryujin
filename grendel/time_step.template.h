@@ -110,13 +110,13 @@ namespace grendel
     std::vector<unsigned int> f_i_(locally_relevant.n_elements());
 
     /*
-     * Step 1: Compute off-diagonal d_ij, and f_i:
+     * Step 1: Compute off-diagonal d_ij:
      */
 
     {
-      deallog << "        compute d_ij and f_i" << std::endl;
+      deallog << "        compute d_ij" << std::endl;
       TimerOutput::Scope t(computing_timer_,
-                           "time_step - 1 compute d_ij and f_i");
+                           "time_step - 1 compute d_ij");
 
       const auto on_subranges = [&](const auto it1, const auto it2) {
         /* [it1, it2) is an iterator range over f_i_ */
@@ -225,6 +225,7 @@ namespace grendel
 
           dij_matrix_.diag_element(i) = d_sum;
 
+          //FIXME: refactor!
           if (locally_owned.is_element(i)) {
             alpha_i_[i] =
                 std::pow(std::abs(numerator) / denominator, smoothness_power_);
@@ -245,11 +246,11 @@ namespace grendel
       parallel::apply_to_subranges(
           f_i_.begin(), f_i_.end(), on_subranges, 4096);
 
-      /* Synchronize alpha_i_t over all MPI processes: */
-      alpha_i_.update_ghost_values();
-
       /* Synchronize tau_max over all MPI processes: */
       tau_max.store(Utilities::MPI::min(tau_max.load(), mpi_communicator_));
+
+      /* Synchronize alpha_i_t over all MPI processes: */
+      alpha_i_.update_ghost_values();
 
       deallog << "        computed tau_max = " << tau_max << std::endl;
     }
@@ -287,11 +288,11 @@ namespace grendel
             continue;
 
           const auto U_i = gather(U, i);
+          auto  Unew_i = U_i;
+
           const double m_i = lumped_mass_matrix.diag_element(i);
           const auto f_i = problem_description_->f(U_i);
-          const auto alpha_i = use_smoothness_indicator_ ? alpha_i_[i] : 1.;
-
-          dealii::Tensor<1, problem_dimension> Unew_i = U_i;
+          const auto alpha_i = alpha_i_[i];
 
           const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
           const double lambda = 1. / (size - 1.);
@@ -301,10 +302,8 @@ namespace grendel
             const auto j = jt->column();
 
             const auto U_j = gather(U, j);
-
-            const unsigned int pos_j = locally_relevant.index_within_set(j);
             const auto f_j = problem_description_->f(U_j);
-            const auto alpha_j = use_smoothness_indicator_ ? alpha_i_[j] : 1.;
+            const auto alpha_j = alpha_i_[j];
 
             const auto c_ij = gather_get_entry(cij_matrix, jt);
             const auto d_ij = get_entry(dij_matrix_, jt);
@@ -345,10 +344,9 @@ namespace grendel
      *   High-order update: += l_ij * lambda * P_ij
      */
 
-    {
+    if (use_smoothness_indicator_) {
       deallog << "        high-order update" << std::endl;
-      TimerOutput::Scope t(computing_timer_,
-                           "time_step - 4 high-order update");
+      TimerOutput::Scope t(computing_timer_, "time_step - 4 high-order update");
 
       const auto on_subranges = [&](const auto it1, const auto it2) {
         /* [it1, it2) is an iterator range over f_i_ */
@@ -367,20 +365,17 @@ namespace grendel
 
           auto Unew_i = gather(temp_euler_, i);
 
-          if (use_smoothness_indicator_) {
+          const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
+          const double lambda = 1. / (size - 1.);
 
-            const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
-            const double lambda = 1. / (size - 1.);
-
-            for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
-              const auto p_ij = gather_get_entry(pij_matrix_, jt);
-              const auto l_ij = use_limiter_ ? get_entry(lij_matrix_, jt) : 1.;
-              Unew_i += l_ij * lambda * p_ij;
-            }
+          for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
+            const auto p_ij = gather_get_entry(pij_matrix_, jt);
+            const auto l_ij = use_limiter_ ? get_entry(lij_matrix_, jt) : 1.;
+            Unew_i += l_ij * lambda * p_ij;
           }
-
-          scatter(temp_euler_, Unew_i, i);
         }
+
+        scatter(temp_euler_, Unew_i, i);
       };
 
       parallel::apply_to_subranges(
@@ -435,7 +430,6 @@ namespace grendel
       it.update_ghost_values();
 
     /* And finally update the result: */
-
     U.swap(temp_euler_);
 
     return tau_max;
