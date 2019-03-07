@@ -4,6 +4,8 @@
 #include "helper.h"
 #include "time_step.h"
 
+#include <boost/range/irange.hpp>
+
 #include <atomic>
 
 namespace grendel
@@ -105,7 +107,8 @@ namespace grendel
     const auto &cij_matrix = offline_data_->cij_matrix();
     const auto &boundary_normal_map = offline_data_->boundary_normal_map();
 
-    std::vector<unsigned int> f_i_(locally_relevant.n_elements());
+    const auto indices =
+        boost::irange<unsigned int>(0, locally_relevant.n_elements());
 
     /*
      * Step 1: Compute off-diagonal d_ij:
@@ -116,16 +119,12 @@ namespace grendel
       TimerOutput::Scope t(computing_timer_,
                            "time_step - 1 compute d_ij");
 
-      const auto on_subranges = [&](const auto it1, const auto it2) {
-        /* [it1, it2) is an iterator range over f_i_ */
+      const auto on_subranges = [&](auto i1, const auto i2) {
+        /* Translate the local index into a index set iterator:: */
+        auto it = locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
+        for (; i1 < i2; ++i1, ++it) {
 
-        /* Create an iterator for the index set: */
-        const unsigned int pos = std::distance(f_i_.begin(), it1);
-        auto set_iterator =
-            locally_relevant.at(locally_relevant.nth_index_in_set(pos));
-
-        for (auto it = it1; it != it2; ++it, ++set_iterator) {
-          const auto i = *set_iterator;
+          const auto i = *it;
           const auto U_i = gather(U, i);
 
           /* Populate off-diagonal dij_: */
@@ -168,7 +167,7 @@ namespace grendel
       };
 
       parallel::apply_to_subranges(
-          f_i_.begin(), f_i_.end(), on_subranges, 4096);
+          indices.begin(), indices.end(), on_subranges, 4096);
     }
 
     /*
@@ -185,19 +184,15 @@ namespace grendel
       TimerOutput::Scope t(computing_timer_,
                            "time_step - 2 compute d_ii, tau_max, and alpha_i");
 
-      /* [it1, it2) is an iterator range over f_i_ */
-      const auto on_subranges = [&](const auto it1, const auto it2) {
-
+      const auto on_subranges = [&](auto i1, const auto i2) {
         double tau_max_on_subrange = std::numeric_limits<double>::infinity();
         const double cfl = problem_description_->cfl_update();
 
-        /* Create an iterator for the index set: */
-        const unsigned int pos = std::distance(f_i_.begin(), it1);
-        auto set_iterator =
-            locally_relevant.at(locally_relevant.nth_index_in_set(pos));
+        /* Translate the local index into a index set iterator:: */
+        auto it = locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
+        for (; i1 < i2; ++i1, ++it) {
 
-        for (auto it = it1; it != it2; ++it, ++set_iterator) {
-          const auto i = *set_iterator;
+          const auto i = *it;
           const auto U_is = U[smoothness_index_][i];
 
           /* Let's compute the sum of the off-diagonal d_ijs and alpha_i for
@@ -242,7 +237,7 @@ namespace grendel
       };
 
       parallel::apply_to_subranges(
-          f_i_.begin(), f_i_.end(), on_subranges, 4096);
+          indices.begin(), indices.end(), on_subranges, 4096);
 
       /* Synchronize tau_max over all MPI processes: */
       tau_max.store(Utilities::MPI::min(tau_max.load(), mpi_communicator_));
@@ -270,16 +265,12 @@ namespace grendel
       TimerOutput::Scope t(computing_timer_,
                            "time_step - 3 low-order update and limiter");
 
-      const auto on_subranges = [&](const auto it1, const auto it2) {
-        /* [it1, it2) is an iterator range over f_i_ */
+      const auto on_subranges = [&](auto i1, const auto i2) {
+        /* Translate the local index into a index set iterator:: */
+        auto it = locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
+        for (; i1 < i2; ++i1, ++it) {
 
-        /* Create an iterator for the index set: */
-        const unsigned int pos = std::distance(f_i_.begin(), it1);
-        auto set_iterator =
-            locally_relevant.at(locally_relevant.nth_index_in_set(pos));
-
-        for (auto it = it1; it != it2; ++it, ++set_iterator) {
-          const auto i = *set_iterator;
+          const auto i = *it;
 
           /* Only iterate over locally owned subset */
           if (!locally_owned.is_element(i))
@@ -341,7 +332,7 @@ namespace grendel
       };
 
       parallel::apply_to_subranges(
-          f_i_.begin(), f_i_.end(), on_subranges, 4096);
+          indices.begin(), indices.end(), on_subranges, 4096);
     }
 
     /*
@@ -356,16 +347,12 @@ namespace grendel
       deallog << "        high-order update" << std::endl;
       TimerOutput::Scope t(computing_timer_, "time_step - 4 high-order update");
 
-      const auto on_subranges = [&](const auto it1, const auto it2) {
-        /* [it1, it2) is an iterator range over f_i_ */
+      const auto on_subranges = [&](auto i1, const auto i2) {
+        /* Translate the local index into a index set iterator:: */
+        auto it = locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
+        for (; i1 < i2; ++i1, ++it) {
 
-        /* Create an iterator for the index set: */
-        const unsigned int pos = std::distance(f_i_.begin(), it1);
-        auto set_iterator =
-            locally_relevant.at(locally_relevant.nth_index_in_set(pos));
-
-        for (auto it = it1; it != it2; ++it, ++set_iterator) {
-          const auto i = *set_iterator;
+          const auto i = *it;
 
           /* Only iterate over locally owned subset */
           if (!locally_owned.is_element(i))
@@ -387,7 +374,7 @@ namespace grendel
       };
 
       parallel::apply_to_subranges(
-          f_i_.begin(), f_i_.end(), on_subranges, 4096);
+          indices.begin(), indices.end(), on_subranges, 4096);
     }
 
     /*
