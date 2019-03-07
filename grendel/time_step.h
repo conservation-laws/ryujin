@@ -86,7 +86,6 @@ namespace grendel
   private:
     /* Scratch data: */
 
-    std::vector<rank2_type> f_i_;
     dealii::SparseMatrix<double> dij_matrix_;
 
     dealii::LinearAlgebra::distributed::Vector<double> alpha_i_;

@@ -76,8 +76,6 @@ namespace grendel
         it.reinit(sparsity_pattern);
     }
 
-    f_i_.resize(locally_relevant.n_elements());
-
     if (use_limiter_) {
       for (auto &it : uij_bar_matrix_)
         it.reinit(sparsity_pattern);
@@ -109,6 +107,8 @@ namespace grendel
     const auto &cij_matrix = offline_data_->cij_matrix();
     const auto &boundary_normal_map = offline_data_->boundary_normal_map();
 
+    std::vector<unsigned int> f_i_(locally_relevant.n_elements());
+
     /*
      * Step 1: Compute off-diagonal d_ij, and f_i:
      */
@@ -117,13 +117,6 @@ namespace grendel
       deallog << "        compute d_ij and f_i" << std::endl;
       TimerOutput::Scope t(computing_timer_,
                            "time_step - 1 compute d_ij and f_i");
-
-      /*
-       * FIXME Workaround: IndexSet does not have an iterator with
-       * complete operater arithmetic (that is required for tbb). We
-       * iterate over the local vector f_i_ instead and do a bit of index
-       * juggling...
-       */
 
       const auto on_subranges = [&](const auto it1, const auto it2) {
         /* [it1, it2) is an iterator range over f_i_ */
@@ -136,9 +129,6 @@ namespace grendel
         for (auto it = it1; it != it2; ++it, ++set_iterator) {
           const auto i = *set_iterator;
           const auto U_i = gather(U, i);
-
-          /* Populate f_i_: */
-          *it = problem_description_->f(U_i);
 
           /* Populate off-diagonal dij_: */
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
@@ -298,7 +288,7 @@ namespace grendel
 
           const auto U_i = gather(U, i);
           const double m_i = lumped_mass_matrix.diag_element(i);
-          const auto f_i = *it; // This is f_i_[pos_i]
+          const auto f_i = problem_description_->f(U_i);
           const auto alpha_i = use_smoothness_indicator_ ? alpha_i_[i] : 1.;
 
           dealii::Tensor<1, problem_dimension> Unew_i = U_i;
@@ -313,7 +303,7 @@ namespace grendel
             const auto U_j = gather(U, j);
 
             const unsigned int pos_j = locally_relevant.index_within_set(j);
-            const auto f_j = f_i_[pos_j];
+            const auto f_j = problem_description_->f(U_j);
             const auto alpha_j = use_smoothness_indicator_ ? alpha_i_[j] : 1.;
 
             const auto c_ij = gather_get_entry(cij_matrix, jt);
