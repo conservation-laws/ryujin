@@ -31,7 +31,7 @@ namespace grendel
     add_parameter("initial state",
                   initial_state_,
                   "Initial state. Valid names are \"shock front\", "
-                  "\"sod contrast\", or \"smooth solution\".");
+                  "\"sod contrast\", \"uniform\", or \"smooth solution\".");
 
     initial_direction_[0] = 1.;
     add_parameter("initial - direction",
@@ -47,6 +47,11 @@ namespace grendel
     add_parameter("shock front - mach number",
                   initial_shock_front_mach_number_,
                   "Shock Front: Mach number");
+
+    initial_uniform_mach_number_ = 3.0;
+    add_parameter("uniform - mach number",
+                  initial_uniform_mach_number_,
+                  "Uniform: Mach number");
   }
 
 
@@ -98,6 +103,17 @@ namespace grendel
 
         return {rho_R, u_R, p_R};
       };
+
+    } else if (initial_state_ == "uniform") {
+
+      state_1d_L_ = [=](const double, const double t) -> std::array<double, 3> {
+        AssertThrow(t == 0.,
+                    ExcMessage("No analytic solution for t > 0. available"));
+
+        return {gamma_, initial_uniform_mach_number_, 1.};
+      };
+
+      state_1d_R_ = state_1d_L_;
 
     } else if (initial_state_ == "sod contrast") {
 

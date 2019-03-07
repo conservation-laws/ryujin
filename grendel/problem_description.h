@@ -117,6 +117,7 @@ namespace grendel
     dealii::Tensor<1, dim> initial_direction_;
     dealii::Point<dim> initial_position_;
     double initial_shock_front_mach_number_;
+    double initial_uniform_mach_number_;
 
     /*
      * We use two internal function objects to compute "left" and "right"
