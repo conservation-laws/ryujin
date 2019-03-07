@@ -245,8 +245,17 @@ namespace grendel
             normal += fe_face_values.normal_vector(q) *
                       fe_face_values.shape_value(i, q);
 
-          local_boundary_normal_map[local_dof_indices[i]] =
-              std::make_tuple(normal, id);
+          const auto index = local_dof_indices[i];
+
+          // FIXME: This is a bloody hack:
+          Point<dim> position;
+          for (unsigned int v = 0; v < GeometryInfo<dim>::vertices_per_cell;
+               ++v)
+            if (cell->vertex_dof_index(v, 0) == index)
+              position = cell->vertex(v);
+
+          local_boundary_normal_map[index] =
+              std::make_tuple(normal, id, position);
         }
       }
     };
@@ -266,6 +275,7 @@ namespace grendel
         auto &jt = boundary_normal_map_[it.first];
         std::get<0>(jt) += std::get<0>(it.second);
         std::get<1>(jt) = std::get<1>(it.second);
+        std::get<2>(jt) = std::get<2>(it.second);
       }
 
       affine_constraints_.distribute_local_to_global(
@@ -366,7 +376,7 @@ namespace grendel
        * And also normalize our boundary normals:
        */
       for (auto &it : boundary_normal_map_) {
-        auto &[normal, id] = it.second;
+        auto &[normal, id, _] = it.second;
         normal /= normal.norm();
       }
     }

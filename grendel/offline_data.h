@@ -102,14 +102,16 @@ namespace grendel
      *
      * For every degree of freedom that has nonzero support at the boundary
      * we record the global degree of freedom index along with a weighted
-     * boundary normal and the associated boundary id.
+     * boundary normal, the associated boundary id, and position.
      *
      * This map is later used in @ref OfflineData to handle boundary
      * degrees of freedom after every time step (for example to implement
      * reflective boundary conditions).
      */
     std::map<dealii::types::global_dof_index,
-             std::tuple<dealii::Tensor<1, dim>, dealii::types::boundary_id>>
+             std::tuple<dealii::Tensor<1, dim>,
+                        dealii::types::boundary_id,
+                        dealii::Point<dim>>>
         boundary_normal_map_;
     ACCESSOR_READ_ONLY(boundary_normal_map)
 

@@ -111,7 +111,7 @@ namespace grendel
 
           const auto bnm_it = boundary_normal_map.find(i);
           if (bnm_it != boundary_normal_map.end()) {
-            const auto [normal, id] = bnm_it->second;
+            const auto [normal, id, _] = bnm_it->second;
             r_i -= 1. * (r_i * normal) * normal;
           }
 

@@ -415,7 +415,7 @@ namespace grendel
 
           const auto bnm_it = boundary_normal_map.find(i);
           if (bnm_it != boundary_normal_map.end()) {
-            const auto [normal, id] = bnm_it->second;
+            const auto [normal, id, _] = bnm_it->second;
 
             /* On boundray 1 remove the normal component of the momentum: */
             if (id == 1) {
