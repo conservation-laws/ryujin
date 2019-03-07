@@ -323,7 +323,7 @@ namespace grendel
           const double m_i = lumped_mass_matrix.diag_element(i);
           const auto f_i = *it; // This is f_i_[pos_i]
           const unsigned int pos_i = locally_relevant.index_within_set(i);
-          const auto alpha_i = alpha_i_[pos_i];
+          const auto alpha_i = use_smoothness_indicator_ ? alpha_i_[pos_i] : 1.;
 
           dealii::Tensor<1, problem_dimension> Unew_i = U_i;
 
@@ -338,7 +338,8 @@ namespace grendel
 
             const unsigned int pos_j = locally_relevant.index_within_set(j);
             const auto f_j = f_i_[pos_j];
-            const auto alpha_j = alpha_i_[pos_j];
+            const auto alpha_j =
+                use_smoothness_indicator_ ? alpha_i_[pos_j] : 1.;
 
             const auto c_ij = gather_get_entry(cij_matrix, jt);
             const auto d_ij = get_entry(dij_matrix_, jt);
