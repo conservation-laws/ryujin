@@ -27,7 +27,7 @@ namespace grendel
       , mpi_communicator_(mpi_communicator)
       , computing_timer_(computing_timer)
   {
-    geometry_ = "immersed triangle";
+    geometry_ = "triangle";
     add_parameter(
         "geometry",
         geometry_,
@@ -77,9 +77,9 @@ namespace grendel
                   "Mach step : height of computational domain");
 
     mach_step_step_position_ = 0.6;
-    add_parameter("mach step - step height",
+    add_parameter("mach step - step position",
                   mach_step_step_position_,
-                  "Mach step : height of step ");
+                  "Mach step : position of step ");
 
     mach_step_step_height_ = 0.2;
     add_parameter("mach step - step height",
