@@ -78,7 +78,11 @@ namespace grendel
     momentum_vector(const rank1_type &U);
 
 
-    // FIXME: Add pressure extractor
+    /**
+     * For a given (2+dim dimensional) state vector <code>U</code>, compute
+     * and return the pressure .
+     */
+    inline DEAL_II_ALWAYS_INLINE double pressure(const rank1_type &U) const;
 
 
     /**
@@ -131,14 +135,6 @@ namespace grendel
   };
 
 
-  /*
-   * We have to provide the implementation of the following two inline
-   * functions in this header file (otherwise they cannot be inlined). Both
-   * functions are performance critical because they get evaluated
-   * repeatedly during time stepping.
-   */
-
-
   template <int dim>
   inline DEAL_II_ALWAYS_INLINE dealii::Tensor<1, dim>
   ProblemDescription<dim>::momentum_vector(const rank1_type &U)
@@ -150,12 +146,9 @@ namespace grendel
 
 
   template <int dim>
-  inline DEAL_II_ALWAYS_INLINE typename ProblemDescription<dim>::rank2_type
-  ProblemDescription<dim>::f(const rank1_type &U) const
+  inline DEAL_II_ALWAYS_INLINE double
+  ProblemDescription<dim>::pressure(const rank1_type &U) const
   {
-    const double rho = U[0];
-    const auto m = momentum_vector(U);
-    const double E = U[dim + 1];
     /*
      * With
      *   u = m / rho
@@ -163,8 +156,21 @@ namespace grendel
      *   p(1-b rho) = (gamma - 1) e rho
      * We get: p = (gamma - 1)/(1 - b*rho)*(E - 1/2*m^2/rho)
      */
-    const double p =
-        (gamma_ - 1.) / (1. - b_ * rho) * (E - 0.5 * m.norm_square() / rho);
+    const double &rho = U[0];
+    const auto m = momentum_vector(U);
+    const double &E = U[dim + 1];
+    return (gamma_ - 1.) / (1. - b_ * rho) * (E - 0.5 * m.norm_square() / rho);
+  }
+
+
+  template <int dim>
+  inline DEAL_II_ALWAYS_INLINE typename ProblemDescription<dim>::rank2_type
+  ProblemDescription<dim>::f(const rank1_type &U) const
+  {
+    const double &rho = U[0];
+    const auto m = momentum_vector(U);
+    const auto p = pressure(U);
+    const double &E = U[dim + 1];
 
     rank2_type result;
 
