@@ -112,6 +112,7 @@ namespace grendel
    * bottom side in 2D, as well as the curved portion of the boundary in 3D
    * to indicate "reflective boundary conditions".
    */
+
   template <int dim>
   void
   create_coarse_grid_tube(dealii::parallel::distributed::Triangulation<dim> &,
@@ -197,6 +198,74 @@ namespace grendel
 
         const auto center = face->center();
         if (center[0] > -length / 2. && center[0] < length / 2.)
+          face->set_boundary_id(1);
+      }
+    }
+  }
+
+
+  /**
+   * Create the 2D mach step triangulation.
+   *
+   * Even though this function has a template parameter @p dim, it is only
+   * implemented for dimension 2.
+   */
+
+  template <int dim>
+  void
+  create_coarse_grid_step(dealii::parallel::distributed::Triangulation<dim> &,
+                          const double /*length*/,
+                          const double /*height*/,
+                          const double /*step_position*/,
+                          const double /*step_height*/)
+  {
+    AssertThrow(false, dealii::ExcNotImplemented());
+  }
+
+
+  template <>
+  void create_coarse_grid_step<2>(
+      dealii::parallel::distributed::Triangulation<2> &triangulation,
+      const double length,
+      const double height,
+      const double step_position,
+      const double step_height)
+  {
+    constexpr int dim = 2;
+
+    using namespace dealii;
+
+    Triangulation<dim> tria1;
+
+    GridGenerator::subdivided_hyper_rectangle(
+        tria1, {15, 4}, Point<2>(0., step_height), Point<2>(length, height));
+
+    Triangulation<dim> tria2;
+
+    GridGenerator::subdivided_hyper_rectangle(
+        tria2, {3, 1}, Point<2>(0., 0.), Point<2>(step_position, step_height));
+
+    GridGenerator::merge_triangulations(tria1, tria2, triangulation);
+
+    /*
+     * Set boundary ids:
+     */
+
+    for (auto cell : triangulation.active_cell_iterators()) {
+      for (unsigned int f = 0; f < GeometryInfo<2>::faces_per_cell; ++f) {
+        const auto face = cell->face(f);
+
+        if (!face->at_boundary())
+          continue;
+
+        /*
+         * We want reflective boundary conditions (i.e. indicator 1) at top
+         * and bottom of the rectangle. On the left and right side we leave
+         * the boundary indicator at 0, i.e. do nothing.
+         */
+
+        const auto center = face->center();
+        if (center[0] > 0. + length / 15. && center[0] < length - length / 15.)
           face->set_boundary_id(1);
       }
     }

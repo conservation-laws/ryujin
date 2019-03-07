@@ -28,9 +28,12 @@ namespace grendel
       , computing_timer_(computing_timer)
   {
     geometry_ = "immersed triangle";
-    add_parameter("geometry",
-                  geometry_,
-                  "Geometry. Valid names are \"immersed triangle\", \"tube\".");
+    add_parameter(
+        "geometry",
+        geometry_,
+        "Geometry. Valid names are \"triangle\", \"tube\", \"step\".");
+
+    /* Immersed triangle: */
 
     immersed_triangle_length_ = 3.;
     add_parameter("immersed triangle - length",
@@ -47,6 +50,8 @@ namespace grendel
                   immersed_triangle_object_height_,
                   "Immersed Triangle: height of immersed triangle");
 
+    /* Shock tube: */
+
     tube_length_ = 1.;
     add_parameter("tube - length",
                   tube_length_,
@@ -56,6 +61,34 @@ namespace grendel
     add_parameter("tube - diameter",
                   tube_diameter_,
                   "Shock tube: diameter of tube (ignored in 1D)");
+
+    /* Mach step: */
+
+    /* Immersed triangle: */
+
+    mach_step_length_ = 3.;
+    add_parameter("mach step - length",
+                  mach_step_length_,
+                  "Mach step : length of computational domain");
+
+    mach_step_height_ = 1.;
+    add_parameter("mach step - height",
+                  mach_step_height_,
+                  "Mach step : height of computational domain");
+
+    mach_step_step_position_ = 0.6;
+    add_parameter("mach step - step height",
+                  mach_step_step_position_,
+                  "Mach step : height of step ");
+
+    mach_step_step_height_ = 0.2;
+    add_parameter("mach step - step height",
+                  mach_step_step_height_,
+                  "Mach step : height of step ");
+
+    /* Immersed disc: */
+
+    /* Options: */
 
     refinement_ = 5;
     add_parameter("initial refinement",
@@ -89,7 +122,7 @@ namespace grendel
     auto &triangulation = *triangulation_;
     triangulation.clear();
 
-    if (geometry_ == "immersed triangle") {
+    if (geometry_ == "triangle") {
 
       create_coarse_grid_triangle(triangulation,
                                   immersed_triangle_length_,
@@ -99,6 +132,14 @@ namespace grendel
     } else if (geometry_ == "tube") {
 
       create_coarse_grid_tube(triangulation, tube_length_, tube_diameter_);
+
+    } else if (geometry_ == "step") {
+
+      create_coarse_grid_step(triangulation,
+                              mach_step_length_,
+                              mach_step_height_,
+                              mach_step_step_position_,
+                              mach_step_step_height_);
 
     } else {
 

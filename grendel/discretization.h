@@ -83,6 +83,11 @@ namespace grendel
     double tube_length_;
     double tube_diameter_;
 
+    double mach_step_length_;
+    double mach_step_height_;
+    double mach_step_step_position_;
+    double mach_step_step_height_;
+
     unsigned int refinement_;
 
     unsigned int order_finite_element_;
