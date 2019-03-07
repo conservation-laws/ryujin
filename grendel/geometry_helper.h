@@ -194,13 +194,18 @@ namespace grendel
 
         /*
          * We want reflective boundary conditions (i.e. indicator 1) at top
-         * and bottom of the rectangle. On the left and right side we leave
-         * the boundary indicator at 0, i.e. do nothing.
+         * and bottom of the rectangle. On the left we set inflow
+         * conditions (i.e. indicator 2), and we do nothing on the right
+         * side (i.e. indicator 0).
          */
 
         const auto center = face->center();
+
         if (center[0] > -length / 2. && center[0] < length / 2.)
           face->set_boundary_id(1);
+
+        if (center[0] < -length / 2. + 1.e-06)
+          face->set_boundary_id(2);
       }
     }
   }
@@ -262,13 +267,18 @@ namespace grendel
 
         /*
          * We want reflective boundary conditions (i.e. indicator 1) at top
-         * and bottom of the rectangle. On the left and right side we leave
-         * the boundary indicator at 0, i.e. do nothing.
+         * and bottom of the rectangle. On the left we set inflow
+         * conditions (i.e. indicator 2), and we do nothing on the right
+         * side (i.e. indicator 0).
          */
 
         const auto center = face->center();
-        if (center[0] > 0. + length / 15. && center[0] < length - length / 15.)
+
+        if (center[0] > 0. + 1.e-6 && center[0] < length - 1.e-6)
           face->set_boundary_id(1);
+
+        if (center[0] < 0. + 1.e-06)
+          face->set_boundary_id(2);
       }
     }
 
