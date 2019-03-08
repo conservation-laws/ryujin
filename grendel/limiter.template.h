@@ -14,12 +14,6 @@ namespace grendel
       : ParameterAcceptor(subsection)
       , problem_description_(&problem_description)
   {
-    smoothness_index_ = 0;
-    add_parameter("smoothness index",
-                  smoothness_index_,
-                  "Use the corresponding component of the state vector for the "
-                  "smoothness indicator");
-
     smoothness_power_ = 3;
     add_parameter("smoothness power",
                   smoothness_power_,

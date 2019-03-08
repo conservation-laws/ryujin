@@ -32,10 +32,13 @@ namespace grendel
   private:
     /* Options: */
 
-    unsigned int smoothness_index_;
-
     unsigned int smoothness_power_;
     ACCESSOR_READ_ONLY(smoothness_power)
+
+    enum class Indicator {
+      rho,
+      internal_energy
+    } indicator_ = Indicator::rho;
 
     double eps_;
   };
@@ -46,10 +49,14 @@ namespace grendel
   inline DEAL_II_ALWAYS_INLINE double
   Limiter<dim>::smoothness_indicator(const Vector &U, Index i) const
   {
-    return U[smoothness_index_][i];
+    switch (indicator_) {
 
-    // Internal energy:
-    // return problem_description.internal_energy(U);
+    case Indicator::rho:
+      return U[0][i];
+
+    case Indicator::internal_energy:
+      return problem_description_->internal_energy(gather(U, i));
+    }
   }
 
 } /* namespace grendel */
