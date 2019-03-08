@@ -329,7 +329,7 @@ namespace grendel
           indices.begin(), indices.end(), on_subranges, 4096);
     }
 
-    {
+    if (use_limiter_) {
       TimerOutput::Scope t(computing_timer_, "time_step - 3b symmetrize");
 
       const auto on_subranges = [&](auto i1, const auto i2) {
