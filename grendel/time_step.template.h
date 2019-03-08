@@ -259,12 +259,17 @@ namespace grendel
       TimerOutput::Scope t(computing_timer_,
                            "time_step - 3 low-order update and limiter");
 
+      typename Limiter<dim>::Bounds bounds;
+
       const auto on_subranges = [&](auto i1, const auto i2) {
         /* Translate the local index into a index set iterator:: */
         auto it = locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
         for (; i1 < i2; ++i1, ++it) {
 
           const auto i = *it;
+
+          /* Clear bounds: */
+          limiter_->reset(bounds);
 
           /* Only iterate over locally owned subset */
           if (!locally_owned.is_element(i))
@@ -298,36 +303,33 @@ namespace grendel
 
             Unew_i += tau / m_i * 2. * d_ij * (U_ij_bar - U_i);
 
-            if (use_limiter_) {
-              // FIXME: Accumulate
-            }
-
             if (use_smoothness_indicator_ || use_limiter_) {
               const auto p_ij = tau / m_i / lambda * d_ij *
                                 (std::max(alpha_i, alpha_j) - 1.) * (U_j - U_i);
               scatter_set_entry(pij_matrix_, jt, p_ij);
             }
+
+            if (use_limiter_)
+              limiter_->accumulate(bounds, U_ij_bar);
           }
 
-          scatter(temp_euler_, Unew_i, i);
-
           if (use_limiter_) {
-            // FIXME: Limit
-            {
-              for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
-              }
+            for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
+              const auto p_ij = gather_get_entry(pij_matrix_, jt);
+              const auto l_ij = limiter_->limit(bounds, Unew_i, p_ij);
+              set_entry(lij_matrix_, jt, l_ij);
             }
           }
 
-          //FIXME: Refactor into own class
-          // limit(lij_matrix, uij_bar_matrix, pij_matrix, i)
-
+          scatter(temp_euler_, Unew_i, i);
         }
       };
 
       parallel::apply_to_subranges(
           indices.begin(), indices.end(), on_subranges, 4096);
     }
+
+    // fixme - symmetrize lij_matrix_
 
     /*
      * Step 4: Perform high-order and fix boundary:
