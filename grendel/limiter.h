@@ -48,7 +48,7 @@ namespace grendel
     unsigned int smoothness_power_;
     ACCESSOR_READ_ONLY(smoothness_power)
 
-    enum class Indicator { rho, internal_energy } indicator_ = Indicator::rho;
+    enum class Indicator { rho, internal_energy } indicator_ = Indicator::internal_energy;
 
     enum class Limiters { rho, internal_energy } limiters_ = Limiters::internal_energy;
 
@@ -117,11 +117,22 @@ namespace grendel
       }
       [[fallthrough]];
     case Limiters::rho:
+      /* See [Guermond, Nazarov, Popov, Thomas] (4.8): */
       {
         double l_ij_rho = 1.;
 
+        const auto U_i_rho = U[0];
+        const auto P_ij_rho = P_ij[0];
 
-        l_ij = std::min(l_ij, l_ij_rho);
+        if (U_i_rho + P_ij_rho < rho_min)
+          l_ij_rho = std::abs(rho_min - U_i_rho) /
+                     (std::abs(P_ij_rho) + eps_ * rho_max);
+
+        else if (rho_max < U_i_rho + P_ij_rho)
+          l_ij_rho = std::abs(rho_max - U_i_rho) /
+                     (std::abs(P_ij_rho) + eps_ * rho_max);
+
+        l_ij = std::min(l_ij, l_ij_rho); // ensures that l_ij <= 1
       }
     }
 
