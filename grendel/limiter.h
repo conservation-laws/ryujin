@@ -50,7 +50,7 @@ namespace grendel
 
     enum class Indicator { rho, internal_energy } indicator_ = Indicator::internal_energy;
 
-    enum class Limiters { rho, internal_energy } limiters_ = Limiters::internal_energy;
+    enum class Limiters { rho, internal_energy } limiters_ = Limiters::rho;
 
     double eps_;
   };
@@ -116,6 +116,34 @@ namespace grendel
       /* See [Guermond, Nazarov, Popov, Thomas], Section 4.5: */
       {
         double l_ij_ie = 1.;
+
+        // FIXME
+        const double a = 1.;
+        const double b = 0.;
+        const double c = 4.;
+
+        // Solve for the smallest positive root of a t^2 + b t + c = 0:
+
+        if (a == 0. && b != 0.) {
+
+          const double t_0 = -c / b;
+          if (t_0 >= 0.)
+            l_ij_ie = t_0;
+
+        } else if (a != 0.) {
+
+          const double discriminant = (b * b - 4.0 * a * c);
+          if(discriminant > 0.) {
+            const double r1 = (-b + std::sqrt(b * b - 4.0 * a * c)) / (2.0 * a);
+            if (r1 >= 0.)
+              l_ij_ie = r1;
+
+            const double r2 = (-b - std::sqrt(b * b - 4.0 * a * c)) / (2.0 * a);
+            if (r2 >= 0.)
+              l_ij_ie = std::min(l_ij_ie, r1);
+          }
+        }
+
         l_ij = std::min(l_ij, l_ij_ie); // ensures that l_ij <= 1
       }
       [[fallthrough]];
