@@ -259,9 +259,12 @@ namespace grendel
       TimerOutput::Scope t(computing_timer_,
                            "time_step - 3 low-order update and limiter");
 
-      typename Limiter<dim>::Bounds bounds;
 
       const auto on_subranges = [&](auto i1, const auto i2) {
+
+        /* Notar bene: This bounds variable is thread local: */
+        typename Limiter<dim>::Bounds bounds;
+
         /* Translate the local index into a index set iterator:: */
         auto it = locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
         for (; i1 < i2; ++i1, ++it) {
