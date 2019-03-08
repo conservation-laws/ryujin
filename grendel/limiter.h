@@ -50,7 +50,7 @@ namespace grendel
 
     enum class Indicator { rho, internal_energy } indicator_ = Indicator::rho;
 
-    enum class Limiters { rho, internal_energy } limiters_ = Limiters::rho;
+    enum class Limiters { rho, internal_energy } limiters_ = Limiters::internal_energy;
 
     double eps_;
   };
@@ -75,19 +75,57 @@ namespace grendel
   inline DEAL_II_ALWAYS_INLINE void
   Limiter<dim>::reset(Bounds &bounds) const
   {
+    auto &[rho_min, rho_max, rho_epsilon_min] = bounds;
+    rho_min = std::numeric_limits<double>::max();
+    rho_max = 0.;
+    rho_epsilon_min = std::numeric_limits<double>::max();
   }
 
   template <int dim>
   inline DEAL_II_ALWAYS_INLINE void
   Limiter<dim>::accumulate(Bounds &bounds, const rank1_type &U) const
   {
+    auto &[rho_min, rho_max, rho_epsilon_min] = bounds;
+
+    switch (limiters_) {
+    case Limiters::internal_energy:
+      {
+        const auto rho_epsilon = problem_description_->internal_energy(U);
+        rho_epsilon_min = std::min(rho_epsilon_min, rho_epsilon);
+      }
+      [[fallthrough]];
+    case Limiters::rho:
+      {
+        const auto rho = U[0];
+        rho_min = std::min(rho_min, rho);
+        rho_max = std::max(rho_min, rho);
+      }
+    }
   }
 
   template <int dim>
   inline DEAL_II_ALWAYS_INLINE double Limiter<dim>::limit(
       Bounds &bounds, const rank1_type &U, const rank1_type &P_ij) const
   {
-    return 1.;
+    auto &[rho_min, rho_max, rho_epsilon_min] = bounds;
+
+    double l_ij = 1.;
+
+    switch (limiters_) {
+    case Limiters::internal_energy:
+      {
+      }
+      [[fallthrough]];
+    case Limiters::rho:
+      {
+        double l_ij_rho = 1.;
+
+
+        l_ij = std::min(l_ij, l_ij_rho);
+      }
+    }
+
+    return l_ij;
   }
 
 } /* namespace grendel */
