@@ -77,8 +77,6 @@ namespace grendel
     }
 
     if (use_limiter_) {
-      for (auto &it : uij_bar_matrix_)
-        it.reinit(sparsity_pattern);
       lij_matrix_.reinit(sparsity_pattern);
     }
 
@@ -316,7 +314,7 @@ namespace grendel
             Unew_i += tau / m_i * 2. * d_ij * (U_ij_bar - U_i);
 
             if (use_limiter_) {
-              scatter_set_entry(uij_bar_matrix_, jt, U_ij_bar);
+              // FIXME: Accumulate
             }
 
             if (use_smoothness_indicator_ || use_limiter_) {
@@ -328,14 +326,17 @@ namespace grendel
 
           scatter(temp_euler_, Unew_i, i);
 
+          if (use_limiter_) {
+            // FIXME: Limit
+            {
+              for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
+              }
+            }
+          }
+
           //FIXME: Refactor into own class
           // limit(lij_matrix, uij_bar_matrix, pij_matrix, i)
 
-//           {
-//             for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
-//               const auto foo = Unew_i / lambda + p_ij
-//             }
-//           }
         }
       };
 
