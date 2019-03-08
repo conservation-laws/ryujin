@@ -18,8 +18,9 @@ namespace grendel
     Limiter(const grendel::ProblemDescription<dim> &problem_description,
             const std::string &subsection = "Limiter");
 
+    template<typename Vector, typename Index>
     inline DEAL_II_ALWAYS_INLINE double
-    smoothness_indicator(const rank1_type &U) const;
+    smoothness_indicator(const Vector &U, Index i) const;
 
     virtual ~Limiter() final = default;
 
@@ -41,11 +42,11 @@ namespace grendel
 
 
   template <int dim>
+  template <typename Vector, typename Index>
   inline DEAL_II_ALWAYS_INLINE double
-  Limiter<dim>::smoothness_indicator(const rank1_type &U) const
+  Limiter<dim>::smoothness_indicator(const Vector &U, Index i) const
   {
-    // Density:
-    return U[0];
+    return U[smoothness_index_][i];
 
     // Internal energy:
     // return problem_description.internal_energy(U);

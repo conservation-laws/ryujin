@@ -47,6 +47,8 @@ namespace grendel
         "use limiter",
         use_limiter_,
         "If enabled, use a convex limiter for the high-order approximation..");
+
+    eps_ = std::numeric_limits<double>::epsilon();
   }
 
 
@@ -173,6 +175,8 @@ namespace grendel
       TimerOutput::Scope t(computing_timer_,
                            "time_step - 2 compute d_ii, tau_max, and alpha_i");
 
+      const double smoothness_power = limiter_->smoothness_power();
+
       const auto on_subranges = [&](auto i1, const auto i2) {
         double tau_max_on_subrange = std::numeric_limits<double>::infinity();
         const double cfl = problem_description_->cfl_update();
@@ -182,7 +186,7 @@ namespace grendel
         for (; i1 < i2; ++i1, ++it) {
 
           const auto i = *it;
-          const auto U_is = limiter_->smoothness_indicator(gather(U, i));
+          const auto indicator_i = limiter_->smoothness_indicator(U, i);
 
           /* Let's compute the sum of the off-diagonal d_ijs and alpha_i for
            * index i: */
@@ -198,18 +202,20 @@ namespace grendel
             if (j == i)
               continue;
 
-            const auto U_js = limiter_->smoothness_indicator(gather(U, j));
+            const auto indicator_j = limiter_->smoothness_indicator(U, j);
 
             d_sum -= get_entry(dij_matrix_, jt);
-            numerator += (U_js - U_is);
-            denominator += std::abs(U_js - U_is) + eps_ * std::abs(U_js);
+            numerator += (indicator_i - indicator_j);
+            denominator += std::abs(indicator_i - indicator_j) +
+                           eps_ * std::abs(indicator_j);
           }
 
           dij_matrix_.diag_element(i) = d_sum;
 
+          //FIXME: refactor!
           if (locally_owned.is_element(i)) {
-            alpha_i_[i] = std::pow(std::abs(numerator) / denominator,
-                                   limiter_->smoothness_power());
+            alpha_i_[i] =
+                std::pow(std::abs(numerator) / denominator, smoothness_power);
           }
 
           const double mass = lumped_mass_matrix.diag_element(i);
