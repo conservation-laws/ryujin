@@ -329,7 +329,32 @@ namespace grendel
           indices.begin(), indices.end(), on_subranges, 4096);
     }
 
-    // fixme - symmetrize lij_matrix_
+    {
+      TimerOutput::Scope t(computing_timer_, "time_step - 3b symmetrize");
+
+      const auto on_subranges = [&](auto i1, const auto i2) {
+        /* Translate the local index into a index set iterator:: */
+        auto it = locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
+        for (; i1 < i2; ++i1, ++it) {
+          const auto i = *it;
+          for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
+            const auto j = jt->column();
+            if (j >= i)
+              continue;
+            auto l_ij = get_entry(lij_matrix_, jt);
+            auto &l_ji = lij_matrix_(j, i); // FIXME: Suboptimal
+
+            const double min = std::min(l_ij, l_ji);
+            l_ji = min;
+            set_entry(lij_matrix_, jt, min);
+          }
+        }
+      };
+
+      parallel::apply_to_subranges(
+          indices.begin(), indices.end(), on_subranges, 4096);
+    }
+
 
     /*
      * Step 4: Perform high-order and fix boundary:

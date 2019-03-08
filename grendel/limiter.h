@@ -113,7 +113,10 @@ namespace grendel
 
     switch (limiters_) {
     case Limiters::internal_energy:
+      /* See [Guermond, Nazarov, Popov, Thomas], Section 4.5: */
       {
+        double l_ij_ie = 1.;
+        l_ij = std::min(l_ij, l_ij_ie); // ensures that l_ij <= 1
       }
       [[fallthrough]];
     case Limiters::rho:
