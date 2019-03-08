@@ -326,9 +326,16 @@ namespace grendel
             }
           }
 
-          //FIXME: Call limiter to compute l_ij
-
           scatter(temp_euler_, Unew_i, i);
+
+          //FIXME: Refactor into own class
+          // limit(lij_matrix, uij_bar_matrix, pij_matrix, i)
+
+//           {
+//             for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
+//               const auto foo = Unew_i / lambda + p_ij
+//             }
+//           }
         }
       };
 
@@ -373,9 +380,9 @@ namespace grendel
             const auto l_ij = use_limiter_ ? get_entry(lij_matrix_, jt) : 1.;
             Unew_i += l_ij * lambda * p_ij;
           }
-        }
 
-        scatter(temp_euler_, Unew_i, i);
+          scatter(temp_euler_, Unew_i, i);
+        }
       };
 
       parallel::apply_to_subranges(
