@@ -20,6 +20,7 @@ namespace grendel
       const grendel::OfflineData<dim> &offline_data,
       const grendel::ProblemDescription<dim> &problem_description,
       const grendel::RiemannSolver<dim> &riemann_solver,
+      const grendel::Limiter<dim> &limiter,
       const std::string &subsection /*= "TimeStep"*/)
       : ParameterAcceptor(subsection)
       , mpi_communicator_(mpi_communicator)
@@ -27,6 +28,7 @@ namespace grendel
       , offline_data_(&offline_data)
       , problem_description_(&problem_description)
       , riemann_solver_(&riemann_solver)
+      , limiter_(&limiter)
   {
     use_ssprk_ = false;
     add_parameter(
@@ -45,19 +47,6 @@ namespace grendel
         "use limiter",
         use_limiter_,
         "If enabled, use a convex limiter for the high-order approximation..");
-
-    smoothness_index_ = 0;
-    add_parameter("smoothness index",
-                  smoothness_index_,
-                  "Use the corresponding component of the state vector for the "
-                  "smoothness indicator");
-
-    smoothness_power_ = 3;
-    add_parameter("smoothness power",
-                  smoothness_power_,
-                  "Sets the exponent for the smoothness indicator");
-
-    eps_ = std::numeric_limits<double>::epsilon();
   }
 
 
@@ -193,7 +182,7 @@ namespace grendel
         for (; i1 < i2; ++i1, ++it) {
 
           const auto i = *it;
-          const auto U_is = U[smoothness_index_][i];
+          const auto U_is = limiter_->smoothness_indicator(gather(U, i));
 
           /* Let's compute the sum of the off-diagonal d_ijs and alpha_i for
            * index i: */
@@ -209,7 +198,7 @@ namespace grendel
             if (j == i)
               continue;
 
-            const auto U_js = U[smoothness_index_][j];
+            const auto U_js = limiter_->smoothness_indicator(gather(U, j));
 
             d_sum -= get_entry(dij_matrix_, jt);
             numerator += (U_js - U_is);
@@ -218,10 +207,9 @@ namespace grendel
 
           dij_matrix_.diag_element(i) = d_sum;
 
-          //FIXME: refactor!
           if (locally_owned.is_element(i)) {
-            alpha_i_[i] =
-                std::pow(std::abs(numerator) / denominator, smoothness_power_);
+            alpha_i_[i] = std::pow(std::abs(numerator) / denominator,
+                                   limiter_->smoothness_power());
           }
 
           const double mass = lumped_mass_matrix.diag_element(i);

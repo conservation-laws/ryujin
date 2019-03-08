@@ -66,16 +66,18 @@ namespace ryujin
                      "C - OfflineData")
       , problem_description("D - ProblemDescription")
       , riemann_solver(problem_description, "E - RiemannSolver")
+      , limiter(problem_description, "F - Limiter")
       , time_step(mpi_communicator,
                   computing_timer,
                   offline_data,
                   problem_description,
                   riemann_solver,
-                  "F - TimeStep")
+                  limiter,
+                  "G - TimeStep")
       , schlieren_postprocessor(mpi_communicator,
                                 computing_timer,
                                 offline_data,
-                                "G - SchlierenPostprocessor")
+                                "H - SchlierenPostprocessor")
   {
     base_name = "test";
     add_parameter("basename", base_name, "Base name for all output files");

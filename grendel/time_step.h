@@ -2,6 +2,7 @@
 #define TIME_STEP_H
 
 #include "helper.h"
+#include "limiter.h"
 #include "offline_data.h"
 #include "problem_description.h"
 #include "riemann_solver.h"
@@ -33,6 +34,7 @@ namespace grendel
              const grendel::OfflineData<dim> &offline_data,
              const grendel::ProblemDescription<dim> &problem_description,
              const grendel::RiemannSolver<dim> &riemann_solver,
+             const grendel::Limiter<dim> &limiter,
              const std::string &subsection = "TimeStep");
 
     virtual ~TimeStep() final = default;
@@ -83,6 +85,9 @@ namespace grendel
     dealii::SmartPointer<const grendel::RiemannSolver<dim>> riemann_solver_;
     ACCESSOR_READ_ONLY(riemann_solver)
 
+    dealii::SmartPointer<const grendel::Limiter<dim>> limiter_;
+    ACCESSOR_READ_ONLY(limiter)
+
   private:
     /* Scratch data: */
 
@@ -101,9 +106,6 @@ namespace grendel
     bool use_ssprk_;
     bool use_smoothness_indicator_;
     bool use_limiter_;
-
-    unsigned int smoothness_index_;
-    unsigned int smoothness_power_;
 
     double eps_;
   };
