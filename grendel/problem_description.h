@@ -80,6 +80,14 @@ namespace grendel
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
+     * and return the internal energy \rho e.
+     */
+    inline DEAL_II_ALWAYS_INLINE double
+    internal_energy(const rank1_type &U) const;
+
+
+    /**
+     * For a given (2+dim dimensional) state vector <code>U</code>, compute
      * and return the pressure .
      */
     inline DEAL_II_ALWAYS_INLINE double pressure(const rank1_type &U) const;
@@ -101,6 +109,11 @@ namespace grendel
      * Given a state @p U compute <code>f(U)</code>.
      */
     inline DEAL_II_ALWAYS_INLINE rank2_type f(const rank1_type &U) const;
+
+    rank2_type zoo(const rank1_type &U)
+    {
+      return f(U);
+    }
 
 
   protected:
@@ -147,6 +160,20 @@ namespace grendel
 
   template <int dim>
   inline DEAL_II_ALWAYS_INLINE double
+  ProblemDescription<dim>::internal_energy(const rank1_type &U) const
+  {
+    /*
+     * e rho = (E - 1/2*m^2/rho)
+     */
+    const double &rho = U[0];
+    const auto m = momentum_vector(U);
+    const double &E = U[dim + 1];
+    return E - 0.5 * m.norm_square() / rho;
+  }
+
+
+  template <int dim>
+  inline DEAL_II_ALWAYS_INLINE double
   ProblemDescription<dim>::pressure(const rank1_type &U) const
   {
     /*
@@ -154,12 +181,11 @@ namespace grendel
      *   u = m / rho
      *   e = rho^-1 E - 1/2 |u|^2
      *   p(1-b rho) = (gamma - 1) e rho
-     * We get: p = (gamma - 1)/(1 - b*rho)*(E - 1/2*m^2/rho)
+     * we get
+     *   p = (gamma - 1)/(1 - b*rho) * (e rho)
      */
     const double &rho = U[0];
-    const auto m = momentum_vector(U);
-    const double &E = U[dim + 1];
-    return (gamma_ - 1.) / (1. - b_ * rho) * (E - 0.5 * m.norm_square() / rho);
+    return (gamma_ - 1.) / (1. - b_ * rho) * internal_energy(U);
   }
 
 
