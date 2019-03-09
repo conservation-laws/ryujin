@@ -18,8 +18,6 @@ namespace grendel
     add_parameter("smoothness power",
                   smoothness_power_,
                   "Sets the exponent for the smoothness indicator");
-
-    eps_ = std::numeric_limits<double>::epsilon();
   }
 } /* namespace grendel */
 

@@ -51,8 +51,6 @@ namespace grendel
     enum class Indicator { rho, internal_energy } indicator_ = Indicator::internal_energy;
 
     enum class Limiters { rho, internal_energy } limiters_ = Limiters::rho;
-
-    double eps_;
   };
 
 
@@ -154,6 +152,8 @@ namespace grendel
 
         const auto U_i_rho = U[0];
         const auto P_ij_rho = P_ij[0];
+
+        constexpr double eps_ = std::numeric_limits<double>::epsilon();
 
         if (U_i_rho + P_ij_rho < rho_min)
           l_ij_rho = std::abs(rho_min - U_i_rho) /
