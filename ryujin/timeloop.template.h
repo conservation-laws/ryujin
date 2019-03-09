@@ -411,6 +411,7 @@ namespace ryujin
       data_out.add_data_vector(schlieren_postprocessor.schlieren(),
                                "schlieren_plot");
 
+      output_alpha.update_ghost_values();
       data_out.add_data_vector(output_alpha, "alpha");
 
       data_out.build_patches(mapping,

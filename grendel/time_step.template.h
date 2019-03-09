@@ -62,23 +62,28 @@ namespace grendel
 
     dij_matrix_.reinit(sparsity_pattern);
 
+    alpha_.reinit(locally_owned, locally_relevant, mpi_communicator_);
+
+    auto &exemplar = temp_euler_[0];
+
+    exemplar.reinit(locally_owned, locally_relevant, mpi_communicator_);
+    for (auto &it : temp_euler_)
+      it.reinit(exemplar);
+
+    for (auto &it : temp_ssprk_)
+      it.reinit(exemplar);
+
     if (use_smoothness_indicator_) {
       for (auto &it : pij_matrix_)
         it.reinit(sparsity_pattern);
+
+      for (auto &it : r_)
+        it.reinit(temp_euler_[0]);
     }
 
     if (use_limiter_) {
       lij_matrix_.reinit(sparsity_pattern);
     }
-
-    alpha_.reinit(locally_owned, locally_relevant, mpi_communicator_);
-
-    temp_euler_[0].reinit(locally_owned, locally_relevant, mpi_communicator_);
-    for (auto &it : temp_euler_)
-      it.reinit(temp_euler_[0]);
-
-    for (auto &it : temp_ssprk_)
-      it.reinit(temp_euler_[0]);
   }
 
 
@@ -98,6 +103,7 @@ namespace grendel
 
     const auto indices =
         boost::irange<unsigned int>(0, locally_relevant.n_elements());
+
 
     /*
      * Step 1: Compute off-diagonal d_ij:
@@ -159,8 +165,9 @@ namespace grendel
           indices.begin(), indices.end(), on_subranges, 4096);
     }
 
+
     /*
-     * Step 2: Compute diagonal of d_ij and maximal time-step size, and
+     * Step 2: Compute diagonal of d_ij maximal time-step size, and
      *         smoothness indicator:
      *
      *   \alpha_i = \|\sum_j U_i[s] - U_j[s] \| / \sum_j \| U_i[s] - U_j[s] \|
@@ -173,6 +180,7 @@ namespace grendel
       TimerOutput::Scope t(computing_timer_,
                            "time_step - 2 compute d_ii, tau_max, and alpha_i");
 
+      alpha_.zero_out_ghosts();
       const double smoothness_power = limiter_->smoothness_power();
 
       const auto on_subranges = [&](auto i1, const auto i2) {
@@ -212,11 +220,8 @@ namespace grendel
 
           dij_matrix_.diag_element(i) = d_sum;
 
-          //FIXME: refactor!
-          if (locally_owned.is_element(i)) {
-            alpha_[i] =
-                std::pow(std::abs(numerator) / denominator, smoothness_power);
-          }
+          alpha_[i] =
+              std::pow(std::abs(numerator) / denominator, smoothness_power);
 
           const double mass = lumped_mass_matrix.diag_element(i);
           const double tau = cfl * mass / (-2. * d_sum);
@@ -241,10 +246,10 @@ namespace grendel
           ExcMessage(
               "I'm sorry, Dave. I'm afraid I can't do that. - We crashed."));
 
+      deallog << "        computed tau_max = " << tau_max << std::endl;
+
       /* Synchronize alpha_ over all MPI processes: */
       alpha_.update_ghost_values();
-
-      deallog << "        computed tau_max = " << tau_max << std::endl;
     }
 
     tau = tau == 0 ? tau_max.load() : tau;
@@ -254,7 +259,10 @@ namespace grendel
      * Step 3: Perform low-order update and compute limiter:
      *
      *   \bar U_ij = 1/2 d_ij^L (U_i + U_j) - 1/2 (f_j - f_i) c_ij
-     *        P_ij = tau / m_i / lambda (d_ij^H - d_ij^L) + [...]
+     *
+     *        P_ij = tau / m_i / lambda (
+     *                   (d_ij^H - d_ij^L) (U_i + U_j) +
+     *                   b_ij R_j - b_ji R_i
      *
      *   Low-order update: += tau / m_i * 2 d_ij^L (\bar U_ij - U_i)
      */
@@ -293,8 +301,7 @@ namespace grendel
           const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
           const double lambda = 1. / (size - 1.);
 
-          for (auto jt = sparsity.begin(i); jt != sparsity.end(i);
-               ++jt) {
+          for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
             const auto j = jt->column();
 
             const auto U_j = gather(U, j);
