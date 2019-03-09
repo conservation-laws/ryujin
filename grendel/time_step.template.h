@@ -56,34 +56,35 @@ namespace grendel
     deallog << "TimeStep<dim>::prepare()" << std::endl;
     TimerOutput::Scope t(computing_timer_, "time_step - prepare scratch space");
 
+    /* Initialize (global) vectors: */
+
     const auto &locally_owned = offline_data_->locally_owned();
     const auto &locally_relevant = offline_data_->locally_relevant();
-    const auto &sparsity_pattern = offline_data_->sparsity_pattern();
 
-    dij_matrix_.reinit(sparsity_pattern);
-
-    alpha_.reinit(locally_owned, locally_relevant, mpi_communicator_);
-
-    auto &exemplar = temp_euler_[0];
-
+    auto &exemplar = alpha_;
     exemplar.reinit(locally_owned, locally_relevant, mpi_communicator_);
+
     for (auto &it : temp_euler_)
       it.reinit(exemplar);
 
     for (auto &it : temp_ssprk_)
       it.reinit(exemplar);
 
-    if (use_smoothness_indicator_) {
-      for (auto &it : pij_matrix_)
-        it.reinit(sparsity_pattern);
+    for (auto &it : r_)
+      it.reinit(exemplar);
 
-      for (auto &it : r_)
-        it.reinit(temp_euler_[0]);
-    }
+    for (auto &it : bounds_)
+      it.reinit(exemplar);
 
-    if (use_limiter_) {
-      lij_matrix_.reinit(sparsity_pattern);
-    }
+    /* Initialize local matrices */
+
+    const auto &sparsity_pattern = offline_data_->sparsity_pattern();
+
+    for (auto &it : pij_matrix_)
+      it.reinit(sparsity_pattern);
+
+    dij_matrix_.reinit(sparsity_pattern);
+    lij_matrix_.reinit(sparsity_pattern);
   }
 
 
@@ -256,84 +257,23 @@ namespace grendel
     tau = tau == 0 ? tau_max.load() : tau;
     deallog << "        perform time-step with tau = " << tau << std::endl;
 
-
     /*
-     * Step 3: Compute R_i and first part of P_ij
+     * Step 3: Low-order update, also compute limiter bounds, R_i and first
+     *         part of P_ij
+     *
+     *   \bar U_ij = 1/2 d_ij^L (U_i + U_j) - 1/2 (f_j - f_i) c_ij
      *
      *        R_i = \sum_j - c_ij f_j + d_ij^H (U_j - U_i)
      *
      *        P_ij = tau / m_i / lambda (d_ij^H - d_ij^L) (U_i + U_j) + [...]
-     */
-
-    {
-      deallog << "        compute r_i, and p_ij" << std::endl;
-      TimerOutput::Scope t(computing_timer_,
-                           "time_step - 4 compute r_i, and p_ij");
-
-      const auto on_subranges = [&](auto i1, const auto i2) {
-
-        /* Translate the local index into a index set iterator:: */
-        auto it = locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
-        for (; i1 < i2; ++i1, ++it) {
-
-          const auto i = *it;
-
-          const auto U_i = gather(U, i);
-          const auto alpha_i = alpha_[i];
-
-          const double m_i = lumped_mass_matrix.diag_element(i);
-          const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
-          const double lambda = 1. / (size - 1.);
-
-          rank1_type r_i;
-
-          for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
-
-            const auto j = jt->column();
-            const auto U_j = gather(U, j);
-            const auto f_j = problem_description_->f(U_j);
-            const auto alpha_j = alpha_[j];
-
-            const auto c_ij = gather_get_entry(cij_matrix, jt);
-            const auto d_ij = get_entry(dij_matrix_, jt);
-
-            const auto d_ijH = d_ij * std::max(alpha_i, alpha_j);
-
-            const auto p_ij = tau / m_i / lambda * (d_ijH - d_ij) * (U_j - U_i);
-
-            for (unsigned int k = 0; k < problem_dimension; ++k)
-              r_i[k] += -c_ij * f_j[k] + d_ijH * (U_j - U_i)[k];
-
-            scatter_set_entry(pij_matrix_, jt, p_ij);
-          }
-
-          scatter(r_, r_i, i);
-        }
-      };
-
-      parallel::apply_to_subranges(
-          indices.begin(), indices.end(), on_subranges, 4096);
-
-      /* Synchronize r_ over all MPI processes: */
-      for (auto &it : r_)
-        it.update_ghost_values();
-    }
-
-
-    /*
-     * Step 4: Compute limiter:
-     *
-     *   \bar U_ij = 1/2 d_ij^L (U_i + U_j) - 1/2 (f_j - f_i) c_ij
-     *
-     *        P_ij = [...] + tau / m_i / lambda (b_ij R_j - b_ji R_i)
      *
      *   Low-order update: += tau / m_i * 2 d_ij^L (\bar U_ij - U_i)
      */
 
     {
-      deallog << "        low-order update and limiter" << std::endl;
+      deallog << "        low-order update, limiter bounds, r_i, and p_ij" << std::endl;
       TimerOutput::Scope t(computing_timer_,
-                           "time_step - 4 low-order update and limiter");
+                           "time_step - 3 low-orer update, limiter bounds, compute r_i, and p_ij");
 
       const auto on_subranges = [&](auto i1, const auto i2) {
 
@@ -350,34 +290,96 @@ namespace grendel
           if (!locally_owned.is_element(i))
             continue;
 
+          const auto U_i = gather(U, i);
+          auto U_i_new = U_i;
+
+          const auto f_i = problem_description_->f(U_i);
+          const auto alpha_i = alpha_[i];
+
           const double m_i = lumped_mass_matrix.diag_element(i);
           const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
           const double lambda = 1. / (size - 1.);
 
+          rank1_type r_i;
+
           /* Clear bounds: */
           limiter_->reset(bounds);
 
-          const auto U_i = gather(U, i);
-          const auto Unew_i = gather(temp_euler_, i);
-
-          const auto f_i = problem_description_->f(U_i);
-
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
-            const auto j = jt->column();
 
+            const auto j = jt->column();
             const auto U_j = gather(U, j);
             const auto f_j = problem_description_->f(U_j);
+            const auto alpha_j = alpha_[j];
 
             const auto c_ij = gather_get_entry(cij_matrix, jt);
             const auto d_ij = get_entry(dij_matrix_, jt);
 
+            const auto d_ijH = d_ij * std::max(alpha_i, alpha_j);
+
+            const auto p_ij = tau / m_i / lambda * (d_ijH - d_ij) * (U_j - U_i);
+
             dealii::Tensor<1, problem_dimension> U_ij_bar;
-            for (unsigned int k = 0; k < problem_dimension; ++k)
+
+            for (unsigned int k = 0; k < problem_dimension; ++k) {
+              r_i[k] += -c_ij * f_j[k] + d_ijH * (U_j - U_i)[k];
+
               U_ij_bar[k] = 1. / 2. * (U_i[k] + U_j[k]) -
                             1. / 2. * (f_j[k] - f_i[k]) * c_ij / d_ij;
-            limiter_->accumulate(bounds, U_ij_bar);
+            }
 
+            U_i_new += tau / m_i * 2. * d_ij * (U_ij_bar - U_i);
+
+            scatter_set_entry(pij_matrix_, jt, p_ij);
+
+            limiter_->accumulate(bounds, U_ij_bar);
           }
+
+          scatter(temp_euler_, U_i_new, i);
+
+          scatter(r_, r_i, i);
+
+          scatter(bounds_, bounds, i);
+        }
+      };
+
+      parallel::apply_to_subranges(
+          indices.begin(), indices.end(), on_subranges, 4096);
+
+      /* Synchronize r_ over all MPI processes: */
+      for (auto &it : r_)
+        it.update_ghost_values();
+    }
+
+    /*
+     * Step 4: Compute second part of P_ij, and compute l_ij:
+     *
+     *        P_ij = [...] + tau / m_i / lambda (b_ij R_j - b_ji R_i)
+     */
+
+    {
+      deallog << "        compute p_ij and l_ij" << std::endl;
+      TimerOutput::Scope t(computing_timer_,
+                           "time_step - 4 compute p_ij, and l_ij");
+
+      const auto on_subranges = [&](auto i1, const auto i2) {
+
+        /* Translate the local index into a index set iterator:: */
+        auto it = locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
+        for (; i1 < i2; ++i1, ++it) {
+
+          const auto i = *it;
+
+          /* Only iterate over locally owned subset */
+          if (!locally_owned.is_element(i))
+            continue;
+
+          const auto bounds = gather_array(bounds_, i);
+          const auto U_i_new = gather(temp_euler_, i);
+
+          const double m_i = lumped_mass_matrix.diag_element(i);
+          const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
+          const double lambda = 1. / (size - 1.);
 
           const auto r_i = gather(r_, i);
 
@@ -393,7 +395,7 @@ namespace grendel
             p_ij += tau / m_i / lambda * (b_ij * r_j - b_ji * r_i);
             scatter_set_entry(pij_matrix_, jt, p_ij);
 
-            const auto l_ij = limiter_->limit(bounds, Unew_i, p_ij);
+            const auto l_ij = limiter_->limit(bounds, U_i_new, p_ij);
             set_entry(lij_matrix_, jt, l_ij);
           }
         }
@@ -403,8 +405,13 @@ namespace grendel
           indices.begin(), indices.end(), on_subranges, 4096);
     }
 
+
+    /* And symmetrize l_ij: */
+
     {
-      TimerOutput::Scope t(computing_timer_, "time_step - 3b symmetrize");
+      deallog << "        symmetrize l_ij" << std::endl;
+      TimerOutput::Scope t(computing_timer_,
+                           "time_step - 4 symmetrize l_ij");
 
       const auto on_subranges = [&](auto i1, const auto i2) {
         /* Translate the local index into a index set iterator:: */
@@ -431,7 +438,7 @@ namespace grendel
 
 
     /*
-     * Step 5: Perform high-order and fix boundary:
+     * Step 5: Perform high-order update:
      *
      *   High-order update: += l_ij * lambda * P_ij
      */
@@ -451,18 +458,18 @@ namespace grendel
           if (!locally_owned.is_element(i))
             continue;
 
-          auto Unew_i = gather(temp_euler_, i);
+          auto U_i_new = gather(temp_euler_, i);
 
           const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
           const double lambda = 1. / (size - 1.);
 
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
             const auto p_ij = gather_get_entry(pij_matrix_, jt);
-            const auto l_ij = use_limiter_ ? get_entry(lij_matrix_, jt) : 1.;
-            Unew_i += l_ij * lambda * p_ij;
+            const auto l_ij = get_entry(lij_matrix_, jt);
+            U_i_new += l_ij * lambda * p_ij;
           }
 
-          scatter(temp_euler_, Unew_i, i);
+          scatter(temp_euler_, U_i_new, i);
         }
       };
 

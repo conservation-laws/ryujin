@@ -3,6 +3,8 @@
 
 #include "problem_description.h"
 
+#include <deal.II/lac/la_parallel_vector.templates.h>
+
 namespace grendel
 {
 
@@ -20,6 +22,9 @@ namespace grendel
      */
     typedef std::array<double, 3> Bounds;
 
+    typedef std::array<dealii::LinearAlgebra::distributed::Vector<double>, 3>
+        vector_type;
+
     Limiter(const grendel::ProblemDescription<dim> &problem_description,
             const std::string &subsection = "Limiter");
 
@@ -34,8 +39,9 @@ namespace grendel
     inline DEAL_II_ALWAYS_INLINE void accumulate(Bounds &bounds,
                                                  const rank1_type &U) const;
 
-    inline DEAL_II_ALWAYS_INLINE double
-    limit(Bounds &bounds, const rank1_type &U, const rank1_type &P_ij) const;
+    inline DEAL_II_ALWAYS_INLINE double limit(const Bounds &bounds,
+                                              const rank1_type &U,
+                                              const rank1_type &P_ij) const;
 
   protected:
     dealii::SmartPointer<const grendel::ProblemDescription<dim>>
@@ -117,7 +123,7 @@ namespace grendel
 
   template <int dim>
   inline DEAL_II_ALWAYS_INLINE double Limiter<dim>::limit(
-      Bounds &bounds, const rank1_type &U, const rank1_type &P_ij) const
+      const Bounds &bounds, const rank1_type &U, const rank1_type &P_ij) const
   {
     auto &[rho_min, rho_max, rho_epsilon_min] = bounds;
 
