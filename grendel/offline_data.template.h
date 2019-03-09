@@ -342,21 +342,21 @@ namespace grendel
       std::for_each(sparsity_pattern_.begin(row_index),
                     sparsity_pattern_.end(row_index),
                     [&](const auto &jt) {
-                      const auto value = gather_get_enry(cij_matrix_, jt);
+                      const auto value = gather_get_entry(cij_matrix_, &jt);
                       const double norm = value.norm();
-                      set_entry(norm_matrix_, jt, norm);
+                      set_entry(norm_matrix_, &jt, norm);
                     });
 
       std::for_each(sparsity_pattern_.begin(row_index),
                     sparsity_pattern_.end(row_index),
                     [&](const auto &jt) {
                       const auto col_index = jt.column();
-                      const auto m_ij = get_entry(mass_matrix_, jt);
+                      const auto m_ij = get_entry(mass_matrix_, &jt);
                       const auto m_j =
                           lumped_mass_matrix_.diag_element(col_index);
                       const auto b_ij =
                           (row_index == col_index ? 1. : 0.) - m_ij / m_j;
-                      set_entry(bij_matrix_, jt, b_ij);
+                      set_entry(bij_matrix_, &jt, b_ij);
                     });
 
       for (auto &matrix : nij_matrix_) {
