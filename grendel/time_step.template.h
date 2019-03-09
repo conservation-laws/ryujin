@@ -262,9 +262,7 @@ namespace grendel
      *
      *        R_i = \sum_j - c_ij f_j + d_ij^H (U_j - U_i)
      *
-     *        P_ij = tau / m_i / lambda (
-     *                   (d_ij^H - d_ij^L) (U_i + U_j) +
-     *                   b_ij R_j - b_ji R_i
+     *        P_ij = tau / m_i / lambda (d_ij^H - d_ij^L) (U_i + U_j) + [...]
      */
 
     {
@@ -284,7 +282,6 @@ namespace grendel
           const auto alpha_i = alpha_[i];
 
           const double m_i = lumped_mass_matrix.diag_element(i);
-
           const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
           const double lambda = 1. / (size - 1.);
 
@@ -324,13 +321,11 @@ namespace grendel
 
 
     /*
-     * Step 4: Perform low-order update and compute limiter:
+     * Step 4: Compute limiter:
      *
      *   \bar U_ij = 1/2 d_ij^L (U_i + U_j) - 1/2 (f_j - f_i) c_ij
      *
-     *        P_ij = tau / m_i / lambda (
-     *                   (d_ij^H - d_ij^L) (U_i + U_j) +
-     *                   b_ij R_j - b_ji R_i
+     *        P_ij = [...] + tau / m_i / lambda (b_ij R_j - b_ji R_i)
      *
      *   Low-order update: += tau / m_i * 2 d_ij^L (\bar U_ij - U_i)
      */
@@ -351,34 +346,28 @@ namespace grendel
 
           const auto i = *it;
 
-          /* Clear bounds: */
-          limiter_->reset(bounds);
-
           /* Only iterate over locally owned subset */
           if (!locally_owned.is_element(i))
             continue;
 
-          const auto U_i = gather(U, i);
-          auto  Unew_i = U_i;
-
           const double m_i = lumped_mass_matrix.diag_element(i);
-          const auto f_i = problem_description_->f(U_i);
-          const auto alpha_i = alpha_[i];
-          const auto r_i = gather(r_, i);
-
           const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
           const double lambda = 1. / (size - 1.);
+
+          /* Clear bounds: */
+          limiter_->reset(bounds);
+
+          const auto U_i = gather(U, i);
+          const auto Unew_i = gather(temp_euler_, i);
+
+          const auto f_i = problem_description_->f(U_i);
 
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
             const auto j = jt->column();
 
             const auto U_j = gather(U, j);
             const auto f_j = problem_description_->f(U_j);
-            const auto alpha_j = alpha_[j];
-            const auto r_j = gather(r_, i);
 
-            const auto b_ij = get_entry(bij_matrix, jt);
-            const auto b_ji = bij_matrix(j, i); // FIXME: Suboptimal
             const auto c_ij = gather_get_entry(cij_matrix, jt);
             const auto d_ij = get_entry(dij_matrix_, jt);
 
@@ -386,30 +375,27 @@ namespace grendel
             for (unsigned int k = 0; k < problem_dimension; ++k)
               U_ij_bar[k] = 1. / 2. * (U_i[k] + U_j[k]) -
                             1. / 2. * (f_j[k] - f_i[k]) * c_ij / d_ij;
+            limiter_->accumulate(bounds, U_ij_bar);
 
-            Unew_i += tau / m_i * 2. * d_ij * (U_ij_bar - U_i);
-
-            if (use_smoothness_indicator_ || use_limiter_) {
-              const auto p_ij =
-                  tau / m_i / lambda *
-                  (d_ij * (std::max(alpha_i, alpha_j) - 1.) * (U_j - U_i) +
-                   b_ij * r_j - b_ji * r_i);
-              scatter_set_entry(pij_matrix_, jt, p_ij);
-            }
-
-            if (use_limiter_)
-              limiter_->accumulate(bounds, U_ij_bar);
           }
 
-          if (use_limiter_) {
-            for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
-              const auto p_ij = gather_get_entry(pij_matrix_, jt);
-              const auto l_ij = limiter_->limit(bounds, Unew_i, p_ij);
-              set_entry(lij_matrix_, jt, l_ij);
-            }
-          }
+          const auto r_i = gather(r_, i);
 
-          scatter(temp_euler_, Unew_i, i);
+          for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
+            const auto j = jt->column();
+
+            const auto b_ij = get_entry(bij_matrix, jt);
+            const auto b_ji = bij_matrix(j, i); // FIXME: Suboptimal
+
+            const auto r_j = gather(r_, i);
+
+            auto p_ij = gather_get_entry(pij_matrix_, jt);
+            p_ij += tau / m_i / lambda * (b_ij * r_j - b_ji * r_i);
+            scatter_set_entry(pij_matrix_, jt, p_ij);
+
+            const auto l_ij = limiter_->limit(bounds, Unew_i, p_ij);
+            set_entry(lij_matrix_, jt, l_ij);
+          }
         }
       };
 
@@ -417,7 +403,7 @@ namespace grendel
           indices.begin(), indices.end(), on_subranges, 4096);
     }
 
-    if (use_limiter_) {
+    {
       TimerOutput::Scope t(computing_timer_, "time_step - 3b symmetrize");
 
       const auto on_subranges = [&](auto i1, const auto i2) {
