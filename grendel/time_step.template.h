@@ -73,7 +73,7 @@ namespace grendel
       lij_matrix_.reinit(sparsity_pattern);
     }
 
-    alpha_i_.reinit(locally_owned, locally_relevant, mpi_communicator_);
+    alpha_.reinit(locally_owned, locally_relevant, mpi_communicator_);
 
     temp_euler_[0].reinit(locally_owned, locally_relevant, mpi_communicator_);
     for (auto &it : temp_euler_)
@@ -214,7 +214,7 @@ namespace grendel
 
           //FIXME: refactor!
           if (locally_owned.is_element(i)) {
-            alpha_i_[i] =
+            alpha_[i] =
                 std::pow(std::abs(numerator) / denominator, smoothness_power);
           }
 
@@ -241,8 +241,8 @@ namespace grendel
           ExcMessage(
               "I'm sorry, Dave. I'm afraid I can't do that. - We crashed."));
 
-      /* Synchronize alpha_i_t over all MPI processes: */
-      alpha_i_.update_ghost_values();
+      /* Synchronize alpha_ over all MPI processes: */
+      alpha_.update_ghost_values();
 
       deallog << "        computed tau_max = " << tau_max << std::endl;
     }
@@ -288,7 +288,7 @@ namespace grendel
 
           const double m_i = lumped_mass_matrix.diag_element(i);
           const auto f_i = problem_description_->f(U_i);
-          const auto alpha_i = alpha_i_[i];
+          const auto alpha_i = alpha_[i];
 
           const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
           const double lambda = 1. / (size - 1.);
@@ -299,7 +299,7 @@ namespace grendel
 
             const auto U_j = gather(U, j);
             const auto f_j = problem_description_->f(U_j);
-            const auto alpha_j = alpha_i_[j];
+            const auto alpha_j = alpha_[j];
 
             const auto c_ij = gather_get_entry(cij_matrix, jt);
             const auto d_ij = get_entry(dij_matrix_, jt);

@@ -67,7 +67,7 @@ namespace ryujin
     /* Data for output management: */
     std::thread output_thread;
     vector_type output_vector;
-
+    dealii::LinearAlgebra::distributed::Vector<double> output_alpha;
   };
 
 } // namespace ryujin

@@ -93,8 +93,10 @@ namespace grendel
 
     dealii::SparseMatrix<double> dij_matrix_;
 
-    dealii::LinearAlgebra::distributed::Vector<double> alpha_i_;
+    dealii::LinearAlgebra::distributed::Vector<double> alpha_;
+    ACCESSOR_READ_ONLY(alpha)
 
+  private:
     dealii::SparseMatrix<double> lij_matrix_; // FIXME
     std::array<dealii::SparseMatrix<double>, problem_dimension> pij_matrix_;
 
