@@ -98,7 +98,7 @@ namespace grendel
      * and return the specific entropy.
      */
     inline DEAL_II_ALWAYS_INLINE double
-    internal_energy(const rank1_type &U) const;
+    specific_entropy(const rank1_type &U) const;
 
 
     /**
@@ -197,11 +197,12 @@ namespace grendel
   }
 
 
-//   template <int dim>
-//   inline DEAL_II_ALWAYS_INLINE double
-//   ProblemDescription<dim>::specific_entropy(const rank1_type &U) const
-//   {
-//   }
+  template <int dim>
+  inline DEAL_II_ALWAYS_INLINE double
+  ProblemDescription<dim>::specific_entropy(const rank1_type &/*U*/) const
+  {
+    AssertThrow(false, dealii::ExcNotImplemented());
+  }
 
 
   template <int dim>

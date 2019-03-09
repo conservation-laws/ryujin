@@ -48,9 +48,18 @@ namespace grendel
     unsigned int smoothness_power_;
     ACCESSOR_READ_ONLY(smoothness_power)
 
-    enum class Indicator { rho, internal_energy } indicator_ = Indicator::rho;
+    static constexpr enum class Indicator {
+      rho,
+      internal_energy,
+      pressure,
+    } indicator_ = Indicator::rho;
 
-    enum class Limiters { rho, internal_energy } limiters_ = Limiters::rho;
+    static constexpr enum class Limiters {
+      rho,
+      internal_energy,
+      specific_entropy
+    } limiters_ = Limiters::rho;
+
   };
 
 
@@ -66,8 +75,12 @@ namespace grendel
 
     case Indicator::internal_energy:
       return problem_description_->internal_energy(gather(U, i));
+
+    case Indicator::pressure:
+      return problem_description_->pressure(gather(U, i));
     }
   }
+
 
   template <int dim>
   inline DEAL_II_ALWAYS_INLINE void
@@ -78,6 +91,7 @@ namespace grendel
     rho_max = 0.;
     rho_epsilon_min = std::numeric_limits<double>::max();
   }
+
 
   template <int dim>
   inline DEAL_II_ALWAYS_INLINE void
@@ -96,7 +110,7 @@ namespace grendel
       {
         const auto rho = U[0];
         rho_min = std::min(rho_min, rho);
-        rho_max = std::max(rho_min, rho);
+        rho_max = std::max(rho_max, rho);
       }
     }
   }
@@ -109,34 +123,38 @@ namespace grendel
 
     double l_ij = 1.;
 
-    switch (limiters_) {
-    case Limiters::internal_energy:
-      /* See [Guermond, Nazarov, Popov, Thomas], Section 4.5: */
-      {
-        // FIXME
-      }
-      [[fallthrough]];
-    case Limiters::rho:
+    /*
+     * First limit rho:
+     */
+    {
       /* See [Guermond, Nazarov, Popov, Thomas] (4.8): */
-      {
-        double l_ij_rho = 1.;
 
-        const auto U_i_rho = U[0];
-        const auto P_ij_rho = P_ij[0];
+      double l_ij_rho = 1.;
 
-        constexpr double eps_ = std::numeric_limits<double>::epsilon();
+      const auto U_i_rho = U[0];
+      const auto P_ij_rho = P_ij[0];
 
-        if (U_i_rho + P_ij_rho < rho_min)
-          l_ij_rho = std::abs(rho_min - U_i_rho) /
-                     (std::abs(P_ij_rho) + eps_ * rho_max);
+      constexpr double eps_ = std::numeric_limits<double>::epsilon();
 
-        else if (rho_max < U_i_rho + P_ij_rho)
-          l_ij_rho = std::abs(rho_max - U_i_rho) /
-                     (std::abs(P_ij_rho) + eps_ * rho_max);
+      if (U_i_rho + P_ij_rho < rho_min)
+        l_ij_rho = std::abs(rho_min - U_i_rho) /
+                   (std::abs(P_ij_rho) + eps_ * rho_max);
 
-        l_ij = std::min(l_ij, l_ij_rho); // ensures that l_ij <= 1
-      }
+      else if (rho_max < U_i_rho + P_ij_rho)
+        l_ij_rho = std::abs(rho_max - U_i_rho) /
+                   (std::abs(P_ij_rho) + eps_ * rho_max);
+
+      l_ij = std::min(l_ij, l_ij_rho); // ensures that l_ij <= 1
     }
+
+    if (limiters_ == Limiters::rho)
+      return l_ij;
+
+    /*
+     * Then, limit the internal energy:
+     */
+
+    /* See [Guermond, Nazarov, Popov, Thomas], Section 4.5: */
 
     return l_ij;
   }

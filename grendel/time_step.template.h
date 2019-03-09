@@ -47,9 +47,6 @@ namespace grendel
         "use limiter",
         use_limiter_,
         "If enabled, use a convex limiter for the high-order approximation..");
-
-//     eps_ = 10.e-7; //FIXME
-    eps_ = std::numeric_limits<double>::epsilon();
   }
 
 
@@ -207,6 +204,8 @@ namespace grendel
 
             d_sum -= get_entry(dij_matrix_, jt);
             numerator += (indicator_i - indicator_j);
+
+            constexpr double eps_ = 1.e-7;
             denominator += std::abs(indicator_i - indicator_j) +
                            eps_ * std::abs(indicator_j);
           }
