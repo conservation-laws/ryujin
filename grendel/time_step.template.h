@@ -98,6 +98,7 @@ namespace grendel
     const auto &lumped_mass_matrix = offline_data_->lumped_mass_matrix();
     const auto &norm_matrix = offline_data_->norm_matrix();
     const auto &nij_matrix = offline_data_->nij_matrix();
+    const auto &bij_matrix = offline_data_->bij_matrix();
     const auto &cij_matrix = offline_data_->cij_matrix();
     const auto &boundary_normal_map = offline_data_->boundary_normal_map();
 
@@ -255,8 +256,75 @@ namespace grendel
     tau = tau == 0 ? tau_max.load() : tau;
     deallog << "        perform time-step with tau = " << tau << std::endl;
 
+
     /*
-     * Step 3: Perform low-order update and compute limiter:
+     * Step 3: Compute R_i and first part of P_ij
+     *
+     *        R_i = \sum_j - c_ij f_j + d_ij^H (U_j - U_i)
+     *
+     *        P_ij = tau / m_i / lambda (
+     *                   (d_ij^H - d_ij^L) (U_i + U_j) +
+     *                   b_ij R_j - b_ji R_i
+     */
+
+    {
+      deallog << "        compute r_i, and p_ij" << std::endl;
+      TimerOutput::Scope t(computing_timer_,
+                           "time_step - 4 compute r_i, and p_ij");
+
+      const auto on_subranges = [&](auto i1, const auto i2) {
+
+        /* Translate the local index into a index set iterator:: */
+        auto it = locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
+        for (; i1 < i2; ++i1, ++it) {
+
+          const auto i = *it;
+
+          const auto U_i = gather(U, i);
+          const auto alpha_i = alpha_[i];
+
+          const double m_i = lumped_mass_matrix.diag_element(i);
+
+          const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
+          const double lambda = 1. / (size - 1.);
+
+          rank1_type r_i;
+
+          for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
+
+            const auto j = jt->column();
+            const auto U_j = gather(U, j);
+            const auto f_j = problem_description_->f(U_j);
+            const auto alpha_j = alpha_[j];
+
+            const auto c_ij = gather_get_entry(cij_matrix, jt);
+            const auto d_ij = get_entry(dij_matrix_, jt);
+
+            const auto d_ijH = d_ij * std::max(alpha_i, alpha_j);
+
+            const auto p_ij = tau / m_i / lambda * (d_ijH - d_ij) * (U_j - U_i);
+
+            for (unsigned int k = 0; k < problem_dimension; ++k)
+              r_i[k] += -c_ij * f_j[k] + d_ijH * (U_j - U_i)[k];
+
+            scatter_set_entry(pij_matrix_, jt, p_ij);
+          }
+
+          scatter(r_, r_i, i);
+        }
+      };
+
+      parallel::apply_to_subranges(
+          indices.begin(), indices.end(), on_subranges, 4096);
+
+      /* Synchronize r_ over all MPI processes: */
+      for (auto &it : r_)
+        it.update_ghost_values();
+    }
+
+
+    /*
+     * Step 4: Perform low-order update and compute limiter:
      *
      *   \bar U_ij = 1/2 d_ij^L (U_i + U_j) - 1/2 (f_j - f_i) c_ij
      *
@@ -270,8 +338,7 @@ namespace grendel
     {
       deallog << "        low-order update and limiter" << std::endl;
       TimerOutput::Scope t(computing_timer_,
-                           "time_step - 3 low-order update and limiter");
-
+                           "time_step - 4 low-order update and limiter");
 
       const auto on_subranges = [&](auto i1, const auto i2) {
 
@@ -297,6 +364,7 @@ namespace grendel
           const double m_i = lumped_mass_matrix.diag_element(i);
           const auto f_i = problem_description_->f(U_i);
           const auto alpha_i = alpha_[i];
+          const auto r_i = gather(r_, i);
 
           const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
           const double lambda = 1. / (size - 1.);
@@ -307,7 +375,10 @@ namespace grendel
             const auto U_j = gather(U, j);
             const auto f_j = problem_description_->f(U_j);
             const auto alpha_j = alpha_[j];
+            const auto r_j = gather(r_, i);
 
+            const auto b_ij = get_entry(bij_matrix, jt);
+            const auto b_ji = bij_matrix(j, i); // FIXME: Suboptimal
             const auto c_ij = gather_get_entry(cij_matrix, jt);
             const auto d_ij = get_entry(dij_matrix_, jt);
 
@@ -319,8 +390,10 @@ namespace grendel
             Unew_i += tau / m_i * 2. * d_ij * (U_ij_bar - U_i);
 
             if (use_smoothness_indicator_ || use_limiter_) {
-              const auto p_ij = tau / m_i / lambda * d_ij *
-                                (std::max(alpha_i, alpha_j) - 1.) * (U_j - U_i);
+              const auto p_ij =
+                  tau / m_i / lambda *
+                  (d_ij * (std::max(alpha_i, alpha_j) - 1.) * (U_j - U_i) +
+                   b_ij * r_j - b_ji * r_i);
               scatter_set_entry(pij_matrix_, jt, p_ij);
             }
 
@@ -372,16 +445,14 @@ namespace grendel
 
 
     /*
-     * Step 4: Perform high-order and fix boundary:
-     *
-     *   P_ij = tau / m_i / lambda (d_ij^H - d_ij^L) + [...]
+     * Step 5: Perform high-order and fix boundary:
      *
      *   High-order update: += l_ij * lambda * P_ij
      */
 
     if (use_smoothness_indicator_) {
       deallog << "        high-order update" << std::endl;
-      TimerOutput::Scope t(computing_timer_, "time_step - 4 high-order update");
+      TimerOutput::Scope t(computing_timer_, "time_step - 5 high-order update");
 
       const auto on_subranges = [&](auto i1, const auto i2) {
         /* Translate the local index into a index set iterator:: */
@@ -414,13 +485,13 @@ namespace grendel
     }
 
     /*
-     * Step 5: Fix boundary:
+     * Step 6: Fix boundary:
      */
 
     {
       deallog << "        fix up boundary states" << std::endl;
       TimerOutput::Scope t(computing_timer_,
-                           "time_step - 5 fix boundary states");
+                           "time_step - 6 fix boundary states");
 
       const auto on_subranges = [&](const auto it1, const auto it2) {
         for (auto it = it1; it != it2; ++it) {
@@ -456,7 +527,6 @@ namespace grendel
     }
 
     /* Synchronize temp over all MPI processes: */
-
     for (auto &it : temp_euler_)
       it.update_ghost_values();
 
