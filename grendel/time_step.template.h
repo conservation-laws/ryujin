@@ -48,6 +48,7 @@ namespace grendel
         use_limiter_,
         "If enabled, use a convex limiter for the high-order approximation..");
 
+//     eps_ = 10.e-7; //FIXME
     eps_ = std::numeric_limits<double>::epsilon();
   }
 

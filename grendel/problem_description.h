@@ -94,6 +94,14 @@ namespace grendel
 
 
     /**
+     * For a given (2+dim dimensional) state vector <code>U</code>, compute
+     * and return the specific entropy.
+     */
+    inline DEAL_II_ALWAYS_INLINE double
+    internal_energy(const rank1_type &U) const;
+
+
+    /**
      * Given a position @p point return the corresponding (conserved)
      * initial state. This function is used to interpolate initial values.
      *
@@ -163,7 +171,7 @@ namespace grendel
   ProblemDescription<dim>::internal_energy(const rank1_type &U) const
   {
     /*
-     * e rho = (E - 1/2*m^2/rho)
+     * rho e = (E - 1/2*m^2/rho)
      */
     const double &rho = U[0];
     const auto m = momentum_vector(U);
@@ -187,6 +195,13 @@ namespace grendel
     const double &rho = U[0];
     return (gamma_ - 1.) / (1. - b_ * rho) * internal_energy(U);
   }
+
+
+//   template <int dim>
+//   inline DEAL_II_ALWAYS_INLINE double
+//   ProblemDescription<dim>::specific_entropy(const rank1_type &U) const
+//   {
+//   }
 
 
   template <int dim>
