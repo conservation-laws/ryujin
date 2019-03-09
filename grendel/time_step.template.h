@@ -236,6 +236,11 @@ namespace grendel
       /* Synchronize tau_max over all MPI processes: */
       tau_max.store(Utilities::MPI::min(tau_max.load(), mpi_communicator_));
 
+      AssertThrow(
+          !std::isnan(tau_max),
+          ExcMessage(
+              "I'm sorry, Dave. I'm afraid I can't do that. - We crashed."));
+
       /* Synchronize alpha_i_t over all MPI processes: */
       alpha_i_.update_ghost_values();
 
