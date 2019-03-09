@@ -14,6 +14,8 @@
 
 #include <boost/range/iterator_range.hpp>
 
+#include "helper.h"
+
 namespace grendel
 {
   using namespace dealii;
@@ -133,6 +135,7 @@ namespace grendel
       TimerOutput::Scope t(computing_timer_, "offline_data - setup matrices");
       mass_matrix_.reinit(sparsity_pattern_);
       lumped_mass_matrix_.reinit(sparsity_pattern_);
+      bij_matrix_.reinit(sparsity_pattern_);
       norm_matrix_.reinit(sparsity_pattern_);
       for (auto &matrix : cij_matrix_)
         matrix.reinit(sparsity_pattern_);
@@ -333,19 +336,27 @@ namespace grendel
      * Second part: Compute norms and n_ijs
      */
 
-    const auto local_compute_norms = [&](const auto &it, auto &, auto &) {
+    const auto on_subranges = [&](const auto &it, auto &, auto &) {
       const auto row_index = *it;
 
       std::for_each(sparsity_pattern_.begin(row_index),
                     sparsity_pattern_.end(row_index),
-                    [&](const auto &it) {
-                      const auto col_index = it.column();
-                      double norm = 0;
-                      for (const auto &matrix : cij_matrix_) {
-                        const auto value = matrix(row_index, col_index);
-                        norm += value * value;
-                      }
-                      norm_matrix_(row_index, col_index) = std::sqrt(norm);
+                    [&](const auto &jt) {
+                      const auto value = gather_get_enry(cij_matrix_, jt);
+                      const double norm = value.norm();
+                      set_entry(norm_matrix_, jt, norm);
+                    });
+
+      std::for_each(sparsity_pattern_.begin(row_index),
+                    sparsity_pattern_.end(row_index),
+                    [&](const auto &jt) {
+                      const auto col_index = jt.column();
+                      const auto m_ij = get_entry(mass_matrix_, jt);
+                      const auto m_j =
+                          lumped_mass_matrix_.diag_element(col_index);
+                      const auto b_ij =
+                          (row_index == col_index ? 1. : 0.) - m_ij / m_j;
+                      set_entry(bij_matrix_, jt, b_ij);
                     });
 
       for (auto &matrix : nij_matrix_) {
@@ -361,13 +372,13 @@ namespace grendel
     };
 
     {
-      deallog << "        compute |c_ij|s and n_ijs" << std::endl;
+      deallog << "        compute b_ijs, |c_ij|s, and n_ijs" << std::endl;
       TimerOutput::Scope t(computing_timer_,
-                           "offline_data - compute |c_ij| and n_ij");
+                           "offline_data - compute b_ij, |c_ij|, and n_ij");
 
       WorkStream::run(locally_relevant_.begin(),
                       locally_relevant_.end(),
-                      local_compute_norms,
+                      on_subranges,
                       [](const auto &) {},
                       double(),
                       double());

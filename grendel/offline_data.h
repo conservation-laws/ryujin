@@ -134,6 +134,13 @@ namespace grendel
     ACCESSOR_READ_ONLY(lumped_mass_matrix)
 
     /**
+     * The $(b_{ij})$ matrix:
+     *   $b_{ij} = \delta_{ij} - m_{ij}/m{j}$
+     */
+    dealii::SparseMatrix<double> bij_matrix_;
+    ACCESSOR_READ_ONLY(bij_matrix)
+
+    /**
      * The $(c_{ij})$ matrix.
      *
      * Departing from the mathematical formulation, where an entry $c_ij$
