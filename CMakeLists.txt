@@ -13,19 +13,21 @@ IF(NOT DEAL_II_WITH_MPI OR NOT DEAL_II_WITH_THREADS OR NOT DEAL_II_WITH_P4EST)
 ENDIF()
 
 IF(CMAKE_CXX_COMPILER MATCHES "clang")
-  SET(DEAL_II_CXX_FLAGS "${DEAL_II_CXX_FLAGS} -Xclang -fcolor-diagnostics -Qunused-arguments")
-  SET(DEAL_II_LINKER_FLAGS "${DEAL_II_LINKER_FLAGS} -Wl,-as-needed")
-
-  SET(DEAL_II_CXX_FLAGS_DEBUG
-    "${DEAL_II_CXX_FLAGS_DEBUG} -fsanitize=address -fsanitize-address-use-after-scope"
+  STRING(APPEND DEAL_II_CXX_FLAGS
+    " -Xclang -fcolor-diagnostics -Qunused-arguments"
     )
-  SET(DEAL_II_LINKER_FLAGS_DEBUG
-    "${DEAL_II_LINKER_FLAGS_DEBUG} -fsanitize=address -fsanitize-address-use-after-scope"
+  STRING(APPEND DEAL_II_LINKER_FLAGS " -Wl,-as-needed")
+
+  STRING(APPEND DEAL_II_CXX_FLAGS_DEBUG
+    " -fsanitize=address -fsanitize-address-use-after-scope"
+    )
+  STRING(APPEND DEAL_II_LINKER_FLAGS_DEBUG
+    " -fsanitize=address -fsanitize-address-use-after-scope"
     )
 ENDIF()
 
-SET(DEAL_II_CXX_FLAGS_RELEASE
-  "${DEAL_II_CXX_FLAGS_DEBUG} -march=native -Ofast -ffp-contract=fast"
+STRING(APPEND DEAL_II_CXX_FLAGS_RELEASE
+  " -march=native -Ofast -ffp-contract=fast"
   )
 
 PROJECT(ryujin CXX)
