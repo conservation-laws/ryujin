@@ -15,11 +15,7 @@ int main (int argc, char *argv[])
    * If necessary, create empty parameter file and exit:
    */
 
-  try{
-    dealii::ParameterAcceptor::initialize("ryujin.prm");
-  } catch (...) {
-    return 1;
-  }
+  dealii::ParameterAcceptor::initialize("ryujin.prm");
 
   time_loop.run();
   return 0;

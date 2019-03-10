@@ -106,20 +106,22 @@ namespace grendel
   {
     auto &[rho_min, rho_max, rho_epsilon_min] = bounds;
 
-    switch (limiters_) {
-    case Limiters::internal_energy:
-      {
-        const auto rho_epsilon = problem_description_->internal_energy(U);
-        rho_epsilon_min = std::min(rho_epsilon_min, rho_epsilon);
-      }
-      [[fallthrough]];
-    case Limiters::rho:
-      {
-        const auto rho = U[0];
-        rho_min = std::min(rho_min, rho);
-        rho_max = std::max(rho_max, rho);
-      }
-    }
+    if constexpr(limiters_ == Limiters::none)
+      return;
+
+    const auto rho = U[0];
+    rho_min = std::min(rho_min, rho);
+    rho_max = std::max(rho_max, rho);
+
+    if constexpr(limiters_ == Limiters::rho)
+      return;
+
+    const auto rho_epsilon = problem_description_->internal_energy(U);
+    rho_epsilon_min = std::min(rho_epsilon_min, rho_epsilon);
+
+
+    if constexpr(limiters_ == Limiters::internal_energy)
+      return;
   }
 
   template <int dim>
@@ -130,7 +132,7 @@ namespace grendel
 
     double l_ij = 1.;
 
-    if (limiters_ == Limiters::none)
+    if constexpr(limiters_ == Limiters::none)
       return l_ij;
 
     /*
@@ -157,7 +159,7 @@ namespace grendel
       l_ij = std::min(l_ij, l_ij_rho); // ensures that l_ij <= 1
     }
 
-    if (limiters_ == Limiters::rho)
+    if constexpr(limiters_ == Limiters::rho)
       return l_ij;
 
     /*
