@@ -64,11 +64,10 @@ namespace grendel
 
     static constexpr enum class Indicator {
       none,
-      one,
       rho,
       internal_energy,
       pressure,
-    } indicator_ = Indicator::one;
+    } indicator_ = Indicator::rho;
 
     static constexpr enum class Limiters {
       none,
@@ -87,10 +86,7 @@ namespace grendel
   {
     switch (indicator_) {
     case Indicator::none:
-      return 0.;
-
-    case Indicator::one:
-      return 0.;
+      return 1.;
 
     case Indicator::rho:
       return U[0][i];
