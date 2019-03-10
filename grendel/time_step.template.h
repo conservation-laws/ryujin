@@ -230,10 +230,9 @@ namespace grendel
       /* Synchronize tau_max over all MPI processes: */
       tau_max.store(Utilities::MPI::min(tau_max.load(), mpi_communicator_));
 
-      AssertThrow(
-          !std::isnan(tau_max),
-          ExcMessage(
-              "I'm sorry, Dave. I'm afraid I can't do that. - We crashed."));
+      AssertThrow(!std::isnan(tau_max) && !std::isinf(tau_max) && tau_max > 0.,
+                  ExcMessage("I'm sorry, Dave. I'm afraid I can't "
+                             "do that. - We crashed."));
 
       deallog << "        computed tau_max = " << tau_max << std::endl;
 
