@@ -24,6 +24,10 @@ IF(CMAKE_CXX_COMPILER MATCHES "clang")
     )
 ENDIF()
 
+SET(DEAL_II_CXX_FLAGS_RELEASE
+  "${DEAL_II_CXX_FLAGS_DEBUG} -march=native -Ofast -ffp-contract=fast"
+  )
+
 PROJECT(ryujin CXX)
 
 IF(POLICY CMP0042)
