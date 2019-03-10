@@ -377,7 +377,7 @@ namespace grendel
             const auto b_ij = get_entry(bij_matrix, jt);
             const auto b_ji = bij_matrix(j, i); // FIXME: Suboptimal
 
-            const auto r_j = gather(r_, i);
+            const auto r_j = gather(r_, j);
 
             auto p_ij = gather_get_entry(pij_matrix_, jt);
             p_ij += tau / m_i / lambda * (b_ij * r_j - b_ji * r_i);
