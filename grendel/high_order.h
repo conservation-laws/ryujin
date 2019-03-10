@@ -63,10 +63,12 @@ namespace grendel
 
 
     static constexpr enum class Indicator {
+      none,
+      one,
       rho,
       internal_energy,
       pressure,
-    } indicator_ = Indicator::rho;
+    } indicator_ = Indicator::one;
 
     static constexpr enum class Limiters {
       none,
@@ -84,6 +86,11 @@ namespace grendel
   HighOrder<dim>::smoothness_indicator(const Vector &U, Index i) const
   {
     switch (indicator_) {
+    case Indicator::none:
+      return 0.;
+
+    case Indicator::one:
+      return 0.;
 
     case Indicator::rho:
       return U[0][i];
