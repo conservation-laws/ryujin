@@ -283,8 +283,8 @@ namespace grendel
 
           const auto f_i = problem_description_->f(U_i);
           const auto alpha_i = alpha_[i];
-
           const double m_i = lumped_mass_matrix.diag_element(i);
+
           const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
           const double lambda = 1. / (size - 1.);
 
@@ -310,13 +310,13 @@ namespace grendel
             dealii::Tensor<1, problem_dimension> U_ij_bar;
 
             for (unsigned int k = 0; k < problem_dimension; ++k) {
-              r_i[k] += -c_ij * f_j[k] + d_ijH * (U_j - U_i)[k];
+              const auto temp = c_ij * (f_j[k] - f_i[k]);
 
-              U_ij_bar[k] = 1. / 2. * (U_i[k] + U_j[k]) -
-                            1. / 2. * (f_j[k] - f_i[k]) * c_ij / d_ij;
+              r_i[k] += -temp + d_ijH * (U_j - U_i)[k];
+              U_ij_bar[k] = 1. / 2. * (U_i[k] + U_j[k]) - 1. / 2. * temp / d_ij;
             }
 
-            U_i_new += tau / m_i * 2. * d_ij * (U_ij_bar - U_i);
+            U_i_new += tau / m_i * 2. * d_ij * U_ij_bar;
 
             scatter_set_entry(pij_matrix_, jt, p_ij);
 
