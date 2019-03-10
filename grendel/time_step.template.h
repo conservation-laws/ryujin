@@ -20,7 +20,7 @@ namespace grendel
       const grendel::OfflineData<dim> &offline_data,
       const grendel::ProblemDescription<dim> &problem_description,
       const grendel::RiemannSolver<dim> &riemann_solver,
-      const grendel::Limiter<dim> &limiter,
+      const grendel::HighOrder<dim> &high_order,
       const std::string &subsection /*= "TimeStep"*/)
       : ParameterAcceptor(subsection)
       , mpi_communicator_(mpi_communicator)
@@ -28,7 +28,7 @@ namespace grendel
       , offline_data_(&offline_data)
       , problem_description_(&problem_description)
       , riemann_solver_(&riemann_solver)
-      , limiter_(&limiter)
+      , high_order_(&high_order)
   {
     use_ssprk_ = false;
     add_parameter(
@@ -171,7 +171,6 @@ namespace grendel
                            "time_step - 2 compute d_ii, tau_max, and alpha_i");
 
       alpha_.zero_out_ghosts();
-      const double smoothness_power = limiter_->smoothness_power();
 
       const auto on_subranges = [&](auto i1, const auto i2) {
         double tau_max_on_subrange = std::numeric_limits<double>::infinity();
@@ -182,7 +181,7 @@ namespace grendel
         for (; i1 < i2; ++i1, ++it) {
 
           const auto i = *it;
-          const auto indicator_i = limiter_->smoothness_indicator(U, i);
+          const auto indicator_i = high_order_->smoothness_indicator(U, i);
 
           /* Let's compute the sum of the off-diagonal d_ijs and alpha_i for
            * index i: */
@@ -198,7 +197,7 @@ namespace grendel
             if (j == i)
               continue;
 
-            const auto indicator_j = limiter_->smoothness_indicator(U, j);
+            const auto indicator_j = high_order_->smoothness_indicator(U, j);
 
             d_sum -= get_entry(dij_matrix_, jt);
             numerator += (indicator_i - indicator_j);
@@ -210,8 +209,8 @@ namespace grendel
 
           dij_matrix_.diag_element(i) = d_sum;
 
-          alpha_[i] =
-              std::pow(std::abs(numerator) / denominator, smoothness_power);
+          alpha_[i] = std::pow(std::abs(numerator) / denominator,
+                               HighOrder<dim>::smoothness_power);
 
           const double mass = lumped_mass_matrix.diag_element(i);
           const double tau = cfl * mass / (-2. * d_sum);
@@ -266,7 +265,7 @@ namespace grendel
       const auto on_subranges = [&](auto i1, const auto i2) {
 
         /* Notar bene: This bounds variable is thread local: */
-        typename Limiter<dim>::Bounds bounds;
+        typename HighOrder<dim>::Bounds bounds;
 
         /* Translate the local index into a index set iterator:: */
         auto it = locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
@@ -291,7 +290,7 @@ namespace grendel
           rank1_type r_i;
 
           /* Clear bounds: */
-          limiter_->reset(bounds);
+          high_order_->reset(bounds);
 
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
 
@@ -320,7 +319,7 @@ namespace grendel
 
             scatter_set_entry(pij_matrix_, jt, p_ij);
 
-            limiter_->accumulate(bounds, U_ij_bar);
+            high_order_->accumulate(bounds, U_ij_bar);
           }
 
           scatter(temp_euler_, U_i_new, i);
@@ -383,7 +382,7 @@ namespace grendel
             p_ij += tau / m_i / lambda * (b_ij * r_j - b_ji * r_i);
             scatter_set_entry(pij_matrix_, jt, p_ij);
 
-            const auto l_ij = limiter_->limit(bounds, U_i_new, p_ij);
+            const auto l_ij = high_order_->limit(bounds, U_i_new, p_ij);
             set_entry(lij_matrix_, jt, l_ij);
           }
         }

@@ -2,7 +2,7 @@
 #define TIMELOOP_H
 
 #include <discretization.h>
-#include <limiter.h>
+#include <high_order.h>
 #include <offline_data.h>
 #include <problem_description.h>
 #include <riemann_solver.h>
@@ -58,7 +58,7 @@ namespace ryujin
     grendel::OfflineData<dim> offline_data;
     grendel::ProblemDescription<dim> problem_description;
     grendel::RiemannSolver<dim> riemann_solver;
-    grendel::Limiter<dim> limiter;
+    grendel::HighOrder<dim> high_order;
     grendel::TimeStep<dim> time_step;
     grendel::SchlierenPostprocessor<dim> schlieren_postprocessor;
 

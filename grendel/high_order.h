@@ -1,5 +1,5 @@
-#ifndef LIMITER_H
-#define LIMITER_H
+#ifndef HIGH_ORDER_H
+#define HIGH_ORDER_H
 
 #include "problem_description.h"
 
@@ -9,7 +9,7 @@ namespace grendel
 {
 
   template <int dim>
-  class Limiter : public dealii::ParameterAcceptor
+  class HighOrder : public dealii::ParameterAcceptor
   {
   public:
     static constexpr unsigned int problem_dimension =
@@ -25,14 +25,24 @@ namespace grendel
     typedef std::array<dealii::LinearAlgebra::distributed::Vector<double>, 3>
         vector_type;
 
-    Limiter(const grendel::ProblemDescription<dim> &problem_description,
-            const std::string &subsection = "Limiter");
+    HighOrder(const grendel::ProblemDescription<dim> &problem_description,
+              const std::string &subsection = "HighOrder");
 
-    virtual ~Limiter() final = default;
+    virtual ~HighOrder() final = default;
+
+    /*
+     * Indicator:
+     */
+
+    static constexpr unsigned int smoothness_power = 3;
 
     template <typename Vector, typename Index>
     inline DEAL_II_ALWAYS_INLINE double smoothness_indicator(const Vector &U,
                                                              Index i) const;
+
+    /*
+     * Limiter:
+     */
 
     inline DEAL_II_ALWAYS_INLINE void reset(Bounds &bounds) const;
 
@@ -51,8 +61,6 @@ namespace grendel
   private:
     /* Options: */
 
-    unsigned int smoothness_power_;
-    ACCESSOR_READ_ONLY(smoothness_power)
 
     static constexpr enum class Indicator {
       rho,
@@ -73,7 +81,7 @@ namespace grendel
   template <int dim>
   template <typename Vector, typename Index>
   inline DEAL_II_ALWAYS_INLINE double
-  Limiter<dim>::smoothness_indicator(const Vector &U, Index i) const
+  HighOrder<dim>::smoothness_indicator(const Vector &U, Index i) const
   {
     switch (indicator_) {
 
@@ -91,7 +99,7 @@ namespace grendel
 
   template <int dim>
   inline DEAL_II_ALWAYS_INLINE void
-  Limiter<dim>::reset(Bounds &bounds) const
+  HighOrder<dim>::reset(Bounds &bounds) const
   {
     auto &[rho_min, rho_max, rho_epsilon_min] = bounds;
     rho_min = std::numeric_limits<double>::max();
@@ -102,7 +110,7 @@ namespace grendel
 
   template <int dim>
   inline DEAL_II_ALWAYS_INLINE void
-  Limiter<dim>::accumulate(Bounds &bounds, const rank1_type &U) const
+  HighOrder<dim>::accumulate(Bounds &bounds, const rank1_type &U) const
   {
     auto &[rho_min, rho_max, rho_epsilon_min] = bounds;
 
@@ -125,7 +133,7 @@ namespace grendel
   }
 
   template <int dim>
-  inline DEAL_II_ALWAYS_INLINE double Limiter<dim>::limit(
+  inline DEAL_II_ALWAYS_INLINE double HighOrder<dim>::limit(
       const Bounds &bounds, const rank1_type &U, const rank1_type &P_ij) const
   {
     auto &[rho_min, rho_max, rho_epsilon_min] = bounds;
@@ -173,4 +181,4 @@ namespace grendel
 
 } /* namespace grendel */
 
-#endif /* LIMITER_H */
+#endif /* HIGH_ORDER_H */
