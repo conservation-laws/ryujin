@@ -61,10 +61,11 @@ namespace grendel
     } indicator_ = Indicator::rho;
 
     static constexpr enum class Limiters {
+      none,
       rho,
       internal_energy,
       specific_entropy
-    } limiters_ = Limiters::rho;
+    } limiters_ = Limiters::none;
 
   };
 
@@ -128,6 +129,9 @@ namespace grendel
     auto &[rho_min, rho_max, rho_epsilon_min] = bounds;
 
     double l_ij = 1.;
+
+    if (limiters_ == Limiters::none)
+      return l_ij;
 
     /*
      * First limit rho:
