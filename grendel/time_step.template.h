@@ -35,18 +35,6 @@ namespace grendel
         "use SSP RK",
         use_ssprk_,
         "If enabled, use SSP RK(3) instead of the forward Euler scheme.");
-
-    use_smoothness_indicator_ = false;
-    add_parameter("use smoothness indicator",
-                  use_smoothness_indicator_,
-                  "If enabled, use a smoothness indicator for the high-order "
-                  "approximation.");
-
-    use_limiter_ = false;
-    add_parameter(
-        "use limiter",
-        use_limiter_,
-        "If enabled, use a convex limiter for the high-order approximation..");
   }
 
 
@@ -273,7 +261,7 @@ namespace grendel
     {
       deallog << "        low-order update, limiter bounds, r_i, and p_ij" << std::endl;
       TimerOutput::Scope t(computing_timer_,
-                           "time_step - 3 low-orer update, limiter bounds, compute r_i, and p_ij");
+                           "time_step - 3 low-order update, limiter bounds, compute r_i, and p_ij (1)");
 
       const auto on_subranges = [&](auto i1, const auto i2) {
 
@@ -360,7 +348,7 @@ namespace grendel
     {
       deallog << "        compute p_ij and l_ij" << std::endl;
       TimerOutput::Scope t(computing_timer_,
-                           "time_step - 4 compute p_ij, and l_ij");
+                           "time_step - 4 compute p_ij (2), and l_ij");
 
       const auto on_subranges = [&](auto i1, const auto i2) {
 
@@ -443,7 +431,7 @@ namespace grendel
      *   High-order update: += l_ij * lambda * P_ij
      */
 
-    if (use_smoothness_indicator_) {
+    {
       deallog << "        high-order update" << std::endl;
       TimerOutput::Scope t(computing_timer_, "time_step - 5 high-order update");
 

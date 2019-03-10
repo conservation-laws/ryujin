@@ -109,8 +109,6 @@ namespace grendel
     /* Options: */
 
     bool use_ssprk_;
-    bool use_smoothness_indicator_;
-    bool use_limiter_;
   };
 
 } /* namespace grendel */
