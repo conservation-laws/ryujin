@@ -67,14 +67,14 @@ namespace grendel
       rho,
       internal_energy,
       pressure,
-    } indicator_ = Indicator::rho;
+    } indicator_ = Indicator::none;
 
     static constexpr enum class Limiters {
       none,
       rho,
       internal_energy,
       specific_entropy
-    } limiters_ = Limiters::rho;
+    } limiters_ = Limiters::none;
 
   };
 
