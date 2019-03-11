@@ -71,6 +71,13 @@ namespace grendel
      */
     double step(vector_type &U);
 
+    /* Options: */
+
+    static constexpr enum class Order {
+      first_order,
+      second_order
+    } order_ = Order::second_order;
+
   protected:
     const MPI_Comm &mpi_communicator_;
     dealii::TimerOutput &computing_timer_;

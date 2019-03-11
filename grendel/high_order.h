@@ -58,9 +58,8 @@ namespace grendel
         problem_description_;
     ACCESSOR_READ_ONLY(problem_description)
 
-  private:
+  public:
     /* Options: */
-
 
     static constexpr enum class Indicator {
       none,
@@ -75,7 +74,6 @@ namespace grendel
       internal_energy,
       specific_entropy
     } limiters_ = Limiters::none;
-
   };
 
 

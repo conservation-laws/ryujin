@@ -160,7 +160,7 @@ namespace grendel
      * Step 2: Compute diagonal of d_ij maximal time-step size, and
      *         smoothness indicator:
      *
-     *   \alpha_i = \|\sum_j U_i[s] - U_j[s] \| / \sum_j \| U_i[s] - U_j[s] \|
+     *   \alpha_i = \|\sum_j s(U_i) - s(U_j) \| / \sum_j \| s(U_i) - s(U_j) \|
      */
 
     std::atomic<double> tau_max{std::numeric_limits<double>::infinity()};
@@ -343,7 +343,7 @@ namespace grendel
      *        P_ij = [...] + tau / m_i / lambda (b_ij R_j - b_ji R_i)
      */
 
-    {
+    if constexpr (order_ == Order::second_order) {
       deallog << "        compute p_ij and l_ij" << std::endl;
       TimerOutput::Scope t(computing_timer_,
                            "time_step - 4 compute p_ij (2), and l_ij");
@@ -370,14 +370,14 @@ namespace grendel
           const auto r_i = gather(r_, i);
 
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
-            const auto j = jt->column();
+            auto p_ij = gather_get_entry(pij_matrix_, jt);
 
+            const auto j = jt->column();
             const auto b_ij = get_entry(bij_matrix, jt);
             const auto b_ji = bij_matrix(j, i); // FIXME: Suboptimal
 
             const auto r_j = gather(r_, j);
 
-            auto p_ij = gather_get_entry(pij_matrix_, jt);
             p_ij += tau / m_i / lambda * (b_ij * r_j - b_ji * r_i);
             scatter_set_entry(pij_matrix_, jt, p_ij);
 
@@ -394,7 +394,7 @@ namespace grendel
 
     /* And symmetrize l_ij: */
 
-    {
+    if constexpr (order_ == Order::second_order) {
       deallog << "        symmetrize l_ij" << std::endl;
       TimerOutput::Scope t(computing_timer_,
                            "time_step - 4 symmetrize l_ij");
@@ -429,7 +429,7 @@ namespace grendel
      *   High-order update: += l_ij * lambda * P_ij
      */
 
-    {
+    if constexpr (order_ == Order::second_order) {
       deallog << "        high-order update" << std::endl;
       TimerOutput::Scope t(computing_timer_, "time_step - 5 high-order update");
 
