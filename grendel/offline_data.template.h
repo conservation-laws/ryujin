@@ -136,6 +136,7 @@ namespace grendel
       mass_matrix_.reinit(sparsity_pattern_);
       lumped_mass_matrix_.reinit(sparsity_pattern_);
       bij_matrix_.reinit(sparsity_pattern_);
+      betaij_matrix_.reinit(sparsity_pattern_);
       norm_matrix_.reinit(sparsity_pattern_);
       for (auto &matrix : cij_matrix_)
         matrix.reinit(sparsity_pattern_);
@@ -155,6 +156,7 @@ namespace grendel
     norm_matrix_ = 0.;
     for (auto &matrix : cij_matrix_)
       matrix = 0.;
+    betaij_matrix_ = 0.;
     for (auto &matrix : nij_matrix_)
       matrix = 0.;
 
@@ -180,6 +182,7 @@ namespace grendel
       auto &local_boundary_normal_map = copy.local_boundary_normal_map_;
       auto &cell_mass_matrix = copy.cell_mass_matrix_;
       auto &cell_lumped_mass_matrix = copy.cell_lumped_mass_matrix_;
+      auto &cell_betaij_matrix = copy.cell_betaij_matrix_;
       auto &cell_cij_matrix = copy.cell_cij_matrix_;
 
       auto &fe_values = scratch.fe_values_;
@@ -191,6 +194,7 @@ namespace grendel
 
       cell_mass_matrix.reinit(dofs_per_cell, dofs_per_cell);
       cell_lumped_mass_matrix.reinit(dofs_per_cell, dofs_per_cell);
+      cell_betaij_matrix.reinit(dofs_per_cell, dofs_per_cell);
       for (auto &matrix : cell_cij_matrix)
         matrix.reinit(dofs_per_cell, dofs_per_cell);
 
@@ -202,6 +206,7 @@ namespace grendel
       local_boundary_normal_map.clear();
       cell_mass_matrix = 0.;
       cell_lumped_mass_matrix = 0.;
+      cell_betaij_matrix = 0.;
       for (auto &matrix : cell_cij_matrix)
         matrix = 0.;
 
@@ -218,8 +223,11 @@ namespace grendel
           for (unsigned int i = 0; i < dofs_per_cell; ++i) {
 
             const auto value = fe_values.shape_value(i, q_point);
+            const auto grad = fe_values.shape_grad(i, q_point);
 
             cell_mass_matrix(i, j) += value * value_JxW;
+
+            cell_betaij_matrix(i, j) += grad * grad_JxW;
 
             for (unsigned int d = 0; d < dim; ++d)
               cell_cij_matrix[d](i, j) += (value * grad_JxW)[d];
@@ -270,6 +278,7 @@ namespace grendel
       const auto &cell_mass_matrix = copy.cell_mass_matrix_;
       const auto &cell_lumped_mass_matrix = copy.cell_lumped_mass_matrix_;
       const auto &cell_cij_matrix = copy.cell_cij_matrix_;
+      const auto &cell_betaij_matrix = copy.cell_betaij_matrix_;
 
       if (is_artificial)
         return;
@@ -293,32 +302,10 @@ namespace grendel
         affine_constraints_.distribute_local_to_global(
             cell_cij_matrix[k], local_dof_indices, nij_matrix_[k]);
       }
+
+      affine_constraints_.distribute_local_to_global(
+          cell_betaij_matrix, local_dof_indices, betaij_matrix_);
     };
-
-    /*
-     * And run a workstream to assemble the matrix.
-     *
-     * We need a graph coloring for the cells exactly once (the TimeStep
-     * iterates over degrees of freedom without conflicts). Thus, construct
-     * a graph coloring locally instead of caching it.
-     */
-
-#if 0
-    // FIXME: The graph coloring is slow
-    deallog << "        construct graph" << std::endl;
-
-    const auto get_conflict_indices = [&](auto &cell) {
-      if (cell->is_artificial())
-        return std::vector<types::global_dof_index>();
-
-      std::vector<types::global_dof_index> local_dof_indices(dofs_per_cell);
-      cell->get_dof_indices(local_dof_indices);
-      return local_dof_indices;
-    };
-
-    const auto graph = GraphColoring::make_graph_coloring(
-        dof_handler_.begin_active(), dof_handler_.end(), get_conflict_indices);
-#endif
 
     {
       deallog << "        assemble mass matrices and c_ijs" << std::endl;

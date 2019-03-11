@@ -89,6 +89,7 @@ namespace grendel
     const auto &nij_matrix = offline_data_->nij_matrix();
     const auto &bij_matrix = offline_data_->bij_matrix();
     const auto &cij_matrix = offline_data_->cij_matrix();
+    const auto &betaij_matrix = offline_data_->betaij_matrix();
     const auto &boundary_normal_map = offline_data_->boundary_normal_map();
 
     const auto indices =
@@ -197,14 +198,18 @@ namespace grendel
             if (j == i)
               continue;
 
+            d_sum -= get_entry(dij_matrix_, jt);
+
+            const auto beta_ij = get_entry(betaij_matrix, jt);
+
             const auto indicator_j = high_order_->smoothness_indicator(U, j);
 
-            d_sum -= get_entry(dij_matrix_, jt);
-            numerator += (indicator_i - indicator_j);
+            numerator += beta_ij * (indicator_i - indicator_j);
 
             constexpr double eps_ = 1.e-7;
-            denominator += std::abs(indicator_i - indicator_j) +
-                           eps_ * std::abs(indicator_j);
+            denominator +=
+                std::abs(beta_ij) * std::abs(indicator_i - indicator_j) +
+                eps_ * std::abs(indicator_j);
           }
 
           dij_matrix_.diag_element(i) = d_sum;

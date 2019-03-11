@@ -141,6 +141,12 @@ namespace grendel
     ACCESSOR_READ_ONLY(bij_matrix)
 
     /**
+     * The $(beta_{ij})$ matrix.
+     */
+    dealii::SparseMatrix<double> betaij_matrix_;
+    ACCESSOR_READ_ONLY(betaij_matrix)
+
+    /**
      * The $(c_{ij})$ matrix.
      *
      * Departing from the mathematical formulation, where an entry $c_ij$
