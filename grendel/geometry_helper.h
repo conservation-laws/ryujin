@@ -143,8 +143,8 @@ namespace grendel
     using namespace dealii;
 
     GridGenerator::hyper_rectangle(triangulation,
-                                   Point<2>(-length / 2., 0.),
-                                   Point<2>(length / 2., diameter));
+                                   Point<2>(-length / 2., -diameter / 2.),
+                                   Point<2>(length / 2., diameter / 2.));
 
     /*
      * Set boundary ids:
