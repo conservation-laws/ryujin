@@ -33,7 +33,8 @@ namespace ryujin
 
     void initialize();
 
-    vector_type interpolate_initial_values();
+    vector_type interpolate_initial_values(double t = 0);
+
     void compute_error(const vector_type &U, double t);
 
     void output(const vector_type &U,

@@ -152,6 +152,9 @@ namespace ryujin
     double last_output = 0.;
 
     output(U, base_name + "-solution", t, 0);
+    if (enable_compute_error) {
+      output(U, base_name + "-analytic_solution", t, 0);
+    }
 
     /*
      * Loop:
@@ -175,12 +178,20 @@ namespace ryujin
 
       if (t - last_output > output_granularity) {
         output(U, base_name + "-solution", t, output_cycle++);
+        if (enable_compute_error) {
+          const auto analytic = interpolate_initial_values();
+          output(analytic, base_name + "-analytic_solution", t, output_cycle);
+        }
         last_output = t;
       }
     } /* end of loop */
 
     /* Final output: */
     output(U, base_name + "-solution", t, output_cycle);
+    if (enable_compute_error) {
+      const auto analytic = interpolate_initial_values();
+      output(analytic, base_name + "-analytic_solution", t, output_cycle);
+    }
 
     computing_timer.print_summary();
     deallog << timer_output.str() << std::endl;
@@ -281,7 +292,7 @@ namespace ryujin
 
   template <int dim>
   typename TimeLoop<dim>::vector_type
-  TimeLoop<dim>::interpolate_initial_values()
+  TimeLoop<dim>::interpolate_initial_values(double t)
   {
     deallog << "TimeLoop<dim>::interpolate_initial_values()" << std::endl;
     TimerOutput::Scope timer(computing_timer,
@@ -299,7 +310,7 @@ namespace ryujin
         ProblemDescription<dim>::problem_dimension;
 
     const auto callable = [&](const auto &p) {
-      return problem_description.initial_state(p, /*t=*/0.);
+      return problem_description.initial_state(p, t);
     };
 
     for (unsigned int i = 0; i < problem_dimension; ++i)
@@ -328,34 +339,24 @@ namespace ryujin
             << std::endl;
     deallog << "        t     = " << t << std::endl;
 
-    /*
-     * Some scratch data:
-     */
-
     constexpr auto problem_dimension =
         ProblemDescription<dim>::problem_dimension;
-
-    const auto callable = [&](const auto &p) {
-      return problem_description.initial_state(p, t);
-    };
-
-    dealii::LinearAlgebra::distributed::Vector<double> error(U[0]);
-
-    Vector<float> difference_per_cell(
-        offline_data.discretization().triangulation().n_active_cells());
 
     /*
      * Compute L_inf norm:
      */
 
+    Vector<float> difference_per_cell(
+        offline_data.discretization().triangulation().n_active_cells());
+
     double linf_norm = 0.;
     double l1_norm = 0;
     double l2_norm = 0;
 
+    auto analytic = interpolate_initial_values(t);
+
     for (unsigned int i = 0; i < problem_dimension; ++i) {
-      VectorTools::interpolate(offline_data.dof_handler(),
-                               to_function<dim, double>(callable, i),
-                               error);
+      auto &error = analytic[i];
 
       /*
        * Compute norms of analytic solution:
