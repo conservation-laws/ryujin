@@ -37,22 +37,24 @@ namespace grendel
     initial_direction_[0] = 1.;
     add_parameter("initial - direction",
                   initial_direction_,
-                  "Initial direction of shock, or contrast front");
+                  "Initial direction of shock front, sod contrast, or vortex");
 
     initial_position_[0] = 1.;
     add_parameter("initial - position",
                   initial_position_,
-                  "Initial position of shock, or contrast front");
+                  "Initial position of shock front, sod contrast, or vortex");
 
-    initial_shock_front_mach_number_ = 2.0;
-    add_parameter("shock front - mach number",
-                  initial_shock_front_mach_number_,
-                  "Shock Front: Mach number");
+    initial_mach_number_ = 2.0;
+    add_parameter(
+        "initial - mach number",
+        initial_mach_number_,
+        "Initial mach number of shock front, uniform state, or vortex");
 
-    initial_uniform_mach_number_ = 3.0;
-    add_parameter("uniform - mach number",
-                  initial_uniform_mach_number_,
-                  "Uniform: Mach number");
+    initial_vortex_beta_ = 5.0;
+    add_parameter(
+        "initial - vortex beta",
+        initial_vortex_beta_,
+        "Initial vortex strength beta");
   }
 
 
@@ -63,18 +65,42 @@ namespace grendel
      * First, let's normalize the direction:
      */
 
-    AssertThrow(initial_direction_.norm() != 0.,
-                ExcMessage("no direction, initial shock front direction is set "
-                           "to the zero vector."));
+    AssertThrow(
+        initial_direction_.norm() != 0.,
+        ExcMessage("Initial shock front direction is set to the zero vector."));
     initial_direction_ /= initial_direction_.norm();
 
     /*
-     * Now populate the "left" and "right" state functions:
+     * Create a small lambda that translates a 1D state (rho, u, p) into an
+     * nD state:
+     */
+
+    const auto from_1d_state =
+        [=](const std::array<double, 3> &state_1d) -> rank1_type {
+      const auto &[rho, u, p] = state_1d;
+
+      rank1_type state;
+
+      state[0] = rho;
+      for (unsigned int i = 0; i < dim; ++i)
+        state[1 + i] = rho * u * initial_direction_[i];
+      state[dim + 1] = p / (gamma_ - 1.) + 0.5 * rho * u * u;
+
+      return state;
+    };
+
+
+    /*
+     * Now populate the initial_state_internal function object:
      */
 
     if (initial_state_ == "shock front") {
 
-      // FIXME: Add reference to literature
+      /*
+       * A mach shock front:
+       *
+       * FIXME: Add reference to literature
+       */
 
       const double rho_R = gamma_;
       const double u_R = 0.;
@@ -82,7 +108,7 @@ namespace grendel
 
       /*   c^2 = gamma * p / rho / (1 - b * rho) */
       const double a_R = std::sqrt(gamma_ * p_R / rho_R / (1. - b_ * rho_R));
-      const double mach = initial_shock_front_mach_number_;
+      const double mach = initial_mach_number_;
       const double S3 = mach * a_R;
 
       const double rho_L = rho_R * (gamma_ + 1.) * mach * mach /
@@ -91,150 +117,117 @@ namespace grendel
       double p_L =
           p_R * (2. * gamma_ * mach * mach - (gamma_ - 1.)) / (gamma_ + 1.);
 
-      state_1d_L_ = [=](const double, const double t) -> std::array<double, 3> {
+      initial_state_internal = [=](const dealii::Point<dim> &point, double t) {
         AssertThrow(t == 0.,
                     ExcMessage("No analytic solution for t > 0. available"));
 
-        return {rho_L, u_L, p_L};
-      };
+        const double position_1d =
+            (point - initial_position_) * initial_direction_;
 
-      state_1d_R_ = [=](const double, const double t) -> std::array<double, 3> {
-        AssertThrow(t == 0.,
-                    ExcMessage("No analytic solution for t > 0. available"));
-
-        return {rho_R, u_R, p_R};
+        if (position_1d > 0.) {
+          return from_1d_state({rho_R, u_R, p_R});
+        } else {
+          return from_1d_state({rho_L, u_L, p_L});
+        }
       };
 
     } else if (initial_state_ == "uniform") {
 
-      state_1d_L_ = [=](const double, const double t) -> std::array<double, 3> {
+      /*
+       * A uniform flow:
+       */
+
+      initial_state_internal = [=](const dealii::Point<dim> & /*point*/,
+                                   double t) {
         AssertThrow(t == 0.,
                     ExcMessage("No analytic solution for t > 0. available"));
 
-        return {gamma_, initial_uniform_mach_number_, 1.};
+        return from_1d_state({gamma_, initial_mach_number_, 1.});
       };
-
-      state_1d_R_ = state_1d_L_;
 
     } else if (initial_state_ == "sod contrast") {
 
-      /* Contrast of the Sod shock tube: */
+      /*
+       * Contrast of the Sod shock tube:
+       */
 
-      state_1d_L_ = [](const double, const double t) -> std::array<double, 3> {
+      initial_state_internal = [=](const dealii::Point<dim> &point, double t) {
         AssertThrow(t == 0.,
                     ExcMessage("No analytic solution for t > 0. available"));
 
-        // rho, u, p
-        return {1.0, 0.0, 1.0};
-      };
+        const double position_1d =
+            (point - initial_position_) * initial_direction_;
 
-      state_1d_R_ = [](const double, const double t) -> std::array<double, 3> {
-        AssertThrow(t == 0.,
-                    ExcMessage("No analytic solution for t > 0. available"));
-
-        // rho, u, p
-        return {0.125, 0.0, 0.1};
+        if (position_1d > 0.) {
+          return from_1d_state({0.125, 0.0, 0.1});
+        } else {
+          return from_1d_state({1.0, 0.0, 1.0});
+        }
       };
 
     } else if (initial_state_ == "smooth") {
 
-      state_1d_L_ = [](const double x,
-                       const double t) -> std::array<double, 3> {
-        const double x_0 = -0.1; // 0.1;
-        const double x_1 = 0.1;  // 0.3;
+      /*
+       * Smooth 1D solution:
+       */
+
+      initial_state_internal = [=](const dealii::Point<dim> &point, double t) {
+        const double x = point[0];
+        const double x_0 = -0.1;
+        const double x_1 = 0.1;
 
         double rho = 1.;
         if (x - t > x_0 && x - t < x_1)
           rho = 1. + 64. * std::pow(x_1 - x_0, -6.) * std::pow(x - t - x_0, 3) *
                          std::pow(x_1 - x + t, 3);
 
-        // rho, u, p
-        return {rho, 1.0, 1.0};
+        return from_1d_state({rho, 1.0, 1.0});
       };
-      state_1d_R_ = state_1d_L_;
 
     } else if (initial_state_ == "vortex") {
 
       /*
-        2D isentropic vortex problem. See section 5.6 of Euler-convex limiting
-        paper by Guermond et al. Note that the paper might have typos. Also note
-        this is not in the framework of left/right states.
-      */
-      initial_state_2D = [=](const double x,
-                             const double y,
-                             const double t) -> std::array<double, 4> {
-        // define PI
-        const double PI = std::atan(1.0) * 4.0;
-        // set center point vortex center initialized at (5,5) and set
-        // definition of r^2
-        const double xBar = x - 5.0 - 2.0 * t;
-        const double yBar = y - 5.0;
-        const double rSquared = std::pow(xBar, 2.0) + std::pow(yBar, 2.0);
-        // free stream values, Inf for infinity
-        const double uInf = 2.0;
-        const double vInf = 0.0;
-        const double TInf = 1.0;
-        // vortex strength
-        const double beta = 5.0;
-        // define flow perturbuations here
-        double deltaU = -beta / (2.0 * PI) * exp((1.0 - rSquared) / 2.0) * yBar;
-        double deltaV = beta / (2.0 * PI) * exp((1.0 - rSquared) / 2.0) * xBar;
-        double deltaT = -(gamma_ - 1.0) * std::pow(beta, 2.0) /
-                        (8.0 * gamma_ * std::pow(PI, 2.0)) *
-                        exp(1.0 - rSquared);
-        // exact functions defined here
-        double Temp = TInf + deltaT;
-        double rho = std::pow(Temp, 1.0 / (gamma_ - 1.0));
-        double u = uInf + deltaU;
-        double v = vInf + deltaV;
-        double p = std::pow(rho, gamma_);
-        // rho, u, v, p
-        return {rho, u, v, p};
-      };
+       * 2D isentropic vortex problem. See section 5.6 of Euler-convex
+       * limiting paper by Guermond et al.
+       */
+
+      if constexpr(dim == 2) {
+        initial_state_internal = [=](const dealii::Point<dim> &point,
+                                     double t) {
+          const auto point_bar = point - initial_position_ -
+                                 initial_direction_ * initial_mach_number_ * t;
+          const double r_square = point_bar.norm_square();
+
+          const double beta = initial_vortex_beta_;
+
+          const double T =
+              1. - (gamma_ - 1.) * beta * beta /
+                       (8. * gamma_ * M_PI * M_PI * exp(1. - r_square));
+
+          const double u =
+              initial_direction_[0] * initial_mach_number_ -
+              beta / (2. * M_PI) * exp((1. - r_square) / 2.) * point_bar[1];
+
+          const double v =
+              initial_direction_[1] * initial_mach_number_ +
+              beta / (2. * M_PI) * exp((1. - r_square) / 2.) * point_bar[0];
+
+          const double rho = std::pow(T, 1. / (gamma_ - 1.));
+          const double p = std::pow(rho, gamma_);
+          const double E = p / (gamma_ - 1.) + 0.5 * rho * u * u;
+
+          return rank1_type({rho, u, v, E});
+        };
+
+      } else {
+
+        AssertThrow(false, dealii::ExcNotImplemented());
+      }
+
     } else {
 
       AssertThrow(false, dealii::ExcMessage("Unknown initial state."));
     }
-  } // namespace grendel
-
-
-  template <int dim>
-  typename ProblemDescription<dim>::rank1_type
-  ProblemDescription<dim>::initial_state(const dealii::Point<dim> &point,
-                                         double t) const
-  {
-    /*
-     * Translate to conserved quantities and return the corresponding
-     * state:
-     */
-
-    rank1_type state;
-    const double position_1d = (point - initial_position_) * initial_direction_;
-
-    /*
-        For the test cases in the left/right state framework.
-    */
-    if (initial_state_ != "vortex") {
-      const auto [rho, u, p] = (position_1d > 0.) ? state_1d_R_(position_1d, t)
-                                                  : state_1d_L_(position_1d, t);
-      state[0] = rho;
-      for (unsigned int i = 0; i < dim; ++i) {
-        state[1 + i] = rho * u * initial_direction_[i];
-        state[dim + 1] = p / (gamma_ - 1.) + 0.5 * rho * u * u;
-      }
-      /*
-          For the test cases with a general initial state framework. Vortex only
-          problem implemented at the moment
-      */
-    } else {
-      const auto [rho2d, u2d, v2d, p2d] =
-          initial_state_2D(point[0], point[1], t);
-      state[0] = rho2d;
-      state[1] = rho2d * u2d;
-      state[2] = rho2d * v2d;
-      state[3] = p2d / (gamma_ - 1.) + 0.5 * rho2d * (u2d * u2d + v2d * v2d);
-    }
-    return state;
   }
 
 } /* namespace grendel */

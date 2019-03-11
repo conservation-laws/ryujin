@@ -102,6 +102,12 @@ namespace grendel
 
 
     /**
+     * Given a state @p U compute <code>f(U)</code>.
+     */
+    inline DEAL_II_ALWAYS_INLINE rank2_type f(const rank1_type &U) const;
+
+
+    /**
      * Given a position @p point return the corresponding (conserved)
      * initial state. This function is used to interpolate initial values.
      *
@@ -110,18 +116,8 @@ namespace grendel
      * configuration and want to compare the numerical computation against
      * it.
      */
-    rank1_type initial_state(const dealii::Point<dim> &point, double t) const;
-
-
-    /**
-     * Given a state @p U compute <code>f(U)</code>.
-     */
-    inline DEAL_II_ALWAYS_INLINE rank2_type f(const rank1_type &U) const;
-
-    rank2_type zoo(const rank1_type &U)
-    {
-      return f(U);
-    }
+    inline DEAL_II_ALWAYS_INLINE rank1_type
+    initial_state(const dealii::Point<dim> &point, double t) const;
 
 
   protected:
@@ -139,27 +135,19 @@ namespace grendel
 
   private:
     std::string initial_state_;
+
     dealii::Tensor<1, dim> initial_direction_;
     dealii::Point<dim> initial_position_;
-    double initial_shock_front_mach_number_;
-    double initial_uniform_mach_number_;
+    double initial_mach_number_;
+
+    double initial_vortex_beta_;
 
     /*
-     * We use two internal function objects to compute "left" and "right"
-     * initial 1d states. The @ref initial_states() function translates the
-     * result into 3D conserved states according to the chosen initial
-     * position and direction. EJT: Note that there will be some cases where we
-     * just have a general exact solution so the "left" and "right" state set up
-     * makes life messy. Need to generalize.
+     * Internal function object that we used to implement the
+     * internal_state function for all internal states:
      */
-
-    std::function<std::array<double, 3>(double x, double t)> state_1d_L_;
-    std::function<std::array<double, 3>(double x, double t)> state_1d_R_;
-    std::function<std::array<double, 4>(double x,
-                                        double y,
-                                        double t)>
-        initial_state_2D; // Adding 2D at the end to avoid confusion with
-                          // initial_state_
+    std::function<rank1_type(const dealii::Point<dim> &point, double t)>
+        initial_state_internal;
   };
 
 
@@ -231,6 +219,15 @@ namespace grendel
     result[dim + 1] = m / rho * (E + p);
 
     return std::move(result);
+  }
+
+
+  template <int dim>
+  inline DEAL_II_ALWAYS_INLINE typename ProblemDescription<dim>::rank1_type
+  ProblemDescription<dim>::initial_state(const dealii::Point<dim> &point,
+                                         double t) const
+  {
+    return initial_state_internal(point, t);
   }
 
 } /* namespace grendel */
