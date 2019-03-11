@@ -297,7 +297,8 @@ namespace ryujin
   typename TimeLoop<dim>::vector_type
   TimeLoop<dim>::interpolate_initial_values(double t)
   {
-    deallog << "TimeLoop<dim>::interpolate_initial_values()" << std::endl;
+    deallog << "TimeLoop<dim>::interpolate_initial_values(t = " << t << ")"
+            << std::endl;
     TimerOutput::Scope timer(computing_timer,
                              "time_loop - setup scratch space");
 
