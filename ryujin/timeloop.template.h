@@ -179,7 +179,7 @@ namespace ryujin
       if (t - last_output > output_granularity) {
         output(U, base_name + "-solution", t, output_cycle++);
         if (enable_compute_error) {
-          const auto analytic = interpolate_initial_values();
+          const auto analytic = interpolate_initial_values(t);
           output(analytic, base_name + "-analytic_solution", t, output_cycle);
         }
         last_output = t;
@@ -187,10 +187,13 @@ namespace ryujin
     } /* end of loop */
 
     /* Final output: */
-    output(U, base_name + "-solution", t, output_cycle);
-    if (enable_compute_error) {
-      const auto analytic = interpolate_initial_values();
-      output(analytic, base_name + "-analytic_solution", t, output_cycle);
+
+    if (last_output < t_final) {
+      output(U, base_name + "-solution", t, output_cycle);
+      if (enable_compute_error) {
+        const auto analytic = interpolate_initial_values(t);
+        output(analytic, base_name + "-analytic_solution", t, output_cycle);
+      }
     }
 
     computing_timer.print_summary();
