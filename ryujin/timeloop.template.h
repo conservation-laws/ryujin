@@ -322,9 +322,15 @@ namespace ryujin
     deallog << "TimeLoop<dim>::compute_error()" << std::endl;
     TimerOutput::Scope timer(computing_timer, "time_loop - compute error");
 
-    dealii::LinearAlgebra::distributed::Vector<double> error(U[0]);
-    dealii::LinearAlgebra::distributed::Vector<double> zeroVec(U[0]);
-    zeroVec = 0.0;
+    deallog << "        Normalized consolidated Linf, L1, and L2 errors at "
+            << "final time" << std::endl;
+    deallog << "        #dofs = " << offline_data.dof_handler().n_dofs()
+            << std::endl;
+    deallog << "        t     = " << t << std::endl;
+
+    /*
+     * Some scratch data:
+     */
 
     constexpr auto problem_dimension =
         ProblemDescription<dim>::problem_dimension;
@@ -333,98 +339,88 @@ namespace ryujin
       return problem_description.initial_state(p, t);
     };
 
-    /*
-       EJT: Implementation of normalized Linf, L1, L2 error from eq (5.1) in
-       euler convex paper
-    */
+    dealii::LinearAlgebra::distributed::Vector<double> error(U[0]);
+
     Vector<float> difference_per_cell(
         offline_data.discretization().triangulation().n_active_cells());
-    // for Linf
-    std::vector<double> Linf_of_analytic_solution(problem_dimension);
-    double Linf_norm = 0.;
-    // for L1
-    std::vector<double> L1_of_analytic_solution(problem_dimension);
-    double L1_norm = 0;
-    // for L2
-    std::vector<double> L2_of_analytic_solution(problem_dimension);
-    double L2_norm = 0;
+
+    /*
+     * Compute L_inf norm:
+     */
+
+    double linf_norm = 0.;
+    double l1_norm = 0;
+    double l2_norm = 0;
 
     for (unsigned int i = 0; i < problem_dimension; ++i) {
       VectorTools::interpolate(offline_data.dof_handler(),
                                to_function<dim, double>(callable, i),
                                error);
+
       /*
-        here we define local Linf,L1,L2
-        errors of analytical solutions. note that we use dealii integrate
-        difference with 0 ie (u_exact - 0.0)
-      */
-      double local_linf_analytical = error.linfty_norm();
+       * Compute norms of analytic solution:
+       */
+
+      const double linf_norm_analytic =
+          Utilities::MPI::max(error.linfty_norm(), mpi_communicator);
+
       VectorTools::integrate_difference(offline_data.dof_handler(),
                                         error,
                                         ZeroFunction<dim, double>(),
                                         difference_per_cell,
                                         QGauss<dim>(3),
                                         VectorTools::L1_norm);
-      double local_L1_analytical = difference_per_cell.l1_norm();
+
+      const double l1_norm_analytic =
+          Utilities::MPI::sum(difference_per_cell.l1_norm(), mpi_communicator);
+
       VectorTools::integrate_difference(offline_data.dof_handler(),
                                         error,
                                         ZeroFunction<dim, double>(),
                                         difference_per_cell,
                                         QGauss<dim>(3),
                                         VectorTools::L2_norm);
-      double local_L2_analytical = difference_per_cell.l2_norm();
-      /* and then take the maximum/sum over all processors*/
-      Linf_of_analytic_solution[i] =
-          Utilities::MPI::max(local_linf_analytical, mpi_communicator);
-      L1_of_analytic_solution[i] =
-          Utilities::MPI::sum(local_L1_analytical, mpi_communicator);
-      L2_of_analytic_solution[i] =
-          Utilities::MPI::sum(local_L2_analytical, mpi_communicator);
+
+      const double l2_norm_analytic = std::sqrt(Utilities::MPI::sum(
+          std::pow(difference_per_cell.l2_norm(), 2), mpi_communicator));
+
       /*
-        here we define (component wise) the difference of the analytical
-        solution and approximate solution
-      */
+       * Compute norms of error:
+       */
+
       error -= U[i];
-      /*
-        here we define the normalized local Linf and L1 errors and take max
-        over processors
-      */
-      // Linf
-      double local_Linf_error =
-          error.linfty_norm() / Linf_of_analytic_solution[i];
-      Linf_norm += Utilities::MPI::max(local_Linf_error, mpi_communicator);
-      // L1
+
+      const double linf_norm_error =
+          Utilities::MPI::max(error.linfty_norm(), mpi_communicator);
+
       VectorTools::integrate_difference(offline_data.dof_handler(),
                                         error,
                                         ZeroFunction<dim, double>(),
                                         difference_per_cell,
                                         QGauss<dim>(3),
                                         VectorTools::L1_norm);
-      const double local_L1_error =
-          difference_per_cell.l1_norm() / L1_of_analytic_solution[i];
-      L1_norm += Utilities::MPI::sum(local_L1_error, mpi_communicator);
-      // L2
+
+      const double l1_norm_error =
+          Utilities::MPI::sum(difference_per_cell.l1_norm(), mpi_communicator);
+
       VectorTools::integrate_difference(offline_data.dof_handler(),
                                         error,
                                         ZeroFunction<dim, double>(),
                                         difference_per_cell,
                                         QGauss<dim>(3),
                                         VectorTools::L2_norm);
-      const double local_L2_error =
-          difference_per_cell.l2_norm() / L2_of_analytic_solution[i];
-      L2_norm += Utilities::MPI::sum(local_L2_error, mpi_communicator);
+
+      const double l2_norm_error = std::sqrt(Utilities::MPI::sum(
+          std::pow(difference_per_cell.l2_norm(), 2), mpi_communicator));
+
+      linf_norm += linf_norm_error / linf_norm_analytic;
+      l1_norm += l1_norm_error / l1_norm_analytic;
+      l2_norm += l2_norm_error / l2_norm_analytic;
     }
-    deallog << "        Normalized consolidated Linf, L1, and L2" << std::endl;
-    deallog << "        errors at final timestep"
-            << " with " << offline_data.dof_handler().n_dofs()
-            << " global DoFs." << std::endl;
-    deallog << "                                                " << std::endl;
-    deallog << "        Linf_norm error for t=" << t << ": " << Linf_norm
-            << std::endl;
-    deallog << "        L1_norm error for t=" << t << ": " << L1_norm
-            << std::endl;
-    deallog << "        L2_norm error for t=" << t << ": " << L2_norm
-            << std::endl;
+
+    deallog << "        Linf  = " << linf_norm << std::endl;
+    deallog << "        L1    = " << l1_norm << std::endl;
+    deallog << "        L2    = " << l2_norm << std::endl;
   }
 
 
