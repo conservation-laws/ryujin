@@ -198,25 +198,22 @@ namespace grendel
                                  initial_direction_ * initial_mach_number_ * t;
           const double r_square = point_bar.norm_square();
 
-          const double beta = initial_vortex_beta_;
+          const double factor =
+              initial_vortex_beta_ / (2. * M_PI) * exp(0.5 - 0.5 * r_square);
 
-          const double T =
-              1. - (gamma_ - 1.) * beta * beta /
-                       (8. * gamma_ * M_PI * M_PI * exp(1. - r_square));
+          const double T = 1. - (gamma_ - 1.) / (2. * gamma_) * factor * factor;
 
-          const double u =
-              initial_direction_[0] * initial_mach_number_ -
-              beta / (2. * M_PI) * exp((1. - r_square) / 2.) * point_bar[1];
+          const double u = initial_direction_[0] * initial_mach_number_ -
+                           factor * point_bar[1];
 
-          const double v =
-              initial_direction_[1] * initial_mach_number_ +
-              beta / (2. * M_PI) * exp((1. - r_square) / 2.) * point_bar[0];
+          const double v = initial_direction_[1] * initial_mach_number_ +
+                           factor * point_bar[0];
 
           const double rho = std::pow(T, 1. / (gamma_ - 1.));
           const double p = std::pow(rho, gamma_);
-          const double E = p / (gamma_ - 1.) + 0.5 * rho * u * u;
+          const double E = p / (gamma_ - 1.) + 0.5 * rho * (u * u + v * v);
 
-          return rank1_type({rho, u, v, E});
+          return rank1_type({rho, rho * u, rho * v, E});
         };
 
       } else {
