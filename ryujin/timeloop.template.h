@@ -157,8 +157,6 @@ namespace ryujin
      * Loop:
      */
 
-    double error_norm = 0.;
-    double error_at_final_time = 0;
     unsigned int output_cycle = 1;
     for (unsigned int cycle = 1; t < t_final; ++cycle) {
       std::ostringstream head;
@@ -178,14 +176,6 @@ namespace ryujin
       if (t - last_output > output_granularity) {
         output(U, base_name + "-solution", t, output_cycle++);
         last_output = t;
-
-        /*
-         * Let's compute intermediate errors with the same granularity
-         * with what we produce output.
-         */
-        // if (enable_compute_error)
-        // error_norm = std::max(error_norm, compute_error(U, t));
-        // error_at_final_time = compute_error(U, t);
       }
     } /* end of loop */
 
@@ -202,7 +192,7 @@ namespace ryujin
 
     /* Output final error: */
     if (enable_compute_error) {
-      error_at_final_time = compute_error(U, t);
+      compute_error(U, t);
     }
 
     /* Detach deallog: */
@@ -325,7 +315,7 @@ namespace ryujin
 
 
   template <int dim>
-  double
+  void
   TimeLoop<dim>::compute_error(const typename TimeLoop<dim>::vector_type &U,
                                const double t)
   {
@@ -435,8 +425,6 @@ namespace ryujin
             << std::endl;
     deallog << "        L2_norm error for t=" << t << ": " << L2_norm
             << std::endl;
-
-    return L1_norm;
   }
 
 
