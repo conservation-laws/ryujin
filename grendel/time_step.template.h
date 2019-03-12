@@ -198,6 +198,7 @@ namespace grendel
           double d_sum = 0.;
           double numerator = 0.;
           double denominator = 0.;
+          double delta = 0.;
 
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
 
@@ -213,6 +214,7 @@ namespace grendel
             const auto indicator_j = high_order_->smoothness_indicator(U, j);
 
             numerator += beta_ij * (indicator_i - indicator_j);
+            delta += beta_ij * (-indicator_j);
 
             constexpr double eps_ = 1.e-7;
             denominator +=
@@ -225,7 +227,7 @@ namespace grendel
           alpha_[i] = std::pow(std::abs(numerator) / denominator,
                                HighOrder<dim>::smoothness_power);
 
-          delta_[i] = numerator / m_i;
+          delta_[i] = delta / m_i;
 
           const double mass = lumped_mass_matrix.diag_element(i);
           const double tau = cfl * mass / (-2. * d_sum);
