@@ -194,9 +194,12 @@ namespace grendel
 
   template <int dim>
   inline DEAL_II_ALWAYS_INLINE double
-  ProblemDescription<dim>::specific_entropy(const rank1_type &/*U*/) const
+  ProblemDescription<dim>::specific_entropy(const rank1_type &U) const
   {
-    AssertThrow(false, dealii::ExcNotImplemented());
+    const auto &rho = U[0];
+    const auto p = pressure(U);
+
+    return rho * std::log(p / std::pow(rho, gamma_));
   }
 
 
