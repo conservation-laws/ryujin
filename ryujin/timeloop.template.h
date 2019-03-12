@@ -337,12 +337,6 @@ namespace ryujin
     deallog << "TimeLoop<dim>::compute_error()" << std::endl;
     TimerOutput::Scope timer(computing_timer, "time_loop - compute error");
 
-    deallog << "        Normalized consolidated Linf, L1, and L2 errors at "
-            << "final time" << std::endl;
-    deallog << "        #dofs = " << offline_data.dof_handler().n_dofs()
-            << std::endl;
-    deallog << "        t     = " << t << std::endl;
-
     constexpr auto problem_dimension =
         ProblemDescription<dim>::problem_dimension;
 
@@ -423,6 +417,11 @@ namespace ryujin
       l2_norm += l2_norm_error / l2_norm_analytic;
     }
 
+    deallog << "        Normalized consolidated Linf, L1, and L2 errors at "
+            << "final time" << std::endl;
+    deallog << "        #dofs = " << offline_data.dof_handler().n_dofs()
+            << std::endl;
+    deallog << "        t     = " << t << std::endl;
     deallog << "        Linf  = " << linf_norm << std::endl;
     deallog << "        L1    = " << l1_norm << std::endl;
     deallog << "        L2    = " << l2_norm << std::endl;
