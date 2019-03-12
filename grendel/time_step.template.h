@@ -52,6 +52,9 @@ namespace grendel
     auto &exemplar = alpha_;
     exemplar.reinit(locally_owned, locally_relevant, mpi_communicator_);
 
+    alpha_second_.reinit(exemplar);
+    delta_.reinit(exemplar);
+
     for (auto &it : temp_euler_)
       it.reinit(exemplar);
 
@@ -161,7 +164,10 @@ namespace grendel
      * Step 2: Compute diagonal of d_ij maximal time-step size, and
      *         smoothness indicator:
      *
-     *   \alpha_i = \|\sum_j s(U_i) - s(U_j) \| / \sum_j \| s(U_i) - s(U_j) \|
+     *   \alpha_i = \|\sum_j beta_ij (s(U_i) - s(U_j)) \|
+     *                / \sum_j \| \beta_ij (s(U_i) - s(U_j)) \|
+     *
+     *   \Delta_i = 1. / m_i \sum \beta_ij (- s(U_j))
      */
 
     std::atomic<double> tau_max{std::numeric_limits<double>::infinity()};
@@ -172,6 +178,7 @@ namespace grendel
                            "time_step - 2 compute d_ii, tau_max, and alpha_i");
 
       alpha_.zero_out_ghosts();
+      delta_.zero_out_ghosts();
 
       const auto on_subranges = [&](auto i1, const auto i2) {
         double tau_max_on_subrange = std::numeric_limits<double>::infinity();
@@ -182,6 +189,7 @@ namespace grendel
         for (; i1 < i2; ++i1, ++it) {
 
           const auto i = *it;
+          const double m_i = lumped_mass_matrix.diag_element(i);
           const auto indicator_i = high_order_->smoothness_indicator(U, i);
 
           /* Let's compute the sum of the off-diagonal d_ijs and alpha_i for
@@ -217,6 +225,8 @@ namespace grendel
           alpha_[i] = std::pow(std::abs(numerator) / denominator,
                                HighOrder<dim>::smoothness_power);
 
+          delta_[i] = numerator / m_i;
+
           const double mass = lumped_mass_matrix.diag_element(i);
           const double tau = cfl * mass / (-2. * d_sum);
           tau_max_on_subrange = std::min(tau_max_on_subrange, tau);
@@ -243,6 +253,55 @@ namespace grendel
 
       /* Synchronize alpha_ over all MPI processes: */
       alpha_.update_ghost_values();
+
+      /* Synchronize delta_ over all MPI processes: */
+      delta_.update_ghost_values();
+    }
+
+    /*
+     * FIXME:
+     */
+
+    {
+      deallog << "        compute FIXME" << std::endl;
+      TimerOutput::Scope t(computing_timer_,
+                           "time_step - 2b FIXME");
+
+      alpha_second_.zero_out_ghosts();
+
+      const auto on_subranges = [&](auto i1, const auto i2) {
+
+        /* Translate the local index into a index set iterator:: */
+        auto it = locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
+        for (; i1 < i2; ++i1, ++it) {
+
+          const auto i = *it;
+
+          /* Let's compute the sum of the off-diagonal d_ijs and alpha_i for
+           * index i: */
+
+          double delta_max = std::numeric_limits<double>::min();
+          double delta_min = std::numeric_limits<double>::max();
+
+          for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
+
+            const auto j = jt->column();
+
+            const auto delta_j = delta_[j];
+            delta_max = std::max(delta_max, delta_j);
+            delta_min = std::min(delta_min, delta_j);
+          }
+
+          alpha_second_[i] = std::abs(delta_max - delta_min) /
+                             (std::abs(delta_max) + std::abs(delta_min));
+        }
+      };
+
+      parallel::apply_to_subranges(
+          indices.begin(), indices.end(), on_subranges, 4096);
+
+      /* Synchronize alpha_ over all MPI processes: */
+      alpha_second_.update_ghost_values();
     }
 
     tau = tau == 0 ? tau_max.load() : tau;
@@ -285,7 +344,7 @@ namespace grendel
           auto U_i_new = U_i;
 
           const auto f_i = problem_description_->f(U_i);
-          const auto alpha_i = alpha_[i];
+          const auto alpha_i = std::min(alpha_[i], alpha_second_[i]);
           const double m_i = lumped_mass_matrix.diag_element(i);
 
           const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
@@ -301,7 +360,7 @@ namespace grendel
             const auto j = jt->column();
             const auto U_j = gather(U, j);
             const auto f_j = problem_description_->f(U_j);
-            const auto alpha_j = alpha_[j];
+            const auto alpha_j = std::min(alpha_[j], alpha_second_[j]);
 
             const auto c_ij = gather_get_entry(cij_matrix, jt);
             const auto d_ij = get_entry(dij_matrix_, jt);
