@@ -100,13 +100,25 @@ namespace grendel
 
 
     /*
-     * Step 1: Compute off-diagonal d_ij:
+     * Step 1: Compute off-diagonal d_ij, also compute smoothness
+     *         indicators \alpha_i and \Delta_i:
+     *
+     *   \alpha_i = \|\sum_j beta_ij (s(U_i) - s(U_j)) \|
+     *                / \sum_j \| \beta_ij (s(U_i) - s(U_j)) \|,
+     *
+     *   \Delta_i = 1. / m_i \sum \beta_ij (- s(U_j)),
+     *
+     *   where s(.) is a suitable function used for the smoothness
+     *   indicator and \beta_ij is the stiffness matrix.
      */
 
     {
-      deallog << "        compute d_ij" << std::endl;
+      deallog << "        compute d_ij, alpha_i, delta_i" << std::endl;
       TimerOutput::Scope t(computing_timer_,
-                           "time_step - 1 compute d_ij");
+                           "time_step - 1 compute d_ij, alpha_i, delta_i");
+
+      alpha_.zero_out_ghosts();
+      delta_.zero_out_ghosts();
 
       const auto on_subranges = [&](auto i1, const auto i2) {
         /* Translate the local index into a index set iterator:: */
@@ -115,13 +127,39 @@ namespace grendel
 
           const auto i = *it;
           const auto U_i = gather(U, i);
+          const auto indicator_i = high_order_->smoothness_indicator(U, i);
+          const double m_i = lumped_mass_matrix.diag_element(i);
 
-          /* Populate off-diagonal dij_: */
+          double numerator = 0.;
+          double denominator = 0.;
+          double delta = 0.;
+
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
             const auto j = jt->column();
 
-            /* Iterate over subdiagonal */
-            if (j >= i)
+            /*
+             * Skip diagonal elements:
+             */
+
+            if (j == i)
+              continue;
+
+            const auto beta_ij = get_entry(betaij_matrix, jt);
+            const auto indicator_j = high_order_->smoothness_indicator(U, j);
+
+            numerator += beta_ij * (indicator_i - indicator_j);
+            delta -= beta_ij * indicator_j;
+
+            constexpr double eps_ = 1.e-7;
+            denominator +=
+                std::abs(beta_ij) * std::abs(indicator_i - indicator_j) +
+                eps_ * std::abs(indicator_j);
+
+            /*
+             * Only iterate over the subdiagonal for d_ij
+             */
+
+            if (j > i)
               continue;
 
             const auto U_j = gather(U, j);
@@ -152,33 +190,36 @@ namespace grendel
             set_entry(dij_matrix_, jt, d);
             dij_matrix_(j, i) = d; // FIXME: Suboptimal
           }
+
+          alpha_[i] = std::pow(std::abs(numerator) / denominator,
+                               HighOrder<dim>::smoothness_power);
+
+          delta_[i] = delta / m_i;
         }
       };
 
       parallel::apply_to_subranges(
           indices.begin(), indices.end(), on_subranges, 4096);
+
+      /* Synchronize alpha_ over all MPI processes: */
+      alpha_.update_ghost_values();
+
+      /* Synchronize delta_ over all MPI processes: */
+      delta_.update_ghost_values();
     }
 
 
     /*
      * Step 2: Compute diagonal of d_ij maximal time-step size, and
      *         smoothness indicator:
-     *
-     *   \alpha_i = \|\sum_j beta_ij (s(U_i) - s(U_j)) \|
-     *                / \sum_j \| \beta_ij (s(U_i) - s(U_j)) \|
-     *
-     *   \Delta_i = 1. / m_i \sum \beta_ij (- s(U_j))
      */
 
     std::atomic<double> tau_max{std::numeric_limits<double>::infinity()};
 
     {
-      deallog << "        compute d_ii, tau_max, and alpha_i" << std::endl;
+      deallog << "        compute d_ii, tau_max" << std::endl;
       TimerOutput::Scope t(computing_timer_,
-                           "time_step - 2 compute d_ii, tau_max, and alpha_i");
-
-      alpha_.zero_out_ghosts();
-      delta_.zero_out_ghosts();
+                           "time_step - 2 compute d_ii, tau_max");
 
       const auto on_subranges = [&](auto i1, const auto i2) {
         double tau_max_on_subrange = std::numeric_limits<double>::infinity();
@@ -189,45 +230,19 @@ namespace grendel
         for (; i1 < i2; ++i1, ++it) {
 
           const auto i = *it;
-          const double m_i = lumped_mass_matrix.diag_element(i);
-          const auto indicator_i = high_order_->smoothness_indicator(U, i);
-
-          /* Let's compute the sum of the off-diagonal d_ijs and alpha_i for
-           * index i: */
 
           double d_sum = 0.;
-          double numerator = 0.;
-          double denominator = 0.;
-          double delta = 0.;
 
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
-
             const auto j = jt->column();
 
             if (j == i)
               continue;
 
             d_sum -= get_entry(dij_matrix_, jt);
-
-            const auto beta_ij = get_entry(betaij_matrix, jt);
-
-            const auto indicator_j = high_order_->smoothness_indicator(U, j);
-
-            numerator += beta_ij * (indicator_i - indicator_j);
-            delta += beta_ij * (-indicator_j);
-
-            constexpr double eps_ = 1.e-7;
-            denominator +=
-                std::abs(beta_ij) * std::abs(indicator_i - indicator_j) +
-                eps_ * std::abs(indicator_j);
           }
 
           dij_matrix_.diag_element(i) = d_sum;
-
-          alpha_[i] = std::pow(std::abs(numerator) / denominator,
-                               HighOrder<dim>::smoothness_power);
-
-          delta_[i] = delta / m_i;
 
           const double mass = lumped_mass_matrix.diag_element(i);
           const double tau = cfl * mass / (-2. * d_sum);
@@ -252,12 +267,6 @@ namespace grendel
                              "do that. - We crashed."));
 
       deallog << "        computed tau_max = " << tau_max << std::endl;
-
-      /* Synchronize alpha_ over all MPI processes: */
-      alpha_.update_ghost_values();
-
-      /* Synchronize delta_ over all MPI processes: */
-      delta_.update_ghost_values();
     }
 
     /*
