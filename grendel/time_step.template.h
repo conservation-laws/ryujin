@@ -150,7 +150,7 @@ namespace grendel
             numerator += beta_ij * (indicator_i - indicator_j);
             delta -= beta_ij * indicator_j;
 
-            constexpr double eps_ = 1.e-7;
+            constexpr double eps_ = 1.e-14;
             denominator +=
                 std::abs(beta_ij) * std::abs(indicator_i - indicator_j) +
                 eps_ * std::abs(indicator_j);
@@ -329,7 +329,7 @@ namespace grendel
           auto U_i_new = U_i;
 
           const auto f_i = problem_description_->f(U_i);
-          const auto alpha_i = std::min(alpha_[i], alpha_second_[i]);
+          const auto alpha_i = alpha_[i]; //std::min(alpha_[i], alpha_second_[i]);
           const double m_i = lumped_mass_matrix.diag_element(i);
 
           const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
@@ -345,7 +345,7 @@ namespace grendel
             const auto j = jt->column();
             const auto U_j = gather(U, j);
             const auto f_j = problem_description_->f(U_j);
-            const auto alpha_j = std::min(alpha_[j], alpha_second_[j]);
+            const auto alpha_j = alpha_[j]; //std::min(alpha_[j], alpha_second_[j]);
 
             const auto c_ij = gather_get_entry(cij_matrix, jt);
             const auto d_ij = get_entry(dij_matrix_, jt);
@@ -417,18 +417,18 @@ namespace grendel
           const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
           const double lambda = 1. / (size - 1.);
 
-          const auto r_i = gather(r_, i);
+//           const auto r_i = gather(r_, i);
 
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
             auto p_ij = gather_get_entry(pij_matrix_, jt);
 
             const auto j = jt->column();
-            const auto b_ij = get_entry(bij_matrix, jt);
-            const auto b_ji = bij_matrix(j, i); // FIXME: Suboptimal
+//             const auto b_ij = get_entry(bij_matrix, jt);
+//             const auto b_ji = bij_matrix(j, i); // FIXME: Suboptimal
 
-            const auto r_j = gather(r_, j);
+//             const auto r_j = gather(r_, j);
 
-            p_ij += tau / m_i / lambda * (b_ij * r_j - b_ji * r_i);
+//             p_ij += tau / m_i / lambda * (b_ij * r_j - b_ji * r_i);
             scatter_set_entry(pij_matrix_, jt, p_ij);
 
             const auto l_ij = high_order_->limit(bounds, U_i_new, p_ij);
