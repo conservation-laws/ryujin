@@ -113,9 +113,9 @@ namespace grendel
      */
 
     {
-      deallog << "        compute d_ij, alpha_i, delta_i" << std::endl;
+      deallog << "        compute d_ij, alpha_i, and delta_i" << std::endl;
       TimerOutput::Scope t(computing_timer_,
-                           "time_step - 1 compute d_ij, alpha_i, delta_i");
+                           "time_step - 1 compute d_ij, alpha_i, and delta_i");
 
       alpha_.zero_out_ghosts();
       delta_.zero_out_ghosts();
@@ -211,15 +211,19 @@ namespace grendel
 
     /*
      * Step 2: Compute diagonal of d_ij maximal time-step size, and
-     *         smoothness indicator:
+     *         alpha_second_i:
      */
 
     std::atomic<double> tau_max{std::numeric_limits<double>::infinity()};
 
     {
-      deallog << "        compute d_ii, tau_max" << std::endl;
-      TimerOutput::Scope t(computing_timer_,
-                           "time_step - 2 compute d_ii, tau_max");
+      deallog << "        compute d_ii, tau_max, and alpha_second_i"
+              << std::endl;
+      TimerOutput::Scope t(
+          computing_timer_,
+          "time_step - 2 compute d_ii, tau_max, and alpha_second_i");
+
+      alpha_second_.zero_out_ghosts();
 
       const auto on_subranges = [&](auto i1, const auto i2) {
         double tau_max_on_subrange = std::numeric_limits<double>::infinity();
@@ -233,14 +237,24 @@ namespace grendel
 
           double d_sum = 0.;
 
+          double delta_max = std::numeric_limits<double>::min();
+          double delta_min = std::numeric_limits<double>::max();
+
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
             const auto j = jt->column();
+
+            const auto delta_j = delta_[j];
+            delta_max = std::max(delta_max, delta_j);
+            delta_min = std::min(delta_min, delta_j);
 
             if (j == i)
               continue;
 
             d_sum -= get_entry(dij_matrix_, jt);
           }
+
+          alpha_second_[i] = std::abs(delta_max - delta_min) /
+                             (std::abs(delta_max) + std::abs(delta_min));
 
           dij_matrix_.diag_element(i) = d_sum;
 
@@ -259,6 +273,9 @@ namespace grendel
       parallel::apply_to_subranges(
           indices.begin(), indices.end(), on_subranges, 4096);
 
+      /* Synchronize alpha_second_ over all MPI processes: */
+      alpha_second_.update_ghost_values();
+
       /* Synchronize tau_max over all MPI processes: */
       tau_max.store(Utilities::MPI::min(tau_max.load(), mpi_communicator_));
 
@@ -269,54 +286,9 @@ namespace grendel
       deallog << "        computed tau_max = " << tau_max << std::endl;
     }
 
-    /*
-     * FIXME:
-     */
-
-    {
-      deallog << "        compute FIXME" << std::endl;
-      TimerOutput::Scope t(computing_timer_,
-                           "time_step - 2b FIXME");
-
-      alpha_second_.zero_out_ghosts();
-
-      const auto on_subranges = [&](auto i1, const auto i2) {
-
-        /* Translate the local index into a index set iterator:: */
-        auto it = locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
-        for (; i1 < i2; ++i1, ++it) {
-
-          const auto i = *it;
-
-          /* Let's compute the sum of the off-diagonal d_ijs and alpha_i for
-           * index i: */
-
-          double delta_max = std::numeric_limits<double>::min();
-          double delta_min = std::numeric_limits<double>::max();
-
-          for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
-
-            const auto j = jt->column();
-
-            const auto delta_j = delta_[j];
-            delta_max = std::max(delta_max, delta_j);
-            delta_min = std::min(delta_min, delta_j);
-          }
-
-          alpha_second_[i] = std::abs(delta_max - delta_min) /
-                             (std::abs(delta_max) + std::abs(delta_min));
-        }
-      };
-
-      parallel::apply_to_subranges(
-          indices.begin(), indices.end(), on_subranges, 4096);
-
-      /* Synchronize alpha_ over all MPI processes: */
-      alpha_second_.update_ghost_values();
-    }
-
     tau = tau == 0 ? tau_max.load() : tau;
     deallog << "        perform time-step with tau = " << tau << std::endl;
+
 
     /*
      * Step 3: Low-order update, also compute limiter bounds, R_i and first
@@ -332,9 +304,11 @@ namespace grendel
      */
 
     {
-      deallog << "        low-order update, limiter bounds, r_i, and p_ij" << std::endl;
+      deallog << "        low-order update, limiter bounds, r_i, and p_ij"
+              << std::endl;
       TimerOutput::Scope t(computing_timer_,
-                           "time_step - 3 low-order update, limiter bounds, compute r_i, and p_ij (1)");
+                           "time_step - 3 low-order update, limiter bounds, "
+                           "compute r_i, and p_ij (1)");
 
       const auto on_subranges = [&](auto i1, const auto i2) {
 
@@ -411,6 +385,7 @@ namespace grendel
       for (auto &it : r_)
         it.update_ghost_values();
     }
+
 
     /*
      * Step 4: Compute second part of P_ij, and compute l_ij:
