@@ -191,8 +191,15 @@ namespace grendel
             dij_matrix_(j, i) = d; // FIXME: Suboptimal
           }
 
-          alpha_[i] = std::pow(std::abs(numerator) / denominator,
-                               HighOrder<dim>::smoothness_power);
+//           alpha_[i] = std::pow(std::abs(numerator) / denominator,
+//                                HighOrder<dim>::smoothness_power);
+
+          const double ratio = std::abs(numerator) / denominator;
+
+          constexpr double alpha_0 = 0.5;
+          constexpr unsigned int beta = 3;
+          alpha_[i] = std::pow(std::max(ratio - alpha_0, 0.), beta) /
+                      std::pow(1 - alpha_0, beta);
 
           delta_[i] = delta / m_i;
         }
@@ -417,18 +424,18 @@ namespace grendel
           const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
           const double lambda = 1. / (size - 1.);
 
-//           const auto r_i = gather(r_, i);
+          const auto r_i = gather(r_, i);
 
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
             auto p_ij = gather_get_entry(pij_matrix_, jt);
 
             const auto j = jt->column();
-//             const auto b_ij = get_entry(bij_matrix, jt);
-//             const auto b_ji = bij_matrix(j, i); // FIXME: Suboptimal
+            const auto b_ij = get_entry(bij_matrix, jt);
+            const auto b_ji = bij_matrix(j, i); // FIXME: Suboptimal
 
-//             const auto r_j = gather(r_, j);
+            const auto r_j = gather(r_, j);
 
-//             p_ij += tau / m_i / lambda * (b_ij * r_j - b_ji * r_i);
+            p_ij += tau / m_i / lambda * (b_ij * r_j - b_ji * r_i);
             scatter_set_entry(pij_matrix_, jt, p_ij);
 
             const auto l_ij = high_order_->limit(bounds, U_i_new, p_ij);
