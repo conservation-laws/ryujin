@@ -150,7 +150,7 @@ namespace grendel
             numerator += beta_ij * (indicator_i - indicator_j);
             delta -= beta_ij * indicator_j;
 
-            constexpr double eps_ = 1.e-14;
+            constexpr double eps_ = 1.e-7;
             denominator +=
                 std::abs(beta_ij) * std::abs(indicator_i - indicator_j) +
                 eps_ * std::abs(indicator_j);
