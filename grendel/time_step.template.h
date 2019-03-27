@@ -128,7 +128,7 @@ namespace grendel
 
           double numerator = 0.;
           double denominator = 0.;
-          double denominator_bound = 0.;
+          double denominator_abs = 0.;
 
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
             const auto j = jt->column();
@@ -147,7 +147,7 @@ namespace grendel
 
             denominator +=
                 std::abs(beta_ij) * std::abs(indicator_i - indicator_j);
-            denominator_bound += std::abs(beta_ij) * (std::abs(indicator_i) +
+            denominator_abs += std::abs(beta_ij) * (std::abs(indicator_i) +
                                                       std::abs(indicator_j));
 
             /*
@@ -186,15 +186,22 @@ namespace grendel
             dij_matrix_(j, i) = d; // FIXME: Suboptimal
           }
 
-          if(denominator > 1.e-7 * denominator_bound)
+          if(denominator > 1.e-7 * denominator_abs)
           {
-            const double ratio = std::abs(numerator) / denominator;
-
+            // FIXME: Refactor!
             constexpr double alpha_0 = 0.5;
             constexpr unsigned int beta = 3;
-            alpha_[i] = std::pow(std::max(ratio - alpha_0, 0.), beta) /
-                        std::pow(1 - alpha_0, beta);
+            const auto ratio_alpha = std::abs(numerator) / denominator;
+            const auto alpha_i =
+                std::pow(std::max(ratio_alpha - alpha_0, 0.), beta) /
+                std::pow(1 - alpha_0, beta);
+
+            const auto beta_i = std::abs(numerator) / denominator_abs;
+
+            alpha_[i] = std::min(alpha_i, beta_i);
+
           } else {
+
             alpha_[i] = 0.;
           }
         }
