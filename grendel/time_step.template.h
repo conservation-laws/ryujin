@@ -132,6 +132,7 @@ namespace grendel
 
           double numerator = 0.;
           double denominator = 0.;
+          double denominator_bound = 0.;
           double delta = 0.;
 
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
@@ -150,10 +151,10 @@ namespace grendel
             numerator += beta_ij * (indicator_i - indicator_j);
             delta -= beta_ij * indicator_j;
 
-            constexpr double eps_ = 1.e-7;
             denominator +=
-                std::abs(beta_ij) * std::abs(indicator_i - indicator_j) +
-                eps_ * std::abs(indicator_j);
+                std::abs(beta_ij) * std::abs(indicator_i - indicator_j);
+            denominator_bound += std::abs(beta_ij) * (std::abs(indicator_i) +
+                                                      std::abs(indicator_j));
 
             /*
              * Only iterate over the subdiagonal for d_ij
@@ -191,15 +192,17 @@ namespace grendel
             dij_matrix_(j, i) = d; // FIXME: Suboptimal
           }
 
-//           alpha_[i] = std::pow(std::abs(numerator) / denominator,
-//                                HighOrder<dim>::smoothness_power);
+          if(denominator > 1.e-7 * denominator_bound)
+          {
+            const double ratio = std::abs(numerator) / denominator;
 
-          const double ratio = std::abs(numerator) / denominator;
-
-          constexpr double alpha_0 = 0.5;
-          constexpr unsigned int beta = 3;
-          alpha_[i] = std::pow(std::max(ratio - alpha_0, 0.), beta) /
-                      std::pow(1 - alpha_0, beta);
+            constexpr double alpha_0 = 0.5;
+            constexpr unsigned int beta = 3;
+            alpha_[i] = std::pow(std::max(ratio - alpha_0, 0.), beta) /
+                        std::pow(1 - alpha_0, beta);
+          } else {
+            alpha_[i] = 0.;
+          }
 
           delta_[i] = delta / m_i;
         }
