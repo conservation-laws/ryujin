@@ -103,12 +103,6 @@ namespace grendel
     dealii::LinearAlgebra::distributed::Vector<double> alpha_;
     ACCESSOR_READ_ONLY(alpha)
 
-    dealii::LinearAlgebra::distributed::Vector<double> alpha_second_;
-    ACCESSOR_READ_ONLY(alpha_second)
-
-    dealii::LinearAlgebra::distributed::Vector<double> delta_;
-    ACCESSOR_READ_ONLY(delta)
-
     typename HighOrder<dim>::vector_type bounds_;
 
     vector_type r_;
