@@ -31,14 +31,36 @@ namespace grendel
     virtual ~HighOrder() final = default;
 
     /*
-     * Indicator:
+     * Options:
      */
 
-    static constexpr unsigned int smoothness_power = 3;
+    static constexpr enum class Indicator {
+      none,
+      rho,
+      internal_energy,
+      pressure,
+      specific_entropy,
+    } indicator_ = Indicator::pressure;
+
+    static constexpr enum class Limiters {
+      none,
+      rho,
+      internal_energy,
+      specific_entropy
+    } limiters_ = Limiters::rho;
+
+    /*
+     * Indicator:
+     */
 
     template <typename Vector, typename Index>
     inline DEAL_II_ALWAYS_INLINE double smoothness_indicator(const Vector &U,
                                                              Index i) const;
+
+    static constexpr double alpha_0 = 0;
+    static constexpr unsigned int smoothness_power = 3;
+
+    static inline DEAL_II_ALWAYS_INLINE double psi(const double ratio);
 
     /*
      * Limiter:
@@ -57,24 +79,6 @@ namespace grendel
     dealii::SmartPointer<const grendel::ProblemDescription<dim>>
         problem_description_;
     ACCESSOR_READ_ONLY(problem_description)
-
-  public:
-    /* Options: */
-
-    static constexpr enum class Indicator {
-      none,
-      rho,
-      internal_energy,
-      pressure,
-      specific_entropy,
-    } indicator_ = Indicator::pressure;
-
-    static constexpr enum class Limiters {
-      none,
-      rho,
-      internal_energy,
-      specific_entropy
-    } limiters_ = Limiters::rho;
   };
 
 
@@ -99,6 +103,15 @@ namespace grendel
     case Indicator::specific_entropy:
       return problem_description_->specific_entropy(gather(U, i));
     }
+  }
+
+
+  template <int dim>
+  inline DEAL_II_ALWAYS_INLINE double
+  HighOrder<dim>::psi(const double ratio)
+  {
+    return std::pow(std::max(ratio - alpha_0, 0.), smoothness_power) /
+           std::pow(1 - alpha_0, smoothness_power);
   }
 
 

@@ -188,16 +188,9 @@ namespace grendel
 
           if(denominator > 1.e-7 * denominator_abs)
           {
-            // FIXME: Refactor!
-            constexpr double alpha_0 = 0.25;
-            constexpr unsigned int beta = 3;
-            const auto ratio_alpha = std::abs(numerator) / denominator;
             const auto alpha_i =
-                std::pow(std::max(ratio_alpha - alpha_0, 0.), beta) /
-                std::pow(1 - alpha_0, beta);
-
+                high_order_->psi(std::abs(numerator) / denominator);
             const auto beta_i = std::abs(numerator) / denominator_abs;
-
             alpha_[i] = std::min(alpha_i, beta_i);
 
           } else {
@@ -276,7 +269,7 @@ namespace grendel
       deallog << "        computed tau_max = " << tau_max << std::endl;
     }
 
-    tau = tau == 0 ? tau_max.load() : tau;
+    tau = (tau == 0 ? tau_max.load() : tau);
     deallog << "        perform time-step with tau = " << tau << std::endl;
 
 
