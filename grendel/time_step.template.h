@@ -189,7 +189,7 @@ namespace grendel
           if(denominator > 1.e-7 * denominator_abs)
           {
             // FIXME: Refactor!
-            constexpr double alpha_0 = 0.5;
+            constexpr double alpha_0 = 0.25;
             constexpr unsigned int beta = 3;
             const auto ratio_alpha = std::abs(numerator) / denominator;
             const auto alpha_i =
