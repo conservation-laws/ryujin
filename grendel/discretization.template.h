@@ -28,27 +28,27 @@ namespace grendel
       , computing_timer_(computing_timer)
   {
     geometry_ = "triangle";
-    add_parameter(
-        "geometry",
-        geometry_,
-        "Geometry. Valid names are \"triangle\", \"tube\", \"step\".");
+    add_parameter("geometry",
+                  geometry_,
+                  "Geometry. Valid names are \"triangle\", \"tube\", \"step\", "
+                  "or \"disc\".");
 
     /* Immersed triangle: */
 
     immersed_triangle_length_ = 3.;
     add_parameter("immersed triangle - length",
                   immersed_triangle_length_,
-                  "Immersed Triangle: length of computational domain");
+                  "Immersed triangle: length of computational domain");
 
     immersed_triangle_height_ = 3.;
     add_parameter("immersed triangle - height",
                   immersed_triangle_height_,
-                  "Immersed Triangle: height of computational domain");
+                  "Immersed triangle: height of computational domain");
 
     immersed_triangle_object_height_ = 1.;
     add_parameter("immersed triangle - object height",
                   immersed_triangle_object_height_,
-                  "Immersed Triangle: height of immersed triangle");
+                  "Immersed triangle: height of immersed triangle");
 
     /* Shock tube: */
 
@@ -63,8 +63,6 @@ namespace grendel
                   "Shock tube: diameter of tube (ignored in 1D)");
 
     /* Mach step: */
-
-    /* Immersed triangle: */
 
     mach_step_length_ = 3.;
     add_parameter("mach step - length",
@@ -87,6 +85,26 @@ namespace grendel
                   "Mach step : height of step ");
 
     /* Immersed disc: */
+
+    immersed_disc_length_ = 4.;
+    add_parameter("immersed disc - length",
+                  immersed_disc_length_,
+                  "Immersed disc: length of computational domain");
+
+    immersed_disc_height_ = 2.;
+    add_parameter("immersed disc - height",
+                  immersed_disc_height_,
+                  "Immersed disc: height of computational domain");
+
+    immersed_disc_object_position_ = 0.6;
+    add_parameter("immersed disc - object position",
+                  immersed_disc_object_position_,
+                  "Immersed disc: x position of immersed disc center point");
+
+    immersed_disc_object_diameter_ = 0.5;
+    add_parameter("immersed disc - object diameter",
+                  immersed_disc_object_diameter_,
+                  "Immersed disc: diameter of immersed disc");
 
     /* Options: */
 
@@ -150,6 +168,16 @@ namespace grendel
                               mach_step_step_height_);
 
       triangulation.refine_global(refinement_ - 4);
+
+    } else if (geometry_ == "disc") {
+
+      create_coarse_grid_cylinder(triangulation,
+                                  immersed_disc_length_,
+                                  immersed_disc_height_,
+                                  immersed_disc_object_position_,
+                                  immersed_disc_object_diameter_);
+
+      triangulation.refine_global(refinement_);
 
     } else {
 

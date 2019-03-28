@@ -80,6 +80,7 @@ namespace grendel
     double immersed_triangle_length_;
     double immersed_triangle_height_;
     double immersed_triangle_object_height_;
+
     double tube_length_;
     double tube_diameter_;
 
@@ -87,6 +88,11 @@ namespace grendel
     double mach_step_height_;
     double mach_step_step_position_;
     double mach_step_step_height_;
+
+    double immersed_disc_length_;
+    double immersed_disc_height_;
+    double immersed_disc_object_position_;
+    double immersed_disc_object_diameter_;
 
     unsigned int refinement_;
 

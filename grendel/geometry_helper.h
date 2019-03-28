@@ -325,6 +325,106 @@ namespace grendel
     }
   }
 
+
+  /**
+   * Create the 2D cylinder configuration
+   *
+   * Even though this function has a template parameter @p dim, it is only
+   * implemented for dimension 2.
+   */
+
+  template <int dim>
+  void create_coarse_grid_cylinder(
+      dealii::parallel::distributed::Triangulation<dim> &,
+      const double /*length*/,
+      const double /*height*/,
+      const double /*step_position*/,
+      const double /*step_height*/)
+  {
+    AssertThrow(false, dealii::ExcNotImplemented());
+  }
+
+
+  template <>
+  void create_coarse_grid_cylinder<2>(
+      dealii::parallel::distributed::Triangulation<2> &triangulation,
+      const double length,
+      const double height,
+      const double disc_position,
+      const double disc_diameter)
+  {
+    constexpr int dim = 2;
+
+    using namespace dealii;
+
+    Triangulation<dim> tria1, tria2, tria3, tria4;
+
+    GridGenerator::hyper_cube_with_cylindrical_hole(
+        tria1, disc_diameter / 2., disc_diameter, 0.5, 1, false);
+
+    GridGenerator::subdivided_hyper_rectangle(
+        tria2,
+        {2, 1},
+        Point<2>(-disc_diameter, disc_diameter),
+        Point<2>(disc_diameter, height / 2.));
+
+    GridGenerator::subdivided_hyper_rectangle(
+        tria3,
+        {2, 1},
+        Point<2>(-disc_diameter, -disc_diameter),
+        Point<2>(disc_diameter, -height / 2.));
+
+    GridGenerator::subdivided_hyper_rectangle(
+        tria4,
+        {6, 4},
+        Point<2>(disc_diameter, -height / 2.),
+        Point<2>(length - disc_position, height / 2.));
+
+    GridGenerator::merge_triangulations(
+        {&tria1, &tria2, &tria3, &tria4}, triangulation, 1.e-12, true);
+
+    /* Restore polar manifold for disc: */
+
+    triangulation.set_manifold(0, PolarManifold<2>(Point<2>()));
+
+    /* Fix up position of left boundary: */
+
+    for (auto cell : triangulation.active_cell_iterators())
+      for (unsigned int v = 0; v < GeometryInfo<dim>::vertices_per_cell; ++v) {
+        auto &vertex = cell->vertex(v);
+        if (vertex[0] <= -disc_diameter + 1.e-6)
+          vertex[0] = -disc_position;
+      }
+
+    /*
+     * Set boundary ids:
+     */
+
+    for (auto cell : triangulation.active_cell_iterators()) {
+      for (unsigned int f = 0; f < GeometryInfo<2>::faces_per_cell; ++f) {
+        const auto face = cell->face(f);
+
+        if (!face->at_boundary())
+          continue;
+
+        /*
+         * We want reflective boundary conditions (i.e. indicator 1) at top
+         * and bottom of the channel. On the left side we set inflow
+         * conditions (indicator 2) and on the right side we
+         * set indicator 0, i.e. do nothing.
+         */
+
+        const auto center = face->center();
+        if (center[0] < disc_position + 1.e-6)
+          face->set_boundary_id(2);
+
+        if (std::abs(center[1]) > height / 2. - 1.e-6)
+          face->set_boundary_id(1);
+      }
+    }
+
+  }
+
 } // namespace grendel
 
 #endif /* GEOMETRY_HELPER_H */
