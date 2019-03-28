@@ -93,7 +93,7 @@ namespace grendel
           continue;
 
         /*
-         * We want reflective boundary conditions (i.e. indicator 1) at top
+         * We want slip boundary conditions (i.e. indicator 1) at top
          * bottom and on the triangle. On the left and right side we leave
          * the boundary indicator at 0, i.e. do nothing.
          */
@@ -112,7 +112,7 @@ namespace grendel
    * We set boundary indicator 0 on the left and right side to indicate "do
    * nothing" boundary conditions, and boundary indicator 1 at the top and
    * bottom side in 2D, as well as the curved portion of the boundary in 3D
-   * to indicate "reflective boundary conditions".
+   * to indicate "slip boundary conditions".
    */
 
   template <int dim>
@@ -158,7 +158,7 @@ namespace grendel
           continue;
 
         /*
-         * We want reflective boundary conditions (i.e. indicator 1) at top
+         * We want slip boundary conditions (i.e. indicator 1) at top
          * and bottom of the rectangle. On the left and right side we leave
          * the boundary indicator at 0, i.e. do nothing.
          */
@@ -193,7 +193,7 @@ namespace grendel
           continue;
 
         /*
-         * We want reflective boundary conditions (i.e. indicator 1) at top
+         * We want slip boundary conditions (i.e. indicator 1) at top
          * and bottom of the rectangle. On the left we set inflow
          * conditions (i.e. indicator 2), and we do nothing on the right
          * side (i.e. indicator 0).
@@ -266,7 +266,7 @@ namespace grendel
           continue;
 
         /*
-         * We want reflective boundary conditions (i.e. indicator 1) at top
+         * We want slip boundary conditions (i.e. indicator 1) at top
          * and bottom of the rectangle. On the left we set inflow
          * conditions (i.e. indicator 2), and we do nothing on the right
          * side (i.e. indicator 0).
@@ -408,18 +408,24 @@ namespace grendel
           continue;
 
         /*
-         * We want reflective boundary conditions (i.e. indicator 1) at top
-         * and bottom of the channel. On the left side we set inflow
-         * conditions (indicator 2) and on the right side we
-         * set indicator 0, i.e. do nothing.
+         * We want slip boundary conditions (i.e. indicator 1) at top and
+         * bottom of the channel, as well as on the obstacle. On the left
+         * side we set inflow conditions (indicator 2) and on the right
+         * side we set indicator 0, i.e. do nothing.
          */
 
         const auto center = face->center();
-        if (center[0] < disc_position + 1.e-6)
-          face->set_boundary_id(2);
 
-        if (std::abs(center[1]) > height / 2. - 1.e-6)
-          face->set_boundary_id(1);
+        if (center[0] > length - disc_position - 1.e-6)
+          continue;
+
+        if (center[0] < -disc_position + 1.e-6) {
+          face->set_boundary_id(2);
+          continue;
+        }
+
+        // the rest:
+        face->set_boundary_id(1);
       }
     }
 
