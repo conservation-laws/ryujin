@@ -195,7 +195,8 @@ namespace grendel
 
           } else {
 
-            alpha_[i] = 0.;
+            const auto beta_i = std::abs(numerator) / denominator_abs;
+            alpha_[i] = beta_i;
           }
         }
       };
