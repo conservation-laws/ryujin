@@ -47,7 +47,7 @@ namespace grendel
       rho,
       internal_energy,
       specific_entropy
-    } limiters_ = Limiters::rho;
+    } limiters_ = Limiters::internal_energy;
 
     /*
      * Indicator:
@@ -163,14 +163,15 @@ namespace grendel
 
     /*
      * First limit rho:
+     *
+     * See [Guermond, Nazarov, Popov, Thomas] (4.8):
      */
+
+    const auto &U_i_rho = U[0];
+    const auto &P_ij_rho = P_ij[0];
+
     {
-      /* See [Guermond, Nazarov, Popov, Thomas] (4.8): */
-
       double l_ij_rho = 1.;
-
-      const auto U_i_rho = U[0];
-      const auto P_ij_rho = P_ij[0];
 
       constexpr double eps_ = std::numeric_limits<double>::epsilon();
 
@@ -190,9 +191,61 @@ namespace grendel
 
     /*
      * Then, limit the internal energy:
+     *
+     * See [Guermond, Nazarov, Popov, Thomas], Section 4.5:
      */
 
-    /* See [Guermond, Nazarov, Popov, Thomas], Section 4.5: */
+    const auto P_ij_m = problem_description_->momentum_vector(P_ij);
+    const auto &P_ij_E = P_ij[dim + 1];
+
+    const auto U_i_m = problem_description_->momentum_vector(U);
+    const double &U_i_E = U[dim + 1];
+
+    {
+      double l_ij_rhoe = 1.;
+
+      const double a = P_ij_rho * P_ij_E + 1. / 2. * P_ij_m.norm_square();
+
+      const double b = (U_i_E - rho_epsilon_min) * P_ij_rho - U_i_m * P_ij_m +
+                       U_i_rho * P_ij_rho;
+
+      const double c = U_i_rho * U_i_E - 1. / 2. * U_i_m.norm_square() -
+                       rho_epsilon_min * U_i_rho;
+
+      /*
+       * Solve the quadratic equation a t^2 + b t + c = 0 by hand. We use the
+       * Ciatardauq formula to avoid numerical cancellation and some if
+       * statements:
+       */
+
+      const double discriminant = b * b - 4. * a * c;
+
+      if (discriminant == 0.) {
+
+        l_ij_rhoe = -b / 2. / a;
+
+      } else if (discriminant > 0.) {
+
+        const double x = 2. * c / (-b - std::copysign(discriminant, b));
+        const double y = c / a / x;
+
+        if (x > 0 && x < y)
+          l_ij_rhoe = x;
+        else if (y > 0)
+          l_ij_rhoe = y;
+      }
+
+      if (l_ij_rhoe < 0.)
+        l_ij_rhoe = 1.;
+
+      l_ij = std::min(l_ij, l_ij_rhoe); // ensures that l_ij <= 1
+    }
+
+    if constexpr (limiters_ == Limiters::internal_energy)
+      return l_ij;
+
+    static_assert(limiters_ != Limiters::specific_entropy,
+                  "not implemented, sorry");
 
     return l_ij;
   }
