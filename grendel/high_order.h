@@ -186,7 +186,9 @@ namespace grendel
       l_ij = std::min(l_ij, l_ij_rho); // ensures that l_ij <= 1
     }
 
-    Assert((U + l_ij * P_ij)[0] > 0., ExcInternalError());
+    Assert((U + l_ij * P_ij)[0] > 0.,
+           dealii::ExcMessage("I'm sorry, Dave. I'm afraid I can't "
+                              "do that. - Negative internal energy."));
 
     if constexpr(limiters_ == Limiters::rho)
       return l_ij;
@@ -204,7 +206,6 @@ namespace grendel
     const double &U_i_E = U[dim + 1];
 
     {
-
       const double c =
           (U_i_E - rho_epsilon_min) * U_i_rho - 1. / 2. * U_i_m.norm_square();
 
@@ -253,8 +254,9 @@ namespace grendel
       l_ij = std::min(l_ij, l_ij_rhoe);
     }
 
-    Assert(problem_description_->internal_energy(U + l_ij * P_ij) > 0.,
-           ExcInternalError());
+    AssertThrow(problem_description_->internal_energy(U + l_ij * P_ij) > 0.,
+                dealii::ExcMessage("I'm sorry, Dave. I'm afraid I can't "
+                                   "do that. - Negative internal energy."));
 
     if constexpr (limiters_ == Limiters::internal_energy)
       return l_ij;

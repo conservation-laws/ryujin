@@ -157,7 +157,7 @@ namespace grendel
   {
     dealii::Tensor<1, dim> result;
     std::copy(&U[1], &U[1 + dim], &result[0]);
-    return std::move(result);
+    return result;
   }
 
 
@@ -221,7 +221,7 @@ namespace grendel
     }
     result[dim + 1] = m / rho * (E + p);
 
-    return std::move(result);
+    return result;
   }
 
 
