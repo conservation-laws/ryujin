@@ -204,13 +204,13 @@ namespace grendel
     {
       double l_ij_rhoe = 1.;
 
-      const double a = P_ij_rho * P_ij_E + 1. / 2. * P_ij_m.norm_square();
+      const double c =
+          (U_i_E - rho_epsilon_min) * U_i_rho - 1. / 2. * U_i_m.norm_square();
 
-      const double b = (U_i_E - rho_epsilon_min) * P_ij_rho - U_i_m * P_ij_m +
-                       U_i_rho * P_ij_rho;
+      const double b = (U_i_E - rho_epsilon_min) * P_ij_rho +
+                       P_ij_E * U_i_rho - U_i_m * P_ij_m;
 
-      const double c = U_i_rho * U_i_E - 1. / 2. * U_i_m.norm_square() -
-                       rho_epsilon_min * U_i_rho;
+      const double a = P_ij_E * P_ij_rho  - 1. / 2. * P_ij_m.norm_square();
 
       /*
        * Solve the quadratic equation a t^2 + b t + c = 0 by hand. We use the
