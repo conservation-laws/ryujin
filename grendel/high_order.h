@@ -186,6 +186,8 @@ namespace grendel
       l_ij = std::min(l_ij, l_ij_rho); // ensures that l_ij <= 1
     }
 
+    Assert((U + l_ij * P_ij)[0] > 0., ExcInternalError());
+
     if constexpr(limiters_ == Limiters::rho)
       return l_ij;
 
@@ -202,7 +204,6 @@ namespace grendel
     const double &U_i_E = U[dim + 1];
 
     {
-      double l_ij_rhoe = 1.;
 
       const double c =
           (U_i_E - rho_epsilon_min) * U_i_rho - 1. / 2. * U_i_m.norm_square();
@@ -218,32 +219,42 @@ namespace grendel
        * statements:
        */
 
-      const double discriminant = b * b - 4. * a * c;
+      double l_ij_rhoe = 1.;
 
-      if (discriminant < 0.) {
-        l_ij_rhoe = 0.;
-      }
+      const double discriminant = b * b - 4. * a * c;
 
       if (discriminant == 0.) {
 
-        l_ij_rhoe = -b / 2. / a;
+        const double x = -b / 2. / a;
+
+        if (x > 0)
+          l_ij_rhoe = x;
 
       } else if (discriminant > 0.) {
 
-        const double x = 2. * c / (-b - std::copysign(discriminant, b));
+        const double x =
+            2. * c / (-b - std::copysign(std::sqrt(discriminant), b));
         const double y = c / a / x;
 
-        if (x > 0 && x < y)
-          l_ij_rhoe = x;
-        else if (y > 0)
-          l_ij_rhoe = y;
-      }
+        /*
+         * Select the smallest positive root:
+         */
 
-      if (l_ij_rhoe < 0.)
-        l_ij_rhoe = 1.;
+        if (x > 0.) {
+          if (y > 0. && y < x)
+            l_ij_rhoe = y;
+          else
+            l_ij_rhoe = x;
+        } else if (y > 0.) {
+          l_ij_rhoe = y;
+        }
+      }
 
       l_ij = std::min(l_ij, l_ij_rhoe);
     }
+
+    Assert(problem_description_->internal_energy(U + l_ij * P_ij) > 0.,
+           ExcInternalError());
 
     if constexpr (limiters_ == Limiters::internal_energy)
       return l_ij;
