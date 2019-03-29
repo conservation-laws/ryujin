@@ -170,7 +170,7 @@ namespace ryujin
       print_head(head.str());
 
       deallog << "        at time t="                    //
-              << std::setprecision(4) << std::fixed << t //
+              << std::setprecision(8) << std::fixed << t //
               << std::endl;
 
       const auto tau = time_step.step(U);

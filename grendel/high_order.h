@@ -220,6 +220,10 @@ namespace grendel
 
       const double discriminant = b * b - 4. * a * c;
 
+      if (discriminant < 0.) {
+        l_ij_rhoe = 0.;
+      }
+
       if (discriminant == 0.) {
 
         l_ij_rhoe = -b / 2. / a;
@@ -238,7 +242,7 @@ namespace grendel
       if (l_ij_rhoe < 0.)
         l_ij_rhoe = 1.;
 
-      l_ij = std::min(l_ij, l_ij_rhoe); // ensures that l_ij <= 1
+      l_ij = std::min(l_ij, l_ij_rhoe);
     }
 
     if constexpr (limiters_ == Limiters::internal_energy)
