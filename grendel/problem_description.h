@@ -95,10 +95,10 @@ namespace grendel
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
-     * and return the specific entropy.
+     * and return  \rho e / \rho ^ \gamma.
      */
     inline DEAL_II_ALWAYS_INLINE double
-    specific_entropy(const rank1_type &U) const;
+    specific_entropy_measure(const rank1_type &U) const;
 
 
     /**
@@ -194,12 +194,10 @@ namespace grendel
 
   template <int dim>
   inline DEAL_II_ALWAYS_INLINE double
-  ProblemDescription<dim>::specific_entropy(const rank1_type &U) const
+  ProblemDescription<dim>::specific_entropy_measure(const rank1_type &U) const
   {
     const auto &rho = U[0];
-    const auto p = pressure(U);
-
-    return rho * std::log(p / std::pow(rho, gamma_));
+    return internal_energy(U) / std::pow(rho, gamma_ - 1.);
   }
 
 

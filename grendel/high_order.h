@@ -101,7 +101,7 @@ namespace grendel
       return problem_description_->pressure(gather(U, i));
 
     case Indicator::specific_entropy:
-      return problem_description_->specific_entropy(gather(U, i));
+      return problem_description_->specific_entropy_measure(gather(U, i));
     }
   }
 
