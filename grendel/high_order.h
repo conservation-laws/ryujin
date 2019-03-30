@@ -147,9 +147,11 @@ namespace grendel
     const auto rho_epsilon = problem_description_->internal_energy(U);
     rho_epsilon_min = std::min(rho_epsilon_min, rho_epsilon);
 
-
     if constexpr(limiters_ == Limiters::internal_energy)
       return;
+
+    const auto s = problem_description_->specific_entropy_measure(U);
+    s_min = std::min(s_min, s);
   }
 
   template <int dim>
@@ -186,11 +188,11 @@ namespace grendel
                    (std::abs(P_ij_rho) + eps_ * rho_max);
 
       l_ij = std::min(l_ij, l_ij_rho); // ensures that l_ij <= 1
-    }
 
-    Assert((U + l_ij * P_ij)[0] > 0.,
-           dealii::ExcMessage("I'm sorry, Dave. I'm afraid I can't "
-                              "do that. - Negative internal energy."));
+      AssertThrow((U + l_ij * P_ij)[0] > 0.,
+                  dealii::ExcMessage("I'm sorry, Dave. I'm afraid I can't "
+                                     "do that. - Negative internal energy."));
+    }
 
     if constexpr(limiters_ == Limiters::rho)
       return l_ij;
@@ -201,13 +203,14 @@ namespace grendel
      * See [Guermond, Nazarov, Popov, Thomas], Section 4.5:
      */
 
-    const auto P_ij_m = problem_description_->momentum_vector(P_ij);
-    const auto &P_ij_E = P_ij[dim + 1];
+    if constexpr (limiters_ == Limiters::internal_energy) {
 
-    const auto U_i_m = problem_description_->momentum_vector(U);
-    const double &U_i_E = U[dim + 1];
+      const auto P_ij_m = problem_description_->momentum_vector(P_ij);
+      const auto &P_ij_E = P_ij[dim + 1];
 
-    {
+      const auto U_i_m = problem_description_->momentum_vector(U);
+      const double &U_i_E = U[dim + 1];
+
       const double c =
           (U_i_E - rho_epsilon_min) * U_i_rho - 1. / 2. * U_i_m.norm_square();
 
@@ -254,16 +257,33 @@ namespace grendel
       }
 
       l_ij = std::min(l_ij, l_ij_rhoe);
+
+      AssertThrow(problem_description_->internal_energy(U + l_ij * P_ij) > 0.,
+                  dealii::ExcMessage("I'm sorry, Dave. I'm afraid I can't "
+                                     "do that. - Negative internal energy."));
+
+      return l_ij;
     }
 
-    AssertThrow(problem_description_->internal_energy(U + l_ij * P_ij) > 0.,
-                dealii::ExcMessage("I'm sorry, Dave. I'm afraid I can't "
-                                   "do that. - Negative internal energy."));
+    /*
+     * And finally, limit the specific entropy:
+     *
+     * See [Guermond, Nazarov, Popov, Thomas], Section 4.6:
+     */
 
-    if constexpr (limiters_ == Limiters::internal_energy)
+    if constexpr (limiters_ == Limiters::specific_entropy)
+    {
+      // FIXME
+
+      AssertThrow(
+          problem_description_->specific_entropy_measure(U + l_ij * P_ij) > 0.,
+          dealii::ExcMessage("I'm sorry, Dave. I'm afraid I can't "
+                             "do that. - Negative specific entropy."));
+
       return l_ij;
+    }
 
-    return l_ij;
+    __builtin_unreachable();
   }
 
 } /* namespace grendel */
