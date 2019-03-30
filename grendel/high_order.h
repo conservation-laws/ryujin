@@ -18,11 +18,11 @@ namespace grendel
     using rank1_type = typename ProblemDescription<dim>::rank1_type;
 
     /*
-     * Let's allocate 3 double's for limiter bounds:
+     * Let's allocate 5 double's for limiter bounds:
      */
-    typedef std::array<double, 3> Bounds;
+    typedef std::array<double, 5> Bounds;
 
-    typedef std::array<dealii::LinearAlgebra::distributed::Vector<double>, 3>
+    typedef std::array<dealii::LinearAlgebra::distributed::Vector<double>, 5>
         vector_type;
 
     HighOrder(const grendel::ProblemDescription<dim> &problem_description,
@@ -47,7 +47,7 @@ namespace grendel
       rho,
       internal_energy,
       specific_entropy
-    } limiters_ = Limiters::internal_energy;
+    } limiters_ = Limiters::specific_entropy;
 
     /*
      * Indicator:
@@ -119,10 +119,12 @@ namespace grendel
   inline DEAL_II_ALWAYS_INLINE void
   HighOrder<dim>::reset(Bounds &bounds) const
   {
-    auto &[rho_min, rho_max, rho_epsilon_min] = bounds;
+    auto &[rho_min, rho_max, rho_epsilon_min, s_min, s_laplace] = bounds;
     rho_min = std::numeric_limits<double>::max();
     rho_max = 0.;
     rho_epsilon_min = std::numeric_limits<double>::max();
+    s_min = std::numeric_limits<double>::max();
+    s_laplace = 0.;
   }
 
 
@@ -130,7 +132,7 @@ namespace grendel
   inline DEAL_II_ALWAYS_INLINE void
   HighOrder<dim>::accumulate(Bounds &bounds, const rank1_type &U) const
   {
-    auto &[rho_min, rho_max, rho_epsilon_min] = bounds;
+    auto &[rho_min, rho_max, rho_epsilon_min, s_min, s_laplace] = bounds;
 
     if constexpr(limiters_ == Limiters::none)
       return;
@@ -154,7 +156,7 @@ namespace grendel
   inline DEAL_II_ALWAYS_INLINE double HighOrder<dim>::limit(
       const Bounds &bounds, const rank1_type &U, const rank1_type &P_ij) const
   {
-    auto &[rho_min, rho_max, rho_epsilon_min] = bounds;
+    auto &[rho_min, rho_max, rho_epsilon_min, s_min, s_laplace] = bounds;
 
     double l_ij = 1.;
 
@@ -260,9 +262,6 @@ namespace grendel
 
     if constexpr (limiters_ == Limiters::internal_energy)
       return l_ij;
-
-    static_assert(limiters_ != Limiters::specific_entropy,
-                  "not implemented, sorry");
 
     return l_ij;
   }
