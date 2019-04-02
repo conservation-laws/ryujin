@@ -96,13 +96,13 @@ namespace grendel
 
 
     /*
-     * Step 1: Compute off-diagonal d_ij
+     * Step 1: Compute off-diagonal d_ij, and alpha_i
      */
 
     {
       deallog << "        compute d_ij" << std::endl;
       TimerOutput::Scope t(computing_timer_,
-                           "time_step - 1 compute d_ij");
+                           "time_step - 1 compute d_ij, and alpha_i");
 
       const auto on_subranges = [&](auto i1, const auto i2) {
         /* Translate the local index into a index set iterator:: */
@@ -112,8 +112,37 @@ namespace grendel
           const auto i = *it;
           const auto U_i = gather(U, i);
 
+          // FIXME: Refactor
+          const auto eta_i = problem_description_->entropy(U_i);
+          const auto &rho_i = U_i[0];
+
+          double left = 0.;
+          rank1_type right;
+
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
             const auto j = jt->column();
+
+            /*
+             * Skip diagonal:
+             */
+
+            if (j == i)
+              continue;
+
+            const auto U_j = gather(U, j);
+
+            const auto f_j = problem_description_->f(U_j);
+            const auto c_ij = gather_get_entry(cij_matrix, jt);
+
+            // FIXME: Refactor
+            const auto eta_j = problem_description_->entropy(U_j);
+            const auto &rho_j = U_j[0];
+            const auto m_j = problem_description_->momentum(U_j);
+
+            left += (eta_j / rho_j - eta_i / rho_i) * m_j * c_ij;
+            // Ensure that right[0] == 0.
+            for (unsigned int k = 1; k < problem_dimension; ++k)
+              right[k] += f_j[k] * c_ij;
 
             /*
              * Only iterate over the subdiagonal for d_ij
@@ -122,7 +151,6 @@ namespace grendel
             if (j >= i)
               continue;
 
-            const auto U_j = gather(U, j);
             const auto n_ij = gather_get_entry(nij_matrix, jt);
             const double norm = get_entry(norm_matrix, jt);
 
@@ -150,11 +178,27 @@ namespace grendel
             set_entry(dij_matrix_, jt, d);
             dij_matrix_(j, i) = d; // FIXME: Suboptimal
           }
+
+          // FIXME: Refactor
+          const auto d_eta_i = problem_description_->entropy_derivative(U_i);
+
+          double numerator = left;
+          double denominator = std::abs(left);
+          // Ignore first component:
+          for (unsigned int k = 1; k < problem_dimension; ++k) {
+            numerator -= d_eta_i[k] * right[k];
+            denominator += std::abs(d_eta_i[k] * right[k]);
+          }
+          alpha_[i] = std::abs(numerator) / denominator;
+
         }
       };
 
       parallel::apply_to_subranges(
           indices.begin(), indices.end(), on_subranges, 4096);
+
+      /* Synchronize alpha_ over all MPI processes: */
+      alpha_.update_ghost_values();
     }
 
 
