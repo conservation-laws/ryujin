@@ -20,7 +20,7 @@ namespace grendel
       const grendel::OfflineData<dim> &offline_data,
       const grendel::ProblemDescription<dim> &problem_description,
       const grendel::RiemannSolver<dim> &riemann_solver,
-      const grendel::HighOrder<dim> &high_order,
+      const grendel::Limiter<dim> &high_order,
       const std::string &subsection /*= "TimeStep"*/)
       : ParameterAcceptor(subsection)
       , mpi_communicator_(mpi_communicator)
@@ -28,7 +28,7 @@ namespace grendel
       , offline_data_(&offline_data)
       , problem_description_(&problem_description)
       , riemann_solver_(&riemann_solver)
-      , high_order_(&high_order)
+      , limiter_(&high_order)
   {
     use_ssprk_ = false;
     add_parameter(
@@ -246,7 +246,7 @@ namespace grendel
       const auto on_subranges = [&](auto i1, const auto i2) {
 
         /* Notar bene: This bounds variable is thread local: */
-        typename HighOrder<dim>::Bounds bounds;
+        typename Limiter<dim>::Bounds bounds;
 
         /* Translate the local index into a index set iterator:: */
         auto it = locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
@@ -271,7 +271,7 @@ namespace grendel
           rank1_type r_i;
 
           /* Clear bounds: */
-          high_order_->reset(bounds);
+          limiter_->reset(bounds);
 
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
 
@@ -300,7 +300,7 @@ namespace grendel
 
             scatter_set_entry(pij_matrix_, jt, p_ij);
 
-            high_order_->accumulate(bounds, U_ij_bar);
+            limiter_->accumulate(bounds, U_ij_bar);
           }
 
           scatter(temp_euler_, U_i_new, i);
@@ -364,7 +364,7 @@ namespace grendel
             p_ij += tau / m_i / lambda * (b_ij * r_j - b_ji * r_i);
             scatter_set_entry(pij_matrix_, jt, p_ij);
 
-            const auto l_ij = high_order_->limit(bounds, U_i_new, p_ij);
+            const auto l_ij = limiter_->limit(bounds, U_i_new, p_ij);
             set_entry(lij_matrix_, jt, l_ij);
           }
         }

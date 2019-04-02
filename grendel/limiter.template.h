@@ -1,14 +1,14 @@
-#ifndef HIGH_ORDER_TEMPLATE_H
-#define HIGH_ORDER_TEMPLATE_H
+#ifndef LIMITER_TEMPLATE_H
+#define LIMITER_TEMPLATE_H
 
-#include "high_order.h"
+#include "limiter.h"
 
 namespace grendel
 {
   using namespace dealii;
 
   template <int dim>
-  HighOrder<dim>::HighOrder(
+  Limiter<dim>::Limiter(
       const grendel::ProblemDescription<dim> &problem_description,
       const std::string &subsection)
       : ParameterAcceptor(subsection)
@@ -17,4 +17,4 @@ namespace grendel
   }
 } /* namespace grendel */
 
-#endif /* HIGH_ORDER_TEMPLATE_H */
+#endif /* LIMITER_TEMPLATE_H */

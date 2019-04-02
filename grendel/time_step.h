@@ -2,7 +2,7 @@
 #define TIME_STEP_H
 
 #include "helper.h"
-#include "high_order.h"
+#include "limiter.h"
 #include "offline_data.h"
 #include "problem_description.h"
 #include "riemann_solver.h"
@@ -34,7 +34,7 @@ namespace grendel
              const grendel::OfflineData<dim> &offline_data,
              const grendel::ProblemDescription<dim> &problem_description,
              const grendel::RiemannSolver<dim> &riemann_solver,
-             const grendel::HighOrder<dim> &high_order,
+             const grendel::Limiter<dim> &limiter,
              const std::string &subsection = "TimeStep");
 
     virtual ~TimeStep() final = default;
@@ -92,8 +92,8 @@ namespace grendel
     dealii::SmartPointer<const grendel::RiemannSolver<dim>> riemann_solver_;
     ACCESSOR_READ_ONLY(riemann_solver)
 
-    dealii::SmartPointer<const grendel::HighOrder<dim>> high_order_;
-    ACCESSOR_READ_ONLY(high_order)
+    dealii::SmartPointer<const grendel::Limiter<dim>> limiter_;
+    ACCESSOR_READ_ONLY(limiter)
 
   private:
     /* Scratch data: */
@@ -103,7 +103,7 @@ namespace grendel
     dealii::LinearAlgebra::distributed::Vector<double> alpha_;
     ACCESSOR_READ_ONLY(alpha)
 
-    typename HighOrder<dim>::vector_type bounds_;
+    typename Limiter<dim>::vector_type bounds_;
 
     vector_type r_;
 

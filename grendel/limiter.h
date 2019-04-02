@@ -1,5 +1,5 @@
-#ifndef HIGH_ORDER_H
-#define HIGH_ORDER_H
+#ifndef LIMITER_H
+#define LIMITER_H
 
 #include "problem_description.h"
 
@@ -9,7 +9,7 @@ namespace grendel
 {
 
   template <int dim>
-  class HighOrder : public dealii::ParameterAcceptor
+  class Limiter : public dealii::ParameterAcceptor
   {
   public:
     static constexpr unsigned int problem_dimension =
@@ -25,10 +25,10 @@ namespace grendel
     typedef std::array<dealii::LinearAlgebra::distributed::Vector<double>, 5>
         vector_type;
 
-    HighOrder(const grendel::ProblemDescription<dim> &problem_description,
-              const std::string &subsection = "HighOrder");
+    Limiter(const grendel::ProblemDescription<dim> &problem_description,
+              const std::string &subsection = "Limiter");
 
-    virtual ~HighOrder() final = default;
+    virtual ~Limiter() final = default;
 
     /*
      * Options:
@@ -63,7 +63,7 @@ namespace grendel
 
   template <int dim>
   inline DEAL_II_ALWAYS_INLINE void
-  HighOrder<dim>::reset(Bounds &bounds) const
+  Limiter<dim>::reset(Bounds &bounds) const
   {
     auto &[rho_min, rho_max, rho_epsilon_min, s_min, s_laplace] = bounds;
     rho_min = std::numeric_limits<double>::max();
@@ -76,7 +76,7 @@ namespace grendel
 
   template <int dim>
   inline DEAL_II_ALWAYS_INLINE void
-  HighOrder<dim>::accumulate(Bounds &bounds, const rank1_type &U) const
+  Limiter<dim>::accumulate(Bounds &bounds, const rank1_type &U) const
   {
     auto &[rho_min, rho_max, rho_epsilon_min, s_min, s_laplace] = bounds;
 
@@ -98,7 +98,7 @@ namespace grendel
   }
 
   template <int dim>
-  inline DEAL_II_ALWAYS_INLINE double HighOrder<dim>::limit(
+  inline DEAL_II_ALWAYS_INLINE double Limiter<dim>::limit(
       const Bounds &bounds, const rank1_type &U, const rank1_type &P_ij) const
   {
     auto &[rho_min, rho_max, rho_epsilon_min, s_min, s_laplace] = bounds;
@@ -225,4 +225,4 @@ namespace grendel
 
 } /* namespace grendel */
 
-#endif /* HIGH_ORDER_H */
+#endif /* LIMITER_H */

@@ -1,6 +1,6 @@
 ADD_LIBRARY(grendel SHARED
   discretization.cc
-  high_order.cc
+  limiter.cc
   offline_data.cc
   problem_description.cc
   riemann_solver.cc

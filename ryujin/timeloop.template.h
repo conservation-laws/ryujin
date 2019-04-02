@@ -66,13 +66,13 @@ namespace ryujin
                      "C - OfflineData")
       , problem_description("D - ProblemDescription")
       , riemann_solver(problem_description, "E - RiemannSolver")
-      , high_order(problem_description, "F - HighOrder")
+      , limiter(problem_description, "F - Limiter")
       , time_step(mpi_communicator,
                   computing_timer,
                   offline_data,
                   problem_description,
                   riemann_solver,
-                  high_order,
+                  limiter,
                   "G - TimeStep")
       , schlieren_postprocessor(mpi_communicator,
                                 computing_timer,
