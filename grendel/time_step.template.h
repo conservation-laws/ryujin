@@ -89,7 +89,6 @@ namespace grendel
     const auto &nij_matrix = offline_data_->nij_matrix();
     const auto &bij_matrix = offline_data_->bij_matrix();
     const auto &cij_matrix = offline_data_->cij_matrix();
-    const auto &betaij_matrix = offline_data_->betaij_matrix();
     const auto &boundary_normal_map = offline_data_->boundary_normal_map();
 
     const auto indices =
@@ -97,23 +96,16 @@ namespace grendel
 
 
     /*
-     * Step 1: Compute off-diagonal d_ij, also compute smoothness
-     *         indicators \alpha_i and \beta_i:
+     * Step 1: Compute off-diagonal d_ij, and the entropy viscosity
+     *         commutator alpha_i
      *
-     *   \alpha_i = \|\sum_j beta_ij (s(U_i) - s(U_j)) \|
-     *                / \sum_j \| \beta_ij (s(U_i) - s(U_j)) \|,
-     *
-     *   \beta_i = \|\sum_j beta_ij (s(U_i) - s(U_j)) \|
-     *             / \sum_j \| \beta_ij \| (\|s(U_i)\| + \|s(U_j)\|),
-     *
-     *   where s(.) is a suitable function used for the smoothness
-     *   indicator and \beta_ij is the stiffness matrix.
+     *   FIXME
      */
 
     {
-      deallog << "        compute d_ij, alpha_i, and beta_i" << std::endl;
+      deallog << "        compute d_ij, alpha_i" << std::endl;
       TimerOutput::Scope t(computing_timer_,
-                           "time_step - 1 compute d_ij, alpha_i, and beta_i");
+                           "time_step - 1 compute d_ij, alpha_i");
 
       alpha_.zero_out_ghosts();
 
@@ -124,11 +116,8 @@ namespace grendel
 
           const auto i = *it;
           const auto U_i = gather(U, i);
-          const auto indicator_i = high_order_->smoothness_indicator(U, i);
 
-          double numerator = 0.;
-          double denominator = 0.;
-          double denominator_abs = 0.;
+          // FIXME
 
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
             const auto j = jt->column();
@@ -139,16 +128,6 @@ namespace grendel
 
             if (j == i)
               continue;
-
-            const auto beta_ij = get_entry(betaij_matrix, jt);
-            const auto indicator_j = high_order_->smoothness_indicator(U, j);
-
-            numerator += beta_ij * (indicator_i - indicator_j);
-
-            denominator +=
-                std::abs(beta_ij) * std::abs(indicator_i - indicator_j);
-            denominator_abs += std::abs(beta_ij) * (std::abs(indicator_i) +
-                                                      std::abs(indicator_j));
 
             /*
              * Only iterate over the subdiagonal for d_ij
@@ -186,18 +165,8 @@ namespace grendel
             dij_matrix_(j, i) = d; // FIXME: Suboptimal
           }
 
-          if(denominator > 1.e-7 * denominator_abs)
-          {
-            const auto alpha_i =
-                high_order_->psi(std::abs(numerator) / denominator);
-            const auto beta_i = std::abs(numerator) / denominator_abs;
-            alpha_[i] = std::min(alpha_i, beta_i);
-
-          } else {
-
-            const auto beta_i = std::abs(numerator) / denominator_abs;
-            alpha_[i] = beta_i;
-          }
+          // FIXME
+          // alpha_[i] = ...
         }
       };
 
@@ -519,7 +488,7 @@ namespace grendel
           /* On boundray 1 remove the normal component of the momentum: */
 
           if (id == 1) {
-            auto m = ProblemDescription<dim>::momentum_vector(U_i);
+            auto m = ProblemDescription<dim>::momentum(U_i);
             m -= 1. * (m * normal) * normal;
             for (unsigned int k = 0; k < dim; ++k)
               U_i[k + 1] = m[k];

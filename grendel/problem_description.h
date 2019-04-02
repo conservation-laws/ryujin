@@ -75,7 +75,7 @@ namespace grendel
      * the momentum vector <code>[U[1], ..., U[1+dim]]</code>.
      */
     static inline DEAL_II_ALWAYS_INLINE dealii::Tensor<1, dim>
-    momentum_vector(const rank1_type &U);
+    momentum(const rank1_type &U);
 
 
     /**
@@ -95,10 +95,17 @@ namespace grendel
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
-     * and return  \rho e / \rho ^ \gamma.
+     * and return the entropy p^(1/\gamma)
      */
-    inline DEAL_II_ALWAYS_INLINE double
-    specific_entropy_measure(const rank1_type &U) const;
+    inline DEAL_II_ALWAYS_INLINE double entropy(const rank1_type &U) const;
+
+
+    /**
+     * For a given (2+dim dimensional) state vector <code>U</code>, compute
+     * and return the entropy flux u p^(1/\gamma)
+     */
+    inline DEAL_II_ALWAYS_INLINE dealii::Tensor<1, dim>
+    entropy_flux(const rank1_type &U) const;
 
 
     /**
@@ -153,7 +160,7 @@ namespace grendel
 
   template <int dim>
   inline DEAL_II_ALWAYS_INLINE dealii::Tensor<1, dim>
-  ProblemDescription<dim>::momentum_vector(const rank1_type &U)
+  ProblemDescription<dim>::momentum(const rank1_type &U)
   {
     dealii::Tensor<1, dim> result;
     std::copy(&U[1], &U[1 + dim], &result[0]);
@@ -169,7 +176,7 @@ namespace grendel
      * rho e = (E - 1/2*m^2/rho)
      */
     const double &rho = U[0];
-    const auto m = momentum_vector(U);
+    const auto m = momentum(U);
     const double &E = U[dim + 1];
     return E - 0.5 * m.norm_square() / rho;
   }
@@ -194,10 +201,22 @@ namespace grendel
 
   template <int dim>
   inline DEAL_II_ALWAYS_INLINE double
-  ProblemDescription<dim>::specific_entropy_measure(const rank1_type &U) const
+  ProblemDescription<dim>::entropy(const rank1_type &U) const
+  {
+    const auto p = pressure(U);
+    return std::pow(p, 1. / gamma_);
+  }
+
+
+  template <int dim>
+  inline DEAL_II_ALWAYS_INLINE dealii::Tensor<1, dim>
+  ProblemDescription<dim>::entropy_flux(const rank1_type &U) const
   {
     const auto &rho = U[0];
-    return internal_energy(U) / std::pow(rho, gamma_ - 1.);
+    const auto eta = entropy(U);
+    const auto m = momentum(U);
+
+    return eta * m / rho;
   }
 
 
@@ -206,7 +225,7 @@ namespace grendel
   ProblemDescription<dim>::f(const rank1_type &U) const
   {
     const double &rho = U[0];
-    const auto m = momentum_vector(U);
+    const auto m = momentum(U);
     const auto p = pressure(U);
     const double &E = U[dim + 1];
 

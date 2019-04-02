@@ -65,7 +65,7 @@ namespace grendel
       result[0] = U[0];
 
       // m:
-      const auto m = ProblemDescription<dim>::momentum_vector(U);
+      const auto m = ProblemDescription<dim>::momentum(U);
       result[1] = n_ij * m;
 
       // E:

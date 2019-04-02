@@ -34,33 +34,12 @@ namespace grendel
      * Options:
      */
 
-    static constexpr enum class Indicator {
-      none,
-      rho,
-      internal_energy,
-      pressure,
-      specific_entropy,
-    } indicator_ = Indicator::pressure;
-
     static constexpr enum class Limiters {
       none,
       rho,
       internal_energy,
       specific_entropy
     } limiters_ = Limiters::internal_energy;
-
-    /*
-     * Indicator:
-     */
-
-    template <typename Vector, typename Index>
-    inline DEAL_II_ALWAYS_INLINE double smoothness_indicator(const Vector &U,
-                                                             Index i) const;
-
-    static constexpr double alpha_0 = 0;
-    static constexpr unsigned int smoothness_power = 3;
-
-    static inline DEAL_II_ALWAYS_INLINE double psi(const double ratio);
 
     /*
      * Limiter:
@@ -80,39 +59,6 @@ namespace grendel
         problem_description_;
     ACCESSOR_READ_ONLY(problem_description)
   };
-
-
-  template <int dim>
-  template <typename Vector, typename Index>
-  inline DEAL_II_ALWAYS_INLINE double
-  HighOrder<dim>::smoothness_indicator(const Vector &U, Index i) const
-  {
-    switch (indicator_) {
-    case Indicator::none:
-      return 1.;
-
-    case Indicator::rho:
-      return U[0][i];
-
-    case Indicator::internal_energy:
-      return problem_description_->internal_energy(gather(U, i));
-
-    case Indicator::pressure:
-      return problem_description_->pressure(gather(U, i));
-
-    case Indicator::specific_entropy:
-      return problem_description_->specific_entropy_measure(gather(U, i));
-    }
-  }
-
-
-  template <int dim>
-  inline DEAL_II_ALWAYS_INLINE double
-  HighOrder<dim>::psi(const double ratio)
-  {
-    return std::pow(std::max(ratio - alpha_0, 0.), smoothness_power) /
-           std::pow(1 - alpha_0, smoothness_power);
-  }
 
 
   template <int dim>
@@ -149,9 +95,6 @@ namespace grendel
 
     if constexpr(limiters_ == Limiters::internal_energy)
       return;
-
-    const auto s = problem_description_->specific_entropy_measure(U);
-    s_min = std::min(s_min, s);
   }
 
   template <int dim>
@@ -205,10 +148,10 @@ namespace grendel
 
     if constexpr (limiters_ == Limiters::internal_energy) {
 
-      const auto P_ij_m = problem_description_->momentum_vector(P_ij);
+      const auto P_ij_m = problem_description_->momentum(P_ij);
       const auto &P_ij_E = P_ij[dim + 1];
 
-      const auto U_i_m = problem_description_->momentum_vector(U);
+      const auto U_i_m = problem_description_->momentum(U);
       const double &U_i_E = U[dim + 1];
 
       const double c =
@@ -273,13 +216,7 @@ namespace grendel
 
     if constexpr (limiters_ == Limiters::specific_entropy)
     {
-      // FIXME
-
-      AssertThrow(
-          problem_description_->specific_entropy_measure(U + l_ij * P_ij) > 0.,
-          dealii::ExcMessage("I'm sorry, Dave. I'm afraid I can't "
-                             "do that. - Negative specific entropy."));
-
+      AssertThrow(false, dealii::ExcNotImplemented());
       return l_ij;
     }
 
