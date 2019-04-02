@@ -218,7 +218,7 @@ namespace grendel
      *
      * we get
      *
-     *   eta' = 1/gamma p ^(1/gamma - 1) *
+     *   eta' = (gamma - 1)/gamma p ^(1/gamma - 1) *
      *
      *     (1/2m^2/rho^2 , rho m , 1 )^T
      *
@@ -229,7 +229,7 @@ namespace grendel
     const auto m = momentum(U);
     const auto p = pressure(U);
 
-    const auto factor = 1 / gamma_ * std::pow(p, 1. / gamma_ - 1.);
+    const auto factor = (gamma_ - 1) / gamma_ * std::pow(p, 1. / gamma_ - 1.);
 
     rank1_type result;
 

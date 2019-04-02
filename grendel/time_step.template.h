@@ -116,6 +116,9 @@ namespace grendel
           const auto eta_i = problem_description_->entropy(U_i);
           const auto &rho_i = U_i[0];
 
+          auto d_eta_i = problem_description_->entropy_derivative(U_i);
+          d_eta_i[0] -= eta_i / rho_i;
+
           double left = 0.;
           rank1_type right;
 
@@ -140,8 +143,7 @@ namespace grendel
             const auto m_j = problem_description_->momentum(U_j);
 
             left += (eta_j / rho_j - eta_i / rho_i) * m_j * c_ij;
-            // Ensure that right[0] == 0.
-            for (unsigned int k = 1; k < problem_dimension; ++k)
+            for (unsigned int k = 0; k < problem_dimension; ++k)
               right[k] += f_j[k] * c_ij;
 
             /*
@@ -180,12 +182,9 @@ namespace grendel
           }
 
           // FIXME: Refactor
-          const auto d_eta_i = problem_description_->entropy_derivative(U_i);
-
           double numerator = left;
           double denominator = std::abs(left);
-          // Ignore first component:
-          for (unsigned int k = 1; k < problem_dimension; ++k) {
+          for (unsigned int k = 0; k < problem_dimension; ++k) {
             numerator -= d_eta_i[k] * right[k];
             denominator += std::abs(d_eta_i[k] * right[k]);
           }
