@@ -109,14 +109,6 @@ namespace grendel
 
 
     /**
-     * For a given (2+dim dimensional) state vector <code>U</code>, compute
-     * and return the entropy flux u \eta = u p^(1/\gamma)
-     */
-    inline DEAL_II_ALWAYS_INLINE dealii::Tensor<1, dim>
-    entropy_flux(const rank1_type &U) const;
-
-
-    /**
      * Given a state @p U compute <code>f(U)</code>.
      */
     inline DEAL_II_ALWAYS_INLINE rank2_type f(const rank1_type &U) const;
@@ -248,18 +240,6 @@ namespace grendel
     }
 
     return result;
-  }
-
-
-  template <int dim>
-  inline DEAL_II_ALWAYS_INLINE dealii::Tensor<1, dim>
-  ProblemDescription<dim>::entropy_flux(const rank1_type &U) const
-  {
-    const auto &rho = U[0];
-    const auto eta = entropy(U);
-    const auto m = momentum(U);
-
-    return eta * m / rho;
   }
 
 

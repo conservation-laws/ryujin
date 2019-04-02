@@ -96,18 +96,13 @@ namespace grendel
 
 
     /*
-     * Step 1: Compute off-diagonal d_ij, and the entropy viscosity
-     *         commutator alpha_i
-     *
-     *   FIXME
+     * Step 1: Compute off-diagonal d_ij
      */
 
     {
-      deallog << "        compute d_ij, alpha_i" << std::endl;
+      deallog << "        compute d_ij" << std::endl;
       TimerOutput::Scope t(computing_timer_,
-                           "time_step - 1 compute d_ij, alpha_i");
-
-      alpha_.zero_out_ghosts();
+                           "time_step - 1 compute d_ij");
 
       const auto on_subranges = [&](auto i1, const auto i2) {
         /* Translate the local index into a index set iterator:: */
@@ -117,23 +112,14 @@ namespace grendel
           const auto i = *it;
           const auto U_i = gather(U, i);
 
-          // FIXME
-
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
             const auto j = jt->column();
-
-            /*
-             * Skip diagonal elements:
-             */
-
-            if (j == i)
-              continue;
 
             /*
              * Only iterate over the subdiagonal for d_ij
              */
 
-            if (j > i)
+            if (j >= i)
               continue;
 
             const auto U_j = gather(U, j);
@@ -164,17 +150,11 @@ namespace grendel
             set_entry(dij_matrix_, jt, d);
             dij_matrix_(j, i) = d; // FIXME: Suboptimal
           }
-
-          // FIXME
-          // alpha_[i] = ...
         }
       };
 
       parallel::apply_to_subranges(
           indices.begin(), indices.end(), on_subranges, 4096);
-
-      /* Synchronize alpha_ over all MPI processes: */
-      alpha_.update_ghost_values();
     }
 
 
