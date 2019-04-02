@@ -47,7 +47,7 @@ namespace grendel
       rho,
       internal_energy,
       specific_entropy
-    } limiters_ = Limiters::specific_entropy;
+    } limiters_ = Limiters::internal_energy;
 
     /*
      * Indicator:
@@ -191,7 +191,7 @@ namespace grendel
 
       AssertThrow((U + l_ij * P_ij)[0] > 0.,
                   dealii::ExcMessage("I'm sorry, Dave. I'm afraid I can't "
-                                     "do that. - Negative internal energy."));
+                                     "do that. - Negative density."));
     }
 
     if constexpr(limiters_ == Limiters::rho)
