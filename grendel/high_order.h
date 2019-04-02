@@ -18,7 +18,7 @@ namespace grendel
     using rank1_type = typename ProblemDescription<dim>::rank1_type;
 
     /*
-     * Let's allocate 5 double's for limiter bounds:
+     * Let's allocate 5 doubles for limiter bounds:
      */
     typedef std::array<double, 5> Bounds;
 
