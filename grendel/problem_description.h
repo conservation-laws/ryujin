@@ -95,14 +95,22 @@ namespace grendel
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
-     * and return the entropy p^(1/\gamma)
+     * and return the entropy \eta = p^(1/\gamma)
      */
     inline DEAL_II_ALWAYS_INLINE double entropy(const rank1_type &U) const;
 
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
-     * and return the entropy flux u p^(1/\gamma)
+     * and return the derivative \eta' of the entropy \eta = p^(1/\gamma)
+     */
+    inline DEAL_II_ALWAYS_INLINE rank1_type
+    entropy_derivative(const rank1_type &U) const;
+
+
+    /**
+     * For a given (2+dim dimensional) state vector <code>U</code>, compute
+     * and return the entropy flux u \eta = u p^(1/\gamma)
      */
     inline DEAL_II_ALWAYS_INLINE dealii::Tensor<1, dim>
     entropy_flux(const rank1_type &U) const;
@@ -130,9 +138,6 @@ namespace grendel
   protected:
     double gamma_;
     ACCESSOR_READ_ONLY(gamma)
-
-    double b_;
-    ACCESSOR_READ_ONLY(b)
 
     double cfl_update_;
     ACCESSOR_READ_ONLY(cfl_update)
@@ -192,10 +197,11 @@ namespace grendel
      *   e = rho^-1 E - 1/2 |u|^2
      *   p(1-b rho) = (gamma - 1) e rho
      * we get
-     *   p = (gamma - 1)/(1 - b*rho) * (e rho)
+     *   p = (gamma - 1)/(1 - b*rho) * (rho e)
+     * (Here we have set b = 0)
      */
-    const double &rho = U[0];
-    return (gamma_ - 1.) / (1. - b_ * rho) * internal_energy(U);
+
+    return (gamma_ - 1.) * internal_energy(U);
   }
 
 
@@ -205,6 +211,43 @@ namespace grendel
   {
     const auto p = pressure(U);
     return std::pow(p, 1. / gamma_);
+  }
+
+
+  template <int dim>
+  inline DEAL_II_ALWAYS_INLINE typename ProblemDescription<dim>::rank1_type
+  ProblemDescription<dim>::entropy_derivative(const rank1_type &U) const
+  {
+    /*
+     * With
+     *   eta = p ^ (1/gamma)
+     *   p = (gamma - 1) * (rho e)
+     *   rho e = E - 1/2 |m|^2 / rho
+     *
+     * we get
+     *
+     *   eta' = 1/gamma p ^(1/gamma - 1) *
+     *
+     *     (1/2m^2/rho^2 , rho m , 1 )^T
+     *
+     * (Here we have set b = 0)
+     */
+
+    const double &rho = U[0];
+    const auto m = momentum(U);
+    const auto p = pressure(U);
+
+    const auto factor = 1 / gamma_ * std::pow(p, 1. / gamma_ - 1.);
+
+    rank1_type result;
+
+    result[0] = factor * 1. / 2. * m.norm_square() / rho / rho;
+    result[dim + 1] = factor;
+    for (unsigned int i = 0; i < dim; ++i) {
+      result[1 + i] = factor * rho * m[i];
+    }
+
+    return result;
   }
 
 

@@ -18,9 +18,6 @@ namespace grendel
     gamma_ = 7. / 5.;
     add_parameter("gamma", gamma_, "Gamma");
 
-    b_ = 0.0;
-    add_parameter("b", b_, "b aka bcovol");
-
     cfl_update_ = 1.00;
     add_parameter("cfl update", cfl_update_, "CFL constant used for update");
 
@@ -107,7 +104,7 @@ namespace grendel
       const double p_R = 1.;
 
       /*   c^2 = gamma * p / rho / (1 - b * rho) */
-      const double a_R = std::sqrt(gamma_ * p_R / rho_R / (1. - b_ * rho_R));
+      const double a_R = std::sqrt(gamma_ * p_R / rho_R);
       const double mach = initial_mach_number_;
       const double S3 = mach * a_R;
 
