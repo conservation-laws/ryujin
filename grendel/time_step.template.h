@@ -111,6 +111,7 @@ namespace grendel
 
           const auto i = *it;
           const auto U_i = gather(U, i);
+          const auto f_i = problem_description_->f(U_i);
 
           // FIXME: Refactor
           const auto eta_i = problem_description_->entropy(U_i);
@@ -133,8 +134,8 @@ namespace grendel
               continue;
 
             const auto U_j = gather(U, j);
-
             const auto f_j = problem_description_->f(U_j);
+
             const auto c_ij = gather_get_entry(cij_matrix, jt);
 
             // FIXME: Refactor
@@ -144,7 +145,7 @@ namespace grendel
 
             left += (eta_j / rho_j - eta_i / rho_i) * m_j * c_ij;
             for (unsigned int k = 0; k < problem_dimension; ++k)
-              right[k] += f_j[k] * c_ij;
+              right[k] += (f_j[k] - f_i[k]) * c_ij;
 
             /*
              * Only iterate over the subdiagonal for d_ij
@@ -305,7 +306,7 @@ namespace grendel
           auto U_i_new = U_i;
 
           const auto f_i = problem_description_->f(U_i);
-          const auto alpha_i = alpha_[i];
+          const auto alpha_i = 0.; //alpha_[i];
           const double m_i = lumped_mass_matrix.diag_element(i);
 
           const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
@@ -321,7 +322,7 @@ namespace grendel
             const auto j = jt->column();
             const auto U_j = gather(U, j);
             const auto f_j = problem_description_->f(U_j);
-            const auto alpha_j = alpha_[j];
+            const auto alpha_j = 0.; //alpha_[j];
 
             const auto c_ij = gather_get_entry(cij_matrix, jt);
             const auto d_ij = get_entry(dij_matrix_, jt);

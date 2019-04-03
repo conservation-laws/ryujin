@@ -163,9 +163,11 @@ namespace grendel
          * the boundary indicator at 0, i.e. do nothing.
          */
 
-        const auto center = face->center();
-        if (center[0] > -length / 2. && center[0] < length / 2.)
-          face->set_boundary_id(1);
+//         const auto center = face->center();
+//         if (center[0] > -length / 2. && center[0] < length / 2.)
+//           face->set_boundary_id(1);
+
+        face->set_boundary_id(2);
       }
     }
   }

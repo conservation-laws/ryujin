@@ -39,7 +39,7 @@ namespace grendel
       rho,
       internal_energy,
       specific_entropy
-    } limiters_ = Limiters::internal_energy;
+    } limiters_ = Limiters::none;
 
     /*
      * Limiter:
