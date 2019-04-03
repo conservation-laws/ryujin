@@ -265,7 +265,7 @@ namespace grendel
 
       const auto on_subranges = [&](auto i1, const auto i2) {
         /* Notar bene: This bounds variable is thread local: */
-        typename Limiter<dim>::Bounds bounds;
+        Limiter<dim> limiter;
 
         /* Translate the local index into a index set iterator:: */
         auto it = locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
@@ -290,7 +290,7 @@ namespace grendel
           rank1_type r_i;
 
           /* Clear bounds: */
-          Limiter<dim>::reset(bounds);
+          limiter.reset();
 
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
 
@@ -319,14 +319,12 @@ namespace grendel
 
             scatter_set_entry(pij_matrix_, jt, p_ij);
 
-            Limiter<dim>::accumulate(bounds, U_ij_bar);
+            limiter.accumulate(U_ij_bar);
           }
 
           scatter(temp_euler_, U_i_new, i);
-
           scatter(r_, r_i, i);
-
-          scatter(bounds_, bounds, i);
+          scatter(bounds_, limiter.bounds(), i);
         }
       };
 

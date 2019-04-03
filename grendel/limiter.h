@@ -3,14 +3,13 @@
 
 #include "problem_description.h"
 
-#include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/lac/la_parallel_vector.templates.h>
 
 namespace grendel
 {
 
   template <int dim>
-  class Limiter : public dealii::ParameterAcceptor
+  class Limiter
   {
   public:
     static constexpr unsigned int problem_dimension =
@@ -18,10 +17,7 @@ namespace grendel
 
     using rank1_type = typename ProblemDescription<dim>::rank1_type;
 
-    /*
-     * Let's allocate 5 doubles for limiter bounds:
-     */
-
+    /* Let's allocate 5 doubles for limiter bounds: */
     typedef std::array<double, 5> Bounds;
 
     typedef std::array<dealii::LinearAlgebra::distributed::Vector<double>, 5>
@@ -38,22 +34,33 @@ namespace grendel
       specific_entropy
     } limiters_ = Limiters::internal_energy;
 
+    /*
+     * Accumulate bounds:
+     */
 
-    static inline DEAL_II_ALWAYS_INLINE void reset(Bounds &bounds);
+    inline DEAL_II_ALWAYS_INLINE void reset();
 
-    static inline DEAL_II_ALWAYS_INLINE void accumulate(Bounds &bounds,
-                                                        const rank1_type &U);
+    inline DEAL_II_ALWAYS_INLINE void accumulate(const rank1_type &U);
+
+    inline DEAL_II_ALWAYS_INLINE const Bounds &bounds() const;
+
+    /*
+     * Compute limiter value l_ij for update P_ij:
+     */
 
     static inline DEAL_II_ALWAYS_INLINE double
     limit(const Bounds &bounds, const rank1_type &U, const rank1_type &P_ij);
+
+  private:
+    Bounds bounds_;
   };
 
 
   template <int dim>
   inline DEAL_II_ALWAYS_INLINE void
-  Limiter<dim>::reset(Bounds &bounds)
+  Limiter<dim>::reset()
   {
-    auto &[rho_min, rho_max, rho_epsilon_min, s_min, s_laplace] = bounds;
+    auto &[rho_min, rho_max, rho_epsilon_min, s_min, s_laplace] = bounds_;
     rho_min = std::numeric_limits<double>::max();
     rho_max = 0.;
     rho_epsilon_min = std::numeric_limits<double>::max();
@@ -64,9 +71,9 @@ namespace grendel
 
   template <int dim>
   inline DEAL_II_ALWAYS_INLINE void
-  Limiter<dim>::accumulate(Bounds &bounds, const rank1_type &U)
+  Limiter<dim>::accumulate(const rank1_type &U)
   {
-    auto &[rho_min, rho_max, rho_epsilon_min, s_min, s_laplace] = bounds;
+    auto &[rho_min, rho_max, rho_epsilon_min, s_min, s_laplace] = bounds_;
 
     if constexpr(limiters_ == Limiters::none)
       return;
@@ -84,6 +91,15 @@ namespace grendel
     if constexpr(limiters_ == Limiters::internal_energy)
       return;
   }
+
+
+  template <int dim>
+  inline DEAL_II_ALWAYS_INLINE const typename Limiter<dim>::Bounds &
+  Limiter<dim>::bounds() const
+  {
+    return bounds_;
+  }
+
 
   template <int dim>
   inline DEAL_II_ALWAYS_INLINE double Limiter<dim>::limit(
