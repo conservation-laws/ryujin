@@ -108,6 +108,9 @@ namespace grendel
                            "time_step - 1 compute d_ij, and alpha_i");
 
       const auto on_subranges = [&](auto i1, const auto i2) {
+        /* Stored thread locally: */
+        Indicator<dim> indicator(*offline_data_);
+
         /* Translate the local index into a index set iterator:: */
         auto it = locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
         for (; i1 < i2; ++i1, ++it) {
@@ -115,7 +118,7 @@ namespace grendel
           const auto i = *it;
           const auto U_i = gather(U, i);
 
-          Indicator<dim> indicator(U_i);
+          indicator.reset(U_i);
 
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
             const auto j = jt->column();
@@ -128,9 +131,8 @@ namespace grendel
               continue;
 
             const auto U_j = gather(U, j);
-            const auto c_ij = gather_get_entry(cij_matrix, jt);
 
-            indicator.add(U_j, c_ij);
+            indicator.add(U_j, jt);
 
             /*
              * Only iterate over the subdiagonal for d_ij
