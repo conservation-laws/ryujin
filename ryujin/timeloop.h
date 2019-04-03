@@ -50,7 +50,7 @@ namespace ryujin
     std::string base_name;
     double t_final;
     double output_granularity;
-    bool enable_deallog_output;
+    bool enable_detailed_output;
     bool enable_compute_error;
 
     grendel::Discretization<dim> discretization;

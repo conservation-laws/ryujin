@@ -25,20 +25,27 @@ namespace
   /**
    * A helper function to print formatted section headings.
    */
-  void print_head(std::string header)
+  void print_head(std::string header, std::string secondary = "")
   {
-    const auto size = header.size();
+    const auto header_size = header.size();
+    const auto secondary_size = secondary.size();
 
     deallog << std::endl;
     deallog << "    ####################################################"
             << std::endl;
     deallog << "    #########                                  #########"
             << std::endl;
-    deallog << "    #########"                   //
-            << std::string((34 - size) / 2, ' ') //
-            << header                            //
-            << std::string((35 - size) / 2, ' ') //
-            << "#########"                       //
+    deallog << "    #########"                          //
+            << std::string((34 - header_size) / 2, ' ') //
+            << header                                   //
+            << std::string((35 - header_size) / 2, ' ') //
+            << "#########"                              //
+            << std::endl;
+    deallog << "    #########"                             //
+            << std::string((34 - secondary_size) / 2, ' ') //
+            << secondary                                   //
+            << std::string((35 - secondary_size) / 2, ' ') //
+            << "#########"                                 //
             << std::endl;
     deallog << "    #########                                  #########"
             << std::endl;
@@ -87,10 +94,10 @@ namespace ryujin
     add_parameter(
         "output granularity", output_granularity, "time interval for output");
 
-    enable_deallog_output = true;
-    add_parameter("enable deallog output",
-                  enable_deallog_output,
-                  "Flag to control whether we output to deallog");
+    enable_detailed_output = true;
+    add_parameter("enable detailed output",
+                  enable_detailed_output,
+                  "Flag to control detailed output to deallog");
 
     enable_compute_error = false;
     add_parameter(
@@ -153,45 +160,64 @@ namespace ryujin
       output(U, base_name + "-analytic_solution", t, 0);
     }
 
+    print_head("enter main loop");
+
+    /* Disable deallog output: */
+    if (!enable_detailed_output)
+      deallog.push("SILENCE!");
+
     /*
      * Loop:
      */
 
     unsigned int output_cycle = 1;
     for (unsigned int cycle = 1; t < t_final; ++cycle) {
+
       std::ostringstream head;
       head << "Cycle  " << Utilities::int_to_string(cycle, 6)         //
            << "  ("                                                   //
            << std::fixed << std::setprecision(1) << t / t_final * 100 //
            << "%)";
-      print_head(head.str());
+      std::ostringstream secondary;
+      secondary << "at time t = " << std::setprecision(8) << std::fixed << t;
 
-      deallog << "        at time t="                    //
-              << std::setprecision(8) << std::fixed << t //
-              << std::endl;
+      print_head(head.str(), secondary.str());
 
+      /* Do a time step: */
       const auto tau = time_step.step(U);
       t += tau;
 
       if (t > output_cycle * output_granularity) {
+        if (!enable_detailed_output) {
+          deallog.pop();
+          print_head(head.str(), secondary.str());
+        }
+
         output(U, base_name + "-solution", t, output_cycle++);
         if (enable_compute_error) {
           const auto analytic = interpolate_initial_values(t);
           output(analytic, base_name + "-analytic_solution", t, output_cycle);
         }
+
+        if (!enable_detailed_output)
+          deallog.push("SILENCE!");
       }
     } /* end of loop */
-
-    computing_timer.print_summary();
-    deallog << timer_output.str() << std::endl;
 
     /* Wait for output thread: */
     if (output_thread.joinable())
       output_thread.join();
 
+    /* Reenable deallog output: */
+    if (!enable_detailed_output)
+      deallog.pop();
+
     /* Output final error: */
     if (enable_compute_error)
       compute_error(U, t);
+
+    computing_timer.print_summary();
+    deallog << timer_output.str() << std::endl;
 
     /* Detach deallog: */
     if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0) {
@@ -223,12 +249,6 @@ namespace ryujin
 
       deallog << "[ OK ]" << std::endl;
 
-      if (!enable_deallog_output) {
-        deallog.push("SILENT");
-        deallog.depth_console(0);
-        return;
-      }
-
     } else {
 
       ParameterAcceptor::initialize("ryujin.prm");
@@ -244,10 +264,10 @@ namespace ryujin
 
     deallog.push(DEAL_II_GIT_SHORTREV "+" RYUJIN_GIT_SHORTREV);
 #ifdef DEBUG
-    deallog.depth_console(5);
+    deallog.depth_console(3);
     deallog.push("DEBUG");
 #else
-    deallog.depth_console(4);
+    deallog.depth_console(2);
 #endif
     deallog.push(base_name);
 
@@ -417,7 +437,7 @@ namespace ryujin
                              double t,
                              unsigned int cycle)
   {
-    deallog << "TimeLoop<dim>::output()" << std::endl;
+    deallog << "TimeLoop<dim>::output(t = " << t << ")" << std::endl;
 
     /*
      * Offload output to a worker thread.
@@ -499,9 +519,6 @@ namespace ryujin
         data_out.write_pvtu_record(output, filenames);
       }
 
-      /*
-       * Release output mutex:
-       */
       deallog << "        Commit output for cycle = " << cycle << std::endl;
     };
 
