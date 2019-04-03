@@ -95,36 +95,36 @@ namespace grendel
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
      * and return the internal energy \rho e.
      */
-    inline DEAL_II_ALWAYS_INLINE double
-    internal_energy(const rank1_type &U) const;
+    static inline DEAL_II_ALWAYS_INLINE double
+    internal_energy(const rank1_type &U);
 
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
      * and return the pressure .
      */
-    inline DEAL_II_ALWAYS_INLINE double pressure(const rank1_type &U) const;
+    static inline DEAL_II_ALWAYS_INLINE double pressure(const rank1_type &U);
 
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
      * and return the entropy \eta = p^(1/\gamma)
      */
-    inline DEAL_II_ALWAYS_INLINE double entropy(const rank1_type &U) const;
+    static inline DEAL_II_ALWAYS_INLINE double entropy(const rank1_type &U);
 
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
      * and return the derivative \eta' of the entropy \eta = p^(1/\gamma)
      */
-    inline DEAL_II_ALWAYS_INLINE rank1_type
-    entropy_derivative(const rank1_type &U) const;
+    static inline DEAL_II_ALWAYS_INLINE rank1_type
+    entropy_derivative(const rank1_type &U);
 
 
     /**
      * Given a state @p U compute <code>f(U)</code>.
      */
-    inline DEAL_II_ALWAYS_INLINE rank2_type f(const rank1_type &U) const;
+    static inline DEAL_II_ALWAYS_INLINE rank2_type f(const rank1_type &U);
 
 
     /**
@@ -144,7 +144,9 @@ namespace grendel
     std::string initial_state_;
 
     dealii::Tensor<1, dim> initial_direction_;
+
     dealii::Point<dim> initial_position_;
+
     double initial_mach_number_;
 
     double initial_vortex_beta_;
@@ -170,7 +172,7 @@ namespace grendel
 
   template <int dim>
   inline DEAL_II_ALWAYS_INLINE double
-  ProblemDescription<dim>::internal_energy(const rank1_type &U) const
+  ProblemDescription<dim>::internal_energy(const rank1_type &U)
   {
     /*
      * rho e = (E - 1/2*m^2/rho)
@@ -184,7 +186,7 @@ namespace grendel
 
   template <int dim>
   inline DEAL_II_ALWAYS_INLINE double
-  ProblemDescription<dim>::pressure(const rank1_type &U) const
+  ProblemDescription<dim>::pressure(const rank1_type &U)
   {
     /*
      * With
@@ -202,7 +204,7 @@ namespace grendel
 
   template <int dim>
   inline DEAL_II_ALWAYS_INLINE double
-  ProblemDescription<dim>::entropy(const rank1_type &U) const
+  ProblemDescription<dim>::entropy(const rank1_type &U)
   {
     const auto p = pressure(U);
     return std::pow(p, 1. / gamma);
@@ -211,7 +213,7 @@ namespace grendel
 
   template <int dim>
   inline DEAL_II_ALWAYS_INLINE typename ProblemDescription<dim>::rank1_type
-  ProblemDescription<dim>::entropy_derivative(const rank1_type &U) const
+  ProblemDescription<dim>::entropy_derivative(const rank1_type &U)
   {
     /*
      * With
@@ -248,7 +250,7 @@ namespace grendel
 
   template <int dim>
   inline DEAL_II_ALWAYS_INLINE typename ProblemDescription<dim>::rank2_type
-  ProblemDescription<dim>::f(const rank1_type &U) const
+  ProblemDescription<dim>::f(const rank1_type &U)
   {
     const double &rho = U[0];
     const auto m = momentum(U);
