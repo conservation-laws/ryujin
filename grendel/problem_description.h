@@ -220,23 +220,23 @@ namespace grendel
      *
      *   eta' = (gamma - 1)/gamma p ^(1/gamma - 1) *
      *
-     *     (1/2m^2/rho^2 , rho m , 1 )^T
+     *     (1/2m^2/rho^2 , -m/rho , 1 )^T
      *
      * (Here we have set b = 0)
      */
 
     const double &rho = U[0];
-    const auto m = momentum(U);
+    const auto u = momentum(U) / rho;
     const auto p = pressure(U);
 
     const auto factor = (gamma_ - 1) / gamma_ * std::pow(p, 1. / gamma_ - 1.);
 
     rank1_type result;
 
-    result[0] = factor * 1. / 2. * m.norm_square() / rho / rho;
+    result[0] = factor * 1. / 2. * u.norm_square();
     result[dim + 1] = factor;
     for (unsigned int i = 0; i < dim; ++i) {
-      result[1 + i] = factor * rho * m[i];
+      result[1 + i] = -factor * u[i];
     }
 
     return result;
