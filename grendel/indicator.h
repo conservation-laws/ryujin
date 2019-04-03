@@ -27,7 +27,7 @@ namespace grendel
     static constexpr enum class Indicators {
       smoothness_indicator,
       entropy_viscosity_commutator
-    } indicator_ = Indicators::smoothness_indicator;
+    } indicator_ = Indicators::entropy_viscosity_commutator;
 
     /*
      * Options for smoothness indicator:
