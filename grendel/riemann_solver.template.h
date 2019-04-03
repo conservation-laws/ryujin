@@ -351,8 +351,8 @@ namespace grendel
                               const rank1_type &U_j,
                               const dealii::Tensor<1, dim> &n_ij) const
   {
-    const double gamma = problem_description_->gamma();
-    constexpr double b = 0.; //problem_description_->b();
+    constexpr double gamma = ProblemDescription<dim>::gamma;
+    constexpr double b = ProblemDescription<dim>::b;
 
     /*
      * Step 1: Compute projected 1D states.
@@ -375,8 +375,8 @@ namespace grendel
   RiemannSolver<dim>::compute(const std::array<double, 6> &riemann_data_i,
                               const std::array<double, 6> &riemann_data_j) const
   {
-    const double gamma = problem_description_->gamma();
-    constexpr double b = 0.; //problem_description_->b();
+    constexpr double gamma = ProblemDescription<dim>::gamma;
+    constexpr double b = ProblemDescription<dim>::b;
 
     const double p_min = std::min(riemann_data_i[2], riemann_data_j[2]);
     const double p_max = std::max(riemann_data_i[2], riemann_data_j[2]);

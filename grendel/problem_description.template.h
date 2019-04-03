@@ -15,16 +15,6 @@ namespace grendel
     ParameterAcceptor::parse_parameters_call_back.connect(
         std::bind(&ProblemDescription<dim>::parse_parameters_callback, this));
 
-    gamma_ = 7. / 5.;
-    add_parameter("gamma", gamma_, "Gamma");
-
-    cfl_update_ = 1.00;
-    add_parameter("cfl update", cfl_update_, "CFL constant used for update");
-
-    cfl_max_ = 1.00;
-    add_parameter("cfl max", cfl_max_, "Maximal admissible CFL constant");
-
-
     initial_state_ = "shock front";
     add_parameter("initial state",
                   initial_state_,
@@ -81,7 +71,7 @@ namespace grendel
       state[0] = rho;
       for (unsigned int i = 0; i < dim; ++i)
         state[1 + i] = rho * u * initial_direction_[i];
-      state[dim + 1] = p / (gamma_ - 1.) + 0.5 * rho * u * u;
+      state[dim + 1] = p / (gamma - 1.) + 0.5 * rho * u * u;
 
       return state;
     };
@@ -99,20 +89,20 @@ namespace grendel
        * FIXME: Add reference to literature
        */
 
-      const double rho_R = gamma_;
+      const double rho_R = gamma;
       const double u_R = 0.;
       const double p_R = 1.;
 
       /*   c^2 = gamma * p / rho / (1 - b * rho) */
-      const double a_R = std::sqrt(gamma_ * p_R / rho_R);
+      const double a_R = std::sqrt(gamma * p_R / rho_R);
       const double mach = initial_mach_number_;
       const double S3 = mach * a_R;
 
-      const double rho_L = rho_R * (gamma_ + 1.) * mach * mach /
-                           ((gamma_ - 1.) * mach * mach + 2.);
+      const double rho_L = rho_R * (gamma + 1.) * mach * mach /
+                           ((gamma - 1.) * mach * mach + 2.);
       double u_L = (1. - rho_R / rho_L) * S3 + rho_R / rho_L * u_R;
       double p_L =
-          p_R * (2. * gamma_ * mach * mach - (gamma_ - 1.)) / (gamma_ + 1.);
+          p_R * (2. * gamma * mach * mach - (gamma - 1.)) / (gamma + 1.);
 
       initial_state_internal = [=](const dealii::Point<dim> &point, double t) {
         AssertThrow(t == 0.,
@@ -139,7 +129,7 @@ namespace grendel
         AssertThrow(t == 0.,
                     ExcMessage("No analytic solution for t > 0. available"));
 
-        return from_1d_state({gamma_, initial_mach_number_, 1.});
+        return from_1d_state({gamma, initial_mach_number_, 1.});
       };
 
     } else if (initial_state_ == "sod contrast") {
@@ -198,7 +188,7 @@ namespace grendel
           const double factor =
               initial_vortex_beta_ / (2. * M_PI) * exp(0.5 - 0.5 * r_square);
 
-          const double T = 1. - (gamma_ - 1.) / (2. * gamma_) * factor * factor;
+          const double T = 1. - (gamma - 1.) / (2. * gamma) * factor * factor;
 
           const double u = initial_direction_[0] * initial_mach_number_ -
                            factor * point_bar[1];
@@ -206,9 +196,9 @@ namespace grendel
           const double v = initial_direction_[1] * initial_mach_number_ +
                            factor * point_bar[0];
 
-          const double rho = std::pow(T, 1. / (gamma_ - 1.));
-          const double p = std::pow(rho, gamma_);
-          const double E = p / (gamma_ - 1.) + 0.5 * rho * (u * u + v * v);
+          const double rho = std::pow(T, 1. / (gamma - 1.));
+          const double p = std::pow(rho, gamma);
+          const double E = p / (gamma - 1.) + 0.5 * rho * (u * u + v * v);
 
           return rank1_type({rho, rho * u, rho * v, E});
         };

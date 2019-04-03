@@ -36,6 +36,19 @@ namespace grendel
 
 
     /**
+     * gamma
+     */
+    static constexpr double gamma = 7. / 5.;
+
+
+    /**
+     * b (covolume)
+     */
+    static constexpr double b = 0.;
+    static_assert(b == 0., "If you change this value, implement the rest...");
+
+
+    /**
      * rank1_type denotes the storage type used for a state vector
      */
     typedef dealii::Tensor<1, problem_dimension> rank1_type;
@@ -127,16 +140,6 @@ namespace grendel
     initial_state(const dealii::Point<dim> &point, double t) const;
 
 
-  protected:
-    double gamma_;
-    ACCESSOR_READ_ONLY(gamma)
-
-    double cfl_update_;
-    ACCESSOR_READ_ONLY(cfl_update)
-
-    double cfl_max_;
-    ACCESSOR_READ_ONLY(cfl_max)
-
   private:
     std::string initial_state_;
 
@@ -193,7 +196,7 @@ namespace grendel
      * (Here we have set b = 0)
      */
 
-    return (gamma_ - 1.) * internal_energy(U);
+    return (gamma - 1.) * internal_energy(U);
   }
 
 
@@ -202,7 +205,7 @@ namespace grendel
   ProblemDescription<dim>::entropy(const rank1_type &U) const
   {
     const auto p = pressure(U);
-    return std::pow(p, 1. / gamma_);
+    return std::pow(p, 1. / gamma);
   }
 
 
@@ -229,7 +232,7 @@ namespace grendel
     const auto u = momentum(U) / rho;
     const auto p = pressure(U);
 
-    const auto factor = (gamma_ - 1) / gamma_ * std::pow(p, 1. / gamma_ - 1.);
+    const auto factor = (gamma - 1) / gamma * std::pow(p, 1. / gamma - 1.);
 
     rank1_type result;
 

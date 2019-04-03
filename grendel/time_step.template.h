@@ -30,6 +30,12 @@ namespace grendel
       , riemann_solver_(&riemann_solver)
       , limiter_(&high_order)
   {
+    cfl_update_ = 1.00;
+    add_parameter("cfl update", cfl_update_, "CFL constant used for update");
+
+    cfl_max_ = 1.00;
+    add_parameter("cfl max", cfl_max_, "Maximal admissible CFL constant");
+
     use_ssprk_ = false;
     add_parameter(
         "use SSP RK",
@@ -217,7 +223,6 @@ namespace grendel
 
       const auto on_subranges = [&](auto i1, const auto i2) {
         double tau_max_on_subrange = std::numeric_limits<double>::infinity();
-        const double cfl = problem_description_->cfl_update();
 
         /* Translate the local index into a index set iterator:: */
         auto it = locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
@@ -239,7 +244,7 @@ namespace grendel
           dij_matrix_.diag_element(i) = d_sum;
 
           const double mass = lumped_mass_matrix.diag_element(i);
-          const double tau = cfl * mass / (-2. * d_sum);
+          const double tau = cfl_update_ * mass / (-2. * d_sum);
           tau_max_on_subrange = std::min(tau_max_on_subrange, tau);
         }
 
@@ -560,8 +565,7 @@ namespace grendel
 
     const double tau_2 = euler_step(U, tau_1);
 
-    const double ratio =
-        problem_description_->cfl_max() / problem_description_->cfl_update();
+    const double ratio = cfl_max_ / cfl_update_;
     AssertThrow(ratio * tau_2 >= tau_1,
                 ExcMessage("Problem performing SSP RK(3) time step: "
                            "Insufficient CFL condition."));
