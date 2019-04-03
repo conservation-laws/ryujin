@@ -27,7 +27,7 @@ namespace grendel
     static constexpr enum class Indicators {
       smoothness_indicator,
       entropy_viscosity_commutator
-    } indicator_ = Indicators::entropy_viscosity_commutator;
+    } indicator_ = Indicators::smoothness_indicator;
 
     /*
      * Options for smoothness indicator:
@@ -152,7 +152,7 @@ namespace grendel
       denominator = 0.;
       denominator_abs = 0.;
 
-      indicator_i = smoothness_indicator(U_i);
+      indicator_i = smoothness_indicator<dim>(U_i);
     }
 
     __builtin_unreachable();
@@ -180,7 +180,7 @@ namespace grendel
     if constexpr (indicator_ == Indicators::smoothness_indicator) {
       const auto beta_ij = get_entry(betaij_matrix_, jt);
 
-      const auto indicator_j = smoothness_indicator(U_j);
+      const auto indicator_j = smoothness_indicator<dim>(U_j);
 
       numerator += beta_ij * (indicator_i - indicator_j);
       denominator +=
