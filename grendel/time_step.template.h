@@ -189,7 +189,7 @@ namespace grendel
             numerator -= d_eta_i[k] * right[k];
             denominator += std::abs(d_eta_i[k] * right[k]);
           }
-          alpha_[i] = std::abs(numerator) / denominator;
+          alpha_[i] = std::abs(numerator) / (denominator + 1.e-12);
 
         }
       };
