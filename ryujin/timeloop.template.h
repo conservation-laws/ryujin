@@ -118,6 +118,8 @@ namespace ryujin
 
     initialize();
 
+    deallog << "TimeLoop<dim>::run()" << std::endl;
+
     /*
      * Create distributed triangulation and output the triangulation to inp
      * files:
@@ -277,19 +279,19 @@ namespace ryujin
             << "  -  " << RYUJIN_GIT_REVISION << std::endl;
     deallog << "#" << std::endl;
     deallog << "###" << std::endl;
-    ParameterAcceptor::prm.log_parameters(deallog);
     /* clang-format on */
 
-    deallog << "TimeLoop<dim>::run()" << std::endl;
-
     deallog.push(DEAL_II_GIT_SHORTREV "+" RYUJIN_GIT_SHORTREV);
+    deallog.push(base_name);
+
+    ParameterAcceptor::prm.log_parameters(deallog);
+
 #ifdef DEBUG
     deallog.depth_console(3);
     deallog.push("DEBUG");
 #else
     deallog.depth_console(2);
 #endif
-    deallog.push(base_name);
 
   }
 
