@@ -260,7 +260,27 @@ namespace ryujin
     std::ofstream output(base_name + "-parameter.prm");
     ParameterAcceptor::prm.print_parameters(output, ParameterHandler::Text);
 
-    /* Prepare deallog: */
+    /* Prepare and attach logfile: */
+
+    filestream.reset(new std::ofstream(base_name + "-deallog.log"));
+    deallog.attach(*filestream);
+
+    /* Output commit and library informations, as well as parameters: */
+
+    /* clang-format off */
+    deallog.depth_console(4);
+    deallog << "###" << std::endl;
+    deallog << "#" << std::endl;
+    deallog << "# deal.II version " << std::setw(8) << DEAL_II_PACKAGE_VERSION
+            << "  -  " << DEAL_II_GIT_REVISION << std::endl;
+    deallog << "# ryujin  version " << std::setw(8) << RYUJIN_VERSION
+            << "  -  " << RYUJIN_GIT_REVISION << std::endl;
+    deallog << "#" << std::endl;
+    deallog << "###" << std::endl;
+    ParameterAcceptor::prm.log_parameters(deallog);
+    /* clang-format on */
+
+    deallog << "TimeLoop<dim>::run()" << std::endl;
 
     deallog.push(DEAL_II_GIT_SHORTREV "+" RYUJIN_GIT_SHORTREV);
 #ifdef DEBUG
@@ -271,28 +291,6 @@ namespace ryujin
 #endif
     deallog.push(base_name);
 
-    /* Prepare and attach logfile: */
-
-    filestream.reset(new std::ofstream(base_name + "-deallog.log"));
-    deallog.attach(*filestream);
-
-    /* Output commit and library informations: */
-
-    /* clang-format off */
-    deallog << "###" << std::endl;
-    deallog << "#" << std::endl;
-    deallog << "# deal.II version " << std::setw(8) << DEAL_II_PACKAGE_VERSION
-            << "  -  " << DEAL_II_GIT_REVISION << std::endl;
-    deallog << "# ryujin  version " << std::setw(8) << RYUJIN_VERSION
-            << "  -  " << RYUJIN_GIT_REVISION << std::endl;
-    deallog << "#" << std::endl;
-    deallog << "###" << std::endl;
-    /* clang-format on */
-
-    /* Print out parameters to deallog as well: */
-
-    deallog << "TimeLoop<dim>::run()" << std::endl;
-    ParameterAcceptor::prm.log_parameters(deallog);
   }
 
 
@@ -447,7 +445,7 @@ namespace ryujin
      * schlieren_postprocessor.
      */
 
-    deallog << "        Schedule output for cycle = " << cycle << std::endl;
+    deallog << "        Schedule output cycle = " << cycle << std::endl;
     if (output_thread.joinable()) {
       TimerOutput::Scope timer(computing_timer, "time_loop - stalled output");
       output_thread.join();
@@ -519,7 +517,7 @@ namespace ryujin
         data_out.write_pvtu_record(output, filenames);
       }
 
-      deallog << "        Commit output for cycle = " << cycle << std::endl;
+      deallog << "        Commit output cycle = " << cycle << std::endl;
     };
 
     /*

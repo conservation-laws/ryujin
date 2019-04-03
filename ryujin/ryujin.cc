@@ -11,12 +11,10 @@ int main (int argc, char *argv[])
 
   ryujin::TimeLoop<DIM> time_loop(mpi_communicator);
 
-  /*
-   * If necessary, create empty parameter file and exit:
-   */
-
+  /* If necessary, create empty parameter file and exit: */
   dealii::ParameterAcceptor::initialize("ryujin.prm");
 
   time_loop.run();
+
   return 0;
 }
