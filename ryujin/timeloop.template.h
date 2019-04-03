@@ -147,7 +147,6 @@ namespace ryujin
 
     auto U = interpolate_initial_values();
     double t = 0.;
-    double last_output = 0.;
 
     output(U, base_name + "-solution", t, 0);
     if (enable_compute_error) {
@@ -174,41 +173,27 @@ namespace ryujin
       const auto tau = time_step.step(U);
       t += tau;
 
-      if (t - last_output > output_granularity) {
+      if (t > output_cycle * output_granularity) {
         output(U, base_name + "-solution", t, output_cycle++);
         if (enable_compute_error) {
           const auto analytic = interpolate_initial_values(t);
           output(analytic, base_name + "-analytic_solution", t, output_cycle);
         }
-        last_output = t;
       }
     } /* end of loop */
-
-    /* Final output: */
-
-    if (last_output < t_final) {
-      output(U, base_name + "-solution", t, output_cycle);
-      if (enable_compute_error) {
-        const auto analytic = interpolate_initial_values(t);
-        output(analytic, base_name + "-analytic_solution", t, output_cycle);
-      }
-    }
 
     computing_timer.print_summary();
     deallog << timer_output.str() << std::endl;
 
     /* Wait for output thread: */
-
     if (output_thread.joinable())
       output_thread.join();
 
     /* Output final error: */
-    if (enable_compute_error) {
+    if (enable_compute_error)
       compute_error(U, t);
-    }
 
     /* Detach deallog: */
-
     if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0) {
       deallog.pop();
       deallog.detach();
