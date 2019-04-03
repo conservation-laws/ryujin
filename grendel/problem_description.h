@@ -35,13 +35,13 @@ namespace grendel
 
 
     /**
-     * gamma
+     * Gamma.
      */
     static constexpr double gamma = 7. / 5.;
 
 
     /**
-     * b (covolume)
+     * Covolume b.
      */
     static constexpr double b = 0.;
     static_assert(b == 0., "If you change this value, implement the rest...");

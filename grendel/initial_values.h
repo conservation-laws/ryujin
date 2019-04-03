@@ -14,10 +14,14 @@ namespace grendel
   class InitialValues : public dealii::ParameterAcceptor
   {
   public:
+    static constexpr unsigned int problem_dimension =
+        ProblemDescription<dim>::problem_dimension;
 
-    static constexpr unsigned int problem_dimension = 2 + dim;
-    static constexpr double gamma = 7. / 5.;
-    static constexpr double b = 0.;
+    static constexpr double gamma = ProblemDescription<dim>::gamma;
+
+    static constexpr double b = ProblemDescription<dim>::b;
+
+
     typedef dealii::Tensor<1, problem_dimension> rank1_type;
 
 
