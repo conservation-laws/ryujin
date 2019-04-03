@@ -154,8 +154,6 @@ namespace grendel
 
       indicator_i = smoothness_indicator<dim>(U_i);
     }
-
-    __builtin_unreachable();
   }
 
 
@@ -188,8 +186,6 @@ namespace grendel
       denominator_abs += std::abs(beta_ij) * (std::abs(indicator_i) +
                                                 std::abs(indicator_j));
     }
-
-    __builtin_unreachable();
   }
 
 

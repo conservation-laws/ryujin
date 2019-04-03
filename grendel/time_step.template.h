@@ -103,7 +103,7 @@ namespace grendel
      */
 
     {
-      deallog << "        compute d_ij" << std::endl;
+      deallog << "        compute d_ij, and alpha_i" << std::endl;
       TimerOutput::Scope t(computing_timer_,
                            "time_step - 1 compute d_ij, and alpha_i");
 
