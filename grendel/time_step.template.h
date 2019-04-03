@@ -2,6 +2,7 @@
 #define TIME_STEP_TEMPLATE_H
 
 #include "helper.h"
+#include "indicator.h"
 #include "time_step.h"
 
 #include <boost/range/irange.hpp>
@@ -97,7 +98,6 @@ namespace grendel
     const auto indices =
         boost::irange<unsigned int>(0, locally_relevant.n_elements());
 
-
     /*
      * Step 1: Compute off-diagonal d_ij, and alpha_i
      */
@@ -114,17 +114,8 @@ namespace grendel
 
           const auto i = *it;
           const auto U_i = gather(U, i);
-          const auto f_i = ProblemDescription<dim>::f(U_i);
 
-          // FIXME: Refactor
-          const auto eta_i = ProblemDescription<dim>::entropy(U_i);
-          const auto &rho_i = U_i[0];
-
-          auto d_eta_i = ProblemDescription<dim>::entropy_derivative(U_i);
-          d_eta_i[0] -= eta_i / rho_i;
-
-          double left = 0.;
-          rank1_type right;
+          Indicator<dim> indicator(U_i);
 
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
             const auto j = jt->column();
@@ -137,18 +128,9 @@ namespace grendel
               continue;
 
             const auto U_j = gather(U, j);
-            const auto f_j = ProblemDescription<dim>::f(U_j);
-
             const auto c_ij = gather_get_entry(cij_matrix, jt);
 
-            // FIXME: Refactor
-            const auto eta_j = ProblemDescription<dim>::entropy(U_j);
-            const auto &rho_j = U_j[0];
-            const auto m_j = ProblemDescription<dim>::momentum(U_j);
-
-            left += (eta_j / rho_j - eta_i / rho_i) * m_j * c_ij;
-            for (unsigned int k = 0; k < problem_dimension; ++k)
-              right[k] += (f_j[k] - f_i[k]) * c_ij;
+            indicator.add(U_j, c_ij);
 
             /*
              * Only iterate over the subdiagonal for d_ij
@@ -185,14 +167,7 @@ namespace grendel
             dij_matrix_(j, i) = d; // FIXME: Suboptimal
           }
 
-          // FIXME: Refactor
-          double numerator = left;
-          double denominator = std::abs(left);
-          for (unsigned int k = 0; k < problem_dimension; ++k) {
-            numerator -= d_eta_i[k] * right[k];
-            denominator += std::abs(d_eta_i[k] * right[k]);
-          }
-          alpha_[i] = std::abs(numerator) / (denominator + 1.e-12);
+          alpha_[i] = indicator.alpha();
         }
       };
 
