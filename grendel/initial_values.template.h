@@ -1,19 +1,18 @@
-#ifndef PROBLEM_DESCRIPTION_TEMPLATE_H
-#define PROBLEM_DESCRIPTION_TEMPLATE_H
+#ifndef INITIAL_VALUES_TEMPLATE_H
+#define INITIAL_VALUES_TEMPLATE_H
 
-#include "problem_description.h"
-#include <iostream>
+#include "initial_values.h"
 
 namespace grendel
 {
   using namespace dealii;
 
   template <int dim>
-  ProblemDescription<dim>::ProblemDescription(const std::string &subsection)
+  InitialValues<dim>::InitialValues(const std::string &subsection)
       : ParameterAcceptor(subsection)
   {
     ParameterAcceptor::parse_parameters_call_back.connect(
-        std::bind(&ProblemDescription<dim>::parse_parameters_callback, this));
+        std::bind(&InitialValues<dim>::parse_parameters_callback, this));
 
     initial_state_ = "shock front";
     add_parameter("initial state",
@@ -46,7 +45,7 @@ namespace grendel
 
 
   template <int dim>
-  void ProblemDescription<dim>::parse_parameters_callback()
+  void InitialValues<dim>::parse_parameters_callback()
   {
     /*
      * First, let's normalize the direction:
@@ -94,7 +93,7 @@ namespace grendel
       const double p_R = 1.;
 
       /*   c^2 = gamma * p / rho / (1 - b * rho) */
-      const double a_R = std::sqrt(gamma * p_R / rho_R);
+      const double a_R = std::sqrt(gamma * p_R / rho_R / (1 - b * rho_R));
       const double mach = initial_mach_number_;
       const double S3 = mach * a_R;
 
@@ -216,4 +215,4 @@ namespace grendel
 
 } /* namespace grendel */
 
-#endif /* PROBLEM_DESCRIPTION_TEMPLATE_H */
+#endif /* INITIAL_VALUES_TEMPLATE_H */

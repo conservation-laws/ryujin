@@ -8,11 +8,8 @@ namespace grendel
   using namespace dealii;
 
   template <int dim>
-  RiemannSolver<dim>::RiemannSolver(
-      const grendel::ProblemDescription<dim> &problem_description,
-      const std::string &subsection)
+  RiemannSolver<dim>::RiemannSolver(const std::string &subsection)
       : ParameterAcceptor(subsection)
-      , problem_description_(&problem_description)
   {
     eps_ = 1.e-10;
     add_parameter("newton eps", eps_, "Tolerance of the Newton secant solver");

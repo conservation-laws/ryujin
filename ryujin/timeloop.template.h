@@ -64,20 +64,18 @@ namespace ryujin
                      computing_timer,
                      discretization,
                      "C - OfflineData")
-      , problem_description("D - ProblemDescription")
-      , riemann_solver(problem_description, "E - RiemannSolver")
-      , limiter(problem_description, "F - Limiter")
+      , initial_values("D - InitialValues")
+      , riemann_solver("E - RiemannSolver")
       , time_step(mpi_communicator,
                   computing_timer,
                   offline_data,
-                  problem_description,
+                  initial_values,
                   riemann_solver,
-                  limiter,
-                  "G - TimeStep")
+                  "F - TimeStep")
       , schlieren_postprocessor(mpi_communicator,
                                 computing_timer,
                                 offline_data,
-                                "H - SchlierenPostprocessor")
+                                "G - SchlierenPostprocessor")
   {
     base_name = "test";
     add_parameter("basename", base_name, "Base name for all output files");
@@ -314,7 +312,7 @@ namespace ryujin
         ProblemDescription<dim>::problem_dimension;
 
     const auto callable = [&](const auto &p) {
-      return problem_description.initial_state(p, t);
+      return initial_values.initial_state(p, t);
     };
 
     for (unsigned int i = 0; i < problem_dimension; ++i)
@@ -468,7 +466,6 @@ namespace ryujin
 
     /* capture name, t, cycle by value */
     const auto output_worker = [this, name, t, cycle]() {
-
       const auto &dof_handler = offline_data.dof_handler();
       const auto &triangulation = discretization.triangulation();
       const auto &mapping = discretization.mapping();

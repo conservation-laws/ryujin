@@ -14,21 +14,18 @@ namespace grendel
 
 
   template <int dim>
-  TimeStep<dim>::TimeStep(
-      const MPI_Comm &mpi_communicator,
-      dealii::TimerOutput &computing_timer,
-      const grendel::OfflineData<dim> &offline_data,
-      const grendel::ProblemDescription<dim> &problem_description,
-      const grendel::RiemannSolver<dim> &riemann_solver,
-      const grendel::Limiter<dim> &high_order,
-      const std::string &subsection /*= "TimeStep"*/)
+  TimeStep<dim>::TimeStep(const MPI_Comm &mpi_communicator,
+                          dealii::TimerOutput &computing_timer,
+                          const grendel::OfflineData<dim> &offline_data,
+                          const grendel::InitialValues<dim> &initial_values,
+                          const grendel::RiemannSolver<dim> &riemann_solver,
+                          const std::string &subsection /*= "TimeStep"*/)
       : ParameterAcceptor(subsection)
       , mpi_communicator_(mpi_communicator)
       , computing_timer_(computing_timer)
       , offline_data_(&offline_data)
-      , problem_description_(&problem_description)
+      , initial_values_(&initial_values)
       , riemann_solver_(&riemann_solver)
-      , limiter_(&high_order)
   {
     cfl_update_ = 1.00;
     add_parameter("cfl update", cfl_update_, "CFL constant used for update");
@@ -117,13 +114,13 @@ namespace grendel
 
           const auto i = *it;
           const auto U_i = gather(U, i);
-          const auto f_i = problem_description_->f(U_i);
+          const auto f_i = ProblemDescription<dim>::f(U_i);
 
           // FIXME: Refactor
-          const auto eta_i = problem_description_->entropy(U_i);
+          const auto eta_i = ProblemDescription<dim>::entropy(U_i);
           const auto &rho_i = U_i[0];
 
-          auto d_eta_i = problem_description_->entropy_derivative(U_i);
+          auto d_eta_i = ProblemDescription<dim>::entropy_derivative(U_i);
           d_eta_i[0] -= eta_i / rho_i;
 
           double left = 0.;
@@ -140,14 +137,14 @@ namespace grendel
               continue;
 
             const auto U_j = gather(U, j);
-            const auto f_j = problem_description_->f(U_j);
+            const auto f_j = ProblemDescription<dim>::f(U_j);
 
             const auto c_ij = gather_get_entry(cij_matrix, jt);
 
             // FIXME: Refactor
-            const auto eta_j = problem_description_->entropy(U_j);
+            const auto eta_j = ProblemDescription<dim>::entropy(U_j);
             const auto &rho_j = U_j[0];
-            const auto m_j = problem_description_->momentum(U_j);
+            const auto m_j = ProblemDescription<dim>::momentum(U_j);
 
             left += (eta_j / rho_j - eta_i / rho_i) * m_j * c_ij;
             for (unsigned int k = 0; k < problem_dimension; ++k)
@@ -196,7 +193,6 @@ namespace grendel
             denominator += std::abs(d_eta_i[k] * right[k]);
           }
           alpha_[i] = std::abs(numerator) / (denominator + 1.e-12);
-
         }
       };
 
@@ -215,11 +211,9 @@ namespace grendel
     std::atomic<double> tau_max{std::numeric_limits<double>::infinity()};
 
     {
-      deallog << "        compute d_ii, and tau_max"
-              << std::endl;
-      TimerOutput::Scope t(
-          computing_timer_,
-          "time_step - 2 compute d_ii, and tau_max");
+      deallog << "        compute d_ii, and tau_max" << std::endl;
+      TimerOutput::Scope t(computing_timer_,
+                           "time_step - 2 compute d_ii, and tau_max");
 
       const auto on_subranges = [&](auto i1, const auto i2) {
         double tau_max_on_subrange = std::numeric_limits<double>::infinity();
@@ -293,7 +287,6 @@ namespace grendel
                            "compute r_i, and p_ij (1)");
 
       const auto on_subranges = [&](auto i1, const auto i2) {
-
         /* Notar bene: This bounds variable is thread local: */
         typename Limiter<dim>::Bounds bounds;
 
@@ -310,7 +303,7 @@ namespace grendel
           const auto U_i = gather(U, i);
           auto U_i_new = U_i;
 
-          const auto f_i = problem_description_->f(U_i);
+          const auto f_i = ProblemDescription<dim>::f(U_i);
           const auto alpha_i = alpha_[i];
           const double m_i = lumped_mass_matrix.diag_element(i);
 
@@ -320,13 +313,13 @@ namespace grendel
           rank1_type r_i;
 
           /* Clear bounds: */
-          limiter_->reset(bounds);
+          Limiter<dim>::reset(bounds);
 
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
 
             const auto j = jt->column();
             const auto U_j = gather(U, j);
-            const auto f_j = problem_description_->f(U_j);
+            const auto f_j = ProblemDescription<dim>::f(U_j);
             const auto alpha_j = alpha_[j];
 
             const auto c_ij = gather_get_entry(cij_matrix, jt);
@@ -349,7 +342,7 @@ namespace grendel
 
             scatter_set_entry(pij_matrix_, jt, p_ij);
 
-            limiter_->accumulate(bounds, U_ij_bar);
+            Limiter<dim>::accumulate(bounds, U_ij_bar);
           }
 
           scatter(temp_euler_, U_i_new, i);
@@ -381,7 +374,6 @@ namespace grendel
                            "time_step - 4 compute p_ij (2), and l_ij");
 
       const auto on_subranges = [&](auto i1, const auto i2) {
-
         /* Translate the local index into a index set iterator:: */
         auto it = locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
         for (; i1 < i2; ++i1, ++it) {
@@ -413,7 +405,7 @@ namespace grendel
             p_ij += tau / m_i / lambda * (b_ij * r_j - b_ji * r_i);
             scatter_set_entry(pij_matrix_, jt, p_ij);
 
-            const auto l_ij = limiter_->limit(bounds, U_i_new, p_ij);
+            const auto l_ij = Limiter<dim>::limit(bounds, U_i_new, p_ij);
             set_entry(lij_matrix_, jt, l_ij);
           }
         }
@@ -428,8 +420,7 @@ namespace grendel
 
     if constexpr (order_ == Order::second_order) {
       deallog << "        symmetrize l_ij" << std::endl;
-      TimerOutput::Scope t(computing_timer_,
-                           "time_step - 4 symmetrize l_ij");
+      TimerOutput::Scope t(computing_timer_, "time_step - 4 symmetrize l_ij");
 
       const auto on_subranges = [&](auto i1, const auto i2) {
         /* Translate the local index into a index set iterator:: */
@@ -526,14 +517,14 @@ namespace grendel
           /* On boundray 2 enforce initial conditions: */
 
           if (id == 2) {
-            U_i = problem_description_->initial_state(position, 0.);
+            U_i = initial_values_->initial_state(position, 0.);
           }
 
           scatter(temp_euler_, U_i, i);
         }
       };
 
-      //FIXME: This is currently not parallel:
+      // FIXME: This is currently not parallel:
       on_subranges(boundary_normal_map.begin(), boundary_normal_map.end());
     }
 
@@ -596,8 +587,6 @@ namespace grendel
 
     return use_ssprk_ ? ssprk_step(U) : euler_step(U);
   }
-
-
 
 
 } /* namespace grendel */

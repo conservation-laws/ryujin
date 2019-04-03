@@ -2,6 +2,7 @@
 #define TIME_STEP_H
 
 #include "helper.h"
+#include "initial_values.h"
 #include "limiter.h"
 #include "offline_data.h"
 #include "problem_description.h"
@@ -32,9 +33,8 @@ namespace grendel
     TimeStep(const MPI_Comm &mpi_communicator,
              dealii::TimerOutput &computing_timer,
              const grendel::OfflineData<dim> &offline_data,
-             const grendel::ProblemDescription<dim> &problem_description,
+             const grendel::InitialValues<dim> &initial_values,
              const grendel::RiemannSolver<dim> &riemann_solver,
-             const grendel::Limiter<dim> &limiter,
              const std::string &subsection = "TimeStep");
 
     virtual ~TimeStep() final = default;
@@ -85,15 +85,11 @@ namespace grendel
     dealii::SmartPointer<const grendel::OfflineData<dim>> offline_data_;
     ACCESSOR_READ_ONLY(offline_data)
 
-    dealii::SmartPointer<const grendel::ProblemDescription<dim>>
-        problem_description_;
-    ACCESSOR_READ_ONLY(problem_description)
+    dealii::SmartPointer<const grendel::InitialValues<dim>> initial_values_;
+    ACCESSOR_READ_ONLY(initial_values)
 
     dealii::SmartPointer<const grendel::RiemannSolver<dim>> riemann_solver_;
     ACCESSOR_READ_ONLY(riemann_solver)
-
-    dealii::SmartPointer<const grendel::Limiter<dim>> limiter_;
-    ACCESSOR_READ_ONLY(limiter)
 
   private:
     /* Scratch data: */

@@ -3,7 +3,6 @@
 
 #include "helper.h"
 
-#include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/tensor.h>
 
 #include <array>
@@ -21,7 +20,7 @@ namespace grendel
    * FIXME: Description
    */
   template <int dim>
-  class ProblemDescription : public dealii::ParameterAcceptor
+  class ProblemDescription
   {
   public:
     /**
@@ -59,28 +58,6 @@ namespace grendel
      */
     typedef dealii::Tensor<1, problem_dimension, dealii::Tensor<1, dim>>
         rank2_type;
-
-
-    /**
-     * Constructor.
-     */
-    ProblemDescription(const std::string &subsection = "ProblemDescription");
-
-
-    /**
-     * Destructor. We prevent the creation of derived classes by declaring
-     * the destructor to be <code>final</code>.
-     */
-    virtual ~ProblemDescription() final = default;
-
-
-    /**
-     * Callback for ParameterAcceptor::initialize(). After we read in
-     * configuration parameters from the parameter file we have to do some
-     * (minor) preparatory work in this class to precompute some initial
-     * state values. Do this with a callback.
-     */
-    void parse_parameters_callback();
 
 
     /**
@@ -125,38 +102,6 @@ namespace grendel
      * Given a state @p U compute <code>f(U)</code>.
      */
     static inline DEAL_II_ALWAYS_INLINE rank2_type f(const rank1_type &U);
-
-
-    /**
-     * Given a position @p point return the corresponding (conserved)
-     * initial state. This function is used to interpolate initial values.
-     *
-     * The additional time parameter "t" is for validation purposes.
-     * Sometimes we know the (analytic) solution of a test tube
-     * configuration and want to compare the numerical computation against
-     * it.
-     */
-    inline DEAL_II_ALWAYS_INLINE rank1_type
-    initial_state(const dealii::Point<dim> &point, double t) const;
-
-
-  private:
-    std::string initial_state_;
-
-    dealii::Tensor<1, dim> initial_direction_;
-
-    dealii::Point<dim> initial_position_;
-
-    double initial_mach_number_;
-
-    double initial_vortex_beta_;
-
-    /*
-     * Internal function object that we used to implement the
-     * internal_state function for all internal states:
-     */
-    std::function<rank1_type(const dealii::Point<dim> &point, double t)>
-        initial_state_internal;
   };
 
 
@@ -267,15 +212,6 @@ namespace grendel
     result[dim + 1] = m / rho * (E + p);
 
     return result;
-  }
-
-
-  template <int dim>
-  inline DEAL_II_ALWAYS_INLINE typename ProblemDescription<dim>::rank1_type
-  ProblemDescription<dim>::initial_state(const dealii::Point<dim> &point,
-                                         double t) const
-  {
-    return initial_state_internal(point, t);
   }
 
 } /* namespace grendel */

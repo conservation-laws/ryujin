@@ -1,4 +1,4 @@
-#include "problem_description.template.h"
+#include "problem_description.h"
 
 namespace grendel
 {
@@ -13,9 +13,4 @@ namespace grendel
   template<>
   const std::array<std::string, 5> ProblemDescription<3>::component_names{
       "rho", "m_1", "m_2", "m_3", "E"};
-
-  template class grendel::ProblemDescription<1>;
-  template class grendel::ProblemDescription<2>;
-  template class grendel::ProblemDescription<3>;
-
 } /* namespace grendel */

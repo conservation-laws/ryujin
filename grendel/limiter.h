@@ -3,6 +3,7 @@
 
 #include "problem_description.h"
 
+#include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/lac/la_parallel_vector.templates.h>
 
 namespace grendel
@@ -20,15 +21,11 @@ namespace grendel
     /*
      * Let's allocate 5 doubles for limiter bounds:
      */
+
     typedef std::array<double, 5> Bounds;
 
     typedef std::array<dealii::LinearAlgebra::distributed::Vector<double>, 5>
         vector_type;
-
-    Limiter(const grendel::ProblemDescription<dim> &problem_description,
-              const std::string &subsection = "Limiter");
-
-    virtual ~Limiter() final = default;
 
     /*
      * Options:
@@ -41,29 +38,20 @@ namespace grendel
       specific_entropy
     } limiters_ = Limiters::internal_energy;
 
-    /*
-     * Limiter:
-     */
 
-    inline DEAL_II_ALWAYS_INLINE void reset(Bounds &bounds) const;
+    static inline DEAL_II_ALWAYS_INLINE void reset(Bounds &bounds);
 
-    inline DEAL_II_ALWAYS_INLINE void accumulate(Bounds &bounds,
-                                                 const rank1_type &U) const;
+    static inline DEAL_II_ALWAYS_INLINE void accumulate(Bounds &bounds,
+                                                        const rank1_type &U);
 
-    inline DEAL_II_ALWAYS_INLINE double limit(const Bounds &bounds,
-                                              const rank1_type &U,
-                                              const rank1_type &P_ij) const;
-
-  protected:
-    dealii::SmartPointer<const grendel::ProblemDescription<dim>>
-        problem_description_;
-    ACCESSOR_READ_ONLY(problem_description)
+    static inline DEAL_II_ALWAYS_INLINE double
+    limit(const Bounds &bounds, const rank1_type &U, const rank1_type &P_ij);
   };
 
 
   template <int dim>
   inline DEAL_II_ALWAYS_INLINE void
-  Limiter<dim>::reset(Bounds &bounds) const
+  Limiter<dim>::reset(Bounds &bounds)
   {
     auto &[rho_min, rho_max, rho_epsilon_min, s_min, s_laplace] = bounds;
     rho_min = std::numeric_limits<double>::max();
@@ -76,7 +64,7 @@ namespace grendel
 
   template <int dim>
   inline DEAL_II_ALWAYS_INLINE void
-  Limiter<dim>::accumulate(Bounds &bounds, const rank1_type &U) const
+  Limiter<dim>::accumulate(Bounds &bounds, const rank1_type &U)
   {
     auto &[rho_min, rho_max, rho_epsilon_min, s_min, s_laplace] = bounds;
 
@@ -90,7 +78,7 @@ namespace grendel
     if constexpr(limiters_ == Limiters::rho)
       return;
 
-    const auto rho_epsilon = problem_description_->internal_energy(U);
+    const auto rho_epsilon = ProblemDescription<dim>::internal_energy(U);
     rho_epsilon_min = std::min(rho_epsilon_min, rho_epsilon);
 
     if constexpr(limiters_ == Limiters::internal_energy)
@@ -99,7 +87,7 @@ namespace grendel
 
   template <int dim>
   inline DEAL_II_ALWAYS_INLINE double Limiter<dim>::limit(
-      const Bounds &bounds, const rank1_type &U, const rank1_type &P_ij) const
+      const Bounds &bounds, const rank1_type &U, const rank1_type &P_ij)
   {
     auto &[rho_min, rho_max, rho_epsilon_min, s_min, s_laplace] = bounds;
 
@@ -148,10 +136,10 @@ namespace grendel
 
     if constexpr (limiters_ == Limiters::internal_energy) {
 
-      const auto P_ij_m = problem_description_->momentum(P_ij);
+      const auto P_ij_m = ProblemDescription<dim>::momentum(P_ij);
       const auto &P_ij_E = P_ij[dim + 1];
 
-      const auto U_i_m = problem_description_->momentum(U);
+      const auto U_i_m = ProblemDescription<dim>::momentum(U);
       const double &U_i_E = U[dim + 1];
 
       const double c =
@@ -201,7 +189,7 @@ namespace grendel
 
       l_ij = std::min(l_ij, l_ij_rhoe);
 
-      AssertThrow(problem_description_->internal_energy(U + l_ij * P_ij) > 0.,
+      AssertThrow(ProblemDescription<dim>::internal_energy(U + l_ij * P_ij) > 0.,
                   dealii::ExcMessage("I'm sorry, Dave. I'm afraid I can't "
                                      "do that. - Negative internal energy."));
 

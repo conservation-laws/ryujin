@@ -28,15 +28,9 @@ namespace grendel
 
     using rank1_type = typename ProblemDescription<dim>::rank1_type;
 
-    RiemannSolver(const grendel::ProblemDescription<dim> &problem_description,
-                  const std::string &subsection = "RiemannSolver");
-
-    virtual ~RiemannSolver() final = default;
-
+    RiemannSolver(const std::string &subsection = "RiemannSolver");
 
     /**
-     * FIXME: Description
-     *
      * For two given states U_i a U_j and a (normalized) "direction" n_ij
      * compute an estimation of an upper bound for lambda.
      *
@@ -59,19 +53,13 @@ namespace grendel
 
     /**
      * Variant of above function that takes two arrays as input describing
-     * the Riemann data instead of two nD states.
+     * the "1D Riemann data" instead of two nD states.
      */
     std::tuple<double /*lambda_max*/,
                double /*p_star*/,
                unsigned int /*iteration*/>
     compute(const std::array<double, 6> &riemann_data_i,
             const std::array<double, 6> &riemann_data_j) const;
-
-
-  protected:
-    dealii::SmartPointer<const grendel::ProblemDescription<dim>>
-        problem_description_;
-    ACCESSOR_READ_ONLY(problem_description)
 
   private:
     double eps_;
