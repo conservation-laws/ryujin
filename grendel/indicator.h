@@ -74,6 +74,8 @@ namespace grendel
     const std::array<dealii::SparseMatrix<double>, dim> &cij_matrix_;
     const dealii::SparseMatrix<double> &betaij_matrix_;
 
+    // FIXME: Unify memory regions:
+
     /*
      * temporary storage used for the entropy_viscosity_commutator:
      */
@@ -152,6 +154,8 @@ namespace grendel
 
       indicator_i = smoothness_indicator(U_i);
     }
+
+    __builtin_unreachable();
   }
 
 
