@@ -32,7 +32,7 @@ namespace grendel
       rho,
       internal_energy,
       specific_entropy
-    } limiter_ = Limiters::internal_energy;
+    } limiter_ = Limiters::specific_entropy;
 
     /*
      * Accumulate bounds:
@@ -90,6 +90,9 @@ namespace grendel
 
     if constexpr(limiter_ == Limiters::internal_energy)
       return;
+
+    const auto s = ProblemDescription<dim>::specific_entropy(U);
+    s_min  = std::min(s_min, (1. - 1.e-7) * s);
   }
 
 
@@ -113,7 +116,7 @@ namespace grendel
       return l_ij;
 
     /*
-     * First limit rho:
+     * First limit rho.
      *
      * See [Guermond, Nazarov, Popov, Thomas] (4.8):
      */
@@ -122,30 +125,30 @@ namespace grendel
     const auto &P_ij_rho = P_ij[0];
 
     {
-      double l_ij_rho = 1.;
+      double t_0 = 1.;
 
       constexpr double eps_ = std::numeric_limits<double>::epsilon();
 
       if (U_i_rho + P_ij_rho < rho_min)
-        l_ij_rho = std::abs(rho_min - U_i_rho) /
+        t_0 = std::abs(rho_min - U_i_rho) /
                    (std::abs(P_ij_rho) + eps_ * rho_max);
 
       else if (rho_max < U_i_rho + P_ij_rho)
-        l_ij_rho = std::abs(rho_max - U_i_rho) /
+        t_0 = std::abs(rho_max - U_i_rho) /
                    (std::abs(P_ij_rho) + eps_ * rho_max);
 
-      l_ij = std::min(l_ij, l_ij_rho); // ensures that l_ij <= 1
+      l_ij = std::min(l_ij, t_0);
 
-      AssertThrow((U + l_ij * P_ij)[0] > 0.,
-                  dealii::ExcMessage("I'm sorry, Dave. I'm afraid I can't "
-                                     "do that. - Negative density."));
+      Assert((U + l_ij * P_ij)[0] > 0.,
+             dealii::ExcMessage("I'm sorry, Dave. I'm afraid I can't do that. "
+                                "- Negative density."));
     }
 
     if constexpr(limiter_ == Limiters::rho)
       return l_ij;
 
     /*
-     * Then, limit the internal energy:
+     * Then, limit the internal energy. (We skip this limiting step in case
      *
      * See [Guermond, Nazarov, Popov, Thomas], Section 4.5:
      */
@@ -172,7 +175,7 @@ namespace grendel
        * statements:
        */
 
-      double l_ij_rhoe = 1.;
+      double t_0 = 1.;
 
       const double discriminant = b * b - 4. * a * c;
 
@@ -181,7 +184,7 @@ namespace grendel
         const double x = -b / 2. / a;
 
         if (x > 0)
-          l_ij_rhoe = x;
+          t_0 = x;
 
       } else if (discriminant > 0.) {
 
@@ -189,25 +192,26 @@ namespace grendel
             2. * c / (-b - std::copysign(std::sqrt(discriminant), b));
         const double y = c / a / x;
 
-        /*
-         * Select the smallest positive root:
-         */
-
+        /* Select the smallest positive root: */
         if (x > 0.) {
           if (y > 0. && y < x)
-            l_ij_rhoe = y;
+            t_0 = y;
           else
-            l_ij_rhoe = x;
+            t_0 = x;
         } else if (y > 0.) {
-          l_ij_rhoe = y;
+          t_0 = y;
         }
       }
 
-      l_ij = std::min(l_ij, l_ij_rhoe);
+      l_ij = std::min(l_ij, t_0);
 
-      AssertThrow(ProblemDescription<dim>::internal_energy(U + l_ij * P_ij) > 0.,
-                  dealii::ExcMessage("I'm sorry, Dave. I'm afraid I can't "
-                                     "do that. - Negative internal energy."));
+#ifdef DEBUG
+      const double rho_epsilon =
+          ProblemDescription<dim>::internal_energy(U + l_ij * P_ij);
+      Assert(rho_epsilon - rho_epsilon_min > 0.,
+             dealii::ExcMessage("I'm sorry, Dave. I'm afraid I can't do that. "
+                                "- Negative internal energy."));
+#endif
 
       return l_ij;
     }
@@ -220,8 +224,69 @@ namespace grendel
 
     if constexpr (limiter_ == Limiters::specific_entropy)
     {
-      AssertThrow(false, dealii::ExcNotImplemented());
-      return l_ij;
+      /*
+       * Prepare a Newton second method:
+       */
+
+      double t_l = 0.;
+      double t_r = l_ij;
+
+      constexpr unsigned int n_max_iter = 3;
+      constexpr double tolerance = 1.e-7;
+
+      for (unsigned int n = 0; n < n_max_iter; ++n) {
+
+        const auto U_r = U + t_r * P_ij;
+        const auto psi_r =
+            ProblemDescription<dim>::specific_entropy(U_r) - s_min;
+
+        /* Right state is good, cut it short and return: */
+
+        if (psi_r >= 0.)
+          return std::min(l_ij, t_r);
+
+        const auto U_l = U + t_l * P_ij;
+        const auto psi_l =
+            ProblemDescription<dim>::specific_entropy(U_l) - s_min;
+
+        AssertThrow(psi_l >= 0. && psi_r < 0. && psi_l > psi_r,
+                    dealii::ExcMessage("Houston, we have a problem!"));
+
+        const auto dpsi_l =
+            ProblemDescription<dim>::specific_entropy_derivative(U_l) * P_ij;
+        const auto dpsi_r =
+            ProblemDescription<dim>::specific_entropy_derivative(U_r) * P_ij;
+
+        AssertThrow(dpsi_l > 0. && dpsi_r > 0.,
+                    dealii::ExcMessage("Houston, we have a problem!"));
+
+        /* Compute divided differences: */
+
+        const double dd_11 = dpsi_l;
+        const double dd_12 = (psi_r - psi_l) / (psi_r - psi_l);
+        const double dd_22 = dpsi_r;
+
+        const double dd_112 = (dd_12 - dd_11) / (psi_r - psi_l);
+        const double dd_122 = (dd_22 - dd_12) / (psi_r - psi_l);
+
+        /* Update left point: */
+        const double discriminant_l = dpsi_l * dpsi_l - 4. * psi_l * dd_112;
+        AssertThrow(discriminant_l > 0.,
+                    dealii::ExcMessage("Houston, we have a problem!"));
+        t_l = t_l - 2. * psi_l / (dpsi_l + std::sqrt(discriminant_l));
+
+        /* Update right point: */
+        const double discriminant_r = dpsi_r * dpsi_r - 4. * psi_r * dd_122;
+        AssertThrow(discriminant_r > 0.,
+                    dealii::ExcMessage("Houston, we have a problem!"));
+        t_r = t_r - 2. * psi_r / (dpsi_r + std::sqrt(discriminant_r));
+
+        if (t_r < t_l || std::abs(t_r - t_l) < tolerance)
+          return std::min(l_ij, t_r);
+      }
+
+      /* t_l is a good state with psi_l > 0. */
+      return std::min(l_ij, t_l);
     }
 
     __builtin_unreachable();
