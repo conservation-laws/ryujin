@@ -4,6 +4,8 @@
 #include "timeloop.h"
 
 #include <helper.h>
+#include <indicator.h>
+#include <limiter.h>
 
 #include <deal.II/base/logstream.h>
 #include <deal.II/base/revision.h>
@@ -11,6 +13,8 @@
 #include <deal.II/grid/grid_out.h>
 #include <deal.II/numerics/data_out.h>
 #include <deal.II/numerics/vector_tools.h>
+
+#include <boost/core/demangle.hpp>
 
 #include <fstream>
 #include <iomanip>
@@ -267,7 +271,7 @@ namespace ryujin
     filestream.reset(new std::ofstream(base_name + "-deallog.log"));
     deallog.attach(*filestream);
 
-    /* Output commit and library informations, as well as parameters: */
+    /* Output commit and library informations: */
 
     /* clang-format off */
     deallog.depth_console(4);
@@ -279,13 +283,78 @@ namespace ryujin
             << "  -  " << RYUJIN_GIT_REVISION << std::endl;
     deallog << "#" << std::endl;
     deallog << "###" << std::endl;
+
+    /*
+     * Print compile time parameters:
+     */
+
+    deallog << "Compile time parameters:" << std::endl;
+
+    deallog << "TimeStep<dim>::order_ == ";
+    switch (TimeStep<dim>::order_) {
+    case TimeStep<dim>::Order::first_order:
+      deallog << "TimeStep<dim>::Order::first_order" << std::endl;
+      break;
+    case TimeStep<dim>::Order::second_order:
+      deallog << "TimeStep<dim>::Order::second_order" << std::endl;
+    }
+
+    deallog << "Indicator<dim>::indicators_ == ";
+    switch (Indicator<dim>::indicator_) {
+    case Indicator<dim>::Indicators::zero:
+      deallog << "Indicator<dim>::Indicators::zero" << std::endl;
+      break;
+    case Indicator<dim>::Indicators::one:
+      deallog << "Indicator<dim>::Indicators::one" << std::endl;
+      break;
+    case Indicator<dim>::Indicators::entropy_viscosity_commutator:
+      deallog << "Indicator<dim>::Indicators::entropy_viscosity_commutator" << std::endl;
+      break;
+    case Indicator<dim>::Indicators::smoothness_indicator:
+      deallog << "Indicator<dim>::Indicators::smoothness_indicator" << std::endl;
+    }
+
+    deallog << "Indicator<dim>::smoothness_indicator_ == ";
+    switch (Indicator<dim>::smoothness_indicator_) {
+    case Indicator<dim>::SmoothnessIndicators::rho:
+      deallog << "Indicator<dim>::SmoothnessIndicators::rho" << std::endl;
+      break;
+    case Indicator<dim>::SmoothnessIndicators::internal_energy:
+      deallog << "Indicator<dim>::SmoothnessIndicators::internal_energy" << std::endl;
+      break;
+    case Indicator<dim>::SmoothnessIndicators::pressure:
+      deallog << "Indicator<dim>::SmoothnessIndicators::pressure" << std::endl;
+    }
+
+    deallog << "Indicator<dim>::smoothness_indicator_alpha_0_ == "
+            << Indicator<dim>::smoothness_indicator_alpha_0_ << std::endl;
+
+    deallog << "Indicator<dim>::smoothness_indicator_power_ == "
+            << Indicator<dim>::smoothness_indicator_power_ << std::endl;
+
+    deallog << "Limiter<dim>::limiter_ == ";
+    switch (Limiter<dim>::limiter_) {
+    case Limiter<dim>::Limiters::none:
+      deallog << "Limiter<dim>::Limiters::none" << std::endl;
+      break;
+    case Limiter<dim>::Limiters::rho:
+      deallog << "Limiter<dim>::Limiters::rho" << std::endl;
+      break;
+    case Limiter<dim>::Limiters::internal_energy:
+      deallog << "Limiter<dim>::Limiters::internal_energy" << std::endl;
+      break;
+    case Limiter<dim>::Limiters::specific_entropy:
+      deallog << "Limiter<dim>::Limiters::specific_entropy" << std::endl;
+    }
+
     /* clang-format on */
 
-    deallog.push(DEAL_II_GIT_SHORTREV "+" RYUJIN_GIT_SHORTREV);
-    deallog.push(base_name);
+    deallog << "Run time parameters:" << std::endl;
 
     ParameterAcceptor::prm.log_parameters(deallog);
 
+    deallog.push(DEAL_II_GIT_SHORTREV "+" RYUJIN_GIT_SHORTREV);
+    deallog.push(base_name);
 #ifdef DEBUG
     deallog.depth_console(3);
     deallog.depth_file(3);

@@ -1,8 +1,8 @@
 #ifndef INDICATOR_H
 #define INDICATOR_H
 
-#include "problem_description.h"
 #include "offline_data.h"
+#include "problem_description.h"
 
 #include <deal.II/lac/la_parallel_vector.templates.h>
 
@@ -25,6 +25,8 @@ namespace grendel
      */
 
     static constexpr enum class Indicators {
+      zero,
+      one,
       smoothness_indicator,
       entropy_viscosity_commutator
     } indicator_ = Indicators::entropy_viscosity_commutator;
@@ -34,15 +36,14 @@ namespace grendel
      */
 
     static constexpr enum class SmoothnessIndicators {
-      none,
       rho,
       internal_energy,
       pressure,
     } smoothness_indicator_ = SmoothnessIndicators::pressure;
 
-    static constexpr double smoothness_indicator_alpha_0 = 0;
+    static constexpr double smoothness_indicator_alpha_0_ = 0;
 
-    static constexpr unsigned int smoothness_indicator_power = 3;
+    static constexpr unsigned int smoothness_indicator_power_ = 3;
 
     /**
      * We take a reference to an OfflineData object in order to store
@@ -54,7 +55,7 @@ namespace grendel
      * Reset temporary storage and initialize for a new row corresponding
      * to state vector U_i:
      */
-    inline DEAL_II_ALWAYS_INLINE void reset(const rank1_type& U_i);
+    inline DEAL_II_ALWAYS_INLINE void reset(const rank1_type &U_i);
 
     /**
      * When looping over the sparsity row, add the contribution associated
@@ -70,7 +71,6 @@ namespace grendel
     inline DEAL_II_ALWAYS_INLINE double alpha();
 
   private:
-
     const std::array<dealii::SparseMatrix<double>, dim> &cij_matrix_;
     const dealii::SparseMatrix<double> &betaij_matrix_;
 
@@ -97,7 +97,6 @@ namespace grendel
     double numerator = 0.;
     double denominator = 0.;
     double denominator_abs = 0.;
-
   };
 
 
@@ -111,14 +110,11 @@ namespace grendel
 
   namespace
   {
-    template<int dim>
+    template <int dim>
     inline DEAL_II_ALWAYS_INLINE double
     smoothness_indicator(const typename Indicator<dim>::rank1_type &U)
     {
       switch (Indicator<dim>::smoothness_indicator_) {
-      case Indicator<dim>::SmoothnessIndicators::none:
-        return 1.;
-
       case Indicator<dim>::SmoothnessIndicators::rho:
         return U[0];
 
@@ -181,10 +177,9 @@ namespace grendel
       const auto indicator_j = smoothness_indicator<dim>(U_j);
 
       numerator += beta_ij * (indicator_i - indicator_j);
-      denominator +=
-          std::abs(beta_ij) * std::abs(indicator_i - indicator_j);
-      denominator_abs += std::abs(beta_ij) * (std::abs(indicator_i) +
-                                                std::abs(indicator_j));
+      denominator += std::abs(beta_ij) * std::abs(indicator_i - indicator_j);
+      denominator_abs +=
+          std::abs(beta_ij) * (std::abs(indicator_i) + std::abs(indicator_j));
     }
   }
 
@@ -192,6 +187,14 @@ namespace grendel
   template <int dim>
   inline DEAL_II_ALWAYS_INLINE double Indicator<dim>::alpha()
   {
+    if constexpr (indicator_ == Indicators::zero) {
+      return 0.;
+    }
+
+    if constexpr (indicator_ == Indicators::one) {
+      return 1.;
+    }
+
     if constexpr (indicator_ == Indicators::entropy_viscosity_commutator) {
       double numerator = left;
       double denominator = std::abs(left);
@@ -205,14 +208,13 @@ namespace grendel
     if constexpr (indicator_ == Indicators::smoothness_indicator) {
       const auto beta_i = std::abs(numerator) / denominator_abs;
 
-      if(denominator > 1.e-7 * denominator_abs)
-      {
+      if (denominator > 1.e-7 * denominator_abs) {
         const auto ratio = std::abs(numerator) / denominator;
         const auto alpha_i =
-            std::pow(std::max(ratio - smoothness_indicator_alpha_0, 0.),
-                     smoothness_indicator_power) /
-            std::pow(1 - smoothness_indicator_alpha_0,
-                     smoothness_indicator_power);
+            std::pow(std::max(ratio - smoothness_indicator_alpha_0_, 0.),
+                     smoothness_indicator_power_) /
+            std::pow(1 - smoothness_indicator_alpha_0_,
+                     smoothness_indicator_power_);
         return std::min(alpha_i, beta_i);
       }
 

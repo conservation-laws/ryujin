@@ -32,7 +32,7 @@ namespace grendel
       rho,
       internal_energy,
       specific_entropy
-    } limiters_ = Limiters::internal_energy;
+    } limiter_ = Limiters::internal_energy;
 
     /*
      * Accumulate bounds:
@@ -75,20 +75,20 @@ namespace grendel
   {
     auto &[rho_min, rho_max, rho_epsilon_min, s_min, s_laplace] = bounds_;
 
-    if constexpr(limiters_ == Limiters::none)
+    if constexpr(limiter_ == Limiters::none)
       return;
 
     const auto rho = U[0];
     rho_min = std::min(rho_min, rho);
     rho_max = std::max(rho_max, rho);
 
-    if constexpr(limiters_ == Limiters::rho)
+    if constexpr(limiter_ == Limiters::rho)
       return;
 
     const auto rho_epsilon = ProblemDescription<dim>::internal_energy(U);
     rho_epsilon_min = std::min(rho_epsilon_min, rho_epsilon);
 
-    if constexpr(limiters_ == Limiters::internal_energy)
+    if constexpr(limiter_ == Limiters::internal_energy)
       return;
   }
 
@@ -109,7 +109,7 @@ namespace grendel
 
     double l_ij = 1.;
 
-    if constexpr(limiters_ == Limiters::none)
+    if constexpr(limiter_ == Limiters::none)
       return l_ij;
 
     /*
@@ -141,7 +141,7 @@ namespace grendel
                                      "do that. - Negative density."));
     }
 
-    if constexpr(limiters_ == Limiters::rho)
+    if constexpr(limiter_ == Limiters::rho)
       return l_ij;
 
     /*
@@ -150,7 +150,7 @@ namespace grendel
      * See [Guermond, Nazarov, Popov, Thomas], Section 4.5:
      */
 
-    if constexpr (limiters_ == Limiters::internal_energy) {
+    if constexpr (limiter_ == Limiters::internal_energy) {
 
       const auto P_ij_m = ProblemDescription<dim>::momentum(P_ij);
       const auto &P_ij_E = P_ij[dim + 1];
@@ -218,7 +218,7 @@ namespace grendel
      * See [Guermond, Nazarov, Popov, Thomas], Section 4.6:
      */
 
-    if constexpr (limiters_ == Limiters::specific_entropy)
+    if constexpr (limiter_ == Limiters::specific_entropy)
     {
       AssertThrow(false, dealii::ExcNotImplemented());
       return l_ij;

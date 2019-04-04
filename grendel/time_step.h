@@ -113,7 +113,6 @@ namespace grendel
 
     double cfl_update_;
     double cfl_max_;
-    bool use_ssprk_;
   };
 
 } /* namespace grendel */

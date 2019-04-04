@@ -33,12 +33,6 @@ namespace grendel
 
     cfl_max_ = 1.00;
     add_parameter("cfl max", cfl_max_, "Maximal admissible CFL constant");
-
-    use_ssprk_ = false;
-    add_parameter(
-        "use SSP RK",
-        use_ssprk_,
-        "If enabled, use SSP RK(3) instead of the forward Euler scheme.");
   }
 
 
@@ -560,7 +554,11 @@ namespace grendel
   {
     deallog << "TimeStep<dim>::step()" << std::endl;
 
-    return use_ssprk_ ? ssprk_step(U) : euler_step(U);
+    if constexpr (order_ == Order::second_order) {
+      return ssprk_step(U);
+    } else {
+      return euler_step(U);
+    }
   }
 
 
