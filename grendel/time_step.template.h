@@ -3,6 +3,7 @@
 
 #include "helper.h"
 #include "indicator.h"
+#include "riemann_solver.h"
 #include "time_step.h"
 
 #include <boost/range/irange.hpp>
@@ -19,14 +20,12 @@ namespace grendel
                           dealii::TimerOutput &computing_timer,
                           const grendel::OfflineData<dim> &offline_data,
                           const grendel::InitialValues<dim> &initial_values,
-                          const grendel::RiemannSolver<dim> &riemann_solver,
                           const std::string &subsection /*= "TimeStep"*/)
       : ParameterAcceptor(subsection)
       , mpi_communicator_(mpi_communicator)
       , computing_timer_(computing_timer)
       , offline_data_(&offline_data)
       , initial_values_(&initial_values)
-      , riemann_solver_(&riemann_solver)
   {
     cfl_update_ = 1.00;
     add_parameter("cfl update", cfl_update_, "CFL constant used for update");
@@ -139,7 +138,7 @@ namespace grendel
             const double norm = get_entry(norm_matrix, jt);
 
             const auto [lambda_max, p_star, n_iterations] =
-                riemann_solver_->compute(U_i, U_j, n_ij);
+                RiemannSolver<dim>::compute(U_i, U_j, n_ij);
 
             double d = norm * lambda_max;
 
@@ -152,7 +151,7 @@ namespace grendel
                 boundary_normal_map.count(j) != 0) {
               const auto n_ji = gather(nij_matrix, j, i);
               auto [lambda_max_2, p_star_2, n_iterations_2] =
-                  riemann_solver_->compute(U_j, U_i, n_ji);
+                  RiemannSolver<dim>::compute(U_j, U_i, n_ji);
               const double norm_2 = norm_matrix(j, i);
               d = std::max(d, norm_2 * lambda_max_2);
             }

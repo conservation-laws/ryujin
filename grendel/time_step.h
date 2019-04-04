@@ -6,7 +6,6 @@
 #include "limiter.h"
 #include "offline_data.h"
 #include "problem_description.h"
-#include "riemann_solver.h"
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/timer.h>
@@ -34,7 +33,6 @@ namespace grendel
              dealii::TimerOutput &computing_timer,
              const grendel::OfflineData<dim> &offline_data,
              const grendel::InitialValues<dim> &initial_values,
-             const grendel::RiemannSolver<dim> &riemann_solver,
              const std::string &subsection = "TimeStep");
 
     virtual ~TimeStep() final = default;
@@ -87,9 +85,6 @@ namespace grendel
 
     dealii::SmartPointer<const grendel::InitialValues<dim>> initial_values_;
     ACCESSOR_READ_ONLY(initial_values)
-
-    dealii::SmartPointer<const grendel::RiemannSolver<dim>> riemann_solver_;
-    ACCESSOR_READ_ONLY(riemann_solver)
 
   private:
     /* Scratch data: */

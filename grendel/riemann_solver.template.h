@@ -7,19 +7,6 @@ namespace grendel
 {
   using namespace dealii;
 
-  template <int dim>
-  RiemannSolver<dim>::RiemannSolver(const std::string &subsection)
-      : ParameterAcceptor(subsection)
-  {
-    eps_ = 1.e-10;
-    add_parameter("newton eps", eps_, "Tolerance of the Newton secant solver");
-
-    max_iter_ = 10;
-    add_parameter("newton max iter",
-                  max_iter_,
-                  "Maximal number of iterations for the Newton secant solver");
-  }
-
 
   /*
    * HERE BE DRAGONS!
@@ -346,7 +333,7 @@ namespace grendel
   std::tuple<double, double, unsigned int>
   RiemannSolver<dim>::compute(const rank1_type &U_i,
                               const rank1_type &U_j,
-                              const dealii::Tensor<1, dim> &n_ij) const
+                              const dealii::Tensor<1, dim> &n_ij)
   {
     constexpr double gamma = ProblemDescription<dim>::gamma;
     constexpr double b = ProblemDescription<dim>::b;
@@ -370,7 +357,7 @@ namespace grendel
   template <int dim>
   std::tuple<double, double, unsigned int>
   RiemannSolver<dim>::compute(const std::array<double, 6> &riemann_data_i,
-                              const std::array<double, 6> &riemann_data_j) const
+                              const std::array<double, 6> &riemann_data_j)
   {
     constexpr double gamma = ProblemDescription<dim>::gamma;
     constexpr double b = ProblemDescription<dim>::b;
@@ -400,7 +387,7 @@ namespace grendel
     const double phi_p_max =
         phi(gamma, b, riemann_data_i, riemann_data_j, p_max);
 
-    if (std::abs(phi_p_max) <= eps_) {
+    if (std::abs(phi_p_max) <= newton_eps_) {
       const double p_star = p_max;
       const double lambda1 = lambda1_minus(gamma, riemann_data_i, p_star);
       const double lambda3 = lambda3_plus(gamma, riemann_data_j, p_star);
@@ -437,7 +424,7 @@ namespace grendel
       /*
        * We return our current guess if we either reach the tolerance...
        */
-      if (gap < eps_)
+      if (gap < newton_eps_)
         return {lambda_max, p_2, i};
 
       /*
@@ -445,7 +432,7 @@ namespace grendel
        * lambda_max is a guaranteed upper bound, in the worst case we
        * overestimated the result.
        */
-      if (i + 1 >= max_iter_)
+      if (i + 1 >= newton_max_iter_)
         return {lambda_max, p_2, std::numeric_limits<unsigned int>::max()};
 
       /*
@@ -508,7 +495,7 @@ namespace grendel
         return {lambda_max, p_2, i + 1};
       }
 
-    } while (i++ < max_iter_);
+    } while (i++ < newton_max_iter_);
 
     __builtin_unreachable();
   }

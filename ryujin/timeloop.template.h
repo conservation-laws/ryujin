@@ -76,17 +76,15 @@ namespace ryujin
                      discretization,
                      "C - OfflineData")
       , initial_values("D - InitialValues")
-      , riemann_solver("E - RiemannSolver")
       , time_step(mpi_communicator,
                   computing_timer,
                   offline_data,
                   initial_values,
-                  riemann_solver,
-                  "F - TimeStep")
+                  "E - TimeStep")
       , schlieren_postprocessor(mpi_communicator,
                                 computing_timer,
                                 offline_data,
-                                "G - SchlierenPostprocessor")
+                                "F - SchlierenPostprocessor")
   {
     base_name = "test";
     add_parameter("basename", base_name, "Base name for all output files");
