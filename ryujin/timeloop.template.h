@@ -288,9 +288,11 @@ namespace ryujin
 
 #ifdef DEBUG
     deallog.depth_console(3);
+    deallog.depth_file(3);
     deallog.push("DEBUG");
 #else
     deallog.depth_console(2);
+    deallog.depth_file(2);
 #endif
 
   }
