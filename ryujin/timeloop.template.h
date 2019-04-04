@@ -6,6 +6,7 @@
 #include <helper.h>
 #include <indicator.h>
 #include <limiter.h>
+#include <riemann_solver.h>
 
 #include <deal.II/base/logstream.h>
 #include <deal.II/base/revision.h>
@@ -288,15 +289,6 @@ namespace ryujin
 
     deallog << "Compile time parameters:" << std::endl;
 
-    deallog << "TimeStep<dim>::order_ == ";
-    switch (TimeStep<dim>::order_) {
-    case TimeStep<dim>::Order::first_order:
-      deallog << "TimeStep<dim>::Order::first_order" << std::endl;
-      break;
-    case TimeStep<dim>::Order::second_order:
-      deallog << "TimeStep<dim>::Order::second_order" << std::endl;
-    }
-
     deallog << "Indicator<dim>::indicators_ == ";
     switch (Indicator<dim>::indicator_) {
     case Indicator<dim>::Indicators::zero:
@@ -343,6 +335,27 @@ namespace ryujin
       break;
     case Limiter<dim>::Limiters::specific_entropy:
       deallog << "Limiter<dim>::Limiters::specific_entropy" << std::endl;
+    }
+
+    deallog << "Limiter<dim>::line_search_eps_ == "
+            << Limiter<dim>::line_search_eps_ << std::endl;
+
+    deallog << "Limiter<dim>::line_search_max_iter_ == "
+            << Limiter<dim>::line_search_max_iter_ << std::endl;
+
+    deallog << "RiemannSolver<dim>::newton_eps_ == "
+            <<  RiemannSolver<dim>::newton_eps_ << std::endl;
+
+    deallog << "RiemannSolver<dim>::newton_max_iter_ == "
+            <<  RiemannSolver<dim>::newton_eps_ << std::endl;
+
+    deallog << "TimeStep<dim>::order_ == ";
+    switch (TimeStep<dim>::order_) {
+    case TimeStep<dim>::Order::first_order:
+      deallog << "TimeStep<dim>::Order::first_order" << std::endl;
+      break;
+    case TimeStep<dim>::Order::second_order:
+      deallog << "TimeStep<dim>::Order::second_order" << std::endl;
     }
 
     /* clang-format on */

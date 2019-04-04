@@ -34,9 +34,9 @@ namespace grendel
       specific_entropy
     } limiter_ = Limiters::specific_entropy;
 
-    static constexpr unsigned int line_search_max_iter = 4;
+    static constexpr double line_search_eps_ = 1.e-5;
 
-    static constexpr double line_search_tolerance = 1.e-5;
+    static constexpr unsigned int line_search_max_iter_ = 4;
 
     /*
      * Accumulate bounds:
@@ -237,7 +237,7 @@ namespace grendel
 
       constexpr double gamma = ProblemDescription<dim>::gamma;
 
-      for (unsigned int n = 0; n < line_search_max_iter; ++n) {
+      for (unsigned int n = 0; n < line_search_max_iter_; ++n) {
 
         const auto U_r = U + t_r * P_ij;
         const auto rho_r = U_r[0];
@@ -289,7 +289,7 @@ namespace grendel
                dealii::ExcMessage("Houston, we have a problem!"));
         t_r = t_r - 2. * psi_r / (dpsi_r - std::sqrt(discriminant_r));
 
-        if (t_r < t_l || std::abs(t_r - t_l) < line_search_tolerance) {
+        if (t_r < t_l || std::abs(t_r - t_l) < line_search_eps_) {
           const auto t = t_l < t_r ? t_l : t_r;
           return std::min(l_ij, t);
         }
