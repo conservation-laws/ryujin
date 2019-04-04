@@ -78,6 +78,14 @@ namespace grendel
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
+     * and return the derivative of the internal energy (\rho e).
+     */
+    static inline DEAL_II_ALWAYS_INLINE rank1_type
+    internal_energy_derivative(const rank1_type &U);
+
+
+    /**
+     * For a given (2+dim dimensional) state vector <code>U</code>, compute
      * and return the pressure .
      */
     static inline DEAL_II_ALWAYS_INLINE double pressure(const rank1_type &U);
@@ -90,15 +98,6 @@ namespace grendel
      */
     static inline DEAL_II_ALWAYS_INLINE double
     specific_entropy(const rank1_type &U);
-
-
-    /**
-     * For a given (2+dim dimensional) state vector <code>U</code>, compute
-     * and return the derivative of the specific entropy
-     * e^((\gamma-1)s) = (rho e) / rho ^ gamma.
-     */
-    static inline DEAL_II_ALWAYS_INLINE rank1_type
-    specific_entropy_derivative(const rank1_type &U);
 
 
     /**
@@ -148,6 +147,32 @@ namespace grendel
 
 
   template <int dim>
+  inline DEAL_II_ALWAYS_INLINE typename ProblemDescription<dim>::rank1_type
+  ProblemDescription<dim>::internal_energy_derivative(const rank1_type &U)
+  {
+    /*
+     * With
+     *   rho e = E - 1/2 |m|^2 / rho
+     * we get
+     *   (rho e)' = (1/2m^2/rho^2, -m/rho , 1 )^T
+     */
+
+    const double &rho = U[0];
+    const auto u = momentum(U) / rho;
+
+    rank1_type result;
+
+    result[0] = 0.5 * u.norm_square();
+    for (unsigned int i = 0; i < dim; ++i) {
+      result[1 + i] = -u[i];
+    }
+    result[dim + 1] = 1.;
+
+    return result;
+  }
+
+
+  template <int dim>
   inline DEAL_II_ALWAYS_INLINE double
   ProblemDescription<dim>::pressure(const rank1_type &U)
   {
@@ -175,41 +200,6 @@ namespace grendel
      */
     const auto &rho = U[0];
     return internal_energy(U) / std::pow(rho, gamma);
-  }
-
-
-  template <int dim>
-  inline DEAL_II_ALWAYS_INLINE typename ProblemDescription<dim>::rank1_type
-  ProblemDescription<dim>::specific_entropy_derivative(const rank1_type &U)
-  {
-    /*
-     * With
-     *   s = (rho e) / rho ^ gamma
-     *   rho e = E - 1/2 |m|^2 / rho
-     *
-     * we get
-     *
-     *   s' = (rho e) / rho ^ gamma *
-     *
-     *     (1/2m^2/rho^2 - gamma / rho, -m/rho , 1 )^T
-     *
-     * (Here we have set b = 0)
-     */
-
-    const double &rho = U[0];
-    const auto u = momentum(U) / rho;
-    const auto factor = 1 / std::pow(rho, gamma);
-    const double rho_epsilon = ProblemDescription<dim>::internal_energy(U);
-
-    rank1_type result;
-
-    result[0] = factor * (0.5 * u.norm_square() - gamma * rho_epsilon / rho);
-    result[dim + 1] = factor;
-    for (unsigned int i = 0; i < dim; ++i) {
-      result[1 + i] = -factor * u[i];
-    }
-
-    return result;
   }
 
 

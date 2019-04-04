@@ -34,6 +34,10 @@ namespace grendel
       specific_entropy
     } limiter_ = Limiters::specific_entropy;
 
+    static constexpr unsigned int line_search_max_iter = 4;
+
+    static constexpr double line_search_tolerance = 1.e-5;
+
     /*
      * Accumulate bounds:
      */
@@ -219,7 +223,7 @@ namespace grendel
     /*
      * And finally, limit the specific entropy:
      *
-     * See [Guermond, Nazarov, Popov, Thomas], Section 4.6:
+     * See [Guermond, Nazarov, Popov, Thomas], Section 4.6 + Section 5.1:
      */
 
     if constexpr (limiter_ == Limiters::specific_entropy)
@@ -231,58 +235,64 @@ namespace grendel
       double t_l = 0.;
       double t_r = l_ij;
 
-      constexpr unsigned int n_max_iter = 3;
-      constexpr double tolerance = 1.e-7;
+      constexpr double gamma = ProblemDescription<dim>::gamma;
 
-      for (unsigned int n = 0; n < n_max_iter; ++n) {
+      for (unsigned int n = 0; n < line_search_max_iter; ++n) {
 
         const auto U_r = U + t_r * P_ij;
+        const auto rho_r = U_r[0];
+        const auto rho_r_gamma = std::pow(rho_r, gamma);
         const auto psi_r =
-            ProblemDescription<dim>::specific_entropy(U_r) - s_min;
+            ProblemDescription<dim>::internal_energy(U_r) - s_min * rho_r_gamma;
 
         /* Right state is good, cut it short and return: */
-
         if (psi_r >= 0.)
           return std::min(l_ij, t_r);
 
         const auto U_l = U + t_l * P_ij;
+        const auto rho_l = U_l[0];
+        const auto rho_l_gamma = std::pow(rho_l, gamma);
         const auto psi_l =
-            ProblemDescription<dim>::specific_entropy(U_l) - s_min;
+            ProblemDescription<dim>::internal_energy(U_l) - s_min * rho_l_gamma;
 
-        AssertThrow(psi_l >= 0. && psi_r < 0. && psi_l > psi_r,
-                    dealii::ExcMessage("Houston, we have a problem!"));
+        Assert(psi_l >= 0. && psi_r < 0.,
+               dealii::ExcMessage("Houston, we have a problem!"));
 
         const auto dpsi_l =
-            ProblemDescription<dim>::specific_entropy_derivative(U_l) * P_ij;
+            ProblemDescription<dim>::internal_energy_derivative(U_l) * P_ij -
+            gamma * rho_l_gamma / rho_l * s_min * P_ij[0];
         const auto dpsi_r =
-            ProblemDescription<dim>::specific_entropy_derivative(U_r) * P_ij;
+            ProblemDescription<dim>::internal_energy_derivative(U_r) * P_ij -
+            gamma * rho_r_gamma / rho_r * s_min * P_ij[0];
 
-        AssertThrow(dpsi_l > 0. && dpsi_r > 0.,
-                    dealii::ExcMessage("Houston, we have a problem!"));
+        Assert(dpsi_l <= 0. && dpsi_r <= 0.,
+               dealii::ExcMessage("Houston, we have a problem!"));
 
         /* Compute divided differences: */
 
-        const double dd_11 = dpsi_l;
-        const double dd_12 = (psi_r - psi_l) / (psi_r - psi_l);
-        const double dd_22 = dpsi_r;
+        const double dd_11 = -dpsi_l;
+        const double dd_12 = (psi_l - psi_r) / (t_r - t_l);
+        const double dd_22 = -dpsi_r;
 
-        const double dd_112 = (dd_12 - dd_11) / (psi_r - psi_l);
-        const double dd_122 = (dd_22 - dd_12) / (psi_r - psi_l);
+        const double dd_112 = (dd_12 - dd_11) / (t_r - t_l);
+        const double dd_122 = (dd_22 - dd_12) / (t_r - t_l);
 
         /* Update left point: */
-        const double discriminant_l = dpsi_l * dpsi_l - 4. * psi_l * dd_112;
-        AssertThrow(discriminant_l > 0.,
-                    dealii::ExcMessage("Houston, we have a problem!"));
-        t_l = t_l - 2. * psi_l / (dpsi_l + std::sqrt(discriminant_l));
+        const double discriminant_l = dpsi_l * dpsi_l + 4. * psi_l * dd_112;
+        Assert(discriminant_l > 0.,
+               dealii::ExcMessage("Houston, we have a problem!"));
+        t_l = t_l - 2. * psi_l / (dpsi_l - std::sqrt(discriminant_l));
 
         /* Update right point: */
-        const double discriminant_r = dpsi_r * dpsi_r - 4. * psi_r * dd_122;
-        AssertThrow(discriminant_r > 0.,
-                    dealii::ExcMessage("Houston, we have a problem!"));
-        t_r = t_r - 2. * psi_r / (dpsi_r + std::sqrt(discriminant_r));
+        const double discriminant_r = dpsi_r * dpsi_r + 4. * psi_r * dd_122;
+        Assert(discriminant_r > 0.,
+               dealii::ExcMessage("Houston, we have a problem!"));
+        t_r = t_r - 2. * psi_r / (dpsi_r - std::sqrt(discriminant_r));
 
-        if (t_r < t_l || std::abs(t_r - t_l) < tolerance)
-          return std::min(l_ij, t_r);
+        if (t_r < t_l || std::abs(t_r - t_l) < line_search_tolerance) {
+          const auto t = t_l < t_r ? t_l : t_r;
+          return std::min(l_ij, t);
+        }
       }
 
       /* t_l is a good state with psi_l > 0. */
