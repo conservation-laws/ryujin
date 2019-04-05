@@ -261,7 +261,7 @@ namespace grendel
 
       const auto on_subranges = [&](auto i1, const auto i2) {
         /* Notar bene: This bounds variable is thread local: */
-        Limiter<dim> limiter;
+        Limiter<dim> limiter(*offline_data_);
 
         /* Translate the local index into a index set iterator:: */
         auto it = locally_relevant.at(locally_relevant.nth_index_in_set(*i1));

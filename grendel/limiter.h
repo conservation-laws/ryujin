@@ -37,8 +37,14 @@ namespace grendel
     static constexpr unsigned int relaxation_order_ = 3;
 
     static constexpr double line_search_eps_ = 1.e-5;
+
     static constexpr unsigned int line_search_max_iter_ = 4;
 
+    /**
+     * We take a reference to an OfflineData object in order to store a
+     * reference to the beta_ij matrix.
+     */
+    Limiter(const OfflineData<dim> &offline_data);
 
     /*
      * Accumulate bounds:
@@ -63,6 +69,8 @@ namespace grendel
     limit(const Bounds &bounds, const rank1_type &U, const rank1_type &P_ij);
 
   private:
+    const dealii::SparseMatrix<double> &betaij_matrix_;
+
     Bounds bounds_;
 
     double rho_second_variation_numerator;
@@ -71,6 +79,13 @@ namespace grendel
     double internal_energy_second_variation_denominator;
     double s_interp_max;
   };
+
+
+  template <int dim>
+  Limiter<dim>::Limiter(const OfflineData<dim> &offline_data)
+      , betaij_matrix_(offline_data.betaij_matrix())
+  {
+  }
 
 
   template <int dim>
