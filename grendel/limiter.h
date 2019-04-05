@@ -125,7 +125,13 @@ namespace grendel
     rho_max *= (1 + r_i);
     rho_epsilon_min *= (1 - r_i);
 
-    AssertThrow(s_interp_max > (1. - 1.e-10) * s_min,
+    /*
+     * We have to lower the s_min bound by eps to ensure positivity in the
+     * convex Newton solver.
+     */
+    s_min *= (1.0 - 1.0e-10);
+
+    AssertThrow(s_interp_max > s_min,
                 dealii::ExcMessage("Houston, we have a problem!"));
 
     s_min = std::max((1 - r_i) * s_min, 2. * s_min - s_interp_max);
@@ -274,8 +280,8 @@ namespace grendel
         const auto U_r = U + t_r * P_ij;
         const auto rho_r = U_r[0];
         const auto rho_r_gamma = std::pow(rho_r, gamma);
-        const auto psi_r = ProblemDescription<dim>::internal_energy(U_r) -
-                           (1. - 1.e-10) * s_min * rho_r_gamma;
+        const auto psi_r =
+            ProblemDescription<dim>::internal_energy(U_r) - s_min * rho_r_gamma;
 
         /* Right state is good, cut it short and return: */
         if (psi_r >= 0.)
@@ -284,8 +290,8 @@ namespace grendel
         const auto U_l = U + t_l * P_ij;
         const auto rho_l = U_l[0];
         const auto rho_l_gamma = std::pow(rho_l, gamma);
-        const auto psi_l = ProblemDescription<dim>::internal_energy(U_l) -
-                           (1. - 1.e-10) * s_min * rho_l_gamma;
+        const auto psi_l =
+            ProblemDescription<dim>::internal_energy(U_l) - s_min * rho_l_gamma;
 
         AssertThrow(psi_l >= 0. && psi_r < 0.,
                     dealii::ExcMessage("Houston, we have a problem!"));
@@ -296,9 +302,6 @@ namespace grendel
         const auto dpsi_r =
             ProblemDescription<dim>::internal_energy_derivative(U_r) * P_ij -
             gamma * rho_r_gamma / rho_r * s_min * P_ij[0];
-
-        AssertThrow(dpsi_l <= 0. && dpsi_r <= 0.,
-                    dealii::ExcMessage("Houston, we have a problem!"));
 
         /* Compute divided differences: */
 
