@@ -119,13 +119,13 @@ namespace grendel
   {
     auto &[rho_min, rho_max, rho_epsilon_min, s_min] = bounds_;
 
-//     const auto r_i =
-//         2. * std::pow(std::sqrt(std::sqrt(hd_i)), relaxation_order_);
+    const auto r_i =
+        2. * std::pow(std::sqrt(std::sqrt(hd_i)), relaxation_order_);
 
-//     rho_min *= (1 - r_i);
-//     rho_max *= (1 + r_i);
-//     rho_epsilon_min *= (1 - r_i);
-//     s_min = (1 - r_i) * s_min;
+    rho_min *= (1 - r_i);
+    rho_max *= (1 + r_i);
+    rho_epsilon_min *= (1 - r_i);
+    s_min = (1 - r_i) * s_min;
 
     /*
      * We have to lower the s_min bound by eps to ensure positivity in the
