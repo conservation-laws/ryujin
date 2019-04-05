@@ -37,7 +37,6 @@ namespace grendel
     static constexpr unsigned int relaxation_order_ = 3;
 
     static constexpr double line_search_eps_ = 1.e-5;
-
     static constexpr unsigned int line_search_max_iter_ = 4;
 
 
@@ -65,6 +64,10 @@ namespace grendel
   private:
     Bounds bounds_;
 
+    double rho_second_variation_numerator;
+    double rho_second_variation_denominator;
+    double internal_energy_second_variation_numerator;
+    double internal_energy_second_variation_denominator;
     double s_interp_max;
   };
 
@@ -78,6 +81,10 @@ namespace grendel
     rho_max = 0.;
     rho_epsilon_min = std::numeric_limits<double>::max();
     s_min = std::numeric_limits<double>::max();
+    rho_second_variation_numerator = 0.;
+    rho_second_variation_denominator = 0.;
+    internal_energy_second_variation_numerator = 0.;
+    internal_energy_second_variation_denominator = 0.;
     s_interp_max = 0.;
   }
 
@@ -95,21 +102,19 @@ namespace grendel
     rho_min = std::min(rho_min, rho_ij);
     rho_max = std::max(rho_max, rho_ij);
 
-    if constexpr(limiter_ == Limiters::rho)
-      return;
+    if constexpr (limiter_ == Limiters::internal_energy) {
+      const auto rho_epsilon =
+          ProblemDescription<dim>::internal_energy(U_ij_bar);
+      rho_epsilon_min = std::min(rho_epsilon_min, rho_epsilon);
+    }
 
-    const auto rho_epsilon = ProblemDescription<dim>::internal_energy(U_ij_bar);
-    rho_epsilon_min = std::min(rho_epsilon_min, rho_epsilon);
-
-    if constexpr(limiter_ == Limiters::internal_energy)
-      return;
-
-    const auto s = ProblemDescription<dim>::specific_entropy(U_ij_bar);
-    s_min  = std::min(s_min, s);
-
-//     const double s_interp =
-//         ProblemDescription<dim>::specific_entropy((U_i + U_j) / 2.);
-//     s_interp_max = std::max(s_interp_max, s_interp);
+    if constexpr (limiter_ == Limiters::specific_entropy) {
+      const auto s = ProblemDescription<dim>::specific_entropy(U_j);
+      s_min = std::min(s_min, s);
+      // const double s_interp =
+      // ProblemDescription<dim>::specific_entropy((U_i + U_j) / 2.);
+      // s_interp_max = std::max(s_interp_max, s_interp);
+    }
   }
 
 
@@ -122,10 +127,10 @@ namespace grendel
     const auto r_i =
         2. * std::pow(std::sqrt(std::sqrt(hd_i)), relaxation_order_);
 
-    rho_min *= (1 - r_i);
-    rho_max *= (1 + r_i);
-    rho_epsilon_min *= (1 - r_i);
-    s_min = (1 - r_i) * s_min;
+//     rho_min *= (1 - r_i);
+//     rho_max *= (1 + r_i);
+//     rho_epsilon_min *= (1 - r_i);
+//     s_min = (1 - r_i) * s_min;
 
     /*
      * We have to lower the s_min bound by eps to ensure positivity in the
