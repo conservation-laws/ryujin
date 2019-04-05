@@ -315,7 +315,7 @@ namespace grendel
 
             scatter_set_entry(pij_matrix_, jt, p_ij);
 
-            limiter.accumulate(U_ij_bar);
+            limiter.accumulate(U_i, U_j, U_ij_bar);
           }
 
           const double hd_i = m_i / measure_of_omega;

@@ -47,7 +47,9 @@ namespace grendel
 
     inline DEAL_II_ALWAYS_INLINE void reset();
 
-    inline DEAL_II_ALWAYS_INLINE void accumulate(const rank1_type &U);
+    inline DEAL_II_ALWAYS_INLINE void accumulate(const rank1_type &U_i,
+                                                 const rank1_type &U_j,
+                                                 const rank1_type &U_ij_bar);
 
     inline DEAL_II_ALWAYS_INLINE void apply_relaxation(const double hd_i);
 
@@ -62,6 +64,8 @@ namespace grendel
 
   private:
     Bounds bounds_;
+
+    double s_interp_max;
   };
 
 
@@ -74,33 +78,38 @@ namespace grendel
     rho_max = 0.;
     rho_epsilon_min = std::numeric_limits<double>::max();
     s_min = std::numeric_limits<double>::max();
+    s_interp_max = 0.;
   }
 
 
   template <int dim>
-  inline DEAL_II_ALWAYS_INLINE void
-  Limiter<dim>::accumulate(const rank1_type &U)
+  inline DEAL_II_ALWAYS_INLINE void Limiter<dim>::accumulate(
+      const rank1_type &U_i, const rank1_type &U_j, const rank1_type &U_ij_bar)
   {
     auto &[rho_min, rho_max, rho_epsilon_min, s_min] = bounds_;
 
     if constexpr(limiter_ == Limiters::none)
       return;
 
-    const auto rho = U[0];
+    const auto rho = U_ij_bar[0];
     rho_min = std::min(rho_min, rho);
     rho_max = std::max(rho_max, rho);
 
     if constexpr(limiter_ == Limiters::rho)
       return;
 
-    const auto rho_epsilon = ProblemDescription<dim>::internal_energy(U);
+    const auto rho_epsilon = ProblemDescription<dim>::internal_energy(U_ij_bar);
     rho_epsilon_min = std::min(rho_epsilon_min, rho_epsilon);
 
     if constexpr(limiter_ == Limiters::internal_energy)
       return;
 
-    const auto s = ProblemDescription<dim>::specific_entropy(U);
-    s_min  = std::min(s_min, (1. - 1.e-7) * s);
+    const auto s = ProblemDescription<dim>::specific_entropy(U_ij_bar);
+    s_min  = std::min(s_min, s);
+
+    const double s_interp =
+        ProblemDescription<dim>::specific_entropy((U_i + U_j) / 2.);
+    s_interp_max = std::max(s_interp_max, s_interp);
   }
 
 
@@ -115,7 +124,11 @@ namespace grendel
     rho_min *= (1 - r_i);
     rho_max *= (1 + r_i);
     rho_epsilon_min *= (1 - r_i);
-    s_min *= (1 - r_i);
+
+    AssertThrow(s_interp_max > (1. - 1.e-10) * s_min,
+                dealii::ExcMessage("Houston, we have a problem!"));
+
+    s_min = std::max((1 - r_i) * s_min, 2. * s_min - s_interp_max);
   }
 
 
@@ -261,8 +274,8 @@ namespace grendel
         const auto U_r = U + t_r * P_ij;
         const auto rho_r = U_r[0];
         const auto rho_r_gamma = std::pow(rho_r, gamma);
-        const auto psi_r =
-            ProblemDescription<dim>::internal_energy(U_r) - s_min * rho_r_gamma;
+        const auto psi_r = ProblemDescription<dim>::internal_energy(U_r) -
+                           (1. - 1.e-10) * s_min * rho_r_gamma;
 
         /* Right state is good, cut it short and return: */
         if (psi_r >= 0.)
@@ -271,11 +284,11 @@ namespace grendel
         const auto U_l = U + t_l * P_ij;
         const auto rho_l = U_l[0];
         const auto rho_l_gamma = std::pow(rho_l, gamma);
-        const auto psi_l =
-            ProblemDescription<dim>::internal_energy(U_l) - s_min * rho_l_gamma;
+        const auto psi_l = ProblemDescription<dim>::internal_energy(U_l) -
+                           (1. - 1.e-10) * s_min * rho_l_gamma;
 
-        Assert(psi_l >= 0. && psi_r < 0.,
-               dealii::ExcMessage("Houston, we have a problem!"));
+        AssertThrow(psi_l >= 0. && psi_r < 0.,
+                    dealii::ExcMessage("Houston, we have a problem!"));
 
         const auto dpsi_l =
             ProblemDescription<dim>::internal_energy_derivative(U_l) * P_ij -
@@ -284,8 +297,8 @@ namespace grendel
             ProblemDescription<dim>::internal_energy_derivative(U_r) * P_ij -
             gamma * rho_r_gamma / rho_r * s_min * P_ij[0];
 
-        Assert(dpsi_l <= 0. && dpsi_r <= 0.,
-               dealii::ExcMessage("Houston, we have a problem!"));
+        AssertThrow(dpsi_l <= 0. && dpsi_r <= 0.,
+                    dealii::ExcMessage("Houston, we have a problem!"));
 
         /* Compute divided differences: */
 
@@ -298,14 +311,14 @@ namespace grendel
 
         /* Update left point: */
         const double discriminant_l = dpsi_l * dpsi_l + 4. * psi_l * dd_112;
-        Assert(discriminant_l > 0.,
-               dealii::ExcMessage("Houston, we have a problem!"));
+        AssertThrow(discriminant_l > 0.,
+                    dealii::ExcMessage("Houston, we have a problem!"));
         t_l = t_l - 2. * psi_l / (dpsi_l - std::sqrt(discriminant_l));
 
         /* Update right point: */
         const double discriminant_r = dpsi_r * dpsi_r + 4. * psi_r * dd_122;
-        Assert(discriminant_r > 0.,
-               dealii::ExcMessage("Houston, we have a problem!"));
+        AssertThrow(discriminant_r > 0.,
+                    dealii::ExcMessage("Houston, we have a problem!"));
         t_r = t_r - 2. * psi_r / (dpsi_r - std::sqrt(discriminant_r));
 
         if (t_r < t_l || std::abs(t_r - t_l) < line_search_eps_) {
