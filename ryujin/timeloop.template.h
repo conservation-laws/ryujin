@@ -337,6 +337,9 @@ namespace ryujin
       deallog << "Limiter<dim>::Limiters::specific_entropy" << std::endl;
     }
 
+    deallog << "Limiter<dim>::relaxation_order_ == "
+            << Limiter<dim>::relaxation_order_ << std::endl;
+
     deallog << "Limiter<dim>::line_search_eps_ == "
             << Limiter<dim>::line_search_eps_ << std::endl;
 

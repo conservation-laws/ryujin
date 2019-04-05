@@ -34,7 +34,7 @@ namespace grendel
       specific_entropy
     } limiter_ = Limiters::specific_entropy;
 
-    static constexpr double relaxation_order_ = 1.2;
+    static constexpr double relaxation_order_ = 1.5;
 
     static constexpr double line_search_eps_ = 1.e-5;
 
