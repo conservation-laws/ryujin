@@ -48,7 +48,8 @@ namespace grendel
 
     inline DEAL_II_ALWAYS_INLINE void accumulate(const rank1_type &U_i,
                                                  const rank1_type &U_j,
-                                                 const rank1_type &U_ij_bar);
+                                                 const rank1_type &U_ij_bar,
+                                                 const bool diagonal);
 
     inline DEAL_II_ALWAYS_INLINE void apply_relaxation(const double hd_i);
 
@@ -77,21 +78,34 @@ namespace grendel
   Limiter<dim>::reset()
   {
     auto &[rho_min, rho_max, rho_epsilon_min, s_min] = bounds_;
+
+    if constexpr(limiter_ == Limiters::none)
+      return;
+
     rho_min = std::numeric_limits<double>::max();
     rho_max = 0.;
-    rho_epsilon_min = std::numeric_limits<double>::max();
-    s_min = std::numeric_limits<double>::max();
     rho_second_variation_numerator = 0.;
     rho_second_variation_denominator = 0.;
-    internal_energy_second_variation_numerator = 0.;
-    internal_energy_second_variation_denominator = 0.;
-    s_interp_max = 0.;
+
+    if constexpr (limiter_ == Limiters::internal_energy) {
+      rho_epsilon_min = std::numeric_limits<double>::max();
+      internal_energy_second_variation_numerator = 0.;
+      internal_energy_second_variation_denominator = 0.;
+    }
+
+    if constexpr (limiter_ == Limiters::specific_entropy) {
+      s_min = std::numeric_limits<double>::max();
+      s_interp_max = 0.;
+    }
   }
 
 
   template <int dim>
-  inline DEAL_II_ALWAYS_INLINE void Limiter<dim>::accumulate(
-      const rank1_type &U_i, const rank1_type &U_j, const rank1_type &U_ij_bar)
+  inline DEAL_II_ALWAYS_INLINE void
+  Limiter<dim>::accumulate(const rank1_type &U_i,
+                           const rank1_type &U_j,
+                           const rank1_type &U_ij_bar,
+                           const bool diagonal)
   {
     auto &[rho_min, rho_max, rho_epsilon_min, s_min] = bounds_;
 
@@ -111,9 +125,12 @@ namespace grendel
     if constexpr (limiter_ == Limiters::specific_entropy) {
       const auto s = ProblemDescription<dim>::specific_entropy(U_j);
       s_min = std::min(s_min, s);
-      // const double s_interp =
-      // ProblemDescription<dim>::specific_entropy((U_i + U_j) / 2.);
-      // s_interp_max = std::max(s_interp_max, s_interp);
+
+      if(!diagonal) {
+        const double s_interp =
+            ProblemDescription<dim>::specific_entropy((U_i + U_j) / 2.);
+        s_interp_max = std::max(s_interp_max, s_interp);
+      }
     }
   }
 
@@ -124,19 +141,27 @@ namespace grendel
   {
     auto &[rho_min, rho_max, rho_epsilon_min, s_min] = bounds_;
 
+    if constexpr(limiter_ == Limiters::none)
+      return;
+
     const auto r_i =
         2. * std::pow(std::sqrt(std::sqrt(hd_i)), relaxation_order_);
 
-//     rho_min *= (1 - r_i);
-//     rho_max *= (1 + r_i);
-//     rho_epsilon_min *= (1 - r_i);
-//     s_min = (1 - r_i) * s_min;
+    rho_min *= (1 - r_i);
+    rho_max *= (1 + r_i);
 
-    /*
-     * We have to lower the s_min bound by eps to ensure positivity in the
-     * convex Newton solver.
-     */
-    s_min *= (1.0 - 1.0e-10);
+    if constexpr (limiter_ == Limiters::internal_energy) {
+      rho_epsilon_min *= (1 - r_i);
+    }
+
+    if constexpr (limiter_ == Limiters::specific_entropy) {
+      s_min = std::max((1 - r_i) * s_min, 2. * s_min - s_interp_max);
+
+      /* We have to lower the s_min bound by eps to ensure positivity in the
+       * convex Newton solver. */
+      s_min *= (1.0 - 1.0e-10);
+    }
+
   }
 
 
