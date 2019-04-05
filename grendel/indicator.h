@@ -68,7 +68,7 @@ namespace grendel
     /**
      * Return the computed alpha_i value.
      */
-    inline DEAL_II_ALWAYS_INLINE double alpha();
+    inline DEAL_II_ALWAYS_INLINE double alpha(const double h_i);
 
   private:
     const std::array<dealii::SparseMatrix<double>, dim> &cij_matrix_;
@@ -185,7 +185,7 @@ namespace grendel
 
 
   template <int dim>
-  inline DEAL_II_ALWAYS_INLINE double Indicator<dim>::alpha()
+  inline DEAL_II_ALWAYS_INLINE double Indicator<dim>::alpha(const double hd_i)
   {
     if constexpr (indicator_ == Indicators::zero) {
       return 0.;
@@ -202,7 +202,7 @@ namespace grendel
         numerator -= d_eta_i[k] * right[k];
         denominator += std::abs(d_eta_i[k] * right[k]);
       }
-      return std::abs(numerator) / (denominator + 1.e-12); // FIXME
+      return std::abs(numerator) / (denominator + hd_i * std::abs(eta_i));
     }
 
     if constexpr (indicator_ == Indicators::smoothness_indicator) {

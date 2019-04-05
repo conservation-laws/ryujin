@@ -215,6 +215,7 @@ namespace grendel
 
       for (unsigned int q_point = 0; q_point < n_q_points; ++q_point) {
         const auto JxW = fe_values.JxW(q_point);
+        cell_measure += JxW;
 
         for (unsigned int j = 0; j < dofs_per_cell; ++j) {
 
@@ -222,7 +223,6 @@ namespace grendel
           const auto grad_JxW = fe_values.shape_grad(j, q_point) * JxW;
 
           cell_lumped_mass_matrix(j, j) += value_JxW;
-          cell_measure += value_JxW;
 
           for (unsigned int i = 0; i < dofs_per_cell; ++i) {
 

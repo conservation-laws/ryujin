@@ -18,9 +18,9 @@ namespace grendel
     using rank1_type = typename ProblemDescription<dim>::rank1_type;
 
     /* Let's allocate 5 doubles for limiter bounds: */
-    typedef std::array<double, 5> Bounds;
+    typedef std::array<double, 4> Bounds;
 
-    typedef std::array<dealii::LinearAlgebra::distributed::Vector<double>, 5>
+    typedef std::array<dealii::LinearAlgebra::distributed::Vector<double>, 4>
         vector_type;
 
     /*
@@ -34,9 +34,12 @@ namespace grendel
       specific_entropy
     } limiter_ = Limiters::specific_entropy;
 
+    static constexpr double relaxation_order_ = 1.2;
+
     static constexpr double line_search_eps_ = 1.e-5;
 
     static constexpr unsigned int line_search_max_iter_ = 4;
+
 
     /*
      * Accumulate bounds:
@@ -45,6 +48,8 @@ namespace grendel
     inline DEAL_II_ALWAYS_INLINE void reset();
 
     inline DEAL_II_ALWAYS_INLINE void accumulate(const rank1_type &U);
+
+    inline DEAL_II_ALWAYS_INLINE void apply_relaxation(const double hd_i);
 
     inline DEAL_II_ALWAYS_INLINE const Bounds &bounds() const;
 
@@ -64,12 +69,11 @@ namespace grendel
   inline DEAL_II_ALWAYS_INLINE void
   Limiter<dim>::reset()
   {
-    auto &[rho_min, rho_max, rho_epsilon_min, s_min, s_laplace] = bounds_;
+    auto &[rho_min, rho_max, rho_epsilon_min, s_min] = bounds_;
     rho_min = std::numeric_limits<double>::max();
     rho_max = 0.;
     rho_epsilon_min = std::numeric_limits<double>::max();
     s_min = std::numeric_limits<double>::max();
-    s_laplace = 0.;
   }
 
 
@@ -77,7 +81,7 @@ namespace grendel
   inline DEAL_II_ALWAYS_INLINE void
   Limiter<dim>::accumulate(const rank1_type &U)
   {
-    auto &[rho_min, rho_max, rho_epsilon_min, s_min, s_laplace] = bounds_;
+    auto &[rho_min, rho_max, rho_epsilon_min, s_min] = bounds_;
 
     if constexpr(limiter_ == Limiters::none)
       return;
@@ -101,6 +105,21 @@ namespace grendel
 
 
   template <int dim>
+  inline DEAL_II_ALWAYS_INLINE void
+  Limiter<dim>::apply_relaxation(double hd_i)
+  {
+    auto &[rho_min, rho_max, rho_epsilon_min, s_min] = bounds_;
+
+    const auto r_i = std::pow(hd_i, relaxation_order_ / dim);
+
+    rho_min *= (1 - r_i);
+    rho_max *= (1 + r_i);
+    rho_epsilon_min *= (1 - r_i);
+    s_min *= (1 - r_i);
+  }
+
+
+  template <int dim>
   inline DEAL_II_ALWAYS_INLINE const typename Limiter<dim>::Bounds &
   Limiter<dim>::bounds() const
   {
@@ -112,7 +131,7 @@ namespace grendel
   inline DEAL_II_ALWAYS_INLINE double Limiter<dim>::limit(
       const Bounds &bounds, const rank1_type &U, const rank1_type &P_ij)
   {
-    auto &[rho_min, rho_max, rho_epsilon_min, s_min, s_laplace] = bounds;
+    auto &[rho_min, rho_max, rho_epsilon_min, s_min] = bounds;
 
     double l_ij = 1.;
 

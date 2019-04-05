@@ -87,6 +87,7 @@ namespace grendel
     const auto &bij_matrix = offline_data_->bij_matrix();
     const auto &cij_matrix = offline_data_->cij_matrix();
     const auto &boundary_normal_map = offline_data_->boundary_normal_map();
+    const double measure_of_omega = offline_data_->measure_of_omega();
 
     const auto indices =
         boost::irange<unsigned int>(0, locally_relevant.n_elements());
@@ -162,7 +163,9 @@ namespace grendel
             dij_matrix_(j, i) = d; // FIXME: Suboptimal
           }
 
-          alpha_[i] = indicator.alpha();
+          const double mass = lumped_mass_matrix.diag_element(i);
+          const double hd_i = mass / measure_of_omega;
+          alpha_[i] = indicator.alpha(hd_i);
         }
       };
 
@@ -314,6 +317,9 @@ namespace grendel
 
             limiter.accumulate(U_ij_bar);
           }
+
+          const double hd_i = m_i / measure_of_omega;
+          limiter.apply_relaxation(hd_i);
 
           scatter(temp_euler_, U_i_new, i);
           scatter(r_, r_i, i);
