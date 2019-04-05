@@ -61,6 +61,7 @@ namespace grendel
     dealii::FullMatrix<double> cell_lumped_mass_matrix_;
     std::array<dealii::FullMatrix<double>, dim> cell_cij_matrix_;
     dealii::FullMatrix<double> cell_betaij_matrix_;
+    double cell_measure_;
   };
 
 } // namespace grendel

@@ -159,6 +159,7 @@ namespace grendel
     betaij_matrix_ = 0.;
     for (auto &matrix : nij_matrix_)
       matrix = 0.;
+    measure_of_omega_ = 0.;
 
     const unsigned int dofs_per_cell =
         discretization_->finite_element().dofs_per_cell;
@@ -184,6 +185,7 @@ namespace grendel
       auto &cell_lumped_mass_matrix = copy.cell_lumped_mass_matrix_;
       auto &cell_betaij_matrix = copy.cell_betaij_matrix_;
       auto &cell_cij_matrix = copy.cell_cij_matrix_;
+      auto &cell_measure = copy.cell_measure_;
 
       auto &fe_values = scratch.fe_values_;
       auto &fe_face_values = scratch.fe_face_values_;
@@ -209,6 +211,7 @@ namespace grendel
       cell_betaij_matrix = 0.;
       for (auto &matrix : cell_cij_matrix)
         matrix = 0.;
+      cell_measure = 0.;
 
       for (unsigned int q_point = 0; q_point < n_q_points; ++q_point) {
         const auto JxW = fe_values.JxW(q_point);
@@ -219,6 +222,7 @@ namespace grendel
           const auto grad_JxW = fe_values.shape_grad(j, q_point) * JxW;
 
           cell_lumped_mass_matrix(j, j) += value_JxW;
+          cell_measure += value_JxW;
 
           for (unsigned int i = 0; i < dofs_per_cell; ++i) {
 
@@ -279,6 +283,7 @@ namespace grendel
       const auto &cell_lumped_mass_matrix = copy.cell_lumped_mass_matrix_;
       const auto &cell_cij_matrix = copy.cell_cij_matrix_;
       const auto &cell_betaij_matrix = copy.cell_betaij_matrix_;
+      const auto &cell_measure = copy.cell_measure_;
 
       if (is_artificial)
         return;
@@ -305,6 +310,8 @@ namespace grendel
 
       affine_constraints_.distribute_local_to_global(
           cell_betaij_matrix, local_dof_indices, betaij_matrix_);
+
+      measure_of_omega_ += cell_measure;
     };
 
     {

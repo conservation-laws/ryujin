@@ -134,6 +134,13 @@ namespace grendel
     ACCESSOR_READ_ONLY(lumped_mass_matrix)
 
     /**
+     * Size of computational domain.
+     */
+    double measure_of_omega_;
+    ACCESSOR_READ_ONLY(measure_of_omega)
+
+
+    /**
      * The $(b_{ij})$ matrix:
      *   $b_{ij} = \delta_{ij} - m_{ij}/m{j}$
      */
