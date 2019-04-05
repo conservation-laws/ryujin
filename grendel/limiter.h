@@ -124,17 +124,13 @@ namespace grendel
     rho_min *= (1 - r_i);
     rho_max *= (1 + r_i);
     rho_epsilon_min *= (1 - r_i);
+    s_min = (1 - r_i) * s_min;
 
     /*
      * We have to lower the s_min bound by eps to ensure positivity in the
      * convex Newton solver.
      */
     s_min *= (1.0 - 1.0e-10);
-
-    AssertThrow(s_interp_max > s_min,
-                dealii::ExcMessage("Houston, we have a problem!"));
-
-    s_min = std::max((1 - r_i) * s_min, 2. * s_min - s_interp_max);
   }
 
 
@@ -293,8 +289,8 @@ namespace grendel
         const auto psi_l =
             ProblemDescription<dim>::internal_energy(U_l) - s_min * rho_l_gamma;
 
-        AssertThrow(psi_l >= 0. && psi_r < 0.,
-                    dealii::ExcMessage("Houston, we have a problem!"));
+        Assert(psi_l >= 0. && psi_r < 0.,
+               dealii::ExcMessage("Houston, we have a problem!"));
 
         const auto dpsi_l =
             ProblemDescription<dim>::internal_energy_derivative(U_l) * P_ij -
@@ -314,14 +310,14 @@ namespace grendel
 
         /* Update left point: */
         const double discriminant_l = dpsi_l * dpsi_l + 4. * psi_l * dd_112;
-        AssertThrow(discriminant_l > 0.,
-                    dealii::ExcMessage("Houston, we have a problem!"));
+        Assert(discriminant_l > 0.,
+               dealii::ExcMessage("Houston, we have a problem!"));
         t_l = t_l - 2. * psi_l / (dpsi_l - std::sqrt(discriminant_l));
 
         /* Update right point: */
         const double discriminant_r = dpsi_r * dpsi_r + 4. * psi_r * dd_122;
-        AssertThrow(discriminant_r > 0.,
-                    dealii::ExcMessage("Houston, we have a problem!"));
+        Assert(discriminant_r > 0.,
+               dealii::ExcMessage("Houston, we have a problem!"));
         t_r = t_r - 2. * psi_r / (dpsi_r - std::sqrt(discriminant_r));
 
         if (t_r < t_l || std::abs(t_r - t_l) < line_search_eps_) {
