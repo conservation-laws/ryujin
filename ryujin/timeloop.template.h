@@ -17,6 +17,10 @@
 
 #include <boost/core/demangle.hpp>
 
+#ifdef CALLGRIND
+#include <valgrind/callgrind.h>
+#endif
+
 #include <fstream>
 #include <iomanip>
 
@@ -208,6 +212,10 @@ namespace ryujin
           deallog.push("SILENCE!");
       }
     } /* end of loop */
+
+#ifdef CALLGRIND
+    CALLGRIND_DUMP_STATS;
+#endif
 
     /* Wait for output thread: */
     if (output_thread.joinable())

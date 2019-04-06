@@ -8,6 +8,10 @@
 
 #include <boost/range/irange.hpp>
 
+#ifdef CALLGRIND
+#include <valgrind/callgrind.h>
+#endif
+
 #include <atomic>
 
 namespace grendel
@@ -77,6 +81,10 @@ namespace grendel
   double TimeStep<dim>::euler_step(vector_type &U, double tau)
   {
     deallog << "TimeStep<dim>::euler_step()" << std::endl;
+
+#ifdef CALLGRIND
+    CALLGRIND_START_INSTRUMENTATION;
+#endif
 
     const auto &locally_relevant = offline_data_->locally_relevant();
     const auto &locally_owned = offline_data_->locally_owned();
@@ -518,6 +526,10 @@ namespace grendel
 
     /* And finally update the result: */
     U.swap(temp_euler_);
+
+#ifdef CALLGRIND
+    CALLGRIND_STOP_INSTRUMENTATION;
+#endif
 
     return tau_max;
   }
