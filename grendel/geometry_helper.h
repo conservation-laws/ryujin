@@ -463,12 +463,12 @@ namespace grendel
     Triangulation<2> tria1;
 
     GridGenerator::subdivided_hyper_rectangle(
-        tria1, {6, 2}, Point<2>(wall_position, 0), Point<2>(length, height));
+        tria1, {18, 6}, Point<2>(wall_position, 0), Point<2>(length, height));
 
     Triangulation<2> tria2;
 
     GridGenerator::subdivided_hyper_rectangle(
-        tria2, {1, 2}, Point<2>(0., 0.), Point<2>(wall_position, height));
+        tria2, {1, 6}, Point<2>(0., 0.), Point<2>(wall_position, height));
 
     GridGenerator::merge_triangulations(tria1, tria2, triangulation);
 
