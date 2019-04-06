@@ -106,6 +106,23 @@ namespace grendel
                   immersed_disc_object_diameter_,
                   "Immersed disc: diameter of immersed disc");
 
+    /* Wall: */
+
+    wall_length_ = 3.2;
+    add_parameter("wall - length",
+                  wall_length_,
+                  "Wall: length of computational domain");
+
+    wall_height_ = 1.0;
+    add_parameter("wall - height",
+                  wall_height_,
+                  "Wall: height of computational domain");
+
+    wall_position_ = 1. / 6.;
+    add_parameter("wall - wall position",
+                  wall_position_,
+                  "Wall: x position of wall");
+
     /* Options: */
 
     refinement_ = 5;
@@ -176,6 +193,15 @@ namespace grendel
                                   immersed_disc_height_,
                                   immersed_disc_object_position_,
                                   immersed_disc_object_diameter_);
+
+      triangulation.refine_global(refinement_);
+
+    } else if (geometry_ == "wall") {
+
+      create_coarse_grid_wall(triangulation,
+                              wall_length_,
+                              wall_height_,
+                              wall_position_);
 
       triangulation.refine_global(refinement_);
 

@@ -94,6 +94,10 @@ namespace grendel
     double immersed_disc_object_position_;
     double immersed_disc_object_diameter_;
 
+    double wall_length_;
+    double wall_height_;
+    double wall_position_;
+
     unsigned int refinement_;
 
     unsigned int order_finite_element_;

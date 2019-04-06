@@ -163,9 +163,9 @@ namespace grendel
          * the boundary indicator at 0, i.e. do nothing.
          */
 
-//         const auto center = face->center();
-//         if (center[0] > -length / 2. && center[0] < length / 2.)
-//           face->set_boundary_id(1);
+        const auto center = face->center();
+        if (center[0] > -length / 2. && center[0] < length / 2.)
+          face->set_boundary_id(1);
 
         face->set_boundary_id(2);
       }
@@ -428,6 +428,76 @@ namespace grendel
 
         // the rest:
         face->set_boundary_id(1);
+      }
+    }
+
+  }
+
+
+  /**
+   * Create a 2D wall configuration: A rectangular domain with given length
+   * and height.
+   *
+   */
+
+  template <int dim>
+  void
+  create_coarse_grid_wall(dealii::parallel::distributed::Triangulation<dim> &,
+                          const double /*length*/,
+                          const double /*height*/,
+                          const double /*wall_position*/)
+  {
+    AssertThrow(false, dealii::ExcNotImplemented());
+  }
+
+
+  template <>
+  void create_coarse_grid_wall<2>(
+      dealii::parallel::distributed::Triangulation<2> &triangulation,
+      const double length,
+      const double height,
+      const double wall_position)
+  {
+    using namespace dealii;
+
+    Triangulation<2> tria1;
+
+    GridGenerator::subdivided_hyper_rectangle(
+        tria1, {6, 2}, Point<2>(wall_position, 0), Point<2>(length, height));
+
+    Triangulation<2> tria2;
+
+    GridGenerator::subdivided_hyper_rectangle(
+        tria2, {1, 2}, Point<2>(0., 0.), Point<2>(wall_position, height));
+
+    GridGenerator::merge_triangulations(tria1, tria2, triangulation);
+
+    /*
+     * Set boundary ids:
+     */
+
+    for (auto cell : triangulation.active_cell_iterators()) {
+      for (unsigned int f = 0; f < GeometryInfo<2>::faces_per_cell; ++f) {
+        const auto face = cell->face(f);
+
+        if (!face->at_boundary())
+          continue;
+
+        /*
+         * We want slip boundary conditions (i.e. indicator 1) at the
+         * bottom starting at position wall_position. We do nothing on the
+         * right boundary and enforce inflow conditions elsewhere
+         */
+
+        const auto center = face->center();
+
+        if (center[0] > wall_position && center[1] < 1.e-6)
+          face->set_boundary_id(1);
+        else if (center[0] > length - 1.e-6)
+          continue;
+
+        // the rest:
+        face->set_boundary_id(2);
       }
     }
 
