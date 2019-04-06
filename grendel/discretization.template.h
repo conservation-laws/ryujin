@@ -31,7 +31,7 @@ namespace grendel
     add_parameter("geometry",
                   geometry_,
                   "Geometry. Valid names are \"triangle\", \"tube\", \"step\", "
-                  "or \"disc\".");
+                  "\"disc\", or \"wall\".");
 
     /* Immersed triangle: */
 
