@@ -81,6 +81,7 @@ namespace grendel
     const auto &locally_relevant = offline_data_->locally_relevant();
     const auto &locally_owned = offline_data_->locally_owned();
     const auto &sparsity = offline_data_->sparsity_pattern();
+    const auto &mass_matrix = offline_data_->mass_matrix();
     const auto &lumped_mass_matrix = offline_data_->lumped_mass_matrix();
     const auto &norm_matrix = offline_data_->norm_matrix();
     const auto &nij_matrix = offline_data_->nij_matrix();
@@ -117,21 +118,14 @@ namespace grendel
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
             const auto j = jt->column();
 
-            /*
-             * Skip diagonal:
-             */
-
+            /* Skip diagonal. */
             if (j == i)
               continue;
 
             const auto U_j = gather(U, j);
-
             indicator.add(U_j, jt);
 
-            /*
-             * Only iterate over the subdiagonal for d_ij
-             */
-
+            /* Only iterate over the subdiagonal for d_ij */
             if (j >= i)
               continue;
 
@@ -197,15 +191,26 @@ namespace grendel
 
           const auto i = *it;
 
+          double alpha_i = 0.;
           double d_sum = 0.;
 
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
             const auto j = jt->column();
 
+            if constexpr (smoothen_alpha_) {
+              const auto m_ij = get_entry(mass_matrix, jt);
+              alpha_i += m_ij * alpha_[j];
+            }
+
             if (j == i)
               continue;
 
             d_sum -= get_entry(dij_matrix_, jt);
+          }
+
+          if constexpr (smoothen_alpha_) {
+            const double m_i = lumped_mass_matrix.diag_element(i);
+            alpha_[i] = alpha_i / m_i;
           }
 
           dij_matrix_.diag_element(i) = d_sum;
@@ -224,6 +229,11 @@ namespace grendel
 
       parallel::apply_to_subranges(
           indices.begin(), indices.end(), on_subranges, 4096);
+
+      if constexpr (smoothen_alpha_) {
+        /* Synchronize alpha_ over all MPI processes: */
+        alpha_.update_ghost_values();
+      }
 
       /* Synchronize tau_max over all MPI processes: */
       tau_max.store(Utilities::MPI::min(tau_max.load(), mpi_communicator_));

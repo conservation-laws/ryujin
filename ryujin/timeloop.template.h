@@ -361,6 +361,9 @@ namespace ryujin
       deallog << "TimeStep<dim>::Order::second_order" << std::endl;
     }
 
+    deallog << "TimeStep<dim>::smoothen_alpha_ == "
+            <<  TimeStep<dim>::smoothen_alpha_ << std::endl;
+
     /* clang-format on */
 
     deallog << "Run time parameters:" << std::endl;
