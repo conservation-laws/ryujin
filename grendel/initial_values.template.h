@@ -104,11 +104,9 @@ namespace grendel
           p_R * (2. * gamma * mach * mach - (gamma - 1.)) / (gamma + 1.);
 
       initial_state_internal = [=](const dealii::Point<dim> &point, double t) {
-        AssertThrow(t == 0.,
-                    ExcMessage("No analytic solution for t > 0. available"));
 
         const double position_1d =
-            (point - initial_position_) * initial_direction_;
+            (point - initial_position_) * initial_direction_ - mach * t;
 
         if (position_1d > 0.) {
           return from_1d_state({rho_R, u_R, p_R});
