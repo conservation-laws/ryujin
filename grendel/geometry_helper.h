@@ -158,16 +158,17 @@ namespace grendel
           continue;
 
         /*
-         * We want slip boundary conditions (i.e. indicator 1) at top
-         * and bottom of the rectangle. On the left and right side we leave
-         * the boundary indicator at 0, i.e. do nothing.
+         * We want slip boundary conditions (i.e. indicator 1) at top and
+         * bottom of the rectangle. On the left side we enforce initial
+         * conditionas and leave the boundary indicator on the right side
+         * at 0, i.e. do nothing.
          */
 
         const auto center = face->center();
-        if (center[0] > -length / 2. && center[0] < length / 2.)
+        if (center[0] < -length / 2. + 1.e-6)
+          face->set_boundary_id(2);
+        else if (std::abs(center[1]) > diameter / 2. - 1.e-6)
           face->set_boundary_id(1);
-
-        face->set_boundary_id(2);
       }
     }
   }
@@ -195,19 +196,19 @@ namespace grendel
           continue;
 
         /*
-         * We want slip boundary conditions (i.e. indicator 1) at top
-         * and bottom of the rectangle. On the left we set inflow
-         * conditions (i.e. indicator 2), and we do nothing on the right
-         * side (i.e. indicator 0).
+         * We want slip boundary conditions (i.e. indicator 1) at top and
+         * bottom of the rectangle. On the left side we enforce initial
+         * conditionas and leave the boundary indicator on the right side
+         * at 0, i.e. do nothing.
          */
 
         const auto center = face->center();
-
-        if (center[0] > -length / 2. && center[0] < length / 2.)
-          face->set_boundary_id(1);
-
-        if (center[0] < -length / 2. + 1.e-06)
+        if (center[0] < -length / 2. + 1.e-6)
           face->set_boundary_id(2);
+        else if (center[0] > length / 2. - 1.e-6)
+          face->set_boundary_id(0);
+
+        face->set_boundary_id(1);
       }
     }
   }
@@ -495,9 +496,9 @@ namespace grendel
           face->set_boundary_id(1);
         else if (center[0] > length - 1.e-6)
           continue;
-
-        // the rest:
-        face->set_boundary_id(2);
+        else
+          // the rest:
+          face->set_boundary_id(2);
       }
     }
 
