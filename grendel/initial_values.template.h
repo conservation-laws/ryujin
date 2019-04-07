@@ -123,8 +123,6 @@ namespace grendel
 
       initial_state_internal = [=](const dealii::Point<dim> & /*point*/,
                                    double t) {
-        AssertThrow(t == 0.,
-                    ExcMessage("No analytic solution for t > 0. available"));
 
         return from_1d_state({gamma, initial_mach_number_, 1.});
       };
@@ -136,8 +134,6 @@ namespace grendel
        */
 
       initial_state_internal = [=](const dealii::Point<dim> &point, double t) {
-        AssertThrow(t == 0.,
-                    ExcMessage("No analytic solution for t > 0. available"));
 
         const double position_1d =
             (point - initial_position_) * initial_direction_;
