@@ -43,7 +43,8 @@ namespace grendel
   void TimeStep<dim>::prepare()
   {
     deallog << "TimeStep<dim>::prepare()" << std::endl;
-    TimerOutput::Scope t(computing_timer_, "time_step - prepare scratch space");
+    TimerOutput::Scope time(computing_timer_,
+                            "time_step - prepare scratch space");
 
     /* Initialize (global) vectors: */
 
@@ -78,7 +79,7 @@ namespace grendel
 
 
   template <int dim>
-  double TimeStep<dim>::euler_step(vector_type &U, double tau)
+  double TimeStep<dim>::euler_step(vector_type &U, double t, double tau)
   {
     deallog << "TimeStep<dim>::euler_step()" << std::endl;
 
@@ -107,7 +108,7 @@ namespace grendel
 
     {
       deallog << "        compute d_ij, and alpha_i" << std::endl;
-      TimerOutput::Scope t(computing_timer_,
+      TimerOutput::Scope time(computing_timer_,
                            "time_step - 1 compute d_ij, and alpha_i");
 
       const auto on_subranges = [&](auto i1, const auto i2) {
@@ -187,8 +188,8 @@ namespace grendel
 
     {
       deallog << "        compute d_ii, and tau_max" << std::endl;
-      TimerOutput::Scope t(computing_timer_,
-                           "time_step - 2 compute d_ii, and tau_max");
+      TimerOutput::Scope time(computing_timer_,
+                              "time_step - 2 compute d_ii, and tau_max");
 
       const auto on_subranges = [&](auto i1, const auto i2) {
         double tau_max_on_subrange = std::numeric_limits<double>::infinity();
@@ -273,9 +274,9 @@ namespace grendel
     {
       deallog << "        low-order update, limiter bounds, r_i, and p_ij"
               << std::endl;
-      TimerOutput::Scope t(computing_timer_,
-                           "time_step - 3 low-order update, limiter bounds, "
-                           "compute r_i, and p_ij (1)");
+      TimerOutput::Scope time(computing_timer_,
+                              "time_step - 3 low-order update, limiter bounds, "
+                              "compute r_i, and p_ij (1)");
 
       const auto on_subranges = [&](auto i1, const auto i2) {
         /* Notar bene: This bounds variable is thread local: */
@@ -362,8 +363,8 @@ namespace grendel
 
     if constexpr (order_ == Order::second_order) {
       deallog << "        compute p_ij and l_ij" << std::endl;
-      TimerOutput::Scope t(computing_timer_,
-                           "time_step - 4 compute p_ij (2), and l_ij");
+      TimerOutput::Scope time(computing_timer_,
+                              "time_step - 4 compute p_ij (2), and l_ij");
 
       const auto on_subranges = [&](auto i1, const auto i2) {
         /* Translate the local index into a index set iterator:: */
@@ -412,7 +413,8 @@ namespace grendel
 
     if constexpr (order_ == Order::second_order) {
       deallog << "        symmetrize l_ij" << std::endl;
-      TimerOutput::Scope t(computing_timer_, "time_step - 4 symmetrize l_ij");
+      TimerOutput::Scope time(computing_timer_,
+                              "time_step - 4 symmetrize l_ij");
 
       const auto on_subranges = [&](auto i1, const auto i2) {
         /* Translate the local index into a index set iterator:: */
@@ -446,7 +448,8 @@ namespace grendel
 
     if constexpr (order_ == Order::second_order) {
       deallog << "        high-order update" << std::endl;
-      TimerOutput::Scope t(computing_timer_, "time_step - 5 high-order update");
+      TimerOutput::Scope time(computing_timer_,
+                              "time_step - 5 high-order update");
 
       const auto on_subranges = [&](auto i1, const auto i2) {
         /* Translate the local index into a index set iterator:: */
@@ -484,8 +487,8 @@ namespace grendel
 
     {
       deallog << "        fix up boundary states" << std::endl;
-      TimerOutput::Scope t(computing_timer_,
-                           "time_step - 6 fix boundary states");
+      TimerOutput::Scope time(computing_timer_,
+                              "time_step - 6 fix boundary states");
 
       const auto on_subranges = [&](const auto it1, const auto it2) {
         for (auto it = it1; it != it2; ++it) {
@@ -509,7 +512,7 @@ namespace grendel
           /* On boundray 2 enforce initial conditions: */
 
           if (id == 2) {
-            U_i = initial_values_->initial_state(position, 0.);
+            U_i = initial_values_->initial_state(position, t + tau);
           }
 
           scatter(temp_euler_, U_i, i);
@@ -536,7 +539,7 @@ namespace grendel
 
 
   template <int dim>
-  double TimeStep<dim>::ssprk_step(vector_type &U)
+  double TimeStep<dim>::ssprk_step(vector_type &U, double t)
   {
     deallog << "TimeStep<dim>::ssprk_step()" << std::endl;
 
@@ -546,11 +549,11 @@ namespace grendel
 
     // Step 1: U1 = U_old + tau * L(U_old)
 
-    const double tau_1 = euler_step(U);
+    const double tau_1 = euler_step(U, t);
 
     // Step 2: U2 = 3/4 U_old + 1/4 (U1 + tau L(U1))
 
-    const double tau_2 = euler_step(U, tau_1);
+    const double tau_2 = euler_step(U, t, tau_1);
 
     const double ratio = cfl_max_ / cfl_update_;
     AssertThrow(ratio * tau_2 >= tau_1,
@@ -563,7 +566,7 @@ namespace grendel
 
     // Step 3: U_new = 1/3 U_old + 2/3 (U2 + tau L(U2))
 
-    const double tau_3 = euler_step(U, tau_1);
+    const double tau_3 = euler_step(U, t, tau_1);
 
     AssertThrow(ratio * tau_3 >= tau_1,
                 ExcMessage("Problem performing SSP RK(3) time step: "
@@ -577,14 +580,14 @@ namespace grendel
 
 
   template <int dim>
-  double TimeStep<dim>::step(vector_type &U)
+  double TimeStep<dim>::step(vector_type &U, double t)
   {
     deallog << "TimeStep<dim>::step()" << std::endl;
 
     if constexpr (order_ == Order::second_order) {
-      return ssprk_step(U);
+      return ssprk_step(U, t);
     } else {
-      return euler_step(U);
+      return euler_step(U, t);
     }
   }
 

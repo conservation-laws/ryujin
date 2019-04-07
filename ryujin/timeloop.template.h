@@ -193,7 +193,7 @@ namespace ryujin
       print_head(head.str(), secondary.str());
 
       /* Do a time step: */
-      const auto tau = time_step.step(U);
+      const auto tau = time_step.step(U, t);
       t += tau;
 
       if (t > output_cycle * output_granularity) {

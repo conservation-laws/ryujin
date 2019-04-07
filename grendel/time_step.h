@@ -50,7 +50,7 @@ namespace grendel
      *    0), or tau (if tau != 0). Here, tau_max is the computed maximal
      *    time step size and tau is the optional third parameter.
      */
-    double euler_step(vector_type &U, double tau = 0.);
+    double euler_step(vector_type &U, double t, double tau = 0.);
 
     /**
      * Given a reference to a previous state vector U compute
@@ -60,14 +60,14 @@ namespace grendel
      * Non-oscillatory Shock-Capturing Schemes JCP 77:439-471 (1988), Eq.
      * 2.18]
      */
-    double ssprk_step(vector_type &U);
+    double ssprk_step(vector_type &U, double t);
 
     /**
      * Given a reference to a previous state vector U perform an explicit
      * time step (and store the result in U). The function returns the
      * chosen time step.
      */
-    double step(vector_type &U);
+    double step(vector_type &U, double t);
 
     /* Options: */
 
