@@ -144,7 +144,7 @@ namespace grendel
         2. * std::pow(std::sqrt(std::sqrt(hd_i)), relaxation_order_);
 
     rho_min = std::max((1 - r_i) * rho_min, rho_min - rho_relaxation);
-    rho_max = std::min((1 + r_i) * rho_min, rho_max + rho_relaxation);
+    rho_max = std::min((1 + r_i) * rho_max, rho_max + rho_relaxation);
 
     if constexpr (limiter_ == Limiters::specific_entropy) {
       s_min = std::max((1 - r_i) * s_min, 2. * s_min - s_interp_max);
