@@ -175,8 +175,8 @@ namespace grendel
             dij_matrix_(j, i) = d; // FIXME: Suboptimal
           }
 
-          rho_second_variation_[i] = std::abs(rho_second_variation_numerator /
-                                              rho_second_variation_denominator);
+          rho_second_variation_[i] =
+              rho_second_variation_numerator / rho_second_variation_denominator;
 
           const double mass = lumped_mass_matrix.diag_element(i);
           const double hd_i = mass / measure_of_omega;
