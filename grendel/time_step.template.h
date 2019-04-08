@@ -31,6 +31,10 @@ namespace grendel
       , offline_data_(&offline_data)
       , initial_values_(&initial_values)
   {
+    use_ssprk3_ = order_ == Order::second_order;
+    add_parameter(
+        "use ssprk3", use_ssprk3_, "Use SSPRK3 instead of explicit Euler");
+
     cfl_update_ = 1.00;
     add_parameter("cfl update", cfl_update_, "CFL constant used for update");
 
@@ -613,7 +617,7 @@ namespace grendel
   {
     deallog << "TimeStep<dim>::step()" << std::endl;
 
-    if constexpr (order_ == Order::second_order) {
+    if (use_ssprk3_) {
       return ssprk_step(U, t);
     } else {
       return euler_step(U, t);

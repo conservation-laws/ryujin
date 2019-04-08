@@ -110,6 +110,7 @@ namespace grendel
 
     /* Options: */
 
+    bool use_ssprk3_;
     double cfl_update_;
     double cfl_max_;
   };
