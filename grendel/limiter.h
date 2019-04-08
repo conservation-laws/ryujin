@@ -1,7 +1,6 @@
 #ifndef LIMITER_H
 #define LIMITER_H
 
-#include "offline_data.h"
 #include "problem_description.h"
 
 #include <deal.II/lac/la_parallel_vector.templates.h>
@@ -41,12 +40,6 @@ namespace grendel
 
     static constexpr unsigned int line_search_max_iter_ = 4;
 
-    /**
-     * We take a reference to an OfflineData object in order to store a
-     * reference to the beta_ij matrix.
-     */
-    Limiter(const OfflineData<dim> &offline_data);
-
     /*
      * Accumulate bounds:
      */
@@ -59,7 +52,8 @@ namespace grendel
                                                  const rank1_type &U_ij_bar,
                                                  const ITERATOR jt);
 
-    inline DEAL_II_ALWAYS_INLINE void apply_relaxation(const double hd_i);
+    inline DEAL_II_ALWAYS_INLINE void
+    apply_relaxation(const double hd_i, const double rho_relaxation);
 
     inline DEAL_II_ALWAYS_INLINE const Bounds &bounds() const;
 
@@ -71,23 +65,11 @@ namespace grendel
     limit(const Bounds &bounds, const rank1_type &U, const rank1_type &P_ij);
 
   private:
-    const dealii::SparseMatrix<double> &betaij_matrix_;
 
     Bounds bounds_;
 
-    double rho_second_variation_numerator;
-    double rho_second_variation_denominator;
-    double rho_epsilon_second_variation_numerator;
-    double rho_epsilon_second_variation_denominator;
     double s_interp_max;
   };
-
-
-  template <int dim>
-  Limiter<dim>::Limiter(const OfflineData<dim> &offline_data)
-      : betaij_matrix_(offline_data.betaij_matrix())
-  {
-  }
 
 
   template <int dim>
@@ -101,13 +83,9 @@ namespace grendel
 
     rho_min = std::numeric_limits<double>::max();
     rho_max = 0.;
-    rho_second_variation_numerator = 0.;
-    rho_second_variation_denominator = 0.;
 
     if constexpr (limiter_ == Limiters::internal_energy) {
       rho_epsilon_min = std::numeric_limits<double>::max();
-      rho_epsilon_second_variation_numerator = 0.;
-      rho_epsilon_second_variation_denominator = 0.;
     }
 
     if constexpr (limiter_ == Limiters::specific_entropy) {
@@ -130,28 +108,14 @@ namespace grendel
     if constexpr(limiter_ == Limiters::none)
       return;
 
-    const auto beta_ij = get_entry(betaij_matrix_, jt);
-
     const auto rho_ij = U_ij_bar[0];
     rho_min = std::min(rho_min, rho_ij);
     rho_max = std::max(rho_max, rho_ij);
-
-    if (jt->row() != jt->column()) {
-      rho_second_variation_numerator += beta_ij * (U_j[0] - U_i[0]);
-      rho_second_variation_denominator += beta_ij;
-    }
 
     if constexpr (limiter_ == Limiters::internal_energy) {
       const auto rho_epsilon =
           ProblemDescription<dim>::internal_energy(U_ij_bar);
       rho_epsilon_min = std::min(rho_epsilon_min, rho_epsilon);
-
-      if (jt->row() != jt->column()) {
-        rho_epsilon_second_variation_numerator +=
-            beta_ij * (ProblemDescription<dim>::internal_energy(U_j) -
-                       ProblemDescription<dim>::internal_energy(U_i));
-        rho_epsilon_second_variation_denominator += beta_ij;
-      }
     }
 
     if constexpr (limiter_ == Limiters::specific_entropy) {
@@ -169,7 +133,7 @@ namespace grendel
 
   template <int dim>
   inline DEAL_II_ALWAYS_INLINE void
-  Limiter<dim>::apply_relaxation(double hd_i)
+  Limiter<dim>::apply_relaxation(double hd_i, double rho_relaxation)
   {
     auto &[rho_min, rho_max, rho_epsilon_min, s_min] = bounds_;
 
@@ -179,24 +143,8 @@ namespace grendel
     const auto r_i =
         2. * std::pow(std::sqrt(std::sqrt(hd_i)), relaxation_order_);
 
-    const auto rho_second_variation =
-        0.5 * std::abs(rho_second_variation_numerator /
-                       rho_second_variation_denominator);
-
-    rho_min = std::max((1 - r_i) * rho_min, rho_min - rho_second_variation);
-    rho_max = std::min((1 + r_i) * rho_min, rho_max + rho_second_variation);
-
-    if constexpr (limiter_ == Limiters::internal_energy) {
-      rho_epsilon_min *= (1 - r_i);
-
-      const auto rho_epsilon_second_variation =
-          0.5 * std::abs(rho_epsilon_second_variation_numerator /
-                         rho_epsilon_second_variation_denominator);
-
-      rho_epsilon_min =
-          std::max((1 - r_i) * rho_epsilon_min,
-                   rho_epsilon_min - rho_epsilon_second_variation);
-    }
+    rho_min = std::max((1 - r_i) * rho_min, rho_min - rho_relaxation);
+    rho_max = std::min((1 + r_i) * rho_min, rho_max + rho_relaxation);
 
     if constexpr (limiter_ == Limiters::specific_entropy) {
       s_min = std::max((1 - r_i) * s_min, 2. * s_min - s_interp_max);

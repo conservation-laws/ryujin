@@ -54,6 +54,9 @@ namespace grendel
     auto &exemplar = alpha_;
     exemplar.reinit(locally_owned, locally_relevant, mpi_communicator_);
 
+    rho_second_variation_.reinit(exemplar);
+    rho_relaxation_.reinit(exemplar);
+
     for (auto &it : temp_euler_)
       it.reinit(exemplar);
 
@@ -95,6 +98,7 @@ namespace grendel
     const auto &norm_matrix = offline_data_->norm_matrix();
     const auto &nij_matrix = offline_data_->nij_matrix();
     const auto &bij_matrix = offline_data_->bij_matrix();
+    const auto &betaij_matrix = offline_data_->betaij_matrix();
     const auto &cij_matrix = offline_data_->cij_matrix();
     const auto &boundary_normal_map = offline_data_->boundary_normal_map();
     const double measure_of_omega = offline_data_->measure_of_omega();
@@ -123,6 +127,8 @@ namespace grendel
           const auto U_i = gather(U, i);
 
           indicator.reset(U_i);
+          double rho_second_variation_numerator = 0.;
+          double rho_second_variation_denominator = 0.;
 
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
             const auto j = jt->column();
@@ -133,6 +139,9 @@ namespace grendel
 
             const auto U_j = gather(U, j);
             indicator.add(U_j, jt);
+            const auto beta_ij = get_entry(betaij_matrix, jt);
+            rho_second_variation_numerator += beta_ij * (U_j[0] - U_i[0]);
+            rho_second_variation_denominator += beta_ij;
 
             /* Only iterate over the subdiagonal for d_ij */
             if (j >= i)
@@ -166,6 +175,9 @@ namespace grendel
             dij_matrix_(j, i) = d; // FIXME: Suboptimal
           }
 
+          rho_second_variation_[i] = std::abs(rho_second_variation_numerator /
+                                              rho_second_variation_denominator);
+
           const double mass = lumped_mass_matrix.diag_element(i);
           const double hd_i = mass / measure_of_omega;
           alpha_[i] = indicator.alpha(hd_i);
@@ -176,6 +188,7 @@ namespace grendel
           indices.begin(), indices.end(), on_subranges, 4096);
 
       /* Synchronize alpha_ over all MPI processes: */
+      rho_second_variation_.update_ghost_values();
       alpha_.update_ghost_values();
     }
 
@@ -200,8 +213,12 @@ namespace grendel
 
           const auto i = *it;
 
+          const double laplace_rho_i = rho_second_variation_[i];
+
           double alpha_i = 0.;
           double d_sum = 0.;
+          double rho_relaxation_numerator = 0.;
+          double rho_relaxation_denominator = 0.;
 
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
             const auto j = jt->column();
@@ -214,6 +231,14 @@ namespace grendel
             if (j == i)
               continue;
 
+            const double laplace_rho_j = rho_second_variation_[j];
+            const auto beta_ij = get_entry(betaij_matrix, jt);
+
+            // FIXME 0.5, or 0.25?
+            rho_relaxation_numerator +=
+                0.5 * beta_ij * (laplace_rho_i + laplace_rho_j);
+            rho_relaxation_denominator += beta_ij;
+
             d_sum -= get_entry(dij_matrix_, jt);
           }
 
@@ -221,6 +246,9 @@ namespace grendel
             const double m_i = lumped_mass_matrix.diag_element(i);
             alpha_[i] = alpha_i / m_i;
           }
+
+          rho_relaxation_[i] =
+              std::abs(rho_relaxation_numerator / rho_relaxation_denominator);
 
           dij_matrix_.diag_element(i) = d_sum;
 
@@ -280,7 +308,7 @@ namespace grendel
 
       const auto on_subranges = [&](auto i1, const auto i2) {
         /* Notar bene: This bounds variable is thread local: */
-        Limiter<dim> limiter(*offline_data_);
+        Limiter<dim> limiter;
 
         /* Translate the local index into a index set iterator:: */
         auto it = locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
@@ -337,11 +365,12 @@ namespace grendel
             limiter.accumulate(U_i, U_j, U_ij_bar, jt);
           }
 
-          const double hd_i = m_i / measure_of_omega;
-          limiter.apply_relaxation(hd_i);
-
           scatter(temp_euler_, U_i_new, i);
           scatter(r_, r_i, i);
+
+          const double hd_i = m_i / measure_of_omega;
+          const double rho_relaxation_i = rho_relaxation_[i];
+          limiter.apply_relaxation(hd_i, rho_relaxation_i);
           scatter(bounds_, limiter.bounds(), i);
         }
       };
