@@ -55,14 +55,14 @@ namespace grendel
      * Reset temporary storage and initialize for a new row corresponding
      * to state vector U_i:
      */
-    inline DEAL_II_ALWAYS_INLINE void reset(const rank1_type &U_i);
+    inline DEAL_II_ALWAYS_INLINE void reset(const rank1_type U_i);
 
     /**
      * When looping over the sparsity row, add the contribution associated
      * with the neighboring state U_j:
      */
     template <typename ITERATOR>
-    inline DEAL_II_ALWAYS_INLINE void add(const rank1_type &U_j,
+    inline DEAL_II_ALWAYS_INLINE void add(const rank1_type U_j,
                                           const ITERATOR jt);
 
     /**
@@ -112,7 +112,7 @@ namespace grendel
   {
     template <int dim>
     inline DEAL_II_ALWAYS_INLINE double
-    smoothness_indicator(const typename Indicator<dim>::rank1_type &U)
+    smoothness_indicator(const typename Indicator<dim>::rank1_type U)
     {
       switch (Indicator<dim>::smoothness_indicator_) {
       case Indicator<dim>::SmoothnessIndicators::rho:
@@ -129,7 +129,7 @@ namespace grendel
 
 
   template <int dim>
-  inline DEAL_II_ALWAYS_INLINE void Indicator<dim>::reset(const rank1_type &U_i)
+  inline DEAL_II_ALWAYS_INLINE void Indicator<dim>::reset(const rank1_type U_i)
   {
     if constexpr (indicator_ == Indicators::entropy_viscosity_commutator) {
       rho_i = U_i[0];
@@ -155,7 +155,7 @@ namespace grendel
 
   template <int dim>
   template <typename ITERATOR>
-  inline DEAL_II_ALWAYS_INLINE void Indicator<dim>::add(const rank1_type &U_j,
+  inline DEAL_II_ALWAYS_INLINE void Indicator<dim>::add(const rank1_type U_j,
                                                         const ITERATOR jt)
   {
     if constexpr (indicator_ == Indicators::entropy_viscosity_commutator) {

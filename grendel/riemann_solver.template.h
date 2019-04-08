@@ -40,7 +40,7 @@ namespace grendel
      */
     template <int dim>
     inline DEAL_II_ALWAYS_INLINE dealii::Tensor<1, 3>
-    projected_state(const typename ProblemDescription<dim>::rank1_type &U,
+    projected_state(const typename ProblemDescription<dim>::rank1_type U,
                     const dealii::Tensor<1, dim> &n_ij)
     {
       dealii::Tensor<1, 3> result;
@@ -331,8 +331,8 @@ namespace grendel
 
   template <int dim>
   std::tuple<double, double, unsigned int>
-  RiemannSolver<dim>::compute(const rank1_type &U_i,
-                              const rank1_type &U_j,
+  RiemannSolver<dim>::compute(const rank1_type U_i,
+                              const rank1_type U_j,
                               const dealii::Tensor<1, dim> &n_ij)
   {
     constexpr double gamma = ProblemDescription<dim>::gamma;

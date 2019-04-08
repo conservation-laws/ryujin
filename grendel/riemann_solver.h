@@ -53,8 +53,8 @@ namespace grendel
     static std::tuple<double /*lambda_max*/,
                       double /*p_star*/,
                       unsigned int /*iteration*/>
-    compute(const rank1_type &U_i,
-            const rank1_type &U_j,
+    compute(const rank1_type U_i,
+            const rank1_type U_j,
             const dealii::Tensor<1, dim> &n_ij);
 
 

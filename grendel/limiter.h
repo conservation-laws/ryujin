@@ -47,9 +47,9 @@ namespace grendel
     inline DEAL_II_ALWAYS_INLINE void reset();
 
     template <typename ITERATOR>
-    inline DEAL_II_ALWAYS_INLINE void accumulate(const rank1_type &U_i,
-                                                 const rank1_type &U_j,
-                                                 const rank1_type &U_ij_bar,
+    inline DEAL_II_ALWAYS_INLINE void accumulate(const rank1_type U_i,
+                                                 const rank1_type U_j,
+                                                 const rank1_type U_ij_bar,
                                                  const ITERATOR jt);
 
     inline DEAL_II_ALWAYS_INLINE void
@@ -62,7 +62,7 @@ namespace grendel
      */
 
     static inline DEAL_II_ALWAYS_INLINE double
-    limit(const Bounds &bounds, const rank1_type &U, const rank1_type &P_ij);
+    limit(const Bounds &bounds, const rank1_type U, const rank1_type P_ij);
 
   private:
 
@@ -98,9 +98,9 @@ namespace grendel
   template <int dim>
   template <typename ITERATOR>
   inline DEAL_II_ALWAYS_INLINE void
-  Limiter<dim>::accumulate(const rank1_type &U_i,
-                           const rank1_type &U_j,
-                           const rank1_type &U_ij_bar,
+  Limiter<dim>::accumulate(const rank1_type U_i,
+                           const rank1_type U_j,
+                           const rank1_type U_ij_bar,
                            const ITERATOR jt)
   {
     auto &[rho_min, rho_max, rho_epsilon_min, s_min] = bounds_;
@@ -167,7 +167,7 @@ namespace grendel
 
   template <int dim>
   inline DEAL_II_ALWAYS_INLINE double Limiter<dim>::limit(
-      const Bounds &bounds, const rank1_type &U, const rank1_type &P_ij)
+      const Bounds &bounds, const rank1_type U, const rank1_type P_ij)
   {
     auto &[rho_min, rho_max, rho_epsilon_min, s_min] = bounds;
 
