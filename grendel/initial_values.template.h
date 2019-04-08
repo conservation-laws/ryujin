@@ -122,8 +122,7 @@ namespace grendel
        */
 
       initial_state_internal = [=](const dealii::Point<dim> & /*point*/,
-                                   double t) {
-
+                                   double /*t*/) {
         return from_1d_state({gamma, initial_mach_number_, 1.});
       };
 
@@ -133,8 +132,8 @@ namespace grendel
        * Contrast of the Sod shock tube:
        */
 
-      initial_state_internal = [=](const dealii::Point<dim> &point, double t) {
-
+      initial_state_internal = [=](const dealii::Point<dim> &point,
+                                   double /*t*/) {
         const double position_1d =
             (point - initial_position_) * initial_direction_;
 
