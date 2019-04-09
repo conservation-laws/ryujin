@@ -76,7 +76,7 @@ namespace grendel
       second_order
     } order_ = Order::second_order;
 
-    static constexpr bool smoothen_alpha_ = true;
+    static constexpr bool smoothen_alpha_ = false;
 
   protected:
     const MPI_Comm &mpi_communicator_;
