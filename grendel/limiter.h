@@ -36,9 +36,9 @@ namespace grendel
 
     static constexpr unsigned int relaxation_order_ = 3;
 
-    static constexpr double line_search_eps_ = 1.e-5;
+    static constexpr double line_search_eps_ = 1.e-8;
 
-    static constexpr unsigned int line_search_max_iter_ = 4;
+    static constexpr unsigned int line_search_max_iter_ = 10;
 
     /*
      * Accumulate bounds:

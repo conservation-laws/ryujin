@@ -349,7 +349,11 @@ namespace grendel
             const auto c_ij = gather_get_entry(cij_matrix, jt);
             const auto d_ij = get_entry(dij_matrix_, jt);
 
-            const auto d_ijH = d_ij * std::max(alpha_i, alpha_j);
+            const auto d_ijH =
+                Indicator<dim>::indicator_ ==
+                        Indicator<dim>::Indicators::entropy_viscosity_commutator
+                    ? d_ij * (alpha_i + alpha_j) / 2.
+                    : d_ij * std::max(alpha_i, alpha_j);
 
             const auto p_ij = tau / m_i / lambda * (d_ijH - d_ij) * (U_j - U_i);
 
