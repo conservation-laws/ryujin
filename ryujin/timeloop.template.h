@@ -372,6 +372,9 @@ namespace ryujin
     deallog << "TimeStep<dim>::smoothen_alpha_ == "
             <<  TimeStep<dim>::smoothen_alpha_ << std::endl;
 
+    deallog << "TimeStep<dim>::limiter_iter_ == "
+            <<  TimeStep<dim>::limiter_iter_ << std::endl;
+
     /* clang-format on */
 
     deallog << "Run time parameters:" << std::endl;
