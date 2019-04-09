@@ -389,15 +389,15 @@ namespace grendel
 
 
     /*
-     * Step 4: Compute second part of P_ij, and compute l_ij:
+     * Step 4: Compute second part of P_ij:
      *
      *        P_ij = [...] + tau / m_i / lambda (b_ij R_j - b_ji R_i)
      */
 
     if constexpr (order_ == Order::second_order) {
-      deallog << "        compute p_ij and l_ij" << std::endl;
+      deallog << "        compute p_ij" << std::endl;
       TimerOutput::Scope time(computing_timer_,
-                              "time_step - 4 compute p_ij (2), and l_ij");
+                              "time_step - 4 compute p_ij (2)");
 
       const auto on_subranges = [&](auto i1, const auto i2) {
         /* Translate the local index into a index set iterator:: */
@@ -409,9 +409,6 @@ namespace grendel
           /* Only iterate over locally owned subset */
           if (!locally_owned.is_element(i))
             continue;
-
-          const auto bounds = gather_array(bounds_, i);
-          const auto U_i_new = gather(temp_euler_, i);
 
           const double m_i = lumped_mass_matrix.diag_element(i);
           const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
@@ -430,7 +427,40 @@ namespace grendel
 
             p_ij += tau / m_i / lambda * (b_ij * r_j - b_ji * r_i);
             scatter_set_entry(pij_matrix_, jt, p_ij);
+          }
+        }
+      };
 
+      parallel::apply_to_subranges(
+          indices.begin(), indices.end(), on_subranges, 4096);
+    }
+
+
+    /*
+     * Step 5: compute l_ij:
+     */
+
+    if constexpr (order_ == Order::second_order) {
+      deallog << "        compute l_ij" << std::endl;
+      TimerOutput::Scope time(computing_timer_,
+                              "time_step - 5 compute l_ij");
+
+      const auto on_subranges = [&](auto i1, const auto i2) {
+        /* Translate the local index into a index set iterator:: */
+        auto it = locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
+        for (; i1 < i2; ++i1, ++it) {
+
+          const auto i = *it;
+
+          /* Only iterate over locally owned subset */
+          if (!locally_owned.is_element(i))
+            continue;
+
+          const auto bounds = gather_array(bounds_, i);
+          const auto U_i_new = gather(temp_euler_, i);
+
+          for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
+            auto p_ij = gather_get_entry(pij_matrix_, jt);
             const auto l_ij = Limiter<dim>::limit(bounds, U_i_new, p_ij);
             set_entry(lij_matrix_, jt, l_ij);
           }
@@ -441,13 +471,14 @@ namespace grendel
           indices.begin(), indices.end(), on_subranges, 4096);
     }
 
-
-    /* And symmetrize l_ij: */
+    /*
+     * And symmetrize l_ij:
+     */
 
     if constexpr (order_ == Order::second_order) {
       deallog << "        symmetrize l_ij" << std::endl;
       TimerOutput::Scope time(computing_timer_,
-                              "time_step - 4 symmetrize l_ij");
+                              "time_step - 6 symmetrize l_ij");
 
       const auto on_subranges = [&](auto i1, const auto i2) {
         /* Translate the local index into a index set iterator:: */
@@ -472,9 +503,8 @@ namespace grendel
           indices.begin(), indices.end(), on_subranges, 4096);
     }
 
-
     /*
-     * Step 5: Perform high-order update:
+     * Step 7: Perform high-order update:
      *
      *   High-order update: += l_ij * lambda * P_ij
      */
@@ -482,7 +512,7 @@ namespace grendel
     if constexpr (order_ == Order::second_order) {
       deallog << "        high-order update" << std::endl;
       TimerOutput::Scope time(computing_timer_,
-                              "time_step - 5 high-order update");
+                              "time_step - 7 high-order update");
 
       const auto on_subranges = [&](auto i1, const auto i2) {
         /* Translate the local index into a index set iterator:: */
@@ -501,9 +531,11 @@ namespace grendel
           const double lambda = 1. / (size - 1.);
 
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
-            const auto p_ij = gather_get_entry(pij_matrix_, jt);
+            auto p_ij = gather_get_entry(pij_matrix_, jt);
             const auto l_ij = get_entry(lij_matrix_, jt);
             U_i_new += l_ij * lambda * p_ij;
+            p_ij *= (1 - l_ij);
+            scatter_set_entry(pij_matrix_, jt, p_ij);
           }
 
           scatter(temp_euler_, U_i_new, i);
@@ -515,13 +547,13 @@ namespace grendel
     }
 
     /*
-     * Step 6: Fix boundary:
+     * Step 8: Fix boundary:
      */
 
     {
       deallog << "        fix up boundary states" << std::endl;
       TimerOutput::Scope time(computing_timer_,
-                              "time_step - 6 fix boundary states");
+                              "time_step - 8 fix boundary states");
 
       const auto on_subranges = [&](const auto it1, const auto it2) {
         for (auto it = it1; it != it2; ++it) {
