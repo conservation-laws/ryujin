@@ -77,6 +77,8 @@ namespace grendel
      */
 
     std::string geometry_;
+    std::string grid_file_;
+
     double immersed_triangle_length_;
     double immersed_triangle_height_;
     double immersed_triangle_object_height_;

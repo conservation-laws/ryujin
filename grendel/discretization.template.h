@@ -30,8 +30,14 @@ namespace grendel
     geometry_ = "triangle";
     add_parameter("geometry",
                   geometry_,
-                  "Geometry. Valid names are \"triangle\", \"tube\", \"step\", "
-                  "\"disc\", or \"wall\".");
+                  "Geometry. Valid names are \"file\", \"triangle\", \"tube\", "
+                  "\"step\", \"disc\", or \"wall\".");
+
+    grid_file_ = "wall.msh";
+    add_parameter("grid file",
+                  grid_file_,
+                  "Grid file (in gmsh msh format) that is read in when "
+                  "geometry is set to file");
 
     /* Immersed triangle: */
 
@@ -155,9 +161,20 @@ namespace grendel
           new parallel::distributed::Triangulation<dim>(mpi_communicator_));
 
     auto &triangulation = *triangulation_;
+
     triangulation.clear();
 
-    if (geometry_ == "triangle") {
+    if (geometry_ == "file") {
+
+      GridIn<dim> grid_in;
+      grid_in.attach_triangulation(triangulation);
+
+      deallog << "        reading in \"" << grid_file_ << "\"" << std::endl;
+
+      std::ifstream file(grid_file_);
+      grid_in.read_msh(file);
+
+    } else if (geometry_ == "triangle") {
 
       create_coarse_grid_triangle(triangulation,
                                   immersed_triangle_length_,
