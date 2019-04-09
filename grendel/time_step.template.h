@@ -435,116 +435,119 @@ namespace grendel
           indices.begin(), indices.end(), on_subranges, 4096);
     }
 
+    for (unsigned int i = 0; i < limiter_iter_; ++i) {
 
-    /*
-     * Step 5: compute l_ij:
-     */
+      deallog << "        limiter pass " << i + 1 << std::endl;
 
-    if constexpr (order_ == Order::second_order) {
-      deallog << "        compute l_ij" << std::endl;
-      TimerOutput::Scope time(computing_timer_,
-                              "time_step - 5 compute l_ij");
+      /*
+       * Step 5: compute l_ij:
+       */
 
-      const auto on_subranges = [&](auto i1, const auto i2) {
-        /* Translate the local index into a index set iterator:: */
-        auto it = locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
-        for (; i1 < i2; ++i1, ++it) {
+      if constexpr (order_ == Order::second_order) {
+        deallog << "        compute l_ij" << std::endl;
+        TimerOutput::Scope time(computing_timer_, "time_step - 5 compute l_ij");
 
-          const auto i = *it;
+        const auto on_subranges = [&](auto i1, const auto i2) {
+          /* Translate the local index into a index set iterator:: */
+          auto it = locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
+          for (; i1 < i2; ++i1, ++it) {
 
-          /* Only iterate over locally owned subset */
-          if (!locally_owned.is_element(i))
-            continue;
+            const auto i = *it;
 
-          const auto bounds = gather_array(bounds_, i);
-          const auto U_i_new = gather(temp_euler_, i);
-
-          for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
-            auto p_ij = gather_get_entry(pij_matrix_, jt);
-            const auto l_ij = Limiter<dim>::limit(bounds, U_i_new, p_ij);
-            set_entry(lij_matrix_, jt, l_ij);
-          }
-        }
-      };
-
-      parallel::apply_to_subranges(
-          indices.begin(), indices.end(), on_subranges, 4096);
-    }
-
-    /*
-     * And symmetrize l_ij:
-     */
-
-    if constexpr (order_ == Order::second_order) {
-      deallog << "        symmetrize l_ij" << std::endl;
-      TimerOutput::Scope time(computing_timer_,
-                              "time_step - 6 symmetrize l_ij");
-
-      const auto on_subranges = [&](auto i1, const auto i2) {
-        /* Translate the local index into a index set iterator:: */
-        auto it = locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
-        for (; i1 < i2; ++i1, ++it) {
-          const auto i = *it;
-          for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
-            const auto j = jt->column();
-            if (j >= i)
+            /* Only iterate over locally owned subset */
+            if (!locally_owned.is_element(i))
               continue;
-            auto l_ij = get_entry(lij_matrix_, jt);
-            auto &l_ji = lij_matrix_(j, i); // FIXME: Suboptimal
 
-            const double min = std::min(l_ij, l_ji);
-            l_ji = min;
-            set_entry(lij_matrix_, jt, min);
+            const auto bounds = gather_array(bounds_, i);
+            const auto U_i_new = gather(temp_euler_, i);
+
+            for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
+              auto p_ij = gather_get_entry(pij_matrix_, jt);
+              const auto l_ij = Limiter<dim>::limit(bounds, U_i_new, p_ij);
+              set_entry(lij_matrix_, jt, l_ij);
+            }
           }
-        }
-      };
+        };
 
-      parallel::apply_to_subranges(
-          indices.begin(), indices.end(), on_subranges, 4096);
-    }
+        parallel::apply_to_subranges(
+            indices.begin(), indices.end(), on_subranges, 4096);
+      }
 
-    /*
-     * Step 7: Perform high-order update:
-     *
-     *   High-order update: += l_ij * lambda * P_ij
-     */
+      /*
+       * And symmetrize l_ij:
+       */
 
-    if constexpr (order_ == Order::second_order) {
-      deallog << "        high-order update" << std::endl;
-      TimerOutput::Scope time(computing_timer_,
-                              "time_step - 7 high-order update");
+      if constexpr (order_ == Order::second_order) {
+        deallog << "        symmetrize l_ij" << std::endl;
+        TimerOutput::Scope time(computing_timer_,
+                                "time_step - 6 symmetrize l_ij");
 
-      const auto on_subranges = [&](auto i1, const auto i2) {
-        /* Translate the local index into a index set iterator:: */
-        auto it = locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
-        for (; i1 < i2; ++i1, ++it) {
+        const auto on_subranges = [&](auto i1, const auto i2) {
+          /* Translate the local index into a index set iterator:: */
+          auto it = locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
+          for (; i1 < i2; ++i1, ++it) {
+            const auto i = *it;
+            for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
+              const auto j = jt->column();
+              if (j >= i)
+                continue;
+              auto l_ij = get_entry(lij_matrix_, jt);
+              auto &l_ji = lij_matrix_(j, i); // FIXME: Suboptimal
 
-          const auto i = *it;
-
-          /* Only iterate over locally owned subset */
-          if (!locally_owned.is_element(i))
-            continue;
-
-          auto U_i_new = gather(temp_euler_, i);
-
-          const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
-          const double lambda = 1. / (size - 1.);
-
-          for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
-            auto p_ij = gather_get_entry(pij_matrix_, jt);
-            const auto l_ij = get_entry(lij_matrix_, jt);
-            U_i_new += l_ij * lambda * p_ij;
-            p_ij *= (1 - l_ij);
-            scatter_set_entry(pij_matrix_, jt, p_ij);
+              const double min = std::min(l_ij, l_ji);
+              l_ji = min;
+              set_entry(lij_matrix_, jt, min);
+            }
           }
+        };
 
-          scatter(temp_euler_, U_i_new, i);
-        }
-      };
+        parallel::apply_to_subranges(
+            indices.begin(), indices.end(), on_subranges, 4096);
+      }
 
-      parallel::apply_to_subranges(
-          indices.begin(), indices.end(), on_subranges, 4096);
-    }
+      /*
+       * Step 7: Perform high-order update:
+       *
+       *   High-order update: += l_ij * lambda * P_ij
+       */
+
+      if constexpr (order_ == Order::second_order) {
+        deallog << "        high-order update" << std::endl;
+        TimerOutput::Scope time(computing_timer_,
+                                "time_step - 7 high-order update");
+
+        const auto on_subranges = [&](auto i1, const auto i2) {
+          /* Translate the local index into a index set iterator:: */
+          auto it = locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
+          for (; i1 < i2; ++i1, ++it) {
+
+            const auto i = *it;
+
+            /* Only iterate over locally owned subset */
+            if (!locally_owned.is_element(i))
+              continue;
+
+            auto U_i_new = gather(temp_euler_, i);
+
+            const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
+            const double lambda = 1. / (size - 1.);
+
+            for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
+              auto p_ij = gather_get_entry(pij_matrix_, jt);
+              const auto l_ij = get_entry(lij_matrix_, jt);
+              U_i_new += l_ij * lambda * p_ij;
+              p_ij *= (1 - l_ij);
+              scatter_set_entry(pij_matrix_, jt, p_ij);
+            }
+
+            scatter(temp_euler_, U_i_new, i);
+          }
+        };
+
+        parallel::apply_to_subranges(
+            indices.begin(), indices.end(), on_subranges, 4096);
+      }
+    } /* limiter_iter_ */
 
     /*
      * Step 8: Fix boundary:

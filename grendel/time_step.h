@@ -79,7 +79,6 @@ namespace grendel
     static constexpr bool smoothen_alpha_ = false;
 
     static constexpr unsigned int limiter_iter_ = 2;
-    static_assert(limiter_iter_ > 0, "limiter_iter_ has to be larger than 0");
 
   protected:
     const MPI_Comm &mpi_communicator_;
