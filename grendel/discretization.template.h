@@ -174,6 +174,8 @@ namespace grendel
       std::ifstream file(grid_file_);
       grid_in.read_msh(file);
 
+      triangulation.refine_global(refinement_);
+
     } else if (geometry_ == "triangle") {
 
       create_coarse_grid_triangle(triangulation,
