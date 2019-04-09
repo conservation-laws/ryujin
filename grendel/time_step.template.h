@@ -58,7 +58,7 @@ namespace grendel
     auto &exemplar = alpha_;
     exemplar.reinit(locally_owned, locally_relevant, mpi_communicator_);
 
-    laplace_rho_.reinit(exemplar);
+    rho_second_variation_.reinit(exemplar);
     rho_relaxation_.reinit(exemplar);
 
     for (auto &it : temp_euler_)
@@ -102,6 +102,7 @@ namespace grendel
     const auto &norm_matrix = offline_data_->norm_matrix();
     const auto &nij_matrix = offline_data_->nij_matrix();
     const auto &bij_matrix = offline_data_->bij_matrix();
+    const auto &betaij_matrix = offline_data_->betaij_matrix();
     const auto &cij_matrix = offline_data_->cij_matrix();
     const auto &boundary_normal_map = offline_data_->boundary_normal_map();
     const double measure_of_omega = offline_data_->measure_of_omega();
@@ -130,7 +131,8 @@ namespace grendel
           const auto U_i = gather(U, i);
 
           indicator.reset(U_i);
-          double laplace_rho_numerator = 0.;
+          double rho_second_variation_numerator = 0.;
+          double rho_second_variation_denominator = 0.;
 
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
             const auto j = jt->column();
@@ -141,7 +143,9 @@ namespace grendel
 
             const auto U_j = gather(U, j);
             indicator.add(U_j, jt);
-            laplace_rho_numerator += U_i[0] - U_j[0];
+            const auto beta_ij = get_entry(betaij_matrix, jt);
+            rho_second_variation_numerator += beta_ij * (U_j[0] - U_i[0]);
+            rho_second_variation_denominator += beta_ij;
 
             /* Only iterate over the subdiagonal for d_ij */
             if (j >= i)
@@ -175,7 +179,8 @@ namespace grendel
             dij_matrix_(j, i) = d; // FIXME: Suboptimal
           }
 
-          laplace_rho_[i] = laplace_rho_numerator;
+          rho_second_variation_[i] =
+              rho_second_variation_numerator / rho_second_variation_denominator;
 
           const double mass = lumped_mass_matrix.diag_element(i);
           const double hd_i = mass / measure_of_omega;
@@ -187,7 +192,7 @@ namespace grendel
           indices.begin(), indices.end(), on_subranges, 4096);
 
       /* Synchronize alpha_ over all MPI processes: */
-      laplace_rho_.update_ghost_values();
+      rho_second_variation_.update_ghost_values();
       alpha_.update_ghost_values();
     }
 
@@ -212,7 +217,7 @@ namespace grendel
 
           const auto i = *it;
 
-          const double laplace_rho_i = laplace_rho_[i];
+          const double laplace_rho_i = rho_second_variation_[i];
 
           double alpha_i = 0.;
           double d_sum = 0.;
@@ -230,10 +235,13 @@ namespace grendel
             if (j == i)
               continue;
 
-            const double laplace_rho_j = laplace_rho_[j];
+            const double laplace_rho_j = rho_second_variation_[j];
+            const auto beta_ij = get_entry(betaij_matrix, jt);
 
-            rho_relaxation_numerator += 0.25 * (laplace_rho_i + laplace_rho_j);
-            rho_relaxation_denominator += 1.;
+            // FIXME The numerical constant 2. is up to debate
+            rho_relaxation_numerator +=
+                2.* 0.5 * beta_ij * (laplace_rho_i + laplace_rho_j);
+            rho_relaxation_denominator += beta_ij;
 
             d_sum -= get_entry(dij_matrix_, jt);
           }

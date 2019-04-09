@@ -93,7 +93,7 @@ namespace grendel
 
     dealii::SparseMatrix<double> dij_matrix_;
 
-    dealii::LinearAlgebra::distributed::Vector<double> laplace_rho_;
+    dealii::LinearAlgebra::distributed::Vector<double> rho_second_variation_;
     dealii::LinearAlgebra::distributed::Vector<double> rho_relaxation_;
     dealii::LinearAlgebra::distributed::Vector<double> alpha_;
     ACCESSOR_READ_ONLY(alpha)
