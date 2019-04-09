@@ -21,9 +21,9 @@ Plane Surface(1) = {1};
 // The physical surface:
 Physical Surface(1) = {1};
 
-Transfinite Curve {-1} =  3 Using Progression 2.0;
-Transfinite Curve {2} = 49 Using Progression 1.01455;
-Transfinite Curve {3} = 12 Using Progression 1.059;
+Transfinite Curve {-1} =  6 Using Progression 1.38;
+Transfinite Curve {2} = 92 Using Progression 1.0178;
+Transfinite Curve {3} = 12 Using Progression 1.1225;
 Transfinite Curve {4} = 25 Using Progression 1.0;
 Transfinite Curve {-5} = 12 Using Progression 1.059;
 
