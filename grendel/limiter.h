@@ -153,7 +153,6 @@ namespace grendel
        * convex Newton solver. */
       s_min *= (1.0 - 1.0e-10);
     }
-
   }
 
 

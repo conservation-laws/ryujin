@@ -102,7 +102,6 @@ namespace grendel
     const auto &norm_matrix = offline_data_->norm_matrix();
     const auto &nij_matrix = offline_data_->nij_matrix();
     const auto &bij_matrix = offline_data_->bij_matrix();
-    const auto &betaij_matrix = offline_data_->betaij_matrix();
     const auto &cij_matrix = offline_data_->cij_matrix();
     const auto &boundary_normal_map = offline_data_->boundary_normal_map();
     const double measure_of_omega = offline_data_->measure_of_omega();
