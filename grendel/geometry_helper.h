@@ -119,18 +119,27 @@ namespace grendel
   void
   create_coarse_grid_tube(dealii::parallel::distributed::Triangulation<dim> &,
                           const double /*length*/,
-                          const double /*diameter*/) = delete;
+                          const double /*diameter*/,
+                          const bool /*prescribe*/) = delete;
 
 
   template <>
   void create_coarse_grid_tube<1>(
       dealii::parallel::distributed::Triangulation<1> &triangulation,
       const double length,
-      const double /*diameter*/)
+      const double /*diameter*/,
+      const bool prescribe)
   {
     dealii::GridGenerator::hyper_cube(triangulation, 0., length);
-    triangulation.begin_active()->face(0)->set_boundary_id(0);
-    triangulation.begin_active()->face(1)->set_boundary_id(0);
+    if (prescribe) {
+      /* Dirichlet data: */
+      triangulation.begin_active()->face(0)->set_boundary_id(2);
+      triangulation.begin_active()->face(1)->set_boundary_id(2);
+    } else {
+      /* Do nothing: */
+      triangulation.begin_active()->face(0)->set_boundary_id(0);
+      triangulation.begin_active()->face(1)->set_boundary_id(0);
+    }
   }
 
 
@@ -138,7 +147,8 @@ namespace grendel
   void create_coarse_grid_tube<2>(
       dealii::parallel::distributed::Triangulation<2> &triangulation,
       const double length,
-      const double diameter)
+      const double diameter,
+      const bool prescribe)
   {
     using namespace dealii;
 
@@ -157,20 +167,26 @@ namespace grendel
         if (!face->at_boundary())
           continue;
 
-        /*
-         * We want slip boundary conditions (i.e. indicator 1) at top and
-         * bottom of the rectangle. On the left side we enforce initial
-         * conditionas and leave the boundary indicator on the right side
-         * at 0, i.e. do nothing.
-         */
+        if (prescribe) {
+          /* Dirichlet data: */
+          face->set_boundary_id(2);
 
-        face->set_boundary_id(2);
+        } else {
 
-//         const auto center = face->center();
-//         if (center[0] < -length / 2. + 1.e-6)
-//           face->set_boundary_id(2);
-//         else if (std::abs(center[1]) > diameter / 2. - 1.e-6)
-//           face->set_boundary_id(1);
+          /*
+           * We want slip boundary conditions (i.e. indicator 1) at top and
+           * bottom of the rectangle. On the left side we enforce initial
+           * conditionas and leave the boundary indicator on the right side
+           * at 0, i.e. do nothing.
+           */
+          const auto center = face->center();
+          if (center[0] < -length / 2. + 1.e-6)
+            face->set_boundary_id(2);
+          else if (std::abs(center[1]) > diameter / 2. - 1.e-6)
+            face->set_boundary_id(1);
+          else
+            face->set_boundary_id(0);
+        }
       }
     }
   }
@@ -180,7 +196,8 @@ namespace grendel
   void create_coarse_grid_tube<3>(
       dealii::parallel::distributed::Triangulation<3> &triangulation,
       const double length,
-      const double diameter)
+      const double diameter,
+      const bool prescribe)
   {
     using namespace dealii;
 
@@ -204,13 +221,26 @@ namespace grendel
          * at 0, i.e. do nothing.
          */
 
-        const auto center = face->center();
-        if (center[0] < -length / 2. + 1.e-6)
+        if (prescribe) {
+          /* Dirichlet data: */
           face->set_boundary_id(2);
-        else if (center[0] > length / 2. - 1.e-6)
-          face->set_boundary_id(0);
 
-        face->set_boundary_id(1);
+        } else {
+
+          /*
+           * We want slip boundary conditions (i.e. indicator 1) at top and
+           * bottom of the rectangle. On the left side we enforce initial
+           * conditionas and leave the boundary indicator on the right side
+           * at 0, i.e. do nothing.
+           */
+          const auto center = face->center();
+          if (center[0] < -length / 2. + 1.e-6)
+            face->set_boundary_id(2);
+          else if (center[0] > length / 2. - 1.e-6)
+            face->set_boundary_id(0);
+
+          face->set_boundary_id(1);
+        }
       }
     }
   }
