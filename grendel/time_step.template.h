@@ -217,7 +217,7 @@ namespace grendel
 
           const auto i = *it;
 
-          const double laplace_rho_i = rho_second_variation_[i];
+          const double delta_rho_i = rho_second_variation_[i];
 
           double alpha_i = 0.;
           double d_sum = 0.;
@@ -235,12 +235,12 @@ namespace grendel
             if (j == i)
               continue;
 
-            const double laplace_rho_j = rho_second_variation_[j];
+            const double delta_rho_j = rho_second_variation_[j];
             const auto beta_ij = get_entry(betaij_matrix, jt);
 
-            // FIXME The numerical constant 2. is up to debate
+            // FIXME The numerical constant 8. is up to debate
             rho_relaxation_numerator +=
-                2.* 0.5 * beta_ij * (laplace_rho_i + laplace_rho_j);
+                8.* 0.5 * beta_ij * (delta_rho_i + delta_rho_j);
             rho_relaxation_denominator += beta_ij;
 
             d_sum -= get_entry(dij_matrix_, jt);
