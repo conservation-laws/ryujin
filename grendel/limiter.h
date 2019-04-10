@@ -288,6 +288,9 @@ namespace grendel
       double t_l = 0.;
       double t_r = l_ij;
 
+      if(t_r <= 0.)
+        return 0.;
+
       constexpr double gamma = ProblemDescription<dim>::gamma;
 
       for (unsigned int n = 0; n < line_search_max_iter_; ++n) {
@@ -347,7 +350,16 @@ namespace grendel
         t_l = t_l - 2. * psi_l / (dpsi_l - std::sqrt(discriminant_l));
         t_r = t_r - 2. * psi_r / (dpsi_r - std::sqrt(discriminant_r));
 
-        if (t_r < t_l || std::abs(t_r - t_l) < line_search_eps_) {
+        /* Handle some pathological cases that happen in regions with
+         * constant specific entropy: */
+        if(std::isnan(t_l)) {
+          return l_ij;
+        }
+        if(std::isnan(t_r)) {
+          return l_ij;
+        }
+
+        if (t_r < t_l + line_search_eps_) {
           const auto t = t_l < t_r ? t_l : t_r;
           return std::min(l_ij, t);
         }
