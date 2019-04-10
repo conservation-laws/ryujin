@@ -148,10 +148,6 @@ namespace grendel
 
     if constexpr (limiter_ == Limiters::specific_entropy) {
       s_min = std::max((1 - r_i) * s_min, 2. * s_min - s_interp_max);
-
-      /* We have to lower the s_min bound by eps to ensure positivity in the
-       * convex Newton solver. */
-      s_min *= (1.0 - 1.0e-10);
     }
 
   }
@@ -299,7 +295,7 @@ namespace grendel
         const auto U_r = U + t_r * P_ij;
         const auto rho_r = U_r[0];
         const auto rho_r_gamma = std::pow(rho_r, gamma);
-        const auto psi_r =
+        auto psi_r =
             ProblemDescription<dim>::internal_energy(U_r) - s_min * rho_r_gamma;
 
         /* Right state is good, cut it short and return: */
@@ -309,11 +305,20 @@ namespace grendel
         const auto U_l = U + t_l * P_ij;
         const auto rho_l = U_l[0];
         const auto rho_l_gamma = std::pow(rho_l, gamma);
-        const auto psi_l =
+        auto psi_l =
             ProblemDescription<dim>::internal_energy(U_l) - s_min * rho_l_gamma;
 
-        Assert(psi_l >= 0. && psi_r < 0.,
-               dealii::ExcMessage("Houston, we have a problem!"));
+        /*
+         * Due to round-off errors it might happen that psi_l is negative
+         * (close to eps). In this case we fix the problem by lowering
+         * s_min just enough so that psi_l = 0.;
+         */
+        if (psi_l < 0.) {
+          psi_r -= psi_l;
+          psi_l = 0.;
+          if (psi_r >= 0.)
+            return std::min(l_ij, t_r);
+        }
 
         const auto dpsi_l =
             ProblemDescription<dim>::internal_energy_derivative(U_l) * P_ij -
@@ -331,16 +336,15 @@ namespace grendel
         const double dd_112 = (dd_12 - dd_11) / (t_r - t_l);
         const double dd_122 = (dd_22 - dd_12) / (t_r - t_l);
 
-        /* Update left point: */
-        const double discriminant_l = dpsi_l * dpsi_l + 4. * psi_l * dd_112;
-        Assert(discriminant_l > 0.,
-               dealii::ExcMessage("Houston, we have a problem!"));
-        t_l = t_l - 2. * psi_l / (dpsi_l - std::sqrt(discriminant_l));
+        /* Update left and right point: */
 
-        /* Update right point: */
+        const double discriminant_l = dpsi_l * dpsi_l + 4. * psi_l * dd_112;
         const double discriminant_r = dpsi_r * dpsi_r + 4. * psi_r * dd_122;
-        Assert(discriminant_r > 0.,
-               dealii::ExcMessage("Houston, we have a problem!"));
+
+        Assert(discriminant_l >= 0. && discriminant_r >= 0.,
+               dealii::ExcMessage("Houston we have a problem!"));
+
+        t_l = t_l - 2. * psi_l / (dpsi_l - std::sqrt(discriminant_l));
         t_r = t_r - 2. * psi_r / (dpsi_r - std::sqrt(discriminant_r));
 
         if (t_r < t_l || std::abs(t_r - t_l) < line_search_eps_) {
