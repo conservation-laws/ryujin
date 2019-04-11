@@ -38,7 +38,8 @@ namespace ryujin
     void output(const vector_type &U,
                 const std::string &name,
                 double t,
-                unsigned int cycle);
+                unsigned int cycle,
+                bool checkpoint = false);
 
     /* Data: */
 

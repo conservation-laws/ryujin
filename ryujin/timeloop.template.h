@@ -15,6 +15,8 @@
 #include <deal.II/numerics/data_out.h>
 #include <deal.II/numerics/vector_tools.h>
 
+#include <boost/archive/binary_iarchive.hpp>
+#include <boost/archive/binary_oarchive.hpp>
 #include <boost/core/demangle.hpp>
 
 #ifdef CALLGRIND
@@ -74,7 +76,7 @@ namespace ryujin
       , computing_timer(mpi_communicator,
                         timer_output,
                         TimerOutput::never,
-                        TimerOutput::cpu_times)
+                        TimerOutput::cpu_and_wall_times)
       , discretization(mpi_communicator, computing_timer, "B - Discretization")
       , offline_data(mpi_communicator,
                      computing_timer,
@@ -202,7 +204,8 @@ namespace ryujin
           print_head(head.str(), secondary.str());
         }
 
-        output(U, base_name + "-solution", t, output_cycle++);
+        output(
+            U, base_name + "-solution", t, output_cycle++, /*checkpoint*/ true);
         if (enable_compute_error) {
           const auto analytic = interpolate_initial_values(t);
           output(analytic, base_name + "-analytic_solution", t, output_cycle);
@@ -534,9 +537,11 @@ namespace ryujin
   void TimeLoop<dim>::output(const typename TimeLoop<dim>::vector_type &U,
                              const std::string &name,
                              double t,
-                             unsigned int cycle)
+                             unsigned int cycle,
+                             bool checkpoint)
   {
-    deallog << "TimeLoop<dim>::output(t = " << t << ")" << std::endl;
+    deallog << "TimeLoop<dim>::output(t = " << t
+            << ", checkpoint = " << checkpoint << ")" << std::endl;
 
     /*
      * Offload output to a worker thread.
@@ -565,14 +570,43 @@ namespace ryujin
       output_vector[i] = U[i];
     }
 
-    schlieren_postprocessor.compute_schlieren(output_vector);
     output_alpha = time_step.alpha();
 
     /* capture name, t, cycle by value */
-    const auto output_worker = [this, name, t, cycle]() {
+    const auto output_worker = [this, name, t, cycle, checkpoint]() {
+
+      constexpr auto problem_dimension =
+          ProblemDescription<dim>::problem_dimension;
       const auto &dof_handler = offline_data.dof_handler();
       const auto &triangulation = discretization.triangulation();
       const auto &mapping = discretization.mapping();
+
+      /*
+       * Checkpointing:
+       */
+
+      if (checkpoint) {
+        deallog << "        Checkpointing" << std::endl;
+
+        const unsigned int i = triangulation.locally_owned_subdomain();
+        std::string name = base_name + "-checkpoint-" +
+                           dealii::Utilities::int_to_string(i, 4) + ".archive";
+        std::ofstream file(name, std::ios::binary | std::ios::trunc);
+
+        {
+          boost::archive::binary_oarchive oa(file);
+          oa << t;
+          for (unsigned int i = 0; i < problem_dimension; ++i)
+            for (auto &it : output_vector[i])
+              oa << it;
+        }
+      }
+
+      /*
+       * Output scientific data in vtu format:
+       */
+
+      schlieren_postprocessor.compute_schlieren(output_vector);
 
       dealii::DataOut<dim> data_out;
       data_out.attach_dof_handler(dof_handler);
