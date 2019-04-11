@@ -40,36 +40,32 @@ namespace
   void print_head(std::string header, std::string secondary = "")
   {
     const auto header_size = header.size();
-    const auto secondary_size = secondary.size();
+    const auto padded_header = std::string((34 - header_size) / 2, ' ') +
+                               header +
+                               std::string((35 - header_size) / 2, ' ');
 
+    const auto secondary_size = secondary.size();
+    const auto padded_secondary = std::string((34 - secondary_size) / 2, ' ') +
+                                  secondary +
+                                  std::string((35 - secondary_size) / 2, ' ');
+
+    /* clang-format off */
     deallog << std::endl;
-    deallog << "    ####################################################"
-            << std::endl;
-    deallog << "    #########                                  #########"
-            << std::endl;
-    deallog << "    #########"                          //
-            << std::string((34 - header_size) / 2, ' ') //
-            << header                                   //
-            << std::string((35 - header_size) / 2, ' ') //
-            << "#########"                              //
-            << std::endl;
-    deallog << "    #########"                             //
-            << std::string((34 - secondary_size) / 2, ' ') //
-            << secondary                                   //
-            << std::string((35 - secondary_size) / 2, ' ') //
-            << "#########"                                 //
-            << std::endl;
-    deallog << "    #########                                  #########"
-            << std::endl;
-    deallog << "    ####################################################"
-            << std::endl;
+    deallog << "    ####################################################" << std::endl;
+    deallog << "    #########                                  #########" << std::endl;
+    deallog << "    #########"     <<  padded_header   <<     "#########" << std::endl;
+    deallog << "    #########"     << padded_secondary <<     "#########" << std::endl;
+    deallog << "    #########                                  #########" << std::endl;
+    deallog << "    ####################################################" << std::endl;
     deallog << std::endl;
+    /* clang-format on */
   }
 } // namespace
 
 
 namespace ryujin
 {
+
   template <int dim>
   TimeLoop<dim>::TimeLoop(const MPI_Comm &mpi_comm)
       : ParameterAcceptor("A - TimeLoop")
@@ -122,21 +118,17 @@ namespace ryujin
   }
 
 
+
   template <int dim>
   void TimeLoop<dim>::run()
   {
-    /*
-     * Initialize deallog:
-     */
+    /* Initialize deallog: */
 
     initialize();
 
     deallog << "TimeLoop<dim>::run()" << std::endl;
 
-    /*
-     * Create distributed triangulation and output the triangulation to inp
-     * files:
-     */
+    /* Create distributed triangulation and output the triangulation: */
 
     print_head("create triangulation");
     discretization.prepare();
@@ -150,9 +142,7 @@ namespace ryujin
       GridOut().write_ucd(discretization.triangulation(), output);
     }
 
-    /*
-     * Prepare offline data:
-     */
+    /* Prepare offline data: */
 
     print_head("compute offline data");
     offline_data.prepare();
@@ -161,15 +151,13 @@ namespace ryujin
     time_step.prepare();
     schlieren_postprocessor.prepare();
 
-    /*
-     * Interpolate initial values:
-     */
+    /* Interpolate initial values: */
 
     print_head("interpolate initial values");
 
-    auto U = interpolate_initial_values();
     double t = 0.;
     unsigned int output_cycle = 0;
+    auto U = interpolate_initial_values();
 
     if (resume) {
       print_head("restore interrupted computation");
@@ -202,26 +190,23 @@ namespace ryujin
     print_head("enter main loop");
 
     /* Disable deallog output: */
+
     if (!enable_detailed_output)
       deallog.push("SILENCE!");
 
-    /*
-     * Loop:
-     */
+    /* Loop: */
 
     for (unsigned int cycle = 1; t < t_final; ++cycle) {
 
       std::ostringstream head;
-      head << "Cycle  " << Utilities::int_to_string(cycle, 6)         //
-           << "  ("                                                   //
-           << std::fixed << std::setprecision(1) << t / t_final * 100 //
-           << "%)";
+      head << "Cycle  " << Utilities::int_to_string(cycle, 6) << "  ("
+           << std::fixed << std::setprecision(1) << t / t_final * 100 << "%)";
       std::ostringstream secondary;
       secondary << "at time t = " << std::setprecision(8) << std::fixed << t;
-
       print_head(head.str(), secondary.str());
 
       /* Do a time step: */
+
       const auto tau = time_step.step(U, t);
       t += tau;
 
@@ -248,15 +233,18 @@ namespace ryujin
 #endif
 
     /* Wait for output thread: */
+
     if (output_thread.joinable())
       output_thread.join();
 
     /* Reenable deallog output: */
+
     if (!enable_detailed_output)
       deallog.pop();
 
-    /* Output final error: */
     if (enable_compute_error) {
+      /* Output final error: */
+
       const auto &affine_constraints = offline_data.affine_constraints();
       constexpr auto problem_dimension =
           ProblemDescription<dim>::problem_dimension;
@@ -328,9 +316,7 @@ namespace ryujin
     deallog << "#" << std::endl;
     deallog << "###" << std::endl;
 
-    /*
-     * Print compile time parameters:
-     */
+    /* Print compile time parameters: */
 
     deallog << "Compile time parameters:" << std::endl;
 
@@ -479,9 +465,7 @@ namespace ryujin
     constexpr auto problem_dimension =
         ProblemDescription<dim>::problem_dimension;
 
-    /*
-     * Compute L_inf norm:
-     */
+    /* Compute L_inf norm: */
 
     Vector<float> difference_per_cell(
         offline_data.discretization().triangulation().n_active_cells());
@@ -495,9 +479,7 @@ namespace ryujin
     for (unsigned int i = 0; i < problem_dimension; ++i) {
       auto &error = analytic[i];
 
-      /*
-       * Compute norms of analytic solution:
-       */
+      /* Compute norms of analytic solution: */
 
       const double linf_norm_analytic =
           Utilities::MPI::max(error.linfty_norm(), mpi_communicator);
@@ -522,9 +504,7 @@ namespace ryujin
       const double l2_norm_analytic = std::sqrt(Utilities::MPI::sum(
           std::pow(difference_per_cell.l2_norm(), 2), mpi_communicator));
 
-      /*
-       * Compute norms of error:
-       */
+      /* Compute norms of error: */
 
       error -= U[i];
 
@@ -591,9 +571,7 @@ namespace ryujin
       output_thread.join();
     }
 
-    /*
-     * Copy the current state vector over to output_vector:
-     */
+    /* Copy the current state vector over to output_vector: */
 
     constexpr auto problem_dimension =
         ProblemDescription<dim>::problem_dimension;
@@ -616,17 +594,13 @@ namespace ryujin
       const auto &mapping = discretization.mapping();
       const auto &affine_constraints = offline_data.affine_constraints();
 
-      /*
-       * Distribute hanging nodes:
-       */
+      /* Distribute hanging nodes: */
 
       affine_constraints.distribute(output_alpha);
       for (unsigned int i = 0; i < problem_dimension; ++i)
         affine_constraints.distribute(output_vector[i]);
 
-      /*
-       * Checkpointing:
-       */
+      /* Checkpointing: */
 
       if (checkpoint) {
         deallog << "        Checkpointing" << std::endl;
@@ -643,9 +617,7 @@ namespace ryujin
             oa << it;
       }
 
-      /*
-       * Output scientific data in vtu format:
-       */
+      /* Output data in vtu format: */
 
       schlieren_postprocessor.compute_schlieren(output_vector);
 
