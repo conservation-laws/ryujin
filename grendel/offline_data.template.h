@@ -228,7 +228,9 @@ namespace grendel
 
       for (unsigned int q_point = 0; q_point < n_q_points; ++q_point) {
         const auto JxW = fe_values.JxW(q_point);
-        cell_measure += JxW;
+
+        if(cell->is_locally_owned())
+          cell_measure += JxW;
 
         for (unsigned int j = 0; j < dofs_per_cell; ++j) {
 
