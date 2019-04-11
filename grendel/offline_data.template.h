@@ -326,6 +326,9 @@ namespace grendel
                       AssemblyCopyData<dim>());
     }
 
+    measure_of_omega_ =
+        Utilities::MPI::sum(measure_of_omega_, mpi_communicator_);
+
     /*
      * Second part: We have to import the "ghost" layer of the lumped mass
      * matrix in order to compute the b_ij matrices correctly.
