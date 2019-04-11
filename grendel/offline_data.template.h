@@ -327,7 +327,23 @@ namespace grendel
     }
 
     /*
-     * Second part: Compute norms and n_ijs
+     * Second part: We have to import the "ghost" layer of the lumped mass
+     * matrix in order to compute the b_ij matrices correctly.
+     */
+
+    {
+      dealii::LinearAlgebra::distributed::Vector<double> temp_(
+          locally_owned_, locally_relevant_, mpi_communicator_);
+
+      for(auto i : locally_owned_)
+        temp_[i] = lumped_mass_matrix_.diag_element(i);
+      temp_.update_ghost_values();
+      for(auto i : locally_relevant_)
+        lumped_mass_matrix_.diag_element(i) = temp_[i];
+    }
+
+    /*
+     * Third part: Compute norms and n_ijs
      */
 
     const auto on_subranges = [&](const auto &it, auto &, auto &) {
