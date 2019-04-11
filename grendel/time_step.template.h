@@ -83,7 +83,9 @@ namespace grendel
       const auto n_locally_relevant = locally_relevant.n_elements();
       const auto n_matrix_entries = sparsity_pattern.n_nonzero_elements();
 
-      offsets_.reserve(n_locally_relevant);
+      offsets_.reserve(n_locally_relevant + 1);
+      offsets_.push_back(0);
+
       indices_.reserve(n_matrix_entries);
 
       std::size_t next_index = 0;
@@ -91,21 +93,19 @@ namespace grendel
 
         auto ejt = extended_sparsity_pattern.begin(i);
         unsigned int local_index = 0;
+
         for (auto jt = sparsity_pattern.begin(i); jt != sparsity_pattern.end(i);
              ++jt) {
-          next_index++;
-          const auto global_index_t =
-              sparsity_pattern.operator()(jt->column(), i);
-          SparsityPattern::iterator jt_t(&sparsity_pattern, global_index_t);
 
-          for (; ejt->column() != jt->column(); ++ejt) {
-            dealii::deallog << "adv!" << std::endl;
+          next_index++;
+
+          SparsityPattern::iterator jt_t(
+              &sparsity_pattern, sparsity_pattern.operator()(jt->column(), i));
+
+          for (; ejt->column() != jt->column(); ++ejt)
             local_index++;
-          }
 
           indices_.push_back({jt, jt_t, local_index});
-          dealii::deallog << jt->column() << " == " << ejt->column()
-                          << " index: " << local_index << std::endl;
         }
         offsets_.push_back(next_index);
       }
@@ -548,65 +548,56 @@ namespace grendel
         TimerOutput::Scope time(computing_timer_,
                                 "time_step - 6 symmetrize l_ij");
 
-#if 0
         // BEGIN workaround
         {
-          const auto on_subranges = [&](auto i1, const auto i2) {
-            /* Translate the local index into a index set iterator:: */
-            auto it =
-                locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
-            for (; i1 < i2; ++i1, ++it) {
-              const auto i = *it;
-              auto j = 0;
-              for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
-                lij_temp_[j++][i] = get_entry(lij_matrix_, jt);
+          const auto on_subranges = [&](auto p_off_1, auto p_off_2) {
+            for (auto p_off = p_off_1; p_off < p_off_2; ++p_off) {
+              const auto offset = *(p_off - 1);
+              const auto next_offset = *p_off;
+              const auto &[it, it_t, it_local_index] = indices_[offset];
+              const auto i = it->row();
+
+              for (auto s = offset; s < next_offset; ++s) {
+                const auto &[jt, jt_t, jt_local_index] = indices_[s];
+
+                lij_temp_[jt_local_index][i] = get_entry(lij_matrix_, jt);
               }
             }
           };
+
           parallel::apply_to_subranges(
-              indices.begin(), indices.end(), on_subranges, 4096);
+              ++offsets_.begin(), offsets_.end(), on_subranges, 4096);
         }
 
         for (auto &it : lij_temp_)
           it.update_ghost_values();
 
         {
-          const auto on_subranges = [&](auto i1, const auto i2) {
-            /* Translate the local index into a index set iterator:: */
-            auto it =
-                locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
-            for (; i1 < i2; ++i1, ++it) {
-              const auto i = *it;
+          const auto on_subranges = [&](auto p_off_1, auto p_off_2) {
+            for (auto p_off = p_off_1; p_off < p_off_2; ++p_off) {
+              const auto offset = *(p_off - 1);
+              const auto next_offset = *p_off;
+              const auto &[it, it_t, it_local_index] = indices_[offset];
+              const auto i = it->row();
 
-              if (locally_owned.is_element(i))
-                continue;
+              for (auto s = offset; s < next_offset; ++s) {
+                const auto &[jt, jt_t, jt_local_index] = indices_[s];
 
-              auto j = 0;
-              for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
-                set_entry(lij_matrix_, jt, lij_temp_[j++][i]);
+                set_entry(lij_matrix_, jt, lij_temp_[jt_local_index][i]);
               }
             }
           };
+
           parallel::apply_to_subranges(
-              indices.begin(), indices.end(), on_subranges, 4096);
+              ++offsets_.begin(), offsets_.end(), on_subranges, 4096);
         }
         // END workaround
-#endif
 
         const auto on_subranges = [&](auto i1, const auto i2) {
           /* Translate the local index into a index set iterator:: */
           auto it = locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
           for (; i1 < i2; ++i1, ++it) {
             const auto i = *it;
-
-            /* Skip constrained degrees of freedom */
-            if (++sparsity.begin(i) == sparsity.end(i))
-              continue;
-
-            /* Only iterate over locally owned subset */
-            if (!locally_owned.is_element(i))
-              continue;
-
 
             for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
               const auto j = jt->column();
