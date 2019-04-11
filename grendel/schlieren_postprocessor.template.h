@@ -87,6 +87,10 @@ namespace grendel
         for (auto it = it1; it != it2; ++it, ++set_iterator) {
           const auto i = *set_iterator;
 
+          /* Skip constrained degrees of freedom */
+          if (++sparsity.begin(i) == sparsity.end(i))
+            continue;
+
           /* Only iterate over locally owned subset */
           if (!locally_owned.is_element(i))
             continue;
@@ -162,6 +166,10 @@ namespace grendel
         for (auto it = it1; it != it2; ++it, ++set_iterator) {
           const auto i = *set_iterator;
 
+          /* Skip constrained degrees of freedom */
+          if (++sparsity.begin(i) == sparsity.end(i))
+            continue;
+
           const auto r_i = *it;
 
           schlieren_[i] = 1. - std::exp(-schlieren_beta_ * (r_i - r_i_min) /
@@ -171,6 +179,10 @@ namespace grendel
 
       parallel::apply_to_subranges(
           r_i_.begin(), r_i_.end(), on_subranges, 4096);
+
+      /* Fix up hanging nodes: */
+      const auto &affine_constraints = offline_data_->affine_constraints();
+      affine_constraints.distribute(schlieren_);
     }
 
     schlieren_.update_ghost_values();
