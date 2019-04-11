@@ -239,6 +239,13 @@ namespace grendel
       AssertThrow(false, dealii::ExcMessage("Unknown geometry name."));
     }
 
+    int i = 0;
+    for(auto &cell : triangulation.active_cell_iterators()) {
+      if (i % 3 == 0)
+        cell->set_refine_flag();
+      i++;
+    }
+    triangulation.execute_coarsening_and_refinement();
 
     mapping_.reset(new MappingQ<dim>(order_mapping_));
 

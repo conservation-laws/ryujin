@@ -85,11 +85,10 @@ namespace grendel
       }
     }
 
-    /*
-     * We are not doing anything with constraints (yet).
-     */
-
     affine_constraints_.clear();
+
+    DoFTools::make_hanging_node_constraints(dof_handler_, affine_constraints_);
+
     affine_constraints_.close();
 
     /*
@@ -121,7 +120,8 @@ namespace grendel
           continue;
 
         cell->get_dof_indices(dof_indices);
-        affine_constraints_.add_entries_local_to_global(dof_indices, dsp, true);
+        affine_constraints_.add_entries_local_to_global(
+            dof_indices, dsp, false);
       }
 
       sparsity_pattern_.copy_from(dsp);

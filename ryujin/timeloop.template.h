@@ -36,6 +36,7 @@ namespace
   /**
    * A helper function to print formatted section headings.
    */
+
   void print_head(std::string header, std::string secondary = "")
   {
     const auto header_size = header.size();
@@ -255,8 +256,15 @@ namespace ryujin
       deallog.pop();
 
     /* Output final error: */
-    if (enable_compute_error)
+    if (enable_compute_error) {
+      const auto &affine_constraints = offline_data.affine_constraints();
+      constexpr auto problem_dimension =
+          ProblemDescription<dim>::problem_dimension;
+
+      for (unsigned int i = 0; i < problem_dimension; ++i)
+        affine_constraints.distribute(U[i]);
       compute_error(U, t);
+    }
 
     computing_timer.print_summary();
     deallog << timer_output.str() << std::endl;
@@ -606,6 +614,15 @@ namespace ryujin
       const auto &dof_handler = offline_data.dof_handler();
       const auto &triangulation = discretization.triangulation();
       const auto &mapping = discretization.mapping();
+      const auto &affine_constraints = offline_data.affine_constraints();
+
+      /*
+       * Distribute hanging nodes:
+       */
+
+      affine_constraints.distribute(output_alpha);
+      for (unsigned int i = 0; i < problem_dimension; ++i)
+        affine_constraints.distribute(output_vector[i]);
 
       /*
        * Checkpointing:

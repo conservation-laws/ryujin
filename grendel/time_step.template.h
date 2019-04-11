@@ -128,6 +128,11 @@ namespace grendel
         for (; i1 < i2; ++i1, ++it) {
 
           const auto i = *it;
+
+          /* Skip constrained degrees of freedom */
+          if (++sparsity.begin(i) == sparsity.end(i))
+            continue;
+
           const auto U_i = gather(U, i);
 
           indicator.reset(U_i);
@@ -216,6 +221,10 @@ namespace grendel
         for (; i1 < i2; ++i1, ++it) {
 
           const auto i = *it;
+
+          /* Skip constrained degrees of freedom */
+          if (++sparsity.begin(i) == sparsity.end(i))
+            continue;
 
           const double delta_rho_i = rho_second_variation_[i];
 
@@ -320,6 +329,10 @@ namespace grendel
 
           const auto i = *it;
 
+          /* Skip constrained degrees of freedom */
+          if (++sparsity.begin(i) == sparsity.end(i))
+            continue;
+
           /* Only iterate over locally owned subset */
           if (!locally_owned.is_element(i))
             continue;
@@ -410,6 +423,10 @@ namespace grendel
 
           const auto i = *it;
 
+          /* Skip constrained degrees of freedom */
+          if (++sparsity.begin(i) == sparsity.end(i))
+            continue;
+
           /* Only iterate over locally owned subset */
           if (!locally_owned.is_element(i))
             continue;
@@ -457,6 +474,10 @@ namespace grendel
           for (; i1 < i2; ++i1, ++it) {
 
             const auto i = *it;
+
+            /* Skip constrained degrees of freedom */
+            if (++sparsity.begin(i) == sparsity.end(i))
+              continue;
 
             /* Only iterate over locally owned subset */
             if (!locally_owned.is_element(i))
@@ -527,6 +548,10 @@ namespace grendel
 
             const auto i = *it;
 
+            /* Skip constrained degrees of freedom */
+            if (++sparsity.begin(i) == sparsity.end(i))
+              continue;
+
             /* Only iterate over locally owned subset */
             if (!locally_owned.is_element(i))
               continue;
@@ -566,6 +591,10 @@ namespace grendel
         for (auto it = it1; it != it2; ++it) {
           const auto i = it->first;
           const auto &[normal, id, position] = it->second;
+
+          /* Skip constrained degrees of freedom */
+          if (++sparsity.begin(i) == sparsity.end(i))
+            continue;
 
           if (!locally_owned.is_element(i))
             continue;
