@@ -53,6 +53,8 @@ namespace ryujin
     bool enable_detailed_output;
     bool enable_compute_error;
 
+    bool resume;
+
     grendel::Discretization<dim> discretization;
     grendel::OfflineData<dim> offline_data;
     grendel::InitialValues<dim> initial_values;

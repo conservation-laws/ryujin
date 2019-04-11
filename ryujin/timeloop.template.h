@@ -115,6 +115,9 @@ namespace ryujin
         "Flag to control whether we compute the Linfty Linf_norm of the "
         "difference to an analytic solution. Implemented only for "
         "certain initial state configurations.");
+
+    resume = false;
+    add_parameter("resume", resume, "Resume an interrupted computation.");
   }
 
 
@@ -165,11 +168,35 @@ namespace ryujin
 
     auto U = interpolate_initial_values();
     double t = 0.;
+    unsigned int output_cycle = 0;
 
-    output(U, base_name + "-solution", t, 0);
-    if (enable_compute_error) {
-      output(U, base_name + "-analytic_solution", t, 0);
+    if (resume) {
+      print_head("restore interrupted computation");
+
+      constexpr auto problem_dimension =
+          ProblemDescription<dim>::problem_dimension;
+      const auto &triangulation = discretization.triangulation();
+      const unsigned int i = triangulation.locally_owned_subdomain();
+      std::string name = base_name + "-checkpoint-" +
+                         dealii::Utilities::int_to_string(i, 4) + ".archive";
+      std::ifstream file(name, std::ios::binary);
+
+      boost::archive::binary_iarchive ia(file);
+      ia >> t >> output_cycle;
+
+      for (unsigned int i = 0; i < problem_dimension; ++i) {
+        U[i] = 0.;
+        for (auto &it : U[i])
+          ia >> it;
+      }
     }
+
+    output(U, base_name + "-solution", t, output_cycle);
+    if (enable_compute_error) {
+      const auto analytic = interpolate_initial_values(t);
+      output(analytic, base_name + "-analytic_solution", t, output_cycle);
+    }
+    ++output_cycle;
 
     print_head("enter main loop");
 
@@ -181,7 +208,6 @@ namespace ryujin
      * Loop:
      */
 
-    unsigned int output_cycle = 1;
     for (unsigned int cycle = 1; t < t_final; ++cycle) {
 
       std::ostringstream head;
@@ -204,12 +230,12 @@ namespace ryujin
           print_head(head.str(), secondary.str());
         }
 
-        output(
-            U, base_name + "-solution", t, output_cycle++, /*checkpoint*/ true);
+        output(U, base_name + "-solution", t, output_cycle, true);
         if (enable_compute_error) {
           const auto analytic = interpolate_initial_values(t);
           output(analytic, base_name + "-analytic_solution", t, output_cycle);
         }
+        ++output_cycle;
 
         if (!enable_detailed_output)
           deallog.push("SILENCE!");
@@ -593,13 +619,11 @@ namespace ryujin
                            dealii::Utilities::int_to_string(i, 4) + ".archive";
         std::ofstream file(name, std::ios::binary | std::ios::trunc);
 
-        {
-          boost::archive::binary_oarchive oa(file);
-          oa << t;
-          for (unsigned int i = 0; i < problem_dimension; ++i)
-            for (auto &it : output_vector[i])
-              oa << it;
-        }
+        boost::archive::binary_oarchive oa(file);
+        oa << t << cycle;
+        for (unsigned int i = 0; i < problem_dimension; ++i)
+          for (auto &it : output_vector[i])
+            oa << it;
       }
 
       /*
