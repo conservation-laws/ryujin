@@ -593,28 +593,33 @@ namespace grendel
         }
         // END workaround
 
-        const auto on_subranges = [&](auto i1, const auto i2) {
-          /* Translate the local index into a index set iterator:: */
-          auto it = locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
-          for (; i1 < i2; ++i1, ++it) {
-            const auto i = *it;
+        {
+          const auto on_subranges = [&](auto p_off_1, auto p_off_2) {
+            for (auto p_off = p_off_1; p_off < p_off_2; ++p_off) {
+              const auto offset = *(p_off - 1);
+              const auto next_offset = *p_off;
+              const auto &[it, it_t, it_local_index] = indices_[offset];
+              const auto i = it->row();
 
-            for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
-              const auto j = jt->column();
-              if (j >= i)
-                continue;
-              auto l_ij = get_entry(lij_matrix_, jt);
-              auto &l_ji = lij_matrix_(j, i); // FIXME: Suboptimal
+              for (auto s = offset; s < next_offset; ++s) {
+                const auto &[jt, jt_t, jt_local_index] = indices_[s];
+                const auto j = jt->column();
+                if (j >= i)
+                  continue;
 
-              const double min = std::min(l_ij, l_ji);
-              l_ji = min;
-              set_entry(lij_matrix_, jt, min);
+                auto l_ij = get_entry(lij_matrix_, jt);
+                auto l_ji = get_entry(lij_matrix_, jt_t);
+
+                const double min = std::min(l_ij, l_ji);
+                set_entry(lij_matrix_, jt, min);
+                set_entry(lij_matrix_, jt_t, min);
+              }
             }
-          }
-        };
+          };
 
-        parallel::apply_to_subranges(
-            indices.begin(), indices.end(), on_subranges, 4096);
+          parallel::apply_to_subranges(
+              ++offsets_.begin(), offsets_.end(), on_subranges, 4096);
+        }
       }
 
       /*
