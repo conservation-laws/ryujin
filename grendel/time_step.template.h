@@ -76,6 +76,8 @@ namespace grendel
     /* Precompute index operations: */
 
     const auto &sparsity_pattern = offline_data_->sparsity_pattern();
+    const auto &extended_sparsity_pattern =
+        offline_data_->extended_sparsity_pattern();
     {
       Assert(sparsity_pattern.is_compressed(), dealii::ExcInternalError());
       const auto n_locally_relevant = locally_relevant.n_elements();
@@ -86,13 +88,24 @@ namespace grendel
 
       std::size_t next_index = 0;
       for (auto i : locally_relevant) {
+
+        auto ejt = extended_sparsity_pattern.begin(i);
+        unsigned int local_index = 0;
         for (auto jt = sparsity_pattern.begin(i); jt != sparsity_pattern.end(i);
              ++jt) {
           next_index++;
           const auto global_index_t =
               sparsity_pattern.operator()(jt->column(), i);
           SparsityPattern::iterator jt_t(&sparsity_pattern, global_index_t);
-          indices_.push_back({jt, jt_t, 0.});
+
+          for (; ejt->column() != jt->column(); ++ejt) {
+            dealii::deallog << "adv!" << std::endl;
+            local_index++;
+          }
+
+          indices_.push_back({jt, jt_t, local_index});
+          dealii::deallog << jt->column() << " == " << ejt->column()
+                          << " index: " << local_index << std::endl;
         }
         offsets_.push_back(next_index);
       }
@@ -535,6 +548,7 @@ namespace grendel
         TimerOutput::Scope time(computing_timer_,
                                 "time_step - 6 symmetrize l_ij");
 
+#if 0
         // BEGIN workaround
         {
           const auto on_subranges = [&](auto i1, const auto i2) {
@@ -577,6 +591,7 @@ namespace grendel
               indices.begin(), indices.end(), on_subranges, 4096);
         }
         // END workaround
+#endif
 
         const auto on_subranges = [&](auto i1, const auto i2) {
           /* Translate the local index into a index set iterator:: */
