@@ -282,7 +282,7 @@ namespace grendel
     if constexpr (limiter_ == Limiters::specific_entropy)
     {
       /*
-       * Prepare a Newton second method:
+       * Prepare a Newton secant method:
        */
 
       double t_l = 0.;
