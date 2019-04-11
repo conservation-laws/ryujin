@@ -571,16 +571,23 @@ namespace ryujin
     constexpr auto problem_dimension =
         ProblemDescription<dim>::problem_dimension;
     const auto &component_names = ProblemDescription<dim>::component_names;
+    const auto &affine_constraints = offline_data.affine_constraints();
+
+    /* Distribute hanging nodes: */
+
+    output_alpha = time_step.alpha();
+    affine_constraints.distribute(output_alpha);
+    output_alpha.update_ghost_values();
 
     for (unsigned int i = 0; i < problem_dimension; ++i) {
       output_vector[i] = U[i];
+      affine_constraints.distribute(output_vector[i]);
+      output_vector[i].update_ghost_values();
     }
 
-    output_alpha = time_step.alpha();
+    schlieren_postprocessor.compute_schlieren(output_vector);
 
     /* Output data in vtu format: */
-
-    schlieren_postprocessor.compute_schlieren(output_vector);
 
     /* capture name, t, cycle by value */
     const auto output_worker = [this, name, t, cycle, checkpoint]() {
@@ -589,17 +596,6 @@ namespace ryujin
       const auto &dof_handler = offline_data.dof_handler();
       const auto &triangulation = discretization.triangulation();
       const auto &mapping = discretization.mapping();
-      const auto &affine_constraints = offline_data.affine_constraints();
-
-      /* Distribute hanging nodes: */
-
-      affine_constraints.distribute(output_alpha);
-      output_alpha.update_ghost_values();
-
-      for (auto &it : output_vector) {
-        affine_constraints.distribute(it);
-        it.update_ghost_values();
-      }
 
       /* Checkpointing: */
 
@@ -613,10 +609,9 @@ namespace ryujin
 
         boost::archive::binary_oarchive oa(file);
         oa << t << cycle;
-        for (unsigned int i = 0; i < problem_dimension; ++i)
-          for (const auto &it1 : output_vector)
-            for (const auto &it2 : it1)
-              oa << it2;
+        for (const auto &it1 : output_vector)
+          for (const auto &it2 : it1)
+            oa << it2;
       }
 
       dealii::DataOut<dim> data_out;
@@ -644,6 +639,7 @@ namespace ryujin
       };
 
       /* Write out local vtu: */
+
       const unsigned int i = triangulation.locally_owned_subdomain();
       std::ofstream output(filename(i));
       data_out.write_vtu(output);
