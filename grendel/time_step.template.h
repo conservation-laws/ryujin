@@ -82,6 +82,12 @@ namespace grendel
 
     dij_matrix_.reinit(sparsity_pattern);
     lij_matrix_.reinit(sparsity_pattern);
+
+    // BEGIN workaround
+    Assert(sparsity_pattern.is_compressed(), dealii::ExcInternalError());
+    unsigned int n = sparsity_pattern.max_entries_per_row();
+    lij_temp_.resize(n, exemplar);
+    // END workaround
   }
 
 
@@ -506,6 +512,49 @@ namespace grendel
         deallog << "        symmetrize l_ij" << std::endl;
         TimerOutput::Scope time(computing_timer_,
                                 "time_step - 6 symmetrize l_ij");
+
+        // BEGIN workaround
+        {
+          const auto on_subranges = [&](auto i1, const auto i2) {
+            /* Translate the local index into a index set iterator:: */
+            auto it =
+                locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
+            for (; i1 < i2; ++i1, ++it) {
+              const auto i = *it;
+              auto j = 0;
+              for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
+                lij_temp_[j++][i] = get_entry(lij_matrix_, jt);
+              }
+            }
+          };
+          parallel::apply_to_subranges(
+              indices.begin(), indices.end(), on_subranges, 4096);
+        }
+
+        for (auto &it : lij_temp_)
+          it.update_ghost_values();
+
+        {
+          const auto on_subranges = [&](auto i1, const auto i2) {
+            /* Translate the local index into a index set iterator:: */
+            auto it =
+                locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
+            for (; i1 < i2; ++i1, ++it) {
+              const auto i = *it;
+
+              if (locally_owned.is_element(i))
+                continue;
+
+              auto j = 0;
+              for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
+                set_entry(lij_matrix_, jt, lij_temp_[j++][i]);
+              }
+            }
+          };
+          parallel::apply_to_subranges(
+              indices.begin(), indices.end(), on_subranges, 4096);
+        }
+        // END workaround
 
         const auto on_subranges = [&](auto i1, const auto i2) {
           /* Translate the local index into a index set iterator:: */

@@ -104,7 +104,16 @@ namespace grendel
 
     vector_type r_;
 
-    dealii::SparseMatrix<double> lij_matrix_; // FIXME
+    dealii::SparseMatrix<double> lij_matrix_;
+
+    // BEGIN workaround
+    /*
+     * Workaround: We use a number of temporary vectors in order to
+     * efficiently distribute the "ghost layer" of the sparse matrix
+     */
+    std::vector<dealii::LinearAlgebra::distributed::Vector<double>> lij_temp_;
+    // END workaround
+
     std::array<dealii::SparseMatrix<double>, problem_dimension> pij_matrix_;
 
     vector_type temp_euler_;
