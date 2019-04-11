@@ -73,9 +73,32 @@ namespace grendel
     for (auto &it : bounds_)
       it.reinit(exemplar);
 
-    /* Initialize local matrices */
+    /* Precompute index operations: */
 
     const auto &sparsity_pattern = offline_data_->sparsity_pattern();
+    {
+      Assert(sparsity_pattern.is_compressed(), dealii::ExcInternalError());
+      const auto n_locally_relevant = locally_relevant.n_elements();
+      const auto n_matrix_entries = sparsity_pattern.n_nonzero_elements();
+
+      offsets_.reserve(n_locally_relevant);
+      indices_.reserve(n_matrix_entries);
+
+      std::size_t next_index = 0;
+      for (auto i : locally_relevant) {
+        for (auto jt = sparsity_pattern.begin(i); jt != sparsity_pattern.end(i);
+             ++jt) {
+          next_index++;
+          const auto global_index_t =
+              sparsity_pattern.operator()(jt->column(), i);
+          SparsityPattern::iterator jt_t(&sparsity_pattern, global_index_t);
+          indices_.push_back({jt, jt_t, 0.});
+        }
+        offsets_.push_back(next_index);
+      }
+    }
+
+    /* Initialize local matrices */
 
     for (auto &it : pij_matrix_)
       it.reinit(sparsity_pattern);
@@ -84,7 +107,6 @@ namespace grendel
     lij_matrix_.reinit(sparsity_pattern);
 
     // BEGIN workaround
-    Assert(sparsity_pattern.is_compressed(), dealii::ExcInternalError());
     unsigned int n = sparsity_pattern.max_entries_per_row();
     lij_temp_.resize(n, exemplar);
     // END workaround
@@ -444,11 +466,11 @@ namespace grendel
           const auto r_i = gather(r_, i);
 
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
-            auto p_ij = gather_get_entry(pij_matrix_, jt);
 
             const auto j = jt->column();
             const auto b_ij = get_entry(bij_matrix, jt);
             const auto b_ji = bij_matrix(j, i); // FIXME: Suboptimal
+            auto p_ij = gather_get_entry(pij_matrix_, jt);
 
             const auto r_j = gather(r_, j);
 
@@ -561,6 +583,16 @@ namespace grendel
           auto it = locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
           for (; i1 < i2; ++i1, ++it) {
             const auto i = *it;
+
+            /* Skip constrained degrees of freedom */
+            if (++sparsity.begin(i) == sparsity.end(i))
+              continue;
+
+            /* Only iterate over locally owned subset */
+            if (!locally_owned.is_element(i))
+              continue;
+
+
             for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
               const auto j = jt->column();
               if (j >= i)

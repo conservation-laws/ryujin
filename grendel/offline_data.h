@@ -98,6 +98,12 @@ namespace grendel
     ACCESSOR_READ_ONLY(sparsity_pattern)
 
     /**
+     * The extended SparsityPattern.
+     */
+    dealii::SparsityPattern extended_sparsity_pattern_;
+    ACCESSOR_READ_ONLY(extended_sparsity_pattern)
+
+    /**
      * The boundary map.
      *
      * For every degree of freedom that has nonzero support at the boundary

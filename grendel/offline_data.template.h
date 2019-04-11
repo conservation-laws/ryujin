@@ -103,10 +103,11 @@ namespace grendel
      * pattern, so we quickly do the grunt work by hand:
      */
 
+    const auto n_dofs = locally_relevant_.size();
+
     {
       TimerOutput::Scope t(computing_timer_,
                            "offline_data - create sparsity pattern");
-      const auto n_dofs = locally_relevant_.size();
       const auto dofs_per_cell =
           discretization_->finite_element().dofs_per_cell;
 
@@ -125,6 +126,18 @@ namespace grendel
       }
 
       sparsity_pattern_.copy_from(dsp);
+
+      /* Extend the stencil: */
+
+      IndexSet all_indices(n_dofs);
+      all_indices.add_range(0, n_dofs);
+      SparsityTools::gather_sparsity_pattern(
+          dsp,
+          dof_handler_.locally_owned_dofs_per_processor(),
+          mpi_communicator_,
+          all_indices);
+
+      extended_sparsity_pattern_.copy_from(dsp);
     }
 
     /*
