@@ -162,8 +162,6 @@ namespace ryujin
     if (resume) {
       print_head("restore interrupted computation");
 
-      constexpr auto problem_dimension =
-          ProblemDescription<dim>::problem_dimension;
       const auto &triangulation = discretization.triangulation();
       const unsigned int i = triangulation.locally_owned_subdomain();
       std::string name = base_name + "-checkpoint-" +
@@ -173,10 +171,10 @@ namespace ryujin
       boost::archive::binary_iarchive ia(file);
       ia >> t >> output_cycle;
 
-      for (unsigned int i = 0; i < problem_dimension; ++i) {
-        U[i] = 0.;
-        for (auto &it : U[i])
-          ia >> it;
+      for (auto &it1 : U) {
+        for (auto &it2 : it1)
+          ia >> it2;
+        it1.update_ghost_values();
       }
     }
 
@@ -246,11 +244,8 @@ namespace ryujin
       /* Output final error: */
 
       const auto &affine_constraints = offline_data.affine_constraints();
-      constexpr auto problem_dimension =
-          ProblemDescription<dim>::problem_dimension;
-
-      for (unsigned int i = 0; i < problem_dimension; ++i)
-        affine_constraints.distribute(U[i]);
+      for (auto &it : U)
+        affine_constraints.distribute(it);
       compute_error(U, t);
     }
 
@@ -578,15 +573,17 @@ namespace ryujin
     const auto &component_names = ProblemDescription<dim>::component_names;
 
     for (unsigned int i = 0; i < problem_dimension; ++i) {
-      /* This also copies ghost elements: */
       output_vector[i] = U[i];
     }
 
     output_alpha = time_step.alpha();
 
+    /* Output data in vtu format: */
+
+    schlieren_postprocessor.compute_schlieren(output_vector);
+
     /* capture name, t, cycle by value */
     const auto output_worker = [this, name, t, cycle, checkpoint]() {
-
       constexpr auto problem_dimension =
           ProblemDescription<dim>::problem_dimension;
       const auto &dof_handler = offline_data.dof_handler();
@@ -597,8 +594,12 @@ namespace ryujin
       /* Distribute hanging nodes: */
 
       affine_constraints.distribute(output_alpha);
-      for (unsigned int i = 0; i < problem_dimension; ++i)
-        affine_constraints.distribute(output_vector[i]);
+      output_alpha.update_ghost_values();
+
+      for (auto &it : output_vector) {
+        affine_constraints.distribute(it);
+        it.update_ghost_values();
+      }
 
       /* Checkpointing: */
 
@@ -613,13 +614,10 @@ namespace ryujin
         boost::archive::binary_oarchive oa(file);
         oa << t << cycle;
         for (unsigned int i = 0; i < problem_dimension; ++i)
-          for (auto &it : output_vector[i])
-            oa << it;
+          for (const auto &it1 : output_vector)
+            for (const auto &it2 : it1)
+              oa << it2;
       }
-
-      /* Output data in vtu format: */
-
-      schlieren_postprocessor.compute_schlieren(output_vector);
 
       dealii::DataOut<dim> data_out;
       data_out.attach_dof_handler(dof_handler);
@@ -630,7 +628,6 @@ namespace ryujin
       data_out.add_data_vector(schlieren_postprocessor.schlieren(),
                                "schlieren_plot");
 
-      output_alpha.update_ghost_values();
       data_out.add_data_vector(output_alpha, "alpha");
 
       data_out.build_patches(mapping,
