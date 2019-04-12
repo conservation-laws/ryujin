@@ -120,8 +120,10 @@ namespace grendel
     lij_matrix_.reinit(sparsity_pattern);
 
     // BEGIN workaround
-    unsigned int n = sparsity_pattern.max_entries_per_row();
-    lij_temp_.resize(n, exemplar);
+    if (Utilities::MPI::n_mpi_processes(mpi_communicator_) > 1) {
+      unsigned int n = sparsity_pattern.max_entries_per_row();
+      lij_temp_.resize(n, exemplar);
+    }
     // END workaround
   }
 
@@ -549,47 +551,49 @@ namespace grendel
                                 "time_step - 6 symmetrize l_ij");
 
         // BEGIN workaround
-        {
-          const auto on_subranges = [&](auto p_off_1, auto p_off_2) {
-            for (auto p_off = p_off_1; p_off < p_off_2; ++p_off) {
-              const auto offset = *(p_off - 1);
-              const auto next_offset = *p_off;
-              const auto &[it, it_t, it_local_index] = indices_[offset];
-              const auto i = it->row();
+        if(Utilities::MPI::n_mpi_processes(mpi_communicator_) > 1) {
+          {
+            const auto on_subranges = [&](auto p_off_1, auto p_off_2) {
+              for (auto p_off = p_off_1; p_off < p_off_2; ++p_off) {
+                const auto offset = *(p_off - 1);
+                const auto next_offset = *p_off;
+                const auto &[it, it_t, it_local_index] = indices_[offset];
+                const auto i = it->row();
 
-              for (auto s = offset; s < next_offset; ++s) {
-                const auto &[jt, jt_t, jt_local_index] = indices_[s];
+                for (auto s = offset; s < next_offset; ++s) {
+                  const auto &[jt, jt_t, jt_local_index] = indices_[s];
 
-                lij_temp_[jt_local_index][i] = get_entry(lij_matrix_, jt);
+                  lij_temp_[jt_local_index][i] = get_entry(lij_matrix_, jt);
+                }
               }
-            }
-          };
+            };
 
-          parallel::apply_to_subranges(
-              ++offsets_.begin(), offsets_.end(), on_subranges, 4096);
-        }
+            parallel::apply_to_subranges(
+                ++offsets_.begin(), offsets_.end(), on_subranges, 4096);
+          }
 
-        for (auto &it : lij_temp_)
-          it.update_ghost_values();
+          for (auto &it : lij_temp_)
+            it.update_ghost_values();
 
-        {
-          const auto on_subranges = [&](auto p_off_1, auto p_off_2) {
-            for (auto p_off = p_off_1; p_off < p_off_2; ++p_off) {
-              const auto offset = *(p_off - 1);
-              const auto next_offset = *p_off;
-              const auto &[it, it_t, it_local_index] = indices_[offset];
-              const auto i = it->row();
+          {
+            const auto on_subranges = [&](auto p_off_1, auto p_off_2) {
+              for (auto p_off = p_off_1; p_off < p_off_2; ++p_off) {
+                const auto offset = *(p_off - 1);
+                const auto next_offset = *p_off;
+                const auto &[it, it_t, it_local_index] = indices_[offset];
+                const auto i = it->row();
 
-              for (auto s = offset; s < next_offset; ++s) {
-                const auto &[jt, jt_t, jt_local_index] = indices_[s];
+                for (auto s = offset; s < next_offset; ++s) {
+                  const auto &[jt, jt_t, jt_local_index] = indices_[s];
 
-                set_entry(lij_matrix_, jt, lij_temp_[jt_local_index][i]);
+                  set_entry(lij_matrix_, jt, lij_temp_[jt_local_index][i]);
+                }
               }
-            }
-          };
+            };
 
-          parallel::apply_to_subranges(
-              ++offsets_.begin(), offsets_.end(), on_subranges, 4096);
+            parallel::apply_to_subranges(
+                ++offsets_.begin(), offsets_.end(), on_subranges, 4096);
+          }
         }
         // END workaround
 
