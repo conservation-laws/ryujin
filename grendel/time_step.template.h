@@ -106,6 +106,7 @@ namespace grendel
       }
 
       unsigned int n = sparsity.max_entries_per_row();
+      n = Utilities::MPI::max(n, mpi_communicator_);
       lij_temp_.resize(n, exemplar);
     }
     // END workaround
