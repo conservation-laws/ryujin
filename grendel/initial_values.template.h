@@ -38,7 +38,7 @@ namespace grendel
     initial_1d_state_[2] = 1.;
     add_parameter("initial - 1d state",
                   initial_1d_state_,
-                  "Initial 1d state (rho, u, p) of the unifrom, shock front "
+                  "Initial 1d state (rho, u, p) of the uniform, shock front "
                   "configurations");
 
     initial_mach_number_ = 2.0;
