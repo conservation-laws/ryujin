@@ -35,11 +35,11 @@ namespace grendel
     add_parameter(
         "use ssprk3", use_ssprk3_, "Use SSPRK3 instead of explicit Euler");
 
-    cfl_update_ = 0.90;
+    cfl_update_ = 0.80;
     add_parameter(
         "cfl update", cfl_update_, "relative CFL constant used for update");
 
-    cfl_max_ = 0.80;
+    cfl_max_ = 0.90;
     add_parameter(
         "cfl max", cfl_max_, "Maximal admissible relative CFL constant");
   }
