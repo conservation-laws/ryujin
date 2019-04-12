@@ -17,8 +17,8 @@ namespace grendel
    * vector. Thus, this little workaround.
    */
   template <typename Matrix, typename Iterator>
-  inline DEAL_II_ALWAYS_INLINE double get_entry(const Matrix &matrix,
-                                                const Iterator &it)
+  inline DEAL_II_ALWAYS_INLINE typename Matrix::value_type
+  get_entry(const Matrix &matrix, const Iterator &it)
   {
     const auto global_index = it->global_index();
     const typename Matrix::const_iterator matrix_iterator(&matrix,
@@ -32,7 +32,7 @@ namespace grendel
    */
   template <typename Matrix, typename Iterator>
   inline DEAL_II_ALWAYS_INLINE void
-  set_entry(Matrix &matrix, const Iterator &it, double value)
+  set_entry(Matrix &matrix, const Iterator &it, typename Matrix::value_type value)
   {
     const auto global_index = it->global_index();
     typename Matrix::iterator matrix_iterator(&matrix, global_index);

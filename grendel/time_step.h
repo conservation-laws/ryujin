@@ -9,8 +9,9 @@
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/timer.h>
-#include <deal.II/lac/la_parallel_vector.templates.h>
-#include <deal.II/lac/vector.templates.h>
+#include <deal.II/lac/la_parallel_vector.h>
+#include <deal.II/lac/vector.h>
+#include <deal.II/lac/sparse_matrix.templates.h>
 
 namespace grendel
 {
@@ -93,12 +94,6 @@ namespace grendel
   private:
     /* Scratch data: */
 
-    std::vector<size_t> offsets_;
-    std::vector<std::tuple<dealii::SparsityPattern::const_iterator /*jt*/,
-                           dealii::SparsityPattern::const_iterator /*jt_t*/,
-                           unsigned int /*local index*/>>
-        indices_;
-
     dealii::SparseMatrix<double> dij_matrix_;
 
     dealii::LinearAlgebra::distributed::Vector<double> rho_second_variation_;
@@ -117,8 +112,8 @@ namespace grendel
      * Workaround: We use a number of temporary vectors in order to
      * efficiently distribute the "ghost layer" of the sparse matrix
      */
-    std::vector<dealii::LinearAlgebra::distributed::Vector<double>>
-        lij_temp_;
+    dealii::SparseMatrix<unsigned int> indices_;
+    std::vector<dealii::LinearAlgebra::distributed::Vector<double>> lij_temp_;
     // END workaround
 
     std::array<dealii::SparseMatrix<double>, problem_dimension> pij_matrix_;
