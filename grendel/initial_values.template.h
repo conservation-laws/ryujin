@@ -14,33 +14,44 @@ namespace grendel
     ParameterAcceptor::parse_parameters_call_back.connect(
         std::bind(&InitialValues<dim>::parse_parameters_callback, this));
 
-    initial_state_ = "shock front";
-    add_parameter("initial state",
-                  initial_state_,
-                  "Initial state. Valid names are \"shock front\", "
-                  "\"sod contrast\", \"uniform\", \"smooth solution\", or \"vortex\".");
+    configuration_ = "uniform";
+    add_parameter(
+        "configuration",
+        configuration_,
+        "Configuration. Valid options are \"uniform\", \"shock front S1\", "
+        "\"shock front S3\", \"sod contrast\", \"isentropic vortex\"");
 
     initial_direction_[0] = 1.;
-    add_parameter("initial - direction",
-                  initial_direction_,
-                  "Initial direction of shock front, sod contrast, or vortex");
+    add_parameter(
+        "initial - direction",
+        initial_direction_,
+        "Initial direction of shock front S1, S3, sod contrast, or vortex");
 
     initial_position_[0] = 1.;
-    add_parameter("initial - position",
-                  initial_position_,
-                  "Initial position of shock front, sod contrast, or vortex");
+    add_parameter(
+        "initial - position",
+        initial_position_,
+        "Initial position of shock front S1, S3, sod contrast, or vortex");
+
+    initial_1d_state_[0] = gamma;
+    initial_1d_state_[1] = 0.;
+    initial_1d_state_[2] = 1.;
+    add_parameter("initial - 1d state",
+                  initial_1d_state_,
+                  "Initial 1d state (rho, u, p) of the unifrom, shock front "
+                  "S1, S3 configurations");
 
     initial_mach_number_ = 2.0;
-    add_parameter(
-        "initial - mach number",
-        initial_mach_number_,
-        "Initial mach number of shock front, uniform state, or vortex");
+    add_parameter("initial - mach number",
+                  initial_mach_number_,
+                  "Mach number of shock front (S1, S3 = mach * a_R), or "
+                  "isentropic vortex");
 
     initial_vortex_beta_ = 5.0;
     add_parameter(
-        "initial - vortex beta",
+        "vortex - beta",
         initial_vortex_beta_,
-        "Initial vortex strength beta");
+        "Isentropic vortex strength beta");
   }
 
 
@@ -62,8 +73,10 @@ namespace grendel
      */
 
     const auto from_1d_state =
-        [=](const std::array<double, 3> &state_1d) -> rank1_type {
-      const auto &[rho, u, p] = state_1d;
+        [=](const dealii::Tensor<1, 3, double> &state_1d) -> rank1_type {
+      const auto &rho = state_1d[0];
+      const auto &u = state_1d[1];
+      const auto &p = state_1d[2];
 
       rank1_type state;
 
@@ -80,21 +93,31 @@ namespace grendel
      * Now populate the initial_state_internal function object:
      */
 
-    if (initial_state_ == "shock front") {
+    if (configuration_ == "uniform") {
 
       /*
-       * A mach shock front:
-       *
-       * FIXME: Add reference to literature
+       * A uniform flow:
        */
 
-      const double rho_R = gamma;
-      const double u_R = 0.;
-      const double p_R = 1.;
+      initial_state_internal = [=](const dealii::Point<dim> & /*point*/,
+                                   double /*t*/) {
+        return from_1d_state(initial_1d_state_);
+      };
 
-      /*   c^2 = gamma * p / rho / (1 - b * rho) */
-      const double a_R = std::sqrt(gamma * p_R / rho_R / (1 - b * rho_R));
+    } else if (configuration_ == "shock front S3") {
+
+      /*
+       * Mach shock front S3:
+       */
+
+      const auto & rho_R = initial_1d_state_[0];
+      const auto & u_R = initial_1d_state_[1];
+      const auto & p_R = initial_1d_state_[2];
       const double mach = initial_mach_number_;
+
+      /* a_R^2 = gamma * p / rho / (1 - b * rho) */
+      const double a_R = std::sqrt(gamma * p_R / rho_R / (1 - b * rho_R));
+
       const double S3 = mach * a_R;
 
       const double rho_L = rho_R * (gamma + 1.) * mach * mach /
@@ -103,34 +126,32 @@ namespace grendel
       double p_L =
           p_R * (2. * gamma * mach * mach - (gamma - 1.)) / (gamma + 1.);
 
+      dealii::Tensor<1, 3, double> initial_1d_state_L{{rho_L, u_L, p_L}};
+
       initial_state_internal = [=](const dealii::Point<dim> &point, double t) {
 
         const double position_1d =
             (point - initial_position_) * initial_direction_ - mach * t;
 
         if (position_1d > 0.) {
-          return from_1d_state({rho_R, u_R, p_R});
+          return from_1d_state(initial_1d_state_);
         } else {
-          return from_1d_state({rho_L, u_L, p_L});
+          return from_1d_state(initial_1d_state_L);
         }
       };
 
-    } else if (initial_state_ == "uniform") {
+    } else if (configuration_ == "shock front S1") {
 
-      /*
-       * A uniform flow:
-       */
+      // FIXME
 
-      initial_state_internal = [=](const dealii::Point<dim> & /*point*/,
-                                   double /*t*/) {
-        return from_1d_state({gamma, initial_mach_number_, 1.});
-      };
-
-    } else if (initial_state_ == "sod contrast") {
+    } else if (configuration_ == "sod contrast") {
 
       /*
        * Contrast of the Sod shock tube:
        */
+
+      dealii::Tensor<1, 3, double> initial_1d_state_L{{0.125, 0.0, 0.1}};
+      dealii::Tensor<1, 3, double> initial_1d_state_R{{1.0, 0.0, 1.0}};
 
       initial_state_internal = [=](const dealii::Point<dim> &point,
                                    double /*t*/) {
@@ -138,32 +159,13 @@ namespace grendel
             (point - initial_position_) * initial_direction_;
 
         if (position_1d > 0.) {
-          return from_1d_state({0.125, 0.0, 0.1});
+          return from_1d_state(initial_1d_state_L);
         } else {
-          return from_1d_state({1.0, 0.0, 1.0});
+          return from_1d_state(initial_1d_state_R);
         }
       };
 
-    } else if (initial_state_ == "smooth") {
-
-      /*
-       * Smooth 1D solution:
-       */
-
-      initial_state_internal = [=](const dealii::Point<dim> &point, double t) {
-        const double x = point[0];
-        const double x_0 = -0.1;
-        const double x_1 = 0.1;
-
-        double rho = 1.;
-        if (x - t > x_0 && x - t < x_1)
-          rho = 1. + 64. * std::pow(x_1 - x_0, -6.) * std::pow(x - t - x_0, 3) *
-                         std::pow(x_1 - x + t, 3);
-
-        return from_1d_state({rho, 1.0, 1.0});
-      };
-
-    } else if (initial_state_ == "vortex") {
+    } else if (configuration_ == "vortex") {
 
       /*
        * 2D isentropic vortex problem. See section 5.6 of Euler-convex

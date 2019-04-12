@@ -54,12 +54,12 @@ namespace grendel
 
 
   private:
-    std::string initial_state_;
-
-    dealii::Tensor<1, dim> initial_direction_;
+    std::string configuration_;
 
     dealii::Point<dim> initial_position_;
+    dealii::Tensor<1, dim> initial_direction_;
 
+    dealii::Tensor<1, 3> initial_1d_state_;
     double initial_mach_number_;
 
     double initial_vortex_beta_;
