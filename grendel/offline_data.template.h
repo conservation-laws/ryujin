@@ -16,6 +16,21 @@
 
 #include "helper.h"
 
+// Workaround
+namespace dealii
+{
+  template <>
+  void dealii::DoFTools::make_periodicity_constraints<dealii::DoFHandler<1, 1>>(
+      dealii::DoFHandler<1, 1> const &,
+      unsigned int,
+      int,
+      dealii::AffineConstraints<double> &,
+      dealii::ComponentMask const &)
+  {
+    // do nothing
+  }
+}
+
 namespace grendel
 {
   using namespace dealii;
@@ -88,6 +103,17 @@ namespace grendel
     affine_constraints_.clear();
 
     DoFTools::make_hanging_node_constraints(dof_handler_, affine_constraints_);
+
+    /*
+     * We use boundary indicator 3 to denote periodic boundary conditions.
+     * In this case we assume that the mesh is in "normal configuration":
+     */
+
+    for (int i = 0; i < dim; ++i)
+      DoFTools::make_periodicity_constraints(dof_handler_,
+                                             /*b_id    */ 3,
+                                             /*direction*/ i,
+                                             affine_constraints_);
 
     affine_constraints_.close();
 

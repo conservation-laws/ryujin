@@ -684,7 +684,7 @@ namespace grendel
 
           auto U_i = gather(temp_euler_, i);
 
-          /* On boundray 1 remove the normal component of the momentum: */
+          /* On boundary 1 remove the normal component of the momentum: */
 
           if (id == 1) {
             auto m = ProblemDescription<dim>::momentum(U_i);
@@ -693,7 +693,7 @@ namespace grendel
               U_i[k + 1] = m[k];
           }
 
-          /* On boundray 2 enforce initial conditions: */
+          /* On boundary 2 enforce initial conditions: */
 
           if (id == 2) {
             U_i = initial_values_->initial_state(position, t + tau);
