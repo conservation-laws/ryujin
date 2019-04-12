@@ -607,7 +607,8 @@ namespace ryujin
         std::string name = base_name + "-checkpoint-" +
                            dealii::Utilities::int_to_string(i, 4) + ".archive";
 
-        std::filesystem::rename(name, name + "~");
+        if (std::filesystem::exists(name))
+          std::filesystem::rename(name, name + "~");
 
         std::ofstream file(name, std::ios::binary | std::ios::trunc);
 
