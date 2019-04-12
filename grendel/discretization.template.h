@@ -33,7 +33,8 @@ namespace grendel
     add_parameter("geometry",
                   geometry_,
                   "Geometry. Valid names are \"file\", \"triangle\", \"tube\", "
-                  "\"tube analytical\", \"step\", \"disc\", or \"wall\".");
+                  "\"tube analytical\", \"tube periodic\", \"step\", \"disc\", "
+                  "or \"wall\".");
 
     grid_file_ = "wall.msh";
     add_parameter("grid file",
@@ -189,15 +190,31 @@ namespace grendel
 
     } else if (geometry_ == "tube") {
 
-      create_coarse_grid_tube(
-          triangulation, tube_length_, tube_diameter_, /*prescribe*/ false);
+      create_coarse_grid_tube(triangulation,
+                              tube_length_,
+                              tube_diameter_,
+                              /*prescribe*/ false,
+                              /*periodic*/ false);
 
       triangulation.refine_global(refinement_);
 
     } else if (geometry_ == "tube analytical") {
 
-      create_coarse_grid_tube(
-          triangulation, tube_length_, tube_diameter_, /*prescribe*/ true);
+      create_coarse_grid_tube(triangulation,
+                              tube_length_,
+                              tube_diameter_,
+                              /*prescribe*/ true,
+                              /*periodic*/ false);
+
+      triangulation.refine_global(refinement_);
+
+    } else if (geometry_ == "tube periodic") {
+
+      create_coarse_grid_tube(triangulation,
+                              tube_length_,
+                              tube_diameter_,
+                              /*prescribe*/ false,
+                              /*periodic*/ true);
 
       triangulation.refine_global(refinement_);
 

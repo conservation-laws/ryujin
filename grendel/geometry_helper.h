@@ -115,12 +115,14 @@ namespace grendel
    * to indicate "slip boundary conditions".
    */
 
+  // FIXME: Refactor prescribe/periodic into enum
   template <int dim>
   void
   create_coarse_grid_tube(dealii::parallel::distributed::Triangulation<dim> &,
                           const double /*length*/,
                           const double /*diameter*/,
-                          const bool /*prescribe*/) = delete;
+                          const bool /*prescribe*/,
+                          const bool /*periodic*/) = delete;
 
 
   template <>
@@ -128,13 +130,18 @@ namespace grendel
       dealii::parallel::distributed::Triangulation<1> &triangulation,
       const double length,
       const double /*diameter*/,
-      const bool prescribe)
+      const bool prescribe,
+      const bool periodic)
   {
     dealii::GridGenerator::hyper_cube(triangulation, 0., length);
     if (prescribe) {
       /* Dirichlet data: */
       triangulation.begin_active()->face(0)->set_boundary_id(2);
       triangulation.begin_active()->face(1)->set_boundary_id(2);
+    } else if (periodic) {
+      /* Periodic data: */
+      triangulation.begin_active()->face(0)->set_boundary_id(3);
+      triangulation.begin_active()->face(1)->set_boundary_id(3);
     } else {
       /* Do nothing: */
       triangulation.begin_active()->face(0)->set_boundary_id(0);
@@ -148,7 +155,8 @@ namespace grendel
       dealii::parallel::distributed::Triangulation<2> &triangulation,
       const double length,
       const double diameter,
-      const bool prescribe)
+      const bool prescribe,
+      const bool periodic)
   {
     using namespace dealii;
 
@@ -172,18 +180,20 @@ namespace grendel
           face->set_boundary_id(2);
 
         } else {
-
           /*
-           * We want slip boundary conditions (i.e. indicator 1) at top and
-           * bottom of the rectangle. On the left side we enforce initial
-           * conditionas and leave the boundary indicator on the right side
-           * at 0, i.e. do nothing.
+           * We want slip boundary conditions, or periodic conditions (i.e.
+           * indicator 1/3) at top and bottom of the rectangle. On the left
+           * side we enforce initial conditionas and leave the boundary
+           * indicator on the right side at 0, i.e. do nothing.
            */
           const auto center = face->center();
           if (center[0] < -length / 2. + 1.e-6)
             face->set_boundary_id(2);
           else if (std::abs(center[1]) > diameter / 2. - 1.e-6)
-            face->set_boundary_id(1);
+            if (periodic)
+              face->set_boundary_id(3);
+            else
+              face->set_boundary_id(1);
           else
             face->set_boundary_id(0);
         }
@@ -197,7 +207,8 @@ namespace grendel
       dealii::parallel::distributed::Triangulation<3> &triangulation,
       const double length,
       const double diameter,
-      const bool prescribe)
+      const bool prescribe,
+      const bool periodic)
   {
     using namespace dealii;
 
@@ -227,19 +238,7 @@ namespace grendel
 
         } else {
 
-          /*
-           * We want slip boundary conditions (i.e. indicator 1) at top and
-           * bottom of the rectangle. On the left side we enforce initial
-           * conditionas and leave the boundary indicator on the right side
-           * at 0, i.e. do nothing.
-           */
-          const auto center = face->center();
-          if (center[0] < -length / 2. + 1.e-6)
-            face->set_boundary_id(2);
-          else if (center[0] > length / 2. - 1.e-6)
-            face->set_boundary_id(0);
-
-          face->set_boundary_id(1);
+          AssertThrow(false, dealii::ExcNotImplemented());
         }
       }
     }
