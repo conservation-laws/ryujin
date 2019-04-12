@@ -32,7 +32,7 @@ namespace grendel
       rho,
       internal_energy,
       specific_entropy
-    } limiter_ = Limiters::specific_entropy;
+    } limiter_ = Limiters::rho;
 
     static constexpr unsigned int relaxation_order_ = 3;
 

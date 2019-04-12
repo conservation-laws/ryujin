@@ -18,20 +18,20 @@ namespace grendel
     add_parameter(
         "configuration",
         configuration_,
-        "Configuration. Valid options are \"uniform\", \"shock front S1\", "
-        "\"shock front S3\", \"sod contrast\", \"isentropic vortex\"");
+        "Configuration. Valid options are \"uniform\", \"shock front\", "
+        "\"sod contrast\", \"isentropic vortex\"");
 
     initial_direction_[0] = 1.;
     add_parameter(
         "initial - direction",
         initial_direction_,
-        "Initial direction of shock front S1, S3, sod contrast, or vortex");
+        "Initial direction of shock front, sod contrast, or vortex");
 
     initial_position_[0] = 1.;
     add_parameter(
         "initial - position",
         initial_position_,
-        "Initial position of shock front S1, S3, sod contrast, or vortex");
+        "Initial position of shock front, sod contrast, or vortex");
 
     initial_1d_state_[0] = gamma;
     initial_1d_state_[1] = 0.;
@@ -39,12 +39,12 @@ namespace grendel
     add_parameter("initial - 1d state",
                   initial_1d_state_,
                   "Initial 1d state (rho, u, p) of the unifrom, shock front "
-                  "S1, S3 configurations");
+                  "configurations");
 
     initial_mach_number_ = 2.0;
     add_parameter("initial - mach number",
                   initial_mach_number_,
-                  "Mach number of shock front (S1, S3 = mach * a_R), or "
+                  "Mach number of shock front (S1, S3 = mach * a_L/R), or "
                   "isentropic vortex");
 
     initial_vortex_beta_ = 5.0;
@@ -104,34 +104,35 @@ namespace grendel
         return from_1d_state(initial_1d_state_);
       };
 
-    } else if (configuration_ == "shock front S3") {
+    } else if (configuration_ == "shock front") {
 
       /*
-       * Mach shock front S3:
+       * Mach shock front S1/S3:
        */
 
       const auto & rho_R = initial_1d_state_[0];
       const auto & u_R = initial_1d_state_[1];
       const auto & p_R = initial_1d_state_[2];
-      const double mach = initial_mach_number_;
+      const double mach_S = initial_mach_number_;
 
       /* a_R^2 = gamma * p / rho / (1 - b * rho) */
       const double a_R = std::sqrt(gamma * p_R / rho_R / (1 - b * rho_R));
+      const double mach_R = u_R / a_R;
 
-      const double S3 = mach * a_R;
+      const double S3 = mach_S * a_R;
+      const double delta_mach = mach_R - mach_S;
 
-      const double rho_L = rho_R * (gamma + 1.) * mach * mach /
-                           ((gamma - 1.) * mach * mach + 2.);
+      const double rho_L = rho_R * (gamma + 1.) * delta_mach * delta_mach /
+                           ((gamma - 1.) * delta_mach * delta_mach + 2.);
       double u_L = (1. - rho_R / rho_L) * S3 + rho_R / rho_L * u_R;
-      double p_L =
-          p_R * (2. * gamma * mach * mach - (gamma - 1.)) / (gamma + 1.);
+      double p_L = p_R * (2. * gamma * delta_mach * delta_mach - (gamma - 1.)) /
+                   (gamma + 1.);
 
       dealii::Tensor<1, 3, double> initial_1d_state_L{{rho_L, u_L, p_L}};
 
       initial_state_internal = [=](const dealii::Point<dim> &point, double t) {
-
         const double position_1d =
-            (point - initial_position_) * initial_direction_ - mach * t;
+            (point - initial_position_) * initial_direction_ - S3 * t;
 
         if (position_1d > 0.) {
           return from_1d_state(initial_1d_state_);
@@ -139,10 +140,6 @@ namespace grendel
           return from_1d_state(initial_1d_state_L);
         }
       };
-
-    } else if (configuration_ == "shock front S1") {
-
-      // FIXME
 
     } else if (configuration_ == "sod contrast") {
 
