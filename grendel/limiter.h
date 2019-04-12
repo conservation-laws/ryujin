@@ -32,7 +32,7 @@ namespace grendel
       rho,
       internal_energy,
       specific_entropy
-    } limiter_ = Limiters::rho;
+    } limiter_ = Limiters::specific_entropy;
 
     static constexpr unsigned int relaxation_order_ = 3;
 
@@ -288,8 +288,13 @@ namespace grendel
       double t_l = 0.;
       double t_r = l_ij;
 
-      if(t_r <= 0.)
+      if(t_r <= 0. + line_search_eps_)
         return 0.;
+
+      if (t_r < t_l + line_search_eps_) {
+        const auto t = t_l < t_r ? t_l : t_r;
+        return std::min(l_ij, t);
+      }
 
       constexpr double gamma = ProblemDescription<dim>::gamma;
 
@@ -302,7 +307,7 @@ namespace grendel
             ProblemDescription<dim>::internal_energy(U_r) - s_min * rho_r_gamma;
 
         /* Right state is good, cut it short and return: */
-        if (psi_r >= 0.)
+        if (psi_r >= 0. - line_search_eps_)
           return std::min(l_ij, t_r);
 
         const auto U_l = U + t_l * P_ij;
@@ -319,7 +324,7 @@ namespace grendel
         if (psi_l < 0.) {
           psi_r -= psi_l;
           psi_l = 0.;
-          if (psi_r >= 0.)
+          if (psi_r >= 0. - line_search_eps_)
             return std::min(l_ij, t_r);
         }
 
