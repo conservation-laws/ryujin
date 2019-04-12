@@ -25,6 +25,7 @@
 
 #include <fstream>
 #include <iomanip>
+#include <filesystem>
 
 
 using namespace dealii;
@@ -605,6 +606,9 @@ namespace ryujin
         const unsigned int i = triangulation.locally_owned_subdomain();
         std::string name = base_name + "-checkpoint-" +
                            dealii::Utilities::int_to_string(i, 4) + ".archive";
+
+        std::filesystem::rename(name, name + "~");
+
         std::ofstream file(name, std::ios::binary | std::ios::trunc);
 
         boost::archive::binary_oarchive oa(file);
