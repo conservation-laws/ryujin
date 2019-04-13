@@ -220,7 +220,7 @@ namespace grendel
     const unsigned int n_q_points = discretization_->quadrature().size();
 
     /*
-     * First part: Assemble mass matrices and cij matrices:
+     * First pass: Assemble all matrices:
      */
 
     /* The local, per-cell assembly routine: */
@@ -305,9 +305,9 @@ namespace grendel
         fe_face_values.reinit(cell, f);
         const unsigned int n_face_q_points = scratch.face_quadrature_.size();
 
-        for (unsigned int i = 0; i < dofs_per_cell; ++i) {
+        for (unsigned int j = 0; j < dofs_per_cell; ++j) {
 
-          if (!discretization_->finite_element().has_support_on_face(i, f))
+          if (!discretization_->finite_element().has_support_on_face(j, f))
             continue;
 
           dealii::Tensor<1, dim> normal;
@@ -319,10 +319,10 @@ namespace grendel
              */
             for (unsigned int q = 0; q < n_face_q_points; ++q)
               normal += fe_face_values.normal_vector(q) *
-                        fe_face_values.shape_value(i, q);
+                        fe_face_values.shape_value(j, q);
           }
 
-          const auto index = local_dof_indices[i];
+          const auto index = local_dof_indices[j];
 
           // FIXME: This is a bloody hack:
           Point<dim> position;
@@ -382,9 +382,14 @@ namespace grendel
       measure_of_omega_ += cell_measure;
     };
 
+
+
     {
-      deallog << "        assemble mass matrices and c_ijs" << std::endl;
-      TimerOutput::Scope t(computing_timer_, "offline_data - assemble c_ij");
+      deallog << "        assemble mass matrices, beta_ij, and c_ijs"
+              << std::endl;
+      TimerOutput::Scope t(
+          computing_timer_,
+          "offline_data - assemble mass matrices, beta_ij, and c_ij");
 
       WorkStream::run(dof_handler_.begin_active(),
                       dof_handler_.end(),
@@ -473,6 +478,106 @@ namespace grendel
         normal /= (normal.norm() + std::numeric_limits<double>::epsilon());
       }
     }
+
+    /*
+     * Second pass: Fix up boundary cijs:
+     */
+
+    /* The local, per-cell assembly routine: */
+
+    const auto local_assemble_system_cij = [&](const auto &cell,
+                                               auto &scratch,
+                                               auto &copy) {
+      /* iterate over locally owned cells and the ghost layer */
+
+      auto &is_artificial = copy.is_artificial_;
+      auto &local_dof_indices = copy.local_dof_indices_;
+
+      auto &cell_cij_matrix = copy.cell_cij_matrix_;
+
+      auto &fe_face_values = scratch.fe_face_values_;
+
+      is_artificial = cell->is_artificial();
+      if (is_artificial)
+        return;
+
+      for (auto &matrix : cell_cij_matrix)
+        matrix.reinit(dofs_per_cell, dofs_per_cell);
+
+      local_dof_indices.resize(dofs_per_cell);
+      cell->get_dof_indices(local_dof_indices);
+
+      /* clear out copy data: */
+      for (auto &matrix : cell_cij_matrix)
+        matrix = 0.;
+
+      for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f) {
+        const auto face = cell->face(f);
+        const auto id = face->boundary_id();
+
+        if (!face->at_boundary())
+          continue;
+
+        if (id != Boundary::slip)
+          continue;
+
+        fe_face_values.reinit(cell, f);
+        const unsigned int n_face_q_points = scratch.face_quadrature_.size();
+
+        for (unsigned int q = 0; q < n_face_q_points; ++q) {
+
+          const auto JxW = fe_face_values.JxW(q);
+          const auto normal_q = fe_face_values.normal_vector(q);
+
+          for (unsigned int j = 0; j < dofs_per_cell; ++j) {
+            if (!discretization_->finite_element().has_support_on_face(j, f))
+              continue;
+
+            const auto &[normal_j, _1, _2] =
+                boundary_normal_map_[local_dof_indices[j]];
+
+            const auto value_JxW = fe_face_values.shape_value(j, q) * JxW;
+
+            for (unsigned int i = 0; i < dofs_per_cell; ++i) {
+              const auto value = fe_face_values.shape_value(i, q);
+
+              for (unsigned int d = 0; d < dim; ++d)
+                cell_cij_matrix[d](i, j) +=
+                    (normal_j[d] - normal_q[d]) * (value * value_JxW);
+            } /* i */
+          }   /* j */
+        }     /* q */
+      }       /* f */
+    };
+
+    const auto copy_local_to_global_cij = [&](const auto &copy) {
+      const auto &is_artificial = copy.is_artificial_;
+      const auto &local_dof_indices = copy.local_dof_indices_;
+      const auto &cell_cij_matrix = copy.cell_cij_matrix_;
+
+      if (is_artificial)
+        return;
+
+      for (int k = 0; k < dim; ++k) {
+        affine_constraints_.distribute_local_to_global(
+            cell_cij_matrix[k], local_dof_indices, cij_matrix_[k]);
+      }
+    };
+
+    {
+      deallog << "        fix boundary c_ijs" << std::endl;
+      TimerOutput::Scope t(computing_timer_,
+                           "offline_data - fix boundary c_ij");
+
+      WorkStream::run(dof_handler_.begin_active(),
+                      dof_handler_.end(),
+                      local_assemble_system_cij,
+                      copy_local_to_global_cij,
+                      AssemblyScratchData<dim>(*discretization_),
+                      AssemblyCopyData<dim>());
+    }
+
+
   }
 
 } /* namespace grendel */
