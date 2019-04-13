@@ -337,10 +337,16 @@ namespace grendel
         return;
 
       for (const auto &it : local_boundary_normal_map) {
-        auto &jt = boundary_normal_map_[it.first];
-        std::get<0>(jt) += std::get<0>(it.second);
-        std::get<1>(jt) = std::get<1>(it.second);
-        std::get<2>(jt) = std::get<2>(it.second);
+        auto &[normal, id, position] = boundary_normal_map_[it.first];
+        auto &[new_normal, new_id, new_position] = it.second;
+
+        normal += new_normal;
+        /*
+         * Ensure that we record the highest boundary indicator for a given
+         * degree of freedom (higher indicators take precedence):
+         */
+        id = std::max(id, new_id);
+        position = new_position;
       }
 
       affine_constraints_.distribute_local_to_global(
