@@ -686,7 +686,7 @@ namespace grendel
 
           /* On boundary 1 remove the normal component of the momentum: */
 
-          if (id == 1) {
+          if (id == Boundary::slip) {
             auto m = ProblemDescription<dim>::momentum(U_i);
             m -= 1. * (m * normal) * normal;
             for (unsigned int k = 0; k < dim; ++k)
@@ -695,7 +695,7 @@ namespace grendel
 
           /* On boundary 2 enforce initial conditions: */
 
-          if (id == 2) {
+          if (id == Boundary::dirichlet) {
             U_i = initial_values_->initial_state(position, t + tau);
           }
 
