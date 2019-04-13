@@ -210,7 +210,7 @@ namespace grendel
     /*
      * Add a random perturbation to the original function object:
      */
-    if(perturbation_ != 0.) {
+    if (perturbation_ != 0.) {
       initial_state_ = [old_state = this->initial_state_,
                         perturbation = this->perturbation_](
                            const dealii::Point<dim> &point, double t) {
@@ -225,8 +225,6 @@ namespace grendel
         return state;
       };
     }
-
-
   }
 
 } /* namespace grendel */

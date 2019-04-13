@@ -65,7 +65,6 @@ namespace grendel
     limit(const Bounds &bounds, const rank1_type U, const rank1_type P_ij);
 
   private:
-
     Bounds bounds_;
 
     double s_interp_max;
@@ -73,12 +72,11 @@ namespace grendel
 
 
   template <int dim>
-  inline DEAL_II_ALWAYS_INLINE void
-  Limiter<dim>::reset()
+  inline DEAL_II_ALWAYS_INLINE void Limiter<dim>::reset()
   {
     auto &[rho_min, rho_max, rho_epsilon_min, s_min] = bounds_;
 
-    if constexpr(limiter_ == Limiters::none)
+    if constexpr (limiter_ == Limiters::none)
       return;
 
     rho_min = std::numeric_limits<double>::max();
@@ -105,7 +103,7 @@ namespace grendel
   {
     auto &[rho_min, rho_max, rho_epsilon_min, s_min] = bounds_;
 
-    if constexpr(limiter_ == Limiters::none)
+    if constexpr (limiter_ == Limiters::none)
       return;
 
     const auto rho_ij = U_ij_bar[0];
@@ -122,7 +120,7 @@ namespace grendel
       const auto s = ProblemDescription<dim>::specific_entropy(U_j);
       s_min = std::min(s_min, s);
 
-      if(jt->row() != jt->column()) {
+      if (jt->row() != jt->column()) {
         const double s_interp =
             ProblemDescription<dim>::specific_entropy((U_i + U_j) / 2.);
         s_interp_max = std::max(s_interp_max, s_interp);
@@ -137,7 +135,7 @@ namespace grendel
   {
     auto &[rho_min, rho_max, rho_epsilon_min, s_min] = bounds_;
 
-    if constexpr(limiter_ == Limiters::none)
+    if constexpr (limiter_ == Limiters::none)
       return;
 
     const auto r_i =
@@ -149,7 +147,6 @@ namespace grendel
     if constexpr (limiter_ == Limiters::specific_entropy) {
       s_min = std::max((1 - r_i) * s_min, 2. * s_min - s_interp_max);
     }
-
   }
 
 
@@ -162,14 +159,15 @@ namespace grendel
 
 
   template <int dim>
-  inline DEAL_II_ALWAYS_INLINE double Limiter<dim>::limit(
-      const Bounds &bounds, const rank1_type U, const rank1_type P_ij)
+  inline DEAL_II_ALWAYS_INLINE double Limiter<dim>::limit(const Bounds &bounds,
+                                                          const rank1_type U,
+                                                          const rank1_type P_ij)
   {
     auto &[rho_min, rho_max, rho_epsilon_min, s_min] = bounds;
 
     double l_ij = 1.;
 
-    if constexpr(limiter_ == Limiters::none)
+    if constexpr (limiter_ == Limiters::none)
       return l_ij;
 
     /*
@@ -187,12 +185,12 @@ namespace grendel
       constexpr double eps_ = std::numeric_limits<double>::epsilon();
 
       if (U_i_rho + P_ij_rho < rho_min)
-        t_0 = std::abs(rho_min - U_i_rho) /
-                   (std::abs(P_ij_rho) + eps_ * rho_max);
+        t_0 =
+            std::abs(rho_min - U_i_rho) / (std::abs(P_ij_rho) + eps_ * rho_max);
 
       else if (rho_max < U_i_rho + P_ij_rho)
-        t_0 = std::abs(rho_max - U_i_rho) /
-                   (std::abs(P_ij_rho) + eps_ * rho_max);
+        t_0 =
+            std::abs(rho_max - U_i_rho) / (std::abs(P_ij_rho) + eps_ * rho_max);
 
       l_ij = std::min(l_ij, t_0);
 
@@ -201,7 +199,7 @@ namespace grendel
                                 "- Negative density."));
     }
 
-    if constexpr(limiter_ == Limiters::rho)
+    if constexpr (limiter_ == Limiters::rho)
       return l_ij;
 
     /*
@@ -221,10 +219,10 @@ namespace grendel
       const double c =
           (U_i_E - rho_epsilon_min) * U_i_rho - 1. / 2. * U_i_m.norm_square();
 
-      const double b = (U_i_E - rho_epsilon_min) * P_ij_rho +
-                       P_ij_E * U_i_rho - U_i_m * P_ij_m;
+      const double b = (U_i_E - rho_epsilon_min) * P_ij_rho + P_ij_E * U_i_rho -
+                       U_i_m * P_ij_m;
 
-      const double a = P_ij_E * P_ij_rho  - 1. / 2. * P_ij_m.norm_square();
+      const double a = P_ij_E * P_ij_rho - 1. / 2. * P_ij_m.norm_square();
 
       /*
        * Solve the quadratic equation a t^2 + b t + c = 0 by hand. We use the
@@ -279,8 +277,7 @@ namespace grendel
      * See [Guermond, Nazarov, Popov, Thomas], Section 4.6 + Section 5.1:
      */
 
-    if constexpr (limiter_ == Limiters::specific_entropy)
-    {
+    if constexpr (limiter_ == Limiters::specific_entropy) {
       /*
        * Prepare a Newton secant method:
        */
@@ -288,7 +285,7 @@ namespace grendel
       double t_l = 0.;
       double t_r = l_ij;
 
-      if(t_r <= 0. + line_search_eps_)
+      if (t_r <= 0. + line_search_eps_)
         return 0.;
 
       if (t_r < t_l + line_search_eps_) {
@@ -357,10 +354,10 @@ namespace grendel
 
         /* Handle some pathological cases that happen in regions with
          * constant specific entropy: */
-        if(std::isnan(t_l)) {
+        if (std::isnan(t_l)) {
           return l_ij;
         }
-        if(std::isnan(t_r)) {
+        if (std::isnan(t_r)) {
           return l_ij;
         }
 

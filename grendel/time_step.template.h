@@ -147,7 +147,7 @@ namespace grendel
     {
       deallog << "        compute d_ij, and alpha_i" << std::endl;
       TimerOutput::Scope time(computing_timer_,
-                           "time_step - 1 compute d_ij, and alpha_i");
+                              "time_step - 1 compute d_ij, and alpha_i");
 
       const auto on_subranges = [&](auto i1, const auto i2) {
         /* Stored thread locally: */
@@ -279,7 +279,7 @@ namespace grendel
 
             // FIXME The numerical constant 8. is up to debate
             rho_relaxation_numerator +=
-                8.* 0.5 * beta_ij * (delta_rho_i + delta_rho_j);
+                8. * 0.5 * beta_ij * (delta_rho_i + delta_rho_j);
             rho_relaxation_denominator += beta_ij;
 
             d_sum -= get_entry(dij_matrix_, jt);
@@ -591,7 +591,8 @@ namespace grendel
         {
           const auto on_subranges = [&](auto i1, const auto i2) {
             /* Translate the local index into a index set iterator:: */
-            auto it = locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
+            auto it =
+                locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
             for (; i1 < i2; ++i1, ++it) {
               const auto i = *it;
               for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {

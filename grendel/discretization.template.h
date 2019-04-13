@@ -118,19 +118,16 @@ namespace grendel
     /* Wall: */
 
     wall_length_ = 3.2;
-    add_parameter("wall - length",
-                  wall_length_,
-                  "Wall: length of computational domain");
+    add_parameter(
+        "wall - length", wall_length_, "Wall: length of computational domain");
 
     wall_height_ = 1.0;
-    add_parameter("wall - height",
-                  wall_height_,
-                  "Wall: height of computational domain");
+    add_parameter(
+        "wall - height", wall_height_, "Wall: height of computational domain");
 
     wall_position_ = 1. / 6.;
-    add_parameter("wall - wall position",
-                  wall_position_,
-                  "Wall: x position of wall");
+    add_parameter(
+        "wall - wall position", wall_position_, "Wall: x position of wall");
 
     /* Options: */
 
@@ -244,10 +241,8 @@ namespace grendel
 
     } else if (geometry_ == "wall") {
 
-      create_coarse_grid_wall(triangulation,
-                              wall_length_,
-                              wall_height_,
-                              wall_position_);
+      create_coarse_grid_wall(
+          triangulation, wall_length_, wall_height_, wall_position_);
 
       triangulation.refine_global(refinement_);
 

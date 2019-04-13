@@ -24,10 +24,11 @@ namespace grendel
         std::array<dealii::LinearAlgebra::distributed::Vector<double>,
                    problem_dimension>;
 
-    SchlierenPostprocessor(const MPI_Comm &mpi_communicator,
-             dealii::TimerOutput &computing_timer,
-             const grendel::OfflineData<dim> &offline_data,
-             const std::string &subsection = "SchlierenPostprocessor");
+    SchlierenPostprocessor(
+        const MPI_Comm &mpi_communicator,
+        dealii::TimerOutput &computing_timer,
+        const grendel::OfflineData<dim> &offline_data,
+        const std::string &subsection = "SchlierenPostprocessor");
 
     virtual ~SchlierenPostprocessor() final = default;
 

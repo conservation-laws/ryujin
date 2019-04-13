@@ -269,7 +269,7 @@ namespace grendel
       for (unsigned int q_point = 0; q_point < n_q_points; ++q_point) {
         const auto JxW = fe_values.JxW(q_point);
 
-        if(cell->is_locally_owned())
+        if (cell->is_locally_owned())
           cell_measure += JxW;
 
         for (unsigned int j = 0; j < dofs_per_cell; ++j) {
@@ -406,10 +406,10 @@ namespace grendel
       dealii::LinearAlgebra::distributed::Vector<double> temp_(
           locally_owned_, locally_relevant_, mpi_communicator_);
 
-      for(auto i : locally_owned_)
+      for (auto i : locally_owned_)
         temp_[i] = lumped_mass_matrix_.diag_element(i);
       temp_.update_ghost_values();
-      for(auto i : locally_relevant_)
+      for (auto i : locally_relevant_)
         lumped_mass_matrix_.diag_element(i) = temp_[i];
     }
 
@@ -457,12 +457,13 @@ namespace grendel
       TimerOutput::Scope t(computing_timer_,
                            "offline_data - compute b_ij, |c_ij|, and n_ij");
 
-      WorkStream::run(locally_relevant_.begin(),
-                      locally_relevant_.end(),
-                      on_subranges,
-                      [](const auto &) {},
-                      double(),
-                      double());
+      WorkStream::run(
+          locally_relevant_.begin(),
+          locally_relevant_.end(),
+          on_subranges,
+          [](const auto &) {},
+          double(),
+          double());
 
       /*
        * And also normalize our boundary normals:

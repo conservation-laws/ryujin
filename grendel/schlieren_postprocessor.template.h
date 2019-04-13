@@ -115,7 +115,7 @@ namespace grendel
             const auto [normal, id, _] = bnm_it->second;
             if (id == Boundary::slip) {
               r_i -= 1. * (r_i * normal) * normal;
-            } else  {
+            } else {
               /*
                * FIXME: This is not particularly elegant. On all other
                * boundary types, we simply set r_i to zero.

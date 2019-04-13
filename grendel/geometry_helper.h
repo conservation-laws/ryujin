@@ -195,11 +195,11 @@ namespace grendel
               face->set_boundary_id(Boundary::slip);
 
           else
-            /* The right side of the domain: */
-            if (periodic)
-              face->set_boundary_id(Boundary::dirichlet);
-            else
-              face->set_boundary_id(Boundary::do_nothing);
+              /* The right side of the domain: */
+              if (periodic)
+            face->set_boundary_id(Boundary::dirichlet);
+          else
+            face->set_boundary_id(Boundary::do_nothing);
         }
       }
     }
@@ -336,7 +336,7 @@ namespace grendel
         if (distance < 1.e-6) {
           for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f) {
             const auto face = cell->face(f);
-            if(face->at_boundary())
+            if (face->at_boundary())
               face->set_manifold_id(Boundary::slip);
             cell->set_manifold_id(1); // temporarily for second loop
           }
@@ -468,7 +468,6 @@ namespace grendel
         face->set_boundary_id(Boundary::slip);
       }
     }
-
   }
 
 
