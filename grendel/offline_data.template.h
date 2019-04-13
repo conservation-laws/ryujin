@@ -331,8 +331,13 @@ namespace grendel
             if (cell->vertex_dof_index(v, 0) == index)
               position = cell->vertex(v);
 
+          /*
+           * Ensure that we record the highest boundary indicator for a
+           * given degree of freedom (higher indicators take precedence):
+           */
+          const auto old_id = std::get<1>(local_boundary_normal_map[index]);
           local_boundary_normal_map[index] =
-              std::make_tuple(normal, id, position);
+              std::make_tuple(normal, std::max(old_id, id), position);
         }
       }
     };
