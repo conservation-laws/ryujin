@@ -202,7 +202,6 @@ namespace grendel
               face->set_boundary_id(Boundary::dirichlet);
             else
               face->set_boundary_id(Boundary::do_nothing);
-            face->set_boundary_id(Boundary::dirichlet);
           }
         }
       }
