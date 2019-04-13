@@ -109,7 +109,7 @@ namespace grendel
      * In this case we assume that the mesh is in "normal configuration":
      */
 
-    for (int i = 0; i < dim; ++i)
+    for (int i = 1; i < dim; ++i) /* omit x direction! */
       DoFTools::make_periodicity_constraints(dof_handler_,
                                              /*b_id    */ 3,
                                              /*direction*/ i,
