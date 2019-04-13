@@ -565,9 +565,9 @@ namespace grendel
     };
 
     {
-      deallog << "        fix boundary c_ijs" << std::endl;
+      deallog << "        fix slip boundary c_ijs" << std::endl;
       TimerOutput::Scope t(computing_timer_,
-                           "offline_data - fix boundary c_ij");
+                           "offline_data - fix slip boundary c_ij");
 
       WorkStream::run(dof_handler_.begin_active(),
                       dof_handler_.end(),
@@ -576,8 +576,6 @@ namespace grendel
                       AssemblyScratchData<dim>(*discretization_),
                       AssemblyCopyData<dim>());
     }
-
-
   }
 
 } /* namespace grendel */
