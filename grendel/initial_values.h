@@ -49,8 +49,8 @@ namespace grendel
      * configuration and want to compare the numerical computation against
      * it.
      */
-    inline DEAL_II_ALWAYS_INLINE rank1_type
-    initial_state(const dealii::Point<dim> &point, double t) const;
+    const std::function<rank1_type(const dealii::Point<dim> &point, double t)>
+        &initial_state;
 
 
   private:
@@ -64,22 +64,15 @@ namespace grendel
 
     double initial_vortex_beta_;
 
+    double perturbation_;
+
     /*
      * Internal function object that we used to implement the
      * internal_state function for all internal states:
      */
     std::function<rank1_type(const dealii::Point<dim> &point, double t)>
-        initial_state_internal;
+        initial_state_;
   };
-
-
-  template <int dim>
-  inline DEAL_II_ALWAYS_INLINE typename InitialValues<dim>::rank1_type
-  InitialValues<dim>::initial_state(const dealii::Point<dim> &point,
-                                         double t) const
-  {
-    return initial_state_internal(point, t);
-  }
 
 } /* namespace grendel */
 

@@ -3,6 +3,8 @@
 
 #include "initial_values.h"
 
+#include <random>
+
 namespace grendel
 {
   using namespace dealii;
@@ -10,6 +12,7 @@ namespace grendel
   template <int dim>
   InitialValues<dim>::InitialValues(const std::string &subsection)
       : ParameterAcceptor(subsection)
+      , initial_state(initial_state_)
   {
     ParameterAcceptor::parse_parameters_call_back.connect(
         std::bind(&InitialValues<dim>::parse_parameters_callback, this));
@@ -22,16 +25,14 @@ namespace grendel
         "\"sod contrast\", \"isentropic vortex\"");
 
     initial_direction_[0] = 1.;
-    add_parameter(
-        "initial - direction",
-        initial_direction_,
-        "Initial direction of shock front, sod contrast, or vortex");
+    add_parameter("initial - direction",
+                  initial_direction_,
+                  "Initial direction of shock front, sod contrast, or vortex");
 
     initial_position_[0] = 1.;
-    add_parameter(
-        "initial - position",
-        initial_position_,
-        "Initial position of shock front, sod contrast, or vortex");
+    add_parameter("initial - position",
+                  initial_position_,
+                  "Initial position of shock front, sod contrast, or vortex");
 
     initial_1d_state_[0] = gamma;
     initial_1d_state_[1] = 0.;
@@ -48,10 +49,15 @@ namespace grendel
                   "isentropic vortex");
 
     initial_vortex_beta_ = 5.0;
-    add_parameter(
-        "vortex - beta",
-        initial_vortex_beta_,
-        "Isentropic vortex strength beta");
+    add_parameter("vortex - beta",
+                  initial_vortex_beta_,
+                  "Isentropic vortex strength beta");
+
+    perturbation_ = 0.;
+    add_parameter("perturbation",
+                  perturbation_,
+                  "Add a random perturbation of the specified magnitude to the "
+                  "initial state.");
   }
 
 
@@ -90,7 +96,7 @@ namespace grendel
 
 
     /*
-     * Now populate the initial_state_internal function object:
+     * Now populate the initial_state_ function object:
      */
 
     if (configuration_ == "uniform") {
@@ -99,8 +105,7 @@ namespace grendel
        * A uniform flow:
        */
 
-      initial_state_internal = [=](const dealii::Point<dim> & /*point*/,
-                                   double /*t*/) {
+      initial_state_ = [=](const dealii::Point<dim> & /*point*/, double /*t*/) {
         return from_1d_state(initial_1d_state_);
       };
 
@@ -110,9 +115,9 @@ namespace grendel
        * Mach shock front S1/S3:
        */
 
-      const auto & rho_R = initial_1d_state_[0];
-      const auto & u_R = initial_1d_state_[1];
-      const auto & p_R = initial_1d_state_[2];
+      const auto &rho_R = initial_1d_state_[0];
+      const auto &u_R = initial_1d_state_[1];
+      const auto &p_R = initial_1d_state_[2];
       const double mach_S = initial_mach_number_;
 
       /* a_R^2 = gamma * p / rho / (1 - b * rho) */
@@ -130,7 +135,7 @@ namespace grendel
 
       dealii::Tensor<1, 3, double> initial_1d_state_L{{rho_L, u_L, p_L}};
 
-      initial_state_internal = [=](const dealii::Point<dim> &point, double t) {
+      initial_state_ = [=](const dealii::Point<dim> &point, double t) {
         const double position_1d =
             (point - initial_position_) * initial_direction_ - S3 * t;
 
@@ -150,8 +155,7 @@ namespace grendel
       dealii::Tensor<1, 3, double> initial_1d_state_L{{0.125, 0.0, 0.1}};
       dealii::Tensor<1, 3, double> initial_1d_state_R{{1.0, 0.0, 1.0}};
 
-      initial_state_internal = [=](const dealii::Point<dim> &point,
-                                   double /*t*/) {
+      initial_state_ = [=](const dealii::Point<dim> &point, double /*t*/) {
         const double position_1d =
             (point - initial_position_) * initial_direction_;
 
@@ -169,9 +173,8 @@ namespace grendel
        * limiting paper by Guermond et al.
        */
 
-      if constexpr(dim == 2) {
-        initial_state_internal = [=](const dealii::Point<dim> &point,
-                                     double t) {
+      if constexpr (dim == 2) {
+        initial_state_ = [=](const dealii::Point<dim> &point, double t) {
           const auto point_bar = point - initial_position_ -
                                  initial_direction_ * initial_mach_number_ * t;
           const double r_square = point_bar.norm_square();
@@ -203,6 +206,27 @@ namespace grendel
 
       AssertThrow(false, dealii::ExcMessage("Unknown initial state."));
     }
+
+    /*
+     * Add a random perturbation to the original function object:
+     */
+    if(perturbation_ != 0.) {
+      initial_state_ = [old_state = this->initial_state_,
+                        perturbation = this->perturbation_](
+                           const dealii::Point<dim> &point, double t) {
+        static std::default_random_engine generator;
+        static std::uniform_real_distribution<double> distribution(-1., 1.);
+        auto draw = std::bind(distribution, generator);
+
+        auto state = old_state(point, t);
+        for (unsigned int i = 0; i < problem_dimension; ++i)
+          state[i] *= (1. + perturbation * draw());
+
+        return state;
+      };
+    }
+
+
   }
 
 } /* namespace grendel */
