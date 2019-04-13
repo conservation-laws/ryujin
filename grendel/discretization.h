@@ -15,9 +15,9 @@ namespace grendel
 
   enum Boundary : dealii::types::boundary_id {
     do_nothing = 0,
-    slip = 1,
-    dirichlet = 2,
-    periodic = 3
+    periodic = 1,
+    slip = 2,
+    dirichlet = 3,
   };
 
   /**

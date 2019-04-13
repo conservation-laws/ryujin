@@ -102,18 +102,32 @@ namespace grendel
 
     affine_constraints_.clear();
 
-    DoFTools::make_hanging_node_constraints(dof_handler_, affine_constraints_);
-
     /*
-     * We use boundary indicator 3 to denote periodic boundary conditions.
-     * In this case we assume that the mesh is in "normal configuration":
+     * Enforce periodic boundary conditions. In this case we assume that
+     * the mesh is in "normal configuration":
      */
 
     for (int i = 1; i < dim; ++i) /* omit x direction! */
       DoFTools::make_periodicity_constraints(dof_handler_,
-                                             /*b_id    */ 3,
+                                             /*b_id */ Boundary::periodic,
                                              /*direction*/ i,
                                              affine_constraints_);
+
+    /*
+     * Ensure that dirichlet boundary conditions take precedence over
+     * periodic boundary conditions:
+     */
+
+    for (auto &cell : dof_handler_.active_cell_iterators())
+      for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f) {
+        const auto face = cell->face(f);
+
+        if (!face->at_boundary() || face->boundary_id() != Boundary::dirichlet)
+          continue;
+      }
+
+
+    DoFTools::make_hanging_node_constraints(dof_handler_, affine_constraints_);
 
     affine_constraints_.close();
 
