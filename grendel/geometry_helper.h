@@ -180,22 +180,25 @@ namespace grendel
           face->set_boundary_id(2);
 
         } else {
-          /*
-           * We want slip boundary conditions, or periodic conditions (i.e.
-           * indicator 1/3) at top and bottom of the rectangle. On the left
-           * side we enforce initial conditionas and leave the boundary
-           * indicator on the right side at 0, i.e. do nothing.
-           */
+
           const auto center = face->center();
           if (center[0] < -length / 2. + 1.e-6)
+            /* Dirichlet conditions for inflow: */
             face->set_boundary_id(2);
+
           else if (std::abs(center[1]) > diameter / 2. - 1.e-6)
+            /* Top and bottom of computational domain: */
             if (periodic)
               face->set_boundary_id(3);
             else
               face->set_boundary_id(1);
+
           else
-            face->set_boundary_id(0);
+            /* The right side of the domain: */
+            if (periodic)
+              face->set_boundary_id(2);
+            else
+              face->set_boundary_id(0);
         }
       }
     }
@@ -208,7 +211,7 @@ namespace grendel
       const double length,
       const double diameter,
       const bool prescribe,
-      const bool periodic)
+      const bool /*periodic*/)
   {
     using namespace dealii;
 
