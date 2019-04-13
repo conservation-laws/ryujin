@@ -99,7 +99,7 @@ namespace grendel
          */
         const auto center = face->center();
         if (center[0] > 0. && center[0] < length)
-          face->set_boundary_id(1);
+          face->set_boundary_id(Boundary::slip);
       }
     }
   }
@@ -134,18 +134,19 @@ namespace grendel
       const bool periodic)
   {
     dealii::GridGenerator::hyper_cube(triangulation, 0., length);
+    const auto cell = triangulation.begin_active();
     if (prescribe) {
       /* Dirichlet data: */
-      triangulation.begin_active()->face(0)->set_boundary_id(2);
-      triangulation.begin_active()->face(1)->set_boundary_id(2);
+      cell->face(0)->set_boundary_id(Boundary::dirichlet);
+      cell->face(1)->set_boundary_id(Boundary::dirichlet);
     } else if (periodic) {
       /* Periodic data: */
-      triangulation.begin_active()->face(0)->set_boundary_id(3);
-      triangulation.begin_active()->face(1)->set_boundary_id(3);
+      cell->face(0)->set_boundary_id(Boundary::periodic);
+      cell->face(1)->set_boundary_id(Boundary::periodic);
     } else {
       /* Do nothing: */
-      triangulation.begin_active()->face(0)->set_boundary_id(0);
-      triangulation.begin_active()->face(1)->set_boundary_id(0);
+      cell->face(0)->set_boundary_id(Boundary::do_nothing);
+      cell->face(1)->set_boundary_id(Boundary::do_nothing);
     }
   }
 
@@ -177,28 +178,28 @@ namespace grendel
 
         if (prescribe) {
           /* Dirichlet data: */
-          face->set_boundary_id(2);
+          face->set_boundary_id(Boundary::dirichlet);
 
         } else {
 
           const auto center = face->center();
           if (center[0] < -length / 2. + 1.e-6)
             /* Dirichlet conditions for inflow: */
-            face->set_boundary_id(2);
+            face->set_boundary_id(Boundary::dirichlet);
 
           else if (std::abs(center[1]) > diameter / 2. - 1.e-6)
             /* Top and bottom of computational domain: */
             if (periodic)
-              face->set_boundary_id(3);
+              face->set_boundary_id(Boundary::periodic);
             else
-              face->set_boundary_id(1);
+              face->set_boundary_id(Boundary::slip);
 
           else
             /* The right side of the domain: */
             if (periodic)
-              face->set_boundary_id(2);
+              face->set_boundary_id(Boundary::dirichlet);
             else
-              face->set_boundary_id(0);
+              face->set_boundary_id(Boundary::do_nothing);
         }
       }
     }
@@ -237,7 +238,7 @@ namespace grendel
 
         if (prescribe) {
           /* Dirichlet data: */
-          face->set_boundary_id(2);
+          face->set_boundary_id(Boundary::dirichlet);
 
         } else {
 
@@ -312,10 +313,10 @@ namespace grendel
         const auto center = face->center();
 
         if (center[0] > 0. + 1.e-6 && center[0] < length - 1.e-6)
-          face->set_boundary_id(1);
+          face->set_boundary_id(Boundary::slip);
 
         if (center[0] < 0. + 1.e-06)
-          face->set_boundary_id(2);
+          face->set_boundary_id(Boundary::dirichlet);
       }
     }
 
@@ -336,7 +337,7 @@ namespace grendel
           for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f) {
             const auto face = cell->face(f);
             if(face->at_boundary())
-              face->set_manifold_id(1);
+              face->set_manifold_id(Boundary::slip);
             cell->set_manifold_id(1); // temporarily for second loop
           }
         }
@@ -453,16 +454,18 @@ namespace grendel
 
         const auto center = face->center();
 
-        if (center[0] > length - disc_position - 1.e-6)
+        if (center[0] > length - disc_position - 1.e-6) {
+          face->set_boundary_id(Boundary::do_nothing);
           continue;
+        }
 
         if (center[0] < -disc_position + 1.e-6) {
-          face->set_boundary_id(2);
+          face->set_boundary_id(Boundary::dirichlet);
           continue;
         }
 
         // the rest:
-        face->set_boundary_id(1);
+        face->set_boundary_id(Boundary::slip);
       }
     }
 
@@ -526,16 +529,20 @@ namespace grendel
 
         const auto center = face->center();
 
-        if (center[0] > wall_position && center[1] < 1.e-6)
-          face->set_boundary_id(1);
-        else if (center[0] > length - 1.e-6)
-          continue;
-        else
-          // the rest:
-          face->set_boundary_id(2);
-      }
-    }
+        if (center[0] > wall_position && center[1] < 1.e-6) {
+          face->set_boundary_id(Boundary::slip);
 
+        } else if (center[0] > length - 1.e-6) {
+
+          face->set_boundary_id(Boundary::do_nothing);
+
+        } else {
+
+          // the rest:
+          face->set_boundary_id(Boundary::dirichlet);
+        }
+      } /*f*/
+    }   /*cell*/
   }
 
 } // namespace grendel

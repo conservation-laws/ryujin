@@ -109,14 +109,19 @@ namespace grendel
             r_i += c_ij * U_js;
           }
 
-          /*
-           * On boundaries remove the normal component of r_i:
-           */
-
+          /* Fix up boundaries: */
           const auto bnm_it = boundary_normal_map.find(i);
           if (bnm_it != boundary_normal_map.end()) {
             const auto [normal, id, _] = bnm_it->second;
-            r_i -= 1. * (r_i * normal) * normal;
+            if (id == Boundary::slip) {
+              r_i -= 1. * (r_i * normal) * normal;
+            } else  {
+              /*
+               * FIXME: This is not particularly elegant. On all other
+               * boundary types, we simply set r_i to zero.
+               */
+              r_i = 0.;
+            }
           }
 
           const double m_i = lumped_mass_matrix.diag_element(i);

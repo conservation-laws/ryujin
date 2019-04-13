@@ -297,9 +297,16 @@ namespace grendel
             continue;
 
           dealii::Tensor<1, dim> normal;
-          for (unsigned int q = 0; q < n_face_q_points; ++q)
-            normal += fe_face_values.normal_vector(q) *
-                      fe_face_values.shape_value(i, q);
+          if (id == Boundary::slip) {
+            /*
+             * Only accumulate a normal if the boundary indicator is for
+             * slip boundary conditions. Otherwise we create a wrong normal
+             * in corners of the computational domain.
+             */
+            for (unsigned int q = 0; q < n_face_q_points; ++q)
+              normal += fe_face_values.normal_vector(q) *
+                        fe_face_values.shape_value(i, q);
+          }
 
           const auto index = local_dof_indices[i];
 
@@ -442,7 +449,7 @@ namespace grendel
        */
       for (auto &it : boundary_normal_map_) {
         auto &[normal, id, _] = it.second;
-        normal /= normal.norm();
+        normal /= (normal.norm() + std::numeric_limits<double>::epsilon());
       }
     }
   }

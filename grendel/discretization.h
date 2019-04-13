@@ -12,6 +12,14 @@
 
 namespace grendel
 {
+
+  enum Boundary : dealii::types::boundary_id {
+    do_nothing = 0,
+    slip = 1,
+    dirichlet = 2,
+    periodic = 3
+  };
+
   /**
    * This class serves as a container for data related to the
    * discretization. This includes the triangulation, finite element,
