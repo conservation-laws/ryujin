@@ -1,6 +1,7 @@
 ADD_LIBRARY(grendel SHARED
   discretization.cc
   initial_values.cc
+  matrix_communicator.cc
   offline_data.cc
   problem_description.cc
   riemann_solver.cc

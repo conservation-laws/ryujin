@@ -30,6 +30,8 @@ namespace grendel
       , computing_timer_(computing_timer)
       , offline_data_(&offline_data)
       , initial_values_(&initial_values)
+      , lij_matrix_communicator_(
+            mpi_communicator, computing_timer, offline_data, lij_matrix_)
   {
     use_ssprk3_ = order_ == Order::second_order;
     add_parameter(
@@ -85,33 +87,8 @@ namespace grendel
     dij_matrix_.reinit(sparsity);
     lij_matrix_.reinit(sparsity);
 
-    // BEGIN workaround
-    if (Utilities::MPI::n_mpi_processes(mpi_communicator_) > 1) {
-      const auto &extended_sparsity =
-          offline_data_->extended_sparsity_pattern();
-
-      Assert(sparsity.is_compressed(), dealii::ExcInternalError());
-      Assert(extended_sparsity.is_compressed(), dealii::ExcInternalError());
-
-      indices_.reinit(sparsity);
-
-      for (auto i : locally_relevant) {
-        auto ejt = extended_sparsity.begin(i);
-        unsigned int local_index = 0;
-
-        for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
-          for (; ejt->column() != jt->column(); ++ejt)
-            local_index++;
-
-          set_entry(indices_, jt, local_index);
-        }
-      }
-
-      unsigned int n = sparsity.max_entries_per_row();
-      n = Utilities::MPI::max(n, mpi_communicator_);
-      lij_temp_.resize(n, exemplar);
-    }
-    // END workaround
+    if (Utilities::MPI::n_mpi_processes(mpi_communicator_) > 1)
+      lij_matrix_communicator_.prepare();
   }
 
 
@@ -537,56 +514,8 @@ namespace grendel
         TimerOutput::Scope time(computing_timer_,
                                 "time_step - 6 symmetrize l_ij");
 
-        // BEGIN workaround
-        if (Utilities::MPI::n_mpi_processes(mpi_communicator_) > 1) {
-          {
-            const auto on_subranges = [&](auto i1, const auto i2) {
-              /* Translate the local index into a index set iterator:: */
-              auto it =
-                  locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
-              for (; i1 < i2; ++i1, ++it) {
-                const auto i = *it;
-
-                if (!locally_owned.is_element(i))
-                  continue;
-
-                for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
-                  const auto jt_local_index = get_entry(indices_, jt);
-                  lij_temp_[jt_local_index][i] = get_entry(lij_matrix_, jt);
-                }
-              }
-            };
-
-            parallel::apply_to_subranges(
-                indices.begin(), indices.end(), on_subranges, 4096);
-          }
-
-          for (auto &it : lij_temp_)
-            it.update_ghost_values();
-
-          {
-            const auto on_subranges = [&](auto i1, const auto i2) {
-              /* Translate the local index into a index set iterator:: */
-              auto it =
-                  locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
-              for (; i1 < i2; ++i1, ++it) {
-                const auto i = *it;
-
-                if (locally_owned.is_element(i))
-                  continue;
-
-                for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
-                  const auto jt_local_index = get_entry(indices_, jt);
-                  set_entry(lij_matrix_, jt, lij_temp_[jt_local_index][i]);
-                }
-              }
-            };
-
-            parallel::apply_to_subranges(
-                indices.begin(), indices.end(), on_subranges, 4096);
-          }
-        }
-        // END workaround
+        if (Utilities::MPI::n_mpi_processes(mpi_communicator_) > 1)
+          lij_matrix_communicator_.synchronize();
 
         {
           const auto on_subranges = [&](auto i1, const auto i2) {

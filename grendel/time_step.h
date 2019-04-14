@@ -4,6 +4,7 @@
 #include "helper.h"
 #include "initial_values.h"
 #include "limiter.h"
+#include "matrix_communicator.h"
 #include "offline_data.h"
 #include "problem_description.h"
 
@@ -106,15 +107,7 @@ namespace grendel
     vector_type r_;
 
     dealii::SparseMatrix<double> lij_matrix_;
-
-    // BEGIN workaround
-    /*
-     * Workaround: We use a number of temporary vectors in order to
-     * efficiently distribute the "ghost layer" of the sparse matrix
-     */
-    dealii::SparseMatrix<unsigned int> indices_;
-    std::vector<dealii::LinearAlgebra::distributed::Vector<double>> lij_temp_;
-    // END workaround
+    MatrixCommunicator<dim> lij_matrix_communicator_;
 
     std::array<dealii::SparseMatrix<double>, problem_dimension> pij_matrix_;
 
