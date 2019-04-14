@@ -34,6 +34,8 @@ namespace grendel
       specific_entropy
     } limiter_ = Limiters::specific_entropy;
 
+    static constexpr bool relax_bounds_ = true;
+
     static constexpr unsigned int relaxation_order_ = 3;
 
     static constexpr double line_search_eps_ = 1.e-8;
@@ -133,19 +135,21 @@ namespace grendel
   inline DEAL_II_ALWAYS_INLINE void
   Limiter<dim>::apply_relaxation(double hd_i, double rho_relaxation)
   {
-    auto &[rho_min, rho_max, rho_epsilon_min, s_min] = bounds_;
+    if constexpr (relax_bounds_) {
+      auto &[rho_min, rho_max, rho_epsilon_min, s_min] = bounds_;
 
-    if constexpr (limiter_ == Limiters::none)
-      return;
+      if constexpr (limiter_ == Limiters::none)
+        return;
 
-    const auto r_i =
-        2. * std::pow(std::sqrt(std::sqrt(hd_i)), relaxation_order_);
+      const auto r_i =
+          2. * std::pow(std::sqrt(std::sqrt(hd_i)), relaxation_order_);
 
-    rho_min = std::max((1 - r_i) * rho_min, rho_min - rho_relaxation);
-    rho_max = std::min((1 + r_i) * rho_max, rho_max + rho_relaxation);
+      rho_min = std::max((1 - r_i) * rho_min, rho_min - rho_relaxation);
+      rho_max = std::min((1 + r_i) * rho_max, rho_max + rho_relaxation);
 
-    if constexpr (limiter_ == Limiters::specific_entropy) {
-      s_min = std::max((1 - r_i) * s_min, 2. * s_min - s_interp_max);
+      if constexpr (limiter_ == Limiters::specific_entropy) {
+        s_min = std::max((1 - r_i) * s_min, 2. * s_min - s_interp_max);
+      }
     }
   }
 
