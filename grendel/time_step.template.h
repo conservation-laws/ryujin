@@ -85,8 +85,8 @@ namespace grendel
       it.reinit(sparsity);
 
     dij_matrix_.reinit(sparsity);
-    lij_matrix_.reinit(sparsity);
 
+    lij_matrix_.reinit(sparsity);
     if (Utilities::MPI::n_mpi_processes(mpi_communicator_) > 1)
       lij_matrix_communicator_.prepare();
   }
@@ -254,9 +254,9 @@ namespace grendel
             const double delta_rho_j = rho_second_variation_[j];
             const auto beta_ij = get_entry(betaij_matrix, jt);
 
-            // FIXME The numerical constant 8. is up to debate
+            /* The numerical constant 8 is up to debate... */
             rho_relaxation_numerator +=
-                8. * 0.5 * beta_ij * (delta_rho_i + delta_rho_j);
+                8.0 * 0.5 * beta_ij * (delta_rho_i + delta_rho_j);
             rho_relaxation_denominator += beta_ij;
 
             d_sum -= get_entry(dij_matrix_, jt);
