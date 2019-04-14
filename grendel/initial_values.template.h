@@ -166,7 +166,7 @@ namespace grendel
         }
       };
 
-    } else if (configuration_ == "vortex") {
+    } else if (configuration_ == "isentropic vortex") {
 
       /*
        * 2D isentropic vortex problem. See section 5.6 of Euler-convex
