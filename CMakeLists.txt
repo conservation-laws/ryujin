@@ -18,17 +18,18 @@ IF(CMAKE_CXX_COMPILER MATCHES "clang")
     )
   STRING(APPEND DEAL_II_LINKER_FLAGS " -Wl,-as-needed")
 
-#    STRING(APPEND DEAL_II_CXX_FLAGS_DEBUG
-#      " -fsanitize=address -fsanitize-address-use-after-scope"
-#      )
-#    STRING(APPEND DEAL_II_LINKER_FLAGS_DEBUG
-#      " -fsanitize=address -fsanitize-address-use-after-scope"
-#      )
+  STRING(APPEND DEAL_II_CXX_FLAGS_RELEASE
+    " -march=native -Ofast -ffp-contract=fast"
+    )
+
+  STRING(APPEND DEAL_II_CXX_FLAGS_DEBUG
+    " -fsanitize=address -fsanitize-address-use-after-scope"
+    )
+  STRING(APPEND DEAL_II_LINKER_FLAGS_DEBUG
+    " -fsanitize=address -fsanitize-address-use-after-scope"
+    )
 ENDIF()
 
-STRING(APPEND DEAL_II_CXX_FLAGS_RELEASE
-  " -march=native -Ofast -ffp-contract=fast"
-  )
 
 PROJECT(ryujin CXX)
 
