@@ -119,8 +119,13 @@ namespace grendel
           continue;
 
         cell->get_dof_indices(dof_indices);
-        locally_extended.add_indices(dof_indices.begin(), dof_indices.end());
+        for (auto it : dof_indices)
+          if (!locally_relevant_.is_element(it))
+            locally_extended.add_index(it);
       }
+
+      locally_extended.add_indices(locally_relevant_);
+      locally_extended.compress();
 
       affine_constraints_.reinit(locally_extended);
 
