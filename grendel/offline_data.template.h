@@ -70,7 +70,8 @@ namespace grendel
        * Print out the DoF distribution
        */
 
-      deallog << "        " << dof_handler_.n_dofs()
+      const auto n_dofs = locally_relevant_.size();
+      deallog << "        " << n_dofs
               << " global DoFs, local DoF distribution:" << std::endl;
 
       const auto this_mpi_process =
@@ -100,36 +101,60 @@ namespace grendel
       }
     }
 
-    affine_constraints_.clear();
+    const auto n_dofs = locally_relevant_.size();
+    const auto dofs_per_cell =
+        discretization_->finite_element().dofs_per_cell;
 
-    /*
-     * Enforce periodic boundary conditions. In this case we assume that
-     * the mesh is in "normal configuration":
-     */
+    IndexSet locally_extended(n_dofs);
 
-    for (int i = 1; i < dim; ++i) /* omit x direction! */
-      DoFTools::make_periodicity_constraints(dof_handler_,
-                                             /*b_id */ Boundary::periodic,
-                                             /*direction*/ i,
-                                             affine_constraints_);
+    {
+      deallog << "        populate affine constraints" << std::endl;
+      TimerOutput::Scope t(computing_timer_,
+                           "offline_data - populate affine constraints");
 
-    /*
-     * Ensure that dirichlet boundary conditions take precedence over
-     * periodic boundary conditions:
-     */
-
-    for (auto &cell : dof_handler_.active_cell_iterators())
-      for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f) {
-        const auto face = cell->face(f);
-
-        if (!face->at_boundary() || face->boundary_id() != Boundary::dirichlet)
+      std::vector<types::global_dof_index> dof_indices(dofs_per_cell);
+      for (auto cell : dof_handler_.active_cell_iterators()) {
+        /* iterate over locally owned cells and the ghost layer */
+        if (cell->is_artificial())
           continue;
+
+        cell->get_dof_indices(dof_indices);
+        locally_extended.add_indices(dof_indices.begin(), dof_indices.end());
       }
 
+      affine_constraints_.reinit(locally_extended);
 
-    DoFTools::make_hanging_node_constraints(dof_handler_, affine_constraints_);
+      /*
+       * Enforce periodic boundary conditions. In this case we assume that
+       * the mesh is in "normal configuration":
+       */
 
-    affine_constraints_.close();
+      for (int i = 1; i < dim; ++i) /* omit x direction! */
+        DoFTools::make_periodicity_constraints(dof_handler_,
+                                               /*b_id */ Boundary::periodic,
+                                               /*direction*/ i,
+                                               affine_constraints_);
+
+      /*
+       * Ensure that dirichlet boundary conditions take precedence over
+       * periodic boundary conditions:
+       */
+
+      for (auto &cell : dof_handler_.active_cell_iterators())
+        for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f) {
+          const auto face = cell->face(f);
+
+          if (!face->at_boundary() ||
+              face->boundary_id() != Boundary::dirichlet)
+            continue;
+        }
+
+
+      DoFTools::make_hanging_node_constraints(dof_handler_,
+                                              affine_constraints_);
+
+      affine_constraints_.close();
+    }
 
     /*
      * We need a local view of a couple of matrices. Because they are never
@@ -143,18 +168,15 @@ namespace grendel
      * pattern, so we quickly do the grunt work by hand:
      */
 
-    const auto n_dofs = locally_relevant_.size();
-
     {
+      deallog << "        create_sparsity_pattern" << std::endl;
       TimerOutput::Scope t(computing_timer_,
                            "offline_data - create sparsity pattern");
-      const auto dofs_per_cell =
-          discretization_->finite_element().dofs_per_cell;
 
-      DynamicSparsityPattern dsp(n_dofs, n_dofs);
+      deallog << "        #1" << std::endl;
+      DynamicSparsityPattern dsp(n_dofs, n_dofs, locally_extended);
 
       std::vector<types::global_dof_index> dof_indices(dofs_per_cell);
-
       for (auto cell : dof_handler_.active_cell_iterators()) {
         /* iterate over locally owned cells and the ghost layer */
         if (cell->is_artificial())
@@ -164,20 +186,25 @@ namespace grendel
         affine_constraints_.add_entries_local_to_global(
             dof_indices, dsp, false);
       }
+      deallog << "        #2" << std::endl;
 
       sparsity_pattern_.copy_from(dsp);
 
+      deallog << "        #3" << std::endl;
+
       /* Extend the stencil: */
 
-      IndexSet all_indices(n_dofs);
-      all_indices.add_range(0, n_dofs);
       SparsityTools::gather_sparsity_pattern(
           dsp,
           dof_handler_.locally_owned_dofs_per_processor(),
           mpi_communicator_,
-          all_indices);
+          locally_extended);
+
+      deallog << "        #4" << std::endl;
 
       extended_sparsity_pattern_.copy_from(dsp);
+
+      deallog << "        #5" << std::endl;
     }
 
     /*
@@ -185,7 +212,8 @@ namespace grendel
      */
 
     {
-      TimerOutput::Scope t(computing_timer_, "offline_data - setup matrices");
+      deallog << "        set up matrices" << std::endl;
+      TimerOutput::Scope t(computing_timer_, "offline_data - set up matrices");
       mass_matrix_.reinit(sparsity_pattern_);
       lumped_mass_matrix_.reinit(sparsity_pattern_);
       bij_matrix_.reinit(sparsity_pattern_);
