@@ -1,4 +1,4 @@
-ADD_CUSTOM_TARGET(generate_meshes ALL)
+ADD_CUSTOM_TARGET(generate_meshes)
 
 FILE(GLOB _meshes ${CMAKE_CURRENT_SOURCE_DIR}/*.geo)
 FOREACH(_mesh ${_meshes})
