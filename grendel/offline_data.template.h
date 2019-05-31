@@ -163,7 +163,6 @@ namespace grendel
       TimerOutput::Scope t(computing_timer_,
                            "offline_data - create sparsity pattern");
 
-      deallog << "        #1" << std::endl;
       DynamicSparsityPattern dsp(n_dofs, n_dofs, locally_extended);
 
       std::vector<types::global_dof_index> dof_indices(dofs_per_cell);
@@ -176,11 +175,8 @@ namespace grendel
         affine_constraints_.add_entries_local_to_global(
             dof_indices, dsp, false);
       }
-      deallog << "        #2" << std::endl;
 
       sparsity_pattern_.copy_from(dsp);
-
-      deallog << "        #3" << std::endl;
 
       /* Extend the stencil: */
 
@@ -190,11 +186,7 @@ namespace grendel
           mpi_communicator_,
           locally_extended);
 
-      deallog << "        #4" << std::endl;
-
       extended_sparsity_pattern_.copy_from(dsp);
-
-      deallog << "        #5" << std::endl;
     }
 
     /*

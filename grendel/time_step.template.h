@@ -136,9 +136,7 @@ namespace grendel
 
           const auto i = *it;
 
-          /* Skip constrained degrees of freedom */
-          if (++sparsity.begin(i) == sparsity.end(i))
-            continue;
+          /* FIXME: Skip constrained degrees of freedom */
 
           const auto U_i = gather(U, i);
 
