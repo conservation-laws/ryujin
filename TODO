@@ -1,0 +1,13 @@
+TODO:
+
+ * change to local indices in the loop and assembly
+
+ * Add to deal.II:
+
+   - ternary_ge
+
+   - MatrixCommunicator
+
+ * Think about optimizing
+
+   - std::pow
