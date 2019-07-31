@@ -13,6 +13,7 @@
 #include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/lac/la_parallel_vector.h>
 
+#include <boost/range/irange.hpp>
 #include <boost/range/iterator_range.hpp>
 
 #include "helper.h"
@@ -57,6 +58,11 @@ namespace grendel
     deallog << "OfflineData<dim>::setup()" << std::endl;
 
     {
+      /*
+       * Initialize dof_handler and gather all locally owned and locally
+       * relevant indices:
+       */
+
       TimerOutput::Scope t(computing_timer_, "offline_data - distribute dofs");
 
       dof_handler_.initialize(discretization_->triangulation(),
@@ -64,6 +70,7 @@ namespace grendel
       DoFRenumbering::Cuthill_McKee(dof_handler_);
 
       locally_owned_ = dof_handler_.locally_owned_dofs();
+
       locally_relevant_.clear();
       DoFTools::extract_locally_relevant_dofs(dof_handler_, locally_relevant_);
 
@@ -102,12 +109,18 @@ namespace grendel
       }
     }
 
-    const auto n_dofs = locally_relevant_.size();
     const auto dofs_per_cell =
         discretization_->finite_element().dofs_per_cell;
 
-    IndexSet locally_extended(n_dofs);
+    const auto n_dofs = locally_relevant_.size();
 
+    /*
+     * Populate the locally_extended index set as well as the
+     * affine_constraints object:
+     */
+
+    locally_extended_.clear();
+    locally_extended_.set_size(n_dofs);
     {
       deallog << "        populate affine constraints" << std::endl;
       TimerOutput::Scope t(computing_timer_,
@@ -122,19 +135,27 @@ namespace grendel
         cell->get_dof_indices(dof_indices);
         for (auto it : dof_indices)
           if (!locally_relevant_.is_element(it))
-            locally_extended.add_index(it);
+            locally_extended_.add_index(it);
       }
 
-      locally_extended.add_indices(locally_relevant_);
-      locally_extended.compress();
+      locally_extended_.add_indices(locally_relevant_);
+      locally_extended_.compress();
 
-      affine_constraints_.reinit(locally_extended);
 
+      // FIXME:
+      affine_constraints_.close();
+#if 0
       /*
        * Enforce periodic boundary conditions. In this case we assume that
-       * the mesh is in "normal configuration":
+       * the mesh is in "normal configuration". By convenction we also omit
+       * enforcing periodicity in x direction. This avoids accidentally
+       * glueing the corner degrees of freedom together whish leads to
+       * instability.
        */
 
+      // FIXME
+
+      affine_constraints_.reinit(locally_extended);
       const auto boundary_ids =
           discretization_->triangulation().get_boundary_ids();
       if (std::find(boundary_ids.begin(),
@@ -151,6 +172,7 @@ namespace grendel
                                               affine_constraints_);
 
       affine_constraints_.close();
+#endif
     }
 
     /*
@@ -160,9 +182,12 @@ namespace grendel
      * dealii::SparseMatrix<dim>.
      *
      * These sparse matrices have to store values for all _locally
-     * relevant_ degrees of freedom that couple. Unfortunately, the deal.II
+     * extended_ degrees of freedom that couple. Unfortunately, the deal.II
      * library doesn't have a helper function to record such a sparsity
-     * pattern, so we quickly do the grunt work by hand:
+     * pattern, so we quickly do the grunt work by hand. While we are at
+     * it, we also apply a translation between the global (distributed)
+     * degrees of freedom numbering and the local index range [0,
+     * locally_extended_.n_elements()];
      */
 
     {
@@ -170,30 +195,41 @@ namespace grendel
       TimerOutput::Scope t(computing_timer_,
                            "offline_data - create sparsity pattern");
 
-      DynamicSparsityPattern dsp(n_dofs, n_dofs, locally_extended);
+      const auto n_local_dofs = locally_extended_.n_elements();
+      DynamicSparsityPattern dsp(n_local_dofs, n_local_dofs);
 
       std::vector<types::global_dof_index> dof_indices(dofs_per_cell);
+
       for (auto cell : dof_handler_.active_cell_iterators()) {
         /* iterate over locally owned cells and the ghost layer */
         if (cell->is_artificial())
           continue;
 
+        /* translate into local index ranges: */
         cell->get_dof_indices(dof_indices);
+        std::transform(dof_indices.begin(),
+                       dof_indices.end(),
+                       dof_indices.begin(),
+                       [&](auto index) {
+                         return locally_extended_.index_within_set(index);
+                       });
+
         affine_constraints_.add_entries_local_to_global(
             dof_indices, dsp, false);
       }
 
       sparsity_pattern_.copy_from(dsp);
 
+#if 0
+      // FIXME
       /* Extend the stencil: */
 
       SparsityTools::gather_sparsity_pattern(
           dsp,
           dof_handler_.compute_locally_owned_dofs_per_processor(),
           mpi_communicator_,
-          locally_extended);
-
-      extended_sparsity_pattern_.copy_from(dsp);
+          locally_relevant_);
+#endif
     }
 
     /*
@@ -271,8 +307,17 @@ namespace grendel
         matrix.reinit(dofs_per_cell, dofs_per_cell);
 
       fe_values.reinit(cell);
+
       local_dof_indices.resize(dofs_per_cell);
       cell->get_dof_indices(local_dof_indices);
+
+      /* translate into local index ranges: */
+      std::transform(local_dof_indices.begin(),
+                     local_dof_indices.end(),
+                     local_dof_indices.begin(),
+                     [&](auto index) {
+                       return locally_extended_.index_within_set(index);
+                     });
 
       /* clear out copy data: */
       local_boundary_normal_map.clear();
@@ -355,8 +400,8 @@ namespace grendel
           const auto old_id = std::get<1>(local_boundary_normal_map[index]);
           local_boundary_normal_map[index] =
               std::make_tuple(normal, std::max(old_id, id), position);
-        }
-      }
+        } /* j */
+      }   /* f */
     };
 
     const auto copy_local_to_global = [&](const auto &copy) {
@@ -433,50 +478,59 @@ namespace grendel
       dealii::LinearAlgebra::distributed::Vector<double> temp_(
           locally_owned_, locally_relevant_, mpi_communicator_);
 
-      for (auto i : locally_owned_)
-        temp_[i] = lumped_mass_matrix_.diag_element(i);
+      for (auto i : locally_owned_) {
+        const auto local_index = locally_extended_.index_within_set(i);
+        temp_[i] = lumped_mass_matrix_.diag_element(local_index);
+      }
+
       temp_.update_ghost_values();
-      for (auto i : locally_relevant_)
-        lumped_mass_matrix_.diag_element(i) = temp_[i];
+
+      for (auto i : locally_relevant_) {
+        const auto local_index = locally_extended_.index_within_set(i);
+        lumped_mass_matrix_.diag_element(local_index) = temp_[i];
+      }
     }
 
     /*
      * Third part: Compute norms and n_ijs
      */
 
-    const auto on_subranges = [&](const auto &it, auto &, auto &) {
-      const auto row_index = *it;
+    const auto on_subranges = [&](auto i1, const auto i2) {
+      for (; i1 < i2; ++i1) {
+        const auto row_index = *i1;
 
-      std::for_each(sparsity_pattern_.begin(row_index),
-                    sparsity_pattern_.end(row_index),
-                    [&](const auto &jt) {
-                      const auto value = gather_get_entry(cij_matrix_, &jt);
-                      const double norm = value.norm();
-                      set_entry(norm_matrix_, &jt, norm);
-                    });
-
-      std::for_each(sparsity_pattern_.begin(row_index),
-                    sparsity_pattern_.end(row_index),
-                    [&](const auto &jt) {
-                      const auto col_index = jt.column();
-                      const auto m_ij = get_entry(mass_matrix_, &jt);
-                      const auto m_j =
-                          lumped_mass_matrix_.diag_element(col_index);
-                      const auto b_ij =
-                          (row_index == col_index ? 1. : 0.) - m_ij / m_j;
-                      set_entry(bij_matrix_, &jt, b_ij);
-                    });
-
-      for (auto &matrix : nij_matrix_) {
-        auto nij_entry = matrix.begin(row_index);
-        std::for_each(norm_matrix_.begin(row_index),
-                      norm_matrix_.end(row_index),
-                      [&](const auto &it) {
-                        const auto norm = it.value();
-                        nij_entry->value() /= norm;
-                        ++nij_entry;
+        std::for_each(sparsity_pattern_.begin(row_index),
+                      sparsity_pattern_.end(row_index),
+                      [&](const auto &jt) {
+                        const auto value = gather_get_entry(cij_matrix_, &jt);
+                        const double norm = value.norm();
+                        set_entry(norm_matrix_, &jt, norm);
                       });
-      }
+
+        std::for_each(sparsity_pattern_.begin(row_index),
+                      sparsity_pattern_.end(row_index),
+                      [&](const auto &jt) {
+                        const auto col_index = jt.column();
+                        const auto m_ij = get_entry(mass_matrix_, &jt);
+                        const auto m_j =
+                            lumped_mass_matrix_.diag_element(col_index);
+                        const auto b_ij =
+                            (row_index == col_index ? 1. : 0.) - m_ij / m_j;
+                        set_entry(bij_matrix_, &jt, b_ij);
+                      });
+
+        for (auto &matrix : nij_matrix_) {
+          auto nij_entry = matrix.begin(row_index);
+          std::for_each(norm_matrix_.begin(row_index),
+                        norm_matrix_.end(row_index),
+                        [&](const auto &it) {
+                          const auto norm = it.value();
+                          nij_entry->value() /= norm;
+                          ++nij_entry;
+                        });
+        }
+
+      } /* row_index */
     };
 
     {
@@ -484,13 +538,11 @@ namespace grendel
       TimerOutput::Scope t(computing_timer_,
                            "offline_data - compute b_ij, |c_ij|, and n_ij");
 
-      WorkStream::run(
-          locally_relevant_.begin(),
-          locally_relevant_.end(),
-          on_subranges,
-          [](const auto &) {},
-          double(),
-          double());
+      const auto indices =
+          boost::irange<unsigned int>(0, locally_relevant_.n_elements());
+
+      parallel::apply_to_subranges(
+          indices.begin(), indices.end(), on_subranges, 4096);
 
       /*
        * And also normalize our boundary normals:
@@ -528,6 +580,12 @@ namespace grendel
 
       local_dof_indices.resize(dofs_per_cell);
       cell->get_dof_indices(local_dof_indices);
+      std::transform(local_dof_indices.begin(),
+                     local_dof_indices.end(),
+                     local_dof_indices.begin(),
+                     [&](auto index) {
+                       return locally_extended_.index_within_set(index);
+                     });
 
       /* clear out copy data: */
       for (auto &matrix : cell_cij_matrix)

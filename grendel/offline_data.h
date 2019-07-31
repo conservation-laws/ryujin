@@ -92,16 +92,18 @@ namespace grendel
     ACCESSOR_READ_ONLY(locally_relevant)
 
     /**
+     * An IndexSet storing an extended set of locally relevant indices.
+     * This includes all global indices associated with all locally owned
+     * cells and the complete ghost layer.
+     */
+    dealii::IndexSet locally_extended_;
+    ACCESSOR_READ_ONLY(locally_extended)
+
+    /**
      * The SparsityPattern.
      */
     dealii::SparsityPattern sparsity_pattern_;
     ACCESSOR_READ_ONLY(sparsity_pattern)
-
-    /**
-     * The extended SparsityPattern.
-     */
-    dealii::SparsityPattern extended_sparsity_pattern_;
-    ACCESSOR_READ_ONLY(extended_sparsity_pattern)
 
     /**
      * The boundary map.

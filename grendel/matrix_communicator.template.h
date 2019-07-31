@@ -27,6 +27,8 @@ namespace grendel
   template <int dim>
   void MatrixCommunicator<dim>::prepare()
   {
+    AssertThrow(false, ExcMessage("FIXME"));
+#if 0
     const auto &locally_owned = offline_data_->locally_owned();
     const auto &locally_relevant = offline_data_->locally_relevant();
     const auto &sparsity = offline_data_->sparsity_pattern();
@@ -56,6 +58,7 @@ namespace grendel
         n,
         dealii::LinearAlgebra::distributed::Vector<double>(
             locally_owned, locally_relevant, mpi_communicator_));
+#endif
   }
 
 
