@@ -4,6 +4,8 @@
 #include "helper.h"
 #include "schlieren_postprocessor.h"
 
+#include <boost/range/irange.hpp>
+
 #include <atomic>
 
 namespace grendel
@@ -65,6 +67,9 @@ namespace grendel
     const auto &cij_matrix = offline_data_->cij_matrix();
     const auto &boundary_normal_map = offline_data_->boundary_normal_map();
 
+    const auto indices =
+        boost::irange<unsigned int>(0, locally_extended.n_elements());
+
     /*
      * Step 1: Compute r_i and r_i_max, r_i_min:
      */
@@ -73,37 +78,36 @@ namespace grendel
     std::atomic<double> r_i_min{std::numeric_limits<double>::infinity()};
 
     {
-      const auto on_subranges = [&](const auto it1, const auto it2) {
+      const auto on_subranges = [&](auto i1, const auto i2) {
         double r_i_max_on_subrange = 0.;
         double r_i_min_on_subrange = std::numeric_limits<double>::infinity();
 
-        /* [it1, it2) is an iterator range over r_i_ */
+        /* Translate the local index into a index set iterator:: */
+        auto it_global =
+            locally_extended.at(locally_extended.nth_index_in_set(*i1));
 
-        /* Create an iterator for the index set: */
-        const unsigned int pos = std::distance(r_i_.begin(), it1);
-        auto set_iterator =
-            locally_extended.at(locally_extended.nth_index_in_set(pos));
-
-        for (auto it = it1; it != it2; ++it, ++set_iterator) {
-          const auto i = *set_iterator;
+        for (; i1 < i2; ++i1, ++it_global) {
+          const auto i = *i1;
+          const auto i_global = *it_global;
 
           /* Skip constrained degrees of freedom */
           if (++sparsity.begin(i) == sparsity.end(i))
             continue;
 
           /* Only iterate over locally owned subset */
-          if (!locally_owned.is_element(i))
+          if (!locally_owned.is_element(i_global))
             continue;
 
           Tensor<1, dim> r_i;
 
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
             const auto j = jt->column();
+            const auto j_global = locally_extended.nth_index_in_set(j);
 
             if (i == j)
               continue;
 
-            const auto U_js = U[schlieren_index_][j];
+            const auto U_js = U[schlieren_index_][j_global];
             const auto c_ij = gather_get_entry(cij_matrix, jt);
 
             r_i += c_ij * U_js;
@@ -125,10 +129,10 @@ namespace grendel
           }
 
           const double m_i = lumped_mass_matrix.diag_element(i);
-          *it = r_i.norm() / m_i;
+          r_i_[i] = r_i.norm() / m_i;
 
-          r_i_max_on_subrange = std::max(r_i_max_on_subrange, *it);
-          r_i_min_on_subrange = std::min(r_i_min_on_subrange, *it);
+          r_i_max_on_subrange = std::max(r_i_max_on_subrange, r_i_[i]);
+          r_i_min_on_subrange = std::min(r_i_min_on_subrange, r_i_[i]);
         }
 
         /* Synchronize over all threads: */
@@ -147,7 +151,7 @@ namespace grendel
       };
 
       parallel::apply_to_subranges(
-          r_i_.begin(), r_i_.end(), on_subranges, 4096);
+          indices.begin(), indices.end(), on_subranges, 4096);
     }
 
     /* And synchronize over all processors: */
@@ -160,30 +164,29 @@ namespace grendel
      */
 
     {
-      const auto on_subranges = [&](const auto it1, const auto it2) {
-        /* [it1, it2) is an iterator range over r_i_ */
+      const auto on_subranges = [&](auto i1, const auto i2) {
 
-        /* Create an iterator for the index set: */
-        const unsigned int pos = std::distance(r_i_.begin(), it1);
-        auto set_iterator =
-            locally_extended.at(locally_extended.nth_index_in_set(pos));
+        /* Translate the local index into a index set iterator:: */
+        auto it_global =
+            locally_extended.at(locally_extended.nth_index_in_set(*i1));
 
-        for (auto it = it1; it != it2; ++it, ++set_iterator) {
-          const auto i = *set_iterator;
+        for (; i1 < i2; ++i1, ++it_global) {
+          const auto i = *i1;
+          const auto i_global = *it_global;
 
           /* Skip constrained degrees of freedom */
           if (++sparsity.begin(i) == sparsity.end(i))
             continue;
 
-          const auto r_i = *it;
-
-          schlieren_[i] = 1. - std::exp(-schlieren_beta_ * (r_i - r_i_min) /
-                                        (r_i_max - r_i_min));
+          const auto r_i = r_i_[i];
+          schlieren_[i_global] =
+              1. - std::exp(-schlieren_beta_ * (r_i - r_i_min) /
+                            (r_i_max - r_i_min));
         }
       };
 
       parallel::apply_to_subranges(
-          r_i_.begin(), r_i_.end(), on_subranges, 4096);
+          indices.begin(), indices.end(), on_subranges, 4096);
 
       /* Fix up hanging nodes: */
       const auto &affine_constraints = offline_data_->affine_constraints();
