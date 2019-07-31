@@ -429,8 +429,8 @@ namespace ryujin
     vector_type U;
 
     const auto &locally_owned = offline_data.locally_owned();
-    const auto &locally_relevant = offline_data.locally_relevant();
-    U[0].reinit(locally_owned, locally_relevant, mpi_communicator);
+    const auto &locally_extended = offline_data.locally_extended();
+    U[0].reinit(locally_owned, locally_extended, mpi_communicator);
     for (auto &it : U)
       it.reinit(U[0]);
 

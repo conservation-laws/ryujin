@@ -71,14 +71,11 @@ namespace grendel
 
       locally_owned_ = dof_handler_.locally_owned_dofs();
 
-      locally_relevant_.clear();
-      DoFTools::extract_locally_relevant_dofs(dof_handler_, locally_relevant_);
-
       /*
        * Print out the DoF distribution
        */
 
-      const auto n_dofs = locally_relevant_.size();
+      const auto n_dofs = locally_owned_.size();
       deallog << "        " << n_dofs
               << " global DoFs, local DoF distribution:" << std::endl;
 
@@ -109,19 +106,19 @@ namespace grendel
       }
     }
 
-    const auto dofs_per_cell =
-        discretization_->finite_element().dofs_per_cell;
-
-    const auto n_dofs = locally_relevant_.size();
-
     /*
-     * Populate the locally_extended index set as well as the
-     * affine_constraints object:
+     * Populate the locally_extended index:
      */
 
-    locally_extended_.clear();
-    locally_extended_.set_size(n_dofs);
     {
+      locally_extended_.clear();
+
+      const auto n_dofs = locally_owned_.size();
+      locally_extended_.set_size(n_dofs);
+
+      const auto dofs_per_cell =
+          discretization_->finite_element().dofs_per_cell;
+
       deallog << "        populate affine constraints" << std::endl;
       TimerOutput::Scope t(computing_timer_,
                            "offline_data - populate affine constraints");
@@ -134,16 +131,15 @@ namespace grendel
 
         cell->get_dof_indices(dof_indices);
         for (auto it : dof_indices)
-          if (!locally_relevant_.is_element(it))
-            locally_extended_.add_index(it);
+          locally_extended_.add_index(it);
       }
 
-      locally_extended_.add_indices(locally_relevant_);
       locally_extended_.compress();
+    }
 
 
-      // FIXME:
-      affine_constraints_.close();
+    // FIXME:
+    affine_constraints_.close();
 #if 0
       /*
        * Enforce periodic boundary conditions. In this case we assume that
@@ -173,7 +169,6 @@ namespace grendel
 
       affine_constraints_.close();
 #endif
-    }
 
     /*
      * We need a local view of a couple of matrices. Because they are never
@@ -465,7 +460,7 @@ namespace grendel
 
     {
       dealii::LinearAlgebra::distributed::Vector<double> temp_(
-          locally_owned_, locally_relevant_, mpi_communicator_);
+          locally_owned_, locally_extended_, mpi_communicator_);
 
       for (auto i : locally_owned_) {
         const auto local_index = locally_extended_.index_within_set(i);
@@ -474,7 +469,7 @@ namespace grendel
 
       temp_.update_ghost_values();
 
-      for (auto i : locally_relevant_) {
+      for (auto i : locally_extended_) {
         const auto local_index = locally_extended_.index_within_set(i);
         lumped_mass_matrix_.diag_element(local_index) = temp_[i];
       }
@@ -528,7 +523,7 @@ namespace grendel
                            "offline_data - compute b_ij, |c_ij|, and n_ij");
 
       const auto indices =
-          boost::irange<unsigned int>(0, locally_relevant_.n_elements());
+          boost::irange<unsigned int>(0, locally_extended_.n_elements());
 
       parallel::apply_to_subranges(
           indices.begin(), indices.end(), on_subranges, 4096);

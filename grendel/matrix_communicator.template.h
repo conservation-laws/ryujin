@@ -38,12 +38,12 @@ namespace grendel
           dsp,
           dof_handler_.compute_locally_owned_dofs_per_processor(),
           mpi_communicator_,
-          locally_relevant_);
+          locally_extended_);
 #endif
 
 #if 0
     const auto &locally_owned = offline_data_->locally_owned();
-    const auto &locally_relevant = offline_data_->locally_relevant();
+    const auto &locally_extended = offline_data_->locally_extended();
     const auto &sparsity = offline_data_->sparsity_pattern();
     const auto &extended_sparsity = offline_data_->extended_sparsity_pattern();
 
@@ -52,7 +52,7 @@ namespace grendel
 
     indices_.reinit(sparsity);
 
-    for (auto i : locally_relevant) {
+    for (auto i : locally_extended) {
       auto ejt = extended_sparsity.begin(i);
       unsigned int local_index = 0;
 
@@ -70,7 +70,7 @@ namespace grendel
     matrix_temp_.resize(
         n,
         dealii::LinearAlgebra::distributed::Vector<double>(
-            locally_owned, locally_relevant, mpi_communicator_));
+            locally_owned, locally_extended, mpi_communicator_));
 #endif
   }
 
@@ -79,15 +79,15 @@ namespace grendel
   void MatrixCommunicator<dim>::synchronize()
   {
     const auto &locally_owned = offline_data_->locally_owned();
-    const auto &locally_relevant = offline_data_->locally_relevant();
+    const auto &locally_extended = offline_data_->locally_extended();
     const auto indices =
-        boost::irange<unsigned int>(0, locally_relevant.n_elements());
+        boost::irange<unsigned int>(0, locally_extended.n_elements());
     const auto &sparsity = offline_data_->sparsity_pattern();
 
     {
       const auto on_subranges = [&](auto i1, const auto i2) {
         /* Translate the local index into a index set iterator:: */
-        auto it = locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
+        auto it = locally_extended.at(locally_extended.nth_index_in_set(*i1));
         for (; i1 < i2; ++i1, ++it) {
           const auto i = *it;
 
@@ -111,7 +111,7 @@ namespace grendel
     {
       const auto on_subranges = [&](auto i1, const auto i2) {
         /* Translate the local index into a index set iterator:: */
-        auto it = locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
+        auto it = locally_extended.at(locally_extended.nth_index_in_set(*i1));
         for (; i1 < i2; ++i1, ++it) {
           const auto i = *it;
 

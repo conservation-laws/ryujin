@@ -86,12 +86,6 @@ namespace grendel
     ACCESSOR_READ_ONLY(locally_owned)
 
     /**
-     * An IndexSet storing all locally relevant indices.
-     */
-    dealii::IndexSet locally_relevant_;
-    ACCESSOR_READ_ONLY(locally_relevant)
-
-    /**
      * An IndexSet storing an extended set of locally relevant indices.
      * This includes all global indices associated with all locally owned
      * cells and the complete ghost layer.

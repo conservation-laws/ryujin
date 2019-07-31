@@ -43,10 +43,10 @@ namespace grendel
                          "schlieren_postprocessor - prepare scratch space");
 
     const auto &locally_owned = offline_data_->locally_owned();
-    const auto &locally_relevant = offline_data_->locally_relevant();
+    const auto &locally_extended = offline_data_->locally_extended();
 
-    r_i_.reinit(locally_relevant.n_elements());
-    schlieren_.reinit(locally_owned, locally_relevant, mpi_communicator_);
+    r_i_.reinit(locally_extended.n_elements());
+    schlieren_.reinit(locally_owned, locally_extended, mpi_communicator_);
   }
 
 
@@ -58,7 +58,7 @@ namespace grendel
     TimerOutput::Scope t(computing_timer_,
                          "schlieren_postprocessor - compute schlieren plot");
 
-    const auto &locally_relevant = offline_data_->locally_relevant();
+    const auto &locally_extended = offline_data_->locally_extended();
     const auto &locally_owned = offline_data_->locally_owned();
     const auto &sparsity = offline_data_->sparsity_pattern();
     const auto &lumped_mass_matrix = offline_data_->lumped_mass_matrix();
@@ -82,7 +82,7 @@ namespace grendel
         /* Create an iterator for the index set: */
         const unsigned int pos = std::distance(r_i_.begin(), it1);
         auto set_iterator =
-            locally_relevant.at(locally_relevant.nth_index_in_set(pos));
+            locally_extended.at(locally_extended.nth_index_in_set(pos));
 
         for (auto it = it1; it != it2; ++it, ++set_iterator) {
           const auto i = *set_iterator;
@@ -166,7 +166,7 @@ namespace grendel
         /* Create an iterator for the index set: */
         const unsigned int pos = std::distance(r_i_.begin(), it1);
         auto set_iterator =
-            locally_relevant.at(locally_relevant.nth_index_in_set(pos));
+            locally_extended.at(locally_extended.nth_index_in_set(pos));
 
         for (auto it = it1; it != it2; ++it, ++set_iterator) {
           const auto i = *set_iterator;
