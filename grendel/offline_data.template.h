@@ -183,7 +183,7 @@ namespace grendel
 
       SparsityTools::gather_sparsity_pattern(
           dsp,
-          dof_handler_.locally_owned_dofs_per_processor(),
+          dof_handler_.compute_locally_owned_dofs_per_processor(),
           mpi_communicator_,
           locally_extended);
 
