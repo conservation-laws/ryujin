@@ -438,10 +438,12 @@ namespace grendel
 
       const auto on_subranges = [&](auto i1, const auto i2) {
         /* Translate the local index into a index set iterator:: */
-        auto it = locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
-        for (; i1 < i2; ++i1, ++it) {
+        auto it_global =
+            locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
 
-          const auto i = *it;
+        for (; i1 < i2; ++i1, ++it_global) {
+          const auto i = *i1;
+          const auto i_global = *it_global;
 
           /* Skip constrained degrees of freedom */
           if (++sparsity.begin(i) == sparsity.end(i))
@@ -455,16 +457,18 @@ namespace grendel
           const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
           const double lambda = 1. / (size - 1.);
 
-          const auto r_i = gather(r_, i);
+          const auto r_i = gather(r_, i_global);
 
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
 
             const auto j = jt->column();
+            const auto j_global = locally_relevant.nth_index_in_set(j);
+
             const auto b_ij = get_entry(bij_matrix, jt);
             const auto b_ji = bij_matrix(j, i); // FIXME: Suboptimal
             auto p_ij = gather_get_entry(pij_matrix_, jt);
 
-            const auto r_j = gather(r_, j);
+            const auto r_j = gather(r_, j_global);
 
             p_ij += tau / m_i / lambda * (b_ij * r_j - b_ji * r_i);
             scatter_set_entry(pij_matrix_, jt, p_ij);
