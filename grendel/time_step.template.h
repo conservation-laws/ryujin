@@ -57,10 +57,10 @@ namespace grendel
     /* Initialize (global) vectors: */
 
     const auto &locally_owned = offline_data_->locally_owned();
-    const auto &locally_relevant = offline_data_->locally_relevant();
+    const auto &locally_extended = offline_data_->locally_extended();
 
     auto &exemplar = alpha_;
-    exemplar.reinit(locally_owned, locally_relevant, mpi_communicator_);
+    exemplar.reinit(locally_owned, locally_extended, mpi_communicator_);
 
     rho_second_variation_.reinit(exemplar);
     rho_relaxation_.reinit(exemplar);
@@ -104,7 +104,7 @@ namespace grendel
     CALLGRIND_START_INSTRUMENTATION;
 #endif
 
-    const auto &locally_relevant = offline_data_->locally_relevant();
+    const auto &locally_extended = offline_data_->locally_extended();
     const auto &locally_owned = offline_data_->locally_owned();
     const auto &sparsity = offline_data_->sparsity_pattern();
     const auto &mass_matrix = offline_data_->mass_matrix();
@@ -118,7 +118,7 @@ namespace grendel
     const double measure_of_omega = offline_data_->measure_of_omega();
 
     const auto indices =
-        boost::irange<unsigned int>(0, locally_relevant.n_elements());
+        boost::irange<unsigned int>(0, locally_extended.n_elements());
 
     /*
      * Step 1: Compute off-diagonal d_ij, and alpha_i
@@ -135,7 +135,7 @@ namespace grendel
 
         /* Translate the local index into a index set iterator:: */
         auto it_global =
-            locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
+            locally_extended.at(locally_extended.nth_index_in_set(*i1));
 
         for (; i1 < i2; ++i1, ++it_global) {
           const auto i = *i1;
@@ -151,7 +151,7 @@ namespace grendel
 
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
             const auto j = jt->column();
-            const auto j_global = locally_relevant.nth_index_in_set(j);
+            const auto j_global = locally_extended.nth_index_in_set(j);
 
             /* Skip diagonal. */
             if (j == i)
@@ -229,7 +229,7 @@ namespace grendel
 
         /* Translate the local index into a index set iterator:: */
         auto it_global =
-            locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
+            locally_extended.at(locally_extended.nth_index_in_set(*i1));
 
         for (; i1 < i2; ++i1, ++it_global) {
 
@@ -249,7 +249,7 @@ namespace grendel
 
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
             const auto j = jt->column();
-            const auto j_global = locally_relevant.nth_index_in_set(j);
+            const auto j_global = locally_extended.nth_index_in_set(j);
 
             if constexpr (smoothen_alpha_) {
               const auto m_ij = get_entry(mass_matrix, jt);
@@ -340,7 +340,7 @@ namespace grendel
 
         /* Translate the local index into a index set iterator:: */
         auto it_global =
-            locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
+            locally_extended.at(locally_extended.nth_index_in_set(*i1));
 
         for (; i1 < i2; ++i1, ++it_global) {
 
@@ -352,7 +352,7 @@ namespace grendel
             continue;
 
           /* Only iterate over locally owned subset */
-          if (!locally_owned.is_element(i))
+          if (!locally_owned.is_element(i_global))
             continue;
 
           const auto U_i = gather(U, i_global);
@@ -373,7 +373,7 @@ namespace grendel
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
 
             const auto j = jt->column();
-            const auto j_global = locally_relevant.nth_index_in_set(j);
+            const auto j_global = locally_extended.nth_index_in_set(j);
 
             const auto U_j = gather(U, j_global);
             const auto f_j = ProblemDescription<dim>::f(U_j);
@@ -439,7 +439,7 @@ namespace grendel
       const auto on_subranges = [&](auto i1, const auto i2) {
         /* Translate the local index into a index set iterator:: */
         auto it_global =
-            locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
+            locally_extended.at(locally_extended.nth_index_in_set(*i1));
 
         for (; i1 < i2; ++i1, ++it_global) {
           const auto i = *i1;
@@ -450,7 +450,7 @@ namespace grendel
             continue;
 
           /* Only iterate over locally owned subset */
-          if (!locally_owned.is_element(i))
+          if (!locally_owned.is_element(i_global))
             continue;
 
           const double m_i = lumped_mass_matrix.diag_element(i);
@@ -462,7 +462,7 @@ namespace grendel
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
 
             const auto j = jt->column();
-            const auto j_global = locally_relevant.nth_index_in_set(j);
+            const auto j_global = locally_extended.nth_index_in_set(j);
 
             const auto b_ij = get_entry(bij_matrix, jt);
             const auto b_ji = bij_matrix(j, i); // FIXME: Suboptimal
@@ -495,7 +495,7 @@ namespace grendel
         const auto on_subranges = [&](auto i1, const auto i2) {
           /* Translate the local index into a index set iterator:: */
           auto it_global =
-              locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
+              locally_extended.at(locally_extended.nth_index_in_set(*i1));
 
           for (; i1 < i2; ++i1, ++it_global) {
 
@@ -507,7 +507,7 @@ namespace grendel
               continue;
 
             /* Only iterate over locally owned subset */
-            if (!locally_owned.is_element(i))
+            if (!locally_owned.is_element(i_global))
               continue;
 
             const auto bounds = gather_array(bounds_, i_global);
@@ -579,7 +579,7 @@ namespace grendel
         const auto on_subranges = [&](auto i1, const auto i2) {
           /* Translate the local index into a index set iterator:: */
           auto it_global =
-              locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
+              locally_extended.at(locally_extended.nth_index_in_set(*i1));
 
           for (; i1 < i2; ++i1, ++it_global) {
 
@@ -591,7 +591,7 @@ namespace grendel
               continue;
 
             /* Only iterate over locally owned subset */
-            if (!locally_owned.is_element(i))
+            if (!locally_owned.is_element(i_global))
               continue;
 
             auto U_i_new = gather(temp_euler_, i_global);
@@ -629,7 +629,7 @@ namespace grendel
         for (auto it = it1; it != it2; ++it) {
 
           const auto i = it->first;
-          const auto i_global = locally_relevant.nth_index_in_set(i);
+          const auto i_global = locally_extended.nth_index_in_set(i);
 
           const auto &[normal, id, position] = it->second;
 
@@ -637,7 +637,7 @@ namespace grendel
           if (++sparsity.begin(i) == sparsity.end(i))
             continue;
 
-          if (!locally_owned.is_element(i))
+          if (!locally_owned.is_element(i_global))
             continue;
 
           auto U_i = gather(temp_euler_, i_global);
