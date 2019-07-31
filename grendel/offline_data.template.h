@@ -135,11 +135,17 @@ namespace grendel
        * the mesh is in "normal configuration":
        */
 
-      for (int i = 1; i < dim; ++i) /* omit x direction! */
-        DoFTools::make_periodicity_constraints(dof_handler_,
-                                               /*b_id */ Boundary::periodic,
-                                               /*direction*/ i,
-                                               affine_constraints_);
+      const auto boundary_ids =
+          discretization_->triangulation().get_boundary_ids();
+      if (std::find(boundary_ids.begin(),
+                    boundary_ids.end(),
+                    Boundary::periodic) != boundary_ids.end()) {
+        for (int i = 1; i < dim; ++i) /* omit x direction! */
+          DoFTools::make_periodicity_constraints(dof_handler_,
+                                                 /*b_id */ Boundary::periodic,
+                                                 /*direction*/ i,
+                                                 affine_constraints_);
+      }
 
       DoFTools::make_hanging_node_constraints(dof_handler_,
                                               affine_constraints_);
