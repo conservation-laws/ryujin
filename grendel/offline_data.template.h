@@ -106,6 +106,9 @@ namespace grendel
       }
     }
 
+    const auto dofs_per_cell =
+        discretization_->finite_element().dofs_per_cell;
+
     /*
      * Populate the locally_extended index:
      */
@@ -115,9 +118,6 @@ namespace grendel
 
       const auto n_dofs = locally_owned_.size();
       locally_extended_.set_size(n_dofs);
-
-      const auto dofs_per_cell =
-          discretization_->finite_element().dofs_per_cell;
 
       deallog << "        populate affine constraints" << std::endl;
       TimerOutput::Scope t(computing_timer_,
