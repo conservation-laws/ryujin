@@ -28,6 +28,19 @@ namespace grendel
   void MatrixCommunicator<dim>::prepare()
   {
     AssertThrow(false, ExcMessage("FIXME"));
+
+#if 0
+    // Refactored from OfflineData
+      // FIXME
+      /* Extend the stencil: */
+
+      SparsityTools::gather_sparsity_pattern(
+          dsp,
+          dof_handler_.compute_locally_owned_dofs_per_processor(),
+          mpi_communicator_,
+          locally_relevant_);
+#endif
+
 #if 0
     const auto &locally_owned = offline_data_->locally_owned();
     const auto &locally_relevant = offline_data_->locally_relevant();

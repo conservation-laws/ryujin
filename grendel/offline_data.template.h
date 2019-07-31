@@ -219,17 +219,6 @@ namespace grendel
       }
 
       sparsity_pattern_.copy_from(dsp);
-
-#if 0
-      // FIXME
-      /* Extend the stencil: */
-
-      SparsityTools::gather_sparsity_pattern(
-          dsp,
-          dof_handler_.compute_locally_owned_dofs_per_processor(),
-          mpi_communicator_,
-          locally_relevant_);
-#endif
     }
 
     /*
