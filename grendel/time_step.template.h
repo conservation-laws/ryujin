@@ -87,11 +87,9 @@ namespace grendel
     dij_matrix_.reinit(sparsity);
 
     lij_matrix_.reinit(sparsity);
-#if 0
-    // FIXME
+
     if (Utilities::MPI::n_mpi_processes(mpi_communicator_) > 1)
       lij_matrix_communicator_.prepare();
-#endif
   }
 
 
@@ -534,11 +532,8 @@ namespace grendel
         TimerOutput::Scope time(computing_timer_,
                                 "time_step - 6 symmetrize l_ij");
 
-#if 0
-        // FIXME
         if (Utilities::MPI::n_mpi_processes(mpi_communicator_) > 1)
           lij_matrix_communicator_.synchronize();
-#endif
 
         {
           const auto on_subranges = [&](auto i1, const auto i2) {

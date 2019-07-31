@@ -3,6 +3,8 @@
 
 #include "matrix_communicator.h"
 
+#include <deal.II/lac/sparsity_tools.h>
+
 #include <boost/range/irange.hpp>
 
 namespace grendel
@@ -27,42 +29,70 @@ namespace grendel
   template <int dim>
   void MatrixCommunicator<dim>::prepare()
   {
-    AssertThrow(false, ExcMessage("FIXME"));
-
-#if 0
-    // Refactored from OfflineData
-      // FIXME
-      /* Extend the stencil: */
-
-      SparsityTools::gather_sparsity_pattern(
-          dsp,
-          dof_handler_.compute_locally_owned_dofs_per_processor(),
-          mpi_communicator_,
-          locally_extended_);
-#endif
-
-#if 0
+    const auto &dof_handler = offline_data_->dof_handler();
+    const auto &affine_constraints = offline_data_->affine_constraints();
     const auto &locally_owned = offline_data_->locally_owned();
     const auto &locally_extended = offline_data_->locally_extended();
     const auto &sparsity = offline_data_->sparsity_pattern();
-    const auto &extended_sparsity = offline_data_->extended_sparsity_pattern();
 
     Assert(sparsity.is_compressed(), dealii::ExcInternalError());
-    Assert(extended_sparsity.is_compressed(), dealii::ExcInternalError());
 
-    indices_.reinit(sparsity);
+    /*
+     * This is an evil hack:
+     *
+     * The following creates a temporary extended sparsity pattern with
+     * global indices and full sparsity rows. This sparsity pattern is only
+     * used to create a (globally stable) ordering of all degrees of
+     * freedom of the stencil belonging to a degree of freedom. We use this
+     * information to synchronize the "ghost layer" of local SparseMatrix
+     * objects over all MPI ranks.
+     */
 
-    for (auto i : locally_extended) {
-      auto ejt = extended_sparsity.begin(i);
-      unsigned int local_index = 0;
+    {
+      const auto n_dofs = locally_owned.size();
+      const auto dofs_per_cell = dof_handler.get_fe().dofs_per_cell;
 
-      for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
-        for (; ejt->column() != jt->column(); ++ejt)
-          local_index++;
+      DynamicSparsityPattern extended_sparsity(
+          n_dofs, n_dofs, locally_extended);
 
-        set_entry(indices_, jt, local_index);
+      std::vector<types::global_dof_index> dof_indices(dofs_per_cell);
+      for (auto cell : dof_handler.active_cell_iterators()) {
+        /* iterate over locally owned cells and the ghost layer */
+        if (cell->is_artificial())
+          continue;
+
+        cell->get_dof_indices(dof_indices);
+        affine_constraints.add_entries_local_to_global(
+            dof_indices, extended_sparsity, false);
       }
-    }
+
+      SparsityTools::gather_sparsity_pattern(
+          extended_sparsity,
+          dof_handler.compute_locally_owned_dofs_per_processor(),
+          mpi_communicator_,
+          locally_extended);
+
+      extended_sparsity.compress();
+
+      indices_.reinit(sparsity);
+
+      for (const auto i_global : locally_extended) {
+        const auto i = locally_extended.index_within_set(i_global);
+
+        auto ejt = extended_sparsity.begin(i_global);
+
+        unsigned int index = 0;
+
+        for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
+          const auto j = jt->column();
+          const auto j_global = locally_extended.nth_index_in_set(j);
+
+          for (; ejt->column() != j_global; ++ejt)
+            index++;
+          set_entry(indices_, jt, index);
+        }
+      }
+    } /* end of hack */
 
     unsigned int n = sparsity.max_entries_per_row();
     n = Utilities::MPI::max(n, mpi_communicator_);
@@ -71,7 +101,6 @@ namespace grendel
         n,
         dealii::LinearAlgebra::distributed::Vector<double>(
             locally_owned, locally_extended, mpi_communicator_));
-#endif
   }
 
 
