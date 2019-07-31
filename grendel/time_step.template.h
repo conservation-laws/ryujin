@@ -494,10 +494,13 @@ namespace grendel
 
         const auto on_subranges = [&](auto i1, const auto i2) {
           /* Translate the local index into a index set iterator:: */
-          auto it = locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
-          for (; i1 < i2; ++i1, ++it) {
+          auto it_global =
+              locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
 
-            const auto i = *it;
+          for (; i1 < i2; ++i1, ++it_global) {
+
+            const auto i = *i1;
+            const auto i_global = *it_global;
 
             /* Skip constrained degrees of freedom */
             if (++sparsity.begin(i) == sparsity.end(i))
@@ -507,8 +510,8 @@ namespace grendel
             if (!locally_owned.is_element(i))
               continue;
 
-            const auto bounds = gather_array(bounds_, i);
-            const auto U_i_new = gather(temp_euler_, i);
+            const auto bounds = gather_array(bounds_, i_global);
+            const auto U_i_new = gather(temp_euler_, i_global);
 
             for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
               auto p_ij = gather_get_entry(pij_matrix_, jt);
@@ -539,15 +542,14 @@ namespace grendel
 
         {
           const auto on_subranges = [&](auto i1, const auto i2) {
-            /* Translate the local index into a index set iterator:: */
-            auto it =
-                locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
-            for (; i1 < i2; ++i1, ++it) {
-              const auto i = *it;
+            for (; i1 < i2; ++i1) {
+              const auto i = *i1;
               for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
                 const auto j = jt->column();
+
                 if (j >= i)
                   continue;
+
                 auto l_ij = get_entry(lij_matrix_, jt);
                 auto &l_ji = lij_matrix_(j, i); // FIXME: Suboptimal
 
@@ -576,10 +578,13 @@ namespace grendel
 
         const auto on_subranges = [&](auto i1, const auto i2) {
           /* Translate the local index into a index set iterator:: */
-          auto it = locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
-          for (; i1 < i2; ++i1, ++it) {
+          auto it_global =
+              locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
 
-            const auto i = *it;
+          for (; i1 < i2; ++i1, ++it_global) {
+
+            const auto i = *i1;
+            const auto i_global = *it_global;
 
             /* Skip constrained degrees of freedom */
             if (++sparsity.begin(i) == sparsity.end(i))
@@ -589,7 +594,7 @@ namespace grendel
             if (!locally_owned.is_element(i))
               continue;
 
-            auto U_i_new = gather(temp_euler_, i);
+            auto U_i_new = gather(temp_euler_, i_global);
 
             const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
             const double lambda = 1. / (size - 1.);
@@ -602,7 +607,7 @@ namespace grendel
               scatter_set_entry(pij_matrix_, jt, p_ij);
             }
 
-            scatter(temp_euler_, U_i_new, i);
+            scatter(temp_euler_, U_i_new, i_global);
           }
         };
 
@@ -622,7 +627,10 @@ namespace grendel
 
       const auto on_subranges = [&](const auto it1, const auto it2) {
         for (auto it = it1; it != it2; ++it) {
+
           const auto i = it->first;
+          const auto i_global = locally_relevant.nth_index_in_set(i);
+
           const auto &[normal, id, position] = it->second;
 
           /* Skip constrained degrees of freedom */
@@ -632,7 +640,7 @@ namespace grendel
           if (!locally_owned.is_element(i))
             continue;
 
-          auto U_i = gather(temp_euler_, i);
+          auto U_i = gather(temp_euler_, i_global);
 
           /* On boundary 1 remove the normal component of the momentum: */
 
@@ -649,7 +657,7 @@ namespace grendel
             U_i = initial_values_->initial_state(position, t + tau);
           }
 
-          scatter(temp_euler_, U_i, i);
+          scatter(temp_euler_, U_i, i_global);
         }
       };
 
@@ -678,8 +686,8 @@ namespace grendel
     deallog << "TimeStep<dim>::ssprk_step()" << std::endl;
 
     /* This also copies ghost elements: */
-    for (unsigned int i = 0; i < problem_dimension; ++i)
-      temp_ssprk_[i] = U[i];
+    for (unsigned int k = 0; k < problem_dimension; ++k)
+      temp_ssprk_[k] = U[k];
 
     // Step 1: U1 = U_old + tau * L(U_old)
 
