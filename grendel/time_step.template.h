@@ -228,16 +228,19 @@ namespace grendel
         double tau_max_on_subrange = std::numeric_limits<double>::infinity();
 
         /* Translate the local index into a index set iterator:: */
-        auto it = locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
-        for (; i1 < i2; ++i1, ++it) {
+        auto it_global =
+            locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
 
-          const auto i = *it;
+        for (; i1 < i2; ++i1, ++it_global) {
+
+          const auto i = *i1;
+          const auto i_global = *it_global;
 
           /* Skip constrained degrees of freedom */
           if (++sparsity.begin(i) == sparsity.end(i))
             continue;
 
-          const double delta_rho_i = rho_second_variation_[i];
+          const double delta_rho_i = rho_second_variation_[i_global];
 
           double alpha_i = 0.;
           double d_sum = 0.;
@@ -246,16 +249,17 @@ namespace grendel
 
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
             const auto j = jt->column();
+            const auto j_global = locally_relevant.nth_index_in_set(j);
 
             if constexpr (smoothen_alpha_) {
               const auto m_ij = get_entry(mass_matrix, jt);
-              alpha_i += m_ij * alpha_[j];
+              alpha_i += m_ij * alpha_[j_global];
             }
 
             if (j == i)
               continue;
 
-            const double delta_rho_j = rho_second_variation_[j];
+            const double delta_rho_j = rho_second_variation_[j_global];
             const auto beta_ij = get_entry(betaij_matrix, jt);
 
             /* The numerical constant 8 is up to debate... */
@@ -268,10 +272,10 @@ namespace grendel
 
           if constexpr (smoothen_alpha_) {
             const double m_i = lumped_mass_matrix.diag_element(i);
-            alpha_[i] = alpha_i / m_i;
+            alpha_[i_global] = alpha_i / m_i;
           }
 
-          rho_relaxation_[i] =
+          rho_relaxation_[i_global] =
               std::abs(rho_relaxation_numerator / rho_relaxation_denominator);
 
           dij_matrix_.diag_element(i) = d_sum;
@@ -335,10 +339,13 @@ namespace grendel
         Limiter<dim> limiter;
 
         /* Translate the local index into a index set iterator:: */
-        auto it = locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
-        for (; i1 < i2; ++i1, ++it) {
+        auto it_global =
+            locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
 
-          const auto i = *it;
+        for (; i1 < i2; ++i1, ++it_global) {
+
+          const auto i = *i1;
+          const auto i_global = *it_global;
 
           /* Skip constrained degrees of freedom */
           if (++sparsity.begin(i) == sparsity.end(i))
@@ -348,11 +355,11 @@ namespace grendel
           if (!locally_owned.is_element(i))
             continue;
 
-          const auto U_i = gather(U, i);
+          const auto U_i = gather(U, i_global);
           auto U_i_new = U_i;
 
           const auto f_i = ProblemDescription<dim>::f(U_i);
-          const auto alpha_i = alpha_[i];
+          const auto alpha_i = alpha_[i_global];
           const double m_i = lumped_mass_matrix.diag_element(i);
 
           const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
@@ -366,9 +373,11 @@ namespace grendel
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
 
             const auto j = jt->column();
-            const auto U_j = gather(U, j);
+            const auto j_global = locally_relevant.nth_index_in_set(j);
+
+            const auto U_j = gather(U, j_global);
             const auto f_j = ProblemDescription<dim>::f(U_j);
-            const auto alpha_j = alpha_[j];
+            const auto alpha_j = alpha_[j_global];
 
             const auto c_ij = gather_get_entry(cij_matrix, jt);
             const auto d_ij = get_entry(dij_matrix_, jt);
@@ -397,13 +406,13 @@ namespace grendel
             limiter.accumulate(U_i, U_j, U_ij_bar, jt);
           }
 
-          scatter(temp_euler_, U_i_new, i);
-          scatter(r_, r_i, i);
+          scatter(temp_euler_, U_i_new, i_global);
+          scatter(r_, r_i, i_global);
 
           const double hd_i = m_i / measure_of_omega;
-          const double rho_relaxation_i = rho_relaxation_[i];
+          const double rho_relaxation_i = rho_relaxation_[i_global];
           limiter.apply_relaxation(hd_i, rho_relaxation_i);
-          scatter(bounds_, limiter.bounds(), i);
+          scatter(bounds_, limiter.bounds(), i_global);
         }
       };
 
