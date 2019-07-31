@@ -87,8 +87,11 @@ namespace grendel
     dij_matrix_.reinit(sparsity);
 
     lij_matrix_.reinit(sparsity);
+#if 0
+    // FIXME
     if (Utilities::MPI::n_mpi_processes(mpi_communicator_) > 1)
       lij_matrix_communicator_.prepare();
+#endif
   }
 
 
@@ -131,14 +134,16 @@ namespace grendel
         Indicator<dim> indicator(*offline_data_);
 
         /* Translate the local index into a index set iterator:: */
-        auto it = locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
-        for (; i1 < i2; ++i1, ++it) {
+        auto it_global =
+            locally_relevant.at(locally_relevant.nth_index_in_set(*i1));
 
-          const auto i = *it;
+        for (; i1 < i2; ++i1, ++it_global) {
+          const auto i = *i1;
+          const auto i_global = *it_global;
 
           /* FIXME: Skip constrained degrees of freedom */
 
-          const auto U_i = gather(U, i);
+          const auto U_i = gather(U, i_global);
 
           indicator.reset(U_i);
           double rho_second_variation_numerator = 0.;
@@ -146,12 +151,13 @@ namespace grendel
 
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
             const auto j = jt->column();
+            const auto j_global = locally_relevant.nth_index_in_set(j);
 
             /* Skip diagonal. */
             if (j == i)
               continue;
 
-            const auto U_j = gather(U, j);
+            const auto U_j = gather(U, j_global);
             indicator.add(U_j, jt);
             const auto beta_ij = get_entry(betaij_matrix, jt);
             rho_second_variation_numerator += beta_ij * (U_j[0] - U_i[0]);
@@ -189,12 +195,12 @@ namespace grendel
             dij_matrix_(j, i) = d; // FIXME: Suboptimal
           }
 
-          rho_second_variation_[i] =
+          rho_second_variation_[i_global] =
               rho_second_variation_numerator / rho_second_variation_denominator;
 
           const double mass = lumped_mass_matrix.diag_element(i);
           const double hd_i = mass / measure_of_omega;
-          alpha_[i] = indicator.alpha(hd_i);
+          alpha_[i_global] = indicator.alpha(hd_i);
         }
       };
 
@@ -512,8 +518,11 @@ namespace grendel
         TimerOutput::Scope time(computing_timer_,
                                 "time_step - 6 symmetrize l_ij");
 
+#if 0
+        // FIXME
         if (Utilities::MPI::n_mpi_processes(mpi_communicator_) > 1)
           lij_matrix_communicator_.synchronize();
+#endif
 
         {
           const auto on_subranges = [&](auto i1, const auto i2) {
