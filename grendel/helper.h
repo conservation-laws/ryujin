@@ -92,9 +92,11 @@ namespace grendel
   {
     dealii::Tensor<1, k> result;
     for (unsigned int j = 0; j < k; ++j)
-      result[j] = U[j][i];
+      result[j] = U[j].local_element(i);
     return result;
   }
+
+
   /*
    * It's magic
    */
@@ -104,7 +106,7 @@ namespace grendel
   {
     std::array<double, k> result;
     for (unsigned int j = 0; j < k; ++j)
-      result[j] = U[j][i];
+      result[j] = U[j].local_element(i);
     return result;
   }
 
@@ -118,7 +120,7 @@ namespace grendel
   scatter(std::array<T1, k1> &U, const T2 &result, const T3 i)
   {
     for (unsigned int j = 0; j < k1; ++j)
-      U[j][i] = result[j];
+      U[j].local_element(i) = result[j];
   }
 
 

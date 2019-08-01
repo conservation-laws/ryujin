@@ -57,6 +57,9 @@ namespace grendel
   {
     deallog << "OfflineData<dim>::setup()" << std::endl;
 
+    IndexSet locally_owned;
+    IndexSet locally_extended;
+
     {
       /*
        * Initialize dof_handler and gather all locally owned and locally
@@ -69,13 +72,14 @@ namespace grendel
                               discretization_->finite_element());
       DoFRenumbering::Cuthill_McKee(dof_handler_);
 
-      locally_owned_ = dof_handler_.locally_owned_dofs();
+      locally_owned = dof_handler_.locally_owned_dofs();
+      n_locally_owned_ = locally_owned.n_elements();
 
       /*
        * Print out the DoF distribution
        */
 
-      const auto n_dofs = locally_owned_.size();
+      const auto n_dofs = locally_owned.size();
       deallog << "        " << n_dofs
               << " global DoFs, local DoF distribution:" << std::endl;
 
@@ -114,14 +118,12 @@ namespace grendel
      */
 
     {
-      locally_extended_.clear();
-
       /* FIXME: Performance hack to make the loop fast: */
       IndexSet locally_relevant;
       DoFTools::extract_locally_relevant_dofs(dof_handler_, locally_relevant);
 
-      const auto n_dofs = locally_owned_.size();
-      locally_extended_.set_size(n_dofs);
+      const auto n_dofs = locally_owned.size();
+      locally_extended.set_size(n_dofs);
 
       deallog << "        populate affine constraints" << std::endl;
       TimerOutput::Scope t(computing_timer_,
@@ -136,15 +138,16 @@ namespace grendel
         cell->get_dof_indices(dof_indices);
         for (auto it : dof_indices)
           if (!locally_relevant.is_element(it))
-            locally_extended_.add_index(it);
+            locally_extended.add_index(it);
       }
 
-      locally_extended_.add_indices(locally_relevant);
-      locally_extended_.compress();
+      locally_extended.add_indices(locally_relevant);
+      locally_extended.compress();
+      n_locally_extended_ = locally_extended.n_elements();
     }
 
     partitioner_.reset(new dealii::Utilities::MPI::Partitioner(
-        locally_owned_, locally_extended_, mpi_communicator_));
+        locally_owned, locally_extended, mpi_communicator_));
 
     // FIXME:
     affine_constraints_.close();
@@ -198,8 +201,7 @@ namespace grendel
       TimerOutput::Scope t(computing_timer_,
                            "offline_data - create sparsity pattern");
 
-      const auto n_local_dofs = locally_extended_.n_elements();
-      DynamicSparsityPattern dsp(n_local_dofs, n_local_dofs);
+      DynamicSparsityPattern dsp(n_locally_extended_, n_locally_extended_);
 
       std::vector<types::global_dof_index> dof_indices(dofs_per_cell);
 
@@ -214,7 +216,7 @@ namespace grendel
                        dof_indices.end(),
                        dof_indices.begin(),
                        [&](auto index) {
-                         return locally_extended_.index_within_set(index);
+                         return partitioner_->global_to_local(index);
                        });
 
         affine_constraints_.add_entries_local_to_global(
@@ -308,7 +310,7 @@ namespace grendel
                      local_dof_indices.end(),
                      local_dof_indices.begin(),
                      [&](auto index) {
-                       return locally_extended_.index_within_set(index);
+                       return partitioner_->global_to_local(index);
                      });
 
       /* clear out copy data: */
@@ -377,7 +379,7 @@ namespace grendel
           }
 
           const auto index = local_dof_indices[j];
-          const auto global_index = locally_extended_.nth_index_in_set(index);
+          const auto global_index = partitioner_->local_to_global(index);
 
           // FIXME: This is a bloody hack:
           Point<dim> position;
@@ -468,20 +470,17 @@ namespace grendel
      */
 
     {
-      dealii::LinearAlgebra::distributed::Vector<double> temp_(
-          locally_owned_, locally_extended_, mpi_communicator_);
+      dealii::LinearAlgebra::distributed::Vector<double> temp_(partitioner_);
 
-      for (auto i : locally_owned_) {
-        const auto local_index = locally_extended_.index_within_set(i);
-        temp_[i] = lumped_mass_matrix_.diag_element(local_index);
-      }
+      for (unsigned int i = 0; i < partitioner_->local_size(); ++i)
+        temp_.local_element(i) = lumped_mass_matrix_.diag_element(i);
 
       temp_.update_ghost_values();
 
-      for (auto i : locally_extended_) {
-        const auto local_index = locally_extended_.index_within_set(i);
-        lumped_mass_matrix_.diag_element(local_index) = temp_[i];
-      }
+      const auto offset = partitioner_->local_size();
+      for (unsigned int i = 0; i < partitioner_->n_ghost_indices(); ++i)
+        lumped_mass_matrix_.diag_element(offset + i) =
+            temp_.local_element(offset + i);
     }
 
     /*
@@ -531,9 +530,7 @@ namespace grendel
       TimerOutput::Scope t(computing_timer_,
                            "offline_data - compute b_ij, |c_ij|, and n_ij");
 
-      const auto indices =
-          boost::irange<unsigned int>(0, locally_extended_.n_elements());
-
+      const auto indices = boost::irange<unsigned int>(0, n_locally_extended_);
       parallel::apply_to_subranges(
           indices.begin(), indices.end(), on_subranges, 4096);
 
@@ -577,7 +574,7 @@ namespace grendel
                      local_dof_indices.end(),
                      local_dof_indices.begin(),
                      [&](auto index) {
-                       return locally_extended_.index_within_set(index);
+                       return partitioner_->global_to_local(index);
                      });
 
       /* clear out copy data: */

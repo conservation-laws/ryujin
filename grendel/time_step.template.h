@@ -100,8 +100,9 @@ namespace grendel
     CALLGRIND_START_INSTRUMENTATION;
 #endif
 
-    const auto &locally_owned = offline_data_->locally_owned();
-    const auto &locally_extended = offline_data_->locally_extended();
+    const auto &n_locally_owned = offline_data_->n_locally_owned();
+    const auto &n_locally_extended = offline_data_->n_locally_extended();
+
     const auto &sparsity = offline_data_->sparsity_pattern();
     const auto &mass_matrix = offline_data_->mass_matrix();
     const auto &lumped_mass_matrix = offline_data_->lumped_mass_matrix();
@@ -113,8 +114,9 @@ namespace grendel
     const auto &boundary_normal_map = offline_data_->boundary_normal_map();
     const double measure_of_omega = offline_data_->measure_of_omega();
 
-    const auto indices =
-        boost::irange<unsigned int>(0, locally_extended.n_elements());
+    const auto indices_owned = boost::irange<unsigned int>(0, n_locally_owned);
+    const auto indices_extended =
+        boost::irange<unsigned int>(0, n_locally_extended);
 
     /*
      * Step 1: Compute off-diagonal d_ij, and alpha_i
@@ -129,17 +131,12 @@ namespace grendel
         /* Stored thread locally: */
         Indicator<dim> indicator(*offline_data_);
 
-        /* Translate the local index into a index set iterator:: */
-        auto it_global =
-            locally_extended.at(locally_extended.nth_index_in_set(*i1));
-
-        for (; i1 < i2; ++i1, ++it_global) {
+        for (; i1 < i2; ++i1) {
           const auto i = *i1;
-          const auto i_global = *it_global;
 
           /* FIXME: Skip constrained degrees of freedom */
 
-          const auto U_i = gather(U, i_global);
+          const auto U_i = gather(U, i);
 
           indicator.reset(U_i);
           double rho_second_variation_numerator = 0.;
@@ -147,13 +144,12 @@ namespace grendel
 
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
             const auto j = jt->column();
-            const auto j_global = locally_extended.nth_index_in_set(j);
 
             /* Skip diagonal. */
             if (j == i)
               continue;
 
-            const auto U_j = gather(U, j_global);
+            const auto U_j = gather(U, j);
             indicator.add(U_j, jt);
             const auto beta_ij = get_entry(betaij_matrix, jt);
             rho_second_variation_numerator += beta_ij * (U_j[0] - U_i[0]);
@@ -191,17 +187,17 @@ namespace grendel
             dij_matrix_(j, i) = d; // FIXME: Suboptimal
           }
 
-          rho_second_variation_[i_global] =
+          rho_second_variation_.local_element(i) =
               rho_second_variation_numerator / rho_second_variation_denominator;
 
           const double mass = lumped_mass_matrix.diag_element(i);
           const double hd_i = mass / measure_of_omega;
-          alpha_[i_global] = indicator.alpha(hd_i);
+          alpha_.local_element(i) = indicator.alpha(hd_i);
         }
       };
 
       parallel::apply_to_subranges(
-          indices.begin(), indices.end(), on_subranges, 4096);
+          indices_extended.begin(), indices_extended.end(), on_subranges, 4096);
 
       /* Synchronize alpha_ over all MPI processes: */
       rho_second_variation_.update_ghost_values();
@@ -223,20 +219,14 @@ namespace grendel
       const auto on_subranges = [&](auto i1, const auto i2) {
         double tau_max_on_subrange = std::numeric_limits<double>::infinity();
 
-        /* Translate the local index into a index set iterator:: */
-        auto it_global =
-            locally_extended.at(locally_extended.nth_index_in_set(*i1));
-
-        for (; i1 < i2; ++i1, ++it_global) {
-
+        for (; i1 < i2; ++i1) {
           const auto i = *i1;
-          const auto i_global = *it_global;
 
           /* Skip constrained degrees of freedom */
           if (++sparsity.begin(i) == sparsity.end(i))
             continue;
 
-          const double delta_rho_i = rho_second_variation_[i_global];
+          const double delta_rho_i = rho_second_variation_.local_element(i);
 
           double alpha_i = 0.;
           double d_sum = 0.;
@@ -245,17 +235,16 @@ namespace grendel
 
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
             const auto j = jt->column();
-            const auto j_global = locally_extended.nth_index_in_set(j);
 
             if constexpr (smoothen_alpha_) {
               const auto m_ij = get_entry(mass_matrix, jt);
-              alpha_i += m_ij * alpha_[j_global];
+              alpha_i += m_ij * alpha_.local_element(j);
             }
 
             if (j == i)
               continue;
 
-            const double delta_rho_j = rho_second_variation_[j_global];
+            const double delta_rho_j = rho_second_variation_.local_element(j);
             const auto beta_ij = get_entry(betaij_matrix, jt);
 
             /* The numerical constant 8 is up to debate... */
@@ -268,10 +257,10 @@ namespace grendel
 
           if constexpr (smoothen_alpha_) {
             const double m_i = lumped_mass_matrix.diag_element(i);
-            alpha_[i_global] = alpha_i / m_i;
+            alpha_.local_element(i) = alpha_i / m_i;
           }
 
-          rho_relaxation_[i_global] =
+          rho_relaxation_.local_element(i) =
               std::abs(rho_relaxation_numerator / rho_relaxation_denominator);
 
           dij_matrix_.diag_element(i) = d_sum;
@@ -289,7 +278,7 @@ namespace grendel
       };
 
       parallel::apply_to_subranges(
-          indices.begin(), indices.end(), on_subranges, 4096);
+          indices_extended.begin(), indices_extended.end(), on_subranges, 4096);
 
       if constexpr (smoothen_alpha_) {
         /* Synchronize alpha_ over all MPI processes: */
@@ -334,28 +323,21 @@ namespace grendel
         /* Notar bene: This bounds variable is thread local: */
         Limiter<dim> limiter;
 
-        /* Translate the local index into a index set iterator:: */
-        auto it_global =
-            locally_extended.at(locally_extended.nth_index_in_set(*i1));
-
-        for (; i1 < i2; ++i1, ++it_global) {
-
+        for (; i1 < i2; ++i1) {
           const auto i = *i1;
-          const auto i_global = *it_global;
 
           /* Skip constrained degrees of freedom */
           if (++sparsity.begin(i) == sparsity.end(i))
             continue;
 
-          /* Only iterate over locally owned subset */
-          if (!locally_owned.is_element(i_global))
-            continue;
+          /* Only iterate over locally owned subset! */
+          Assert(i < n_locally_owned, ExcInternalError());
 
-          const auto U_i = gather(U, i_global);
+          const auto U_i = gather(U, i);
           auto U_i_new = U_i;
 
           const auto f_i = ProblemDescription<dim>::f(U_i);
-          const auto alpha_i = alpha_[i_global];
+          const auto alpha_i = alpha_.local_element(i);
           const double m_i = lumped_mass_matrix.diag_element(i);
 
           const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
@@ -367,13 +349,11 @@ namespace grendel
           limiter.reset();
 
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
-
             const auto j = jt->column();
-            const auto j_global = locally_extended.nth_index_in_set(j);
 
-            const auto U_j = gather(U, j_global);
+            const auto U_j = gather(U, j);
             const auto f_j = ProblemDescription<dim>::f(U_j);
-            const auto alpha_j = alpha_[j_global];
+            const auto alpha_j = alpha_.local_element(j);
 
             const auto c_ij = gather_get_entry(cij_matrix, jt);
             const auto d_ij = get_entry(dij_matrix_, jt);
@@ -402,18 +382,19 @@ namespace grendel
             limiter.accumulate(U_i, U_j, U_ij_bar, jt);
           }
 
-          scatter(temp_euler_, U_i_new, i_global);
-          scatter(r_, r_i, i_global);
+          scatter(temp_euler_, U_i_new, i);
+          scatter(r_, r_i, i);
 
           const double hd_i = m_i / measure_of_omega;
-          const double rho_relaxation_i = rho_relaxation_[i_global];
+          const double rho_relaxation_i = rho_relaxation_.local_element(i);
           limiter.apply_relaxation(hd_i, rho_relaxation_i);
-          scatter(bounds_, limiter.bounds(), i_global);
+          scatter(bounds_, limiter.bounds(), i);
         }
       };
 
+      /* Only iterate over locally owned subset! */
       parallel::apply_to_subranges(
-          indices.begin(), indices.end(), on_subranges, 4096);
+          indices_owned.begin(), indices_owned.end(), on_subranges, 4096);
 
       /* Synchronize r_ over all MPI processes: */
       for (auto &it : r_)
@@ -433,38 +414,31 @@ namespace grendel
                               "time_step - 4 compute p_ij (2)");
 
       const auto on_subranges = [&](auto i1, const auto i2) {
-        /* Translate the local index into a index set iterator:: */
-        auto it_global =
-            locally_extended.at(locally_extended.nth_index_in_set(*i1));
 
-        for (; i1 < i2; ++i1, ++it_global) {
+        for (; i1 < i2; ++i1) {
           const auto i = *i1;
-          const auto i_global = *it_global;
+
+          /* Only iterate over locally owned subset! */
+          Assert(i < n_locally_owned, ExcInternalError());
 
           /* Skip constrained degrees of freedom */
           if (++sparsity.begin(i) == sparsity.end(i))
-            continue;
-
-          /* Only iterate over locally owned subset */
-          if (!locally_owned.is_element(i_global))
             continue;
 
           const double m_i = lumped_mass_matrix.diag_element(i);
           const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
           const double lambda = 1. / (size - 1.);
 
-          const auto r_i = gather(r_, i_global);
+          const auto r_i = gather(r_, i);
 
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
-
             const auto j = jt->column();
-            const auto j_global = locally_extended.nth_index_in_set(j);
 
             const auto b_ij = get_entry(bij_matrix, jt);
             const auto b_ji = bij_matrix(j, i); // FIXME: Suboptimal
             auto p_ij = gather_get_entry(pij_matrix_, jt);
 
-            const auto r_j = gather(r_, j_global);
+            const auto r_j = gather(r_, j);
 
             p_ij += tau / m_i / lambda * (b_ij * r_j - b_ji * r_i);
             scatter_set_entry(pij_matrix_, jt, p_ij);
@@ -473,7 +447,7 @@ namespace grendel
       };
 
       parallel::apply_to_subranges(
-          indices.begin(), indices.end(), on_subranges, 4096);
+          indices_owned.begin(), indices_owned.end(), on_subranges, 4096);
     }
 
     for (unsigned int i = 0; i < limiter_iter_; ++i) {
@@ -489,25 +463,19 @@ namespace grendel
         TimerOutput::Scope time(computing_timer_, "time_step - 5 compute l_ij");
 
         const auto on_subranges = [&](auto i1, const auto i2) {
-          /* Translate the local index into a index set iterator:: */
-          auto it_global =
-              locally_extended.at(locally_extended.nth_index_in_set(*i1));
 
-          for (; i1 < i2; ++i1, ++it_global) {
-
+          for (; i1 < i2; ++i1) {
             const auto i = *i1;
-            const auto i_global = *it_global;
+
+            /* Only iterate over locally owned subset! */
+            Assert(i < n_locally_owned, ExcInternalError());
 
             /* Skip constrained degrees of freedom */
             if (++sparsity.begin(i) == sparsity.end(i))
               continue;
 
-            /* Only iterate over locally owned subset */
-            if (!locally_owned.is_element(i_global))
-              continue;
-
-            const auto bounds = gather_array(bounds_, i_global);
-            const auto U_i_new = gather(temp_euler_, i_global);
+            const auto bounds = gather_array(bounds_, i);
+            const auto U_i_new = gather(temp_euler_, i);
 
             for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
               auto p_ij = gather_get_entry(pij_matrix_, jt);
@@ -518,7 +486,7 @@ namespace grendel
         };
 
         parallel::apply_to_subranges(
-            indices.begin(), indices.end(), on_subranges, 4096);
+            indices_owned.begin(), indices_owned.end(), on_subranges, 4096);
       }
 
       /*
@@ -553,8 +521,10 @@ namespace grendel
             }
           };
 
-          parallel::apply_to_subranges(
-              indices.begin(), indices.end(), on_subranges, 4096);
+          parallel::apply_to_subranges(indices_extended.begin(),
+                                       indices_extended.end(),
+                                       on_subranges,
+                                       4096);
         }
       }
 
@@ -570,24 +540,18 @@ namespace grendel
                                 "time_step - 7 high-order update");
 
         const auto on_subranges = [&](auto i1, const auto i2) {
-          /* Translate the local index into a index set iterator:: */
-          auto it_global =
-              locally_extended.at(locally_extended.nth_index_in_set(*i1));
 
-          for (; i1 < i2; ++i1, ++it_global) {
-
+          for (; i1 < i2; ++i1) {
             const auto i = *i1;
-            const auto i_global = *it_global;
+
+            /* Only iterate over locally owned subset */
+            Assert(i < n_locally_owned, ExcInternalError());
 
             /* Skip constrained degrees of freedom */
             if (++sparsity.begin(i) == sparsity.end(i))
               continue;
 
-            /* Only iterate over locally owned subset */
-            if (!locally_owned.is_element(i_global))
-              continue;
-
-            auto U_i_new = gather(temp_euler_, i_global);
+            auto U_i_new = gather(temp_euler_, i);
 
             const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
             const double lambda = 1. / (size - 1.);
@@ -600,12 +564,12 @@ namespace grendel
               scatter_set_entry(pij_matrix_, jt, p_ij);
             }
 
-            scatter(temp_euler_, U_i_new, i_global);
+            scatter(temp_euler_, U_i_new, i);
           }
         };
 
         parallel::apply_to_subranges(
-            indices.begin(), indices.end(), on_subranges, 4096);
+            indices_owned.begin(), indices_owned.end(), on_subranges, 4096);
       }
     } /* limiter_iter_ */
 
@@ -622,7 +586,9 @@ namespace grendel
         for (auto it = it1; it != it2; ++it) {
 
           const auto i = it->first;
-          const auto i_global = locally_extended.nth_index_in_set(i);
+
+          /* Only iterate over locally owned subset */
+          Assert(i < n_locally_owned, ExcInternalError());
 
           const auto &[normal, id, position] = it->second;
 
@@ -630,10 +596,7 @@ namespace grendel
           if (++sparsity.begin(i) == sparsity.end(i))
             continue;
 
-          if (!locally_owned.is_element(i_global))
-            continue;
-
-          auto U_i = gather(temp_euler_, i_global);
+          auto U_i = gather(temp_euler_, i);
 
           /* On boundary 1 remove the normal component of the momentum: */
 
@@ -650,7 +613,7 @@ namespace grendel
             U_i = initial_values_->initial_state(position, t + tau);
           }
 
-          scatter(temp_euler_, U_i, i_global);
+          scatter(temp_euler_, U_i, i);
         }
       };
 

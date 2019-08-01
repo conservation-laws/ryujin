@@ -81,24 +81,22 @@ namespace grendel
     ACCESSOR_READ_ONLY(dof_handler)
 
     /**
-     * An IndexSet storing all locally owned indices.
-     */
-    dealii::IndexSet locally_owned_;
-    ACCESSOR_READ_ONLY(locally_owned)
-
-    /**
-     * An IndexSet storing an extended set of locally relevant indices.
-     * This includes all global indices associated with all locally owned
-     * cells and the complete ghost layer.
-     */
-    dealii::IndexSet locally_extended_;
-    ACCESSOR_READ_ONLY(locally_extended)
-
-    /**
      * FIXME Description.
      */
     std::shared_ptr<const dealii::Utilities::MPI::Partitioner> partitioner_;
     ACCESSOR_READ_ONLY_NO_DEREFERENCE(partitioner)
+
+    /**
+     * FIXME Description.
+     */
+    unsigned int n_locally_owned_;
+    ACCESSOR_READ_ONLY(n_locally_owned)
+
+    /**
+     * FIXME Description.
+     */
+    unsigned int n_locally_extended_;
+    ACCESSOR_READ_ONLY(n_locally_extended)
 
     /**
      * The SparsityPattern.
