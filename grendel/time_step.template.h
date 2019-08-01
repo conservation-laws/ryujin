@@ -75,7 +75,7 @@ namespace grendel
     for (auto &it : bounds_)
       it.reinit(partitioner);
 
-    /* Initialize local matrices */
+    /* Initialize local matrices: */
 
     const auto &sparsity = offline_data_->sparsity_pattern();
 
@@ -103,7 +103,12 @@ namespace grendel
     const auto &n_locally_owned = offline_data_->n_locally_owned();
     const auto &n_locally_extended = offline_data_->n_locally_extended();
 
+    const auto indices_owned = boost::irange<unsigned int>(0, n_locally_owned);
+    const auto indices_extended =
+        boost::irange<unsigned int>(0, n_locally_extended);
+
     const auto &sparsity = offline_data_->sparsity_pattern();
+
     const auto &mass_matrix = offline_data_->mass_matrix();
     const auto &lumped_mass_matrix = offline_data_->lumped_mass_matrix();
     const auto &norm_matrix = offline_data_->norm_matrix();
@@ -111,12 +116,9 @@ namespace grendel
     const auto &bij_matrix = offline_data_->bij_matrix();
     const auto &betaij_matrix = offline_data_->betaij_matrix();
     const auto &cij_matrix = offline_data_->cij_matrix();
+
     const auto &boundary_normal_map = offline_data_->boundary_normal_map();
     const double measure_of_omega = offline_data_->measure_of_omega();
-
-    const auto indices_owned = boost::irange<unsigned int>(0, n_locally_owned);
-    const auto indices_extended =
-        boost::irange<unsigned int>(0, n_locally_extended);
 
     /*
      * Step 1: Compute off-diagonal d_ij, and alpha_i
@@ -131,16 +133,15 @@ namespace grendel
         /* Stored thread locally: */
         Indicator<dim> indicator(*offline_data_);
 
-        for (; i1 < i2; ++i1) {
-          const auto i = *i1;
+        for (const auto i : boost::make_iterator_range(i1, i2)) {
 
-          /* FIXME: Skip constrained degrees of freedom */
+          /* Skip constrained degrees of freedom */
+          if (++sparsity.begin(i) == sparsity.end(i))
+            continue;
 
           const auto U_i = gather(U, i);
 
           indicator.reset(U_i);
-          double rho_second_variation_numerator = 0.;
-          double rho_second_variation_denominator = 0.;
 
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
             const auto j = jt->column();
@@ -151,9 +152,6 @@ namespace grendel
 
             const auto U_j = gather(U, j);
             indicator.add(U_j, jt);
-            const auto beta_ij = get_entry(betaij_matrix, jt);
-            rho_second_variation_numerator += beta_ij * (U_j[0] - U_i[0]);
-            rho_second_variation_denominator += beta_ij;
 
             /* Only iterate over the subdiagonal for d_ij */
             if (j >= i)
@@ -188,7 +186,7 @@ namespace grendel
           }
 
           rho_second_variation_.local_element(i) =
-              rho_second_variation_numerator / rho_second_variation_denominator;
+              indicator.rho_second_variation();
 
           const double mass = lumped_mass_matrix.diag_element(i);
           const double hd_i = mass / measure_of_omega;

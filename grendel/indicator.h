@@ -31,10 +31,6 @@ namespace grendel
       entropy_viscosity_commutator
     } indicator_ = Indicators::entropy_viscosity_commutator;
 
-    /*
-     * Options for smoothness indicator:
-     */
-
     static constexpr enum class SmoothnessIndicators {
       rho,
       internal_energy,
@@ -44,6 +40,8 @@ namespace grendel
     static constexpr double smoothness_indicator_alpha_0_ = 0;
 
     static constexpr unsigned int smoothness_indicator_power_ = 3;
+
+    static constexpr bool compute_second_variations_ = true;
 
     /**
      * We take a reference to an OfflineData object in order to store
@@ -64,39 +62,42 @@ namespace grendel
     template <typename ITERATOR>
     inline DEAL_II_ALWAYS_INLINE void add(const rank1_type U_j,
                                           const ITERATOR jt);
-
     /**
      * Return the computed alpha_i value.
      */
     inline DEAL_II_ALWAYS_INLINE double alpha(const double h_i);
 
+    /**
+     * Return the computed second variation of rho.
+     */
+    inline DEAL_II_ALWAYS_INLINE double rho_second_variation();
+
   private:
     const std::array<dealii::SparseMatrix<double>, dim> &cij_matrix_;
     const dealii::SparseMatrix<double> &betaij_matrix_;
 
-    // FIXME: Unify memory regions:
+    /* Temporary storage used for the entropy_viscosity_commutator: */
 
-    /*
-     * temporary storage used for the entropy_viscosity_commutator:
-     */
-
+    double rho_i = 0.; // also used for second variations
     double eta_i = 0.;
-    double rho_i = 0.;
     rank2_type f_i;
     rank1_type d_eta_i;
 
     double left = 0.;
     rank1_type right;
 
-    /*
-     * temporary storage used for the smoothness indicator:
-     */
+    /* Temporary storage used for the smoothness indicator: */
 
     double indicator_i = 0.;
 
     double numerator = 0.;
     double denominator = 0.;
     double denominator_abs = 0.;
+
+    /* Temporary storage used to compute second variations: */
+
+    double rho_second_variation_numerator = 0.;
+    double rho_second_variation_denominator = 0.;
   };
 
 
@@ -150,6 +151,12 @@ namespace grendel
 
       indicator_i = smoothness_indicator<dim>(U_i);
     }
+
+    if constexpr (compute_second_variations_) {
+      rho_i = U_i[0];
+      rho_second_variation_numerator = 0.;
+      rho_second_variation_denominator = 0.;
+    }
   }
 
 
@@ -171,15 +178,22 @@ namespace grendel
         right[k] += (f_j[k] - f_i[k]) * c_ij;
     }
 
-    if constexpr (indicator_ == Indicators::smoothness_indicator) {
-      const auto beta_ij = get_entry(betaij_matrix_, jt);
+    const auto beta_ij = get_entry(betaij_matrix_, jt);
 
+    if constexpr (indicator_ == Indicators::smoothness_indicator) {
       const auto indicator_j = smoothness_indicator<dim>(U_j);
 
       numerator += beta_ij * (indicator_i - indicator_j);
       denominator += std::abs(beta_ij) * std::abs(indicator_i - indicator_j);
       denominator_abs +=
           std::abs(beta_ij) * (std::abs(indicator_i) + std::abs(indicator_j));
+    }
+
+    if constexpr (compute_second_variations_) {
+      const auto &rho_j = U_j[0];
+
+      rho_second_variation_numerator += beta_ij * (rho_j - rho_i);
+      rho_second_variation_denominator += beta_ij;
     }
   }
 
@@ -222,6 +236,15 @@ namespace grendel
     }
 
     __builtin_unreachable();
+  }
+
+
+  template <int dim>
+  inline DEAL_II_ALWAYS_INLINE double Indicator<dim>::rho_second_variation()
+  {
+    constexpr double eps = std::numeric_limits<double>::epsilon();
+    return rho_second_variation_numerator /
+           (rho_second_variation_denominator + eps);
   }
 
 
