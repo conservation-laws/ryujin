@@ -79,14 +79,12 @@ namespace grendel
       for (const auto i_global : locally_extended) {
         const auto i = locally_extended.index_within_set(i_global);
 
-        auto ejt = extended_sparsity.begin(i_global);
-
-        unsigned int index = 0;
-
         for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
           const auto j = jt->column();
           const auto j_global = locally_extended.nth_index_in_set(j);
 
+          auto ejt = extended_sparsity.begin(i_global);
+          unsigned int index = 0;
           for (; ejt->column() != j_global; ++ejt)
             index++;
           set_entry(indices_, jt, index);
