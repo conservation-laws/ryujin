@@ -31,9 +31,11 @@ namespace grendel
   {
     const auto &dof_handler = offline_data_->dof_handler();
     const auto &affine_constraints = offline_data_->affine_constraints();
-    const auto &locally_owned = offline_data_->locally_owned();
-    const auto &locally_extended = offline_data_->locally_extended();
     const auto &sparsity = offline_data_->sparsity_pattern();
+
+    const auto &partitioner = offline_data_->partitioner();
+    const auto &n_locally_owned = offline_data_->n_locally_owned();
+    const auto &n_locally_extended = offline_data_->n_locally_extended();
 
     Assert(sparsity.is_compressed(), dealii::ExcInternalError());
 
@@ -94,44 +96,36 @@ namespace grendel
 
     unsigned int n = sparsity.max_entries_per_row();
     n = Utilities::MPI::max(n, mpi_communicator_);
-
     matrix_temp_.resize(
-        n,
-        dealii::LinearAlgebra::distributed::Vector<double>(
-            locally_owned, locally_extended, mpi_communicator_));
+        n, dealii::LinearAlgebra::distributed::Vector<double>(partitioner));
   }
 
 
   template <int dim>
   void MatrixCommunicator<dim>::synchronize()
   {
-    const auto &locally_owned = offline_data_->locally_owned();
-    const auto &locally_extended = offline_data_->locally_extended();
-    const auto indices =
-        boost::irange<unsigned int>(0, locally_extended.n_elements());
+    const auto &n_locally_owned = offline_data_->n_locally_owned();
+    const auto &n_locally_extended = offline_data_->n_locally_extended();
+
+
     const auto &sparsity = offline_data_->sparsity_pattern();
 
     {
       const auto on_subranges = [&](auto i1, const auto i2) {
-
-        /* Translate the local index into a index set iterator:: */
-        auto it_global =
-            locally_extended.at(locally_extended.nth_index_in_set(*i1));
-
         for (; i1 < i2; ++i1, ++it_global) {
           const auto i = *i1;
-          const auto i_global = *it_global;
 
-          if (!locally_owned.is_element(i_global))
-            continue;
+          /* Only iterate over locally owned subset! */
+          Assert(i < n_locally_owned, ExcInternalError());
 
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
             const auto jt_index = get_entry(indices_, jt);
-            matrix_temp_[jt_index][i_global] = get_entry(matrix_, jt);
+            matrix_temp_[jt_index].local_element(i) = get_entry(matrix_, jt);
           }
         }
       };
 
+      const auto indices = boost::irange<unsigned int>(0, n_locally_owned);
       parallel::apply_to_subranges(
           indices.begin(), indices.end(), on_subranges, 4096);
     }
@@ -141,25 +135,22 @@ namespace grendel
 
     {
       const auto on_subranges = [&](auto i1, const auto i2) {
-
-        /* Translate the local index into a index set iterator:: */
-        auto it_global =
-            locally_extended.at(locally_extended.nth_index_in_set(*i1));
-
-        for (; i1 < i2; ++i1, ++it_global) {
+        for (; i1 < i2; ++i1) {
           const auto i = *i1;
-          const auto i_global = *it_global;
 
-          if (locally_owned.is_element(i_global))
-            continue;
+          /* Only iterate over ghost indices! */
+          Assert(i >= n_locally_owned && i < n_locally_extended,
+                 ExcInternalError());
 
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
             const auto jt_index = get_entry(indices_, jt);
-            set_entry(matrix_, jt, matrix_temp_[jt_index][i_global]);
+            set_entry(matrix_, jt, matrix_temp_[jt_index].local_element(i));
           }
         }
       };
 
+      const auto indices =
+          boost::irange<unsigned int>(n_locally_owned, n_locally_extended);
       parallel::apply_to_subranges(
           indices.begin(), indices.end(), on_subranges, 4096);
     }
