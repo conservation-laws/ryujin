@@ -31,7 +31,6 @@ namespace grendel
   void MatrixCommunicator<dim>::prepare()
   {
     const auto &dof_handler = offline_data_->dof_handler();
-    const auto &affine_constraints = offline_data_->affine_constraints();
     const auto &sparsity = offline_data_->sparsity_pattern();
 
     const auto &partitioner = offline_data_->partitioner();
@@ -53,9 +52,14 @@ namespace grendel
       const auto n_dofs = partitioner->size();
       const auto dofs_per_cell = dof_handler.get_fe().dofs_per_cell;
 
-      IndexSet locally_extended;
+      /*
+       * We duplicae some work from OfflineData here. Namely, we have to
+       * recreate the locally_extended and locally_relevant IndexSet
+       * objects as well as the global_constraints AffineConstraints
+       * object.
+       */
 
-      /* FIXME: Performance hack to make the loop fast: */
+      IndexSet locally_extended;
       IndexSet locally_relevant;
       DoFTools::extract_locally_relevant_dofs(dof_handler, locally_relevant);
 
@@ -77,6 +81,21 @@ namespace grendel
       locally_extended.add_indices(locally_relevant);
       locally_extended.compress();
 
+      AffineConstraints<double> global_constraints(locally_extended);
+
+      const auto n_periodic_faces =
+          dof_handler.get_triangulation().get_periodic_face_map().size();
+      if (n_periodic_faces != 0) {
+        for (int i = 1; i < dim; ++i) /* omit x direction! */
+          DoFTools::make_periodicity_constraints(dof_handler,
+                                                 /*b_id */ Boundary::periodic,
+                                                 /*direction*/ i,
+                                                 global_constraints);
+      }
+      DoFTools::make_hanging_node_constraints(dof_handler, global_constraints);
+
+      global_constraints.close();
+
       DynamicSparsityPattern extended_sparsity(
           n_dofs, n_dofs, locally_extended);
 
@@ -87,7 +106,7 @@ namespace grendel
 
         cell->get_dof_indices(dof_indices);
         // FIXME
-        affine_constraints.add_entries_local_to_global(
+        global_constraints.add_entries_local_to_global(
             dof_indices, extended_sparsity, false);
       }
 

@@ -174,16 +174,12 @@ namespace grendel
       std::ifstream file(grid_file_);
       grid_in.read_msh(file);
 
-      triangulation.refine_global(refinement_);
-
     } else if (geometry_ == "triangle") {
 
       create_coarse_grid_triangle(triangulation,
                                   immersed_triangle_length_,
                                   immersed_triangle_height_,
                                   immersed_triangle_object_height_);
-
-      triangulation.refine_global(refinement_);
 
     } else if (geometry_ == "tube") {
 
@@ -193,8 +189,6 @@ namespace grendel
                               /*prescribe*/ false,
                               /*periodic*/ false);
 
-      triangulation.refine_global(refinement_);
-
     } else if (geometry_ == "tube analytical") {
 
       create_coarse_grid_tube(triangulation,
@@ -203,8 +197,6 @@ namespace grendel
                               /*prescribe*/ true,
                               /*periodic*/ false);
 
-      triangulation.refine_global(refinement_);
-
     } else if (geometry_ == "tube periodic") {
 
       create_coarse_grid_tube(triangulation,
@@ -212,8 +204,6 @@ namespace grendel
                               tube_diameter_,
                               /*prescribe*/ false,
                               /*periodic*/ true);
-
-      triangulation.refine_global(refinement_);
 
     } else if (geometry_ == "step") {
 
@@ -227,8 +217,6 @@ namespace grendel
                               mach_step_step_position_,
                               mach_step_step_height_);
 
-      triangulation.refine_global(refinement_ - 4);
-
     } else if (geometry_ == "disc") {
 
       create_coarse_grid_cylinder(triangulation,
@@ -237,18 +225,42 @@ namespace grendel
                                   immersed_disc_object_position_,
                                   immersed_disc_object_diameter_);
 
-      triangulation.refine_global(refinement_);
-
     } else if (geometry_ == "wall") {
 
       create_coarse_grid_wall(
           triangulation, wall_length_, wall_height_, wall_position_);
 
-      triangulation.refine_global(refinement_);
-
     } else {
 
       AssertThrow(false, dealii::ExcMessage("Unknown geometry name."));
+    }
+
+    /* Handle periodic faces: */
+
+    const auto bdy_ids = triangulation.get_boundary_ids();
+    if (std::find(bdy_ids.begin(), bdy_ids.end(), Boundary::periodic) !=
+        bdy_ids.end()) {
+
+      deallog << "        collecting periodic faces" << std::endl;
+
+      std::vector<dealii::GridTools::PeriodicFacePair<
+          typename dealii::Triangulation<dim>::cell_iterator>>
+          periodic_faces;
+
+      for (int i = 1; i < dim; ++i) /* omit x direction! */
+        GridTools::collect_periodic_faces(triangulation,
+                                          /*b_id */ Boundary::periodic,
+                                          /*direction*/ i,
+                                          periodic_faces);
+
+      triangulation.add_periodicity(periodic_faces);
+    }
+
+
+    if (geometry_ == "step") {
+      triangulation.refine_global(refinement_ - 4);
+    } else {
+      triangulation.refine_global(refinement_);
     }
 
     mapping_.reset(new MappingQ<dim>(order_mapping_));

@@ -61,12 +61,10 @@ namespace grendel
     IndexSet locally_extended;
 
     {
-      /*
-       * Initialize dof_handler and gather all locally owned and locally
-       * relevant indices:
-       */
-
+      deallog << "        distribute dofs" << std::endl;
       TimerOutput::Scope t(computing_timer_, "offline_data - distribute dofs");
+
+      /* Initialize dof_handler and gather all locally owned indices: */
 
       dof_handler_.initialize(discretization_->triangulation(),
                               discretization_->finite_element());
@@ -75,9 +73,7 @@ namespace grendel
       locally_owned = dof_handler_.locally_owned_dofs();
       n_locally_owned_ = locally_owned.n_elements();
 
-      /*
-       * Print out the DoF distribution
-       */
+      /* Print out the DoF distribution: */
 
       const auto n_dofs = locally_owned.size();
       deallog << "        " << n_dofs
@@ -113,21 +109,30 @@ namespace grendel
     const auto dofs_per_cell =
         discretization_->finite_element().dofs_per_cell;
 
-    /*
-     * Populate the locally_extended index set:
-     */
-
     {
-      /* FIXME: Performance hack to make the loop fast: */
+      deallog << "        create partitioner and affine constraints"
+              << std::endl;
+      TimerOutput::Scope t(
+          computing_timer_,
+          "offline_data - create partitioner and affine constraints");
+
+      /*
+       * We first populate a "locally extended" index set. This set
+       * contains all locally relevant dofs (in our usual definition) and
+       * in addition all dofs associated with ghosted cells. Adding these
+       * extended degrees of freedom to local matrices simplifies the
+       * assembly significantly. FIXME: If it ever becomes necessary we
+       * could try to add a locally relevant index set to the  partitioner
+       * to only communicate a subset of these degrees of freedom.
+       */
+
+      locally_extended.clear();
+
       IndexSet locally_relevant;
       DoFTools::extract_locally_relevant_dofs(dof_handler_, locally_relevant);
 
       const auto n_dofs = locally_owned.size();
       locally_extended.set_size(n_dofs);
-
-      deallog << "        populate affine constraints" << std::endl;
-      TimerOutput::Scope t(computing_timer_,
-                           "offline_data - populate affine constraints");
 
       std::vector<types::global_dof_index> dof_indices(dofs_per_cell);
       for (auto cell : dof_handler_.active_cell_iterators()) {
@@ -144,42 +149,63 @@ namespace grendel
       locally_extended.add_indices(locally_relevant);
       locally_extended.compress();
       n_locally_extended_ = locally_extended.n_elements();
-    }
 
-    partitioner_.reset(new dealii::Utilities::MPI::Partitioner(
-        locally_owned, locally_extended, mpi_communicator_));
+      partitioner_.reset(new dealii::Utilities::MPI::Partitioner(
+          locally_owned, locally_extended, mpi_communicator_));
 
-    // FIXME:
-    affine_constraints_.close();
-#if 0
       /*
-       * Enforce periodic boundary conditions. In this case we assume that
-       * the mesh is in "normal configuration". By convenction we also omit
-       * enforcing periodicity in x direction. This avoids accidentally
-       * glueing the corner degrees of freedom together whish leads to
-       * instability.
+       * create a temporary affine constraints object and populate it with
+       * global indices:
        */
 
-      // FIXME
+      AffineConstraints<double> global_constraints(locally_extended);
 
-      affine_constraints_.reinit(locally_extended);
-      const auto boundary_ids =
-          discretization_->triangulation().get_boundary_ids();
-      if (std::find(boundary_ids.begin(),
-                    boundary_ids.end(),
-                    Boundary::periodic) != boundary_ids.end()) {
+
+      const auto n_periodic_faces =
+          discretization_->triangulation().get_periodic_face_map().size();
+      if (n_periodic_faces != 0) {
+        /*
+         * Enforce periodic boundary conditions. We assume that the mesh is
+         * in "normal configuration". By convenction we also omit enforcing
+         * periodicity in x direction. This avoids accidentally glueing the
+         * corner degrees of freedom together whish leads to instability.
+         */
         for (int i = 1; i < dim; ++i) /* omit x direction! */
           DoFTools::make_periodicity_constraints(dof_handler_,
                                                  /*b_id */ Boundary::periodic,
                                                  /*direction*/ i,
-                                                 affine_constraints_);
+                                                 global_constraints);
       }
 
-      DoFTools::make_hanging_node_constraints(dof_handler_,
-                                              affine_constraints_);
+      DoFTools::make_hanging_node_constraints(dof_handler_, global_constraints);
 
+      global_constraints.close();
+
+      /*
+       * And translate into local indices:
+       */
+
+      affine_constraints_.clear();
+      for(auto line : global_constraints.get_lines()) {
+        const auto old = line.index; //REM
+
+        /* translate into local index ranges: */
+        line.index = partitioner_->global_to_local(line.index);
+        std::transform(line.entries.begin(),
+                       line.entries.end(),
+                       line.entries.begin(),
+                       [&](auto entry) {
+                         return std::make_pair(
+                             partitioner_->global_to_local(entry.first),
+                             entry.second);
+                       });
+
+        affine_constraints_.add_line(line.index);
+        affine_constraints_.add_entries(line.index, line.entries);
+        affine_constraints_.set_inhomogeneity(line.index, line.inhomogeneity);
+      }
       affine_constraints_.close();
-#endif
+    }
 
     /*
      * We need a local view of a couple of matrices. Because they are never
@@ -233,6 +259,7 @@ namespace grendel
     {
       deallog << "        set up matrices" << std::endl;
       TimerOutput::Scope t(computing_timer_, "offline_data - set up matrices");
+
       mass_matrix_.reinit(sparsity_pattern_);
       lumped_mass_matrix_.reinit(sparsity_pattern_);
       bij_matrix_.reinit(sparsity_pattern_);
