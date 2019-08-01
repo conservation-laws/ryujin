@@ -56,26 +56,24 @@ namespace grendel
 
     /* Initialize (global) vectors: */
 
-    const auto &locally_owned = offline_data_->locally_owned();
-    const auto &locally_extended = offline_data_->locally_extended();
+    const auto &partitioner = offline_data_->partitioner();
 
-    auto &exemplar = alpha_;
-    exemplar.reinit(locally_owned, locally_extended, mpi_communicator_);
+    alpha_.reinit(partitioner);
 
-    rho_second_variation_.reinit(exemplar);
-    rho_relaxation_.reinit(exemplar);
+    rho_second_variation_.reinit(partitioner);
+    rho_relaxation_.reinit(partitioner);
 
     for (auto &it : temp_euler_)
-      it.reinit(exemplar);
+      it.reinit(partitioner);
 
     for (auto &it : temp_ssprk_)
-      it.reinit(exemplar);
+      it.reinit(partitioner);
 
     for (auto &it : r_)
-      it.reinit(exemplar);
+      it.reinit(partitioner);
 
     for (auto &it : bounds_)
-      it.reinit(exemplar);
+      it.reinit(partitioner);
 
     /* Initialize local matrices */
 
@@ -102,8 +100,8 @@ namespace grendel
     CALLGRIND_START_INSTRUMENTATION;
 #endif
 
-    const auto &locally_extended = offline_data_->locally_extended();
     const auto &locally_owned = offline_data_->locally_owned();
+    const auto &locally_extended = offline_data_->locally_extended();
     const auto &sparsity = offline_data_->sparsity_pattern();
     const auto &mass_matrix = offline_data_->mass_matrix();
     const auto &lumped_mass_matrix = offline_data_->lumped_mass_matrix();

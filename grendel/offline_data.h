@@ -5,6 +5,7 @@
 #include "helper.h"
 
 #include <deal.II/base/parameter_acceptor.h>
+#include <deal.II/base/partitioner.h>
 #include <deal.II/base/timer.h>
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/lac/affine_constraints.h>
@@ -92,6 +93,12 @@ namespace grendel
      */
     dealii::IndexSet locally_extended_;
     ACCESSOR_READ_ONLY(locally_extended)
+
+    /**
+     * FIXME Description.
+     */
+    std::shared_ptr<const dealii::Utilities::MPI::Partitioner> partitioner_;
+    ACCESSOR_READ_ONLY_NO_DEREFERENCE(partitioner)
 
     /**
      * The SparsityPattern.

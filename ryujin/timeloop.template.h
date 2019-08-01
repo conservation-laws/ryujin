@@ -428,11 +428,9 @@ namespace ryujin
 
     vector_type U;
 
-    const auto &locally_owned = offline_data.locally_owned();
-    const auto &locally_extended = offline_data.locally_extended();
-    U[0].reinit(locally_owned, locally_extended, mpi_communicator);
+    const auto &partitioner = offline_data.partitioner();
     for (auto &it : U)
-      it.reinit(U[0]);
+      it.reinit(partitioner);
 
     constexpr auto problem_dimension =
         ProblemDescription<dim>::problem_dimension;

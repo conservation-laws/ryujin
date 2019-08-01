@@ -44,11 +44,11 @@ namespace grendel
     TimerOutput::Scope t(computing_timer_,
                          "schlieren_postprocessor - prepare scratch space");
 
-    const auto &locally_owned = offline_data_->locally_owned();
     const auto &locally_extended = offline_data_->locally_extended();
+    const auto &partitioner = offline_data_->partitioner();
 
     r_i_.reinit(locally_extended.n_elements());
-    schlieren_.reinit(locally_owned, locally_extended, mpi_communicator_);
+    schlieren_.reinit(partitioner);
   }
 
 

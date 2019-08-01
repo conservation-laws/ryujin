@@ -110,7 +110,7 @@ namespace grendel
         discretization_->finite_element().dofs_per_cell;
 
     /*
-     * Populate the locally_extended index:
+     * Populate the locally_extended index set:
      */
 
     {
@@ -143,6 +143,8 @@ namespace grendel
       locally_extended_.compress();
     }
 
+    partitioner_.reset(new dealii::Utilities::MPI::Partitioner(
+        locally_owned_, locally_extended_, mpi_communicator_));
 
     // FIXME:
     affine_constraints_.close();

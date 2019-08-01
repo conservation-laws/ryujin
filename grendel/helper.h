@@ -225,5 +225,15 @@ public:                                                                        \
                                                                                \
 protected:
 
+#define ACCESSOR_READ_ONLY_NO_DEREFERENCE(member)                              \
+public:                                                                        \
+  const decltype(member##_) &member() const                                    \
+  {                                                                            \
+    return member##_;                                                          \
+  }                                                                            \
+                                                                               \
+protected:
+
+
 
 #endif /* HELPER_H */
