@@ -44,10 +44,10 @@ namespace grendel
     TimerOutput::Scope t(computing_timer_,
                          "schlieren_postprocessor - prepare scratch space");
 
-    const auto &locally_extended = offline_data_->locally_extended();
+    const auto &n_locally_extended = offline_data_->n_locally_extended();
     const auto &partitioner = offline_data_->partitioner();
 
-    r_i_.reinit(locally_extended.n_elements());
+    r_i_.reinit(n_locally_extended);
     schlieren_.reinit(partitioner);
   }
 
@@ -60,15 +60,15 @@ namespace grendel
     TimerOutput::Scope t(computing_timer_,
                          "schlieren_postprocessor - compute schlieren plot");
 
-    const auto &locally_extended = offline_data_->locally_extended();
-    const auto &locally_owned = offline_data_->locally_owned();
+
+    const auto &affine_constraints = offline_data_->affine_constraints();
     const auto &sparsity = offline_data_->sparsity_pattern();
     const auto &lumped_mass_matrix = offline_data_->lumped_mass_matrix();
     const auto &cij_matrix = offline_data_->cij_matrix();
     const auto &boundary_normal_map = offline_data_->boundary_normal_map();
 
-    const auto indices =
-        boost::irange<unsigned int>(0, locally_extended.n_elements());
+    const auto &n_locally_owned = offline_data_->n_locally_owned();
+    const auto indices = boost::irange<unsigned int>(0, n_locally_owned);
 
     /*
      * Step 1: Compute r_i and r_i_max, r_i_min:
@@ -82,32 +82,25 @@ namespace grendel
         double r_i_max_on_subrange = 0.;
         double r_i_min_on_subrange = std::numeric_limits<double>::infinity();
 
-        /* Translate the local index into a index set iterator:: */
-        auto it_global =
-            locally_extended.at(locally_extended.nth_index_in_set(*i1));
-
-        for (; i1 < i2; ++i1, ++it_global) {
+        for (; i1 < i2; ++i1) {
           const auto i = *i1;
-          const auto i_global = *it_global;
+
+          /* Only iterate over locally owned subset */
+          Assert(i < n_locally_owned, ExcInternalError());
 
           /* Skip constrained degrees of freedom */
           if (++sparsity.begin(i) == sparsity.end(i))
-            continue;
-
-          /* Only iterate over locally owned subset */
-          if (!locally_owned.is_element(i_global))
             continue;
 
           Tensor<1, dim> r_i;
 
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
             const auto j = jt->column();
-            const auto j_global = locally_extended.nth_index_in_set(j);
 
             if (i == j)
               continue;
 
-            const auto U_js = U[schlieren_index_][j_global];
+            const auto U_js = U[schlieren_index_].local_element(j);
             const auto c_ij = gather_get_entry(cij_matrix, jt);
 
             r_i += c_ij * U_js;
@@ -165,21 +158,18 @@ namespace grendel
 
     {
       const auto on_subranges = [&](auto i1, const auto i2) {
-
-        /* Translate the local index into a index set iterator:: */
-        auto it_global =
-            locally_extended.at(locally_extended.nth_index_in_set(*i1));
-
-        for (; i1 < i2; ++i1, ++it_global) {
+        for (; i1 < i2; ++i1) {
           const auto i = *i1;
-          const auto i_global = *it_global;
+
+          /* Only iterate over locally owned subset */
+          Assert(i < n_locally_owned, ExcInternalError());
 
           /* Skip constrained degrees of freedom */
           if (++sparsity.begin(i) == sparsity.end(i))
             continue;
 
-          const auto r_i = r_i_[i];
-          schlieren_[i_global] =
+          const auto r_i = r_i_[i]; /* SIC */
+          schlieren_.local_element(i) =
               1. - std::exp(-schlieren_beta_ * (r_i - r_i_min) /
                             (r_i_max - r_i_min));
         }
@@ -189,7 +179,6 @@ namespace grendel
           indices.begin(), indices.end(), on_subranges, 4096);
 
       /* Fix up hanging nodes: */
-      const auto &affine_constraints = offline_data_->affine_constraints();
       affine_constraints.distribute(schlieren_);
     }
 
