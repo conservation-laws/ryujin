@@ -658,8 +658,8 @@ namespace grendel
                 ExcMessage("Problem performing SSP RK(3) time step: "
                            "Insufficient CFL condition."));
 
-    for (unsigned int i = 0; i < problem_dimension; ++i)
-      U[i].sadd(1. / 4., 3. / 4., temp_ssprk_[i]);
+    for (unsigned int k = 0; k < problem_dimension; ++k)
+      U[k].sadd(1. / 4., 3. / 4., temp_ssprk_[k]);
 
 
     // Step 3: U_new = 1/3 U_old + 2/3 (U2 + tau L(U2))
@@ -670,8 +670,8 @@ namespace grendel
                 ExcMessage("Problem performing SSP RK(3) time step: "
                            "Insufficient CFL condition."));
 
-    for (unsigned int i = 0; i < problem_dimension; ++i)
-      U[i].sadd(2. / 3., 1. / 3., temp_ssprk_[i]);
+    for (unsigned int k = 0; k < problem_dimension; ++k)
+      U[k].sadd(2. / 3., 1. / 3., temp_ssprk_[k]);
 
     return tau_1;
   }
