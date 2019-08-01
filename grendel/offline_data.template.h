@@ -380,10 +380,6 @@ namespace grendel
 
           const auto index = local_dof_indices[j];
 
-          /* only retain values for locally owned DOFs: */
-          if(index >= n_locally_owned_)
-            continue;
-
           // FIXME: This is a bloody hack:
           Point<dim> position;
           const auto global_index = partitioner_->local_to_global(index);

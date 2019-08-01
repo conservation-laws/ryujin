@@ -588,7 +588,8 @@ namespace grendel
           const auto i = it->first;
 
           /* Only iterate over locally owned subset */
-          Assert(i < n_locally_owned, ExcInternalError());
+          if (i >= n_locally_owned)
+            continue;
 
           const auto &[normal, id, position] = it->second;
 
