@@ -369,12 +369,13 @@ namespace grendel
           }
 
           const auto index = local_dof_indices[j];
+          const auto global_index = locally_extended_.nth_index_in_set(index);
 
           // FIXME: This is a bloody hack:
           Point<dim> position;
           for (unsigned int v = 0; v < GeometryInfo<dim>::vertices_per_cell;
                ++v)
-            if (cell->vertex_dof_index(v, 0) == index)
+            if (cell->vertex_dof_index(v, 0) == global_index)
               position = cell->vertex(v);
 
           /*
