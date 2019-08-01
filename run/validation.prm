@@ -1,0 +1,43 @@
+subsection A - TimeLoop
+  set basename               = validation
+
+  set enable compute error   = true
+  set enable detailed output = false
+
+  set final time             = 2.0
+  set output granularity     = 0.2
+
+  set resume                 = false
+end
+
+subsection B - Discretization
+  set geometry           = tube analytical
+
+  set initial refinement = 7
+
+  set tube - diameter    = 20
+  set tube - length      = 20
+end
+
+subsection D - InitialValues
+  set configuration         = isentropic vortex
+
+  set initial - 1d state    = 1.4, 0, 1
+  set initial - direction   = 1, 1
+  set initial - mach number = 1
+  set initial - position    = -1, -1
+
+  set vortex - beta         = 5
+end
+
+subsection E - TimeStep
+  set cfl max    = 0.4
+  set cfl update = 0.2
+
+  set use ssprk3 = true
+end
+
+subsection F - SchlierenPostprocessor
+  set schlieren beta  = 10
+  set schlieren index = 0
+end

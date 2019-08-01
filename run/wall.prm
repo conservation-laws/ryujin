@@ -1,0 +1,43 @@
+# Mach 10 Double Mach Reflection with 7.5M grid points
+
+subsection A - TimeLoop
+  set basename               = wall
+
+  set enable detailed output = false
+
+  set final time             = 0.2000
+  set output granularity     = 0.0004
+
+  set resume                 = false
+end
+
+subsection B - Discretization
+  set geometry             = wall
+
+  set initial refinement   = 8
+
+  set wall - height        = 1
+  set wall - length        = 3.2
+  set wall - wall position = 0.166667
+end
+
+subsection D - InitialValues
+  set configuration         = shock front
+
+  set initial - 1d state    = 1.4, 0, 1
+  set initial - direction   = 0.8660254, -0.5
+  set initial - mach number = 10
+  set initial - position    = 0.166667, 0
+end
+
+subsection E - TimeStep
+  set cfl max    = 0.9
+  set cfl update = 0.8
+
+  set use ssprk3 = true
+end
+
+subsection F - SchlierenPostprocessor
+  set schlieren beta  = 10
+  set schlieren index = 0
+end
