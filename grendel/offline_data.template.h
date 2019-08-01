@@ -379,10 +379,14 @@ namespace grendel
           }
 
           const auto index = local_dof_indices[j];
-          const auto global_index = partitioner_->local_to_global(index);
+
+          /* only retain values for locally owned DOFs: */
+          if(index >= n_locally_owned_)
+            continue;
 
           // FIXME: This is a bloody hack:
           Point<dim> position;
+          const auto global_index = partitioner_->local_to_global(index);
           for (unsigned int v = 0; v < GeometryInfo<dim>::vertices_per_cell;
                ++v)
             if (cell->vertex_dof_index(v, 0) == global_index)
