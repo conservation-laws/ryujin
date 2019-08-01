@@ -14,3 +14,12 @@ FOREACH(_mesh ${_meshes})
     )
   ADD_DEPENDENCIES(generate_meshes generate_${_name})
 ENDFOREACH()
+
+SET(_files disc.prm validation.baseline validation.prm wall.prm)
+FOREACH(_file ${_files})
+  CONFIGURE_FILE(
+    ${CMAKE_CURRENT_SOURCE_DIR}/${_file}
+    ${CMAKE_CURRENT_BINARY_DIR}/${_file}
+    COPYONLY
+    )
+ENDFOREACH()
