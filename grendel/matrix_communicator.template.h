@@ -102,11 +102,11 @@ namespace grendel
       indices_.reinit(sparsity);
 
       for (const auto i_global : locally_extended) {
-        const auto i = locally_extended.index_within_set(i_global);
+        const auto i = partitioner->global_to_local(i_global);
 
         for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
           const auto j = jt->column();
-          const auto j_global = locally_extended.nth_index_in_set(j);
+          const auto j_global = partitioner->local_to_global(j);
 
           auto ejt = extended_sparsity.begin(i_global);
           unsigned int index = 0;
