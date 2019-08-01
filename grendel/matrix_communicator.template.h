@@ -4,6 +4,7 @@
 #include "matrix_communicator.h"
 
 #include <deal.II/lac/sparsity_tools.h>
+#include <deal.II/dofs/dof_tools.h>
 
 #include <boost/range/irange.hpp>
 
@@ -34,8 +35,6 @@ namespace grendel
     const auto &sparsity = offline_data_->sparsity_pattern();
 
     const auto &partitioner = offline_data_->partitioner();
-    const auto &n_locally_owned = offline_data_->n_locally_owned();
-    const auto &n_locally_extended = offline_data_->n_locally_extended();
 
     Assert(sparsity.is_compressed(), dealii::ExcInternalError());
 
@@ -51,19 +50,43 @@ namespace grendel
      */
 
     {
-      const auto n_dofs = locally_owned.size();
+      const auto n_dofs = partitioner->size();
       const auto dofs_per_cell = dof_handler.get_fe().dofs_per_cell;
 
-      DynamicSparsityPattern extended_sparsity(
-          n_dofs, n_dofs, locally_extended);
+      IndexSet locally_extended;
+
+      /* FIXME: Performance hack to make the loop fast: */
+      IndexSet locally_relevant;
+      DoFTools::extract_locally_relevant_dofs(dof_handler, locally_relevant);
+
+      locally_extended.set_size(n_dofs);
 
       std::vector<types::global_dof_index> dof_indices(dofs_per_cell);
+
       for (auto cell : dof_handler.active_cell_iterators()) {
         /* iterate over locally owned cells and the ghost layer */
         if (cell->is_artificial())
           continue;
 
         cell->get_dof_indices(dof_indices);
+        for (auto it : dof_indices)
+          if (!locally_relevant.is_element(it))
+            locally_extended.add_index(it);
+      }
+
+      locally_extended.add_indices(locally_relevant);
+      locally_extended.compress();
+
+      DynamicSparsityPattern extended_sparsity(
+          n_dofs, n_dofs, locally_extended);
+
+      for (auto cell : dof_handler.active_cell_iterators()) {
+        /* iterate over locally owned cells and the ghost layer */
+        if (cell->is_artificial())
+          continue;
+
+        cell->get_dof_indices(dof_indices);
+        // FIXME
         affine_constraints.add_entries_local_to_global(
             dof_indices, extended_sparsity, false);
       }
@@ -112,7 +135,7 @@ namespace grendel
 
     {
       const auto on_subranges = [&](auto i1, const auto i2) {
-        for (; i1 < i2; ++i1, ++it_global) {
+        for (; i1 < i2; ++i1) {
           const auto i = *i1;
 
           /* Only iterate over locally owned subset! */
