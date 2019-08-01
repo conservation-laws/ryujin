@@ -116,6 +116,10 @@ namespace grendel
     {
       locally_extended_.clear();
 
+      /* FIXME: Performance hack to make the loop fast: */
+      IndexSet locally_relevant;
+      DoFTools::extract_locally_relevant_dofs(dof_handler_, locally_relevant);
+
       const auto n_dofs = locally_owned_.size();
       locally_extended_.set_size(n_dofs);
 
@@ -131,9 +135,11 @@ namespace grendel
 
         cell->get_dof_indices(dof_indices);
         for (auto it : dof_indices)
-          locally_extended_.add_index(it);
+          if (!locally_relevant.is_element(it))
+            locally_extended_.add_index(it);
       }
 
+      locally_extended_.add_indices(locally_relevant);
       locally_extended_.compress();
     }
 
