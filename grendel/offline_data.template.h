@@ -187,7 +187,6 @@ namespace grendel
 
       affine_constraints_.clear();
       for(auto line : global_constraints.get_lines()) {
-        const auto old = line.index; //REM
 
         /* translate into local index ranges: */
         line.index = partitioner_->global_to_local(line.index);
