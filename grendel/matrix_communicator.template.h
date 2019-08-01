@@ -119,7 +119,7 @@ namespace grendel
             locally_extended.at(locally_extended.nth_index_in_set(*i1));
 
         for (; i1 < i2; ++i1, ++it_global) {
-          const auto i = *i1
+          const auto i = *i1;
           const auto i_global = *it_global;
 
           if (!locally_owned.is_element(i_global))
