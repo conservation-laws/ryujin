@@ -349,6 +349,9 @@ namespace ryujin
     deallog << "Indicator<dim>::smoothness_indicator_power_ == "
             << Indicator<dim>::smoothness_indicator_power_ << std::endl;
 
+    deallog << "Indicator<dim>::compute_second_variations_ == "
+            << Indicator<dim>::compute_second_variations_ << std::endl;
+
     deallog << "Limiter<dim>::limiter_ == ";
     switch (Limiter<dim>::limiter_) {
     case Limiter<dim>::Limiters::none:
