@@ -113,17 +113,21 @@ namespace grendel
 
     {
       const auto on_subranges = [&](auto i1, const auto i2) {
-        /* Translate the local index into a index set iterator:: */
-        auto it = locally_extended.at(locally_extended.nth_index_in_set(*i1));
-        for (; i1 < i2; ++i1, ++it) {
-          const auto i = *it;
 
-          if (!locally_owned.is_element(i))
+        /* Translate the local index into a index set iterator:: */
+        auto it_global =
+            locally_extended.at(locally_extended.nth_index_in_set(*i1));
+
+        for (; i1 < i2; ++i1, ++it_global) {
+          const auto i = *i1
+          const auto i_global = *it_global;
+
+          if (!locally_owned.is_element(i_global))
             continue;
 
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
-            const auto jt_local_index = get_entry(indices_, jt);
-            matrix_temp_[jt_local_index][i] = get_entry(matrix_, jt);
+            const auto jt_index = get_entry(indices_, jt);
+            matrix_temp_[jt_index][i_global] = get_entry(matrix_, jt);
           }
         }
       };
@@ -137,17 +141,21 @@ namespace grendel
 
     {
       const auto on_subranges = [&](auto i1, const auto i2) {
-        /* Translate the local index into a index set iterator:: */
-        auto it = locally_extended.at(locally_extended.nth_index_in_set(*i1));
-        for (; i1 < i2; ++i1, ++it) {
-          const auto i = *it;
 
-          if (locally_owned.is_element(i))
+        /* Translate the local index into a index set iterator:: */
+        auto it_global =
+            locally_extended.at(locally_extended.nth_index_in_set(*i1));
+
+        for (; i1 < i2; ++i1, ++it_global) {
+          const auto i = *i1;
+          const auto i_global = *it_global;
+
+          if (locally_owned.is_element(i_global))
             continue;
 
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
-            const auto jt_local_index = get_entry(indices_, jt);
-            set_entry(matrix_, jt, matrix_temp_[jt_local_index][i]);
+            const auto jt_index = get_entry(indices_, jt);
+            set_entry(matrix_, jt, matrix_temp_[jt_index][i_global]);
           }
         }
       };
