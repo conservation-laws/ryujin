@@ -19,7 +19,7 @@ subsection B - Discretization
   set immersed disc - object diameter = 0.5
   set immersed disc - object position = 0.6
 
-  set initial refinement              = 5
+  set initial refinement              = 8
 end
 
 
