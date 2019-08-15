@@ -217,8 +217,7 @@ namespace grendel
       const auto on_subranges = [&](auto i1, const auto i2) {
         double tau_max_on_subrange = std::numeric_limits<double>::infinity();
 
-        for (; i1 < i2; ++i1) {
-          const auto i = *i1;
+        for (const auto i : boost::make_iterator_range(i1, i2)) {
 
           /* Skip constrained degrees of freedom */
           if (++sparsity.begin(i) == sparsity.end(i))
@@ -321,8 +320,7 @@ namespace grendel
         /* Notar bene: This bounds variable is thread local: */
         Limiter<dim> limiter;
 
-        for (; i1 < i2; ++i1) {
-          const auto i = *i1;
+        for (const auto i : boost::make_iterator_range(i1, i2)) {
 
           /* Skip constrained degrees of freedom */
           if (++sparsity.begin(i) == sparsity.end(i))
@@ -413,8 +411,7 @@ namespace grendel
 
       const auto on_subranges = [&](auto i1, const auto i2) {
 
-        for (; i1 < i2; ++i1) {
-          const auto i = *i1;
+        for (const auto i : boost::make_iterator_range(i1, i2)) {
 
           /* Only iterate over locally owned subset! */
           Assert(i < n_locally_owned, ExcInternalError());
@@ -462,8 +459,7 @@ namespace grendel
 
         const auto on_subranges = [&](auto i1, const auto i2) {
 
-          for (; i1 < i2; ++i1) {
-            const auto i = *i1;
+          for (const auto i : boost::make_iterator_range(i1, i2)) {
 
             /* Only iterate over locally owned subset! */
             Assert(i < n_locally_owned, ExcInternalError());
@@ -501,8 +497,7 @@ namespace grendel
 
         {
           const auto on_subranges = [&](auto i1, const auto i2) {
-            for (; i1 < i2; ++i1) {
-              const auto i = *i1;
+            for (const auto i : boost::make_iterator_range(i1, i2)) {
               for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
                 const auto j = jt->column();
 
@@ -539,8 +534,7 @@ namespace grendel
 
         const auto on_subranges = [&](auto i1, const auto i2) {
 
-          for (; i1 < i2; ++i1) {
-            const auto i = *i1;
+          for (const auto i : boost::make_iterator_range(i1, i2)) {
 
             /* Only iterate over locally owned subset */
             Assert(i < n_locally_owned, ExcInternalError());
