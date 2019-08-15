@@ -468,7 +468,7 @@ namespace ryujin
     /* Compute L_inf norm: */
 
     Vector<float> difference_per_cell(
-        offline_data.discretization().triangulation().n_active_cells());
+        discretization.triangulation().n_active_cells());
 
     double linf_norm = 0.;
     double l1_norm = 0;

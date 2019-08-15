@@ -65,15 +65,6 @@ namespace grendel
     void assemble();
 
   protected:
-    const MPI_Comm &mpi_communicator_;
-    dealii::TimerOutput &computing_timer_;
-
-    /**
-     * A read-only reference to the underlying discretization.
-     */
-    dealii::SmartPointer<const grendel::Discretization<dim>> discretization_;
-    ACCESSOR_READ_ONLY(discretization)
-
     /**
      * The DofHandler for our (scalar) CG ansatz space.
      */
@@ -185,6 +176,12 @@ namespace grendel
      */
     dealii::SparseMatrix<double> norm_matrix_;
     ACCESSOR_READ_ONLY(norm_matrix)
+
+  private:
+    const MPI_Comm &mpi_communicator_;
+    dealii::TimerOutput &computing_timer_;
+
+    dealii::SmartPointer<const grendel::Discretization<dim>> discretization_;
   };
 
 } /* namespace grendel */

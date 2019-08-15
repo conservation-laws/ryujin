@@ -23,13 +23,12 @@ namespace grendel
     void prepare();
     void synchronize();
 
-  protected:
+  private:
     const MPI_Comm &mpi_communicator_;
     dealii::TimerOutput &computing_timer_;
 
     dealii::SmartPointer<const grendel::OfflineData<dim>> offline_data_;
 
-  private:
     dealii::SparseMatrix<double> &matrix_;
 
     dealii::SparseMatrix<unsigned int> indices_;

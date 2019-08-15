@@ -37,15 +37,14 @@ namespace grendel
     void compute_schlieren(const vector_type &U);
 
   protected:
+    dealii::LinearAlgebra::distributed::Vector<double> schlieren_;
+    ACCESSOR_READ_ONLY(schlieren)
+
+  private:
     const MPI_Comm &mpi_communicator_;
     dealii::TimerOutput &computing_timer_;
 
     dealii::SmartPointer<const grendel::OfflineData<dim>> offline_data_;
-    ACCESSOR_READ_ONLY(offline_data)
-
-  private:
-    dealii::LinearAlgebra::distributed::Vector<double> schlieren_;
-    ACCESSOR_READ_ONLY(schlieren)
 
     /* Scratch data: */
 

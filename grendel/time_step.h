@@ -82,17 +82,13 @@ namespace grendel
 
     static constexpr unsigned int limiter_iter_ = 2;
 
-  protected:
+  private:
     const MPI_Comm &mpi_communicator_;
     dealii::TimerOutput &computing_timer_;
 
     dealii::SmartPointer<const grendel::OfflineData<dim>> offline_data_;
-    ACCESSOR_READ_ONLY(offline_data)
-
     dealii::SmartPointer<const grendel::InitialValues<dim>> initial_values_;
-    ACCESSOR_READ_ONLY(initial_values)
 
-  private:
     /* Scratch data: */
 
     dealii::SparseMatrix<double> dij_matrix_;
