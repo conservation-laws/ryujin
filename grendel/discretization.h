@@ -99,10 +99,10 @@ namespace grendel
     double mach_step_step_position_;
     double mach_step_step_height_;
 
-    double immersed_disc_length_;
-    double immersed_disc_height_;
-    double immersed_disc_object_position_;
-    double immersed_disc_object_diameter_;
+    double immersed_cylinder_length_;
+    double immersed_cylinder_height_;
+    double immersed_cylinder_object_position_;
+    double immersed_cylinder_object_diameter_;
 
     double wall_length_;
     double wall_height_;

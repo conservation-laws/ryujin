@@ -33,8 +33,8 @@ namespace grendel
     add_parameter("geometry",
                   geometry_,
                   "Geometry. Valid names are \"file\", \"triangle\", \"tube\", "
-                  "\"tube analytical\", \"tube periodic\", \"step\", \"disc\", "
-                  "or \"wall\".");
+                  "\"tube analytical\", \"tube periodic\", \"step\", "
+                  "\"cylinder\", or \"wall\".");
 
     grid_file_ = "wall.msh";
     add_parameter("grid file",
@@ -93,27 +93,28 @@ namespace grendel
                   mach_step_step_height_,
                   "Mach step : height of step ");
 
-    /* Immersed disc: */
+    /* Immersed cylinder: */
 
-    immersed_disc_length_ = 4.;
-    add_parameter("immersed disc - length",
-                  immersed_disc_length_,
-                  "Immersed disc: length of computational domain");
+    immersed_cylinder_length_ = 4.;
+    add_parameter("immersed cylinder - length",
+                  immersed_cylinder_length_,
+                  "Immersed cylinder: length of computational domain");
 
-    immersed_disc_height_ = 2.;
-    add_parameter("immersed disc - height",
-                  immersed_disc_height_,
-                  "Immersed disc: height of computational domain");
+    immersed_cylinder_height_ = 2.;
+    add_parameter("immersed cylinder - height",
+                  immersed_cylinder_height_,
+                  "Immersed cylinder: height of computational domain");
 
-    immersed_disc_object_position_ = 0.6;
-    add_parameter("immersed disc - object position",
-                  immersed_disc_object_position_,
-                  "Immersed disc: x position of immersed disc center point");
+    immersed_cylinder_object_position_ = 0.6;
+    add_parameter(
+        "immersed cylinder - object position",
+        immersed_cylinder_object_position_,
+        "Immersed cylinder: x position of immersed cylinder center point");
 
-    immersed_disc_object_diameter_ = 0.5;
-    add_parameter("immersed disc - object diameter",
-                  immersed_disc_object_diameter_,
-                  "Immersed disc: diameter of immersed disc");
+    immersed_cylinder_object_diameter_ = 0.5;
+    add_parameter("immersed cylinder - object diameter",
+                  immersed_cylinder_object_diameter_,
+                  "Immersed cylinder: diameter of immersed cylinder");
 
     /* Wall: */
 
@@ -217,13 +218,13 @@ namespace grendel
                               mach_step_step_position_,
                               mach_step_step_height_);
 
-    } else if (geometry_ == "disc") {
+    } else if (geometry_ == "cylinder") {
 
       create_coarse_grid_cylinder(triangulation,
-                                  immersed_disc_length_,
-                                  immersed_disc_height_,
-                                  immersed_disc_object_position_,
-                                  immersed_disc_object_diameter_);
+                                  immersed_cylinder_length_,
+                                  immersed_cylinder_height_,
+                                  immersed_cylinder_object_position_,
+                                  immersed_cylinder_object_diameter_);
 
     } else if (geometry_ == "wall") {
 
