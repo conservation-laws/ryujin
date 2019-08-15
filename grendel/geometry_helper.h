@@ -391,8 +391,8 @@ namespace grendel
       dealii::parallel::distributed::Triangulation<2> &triangulation,
       const double length,
       const double height,
-      const double disc_position,
-      const double disc_diameter)
+      const double cylinder_position,
+      const double cylinder_diameter)
   {
     constexpr int dim = 2;
 
@@ -401,25 +401,25 @@ namespace grendel
     Triangulation<dim> tria1, tria2, tria3, tria4;
 
     GridGenerator::hyper_cube_with_cylindrical_hole(
-        tria1, disc_diameter / 2., disc_diameter, 0.5, 1, false);
+        tria1, cylinder_diameter / 2., cylinder_diameter, 0.5, 1, false);
 
     GridGenerator::subdivided_hyper_rectangle(
         tria2,
         {2, 1},
-        Point<2>(-disc_diameter, disc_diameter),
-        Point<2>(disc_diameter, height / 2.));
+        Point<2>(-cylinder_diameter, cylinder_diameter),
+        Point<2>(cylinder_diameter, height / 2.));
 
     GridGenerator::subdivided_hyper_rectangle(
         tria3,
         {2, 1},
-        Point<2>(-disc_diameter, -disc_diameter),
-        Point<2>(disc_diameter, -height / 2.));
+        Point<2>(-cylinder_diameter, -cylinder_diameter),
+        Point<2>(cylinder_diameter, -height / 2.));
 
     GridGenerator::subdivided_hyper_rectangle(
         tria4,
         {6, 4},
-        Point<2>(disc_diameter, -height / 2.),
-        Point<2>(length - disc_position, height / 2.));
+        Point<2>(cylinder_diameter, -height / 2.),
+        Point<2>(length - cylinder_position, height / 2.));
 
     GridGenerator::merge_triangulations(
         {&tria1, &tria2, &tria3, &tria4}, triangulation, 1.e-12, true);
@@ -433,8 +433,8 @@ namespace grendel
     for (auto cell : triangulation.active_cell_iterators())
       for (unsigned int v = 0; v < GeometryInfo<dim>::vertices_per_cell; ++v) {
         auto &vertex = cell->vertex(v);
-        if (vertex[0] <= -disc_diameter + 1.e-6)
-          vertex[0] = -disc_position;
+        if (vertex[0] <= -cylinder_diameter + 1.e-6)
+          vertex[0] = -cylinder_position;
       }
 
     /*
@@ -457,12 +457,12 @@ namespace grendel
 
         const auto center = face->center();
 
-        if (center[0] > length - disc_position - 1.e-6) {
+        if (center[0] > length - cylinder_position - 1.e-6) {
           face->set_boundary_id(Boundary::do_nothing);
           continue;
         }
 
-        if (center[0] < -disc_position + 1.e-6) {
+        if (center[0] < -cylinder_position + 1.e-6) {
           face->set_boundary_id(Boundary::dirichlet);
           continue;
         }
@@ -471,6 +471,25 @@ namespace grendel
         face->set_boundary_id(Boundary::slip);
       }
     }
+  }
+
+
+  template <>
+  void create_coarse_grid_cylinder<3>(
+      dealii::parallel::distributed::Triangulation<3> &triangulation,
+      const double length,
+      const double height,
+      const double cylinder_position,
+      const double cylinder_diameter)
+  {
+    dealii::parallel::distributed::Triangulation<2> tria1(
+        triangulation.get_communicator());
+
+    create_coarse_grid_cylinder(
+        tria1, length, height, cylinder_position, cylinder_diameter);
+
+    dealii::GridGenerator::extrude_triangulation(
+        tria1, 4, height, triangulation, true);
   }
 
 
