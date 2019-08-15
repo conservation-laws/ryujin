@@ -482,14 +482,42 @@ namespace grendel
       const double cylinder_position,
       const double cylinder_diameter)
   {
-    dealii::parallel::distributed::Triangulation<2> tria1(
+    using namespace dealii;
+
+    parallel::distributed::Triangulation<2> tria1(
         triangulation.get_communicator());
 
     create_coarse_grid_cylinder(
         tria1, length, height, cylinder_position, cylinder_diameter);
 
-    dealii::GridGenerator::extrude_triangulation(
-        tria1, 4, height, triangulation, true);
+    GridGenerator::extrude_triangulation(tria1, 4, height, triangulation, true);
+
+    /*
+     * Reattach an appropriate manifold ID:
+     */
+
+    triangulation.set_manifold(
+        0, CylindricalManifold<3>(Tensor<1, 3>{{0., 0., 1.}}, Point<3>()));
+
+    /*
+     * Fix up boundary ids:
+     */
+
+    for (auto cell : triangulation.active_cell_iterators()) {
+      for (unsigned int f = 0; f < GeometryInfo<2>::faces_per_cell; ++f) {
+        const auto face = cell->face(f);
+
+        if (!face->at_boundary())
+          continue;
+
+        const auto center = face->center();
+
+        if (std::abs(center[2]) > height / 2.0 - 1.e-6) {
+          face->set_boundary_id(Boundary::slip);
+        }
+      }
+    }
+
   }
 
 
