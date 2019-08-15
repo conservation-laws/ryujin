@@ -500,7 +500,7 @@ namespace grendel
         0, CylindricalManifold<3>(Tensor<1, 3>{{0., 0., 1.}}, Point<3>()));
 
     /*
-     * Fix up boundary ids:
+     * Set boundary ids:
      */
 
     for (auto cell : triangulation.active_cell_iterators()) {
@@ -510,14 +510,29 @@ namespace grendel
         if (!face->at_boundary())
           continue;
 
+        /*
+         * We want slip boundary conditions (i.e. indicator 1) almost
+         * everywhere except on the faces with normal in x-direction.
+         * There, on the left side we set inflow conditions (indicator 2)
+         * and on the right side we set indicator 0, i.e. do nothing.
+         */
+
         const auto center = face->center();
 
-        if (std::abs(center[2]) > height / 2.0 - 1.e-6) {
-          face->set_boundary_id(Boundary::slip);
+        if (center[0] > length - cylinder_position - 1.e-6) {
+          face->set_boundary_id(Boundary::do_nothing);
+          continue;
         }
+
+        if (center[0] < -cylinder_position + 1.e-6) {
+          face->set_boundary_id(Boundary::dirichlet);
+          continue;
+        }
+
+        // the rest:
+        face->set_boundary_id(Boundary::slip);
       }
     }
-
   }
 
 
