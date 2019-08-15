@@ -1,7 +1,7 @@
 # Mach 3 Supersonic Flow Past Cylinder with 2.4M grid points
 
 subsection A - TimeLoop
-  set basename               = disc
+  set basename               = cylinder
 
   set enable detailed output = false
 
@@ -11,15 +11,15 @@ subsection A - TimeLoop
   set resume                 = false
 end
 
-subsection B - Discretization
-  set geometry                        = disc
+subsection B - cylinderretization
+  set geometry                            = cylinder
 
-  set immersed disc - height          = 2
-  set immersed disc - length          = 4
-  set immersed disc - object diameter = 0.5
-  set immersed disc - object position = 0.6
+  set immersed cylinder - height          = 2
+  set immersed cylinder - length          = 4
+  set immersed cylinder - object diameter = 0.5
+  set immersed cylinder - object position = 0.6
 
-  set initial refinement              = 8
+  set initial refinement                  = 8
 end
 
 
