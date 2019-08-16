@@ -4,9 +4,23 @@
 #include "helper.h"
 
 #include <deal.II/base/tensor.h>
+#include <deal.II/base/vectorization.h>
 
 #include <array>
 #include <functional>
+
+// FIXME: Refactor - do we have something like this in the library?
+namespace {
+  template <typename T>
+  struct get_value_type {
+    using type = T;
+  };
+
+  template <typename T>
+  struct get_value_type<dealii::VectorizedArray<T>> {
+    using type = T;
+  };
+}
 
 namespace grendel
 {
@@ -33,17 +47,18 @@ namespace grendel
      */
     const static std::array<std::string, dim + 2> component_names;
 
+    using ScalarNumber = typename get_value_type<Number>::type;
 
     /**
      * Gamma.
      */
-    static constexpr Number gamma = 7. / 5.;
+    static constexpr ScalarNumber gamma = 7. / 5.;
 
 
     /**
      * Covolume b.
      */
-    static constexpr Number b = 0.;
+    static constexpr ScalarNumber b = 0.;
     static_assert(b == 0., "If you change this value, implement the rest...");
 
 
@@ -127,7 +142,8 @@ namespace grendel
   ProblemDescription<dim, Number>::momentum(const rank1_type U)
   {
     dealii::Tensor<1, dim, Number> result;
-    std::copy(&U[1], &U[1 + dim], &result[0]);
+    for (unsigned int i = 0; i < dim; ++i)
+      result[i] = U[1 + i];
     return result;
   }
 
@@ -210,7 +226,7 @@ namespace grendel
   ProblemDescription<dim, Number>::entropy(const rank1_type U)
   {
     const auto p = pressure(U);
-    return std::pow(p, 1. / gamma);
+    return std::pow(p, ScalarNumber(1. / gamma));
   }
 
 
@@ -238,7 +254,8 @@ namespace grendel
     const auto u = momentum(U) / rho;
     const auto p = pressure(U);
 
-    const auto factor = (gamma - 1) / gamma * std::pow(p, 1. / gamma - 1.);
+    const auto factor =
+        (gamma - 1.0) / gamma * std::pow(p, ScalarNumber(1. / gamma - 1.));
 
     rank1_type result;
 

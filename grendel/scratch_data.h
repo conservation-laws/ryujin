@@ -46,7 +46,7 @@ namespace grendel
     dealii::FEFaceValues<dim> fe_face_values_;
   };
 
-  template <int dim>
+  template <int dim, typename Number = double>
   class AssemblyCopyData
   {
   public:
@@ -57,11 +57,11 @@ namespace grendel
                         dealii::types::boundary_id,
                         dealii::Point<dim>>>
         local_boundary_normal_map_;
-    dealii::FullMatrix<double> cell_mass_matrix_;
-    dealii::FullMatrix<double> cell_lumped_mass_matrix_;
-    std::array<dealii::FullMatrix<double>, dim> cell_cij_matrix_;
-    dealii::FullMatrix<double> cell_betaij_matrix_;
-    double cell_measure_;
+    dealii::FullMatrix<Number> cell_mass_matrix_;
+    dealii::FullMatrix<Number> cell_lumped_mass_matrix_;
+    std::array<dealii::FullMatrix<Number>, dim> cell_cij_matrix_;
+    dealii::FullMatrix<Number> cell_betaij_matrix_;
+    Number cell_measure_;
   };
 
 } // namespace grendel

@@ -18,28 +18,13 @@
 
 #include "helper.h"
 
-// Workaround
-namespace dealii
-{
-  template <>
-  void dealii::DoFTools::make_periodicity_constraints<dealii::DoFHandler<1, 1>>(
-      dealii::DoFHandler<1, 1> const &,
-      unsigned int,
-      int,
-      dealii::AffineConstraints<double> &,
-      dealii::ComponentMask const &)
-  {
-    // do nothing
-  }
-}
-
 namespace grendel
 {
   using namespace dealii;
 
 
-  template <int dim>
-  OfflineData<dim>::OfflineData(
+  template <int dim, typename Number>
+  OfflineData<dim, Number>::OfflineData(
       const MPI_Comm &mpi_communicator,
       dealii::TimerOutput &computing_timer,
       const grendel::Discretization<dim> &discretization,
@@ -52,10 +37,10 @@ namespace grendel
   }
 
 
-  template <int dim>
-  void OfflineData<dim>::setup()
+  template <int dim, typename Number>
+  void OfflineData<dim, Number>::setup()
   {
-    deallog << "OfflineData<dim>::setup()" << std::endl;
+    deallog << "OfflineData<dim, Number>::setup()" << std::endl;
 
     IndexSet locally_owned;
     IndexSet locally_relevant;
@@ -100,7 +85,7 @@ namespace grendel
 
           for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f) {
             const auto face = cell->face(f);
-            if(!face->at_boundary())
+            if (!face->at_boundary())
               continue;
 
             for (unsigned int j = 0; j < dofs_per_cell; ++j) {
@@ -165,8 +150,7 @@ namespace grendel
       }
     }
 
-    const auto dofs_per_cell =
-        discretization_->finite_element().dofs_per_cell;
+    const auto dofs_per_cell = discretization_->finite_element().dofs_per_cell;
 
     {
       deallog << "        create partitioner and affine constraints"
@@ -198,23 +182,25 @@ namespace grendel
        * global indices:
        */
 
-      AffineConstraints<double> global_constraints(locally_relevant);
+      AffineConstraints<Number> global_constraints(locally_relevant);
 
 
-      const auto n_periodic_faces =
-          discretization_->triangulation().get_periodic_face_map().size();
-      if (n_periodic_faces != 0) {
-        /*
-         * Enforce periodic boundary conditions. We assume that the mesh is
-         * in "normal configuration". By convenction we also omit enforcing
-         * periodicity in x direction. This avoids accidentally glueing the
-         * corner degrees of freedom together whish leads to instability.
-         */
-        for (int i = 1; i < dim; ++i) /* omit x direction! */
-          DoFTools::make_periodicity_constraints(dof_handler_,
-                                                 /*b_id */ Boundary::periodic,
-                                                 /*direction*/ i,
-                                                 global_constraints);
+      if constexpr (dim != 1) {
+        const auto n_periodic_faces =
+            discretization_->triangulation().get_periodic_face_map().size();
+        if (n_periodic_faces != 0) {
+          /*
+           * Enforce periodic boundary conditions. We assume that the mesh is
+           * in "normal configuration". By convenction we also omit enforcing
+           * periodicity in x direction. This avoids accidentally glueing the
+           * corner degrees of freedom together whish leads to instability.
+           */
+          for (int i = 1; i < dim; ++i) /* omit x direction! */
+            DoFTools::make_periodicity_constraints(dof_handler_,
+                                                   /*b_id */ Boundary::periodic,
+                                                   /*direction*/ i,
+                                                   global_constraints);
+        }
       }
 
       DoFTools::make_hanging_node_constraints(dof_handler_, global_constraints);
@@ -226,7 +212,7 @@ namespace grendel
        */
 
       affine_constraints_.clear();
-      for(auto line : global_constraints.get_lines()) {
+      for (auto line : global_constraints.get_lines()) {
 
         /* translate into local index ranges: */
         line.index = partitioner_->global_to_local(line.index);
@@ -277,12 +263,11 @@ namespace grendel
 
         /* translate into local index ranges: */
         cell->get_dof_indices(dof_indices);
-        std::transform(dof_indices.begin(),
-                       dof_indices.end(),
-                       dof_indices.begin(),
-                       [&](auto index) {
-                         return partitioner_->global_to_local(index);
-                       });
+        std::transform(
+            dof_indices.begin(),
+            dof_indices.end(),
+            dof_indices.begin(),
+            [&](auto index) { return partitioner_->global_to_local(index); });
 
         affine_constraints_.add_entries_local_to_global(
             dof_indices, dsp, false);
@@ -312,10 +297,10 @@ namespace grendel
   }
 
 
-  template <int dim>
-  void OfflineData<dim>::assemble()
+  template <int dim, typename Number>
+  void OfflineData<dim, Number>::assemble()
   {
-    deallog << "OfflineData<dim>::assemble()" << std::endl;
+    deallog << "OfflineData<dim, Number>::assemble()" << std::endl;
 
     mass_matrix_ = 0.;
     lumped_mass_matrix_ = 0.;
@@ -372,12 +357,11 @@ namespace grendel
       cell->get_dof_indices(local_dof_indices);
 
       /* translate into local index ranges: */
-      std::transform(local_dof_indices.begin(),
-                     local_dof_indices.end(),
-                     local_dof_indices.begin(),
-                     [&](auto index) {
-                       return partitioner_->global_to_local(index);
-                     });
+      std::transform(
+          local_dof_indices.begin(),
+          local_dof_indices.end(),
+          local_dof_indices.begin(),
+          [&](auto index) { return partitioner_->global_to_local(index); });
 
       /* clear out copy data: */
       local_boundary_normal_map.clear();
@@ -511,7 +495,6 @@ namespace grendel
     };
 
 
-
     {
       deallog << "        assemble mass matrices, beta_ij, and c_ijs"
               << std::endl;
@@ -524,7 +507,7 @@ namespace grendel
                       local_assemble_system,
                       copy_local_to_global,
                       AssemblyScratchData<dim>(*discretization_),
-                      AssemblyCopyData<dim>());
+                      AssemblyCopyData<dim, Number>());
     }
 
     measure_of_omega_ =
@@ -536,7 +519,7 @@ namespace grendel
      */
 
     {
-      dealii::LinearAlgebra::distributed::Vector<double> temp_(partitioner_);
+      dealii::LinearAlgebra::distributed::Vector<Number> temp_(partitioner_);
 
       for (unsigned int i = 0; i < partitioner_->local_size(); ++i)
         temp_.local_element(i) = lumped_mass_matrix_.diag_element(i);
@@ -561,7 +544,7 @@ namespace grendel
                       sparsity_pattern_.end(row_index),
                       [&](const auto &jt) {
                         const auto value = gather_get_entry(cij_matrix_, &jt);
-                        const double norm = value.norm();
+                        const Number norm = value.norm();
                         set_entry(norm_matrix_, &jt, norm);
                       });
 
@@ -605,7 +588,7 @@ namespace grendel
        */
       for (auto &it : boundary_normal_map_) {
         auto &[normal, id, _] = it.second;
-        normal /= (normal.norm() + std::numeric_limits<double>::epsilon());
+        normal /= (normal.norm() + std::numeric_limits<Number>::epsilon());
       }
     }
 
@@ -636,12 +619,11 @@ namespace grendel
 
       local_dof_indices.resize(dofs_per_cell);
       cell->get_dof_indices(local_dof_indices);
-      std::transform(local_dof_indices.begin(),
-                     local_dof_indices.end(),
-                     local_dof_indices.begin(),
-                     [&](auto index) {
-                       return partitioner_->global_to_local(index);
-                     });
+      std::transform(
+          local_dof_indices.begin(),
+          local_dof_indices.end(),
+          local_dof_indices.begin(),
+          [&](auto index) { return partitioner_->global_to_local(index); });
 
       /* clear out copy data: */
       for (auto &matrix : cell_cij_matrix)
@@ -710,7 +692,7 @@ namespace grendel
                       local_assemble_system_cij,
                       copy_local_to_global_cij,
                       AssemblyScratchData<dim>(*discretization_),
-                      AssemblyCopyData<dim>());
+                      AssemblyCopyData<dim, Number>());
     }
   }
 

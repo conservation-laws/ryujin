@@ -34,7 +34,7 @@ namespace grendel
    * @note The offline data precomputed in this class is problem
    * independent, it only depends on the Discretization.
    */
-  template <int dim>
+  template <int dim, typename Number = double>
   class OfflineData : public dealii::ParameterAcceptor
   {
   public:
@@ -107,34 +107,34 @@ namespace grendel
      * reflective boundary conditions).
      */
     std::map<dealii::types::global_dof_index,
-             std::tuple<dealii::Tensor<1, dim>,
+             std::tuple<dealii::Tensor<1, dim, Number>,
                         dealii::types::boundary_id,
-                        dealii::Point<dim>>>
+                        dealii::Point<dim, Number>>>
         boundary_normal_map_;
     ACCESSOR_READ_ONLY(boundary_normal_map)
 
     /**
      * The AffineConstraints object is currently unused.
      */
-    dealii::AffineConstraints<double> affine_constraints_;
+    dealii::AffineConstraints<Number> affine_constraints_;
     ACCESSOR_READ_ONLY(affine_constraints)
 
     /**
      * The mass matrix.
      */
-    dealii::SparseMatrix<double> mass_matrix_;
+    dealii::SparseMatrix<Number> mass_matrix_;
     ACCESSOR_READ_ONLY(mass_matrix)
 
     /**
      * The lumped mass matrix.
      */
-    dealii::SparseMatrix<double> lumped_mass_matrix_;
+    dealii::SparseMatrix<Number> lumped_mass_matrix_;
     ACCESSOR_READ_ONLY(lumped_mass_matrix)
 
     /**
      * Size of computational domain.
      */
-    double measure_of_omega_;
+    Number measure_of_omega_;
     ACCESSOR_READ_ONLY(measure_of_omega)
 
 
@@ -142,13 +142,13 @@ namespace grendel
      * The $(b_{ij})$ matrix:
      *   $b_{ij} = \delta_{ij} - m_{ij}/m{j}$
      */
-    dealii::SparseMatrix<double> bij_matrix_;
+    dealii::SparseMatrix<Number> bij_matrix_;
     ACCESSOR_READ_ONLY(bij_matrix)
 
     /**
      * The $(beta_{ij})$ matrix.
      */
-    dealii::SparseMatrix<double> betaij_matrix_;
+    dealii::SparseMatrix<Number> betaij_matrix_;
     ACCESSOR_READ_ONLY(betaij_matrix)
 
     /**
@@ -159,7 +159,7 @@ namespace grendel
      * store the matrix as a $p dim dimensional array of scalar-valued,
      * regular matrices.
      */
-    std::array<dealii::SparseMatrix<double>, dim> cij_matrix_;
+    std::array<dealii::SparseMatrix<Number>, dim> cij_matrix_;
     ACCESSOR_READ_ONLY(cij_matrix)
 
     /**
@@ -167,14 +167,14 @@ namespace grendel
      *
      * This matrix is defined as $n_{ij} = c_{ij} / |c_{ij}|$.
      */
-    std::array<dealii::SparseMatrix<double>, dim> nij_matrix_;
+    std::array<dealii::SparseMatrix<Number>, dim> nij_matrix_;
     ACCESSOR_READ_ONLY(nij_matrix)
 
     /**
      * We also store the norm of all $c_{ij}$s separately in a @p norm
      * matrix_
      */
-    dealii::SparseMatrix<double> norm_matrix_;
+    dealii::SparseMatrix<Number> norm_matrix_;
     ACCESSOR_READ_ONLY(norm_matrix)
 
   private:
