@@ -86,8 +86,8 @@ namespace grendel
     /**
      * FIXME Description.
      */
-    unsigned int n_locally_extended_;
-    ACCESSOR_READ_ONLY(n_locally_extended)
+    unsigned int n_locally_relevant_;
+    ACCESSOR_READ_ONLY(n_locally_relevant)
 
     /**
      * The SparsityPattern.

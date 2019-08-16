@@ -44,10 +44,10 @@ namespace grendel
     TimerOutput::Scope t(computing_timer_,
                          "schlieren_postprocessor - prepare scratch space");
 
-    const auto &n_locally_extended = offline_data_->n_locally_extended();
+    const auto &n_locally_relevant = offline_data_->n_locally_relevant();
     const auto &partitioner = offline_data_->partitioner();
 
-    r_i_.reinit(n_locally_extended);
+    r_i_.reinit(n_locally_relevant);
     schlieren_.reinit(partitioner);
   }
 

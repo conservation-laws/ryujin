@@ -54,34 +54,15 @@ namespace grendel
 
       /*
        * We duplicae some work from OfflineData here. Namely, we have to
-       * recreate the locally_extended and locally_relevant IndexSet
+       * recreate the locally_relevant and locally_relevant IndexSet
        * objects as well as the global_constraints AffineConstraints
        * object.
        */
 
-      IndexSet locally_extended;
       IndexSet locally_relevant;
       DoFTools::extract_locally_relevant_dofs(dof_handler, locally_relevant);
 
-      locally_extended.set_size(n_dofs);
-
-      std::vector<types::global_dof_index> dof_indices(dofs_per_cell);
-
-      for (auto cell : dof_handler.active_cell_iterators()) {
-        /* iterate over locally owned cells and the ghost layer */
-        if (cell->is_artificial())
-          continue;
-
-        cell->get_dof_indices(dof_indices);
-        for (auto it : dof_indices)
-          if (!locally_relevant.is_element(it))
-            locally_extended.add_index(it);
-      }
-
-      locally_extended.add_indices(locally_relevant);
-      locally_extended.compress();
-
-      AffineConstraints<double> global_constraints(locally_extended);
+      AffineConstraints<double> global_constraints(locally_relevant);
 
       const auto n_periodic_faces =
           dof_handler.get_triangulation().get_periodic_face_map().size();
@@ -97,7 +78,9 @@ namespace grendel
       global_constraints.close();
 
       DynamicSparsityPattern extended_sparsity(
-          n_dofs, n_dofs, locally_extended);
+          n_dofs, n_dofs, locally_relevant);
+
+      std::vector<types::global_dof_index> dof_indices(dofs_per_cell);
 
       for (auto cell : dof_handler.active_cell_iterators()) {
         /* iterate over locally owned cells and the ghost layer */
@@ -114,13 +97,13 @@ namespace grendel
           extended_sparsity,
           dof_handler.compute_locally_owned_dofs_per_processor(),
           mpi_communicator_,
-          locally_extended);
+          locally_relevant);
 
       extended_sparsity.compress();
 
       indices_.reinit(sparsity);
 
-      for (const auto i_global : locally_extended) {
+      for (const auto i_global : locally_relevant) {
         const auto i = partitioner->global_to_local(i_global);
 
         for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
@@ -147,7 +130,7 @@ namespace grendel
   void MatrixCommunicator<dim>::synchronize()
   {
     const auto &n_locally_owned = offline_data_->n_locally_owned();
-    const auto &n_locally_extended = offline_data_->n_locally_extended();
+    const auto &n_locally_relevant = offline_data_->n_locally_relevant();
 
 
     const auto &sparsity = offline_data_->sparsity_pattern();
@@ -181,7 +164,7 @@ namespace grendel
           const auto i = *i1;
 
           /* Only iterate over ghost indices! */
-          Assert(i >= n_locally_owned && i < n_locally_extended,
+          Assert(i >= n_locally_owned && i < n_locally_relevant,
                  ExcInternalError());
 
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
@@ -192,7 +175,7 @@ namespace grendel
       };
 
       const auto indices =
-          boost::irange<unsigned int>(n_locally_owned, n_locally_extended);
+          boost::irange<unsigned int>(n_locally_owned, n_locally_relevant);
       parallel::apply_to_subranges(
           indices.begin(), indices.end(), on_subranges, 4096);
     }

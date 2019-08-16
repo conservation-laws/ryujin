@@ -58,7 +58,7 @@ namespace grendel
     deallog << "OfflineData<dim>::setup()" << std::endl;
 
     IndexSet locally_owned;
-    IndexSet locally_extended;
+    IndexSet locally_relevant;
 
     {
       deallog << "        distribute dofs" << std::endl;
@@ -69,6 +69,8 @@ namespace grendel
       dof_handler_.initialize(discretization_->triangulation(),
                               discretization_->finite_element());
       DoFRenumbering::Cuthill_McKee(dof_handler_);
+
+
 
       locally_owned = dof_handler_.locally_owned_dofs();
       n_locally_owned_ = locally_owned.n_elements();
@@ -126,39 +128,20 @@ namespace grendel
        * to only communicate a subset of these degrees of freedom.
        */
 
-      locally_extended.clear();
+      locally_relevant.clear();
 
-      IndexSet locally_relevant;
       DoFTools::extract_locally_relevant_dofs(dof_handler_, locally_relevant);
-
-      const auto n_dofs = locally_owned.size();
-      locally_extended.set_size(n_dofs);
-
-      std::vector<types::global_dof_index> dof_indices(dofs_per_cell);
-      for (auto cell : dof_handler_.active_cell_iterators()) {
-        /* iterate over locally owned cells and the ghost layer */
-        if (cell->is_artificial())
-          continue;
-
-        cell->get_dof_indices(dof_indices);
-        for (auto it : dof_indices)
-          if (!locally_relevant.is_element(it))
-            locally_extended.add_index(it);
-      }
-
-      locally_extended.add_indices(locally_relevant);
-      locally_extended.compress();
-      n_locally_extended_ = locally_extended.n_elements();
+      n_locally_relevant_ = locally_relevant.n_elements();
 
       partitioner_.reset(new dealii::Utilities::MPI::Partitioner(
-          locally_owned, locally_extended, mpi_communicator_));
+          locally_owned, locally_relevant, mpi_communicator_));
 
       /*
        * create a temporary affine constraints object and populate it with
        * global indices:
        */
 
-      AffineConstraints<double> global_constraints(locally_extended);
+      AffineConstraints<double> global_constraints(locally_relevant);
 
 
       const auto n_periodic_faces =
@@ -218,7 +201,7 @@ namespace grendel
      * pattern, so we quickly do the grunt work by hand. While we are at
      * it, we also apply a translation between the global (distributed)
      * degrees of freedom numbering and the local index range [0,
-     * locally_extended_.n_elements()];
+     * locally_relevant_.n_elements()];
      */
 
     {
@@ -226,7 +209,7 @@ namespace grendel
       TimerOutput::Scope t(computing_timer_,
                            "offline_data - create sparsity pattern");
 
-      DynamicSparsityPattern dsp(n_locally_extended_, n_locally_extended_);
+      DynamicSparsityPattern dsp(n_locally_relevant_, n_locally_relevant_);
 
       std::vector<types::global_dof_index> dof_indices(dofs_per_cell);
 
@@ -556,7 +539,7 @@ namespace grendel
       TimerOutput::Scope t(computing_timer_,
                            "offline_data - compute b_ij, |c_ij|, and n_ij");
 
-      const auto indices = boost::irange<unsigned int>(0, n_locally_extended_);
+      const auto indices = boost::irange<unsigned int>(0, n_locally_relevant_);
       parallel::apply_to_subranges(
           indices.begin(), indices.end(), on_subranges, 4096);
 

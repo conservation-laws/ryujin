@@ -101,11 +101,11 @@ namespace grendel
 #endif
 
     const auto &n_locally_owned = offline_data_->n_locally_owned();
-    const auto &n_locally_extended = offline_data_->n_locally_extended();
+    const auto &n_locally_relevant = offline_data_->n_locally_relevant();
 
     const auto indices_owned = boost::irange<unsigned int>(0, n_locally_owned);
     const auto indices_extended =
-        boost::irange<unsigned int>(0, n_locally_extended);
+        boost::irange<unsigned int>(0, n_locally_relevant);
 
     const auto &sparsity = offline_data_->sparsity_pattern();
 
