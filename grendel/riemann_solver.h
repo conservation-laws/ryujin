@@ -27,13 +27,11 @@ namespace grendel
 
     using rank1_type = typename ProblemDescription<dim>::rank1_type;
 
-    RiemannSolver(const std::string &subsection = "RiemannSolver");
-
     /*
      * Options:
      */
 
-    static constexpr double newton_eps_ = 1.0e-5;
+    static constexpr double newton_eps_ = 1.0e-10;
 
     static constexpr unsigned int newton_max_iter_ = 0;
 
@@ -47,7 +45,7 @@ namespace grendel
      * iterations used in the solver to find it.
      *
      * References:
-     *   [1] J.-L. Guermond, B. Popov. Fast estimation from above fo the
+     *   [1] J.-L. Guermond, B. Popov. Fast estimation from above for the
      *       maximum wave speed in the Riemann problem for the Euler equations.
      */
     static std::tuple<double /*lambda_max*/,
@@ -62,6 +60,9 @@ namespace grendel
      * Variant of above function that takes two arrays as input describing
      * the "1D Riemann data" instead of two nD states.
      */
+    // Remark: We use the  non-type template parameter max_iter in order to
+    // change the compile-time constant in the test
+    template <unsigned int max_iter = newton_max_iter_>
     static std::tuple<double /*lambda_max*/,
                       double /*p_star*/,
                       unsigned int /*iteration*/>

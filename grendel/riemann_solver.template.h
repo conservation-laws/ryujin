@@ -253,12 +253,6 @@ namespace grendel
      * Two-rarefaction approximation to p_star computed for two primitive
      * states <code>riemann_data_i</code> and
      * <code>riemann_data_j</code>. See [1], page 914, (4.3)
-     *
-     * Note: Instead of returning \lambda_RR directly, we also compute
-     * another upper bound
-     *   lambda_tilde =
-     *   2 * max(|U_i|, |U_j|) + max(1, 2 / (gamma - 1)) * max(a_i, a_j)
-     * and return min(lambda_RR, lambda_tilde).
      */
     inline DEAL_II_ALWAYS_INLINE double
     p_star_two_rarefaction(const double gamma,
@@ -286,14 +280,7 @@ namespace grendel
           a_i * tmp_i * std::pow(p_i / p_j, -1. * (gamma - 1.) / 2. / gamma) +
           a_j * tmp_j * 1.;
 
-      const double lambda_RR =
-          p_j * std::pow(numerator / denominator, 2. * gamma / (gamma - 1.));
-
-      const double lambda_tilde = 2. * std::max(std::abs(u_i), std::abs(u_j)) +
-                                  std::max(1., 2. / (gamma - 1.)) *
-                                      std::max(std::abs(a_i), std::abs(a_j));
-
-      return std::min(lambda_tilde, lambda_RR);
+      return p_j * std::pow(numerator / denominator, 2. * gamma / (gamma - 1));
     }
 
 
@@ -355,6 +342,7 @@ namespace grendel
 
 
   template <int dim>
+  template <unsigned int max_iter>
   std::tuple<double, double, unsigned int>
   RiemannSolver<dim>::compute(const std::array<double, 6> &riemann_data_i,
                               const std::array<double, 6> &riemann_data_j)
@@ -410,6 +398,15 @@ namespace grendel
     double p_2 =
         (phi_p_max < 0.) ? p_star_tilde : std::min(p_max, p_star_tilde);
 
+#if DEBUG
+    {
+      const double phi_p_1 = phi(gamma, b, riemann_data_i, riemann_data_j, p_1);
+      const double phi_p_2 = phi(gamma, b, riemann_data_i, riemann_data_j, p_2);
+      Assert(phi_p_1 <= 0. && phi_p_2 >= 0.,
+             dealii::ExcMessage("Houston, we have a problem!"));
+    }
+#endif
+
     /*
      * Step 4: Perform quadratic Newton iteration.
      *
@@ -428,11 +425,11 @@ namespace grendel
         return {lambda_max, p_2, i};
 
       /*
-       * ... or if we reached the number of allowed Newton iteratoins.
+       * ... or if we reached the number of allowed Newton iterations.
        * lambda_max is a guaranteed upper bound, in the worst case we
        * overestimated the result.
        */
-      if (i + 1 >= newton_max_iter_)
+      if (i + 1 >= max_iter)
         return {lambda_max, p_2, std::numeric_limits<unsigned int>::max()};
 
       /*
@@ -474,15 +471,16 @@ namespace grendel
       const double discriminant_1 = dphi_p_1 * dphi_p_1 - 4. * phi_p_1 * dd_112;
       Assert(discriminant_1 > 0.,
              dealii::ExcMessage("Houston, we have a problem!"));
-
-      p_1 = p_1 - 2. * phi_p_1 / (dphi_p_1 + std::sqrt(discriminant_1));
+      if (discriminant_1 > 0.)
+        p_1 = p_1 - 2. * phi_p_1 / (dphi_p_1 + std::sqrt(discriminant_1));
 
       /* Update right point: */
       const double discriminant_2 = dphi_p_2 * dphi_p_2 - 4. * phi_p_2 * dd_122;
       Assert(discriminant_2 > 0.,
              dealii::ExcMessage("Houston, we have a problem!"));
+      if (discriminant_2 > 0.)
+        p_2 = p_2 - 2. * phi_p_2 / (dphi_p_2 + std::sqrt(discriminant_2));
 
-      p_2 = p_2 - 2. * phi_p_2 / (dphi_p_2 + std::sqrt(discriminant_2));
 
       /* We have found our root (up to roundoff erros): */
       if (p_1 >= p_2) {
@@ -495,7 +493,7 @@ namespace grendel
         return {lambda_max, p_2, i + 1};
       }
 
-    } while (i++ < newton_max_iter_);
+    } while (i++ < max_iter);
 
     __builtin_unreachable();
   }
