@@ -185,7 +185,7 @@ namespace grendel
       AffineConstraints<Number> global_constraints(locally_relevant);
 
 
-      if constexpr (dim != 1) {
+      if constexpr (dim != 1 && std::is_same<Number, double>::value) { // FIXME
         const auto n_periodic_faces =
             discretization_->triangulation().get_periodic_face_map().size();
         if (n_periodic_faces != 0) {
