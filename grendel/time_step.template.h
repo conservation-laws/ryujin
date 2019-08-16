@@ -104,7 +104,7 @@ namespace grendel
     const auto &n_locally_relevant = offline_data_->n_locally_relevant();
 
     const auto indices_owned = boost::irange<unsigned int>(0, n_locally_owned);
-    const auto indices_extended =
+    const auto indices_relevant =
         boost::irange<unsigned int>(0, n_locally_relevant);
 
     const auto &sparsity = offline_data_->sparsity_pattern();
@@ -195,7 +195,7 @@ namespace grendel
       };
 
       parallel::apply_to_subranges(
-          indices_extended.begin(), indices_extended.end(), on_subranges, 4096);
+          indices_relevant.begin(), indices_relevant.end(), on_subranges, 4096);
 
       /* Synchronize alpha_ over all MPI processes: */
       rho_second_variation_.update_ghost_values();
@@ -275,7 +275,7 @@ namespace grendel
       };
 
       parallel::apply_to_subranges(
-          indices_extended.begin(), indices_extended.end(), on_subranges, 4096);
+          indices_relevant.begin(), indices_relevant.end(), on_subranges, 4096);
 
       if constexpr (smoothen_alpha_) {
         /* Synchronize alpha_ over all MPI processes: */
@@ -410,7 +410,6 @@ namespace grendel
                               "time_step - 4 compute p_ij (2)");
 
       const auto on_subranges = [&](auto i1, const auto i2) {
-
         for (const auto i : boost::make_iterator_range(i1, i2)) {
 
           /* Only iterate over locally owned subset! */
@@ -458,7 +457,6 @@ namespace grendel
         TimerOutput::Scope time(computing_timer_, "time_step - 5 compute l_ij");
 
         const auto on_subranges = [&](auto i1, const auto i2) {
-
           for (const auto i : boost::make_iterator_range(i1, i2)) {
 
             /* Only iterate over locally owned subset! */
@@ -514,8 +512,8 @@ namespace grendel
             }
           };
 
-          parallel::apply_to_subranges(indices_extended.begin(),
-                                       indices_extended.end(),
+          parallel::apply_to_subranges(indices_relevant.begin(),
+                                       indices_relevant.end(),
                                        on_subranges,
                                        4096);
         }
@@ -533,7 +531,6 @@ namespace grendel
                                 "time_step - 7 high-order update");
 
         const auto on_subranges = [&](auto i1, const auto i2) {
-
           for (const auto i : boost::make_iterator_range(i1, i2)) {
 
             /* Only iterate over locally owned subset */
