@@ -70,10 +70,67 @@ namespace grendel
                               discretization_->finite_element());
       DoFRenumbering::Cuthill_McKee(dof_handler_);
 
-
-
       locally_owned = dof_handler_.locally_owned_dofs();
       n_locally_owned_ = locally_owned.n_elements();
+
+      /*
+       * Reorder all locally owned boundary degree of freedoms to the end
+       * of the local index range:
+       */
+
+      {
+        Assert(locally_owned.is_contiguous() == true,
+               ExcMessage("Need a contigous set of locally owned indices."));
+
+        std::vector<types::global_dof_index> new_order(n_locally_owned_);
+
+        const auto offset = n_locally_owned_ != 0 ? *locally_owned.begin() : 0;
+
+        const unsigned int dofs_per_cell =
+            discretization_->finite_element().dofs_per_cell;
+        std::vector<types::global_dof_index> local_dof_indices(dofs_per_cell);
+
+        /* First pass: Mark all locally owned boundary dofs: */
+
+        for (auto cell : dof_handler_.active_cell_iterators()) {
+          if (cell->is_artificial())
+            continue;
+
+          cell->get_dof_indices(local_dof_indices);
+
+          for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f) {
+            const auto face = cell->face(f);
+            if(!face->at_boundary())
+              continue;
+
+            for (unsigned int j = 0; j < dofs_per_cell; ++j) {
+              if (!discretization_->finite_element().has_support_on_face(j, f))
+                continue;
+
+              const auto &index = local_dof_indices[j];
+              if (!locally_owned.is_element(index))
+                continue;
+
+              Assert(index - offset < n_locally_owned_, ExcInternalError());
+              new_order[index - offset] = numbers::invalid_dof_index;
+            }
+          }
+        }
+
+        /* Second pass: Create renumbering. */
+
+        types::global_dof_index index = offset;
+
+        for (auto &it : new_order)
+          if (it != numbers::invalid_dof_index)
+            it = index++;
+
+        for (auto &it : new_order)
+          if (it == numbers::invalid_dof_index)
+            it = index++;
+
+        dof_handler_.renumber_dofs(new_order);
+      }
 
       /* Print out the DoF distribution: */
 
