@@ -11,7 +11,7 @@ subsection A - TimeLoop
   set resume                 = false
 end
 
-subsection B - cylinderretization
+subsection B - Discretization
   set geometry                            = cylinder
 
   set immersed cylinder - height          = 2
