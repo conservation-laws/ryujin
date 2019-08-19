@@ -9,16 +9,21 @@
 namespace grendel
 {
 
-  template <int dim>
+  template <int dim, typename Number = double>
   class Indicator
   {
   public:
     static constexpr unsigned int problem_dimension =
-        ProblemDescription<dim>::problem_dimension;
+        ProblemDescription<dim, Number>::problem_dimension;
 
-    using rank1_type = typename ProblemDescription<dim>::rank1_type;
+    using rank1_type = typename ProblemDescription<dim, Number>::rank1_type;
 
-    using rank2_type = typename ProblemDescription<dim>::rank2_type;
+    using rank2_type = typename ProblemDescription<dim, Number>::rank2_type;
+
+    /**
+     * Scalar number type
+     */
+    using ScalarNumber = typename get_value_type<Number>::type;
 
     /*
      * Options:
@@ -37,7 +42,7 @@ namespace grendel
       pressure,
     } smoothness_indicator_ = SmoothnessIndicators::pressure;
 
-    static constexpr double smoothness_indicator_alpha_0_ = 0;
+    static constexpr ScalarNumber smoothness_indicator_alpha_0_ = 0.;
 
     static constexpr unsigned int smoothness_indicator_power_ = 3;
 
@@ -47,62 +52,62 @@ namespace grendel
      * We take a reference to an OfflineData object in order to store
      * references to the beta_ij and c_ij matrices.
      */
-    Indicator(const OfflineData<dim> &offline_data);
+    Indicator(const OfflineData<dim, Number> &offline_data);
 
     /**
      * Reset temporary storage and initialize for a new row corresponding
      * to state vector U_i:
      */
-    inline DEAL_II_ALWAYS_INLINE void reset(const rank1_type U_i);
+    DEAL_II_ALWAYS_INLINE inline void reset(const rank1_type U_i);
 
     /**
      * When looping over the sparsity row, add the contribution associated
      * with the neighboring state U_j:
      */
     template <typename ITERATOR>
-    inline DEAL_II_ALWAYS_INLINE void add(const rank1_type U_j,
+    DEAL_II_ALWAYS_INLINE inline void add(const rank1_type U_j,
                                           const ITERATOR jt);
     /**
      * Return the computed alpha_i value.
      */
-    inline DEAL_II_ALWAYS_INLINE double alpha(const double h_i);
+    DEAL_II_ALWAYS_INLINE inline Number alpha(const Number h_i);
 
     /**
      * Return the computed second variation of rho.
      */
-    inline DEAL_II_ALWAYS_INLINE double rho_second_variation();
+    DEAL_II_ALWAYS_INLINE inline Number rho_second_variation();
 
   private:
-    const std::array<dealii::SparseMatrix<double>, dim> &cij_matrix_;
-    const dealii::SparseMatrix<double> &betaij_matrix_;
+    const std::array<dealii::SparseMatrix<Number>, dim> &cij_matrix_;
+    const dealii::SparseMatrix<Number> &betaij_matrix_;
 
     /* Temporary storage used for the entropy_viscosity_commutator: */
 
-    double rho_i = 0.; // also used for second variations
-    double eta_i = 0.;
+    Number rho_i = 0.; // also used for second variations
+    Number eta_i = 0.;
     rank2_type f_i;
     rank1_type d_eta_i;
 
-    double left = 0.;
+    Number left = 0.;
     rank1_type right;
 
     /* Temporary storage used for the smoothness indicator: */
 
-    double indicator_i = 0.;
+    Number indicator_i = 0.;
 
-    double numerator = 0.;
-    double denominator = 0.;
-    double denominator_abs = 0.;
+    Number numerator = 0.;
+    Number denominator = 0.;
+    Number denominator_abs = 0.;
 
     /* Temporary storage used to compute second variations: */
 
-    double rho_second_variation_numerator = 0.;
-    double rho_second_variation_denominator = 0.;
+    Number rho_second_variation_numerator = 0.;
+    Number rho_second_variation_denominator = 0.;
   };
 
 
-  template <int dim>
-  Indicator<dim>::Indicator(const OfflineData<dim> &offline_data)
+  template <int dim, typename Number>
+  Indicator<dim, Number>::Indicator(const OfflineData<dim, Number> &offline_data)
       : cij_matrix_(offline_data.cij_matrix())
       , betaij_matrix_(offline_data.betaij_matrix())
   {
@@ -111,33 +116,34 @@ namespace grendel
 
   namespace
   {
-    template <int dim>
-    inline DEAL_II_ALWAYS_INLINE double
-    smoothness_indicator(const typename Indicator<dim>::rank1_type U)
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline Number
+    smoothness_indicator(const typename Indicator<dim, Number>::rank1_type U)
     {
-      switch (Indicator<dim>::smoothness_indicator_) {
-      case Indicator<dim>::SmoothnessIndicators::rho:
+      switch (Indicator<dim, Number>::smoothness_indicator_) {
+      case Indicator<dim, Number>::SmoothnessIndicators::rho:
         return U[0];
 
-      case Indicator<dim>::SmoothnessIndicators::internal_energy:
-        return ProblemDescription<dim>::internal_energy(U);
+      case Indicator<dim, Number>::SmoothnessIndicators::internal_energy:
+        return ProblemDescription<dim, Number>::internal_energy(U);
 
-      case Indicator<dim>::SmoothnessIndicators::pressure:
-        return ProblemDescription<dim>::pressure(U);
+      case Indicator<dim, Number>::SmoothnessIndicators::pressure:
+        return ProblemDescription<dim, Number>::pressure(U);
       }
     }
   } // namespace
 
 
-  template <int dim>
-  inline DEAL_II_ALWAYS_INLINE void Indicator<dim>::reset(const rank1_type U_i)
+  template <int dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline void
+  Indicator<dim, Number>::reset(const rank1_type U_i)
   {
     if constexpr (indicator_ == Indicators::entropy_viscosity_commutator) {
       rho_i = U_i[0];
-      eta_i = ProblemDescription<dim>::entropy(U_i);
-      f_i = ProblemDescription<dim>::f(U_i);
+      eta_i = ProblemDescription<dim, Number>::entropy(U_i);
+      f_i = ProblemDescription<dim, Number>::f(U_i);
 
-      d_eta_i = ProblemDescription<dim>::entropy_derivative(U_i);
+      d_eta_i = ProblemDescription<dim, Number>::entropy_derivative(U_i);
       d_eta_i[0] -= eta_i / rho_i;
 
       left = 0.;
@@ -149,7 +155,7 @@ namespace grendel
       denominator = 0.;
       denominator_abs = 0.;
 
-      indicator_i = smoothness_indicator<dim>(U_i);
+      indicator_i = smoothness_indicator<dim, Number>(U_i);
     }
 
     if constexpr (compute_second_variations_) {
@@ -160,18 +166,18 @@ namespace grendel
   }
 
 
-  template <int dim>
+  template <int dim, typename Number>
   template <typename ITERATOR>
-  inline DEAL_II_ALWAYS_INLINE void Indicator<dim>::add(const rank1_type U_j,
-                                                        const ITERATOR jt)
+  DEAL_II_ALWAYS_INLINE inline void
+  Indicator<dim, Number>::add(const rank1_type U_j, const ITERATOR jt)
   {
     if constexpr (indicator_ == Indicators::entropy_viscosity_commutator) {
       const auto c_ij = gather_get_entry(cij_matrix_, jt);
 
       const auto &rho_j = U_j[0];
-      const auto m_j = ProblemDescription<dim>::momentum(U_j);
-      const auto eta_j = ProblemDescription<dim>::entropy(U_j);
-      const auto f_j = ProblemDescription<dim>::f(U_j);
+      const auto m_j = ProblemDescription<dim, Number>::momentum(U_j);
+      const auto eta_j = ProblemDescription<dim, Number>::entropy(U_j);
+      const auto f_j = ProblemDescription<dim, Number>::f(U_j);
 
       left += (eta_j / rho_j - eta_i / rho_i) * m_j * c_ij;
       for (unsigned int k = 0; k < problem_dimension; ++k)
@@ -181,7 +187,7 @@ namespace grendel
     const auto beta_ij = get_entry(betaij_matrix_, jt);
 
     if constexpr (indicator_ == Indicators::smoothness_indicator) {
-      const auto indicator_j = smoothness_indicator<dim>(U_j);
+      const auto indicator_j = smoothness_indicator<dim, Number>(U_j);
 
       numerator += beta_ij * (indicator_i - indicator_j);
       denominator += std::abs(beta_ij) * std::abs(indicator_i - indicator_j);
@@ -198,8 +204,9 @@ namespace grendel
   }
 
 
-  template <int dim>
-  inline DEAL_II_ALWAYS_INLINE double Indicator<dim>::alpha(const double hd_i)
+  template <int dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline Number
+  Indicator<dim, Number>::alpha(const Number hd_i)
   {
     if constexpr (indicator_ == Indicators::zero) {
       return 0.;
@@ -210,8 +217,8 @@ namespace grendel
     }
 
     if constexpr (indicator_ == Indicators::entropy_viscosity_commutator) {
-      double numerator = left;
-      double denominator = std::abs(left);
+      Number numerator = left;
+      Number denominator = std::abs(left);
       for (unsigned int k = 0; k < problem_dimension; ++k) {
         numerator -= d_eta_i[k] * right[k];
         denominator += std::abs(d_eta_i[k] * right[k]);
@@ -239,10 +246,11 @@ namespace grendel
   }
 
 
-  template <int dim>
-  inline DEAL_II_ALWAYS_INLINE double Indicator<dim>::rho_second_variation()
+  template <int dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline Number
+  Indicator<dim, Number>::rho_second_variation()
   {
-    constexpr double eps = std::numeric_limits<double>::epsilon();
+    constexpr Number eps = std::numeric_limits<Number>::epsilon();
     return rho_second_variation_numerator /
            (rho_second_variation_denominator + eps);
   }

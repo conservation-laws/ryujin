@@ -9,19 +9,6 @@
 #include <array>
 #include <functional>
 
-// FIXME: Refactor - do we have something like this in the library?
-namespace {
-  template <typename T>
-  struct get_value_type {
-    using type = T;
-  };
-
-  template <typename T>
-  struct get_value_type<dealii::VectorizedArray<T>> {
-    using type = T;
-  };
-}
-
 namespace grendel
 {
   /**
@@ -47,13 +34,15 @@ namespace grendel
      */
     const static std::array<std::string, dim + 2> component_names;
 
+    /**
+     * Scalar number type
+     */
     using ScalarNumber = typename get_value_type<Number>::type;
 
     /**
      * Gamma.
      */
     static constexpr ScalarNumber gamma = 7. / 5.;
-
 
     /**
      * Covolume b.

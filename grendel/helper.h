@@ -160,6 +160,18 @@ namespace grendel
     return {callable, k};
   }
 
+
+  // FIXME: Refactor - do we have something like this in the library?
+  template <typename T>
+  struct get_value_type {
+    using type = T;
+  };
+
+  template <typename T>
+  struct get_value_type<dealii::VectorizedArray<T>> {
+    using type = T;
+  };
+
 } // namespace grendel
 
 
