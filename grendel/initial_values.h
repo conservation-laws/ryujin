@@ -10,19 +10,19 @@
 
 namespace grendel
 {
-  template <int dim>
+  template <int dim, typename Number = double>
   class InitialValues : public dealii::ParameterAcceptor
   {
   public:
     static constexpr unsigned int problem_dimension =
         ProblemDescription<dim>::problem_dimension;
 
-    static constexpr double gamma = ProblemDescription<dim>::gamma;
+    static constexpr Number gamma = ProblemDescription<dim, Number>::gamma;
 
-    static constexpr double b = ProblemDescription<dim>::b;
+    static constexpr Number b = ProblemDescription<dim, Number>::b;
 
 
-    typedef dealii::Tensor<1, problem_dimension> rank1_type;
+    typedef dealii::Tensor<1, problem_dimension, Number> rank1_type;
 
 
     /**
@@ -49,28 +49,28 @@ namespace grendel
      * configuration and want to compare the numerical computation against
      * it.
      */
-    const std::function<rank1_type(const dealii::Point<dim> &point, double t)>
-        &initial_state;
+    const std::function<rank1_type(const dealii::Point<dim, Number> &point,
+                                   Number t)> &initial_state;
 
 
   private:
     std::string configuration_;
 
-    dealii::Point<dim> initial_position_;
-    dealii::Tensor<1, dim> initial_direction_;
+    dealii::Point<dim, Number> initial_position_;
+    dealii::Tensor<1, dim, Number> initial_direction_;
 
-    dealii::Tensor<1, 3> initial_1d_state_;
-    double initial_mach_number_;
+    dealii::Tensor<1, 3, Number> initial_1d_state_;
+    Number initial_mach_number_;
 
-    double initial_vortex_beta_;
+    Number initial_vortex_beta_;
 
-    double perturbation_;
+    Number perturbation_;
 
     /*
      * Internal function object that we used to implement the
      * internal_state function for all internal states:
      */
-    std::function<rank1_type(const dealii::Point<dim> &point, double t)>
+    std::function<rank1_type(const dealii::Point<dim, Number> &point, Number t)>
         initial_state_;
   };
 

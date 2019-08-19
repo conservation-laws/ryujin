@@ -9,13 +9,13 @@ namespace grendel
 {
   using namespace dealii;
 
-  template <int dim>
-  InitialValues<dim>::InitialValues(const std::string &subsection)
+  template <int dim, typename Number>
+  InitialValues<dim, Number>::InitialValues(const std::string &subsection)
       : ParameterAcceptor(subsection)
       , initial_state(initial_state_)
   {
-    ParameterAcceptor::parse_parameters_call_back.connect(
-        std::bind(&InitialValues<dim>::parse_parameters_callback, this));
+    ParameterAcceptor::parse_parameters_call_back.connect(std::bind(
+        &InitialValues<dim, Number>::parse_parameters_callback, this));
 
     configuration_ = "uniform";
     add_parameter(
@@ -61,8 +61,8 @@ namespace grendel
   }
 
 
-  template <int dim>
-  void InitialValues<dim>::parse_parameters_callback()
+  template <int dim, typename Number>
+  void InitialValues<dim, Number>::parse_parameters_callback()
   {
     /*
      * First, let's normalize the direction:
@@ -79,7 +79,7 @@ namespace grendel
      */
 
     const auto from_1d_state =
-        [=](const dealii::Tensor<1, 3, double> &state_1d) -> rank1_type {
+        [=](const dealii::Tensor<1, 3, Number> &state_1d) -> rank1_type {
       const auto &rho = state_1d[0];
       const auto &u = state_1d[1];
       const auto &p = state_1d[2];
@@ -105,7 +105,8 @@ namespace grendel
        * A uniform flow:
        */
 
-      initial_state_ = [=](const dealii::Point<dim> & /*point*/, double /*t*/) {
+      initial_state_ = [=](const dealii::Point<dim, Number> & /*point*/,
+                           Number /*t*/) {
         return from_1d_state(initial_1d_state_);
       };
 
@@ -118,25 +119,25 @@ namespace grendel
       const auto &rho_R = initial_1d_state_[0];
       const auto &u_R = initial_1d_state_[1];
       const auto &p_R = initial_1d_state_[2];
-      const double mach_S = initial_mach_number_;
+      const Number mach_S = initial_mach_number_;
 
       /* a_R^2 = gamma * p / rho / (1 - b * rho) */
-      const double a_R = std::sqrt(gamma * p_R / rho_R / (1 - b * rho_R));
-      const double mach_R = u_R / a_R;
+      const Number a_R = std::sqrt(gamma * p_R / rho_R / (1 - b * rho_R));
+      const Number mach_R = u_R / a_R;
 
-      const double S3 = mach_S * a_R;
-      const double delta_mach = mach_R - mach_S;
+      const Number S3 = mach_S * a_R;
+      const Number delta_mach = mach_R - mach_S;
 
-      const double rho_L = rho_R * (gamma + 1.) * delta_mach * delta_mach /
+      const Number rho_L = rho_R * (gamma + 1.) * delta_mach * delta_mach /
                            ((gamma - 1.) * delta_mach * delta_mach + 2.);
-      double u_L = (1. - rho_R / rho_L) * S3 + rho_R / rho_L * u_R;
-      double p_L = p_R * (2. * gamma * delta_mach * delta_mach - (gamma - 1.)) /
+      Number u_L = (1. - rho_R / rho_L) * S3 + rho_R / rho_L * u_R;
+      Number p_L = p_R * (2. * gamma * delta_mach * delta_mach - (gamma - 1.)) /
                    (gamma + 1.);
 
-      dealii::Tensor<1, 3, double> initial_1d_state_L{{rho_L, u_L, p_L}};
+      dealii::Tensor<1, 3, Number> initial_1d_state_L{{rho_L, u_L, p_L}};
 
-      initial_state_ = [=](const dealii::Point<dim> &point, double t) {
-        const double position_1d =
+      initial_state_ = [=](const dealii::Point<dim, Number> &point, Number t) {
+        const Number position_1d =
             (point - initial_position_) * initial_direction_ - S3 * t;
 
         if (position_1d > 0.) {
@@ -152,11 +153,12 @@ namespace grendel
        * Contrast of the Sod shock tube:
        */
 
-      dealii::Tensor<1, 3, double> initial_1d_state_L{{0.125, 0.0, 0.1}};
-      dealii::Tensor<1, 3, double> initial_1d_state_R{{1.0, 0.0, 1.0}};
+      dealii::Tensor<1, 3, Number> initial_1d_state_L{{0.125, 0.0, 0.1}};
+      dealii::Tensor<1, 3, Number> initial_1d_state_R{{1.0, 0.0, 1.0}};
 
-      initial_state_ = [=](const dealii::Point<dim> &point, double /*t*/) {
-        const double position_1d =
+      initial_state_ = [=](const dealii::Point<dim, Number> &point,
+                           Number /*t*/) {
+        const Number position_1d =
             (point - initial_position_) * initial_direction_;
 
         if (position_1d > 0.) {
@@ -174,25 +176,26 @@ namespace grendel
        */
 
       if constexpr (dim == 2) {
-        initial_state_ = [=](const dealii::Point<dim> &point, double t) {
+        initial_state_ = [=](const dealii::Point<dim, Number> &point,
+                             Number t) {
           const auto point_bar = point - initial_position_ -
                                  initial_direction_ * initial_mach_number_ * t;
-          const double r_square = point_bar.norm_square();
+          const Number r_square = point_bar.norm_square();
 
-          const double factor =
+          const Number factor =
               initial_vortex_beta_ / (2. * M_PI) * exp(0.5 - 0.5 * r_square);
 
-          const double T = 1. - (gamma - 1.) / (2. * gamma) * factor * factor;
+          const Number T = 1. - (gamma - 1.) / (2. * gamma) * factor * factor;
 
-          const double u = initial_direction_[0] * initial_mach_number_ -
+          const Number u = initial_direction_[0] * initial_mach_number_ -
                            factor * point_bar[1];
 
-          const double v = initial_direction_[1] * initial_mach_number_ +
+          const Number v = initial_direction_[1] * initial_mach_number_ +
                            factor * point_bar[0];
 
-          const double rho = std::pow(T, 1. / (gamma - 1.));
-          const double p = std::pow(rho, gamma);
-          const double E = p / (gamma - 1.) + 0.5 * rho * (u * u + v * v);
+          const Number rho = std::pow(T, 1. / (gamma - 1.));
+          const Number p = std::pow(rho, gamma);
+          const Number E = p / (gamma - 1.) + 0.5 * rho * (u * u + v * v);
 
           return rank1_type({rho, rho * u, rho * v, E});
         };
@@ -213,9 +216,9 @@ namespace grendel
     if (perturbation_ != 0.) {
       initial_state_ = [old_state = this->initial_state_,
                         perturbation = this->perturbation_](
-                           const dealii::Point<dim> &point, double t) {
+                           const dealii::Point<dim, Number> &point, Number t) {
         static std::default_random_engine generator;
-        static std::uniform_real_distribution<double> distribution(-1., 1.);
+        static std::uniform_real_distribution<Number> distribution(-1., 1.);
         auto draw = std::bind(distribution, generator);
 
         auto state = old_state(point, t);
