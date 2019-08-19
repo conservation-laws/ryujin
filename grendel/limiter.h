@@ -8,20 +8,21 @@
 namespace grendel
 {
 
-  template <int dim>
+  template <int dim, typename Number = double>
   class Limiter
   {
   public:
     static constexpr unsigned int problem_dimension =
-        ProblemDescription<dim>::problem_dimension;
+        ProblemDescription<dim, Number>::problem_dimension;
 
-    using rank1_type = typename ProblemDescription<dim>::rank1_type;
+    using rank1_type = typename ProblemDescription<dim, Number>::rank1_type;
 
-    /* Let's allocate 5 doubles for limiter bounds: */
-    typedef std::array<double, 4> Bounds;
+    using vector_type =
+        std::array<dealii::LinearAlgebra::distributed::Vector<Number>, 4>;
 
-    typedef std::array<dealii::LinearAlgebra::distributed::Vector<double>, 4>
-        vector_type;
+    using ScalarNumber = typename get_value_type<Number>::type;
+
+    using Bounds = std::array<Number, 4>;
 
     /*
      * Options:
@@ -38,7 +39,7 @@ namespace grendel
 
     static constexpr unsigned int relaxation_order_ = 3;
 
-    static constexpr double line_search_eps_ = 1.e-8;
+    static constexpr ScalarNumber line_search_eps_ = 1.e-8;
 
     static constexpr unsigned int line_search_max_iter_ = 10;
 
@@ -46,62 +47,63 @@ namespace grendel
      * Accumulate bounds:
      */
 
-    inline DEAL_II_ALWAYS_INLINE void reset();
+    DEAL_II_ALWAYS_INLINE inline void reset();
 
     template <typename ITERATOR>
-    inline DEAL_II_ALWAYS_INLINE void accumulate(const rank1_type U_i,
+    DEAL_II_ALWAYS_INLINE inline void accumulate(const rank1_type U_i,
                                                  const rank1_type U_j,
                                                  const rank1_type U_ij_bar,
-                                                 const ITERATOR jt);
+                                                 const ITERATOR jt); // FIXME
 
-    inline DEAL_II_ALWAYS_INLINE void
-    apply_relaxation(const double hd_i, const double rho_relaxation);
+    DEAL_II_ALWAYS_INLINE inline void
+    apply_relaxation(const Number hd_i, const Number rho_relaxation);
 
-    inline DEAL_II_ALWAYS_INLINE const Bounds &bounds() const;
+    DEAL_II_ALWAYS_INLINE inline const Bounds &bounds() const;
 
     /*
      * Compute limiter value l_ij for update P_ij:
      */
 
-    static inline DEAL_II_ALWAYS_INLINE double
-    limit(const Bounds &bounds, const rank1_type U, const rank1_type P_ij);
+    static DEAL_II_ALWAYS_INLINE inline Number limit(const Bounds &bounds,
+                                                     const rank1_type U,
+                                                     const rank1_type P_ij);
 
   private:
     Bounds bounds_;
 
-    double s_interp_max;
+    Number s_interp_max;
   };
 
 
-  template <int dim>
-  inline DEAL_II_ALWAYS_INLINE void Limiter<dim>::reset()
+  template <int dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline void Limiter<dim, Number>::reset()
   {
     auto &[rho_min, rho_max, rho_epsilon_min, s_min] = bounds_;
 
     if constexpr (limiter_ == Limiters::none)
       return;
 
-    rho_min = std::numeric_limits<double>::max();
+    rho_min = std::numeric_limits<Number>::max();
     rho_max = 0.;
 
     if constexpr (limiter_ == Limiters::internal_energy) {
-      rho_epsilon_min = std::numeric_limits<double>::max();
+      rho_epsilon_min = std::numeric_limits<Number>::max();
     }
 
     if constexpr (limiter_ == Limiters::specific_entropy) {
-      s_min = std::numeric_limits<double>::max();
+      s_min = std::numeric_limits<Number>::max();
       s_interp_max = 0.;
     }
   }
 
 
-  template <int dim>
+  template <int dim, typename Number>
   template <typename ITERATOR>
-  inline DEAL_II_ALWAYS_INLINE void
-  Limiter<dim>::accumulate(const rank1_type U_i,
-                           const rank1_type U_j,
-                           const rank1_type U_ij_bar,
-                           const ITERATOR jt)
+  DEAL_II_ALWAYS_INLINE inline void
+  Limiter<dim, Number>::accumulate(const rank1_type U_i,
+                                   const rank1_type U_j,
+                                   const rank1_type U_ij_bar,
+                                   const ITERATOR jt) // FIXME
   {
     auto &[rho_min, rho_max, rho_epsilon_min, s_min] = bounds_;
 
@@ -114,26 +116,26 @@ namespace grendel
 
     if constexpr (limiter_ == Limiters::internal_energy) {
       const auto rho_epsilon =
-          ProblemDescription<dim>::internal_energy(U_ij_bar);
+          ProblemDescription<dim, Number>::internal_energy(U_ij_bar);
       rho_epsilon_min = std::min(rho_epsilon_min, rho_epsilon);
     }
 
     if constexpr (limiter_ == Limiters::specific_entropy) {
-      const auto s = ProblemDescription<dim>::specific_entropy(U_j);
+      const auto s = ProblemDescription<dim, Number>::specific_entropy(U_j);
       s_min = std::min(s_min, s);
 
-      if (jt->row() != jt->column()) {
-        const double s_interp =
-            ProblemDescription<dim>::specific_entropy((U_i + U_j) / 2.);
+      if (jt->row() != jt->column()) { // FIXME
+        const Number s_interp =
+            ProblemDescription<dim, Number>::specific_entropy((U_i + U_j) / 2.);
         s_interp_max = std::max(s_interp_max, s_interp);
       }
     }
   }
 
 
-  template <int dim>
-  inline DEAL_II_ALWAYS_INLINE void
-  Limiter<dim>::apply_relaxation(double hd_i, double rho_relaxation)
+  template <int dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline void
+  Limiter<dim, Number>::apply_relaxation(Number hd_i, Number rho_relaxation)
   {
     if constexpr (relax_bounds_) {
       auto &[rho_min, rho_max, rho_epsilon_min, s_min] = bounds_;
@@ -141,35 +143,37 @@ namespace grendel
       if constexpr (limiter_ == Limiters::none)
         return;
 
-      const auto r_i =
-          2. * std::pow(std::sqrt(std::sqrt(hd_i)), relaxation_order_);
+      const Number r_i =
+          Number(2.) * std::pow(std::sqrt(std::sqrt(hd_i)), relaxation_order_);
 
-      rho_min = std::max((1 - r_i) * rho_min, rho_min - rho_relaxation);
-      rho_max = std::min((1 + r_i) * rho_max, rho_max + rho_relaxation);
+      rho_min =
+          std::max((Number(1.) - r_i) * rho_min, rho_min - rho_relaxation);
+      rho_max =
+          std::min((Number(1.) + r_i) * rho_max, rho_max + rho_relaxation);
 
       if constexpr (limiter_ == Limiters::specific_entropy) {
-        s_min = std::max((1 - r_i) * s_min, 2. * s_min - s_interp_max);
+        s_min = std::max((Number(1.) - r_i) * s_min,
+                         Number(2.) * s_min - s_interp_max);
       }
     }
   }
 
 
-  template <int dim>
-  inline DEAL_II_ALWAYS_INLINE const typename Limiter<dim>::Bounds &
-  Limiter<dim>::bounds() const
+  template <int dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline const typename Limiter<dim, Number>::Bounds &
+  Limiter<dim, Number>::bounds() const
   {
     return bounds_;
   }
 
 
-  template <int dim>
-  inline DEAL_II_ALWAYS_INLINE double Limiter<dim>::limit(const Bounds &bounds,
-                                                          const rank1_type U,
-                                                          const rank1_type P_ij)
+  template <int dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline Number Limiter<dim, Number>::limit(
+      const Bounds &bounds, const rank1_type U, const rank1_type P_ij)
   {
     auto &[rho_min, rho_max, rho_epsilon_min, s_min] = bounds;
 
-    double l_ij = 1.;
+    Number l_ij = 1.;
 
     if constexpr (limiter_ == Limiters::none)
       return l_ij;
@@ -184,9 +188,10 @@ namespace grendel
     const auto &P_ij_rho = P_ij[0];
 
     {
-      double t_0 = 1.;
+      Number t_0 = 1.;
 
-      constexpr double eps_ = std::numeric_limits<double>::epsilon();
+      constexpr ScalarNumber eps_ =
+          std::numeric_limits<ScalarNumber>::epsilon();
 
       if (U_i_rho + P_ij_rho < rho_min)
         t_0 =
@@ -214,19 +219,19 @@ namespace grendel
 
     if constexpr (limiter_ == Limiters::internal_energy) {
 
-      const auto P_ij_m = ProblemDescription<dim>::momentum(P_ij);
+      const auto P_ij_m = ProblemDescription<dim, Number>::momentum(P_ij);
       const auto &P_ij_E = P_ij[dim + 1];
 
-      const auto U_i_m = ProblemDescription<dim>::momentum(U);
-      const double &U_i_E = U[dim + 1];
+      const auto U_i_m = ProblemDescription<dim, Number>::momentum(U);
+      const Number &U_i_E = U[dim + 1];
 
-      const double c =
-          (U_i_E - rho_epsilon_min) * U_i_rho - 1. / 2. * U_i_m.norm_square();
+      const Number c =
+          (U_i_E - rho_epsilon_min) * U_i_rho - Number(1. / 2.) * U_i_m.norm_square();
 
-      const double b = (U_i_E - rho_epsilon_min) * P_ij_rho + P_ij_E * U_i_rho -
+      const Number b = (U_i_E - rho_epsilon_min) * P_ij_rho + P_ij_E * U_i_rho -
                        U_i_m * P_ij_m;
 
-      const double a = P_ij_E * P_ij_rho - 1. / 2. * P_ij_m.norm_square();
+      const Number a = P_ij_E * P_ij_rho - Number(1. / 2.) * P_ij_m.norm_square();
 
       /*
        * Solve the quadratic equation a t^2 + b t + c = 0 by hand. We use the
@@ -234,22 +239,22 @@ namespace grendel
        * statements:
        */
 
-      double t_0 = 1.;
+      Number t_0 = 1.;
 
-      const double discriminant = b * b - 4. * a * c;
+      const Number discriminant = b * b - Number(4.) * a * c;
 
       if (discriminant == 0.) {
 
-        const double x = -b / 2. / a;
+        const Number x = -b / Number(2.) / a;
 
-        if (x > 0)
+        if (x > 0.)
           t_0 = x;
 
       } else if (discriminant > 0.) {
 
-        const double x =
-            2. * c / (-b - std::copysign(std::sqrt(discriminant), b));
-        const double y = c / a / x;
+        const Number x =
+            Number(2.) * c / (-b - std::copysign(std::sqrt(discriminant), b));
+        const Number y = c / a / x;
 
         /* Select the smallest positive root: */
         if (x > 0.) {
@@ -265,8 +270,8 @@ namespace grendel
       l_ij = std::min(l_ij, t_0);
 
 #ifdef DEBUG
-      const double rho_epsilon =
-          ProblemDescription<dim>::internal_energy(U + l_ij * P_ij);
+      const Number rho_epsilon =
+          ProblemDescription<dim, Number>::internal_energy(U + l_ij * P_ij);
       Assert(rho_epsilon - rho_epsilon_min > 0.,
              dealii::ExcMessage("I'm sorry, Dave. I'm afraid I can't do that. "
                                 "- Negative internal energy."));
@@ -286,10 +291,10 @@ namespace grendel
        * Prepare a Newton secant method:
        */
 
-      double t_l = 0.;
-      double t_r = l_ij;
+      Number t_l = 0.;
+      Number t_r = l_ij;
 
-      if (t_r <= 0. + line_search_eps_)
+      if (t_r <= ScalarNumber(0.) + line_search_eps_)
         return 0.;
 
       if (t_r < t_l + line_search_eps_) {
@@ -297,15 +302,15 @@ namespace grendel
         return std::min(l_ij, t);
       }
 
-      constexpr double gamma = ProblemDescription<dim>::gamma;
+      constexpr ScalarNumber gamma = ProblemDescription<dim, Number>::gamma;
 
       for (unsigned int n = 0; n < line_search_max_iter_; ++n) {
 
         const auto U_r = U + t_r * P_ij;
         const auto rho_r = U_r[0];
         const auto rho_r_gamma = std::pow(rho_r, gamma);
-        auto psi_r =
-            ProblemDescription<dim>::internal_energy(U_r) - s_min * rho_r_gamma;
+        auto psi_r = ProblemDescription<dim, Number>::internal_energy(U_r) -
+                     s_min * rho_r_gamma;
 
         /* Right state is good, cut it short and return: */
         if (psi_r >= 0. - line_search_eps_)
@@ -314,8 +319,8 @@ namespace grendel
         const auto U_l = U + t_l * P_ij;
         const auto rho_l = U_l[0];
         const auto rho_l_gamma = std::pow(rho_l, gamma);
-        auto psi_l =
-            ProblemDescription<dim>::internal_energy(U_l) - s_min * rho_l_gamma;
+        auto psi_l = ProblemDescription<dim, Number>::internal_energy(U_l) -
+                     s_min * rho_l_gamma;
 
         /*
          * Due to round-off errors it might happen that psi_l is negative
@@ -325,30 +330,32 @@ namespace grendel
         if (psi_l < 0.) {
           psi_r -= psi_l;
           psi_l = 0.;
-          if (psi_r >= 0. - line_search_eps_)
+          if (psi_r >= ScalarNumber(0.) - line_search_eps_)
             return std::min(l_ij, t_r);
         }
 
         const auto dpsi_l =
-            ProblemDescription<dim>::internal_energy_derivative(U_l) * P_ij -
+            ProblemDescription<dim, Number>::internal_energy_derivative(U_l) *
+                P_ij -
             gamma * rho_l_gamma / rho_l * s_min * P_ij[0];
         const auto dpsi_r =
-            ProblemDescription<dim>::internal_energy_derivative(U_r) * P_ij -
+            ProblemDescription<dim, Number>::internal_energy_derivative(U_r) *
+                P_ij -
             gamma * rho_r_gamma / rho_r * s_min * P_ij[0];
 
         /* Compute divided differences: */
 
-        const double dd_11 = -dpsi_l;
-        const double dd_12 = (psi_l - psi_r) / (t_r - t_l);
-        const double dd_22 = -dpsi_r;
+        const Number dd_11 = -dpsi_l;
+        const Number dd_12 = (psi_l - psi_r) / (t_r - t_l);
+        const Number dd_22 = -dpsi_r;
 
-        const double dd_112 = (dd_12 - dd_11) / (t_r - t_l);
-        const double dd_122 = (dd_22 - dd_12) / (t_r - t_l);
+        const Number dd_112 = (dd_12 - dd_11) / (t_r - t_l);
+        const Number dd_122 = (dd_22 - dd_12) / (t_r - t_l);
 
         /* Update left and right point: */
 
-        const double discriminant_l = dpsi_l * dpsi_l + 4. * psi_l * dd_112;
-        const double discriminant_r = dpsi_r * dpsi_r + 4. * psi_r * dd_122;
+        const Number discriminant_l = dpsi_l * dpsi_l + 4. * psi_l * dd_112;
+        const Number discriminant_r = dpsi_r * dpsi_r + 4. * psi_r * dd_122;
 
         Assert(discriminant_l >= 0. && discriminant_r >= 0.,
                dealii::ExcMessage("Houston we have a problem!"));
