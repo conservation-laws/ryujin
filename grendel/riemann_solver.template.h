@@ -18,18 +18,20 @@ namespace grendel
     /**
      * Return the positive part of a number.
      */
-    inline DEAL_II_ALWAYS_INLINE double positive_part(const double number)
+    template <typename Number>
+    inline DEAL_II_ALWAYS_INLINE Number positive_part(const Number number)
     {
-      return (std::abs(number) + number) / 2.0;
+      return (std::abs(number) + number) / Number(2.0);
     }
 
 
     /**
      * Return the negative part of a number.
      */
-    inline DEAL_II_ALWAYS_INLINE double negative_part(const double number)
+    template <typename Number>
+    inline DEAL_II_ALWAYS_INLINE Number negative_part(const Number number)
     {
-      return (std::fabs(number) - number) / 2.0;
+      return (std::fabs(number) - number) / Number(2.0);
     }
 
 
@@ -38,10 +40,10 @@ namespace grendel
      * (normalized) "direction" n_ij, return the corresponding projected
      * state in the corresponding 1D Riemann problem.
      */
-    template <int dim>
-    inline DEAL_II_ALWAYS_INLINE dealii::Tensor<1, 3>
-    projected_state(const typename ProblemDescription<dim>::rank1_type U,
-                    const dealii::Tensor<1, dim> &n_ij)
+    template <int dim, typename Number>
+    inline DEAL_II_ALWAYS_INLINE dealii::Tensor<1, 3> projected_state(
+        const typename ProblemDescription<dim, Number>::rank1_type U,
+        const dealii::Tensor<1, dim, Number> &n_ij)
     {
       dealii::Tensor<1, 3> result;
 
@@ -49,12 +51,13 @@ namespace grendel
       result[0] = U[0];
 
       // m:
-      const auto m = ProblemDescription<dim>::momentum(U);
+      const auto m = ProblemDescription<dim, Number>::momentum(U);
       result[1] = n_ij * m;
 
       // E:
       const auto perpendicular_m = m - result[1] * n_ij;
-      result[2] = U[1 + dim] - 0.5 * perpendicular_m.norm_square() / U[0];
+      result[2] =
+          U[1 + dim] - Number(0.5) * perpendicular_m.norm_square() / U[0];
 
       return result;
     }
@@ -67,13 +70,13 @@ namespace grendel
      * Recall that
      *   p = (gamma - 1.0)*rho*e = (gamma - 1.0)*(E - 0.5*m^2/rho)
      */
-    inline DEAL_II_ALWAYS_INLINE double
-    pressure_from_projected_state(const double gamma,
-                                  const dealii::Tensor<1, 3> &projected_U)
+    template <typename Number>
+    inline DEAL_II_ALWAYS_INLINE Number pressure_from_projected_state(
+        const Number gamma, const dealii::Tensor<1, 3> &projected_U)
     {
-      return (gamma - 1.0) *
+      return (gamma - Number(1.0)) *
              (projected_U[2] -
-              0.5 * projected_U[1] * projected_U[1] / projected_U[0]);
+              Number(0.5) * projected_U[1] * projected_U[1] / projected_U[0]);
     }
 
 
@@ -84,15 +87,16 @@ namespace grendel
      * Recall that
      *   c^2 = gamma * p / rho / (1 - b * rho)
      */
-    inline DEAL_II_ALWAYS_INLINE double
-    speed_of_sound_from_projected_state(const double gamma,
-                                        const double b,
+    template <typename Number>
+    inline DEAL_II_ALWAYS_INLINE Number
+    speed_of_sound_from_projected_state(const Number gamma,
+                                        const Number b,
                                         const dealii::Tensor<1, 3> &projected_U)
     {
-      const double rho = projected_U[0];
-      const double p = pressure_from_projected_state(gamma, projected_U);
+      const Number rho = projected_U[0];
+      const Number p = pressure_from_projected_state(gamma, projected_U);
 
-      return std::sqrt(gamma * p / rho / (1.0 - b * rho));
+      return std::sqrt(gamma * p / rho / (Number(1.0) - b * rho));
     }
 
 
@@ -103,12 +107,13 @@ namespace grendel
      *
      * FIXME: Describe state in more detail.
      */
-    inline DEAL_II_ALWAYS_INLINE std::array<double, 6>
-    riemann_data_from_projected_state(const double gamma,
-                                      const double b,
+    template <typename Number>
+    inline DEAL_II_ALWAYS_INLINE std::array<Number, 6>
+    riemann_data_from_projected_state(const Number gamma,
+                                      const Number b,
                                       const dealii::Tensor<1, 3> &projected_U)
     {
-      std::array<double, 6> result;
+      std::array<Number, 6> result;
 
       // rho_Z:
       result[0] = projected_U[0];
@@ -119,10 +124,10 @@ namespace grendel
       // a_Z:
       result[3] = speed_of_sound_from_projected_state(gamma, b, projected_U);
       // A_Z:
-      result[4] =
-          2.0 * (1.0 - b * projected_U[0]) / (gamma + 1.0) / projected_U[0];
+      result[4] = Number(2.0) * (Number(1.0) - b * projected_U[0]) /
+                  (gamma + Number(1.0)) / projected_U[0];
       // B_Z:
-      result[5] = (gamma - 1.0) / (gamma + 1.0) * result[2];
+      result[5] = (gamma - Number(1.0)) / (gamma + Number(1.0)) * result[2];
 
       return result;
     }
@@ -133,11 +138,12 @@ namespace grendel
      *
      * See [1], page 912, (3.4).
      */
-    inline DEAL_II_ALWAYS_INLINE double
-    f_Z(const double gamma,
-        const double b,
-        const std::array<double, 6> &primitive_state,
-        const double &p)
+    template <typename Number>
+    inline DEAL_II_ALWAYS_INLINE Number
+    f_Z(const Number gamma,
+        const Number b,
+        const std::array<Number, 6> &primitive_state,
+        const Number &p)
     {
       const auto &[rho_Z, u_Z, p_Z, a_Z, A_Z, B_Z] = primitive_state;
 
@@ -146,8 +152,11 @@ namespace grendel
 
       } else {
 
-        const double tmp = std::pow(p / p_Z, (gamma - 1.) / 2. / gamma) - 1.;
-        return 2. * a_Z * (1. - b * rho_Z) / (gamma - 1.) * tmp;
+        const Number tmp =
+            std::pow(p / p_Z, (gamma - Number(1.0)) / Number(2.0) / gamma) -
+            Number(1.0);
+        return Number(2.0) * a_Z * (Number(1.0) - b * rho_Z) /
+               (gamma - Number(1.0)) * tmp;
       }
     }
 
@@ -157,24 +166,29 @@ namespace grendel
      *
      * See [1], page 912, (3.4). FIXME find equation defining the
      */
-    inline DEAL_II_ALWAYS_INLINE double
-    df_Z(const double gamma,
-         const double b,
-         const std::array<double, 6> &primitive_state,
-         const double &p)
+    template <typename Number>
+    inline DEAL_II_ALWAYS_INLINE Number
+    df_Z(const Number gamma,
+         const Number b,
+         const std::array<Number, 6> &primitive_state,
+         const Number &p)
     {
       const auto &[rho_Z, u_Z, p_Z, a_Z, A_Z, B_Z] = primitive_state;
 
       if (p >= p_Z) {
         /* Derivative of (p - p_Z) * std::sqrt(A_Z / (p + B_Z)): */
-        return std::sqrt(A_Z / (p + B_Z)) * (1. - 0.5 * (p - p_Z) / (p + B_Z));
+        return std::sqrt(A_Z / (p + B_Z)) *
+               (Number(1.0) - Number(0.5) * (p - p_Z) / (p + B_Z));
 
       } else {
 
         /* Derivative of std::pow(p / p_Z, (gamma - 1.) / 2. / gamma) - 1.*/
-        const double tmp = (gamma - 1.) / 2. / gamma *
-                           std::pow(p / p_Z, (-1. - gamma) / 2. / gamma) / p_Z;
-        return 2. * a_Z * (1. - b * rho_Z) / (gamma - 1.) * tmp;
+        const Number tmp =
+            (gamma - Number(1.0)) / Number(2.) / gamma *
+            std::pow(p / p_Z, (Number(-1.0) - gamma) / Number(2.0) / gamma) /
+            p_Z;
+        return Number(2.) * a_Z * (Number(1.0) - b * rho_Z) /
+               (gamma - Number(1.0)) * tmp;
       }
     }
 
@@ -184,15 +198,16 @@ namespace grendel
      *
      * See [1], page 912, (3.3).
      */
-    inline DEAL_II_ALWAYS_INLINE double
-    phi(const double gamma,
-        const double b,
-        const std::array<double, 6> &riemann_data_i,
-        const std::array<double, 6> &riemann_data_j,
-        const double &p)
+    template <typename Number>
+    inline DEAL_II_ALWAYS_INLINE Number
+    phi(const Number gamma,
+        const Number b,
+        const std::array<Number, 6> &riemann_data_i,
+        const std::array<Number, 6> &riemann_data_j,
+        const Number &p)
     {
-      const double &u_i = riemann_data_i[1];
-      const double &u_j = riemann_data_j[1];
+      const Number &u_i = riemann_data_i[1];
+      const Number &u_j = riemann_data_j[1];
 
       return f_Z(gamma, b, riemann_data_i, p) +
              f_Z(gamma, b, riemann_data_j, p) + u_j - u_i;
@@ -205,12 +220,13 @@ namespace grendel
      * See [1], page 912, (3.3). FIXME find equation defining the
      * derivative.
      */
-    inline DEAL_II_ALWAYS_INLINE double
-    dphi(const double gamma,
-         const double b,
-         const std::array<double, 6> &riemann_data_i,
-         const std::array<double, 6> &riemann_data_j,
-         const double &p)
+    template <typename Number>
+    inline DEAL_II_ALWAYS_INLINE Number
+    dphi(const Number gamma,
+         const Number b,
+         const std::array<Number, 6> &riemann_data_i,
+         const std::array<Number, 6> &riemann_data_j,
+         const Number &p)
     {
       return df_Z(gamma, b, riemann_data_i, p) +
              df_Z(gamma, b, riemann_data_j, p);
@@ -220,32 +236,34 @@ namespace grendel
     /**
      * see [1], page 912, (3.7)
      */
-    inline DEAL_II_ALWAYS_INLINE double
-    lambda1_minus(const double gamma,
-                  const std::array<double, 6> &riemann_data,
-                  const double p_star)
+    template <typename Number>
+    inline DEAL_II_ALWAYS_INLINE Number
+    lambda1_minus(const Number gamma,
+                  const std::array<Number, 6> &riemann_data,
+                  const Number p_star)
     {
       const auto &[rho_Z, u_Z, p_Z, a_Z, A_Z, B_Z] = riemann_data;
 
-      const double factor = (gamma + 1.0) / 2.0 / gamma;
-      const double tmp = positive_part((p_star - p_Z) / p_Z);
-      return u_Z - a_Z * std::sqrt(1.0 + factor * tmp);
+      const Number factor = (gamma + Number(1.0)) / Number(2.0) / gamma;
+      const Number tmp = positive_part((p_star - p_Z) / p_Z);
+      return u_Z - a_Z * std::sqrt(Number(1.0) + factor * tmp);
     }
 
 
     /**
      * see [1], page 912, (3.8)
      */
-    inline DEAL_II_ALWAYS_INLINE double
-    lambda3_plus(const double gamma,
-                 const std::array<double, 6> &primitive_state,
-                 const double p_star)
+    template <typename Number>
+    inline DEAL_II_ALWAYS_INLINE Number
+    lambda3_plus(const Number gamma,
+                 const std::array<Number, 6> &primitive_state,
+                 const Number p_star)
     {
       const auto &[rho_Z, u_Z, p_Z, a_Z, A_Z, B_Z] = primitive_state;
 
-      const double factor = (gamma + 1.0) / 2.0 / gamma;
-      const double tmp = positive_part((p_star - p_Z) / p_Z);
-      return u_Z + a_Z * std::sqrt(1.0 + factor * tmp);
+      const Number factor = (gamma + Number(1.0)) / Number(2.0) / gamma;
+      const Number tmp = positive_part((p_star - p_Z) / p_Z);
+      return u_Z + a_Z * std::sqrt(Number(1.0) + factor * tmp);
     }
 
 
@@ -254,11 +272,12 @@ namespace grendel
      * states <code>riemann_data_i</code> and
      * <code>riemann_data_j</code>. See [1], page 914, (4.3)
      */
-    inline DEAL_II_ALWAYS_INLINE double
-    p_star_two_rarefaction(const double gamma,
-                           const double b,
-                           const std::array<double, 6> &riemann_data_i,
-                           const std::array<double, 6> &riemann_data_j)
+    template <typename Number>
+    inline DEAL_II_ALWAYS_INLINE Number
+    p_star_two_rarefaction(const Number gamma,
+                           const Number b,
+                           const std::array<Number, 6> &riemann_data_i,
+                           const std::array<Number, 6> &riemann_data_j)
     {
       const auto &[rho_i, u_i, p_i, a_i, A_i, B_i] = riemann_data_i;
       const auto &[rho_j, u_j, p_j, a_j, A_j, B_j] = riemann_data_j;
@@ -270,17 +289,21 @@ namespace grendel
        * identity below:
        */
 
-      const double tmp_i = 1. - b * rho_i;
-      const double tmp_j = 1. - b * rho_j;
+      const Number tmp_i = Number(1.0) - b * rho_i;
+      const Number tmp_j = Number(1.0) - b * rho_j;
 
-      const double numerator =
-          a_i * tmp_i + a_j * tmp_j - (gamma - 1.) / 2. * (u_j - u_i);
+      const Number numerator = a_i * tmp_i + a_j * tmp_j -
+                               (gamma - Number(1.)) / Number(2.0) * (u_j - u_i);
 
-      const double denominator =
-          a_i * tmp_i * std::pow(p_i / p_j, -1. * (gamma - 1.) / 2. / gamma) +
-          a_j * tmp_j * 1.;
+      const Number denominator =
+          a_i * tmp_i *
+              std::pow(p_i / p_j,
+                       -Number(1.0) * (gamma - Number(1.)) / Number(2.) /
+                           gamma) +
+          a_j * tmp_j * Number(1.0);
 
-      return p_j * std::pow(numerator / denominator, 2. * gamma / (gamma - 1));
+      return p_j * std::pow(numerator / denominator,
+                            Number(2.0) * gamma / (gamma - Number(1.0)));
     }
 
 
@@ -291,23 +314,24 @@ namespace grendel
      *
      * See [1], page 914, (4.4a), (4.4b), (4.5), and (4.6)
      */
-    inline DEAL_II_ALWAYS_INLINE std::array<double, 2>
-    compute_gap(const double gamma,
-                const std::array<double, 6> &riemann_data_i,
-                const std::array<double, 6> &riemann_data_j,
-                const double p_1,
-                const double p_2)
+    template <typename Number>
+    inline DEAL_II_ALWAYS_INLINE std::array<Number, 2>
+    compute_gap(const Number gamma,
+                const std::array<Number, 6> &riemann_data_i,
+                const std::array<Number, 6> &riemann_data_j,
+                const Number p_1,
+                const Number p_2)
     {
-      const double nu_11 = lambda1_minus(gamma, riemann_data_i, p_2 /*SIC!*/);
-      const double nu_12 = lambda1_minus(gamma, riemann_data_i, p_1 /*SIC!*/);
+      const Number nu_11 = lambda1_minus(gamma, riemann_data_i, p_2 /*SIC!*/);
+      const Number nu_12 = lambda1_minus(gamma, riemann_data_i, p_1 /*SIC!*/);
 
-      const double nu_31 = lambda3_plus(gamma, riemann_data_j, p_1);
-      const double nu_32 = lambda3_plus(gamma, riemann_data_j, p_2);
+      const Number nu_31 = lambda3_plus(gamma, riemann_data_j, p_1);
+      const Number nu_32 = lambda3_plus(gamma, riemann_data_j, p_2);
 
-      const double lambda_max =
+      const Number lambda_max =
           std::max(positive_part(nu_32), negative_part(nu_11));
 
-      const double gap =
+      const Number gap =
           std::max(std::abs(nu_32 - nu_31), std::abs(nu_12 - nu_11));
 
       return {gap, lambda_max};
@@ -316,14 +340,14 @@ namespace grendel
   } /*anonymous namespace*/
 
 
-  template <int dim>
-  std::tuple<double, double, unsigned int>
-  RiemannSolver<dim>::compute(const rank1_type U_i,
-                              const rank1_type U_j,
-                              const dealii::Tensor<1, dim> &n_ij)
+  template <int dim, typename Number>
+  std::tuple<Number, Number, unsigned int> RiemannSolver<dim, Number>::compute(
+      const rank1_type U_i,
+      const rank1_type U_j,
+      const dealii::Tensor<1, dim, Number> &n_ij)
   {
-    constexpr double gamma = ProblemDescription<dim>::gamma;
-    constexpr double b = ProblemDescription<dim>::b;
+    constexpr Number gamma = ProblemDescription<dim, Number>::gamma;
+    constexpr Number b = ProblemDescription<dim, Number>::b;
 
     /*
      * Step 1: Compute projected 1D states.
@@ -341,17 +365,17 @@ namespace grendel
   }
 
 
-  template <int dim>
+  template <int dim, typename Number>
   template <unsigned int max_iter>
-  std::tuple<double, double, unsigned int>
-  RiemannSolver<dim>::compute(const std::array<double, 6> &riemann_data_i,
-                              const std::array<double, 6> &riemann_data_j)
+  std::tuple<Number, Number, unsigned int> RiemannSolver<dim, Number>::compute(
+      const std::array<Number, 6> &riemann_data_i,
+      const std::array<Number, 6> &riemann_data_j)
   {
-    constexpr double gamma = ProblemDescription<dim>::gamma;
-    constexpr double b = ProblemDescription<dim>::b;
+    constexpr Number gamma = ProblemDescription<dim, Number>::gamma;
+    constexpr Number b = ProblemDescription<dim, Number>::b;
 
-    const double p_min = std::min(riemann_data_i[2], riemann_data_j[2]);
-    const double p_max = std::max(riemann_data_i[2], riemann_data_j[2]);
+    const Number p_min = std::min(riemann_data_i[2], riemann_data_j[2]);
+    const Number p_max = std::max(riemann_data_i[2], riemann_data_j[2]);
 
     /*
      * Step 2: Shortcuts.
@@ -361,25 +385,25 @@ namespace grendel
      * away.
      */
 
-    const double phi_p_min =
+    const Number phi_p_min =
         phi(gamma, b, riemann_data_i, riemann_data_j, p_min);
 
     if (phi_p_min >= 0.) {
-      const double p_star = 0.;
-      const double lambda1 = lambda1_minus(gamma, riemann_data_i, p_star);
-      const double lambda3 = lambda3_plus(gamma, riemann_data_j, p_star);
-      const double lambda_max = std::max(std::abs(lambda1), std::abs(lambda3));
+      const Number p_star = 0.;
+      const Number lambda1 = lambda1_minus(gamma, riemann_data_i, p_star);
+      const Number lambda3 = lambda3_plus(gamma, riemann_data_j, p_star);
+      const Number lambda_max = std::max(std::abs(lambda1), std::abs(lambda3));
       return {lambda_max, p_star, 0};
     }
 
-    const double phi_p_max =
+    const Number phi_p_max =
         phi(gamma, b, riemann_data_i, riemann_data_j, p_max);
 
     if (std::abs(phi_p_max) <= newton_eps_) {
-      const double p_star = p_max;
-      const double lambda1 = lambda1_minus(gamma, riemann_data_i, p_star);
-      const double lambda3 = lambda3_plus(gamma, riemann_data_j, p_star);
-      const double lambda_max = std::max(std::abs(lambda1), std::abs(lambda3));
+      const Number p_star = p_max;
+      const Number lambda1 = lambda1_minus(gamma, riemann_data_i, p_star);
+      const Number lambda3 = lambda3_plus(gamma, riemann_data_j, p_star);
+      const Number lambda_max = std::max(std::abs(lambda1), std::abs(lambda3));
       return {lambda_max, p_star, 0};
     }
 
@@ -391,17 +415,17 @@ namespace grendel
      * iterate at all.)
      */
 
-    const double p_star_tilde =
+    const Number p_star_tilde =
         p_star_two_rarefaction(gamma, b, riemann_data_i, riemann_data_j);
 
-    double p_1 = (phi_p_max < 0.) ? p_max : p_min;
-    double p_2 =
+    Number p_1 = (phi_p_max < 0.) ? p_max : p_min;
+    Number p_2 =
         (phi_p_max < 0.) ? p_star_tilde : std::min(p_max, p_star_tilde);
 
 #if DEBUG
     {
-      const double phi_p_1 = phi(gamma, b, riemann_data_i, riemann_data_j, p_1);
-      const double phi_p_2 = phi(gamma, b, riemann_data_i, riemann_data_j, p_2);
+      const Number phi_p_1 = phi(gamma, b, riemann_data_i, riemann_data_j, p_1);
+      const Number phi_p_2 = phi(gamma, b, riemann_data_i, riemann_data_j, p_2);
       Assert(phi_p_1 <= 0. && phi_p_2 >= 0.,
              dealii::ExcMessage("Houston, we have a problem!"));
     }
@@ -436,11 +460,11 @@ namespace grendel
        * This is expensive:
        */
 
-      const double phi_p_1 = phi(gamma, b, riemann_data_i, riemann_data_j, p_1);
-      const double dphi_p_1 =
+      const Number phi_p_1 = phi(gamma, b, riemann_data_i, riemann_data_j, p_1);
+      const Number dphi_p_1 =
           dphi(gamma, b, riemann_data_i, riemann_data_j, p_1);
-      const double phi_p_2 = phi(gamma, b, riemann_data_i, riemann_data_j, p_2);
-      const double dphi_p_2 =
+      const Number phi_p_2 = phi(gamma, b, riemann_data_i, riemann_data_j, p_2);
+      const Number dphi_p_2 =
           dphi(gamma, b, riemann_data_i, riemann_data_j, p_2);
 
       /*
@@ -460,26 +484,30 @@ namespace grendel
        * Compute divided differences
        */
 
-      const double dd_11 = dphi_p_1;
-      const double dd_12 = (phi_p_2 - phi_p_1) / (p_2 - p_1);
-      const double dd_22 = dphi_p_2;
+      const Number dd_11 = dphi_p_1;
+      const Number dd_12 = (phi_p_2 - phi_p_1) / (p_2 - p_1);
+      const Number dd_22 = dphi_p_2;
 
-      const double dd_112 = (dd_12 - dd_11) / (p_2 - p_1);
-      const double dd_122 = (dd_22 - dd_12) / (p_2 - p_1);
+      const Number dd_112 = (dd_12 - dd_11) / (p_2 - p_1);
+      const Number dd_122 = (dd_22 - dd_12) / (p_2 - p_1);
 
       /* Update left point: */
-      const double discriminant_1 = dphi_p_1 * dphi_p_1 - 4. * phi_p_1 * dd_112;
-      Assert(discriminant_1 > 0.,
+      const Number discriminant_1 =
+          dphi_p_1 * dphi_p_1 - Number(4.0) * phi_p_1 * dd_112;
+      Assert(discriminant_1 > 0.0,
              dealii::ExcMessage("Houston, we have a problem!"));
       if (discriminant_1 > 0.)
-        p_1 = p_1 - 2. * phi_p_1 / (dphi_p_1 + std::sqrt(discriminant_1));
+        p_1 = p_1 -
+              Number(2.0) * phi_p_1 / (dphi_p_1 + std::sqrt(discriminant_1));
 
       /* Update right point: */
-      const double discriminant_2 = dphi_p_2 * dphi_p_2 - 4. * phi_p_2 * dd_122;
-      Assert(discriminant_2 > 0.,
+      const Number discriminant_2 =
+          dphi_p_2 * dphi_p_2 - Number(4.0) * phi_p_2 * dd_122;
+      Assert(discriminant_2 > 0.0,
              dealii::ExcMessage("Houston, we have a problem!"));
       if (discriminant_2 > 0.)
-        p_2 = p_2 - 2. * phi_p_2 / (dphi_p_2 + std::sqrt(discriminant_2));
+        p_2 = p_2 -
+              Number(2.0) * phi_p_2 / (dphi_p_2 + std::sqrt(discriminant_2));
 
 
       /* We have found our root (up to roundoff erros): */
