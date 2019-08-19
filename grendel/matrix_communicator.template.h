@@ -13,12 +13,12 @@ namespace grendel
   using namespace dealii;
 
 
-  template <int dim>
-  MatrixCommunicator<dim>::MatrixCommunicator(
+  template <int dim, typename Number>
+  MatrixCommunicator<dim, Number>::MatrixCommunicator(
       const MPI_Comm &mpi_communicator,
       dealii::TimerOutput &computing_timer,
-      const grendel::OfflineData<dim> &offline_data,
-      dealii::SparseMatrix<double> &matrix)
+      const grendel::OfflineData<dim, Number> &offline_data,
+      dealii::SparseMatrix<Number> &matrix)
       : mpi_communicator_(mpi_communicator)
       , computing_timer_(computing_timer)
       , offline_data_(&offline_data)
@@ -27,8 +27,8 @@ namespace grendel
   }
 
 
-  template <int dim>
-  void MatrixCommunicator<dim>::prepare()
+  template <int dim, typename Number>
+  void MatrixCommunicator<dim, Number>::prepare()
   {
     const auto &dof_handler = offline_data_->dof_handler();
     const auto &sparsity = offline_data_->sparsity_pattern();
@@ -62,7 +62,7 @@ namespace grendel
       IndexSet locally_relevant;
       DoFTools::extract_locally_relevant_dofs(dof_handler, locally_relevant);
 
-      AffineConstraints<double> global_constraints(locally_relevant);
+      AffineConstraints<Number> global_constraints(locally_relevant);
 
       const auto n_periodic_faces =
           dof_handler.get_triangulation().get_periodic_face_map().size();
@@ -122,12 +122,12 @@ namespace grendel
     unsigned int n = sparsity.max_entries_per_row();
     n = Utilities::MPI::max(n, mpi_communicator_);
     matrix_temp_.resize(
-        n, dealii::LinearAlgebra::distributed::Vector<double>(partitioner));
+        n, dealii::LinearAlgebra::distributed::Vector<Number>(partitioner));
   }
 
 
-  template <int dim>
-  void MatrixCommunicator<dim>::synchronize()
+  template <int dim, typename Number>
+  void MatrixCommunicator<dim, Number>::synchronize()
   {
     const auto &n_locally_owned = offline_data_->n_locally_owned();
     const auto &n_locally_relevant = offline_data_->n_locally_relevant();

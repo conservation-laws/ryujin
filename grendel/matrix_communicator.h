@@ -11,14 +11,14 @@
 namespace grendel
 {
 
-  template <int dim>
+  template <int dim, typename Number = double>
   class MatrixCommunicator
   {
   public:
     MatrixCommunicator(const MPI_Comm &mpi_communicator,
                        dealii::TimerOutput &computing_timer,
-                       const grendel::OfflineData<dim> &offline_data,
-                       dealii::SparseMatrix<double> &matrix);
+                       const grendel::OfflineData<dim, Number> &offline_data,
+                       dealii::SparseMatrix<Number> &matrix);
 
     void prepare();
     void synchronize();
@@ -27,12 +27,12 @@ namespace grendel
     const MPI_Comm &mpi_communicator_;
     dealii::TimerOutput &computing_timer_;
 
-    dealii::SmartPointer<const grendel::OfflineData<dim>> offline_data_;
+    dealii::SmartPointer<const grendel::OfflineData<dim, Number>> offline_data_;
 
-    dealii::SparseMatrix<double> &matrix_;
+    dealii::SparseMatrix<Number> &matrix_;
 
     dealii::SparseMatrix<unsigned int> indices_;
-    std::vector<dealii::LinearAlgebra::distributed::Vector<double>>
+    std::vector<dealii::LinearAlgebra::distributed::Vector<Number>>
         matrix_temp_;
   };
 
