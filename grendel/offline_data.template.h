@@ -416,7 +416,7 @@ namespace grendel
           if (!discretization_->finite_element().has_support_on_face(j, f))
             continue;
 
-          dealii::Tensor<1, dim> normal;
+          dealii::Tensor<1, dim, Number> normal;
           if (id == Boundary::slip) {
             /*
              * Only accumulate a normal if the boundary indicator is for
