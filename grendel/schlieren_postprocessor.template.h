@@ -13,11 +13,11 @@ namespace grendel
   using namespace dealii;
 
 
-  template <int dim>
-  SchlierenPostprocessor<dim>::SchlierenPostprocessor(
+  template <int dim, typename Number>
+  SchlierenPostprocessor<dim, Number>::SchlierenPostprocessor(
       const MPI_Comm &mpi_communicator,
       dealii::TimerOutput &computing_timer,
-      const grendel::OfflineData<dim> &offline_data,
+      const grendel::OfflineData<dim, Number> &offline_data,
       const std::string &subsection /*= "SchlierenPostprocessor"*/)
       : ParameterAcceptor(subsection)
       , mpi_communicator_(mpi_communicator)
@@ -37,10 +37,10 @@ namespace grendel
   }
 
 
-  template <int dim>
-  void SchlierenPostprocessor<dim>::prepare()
+  template <int dim, typename Number>
+  void SchlierenPostprocessor<dim, Number>::prepare()
   {
-    deallog << "SchlierenPostprocessor<dim>::prepare()" << std::endl;
+    deallog << "SchlierenPostprocessor<dim, Number>::prepare()" << std::endl;
     TimerOutput::Scope t(computing_timer_,
                          "schlieren_postprocessor - prepare scratch space");
 
@@ -52,10 +52,12 @@ namespace grendel
   }
 
 
-  template <int dim>
-  void SchlierenPostprocessor<dim>::compute_schlieren(const vector_type &U)
+  template <int dim, typename Number>
+  void
+  SchlierenPostprocessor<dim, Number>::compute_schlieren(const vector_type &U)
   {
-    deallog << "SchlierenPostprocessor<dim>::compute_schlieren()" << std::endl;
+    deallog << "SchlierenPostprocessor<dim, Number>::compute_schlieren()"
+            << std::endl;
 
     TimerOutput::Scope t(computing_timer_,
                          "schlieren_postprocessor - compute schlieren plot");
@@ -74,13 +76,13 @@ namespace grendel
      * Step 1: Compute r_i and r_i_max, r_i_min:
      */
 
-    std::atomic<double> r_i_max{0.};
-    std::atomic<double> r_i_min{std::numeric_limits<double>::infinity()};
+    std::atomic<Number> r_i_max{0.};
+    std::atomic<Number> r_i_min{std::numeric_limits<Number>::infinity()};
 
     {
       const auto on_subranges = [&](auto i1, const auto i2) {
-        double r_i_max_on_subrange = 0.;
-        double r_i_min_on_subrange = std::numeric_limits<double>::infinity();
+        Number r_i_max_on_subrange = 0.;
+        Number r_i_min_on_subrange = std::numeric_limits<Number>::infinity();
 
         for (; i1 < i2; ++i1) {
           const auto i = *i1;
@@ -92,7 +94,7 @@ namespace grendel
           if (++sparsity.begin(i) == sparsity.end(i))
             continue;
 
-          Tensor<1, dim> r_i;
+          Tensor<1, dim, Number> r_i;
 
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
             const auto j = jt->column();
@@ -121,7 +123,7 @@ namespace grendel
             }
           }
 
-          const double m_i = lumped_mass_matrix.diag_element(i);
+          const Number m_i = lumped_mass_matrix.diag_element(i);
           r_i_[i] = r_i.norm() / m_i;
 
           r_i_max_on_subrange = std::max(r_i_max_on_subrange, r_i_[i]);
@@ -130,13 +132,13 @@ namespace grendel
 
         /* Synchronize over all threads: */
 
-        double current_r_i_max = r_i_max.load();
+        Number current_r_i_max = r_i_max.load();
         while (current_r_i_max < r_i_max_on_subrange &&
                !r_i_max.compare_exchange_weak(current_r_i_max,
                                               r_i_max_on_subrange))
           ;
 
-        double current_r_i_min = r_i_min.load();
+        Number current_r_i_min = r_i_min.load();
         while (current_r_i_min > r_i_min_on_subrange &&
                !r_i_min.compare_exchange_weak(current_r_i_min,
                                               r_i_min_on_subrange))
