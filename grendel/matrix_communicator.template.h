@@ -64,15 +64,18 @@ namespace grendel
 
       AffineConstraints<Number> global_constraints(locally_relevant);
 
-      const auto n_periodic_faces =
-          dof_handler.get_triangulation().get_periodic_face_map().size();
-      if (n_periodic_faces != 0) {
-        for (int i = 1; i < dim; ++i) /* omit x direction! */
-          DoFTools::make_periodicity_constraints(dof_handler,
-                                                 /*b_id */ Boundary::periodic,
-                                                 /*direction*/ i,
-                                                 global_constraints);
+      if constexpr (dim != 1 && std::is_same<Number, double>::value) { // FIXME
+        const auto n_periodic_faces =
+            dof_handler.get_triangulation().get_periodic_face_map().size();
+        if (n_periodic_faces != 0) {
+          for (int i = 1; i < dim; ++i) /* omit x direction! */
+            DoFTools::make_periodicity_constraints(dof_handler,
+                                                   /*b_id */ Boundary::periodic,
+                                                   /*direction*/ i,
+                                                   global_constraints);
+        }
       }
+
       DoFTools::make_hanging_node_constraints(dof_handler, global_constraints);
 
       global_constraints.close();
