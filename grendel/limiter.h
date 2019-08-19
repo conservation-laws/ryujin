@@ -39,7 +39,8 @@ namespace grendel
 
     static constexpr unsigned int relaxation_order_ = 3;
 
-    static constexpr ScalarNumber line_search_eps_ = 1.e-8;
+    static constexpr ScalarNumber line_search_eps_ =
+        std::is_same<Number, double>::value ? 1.0e-8 : 1.0e-4;
 
     static constexpr unsigned int line_search_max_iter_ = 10;
 

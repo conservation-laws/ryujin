@@ -422,15 +422,6 @@ namespace grendel
     Number p_2 =
         (phi_p_max < 0.) ? p_star_tilde : std::min(p_max, p_star_tilde);
 
-#if DEBUG
-    {
-      const Number phi_p_1 = phi(gamma, b, riemann_data_i, riemann_data_j, p_1);
-      const Number phi_p_2 = phi(gamma, b, riemann_data_i, riemann_data_j, p_2);
-      Assert(phi_p_1 <= 0. && phi_p_2 >= 0.,
-             dealii::ExcMessage("Houston, we have a problem!"));
-    }
-#endif
-
     /*
      * Step 4: Perform quadratic Newton iteration.
      *
@@ -455,6 +446,17 @@ namespace grendel
        */
       if (i + 1 >= max_iter)
         return {lambda_max, p_2, std::numeric_limits<unsigned int>::max()};
+
+#if DEBUG
+      {
+        const Number phi_p_1 =
+            phi(gamma, b, riemann_data_i, riemann_data_j, p_1);
+        const Number phi_p_2 =
+            phi(gamma, b, riemann_data_i, riemann_data_j, p_2);
+        Assert(phi_p_1 <= 0. && phi_p_2 >= 0.,
+               dealii::ExcMessage("Houston, we have a problem!"));
+      }
+#endif
 
       /*
        * This is expensive:
