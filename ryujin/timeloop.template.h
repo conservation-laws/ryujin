@@ -315,6 +315,9 @@ namespace ryujin
 
     deallog << "Compile time parameters:" << std::endl;
 
+    deallog << "DIM == " << dim << std::endl;
+    deallog << "NUMBER == " << typeid(Number).name() << std::endl;
+
     deallog << "Indicator<dim, Number>::indicators_ == ";
     switch (Indicator<dim, Number>::indicator_) {
     case Indicator<dim, Number>::Indicators::zero:
