@@ -23,9 +23,9 @@
 #include <valgrind/callgrind.h>
 #endif
 
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
-#include <filesystem>
 
 
 using namespace dealii;
@@ -67,8 +67,8 @@ namespace
 namespace ryujin
 {
 
-  template <int dim>
-  TimeLoop<dim>::TimeLoop(const MPI_Comm &mpi_comm)
+  template <int dim, typename Number>
+  TimeLoop<dim, Number>::TimeLoop(const MPI_Comm &mpi_comm)
       : ParameterAcceptor("A - TimeLoop")
       , mpi_communicator(mpi_comm)
       , computing_timer(mpi_communicator,
@@ -119,15 +119,14 @@ namespace ryujin
   }
 
 
-
-  template <int dim>
-  void TimeLoop<dim>::run()
+  template <int dim, typename Number>
+  void TimeLoop<dim, Number>::run()
   {
     /* Initialize deallog: */
 
     initialize();
 
-    deallog << "TimeLoop<dim>::run()" << std::endl;
+    deallog << "TimeLoop<dim, Number>::run()" << std::endl;
 
     /* Create distributed triangulation and output the triangulation: */
 
@@ -156,7 +155,7 @@ namespace ryujin
 
     print_head("interpolate initial values");
 
-    double t = 0.;
+    Number t = 0.;
     unsigned int output_cycle = 0;
     auto U = interpolate_initial_values();
 
@@ -264,8 +263,8 @@ namespace ryujin
   /**
    * Set up deallog output, read in parameters and initialize all objects.
    */
-  template <int dim>
-  void TimeLoop<dim>::initialize()
+  template <int dim, typename Number>
+  void TimeLoop<dim, Number>::initialize()
   {
     /* Read in parameters and initialize all objects: */
 
@@ -316,89 +315,89 @@ namespace ryujin
 
     deallog << "Compile time parameters:" << std::endl;
 
-    deallog << "Indicator<dim>::indicators_ == ";
-    switch (Indicator<dim>::indicator_) {
-    case Indicator<dim>::Indicators::zero:
-      deallog << "Indicator<dim>::Indicators::zero" << std::endl;
+    deallog << "Indicator<dim, Number>::indicators_ == ";
+    switch (Indicator<dim, Number>::indicator_) {
+    case Indicator<dim, Number>::Indicators::zero:
+      deallog << "Indicator<dim, Number>::Indicators::zero" << std::endl;
       break;
-    case Indicator<dim>::Indicators::one:
-      deallog << "Indicator<dim>::Indicators::one" << std::endl;
+    case Indicator<dim, Number>::Indicators::one:
+      deallog << "Indicator<dim, Number>::Indicators::one" << std::endl;
       break;
-    case Indicator<dim>::Indicators::entropy_viscosity_commutator:
-      deallog << "Indicator<dim>::Indicators::entropy_viscosity_commutator" << std::endl;
+    case Indicator<dim, Number>::Indicators::entropy_viscosity_commutator:
+      deallog << "Indicator<dim, Number>::Indicators::entropy_viscosity_commutator" << std::endl;
       break;
-    case Indicator<dim>::Indicators::smoothness_indicator:
-      deallog << "Indicator<dim>::Indicators::smoothness_indicator" << std::endl;
+    case Indicator<dim, Number>::Indicators::smoothness_indicator:
+      deallog << "Indicator<dim, Number>::Indicators::smoothness_indicator" << std::endl;
     }
 
-    deallog << "Indicator<dim>::smoothness_indicator_ == ";
-    switch (Indicator<dim>::smoothness_indicator_) {
-    case Indicator<dim>::SmoothnessIndicators::rho:
-      deallog << "Indicator<dim>::SmoothnessIndicators::rho" << std::endl;
+    deallog << "Indicator<dim, Number>::smoothness_indicator_ == ";
+    switch (Indicator<dim, Number>::smoothness_indicator_) {
+    case Indicator<dim, Number>::SmoothnessIndicators::rho:
+      deallog << "Indicator<dim, Number>::SmoothnessIndicators::rho" << std::endl;
       break;
-    case Indicator<dim>::SmoothnessIndicators::internal_energy:
-      deallog << "Indicator<dim>::SmoothnessIndicators::internal_energy" << std::endl;
+    case Indicator<dim, Number>::SmoothnessIndicators::internal_energy:
+      deallog << "Indicator<dim, Number>::SmoothnessIndicators::internal_energy" << std::endl;
       break;
-    case Indicator<dim>::SmoothnessIndicators::pressure:
-      deallog << "Indicator<dim>::SmoothnessIndicators::pressure" << std::endl;
+    case Indicator<dim, Number>::SmoothnessIndicators::pressure:
+      deallog << "Indicator<dim, Number>::SmoothnessIndicators::pressure" << std::endl;
     }
 
-    deallog << "Indicator<dim>::smoothness_indicator_alpha_0_ == "
-            << Indicator<dim>::smoothness_indicator_alpha_0_ << std::endl;
+    deallog << "Indicator<dim, Number>::smoothness_indicator_alpha_0_ == "
+            << Indicator<dim, Number>::smoothness_indicator_alpha_0_ << std::endl;
 
-    deallog << "Indicator<dim>::smoothness_indicator_power_ == "
-            << Indicator<dim>::smoothness_indicator_power_ << std::endl;
+    deallog << "Indicator<dim, Number>::smoothness_indicator_power_ == "
+            << Indicator<dim, Number>::smoothness_indicator_power_ << std::endl;
 
-    deallog << "Indicator<dim>::compute_second_variations_ == "
-            << Indicator<dim>::compute_second_variations_ << std::endl;
+    deallog << "Indicator<dim, Number>::compute_second_variations_ == "
+            << Indicator<dim, Number>::compute_second_variations_ << std::endl;
 
-    deallog << "Limiter<dim>::limiter_ == ";
-    switch (Limiter<dim>::limiter_) {
-    case Limiter<dim>::Limiters::none:
-      deallog << "Limiter<dim>::Limiters::none" << std::endl;
+    deallog << "Limiter<dim, Number>::limiter_ == ";
+    switch (Limiter<dim, Number>::limiter_) {
+    case Limiter<dim, Number>::Limiters::none:
+      deallog << "Limiter<dim, Number>::Limiters::none" << std::endl;
       break;
-    case Limiter<dim>::Limiters::rho:
-      deallog << "Limiter<dim>::Limiters::rho" << std::endl;
+    case Limiter<dim, Number>::Limiters::rho:
+      deallog << "Limiter<dim, Number>::Limiters::rho" << std::endl;
       break;
-    case Limiter<dim>::Limiters::internal_energy:
-      deallog << "Limiter<dim>::Limiters::internal_energy" << std::endl;
+    case Limiter<dim, Number>::Limiters::internal_energy:
+      deallog << "Limiter<dim, Number>::Limiters::internal_energy" << std::endl;
       break;
-    case Limiter<dim>::Limiters::specific_entropy:
-      deallog << "Limiter<dim>::Limiters::specific_entropy" << std::endl;
+    case Limiter<dim, Number>::Limiters::specific_entropy:
+      deallog << "Limiter<dim, Number>::Limiters::specific_entropy" << std::endl;
     }
 
-    deallog << "Limiter<dim>::relax_bounds_ == "
-            << Limiter<dim>::relax_bounds_ << std::endl;
+    deallog << "Limiter<dim, Number>::relax_bounds_ == "
+            << Limiter<dim, Number>::relax_bounds_ << std::endl;
 
-    deallog << "Limiter<dim>::relaxation_order_ == "
-            << Limiter<dim>::relaxation_order_ << std::endl;
+    deallog << "Limiter<dim, Number>::relaxation_order_ == "
+            << Limiter<dim, Number>::relaxation_order_ << std::endl;
 
-    deallog << "Limiter<dim>::line_search_eps_ == "
-            << Limiter<dim>::line_search_eps_ << std::endl;
+    deallog << "Limiter<dim, Number>::line_search_eps_ == "
+            << Limiter<dim, Number>::line_search_eps_ << std::endl;
 
-    deallog << "Limiter<dim>::line_search_max_iter_ == "
-            << Limiter<dim>::line_search_max_iter_ << std::endl;
+    deallog << "Limiter<dim, Number>::line_search_max_iter_ == "
+            << Limiter<dim, Number>::line_search_max_iter_ << std::endl;
 
-    deallog << "RiemannSolver<dim>::newton_eps_ == "
-            <<  RiemannSolver<dim>::newton_eps_ << std::endl;
+    deallog << "RiemannSolver<dim, Number>::newton_eps_ == "
+            <<  RiemannSolver<dim, Number>::newton_eps_ << std::endl;
 
-    deallog << "RiemannSolver<dim>::newton_max_iter_ == "
-            <<  RiemannSolver<dim>::newton_eps_ << std::endl;
+    deallog << "RiemannSolver<dim, Number>::newton_max_iter_ == "
+            <<  RiemannSolver<dim, Number>::newton_eps_ << std::endl;
 
-    deallog << "TimeStep<dim>::order_ == ";
-    switch (TimeStep<dim>::order_) {
-    case TimeStep<dim>::Order::first_order:
-      deallog << "TimeStep<dim>::Order::first_order" << std::endl;
+    deallog << "TimeStep<dim, Number>::order_ == ";
+    switch (TimeStep<dim, Number>::order_) {
+    case TimeStep<dim, Number>::Order::first_order:
+      deallog << "TimeStep<dim, Number>::Order::first_order" << std::endl;
       break;
-    case TimeStep<dim>::Order::second_order:
-      deallog << "TimeStep<dim>::Order::second_order" << std::endl;
+    case TimeStep<dim, Number>::Order::second_order:
+      deallog << "TimeStep<dim, Number>::Order::second_order" << std::endl;
     }
 
-    deallog << "TimeStep<dim>::smoothen_alpha_ == "
-            <<  TimeStep<dim>::smoothen_alpha_ << std::endl;
+    deallog << "TimeStep<dim, Number>::smoothen_alpha_ == "
+            <<  TimeStep<dim, Number>::smoothen_alpha_ << std::endl;
 
-    deallog << "TimeStep<dim>::limiter_iter_ == "
-            <<  TimeStep<dim>::limiter_iter_ << std::endl;
+    deallog << "TimeStep<dim, Number>::limiter_iter_ == "
+            <<  TimeStep<dim, Number>::limiter_iter_ << std::endl;
 
     /* clang-format on */
 
@@ -416,16 +415,15 @@ namespace ryujin
     deallog.depth_console(2);
     deallog.depth_file(2);
 #endif
-
   }
 
 
-  template <int dim>
-  typename TimeLoop<dim>::vector_type
-  TimeLoop<dim>::interpolate_initial_values(double t)
+  template <int dim, typename Number>
+  typename TimeLoop<dim, Number>::vector_type
+  TimeLoop<dim, Number>::interpolate_initial_values(Number t)
   {
-    deallog << "TimeLoop<dim>::interpolate_initial_values(t = " << t << ")"
-            << std::endl;
+    deallog << "TimeLoop<dim, Number>::interpolate_initial_values(t = " << t
+            << ")" << std::endl;
     TimerOutput::Scope timer(computing_timer,
                              "time_loop - setup scratch space");
 
@@ -436,7 +434,7 @@ namespace ryujin
       it.reinit(partitioner);
 
     constexpr auto problem_dimension =
-        ProblemDescription<dim>::problem_dimension;
+        ProblemDescription<dim, Number>::problem_dimension;
 
     const auto callable = [&](const auto &p) {
       return initial_values.initial_state(p, t);
@@ -444,7 +442,7 @@ namespace ryujin
 
     for (unsigned int i = 0; i < problem_dimension; ++i)
       VectorTools::interpolate(offline_data.dof_handler(),
-                               to_function<dim, double>(callable, i),
+                               to_function<dim, Number>(callable, i),
                                U[i]);
 
     for (auto &it : U)
@@ -454,25 +452,24 @@ namespace ryujin
   }
 
 
-  template <int dim>
-  void
-  TimeLoop<dim>::compute_error(const typename TimeLoop<dim>::vector_type &U,
-                               const double t)
+  template <int dim, typename Number>
+  void TimeLoop<dim, Number>::compute_error(
+      const typename TimeLoop<dim, Number>::vector_type &U, const Number t)
   {
-    deallog << "TimeLoop<dim>::compute_error()" << std::endl;
+    deallog << "TimeLoop<dim, Number>::compute_error()" << std::endl;
     TimerOutput::Scope timer(computing_timer, "time_loop - compute error");
 
     constexpr auto problem_dimension =
-        ProblemDescription<dim>::problem_dimension;
+        ProblemDescription<dim, Number>::problem_dimension;
 
     /* Compute L_inf norm: */
 
     Vector<float> difference_per_cell(
         discretization.triangulation().n_active_cells());
 
-    double linf_norm = 0.;
-    double l1_norm = 0;
-    double l2_norm = 0;
+    Number linf_norm = 0.;
+    Number l1_norm = 0;
+    Number l2_norm = 0;
 
     auto analytic = interpolate_initial_values(t);
 
@@ -481,7 +478,7 @@ namespace ryujin
 
       /* Compute norms of analytic solution: */
 
-      const double linf_norm_analytic =
+      const Number linf_norm_analytic =
           Utilities::MPI::max(error.linfty_norm(), mpi_communicator);
 
       VectorTools::integrate_difference(offline_data.dof_handler(),
@@ -491,7 +488,7 @@ namespace ryujin
                                         QGauss<dim>(3),
                                         VectorTools::L1_norm);
 
-      const double l1_norm_analytic =
+      const Number l1_norm_analytic =
           Utilities::MPI::sum(difference_per_cell.l1_norm(), mpi_communicator);
 
       VectorTools::integrate_difference(offline_data.dof_handler(),
@@ -501,14 +498,14 @@ namespace ryujin
                                         QGauss<dim>(3),
                                         VectorTools::L2_norm);
 
-      const double l2_norm_analytic = std::sqrt(Utilities::MPI::sum(
+      const Number l2_norm_analytic = std::sqrt(Utilities::MPI::sum(
           std::pow(difference_per_cell.l2_norm(), 2), mpi_communicator));
 
       /* Compute norms of error: */
 
       error -= U[i];
 
-      const double linf_norm_error =
+      const Number linf_norm_error =
           Utilities::MPI::max(error.linfty_norm(), mpi_communicator);
 
       VectorTools::integrate_difference(offline_data.dof_handler(),
@@ -518,7 +515,7 @@ namespace ryujin
                                         QGauss<dim>(3),
                                         VectorTools::L1_norm);
 
-      const double l1_norm_error =
+      const Number l1_norm_error =
           Utilities::MPI::sum(difference_per_cell.l1_norm(), mpi_communicator);
 
       VectorTools::integrate_difference(offline_data.dof_handler(),
@@ -528,7 +525,7 @@ namespace ryujin
                                         QGauss<dim>(3),
                                         VectorTools::L2_norm);
 
-      const double l2_norm_error = std::sqrt(Utilities::MPI::sum(
+      const Number l2_norm_error = std::sqrt(Utilities::MPI::sum(
           std::pow(difference_per_cell.l2_norm(), 2), mpi_communicator));
 
       linf_norm += linf_norm_error / linf_norm_analytic;
@@ -547,14 +544,15 @@ namespace ryujin
   }
 
 
-  template <int dim>
-  void TimeLoop<dim>::output(const typename TimeLoop<dim>::vector_type &U,
-                             const std::string &name,
-                             double t,
-                             unsigned int cycle,
-                             bool checkpoint)
+  template <int dim, typename Number>
+  void TimeLoop<dim, Number>::output(
+      const typename TimeLoop<dim, Number>::vector_type &U,
+      const std::string &name,
+      Number t,
+      unsigned int cycle,
+      bool checkpoint)
   {
-    deallog << "TimeLoop<dim>::output(t = " << t
+    deallog << "TimeLoop<dim, Number>::output(t = " << t
             << ", checkpoint = " << checkpoint << ")" << std::endl;
 
     /*
@@ -574,8 +572,9 @@ namespace ryujin
     /* Copy the current state vector over to output_vector: */
 
     constexpr auto problem_dimension =
-        ProblemDescription<dim>::problem_dimension;
-    const auto &component_names = ProblemDescription<dim>::component_names;
+        ProblemDescription<dim, Number>::problem_dimension;
+    const auto &component_names =
+        ProblemDescription<dim, Number>::component_names;
     const auto &affine_constraints = offline_data.affine_constraints();
 
     /* Distribute hanging nodes: */
@@ -597,7 +596,7 @@ namespace ryujin
     /* capture name, t, cycle by value */
     const auto output_worker = [this, name, t, cycle, checkpoint]() {
       constexpr auto problem_dimension =
-          ProblemDescription<dim>::problem_dimension;
+          ProblemDescription<dim, Number>::problem_dimension;
       const auto &dof_handler = offline_data.dof_handler();
       const auto &triangulation = discretization.triangulation();
       const auto &mapping = discretization.mapping();

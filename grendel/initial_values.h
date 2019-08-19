@@ -49,14 +49,14 @@ namespace grendel
      * configuration and want to compare the numerical computation against
      * it.
      */
-    const std::function<rank1_type(const dealii::Point<dim, Number> &point,
+    const std::function<rank1_type(const dealii::Point<dim> &point,
                                    Number t)> &initial_state;
 
 
   private:
     std::string configuration_;
 
-    dealii::Point<dim, Number> initial_position_;
+    dealii::Point<dim> initial_position_;
     dealii::Tensor<1, dim, Number> initial_direction_;
 
     dealii::Tensor<1, 3, Number> initial_1d_state_;
@@ -70,7 +70,7 @@ namespace grendel
      * Internal function object that we used to implement the
      * internal_state function for all internal states:
      */
-    std::function<rank1_type(const dealii::Point<dim, Number> &point, Number t)>
+    std::function<rank1_type(const dealii::Point<dim> &point, Number t)>
         initial_state_;
   };
 

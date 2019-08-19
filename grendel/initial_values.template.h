@@ -105,7 +105,7 @@ namespace grendel
        * A uniform flow:
        */
 
-      initial_state_ = [=](const dealii::Point<dim, Number> & /*point*/,
+      initial_state_ = [=](const dealii::Point<dim> & /*point*/,
                            Number /*t*/) {
         return from_1d_state(initial_1d_state_);
       };
@@ -136,7 +136,7 @@ namespace grendel
 
       dealii::Tensor<1, 3, Number> initial_1d_state_L{{rho_L, u_L, p_L}};
 
-      initial_state_ = [=](const dealii::Point<dim, Number> &point, Number t) {
+      initial_state_ = [=](const dealii::Point<dim> &point, Number t) {
         const Number position_1d =
             (point - initial_position_) * initial_direction_ - S3 * t;
 
@@ -156,7 +156,7 @@ namespace grendel
       dealii::Tensor<1, 3, Number> initial_1d_state_L{{0.125, 0.0, 0.1}};
       dealii::Tensor<1, 3, Number> initial_1d_state_R{{1.0, 0.0, 1.0}};
 
-      initial_state_ = [=](const dealii::Point<dim, Number> &point,
+      initial_state_ = [=](const dealii::Point<dim> &point,
                            Number /*t*/) {
         const Number position_1d =
             (point - initial_position_) * initial_direction_;
@@ -176,7 +176,7 @@ namespace grendel
        */
 
       if constexpr (dim == 2) {
-        initial_state_ = [=](const dealii::Point<dim, Number> &point,
+        initial_state_ = [=](const dealii::Point<dim> &point,
                              Number t) {
           const auto point_bar = point - initial_position_ -
                                  initial_direction_ * initial_mach_number_ * t;
@@ -216,7 +216,7 @@ namespace grendel
     if (perturbation_ != 0.) {
       initial_state_ = [old_state = this->initial_state_,
                         perturbation = this->perturbation_](
-                           const dealii::Point<dim, Number> &point, Number t) {
+                           const dealii::Point<dim> &point, Number t) {
         static std::default_random_engine generator;
         static std::uniform_real_distribution<Number> distribution(-1., 1.);
         auto draw = std::bind(distribution, generator);

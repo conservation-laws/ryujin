@@ -109,7 +109,7 @@ namespace grendel
     std::map<dealii::types::global_dof_index,
              std::tuple<dealii::Tensor<1, dim, Number>,
                         dealii::types::boundary_id,
-                        dealii::Point<dim, Number>>>
+                        dealii::Point<dim>>>
         boundary_normal_map_;
     ACCESSOR_READ_ONLY(boundary_normal_map)
 

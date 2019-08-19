@@ -15,11 +15,11 @@
 namespace ryujin
 {
 
-  template <int dim>
+  template <int dim, typename Number = double>
   class TimeLoop : public dealii::ParameterAcceptor
   {
   public:
-    using vector_type = typename grendel::TimeStep<dim>::vector_type;
+    using vector_type = typename grendel::TimeStep<dim, Number>::vector_type;
 
     TimeLoop(const MPI_Comm &mpi_comm);
     virtual ~TimeLoop() final = default;
@@ -31,13 +31,13 @@ namespace ryujin
 
     void initialize();
 
-    vector_type interpolate_initial_values(double t = 0);
+    vector_type interpolate_initial_values(Number t = 0);
 
-    void compute_error(const vector_type &U, double t);
+    void compute_error(const vector_type &U, Number t);
 
     void output(const vector_type &U,
                 const std::string &name,
-                double t,
+                Number t,
                 unsigned int cycle,
                 bool checkpoint = false);
 
@@ -48,25 +48,25 @@ namespace ryujin
     dealii::TimerOutput computing_timer;
 
     std::string base_name;
-    double t_final;
-    double output_granularity;
+    Number t_final;
+    Number output_granularity;
     bool enable_detailed_output;
     bool enable_compute_error;
 
     bool resume;
 
     grendel::Discretization<dim> discretization;
-    grendel::OfflineData<dim> offline_data;
-    grendel::InitialValues<dim> initial_values;
-    grendel::TimeStep<dim> time_step;
-    grendel::SchlierenPostprocessor<dim> schlieren_postprocessor;
+    grendel::OfflineData<dim, Number> offline_data;
+    grendel::InitialValues<dim, Number> initial_values;
+    grendel::TimeStep<dim, Number> time_step;
+    grendel::SchlierenPostprocessor<dim, Number> schlieren_postprocessor;
 
     std::unique_ptr<std::ofstream> filestream;
 
     /* Data for output management: */
     std::thread output_thread;
     vector_type output_vector;
-    dealii::LinearAlgebra::distributed::Vector<double> output_alpha;
+    dealii::LinearAlgebra::distributed::Vector<Number> output_alpha;
   };
 
 } // namespace ryujin
