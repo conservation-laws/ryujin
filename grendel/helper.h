@@ -17,7 +17,7 @@ namespace grendel
    * vector. Thus, this little workaround.
    */
   template <typename Matrix, typename Iterator>
-  inline DEAL_II_ALWAYS_INLINE typename Matrix::value_type
+  DEAL_II_ALWAYS_INLINE inline typename Matrix::value_type
   get_entry(const Matrix &matrix, const Iterator &it)
   {
     const auto global_index = it->global_index();
@@ -31,7 +31,7 @@ namespace grendel
    * It's magic
    */
   template <typename Matrix, typename Iterator>
-  inline DEAL_II_ALWAYS_INLINE void set_entry(Matrix &matrix,
+  DEAL_II_ALWAYS_INLINE inline void set_entry(Matrix &matrix,
                                               const Iterator &it,
                                               typename Matrix::value_type value)
   {
@@ -45,7 +45,7 @@ namespace grendel
    * It's magic
    */
   template <typename T1, std::size_t k, typename T2>
-  inline DEAL_II_ALWAYS_INLINE dealii::Tensor<1, k>
+  DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, k>
   gather_get_entry(const std::array<T1, k> &U, const T2 it)
   {
     dealii::Tensor<1, k> result;
@@ -61,7 +61,7 @@ namespace grendel
    * FIXME: k versus l
    */
   template <typename T1, std::size_t k, int l, typename T2>
-  inline DEAL_II_ALWAYS_INLINE void scatter_set_entry(
+  DEAL_II_ALWAYS_INLINE inline void scatter_set_entry(
       std::array<T1, k> &U, const T2 it, const dealii::Tensor<1, l> &V)
   {
     for (unsigned int j = 0; j < k; ++j)
@@ -73,7 +73,7 @@ namespace grendel
    * It's magic
    */
   template <typename T1, std::size_t k, typename T2, typename T3>
-  inline DEAL_II_ALWAYS_INLINE dealii::Tensor<1, k>
+  DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, k>
   gather(const std::array<T1, k> &U, const T2 i, const T3 l)
   {
     dealii::Tensor<1, k> result;
@@ -87,7 +87,7 @@ namespace grendel
    * It's magic
    */
   template <typename T1, std::size_t k, typename T2>
-  inline DEAL_II_ALWAYS_INLINE dealii::Tensor<1, k>
+  DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, k>
   gather(const std::array<T1, k> &U, const T2 i)
   {
     dealii::Tensor<1, k> result;
@@ -101,10 +101,10 @@ namespace grendel
    * It's magic
    */
   template <typename T1, std::size_t k, typename T2>
-  inline DEAL_II_ALWAYS_INLINE std::array<double, k>
+  DEAL_II_ALWAYS_INLINE inline std::array<typename T1::value_type, k>
   gather_array(const std::array<T1, k> &U, const T2 i)
   {
-    std::array<double, k> result;
+    std::array<typename T1::value_type, k> result;
     for (unsigned int j = 0; j < k; ++j)
       result[j] = U[j].local_element(i);
     return result;
@@ -116,7 +116,7 @@ namespace grendel
    */
 
   template <typename T1, std::size_t k1, typename T2, typename T3>
-  inline DEAL_II_ALWAYS_INLINE void
+  DEAL_II_ALWAYS_INLINE inline void
   scatter(std::array<T1, k1> &U, const T2 &result, const T3 i)
   {
     for (unsigned int j = 0; j < k1; ++j)

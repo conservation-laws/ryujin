@@ -19,12 +19,13 @@ namespace grendel
   using namespace dealii;
 
 
-  template <int dim>
-  TimeStep<dim>::TimeStep(const MPI_Comm &mpi_communicator,
-                          dealii::TimerOutput &computing_timer,
-                          const grendel::OfflineData<dim> &offline_data,
-                          const grendel::InitialValues<dim> &initial_values,
-                          const std::string &subsection /*= "TimeStep"*/)
+  template <int dim, typename Number>
+  TimeStep<dim, Number>::TimeStep(
+      const MPI_Comm &mpi_communicator,
+      dealii::TimerOutput &computing_timer,
+      const grendel::OfflineData<dim, Number> &offline_data,
+      const grendel::InitialValues<dim, Number> &initial_values,
+      const std::string &subsection /*= "TimeStep"*/)
       : ParameterAcceptor(subsection)
       , mpi_communicator_(mpi_communicator)
       , computing_timer_(computing_timer)
@@ -47,10 +48,10 @@ namespace grendel
   }
 
 
-  template <int dim>
-  void TimeStep<dim>::prepare()
+  template <int dim, typename Number>
+  void TimeStep<dim, Number>::prepare()
   {
-    deallog << "TimeStep<dim>::prepare()" << std::endl;
+    deallog << "TimeStep<dim, Number>::prepare()" << std::endl;
     TimerOutput::Scope time(computing_timer_,
                             "time_step - prepare scratch space");
 
@@ -91,10 +92,10 @@ namespace grendel
   }
 
 
-  template <int dim>
-  double TimeStep<dim>::euler_step(vector_type &U, double t, double tau)
+  template <int dim, typename Number>
+  Number TimeStep<dim, Number>::euler_step(vector_type &U, Number t, Number tau)
   {
-    deallog << "TimeStep<dim>::euler_step()" << std::endl;
+    deallog << "TimeStep<dim, Number>::euler_step()" << std::endl;
 
 #ifdef CALLGRIND
     CALLGRIND_START_INSTRUMENTATION;
@@ -118,7 +119,7 @@ namespace grendel
     const auto &cij_matrix = offline_data_->cij_matrix();
 
     const auto &boundary_normal_map = offline_data_->boundary_normal_map();
-    const double measure_of_omega = offline_data_->measure_of_omega();
+    const Number measure_of_omega = offline_data_->measure_of_omega();
 
     /*
      * Step 1: Compute off-diagonal d_ij, and alpha_i
@@ -131,7 +132,7 @@ namespace grendel
 
       const auto on_subranges = [&](auto i1, const auto i2) {
         /* Stored thread locally: */
-        Indicator<dim> indicator(*offline_data_);
+        Indicator<dim, Number> indicator(*offline_data_);
 
         for (const auto i : boost::make_iterator_range(i1, i2)) {
 
@@ -158,12 +159,12 @@ namespace grendel
               continue;
 
             const auto n_ij = gather_get_entry(nij_matrix, jt);
-            const double norm = get_entry(norm_matrix, jt);
+            const Number norm = get_entry(norm_matrix, jt);
 
             const auto [lambda_max, p_star, n_iterations] =
-                RiemannSolver<dim>::compute(U_i, U_j, n_ij);
+                RiemannSolver<dim, Number>::compute(U_i, U_j, n_ij);
 
-            double d = norm * lambda_max;
+            Number d = norm * lambda_max;
 
             /*
              * In case both dofs are located at the boundary we have to
@@ -174,8 +175,8 @@ namespace grendel
                 boundary_normal_map.count(j) != 0) {
               const auto n_ji = gather(nij_matrix, j, i);
               auto [lambda_max_2, p_star_2, n_iterations_2] =
-                  RiemannSolver<dim>::compute(U_j, U_i, n_ji);
-              const double norm_2 = norm_matrix(j, i);
+                  RiemannSolver<dim, Number>::compute(U_j, U_i, n_ji);
+              const Number norm_2 = norm_matrix(j, i);
               d = std::max(d, norm_2 * lambda_max_2);
             }
 
@@ -188,8 +189,8 @@ namespace grendel
           rho_second_variation_.local_element(i) =
               indicator.rho_second_variation();
 
-          const double mass = lumped_mass_matrix.diag_element(i);
-          const double hd_i = mass / measure_of_omega;
+          const Number mass = lumped_mass_matrix.diag_element(i);
+          const Number hd_i = mass / measure_of_omega;
           alpha_.local_element(i) = indicator.alpha(hd_i);
         }
       };
@@ -207,7 +208,7 @@ namespace grendel
      * Step 2: Compute diagonal of d_ij, and maximal time-step size.
      */
 
-    std::atomic<double> tau_max{std::numeric_limits<double>::infinity()};
+    std::atomic<Number> tau_max{std::numeric_limits<Number>::infinity()};
 
     {
       deallog << "        compute d_ii, and tau_max" << std::endl;
@@ -215,7 +216,7 @@ namespace grendel
                               "time_step - 2 compute d_ii, and tau_max");
 
       const auto on_subranges = [&](auto i1, const auto i2) {
-        double tau_max_on_subrange = std::numeric_limits<double>::infinity();
+        Number tau_max_on_subrange = std::numeric_limits<Number>::infinity();
 
         for (const auto i : boost::make_iterator_range(i1, i2)) {
 
@@ -223,12 +224,12 @@ namespace grendel
           if (++sparsity.begin(i) == sparsity.end(i))
             continue;
 
-          const double delta_rho_i = rho_second_variation_.local_element(i);
+          const Number delta_rho_i = rho_second_variation_.local_element(i);
 
-          double alpha_i = 0.;
-          double d_sum = 0.;
-          double rho_relaxation_numerator = 0.;
-          double rho_relaxation_denominator = 0.;
+          Number alpha_i = 0.;
+          Number d_sum = 0.;
+          Number rho_relaxation_numerator = 0.;
+          Number rho_relaxation_denominator = 0.;
 
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
             const auto j = jt->column();
@@ -241,7 +242,7 @@ namespace grendel
             if (j == i)
               continue;
 
-            const double delta_rho_j = rho_second_variation_.local_element(j);
+            const Number delta_rho_j = rho_second_variation_.local_element(j);
             const auto beta_ij = get_entry(betaij_matrix, jt);
 
             /* The numerical constant 8 is up to debate... */
@@ -253,7 +254,7 @@ namespace grendel
           }
 
           if constexpr (smoothen_alpha_) {
-            const double m_i = lumped_mass_matrix.diag_element(i);
+            const Number m_i = lumped_mass_matrix.diag_element(i);
             alpha_.local_element(i) = alpha_i / m_i;
           }
 
@@ -262,12 +263,12 @@ namespace grendel
 
           dij_matrix_.diag_element(i) = d_sum;
 
-          const double mass = lumped_mass_matrix.diag_element(i);
-          const double tau = cfl_update_ * mass / (-2. * d_sum);
+          const Number mass = lumped_mass_matrix.diag_element(i);
+          const Number tau = cfl_update_ * mass / (-2. * d_sum);
           tau_max_on_subrange = std::min(tau_max_on_subrange, tau);
         }
 
-        double current_tau_max = tau_max.load();
+        Number current_tau_max = tau_max.load();
         while (current_tau_max > tau_max_on_subrange &&
                !tau_max.compare_exchange_weak(current_tau_max,
                                               tau_max_on_subrange))
@@ -318,7 +319,7 @@ namespace grendel
 
       const auto on_subranges = [&](auto i1, const auto i2) {
         /* Notar bene: This bounds variable is thread local: */
-        Limiter<dim> limiter;
+        Limiter<dim, Number> limiter;
 
         for (const auto i : boost::make_iterator_range(i1, i2)) {
 
@@ -332,12 +333,12 @@ namespace grendel
           const auto U_i = gather(U, i);
           auto U_i_new = U_i;
 
-          const auto f_i = ProblemDescription<dim>::f(U_i);
+          const auto f_i = ProblemDescription<dim, Number>::f(U_i);
           const auto alpha_i = alpha_.local_element(i);
-          const double m_i = lumped_mass_matrix.diag_element(i);
+          const Number m_i = lumped_mass_matrix.diag_element(i);
 
           const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
-          const double lambda = 1. / (size - 1.);
+          const Number lambda = 1. / (size - 1.);
 
           rank1_type r_i;
 
@@ -348,17 +349,17 @@ namespace grendel
             const auto j = jt->column();
 
             const auto U_j = gather(U, j);
-            const auto f_j = ProblemDescription<dim>::f(U_j);
+            const auto f_j = ProblemDescription<dim, Number>::f(U_j);
             const auto alpha_j = alpha_.local_element(j);
 
             const auto c_ij = gather_get_entry(cij_matrix, jt);
             const auto d_ij = get_entry(dij_matrix_, jt);
 
-            const auto d_ijH =
-                Indicator<dim>::indicator_ ==
-                        Indicator<dim>::Indicators::entropy_viscosity_commutator
-                    ? d_ij * (alpha_i + alpha_j) / 2.
-                    : d_ij * std::max(alpha_i, alpha_j);
+            const auto d_ijH = Indicator<dim, Number>::indicator_ ==
+                                       Indicator<dim, Number>::Indicators::
+                                           entropy_viscosity_commutator
+                                   ? d_ij * (alpha_i + alpha_j) / 2.
+                                   : d_ij * std::max(alpha_i, alpha_j);
 
             const auto p_ij = tau / m_i / lambda * (d_ijH - d_ij) * (U_j - U_i);
 
@@ -381,8 +382,8 @@ namespace grendel
           scatter(temp_euler_, U_i_new, i);
           scatter(r_, r_i, i);
 
-          const double hd_i = m_i / measure_of_omega;
-          const double rho_relaxation_i = rho_relaxation_.local_element(i);
+          const Number hd_i = m_i / measure_of_omega;
+          const Number rho_relaxation_i = rho_relaxation_.local_element(i);
           limiter.apply_relaxation(hd_i, rho_relaxation_i);
           scatter(bounds_, limiter.bounds(), i);
         }
@@ -419,9 +420,9 @@ namespace grendel
           if (++sparsity.begin(i) == sparsity.end(i))
             continue;
 
-          const double m_i = lumped_mass_matrix.diag_element(i);
+          const Number m_i = lumped_mass_matrix.diag_element(i);
           const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
-          const double lambda = 1. / (size - 1.);
+          const Number lambda = 1. / (size - 1.);
 
           const auto r_i = gather(r_, i);
 
@@ -471,7 +472,8 @@ namespace grendel
 
             for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
               auto p_ij = gather_get_entry(pij_matrix_, jt);
-              const auto l_ij = Limiter<dim>::limit(bounds, U_i_new, p_ij);
+              const auto l_ij =
+                  Limiter<dim, Number>::limit(bounds, U_i_new, p_ij);
               set_entry(lij_matrix_, jt, l_ij);
             }
           }
@@ -505,7 +507,7 @@ namespace grendel
                 auto l_ij = get_entry(lij_matrix_, jt);
                 auto &l_ji = lij_matrix_(j, i); // FIXME: Suboptimal
 
-                const double min = std::min(l_ij, l_ji);
+                const Number min = std::min(l_ij, l_ji);
                 l_ji = min;
                 set_entry(lij_matrix_, jt, min);
               }
@@ -543,7 +545,7 @@ namespace grendel
             auto U_i_new = gather(temp_euler_, i);
 
             const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
-            const double lambda = 1. / (size - 1.);
+            const Number lambda = 1. / (size - 1.);
 
             for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
               auto p_ij = gather_get_entry(pij_matrix_, jt);
@@ -591,7 +593,7 @@ namespace grendel
           /* On boundary 1 remove the normal component of the momentum: */
 
           if (id == Boundary::slip) {
-            auto m = ProblemDescription<dim>::momentum(U_i);
+            auto m = ProblemDescription<dim, Number>::momentum(U_i);
             m -= 1. * (m * normal) * normal;
             for (unsigned int k = 0; k < dim; ++k)
               U_i[k + 1] = m[k];
@@ -626,10 +628,10 @@ namespace grendel
   }
 
 
-  template <int dim>
-  double TimeStep<dim>::ssprk_step(vector_type &U, double t)
+  template <int dim, typename Number>
+  Number TimeStep<dim, Number>::ssprk_step(vector_type &U, Number t)
   {
-    deallog << "TimeStep<dim>::ssprk_step()" << std::endl;
+    deallog << "TimeStep<dim, Number>::ssprk_step()" << std::endl;
 
     /* This also copies ghost elements: */
     for (unsigned int k = 0; k < problem_dimension; ++k)
@@ -637,13 +639,13 @@ namespace grendel
 
     // Step 1: U1 = U_old + tau * L(U_old)
 
-    const double tau_1 = euler_step(U, t);
+    const Number tau_1 = euler_step(U, t);
 
     // Step 2: U2 = 3/4 U_old + 1/4 (U1 + tau L(U1))
 
-    const double tau_2 = euler_step(U, t, tau_1);
+    const Number tau_2 = euler_step(U, t, tau_1);
 
-    const double ratio = cfl_max_ / cfl_update_;
+    const Number ratio = cfl_max_ / cfl_update_;
     AssertThrow(ratio * tau_2 >= tau_1,
                 ExcMessage("Problem performing SSP RK(3) time step: "
                            "Insufficient CFL condition."));
@@ -654,7 +656,7 @@ namespace grendel
 
     // Step 3: U_new = 1/3 U_old + 2/3 (U2 + tau L(U2))
 
-    const double tau_3 = euler_step(U, t, tau_1);
+    const Number tau_3 = euler_step(U, t, tau_1);
 
     AssertThrow(ratio * tau_3 >= tau_1,
                 ExcMessage("Problem performing SSP RK(3) time step: "
@@ -667,10 +669,10 @@ namespace grendel
   }
 
 
-  template <int dim>
-  double TimeStep<dim>::step(vector_type &U, double t)
+  template <int dim, typename Number>
+  Number TimeStep<dim, Number>::step(vector_type &U, Number t)
   {
-    deallog << "TimeStep<dim>::step()" << std::endl;
+    deallog << "TimeStep<dim, Number>::step()" << std::endl;
 
     if (use_ssprk3_) {
       return ssprk_step(U, t);

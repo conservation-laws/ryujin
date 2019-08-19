@@ -17,24 +17,24 @@
 namespace grendel
 {
 
-  template <int dim>
+  template <int dim, typename Number = double>
   class TimeStep : public dealii::ParameterAcceptor
   {
   public:
     static constexpr unsigned int problem_dimension =
-        ProblemDescription<dim>::problem_dimension;
+        ProblemDescription<dim, Number>::problem_dimension;
 
-    using rank1_type = typename ProblemDescription<dim>::rank1_type;
-    using rank2_type = typename ProblemDescription<dim>::rank2_type;
+    using rank1_type = typename ProblemDescription<dim, Number>::rank1_type;
+    using rank2_type = typename ProblemDescription<dim, Number>::rank2_type;
 
-    typedef std::array<dealii::LinearAlgebra::distributed::Vector<double>,
+    typedef std::array<dealii::LinearAlgebra::distributed::Vector<Number>,
                        problem_dimension>
         vector_type;
 
     TimeStep(const MPI_Comm &mpi_communicator,
              dealii::TimerOutput &computing_timer,
-             const grendel::OfflineData<dim> &offline_data,
-             const grendel::InitialValues<dim> &initial_values,
+             const grendel::OfflineData<dim, Number> &offline_data,
+             const grendel::InitialValues<dim, Number> &initial_values,
              const std::string &subsection = "TimeStep");
 
     virtual ~TimeStep() final = default;
@@ -52,7 +52,7 @@ namespace grendel
      *    0), or tau (if tau != 0). Here, tau_max is the computed maximal
      *    time step size and tau is the optional third parameter.
      */
-    double euler_step(vector_type &U, double t, double tau = 0.);
+    Number euler_step(vector_type &U, Number t, Number tau = 0.);
 
     /**
      * Given a reference to a previous state vector U compute
@@ -62,14 +62,14 @@ namespace grendel
      * Non-oscillatory Shock-Capturing Schemes JCP 77:439-471 (1988), Eq.
      * 2.18]
      */
-    double ssprk_step(vector_type &U, double t);
+    Number ssprk_step(vector_type &U, Number t);
 
     /**
      * Given a reference to a previous state vector U perform an explicit
      * time step (and store the result in U). The function returns the
      * chosen time step.
      */
-    double step(vector_type &U, double t);
+    Number step(vector_type &U, Number t);
 
     /* Options: */
 
@@ -86,26 +86,27 @@ namespace grendel
     const MPI_Comm &mpi_communicator_;
     dealii::TimerOutput &computing_timer_;
 
-    dealii::SmartPointer<const grendel::OfflineData<dim>> offline_data_;
-    dealii::SmartPointer<const grendel::InitialValues<dim>> initial_values_;
+    dealii::SmartPointer<const grendel::OfflineData<dim, Number>> offline_data_;
+    dealii::SmartPointer<const grendel::InitialValues<dim, Number>>
+        initial_values_;
 
     /* Scratch data: */
 
-    dealii::SparseMatrix<double> dij_matrix_;
+    dealii::SparseMatrix<Number> dij_matrix_;
 
-    dealii::LinearAlgebra::distributed::Vector<double> rho_second_variation_;
-    dealii::LinearAlgebra::distributed::Vector<double> rho_relaxation_;
-    dealii::LinearAlgebra::distributed::Vector<double> alpha_;
+    dealii::LinearAlgebra::distributed::Vector<Number> rho_second_variation_;
+    dealii::LinearAlgebra::distributed::Vector<Number> rho_relaxation_;
+    dealii::LinearAlgebra::distributed::Vector<Number> alpha_;
     ACCESSOR_READ_ONLY(alpha)
 
-    typename Limiter<dim>::vector_type bounds_;
+    typename Limiter<dim, Number>::vector_type bounds_;
 
     vector_type r_;
 
-    dealii::SparseMatrix<double> lij_matrix_;
-    MatrixCommunicator<dim> lij_matrix_communicator_;
+    dealii::SparseMatrix<Number> lij_matrix_;
+    MatrixCommunicator<dim, Number> lij_matrix_communicator_;
 
-    std::array<dealii::SparseMatrix<double>, problem_dimension> pij_matrix_;
+    std::array<dealii::SparseMatrix<Number>, problem_dimension> pij_matrix_;
 
     vector_type temp_euler_;
     vector_type temp_ssprk_;
@@ -113,8 +114,8 @@ namespace grendel
     /* Options: */
 
     bool use_ssprk3_;
-    double cfl_update_;
-    double cfl_max_;
+    Number cfl_update_;
+    Number cfl_max_;
   };
 
 } /* namespace grendel */
