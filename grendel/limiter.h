@@ -1,9 +1,11 @@
 #ifndef LIMITER_H
 #define LIMITER_H
 
+#include "helper.h"
 #include "problem_description.h"
 
 #include <deal.II/lac/la_parallel_vector.templates.h>
+
 
 namespace grendel
 {
@@ -65,9 +67,8 @@ namespace grendel
      * Compute limiter value l_ij for update P_ij:
      */
 
-    static DEAL_II_ALWAYS_INLINE inline Number limit(const Bounds &bounds,
-                                                     const rank1_type U,
-                                                     const rank1_type P_ij);
+    static DEAL_II_ALWAYS_INLINE inline Number
+    limit(const Bounds &bounds, const rank1_type U, const rank1_type P_ij);
 
   private:
     Bounds bounds_;
@@ -194,19 +195,30 @@ namespace grendel
       constexpr ScalarNumber eps_ =
           std::numeric_limits<ScalarNumber>::epsilon();
 
-      if (U_i_rho + P_ij_rho < rho_min)
-        t_0 =
-            std::abs(rho_min - U_i_rho) / (std::abs(P_ij_rho) + eps_ * rho_max);
+      const Number temp = dealii::ternary_gt(        //
+          U_i_rho + P_ij_rho,                        //
+          rho_max,                                   //
+          std::abs(rho_max - U_i_rho) /              //
+              (std::abs(P_ij_rho) + eps_ * rho_max), //
+          t_0);
 
-      else if (rho_max < U_i_rho + P_ij_rho)
-        t_0 =
-            std::abs(rho_max - U_i_rho) / (std::abs(P_ij_rho) + eps_ * rho_max);
+      t_0 = dealii::ternary_gt(                      //
+          rho_min,                                   //
+          U_i_rho + P_ij_rho,                        //
+          std::abs(rho_min - U_i_rho) /              //
+              (std::abs(P_ij_rho) + eps_ * rho_max), //
+          temp);
 
       l_ij = std::min(l_ij, t_0);
 
-      Assert((U + l_ij * P_ij)[0] > 0.,
-             dealii::ExcMessage("I'm sorry, Dave. I'm afraid I can't do that. "
-                                "- Negative density."));
+      // FIXME
+      if constexpr (std::is_same<Number, double>::value ||
+                    std::is_same<Number, float>::value) {
+        Assert(
+            (U + l_ij * P_ij)[0] > 0.,
+            dealii::ExcMessage("I'm sorry, Dave. I'm afraid I can't do that. "
+                               "- Negative density."));
+      }
     }
 
     if constexpr (limiter_ == Limiters::rho)
@@ -220,19 +232,25 @@ namespace grendel
 
     if constexpr (limiter_ == Limiters::internal_energy) {
 
+      static_assert(std::is_same<Number, double>::value ||
+                        std::is_same<Number, float>::value,
+                    "Not implemented yet");
+
+
       const auto P_ij_m = ProblemDescription<dim, Number>::momentum(P_ij);
       const auto &P_ij_E = P_ij[dim + 1];
 
       const auto U_i_m = ProblemDescription<dim, Number>::momentum(U);
       const Number &U_i_E = U[dim + 1];
 
-      const Number c =
-          (U_i_E - rho_epsilon_min) * U_i_rho - Number(1. / 2.) * U_i_m.norm_square();
+      const Number c = (U_i_E - rho_epsilon_min) * U_i_rho -
+                       Number(1. / 2.) * U_i_m.norm_square();
 
       const Number b = (U_i_E - rho_epsilon_min) * P_ij_rho + P_ij_E * U_i_rho -
                        U_i_m * P_ij_m;
 
-      const Number a = P_ij_E * P_ij_rho - Number(1. / 2.) * P_ij_m.norm_square();
+      const Number a =
+          P_ij_E * P_ij_rho - Number(1. / 2.) * P_ij_m.norm_square();
 
       /*
        * Solve the quadratic equation a t^2 + b t + c = 0 by hand. We use the
