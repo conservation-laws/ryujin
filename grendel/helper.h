@@ -253,5 +253,4 @@ public:                                                                        \
 protected:
 
 
-
 #endif /* HELPER_H */
