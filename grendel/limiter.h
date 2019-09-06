@@ -146,7 +146,8 @@ namespace grendel
         return;
 
       const Number r_i =
-          Number(2.) * std::pow(std::sqrt(std::sqrt(hd_i)), relaxation_order_);
+          Number(2.) * dealii::Utilities::fixed_power<relaxation_order_>(
+                           std::sqrt(std::sqrt(hd_i)));
 
       rho_min =
           std::max((Number(1.) - r_i) * rho_min, rho_min - rho_relaxation);

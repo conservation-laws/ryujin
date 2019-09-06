@@ -232,10 +232,10 @@ namespace grendel
       if (denominator > 1.e-7 * denominator_abs) {
         const auto ratio = std::abs(numerator) / denominator;
         const auto alpha_i =
-            std::pow(std::max(ratio - smoothness_indicator_alpha_0_, 0.),
-                     smoothness_indicator_power_) /
-            std::pow(1 - smoothness_indicator_alpha_0_,
-                     smoothness_indicator_power_);
+            dealii::Utilities::fixed_power<smoothness_indicator_power_>(
+                std::max(ratio - smoothness_indicator_alpha_0_, 0.)) /
+            dealii::Utilities::fixed_power<smoothness_indicator_power_>(
+                1 - smoothness_indicator_alpha_0_);
         return std::min(alpha_i, beta_i);
       }
 
