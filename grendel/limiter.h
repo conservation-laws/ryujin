@@ -196,19 +196,21 @@ namespace grendel
       constexpr ScalarNumber eps_ =
           std::numeric_limits<ScalarNumber>::epsilon();
 
-      const Number temp = dealii::ternary_gt(        //
-          U_i_rho + P_ij_rho,                        //
-          rho_max,                                   //
-          std::abs(rho_max - U_i_rho) /              //
-              (std::abs(P_ij_rho) + eps_ * rho_max), //
-          t_0);
+      const Number temp =
+          dealii::compare_and_apply_mask<dealii::SIMDComparison::greater_than>(
+              U_i_rho + P_ij_rho,
+              rho_max,
+              std::abs(rho_max - U_i_rho) /
+                  (std::abs(P_ij_rho) + eps_ * rho_max),
+              t_0);
 
-      t_0 = dealii::ternary_gt(                      //
-          rho_min,                                   //
-          U_i_rho + P_ij_rho,                        //
-          std::abs(rho_min - U_i_rho) /              //
-              (std::abs(P_ij_rho) + eps_ * rho_max), //
-          temp);
+      t_0 =
+          dealii::compare_and_apply_mask<dealii::SIMDComparison::greater_than>(
+              rho_min,
+              U_i_rho + P_ij_rho,
+              std::abs(rho_min - U_i_rho) /
+                  (std::abs(P_ij_rho) + eps_ * rho_max),
+              temp);
 
       l_ij = std::min(l_ij, t_0);
 

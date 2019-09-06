@@ -309,51 +309,6 @@ compare_and_apply_mask(const VectorizedArray<double, 2> &left,
 #  endif
 #endif // DOXYGEN
 
-
-  //
-  // FIXME: Refactor into library and document
-  //
-
-  DEAL_II_ALWAYS_INLINE inline VectorizedArray<float>
-  ternary_gt(const VectorizedArray<float> &left,
-             const VectorizedArray<float> &right,
-             const VectorizedArray<float> &true_value,
-             const VectorizedArray<float> &false_value)
-  {
-    return compare_and_apply_mask<SIMDComparison::greater_than>(
-        left, right, true_value, false_value);
-  }
-
-  DEAL_II_ALWAYS_INLINE inline VectorizedArray<double>
-  ternary_gt(const VectorizedArray<double> &left,
-             const VectorizedArray<double> &right,
-             const VectorizedArray<double> &true_value,
-             const VectorizedArray<double> &false_value)
-  {
-    return compare_and_apply_mask<SIMDComparison::greater_than>(
-        left, right, true_value, false_value);
-  }
-
-
-  DEAL_II_ALWAYS_INLINE inline double ternary_gt(const double left,
-                                                 const double right,
-                                                 const double true_value,
-                                                 const double false_value)
-  {
-    return compare_and_apply_mask<SIMDComparison::greater_than>(
-        left, right, true_value, false_value);
-  }
-
-
-  DEAL_II_ALWAYS_INLINE inline float ternary_gt(const float left,
-                                                const float right,
-                                                const float true_value,
-                                                const float false_value)
-  {
-    return compare_and_apply_mask<SIMDComparison::greater_than>(
-        left, right, true_value, false_value);
-  }
-
 } // namespace dealii
 
 #endif /* SIMD_H */
