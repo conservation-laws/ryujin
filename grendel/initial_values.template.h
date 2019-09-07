@@ -1,6 +1,8 @@
 #ifndef INITIAL_VALUES_TEMPLATE_H
 #define INITIAL_VALUES_TEMPLATE_H
 
+#include "simd.h"
+
 #include "initial_values.h"
 
 #include <random>
@@ -193,8 +195,8 @@ namespace grendel
           const Number v = initial_direction_[1] * initial_mach_number_ +
                            factor * point_bar[0];
 
-          const Number rho = std::pow(T, 1. / (gamma - 1.));
-          const Number p = std::pow(rho, gamma);
+          const Number rho = grendel::pow(T, 1. / (gamma - 1.));
+          const Number p =   grendel::pow(rho, gamma);
           const Number E = p / (gamma - 1.) + 0.5 * rho * (u * u + v * v);
 
           return rank1_type({rho, rho * u, rho * v, E});

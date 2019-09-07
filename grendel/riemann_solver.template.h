@@ -153,7 +153,7 @@ namespace grendel
       } else {
 
         const Number tmp =
-            std::pow(p / p_Z, (gamma - Number(1.0)) / Number(2.0) / gamma) -
+            grendel::pow(p / p_Z, (gamma - Number(1.0)) / Number(2.0) / gamma) -
             Number(1.0);
         return Number(2.0) * a_Z * (Number(1.0) - b * rho_Z) /
                (gamma - Number(1.0)) * tmp;
@@ -182,10 +182,11 @@ namespace grendel
 
       } else {
 
-        /* Derivative of std::pow(p / p_Z, (gamma - 1.) / 2. / gamma) - 1.*/
+        /* Derivative of grendel::pow(p / p_Z, (gamma - 1.) / 2. / gamma) - 1.*/
         const Number tmp =
             (gamma - Number(1.0)) / Number(2.) / gamma *
-            std::pow(p / p_Z, (Number(-1.0) - gamma) / Number(2.0) / gamma) /
+            grendel::pow(p / p_Z,
+                         (Number(-1.0) - gamma) / Number(2.0) / gamma) /
             p_Z;
         return Number(2.) * a_Z * (Number(1.0) - b * rho_Z) /
                (gamma - Number(1.0)) * tmp;
@@ -297,13 +298,13 @@ namespace grendel
 
       const Number denominator =
           a_i * tmp_i *
-              std::pow(p_i / p_j,
-                       -Number(1.0) * (gamma - Number(1.)) / Number(2.) /
-                           gamma) +
+              grendel::pow(p_i / p_j,
+                           -Number(1.0) * (gamma - Number(1.)) / Number(2.) /
+                               gamma) +
           a_j * tmp_j * Number(1.0);
 
-      return p_j * std::pow(numerator / denominator,
-                            Number(2.0) * gamma / (gamma - Number(1.0)));
+      return p_j * grendel::pow(numerator / denominator,
+                                Number(2.0) * gamma / (gamma - Number(1.0)));
     }
 
 

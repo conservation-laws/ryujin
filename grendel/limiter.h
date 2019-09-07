@@ -332,7 +332,7 @@ namespace grendel
 
         const auto U_r = U + t_r * P_ij;
         const auto rho_r = U_r[0];
-        const auto rho_r_gamma = std::pow(rho_r, gamma);
+        const auto rho_r_gamma = grendel::pow(rho_r, gamma);
         auto psi_r = ProblemDescription<dim, Number>::internal_energy(U_r) -
                      s_min * rho_r_gamma;
 
@@ -342,7 +342,7 @@ namespace grendel
 
         const auto U_l = U + t_l * P_ij;
         const auto rho_l = U_l[0];
-        const auto rho_l_gamma = std::pow(rho_l, gamma);
+        const auto rho_l_gamma = grendel::pow(rho_l, gamma);
         auto psi_l = ProblemDescription<dim, Number>::internal_energy(U_l) -
                      s_min * rho_l_gamma;
 

@@ -206,7 +206,7 @@ namespace grendel
      *   exp((gamma - 1)s) = (rho e) / rho ^ gamma
      */
     const auto &rho = U[0];
-    return internal_energy(U) / std::pow(rho, gamma);
+    return internal_energy(U) / grendel::pow(rho, gamma);
   }
 
 
@@ -215,7 +215,7 @@ namespace grendel
   ProblemDescription<dim, Number>::entropy(const rank1_type U)
   {
     const auto p = pressure(U);
-    return std::pow(p, ScalarNumber(1. / gamma));
+    return grendel::pow(p, ScalarNumber(1. / gamma));
   }
 
 
@@ -244,7 +244,7 @@ namespace grendel
     const auto p = pressure(U);
 
     const auto factor =
-        (gamma - 1.0) / gamma * std::pow(p, ScalarNumber(1. / gamma - 1.));
+        (gamma - 1.0) / gamma * grendel::pow(p, ScalarNumber(1. / gamma - 1.));
 
     rank1_type result;
 
