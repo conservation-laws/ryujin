@@ -52,24 +52,23 @@ namespace grendel
      * Accumulate bounds:
      */
 
-    DEAL_II_ALWAYS_INLINE inline void reset();
+    void reset();
 
     template <typename ITERATOR>
-    DEAL_II_ALWAYS_INLINE inline void accumulate(const rank1_type U_i,
-                                                 const rank1_type U_j,
-                                                 const rank1_type U_ij_bar,
-                                                 const ITERATOR jt); // FIXME
+    void accumulate(const rank1_type U_i,
+                    const rank1_type U_j,
+                    const rank1_type U_ij_bar,
+                    const ITERATOR jt); // FIXME
 
-    DEAL_II_ALWAYS_INLINE inline void
-    apply_relaxation(const Number hd_i, const Number rho_relaxation);
+    void apply_relaxation(const Number hd_i, const Number rho_relaxation);
 
-    DEAL_II_ALWAYS_INLINE inline const Bounds &bounds() const;
+    const Bounds &bounds() const;
 
     /*
      * Compute limiter value l_ij for update P_ij:
      */
 
-    static DEAL_II_ALWAYS_INLINE inline Number
+    static Number
     limit(const Bounds &bounds, const rank1_type U, const rank1_type P_ij);
 
   private:

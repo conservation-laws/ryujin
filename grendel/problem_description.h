@@ -1,8 +1,8 @@
 #ifndef PROBLEM_DESCRIPTION_H
 #define PROBLEM_DESCRIPTION_H
 
-#include "simd.h"
 #include "helper.h"
+#include "simd.h"
 
 #include <deal.II/base/tensor.h>
 
@@ -68,31 +68,28 @@ namespace grendel
      * For a given (2+dim dimensional) state vector <code>U</code>, return
      * the momentum vector <code>[U[1], ..., U[1+dim]]</code>.
      */
-    static DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, dim, Number>
-    momentum(const rank1_type U);
+    static dealii::Tensor<1, dim, Number> momentum(const rank1_type U);
 
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
      * and return the internal energy (\rho e).
      */
-    static DEAL_II_ALWAYS_INLINE inline Number
-    internal_energy(const rank1_type U);
+    static Number internal_energy(const rank1_type U);
 
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
      * and return the derivative of the internal energy (\rho e).
      */
-    static DEAL_II_ALWAYS_INLINE inline rank1_type
-    internal_energy_derivative(const rank1_type U);
+    static rank1_type internal_energy_derivative(const rank1_type U);
 
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
      * and return the pressure .
      */
-    static DEAL_II_ALWAYS_INLINE inline Number pressure(const rank1_type U);
+    static Number pressure(const rank1_type U);
 
 
     /**
@@ -100,29 +97,27 @@ namespace grendel
      * and return the specific entropy
      * e^((\gamma-1)s) = (rho e) / rho ^ gamma.
      */
-    static DEAL_II_ALWAYS_INLINE inline Number
-    specific_entropy(const rank1_type U);
+    static Number specific_entropy(const rank1_type U);
 
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
      * and return the entropy \eta = p^(1/\gamma)
      */
-    static DEAL_II_ALWAYS_INLINE inline Number entropy(const rank1_type U);
+    static Number entropy(const rank1_type U);
 
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
      * and return the derivative \eta' of the entropy \eta = p^(1/\gamma)
      */
-    static DEAL_II_ALWAYS_INLINE inline rank1_type
-    entropy_derivative(const rank1_type U);
+    static rank1_type entropy_derivative(const rank1_type U);
 
 
     /**
      * Given a state @p U compute <code>f(U)</code>.
      */
-    static DEAL_II_ALWAYS_INLINE inline rank2_type f(const rank1_type U);
+    static rank2_type f(const rank1_type U);
   };
 
 

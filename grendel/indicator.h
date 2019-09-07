@@ -58,24 +58,23 @@ namespace grendel
      * Reset temporary storage and initialize for a new row corresponding
      * to state vector U_i:
      */
-    DEAL_II_ALWAYS_INLINE inline void reset(const rank1_type U_i);
+    void reset(const rank1_type U_i);
 
     /**
      * When looping over the sparsity row, add the contribution associated
      * with the neighboring state U_j:
      */
     template <typename ITERATOR>
-    DEAL_II_ALWAYS_INLINE inline void add(const rank1_type U_j,
-                                          const ITERATOR jt);
+    void add(const rank1_type U_j, const ITERATOR jt);
     /**
      * Return the computed alpha_i value.
      */
-    DEAL_II_ALWAYS_INLINE inline Number alpha(const Number h_i);
+    Number alpha(const Number h_i);
 
     /**
      * Return the computed second variation of rho.
      */
-    DEAL_II_ALWAYS_INLINE inline Number rho_second_variation();
+    Number rho_second_variation();
 
   private:
     const std::array<dealii::SparseMatrix<Number>, dim> &cij_matrix_;
