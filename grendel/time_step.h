@@ -2,9 +2,12 @@
 #define TIME_STEP_H
 
 #include "helper.h"
-#include "initial_values.h"
+#include "simd.h"
+
 #include "limiter.h"
 #include "matrix_communicator.h"
+
+#include "initial_values.h"
 #include "offline_data.h"
 #include "problem_description.h"
 

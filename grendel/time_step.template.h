@@ -1,10 +1,10 @@
 #ifndef TIME_STEP_TEMPLATE_H
 #define TIME_STEP_TEMPLATE_H
 
-#include "helper.h"
+#include "time_step.h"
+
 #include "indicator.h"
 #include "riemann_solver.h"
-#include "time_step.h"
 
 #include <boost/range/irange.hpp>
 

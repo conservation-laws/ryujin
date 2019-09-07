@@ -2,6 +2,8 @@
 #define RIEMANN_SOLVER_H
 
 #include "helper.h"
+#include "simd.h"
+
 #include "problem_description.h"
 
 #include <deal.II/base/point.h>

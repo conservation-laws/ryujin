@@ -2,6 +2,8 @@
 #define LIMITER_H
 
 #include "helper.h"
+#include "simd.h"
+
 #include "problem_description.h"
 
 #include <deal.II/lac/la_parallel_vector.templates.h>

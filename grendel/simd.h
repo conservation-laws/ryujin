@@ -3,14 +3,12 @@
 
 #include <deal.II/base/vectorization.h>
 
-
 namespace dealii
 {
 /**
  * @name Ternary operations on VectorizedArray
  */
 //@{
-
 
 /**
  * enum class encoding binary operations for a component-wise comparison of

@@ -1,10 +1,10 @@
 #ifndef PROBLEM_DESCRIPTION_H
 #define PROBLEM_DESCRIPTION_H
 
+#include "simd.h"
 #include "helper.h"
 
 #include <deal.II/base/tensor.h>
-#include <deal.II/base/vectorization.h>
 
 #include <array>
 #include <functional>
