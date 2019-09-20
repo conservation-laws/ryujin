@@ -301,13 +301,13 @@ namespace grendel
      * Step 3: Low-order update, also compute limiter bounds, R_i and first
      *         part of P_ij
      *
-     *   \bar U_ij = 1/2 d_ij^L (U_i + U_j) - 1/2 (f_j - f_i) c_ij
+     *   \bar U_ij = 1/2 (U_i + U_j) - 1/2 (f_j - f_i) c_ij / d_ij^L
      *
      *        R_i = \sum_j - c_ij f_j + d_ij^H (U_j - U_i)
      *
-     *        P_ij = tau / m_i / lambda (d_ij^H - d_ij^L) (U_i + U_j) + [...]
+     *        P_ij = tau / m_i / lambda (d_ij^H - d_ij^L) (U_i - U_j) + [...]
      *
-     *   Low-order update: += tau / m_i * 2 d_ij^L (\bar U_ij - U_i)
+     *   Low-order update: += tau / m_i * 2 d_ij^L (\bar U_ij)
      */
 
     {
@@ -366,7 +366,7 @@ namespace grendel
             dealii::Tensor<1, problem_dimension> U_ij_bar;
 
             for (unsigned int k = 0; k < problem_dimension; ++k) {
-              const auto temp = c_ij * (f_j[k] - f_i[k]);
+              const auto temp = (f_j[k] - f_i[k]) * c_ij;
 
               r_i[k] += -temp + d_ijH * (U_j - U_i)[k];
               U_ij_bar[k] = 1. / 2. * (U_i[k] + U_j[k]) - 1. / 2. * temp / d_ij;
