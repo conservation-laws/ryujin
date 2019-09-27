@@ -41,7 +41,7 @@ namespace grendel
      * state in the corresponding 1D Riemann problem.
      */
     template <int dim, typename Number>
-    inline DEAL_II_ALWAYS_INLINE dealii::Tensor<1, 3> projected_state(
+    inline DEAL_II_ALWAYS_INLINE dealii::Tensor<1, 3, Number> projected_state(
         const typename ProblemDescription<dim, Number>::rank1_type U,
         const dealii::Tensor<1, dim, Number> &n_ij)
     {
@@ -65,18 +65,17 @@ namespace grendel
 
     /**
      * For a given projected state <code>projected_U</code> compute the
-     * Riemann data [rho_Z, u_Z, p_Z, a_Z, A_Z, B_Z] (used in the
+     * Riemann data [rho_Z, u_Z, p_Z, a_Z] (used in the
      * approximative Riemman solver).
      *
      * FIXME: Describe state in more detail.
      */
     template <typename Number>
-    inline DEAL_II_ALWAYS_INLINE std::array<Number, 6>
-    riemann_data_from_projected_state(const Number gamma,
-                                      const Number b,
-                                      const dealii::Tensor<1, 3> &projected_U)
+    inline DEAL_II_ALWAYS_INLINE std::array<Number, 4>
+    riemann_data_from_projected_state(
+        const dealii::Tensor<1, 3, Number> &projected_U)
     {
-      std::array<Number, 6> result;
+      std::array<Number, 4> result;
 
       // rho_Z:
       result[0] = projected_U[0];
@@ -86,11 +85,6 @@ namespace grendel
       result[2] = ProblemDescription<1, Number>::pressure(projected_U);
       // a_Z:
       result[3] = ProblemDescription<1, Number>::speed_of_sound(projected_U);
-      // A_Z:
-      result[4] = Number(2.0) * (Number(1.0) - b * projected_U[0]) /
-                  (gamma + Number(1.0)) / projected_U[0];
-      // B_Z:
-      result[5] = (gamma - Number(1.0)) / (gamma + Number(1.0)) * result[2];
 
       return result;
     }
@@ -105,13 +99,15 @@ namespace grendel
     inline DEAL_II_ALWAYS_INLINE Number
     f_Z(const Number gamma,
         const Number b,
-        const std::array<Number, 6> &primitive_state,
+        const std::array<Number, 4> &primitive_state,
         const Number &p)
     {
-      const auto &[rho_Z, u_Z, p_Z, a_Z, A_Z, B_Z] = primitive_state;
+      const auto &[rho_Z, u_Z, p_Z, a_Z] = primitive_state;
 
       if (p >= p_Z) {
-        return (p - p_Z) * std::sqrt(A_Z / (p + B_Z));
+        return (p - p_Z) * std::sqrt(Number(2.) / rho_Z /
+                                     ((gamma + Number(1.)) * p +
+                                      (gamma - Number(1.)) * p_Z));
 
       } else {
 
@@ -133,15 +129,20 @@ namespace grendel
     inline DEAL_II_ALWAYS_INLINE Number
     df_Z(const Number gamma,
          const Number b,
-         const std::array<Number, 6> &primitive_state,
+         const std::array<Number, 4> &primitive_state,
          const Number &p)
     {
-      const auto &[rho_Z, u_Z, p_Z, a_Z, A_Z, B_Z] = primitive_state;
+      const auto &[rho_Z, u_Z, p_Z, a_Z] = primitive_state;
 
       if (p >= p_Z) {
         /* Derivative of (p - p_Z) * std::sqrt(A_Z / (p + B_Z)): */
-        return std::sqrt(A_Z / (p + B_Z)) *
-               (Number(1.0) - Number(0.5) * (p - p_Z) / (p + B_Z));
+
+        return std::sqrt(
+                   Number(2.) / rho_Z /
+                   ((gamma + Number(1.)) * p + (gamma - Number(1.)) * p_Z)) *
+               (Number(1.0) -
+                Number(0.5) * (p - p_Z) /
+                    (p + (gamma - Number(1.0)) / (gamma + Number(1.0)) * p_Z));
 
       } else {
 
@@ -166,8 +167,8 @@ namespace grendel
     inline DEAL_II_ALWAYS_INLINE Number
     phi(const Number gamma,
         const Number b,
-        const std::array<Number, 6> &riemann_data_i,
-        const std::array<Number, 6> &riemann_data_j,
+        const std::array<Number, 4> &riemann_data_i,
+        const std::array<Number, 4> &riemann_data_j,
         const Number &p)
     {
       const Number &u_i = riemann_data_i[1];
@@ -188,8 +189,8 @@ namespace grendel
     inline DEAL_II_ALWAYS_INLINE Number
     dphi(const Number gamma,
          const Number b,
-         const std::array<Number, 6> &riemann_data_i,
-         const std::array<Number, 6> &riemann_data_j,
+         const std::array<Number, 4> &riemann_data_i,
+         const std::array<Number, 4> &riemann_data_j,
          const Number &p)
     {
       return df_Z(gamma, b, riemann_data_i, p) +
@@ -203,10 +204,10 @@ namespace grendel
     template <typename Number>
     inline DEAL_II_ALWAYS_INLINE Number
     lambda1_minus(const Number gamma,
-                  const std::array<Number, 6> &riemann_data,
+                  const std::array<Number, 4> &riemann_data,
                   const Number p_star)
     {
-      const auto &[rho_Z, u_Z, p_Z, a_Z, A_Z, B_Z] = riemann_data;
+      const auto &[rho_Z, u_Z, p_Z, a_Z] = riemann_data;
 
       const Number factor = (gamma + Number(1.0)) / Number(2.0) / gamma;
       const Number tmp = positive_part((p_star - p_Z) / p_Z);
@@ -220,10 +221,10 @@ namespace grendel
     template <typename Number>
     inline DEAL_II_ALWAYS_INLINE Number
     lambda3_plus(const Number gamma,
-                 const std::array<Number, 6> &primitive_state,
+                 const std::array<Number, 4> &primitive_state,
                  const Number p_star)
     {
-      const auto &[rho_Z, u_Z, p_Z, a_Z, A_Z, B_Z] = primitive_state;
+      const auto &[rho_Z, u_Z, p_Z, a_Z] = primitive_state;
 
       const Number factor = (gamma + Number(1.0)) / Number(2.0) / gamma;
       const Number tmp = positive_part((p_star - p_Z) / p_Z);
@@ -240,11 +241,11 @@ namespace grendel
     inline DEAL_II_ALWAYS_INLINE Number
     p_star_two_rarefaction(const Number gamma,
                            const Number b,
-                           const std::array<Number, 6> &riemann_data_i,
-                           const std::array<Number, 6> &riemann_data_j)
+                           const std::array<Number, 4> &riemann_data_i,
+                           const std::array<Number, 4> &riemann_data_j)
     {
-      const auto &[rho_i, u_i, p_i, a_i, A_i, B_i] = riemann_data_i;
-      const auto &[rho_j, u_j, p_j, a_j, A_j, B_j] = riemann_data_j;
+      const auto &[rho_i, u_i, p_i, a_i] = riemann_data_i;
+      const auto &[rho_j, u_j, p_j, a_j] = riemann_data_j;
 
       /*
        * Notar bene (cf. [1, (4.3)]):
@@ -281,8 +282,8 @@ namespace grendel
     template <typename Number>
     inline DEAL_II_ALWAYS_INLINE std::array<Number, 2>
     compute_gap(const Number gamma,
-                const std::array<Number, 6> &riemann_data_i,
-                const std::array<Number, 6> &riemann_data_j,
+                const std::array<Number, 4> &riemann_data_i,
+                const std::array<Number, 4> &riemann_data_j,
                 const Number p_1,
                 const Number p_2)
     {
@@ -310,20 +311,15 @@ namespace grendel
       const rank1_type U_j,
       const dealii::Tensor<1, dim, Number> &n_ij)
   {
-    constexpr Number gamma = ProblemDescription<dim, Number>::gamma;
-    constexpr Number b = ProblemDescription<dim, Number>::b;
-
     /*
      * Step 1: Compute projected 1D states.
      */
 
-    const auto projected_U_i = projected_state(U_i, n_ij);
-    const auto projected_U_j = projected_state(U_j, n_ij);
+    const auto proj_U_i = projected_state(U_i, n_ij);
+    const auto proj_U_j = projected_state(U_j, n_ij);
 
-    const auto riemann_data_i =
-        riemann_data_from_projected_state(gamma, b, projected_U_i);
-    const auto riemann_data_j =
-        riemann_data_from_projected_state(gamma, b, projected_U_j);
+    const auto riemann_data_i = riemann_data_from_projected_state(proj_U_i);
+    const auto riemann_data_j = riemann_data_from_projected_state(proj_U_j);
 
     return compute(riemann_data_i, riemann_data_j);
   }
@@ -332,8 +328,8 @@ namespace grendel
   template <int dim, typename Number>
   template <unsigned int max_iter>
   std::tuple<Number, Number, unsigned int> RiemannSolver<dim, Number>::compute(
-      const std::array<Number, 6> &riemann_data_i,
-      const std::array<Number, 6> &riemann_data_j)
+      const std::array<Number, 4> &riemann_data_i,
+      const std::array<Number, 4> &riemann_data_j)
   {
     constexpr Number gamma = ProblemDescription<dim, Number>::gamma;
     constexpr Number b = ProblemDescription<dim, Number>::b;

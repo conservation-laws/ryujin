@@ -13,16 +13,13 @@ int main()
     const double rho = state[0];
     const double u = state[1];
     const double p = state[2];
-    constexpr double gamma = ProblemDescription<dim>::gamma;
-    const double b = ProblemDescription<dim>::b;
 
-    std::array<double, 6> result;
+    std::array<double, 4> result;
     result[0] = rho;
     result[1] = u;
     result[2] = p;
-    result[3] = std::sqrt(gamma * p / rho / (1.0 - b * rho));
-    result[4] = 2.0 * (1.0 - b * rho) / (gamma + 1.0) / rho;
-    result[5] = (gamma - 1.0) / (gamma + 1.0) * result[2];
+    constexpr double gamma = ProblemDescription<dim>::gamma;
+    result[3] = std::sqrt(gamma * p / rho);
     return result;
   };
 

@@ -71,8 +71,8 @@ namespace grendel
     static std::tuple<Number /*lambda_max*/,
                       Number /*p_star*/,
                       unsigned int /*iteration*/>
-    compute(const std::array<Number, 6> &riemann_data_i,
-            const std::array<Number, 6> &riemann_data_j);
+    compute(const std::array<Number, 4> &riemann_data_i,
+            const std::array<Number, 4> &riemann_data_j);
   };
 
 } /* namespace grendel */
