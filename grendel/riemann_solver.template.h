@@ -37,54 +37,32 @@ namespace grendel
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, and a
-     * (normalized) "direction" n_ij, return the corresponding projected
-     * state in the corresponding 1D Riemann problem.
+     * (normalized) "direction" n_ij, first compute the corresponding
+     * projected state in the corresponding 1D Riemann problem, and then
+     * compute and return the Riemann data [rho, u, p, a] (used in the
+     * approximative Riemman solver).
      */
     template <int dim, typename Number>
-    inline DEAL_II_ALWAYS_INLINE dealii::Tensor<1, 3, Number> projected_state(
+    inline DEAL_II_ALWAYS_INLINE std::array<Number, 4> riemann_data_from_state(
         const typename ProblemDescription<dim, Number>::rank1_type U,
         const dealii::Tensor<1, dim, Number> &n_ij)
     {
-      dealii::Tensor<1, 3> result;
+      typename ProblemDescription<1, Number>::rank1_type projected;
 
-      // rho:
-      result[0] = U[0];
+      projected[0] = U[0];
 
-      // m:
       const auto m = ProblemDescription<dim, Number>::momentum(U);
-      result[1] = n_ij * m;
+      projected[1] = n_ij * m;
 
-      // E:
-      const auto perpendicular_m = m - result[1] * n_ij;
-      result[2] =
-          U[1 + dim] - Number(0.5) * perpendicular_m.norm_square() / U[0];
+      const auto perp = m - projected[1] * n_ij;
+      projected[2] = U[1 + dim] - Number(0.5) * perp.norm_square() / U[0];
 
-      return result;
-    }
-
-
-    /**
-     * For a given projected state <code>projected_U</code> compute the
-     * Riemann data [rho_Z, u_Z, p_Z, a_Z] (used in the
-     * approximative Riemman solver).
-     *
-     * FIXME: Describe state in more detail.
-     */
-    template <typename Number>
-    inline DEAL_II_ALWAYS_INLINE std::array<Number, 4>
-    riemann_data_from_projected_state(
-        const dealii::Tensor<1, 3, Number> &projected_U)
-    {
       std::array<Number, 4> result;
 
-      // rho_Z:
-      result[0] = projected_U[0];
-      // u_Z:
-      result[1] = projected_U[1] / projected_U[0];
-      // p_Z:
-      result[2] = ProblemDescription<1, Number>::pressure(projected_U);
-      // a_Z:
-      result[3] = ProblemDescription<1, Number>::speed_of_sound(projected_U);
+      result[0] = projected[0]; // rho
+      result[1] = projected[1] / projected[0]; // u
+      result[2] = ProblemDescription<1, Number>::pressure(projected);
+      result[3] = ProblemDescription<1, Number>::speed_of_sound(projected);
 
       return result;
     }
@@ -315,11 +293,8 @@ namespace grendel
      * Step 1: Compute projected 1D states.
      */
 
-    const auto proj_U_i = projected_state(U_i, n_ij);
-    const auto proj_U_j = projected_state(U_j, n_ij);
-
-    const auto riemann_data_i = riemann_data_from_projected_state(proj_U_i);
-    const auto riemann_data_j = riemann_data_from_projected_state(proj_U_j);
+    const auto riemann_data_i = riemann_data_from_state(U_i, n_ij);
+    const auto riemann_data_j = riemann_data_from_state(U_j, n_ij);
 
     return compute(riemann_data_i, riemann_data_j);
   }
