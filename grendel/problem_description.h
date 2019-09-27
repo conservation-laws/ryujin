@@ -15,7 +15,7 @@ namespace grendel
    * The nD compressible Euler problem
    *
    * We have a (2 + n) dimensional state space [rho, m_1, ..., m_n, E],
-   * where rho denotes the pressure, [m_1, ..., m_n] is the momentum vector
+   * where rho denotes the density, [m_1, ..., m_n] is the momentum vector
    * field, and E is the total energy.
    *
    * FIXME: Description

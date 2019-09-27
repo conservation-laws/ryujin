@@ -65,23 +65,6 @@ namespace grendel
 
     /**
      * For a projected state <code>projected_U</code> compute the
-     * (physical) pressure p of the state.
-     *
-     * Recall that
-     *   p = (gamma - 1.0)*rho*e = (gamma - 1.0)*(E - 0.5*m^2/rho)
-     */
-    template <typename Number>
-    inline DEAL_II_ALWAYS_INLINE Number pressure_from_projected_state(
-        const Number gamma, const dealii::Tensor<1, 3> &projected_U)
-    {
-      return (gamma - Number(1.0)) *
-             (projected_U[2] -
-              Number(0.5) * projected_U[1] * projected_U[1] / projected_U[0]);
-    }
-
-
-    /**
-     * For a projected state <code>projected_U</code> compute the
      * (physical) speed of sound.
      *
      * Recall that
@@ -94,7 +77,7 @@ namespace grendel
                                         const dealii::Tensor<1, 3> &projected_U)
     {
       const Number rho = projected_U[0];
-      const Number p = pressure_from_projected_state(gamma, projected_U);
+      const Number p = ProblemDescription<1, Number>::pressure(projected_U);
 
       return std::sqrt(gamma * p / rho / (Number(1.0) - b * rho));
     }
@@ -120,7 +103,7 @@ namespace grendel
       // u_Z:
       result[1] = projected_U[1] / projected_U[0];
       // p_Z:
-      result[2] = pressure_from_projected_state(gamma, projected_U);
+      result[2] = ProblemDescription<1, Number>::pressure(projected_U);
       // a_Z:
       result[3] = speed_of_sound_from_projected_state(gamma, b, projected_U);
       // A_Z:
