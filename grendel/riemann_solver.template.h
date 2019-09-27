@@ -64,26 +64,6 @@ namespace grendel
 
 
     /**
-     * For a projected state <code>projected_U</code> compute the
-     * (physical) speed of sound.
-     *
-     * Recall that
-     *   c^2 = gamma * p / rho / (1 - b * rho)
-     */
-    template <typename Number>
-    inline DEAL_II_ALWAYS_INLINE Number
-    speed_of_sound_from_projected_state(const Number gamma,
-                                        const Number b,
-                                        const dealii::Tensor<1, 3> &projected_U)
-    {
-      const Number rho = projected_U[0];
-      const Number p = ProblemDescription<1, Number>::pressure(projected_U);
-
-      return std::sqrt(gamma * p / rho / (Number(1.0) - b * rho));
-    }
-
-
-    /**
      * For a given projected state <code>projected_U</code> compute the
      * Riemann data [rho_Z, u_Z, p_Z, a_Z, A_Z, B_Z] (used in the
      * approximative Riemman solver).
@@ -105,7 +85,7 @@ namespace grendel
       // p_Z:
       result[2] = ProblemDescription<1, Number>::pressure(projected_U);
       // a_Z:
-      result[3] = speed_of_sound_from_projected_state(gamma, b, projected_U);
+      result[3] = ProblemDescription<1, Number>::speed_of_sound(projected_U);
       // A_Z:
       result[4] = Number(2.0) * (Number(1.0) - b * projected_U[0]) /
                   (gamma + Number(1.0)) / projected_U[0];

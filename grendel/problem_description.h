@@ -94,6 +94,16 @@ namespace grendel
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
+     * the (physical) speed of sound:
+     *
+     * Recall that
+     *   c^2 = gamma * p / rho / (1 - b * rho)
+     */
+    static Number speed_of_sound(const rank1_type U);
+
+
+    /**
+     * For a given (2+dim dimensional) state vector <code>U</code>, compute
      * and return the specific entropy
      * e^((\gamma-1)s) = (rho e) / rho ^ gamma.
      */
@@ -189,6 +199,17 @@ namespace grendel
      */
 
     return (gamma - 1.) * internal_energy(U);
+  }
+
+
+  template <int dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline Number
+  ProblemDescription<dim, Number>::speed_of_sound(const rank1_type U)
+  {
+    /* c^2 = gamma * p / rho / (1 - b * rho) */
+    const Number rho = U[0];
+    const Number p = pressure(U);
+    return std::sqrt(gamma * p / rho);
   }
 
 
