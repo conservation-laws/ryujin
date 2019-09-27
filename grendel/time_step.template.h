@@ -445,7 +445,9 @@ namespace grendel
           indices_owned.begin(), indices_owned.end(), on_subranges, 4096);
     }
 
-    for (unsigned int i = 0; i < limiter_iter_; ++i) {
+    for (unsigned int i = 0;
+         i < (order_ == Order::second_order ? limiter_iter_ : 0);
+         ++i) {
 
       deallog << "        limiter pass " << i + 1 << std::endl;
 
@@ -453,7 +455,7 @@ namespace grendel
        * Step 5: compute l_ij:
        */
 
-      if constexpr (order_ == Order::second_order) {
+      {
         deallog << "        compute l_ij" << std::endl;
         TimerOutput::Scope time(computing_timer_, "time_step - 5 compute l_ij");
 
@@ -487,7 +489,7 @@ namespace grendel
        * And symmetrize l_ij:
        */
 
-      if constexpr (order_ == Order::second_order) {
+      {
         deallog << "        symmetrize l_ij" << std::endl;
         TimerOutput::Scope time(computing_timer_,
                                 "time_step - 6 symmetrize l_ij");
@@ -527,7 +529,7 @@ namespace grendel
        *   High-order update: += l_ij * lambda * P_ij
        */
 
-      if constexpr (order_ == Order::second_order) {
+      {
         deallog << "        high-order update" << std::endl;
         TimerOutput::Scope time(computing_timer_,
                                 "time_step - 7 high-order update");
