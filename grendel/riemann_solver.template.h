@@ -77,54 +77,61 @@ namespace grendel
     inline DEAL_II_ALWAYS_INLINE Number
     f(const std::array<Number, 4> &primitive_state, const Number &p_star)
     {
+      using ScalarNumber = typename get_value_type<Number>::type;
+
       constexpr auto gamma = ProblemDescription<1, Number>::gamma;
       const auto &[rho, u, p, a] = primitive_state;
 
-      if (p_star >= p) {
-        return (p_star - p) * std::sqrt(Number(2.) / rho /
-                                        ((gamma + Number(1.)) * p_star +
-                                         (gamma - Number(1.)) * p));
+      const Number radicand = ScalarNumber(2.) / rho /
+                              ((gamma + ScalarNumber(1.)) * p_star +
+                               (gamma - ScalarNumber(1.)) * p);
+      const Number true_value = (p_star - p) * std::sqrt(radicand);
 
-      } else {
+      const auto exponent =
+          (gamma - ScalarNumber(1.)) / ScalarNumber(2.) / gamma;
+      const Number factor = grendel::pow(p_star / p, exponent) - Number(1.);
+      const auto false_value =
+          factor * ScalarNumber(2.) * a / (gamma - ScalarNumber(1.));
 
-        const Number tmp =
-            grendel::pow(p_star / p,
-                         (gamma - Number(1.0)) / Number(2.0) / gamma) -
-            Number(1.0);
-        return Number(2.0) * a / (gamma - Number(1.0)) * tmp;
-      }
+      return dealii::compare_and_apply_mask<
+          dealii::SIMDComparison::greater_than_or_equal>(
+          p_star, p, true_value, false_value);
     }
 
 
     /**
      * FIXME: Write a lengthy explanation.
      *
-     * See [1], page 912, (3.4). FIXME find equation defining the
+     * See [1], page 912, (3.4).
      */
     template <typename Number>
     inline DEAL_II_ALWAYS_INLINE Number
     df(const std::array<Number, 4> &primitive_state, const Number &p_star)
     {
+      using ScalarNumber = typename get_value_type<Number>::type;
+
       constexpr auto gamma = ProblemDescription<1, Number>::gamma;
       const auto &[rho, u, p, a] = primitive_state;
 
-      if (p_star >= p) {
-        return std::sqrt(
-                   Number(2.) / rho /
-                   ((gamma + Number(1.)) * p_star + (gamma - Number(1.)) * p)) *
-               (Number(1.0) - Number(0.5) * (p_star - p) /
-                                  (p_star + (gamma - Number(1.0)) /
-                                                (gamma + Number(1.0)) * p));
+      const Number radicand = ScalarNumber(2.) / rho /
+                              ((gamma + ScalarNumber(1.)) * p_star +
+                               (gamma - ScalarNumber(1.)) * p);
+      const Number true_value =
+          std::sqrt(radicand) *
+          (Number(1.) - ScalarNumber(0.5) * (p_star - p) /
+                            (p_star + (gamma - ScalarNumber(1.)) /
+                                          (gamma + ScalarNumber(1.)) * p));
 
-      } else {
+      const auto exponent =
+          (ScalarNumber(-1.) - gamma) / ScalarNumber(2.) / gamma;
+      const Number factor = (gamma - ScalarNumber(1.)) / ScalarNumber(2.) /
+                            gamma * grendel::pow(p_star / p, exponent) / p;
+      const auto false_value =
+          factor * ScalarNumber(2.) * a / (gamma - ScalarNumber(1.));
 
-        const Number tmp =
-            (gamma - Number(1.0)) / Number(2.) / gamma *
-            grendel::pow(p_star / p,
-                         (Number(-1.0) - gamma) / Number(2.0) / gamma) /
-            p;
-        return Number(2.) * a / (gamma - Number(1.0)) * tmp;
-      }
+      return dealii::compare_and_apply_mask<
+          dealii::SIMDComparison::greater_than_or_equal>(
+          p_star, p, true_value, false_value);
     }
 
 
@@ -149,8 +156,7 @@ namespace grendel
     /**
      * FIXME: Write a lengthy explanation.
      *
-     * See [1], page 912, (3.3). FIXME find equation defining the
-     * derivative.
+     * See [1], page 912, (3.3).
      */
     template <typename Number>
     inline DEAL_II_ALWAYS_INLINE Number
@@ -170,11 +176,15 @@ namespace grendel
     lambda1_minus(const std::array<Number, 4> &riemann_data,
                   const Number p_star)
     {
+      using ScalarNumber = typename get_value_type<Number>::type;
+
       constexpr auto gamma = ProblemDescription<1, Number>::gamma;
       const auto &[rho, u, p, a] = riemann_data;
 
-      const Number factor = (gamma + Number(1.0)) / Number(2.0) / gamma;
+      const auto factor =
+          (gamma + ScalarNumber(1.0)) / ScalarNumber(2.0) / gamma;
       const Number tmp = positive_part((p_star - p) / p);
+
       return u - a * std::sqrt(Number(1.0) + factor * tmp);
     }
 
@@ -187,10 +197,13 @@ namespace grendel
     lambda3_plus(const std::array<Number, 4> &primitive_state,
                  const Number p_star)
     {
+      using ScalarNumber = typename get_value_type<Number>::type;
+
       constexpr auto gamma = ProblemDescription<1, Number>::gamma;
       const auto &[rho, u, p, a] = primitive_state;
 
-      const Number factor = (gamma + Number(1.0)) / Number(2.0) / gamma;
+      const Number factor =
+          (gamma + ScalarNumber(1.0)) / ScalarNumber(2.0) / gamma;
       const Number tmp = positive_part((p_star - p) / p);
       return u + a * std::sqrt(Number(1.0) + factor * tmp);
     }
@@ -206,6 +219,8 @@ namespace grendel
     p_star_two_rarefaction(const std::array<Number, 4> &riemann_data_i,
                            const std::array<Number, 4> &riemann_data_j)
     {
+      using ScalarNumber = typename get_value_type<Number>::type;
+
       constexpr auto gamma = ProblemDescription<1, Number>::gamma;
       const auto &[rho_i, u_i, p_i, a_i] = riemann_data_i;
       const auto &[rho_j, u_j, p_j, a_j] = riemann_data_j;
@@ -217,17 +232,17 @@ namespace grendel
        * identity below:
        */
 
-      const Number numerator =
-          a_i + a_j - (gamma - Number(1.)) / Number(2.0) * (u_j - u_i);
+      const auto factor = (gamma - ScalarNumber(1.)) / ScalarNumber(2.);
+
+      const Number numerator = a_i + a_j - factor * (u_j - u_i);
 
       const Number denominator =
-          a_i * grendel::pow(p_i / p_j,
-                             -Number(1.0) * (gamma - Number(1.)) / Number(2.) /
-                                 gamma) +
-          a_j * Number(1.0);
+          a_i * grendel::pow(p_i / p_j, -factor / gamma) + a_j * Number(1.0);
 
-      return p_j * grendel::pow(numerator / denominator,
-                                Number(2.0) * gamma / (gamma - Number(1.0)));
+      const auto exponent =
+          ScalarNumber(2.0) * gamma / (gamma - ScalarNumber(1.0));
+
+      return p_j * grendel::pow(numerator / denominator, exponent);
     }
 
 
@@ -258,6 +273,25 @@ namespace grendel
           std::max(std::abs(nu_32 - nu_31), std::abs(nu_12 - nu_11));
 
       return {gap, lambda_max};
+    }
+
+
+    /**
+     * For a given primitive state <code>riemann_data</code> and a guess
+     * for p_star compute an upper bound for lambda.
+     *
+     * This is the same lambda_max as computed by compute_gap.
+     *
+     * See [1], page 914, (4.4a), (4.4b), (4.5), and (4.6)
+     */
+    template <typename Number>
+    inline DEAL_II_ALWAYS_INLINE Number compute_lambda(
+        const std::array<Number, 4> &riemann_data, const Number p_star)
+    {
+      const Number nu_11 = lambda1_minus(riemann_data, p_star);
+      const Number nu_32 = lambda3_plus(riemann_data, p_star);
+
+      return std::max(positive_part(nu_32), negative_part(nu_11));
     }
 
   } /*anonymous namespace*/
