@@ -75,25 +75,23 @@ namespace grendel
      */
     template <typename Number>
     inline DEAL_II_ALWAYS_INLINE Number
-    f_Z(const Number gamma,
-        const Number b,
-        const std::array<Number, 4> &primitive_state,
-        const Number &p)
+    f(const std::array<Number, 4> &primitive_state, const Number &p_star)
     {
-      const auto &[rho_Z, u_Z, p_Z, a_Z] = primitive_state;
+      constexpr auto gamma = ProblemDescription<1, Number>::gamma;
+      const auto &[rho, u, p, a] = primitive_state;
 
-      if (p >= p_Z) {
-        return (p - p_Z) * std::sqrt(Number(2.) / rho_Z /
-                                     ((gamma + Number(1.)) * p +
-                                      (gamma - Number(1.)) * p_Z));
+      if (p_star >= p) {
+        return (p_star - p) * std::sqrt(Number(2.) / rho /
+                                        ((gamma + Number(1.)) * p_star +
+                                         (gamma - Number(1.)) * p));
 
       } else {
 
         const Number tmp =
-            grendel::pow(p / p_Z, (gamma - Number(1.0)) / Number(2.0) / gamma) -
+            grendel::pow(p_star / p,
+                         (gamma - Number(1.0)) / Number(2.0) / gamma) -
             Number(1.0);
-        return Number(2.0) * a_Z * (Number(1.0) - b * rho_Z) /
-               (gamma - Number(1.0)) * tmp;
+        return Number(2.0) * a / (gamma - Number(1.0)) * tmp;
       }
     }
 
@@ -105,33 +103,27 @@ namespace grendel
      */
     template <typename Number>
     inline DEAL_II_ALWAYS_INLINE Number
-    df_Z(const Number gamma,
-         const Number b,
-         const std::array<Number, 4> &primitive_state,
-         const Number &p)
+    df(const std::array<Number, 4> &primitive_state, const Number &p_star)
     {
-      const auto &[rho_Z, u_Z, p_Z, a_Z] = primitive_state;
+      constexpr auto gamma = ProblemDescription<1, Number>::gamma;
+      const auto &[rho, u, p, a] = primitive_state;
 
-      if (p >= p_Z) {
-        /* Derivative of (p - p_Z) * std::sqrt(A_Z / (p + B_Z)): */
-
+      if (p_star >= p) {
         return std::sqrt(
-                   Number(2.) / rho_Z /
-                   ((gamma + Number(1.)) * p + (gamma - Number(1.)) * p_Z)) *
-               (Number(1.0) -
-                Number(0.5) * (p - p_Z) /
-                    (p + (gamma - Number(1.0)) / (gamma + Number(1.0)) * p_Z));
+                   Number(2.) / rho /
+                   ((gamma + Number(1.)) * p_star + (gamma - Number(1.)) * p)) *
+               (Number(1.0) - Number(0.5) * (p_star - p) /
+                                  (p_star + (gamma - Number(1.0)) /
+                                                (gamma + Number(1.0)) * p));
 
       } else {
 
-        /* Derivative of grendel::pow(p / p_Z, (gamma - 1.) / 2. / gamma) - 1.*/
         const Number tmp =
             (gamma - Number(1.0)) / Number(2.) / gamma *
-            grendel::pow(p / p_Z,
+            grendel::pow(p_star / p,
                          (Number(-1.0) - gamma) / Number(2.0) / gamma) /
-            p_Z;
-        return Number(2.) * a_Z * (Number(1.0) - b * rho_Z) /
-               (gamma - Number(1.0)) * tmp;
+            p;
+        return Number(2.) * a / (gamma - Number(1.0)) * tmp;
       }
     }
 
@@ -143,17 +135,14 @@ namespace grendel
      */
     template <typename Number>
     inline DEAL_II_ALWAYS_INLINE Number
-    phi(const Number gamma,
-        const Number b,
-        const std::array<Number, 4> &riemann_data_i,
+    phi(const std::array<Number, 4> &riemann_data_i,
         const std::array<Number, 4> &riemann_data_j,
         const Number &p)
     {
       const Number &u_i = riemann_data_i[1];
       const Number &u_j = riemann_data_j[1];
 
-      return f_Z(gamma, b, riemann_data_i, p) +
-             f_Z(gamma, b, riemann_data_j, p) + u_j - u_i;
+      return f(riemann_data_i, p) + f(riemann_data_j, p) + u_j - u_i;
     }
 
 
@@ -165,14 +154,11 @@ namespace grendel
      */
     template <typename Number>
     inline DEAL_II_ALWAYS_INLINE Number
-    dphi(const Number gamma,
-         const Number b,
-         const std::array<Number, 4> &riemann_data_i,
+    dphi(const std::array<Number, 4> &riemann_data_i,
          const std::array<Number, 4> &riemann_data_j,
          const Number &p)
     {
-      return df_Z(gamma, b, riemann_data_i, p) +
-             df_Z(gamma, b, riemann_data_j, p);
+      return df(riemann_data_i, p) + df(riemann_data_j, p);
     }
 
 
@@ -181,15 +167,15 @@ namespace grendel
      */
     template <typename Number>
     inline DEAL_II_ALWAYS_INLINE Number
-    lambda1_minus(const Number gamma,
-                  const std::array<Number, 4> &riemann_data,
+    lambda1_minus(const std::array<Number, 4> &riemann_data,
                   const Number p_star)
     {
-      const auto &[rho_Z, u_Z, p_Z, a_Z] = riemann_data;
+      constexpr auto gamma = ProblemDescription<1, Number>::gamma;
+      const auto &[rho, u, p, a] = riemann_data;
 
       const Number factor = (gamma + Number(1.0)) / Number(2.0) / gamma;
-      const Number tmp = positive_part((p_star - p_Z) / p_Z);
-      return u_Z - a_Z * std::sqrt(Number(1.0) + factor * tmp);
+      const Number tmp = positive_part((p_star - p) / p);
+      return u - a * std::sqrt(Number(1.0) + factor * tmp);
     }
 
 
@@ -198,15 +184,15 @@ namespace grendel
      */
     template <typename Number>
     inline DEAL_II_ALWAYS_INLINE Number
-    lambda3_plus(const Number gamma,
-                 const std::array<Number, 4> &primitive_state,
+    lambda3_plus(const std::array<Number, 4> &primitive_state,
                  const Number p_star)
     {
-      const auto &[rho_Z, u_Z, p_Z, a_Z] = primitive_state;
+      constexpr auto gamma = ProblemDescription<1, Number>::gamma;
+      const auto &[rho, u, p, a] = primitive_state;
 
       const Number factor = (gamma + Number(1.0)) / Number(2.0) / gamma;
-      const Number tmp = positive_part((p_star - p_Z) / p_Z);
-      return u_Z + a_Z * std::sqrt(Number(1.0) + factor * tmp);
+      const Number tmp = positive_part((p_star - p) / p);
+      return u + a * std::sqrt(Number(1.0) + factor * tmp);
     }
 
 
@@ -217,11 +203,10 @@ namespace grendel
      */
     template <typename Number>
     inline DEAL_II_ALWAYS_INLINE Number
-    p_star_two_rarefaction(const Number gamma,
-                           const Number b,
-                           const std::array<Number, 4> &riemann_data_i,
+    p_star_two_rarefaction(const std::array<Number, 4> &riemann_data_i,
                            const std::array<Number, 4> &riemann_data_j)
     {
+      constexpr auto gamma = ProblemDescription<1, Number>::gamma;
       const auto &[rho_i, u_i, p_i, a_i] = riemann_data_i;
       const auto &[rho_j, u_j, p_j, a_j] = riemann_data_j;
 
@@ -232,18 +217,14 @@ namespace grendel
        * identity below:
        */
 
-      const Number tmp_i = Number(1.0) - b * rho_i;
-      const Number tmp_j = Number(1.0) - b * rho_j;
-
-      const Number numerator = a_i * tmp_i + a_j * tmp_j -
-                               (gamma - Number(1.)) / Number(2.0) * (u_j - u_i);
+      const Number numerator =
+          a_i + a_j - (gamma - Number(1.)) / Number(2.0) * (u_j - u_i);
 
       const Number denominator =
-          a_i * tmp_i *
-              grendel::pow(p_i / p_j,
-                           -Number(1.0) * (gamma - Number(1.)) / Number(2.) /
-                               gamma) +
-          a_j * tmp_j * Number(1.0);
+          a_i * grendel::pow(p_i / p_j,
+                             -Number(1.0) * (gamma - Number(1.)) / Number(2.) /
+                                 gamma) +
+          a_j * Number(1.0);
 
       return p_j * grendel::pow(numerator / denominator,
                                 Number(2.0) * gamma / (gamma - Number(1.0)));
@@ -259,17 +240,16 @@ namespace grendel
      */
     template <typename Number>
     inline DEAL_II_ALWAYS_INLINE std::array<Number, 2>
-    compute_gap(const Number gamma,
-                const std::array<Number, 4> &riemann_data_i,
+    compute_gap(const std::array<Number, 4> &riemann_data_i,
                 const std::array<Number, 4> &riemann_data_j,
                 const Number p_1,
                 const Number p_2)
     {
-      const Number nu_11 = lambda1_minus(gamma, riemann_data_i, p_2 /*SIC!*/);
-      const Number nu_12 = lambda1_minus(gamma, riemann_data_i, p_1 /*SIC!*/);
+      const Number nu_11 = lambda1_minus(riemann_data_i, p_2 /*SIC!*/);
+      const Number nu_12 = lambda1_minus(riemann_data_i, p_1 /*SIC!*/);
 
-      const Number nu_31 = lambda3_plus(gamma, riemann_data_j, p_1);
-      const Number nu_32 = lambda3_plus(gamma, riemann_data_j, p_2);
+      const Number nu_31 = lambda3_plus(riemann_data_j, p_1);
+      const Number nu_32 = lambda3_plus(riemann_data_j, p_2);
 
       const Number lambda_max =
           std::max(positive_part(nu_32), negative_part(nu_11));
@@ -306,9 +286,6 @@ namespace grendel
       const std::array<Number, 4> &riemann_data_i,
       const std::array<Number, 4> &riemann_data_j)
   {
-    constexpr Number gamma = ProblemDescription<dim, Number>::gamma;
-    constexpr Number b = ProblemDescription<dim, Number>::b;
-
     const Number p_min = std::min(riemann_data_i[2], riemann_data_j[2]);
     const Number p_max = std::max(riemann_data_i[2], riemann_data_j[2]);
 
@@ -320,24 +297,22 @@ namespace grendel
      * away.
      */
 
-    const Number phi_p_min =
-        phi(gamma, b, riemann_data_i, riemann_data_j, p_min);
+    const Number phi_p_min = phi(riemann_data_i, riemann_data_j, p_min);
 
     if (phi_p_min >= 0.) {
       const Number p_star = 0.;
-      const Number lambda1 = lambda1_minus(gamma, riemann_data_i, p_star);
-      const Number lambda3 = lambda3_plus(gamma, riemann_data_j, p_star);
+      const Number lambda1 = lambda1_minus(riemann_data_i, p_star);
+      const Number lambda3 = lambda3_plus(riemann_data_j, p_star);
       const Number lambda_max = std::max(std::abs(lambda1), std::abs(lambda3));
       return {lambda_max, p_star, 0};
     }
 
-    const Number phi_p_max =
-        phi(gamma, b, riemann_data_i, riemann_data_j, p_max);
+    const Number phi_p_max = phi(riemann_data_i, riemann_data_j, p_max);
 
     if (std::abs(phi_p_max) <= newton_eps_) {
       const Number p_star = p_max;
-      const Number lambda1 = lambda1_minus(gamma, riemann_data_i, p_star);
-      const Number lambda3 = lambda3_plus(gamma, riemann_data_j, p_star);
+      const Number lambda1 = lambda1_minus(riemann_data_i, p_star);
+      const Number lambda3 = lambda3_plus(riemann_data_j, p_star);
       const Number lambda_max = std::max(std::abs(lambda1), std::abs(lambda3));
       return {lambda_max, p_star, 0};
     }
@@ -351,7 +326,7 @@ namespace grendel
      */
 
     const Number p_star_tilde =
-        p_star_two_rarefaction(gamma, b, riemann_data_i, riemann_data_j);
+        p_star_two_rarefaction(riemann_data_i, riemann_data_j);
 
     Number p_1 = (phi_p_max < 0.) ? p_max : p_min;
     Number p_2 =
@@ -366,7 +341,7 @@ namespace grendel
     unsigned int i = 0;
     do {
       const auto [gap, lambda_max] =
-          compute_gap(gamma, riemann_data_i, riemann_data_j, p_1, p_2);
+          compute_gap(riemann_data_i, riemann_data_j, p_1, p_2);
 
       /*
        * We return our current guess if we either reach the tolerance...
@@ -384,10 +359,8 @@ namespace grendel
 
 #if DEBUG
       {
-        const Number phi_p_1 =
-            phi(gamma, b, riemann_data_i, riemann_data_j, p_1);
-        const Number phi_p_2 =
-            phi(gamma, b, riemann_data_i, riemann_data_j, p_2);
+        const Number phi_p_1 = phi(riemann_data_i, riemann_data_j, p_1);
+        const Number phi_p_2 = phi(riemann_data_i, riemann_data_j, p_2);
         Assert(phi_p_1 <= 0. && phi_p_2 >= 0.,
                dealii::ExcMessage("Houston, we have a problem!"));
       }
@@ -397,12 +370,10 @@ namespace grendel
        * This is expensive:
        */
 
-      const Number phi_p_1 = phi(gamma, b, riemann_data_i, riemann_data_j, p_1);
-      const Number dphi_p_1 =
-          dphi(gamma, b, riemann_data_i, riemann_data_j, p_1);
-      const Number phi_p_2 = phi(gamma, b, riemann_data_i, riemann_data_j, p_2);
-      const Number dphi_p_2 =
-          dphi(gamma, b, riemann_data_i, riemann_data_j, p_2);
+      const Number phi_p_1 = phi(riemann_data_i, riemann_data_j, p_1);
+      const Number dphi_p_1 = dphi(riemann_data_i, riemann_data_j, p_1);
+      const Number phi_p_2 = phi(riemann_data_i, riemann_data_j, p_2);
+      const Number dphi_p_2 = dphi(riemann_data_i, riemann_data_j, p_2);
 
       /*
        * Sanity checks:
@@ -454,7 +425,7 @@ namespace grendel
          * so call the compute_gap function with reversed parameters:
          */
         const auto [gap, lambda_max] = compute_gap(
-            gamma, riemann_data_i, riemann_data_j, p_2 /*SIC!*/, p_1 /*SIC!*/);
+            riemann_data_i, riemann_data_j, p_2 /*SIC!*/, p_1 /*SIC!*/);
         return {lambda_max, p_2, i + 1};
       }
 
