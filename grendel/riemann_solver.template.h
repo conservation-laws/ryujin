@@ -306,14 +306,52 @@ namespace grendel
       const rank1_type U_j,
       const dealii::Tensor<1, dim, Number> &n_ij)
   {
-    /*
-     * Step 1: Compute projected 1D states.
-     */
-
     const auto riemann_data_i = riemann_data_from_state(U_i, n_ij);
     const auto riemann_data_j = riemann_data_from_state(U_j, n_ij);
 
-    return compute(riemann_data_i, riemann_data_j);
+    if constexpr (newton_max_iter_ > 0)
+
+      /*
+       * The approximate Riemann solver with quadratic Newton scheme is
+       * currently only implemented for non-SIMD Number types.
+       */
+      return compute(riemann_data_i, riemann_data_j);
+
+    else {
+
+      /*
+       * This duplicates some (slightly refactored code) from the function
+       * below:
+       */
+
+      const Number p_min = std::min(riemann_data_i[2], riemann_data_j[2]);
+      const Number p_max = std::max(riemann_data_i[2], riemann_data_j[2]);
+
+      const Number phi_p_min = phi(riemann_data_i, riemann_data_j, p_min);
+      const Number phi_p_max = phi(riemann_data_i, riemann_data_j, p_max);
+
+      const Number p_star_tilde =
+          p_star_two_rarefaction(riemann_data_i, riemann_data_j);
+
+      Number p_star =
+          dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+              phi_p_max,
+              Number(0.),
+              p_star_tilde,
+              std::min(p_max, p_star_tilde));
+
+      p_star =
+          dealii::compare_and_apply_mask<dealii::SIMDComparison::greater_than>(
+              phi_p_min, Number(0.), Number(0.), p_star);
+
+      p_star = dealii::compare_and_apply_mask<
+          dealii::SIMDComparison::less_than_or_equal>(
+          std::abs(phi_p_min), Number(newton_eps_), Number(0.), p_star);
+
+      const Number lambda_max =
+          compute_lambda(riemann_data_i, riemann_data_j, p_star);
+      return {lambda_max, p_star, 0};
+    }
   }
 
 
@@ -323,6 +361,10 @@ namespace grendel
       const std::array<Number, 4> &riemann_data_i,
       const std::array<Number, 4> &riemann_data_j)
   {
+    static_assert(std::is_same<Number, double>::value ||
+                      std::is_same<Number, float>::value,
+                  "Currently not ported to SIMD");
+
     const Number p_min = std::min(riemann_data_i[2], riemann_data_j[2]);
     const Number p_max = std::max(riemann_data_i[2], riemann_data_j[2]);
 
