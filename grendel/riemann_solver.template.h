@@ -277,19 +277,22 @@ namespace grendel
 
 
     /**
-     * For a given primitive state <code>riemann_data</code> and a guess
-     * for p_star compute an upper bound for lambda.
+     * For two given primitive states <code>riemann_data_i</code> and
+     * <code>riemann_data_j</code>, and a guess p_2, compute an upper bound
+     * for lambda.
      *
      * This is the same lambda_max as computed by compute_gap.
      *
      * See [1], page 914, (4.4a), (4.4b), (4.5), and (4.6)
      */
     template <typename Number>
-    inline DEAL_II_ALWAYS_INLINE Number compute_lambda(
-        const std::array<Number, 4> &riemann_data, const Number p_star)
+    inline DEAL_II_ALWAYS_INLINE Number
+    compute_lambda(const std::array<Number, 4> &riemann_data_i,
+                   const std::array<Number, 4> &riemann_data_j,
+                   const Number p_star)
     {
-      const Number nu_11 = lambda1_minus(riemann_data, p_star);
-      const Number nu_32 = lambda3_plus(riemann_data, p_star);
+      const Number nu_11 = lambda1_minus(riemann_data_i, p_star);
+      const Number nu_32 = lambda3_plus(riemann_data_j, p_star);
 
       return std::max(positive_part(nu_32), negative_part(nu_11));
     }
@@ -335,9 +338,8 @@ namespace grendel
 
     if (phi_p_min >= 0.) {
       const Number p_star = 0.;
-      const Number lambda1 = lambda1_minus(riemann_data_i, p_star);
-      const Number lambda3 = lambda3_plus(riemann_data_j, p_star);
-      const Number lambda_max = std::max(std::abs(lambda1), std::abs(lambda3));
+      const Number lambda_max =
+          compute_lambda(riemann_data_i, riemann_data_j, p_star);
       return {lambda_max, p_star, 0};
     }
 
@@ -345,9 +347,8 @@ namespace grendel
 
     if (std::abs(phi_p_max) <= newton_eps_) {
       const Number p_star = p_max;
-      const Number lambda1 = lambda1_minus(riemann_data_i, p_star);
-      const Number lambda3 = lambda3_plus(riemann_data_j, p_star);
-      const Number lambda_max = std::max(std::abs(lambda1), std::abs(lambda3));
+      const Number lambda_max =
+          compute_lambda(riemann_data_i, riemann_data_j, p_star);
       return {lambda_max, p_star, 0};
     }
 
