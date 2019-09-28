@@ -31,7 +31,7 @@ namespace grendel
     template <typename Number>
     inline DEAL_II_ALWAYS_INLINE Number negative_part(const Number number)
     {
-      return (std::fabs(number) - number) / Number(2.0);
+      return (std::abs(number) - number) / Number(2.0);
     }
 
 
