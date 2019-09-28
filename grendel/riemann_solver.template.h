@@ -340,13 +340,13 @@ namespace grendel
               p_star_tilde,
               std::min(p_max, p_star_tilde));
 
-      p_star =
-          dealii::compare_and_apply_mask<dealii::SIMDComparison::greater_than>(
-              phi_p_min, Number(0.), Number(0.), p_star);
-
       p_star = dealii::compare_and_apply_mask<
           dealii::SIMDComparison::less_than_or_equal>(
-          std::abs(phi_p_min), Number(newton_eps_), Number(0.), p_star);
+          std::abs(phi_p_max), Number(newton_eps_), p_max, p_star);
+
+      p_star = dealii::compare_and_apply_mask<
+          dealii::SIMDComparison::greater_than_or_equal>(
+          phi_p_min, Number(0.), Number(0.), p_star);
 
       const Number lambda_max =
           compute_lambda(riemann_data_i, riemann_data_j, p_star);
