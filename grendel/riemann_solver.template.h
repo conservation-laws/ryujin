@@ -309,19 +309,19 @@ namespace grendel
     const auto riemann_data_i = riemann_data_from_state(U_i, n_ij);
     const auto riemann_data_j = riemann_data_from_state(U_j, n_ij);
 
-    if constexpr (newton_max_iter_ > 0)
+    return compute(riemann_data_i, riemann_data_j);
+  }
+
+
+  template <int dim, typename Number>
+  std::tuple<Number, Number, unsigned int> RiemannSolver<dim, Number>::compute(
+      const std::array<Number, 4> &riemann_data_i,
+      const std::array<Number, 4> &riemann_data_j)
+  {
+    if constexpr (newton_max_iter_ == 0) {
 
       /*
-       * The approximate Riemann solver with quadratic Newton scheme is
-       * currently only implemented for non-SIMD Number types.
-       */
-      return compute(riemann_data_i, riemann_data_j);
-
-    else {
-
-      /*
-       * This duplicates some (slightly refactored code) from the function
-       * below:
+       * SIMDified version of the two-rarefaction approximation.
        */
 
       const Number p_min = std::min(riemann_data_i[2], riemann_data_j[2]);
@@ -350,167 +350,159 @@ namespace grendel
 
       const Number lambda_max =
           compute_lambda(riemann_data_i, riemann_data_j, p_star);
-      return {lambda_max, p_star, 0};
-    }
-  }
+      return {lambda_max, p_star, -1};
 
-
-  template <int dim, typename Number>
-  template <unsigned int max_iter>
-  std::tuple<Number, Number, unsigned int> RiemannSolver<dim, Number>::compute(
-      const std::array<Number, 4> &riemann_data_i,
-      const std::array<Number, 4> &riemann_data_j)
-  {
-    static_assert(std::is_same<Number, double>::value ||
-                      std::is_same<Number, float>::value,
-                  "Currently not ported to SIMD");
-
-    const Number p_min = std::min(riemann_data_i[2], riemann_data_j[2]);
-    const Number p_max = std::max(riemann_data_i[2], riemann_data_j[2]);
-
-    /*
-     * Step 2: Shortcuts.
-     *
-     * In a number of cases we actually do not need to do a Newton search
-     * for the optimal lambda upper bound, but know the answer right
-     * away.
-     */
-
-    const Number phi_p_min = phi(riemann_data_i, riemann_data_j, p_min);
-
-    if (phi_p_min >= 0.) {
-      const Number p_star = 0.;
-      const Number lambda_max =
-          compute_lambda(riemann_data_i, riemann_data_j, p_star);
-      return {lambda_max, p_star, 0};
-    }
-
-    const Number phi_p_max = phi(riemann_data_i, riemann_data_j, p_max);
-
-    if (std::abs(phi_p_max) <= newton_eps_) {
-      const Number p_star = p_max;
-      const Number lambda_max =
-          compute_lambda(riemann_data_i, riemann_data_j, p_star);
-      return {lambda_max, p_star, 0};
-    }
-
-    /*
-     * Step 3: Prepare quadratic Newton method.
-     *
-     * We need a good upper and lower bound, p_1 < p_star < p_2, for the
-     * Newton method. (Ideally, for a moderate tolerance we might not
-     * iterate at all.)
-     */
-
-    const Number p_star_tilde =
-        p_star_two_rarefaction(riemann_data_i, riemann_data_j);
-
-    Number p_1 = (phi_p_max < 0.) ? p_max : p_min;
-    Number p_2 =
-        (phi_p_max < 0.) ? p_star_tilde : std::min(p_max, p_star_tilde);
-
-    /*
-     * Step 4: Perform quadratic Newton iteration.
-     *
-     * See [1], p. 915f (4.8) and (4.9)
-     */
-
-    unsigned int i = 0;
-    do {
-      const auto [gap, lambda_max] =
-          compute_gap(riemann_data_i, riemann_data_j, p_1, p_2);
+    } else {
 
       /*
-       * We return our current guess if we either reach the tolerance...
+       * Full approximate Riemann solver, currently only implemented for
+       * nonSIMD number types
        */
-      if (gap < newton_eps_)
-        return {lambda_max, p_2, i};
+
+      static_assert(std::is_same<Number, double>::value ||
+                        std::is_same<Number, float>::value,
+                    "Currently not ported to SIMD");
+
+      const Number p_min = std::min(riemann_data_i[2], riemann_data_j[2]);
+      const Number p_max = std::max(riemann_data_i[2], riemann_data_j[2]);
+
+      const Number phi_p_min = phi(riemann_data_i, riemann_data_j, p_min);
+
+      if (phi_p_min >= 0.) {
+        const Number p_star = 0.;
+        const Number lambda_max =
+            compute_lambda(riemann_data_i, riemann_data_j, p_star);
+        return {lambda_max, p_star, 0};
+      }
+
+      const Number phi_p_max = phi(riemann_data_i, riemann_data_j, p_max);
+
+      if (std::abs(phi_p_max) <= newton_eps_) {
+        const Number p_star = p_max;
+        const Number lambda_max =
+            compute_lambda(riemann_data_i, riemann_data_j, p_star);
+        return {lambda_max, p_star, 0};
+      }
 
       /*
-       * ... or if we reached the number of allowed Newton iterations.
-       * lambda_max is a guaranteed upper bound, in the worst case we
-       * overestimated the result.
+       * Step 3: Prepare quadratic Newton method.
+       *
+       * We need a good upper and lower bound, p_1 < p_star < p_2, for the
+       * Newton method. (Ideally, for a moderate tolerance we might not
+       * iterate at all.)
        */
-      if (i + 1 >= max_iter)
-        return {lambda_max, p_2, std::numeric_limits<unsigned int>::max()};
+
+      const Number p_star_tilde =
+          p_star_two_rarefaction(riemann_data_i, riemann_data_j);
+
+      Number p_1 = (phi_p_max < 0.) ? p_max : p_min;
+      Number p_2 =
+          (phi_p_max < 0.) ? p_star_tilde : std::min(p_max, p_star_tilde);
+
+      /*
+       * Step 4: Perform quadratic Newton iteration.
+       *
+       * See [1], p. 915f (4.8) and (4.9)
+       */
+
+      unsigned int i = 0;
+      do {
+        const auto [gap, lambda_max] =
+            compute_gap(riemann_data_i, riemann_data_j, p_1, p_2);
+
+        /*
+         * We return our current guess if we either reach the tolerance...
+         */
+        if (gap < newton_eps_)
+          return {lambda_max, p_2, i};
+
+        /*
+         * ... or if we reached the number of allowed Newton iterations.
+         * lambda_max is a guaranteed upper bound, in the worst case we
+         * overestimated the result.
+         */
+        if (i + 1 >= newton_max_iter_)
+          return {lambda_max, p_2, std::numeric_limits<unsigned int>::max()};
 
 #if DEBUG
-      {
-        const Number phi_p_1 = phi(riemann_data_i, riemann_data_j, p_1);
-        const Number phi_p_2 = phi(riemann_data_i, riemann_data_j, p_2);
-        Assert(phi_p_1 <= 0. && phi_p_2 >= 0.,
-               dealii::ExcMessage("Houston, we have a problem!"));
-      }
+        {
+          const Number phi_p_1 = phi(riemann_data_i, riemann_data_j, p_1);
+          const Number phi_p_2 = phi(riemann_data_i, riemann_data_j, p_2);
+          Assert(phi_p_1 <= 0. && phi_p_2 >= 0.,
+                 dealii::ExcMessage("Houston, we have a problem!"));
+        }
 #endif
 
-      /*
-       * This is expensive:
-       */
-
-      const Number phi_p_1 = phi(riemann_data_i, riemann_data_j, p_1);
-      const Number dphi_p_1 = dphi(riemann_data_i, riemann_data_j, p_1);
-      const Number phi_p_2 = phi(riemann_data_i, riemann_data_j, p_2);
-      const Number dphi_p_2 = dphi(riemann_data_i, riemann_data_j, p_2);
-
-      /*
-       * Sanity checks:
-       *  * phi is monotone increasing and concave down: the derivative
-       *    has to be positive, both function values have to be different
-       *  * p_1 < p_2
-       */
-
-      Assert(dphi_p_1 > 0., dealii::ExcMessage("Houston, we have a problem!"));
-      Assert(dphi_p_2 > 0., dealii::ExcMessage("Houston, we have a problem!"));
-      Assert(phi_p_1 < phi_p_2,
-             dealii::ExcMessage("Houston, we have a problem!"));
-      Assert(p_1 < p_2, dealii::ExcMessage("Houston, we have a problem!"));
-
-      /*
-       * Compute divided differences
-       */
-
-      const Number dd_11 = dphi_p_1;
-      const Number dd_12 = (phi_p_2 - phi_p_1) / (p_2 - p_1);
-      const Number dd_22 = dphi_p_2;
-
-      const Number dd_112 = (dd_12 - dd_11) / (p_2 - p_1);
-      const Number dd_122 = (dd_22 - dd_12) / (p_2 - p_1);
-
-      /* Update left point: */
-      const Number discriminant_1 =
-          dphi_p_1 * dphi_p_1 - Number(4.0) * phi_p_1 * dd_112;
-      Assert(discriminant_1 > 0.0,
-             dealii::ExcMessage("Houston, we have a problem!"));
-      if (discriminant_1 > 0.)
-        p_1 = p_1 -
-              Number(2.0) * phi_p_1 / (dphi_p_1 + std::sqrt(discriminant_1));
-
-      /* Update right point: */
-      const Number discriminant_2 =
-          dphi_p_2 * dphi_p_2 - Number(4.0) * phi_p_2 * dd_122;
-      Assert(discriminant_2 > 0.0,
-             dealii::ExcMessage("Houston, we have a problem!"));
-      if (discriminant_2 > 0.)
-        p_2 = p_2 -
-              Number(2.0) * phi_p_2 / (dphi_p_2 + std::sqrt(discriminant_2));
-
-
-      /* We have found our root (up to roundoff erros): */
-      if (p_1 >= p_2) {
         /*
-         * p_1 has changed position with p_2, it is now on the right side,
-         * so call the compute_gap function with reversed parameters:
+         * This is expensive:
          */
-        const auto [gap, lambda_max] = compute_gap(
-            riemann_data_i, riemann_data_j, p_2 /*SIC!*/, p_1 /*SIC!*/);
-        return {lambda_max, p_2, i + 1};
-      }
 
-    } while (i++ < max_iter);
+        const Number phi_p_1 = phi(riemann_data_i, riemann_data_j, p_1);
+        const Number dphi_p_1 = dphi(riemann_data_i, riemann_data_j, p_1);
+        const Number phi_p_2 = phi(riemann_data_i, riemann_data_j, p_2);
+        const Number dphi_p_2 = dphi(riemann_data_i, riemann_data_j, p_2);
 
-    __builtin_unreachable();
+        /*
+         * Sanity checks:
+         *  * phi is monotone increasing and concave down: the derivative
+         *    has to be positive, both function values have to be different
+         *  * p_1 < p_2
+         */
+
+        Assert(dphi_p_1 > 0.,
+               dealii::ExcMessage("Houston, we have a problem!"));
+        Assert(dphi_p_2 > 0.,
+               dealii::ExcMessage("Houston, we have a problem!"));
+        Assert(phi_p_1 < phi_p_2,
+               dealii::ExcMessage("Houston, we have a problem!"));
+        Assert(p_1 < p_2, dealii::ExcMessage("Houston, we have a problem!"));
+
+        /*
+         * Compute divided differences
+         */
+
+        const Number dd_11 = dphi_p_1;
+        const Number dd_12 = (phi_p_2 - phi_p_1) / (p_2 - p_1);
+        const Number dd_22 = dphi_p_2;
+
+        const Number dd_112 = (dd_12 - dd_11) / (p_2 - p_1);
+        const Number dd_122 = (dd_22 - dd_12) / (p_2 - p_1);
+
+        /* Update left point: */
+        const Number discriminant_1 =
+            dphi_p_1 * dphi_p_1 - Number(4.0) * phi_p_1 * dd_112;
+        Assert(discriminant_1 > 0.0,
+               dealii::ExcMessage("Houston, we have a problem!"));
+        if (discriminant_1 > 0.)
+          p_1 = p_1 -
+                Number(2.0) * phi_p_1 / (dphi_p_1 + std::sqrt(discriminant_1));
+
+        /* Update right point: */
+        const Number discriminant_2 =
+            dphi_p_2 * dphi_p_2 - Number(4.0) * phi_p_2 * dd_122;
+        Assert(discriminant_2 > 0.0,
+               dealii::ExcMessage("Houston, we have a problem!"));
+        if (discriminant_2 > 0.)
+          p_2 = p_2 -
+                Number(2.0) * phi_p_2 / (dphi_p_2 + std::sqrt(discriminant_2));
+
+
+        /* We have found our root (up to roundoff erros): */
+        if (p_1 >= p_2) {
+          /*
+           * p_1 has changed position with p_2, it is now on the right side,
+           * so call the compute_gap function with reversed parameters:
+           */
+          const auto [gap, lambda_max] = compute_gap(
+              riemann_data_i, riemann_data_j, p_2 /*SIC!*/, p_1 /*SIC!*/);
+          return {lambda_max, p_2, i + 1};
+        }
+
+      } while (i++ < newton_max_iter_);
+
+      __builtin_unreachable();
+    } /* if constexpr */
   }
-
 
 } /* namespace grendel */
 

@@ -8,14 +8,13 @@
 #include <deal.II/base/vectorization.h>
 #include <deal.II/lac/la_parallel_vector.templates.h>
 
-/**
- * FIXME: Currently the handling of compile time constants is a big mess...
- */
 
+/* FIXME: Currently the handling of compile time constants is a big mess... */
 #ifndef INDICATOR
 #define INDICATOR Indicators::entropy_viscosity_commutator
 #endif
 
+/* FIXME: Currently the handling of compile time constants is a big mess... */
 #ifndef SMOOTHNESS_INDICATOR
 #define SMOOTHNESS_INDICATOR SmoothnessIndicators::pressure
 #endif

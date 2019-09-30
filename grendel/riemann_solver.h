@@ -11,6 +11,11 @@
 
 #include <functional>
 
+/* FIXME: Currently the handling of compile time constants is a big mess... */
+#ifndef NEWTON_MAX_ITER
+#define NEWTON_MAX_ITER 0
+#endif
+
 namespace grendel
 {
 
@@ -36,9 +41,9 @@ namespace grendel
      */
 
     static constexpr ScalarNumber newton_eps_ =
-        std::is_same<Number, double>::value ? 1.0e-10 : 1.0e-5;
+        std::is_same<ScalarNumber, double>::value ? 1.0e-10 : 1.0e-5;
 
-    static constexpr unsigned int newton_max_iter_ = 0;
+    static constexpr unsigned int newton_max_iter_ = NEWTON_MAX_ITER;
 
     /**
      * For two given states U_i a U_j and a (normalized) "direction" n_ij
@@ -65,9 +70,6 @@ namespace grendel
      * Variant of above function that takes two arrays as input describing
      * the "1D Riemann data" instead of two nD states.
      */
-    // Remark: We use the  non-type template parameter max_iter in order to
-    // change the compile-time constant in the test
-    template <unsigned int max_iter = newton_max_iter_>
     static std::tuple<Number /*lambda_max*/,
                       Number /*p_star*/,
                       unsigned int /*iteration*/>
