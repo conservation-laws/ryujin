@@ -239,11 +239,9 @@ namespace grendel
      * dealii::SparseMatrix<dim>.
      *
      * These sparse matrices have to store values for all _locally
-     * extended_ degrees of freedom that couple. Unfortunately, the deal.II
-     * library doesn't have a helper function to record such a sparsity
-     * pattern, so we quickly do the grunt work by hand. While we are at
-     * it, we also apply a translation between the global (distributed)
-     * degrees of freedom numbering and the local index range [0,
+     * extended_ degrees of freedom that couple. While we are at it, we
+     * also apply a translation between the global (distributed) degrees of
+     * freedom numbering and the local index range [0,
      * locally_relevant_.n_elements()];
      */
 
