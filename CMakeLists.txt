@@ -28,6 +28,11 @@ IF(CMAKE_CXX_COMPILER MATCHES "clang")
   STRING(APPEND DEAL_II_LINKER_FLAGS_DEBUG
     " -fsanitize=address -fsanitize-address-use-after-scope"
     )
+
+ELSE()
+  STRING(REPLACE "-Xclang" "" DEAL_II_CXX_FLAGS "${DEAL_II_CXX_FLAGS}")
+  STRING(REPLACE "-fcolor-diagnostics" "" DEAL_II_CXX_FLAGS "${DEAL_II_CXX_FLAGS}")
+  STRING(REPLACE "-Qunused-arguments" "" DEAL_II_CXX_FLAGS "${DEAL_II_CXX_FLAGS}")
 ENDIF()
 
 
