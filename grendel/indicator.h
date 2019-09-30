@@ -3,8 +3,23 @@
 
 #include "offline_data.h"
 #include "problem_description.h"
+#include "simd.h"
 
+#include <deal.II/base/vectorization.h>
 #include <deal.II/lac/la_parallel_vector.templates.h>
+
+/**
+ * FIXME: Currently the handling of compile time constants is a big mess...
+ */
+
+#ifndef INDICATOR
+#define INDICATOR Indicators::entropy_viscosity_commutator
+#endif
+
+#ifndef SMOOTHNESS_INDICATOR
+#define SMOOTHNESS_INDICATOR SmoothnessIndicators::pressure
+#endif
+
 
 namespace grendel
 {
@@ -34,13 +49,13 @@ namespace grendel
       one,
       smoothness_indicator,
       entropy_viscosity_commutator
-    } indicator_ = Indicators::entropy_viscosity_commutator;
+    } indicator_ = INDICATOR;
 
     static constexpr enum class SmoothnessIndicators {
       rho,
       internal_energy,
       pressure,
-    } smoothness_indicator_ = SmoothnessIndicators::pressure;
+    } smoothness_indicator_ = SMOOTHNESS_INDICATOR;
 
     static constexpr ScalarNumber smoothness_indicator_alpha_0_ = 0.;
 
@@ -207,12 +222,14 @@ namespace grendel
   DEAL_II_ALWAYS_INLINE inline Number
   Indicator<dim, Number>::alpha(const Number hd_i)
   {
+    using ScalarNumber = typename get_value_type<Number>::type;
+
     if constexpr (indicator_ == Indicators::zero) {
-      return 0.;
+      return Number(0.);
     }
 
     if constexpr (indicator_ == Indicators::one) {
-      return 1.;
+      return Number(1.);
     }
 
     if constexpr (indicator_ == Indicators::entropy_viscosity_commutator) {
@@ -226,19 +243,21 @@ namespace grendel
     }
 
     if constexpr (indicator_ == Indicators::smoothness_indicator) {
-      const auto beta_i = std::abs(numerator) / denominator_abs;
+      const Number beta_i = std::abs(numerator) / denominator_abs;
 
-      if (denominator > 1.e-7 * denominator_abs) {
-        const auto ratio = std::abs(numerator) / denominator;
-        const auto alpha_i =
-            dealii::Utilities::fixed_power<smoothness_indicator_power_>(
-                std::max(ratio - smoothness_indicator_alpha_0_, 0.)) /
-            dealii::Utilities::fixed_power<smoothness_indicator_power_>(
-                1 - smoothness_indicator_alpha_0_);
-        return std::min(alpha_i, beta_i);
-      }
+      const Number ratio = std::abs(numerator) / denominator;
+      const Number alpha_i =
+          dealii::Utilities::fixed_power<smoothness_indicator_power_>(
+              std::max(ratio - smoothness_indicator_alpha_0_, Number(0.))) /
+          dealii::Utilities::fixed_power<smoothness_indicator_power_>(
+              1 - smoothness_indicator_alpha_0_);
 
-      return beta_i;
+      return dealii::compare_and_apply_mask<
+          dealii::SIMDComparison::greater_than>(denominator,
+                                                ScalarNumber(1.0e-7) *
+                                                    denominator_abs,
+                                                std::min(alpha_i, beta_i),
+                                                beta_i);
     }
 
     __builtin_unreachable();
