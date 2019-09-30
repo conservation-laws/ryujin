@@ -106,9 +106,12 @@ namespace grendel
 
         types::global_dof_index index = offset;
 
+        n_locally_internal_ = 0;
         for (auto &it : new_order)
-          if (it != numbers::invalid_dof_index)
+          if (it != numbers::invalid_dof_index) {
             it = index++;
+            n_locally_internal_++;
+          }
 
         for (auto &it : new_order)
           if (it == numbers::invalid_dof_index)
@@ -127,26 +130,31 @@ namespace grendel
           Utilities::MPI::this_mpi_process(mpi_communicator_);
       const auto n_mpi_processes =
           Utilities::MPI::n_mpi_processes(mpi_communicator_);
-      unsigned int n_locally_owned_dofs = dof_handler_.n_locally_owned_dofs();
+
+      unsigned int dofs[2];
+      dofs[0] = n_locally_owned_;
+      dofs[1] = n_locally_internal_;
 
       if (this_mpi_process > 0) {
-        MPI_Send(
-            &n_locally_owned_dofs, 1, MPI_UNSIGNED, 0, 0, mpi_communicator_);
+        MPI_Send(&dofs, 2, MPI_UNSIGNED, 0, 0, mpi_communicator_);
 
       } else {
 
-        deallog << "        ( " << n_locally_owned_dofs << std::flush;
-        for (unsigned int p = 1; p < n_mpi_processes; ++p) {
-          MPI_Recv(&n_locally_owned_dofs,
-                   1,
-                   MPI_UNSIGNED,
-                   p,
-                   0,
-                   mpi_communicator_,
-                   MPI_STATUS_IGNORE);
-          deallog << " + " << n_locally_owned_dofs << std::flush;
+        for (unsigned int p = 0; p < n_mpi_processes; ++p) {
+          deallog << "            Rank " << p << std::flush;
+
+          if (p != 0)
+            MPI_Recv(&dofs,
+                     2,
+                     MPI_UNSIGNED,
+                     p,
+                     0,
+                     mpi_communicator_,
+                     MPI_STATUS_IGNORE);
+
+          deallog << ":\tlocal: " << dofs[0] << std::flush;
+          deallog << "\tinternal: " << dofs[1] << std::endl;
         }
-        deallog << " )" << std::endl;
       }
     }
 

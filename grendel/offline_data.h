@@ -72,19 +72,33 @@ namespace grendel
     ACCESSOR_READ_ONLY(dof_handler)
 
     /**
-     * FIXME Description.
+     * The MPI partitioner used in all distributed Vectors.
      */
     std::shared_ptr<const dealii::Utilities::MPI::Partitioner> partitioner_;
     ACCESSOR_READ_ONLY_NO_DEREFERENCE(partitioner)
 
     /**
-     * FIXME Description.
+     * Number of locally owned internal degrees of freedom: In (MPI rank)
+     * local numbering all indices in the half open interval [0,
+     * n_locally_internal_) are owned by this processor, as well as not
+     * situated at a boundary.
+     */
+    unsigned int n_locally_internal_;
+    ACCESSOR_READ_ONLY(n_locally_internal)
+
+    /**
+     * Number of locally owned degrees of freedom: In (MPI rank) local
+     * numbering all indices in the half open interval [0,
+     * n_locally_owned_) are owned by this processor.
      */
     unsigned int n_locally_owned_;
     ACCESSOR_READ_ONLY(n_locally_owned)
 
     /**
-     * FIXME Description.
+     * Number of locally relevant degrees of freedom: This number is the
+     * toal number of degrees of freedom we store locally on this MPI rank.
+     * I.e.,  we can access the half open interval [0, n_locally_relevant_)
+     * on this machine.
      */
     unsigned int n_locally_relevant_;
     ACCESSOR_READ_ONLY(n_locally_relevant)
