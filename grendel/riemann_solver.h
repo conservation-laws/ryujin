@@ -41,7 +41,8 @@ namespace grendel
      */
 
     static constexpr ScalarNumber newton_eps_ =
-        std::is_same<ScalarNumber, double>::value ? 1.0e-10 : 1.0e-5;
+        std::is_same<ScalarNumber, double>::value ? ScalarNumber(1.0e-10)
+                                                  : ScalarNumber(1.0e-5);
 
     static constexpr unsigned int newton_max_iter_ = NEWTON_MAX_ITER;
 

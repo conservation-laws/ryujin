@@ -57,9 +57,10 @@ namespace grendel
     std::string configuration_;
 
     dealii::Point<dim> initial_position_;
-    dealii::Tensor<1, dim, Number> initial_direction_;
+    dealii::Tensor<1, dim> initial_direction_;
 
     dealii::Tensor<1, 3, Number> initial_1d_state_;
+
     Number initial_mach_number_;
 
     Number initial_vortex_beta_;

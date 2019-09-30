@@ -94,10 +94,10 @@ namespace ryujin
     base_name = "test";
     add_parameter("basename", base_name, "Base name for all output files");
 
-    t_final = 4.;
+    t_final = Number(4.);
     add_parameter("final time", t_final, "Final time");
 
-    output_granularity = 0.02;
+    output_granularity = Number(0.02);
     add_parameter(
         "output granularity", output_granularity, "time interval for output");
 
@@ -501,8 +501,8 @@ namespace ryujin
                                         QGauss<dim>(3),
                                         VectorTools::L2_norm);
 
-      const Number l2_norm_analytic = std::sqrt(Utilities::MPI::sum(
-          std::pow(difference_per_cell.l2_norm(), 2), mpi_communicator));
+      const Number l2_norm_analytic = Number(std::sqrt(Utilities::MPI::sum(
+          std::pow(difference_per_cell.l2_norm(), 2), mpi_communicator)));
 
       /* Compute norms of error: */
 
@@ -528,8 +528,8 @@ namespace ryujin
                                         QGauss<dim>(3),
                                         VectorTools::L2_norm);
 
-      const Number l2_norm_error = std::sqrt(Utilities::MPI::sum(
-          std::pow(difference_per_cell.l2_norm(), 2), mpi_communicator));
+      const Number l2_norm_error = Number(std::sqrt(Utilities::MPI::sum(
+          std::pow(difference_per_cell.l2_norm(), 2), mpi_communicator)));
 
       linf_norm += linf_norm_error / linf_norm_analytic;
       l1_norm += l1_norm_error / l1_norm_analytic;

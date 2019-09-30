@@ -172,8 +172,8 @@ namespace grendel
 
           const auto r_i = r_i_[i]; /* SIC */
           schlieren_.local_element(i) =
-              1. - std::exp(-schlieren_beta_ * (r_i - r_i_min) /
-                            (r_i_max - r_i_min));
+              Number(1.) - std::exp(-schlieren_beta_ * (r_i - r_i_min) /
+                                    (r_i_max - r_i_min));
         }
       };
 

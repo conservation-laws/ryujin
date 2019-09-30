@@ -374,26 +374,26 @@ namespace grendel
         const auto JxW = fe_values.JxW(q_point);
 
         if (cell->is_locally_owned())
-          cell_measure += JxW;
+          cell_measure += Number(JxW);
 
         for (unsigned int j = 0; j < dofs_per_cell; ++j) {
 
           const auto value_JxW = fe_values.shape_value(j, q_point) * JxW;
           const auto grad_JxW = fe_values.shape_grad(j, q_point) * JxW;
 
-          cell_lumped_mass_matrix(j, j) += value_JxW;
+          cell_lumped_mass_matrix(j, j) += Number(value_JxW);
 
           for (unsigned int i = 0; i < dofs_per_cell; ++i) {
 
             const auto value = fe_values.shape_value(i, q_point);
             const auto grad = fe_values.shape_grad(i, q_point);
 
-            cell_mass_matrix(i, j) += value * value_JxW;
+            cell_mass_matrix(i, j) += Number(value * value_JxW);
 
-            cell_betaij_matrix(i, j) += grad * grad_JxW;
+            cell_betaij_matrix(i, j) += Number(grad * grad_JxW);
 
             for (unsigned int d = 0; d < dim; ++d)
-              cell_cij_matrix[d](i, j) += (value * grad_JxW)[d];
+              cell_cij_matrix[d](i, j) += Number((value * grad_JxW)[d]);
 
           } /* for i */
         }   /* for j */
@@ -550,11 +550,12 @@ namespace grendel
                       sparsity_pattern_.end(row_index),
                       [&](const auto &jt) {
                         const auto col_index = jt.column();
-                        const auto m_ij = get_entry(mass_matrix_, &jt);
-                        const auto m_j =
+                        const Number m_ij = get_entry(mass_matrix_, &jt);
+                        const Number m_j =
                             lumped_mass_matrix_.diag_element(col_index);
-                        const auto b_ij =
-                            (row_index == col_index ? 1. : 0.) - m_ij / m_j;
+                        const Number b_ij =
+                            Number(row_index == col_index ? 1. : 0.) -
+                            m_ij / m_j;
                         set_entry(bij_matrix_, &jt, b_ij);
                       });
 
@@ -659,7 +660,7 @@ namespace grendel
 
               for (unsigned int d = 0; d < dim; ++d)
                 cell_cij_matrix[d](i, j) +=
-                    (normal_j[d] - normal_q[d]) * (value * value_JxW);
+                    Number((normal_j[d] - normal_q[d]) * (value * value_JxW));
             } /* i */
           }   /* j */
         }     /* q */

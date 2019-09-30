@@ -38,11 +38,11 @@ namespace grendel
     add_parameter(
         "use ssprk3", use_ssprk3_, "Use SSPRK3 instead of explicit Euler");
 
-    cfl_update_ = 0.80;
+    cfl_update_ = Number(0.80);
     add_parameter(
         "cfl update", cfl_update_, "relative CFL constant used for update");
 
-    cfl_max_ = 0.90;
+    cfl_max_ = Number(0.90);
     add_parameter(
         "cfl max", cfl_max_, "Maximal admissible relative CFL constant");
   }
@@ -226,10 +226,11 @@ namespace grendel
 
           const Number delta_rho_i = rho_second_variation_.local_element(i);
 
-          Number alpha_i = 0.;
-          Number d_sum = 0.;
-          Number rho_relaxation_numerator = 0.;
-          Number rho_relaxation_denominator = 0.;
+          Number alpha_i = Number(0.);
+          (void)alpha_i;
+          Number d_sum = Number(0.);
+          Number rho_relaxation_numerator = Number(0.);
+          Number rho_relaxation_denominator = Number(0.);
 
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
             const auto j = jt->column();
@@ -247,7 +248,7 @@ namespace grendel
 
             /* The numerical constant 8 is up to debate... */
             rho_relaxation_numerator +=
-                8.0 * 0.5 * beta_ij * (delta_rho_i + delta_rho_j);
+                Number(8.0 * 0.5) * beta_ij * (delta_rho_i + delta_rho_j);
             rho_relaxation_denominator += beta_ij;
 
             d_sum -= get_entry(dij_matrix_, jt);
@@ -264,7 +265,7 @@ namespace grendel
           dij_matrix_.diag_element(i) = d_sum;
 
           const Number mass = lumped_mass_matrix.diag_element(i);
-          const Number tau = cfl_update_ * mass / (-2. * d_sum);
+          const Number tau = cfl_update_ * mass / (Number(-2.) * d_sum);
           tau_max_on_subrange = std::min(tau_max_on_subrange, tau);
         }
 
@@ -338,7 +339,7 @@ namespace grendel
           const Number m_i = lumped_mass_matrix.diag_element(i);
 
           const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
-          const Number lambda = 1. / (size - 1.);
+          const Number lambda = Number(1.) / Number(size - 1);
 
           rank1_type r_i;
 
@@ -358,7 +359,7 @@ namespace grendel
             const auto d_ijH = Indicator<dim, Number>::indicator_ ==
                                        Indicator<dim, Number>::Indicators::
                                            entropy_viscosity_commutator
-                                   ? d_ij * (alpha_i + alpha_j) / 2.
+                                   ? d_ij * (alpha_i + alpha_j) / Number(2.)
                                    : d_ij * std::max(alpha_i, alpha_j);
 
             const auto p_ij = tau / m_i / lambda * (d_ijH - d_ij) * (U_j - U_i);
@@ -369,10 +370,11 @@ namespace grendel
               const auto temp = (f_j[k] - f_i[k]) * c_ij;
 
               r_i[k] += -temp + d_ijH * (U_j - U_i)[k];
-              U_ij_bar[k] = 1. / 2. * (U_i[k] + U_j[k]) - 1. / 2. * temp / d_ij;
+              U_ij_bar[k] =
+                  Number(0.5) * (U_i[k] + U_j[k]) - Number(0.5) * temp / d_ij;
             }
 
-            U_i_new += tau / m_i * 2. * d_ij * U_ij_bar;
+            U_i_new += tau / m_i * Number(2.) * d_ij * U_ij_bar;
 
             scatter_set_entry(pij_matrix_, jt, p_ij);
 
@@ -422,7 +424,7 @@ namespace grendel
 
           const Number m_i = lumped_mass_matrix.diag_element(i);
           const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
-          const Number lambda = 1. / (size - 1.);
+          const Number lambda = Number(1.) / Number(size - 1);
 
           const auto r_i = gather(r_, i);
 
@@ -547,7 +549,7 @@ namespace grendel
             auto U_i_new = gather(temp_euler_, i);
 
             const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
-            const Number lambda = 1. / (size - 1.);
+            const Number lambda = Number(1.) / Number(size - 1);
 
             for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
               auto p_ij = gather_get_entry(pij_matrix_, jt);
@@ -653,7 +655,7 @@ namespace grendel
                            "Insufficient CFL condition."));
 
     for (unsigned int k = 0; k < problem_dimension; ++k)
-      U[k].sadd(1. / 4., 3. / 4., temp_ssprk_[k]);
+      U[k].sadd(Number(1. / 4.), Number(3. / 4.), temp_ssprk_[k]);
 
 
     // Step 3: U_new = 1/3 U_old + 2/3 (U2 + tau L(U2))
@@ -665,7 +667,7 @@ namespace grendel
                            "Insufficient CFL condition."));
 
     for (unsigned int k = 0; k < problem_dimension; ++k)
-      U[k].sadd(2. / 3., 1. / 3., temp_ssprk_[k]);
+      U[k].sadd(Number(2. / 3.), Number(1. / 3.), temp_ssprk_[k]);
 
     return tau_1;
   }

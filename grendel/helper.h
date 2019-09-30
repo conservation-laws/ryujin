@@ -46,10 +46,10 @@ namespace grendel
    * It's magic
    */
   template <typename T1, std::size_t k, typename T2>
-  DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, k>
+  DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, k, typename T1::value_type>
   gather_get_entry(const std::array<T1, k> &U, const T2 it)
   {
-    dealii::Tensor<1, k> result;
+    dealii::Tensor<1, k, typename T1::value_type> result;
     for (unsigned int j = 0; j < k; ++j)
       result[j] = get_entry(U[j], it);
     return result;
@@ -62,8 +62,10 @@ namespace grendel
    * FIXME: k versus l
    */
   template <typename T1, std::size_t k, int l, typename T2>
-  DEAL_II_ALWAYS_INLINE inline void scatter_set_entry(
-      std::array<T1, k> &U, const T2 it, const dealii::Tensor<1, l> &V)
+  DEAL_II_ALWAYS_INLINE inline void
+  scatter_set_entry(std::array<T1, k> &U,
+                    const T2 it,
+                    const dealii::Tensor<1, l, typename T1::value_type> &V)
   {
     for (unsigned int j = 0; j < k; ++j)
       set_entry(U[j], it, V[j]);
@@ -74,10 +76,10 @@ namespace grendel
    * It's magic
    */
   template <typename T1, std::size_t k, typename T2, typename T3>
-  DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, k>
+  DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, k, typename T1::value_type>
   gather(const std::array<T1, k> &U, const T2 i, const T3 l)
   {
-    dealii::Tensor<1, k> result;
+    dealii::Tensor<1, k, typename T1::value_type> result;
     for (unsigned int j = 0; j < k; ++j)
       result[j] = U[j](i, l);
     return result;
@@ -88,10 +90,10 @@ namespace grendel
    * It's magic
    */
   template <typename T1, std::size_t k, typename T2>
-  DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, k>
+  DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, k, typename T1::value_type>
   gather(const std::array<T1, k> &U, const T2 i)
   {
-    dealii::Tensor<1, k> result;
+    dealii::Tensor<1, k, typename T1::value_type> result;
     for (unsigned int j = 0; j < k; ++j)
       result[j] = U[j].local_element(i);
     return result;

@@ -44,7 +44,8 @@ namespace grendel
     static constexpr unsigned int relaxation_order_ = 3;
 
     static constexpr ScalarNumber line_search_eps_ =
-        std::is_same<Number, double>::value ? 1.0e-8 : 1.0e-4;
+        std::is_same<Number, double>::value ? ScalarNumber(1.0e-8)
+                                            : ScalarNumber(1.0e-4);
 
     static constexpr unsigned int line_search_max_iter_ = 10;
 
@@ -377,14 +378,16 @@ namespace grendel
 
         /* Update left and right point: */
 
-        const Number discriminant_l = dpsi_l * dpsi_l + 4. * psi_l * dd_112;
-        const Number discriminant_r = dpsi_r * dpsi_r + 4. * psi_r * dd_122;
+        const Number discriminant_l =
+            dpsi_l * dpsi_l + Number(4.) * psi_l * dd_112;
+        const Number discriminant_r =
+            dpsi_r * dpsi_r + Number(4.) * psi_r * dd_122;
 
         Assert(discriminant_l >= 0. && discriminant_r >= 0.,
                dealii::ExcMessage("Houston we have a problem!"));
 
-        t_l = t_l - 2. * psi_l / (dpsi_l - std::sqrt(discriminant_l));
-        t_r = t_r - 2. * psi_r / (dpsi_r - std::sqrt(discriminant_r));
+        t_l = t_l - Number(2.) * psi_l / (dpsi_l - std::sqrt(discriminant_l));
+        t_r = t_r - Number(2.) * psi_r / (dpsi_r - std::sqrt(discriminant_r));
 
         /* Handle some pathological cases that happen in regions with
          * constant specific entropy: */

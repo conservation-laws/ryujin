@@ -42,7 +42,7 @@ namespace grendel
     /**
      * Gamma.
      */
-    static constexpr ScalarNumber gamma = 7. / 5.;
+    static constexpr ScalarNumber gamma = ScalarNumber(7.) / ScalarNumber(5.);
 
     /**
      * Covolume b.
@@ -152,7 +152,7 @@ namespace grendel
     const Number &rho = U[0];
     const auto m = momentum(U);
     const Number &E = U[dim + 1];
-    return E - 0.5 * m.norm_square() / rho;
+    return E - ScalarNumber(0.5) * m.norm_square() / rho;
   }
 
 
@@ -174,11 +174,11 @@ namespace grendel
 
     rank1_type result;
 
-    result[0] = 0.5 * u.norm_square();
+    result[0] = ScalarNumber(0.5) * u.norm_square();
     for (unsigned int i = 0; i < dim; ++i) {
       result[1 + i] = -u[i];
     }
-    result[dim + 1] = 1.;
+    result[dim + 1] = ScalarNumber(1.);
 
     return result;
   }
@@ -198,7 +198,7 @@ namespace grendel
      * (Here we have set b = 0)
      */
 
-    return (gamma - 1.) * internal_energy(U);
+    return (gamma - ScalarNumber(1.)) * internal_energy(U);
   }
 
 
@@ -260,11 +260,12 @@ namespace grendel
     const auto p = pressure(U);
 
     const auto factor =
-        (gamma - 1.0) / gamma * grendel::pow(p, ScalarNumber(1. / gamma - 1.));
+        (gamma - ScalarNumber(1.0)) / gamma *
+        grendel::pow(p, ScalarNumber(1.) / gamma - ScalarNumber(1.));
 
     rank1_type result;
 
-    result[0] = factor * 1. / 2. * u.norm_square();
+    result[0] = factor * ScalarNumber(0.5) * u.norm_square();
     result[dim + 1] = factor;
     for (unsigned int i = 0; i < dim; ++i) {
       result[1 + i] = -factor * u[i];
