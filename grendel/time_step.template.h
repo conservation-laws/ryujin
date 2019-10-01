@@ -294,7 +294,7 @@ namespace grendel
       TimerOutput::Scope time(computing_timer_,
                               "time_step - 2 compute d_ii, and tau_max");
 
-      const auto on_subranges = [&](auto i1, const auto i2) {
+      const auto step_2_serial = [&](auto i1, const auto i2) {
         Number tau_max_on_subrange = std::numeric_limits<Number>::infinity();
 
         for (const auto i : boost::make_iterator_range(i1, i2)) {
@@ -356,7 +356,7 @@ namespace grendel
       };
 
       parallel::apply_to_subranges(
-          serial_relevant.begin(), serial_relevant.end(), on_subranges, 4096);
+          serial_relevant.begin(), serial_relevant.end(), step_2_serial, 1024);
 
       if constexpr (smoothen_alpha_) {
         /* Synchronize alpha_ over all MPI processes: */
@@ -397,7 +397,7 @@ namespace grendel
                               "time_step - 3 low-order update, limiter bounds, "
                               "compute r_i, and p_ij (1)");
 
-      const auto on_subranges = [&](auto i1, const auto i2) {
+      const auto step_3_serial = [&](auto i1, const auto i2) {
         /* Notar bene: This bounds variable is thread local: */
         Limiter<dim, Number> limiter;
 
@@ -472,7 +472,7 @@ namespace grendel
 
       /* Only iterate over locally owned subset! */
       parallel::apply_to_subranges(
-          serial_owned.begin(), serial_owned.end(), on_subranges, 4096);
+          serial_owned.begin(), serial_owned.end(), step_3_serial, 1024);
 
       /* Synchronize r_ over all MPI processes: */
       for (auto &it : r_)
@@ -523,7 +523,7 @@ namespace grendel
       };
 
       parallel::apply_to_subranges(
-          serial_owned.begin(), serial_owned.end(), on_subranges, 4096);
+          serial_owned.begin(), serial_owned.end(), on_subranges, 1024);
     }
 
     for (unsigned int i = 0;
@@ -563,7 +563,7 @@ namespace grendel
         };
 
         parallel::apply_to_subranges(
-            serial_owned.begin(), serial_owned.end(), on_subranges, 4096);
+            serial_owned.begin(), serial_owned.end(), on_subranges, 1024);
       }
 
       /*
@@ -600,7 +600,7 @@ namespace grendel
           parallel::apply_to_subranges(serial_relevant.begin(),
                                        serial_relevant.end(),
                                        on_subranges,
-                                       4096);
+                                       1024);
         }
       }
 
@@ -643,7 +643,7 @@ namespace grendel
         };
 
         parallel::apply_to_subranges(
-            serial_owned.begin(), serial_owned.end(), on_subranges, 4096);
+            serial_owned.begin(), serial_owned.end(), on_subranges, 1024);
       }
     } /* limiter_iter_ */
 
