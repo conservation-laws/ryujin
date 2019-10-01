@@ -164,6 +164,48 @@ namespace grendel
       TimerOutput::Scope time(computing_timer_,
                               "time_step - 1 compute d_ij, and alpha_i");
 
+      const auto step_1_simd = [&](auto i1, const auto i2) {
+        /* Stored thread locally: */
+        Indicator<dim, VectorizedArray<Number>> indicator(*offline_data_);
+
+        for (auto i : boost::make_iterator_range(i1, i2)) {
+
+          const auto U_i = simd_gather(U, i);
+          indicator.reset(U_i);
+
+          auto jts = generate_iterators<n_array_elements>(
+              [&](auto k) { return sparsity.begin(i + k); });
+
+          /* Skip diagonal. */
+          increment_iterators(jts);
+
+          for (; jts[0] != sparsity.end(i); increment_iterators(jts)) {
+
+            const auto js = get_column_indices(jts);
+            const auto U_j = simd_gather(U, js);
+
+            indicator.add(U_j, jts);
+
+            const auto n_ij = gather_get_entry(nij_matrix, jts);
+            const auto norm = get_entry(norm_matrix, jts);
+
+            const auto [lambda_max, p_star, n_iterations] =
+                RiemannSolver<dim, VectorizedArray<Number>>::compute(
+                    U_i, U_j, n_ij);
+
+            const auto d = norm * lambda_max;
+            set_entry(dij_matrix_, jts, d);
+          }
+
+          simd_scatter(
+              rho_second_variation_, indicator.rho_second_variation(), i);
+
+          const auto mass = simd_get_diag_element(lumped_mass_matrix, i);
+          const auto hd_i = mass / measure_of_omega;
+          simd_scatter(alpha_, indicator.alpha(hd_i), i);
+        }
+      };
+
       const auto step_1_serial = [&](auto i1, const auto i2) {
         /* Stored thread locally: */
         Indicator<dim, Number> indicator(*offline_data_);
@@ -178,12 +220,10 @@ namespace grendel
 
           indicator.reset(U_i);
 
-          for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
+          for (auto jt = ++sparsity.begin(i) /* skip diagonal */;
+               jt != sparsity.end(i);
+               ++jt) {
             const auto j = jt->column();
-
-            /* Skip diagonal. */
-            if (j == i)
-              continue;
 
             const auto U_j = gather(U, j);
             indicator.add(U_j, jt);
@@ -230,7 +270,12 @@ namespace grendel
       };
 
       parallel::apply_to_subranges(
-          serial_relevant.begin(), serial_relevant.end(), step_1_serial, 4096);
+          simd_internal.begin(), simd_internal.end(), step_1_simd, 1024);
+
+      parallel::apply_to_subranges(simd_remaining_relevant.begin(),
+                                   simd_remaining_relevant.end(),
+                                   step_1_serial,
+                                   1024);
 
       /* Synchronize alpha_ over all MPI processes: */
       rho_second_variation_.update_ghost_values();
