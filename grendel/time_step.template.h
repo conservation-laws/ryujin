@@ -101,12 +101,46 @@ namespace grendel
     CALLGRIND_START_INSTRUMENTATION;
 #endif
 
-    const auto &n_locally_owned = offline_data_->n_locally_owned();
-    const auto &n_locally_relevant = offline_data_->n_locally_relevant();
+    /* Index ranges for the iteration over the sparsity pattern : */
 
-    const auto indices_owned = boost::irange<unsigned int>(0, n_locally_owned);
-    const auto indices_relevant =
-        boost::irange<unsigned int>(0, n_locally_relevant);
+    constexpr auto n_array_elements = VectorizedArray<Number>::n_array_elements;
+
+    /*
+     * Round a given number down to the nearest multiple of  n_array_elements:
+     */
+    const auto round_down = [=](const auto m) {
+      return m - m % n_array_elements;
+    };
+
+    const auto n_internal = round_down(offline_data_->n_locally_internal());
+    const auto n_owned = offline_data_->n_locally_owned();
+    const auto n_relevant = offline_data_->n_locally_relevant();
+
+    /* Index ranges to iterator over dofs in serial: */
+
+    const auto serial_owned = boost::irange<unsigned int>(0, n_owned);
+    const auto serial_relevant = boost::irange<unsigned int>(0, n_relevant);
+
+    /*
+     * Index ranges for SIMD iteration:
+     *
+     * simd_internal is actually the only index range over which we iterate
+     * vectorized, therefore we compute indices in increments of
+     * n_array_elements. The simd_remaining_owned and
+     * simd_remaining_relevant index ranges are then used to iterate over
+     * the remaining degrees of freedom that do not allow a straightforward
+     * vectorization
+     */
+
+    const auto simd_internal =
+        boost::irange<unsigned int>(0, n_internal, n_array_elements);
+
+//     const auto simd_remaining_owned =
+//         boost::irange<unsigned int>(n_internal, n_owned);
+    const auto simd_remaining_relevant =
+        boost::irange<unsigned int>(n_internal, n_relevant);
+
+    /* References to precomputed matrices and the stencil: */
 
     const auto &sparsity = offline_data_->sparsity_pattern();
 
@@ -130,7 +164,7 @@ namespace grendel
       TimerOutput::Scope time(computing_timer_,
                               "time_step - 1 compute d_ij, and alpha_i");
 
-      const auto on_subranges = [&](auto i1, const auto i2) {
+      const auto step_1_serial = [&](auto i1, const auto i2) {
         /* Stored thread locally: */
         Indicator<dim, Number> indicator(*offline_data_);
 
@@ -196,7 +230,7 @@ namespace grendel
       };
 
       parallel::apply_to_subranges(
-          indices_relevant.begin(), indices_relevant.end(), on_subranges, 4096);
+          serial_relevant.begin(), serial_relevant.end(), step_1_serial, 4096);
 
       /* Synchronize alpha_ over all MPI processes: */
       rho_second_variation_.update_ghost_values();
@@ -277,7 +311,7 @@ namespace grendel
       };
 
       parallel::apply_to_subranges(
-          indices_relevant.begin(), indices_relevant.end(), on_subranges, 4096);
+          serial_relevant.begin(), serial_relevant.end(), on_subranges, 4096);
 
       if constexpr (smoothen_alpha_) {
         /* Synchronize alpha_ over all MPI processes: */
@@ -329,7 +363,7 @@ namespace grendel
             continue;
 
           /* Only iterate over locally owned subset! */
-          Assert(i < n_locally_owned, ExcInternalError());
+          Assert(i < n_owned, ExcInternalError());
 
           const auto U_i = gather(U, i);
           auto U_i_new = U_i;
@@ -393,7 +427,7 @@ namespace grendel
 
       /* Only iterate over locally owned subset! */
       parallel::apply_to_subranges(
-          indices_owned.begin(), indices_owned.end(), on_subranges, 4096);
+          serial_owned.begin(), serial_owned.end(), on_subranges, 4096);
 
       /* Synchronize r_ over all MPI processes: */
       for (auto &it : r_)
@@ -416,7 +450,7 @@ namespace grendel
         for (const auto i : boost::make_iterator_range(i1, i2)) {
 
           /* Only iterate over locally owned subset! */
-          Assert(i < n_locally_owned, ExcInternalError());
+          Assert(i < n_owned, ExcInternalError());
 
           /* Skip constrained degrees of freedom */
           if (++sparsity.begin(i) == sparsity.end(i))
@@ -444,7 +478,7 @@ namespace grendel
       };
 
       parallel::apply_to_subranges(
-          indices_owned.begin(), indices_owned.end(), on_subranges, 4096);
+          serial_owned.begin(), serial_owned.end(), on_subranges, 4096);
     }
 
     for (unsigned int i = 0;
@@ -465,7 +499,7 @@ namespace grendel
           for (const auto i : boost::make_iterator_range(i1, i2)) {
 
             /* Only iterate over locally owned subset! */
-            Assert(i < n_locally_owned, ExcInternalError());
+            Assert(i < n_owned, ExcInternalError());
 
             /* Skip constrained degrees of freedom */
             if (++sparsity.begin(i) == sparsity.end(i))
@@ -484,7 +518,7 @@ namespace grendel
         };
 
         parallel::apply_to_subranges(
-            indices_owned.begin(), indices_owned.end(), on_subranges, 4096);
+            serial_owned.begin(), serial_owned.end(), on_subranges, 4096);
       }
 
       /*
@@ -518,8 +552,8 @@ namespace grendel
             }
           };
 
-          parallel::apply_to_subranges(indices_relevant.begin(),
-                                       indices_relevant.end(),
+          parallel::apply_to_subranges(serial_relevant.begin(),
+                                       serial_relevant.end(),
                                        on_subranges,
                                        4096);
         }
@@ -540,7 +574,7 @@ namespace grendel
           for (const auto i : boost::make_iterator_range(i1, i2)) {
 
             /* Only iterate over locally owned subset */
-            Assert(i < n_locally_owned, ExcInternalError());
+            Assert(i < n_owned, ExcInternalError());
 
             /* Skip constrained degrees of freedom */
             if (++sparsity.begin(i) == sparsity.end(i))
@@ -564,7 +598,7 @@ namespace grendel
         };
 
         parallel::apply_to_subranges(
-            indices_owned.begin(), indices_owned.end(), on_subranges, 4096);
+            serial_owned.begin(), serial_owned.end(), on_subranges, 4096);
       }
     } /* limiter_iter_ */
 
@@ -583,7 +617,7 @@ namespace grendel
           const auto i = it->first;
 
           /* Only iterate over locally owned subset */
-          if (i >= n_locally_owned)
+          if (i >= n_owned)
             continue;
 
           const auto &[normal, id, position] = it->second;
