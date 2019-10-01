@@ -79,7 +79,7 @@ namespace grendel
     static constexpr enum class Order {
       first_order,
       second_order
-    } order_ = Order::second_order;
+    } order_ = Order::first_order;
 
     static constexpr bool smoothen_alpha_ = false;
 
