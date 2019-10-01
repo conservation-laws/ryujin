@@ -66,7 +66,7 @@ namespace grendel
      * We take a reference to an OfflineData object in order to store
      * references to the beta_ij and c_ij matrices.
      */
-    Indicator(const OfflineData<dim, Number> &offline_data);
+    Indicator(const OfflineData<dim, ScalarNumber> &offline_data);
 
     /**
      * Reset temporary storage and initialize for a new row corresponding
@@ -91,8 +91,8 @@ namespace grendel
     Number rho_second_variation();
 
   private:
-    const std::array<dealii::SparseMatrix<Number>, dim> &cij_matrix_;
-    const dealii::SparseMatrix<Number> &betaij_matrix_;
+    const std::array<dealii::SparseMatrix<ScalarNumber>, dim> &cij_matrix_;
+    const dealii::SparseMatrix<ScalarNumber> &betaij_matrix_;
 
     /* Temporary storage used for the entropy_viscosity_commutator: */
 
@@ -120,7 +120,8 @@ namespace grendel
 
 
   template <int dim, typename Number>
-  Indicator<dim, Number>::Indicator(const OfflineData<dim, Number> &offline_data)
+  Indicator<dim, Number>::Indicator(
+      const OfflineData<dim, ScalarNumber> &offline_data)
       : cij_matrix_(offline_data.cij_matrix())
       , betaij_matrix_(offline_data.betaij_matrix())
   {
@@ -269,7 +270,7 @@ namespace grendel
   {
     constexpr Number eps = std::numeric_limits<Number>::epsilon();
     return rho_second_variation_numerator /
-           (rho_second_variation_denominator + eps);
+           (rho_second_variation_denominator + Number(eps));
   }
 
 
