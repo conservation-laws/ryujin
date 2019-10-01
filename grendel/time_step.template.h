@@ -173,7 +173,7 @@ namespace grendel
 
             if (boundary_normal_map.count(i) != 0 &&
                 boundary_normal_map.count(j) != 0) {
-              const auto n_ji = gather(nij_matrix, j, i);
+              const auto n_ji = gather_get_entry(nij_matrix, j, i);
               auto [lambda_max_2, p_star_2, n_iterations_2] =
                   RiemannSolver<dim, Number>::compute(U_j, U_i, n_ji);
               const Number norm_2 = norm_matrix(j, i);
