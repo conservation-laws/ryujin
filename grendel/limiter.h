@@ -177,7 +177,7 @@ namespace grendel
   {
     auto &[rho_min, rho_max, rho_epsilon_min, s_min] = bounds;
 
-    Number l_ij = 1.;
+    Number l_ij = Number(1.);
 
     if constexpr (limiter_ == Limiters::none)
       return l_ij;
@@ -192,37 +192,38 @@ namespace grendel
     const auto &P_ij_rho = P_ij[0];
 
     {
-      Number t_0 = 1.;
-
       constexpr ScalarNumber eps_ =
           std::numeric_limits<ScalarNumber>::epsilon();
 
-      const Number temp =
-          dealii::compare_and_apply_mask<dealii::SIMDComparison::greater_than>(
-              U_i_rho + P_ij_rho,
-              rho_max,
-              std::abs(rho_max - U_i_rho) /
-                  (std::abs(P_ij_rho) + eps_ * rho_max),
-              t_0);
+      Number t_0 = Number(1.);
 
-      t_0 =
-          dealii::compare_and_apply_mask<dealii::SIMDComparison::greater_than>(
-              rho_min,
-              U_i_rho + P_ij_rho,
-              std::abs(rho_min - U_i_rho) /
-                  (std::abs(P_ij_rho) + eps_ * rho_max),
-              temp);
+      t_0 = dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+          rho_max,
+          U_i_rho + P_ij_rho,
+          std::abs(rho_max - U_i_rho) / (std::abs(P_ij_rho) + eps_ * rho_max),
+          t_0);
+
+      t_0 = dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+          U_i_rho + P_ij_rho,
+          rho_min,
+          std::abs(rho_min - U_i_rho) / (std::abs(P_ij_rho) + eps_ * rho_max),
+          t_0);
 
       l_ij = std::min(l_ij, t_0);
 
-      // FIXME
+#ifdef DEBUG
       if constexpr (std::is_same<Number, double>::value ||
                     std::is_same<Number, float>::value) {
-        Assert(
-            (U + l_ij * P_ij)[0] > 0.,
-            dealii::ExcMessage("I'm sorry, Dave. I'm afraid I can't do that. "
-                               "- Negative density."));
+        Assert((U + l_ij * P_ij)[0] > 0.,
+               dealii::ExcMessage("I'm sorry, Dave. I'm afraid I can't do "
+                                  "that. - Negative density."));
+      } else {
+        for (const auto it : (U + l_ij * P_ij)[0])
+          Assert(it > 0.,
+                 dealii::ExcMessage("I'm sorry, Dave. I'm afraid I can't do "
+                                    "that. - Negative density."));
       }
+#endif
     }
 
     if constexpr (limiter_ == Limiters::rho)
@@ -230,6 +231,8 @@ namespace grendel
 
     /*
      * Then, limit the internal energy. (We skip this limiting step in case
+     * we already limit the specific entropy because limiting the latter
+     * implies that the internal energy stays in bounds).
      *
      * See [Guermond, Nazarov, Popov, Thomas], Section 4.5:
      */
