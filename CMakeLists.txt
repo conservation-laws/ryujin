@@ -2,6 +2,10 @@ SET(RYUJIN_VERSION 0.0.1)
 
 CMAKE_MINIMUM_REQUIRED(VERSION 3.5)
 
+#
+# Find deal.II and setup up compiler flags:
+#
+
 FIND_PACKAGE(deal.II 9.0 REQUIRED HINTS ${DEAL_II_DIR} $ENV{DEAL_II_DIR})
 DEAL_II_INITIALIZE_CACHED_VARIABLES()
 DEAL_II_QUERY_GIT_INFORMATION()
@@ -41,6 +45,20 @@ PROJECT(ryujin CXX)
 IF(POLICY CMP0042)
   CMAKE_POLICY(SET CMP0042 NEW)
 ENDIF()
+
+#
+# Options:
+#
+
+SET(DIM "2" CACHE STRING "The dimension")
+
+SET(NUMBER "double" CACHE STRING "The principal floating point type")
+
+SET(USE_SIMD true CACHE Bool "Use SIMD vectorization")
+
+#
+# Set up the rest:
+#
 
 ADD_SUBDIRECTORY(grendel)
 ADD_SUBDIRECTORY(ryujin)

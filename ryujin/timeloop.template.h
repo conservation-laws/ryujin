@@ -318,6 +318,13 @@ namespace ryujin
     deallog << "DIM == " << dim << std::endl;
     deallog << "NUMBER == " << typeid(Number).name() << std::endl;
 
+#ifdef USE_SIMD
+    deallog << "SIMD width == " << VectorizedArray<Number>::n_array_elements << std::endl;
+#else
+    deallog << "SIMD width == " << "(( disabled ))" << std::endl;
+#endif
+
+
     deallog << "Indicator<dim, Number>::indicators_ == ";
     switch (Indicator<dim, Number>::indicator_) {
     case Indicator<dim, Number>::Indicators::zero:

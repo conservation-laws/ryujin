@@ -113,6 +113,14 @@ namespace grendel
             n_locally_internal_++;
           }
 
+#ifndef USE_SIMD
+        /*
+         * If USE_SIMD is not set, we disable all SIMD instructions by
+         * setting the [0, n_locally_internal) range to [0,0).
+         */
+        n_locally_internal_ = 0;
+#endif
+
         for (auto &it : new_order)
           if (it == numbers::invalid_dof_index)
             it = index++;
