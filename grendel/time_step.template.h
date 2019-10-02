@@ -14,6 +14,11 @@
 
 #include <atomic>
 
+#ifdef LIKWID_PERFMON
+  #include <likwid.h>
+#endif
+
+
 namespace grendel
 {
   using namespace dealii;
@@ -163,6 +168,9 @@ namespace grendel
       deallog << "        compute d_ij, and alpha_i" << std::endl;
       TimerOutput::Scope time(computing_timer_,
                               "time_step - 1 compute d_ij, and alpha_i");
+#ifdef LIKWID_PERFMON
+      LIKWID_MARKER_START("time_step_1");
+#endif
 
       const auto step_1_simd = [&](auto i1, const auto i2) {
         /* Stored thread locally: */
@@ -280,6 +288,10 @@ namespace grendel
       /* Synchronize alpha_ over all MPI processes: */
       rho_second_variation_.update_ghost_values();
       alpha_.update_ghost_values();
+
+#ifdef LIKWID_PERFMON
+      LIKWID_MARKER_STOP("time_step_1");
+#endif
     }
 
 
@@ -293,6 +305,9 @@ namespace grendel
       deallog << "        compute d_ii, and tau_max" << std::endl;
       TimerOutput::Scope time(computing_timer_,
                               "time_step - 2 compute d_ii, and tau_max");
+#ifdef LIKWID_PERFMON
+      LIKWID_MARKER_START("time_step_2");
+#endif
 
       const auto step_2_serial = [&](auto i1, const auto i2) {
         Number tau_max_on_subrange = std::numeric_limits<Number>::infinity();
@@ -370,6 +385,10 @@ namespace grendel
                   ExcMessage("I'm sorry, Dave. I'm afraid I can't "
                              "do that. - We crashed."));
 
+#ifdef LIKWID_PERFMON
+      LIKWID_MARKER_STOP("time_step_2");
+#endif
+
       deallog << "        computed tau_max = " << tau_max << std::endl;
     }
 
@@ -396,6 +415,9 @@ namespace grendel
       TimerOutput::Scope time(computing_timer_,
                               "time_step - 3 low-order update, limiter bounds, "
                               "compute r_i, and p_ij (1)");
+#ifdef LIKWID_PERFMON
+      LIKWID_MARKER_START("time_step_3");
+#endif
 
       const auto step_3_simd = [&](auto i1, const auto i2) {
         /* Notar bene: This bounds variable is thread local: */
@@ -563,6 +585,10 @@ namespace grendel
       /* Synchronize r_ over all MPI processes: */
       for (auto &it : r_)
         it.update_ghost_values();
+
+#ifdef LIKWID_PERFMON
+      LIKWID_MARKER_STOP("time_step_3");
+#endif
     }
 
 
@@ -576,6 +602,9 @@ namespace grendel
       deallog << "        compute p_ij" << std::endl;
       TimerOutput::Scope time(computing_timer_,
                               "time_step - 4 compute p_ij (2)");
+#ifdef LIKWID_PERFMON
+      LIKWID_MARKER_START("time_step_4");
+#endif
 
       const auto on_subranges = [&](auto i1, const auto i2) {
         for (const auto i : boost::make_iterator_range(i1, i2)) {
@@ -610,6 +639,10 @@ namespace grendel
 
       parallel::apply_to_subranges(
           serial_owned.begin(), serial_owned.end(), on_subranges, 1024);
+
+#ifdef LIKWID_PERFMON
+      LIKWID_MARKER_STOP("time_step_4");
+#endif
     }
 
     for (unsigned int i = 0;
@@ -625,6 +658,9 @@ namespace grendel
       {
         deallog << "        compute l_ij" << std::endl;
         TimerOutput::Scope time(computing_timer_, "time_step - 5 compute l_ij");
+#ifdef LIKWID_PERFMON
+        LIKWID_MARKER_START("time_step_5");
+#endif
 
         const auto on_subranges = [&](auto i1, const auto i2) {
           for (const auto i : boost::make_iterator_range(i1, i2)) {
@@ -650,6 +686,9 @@ namespace grendel
 
         parallel::apply_to_subranges(
             serial_owned.begin(), serial_owned.end(), on_subranges, 1024);
+#ifdef LIKWID_PERFMON
+        LIKWID_MARKER_STOP("time_step_5");
+#endif
       }
 
       /*
@@ -660,6 +699,9 @@ namespace grendel
         deallog << "        symmetrize l_ij" << std::endl;
         TimerOutput::Scope time(computing_timer_,
                                 "time_step - 6 symmetrize l_ij");
+#ifdef LIKWID_PERFMON
+        LIKWID_MARKER_START("time_step_6");
+#endif
 
         if (Utilities::MPI::n_mpi_processes(mpi_communicator_) > 1)
           lij_matrix_communicator_.synchronize();
@@ -688,6 +730,9 @@ namespace grendel
                                        on_subranges,
                                        1024);
         }
+#ifdef LIKWID_PERFMON
+        LIKWID_MARKER_STOP("time_step_6");
+#endif
       }
 
       /*
@@ -700,6 +745,9 @@ namespace grendel
         deallog << "        high-order update" << std::endl;
         TimerOutput::Scope time(computing_timer_,
                                 "time_step - 7 high-order update");
+#ifdef LIKWID_PERFMON
+        LIKWID_MARKER_START("time_step_7");
+#endif
 
         const auto on_subranges = [&](auto i1, const auto i2) {
           for (const auto i : boost::make_iterator_range(i1, i2)) {
@@ -730,6 +778,10 @@ namespace grendel
 
         parallel::apply_to_subranges(
             serial_owned.begin(), serial_owned.end(), on_subranges, 1024);
+
+#ifdef LIKWID_PERFMON
+        LIKWID_MARKER_STOP("time_step_7");
+#endif
       }
     } /* limiter_iter_ */
 
@@ -741,6 +793,9 @@ namespace grendel
       deallog << "        fix up boundary states" << std::endl;
       TimerOutput::Scope time(computing_timer_,
                               "time_step - 8 fix boundary states");
+#ifdef LIKWID_PERFMON
+      LIKWID_MARKER_START("time_step_8");
+#endif
 
       const auto on_subranges = [&](const auto it1, const auto it2) {
         for (auto it = it1; it != it2; ++it) {
@@ -780,6 +835,10 @@ namespace grendel
 
       // FIXME: This is currently not parallel:
       on_subranges(boundary_normal_map.begin(), boundary_normal_map.end());
+
+#ifdef LIKWID_PERFMON
+      LIKWID_MARKER_STOP("time_step_8");
+#endif
     }
 
     /* Synchronize temp over all MPI processes: */
