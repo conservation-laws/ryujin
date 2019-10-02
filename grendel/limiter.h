@@ -86,16 +86,16 @@ namespace grendel
     if constexpr (limiter_ == Limiters::none)
       return;
 
-    rho_min = std::numeric_limits<Number>::max();
-    rho_max = 0.;
+    rho_min = Number(std::numeric_limits<ScalarNumber>::max());
+    rho_max = Number(0.);
 
     if constexpr (limiter_ == Limiters::internal_energy) {
-      rho_epsilon_min = std::numeric_limits<Number>::max();
+      rho_epsilon_min = Number(std::numeric_limits<ScalarNumber>::max());
     }
 
     if constexpr (limiter_ == Limiters::specific_entropy) {
-      s_min = std::numeric_limits<Number>::max();
-      s_interp_max = 0.;
+      s_min = Number(std::numeric_limits<ScalarNumber>::max());
+      s_interp_max = Number(0.);
     }
   }
 
