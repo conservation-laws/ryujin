@@ -1,16 +1,16 @@
-#dofs = 4225
+#dofs = 4225 double precision
 t     = 2.00548
 Linf  = 0.0537976
 L1    = 0.000899245
 L2    = 0.00444967
 
-#dofs = 16641
+#dofs = 16641 double precision
 t     = 2.00176
 Linf  = 0.00541965
 L1    = 0.000104427
 L2    = 0.000490947
 
-#dofs = 66049
+#dofs = 66049 double precision
 t     = 2.00176
 Linf  = 0.000675284
 L1    = 1.29060e-05
