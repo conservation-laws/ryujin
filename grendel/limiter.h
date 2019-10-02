@@ -128,7 +128,8 @@ namespace grendel
 
       if (!is_diagonal_entry) {
         const Number s_interp =
-            ProblemDescription<dim, Number>::specific_entropy((U_i + U_j) / 2.);
+            ProblemDescription<dim, Number>::specific_entropy((U_i + U_j) /
+                                                              ScalarNumber(2.));
         s_interp_max = std::max(s_interp_max, s_interp);
       }
     }

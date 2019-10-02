@@ -369,9 +369,6 @@ namespace grendel
   }
 
 
-  /*
-   * FIXME: k versus l
-   */
   template <typename T1, std::size_t k, typename T2>
   DEAL_II_ALWAYS_INLINE inline void
   simd_scatter(std::array<T1, k> &U, const T2 &result, unsigned int i)
