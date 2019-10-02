@@ -39,15 +39,15 @@ namespace grendel
       , lij_matrix_communicator_(
             mpi_communicator, computing_timer, offline_data, lij_matrix_)
   {
-    use_ssprk3_ = order_ == Order::second_order;
+    use_ssprk3_ = (order_ == Order::second_order);
     add_parameter(
         "use ssprk3", use_ssprk3_, "Use SSPRK3 instead of explicit Euler");
 
-    cfl_update_ = Number(0.80);
+    cfl_update_ = Number(0.95);
     add_parameter(
         "cfl update", cfl_update_, "relative CFL constant used for update");
 
-    cfl_max_ = Number(0.90);
+    cfl_max_ = Number(1.0);
     add_parameter(
         "cfl max", cfl_max_, "Maximal admissible relative CFL constant");
   }

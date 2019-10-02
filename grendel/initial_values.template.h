@@ -37,7 +37,7 @@ namespace grendel
                   "Initial position of shock front, sod contrast, or vortex");
 
     initial_1d_state_[0] = gamma;
-    initial_1d_state_[1] = 0.;
+    initial_1d_state_[1] = 3.0;
     initial_1d_state_[2] = 1.;
     add_parameter("initial - 1d state",
                   initial_1d_state_,

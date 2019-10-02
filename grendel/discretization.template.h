@@ -29,7 +29,7 @@ namespace grendel
       , mpi_communicator_(mpi_communicator)
       , computing_timer_(computing_timer)
   {
-    geometry_ = "triangle";
+    geometry_ = "cylinder";
     add_parameter("geometry",
                   geometry_,
                   "Geometry. Valid names are \"file\", \"triangle\", \"tube\", "

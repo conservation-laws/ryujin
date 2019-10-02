@@ -91,17 +91,17 @@ namespace ryujin
                                 offline_data,
                                 "F - SchlierenPostprocessor")
   {
-    base_name = "test";
+    base_name = "cylinder";
     add_parameter("basename", base_name, "Base name for all output files");
 
-    t_final = Number(4.);
+    t_final = Number(5.);
     add_parameter("final time", t_final, "Final time");
 
-    output_granularity = Number(0.02);
+    output_granularity = Number(0.01);
     add_parameter(
         "output granularity", output_granularity, "time interval for output");
 
-    enable_detailed_output = true;
+    enable_detailed_output = false;
     add_parameter("enable detailed output",
                   enable_detailed_output,
                   "Flag to control detailed output to deallog");
