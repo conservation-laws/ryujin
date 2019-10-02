@@ -135,8 +135,8 @@ namespace grendel
     const auto simd_internal =
         boost::irange<unsigned int>(0, n_internal, n_array_elements);
 
-//     const auto simd_remaining_owned =
-//         boost::irange<unsigned int>(n_internal, n_owned);
+    const auto simd_remaining_owned =
+        boost::irange<unsigned int>(n_internal, n_owned);
     const auto simd_remaining_relevant =
         boost::irange<unsigned int>(n_internal, n_relevant);
 
@@ -397,6 +397,86 @@ namespace grendel
                               "time_step - 3 low-order update, limiter bounds, "
                               "compute r_i, and p_ij (1)");
 
+      const auto step_3_simd = [&](auto i1, const auto i2) {
+        /* Notar bene: This bounds variable is thread local: */
+        Limiter<dim, VectorizedArray<Number>> limiter;
+
+        /* lambda is the same value for all interior dofs */
+        const auto size = std::distance(sparsity.begin(*i1), sparsity.end(*i1));
+        const Number lambda = Number(1.) / Number(size - 1);
+
+        for (const auto i : boost::make_iterator_range(i1, i2)) {
+
+          const auto U_i = simd_gather(U, i);
+          auto U_i_new = U_i;
+
+          const auto f_i =
+              ProblemDescription<dim, VectorizedArray<Number>>::f(U_i);
+
+          const auto alpha_i = simd_gather(alpha_, i);
+          const auto m_i = simd_get_diag_element(lumped_mass_matrix, i);
+
+          using rank1_type =
+              typename ProblemDescription<dim,
+                                          VectorizedArray<Number>>::rank1_type;
+          rank1_type r_i;
+
+          /* Clear bounds: */
+          limiter.reset();
+
+          auto jts = generate_iterators<n_array_elements>(
+              [&](auto k) { return sparsity.begin(i + k); });
+
+          for (; jts[0] != sparsity.end(i); increment_iterators(jts)) {
+
+            const auto js = get_column_indices(jts);
+            const auto U_j = simd_gather(U, js);
+
+            const auto f_j =
+                ProblemDescription<dim, VectorizedArray<Number>>::f(U_j);
+            const auto alpha_j = simd_gather(alpha_, js);
+
+            const auto c_ij = gather_get_entry(cij_matrix, jts);
+            const auto d_ij = get_entry(dij_matrix_, jts);
+
+            const auto d_ijH = Indicator<dim, Number>::indicator_ ==
+                                       Indicator<dim, Number>::Indicators::
+                                           entropy_viscosity_commutator
+                                   ? d_ij * (alpha_i + alpha_j) / Number(2.)
+                                   : d_ij * std::max(alpha_i, alpha_j);
+
+            const auto p_ij = tau / m_i / lambda * (d_ijH - d_ij) * (U_j - U_i);
+
+            dealii::Tensor<1, problem_dimension, VectorizedArray<Number>>
+                U_ij_bar;
+
+            for (unsigned int k = 0; k < problem_dimension; ++k) {
+              const auto temp = (f_j[k] - f_i[k]) * c_ij;
+
+              r_i[k] += -temp + d_ijH * (U_j - U_i)[k];
+              U_ij_bar[k] =
+                  Number(0.5) * (U_i[k] + U_j[k]) - Number(0.5) * temp / d_ij;
+            }
+
+            U_i_new += tau / m_i * Number(2.) * d_ij * U_ij_bar;
+
+            scatter_set_entry(pij_matrix_, jts, p_ij);
+
+            limiter.accumulate(
+                U_i, U_j, U_ij_bar, /* is diagonal */ js[0] == i);
+          }
+
+          simd_scatter(temp_euler_, U_i_new, i);
+          simd_scatter(r_, r_i, i);
+
+          const auto hd_i = m_i / measure_of_omega;
+          const auto rho_relaxation_i = simd_gather(rho_relaxation_, i);
+
+          limiter.apply_relaxation(hd_i, rho_relaxation_i);
+          simd_scatter(bounds_, limiter.bounds(), i);
+        }
+      };
+
       const auto step_3_serial = [&](auto i1, const auto i2) {
         /* Notar bene: This bounds variable is thread local: */
         Limiter<dim, Number> limiter;
@@ -457,7 +537,7 @@ namespace grendel
 
             scatter_set_entry(pij_matrix_, jt, p_ij);
 
-            limiter.accumulate(U_i, U_j, U_ij_bar, jt);
+            limiter.accumulate(U_i, U_j, U_ij_bar, /* is diagonal */ i == j);
           }
 
           scatter(temp_euler_, U_i_new, i);
@@ -471,8 +551,14 @@ namespace grendel
       };
 
       /* Only iterate over locally owned subset! */
+
       parallel::apply_to_subranges(
-          serial_owned.begin(), serial_owned.end(), step_3_serial, 1024);
+          simd_internal.begin(), simd_internal.end(), step_3_simd, 1024);
+
+      parallel::apply_to_subranges(simd_remaining_owned.begin(),
+                                   simd_remaining_owned.end(),
+                                   step_3_serial,
+                                   1024);
 
       /* Synchronize r_ over all MPI processes: */
       for (auto &it : r_)

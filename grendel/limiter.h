@@ -55,11 +55,10 @@ namespace grendel
 
     void reset();
 
-    template <typename ITERATOR>
     void accumulate(const rank1_type U_i,
                     const rank1_type U_j,
                     const rank1_type U_ij_bar,
-                    const ITERATOR jt); // FIXME
+                    const bool is_diagonal_entry);
 
     void apply_relaxation(const Number hd_i, const Number rho_relaxation);
 
@@ -102,12 +101,11 @@ namespace grendel
 
 
   template <int dim, typename Number>
-  template <typename ITERATOR>
   DEAL_II_ALWAYS_INLINE inline void
   Limiter<dim, Number>::accumulate(const rank1_type U_i,
                                    const rank1_type U_j,
                                    const rank1_type U_ij_bar,
-                                   const ITERATOR jt) // FIXME
+                                   const bool is_diagonal_entry)
   {
     auto &[rho_min, rho_max, rho_epsilon_min, s_min] = bounds_;
 
@@ -128,7 +126,7 @@ namespace grendel
       const auto s = ProblemDescription<dim, Number>::specific_entropy(U_j);
       s_min = std::min(s_min, s);
 
-      if (jt->row() != jt->column()) { // FIXME
+      if (!is_diagonal_entry) {
         const Number s_interp =
             ProblemDescription<dim, Number>::specific_entropy((U_i + U_j) / 2.);
         s_interp_max = std::max(s_interp_max, s_interp);

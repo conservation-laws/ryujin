@@ -228,15 +228,15 @@ namespace grendel
    * This is a vectorized variant of get_entry for the c_ij, and n_ij
    * "matrices" that are std::array<SparseMatrix<Number>, dim> objects.
    *
-   * FIXME: Currently serial only
+   * This provides both, the serial and SIMD variant.
    *
    * FIXME: k versus l
    */
-  template <typename T1, std::size_t k, int l, typename T2>
+  template <typename T1, std::size_t k, int l, typename T2, typename T3>
   DEAL_II_ALWAYS_INLINE inline void
   scatter_set_entry(std::array<T1, k> &U,
                     const T2 it,
-                    const dealii::Tensor<1, l, typename T1::value_type> &V)
+                    const dealii::Tensor<1, l, T3> &V)
   {
     for (unsigned int j = 0; j < k; ++j)
       set_entry(U[j], it, V[j]);
@@ -323,6 +323,23 @@ namespace grendel
   /*
    * It's magic
    */
+  template <typename T1>
+  DEAL_II_ALWAYS_INLINE inline dealii::VectorizedArray<typename T1::value_type>
+      simd_gather(
+          const T1 &U,
+          const std::array<unsigned int,
+                           dealii::VectorizedArray<
+                               typename T1::value_type>::n_array_elements> js)
+  {
+    dealii::VectorizedArray<typename T1::value_type> result;
+    result.gather(U.get_values(), js.data());
+    return result;
+  }
+
+
+  /*
+   * It's magic
+   */
   template <typename T1, std::size_t k>
   DEAL_II_ALWAYS_INLINE inline dealii::
       Tensor<1, k, dealii::VectorizedArray<typename T1::value_type>>
@@ -349,6 +366,18 @@ namespace grendel
                unsigned int i)
   {
     result.store(U.get_values() + i);
+  }
+
+
+  /*
+   * FIXME: k versus l
+   */
+  template <typename T1, std::size_t k, typename T2>
+  DEAL_II_ALWAYS_INLINE inline void
+  simd_scatter(std::array<T1, k> &U, const T2 &result, unsigned int i)
+  {
+    for (unsigned int j = 0; j < k; ++j)
+      result[j].store(U[j].get_values() + i);
   }
 
 
