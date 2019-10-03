@@ -51,18 +51,23 @@ namespace grendel
 
       projected[0] = U[0];
 
+      const Number inv_density = Number(1.0) / U[0];
+
       const auto m = ProblemDescription<dim, Number>::momentum(U);
       projected[1] = n_ij * m;
 
       const auto perp = m - projected[1] * n_ij;
-      projected[2] = U[1 + dim] - Number(0.5) * perp.norm_square() / U[0];
+      projected[2] =
+          U[1 + dim] - Number(0.5) * perp.norm_square() * inv_density;
 
       std::array<Number, 4> result;
 
-      result[0] = projected[0]; // rho
-      result[1] = projected[1] / projected[0]; // u
-      result[2] = ProblemDescription<1, Number>::pressure(projected);
-      result[3] = ProblemDescription<1, Number>::speed_of_sound(projected);
+      result[0] = projected[0];               // rho
+      result[1] = projected[1] * inv_density; // u
+      result[2] =
+          ProblemDescription<1, Number>::pressure(projected, inv_density);
+      result[3] =
+          ProblemDescription<1, Number>::speed_of_sound(projected, inv_density);
 
       return result;
     }
@@ -80,24 +85,27 @@ namespace grendel
       using ScalarNumber = typename get_value_type<Number>::type;
 
       constexpr auto gamma = ProblemDescription<1, Number>::gamma;
+      constexpr auto gamma_inverse =
+          ProblemDescription<1, Number>::gamma_inverse;
+      constexpr auto gamma_minus_one_inverse =
+          ProblemDescription<1, Number>::gamma_minus_one_inverse;
       const auto &[rho, u, p, a] = primitive_state;
 
-      const Number radicand = ScalarNumber(2.) / rho /
-                              ((gamma + ScalarNumber(1.)) * p_star +
-                               (gamma - ScalarNumber(1.)) * p);
-      const Number true_value = (p_star - p) * std::sqrt(radicand);
+      const Number radicand_inverse = ScalarNumber(0.5) * rho *
+                                      ((gamma + ScalarNumber(1.)) * p_star +
+                                       (gamma - ScalarNumber(1.)) * p);
+      const Number true_value = (p_star - p) / std::sqrt(radicand_inverse);
 
       const auto exponent =
-          (gamma - ScalarNumber(1.)) / ScalarNumber(2.) / gamma;
+          (gamma - ScalarNumber(1.)) * ScalarNumber(0.5) * gamma_inverse;
       const Number factor = grendel::pow(p_star / p, exponent) - Number(1.);
       const auto false_value =
-          factor * ScalarNumber(2.) * a / (gamma - ScalarNumber(1.));
+          factor * ScalarNumber(2.) * a * gamma_minus_one_inverse;
 
       return dealii::compare_and_apply_mask<
           dealii::SIMDComparison::greater_than_or_equal>(
           p_star, p, true_value, false_value);
     }
-
 
     /**
      * FIXME: Write a lengthy explanation.
@@ -111,23 +119,30 @@ namespace grendel
       using ScalarNumber = typename get_value_type<Number>::type;
 
       constexpr auto gamma = ProblemDescription<1, Number>::gamma;
+      constexpr auto gamma_inverse =
+          ProblemDescription<1, Number>::gamma_inverse;
+      constexpr auto gamma_minus_one_inverse =
+          ProblemDescription<1, Number>::gamma_minus_one_inverse;
+      constexpr auto gamma_plus_one_inverse =
+          ProblemDescription<1, Number>::gamma_plus_one_inverse;
       const auto &[rho, u, p, a] = primitive_state;
 
-      const Number radicand = ScalarNumber(2.) / rho /
-                              ((gamma + ScalarNumber(1.)) * p_star +
-                               (gamma - ScalarNumber(1.)) * p);
+      const Number radicand_inverse = ScalarNumber(0.5) * rho *
+                                      ((gamma + ScalarNumber(1.)) * p_star +
+                                       (gamma - ScalarNumber(1.)) * p);
+      const Number denominator =
+          (p_star + (gamma - ScalarNumber(1.)) * gamma_plus_one_inverse * p);
       const Number true_value =
-          std::sqrt(radicand) *
-          (Number(1.) - ScalarNumber(0.5) * (p_star - p) /
-                            (p_star + (gamma - ScalarNumber(1.)) /
-                                          (gamma + ScalarNumber(1.)) * p));
+          (denominator - ScalarNumber(0.5) * (p_star - p)) /
+          (denominator * std::sqrt(radicand_inverse));
 
       const auto exponent =
-          (ScalarNumber(-1.) - gamma) / ScalarNumber(2.) / gamma;
-      const Number factor = (gamma - ScalarNumber(1.)) / ScalarNumber(2.) /
-                            gamma * grendel::pow(p_star / p, exponent) / p;
+          (ScalarNumber(-1.) - gamma) * ScalarNumber(0.5) * gamma_inverse;
+      const Number factor = (gamma - ScalarNumber(1.)) * ScalarNumber(0.5) *
+                            gamma_inverse *
+                            grendel::pow(p_star / p, -exponent) / p;
       const auto false_value =
-          factor * ScalarNumber(2.) * a / (gamma - ScalarNumber(1.));
+          factor * ScalarNumber(2.) * a * gamma_minus_one_inverse;
 
       return dealii::compare_and_apply_mask<
           dealii::SIMDComparison::greater_than_or_equal>(
@@ -154,6 +169,73 @@ namespace grendel
 
 
     /**
+     * This combines the calculation of phi both against p_min and p_max in a
+     * single call to reduce the number of calls to pow(). It is inlining the
+     * content of f() and choosing only the relevant paths.
+     */
+    template <typename Number>
+    inline DEAL_II_ALWAYS_INLINE std::array<Number, 2>
+    phi_twosided(const std::array<Number, 4> &riemann_data_i,
+                 const std::array<Number, 4> &riemann_data_j)
+    {
+      using ScalarNumber = typename get_value_type<Number>::type;
+
+      constexpr auto gamma = ProblemDescription<1, Number>::gamma;
+      constexpr auto gamma_inverse =
+          ProblemDescription<1, Number>::gamma_inverse;
+      constexpr auto gamma_minus_one_inverse =
+          ProblemDescription<1, Number>::gamma_minus_one_inverse;
+      const auto &[rho_i, u_i, p_i, a_i] = riemann_data_i;
+      const auto &[rho_j, u_j, p_j, a_j] = riemann_data_j;
+
+      const Number p_min = std::min(p_i, p_j);
+      const Number p_max = std::max(p_i, p_j);
+
+      // The exponent path is only selected for the branch where we compute
+      // p_min / p_max, in the other three cases the radicand case is selected
+      const auto exponent =
+          (gamma - ScalarNumber(1.)) * ScalarNumber(0.5) * gamma_inverse;
+      const Number factor = grendel::pow(p_min / p_max, exponent) - Number(1.);
+      const Number false_value_i =
+          factor * ScalarNumber(2.) * a_i * gamma_minus_one_inverse;
+      const Number false_value_j =
+          factor * ScalarNumber(2.) * a_j * gamma_minus_one_inverse;
+
+      const Number radicand_inverse_i_1 = ScalarNumber(0.5) * rho_i *
+                                          ((gamma + ScalarNumber(1.)) * p_min +
+                                           (gamma - ScalarNumber(1.)) * p_i);
+      const Number true_value_i_1 =
+          (p_min - p_i) / std::sqrt(radicand_inverse_i_1);
+      const Number radicand_inverse_i_2 = ScalarNumber(0.5) * rho_i *
+                                          ((gamma + ScalarNumber(1.)) * p_max +
+                                           (gamma - ScalarNumber(1.)) * p_i);
+      const Number true_value_i_2 =
+          (p_max - p_i) / std::sqrt(radicand_inverse_i_2);
+      const Number radicand_inverse_j_1 = ScalarNumber(0.5) * rho_j *
+                                          ((gamma + ScalarNumber(1.)) * p_min +
+                                           (gamma - ScalarNumber(1.)) * p_j);
+      const Number true_value_j_1 =
+          (p_min - p_j) / std::sqrt(radicand_inverse_j_1);
+      const Number radicand_inverse_j_2 = ScalarNumber(0.5) * rho_j *
+                                          ((gamma + ScalarNumber(1.)) * p_max +
+                                           (gamma - ScalarNumber(1.)) * p_j);
+      const Number true_value_j_2 =
+          (p_max - p_j) / std::sqrt(radicand_inverse_j_2);
+
+      // The p_max part always selects the 'true' branch, whereas we need to
+      // make a selection for the p_min part
+      return {true_value_i_2 + true_value_j_2 + u_j - u_i,
+              dealii::compare_and_apply_mask<
+                  dealii::SIMDComparison::greater_than_or_equal>(
+                  p_min, p_i, true_value_i_1, false_value_i) +
+                  dealii::compare_and_apply_mask<
+                      dealii::SIMDComparison::greater_than_or_equal>(
+                      p_min, p_j, true_value_j_1, false_value_j) +
+                  u_j - u_i};
+    }
+
+
+    /**
      * FIXME: Write a lengthy explanation.
      *
      * See [1], page 912, (3.3).
@@ -172,17 +254,18 @@ namespace grendel
      * see [1], page 912, (3.7)
      */
     template <typename Number>
-    inline DEAL_II_ALWAYS_INLINE Number
-    lambda1_minus(const std::array<Number, 4> &riemann_data,
-                  const Number p_star)
+    inline DEAL_II_ALWAYS_INLINE Number lambda1_minus(
+        const std::array<Number, 4> &riemann_data, const Number p_star)
     {
       using ScalarNumber = typename get_value_type<Number>::type;
 
       constexpr auto gamma = ProblemDescription<1, Number>::gamma;
+      constexpr auto gamma_inverse =
+          ProblemDescription<1, Number>::gamma_inverse;
       const auto &[rho, u, p, a] = riemann_data;
 
       const auto factor =
-          (gamma + ScalarNumber(1.0)) / ScalarNumber(2.0) / gamma;
+          (gamma + ScalarNumber(1.0)) * ScalarNumber(0.5) * gamma_inverse;
       const Number tmp = positive_part((p_star - p) / p);
 
       return u - a * std::sqrt(Number(1.0) + factor * tmp);
@@ -193,17 +276,18 @@ namespace grendel
      * see [1], page 912, (3.8)
      */
     template <typename Number>
-    inline DEAL_II_ALWAYS_INLINE Number
-    lambda3_plus(const std::array<Number, 4> &primitive_state,
-                 const Number p_star)
+    inline DEAL_II_ALWAYS_INLINE Number lambda3_plus(
+        const std::array<Number, 4> &primitive_state, const Number p_star)
     {
       using ScalarNumber = typename get_value_type<Number>::type;
 
       constexpr auto gamma = ProblemDescription<1, Number>::gamma;
+      constexpr auto gamma_inverse =
+          ProblemDescription<1, Number>::gamma_inverse;
       const auto &[rho, u, p, a] = primitive_state;
 
       const Number factor =
-          (gamma + ScalarNumber(1.0)) / ScalarNumber(2.0) / gamma;
+          (gamma + ScalarNumber(1.0)) * ScalarNumber(0.5) * gamma_inverse;
       const Number tmp = positive_part((p_star - p) / p);
       return u + a * std::sqrt(Number(1.0) + factor * tmp);
     }
@@ -222,6 +306,10 @@ namespace grendel
       using ScalarNumber = typename get_value_type<Number>::type;
 
       constexpr auto gamma = ProblemDescription<1, Number>::gamma;
+      constexpr auto gamma_inverse =
+          ProblemDescription<1, Number>::gamma_inverse;
+      constexpr auto gamma_minus_one_inverse =
+          ProblemDescription<1, Number>::gamma_minus_one_inverse;
       const auto &[rho_i, u_i, p_i, a_i] = riemann_data_i;
       const auto &[rho_j, u_j, p_j, a_j] = riemann_data_j;
 
@@ -232,15 +320,14 @@ namespace grendel
        * identity below:
        */
 
-      const auto factor = (gamma - ScalarNumber(1.)) / ScalarNumber(2.);
+      const auto factor = (gamma - ScalarNumber(1.)) * ScalarNumber(0.5);
 
       const Number numerator = a_i + a_j - factor * (u_j - u_i);
 
       const Number denominator =
-          a_i * grendel::pow(p_i / p_j, -factor / gamma) + a_j * Number(1.0);
+          a_i * grendel::pow(p_i / p_j, -factor * gamma_inverse) + a_j;
 
-      const auto exponent =
-          ScalarNumber(2.0) * gamma / (gamma - ScalarNumber(1.0));
+      const auto exponent = ScalarNumber(2.0) * gamma * gamma_minus_one_inverse;
 
       return p_j * grendel::pow(numerator / denominator, exponent);
     }
@@ -324,29 +411,34 @@ namespace grendel
        * SIMDified version of the two-rarefaction approximation.
        */
 
-      const Number p_min = std::min(riemann_data_i[2], riemann_data_j[2]);
+      // const Number p_min = std::min(riemann_data_i[2], riemann_data_j[2]);
       const Number p_max = std::max(riemann_data_i[2], riemann_data_j[2]);
 
-      const Number phi_p_min = phi(riemann_data_i, riemann_data_j, p_min);
-      const Number phi_p_max = phi(riemann_data_i, riemann_data_j, p_max);
+      // const Number phi_p_min = phi(riemann_data_i, riemann_data_j, p_min);
+      // const Number phi_p_max = phi(riemann_data_i, riemann_data_j, p_max);
+
+      const std::array<Number, 2> phi_alt =
+          phi_twosided(riemann_data_i, riemann_data_j);
+      // std::cout << phi_p_min << "  " << phi_alt[1] << "  "
+      //          << phi_p_max << "  " << phi_alt[0] << std::endl;
 
       const Number p_star_tilde =
           p_star_two_rarefaction(riemann_data_i, riemann_data_j);
 
       Number p_star =
           dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-              phi_p_max,
+              phi_alt[0], // phi_p_max,
               Number(0.),
               p_star_tilde,
               std::min(p_max, p_star_tilde));
 
       p_star = dealii::compare_and_apply_mask<
           dealii::SIMDComparison::less_than_or_equal>(
-          std::abs(phi_p_max), Number(newton_eps_), p_max, p_star);
+          std::abs(phi_alt[0]), Number(newton_eps_), p_max, p_star);
 
       p_star = dealii::compare_and_apply_mask<
           dealii::SIMDComparison::greater_than_or_equal>(
-          phi_p_min, Number(0.), Number(0.), p_star);
+          phi_alt[1], Number(0.), Number(0.), p_star);
 
       const Number lambda_max =
           compute_lambda(riemann_data_i, riemann_data_j, p_star);

@@ -45,6 +45,23 @@ namespace grendel
     static constexpr ScalarNumber gamma = ScalarNumber(7.) / ScalarNumber(5.);
 
     /**
+     * 1/Gamma.
+     */
+    static constexpr ScalarNumber gamma_inverse = ScalarNumber(1.) / gamma;
+
+    /**
+     * 1/(Gamma-1).
+     */
+    static constexpr ScalarNumber gamma_minus_one_inverse =
+        ScalarNumber(1.) / (gamma - ScalarNumber(1.));
+
+    /**
+     * 1/(Gamma+1).
+     */
+    static constexpr ScalarNumber gamma_plus_one_inverse =
+        ScalarNumber(1.) / (gamma + ScalarNumber(1.));
+
+    /**
      * Covolume b.
      */
     static constexpr ScalarNumber b = 0.;
@@ -77,6 +94,12 @@ namespace grendel
      */
     static Number internal_energy(const rank1_type U);
 
+    /**
+     * For a given (2+dim dimensional) state vector <code>U</code> and the
+     * inverse density, compute and return the internal energy (\rho e). Uses
+     * pre-computed inverse density for faster evaluation.
+     */
+    static Number internal_energy(const rank1_type U, const Number rho_inverse);
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
@@ -91,6 +114,13 @@ namespace grendel
      */
     static Number pressure(const rank1_type U);
 
+    /**
+     * For a given (2+dim dimensional) state vector <code>U</code> and the
+     * inverse density, compute and return the pressure. Uses pre-computed
+     * inverse density for faster evaluation.
+     */
+    static Number pressure(const rank1_type U, const Number rho_inverse);
+
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
@@ -100,6 +130,12 @@ namespace grendel
      *   c^2 = gamma * p / rho / (1 - b * rho)
      */
     static Number speed_of_sound(const rank1_type U);
+
+    /**
+     * For a given (2+dim dimensional) state vector <code>U</code> and the
+     * inverse of the density, compute the (physical) speed of sound.
+     */
+    static Number speed_of_sound(const rank1_type U, const Number rho_inverse);
 
 
     /**
@@ -157,6 +193,17 @@ namespace grendel
 
 
   template <int dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline Number
+  ProblemDescription<dim, Number>::internal_energy(const rank1_type U,
+                                                   const Number rho_inverse)
+  {
+    const auto m = momentum(U);
+    const Number &E = U[dim + 1];
+    return E - ScalarNumber(0.5) * m.norm_square() * rho_inverse;
+  }
+
+
+  template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline
       typename ProblemDescription<dim, Number>::rank1_type
       ProblemDescription<dim, Number>::internal_energy_derivative(
@@ -204,12 +251,31 @@ namespace grendel
 
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline Number
+  ProblemDescription<dim, Number>::pressure(const rank1_type U,
+                                            const Number rho_inverse)
+  {
+    return (gamma - ScalarNumber(1.)) * internal_energy(U, rho_inverse);
+  }
+
+
+  template <int dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline Number
   ProblemDescription<dim, Number>::speed_of_sound(const rank1_type U)
   {
     /* c^2 = gamma * p / rho / (1 - b * rho) */
     const Number rho = U[0];
     const Number p = pressure(U);
     return std::sqrt(gamma * p / rho);
+  }
+
+
+  template <int dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline Number
+  ProblemDescription<dim, Number>::speed_of_sound(const rank1_type U,
+                                                  const Number rho_inverse)
+  {
+    const Number p = pressure(U, rho_inverse);
+    return std::sqrt(gamma * p * rho_inverse);
   }
 
 
