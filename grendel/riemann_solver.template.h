@@ -419,8 +419,6 @@ namespace grendel
 
       const std::array<Number, 2> phi_alt =
           phi_twosided(riemann_data_i, riemann_data_j);
-      // std::cout << phi_p_min << "  " << phi_alt[1] << "  "
-      //          << phi_p_max << "  " << phi_alt[0] << std::endl;
 
       const Number p_star_tilde =
           p_star_two_rarefaction(riemann_data_i, riemann_data_j);
