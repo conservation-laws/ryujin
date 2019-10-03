@@ -140,7 +140,7 @@ namespace grendel
           (ScalarNumber(-1.) - gamma) * ScalarNumber(0.5) * gamma_inverse;
       const Number factor = (gamma - ScalarNumber(1.)) * ScalarNumber(0.5) *
                             gamma_inverse *
-                            grendel::pow(p_star / p, -exponent) / p;
+                            grendel::pow(p_star / p, exponent) / p;
       const auto false_value =
           factor * ScalarNumber(2.) * a * gamma_minus_one_inverse;
 
