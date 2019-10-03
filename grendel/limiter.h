@@ -212,16 +212,19 @@ namespace grendel
       l_ij = std::min(l_ij, t_0);
 
 #ifdef DEBUG
+      const auto new_density = (U + l_ij * P_ij)[0];
+
       if constexpr (std::is_same<Number, double>::value ||
                     std::is_same<Number, float>::value) {
-        Assert((U + l_ij * P_ij)[0] > 0.,
-               dealii::ExcMessage("I'm sorry, Dave. I'm afraid I can't do "
-                                  "that. - Negative density."));
+        AssertThrow(new_density > 0.,
+                    dealii::ExcMessage("I'm sorry, Dave. I'm afraid I can't do "
+                                       "that. - Negative density."));
       } else {
         for (unsigned int k = 0; k < Number::n_array_elements; ++k)
-          Assert((U + l_ij * P_ij)[0][k] > 0.,
-                 dealii::ExcMessage("I'm sorry, Dave. I'm afraid I can't do "
-                                    "that. - Negative density."));
+          AssertThrow(
+              new_density[k] > 0.,
+              dealii::ExcMessage("I'm sorry, Dave. I'm afraid I can't do "
+                                 "that. - Negative density."));
       }
 #endif
     }
@@ -345,8 +348,10 @@ namespace grendel
          * because Psi(t_r) > 0. Just return in this case:
          */
 
-        if (std::min(Number(0.), psi_r) == Number(0.))
-          return std::min(l_ij, t_r);
+        if (std::min(Number(0.), psi_r) == Number(0.)) {
+          t_r = t_l;
+          break;
+        }
 
         /*
          * If psi_r > 0 the right state is fine, force l_ij = t_r by
@@ -371,7 +376,7 @@ namespace grendel
 
         if (std::max(Number(0.), psi_l - Number(line_search_eps_)) ==
             Number(0.))
-          return std::min(l_ij, t_l);
+          break;
 
         const auto dpsi_l =
             ProblemDescription<dim, Number>::internal_energy_derivative(U_l) *
@@ -407,17 +412,19 @@ namespace grendel
 
         /* Make sure we do not produce NaNs: */
 
-        t_l -= dealii::compare_and_apply_mask<dealii::SIMDComparison::equal>(
-            denominator_l,
-            Number(0.),
-            Number(0.),
-            ScalarNumber(2.) * psi_l / denominator_l);
+        t_l -=
+            dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+                std::abs(denominator_l),
+                Number(line_search_eps_),
+                Number(0.),
+                ScalarNumber(2.) * psi_l / denominator_l);
 
-        t_r -= dealii::compare_and_apply_mask<dealii::SIMDComparison::equal>(
-            denominator_r,
-            Number(0.),
-            Number(0.),
-            ScalarNumber(2.) * psi_r / denominator_r);
+        t_r -=
+            dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+                std::abs(denominator_r),
+                Number(line_search_eps_),
+                Number(0.),
+                ScalarNumber(2.) * psi_r / denominator_r);
 
         /* Enforce bounds: */
         t_l = std::max(Number(0.), t_l);
@@ -429,7 +436,27 @@ namespace grendel
         t_l = std::min(t_l, t_r);
       }
 
-      return std::min(l_ij, t_l);
+      l_ij = std::min(l_ij, t_l);
+
+#ifdef DEBUG
+      const auto new_internal_energy = (U + l_ij * P_ij)[0];
+      ProblemDescription<dim, Number>::internal_energy(U + l_ij * P_ij);
+
+      if constexpr (std::is_same<Number, double>::value ||
+                    std::is_same<Number, float>::value) {
+        AssertThrow(new_internal_energy > 0.,
+                    dealii::ExcMessage("I'm sorry, Dave. I'm afraid I can't do "
+                                       "that. - Negative internal energy."));
+      } else {
+        for (unsigned int k = 0; k < Number::n_array_elements; ++k)
+          AssertThrow(
+              new_internal_energy[k] > 0.,
+              dealii::ExcMessage("I'm sorry, Dave. I'm afraid I can't do "
+                                 "that. - Negative internal energy."));
+      }
+#endif
+
+      return l_ij;
     }
 
     __builtin_unreachable();
