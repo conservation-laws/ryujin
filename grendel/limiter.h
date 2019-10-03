@@ -384,14 +384,28 @@ namespace grendel
         const auto discriminant_r =
             dpsi_r * dpsi_r + ScalarNumber(4.) * psi_r * dd_122;
 
-        Assert(discriminant_l >= 0. && discriminant_r >= 0.,
-               dealii::ExcMessage("Houston we have a problem!"));
+        /*
+         * Handle pathological cases  discriminant < 0 by not moving the
+         * respective point:
+         */
 
-        t_l -= ScalarNumber(2.) * psi_l /
-               (dpsi_l - std::sqrt(discriminant_l) + Number(line_search_eps_));
+        t_l -=
+            dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+                discriminant_l,
+                Number(0.),
+                Number(0.),
+                ScalarNumber(2.) * psi_l /
+                    (dpsi_l - std::sqrt(discriminant_l) +
+                     Number(line_search_eps_)));
 
-        t_r -= ScalarNumber(2.) * psi_r /
-               (dpsi_r - std::sqrt(discriminant_r) + Number(line_search_eps_));
+        t_r -=
+            dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+                discriminant_r,
+                Number(0.),
+                Number(0.),
+                ScalarNumber(2.) * psi_r /
+                    (dpsi_r - std::sqrt(discriminant_r) +
+                     Number(line_search_eps_)));
 
         /* Ensure that always t_l <= t_r: */
         t_l = std::min(t_l, t_r);
