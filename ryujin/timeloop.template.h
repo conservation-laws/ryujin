@@ -385,8 +385,8 @@ namespace ryujin
     deallog << "Limiter<dim, Number>::line_search_eps_ == "
             << Limiter<dim, Number>::line_search_eps_ << std::endl;
 
-    deallog << "Limiter<dim, Number>::line_search_iter_ == "
-            << Limiter<dim, Number>::line_search_iter_ << std::endl;
+    deallog << "Limiter<dim, Number>::line_search_max_iter_ == "
+            << Limiter<dim, Number>::line_search_max_iter_ << std::endl;
 
     deallog << "RiemannSolver<dim, Number>::newton_eps_ == "
             <<  RiemannSolver<dim, Number>::newton_eps_ << std::endl;

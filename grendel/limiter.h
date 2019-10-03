@@ -47,7 +47,7 @@ namespace grendel
         std::is_same<ScalarNumber, double>::value ? ScalarNumber(1.0e-10)
                                                   : ScalarNumber(1.0e-4);
 
-    static constexpr unsigned int line_search_iter_ = 1;
+    static constexpr unsigned int line_search_max_iter_ = 2;
 
     /*
      * Accumulate bounds:
@@ -331,7 +331,7 @@ namespace grendel
 
       constexpr ScalarNumber gamma = ProblemDescription<dim, Number>::gamma;
 
-      for (unsigned int n = 0; n < line_search_iter_; ++n) {
+      for (unsigned int n = 0; n < line_search_max_iter_; ++n) {
 
         const auto U_r = U + t_r * P_ij;
         const auto rho_r = U_r[0];
@@ -340,7 +340,20 @@ namespace grendel
         auto psi_r = ProblemDescription<dim, Number>::internal_energy(U_r) -
                      s_min * rho_r_gamma;
 
-        /* Handle pathological case  psi_r > 0: */
+        /*
+         * Shortcut: In the majority of states no Newton step is necessary
+         * because Psi(t_r) > 0. Just return in this case:
+         */
+
+        if (std::min(Number(0.), psi_r + Number(line_search_eps_)) ==
+            Number(0.))
+          return std::min(l_ij, t_r);
+
+        /*
+         * If psi_r > 0 the right state is fine, force l_ij = t_r by
+         * setting t_l = t_r:
+         */
+
         t_l = dealii::compare_and_apply_mask<
             dealii::SIMDComparison::greater_than>(psi_r, Number(0.), t_r, t_l);
 
@@ -351,9 +364,15 @@ namespace grendel
         auto psi_l = ProblemDescription<dim, Number>::internal_energy(U_l) -
                      s_min * rho_l_gamma;
 
-        /* Handle pathological case  psi_l < 0: */
-        t_r = dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-            psi_l, Number(0.), t_l, t_r);
+        /*
+         * Shortcut: In the majority of cases only at most one Newton
+         * iteration is necessary because we reach Psi(t_l) \approx 0
+         * quickly. Just return in this case:
+         */
+
+        if (std::max(Number(0.), psi_l - Number(line_search_eps_)) ==
+            Number(0.))
+          return std::min(l_ij, t_l);
 
         const auto dpsi_l =
             ProblemDescription<dim, Number>::internal_energy_derivative(U_l) *
@@ -380,40 +399,30 @@ namespace grendel
         /* Update left and right point: */
 
         const auto discriminant_l =
-            dpsi_l * dpsi_l + ScalarNumber(4.) * psi_l * dd_112;
+            std::abs(dpsi_l * dpsi_l + ScalarNumber(4.) * psi_l * dd_112);
         const auto discriminant_r =
-            dpsi_r * dpsi_r + ScalarNumber(4.) * psi_r * dd_122;
+            std::abs(dpsi_r * dpsi_r + ScalarNumber(4.) * psi_r * dd_122);
+
+        t_l -= ScalarNumber(2.) * psi_l /
+               (dpsi_l - std::sqrt(discriminant_l) + Number(line_search_eps_));
+
+        t_r -= ScalarNumber(2.) * psi_r /
+               (dpsi_r - std::sqrt(discriminant_r) + Number(line_search_eps_));
 
         /*
-         * Handle pathological cases  discriminant < 0 by not moving the
-         * respective point:
+         * In pathological cases (where the states are constant) we might
+         * end up with pathological t_l and t_r values. Simply clean up t_l
+         * and t_r (what we choose as actual value for l_ij in this case
+         * doesn't really matter).
          */
-
-        t_l -=
-            dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-                discriminant_l,
-                Number(0.),
-                Number(0.),
-                ScalarNumber(2.) * psi_l /
-                    (dpsi_l - std::sqrt(discriminant_l) +
-                     Number(line_search_eps_)));
 
         t_l = std::max(Number(0.), t_l);
         t_l = std::min(Number(1.), t_l);
-
-        t_r -=
-            dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-                discriminant_r,
-                Number(0.),
-                Number(0.),
-                ScalarNumber(2.) * psi_r /
-                    (dpsi_r - std::sqrt(discriminant_r) +
-                     Number(line_search_eps_)));
-
         t_r = std::max(Number(0.), t_r);
         t_r = std::min(Number(1.), t_r);
 
         /* Ensure that always t_l <= t_r: */
+
         t_l = std::min(t_l, t_r);
       }
 
