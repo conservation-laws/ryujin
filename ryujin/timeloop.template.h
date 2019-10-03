@@ -194,7 +194,8 @@ namespace ryujin
 
     /* Loop: */
 
-    for (unsigned int cycle = 1; t < t_final; ++cycle) {
+    unsigned int cycle = 1;
+    for (; t < t_final; ++cycle) {
 
       std::ostringstream head;
       head << "Cycle  " << Utilities::int_to_string(cycle, 6) << "  ("
@@ -251,6 +252,46 @@ namespace ryujin
 
     computing_timer.print_summary();
     deallog << timer_output.str() << std::endl;
+
+
+    {
+      /* Print Jean-Luc and Martin metrics: */
+
+      const auto cpu_summary_data = computing_timer.get_summary_data(
+          TimerOutput::OutputData::total_cpu_time);
+
+      const double cpu_time =
+          std::accumulate(cpu_summary_data.begin(),
+                          cpu_summary_data.end(),
+                          0.,
+                          [](auto sum, auto it) { return sum + it.second; });
+
+      const auto wall_summary_data = computing_timer.get_summary_data(
+          TimerOutput::OutputData::total_wall_time);
+
+      const double wall_time =
+          std::accumulate(wall_summary_data.begin(),
+                          wall_summary_data.end(),
+                          0.,
+                          [](auto sum, auto it) { return sum + it.second; });
+
+      const double cpu_m_dofs_per_sec =
+          cycle * offline_data.dof_handler().n_dofs() / 1.e6 / cpu_time;
+      const double wall_m_dofs_per_sec =
+          cycle * offline_data.dof_handler().n_dofs() / 1.e6 / wall_time;
+
+      std::ostringstream head;
+      head << std::setprecision(4) << std::endl << std::endl;
+      head << "Throughput: (CPU )  " << std::fixed << cpu_m_dofs_per_sec
+           << " MQ/s  (" << std::scientific << 1. / cpu_m_dofs_per_sec * 1.e-6
+           << " s/Qdof/cycle)" << std::endl;
+      head << "            (WALL)  " << std::fixed << wall_m_dofs_per_sec
+           << " MQ/s  (" << std::scientific << 1. / wall_m_dofs_per_sec * 1.e-6
+           << " s/Qdof/cycle)" << std::endl;
+
+      deallog << head.str() << std::endl;
+    }
+
 
     /* Detach deallog: */
     if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0) {
