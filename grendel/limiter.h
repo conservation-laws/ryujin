@@ -44,10 +44,10 @@ namespace grendel
     static constexpr unsigned int relaxation_order_ = 3;
 
     static constexpr ScalarNumber line_search_eps_ =
-        std::is_same<Number, double>::value ? ScalarNumber(1.0e-8)
-                                            : ScalarNumber(1.0e-4);
+        std::is_same<ScalarNumber, double>::value ? ScalarNumber(1.0e-10)
+                                                  : ScalarNumber(1.0e-4);
 
-    static constexpr unsigned int line_search_max_iter_ = 10;
+    static constexpr unsigned int line_search_iter_ = 1;
 
     /*
      * Accumulate bounds:
@@ -314,56 +314,52 @@ namespace grendel
 
     if constexpr (limiter_ == Limiters::specific_entropy) {
       /*
-       * Prepare a Newton secant method:
+       * Prepare a quadratic Newton method:
+       *
+       * Given initial limiter values t_l and t_r with psi(t_l) > 0 and
+       * psi(t_r) < 0 we try to find t^\ast with psi(t^\ast) \approx 0.
+       *
+       * Note: If the precondition psi(t_l) > 0 and psi(t_r) < 0 is not
+       * fulfilled we are very likely in a region of almost constant state.
+       * Here, the limiter value ultimately doesn't matter that much. We
+       * nevertheless have to make sure that we do not accidentally produce
+       * nonsensical l_ij in the quadratic Newton iteration.
        */
 
-      Number t_l = 0.;
+      Number t_l = Number(0.);
       Number t_r = l_ij;
-
-      if (t_r <= ScalarNumber(0.) + line_search_eps_)
-        return 0.;
-
-      if (t_r < t_l + line_search_eps_) {
-        const auto t = t_l < t_r ? t_l : t_r;
-        return std::min(l_ij, t);
-      }
 
       constexpr ScalarNumber gamma = ProblemDescription<dim, Number>::gamma;
 
-      for (unsigned int n = 0; n < line_search_max_iter_; ++n) {
+      for (unsigned int n = 0; n < line_search_iter_; ++n) {
 
         const auto U_r = U + t_r * P_ij;
         const auto rho_r = U_r[0];
         const auto rho_r_gamma = grendel::pow(rho_r, gamma);
+        /* use a scaled variant of psi:  e - s * rho^gamma */
         auto psi_r = ProblemDescription<dim, Number>::internal_energy(U_r) -
                      s_min * rho_r_gamma;
 
-        /* Right state is good, cut it short and return: */
-        if (psi_r >= 0. - line_search_eps_)
-          return std::min(l_ij, t_r);
+        /* Handle pathological case  psi_r > 0: */
+        t_l = dealii::compare_and_apply_mask<
+            dealii::SIMDComparison::greater_than>(psi_r, Number(0.), t_r, t_l);
 
         const auto U_l = U + t_l * P_ij;
         const auto rho_l = U_l[0];
         const auto rho_l_gamma = grendel::pow(rho_l, gamma);
+        /* use a scaled variant of psi:  e - s * rho^gamma */
         auto psi_l = ProblemDescription<dim, Number>::internal_energy(U_l) -
                      s_min * rho_l_gamma;
 
-        /*
-         * Due to round-off errors it might happen that psi_l is negative
-         * (close to eps). In this case we fix the problem by lowering
-         * s_min just enough so that psi_l = 0.;
-         */
-        if (psi_l < 0.) {
-          psi_r -= psi_l;
-          psi_l = 0.;
-          if (psi_r >= ScalarNumber(0.) - line_search_eps_)
-            return std::min(l_ij, t_r);
-        }
+        /* Handle pathological case  psi_l < 0: */
+        t_r = dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+            psi_l, Number(0.), t_l, t_r);
 
         const auto dpsi_l =
             ProblemDescription<dim, Number>::internal_energy_derivative(U_l) *
                 P_ij -
             gamma * rho_l_gamma / rho_l * s_min * P_ij[0];
+
         const auto dpsi_r =
             ProblemDescription<dim, Number>::internal_energy_derivative(U_r) *
                 P_ij -
@@ -371,42 +367,36 @@ namespace grendel
 
         /* Compute divided differences: */
 
-        const Number dd_11 = -dpsi_l;
-        const Number dd_12 = (psi_l - psi_r) / (t_r - t_l);
-        const Number dd_22 = -dpsi_r;
+        const auto scaling =
+            ScalarNumber(1.) / (t_r - t_l + Number(line_search_eps_));
 
-        const Number dd_112 = (dd_12 - dd_11) / (t_r - t_l);
-        const Number dd_122 = (dd_22 - dd_12) / (t_r - t_l);
+        const auto dd_11 = -dpsi_l;
+        const auto dd_12 = (psi_l - psi_r) * scaling;
+        const auto dd_22 = -dpsi_r;
+
+        const auto dd_112 = (dd_12 - dd_11) * scaling;
+        const auto dd_122 = (dd_22 - dd_12) * scaling;
 
         /* Update left and right point: */
 
-        const Number discriminant_l =
-            dpsi_l * dpsi_l + Number(4.) * psi_l * dd_112;
-        const Number discriminant_r =
-            dpsi_r * dpsi_r + Number(4.) * psi_r * dd_122;
+        const auto discriminant_l =
+            dpsi_l * dpsi_l + ScalarNumber(4.) * psi_l * dd_112;
+        const auto discriminant_r =
+            dpsi_r * dpsi_r + ScalarNumber(4.) * psi_r * dd_122;
 
         Assert(discriminant_l >= 0. && discriminant_r >= 0.,
                dealii::ExcMessage("Houston we have a problem!"));
 
-        t_l = t_l - Number(2.) * psi_l / (dpsi_l - std::sqrt(discriminant_l));
-        t_r = t_r - Number(2.) * psi_r / (dpsi_r - std::sqrt(discriminant_r));
+        t_l -= ScalarNumber(2.) * psi_l /
+               (dpsi_l - std::sqrt(discriminant_l) + Number(line_search_eps_));
 
-        /* Handle some pathological cases that happen in regions with
-         * constant specific entropy: */
-        if (std::isnan(t_l)) {
-          return l_ij;
-        }
-        if (std::isnan(t_r)) {
-          return l_ij;
-        }
+        t_r -= ScalarNumber(2.) * psi_r /
+               (dpsi_r - std::sqrt(discriminant_r) + Number(line_search_eps_));
 
-        if (t_r < t_l + line_search_eps_) {
-          const auto t = t_l < t_r ? t_l : t_r;
-          return std::min(l_ij, t);
-        }
+        /* Ensure that always t_l <= t_r: */
+        t_l = std::min(t_l, t_r);
       }
 
-      /* t_l is a good state with psi_l > 0. */
       return std::min(l_ij, t_l);
     }
 
