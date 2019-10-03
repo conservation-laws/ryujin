@@ -320,6 +320,23 @@ namespace grendel
   }
 
 
+  /**
+   * Variant of above function that returns an array instead of a tensor
+   */
+  template <typename T1, std::size_t k, typename T2>
+  DEAL_II_ALWAYS_INLINE inline std::
+      array<dealii::VectorizedArray<typename T1::value_type>, k>
+      simd_gather_array(const std::array<T1, k> &U, const T2 i)
+  {
+    std::array<dealii::VectorizedArray<typename T1::value_type>, k> result;
+
+    for (unsigned int j = 0; j < k; ++j)
+      result[j].load(U[j].get_values() + i);
+
+    return result;
+  }
+
+
   /*
    * It's magic
    */

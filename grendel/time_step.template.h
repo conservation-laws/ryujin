@@ -509,9 +509,6 @@ namespace grendel
           if (++sparsity.begin(i) == sparsity.end(i))
             continue;
 
-          /* Only iterate over locally owned subset! */
-          Assert(i < n_owned, ExcInternalError());
-
           const auto U_i = gather(U, i);
           auto U_i_new = U_i;
 
@@ -662,11 +659,28 @@ namespace grendel
         LIKWID_MARKER_START("time_step_5");
 #endif
 
-        const auto on_subranges = [&](auto i1, const auto i2) {
+        const auto step_5_simd = [&](auto i1, const auto i2) {
           for (const auto i : boost::make_iterator_range(i1, i2)) {
 
-            /* Only iterate over locally owned subset! */
-            Assert(i < n_owned, ExcInternalError());
+            const auto bounds = simd_gather_array(bounds_, i);
+            const auto U_i_new = simd_gather(temp_euler_, i);
+
+            auto jts = generate_iterators<n_array_elements>(
+                [&](auto k) { return sparsity.begin(i + k); });
+
+            for (; jts[0] != sparsity.end(i); increment_iterators(jts)) {
+
+              const auto p_ij = gather_get_entry(pij_matrix_, jts);
+              const auto l_ij = Limiter<dim, VectorizedArray<Number>>::limit(
+                  bounds, U_i_new, p_ij);
+
+              set_entry(lij_matrix_, jts, l_ij);
+            }
+          }
+        };
+
+        const auto step_5_serial = [&](auto i1, const auto i2) {
+          for (const auto i : boost::make_iterator_range(i1, i2)) {
 
             /* Skip constrained degrees of freedom */
             if (++sparsity.begin(i) == sparsity.end(i))
@@ -685,7 +699,13 @@ namespace grendel
         };
 
         parallel::apply_to_subranges(
-            serial_owned.begin(), serial_owned.end(), on_subranges, 1024);
+            simd_internal.begin(), simd_internal.end(), step_5_simd, 1024);
+
+        parallel::apply_to_subranges(simd_remaining_owned.begin(),
+                                     simd_remaining_owned.end(),
+                                     step_5_serial,
+                                     1024);
+
 #ifdef LIKWID_PERFMON
         LIKWID_MARKER_STOP("time_step_5");
 #endif

@@ -218,8 +218,8 @@ namespace grendel
                dealii::ExcMessage("I'm sorry, Dave. I'm afraid I can't do "
                                   "that. - Negative density."));
       } else {
-        for (const auto it : (U + l_ij * P_ij)[0])
-          Assert(it > 0.,
+        for (unsigned int k = 0; k < Number::n_array_elements; ++k)
+          Assert((U + l_ij * P_ij)[0][k] > 0.,
                  dealii::ExcMessage("I'm sorry, Dave. I'm afraid I can't do "
                                     "that. - Negative density."));
       }
@@ -398,6 +398,9 @@ namespace grendel
                     (dpsi_l - std::sqrt(discriminant_l) +
                      Number(line_search_eps_)));
 
+        t_l = std::max(Number(0.), t_l);
+        t_l = std::min(Number(1.), t_l);
+
         t_r -=
             dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
                 discriminant_r,
@@ -406,6 +409,9 @@ namespace grendel
                 ScalarNumber(2.) * psi_r /
                     (dpsi_r - std::sqrt(discriminant_r) +
                      Number(line_search_eps_)));
+
+        t_r = std::max(Number(0.), t_r);
+        t_r = std::min(Number(1.), t_r);
 
         /* Ensure that always t_l <= t_r: */
         t_l = std::min(t_l, t_r);
