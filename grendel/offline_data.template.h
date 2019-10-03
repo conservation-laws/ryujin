@@ -113,6 +113,14 @@ namespace grendel
             n_locally_internal_++;
           }
 
+        /*
+         * Round down to the nearest multiple of n_array_elements:
+         */
+
+        n_locally_internal_ =
+            n_locally_internal_ -
+            n_locally_internal_ % VectorizedArray<Number>::n_array_elements;
+
 #ifndef USE_SIMD
         /*
          * If USE_SIMD is not set, we disable all SIMD instructions by

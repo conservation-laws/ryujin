@@ -110,14 +110,7 @@ namespace grendel
 
     constexpr auto n_array_elements = VectorizedArray<Number>::n_array_elements;
 
-    /*
-     * Round a given number down to the nearest multiple of  n_array_elements:
-     */
-    const auto round_down = [=](const auto m) {
-      return m - m % n_array_elements;
-    };
-
-    const auto n_internal = round_down(offline_data_->n_locally_internal());
+    const auto n_internal = offline_data_->n_locally_internal();
     const auto n_owned = offline_data_->n_locally_owned();
     const auto n_relevant = offline_data_->n_locally_relevant();
 
@@ -464,7 +457,7 @@ namespace grendel
             const auto d_ijH = Indicator<dim, Number>::indicator_ ==
                                        Indicator<dim, Number>::Indicators::
                                            entropy_viscosity_commutator
-                                   ? d_ij * (alpha_i + alpha_j) / Number(2.)
+                                   ? d_ij * (alpha_i + alpha_j) * Number(.5)
                                    : d_ij * std::max(alpha_i, alpha_j);
 
             const auto p_ij = tau / m_i / lambda * (d_ijH - d_ij) * (U_j - U_i);
@@ -517,7 +510,7 @@ namespace grendel
           const Number m_i = lumped_mass_matrix.diag_element(i);
 
           const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
-          const Number lambda = Number(1.) / Number(size - 1);
+          const Number lambda_inv = Number(size - 1);
 
           rank1_type r_i;
 
@@ -537,10 +530,11 @@ namespace grendel
             const auto d_ijH = Indicator<dim, Number>::indicator_ ==
                                        Indicator<dim, Number>::Indicators::
                                            entropy_viscosity_commutator
-                                   ? d_ij * (alpha_i + alpha_j) / Number(2.)
+                                   ? d_ij * (alpha_i + alpha_j) * Number(.5)
                                    : d_ij * std::max(alpha_i, alpha_j);
 
-            const auto p_ij = tau / m_i / lambda * (d_ijH - d_ij) * (U_j - U_i);
+            const auto p_ij =
+                tau / m_i * lambda_inv * (d_ijH - d_ij) * (U_j - U_i);
 
             dealii::Tensor<1, problem_dimension> U_ij_bar;
 
