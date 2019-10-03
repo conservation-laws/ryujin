@@ -54,7 +54,7 @@ SET(DIM "2" CACHE STRING "The dimension")
 
 SET(NUMBER "double" CACHE STRING "The principal floating point type")
 
-SET(USE_SIMD true CACHE Bool "Use SIMD vectorization")
+OPTION(USE_SIMD "Use SIMD vectorization" TRUE)
 
 #
 # Set up the rest:
