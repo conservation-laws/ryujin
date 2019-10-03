@@ -345,8 +345,7 @@ namespace grendel
          * because Psi(t_r) > 0. Just return in this case:
          */
 
-        if (std::min(Number(0.), psi_r + Number(line_search_eps_)) ==
-            Number(0.))
+        if (std::min(Number(0.), psi_r) == Number(0.))
           return std::min(l_ij, t_r);
 
         /*
@@ -403,26 +402,30 @@ namespace grendel
         const auto discriminant_r =
             std::abs(dpsi_r * dpsi_r + ScalarNumber(4.) * psi_r * dd_122);
 
-        t_l -= ScalarNumber(2.) * psi_l /
-               (dpsi_l - std::sqrt(discriminant_l) + Number(line_search_eps_));
+        const auto denominator_l = dpsi_l - std::sqrt(discriminant_l);
+        const auto denominator_r = dpsi_r - std::sqrt(discriminant_r);
 
-        t_r -= ScalarNumber(2.) * psi_r /
-               (dpsi_r - std::sqrt(discriminant_r) + Number(line_search_eps_));
+        /* Make sure we do not produce NaNs: */
 
-        /*
-         * In pathological cases (where the states are constant) we might
-         * end up with pathological t_l and t_r values. Simply clean up t_l
-         * and t_r (what we choose as actual value for l_ij in this case
-         * doesn't really matter).
-         */
+        t_l -= dealii::compare_and_apply_mask<dealii::SIMDComparison::equal>(
+            denominator_l,
+            Number(0.),
+            Number(0.),
+            ScalarNumber(2.) * psi_l / denominator_l);
 
+        t_r -= dealii::compare_and_apply_mask<dealii::SIMDComparison::equal>(
+            denominator_r,
+            Number(0.),
+            Number(0.),
+            ScalarNumber(2.) * psi_r / denominator_r);
+
+        /* Enforce bounds: */
         t_l = std::max(Number(0.), t_l);
-        t_l = std::min(Number(1.), t_l);
         t_r = std::max(Number(0.), t_r);
-        t_r = std::min(Number(1.), t_r);
+        t_l = std::min(l_ij, t_l);
+        t_r = std::min(l_ij, t_r);
 
         /* Ensure that always t_l <= t_r: */
-
         t_l = std::min(t_l, t_r);
       }
 
