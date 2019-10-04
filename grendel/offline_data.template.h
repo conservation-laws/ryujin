@@ -59,23 +59,48 @@ namespace grendel
       n_locally_owned_ = locally_owned.n_elements();
 
       /*
-       * Reorder all locally owned boundary degree of freedoms to the end
-       * of the local index range:
+       * Reorder indices:
+       *
+       * In order to traverse over multiple rows of a (to be constructed)
+       * sparsity pattern simultaneously using SIMD instructions we reorder
+       * all locally owned degrees of freedom to ensure that a local index
+       * range [0, n_locally_internal_) \subset [0, n_locally_owned_) is
+       * available that
+       *
+       *  - contains no boundary dof
+       *
+       *  - contains no foreign degree of freedom
+       *
+       *  - has "standard" connectivity, i.e. 2, 8, or 26 neighboring DoFs
+       *    (in 1, 2, 3D).
+       *
+       *  - n_locally_owned_ is a multiple of n_array_elements
        */
 
       {
+        constexpr auto n_array_elements =
+            VectorizedArray<Number>::n_array_elements;
+
+        /* The locally owned index range has to be contiguous */
+
         Assert(locally_owned.is_contiguous() == true,
-               ExcMessage("Need a contigous set of locally owned indices."));
+               ExcMessage("Need a contiguous set of locally owned indices."));
 
-        std::vector<types::global_dof_index> new_order(n_locally_owned_);
-
+        /* Offset to translate from global to local index range */
         const auto offset = n_locally_owned_ != 0 ? *locally_owned.begin() : 0;
 
         const unsigned int dofs_per_cell =
             discretization_->finite_element().dofs_per_cell;
         std::vector<types::global_dof_index> local_dof_indices(dofs_per_cell);
 
-        /* First pass: Mark all locally owned boundary dofs: */
+        /*
+         * First pass: Accumulate how many cells are assoziated with a
+         * given degree of freedom and mark all degrees of freedom shared
+         * with a different number of cells than 2, 4, or 8 with
+         * numbers::invalid_dof_index:
+         */
+
+        std::vector<types::global_dof_index> new_order(n_locally_owned_);
 
         for (auto cell : dof_handler_.active_cell_iterators()) {
           if (cell->is_artificial())
@@ -83,23 +108,24 @@ namespace grendel
 
           cell->get_dof_indices(local_dof_indices);
 
-          for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f) {
-            const auto face = cell->face(f);
-            if (!face->at_boundary())
+          for (unsigned int j = 0; j < dofs_per_cell; ++j) {
+            const auto &index = local_dof_indices[j];
+            if (!locally_owned.is_element(index))
               continue;
 
-            for (unsigned int j = 0; j < dofs_per_cell; ++j) {
-              if (!discretization_->finite_element().has_support_on_face(j, f))
-                continue;
-
-              const auto &index = local_dof_indices[j];
-              if (!locally_owned.is_element(index))
-                continue;
-
-              Assert(index - offset < n_locally_owned_, ExcInternalError());
-              new_order[index - offset] = numbers::invalid_dof_index;
-            }
+            Assert(index - offset < n_locally_owned_, ExcInternalError());
+            new_order[index - offset] += 1;
           }
+        }
+
+        constexpr types::global_dof_index standard_number_of_neighbors =
+            dim == 1 ? 2 : (dim == 2 ? 4 : 8);
+
+        for (auto &it : new_order) {
+          if (it == standard_number_of_neighbors)
+            it = 0;
+          else
+            it = numbers::invalid_dof_index;
         }
 
         /* Second pass: Create renumbering. */
@@ -113,13 +139,17 @@ namespace grendel
             n_locally_internal_++;
           }
 
-        /*
-         * Round down to the nearest multiple of n_array_elements:
-         */
+        for (auto &it : new_order)
+          if (it == numbers::invalid_dof_index)
+            it = index++;
+
+        dof_handler_.renumber_dofs(new_order);
+
+        /* Round down to the nearest multiple of n_array_elements: */
 
         n_locally_internal_ =
             n_locally_internal_ -
-            n_locally_internal_ % VectorizedArray<Number>::n_array_elements;
+            n_locally_internal_ % n_array_elements;
 
 #ifndef USE_SIMD
         /*
@@ -128,12 +158,6 @@ namespace grendel
          */
         n_locally_internal_ = 0;
 #endif
-
-        for (auto &it : new_order)
-          if (it == numbers::invalid_dof_index)
-            it = index++;
-
-        dof_handler_.renumber_dofs(new_order);
       }
 
       /* Print out the DoF distribution: */
@@ -184,13 +208,7 @@ namespace grendel
           "offline_data - create partitioner and affine constraints");
 
       /*
-       * We first populate a "locally extended" index set. This set
-       * contains all locally relevant dofs (in our usual definition) and
-       * in addition all dofs associated with ghosted cells. Adding these
-       * extended degrees of freedom to local matrices simplifies the
-       * assembly significantly. FIXME: If it ever becomes necessary we
-       * could try to add a locally relevant index set to the  partitioner
-       * to only communicate a subset of these degrees of freedom.
+       * Create locally relevant index set:
        */
 
       locally_relevant.clear();
@@ -202,7 +220,7 @@ namespace grendel
           locally_owned, locally_relevant, mpi_communicator_));
 
       /*
-       * create a temporary affine constraints object and populate it with
+       * Create a temporary affine constraints object and populate it with
        * global indices:
        */
 
