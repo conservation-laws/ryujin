@@ -44,19 +44,39 @@ namespace grendel
   template <typename T>
   inline T pow(const T x, const typename get_value_type<T>::type b) = delete;
 
+#  if DEAL_II_COMPILER_VECTORIZATION_LEVEL >= 1 && defined(__SSE2__) && defined(USE_CUSTOM_POW)
+
+  template<>
+  DEAL_II_ALWAYS_INLINE inline float pow(const float x, const float b)
+  {
+    /* Use a custom pow implementation for SIMD vector units: */
+    return pow(Vec4f(x), b).extract(0);
+  }
+
+  template <>
+  DEAL_II_ALWAYS_INLINE inline double pow(const double x, const double b)
+  {
+    /* Use a custom pow implementation for SIMD vector units: */
+    return pow(Vec2d(x), b).extract(0);
+  }
+
+
+#else
+
   template <>
   DEAL_II_ALWAYS_INLINE inline float pow(const float x, const float b)
   {
-    // FIXME: Something more performant?
+    // Call generic implementation
     return std::pow(x, b);
   }
 
   template <>
   DEAL_II_ALWAYS_INLINE inline double pow(const double x, const double b)
   {
-    // FIXME: Something more performant?
+    // Call generic implementation
     return std::pow(x, b);
   }
+#endif
 
 #  if DEAL_II_COMPILER_VECTORIZATION_LEVEL >= 3 && defined(__AVX512F__)
 
