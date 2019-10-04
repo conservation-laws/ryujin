@@ -418,7 +418,7 @@ namespace grendel
 
         /* lambda is the same value for all interior dofs */
         const auto size = std::distance(sparsity.begin(*i1), sparsity.end(*i1));
-        const Number lambda = Number(1.) / Number(size - 1);
+        const Number lambda_inv = Number(size - 1);
 
         for (const auto i : boost::make_iterator_range(i1, i2)) {
 
@@ -460,7 +460,8 @@ namespace grendel
                                    ? d_ij * (alpha_i + alpha_j) * Number(.5)
                                    : d_ij * std::max(alpha_i, alpha_j);
 
-            const auto p_ij = tau / m_i / lambda * (d_ijH - d_ij) * (U_j - U_i);
+            const auto p_ij =
+                tau / m_i * lambda_inv * (d_ijH - d_ij) * (U_j - U_i);
 
             dealii::Tensor<1, problem_dimension, VectorizedArray<Number>>
                 U_ij_bar;
@@ -609,7 +610,7 @@ namespace grendel
 
           const Number m_i = lumped_mass_matrix.diag_element(i);
           const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
-          const Number lambda = Number(1.) / Number(size - 1);
+          const Number lambda_inv = Number(size - 1);
 
           const auto r_i = gather(r_, i);
 
@@ -622,7 +623,7 @@ namespace grendel
 
             const auto r_j = gather(r_, j);
 
-            p_ij += tau / m_i / lambda * (b_ij * r_j - b_ji * r_i);
+            p_ij += tau / m_i * lambda_inv * (b_ij * r_j - b_ji * r_i);
             scatter_set_entry(pij_matrix_, jt, p_ij);
           }
         }
