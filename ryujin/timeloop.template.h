@@ -367,6 +367,12 @@ namespace ryujin
     deallog << "SIMD width == " << "(( disabled ))" << std::endl;
 #endif
 
+#ifdef USE_CUSTOM_POW
+    deallog << "serial pow == broadcasted pow(Vec4f)/pow(Vec2d)" << std::endl;
+#else
+    deallog << "erial pow == std::pow"<< std::endl;
+#endif
+
 
     deallog << "Indicator<dim, Number>::indicators_ == ";
     switch (Indicator<dim, Number>::indicator_) {
