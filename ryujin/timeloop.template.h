@@ -276,9 +276,11 @@ namespace ryujin
                           [](auto sum, auto it) { return sum + it.second; });
 
       const double cpu_m_dofs_per_sec =
-          cycle * offline_data.dof_handler().n_dofs() / 1.e6 / cpu_time;
+          ((double)cycle) * ((double)offline_data.dof_handler().n_dofs()) /
+          1.e6 / cpu_time;
       const double wall_m_dofs_per_sec =
-          cycle * offline_data.dof_handler().n_dofs() / 1.e6 / wall_time;
+          ((double)cycle) * ((double)offline_data.dof_handler().n_dofs()) /
+          1.e6 / wall_time;
 
       std::ostringstream head;
       head << std::setprecision(4) << std::endl << std::endl;
