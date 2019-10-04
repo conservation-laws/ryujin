@@ -349,7 +349,7 @@ namespace grendel
          */
 
         if (std::min(Number(0.), psi_r) == Number(0.)) {
-          t_r = t_l;
+          t_l = t_r;
           break;
         }
 
