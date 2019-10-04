@@ -41,6 +41,8 @@ namespace ryujin
                 unsigned int cycle,
                 bool checkpoint = false);
 
+    void print_throughput(unsigned int cycle);
+
     /* Data: */
 
     const MPI_Comm &mpi_communicator;
