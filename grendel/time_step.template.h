@@ -15,7 +15,7 @@
 #include <atomic>
 
 #ifdef LIKWID_PERFMON
-  #include <likwid.h>
+#include <likwid.h>
 #endif
 
 
@@ -151,7 +151,8 @@ namespace grendel
     const auto &cij_matrix = offline_data_->cij_matrix();
 
     const auto &boundary_normal_map = offline_data_->boundary_normal_map();
-    const Number measure_of_omega = offline_data_->measure_of_omega();
+    const Number measure_of_omega_inverse =
+        Number(1.) / offline_data_->measure_of_omega();
 
     /*
      * Step 1: Compute off-diagonal d_ij, and alpha_i
@@ -183,9 +184,20 @@ namespace grendel
           for (; jts[0] != sparsity.end(i); increment_iterators(jts)) {
 
             const auto js = get_column_indices(jts);
+            bool all_above_diagonal = true;
+            for (unsigned int k = 0; k < js.size(); ++k)
+              if (js[k] < i + k) {
+                all_above_diagonal = false;
+                break;
+              }
+
             const auto U_j = simd_gather(U, js);
 
             indicator.add(U_j, jts);
+
+            /* Only iterate over the subdiagonal for d_ij */
+            if (all_above_diagonal)
+              continue;
 
             const auto n_ij = gather_get_entry(nij_matrix, jts);
             const auto norm = get_entry(norm_matrix, jts);
@@ -196,13 +208,16 @@ namespace grendel
 
             const auto d = norm * lambda_max;
             set_entry(dij_matrix_, jts, d);
+            for (unsigned int k = 0; k < d.n_array_elements; ++k)
+              if (js[k] < i + k)
+                dij_matrix_(js[k], i + k) = d[k];
           }
 
           simd_scatter(
               rho_second_variation_, indicator.rho_second_variation(), i);
 
           const auto mass = simd_get_diag_element(lumped_mass_matrix, i);
-          const auto hd_i = mass / measure_of_omega;
+          const auto hd_i = mass * measure_of_omega_inverse;
           simd_scatter(alpha_, indicator.alpha(hd_i), i);
         }
       };
@@ -265,7 +280,7 @@ namespace grendel
               indicator.rho_second_variation();
 
           const Number mass = lumped_mass_matrix.diag_element(i);
-          const Number hd_i = mass / measure_of_omega;
+          const Number hd_i = mass * measure_of_omega_inverse;
           alpha_.local_element(i) = indicator.alpha(hd_i);
         }
       };
@@ -430,6 +445,7 @@ namespace grendel
 
           const auto alpha_i = simd_gather(alpha_, i);
           const auto m_i = simd_get_diag_element(lumped_mass_matrix, i);
+          const auto m_i_inv = Number(1.) / m_i;
 
           using rank1_type =
               typename ProblemDescription<dim,
@@ -453,6 +469,7 @@ namespace grendel
 
             const auto c_ij = gather_get_entry(cij_matrix, jts);
             const auto d_ij = get_entry(dij_matrix_, jts);
+            const auto d_ij_inv = Number(1.) / d_ij;
 
             const auto d_ijH = Indicator<dim, Number>::indicator_ ==
                                        Indicator<dim, Number>::Indicators::
@@ -461,7 +478,7 @@ namespace grendel
                                    : d_ij * std::max(alpha_i, alpha_j);
 
             const auto p_ij =
-                tau / m_i * lambda_inv * (d_ijH - d_ij) * (U_j - U_i);
+                tau * m_i_inv * lambda_inv * (d_ijH - d_ij) * (U_j - U_i);
 
             dealii::Tensor<1, problem_dimension, VectorizedArray<Number>>
                 U_ij_bar;
@@ -470,11 +487,11 @@ namespace grendel
               const auto temp = (f_j[k] - f_i[k]) * c_ij;
 
               r_i[k] += -temp + d_ijH * (U_j - U_i)[k];
-              U_ij_bar[k] =
-                  Number(0.5) * (U_i[k] + U_j[k]) - Number(0.5) * temp / d_ij;
+              U_ij_bar[k] = Number(0.5) * (U_i[k] + U_j[k]) -
+                            Number(0.5) * temp * d_ij_inv;
             }
 
-            U_i_new += tau / m_i * Number(2.) * d_ij * U_ij_bar;
+            U_i_new += tau * m_i_inv * Number(2.) * d_ij * U_ij_bar;
 
             scatter_set_entry(pij_matrix_, jts, p_ij);
 
@@ -485,7 +502,7 @@ namespace grendel
           simd_scatter(temp_euler_, U_i_new, i);
           simd_scatter(r_, r_i, i);
 
-          const auto hd_i = m_i / measure_of_omega;
+          const auto hd_i = m_i * measure_of_omega_inverse;
           const auto rho_relaxation_i = simd_gather(rho_relaxation_, i);
 
           limiter.apply_relaxation(hd_i, rho_relaxation_i);
@@ -509,6 +526,7 @@ namespace grendel
           const auto f_i = ProblemDescription<dim, Number>::f(U_i);
           const auto alpha_i = alpha_.local_element(i);
           const Number m_i = lumped_mass_matrix.diag_element(i);
+          const Number m_i_inv = Number(1.) / m_i;
 
           const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
           const Number lambda_inv = Number(size - 1);
@@ -527,6 +545,7 @@ namespace grendel
 
             const auto c_ij = gather_get_entry(cij_matrix, jt);
             const auto d_ij = get_entry(dij_matrix_, jt);
+            const Number d_ij_inv = Number(1.) / d_ij;
 
             const auto d_ijH = Indicator<dim, Number>::indicator_ ==
                                        Indicator<dim, Number>::Indicators::
@@ -535,7 +554,7 @@ namespace grendel
                                    : d_ij * std::max(alpha_i, alpha_j);
 
             const auto p_ij =
-                tau / m_i * lambda_inv * (d_ijH - d_ij) * (U_j - U_i);
+                tau * m_i_inv * lambda_inv * (d_ijH - d_ij) * (U_j - U_i);
 
             dealii::Tensor<1, problem_dimension> U_ij_bar;
 
@@ -543,11 +562,11 @@ namespace grendel
               const auto temp = (f_j[k] - f_i[k]) * c_ij;
 
               r_i[k] += -temp + d_ijH * (U_j - U_i)[k];
-              U_ij_bar[k] =
-                  Number(0.5) * (U_i[k] + U_j[k]) - Number(0.5) * temp / d_ij;
+              U_ij_bar[k] = Number(0.5) * (U_i[k] + U_j[k]) -
+                            Number(0.5) * temp * d_ij_inv;
             }
 
-            U_i_new += tau / m_i * Number(2.) * d_ij * U_ij_bar;
+            U_i_new += tau * m_i_inv * Number(2.) * d_ij * U_ij_bar;
 
             scatter_set_entry(pij_matrix_, jt, p_ij);
 
@@ -557,7 +576,7 @@ namespace grendel
           scatter(temp_euler_, U_i_new, i);
           scatter(r_, r_i, i);
 
-          const Number hd_i = m_i / measure_of_omega;
+          const Number hd_i = m_i * measure_of_omega_inverse;
           const Number rho_relaxation_i = rho_relaxation_.local_element(i);
           limiter.apply_relaxation(hd_i, rho_relaxation_i);
           scatter(bounds_, limiter.bounds(), i);
@@ -609,6 +628,7 @@ namespace grendel
             continue;
 
           const Number m_i = lumped_mass_matrix.diag_element(i);
+          const Number m_i_inv = Number(1.) / m_i;
           const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
           const Number lambda_inv = Number(size - 1);
 
@@ -623,7 +643,7 @@ namespace grendel
 
             const auto r_j = gather(r_, j);
 
-            p_ij += tau / m_i * lambda_inv * (b_ij * r_j - b_ji * r_i);
+            p_ij += tau * m_i_inv * lambda_inv * (b_ij * r_j - b_ji * r_i);
             scatter_set_entry(pij_matrix_, jt, p_ij);
           }
         }
