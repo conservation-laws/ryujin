@@ -332,7 +332,7 @@ namespace ryujin
 #ifdef USE_CUSTOM_POW
     deallog << "serial pow == broadcasted pow(Vec4f)/pow(Vec2d)" << std::endl;
 #else
-    deallog << "erial pow == std::pow"<< std::endl;
+    deallog << "serial pow == std::pow"<< std::endl;
 #endif
 
 
