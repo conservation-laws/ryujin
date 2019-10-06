@@ -346,7 +346,7 @@ namespace grendel
       typename ProblemDescription<dim, Number>::rank2_type
       ProblemDescription<dim, Number>::f(const rank1_type U)
   {
-    const Number &rho = U[0];
+    const Number &rho_inverse = Number(1.) / U[0];
     const auto m = momentum(U);
     const auto p = pressure(U);
     const Number &E = U[dim + 1];
@@ -355,10 +355,10 @@ namespace grendel
 
     result[0] = m;
     for (unsigned int i = 0; i < dim; ++i) {
-      result[1 + i] = m * m[i] / rho;
+      result[1 + i] = m * m[i] * rho_inverse;
       result[1 + i][i] += p;
     }
-    result[dim + 1] = m / rho * (E + p);
+    result[dim + 1] = m * rho_inverse * (E + p);
 
     return result;
   }
