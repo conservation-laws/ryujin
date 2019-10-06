@@ -139,8 +139,8 @@ namespace grendel
       const auto exponent =
           (ScalarNumber(-1.) - gamma) * ScalarNumber(0.5) * gamma_inverse;
       const Number factor = (gamma - ScalarNumber(1.)) * ScalarNumber(0.5) *
-                            gamma_inverse *
-                            grendel::pow(p_star / p, exponent) / p;
+                            gamma_inverse * grendel::pow(p_star / p, exponent) /
+                            p;
       const auto false_value =
           factor * ScalarNumber(2.) * a * gamma_minus_one_inverse;
 
@@ -414,10 +414,7 @@ namespace grendel
       // const Number p_min = std::min(riemann_data_i[2], riemann_data_j[2]);
       const Number p_max = std::max(riemann_data_i[2], riemann_data_j[2]);
 
-      // const Number phi_p_min = phi(riemann_data_i, riemann_data_j, p_min);
-      // const Number phi_p_max = phi(riemann_data_i, riemann_data_j, p_max);
-
-      const std::array<Number, 2> phi_alt =
+      const auto &[phi_p_max, phi_p_min] =
           phi_twosided(riemann_data_i, riemann_data_j);
 
       const Number p_star_tilde =
@@ -425,18 +422,18 @@ namespace grendel
 
       Number p_star =
           dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-              phi_alt[0], // phi_p_max,
+              phi_p_max,
               Number(0.),
               p_star_tilde,
               std::min(p_max, p_star_tilde));
 
       p_star = dealii::compare_and_apply_mask<
           dealii::SIMDComparison::less_than_or_equal>(
-          std::abs(phi_alt[0]), Number(newton_eps_), p_max, p_star);
+          std::abs(phi_p_max), Number(newton_eps_), p_max, p_star);
 
       p_star = dealii::compare_and_apply_mask<
           dealii::SIMDComparison::greater_than_or_equal>(
-          phi_alt[1], Number(0.), Number(0.), p_star);
+          phi_p_min, Number(0.), Number(0.), p_star);
 
       const Number lambda_max =
           compute_lambda(riemann_data_i, riemann_data_j, p_star);
