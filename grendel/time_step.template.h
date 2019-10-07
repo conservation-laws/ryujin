@@ -740,10 +740,11 @@ namespace grendel
       }
 
       /*
-       * And symmetrize l_ij:
+       * And exchange l_ij:
        */
 
-      {
+      if (Utilities::MPI::n_mpi_processes(mpi_communicator_) > 1) {
+
         deallog << "        exchange l_ij" << std::endl;
         TimerOutput::Scope time(computing_timer_,
                                 "time_step - 6 exchange l_ij");
@@ -751,43 +752,8 @@ namespace grendel
         LIKWID_MARKER_START("time_step_6");
 #endif
 
-        if (Utilities::MPI::n_mpi_processes(mpi_communicator_) > 1)
-          lij_matrix_communicator_.synchronize();
+        lij_matrix_communicator_.synchronize();
 
-        // rather than separately filling the l_ij matrix here, we simply
-        // compute the relevant entry on the fly in step 7; this avoids
-        // writing to rows and columns in parallel (which might perform not
-        // optimally because different threads might write to nearby entries
-        // in the matrix from different columns; this can lead to false
-        // sharing and some heavy coherency traffic)
-          /*
-          {
-            const auto on_subranges = [&](auto i1, const auto i2) {
-              for (const auto i : boost::make_iterator_range(i1, i2)) {
-                for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
-                  const auto j = jt->column();
-
-                  if (j >= i)
-                    continue;
-
-                  auto l_ij = get_entry(lij_matrix_, jt);
-                  auto l_ji = get_transposed_entry(lij_matrix_, jt,
-                                                   transposed_indices);
-
-                  const Number min = std::min(l_ij, l_ji);
-                  set_transposed_entry(lij_matrix_, jt, transposed_indices,
-                                       min);
-                  set_entry(lij_matrix_, jt, min);
-                }
-              }
-            };
-
-            parallel::apply_to_subranges(serial_relevant.begin(),
-                                         serial_relevant.end(),
-                                         on_subranges,
-                                         1024);
-          }
-          */
 #ifdef LIKWID_PERFMON
         LIKWID_MARKER_STOP("time_step_6");
 #endif
@@ -801,9 +767,9 @@ namespace grendel
        */
 
       {
-        deallog << "        high-order update" << std::endl;
+        deallog << "        symmetrize l_ij, high-order update" << std::endl;
         TimerOutput::Scope time(computing_timer_,
-                                "time_step - 7 high-order update");
+                                "time_step - 7 symmetrize l_ij, high-order update");
 #ifdef LIKWID_PERFMON
         LIKWID_MARKER_START("time_step_7");
 #endif
