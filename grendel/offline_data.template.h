@@ -482,9 +482,10 @@ namespace grendel
            * Ensure that we record the highest boundary indicator for a
            * given degree of freedom (higher indicators take precedence):
            */
-          const auto old_id = std::get<1>(local_boundary_normal_map[index]);
-          local_boundary_normal_map[index] =
-              std::make_tuple(normal, std::max(old_id, id), position);
+          const auto &[old_normal, old_id, _] =
+              local_boundary_normal_map[index];
+          local_boundary_normal_map[index] = std::make_tuple(
+              old_normal + normal, std::max(old_id, id), position);
         } /* j */
       }   /* f */
     };

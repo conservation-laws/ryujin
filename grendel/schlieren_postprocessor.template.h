@@ -109,6 +109,7 @@ namespace grendel
           }
 
           /* Fix up boundaries: */
+
           const auto bnm_it = boundary_normal_map.find(i);
           if (bnm_it != boundary_normal_map.end()) {
             const auto [normal, id, _] = bnm_it->second;
