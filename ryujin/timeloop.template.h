@@ -707,11 +707,13 @@ namespace ryujin
     const auto wall_summary_data = computing_timer.get_summary_data(
         TimerOutput::OutputData::total_wall_time);
 
-    const double cpu_time =
+    double cpu_time =
         std::accumulate(cpu_summary_data.begin(),
                         cpu_summary_data.end(),
                         0.,
                         [](auto sum, auto it) { return sum + it.second; });
+    cpu_time = Utilities::MPI::sum(cpu_time, mpi_communicator);
+
     const double wall_time =
         std::accumulate(wall_summary_data.begin(),
                         wall_summary_data.end(),
