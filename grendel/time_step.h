@@ -104,6 +104,8 @@ namespace grendel
 
     typename Limiter<dim, Number>::vector_type bounds_;
 
+    std::vector<unsigned int> transposed_indices;
+
     vector_type r_;
 
     dealii::SparseMatrix<Number> lij_matrix_;

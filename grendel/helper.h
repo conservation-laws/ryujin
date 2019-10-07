@@ -84,11 +84,9 @@ namespace grendel
   }
 
 
-
   /*
    * Serial and SIMD iterator-based access to matrix values.
    */
-
 
 
   /*
@@ -136,7 +134,8 @@ namespace grendel
 
   /**
    * SIMD variant of get_entry that returns
-   *   { matrix.diag_element(i) , ... , matrix.diag_element(i + n_array_elements - 1) }
+   *   { matrix.diag_element(i) , ... , matrix.diag_element(i + n_array_elements
+   * - 1) }
    *
    * FIXME: Performance
    */
@@ -208,6 +207,46 @@ namespace grendel
 
 
   /**
+   * Return the entry on the transposed position to the given
+   * iterator, i.e., matrix(it->column(), it->row()). Read-only
+   * version.
+   */
+  template <typename Matrix, typename Iterator>
+  DEAL_II_ALWAYS_INLINE inline typename Matrix::value_type
+  get_transposed_entry(const Matrix &matrix,
+                       const Iterator &it,
+                       const std::vector<unsigned int> &transposed_indices)
+  {
+    Iterator iterator_transpose =
+        matrix.get_sparsity_pattern().begin(it->column()) +
+        transposed_indices[it->global_index()];
+    const auto global_index = iterator_transpose->global_index();
+    typename Matrix::const_iterator matrix_iterator(&matrix, global_index);
+    return matrix_iterator->value();
+  }
+
+
+  /**
+   * Write the given value on the transposed position to the given
+   * iterator, i.e., matrix(it->column(), it->row()) = value.
+   */
+  template <typename Matrix, typename Iterator>
+  DEAL_II_ALWAYS_INLINE inline void
+  set_transposed_entry(Matrix &matrix,
+                       const Iterator &it,
+                       const std::vector<unsigned int> &transposed_indices,
+                       typename Matrix::value_type value)
+  {
+    Iterator iterator_transpose =
+        matrix.get_sparsity_pattern().begin(it->column()) +
+        transposed_indices[it->global_index()];
+    const auto global_index = iterator_transpose->global_index();
+    typename Matrix::iterator matrix_iterator(&matrix, global_index);
+    matrix_iterator->value() = value;
+  }
+
+
+  /**
    * SIMD variant of above function
    */
   template <typename Matrix, typename Iterator>
@@ -233,15 +272,12 @@ namespace grendel
    * FIXME: k versus l
    */
   template <typename T1, std::size_t k, int l, typename T2, typename T3>
-  DEAL_II_ALWAYS_INLINE inline void
-  scatter_set_entry(std::array<T1, k> &U,
-                    const T2 it,
-                    const dealii::Tensor<1, l, T3> &V)
+  DEAL_II_ALWAYS_INLINE inline void scatter_set_entry(
+      std::array<T1, k> &U, const T2 it, const dealii::Tensor<1, l, T3> &V)
   {
     for (unsigned int j = 0; j < k; ++j)
       set_entry(U[j], it, V[j]);
   }
-
 
 
   /*
@@ -278,7 +314,6 @@ namespace grendel
     for (unsigned int j = 0; j < k1; ++j)
       U[j].local_element(i) = result[j];
   }
-
 
 
   /*
@@ -342,11 +377,12 @@ namespace grendel
    */
   template <typename T1>
   DEAL_II_ALWAYS_INLINE inline dealii::VectorizedArray<typename T1::value_type>
-      simd_gather(
-          const T1 &U,
-          const std::array<unsigned int,
-                           dealii::VectorizedArray<
-                               typename T1::value_type>::n_array_elements> js)
+  simd_gather(
+      const T1 &U,
+      const std::array<
+          unsigned int,
+          dealii::VectorizedArray<typename T1::value_type>::n_array_elements>
+          js)
   {
     dealii::VectorizedArray<typename T1::value_type> result;
     result.gather(U.get_values(), js.data());
@@ -395,12 +431,10 @@ namespace grendel
   }
 
 
-
   /*
    * Convenience wrapper that creates a dealii::Function object out of a
    * (fairly general) callable object:
    */
-
 
 
   namespace

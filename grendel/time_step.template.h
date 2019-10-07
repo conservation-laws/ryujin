@@ -94,6 +94,14 @@ namespace grendel
 
     if (Utilities::MPI::n_mpi_processes(mpi_communicator_) > 1)
       lij_matrix_communicator_.prepare();
+
+    transposed_indices.resize(sparsity.n_nonzero_elements(),
+                              numbers::invalid_unsigned_int);
+    for (unsigned int row = 0; row < sparsity.n_rows(); ++row) {
+      for (auto j = sparsity.begin(row); j != sparsity.end(row); ++j)
+        transposed_indices[j->global_index()] =
+            sparsity.row_position(j->column(), row);
+    }
   }
 
 
@@ -207,10 +215,9 @@ namespace grendel
                     U_i, U_j, n_ij);
 
             const auto d = norm * lambda_max;
+
+            /* Set lower diagonal values (the upper will be set in step 2): */
             set_entry(dij_matrix_, jts, d);
-            for (unsigned int k = 0; k < d.n_array_elements; ++k)
-              if (js[k] < i + k)
-                dij_matrix_(js[k], i + k) = d[k];
           }
 
           simd_scatter(
@@ -270,10 +277,8 @@ namespace grendel
               d = std::max(d, norm_2 * lambda_max_2);
             }
 
-            /* Set symmetrized off-diagonal values: */
-
+            /* Set lower diagonal values (the upper will be set in step 2): */
             set_entry(dij_matrix_, jt, d);
-            dij_matrix_(j, i) = d; // FIXME: Suboptimal
           }
 
           rho_second_variation_.local_element(i) =
@@ -344,6 +349,13 @@ namespace grendel
 
             if (j == i)
               continue;
+
+            // fill upper diagonal part of dij_matrix missing from step 1
+            if (j > i)
+              set_entry(
+                  dij_matrix_,
+                  jt,
+                  get_transposed_entry(dij_matrix_, jt, transposed_indices));
 
             const Number delta_rho_j = rho_second_variation_.local_element(j);
             const auto beta_ij = get_entry(betaij_matrix, jt);
@@ -638,7 +650,8 @@ namespace grendel
             const auto j = jt->column();
 
             const auto b_ij = get_entry(bij_matrix, jt);
-            const auto b_ji = bij_matrix(j, i); // FIXME: Suboptimal
+            const auto b_ji =
+                get_transposed_entry(bij_matrix, jt, transposed_indices);
             auto p_ij = gather_get_entry(pij_matrix_, jt);
 
             const auto r_j = gather(r_, j);
@@ -731,9 +744,9 @@ namespace grendel
        */
 
       {
-        deallog << "        symmetrize l_ij" << std::endl;
+        deallog << "        exchange l_ij" << std::endl;
         TimerOutput::Scope time(computing_timer_,
-                                "time_step - 6 symmetrize l_ij");
+                                "time_step - 6 exchange l_ij");
 #ifdef LIKWID_PERFMON
         LIKWID_MARKER_START("time_step_6");
 #endif
@@ -741,30 +754,40 @@ namespace grendel
         if (Utilities::MPI::n_mpi_processes(mpi_communicator_) > 1)
           lij_matrix_communicator_.synchronize();
 
-        {
-          const auto on_subranges = [&](auto i1, const auto i2) {
-            for (const auto i : boost::make_iterator_range(i1, i2)) {
-              for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
-                const auto j = jt->column();
+        // rather than separately filling the l_ij matrix here, we simply
+        // compute the relevant entry on the fly in step 7; this avoids
+        // writing to rows and columns in parallel (which might perform not
+        // optimally because different threads might write to nearby entries
+        // in the matrix from different columns; this can lead to false
+        // sharing and some heavy coherency traffic)
+          /*
+          {
+            const auto on_subranges = [&](auto i1, const auto i2) {
+              for (const auto i : boost::make_iterator_range(i1, i2)) {
+                for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
+                  const auto j = jt->column();
 
-                if (j >= i)
-                  continue;
+                  if (j >= i)
+                    continue;
 
-                auto l_ij = get_entry(lij_matrix_, jt);
-                auto &l_ji = lij_matrix_(j, i); // FIXME: Suboptimal
+                  auto l_ij = get_entry(lij_matrix_, jt);
+                  auto l_ji = get_transposed_entry(lij_matrix_, jt,
+                                                   transposed_indices);
 
-                const Number min = std::min(l_ij, l_ji);
-                l_ji = min;
-                set_entry(lij_matrix_, jt, min);
+                  const Number min = std::min(l_ij, l_ji);
+                  set_transposed_entry(lij_matrix_, jt, transposed_indices,
+                                       min);
+                  set_entry(lij_matrix_, jt, min);
+                }
               }
-            }
-          };
+            };
 
-          parallel::apply_to_subranges(serial_relevant.begin(),
-                                       serial_relevant.end(),
-                                       on_subranges,
-                                       1024);
-        }
+            parallel::apply_to_subranges(serial_relevant.begin(),
+                                         serial_relevant.end(),
+                                         on_subranges,
+                                         1024);
+          }
+          */
 #ifdef LIKWID_PERFMON
         LIKWID_MARKER_STOP("time_step_6");
 #endif
@@ -773,6 +796,7 @@ namespace grendel
       /*
        * Step 7: Perform high-order update:
        *
+       *   Symmetrize l_ij
        *   High-order update: += l_ij * lambda * P_ij
        */
 
@@ -801,7 +825,11 @@ namespace grendel
 
             for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
               auto p_ij = gather_get_entry(pij_matrix_, jt);
-              const auto l_ij = get_entry(lij_matrix_, jt);
+
+              const auto l_ji =
+                  get_transposed_entry(lij_matrix_, jt, transposed_indices);
+              const auto l_ij = std::min(get_entry(lij_matrix_, jt), l_ji);
+
               U_i_new += l_ij * lambda * p_ij;
               p_ij *= (1 - l_ij);
               scatter_set_entry(pij_matrix_, jt, p_ij);
