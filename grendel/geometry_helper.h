@@ -504,7 +504,7 @@ namespace grendel
      */
 
     for (auto cell : triangulation.active_cell_iterators()) {
-      for (unsigned int f = 0; f < GeometryInfo<2>::faces_per_cell; ++f) {
+      for (unsigned int f = 0; f < GeometryInfo<3>::faces_per_cell; ++f) {
         const auto face = cell->face(f);
 
         if (!face->at_boundary())
