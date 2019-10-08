@@ -128,8 +128,8 @@ namespace grendel
 
       if (!is_diagonal_entry) {
         const Number s_interp =
-            ProblemDescription<dim, Number>::specific_entropy((U_i + U_j) /
-                                                              ScalarNumber(2.));
+            ProblemDescription<dim, Number>::specific_entropy((U_i + U_j) *
+                                                              ScalarNumber(.5));
         s_interp_max = std::max(s_interp_max, s_interp);
       }
     }
@@ -254,13 +254,12 @@ namespace grendel
       const Number &U_i_E = U[dim + 1];
 
       const Number c = (U_i_E - rho_epsilon_min) * U_i_rho -
-                       Number(1. / 2.) * U_i_m.norm_square();
+                       Number(.5) * U_i_m.norm_square();
 
       const Number b = (U_i_E - rho_epsilon_min) * P_ij_rho + P_ij_E * U_i_rho -
                        U_i_m * P_ij_m;
 
-      const Number a =
-          P_ij_E * P_ij_rho - Number(1. / 2.) * P_ij_m.norm_square();
+      const Number a = P_ij_E * P_ij_rho - Number(.5) * P_ij_m.norm_square();
 
       /*
        * Solve the quadratic equation a t^2 + b t + c = 0 by hand. We use the
@@ -274,7 +273,7 @@ namespace grendel
 
       if (discriminant == 0.) {
 
-        const Number x = -b / Number(2.) / a;
+        const Number x = -b * Number(.5) / a;
 
         if (x > 0.)
           t_0 = x;
