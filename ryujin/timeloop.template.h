@@ -426,6 +426,11 @@ namespace ryujin
 
     ParameterAcceptor::prm.log_parameters(deallog);
 
+    deallog << "Number of MPI ranks: "
+            << Utilities::MPI::n_mpi_processes(mpi_communicator) << std::endl;
+    deallog << "Number of threads:   " << MultithreadInfo::n_threads()
+            << std::endl;
+
     deallog.push(DEAL_II_GIT_SHORTREV "+" RYUJIN_GIT_SHORTREV);
     deallog.push(base_name);
 #ifdef DEBUG
