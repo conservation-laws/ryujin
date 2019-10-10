@@ -104,18 +104,33 @@ namespace ryujin
     enable_detailed_output = false;
     add_parameter("enable detailed output",
                   enable_detailed_output,
-                  "Flag to control detailed output to deallog");
+                  "Enable detailed terminal output to deallog");
 
-    enable_compute_error = false;
-    add_parameter(
-        "enable compute error",
-        enable_compute_error,
-        "Flag to control whether we compute the Linfty Linf_norm of the "
-        "difference to an analytic solution. Implemented only for "
-        "certain initial state configurations.");
+    enable_checkpointing = true;
+    add_parameter("enable checkpointing",
+                  enable_checkpointing,
+                  "Write out checkpoints to resume an interrupted computation "
+                  "at output granularity intervals");
 
     resume = false;
-    add_parameter("resume", resume, "Resume an interrupted computation.");
+    add_parameter("resume", resume, "Resume an interrupted computation");
+
+    write_mesh = false;
+    add_parameter("write mesh",
+                  write_mesh,
+                  "Write out the (distributed) mesh in inp format");
+
+    write_output_files = true;
+    add_parameter("write output files",
+                  write_output_files,
+                  "Write out postprocessed output files in vtu/pvtu format");
+
+    enable_compute_error = false;
+    add_parameter("enable compute error",
+                  enable_compute_error,
+                  "Flag to control whether we compute the Linfty Linf_norm of "
+                  "the difference to an analytic solution. Implemented only "
+                  "for certain initial state configurations.");
   }
 
 
@@ -133,7 +148,7 @@ namespace ryujin
     print_head("create triangulation");
     discretization.prepare();
 
-    {
+    if (write_mesh) {
       deallog << "        output triangulation" << std::endl;
       std::ofstream output(
           base_name + "-triangulation-p" +
@@ -178,11 +193,14 @@ namespace ryujin
       }
     }
 
-    output(U, base_name + "-solution", t, output_cycle);
-    if (enable_compute_error) {
+    if (write_output_files)
+      output(U, base_name + "-solution", t, output_cycle);
+
+    if (write_output_files && enable_compute_error) {
       const auto analytic = interpolate_initial_values(t);
       output(analytic, base_name + "-analytic_solution", t, output_cycle);
     }
+
     ++output_cycle;
 
     print_head("enter main loop");
@@ -215,11 +233,18 @@ namespace ryujin
           print_head(head.str(), secondary.str());
         }
 
-        output(U, base_name + "-solution", t, output_cycle, true);
-        if (enable_compute_error) {
+        if (write_output_files)
+          output(U,
+                 base_name + "-solution",
+                 t,
+                 output_cycle,
+                 /*checkpoint*/ enable_checkpointing);
+
+        if (write_output_files && enable_compute_error) {
           const auto analytic = interpolate_initial_values(t);
           output(analytic, base_name + "-analytic_solution", t, output_cycle);
         }
+
         ++output_cycle;
 
         print_throughput(cycle);
@@ -595,25 +620,30 @@ namespace ryujin
       output_thread.join();
     }
 
-    /* Copy the current state vector over to output_vector: */
-
     constexpr auto problem_dimension =
         ProblemDescription<dim, Number>::problem_dimension;
     const auto &component_names =
         ProblemDescription<dim, Number>::component_names;
     const auto &affine_constraints = offline_data.affine_constraints();
 
-    /* Distribute hanging nodes: */
-
-    output_alpha = time_step.alpha();
-    affine_constraints.distribute(output_alpha);
-    output_alpha.update_ghost_values();
+    /* Copy the current state vector over to output_vector: */
 
     for (unsigned int i = 0; i < problem_dimension; ++i) {
       output_vector[i] = U[i];
+    }
+
+    output_alpha = time_step.alpha();
+
+
+    /* Distribute hanging nodes and update ghost values: */
+
+    for (unsigned int i = 0; i < problem_dimension; ++i) {
       affine_constraints.distribute(output_vector[i]);
       output_vector[i].update_ghost_values();
     }
+
+    affine_constraints.distribute(output_alpha);
+    output_alpha.update_ghost_values();
 
     schlieren_postprocessor.compute_schlieren(output_vector);
 

@@ -52,10 +52,16 @@ namespace ryujin
     std::string base_name;
     Number t_final;
     Number output_granularity;
-    bool enable_detailed_output;
-    bool enable_compute_error;
 
+    bool enable_detailed_output;
+
+    bool enable_checkpointing;
     bool resume;
+
+    bool write_mesh;
+    bool write_output_files;
+
+    bool enable_compute_error;
 
     grendel::Discretization<dim> discretization;
     grendel::OfflineData<dim, Number> offline_data;
