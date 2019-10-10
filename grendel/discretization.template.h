@@ -239,23 +239,24 @@ namespace grendel
     /* Handle periodic faces: */
 
     const auto bdy_ids = triangulation.get_boundary_ids();
-    if (std::find(bdy_ids.begin(), bdy_ids.end(), Boundary::periodic) !=
-        bdy_ids.end()) {
+    if constexpr (dim != 1)
+      if (std::find(bdy_ids.begin(), bdy_ids.end(), Boundary::periodic) !=
+          bdy_ids.end()) {
 
-      deallog << "        collecting periodic faces" << std::endl;
+        deallog << "        collecting periodic faces" << std::endl;
 
-      std::vector<dealii::GridTools::PeriodicFacePair<
-          typename dealii::Triangulation<dim>::cell_iterator>>
-          periodic_faces;
+        std::vector<dealii::GridTools::PeriodicFacePair<
+            typename dealii::Triangulation<dim>::cell_iterator>>
+            periodic_faces;
 
-      for (int i = 1; i < dim; ++i) /* omit x direction! */
-        GridTools::collect_periodic_faces(triangulation,
-                                          /*b_id */ Boundary::periodic,
-                                          /*direction*/ i,
-                                          periodic_faces);
+        for (int i = 1; i < dim; ++i) /* omit x direction! */
+          GridTools::collect_periodic_faces(triangulation,
+                                            /*b_id */ Boundary::periodic,
+                                            /*direction*/ i,
+                                            periodic_faces);
 
-      triangulation.add_periodicity(periodic_faces);
-    }
+        triangulation.add_periodicity(periodic_faces);
+      }
 
 
     if (geometry_ == "step") {
