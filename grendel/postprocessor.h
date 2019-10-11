@@ -1,5 +1,5 @@
-#ifndef SCHLIEREN_POSTPROCESSOR_H
-#define SCHLIEREN_POSTPROCESSOR_H
+#ifndef POSTPROCESSOR_H
+#define POSTPROCESSOR_H
 
 #include "offline_data.h"
 #include "problem_description.h"
@@ -12,7 +12,7 @@ namespace grendel
 {
 
   template <int dim, typename Number = double>
-  class SchlierenPostprocessor : public dealii::ParameterAcceptor
+  class Postprocessor : public dealii::ParameterAcceptor
   {
   public:
     static constexpr unsigned int problem_dimension =
@@ -24,17 +24,17 @@ namespace grendel
         std::array<dealii::LinearAlgebra::distributed::Vector<Number>,
                    problem_dimension>;
 
-    SchlierenPostprocessor(
+    Postprocessor(
         const MPI_Comm &mpi_communicator,
         dealii::TimerOutput &computing_timer,
         const grendel::OfflineData<dim, Number> &offline_data,
-        const std::string &subsection = "SchlierenPostprocessor");
+        const std::string &subsection = "Postprocessor");
 
-    virtual ~SchlierenPostprocessor() final = default;
+    virtual ~Postprocessor() final = default;
 
     void prepare();
 
-    void compute_schlieren(const vector_type &U);
+    void compute(const vector_type &U);
 
   protected:
     dealii::LinearAlgebra::distributed::Vector<Number> schlieren_;
@@ -58,4 +58,4 @@ namespace grendel
 
 } /* namespace grendel */
 
-#endif /* SCHLIEREN_POSTPROCESSOR_H */
+#endif /* POSTPROCESSOR_H */

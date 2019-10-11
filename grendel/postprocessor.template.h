@@ -14,11 +14,11 @@ namespace grendel
 
 
   template <int dim, typename Number>
-  SchlierenPostprocessor<dim, Number>::SchlierenPostprocessor(
+  Postprocessor<dim, Number>::Postprocessor(
       const MPI_Comm &mpi_communicator,
       dealii::TimerOutput &computing_timer,
       const grendel::OfflineData<dim, Number> &offline_data,
-      const std::string &subsection /*= "SchlierenPostprocessor"*/)
+      const std::string &subsection /*= "Postprocessor"*/)
       : ParameterAcceptor(subsection)
       , mpi_communicator_(mpi_communicator)
       , computing_timer_(computing_timer)
@@ -27,22 +27,22 @@ namespace grendel
     schlieren_beta_ = 10.;
     add_parameter("schlieren beta",
                   schlieren_beta_,
-                  "Beta factor used in Schlieren-type postprocessor");
+                  "Beta factor used in the Schlieren postprocessor");
 
     schlieren_index_ = 0;
     add_parameter("schlieren index",
                   schlieren_index_,
                   "Use the corresponding component of the state vector for the "
-                  "schlieren plot");
+                  "schlieren postprocessor");
   }
 
 
   template <int dim, typename Number>
-  void SchlierenPostprocessor<dim, Number>::prepare()
+  void Postprocessor<dim, Number>::prepare()
   {
-    deallog << "SchlierenPostprocessor<dim, Number>::prepare()" << std::endl;
+    deallog << "Postprocessor<dim, Number>::prepare()" << std::endl;
     TimerOutput::Scope t(computing_timer_,
-                         "schlieren_postprocessor - prepare scratch space");
+                         "postprocessor - prepare scratch space");
 
     const auto &n_locally_relevant = offline_data_->n_locally_relevant();
     const auto &partitioner = offline_data_->partitioner();
@@ -54,13 +54,11 @@ namespace grendel
 
   template <int dim, typename Number>
   void
-  SchlierenPostprocessor<dim, Number>::compute_schlieren(const vector_type &U)
+  Postprocessor<dim, Number>::compute(const vector_type &U)
   {
-    deallog << "SchlierenPostprocessor<dim, Number>::compute_schlieren()"
-            << std::endl;
+    deallog << "Postprocessor<dim, Number>::compute()" << std::endl;
 
-    TimerOutput::Scope t(computing_timer_,
-                         "schlieren_postprocessor - compute schlieren plot");
+    TimerOutput::Scope t(computing_timer_, "postprocessor - compute");
 
 
     const auto &affine_constraints = offline_data_->affine_constraints();

@@ -67,7 +67,7 @@ namespace ryujin
     grendel::OfflineData<dim, Number> offline_data;
     grendel::InitialValues<dim, Number> initial_values;
     grendel::TimeStep<dim, Number> time_step;
-    grendel::SchlierenPostprocessor<dim, Number> schlieren_postprocessor;
+    grendel::Postprocessor<dim, Number> postprocessor;
 
     std::unique_ptr<std::ofstream> filestream;
 

@@ -86,10 +86,10 @@ namespace ryujin
                   offline_data,
                   initial_values,
                   "E - TimeStep")
-      , schlieren_postprocessor(mpi_communicator,
-                                computing_timer,
-                                offline_data,
-                                "F - SchlierenPostprocessor")
+      , postprocessor(mpi_communicator,
+                      computing_timer,
+                      offline_data,
+                      "F - SchlierenPostprocessor")
   {
     base_name = "cylinder";
     add_parameter("basename", base_name, "Base name for all output files");
@@ -164,7 +164,7 @@ namespace ryujin
 
     print_head("set up time step");
     time_step.prepare();
-    schlieren_postprocessor.prepare();
+    postprocessor.prepare();
 
     /* Interpolate initial values: */
 
@@ -611,7 +611,7 @@ namespace ryujin
      *
      * We wait for a previous thread to finish before we schedule a new
      * one. This logic also serves as a mutex for output_vector and
-     * schlieren_postprocessor.
+     * postprocessor.
      */
 
     deallog << "        Schedule output cycle = " << cycle << std::endl;
@@ -645,7 +645,7 @@ namespace ryujin
     affine_constraints.distribute(output_alpha);
     output_alpha.update_ghost_values();
 
-    schlieren_postprocessor.compute_schlieren(output_vector);
+    postprocessor.compute(output_vector);
 
     /* Output data in vtu format: */
 
@@ -684,8 +684,7 @@ namespace ryujin
       for (unsigned int i = 0; i < problem_dimension; ++i)
         data_out.add_data_vector(output_vector[i], component_names[i]);
 
-      data_out.add_data_vector(schlieren_postprocessor.schlieren(),
-                               "schlieren_plot");
+      data_out.add_data_vector(postprocessor.schlieren(), "schlieren");
 
       data_out.add_data_vector(output_alpha, "alpha");
 
