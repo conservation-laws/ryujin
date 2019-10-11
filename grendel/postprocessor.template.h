@@ -1,8 +1,8 @@
-#ifndef SCHLIEREN_POSTPROCESSOR_TEMPLATE_H
-#define SCHLIEREN_POSTPROCESSOR_TEMPLATE_H
+#ifndef POSTPROCESSOR_TEMPLATE_H
+#define POSTPROCESSOR_TEMPLATE_H
 
 #include "helper.h"
-#include "schlieren_postprocessor.h"
+#include "postprocessor.h"
 
 #include <boost/range/irange.hpp>
 
@@ -190,4 +190,4 @@ namespace grendel
 
 } /* namespace grendel */
 
-#endif /* SCHLIEREN_POSTPROCESSOR_TEMPLATE_H */
+#endif /* POSTPROCESSOR_TEMPLATE_H */

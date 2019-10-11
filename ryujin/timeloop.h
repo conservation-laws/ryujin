@@ -4,7 +4,7 @@
 #include <discretization.h>
 #include <offline_data.h>
 #include <initial_values.h>
-#include <schlieren_postprocessor.h>
+#include <postprocessor.h>
 #include <time_step.h>
 
 #include <deal.II/base/parameter_acceptor.h>

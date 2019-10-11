@@ -1,4 +1,4 @@
-#include "schlieren_postprocessor.template.h"
+#include "postprocessor.template.h"
 
 namespace grendel
 {
