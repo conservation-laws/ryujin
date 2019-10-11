@@ -176,21 +176,6 @@ namespace grendel
     std::array<dealii::SparseMatrix<Number>, dim> cij_matrix_;
     ACCESSOR_READ_ONLY(cij_matrix)
 
-    /**
-     * The $(n_{ij})$ matrix.
-     *
-     * This matrix is defined as $n_{ij} = c_{ij} / |c_{ij}|$.
-     */
-    std::array<dealii::SparseMatrix<Number>, dim> nij_matrix_;
-    ACCESSOR_READ_ONLY(nij_matrix)
-
-    /**
-     * We also store the norm of all $c_{ij}$s separately in a @p norm
-     * matrix_
-     */
-    dealii::SparseMatrix<Number> norm_matrix_;
-    ACCESSOR_READ_ONLY(norm_matrix)
-
   private:
     const MPI_Comm &mpi_communicator_;
     dealii::TimerOutput &computing_timer_;

@@ -152,8 +152,6 @@ namespace grendel
 
     const auto &mass_matrix = offline_data_->mass_matrix();
     const auto &lumped_mass_matrix = offline_data_->lumped_mass_matrix();
-    const auto &norm_matrix = offline_data_->norm_matrix();
-    const auto &nij_matrix = offline_data_->nij_matrix();
     const auto &bij_matrix = offline_data_->bij_matrix();
     const auto &betaij_matrix = offline_data_->betaij_matrix();
     const auto &cij_matrix = offline_data_->cij_matrix();
@@ -207,8 +205,9 @@ namespace grendel
             if (all_above_diagonal)
               continue;
 
-            const auto n_ij = gather_get_entry(nij_matrix, jts);
-            const auto norm = get_entry(norm_matrix, jts);
+            const auto c_ij = gather_get_entry(cij_matrix, jts);
+            const auto norm = c_ij.norm();
+            const auto n_ij = c_ij / norm;
 
             const auto [lambda_max, p_star, n_iterations] =
                 RiemannSolver<dim, VectorizedArray<Number>>::compute(
@@ -255,8 +254,9 @@ namespace grendel
             if (j >= i)
               continue;
 
-            const auto n_ij = gather_get_entry(nij_matrix, jt);
-            const Number norm = get_entry(norm_matrix, jt);
+            const auto c_ij = gather_get_entry(cij_matrix, jt);
+            const auto norm = c_ij.norm();
+            const auto n_ij = c_ij / norm;
 
             const auto [lambda_max, p_star, n_iterations] =
                 RiemannSolver<dim, Number>::compute(U_i, U_j, n_ij);
@@ -270,10 +270,13 @@ namespace grendel
 
             if (boundary_normal_map.count(i) != 0 &&
                 boundary_normal_map.count(j) != 0) {
-              const auto n_ji = gather_get_entry(nij_matrix, j, i);
+
+              const auto c_ji = gather_get_entry(cij_matrix, j, i);
+              const auto norm_2 = c_ji.norm();
+              const auto n_ji = c_ji / norm_2;
+
               auto [lambda_max_2, p_star_2, n_iterations_2] =
                   RiemannSolver<dim, Number>::compute(U_j, U_i, n_ji);
-              const Number norm_2 = norm_matrix(j, i);
               d = std::max(d, norm_2 * lambda_max_2);
             }
 

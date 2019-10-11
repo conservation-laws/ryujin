@@ -325,10 +325,7 @@ namespace grendel
       lumped_mass_matrix_.reinit(sparsity_pattern_);
       bij_matrix_.reinit(sparsity_pattern_);
       betaij_matrix_.reinit(sparsity_pattern_);
-      norm_matrix_.reinit(sparsity_pattern_);
       for (auto &matrix : cij_matrix_)
-        matrix.reinit(sparsity_pattern_);
-      for (auto &matrix : nij_matrix_)
         matrix.reinit(sparsity_pattern_);
     }
   }
@@ -341,12 +338,9 @@ namespace grendel
 
     mass_matrix_ = 0.;
     lumped_mass_matrix_ = 0.;
-    norm_matrix_ = 0.;
     for (auto &matrix : cij_matrix_)
       matrix = 0.;
     betaij_matrix_ = 0.;
-    for (auto &matrix : nij_matrix_)
-      matrix = 0.;
     measure_of_omega_ = 0.;
 
     boundary_normal_map_.clear();
@@ -524,8 +518,6 @@ namespace grendel
       for (int k = 0; k < dim; ++k) {
         affine_constraints_.distribute_local_to_global(
             cell_cij_matrix[k], local_dof_indices, cij_matrix_[k]);
-        affine_constraints_.distribute_local_to_global(
-            cell_cij_matrix[k], local_dof_indices, nij_matrix_[k]);
       }
 
       affine_constraints_.distribute_local_to_global(
@@ -573,52 +565,30 @@ namespace grendel
     }
 
     /*
-     * Third part: Compute norms and n_ijs
+     * Third part: Compute b_ijs
      */
 
     const auto on_subranges = [&](auto i1, const auto i2) {
       for (; i1 < i2; ++i1) {
         const auto row_index = *i1;
-
-        std::for_each(sparsity_pattern_.begin(row_index),
-                      sparsity_pattern_.end(row_index),
-                      [&](const auto &jt) {
-                        const auto value = gather_get_entry(cij_matrix_, &jt);
-                        const Number norm = value.norm();
-                        set_entry(norm_matrix_, &jt, norm);
-                      });
-
-        std::for_each(sparsity_pattern_.begin(row_index),
-                      sparsity_pattern_.end(row_index),
-                      [&](const auto &jt) {
-                        const auto col_index = jt.column();
-                        const Number m_ij = get_entry(mass_matrix_, &jt);
-                        const Number m_j =
-                            lumped_mass_matrix_.diag_element(col_index);
-                        const Number b_ij =
-                            Number(row_index == col_index ? 1. : 0.) -
-                            m_ij / m_j;
-                        set_entry(bij_matrix_, &jt, b_ij);
-                      });
-
-        for (auto &matrix : nij_matrix_) {
-          auto nij_entry = matrix.begin(row_index);
-          std::for_each(norm_matrix_.begin(row_index),
-                        norm_matrix_.end(row_index),
-                        [&](const auto &it) {
-                          const auto norm = it.value();
-                          nij_entry->value() /= norm;
-                          ++nij_entry;
-                        });
-        }
-
+        std::for_each(
+            sparsity_pattern_.begin(row_index),
+            sparsity_pattern_.end(row_index),
+            [&](const auto &jt) {
+              const auto col_index = jt.column();
+              const Number m_ij = get_entry(mass_matrix_, &jt);
+              const Number m_j = lumped_mass_matrix_.diag_element(col_index);
+              const Number b_ij =
+                  Number(row_index == col_index ? 1. : 0.) - m_ij / m_j;
+              set_entry(bij_matrix_, &jt, b_ij);
+            });
       } /* row_index */
     };
 
     {
-      deallog << "        compute b_ijs, |c_ij|s, and n_ijs" << std::endl;
+      deallog << "        compute b_ijs" << std::endl;
       TimerOutput::Scope t(computing_timer_,
-                           "offline_data - compute b_ij, |c_ij|, and n_ij");
+                           "offline_data - compute b_ij");
 
       const auto indices = boost::irange<unsigned int>(0, n_locally_relevant_);
       parallel::apply_to_subranges(
