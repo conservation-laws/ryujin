@@ -33,8 +33,6 @@ end
 subsection E - TimeStep
   set cfl max    = 0.9
   set cfl update = 0.8
-
-  set use ssprk3 = true
 end
 
 subsection F - SchlierenPostprocessor

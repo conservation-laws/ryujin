@@ -34,8 +34,6 @@ end
 subsection E - TimeStep
   set cfl max    = 1.0
   set cfl update = 0.95
-
-  set use ssprk3 = true
 end
 
 
