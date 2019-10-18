@@ -439,9 +439,6 @@ namespace ryujin
       deallog << "TimeStep<dim, Number>::Order::second_order" << std::endl;
     }
 
-    deallog << "TimeStep<dim, Number>::smoothen_alpha_ == "
-            <<  TimeStep<dim, Number>::smoothen_alpha_ << std::endl;
-
     deallog << "TimeStep<dim, Number>::limiter_iter_ == "
             <<  TimeStep<dim, Number>::limiter_iter_ << std::endl;
 

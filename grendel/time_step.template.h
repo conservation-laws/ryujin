@@ -146,7 +146,6 @@ namespace grendel
 
     const auto &sparsity = offline_data_->sparsity_pattern();
 
-    const auto &mass_matrix = offline_data_->mass_matrix();
     const auto &lumped_mass_matrix = offline_data_->lumped_mass_matrix();
     const auto &bij_matrix = offline_data_->bij_matrix();
     const auto &betaij_matrix = offline_data_->betaij_matrix();
@@ -341,11 +340,6 @@ namespace grendel
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
             const auto j = jt->column();
 
-            if constexpr (smoothen_alpha_) {
-              const auto m_ij = get_entry(mass_matrix, jt);
-              alpha_i += m_ij * alpha_.local_element(j);
-            }
-
             if (j == i)
               continue;
 
@@ -367,11 +361,6 @@ namespace grendel
             d_sum -= get_entry(dij_matrix_, jt);
           }
 
-          if constexpr (smoothen_alpha_) {
-            const Number m_i = lumped_mass_matrix.diag_element(i);
-            alpha_.local_element(i) = alpha_i / m_i;
-          }
-
           rho_relaxation_.local_element(i) =
               std::abs(rho_relaxation_numerator / rho_relaxation_denominator);
 
@@ -391,11 +380,6 @@ namespace grendel
 
       parallel::apply_to_subranges(
           serial_relevant.begin(), serial_relevant.end(), step_2_serial, 1024);
-
-      if constexpr (smoothen_alpha_) {
-        /* Synchronize alpha_ over all MPI processes: */
-        alpha_.update_ghost_values();
-      }
 
       /* Synchronize tau_max over all MPI processes: */
       tau_max.store(Utilities::MPI::min(tau_max.load(), mpi_communicator_));

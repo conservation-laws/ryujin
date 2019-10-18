@@ -99,8 +99,6 @@ namespace grendel
       second_order
     } order_ = Order::second_order;
 
-    static constexpr bool smoothen_alpha_ = false;
-
     static constexpr unsigned int limiter_iter_ = 2;
 
   private:
