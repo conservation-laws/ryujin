@@ -39,10 +39,6 @@ namespace grendel
       , lij_matrix_communicator_(
             mpi_communicator, computing_timer, offline_data, lij_matrix_)
   {
-    use_ssprk3_ = (order_ == Order::second_order);
-    add_parameter(
-        "use ssprk3", use_ssprk3_, "Use SSPRK3 instead of explicit Euler");
-
     cfl_update_ = Number(0.95);
     add_parameter(
         "cfl update", cfl_update_, "relative CFL constant used for update");
@@ -889,9 +885,38 @@ namespace grendel
 
 
   template <int dim, typename Number>
-  Number TimeStep<dim, Number>::ssprk_step(vector_type &U, Number t)
+  Number TimeStep<dim, Number>::ssph2_step(vector_type &U, Number t)
   {
-    deallog << "TimeStep<dim, Number>::ssprk_step()" << std::endl;
+    deallog << "TimeStep<dim, Number>::ssph2_step()" << std::endl;
+
+    /* This also copies ghost elements: */
+    for (unsigned int k = 0; k < problem_dimension; ++k)
+      temp_ssprk_[k] = U[k];
+
+    // Step 1: U1 = U_old + tau * L(U_old)
+
+    const Number tau_1 = euler_step(U, t);
+
+    // Step 2: U2 = 1/2 U_old + 1/2 (U1 + tau L(U1))
+
+    const Number tau_2 = euler_step(U, t, tau_1);
+
+    const Number ratio = cfl_max_ / cfl_update_;
+    AssertThrow(ratio * tau_2 >= tau_1,
+                ExcMessage("Problem performing SSP H(2) time step: "
+                           "CFL condition violated."));
+
+    for (unsigned int k = 0; k < problem_dimension; ++k)
+      U[k].sadd(Number(1. / 2.), Number(1. / 2.), temp_ssprk_[k]);
+
+    return tau_1;
+  }
+
+
+  template <int dim, typename Number>
+  Number TimeStep<dim, Number>::ssprk3_step(vector_type &U, Number t)
+  {
+    deallog << "TimeStep<dim, Number>::ssprk3_step()" << std::endl;
 
     /* This also copies ghost elements: */
     for (unsigned int k = 0; k < problem_dimension; ++k)
@@ -908,7 +933,7 @@ namespace grendel
     const Number ratio = cfl_max_ / cfl_update_;
     AssertThrow(ratio * tau_2 >= tau_1,
                 ExcMessage("Problem performing SSP RK(3) time step: "
-                           "Insufficient CFL condition."));
+                           "CFL condition violated."));
 
     for (unsigned int k = 0; k < problem_dimension; ++k)
       U[k].sadd(Number(1. / 4.), Number(3. / 4.), temp_ssprk_[k]);
@@ -920,7 +945,7 @@ namespace grendel
 
     AssertThrow(ratio * tau_3 >= tau_1,
                 ExcMessage("Problem performing SSP RK(3) time step: "
-                           "Insufficient CFL condition."));
+                           "CFL condition violated."));
 
     for (unsigned int k = 0; k < problem_dimension; ++k)
       U[k].sadd(Number(2. / 3.), Number(1. / 3.), temp_ssprk_[k]);
@@ -934,10 +959,10 @@ namespace grendel
   {
     deallog << "TimeStep<dim, Number>::step()" << std::endl;
 
-    if (use_ssprk3_) {
-      return ssprk_step(U, t);
+    if constexpr (order_ == Order::second_order) {
+      return ssprk3_step(U, t);
     } else {
-      return euler_step(U, t);
+      return ssph2_step(U, t);
     }
   }
 

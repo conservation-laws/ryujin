@@ -58,19 +58,37 @@ namespace grendel
     Number euler_step(vector_type &U, Number t, Number tau = 0.);
 
     /**
-     * Given a reference to a previous state vector U compute
-     * perform an explicit SSP RK(3) step (and store the result in U).
+     * Given a reference to a previous state vector U perform an explicit
+     * Heun 2nd order step (and store the result in U).
+     *
+     *  - returns the computed maximal time step size tau_max
+     *
+     * [Shu & Osher, Efficient Implementation of Essentially
+     * Non-oscillatory Shock-Capturing Schemes JCP 77:439-471 (1988), Eq.
+     * 2.15]
+     */
+    Number ssph2_step(vector_type &U, Number t);
+
+    /**
+     * Given a reference to a previous state vector U perform an explicit
+     * SSP Runge Kutta 3rd order step (and store the result in U).
+     *
+     *  - returns the computed maximal time step size tau_max
      *
      * [Shu & Osher, Efficient Implementation of Essentially
      * Non-oscillatory Shock-Capturing Schemes JCP 77:439-471 (1988), Eq.
      * 2.18]
      */
-    Number ssprk_step(vector_type &U, Number t);
+    Number ssprk3_step(vector_type &U, Number t);
 
     /**
      * Given a reference to a previous state vector U perform an explicit
      * time step (and store the result in U). The function returns the
-     * chosen time step.
+     * chosen time step size tau.
+     *
+     * Depending on the approximation order (first or second order) this
+     * function chooses the 2nd order Heun, or the third order Runge Kutta
+     * time stepping scheme.
      */
     Number step(vector_type &U, Number t);
 
@@ -118,7 +136,6 @@ namespace grendel
 
     /* Options: */
 
-    bool use_ssprk3_;
     Number cfl_update_;
     Number cfl_max_;
   };
