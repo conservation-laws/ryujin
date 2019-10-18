@@ -439,6 +439,19 @@ namespace ryujin
       deallog << "TimeStep<dim, Number>::Order::second_order" << std::endl;
     }
 
+    deallog << "TimeStep<dim, Number>::time_step_order_ == ";
+    switch (TimeStep<dim, Number>::time_step_order_) {
+    case TimeStep<dim, Number>::TimeStepOrder::first_order:
+      deallog << "TimeStep<dim, Number>::TimeStepOrder::first_order" << std::endl;
+      break;
+    case TimeStep<dim, Number>::TimeStepOrder::second_order:
+      deallog << "TimeStep<dim, Number>::TimeStepOrder::second_order" << std::endl;
+      break;
+    case TimeStep<dim, Number>::TimeStepOrder::third_order:
+      deallog << "TimeStep<dim, Number>::TimeStepOrder::third_order" << std::endl;
+      break;
+    }
+
     deallog << "TimeStep<dim, Number>::limiter_iter_ == "
             <<  TimeStep<dim, Number>::limiter_iter_ << std::endl;
 

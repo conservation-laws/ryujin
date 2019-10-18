@@ -99,6 +99,12 @@ namespace grendel
       second_order
     } order_ = Order::second_order;
 
+    static constexpr enum class TimeStepOrder {
+      first_order,
+      second_order,
+      third_order
+    } time_step_order_ = TimeStepOrder::second_order;
+
     static constexpr unsigned int limiter_iter_ = 2;
 
   private:

@@ -943,10 +943,13 @@ namespace grendel
   {
     deallog << "TimeStep<dim, Number>::step()" << std::endl;
 
-    if constexpr (order_ == Order::second_order) {
-      return ssprk3_step(U, t);
-    } else {
+    switch (time_step_order_) {
+    case TimeStepOrder::first_order:
+      return euler_step(U, t);
+    case TimeStepOrder::second_order:
       return ssph2_step(U, t);
+    case TimeStepOrder::third_order:
+      return ssprk3_step(U, t);
     }
   }
 
