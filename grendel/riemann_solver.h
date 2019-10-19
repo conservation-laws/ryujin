@@ -44,7 +44,27 @@ namespace grendel
         std::is_same<ScalarNumber, double>::value ? ScalarNumber(1.0e-10)
                                                   : ScalarNumber(1.0e-4);
 
-    static constexpr unsigned int newton_max_iter_ = NEWTON_MAX_ITER;
+    static constexpr bool greedy_dij = true;
+
+    /* In case of the greedy variant, we have to allow for at least one
+     * Newton iteration step. */
+    static constexpr unsigned int newton_max_iter_ =
+        greedy_dij ? std::max(NEWTON_MAX_ITER, 1) : NEWTON_MAX_ITER;
+
+
+    /**
+     * For two given 1D states riemann_data_i and riemann_data_j, compute
+     * an estimation of an upper bound for the maximum wavespeed lambda.
+     *
+     * We also return bounds = {p_min, p_max, rho_min, rho_max} for the
+     * "greedy d_ij" computation.
+     */
+    static std::tuple<Number /*lambda_max*/,
+                      Number /*p_star*/,
+                      unsigned int /*iteration*/,
+                      std::array<Number, 4> /*bounds*/>
+    compute(const std::array<Number, 4> &riemann_data_i,
+            const std::array<Number, 4> &riemann_data_j);
 
     /**
      * For two given states U_i a U_j and a (normalized) "direction" n_ij
@@ -65,17 +85,6 @@ namespace grendel
     compute(const rank1_type U_i,
             const rank1_type U_j,
             const dealii::Tensor<1, dim, Number> &n_ij);
-
-
-    /**
-     * Variant of above function that takes two arrays as input describing
-     * the "1D Riemann data" instead of two nD states.
-     */
-    static std::tuple<Number /*lambda_max*/,
-                      Number /*p_star*/,
-                      unsigned int /*iteration*/>
-    compute(const std::array<Number, 4> &riemann_data_i,
-            const std::array<Number, 4> &riemann_data_j);
   };
 
 } /* namespace grendel */

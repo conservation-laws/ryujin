@@ -364,12 +364,16 @@ namespace grendel
     const auto riemann_data_i = riemann_data_from_state(U_i, n_ij);
     const auto riemann_data_j = riemann_data_from_state(U_j, n_ij);
 
-    return compute(riemann_data_i, riemann_data_j);
+    const auto &[lambda_max, p_star, i, bounds] =
+        compute(riemann_data_i, riemann_data_j);
+
+    return {lambda_max, p_star, i};
   }
 
 
   template <int dim, typename Number>
-  std::tuple<Number, Number, unsigned int> RiemannSolver<dim, Number>::compute(
+  std::tuple<Number, Number, unsigned int, std::array<Number, 4>>
+  RiemannSolver<dim, Number>::compute(
       const std::array<Number, 4> &riemann_data_i,
       const std::array<Number, 4> &riemann_data_j)
   {
@@ -444,7 +448,7 @@ namespace grendel
 
       const Number lambda_max =
           compute_lambda(riemann_data_i, riemann_data_j, p_2);
-      return {lambda_max, p_2, -1};
+      return {lambda_max, p_2, -1, std::array<Number, 4>()};
     }
 
     Number p_1 =
@@ -546,7 +550,7 @@ namespace grendel
       lambda_max = lambda_max_new;
     }
 
-    return {lambda_max, p_2, i};
+    return {lambda_max, p_2, i, std::array<Number, 4>()};
   }
 
 } /* namespace grendel */
