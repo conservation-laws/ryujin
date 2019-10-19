@@ -412,26 +412,74 @@ namespace grendel
       const std::array<Number, 4> &riemann_data_j)
   {
     /*
-     * Step 1: Prepare quadratic Newton method:
+     * Step 1:
      *
-     * We need a good upper and lower bound, p_1 < p_star < p_2, for the
-     * Newton method. (Ideally, for a moderate tolerance we might not
-     * iterate at all.)
+     * In case we iterate (in the Newton method) we need a good upper and
+     * lower bound, p_1 < p_star < p_2, for finding phi(p_star) == 0.
+     *
+     * In case we do not iterate (because the iteration iw really
+     * expensive...) we will need p_2 as an approximation to p_star.
+     *
+     * In any case we have to ensure that phi(p_2) >= 0 (and phi(p_1) <=
+     * 0).
+     *
+     * We will use three candidates, p_min, p_max and the two rarefaction
+     * approximation p_star_tilde. We have (up to round-off errors) that
+     * phi(p_star_tilde) >= 0. So this is a save upper bound.
+     *
+     * Depending on the sign of phi(p_max) we thus select the following
+     * ranges:
+     *
+     * phi(p_max) <  0:
+     *   p_1  <-  p_max   and   p_2  <-  p_star_tilde
+     *
+     * phi(p_max) >= 0:
+     *   p_1  <-  p_min   and   p_2  <-  min(p_max, p_star_tilde)
+     *
+     * Notar bene:
+     *
+     *  - The case phi(p_max) == 0 as discussed as a special case
+     *    in [1] is already contained in the second condition. We thus
+     *    simply change the comparison to "phi(p_max) < -eps" to allow for
+     *    numerical round-off errors.
+     *
+     *  - In principle, we would have to treat the case phi(p_min) > 0 as
+     *    well. This corresponds to two expansion waves and a good estimate
+     *    for the wavespeed is obtained by setting p_star = 0. and exiting.
+     *    However, it turns out that numerically in this case the
+     *    two-rarefaction approximation p_star_tilde is already an
+     *    excellent guess (and we will set p_2 to this upper bound in both
+     *    of the above two cases).
+     *
+     *    So let's happily take the risk by setting
+     *      p_1 <- 0.   and  p_2  <-  p_star_tilde
+     *    in this case.
+     *
+     *    Important: _NONE_ of these considerations changes the fact that
+     *    the computed lambda_max is an upper bound on the maximum
+     *    wavespeed. We might simply be a bit worse off in this case if it
+     *    happens that p_star_tilde is a bad guess.
      */
 
     const Number p_min = std::min(riemann_data_i[2], riemann_data_j[2]);
     const Number p_max = std::max(riemann_data_i[2], riemann_data_j[2]);
-    const auto &[phi_p_min, phi_p_max] =
-        phi_twosided(riemann_data_i, riemann_data_j);
 
     const Number p_star_tilde =
         p_star_two_rarefaction(riemann_data_i, riemann_data_j);
 
+    const Number phi_p_max = phi(riemann_data_i, riemann_data_j, p_max);
+
     Number p_2 =
         dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-            phi_p_max, Number(0.), p_star_tilde, std::min(p_max, p_star_tilde));
+            phi_p_max,
+            Number(-newton_eps_), /* prefer p_max if close to zero */
+            p_star_tilde,
+            std::min(p_max, p_star_tilde));
 
     if constexpr (newton_max_iter_ == 0) {
+
+      /* If there is nothing to do, cut it short: */
+
       const Number lambda_max =
           compute_lambda(riemann_data_i, riemann_data_j, p_2);
       return {lambda_max, p_2, -1};
@@ -439,7 +487,19 @@ namespace grendel
 
     Number p_1 =
         dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-            phi_p_max, Number(0.), p_max, p_min);
+            phi_p_max,
+            Number(newton_eps_), /* prefer p_max if close to zero */
+            p_max,
+            p_min);
+
+    /*
+     * Ensure that p_1 < p_2. In case we hit a case with two expansions we
+     * might indeed have that p_star_tilde < p_1. Set p_1 = 0. in this case
+     * (because this is the value we want to attain anyway).
+     */
+
+    p_1 = dealii::compare_and_apply_mask<
+        dealii::SIMDComparison::less_than_or_equal>(p_1, p_2, p_1, Number(0.));
 
     /*
      * Step 2: Perform quadratic Newton iteration.
