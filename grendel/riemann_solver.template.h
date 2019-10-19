@@ -509,14 +509,6 @@ namespace grendel
       const auto denominator_1 = dphi_p_1 + std::sqrt(discriminant_1);
       const auto denominator_2 = dphi_p_2 + std::sqrt(discriminant_2);
 
-      if constexpr (std::is_same<Number, double>::value ||
-                    std::is_same<Number, float>::value) {
-        AssertThrow(discriminant_1 > 0.0,
-                    dealii::ExcMessage("Houston, we have a problem!"));
-        AssertThrow(discriminant_2 > 0.0,
-                    dealii::ExcMessage("Houston, we have a problem!"));
-      }
-
       /* Make sure we do not produce NaNs: */
 
       auto t_1 =
