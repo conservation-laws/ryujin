@@ -169,75 +169,37 @@ namespace grendel
 
 
     /**
-     * This combines the calculation of phi both against p_min and p_max in a
-     * single call to reduce the number of calls to pow(). It is inlining the
-     * content of f() and choosing only the relevant paths.
+     * This is a specialized variant of phi() that computes phi(p_max). It
+     * inlines the implementation of f() and eliminates all unnecessary
+     * branches in f().
      */
     template <typename Number>
-    inline DEAL_II_ALWAYS_INLINE std::array<Number, 2>
-    phi_twosided(const std::array<Number, 4> &riemann_data_i,
+    inline DEAL_II_ALWAYS_INLINE Number
+    phi_of_p_max(const std::array<Number, 4> &riemann_data_i,
                  const std::array<Number, 4> &riemann_data_j)
     {
       using ScalarNumber = typename get_value_type<Number>::type;
 
       constexpr auto gamma = ProblemDescription<1, Number>::gamma;
-      constexpr auto gamma_inverse =
-          ProblemDescription<1, Number>::gamma_inverse;
-      constexpr auto gamma_minus_one_inverse =
-          ProblemDescription<1, Number>::gamma_minus_one_inverse;
 
       const auto &[rho_i, u_i, p_i, a_i] = riemann_data_i;
       const auto &[rho_j, u_j, p_j, a_j] = riemann_data_j;
 
-      const Number p_min = std::min(p_i, p_j);
       const Number p_max = std::max(p_i, p_j);
 
-      // The exponent path is only selected for the branch where we compute
-      // p_min / p_max, in the other three cases the radicand case is selected
-
-      const auto exponent =
-          (gamma - ScalarNumber(1.)) * ScalarNumber(0.5) * gamma_inverse;
-      const Number factor = grendel::pow(p_min / p_max, exponent) - Number(1.);
-      const Number false_value_i =
-          factor * ScalarNumber(2.) * a_i * gamma_minus_one_inverse;
-      const Number false_value_j =
-          factor * ScalarNumber(2.) * a_j * gamma_minus_one_inverse;
-
-      const Number radicand_inverse_i_1 = ScalarNumber(0.5) * rho_i *
-                                          ((gamma + ScalarNumber(1.)) * p_min +
-                                           (gamma - ScalarNumber(1.)) * p_i);
-      const Number true_value_i_1 =
-          (p_min - p_i) / std::sqrt(radicand_inverse_i_1);
-      const Number radicand_inverse_i_2 = ScalarNumber(0.5) * rho_i *
+      const Number radicand_inverse_i = ScalarNumber(0.5) * rho_i *
                                           ((gamma + ScalarNumber(1.)) * p_max +
                                            (gamma - ScalarNumber(1.)) * p_i);
-      const Number true_value_i_2 =
-          (p_max - p_i) / std::sqrt(radicand_inverse_i_2);
-      const Number radicand_inverse_j_1 = ScalarNumber(0.5) * rho_j *
-                                          ((gamma + ScalarNumber(1.)) * p_min +
-                                           (gamma - ScalarNumber(1.)) * p_j);
-      const Number true_value_j_1 =
-          (p_min - p_j) / std::sqrt(radicand_inverse_j_1);
-      const Number radicand_inverse_j_2 = ScalarNumber(0.5) * rho_j *
-                                          ((gamma + ScalarNumber(1.)) * p_max +
-                                           (gamma - ScalarNumber(1.)) * p_j);
-      const Number true_value_j_2 =
-          (p_max - p_j) / std::sqrt(radicand_inverse_j_2);
 
-      // The p_max part always selects the 'true' branch, whereas we need to
-      // make a selection for the p_min part:
+      const Number value_i = (p_max - p_i) / std::sqrt(radicand_inverse_i);
 
-      const auto phi_p_min = dealii::compare_and_apply_mask<
-                                 dealii::SIMDComparison::greater_than_or_equal>(
-                                 p_min, p_i, true_value_i_1, false_value_i) +
-                             dealii::compare_and_apply_mask<
-                                 dealii::SIMDComparison::greater_than_or_equal>(
-                                 p_min, p_j, true_value_j_1, false_value_j) +
-                             u_j - u_i;
+      const Number radicand_inverse_j = ScalarNumber(0.5) * rho_j *
+                                        ((gamma + ScalarNumber(1.)) * p_max +
+                                         (gamma - ScalarNumber(1.)) * p_j);
 
-      const auto phi_p_max = true_value_i_2 + true_value_j_2 + u_j - u_i;
+      const Number value_j = (p_max - p_j) / std::sqrt(radicand_inverse_j);
 
-      return {phi_p_min, phi_p_max};
+      return value_i + value_j + u_j - u_i;
     }
 
 
@@ -467,7 +429,7 @@ namespace grendel
     const Number p_star_tilde =
         p_star_two_rarefaction(riemann_data_i, riemann_data_j);
 
-    const Number phi_p_max = phi(riemann_data_i, riemann_data_j, p_max);
+    const Number phi_p_max = phi_of_p_max(riemann_data_i, riemann_data_j);
 
     Number p_2 =
         dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
