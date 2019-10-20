@@ -658,6 +658,11 @@ namespace grendel
     const auto &[lambda_max, p_star, i, bounds] =
         compute(riemann_data_i, riemann_data_j);
 
+    /*
+     * So, we are indeed greedy... Lets' try to minimize lambda_max as much
+     * as possible.
+     */
+
     if constexpr (!greedy_dij)
       return {lambda_max, p_star, i};
 
@@ -666,10 +671,14 @@ namespace grendel
 
     const auto &[p_min, p_max, rho_min, rho_max] = bounds;
 
-    /*
-     * So, we are indeed greedy... Lets' try to minimize lambda_max as much
-     * as possible.
-     */
+    const auto f_i = ProblemDescription<dim, Number>::f(U_i);
+    const auto f_j = ProblemDescription<dim, Number>::f(U_j);
+
+    dealii::Tensor<1, problem_dimension, Number> P_ij;
+    for (unsigned int k = 0; k < problem_dimension; ++k)
+      P_ij[k] = ScalarNumber(0.5) * (f_i[k] - f_j[k]) * n_ij;
+
+    const auto U = ScalarNumber(0.5) * (U_i + U_j);
 
     auto lambda_greedy = lambda_max * newton_eps_;
 
@@ -701,15 +710,30 @@ namespace grendel
               lambda_max);
 
       lambda_greedy = std::max(lambda_greedy, std::max(lambda_1, lambda_2));
-
       /*
        * Box lambda_greedy back into bounds.
        *
        * In case we have two states that are almost equal the above
        * division can pick up a massive cancelation error.
        */
-
       lambda_greedy = std::min(lambda_greedy, lambda_max);
+
+#ifdef DEBUG
+      const auto new_density = (U + Number(1.) / lambda_greedy * P_ij)[0];
+
+      if constexpr (std::is_same<Number, double>::value ||
+                    std::is_same<Number, float>::value) {
+        AssertThrow(new_density > 0.,
+                    dealii::ExcMessage("I'm sorry, Dave. I'm afraid I can't do "
+                                       "that. - Negative density."));
+      } else {
+        for (unsigned int k = 0; k < Number::n_array_elements; ++k)
+          AssertThrow(
+              new_density[k] > 0.,
+              dealii::ExcMessage("I'm sorry, Dave. I'm afraid I can't do "
+                                 "that. - Negative density."));
+      }
+#endif
     }
 
     {
@@ -732,13 +756,6 @@ namespace grendel
           std::min(ProblemDescription<dim, Number>::specific_entropy(U_i),
                    ProblemDescription<dim, Number>::specific_entropy(U_j));
 
-      const auto f_i = ProblemDescription<dim, Number>::f(U_i);
-      const auto f_j = ProblemDescription<dim, Number>::f(U_j);
-
-      dealii::Tensor<1, problem_dimension, Number> P_ij;
-      for (unsigned int k = 0; k < problem_dimension; ++k)
-        P_ij[k] = ScalarNumber(0.5) * (f_i[k] - f_j[k]) * n_ij;
-
       const Number upper_bound = Number(1.) / lambda_greedy;
       Number t_l = Number(0.);
       Number t_r = upper_bound;
@@ -747,7 +764,7 @@ namespace grendel
 
       for (unsigned int n = 0; n < newton_max_iter_; ++n) {
 
-        const auto U_r = ScalarNumber(0.5) * (U_i + U_j) + t_r * P_ij;
+        const auto U_r = U + t_r * P_ij;
         const auto rho_r = U_r[0];
         const auto rho_r_gamma = grendel::pow(rho_r, gamma);
         /* use a scaled variant of psi:  e - s * rho^gamma */
@@ -772,7 +789,7 @@ namespace grendel
         t_l = dealii::compare_and_apply_mask<
             dealii::SIMDComparison::greater_than>(psi_r, Number(0.), t_r, t_l);
 
-        const auto U_l = ScalarNumber(0.5) * (U_i + U_j) + t_l * P_ij;
+        const auto U_l = U + t_l * P_ij;
         const auto rho_l = U_l[0];
         const auto rho_l_gamma = grendel::pow(rho_l, gamma);
         /* use a scaled variant of psi:  e - s * rho^gamma */
@@ -844,10 +861,29 @@ namespace grendel
 
         /* Ensure that always t_l <= t_r: */
         t_l = std::min(t_l, t_r);
-
       }
 
-      lambda_greedy = std::max(Number(1.) / t_r, lambda_max);
+      lambda_greedy = std::max(Number(1.) / t_l, lambda_greedy);
+      lambda_greedy = std::min(lambda_greedy, lambda_max);
+
+#ifdef DEBUG
+      const auto new_specific_entropy =
+          ProblemDescription<dim, Number>::specific_entropy(
+              U + Number(1.) / lambda_greedy * P_ij);
+
+      if constexpr (std::is_same<Number, double>::value ||
+                    std::is_same<Number, float>::value) {
+        AssertThrow(new_specific_entropy >= 0.,
+                    dealii::ExcMessage("I'm sorry, Dave. I'm afraid I can't do "
+                                       "that. - Negative specific entropy."));
+      } else {
+        for (unsigned int k = 0; k < Number::n_array_elements; ++k)
+          AssertThrow(
+              new_specific_entropy[k] >= 0.,
+              dealii::ExcMessage("I'm sorry, Dave. I'm afraid I can't do "
+                                 "that. - Negative specific entropy."));
+      }
+#endif
     }
 
     return {lambda_greedy, p_star, i};

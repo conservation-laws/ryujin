@@ -438,8 +438,8 @@ namespace grendel
       l_ij = std::min(l_ij, t_l);
 
 #ifdef DEBUG
-      const auto new_internal_energy = (U + l_ij * P_ij)[0];
-      ProblemDescription<dim, Number>::internal_energy(U + l_ij * P_ij);
+      const auto new_internal_energy =
+          ProblemDescription<dim, Number>::internal_energy(U + l_ij * P_ij);
 
       if constexpr (std::is_same<Number, double>::value ||
                     std::is_same<Number, float>::value) {
