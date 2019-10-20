@@ -86,7 +86,8 @@ namespace grendel
                       unsigned int /*iteration*/>
     compute(const rank1_type U_i,
             const rank1_type U_j,
-            const dealii::Tensor<1, dim, Number> &n_ij);
+            const dealii::Tensor<1, dim, Number> &n_ij,
+            const Number hd_i = Number(0.));
   };
 
 } /* namespace grendel */

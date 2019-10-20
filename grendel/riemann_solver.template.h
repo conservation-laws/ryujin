@@ -1,6 +1,7 @@
 #ifndef RIEMANN_SOLVER_TEMPLATE_H
 #define RIEMANN_SOLVER_TEMPLATE_H
 
+#include "limiter.h"
 #include "riemann_solver.h"
 
 namespace grendel
@@ -150,8 +151,8 @@ namespace grendel
       const Number p_max = std::max(p_i, p_j);
 
       const Number radicand_inverse_i = ScalarNumber(0.5) * rho_i *
-                                          ((gamma + ScalarNumber(1.)) * p_max +
-                                           (gamma - ScalarNumber(1.)) * p_i);
+                                        ((gamma + ScalarNumber(1.)) * p_max +
+                                         (gamma - ScalarNumber(1.)) * p_i);
 
       const Number value_i = (p_max - p_i) / std::sqrt(radicand_inverse_i);
 
@@ -648,7 +649,8 @@ namespace grendel
   std::tuple<Number, Number, unsigned int> RiemannSolver<dim, Number>::compute(
       const rank1_type U_i,
       const rank1_type U_j,
-      const dealii::Tensor<1, dim, Number> &n_ij)
+      const dealii::Tensor<1, dim, Number> &n_ij,
+      const Number hd_i /* = Number(0.) */)
   {
     const auto riemann_data_i = riemann_data_from_state(U_i, n_ij);
     const auto riemann_data_j = riemann_data_from_state(U_j, n_ij);
@@ -711,13 +713,144 @@ namespace grendel
     }
 
     {
+      // FIXME: This is more or less a copy from the limiter in limiter.h
+      //        We should really refactor all Newton, Newton secant and
+      //        Quadratic Newton variants into its own function prototypes
+
       /*
        * Enforce local minimum principle on specific entropy:
        */
 
+      /* Use the same relaxation as done in the limiter: */
+      const Number r_i =
+          Number(2.) *
+          dealii::Utilities::fixed_power<Limiter<dim>::relaxation_order_>(
+              std::sqrt(std::sqrt(hd_i)));
+
+      const auto s_min =
+          (Number(1.) - r_i) *
+          std::min(ProblemDescription<dim, Number>::specific_entropy(U_i),
+                   ProblemDescription<dim, Number>::specific_entropy(U_j));
+
+      const auto f_i = ProblemDescription<dim, Number>::f(U_i);
+      const auto f_j = ProblemDescription<dim, Number>::f(U_j);
+
+      dealii::Tensor<1, problem_dimension, Number> P_ij;
+      for (unsigned int k = 0; k < problem_dimension; ++k)
+        P_ij[k] = ScalarNumber(0.5) * (f_i[k] - f_j[k]) * n_ij;
+
+      const Number upper_bound = Number(1.) / lambda_greedy;
+      Number t_l = Number(0.);
+      Number t_r = upper_bound;
+
+      constexpr auto gamma = ProblemDescription<1, Number>::gamma;
+
+      for (unsigned int n = 0; n < newton_max_iter_; ++n) {
+
+        const auto U_r = ScalarNumber(0.5) * (U_i + U_j) + t_r * P_ij;
+        const auto rho_r = U_r[0];
+        const auto rho_r_gamma = grendel::pow(rho_r, gamma);
+        /* use a scaled variant of psi:  e - s * rho^gamma */
+        auto psi_r = ProblemDescription<dim, Number>::internal_energy(U_r) -
+                     s_min * rho_r_gamma;
+
+        /*
+         * Shortcut: In the majority of states no Newton step is necessary
+         * because Psi(t_r) > 0. Just return in this case:
+         */
+
+        if (std::min(Number(0.), psi_r) == Number(0.)) {
+          t_l = t_r;
+          break;
+        }
+
+        /*
+         * If psi_r > 0 the right state is fine, force t = t_r by setting
+         * t_l = t_r:
+         */
+
+        t_l = dealii::compare_and_apply_mask<
+            dealii::SIMDComparison::greater_than>(psi_r, Number(0.), t_r, t_l);
+
+        const auto U_l = ScalarNumber(0.5) * (U_i + U_j) + t_l * P_ij;
+        const auto rho_l = U_l[0];
+        const auto rho_l_gamma = grendel::pow(rho_l, gamma);
+        /* use a scaled variant of psi:  e - s * rho^gamma */
+        auto psi_l = ProblemDescription<dim, Number>::internal_energy(U_l) -
+                     s_min * rho_l_gamma;
+
+        /*
+         * Shortcut: In the majority of cases only at most one Newton
+         * iteration is necessary because we reach Psi(t_l) \approx 0
+         * quickly. Just return in this case:
+         */
+
+        if (std::max(Number(0.), psi_l - Number(newton_eps_)) == Number(0.))
+          break;
+
+        const auto dpsi_l =
+            ProblemDescription<dim, Number>::internal_energy_derivative(U_l) *
+                P_ij -
+            gamma * rho_l_gamma / rho_l * s_min * P_ij[0];
+
+        const auto dpsi_r =
+            ProblemDescription<dim, Number>::internal_energy_derivative(U_r) *
+                P_ij -
+            gamma * rho_r_gamma / rho_r * s_min * P_ij[0];
+
+        /* Compute divided differences: */
+
+        const auto scaling =
+            ScalarNumber(1.) / (t_r - t_l + Number(newton_eps_));
+
+        const auto dd_11 = -dpsi_l;
+        const auto dd_12 = (psi_l - psi_r) * scaling;
+        const auto dd_22 = -dpsi_r;
+
+        const auto dd_112 = (dd_12 - dd_11) * scaling;
+        const auto dd_122 = (dd_22 - dd_12) * scaling;
+
+        /* Update left and right point: */
+
+        const auto discriminant_l =
+            std::abs(dpsi_l * dpsi_l + ScalarNumber(4.) * psi_l * dd_112);
+        const auto discriminant_r =
+            std::abs(dpsi_r * dpsi_r + ScalarNumber(4.) * psi_r * dd_122);
+
+        const auto denominator_l = dpsi_l - std::sqrt(discriminant_l);
+        const auto denominator_r = dpsi_r - std::sqrt(discriminant_r);
+
+        /* Make sure we do not produce NaNs: */
+
+        t_l -=
+            dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+                std::abs(denominator_l),
+                Number(newton_eps_),
+                Number(0.),
+                ScalarNumber(2.) * psi_l / denominator_l);
+
+        t_r -=
+            dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+                std::abs(denominator_r),
+                Number(newton_eps_),
+                Number(0.),
+                ScalarNumber(2.) * psi_r / denominator_r);
+
+        /* Enforce bounds: */
+        t_l = std::max(Number(0.), t_l);
+        t_r = std::max(Number(0.), t_r);
+        t_l = std::min(upper_bound, t_l);
+        t_r = std::min(upper_bound, t_r);
+
+        /* Ensure that always t_l <= t_r: */
+        t_l = std::min(t_l, t_r);
+
+      }
+
+      lambda_greedy = std::max(Number(1.) / t_r, lambda_max);
     }
 
-    return {std::max(lambda_greedy, lambda_max), p_star, i};
+    return {lambda_greedy, p_star, i};
   }
 
 } /* namespace grendel */

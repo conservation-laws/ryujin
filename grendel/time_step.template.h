@@ -176,6 +176,9 @@ namespace grendel
           const auto U_i = simd_gather(U, i);
           indicator.reset(U_i);
 
+          const auto mass = simd_get_diag_element(lumped_mass_matrix, i);
+          const auto hd_i = mass * measure_of_omega_inverse;
+
           auto jts = generate_iterators<n_array_elements>(
               [&](auto k) { return sparsity.begin(i + k); });
 
@@ -206,7 +209,7 @@ namespace grendel
 
             const auto [lambda_max, p_star, n_iterations] =
                 RiemannSolver<dim, VectorizedArray<Number>>::compute(
-                    U_i, U_j, n_ij);
+                    U_i, U_j, n_ij, hd_i);
 
             const auto d = norm * lambda_max;
 
@@ -217,8 +220,6 @@ namespace grendel
           simd_scatter(
               rho_second_variation_, indicator.rho_second_variation(), i);
 
-          const auto mass = simd_get_diag_element(lumped_mass_matrix, i);
-          const auto hd_i = mass * measure_of_omega_inverse;
           simd_scatter(alpha_, indicator.alpha(hd_i), i);
         }
       };
@@ -234,6 +235,9 @@ namespace grendel
             continue;
 
           const auto U_i = gather(U, i);
+
+          const Number mass = lumped_mass_matrix.diag_element(i);
+          const Number hd_i = mass * measure_of_omega_inverse;
 
           indicator.reset(U_i);
 
@@ -254,7 +258,7 @@ namespace grendel
             const auto n_ij = c_ij / norm;
 
             const auto [lambda_max, p_star, n_iterations] =
-                RiemannSolver<dim, Number>::compute(U_i, U_j, n_ij);
+                RiemannSolver<dim, Number>::compute(U_i, U_j, n_ij, hd_i);
 
             Number d = norm * lambda_max;
 
@@ -282,8 +286,6 @@ namespace grendel
           rho_second_variation_.local_element(i) =
               indicator.rho_second_variation();
 
-          const Number mass = lumped_mass_matrix.diag_element(i);
-          const Number hd_i = mass * measure_of_omega_inverse;
           alpha_.local_element(i) = indicator.alpha(hd_i);
         }
       };
