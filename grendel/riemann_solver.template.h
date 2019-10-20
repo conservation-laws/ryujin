@@ -617,7 +617,7 @@ namespace grendel
      * (normalized) "direction" n_ij, first compute the corresponding
      * projected state in the corresponding 1D Riemann problem, and then
      * compute and return the Riemann data [rho, u, p, a] (used in the
-     * approximative Riemman solver).
+     * approximative Riemann solver).
      */
     template <int dim, typename Number>
     inline DEAL_II_ALWAYS_INLINE std::array<Number, 4> riemann_data_from_state(
@@ -663,7 +663,71 @@ namespace grendel
     const auto &[lambda_max, p_star, i, bounds] =
         compute(riemann_data_i, riemann_data_j);
 
-    return {lambda_max, p_star, i};
+    if constexpr (!greedy_dij)
+      return {lambda_max, p_star, i};
+
+    const auto &[rho_i, u_i, p_i, a_i] = riemann_data_i;
+    const auto &[rho_j, u_j, p_j, a_j] = riemann_data_j;
+    const auto &[p_min, p_max, rho_min, rho_max] = bounds;
+
+    /*
+     * So, we are indeed greedy... Lets' try to minimize lambda_max as much
+     * as possible.
+     */
+
+    auto lambda_greedy = lambda_max * newton_eps_;
+
+    {
+      /*
+       * Obey local minimum principle on density:
+       *
+       * max ( (rho_i+rho_j - 2rho_bar(lambda_max)) / (rho_i+rho_j - 2rho_min) ,
+       *       (rho_i+rho_j - 2rho_bar(lambda_max)) / (rho_i+rho_j - 2rho_max) )
+       */
+
+      const auto factor = rho_j * u_j - rho_i * u_i;
+
+      const auto denominator_1 = rho_i + rho_j - Number(2.) * rho_min;
+      const auto denominator_2 = rho_i + rho_j - Number(2.) * rho_max;
+
+      const auto lambda_1 =
+          dealii::compare_and_apply_mask<dealii::SIMDComparison::greater_than>(
+              std::abs(denominator_1),
+              rho_max * Number(newton_eps_),
+              factor / denominator_1,
+              lambda_max);
+
+      const auto lambda_2 =
+          dealii::compare_and_apply_mask<dealii::SIMDComparison::greater_than>(
+              std::abs(denominator_2),
+              rho_max * Number(newton_eps_),
+              factor / denominator_2,
+              lambda_max);
+
+      lambda_greedy = std::max(lambda_greedy, std::max(lambda_1, lambda_2));
+
+      /*
+       * FIXME: Filter out stray states:
+       */
+      lambda_greedy = std::min(lambda_greedy, lambda_max);
+
+#ifdef DEBUG
+      if constexpr (std::is_same<Number, double>::value ||
+                    std::is_same<Number, float>::value) {
+
+        AssertThrow(lambda_greedy <= lambda_max + 100. * newton_eps_,
+                    dealii::ExcMessage("I'm sorry, Dave. I'm afraid I can't do "
+                                       "that. - something went wrong."));
+      } else {
+        for (unsigned int k = 0; k < Number::n_array_elements; ++k)
+          AssertThrow(lambda_greedy[k] <= lambda_max[k] + 100. * newton_eps_,
+                      dealii::ExcMessage("I'm sorry, Dave. I'm afraid I can't "
+                                         "do that. - something went wrong."));
+      }
+#endif
+    }
+
+    return {lambda_greedy, p_star, i};
   }
 
 } /* namespace grendel */
