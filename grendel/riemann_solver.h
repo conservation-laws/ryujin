@@ -44,12 +44,12 @@ namespace grendel
         std::is_same<ScalarNumber, double>::value ? ScalarNumber(1.0e-10)
                                                   : ScalarNumber(1.0e-4);
 
-    static constexpr bool greedy_dij = true;
+    static constexpr bool greedy_dij_ = false;
 
     /* In case of the greedy variant, we have to allow for at least one
      * Newton iteration step. */
     static constexpr unsigned int newton_max_iter_ =
-        greedy_dij ? std::max(NEWTON_MAX_ITER, 1) : NEWTON_MAX_ITER;
+        greedy_dij_ ? std::max(NEWTON_MAX_ITER, 1) : NEWTON_MAX_ITER;
 
 
     /**

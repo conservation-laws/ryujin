@@ -430,6 +430,9 @@ namespace ryujin
     deallog << "RiemannSolver<dim, Number>::newton_max_iter_ == "
             <<  RiemannSolver<dim, Number>::newton_max_iter_ << std::endl;
 
+    deallog << "RiemannSolver<dim, Number>::greedy_dij_ == "
+            <<  RiemannSolver<dim, Number>::greedy_dij_ << std::endl;
+
     deallog << "TimeStep<dim, Number>::order_ == ";
     switch (TimeStep<dim, Number>::order_) {
     case TimeStep<dim, Number>::Order::first_order:

@@ -529,7 +529,7 @@ namespace grendel
       lambda_max = lambda_max_new;
     }
 
-    if constexpr (!greedy_dij)
+    if constexpr (!greedy_dij_)
       return {lambda_max, p_2, i, std::array<Number, 4>()};
 
     /*
@@ -663,7 +663,7 @@ namespace grendel
      * as possible.
      */
 
-    if constexpr (!greedy_dij)
+    if constexpr (!greedy_dij_)
       return {lambda_max, p_star, i};
 
     const auto &[rho_i, u_i, p_i, a_i] = riemann_data_i;
