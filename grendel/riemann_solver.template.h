@@ -36,44 +36,6 @@ namespace grendel
 
 
     /**
-     * For a given (2+dim dimensional) state vector <code>U</code>, and a
-     * (normalized) "direction" n_ij, first compute the corresponding
-     * projected state in the corresponding 1D Riemann problem, and then
-     * compute and return the Riemann data [rho, u, p, a] (used in the
-     * approximative Riemman solver).
-     */
-    template <int dim, typename Number>
-    inline DEAL_II_ALWAYS_INLINE std::array<Number, 4> riemann_data_from_state(
-        const typename ProblemDescription<dim, Number>::rank1_type U,
-        const dealii::Tensor<1, dim, Number> &n_ij)
-    {
-      typename ProblemDescription<1, Number>::rank1_type projected;
-
-      projected[0] = U[0];
-
-      const Number inv_density = Number(1.0) / U[0];
-
-      const auto m = ProblemDescription<dim, Number>::momentum(U);
-      projected[1] = n_ij * m;
-
-      const auto perp = m - projected[1] * n_ij;
-      projected[2] =
-          U[1 + dim] - Number(0.5) * perp.norm_square() * inv_density;
-
-      std::array<Number, 4> result;
-
-      result[0] = projected[0];               // rho
-      result[1] = projected[1] * inv_density; // u
-      result[2] =
-          ProblemDescription<1, Number>::pressure(projected, inv_density);
-      result[3] =
-          ProblemDescription<1, Number>::speed_of_sound(projected, inv_density);
-
-      return result;
-    }
-
-
-    /**
      * FIXME: Write a lengthy explanation.
      *
      * See [1], page 912, (3.4).
@@ -352,23 +314,44 @@ namespace grendel
       return std::max(positive_part(nu_32), negative_part(nu_11));
     }
 
-  } /*anonymous namespace*/
+
+    /**
+     * Compute a corresponding expansion and shock density
+     *
+     * [2] Formula (4.4)
+     */
+    template <typename Number>
+    inline DEAL_II_ALWAYS_INLINE std::array<Number, 4>
+    shock_and_expansion_density(const Number p_min,
+                                const Number p_max,
+                                const Number rho_min,
+                                const Number rho_max,
+                                const Number p_1,
+                                const Number p_2)
+    {
+      constexpr auto gm1_gp2 =
+          ProblemDescription<1, Number>::gamma_minus_one_over_gamma_plus_one;
+
+      const auto rho_min_shk =
+          rho_min * (gm1_gp2 * p_min + p_1) / (gm1_gp2 * p_1 + p_min);
+
+      const auto rho_max_shk =
+          rho_min * (gm1_gp2 * p_max + p_1) / (gm1_gp2 * p_1 + p_max);
+
+      constexpr auto gamma_inverse =
+          ProblemDescription<1, Number>::gamma_inverse;
+
+      const auto rho_min_exp =
+          rho_min * grendel::pow(p_2 / p_min, gamma_inverse);
+
+      const auto rho_max_exp =
+          rho_max * grendel::pow(p_2 / p_max, gamma_inverse);
+
+      return {rho_min_shk, rho_max_shk, rho_min_exp, rho_max_exp};
+    }
 
 
-  template <int dim, typename Number>
-  std::tuple<Number, Number, unsigned int> RiemannSolver<dim, Number>::compute(
-      const rank1_type U_i,
-      const rank1_type U_j,
-      const dealii::Tensor<1, dim, Number> &n_ij)
-  {
-    const auto riemann_data_i = riemann_data_from_state(U_i, n_ij);
-    const auto riemann_data_j = riemann_data_from_state(U_j, n_ij);
-
-    const auto &[lambda_max, p_star, i, bounds] =
-        compute(riemann_data_i, riemann_data_j);
-
-    return {lambda_max, p_star, i};
-  }
+  } /* anonymous namespace */
 
 
   template <int dim, typename Number>
@@ -391,7 +374,7 @@ namespace grendel
      *
      * We will use three candidates, p_min, p_max and the two rarefaction
      * approximation p_star_tilde. We have (up to round-off errors) that
-     * phi(p_star_tilde) >= 0. So this is a save upper bound.
+     * phi(p_star_tilde) >= 0. So this is a safe upper bound.
      *
      * Depending on the sign of phi(p_max) we thus select the following
      * ranges:
@@ -411,13 +394,15 @@ namespace grendel
      *
      *  - In principle, we would have to treat the case phi(p_min) > 0 as
      *    well. This corresponds to two expansion waves and a good estimate
-     *    for the wavespeed is obtained by setting p_star = 0. and exiting.
+     *    for the wavespeed is obtained by setting p_star = 0 and computing
+     *    lambda_max with that.
      *    However, it turns out that numerically in this case the
      *    two-rarefaction approximation p_star_tilde is already an
-     *    excellent guess (and we will set p_2 to this upper bound in both
-     *    of the above two cases).
+     *    excellent guess and we will have
+     *      0 < p_star <= p_star_tilde <= p_min <= p_max.
      *
-     *    So let's happily take the risk by setting
+     *    So let's simply detect this case numerically by checking for
+     *    p_star_tilde < p_1 and setting
      *      p_1 <- 0.   and  p_2  <-  p_star_tilde
      *    in this case.
      *
@@ -427,8 +412,8 @@ namespace grendel
      *    happens that p_star_tilde is a bad guess.
      */
 
-    const Number p_min = std::min(riemann_data_i[2], riemann_data_j[2]);
-    const Number p_max = std::max(riemann_data_i[2], riemann_data_j[2]);
+    Number p_min = std::min(riemann_data_i[2], riemann_data_j[2]);
+    Number p_max = std::max(riemann_data_i[2], riemann_data_j[2]);
 
     const Number p_star_tilde =
         p_star_two_rarefaction(riemann_data_i, riemann_data_j);
@@ -459,9 +444,8 @@ namespace grendel
             p_min);
 
     /*
-     * Ensure that p_1 < p_2. In case we hit a case with two expansions we
-     * might indeed have that p_star_tilde < p_1. Set p_1 = 0. in this case
-     * (because this is the value we want to attain anyway).
+     * Ensure that p_1 < p_2. If we hit a case with two expansions we might
+     * indeed have that p_star_tilde < p_1. Set p_1 = 0 in this case.
      */
 
     p_1 = dealii::compare_and_apply_mask<
@@ -550,7 +534,118 @@ namespace grendel
       lambda_max = lambda_max_new;
     }
 
-    return {lambda_max, p_2, i, std::array<Number, 4>()};
+    if constexpr (!greedy_dij)
+      return {lambda_max, p_2, i, std::array<Number, 4>()};
+
+    /*
+     * Step 3: In case of the greedy algorithm we have to compute some
+     * additional bounds for some limiting stages.
+     */
+
+    auto rho_min = std::min(riemann_data_i[0], riemann_data_j[0]);
+    auto rho_max = std::max(riemann_data_i[0], riemann_data_j[0]);
+
+    const auto [rho_min_shk, rho_max_shk, rho_min_exp, rho_max_exp] =
+        shock_and_expansion_density(p_min, p_max, rho_min, rho_max, p_1, p_2);
+
+    /*
+     * We have the following cases:
+     *
+     *  - phi(p_min) >= 0 : two expansion waves with
+     *      p_1 <= p* <= p_2 <= p_min <= p_max  (and p_2 == p_star_tilde)
+     *    thus, select [p_2, p_max] as limiter bounds
+     *
+     *  - phi(p_min) < 0 and phi(p_max) >= 0 : shock and expansion with
+     *      p_min <= p_1 <= p* <= p_2 <= min(p_max, p_star_tilde)
+     *    thus, select [p_min, p_max] as limiter bounds
+     *
+     *  - phi(p_min) < 0 and phi(p_max) < 0 : two shocks with
+     *      p_min <= p_max <= p_1 <= p* <= p_2 <= p_star_tilde
+     *    thus, select [p_min, p_1] as limiter bounds
+     *
+     * In summary, we do the following:
+     */
+
+    p_min = std::min(p_min, p_2);
+    p_max = std::max(p_max, p_1);
+
+    /*
+     * We have the following cases:
+     *
+     *  - phi(p_min) >= 0 : two expansion waves; update
+     *      rho_min  =  min(rho_exp_min, rho_exp_max)
+     *
+     *  - phi(p_min) < 0 and phi(p_max) >= 0 : shock and expansion; update
+     *      rho_min  =  min(rho_min, rho_exp_max)
+     *      rho_max  =  max(rho_shk_min, rho_max)
+     *
+     *  - phi(p_min) < 0 and phi(p_max) < 0 : two shocks; update
+     *      rho_max  =  max(rho_shk_min, rho_shk_max)
+     *
+     *  In summary, we do the following:
+     */
+
+    rho_min = std::min(rho_min, std::min(rho_min_exp, rho_max_exp));
+    rho_max = std::max(rho_max, std::min(rho_min_shk, rho_max_shk));
+
+    return {lambda_max, p_2, i, {p_min, p_max, rho_min, rho_max}};
+  }
+
+
+  namespace
+  {
+    /**
+     * For a given (2+dim dimensional) state vector <code>U</code>, and a
+     * (normalized) "direction" n_ij, first compute the corresponding
+     * projected state in the corresponding 1D Riemann problem, and then
+     * compute and return the Riemann data [rho, u, p, a] (used in the
+     * approximative Riemman solver).
+     */
+    template <int dim, typename Number>
+    inline DEAL_II_ALWAYS_INLINE std::array<Number, 4> riemann_data_from_state(
+        const typename ProblemDescription<dim, Number>::rank1_type U,
+        const dealii::Tensor<1, dim, Number> &n_ij)
+    {
+      typename ProblemDescription<1, Number>::rank1_type projected;
+
+      projected[0] = U[0];
+
+      const Number inv_density = Number(1.0) / U[0];
+
+      const auto m = ProblemDescription<dim, Number>::momentum(U);
+      projected[1] = n_ij * m;
+
+      const auto perp = m - projected[1] * n_ij;
+      projected[2] =
+          U[1 + dim] - Number(0.5) * perp.norm_square() * inv_density;
+
+      std::array<Number, 4> result;
+
+      result[0] = projected[0];               // rho
+      result[1] = projected[1] * inv_density; // u
+      result[2] =
+          ProblemDescription<1, Number>::pressure(projected, inv_density);
+      result[3] =
+          ProblemDescription<1, Number>::speed_of_sound(projected, inv_density);
+
+      return result;
+    }
+  } /* anonymous namespace */
+
+
+  template <int dim, typename Number>
+  std::tuple<Number, Number, unsigned int> RiemannSolver<dim, Number>::compute(
+      const rank1_type U_i,
+      const rank1_type U_j,
+      const dealii::Tensor<1, dim, Number> &n_ij)
+  {
+    const auto riemann_data_i = riemann_data_from_state(U_i, n_ij);
+    const auto riemann_data_j = riemann_data_from_state(U_j, n_ij);
+
+    const auto &[lambda_max, p_star, i, bounds] =
+        compute(riemann_data_i, riemann_data_j);
+
+    return {lambda_max, p_star, i};
   }
 
 } /* namespace grendel */

@@ -45,21 +45,27 @@ namespace grendel
     static constexpr ScalarNumber gamma = ScalarNumber(7.) / ScalarNumber(5.);
 
     /**
-     * 1/Gamma.
+     * 1 / Gamma.
      */
     static constexpr ScalarNumber gamma_inverse = ScalarNumber(1.) / gamma;
 
     /**
-     * 1/(Gamma-1).
+     * 1 / (Gamma - 1).
      */
     static constexpr ScalarNumber gamma_minus_one_inverse =
         ScalarNumber(1.) / (gamma - ScalarNumber(1.));
 
     /**
-     * 1/(Gamma+1).
+     * 1 / (Gamma + 1).
      */
     static constexpr ScalarNumber gamma_plus_one_inverse =
         ScalarNumber(1.) / (gamma + ScalarNumber(1.));
+
+    /**
+     * (Gamma - 1) / (Gamma + 1).
+     */
+    static constexpr ScalarNumber gamma_minus_one_over_gamma_plus_one =
+        (gamma - ScalarNumber(1.)) / (gamma + ScalarNumber(1.));
 
     /**
      * Covolume b.

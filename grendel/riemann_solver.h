@@ -78,6 +78,8 @@ namespace grendel
      * References:
      *   [1] J.-L. Guermond, B. Popov. Fast estimation from above for the
      *       maximum wave speed in the Riemann problem for the Euler equations.
+     *
+     *   [2] J.-L. Guermond, et al. In progress.
      */
     static std::tuple<Number /*lambda_max*/,
                       Number /*p_star*/,
