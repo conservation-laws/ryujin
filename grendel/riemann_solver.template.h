@@ -324,30 +324,30 @@ namespace grendel
     inline DEAL_II_ALWAYS_INLINE std::array<Number, 4>
     shock_and_expansion_density(const Number p_min,
                                 const Number p_max,
-                                const Number rho_min,
-                                const Number rho_max,
+                                const Number rho_p_min,
+                                const Number rho_p_max,
                                 const Number p_1,
                                 const Number p_2)
     {
       constexpr auto gm1_gp2 =
           ProblemDescription<1, Number>::gamma_minus_one_over_gamma_plus_one;
 
-      const auto rho_min_shk =
-          rho_min * (gm1_gp2 * p_min + p_1) / (gm1_gp2 * p_1 + p_min);
+      const auto rho_p_min_shk =
+          rho_p_min * (gm1_gp2 * p_min + p_1) / (gm1_gp2 * p_1 + p_min);
 
-      const auto rho_max_shk =
-          rho_min * (gm1_gp2 * p_max + p_1) / (gm1_gp2 * p_1 + p_max);
+      const auto rho_p_max_shk =
+          rho_p_min * (gm1_gp2 * p_max + p_1) / (gm1_gp2 * p_1 + p_max);
 
       constexpr auto gamma_inverse =
           ProblemDescription<1, Number>::gamma_inverse;
 
-      const auto rho_min_exp =
-          rho_min * grendel::pow(p_2 / p_min, gamma_inverse);
+      const auto rho_p_min_exp =
+          rho_p_min * grendel::pow(p_2 / p_min, gamma_inverse);
 
-      const auto rho_max_exp =
-          rho_max * grendel::pow(p_2 / p_max, gamma_inverse);
+      const auto rho_p_max_exp =
+          rho_p_max * grendel::pow(p_2 / p_max, gamma_inverse);
 
-      return {rho_min_shk, rho_max_shk, rho_min_exp, rho_max_exp};
+      return {rho_p_min_shk, rho_p_max_shk, rho_p_min_exp, rho_p_max_exp};
     }
 
 
@@ -542,11 +542,26 @@ namespace grendel
      * additional bounds for some limiting stages.
      */
 
-    auto rho_min = std::min(riemann_data_i[0], riemann_data_j[0]);
-    auto rho_max = std::max(riemann_data_i[0], riemann_data_j[0]);
+    /*
+     * Get the density of the corresponding min and max states:
+     */
+    const auto rho_p_min =
+        dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+            riemann_data_i[2],
+            riemann_data_j[2],
+            riemann_data_i[0],
+            riemann_data_j[0]);
 
-    const auto [rho_min_shk, rho_max_shk, rho_min_exp, rho_max_exp] =
-        shock_and_expansion_density(p_min, p_max, rho_min, rho_max, p_1, p_2);
+    const auto rho_p_max =
+        dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+            riemann_data_i[2],
+            riemann_data_j[2],
+            riemann_data_j[0],
+            riemann_data_i[0]);
+
+    const auto [rho_p_min_shk, rho_p_max_shk, rho_p_min_exp, rho_p_max_exp] =
+        shock_and_expansion_density(
+            p_min, p_max, rho_p_min, rho_p_max, p_1, p_2);
 
     /*
      * We have the following cases:
@@ -585,8 +600,11 @@ namespace grendel
      *  In summary, we do the following:
      */
 
-    rho_min = std::min(rho_min, std::min(rho_min_exp, rho_max_exp));
-    rho_max = std::max(rho_max, std::min(rho_min_shk, rho_max_shk));
+    auto rho_min = std::min(rho_p_min, rho_p_max);
+    rho_min = std::min(rho_min, std::min(rho_p_min_exp, rho_p_max_exp));
+
+    auto rho_max = std::max(rho_p_min, rho_p_max);
+    rho_max = std::max(rho_max, std::min(rho_p_min_shk, rho_p_max_shk));
 
     return {lambda_max, p_2, i, {p_min, p_max, rho_min, rho_max}};
   }
