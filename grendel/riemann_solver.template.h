@@ -422,10 +422,7 @@ namespace grendel
 
     Number p_2 =
         dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-            phi_p_max,
-            Number(-newton_eps_), /* prefer p_max if close to zero */
-            p_star_tilde,
-            std::min(p_max, p_star_tilde));
+            phi_p_max, Number(0.), p_star_tilde, std::min(p_max, p_star_tilde));
 
     if constexpr (newton_max_iter_ == 0) {
 
@@ -438,10 +435,7 @@ namespace grendel
 
     Number p_1 =
         dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-            phi_p_max,
-            Number(newton_eps_), /* prefer p_max if close to zero */
-            p_max,
-            p_min);
+            phi_p_max, Number(0.), p_max, p_min);
 
     /*
      * Ensure that p_1 < p_2. If we hit a case with two expansions we might
@@ -542,9 +536,8 @@ namespace grendel
      * additional bounds for some limiting stages.
      */
 
-    /*
-     * Get the density of the corresponding min and max states:
-     */
+    /* Get the density of the corresponding min and max states: */
+
     const auto rho_p_min =
         dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
             riemann_data_i[2],
@@ -601,10 +594,10 @@ namespace grendel
      */
 
     auto rho_min = std::min(rho_p_min, rho_p_max);
-    rho_min = std::min(rho_min, std::min(rho_p_min_exp, rho_p_max_exp));
-
     auto rho_max = std::max(rho_p_min, rho_p_max);
-    rho_max = std::max(rho_max, std::min(rho_p_min_shk, rho_p_max_shk));
+
+    rho_min = std::min(rho_min, std::min(rho_p_min_exp, rho_p_max_exp));
+    rho_max = std::max(rho_max, std::max(rho_p_min_shk, rho_p_max_shk));
 
     return {lambda_max, p_2, i, {p_min, p_max, rho_min, rho_max}};
   }
@@ -668,6 +661,7 @@ namespace grendel
 
     const auto &[rho_i, u_i, p_i, a_i] = riemann_data_i;
     const auto &[rho_j, u_j, p_j, a_j] = riemann_data_j;
+
     const auto &[p_min, p_max, rho_min, rho_max] = bounds;
 
     /*
@@ -679,7 +673,7 @@ namespace grendel
 
     {
       /*
-       * Obey local minimum principle on density:
+       * Enforce local minimum principle on density:
        *
        * max ( (rho_i+rho_j - 2rho_bar(lambda_max)) / (rho_i+rho_j - 2rho_min) ,
        *       (rho_i+rho_j - 2rho_bar(lambda_max)) / (rho_i+rho_j - 2rho_max) )
@@ -693,41 +687,37 @@ namespace grendel
       const auto lambda_1 =
           dealii::compare_and_apply_mask<dealii::SIMDComparison::greater_than>(
               std::abs(denominator_1),
-              rho_max * Number(newton_eps_),
+              rho_max * ScalarNumber(newton_eps_),
               factor / denominator_1,
               lambda_max);
 
       const auto lambda_2 =
           dealii::compare_and_apply_mask<dealii::SIMDComparison::greater_than>(
               std::abs(denominator_2),
-              rho_max * Number(newton_eps_),
+              rho_max * ScalarNumber(newton_eps_),
               factor / denominator_2,
               lambda_max);
 
       lambda_greedy = std::max(lambda_greedy, std::max(lambda_1, lambda_2));
 
       /*
-       * FIXME: Filter out stray states:
+       * Box lambda_greedy back into bounds.
+       *
+       * In case we have two states that are almost equal the above
+       * division can pick up a massive cancelation error.
        */
+
       lambda_greedy = std::min(lambda_greedy, lambda_max);
-
-#ifdef DEBUG
-      if constexpr (std::is_same<Number, double>::value ||
-                    std::is_same<Number, float>::value) {
-
-        AssertThrow(lambda_greedy <= lambda_max + 100. * newton_eps_,
-                    dealii::ExcMessage("I'm sorry, Dave. I'm afraid I can't do "
-                                       "that. - something went wrong."));
-      } else {
-        for (unsigned int k = 0; k < Number::n_array_elements; ++k)
-          AssertThrow(lambda_greedy[k] <= lambda_max[k] + 100. * newton_eps_,
-                      dealii::ExcMessage("I'm sorry, Dave. I'm afraid I can't "
-                                         "do that. - something went wrong."));
-      }
-#endif
     }
 
-    return {lambda_greedy, p_star, i};
+    {
+      /*
+       * Enforce local minimum principle on specific entropy:
+       */
+
+    }
+
+    return {std::max(lambda_greedy, lambda_max), p_star, i};
   }
 
 } /* namespace grendel */
