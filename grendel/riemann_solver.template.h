@@ -369,20 +369,17 @@ namespace grendel
      * Step 1:
      *
      * In case we iterate (in the Newton method) we need a good upper and
-     * lower bound, p_1 < p_star < p_2, for finding phi(p_star) == 0.
+     * lower bound, p_1 < p_star < p_2, for finding phi(p_star) == 0. In case
+     * we do not iterate (because the iteration is really expensive...) we
+     * will need p_2 as an approximation to p_star.
      *
-     * In case we do not iterate (because the iteration iw really
-     * expensive...) we will need p_2 as an approximation to p_star.
-     *
-     * In any case we have to ensure that phi(p_2) >= 0 (and phi(p_1) <=
-     * 0).
+     * In any case we have to ensure that phi(p_2) >= 0 (and phi(p_1) <= 0).
      *
      * We will use three candidates, p_min, p_max and the two rarefaction
      * approximation p_star_tilde. We have (up to round-off errors) that
      * phi(p_star_tilde) >= 0. So this is a safe upper bound.
      *
-     * Depending on the sign of phi(p_max) we thus select the following
-     * ranges:
+     * Depending on the sign of phi(p_max) we select the following ranges:
      *
      * phi(p_max) <  0:
      *   p_1  <-  p_max   and   p_2  <-  p_star_tilde
@@ -392,10 +389,8 @@ namespace grendel
      *
      * Notar bene:
      *
-     *  - The case phi(p_max) == 0 as discussed as a special case
-     *    in [1] is already contained in the second condition. We thus
-     *    simply change the comparison to "phi(p_max) < -eps" to allow for
-     *    numerical round-off errors.
+     *  - The special case phi(p_max) == 0 as discussed in [1] is already
+     *    contained in the second condition.
      *
      *  - In principle, we would have to treat the case phi(p_min) > 0 as
      *    well. This corresponds to two expansion waves and a good estimate
@@ -404,17 +399,11 @@ namespace grendel
      *    However, it turns out that numerically in this case the
      *    two-rarefaction approximation p_star_tilde is already an
      *    excellent guess and we will have
+     *
      *      0 < p_star <= p_star_tilde <= p_min <= p_max.
      *
-     *    So let's simply detect this case numerically by checking for
-     *    p_star_tilde < p_1 and setting
-     *      p_1 <- 0.   and  p_2  <-  p_star_tilde
-     *    in this case.
-     *
-     *    Important: _NONE_ of these considerations changes the fact that
-     *    the computed lambda_max is an upper bound on the maximum
-     *    wavespeed. We might simply be a bit worse off in this case if it
-     *    happens that p_star_tilde is a bad guess.
+     *    So let's simply detect this case numerically by checking for p_2 <
+     *    p_1 and setting p_1 <- 0 if necessary.
      */
 
     Number p_min = std::min(riemann_data_i[2], riemann_data_j[2]);
@@ -430,8 +419,7 @@ namespace grendel
             phi_p_max, Number(0.), p_star_tilde, std::min(p_max, p_star_tilde));
 
     if constexpr (newton_max_iter_ == 0) {
-      /* If there is nothing to do, cut it short: */
-
+      /* If we do no Newton iteration, cut it short: */
       const Number lambda_max =
           compute_lambda(riemann_data_i, riemann_data_j, p_2);
       return {lambda_max, p_2, -1, std::array<Number, 4>()};
@@ -475,18 +463,22 @@ namespace grendel
           p_1, p_2, phi_p_1, phi_p_2, dphi_p_1, dphi_p_2);
 
       /* Update  lambda_max and gap: */
-      auto [gap_new, lambda_max_new] =
-          compute_gap(riemann_data_i, riemann_data_j, p_1, p_2);
-      gap = gap_new;
-      lambda_max = lambda_max_new;
+      {
+        auto [gap_new, lambda_max_new] =
+            compute_gap(riemann_data_i, riemann_data_j, p_1, p_2);
+        gap = gap_new;
+        lambda_max = lambda_max_new;
+      }
     }
 
-    if constexpr (!greedy_dij_)
+    if constexpr (!greedy_dij_) {
+      /* If we do not compute */
       return {lambda_max, p_2, i, std::array<Number, 4>()};
+    }
 
     /*
-     * Step 3: In case of the greedy algorithm we have to compute some
-     * additional bounds for some limiting stages.
+     * Step 3: In case of the greedy lambda_max computation we have to
+     * compute bounds on the density for the limiting process:
      */
 
     /* Get the density of the corresponding min and max states: */
@@ -513,38 +505,35 @@ namespace grendel
      * We have the following cases:
      *
      *  - phi(p_min) >= 0 : two expansion waves with
+     *
      *      p_1 <= p* <= p_2 <= p_min <= p_max  (and p_2 == p_star_tilde)
-     *    thus, select [p_2, p_max] as limiter bounds
+     *
+     *    thus, select [p_2, p_max] as limiter bounds and update
+     *
+     *      rho_min  =  min(rho_exp_min, rho_exp_max)
      *
      *  - phi(p_min) < 0 and phi(p_max) >= 0 : shock and expansion with
+     *
      *      p_min <= p_1 <= p* <= p_2 <= min(p_max, p_star_tilde)
-     *    thus, select [p_min, p_max] as limiter bounds
+     *
+     *    thus, select [p_min, p_max] as limiter bounds and update
+     *
+     *      rho_min  =  min(rho_min, rho_exp_max)
+     *      rho_max  =  max(rho_shk_min, rho_max)
      *
      *  - phi(p_min) < 0 and phi(p_max) < 0 : two shocks with
+     *
      *      p_min <= p_max <= p_1 <= p* <= p_2 <= p_star_tilde
-     *    thus, select [p_min, p_1] as limiter bounds
+     *
+     *    thus, select [p_min, p_1] as limiter bounds and update
+     *
+     *      rho_max  =  max(rho_shk_min, rho_shk_max)
      *
      * In summary, we do the following:
      */
 
-    p_min = std::min(p_min, p_2);
-    p_max = std::max(p_max, p_1);
-
-    /*
-     * We have the following cases:
-     *
-     *  - phi(p_min) >= 0 : two expansion waves; update
-     *      rho_min  =  min(rho_exp_min, rho_exp_max)
-     *
-     *  - phi(p_min) < 0 and phi(p_max) >= 0 : shock and expansion; update
-     *      rho_min  =  min(rho_min, rho_exp_max)
-     *      rho_max  =  max(rho_shk_min, rho_max)
-     *
-     *  - phi(p_min) < 0 and phi(p_max) < 0 : two shocks; update
-     *      rho_max  =  max(rho_shk_min, rho_shk_max)
-     *
-     *  In summary, we do the following:
-     */
+    p_min = std::min(p_min, p_2); // FIXME: not used
+    p_max = std::max(p_max, p_1); // FIXME: not used
 
     auto rho_min = std::min(rho_p_min, rho_p_max);
     auto rho_max = std::max(rho_p_min, rho_p_max);
@@ -604,6 +593,8 @@ namespace grendel
       const dealii::Tensor<1, dim, Number> &n_ij,
       const Number hd_i /* = Number(0.) */)
   {
+    constexpr auto gamma = ProblemDescription<1, Number>::gamma;
+
     const auto riemann_data_i = riemann_data_from_state(U_i, n_ij);
     const auto riemann_data_j = riemann_data_from_state(U_j, n_ij);
 
@@ -626,6 +617,10 @@ namespace grendel
     const auto f_i = ProblemDescription<dim, Number>::f(U_i);
     const auto f_j = ProblemDescription<dim, Number>::f(U_j);
 
+    /* bar state: U = 0.5 * (U_i + U_j) */
+    const auto U = ScalarNumber(0.5) * (U_i + U_j);
+
+    /* P_ij = - 0.5 * (f_j - f_i) * n_ij */
     dealii::Tensor<1, problem_dimension, Number> P_ij;
     for (unsigned int k = 0; k < problem_dimension; ++k)
       P_ij[k] = ScalarNumber(0.5) * (f_i[k] - f_j[k]) * n_ij;
@@ -666,7 +661,7 @@ namespace grendel
        * Box lambda_greedy back into bounds.
        *
        * In case we have two states that are almost equal the above
-       * division can pick up a massive cancelation error.
+       * division can pick up a massive cancellation error.
        */
       lambda_greedy = std::min(lambda_greedy, lambda_max);
 
@@ -704,11 +699,8 @@ namespace grendel
           std::min(ProblemDescription<dim, Number>::specific_entropy(U_i),
                    ProblemDescription<dim, Number>::specific_entropy(U_j));
 
-      const Number upper_bound = Number(1.) / lambda_greedy;
       Number t_l = Number(0.);
-      Number t_r = upper_bound;
-
-      constexpr auto gamma = ProblemDescription<1, Number>::gamma;
+      Number t_r = Number(1.) / lambda_greedy;
 
       for (unsigned int n = 0; n < newton_max_iter_; ++n) {
 
