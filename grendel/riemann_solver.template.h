@@ -625,8 +625,6 @@ namespace grendel
     for (unsigned int k = 0; k < problem_dimension; ++k)
       P_ij[k] = ScalarNumber(0.5) * (f_i[k] - f_j[k]) * n_ij;
 
-    const auto U = ScalarNumber(0.5) * (U_i + U_j);
-
     auto lambda_greedy = lambda_max * newton_eps_;
 
     /*
