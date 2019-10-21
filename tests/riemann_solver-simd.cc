@@ -31,7 +31,7 @@ int main()
     std::cout << U_j[0] << " " << U_j[1] << " " << U_j[2] << std::endl;
     const auto rd_i = riemann_data(U_i);
     const auto rd_j = riemann_data(U_j);
-    const auto [lambda_max, p_star, n_iterations] =
+    const auto [lambda_max, p_star, n_iterations, bounds] =
         RiemannSolver<dim, Number>::compute(rd_i, rd_j);
     std::cout << lambda_max << std::endl;
     std::cout << p_star << std::endl;
