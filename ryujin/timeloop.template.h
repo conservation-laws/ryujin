@@ -405,9 +405,6 @@ namespace ryujin
     case Limiter<dim, Number>::Limiters::rho:
       deallog << "Limiter<dim, Number>::Limiters::rho" << std::endl;
       break;
-    case Limiter<dim, Number>::Limiters::internal_energy:
-      deallog << "Limiter<dim, Number>::Limiters::internal_energy" << std::endl;
-      break;
     case Limiter<dim, Number>::Limiters::specific_entropy:
       deallog << "Limiter<dim, Number>::Limiters::specific_entropy" << std::endl;
     }
@@ -418,11 +415,11 @@ namespace ryujin
     deallog << "Limiter<dim, Number>::relaxation_order_ == "
             << Limiter<dim, Number>::relaxation_order_ << std::endl;
 
-    deallog << "Limiter<dim, Number>::line_search_eps_ == "
-            << Limiter<dim, Number>::line_search_eps_ << std::endl;
+    deallog << "Limiter<dim, Number>::newton_eps_ == "
+            << Limiter<dim, Number>::newton_eps_ << std::endl;
 
-    deallog << "Limiter<dim, Number>::line_search_max_iter_ == "
-            << Limiter<dim, Number>::line_search_max_iter_ << std::endl;
+    deallog << "Limiter<dim, Number>::newton_max_iter_ == "
+            << Limiter<dim, Number>::newton_max_iter_ << std::endl;
 
     deallog << "RiemannSolver<dim, Number>::newton_eps_ == "
             <<  RiemannSolver<dim, Number>::newton_eps_ << std::endl;

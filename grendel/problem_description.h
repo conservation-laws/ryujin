@@ -96,20 +96,20 @@ namespace grendel
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
-     * and return the internal energy (\rho e).
+     * and return the internal energy \varepsilon = (\rho e).
      */
     static Number internal_energy(const rank1_type U);
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code> and the
-     * inverse density, compute and return the internal energy (\rho e). Uses
-     * pre-computed inverse density for faster evaluation.
+     * inverse density, compute and return the internal energy \varepsilon
+     * = (\rho e). Uses pre-computed inverse density for faster evaluation.
      */
     static Number internal_energy(const rank1_type U, const Number rho_inverse);
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
-     * and return the derivative of the internal energy (\rho e).
+     * and return the derivative of the internal energy \varepsilon = (\rho e).
      */
     static rank1_type internal_energy_derivative(const rank1_type U);
 
