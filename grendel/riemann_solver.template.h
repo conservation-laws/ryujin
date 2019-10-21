@@ -458,17 +458,10 @@ namespace grendel
     auto [gap, lambda_max] =
         compute_gap(riemann_data_i, riemann_data_j, p_1, p_2);
 
-    // FIXME: This is more or less a copy from the limiter in limiter.h
-    //        We should really refactor all Newton, Newton secant and
-    //        Quadratic Newton variants into its own function prototypes
-
     unsigned int i = 0;
     for (; i < newton_max_iter_; ++i) {
 
-      /*
-       * We return our current guess if we reach the tolerance...
-       */
-
+      /* We return our current guess if we reach the tolerance... */
       if (std::max(Number(0.), gap - Number(newton_eps_)) == Number(0.))
         break;
 
@@ -617,13 +610,13 @@ namespace grendel
     const auto &[lambda_max, p_star, i, bounds] =
         compute(riemann_data_i, riemann_data_j);
 
+    if constexpr (!greedy_dij_)
+      return {lambda_max, p_star, i};
+
     /*
      * So, we are indeed greedy... Lets' try to minimize lambda_max as much
      * as possible.
      */
-
-    if constexpr (!greedy_dij_)
-      return {lambda_max, p_star, i};
 
     const auto &[rho_i, u_i, p_i, a_i] = riemann_data_i;
     const auto &[rho_j, u_j, p_j, a_j] = riemann_data_j;
@@ -641,14 +634,14 @@ namespace grendel
 
     auto lambda_greedy = lambda_max * newton_eps_;
 
-    {
-      /*
-       * Enforce local minimum principle on density:
-       *
-       * max ( (rho_i+rho_j - 2rho_bar(lambda_max)) / (rho_i+rho_j - 2rho_min) ,
-       *       (rho_i+rho_j - 2rho_bar(lambda_max)) / (rho_i+rho_j - 2rho_max) )
-       */
+    /*
+     * Enforce local minimum principle on density:
+     *
+     * max ( (rho_i+rho_j - 2rho_bar(lambda_max)) / (rho_i+rho_j - 2rho_min) ,
+     *       (rho_i+rho_j - 2rho_bar(lambda_max)) / (rho_i+rho_j - 2rho_max) )
+     */
 
+    {
       const auto factor = rho_j * u_j - rho_i * u_i;
 
       const auto denominator_1 = rho_i + rho_j - Number(2.) * rho_min;
@@ -695,15 +688,11 @@ namespace grendel
 #endif
     }
 
+    /*
+     * Enforce local minimum principle on specific entropy:
+     */
+
     {
-      // FIXME: This is more or less a copy from the limiter in limiter.h
-      //        We should really refactor all Newton, Newton secant and
-      //        Quadratic Newton variants into its own function prototypes
-
-      /*
-       * Enforce local minimum principle on specific entropy:
-       */
-
       /* Use the same relaxation as done in the limiter: */
       const Number r_i =
           Number(2.) *
@@ -774,52 +763,8 @@ namespace grendel
                 P_ij -
             gamma * rho_r_gamma / rho_r * s_min * P_ij[0];
 
-        /* Compute divided differences: */
-
-        const auto scaling =
-            ScalarNumber(1.) / (t_r - t_l + Number(newton_eps_));
-
-        const auto dd_11 = -dpsi_l;
-        const auto dd_12 = (psi_l - psi_r) * scaling;
-        const auto dd_22 = -dpsi_r;
-
-        const auto dd_112 = (dd_12 - dd_11) * scaling;
-        const auto dd_122 = (dd_22 - dd_12) * scaling;
-
-        /* Update left and right point: */
-
-        const auto discriminant_l =
-            std::abs(dpsi_l * dpsi_l + ScalarNumber(4.) * psi_l * dd_112);
-        const auto discriminant_r =
-            std::abs(dpsi_r * dpsi_r + ScalarNumber(4.) * psi_r * dd_122);
-
-        const auto denominator_l = dpsi_l - std::sqrt(discriminant_l);
-        const auto denominator_r = dpsi_r - std::sqrt(discriminant_r);
-
-        /* Make sure we do not produce NaNs: */
-
-        t_l -=
-            dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-                std::abs(denominator_l),
-                Number(newton_eps_),
-                Number(0.),
-                ScalarNumber(2.) * psi_l / denominator_l);
-
-        t_r -=
-            dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-                std::abs(denominator_r),
-                Number(newton_eps_),
-                Number(0.),
-                ScalarNumber(2.) * psi_r / denominator_r);
-
-        /* Enforce bounds: */
-        t_l = std::max(Number(0.), t_l);
-        t_r = std::max(Number(0.), t_r);
-        t_l = std::min(upper_bound, t_l);
-        t_r = std::min(upper_bound, t_r);
-
-        /* Ensure that always t_l <= t_r: */
-        t_l = std::min(t_l, t_r);
+        quadratic_newton_step<false /*psi is decreasing!*/>(
+            t_l, t_r, psi_l, psi_r, dpsi_l, dpsi_r);
       }
 
       lambda_greedy = std::max(Number(1.) / t_l, lambda_greedy);

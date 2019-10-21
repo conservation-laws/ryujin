@@ -39,19 +39,21 @@ namespace grendel
      * Compute divided differences
      */
 
+    const auto scaling = ScalarNumber(1.) / (p_2 - p_1 + Number(newton_eps));
+
     const Number dd_11 = dphi_p_1;
-    const Number dd_12 = (phi_p_2 - phi_p_1) / (p_2 - p_1);
+    const Number dd_12 = (phi_p_2 - phi_p_1) * scaling;
     const Number dd_22 = dphi_p_2;
 
-    const Number dd_112 = (dd_12 - dd_11) / (p_2 - p_1);
-    const Number dd_122 = (dd_22 - dd_12) / (p_2 - p_1);
+    const Number dd_112 = (dd_12 - dd_11) * scaling;
+    const Number dd_122 = (dd_22 - dd_12) * scaling;
 
     /* Update left and right point: */
 
-    const auto discriminant_1 = std::abs(
-        dphi_p_1 * dphi_p_1 - sign * ScalarNumber(4.) * phi_p_1 * dd_112);
-    const auto discriminant_2 = std::abs(
-        dphi_p_2 * dphi_p_2 - sign * ScalarNumber(4.) * phi_p_2 * dd_122);
+    const auto discriminant_1 =
+        std::abs(dphi_p_1 * dphi_p_1 - ScalarNumber(4.) * phi_p_1 * dd_112);
+    const auto discriminant_2 =
+        std::abs(dphi_p_2 * dphi_p_2 - ScalarNumber(4.) * phi_p_2 * dd_122);
 
     const auto denominator_1 = dphi_p_1 + sign * std::sqrt(discriminant_1);
     const auto denominator_2 = dphi_p_2 + sign * std::sqrt(discriminant_2);
