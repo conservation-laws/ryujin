@@ -2,6 +2,7 @@
 #define LIMITER_H
 
 #include "helper.h"
+#include "newton.h"
 #include "simd.h"
 
 #include "problem_description.h"
@@ -387,52 +388,9 @@ namespace grendel
                 P_ij -
             gamma * rho_r_gamma / rho_r * s_min * P_ij[0];
 
-        /* Compute divided differences: */
+        quadratic_newton_step<false /*psi is decreasing!*/>(
+            t_l, t_r, psi_l, psi_r, dpsi_l, dpsi_r);
 
-        const auto scaling =
-            ScalarNumber(1.) / (t_r - t_l + Number(line_search_eps_));
-
-        const auto dd_11 = -dpsi_l;
-        const auto dd_12 = (psi_l - psi_r) * scaling;
-        const auto dd_22 = -dpsi_r;
-
-        const auto dd_112 = (dd_12 - dd_11) * scaling;
-        const auto dd_122 = (dd_22 - dd_12) * scaling;
-
-        /* Update left and right point: */
-
-        const auto discriminant_l =
-            std::abs(dpsi_l * dpsi_l + ScalarNumber(4.) * psi_l * dd_112);
-        const auto discriminant_r =
-            std::abs(dpsi_r * dpsi_r + ScalarNumber(4.) * psi_r * dd_122);
-
-        const auto denominator_l = dpsi_l - std::sqrt(discriminant_l);
-        const auto denominator_r = dpsi_r - std::sqrt(discriminant_r);
-
-        /* Make sure we do not produce NaNs: */
-
-        t_l -=
-            dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-                std::abs(denominator_l),
-                Number(line_search_eps_),
-                Number(0.),
-                ScalarNumber(2.) * psi_l / denominator_l);
-
-        t_r -=
-            dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-                std::abs(denominator_r),
-                Number(line_search_eps_),
-                Number(0.),
-                ScalarNumber(2.) * psi_r / denominator_r);
-
-        /* Enforce bounds: */
-        t_l = std::max(Number(0.), t_l);
-        t_r = std::max(Number(0.), t_r);
-        t_l = std::min(l_ij, t_l);
-        t_r = std::min(l_ij, t_r);
-
-        /* Ensure that always t_l <= t_r: */
-        t_l = std::min(t_l, t_r);
       }
 
       l_ij = std::min(l_ij, t_l);
