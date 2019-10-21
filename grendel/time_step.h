@@ -103,7 +103,7 @@ namespace grendel
       first_order,
       second_order,
       third_order
-    } time_step_order_ = TimeStepOrder::second_order;
+    } time_step_order_ = TimeStepOrder::third_order;
 
     static constexpr unsigned int limiter_iter_ = 2;
 
