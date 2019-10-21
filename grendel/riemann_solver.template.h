@@ -455,6 +455,10 @@ namespace grendel
     auto [gap, lambda_max] =
         compute_gap(riemann_data_i, riemann_data_j, p_1, p_2);
 
+    // FIXME: This is more or less a copy from the limiter in limiter.h
+    //        We should really refactor all Newton, Newton secant and
+    //        Quadratic Newton variants into its own function prototypes
+
     unsigned int i = 0;
     for (; i < newton_max_iter_; ++i) {
 
