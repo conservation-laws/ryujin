@@ -2,6 +2,7 @@
 #define RIEMANN_SOLVER_TEMPLATE_H
 
 #include "limiter.h"
+#include "newton.h"
 #include "riemann_solver.h"
 
 namespace grendel
@@ -193,6 +194,7 @@ namespace grendel
       constexpr auto gamma = ProblemDescription<1, Number>::gamma;
       constexpr auto gamma_inverse =
           ProblemDescription<1, Number>::gamma_inverse;
+
       const auto &[rho, u, p, a] = riemann_data;
 
       const auto factor =
@@ -215,6 +217,7 @@ namespace grendel
       constexpr auto gamma = ProblemDescription<1, Number>::gamma;
       constexpr auto gamma_inverse =
           ProblemDescription<1, Number>::gamma_inverse;
+
       const auto &[rho, u, p, a] = primitive_state;
 
       const Number factor =
@@ -241,6 +244,7 @@ namespace grendel
           ProblemDescription<1, Number>::gamma_inverse;
       constexpr auto gamma_minus_one_inverse =
           ProblemDescription<1, Number>::gamma_minus_one_inverse;
+
       const auto &[rho_i, u_i, p_i, a_i] = riemann_data_i;
       const auto &[rho_j, u_j, p_j, a_j] = riemann_data_j;
 
@@ -426,7 +430,6 @@ namespace grendel
             phi_p_max, Number(0.), p_star_tilde, std::min(p_max, p_star_tilde));
 
     if constexpr (newton_max_iter_ == 0) {
-
       /* If there is nothing to do, cut it short: */
 
       const Number lambda_max =
@@ -475,56 +478,8 @@ namespace grendel
       const Number dphi_p_1 = dphi(riemann_data_i, riemann_data_j, p_1);
       const Number dphi_p_2 = dphi(riemann_data_i, riemann_data_j, p_2);
 
-      /*
-       * Compute divided differences
-       */
-
-      const Number dd_11 = dphi_p_1;
-      const Number dd_12 = (phi_p_2 - phi_p_1) / (p_2 - p_1);
-      const Number dd_22 = dphi_p_2;
-
-      const Number dd_112 = (dd_12 - dd_11) / (p_2 - p_1);
-      const Number dd_122 = (dd_22 - dd_12) / (p_2 - p_1);
-
-      /* Update left and right point: */
-
-      const auto discriminant_1 =
-          std::abs(dphi_p_1 * dphi_p_1 - ScalarNumber(4.) * phi_p_1 * dd_112);
-      const auto discriminant_2 =
-          std::abs(dphi_p_2 * dphi_p_2 - ScalarNumber(4.) * phi_p_2 * dd_122);
-
-      const auto denominator_1 = dphi_p_1 + std::sqrt(discriminant_1);
-      const auto denominator_2 = dphi_p_2 + std::sqrt(discriminant_2);
-
-      /* Make sure we do not produce NaNs: */
-
-      auto t_1 =
-          p_1 -
-          dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-              std::abs(denominator_1),
-              Number(newton_eps_),
-              Number(0.),
-              ScalarNumber(2.) * phi_p_1 / denominator_1);
-
-      auto t_2 =
-          p_2 -
-          dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-              std::abs(denominator_2),
-              Number(newton_eps_),
-              Number(0.),
-              ScalarNumber(2.) * phi_p_2 / denominator_2);
-
-      /* Enforce bounds: */
-
-      t_1 = std::max(p_1, t_1);
-      t_2 = std::max(p_1, t_2);
-      t_1 = std::min(p_2, t_1);
-      t_2 = std::min(p_2, t_2);
-
-      /* Ensure that always p_1 <= p_2: */
-
-      p_1 = std::min(t_1, t_2);
-      p_2 = std::max(t_1, t_2);
+      quadratic_newton_step</* increasing */ true>(
+          p_1, p_2, phi_p_1, phi_p_2, dphi_p_1, dphi_p_2);
 
       /* Update  lambda_max and gap: */
       auto [gap_new, lambda_max_new] =

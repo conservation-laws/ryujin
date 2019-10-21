@@ -1,0 +1,92 @@
+#ifndef NEWTON_H
+#define NEWTON_H
+
+#include "simd.h"
+
+#include <array>
+
+namespace grendel
+{
+  /*
+   * Perform one step of a quadratic Newton iteration.
+   *
+   * See [1], p. 915f (4.8) and (4.9)
+   *
+   * Precondition:
+   *
+   *   p_1 <= p* <= p_2
+   *   phi(p_1) <= 0. <= phi(p_2)
+   *
+   * Modifies p_1 and P_2.
+   */
+  template <bool increasing, typename Number>
+  DEAL_II_ALWAYS_INLINE inline void quadratic_newton_step(Number &p_1,
+                                                          Number &p_2,
+                                                          const Number phi_p_1,
+                                                          const Number phi_p_2,
+                                                          const Number dphi_p_1,
+                                                          const Number dphi_p_2)
+  {
+    using ScalarNumber = typename get_value_type<Number>::type;
+
+    static constexpr ScalarNumber newton_eps =
+        std::is_same<ScalarNumber, double>::value ? ScalarNumber(1.0e-10)
+                                                  : ScalarNumber(1.0e-4);
+
+    constexpr auto sign = increasing ? ScalarNumber(1.) : ScalarNumber(-1.);
+
+    /*
+     * Compute divided differences
+     */
+
+    const Number dd_11 = dphi_p_1;
+    const Number dd_12 = (phi_p_2 - phi_p_1) / (p_2 - p_1);
+    const Number dd_22 = dphi_p_2;
+
+    const Number dd_112 = (dd_12 - dd_11) / (p_2 - p_1);
+    const Number dd_122 = (dd_22 - dd_12) / (p_2 - p_1);
+
+    /* Update left and right point: */
+
+    const auto discriminant_1 = std::abs(
+        dphi_p_1 * dphi_p_1 - sign * ScalarNumber(4.) * phi_p_1 * dd_112);
+    const auto discriminant_2 = std::abs(
+        dphi_p_2 * dphi_p_2 - sign * ScalarNumber(4.) * phi_p_2 * dd_122);
+
+    const auto denominator_1 = dphi_p_1 + sign * std::sqrt(discriminant_1);
+    const auto denominator_2 = dphi_p_2 + sign * std::sqrt(discriminant_2);
+
+    /* Make sure we do not produce NaNs: */
+
+    auto t_1 =
+        p_1 - dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+                  std::abs(denominator_1),
+                  Number(newton_eps),
+                  Number(0.),
+                  ScalarNumber(2.) * phi_p_1 / denominator_1);
+
+    auto t_2 =
+        p_2 - dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+                  std::abs(denominator_2),
+                  Number(newton_eps),
+                  Number(0.),
+                  ScalarNumber(2.) * phi_p_2 / denominator_2);
+
+    /* Enforce bounds: */
+
+    t_1 = std::max(p_1, t_1);
+    t_2 = std::max(p_1, t_2);
+    t_1 = std::min(p_2, t_1);
+    t_2 = std::min(p_2, t_2);
+
+    /* Ensure that always p_1 <= p_2: */
+
+    p_1 = std::min(t_1, t_2);
+    p_2 = std::max(t_1, t_2);
+
+    return;
+  }
+
+} /* namespace grendel */
+
+#endif /* NEWTON_H */
