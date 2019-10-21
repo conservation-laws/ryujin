@@ -243,70 +243,8 @@ namespace grendel
 
     if constexpr (limiter_ == Limiters::internal_energy) {
 
-      static_assert(std::is_same<Number, double>::value ||
-                        std::is_same<Number, float>::value,
-                    "Not implemented yet");
+      static_assert(limiter_ != Limiters::internal_energy, "Not implemented.");
 
-
-      const auto P_ij_m = ProblemDescription<dim, Number>::momentum(P_ij);
-      const auto &P_ij_E = P_ij[dim + 1];
-
-      const auto U_i_m = ProblemDescription<dim, Number>::momentum(U);
-      const Number &U_i_E = U[dim + 1];
-
-      const Number c = (U_i_E - rho_epsilon_min) * U_i_rho -
-                       Number(.5) * U_i_m.norm_square();
-
-      const Number b = (U_i_E - rho_epsilon_min) * P_ij_rho + P_ij_E * U_i_rho -
-                       U_i_m * P_ij_m;
-
-      const Number a = P_ij_E * P_ij_rho - Number(.5) * P_ij_m.norm_square();
-
-      /*
-       * Solve the quadratic equation a t^2 + b t + c = 0 by hand. We use the
-       * Ciatardauq formula to avoid numerical cancellation and some if
-       * statements:
-       */
-
-      Number t_0 = 1.;
-
-      const Number discriminant = b * b - Number(4.) * a * c;
-
-      if (discriminant == 0.) {
-
-        const Number x = -b * Number(.5) / a;
-
-        if (x > 0.)
-          t_0 = x;
-
-      } else if (discriminant > 0.) {
-
-        const Number x =
-            Number(2.) * c / (-b - std::copysign(std::sqrt(discriminant), b));
-        const Number y = c / a / x;
-
-        /* Select the smallest positive root: */
-        if (x > 0.) {
-          if (y > 0. && y < x)
-            t_0 = y;
-          else
-            t_0 = x;
-        } else if (y > 0.) {
-          t_0 = y;
-        }
-      }
-
-      l_ij = std::min(l_ij, t_0);
-
-#ifdef DEBUG
-      const Number rho_epsilon =
-          ProblemDescription<dim, Number>::internal_energy(U + l_ij * P_ij);
-      Assert(rho_epsilon - rho_epsilon_min > 0.,
-             dealii::ExcMessage("I'm sorry, Dave. I'm afraid I can't do that. "
-                                "- Negative internal energy."));
-#endif
-
-      return l_ij;
     }
 
     /*
@@ -398,18 +336,23 @@ namespace grendel
 #ifdef DEBUG
       const auto new_internal_energy =
           ProblemDescription<dim, Number>::internal_energy(U + l_ij * P_ij);
+      const auto new_specific_entropy =
+          ProblemDescription<dim, Number>::specific_entropy(U + l_ij * P_ij);
 
       if constexpr (std::is_same<Number, double>::value ||
                     std::is_same<Number, float>::value) {
-        AssertThrow(new_internal_energy > 0.,
-                    dealii::ExcMessage("I'm sorry, Dave. I'm afraid I can't do "
-                                       "that. - Negative internal energy."));
+        AssertThrow(
+            new_internal_energy > 0. && new_specific_entropy > 0.,
+            dealii::ExcMessage(
+                "I'm sorry, Dave. I'm afraid I can't do that. - Negative "
+                "internal energy or negative specific entropy encountered."));
       } else {
         for (unsigned int k = 0; k < Number::n_array_elements; ++k)
           AssertThrow(
-              new_internal_energy[k] > 0.,
-              dealii::ExcMessage("I'm sorry, Dave. I'm afraid I can't do "
-                                 "that. - Negative internal energy."));
+              new_internal_energy[k] > 0. && new_specific_entropy[k] > 0.,
+              dealii::ExcMessage(
+                  "I'm sorry, Dave. I'm afraid I can't do that. - Negative "
+                  "internal energy or negative specific entropy encountered."));
       }
 #endif
 
