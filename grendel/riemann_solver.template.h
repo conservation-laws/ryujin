@@ -406,11 +406,11 @@ namespace grendel
 
     /*
      * Ensure that p_1 < p_2. If we hit a case with two expansions we might
-     * indeed have that p_star_tilde < p_1. Set p_1 = 0 in this case.
+     * indeed have that p_star_tilde < p_1. Set p_1 = p_2 in this case.
      */
 
     p_1 = dealii::compare_and_apply_mask<
-        dealii::SIMDComparison::less_than_or_equal>(p_1, p_2, p_1, Number(0.));
+        dealii::SIMDComparison::less_than_or_equal>(p_1, p_2, p_1, p_2);
 
     /*
      * Step 2: Perform quadratic Newton iteration.
@@ -434,7 +434,7 @@ namespace grendel
       const Number dphi_p_1 = dphi(riemann_data_i, riemann_data_j, p_1);
       const Number dphi_p_2 = dphi(riemann_data_i, riemann_data_j, p_2);
 
-      quadratic_newton_step</* increasing */ true>(
+      quadratic_newton_step<true>(
           p_1, p_2, phi_p_1, phi_p_2, dphi_p_1, dphi_p_2);
 
       /* Update  lambda_max and gap: */
