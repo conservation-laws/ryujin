@@ -65,11 +65,16 @@ namespace grendel
     const Bounds &bounds() const;
 
     /*
-     * Compute limiter value l_ij for update P_ij:
+     * Compute limiter value l_ij for update P:
+     *
+     * Returns the maximal t, obeying t_min < t < t_max such that the
+     * selected local minimum principles are obeyed.
      */
-
-    static Number
-    limit(const Bounds &bounds, const rank1_type U, const rank1_type P_ij);
+    static Number limit(const Bounds &bounds,
+                        const rank1_type U,
+                        const rank1_type P,
+                        const Number t_min = Number(0.),
+                        const Number t_max = Number(1.));
 
   private:
     Bounds bounds_;
@@ -162,15 +167,19 @@ namespace grendel
 
 
   template <int dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline Number Limiter<dim, Number>::limit(
-      const Bounds &bounds, const rank1_type U, const rank1_type P_ij)
+  DEAL_II_ALWAYS_INLINE inline Number
+  Limiter<dim, Number>::limit(const Bounds &bounds,
+                              const rank1_type U,
+                              const rank1_type P,
+                              const Number t_min /* = Number(0.) */,
+                              const Number t_max /* = Number(1.) */)
   {
     auto &[rho_min, rho_max, s_min] = bounds;
 
-    Number l_ij = Number(1.);
+    Number t_r = t_max;
 
     if constexpr (limiter_ == Limiters::none)
-      return l_ij;
+      return t_r;
 
     /*
      * First limit the density rho.
@@ -178,31 +187,36 @@ namespace grendel
      * See [Guermond, Nazarov, Popov, Thomas] (4.8):
      */
 
-    const auto &U_i_rho = U[0];
-    const auto &P_ij_rho = P_ij[0];
-
     {
+      const auto &U_rho = U[0];
+      const auto &P_rho = P[0];
+
       constexpr ScalarNumber eps_ =
           std::numeric_limits<ScalarNumber>::epsilon();
 
-      Number t_0 = Number(1.);
-
-      t_0 = dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+      t_r = dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
           rho_max,
-          U_i_rho + P_ij_rho,
-          std::abs(rho_max - U_i_rho) / (std::abs(P_ij_rho) + eps_ * rho_max),
-          t_0);
+          U_rho + t_r * P_rho,
+          (std::abs(rho_max - U_rho) + eps_ * rho_min) /
+              (std::abs(P_rho) + eps_ * rho_max),
+          t_r);
 
-      t_0 = dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-          U_i_rho + P_ij_rho,
+      t_r = dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+          U_rho + t_r * P_rho,
           rho_min,
-          std::abs(rho_min - U_i_rho) / (std::abs(P_ij_rho) + eps_ * rho_max),
-          t_0);
+          (std::abs(rho_min - U_rho) + eps_ * rho_min) /
+              (std::abs(P_rho) + eps_ * rho_max),
+          t_r);
 
-      l_ij = std::min(l_ij, t_0);
+      /*
+       * It is always t_min <= t <= t_max, but just to be sure, box
+       * back into bounds:
+       */
+      t_r = std::min(t_r, t_max);
+      t_r = std::max(t_r, t_min);
 
 #ifdef DEBUG
-      const auto new_density = (U + l_ij * P_ij)[0];
+      const auto new_density = (U + t_r * P)[0];
 
       if constexpr (std::is_same<Number, double>::value ||
                     std::is_same<Number, float>::value) {
@@ -211,16 +225,15 @@ namespace grendel
                                        "that. - Negative density."));
       } else {
         for (unsigned int k = 0; k < Number::n_array_elements; ++k)
-          AssertThrow(
-              new_density[k] > 0.,
-              dealii::ExcMessage("I'm sorry, Dave. I'm afraid I can't do "
-                                 "that. - Negative density."));
+          AssertThrow(new_density[k] > 0.,
+                      dealii::ExcMessage("I'm sorry, Dave. I'm afraid I can't "
+                                         "do that. - Negative density."));
       }
 #endif
     }
 
     if constexpr (limiter_ == Limiters::rho)
-      return l_ij;
+      return t_r;
 
     /*
      * Then limit the specific entropy:
@@ -228,7 +241,9 @@ namespace grendel
      * See [Guermond, Nazarov, Popov, Thomas], Section 4.6 + Section 5.1:
      */
 
-    if constexpr (limiter_ == Limiters::specific_entropy) {
+    Number t_l = t_min;
+
+    {
       /*
        * Prepare a quadratic Newton method:
        *
@@ -240,25 +255,16 @@ namespace grendel
        *
        *   psi = \rho ^ {\gamma + 1} s
        *
-       * (s in turn was defined to be s =\varepsilon \rho ^{-\gamma}, where
+       * (s in turn was defined as s =\varepsilon \rho ^{-\gamma}, where
        * \varepsilon = (\rho e) is the internal energy.)
-       *
-       * Note: If the precondition psi(t_l) > 0 and psi(t_r) < 0 is not
-       * fulfilled we are very likely in a region of almost constant state.
-       * Here, the limiter value ultimately doesn't matter that much. We
-       * nevertheless have to make sure that we do not accidentally produce
-       * nonsensical l_ij in the quadratic Newton iteration.
        */
-
-      Number t_l = Number(0.);
-      Number t_r = l_ij;
 
       constexpr ScalarNumber gamma = ProblemDescription<dim, Number>::gamma;
       constexpr ScalarNumber gp1 = gamma + ScalarNumber(1.);
 
       for (unsigned int n = 0; n < newton_max_iter_; ++n) {
 
-        const auto U_r = U + t_r * P_ij;
+        const auto U_r = U + t_r * P;
         const auto rho_r = U_r[0];
         const auto rho_r_gamma_plus_one = grendel::pow(rho_r, gp1);
         const auto e_r = ProblemDescription<dim, Number>::internal_energy(U_r);
@@ -276,14 +282,14 @@ namespace grendel
         }
 
         /*
-         * If psi_r > 0 the right state is fine, force l_ij = t_r by
+         * If psi_r > 0 the right state is fine, force returning t_r by
          * setting t_l = t_r:
          */
 
         t_l = dealii::compare_and_apply_mask<
             dealii::SIMDComparison::greater_than>(psi_r, Number(0.), t_r, t_l);
 
-        const auto U_l = U + t_l * P_ij;
+        const auto U_l = U + t_l * P;
         const auto rho_l = U_l[0];
         const auto rho_l_gamma_plus_one = grendel::pow(rho_l, gp1);
         const auto e_l = ProblemDescription<dim, Number>::internal_energy(U_l);
@@ -299,14 +305,14 @@ namespace grendel
         if (std::max(Number(0.), psi_l - Number(newton_eps_)) == Number(0.))
           break;
 
-        const auto drho = P_ij[0];
+        const auto drho = P[0];
 
         const auto de_l =
             ProblemDescription<dim, Number>::internal_energy_derivative(U_l) *
-            P_ij;
+            P;
         const auto de_r =
             ProblemDescription<dim, Number>::internal_energy_derivative(U_r) *
-            P_ij;
+            P;
 
         const auto dpsi_l =
             rho_l * de_l -
@@ -320,10 +326,8 @@ namespace grendel
             t_l, t_r, psi_l, psi_r, dpsi_l, dpsi_r);
       }
 
-      l_ij = std::min(l_ij, t_l);
-
 #ifdef DEBUG
-      const auto U_new = U + t_l * P_ij;
+      const auto U_new = U + t_l * P;
       const auto new_internal_energy =
           ProblemDescription<dim, Number>::internal_energy(U_new);
       const auto new_specific_entropy =
@@ -351,16 +355,22 @@ namespace grendel
                   "I'm sorry, Dave. I'm afraid I can't do that. - Negative "
                   "internal energy or negative specific entropy encountered."));
           AssertThrow( //
-              psi[k] > - 100. * newton_eps_,
+              psi[k] > -100. * newton_eps_,
               dealii::ExcMessage(
                   "I'm sorry, Dave. I'm afraid I can't do that. - Local "
                   "minimum principle on specific entropy violated."));
         }
       }
 #endif
-
-      return l_ij;
     }
+
+    /*
+     * The quadratic Newton update does not allow t_r and t_l to go out of
+     * bounds. I.e., t_l is good.
+     */
+
+    if constexpr (limiter_ == Limiters::specific_entropy)
+      return t_l;
 
     __builtin_unreachable();
   }

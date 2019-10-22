@@ -44,7 +44,7 @@ namespace grendel
         std::is_same<ScalarNumber, double>::value ? ScalarNumber(1.0e-10)
                                                   : ScalarNumber(1.0e-4);
 
-    static constexpr bool greedy_dij_ = false;
+    static constexpr bool greedy_dij_ = true;
 
     /* In case of the greedy variant, we have to allow for at least one
      * Newton iteration step. */
@@ -56,13 +56,13 @@ namespace grendel
      * For two given 1D states riemann_data_i and riemann_data_j, compute
      * an estimation of an upper bound for the maximum wavespeed lambda.
      *
-     * We also return bounds = {p_min, p_max, rho_min, rho_max} for the
+     * We also return bounds = {rho_min, rho_max, s_min} for the
      * "greedy d_ij" computation.
      */
     static std::tuple<Number /*lambda_max*/,
                       Number /*p_star*/,
                       unsigned int /*iteration*/,
-                      std::array<Number, 4> /*bounds*/>
+                      std::array<Number, 3> /*bounds*/>
     compute(const std::array<Number, 4> &riemann_data_i,
             const std::array<Number, 4> &riemann_data_j);
 
@@ -86,8 +86,7 @@ namespace grendel
                       unsigned int /*iteration*/>
     compute(const rank1_type U_i,
             const rank1_type U_j,
-            const dealii::Tensor<1, dim, Number> &n_ij,
-            const Number hd_i = Number(0.));
+            const dealii::Tensor<1, dim, Number> &n_ij);
   };
 
 } /* namespace grendel */

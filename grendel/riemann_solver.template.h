@@ -360,7 +360,7 @@ namespace grendel
 
 
   template <int dim, typename Number>
-  std::tuple<Number, Number, unsigned int, std::array<Number, 4>>
+  std::tuple<Number, Number, unsigned int, std::array<Number, 3>>
   RiemannSolver<dim, Number>::compute(
       const std::array<Number, 4> &riemann_data_i,
       const std::array<Number, 4> &riemann_data_j)
@@ -532,16 +532,36 @@ namespace grendel
      * In summary, we do the following:
      */
 
-    p_min = std::min(p_min, p_2); // FIXME: not used
-    p_max = std::max(p_max, p_1); // FIXME: not used
-
     auto rho_min = std::min(rho_p_min, rho_p_max);
     auto rho_max = std::max(rho_p_min, rho_p_max);
 
     rho_min = std::min(rho_min, std::min(rho_p_min_exp, rho_p_max_exp));
     rho_max = std::max(rho_max, std::max(rho_p_min_shk, rho_p_max_shk));
 
-    return {lambda_max, p_2, i, {p_min, p_max, rho_min, rho_max}};
+    /*
+     * And finally we compute s_min of both states.
+     *
+     * Normally, we would just call ProblemDescription::specific_entropy,
+     * however, given the fact that we already have the pressure available
+     * we do a little dance here and avoid recomputing quantitites:
+     */
+
+    static_assert(ProblemDescription<1, Number>::b == 0.,
+                  "If you change this value, implement the rest...");
+    constexpr auto gamma = ProblemDescription<1, Number>::gamma;
+    constexpr auto gamma_minus_one_inverse =
+        ProblemDescription<1, Number>::gamma_minus_one_inverse;
+
+    const auto s_i = riemann_data_i[2] * gamma_minus_one_inverse /
+                     grendel::pow(riemann_data_i[0], gamma);
+
+    const auto s_j = riemann_data_j[2] * gamma_minus_one_inverse /
+                     grendel::pow(riemann_data_j[0], gamma);
+
+    constexpr ScalarNumber eps_ = std::numeric_limits<ScalarNumber>::epsilon();
+    const auto s_min = ScalarNumber(1. - 10. * eps_) * std::min(s_i, s_j);
+
+    return {lambda_max, p_2, i, {rho_min, rho_max, s_min}};
   }
 
 
@@ -590,11 +610,8 @@ namespace grendel
   std::tuple<Number, Number, unsigned int> RiemannSolver<dim, Number>::compute(
       const rank1_type U_i,
       const rank1_type U_j,
-      const dealii::Tensor<1, dim, Number> &n_ij,
-      const Number hd_i /* = Number(0.) */)
+      const dealii::Tensor<1, dim, Number> &n_ij)
   {
-    constexpr auto gamma = ProblemDescription<1, Number>::gamma;
-
     const auto riemann_data_i = riemann_data_from_state(U_i, n_ij);
     const auto riemann_data_j = riemann_data_from_state(U_j, n_ij);
 
@@ -606,179 +623,39 @@ namespace grendel
 
     /*
      * So, we are indeed greedy... Lets' try to minimize lambda_max as much
-     * as possible.
+     * as possible. We do this by simply limiting a bar state against an
+     * (almost) inviscid update:
      */
-
-    const auto &[rho_i, u_i, p_i, a_i] = riemann_data_i;
-    const auto &[rho_j, u_j, p_j, a_j] = riemann_data_j;
-
-    const auto &[p_min, p_max, rho_min, rho_max] = bounds;
-
-    const auto f_i = ProblemDescription<dim, Number>::f(U_i);
-    const auto f_j = ProblemDescription<dim, Number>::f(U_j);
 
     /* bar state: U = 0.5 * (U_i + U_j) */
     const auto U = ScalarNumber(0.5) * (U_i + U_j);
 
-    /* P_ij = - 0.5 * (f_j - f_i) * n_ij */
-    dealii::Tensor<1, problem_dimension, Number> P_ij;
+    /* P = - 0.5 * (f_j - f_i) * n_ij */
+
+    const auto f_i = ProblemDescription<dim, Number>::f(U_i);
+    const auto f_j = ProblemDescription<dim, Number>::f(U_j);
+
+    dealii::Tensor<1, problem_dimension, Number> P;
     for (unsigned int k = 0; k < problem_dimension; ++k)
-      P_ij[k] = ScalarNumber(0.5) * (f_i[k] - f_j[k]) * n_ij;
+      P[k] = ScalarNumber(0.5) * (f_i[k] - f_j[k]) * n_ij;
 
-    auto lambda_greedy = lambda_max * newton_eps_;
+    auto lambda_greedy =
+        ScalarNumber(1.) /
+        Limiter<dim, Number>::limit(bounds,
+                                    U,
+                                    P,
+                                    ScalarNumber(1.) / lambda_max,
+                                    ScalarNumber(1.e6) / lambda_max);
 
-    /*
-     * Enforce local minimum principle on density:
-     *
-     * max ( (rho_i+rho_j - 2rho_bar(lambda_max)) / (rho_i+rho_j - 2rho_min) ,
-     *       (rho_i+rho_j - 2rho_bar(lambda_max)) / (rho_i+rho_j - 2rho_max) )
-     */
-
-    {
-      const auto factor = rho_j * u_j - rho_i * u_i;
-
-      const auto denominator_1 = rho_i + rho_j - Number(2.) * rho_min;
-      const auto denominator_2 = rho_i + rho_j - Number(2.) * rho_max;
-
-      const auto lambda_1 =
-          dealii::compare_and_apply_mask<dealii::SIMDComparison::greater_than>(
-              std::abs(denominator_1),
-              rho_max * ScalarNumber(newton_eps_),
-              factor / denominator_1,
-              lambda_max);
-
-      const auto lambda_2 =
-          dealii::compare_and_apply_mask<dealii::SIMDComparison::greater_than>(
-              std::abs(denominator_2),
-              rho_max * ScalarNumber(newton_eps_),
-              factor / denominator_2,
-              lambda_max);
-
-      lambda_greedy = std::max(lambda_greedy, std::max(lambda_1, lambda_2));
-      /*
-       * Box lambda_greedy back into bounds.
-       *
-       * In case we have two states that are almost equal the above
-       * division can pick up a massive cancellation error.
-       */
-      lambda_greedy = std::min(lambda_greedy, lambda_max);
-
-#ifdef DEBUG
-      const auto new_density = (U + Number(1.) / lambda_greedy * P_ij)[0];
-
-      if constexpr (std::is_same<Number, double>::value ||
-                    std::is_same<Number, float>::value) {
-        AssertThrow(new_density > 0.,
-                    dealii::ExcMessage("I'm sorry, Dave. I'm afraid I can't do "
-                                       "that. - Negative density."));
-      } else {
-        for (unsigned int k = 0; k < Number::n_array_elements; ++k)
-          AssertThrow(
-              new_density[k] > 0.,
-              dealii::ExcMessage("I'm sorry, Dave. I'm afraid I can't do "
-                                 "that. - Negative density."));
-      }
-#endif
-    }
-
-    /*
-     * Enforce local minimum principle on specific entropy:
-     */
-
-    {
-      /* Use the same relaxation as done in the limiter: */
-      const Number r_i =
-          Number(2.) *
-          dealii::Utilities::fixed_power<Limiter<dim>::relaxation_order_>(
-              std::sqrt(std::sqrt(hd_i)));
-
-      const auto s_min =
-          (Number(1.) - r_i) *
-          std::min(ProblemDescription<dim, Number>::specific_entropy(U_i),
-                   ProblemDescription<dim, Number>::specific_entropy(U_j));
-
-      Number t_l = Number(0.);
-      Number t_r = Number(1.) / lambda_greedy;
-
-      for (unsigned int n = 0; n < newton_max_iter_; ++n) {
-
-        const auto U_r = U + t_r * P_ij;
-        const auto rho_r = U_r[0];
-        const auto rho_r_gamma = grendel::pow(rho_r, gamma);
-        /* use a scaled variant of psi:  e - s * rho^gamma */
-        auto psi_r = ProblemDescription<dim, Number>::internal_energy(U_r) -
-                     s_min * rho_r_gamma;
-
-        /*
-         * Shortcut: In the majority of states no Newton step is necessary
-         * because Psi(t_r) > 0. Just return in this case:
-         */
-
-        if (std::min(Number(0.), psi_r) == Number(0.)) {
-          t_l = t_r;
-          break;
-        }
-
-        /*
-         * If psi_r > 0 the right state is fine, force t = t_r by setting
-         * t_l = t_r:
-         */
-
-        t_l = dealii::compare_and_apply_mask<
-            dealii::SIMDComparison::greater_than>(psi_r, Number(0.), t_r, t_l);
-
-        const auto U_l = U + t_l * P_ij;
-        const auto rho_l = U_l[0];
-        const auto rho_l_gamma = grendel::pow(rho_l, gamma);
-        /* use a scaled variant of psi:  e - s * rho^gamma */
-        auto psi_l = ProblemDescription<dim, Number>::internal_energy(U_l) -
-                     s_min * rho_l_gamma;
-
-        /*
-         * Shortcut: In the majority of cases only at most one Newton
-         * iteration is necessary because we reach Psi(t_l) \approx 0
-         * quickly. Just return in this case:
-         */
-
-        if (std::max(Number(0.), psi_l - Number(newton_eps_)) == Number(0.))
-          break;
-
-        const auto dpsi_l =
-            ProblemDescription<dim, Number>::internal_energy_derivative(U_l) *
-                P_ij -
-            gamma * rho_l_gamma / rho_l * s_min * P_ij[0];
-
-        const auto dpsi_r =
-            ProblemDescription<dim, Number>::internal_energy_derivative(U_r) *
-                P_ij -
-            gamma * rho_r_gamma / rho_r * s_min * P_ij[0];
-
-        quadratic_newton_step<false /*psi is decreasing!*/>(
-            t_l, t_r, psi_l, psi_r, dpsi_l, dpsi_r);
-      }
-
-      lambda_greedy = std::max(Number(1.) / t_l, lambda_greedy);
-      lambda_greedy = std::min(lambda_greedy, lambda_max);
-
-#ifdef DEBUG
-      const auto new_specific_entropy =
-          ProblemDescription<dim, Number>::specific_entropy(
-              U + Number(1.) / lambda_greedy * P_ij);
-
-      if constexpr (std::is_same<Number, double>::value ||
-                    std::is_same<Number, float>::value) {
-        AssertThrow(new_specific_entropy >= 0.,
-                    dealii::ExcMessage("I'm sorry, Dave. I'm afraid I can't do "
-                                       "that. - Negative specific entropy."));
-      } else {
-        for (unsigned int k = 0; k < Number::n_array_elements; ++k)
-          AssertThrow(
-              new_specific_entropy[k] >= 0.,
-              dealii::ExcMessage("I'm sorry, Dave. I'm afraid I can't do "
-                                 "that. - Negative specific entropy."));
-      }
-#endif
-    }
+//     if constexpr (std::is_same<Number, double>::value ||
+//                   std::is_same<Number, float>::value) {
+//       std::cout << lambda_greedy << "  <<<<  " << lambda_max << std::endl;
+//     } else {
+//       for (unsigned int k = 0; k < Number::n_array_elements; ++k) {
+//         std::cout << lambda_greedy[k] << "  <<<<  " << lambda_max[k]
+//                   << std::endl;
+//       }
+//     }
 
     return {lambda_greedy, p_star, i};
   }
