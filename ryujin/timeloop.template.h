@@ -779,10 +779,12 @@ namespace ryujin
     head << std::setprecision(4) << std::endl << std::endl;
     head << "Throughput: (CPU )  " << std::fixed << cpu_m_dofs_per_sec
          << " MQ/s  (" << std::scientific << 1. / cpu_m_dofs_per_sec * 1.e-6
-         << " s/Qdof/cycle)" << std::endl;
+         << " s/Qdof/cycle)  (" << std::fixed << ((double)cycle) / cpu_time
+         << " cycle/s)" << std::endl;
     head << "            (WALL)  " << std::fixed << wall_m_dofs_per_sec
          << " MQ/s  (" << std::scientific << 1. / wall_m_dofs_per_sec * 1.e-6
-         << " s/Qdof/cycle)" << std::endl;
+         << " s/Qdof/cycle)  (" << std::fixed << ((double)cycle) / wall_time
+         << " cycle/s)" << std::endl;
 
     deallog << head.str() << std::endl;
   }

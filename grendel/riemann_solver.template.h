@@ -640,16 +640,17 @@ namespace grendel
       P[k] = ScalarNumber(0.5) * (f_i[k] - f_j[k]) * n_ij;
 
     auto lambda_greedy =
-        ScalarNumber(1.) /
-        Limiter<dim, Number>::limit(bounds,
-                                    U,
-                                    P,
-                                    ScalarNumber(1.) / lambda_max,
-                                    ScalarNumber(1.e6) / lambda_max);
+        ScalarNumber(1.) / Limiter<dim, Number>::limit(
+                               bounds,
+                               U,
+                               P,
+                               ScalarNumber(1.) / lambda_max,
+                               ScalarNumber(1. / newton_eps_) / lambda_max);
 
 //     if constexpr (std::is_same<Number, double>::value ||
 //                   std::is_same<Number, float>::value) {
-//       std::cout << lambda_greedy << "  <<<<  " << lambda_max << std::endl;
+//       std::cout << lambda_greedy << "  <<<<  " << lambda_max <<
+//       std::endl;
 //     } else {
 //       for (unsigned int k = 0; k < Number::n_array_elements; ++k) {
 //         std::cout << lambda_greedy[k] << "  <<<<  " << lambda_max[k]
