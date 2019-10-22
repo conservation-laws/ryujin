@@ -11,6 +11,26 @@ DEAL_II_ENABLE_EXTRA_DIAGNOSTICS
 
 namespace grendel
 {
+  /**
+   * Return the positive part of a number.
+   */
+  template <typename Number>
+  inline DEAL_II_ALWAYS_INLINE Number positive_part(const Number number)
+  {
+    return Number(0.5) * (std::abs(number) + number);
+  }
+
+
+  /**
+   * Return the negative part of a number.
+   */
+  template <typename Number>
+  inline DEAL_II_ALWAYS_INLINE Number negative_part(const Number number)
+  {
+    return Number(0.5) * (std::abs(number) - number);
+  }
+
+
   /*
    * A wrapper around dealii::Utilities::fixed_power. We use a wrapper
    * instead of calling the function directly so that we can easily change

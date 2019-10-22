@@ -97,13 +97,13 @@ namespace grendel
     static constexpr enum class Order {
       first_order,
       second_order
-    } order_ = Order::second_order;
+    } order_ = Order::first_order;
 
     static constexpr enum class TimeStepOrder {
       first_order,
       second_order,
       third_order
-    } time_step_order_ = TimeStepOrder::third_order;
+    } time_step_order_ = TimeStepOrder::first_order;
 
     static constexpr unsigned int limiter_iter_ = 2;
 

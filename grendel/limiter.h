@@ -9,6 +9,7 @@
 
 #include <deal.II/lac/la_parallel_vector.templates.h>
 
+#define DEBUG
 
 namespace grendel
 {
@@ -178,7 +179,7 @@ namespace grendel
   {
     Number t_r = t_max;
 
-    if constexpr (limiter_ == Limiters::none)
+    if constexpr (limiter == Limiters::none)
       return t_r;
 
     /*
@@ -235,7 +236,7 @@ namespace grendel
 #endif
     }
 
-    if constexpr (limiter_ == Limiters::rho)
+    if constexpr (limiter == Limiters::rho)
       return t_r;
 
     /*
@@ -245,6 +246,11 @@ namespace grendel
      */
 
     Number t_l = t_min;
+
+    constexpr ScalarNumber gamma = ProblemDescription<dim, Number>::gamma;
+    constexpr ScalarNumber gp1 = gamma + ScalarNumber(1.);
+    constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
+    constexpr ScalarNumber relaxation = ScalarNumber(1.) + 10. * eps;
 
     {
       /*
@@ -262,9 +268,6 @@ namespace grendel
        * \varepsilon = (\rho e) is the internal energy.)
        */
 
-      constexpr ScalarNumber gamma = ProblemDescription<dim, Number>::gamma;
-      constexpr ScalarNumber gp1 = gamma + ScalarNumber(1.);
-
       const auto &s_min = std::get<2>(bounds);
 
       for (unsigned int n = 0; n < newton_max_iter_; ++n) {
@@ -274,124 +277,216 @@ namespace grendel
         const auto rho_r_gamma_plus_one = grendel::pow(rho_r, gp1);
         const auto e_r = ProblemDescription<dim, Number>::internal_energy(U_r);
 
-        auto psi_r = rho_r * e_r - s_min * rho_r_gamma_plus_one;
+        auto psi_r = rho_r * e_r - s_min * rho_r_gamma_plus_one * relaxation;
 
-        /*
-         * Shortcut: In the majority of states no Newton step is necessary
-         * because Psi(t_r) > 0. Just return in this case:
-         */
-
-        if (std::min(Number(0.), psi_r) == Number(0.)) {
-          t_l = t_r;
-          break;
-        }
-
-        /*
-         * If psi_r > 0 the right state is fine, force returning t_r by
-         * setting t_l = t_r:
-         */
-
+        /* If psi_r > 0 the right state is fine, force returning t_r by
+         * setting t_l = t_r: */
         t_l = dealii::compare_and_apply_mask<
             dealii::SIMDComparison::greater_than>(psi_r, Number(0.), t_r, t_l);
+
+        /* If we have set t_l = t_r everywhere we can break: */
+        if (t_l == t_r)
+          break;
 
         const auto U_l = U + t_l * P;
         const auto rho_l = U_l[0];
         const auto rho_l_gamma_plus_one = grendel::pow(rho_l, gp1);
         const auto e_l = ProblemDescription<dim, Number>::internal_energy(U_l);
 
-        auto psi_l = rho_l * e_l - s_min * rho_l_gamma_plus_one;
+        auto psi_l = rho_l * e_l - s_min * rho_l_gamma_plus_one * relaxation;
 
-        /*
-         * Shortcut: In the majority of cases only at most one Newton
-         * iteration is necessary because we reach Psi(t_l) \approx 0
-         * quickly. Just return in this case:
-         */
-
+        /* Shortcut: In the majority of cases only at most one Newton iteration
+         * is necessary because we reach Psi(t_l) \approx 0 quickly. Just return
+         * in this case: */
         if (std::max(Number(0.), psi_l - Number(newton_eps_)) == Number(0.))
           break;
 
-        const auto drho = P[0];
+        /* We got unlucky and have to perform a Newton step: */
 
+        const auto drho = P[0];
         const auto de_l =
             ProblemDescription<dim, Number>::internal_energy_derivative(U_l) *
             P;
         const auto de_r =
             ProblemDescription<dim, Number>::internal_energy_derivative(U_r) *
             P;
-
         const auto dpsi_l =
             rho_l * de_l -
             (e_l - gp1 * s_min * rho_l_gamma_plus_one / rho_l) * drho;
-
         const auto dpsi_r =
             rho_r * de_r -
             (e_r - gp1 * s_min * rho_r_gamma_plus_one / rho_r) * drho;
 
-        quadratic_newton_step<true /*convex*/>(
+        if constexpr (std::is_same<Number, double>::value ||
+                      std::is_same<Number, float>::value) {
+
+          if (psi_l > 0.)
+            std::cout << "specific entropy minimum principle violated: "
+                      << psi_l << std::endl;
+
+        } else {
+          for (unsigned int k = 0; k < Number::n_array_elements; ++k) {
+            if (psi_l[k] > 0.)
+              std::cout << "specific entropy minimum principle violated: "
+                        << psi_l[k] << std::endl;
+          }
+        }
+
+        quadratic_newton_step<true /*concave*/>(
             t_l, t_r, psi_l, psi_r, dpsi_l, dpsi_r);
       }
 
 #ifdef DEBUG
       const auto U_new = U + t_l * P;
-      const auto new_internal_energy =
+      const auto rho_new = U_new[0];
+
+      const auto e_new =
           ProblemDescription<dim, Number>::internal_energy(U_new);
-      const auto new_specific_entropy =
+      const auto s_new =
           ProblemDescription<dim, Number>::specific_entropy(U_new);
-      auto psi = ProblemDescription<dim, Number>::internal_energy(U_new) -
-                 s_min * grendel::pow(U_new[0], gamma);
+      auto psi =
+          rho_new * e_new - s_min * grendel::pow(rho_new, gp1) * relaxation;
 
       if constexpr (std::is_same<Number, double>::value ||
                     std::is_same<Number, float>::value) {
         AssertThrow(
-            new_internal_energy > 0. && new_specific_entropy > 0.,
+            e_new > 0. && s_new > 0.,
             dealii::ExcMessage(
                 "I'm sorry, Dave. I'm afraid I can't do that. - Negative "
                 "internal energy or negative specific entropy encountered."));
-        AssertThrow( //
-            psi > -100. * newton_eps_,
-            dealii::ExcMessage(
-                "I'm sorry, Dave. I'm afraid I can't do that. - Local minimum "
-                "principle on specific entropy violated."));
+//         AssertThrow( //
+//             psi > 0.,
+//             dealii::ExcMessage(
+//                 "I'm sorry, Dave. I'm afraid I can't do that. - Local minimum "
+//                 "principle on specific entropy violated."));
+        if (psi > 0.)
+          std::cout << "(update) specific entropy minimum principle violated: "
+                    << psi << std::endl;
       } else {
         for (unsigned int k = 0; k < Number::n_array_elements; ++k) {
           AssertThrow(
-              new_internal_energy[k] > 0. && new_specific_entropy[k] > 0.,
+              e_new[k] > 0. && s_new[k] > 0.,
               dealii::ExcMessage(
                   "I'm sorry, Dave. I'm afraid I can't do that. - Negative "
                   "internal energy or negative specific entropy encountered."));
-          AssertThrow( //
-              psi[k] > -100. * newton_eps_,
-              dealii::ExcMessage(
-                  "I'm sorry, Dave. I'm afraid I can't do that. - Local "
-                  "minimum principle on specific entropy violated."));
+//           AssertThrow( //
+//               psi[k] > 0.,
+//               dealii::ExcMessage(
+//                   "I'm sorry, Dave. I'm afraid I can't do that. - Local "
+//                   "minimum principle on specific entropy violated."));
+          if (psi[k] > 0.)
+            std::cout
+                << "(update) specific entropy minimum principle violated: "
+                << psi[k] << std::endl;
         }
       }
 #endif
     }
 
-    /*
-     * The quadratic Newton update does not allow t_r and t_l to go out of
-     * bounds. I.e., t_l is good.
-     */
-
-    if constexpr (limiter_ == Limiters::specific_entropy)
+    /* t_l is the good state: */
+    if constexpr (limiter == Limiters::specific_entropy)
       return t_l;
 
     /*
      * Limit based on an entropy inequality:
+     *
+     * We use a Harten-type entropy (with alpha = 1) of the form:
+     *
+     *   salpha  = (rho^2 e) ^ (1 / (gamma + 1))
+     *
+     * Then, given an average
+     *
+     *   a  =  0.5 * (salpha_i + salpha_j)
+     *
+     * and a flux
+     *
+     *   b  =  0.5 * (u_i * salpha_i - u_j * salpha_j)
+     *
+     * The task is to find the maximal t within the bounds [t_l, t_r]
+     * (which happens to be equal to our old bounds [t_min, t_l]) such that
+     *
+     *   psi(t) = (a + bt)^(gamma + 1) - \rho^2 e (t) <= 0.
+     *
+     * Note that we have to take care of one small corner case: The above
+     * line search (with quadratic Newton) will fail if (a + b t) < 0. In
+     * this case, however we have that that t_0 < t_r for t_0 = - a / b,
+     * this implies that t_r is already a good state. We thus simply modify
+     * psi(t) to
+     *
+     *  psi(t) = ([a + bt]_pos)^(gamma + 1) - rho^2 e (t)
+     *
+     * in this case because this immediately accepts the right state.
      */
 
-    if constexpr (limiter_ == Limiters::entropy_inequality) {
+    t_r = t_l;   // bad state
+    t_l = t_min; // good state
 
-      const auto &s_i = std::get<3>(bounds);
-      const auto &s_j = std::get<4>(bounds);
+    if constexpr (limiter == Limiters::entropy_inequality) {
+      const auto a = std::get<3>(bounds); /* 0.5*(salpha_i+salpha_j) */
+      const auto b = std::get<4>(bounds); /* 0.5*(u_i*salpha_i-u_j*salpha_j) */
+
+      /*
+       * Same quadratic Newton method as above:
+       */
+
+      for (unsigned int n = 0; n < newton_max_iter_; ++n) {
+
+        const auto U_r = U + t_r * P;
+        const auto rho_r = U_r[0];
+        const auto rho_e_r =
+            ProblemDescription<dim, Number>::internal_energy(U_r);
+        const auto average_r = grendel::pow(positive_part(a + b * t_r), gp1);
+        auto psi_r = average_r - rho_r * rho_e_r * relaxation;
+
+        /* If psi_r > 0 the right state is fine, force returning t_r by
+         * setting t_l = t_r: */
+        t_l = dealii::compare_and_apply_mask<
+            dealii::SIMDComparison::greater_than>(psi_r, Number(0.), t_r, t_l);
+
+        /* If we have set t_l = t_r we can break: */
+        if (t_l == t_r) {
+          break;
+        }
+
+        const auto U_l = U + t_l * P;
+        const auto rho_l = U_l[0];
+        const auto rho_e_l =
+            ProblemDescription<dim, Number>::internal_energy(U_l);
+        const auto average_l = grendel::pow(positive_part(a + b * t_l), gp1);
+        auto psi_l = average_l - rho_l * rho_e_l * relaxation;
+
+        /* Shortcut: In the majority of cases only at most one Newton iteration
+         * is necessary because we reach Psi(t_l) \approx 0 quickly. Just return
+         * in this case: */
+        if (std::max(Number(0.), psi_l - Number(newton_eps_)) == Number(0.)) {
+          break;
+        }
+
+        if constexpr (std::is_same<Number, double>::value ||
+                      std::is_same<Number, float>::value) {
+
+          if (psi_l > 0.)
+            std::cout << "entropy inequality violated: " << psi_l << std::endl;
+
+        } else {
+          for (unsigned int k = 0; k < Number::n_array_elements; ++k) {
+            if (psi_l[k] > 0.)
+              std::cout << "entropy inequality violated: " << psi_l[k]
+                        << std::endl;
+          }
+        }
+      }
+
+#ifdef DEBUG
+#endif
     }
 
+    /* t_l is the good state: */
     return t_l;
-
-    __builtin_unreachable();
   }
 
 } /* namespace grendel */
+
+#undef DEBUG
 
 #endif /* LIMITER_H */

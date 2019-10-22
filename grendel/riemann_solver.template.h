@@ -4,39 +4,14 @@
 #include "limiter.h"
 #include "newton.h"
 #include "riemann_solver.h"
+#include "simd.h"
 
 namespace grendel
 {
   using namespace dealii;
 
-
-  /*
-   * HERE BE DRAGONS!
-   */
-
-
   namespace
   {
-    /**
-     * Return the positive part of a number.
-     */
-    template <typename Number>
-    inline DEAL_II_ALWAYS_INLINE Number positive_part(const Number number)
-    {
-      return (std::abs(number) + number) / Number(2.0);
-    }
-
-
-    /**
-     * Return the negative part of a number.
-     */
-    template <typename Number>
-    inline DEAL_II_ALWAYS_INLINE Number negative_part(const Number number)
-    {
-      return (std::abs(number) - number) / Number(2.0);
-    }
-
-
     /**
      * FIXME: Write a lengthy explanation.
      *
@@ -360,7 +335,7 @@ namespace grendel
 
 
   template <int dim, typename Number>
-  std::tuple<Number, Number, unsigned int, std::array<Number, 3>>
+  std::tuple<Number, Number, unsigned int, std::array<Number, 5>>
   RiemannSolver<dim, Number>::compute(
       const std::array<Number, 4> &riemann_data_i,
       const std::array<Number, 4> &riemann_data_j)
@@ -422,7 +397,7 @@ namespace grendel
       /* If we do no Newton iteration, cut it short: */
       const Number lambda_max =
           compute_lambda(riemann_data_i, riemann_data_j, p_2);
-      return {lambda_max, p_2, -1, std::array<Number, 3>()};
+      return {lambda_max, p_2, -1, std::array<Number, 5>()};
     }
 
     Number p_1 =
@@ -473,7 +448,7 @@ namespace grendel
 
     if constexpr (!greedy_dij_) {
       /* If we do not compute */
-      return {lambda_max, p_2, i, std::array<Number, 3>()};
+      return {lambda_max, p_2, i, std::array<Number, 5>()};
     }
 
     /*
@@ -542,26 +517,53 @@ namespace grendel
      * And finally we compute s_min of both states.
      *
      * Normally, we would just call ProblemDescription::specific_entropy,
-     * however, given the fact that we already have the pressure available
-     * we do a little dance here and avoid recomputing quantitites:
+     * however, given the fact that we only have primitive variables
+     * available, we do a little dance here and avoid recomputing
+     * quantitites:
+     *
+     * The specific entropy is
+     *
+     *   s = p * 1/(gamma - 1) * rho ^ (- gamma)
+     *
+     * We also need entropy bounds (for both states) for enforcing an
+     * entropy inequality. We use a Harten-type entropy (with alpha = 1) of
+     * the form:
+     *
+     *   salpha  = (rho^2 e) ^ (1 / (gamma + 1))
+     *
+     * In primitive variables this translates to
+     *
+     *   salpha =  (p * 1/(gamma - 1) * rho) ^ (1 / (gamma + 1))
      */
 
     static_assert(ProblemDescription<1, Number>::b == 0.,
                   "If you change this value, implement the rest...");
+
+    const auto &[rho_i, u_i, p_i, a_i] = riemann_data_i;
+    const auto &[rho_j, u_j, p_j, a_j] = riemann_data_j;
+
     constexpr auto gamma = ProblemDescription<1, Number>::gamma;
     constexpr auto gamma_minus_one_inverse =
         ProblemDescription<1, Number>::gamma_minus_one_inverse;
+    constexpr auto gamma_plus_one_inverse =
+        ProblemDescription<1, Number>::gamma_plus_one_inverse;
 
-    const auto s_i = riemann_data_i[2] * gamma_minus_one_inverse /
-                     grendel::pow(riemann_data_i[0], gamma);
+    const auto rho_e_i = p_i * gamma_minus_one_inverse;
+    const auto s_i = rho_e_i * grendel::pow(rho_i, -gamma);
+    const auto salpha_i = grendel::pow(rho_e_i * rho_i, gamma_plus_one_inverse);
 
-    const auto s_j = riemann_data_j[2] * gamma_minus_one_inverse /
-                     grendel::pow(riemann_data_j[0], gamma);
+    const auto rho_e_j = p_j * gamma_minus_one_inverse;
+    const auto s_j = rho_e_j * grendel::pow(rho_j, -gamma);
+    const auto salpha_j = grendel::pow(rho_e_j * rho_j, gamma_plus_one_inverse);
 
-    constexpr ScalarNumber eps_ = std::numeric_limits<ScalarNumber>::epsilon();
-    const auto s_min = ScalarNumber(1. - 10. * eps_) * std::min(s_i, s_j);
+    const auto s_min = std::min(s_i, s_j);
 
-    return {lambda_max, p_2, i, {rho_min, rho_max, s_min}};
+    /* average of entropy: */
+    const auto a = ScalarNumber(0.5) * (salpha_i + salpha_j);
+    /* flux of entropy: */
+    const auto b = ScalarNumber(0.5) * (u_i * salpha_i - u_j * salpha_j);
+
+    return {lambda_max, p_2, i, {rho_min, rho_max, s_min, a, b}};
   }
 
 
@@ -615,7 +617,7 @@ namespace grendel
     const auto riemann_data_i = riemann_data_from_state(U_i, n_ij);
     const auto riemann_data_j = riemann_data_from_state(U_j, n_ij);
 
-    const auto &[lambda_max, p_star, i, bounds] =
+    auto [lambda_max, p_star, i, bounds] =
         compute(riemann_data_i, riemann_data_j);
 
     if constexpr (!greedy_dij_)
@@ -639,26 +641,27 @@ namespace grendel
     for (unsigned int k = 0; k < problem_dimension; ++k)
       P[k] = ScalarNumber(0.5) * (f_i[k] - f_j[k]) * n_ij;
 
-    auto lambda_greedy =
-        ScalarNumber(1.) / Limiter<dim, Number>::limit(
-                               bounds,
-                               U,
-                               P,
-                               ScalarNumber(1.) / lambda_max,
-                               ScalarNumber(1. / newton_eps_) / lambda_max);
+    constexpr auto limiter = Limiter<dim, Number>::Limiters::entropy_inequality;
+    const auto lambda_greedy_inverse =
+        Limiter<dim, Number>::template limit<limiter>(
+            bounds,
+            U,
+            P,
+            ScalarNumber(1.) / lambda_max,
+            ScalarNumber(1.e6) / lambda_max);
 
 //     if constexpr (std::is_same<Number, double>::value ||
 //                   std::is_same<Number, float>::value) {
-//       std::cout << lambda_greedy << "  <<<<  " << lambda_max <<
-//       std::endl;
+//       std::cout << 1. / lambda_greedy_inverse << "  <<<<  " << lambda_max
+//                 << std::endl;
 //     } else {
 //       for (unsigned int k = 0; k < Number::n_array_elements; ++k) {
-//         std::cout << lambda_greedy[k] << "  <<<<  " << lambda_max[k]
-//                   << std::endl;
+//         std::cout << 1. / lambda_greedy_inverse[k] << "  <<<<  "
+//                   << lambda_max[k] << std::endl;
 //       }
 //     }
 
-    return {std::min(lambda_greedy, lambda_max), p_star, i};
+    return {lambda_max, p_star, i};
   }
 
 } /* namespace grendel */
