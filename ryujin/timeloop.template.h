@@ -407,6 +407,10 @@ namespace ryujin
       break;
     case Limiter<dim, Number>::Limiters::specific_entropy:
       deallog << "Limiter<dim, Number>::Limiters::specific_entropy" << std::endl;
+      break;
+    case Limiter<dim, Number>::Limiters::entropy_inequality:
+      deallog << "Limiter<dim, Number>::Limiters::entropy_inequality" << std::endl;
+      break;
     }
 
     deallog << "Limiter<dim, Number>::relax_bounds_ == "

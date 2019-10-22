@@ -20,12 +20,12 @@ namespace grendel
     static constexpr unsigned int problem_dimension =
         ProblemDescription<dim, Number>::problem_dimension;
 
+    using ScalarNumber = typename get_value_type<Number>::type;
+
     using rank1_type = typename ProblemDescription<dim, Number>::rank1_type;
 
     using vector_type =
         std::array<dealii::LinearAlgebra::distributed::Vector<Number>, 3>;
-
-    using ScalarNumber = typename get_value_type<Number>::type;
 
     using Bounds = std::array<Number, 3>;
 
@@ -36,7 +36,8 @@ namespace grendel
     static constexpr enum class Limiters {
       none,
       rho,
-      specific_entropy
+      specific_entropy,
+      entropy_inequality
     } limiter_ = Limiters::specific_entropy;
 
     static constexpr bool relax_bounds_ = true;
@@ -70,7 +71,8 @@ namespace grendel
      * Returns the maximal t, obeying t_min < t < t_max such that the
      * selected local minimum principles are obeyed.
      */
-    static Number limit(const Bounds &bounds,
+    template <Limiters limiter = limiter_, typename BOUNDS>
+    static Number limit(const BOUNDS bounds,
                         const rank1_type U,
                         const rank1_type P,
                         const Number t_min = Number(0.),
@@ -135,25 +137,24 @@ namespace grendel
   DEAL_II_ALWAYS_INLINE inline void
   Limiter<dim, Number>::apply_relaxation(Number hd_i, Number rho_relaxation)
   {
-    if constexpr (relax_bounds_) {
-      auto &[rho_min, rho_max, s_min] = bounds_;
+    if constexpr (!relax_bounds_)
+      return;
 
-      if constexpr (limiter_ == Limiters::none)
-        return;
+    auto &[rho_min, rho_max, s_min] = bounds_;
 
-      const Number r_i =
-          Number(2.) * dealii::Utilities::fixed_power<relaxation_order_>(
-                           std::sqrt(std::sqrt(hd_i)));
+    if constexpr (limiter_ == Limiters::none)
+      return;
 
-      rho_min =
-          std::max((Number(1.) - r_i) * rho_min, rho_min - rho_relaxation);
-      rho_max =
-          std::min((Number(1.) + r_i) * rho_max, rho_max + rho_relaxation);
+    const Number r_i =
+        Number(2.) * dealii::Utilities::fixed_power<relaxation_order_>(
+                         std::sqrt(std::sqrt(hd_i)));
 
-      if constexpr (limiter_ == Limiters::specific_entropy) {
-        s_min = std::max((Number(1.) - r_i) * s_min,
-                         Number(2.) * s_min - s_interp_max);
-      }
+    rho_min = std::max((Number(1.) - r_i) * rho_min, rho_min - rho_relaxation);
+    rho_max = std::min((Number(1.) + r_i) * rho_max, rho_max + rho_relaxation);
+
+    if constexpr (limiter_ == Limiters::specific_entropy) {
+      s_min = std::max((Number(1.) - r_i) * s_min,
+                       Number(2.) * s_min - s_interp_max);
     }
   }
 
@@ -167,15 +168,14 @@ namespace grendel
 
 
   template <int dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline Number
-  Limiter<dim, Number>::limit(const Bounds &bounds,
-                              const rank1_type U,
-                              const rank1_type P,
-                              const Number t_min /* = Number(0.) */,
-                              const Number t_max /* = Number(1.) */)
+  template <typename Limiter<dim, Number>::Limiters limiter, typename BOUNDS>
+  DEAL_II_ALWAYS_INLINE inline Number Limiter<dim, Number>::limit(
+      const BOUNDS bounds,
+      const rank1_type U,
+      const rank1_type P,
+      const Number t_min /* = Number(0.) */,
+      const Number t_max /* = Number(1.) */)
   {
-    auto &[rho_min, rho_max, s_min] = bounds;
-
     Number t_r = t_max;
 
     if constexpr (limiter_ == Limiters::none)
@@ -190,6 +190,9 @@ namespace grendel
     {
       const auto &U_rho = U[0];
       const auto &P_rho = P[0];
+
+      const auto &rho_min = std::get<0>(bounds);
+      const auto &rho_max = std::get<1>(bounds);
 
       constexpr ScalarNumber eps_ =
           std::numeric_limits<ScalarNumber>::epsilon();
@@ -261,6 +264,8 @@ namespace grendel
 
       constexpr ScalarNumber gamma = ProblemDescription<dim, Number>::gamma;
       constexpr ScalarNumber gp1 = gamma + ScalarNumber(1.);
+
+      const auto &s_min = std::get<2>(bounds);
 
       for (unsigned int n = 0; n < newton_max_iter_; ++n) {
 
@@ -371,6 +376,18 @@ namespace grendel
 
     if constexpr (limiter_ == Limiters::specific_entropy)
       return t_l;
+
+    /*
+     * Limit based on an entropy inequality:
+     */
+
+    if constexpr (limiter_ == Limiters::entropy_inequality) {
+
+      const auto &s_i = std::get<3>(bounds);
+      const auto &s_j = std::get<4>(bounds);
+    }
+
+    return t_l;
 
     __builtin_unreachable();
   }

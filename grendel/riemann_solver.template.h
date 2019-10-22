@@ -422,7 +422,7 @@ namespace grendel
       /* If we do no Newton iteration, cut it short: */
       const Number lambda_max =
           compute_lambda(riemann_data_i, riemann_data_j, p_2);
-      return {lambda_max, p_2, -1, std::array<Number, 4>()};
+      return {lambda_max, p_2, -1, std::array<Number, 3>()};
     }
 
     Number p_1 =
@@ -473,7 +473,7 @@ namespace grendel
 
     if constexpr (!greedy_dij_) {
       /* If we do not compute */
-      return {lambda_max, p_2, i, std::array<Number, 4>()};
+      return {lambda_max, p_2, i, std::array<Number, 3>()};
     }
 
     /*
@@ -657,7 +657,7 @@ namespace grendel
 //       }
 //     }
 
-    return {lambda_greedy, p_star, i};
+    return {std::min(lambda_greedy, lambda_max), p_star, i};
   }
 
 } /* namespace grendel */
