@@ -383,7 +383,10 @@ namespace grendel
       const auto b = std::get<4>(bounds); /* 0.5*(u_i*salpha_i-u_j*salpha_j) */
 
       /*
-       * Same quadratic Newton method as above:
+       * Same quadratic Newton method as above, but for a different
+       * 3-concave/3-convex psi:
+       *
+       *  psi(t) = ([a + bt]_pos)^(gamma + 1) - rho^2 e (t)
        */
 
       for (unsigned int n = 0; n < newton_max_iter; ++n) {
@@ -392,8 +395,10 @@ namespace grendel
         const auto rho_r = U_r[0];
         const auto rho_e_r =
             ProblemDescription<dim, Number>::internal_energy(U_r);
-        const auto average_r = grendel::pow(positive_part(a + b * t_r), gp1);
-        auto psi_r = average_r - rho_r * rho_e_r * relaxation;
+        const auto average_r = positive_part(a + b * t_r);
+        const auto average_gamma_r = std::pow(average_r, gamma);
+
+        auto psi_r = average_r * average_gamma_r - rho_r * rho_e_r * relaxation;
 
         /* If psi_r > 0 the right state is fine, force returning t_r by
          * setting t_l = t_r: */
@@ -409,8 +414,10 @@ namespace grendel
         const auto rho_l = U_l[0];
         const auto rho_e_l =
             ProblemDescription<dim, Number>::internal_energy(U_l);
-        const auto average_l = grendel::pow(positive_part(a + b * t_l), gp1);
-        auto psi_l = average_l - rho_l * rho_e_l * relaxation;
+        const auto average_l = positive_part(a + b * t_l);
+        const auto average_gamma_l = std::pow(average_l, gamma);
+
+        auto psi_l = average_l * average_gamma_l - rho_l * rho_e_l * relaxation;
 
         /* Shortcut: In the majority of cases only at most one Newton iteration
          * is necessary because we reach Psi(t_l) \approx 0 quickly. Just return
@@ -418,12 +425,30 @@ namespace grendel
         if (std::max(Number(0.), psi_l - newton_eps<Number>) == Number(0.))
           break;
 
+        /* We got unlucky and have to perform a Newton step: */
+
+        const auto drho = P[0];
+        const auto drho_e_l =
+            ProblemDescription<dim, Number>::internal_energy_derivative(U_l) *
+            P;
+        const auto drho_e_r =
+            ProblemDescription<dim, Number>::internal_energy_derivative(U_r) *
+            P;
+
+        const auto dpsi_l =
+            gp1 * average_gamma_l * b - rho_e_l * drho - rho_l * drho_e_l;
+
+        const auto dpsi_r =
+            gp1 * average_gamma_r * b - rho_e_r * drho - rho_r * drho_e_r;
+
 #ifdef DEBUG
         AssertThrowSIMD(
             psi_l,
             [](auto val) { return val < newton_eps<ScalarNumber>; },
             dealii::ExcMessage("Entropy inequality violated."));
 #endif
+
+        quadratic_newton_step(t_l, t_r, psi_l, psi_r, dpsi_l, dpsi_r);
       }
 
 #ifdef DEBUG
