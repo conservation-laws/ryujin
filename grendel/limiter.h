@@ -236,6 +236,7 @@ namespace grendel
     constexpr ScalarNumber gamma = ProblemDescription<dim, Number>::gamma;
     constexpr ScalarNumber gp1 = gamma + ScalarNumber(1.);
     constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
+    /* relax the entropy inequalities by eps to counter roundoff errors */
     constexpr ScalarNumber relaxation = ScalarNumber(1.) + 10. * eps;
 
     {
@@ -306,7 +307,7 @@ namespace grendel
 #ifdef DEBUG
         AssertThrowSIMD(
             psi_l,
-            [](auto val) { return val > 0.; },
+            [](auto val) { return val > -newton_eps<ScalarNumber>; },
             dealii::ExcMessage("Specific entropy minimum principle violated."));
 #endif
 
@@ -320,6 +321,8 @@ namespace grendel
           ProblemDescription<dim, Number>::internal_energy(U_new);
       const auto s_new =
           ProblemDescription<dim, Number>::specific_entropy(U_new);
+      const auto psi =
+          rho_new * e_new - s_min * grendel::pow(rho_new, gp1) * relaxation;
 
       AssertThrowSIMD(
           e_new,
@@ -332,8 +335,8 @@ namespace grendel
           dealii::ExcMessage("Negative specific entropy."));
 
       AssertThrowSIMD(
-          rho_new * e_new - s_min * grendel::pow(rho_new, gp1) * relaxation,
-          [](auto val) { return val > 0.; },
+          psi,
+          [](auto val) { return val >= -newton_eps<ScalarNumber>; },
           dealii::ExcMessage("Specific entropy minimum principle violated."));
 #endif
     }
@@ -419,7 +422,7 @@ namespace grendel
 #ifdef DEBUG
         AssertThrowSIMD(
             psi_l,
-            [](auto val) { return val > 0.; },
+            [](auto val) { return val < newton_eps<ScalarNumber>; },
             dealii::ExcMessage("Entropy inequality violated."));
 #endif
       }
@@ -430,10 +433,10 @@ namespace grendel
           U_new[0] * ProblemDescription<dim, Number>::internal_energy(U_new);
       const auto avg = grendel::pow(positive_part(a + b * t_l), gp1);
 
-    AssertThrowSIMD(
-        avg - rho_rho_e * relaxation,
-        [](auto val) { return val > 0.; },
-        dealii::ExcMessage("Entropy inequality violated."));
+      AssertThrowSIMD(
+          avg - rho_rho_e * relaxation,
+          [](auto val) { return val < newton_eps<ScalarNumber>; },
+          dealii::ExcMessage("Entropy inequality violated."));
 #endif
     }
 
