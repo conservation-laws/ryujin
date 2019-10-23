@@ -45,12 +45,6 @@ namespace grendel
 
     static constexpr unsigned int relaxation_order_ = 3;
 
-    static constexpr ScalarNumber newton_eps_ =
-        std::is_same<ScalarNumber, double>::value ? ScalarNumber(1.0e-10)
-                                                  : ScalarNumber(1.0e-4);
-
-    static constexpr unsigned int newton_max_iter_ = 2;
-
     /*
      * Accumulate bounds:
      */
@@ -262,7 +256,7 @@ namespace grendel
 
       const auto &s_min = std::get<2>(bounds);
 
-      for (unsigned int n = 0; n < newton_max_iter_; ++n) {
+      for (unsigned int n = 0; n < newton_max_iter; ++n) {
 
         const auto U_r = U + t_r * P;
         const auto rho_r = U_r[0];
@@ -290,7 +284,7 @@ namespace grendel
         /* Shortcut: In the majority of cases only at most one Newton iteration
          * is necessary because we reach Psi(t_l) \approx 0 quickly. Just return
          * in this case: */
-        if (std::max(Number(0.), psi_l - Number(newton_eps_)) == Number(0.))
+        if (std::max(Number(0.), psi_l - newton_eps<Number>) == Number(0.))
           break;
 
         /* We got unlucky and have to perform a Newton step: */
@@ -389,7 +383,7 @@ namespace grendel
        * Same quadratic Newton method as above:
        */
 
-      for (unsigned int n = 0; n < newton_max_iter_; ++n) {
+      for (unsigned int n = 0; n < newton_max_iter; ++n) {
 
         const auto U_r = U + t_r * P;
         const auto rho_r = U_r[0];
@@ -418,7 +412,7 @@ namespace grendel
         /* Shortcut: In the majority of cases only at most one Newton iteration
          * is necessary because we reach Psi(t_l) \approx 0 quickly. Just return
          * in this case: */
-        if (std::max(Number(0.), psi_l - Number(newton_eps_)) == Number(0.)) {
+        if (std::max(Number(0.), psi_l - newton_eps<Number>) == Number(0.)) {
           break;
         }
 

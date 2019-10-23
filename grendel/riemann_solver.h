@@ -47,10 +47,6 @@ namespace grendel
      * Options:
      */
 
-    static constexpr ScalarNumber newton_eps_ =
-        std::is_same<ScalarNumber, double>::value ? ScalarNumber(1.0e-10)
-                                                  : ScalarNumber(1.0e-4);
-
     static constexpr bool greedy_dij_ = false;
 
     /* In case of the greedy variant, we have to allow for at least one

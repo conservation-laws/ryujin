@@ -419,15 +419,6 @@ namespace ryujin
     deallog << "Limiter<dim, Number>::relaxation_order_ == "
             << Limiter<dim, Number>::relaxation_order_ << std::endl;
 
-    deallog << "Limiter<dim, Number>::newton_eps_ == "
-            << Limiter<dim, Number>::newton_eps_ << std::endl;
-
-    deallog << "Limiter<dim, Number>::newton_max_iter_ == "
-            << Limiter<dim, Number>::newton_max_iter_ << std::endl;
-
-    deallog << "RiemannSolver<dim, Number>::newton_eps_ == "
-            <<  RiemannSolver<dim, Number>::newton_eps_ << std::endl;
-
     deallog << "RiemannSolver<dim, Number>::newton_max_iter_ == "
             <<  RiemannSolver<dim, Number>::newton_max_iter_ << std::endl;
 

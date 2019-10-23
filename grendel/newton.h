@@ -8,6 +8,20 @@
 namespace grendel
 {
   /*
+   * Define a tolerance for the Newton iteration:
+   */
+  template <typename Number>
+  static constexpr auto newton_eps = typename get_value_type<Number>::type(
+      std::is_same<typename get_value_type<Number>::type, double>::value
+          ? 1.e-10
+          : 1.e-5);
+
+  /*
+   * Maximal number of Newton iterations we will perform:
+   */
+  static constexpr unsigned int newton_max_iter = 2;
+
+  /*
    * Perform one step of a quadratic Newton iteration.
    *
    * See [1], p. 915f (4.8) and (4.9)

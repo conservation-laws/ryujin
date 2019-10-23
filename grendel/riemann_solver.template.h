@@ -427,7 +427,7 @@ namespace grendel
     for (; i < newton_max_iter_; ++i) {
 
       /* We return our current guess if we reach the tolerance... */
-      if (std::max(Number(0.), gap - Number(newton_eps_)) == Number(0.))
+      if (std::max(Number(0.), gap - newton_eps<Number>) == Number(0.))
         break;
 
       // FIXME: Fuse these computations:
@@ -623,8 +623,10 @@ namespace grendel
 
 #ifdef DEBUG
     const auto phi_p_star = phi(riemann_data_i, riemann_data_j, p_star);
-    std::cout << phi_p_star << std::endl;
-
+    AssertThrowSIMD(
+        phi_p_star,
+        [](auto val) { return val >= -newton_eps<ScalarNumber>; },
+        dealii::ExcMessage("Invalid state in Riemann problem."));
 #endif
 
     if constexpr (!greedy_dij_)
