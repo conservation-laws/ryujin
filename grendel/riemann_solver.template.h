@@ -668,11 +668,7 @@ namespace grendel
         dealii::ExcMessage("Garbled up lambda_greedy."));
 #endif
 
-//     if constexpr (std::is_same<Number, double>::value)
-//       if (lambda_max / lambda_greedy > 1.1)
-//         std::cout << lambda_greedy << "  <<<<  " << lambda_max << std::endl;
-
-    return {lambda_max, p_star, i};
+    return {lambda_greedy, p_star, i};
   }
 
 } /* namespace grendel */
