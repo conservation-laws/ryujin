@@ -12,15 +12,25 @@ namespace grendel
 
   namespace
   {
+    /*
+     * We construct a function phi(p) that is montone increasing in p,
+     * concave down and whose (weak) third derivative is non-negative and
+     * locally bounded [1, p. 912]. We also need to implement derivatives
+     * of phi for the quadratic Newton search:
+     */
+
     /**
-     * FIXME: Write a lengthy explanation.
-     *
      * See [1], page 912, (3.4).
+     *
+     * Cost: 1x pow, 1x division, 2x sqrt
      */
     template <typename Number>
     inline DEAL_II_ALWAYS_INLINE Number
     f(const std::array<Number, 4> &primitive_state, const Number &p_star)
     {
+      static_assert(ProblemDescription<1, Number>::b == 0.,
+                    "If you change this value, implement the rest...");
+
       using ScalarNumber = typename get_value_type<Number>::type;
 
       constexpr auto gamma = ProblemDescription<1, Number>::gamma;
@@ -28,6 +38,7 @@ namespace grendel
           ProblemDescription<1, Number>::gamma_inverse;
       constexpr auto gamma_minus_one_inverse =
           ProblemDescription<1, Number>::gamma_minus_one_inverse;
+
       const auto &[rho, u, p, a] = primitive_state;
 
       const Number radicand_inverse = ScalarNumber(0.5) * rho *
@@ -47,14 +58,17 @@ namespace grendel
     }
 
     /**
-     * FIXME: Write a lengthy explanation.
-     *
      * See [1], page 912, (3.4).
+     *
+     * Cost: 1x pow, 3x division, 1x sqrt
      */
     template <typename Number>
     inline DEAL_II_ALWAYS_INLINE Number
     df(const std::array<Number, 4> &primitive_state, const Number &p_star)
     {
+      static_assert(ProblemDescription<1, Number>::b == 0.,
+                    "If you change this value, implement the rest...");
+
       using ScalarNumber = typename get_value_type<Number>::type;
 
       constexpr auto gamma = ProblemDescription<1, Number>::gamma;
@@ -64,6 +78,7 @@ namespace grendel
           ProblemDescription<1, Number>::gamma_minus_one_inverse;
       constexpr auto gamma_plus_one_inverse =
           ProblemDescription<1, Number>::gamma_plus_one_inverse;
+
       const auto &[rho, u, p, a] = primitive_state;
 
       const Number radicand_inverse = ScalarNumber(0.5) * rho *
@@ -90,9 +105,9 @@ namespace grendel
 
 
     /**
-     * FIXME: Write a lengthy explanation.
-     *
      * See [1], page 912, (3.3).
+     *
+     * Cost: 2x pow, 2x division, 4x sqrt
      */
     template <typename Number>
     inline DEAL_II_ALWAYS_INLINE Number
@@ -111,6 +126,8 @@ namespace grendel
      * This is a specialized variant of phi() that computes phi(p_max). It
      * inlines the implementation of f() and eliminates all unnecessary
      * branches in f().
+     *
+     * Cost: 0x pow, 2x division, 2x sqrt
      */
     template <typename Number>
     inline DEAL_II_ALWAYS_INLINE Number
@@ -143,9 +160,9 @@ namespace grendel
 
 
     /**
-     * FIXME: Write a lengthy explanation.
-     *
      * See [1], page 912, (3.3).
+     *
+     * Cost: 2x pow, 6x division, 2x sqrt
      */
     template <typename Number>
     inline DEAL_II_ALWAYS_INLINE Number
@@ -157,8 +174,18 @@ namespace grendel
     }
 
 
+    /*
+     * Next we construct approximations for the two extreme wave speeds of
+     * the Riemann fan [1, p. 912, (3.7) + (3.8)] and compute a gap (based
+     * on the quality of our current approximation of the two wave speeds)
+     * and an upper bound lambda_max of the maximal wave speed:
+     */
+
+
     /**
      * see [1], page 912, (3.7)
+     *
+     * Cost: 0x pow, 1x division, 1x sqrt
      */
     template <typename Number>
     inline DEAL_II_ALWAYS_INLINE Number lambda1_minus(
@@ -182,6 +209,8 @@ namespace grendel
 
     /**
      * see [1], page 912, (3.8)
+     *
+     * Cost: 0x pow, 1x division, 1x sqrt
      */
     template <typename Number>
     inline DEAL_II_ALWAYS_INLINE Number lambda3_plus(
@@ -203,52 +232,13 @@ namespace grendel
 
 
     /**
-     * Two-rarefaction approximation to p_star computed for two primitive
-     * states <code>riemann_data_i</code> and
-     * <code>riemann_data_j</code>. See [1], page 914, (4.3)
-     */
-    template <typename Number>
-    inline DEAL_II_ALWAYS_INLINE Number
-    p_star_two_rarefaction(const std::array<Number, 4> &riemann_data_i,
-                           const std::array<Number, 4> &riemann_data_j)
-    {
-      using ScalarNumber = typename get_value_type<Number>::type;
-
-      constexpr auto gamma = ProblemDescription<1, Number>::gamma;
-      constexpr auto gamma_inverse =
-          ProblemDescription<1, Number>::gamma_inverse;
-      constexpr auto gamma_minus_one_inverse =
-          ProblemDescription<1, Number>::gamma_minus_one_inverse;
-
-      const auto &[rho_i, u_i, p_i, a_i] = riemann_data_i;
-      const auto &[rho_j, u_j, p_j, a_j] = riemann_data_j;
-
-      /*
-       * Notar bene (cf. [1, (4.3)]):
-       *   a_Z^0 * sqrt(1 - b * rho_Z) = a_Z * (1 - b * rho_Z)
-       * We have computed a_Z already, so we are simply going to use this
-       * identity below:
-       */
-
-      const auto factor = (gamma - ScalarNumber(1.)) * ScalarNumber(0.5);
-
-      const Number numerator = a_i + a_j - factor * (u_j - u_i);
-
-      const Number denominator =
-          a_i * grendel::pow(p_i / p_j, -factor * gamma_inverse) + a_j;
-
-      const auto exponent = ScalarNumber(2.0) * gamma * gamma_minus_one_inverse;
-
-      return p_j * grendel::pow(numerator / denominator, exponent);
-    }
-
-
-    /**
      * For two given primitive states <code>riemann_data_i</code> and
-     * <code>riemann_data_j</code>, and two guesses p_1 < p_2, compute
-     * the gap in lambda between both guesses.
+     * <code>riemann_data_j</code>, and two guesses p_1 <= p* <= p_2,
+     * compute the gap in lambda between both guesses.
      *
      * See [1], page 914, (4.4a), (4.4b), (4.5), and (4.6)
+     *
+     * Cost: 0x pow, 4x division, 4x sqrt
      */
     template <typename Number>
     inline DEAL_II_ALWAYS_INLINE std::array<Number, 2>
@@ -278,9 +268,11 @@ namespace grendel
      * <code>riemann_data_j</code>, and a guess p_2, compute an upper bound
      * for lambda.
      *
-     * This is the same lambda_max as computed by compute_gap.
+     * This is the same lambda_max as computed by compute_gap. The function
+     * simply avoids a number of unnecessary computations (in case we do
+     * not need to know the gap).
      *
-     * See [1], page 914, (4.4a), (4.4b), (4.5), and (4.6)
+     * Cost: 0x pow, 2x division, 2x sqrt
      */
     template <typename Number>
     inline DEAL_II_ALWAYS_INLINE Number
@@ -296,9 +288,56 @@ namespace grendel
 
 
     /**
-     * Compute a corresponding expansion and shock density
+     * Two-rarefaction approximation to p_star computed for two primitive
+     * states <code>riemann_data_i</code> and <code>riemann_data_j</code>.
+     *
+     * See [1], page 914, (4.3)
+     *
+     * Cost: 2x pow, 2x division, 0x sqrt
+     */
+    template <typename Number>
+    inline DEAL_II_ALWAYS_INLINE Number
+    p_star_two_rarefaction(const std::array<Number, 4> &riemann_data_i,
+                           const std::array<Number, 4> &riemann_data_j)
+    {
+      using ScalarNumber = typename get_value_type<Number>::type;
+
+      constexpr auto gamma = ProblemDescription<1, Number>::gamma;
+      constexpr auto gamma_inverse =
+          ProblemDescription<1, Number>::gamma_inverse;
+      constexpr auto gamma_minus_one_inverse =
+          ProblemDescription<1, Number>::gamma_minus_one_inverse;
+
+      const auto &[rho_i, u_i, p_i, a_i] = riemann_data_i;
+      const auto &[rho_j, u_j, p_j, a_j] = riemann_data_j;
+
+      /*
+       * Notar bene (cf. [1, (4.3)]):
+       *   a_Z^0 * sqrt(1 - b * rho_Z) = a_Z * (1 - b * rho_Z)
+       * We have computed a_Z already, so we are simply going to use this
+       * identity below:
+       */
+
+      constexpr auto factor = (gamma - ScalarNumber(1.)) * ScalarNumber(0.5);
+
+      const Number numerator = a_i + a_j - factor * (u_j - u_i);
+      const Number denominator =
+          a_i * grendel::pow(p_i / p_j, -factor * gamma_inverse) + a_j;
+
+      const auto exponent = ScalarNumber(2.0) * gamma * gamma_minus_one_inverse;
+
+      return p_j * grendel::pow(numerator / denominator, exponent);
+    }
+
+
+    /**
+     * Given the pressure minimum and maximum and two corresponding
+     * densities we compute approximations for the density of corresponding
+     * shock and expansion waves.
      *
      * [2] Formula (4.4)
+     *
+     * Cost: 2x pow, 2x division, 0x sqrt
      */
     template <typename Number>
     inline DEAL_II_ALWAYS_INLINE std::array<Number, 4>
@@ -393,20 +432,17 @@ namespace grendel
         dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
             phi_p_max, Number(0.), p_star_tilde, std::min(p_max, p_star_tilde));
 
+    /* If we do no Newton iteration, cut it short: */
+
     if constexpr (newton_max_iter_ == 0) {
-      /* If we do no Newton iteration, cut it short: */
       const Number lambda_max =
           compute_lambda(riemann_data_i, riemann_data_j, p_2);
       return {lambda_max, p_2, -1, std::array<Number, 5>()};
     }
 
-    if constexpr (greedy_dij_) {
-      /*
-       * If we are greedy, ensure that all the work we are about to do is
-       * actually beneficial. We do this by checking whether we have a
-       * contrast of more than greedy_threshold_ in the density. If not,
-       * cut it short:
-       */
+    /* If we are greedy, bail out early if we are in a situation with
+     * minimal density fluctuation: */
+    if constexpr (greedy_dij_ && newton_max_iter_ == 1) {
       const Number rho_min = std::min(riemann_data_i[0], riemann_data_j[0]);
       const Number rho_max = std::max(riemann_data_i[0], riemann_data_j[0]);
 

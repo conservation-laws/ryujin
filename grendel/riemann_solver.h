@@ -24,13 +24,13 @@ namespace grendel
    * wavespeed is a strict upper bound ensuring that all important
    * invariance principles are obtained.
    *
-   * FIXME: Further explanation
-     *
-     * References:
-     *   [1] J.-L. Guermond, B. Popov. Fast estimation from above for the
-     *       maximum wave speed in the Riemann problem for the Euler equations.
-     *
-     *   [2] J.-L. Guermond, et al. In progress.
+   * The solver is based on two publications [1,2].
+   *
+   * References:
+   *   [1] J.-L. Guermond, B. Popov. Fast estimation from above for the
+   *       maximum wave speed in the Riemann problem for the Euler equations.
+   *
+   *   [2] J.-L. Guermond, et al. In progress.
    */
   template <int dim, typename Number = double>
   class RiemannSolver
@@ -67,7 +67,7 @@ namespace grendel
      *   (1 - greedy_factor_)/100 %
      * we simply don't do anything.
      */
-    static constexpr ScalarNumber greedy_factor_ = ScalarNumber(0.95);
+    static constexpr ScalarNumber greedy_factor_ = ScalarNumber(0.97);
 
     static constexpr bool relax_greedy_bounds_ = false;
 
@@ -78,11 +78,13 @@ namespace grendel
 
 
     /**
-     * For two given 1D states riemann_data_i and riemann_data_j, compute
-     * an estimation of an upper bound for the maximum wavespeed lambda.
+     * For two given 1D primitive states riemann_data_i and riemann_data_j,
+     * compute an estimation of an upper bound for the maximum wavespeed
+     * lambda.
      *
-     * We also return bounds = {rho_min, rho_max, s_min} for the
-     * "greedy d_ij" computation.
+     * If necessary, we also compute and return bounds = {rho_min, rho_max,
+     * s_min, salpha_avg, salpha_flux} that are needed as bounds in the
+     * limiter for the "greedy d_ij" computation.
      */
     static std::tuple<Number /*lambda_max*/,
                       Number /*p_star*/,
