@@ -413,6 +413,9 @@ namespace ryujin
       break;
     }
 
+    deallog << "grendel::newton_max_iter == "
+            << grendel::newton_max_iter << std::endl;
+
     deallog << "Limiter<dim, Number>::relax_bounds_ == "
             << Limiter<dim, Number>::relax_bounds_ << std::endl;
 
@@ -424,6 +427,12 @@ namespace ryujin
 
     deallog << "RiemannSolver<dim, Number>::greedy_dij_ == "
             <<  RiemannSolver<dim, Number>::greedy_dij_ << std::endl;
+
+    deallog << "RiemannSolver<dim, Number>::greedy_factor_ == "
+            <<  RiemannSolver<dim, Number>::greedy_factor_ << std::endl;
+
+    deallog << "RiemannSolver<dim, Number>::relax_greedy_bounds_ == "
+            <<  RiemannSolver<dim, Number>::relax_greedy_bounds_ << std::endl;
 
     deallog << "TimeStep<dim, Number>::order_ == ";
     switch (TimeStep<dim, Number>::order_) {
