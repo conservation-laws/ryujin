@@ -14,7 +14,7 @@ namespace grendel
   static constexpr auto newton_eps = typename get_value_type<Number>::type(
       std::is_same<typename get_value_type<Number>::type, double>::value
           ? 1.e-10
-          : 1.e-5);
+          : 1.e-4);
 
   /*
    * Maximal number of Newton iterations we will perform:

@@ -306,7 +306,7 @@ namespace grendel
 #ifdef DEBUG
         AssertThrowSIMD(
             psi_l,
-            [](auto val) { return val > -newton_eps<ScalarNumber>; },
+            [](auto val) { return val > -10. * newton_eps<ScalarNumber>; },
             dealii::ExcMessage("Specific entropy minimum principle violated."));
 #endif
 
@@ -336,7 +336,7 @@ namespace grendel
 
       AssertThrowSIMD(
           psi,
-          [](auto val) { return val >= -newton_eps<ScalarNumber>; },
+          [](auto val) { return val >= -10. * newton_eps<ScalarNumber>; },
           dealii::ExcMessage("Specific entropy minimum principle violated."));
 #endif
     }
@@ -449,7 +449,7 @@ namespace grendel
 #ifdef DEBUG
         AssertThrowSIMD(
             psi_l,
-            [](auto val) { return val < newton_eps<ScalarNumber>; },
+            [](auto val) { return val < 10. * newton_eps<ScalarNumber>; },
             dealii::ExcMessage("Entropy inequality violated."));
 #endif
 
@@ -464,7 +464,7 @@ namespace grendel
 
       AssertThrowSIMD(
           avg - rho_rho_e * relaxation,
-          [](auto val) { return val < newton_eps<ScalarNumber>; },
+          [](auto val) { return val < 10. * newton_eps<ScalarNumber>; },
           dealii::ExcMessage("Entropy inequality violated."));
 #endif
     }

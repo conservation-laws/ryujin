@@ -613,7 +613,8 @@ namespace grendel
   std::tuple<Number, Number, unsigned int> RiemannSolver<dim, Number>::compute(
       const rank1_type U_i,
       const rank1_type U_j,
-      const dealii::Tensor<1, dim, Number> &n_ij)
+      const dealii::Tensor<1, dim, Number> &n_ij,
+      const Number hd_i)
   {
     const auto riemann_data_i = riemann_data_from_state(U_i, n_ij);
     const auto riemann_data_j = riemann_data_from_state(U_j, n_ij);
@@ -649,6 +650,22 @@ namespace grendel
     dealii::Tensor<1, problem_dimension, Number> P;
     for (unsigned int k = 0; k < problem_dimension; ++k)
       P[k] = ScalarNumber(0.5) * (f_i[k] - f_j[k]) * n_ij;
+
+    if constexpr (relax_greedy_bounds_) {
+      /*
+       * Relax entropy bounds a tiny bit: Note, we use a much smaller
+       * window r_i = h_i ^ (3/2) than is done for the second order
+       * limiting.
+       */
+      const Number r_i =
+          ScalarNumber(2.) *
+          dealii::Utilities::fixed_power<
+              Limiter<dim, Number>::relaxation_order_>(std::sqrt(hd_i));
+      const Number factor = Number(1.) - r_i;
+      std::get<2>(bounds) *= factor;
+      std::get<3>(bounds) *= factor;
+      std::get<4>(bounds) *= factor;
+    }
 
     constexpr auto limiter = Limiter<dim, Number>::Limiters::entropy_inequality;
     const auto lambda_greedy_inverse =

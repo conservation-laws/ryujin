@@ -49,6 +49,7 @@ namespace grendel
 
     static constexpr bool greedy_dij_ = true;
 
+    static constexpr bool relax_greedy_bounds_ = false;
 
     /* In case of the greedy variant, we have to allow for at least one
      * Newton iteration step. */
@@ -82,7 +83,8 @@ namespace grendel
                       unsigned int /*iteration*/>
     compute(const rank1_type U_i,
             const rank1_type U_j,
-            const dealii::Tensor<1, dim, Number> &n_ij);
+            const dealii::Tensor<1, dim, Number> &n_ij,
+            const Number hd_i = Number(0.));
   };
 
 } /* namespace grendel */
