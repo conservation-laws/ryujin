@@ -6,8 +6,6 @@
 #include "riemann_solver.h"
 #include "simd.h"
 
-#define DEBUG
-
 namespace grendel
 {
   using namespace dealii;
@@ -689,7 +687,5 @@ namespace grendel
   }
 
 } /* namespace grendel */
-
-#undef DEBUG
 
 #endif /* RIEMANN_SOLVER_TEMPLATE_H */

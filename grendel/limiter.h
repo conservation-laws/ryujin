@@ -9,8 +9,6 @@
 
 #include <deal.II/lac/la_parallel_vector.templates.h>
 
-#define DEBUG
-
 namespace grendel
 {
 
@@ -473,7 +471,5 @@ namespace grendel
   }
 
 } /* namespace grendel */
-
-#undef DEBUG
 
 #endif /* LIMITER_H */
