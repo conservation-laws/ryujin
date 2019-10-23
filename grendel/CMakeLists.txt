@@ -7,6 +7,7 @@ ADD_LIBRARY(grendel SHARED
   riemann_solver.cc
   postprocessor.cc
   time_step.cc
+  simd.cc
   )
 DEAL_II_SETUP_TARGET(grendel)
 
