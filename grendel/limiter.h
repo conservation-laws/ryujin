@@ -195,21 +195,21 @@ namespace grendel
       const auto &rho_min = std::get<0>(bounds);
       const auto &rho_max = std::get<1>(bounds);
 
-      constexpr ScalarNumber eps_ =
+      constexpr ScalarNumber eps =
           std::numeric_limits<ScalarNumber>::epsilon();
 
       t_r = dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
           rho_max,
           U_rho + t_r * P_rho,
-          (std::abs(rho_max - U_rho) + eps_ * rho_min) /
-              (std::abs(P_rho) + eps_ * rho_max),
+          (std::abs(rho_max - U_rho) + eps * rho_min) /
+              (std::abs(P_rho) + eps * rho_max),
           t_r);
 
       t_r = dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
           U_rho + t_r * P_rho,
           rho_min,
-          (std::abs(rho_min - U_rho) + eps_ * rho_min) /
-              (std::abs(P_rho) + eps_ * rho_max),
+          (std::abs(rho_min - U_rho) + eps * rho_min) /
+              (std::abs(P_rho) + eps * rho_max),
           t_r);
 
       /*
@@ -332,8 +332,7 @@ namespace grendel
           }
         }
 
-        quadratic_newton_step<true /*concave*/>(
-            t_l, t_r, psi_l, psi_r, dpsi_l, dpsi_r);
+        quadratic_newton_step(t_l, t_r, psi_l, psi_r, dpsi_l, dpsi_r);
       }
 
 #ifdef DEBUG

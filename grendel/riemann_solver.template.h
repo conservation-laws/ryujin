@@ -434,8 +434,7 @@ namespace grendel
       const Number dphi_p_1 = dphi(riemann_data_i, riemann_data_j, p_1);
       const Number dphi_p_2 = dphi(riemann_data_i, riemann_data_j, p_2);
 
-      quadratic_newton_step<true>(
-          p_1, p_2, phi_p_1, phi_p_2, dphi_p_1, dphi_p_2);
+      quadratic_newton_step(p_1, p_2, phi_p_1, phi_p_2, dphi_p_1, dphi_p_2);
 
       /* Update  lambda_max and gap: */
       {

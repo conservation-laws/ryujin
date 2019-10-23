@@ -11,7 +11,6 @@
 
 #include <functional>
 
-/* FIXME: Currently the handling of compile time constants is a big mess... */
 #ifndef NEWTON_MAX_ITER
 #define NEWTON_MAX_ITER 0
 #endif
@@ -20,10 +19,18 @@ namespace grendel
 {
 
   /**
-   * A fast approximative Riemann problem solver for the nD compressible
-   * Euler problem.
+   * A fast approximative solver for the 1D Riemann problem. The solver
+   * ensures that the estimate lambda_max that is returned for the maximal
+   * wavespeed is a strict upper bound ensuring that all important
+   * invariance principles are obtained.
    *
-   * FIXME: Desciption
+   * FIXME: Further explanation
+     *
+     * References:
+     *   [1] J.-L. Guermond, B. Popov. Fast estimation from above for the
+     *       maximum wave speed in the Riemann problem for the Euler equations.
+     *
+     *   [2] J.-L. Guermond, et al. In progress.
    */
   template <int dim, typename Number = double>
   class RiemannSolver
@@ -70,16 +77,8 @@ namespace grendel
      * For two given states U_i a U_j and a (normalized) "direction" n_ij
      * compute an estimation of an upper bound for lambda.
      *
-     * See [1], page 915, Algorithm 1
-     *
      * Returns a tuple consisting of lambda max and the number of Newton
      * iterations used in the solver to find it.
-     *
-     * References:
-     *   [1] J.-L. Guermond, B. Popov. Fast estimation from above for the
-     *       maximum wave speed in the Riemann problem for the Euler equations.
-     *
-     *   [2] J.-L. Guermond, et al. In progress.
      */
     static std::tuple<Number /*lambda_max*/,
                       Number /*p_star*/,

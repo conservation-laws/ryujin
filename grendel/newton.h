@@ -15,11 +15,15 @@ namespace grendel
    * Precondition:
    *
    *   p_1 <= p* <= p_2
-   *   phi(p_1) <= 0. <= phi(p_2)
    *
-   * Modifies p_1 and P_2.
+   *   phi(p_1) <= 0. <= phi(p_2), or phi(p_1) >= 0. >= phi(p_2)
+   *
+   *   phi''' < 0, or phi''' > 0
+   *
+   * Modifies p_1 and P_2 ensures that p_1 <= p_2, and that p_1 (p_2) is
+   * monotonically increasing (decreasing).
    */
-  template <bool increasing, typename Number>
+  template <typename Number>
   DEAL_II_ALWAYS_INLINE inline void quadratic_newton_step(Number &p_1,
                                                           Number &p_2,
                                                           const Number phi_p_1,
@@ -28,18 +32,15 @@ namespace grendel
                                                           const Number dphi_p_2)
   {
     using ScalarNumber = typename get_value_type<Number>::type;
+    constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
 
-    static constexpr ScalarNumber newton_eps =
-        std::is_same<ScalarNumber, double>::value ? ScalarNumber(1.0e-10)
-                                                  : ScalarNumber(1.0e-4);
-
-    constexpr auto sign = increasing ? ScalarNumber(1.) : ScalarNumber(-1.);
+    constexpr auto sign = ScalarNumber(1.);
 
     /*
      * Compute divided differences
      */
 
-    const auto scaling = ScalarNumber(1.) / (p_2 - p_1 + Number(newton_eps));
+    const auto scaling = ScalarNumber(1.) / (p_2 - p_1 + Number(eps));
 
     const Number dd_11 = dphi_p_1;
     const Number dd_12 = (phi_p_2 - phi_p_1) * scaling;
@@ -63,14 +64,14 @@ namespace grendel
     auto t_1 =
         p_1 - dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
                   std::abs(denominator_1),
-                  Number(newton_eps),
+                  Number(eps),
                   Number(0.),
                   ScalarNumber(2.) * phi_p_1 / denominator_1);
 
     auto t_2 =
         p_2 - dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
                   std::abs(denominator_2),
-                  Number(newton_eps),
+                  Number(eps),
                   Number(0.),
                   ScalarNumber(2.) * phi_p_2 / denominator_2);
 
