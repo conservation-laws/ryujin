@@ -888,9 +888,13 @@ namespace grendel
     const Number tau_2 = euler_step(U, t, tau_1);
 
     const Number ratio = cfl_max_ / cfl_update_;
-    AssertThrow(ratio * tau_2 >= tau_1,
-                ExcMessage("Problem performing SSP H(2) time step: "
-                           "CFL condition violated."));
+
+    if(ratio * tau_2 >= tau_1)
+      deallog << "!!!!  Problem performing SSP H(2) time step: CFL violated: "
+              << tau_1 / tau_2 * cfl_update_ << " > " << cfl_max_ << std::endl;
+//     AssertThrow(ratio * tau_2 >= tau_1,
+//                 ExcMessage("Problem performing SSP H(2) time step: "
+//                            "CFL condition violated."));
 
     for (unsigned int k = 0; k < problem_dimension; ++k)
       U[k].sadd(Number(1. / 2.), Number(1. / 2.), temp_ssprk_[k]);
@@ -917,9 +921,13 @@ namespace grendel
     const Number tau_2 = euler_step(U, t, tau_1);
 
     const Number ratio = cfl_max_ / cfl_update_;
-    AssertThrow(ratio * tau_2 >= tau_1,
-                ExcMessage("Problem performing SSP RK(3) time step: "
-                           "CFL condition violated."));
+
+    if(ratio * tau_2 >= tau_1)
+      deallog << "!!!!  Problem performing SSP RK(3) time step: CFL violated: "
+              << tau_1 / tau_2 * cfl_update_ << " > " << cfl_max_ << std::endl;
+//     AssertThrow(ratio * tau_2 >= tau_1,
+//                 ExcMessage("Problem performing SSP RK(3) time step: "
+//                            "CFL condition violated."));
 
     for (unsigned int k = 0; k < problem_dimension; ++k)
       U[k].sadd(Number(1. / 4.), Number(3. / 4.), temp_ssprk_[k]);
@@ -929,9 +937,12 @@ namespace grendel
 
     const Number tau_3 = euler_step(U, t, tau_1);
 
-    AssertThrow(ratio * tau_3 >= tau_1,
-                ExcMessage("Problem performing SSP RK(3) time step: "
-                           "CFL condition violated."));
+    if(ratio * tau_3 >= tau_1)
+      deallog << "!!!!  Problem performing SSP RK(3) time step: CFL violated: "
+              << tau_1 / tau_3 * cfl_update_ << " > " << cfl_max_ << std::endl;
+//     AssertThrow(ratio * tau_3 >= tau_1,
+//                 ExcMessage("Problem performing SSP RK(3) time step: "
+//                            "CFL condition violated."));
 
     for (unsigned int k = 0; k < problem_dimension; ++k)
       U[k].sadd(Number(2. / 3.), Number(1. / 3.), temp_ssprk_[k]);
