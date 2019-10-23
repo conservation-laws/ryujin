@@ -651,24 +651,26 @@ namespace grendel
       P[k] = ScalarNumber(0.5) * (f_i[k] - f_j[k]) * n_ij;
 
     constexpr auto limiter = Limiter<dim, Number>::Limiters::entropy_inequality;
-//     const auto lambda_greedy_inverse =
+    const auto lambda_greedy_inverse =
         Limiter<dim, Number>::template limit<limiter>(
             bounds,
             U,
             P,
             ScalarNumber(1.) / lambda_max,
-            ScalarNumber(1.) / lambda_max);
+            ScalarNumber(1000.) / lambda_max);
 
-    //     if constexpr (std::is_same<Number, double>::value ||
-    //                   std::is_same<Number, float>::value) {
-    //       std::cout << 1. / lambda_greedy_inverse << "  <<<<  " << lambda_max
-    //                 << std::endl;
-    //     } else {
-    //       for (unsigned int k = 0; k < Number::n_array_elements; ++k) {
-    //         std::cout << 1. / lambda_greedy_inverse[k] << "  <<<<  "
-    //                   << lambda_max[k] << std::endl;
-    //       }
-    //     }
+    const auto lambda_greedy = ScalarNumber(1.) / lambda_greedy_inverse;
+
+#ifdef DEBUG
+    AssertThrowSIMD(
+        lambda_max - lambda_greedy,
+        [](auto val) { return val > -newton_eps<ScalarNumber>; },
+        dealii::ExcMessage("Garbled up lambda_greedy."));
+#endif
+
+//     if constexpr (std::is_same<Number, double>::value)
+//       if (lambda_max / lambda_greedy > 1.1)
+//         std::cout << lambda_greedy << "  <<<<  " << lambda_max << std::endl;
 
     return {lambda_max, p_star, i};
   }

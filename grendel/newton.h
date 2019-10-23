@@ -19,7 +19,7 @@ namespace grendel
   /*
    * Maximal number of Newton iterations we will perform:
    */
-  static constexpr unsigned int newton_max_iter = 2;
+  static constexpr unsigned int newton_max_iter = 10;
 
   /*
    * Perform one step of a quadratic Newton iteration.

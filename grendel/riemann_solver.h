@@ -49,6 +49,7 @@ namespace grendel
 
     static constexpr bool greedy_dij_ = true;
 
+
     /* In case of the greedy variant, we have to allow for at least one
      * Newton iteration step. */
     static constexpr unsigned int newton_max_iter_ =

@@ -398,12 +398,12 @@ namespace grendel
         /* If psi_r > 0 the right state is fine, force returning t_r by
          * setting t_l = t_r: */
         t_l = dealii::compare_and_apply_mask<
-            dealii::SIMDComparison::greater_than>(psi_r, Number(0.), t_r, t_l);
+            dealii::SIMDComparison::less_than_or_equal>(
+            psi_r, Number(0.), t_r, t_l);
 
         /* If we have set t_l = t_r we can break: */
-        if (t_l == t_r) {
+        if (t_l == t_r)
           break;
-        }
 
         const auto U_l = U + t_l * P;
         const auto rho_l = U_l[0];
@@ -415,9 +415,8 @@ namespace grendel
         /* Shortcut: In the majority of cases only at most one Newton iteration
          * is necessary because we reach Psi(t_l) \approx 0 quickly. Just return
          * in this case: */
-        if (std::max(Number(0.), psi_l - newton_eps<Number>) == Number(0.)) {
+        if (std::max(Number(0.), psi_l - newton_eps<Number>) == Number(0.))
           break;
-        }
 
 #ifdef DEBUG
         AssertThrowSIMD(
@@ -440,10 +439,7 @@ namespace grendel
 #endif
     }
 
-    if constexpr (limiter == Limiters::entropy_inequality)
-      return t_l;
-
-    __builtin_unreachable();
+    return t_r;
   }
 
 } /* namespace grendel */
