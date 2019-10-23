@@ -381,8 +381,8 @@ namespace grendel
      *    p_1 and setting p_1 <- 0 if necessary.
      */
 
-    Number p_min = std::min(riemann_data_i[2], riemann_data_j[2]);
-    Number p_max = std::max(riemann_data_i[2], riemann_data_j[2]);
+    const Number p_min = std::min(riemann_data_i[2], riemann_data_j[2]);
+    const Number p_max = std::max(riemann_data_i[2], riemann_data_j[2]);
 
     const Number p_star_tilde =
         p_star_two_rarefaction(riemann_data_i, riemann_data_j);
@@ -398,6 +398,24 @@ namespace grendel
       const Number lambda_max =
           compute_lambda(riemann_data_i, riemann_data_j, p_2);
       return {lambda_max, p_2, -1, std::array<Number, 5>()};
+    }
+
+    if constexpr (greedy_dij_) {
+      /*
+       * If we are greedy, ensure that all the work we are about to do is
+       * actually beneficial. We do this by checking whether we have a
+       * contrast of more than greedy_threshold_ in the density. If not,
+       * cut it short:
+       */
+      const Number rho_min = std::min(riemann_data_i[0], riemann_data_j[0]);
+      const Number rho_max = std::max(riemann_data_i[0], riemann_data_j[0]);
+
+      if (std::max(Number(0.), rho_max * greedy_factor_ - rho_min) ==
+          Number(0.)) {
+        const Number lambda_max =
+            compute_lambda(riemann_data_i, riemann_data_j, p_2);
+        return {lambda_max, p_2, -1, std::array<Number, 5>()};
+      }
     }
 
     Number p_1 =
@@ -630,6 +648,20 @@ namespace grendel
 
     if constexpr (!greedy_dij_)
       return {lambda_max, p_star, i};
+
+    /*
+     * If we are greedy, ensure that all the work we are about to do is
+     * actually beneficial. We do this by checking whether we have a
+     * contrast of more than greedy_threshold_ in the density. If not, cut
+     * it short:
+     */
+    const Number rho_min = std::min(riemann_data_i[0], riemann_data_j[0]);
+    const Number rho_max = std::max(riemann_data_i[0], riemann_data_j[0]);
+
+    if (std::max(Number(0.), rho_max * greedy_factor_ - rho_min) ==
+        Number(0.)) {
+      return {lambda_max, p_star, i};
+    }
 
     /*
      * So, we are indeed greedy... Lets' try to minimize lambda_max as much

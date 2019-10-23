@@ -47,7 +47,19 @@ namespace grendel
      * Options:
      */
 
+    /*
+     * Try to improve the maximal wavespeed estimate. When enabled the
+     * RiemannSolver also computes
+     *  - appropriate bounds on density and specific entropy
+     *  - average and flux of the state and a Harten entropy
+     *  - does a full limiter pass against the inviscid Galerkin update
+     */
     static constexpr bool greedy_dij_ = true;
+
+    /*
+     * Threshold for greedy d_ij computation
+     */
+    static constexpr ScalarNumber greedy_factor_ = ScalarNumber(0.97);
 
     static constexpr bool relax_greedy_bounds_ = false;
 
