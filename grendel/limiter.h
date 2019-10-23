@@ -221,18 +221,10 @@ namespace grendel
 
 #ifdef DEBUG
       const auto new_density = (U + t_r * P)[0];
-
-      if constexpr (std::is_same<Number, double>::value ||
-                    std::is_same<Number, float>::value) {
-        AssertThrow(new_density > 0.,
-                    dealii::ExcMessage("I'm sorry, Dave. I'm afraid I can't do "
-                                       "that. - Negative density."));
-      } else {
-        for (unsigned int k = 0; k < Number::n_array_elements; ++k)
-          AssertThrow(new_density[k] > 0.,
-                      dealii::ExcMessage("I'm sorry, Dave. I'm afraid I can't "
-                                         "do that. - Negative density."));
-      }
+      AssertThrowSIMD(
+          new_density,
+          [](auto val) { return val > 0.; },
+          dealii::ExcMessage("Negative density."));
 #endif
     }
 
@@ -317,20 +309,12 @@ namespace grendel
             rho_r * de_r -
             (e_r - gp1 * s_min * rho_r_gamma_plus_one / rho_r) * drho;
 
-        if constexpr (std::is_same<Number, double>::value ||
-                      std::is_same<Number, float>::value) {
-
-          if (psi_l > 0.)
-            std::cout << "specific entropy minimum principle violated: "
-                      << psi_l << std::endl;
-
-        } else {
-          for (unsigned int k = 0; k < Number::n_array_elements; ++k) {
-            if (psi_l[k] > 0.)
-              std::cout << "specific entropy minimum principle violated: "
-                        << psi_l[k] << std::endl;
-          }
-        }
+#ifdef DEBUG
+        AssertThrowSIMD(
+            psi_l,
+            [](auto val) { return val > 0.; },
+            dealii::ExcMessage("Specific entropy minimum principle violated."));
+#endif
 
         quadratic_newton_step(t_l, t_r, psi_l, psi_r, dpsi_l, dpsi_r);
       }
@@ -338,51 +322,28 @@ namespace grendel
 #ifdef DEBUG
       const auto U_new = U + t_l * P;
       const auto rho_new = U_new[0];
-
       const auto e_new =
           ProblemDescription<dim, Number>::internal_energy(U_new);
       const auto s_new =
           ProblemDescription<dim, Number>::specific_entropy(U_new);
-      auto psi =
-          rho_new * e_new - s_min * grendel::pow(rho_new, gp1) * relaxation;
 
-      if constexpr (std::is_same<Number, double>::value ||
-                    std::is_same<Number, float>::value) {
-        AssertThrow(
-            e_new > 0. && s_new > 0.,
-            dealii::ExcMessage(
-                "I'm sorry, Dave. I'm afraid I can't do that. - Negative "
-                "internal energy or negative specific entropy encountered."));
-//         AssertThrow( //
-//             psi > 0.,
-//             dealii::ExcMessage(
-//                 "I'm sorry, Dave. I'm afraid I can't do that. - Local minimum "
-//                 "principle on specific entropy violated."));
-        if (psi > 0.)
-          std::cout << "(update) specific entropy minimum principle violated: "
-                    << psi << std::endl;
-      } else {
-        for (unsigned int k = 0; k < Number::n_array_elements; ++k) {
-          AssertThrow(
-              e_new[k] > 0. && s_new[k] > 0.,
-              dealii::ExcMessage(
-                  "I'm sorry, Dave. I'm afraid I can't do that. - Negative "
-                  "internal energy or negative specific entropy encountered."));
-//           AssertThrow( //
-//               psi[k] > 0.,
-//               dealii::ExcMessage(
-//                   "I'm sorry, Dave. I'm afraid I can't do that. - Local "
-//                   "minimum principle on specific entropy violated."));
-          if (psi[k] > 0.)
-            std::cout
-                << "(update) specific entropy minimum principle violated: "
-                << psi[k] << std::endl;
-        }
-      }
+      AssertThrowSIMD(
+          e_new,
+          [](auto val) { return val > 0.; },
+          dealii::ExcMessage("Negative internal energy."));
+
+      AssertThrowSIMD(
+          s_new,
+          [](auto val) { return val > 0.; },
+          dealii::ExcMessage("Negative specific entropy."));
+
+      AssertThrowSIMD(
+          rho_new * e_new - s_min * grendel::pow(rho_new, gp1) * relaxation,
+          [](auto val) { return val > 0.; },
+          dealii::ExcMessage("Specific entropy minimum principle violated."));
 #endif
     }
 
-    /* t_l is the good state: */
     if constexpr (limiter == Limiters::specific_entropy)
       return t_l;
 
@@ -461,27 +422,31 @@ namespace grendel
           break;
         }
 
-        if constexpr (std::is_same<Number, double>::value ||
-                      std::is_same<Number, float>::value) {
-
-          if (psi_l > 0.)
-            std::cout << "entropy inequality violated: " << psi_l << std::endl;
-
-        } else {
-          for (unsigned int k = 0; k < Number::n_array_elements; ++k) {
-            if (psi_l[k] > 0.)
-              std::cout << "entropy inequality violated: " << psi_l[k]
-                        << std::endl;
-          }
-        }
+#ifdef DEBUG
+        AssertThrowSIMD(
+            psi_l,
+            [](auto val) { return val > 0.; },
+            dealii::ExcMessage("Entropy inequality violated."));
+#endif
       }
 
 #ifdef DEBUG
+      const auto U_new = U + t_l * P;
+      const auto rho_rho_e =
+          U_new[0] * ProblemDescription<dim, Number>::internal_energy(U_new);
+      const auto avg = grendel::pow(positive_part(a + b * t_l), gp1);
+
+    AssertThrowSIMD(
+        avg - rho_rho_e * relaxation,
+        [](auto val) { return val > 0.; },
+        dealii::ExcMessage("Entropy inequality violated."));
 #endif
     }
 
-    /* t_l is the good state: */
-    return t_l;
+    if constexpr (limiter == Limiters::entropy_inequality)
+      return t_l;
+
+    __builtin_unreachable();
   }
 
 } /* namespace grendel */

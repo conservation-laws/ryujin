@@ -6,6 +6,8 @@
 #include "riemann_solver.h"
 #include "simd.h"
 
+#define DEBUG
+
 namespace grendel
 {
   using namespace dealii;
@@ -619,6 +621,12 @@ namespace grendel
     auto [lambda_max, p_star, i, bounds] =
         compute(riemann_data_i, riemann_data_j);
 
+#ifdef DEBUG
+    const auto phi_p_star = phi(riemann_data_i, riemann_data_j, p_star);
+    std::cout << phi_p_star << std::endl;
+
+#endif
+
     if constexpr (!greedy_dij_)
       return {lambda_max, p_star, i};
 
@@ -664,5 +672,7 @@ namespace grendel
   }
 
 } /* namespace grendel */
+
+#undef DEBUG
 
 #endif /* RIEMANN_SOLVER_TEMPLATE_H */

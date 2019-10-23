@@ -478,6 +478,21 @@ namespace grendel
 
 
 /*
+ * AssertThrowSIMD
+ */
+
+#define AssertThrowSIMD(variable, condition, exception)                        \
+  if constexpr (std::is_same<Number, double>::value ||                         \
+                std::is_same<Number, float>::value) {                          \
+    AssertThrow(condition(variable), exception);                               \
+  } else {                                                                     \
+    for (unsigned int k = 0; k < Number::n_array_elements; ++k) {              \
+      AssertThrow(condition((variable)[k]), exception);                        \
+    }                                                                          \
+  }
+
+
+/*
  * A convenience macro that automatically writes out an accessor (or
  * getter) function:
  *
