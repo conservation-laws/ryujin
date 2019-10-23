@@ -231,7 +231,7 @@ namespace grendel
      * See [Guermond, Nazarov, Popov, Thomas], Section 4.6 + Section 5.1:
      */
 
-    Number t_l = t_min;
+    Number t_l = t_min; // good state
 
     constexpr ScalarNumber gamma = ProblemDescription<dim, Number>::gamma;
     constexpr ScalarNumber gp1 = gamma + ScalarNumber(1.);
@@ -261,10 +261,11 @@ namespace grendel
 
         const auto U_r = U + t_r * P;
         const auto rho_r = U_r[0];
-        const auto rho_r_gamma_plus_one = grendel::pow(rho_r, gp1);
-        const auto e_r = ProblemDescription<dim, Number>::internal_energy(U_r);
+        const auto rho_r_gamma = grendel::pow(rho_r, gamma);
+        const auto rho_e_r =
+            ProblemDescription<dim, Number>::internal_energy(U_r);
 
-        auto psi_r = rho_r * e_r - s_min * rho_r_gamma_plus_one * relaxation;
+        auto psi_r = rho_r * rho_e_r - s_min * rho_r * rho_r_gamma * relaxation;
 
         /* If psi_r > 0 the right state is fine, force returning t_r by
          * setting t_l = t_r: */
@@ -277,10 +278,10 @@ namespace grendel
 
         const auto U_l = U + t_l * P;
         const auto rho_l = U_l[0];
-        const auto rho_l_gamma_plus_one = grendel::pow(rho_l, gp1);
-        const auto e_l = ProblemDescription<dim, Number>::internal_energy(U_l);
+        const auto rho_l_gamma = grendel::pow(rho_l, gamma);
+        const auto rho_e_l = ProblemDescription<dim, Number>::internal_energy(U_l);
 
-        auto psi_l = rho_l * e_l - s_min * rho_l_gamma_plus_one * relaxation;
+        auto psi_l = rho_l * rho_e_l - s_min * rho_l * rho_l_gamma * relaxation;
 
         /* Shortcut: In the majority of cases only at most one Newton iteration
          * is necessary because we reach Psi(t_l) \approx 0 quickly. Just return
@@ -291,18 +292,16 @@ namespace grendel
         /* We got unlucky and have to perform a Newton step: */
 
         const auto drho = P[0];
-        const auto de_l =
+        const auto drho_e_l =
             ProblemDescription<dim, Number>::internal_energy_derivative(U_l) *
             P;
-        const auto de_r =
+        const auto drho_e_r =
             ProblemDescription<dim, Number>::internal_energy_derivative(U_r) *
             P;
         const auto dpsi_l =
-            rho_l * de_l -
-            (e_l - gp1 * s_min * rho_l_gamma_plus_one / rho_l) * drho;
+            rho_l * drho_e_l + (rho_e_l - gp1 * s_min * rho_l_gamma) * drho;
         const auto dpsi_r =
-            rho_r * de_r -
-            (e_r - gp1 * s_min * rho_r_gamma_plus_one / rho_r) * drho;
+            rho_r * drho_e_r + (rho_e_r - gp1 * s_min * rho_r_gamma) * drho;
 
 #ifdef DEBUG
         AssertThrowSIMD(
@@ -311,7 +310,8 @@ namespace grendel
             dealii::ExcMessage("Specific entropy minimum principle violated."));
 #endif
 
-        quadratic_newton_step(t_l, t_r, psi_l, psi_r, dpsi_l, dpsi_r);
+        quadratic_newton_step(
+            t_l, t_r, psi_l, psi_r, dpsi_l, dpsi_r, Number(-1.));
       }
 
 #ifdef DEBUG
@@ -382,6 +382,11 @@ namespace grendel
       const auto a = std::get<3>(bounds); /* 0.5*(salpha_i+salpha_j) */
       const auto b = std::get<4>(bounds); /* 0.5*(u_i*salpha_i-u_j*salpha_j) */
 
+      /* Extract the sign of psi''' depending on b: */
+      const auto sign =
+          dealii::compare_and_apply_mask<dealii::SIMDComparison::greater_than>(
+              b, Number(0.), Number(-1.), Number(1.));
+
       /*
        * Same quadratic Newton method as above, but for a different
        * 3-concave/3-convex psi:
@@ -400,7 +405,7 @@ namespace grendel
 
         auto psi_r = average_r * average_gamma_r - rho_r * rho_e_r * relaxation;
 
-        /* If psi_r > 0 the right state is fine, force returning t_r by
+        /* If psi_r <= 0 the right state is fine, force returning t_r by
          * setting t_l = t_r: */
         t_l = dealii::compare_and_apply_mask<
             dealii::SIMDComparison::less_than_or_equal>(
@@ -422,7 +427,7 @@ namespace grendel
         /* Shortcut: In the majority of cases only at most one Newton iteration
          * is necessary because we reach Psi(t_l) \approx 0 quickly. Just return
          * in this case: */
-        if (std::max(Number(0.), psi_l - newton_eps<Number>) == Number(0.))
+        if (std::min(Number(0.), psi_l + newton_eps<Number>) == Number(0.))
           break;
 
         /* We got unlucky and have to perform a Newton step: */
@@ -448,7 +453,7 @@ namespace grendel
             dealii::ExcMessage("Entropy inequality violated."));
 #endif
 
-        quadratic_newton_step(t_l, t_r, psi_l, psi_r, dpsi_l, dpsi_r);
+        quadratic_newton_step(t_l, t_r, psi_l, psi_r, dpsi_l, dpsi_r, sign);
       }
 
 #ifdef DEBUG
@@ -464,7 +469,7 @@ namespace grendel
 #endif
     }
 
-    return t_r;
+    return t_l;
   }
 
 } /* namespace grendel */

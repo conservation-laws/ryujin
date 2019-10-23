@@ -38,17 +38,17 @@ namespace grendel
    * monotonically increasing (decreasing).
    */
   template <typename Number>
-  DEAL_II_ALWAYS_INLINE inline void quadratic_newton_step(Number &p_1,
-                                                          Number &p_2,
-                                                          const Number phi_p_1,
-                                                          const Number phi_p_2,
-                                                          const Number dphi_p_1,
-                                                          const Number dphi_p_2)
+  DEAL_II_ALWAYS_INLINE inline void
+  quadratic_newton_step(Number &p_1,
+                        Number &p_2,
+                        const Number phi_p_1,
+                        const Number phi_p_2,
+                        const Number dphi_p_1,
+                        const Number dphi_p_2,
+                        const Number sign = Number(1.0))
   {
     using ScalarNumber = typename get_value_type<Number>::type;
     constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
-
-    constexpr auto sign = ScalarNumber(1.);
 
     /*
      * Compute divided differences
