@@ -9,7 +9,7 @@ int main()
 {
   using Number = VectorizedArray<double>;
 
-  constexpr int dim = 2;
+  constexpr int dim = 1;
 
   const auto riemann_data = [&](const auto &state) {
     const Number rho = state[0];

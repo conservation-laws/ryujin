@@ -7,7 +7,7 @@ using namespace dealii;
 
 int main()
 {
-  constexpr int dim = 2;
+  constexpr int dim = 1;
 
   const auto riemann_data = [&](const auto &state) {
     const double rho = state[0];
