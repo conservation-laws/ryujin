@@ -154,14 +154,18 @@ namespace grendel
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
-     * and return the entropy \eta = p^(1/\gamma)
+     * and return the Harten-type entropy
+     *
+     *   \eta = (rho^2 e) ^ (1 / (gamma + 1))
      */
     static Number entropy(const rank1_type U);
 
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
-     * and return the derivative \eta' of the entropy \eta = p^(1/\gamma)
+     * and return the derivative \eta' of the Harten-type entropy
+     *
+     *   \eta = (rho^2 e) ^ (1 / (gamma + 1))
      */
     static rank1_type entropy_derivative(const rank1_type U);
 
@@ -302,8 +306,16 @@ namespace grendel
   DEAL_II_ALWAYS_INLINE inline Number
   ProblemDescription<dim, Number>::entropy(const rank1_type U)
   {
-    const auto p = pressure(U);
-    return grendel::pow(p, ScalarNumber(1. / gamma));
+    /*
+     * We have
+     *   rho^2 e = \rho E - 1/2*m^2
+     */
+    const Number &rho = U[0];
+    const auto m = momentum(U);
+    const Number &E = U[dim + 1];
+
+    const Number rho_rho_e = rho * E - ScalarNumber(0.5) * m.norm_square();
+    return grendel::pow(rho_rho_e, gamma_plus_one_inverse);
   }
 
 
@@ -314,34 +326,32 @@ namespace grendel
   {
     /*
      * With
-     *   eta = p ^ (1/gamma)
-     *   p = (gamma - 1) * (rho e)
-     *   rho e = E - 1/2 |m|^2 / rho
+     *   eta = (rho^2 e) ^ 1/(gamma+1)
+     *   rho^2 e = rho * E - 1/2 |m|^2
      *
      * we get
      *
-     *   eta' = (gamma - 1)/gamma p ^(1/gamma - 1) *
-     *
-     *     (1/2m^2/rho^2 , -m/rho , 1 )^T
+     *   eta' = 1/(gamma+1) * (rho^2 e) ^ -gamma/(gamma+1) * ( E , -m , rho )^T
      *
      * (Here we have set b = 0)
      */
-
     const Number &rho = U[0];
-    const auto u = momentum(U) / rho;
-    const auto p = pressure(U);
+    const auto m = momentum(U);
+    const Number &E = U[dim + 1];
+
+    const Number rho_rho_e = rho * E - ScalarNumber(0.5) * m.norm_square();
 
     const auto factor =
-        (gamma - ScalarNumber(1.0)) / gamma *
-        grendel::pow(p, ScalarNumber(1.) / gamma - ScalarNumber(1.));
+        gamma_plus_one_inverse *
+        grendel::pow(rho_rho_e, -gamma * gamma_plus_one_inverse);
 
     rank1_type result;
 
-    result[0] = factor * ScalarNumber(0.5) * u.norm_square();
-    result[dim + 1] = factor;
+    result[0] = factor * E;
     for (unsigned int i = 0; i < dim; ++i) {
-      result[1 + i] = -factor * u[i];
+      result[1 + i] = -factor * m[i];
     }
+    result[dim + 1] = factor * rho;
 
     return result;
   }

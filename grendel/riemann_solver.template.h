@@ -655,11 +655,7 @@ namespace grendel
        * window r_i = h_i ^ (3/2) than is done for the second order
        * limiting.
        */
-      const Number r_i =
-          ScalarNumber(2.) *
-          dealii::Utilities::fixed_power<
-              Limiter<dim, Number>::relaxation_order_>(std::sqrt(hd_i));
-      const Number factor = Number(1.) - r_i;
+      const Number factor = Number(1.) - hd_i;
       std::get<2>(bounds) *= factor;
       std::get<3>(bounds) *= factor;
       std::get<4>(bounds) *= factor;
