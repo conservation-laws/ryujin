@@ -41,7 +41,7 @@ namespace ryujin
                 unsigned int cycle,
                 bool checkpoint = false);
 
-    void print_throughput(unsigned int cycle);
+    void print_throughput(unsigned int cycle, Number t);
 
     /* Data: */
 
