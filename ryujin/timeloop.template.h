@@ -397,6 +397,9 @@ namespace ryujin
     deallog << "Indicator<dim, Number>::compute_second_variations_ == "
             << Indicator<dim, Number>::compute_second_variations_ << std::endl;
 
+    deallog << "Indicator<dim, Number>::entropy_viscosity_alpha_factor_ == "
+            << Indicator<dim, Number>::entropy_viscosity_alpha_factor_ << std::endl;
+
     deallog << "Limiter<dim, Number>::limiter_ == ";
     switch (Limiter<dim, Number>::limiter_) {
     case Limiter<dim, Number>::Limiters::none:
