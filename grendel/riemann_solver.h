@@ -12,7 +12,7 @@
 #include <functional>
 
 #ifndef NEWTON_MAX_ITER
-#define NEWTON_MAX_ITER 0
+#define NEWTON_MAX_ITER 1
 #endif
 
 namespace grendel
@@ -73,9 +73,7 @@ namespace grendel
 
     /* In case of the greedy variant, we have to allow for at least one
      * Newton iteration step. */
-    static constexpr unsigned int newton_max_iter_ =
-        greedy_dij_ ? std::max(NEWTON_MAX_ITER, 1) : NEWTON_MAX_ITER;
-
+    static constexpr unsigned int newton_max_iter_ = NEWTON_MAX_ITER;
 
     /**
      * For two given 1D primitive states riemann_data_i and riemann_data_j,
