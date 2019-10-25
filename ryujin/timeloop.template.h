@@ -786,7 +786,8 @@ namespace ryujin
     head << "            (WALL)  " << std::fixed << wall_m_dofs_per_sec
          << " MQ/s  (" << std::scientific << 1. / wall_m_dofs_per_sec * 1.e-6
          << " s/Qdof/cycle)  (" << std::fixed << ((double)cycle) / wall_time
-         << " cycles/s)  (avg dt = " << t / ((double)cycle) << ")" << std::endl;
+         << " cycles/s)  (avg dt = " << std::scientific << t / ((double)cycle)
+         << ")" << std::endl;
 
     deallog << head.str() << std::endl;
   }
