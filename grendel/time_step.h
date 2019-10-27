@@ -121,6 +121,7 @@ namespace grendel
 
     dealii::LinearAlgebra::distributed::Vector<Number> rho_second_variation_;
     dealii::LinearAlgebra::distributed::Vector<Number> rho_relaxation_;
+
     dealii::LinearAlgebra::distributed::Vector<Number> alpha_;
     ACCESSOR_READ_ONLY(alpha)
 

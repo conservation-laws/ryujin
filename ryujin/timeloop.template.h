@@ -649,9 +649,6 @@ namespace ryujin
       output_vector[i] = U[i];
     }
 
-    output_alpha = time_step.alpha();
-
-
     /* Distribute hanging nodes and update ghost values: */
 
     for (unsigned int i = 0; i < problem_dimension; ++i) {
@@ -659,10 +656,7 @@ namespace ryujin
       output_vector[i].update_ghost_values();
     }
 
-    affine_constraints.distribute(output_alpha);
-    output_alpha.update_ghost_values();
-
-    postprocessor.compute(output_vector);
+    postprocessor.compute(output_vector, time_step.alpha());
 
     /* Output data in vtu format: */
 
@@ -670,6 +664,8 @@ namespace ryujin
     const auto output_worker = [this, name, t, cycle, checkpoint]() {
       constexpr auto problem_dimension =
           ProblemDescription<dim, Number>::problem_dimension;
+      constexpr auto n_quantities = Postprocessor<dim, Number>::n_quantities;
+
       const auto &dof_handler = offline_data.dof_handler();
       const auto &triangulation = discretization.triangulation();
       const auto &mapping = discretization.mapping();
@@ -701,9 +697,9 @@ namespace ryujin
       for (unsigned int i = 0; i < problem_dimension; ++i)
         data_out.add_data_vector(output_vector[i], component_names[i]);
 
-      data_out.add_data_vector(postprocessor.schlieren(), "schlieren");
-
-      data_out.add_data_vector(output_alpha, "alpha");
+      for (unsigned int i = 0; i < n_quantities; ++i)
+        data_out.add_data_vector(postprocessor.quantities()[i],
+                                 postprocessor.component_names[i]);
 
       data_out.build_patches(mapping,
                              discretization.finite_element().degree - 1);

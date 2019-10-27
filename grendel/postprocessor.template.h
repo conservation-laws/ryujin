@@ -12,6 +12,30 @@ namespace grendel
 {
   using namespace dealii;
 
+  template <>
+  const std::array<std::string, 2> Postprocessor<1, double>::component_names{
+      "schlieren", "alpha"};
+
+  template <>
+  const std::array<std::string, 3> Postprocessor<2, double>::component_names{
+      "schlieren", "vorticity", "alpha"};
+
+  template <>
+  const std::array<std::string, 5> Postprocessor<3, double>::component_names{
+      "schlieren", "vorticity_1", "vorticity_2", "vorticity_3", "alpha"};
+
+  template <>
+  const std::array<std::string, 2> Postprocessor<1, float>::component_names{
+      "schlieren", "alpha"};
+
+  template <>
+  const std::array<std::string, 3> Postprocessor<2, float>::component_names{
+      "schlieren", "vorticity", "alpha"};
+
+  template <>
+  const std::array<std::string, 5> Postprocessor<3, float>::component_names{
+      "schlieren", "vorticity_1", "vorticity_2", "vorticity_3", "alpha"};
+
 
   template <int dim, typename Number>
   Postprocessor<dim, Number>::Postprocessor(
@@ -40,15 +64,14 @@ namespace grendel
 
     const auto &partitioner = offline_data_->partitioner();
 
-    schlieren_.reinit(partitioner);
-    for(auto &it: vorticity_)
+    for(auto &it: quantities_)
       it.reinit(partitioner);
   }
 
 
   template <int dim, typename Number>
-  void
-  Postprocessor<dim, Number>::compute(const vector_type &U)
+  void Postprocessor<dim, Number>::compute(const vector_type &U,
+                                           const scalar_type &alpha)
   {
     deallog << "Postprocessor<dim, Number>::compute()" << std::endl;
 
@@ -124,15 +147,29 @@ namespace grendel
             }
           }
 
-          const Number m_i = lumped_mass_matrix.diag_element(i);
-
-          const auto r = r_i.norm() / m_i;
-          schlieren_.local_element(i) = r;
-          r_i_max_on_subrange = std::max(r_i_max_on_subrange, r);
-          r_i_min_on_subrange = std::min(r_i_min_on_subrange, r);
+          /* Populate quantities: */
 
           const Number rho_i = U[0].local_element(i);
-          scatter(vorticity_, vorticity / (m_i * rho_i), i);
+          const Number m_i = lumped_mass_matrix.diag_element(i);
+
+          Tensor<1, n_quantities, Number> quantities;
+
+          quantities[0] = r_i.norm() / m_i;
+
+          vorticity /= (m_i * rho_i);
+          if constexpr (dim == 2) {
+            quantities[1] = vorticity[0];
+          } else if constexpr (dim == 3) {
+            quantities[1] = vorticity[0];
+            quantities[2] = vorticity[1];
+          }
+
+          quantities[n_quantities - 1] = alpha.local_element(i);
+
+          r_i_max_on_subrange = std::max(r_i_max_on_subrange, quantities[0]);
+          r_i_min_on_subrange = std::min(r_i_min_on_subrange, quantities[0]);
+
+          scatter(quantities_, quantities, i);
         }
 
         /* Synchronize over all threads: */
@@ -160,7 +197,7 @@ namespace grendel
     r_i_min.store(Utilities::MPI::min(r_i_min.load(), mpi_communicator_));
 
     /*
-     * Step 2: Compute schlieren:
+     * Step 2: Normalize schlieren:
      */
 
     {
@@ -175,8 +212,8 @@ namespace grendel
           if (++sparsity.begin(i) == sparsity.end(i))
             continue;
 
-          const auto r_i = schlieren_.local_element(i);
-          schlieren_.local_element(i) =
+          const auto r_i = quantities_[0].local_element(i);
+          quantities_[0].local_element(i) =
               Number(1.) - std::exp(-schlieren_beta_ * (r_i - r_i_min) /
                                     (r_i_max - r_i_min));
         }
@@ -184,12 +221,16 @@ namespace grendel
 
       parallel::apply_to_subranges(
           indices.begin(), indices.end(), on_subranges, 4096);
-
-      /* Fix up hanging nodes: */
-      affine_constraints.distribute(schlieren_);
     }
 
-    schlieren_.update_ghost_values();
+    /*
+     * Step 3: Fix up constraints and distribute:
+     */
+
+    for (auto &it : quantities_) {
+      affine_constraints.distribute(it);
+      it.update_ghost_values();
+    }
   }
 
 } /* namespace grendel */
