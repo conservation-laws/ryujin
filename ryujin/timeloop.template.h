@@ -175,7 +175,7 @@ namespace ryujin
     auto U = interpolate_initial_values();
 
     if (resume) {
-      print_head("restore interrupted computation");
+      print_head("resume interrupted computation");
 
       const auto &triangulation = discretization.triangulation();
       const unsigned int i = triangulation.locally_owned_subdomain();
