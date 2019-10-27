@@ -61,7 +61,6 @@ namespace grendel
     const auto &partitioner = offline_data_->partitioner();
 
     second_variations_.reinit(partitioner);
-    rho_relaxation_.reinit(partitioner);
     alpha_.reinit(partitioner);
 
     for (auto &it : bounds_)
@@ -146,7 +145,6 @@ namespace grendel
 
     const auto &lumped_mass_matrix = offline_data_->lumped_mass_matrix();
     const auto &bij_matrix = offline_data_->bij_matrix();
-    const auto &betaij_matrix = offline_data_->betaij_matrix();
     const auto &cij_matrix = offline_data_->cij_matrix();
 
     const auto &boundary_normal_map = offline_data_->boundary_normal_map();
@@ -325,11 +323,7 @@ namespace grendel
           if (++sparsity.begin(i) == sparsity.end(i))
             continue;
 
-          const Number delta_rho_i = second_variations_.local_element(i);
-
           Number d_sum = Number(0.);
-          Number rho_relaxation_numerator = Number(0.);
-          Number rho_relaxation_denominator = Number(0.);
 
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
             const auto j = jt->column();
@@ -344,19 +338,8 @@ namespace grendel
                   jt,
                   get_transposed_entry(dij_matrix_, jt, transposed_indices));
 
-            const Number delta_rho_j = second_variations_.local_element(j);
-            const auto beta_ij = get_entry(betaij_matrix, jt);
-
-            /* The numerical constant 8 is up to debate... */
-            rho_relaxation_numerator +=
-                Number(8.0 * 0.5) * beta_ij * (delta_rho_i + delta_rho_j);
-            rho_relaxation_denominator += beta_ij;
-
             d_sum -= get_entry(dij_matrix_, jt);
           }
-
-          rho_relaxation_.local_element(i) =
-              std::abs(rho_relaxation_numerator / rho_relaxation_denominator);
 
           dij_matrix_.diag_element(i) = d_sum;
 
@@ -418,7 +401,7 @@ namespace grendel
 
       const auto step_3_simd = [&](auto i1, const auto i2) {
         /* Notar bene: This bounds variable is thread local: */
-        Limiter<dim, VectorizedArray<Number>> limiter;
+        Limiter<dim, VectorizedArray<Number>> limiter(*offline_data_);
 
         /* lambda is the same value for all interior dofs */
         const auto size = std::distance(sparsity.begin(*i1), sparsity.end(*i1));
@@ -433,6 +416,8 @@ namespace grendel
               ProblemDescription<dim, VectorizedArray<Number>>::f(U_i);
 
           const auto alpha_i = simd_gather(alpha_, i);
+          const auto variations_i = simd_gather(second_variations_, i);
+
           const auto m_i = simd_get_diag_element(lumped_mass_matrix, i);
           const auto m_i_inv = Number(1.) / m_i;
 
@@ -443,6 +428,7 @@ namespace grendel
 
           /* Clear bounds: */
           limiter.reset();
+          limiter.reset_variations(variations_i);
 
           auto jts = generate_iterators<n_array_elements>(
               [&](auto k) { return sparsity.begin(i + k); });
@@ -454,9 +440,12 @@ namespace grendel
 
             const auto f_j =
                 ProblemDescription<dim, VectorizedArray<Number>>::f(U_j);
+
             const auto alpha_j = simd_gather(alpha_, js);
+            const auto variations_j = simd_gather(second_variations_, js);
 
             const auto c_ij = gather_get_entry(cij_matrix, jts);
+
             const auto d_ij = get_entry(dij_matrix_, jts);
             const auto d_ij_inv = Number(1.) / d_ij;
 
@@ -486,22 +475,23 @@ namespace grendel
 
             limiter.accumulate(
                 U_i, U_j, U_ij_bar, /* is diagonal */ js[0] == i);
+            limiter.accumulate_variations(variations_j, jts);
+
           }
 
           simd_scatter(temp_euler_, U_i_new, i);
           simd_scatter(r_, r_i, i);
 
           const auto hd_i = m_i * measure_of_omega_inverse;
-          const auto rho_relaxation_i = simd_gather(rho_relaxation_, i);
+          limiter.apply_relaxation(hd_i);
 
-          limiter.apply_relaxation(hd_i, rho_relaxation_i);
           simd_scatter(bounds_, limiter.bounds(), i);
         }
       };
 
       const auto step_3_serial = [&](auto i1, const auto i2) {
         /* Notar bene: This bounds variable is thread local: */
-        Limiter<dim, Number> limiter;
+        Limiter<dim, Number> limiter(*offline_data_);
 
         for (const auto i : boost::make_iterator_range(i1, i2)) {
 
@@ -514,6 +504,8 @@ namespace grendel
 
           const auto f_i = ProblemDescription<dim, Number>::f(U_i);
           const auto alpha_i = alpha_.local_element(i);
+          const auto variations_i = second_variations_.local_element(i);
+
           const Number m_i = lumped_mass_matrix.diag_element(i);
           const Number m_i_inv = Number(1.) / m_i;
 
@@ -524,6 +516,7 @@ namespace grendel
 
           /* Clear bounds: */
           limiter.reset();
+          limiter.reset_variations(variations_i);
 
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
             const auto j = jt->column();
@@ -531,6 +524,7 @@ namespace grendel
             const auto U_j = gather(U, j);
             const auto f_j = ProblemDescription<dim, Number>::f(U_j);
             const auto alpha_j = alpha_.local_element(j);
+            const auto variations_j = second_variations_.local_element(j);
 
             const auto c_ij = gather_get_entry(cij_matrix, jt);
             const auto d_ij = get_entry(dij_matrix_, jt);
@@ -560,14 +554,14 @@ namespace grendel
             scatter_set_entry(pij_matrix_, jt, p_ij);
 
             limiter.accumulate(U_i, U_j, U_ij_bar, /* is diagonal */ i == j);
+            limiter.accumulate_variations(variations_j, jt);
           }
 
           scatter(temp_euler_, U_i_new, i);
           scatter(r_, r_i, i);
 
           const Number hd_i = m_i * measure_of_omega_inverse;
-          const Number rho_relaxation_i = rho_relaxation_.local_element(i);
-          limiter.apply_relaxation(hd_i, rho_relaxation_i);
+          limiter.apply_relaxation(hd_i);
           scatter(bounds_, limiter.bounds(), i);
         }
       };

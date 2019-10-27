@@ -116,11 +116,10 @@ namespace grendel
 
     /* Scratch data: */
 
-    scalar_type second_variations_;
-    scalar_type rho_relaxation_;
-
     scalar_type alpha_;
     ACCESSOR_READ_ONLY(alpha)
+
+    scalar_type second_variations_;
 
     typename Limiter<dim, Number>::vector_type bounds_;
 
