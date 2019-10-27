@@ -64,6 +64,9 @@ namespace grendel
 
     const auto &partitioner = offline_data_->partitioner();
 
+    for (auto &it : U_)
+      it.reinit(partitioner);
+
     for(auto &it: quantities_)
       it.reinit(partitioner);
   }
@@ -88,7 +91,15 @@ namespace grendel
     const auto indices = boost::irange<unsigned int>(0, n_locally_owned);
 
     /*
-     * Step 1: Compute r_i and r_i_max, r_i_min:
+     * Step 1: Copy the current state vector over to output_vector:
+     */
+
+    for (unsigned int i = 0; i < problem_dimension; ++i) {
+      U_[i] = U[i];
+    }
+
+    /*
+     * Step 2: Compute r_i and r_i_max, r_i_min:
      */
 
     std::atomic<Number> r_i_max{0.};
@@ -197,7 +208,7 @@ namespace grendel
     r_i_min.store(Utilities::MPI::min(r_i_min.load(), mpi_communicator_));
 
     /*
-     * Step 2: Normalize schlieren:
+     * Step 3: Normalize schlieren:
      */
 
     {
@@ -224,8 +235,13 @@ namespace grendel
     }
 
     /*
-     * Step 3: Fix up constraints and distribute:
+     * Step 4: Fix up constraints and distribute:
      */
+
+    for (auto &it : U_) {
+      affine_constraints.distribute(it);
+      it.update_ghost_values();
+    }
 
     for (auto &it : quantities_) {
       affine_constraints.distribute(it);

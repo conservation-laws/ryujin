@@ -630,40 +630,19 @@ namespace ryujin
      * Offload output to a worker thread.
      *
      * We wait for a previous thread to finish before we schedule a new
-     * one. This logic also serves as a mutex for output_vector and
-     * postprocessor.
+     * one. This logic also serves as a mutex for the postprocessor class.
      */
 
-    deallog << "        Schedule output cycle = " << cycle << std::endl;
     if (output_thread.joinable()) {
       TimerOutput::Scope timer(computing_timer, "time_loop - stalled output");
       output_thread.join();
     }
 
-    constexpr auto problem_dimension =
-        ProblemDescription<dim, Number>::problem_dimension;
-    const auto &component_names =
-        ProblemDescription<dim, Number>::component_names;
-    const auto &affine_constraints = offline_data.affine_constraints();
-
-    /* Copy the current state vector over to output_vector: */
-
-    for (unsigned int i = 0; i < problem_dimension; ++i) {
-      output_vector[i] = U[i];
-    }
-
-    /* Distribute hanging nodes and update ghost values: */
-
-    for (unsigned int i = 0; i < problem_dimension; ++i) {
-      affine_constraints.distribute(output_vector[i]);
-      output_vector[i].update_ghost_values();
-    }
-
-    postprocessor.compute(output_vector, time_step.alpha());
+    postprocessor.compute(U, time_step.alpha());
 
     /* Output data in vtu format: */
 
-    /* capture name, t, cycle by value */
+    /* capture name, t, cycle, and checkpoint by value */
     const auto output_worker = [this, name, t, cycle, checkpoint]() {
       constexpr auto problem_dimension =
           ProblemDescription<dim, Number>::problem_dimension;
@@ -689,7 +668,7 @@ namespace ryujin
 
         boost::archive::binary_oarchive oa(file);
         oa << t << cycle;
-        for (const auto &it1 : output_vector)
+        for (const auto &it1 : postprocessor.U())
           for (const auto &it2 : it1)
             oa << it2;
       }
@@ -698,7 +677,9 @@ namespace ryujin
       data_out.attach_dof_handler(dof_handler);
 
       for (unsigned int i = 0; i < problem_dimension; ++i)
-        data_out.add_data_vector(output_vector[i], component_names[i]);
+        data_out.add_data_vector(
+            postprocessor.U()[i],
+            ProblemDescription<dim, Number>::component_names[i]);
 
       for (unsigned int i = 0; i < n_quantities; ++i)
         data_out.add_data_vector(postprocessor.quantities()[i],
@@ -737,12 +718,14 @@ namespace ryujin
         data_out.write_pvtu_record(output, filenames);
       }
 
-      deallog << "        Commit output cycle = " << cycle << std::endl;
+      deallog << "        Commit output (cycle = " << cycle << ")" << std::endl;
     };
 
     /*
      * And spawn the thread:
      */
+
+    deallog << "        Schedule output (cycle = " << cycle << ")" << std::endl;
     output_thread = std::move(std::thread(output_worker));
   }
 

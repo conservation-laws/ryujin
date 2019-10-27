@@ -49,6 +49,9 @@ namespace grendel
     void compute(const vector_type &U, const scalar_type &alpha);
 
   protected:
+    std::array<scalar_type, problem_dimension> U_;
+    ACCESSOR_READ_ONLY(U)
+
     std::array<scalar_type, n_quantities> quantities_;
     ACCESSOR_READ_ONLY(quantities)
 
