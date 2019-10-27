@@ -446,7 +446,8 @@ namespace grendel
       const Number rho_min = std::min(riemann_data_i[0], riemann_data_j[0]);
       const Number rho_max = std::max(riemann_data_i[0], riemann_data_j[0]);
 
-      if (std::max(Number(0.), rho_max * greedy_factor_ - rho_min) ==
+      constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
+      if (std::max(Number(0.), rho_max * greedy_threshold_ - rho_min + eps) ==
           Number(0.)) {
         const Number lambda_max =
             compute_lambda(riemann_data_i, riemann_data_j, p_2);
@@ -694,7 +695,8 @@ namespace grendel
     const Number rho_min = std::min(riemann_data_i[0], riemann_data_j[0]);
     const Number rho_max = std::max(riemann_data_i[0], riemann_data_j[0]);
 
-    if (std::max(Number(0.), rho_max * greedy_factor_ - rho_min) ==
+    constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
+    if (std::max(Number(0.), rho_max * greedy_threshold_ - rho_min + eps) ==
         Number(0.)) {
       return {lambda_max, p_star, i};
     }
@@ -717,7 +719,7 @@ namespace grendel
     for (unsigned int k = 0; k < problem_dimension; ++k)
       P[k] = ScalarNumber(0.5) * (f_i[k] - f_j[k]) * n_ij;
 
-    if constexpr (relax_greedy_bounds_) {
+    if constexpr (greedy_relax_bounds_) {
       /*
        * Relax entropy bounds a tiny bit: Note, we use a much smaller
        * window r_i = h_i ^ (3/2) than is done for the second order
@@ -747,7 +749,8 @@ namespace grendel
         dealii::ExcMessage("Garbled up lambda_greedy."));
 #endif
 
-    return {lambda_greedy, p_star, i};
+    return {
+        std::min(greedy_fudge_factor_ * lambda_greedy, lambda_max), p_star, i};
   }
 
 } /* namespace grendel */

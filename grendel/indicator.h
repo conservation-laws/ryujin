@@ -73,7 +73,7 @@ namespace grendel
      * unfortunately a fudge parameter :-(, i.e., choose this value large
      * enough so that we do not produce any carbuncles...
      */
-    static constexpr ScalarNumber entropy_viscosity_alpha_factor_ = 1.;
+    static constexpr ScalarNumber entropy_viscosity_fudge_factor_ = 1.;
 
     /**
      * We take a reference to an OfflineData object in order to store
@@ -255,7 +255,7 @@ namespace grendel
 
       const auto quotient =
           std::abs(numerator) / (denominator + hd_i * std::abs(eta_i));
-      return std::min(Number(1.), entropy_viscosity_alpha_factor_ * quotient);
+      return std::min(Number(1.), entropy_viscosity_fudge_factor_ * quotient);
     }
 
     if constexpr (indicator_ == Indicators::smoothness_indicator) {

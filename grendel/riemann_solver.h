@@ -47,7 +47,7 @@ namespace grendel
      * Options:
      */
 
-    /*
+    /**
      * Try to improve the maximal wavespeed estimate. When enabled the
      * RiemannSolver also computes
      *
@@ -59,17 +59,26 @@ namespace grendel
      */
     static constexpr bool greedy_dij_ = true;
 
-    /*
+    /**
      * The above computation is obviously very expensive (similarly in cost
      * to almost a complete high-order limiter pass). Therefore, we use a
      * threshold for the greedy d_ij computation. If the variance in
      * density rho between two states is less than
-     *   (1 - greedy_factor_)/100 %
+     *   (1 - greedy_threshold_)/100 %
      * we simply don't do anything.
      */
-    static constexpr ScalarNumber greedy_factor_ = ScalarNumber(0.97);
+    static constexpr ScalarNumber greedy_threshold_ = ScalarNumber(1.00);
 
-    static constexpr bool relax_greedy_bounds_ = false;
+    /**
+     * Introduce a fudge factor to lift the greedy d_ij value. More
+     * precisely, we use the value
+     *   min(lambda_max, fudge_factor * lambda_greedy)
+     */
+    static constexpr ScalarNumber greedy_fudge_factor_ = 1.;
+    static_assert(greedy_fudge_factor_ >= 1.,
+                  "The fudge factor has to be no less than 1.");
+
+    static constexpr bool greedy_relax_bounds_ = false;
 
     /* In case of the greedy variant, we have to allow for at least one
      * Newton iteration step. */

@@ -360,7 +360,6 @@ namespace ryujin
     deallog << "serial pow == std::pow"<< std::endl;
 #endif
 
-
     deallog << "Indicator<dim, Number>::indicators_ == ";
     switch (Indicator<dim, Number>::indicator_) {
     case Indicator<dim, Number>::Indicators::zero:
@@ -397,8 +396,8 @@ namespace ryujin
     deallog << "Indicator<dim, Number>::compute_second_variations_ == "
             << Indicator<dim, Number>::compute_second_variations_ << std::endl;
 
-    deallog << "Indicator<dim, Number>::entropy_viscosity_alpha_factor_ == "
-            << Indicator<dim, Number>::entropy_viscosity_alpha_factor_ << std::endl;
+    deallog << "Indicator<dim, Number>::entropy_viscosity_fudge_factor_ == "
+            << Indicator<dim, Number>::entropy_viscosity_fudge_factor_ << std::endl;
 
     deallog << "Limiter<dim, Number>::limiter_ == ";
     switch (Limiter<dim, Number>::limiter_) {
@@ -431,11 +430,15 @@ namespace ryujin
     deallog << "RiemannSolver<dim, Number>::greedy_dij_ == "
             <<  RiemannSolver<dim, Number>::greedy_dij_ << std::endl;
 
-    deallog << "RiemannSolver<dim, Number>::greedy_factor_ == "
-            <<  RiemannSolver<dim, Number>::greedy_factor_ << std::endl;
+    deallog << "RiemannSolver<dim, Number>::greedy_threshold_ == "
+            <<  RiemannSolver<dim, Number>::greedy_threshold_ << std::endl;
 
-    deallog << "RiemannSolver<dim, Number>::relax_greedy_bounds_ == "
-            <<  RiemannSolver<dim, Number>::relax_greedy_bounds_ << std::endl;
+    deallog << "RiemannSolver<dim, Number>::greedy_fudge_factor_ == "
+            <<  RiemannSolver<dim, Number>::greedy_fudge_factor_ << std::endl;
+
+    deallog << "RiemannSolver<dim, Number>::greedy_relax_bounds_ == "
+            <<  RiemannSolver<dim, Number>::greedy_relax_bounds_ << std::endl;
+
 
     deallog << "TimeStep<dim, Number>::order_ == ";
     switch (TimeStep<dim, Number>::order_) {
