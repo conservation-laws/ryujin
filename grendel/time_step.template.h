@@ -60,10 +60,15 @@ namespace grendel
 
     const auto &partitioner = offline_data_->partitioner();
 
+    second_variations_.reinit(partitioner);
+    rho_relaxation_.reinit(partitioner);
     alpha_.reinit(partitioner);
 
-    rho_second_variation_.reinit(partitioner);
-    rho_relaxation_.reinit(partitioner);
+    for (auto &it : bounds_)
+      it.reinit(partitioner);
+
+    for (auto &it : r_)
+      it.reinit(partitioner);
 
     for (auto &it : temp_euler_)
       it.reinit(partitioner);
@@ -71,22 +76,15 @@ namespace grendel
     for (auto &it : temp_ssprk_)
       it.reinit(partitioner);
 
-    for (auto &it : r_)
-      it.reinit(partitioner);
-
-    for (auto &it : bounds_)
-      it.reinit(partitioner);
-
     /* Initialize local matrices: */
 
     const auto &sparsity = offline_data_->sparsity_pattern();
 
+    dij_matrix_.reinit(sparsity);
+    lij_matrix_.reinit(sparsity);
+
     for (auto &it : pij_matrix_)
       it.reinit(sparsity);
-
-    dij_matrix_.reinit(sparsity);
-
-    lij_matrix_.reinit(sparsity);
 
     if (Utilities::MPI::n_mpi_processes(mpi_communicator_) > 1)
       lij_matrix_communicator_.prepare();
@@ -126,12 +124,12 @@ namespace grendel
     /*
      * Index ranges for SIMD iteration:
      *
-     * simd_internal is actually the only index range over which we iterate
+     * simd_internal is the only index range over which we iterate
      * vectorized, therefore we compute indices in increments of
      * n_array_elements. The simd_remaining_owned and
      * simd_remaining_relevant index ranges are then used to iterate over
      * the remaining degrees of freedom that do not allow a straightforward
-     * vectorization
+     * vectorization.
      */
 
     const auto simd_internal =
@@ -217,10 +215,8 @@ namespace grendel
             set_entry(dij_matrix_, jts, d);
           }
 
-          simd_scatter(
-              rho_second_variation_, indicator.rho_second_variation(), i);
-
           simd_scatter(alpha_, indicator.alpha(hd_i), i);
+          simd_scatter(second_variations_, indicator.second_variations(), i);
         }
       };
 
@@ -283,10 +279,8 @@ namespace grendel
             set_entry(dij_matrix_, jt, d);
           }
 
-          rho_second_variation_.local_element(i) =
-              indicator.rho_second_variation();
-
           alpha_.local_element(i) = indicator.alpha(hd_i);
+          second_variations_.local_element(i) = indicator.second_variations();
         }
       };
 
@@ -299,8 +293,8 @@ namespace grendel
                                    1024);
 
       /* Synchronize alpha_ over all MPI processes: */
-      rho_second_variation_.update_ghost_values();
       alpha_.update_ghost_values();
+      second_variations_.update_ghost_values();
 
 #ifdef LIKWID_PERFMON
       LIKWID_MARKER_STOP("time_step_1");
@@ -331,10 +325,8 @@ namespace grendel
           if (++sparsity.begin(i) == sparsity.end(i))
             continue;
 
-          const Number delta_rho_i = rho_second_variation_.local_element(i);
+          const Number delta_rho_i = second_variations_.local_element(i);
 
-          Number alpha_i = Number(0.);
-          (void)alpha_i;
           Number d_sum = Number(0.);
           Number rho_relaxation_numerator = Number(0.);
           Number rho_relaxation_denominator = Number(0.);
@@ -352,7 +344,7 @@ namespace grendel
                   jt,
                   get_transposed_entry(dij_matrix_, jt, transposed_indices));
 
-            const Number delta_rho_j = rho_second_variation_.local_element(j);
+            const Number delta_rho_j = second_variations_.local_element(j);
             const auto beta_ij = get_entry(betaij_matrix, jt);
 
             /* The numerical constant 8 is up to debate... */
@@ -753,8 +745,9 @@ namespace grendel
 
       {
         deallog << "        symmetrize l_ij, high-order update" << std::endl;
-        TimerOutput::Scope time(computing_timer_,
-                                "time_step - 7 symmetrize l_ij, high-order update");
+        TimerOutput::Scope time(
+            computing_timer_,
+            "time_step - 7 symmetrize l_ij, high-order update");
 #ifdef LIKWID_PERFMON
         LIKWID_MARKER_START("time_step_7");
 #endif
@@ -889,12 +882,12 @@ namespace grendel
 
     const Number ratio = cfl_max_ / cfl_update_;
 
-    if(ratio * tau_2 >= tau_1)
+    if (ratio * tau_2 >= tau_1)
       deallog << "!!!!  Problem performing SSP H(2) time step: CFL violated: "
               << tau_1 / tau_2 * cfl_update_ << " > " << cfl_max_ << std::endl;
-//     AssertThrow(ratio * tau_2 >= tau_1,
-//                 ExcMessage("Problem performing SSP H(2) time step: "
-//                            "CFL condition violated."));
+    //     AssertThrow(ratio * tau_2 >= tau_1,
+    //                 ExcMessage("Problem performing SSP H(2) time step: "
+    //                            "CFL condition violated."));
 
     for (unsigned int k = 0; k < problem_dimension; ++k)
       U[k].sadd(Number(1. / 2.), Number(1. / 2.), temp_ssprk_[k]);
@@ -922,12 +915,12 @@ namespace grendel
 
     const Number ratio = cfl_max_ / cfl_update_;
 
-    if(ratio * tau_2 >= tau_1)
+    if (ratio * tau_2 >= tau_1)
       deallog << "!!!!  Problem performing SSP RK(3) time step: CFL violated: "
               << tau_1 / tau_2 * cfl_update_ << " > " << cfl_max_ << std::endl;
-//     AssertThrow(ratio * tau_2 >= tau_1,
-//                 ExcMessage("Problem performing SSP RK(3) time step: "
-//                            "CFL condition violated."));
+    //     AssertThrow(ratio * tau_2 >= tau_1,
+    //                 ExcMessage("Problem performing SSP RK(3) time step: "
+    //                            "CFL condition violated."));
 
     for (unsigned int k = 0; k < problem_dimension; ++k)
       U[k].sadd(Number(1. / 4.), Number(3. / 4.), temp_ssprk_[k]);
@@ -937,12 +930,12 @@ namespace grendel
 
     const Number tau_3 = euler_step(U, t, tau_1);
 
-    if(ratio * tau_3 >= tau_1)
+    if (ratio * tau_3 >= tau_1)
       deallog << "!!!!  Problem performing SSP RK(3) time step: CFL violated: "
               << tau_1 / tau_3 * cfl_update_ << " > " << cfl_max_ << std::endl;
-//     AssertThrow(ratio * tau_3 >= tau_1,
-//                 ExcMessage("Problem performing SSP RK(3) time step: "
-//                            "CFL condition violated."));
+    //     AssertThrow(ratio * tau_3 >= tau_1,
+    //                 ExcMessage("Problem performing SSP RK(3) time step: "
+    //                            "CFL condition violated."));
 
     for (unsigned int k = 0; k < problem_dimension; ++k)
       U[k].sadd(Number(2. / 3.), Number(1. / 3.), temp_ssprk_[k]);

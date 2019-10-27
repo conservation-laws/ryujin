@@ -101,7 +101,7 @@ namespace grendel
     /**
      * Return the computed second variation of rho.
      */
-    Number rho_second_variation();
+    Number second_variations();
 
   private:
     const std::array<dealii::SparseMatrix<ScalarNumber>, dim> &cij_matrix_;
@@ -282,7 +282,7 @@ namespace grendel
 
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline Number
-  Indicator<dim, Number>::rho_second_variation()
+  Indicator<dim, Number>::second_variations()
   {
     constexpr Number eps = std::numeric_limits<Number>::epsilon();
     return rho_second_variation_numerator /

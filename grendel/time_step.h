@@ -117,9 +117,7 @@ namespace grendel
 
     /* Scratch data: */
 
-    dealii::SparseMatrix<Number> dij_matrix_;
-
-    dealii::LinearAlgebra::distributed::Vector<Number> rho_second_variation_;
+    dealii::LinearAlgebra::distributed::Vector<Number> second_variations_;
     dealii::LinearAlgebra::distributed::Vector<Number> rho_relaxation_;
 
     dealii::LinearAlgebra::distributed::Vector<Number> alpha_;
@@ -130,6 +128,8 @@ namespace grendel
     std::vector<unsigned int> transposed_indices;
 
     vector_type r_;
+
+    dealii::SparseMatrix<Number> dij_matrix_;
 
     dealii::SparseMatrix<Number> lij_matrix_;
     MatrixCommunicator<dim, Number> lij_matrix_communicator_;
