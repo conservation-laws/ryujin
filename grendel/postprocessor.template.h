@@ -28,12 +28,6 @@ namespace grendel
     add_parameter("schlieren beta",
                   schlieren_beta_,
                   "Beta factor used in the Schlieren postprocessor");
-
-    schlieren_index_ = 0;
-    add_parameter("schlieren index",
-                  schlieren_index_,
-                  "Use the corresponding component of the state vector for the "
-                  "schlieren postprocessor");
   }
 
 
@@ -44,11 +38,11 @@ namespace grendel
     TimerOutput::Scope t(computing_timer_,
                          "postprocessor - prepare scratch space");
 
-    const auto &n_locally_relevant = offline_data_->n_locally_relevant();
     const auto &partitioner = offline_data_->partitioner();
 
-    r_i_.reinit(n_locally_relevant);
     schlieren_.reinit(partitioner);
+    for(auto &it: vorticity_)
+      it.reinit(partitioner);
   }
 
 
@@ -93,6 +87,7 @@ namespace grendel
             continue;
 
           Tensor<1, dim, Number> r_i;
+          curl_type vorticity;
 
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
             const auto j = jt->column();
@@ -100,10 +95,19 @@ namespace grendel
             if (i == j)
               continue;
 
-            const auto U_js = U[schlieren_index_].local_element(j);
+            const auto U_j = gather(U, j);
+            const auto m_j = ProblemDescription<dim, Number>::momentum(U_j);
+
             const auto c_ij = gather_get_entry(cij_matrix, jt);
 
-            r_i += c_ij * U_js;
+            r_i += c_ij * U_j[0];
+
+            if constexpr (dim == 2) {
+              vorticity[0] += cross_product_2d(c_ij) * m_j;
+            } else if constexpr (dim == 3) {
+              vorticity += cross_product_3d(c_ij, m_j);
+            }
+
           }
 
           /* Fix up boundaries: */
@@ -114,19 +118,21 @@ namespace grendel
             if (id == Boundary::slip) {
               r_i -= 1. * (r_i * normal) * normal;
             } else {
-              /*
-               * FIXME: This is not particularly elegant. On all other
-               * boundary types, we simply set r_i to zero.
-               */
+              /* FIXME: This is not particularly elegant. On all other
+               * boundary types, we simply set r_i to zero. */
               r_i = 0.;
             }
           }
 
           const Number m_i = lumped_mass_matrix.diag_element(i);
-          r_i_[i] = r_i.norm() / m_i;
 
-          r_i_max_on_subrange = std::max(r_i_max_on_subrange, r_i_[i]);
-          r_i_min_on_subrange = std::min(r_i_min_on_subrange, r_i_[i]);
+          const auto r = r_i.norm() / m_i;
+          schlieren_.local_element(i) = r;
+          r_i_max_on_subrange = std::max(r_i_max_on_subrange, r);
+          r_i_min_on_subrange = std::min(r_i_min_on_subrange, r);
+
+          const Number rho_i = U[0].local_element(i);
+          scatter(vorticity_, vorticity / (m_i * rho_i), i);
         }
 
         /* Synchronize over all threads: */
@@ -169,7 +175,7 @@ namespace grendel
           if (++sparsity.begin(i) == sparsity.end(i))
             continue;
 
-          const auto r_i = r_i_[i]; /* SIC */
+          const auto r_i = schlieren_.local_element(i);
           schlieren_.local_element(i) =
               Number(1.) - std::exp(-schlieren_beta_ * (r_i - r_i_min) /
                                     (r_i_max - r_i_min));

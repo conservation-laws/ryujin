@@ -24,6 +24,8 @@ namespace grendel
         std::array<dealii::LinearAlgebra::distributed::Vector<Number>,
                    problem_dimension>;
 
+    using curl_type = dealii::Tensor<1, dim == 2 ? 1 : dim, Number>;
+
     Postprocessor(
         const MPI_Comm &mpi_communicator,
         dealii::TimerOutput &computing_timer,
@@ -40,19 +42,19 @@ namespace grendel
     dealii::LinearAlgebra::distributed::Vector<Number> schlieren_;
     ACCESSOR_READ_ONLY(schlieren)
 
+    std::array<dealii::LinearAlgebra::distributed::Vector<Number>,
+               dim == 2 ? 1 : dim>
+        vorticity_;
+    ACCESSOR_READ_ONLY(vorticity)
+
   private:
     const MPI_Comm &mpi_communicator_;
     dealii::TimerOutput &computing_timer_;
 
     dealii::SmartPointer<const grendel::OfflineData<dim, Number>> offline_data_;
 
-    /* Scratch data: */
-
-    dealii::Vector<Number> r_i_;
-
     /* Options: */
 
-    unsigned int schlieren_index_;
     Number schlieren_beta_;
   };
 
