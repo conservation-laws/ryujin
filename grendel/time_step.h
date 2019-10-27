@@ -30,9 +30,8 @@ namespace grendel
     using rank1_type = typename ProblemDescription<dim, Number>::rank1_type;
     using rank2_type = typename ProblemDescription<dim, Number>::rank2_type;
 
-    typedef std::array<dealii::LinearAlgebra::distributed::Vector<Number>,
-                       problem_dimension>
-        vector_type;
+    using scalar_type = dealii::LinearAlgebra::distributed::Vector<Number>;
+    using vector_type = std::array<scalar_type, problem_dimension>;
 
     TimeStep(const MPI_Comm &mpi_communicator,
              dealii::TimerOutput &computing_timer,
@@ -117,10 +116,10 @@ namespace grendel
 
     /* Scratch data: */
 
-    dealii::LinearAlgebra::distributed::Vector<Number> second_variations_;
-    dealii::LinearAlgebra::distributed::Vector<Number> rho_relaxation_;
+    scalar_type second_variations_;
+    scalar_type rho_relaxation_;
 
-    dealii::LinearAlgebra::distributed::Vector<Number> alpha_;
+    scalar_type alpha_;
     ACCESSOR_READ_ONLY(alpha)
 
     typename Limiter<dim, Number>::vector_type bounds_;
