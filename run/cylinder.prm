@@ -39,5 +39,4 @@ end
 
 subsection F - SchlierenPostprocessor
   set schlieren beta  = 10
-  set schlieren index = 0
 end
