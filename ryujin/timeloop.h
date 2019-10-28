@@ -43,13 +43,10 @@ namespace ryujin
 
     void print_throughput(unsigned int cycle, Number t);
 
-    /* Data: */
-
-    const MPI_Comm &mpi_communicator;
-    std::ostringstream timer_output;
-    dealii::TimerOutput computing_timer;
+    /* Options: */
 
     std::string base_name;
+
     Number t_final;
     Number output_granularity;
 
@@ -63,15 +60,23 @@ namespace ryujin
 
     bool enable_compute_error;
 
+    /* Data: */
+
+    const MPI_Comm &mpi_communicator;
+    std::ostringstream timer_output;
+    dealii::TimerOutput computing_timer;
+
     grendel::Discretization<dim> discretization;
     grendel::OfflineData<dim, Number> offline_data;
     grendel::InitialValues<dim, Number> initial_values;
     grendel::TimeStep<dim, Number> time_step;
     grendel::Postprocessor<dim, Number> postprocessor;
 
-    std::unique_ptr<std::ofstream> filestream;
+    const unsigned int mpi_rank;
+    const unsigned int n_mpi_processes;
 
-    /* Data for output management: */
+    std::unique_ptr<std::ofstream> filestream; /* deallog log file */
+
     std::thread output_thread;
   };
 

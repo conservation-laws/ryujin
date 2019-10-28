@@ -90,6 +90,9 @@ namespace ryujin
                       computing_timer,
                       offline_data,
                       "F - SchlierenPostprocessor")
+      , mpi_rank(dealii::Utilities::MPI::this_mpi_process(mpi_communicator))
+      , n_mpi_processes(
+            dealii::Utilities::MPI::n_mpi_processes(mpi_communicator))
   {
     base_name = "cylinder";
     add_parameter("basename", base_name, "Base name for all output files");
@@ -150,14 +153,12 @@ namespace ryujin
 
     if (write_mesh) {
       deallog << "        output triangulation" << std::endl;
-      std::ofstream output(
-          base_name + "-triangulation-p" +
-          std::to_string(Utilities::MPI::this_mpi_process(mpi_communicator)) +
-          ".inp");
+      std::ofstream output(base_name + "-triangulation-p" +
+                           std::to_string(mpi_rank) + ".inp");
       GridOut().write_ucd(discretization.triangulation(), output);
     }
 
-    /* Prepare offline data: */
+    /* Prepare data structures: */
 
     print_head("compute offline data");
     offline_data.prepare();
@@ -166,15 +167,21 @@ namespace ryujin
     time_step.prepare();
     postprocessor.prepare();
 
-    /* Interpolate initial values: */
-
-    print_head("interpolate initial values");
-
     Number t = 0.;
     unsigned int output_cycle = 0;
-    auto U = interpolate_initial_values();
+    vector_type U;
 
-    if (resume) {
+    const auto &partitioner = offline_data.partitioner();
+    for (auto &it : U)
+      it.reinit(partitioner);
+
+    if (!resume) {
+      print_head("interpolate initial values");
+
+      U = interpolate_initial_values();
+
+    } else {
+
       print_head("resume interrupted computation");
 
       const auto &triangulation = discretization.triangulation();
@@ -215,12 +222,14 @@ namespace ryujin
     unsigned int cycle = 1;
     for (; t < t_final; ++cycle) {
 
-      std::ostringstream head;
-      head << "Cycle  " << Utilities::int_to_string(cycle, 6) << "  ("
-           << std::fixed << std::setprecision(1) << t / t_final * 100 << "%)";
+      std::ostringstream primary;
+      primary << "Cycle  " << Utilities::int_to_string(cycle, 6) //
+              << "  (" << std::fixed << std::setprecision(1)     //
+              << t / t_final * 100 << "%)";
       std::ostringstream secondary;
       secondary << "at time t = " << std::setprecision(8) << std::fixed << t;
-      print_head(head.str(), secondary.str());
+
+      print_head(primary.str(), secondary.str());
 
       /* Do a time step: */
 
@@ -230,7 +239,7 @@ namespace ryujin
       if (t > output_cycle * output_granularity) {
         if (!enable_detailed_output) {
           deallog.pop();
-          print_head(head.str(), secondary.str());
+          print_head(primary.str(), secondary.str());
         }
 
         if (write_output_files)
@@ -283,7 +292,7 @@ namespace ryujin
     print_throughput(cycle, t);
 
     /* Detach deallog: */
-    if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0) {
+    if (mpi_rank == 0) {
       deallog.pop();
       deallog.detach();
     }
@@ -298,7 +307,7 @@ namespace ryujin
   {
     /* Read in parameters and initialize all objects: */
 
-    if (Utilities::MPI::this_mpi_process(mpi_communicator) == 0) {
+    if (mpi_rank == 0) {
 
       deallog.pop();
 
@@ -471,8 +480,7 @@ namespace ryujin
 
     ParameterAcceptor::prm.log_parameters(deallog);
 
-    deallog << "Number of MPI ranks: "
-            << Utilities::MPI::n_mpi_processes(mpi_communicator) << std::endl;
+    deallog << "Number of MPI ranks: " << n_mpi_processes << std::endl;
     deallog << "Number of threads:   " << MultithreadInfo::n_threads()
             << std::endl;
 
@@ -692,10 +700,12 @@ namespace ryujin
           t, cycle, true, DataOutBase::VtkFlags::best_speed);
       data_out.set_flags(flags);
 
+      const auto name_with_cycle =
+          name + "-" + Utilities::int_to_string(cycle, 6);
+
       const auto filename = [&](const unsigned int i) -> std::string {
         const auto seq = dealii::Utilities::int_to_string(i, 4);
-        return name + "-" + Utilities::int_to_string(cycle, 6) + "-" + seq +
-               ".vtu";
+        return name_with_cycle + "-" + seq + ".vtu";
       };
 
       /* Write out local vtu: */
@@ -704,17 +714,14 @@ namespace ryujin
       std::ofstream output(filename(i));
       data_out.write_vtu(output);
 
-      if (dealii::Utilities::MPI::this_mpi_process(mpi_communicator) == 0) {
+      if (mpi_rank == 0) {
         /* Write out pvtu control file: */
 
-        const unsigned int n_mpi_processes =
-            dealii::Utilities::MPI::n_mpi_processes(mpi_communicator);
         std::vector<std::string> filenames;
         for (unsigned int i = 0; i < n_mpi_processes; ++i)
           filenames.push_back(filename(i));
 
-        std::ofstream output(name + "-" + Utilities::int_to_string(cycle, 6) +
-                             ".pvtu");
+        std::ofstream output(name_with_cycle + ".pvtu");
         data_out.write_pvtu_record(output, filenames);
       }
 
