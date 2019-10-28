@@ -196,8 +196,10 @@ namespace grendel
         Number(2.) * dealii::Utilities::fixed_power<relaxation_order_>(
                          std::sqrt(std::sqrt(hd_i)));
 
+    constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
     const Number rho_relaxation =
-        std::abs(rho_relaxation_numerator / rho_relaxation_denominator);
+        std::abs(rho_relaxation_numerator) /
+        (std::abs(rho_relaxation_denominator) + Number(eps));
 
     rho_min = std::max((Number(1.) - r_i) * rho_min, rho_min - rho_relaxation);
     rho_max = std::min((Number(1.) + r_i) * rho_max, rho_max + rho_relaxation);
