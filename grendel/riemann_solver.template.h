@@ -753,8 +753,7 @@ namespace grendel
             dealii::ExcMessage("Garbled up lambda_greedy."));
 #endif
 
-    return {
-        std::min(greedy_fudge_factor_ * lambda_greedy, lambda_max), p_star, i};
+        return {std::min(lambda_greedy, lambda_max), p_star, i};
   }
 
 } /* namespace grendel */

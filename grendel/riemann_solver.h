@@ -47,6 +47,8 @@ namespace grendel
      * Options:
      */
 
+    static constexpr unsigned int newton_max_iter_ = NEWTON_MAX_ITER;
+
     /**
      * Try to improve the maximal wavespeed estimate. When enabled the
      * RiemannSolver also computes
@@ -69,20 +71,7 @@ namespace grendel
      */
     static constexpr ScalarNumber greedy_threshold_ = ScalarNumber(1.00);
 
-    /**
-     * Introduce a fudge factor to lift the greedy d_ij value. More
-     * precisely, we use the value
-     *   min(lambda_max, fudge_factor * lambda_greedy)
-     */
-    static constexpr ScalarNumber greedy_fudge_factor_ = 1.;
-    static_assert(greedy_fudge_factor_ >= 1.,
-                  "The fudge factor has to be no less than 1.");
-
     static constexpr bool greedy_relax_bounds_ = false;
-
-    /* In case of the greedy variant, we have to allow for at least one
-     * Newton iteration step. */
-    static constexpr unsigned int newton_max_iter_ = NEWTON_MAX_ITER;
 
     /**
      * For two given 1D primitive states riemann_data_i and riemann_data_j,

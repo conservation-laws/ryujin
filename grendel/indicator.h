@@ -66,15 +66,6 @@ namespace grendel
 
     static constexpr bool compute_second_variations_ = true;
 
-    /*
-     * Options for entropy viscosity commutator:
-     *
-     * The normalization in the entropy viscosity communtator is
-     * unfortunately a fudge parameter :-(, i.e., choose this value large
-     * enough so that we do not produce any carbuncles...
-     */
-    static constexpr ScalarNumber entropy_viscosity_fudge_factor_ = 1.;
-
     /**
      * We take a reference to an OfflineData object in order to store
      * references to the beta_ij and c_ij matrices.
@@ -255,7 +246,7 @@ namespace grendel
 
       const auto quotient =
           std::abs(numerator) / (denominator + hd_i * std::abs(eta_i));
-      return std::min(Number(1.), entropy_viscosity_fudge_factor_ * quotient);
+      return quotient;
     }
 
     if constexpr (indicator_ == Indicators::smoothness_indicator) {
