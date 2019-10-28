@@ -263,6 +263,8 @@ namespace ryujin
       }
     } /* end of loop */
 
+    --cycle; /* We have actually performed one cycle less. */
+
 #ifdef CALLGRIND
     CALLGRIND_DUMP_STATS;
 #endif
@@ -803,9 +805,9 @@ namespace ryujin
          << ")" << std::endl;
     head << "                    ["                                     //
          << std::setprecision(0) << std::fixed << n_restart_euler_steps //
-         << " CFL restart steps  (" << std::setprecision(4) << std::scientific
+         << " rsts  (" << std::setprecision(4) << std::scientific
          << n_restart_euler_steps / ((double)cycle)
-         << " CFL restart steps/cycle)]" << std::endl;
+         << " rsts/cycle)]" << std::endl;
 
     deallog << head.str() << std::endl;
   }
