@@ -12,11 +12,12 @@
 #include <valgrind/callgrind.h>
 #endif
 
-#include <atomic>
-
 #ifdef LIKWID_PERFMON
 #include <likwid.h>
 #endif
+
+#include <atomic>
+#include <regex>
 
 
 namespace grendel
@@ -72,7 +73,7 @@ namespace grendel
     for (auto &it : temp_euler_)
       it.reinit(partitioner);
 
-    for (auto &it : temp_ssprk_)
+    for (auto &it : temp_ssp_)
       it.reinit(partitioner);
 
     /* Initialize local matrices: */
@@ -372,7 +373,7 @@ namespace grendel
       deallog << "        computed tau_max = " << tau_max << std::endl;
     }
 
-    tau = (tau == 0 ? tau_max.load() : tau);
+    tau = (tau == Number(0.) ? tau_max.load() : tau);
     deallog << "        perform time-step with tau = " << tau << std::endl;
 
 
@@ -862,29 +863,35 @@ namespace grendel
   {
     deallog << "TimeStep<dim, Number>::ssph2_step()" << std::endl;
 
+    Number tau_0 = 0.;
+
+restart_ssph2_step:
     /* This also copies ghost elements: */
     for (unsigned int k = 0; k < problem_dimension; ++k)
-      temp_ssprk_[k] = U[k];
+      temp_ssp_[k] = U[k];
 
-    // Step 1: U1 = U_old + tau * L(U_old)
+    /* Step 1: U1 = U_old + tau * L(U_old) */
+    Number tau_1 = euler_step(U, t, tau_0);
 
-    const Number tau_1 = euler_step(U, t);
+    AssertThrow(tau_1 >= tau_0,
+                ExcMessage("failed to recover from CFL violation"));
+    tau_1 = (tau_0 == 0. ? tau_1 : tau_0);
 
-    // Step 2: U2 = 1/2 U_old + 1/2 (U1 + tau L(U1))
-
+    /* Step 2: U2 = 1/2 U_old + 1/2 (U1 + tau L(U1)) */
     const Number tau_2 = euler_step(U, t, tau_1);
 
-    const Number ratio = cfl_max_ / cfl_update_;
+    AssertThrow(tau_2 >= tau_0,
+                ExcMessage("failed to recover from CFL violation"));
 
-    if (ratio * tau_2 >= tau_1)
-      deallog << "!!!!  Problem performing SSP H(2) time step: CFL violated: "
-              << tau_1 / tau_2 * cfl_update_ << " > " << cfl_max_ << std::endl;
-    //     AssertThrow(ratio * tau_2 >= tau_1,
-    //                 ExcMessage("Problem performing SSP H(2) time step: "
-    //                            "CFL condition violated."));
+    if (tau_2 * cfl_max_ < tau_1 * cfl_update_) {
+      /* Restart and force smaller time step: */
+      tau_0 = tau_2 * cfl_update_;
+      U.swap(temp_ssp_);
+      goto restart_ssph2_step;
+    }
 
     for (unsigned int k = 0; k < problem_dimension; ++k)
-      U[k].sadd(Number(1. / 2.), Number(1. / 2.), temp_ssprk_[k]);
+      U[k].sadd(Number(1. / 2.), Number(1. / 2.), temp_ssp_[k]);
 
     return tau_1;
   }
@@ -895,44 +902,51 @@ namespace grendel
   {
     deallog << "TimeStep<dim, Number>::ssprk3_step()" << std::endl;
 
+    Number tau_0 = Number(0.);
+
+restart_ssprk3_step:
     /* This also copies ghost elements: */
     for (unsigned int k = 0; k < problem_dimension; ++k)
-      temp_ssprk_[k] = U[k];
+      temp_ssp_[k] = U[k];
 
-    // Step 1: U1 = U_old + tau * L(U_old)
+    /* Step 1: U1 = U_old + tau * L(U_old) */
+    Number tau_1 = euler_step(U, tau_0);
 
-    const Number tau_1 = euler_step(U, t);
+    AssertThrow(tau_1 >= tau_0,
+                ExcMessage("failed to recover from CFL violation"));
+    tau_1 = (tau_0 == 0. ? tau_1 : tau_0);
 
-    // Step 2: U2 = 3/4 U_old + 1/4 (U1 + tau L(U1))
-
+    /* Step 2: U2 = 3/4 U_old + 1/4 (U1 + tau L(U1)) */
     const Number tau_2 = euler_step(U, t, tau_1);
 
-    const Number ratio = cfl_max_ / cfl_update_;
+    AssertThrow(tau_2 >= tau_0,
+                ExcMessage("failed to recover from CFL violation"));
 
-    if (ratio * tau_2 >= tau_1)
-      deallog << "!!!!  Problem performing SSP RK(3) time step: CFL violated: "
-              << tau_1 / tau_2 * cfl_update_ << " > " << cfl_max_ << std::endl;
-    //     AssertThrow(ratio * tau_2 >= tau_1,
-    //                 ExcMessage("Problem performing SSP RK(3) time step: "
-    //                            "CFL condition violated."));
+    if (tau_2 * cfl_max_ < tau_1 * cfl_update_) {
+      /* Restart and force smaller time step: */
+      tau_0 = tau_2 * cfl_update_;
+      U.swap(temp_ssp_);
+      goto restart_ssprk3_step;
+    }
 
     for (unsigned int k = 0; k < problem_dimension; ++k)
-      U[k].sadd(Number(1. / 4.), Number(3. / 4.), temp_ssprk_[k]);
+      U[k].sadd(Number(1. / 4.), Number(3. / 4.), temp_ssp_[k]);
 
-
-    // Step 3: U_new = 1/3 U_old + 2/3 (U2 + tau L(U2))
-
+    /* Step 3: U_new = 1/3 U_old + 2/3 (U2 + tau L(U2)) */
     const Number tau_3 = euler_step(U, t, tau_1);
 
-    if (ratio * tau_3 >= tau_1)
-      deallog << "!!!!  Problem performing SSP RK(3) time step: CFL violated: "
-              << tau_1 / tau_3 * cfl_update_ << " > " << cfl_max_ << std::endl;
-    //     AssertThrow(ratio * tau_3 >= tau_1,
-    //                 ExcMessage("Problem performing SSP RK(3) time step: "
-    //                            "CFL condition violated."));
+    AssertThrow(tau_3 >= tau_0,
+                ExcMessage("failed to recover from CFL violation"));
+
+    if (tau_3 * cfl_max_ < tau_1 * cfl_update_) {
+      /* Restart and force smaller time step: */
+      tau_0 = tau_3 * cfl_update_;
+      U.swap(temp_ssp_);
+      goto restart_ssprk3_step;
+    }
 
     for (unsigned int k = 0; k < problem_dimension; ++k)
-      U[k].sadd(Number(2. / 3.), Number(1. / 3.), temp_ssprk_[k]);
+      U[k].sadd(Number(2. / 3.), Number(1. / 3.), temp_ssp_[k]);
 
     return tau_1;
   }

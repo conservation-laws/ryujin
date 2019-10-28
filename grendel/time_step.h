@@ -135,7 +135,7 @@ namespace grendel
     std::array<dealii::SparseMatrix<Number>, problem_dimension> pij_matrix_;
 
     vector_type temp_euler_;
-    vector_type temp_ssprk_;
+    vector_type temp_ssp_;
 
     /* Options: */
 

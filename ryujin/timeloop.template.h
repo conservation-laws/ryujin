@@ -215,7 +215,7 @@ namespace ryujin
     /* Disable deallog output: */
 
     if (!enable_detailed_output)
-      deallog.push("SILENCE!");
+      deallog.push("SILENCE");
 
     /* Loop: */
 
@@ -259,7 +259,7 @@ namespace ryujin
         print_throughput(cycle, t);
 
         if (!enable_detailed_output)
-          deallog.push("SILENCE!");
+          deallog.push("SILENCE");
       }
     } /* end of loop */
 

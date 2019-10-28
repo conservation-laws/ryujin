@@ -57,7 +57,7 @@ namespace grendel
      *
      *  - does a full limiter pass against the inviscid Galerkin update
      */
-    static constexpr bool greedy_dij_ = false;
+    static constexpr bool greedy_dij_ = true;
 
     /**
      * The above computation is obviously very expensive (similarly in cost
