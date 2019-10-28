@@ -1,4 +1,4 @@
-#dofs = 4225, double, RK(3), baseline, generalized entropy
+#dofs =  4225, double, RK(3), baseline, generalized entropy
 t     = 2.00548
 Linf  = 0.0537976
 L1    = 0.000899245
@@ -16,9 +16,10 @@ Linf  = 0.000675284
 L1    = 1.29060e-05
 L2    = 6.14718e-05
 
+
 ################################################################################
 
-#dofs = 4225, double, RK(3), baseline, Harten entropy
+#dofs =  4225, double, RK(3), baseline, Harten entropy
 t     = 2.00548
 Linf  = 0.0537578
 L1    = 0.000894238
@@ -38,21 +39,21 @@ L2    = 6.10265e-05
 
 ################################################################################
 
-#dofs = 4225, double, RK(3), greedy (0.%), Harten entropy
-t     = 2.00548
-Linf  = 0.0626724
-L1    = 0.000853891
-L2    = 0.00441870
+#dofs =  4225, double, RK(3), greedy , Harten entropy
+t     = 2.00787
+Linf  = 0.0633718
+L1    = 0.000860911
+L2    = 0.00444518
 
-#dofs = 16641, double, RK(3), greedy (0%), Harten entropy
-t     = 2.00176
-Linf  = 0.00673171
-L1    = 9.26663e-05
-L2    = 0.000433624
+#dofs = 16641, double, RK(3), greedy , Harten entropy
+t     = 2.00015
+Linf  = 0.00667851
+L1    = 9.68963e-05
+L2    = 0.000434247
 
-#dofs = 66049, double, RK(3), greedy (0%), Harten entropy
-t     = 2.00176
-Linf  = 0.000621030
-L1    = 1.04687e-05
-L2    = 4.81044e-05
+#dofs = 66049, double, RK(3), greedy , Harten entropy
+t     = 2.00121
+Linf  = 0.000664739
+L1    = 1.58954e-05
+L2    = 5.04053e-05
 
