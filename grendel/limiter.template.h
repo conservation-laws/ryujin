@@ -162,8 +162,8 @@ namespace grendel
             t_l, t_r, psi_l, psi_r, dpsi_l, dpsi_r, Number(-1.));
 
         /* Let's error on the safe side: */
-        t_l -= newton_eps<Number>;
-        t_r += newton_eps<Number>;
+        t_l -= ScalarNumber(0.2) * newton_eps<Number>;
+        t_r += ScalarNumber(0.2) * newton_eps<Number>;
       }
 
 #ifdef DEBUG
@@ -308,8 +308,8 @@ namespace grendel
         quadratic_newton_step(t_l, t_r, psi_l, psi_r, dpsi_l, dpsi_r, sign);
 
         /* Let's error on the safe side: */
-        t_l -= newton_eps<Number>;
-        t_r += newton_eps<Number>;
+        t_l -= ScalarNumber(0.2) * newton_eps<Number>;
+        t_r += ScalarNumber(0.2) * newton_eps<Number>;
       }
 
 #ifdef DEBUG
