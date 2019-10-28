@@ -767,16 +767,45 @@ namespace ryujin
         ((double)cycle) * ((double)offline_data.dof_handler().n_dofs()) / 1.e6 /
         wall_time;
 
+    /* Query data for number of restarts: */
+
+    const auto n_calls_summary_data =
+        computing_timer.get_summary_data(TimerOutput::OutputData::n_calls);
+    const auto n_euler_steps =
+        n_calls_summary_data.at("time_step - 1 compute d_ij, and alpha_i");
+
+    auto n_restart_euler_steps = n_euler_steps;
+    switch (TimeStep<dim, Number>::time_step_order_) {
+    case TimeStep<dim, Number>::TimeStepOrder::first_order:
+      n_restart_euler_steps -= cycle;
+      break;
+    case TimeStep<dim, Number>::TimeStepOrder::second_order:
+      n_restart_euler_steps -= 2. * cycle;
+      break;
+    case TimeStep<dim, Number>::TimeStepOrder::third_order:
+      n_restart_euler_steps -= 3. * cycle;
+      break;
+    }
+
     std::ostringstream head;
     head << std::setprecision(4) << std::endl << std::endl;
-    head << "Throughput: (CPU )  " << std::fixed << cpu_m_dofs_per_sec
-         << " MQ/s  (" << std::scientific << 1. / cpu_m_dofs_per_sec * 1.e-6
+    head << "Throughput: (CPU )  "                             //
+         << std::fixed << cpu_m_dofs_per_sec << " MQ/s  ("     //
+         << std::scientific << 1. / cpu_m_dofs_per_sec * 1.e-6 //
          << " s/Qdof/cycle)" << std::endl;
-    head << "            (WALL)  " << std::fixed << wall_m_dofs_per_sec
-         << " MQ/s  (" << std::scientific << 1. / wall_m_dofs_per_sec * 1.e-6
-         << " s/Qdof/cycle)  (" << std::fixed << ((double)cycle) / wall_time
-         << " cycles/s)  (avg dt = " << std::scientific << t / ((double)cycle)
+    head << "            (WALL)  "                              //
+         << std::fixed << wall_m_dofs_per_sec << " MQ/s  ("     //
+         << std::scientific << 1. / wall_m_dofs_per_sec * 1.e-6 //
+         << " s/Qdof/cycle)  ("                                 //
+         << std::fixed << ((double)cycle) / wall_time           //
+         << " cycles/s)  (avg dt = "                            //
+         << std::scientific << t / ((double)cycle)              //
          << ")" << std::endl;
+    head << "                    ["                                     //
+         << std::setprecision(0) << std::fixed << n_restart_euler_steps //
+         << " CFL restart steps  (" << std::setprecision(4) << std::scientific
+         << n_restart_euler_steps / ((double)cycle)
+         << " CFL restart steps/cycle)]" << std::endl;
 
     deallog << head.str() << std::endl;
   }
