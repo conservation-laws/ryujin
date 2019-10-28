@@ -3,6 +3,10 @@
 
 #include "limiter.h"
 
+#if defined(CHECK_BOUNDS) && !defined(DEBUG)
+#define DEBUG
+#endif
+
 namespace grendel
 {
   template <int dim, typename Number>
@@ -109,7 +113,7 @@ namespace grendel
         const auto rho_e_r =
             ProblemDescription<dim, Number>::internal_energy(U_r);
 
-        auto psi_r = rho_r * rho_e_r - s_min * rho_r * rho_r_gamma * relaxation;
+        auto psi_r = relaxation * rho_r * rho_e_r - s_min * rho_r * rho_r_gamma;
 
         /* If psi_r > 0 the right state is fine, force returning t_r by
          * setting t_l = t_r: */
@@ -125,7 +129,7 @@ namespace grendel
         const auto rho_l_gamma = grendel::pow(rho_l, gamma);
         const auto rho_e_l = ProblemDescription<dim, Number>::internal_energy(U_l);
 
-        auto psi_l = rho_l * rho_e_l - s_min * rho_l * rho_l_gamma * relaxation;
+        auto psi_l = relaxation * rho_l * rho_e_l - s_min * rho_l * rho_l_gamma;
 
         /* Shortcut: In the majority of cases only at most one Newton iteration
          * is necessary because we reach Psi(t_l) \approx 0 quickly. Just return
@@ -150,12 +154,16 @@ namespace grendel
 #ifdef DEBUG
         AssertThrowSIMD(
             psi_l,
-            [](auto val) { return val > -10. * newton_eps<ScalarNumber>; },
+            [](auto val) { return val >= -100. * eps; },
             dealii::ExcMessage("Specific entropy minimum principle violated."));
 #endif
 
         quadratic_newton_step(
             t_l, t_r, psi_l, psi_r, dpsi_l, dpsi_r, Number(-1.));
+
+        /* Let's error on the safe side: */
+        t_l -= newton_eps<Number>;
+        t_r += newton_eps<Number>;
       }
 
 #ifdef DEBUG
@@ -166,7 +174,7 @@ namespace grendel
       const auto s_new =
           ProblemDescription<dim, Number>::specific_entropy(U_new);
       const auto psi =
-          rho_new * e_new - s_min * grendel::pow(rho_new, gp1) * relaxation;
+          relaxation * rho_new * e_new - s_min * grendel::pow(rho_new, gp1);
 
       AssertThrowSIMD(
           e_new,
@@ -180,7 +188,7 @@ namespace grendel
 
       AssertThrowSIMD(
           psi,
-          [](auto val) { return val >= -10. * newton_eps<ScalarNumber>; },
+          [](auto val) { return val >= -100. * eps; },
           dealii::ExcMessage("Specific entropy minimum principle violated."));
 #endif
     }
@@ -293,11 +301,15 @@ namespace grendel
 #ifdef DEBUG
         AssertThrowSIMD(
             psi_l,
-            [](auto val) { return val < 10. * newton_eps<ScalarNumber>; },
+            [](auto val) { return val < 1000. * eps; },
             dealii::ExcMessage("Entropy inequality violated."));
 #endif
 
         quadratic_newton_step(t_l, t_r, psi_l, psi_r, dpsi_l, dpsi_r, sign);
+
+        /* Let's error on the safe side: */
+        t_l -= newton_eps<Number>;
+        t_r += newton_eps<Number>;
       }
 
 #ifdef DEBUG
@@ -308,7 +320,7 @@ namespace grendel
 
       AssertThrowSIMD(
           avg - rho_rho_e * relaxation,
-          [](auto val) { return val < 10. * newton_eps<ScalarNumber>; },
+          [](auto val) { return val < 1000. * eps; },
           dealii::ExcMessage("Entropy inequality violated."));
 #endif
     }

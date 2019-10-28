@@ -8,6 +8,9 @@
 
 #include <boost/range/irange.hpp>
 
+#include <atomic>
+#include <regex>
+
 #ifdef CALLGRIND
 #include <valgrind/callgrind.h>
 #endif
@@ -16,9 +19,9 @@
 #include <likwid.h>
 #endif
 
-#include <atomic>
-#include <regex>
-
+#if defined(CHECK_BOUNDS) && !defined(DEBUG)
+#define DEBUG
+#endif
 
 namespace grendel
 {
@@ -779,6 +782,29 @@ namespace grendel
               p_ij *= (1 - l_ij);
               scatter_set_entry(pij_matrix_, jt, p_ij);
             }
+
+#ifdef DEBUG
+            const auto rho_new = U_i_new[0];
+            const auto e_new =
+                ProblemDescription<dim, Number>::internal_energy(U_i_new);
+            const auto s_new =
+                ProblemDescription<dim, Number>::specific_entropy(U_i_new);
+
+            AssertThrowSIMD(
+                rho_new,
+                [](auto val) { return val > 0.; },
+                dealii::ExcMessage("Negative density."));
+
+            AssertThrowSIMD(
+                e_new,
+                [](auto val) { return val > 0.; },
+                dealii::ExcMessage("Negative internal energy."));
+
+            AssertThrowSIMD(
+                s_new,
+                [](auto val) { return val > 0.; },
+                dealii::ExcMessage("Negative specific entropy."));
+#endif
 
             scatter(temp_euler_, U_i_new, i);
           }

@@ -6,6 +6,10 @@
 #include "riemann_solver.h"
 #include "simd.h"
 
+#if defined(CHECK_BOUNDS) && !defined(DEBUG)
+#define DEBUG
+#endif
+
 namespace grendel
 {
   using namespace dealii;
@@ -743,10 +747,10 @@ namespace grendel
     const auto lambda_greedy = ScalarNumber(1.) / lambda_greedy_inverse;
 
 #ifdef DEBUG
-    AssertThrowSIMD(
-        lambda_max - lambda_greedy,
-        [](auto val) { return val > -newton_eps<ScalarNumber>; },
-        dealii::ExcMessage("Garbled up lambda_greedy."));
+        AssertThrowSIMD(
+            lambda_max - lambda_greedy,
+            [](auto val) { return val > -100. * newton_eps<ScalarNumber>; },
+            dealii::ExcMessage("Garbled up lambda_greedy."));
 #endif
 
     return {
