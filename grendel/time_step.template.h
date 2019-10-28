@@ -376,6 +376,12 @@ namespace grendel
     tau = (tau == Number(0.) ? tau_max.load() : tau);
     deallog << "        perform time-step with tau = " << tau << std::endl;
 
+    if (tau * cfl_update_ > tau_max.load() * cfl_max_) {
+      deallog << "        insufficient CFL, refuse update and abort stepping"
+              << std::endl;
+      U[0] *= std::numeric_limits<Number>::quiet_NaN();
+      return tau_max;
+    }
 
     /*
      * Step 3: Low-order update, also compute limiter bounds, R_i and first
@@ -885,6 +891,7 @@ restart_ssph2_step:
 
     if (tau_2 * cfl_max_ < tau_1 * cfl_update_) {
       /* Restart and force smaller time step: */
+      deallog << "        insufficient CFL, restart" << std::endl;
       tau_0 = tau_2 * cfl_update_;
       U.swap(temp_ssp_);
       goto restart_ssph2_step;
@@ -924,6 +931,7 @@ restart_ssprk3_step:
 
     if (tau_2 * cfl_max_ < tau_1 * cfl_update_) {
       /* Restart and force smaller time step: */
+      deallog << "        insufficient CFL, restart" << std::endl;
       tau_0 = tau_2 * cfl_update_;
       U.swap(temp_ssp_);
       goto restart_ssprk3_step;
@@ -940,6 +948,7 @@ restart_ssprk3_step:
 
     if (tau_3 * cfl_max_ < tau_1 * cfl_update_) {
       /* Restart and force smaller time step: */
+      deallog << "        insufficient CFL, restart" << std::endl;
       tau_0 = tau_3 * cfl_update_;
       U.swap(temp_ssp_);
       goto restart_ssprk3_step;
