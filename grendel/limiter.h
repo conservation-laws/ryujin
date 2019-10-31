@@ -143,7 +143,6 @@ namespace grendel
     rho_max = std::max(rho_max, rho_ij);
 
 
-
     if constexpr (limiter_ == Limiters::specific_entropy) {
       const auto s = ProblemDescription<dim, Number>::specific_entropy(U_j);
       s_min = std::min(s_min, s);

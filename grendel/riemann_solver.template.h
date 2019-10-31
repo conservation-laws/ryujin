@@ -745,13 +745,13 @@ namespace grendel
     const auto lambda_greedy = ScalarNumber(1.) / lambda_greedy_inverse;
 
 #ifdef CHECK_BOUNDS
-        AssertThrowSIMD(
-            lambda_max - lambda_greedy,
-            [](auto val) { return val > -100. * newton_eps<ScalarNumber>; },
-            dealii::ExcMessage("Garbled up lambda_greedy."));
+    AssertThrowSIMD(
+        lambda_max - lambda_greedy,
+        [](auto val) { return val > -100. * newton_eps<ScalarNumber>; },
+        dealii::ExcMessage("Garbled up lambda_greedy."));
 #endif
 
-        return {std::min(lambda_greedy, lambda_max), p_star, i};
+    return {std::min(lambda_greedy, lambda_max), p_star, i};
   }
 
 } /* namespace grendel */

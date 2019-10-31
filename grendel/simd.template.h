@@ -10,16 +10,16 @@ DEAL_II_ENABLE_EXTRA_DIAGNOSTICS
 
 namespace grendel
 {
-#  if DEAL_II_COMPILER_VECTORIZATION_LEVEL >= 1 && defined(__SSE2__) && defined(USE_CUSTOM_POW)
+#if DEAL_II_COMPILER_VECTORIZATION_LEVEL >= 1 && defined(__SSE2__) &&          \
+    defined(USE_CUSTOM_POW)
 
-  template<>
+  template <>
   // DEAL_II_ALWAYS_INLINE inline
   float pow(const float x, const float b)
   {
     /* Use a custom pow implementation for SIMD vector units: */
     return pow(Vec4f(x), b).extract(0);
   }
-
 
 
   template <>
@@ -51,7 +51,7 @@ namespace grendel
 
 #endif
 
-#  if DEAL_II_COMPILER_VECTORIZATION_LEVEL >= 3 && defined(__AVX512F__)
+#if DEAL_II_COMPILER_VECTORIZATION_LEVEL >= 3 && defined(__AVX512F__)
 
   template <>
   // DEAL_II_ALWAYS_INLINE inline
@@ -73,9 +73,9 @@ namespace grendel
     return result;
   }
 
-#  endif
+#endif
 
-#  if DEAL_II_COMPILER_VECTORIZATION_LEVEL >= 2 && defined(__AVX__)
+#if DEAL_II_COMPILER_VECTORIZATION_LEVEL >= 2 && defined(__AVX__)
 
   template <>
   // DEAL_II_ALWAYS_INLINE inline
@@ -83,7 +83,7 @@ namespace grendel
   pow(const dealii::VectorizedArray<float, 8> x, const float b)
   {
     dealii::VectorizedArray<float, 8> result;
-    result.data =  pow(Vec8f(x.data), b);
+    result.data = pow(Vec8f(x.data), b);
     return result;
   }
 
@@ -93,13 +93,13 @@ namespace grendel
   pow(const dealii::VectorizedArray<double, 4> x, const double b)
   {
     dealii::VectorizedArray<double, 4> result;
-    result.data =  pow(Vec4d(x.data), b);
+    result.data = pow(Vec4d(x.data), b);
     return result;
   }
 
-#  endif
+#endif
 
-#  if DEAL_II_COMPILER_VECTORIZATION_LEVEL >= 1 && defined(__SSE2__)
+#if DEAL_II_COMPILER_VECTORIZATION_LEVEL >= 1 && defined(__SSE2__)
 
   template <>
   // DEAL_II_ALWAYS_INLINE inline
@@ -107,7 +107,7 @@ namespace grendel
   pow(const dealii::VectorizedArray<float, 4> x, const float b)
   {
     dealii::VectorizedArray<float, 4> result;
-    result.data =  pow(Vec4f(x.data), b);
+    result.data = pow(Vec4f(x.data), b);
     return result;
   }
 
@@ -117,11 +117,11 @@ namespace grendel
   pow(const dealii::VectorizedArray<double, 2> x, const double b)
   {
     dealii::VectorizedArray<double, 2> result;
-    result.data =  pow(Vec2d(x.data), b);
+    result.data = pow(Vec2d(x.data), b);
     return result;
   }
 
-#  endif
+#endif
 
 } // namespace grendel
 

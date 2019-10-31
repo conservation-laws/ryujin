@@ -486,7 +486,6 @@ namespace grendel
             limiter.accumulate(
                 U_i, U_j, U_ij_bar, /* is diagonal */ js[0] == i);
             limiter.accumulate_variations(variations_j, jts);
-
           }
 
           simd_scatter(temp_euler_, U_i_new, i);
@@ -897,7 +896,7 @@ namespace grendel
 
     Number tau_0 = 0.;
 
-restart_ssph2_step:
+  restart_ssph2_step:
     /* This also copies ghost elements: */
     for (unsigned int k = 0; k < problem_dimension; ++k)
       temp_ssp_[k] = U[k];
@@ -937,7 +936,7 @@ restart_ssph2_step:
 
     Number tau_0 = Number(0.);
 
-restart_ssprk3_step:
+  restart_ssprk3_step:
     /* This also copies ghost elements: */
     for (unsigned int k = 0; k < problem_dimension; ++k)
       temp_ssp_[k] = U[k];

@@ -3,8 +3,8 @@
 
 #include "matrix_communicator.h"
 
-#include <deal.II/lac/sparsity_tools.h>
 #include <deal.II/dofs/dof_tools.h>
+#include <deal.II/lac/sparsity_tools.h>
 
 #include <boost/range/irange.hpp>
 

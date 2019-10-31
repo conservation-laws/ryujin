@@ -36,11 +36,10 @@ namespace grendel
      */
     const static std::array<std::string, n_quantities> component_names;
 
-    Postprocessor(
-        const MPI_Comm &mpi_communicator,
-        dealii::TimerOutput &computing_timer,
-        const grendel::OfflineData<dim, Number> &offline_data,
-        const std::string &subsection = "Postprocessor");
+    Postprocessor(const MPI_Comm &mpi_communicator,
+                  dealii::TimerOutput &computing_timer,
+                  const grendel::OfflineData<dim, Number> &offline_data,
+                  const std::string &subsection = "Postprocessor");
 
     virtual ~Postprocessor() final = default;
 

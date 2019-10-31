@@ -67,7 +67,7 @@ namespace grendel
     for (auto &it : U_)
       it.reinit(partitioner);
 
-    for(auto &it: quantities_)
+    for (auto &it : quantities_)
       it.reinit(partitioner);
   }
 
@@ -141,7 +141,6 @@ namespace grendel
             } else if constexpr (dim == 3) {
               vorticity += cross_product_3d(c_ij, m_j);
             }
-
           }
 
           /* Fix up boundaries: */

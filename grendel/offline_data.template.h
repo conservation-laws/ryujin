@@ -587,8 +587,7 @@ namespace grendel
 
     {
       deallog << "        compute b_ijs" << std::endl;
-      TimerOutput::Scope t(computing_timer_,
-                           "offline_data - compute b_ij");
+      TimerOutput::Scope t(computing_timer_, "offline_data - compute b_ij");
 
       const auto indices = boost::irange<unsigned int>(0, n_locally_relevant_);
       parallel::apply_to_subranges(

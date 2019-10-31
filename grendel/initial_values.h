@@ -49,8 +49,8 @@ namespace grendel
      * configuration and want to compare the numerical computation against
      * it.
      */
-    const std::function<rank1_type(const dealii::Point<dim> &point,
-                                   Number t)> &initial_state;
+    const std::function<rank1_type(const dealii::Point<dim> &point, Number t)>
+        &initial_state;
 
 
   private:
