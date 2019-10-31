@@ -1,14 +1,12 @@
 #ifndef RIEMANN_SOLVER_TEMPLATE_H
 #define RIEMANN_SOLVER_TEMPLATE_H
 
+#include "compile_time_options.h"
+
 #include "limiter.h"
 #include "newton.h"
 #include "riemann_solver.h"
 #include "simd.h"
-
-#if defined(CHECK_BOUNDS) && !defined(DEBUG)
-#define DEBUG
-#endif
 
 namespace grendel
 {
@@ -679,7 +677,7 @@ namespace grendel
     auto [lambda_max, p_star, i, bounds] =
         compute(riemann_data_i, riemann_data_j);
 
-#ifdef DEBUG
+#ifdef CHECK_BOUNDS
     const auto phi_p_star = phi(riemann_data_i, riemann_data_j, p_star);
     AssertThrowSIMD(
         phi_p_star,
@@ -746,7 +744,7 @@ namespace grendel
 
     const auto lambda_greedy = ScalarNumber(1.) / lambda_greedy_inverse;
 
-#ifdef DEBUG
+#ifdef CHECK_BOUNDS
         AssertThrowSIMD(
             lambda_max - lambda_greedy,
             [](auto val) { return val > -100. * newton_eps<ScalarNumber>; },

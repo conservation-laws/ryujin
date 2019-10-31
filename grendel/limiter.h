@@ -1,6 +1,8 @@
 #ifndef LIMITER_H
 #define LIMITER_H
 
+#include "compile_time_options.h"
+
 #include "helper.h"
 #include "newton.h"
 #include "offline_data.h"
@@ -44,11 +46,11 @@ namespace grendel
       rho,
       specific_entropy,
       entropy_inequality
-    } limiter_ = Limiters::specific_entropy;
+    } limiter_ = LIMITER;
 
-    static constexpr bool relax_bounds_ = true;
+    static constexpr bool relax_bounds_ = LIMITER_RELAX_BOUNDS;
 
-    static constexpr unsigned int relaxation_order_ = 3;
+    static constexpr unsigned int relaxation_order_ = LIMITER_RELAXATION_ORDER;
 
     /*
      * Accumulate bounds:

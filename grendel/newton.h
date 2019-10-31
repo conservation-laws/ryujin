@@ -1,6 +1,8 @@
 #ifndef NEWTON_H
 #define NEWTON_H
 
+#include "compile_time_options.h"
+
 #include "simd.h"
 
 #include <array>
@@ -13,13 +15,13 @@ namespace grendel
   template <typename Number>
   static constexpr auto newton_eps = typename get_value_type<Number>::type(
       std::is_same<typename get_value_type<Number>::type, double>::value
-          ? 1.e-10
-          : 1.e-4);
+          ? NEWTON_EPS_DOUBLE
+          : NEWTON_EPS_FLOAT);
 
   /*
    * Maximal number of Newton iterations we will perform:
    */
-  static constexpr unsigned int newton_max_iter = 2;
+  static constexpr unsigned int newton_max_iter = NEWTON_MAX_ITER;
 
   /*
    * Perform one step of a quadratic Newton iteration.

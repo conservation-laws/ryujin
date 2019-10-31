@@ -1,6 +1,8 @@
 #ifndef TIME_STEP_H
 #define TIME_STEP_H
 
+#include "compile_time_options.h"
+
 #include "helper.h"
 #include "simd.h"
 
@@ -96,15 +98,15 @@ namespace grendel
     static constexpr enum class Order {
       first_order,
       second_order
-    } order_ = Order::second_order;
+    } order_ = ORDER;
 
     static constexpr enum class TimeStepOrder {
       first_order,
       second_order,
       third_order
-    } time_step_order_ = TimeStepOrder::second_order;
+    } time_step_order_ = TIME_STEP_ORDER;
 
-    static constexpr unsigned int limiter_iter_ = 2;
+    static constexpr unsigned int limiter_iter_ = LIMITER_ITER;
 
   private:
     const MPI_Comm &mpi_communicator_;

@@ -1,23 +1,14 @@
 #ifndef INDICATOR_H
 #define INDICATOR_H
 
+#include "compile_time_options.h"
+
 #include "offline_data.h"
 #include "problem_description.h"
 #include "simd.h"
 
 #include <deal.II/base/vectorization.h>
 #include <deal.II/lac/la_parallel_vector.templates.h>
-
-
-/* FIXME: Currently the handling of compile time constants is a big mess... */
-#ifndef INDICATOR
-#define INDICATOR Indicators::entropy_viscosity_commutator
-#endif
-
-/* FIXME: Currently the handling of compile time constants is a big mess... */
-#ifndef SMOOTHNESS_INDICATOR
-#define SMOOTHNESS_INDICATOR SmoothnessIndicators::pressure
-#endif
 
 
 namespace grendel
@@ -50,6 +41,9 @@ namespace grendel
       entropy_viscosity_commutator
     } indicator_ = INDICATOR;
 
+    static constexpr bool compute_second_variations_ =
+        COMPUTE_SECOND_VARIATIONS;
+
     /*
      * Options for smoothness indicator:
      */
@@ -60,11 +54,11 @@ namespace grendel
       pressure,
     } smoothness_indicator_ = SMOOTHNESS_INDICATOR;
 
-    static constexpr ScalarNumber smoothness_indicator_alpha_0_ = 0.;
+    static constexpr ScalarNumber smoothness_indicator_alpha_0_ =
+        SMOOTHNESS_INDICATOR_ALPHA_0;
 
-    static constexpr unsigned int smoothness_indicator_power_ = 3;
-
-    static constexpr bool compute_second_variations_ = true;
+    static constexpr unsigned int smoothness_indicator_power_ =
+        SMOOTHNESS_INDICATOR_POWER;
 
     /**
      * We take a reference to an OfflineData object in order to store

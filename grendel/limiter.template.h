@@ -1,23 +1,20 @@
 #ifndef LIMITER_TEMPLATE_H
 #define LIMITER_TEMPLATE_H
 
-#include "limiter.h"
+#include "compile_time_options.h"
 
-#if defined(CHECK_BOUNDS) && !defined(DEBUG)
-#define DEBUG
-#endif
+#include "limiter.h"
 
 namespace grendel
 {
   template <int dim, typename Number>
   template <typename Limiter<dim, Number>::Limiters limiter, typename BOUNDS>
   // DEAL_II_ALWAYS_INLINE inline
-  Number Limiter<dim, Number>::limit(
-      const BOUNDS bounds,
-      const rank1_type U,
-      const rank1_type P,
-      const Number t_min /* = Number(0.) */,
-      const Number t_max /* = Number(1.) */)
+  Number Limiter<dim, Number>::limit(const BOUNDS bounds,
+                                     const rank1_type U,
+                                     const rank1_type P,
+                                     const Number t_min /* = Number(0.) */,
+                                     const Number t_max /* = Number(1.) */)
   {
     Number t_r = t_max;
 
@@ -37,8 +34,7 @@ namespace grendel
       const auto &rho_min = std::get<0>(bounds);
       const auto &rho_max = std::get<1>(bounds);
 
-      constexpr ScalarNumber eps =
-          std::numeric_limits<ScalarNumber>::epsilon();
+      constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
 
       t_r = dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
           rho_max,
@@ -61,7 +57,7 @@ namespace grendel
       t_r = std::min(t_r, t_max);
       t_r = std::max(t_r, t_min);
 
-#ifdef DEBUG
+#ifdef CHECK_BOUNDS
       const auto new_density = (U + t_r * P)[0];
       AssertThrowSIMD(
           new_density,
@@ -127,7 +123,8 @@ namespace grendel
         const auto U_l = U + t_l * P;
         const auto rho_l = U_l[0];
         const auto rho_l_gamma = grendel::pow(rho_l, gamma);
-        const auto rho_e_l = ProblemDescription<dim, Number>::internal_energy(U_l);
+        const auto rho_e_l =
+            ProblemDescription<dim, Number>::internal_energy(U_l);
 
         auto psi_l = relaxation * rho_l * rho_e_l - s_min * rho_l * rho_l_gamma;
 
@@ -151,7 +148,7 @@ namespace grendel
         const auto dpsi_r =
             rho_r * drho_e_r + (rho_e_r - gp1 * s_min * rho_r_gamma) * drho;
 
-#ifdef DEBUG
+#ifdef CHECK_BOUNDS
         AssertThrowSIMD(
             psi_l,
             [](auto val) { return val >= -100. * eps; },
@@ -166,7 +163,7 @@ namespace grendel
         t_r += ScalarNumber(0.2) * newton_eps<Number>;
       }
 
-#ifdef DEBUG
+#ifdef CHECK_BOUNDS
       const auto U_new = U + t_l * P;
       const auto rho_new = U_new[0];
       const auto e_new =
@@ -298,7 +295,7 @@ namespace grendel
         const auto dpsi_r =
             gp1 * average_gamma_r * b - rho_e_r * drho - rho_r * drho_e_r;
 
-#ifdef DEBUG
+#ifdef CHECK_BOUNDS
         AssertThrowSIMD(
             psi_l,
             [](auto val) { return val < 1000. * eps; },
@@ -312,7 +309,7 @@ namespace grendel
         t_r += ScalarNumber(0.2) * newton_eps<Number>;
       }
 
-#ifdef DEBUG
+#ifdef CHECK_BOUNDS
       const auto U_new = U + t_l * P;
       const auto rho_rho_e =
           U_new[0] * ProblemDescription<dim, Number>::internal_energy(U_new);

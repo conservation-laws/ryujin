@@ -1,6 +1,8 @@
 #ifndef RIEMANN_SOLVER_H
 #define RIEMANN_SOLVER_H
 
+#include "compile_time_options.h"
+
 #include "helper.h"
 #include "simd.h"
 
@@ -10,10 +12,6 @@
 #include <deal.II/base/tensor.h>
 
 #include <functional>
-
-#ifndef NEWTON_MAX_ITER
-#define NEWTON_MAX_ITER 1
-#endif
 
 namespace grendel
 {
@@ -47,7 +45,7 @@ namespace grendel
      * Options:
      */
 
-    static constexpr unsigned int newton_max_iter_ = NEWTON_MAX_ITER;
+    static constexpr unsigned int newton_max_iter_ = RIEMANN_NEWTON_MAX_ITER;
 
     /**
      * Try to improve the maximal wavespeed estimate. When enabled the
@@ -59,7 +57,7 @@ namespace grendel
      *
      *  - does a full limiter pass against the inviscid Galerkin update
      */
-    static constexpr bool greedy_dij_ = false;
+    static constexpr bool greedy_dij_ = RIEMANN_GREEDY_DIJ;
 
     /**
      * The above computation is obviously very expensive (similarly in cost
@@ -69,9 +67,10 @@ namespace grendel
      *   (1 - greedy_threshold_)/100 %
      * we simply don't do anything.
      */
-    static constexpr ScalarNumber greedy_threshold_ = ScalarNumber(1.00);
+    static constexpr ScalarNumber greedy_threshold_ =
+        ScalarNumber(RIEMANN_GREEDY_THRESHOLD);
 
-    static constexpr bool greedy_relax_bounds_ = false;
+    static constexpr bool greedy_relax_bounds_ = RIEMANN_GREEDY_RELAX_BOUNDS;
 
     /**
      * For two given 1D primitive states riemann_data_i and riemann_data_j,
