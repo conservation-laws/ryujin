@@ -1,6 +1,7 @@
 #ifndef MATRIX_COMMUNICATOR_H
 #define MATRIX_COMMUNICATOR_H
 
+#include <compile_time_options.h>
 #include "offline_data.h"
 
 #include <deal.II/base/timer.h>

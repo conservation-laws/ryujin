@@ -1,6 +1,7 @@
 #ifndef OFFLINE_DATA_H
 #define OFFLINE_DATA_H
 
+#include <compile_time_options.h>
 #include "discretization.h"
 #include "helper.h"
 

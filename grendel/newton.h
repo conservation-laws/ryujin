@@ -1,8 +1,7 @@
 #ifndef NEWTON_H
 #define NEWTON_H
 
-#include "compile_time_options.h"
-
+#include <compile_time_options.h>
 #include "simd.h"
 
 #include <array>

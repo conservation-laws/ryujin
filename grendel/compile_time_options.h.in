@@ -5,22 +5,15 @@
  * General compile-time options:
  */
 
-#ifndef DIM
-// #define DIM 1
-#define DIM 2
-// #define DIM 3
-#endif
+#define DIM @DIM@
 
-#ifndef NUMBER
-// #define NUMBER double
-#define NUMBER float
-#endif
+#define NUMBER @NUMBER@
 
-// #define USE_SIMD
+#cmakedefine USE_SIMD
 
-// #define USE_CUSTOM_POW
+#cmakedefine USE_CUSTOM_POW
 
-// #define CHECK_BOUNDS
+#cmakedefine CHECK_BOUNDS
 
 #if defined(DEBUG) && !defined(CHECK_BOUNDS)
 #define CHECK_BOUNDS

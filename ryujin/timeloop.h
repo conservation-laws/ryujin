@@ -1,6 +1,8 @@
 #ifndef TIMELOOP_H
 #define TIMELOOP_H
 
+#include <compile_time_options.h>
+
 #include <discretization.h>
 #include <offline_data.h>
 #include <initial_values.h>

@@ -1,7 +1,7 @@
 #ifndef INDICATOR_H
 #define INDICATOR_H
 
-#include "compile_time_options.h"
+#include <compile_time_options.h>
 
 #include "offline_data.h"
 #include "problem_description.h"

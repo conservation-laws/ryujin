@@ -1,8 +1,6 @@
 #ifndef LIMITER_TEMPLATE_H
 #define LIMITER_TEMPLATE_H
 
-#include "compile_time_options.h"
-
 #include "limiter.h"
 
 namespace grendel

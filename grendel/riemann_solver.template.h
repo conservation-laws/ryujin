@@ -1,7 +1,7 @@
 #ifndef RIEMANN_SOLVER_TEMPLATE_H
 #define RIEMANN_SOLVER_TEMPLATE_H
 
-#include "compile_time_options.h"
+#include <compile_time_options.h>
 
 #include "limiter.h"
 #include "newton.h"

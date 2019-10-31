@@ -1,6 +1,7 @@
 #ifndef DISCRETIZATION_H
 #define DISCRETIZATION_H
 
+#include <compile_time_options.h>
 #include "helper.h"
 
 #include <deal.II/base/parameter_acceptor.h>

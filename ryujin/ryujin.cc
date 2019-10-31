@@ -1,5 +1,7 @@
 #include "timeloop.h"
 
+#include <compile_time_options.h>
+
 #include <deal.II/base/utilities.h>
 
 #ifdef LIKWID_PERFMON

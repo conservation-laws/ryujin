@@ -1,6 +1,7 @@
 #ifndef PROBLEM_DESCRIPTION_H
 #define PROBLEM_DESCRIPTION_H
 
+#include <compile_time_options.h>
 #include "helper.h"
 #include "simd.h"
 

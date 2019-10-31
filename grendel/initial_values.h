@@ -1,6 +1,7 @@
 #ifndef INITIAL_VALUES_H
 #define INITIAL_VALUES_H
 
+#include <compile_time_options.h>
 #include "problem_description.h"
 
 #include <deal.II/base/parameter_acceptor.h>
