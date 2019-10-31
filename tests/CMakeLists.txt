@@ -1,6 +1,7 @@
 INCLUDE_DIRECTORIES(
-  ${CMAKE_SOURCE_DIR}/ryujin
-  ${CMAKE_SOURCE_DIR}/grendel
+  ${CMAKE_SOURCE_DIR}/ryujin/
+  ${CMAKE_SOURCE_DIR}/grendel/
+  ${CMAKE_BINARY_DIR}/grendel/
   )
 
 SET(TEST_LIBRARIES grendel)

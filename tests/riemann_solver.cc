@@ -1,5 +1,5 @@
-#ifndef NEWTON_MAX_ITER
-#define NEWTON_MAX_ITER 0
+#ifndef RIEMANN_NEWTON_MAX_ITER
+#define RIEMANN_NEWTON_MAX_ITER 0
 #endif
 
 #include <problem_description.h>

@@ -1,3 +1,7 @@
+#ifndef RIEMANN_NEWTON_MAX_ITER
+#define RIEMANN_NEWTON_MAX_ITER 0
+#endif
+
 #include <problem_description.h>
 #include <riemann_solver.h>
 #include <riemann_solver.template.h>
