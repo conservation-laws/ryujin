@@ -58,6 +58,10 @@ OPTION(USE_SIMD "Use SIMD vectorization" ON)
 
 OPTION(USE_CUSTOM_POW "Use custom pow implementation" OFF)
 
+OPTION(CHECK_BOUNDS "Enable debug code paths that check limiter bounds" OFF)
+
+OPTION(DEBUG_OUTPUT "Enable detailed time-step output" OFF)
+
 #
 # Set up the rest:
 #

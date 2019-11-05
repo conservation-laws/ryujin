@@ -19,6 +19,8 @@
 #define CHECK_BOUNDS
 #endif
 
+#cmakedefine DEBUG_OUTPUT
+
 /*
  * class TimeStep:
  */
