@@ -159,7 +159,7 @@ namespace grendel
      */
 
     {
-      // deallog << "        compute d_ij, and alpha_i" << std::endl;
+      deallog << "        compute d_ij, and alpha_i" << std::endl;
       TimerOutput::Scope time(computing_timer_,
                               "time_step - 1 compute d_ij, and alpha_i");
 #ifdef LIKWID_PERFMON
@@ -309,12 +309,9 @@ namespace grendel
     /*
      * Step 2: Compute diagonal of d_ij, and maximal time-step size.
      */
-    std::vector<Number> tau_vec(serial_relevant.end() -
-                                serial_relevant.begin());
-    Number tau_max = 0.;
 
-    // MPI_Barrier(mpi_communicator_);
-    Timer timer2;
+    std::atomic<Number> tau_max{std::numeric_limits<Number>::infinity()};
+
     {
       deallog << "        compute d_ii, and tau_max" << std::endl;
       TimerOutput::Scope time(computing_timer_,
@@ -323,8 +320,9 @@ namespace grendel
       LIKWID_MARKER_START("time_step_2");
 #endif
 
-      Timer timer;
       const auto step_2_serial = [&](auto i1, const auto i2) {
+        Number tau_max_on_subrange = std::numeric_limits<Number>::infinity();
+
         for (const auto i : boost::make_iterator_range(i1, i2)) {
 
           /* Skip constrained degrees of freedom */
@@ -353,28 +351,21 @@ namespace grendel
 
           const Number mass = lumped_mass_matrix.diag_element(i);
           const Number tau = cfl_update_ * mass / (Number(-2.) * d_sum);
-          tau_vec[i] = tau;
+          tau_max_on_subrange = std::min(tau_max_on_subrange, tau);
         }
+
+        Number current_tau_max = tau_max.load();
+        while (current_tau_max > tau_max_on_subrange &&
+               !tau_max.compare_exchange_weak(current_tau_max,
+                                              tau_max_on_subrange))
+          ;
       };
 
       parallel::apply_to_subranges(
           serial_relevant.begin(), serial_relevant.end(), step_2_serial, 1024);
 
-      /*
-      const double t1 = timer.wall_time();
-      Utilities::MPI::MinMaxAvg data;
-      data = Utilities::MPI::min_max_avg(t1, mpi_communicator_);
-      if (Utilities::MPI::this_mpi_process(mpi_communicator_) == 0)
-        std::cout << "Step 2a time distribution      " << data.min << " (p"
-                  << data.min_index << ") " << data.avg << " " << data.max
-                  << " (p" << data.max_index << ")" << std::endl;
-      */
-
       /* Synchronize tau_max over all MPI processes: */
-      tau_max = tau_vec[0];
-      for (unsigned int i = 1; i < tau_vec.size(); ++i)
-        tau_max = std::min(tau_max, tau_vec[i]);
-      tau_max = Utilities::MPI::min(tau_max, mpi_communicator_);
+      tau_max.store(Utilities::MPI::min(tau_max.load(), mpi_communicator_));
 
       AssertThrow(!std::isnan(tau_max) && !std::isinf(tau_max) && tau_max > 0.,
                   ExcMessage("I'm sorry, Dave. I'm afraid I can't "
@@ -386,20 +377,11 @@ namespace grendel
 
       deallog << "        computed tau_max = " << tau_max << std::endl;
     }
-    /*
-    const double t2 = timer2.wall_time();
-    Utilities::MPI::MinMaxAvg data;
-    data = Utilities::MPI::min_max_avg(t2, mpi_communicator_);
-    if (Utilities::MPI::this_mpi_process(mpi_communicator_) == 0)
-      std::cout << "Step 2b time distribution      " << data.min << " (p"
-                << data.min_index << ") " << data.avg << " " << data.max
-                << " (p" << data.max_index << ")" << std::endl;
-    */
 
-    tau = (tau == Number(0.) ? tau_max : tau);
+    tau = (tau == Number(0.) ? tau_max.load() : tau);
     deallog << "        perform time-step with tau = " << tau << std::endl;
 
-    if (tau * cfl_update_ > tau_max * cfl_max_) {
+    if (tau * cfl_update_ > tau_max.load() * cfl_max_) {
       deallog << "        insufficient CFL, refuse update and abort stepping"
               << std::endl;
       U[0] *= std::numeric_limits<Number>::quiet_NaN();
