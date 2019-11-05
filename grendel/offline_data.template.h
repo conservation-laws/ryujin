@@ -3,6 +3,7 @@
 
 #include "offline_data.h"
 #include "scratch_data.h"
+#include "sparse_matrix_simd.h"
 
 #include <deal.II/base/graph_coloring.h>
 #include <deal.II/base/parallel.h>
@@ -325,8 +326,8 @@ namespace grendel
       lumped_mass_matrix_.reinit(sparsity_pattern_);
       bij_matrix_.reinit(sparsity_pattern_);
       betaij_matrix_.reinit(sparsity_pattern_);
-      for (auto &matrix : cij_matrix_)
-        matrix.reinit(sparsity_pattern_);
+      sparsity_pattern_simd_.reinit(n_locally_internal_, sparsity_pattern_);
+      cij_matrix_.reinit(sparsity_pattern_simd_);
     }
   }
 
@@ -338,8 +339,9 @@ namespace grendel
 
     mass_matrix_ = 0.;
     lumped_mass_matrix_ = 0.;
-    for (auto &matrix : cij_matrix_)
-      matrix = 0.;
+    std::array<dealii::SparseMatrix<Number>, dim> cij_matrix_tmp;
+    for (auto &matrix : cij_matrix_tmp)
+      matrix.reinit(sparsity_pattern_);
     betaij_matrix_ = 0.;
     measure_of_omega_ = 0.;
 
@@ -517,7 +519,7 @@ namespace grendel
 
       for (int k = 0; k < dim; ++k) {
         affine_constraints_.distribute_local_to_global(
-            cell_cij_matrix[k], local_dof_indices, cij_matrix_[k]);
+            cell_cij_matrix[k], local_dof_indices, cij_matrix_tmp[k]);
       }
 
       affine_constraints_.distribute_local_to_global(
@@ -688,7 +690,7 @@ namespace grendel
 
       for (int k = 0; k < dim; ++k) {
         affine_constraints_.distribute_local_to_global(
-            cell_cij_matrix[k], local_dof_indices, cij_matrix_[k]);
+            cell_cij_matrix[k], local_dof_indices, cij_matrix_tmp[k]);
       }
     };
 
@@ -703,6 +705,27 @@ namespace grendel
                       copy_local_to_global_cij,
                       AssemblyScratchData<dim>(*discretization_),
                       AssemblyCopyData<dim, Number>());
+
+
+      for (unsigned int i = 0; i < n_locally_internal_;
+           i += VectorizedArray<Number>::n_array_elements) {
+        auto jts =
+            generate_iterators<VectorizedArray<Number>::n_array_elements>(
+                [&](auto k) { return sparsity_pattern_.begin(i + k); });
+        for (; jts[0] != sparsity_pattern_.end(i); increment_iterators(jts)) {
+          const auto c_ij = gather_get_entry(cij_matrix_tmp, jts);
+          cij_matrix_.write_vectorized_tensor(
+              c_ij, i, jts[0] - sparsity_pattern_.begin(i), true);
+        }
+      }
+      for (unsigned int i = n_locally_internal_; i < n_locally_relevant_; ++i) {
+        for (auto jt = sparsity_pattern_.begin(i);
+             jt != sparsity_pattern_.end(i);
+             ++jt) {
+          const auto c_ij = gather_get_entry(cij_matrix_tmp, jt);
+          cij_matrix_.write_entry(c_ij, i, jt - sparsity_pattern_.begin(i));
+        }
+      }
     }
   }
 

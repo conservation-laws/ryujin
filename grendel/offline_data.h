@@ -1,9 +1,10 @@
 #ifndef OFFLINE_DATA_H
 #define OFFLINE_DATA_H
 
-#include <compile_time_options.h>
 #include "discretization.h"
 #include "helper.h"
+#include "sparse_matrix_simd.h"
+#include <compile_time_options.h>
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/partitioner.h>
@@ -168,14 +169,19 @@ namespace grendel
     ACCESSOR_READ_ONLY(betaij_matrix)
 
     /**
-     * The $(c_{ij})$ matrix.
-     *
-     * Departing from the mathematical formulation, where an entry $c_ij$
-     * is itself a vector-valued element of $\mathbb{R}^{\text{dim}}$ we
-     * store the matrix as a $p dim dimensional array of scalar-valued,
-     * regular matrices.
+     * A sparsity pattern for matrices in vectorized format
      */
-    std::array<dealii::SparseMatrix<Number>, dim> cij_matrix_;
+    SparsityPatternForSIMD<dealii::VectorizedArray<Number>::n_array_elements>
+        sparsity_pattern_simd_;
+    ACCESSOR_READ_ONLY(sparsity_pattern_simd)
+
+    /**
+     * The $(c_{ij})$ matrix.
+     */
+    SparseMatrixForSIMD<dealii::VectorizedArray<Number>::n_array_elements,
+                        Number,
+                        dim>
+        cij_matrix_;
     ACCESSOR_READ_ONLY(cij_matrix)
 
   private:

@@ -86,8 +86,7 @@ namespace grendel
     dij_matrix_.reinit(sparsity);
     lij_matrix_.reinit(sparsity);
 
-    for (auto &it : pij_matrix_)
-      it.reinit(sparsity);
+    pij_matrix_.reinit(offline_data_->sparsity_pattern_simd());
 
     if (Utilities::MPI::n_mpi_processes(mpi_communicator_) > 1)
       lij_matrix_communicator_.prepare();
@@ -160,7 +159,7 @@ namespace grendel
      */
 
     {
-      deallog << "        compute d_ij, and alpha_i" << std::endl;
+      // deallog << "        compute d_ij, and alpha_i" << std::endl;
       TimerOutput::Scope time(computing_timer_,
                               "time_step - 1 compute d_ij, and alpha_i");
 #ifdef LIKWID_PERFMON
@@ -197,13 +196,14 @@ namespace grendel
 
             const auto U_j = simd_gather(U, js);
 
-            indicator.add(U_j, jts);
+            const auto c_ij =
+                cij_matrix.get_vectorized_tensor(i, jts[0] - sparsity.begin(i));
+            indicator.add(U_j, jts, c_ij);
 
             /* Only iterate over the subdiagonal for d_ij */
             if (all_above_diagonal)
               continue;
 
-            const auto c_ij = gather_get_entry(cij_matrix, jts);
             const auto norm = c_ij.norm();
             const auto n_ij = c_ij / norm;
 
@@ -245,13 +245,13 @@ namespace grendel
             const auto j = jt->column();
 
             const auto U_j = gather(U, j);
-            indicator.add(U_j, jt);
+            const auto c_ij = cij_matrix.get_tensor(i, jt - sparsity.begin(i));
+            indicator.add(U_j, jt, c_ij);
 
             /* Only iterate over the subdiagonal for d_ij */
             if (j >= i)
               continue;
 
-            const auto c_ij = gather_get_entry(cij_matrix, jt);
             const auto norm = c_ij.norm();
             const auto n_ij = c_ij / norm;
 
@@ -268,7 +268,9 @@ namespace grendel
             if (boundary_normal_map.count(i) != 0 &&
                 boundary_normal_map.count(j) != 0) {
 
-              const auto c_ji = gather_get_entry(cij_matrix, j, i);
+              const unsigned int j_pos =
+                  sparsity(j, i) - (sparsity.begin(j) - sparsity.begin(0));
+              const auto c_ji = cij_matrix.get_tensor(j, j_pos);
               const auto norm_2 = c_ji.norm();
               const auto n_ji = c_ji / norm_2;
 
@@ -292,7 +294,7 @@ namespace grendel
       parallel::apply_to_subranges(simd_remaining_relevant.begin(),
                                    simd_remaining_relevant.end(),
                                    step_1_serial,
-                                   1024);
+                                   512);
 
       /* Synchronize alpha_ over all MPI processes: */
       alpha_.update_ghost_values();
@@ -307,9 +309,12 @@ namespace grendel
     /*
      * Step 2: Compute diagonal of d_ij, and maximal time-step size.
      */
+    std::vector<Number> tau_vec(serial_relevant.end() -
+                                serial_relevant.begin());
+    Number tau_max = 0.;
 
-    std::atomic<Number> tau_max{std::numeric_limits<Number>::infinity()};
-
+    // MPI_Barrier(mpi_communicator_);
+    Timer timer2;
     {
       deallog << "        compute d_ii, and tau_max" << std::endl;
       TimerOutput::Scope time(computing_timer_,
@@ -318,9 +323,8 @@ namespace grendel
       LIKWID_MARKER_START("time_step_2");
 #endif
 
+      Timer timer;
       const auto step_2_serial = [&](auto i1, const auto i2) {
-        Number tau_max_on_subrange = std::numeric_limits<Number>::infinity();
-
         for (const auto i : boost::make_iterator_range(i1, i2)) {
 
           /* Skip constrained degrees of freedom */
@@ -349,21 +353,28 @@ namespace grendel
 
           const Number mass = lumped_mass_matrix.diag_element(i);
           const Number tau = cfl_update_ * mass / (Number(-2.) * d_sum);
-          tau_max_on_subrange = std::min(tau_max_on_subrange, tau);
+          tau_vec[i] = tau;
         }
-
-        Number current_tau_max = tau_max.load();
-        while (current_tau_max > tau_max_on_subrange &&
-               !tau_max.compare_exchange_weak(current_tau_max,
-                                              tau_max_on_subrange))
-          ;
       };
 
       parallel::apply_to_subranges(
           serial_relevant.begin(), serial_relevant.end(), step_2_serial, 1024);
 
+      /*
+      const double t1 = timer.wall_time();
+      Utilities::MPI::MinMaxAvg data;
+      data = Utilities::MPI::min_max_avg(t1, mpi_communicator_);
+      if (Utilities::MPI::this_mpi_process(mpi_communicator_) == 0)
+        std::cout << "Step 2a time distribution      " << data.min << " (p"
+                  << data.min_index << ") " << data.avg << " " << data.max
+                  << " (p" << data.max_index << ")" << std::endl;
+      */
+
       /* Synchronize tau_max over all MPI processes: */
-      tau_max.store(Utilities::MPI::min(tau_max.load(), mpi_communicator_));
+      tau_max = tau_vec[0];
+      for (unsigned int i = 1; i < tau_vec.size(); ++i)
+        tau_max = std::min(tau_max, tau_vec[i]);
+      tau_max = Utilities::MPI::min(tau_max, mpi_communicator_);
 
       AssertThrow(!std::isnan(tau_max) && !std::isinf(tau_max) && tau_max > 0.,
                   ExcMessage("I'm sorry, Dave. I'm afraid I can't "
@@ -375,11 +386,20 @@ namespace grendel
 
       deallog << "        computed tau_max = " << tau_max << std::endl;
     }
+    /*
+    const double t2 = timer2.wall_time();
+    Utilities::MPI::MinMaxAvg data;
+    data = Utilities::MPI::min_max_avg(t2, mpi_communicator_);
+    if (Utilities::MPI::this_mpi_process(mpi_communicator_) == 0)
+      std::cout << "Step 2b time distribution      " << data.min << " (p"
+                << data.min_index << ") " << data.avg << " " << data.max
+                << " (p" << data.max_index << ")" << std::endl;
+    */
 
-    tau = (tau == Number(0.) ? tau_max.load() : tau);
+    tau = (tau == Number(0.) ? tau_max : tau);
     deallog << "        perform time-step with tau = " << tau << std::endl;
 
-    if (tau * cfl_update_ > tau_max.load() * cfl_max_) {
+    if (tau * cfl_update_ > tau_max * cfl_max_) {
       deallog << "        insufficient CFL, refuse update and abort stepping"
               << std::endl;
       U[0] *= std::numeric_limits<Number>::quiet_NaN();
@@ -387,14 +407,11 @@ namespace grendel
     }
 
     /*
-     * Step 3: Low-order update, also compute limiter bounds, R_i and first
-     *         part of P_ij
+     * Step 3: Low-order update, also compute limiter bounds, R_i
      *
      *   \bar U_ij = 1/2 (U_i + U_j) - 1/2 (f_j - f_i) c_ij / d_ij^L
      *
      *        R_i = \sum_j - c_ij f_j + d_ij^H (U_j - U_i)
-     *
-     *        P_ij = tau / m_i / lambda (d_ij^H - d_ij^L) (U_i - U_j) + [...]
      *
      *   Low-order update: += tau / m_i * 2 d_ij^L (\bar U_ij)
      */
@@ -404,18 +421,14 @@ namespace grendel
               << std::endl;
       TimerOutput::Scope time(computing_timer_,
                               "time_step - 3 low-order update, limiter bounds, "
-                              "compute r_i, and p_ij (1)");
+                              "and compute r_i");
 #ifdef LIKWID_PERFMON
       LIKWID_MARKER_START("time_step_3");
 #endif
 
       const auto step_3_simd = [&](auto i1, const auto i2) {
-        /* Notar bene: This bounds variable is thread local: */
+        /* Nota bene: This bounds variable is thread local: */
         Limiter<dim, VectorizedArray<Number>> limiter(*offline_data_);
-
-        /* lambda is the same value for all interior dofs */
-        const auto size = std::distance(sparsity.begin(*i1), sparsity.end(*i1));
-        const Number lambda_inv = Number(size - 1);
 
         for (const auto i : boost::make_iterator_range(i1, i2)) {
 
@@ -454,7 +467,8 @@ namespace grendel
             const auto alpha_j = simd_gather(alpha_, js);
             const auto variations_j = simd_gather(second_variations_, js);
 
-            const auto c_ij = gather_get_entry(cij_matrix, jts);
+            const auto c_ij =
+                cij_matrix.get_vectorized_tensor(i, jts[0] - sparsity.begin(i));
 
             const auto d_ij = get_entry(dij_matrix_, jts);
             const auto d_ij_inv = Number(1.) / d_ij;
@@ -464,9 +478,6 @@ namespace grendel
                                            entropy_viscosity_commutator
                                    ? d_ij * (alpha_i + alpha_j) * Number(.5)
                                    : d_ij * std::max(alpha_i, alpha_j);
-
-            const auto p_ij =
-                tau * m_i_inv * lambda_inv * (d_ijH - d_ij) * (U_j - U_i);
 
             dealii::Tensor<1, problem_dimension, VectorizedArray<Number>>
                 U_ij_bar;
@@ -480,8 +491,6 @@ namespace grendel
             }
 
             U_i_new += tau * m_i_inv * Number(2.) * d_ij * U_ij_bar;
-
-            scatter_set_entry(pij_matrix_, jts, p_ij);
 
             limiter.accumulate(
                 U_i, U_j, U_ij_bar, /* is diagonal */ js[0] == i);
@@ -499,7 +508,7 @@ namespace grendel
       };
 
       const auto step_3_serial = [&](auto i1, const auto i2) {
-        /* Notar bene: This bounds variable is thread local: */
+        /* Nota bene: This bounds variable is thread local: */
         Limiter<dim, Number> limiter(*offline_data_);
 
         for (const auto i : boost::make_iterator_range(i1, i2)) {
@@ -518,9 +527,6 @@ namespace grendel
           const Number m_i = lumped_mass_matrix.diag_element(i);
           const Number m_i_inv = Number(1.) / m_i;
 
-          const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
-          const Number lambda_inv = Number(size - 1);
-
           rank1_type r_i;
 
           /* Clear bounds: */
@@ -535,7 +541,7 @@ namespace grendel
             const auto alpha_j = alpha_.local_element(j);
             const auto variations_j = second_variations_.local_element(j);
 
-            const auto c_ij = gather_get_entry(cij_matrix, jt);
+            const auto c_ij = cij_matrix.get_tensor(i, jt - sparsity.begin(i));
             const auto d_ij = get_entry(dij_matrix_, jt);
             const Number d_ij_inv = Number(1.) / d_ij;
 
@@ -544,9 +550,6 @@ namespace grendel
                                            entropy_viscosity_commutator
                                    ? d_ij * (alpha_i + alpha_j) * Number(.5)
                                    : d_ij * std::max(alpha_i, alpha_j);
-
-            const auto p_ij =
-                tau * m_i_inv * lambda_inv * (d_ijH - d_ij) * (U_j - U_i);
 
             dealii::Tensor<1, problem_dimension> U_ij_bar;
 
@@ -559,8 +562,6 @@ namespace grendel
             }
 
             U_i_new += tau * m_i_inv * Number(2.) * d_ij * U_ij_bar;
-
-            scatter_set_entry(pij_matrix_, jt, p_ij);
 
             limiter.accumulate(U_i, U_j, U_ij_bar, /* is diagonal */ i == j);
             limiter.accumulate_variations(variations_j, jt);
@@ -598,18 +599,65 @@ namespace grendel
     /*
      * Step 4: Compute second part of P_ij:
      *
-     *        P_ij = [...] + tau / m_i / lambda (b_ij R_j - b_ji R_i)
+     *        P_ij = tau / m_i / lambda ( (d_ij^H - d_ij^L) (U_i - U_j) +
+     *                                    (b_ij R_j - b_ji R_i) )
      */
 
     if constexpr (order_ == Order::second_order) {
       deallog << "        compute p_ij" << std::endl;
-      TimerOutput::Scope time(computing_timer_,
-                              "time_step - 4 compute p_ij (2)");
+      TimerOutput::Scope time(computing_timer_, "time_step - 4 compute p_ij");
 #ifdef LIKWID_PERFMON
       LIKWID_MARKER_START("time_step_4");
 #endif
 
-      const auto on_subranges = [&](auto i1, const auto i2) {
+      const auto step_4_simd = [&](auto i1, const auto i2) {
+        for (const auto i : boost::make_iterator_range(i1, i2)) {
+
+          const auto U_i = simd_gather(U, i);
+
+          const auto alpha_i = simd_gather(alpha_, i);
+
+          const auto m_i = simd_get_diag_element(lumped_mass_matrix, i);
+          const auto m_i_inv = Number(1.) / m_i;
+
+          const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
+          const VectorizedArray<Number> lambda_inv = Number(size - 1);
+
+          const auto r_i = simd_gather(r_, i);
+
+          auto jts = generate_iterators<n_array_elements>(
+              [&](auto k) { return sparsity.begin(i + k); });
+
+          for (; jts[0] != sparsity.end(i); increment_iterators(jts)) {
+            const auto js = get_column_indices(jts);
+            const auto U_j = simd_gather(U, js);
+
+            const auto b_ij = get_entry(bij_matrix, jts);
+            VectorizedArray<Number> b_ji{};
+            for (unsigned int k = 0; k < n_array_elements; ++k)
+              b_ji[k] =
+                  get_transposed_entry(bij_matrix, jts[k], transposed_indices);
+
+            const auto d_ij = get_entry(dij_matrix_, jts);
+            const auto alpha_j = simd_gather(alpha_, js);
+            const auto d_ijH = Indicator<dim, Number>::indicator_ ==
+                                       Indicator<dim, Number>::Indicators::
+                                           entropy_viscosity_commutator
+                                   ? d_ij * (alpha_i + alpha_j) * Number(.5)
+                                   : d_ij * std::max(alpha_i, alpha_j);
+
+            const auto r_j = simd_gather(r_, js);
+
+            const auto p_ij =
+                tau * m_i_inv * lambda_inv *
+                ((d_ijH - d_ij) * (U_j - U_i) + b_ij * r_j - b_ji * r_i);
+            pij_matrix_.write_vectorized_tensor(
+                p_ij, i, jts[0] - sparsity.begin(i), true);
+          }
+        }
+      };
+
+      const auto step_4_serial = [&](auto i1, const auto i2) {
         for (const auto i : boost::make_iterator_range(i1, i2)) {
 
           /* Only iterate over locally owned subset! */
@@ -621,8 +669,10 @@ namespace grendel
 
           const Number m_i = lumped_mass_matrix.diag_element(i);
           const Number m_i_inv = Number(1.) / m_i;
+          const auto alpha_i = alpha_.local_element(i);
           const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
           const Number lambda_inv = Number(size - 1);
+          const auto U_i = gather(U, i);
 
           const auto r_i = gather(r_, i);
 
@@ -632,29 +682,44 @@ namespace grendel
             const auto b_ij = get_entry(bij_matrix, jt);
             const auto b_ji =
                 get_transposed_entry(bij_matrix, jt, transposed_indices);
-            auto p_ij = gather_get_entry(pij_matrix_, jt);
+
+            const auto U_j = gather(U, j);
+            const auto d_ij = get_entry(dij_matrix_, jt);
+            const auto alpha_j = alpha_.local_element(j);
+            const auto d_ijH = Indicator<dim, Number>::indicator_ ==
+                                       Indicator<dim, Number>::Indicators::
+                                           entropy_viscosity_commutator
+                                   ? d_ij * (alpha_i + alpha_j) * Number(.5)
+                                   : d_ij * std::max(alpha_i, alpha_j);
 
             const auto r_j = gather(r_, j);
 
-            p_ij += tau * m_i_inv * lambda_inv * (b_ij * r_j - b_ji * r_i);
-            scatter_set_entry(pij_matrix_, jt, p_ij);
+            const auto p_ij =
+                tau * m_i_inv * lambda_inv *
+                ((d_ijH - d_ij) * (U_j - U_i) + b_ij * r_j - b_ji * r_i);
+            pij_matrix_.write_entry(p_ij, i, jt - sparsity.begin(i));
           }
         }
       };
 
       parallel::apply_to_subranges(
-          serial_owned.begin(), serial_owned.end(), on_subranges, 1024);
+          simd_internal.begin(), simd_internal.end(), step_4_simd, 1024);
+
+      parallel::apply_to_subranges(simd_remaining_owned.begin(),
+                                   simd_remaining_owned.end(),
+                                   step_4_serial,
+                                   1024);
 
 #ifdef LIKWID_PERFMON
       LIKWID_MARKER_STOP("time_step_4");
 #endif
     }
 
-    for (unsigned int i = 0;
-         i < (order_ == Order::second_order ? limiter_iter_ : 0);
-         ++i) {
+    const unsigned int n_passes =
+        (order_ == Order::second_order ? limiter_iter_ : 0);
+    for (unsigned int pass = 0; pass < n_passes; ++pass) {
 
-      deallog << "        limiter pass " << i + 1 << std::endl;
+      deallog << "        limiter pass " << pass + 1 << std::endl;
 
       /*
        * Step 5: compute l_ij:
@@ -678,7 +743,9 @@ namespace grendel
 
             for (; jts[0] != sparsity.end(i); increment_iterators(jts)) {
 
-              const auto p_ij = gather_get_entry(pij_matrix_, jts);
+              const auto p_ij = pij_matrix_.get_vectorized_tensor(
+                  i, jts[0] - sparsity.begin(i));
+
               const auto l_ij = Limiter<dim, VectorizedArray<Number>>::limit(
                   bounds, U_i_new, p_ij);
 
@@ -698,7 +765,7 @@ namespace grendel
             const auto U_i_new = gather(temp_euler_, i);
 
             for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
-              auto p_ij = gather_get_entry(pij_matrix_, jt);
+              auto p_ij = pij_matrix_.get_tensor(i, jt - sparsity.begin(i));
               const auto l_ij =
                   Limiter<dim, Number>::limit(bounds, U_i_new, p_ij);
               set_entry(lij_matrix_, jt, l_ij);
@@ -771,7 +838,7 @@ namespace grendel
             const Number lambda = Number(1.) / Number(size - 1);
 
             for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
-              auto p_ij = gather_get_entry(pij_matrix_, jt);
+              auto p_ij = pij_matrix_.get_tensor(i, jt - sparsity.begin(i));
 
               const auto l_ji =
                   get_transposed_entry(lij_matrix_, jt, transposed_indices);
@@ -779,7 +846,9 @@ namespace grendel
 
               U_i_new += l_ij * lambda * p_ij;
               p_ij *= (1 - l_ij);
-              scatter_set_entry(pij_matrix_, jt, p_ij);
+
+              if (pass + 1 < n_passes)
+                pij_matrix_.write_entry(p_ij, i, jt - sparsity.begin(i));
             }
 
 #ifdef DEBUG
@@ -789,20 +858,17 @@ namespace grendel
             const auto s_new =
                 ProblemDescription<dim, Number>::specific_entropy(U_i_new);
 
-            AssertThrowSIMD(
-                rho_new,
-                [](auto val) { return val > 0.; },
-                dealii::ExcMessage("Negative density."));
+            AssertThrowSIMD(rho_new,
+                            [](auto val) { return val > 0.; },
+                            dealii::ExcMessage("Negative density."));
 
-            AssertThrowSIMD(
-                e_new,
-                [](auto val) { return val > 0.; },
-                dealii::ExcMessage("Negative internal energy."));
+            AssertThrowSIMD(e_new,
+                            [](auto val) { return val > 0.; },
+                            dealii::ExcMessage("Negative internal energy."));
 
-            AssertThrowSIMD(
-                s_new,
-                [](auto val) { return val > 0.; },
-                dealii::ExcMessage("Negative specific entropy."));
+            AssertThrowSIMD(s_new,
+                            [](auto val) { return val > 0.; },
+                            dealii::ExcMessage("Negative specific entropy."));
 #endif
 
             scatter(temp_euler_, U_i_new, i);

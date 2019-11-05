@@ -77,7 +77,9 @@ namespace grendel
      * with the neighboring state U_j:
      */
     template <typename ITERATOR>
-    void add(const rank1_type U_j, const ITERATOR jt);
+    void add(const rank1_type U_j,
+             const ITERATOR jt,
+             const dealii::Tensor<1, dim, Number> &c_ij);
     /**
      * Return the computed alpha_i value.
      */
@@ -89,7 +91,10 @@ namespace grendel
     Number second_variations();
 
   private:
-    const std::array<dealii::SparseMatrix<ScalarNumber>, dim> &cij_matrix_;
+    const SparseMatrixForSIMD<
+        dealii::VectorizedArray<ScalarNumber>::n_array_elements,
+        ScalarNumber,
+        dim> &cij_matrix_;
     const dealii::SparseMatrix<ScalarNumber> &betaij_matrix_;
 
     /* Temporary storage used for the entropy_viscosity_commutator: */
@@ -181,11 +186,11 @@ namespace grendel
   template <int dim, typename Number>
   template <typename ITERATOR>
   DEAL_II_ALWAYS_INLINE inline void
-  Indicator<dim, Number>::add(const rank1_type U_j, const ITERATOR jt)
+  Indicator<dim, Number>::add(const rank1_type U_j,
+                              const ITERATOR jt,
+                              const dealii::Tensor<1, dim, Number> &c_ij)
   {
     if constexpr (indicator_ == Indicators::entropy_viscosity_commutator) {
-      const auto c_ij = gather_get_entry(cij_matrix_, jt);
-
       const auto &rho_j = U_j[0];
       const auto m_j = ProblemDescription<dim, Number>::momentum(U_j);
       const auto eta_j = ProblemDescription<dim, Number>::entropy(U_j);

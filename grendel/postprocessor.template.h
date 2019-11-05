@@ -132,7 +132,7 @@ namespace grendel
             const auto U_j = gather(U, j);
             const auto m_j = ProblemDescription<dim, Number>::momentum(U_j);
 
-            const auto c_ij = gather_get_entry(cij_matrix, jt);
+            const auto c_ij = cij_matrix.get_tensor(i, jt - sparsity.begin(i));
 
             r_i += c_ij * U_j[0];
 

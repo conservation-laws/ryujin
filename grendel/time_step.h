@@ -1,9 +1,9 @@
 #ifndef TIME_STEP_H
 #define TIME_STEP_H
 
-#include <compile_time_options.h>
 #include "helper.h"
 #include "simd.h"
+#include <compile_time_options.h>
 
 #include "limiter.h"
 #include "matrix_communicator.h"
@@ -11,6 +11,7 @@
 #include "initial_values.h"
 #include "offline_data.h"
 #include "problem_description.h"
+#include "sparse_matrix_simd.h"
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/timer.h>
@@ -133,7 +134,12 @@ namespace grendel
     dealii::SparseMatrix<Number> lij_matrix_;
     MatrixCommunicator<dim, Number> lij_matrix_communicator_;
 
-    std::array<dealii::SparseMatrix<Number>, problem_dimension> pij_matrix_;
+    SparsityPatternForSIMD<dealii::VectorizedArray<Number>::n_array_elements>
+        alt_sparsity;
+    SparseMatrixForSIMD<dealii::VectorizedArray<Number>::n_array_elements,
+                        Number,
+                        problem_dimension>
+        pij_matrix_;
 
     vector_type temp_euler_;
     vector_type temp_ssp_;
