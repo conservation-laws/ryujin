@@ -695,9 +695,9 @@ namespace grendel
     };
 
     {
-      deallog << "        fix slip boundary c_ijs" << std::endl;
+      deallog << "        fix bdry c_ijs, set up SIMD c_ij" << std::endl;
       TimerOutput::Scope t(computing_timer_,
-                           "offline_data - fix slip boundary c_ij");
+                           "offline_data - fix bdry c_ijs, set up SIMD c_ij");
 
       WorkStream::run(dof_handler_.begin_active(),
                       dof_handler_.end(),
@@ -705,7 +705,6 @@ namespace grendel
                       copy_local_to_global_cij,
                       AssemblyScratchData<dim>(*discretization_),
                       AssemblyCopyData<dim, Number>());
-
 
       for (unsigned int i = 0; i < n_locally_internal_;
            i += VectorizedArray<Number>::n_array_elements) {
