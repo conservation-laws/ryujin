@@ -91,10 +91,6 @@ namespace grendel
     Number second_variations();
 
   private:
-    const SparseMatrixForSIMD<
-        dealii::VectorizedArray<ScalarNumber>::n_array_elements,
-        ScalarNumber,
-        dim> &cij_matrix_;
     const dealii::SparseMatrix<ScalarNumber> &betaij_matrix_;
 
     /* Temporary storage used for the entropy_viscosity_commutator: */
@@ -125,8 +121,7 @@ namespace grendel
   template <int dim, typename Number>
   Indicator<dim, Number>::Indicator(
       const OfflineData<dim, ScalarNumber> &offline_data)
-      : cij_matrix_(offline_data.cij_matrix())
-      , betaij_matrix_(offline_data.betaij_matrix())
+      : betaij_matrix_(offline_data.betaij_matrix())
   {
   }
 
