@@ -53,7 +53,7 @@
 #endif
 
 #ifndef NEWTON_MAX_ITER
-#define NEWTON_MAX_ITER 1
+#define NEWTON_MAX_ITER 2
 #endif
 
 /*
@@ -61,7 +61,7 @@
  */
 
 #ifndef RIEMANN_NEWTON_MAX_ITER
-#define RIEMANN_NEWTON_MAX_ITER 1
+#define RIEMANN_NEWTON_MAX_ITER 0
 #endif
 
 #ifndef RIEMANN_GREEDY_DIJ
