@@ -1090,6 +1090,8 @@ namespace grendel
     case TimeStepOrder::third_order:
       return ssprk3_step(U, t);
     }
+
+    __builtin_unreachable();
   }
 
 

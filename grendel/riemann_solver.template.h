@@ -721,6 +721,7 @@ namespace grendel
     for (unsigned int k = 0; k < problem_dimension; ++k)
       P[k] = ScalarNumber(0.5) * (f_i[k] - f_j[k]) * n_ij;
 
+    (void)hd_i;
     if constexpr (greedy_relax_bounds_) {
       /*
        * Relax entropy bounds a tiny bit: Note, we use a much smaller
