@@ -130,30 +130,6 @@ namespace grendel
     const auto n_owned = offline_data_->n_locally_owned();
     const auto n_relevant = offline_data_->n_locally_relevant();
 
-    /* Index ranges to iterator over dofs in serial: */
-
-    const auto serial_owned = boost::irange<unsigned int>(0, n_owned);
-    const auto serial_relevant = boost::irange<unsigned int>(0, n_relevant);
-
-    /*
-     * Index ranges for SIMD iteration:
-     *
-     * simd_internal is the only index range over which we iterate
-     * vectorized, therefore we compute indices in increments of
-     * n_array_elements. The simd_remaining_owned and
-     * simd_remaining_relevant index ranges are then used to iterate over
-     * the remaining degrees of freedom that do not allow a straightforward
-     * vectorization.
-     */
-
-    const auto simd_internal =
-        boost::irange<unsigned int>(0, n_internal, n_array_elements);
-
-    const auto simd_remaining_owned =
-        boost::irange<unsigned int>(n_internal, n_owned);
-    const auto simd_remaining_relevant =
-        boost::irange<unsigned int>(n_internal, n_relevant);
-
     /* References to precomputed matrices and the stencil: */
 
     const auto &sparsity = offline_data_->sparsity_pattern();
@@ -187,8 +163,7 @@ namespace grendel
       /* Parallel SIMD loop: */
 
       GRENDEL_PARALLEL_FOR(firstprivate(indicator_simd))
-      for (auto it = simd_internal.begin(); it != simd_internal.end(); ++it) {
-        const auto i = *it;
+      for (unsigned int i = 0; i < n_internal; i += n_array_elements) {
 
         const auto U_i = simd_gather(U, i);
         indicator_simd.reset(U_i);
@@ -245,10 +220,7 @@ namespace grendel
       /* Parallel non-vectorized loop: */
 
       GRENDEL_PARALLEL_FOR(firstprivate(indicator_serial))
-      for (auto it = simd_remaining_relevant.begin();
-           it != simd_remaining_relevant.end();
-           ++it) {
-        const auto i = *it;
+      for (unsigned int i = n_internal; i < n_relevant; ++i) {
 
         /* Skip constrained degrees of freedom */
         if (++sparsity.begin(i) == sparsity.end(i))
@@ -339,9 +311,7 @@ namespace grendel
       /* Parallel non-vectorized loop: */
 
       GRENDEL_PARALLEL_FOR()
-      for (auto it = serial_relevant.begin(); it != serial_relevant.end();
-           ++it) {
-        const auto i = *it;
+      for (unsigned int i = 0; i < n_relevant; ++i) {
 
         /* Skip constrained degrees of freedom */
         if (++sparsity.begin(i) == sparsity.end(i))
@@ -435,8 +405,7 @@ namespace grendel
       /* Parallel SIMD loop: */
 
       GRENDEL_PARALLEL_FOR(firstprivate(limiter_simd))
-      for (auto it = simd_internal.begin(); it != simd_internal.end(); ++it) {
-        const auto i = *it;
+      for (unsigned int i = 0; i < n_internal; i += n_array_elements) {
 
         const auto U_i = simd_gather(U, i);
         auto U_i_new = U_i;
@@ -518,10 +487,7 @@ namespace grendel
       /* Parallel non-vectorized loop: */
 
       GRENDEL_PARALLEL_FOR(firstprivate(limiter_serial))
-      for (auto it = simd_remaining_owned.begin();
-           it != simd_remaining_owned.end();
-           ++it) {
-        const auto i = *it;
+      for (unsigned int i = n_internal; i < n_owned; ++i) {
 
         /* Skip constrained degrees of freedom */
         if (++sparsity.begin(i) == sparsity.end(i))
@@ -615,8 +581,7 @@ namespace grendel
       /* Parallel SIMD loop: */
 
       GRENDEL_PARALLEL_FOR()
-      for (auto it = simd_internal.begin(); it != simd_internal.end(); ++it) {
-        const auto i = *it;
+      for (unsigned int i = 0; i < n_internal; i += n_array_elements) {
 
         const auto U_i = simd_gather(U, i);
 
@@ -664,10 +629,7 @@ namespace grendel
       /* Parallel non-vectorized loop: */
 
       GRENDEL_PARALLEL_FOR()
-      for (auto it = simd_remaining_owned.begin();
-           it != simd_remaining_owned.end();
-           ++it) {
-        const auto i = *it;
+      for (unsigned int i = n_internal; i < n_owned; ++i) {
 
         /* Only iterate over locally owned subset! */
         Assert(i < n_owned, ExcInternalError());
@@ -739,8 +701,7 @@ namespace grendel
         /* Parallel SIMD loop: */
 
         GRENDEL_PARALLEL_FOR()
-        for (auto it = simd_internal.begin(); it != simd_internal.end(); ++it) {
-          const auto i = *it;
+        for (unsigned int i = 0; i < n_internal; i += n_array_elements) {
 
           const auto bounds = simd_gather_array(bounds_, i);
           const auto U_i_new = simd_gather(temp_euler_, i);
@@ -763,10 +724,7 @@ namespace grendel
         /* Parallel non-vectorized loop: */
 
         GRENDEL_PARALLEL_FOR()
-        for (auto it = simd_remaining_owned.begin();
-             it != simd_remaining_owned.end();
-             ++it) {
-          const auto i = *it;
+        for (unsigned int i = n_internal; i < n_owned; ++i) {
 
           /* Skip constrained degrees of freedom */
           if (++sparsity.begin(i) == sparsity.end(i))
@@ -834,8 +792,7 @@ namespace grendel
         /* Parallel non-vectorized loop: */
 
         GRENDEL_PARALLEL_FOR()
-        for (auto it = serial_owned.begin(); it != serial_owned.end(); ++it) {
-          const auto i = *it;
+        for (unsigned int i = 0; i < n_owned; ++i) {
 
           /* Only iterate over locally owned subset */
           Assert(i < n_owned, ExcInternalError());
