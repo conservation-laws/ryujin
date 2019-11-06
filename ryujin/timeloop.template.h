@@ -217,13 +217,13 @@ namespace ryujin
 
 #ifndef DEBUG_OUTPUT
         print_cycle(cycle, t);
+        print_cycle_statistics(cycle, t, output_cycle);
 #endif
         print_throughput(cycle, t);
       }
 
 #ifndef DEBUG_OUTPUT
-      if (cycle % update_granularity == 0 ||
-          t > (output_cycle - 1) * output_granularity)
+      if (cycle % update_granularity == 0)
         print_cycle_statistics(cycle, t, output_cycle);
 #endif
     } /* end of loop */
