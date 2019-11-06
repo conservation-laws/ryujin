@@ -2,7 +2,6 @@ subsection A - TimeLoop
   set basename               = validation
 
   set enable compute error   = true
-  set enable detailed output = false
 
   set final time             = 2.0
   set output granularity     = 0.2
