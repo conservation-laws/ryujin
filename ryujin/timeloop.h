@@ -59,6 +59,8 @@ namespace ryujin
     Number t_final;
     Number output_granularity;
 
+    unsigned int update_granularity;
+
     bool enable_checkpointing;
     bool resume;
 

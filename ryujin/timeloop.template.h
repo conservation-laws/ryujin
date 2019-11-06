@@ -72,6 +72,12 @@ namespace ryujin
     add_parameter(
         "output granularity", output_granularity, "time interval for output");
 
+    update_granularity = 10;
+    add_parameter(
+        "update granularity",
+        update_granularity,
+        "number of cycles after which output statistics are recomputed");
+
     enable_checkpointing = true;
     add_parameter("enable checkpointing",
                   enable_checkpointing,
@@ -194,7 +200,8 @@ namespace ryujin
       t += tau;
 
 #ifndef DEBUG_OUTPUT
-      print_cycle_statistics(cycle, t);
+      if (cycle % update_granularity == 0)
+        print_cycle_statistics(cycle, t);
 #endif
 
       if (t > output_cycle * output_granularity) {
