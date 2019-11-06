@@ -951,6 +951,16 @@ namespace ryujin
     }
 
     print_throughput(cycle, t, /*use_cout*/ true);
+
+    computing_timer.print_summary();
+    auto summary = timer_output.str();
+    timer_output.str("");
+
+    if (mpi_rank == 0) {
+      /* Remove CPU statistics: */
+      summary.erase(0, summary.length() / 2 + 1);
+      std::cout << summary << std::endl;
+    }
   }
 
 
