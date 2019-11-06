@@ -43,6 +43,8 @@ namespace ryujin
                 unsigned int cycle,
                 bool checkpoint = false);
 
+    void print_parameters();
+    void print_mpi_partition();
     void print_throughput(unsigned int cycle, Number t);
 
     /* Options: */
@@ -51,8 +53,6 @@ namespace ryujin
 
     Number t_final;
     Number output_granularity;
-
-    bool enable_detailed_output;
 
     bool enable_checkpointing;
     bool resume;

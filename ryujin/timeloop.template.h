@@ -104,11 +104,6 @@ namespace ryujin
     add_parameter(
         "output granularity", output_granularity, "time interval for output");
 
-    enable_detailed_output = false;
-    add_parameter("enable detailed output",
-                  enable_detailed_output,
-                  "Enable detailed terminal output to deallog");
-
     enable_checkpointing = true;
     add_parameter("enable checkpointing",
                   enable_checkpointing,
@@ -141,15 +136,15 @@ namespace ryujin
   void TimeLoop<dim, Number>::run()
   {
     /* Initialize deallog: */
-
     initialize();
+
+    print_parameters();
 
 #ifdef DEBUG_OUTPUT
     deallog << "TimeLoop<dim, Number>::run()" << std::endl;
 #endif
 
     /* Create distributed triangulation and output the triangulation: */
-
     print_head("create triangulation");
     discretization.prepare();
 
@@ -166,10 +161,10 @@ namespace ryujin
 
     print_head("compute offline data");
     offline_data.prepare();
-
-    print_head("set up time step");
     time_step.prepare();
     postprocessor.prepare();
+
+    print_mpi_partition();
 
     Number t = 0.;
     unsigned int output_cycle = 0;
@@ -216,24 +211,10 @@ namespace ryujin
 
     print_head("enter main loop");
 
-    /* Disable deallog output: */
-
-    if (!enable_detailed_output)
-      deallog.push("SILENCE");
-
     /* Loop: */
 
     unsigned int cycle = 1;
     for (; t < t_final; ++cycle) {
-
-      std::ostringstream primary;
-      primary << "Cycle  " << Utilities::int_to_string(cycle, 6) //
-              << "  (" << std::fixed << std::setprecision(1)     //
-              << t / t_final * 100 << "%)";
-      std::ostringstream secondary;
-      secondary << "at time t = " << std::setprecision(8) << std::fixed << t;
-
-      print_head(primary.str(), secondary.str());
 
       /* Do a time step: */
 
@@ -241,10 +222,16 @@ namespace ryujin
       t += tau;
 
       if (t > output_cycle * output_granularity) {
-        if (!enable_detailed_output) {
-          deallog.pop();
-          print_head(primary.str(), secondary.str());
-        }
+
+        std::ostringstream primary;
+        primary << "Cycle  " << Utilities::int_to_string(cycle, 6) //
+                << "  (" << std::fixed << std::setprecision(1)     //
+                << t / t_final * 100 << "%)";
+
+        std::ostringstream secondary;
+        secondary << "at time t = " << std::setprecision(8) << std::fixed << t;
+
+        print_head(primary.str(), secondary.str());
 
         if (write_output_files)
           output(U,
@@ -261,9 +248,6 @@ namespace ryujin
         ++output_cycle;
 
         print_throughput(cycle, t);
-
-        if (!enable_detailed_output)
-          deallog.push("SILENCE");
       }
     } /* end of loop */
 
@@ -277,11 +261,6 @@ namespace ryujin
 
     if (output_thread.joinable())
       output_thread.join();
-
-    /* Reenable deallog output: */
-
-    if (!enable_detailed_output)
-      deallog.pop();
 
     if (enable_compute_error) {
       /* Output final error: */
@@ -303,6 +282,7 @@ namespace ryujin
       deallog.detach();
     }
   }
+
 
 
   /**
@@ -343,158 +323,14 @@ namespace ryujin
     filestream.reset(new std::ofstream(base_name + "-deallog.log"));
     deallog.attach(*filestream);
 
-    /* Output commit and library informations: */
-
-    /* clang-format off */
-    deallog.depth_console(4);
-    deallog << "###" << std::endl;
-    deallog << "#" << std::endl;
-    deallog << "# deal.II version " << std::setw(8) << DEAL_II_PACKAGE_VERSION
-            << "  -  " << DEAL_II_GIT_REVISION << std::endl;
-    deallog << "# ryujin  version " << std::setw(8) << RYUJIN_VERSION
-            << "  -  " << RYUJIN_GIT_REVISION << std::endl;
-    deallog << "#" << std::endl;
-    deallog << "###" << std::endl;
-
-    /* Print compile time parameters: */
-
-    deallog << "Compile time parameters:" << std::endl;
-
-    deallog << "DIM == " << dim << std::endl;
-    deallog << "NUMBER == " << typeid(Number).name() << std::endl;
-
-#ifdef USE_SIMD
-    deallog << "SIMD width == " << VectorizedArray<Number>::n_array_elements << std::endl;
-#else
-    deallog << "SIMD width == " << "(( disabled ))" << std::endl;
-#endif
-
-#ifdef USE_CUSTOM_POW
-    deallog << "serial pow == broadcasted pow(Vec4f)/pow(Vec2d)" << std::endl;
-#else
-    deallog << "serial pow == std::pow"<< std::endl;
-#endif
-
-    deallog << "Indicator<dim, Number>::indicators_ == ";
-    switch (Indicator<dim, Number>::indicator_) {
-    case Indicator<dim, Number>::Indicators::zero:
-      deallog << "Indicator<dim, Number>::Indicators::zero" << std::endl;
-      break;
-    case Indicator<dim, Number>::Indicators::one:
-      deallog << "Indicator<dim, Number>::Indicators::one" << std::endl;
-      break;
-    case Indicator<dim, Number>::Indicators::entropy_viscosity_commutator:
-      deallog << "Indicator<dim, Number>::Indicators::entropy_viscosity_commutator" << std::endl;
-      break;
-    case Indicator<dim, Number>::Indicators::smoothness_indicator:
-      deallog << "Indicator<dim, Number>::Indicators::smoothness_indicator" << std::endl;
-    }
-
-    deallog << "Indicator<dim, Number>::smoothness_indicator_ == ";
-    switch (Indicator<dim, Number>::smoothness_indicator_) {
-    case Indicator<dim, Number>::SmoothnessIndicators::rho:
-      deallog << "Indicator<dim, Number>::SmoothnessIndicators::rho" << std::endl;
-      break;
-    case Indicator<dim, Number>::SmoothnessIndicators::internal_energy:
-      deallog << "Indicator<dim, Number>::SmoothnessIndicators::internal_energy" << std::endl;
-      break;
-    case Indicator<dim, Number>::SmoothnessIndicators::pressure:
-      deallog << "Indicator<dim, Number>::SmoothnessIndicators::pressure" << std::endl;
-    }
-
-    deallog << "Indicator<dim, Number>::smoothness_indicator_alpha_0_ == "
-            << Indicator<dim, Number>::smoothness_indicator_alpha_0_ << std::endl;
-
-    deallog << "Indicator<dim, Number>::smoothness_indicator_power_ == "
-            << Indicator<dim, Number>::smoothness_indicator_power_ << std::endl;
-
-    deallog << "Indicator<dim, Number>::compute_second_variations_ == "
-            << Indicator<dim, Number>::compute_second_variations_ << std::endl;
-
-    deallog << "Limiter<dim, Number>::limiter_ == ";
-    switch (Limiter<dim, Number>::limiter_) {
-    case Limiter<dim, Number>::Limiters::none:
-      deallog << "Limiter<dim, Number>::Limiters::none" << std::endl;
-      break;
-    case Limiter<dim, Number>::Limiters::rho:
-      deallog << "Limiter<dim, Number>::Limiters::rho" << std::endl;
-      break;
-    case Limiter<dim, Number>::Limiters::specific_entropy:
-      deallog << "Limiter<dim, Number>::Limiters::specific_entropy" << std::endl;
-      break;
-    case Limiter<dim, Number>::Limiters::entropy_inequality:
-      deallog << "Limiter<dim, Number>::Limiters::entropy_inequality" << std::endl;
-      break;
-    }
-
-    deallog << "grendel::newton_max_iter == "
-            << grendel::newton_max_iter << std::endl;
-
-    deallog << "Limiter<dim, Number>::relax_bounds_ == "
-            << Limiter<dim, Number>::relax_bounds_ << std::endl;
-
-    deallog << "Limiter<dim, Number>::relaxation_order_ == "
-            << Limiter<dim, Number>::relaxation_order_ << std::endl;
-
-    deallog << "RiemannSolver<dim, Number>::newton_max_iter_ == "
-            <<  RiemannSolver<dim, Number>::newton_max_iter_ << std::endl;
-
-    deallog << "RiemannSolver<dim, Number>::greedy_dij_ == "
-            <<  RiemannSolver<dim, Number>::greedy_dij_ << std::endl;
-
-    deallog << "RiemannSolver<dim, Number>::greedy_threshold_ == "
-            <<  RiemannSolver<dim, Number>::greedy_threshold_ << std::endl;
-
-    deallog << "RiemannSolver<dim, Number>::greedy_relax_bounds_ == "
-            <<  RiemannSolver<dim, Number>::greedy_relax_bounds_ << std::endl;
-
-
-    deallog << "TimeStep<dim, Number>::order_ == ";
-    switch (TimeStep<dim, Number>::order_) {
-    case TimeStep<dim, Number>::Order::first_order:
-      deallog << "TimeStep<dim, Number>::Order::first_order" << std::endl;
-      break;
-    case TimeStep<dim, Number>::Order::second_order:
-      deallog << "TimeStep<dim, Number>::Order::second_order" << std::endl;
-    }
-
-    deallog << "TimeStep<dim, Number>::time_step_order_ == ";
-    switch (TimeStep<dim, Number>::time_step_order_) {
-    case TimeStep<dim, Number>::TimeStepOrder::first_order:
-      deallog << "TimeStep<dim, Number>::TimeStepOrder::first_order" << std::endl;
-      break;
-    case TimeStep<dim, Number>::TimeStepOrder::second_order:
-      deallog << "TimeStep<dim, Number>::TimeStepOrder::second_order" << std::endl;
-      break;
-    case TimeStep<dim, Number>::TimeStepOrder::third_order:
-      deallog << "TimeStep<dim, Number>::TimeStepOrder::third_order" << std::endl;
-      break;
-    }
-
-    deallog << "TimeStep<dim, Number>::limiter_iter_ == "
-            <<  TimeStep<dim, Number>::limiter_iter_ << std::endl;
-
-    /* clang-format on */
-
-    deallog << "Run time parameters:" << std::endl;
-
-    ParameterAcceptor::prm.log_parameters(deallog);
-
-    deallog << "Number of MPI ranks: " << n_mpi_processes << std::endl;
-    deallog << "Number of threads:   " << MultithreadInfo::n_threads()
-            << std::endl;
-
-    deallog.push(DEAL_II_GIT_SHORTREV "+" RYUJIN_GIT_SHORTREV);
-    deallog.push(base_name);
 #ifdef DEBUG
-    deallog.depth_console(3);
-    deallog.depth_file(3);
     deallog.push("DEBUG");
-#else
-    deallog.depth_console(2);
-    deallog.depth_file(2);
 #endif
+
+    deallog.depth_console(4);
+    deallog.depth_file(4);
   }
+
 
 
   template <int dim, typename Number>
@@ -531,6 +367,7 @@ namespace ryujin
 
     return U;
   }
+
 
 
   template <int dim, typename Number>
@@ -625,6 +462,7 @@ namespace ryujin
     deallog << "        L1    = " << l1_norm << std::endl;
     deallog << "        L2    = " << l2_norm << std::endl;
   }
+
 
 
   template <int dim, typename Number>
@@ -747,6 +585,194 @@ namespace ryujin
 #endif
     output_thread = std::move(std::thread(output_worker));
   }
+
+
+
+  template <int dim, typename Number>
+  void TimeLoop<dim, Number>::print_parameters()
+  {
+    /* Output commit and library informations: */
+
+    /* clang-format off */
+    deallog << std::endl;
+    deallog << "###" << std::endl;
+    deallog << "#" << std::endl;
+    deallog << "# deal.II version " << std::setw(8) << DEAL_II_PACKAGE_VERSION
+            << "  -  " << DEAL_II_GIT_REVISION << std::endl;
+    deallog << "# ryujin  version " << std::setw(8) << RYUJIN_VERSION
+            << "  -  " << RYUJIN_GIT_REVISION << std::endl;
+    deallog << "#" << std::endl;
+    deallog << "###" << std::endl;
+    deallog << std::endl;
+
+    /* Print compile time parameters: */
+
+    deallog << "Compile time parameters:" << std::endl;
+
+    deallog << "DIM == " << dim << std::endl;
+    deallog << "NUMBER == " << typeid(Number).name() << std::endl;
+
+#ifdef USE_SIMD
+    deallog << "SIMD width == " << VectorizedArray<Number>::n_array_elements << std::endl;
+#else
+    deallog << "SIMD width == " << "(( disabled ))" << std::endl;
+#endif
+
+#ifdef USE_CUSTOM_POW
+    deallog << "serial pow == broadcasted pow(Vec4f)/pow(Vec2d)" << std::endl;
+#else
+    deallog << "serial pow == std::pow"<< std::endl;
+#endif
+
+    deallog << "Indicator<dim, Number>::indicators_ == ";
+    switch (Indicator<dim, Number>::indicator_) {
+    case Indicator<dim, Number>::Indicators::zero:
+      deallog << "Indicator<dim, Number>::Indicators::zero" << std::endl;
+      break;
+    case Indicator<dim, Number>::Indicators::one:
+      deallog << "Indicator<dim, Number>::Indicators::one" << std::endl;
+      break;
+    case Indicator<dim, Number>::Indicators::entropy_viscosity_commutator:
+      deallog << "Indicator<dim, Number>::Indicators::entropy_viscosity_commutator" << std::endl;
+      break;
+    case Indicator<dim, Number>::Indicators::smoothness_indicator:
+      deallog << "Indicator<dim, Number>::Indicators::smoothness_indicator" << std::endl;
+    }
+
+    deallog << "Indicator<dim, Number>::smoothness_indicator_ == ";
+    switch (Indicator<dim, Number>::smoothness_indicator_) {
+    case Indicator<dim, Number>::SmoothnessIndicators::rho:
+      deallog << "Indicator<dim, Number>::SmoothnessIndicators::rho" << std::endl;
+      break;
+    case Indicator<dim, Number>::SmoothnessIndicators::internal_energy:
+      deallog << "Indicator<dim, Number>::SmoothnessIndicators::internal_energy" << std::endl;
+      break;
+    case Indicator<dim, Number>::SmoothnessIndicators::pressure:
+      deallog << "Indicator<dim, Number>::SmoothnessIndicators::pressure" << std::endl;
+    }
+
+    deallog << "Indicator<dim, Number>::smoothness_indicator_alpha_0_ == "
+            << Indicator<dim, Number>::smoothness_indicator_alpha_0_ << std::endl;
+
+    deallog << "Indicator<dim, Number>::smoothness_indicator_power_ == "
+            << Indicator<dim, Number>::smoothness_indicator_power_ << std::endl;
+
+    deallog << "Indicator<dim, Number>::compute_second_variations_ == "
+            << Indicator<dim, Number>::compute_second_variations_ << std::endl;
+
+    deallog << "Limiter<dim, Number>::limiter_ == ";
+    switch (Limiter<dim, Number>::limiter_) {
+    case Limiter<dim, Number>::Limiters::none:
+      deallog << "Limiter<dim, Number>::Limiters::none" << std::endl;
+      break;
+    case Limiter<dim, Number>::Limiters::rho:
+      deallog << "Limiter<dim, Number>::Limiters::rho" << std::endl;
+      break;
+    case Limiter<dim, Number>::Limiters::specific_entropy:
+      deallog << "Limiter<dim, Number>::Limiters::specific_entropy" << std::endl;
+      break;
+    case Limiter<dim, Number>::Limiters::entropy_inequality:
+      deallog << "Limiter<dim, Number>::Limiters::entropy_inequality" << std::endl;
+      break;
+    }
+
+    deallog << "grendel::newton_max_iter == "
+            << grendel::newton_max_iter << std::endl;
+
+    deallog << "Limiter<dim, Number>::relax_bounds_ == "
+            << Limiter<dim, Number>::relax_bounds_ << std::endl;
+
+    deallog << "Limiter<dim, Number>::relaxation_order_ == "
+            << Limiter<dim, Number>::relaxation_order_ << std::endl;
+
+    deallog << "RiemannSolver<dim, Number>::newton_max_iter_ == "
+            <<  RiemannSolver<dim, Number>::newton_max_iter_ << std::endl;
+
+    deallog << "RiemannSolver<dim, Number>::greedy_dij_ == "
+            <<  RiemannSolver<dim, Number>::greedy_dij_ << std::endl;
+
+    deallog << "RiemannSolver<dim, Number>::greedy_threshold_ == "
+            <<  RiemannSolver<dim, Number>::greedy_threshold_ << std::endl;
+
+    deallog << "RiemannSolver<dim, Number>::greedy_relax_bounds_ == "
+            <<  RiemannSolver<dim, Number>::greedy_relax_bounds_ << std::endl;
+
+
+    deallog << "TimeStep<dim, Number>::order_ == ";
+    switch (TimeStep<dim, Number>::order_) {
+    case TimeStep<dim, Number>::Order::first_order:
+      deallog << "TimeStep<dim, Number>::Order::first_order" << std::endl;
+      break;
+    case TimeStep<dim, Number>::Order::second_order:
+      deallog << "TimeStep<dim, Number>::Order::second_order" << std::endl;
+    }
+
+    deallog << "TimeStep<dim, Number>::time_step_order_ == ";
+    switch (TimeStep<dim, Number>::time_step_order_) {
+    case TimeStep<dim, Number>::TimeStepOrder::first_order:
+      deallog << "TimeStep<dim, Number>::TimeStepOrder::first_order" << std::endl;
+      break;
+    case TimeStep<dim, Number>::TimeStepOrder::second_order:
+      deallog << "TimeStep<dim, Number>::TimeStepOrder::second_order" << std::endl;
+      break;
+    case TimeStep<dim, Number>::TimeStepOrder::third_order:
+      deallog << "TimeStep<dim, Number>::TimeStepOrder::third_order" << std::endl;
+      break;
+    }
+
+    deallog << "TimeStep<dim, Number>::limiter_iter_ == "
+            <<  TimeStep<dim, Number>::limiter_iter_ << std::endl;
+
+    /* clang-format on */
+
+    deallog << std::endl;
+    deallog << "Run time parameters:" << std::endl;
+    ParameterAcceptor::prm.log_parameters(deallog);
+  }
+
+
+
+  template <int dim, typename Number>
+  void TimeLoop<dim, Number>::print_mpi_partition()
+  {
+    deallog << "Number of MPI ranks: " << n_mpi_processes << std::endl;
+    deallog << "Number of threads:   " << MultithreadInfo::n_threads()
+            << std::endl;
+
+    /* Print out the DoF distribution: */
+
+    const auto n_dofs = offline_data.dof_handler().n_dofs();
+
+    deallog << "Qdofs: " << n_dofs
+            << " global DoFs, local DoF distribution:" << std::endl;
+
+    unsigned int dofs[2];
+    dofs[0] = offline_data.n_locally_owned();
+    dofs[1] = offline_data.n_locally_internal();
+
+    if (mpi_rank > 0) {
+      MPI_Send(&dofs, 2, MPI_UNSIGNED, 0, 0, mpi_communicator);
+
+    } else {
+
+      for (unsigned int p = 0; p < n_mpi_processes; ++p) {
+        deallog << "    Rank " << p << std::flush;
+
+        if (p != 0)
+          MPI_Recv(&dofs,
+                   2,
+                   MPI_UNSIGNED,
+                   p,
+                   0,
+                   mpi_communicator,
+                   MPI_STATUS_IGNORE);
+
+        deallog << ":\tlocal: " << dofs[0] << std::flush;
+        deallog << "\tinternal: " << dofs[1] << std::endl;
+      }
+    }
+  }
+
 
 
   template <int dim, typename Number>
