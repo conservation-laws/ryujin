@@ -45,7 +45,12 @@ namespace ryujin
 
     void print_parameters();
     void print_mpi_partition();
-    void print_throughput(unsigned int cycle, Number t);
+    void print_head(const std::string &header,
+                    const std::string &secondary = "",
+                    bool use_cout = false);
+    void print_cycle(unsigned int cycle, Number t, bool use_cout = false);
+    void print_throughput(unsigned int cycle, Number t, bool use_cout = false);
+    void print_cycle_statistics(unsigned int cycle, Number t);
 
     /* Options: */
 
@@ -77,7 +82,7 @@ namespace ryujin
     const unsigned int mpi_rank;
     const unsigned int n_mpi_processes;
 
-    std::unique_ptr<std::ofstream> filestream; /* deallog log file */
+    std::unique_ptr<std::ofstream> filestream; /* log file */
 
     std::thread output_thread;
   };

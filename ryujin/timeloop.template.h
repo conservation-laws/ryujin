@@ -32,38 +32,6 @@ using namespace dealii;
 using namespace grendel;
 
 
-namespace
-{
-  /**
-   * A helper function to print formatted section headings.
-   */
-
-  void print_head(std::string header, std::string secondary = "")
-  {
-    const auto header_size = header.size();
-    const auto padded_header = std::string((34 - header_size) / 2, ' ') +
-                               header +
-                               std::string((35 - header_size) / 2, ' ');
-
-    const auto secondary_size = secondary.size();
-    const auto padded_secondary = std::string((34 - secondary_size) / 2, ' ') +
-                                  secondary +
-                                  std::string((35 - secondary_size) / 2, ' ');
-
-    /* clang-format off */
-    deallog << std::endl;
-    deallog << "    ####################################################" << std::endl;
-    deallog << "    #########                                  #########" << std::endl;
-    deallog << "    #########"     <<  padded_header   <<     "#########" << std::endl;
-    deallog << "    #########"     << padded_secondary <<     "#########" << std::endl;
-    deallog << "    #########                                  #########" << std::endl;
-    deallog << "    ####################################################" << std::endl;
-    deallog << std::endl;
-    /* clang-format on */
-  }
-} // namespace
-
-
 namespace ryujin
 {
 
@@ -135,7 +103,6 @@ namespace ryujin
   template <int dim, typename Number>
   void TimeLoop<dim, Number>::run()
   {
-    /* Initialize deallog: */
     initialize();
 
     print_parameters();
@@ -160,6 +127,7 @@ namespace ryujin
     /* Prepare data structures: */
 
     print_head("compute offline data");
+
     offline_data.prepare();
     time_step.prepare();
     postprocessor.prepare();
@@ -216,22 +184,20 @@ namespace ryujin
     unsigned int cycle = 1;
     for (; t < t_final; ++cycle) {
 
+#ifdef DEBUG_OUTPUT
+      print_cycle(cycle, t);
+#endif
+
       /* Do a time step: */
 
       const auto tau = time_step.step(U, t);
       t += tau;
 
+#ifndef DEBUG_OUTPUT
+      print_cycle_statistics(cycle, t);
+#endif
+
       if (t > output_cycle * output_granularity) {
-
-        std::ostringstream primary;
-        primary << "Cycle  " << Utilities::int_to_string(cycle, 6) //
-                << "  (" << std::fixed << std::setprecision(1)     //
-                << t / t_final * 100 << "%)";
-
-        std::ostringstream secondary;
-        secondary << "at time t = " << std::setprecision(8) << std::fixed << t;
-
-        print_head(primary.str(), secondary.str());
 
         if (write_output_files)
           output(U,
@@ -247,6 +213,9 @@ namespace ryujin
 
         ++output_cycle;
 
+#ifndef DEBUG_OUTPUT
+        print_cycle(cycle, t);
+#endif
         print_throughput(cycle, t);
       }
     } /* end of loop */
@@ -272,17 +241,24 @@ namespace ryujin
     }
 
     computing_timer.print_summary();
-    deallog << timer_output.str() << std::endl;
+    if (mpi_rank == 0) {
+#ifdef DEBUG_OUTPUT
+      auto &stream = deallog;
+#else
+      auto &stream = *filestream;
+#endif
+      stream << timer_output.str() << std::endl;
+    }
 
     print_throughput(cycle, t);
 
     /* Detach deallog: */
+#ifdef DEBUG_OUTPUT
     if (mpi_rank == 0) {
-      deallog.pop();
       deallog.detach();
     }
+#endif
   }
-
 
 
   /**
@@ -295,17 +271,12 @@ namespace ryujin
 
     if (mpi_rank == 0) {
 
-      deallog.pop();
+      std::cout << "[Init] initiating flux capacitor" << std::endl;
+      std::cout << "[Init] bringing Warp Core online" << std::endl;
 
-      deallog << "[Init] Initiating Flux Capacitor... [ OK ]" << std::endl;
-      deallog << "[Init] Bringing Warp Core online... [ OK ]" << std::endl;
-
-      deallog << "[Init] Reading parameters and allocating objects... "
-              << std::flush;
+      std::cout << "[Init] read parameters and allocate objects" << std::endl;
 
       ParameterAcceptor::initialize("ryujin.prm");
-
-      deallog << "[ OK ]" << std::endl;
 
     } else {
 
@@ -321,16 +292,18 @@ namespace ryujin
     /* Prepare and attach logfile: */
 
     filestream.reset(new std::ofstream(base_name + "-deallog.log"));
+
+#ifdef DEBUG_OUTPUT
+    deallog.pop();
     deallog.attach(*filestream);
+    deallog.depth_console(4);
+    deallog.depth_file(4);
+#endif
 
 #ifdef DEBUG
     deallog.push("DEBUG");
 #endif
-
-    deallog.depth_console(4);
-    deallog.depth_file(4);
   }
-
 
 
   template <int dim, typename Number>
@@ -367,7 +340,6 @@ namespace ryujin
 
     return U;
   }
-
 
 
   template <int dim, typename Number>
@@ -453,16 +425,25 @@ namespace ryujin
       l2_norm += l2_norm_error / l2_norm_analytic;
     }
 
-    deallog << "        Normalized consolidated Linf, L1, and L2 errors at "
-            << "final time" << std::endl;
-    deallog << "        #dofs = " << offline_data.dof_handler().n_dofs()
-            << std::endl;
-    deallog << "        t     = " << t << std::endl;
-    deallog << "        Linf  = " << linf_norm << std::endl;
-    deallog << "        L1    = " << l1_norm << std::endl;
-    deallog << "        L2    = " << l2_norm << std::endl;
-  }
+    if (mpi_rank != 0)
+      return;
 
+#ifdef DEBUG_OUTPUT
+      auto &stream = deallog;
+#else
+      auto &stream = *filestream;
+#endif
+
+      print_head("compute error");
+
+      stream << "Normalized consolidated Linf, L1, and L2 errors at "
+             << "final time" << std::endl;
+      stream << "#dofs = " << offline_data.dof_handler().n_dofs() << std::endl;
+      stream << "t     = " << t << std::endl;
+      stream << "Linf  = " << linf_norm << std::endl;
+      stream << "L1    = " << l1_norm << std::endl;
+      stream << "L2    = " << l2_norm << std::endl;
+  }
 
 
   template <int dim, typename Number>
@@ -586,166 +567,169 @@ namespace ryujin
     output_thread = std::move(std::thread(output_worker));
   }
 
+  /*
+   * Output and logging related functions:
+   */
 
 
   template <int dim, typename Number>
   void TimeLoop<dim, Number>::print_parameters()
   {
+    if (mpi_rank != 0)
+      return;
+
+#ifdef DEBUG_OUTPUT
+    auto &stream = deallog;
+#else
+    auto &stream = *filestream;
+#endif
+
     /* Output commit and library informations: */
 
     /* clang-format off */
-    deallog << std::endl;
-    deallog << "###" << std::endl;
-    deallog << "#" << std::endl;
-    deallog << "# deal.II version " << std::setw(8) << DEAL_II_PACKAGE_VERSION
+    stream << std::endl;
+    stream << "###" << std::endl;
+    stream << "#" << std::endl;
+    stream << "# deal.II version " << std::setw(8) << DEAL_II_PACKAGE_VERSION
             << "  -  " << DEAL_II_GIT_REVISION << std::endl;
-    deallog << "# ryujin  version " << std::setw(8) << RYUJIN_VERSION
+    stream << "# ryujin  version " << std::setw(8) << RYUJIN_VERSION
             << "  -  " << RYUJIN_GIT_REVISION << std::endl;
-    deallog << "#" << std::endl;
-    deallog << "###" << std::endl;
-    deallog << std::endl;
+    stream << "#" << std::endl;
+    stream << "###" << std::endl;
+    stream << std::endl;
 
     /* Print compile time parameters: */
 
-    deallog << "Compile time parameters:" << std::endl;
+    stream << "Compile time parameters:" << std::endl;
 
-    deallog << "DIM == " << dim << std::endl;
-    deallog << "NUMBER == " << typeid(Number).name() << std::endl;
+    stream << "DIM == " << dim << std::endl;
+    stream << "NUMBER == " << typeid(Number).name() << std::endl;
 
 #ifdef USE_SIMD
-    deallog << "SIMD width == " << VectorizedArray<Number>::n_array_elements << std::endl;
+    stream << "SIMD width == " << VectorizedArray<Number>::n_array_elements << std::endl;
 #else
-    deallog << "SIMD width == " << "(( disabled ))" << std::endl;
+    stream << "SIMD width == " << "(( disabled ))" << std::endl;
 #endif
 
 #ifdef USE_CUSTOM_POW
-    deallog << "serial pow == broadcasted pow(Vec4f)/pow(Vec2d)" << std::endl;
+    stream << "serial pow == broadcasted pow(Vec4f)/pow(Vec2d)" << std::endl;
 #else
-    deallog << "serial pow == std::pow"<< std::endl;
+    stream << "serial pow == std::pow"<< std::endl;
 #endif
 
-    deallog << "Indicator<dim, Number>::indicators_ == ";
+    stream << "Indicator<dim, Number>::indicators_ == ";
     switch (Indicator<dim, Number>::indicator_) {
     case Indicator<dim, Number>::Indicators::zero:
-      deallog << "Indicator<dim, Number>::Indicators::zero" << std::endl;
+      stream << "Indicator<dim, Number>::Indicators::zero" << std::endl;
       break;
     case Indicator<dim, Number>::Indicators::one:
-      deallog << "Indicator<dim, Number>::Indicators::one" << std::endl;
+      stream << "Indicator<dim, Number>::Indicators::one" << std::endl;
       break;
     case Indicator<dim, Number>::Indicators::entropy_viscosity_commutator:
-      deallog << "Indicator<dim, Number>::Indicators::entropy_viscosity_commutator" << std::endl;
+      stream << "Indicator<dim, Number>::Indicators::entropy_viscosity_commutator" << std::endl;
       break;
     case Indicator<dim, Number>::Indicators::smoothness_indicator:
-      deallog << "Indicator<dim, Number>::Indicators::smoothness_indicator" << std::endl;
+      stream << "Indicator<dim, Number>::Indicators::smoothness_indicator" << std::endl;
     }
 
-    deallog << "Indicator<dim, Number>::smoothness_indicator_ == ";
+    stream << "Indicator<dim, Number>::smoothness_indicator_ == ";
     switch (Indicator<dim, Number>::smoothness_indicator_) {
     case Indicator<dim, Number>::SmoothnessIndicators::rho:
-      deallog << "Indicator<dim, Number>::SmoothnessIndicators::rho" << std::endl;
+      stream << "Indicator<dim, Number>::SmoothnessIndicators::rho" << std::endl;
       break;
     case Indicator<dim, Number>::SmoothnessIndicators::internal_energy:
-      deallog << "Indicator<dim, Number>::SmoothnessIndicators::internal_energy" << std::endl;
+      stream << "Indicator<dim, Number>::SmoothnessIndicators::internal_energy" << std::endl;
       break;
     case Indicator<dim, Number>::SmoothnessIndicators::pressure:
-      deallog << "Indicator<dim, Number>::SmoothnessIndicators::pressure" << std::endl;
+      stream << "Indicator<dim, Number>::SmoothnessIndicators::pressure" << std::endl;
     }
 
-    deallog << "Indicator<dim, Number>::smoothness_indicator_alpha_0_ == "
+    stream << "Indicator<dim, Number>::smoothness_indicator_alpha_0_ == "
             << Indicator<dim, Number>::smoothness_indicator_alpha_0_ << std::endl;
 
-    deallog << "Indicator<dim, Number>::smoothness_indicator_power_ == "
+    stream << "Indicator<dim, Number>::smoothness_indicator_power_ == "
             << Indicator<dim, Number>::smoothness_indicator_power_ << std::endl;
 
-    deallog << "Indicator<dim, Number>::compute_second_variations_ == "
+    stream << "Indicator<dim, Number>::compute_second_variations_ == "
             << Indicator<dim, Number>::compute_second_variations_ << std::endl;
 
-    deallog << "Limiter<dim, Number>::limiter_ == ";
+    stream << "Limiter<dim, Number>::limiter_ == ";
     switch (Limiter<dim, Number>::limiter_) {
     case Limiter<dim, Number>::Limiters::none:
-      deallog << "Limiter<dim, Number>::Limiters::none" << std::endl;
+      stream << "Limiter<dim, Number>::Limiters::none" << std::endl;
       break;
     case Limiter<dim, Number>::Limiters::rho:
-      deallog << "Limiter<dim, Number>::Limiters::rho" << std::endl;
+      stream << "Limiter<dim, Number>::Limiters::rho" << std::endl;
       break;
     case Limiter<dim, Number>::Limiters::specific_entropy:
-      deallog << "Limiter<dim, Number>::Limiters::specific_entropy" << std::endl;
+      stream << "Limiter<dim, Number>::Limiters::specific_entropy" << std::endl;
       break;
     case Limiter<dim, Number>::Limiters::entropy_inequality:
-      deallog << "Limiter<dim, Number>::Limiters::entropy_inequality" << std::endl;
+      stream << "Limiter<dim, Number>::Limiters::entropy_inequality" << std::endl;
       break;
     }
 
-    deallog << "grendel::newton_max_iter == "
+    stream << "grendel::newton_max_iter == "
             << grendel::newton_max_iter << std::endl;
 
-    deallog << "Limiter<dim, Number>::relax_bounds_ == "
+    stream << "Limiter<dim, Number>::relax_bounds_ == "
             << Limiter<dim, Number>::relax_bounds_ << std::endl;
 
-    deallog << "Limiter<dim, Number>::relaxation_order_ == "
+    stream << "Limiter<dim, Number>::relaxation_order_ == "
             << Limiter<dim, Number>::relaxation_order_ << std::endl;
 
-    deallog << "RiemannSolver<dim, Number>::newton_max_iter_ == "
+    stream << "RiemannSolver<dim, Number>::newton_max_iter_ == "
             <<  RiemannSolver<dim, Number>::newton_max_iter_ << std::endl;
 
-    deallog << "RiemannSolver<dim, Number>::greedy_dij_ == "
+    stream << "RiemannSolver<dim, Number>::greedy_dij_ == "
             <<  RiemannSolver<dim, Number>::greedy_dij_ << std::endl;
 
-    deallog << "RiemannSolver<dim, Number>::greedy_threshold_ == "
+    stream << "RiemannSolver<dim, Number>::greedy_threshold_ == "
             <<  RiemannSolver<dim, Number>::greedy_threshold_ << std::endl;
 
-    deallog << "RiemannSolver<dim, Number>::greedy_relax_bounds_ == "
+    stream << "RiemannSolver<dim, Number>::greedy_relax_bounds_ == "
             <<  RiemannSolver<dim, Number>::greedy_relax_bounds_ << std::endl;
 
 
-    deallog << "TimeStep<dim, Number>::order_ == ";
+    stream << "TimeStep<dim, Number>::order_ == ";
     switch (TimeStep<dim, Number>::order_) {
     case TimeStep<dim, Number>::Order::first_order:
-      deallog << "TimeStep<dim, Number>::Order::first_order" << std::endl;
+      stream << "TimeStep<dim, Number>::Order::first_order" << std::endl;
       break;
     case TimeStep<dim, Number>::Order::second_order:
-      deallog << "TimeStep<dim, Number>::Order::second_order" << std::endl;
+      stream << "TimeStep<dim, Number>::Order::second_order" << std::endl;
     }
 
-    deallog << "TimeStep<dim, Number>::time_step_order_ == ";
+    stream << "TimeStep<dim, Number>::time_step_order_ == ";
     switch (TimeStep<dim, Number>::time_step_order_) {
     case TimeStep<dim, Number>::TimeStepOrder::first_order:
-      deallog << "TimeStep<dim, Number>::TimeStepOrder::first_order" << std::endl;
+      stream << "TimeStep<dim, Number>::TimeStepOrder::first_order" << std::endl;
       break;
     case TimeStep<dim, Number>::TimeStepOrder::second_order:
-      deallog << "TimeStep<dim, Number>::TimeStepOrder::second_order" << std::endl;
+      stream << "TimeStep<dim, Number>::TimeStepOrder::second_order" << std::endl;
       break;
     case TimeStep<dim, Number>::TimeStepOrder::third_order:
-      deallog << "TimeStep<dim, Number>::TimeStepOrder::third_order" << std::endl;
+      stream << "TimeStep<dim, Number>::TimeStepOrder::third_order" << std::endl;
       break;
     }
 
-    deallog << "TimeStep<dim, Number>::limiter_iter_ == "
+    stream << "TimeStep<dim, Number>::limiter_iter_ == "
             <<  TimeStep<dim, Number>::limiter_iter_ << std::endl;
 
     /* clang-format on */
 
-    deallog << std::endl;
-    deallog << "Run time parameters:" << std::endl;
-    ParameterAcceptor::prm.log_parameters(deallog);
+#ifndef DEBUG_OUTPUT
+    stream << std::endl;
+    stream << "Run time parameters:" << std::endl;
+    ParameterAcceptor::prm.print_parameters(
+        stream, ParameterHandler::OutputStyle::ShortText);
+#endif
   }
-
 
 
   template <int dim, typename Number>
   void TimeLoop<dim, Number>::print_mpi_partition()
   {
-    deallog << "Number of MPI ranks: " << n_mpi_processes << std::endl;
-    deallog << "Number of threads:   " << MultithreadInfo::n_threads()
-            << std::endl;
-
-    /* Print out the DoF distribution: */
-
-    const auto n_dofs = offline_data.dof_handler().n_dofs();
-
-    deallog << "Qdofs: " << n_dofs
-            << " global DoFs, local DoF distribution:" << std::endl;
-
     unsigned int dofs[2];
     dofs[0] = offline_data.n_locally_owned();
     dofs[1] = offline_data.n_locally_internal();
@@ -755,8 +739,26 @@ namespace ryujin
 
     } else {
 
+#ifdef DEBUG_OUTPUT
+      auto &stream = deallog;
+#else
+      auto &stream = *filestream;
+#endif
+
+      stream << "Number of MPI ranks: " << n_mpi_processes << std::endl;
+      stream << "Number of threads:   " << MultithreadInfo::n_threads()
+             << std::endl;
+
+      /* Print out the DoF distribution: */
+
+      const auto n_dofs = offline_data.dof_handler().n_dofs();
+
+      stream << "Qdofs: " << n_dofs
+             << " global DoFs, local DoF distribution:" << std::endl;
+
+
       for (unsigned int p = 0; p < n_mpi_processes; ++p) {
-        deallog << "    Rank " << p << std::flush;
+        stream << "    Rank " << p << std::flush;
 
         if (p != 0)
           MPI_Recv(&dofs,
@@ -767,16 +769,80 @@ namespace ryujin
                    mpi_communicator,
                    MPI_STATUS_IGNORE);
 
-        deallog << ":\tlocal: " << dofs[0] << std::flush;
-        deallog << "\tinternal: " << dofs[1] << std::endl;
-      }
-    }
+        stream << ":\tlocal: " << dofs[0] << std::flush;
+        stream << "\tinternal: " << dofs[1] << std::endl;
+      } /* p */
+    }   /* mpi_rank */
   }
 
 
+  /**
+   * A small function that prints formatted section headings.
+   */
+  template <int dim, typename Number>
+  void TimeLoop<dim, Number>::print_head(const std::string &header,
+                                         const std::string &secondary,
+                                         bool use_cout)
+  {
+    if (mpi_rank != 0)
+      return;
+
+#ifdef DEBUG_OUTPUT
+    auto &stream = deallog;
+#else
+    std::ostream &stream = use_cout ? std::cout : *filestream;
+#endif
+
+    const auto header_size = header.size();
+    const auto padded_header = std::string((34 - header_size) / 2, ' ') +
+                               header +
+                               std::string((35 - header_size) / 2, ' ');
+
+    const auto secondary_size = secondary.size();
+    const auto padded_secondary = std::string((34 - secondary_size) / 2, ' ') +
+                                  secondary +
+                                  std::string((35 - secondary_size) / 2, ' ');
+
+    /* clang-format off */
+    stream << std::endl;
+    stream << "    ####################################################" << std::endl;
+    stream << "    #########                                  #########" << std::endl;
+    stream << "    #########"     <<  padded_header   <<     "#########" << std::endl;
+    stream << "    #########"     << padded_secondary <<     "#########" << std::endl;
+    stream << "    #########                                  #########" << std::endl;
+    stream << "    ####################################################" << std::endl;
+    stream << std::endl;
+    /* clang-format on */
+
+    if (secondary == "")
+      std::cout << "[Init] " << header << std::endl;
+  }
+
+
+  /**
+   * A small function that prints formatted section headings.
+   */
+  template <int dim, typename Number>
+  void TimeLoop<dim, Number>::print_cycle(unsigned int cycle,
+                                          Number t,
+                                          bool use_cout)
+  {
+    std::ostringstream primary;
+    primary << "Cycle  " << Utilities::int_to_string(cycle, 6) //
+            << "  (" << std::fixed << std::setprecision(1)     //
+            << t / t_final * 100 << "%)";
+
+    std::ostringstream secondary;
+    secondary << "at time t = " << std::setprecision(8) << std::fixed << t;
+
+    print_head(primary.str(), secondary.str(), use_cout);
+  }
+
 
   template <int dim, typename Number>
-  void TimeLoop<dim, Number>::print_throughput(unsigned int cycle, Number t)
+  void TimeLoop<dim, Number>::print_throughput(unsigned int cycle,
+                                               Number t,
+                                               bool use_cout)
   {
     /* Print Jean-Luc and Martin metrics: */
 
@@ -827,11 +893,11 @@ namespace ryujin
 
     std::ostringstream head;
     head << std::setprecision(4) << std::endl << std::endl;
-    head << "Throughput: (CPU )  "                             //
+    head << "Throughput:  (CPU )  "                            //
          << std::fixed << cpu_m_dofs_per_sec << " MQ/s  ("     //
          << std::scientific << 1. / cpu_m_dofs_per_sec * 1.e-6 //
          << " s/Qdof/cycle)" << std::endl;
-    head << "            (WALL)  "                              //
+    head << "             (WALL)  "                             //
          << std::fixed << wall_m_dofs_per_sec << " MQ/s  ("     //
          << std::scientific << 1. / wall_m_dofs_per_sec * 1.e-6 //
          << " s/Qdof/cycle)  ("                                 //
@@ -839,13 +905,52 @@ namespace ryujin
          << " cycles/s)  (avg dt = "                            //
          << std::scientific << t / ((double)cycle)              //
          << ")" << std::endl;
-    head << "                    ["                                     //
+    head << "                     ["                                    //
          << std::setprecision(0) << std::fixed << n_restart_euler_steps //
          << " rsts  (" << std::setprecision(4) << std::scientific
-         << n_restart_euler_steps / ((double)cycle)
-         << " rsts/cycle)]" << std::endl;
+         << n_restart_euler_steps / ((double)cycle) << " rsts/cycle)]"
+         << std::endl;
 
-    deallog << head.str() << std::endl;
+    if (mpi_rank != 0)
+      return;
+
+#ifdef DEBUG_OUTPUT
+    auto &stream = deallog;
+#else
+    std::ostream &stream = use_cout ? std::cout : *filestream;
+#endif
+
+    stream << head.str() << std::endl;
+  }
+
+
+  /**
+   * A small function that prints formatted section headings.
+   */
+  template <int dim, typename Number>
+  void TimeLoop<dim, Number>::print_cycle_statistics(unsigned int cycle,
+                                                     Number t)
+  {
+    if (mpi_rank == 0) {
+      std::ostringstream primary;
+      primary << "Cycle  " << Utilities::int_to_string(cycle, 6) //
+              << "  (" << std::fixed << std::setprecision(1)     //
+              << t / t_final * 100 << "%)";
+
+      std::ostringstream secondary;
+      secondary << "at time t = " << std::setprecision(8) << std::fixed << t;
+
+      std::cout << "\033[2J\033[H" << std::endl;
+
+      print_head(primary.str(), secondary.str(), /*use_cout*/ true);
+
+      std::cout << "Information: [" << base_name << "] with "
+                << offline_data.dof_handler().n_dofs() << " Qdofs on "
+                << n_mpi_processes << " ranks / "
+                << MultithreadInfo::n_threads() << " threads" << std::flush;
+    }
+
+    print_throughput(cycle, t, /*use_cout*/ true);
   }
 
 
