@@ -3,6 +3,9 @@
 #include <compile_time_options.h>
 
 #include <deal.II/base/utilities.h>
+#include <deal.II/base/multithread_info.h>
+
+#include <omp.h>
 
 #ifdef LIKWID_PERFMON
   #include <likwid.h>
@@ -12,6 +15,9 @@
 
 int main (int argc, char *argv[])
 {
+  /* Set the number of OpenMP threads to whatever deal.II allows for TBB: */
+  omp_set_num_threads(dealii::MultithreadInfo::n_threads());
+
 #ifdef LIKWID_PERFMON
   LIKWID_MARKER_INIT;
 #pragma omp parallel
