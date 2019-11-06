@@ -29,7 +29,7 @@
 
 #define GRENDEL_PRAGMA(x) _Pragma(#x)
 #define GRENDEL_PARALLEL_FOR(options)                                          \
-  GRENDEL_PRAGMA(omp parallel for schedule(static) default(shared) options)
+  GRENDEL_PRAGMA(omp parallel for default(shared) options)
 
 namespace grendel
 {
