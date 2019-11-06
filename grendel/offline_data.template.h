@@ -41,13 +41,17 @@ namespace grendel
   template <int dim, typename Number>
   void OfflineData<dim, Number>::setup()
   {
+#ifdef DEBUG_OUTPUT
     deallog << "OfflineData<dim, Number>::setup()" << std::endl;
+#endif
 
     IndexSet locally_owned;
     IndexSet locally_relevant;
 
     {
+#ifdef DEBUG_OUTPUT
       deallog << "        distribute dofs" << std::endl;
+#endif
       TimerOutput::Scope t(computing_timer_, "offline_data - distribute dofs");
 
       /* Initialize dof_handler and gather all locally owned indices: */
@@ -158,49 +162,15 @@ namespace grendel
       n_locally_internal_ = 0;
 #endif
 
-      /* Print out the DoF distribution: */
-
-      const auto n_dofs = locally_owned.size();
-      deallog << "        " << n_dofs
-              << " global DoFs, local DoF distribution:" << std::endl;
-
-      const auto this_mpi_process =
-          Utilities::MPI::this_mpi_process(mpi_communicator_);
-      const auto n_mpi_processes =
-          Utilities::MPI::n_mpi_processes(mpi_communicator_);
-
-      unsigned int dofs[2];
-      dofs[0] = n_locally_owned_;
-      dofs[1] = n_locally_internal_;
-
-      if (this_mpi_process > 0) {
-        MPI_Send(&dofs, 2, MPI_UNSIGNED, 0, 0, mpi_communicator_);
-
-      } else {
-
-        for (unsigned int p = 0; p < n_mpi_processes; ++p) {
-          deallog << "            Rank " << p << std::flush;
-
-          if (p != 0)
-            MPI_Recv(&dofs,
-                     2,
-                     MPI_UNSIGNED,
-                     p,
-                     0,
-                     mpi_communicator_,
-                     MPI_STATUS_IGNORE);
-
-          deallog << ":\tlocal: " << dofs[0] << std::flush;
-          deallog << "\tinternal: " << dofs[1] << std::endl;
-        }
-      }
     }
 
     const auto dofs_per_cell = discretization_->finite_element().dofs_per_cell;
 
     {
+#ifdef DEBUG_OUTPUT
       deallog << "        create partitioner and affine constraints"
               << std::endl;
+#endif
       TimerOutput::Scope t(
           computing_timer_,
           "offline_data - create partitioner and affine constraints");
@@ -286,7 +256,9 @@ namespace grendel
      */
 
     {
+#ifdef DEBUG_OUTPUT
       deallog << "        create_sparsity_pattern" << std::endl;
+#endif
       TimerOutput::Scope t(computing_timer_,
                            "offline_data - create sparsity pattern");
 
@@ -319,7 +291,9 @@ namespace grendel
      */
 
     {
+#ifdef DEBUG_OUTPUT
       deallog << "        set up matrices" << std::endl;
+#endif
       TimerOutput::Scope t(computing_timer_, "offline_data - set up matrices");
 
       mass_matrix_.reinit(sparsity_pattern_);
@@ -335,7 +309,9 @@ namespace grendel
   template <int dim, typename Number>
   void OfflineData<dim, Number>::assemble()
   {
+#ifdef DEBUG_OUTPUT
     deallog << "OfflineData<dim, Number>::assemble()" << std::endl;
+#endif
 
     mass_matrix_ = 0.;
     lumped_mass_matrix_ = 0.;
@@ -530,8 +506,10 @@ namespace grendel
 
 
     {
+#ifdef DEBUG_OUTPUT
       deallog << "        assemble mass matrices, beta_ij, and c_ijs"
               << std::endl;
+#endif
       TimerOutput::Scope t(
           computing_timer_,
           "offline_data - assemble mass matrices, beta_ij, and c_ij");
@@ -588,7 +566,9 @@ namespace grendel
     };
 
     {
+#ifdef DEBUG_OUTPUT
       deallog << "        compute b_ijs" << std::endl;
+#endif
       TimerOutput::Scope t(computing_timer_, "offline_data - compute b_ij");
 
       const auto indices = boost::irange<unsigned int>(0, n_locally_relevant_);
@@ -695,7 +675,9 @@ namespace grendel
     };
 
     {
+#ifdef DEBUG_OUTPUT
       deallog << "        fix bdry c_ijs, set up SIMD c_ij" << std::endl;
+#endif
       TimerOutput::Scope t(computing_timer_,
                            "offline_data - fix bdry c_ijs, set up SIMD c_ij");
 

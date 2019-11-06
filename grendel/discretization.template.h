@@ -154,7 +154,9 @@ namespace grendel
   template <int dim>
   void Discretization<dim>::prepare()
   {
+#ifdef DEBUG_OUTPUT
     deallog << "Discretization<dim>::prepare()" << std::endl;
+#endif
     TimerOutput::Scope t(computing_timer_, "discretization - prepare");
 
     if (!triangulation_)
@@ -170,7 +172,9 @@ namespace grendel
       GridIn<dim> grid_in;
       grid_in.attach_triangulation(triangulation);
 
+#ifdef DEBUG_OUTPUT
       deallog << "        reading in \"" << grid_file_ << "\"" << std::endl;
+#endif
 
       std::ifstream file(grid_file_);
       grid_in.read_msh(file);
@@ -243,7 +247,9 @@ namespace grendel
       if (std::find(bdy_ids.begin(), bdy_ids.end(), Boundary::periodic) !=
           bdy_ids.end()) {
 
+#ifdef DEBUG_OUTPUT
         deallog << "        collecting periodic faces" << std::endl;
+#endif
 
         std::vector<dealii::GridTools::PeriodicFacePair<
             typename dealii::Triangulation<dim>::cell_iterator>>
