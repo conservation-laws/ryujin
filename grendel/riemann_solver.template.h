@@ -314,7 +314,7 @@ namespace grendel
       const auto &[rho_j, u_j, p_j, a_j] = riemann_data_j;
 
       /*
-       * Notar bene (cf. [1, (4.3)]):
+       * Nota bene (cf. [1, (4.3)]):
        *   a_Z^0 * sqrt(1 - b * rho_Z) = a_Z * (1 - b * rho_Z)
        * We have computed a_Z already, so we are simply going to use this
        * identity below:
@@ -403,7 +403,7 @@ namespace grendel
      * phi(p_max) >= 0:
      *   p_1  <-  p_min   and   p_2  <-  min(p_max, p_star_tilde)
      *
-     * Notar bene:
+     * Nota bene:
      *
      *  - The special case phi(p_max) == 0 as discussed in [1] is already
      *    contained in the second condition.

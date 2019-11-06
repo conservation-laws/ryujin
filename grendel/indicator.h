@@ -92,6 +92,7 @@ namespace grendel
 
   private:
     const dealii::SparseMatrix<ScalarNumber> &betaij_matrix_;
+    ACCESSOR_READ_ONLY(betaij_matrix)
 
     /* Temporary storage used for the entropy_viscosity_commutator: */
 
