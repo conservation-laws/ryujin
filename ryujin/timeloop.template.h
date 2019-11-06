@@ -322,7 +322,7 @@ namespace ryujin
             << ")" << std::endl;
 #endif
     TimerOutput::Scope timer(computing_timer,
-                             "time_loop - setup scratch space");
+                             "time_loop - interpolate initial values");
 
     vector_type U;
 
