@@ -144,7 +144,9 @@ namespace ryujin
 
     initialize();
 
+#ifdef DEBUG_OUTPUT
     deallog << "TimeLoop<dim, Number>::run()" << std::endl;
+#endif
 
     /* Create distributed triangulation and output the triangulation: */
 
@@ -152,7 +154,9 @@ namespace ryujin
     discretization.prepare();
 
     if (write_mesh) {
+#ifdef DEBUG_OUTPUT
       deallog << "        output triangulation" << std::endl;
+#endif
       std::ofstream output(base_name + "-triangulation-p" +
                            std::to_string(mpi_rank) + ".inp");
       GridOut().write_ucd(discretization.triangulation(), output);
@@ -497,8 +501,10 @@ namespace ryujin
   typename TimeLoop<dim, Number>::vector_type
   TimeLoop<dim, Number>::interpolate_initial_values(Number t)
   {
+#ifdef DEBUG_OUTPUT
     deallog << "TimeLoop<dim, Number>::interpolate_initial_values(t = " << t
             << ")" << std::endl;
+#endif
     TimerOutput::Scope timer(computing_timer,
                              "time_loop - setup scratch space");
 
@@ -531,7 +537,9 @@ namespace ryujin
   void TimeLoop<dim, Number>::compute_error(
       const typename TimeLoop<dim, Number>::vector_type &U, const Number t)
   {
+#ifdef DEBUG_OUTPUT
     deallog << "TimeLoop<dim, Number>::compute_error()" << std::endl;
+#endif
     TimerOutput::Scope timer(computing_timer, "time_loop - compute error");
 
     constexpr auto problem_dimension =
@@ -627,8 +635,10 @@ namespace ryujin
       unsigned int cycle,
       bool checkpoint)
   {
+#ifdef DEBUG_OUTPUT
     deallog << "TimeLoop<dim, Number>::output(t = " << t
             << ", checkpoint = " << checkpoint << ")" << std::endl;
+#endif
 
     /*
      * Offload output to a worker thread.
@@ -659,7 +669,9 @@ namespace ryujin
       /* Checkpointing: */
 
       if (checkpoint) {
+#ifdef DEBUG_OUTPUT
         deallog << "        Checkpointing" << std::endl;
+#endif
 
         const unsigned int i = triangulation.locally_owned_subdomain();
         std::string name = base_name + "-checkpoint-" +
@@ -721,14 +733,18 @@ namespace ryujin
         data_out.write_pvtu_record(output, filenames);
       }
 
+#ifdef DEBUG_OUTPUT
       deallog << "        Commit output (cycle = " << cycle << ")" << std::endl;
+#endif
     };
 
     /*
      * And spawn the thread:
      */
 
+#ifdef DEBUG_OUTPUT
     deallog << "        Schedule output (cycle = " << cycle << ")" << std::endl;
+#endif
     output_thread = std::move(std::thread(output_worker));
   }
 
