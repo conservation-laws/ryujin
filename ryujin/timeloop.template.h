@@ -61,6 +61,7 @@ namespace ryujin
       , mpi_rank(dealii::Utilities::MPI::this_mpi_process(mpi_communicator))
       , n_mpi_processes(
             dealii::Utilities::MPI::n_mpi_processes(mpi_communicator))
+      , output_thread_active(0)
   {
     base_name = "cylinder";
     add_parameter("basename", base_name, "Base name for all output files");
@@ -199,13 +200,7 @@ namespace ryujin
       const auto tau = time_step.step(U, t);
       t += tau;
 
-#ifndef DEBUG_OUTPUT
-      if (cycle % update_granularity == 0)
-        print_cycle_statistics(cycle, t);
-#endif
-
       if (t > output_cycle * output_granularity) {
-
         if (write_output_files)
           output(U,
                  base_name + "-solution",
@@ -225,6 +220,12 @@ namespace ryujin
 #endif
         print_throughput(cycle, t);
       }
+
+#ifndef DEBUG_OUTPUT
+      if (cycle % update_granularity == 0 ||
+          t > (output_cycle - 1) * output_granularity)
+        print_cycle_statistics(cycle, t, output_cycle);
+#endif
     } /* end of loop */
 
     --cycle; /* We have actually performed one cycle less. */
@@ -484,6 +485,9 @@ namespace ryujin
 
     /* capture name, t, cycle, and checkpoint by value */
     const auto output_worker = [this, name, t, cycle, checkpoint]() {
+      /* Flag thread as active: */
+      output_thread_active = 1;
+
       constexpr auto problem_dimension =
           ProblemDescription<dim, Number>::problem_dimension;
       constexpr auto n_quantities = Postprocessor<dim, Number>::n_quantities;
@@ -562,6 +566,9 @@ namespace ryujin
 #ifdef DEBUG_OUTPUT
       deallog << "        Commit output (cycle = " << cycle << ")" << std::endl;
 #endif
+
+      /* Flag thread as inactive: */
+      output_thread_active = 0;
     };
 
     /*
@@ -571,6 +578,7 @@ namespace ryujin
 #ifdef DEBUG_OUTPUT
     deallog << "        Schedule output (cycle = " << cycle << ")" << std::endl;
 #endif
+
     output_thread = std::move(std::thread(output_worker));
   }
 
@@ -936,8 +944,12 @@ namespace ryujin
    */
   template <int dim, typename Number>
   void TimeLoop<dim, Number>::print_cycle_statistics(unsigned int cycle,
-                                                     Number t)
+                                                     Number t,
+                                                     unsigned int output_cycle)
   {
+    unsigned int n_active_writebacks =
+        Utilities::MPI::sum(output_thread_active, mpi_communicator);
+
     if (mpi_rank == 0) {
       std::ostringstream primary;
       primary << "Cycle  " << Utilities::int_to_string(cycle, 6) //
@@ -954,20 +966,30 @@ namespace ryujin
       std::cout << "Information: [" << base_name << "] with "
                 << offline_data.dof_handler().n_dofs() << " Qdofs on "
                 << n_mpi_processes << " ranks / "
-                << MultithreadInfo::n_threads() << " threads" << std::flush;
-    }
+                << MultithreadInfo::n_threads() << " threads" << std::endl;
 
-    print_throughput(cycle, t, /*use_cout*/ true);
+      std::cout << "             Last output cycle " << output_cycle - 1
+                << " at t = " << output_granularity * (output_cycle - 1)
+                << std::endl;
+
+      if (n_active_writebacks > 0)
+        std::cout << "             !!! " << n_active_writebacks
+                  << " ranks performing output !!!" << std::flush;
+    }
 
     computing_timer.print_summary();
     auto summary = timer_output.str();
     timer_output.str("");
 
     if (mpi_rank == 0) {
-      /* Remove CPU statistics: */
-      summary.erase(0, summary.length() / 2 + 1);
-      std::cout << summary << std::endl;
+      /* Remove CPU statistics and unnecessary whitespace: */
+      std::cout << summary.substr(summary.length() / 2,
+                                  summary.length() / 2 - 2)
+                << std::endl;
     }
+
+    print_throughput(cycle, t, /*use_cout*/ true);
+
   }
 
 

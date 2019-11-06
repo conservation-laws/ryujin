@@ -50,7 +50,9 @@ namespace ryujin
                     bool use_cout = false);
     void print_cycle(unsigned int cycle, Number t, bool use_cout = false);
     void print_throughput(unsigned int cycle, Number t, bool use_cout = false);
-    void print_cycle_statistics(unsigned int cycle, Number t);
+    void print_cycle_statistics(unsigned int cycle,
+                                Number t,
+                                unsigned int output_cycle);
 
     /* Options: */
 
@@ -87,6 +89,7 @@ namespace ryujin
     std::unique_ptr<std::ofstream> filestream; /* log file */
 
     std::thread output_thread;
+    unsigned int output_thread_active;
   };
 
 } // namespace ryujin
