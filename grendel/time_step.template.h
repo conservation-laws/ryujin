@@ -56,7 +56,9 @@ namespace grendel
   template <int dim, typename Number>
   void TimeStep<dim, Number>::prepare()
   {
+#ifdef DEBUG_OUTPUT
     deallog << "TimeStep<dim, Number>::prepare()" << std::endl;
+#endif
     TimerOutput::Scope time(computing_timer_,
                             "time_step - prepare scratch space");
 
@@ -104,7 +106,9 @@ namespace grendel
   template <int dim, typename Number>
   Number TimeStep<dim, Number>::euler_step(vector_type &U, Number t, Number tau)
   {
+#ifdef DEBUG_OUTPUT
     deallog << "TimeStep<dim, Number>::euler_step()" << std::endl;
+#endif
 
 #ifdef CALLGRIND
     CALLGRIND_START_INSTRUMENTATION;
@@ -159,7 +163,9 @@ namespace grendel
      */
 
     {
+#ifdef DEBUG_OUTPUT
       deallog << "        compute d_ij, and alpha_i" << std::endl;
+#endif
       TimerOutput::Scope time(computing_timer_,
                               "time_step - 1 compute d_ij, and alpha_i");
 #ifdef LIKWID_PERFMON
@@ -313,7 +319,9 @@ namespace grendel
     std::atomic<Number> tau_max{std::numeric_limits<Number>::infinity()};
 
     {
+#ifdef DEBUG_OUTPUT
       deallog << "        compute d_ii, and tau_max" << std::endl;
+#endif
       TimerOutput::Scope time(computing_timer_,
                               "time_step - 2 compute d_ii, and tau_max");
 #ifdef LIKWID_PERFMON
@@ -375,15 +383,21 @@ namespace grendel
       LIKWID_MARKER_STOP("time_step_2");
 #endif
 
+#ifdef DEBUG_OUTPUT
       deallog << "        computed tau_max = " << tau_max << std::endl;
+#endif
     }
 
     tau = (tau == Number(0.) ? tau_max.load() : tau);
+#ifdef DEBUG_OUTPUT
     deallog << "        perform time-step with tau = " << tau << std::endl;
+#endif
 
     if (tau * cfl_update_ > tau_max.load() * cfl_max_) {
+#ifdef DEBUG_OUTPUT
       deallog << "        insufficient CFL, refuse update and abort stepping"
               << std::endl;
+#endif
       U[0] *= std::numeric_limits<Number>::quiet_NaN();
       return tau_max;
     }
@@ -399,8 +413,10 @@ namespace grendel
      */
 
     {
+#ifdef DEBUG_OUTPUT
       deallog << "        compute low-order update, limiter bounds, and r_i"
               << std::endl;
+#endif
       TimerOutput::Scope time(
           computing_timer_,
           "time_step - 3 compute low-order update, limiter bounds, and r_i");
@@ -586,7 +602,9 @@ namespace grendel
      */
 
     if constexpr (order_ == Order::second_order) {
+#ifdef DEBUG_OUTPUT
       deallog << "        compute p_ij" << std::endl;
+#endif
       TimerOutput::Scope time(computing_timer_, "time_step - 4 compute p_ij");
 #ifdef LIKWID_PERFMON
       LIKWID_MARKER_START("time_step_4");
@@ -701,14 +719,18 @@ namespace grendel
         (order_ == Order::second_order ? limiter_iter_ : 0);
     for (unsigned int pass = 0; pass < n_passes; ++pass) {
 
+#ifdef DEBUG_OUTPUT
       deallog << "        limiter pass " << pass + 1 << std::endl;
+#endif
 
       /*
        * Step 5: compute l_ij:
        */
 
       {
+#ifdef DEBUG_OUTPUT
         deallog << "        compute l_ij" << std::endl;
+#endif
         TimerOutput::Scope time(computing_timer_, "time_step - 5 compute l_ij");
 #ifdef LIKWID_PERFMON
         LIKWID_MARKER_START("time_step_5");
@@ -774,7 +796,9 @@ namespace grendel
 
       if (Utilities::MPI::n_mpi_processes(mpi_communicator_) > 1) {
 
+#ifdef DEBUG_OUTPUT
         deallog << "        exchange l_ij" << std::endl;
+#endif
         TimerOutput::Scope time(computing_timer_,
                                 "time_step - 6 exchange l_ij");
 #ifdef LIKWID_PERFMON
@@ -796,7 +820,9 @@ namespace grendel
        */
 
       {
+#ifdef DEBUG_OUTPUT
         deallog << "        symmetrize l_ij, high-order update" << std::endl;
+#endif
         TimerOutput::Scope time(
             computing_timer_,
             "time_step - 7 symmetrize l_ij, high-order update");
@@ -871,7 +897,9 @@ namespace grendel
      */
 
     {
+#ifdef DEBUG_OUTPUT
       deallog << "        fix up boundary states" << std::endl;
+#endif
       TimerOutput::Scope time(computing_timer_,
                               "time_step - 8 fix boundary states");
 #ifdef LIKWID_PERFMON
@@ -940,7 +968,9 @@ namespace grendel
   template <int dim, typename Number>
   Number TimeStep<dim, Number>::ssph2_step(vector_type &U, Number t)
   {
+#ifdef DEBUG_OUTPUT
     deallog << "TimeStep<dim, Number>::ssph2_step()" << std::endl;
+#endif
 
     Number tau_0 = 0.;
 
@@ -964,7 +994,9 @@ namespace grendel
 
     if (tau_2 * cfl_max_ < tau_1 * cfl_update_) {
       /* Restart and force smaller time step: */
+#ifdef DEBUG_OUTPUT
       deallog << "        insufficient CFL, restart" << std::endl;
+#endif
       tau_0 = tau_2 * cfl_update_;
       U.swap(temp_ssp_);
       goto restart_ssph2_step;
@@ -980,7 +1012,9 @@ namespace grendel
   template <int dim, typename Number>
   Number TimeStep<dim, Number>::ssprk3_step(vector_type &U, Number t)
   {
+#ifdef DEBUG_OUTPUT
     deallog << "TimeStep<dim, Number>::ssprk3_step()" << std::endl;
+#endif
 
     Number tau_0 = Number(0.);
 
@@ -1004,7 +1038,9 @@ namespace grendel
 
     if (tau_2 * cfl_max_ < tau_1 * cfl_update_) {
       /* Restart and force smaller time step: */
+#ifdef DEBUG_OUTPUT
       deallog << "        insufficient CFL, restart" << std::endl;
+#endif
       tau_0 = tau_2 * cfl_update_;
       U.swap(temp_ssp_);
       goto restart_ssprk3_step;
@@ -1021,7 +1057,9 @@ namespace grendel
 
     if (tau_3 * cfl_max_ < tau_1 * cfl_update_) {
       /* Restart and force smaller time step: */
+#ifdef DEBUG_OUTPUT
       deallog << "        insufficient CFL, restart" << std::endl;
+#endif
       tau_0 = tau_3 * cfl_update_;
       U.swap(temp_ssp_);
       goto restart_ssprk3_step;
@@ -1037,7 +1075,9 @@ namespace grendel
   template <int dim, typename Number>
   Number TimeStep<dim, Number>::step(vector_type &U, Number t)
   {
+#ifdef DEBUG_OUTPUT
     deallog << "TimeStep<dim, Number>::step()" << std::endl;
+#endif
 
     switch (time_step_order_) {
     case TimeStepOrder::first_order:

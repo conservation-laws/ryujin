@@ -58,7 +58,9 @@ namespace grendel
   template <int dim, typename Number>
   void Postprocessor<dim, Number>::prepare()
   {
+#ifdef DEBUG_OUTPUT
     deallog << "Postprocessor<dim, Number>::prepare()" << std::endl;
+#endif
     TimerOutput::Scope t(computing_timer_,
                          "postprocessor - prepare scratch space");
 
@@ -76,7 +78,9 @@ namespace grendel
   void Postprocessor<dim, Number>::compute(const vector_type &U,
                                            const scalar_type &alpha)
   {
+#ifdef DEBUG_OUTPUT
     deallog << "Postprocessor<dim, Number>::compute()" << std::endl;
+#endif
 
     TimerOutput::Scope t(computing_timer_, "postprocessor - compute");
 
