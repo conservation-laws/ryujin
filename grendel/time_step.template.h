@@ -399,11 +399,11 @@ namespace grendel
      */
 
     {
-      deallog << "        low-order update, limiter bounds, r_i, and p_ij"
+      deallog << "        compute low-order update, limiter bounds, and r_i"
               << std::endl;
-      TimerOutput::Scope time(computing_timer_,
-                              "time_step - 3 low-order update, limiter bounds, "
-                              "and compute r_i");
+      TimerOutput::Scope time(
+          computing_timer_,
+          "time_step - 3 compute low-order update, limiter bounds, and r_i");
 #ifdef LIKWID_PERFMON
       LIKWID_MARKER_START("time_step_3");
 #endif
@@ -579,7 +579,7 @@ namespace grendel
 
 
     /*
-     * Step 4: Compute second part of P_ij:
+     * Step 4: Compute P_ij:
      *
      *        P_ij = tau / m_i / lambda ( (d_ij^H - d_ij^L) (U_i - U_j) +
      *                                    (b_ij R_j - b_ji R_i) )
