@@ -937,7 +937,10 @@ namespace ryujin
          << std::setprecision(0) << std::fixed << n_restart_euler_steps //
          << " rsts  (" << std::setprecision(4) << std::scientific
          << n_restart_euler_steps / ((double)cycle) << " rsts/cycle)]"
+         << std::endl
          << std::endl;
+    head << "ETA:         " << std::fixed << std::setprecision(4)
+         << (t_final / t * wall_time / 3600.) << " h" << std::endl;
 
     if (mpi_rank != 0)
       return;
@@ -976,6 +979,7 @@ namespace ryujin
 
       print_head(primary.str(), secondary.str(), /*use_cout*/ true);
 
+      std::cout << std::endl;
       std::cout << "Information: [" << base_name << "] with "
                 << offline_data.dof_handler().n_dofs() << " Qdofs on "
                 << n_mpi_processes << " ranks / "
