@@ -132,7 +132,6 @@ namespace grendel
 
     const auto n_internal = offline_data_->n_locally_internal();
     const auto n_owned = offline_data_->n_locally_owned();
-    const auto n_relevant = offline_data_->n_locally_relevant();
 
     /* References to precomputed matrices and the stencil: */
 
@@ -149,6 +148,26 @@ namespace grendel
 
     /*
      * Step 1: Compute off-diagonal d_ij, and alpha_i
+     *
+     * The computation of the d_ij is quite costly. So we do a trick to
+     * save a bit of computational resources. Instead of computing all d_ij
+     * entries for a row of a given local index i, we only compute d_ij for
+     * which j > i,
+     *
+     *        llllrr
+     *      l .xxxxx
+     *      l ..xxxx
+     *      l ...xxx
+     *      l ....xx
+     *      r ......
+     *      r ......
+     *
+     *  and symmetrize in Step 2.
+     *
+     *  MM: We could save a bit more computational resources by only
+     *  computing entries for which *IN A GLOBAL* enumeration j > i. But
+     *  the index translation, subsequent symmetrization, and exchange
+     *  sounds a bit too expensive...
      */
 
     {
@@ -183,14 +202,13 @@ namespace grendel
 
         /* Skip diagonal. */
         increment_iterators(jts);
-
         for (; jts[0] != sparsity.end(i); increment_iterators(jts)) {
 
           const auto js = get_column_indices(jts);
-          bool all_above_diagonal = true;
+          bool all_below_diagonal = true;
           for (unsigned int k = 0; k < js.size(); ++k)
-            if (js[k] < i + k) {
-              all_above_diagonal = false;
+            if (js[k] >= i + k) {
+              all_below_diagonal = false;
               break;
             }
 
@@ -200,8 +218,8 @@ namespace grendel
               cij_matrix.get_vectorized_tensor(i, jts[0] - sparsity.begin(i));
           indicator_simd.add(U_j, jts, c_ij);
 
-          /* Only iterate over the subdiagonal for d_ij */
-          if (all_above_diagonal)
+          /* Only iterate over the upper triangular portion of d_ij */
+          if (all_below_diagonal)
             continue;
 
           const auto norm = c_ij.norm();
@@ -213,7 +231,6 @@ namespace grendel
 
           const auto d = norm * lambda_max;
 
-          /* Set lower diagonal values (the upper will be set in step 2): */
           set_entry(dij_matrix_, jts, d);
         }
 
@@ -227,7 +244,7 @@ namespace grendel
       /* Parallel non-vectorized loop: */
 
       GRENDEL_OMP_FOR
-      for (unsigned int i = n_internal; i < n_relevant; ++i) {
+      for (unsigned int i = n_internal; i < n_owned; ++i) {
 
         /* Skip constrained degrees of freedom */
         if (++sparsity.begin(i) == sparsity.end(i))
@@ -240,17 +257,16 @@ namespace grendel
 
         indicator_serial.reset(U_i);
 
-        for (auto jt = ++sparsity.begin(i) /* skip diagonal */;
-             jt != sparsity.end(i);
-             ++jt) {
+        /* skip diagonal */
+        for (auto jt = ++sparsity.begin(i); jt != sparsity.end(i); ++jt) {
           const auto j = jt->column();
 
           const auto U_j = gather(U, j);
           const auto c_ij = cij_matrix.get_tensor(i, jt - sparsity.begin(i));
           indicator_serial.add(U_j, jt, c_ij);
 
-          /* Only iterate over the subdiagonal for d_ij */
-          if (j >= i)
+          /* Only iterate over the upper triangular portion of d_ij */
+          if (j <= i)
             continue;
 
           const auto norm = c_ij.norm();
@@ -280,7 +296,6 @@ namespace grendel
             d = std::max(d, norm_2 * lambda_max_2);
           }
 
-          /* Set lower diagonal values (the upper will be set in step 2): */
           set_entry(dij_matrix_, jt, d);
         }
 
@@ -331,18 +346,16 @@ namespace grendel
 
         Number d_sum = Number(0.);
 
-        for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
+        /* skip diagonal: */
+        for (auto jt = ++sparsity.begin(i); jt != sparsity.end(i); ++jt) {
           const auto j = jt->column();
 
-          if (j == i)
-            continue;
-
-          // fill upper diagonal part of dij_matrix missing from step 1
-          if (j > i)
-            set_entry(
-                dij_matrix_,
-                jt,
-                get_transposed_entry(dij_matrix_, jt, transposed_indices));
+          // fill lower triangular part of dij_matrix missing from step 1
+          if (j < i) {
+            const auto d_ji =
+                get_transposed_entry(dij_matrix_, jt, transposed_indices);
+            set_entry(dij_matrix_, jt, d_ji);
+          }
 
           d_sum -= get_entry(dij_matrix_, jt);
         }
