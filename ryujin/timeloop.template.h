@@ -451,6 +451,19 @@ namespace ryujin
       stream << "Linf  = " << linf_norm << std::endl;
       stream << "L1    = " << l1_norm << std::endl;
       stream << "L2    = " << l2_norm << std::endl;
+
+#ifndef DEBUG_OUTPUT
+      if (mpi_rank == 0) {
+        std::cout << "Normalized consolidated Linf, L1, and L2 errors at "
+                  << "final time" << std::endl;
+        std::cout << "#dofs = " << offline_data.dof_handler().n_dofs()
+                  << std::endl;
+        std::cout << "t     = " << t << std::endl;
+        std::cout << "Linf  = " << linf_norm << std::endl;
+        std::cout << "L1    = " << l1_norm << std::endl;
+        std::cout << "L2    = " << l2_norm << std::endl;
+      }
+#endif
   }
 
 
