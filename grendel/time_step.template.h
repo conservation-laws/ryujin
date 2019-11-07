@@ -28,14 +28,12 @@
  */
 
 #define GRENDEL_PRAGMA(x) _Pragma(#x)
-#define GRENDEL_PARALLEL_REGION_BEGIN(options)                                 \
-  GRENDEL_PRAGMA(omp parallel default(shared) options)                         \
+#define GRENDEL_PARALLEL_REGION_BEGIN                                          \
+  GRENDEL_PRAGMA(omp parallel default(shared))                                 \
   {
 #define GRENDEL_PARALLEL_REGION_END }
-#define GRENDEL_OMP_FOR()                                                      \
+#define GRENDEL_OMP_FOR                                                        \
   GRENDEL_PRAGMA(omp for)
-#define GRENDEL_PARALLEL_FOR(options)                                          \
-  GRENDEL_PRAGMA(omp parallel for default(shared) options)
 
 namespace grendel
 {
@@ -160,7 +158,7 @@ namespace grendel
       TimerOutput::Scope time(computing_timer_,
                               "time_step - 1 compute d_ij, and alpha_i");
 
-      GRENDEL_PARALLEL_REGION_BEGIN()
+      GRENDEL_PARALLEL_REGION_BEGIN
 
 #ifdef LIKWID_PERFMON
       LIKWID_MARKER_START("time_step_1");
@@ -171,7 +169,7 @@ namespace grendel
 
       /* Parallel SIMD loop: */
 
-      GRENDEL_OMP_FOR()
+      GRENDEL_OMP_FOR
       for (unsigned int i = 0; i < n_internal; i += n_array_elements) {
 
         const auto U_i = simd_gather(U, i);
@@ -228,7 +226,7 @@ namespace grendel
 
       /* Parallel non-vectorized loop: */
 
-      GRENDEL_OMP_FOR()
+      GRENDEL_OMP_FOR
       for (unsigned int i = n_internal; i < n_relevant; ++i) {
 
         /* Skip constrained degrees of freedom */
@@ -316,7 +314,7 @@ namespace grendel
                               "time_step - 2 compute d_ii, and tau_max");
 
       /* Parallel region */
-      GRENDEL_PARALLEL_REGION_BEGIN()
+      GRENDEL_PARALLEL_REGION_BEGIN
 
 #ifdef LIKWID_PERFMON
       LIKWID_MARKER_START("time_step_2");
@@ -324,7 +322,7 @@ namespace grendel
 
       /* Parallel non-vectorized loop: */
 
-      GRENDEL_OMP_FOR()
+      GRENDEL_OMP_FOR
       for (unsigned int i = 0; i < n_owned; ++i) {
 
         /* Skip constrained degrees of freedom */
@@ -413,7 +411,7 @@ namespace grendel
           "time_step - 3 compute low-order update, limiter bounds, and r_i");
 
       /* Parallel region */
-      GRENDEL_PARALLEL_REGION_BEGIN()
+      GRENDEL_PARALLEL_REGION_BEGIN
 
 #ifdef LIKWID_PERFMON
       LIKWID_MARKER_START("time_step_3");
@@ -424,7 +422,7 @@ namespace grendel
 
       /* Parallel SIMD loop: */
 
-      GRENDEL_OMP_FOR()
+      GRENDEL_OMP_FOR
       for (unsigned int i = 0; i < n_internal; i += n_array_elements) {
 
         const auto U_i = simd_gather(U, i);
@@ -506,7 +504,7 @@ namespace grendel
 
       /* Parallel non-vectorized loop: */
 
-      GRENDEL_OMP_FOR()
+      GRENDEL_OMP_FOR
       for (unsigned int i = n_internal; i < n_owned; ++i) {
 
         /* Skip constrained degrees of freedom */
@@ -603,7 +601,7 @@ namespace grendel
         TimerOutput::Scope time(computing_timer_,
                                 "time_step - 4 compute p_ij and l_ij");
 
-        GRENDEL_PARALLEL_REGION_BEGIN()
+        GRENDEL_PARALLEL_REGION_BEGIN
 
 #ifdef LIKWID_PERFMON
         LIKWID_MARKER_START("time_step_4");
@@ -611,7 +609,7 @@ namespace grendel
 
         /* Parallel SIMD loop: */
 
-        GRENDEL_OMP_FOR()
+        GRENDEL_OMP_FOR
         for (unsigned int i = 0; i < n_internal; i += n_array_elements) {
 
           const auto bounds = simd_gather_array(bounds_, i);
@@ -667,7 +665,7 @@ namespace grendel
 
         /* Parallel non-vectorized loop: */
 
-        GRENDEL_OMP_FOR()
+        GRENDEL_OMP_FOR
         for (unsigned int i = n_internal; i < n_owned; ++i) {
 
           /* Skip constrained degrees of freedom */
@@ -730,7 +728,7 @@ namespace grendel
 #endif
         TimerOutput::Scope time(computing_timer_, "time_step - 5 compute l_ij");
 
-        GRENDEL_PARALLEL_REGION_BEGIN()
+        GRENDEL_PARALLEL_REGION_BEGIN
 
 #ifdef LIKWID_PERFMON
         LIKWID_MARKER_START("time_step_5");
@@ -738,7 +736,7 @@ namespace grendel
 
         /* Parallel SIMD loop: */
 
-        GRENDEL_OMP_FOR()
+        GRENDEL_OMP_FOR
         for (unsigned int i = 0; i < n_internal; i += n_array_elements) {
 
           const auto bounds = simd_gather_array(bounds_, i);
@@ -761,7 +759,7 @@ namespace grendel
 
         /* Parallel non-vectorized loop: */
 
-        GRENDEL_OMP_FOR()
+        GRENDEL_OMP_FOR
         for (unsigned int i = n_internal; i < n_owned; ++i) {
 
           /* Skip constrained degrees of freedom */
@@ -825,7 +823,7 @@ namespace grendel
             computing_timer_,
             "time_step - 7 symmetrize l_ij, high-order update");
 
-        GRENDEL_PARALLEL_REGION_BEGIN()
+        GRENDEL_PARALLEL_REGION_BEGIN
 
 #ifdef LIKWID_PERFMON
         LIKWID_MARKER_START("time_step_7");
@@ -833,7 +831,7 @@ namespace grendel
 
         /* Parallel non-vectorized loop: */
 
-        GRENDEL_OMP_FOR()
+        GRENDEL_OMP_FOR
         for (unsigned int i = 0; i < n_owned; ++i) {
 
           /* Only iterate over locally owned subset */
