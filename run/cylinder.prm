@@ -5,8 +5,6 @@ subsection A - TimeLoop
 
   set final time             = 5.00
   set output granularity     = 0.01
-
-  set resume                 = false
 end
 
 subsection B - Discretization
