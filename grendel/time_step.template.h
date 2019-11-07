@@ -311,7 +311,7 @@ namespace grendel
       /* Parallel non-vectorized loop: */
 
       GRENDEL_PARALLEL_FOR()
-      for (unsigned int i = 0; i < n_relevant; ++i) {
+      for (unsigned int i = 0; i < n_owned; ++i) {
 
         /* Skip constrained degrees of freedom */
         if (++sparsity.begin(i) == sparsity.end(i))
