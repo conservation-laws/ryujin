@@ -23,18 +23,6 @@
 #define DEBUG
 #endif
 
-/*
- * OpenMP parallel for loop options:
- */
-
-#define GRENDEL_PRAGMA(x) _Pragma(#x)
-#define GRENDEL_PARALLEL_REGION_BEGIN                                          \
-  GRENDEL_PRAGMA(omp parallel default(shared))                                 \
-  {
-#define GRENDEL_PARALLEL_REGION_END }
-#define GRENDEL_OMP_FOR                                                        \
-  GRENDEL_PRAGMA(omp for)
-
 namespace grendel
 {
   using namespace dealii;

@@ -1,6 +1,8 @@
 #ifndef MATRIX_COMMUNICATOR_TEMPLATE_H
 #define MATRIX_COMMUNICATOR_TEMPLATE_H
 
+#include "helper.h"
+
 #include "matrix_communicator.h"
 
 #include <deal.II/dofs/dof_tools.h>
@@ -132,56 +134,47 @@ namespace grendel
   template <int dim, typename Number>
   void MatrixCommunicator<dim, Number>::synchronize()
   {
-    const auto &n_locally_owned = offline_data_->n_locally_owned();
-    const auto &n_locally_relevant = offline_data_->n_locally_relevant();
+    const auto n_locally_owned = offline_data_->n_locally_owned();
+    const auto n_locally_relevant = offline_data_->n_locally_relevant();
 
 
     const auto &sparsity = offline_data_->sparsity_pattern();
 
-    {
-      const auto on_subranges = [&](auto i1, const auto i2) {
-        for (; i1 < i2; ++i1) {
-          const auto i = *i1;
+    GRENDEL_PARALLEL_REGION_BEGIN
 
-          /* Only iterate over locally owned subset! */
-          Assert(i < n_locally_owned, ExcInternalError());
+    GRENDEL_OMP_FOR
+    for (unsigned int i = 0; i < n_locally_owned; ++i) {
 
-          for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
-            const auto jt_index = get_entry(indices_, jt);
-            matrix_temp_[jt_index].local_element(i) = get_entry(matrix_, jt);
-          }
-        }
-      };
+      /* Only iterate over locally owned subset! */
+      Assert(i < n_locally_owned, ExcInternalError());
 
-      const auto indices = boost::irange<unsigned int>(0, n_locally_owned);
-      parallel::apply_to_subranges(
-          indices.begin(), indices.end(), on_subranges, 4096);
+      for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
+        const auto jt_index = get_entry(indices_, jt);
+        matrix_temp_[jt_index].local_element(i) = get_entry(matrix_, jt);
+      }
     }
+
+    GRENDEL_PARALLEL_REGION_END
 
     for (auto &it : matrix_temp_)
       it.update_ghost_values();
 
-    {
-      const auto on_subranges = [&](auto i1, const auto i2) {
-        for (; i1 < i2; ++i1) {
-          const auto i = *i1;
+    GRENDEL_PARALLEL_REGION_BEGIN
 
-          /* Only iterate over ghost indices! */
-          Assert(i >= n_locally_owned && i < n_locally_relevant,
-                 ExcInternalError());
+    GRENDEL_OMP_FOR
+    for (unsigned int i = n_locally_owned; i < n_locally_relevant; ++i) {
 
-          for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
-            const auto jt_index = get_entry(indices_, jt);
-            set_entry(matrix_, jt, matrix_temp_[jt_index].local_element(i));
-          }
-        }
-      };
+      /* Only iterate over ghost indices! */
+      Assert(i >= n_locally_owned && i < n_locally_relevant,
+             ExcInternalError());
 
-      const auto indices =
-          boost::irange<unsigned int>(n_locally_owned, n_locally_relevant);
-      parallel::apply_to_subranges(
-          indices.begin(), indices.end(), on_subranges, 4096);
+      for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
+        const auto jt_index = get_entry(indices_, jt);
+        set_entry(matrix_, jt, matrix_temp_[jt_index].local_element(i));
+      }
     }
+
+    GRENDEL_PARALLEL_REGION_END
   }
 
 } /* namespace grendel */

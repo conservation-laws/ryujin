@@ -91,8 +91,7 @@ namespace grendel
     const auto &cij_matrix = offline_data_->cij_matrix();
     const auto &boundary_normal_map = offline_data_->boundary_normal_map();
 
-    const auto &n_locally_owned = offline_data_->n_locally_owned();
-    const auto indices = boost::irange<unsigned int>(0, n_locally_owned);
+    const auto n_locally_owned = offline_data_->n_locally_owned();
 
     /*
      * Step 1: Copy the current state vector over to output_vector:
@@ -110,99 +109,98 @@ namespace grendel
     std::atomic<Number> r_i_min{std::numeric_limits<Number>::infinity()};
 
     {
-      const auto on_subranges = [&](auto i1, const auto i2) {
-        Number r_i_max_on_subrange = 0.;
-        Number r_i_min_on_subrange = std::numeric_limits<Number>::infinity();
+      GRENDEL_PARALLEL_REGION_BEGIN
 
-        for (; i1 < i2; ++i1) {
-          const auto i = *i1;
+      Number r_i_max_on_subrange = 0.;
+      Number r_i_min_on_subrange = std::numeric_limits<Number>::infinity();
 
-          /* Only iterate over locally owned subset */
-          Assert(i < n_locally_owned, ExcInternalError());
+      GRENDEL_OMP_FOR
+      for (unsigned int i = 0; i < n_locally_owned; ++i) {
 
-          /* Skip constrained degrees of freedom */
-          if (++sparsity.begin(i) == sparsity.end(i))
+        /* Only iterate over locally owned subset */
+        Assert(i < n_locally_owned, ExcInternalError());
+
+        /* Skip constrained degrees of freedom */
+        if (++sparsity.begin(i) == sparsity.end(i))
+          continue;
+
+        Tensor<1, dim, Number> r_i;
+        curl_type vorticity;
+
+        for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
+          const auto j = jt->column();
+
+          if (i == j)
             continue;
 
-          Tensor<1, dim, Number> r_i;
-          curl_type vorticity;
+          const auto U_j = gather(U, j);
+          const auto m_j = ProblemDescription<dim, Number>::momentum(U_j);
 
-          for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
-            const auto j = jt->column();
+          const auto c_ij = cij_matrix.get_tensor(i, jt - sparsity.begin(i));
 
-            if (i == j)
-              continue;
+          r_i += c_ij * U_j[0];
 
-            const auto U_j = gather(U, j);
-            const auto m_j = ProblemDescription<dim, Number>::momentum(U_j);
-
-            const auto c_ij = cij_matrix.get_tensor(i, jt - sparsity.begin(i));
-
-            r_i += c_ij * U_j[0];
-
-            if constexpr (dim == 2) {
-              vorticity[0] += cross_product_2d(c_ij) * m_j;
-            } else if constexpr (dim == 3) {
-              vorticity += cross_product_3d(c_ij, m_j);
-            }
-          }
-
-          /* Fix up boundaries: */
-
-          const auto bnm_it = boundary_normal_map.find(i);
-          if (bnm_it != boundary_normal_map.end()) {
-            const auto [normal, id, _] = bnm_it->second;
-            if (id == Boundary::slip) {
-              r_i -= 1. * (r_i * normal) * normal;
-            } else {
-              /* FIXME: This is not particularly elegant. On all other
-               * boundary types, we simply set r_i to zero. */
-              r_i = 0.;
-            }
-          }
-
-          /* Populate quantities: */
-
-          const Number rho_i = U[0].local_element(i);
-          const Number m_i = lumped_mass_matrix.diag_element(i);
-
-          Tensor<1, n_quantities, Number> quantities;
-
-          quantities[0] = r_i.norm() / m_i;
-
-          vorticity /= (m_i * rho_i);
           if constexpr (dim == 2) {
-            quantities[1] = vorticity[0];
+            vorticity[0] += cross_product_2d(c_ij) * m_j;
           } else if constexpr (dim == 3) {
-            quantities[1] = vorticity[0];
-            quantities[2] = vorticity[1];
+            vorticity += cross_product_3d(c_ij, m_j);
           }
-
-          quantities[n_quantities - 1] = alpha.local_element(i);
-
-          r_i_max_on_subrange = std::max(r_i_max_on_subrange, quantities[0]);
-          r_i_min_on_subrange = std::min(r_i_min_on_subrange, quantities[0]);
-
-          scatter(quantities_, quantities, i);
         }
 
-        /* Synchronize over all threads: */
+        /* Fix up boundaries: */
 
-        Number current_r_i_max = r_i_max.load();
-        while (current_r_i_max < r_i_max_on_subrange &&
-               !r_i_max.compare_exchange_weak(current_r_i_max,
-                                              r_i_max_on_subrange))
-          ;
+        const auto bnm_it = boundary_normal_map.find(i);
+        if (bnm_it != boundary_normal_map.end()) {
+          const auto [normal, id, _] = bnm_it->second;
+          if (id == Boundary::slip) {
+            r_i -= 1. * (r_i * normal) * normal;
+          } else {
+            /* FIXME: This is not particularly elegant. On all other
+             * boundary types, we simply set r_i to zero. */
+            r_i = 0.;
+          }
+        }
 
-        Number current_r_i_min = r_i_min.load();
-        while (current_r_i_min > r_i_min_on_subrange &&
-               !r_i_min.compare_exchange_weak(current_r_i_min,
-                                              r_i_min_on_subrange))
-          ;
-      };
+        /* Populate quantities: */
 
-      parallel::apply_to_subranges(
-          indices.begin(), indices.end(), on_subranges, 4096);
+        const Number rho_i = U[0].local_element(i);
+        const Number m_i = lumped_mass_matrix.diag_element(i);
+
+        Tensor<1, n_quantities, Number> quantities;
+
+        quantities[0] = r_i.norm() / m_i;
+
+        vorticity /= (m_i * rho_i);
+        if constexpr (dim == 2) {
+          quantities[1] = vorticity[0];
+        } else if constexpr (dim == 3) {
+          quantities[1] = vorticity[0];
+          quantities[2] = vorticity[1];
+        }
+
+        quantities[n_quantities - 1] = alpha.local_element(i);
+
+        r_i_max_on_subrange = std::max(r_i_max_on_subrange, quantities[0]);
+        r_i_min_on_subrange = std::min(r_i_min_on_subrange, quantities[0]);
+
+        scatter(quantities_, quantities, i);
+      }
+
+      /* Synchronize over all threads: */
+
+      Number current_r_i_max = r_i_max.load();
+      while (
+          current_r_i_max < r_i_max_on_subrange &&
+          !r_i_max.compare_exchange_weak(current_r_i_max, r_i_max_on_subrange))
+        ;
+
+      Number current_r_i_min = r_i_min.load();
+      while (
+          current_r_i_min > r_i_min_on_subrange &&
+          !r_i_min.compare_exchange_weak(current_r_i_min, r_i_min_on_subrange))
+        ;
+
+      GRENDEL_PARALLEL_REGION_END
     }
 
     /* And synchronize over all processors: */
@@ -215,26 +213,24 @@ namespace grendel
      */
 
     {
-      const auto on_subranges = [&](auto i1, const auto i2) {
-        for (; i1 < i2; ++i1) {
-          const auto i = *i1;
+      GRENDEL_PARALLEL_REGION_BEGIN
 
-          /* Only iterate over locally owned subset */
-          Assert(i < n_locally_owned, ExcInternalError());
+      for (unsigned int i = 0; i < n_locally_owned; ++i) {
 
-          /* Skip constrained degrees of freedom */
-          if (++sparsity.begin(i) == sparsity.end(i))
-            continue;
+        /* Only iterate over locally owned subset */
+        Assert(i < n_locally_owned, ExcInternalError());
 
-          const auto r_i = quantities_[0].local_element(i);
-          quantities_[0].local_element(i) =
-              Number(1.) - std::exp(-schlieren_beta_ * (r_i - r_i_min) /
-                                    (r_i_max - r_i_min));
-        }
-      };
+        /* Skip constrained degrees of freedom */
+        if (++sparsity.begin(i) == sparsity.end(i))
+          continue;
 
-      parallel::apply_to_subranges(
-          indices.begin(), indices.end(), on_subranges, 4096);
+        const auto r_i = quantities_[0].local_element(i);
+        quantities_[0].local_element(i) =
+            Number(1.) -
+            std::exp(-schlieren_beta_ * (r_i - r_i_min) / (r_i_max - r_i_min));
+      }
+
+      GRENDEL_PARALLEL_REGION_END
     }
 
     /*
