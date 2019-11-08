@@ -940,7 +940,7 @@ namespace ryujin
          << std::endl
          << std::endl;
     head << "ETA:         " << std::fixed << std::setprecision(4)
-         << (t_final / t * wall_time / 3600.) << " h" << std::endl;
+         << ((t_final - t) / t * wall_time / 3600.) << " h" << std::endl;
 
     if (mpi_rank != 0)
       return;
