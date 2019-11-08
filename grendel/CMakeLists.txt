@@ -16,6 +16,10 @@ ADD_LIBRARY(grendel SHARED
   )
 DEAL_II_SETUP_TARGET(grendel)
 
+IF(LIKWID_PERFMON)
+  TARGET_LINK_LIBRARIES(grendel likwid likwid-hwloc likwid-lua)
+ENDIF()
+
 CONFIGURE_FILE(
   ${CMAKE_CURRENT_SOURCE_DIR}/compile_time_options.h.in
   ${CMAKE_CURRENT_BINARY_DIR}/compile_time_options.h

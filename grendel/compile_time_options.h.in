@@ -21,6 +21,10 @@
 
 #cmakedefine DEBUG_OUTPUT
 
+#cmakedefine LIKWID_PERFMON
+
+#cmakedefine VALGRIND_CALLGRIND
+
 /*
  * class TimeStep:
  */

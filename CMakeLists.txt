@@ -65,6 +65,9 @@ OPTION(CHECK_BOUNDS "Enable debug code paths that check limiter bounds" OFF)
 
 OPTION(DEBUG_OUTPUT "Enable detailed time-step output" OFF)
 
+OPTION(LIKWID_PERFMON "Compile and link against the likwid instrumentation library" OFF)
+OPTION(CALLGRIND "Compile and link against the valgrind/callgrind instrumentation library" OFF)
+
 #
 # Set up the rest:
 #

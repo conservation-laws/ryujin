@@ -11,12 +11,18 @@
 #include <atomic>
 #include <regex>
 
-#ifdef CALLGRIND
+#ifdef VALGRIND_CALLGRIND
 #include <valgrind/callgrind.h>
+#else
+#define CALLGRIND_START_INSTRUMENTATION
+#define CALLGRIND_STOP_INSTRUMENTATION
 #endif
 
 #ifdef LIKWID_PERFMON
 #include <likwid.h>
+#else
+#define LIKWID_MARKER_START(opt)
+#define LIKWID_MARKER_STOP(opt)
 #endif
 
 #if defined(CHECK_BOUNDS) && !defined(DEBUG)
@@ -110,9 +116,7 @@ namespace grendel
     deallog << "TimeStep<dim, Number>::euler_step()" << std::endl;
 #endif
 
-#ifdef CALLGRIND
-    CALLGRIND_START_INSTRUMENTATION;
-#endif
+    CALLGRIND_START_INSTRUMENTATION
 
     /* Index ranges for the iteration over the sparsity pattern : */
 
@@ -166,10 +170,7 @@ namespace grendel
                               "time_step - 1 compute d_ij, and alpha_i");
 
       GRENDEL_PARALLEL_REGION_BEGIN
-
-#ifdef LIKWID_PERFMON
       LIKWID_MARKER_START("time_step_1");
-#endif
 
       /* Stored thread locally: */
       Indicator<dim, VectorizedArray<Number>> indicator_simd(*offline_data_);
@@ -292,9 +293,7 @@ namespace grendel
             indicator_serial.second_variations();
       } /* parallel non-vectorized loop */
 
-#ifdef LIKWID_PERFMON
       LIKWID_MARKER_STOP("time_step_1");
-#endif
       GRENDEL_PARALLEL_REGION_END
 
       /* Synchronize alpha_ over all MPI processes: */
@@ -318,10 +317,7 @@ namespace grendel
 
       /* Parallel region */
       GRENDEL_PARALLEL_REGION_BEGIN
-
-#ifdef LIKWID_PERFMON
       LIKWID_MARKER_START("time_step_2");
-#endif
 
       /* Parallel non-vectorized loop: */
 
@@ -359,10 +355,7 @@ namespace grendel
           ;
       } /* parallel non-vectorized loop */
 
-#ifdef LIKWID_PERFMON
       LIKWID_MARKER_STOP("time_step_2");
-#endif
-
       GRENDEL_PARALLEL_REGION_END
 
       /* Synchronize tau_max over all MPI processes: */
@@ -413,10 +406,7 @@ namespace grendel
 
       /* Parallel region */
       GRENDEL_PARALLEL_REGION_BEGIN
-
-#ifdef LIKWID_PERFMON
       LIKWID_MARKER_START("time_step_3");
-#endif
 
       /* Nota bene: This bounds variable is thread local: */
       Limiter<dim, VectorizedArray<Number>> limiter_simd(*offline_data_);
@@ -571,9 +561,7 @@ namespace grendel
         scatter(bounds_, limiter_serial.bounds(), i);
       } /* parallel non-vectorized loop */
 
-#ifdef LIKWID_PERFMON
       LIKWID_MARKER_STOP("time_step_3");
-#endif
       GRENDEL_PARALLEL_REGION_END
 
       /* Synchronize r_ over all MPI processes: */
@@ -603,10 +591,7 @@ namespace grendel
                                 "time_step - 4 compute p_ij and l_ij");
 
         GRENDEL_PARALLEL_REGION_BEGIN
-
-#ifdef LIKWID_PERFMON
         LIKWID_MARKER_START("time_step_4");
-#endif
 
         /* Parallel SIMD loop: */
 
@@ -714,9 +699,7 @@ namespace grendel
           }
         } /* parallel non-vectorized loop */
 
-#ifdef LIKWID_PERFMON
         LIKWID_MARKER_STOP("time_step_4");
-#endif
         GRENDEL_PARALLEL_REGION_END
 
       } else {
@@ -730,10 +713,7 @@ namespace grendel
         TimerOutput::Scope time(computing_timer_, "time_step - 5 compute l_ij");
 
         GRENDEL_PARALLEL_REGION_BEGIN
-
-#ifdef LIKWID_PERFMON
         LIKWID_MARKER_START("time_step_5");
-#endif
 
         /* Parallel SIMD loop: */
 
@@ -779,9 +759,7 @@ namespace grendel
         } /* parallel non-vectorized loop */
 
 
-#ifdef LIKWID_PERFMON
         LIKWID_MARKER_STOP("time_step_5");
-#endif
         GRENDEL_PARALLEL_REGION_END
       }
 
@@ -797,15 +775,12 @@ namespace grendel
 #endif
         TimerOutput::Scope time(computing_timer_,
                                 "time_step - 6 exchange l_ij");
-#ifdef LIKWID_PERFMON
+
         LIKWID_MARKER_START("time_step_6");
-#endif
 
         lij_matrix_communicator_.synchronize();
 
-#ifdef LIKWID_PERFMON
         LIKWID_MARKER_STOP("time_step_6");
-#endif
       }
 
 
@@ -825,10 +800,7 @@ namespace grendel
             "time_step - 7 symmetrize l_ij, high-order update");
 
         GRENDEL_PARALLEL_REGION_BEGIN
-
-#ifdef LIKWID_PERFMON
         LIKWID_MARKER_START("time_step_7");
-#endif
 
         /* Parallel non-vectorized loop: */
 
@@ -884,10 +856,7 @@ namespace grendel
           scatter(temp_euler_, U_i_new, i);
         } /* parallel non-vectorized loop */
 
-#ifdef LIKWID_PERFMON
         LIKWID_MARKER_STOP("time_step_7");
-#endif
-
         GRENDEL_PARALLEL_REGION_END
       }
     } /* limiter_iter_ */
@@ -902,9 +871,8 @@ namespace grendel
 #endif
       TimerOutput::Scope time(computing_timer_,
                               "time_step - 8 fix boundary states");
-#ifdef LIKWID_PERFMON
+
       LIKWID_MARKER_START("time_step_8");
-#endif
 
       const auto on_subranges = [&](const auto it1, const auto it2) {
         for (auto it = it1; it != it2; ++it) {
@@ -945,9 +913,7 @@ namespace grendel
       // FIXME: This is currently not parallel:
       on_subranges(boundary_normal_map.begin(), boundary_normal_map.end());
 
-#ifdef LIKWID_PERFMON
       LIKWID_MARKER_STOP("time_step_8");
-#endif
     }
 
     /* Synchronize temp over all MPI processes: */
@@ -957,9 +923,7 @@ namespace grendel
     /* And finally update the result: */
     U.swap(temp_euler_);
 
-#ifdef CALLGRIND
-    CALLGRIND_STOP_INSTRUMENTATION;
-#endif
+    CALLGRIND_STOP_INSTRUMENTATION
 
     return tau_max;
   } // namespace grendel
