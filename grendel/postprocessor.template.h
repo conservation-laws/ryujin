@@ -81,29 +81,31 @@ namespace grendel
 
     /* Prepare triangulation and dof_handler for coarsened output: */
 
-    const auto &discretization = offline_data_->discretization();
-    const auto &triangulation = discretization.triangulation();
-    const auto &finite_element = discretization.finite_element();
+    if (coarsening_level_ != 0) {
+      const auto &discretization = offline_data_->discretization();
+      const auto &triangulation = discretization.triangulation();
+      const auto &finite_element = discretization.finite_element();
 
-    output_triangulation_.copy_triangulation(triangulation);
+      output_triangulation_.copy_triangulation(triangulation);
 
-    for (unsigned int i = 0; i < coarsening_level_; ++i) {
-      for (auto &it : output_triangulation_.active_cell_iterators())
-        it->set_coarsen_flag();
-      output_triangulation_.execute_coarsening_and_refinement();
+      for (unsigned int i = 0; i < coarsening_level_; ++i) {
+        for (auto &it : output_triangulation_.active_cell_iterators())
+          it->set_coarsen_flag();
+        output_triangulation_.execute_coarsening_and_refinement();
+      }
+
+      output_dof_handler_.initialize(output_triangulation_, finite_element);
+
+      const auto &dof_handler = offline_data_->dof_handler();
+
+      inter_grid_map_.make_mapping(dof_handler, output_dof_handler_);
+
+      for (auto &it : output_U_)
+        it.reinit(output_dof_handler_.n_dofs());
+
+      for (auto &it : output_quantities_)
+        it.reinit(output_dof_handler_.n_dofs());
     }
-
-    output_dof_handler_.initialize(output_triangulation_, finite_element);
-
-    const auto &dof_handler = offline_data_->dof_handler();
-
-    inter_grid_map_.make_mapping(dof_handler, output_dof_handler_);
-
-    for (auto &it : output_U_)
-      it.reinit(output_dof_handler_.n_dofs());
-
-    for (auto &it : output_quantities_)
-      it.reinit(output_dof_handler_.n_dofs());
   }
 
 
