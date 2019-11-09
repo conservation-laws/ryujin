@@ -7,6 +7,7 @@
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/timer.h>
+#include <deal.II/grid/intergrid_map.h>
 #include <deal.II/lac/la_parallel_vector.templates.h>
 
 namespace grendel
@@ -48,12 +49,21 @@ namespace grendel
 
     void compute(const vector_type &U, const scalar_type &alpha);
 
+    void write_out_vtu(std::string name, Number t, unsigned int cycle);
+
   protected:
+
     std::array<scalar_type, problem_dimension> U_;
     ACCESSOR_READ_ONLY(U)
 
     std::array<scalar_type, n_quantities> quantities_;
     ACCESSOR_READ_ONLY(quantities)
+
+    std::array<dealii::Vector<Number>, problem_dimension> output_U_;
+    ACCESSOR_READ_ONLY(output_U)
+
+    std::array<dealii::Vector<Number>, n_quantities> output_quantities_;
+    ACCESSOR_READ_ONLY(output_quantities)
 
   private:
     const MPI_Comm &mpi_communicator_;
@@ -61,9 +71,19 @@ namespace grendel
 
     dealii::SmartPointer<const grendel::OfflineData<dim, Number>> offline_data_;
 
+    /* Data structures for output: */
+
+    dealii::Triangulation<dim> output_triangulation_;
+    dealii::DoFHandler<dim> output_dof_handler_;
+    ACCESSOR_READ_ONLY(output_dof_handler)
+
+    dealii::InterGridMap<dealii::DoFHandler<dim>> inter_grid_map_;
+
     /* Options: */
 
     Number schlieren_beta_;
+
+    unsigned int coarsening_level_;
   };
 
 } /* namespace grendel */

@@ -190,6 +190,7 @@ namespace grendel
     dealii::TimerOutput &computing_timer_;
 
     dealii::SmartPointer<const grendel::Discretization<dim>> discretization_;
+    ACCESSOR_READ_ONLY(discretization)
   };
 
 } /* namespace grendel */

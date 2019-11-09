@@ -12,7 +12,6 @@
 #include <deal.II/base/revision.h>
 #include <deal.II/base/work_stream.h>
 #include <deal.II/grid/grid_out.h>
-#include <deal.II/numerics/data_out.h>
 #include <deal.II/numerics/vector_tools.h>
 #include <deal.II/numerics/vector_tools.templates.h>
 
@@ -27,7 +26,6 @@
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
-
 
 using namespace dealii;
 using namespace grendel;
@@ -495,20 +493,10 @@ namespace ryujin
 
     postprocessor.compute(U, time_step.alpha());
 
-    /* Output data in vtu format: */
-
     /* capture name, t, cycle, and checkpoint by value */
     const auto output_worker = [this, name, t, cycle, checkpoint]() {
       /* Flag thread as active: */
       output_thread_active = 1;
-
-      constexpr auto problem_dimension =
-          ProblemDescription<dim, Number>::problem_dimension;
-      constexpr auto n_quantities = Postprocessor<dim, Number>::n_quantities;
-
-      const auto &dof_handler = offline_data.dof_handler();
-      const auto &triangulation = discretization.triangulation();
-      const auto &mapping = discretization.mapping();
 
       /* Checkpointing: */
 
@@ -517,7 +505,9 @@ namespace ryujin
         deallog << "        Checkpointing" << std::endl;
 #endif
 
+        const auto &triangulation = discretization.triangulation();
         const unsigned int i = triangulation.locally_owned_subdomain();
+
         std::string name = base_name + "-checkpoint-" +
                            dealii::Utilities::int_to_string(i, 4) + ".archive";
 
@@ -533,49 +523,10 @@ namespace ryujin
             oa << it2;
       }
 
-      dealii::DataOut<dim> data_out;
-      data_out.attach_dof_handler(dof_handler);
+      /* Data output: */
 
-      for (unsigned int i = 0; i < problem_dimension; ++i)
-        data_out.add_data_vector(
-            postprocessor.U()[i],
-            ProblemDescription<dim, Number>::component_names[i]);
-
-      for (unsigned int i = 0; i < n_quantities; ++i)
-        data_out.add_data_vector(postprocessor.quantities()[i],
-                                 postprocessor.component_names[i]);
-
-      data_out.build_patches(mapping,
-                             discretization.finite_element().degree - 1);
-
-      DataOutBase::VtkFlags flags(
-          t, cycle, true, DataOutBase::VtkFlags::best_speed);
-      data_out.set_flags(flags);
-
-      const auto name_with_cycle =
-          name + "-" + Utilities::int_to_string(cycle, 6);
-
-      const auto filename = [&](const unsigned int i) -> std::string {
-        const auto seq = dealii::Utilities::int_to_string(i, 4);
-        return name_with_cycle + "-" + seq + ".vtu";
-      };
-
-      /* Write out local vtu: */
-
-      const unsigned int i = triangulation.locally_owned_subdomain();
-      std::ofstream output(filename(i));
-      data_out.write_vtu(output);
-
-      if (mpi_rank == 0) {
-        /* Write out pvtu control file: */
-
-        std::vector<std::string> filenames;
-        for (unsigned int i = 0; i < n_mpi_processes; ++i)
-          filenames.push_back(filename(i));
-
-        std::ofstream output(name_with_cycle + ".pvtu");
-        data_out.write_pvtu_record(output, filenames);
-      }
+      postprocessor.write_out_vtu(
+          name + "-" + Utilities::int_to_string(cycle, 6), t, cycle);
 
 #ifdef DEBUG_OUTPUT
       deallog << "        Commit output (cycle = " << cycle << ")" << std::endl;

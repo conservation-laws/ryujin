@@ -4,7 +4,8 @@
 #include "helper.h"
 #include "postprocessor.h"
 
-#include <boost/range/irange.hpp>
+#include <deal.II/numerics/data_out.h>
+#include <deal.II/numerics/vector_tools.h>
 
 #include <atomic>
 
@@ -52,6 +53,12 @@ namespace grendel
     add_parameter("schlieren beta",
                   schlieren_beta_,
                   "Beta factor used in the Schlieren postprocessor");
+
+    coarsening_level_ = 0;
+    add_parameter(
+        "coarsening level",
+        coarsening_level_,
+        "Number of coarsening steps applied before writing pvtu/vtu output");
   }
 
 
@@ -71,6 +78,32 @@ namespace grendel
 
     for (auto &it : quantities_)
       it.reinit(partitioner);
+
+    /* Prepare triangulation and dof_handler for coarsened output: */
+
+    const auto &discretization = offline_data_->discretization();
+    const auto &triangulation = discretization.triangulation();
+    const auto &finite_element = discretization.finite_element();
+
+    output_triangulation_.copy_triangulation(triangulation);
+
+    for (unsigned int i = 0; i < coarsening_level_; ++i) {
+      for (auto &it : output_triangulation_.active_cell_iterators())
+        it->set_coarsen_flag();
+      output_triangulation_.execute_coarsening_and_refinement();
+    }
+
+    output_dof_handler_.initialize(output_triangulation_, finite_element);
+
+    const auto &dof_handler = offline_data_->dof_handler();
+
+    inter_grid_map_.make_mapping(dof_handler, output_dof_handler_);
+
+    for (auto &it : output_U_)
+      it.reinit(output_dof_handler_.n_dofs());
+
+    for (auto &it : output_quantities_)
+      it.reinit(output_dof_handler_.n_dofs());
   }
 
 
@@ -246,6 +279,124 @@ namespace grendel
     for (auto &it : quantities_) {
       affine_constraints.distribute(it);
       it.update_ghost_values();
+    }
+  }
+
+
+  namespace
+  {
+    template <int dim, typename Number>
+    void interpolate_to_coarser_mesh(
+        const dealii::InterGridMap<dealii::DoFHandler<dim>> &intergridmap,
+        const dealii::LinearAlgebra::distributed::Vector<Number> &u_1,
+        dealii::Vector<Number> &u_2)
+    {
+      const auto &dof1 = intergridmap.get_source_grid();
+      auto cell_1 = dof1.begin();
+      const auto endc1 = dof1.end();
+
+      Vector<Number> cache;
+      cache.reinit(cell_1->get_fe().dofs_per_cell);
+
+      for (; cell_1 != endc1; ++cell_1) {
+        const auto cell_2 = intergridmap[cell_1];
+
+        if (cell_1->level() != cell_2->level())
+          continue;
+
+        if (!cell_1->active() && !cell_2->active())
+          continue;
+
+        /*
+         * We have to skip artificial cells on the first (distributed)
+         * triangulation:
+         */
+        auto cell = cell_1;
+        for (; !cell->active(); cell = cell->child(0))
+          ;
+        if (!cell->is_locally_owned())
+          continue;
+
+        cell_1->get_interpolated_dof_values(
+            u_1, cache, cell_2->active_fe_index());
+        cell_2->set_dof_values_by_interpolation(
+            cache, u_2, cell_2->active_fe_index());
+      }
+    }
+
+  } /* namespace */
+
+
+  template <int dim, typename Number>
+  void Postprocessor<dim, Number>::write_out_vtu(std::string name,
+                                                 Number t,
+                                                 unsigned int cycle)
+  {
+    constexpr auto problem_dimension =
+        ProblemDescription<dim, Number>::problem_dimension;
+    constexpr auto n_quantities = Postprocessor<dim, Number>::n_quantities;
+
+    const auto &discretization = offline_data_->discretization();
+    const auto &mapping = discretization.mapping();
+    const auto &triangulation = discretization.triangulation();
+
+    dealii::DataOut<dim> data_out;
+
+    if (coarsening_level_ != 0) {
+      data_out.attach_dof_handler(output_dof_handler_);
+
+      for (unsigned int i = 0; i < problem_dimension; ++i)
+        interpolate_to_coarser_mesh(inter_grid_map_, U_[i], output_U_[i]);
+
+      for (unsigned int i = 0; i < n_quantities; ++i)
+        interpolate_to_coarser_mesh(
+            inter_grid_map_, quantities_[i], output_quantities_[i]);
+
+      for (unsigned int i = 0; i < problem_dimension; ++i)
+        data_out.add_data_vector(
+            output_U_[i], ProblemDescription<dim, Number>::component_names[i]);
+      for (unsigned int i = 0; i < n_quantities; ++i)
+        data_out.add_data_vector(output_quantities_[i], component_names[i]);
+
+    } else {
+
+      data_out.attach_dof_handler(offline_data_->dof_handler());
+
+      for (unsigned int i = 0; i < problem_dimension; ++i)
+        data_out.add_data_vector(
+            U_[i], ProblemDescription<dim, Number>::component_names[i]);
+      for (unsigned int i = 0; i < n_quantities; ++i)
+        data_out.add_data_vector(quantities_[i], component_names[i]);
+    }
+
+    data_out.build_patches(mapping, discretization.finite_element().degree - 1);
+
+    DataOutBase::VtkFlags flags(
+        t, cycle, true, DataOutBase::VtkFlags::best_speed);
+    data_out.set_flags(flags);
+
+    const auto filename = [&](const unsigned int i) -> std::string {
+      const auto seq = dealii::Utilities::int_to_string(i, 4);
+      return name + "-" + seq + ".vtu";
+    };
+
+    /* Write out local vtu: */
+
+    const unsigned int i = triangulation.locally_owned_subdomain();
+    std::ofstream output(filename(i));
+    data_out.write_vtu(output);
+
+    if (dealii::Utilities::MPI::this_mpi_process(mpi_communicator_) == 0) {
+      /* Write out pvtu control file: */
+
+      std::vector<std::string> filenames;
+      for (unsigned int i = 0;
+           i < dealii::Utilities::MPI::n_mpi_processes(mpi_communicator_);
+           ++i)
+        filenames.push_back(filename(i));
+
+      std::ofstream output(name + ".pvtu");
+      data_out.write_pvtu_record(output, filenames);
     }
   }
 
