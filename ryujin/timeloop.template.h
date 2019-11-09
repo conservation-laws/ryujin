@@ -382,7 +382,7 @@ namespace ryujin
 
       VectorTools::integrate_difference(offline_data.dof_handler(),
                                         error,
-                                        ZeroFunction<dim, double>(),
+                                        ZeroFunction<dim, Number>(),
                                         difference_per_cell,
                                         QGauss<dim>(3),
                                         VectorTools::L1_norm);
@@ -392,7 +392,7 @@ namespace ryujin
 
       VectorTools::integrate_difference(offline_data.dof_handler(),
                                         error,
-                                        ZeroFunction<dim, double>(),
+                                        ZeroFunction<dim, Number>(),
                                         difference_per_cell,
                                         QGauss<dim>(3),
                                         VectorTools::L2_norm);
@@ -409,7 +409,7 @@ namespace ryujin
 
       VectorTools::integrate_difference(offline_data.dof_handler(),
                                         error,
-                                        ZeroFunction<dim, double>(),
+                                        ZeroFunction<dim, Number>(),
                                         difference_per_cell,
                                         QGauss<dim>(3),
                                         VectorTools::L1_norm);
@@ -419,7 +419,7 @@ namespace ryujin
 
       VectorTools::integrate_difference(offline_data.dof_handler(),
                                         error,
-                                        ZeroFunction<dim, double>(),
+                                        ZeroFunction<dim, Number>(),
                                         difference_per_cell,
                                         QGauss<dim>(3),
                                         VectorTools::L2_norm);
