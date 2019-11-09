@@ -838,7 +838,7 @@ namespace grendel
                 i, jts[0] - sparsity.begin(i));
 
             U_i_new += l_ij * lambda * p_ij;
-            p_ij *= (1 - l_ij);
+            p_ij *= (VectorizedArray<Number>(1.) - l_ij);
 
             if (pass + 1 < n_passes)
               pij_matrix_.write_vectorized_tensor(
