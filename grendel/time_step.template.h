@@ -845,23 +845,22 @@ namespace grendel
                   p_ij, i, jts[0] - sparsity.begin(i));
           }
 
-#ifdef DEBUG
+#ifdef CHECK_BOUNDS
+          using PD = ProblemDescription<dim, VectorizedArray<Number>>;
           const auto rho_new = U_i_new[0];
-          const auto e_new =
-              ProblemDescription<dim, Number>::internal_energy(U_i_new);
-          const auto s_new =
-              ProblemDescription<dim, Number>::specific_entropy(U_i_new);
+          const auto e_new = PD::internal_energy(U_i_new);
+          const auto s_new = PD::specific_entropy(U_i_new);
 
           AssertThrowSIMD(rho_new,
-                          [](auto val) { return val > 0.; },
+                          [](auto val) { return val > Number(0.); },
                           dealii::ExcMessage("Negative density."));
 
           AssertThrowSIMD(e_new,
-                          [](auto val) { return val > 0.; },
+                          [](auto val) { return val > Number(0.); },
                           dealii::ExcMessage("Negative internal energy."));
 
           AssertThrowSIMD(s_new,
-                          [](auto val) { return val > 0.; },
+                          [](auto val) { return val > Number(0.); },
                           dealii::ExcMessage("Negative specific entropy."));
 #endif
 
@@ -896,7 +895,7 @@ namespace grendel
               pij_matrix_.write_entry(p_ij, i, jt - sparsity.begin(i));
           }
 
-#ifdef DEBUG
+#ifdef CHECK_BOUNDS
           const auto rho_new = U_i_new[0];
           const auto e_new =
               ProblemDescription<dim, Number>::internal_energy(U_i_new);
@@ -904,15 +903,15 @@ namespace grendel
               ProblemDescription<dim, Number>::specific_entropy(U_i_new);
 
           AssertThrowSIMD(rho_new,
-                          [](auto val) { return val > 0.; },
+                          [](auto val) { return val > Number(0.); },
                           dealii::ExcMessage("Negative density."));
 
           AssertThrowSIMD(e_new,
-                          [](auto val) { return val > 0.; },
+                          [](auto val) { return val > Number(0.); },
                           dealii::ExcMessage("Negative internal energy."));
 
           AssertThrowSIMD(s_new,
-                          [](auto val) { return val > 0.; },
+                          [](auto val) { return val > Number(0.); },
                           dealii::ExcMessage("Negative specific entropy."));
 #endif
 

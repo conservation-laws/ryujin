@@ -482,11 +482,15 @@ namespace grendel
  */
 
 #define AssertThrowSIMD(variable, condition, exception)                        \
-  if constexpr (std::is_same<Number, double>::value ||                         \
-                std::is_same<Number, float>::value) {                          \
+  if constexpr (std::is_same<                                                  \
+                    typename std::remove_const<decltype(variable)>::type,      \
+                    double>::value ||                                          \
+                std::is_same<                                                  \
+                    typename std::remove_const<decltype(variable)>::type,      \
+                    float>::value) {                                           \
     AssertThrow(condition(variable), exception);                               \
   } else {                                                                     \
-    for (unsigned int k = 0; k < Number::n_array_elements; ++k) {              \
+    for (unsigned int k = 0; k < decltype(variable)::n_array_elements; ++k) {  \
       AssertThrow(condition((variable)[k]), exception);                        \
     }                                                                          \
   }
