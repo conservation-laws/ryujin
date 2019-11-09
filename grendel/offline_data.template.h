@@ -161,7 +161,6 @@ namespace grendel
        */
       n_locally_internal_ = 0;
 #endif
-
     }
 
     const auto dofs_per_cell = discretization_->finite_element().dofs_per_cell;
@@ -296,11 +295,11 @@ namespace grendel
 #endif
       TimerOutput::Scope t(computing_timer_, "offline_data - set up matrices");
 
-      mass_matrix_.reinit(sparsity_pattern_);
-      lumped_mass_matrix_.reinit(sparsity_pattern_);
-      bij_matrix_.reinit(sparsity_pattern_);
+      lumped_mass_matrix_.reinit(partitioner_);
+      lumped_mass_matrix_inverse_.reinit(partitioner_);
       betaij_matrix_.reinit(sparsity_pattern_);
       sparsity_pattern_simd_.reinit(n_locally_internal_, sparsity_pattern_);
+      mass_matrix_.reinit(sparsity_pattern_simd_);
       cij_matrix_.reinit(sparsity_pattern_simd_);
     }
   }
@@ -313,8 +312,8 @@ namespace grendel
     deallog << "OfflineData<dim, Number>::assemble()" << std::endl;
 #endif
 
-    mass_matrix_ = 0.;
-    lumped_mass_matrix_ = 0.;
+    dealii::SparseMatrix<Number> mass_matrix_tmp;
+    mass_matrix_tmp.reinit(sparsity_pattern_);
     std::array<dealii::SparseMatrix<Number>, dim> cij_matrix_tmp;
     for (auto &matrix : cij_matrix_tmp)
       matrix.reinit(sparsity_pattern_);
@@ -344,7 +343,6 @@ namespace grendel
 
       auto &local_boundary_normal_map = copy.local_boundary_normal_map_;
       auto &cell_mass_matrix = copy.cell_mass_matrix_;
-      auto &cell_lumped_mass_matrix = copy.cell_lumped_mass_matrix_;
       auto &cell_betaij_matrix = copy.cell_betaij_matrix_;
       auto &cell_cij_matrix = copy.cell_cij_matrix_;
       auto &cell_measure = copy.cell_measure_;
@@ -357,7 +355,6 @@ namespace grendel
         return;
 
       cell_mass_matrix.reinit(dofs_per_cell, dofs_per_cell);
-      cell_lumped_mass_matrix.reinit(dofs_per_cell, dofs_per_cell);
       cell_betaij_matrix.reinit(dofs_per_cell, dofs_per_cell);
       for (auto &matrix : cell_cij_matrix)
         matrix.reinit(dofs_per_cell, dofs_per_cell);
@@ -377,7 +374,6 @@ namespace grendel
       /* clear out copy data: */
       local_boundary_normal_map.clear();
       cell_mass_matrix = 0.;
-      cell_lumped_mass_matrix = 0.;
       cell_betaij_matrix = 0.;
       for (auto &matrix : cell_cij_matrix)
         matrix = 0.;
@@ -393,8 +389,6 @@ namespace grendel
 
           const auto value_JxW = fe_values.shape_value(j, q_point) * JxW;
           const auto grad_JxW = fe_values.shape_grad(j, q_point) * JxW;
-
-          cell_lumped_mass_matrix(j, j) += Number(value_JxW);
 
           for (unsigned int i = 0; i < dofs_per_cell; ++i) {
 
@@ -466,7 +460,6 @@ namespace grendel
       const auto &local_dof_indices = copy.local_dof_indices_;
       const auto &local_boundary_normal_map = copy.local_boundary_normal_map_;
       const auto &cell_mass_matrix = copy.cell_mass_matrix_;
-      const auto &cell_lumped_mass_matrix = copy.cell_lumped_mass_matrix_;
       const auto &cell_cij_matrix = copy.cell_cij_matrix_;
       const auto &cell_betaij_matrix = copy.cell_betaij_matrix_;
       const auto &cell_measure = copy.cell_measure_;
@@ -488,10 +481,7 @@ namespace grendel
       }
 
       affine_constraints_.distribute_local_to_global(
-          cell_mass_matrix, local_dof_indices, mass_matrix_);
-
-      affine_constraints_.distribute_local_to_global(
-          cell_lumped_mass_matrix, local_dof_indices, lumped_mass_matrix_);
+          cell_mass_matrix, local_dof_indices, mass_matrix_tmp);
 
       for (int k = 0; k < dim; ++k) {
         affine_constraints_.distribute_local_to_global(
@@ -520,6 +510,26 @@ namespace grendel
                       copy_local_to_global,
                       AssemblyScratchData<dim>(*discretization_),
                       AssemblyCopyData<dim, Number>());
+
+      for (unsigned int i = 0; i < n_locally_internal_;
+           i += VectorizedArray<Number>::n_array_elements) {
+        auto jts =
+            generate_iterators<VectorizedArray<Number>::n_array_elements>(
+                [&](auto k) { return sparsity_pattern_.begin(i + k); });
+        for (; jts[0] != sparsity_pattern_.end(i); increment_iterators(jts)) {
+          const auto m_ij = get_entry(mass_matrix_tmp, jts);
+          mass_matrix_.write_vectorized_entry(
+              m_ij, i, jts[0] - sparsity_pattern_.begin(i), true);
+        }
+      }
+      for (unsigned int i = n_locally_internal_; i < n_locally_relevant_; ++i) {
+        for (auto jt = sparsity_pattern_.begin(i);
+             jt != sparsity_pattern_.end(i);
+             ++jt) {
+          const auto m_ij = get_entry(mass_matrix_tmp, jt);
+          mass_matrix_.write_entry(m_ij, i, jt - sparsity_pattern_.begin(i));
+        }
+      }
     }
 
     measure_of_omega_ =
@@ -529,60 +539,18 @@ namespace grendel
      * Second part: We have to import the "ghost" layer of the lumped mass
      * matrix in order to compute the b_ij matrices correctly.
      */
-
-    {
-      dealii::LinearAlgebra::distributed::Vector<Number> temp_(partitioner_);
-
-      for (unsigned int i = 0; i < partitioner_->local_size(); ++i)
-        temp_.local_element(i) = lumped_mass_matrix_.diag_element(i);
-
-      temp_.update_ghost_values();
-
-      const auto offset = partitioner_->local_size();
-      for (unsigned int i = 0; i < partitioner_->n_ghost_indices(); ++i)
-        lumped_mass_matrix_.diag_element(offset + i) =
-            temp_.local_element(offset + i);
+    Vector<Number> one(mass_matrix_tmp.m());
+    one = 1;
+    Vector<Number> local_lumped_mass_matrix(mass_matrix_tmp.m());
+    mass_matrix_tmp.vmult(local_lumped_mass_matrix, one);
+    for (unsigned int i = 0; i < partitioner_->local_size(); ++i) {
+      lumped_mass_matrix_.local_element(i) = local_lumped_mass_matrix(i);
+      lumped_mass_matrix_inverse_.local_element(i) =
+          1. / lumped_mass_matrix_.local_element(i);
     }
+    lumped_mass_matrix_.update_ghost_values();
+    lumped_mass_matrix_inverse_.update_ghost_values();
 
-    /*
-     * Third part: Compute b_ijs
-     */
-
-    const auto on_subranges = [&](auto i1, const auto i2) {
-      for (; i1 < i2; ++i1) {
-        const auto row_index = *i1;
-        std::for_each(
-            sparsity_pattern_.begin(row_index),
-            sparsity_pattern_.end(row_index),
-            [&](const auto &jt) {
-              const auto col_index = jt.column();
-              const Number m_ij = get_entry(mass_matrix_, &jt);
-              const Number m_j = lumped_mass_matrix_.diag_element(col_index);
-              const Number b_ij =
-                  Number(row_index == col_index ? 1. : 0.) - m_ij / m_j;
-              set_entry(bij_matrix_, &jt, b_ij);
-            });
-      } /* row_index */
-    };
-
-    {
-#ifdef DEBUG_OUTPUT
-      deallog << "        compute b_ijs" << std::endl;
-#endif
-      TimerOutput::Scope t(computing_timer_, "offline_data - compute b_ij");
-
-      const auto indices = boost::irange<unsigned int>(0, n_locally_relevant_);
-      parallel::apply_to_subranges(
-          indices.begin(), indices.end(), on_subranges, 4096);
-
-      /*
-       * And also normalize our boundary normals:
-       */
-      for (auto &it : boundary_normal_map_) {
-        auto &[normal, id, _] = it.second;
-        normal /= (normal.norm() + std::numeric_limits<Number>::epsilon());
-      }
-    }
 
     /*
      * Second pass: Fix up boundary cijs:
@@ -680,6 +648,14 @@ namespace grendel
 #endif
       TimerOutput::Scope t(computing_timer_,
                            "offline_data - fix bdry c_ijs, set up SIMD c_ij");
+
+      /*
+       * Normalize our boundary normals:
+       */
+      for (auto &it : boundary_normal_map_) {
+        auto &[normal, id, _] = it.second;
+        normal /= (normal.norm() + std::numeric_limits<Number>::epsilon());
+      }
 
       WorkStream::run(dof_handler_.begin_active(),
                       dof_handler_.end(),

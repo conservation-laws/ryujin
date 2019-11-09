@@ -134,11 +134,11 @@ namespace grendel
     dealii::SparseMatrix<Number> lij_matrix_;
     MatrixCommunicator<dim, Number> lij_matrix_communicator_;
 
-    SparsityPatternForSIMD<dealii::VectorizedArray<Number>::n_array_elements>
+    SparsityPatternSIMD<dealii::VectorizedArray<Number>::n_array_elements>
         alt_sparsity;
-    SparseMatrixForSIMD<dealii::VectorizedArray<Number>::n_array_elements,
-                        Number,
-                        problem_dimension>
+    SparseMatrixSIMD<dealii::VectorizedArray<Number>::n_array_elements,
+                     Number,
+                     problem_dimension>
         pij_matrix_;
 
     vector_type temp_euler_;

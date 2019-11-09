@@ -130,7 +130,9 @@ namespace grendel
     const auto &sparsity = offline_data_->sparsity_pattern();
 
     const auto &lumped_mass_matrix = offline_data_->lumped_mass_matrix();
-    const auto &bij_matrix = offline_data_->bij_matrix();
+    const auto &lumped_mass_matrix_inverse =
+        offline_data_->lumped_mass_matrix_inverse();
+    const auto &mass_matrix = offline_data_->mass_matrix();
     const auto &cij_matrix = offline_data_->cij_matrix();
 
     const auto &boundary_normal_map = offline_data_->boundary_normal_map();
@@ -183,7 +185,7 @@ namespace grendel
         const auto U_i = simd_gather(U, i);
         indicator_simd.reset(U_i);
 
-        const auto mass = simd_get_diag_element(lumped_mass_matrix, i);
+        const auto mass = simd_gather(lumped_mass_matrix, i);
         const auto hd_i = mass * measure_of_omega_inverse;
 
         auto jts = generate_iterators<n_array_elements>(
@@ -241,7 +243,7 @@ namespace grendel
 
         const auto U_i = gather(U, i);
 
-        const Number mass = lumped_mass_matrix.diag_element(i);
+        const Number mass = lumped_mass_matrix.local_element(i);
         const Number hd_i = mass * measure_of_omega_inverse;
 
         indicator_serial.reset(U_i);
@@ -346,7 +348,7 @@ namespace grendel
 
         dij_matrix_.diag_element(i) = d_sum;
 
-        const Number mass = lumped_mass_matrix.diag_element(i);
+        const Number mass = lumped_mass_matrix.local_element(i);
         const Number tau = cfl_update_ * mass / (Number(-2.) * d_sum);
 
         Number current_tau_max = tau_max.load();
@@ -425,8 +427,8 @@ namespace grendel
         const auto alpha_i = simd_gather(alpha_, i);
         const auto variations_i = simd_gather(second_variations_, i);
 
-        const auto m_i = simd_get_diag_element(lumped_mass_matrix, i);
-        const auto m_i_inv = Number(1.) / m_i;
+        const auto m_i = simd_gather(lumped_mass_matrix, i);
+        const auto m_i_inv = simd_gather(lumped_mass_matrix_inverse, i);
 
         using rank1_type =
             typename ProblemDescription<dim,
@@ -509,8 +511,8 @@ namespace grendel
         const auto alpha_i = alpha_.local_element(i);
         const auto variations_i = second_variations_.local_element(i);
 
-        const Number m_i = lumped_mass_matrix.diag_element(i);
-        const Number m_i_inv = Number(1.) / m_i;
+        const Number m_i = lumped_mass_matrix.local_element(i);
+        const Number m_i_inv = lumped_mass_matrix_inverse.local_element(i);
 
         rank1_type r_i;
 
@@ -605,8 +607,7 @@ namespace grendel
 
           const auto alpha_i = simd_gather(alpha_, i);
 
-          const auto m_i = simd_get_diag_element(lumped_mass_matrix, i);
-          const auto m_i_inv = Number(1.) / m_i;
+          const auto m_i_inv = simd_gather(lumped_mass_matrix_inverse, i);
 
           const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
           const VectorizedArray<Number> lambda_inv = Number(size - 1);
@@ -618,13 +619,19 @@ namespace grendel
 
           for (; jts[0] != sparsity.end(i); increment_iterators(jts)) {
             const auto js = get_column_indices(jts);
+            const auto m_j_inv = simd_gather(lumped_mass_matrix_inverse, js);
             const auto U_j = simd_gather(U, js);
 
-            const auto b_ij = get_entry(bij_matrix, jts);
-            VectorizedArray<Number> b_ji{};
-            for (unsigned int k = 0; k < n_array_elements; ++k)
-              b_ji[k] =
-                  get_transposed_entry(bij_matrix, jts[k], transposed_indices);
+            const auto m_ij =
+                mass_matrix.get_vectorized_entry(i, jts[0] - sparsity.begin(i));
+            const auto b_ij =
+                (jts[0] == sparsity.begin(i) ? VectorizedArray<Number>(1.)
+                                             : VectorizedArray<Number>(0.)) -
+                m_ij * m_j_inv;
+            const auto b_ji =
+                (jts[0] == sparsity.begin(i) ? VectorizedArray<Number>(1.)
+                                             : VectorizedArray<Number>(0.)) -
+                m_ij * m_i_inv;
 
             const auto d_ij = get_entry(dij_matrix_, jts);
             const auto alpha_j = simd_gather(alpha_, js);
@@ -661,8 +668,7 @@ namespace grendel
           const auto bounds = gather_array(bounds_, i);
           const auto U_i_new = gather(temp_euler_, i);
 
-          const Number m_i = lumped_mass_matrix.diag_element(i);
-          const Number m_i_inv = Number(1.) / m_i;
+          const Number m_i_inv = lumped_mass_matrix_inverse.local_element(i);
           const auto alpha_i = alpha_.local_element(i);
           const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
           const Number lambda_inv = Number(size - 1);
@@ -672,10 +678,15 @@ namespace grendel
 
           for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
             const auto j = jt->column();
+            const Number m_j_inv = lumped_mass_matrix_inverse.local_element(j);
 
-            const auto b_ij = get_entry(bij_matrix, jt);
+            const auto m_ij = mass_matrix.get_entry(i, jt - sparsity.begin(i));
+            const auto b_ij =
+                (jt == sparsity.begin(i) ? Number(1.) : Number(0.)) -
+                m_ij * m_j_inv;
             const auto b_ji =
-                get_transposed_entry(bij_matrix, jt, transposed_indices);
+                (jt == sparsity.begin(i) ? Number(1.) : Number(0.)) -
+                m_ij * m_i_inv;
 
             const auto U_j = gather(U, j);
             const auto d_ij = get_entry(dij_matrix_, jt);
@@ -802,13 +813,65 @@ namespace grendel
         GRENDEL_PARALLEL_REGION_BEGIN
         LIKWID_MARKER_START("time_step_7");
 
+        /* Parallel vectorized loop: */
+
+        GRENDEL_OMP_FOR
+        for (unsigned int i = 0; i < n_internal; i += n_array_elements) {
+
+          auto U_i_new = simd_gather(temp_euler_, i);
+
+          const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
+          const Number lambda = Number(1.) / Number(size - 1);
+
+          auto jts = generate_iterators<n_array_elements>(
+              [&](auto k) { return sparsity.begin(i + k); });
+
+          for (; jts[0] != sparsity.end(i); increment_iterators(jts)) {
+
+            VectorizedArray<Number> l_ji = {};
+            for (unsigned int k = 0; k < l_ji.size(); ++k)
+              l_ji[k] =
+                  get_transposed_entry(lij_matrix_, jts[k], transposed_indices);
+            const auto l_ij = std::min(get_entry(lij_matrix_, jts), l_ji);
+
+            auto p_ij = pij_matrix_.get_vectorized_tensor(
+                i, jts[0] - sparsity.begin(i));
+
+            U_i_new += l_ij * lambda * p_ij;
+            p_ij *= (1 - l_ij);
+
+            if (pass + 1 < n_passes)
+              pij_matrix_.write_vectorized_tensor(
+                  p_ij, i, jts[0] - sparsity.begin(i));
+          }
+
+#ifdef DEBUG
+          const auto rho_new = U_i_new[0];
+          const auto e_new =
+              ProblemDescription<dim, Number>::internal_energy(U_i_new);
+          const auto s_new =
+              ProblemDescription<dim, Number>::specific_entropy(U_i_new);
+
+          AssertThrowSIMD(rho_new,
+                          [](auto val) { return val > 0.; },
+                          dealii::ExcMessage("Negative density."));
+
+          AssertThrowSIMD(e_new,
+                          [](auto val) { return val > 0.; },
+                          dealii::ExcMessage("Negative internal energy."));
+
+          AssertThrowSIMD(s_new,
+                          [](auto val) { return val > 0.; },
+                          dealii::ExcMessage("Negative specific entropy."));
+#endif
+
+          simd_scatter(temp_euler_, U_i_new, i);
+        }
+
         /* Parallel non-vectorized loop: */
 
         GRENDEL_OMP_FOR
-        for (unsigned int i = 0; i < n_owned; ++i) {
-
-          /* Only iterate over locally owned subset */
-          Assert(i < n_owned, ExcInternalError());
+        for (unsigned int i = n_internal; i < n_owned; ++i) {
 
           /* Skip constrained degrees of freedom */
           if (++sparsity.begin(i) == sparsity.end(i))

@@ -11,6 +11,7 @@
 #include <deal.II/base/timer.h>
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/lac/affine_constraints.h>
+#include <deal.II/lac/la_parallel_vector.h>
 #include <deal.II/lac/sparse_matrix.h>
 
 #include <deal.II/numerics/data_out.h>
@@ -138,28 +139,28 @@ namespace grendel
     /**
      * The mass matrix.
      */
-    dealii::SparseMatrix<Number> mass_matrix_;
+    SparseMatrixSIMD<dealii::VectorizedArray<Number>::n_array_elements, Number>
+        mass_matrix_;
     ACCESSOR_READ_ONLY(mass_matrix)
 
     /**
      * The lumped mass matrix.
      */
-    dealii::SparseMatrix<Number> lumped_mass_matrix_;
+    dealii::LinearAlgebra::distributed::Vector<Number> lumped_mass_matrix_;
     ACCESSOR_READ_ONLY(lumped_mass_matrix)
+
+    /**
+     * The inverse of the lumped mass matrix.
+     */
+    dealii::LinearAlgebra::distributed::Vector<Number>
+        lumped_mass_matrix_inverse_;
+    ACCESSOR_READ_ONLY(lumped_mass_matrix_inverse)
 
     /**
      * Size of computational domain.
      */
     Number measure_of_omega_;
     ACCESSOR_READ_ONLY(measure_of_omega)
-
-
-    /**
-     * The $(b_{ij})$ matrix:
-     *   $b_{ij} = \delta_{ij} - m_{ij}/m{j}$
-     */
-    dealii::SparseMatrix<Number> bij_matrix_;
-    ACCESSOR_READ_ONLY(bij_matrix)
 
     /**
      * The stiffness matrix $(beta_{ij})$:
@@ -171,16 +172,16 @@ namespace grendel
     /**
      * A sparsity pattern for matrices in vectorized format
      */
-    SparsityPatternForSIMD<dealii::VectorizedArray<Number>::n_array_elements>
+    SparsityPatternSIMD<dealii::VectorizedArray<Number>::n_array_elements>
         sparsity_pattern_simd_;
     ACCESSOR_READ_ONLY(sparsity_pattern_simd)
 
     /**
      * The $(c_{ij})$ matrix.
      */
-    SparseMatrixForSIMD<dealii::VectorizedArray<Number>::n_array_elements,
-                        Number,
-                        dim>
+    SparseMatrixSIMD<dealii::VectorizedArray<Number>::n_array_elements,
+                     Number,
+                     dim>
         cij_matrix_;
     ACCESSOR_READ_ONLY(cij_matrix)
 

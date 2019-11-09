@@ -58,7 +58,6 @@ namespace grendel
                         dealii::Point<dim>>>
         local_boundary_normal_map_;
     dealii::FullMatrix<Number> cell_mass_matrix_;
-    dealii::FullMatrix<Number> cell_lumped_mass_matrix_;
     std::array<dealii::FullMatrix<Number>, dim> cell_cij_matrix_;
     dealii::FullMatrix<Number> cell_betaij_matrix_;
     Number cell_measure_;

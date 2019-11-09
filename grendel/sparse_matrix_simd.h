@@ -7,20 +7,20 @@
 namespace grendel
 {
   template <int simd_length, typename Number, int n_components = 1>
-  class SparseMatrixForSIMD;
+  class SparseMatrixSIMD;
 
   template <int simd_length>
-  class SparsityPatternForSIMD
+  class SparsityPatternSIMD
   {
   public:
-    SparsityPatternForSIMD()
+    SparsityPatternSIMD()
         : n_internal_dofs(0)
         , row_starts(1)
     {
     }
 
-    SparsityPatternForSIMD(const unsigned int n_internal_dofs,
-                           const dealii::SparsityPattern &sparsity)
+    SparsityPatternSIMD(const unsigned int n_internal_dofs,
+                        const dealii::SparsityPattern &sparsity)
         : n_internal_dofs(0)
     {
       reinit(n_internal_dofs, sparsity);
@@ -98,7 +98,7 @@ namespace grendel
     dealii::AlignedVector<unsigned int> column_indices_transposed;
 
     template <int, typename, int>
-    friend class SparseMatrixForSIMD;
+    friend class SparseMatrixSIMD;
   };
 
 
@@ -115,21 +115,21 @@ namespace grendel
    * following the sparsity pattern.
    */
   template <int simd_length, typename Number, int n_components>
-  class SparseMatrixForSIMD
+  class SparseMatrixSIMD
   {
   public:
-    SparseMatrixForSIMD()
+    SparseMatrixSIMD()
         : sparsity(nullptr)
     {
     }
 
-    SparseMatrixForSIMD(const SparsityPatternForSIMD<simd_length> &sparsity)
+    SparseMatrixSIMD(const SparsityPatternSIMD<simd_length> &sparsity)
         : sparsity(&sparsity)
     {
       data.resize(sparsity.n_nonzero_elements() * n_components);
     }
 
-    void reinit(const SparsityPatternForSIMD<simd_length> &sparsity)
+    void reinit(const SparsityPatternSIMD<simd_length> &sparsity)
     {
       this->sparsity = &sparsity;
       data.resize(sparsity.n_nonzero_elements() * n_components);
@@ -280,7 +280,7 @@ namespace grendel
           "Single-entry access only available for single-component case");
       dealii::Tensor<1, n_components, Number> result;
       result[0] = entry;
-      write_tensor(result, row, position_within_column);
+      write_entry(result, row, position_within_column);
     }
 
     void write_entry(const dealii::Tensor<1, n_components, Number> &entry,
@@ -311,7 +311,7 @@ namespace grendel
     }
 
   private:
-    const SparsityPatternForSIMD<simd_length> *sparsity;
+    const SparsityPatternSIMD<simd_length> *sparsity;
     dealii::AlignedVector<Number> data;
   };
 

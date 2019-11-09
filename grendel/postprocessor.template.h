@@ -164,7 +164,7 @@ namespace grendel
         /* Populate quantities: */
 
         const Number rho_i = U[0].local_element(i);
-        const Number m_i = lumped_mass_matrix.diag_element(i);
+        const Number m_i = lumped_mass_matrix.local_element(i);
 
         Tensor<1, n_quantities, Number> quantities;
 
