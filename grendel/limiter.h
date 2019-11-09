@@ -57,9 +57,9 @@ namespace grendel
 
     void reset();
 
-    void accumulate(const rank1_type U_i,
-                    const rank1_type U_j,
-                    const rank1_type U_ij_bar,
+    void accumulate(const rank1_type &U_i,
+                    const rank1_type &U_j,
+                    const rank1_type &U_ij_bar,
                     const bool is_diagonal_entry);
 
     void reset_variations(const Number variations_i);
@@ -77,9 +77,9 @@ namespace grendel
      * local minimum principles are obeyed.
      */
     template <Limiters limiter = limiter_, typename BOUNDS>
-    static Number limit(const BOUNDS bounds,
-                        const rank1_type U,
-                        const rank1_type P,
+    static Number limit(const BOUNDS &bounds,
+                        const rank1_type &U,
+                        const rank1_type &P,
                         const Number t_min = Number(0.),
                         const Number t_max = Number(1.));
 
@@ -127,9 +127,9 @@ namespace grendel
 
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline void
-  Limiter<dim, Number>::accumulate(const rank1_type U_i,
-                                   const rank1_type U_j,
-                                   const rank1_type U_ij_bar,
+  Limiter<dim, Number>::accumulate(const rank1_type &U_i,
+                                   const rank1_type &U_j,
+                                   const rank1_type &U_ij_bar,
                                    const bool is_diagonal_entry)
   {
     auto &[rho_min, rho_max, s_min] = bounds_;
