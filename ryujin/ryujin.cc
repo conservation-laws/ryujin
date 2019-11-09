@@ -15,6 +15,8 @@
 
 int main (int argc, char *argv[])
 {
+  dealii::Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv);
+
   /* Set the number of OpenMP threads to whatever deal.II allows for TBB: */
   omp_set_num_threads(dealii::MultithreadInfo::n_threads());
 
@@ -26,7 +28,6 @@ int main (int argc, char *argv[])
   }
 #endif
 
-  dealii::Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv);
   MPI_Comm mpi_communicator(MPI_COMM_WORLD);
 
   ryujin::TimeLoop<DIM, NUMBER> time_loop(mpi_communicator);
