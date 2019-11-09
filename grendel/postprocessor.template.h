@@ -215,6 +215,7 @@ namespace grendel
     {
       GRENDEL_PARALLEL_REGION_BEGIN
 
+      GRENDEL_OMP_FOR
       for (unsigned int i = 0; i < n_locally_owned; ++i) {
 
         /* Only iterate over locally owned subset */
