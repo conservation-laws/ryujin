@@ -279,7 +279,7 @@ namespace ryujin
     if (mpi_rank == 0) {
 
       std::cout << "[Init] initiating flux capacitor" << std::endl;
-      std::cout << "[Init] bringing Warp Core online" << std::endl;
+      std::cout << "[Init] bringing warp core online" << std::endl;
 
       std::cout << "[Init] read parameters and allocate objects" << std::endl;
 
