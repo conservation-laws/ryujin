@@ -71,14 +71,6 @@ namespace grendel
 
     dealii::SmartPointer<const grendel::OfflineData<dim, Number>> offline_data_;
 
-    /* Data structures for output: */
-
-    dealii::Triangulation<dim> output_triangulation_;
-    dealii::DoFHandler<dim> output_dof_handler_;
-    ACCESSOR_READ_ONLY(output_dof_handler)
-
-    dealii::InterGridMap<dealii::DoFHandler<dim>> inter_grid_map_;
-
     /* Options: */
 
     Number schlieren_beta_;

@@ -81,31 +81,7 @@ namespace grendel
 
     /* Prepare triangulation and dof_handler for coarsened output: */
 
-    if (coarsening_level_ != 0) {
-      const auto &discretization = offline_data_->discretization();
-      const auto &triangulation = discretization.triangulation();
-      const auto &finite_element = discretization.finite_element();
-
-      output_triangulation_.copy_triangulation(triangulation);
-
-      for (unsigned int i = 0; i < coarsening_level_; ++i) {
-        for (auto &it : output_triangulation_.active_cell_iterators())
-          it->set_coarsen_flag();
-        output_triangulation_.execute_coarsening_and_refinement();
-      }
-
-      output_dof_handler_.initialize(output_triangulation_, finite_element);
-
-      const auto &dof_handler = offline_data_->dof_handler();
-
-      inter_grid_map_.make_mapping(dof_handler, output_dof_handler_);
-
-      for (auto &it : output_U_)
-        it.reinit(output_dof_handler_.n_dofs());
-
-      for (auto &it : output_quantities_)
-        it.reinit(output_dof_handler_.n_dofs());
-    }
+    AssertThrow(coarsening_level_ == 0, dealii::ExcNotImplemented());
   }
 
 
@@ -344,32 +320,13 @@ namespace grendel
 
     dealii::DataOut<dim> data_out;
 
-    if (coarsening_level_ != 0) {
-      data_out.attach_dof_handler(output_dof_handler_);
+    data_out.attach_dof_handler(offline_data_->dof_handler());
 
-      for (unsigned int i = 0; i < problem_dimension; ++i)
-        interpolate_to_coarser_mesh(inter_grid_map_, U_[i], output_U_[i]);
-
-      for (unsigned int i = 0; i < n_quantities; ++i)
-        interpolate_to_coarser_mesh(
-            inter_grid_map_, quantities_[i], output_quantities_[i]);
-
-      for (unsigned int i = 0; i < problem_dimension; ++i)
-        data_out.add_data_vector(
-            output_U_[i], ProblemDescription<dim, Number>::component_names[i]);
-      for (unsigned int i = 0; i < n_quantities; ++i)
-        data_out.add_data_vector(output_quantities_[i], component_names[i]);
-
-    } else {
-
-      data_out.attach_dof_handler(offline_data_->dof_handler());
-
-      for (unsigned int i = 0; i < problem_dimension; ++i)
-        data_out.add_data_vector(
-            U_[i], ProblemDescription<dim, Number>::component_names[i]);
-      for (unsigned int i = 0; i < n_quantities; ++i)
-        data_out.add_data_vector(quantities_[i], component_names[i]);
-    }
+    for (unsigned int i = 0; i < problem_dimension; ++i)
+      data_out.add_data_vector(
+          U_[i], ProblemDescription<dim, Number>::component_names[i]);
+    for (unsigned int i = 0; i < n_quantities; ++i)
+      data_out.add_data_vector(quantities_[i], component_names[i]);
 
     data_out.build_patches(mapping, discretization.finite_element().degree - 1);
 
