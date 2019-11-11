@@ -297,9 +297,9 @@ namespace grendel
 
       lumped_mass_matrix_.reinit(partitioner_);
       lumped_mass_matrix_inverse_.reinit(partitioner_);
-      betaij_matrix_.reinit(sparsity_pattern_);
       sparsity_pattern_simd_.reinit(n_locally_internal_, sparsity_pattern_);
       mass_matrix_.reinit(sparsity_pattern_simd_);
+      betaij_matrix_.reinit(sparsity_pattern_simd_);
       cij_matrix_.reinit(sparsity_pattern_simd_);
     }
   }
@@ -317,7 +317,8 @@ namespace grendel
     std::array<dealii::SparseMatrix<Number>, dim> cij_matrix_tmp;
     for (auto &matrix : cij_matrix_tmp)
       matrix.reinit(sparsity_pattern_);
-    betaij_matrix_ = 0.;
+    dealii::SparseMatrix<Number> betaij_matrix_tmp;
+    betaij_matrix_tmp.reinit(sparsity_pattern_);
     measure_of_omega_ = 0.;
 
     boundary_normal_map_.clear();
@@ -489,7 +490,7 @@ namespace grendel
       }
 
       affine_constraints_.distribute_local_to_global(
-          cell_betaij_matrix, local_dof_indices, betaij_matrix_);
+          cell_betaij_matrix, local_dof_indices, betaij_matrix_tmp);
 
       measure_of_omega_ += cell_measure;
     };
@@ -520,6 +521,9 @@ namespace grendel
           const auto m_ij = get_entry(mass_matrix_tmp, jts);
           mass_matrix_.write_vectorized_entry(
               m_ij, i, jts[0] - sparsity_pattern_.begin(i), true);
+          const auto beta_ij = get_entry(betaij_matrix_tmp, jts);
+          betaij_matrix_.write_vectorized_entry(
+              beta_ij, i, jts[0] - sparsity_pattern_.begin(i), true);
         }
       }
       for (unsigned int i = n_locally_internal_; i < n_locally_relevant_; ++i) {
@@ -528,6 +532,9 @@ namespace grendel
              ++jt) {
           const auto m_ij = get_entry(mass_matrix_tmp, jt);
           mass_matrix_.write_entry(m_ij, i, jt - sparsity_pattern_.begin(i));
+          const auto beta_ij = get_entry(betaij_matrix_tmp, jt);
+          betaij_matrix_.write_entry(
+              beta_ij, i, jt - sparsity_pattern_.begin(i));
         }
       }
     }

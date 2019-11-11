@@ -60,11 +60,7 @@ namespace grendel
     static constexpr unsigned int smoothness_indicator_power_ =
         SMOOTHNESS_INDICATOR_POWER;
 
-    /**
-     * We take a reference to an OfflineData object in order to store
-     * references to the beta_ij and c_ij matrices.
-     */
-    Indicator(const OfflineData<dim, ScalarNumber> &offline_data);
+    Indicator();
 
     /**
      * Reset temporary storage and initialize for a new row corresponding
@@ -76,10 +72,9 @@ namespace grendel
      * When looping over the sparsity row, add the contribution associated
      * with the neighboring state U_j:
      */
-    template <typename ITERATOR>
     void add(const rank1_type U_j,
-             const ITERATOR jt,
-             const dealii::Tensor<1, dim, Number> &c_ij);
+             const dealii::Tensor<1, dim, Number> &c_ij,
+             const Number beta_ij);
     /**
      * Return the computed alpha_i value.
      */
@@ -91,12 +86,10 @@ namespace grendel
     Number second_variations();
 
   private:
-    const dealii::SparseMatrix<ScalarNumber> &betaij_matrix_;
-    ACCESSOR_READ_ONLY(betaij_matrix)
-
     /* Temporary storage used for the entropy_viscosity_commutator: */
 
-    Number rho_i = 0.; // also used for second variations
+    Number rho_i = 0.;         // also used for second variations
+    Number inverse_rho_i = 0.; // also used for second variations
     Number eta_i = 0.;
     rank2_type f_i;
     rank1_type d_eta_i;
@@ -120,9 +113,7 @@ namespace grendel
 
 
   template <int dim, typename Number>
-  Indicator<dim, Number>::Indicator(
-      const OfflineData<dim, ScalarNumber> &offline_data)
-      : betaij_matrix_(offline_data.betaij_matrix())
+  Indicator<dim, Number>::Indicator()
   {
   }
 
@@ -153,6 +144,7 @@ namespace grendel
   {
     if constexpr (indicator_ == Indicators::entropy_viscosity_commutator) {
       rho_i = U_i[0];
+      inverse_rho_i = Number(1.) / rho_i;
       eta_i = ProblemDescription<dim, Number>::entropy(U_i);
       f_i = ProblemDescription<dim, Number>::f(U_i);
 
@@ -180,24 +172,22 @@ namespace grendel
 
 
   template <int dim, typename Number>
-  template <typename ITERATOR>
   DEAL_II_ALWAYS_INLINE inline void
   Indicator<dim, Number>::add(const rank1_type U_j,
-                              const ITERATOR jt,
-                              const dealii::Tensor<1, dim, Number> &c_ij)
+                              const dealii::Tensor<1, dim, Number> &c_ij,
+                              const Number beta_ij)
   {
     if constexpr (indicator_ == Indicators::entropy_viscosity_commutator) {
       const auto &rho_j = U_j[0];
       const auto m_j = ProblemDescription<dim, Number>::momentum(U_j);
       const auto eta_j = ProblemDescription<dim, Number>::entropy(U_j);
+      const auto inverse_rho_j = Number(1.) / rho_j;
       const auto f_j = ProblemDescription<dim, Number>::f(U_j);
 
-      left += (eta_j / rho_j - eta_i / rho_i) * m_j * c_ij;
+      left += (eta_j * inverse_rho_j - eta_i * inverse_rho_i) * m_j * c_ij;
       for (unsigned int k = 0; k < problem_dimension; ++k)
         right[k] += (f_j[k] - f_i[k]) * c_ij;
     }
-
-    const auto beta_ij = get_entry(betaij_matrix_, jt);
 
     if constexpr (indicator_ == Indicators::smoothness_indicator) {
       const auto indicator_j = smoothness_indicator<dim, Number>(U_j);

@@ -166,7 +166,8 @@ namespace grendel
      * The stiffness matrix $(beta_{ij})$:
      *   $\beta_{ij} = \nabla\varphi_{j}\cdot\nabla\varphi_{i}$
      */
-    dealii::SparseMatrix<Number> betaij_matrix_;
+    SparseMatrixSIMD<dealii::VectorizedArray<Number>::n_array_elements, Number>
+        betaij_matrix_;
     ACCESSOR_READ_ONLY(betaij_matrix)
 
     /**

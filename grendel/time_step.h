@@ -129,13 +129,12 @@ namespace grendel
 
     vector_type r_;
 
-    dealii::SparseMatrix<Number> dij_matrix_;
+    SparseMatrixSIMD<dealii::VectorizedArray<Number>::n_array_elements, Number>
+        dij_matrix_;
 
     dealii::SparseMatrix<Number> lij_matrix_;
     MatrixCommunicator<dim, Number> lij_matrix_communicator_;
 
-    SparsityPatternSIMD<dealii::VectorizedArray<Number>::n_array_elements>
-        alt_sparsity;
     SparseMatrixSIMD<dealii::VectorizedArray<Number>::n_array_elements,
                      Number,
                      problem_dimension>

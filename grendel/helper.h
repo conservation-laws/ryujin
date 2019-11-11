@@ -389,6 +389,15 @@ namespace grendel
     return result;
   }
 
+  template <typename T1>
+  DEAL_II_ALWAYS_INLINE inline dealii::VectorizedArray<typename T1::value_type>
+  simd_gather(const T1 &U, const unsigned int *js)
+  {
+    dealii::VectorizedArray<typename T1::value_type> result;
+    result.gather(U.get_values(), js);
+    return result;
+  }
+
 
   /*
    * It's magic
@@ -407,6 +416,20 @@ namespace grendel
 
     for (unsigned int j = 0; j < k; ++j)
       result[j].gather(U[j].get_values(), js.data());
+
+    return result;
+  }
+
+  template <typename T1, std::size_t k>
+  DEAL_II_ALWAYS_INLINE inline dealii::
+      Tensor<1, k, dealii::VectorizedArray<typename T1::value_type>>
+      simd_gather(const std::array<T1, k> &U, const unsigned int *js)
+  {
+    dealii::Tensor<1, k, dealii::VectorizedArray<typename T1::value_type>>
+        result;
+
+    for (unsigned int j = 0; j < k; ++j)
+      result[j].gather(U[j].get_values(), js);
 
     return result;
   }

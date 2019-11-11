@@ -91,7 +91,7 @@ namespace grendel
 
     const auto &sparsity = offline_data_->sparsity_pattern();
 
-    dij_matrix_.reinit(sparsity);
+    dij_matrix_.reinit(offline_data_->sparsity_pattern_simd());
     lij_matrix_.reinit(sparsity);
 
     pij_matrix_.reinit(offline_data_->sparsity_pattern_simd());
@@ -129,10 +129,13 @@ namespace grendel
 
     const auto &sparsity = offline_data_->sparsity_pattern();
 
+    const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
+
     const auto &lumped_mass_matrix = offline_data_->lumped_mass_matrix();
     const auto &lumped_mass_matrix_inverse =
         offline_data_->lumped_mass_matrix_inverse();
     const auto &mass_matrix = offline_data_->mass_matrix();
+    const auto &betaij_matrix = offline_data_->betaij_matrix();
     const auto &cij_matrix = offline_data_->cij_matrix();
 
     const auto &boundary_normal_map = offline_data_->boundary_normal_map();
@@ -175,7 +178,7 @@ namespace grendel
       LIKWID_MARKER_START("time_step_1");
 
       /* Stored thread locally: */
-      Indicator<dim, VectorizedArray<Number>> indicator_simd(*offline_data_);
+      Indicator<dim, VectorizedArray<Number>> indicator_simd;
 
       /* Parallel SIMD loop: */
 
@@ -188,16 +191,15 @@ namespace grendel
         const auto mass = simd_gather(lumped_mass_matrix, i);
         const auto hd_i = mass * measure_of_omega_inverse;
 
-        auto jts = generate_iterators<n_array_elements>(
-            [&](auto k) { return sparsity.begin(i + k); });
+        const unsigned int row_length = sparsity_simd.row_length(i);
 
         /* Skip diagonal. */
-        increment_iterators(jts);
-        for (; jts[0] != sparsity.end(i); increment_iterators(jts)) {
+        const unsigned int *js = sparsity_simd.columns(i) + n_array_elements;
+        for (unsigned int col_idx = 1; col_idx < row_length;
+             ++col_idx, js += n_array_elements) {
 
-          const auto js = get_column_indices(jts);
           bool all_below_diagonal = true;
-          for (unsigned int k = 0; k < js.size(); ++k)
+          for (unsigned int k = 0; k < n_array_elements; ++k)
             if (js[k] >= i + k) {
               all_below_diagonal = false;
               break;
@@ -205,9 +207,9 @@ namespace grendel
 
           const auto U_j = simd_gather(U, js);
 
-          const auto c_ij =
-              cij_matrix.get_vectorized_tensor(i, jts[0] - sparsity.begin(i));
-          indicator_simd.add(U_j, jts, c_ij);
+          const auto c_ij = cij_matrix.get_vectorized_tensor(i, col_idx);
+          const auto beta_ij = betaij_matrix.get_vectorized_entry(i, col_idx);
+          indicator_simd.add(U_j, c_ij, beta_ij);
 
           /* Only iterate over the upper triangular portion of d_ij */
           if (all_below_diagonal)
@@ -222,7 +224,7 @@ namespace grendel
 
           const auto d = norm * lambda_max;
 
-          set_entry(dij_matrix_, jts, d);
+          dij_matrix_.write_vectorized_entry(d, i, col_idx, true);
         }
 
         simd_scatter(alpha_, indicator_simd.alpha(hd_i), i);
@@ -230,7 +232,7 @@ namespace grendel
       } /* parallel SIMD loop */
 
       /* Stored thread locally: */
-      Indicator<dim, Number> indicator_serial(*offline_data_);
+      Indicator<dim, Number> indicator_serial;
 
       /* Parallel non-vectorized loop: */
 
@@ -248,13 +250,17 @@ namespace grendel
 
         indicator_serial.reset(U_i);
 
-        /* skip diagonal */
-        for (auto jt = ++sparsity.begin(i); jt != sparsity.end(i); ++jt) {
-          const auto j = jt->column();
+        const unsigned int row_length = sparsity_simd.row_length(i);
+
+        /* Skip diagonal. */
+        const unsigned int *js = sparsity_simd.columns(i);
+        for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
+          const unsigned int j = js[col_idx];
 
           const auto U_j = gather(U, j);
-          const auto c_ij = cij_matrix.get_tensor(i, jt - sparsity.begin(i));
-          indicator_serial.add(U_j, jt, c_ij);
+          const auto c_ij = cij_matrix.get_tensor(i, col_idx);
+          const auto beta_ij = betaij_matrix.get_entry(i, col_idx);
+          indicator_serial.add(U_j, c_ij, beta_ij);
 
           /* Only iterate over the upper triangular portion of d_ij */
           if (j <= i)
@@ -287,7 +293,7 @@ namespace grendel
             d = std::max(d, norm_2 * lambda_max_2);
           }
 
-          set_entry(dij_matrix_, jt, d);
+          dij_matrix_.write_entry(d, i, col_idx);
         }
 
         alpha_.local_element(i) = indicator_serial.alpha(hd_i);
@@ -332,21 +338,26 @@ namespace grendel
 
         Number d_sum = Number(0.);
 
+        const unsigned int row_length = sparsity_simd.row_length(i);
+        const unsigned int *js = sparsity_simd.columns(i);
+
         /* skip diagonal: */
-        for (auto jt = ++sparsity.begin(i); jt != sparsity.end(i); ++jt) {
-          const auto j = jt->column();
+        for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
+          const auto j = *(i < n_internal ? js + i % n_array_elements +
+                                                col_idx * n_array_elements
+                                          : js + col_idx);
 
           // fill lower triangular part of dij_matrix missing from step 1
           if (j < i) {
-            const auto d_ji =
-                get_transposed_entry(dij_matrix_, jt, transposed_indices);
-            set_entry(dij_matrix_, jt, d_ji);
+            const auto d_ji = dij_matrix_.get_transposed_entry(i, col_idx);
+            dij_matrix_.write_entry(d_ji, i, col_idx);
           }
 
-          d_sum -= get_entry(dij_matrix_, jt);
+          d_sum -= dij_matrix_.get_entry(i, col_idx);
         }
 
-        dij_matrix_.diag_element(i) = d_sum;
+        /* write diagonal element */
+        dij_matrix_.write_entry(d_sum, i, 0);
 
         const Number mass = lumped_mass_matrix.local_element(i);
         const Number tau = cfl_update_ * mass / (Number(-2.) * d_sum);
@@ -411,7 +422,7 @@ namespace grendel
       LIKWID_MARKER_START("time_step_3");
 
       /* Nota bene: This bounds variable is thread local: */
-      Limiter<dim, VectorizedArray<Number>> limiter_simd(*offline_data_);
+      Limiter<dim, VectorizedArray<Number>> limiter_simd;
 
       /* Parallel SIMD loop: */
 
@@ -439,12 +450,12 @@ namespace grendel
         limiter_simd.reset();
         limiter_simd.reset_variations(variations_i);
 
-        auto jts = generate_iterators<n_array_elements>(
-            [&](auto k) { return sparsity.begin(i + k); });
+        const unsigned int *js = sparsity_simd.columns(i);
+        const unsigned int row_length = sparsity_simd.row_length(i);
 
-        for (; jts[0] != sparsity.end(i); increment_iterators(jts)) {
+        for (unsigned int col_idx = 0; col_idx < row_length;
+             ++col_idx, js += n_array_elements) {
 
-          const auto js = get_column_indices(jts);
           const auto U_j = simd_gather(U, js);
 
           const auto f_j =
@@ -453,10 +464,9 @@ namespace grendel
           const auto alpha_j = simd_gather(alpha_, js);
           const auto variations_j = simd_gather(second_variations_, js);
 
-          const auto c_ij =
-              cij_matrix.get_vectorized_tensor(i, jts[0] - sparsity.begin(i));
+          const auto c_ij = cij_matrix.get_vectorized_tensor(i, col_idx);
 
-          const auto d_ij = get_entry(dij_matrix_, jts);
+          const auto d_ij = dij_matrix_.get_vectorized_entry(i, col_idx);
           const auto d_ij_inv = Number(1.) / d_ij;
 
           const auto d_ijH = Indicator<dim, Number>::indicator_ ==
@@ -479,8 +489,9 @@ namespace grendel
           U_i_new += tau * m_i_inv * Number(2.) * d_ij * U_ij_bar;
 
           limiter_simd.accumulate(
-              U_i, U_j, U_ij_bar, /* is diagonal */ js[0] == i);
-          limiter_simd.accumulate_variations(variations_j, jts);
+              U_i, U_j, U_ij_bar, /* is diagonal */ col_idx == 0);
+          const auto beta_ij = betaij_matrix.get_vectorized_entry(i, col_idx);
+          limiter_simd.accumulate_variations(variations_j, beta_ij);
         }
 
         simd_scatter(temp_euler_, U_i_new, i);
@@ -493,7 +504,7 @@ namespace grendel
       } /* parallel SIMD loop */
 
       /* Nota bene: This bounds variable is thread local: */
-      Limiter<dim, Number> limiter_serial(*offline_data_);
+      Limiter<dim, Number> limiter_serial;
 
       /* Parallel non-vectorized loop: */
 
@@ -501,7 +512,8 @@ namespace grendel
       for (unsigned int i = n_internal; i < n_owned; ++i) {
 
         /* Skip constrained degrees of freedom */
-        if (++sparsity.begin(i) == sparsity.end(i))
+        const unsigned int row_length = sparsity_simd.row_length(i);
+        if (row_length == 1)
           continue;
 
         const auto U_i = gather(U, i);
@@ -520,16 +532,17 @@ namespace grendel
         limiter_serial.reset();
         limiter_serial.reset_variations(variations_i);
 
-        for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
-          const auto j = jt->column();
+        const unsigned int *js = sparsity_simd.columns(i);
+        for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
+          const auto j = js[col_idx];
 
           const auto U_j = gather(U, j);
           const auto f_j = ProblemDescription<dim, Number>::f(U_j);
           const auto alpha_j = alpha_.local_element(j);
           const auto variations_j = second_variations_.local_element(j);
 
-          const auto c_ij = cij_matrix.get_tensor(i, jt - sparsity.begin(i));
-          const auto d_ij = get_entry(dij_matrix_, jt);
+          const auto c_ij = cij_matrix.get_tensor(i, col_idx);
+          const auto d_ij = dij_matrix_.get_entry(i, col_idx);
           const Number d_ij_inv = Number(1.) / d_ij;
 
           const auto d_ijH = Indicator<dim, Number>::indicator_ ==
@@ -551,8 +564,9 @@ namespace grendel
           U_i_new += tau * m_i_inv * Number(2.) * d_ij * U_ij_bar;
 
           limiter_serial.accumulate(
-              U_i, U_j, U_ij_bar, /* is diagonal */ i == j);
-          limiter_serial.accumulate_variations(variations_j, jt);
+              U_i, U_j, U_ij_bar, /* is diagonal */ col_idx == 0);
+          const auto beta_ij = betaij_matrix.get_entry(i, col_idx);
+          limiter_serial.accumulate_variations(variations_j, beta_ij);
         }
 
         scatter(temp_euler_, U_i_new, i);
@@ -633,7 +647,8 @@ namespace grendel
                                              : VectorizedArray<Number>(0.)) -
                 m_ij * m_i_inv;
 
-            const auto d_ij = get_entry(dij_matrix_, jts);
+            const auto d_ij =
+                dij_matrix_.get_vectorized_entry(i, jts[0] - sparsity.begin(i));
             const auto alpha_j = simd_gather(alpha_, js);
             const auto d_ijH = Indicator<dim, Number>::indicator_ ==
                                        Indicator<dim, Number>::Indicators::
@@ -689,7 +704,7 @@ namespace grendel
                 m_ij * m_i_inv;
 
             const auto U_j = gather(U, j);
-            const auto d_ij = get_entry(dij_matrix_, jt);
+            const auto d_ij = dij_matrix_.get_entry(i, jt - sparsity.begin(i));
             const auto alpha_j = alpha_.local_element(j);
             const auto d_ijH = Indicator<dim, Number>::indicator_ ==
                                        Indicator<dim, Number>::Indicators::

@@ -4,6 +4,8 @@
 #include <deal.II/base/aligned_vector.h>
 #include <deal.II/lac/sparsity_pattern.h>
 
+#include "helper.h"
+
 namespace grendel
 {
   template <int simd_length, typename Number, int n_components = 1>
@@ -34,25 +36,30 @@ namespace grendel
       Assert(n_internal_dofs <= sparsity.n_rows(), dealii::ExcInternalError());
       row_starts.resize_fast(sparsity.n_rows() + 1);
       column_indices.resize_fast(sparsity.n_nonzero_elements());
+      column_indices_transposed.resize_fast(sparsity.n_nonzero_elements());
       row_starts[0] = 0;
       Assert(n_internal_dofs % simd_length == 0, dealii::ExcInternalError());
       unsigned int *col_ptr = column_indices.data();
+      unsigned int *transposed_ptr = column_indices_transposed.data();
       for (unsigned int i = 0; i < n_internal_dofs; i += simd_length) {
-        for (unsigned int v = 1; v < simd_length; ++v)
-          row_starts[i + v] = row_starts[i] + v;
         auto jts = generate_iterators<simd_length>(
             [&](auto k) { return sparsity.begin(i + k); });
 
         for (; jts[0] != sparsity.end(i); increment_iterators(jts))
-          for (unsigned int k = 0; k < simd_length; ++k)
+          for (unsigned int k = 0; k < simd_length; ++k) {
             *col_ptr++ = jts[k]->column();
+            *transposed_ptr++ = sparsity.row_position(jts[k]->column(), i + k);
+          }
 
-        row_starts[i + simd_length] = col_ptr - column_indices.data();
+        row_starts[i / simd_length + 1] = col_ptr - column_indices.data();
       }
+      row_starts[n_internal_dofs] = row_starts[n_internal_dofs / simd_length];
 
       for (unsigned int i = n_internal_dofs; i < sparsity.n_rows(); ++i) {
-        for (auto j = sparsity.begin(i); j != sparsity.end(i); ++j)
+        for (auto j = sparsity.begin(i); j != sparsity.end(i); ++j) {
           *col_ptr++ = j->column();
+          *transposed_ptr++ = sparsity.row_position(j->column(), i);
+        }
         row_starts[i + 1] = col_ptr - column_indices.data();
       }
 
@@ -71,18 +78,25 @@ namespace grendel
     const unsigned int *columns(const unsigned int row) const
     {
       AssertIndexRange(row, row_starts.size() - 1);
-      return column_indices.data() + row_starts[row];
+      if (row < n_internal_dofs)
+        return column_indices.data() + row_starts[row / simd_length];
+      else
+        return column_indices.data() + row_starts[row];
     }
 
     unsigned int row_length(const unsigned int row) const
     {
       AssertIndexRange(row, row_starts.size() - 1);
       if (row < n_internal_dofs) {
-        const unsigned int simd_row = row / simd_length * simd_length;
-        return (row_starts[simd_row + simd_length] - row_starts[simd_row]) /
-               simd_length;
+        const unsigned int simd_row = row / simd_length;
+        return (row_starts[simd_row + 1] - row_starts[simd_row]) / simd_length;
       } else
         return row_starts[row + 1] - row_starts[row];
+    }
+
+    unsigned int n_rows() const
+    {
+      return row_starts.size() - 1;
     }
 
     std::size_t n_nonzero_elements() const
@@ -167,11 +181,11 @@ namespace grendel
           Tensor<1, n_components, dealii::VectorizedArray<Number, simd_length>>
               result;
       for (unsigned int d = 0; d < n_components; ++d)
-        result[d].load(
-            data.data() +
-            (sparsity->row_starts[row] + position_within_column * simd_length) *
-                n_components +
-            d * simd_length);
+        result[d].load(data.data() +
+                       (sparsity->row_starts[row / simd_length] +
+                        position_within_column * simd_length) *
+                           n_components +
+                       d * simd_length);
       return result;
     }
 
@@ -216,14 +230,14 @@ namespace grendel
       if (do_streaming_store)
         for (unsigned int d = 0; d < n_components; ++d)
           entry[d].streaming_store(data.data() +
-                                   (sparsity->row_starts[row] +
+                                   (sparsity->row_starts[row / simd_length] +
                                     position_within_column * simd_length) *
                                        n_components +
                                    d * simd_length);
       else
         for (unsigned int d = 0; d < n_components; ++d)
           entry[d].store(data.data() +
-                         (sparsity->row_starts[row] +
+                         (sparsity->row_starts[row / simd_length] +
                           position_within_column * simd_length) *
                              n_components +
                          d * simd_length);
@@ -252,7 +266,7 @@ namespace grendel
       dealii::Tensor<1, n_components, Number> result;
       // go through vectorized part
       if (row < sparsity->n_internal_dofs) {
-        const unsigned int simd_row = row / simd_length * simd_length;
+        const unsigned int simd_row = row / simd_length;
         const unsigned int simd_offset = row % simd_length;
         for (unsigned int d = 0; d < n_components; ++d)
           result[d] = data[(sparsity->row_starts[simd_row] +
@@ -294,7 +308,7 @@ namespace grendel
 
       // go through vectorized part
       if (row < sparsity->n_internal_dofs) {
-        const unsigned int simd_row = row / simd_length * simd_length;
+        const unsigned int simd_row = row / simd_length;
         const unsigned int simd_offset = row % simd_length;
         for (unsigned int d = 0; d < n_components; ++d)
           data[(sparsity->row_starts[simd_row] +
@@ -308,6 +322,82 @@ namespace grendel
           data[(sparsity->row_starts[row] + position_within_column) *
                    n_components +
                d] = entry[d];
+    }
+
+    DEAL_II_ALWAYS_INLINE
+    dealii::VectorizedArray<Number, simd_length>
+    get_vectorized_transposed_entry(
+        const unsigned int row, const unsigned int position_within_column) const
+    {
+      static_assert(
+          n_components == 1,
+          "Access currently only available for single-component case");
+      Assert(sparsity != nullptr, dealii::ExcNotInitialized());
+
+      AssertIndexRange(row, sparsity->row_starts.size() - 1);
+      AssertIndexRange(position_within_column, sparsity->row_length(row));
+      Assert(row < sparsity->n_internal_dofs,
+             dealii::ExcMessage(
+                 "Vectorized access only possible in vectorized part"));
+      Assert(row % simd_length == 0,
+             dealii::ExcMessage(
+                 "Access only supported for rows at the SIMD granularity"));
+
+      dealii::VectorizedArray<Number, simd_length> result = {};
+      for (unsigned int k = 0; k < simd_length; ++k) {
+        const unsigned int col =
+            sparsity->column_indices[sparsity->row_starts[row / simd_length] +
+                                     position_within_column * simd_length + k];
+        if (col < sparsity->n_internal_dofs)
+          result[k] = data[sparsity->row_starts[col / simd_length] +
+                           sparsity->column_indices_transposed
+                                   [sparsity->row_starts[row / simd_length] +
+                                    position_within_column * simd_length + k] *
+                               simd_length +
+                           col % simd_length];
+        else
+          result[k] = data[sparsity->row_starts[col] +
+                           sparsity->column_indices_transposed
+                               [sparsity->row_starts[row / simd_length] +
+                                position_within_column * simd_length + k]];
+      }
+      return result;
+    }
+
+    DEAL_II_ALWAYS_INLINE
+    Number get_transposed_entry(const unsigned int row,
+                                const unsigned int position_within_column) const
+    {
+      static_assert(
+          n_components == 1,
+          "Access currently only available for single-component case");
+      Assert(sparsity != nullptr, dealii::ExcNotInitialized());
+
+      AssertIndexRange(row, sparsity->row_starts.size() - 1);
+      AssertIndexRange(position_within_column, sparsity->row_length(row));
+
+      const unsigned int my_rowstart =
+          row < sparsity->n_internal_dofs
+              ? sparsity->row_starts[row / simd_length] + row % simd_length
+              : sparsity->row_starts[row];
+      const unsigned int my_rowstride =
+          row < sparsity->n_internal_dofs ? simd_length : 1;
+      const unsigned int col =
+          row < sparsity->n_internal_dofs
+              ? sparsity->column_indices[my_rowstart +
+                                         position_within_column * simd_length]
+              : sparsity->column_indices[my_rowstart + position_within_column];
+      if (col < sparsity->n_internal_dofs)
+        return data[sparsity->row_starts[col / simd_length] +
+                    sparsity->column_indices_transposed[my_rowstart +
+                                                        position_within_column *
+                                                            my_rowstride] *
+                        simd_length +
+                    col % simd_length];
+      else
+        return data[sparsity->row_starts[col] +
+                    sparsity->column_indices_transposed
+                        [my_rowstart + position_within_column * my_rowstride]];
     }
 
   private:

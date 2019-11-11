@@ -1,11 +1,11 @@
 #ifndef LIMITER_H
 #define LIMITER_H
 
-#include <compile_time_options.h>
 #include "helper.h"
 #include "newton.h"
 #include "offline_data.h"
 #include "simd.h"
+#include <compile_time_options.h>
 
 #include "problem_description.h"
 
@@ -30,11 +30,7 @@ namespace grendel
 
     using Bounds = std::array<Number, 3>;
 
-    /**
-     * We take a reference to an OfflineData object in order to store
-     * references to the beta_ij matrix.
-     */
-    Limiter(const OfflineData<dim, ScalarNumber> &offline_data);
+    Limiter();
 
     /*
      * Options:
@@ -64,8 +60,7 @@ namespace grendel
 
     void reset_variations(const Number variations_i);
 
-    template <typename ITERATOR>
-    void accumulate_variations(const Number variations_j, const ITERATOR jt);
+    void accumulate_variations(const Number variations_j, const Number beta_ij);
 
     void apply_relaxation(const Number hd_i);
 
@@ -84,8 +79,6 @@ namespace grendel
                         const Number t_max = Number(1.));
 
   private:
-    const dealii::SparseMatrix<ScalarNumber> &betaij_matrix_;
-
     Bounds bounds_;
 
     Number variations_i;
@@ -97,9 +90,7 @@ namespace grendel
 
 
   template <int dim, typename Number>
-  Limiter<dim, Number>::Limiter(
-      const OfflineData<dim, ScalarNumber> &offline_data)
-      : betaij_matrix_(offline_data.betaij_matrix())
+  Limiter<dim, Number>::Limiter()
   {
   }
 
@@ -165,13 +156,10 @@ namespace grendel
 
 
   template <int dim, typename Number>
-  template <typename ITERATOR>
   DEAL_II_ALWAYS_INLINE inline void
   Limiter<dim, Number>::accumulate_variations(const Number variations_j,
-                                              const ITERATOR jt)
+                                              const Number beta_ij)
   {
-    const auto beta_ij = get_entry(betaij_matrix_, jt);
-
     /* The numerical constant 8 is up to debate... */
     rho_relaxation_numerator +=
         Number(8.0 * 0.5) * beta_ij * (variations_i + variations_j);
