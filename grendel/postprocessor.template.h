@@ -8,6 +8,7 @@
 #include <deal.II/numerics/vector_tools.h>
 
 #include <atomic>
+#include <fstream>
 
 namespace grendel
 {
