@@ -200,9 +200,9 @@ namespace grendel
         if (n_periodic_faces != 0) {
           /*
            * Enforce periodic boundary conditions. We assume that the mesh is
-           * in "normal configuration". By convenction we also omit enforcing
+           * in "normal configuration". By convention we also omit enforcing
            * periodicity in x direction. This avoids accidentally glueing the
-           * corner degrees of freedom together whish leads to instability.
+           * corner degrees of freedom together which leads to instability.
            */
           for (int i = 1; i < dim; ++i) /* omit x direction! */
             DoFTools::make_periodicity_constraints(dof_handler_,
@@ -282,7 +282,30 @@ namespace grendel
             dof_indices, dsp, false);
       }
 
-      sparsity_pattern_.copy_from(dsp);
+      sparsity_pattern_assembly_.copy_from(dsp);
+
+      /*
+       * Create a sparsity pattern where the only off-processor rows
+       * are the one for which locally owned rows request the
+       * transpose entries. This will be the one we finally compute on.
+       */
+      DynamicSparsityPattern dsp_minimal(n_locally_relevant_,
+                                         n_locally_relevant_);
+      const unsigned int n_owned_dofs = dof_handler_.n_locally_owned_dofs();
+      std::set<unsigned int> offproc_dofs;
+      for (unsigned int i = 0; i < n_owned_dofs; ++i) {
+        const auto end_it = dsp.end(i);
+        for (auto it = dsp.begin(i); it != end_it; ++it) {
+          const unsigned int col = it->column();
+          dsp_minimal.add(i, col);
+          if (col >= n_owned_dofs) {
+            dsp_minimal.add(col, i);
+            offproc_dofs.insert(col);
+          }
+        }
+      }
+
+      sparsity_pattern_.copy_from(dsp_minimal);
     }
 
     /*
@@ -297,7 +320,8 @@ namespace grendel
 
       lumped_mass_matrix_.reinit(partitioner_);
       lumped_mass_matrix_inverse_.reinit(partitioner_);
-      sparsity_pattern_simd_.reinit(n_locally_internal_, sparsity_pattern_);
+      sparsity_pattern_simd_.reinit(
+          n_locally_internal_, sparsity_pattern_, *partitioner_);
       mass_matrix_.reinit(sparsity_pattern_simd_);
       betaij_matrix_.reinit(sparsity_pattern_simd_);
       cij_matrix_.reinit(sparsity_pattern_simd_);
@@ -313,12 +337,12 @@ namespace grendel
 #endif
 
     dealii::SparseMatrix<Number> mass_matrix_tmp;
-    mass_matrix_tmp.reinit(sparsity_pattern_);
+    mass_matrix_tmp.reinit(sparsity_pattern_assembly_);
     std::array<dealii::SparseMatrix<Number>, dim> cij_matrix_tmp;
     for (auto &matrix : cij_matrix_tmp)
-      matrix.reinit(sparsity_pattern_);
+      matrix.reinit(sparsity_pattern_assembly_);
     dealii::SparseMatrix<Number> betaij_matrix_tmp;
-    betaij_matrix_tmp.reinit(sparsity_pattern_);
+    betaij_matrix_tmp.reinit(sparsity_pattern_assembly_);
     measure_of_omega_ = 0.;
 
     boundary_normal_map_.clear();
@@ -512,31 +536,53 @@ namespace grendel
                       AssemblyScratchData<dim>(*discretization_),
                       AssemblyCopyData<dim, Number>());
 
+      GRENDEL_PARALLEL_REGION_BEGIN
+
+      /* Transform mass_matrix and betaij_matrix into SIMD format */
+      GRENDEL_OMP_FOR
       for (unsigned int i = 0; i < n_locally_internal_;
            i += VectorizedArray<Number>::n_array_elements) {
         auto jts =
             generate_iterators<VectorizedArray<Number>::n_array_elements>(
                 [&](auto k) { return sparsity_pattern_.begin(i + k); });
         for (; jts[0] != sparsity_pattern_.end(i); increment_iterators(jts)) {
-          const auto m_ij = get_entry(mass_matrix_tmp, jts);
+
+          /* sparsity_pattern_assembly_ upon which *_matrix_tmp are
+             based contains more entries than the leaner
+             sparsity_pattern_, so we must use the slower indirect
+             access (i,j) into the _tmp matrices and then write back
+             only the lean data while discarding the rest. */
+          VectorizedArray<Number> m_ij = {};
+          for (unsigned int k = 0;
+               k < VectorizedArray<Number>::n_array_elements;
+               ++k)
+            m_ij[k] = mass_matrix_tmp(i + k, jts[k]->column());
           mass_matrix_.write_vectorized_entry(
               m_ij, i, jts[0] - sparsity_pattern_.begin(i), true);
-          const auto beta_ij = get_entry(betaij_matrix_tmp, jts);
+          VectorizedArray<Number> beta_ij = {};
+          for (unsigned int k = 0;
+               k < VectorizedArray<Number>::n_array_elements;
+               ++k)
+            beta_ij[k] = betaij_matrix_tmp(i + k, jts[k]->column());
           betaij_matrix_.write_vectorized_entry(
               beta_ij, i, jts[0] - sparsity_pattern_.begin(i), true);
         }
       }
+
+      GRENDEL_OMP_FOR
       for (unsigned int i = n_locally_internal_; i < n_locally_relevant_; ++i) {
         for (auto jt = sparsity_pattern_.begin(i);
              jt != sparsity_pattern_.end(i);
              ++jt) {
-          const auto m_ij = get_entry(mass_matrix_tmp, jt);
+          const auto m_ij = mass_matrix_tmp(i, jt->column());
           mass_matrix_.write_entry(m_ij, i, jt - sparsity_pattern_.begin(i));
-          const auto beta_ij = get_entry(betaij_matrix_tmp, jt);
+          const auto beta_ij = betaij_matrix_tmp(i, jt->column());
           betaij_matrix_.write_entry(
               beta_ij, i, jt - sparsity_pattern_.begin(i));
         }
       }
+
+      GRENDEL_PARALLEL_REGION_END
     }
 
     measure_of_omega_ =
@@ -671,25 +717,39 @@ namespace grendel
                       AssemblyScratchData<dim>(*discretization_),
                       AssemblyCopyData<dim, Number>());
 
+      GRENDEL_PARALLEL_REGION_BEGIN
+
+      GRENDEL_OMP_FOR
       for (unsigned int i = 0; i < n_locally_internal_;
            i += VectorizedArray<Number>::n_array_elements) {
         auto jts =
             generate_iterators<VectorizedArray<Number>::n_array_elements>(
                 [&](auto k) { return sparsity_pattern_.begin(i + k); });
         for (; jts[0] != sparsity_pattern_.end(i); increment_iterators(jts)) {
-          const auto c_ij = gather_get_entry(cij_matrix_tmp, jts);
+          Tensor<1, dim, VectorizedArray<Number>> c_ij;
+          for (unsigned int k = 0;
+               k < VectorizedArray<Number>::n_array_elements;
+               ++k)
+            for (unsigned int d = 0; d < dim; ++d)
+              c_ij[d][k] = cij_matrix_tmp[d](i + k, jts[k]->column());
           cij_matrix_.write_vectorized_tensor(
               c_ij, i, jts[0] - sparsity_pattern_.begin(i), true);
         }
       }
+
+      GRENDEL_OMP_FOR
       for (unsigned int i = n_locally_internal_; i < n_locally_relevant_; ++i) {
         for (auto jt = sparsity_pattern_.begin(i);
              jt != sparsity_pattern_.end(i);
              ++jt) {
-          const auto c_ij = gather_get_entry(cij_matrix_tmp, jt);
+          Tensor<1, dim, Number> c_ij;
+          for (unsigned int d = 0; d < dim; ++d)
+            c_ij[d] = cij_matrix_tmp[d](i, jt->column());
           cij_matrix_.write_entry(c_ij, i, jt - sparsity_pattern_.begin(i));
         }
       }
+
+      GRENDEL_PARALLEL_REGION_END
     }
   }
 

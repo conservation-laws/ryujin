@@ -113,6 +113,12 @@ namespace grendel
     ACCESSOR_READ_ONLY(sparsity_pattern)
 
     /**
+     * A somewhat larger SparsityPattern used for assembly of local
+     * matrices.
+     */
+    dealii::SparsityPattern sparsity_pattern_assembly_;
+
+    /**
      * The boundary map.
      *
      * For every degree of freedom that has nonzero support at the boundary

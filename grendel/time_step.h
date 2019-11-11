@@ -125,15 +125,12 @@ namespace grendel
 
     typename Limiter<dim, Number>::vector_type bounds_;
 
-    std::vector<unsigned int> transposed_indices;
-
     vector_type r_;
 
     SparseMatrixSIMD<dealii::VectorizedArray<Number>::n_array_elements, Number>
         dij_matrix_;
-
-    dealii::SparseMatrix<Number> lij_matrix_;
-    MatrixCommunicator<dim, Number> lij_matrix_communicator_;
+    SparseMatrixSIMD<dealii::VectorizedArray<Number>::n_array_elements, Number>
+        lij_matrix_;
 
     SparseMatrixSIMD<dealii::VectorizedArray<Number>::n_array_elements,
                      Number,

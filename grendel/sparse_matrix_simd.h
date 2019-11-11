@@ -2,6 +2,7 @@
 #define SPARSE_MATRIX_SIMD
 
 #include <deal.II/base/aligned_vector.h>
+#include <deal.II/base/partitioner.h>
 #include <deal.II/lac/sparsity_pattern.h>
 
 #include "helper.h"
@@ -18,18 +19,22 @@ namespace grendel
     SparsityPatternSIMD()
         : n_internal_dofs(0)
         , row_starts(1)
+        , mpi_communicator(MPI_COMM_SELF)
     {
     }
 
     SparsityPatternSIMD(const unsigned int n_internal_dofs,
-                        const dealii::SparsityPattern &sparsity)
+                        const dealii::SparsityPattern &sparsity,
+                        const dealii::Utilities::MPI::Partitioner &partitioner)
         : n_internal_dofs(0)
+        , mpi_communicator(MPI_COMM_SELF)
     {
-      reinit(n_internal_dofs, sparsity);
+      reinit(n_internal_dofs, sparsity, partitioner);
     }
 
     void reinit(const unsigned int n_internal_dofs,
-                const dealii::SparsityPattern &sparsity)
+                const dealii::SparsityPattern &sparsity,
+                const dealii::Utilities::MPI::Partitioner &partitioner)
     {
       this->n_internal_dofs = n_internal_dofs;
 
@@ -63,7 +68,95 @@ namespace grendel
         row_starts[i + 1] = col_ptr - column_indices.data();
       }
 
+      mpi_communicator = partitioner.get_mpi_communicator();
+
       Assert(col_ptr == column_indices.end(), dealii::ExcInternalError());
+
+      n_locally_owned_dofs = partitioner.local_size();
+      Assert(n_internal_dofs <= n_locally_owned_dofs,
+             dealii::ExcInternalError());
+      Assert(n_locally_owned_dofs <= sparsity.n_rows(),
+             dealii::ExcInternalError());
+
+      /* compute the data exchange pattern */
+
+      if (sparsity.n_rows() > n_locally_owned_dofs) {
+
+        /* stage 1: the processors that are owning the ghosts are the same as
+           in the partitioner of the index range */
+        auto vec_gt = partitioner.ghost_targets().begin();
+        receive_targets.resize(partitioner.ghost_targets().size());
+
+        /* stage 2: remember which range of indices belongs to which
+           processor */
+        std::vector<unsigned int> ghost_ranges(
+            partitioner.ghost_targets().size() + 1);
+        ghost_ranges[0] = n_locally_owned_dofs;
+        for (unsigned int p = 0; p < receive_targets.size(); ++p) {
+          receive_targets[p].first = partitioner.ghost_targets()[p].first;
+          ghost_ranges[p + 1] =
+              ghost_ranges[p] + partitioner.ghost_targets()[p].second;
+        }
+
+        std::vector<unsigned int> import_indices_part;
+        for (auto i : partitioner.import_indices())
+          for (unsigned int j = i.first; j < i.second; ++j)
+            import_indices_part.push_back(j);
+
+        /* Collect indices to be sent. these consist of the diagonal as well
+           as the part of columns of the given range. Note that this assumes
+           that the sparsity pattern only contains those entries in ghosted
+           rows which have a corresponding transpose entry in the owned rows,
+           which is the case by construction of the sparsity pattern.
+         */
+        AssertDimension(import_indices_part.size(),
+                        partitioner.n_import_indices());
+        indices_to_be_sent.clear();
+        send_targets.resize(partitioner.import_targets().size());
+        auto idx = import_indices_part.begin();
+        for (unsigned int p = 0; p < partitioner.import_targets().size(); ++p) {
+          for (unsigned int c = 0; c < partitioner.import_targets()[p].second;
+               ++c, ++idx) {
+            const unsigned int row = *idx;
+            indices_to_be_sent.push_back(row < n_internal_dofs
+                                             ? row_starts[row / simd_length] +
+                                                   row % simd_length
+                                             : row_starts[row]);
+            for (auto jt = ++sparsity.begin(row); jt != sparsity.end(row); ++jt)
+              if (jt->column() >= ghost_ranges[p] &&
+                  jt->column() < ghost_ranges[p + 1])
+                indices_to_be_sent.push_back(
+                    row < n_internal_dofs
+                        ? row_starts[row / simd_length] + row % simd_length +
+                              (jt - sparsity.begin(row)) * simd_length
+                        : row_starts[row] + (jt - sparsity.begin(row)));
+          }
+          send_targets[p].first = partitioner.import_targets()[p].first;
+          send_targets[p].second = indices_to_be_sent.size();
+        }
+
+        /* Count how many dofs to receive and the various buffers to set up
+           the MPI communication.
+         */
+        std::size_t receive_counter = 0;
+        unsigned int loc_count = 0;
+        for (unsigned int i = n_locally_owned_dofs; i < sparsity.n_rows();
+             ++i) {
+          receive_counter += sparsity.row_length(i);
+          ++loc_count;
+          if (loc_count == vec_gt->second) {
+            receive_targets[vec_gt - partitioner.ghost_targets().begin()]
+                .second = receive_counter;
+            loc_count = 0;
+            ++vec_gt;
+          }
+        }
+
+        Assert(vec_gt == partitioner.ghost_targets().end(),
+               dealii::ExcInternalError());
+      }
+
+      mpi_communicator = partitioner.get_mpi_communicator();
     }
 
     unsigned int stride_of_row(const unsigned int row) const
@@ -107,9 +200,15 @@ namespace grendel
 
   private:
     unsigned int n_internal_dofs;
+    unsigned int n_locally_owned_dofs;
     dealii::AlignedVector<std::size_t> row_starts;
     dealii::AlignedVector<unsigned int> column_indices;
     dealii::AlignedVector<unsigned int> column_indices_transposed;
+
+    dealii::AlignedVector<std::size_t> indices_to_be_sent;
+    std::vector<std::pair<unsigned int, unsigned int>> send_targets;
+    std::vector<std::pair<unsigned int, unsigned int>> receive_targets;
+    MPI_Comm mpi_communicator;
 
     template <int, typename, int>
     friend class SparseMatrixSIMD;
@@ -400,9 +499,68 @@ namespace grendel
                         [my_rowstart + position_within_column * my_rowstride]];
     }
 
+    void communicate_offproc_entries()
+    {
+      static_assert(n_components == 1, "Only scalar case implemented");
+#ifdef DEAL_II_WITH_MPI
+
+      const std::size_t n_indices = sparsity->indices_to_be_sent.size();
+      exchange_buffer.resize_fast(n_indices);
+
+      std::vector<MPI_Request> requests(sparsity->receive_targets.size() +
+                                        sparsity->send_targets.size());
+      {
+        const auto &targets = sparsity->receive_targets;
+        for (unsigned int p = 0; p < targets.size(); ++p) {
+          const int ierr = MPI_Irecv(
+              data.data() +
+                  sparsity->row_starts[sparsity->n_locally_owned_dofs] +
+                  (p == 0 ? 0 : targets[p - 1].second),
+              (targets[p].second - (p == 0 ? 0 : targets[p - 1].second)) *
+                  sizeof(Number),
+              MPI_BYTE,
+              targets[p].first,
+              13,
+              sparsity->mpi_communicator,
+              &requests[p]);
+          AssertThrowMPI(ierr);
+        }
+      }
+
+      GRENDEL_PARALLEL_REGION_BEGIN
+
+      GRENDEL_OMP_FOR
+      for (std::size_t c = 0; c < n_indices; ++c)
+        exchange_buffer[c] = data[sparsity->indices_to_be_sent[c]];
+
+      GRENDEL_PARALLEL_REGION_END
+
+      {
+        const auto &targets = sparsity->send_targets;
+        for (unsigned int p = 0; p < targets.size(); ++p) {
+          const int ierr = MPI_Isend(
+              exchange_buffer.data() + (p == 0 ? 0 : targets[p - 1].second),
+              (targets[p].second - (p == 0 ? 0 : targets[p - 1].second)) *
+                  sizeof(Number),
+              MPI_BYTE,
+              targets[p].first,
+              13,
+              sparsity->mpi_communicator,
+              &requests[p + sparsity->receive_targets.size()]);
+          AssertThrowMPI(ierr);
+        }
+      }
+
+      const int ierr =
+          MPI_Waitall(requests.size(), requests.data(), MPI_STATUSES_IGNORE);
+      AssertThrowMPI(ierr);
+#endif
+    }
+
   private:
     const SparsityPatternSIMD<simd_length> *sparsity;
     dealii::AlignedVector<Number> data;
+    dealii::AlignedVector<Number> exchange_buffer;
   };
 
 } // namespace grendel

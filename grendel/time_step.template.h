@@ -46,8 +46,6 @@ namespace grendel
       , computing_timer_(computing_timer)
       , offline_data_(&offline_data)
       , initial_values_(&initial_values)
-      , lij_matrix_communicator_(
-            mpi_communicator, computing_timer, offline_data, lij_matrix_)
   {
     cfl_update_ = Number(0.95);
     add_parameter(
@@ -89,23 +87,10 @@ namespace grendel
 
     /* Initialize local matrices: */
 
-    const auto &sparsity = offline_data_->sparsity_pattern();
-
     dij_matrix_.reinit(offline_data_->sparsity_pattern_simd());
-    lij_matrix_.reinit(sparsity);
+    lij_matrix_.reinit(offline_data_->sparsity_pattern_simd());
 
     pij_matrix_.reinit(offline_data_->sparsity_pattern_simd());
-
-    if (Utilities::MPI::n_mpi_processes(mpi_communicator_) > 1)
-      lij_matrix_communicator_.prepare();
-
-    transposed_indices.resize(sparsity.n_nonzero_elements(),
-                              numbers::invalid_unsigned_int);
-    for (unsigned int row = 0; row < sparsity.n_rows(); ++row) {
-      for (auto j = sparsity.begin(row); j != sparsity.end(row); ++j)
-        transposed_indices[j->global_index()] =
-            sparsity.row_position(j->column(), row);
-    }
   }
 
 
@@ -667,7 +652,8 @@ namespace grendel
             const auto l_ij = Limiter<dim, VectorizedArray<Number>>::limit(
                 bounds, U_i_new, p_ij);
 
-            set_entry(lij_matrix_, jts, l_ij);
+            lij_matrix_.write_vectorized_entry(
+                l_ij, i, jts[0] - sparsity.begin(i));
           }
         } /* parallel SIMD loop */
 
@@ -721,7 +707,7 @@ namespace grendel
 
             const auto l_ij =
                 Limiter<dim, Number>::limit(bounds, U_i_new, p_ij);
-            set_entry(lij_matrix_, jt, l_ij);
+            lij_matrix_.write_entry(l_ij, i, jt - sparsity.begin(i));
           }
         } /* parallel non-vectorized loop */
 
@@ -760,7 +746,8 @@ namespace grendel
             const auto l_ij = Limiter<dim, VectorizedArray<Number>>::limit(
                 bounds, U_i_new, p_ij);
 
-            set_entry(lij_matrix_, jts, l_ij);
+            lij_matrix_.write_vectorized_entry(
+                l_ij, i, jts[0] - sparsity.begin(i));
           }
         } /* parallel SIMD loop */
 
@@ -780,7 +767,7 @@ namespace grendel
             auto p_ij = pij_matrix_.get_tensor(i, jt - sparsity.begin(i));
             const auto l_ij =
                 Limiter<dim, Number>::limit(bounds, U_i_new, p_ij);
-            set_entry(lij_matrix_, jt, l_ij);
+            lij_matrix_.write_entry(l_ij, i, jt - sparsity.begin(i));
           }
         } /* parallel non-vectorized loop */
 
@@ -804,7 +791,7 @@ namespace grendel
 
         LIKWID_MARKER_START("time_step_6");
 
-        lij_matrix_communicator_.synchronize();
+        lij_matrix_.communicate_offproc_entries();
 
         LIKWID_MARKER_STOP("time_step_6");
       }
@@ -843,11 +830,12 @@ namespace grendel
 
           for (; jts[0] != sparsity.end(i); increment_iterators(jts)) {
 
-            VectorizedArray<Number> l_ji = {};
-            for (unsigned int k = 0; k < l_ji.size(); ++k)
-              l_ji[k] =
-                  get_transposed_entry(lij_matrix_, jts[k], transposed_indices);
-            const auto l_ij = std::min(get_entry(lij_matrix_, jts), l_ji);
+            VectorizedArray<Number> l_ji =
+                lij_matrix_.get_vectorized_transposed_entry(
+                    i, jts[0] - sparsity.begin(i));
+            const auto l_ij = std::min(
+                lij_matrix_.get_vectorized_entry(i, jts[0] - sparsity.begin(i)),
+                l_ji);
 
             auto p_ij = pij_matrix_.get_vectorized_tensor(
                 i, jts[0] - sparsity.begin(i));
@@ -900,8 +888,9 @@ namespace grendel
             auto p_ij = pij_matrix_.get_tensor(i, jt - sparsity.begin(i));
 
             const auto l_ji =
-                get_transposed_entry(lij_matrix_, jt, transposed_indices);
-            const auto l_ij = std::min(get_entry(lij_matrix_, jt), l_ji);
+                lij_matrix_.get_transposed_entry(i, jt - sparsity.begin(i));
+            const auto l_ij = std::min(
+                lij_matrix_.get_entry(i, jt - sparsity.begin(i)), l_ji);
 
             U_i_new += l_ij * lambda * p_ij;
             p_ij *= (1 - l_ij);
