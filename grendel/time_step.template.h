@@ -224,8 +224,10 @@ namespace grendel
       GRENDEL_OMP_FOR
       for (unsigned int i = n_internal; i < n_owned; ++i) {
 
+        const unsigned int row_length = sparsity_simd.row_length(i);
+
         /* Skip constrained degrees of freedom */
-        if (++sparsity.begin(i) == sparsity.end(i))
+        if (row_length == 1)
           continue;
 
         const auto U_i = gather(U, i);
@@ -234,8 +236,6 @@ namespace grendel
         const Number hd_i = mass * measure_of_omega_inverse;
 
         indicator_serial.reset(U_i);
-
-        const unsigned int row_length = sparsity_simd.row_length(i);
 
         /* Skip diagonal. */
         const unsigned int *js = sparsity_simd.columns(i);
@@ -317,13 +317,14 @@ namespace grendel
       GRENDEL_OMP_FOR
       for (unsigned int i = 0; i < n_owned; ++i) {
 
+        const unsigned int row_length = sparsity_simd.row_length(i);
+
         /* Skip constrained degrees of freedom */
-        if (++sparsity.begin(i) == sparsity.end(i))
+        if (row_length == 1)
           continue;
 
         Number d_sum = Number(0.);
 
-        const unsigned int row_length = sparsity_simd.row_length(i);
         const unsigned int *js = sparsity_simd.columns(i);
 
         /* skip diagonal: */
@@ -608,32 +609,28 @@ namespace grendel
 
           const auto m_i_inv = simd_gather(lumped_mass_matrix_inverse, i);
 
-          const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
-          const VectorizedArray<Number> lambda_inv = Number(size - 1);
+          const unsigned int row_length = sparsity_simd.row_length(i);
+          const VectorizedArray<Number> lambda_inv = Number(row_length - 1);
 
           const auto r_i = simd_gather(r_, i);
 
-          auto jts = generate_iterators<n_array_elements>(
-              [&](auto k) { return sparsity.begin(i + k); });
+          const unsigned int *js = sparsity_simd.columns(i);
 
-          for (; jts[0] != sparsity.end(i); increment_iterators(jts)) {
-            const auto js = get_column_indices(jts);
+          for (unsigned int col_idx = 0; col_idx < row_length;
+               ++col_idx, js += n_array_elements) {
+
             const auto m_j_inv = simd_gather(lumped_mass_matrix_inverse, js);
             const auto U_j = simd_gather(U, js);
 
-            const auto m_ij =
-                mass_matrix.get_vectorized_entry(i, jts[0] - sparsity.begin(i));
-            const auto b_ij =
-                (jts[0] == sparsity.begin(i) ? VectorizedArray<Number>(1.)
-                                             : VectorizedArray<Number>(0.)) -
-                m_ij * m_j_inv;
-            const auto b_ji =
-                (jts[0] == sparsity.begin(i) ? VectorizedArray<Number>(1.)
-                                             : VectorizedArray<Number>(0.)) -
-                m_ij * m_i_inv;
+            const auto m_ij = mass_matrix.get_vectorized_entry(i, col_idx);
+            const auto b_ij = (col_idx == 0 ? VectorizedArray<Number>(1.)
+                                            : VectorizedArray<Number>(0.)) -
+                              m_ij * m_j_inv;
+            const auto b_ji = (col_idx == 0 ? VectorizedArray<Number>(1.)
+                                            : VectorizedArray<Number>(0.)) -
+                              m_ij * m_i_inv;
 
-            const auto d_ij =
-                dij_matrix_.get_vectorized_entry(i, jts[0] - sparsity.begin(i));
+            const auto d_ij = dij_matrix_.get_vectorized_entry(i, col_idx);
             const auto alpha_j = simd_gather(alpha_, js);
             const auto d_ijH = Indicator<dim, Number>::indicator_ ==
                                        Indicator<dim, Number>::Indicators::
@@ -646,14 +643,12 @@ namespace grendel
             const auto p_ij =
                 tau * m_i_inv * lambda_inv *
                 ((d_ijH - d_ij) * (U_j - U_i) + b_ij * r_j - b_ji * r_i);
-            pij_matrix_.write_vectorized_tensor(
-                p_ij, i, jts[0] - sparsity.begin(i), true);
+            pij_matrix_.write_vectorized_tensor(p_ij, i, col_idx, true);
 
             const auto l_ij = Limiter<dim, VectorizedArray<Number>>::limit(
                 bounds, U_i_new, p_ij);
 
-            lij_matrix_.write_vectorized_entry(
-                l_ij, i, jts[0] - sparsity.begin(i));
+            lij_matrix_.write_vectorized_entry(l_ij, i, col_idx);
           }
         } /* parallel SIMD loop */
 
@@ -663,7 +658,8 @@ namespace grendel
         for (unsigned int i = n_internal; i < n_owned; ++i) {
 
           /* Skip constrained degrees of freedom */
-          if (++sparsity.begin(i) == sparsity.end(i))
+          const unsigned int row_length = sparsity_simd.row_length(i);
+          if (row_length == 1)
             continue;
 
           const auto bounds = gather_array(bounds_, i);
@@ -671,26 +667,24 @@ namespace grendel
 
           const Number m_i_inv = lumped_mass_matrix_inverse.local_element(i);
           const auto alpha_i = alpha_.local_element(i);
-          const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
-          const Number lambda_inv = Number(size - 1);
+          const Number lambda_inv = Number(row_length - 1);
           const auto U_i = gather(U, i);
 
           const auto r_i = gather(r_, i);
 
-          for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
-            const auto j = jt->column();
+          const unsigned int *js = sparsity_simd.columns(i);
+          for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
+            const auto j = js[col_idx];
             const Number m_j_inv = lumped_mass_matrix_inverse.local_element(j);
 
-            const auto m_ij = mass_matrix.get_entry(i, jt - sparsity.begin(i));
+            const auto m_ij = mass_matrix.get_entry(i, col_idx);
             const auto b_ij =
-                (jt == sparsity.begin(i) ? Number(1.) : Number(0.)) -
-                m_ij * m_j_inv;
+                (col_idx == 0 ? Number(1.) : Number(0.)) - m_ij * m_j_inv;
             const auto b_ji =
-                (jt == sparsity.begin(i) ? Number(1.) : Number(0.)) -
-                m_ij * m_i_inv;
+                (col_idx == 0 ? Number(1.) : Number(0.)) - m_ij * m_i_inv;
 
             const auto U_j = gather(U, j);
-            const auto d_ij = dij_matrix_.get_entry(i, jt - sparsity.begin(i));
+            const auto d_ij = dij_matrix_.get_entry(i, col_idx);
             const auto alpha_j = alpha_.local_element(j);
             const auto d_ijH = Indicator<dim, Number>::indicator_ ==
                                        Indicator<dim, Number>::Indicators::
@@ -703,11 +697,11 @@ namespace grendel
             const auto p_ij =
                 tau * m_i_inv * lambda_inv *
                 ((d_ijH - d_ij) * (U_j - U_i) + b_ij * r_j - b_ji * r_i);
-            pij_matrix_.write_entry(p_ij, i, jt - sparsity.begin(i));
+            pij_matrix_.write_entry(p_ij, i, col_idx);
 
             const auto l_ij =
                 Limiter<dim, Number>::limit(bounds, U_i_new, p_ij);
-            lij_matrix_.write_entry(l_ij, i, jt - sparsity.begin(i));
+            lij_matrix_.write_entry(l_ij, i, col_idx);
           }
         } /* parallel non-vectorized loop */
 
@@ -735,19 +729,15 @@ namespace grendel
           const auto bounds = simd_gather_array(bounds_, i);
           const auto U_i_new = simd_gather(temp_euler_, i);
 
-          auto jts = generate_iterators<n_array_elements>(
-              [&](auto k) { return sparsity.begin(i + k); });
+          const unsigned int row_length = sparsity_simd.row_length(i);
+          for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
 
-          for (; jts[0] != sparsity.end(i); increment_iterators(jts)) {
-
-            const auto p_ij = pij_matrix_.get_vectorized_tensor(
-                i, jts[0] - sparsity.begin(i));
+            const auto p_ij = pij_matrix_.get_vectorized_tensor(i, col_idx);
 
             const auto l_ij = Limiter<dim, VectorizedArray<Number>>::limit(
                 bounds, U_i_new, p_ij);
 
-            lij_matrix_.write_vectorized_entry(
-                l_ij, i, jts[0] - sparsity.begin(i));
+            lij_matrix_.write_vectorized_entry(l_ij, i, col_idx);
           }
         } /* parallel SIMD loop */
 
@@ -757,17 +747,18 @@ namespace grendel
         for (unsigned int i = n_internal; i < n_owned; ++i) {
 
           /* Skip constrained degrees of freedom */
-          if (++sparsity.begin(i) == sparsity.end(i))
+          const unsigned int row_length = sparsity_simd.row_length(i);
+          if (row_length == 1)
             continue;
 
           const auto bounds = gather_array(bounds_, i);
           const auto U_i_new = gather(temp_euler_, i);
 
-          for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
-            auto p_ij = pij_matrix_.get_tensor(i, jt - sparsity.begin(i));
+          for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
+            auto p_ij = pij_matrix_.get_tensor(i, col_idx);
             const auto l_ij =
                 Limiter<dim, Number>::limit(bounds, U_i_new, p_ij);
-            lij_matrix_.write_entry(l_ij, i, jt - sparsity.begin(i));
+            lij_matrix_.write_entry(l_ij, i, col_idx);
           }
         } /* parallel non-vectorized loop */
 
@@ -822,30 +813,23 @@ namespace grendel
 
           auto U_i_new = simd_gather(temp_euler_, i);
 
-          const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
-          const Number lambda = Number(1.) / Number(size - 1);
+          const unsigned int row_length = sparsity_simd.row_length(i);
+          const Number lambda = Number(1.) / Number(row_length - 1);
 
-          auto jts = generate_iterators<n_array_elements>(
-              [&](auto k) { return sparsity.begin(i + k); });
-
-          for (; jts[0] != sparsity.end(i); increment_iterators(jts)) {
+          for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
 
             VectorizedArray<Number> l_ji =
-                lij_matrix_.get_vectorized_transposed_entry(
-                    i, jts[0] - sparsity.begin(i));
-            const auto l_ij = std::min(
-                lij_matrix_.get_vectorized_entry(i, jts[0] - sparsity.begin(i)),
-                l_ji);
+                lij_matrix_.get_vectorized_transposed_entry(i, col_idx);
+            const auto l_ij =
+                std::min(lij_matrix_.get_vectorized_entry(i, col_idx), l_ji);
 
-            auto p_ij = pij_matrix_.get_vectorized_tensor(
-                i, jts[0] - sparsity.begin(i));
+            auto p_ij = pij_matrix_.get_vectorized_tensor(i, col_idx);
 
             U_i_new += l_ij * lambda * p_ij;
             p_ij *= (VectorizedArray<Number>(1.) - l_ij);
 
             if (pass + 1 < n_passes)
-              pij_matrix_.write_vectorized_tensor(
-                  p_ij, i, jts[0] - sparsity.begin(i));
+              pij_matrix_.write_vectorized_tensor(p_ij, i, col_idx);
           }
 
 #ifdef CHECK_BOUNDS
@@ -876,27 +860,25 @@ namespace grendel
         for (unsigned int i = n_internal; i < n_owned; ++i) {
 
           /* Skip constrained degrees of freedom */
-          if (++sparsity.begin(i) == sparsity.end(i))
+          const unsigned int row_length = sparsity_simd.row_length(i);
+          if (row_length == 1)
             continue;
 
           auto U_i_new = gather(temp_euler_, i);
 
-          const auto size = std::distance(sparsity.begin(i), sparsity.end(i));
-          const Number lambda = Number(1.) / Number(size - 1);
+          const Number lambda = Number(1.) / Number(row_length - 1);
 
-          for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
-            auto p_ij = pij_matrix_.get_tensor(i, jt - sparsity.begin(i));
+          for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
+            auto p_ij = pij_matrix_.get_tensor(i, col_idx);
 
-            const auto l_ji =
-                lij_matrix_.get_transposed_entry(i, jt - sparsity.begin(i));
-            const auto l_ij = std::min(
-                lij_matrix_.get_entry(i, jt - sparsity.begin(i)), l_ji);
+            const auto l_ji = lij_matrix_.get_transposed_entry(i, col_idx);
+            const auto l_ij = std::min(lij_matrix_.get_entry(i, col_idx), l_ji);
 
             U_i_new += l_ij * lambda * p_ij;
             p_ij *= (1 - l_ij);
 
             if (pass + 1 < n_passes)
-              pij_matrix_.write_entry(p_ij, i, jt - sparsity.begin(i));
+              pij_matrix_.write_entry(p_ij, i, col_idx);
           }
 
 #ifdef CHECK_BOUNDS
