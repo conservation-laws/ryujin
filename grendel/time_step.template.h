@@ -87,10 +87,12 @@ namespace grendel
 
     /* Initialize local matrices: */
 
-    dij_matrix_.reinit(offline_data_->sparsity_pattern_simd());
-    lij_matrix_.reinit(offline_data_->sparsity_pattern_simd());
+    const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
 
-    pij_matrix_.reinit(offline_data_->sparsity_pattern_simd());
+    dij_matrix_.reinit(sparsity_simd);
+    lij_matrix_.reinit(sparsity_simd);
+
+    pij_matrix_.reinit(sparsity_simd);
   }
 
 
@@ -931,13 +933,14 @@ namespace grendel
           if (i >= n_owned)
             continue;
 
-          const auto &[normal, id, position] = it->second;
-
           /* Skip constrained degrees of freedom */
-          if (++sparsity.begin(i) == sparsity.end(i))
+          const unsigned int row_length = sparsity_simd.row_length(i);
+          if (row_length == 1)
             continue;
 
           auto U_i = gather(temp_euler_, i);
+
+          const auto &[normal, id, position] = it->second;
 
           /* On boundary 1 remove the normal component of the momentum: */
 
