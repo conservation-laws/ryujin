@@ -620,7 +620,6 @@ namespace grendel
                ++col_idx, js += n_array_elements) {
 
             const auto m_j_inv = simd_gather(lumped_mass_matrix_inverse, js);
-            const auto U_j = simd_gather(U, js);
 
             const auto m_ij = mass_matrix.get_vectorized_entry(i, col_idx);
             const auto b_ij = (col_idx == 0 ? VectorizedArray<Number>(1.)
@@ -638,6 +637,7 @@ namespace grendel
                                    ? d_ij * (alpha_i + alpha_j) * Number(.5)
                                    : d_ij * std::max(alpha_i, alpha_j);
 
+            const auto U_j = simd_gather(U, js);
             const auto r_j = simd_gather(r_, js);
 
             const auto p_ij =
@@ -648,7 +648,7 @@ namespace grendel
             const auto l_ij = Limiter<dim, VectorizedArray<Number>>::limit(
                 bounds, U_i_new, p_ij);
 
-            lij_matrix_.write_vectorized_entry(l_ij, i, col_idx);
+            lij_matrix_.write_vectorized_entry(l_ij, i, col_idx, true);
           }
         } /* parallel SIMD loop */
 
@@ -683,7 +683,6 @@ namespace grendel
             const auto b_ji =
                 (col_idx == 0 ? Number(1.) : Number(0.)) - m_ij * m_i_inv;
 
-            const auto U_j = gather(U, j);
             const auto d_ij = dij_matrix_.get_entry(i, col_idx);
             const auto alpha_j = alpha_.local_element(j);
             const auto d_ijH = Indicator<dim, Number>::indicator_ ==
@@ -692,6 +691,7 @@ namespace grendel
                                    ? d_ij * (alpha_i + alpha_j) * Number(.5)
                                    : d_ij * std::max(alpha_i, alpha_j);
 
+            const auto U_j = gather(U, j);
             const auto r_j = gather(r_, j);
 
             const auto p_ij =
@@ -737,7 +737,7 @@ namespace grendel
             const auto l_ij = Limiter<dim, VectorizedArray<Number>>::limit(
                 bounds, U_i_new, p_ij);
 
-            lij_matrix_.write_vectorized_entry(l_ij, i, col_idx);
+            lij_matrix_.write_vectorized_entry(l_ij, i, col_idx, true);
           }
         } /* parallel SIMD loop */
 
