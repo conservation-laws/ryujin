@@ -6,7 +6,6 @@
 #include <compile_time_options.h>
 
 #include "limiter.h"
-#include "matrix_communicator.h"
 
 #include "initial_values.h"
 #include "offline_data.h"

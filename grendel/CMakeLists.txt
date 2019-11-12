@@ -6,7 +6,6 @@ ADD_LIBRARY(grendel SHARED
   discretization.cc
   initial_values.cc
   limiter.cc
-  matrix_communicator.cc
   offline_data.cc
   postprocessor.cc
   problem_description.cc
