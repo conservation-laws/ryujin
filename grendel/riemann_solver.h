@@ -97,8 +97,8 @@ namespace grendel
     static std::tuple<Number /*lambda_max*/,
                       Number /*p_star*/,
                       unsigned int /*iteration*/>
-    compute(const rank1_type U_i,
-            const rank1_type U_j,
+    compute(const rank1_type &U_i,
+            const rank1_type &U_j,
             const dealii::Tensor<1, dim, Number> &n_ij,
             const Number hd_i = Number(0.));
   };

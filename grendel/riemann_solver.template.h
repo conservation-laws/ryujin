@@ -634,7 +634,7 @@ namespace grendel
      */
     template <int dim, typename Number>
     inline DEAL_II_ALWAYS_INLINE std::array<Number, 4> riemann_data_from_state(
-        const typename ProblemDescription<dim, Number>::rank1_type U,
+        const typename ProblemDescription<dim, Number>::rank1_type &U,
         const dealii::Tensor<1, dim, Number> &n_ij)
     {
       typename ProblemDescription<1, Number>::rank1_type projected;
@@ -666,8 +666,8 @@ namespace grendel
 
   template <int dim, typename Number>
   std::tuple<Number, Number, unsigned int> RiemannSolver<dim, Number>::compute(
-      const rank1_type U_i,
-      const rank1_type U_j,
+      const rank1_type &U_i,
+      const rank1_type &U_j,
       const dealii::Tensor<1, dim, Number> &n_ij,
       const Number hd_i)
   {

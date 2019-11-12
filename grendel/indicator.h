@@ -66,13 +66,13 @@ namespace grendel
      * Reset temporary storage and initialize for a new row corresponding
      * to state vector U_i:
      */
-    void reset(const rank1_type U_i);
+    void reset(const rank1_type &U_i);
 
     /**
      * When looping over the sparsity row, add the contribution associated
      * with the neighboring state U_j:
      */
-    void add(const rank1_type U_j,
+    void add(const rank1_type &U_j,
              const dealii::Tensor<1, dim, Number> &c_ij,
              const Number beta_ij);
     /**
@@ -122,7 +122,7 @@ namespace grendel
   {
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
-    smoothness_indicator(const typename Indicator<dim, Number>::rank1_type U)
+    smoothness_indicator(const typename Indicator<dim, Number>::rank1_type &U)
     {
       switch (Indicator<dim, Number>::smoothness_indicator_) {
       case Indicator<dim, Number>::SmoothnessIndicators::rho:
@@ -140,7 +140,7 @@ namespace grendel
 
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline void
-  Indicator<dim, Number>::reset(const rank1_type U_i)
+  Indicator<dim, Number>::reset(const rank1_type &U_i)
   {
     if constexpr (indicator_ == Indicators::entropy_viscosity_commutator) {
       rho_i = U_i[0];
@@ -173,7 +173,7 @@ namespace grendel
 
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline void
-  Indicator<dim, Number>::add(const rank1_type U_j,
+  Indicator<dim, Number>::add(const rank1_type &U_j,
                               const dealii::Tensor<1, dim, Number> &c_ij,
                               const Number beta_ij)
   {
