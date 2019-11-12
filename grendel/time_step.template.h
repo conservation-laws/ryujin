@@ -831,7 +831,7 @@ namespace grendel
             p_ij *= (VectorizedArray<Number>(1.) - l_ij);
 
             if (pass + 1 < n_passes)
-              pij_matrix_.write_vectorized_tensor(p_ij, i, col_idx);
+              pij_matrix_.write_vectorized_tensor(p_ij, i, col_idx, true);
           }
 
 #ifdef CHECK_BOUNDS

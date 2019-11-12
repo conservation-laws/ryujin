@@ -279,12 +279,12 @@ namespace grendel
       dealii::
           Tensor<1, n_components, dealii::VectorizedArray<Number, simd_length>>
               result;
+      const Number *load_pos =
+          data.data() + (sparsity->row_starts[row / simd_length] +
+                         position_within_column * simd_length) *
+                            n_components;
       for (unsigned int d = 0; d < n_components; ++d)
-        result[d].load(data.data() +
-                       (sparsity->row_starts[row / simd_length] +
-                        position_within_column * simd_length) *
-                           n_components +
-                       d * simd_length);
+        result[d].load(load_pos + d * simd_length);
       return result;
     }
 
@@ -293,7 +293,7 @@ namespace grendel
         const dealii::VectorizedArray<Number, simd_length> entry,
         const unsigned int row,
         const unsigned int position_within_column,
-        const bool do_streaming_store = true)
+        const bool do_streaming_store = false)
     {
       static_assert(
           n_components == 1,
@@ -314,7 +314,7 @@ namespace grendel
             &entry,
         const unsigned int row,
         const unsigned int position_within_column,
-        const bool do_streaming_store = true)
+        const bool do_streaming_store = false)
     {
       Assert(sparsity != nullptr, dealii::ExcNotInitialized());
 
@@ -326,20 +326,16 @@ namespace grendel
       Assert(row % simd_length == 0,
              dealii::ExcMessage(
                  "Access only supported for rows at the SIMD granularity"));
+      Number *store_pos =
+          data.data() + (sparsity->row_starts[row / simd_length] +
+                         position_within_column * simd_length) *
+                            n_components;
       if (do_streaming_store)
         for (unsigned int d = 0; d < n_components; ++d)
-          entry[d].streaming_store(data.data() +
-                                   (sparsity->row_starts[row / simd_length] +
-                                    position_within_column * simd_length) *
-                                       n_components +
-                                   d * simd_length);
+          entry[d].streaming_store(store_pos + d * simd_length);
       else
         for (unsigned int d = 0; d < n_components; ++d)
-          entry[d].store(data.data() +
-                         (sparsity->row_starts[row / simd_length] +
-                          position_within_column * simd_length) *
-                             n_components +
-                         d * simd_length);
+          entry[d].store(store_pos + d * simd_length);
     }
 
     DEAL_II_ALWAYS_INLINE
