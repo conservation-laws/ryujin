@@ -9,7 +9,9 @@
 
 namespace grendel
 {
-  template <int simd_length, typename Number, int n_components = 1>
+  template <typename Number,
+            int n_components = 1,
+            int simd_length = dealii::VectorizedArray<Number>::n_array_elements>
   class SparseMatrixSIMD;
 
   /**
@@ -73,7 +75,7 @@ namespace grendel
     std::vector<std::pair<unsigned int, unsigned int>> receive_targets;
     MPI_Comm mpi_communicator;
 
-    template <int, typename, int>
+    template <typename, int, int>
     friend class SparseMatrixSIMD;
   };
 
@@ -87,7 +89,7 @@ namespace grendel
    * region [n_internal_dofs, n_locally_owned_dofs) we store the matrix in
    * CSR format (equivalent to the static dealii::SparsityPattern).
    */
-  template <int simd_length, typename Number, int n_components>
+  template <typename Number, int n_components, int simd_length>
   class SparseMatrixSIMD
   {
   public:
@@ -228,18 +230,18 @@ namespace grendel
   }
 
 
-  template <int simd_length, typename Number, int n_components>
+  template <typename Number, int n_components, int simd_length>
   DEAL_II_ALWAYS_INLINE inline Number
-  SparseMatrixSIMD<simd_length, Number, n_components>::get_entry(
+  SparseMatrixSIMD<Number, n_components, simd_length>::get_entry(
       const unsigned int row, const unsigned int position_within_column) const
   {
     return get_tensor(row, position_within_column)[0];
   }
 
 
-  template <int simd_length, typename Number, int n_components>
+  template <typename Number, int n_components, int simd_length>
   DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, n_components, Number>
-  SparseMatrixSIMD<simd_length, Number, n_components>::get_tensor(
+  SparseMatrixSIMD<Number, n_components, simd_length>::get_tensor(
       const unsigned int row, const unsigned int position_within_column) const
   {
     Assert(sparsity != nullptr, dealii::ExcNotInitialized());
@@ -269,18 +271,18 @@ namespace grendel
   }
 
 
-  template <int simd_length, typename Number, int n_components>
+  template <typename Number, int n_components, int simd_length>
   DEAL_II_ALWAYS_INLINE inline dealii::VectorizedArray<Number, simd_length>
-  SparseMatrixSIMD<simd_length, Number, n_components>::get_vectorized_entry(
+  SparseMatrixSIMD<Number, n_components, simd_length>::get_vectorized_entry(
       const unsigned int row, const unsigned int position_within_column) const
   {
     return get_vectorized_tensor(row, position_within_column)[0];
   }
 
 
-  template <int simd_length, typename Number, int n_components>
+  template <typename Number, int n_components, int simd_length>
   DEAL_II_ALWAYS_INLINE inline auto
-  SparseMatrixSIMD<simd_length, Number, n_components>::get_vectorized_tensor(
+  SparseMatrixSIMD<Number, n_components, simd_length>::get_vectorized_tensor(
       const unsigned int row, const unsigned int position_within_column) const
       -> dealii::Tensor<1, n_components, VectorizedArray>
   {
@@ -308,18 +310,18 @@ namespace grendel
   }
 
 
-  template <int simd_length, typename Number, int n_components>
+  template <typename Number, int n_components, int simd_length>
   DEAL_II_ALWAYS_INLINE inline Number
-  SparseMatrixSIMD<simd_length, Number, n_components>::get_transposed_entry(
+  SparseMatrixSIMD<Number, n_components, simd_length>::get_transposed_entry(
       const unsigned int row, const unsigned int position_within_column) const
   {
     return get_transposed_tensor(row, position_within_column)[0];
   }
 
 
-  template <int simd_length, typename Number, int n_components>
+  template <typename Number, int n_components, int simd_length>
   DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, n_components, Number>
-  SparseMatrixSIMD<simd_length, Number, n_components>::get_transposed_tensor(
+  SparseMatrixSIMD<Number, n_components, simd_length>::get_transposed_tensor(
       const unsigned int row, const unsigned int position_within_column) const
   {
     Assert(sparsity != nullptr, dealii::ExcNotInitialized());
@@ -348,9 +350,9 @@ namespace grendel
   }
 
 
-  template <int simd_length, typename Number, int n_components>
+  template <typename Number, int n_components, int simd_length>
   DEAL_II_ALWAYS_INLINE inline dealii::VectorizedArray<Number, simd_length>
-  SparseMatrixSIMD<simd_length, Number, n_components>::
+  SparseMatrixSIMD<Number, n_components, simd_length>::
       get_vectorized_transposed_entry(
           const unsigned int row,
           const unsigned int position_within_column) const
@@ -388,9 +390,9 @@ namespace grendel
   }
 
 
-  template <int simd_length, typename Number, int n_components>
+  template <typename Number, int n_components, int simd_length>
   DEAL_II_ALWAYS_INLINE inline void
-  SparseMatrixSIMD<simd_length, Number, n_components>::write_entry(
+  SparseMatrixSIMD<Number, n_components, simd_length>::write_entry(
       const Number entry,
       const unsigned int row,
       const unsigned int position_within_column)
@@ -402,9 +404,9 @@ namespace grendel
   }
 
 
-  template <int simd_length, typename Number, int n_components>
+  template <typename Number, int n_components, int simd_length>
   DEAL_II_ALWAYS_INLINE inline void
-  SparseMatrixSIMD<simd_length, Number, n_components>::write_tensor(
+  SparseMatrixSIMD<Number, n_components, simd_length>::write_tensor(
       const dealii::Tensor<1, n_components, Number> &entry,
       const unsigned int row,
       const unsigned int position_within_column)
@@ -433,9 +435,9 @@ namespace grendel
   }
 
 
-  template <int simd_length, typename Number, int n_components>
+  template <typename Number, int n_components, int simd_length>
   DEAL_II_ALWAYS_INLINE inline void
-  SparseMatrixSIMD<simd_length, Number, n_components>::write_vectorized_entry(
+  SparseMatrixSIMD<Number, n_components, simd_length>::write_vectorized_entry(
       const dealii::VectorizedArray<Number, simd_length> entry,
       const unsigned int row,
       const unsigned int position_within_column,
@@ -449,9 +451,9 @@ namespace grendel
   }
 
 
-  template <int simd_length, typename Number, int n_components>
+  template <typename Number, int n_components, int simd_length>
   DEAL_II_ALWAYS_INLINE inline void
-  SparseMatrixSIMD<simd_length, Number, n_components>::write_vectorized_tensor(
+  SparseMatrixSIMD<Number, n_components, simd_length>::write_vectorized_tensor(
       const dealii::Tensor<1, n_components, VectorizedArray> &entry,
       const unsigned int row,
       const unsigned int position_within_column,
@@ -479,8 +481,8 @@ namespace grendel
   }
 
 
-  template <int simd_length, typename Number, int n_components>
-  inline void SparseMatrixSIMD<simd_length, Number, n_components>::
+  template <typename Number, int n_components, int simd_length>
+  inline void SparseMatrixSIMD<Number, n_components, simd_length>::
       communicate_offproc_entries()
   {
 #ifdef DEAL_II_WITH_MPI

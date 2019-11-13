@@ -145,8 +145,7 @@ namespace grendel
     /**
      * The mass matrix.
      */
-    SparseMatrixSIMD<dealii::VectorizedArray<Number>::n_array_elements, Number>
-        mass_matrix_;
+    SparseMatrixSIMD<Number> mass_matrix_;
     ACCESSOR_READ_ONLY(mass_matrix)
 
     /**
@@ -169,14 +168,6 @@ namespace grendel
     ACCESSOR_READ_ONLY(measure_of_omega)
 
     /**
-     * The stiffness matrix $(beta_{ij})$:
-     *   $\beta_{ij} = \nabla\varphi_{j}\cdot\nabla\varphi_{i}$
-     */
-    SparseMatrixSIMD<dealii::VectorizedArray<Number>::n_array_elements, Number>
-        betaij_matrix_;
-    ACCESSOR_READ_ONLY(betaij_matrix)
-
-    /**
      * A sparsity pattern for matrices in vectorized format
      */
     SparsityPatternSIMD<dealii::VectorizedArray<Number>::n_array_elements>
@@ -184,12 +175,16 @@ namespace grendel
     ACCESSOR_READ_ONLY(sparsity_pattern_simd)
 
     /**
+     * The stiffness matrix $(beta_{ij})$:
+     *   $\beta_{ij} = \nabla\varphi_{j}\cdot\nabla\varphi_{i}$
+     */
+    SparseMatrixSIMD<Number> betaij_matrix_;
+    ACCESSOR_READ_ONLY(betaij_matrix)
+
+    /**
      * The $(c_{ij})$ matrix.
      */
-    SparseMatrixSIMD<dealii::VectorizedArray<Number>::n_array_elements,
-                     Number,
-                     dim>
-        cij_matrix_;
+    SparseMatrixSIMD<Number, dim> cij_matrix_;
     ACCESSOR_READ_ONLY(cij_matrix)
 
   private:

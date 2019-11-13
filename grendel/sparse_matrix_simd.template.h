@@ -176,15 +176,15 @@ namespace grendel
   }
 
 
-  template <int simd_length, typename Number, int n_components>
-  SparseMatrixSIMD<simd_length, Number, n_components>::SparseMatrixSIMD()
+  template <typename Number, int n_components, int simd_length>
+  SparseMatrixSIMD<Number, n_components, simd_length>::SparseMatrixSIMD()
       : sparsity(nullptr)
   {
   }
 
 
-  template <int simd_length, typename Number, int n_components>
-  SparseMatrixSIMD<simd_length, Number, n_components>::SparseMatrixSIMD(
+  template <typename Number, int n_components, int simd_length>
+  SparseMatrixSIMD<Number, n_components, simd_length>::SparseMatrixSIMD(
       const SparsityPatternSIMD<simd_length> &sparsity)
       : sparsity(&sparsity)
   {
@@ -192,8 +192,8 @@ namespace grendel
   }
 
 
-  template <int simd_length, typename Number, int n_components>
-  void SparseMatrixSIMD<simd_length, Number, n_components>::reinit(
+  template <typename Number, int n_components, int simd_length>
+  void SparseMatrixSIMD<Number, n_components, simd_length>::reinit(
       const SparsityPatternSIMD<simd_length> &sparsity)
   {
     this->sparsity = &sparsity;

@@ -10,18 +10,11 @@ namespace grendel
   template class SparsityPatternSIMD<
       dealii::VectorizedArray<NUMBER>::n_array_elements>;
 
-  template class SparseMatrixSIMD<
-      dealii::VectorizedArray<NUMBER>::n_array_elements,
-      NUMBER>;
+  template class SparseMatrixSIMD<NUMBER>;
 
-  template class SparseMatrixSIMD<
-      dealii::VectorizedArray<NUMBER>::n_array_elements,
-      NUMBER,
-      DIM>;
+  template class SparseMatrixSIMD<NUMBER, DIM>;
 
-  template class SparseMatrixSIMD<
-      dealii::VectorizedArray<NUMBER>::n_array_elements,
-      NUMBER,
-      ProblemDescription<DIM>::problem_dimension>;
+  template class SparseMatrixSIMD<NUMBER,
+                                  ProblemDescription<DIM>::problem_dimension>;
 
 } /* namespace grendel */

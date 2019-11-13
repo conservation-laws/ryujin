@@ -750,6 +750,8 @@ namespace grendel
       }
 
       GRENDEL_PARALLEL_REGION_END
+
+//       cij_matrix_.read_in(cij_matrix_tmp);
     }
   }
 

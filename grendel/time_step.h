@@ -126,15 +126,10 @@ namespace grendel
 
     vector_type r_;
 
-    SparseMatrixSIMD<dealii::VectorizedArray<Number>::n_array_elements, Number>
-        dij_matrix_;
-    SparseMatrixSIMD<dealii::VectorizedArray<Number>::n_array_elements, Number>
-        lij_matrix_;
+    SparseMatrixSIMD<Number> dij_matrix_;
+    SparseMatrixSIMD<Number> lij_matrix_;
 
-    SparseMatrixSIMD<dealii::VectorizedArray<Number>::n_array_elements,
-                     Number,
-                     problem_dimension>
-        pij_matrix_;
+    SparseMatrixSIMD<Number, problem_dimension> pij_matrix_;
 
     vector_type temp_euler_;
     vector_type temp_ssp_;
