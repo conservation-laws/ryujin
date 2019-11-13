@@ -1,9 +1,9 @@
 #ifndef PROBLEM_DESCRIPTION_H
 #define PROBLEM_DESCRIPTION_H
 
-#include <compile_time_options.h>
 #include "helper.h"
 #include "simd.h"
+#include <compile_time_options.h>
 
 #include <deal.II/base/tensor.h>
 
@@ -92,41 +92,42 @@ namespace grendel
      * For a given (2+dim dimensional) state vector <code>U</code>, return
      * the momentum vector <code>[U[1], ..., U[1+dim]]</code>.
      */
-    static dealii::Tensor<1, dim, Number> momentum(const rank1_type U);
+    static dealii::Tensor<1, dim, Number> momentum(const rank1_type &U);
 
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
      * and return the internal energy \varepsilon = (\rho e).
      */
-    static Number internal_energy(const rank1_type U);
+    static Number internal_energy(const rank1_type &U);
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code> and the
      * inverse density, compute and return the internal energy \varepsilon
      * = (\rho e). Uses pre-computed inverse density for faster evaluation.
      */
-    static Number internal_energy(const rank1_type U, const Number rho_inverse);
+    static Number internal_energy(const rank1_type &U,
+                                  const Number rho_inverse);
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
      * and return the derivative of the internal energy \varepsilon = (\rho e).
      */
-    static rank1_type internal_energy_derivative(const rank1_type U);
+    static rank1_type internal_energy_derivative(const rank1_type &U);
 
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
      * and return the pressure .
      */
-    static Number pressure(const rank1_type U);
+    static Number pressure(const rank1_type &U);
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code> and the
      * inverse density, compute and return the pressure. Uses pre-computed
      * inverse density for faster evaluation.
      */
-    static Number pressure(const rank1_type U, const Number rho_inverse);
+    static Number pressure(const rank1_type &U, const Number rho_inverse);
 
 
     /**
@@ -136,13 +137,13 @@ namespace grendel
      * Recall that
      *   c^2 = gamma * p / rho / (1 - b * rho)
      */
-    static Number speed_of_sound(const rank1_type U);
+    static Number speed_of_sound(const rank1_type &U);
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code> and the
      * inverse of the density, compute the (physical) speed of sound.
      */
-    static Number speed_of_sound(const rank1_type U, const Number rho_inverse);
+    static Number speed_of_sound(const rank1_type &U, const Number rho_inverse);
 
 
     /**
@@ -150,7 +151,7 @@ namespace grendel
      * and return the specific entropy
      * e^((\gamma-1)s) = (rho e) / rho ^ gamma.
      */
-    static Number specific_entropy(const rank1_type U);
+    static Number specific_entropy(const rank1_type &U);
 
 
     /**
@@ -159,7 +160,7 @@ namespace grendel
      *
      *   \eta = (rho^2 e) ^ (1 / (gamma + 1))
      */
-    static Number entropy(const rank1_type U);
+    static Number entropy(const rank1_type &U);
 
 
     /**
@@ -168,19 +169,19 @@ namespace grendel
      *
      *   \eta = (rho^2 e) ^ (1 / (gamma + 1))
      */
-    static rank1_type entropy_derivative(const rank1_type U);
+    static rank1_type entropy_derivative(const rank1_type &U);
 
 
     /**
      * Given a state @p U compute <code>f(U)</code>.
      */
-    static rank2_type f(const rank1_type U);
+    static rank2_type f(const rank1_type &U);
   };
 
 
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, dim, Number>
-  ProblemDescription<dim, Number>::momentum(const rank1_type U)
+  ProblemDescription<dim, Number>::momentum(const rank1_type &U)
   {
     dealii::Tensor<1, dim, Number> result;
     for (unsigned int i = 0; i < dim; ++i)
@@ -191,25 +192,25 @@ namespace grendel
 
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline Number
-  ProblemDescription<dim, Number>::internal_energy(const rank1_type U)
+  ProblemDescription<dim, Number>::internal_energy(const rank1_type &U)
   {
     /*
      * rho e = (E - 1/2*m^2/rho)
      */
-    const Number &rho = U[0];
+    const Number rho = U[0];
     const auto m = momentum(U);
-    const Number &E = U[dim + 1];
+    const Number E = U[dim + 1];
     return E - ScalarNumber(0.5) * m.norm_square() / rho;
   }
 
 
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline Number
-  ProblemDescription<dim, Number>::internal_energy(const rank1_type U,
+  ProblemDescription<dim, Number>::internal_energy(const rank1_type &U,
                                                    const Number rho_inverse)
   {
     const auto m = momentum(U);
-    const Number &E = U[dim + 1];
+    const Number E = U[dim + 1];
     return E - ScalarNumber(0.5) * m.norm_square() * rho_inverse;
   }
 
@@ -218,7 +219,7 @@ namespace grendel
   DEAL_II_ALWAYS_INLINE inline
       typename ProblemDescription<dim, Number>::rank1_type
       ProblemDescription<dim, Number>::internal_energy_derivative(
-          const rank1_type U)
+          const rank1_type &U)
   {
     /*
      * With
@@ -227,7 +228,7 @@ namespace grendel
      *   (rho e)' = (1/2m^2/rho^2, -m/rho , 1 )^T
      */
 
-    const Number &rho = U[0];
+    const Number rho = U[0];
     const auto u = momentum(U) / rho;
 
     rank1_type result;
@@ -244,7 +245,7 @@ namespace grendel
 
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline Number
-  ProblemDescription<dim, Number>::pressure(const rank1_type U)
+  ProblemDescription<dim, Number>::pressure(const rank1_type &U)
   {
     /*
      * With
@@ -262,7 +263,7 @@ namespace grendel
 
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline Number
-  ProblemDescription<dim, Number>::pressure(const rank1_type U,
+  ProblemDescription<dim, Number>::pressure(const rank1_type &U,
                                             const Number rho_inverse)
   {
     return (gamma - ScalarNumber(1.)) * internal_energy(U, rho_inverse);
@@ -271,7 +272,7 @@ namespace grendel
 
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline Number
-  ProblemDescription<dim, Number>::speed_of_sound(const rank1_type U)
+  ProblemDescription<dim, Number>::speed_of_sound(const rank1_type &U)
   {
     /* c^2 = gamma * p / rho / (1 - b * rho) */
     const Number rho = U[0];
@@ -282,7 +283,7 @@ namespace grendel
 
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline Number
-  ProblemDescription<dim, Number>::speed_of_sound(const rank1_type U,
+  ProblemDescription<dim, Number>::speed_of_sound(const rank1_type &U,
                                                   const Number rho_inverse)
   {
     const Number p = pressure(U, rho_inverse);
@@ -292,28 +293,28 @@ namespace grendel
 
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline Number
-  ProblemDescription<dim, Number>::specific_entropy(const rank1_type U)
+  ProblemDescription<dim, Number>::specific_entropy(const rank1_type &U)
   {
     /*
      * We have
      *   exp((gamma - 1)s) = (rho e) / rho ^ gamma
      */
-    const auto &rho = U[0];
+    const auto rho = U[0];
     return internal_energy(U) / grendel::pow(rho, gamma);
   }
 
 
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline Number
-  ProblemDescription<dim, Number>::entropy(const rank1_type U)
+  ProblemDescription<dim, Number>::entropy(const rank1_type &U)
   {
     /*
      * We have
      *   rho^2 e = \rho E - 1/2*m^2
      */
-    const Number &rho = U[0];
+    const Number rho = U[0];
     const auto m = momentum(U);
-    const Number &E = U[dim + 1];
+    const Number E = U[dim + 1];
 
     const Number rho_rho_e = rho * E - ScalarNumber(0.5) * m.norm_square();
     return grendel::pow(rho_rho_e, gamma_plus_one_inverse);
@@ -323,7 +324,7 @@ namespace grendel
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline
       typename ProblemDescription<dim, Number>::rank1_type
-      ProblemDescription<dim, Number>::entropy_derivative(const rank1_type U)
+      ProblemDescription<dim, Number>::entropy_derivative(const rank1_type &U)
   {
     /*
      * With
@@ -336,9 +337,9 @@ namespace grendel
      *
      * (Here we have set b = 0)
      */
-    const Number &rho = U[0];
+    const Number rho = U[0];
     const auto m = momentum(U);
-    const Number &E = U[dim + 1];
+    const Number E = U[dim + 1];
 
     const Number rho_rho_e = rho * E - ScalarNumber(0.5) * m.norm_square();
 
@@ -361,12 +362,12 @@ namespace grendel
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline
       typename ProblemDescription<dim, Number>::rank2_type
-      ProblemDescription<dim, Number>::f(const rank1_type U)
+      ProblemDescription<dim, Number>::f(const rank1_type &U)
   {
-    const Number &rho_inverse = Number(1.) / U[0];
+    const Number rho_inverse = Number(1.) / U[0];
     const auto m = momentum(U);
     const auto p = pressure(U);
-    const Number &E = U[dim + 1];
+    const Number E = U[dim + 1];
 
     rank2_type result;
 
