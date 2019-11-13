@@ -287,7 +287,7 @@ namespace grendel
       LIKWID_MARKER_STOP("time_step_1");
       GRENDEL_PARALLEL_REGION_END
 
-      /* Synchronize alpha_ over all MPI processes: */
+      /* Synchronize over all MPI processes: */
       alpha_.update_ghost_values();
       second_variations_.update_ghost_values();
     }
@@ -355,7 +355,7 @@ namespace grendel
       LIKWID_MARKER_STOP("time_step_2");
       GRENDEL_PARALLEL_REGION_END
 
-      /* Synchronize tau_max over all MPI processes: */
+      /* Synchronize over all MPI processes: */
       tau_max.store(Utilities::MPI::min(tau_max.load(), mpi_communicator_));
 
       AssertThrow(!std::isnan(tau_max) && !std::isinf(tau_max) && tau_max > 0.,
@@ -564,7 +564,7 @@ namespace grendel
       LIKWID_MARKER_STOP("time_step_3");
       GRENDEL_PARALLEL_REGION_END
 
-      /* Synchronize r_ over all MPI processes: */
+      /* Synchronize over all MPI processes: */
       for (auto &it : r_)
         it.update_ghost_values();
     }
@@ -706,6 +706,9 @@ namespace grendel
         LIKWID_MARKER_STOP("time_step_4");
         GRENDEL_PARALLEL_REGION_END
 
+        /* Synchronize over all MPI processes: */
+        lij_matrix_.update_ghost_rows();
+
       } else {
         /*
          * Step 5: compute l_ij (second and later rounds):
@@ -760,29 +763,11 @@ namespace grendel
           }
         } /* parallel non-vectorized loop */
 
-
         LIKWID_MARKER_STOP("time_step_5");
         GRENDEL_PARALLEL_REGION_END
-      }
 
-
-      /*
-       * Step 6: And exchange l_ij:
-       */
-
-      if (Utilities::MPI::n_mpi_processes(mpi_communicator_) > 1) {
-
-#ifdef DEBUG_OUTPUT
-        deallog << "        exchange l_ij" << std::endl;
-#endif
-        TimerOutput::Scope time(computing_timer_,
-                                "time_step - 6 exchange l_ij");
-
-        LIKWID_MARKER_START("time_step_6");
-
-        lij_matrix_.communicate_offproc_entries();
-
-        LIKWID_MARKER_STOP("time_step_6");
+        /* Synchronize over all MPI processes: */
+        lij_matrix_.update_ghost_rows();
       }
 
 
@@ -963,7 +948,7 @@ namespace grendel
       LIKWID_MARKER_STOP("time_step_8");
     }
 
-    /* Synchronize temp over all MPI processes: */
+    /* Synchronize over all MPI processes: */
     for (auto &it : temp_euler_)
       it.update_ghost_values();
 

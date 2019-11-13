@@ -33,8 +33,8 @@ namespace grendel
    *    columns, following the sparsity pattern.
    *
    * For the non-vectorized row index region [n_internal_dofs,
-   * n_locally_owned_dofs) we store the matrix in CSR format (equivalent to
-   * the static dealii::SparsityPattern).
+   * n_locally_relevant_dofs) we store the matrix in CSR format (equivalent
+   * to the static dealii::SparsityPattern).
    */
   template <int simd_length>
   class SparsityPatternSIMD
@@ -158,7 +158,7 @@ namespace grendel
         const bool do_streaming_store = false);
 
 
-    void communicate_offproc_entries();
+    void update_ghost_rows();
 
   private:
     const SparsityPatternSIMD<simd_length> *sparsity;
@@ -482,8 +482,8 @@ namespace grendel
 
 
   template <typename Number, int n_components, int simd_length>
-  inline void SparseMatrixSIMD<Number, n_components, simd_length>::
-      communicate_offproc_entries()
+  inline void
+  SparseMatrixSIMD<Number, n_components, simd_length>::update_ghost_rows()
   {
 #ifdef DEAL_II_WITH_MPI
     Assert(n_components == 1, ExcMessage("Only scalar case implemented"));
