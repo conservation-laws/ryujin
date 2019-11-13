@@ -772,7 +772,7 @@ namespace grendel
 
 
       /*
-       * Step 7: Perform high-order update:
+       * Step 6: Perform high-order update:
        *
        *   Symmetrize l_ij
        *   High-order update: += l_ij * lambda * P_ij
@@ -784,10 +784,10 @@ namespace grendel
 #endif
         TimerOutput::Scope time(
             computing_timer_,
-            "time_step - 7 symmetrize l_ij, high-order update");
+            "time_step - 6 symmetrize l_ij, high-order update");
 
         GRENDEL_PARALLEL_REGION_BEGIN
-        LIKWID_MARKER_START("time_step_7");
+        LIKWID_MARKER_START("time_step_6");
 
         /* Parallel vectorized loop: */
 
@@ -887,7 +887,7 @@ namespace grendel
           scatter(temp_euler_, U_i_new, i);
         } /* parallel non-vectorized loop */
 
-        LIKWID_MARKER_STOP("time_step_7");
+        LIKWID_MARKER_STOP("time_step_6");
         GRENDEL_PARALLEL_REGION_END
       }
     } /* limiter_iter_ */
@@ -901,9 +901,9 @@ namespace grendel
       deallog << "        fix up boundary states" << std::endl;
 #endif
       TimerOutput::Scope time(computing_timer_,
-                              "time_step - 8 fix boundary states");
+                              "time_step - 7 fix boundary states");
 
-      LIKWID_MARKER_START("time_step_8");
+      LIKWID_MARKER_START("time_step_7");
 
       const auto on_subranges = [&](const auto it1, const auto it2) {
         for (auto it = it1; it != it2; ++it) {
@@ -945,7 +945,7 @@ namespace grendel
       // FIXME: This is currently not parallel:
       on_subranges(boundary_normal_map.begin(), boundary_normal_map.end());
 
-      LIKWID_MARKER_STOP("time_step_8");
+      LIKWID_MARKER_STOP("time_step_7");
     }
 
     /* Synchronize over all MPI processes: */
