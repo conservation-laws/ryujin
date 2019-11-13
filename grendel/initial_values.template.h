@@ -24,25 +24,35 @@ namespace grendel
         "configuration",
         configuration_,
         "Configuration. Valid options are \"uniform\", \"shock front\", "
-        "\"sod contrast\", \"isentropic vortex\"");
+        "\"contrast\", \"sod contrast\", \"isentropic vortex\"");
 
     initial_direction_[0] = 1.;
-    add_parameter("initial - direction",
-                  initial_direction_,
-                  "Initial direction of shock front, sod contrast, or vortex");
+    add_parameter(
+        "initial - direction",
+        initial_direction_,
+        "Initial direction of shock front, contrast, sod contrast, or vortex");
 
     initial_position_[0] = 1.;
-    add_parameter("initial - position",
-                  initial_position_,
-                  "Initial position of shock front, sod contrast, or vortex");
+    add_parameter(
+        "initial - position",
+        initial_position_,
+        "Initial position of shock front, contrast, sod contrast, or vortex");
 
     initial_1d_state_[0] = gamma;
     initial_1d_state_[1] = 3.0;
     initial_1d_state_[2] = 1.;
     add_parameter("initial - 1d state",
                   initial_1d_state_,
-                  "Initial 1d state (rho, u, p) of the uniform, shock front "
-                  "configurations");
+                  "Initial 1d state (rho, u, p) of the uniform, shock front, "
+                  "and contrast configurations");
+
+    initial_1d_state_contrast_[0] = gamma;
+    initial_1d_state_contrast_[1] = 3.0;
+    initial_1d_state_contrast_[2] = 1.;
+    add_parameter(
+        "initial - 1d state contrast",
+        initial_1d_state_contrast_,
+        "Contrast 1d state (rho, u, p) of the contrast configuration");
 
     initial_mach_number_ = 2.0;
     add_parameter("initial - mach number",
@@ -148,6 +158,22 @@ namespace grendel
           return from_1d_state(initial_1d_state_);
         } else {
           return from_1d_state(initial_1d_state_L);
+        }
+      };
+
+    } else if (configuration_ == "contrast") {
+
+      /*
+       * A contrast:
+       */
+
+      initial_state_ = [=](const dealii::Point<dim> &point, Number /*t*/) {
+        const Number position_1d = Number((point - initial_position_)[1]);
+
+        if (position_1d > 0.) {
+          return from_1d_state(initial_1d_state_);
+        } else {
+          return from_1d_state(initial_1d_state_contrast_);
         }
       };
 

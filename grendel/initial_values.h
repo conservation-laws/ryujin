@@ -61,6 +61,7 @@ namespace grendel
     dealii::Tensor<1, dim> initial_direction_;
 
     dealii::Tensor<1, 3, Number> initial_1d_state_;
+    dealii::Tensor<1, 3, Number> initial_1d_state_contrast_;
 
     Number initial_mach_number_;
 
