@@ -327,8 +327,7 @@ namespace grendel
 
         /* skip diagonal: */
         for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
-          const auto j = *(i < n_internal ? js + i % n_array_elements +
-                                                col_idx * n_array_elements
+          const auto j = *(i < n_internal ? js + col_idx * n_array_elements
                                           : js + col_idx);
 
           // fill lower triangular part of dij_matrix missing from step 1

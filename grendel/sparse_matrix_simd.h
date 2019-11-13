@@ -191,7 +191,8 @@ namespace grendel
     AssertIndexRange(row, row_starts.size() - 1);
 
     if (row < n_internal_dofs)
-      return column_indices.data() + row_starts[row / simd_length];
+      return column_indices.data() + row_starts[row / simd_length] +
+             row % simd_length;
     else
       return column_indices.data() + row_starts[row];
   }
