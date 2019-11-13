@@ -157,7 +157,7 @@ namespace grendel
       const double length,
       const double diameter,
       const bool prescribe,
-      const bool periodic)
+      const bool /*periodic*/)
   {
     using namespace dealii;
 
@@ -184,24 +184,19 @@ namespace grendel
 
           const auto center = face->center();
           if (center[0] < -length / 2. + 1.e-6) {
+
             /* Dirichlet conditions for inflow: */
             face->set_boundary_id(Boundary::dirichlet);
 
-          } else if (std::abs(center[1]) > diameter / 2. - 1.e-6) {
+          } else if (center[0] > length / 2. - 1.e-6) {
 
-            /* Top and bottom of computational domain: */
-            if (periodic)
-              face->set_boundary_id(Boundary::periodic);
-            else
-              face->set_boundary_id(Boundary::slip);
+            /* The right side of the domain: */
+            face->set_boundary_id(Boundary::do_nothing);
 
           } else {
 
-            /* The right side of the domain: */
-            if (periodic)
-              face->set_boundary_id(Boundary::dirichlet);
-            else
-              face->set_boundary_id(Boundary::do_nothing);
+            /* Top and bottom of computational domain: */
+            face->set_boundary_id(Boundary::slip);
           }
         }
       }
