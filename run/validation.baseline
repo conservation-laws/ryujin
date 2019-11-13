@@ -16,6 +16,39 @@ Linf  = 0.000669789
 L1    = 1.27547e-05
 L2    = 6.08771e-05
 
+#dofs = 263169, double, RK(2), baseline, Harten entropy
+t     = 2.00084
+Linf  = 8.3383e-05
+L1    = 1.64276e-06
+L2    = 7.75102e-06
+
+################################################################################
+#dofs =  4225, float, RK(2), baseline, Harten entropy
+t     = 2.00548
+Linf  = 0.0536912
+L1    = 0.000894531
+L2    = 0.00443072
+
+#dofs = 16641, float, RK(2), baseline, Harten entropy
+t     = 2.00176
+Linf  = 0.00541882
+L1    = 0.000106394
+L2    = 0.000487084
+
+#dofs = 66049, float, RK(2), baseline, Harten entropy
+t     = 2.00176
+Linf  = 0.000681082
+L1    = 1.91713e-05
+L2    = 6.32884e-05
+
+#dofs = 263169, float, RK(2), baseline, Harten entropy
+##dofs = 263169
+t     = 2.0009
+Linf  = 0.000238236
+L1    = 1.43268e-05
+L2    = 3.08405e-05
+
+
 ################################################################################
 
 #dofs =  4225, double, RK(3), baseline, Harten entropy
