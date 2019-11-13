@@ -695,7 +695,7 @@ namespace grendel
             const auto p_ij =
                 tau * m_i_inv * lambda_inv *
                 ((d_ijH - d_ij) * (U_j - U_i) + b_ij * r_j - b_ji * r_i);
-            pij_matrix_.write_entry(p_ij, i, col_idx);
+            pij_matrix_.write_tensor(p_ij, i, col_idx);
 
             const auto l_ij =
                 Limiter<dim, Number>::limit(bounds, U_i_new, p_ij);
@@ -876,7 +876,7 @@ namespace grendel
             p_ij *= (1 - l_ij);
 
             if (pass + 1 < n_passes)
-              pij_matrix_.write_entry(p_ij, i, col_idx);
+              pij_matrix_.write_tensor(p_ij, i, col_idx);
           }
 
 #ifdef CHECK_BOUNDS

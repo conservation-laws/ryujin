@@ -11,6 +11,7 @@ ADD_LIBRARY(grendel SHARED
   problem_description.cc
   riemann_solver.cc
   simd.cc
+  sparse_matrix_simd.cc
   time_step.cc
   )
 DEAL_II_SETUP_TARGET(grendel)

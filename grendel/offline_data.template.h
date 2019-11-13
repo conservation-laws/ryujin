@@ -745,7 +745,7 @@ namespace grendel
           Tensor<1, dim, Number> c_ij;
           for (unsigned int d = 0; d < dim; ++d)
             c_ij[d] = cij_matrix_tmp[d](i, jt->column());
-          cij_matrix_.write_entry(c_ij, i, jt - sparsity_pattern_.begin(i));
+          cij_matrix_.write_tensor(c_ij, i, jt - sparsity_pattern_.begin(i));
         }
       }
 
