@@ -495,6 +495,36 @@ namespace grendel
                         [my_rowstart + position_within_column * my_rowstride]];
     }
 
+    DEAL_II_ALWAYS_INLINE
+    dealii::Tensor<1, n_components, Number>
+    get_transposed_tensor(const unsigned int row,
+                          const unsigned int position_within_column) const
+    {
+      Assert(sparsity != nullptr, dealii::ExcNotInitialized());
+
+      AssertIndexRange(row, sparsity->row_starts.size() - 1);
+      AssertIndexRange(position_within_column, sparsity->row_length(row));
+
+      const unsigned int my_rowstart =
+          row < sparsity->n_internal_dofs
+              ? sparsity->row_starts[row / simd_length] + row % simd_length
+              : sparsity->row_starts[row];
+      const unsigned int my_rowstride =
+          row < sparsity->n_internal_dofs ? simd_length : 1;
+      const unsigned int col =
+          row < sparsity->n_internal_dofs
+              ? sparsity->column_indices[my_rowstart +
+                                         position_within_column * simd_length]
+              : sparsity->column_indices[my_rowstart + position_within_column];
+
+      const unsigned int position_within_transposed_column =
+            sparsity->column_indices_transposed[my_rowstart +
+                                                position_within_column *
+                                                    my_rowstride];
+
+      return get_tensor(col, position_within_transposed_column);
+    }
+
     void communicate_offproc_entries()
     {
       static_assert(n_components == 1, "Only scalar case implemented");

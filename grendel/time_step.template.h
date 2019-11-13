@@ -114,8 +114,6 @@ namespace grendel
 
     /* References to precomputed matrices and the stencil: */
 
-    const auto &sparsity = offline_data_->sparsity_pattern();
-
     const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
 
     const auto &lumped_mass_matrix = offline_data_->lumped_mass_matrix();
@@ -269,9 +267,7 @@ namespace grendel
           if (boundary_normal_map.count(i) != 0 &&
               boundary_normal_map.count(j) != 0) {
 
-            const unsigned int j_pos =
-                sparsity(j, i) - (sparsity.begin(j) - sparsity.begin(0));
-            const auto c_ji = cij_matrix.get_tensor(j, j_pos);
+            const auto c_ji = cij_matrix.get_transposed_tensor(i, col_idx);
             const auto norm_2 = c_ji.norm();
             const auto n_ji = c_ji / norm_2;
 
