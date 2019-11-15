@@ -98,7 +98,7 @@ namespace grendel
       std::vector<types::global_dof_index> local_dof_indices(dofs_per_cell);
 
       /*
-       * First pass: Accumulate how many cells are assoziated with a
+       * First pass: Accumulate how many cells are associated with a
        * given degree of freedom and mark all degrees of freedom shared
        * with a different number of cells than 2, 4, or 8 with
        * numbers::invalid_dof_index:
@@ -289,18 +289,16 @@ namespace grendel
        * are the one for which locally owned rows request the
        * transpose entries. This will be the one we finally compute on.
        */
+
       DynamicSparsityPattern dsp_minimal(n_locally_relevant_,
                                          n_locally_relevant_);
       const unsigned int n_owned_dofs = dof_handler_.n_locally_owned_dofs();
-      std::set<unsigned int> offproc_dofs;
       for (unsigned int i = 0; i < n_owned_dofs; ++i) {
-        const auto end_it = dsp.end(i);
-        for (auto it = dsp.begin(i); it != end_it; ++it) {
+        for (auto it = dsp.begin(i); it != dsp.end(i); ++it) {
           const unsigned int col = it->column();
           dsp_minimal.add(i, col);
           if (col >= n_owned_dofs) {
             dsp_minimal.add(col, i);
-            offproc_dofs.insert(col);
           }
         }
       }
