@@ -52,7 +52,7 @@ namespace grendel
 #ifdef DEBUG_OUTPUT
       deallog << "        distribute dofs" << std::endl;
 #endif
-      TimerOutput::Scope t(computing_timer_, "offline_data - distribute dofs");
+      TimerOutput::Scope t(computing_timer_, "offline_data - 1 distribute dofs");
 
       /* Initialize dof_handler and gather all locally owned indices: */
 
@@ -172,7 +172,7 @@ namespace grendel
 #endif
       TimerOutput::Scope t(
           computing_timer_,
-          "offline_data - create partitioner and affine constraints");
+          "offline_data - 2 create partitioner and affine constraints");
 
       /*
        * Create locally relevant index set:
@@ -259,7 +259,7 @@ namespace grendel
       deallog << "        create_sparsity_pattern" << std::endl;
 #endif
       TimerOutput::Scope t(computing_timer_,
-                           "offline_data - create sparsity pattern");
+                           "offline_data - 3 create sparsity pattern");
 
       DynamicSparsityPattern dsp(n_locally_relevant_, n_locally_relevant_);
 
@@ -314,7 +314,7 @@ namespace grendel
 #ifdef DEBUG_OUTPUT
       deallog << "        set up matrices" << std::endl;
 #endif
-      TimerOutput::Scope t(computing_timer_, "offline_data - set up matrices");
+      TimerOutput::Scope t(computing_timer_, "offline_data - 4 set up matrices");
 
       lumped_mass_matrix_.reinit(partitioner_);
       lumped_mass_matrix_inverse_.reinit(partitioner_);
@@ -527,7 +527,7 @@ namespace grendel
 #endif
       TimerOutput::Scope t(
           computing_timer_,
-          "offline_data - assemble mass matrices, beta_ij, and c_ij");
+          "offline_data - 5 assemble mass matrices, beta_ij, and c_ij");
 
       WorkStream::run(dof_handler_.begin_active(),
                       dof_handler_.end(),
@@ -652,7 +652,7 @@ namespace grendel
       deallog << "        fix boundary c_ijs" << std::endl;
 #endif
       TimerOutput::Scope t(computing_timer_,
-                           "offline_data - fix boundary c_ijs");
+                           "offline_data - 6 fix boundary c_ijs");
 
       /*
        * Normalize our boundary normals:
@@ -675,7 +675,7 @@ namespace grendel
       deallog << "        set up SIMD matrices" << std::endl;
 #endif
       TimerOutput::Scope t(computing_timer_,
-                           "offline_data - set up SIMD matrices");
+                           "offline_data - 7 set up SIMD matrices");
 
       betaij_matrix_.read_in(betaij_matrix_tmp);
       mass_matrix_.read_in(mass_matrix_tmp);

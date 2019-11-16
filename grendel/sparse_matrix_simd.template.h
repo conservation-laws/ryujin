@@ -122,8 +122,7 @@ namespace grendel
        * as well as the part of columns of the given range. Note that this
        * assumes that the sparsity pattern only contains those entries in
        * ghosted rows which have a corresponding transpose entry in the
-       * owned rows; which is the case for (the default constructed
-       * deal.II) sparsity pattern.
+       * owned rows; which is the case for our minimized sparsity pattern.
        */
 
       AssertDimension(import_indices_part.size(),
