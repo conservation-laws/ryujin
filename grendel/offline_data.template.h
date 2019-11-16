@@ -345,21 +345,25 @@ namespace grendel
         Utilities::MPI::sum(measure_of_omega_, mpi_communicator_);
 
     /*
-     * Second part: We have to import the "ghost" layer of the lumped mass
-     * matrix in order to compute the b_ij matrices correctly.
+     * Create lumped mass matrix:
      */
-    Vector<Number> one(mass_matrix_tmp.m());
-    one = 1;
-    Vector<Number> local_lumped_mass_matrix(mass_matrix_tmp.m());
-    mass_matrix_tmp.vmult(local_lumped_mass_matrix, one);
-    for (unsigned int i = 0; i < partitioner_->local_size(); ++i) {
-      lumped_mass_matrix_.local_element(i) = local_lumped_mass_matrix(i);
-      lumped_mass_matrix_inverse_.local_element(i) =
-          1. / lumped_mass_matrix_.local_element(i);
-    }
-    lumped_mass_matrix_.update_ghost_values();
-    lumped_mass_matrix_inverse_.update_ghost_values();
 
+    {
+      Vector<Number> one(mass_matrix_tmp.m());
+      one = 1.;
+
+      Vector<Number> local_lumped_mass_matrix(mass_matrix_tmp.m());
+      mass_matrix_tmp.vmult(local_lumped_mass_matrix, one);
+
+      for (unsigned int i = 0; i < partitioner_->local_size(); ++i) {
+        lumped_mass_matrix_.local_element(i) = local_lumped_mass_matrix(i);
+        lumped_mass_matrix_inverse_.local_element(i) =
+            1. / lumped_mass_matrix_.local_element(i);
+      }
+
+      lumped_mass_matrix_.update_ghost_values();
+      lumped_mass_matrix_inverse_.update_ghost_values();
+    }
 
     /*
      * Second pass: Fix up boundary cijs:

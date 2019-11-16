@@ -93,12 +93,10 @@ namespace grendel
 #ifdef DEBUG_OUTPUT
     deallog << "Postprocessor<dim, Number>::compute()" << std::endl;
 #endif
-#if 0
     TimerOutput::Scope t(computing_timer_, "postprocessor - compute");
 
-
     const auto &affine_constraints = offline_data_->affine_constraints();
-    const auto &sparsity = offline_data_->sparsity_pattern();
+    const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
     const auto &lumped_mass_matrix = offline_data_->lumped_mass_matrix();
     const auto &cij_matrix = offline_data_->cij_matrix();
     const auto &boundary_normal_map = offline_data_->boundary_normal_map();
@@ -129,26 +127,24 @@ namespace grendel
       GRENDEL_OMP_FOR
       for (unsigned int i = 0; i < n_locally_owned; ++i) {
 
-        /* Only iterate over locally owned subset */
-        Assert(i < n_locally_owned, ExcInternalError());
+        const unsigned int row_length = sparsity_simd.row_length(i);
 
         /* Skip constrained degrees of freedom */
-        if (++sparsity.begin(i) == sparsity.end(i))
+        if (row_length == 1)
           continue;
 
         Tensor<1, dim, Number> r_i;
         curl_type vorticity;
 
-        for (auto jt = sparsity.begin(i); jt != sparsity.end(i); ++jt) {
-          const auto j = jt->column();
-
-          if (i == j)
-            continue;
+        /* Skip diagonal. */
+        const unsigned int *js = sparsity_simd.columns(i);
+        for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
+          const unsigned int j = js[col_idx];
 
           const auto U_j = gather(U, j);
           const auto m_j = ProblemDescription<dim, Number>::momentum(U_j);
 
-          const auto c_ij = cij_matrix.get_tensor(i, jt - sparsity.begin(i));
+          const auto c_ij = cij_matrix.get_tensor(i, col_idx);
 
           r_i += c_ij * U_j[0];
 
@@ -230,11 +226,10 @@ namespace grendel
       GRENDEL_OMP_FOR
       for (unsigned int i = 0; i < n_locally_owned; ++i) {
 
-        /* Only iterate over locally owned subset */
-        Assert(i < n_locally_owned, ExcInternalError());
+        const unsigned int row_length = sparsity_simd.row_length(i);
 
         /* Skip constrained degrees of freedom */
-        if (++sparsity.begin(i) == sparsity.end(i))
+        if (row_length == 1)
           continue;
 
         const auto r_i = quantities_[0].local_element(i);
@@ -259,7 +254,6 @@ namespace grendel
       affine_constraints.distribute(it);
       it.update_ghost_values();
     }
-#endif
   }
 
 
