@@ -21,7 +21,7 @@ namespace grendel
   template <int simd_length>
   SparsityPatternSIMD<simd_length>::SparsityPatternSIMD(
       const unsigned int n_internal_dofs,
-      const dealii::SparsityPattern &sparsity,
+      const dealii::DynamicSparsityPattern &sparsity,
       const dealii::Utilities::MPI::Partitioner &partitioner)
       : n_internal_dofs(0)
       , mpi_communicator(MPI_COMM_SELF)
@@ -33,13 +33,37 @@ namespace grendel
   template <int simd_length>
   void SparsityPatternSIMD<simd_length>::reinit(
       const unsigned int n_internal_dofs,
-      const dealii::SparsityPattern &sparsity,
+      const dealii::DynamicSparsityPattern &dsp,
       const dealii::Utilities::MPI::Partitioner &partitioner)
   {
     this->mpi_communicator = partitioner.get_mpi_communicator();
 
     this->n_internal_dofs = n_internal_dofs;
     this->n_locally_owned_dofs = partitioner.local_size();
+
+    const auto n_locally_relevant_dofs =
+        partitioner.local_size() + partitioner.n_ghost_indices();
+
+    /*
+     * First, create a static sparsity pattern where the only off-processor
+     * rows are the one for which locally owned rows request the transpose
+     * entries. This will be the one we finally compute on.
+     */
+
+    dealii::DynamicSparsityPattern dsp_minimal(n_locally_relevant_dofs,
+                                               n_locally_relevant_dofs);
+    for (unsigned int i = 0; i < n_locally_owned_dofs; ++i) {
+      for (auto it = dsp.begin(i); it != dsp.end(i); ++it) {
+        const unsigned int col = it->column();
+        dsp_minimal.add(i, col);
+        if (col >= n_locally_owned_dofs) {
+          dsp_minimal.add(col, i);
+        }
+      }
+    }
+
+    dealii::SparsityPattern sparsity;
+    sparsity.copy_from(dsp_minimal);
 
     Assert(n_internal_dofs <= sparsity.n_rows(), dealii::ExcInternalError());
     Assert(n_internal_dofs % simd_length == 0, dealii::ExcInternalError());

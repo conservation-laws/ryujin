@@ -107,16 +107,17 @@ namespace grendel
     ACCESSOR_READ_ONLY(n_locally_relevant)
 
     /**
-     * The SparsityPattern.
-     */
-    dealii::SparsityPattern sparsity_pattern_;
-    ACCESSOR_READ_ONLY(sparsity_pattern)
-
-    /**
      * A somewhat larger SparsityPattern used for assembly of local
      * matrices.
      */
     dealii::SparsityPattern sparsity_pattern_assembly_;
+
+    /**
+     * A sparsity pattern for matrices in vectorized format
+     */
+    SparsityPatternSIMD<dealii::VectorizedArray<Number>::n_array_elements>
+        sparsity_pattern_simd_;
+    ACCESSOR_READ_ONLY(sparsity_pattern_simd)
 
     /**
      * The boundary map.
@@ -162,19 +163,6 @@ namespace grendel
     ACCESSOR_READ_ONLY(lumped_mass_matrix_inverse)
 
     /**
-     * Size of computational domain.
-     */
-    Number measure_of_omega_;
-    ACCESSOR_READ_ONLY(measure_of_omega)
-
-    /**
-     * A sparsity pattern for matrices in vectorized format
-     */
-    SparsityPatternSIMD<dealii::VectorizedArray<Number>::n_array_elements>
-        sparsity_pattern_simd_;
-    ACCESSOR_READ_ONLY(sparsity_pattern_simd)
-
-    /**
      * The stiffness matrix $(beta_{ij})$:
      *   $\beta_{ij} = \nabla\varphi_{j}\cdot\nabla\varphi_{i}$
      */
@@ -186,6 +174,12 @@ namespace grendel
      */
     SparseMatrixSIMD<Number, dim> cij_matrix_;
     ACCESSOR_READ_ONLY(cij_matrix)
+
+    /**
+     * Size of computational domain.
+     */
+    Number measure_of_omega_;
+    ACCESSOR_READ_ONLY(measure_of_omega)
 
   private:
     const MPI_Comm &mpi_communicator_;

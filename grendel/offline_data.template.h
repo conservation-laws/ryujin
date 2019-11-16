@@ -45,206 +45,91 @@ namespace grendel
 #ifdef DEBUG_OUTPUT
     deallog << "OfflineData<dim, Number>::setup()" << std::endl;
 #endif
+    TimerOutput::Scope t(computing_timer_, "offline_data - setup");
 
-    IndexSet locally_owned;
-    IndexSet locally_relevant;
+    /* Initialize dof_handler and gather all locally owned indices: */
 
-    {
-#ifdef DEBUG_OUTPUT
-      deallog << "        distribute dofs" << std::endl;
-#endif
-      TimerOutput::Scope t(computing_timer_, "offline_data - 1 distribute dofs");
+    dof_handler_.initialize(discretization_->triangulation(),
+                            discretization_->finite_element());
 
-      /* Initialize dof_handler and gather all locally owned indices: */
-
-      dof_handler_.initialize(discretization_->triangulation(),
-                              discretization_->finite_element());
-
-      dealii::DoFRenumbering::Cuthill_McKee(dof_handler_);
-
-      locally_owned = dof_handler_.locally_owned_dofs();
-      n_locally_owned_ = locally_owned.n_elements();
+    DoFRenumbering::Cuthill_McKee(dof_handler_);
 
 #ifdef USE_SIMD
-      n_locally_internal_ =
-          grendel::DoFRenumbering::internal_range(dof_handler_);
+    n_locally_internal_ = DoFRenumbering::internal_range(dof_handler_);
 
-      /* Round down to the nearest multiple of n_array_elements: */
-      n_locally_internal_ =
-          n_locally_internal_ -
-          n_locally_internal_ % VectorizedArray<Number>::n_array_elements;
+    /* Round down to the nearest multiple of n_array_elements: */
+    n_locally_internal_ =
+        n_locally_internal_ -
+        n_locally_internal_ % VectorizedArray<Number>::n_array_elements;
 #else
-      /*
-       * If USE_SIMD is not set, we disable all SIMD instructions by
-       * setting the [0, n_locally_internal) range to [0,0).
-       */
-      n_locally_internal_ = 0;
-#endif
-    }
-
-    const auto dofs_per_cell = discretization_->finite_element().dofs_per_cell;
-
-    {
-#ifdef DEBUG_OUTPUT
-      deallog << "        create partitioner and affine constraints"
-              << std::endl;
-#endif
-      TimerOutput::Scope t(
-          computing_timer_,
-          "offline_data - 2 create partitioner and affine constraints");
-
-      /*
-       * Create locally relevant index set:
-       */
-
-      locally_relevant.clear();
-
-      DoFTools::extract_locally_relevant_dofs(dof_handler_, locally_relevant);
-      n_locally_relevant_ = locally_relevant.n_elements();
-
-      partitioner_.reset(new dealii::Utilities::MPI::Partitioner(
-          locally_owned, locally_relevant, mpi_communicator_));
-
-      /*
-       * Create a temporary affine constraints object and populate it with
-       * global indices:
-       */
-
-      AffineConstraints<Number> global_constraints(locally_relevant);
-
-
-      if constexpr (dim != 1 && std::is_same<Number, double>::value) { // FIXME
-        const auto n_periodic_faces =
-            discretization_->triangulation().get_periodic_face_map().size();
-        if (n_periodic_faces != 0) {
-          /*
-           * Enforce periodic boundary conditions. We assume that the mesh is
-           * in "normal configuration". By convention we also omit enforcing
-           * periodicity in x direction. This avoids accidentally glueing the
-           * corner degrees of freedom together which leads to instability.
-           */
-          for (int i = 1; i < dim; ++i) /* omit x direction! */
-            DoFTools::make_periodicity_constraints(dof_handler_,
-                                                   /*b_id */ Boundary::periodic,
-                                                   /*direction*/ i,
-                                                   global_constraints);
-        }
-      }
-
-      DoFTools::make_hanging_node_constraints(dof_handler_, global_constraints);
-
-      global_constraints.close();
-
-      /*
-       * And translate into local indices:
-       */
-
-      affine_constraints_.clear();
-      for (auto line : global_constraints.get_lines()) {
-
-        /* translate into local index ranges: */
-        line.index = partitioner_->global_to_local(line.index);
-        std::transform(line.entries.begin(),
-                       line.entries.end(),
-                       line.entries.begin(),
-                       [&](auto entry) {
-                         return std::make_pair(
-                             partitioner_->global_to_local(entry.first),
-                             entry.second);
-                       });
-
-        affine_constraints_.add_line(line.index);
-        affine_constraints_.add_entries(line.index, line.entries);
-        affine_constraints_.set_inhomogeneity(line.index, line.inhomogeneity);
-      }
-      affine_constraints_.close();
-    }
-
     /*
-     * We need a local view of a couple of matrices. Because they are never
-     * used in a matrix-vector product, and in order to avoid unnecessary
-     * overhead, we simply assemble these parts into a local
-     * dealii::SparseMatrix<dim>.
-     *
-     * These sparse matrices have to store values for all _locally
-     * extended_ degrees of freedom that couple. While we are at it, we
-     * also apply a translation between the global (distributed) degrees of
-     * freedom numbering and the local index range [0,
-     * locally_relevant_.n_elements()];
+     * If USE_SIMD is not set, we disable all SIMD instructions by
+     * setting the [0, n_locally_internal) range to [0,0).
      */
-
-    {
-#ifdef DEBUG_OUTPUT
-      deallog << "        create_sparsity_pattern" << std::endl;
+    n_locally_internal_ = 0;
 #endif
-      TimerOutput::Scope t(computing_timer_,
-                           "offline_data - 3 create sparsity pattern");
 
-      DynamicSparsityPattern dsp(n_locally_relevant_, n_locally_relevant_);
+    /* Set up partitioner: */
 
-      std::vector<types::global_dof_index> dof_indices(dofs_per_cell);
+    const IndexSet &locally_owned = dof_handler_.locally_owned_dofs();
 
-      for (auto cell : dof_handler_.active_cell_iterators()) {
-        /* iterate over locally owned cells and the ghost layer */
-        if (cell->is_artificial())
-          continue;
+    IndexSet locally_relevant;
+    DoFTools::extract_locally_relevant_dofs(dof_handler_, locally_relevant);
 
-        /* translate into local index ranges: */
-        cell->get_dof_indices(dof_indices);
-        std::transform(
-            dof_indices.begin(),
-            dof_indices.end(),
-            dof_indices.begin(),
-            [&](auto index) { return partitioner_->global_to_local(index); });
+    n_locally_owned_ = locally_owned.n_elements();
+    n_locally_relevant_ = locally_relevant.n_elements();
 
-        affine_constraints_.add_entries_local_to_global(
-            dof_indices, dsp, false);
-      }
+    partitioner_.reset(new dealii::Utilities::MPI::Partitioner(
+        locally_owned, locally_relevant, mpi_communicator_));
 
-      sparsity_pattern_assembly_.copy_from(dsp);
+    /* Set up affine constraints object: */
 
+    affine_constraints_.reinit(locally_relevant);
+
+    const auto n_periodic_faces =
+        discretization_->triangulation().get_periodic_face_map().size();
+    if (n_periodic_faces != 0) {
       /*
-       * Create a sparsity pattern where the only off-processor rows
-       * are the one for which locally owned rows request the
-       * transpose entries. This will be the one we finally compute on.
+       * Enforce periodic boundary conditions. We assume that the mesh is in
+       * "normal configuration". By convention we also omit enforcing
+       * periodicity in x direction. This avoids accidentally glueing the
+       * corner degrees of freedom together which leads to instability.
        */
-
-      DynamicSparsityPattern dsp_minimal(n_locally_relevant_,
-                                         n_locally_relevant_);
-      const unsigned int n_owned_dofs = dof_handler_.n_locally_owned_dofs();
-      for (unsigned int i = 0; i < n_owned_dofs; ++i) {
-        for (auto it = dsp.begin(i); it != dsp.end(i); ++it) {
-          const unsigned int col = it->column();
-          dsp_minimal.add(i, col);
-          if (col >= n_owned_dofs) {
-            dsp_minimal.add(col, i);
-          }
-        }
+      if constexpr (dim != 1 && std::is_same<Number, double>::value) {
+        for (int i = 1; i < dim; ++i) /* omit x direction! */
+          DoFTools::make_periodicity_constraints(dof_handler_,
+                                                 /*b_id */ Boundary::periodic,
+                                                 /*direction*/ i,
+                                                 affine_constraints_);
+      } else {
+        AssertThrow(false, dealii::ExcNotImplemented());
       }
-
-      sparsity_pattern_.copy_from(dsp_minimal);
     }
 
-    /*
-     * Next we can (re)initialize all local matrices:
-     */
+    DoFTools::make_hanging_node_constraints(dof_handler_, affine_constraints_);
 
-    {
-#ifdef DEBUG_OUTPUT
-      deallog << "        set up matrices" << std::endl;
-#endif
-      TimerOutput::Scope t(computing_timer_, "offline_data - 4 set up matrices");
+    affine_constraints_.close();
+    transform_to_local_range(*partitioner_, affine_constraints_);
 
-      lumped_mass_matrix_.reinit(partitioner_);
-      lumped_mass_matrix_inverse_.reinit(partitioner_);
+    /* Create sparsity patterns: */
 
-      sparsity_pattern_simd_.reinit(
-          n_locally_internal_, sparsity_pattern_, *partitioner_);
+    DynamicSparsityPattern dsp(n_locally_relevant_, n_locally_relevant_);
 
-      mass_matrix_.reinit(sparsity_pattern_simd_);
-      betaij_matrix_.reinit(sparsity_pattern_simd_);
-      cij_matrix_.reinit(sparsity_pattern_simd_);
-    }
+    DoFTools::make_local_sparsity_pattern(
+        *partitioner_, dof_handler_, dsp, affine_constraints_, false);
+
+    sparsity_pattern_assembly_.copy_from(dsp);
+
+    sparsity_pattern_simd_.reinit(n_locally_internal_, dsp, *partitioner_);
+
+    /* Next we can (re)initialize all local matrices: */
+
+    lumped_mass_matrix_.reinit(partitioner_);
+    lumped_mass_matrix_inverse_.reinit(partitioner_);
+
+    mass_matrix_.reinit(sparsity_pattern_simd_);
+    betaij_matrix_.reinit(sparsity_pattern_simd_);
+    cij_matrix_.reinit(sparsity_pattern_simd_);
   }
 
 

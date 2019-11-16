@@ -1,12 +1,18 @@
 #ifndef LOCAL_INDEX_HANDLING_H
 #define LOCAL_INDEX_HANDLING_H
 
+#include <deal.II/base/partitioner.h>
 #include <deal.II/dofs/dof_handler.h>
+#include <deal.II/dofs/dof_renumbering.h>
+#include <deal.II/dofs/dof_tools.h>
+#include <deal.II/lac/affine_constraints.h>
 
 namespace grendel
 {
   namespace DoFRenumbering
   {
+    using dealii::DoFRenumbering::Cuthill_McKee;
+
     /**
      * Reorder indices:
      *
@@ -99,6 +105,78 @@ namespace grendel
       return n_locally_internal;
     }
   } // namespace DoFRenumbering
+
+
+  template <typename Number>
+  void transform_to_local_range(
+      const dealii::Utilities::MPI::Partitioner &partitioner,
+      dealii::AffineConstraints<Number> &affine_constraints)
+  {
+    affine_constraints.close();
+
+    dealii::AffineConstraints<Number> temporary;
+
+    for (auto line : affine_constraints.get_lines()) {
+      /* translate into local index ranges: */
+      line.index = partitioner.global_to_local(line.index);
+      std::transform(line.entries.begin(),
+                     line.entries.end(),
+                     line.entries.begin(),
+                     [&](auto entry) {
+                       return std::make_pair(
+                           partitioner.global_to_local(entry.first),
+                           entry.second);
+                     });
+
+      temporary.add_line(line.index);
+      temporary.add_entries(line.index, line.entries);
+      temporary.set_inhomogeneity(line.index, line.inhomogeneity);
+    }
+
+    temporary.close();
+
+    affine_constraints = std::move(temporary);
+  }
+
+
+  namespace DoFTools
+  {
+    using dealii::DoFTools::extract_locally_relevant_dofs;
+    using dealii::DoFTools::make_hanging_node_constraints;
+    using dealii::DoFTools::make_periodicity_constraints;
+    using dealii::DoFTools::make_sparsity_pattern;
+
+
+    template <int dim, typename Number, typename SPARSITY>
+    void make_local_sparsity_pattern(
+        const dealii::Utilities::MPI::Partitioner &partitioner,
+        const dealii::DoFHandler<dim> &dof_handler,
+        SPARSITY &dsp,
+        const dealii::AffineConstraints<Number> &affine_constraints,
+        bool keep_constrained)
+    {
+      const unsigned int dofs_per_cell = dof_handler.get_fe().dofs_per_cell;
+      std::vector<dealii::types::global_dof_index> dof_indices(dofs_per_cell);
+
+      for (auto cell : dof_handler.active_cell_iterators()) {
+        /* iterate over locally owned cells and the ghost layer */
+        if (cell->is_artificial())
+          continue;
+
+        /* translate into local index ranges: */
+        cell->get_dof_indices(dof_indices);
+        std::transform(
+            dof_indices.begin(),
+            dof_indices.end(),
+            dof_indices.begin(),
+            [&](auto index) { return partitioner.global_to_local(index); });
+
+        affine_constraints.add_entries_local_to_global(
+            dof_indices, dsp, keep_constrained);
+      }
+    }
+  } // namespace DoFTools
+
 
 } // namespace grendel
 

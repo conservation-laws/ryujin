@@ -3,7 +3,7 @@
 
 #include <deal.II/base/aligned_vector.h>
 #include <deal.II/base/partitioner.h>
-#include <deal.II/lac/sparsity_pattern.h>
+#include <deal.II/lac/dynamic_sparsity_pattern.h>
 
 #include "helper.h"
 
@@ -43,12 +43,15 @@ namespace grendel
     SparsityPatternSIMD();
 
     SparsityPatternSIMD(const unsigned int n_internal_dofs,
-                        const dealii::SparsityPattern &sparsity,
+                        const dealii::DynamicSparsityPattern &sparsity,
                         const dealii::Utilities::MPI::Partitioner &partitioner);
 
 
+    /**
+     *
+     */
     void reinit(const unsigned int n_internal_dofs,
-                const dealii::SparsityPattern &sparsity,
+                const dealii::DynamicSparsityPattern &sparsity,
                 const dealii::Utilities::MPI::Partitioner &partitioner);
 
 

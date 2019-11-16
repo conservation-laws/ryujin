@@ -93,7 +93,7 @@ namespace grendel
 #ifdef DEBUG_OUTPUT
     deallog << "Postprocessor<dim, Number>::compute()" << std::endl;
 #endif
-
+#if 0
     TimerOutput::Scope t(computing_timer_, "postprocessor - compute");
 
 
@@ -259,6 +259,7 @@ namespace grendel
       affine_constraints.distribute(it);
       it.update_ghost_values();
     }
+#endif
   }
 
 
