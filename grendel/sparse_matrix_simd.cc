@@ -12,7 +12,9 @@ namespace grendel
 
   template class SparseMatrixSIMD<NUMBER>;
 
+#if DIM != 1
   template class SparseMatrixSIMD<NUMBER, DIM>;
+#endif
 
   template class SparseMatrixSIMD<NUMBER,
                                   ProblemDescription<DIM>::problem_dimension>;
