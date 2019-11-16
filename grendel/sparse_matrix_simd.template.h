@@ -3,6 +3,9 @@
 
 #include "sparse_matrix_simd.h"
 
+#include <deal.II/base/vectorization.h>
+#include <deal.II/lac/sparse_matrix.h>
+
 namespace grendel
 {
 
@@ -198,6 +201,104 @@ namespace grendel
   {
     this->sparsity = &sparsity;
     data.resize(sparsity.n_nonzero_elements() * n_components);
+  }
+
+
+  template <typename Number, int n_components, int simd_length>
+  void SparseMatrixSIMD<Number, n_components, simd_length>::read_in(
+      const std::array<dealii::SparseMatrix<Number>, n_components>
+          &sparse_matrix)
+  {
+    GRENDEL_PARALLEL_REGION_BEGIN
+
+    /*
+     * We use the indirect (and slow) access via operator()(i, j) into the
+     * sparse matrix we are copying from. This allows for significantly
+     * increased flexibility with respect to the sparsity pattern used in
+     * the sparse_matrix object.
+     */
+
+    GRENDEL_OMP_FOR
+    for (unsigned int i = 0; i < sparsity->n_internal_dofs; i += simd_length) {
+
+      const unsigned int row_length = sparsity->row_length(i);
+
+      const unsigned int *js = sparsity->columns(i);
+      for (unsigned int col_idx = 0; col_idx < row_length;
+           ++col_idx, js += simd_length) {
+
+        dealii::Tensor<1, n_components, VectorizedArray> temp;
+        for (unsigned int k = 0; k < simd_length; ++k)
+          for (unsigned int d = 0; d < n_components; ++d)
+            temp[d][k] = sparse_matrix[d](i + k, js[k]);
+
+        write_vectorized_tensor(temp, i, col_idx, true);
+      }
+    }
+
+    const auto n_rows = sparsity->n_rows();
+    GRENDEL_OMP_FOR
+    for (unsigned int i = sparsity->n_internal_dofs; i < n_rows; ++i) {
+
+      const unsigned int row_length = sparsity->row_length(i);
+      const unsigned int *js = sparsity->columns(i);
+      for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx, ++js) {
+
+        dealii::Tensor<1, n_components, Number> temp;
+        for (unsigned int d = 0; d < n_components; ++d)
+          temp[d] = sparse_matrix[d](i, js[0]);
+        write_tensor(temp, i, col_idx);
+      }
+    }
+
+    GRENDEL_PARALLEL_REGION_END
+  }
+
+
+  template <typename Number, int n_components, int simd_length>
+  void SparseMatrixSIMD<Number, n_components, simd_length>::read_in(
+      const dealii::SparseMatrix<Number> &sparse_matrix)
+  {
+    GRENDEL_PARALLEL_REGION_BEGIN
+
+    /*
+     * We use the indirect (and slow) access via operator()(i, j) into the
+     * sparse matrix we are copying from. This allows for significantly
+     * increased flexibility with respect to the sparsity pattern used in
+     * the sparse_matrix object.
+     */
+
+    GRENDEL_OMP_FOR
+    for (unsigned int i = 0; i < sparsity->n_internal_dofs; i += simd_length) {
+
+      const unsigned int row_length = sparsity->row_length(i);
+
+      const unsigned int *js = sparsity->columns(i);
+      for (unsigned int col_idx = 0; col_idx < row_length;
+           ++col_idx, js += simd_length) {
+
+        dealii::VectorizedArray<Number, simd_length> temp = {};
+        for (unsigned int k = 0; k < simd_length; ++k)
+          temp[k] = sparse_matrix(i + k, js[k]);
+
+        write_vectorized_entry(temp, i, col_idx, true);
+      }
+    }
+
+    const auto n_rows = sparsity->n_rows();
+    GRENDEL_OMP_FOR
+    for (unsigned int i = sparsity->n_internal_dofs; i < n_rows; ++i) {
+
+      const unsigned int row_length = sparsity->row_length(i);
+      const unsigned int *js = sparsity->columns(i);
+      for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx, ++js) {
+
+        const auto temp = sparse_matrix(i, js[0]);
+        write_entry(temp, i, col_idx);
+      }
+    }
+
+    GRENDEL_PARALLEL_REGION_END
   }
 
 } // namespace grendel

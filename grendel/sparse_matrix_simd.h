@@ -86,7 +86,7 @@ namespace grendel
    * In the vectorized row index region [0, n_internal_dofs) we store data
    * as an array-of-struct-of-array type (see the documentation of class
    * SparsityPatternSIMD for details). For the non-vectorized row index
-   * region [n_internal_dofs, n_locally_owned_dofs) we store the matrix in
+   * region [n_internal_dofs, n_locally_relevant_dofs) we store the matrix in
    * CSR format (equivalent to the static dealii::SparsityPattern).
    */
   template <typename Number, int n_components, int simd_length>
@@ -97,9 +97,11 @@ namespace grendel
 
     SparseMatrixSIMD(const SparsityPatternSIMD<simd_length> &sparsity);
 
-
     void reinit(const SparsityPatternSIMD<simd_length> &sparsity);
 
+    void read_in(const std::array<dealii::SparseMatrix<Number>, n_components>
+                     &sparse_matrix);
+    void read_in(const dealii::SparseMatrix<Number> &sparse_matrix);
 
     using VectorizedArray = dealii::VectorizedArray<Number, simd_length>;
 
@@ -487,7 +489,8 @@ namespace grendel
   SparseMatrixSIMD<Number, n_components, simd_length>::update_ghost_rows()
   {
 #ifdef DEAL_II_WITH_MPI
-    Assert(n_components == 1, ExcMessage("Only scalar case implemented"));
+    Assert(n_components == 1,
+           dealii::ExcMessage("Only scalar case implemented"));
 
     const std::size_t n_indices = sparsity->indices_to_be_sent.size();
     exchange_buffer.resize_fast(n_indices);
