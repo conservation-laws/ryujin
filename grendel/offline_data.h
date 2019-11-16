@@ -47,8 +47,8 @@ namespace grendel
                 const std::string &subsection = "OfflineData");
 
     /**
-     * Prepare offline data. A call to @ref prepare() internally calls @ref
-     * setup() and @ref assemble().
+     * Prepare offline data. A call to @ref prepare() internally calls
+     * @ref setup() and @ref assemble().
      */
     void prepare()
     {
@@ -69,10 +69,16 @@ namespace grendel
 
   protected:
     /**
-     * The DofHandler for our (scalar) CG ansatz space.
+     * The DofHandler for our (scalar) CG ansatz space in global numbering.
      */
     dealii::DoFHandler<dim> dof_handler_;
     ACCESSOR_READ_ONLY(dof_handler)
+
+    /**
+     * An AffineConstraints object storing constraints in global numbering.
+     */
+    dealii::AffineConstraints<Number> affine_constraints_;
+    ACCESSOR_READ_ONLY(affine_constraints)
 
     /**
      * The MPI partitioner used in all distributed Vectors.
@@ -83,8 +89,8 @@ namespace grendel
     /**
      * Number of locally owned internal degrees of freedom: In (MPI rank)
      * local numbering all indices in the half open interval [0,
-     * n_locally_internal_) are owned by this processor, as well as not
-     * situated at a boundary.
+     * n_locally_internal_) are owned by this processor, have standard
+     * connectivity, and are not situated at a boundary.
      */
     unsigned int n_locally_internal_;
     ACCESSOR_READ_ONLY(n_locally_internal)
@@ -107,20 +113,7 @@ namespace grendel
     ACCESSOR_READ_ONLY(n_locally_relevant)
 
     /**
-     * A somewhat larger SparsityPattern used for assembly of local
-     * matrices.
-     */
-    dealii::SparsityPattern sparsity_pattern_assembly_;
-
-    /**
-     * A sparsity pattern for matrices in vectorized format
-     */
-    SparsityPatternSIMD<dealii::VectorizedArray<Number>::n_array_elements>
-        sparsity_pattern_simd_;
-    ACCESSOR_READ_ONLY(sparsity_pattern_simd)
-
-    /**
-     * The boundary map.
+     * The boundary map. Local numbering.
      *
      * For every degree of freedom that has nonzero support at the boundary
      * we record the global degree of freedom index along with a weighted
@@ -138,13 +131,15 @@ namespace grendel
     ACCESSOR_READ_ONLY(boundary_normal_map)
 
     /**
-     * The AffineConstraints object is currently unused.
+     * A sparsity pattern for matrices in vectorized format. Local
+     * numbering.
      */
-    dealii::AffineConstraints<Number> affine_constraints_;
-    ACCESSOR_READ_ONLY(affine_constraints)
+    SparsityPatternSIMD<dealii::VectorizedArray<Number>::n_array_elements>
+        sparsity_pattern_simd_;
+    ACCESSOR_READ_ONLY(sparsity_pattern_simd)
 
     /**
-     * The mass matrix.
+     * The mass matrix. (SIMD storage, local numbering)
      */
     SparseMatrixSIMD<Number> mass_matrix_;
     ACCESSOR_READ_ONLY(mass_matrix)
@@ -165,12 +160,13 @@ namespace grendel
     /**
      * The stiffness matrix $(beta_{ij})$:
      *   $\beta_{ij} = \nabla\varphi_{j}\cdot\nabla\varphi_{i}$
+     * (SIMD storage, local numbering)
      */
     SparseMatrixSIMD<Number> betaij_matrix_;
     ACCESSOR_READ_ONLY(betaij_matrix)
 
     /**
-     * The $(c_{ij})$ matrix.
+     * The $(c_{ij})$ matrix. (SIMD storage, local numbering)
      */
     SparseMatrixSIMD<Number, dim> cij_matrix_;
     ACCESSOR_READ_ONLY(cij_matrix)
@@ -182,9 +178,16 @@ namespace grendel
     ACCESSOR_READ_ONLY(measure_of_omega)
 
   private:
+    /* Scratch storage: */
+    dealii::SparsityPattern sparsity_pattern_assembly_;
+    dealii::AffineConstraints<Number> affine_constraints_assembly_;
+
     const MPI_Comm &mpi_communicator_;
     dealii::TimerOutput &computing_timer_;
 
+    /**
+     * A pointer to a discretization object.
+     */
     dealii::SmartPointer<const grendel::Discretization<dim>> discretization_;
     ACCESSOR_READ_ONLY(discretization)
   };

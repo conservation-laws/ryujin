@@ -109,14 +109,16 @@ namespace grendel
     DoFTools::make_hanging_node_constraints(dof_handler_, affine_constraints_);
 
     affine_constraints_.close();
-    transform_to_local_range(*partitioner_, affine_constraints_);
+
+    affine_constraints_assembly_.copy_from(affine_constraints_);
+    transform_to_local_range(*partitioner_, affine_constraints_assembly_);
 
     /* Create sparsity patterns: */
 
     DynamicSparsityPattern dsp(n_locally_relevant_, n_locally_relevant_);
 
     DoFTools::make_local_sparsity_pattern(
-        *partitioner_, dof_handler_, dsp, affine_constraints_, false);
+        *partitioner_, dof_handler_, dsp, affine_constraints_assembly_, false);
 
     sparsity_pattern_assembly_.copy_from(dsp);
 
@@ -304,15 +306,15 @@ namespace grendel
         position = new_position;
       }
 
-      affine_constraints_.distribute_local_to_global(
+      affine_constraints_assembly_.distribute_local_to_global(
           cell_mass_matrix, local_dof_indices, mass_matrix_tmp);
 
       for (int k = 0; k < dim; ++k) {
-        affine_constraints_.distribute_local_to_global(
+        affine_constraints_assembly_.distribute_local_to_global(
             cell_cij_matrix[k], local_dof_indices, cij_matrix_tmp[k]);
       }
 
-      affine_constraints_.distribute_local_to_global(
+      affine_constraints_assembly_.distribute_local_to_global(
           cell_betaij_matrix, local_dof_indices, betaij_matrix_tmp);
 
       measure_of_omega_ += cell_measure;
@@ -449,7 +451,7 @@ namespace grendel
         return;
 
       for (int k = 0; k < dim; ++k) {
-        affine_constraints_.distribute_local_to_global(
+        affine_constraints_assembly_.distribute_local_to_global(
             cell_cij_matrix[k], local_dof_indices, cij_matrix_tmp[k]);
       }
     };
