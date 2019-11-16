@@ -143,6 +143,7 @@ namespace grendel
     dealii::SparseMatrix<Number> mass_matrix_tmp;
     mass_matrix_tmp.reinit(sparsity_pattern_assembly_);
     std::array<dealii::SparseMatrix<Number>, dim> cij_matrix_tmp;
+
     for (auto &matrix : cij_matrix_tmp)
       matrix.reinit(sparsity_pattern_assembly_);
     dealii::SparseMatrix<Number> betaij_matrix_tmp;
@@ -192,13 +193,7 @@ namespace grendel
 
       local_dof_indices.resize(dofs_per_cell);
       cell->get_dof_indices(local_dof_indices);
-
-      /* translate into local index ranges: */
-      std::transform(
-          local_dof_indices.begin(),
-          local_dof_indices.end(),
-          local_dof_indices.begin(),
-          [&](auto index) { return partitioner_->global_to_local(index); });
+      transform_to_local_range(*partitioner_, local_dof_indices);
 
       /* clear out copy data: */
       local_boundary_normal_map.clear();
@@ -366,6 +361,14 @@ namespace grendel
     }
 
     /*
+     * Normalize our boundary normals:
+     */
+    for (auto &it : boundary_normal_map_) {
+      auto &[normal, id, _] = it.second;
+      normal /= (normal.norm() + std::numeric_limits<Number>::epsilon());
+    }
+
+    /*
      * Second pass: Fix up boundary cijs:
      */
 
@@ -392,11 +395,7 @@ namespace grendel
 
       local_dof_indices.resize(dofs_per_cell);
       cell->get_dof_indices(local_dof_indices);
-      std::transform(
-          local_dof_indices.begin(),
-          local_dof_indices.end(),
-          local_dof_indices.begin(),
-          [&](auto index) { return partitioner_->global_to_local(index); });
+      transform_to_local_range(*partitioner_, local_dof_indices);
 
       /* clear out copy data: */
       for (auto &matrix : cell_cij_matrix)
@@ -461,14 +460,6 @@ namespace grendel
 #endif
       TimerOutput::Scope t(computing_timer_,
                            "offline_data - 6 fix boundary c_ijs");
-
-      /*
-       * Normalize our boundary normals:
-       */
-      for (auto &it : boundary_normal_map_) {
-        auto &[normal, id, _] = it.second;
-        normal /= (normal.norm() + std::numeric_limits<Number>::epsilon());
-      }
 
       WorkStream::run(dof_handler_.begin_active(),
                       dof_handler_.end(),

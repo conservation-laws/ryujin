@@ -9,6 +9,51 @@
 
 namespace grendel
 {
+  template <typename Number>
+  void transform_to_local_range(
+      const dealii::Utilities::MPI::Partitioner &partitioner,
+      dealii::AffineConstraints<Number> &affine_constraints)
+  {
+    affine_constraints.close();
+
+    dealii::AffineConstraints<Number> temporary;
+
+    for (auto line : affine_constraints.get_lines()) {
+      /* translate into local index ranges: */
+      line.index = partitioner.global_to_local(line.index);
+      std::transform(line.entries.begin(),
+                     line.entries.end(),
+                     line.entries.begin(),
+                     [&](auto entry) {
+                       return std::make_pair(
+                           partitioner.global_to_local(entry.first),
+                           entry.second);
+                     });
+
+      temporary.add_line(line.index);
+      temporary.add_entries(line.index, line.entries);
+      temporary.set_inhomogeneity(line.index, line.inhomogeneity);
+    }
+
+    temporary.close();
+
+    affine_constraints = std::move(temporary);
+  }
+
+
+  template <typename VECTOR>
+  void transform_to_local_range(
+      const dealii::Utilities::MPI::Partitioner &partitioner,
+      VECTOR &vector)
+  {
+    std::transform(
+        vector.begin(),
+        vector.end(),
+        vector.begin(),
+        [&](auto index) { return partitioner.global_to_local(index); });
+  }
+
+
   namespace DoFRenumbering
   {
     using dealii::DoFRenumbering::Cuthill_McKee;
@@ -107,38 +152,6 @@ namespace grendel
   } // namespace DoFRenumbering
 
 
-  template <typename Number>
-  void transform_to_local_range(
-      const dealii::Utilities::MPI::Partitioner &partitioner,
-      dealii::AffineConstraints<Number> &affine_constraints)
-  {
-    affine_constraints.close();
-
-    dealii::AffineConstraints<Number> temporary;
-
-    for (auto line : affine_constraints.get_lines()) {
-      /* translate into local index ranges: */
-      line.index = partitioner.global_to_local(line.index);
-      std::transform(line.entries.begin(),
-                     line.entries.end(),
-                     line.entries.begin(),
-                     [&](auto entry) {
-                       return std::make_pair(
-                           partitioner.global_to_local(entry.first),
-                           entry.second);
-                     });
-
-      temporary.add_line(line.index);
-      temporary.add_entries(line.index, line.entries);
-      temporary.set_inhomogeneity(line.index, line.inhomogeneity);
-    }
-
-    temporary.close();
-
-    affine_constraints = std::move(temporary);
-  }
-
-
   namespace DoFTools
   {
     using dealii::DoFTools::extract_locally_relevant_dofs;
@@ -165,18 +178,13 @@ namespace grendel
 
         /* translate into local index ranges: */
         cell->get_dof_indices(dof_indices);
-        std::transform(
-            dof_indices.begin(),
-            dof_indices.end(),
-            dof_indices.begin(),
-            [&](auto index) { return partitioner.global_to_local(index); });
+        transform_to_local_range(partitioner, dof_indices);
 
         affine_constraints.add_entries_local_to_global(
             dof_indices, dsp, keep_constrained);
       }
     }
   } // namespace DoFTools
-
 
 } // namespace grendel
 
