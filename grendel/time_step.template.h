@@ -64,7 +64,7 @@ namespace grendel
     deallog << "TimeStep<dim, Number>::prepare()" << std::endl;
 #endif
     TimerOutput::Scope time(computing_timer_,
-                            "time_step - prepare scratch space");
+                            "* time_step      - prepare scratch space");
 
     /* Initialize (global) vectors: */
 

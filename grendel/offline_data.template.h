@@ -45,7 +45,7 @@ namespace grendel
 #ifdef DEBUG_OUTPUT
     deallog << "OfflineData<dim, Number>::setup()" << std::endl;
 #endif
-    TimerOutput::Scope t(computing_timer_, "offline_data - setup");
+    TimerOutput::Scope t(computing_timer_, "* offline_data   - setup");
 
     /* Initialize dof_handler and gather all locally owned indices: */
 
@@ -141,6 +141,7 @@ namespace grendel
 #ifdef DEBUG_OUTPUT
     deallog << "OfflineData<dim, Number>::assemble()" << std::endl;
 #endif
+    TimerOutput::Scope t(computing_timer_, "* offline_data   - assemble");
 
     dealii::SparseMatrix<Number> mass_matrix_tmp;
     mass_matrix_tmp.reinit(sparsity_pattern_assembly_);
@@ -320,23 +321,12 @@ namespace grendel
       measure_of_omega_ += cell_measure;
     };
 
-
-    {
-#ifdef DEBUG_OUTPUT
-      deallog << "        assemble mass matrices, beta_ij, and c_ijs"
-              << std::endl;
-#endif
-      TimerOutput::Scope t(
-          computing_timer_,
-          "offline_data - 5 assemble mass matrices, beta_ij, and c_ij");
-
-      WorkStream::run(dof_handler_.begin_active(),
-                      dof_handler_.end(),
-                      local_assemble_system,
-                      copy_local_to_global,
-                      AssemblyScratchData<dim>(*discretization_),
-                      AssemblyCopyData<dim, Number>());
-    }
+    WorkStream::run(dof_handler_.begin_active(),
+                    dof_handler_.end(),
+                    local_assemble_system,
+                    copy_local_to_global,
+                    AssemblyScratchData<dim>(*discretization_),
+                    AssemblyCopyData<dim, Number>());
 
     measure_of_omega_ =
         Utilities::MPI::sum(measure_of_omega_, mpi_communicator_);
@@ -456,32 +446,16 @@ namespace grendel
       }
     };
 
-    {
-#ifdef DEBUG_OUTPUT
-      deallog << "        fix boundary c_ijs" << std::endl;
-#endif
-      TimerOutput::Scope t(computing_timer_,
-                           "offline_data - 6 fix boundary c_ijs");
+    WorkStream::run(dof_handler_.begin_active(),
+                    dof_handler_.end(),
+                    local_assemble_system_cij,
+                    copy_local_to_global_cij,
+                    AssemblyScratchData<dim>(*discretization_),
+                    AssemblyCopyData<dim, Number>());
 
-      WorkStream::run(dof_handler_.begin_active(),
-                      dof_handler_.end(),
-                      local_assemble_system_cij,
-                      copy_local_to_global_cij,
-                      AssemblyScratchData<dim>(*discretization_),
-                      AssemblyCopyData<dim, Number>());
-    }
-
-    {
-#ifdef DEBUG_OUTPUT
-      deallog << "        set up SIMD matrices" << std::endl;
-#endif
-      TimerOutput::Scope t(computing_timer_,
-                           "offline_data - 7 set up SIMD matrices");
-
-      betaij_matrix_.read_in(betaij_matrix_tmp);
-      mass_matrix_.read_in(mass_matrix_tmp);
-      cij_matrix_.read_in(cij_matrix_tmp);
-    }
+    betaij_matrix_.read_in(betaij_matrix_tmp);
+    mass_matrix_.read_in(mass_matrix_tmp);
+    cij_matrix_.read_in(cij_matrix_tmp);
   }
 
 } /* namespace grendel */

@@ -157,7 +157,7 @@ namespace grendel
 #ifdef DEBUG_OUTPUT
     deallog << "Discretization<dim>::prepare()" << std::endl;
 #endif
-    TimerOutput::Scope t(computing_timer_, "discretization - prepare");
+    TimerOutput::Scope t(computing_timer_, "* discretization - prepare");
 
     if (!triangulation_)
       triangulation_.reset(

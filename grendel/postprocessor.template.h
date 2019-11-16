@@ -70,7 +70,7 @@ namespace grendel
     deallog << "Postprocessor<dim, Number>::prepare()" << std::endl;
 #endif
     TimerOutput::Scope t(computing_timer_,
-                         "postprocessor - prepare scratch space");
+                         "* postprocessor  - prepare scratch space");
 
     const auto &partitioner = offline_data_->partitioner();
 
