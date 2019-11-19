@@ -1,6 +1,7 @@
 #ifndef TIME_STEP_TEMPLATE_H
 #define TIME_STEP_TEMPLATE_H
 
+#include "scope.h"
 #include "time_step.h"
 
 #include "indicator.h"
@@ -37,7 +38,7 @@ namespace grendel
   template <int dim, typename Number>
   TimeStep<dim, Number>::TimeStep(
       const MPI_Comm &mpi_communicator,
-      dealii::TimerOutput &computing_timer,
+      std::map<std::string, dealii::Timer> &computing_timer,
       const grendel::OfflineData<dim, Number> &offline_data,
       const grendel::InitialValues<dim, Number> &initial_values,
       const std::string &subsection /*= "TimeStep"*/)
@@ -46,6 +47,7 @@ namespace grendel
       , computing_timer_(computing_timer)
       , offline_data_(&offline_data)
       , initial_values_(&initial_values)
+      , n_restarts_(0)
   {
     cfl_update_ = Number(0.95);
     add_parameter(
@@ -63,8 +65,6 @@ namespace grendel
 #ifdef DEBUG_OUTPUT
     deallog << "TimeStep<dim, Number>::prepare()" << std::endl;
 #endif
-    TimerOutput::Scope time(computing_timer_,
-                            "* time_step      - prepare scratch space");
 
     /* Initialize (global) vectors: */
 
@@ -153,11 +153,7 @@ namespace grendel
      */
 
     {
-#ifdef DEBUG_OUTPUT
-      deallog << "        compute d_ij, and alpha_i" << std::endl;
-#endif
-      TimerOutput::Scope time(computing_timer_,
-                              "time_step - 1 compute d_ij, and alpha_i");
+      Scope scope(computing_timer_, "time step 1 - compute d_ij, and alpha_i");
 
       GRENDEL_PARALLEL_REGION_BEGIN
       LIKWID_MARKER_START("time_step_1");
@@ -300,11 +296,7 @@ namespace grendel
     std::atomic<Number> tau_max{std::numeric_limits<Number>::infinity()};
 
     {
-#ifdef DEBUG_OUTPUT
-      deallog << "        compute d_ii, and tau_max" << std::endl;
-#endif
-      TimerOutput::Scope time(computing_timer_,
-                              "time_step - 2 compute d_ii, and tau_max");
+      Scope scope(computing_timer_, "time step 2 - compute d_ii, and tau_max");
 
       /* Parallel region */
       GRENDEL_PARALLEL_REGION_BEGIN
@@ -392,13 +384,8 @@ namespace grendel
      */
 
     {
-#ifdef DEBUG_OUTPUT
-      deallog << "        compute low-order update, limiter bounds, and r_i"
-              << std::endl;
-#endif
-      TimerOutput::Scope time(
-          computing_timer_,
-          "time_step - 3 compute low-order update, limiter bounds, and r_i");
+      Scope scope(computing_timer_,
+                  "time step 3 - low-order update, limiter bounds, and r_i");
 
       /* Parallel region */
       GRENDEL_PARALLEL_REGION_BEGIN
@@ -583,11 +570,7 @@ namespace grendel
          *    P_ij = tau / m_i / lambda ( (d_ij^H - d_ij^L) (U_i - U_j) +
          *                                (b_ij R_j - b_ji R_i) )
          */
-#ifdef DEBUG_OUTPUT
-        deallog << "        compute p_ij and l_ij" << std::endl;
-#endif
-        TimerOutput::Scope time(computing_timer_,
-                                "time_step - 4 compute p_ij and l_ij");
+        Scope scope(computing_timer_, "time step 4 - compute p_ij, and l_ij");
 
         GRENDEL_PARALLEL_REGION_BEGIN
         LIKWID_MARKER_START("time_step_4");
@@ -713,10 +696,7 @@ namespace grendel
          * Step 5: compute l_ij (second and later rounds):
          */
 
-#ifdef DEBUG_OUTPUT
-        deallog << "        compute l_ij" << std::endl;
-#endif
-        TimerOutput::Scope time(computing_timer_, "time_step - 5 compute l_ij");
+        Scope scope(computing_timer_, "time_step 5 - compute l_ij");
 
         GRENDEL_PARALLEL_REGION_BEGIN
         LIKWID_MARKER_START("time_step_5");
@@ -778,12 +758,8 @@ namespace grendel
        */
 
       {
-#ifdef DEBUG_OUTPUT
-        deallog << "        symmetrize l_ij, high-order update" << std::endl;
-#endif
-        TimerOutput::Scope time(
-            computing_timer_,
-            "time_step - 6 symmetrize l_ij, high-order update");
+        Scope scope(computing_timer_,
+                    "time step 6 - symmetrize l_ij, high-order update");
 
         GRENDEL_PARALLEL_REGION_BEGIN
         LIKWID_MARKER_START("time_step_6");
@@ -896,11 +872,7 @@ namespace grendel
      */
 
     {
-#ifdef DEBUG_OUTPUT
-      deallog << "        fix up boundary states" << std::endl;
-#endif
-      TimerOutput::Scope time(computing_timer_,
-                              "time_step - 7 fix boundary states");
+      Scope scope(computing_timer_, "time step 7 - fix boundary states");
 
       LIKWID_MARKER_START("time_step_7");
 
@@ -994,6 +966,7 @@ namespace grendel
 #endif
       tau_0 = tau_2 * cfl_update_;
       U.swap(temp_ssp_);
+      ++n_restarts_;
       goto restart_ssph2_step;
     }
 
@@ -1038,6 +1011,7 @@ namespace grendel
 #endif
       tau_0 = tau_2 * cfl_update_;
       U.swap(temp_ssp_);
+      ++n_restarts_;
       goto restart_ssprk3_step;
     }
 
@@ -1057,6 +1031,7 @@ namespace grendel
 #endif
       tau_0 = tau_3 * cfl_update_;
       U.swap(temp_ssp_);
+      ++n_restarts_;
       goto restart_ssprk3_step;
     }
 

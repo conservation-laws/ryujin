@@ -6,7 +6,6 @@
 #include "problem_description.h"
 
 #include <deal.II/base/parameter_acceptor.h>
-#include <deal.II/base/timer.h>
 #include <deal.II/grid/intergrid_map.h>
 #include <deal.II/lac/la_parallel_vector.templates.h>
 
@@ -39,7 +38,6 @@ namespace grendel
     const static std::array<std::string, n_quantities> component_names;
 
     Postprocessor(const MPI_Comm &mpi_communicator,
-                  dealii::TimerOutput &computing_timer,
                   const grendel::OfflineData<dim, Number> &offline_data,
                   const std::string &subsection = "Postprocessor");
 
@@ -67,7 +65,6 @@ namespace grendel
 
   private:
     const MPI_Comm &mpi_communicator_;
-    dealii::TimerOutput &computing_timer_;
 
     dealii::SmartPointer<const grendel::OfflineData<dim, Number>> offline_data_;
 

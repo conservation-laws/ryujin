@@ -28,12 +28,10 @@ namespace grendel
   template <int dim, typename Number>
   OfflineData<dim, Number>::OfflineData(
       const MPI_Comm &mpi_communicator,
-      dealii::TimerOutput &computing_timer,
       const grendel::Discretization<dim> &discretization,
       const std::string &subsection /*= "OfflineData"*/)
       : ParameterAcceptor(subsection)
       , mpi_communicator_(mpi_communicator)
-      , computing_timer_(computing_timer)
       , discretization_(&discretization)
   {
   }
@@ -45,7 +43,6 @@ namespace grendel
 #ifdef DEBUG_OUTPUT
     deallog << "OfflineData<dim, Number>::setup()" << std::endl;
 #endif
-    TimerOutput::Scope t(computing_timer_, "* offline_data   - setup");
 
     /* Initialize dof_handler and gather all locally owned indices: */
 
@@ -141,7 +138,6 @@ namespace grendel
 #ifdef DEBUG_OUTPUT
     deallog << "OfflineData<dim, Number>::assemble()" << std::endl;
 #endif
-    TimerOutput::Scope t(computing_timer_, "* offline_data   - assemble");
 
     dealii::SparseMatrix<Number> mass_matrix_tmp;
     mass_matrix_tmp.reinit(sparsity_pattern_assembly_);

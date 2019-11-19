@@ -7,6 +7,7 @@
 #include <indicator.h>
 #include <limiter.h>
 #include <riemann_solver.h>
+#include <scope.h>
 
 #include <deal.II/base/logstream.h>
 #include <deal.II/base/revision.h>
@@ -38,25 +39,16 @@ namespace ryujin
   TimeLoop<dim, Number>::TimeLoop(const MPI_Comm &mpi_comm)
       : ParameterAcceptor("A - TimeLoop")
       , mpi_communicator(mpi_comm)
-      , computing_timer(mpi_communicator,
-                        timer_output,
-                        TimerOutput::never,
-                        TimerOutput::cpu_and_wall_times)
-      , discretization(mpi_communicator, computing_timer, "B - Discretization")
-      , offline_data(mpi_communicator,
-                     computing_timer,
-                     discretization,
-                     "C - OfflineData")
+      , discretization(mpi_communicator, "B - Discretization")
+      , offline_data(mpi_communicator, discretization, "C - OfflineData")
       , initial_values("D - InitialValues")
       , time_step(mpi_communicator,
                   computing_timer,
                   offline_data,
                   initial_values,
                   "E - TimeStep")
-      , postprocessor(mpi_communicator,
-                      computing_timer,
-                      offline_data,
-                      "F - SchlierenPostprocessor")
+      , postprocessor(
+            mpi_communicator, offline_data, "F - SchlierenPostprocessor")
       , mpi_rank(dealii::Utilities::MPI::this_mpi_process(mpi_communicator))
       , n_mpi_processes(
             dealii::Utilities::MPI::n_mpi_processes(mpi_communicator))
@@ -184,6 +176,7 @@ namespace ryujin
     ++output_cycle;
 
     print_head("enter main loop");
+    computing_timer["main loop"].start();
 
     /* Loop: */
 
@@ -234,9 +227,10 @@ namespace ryujin
 #endif
 
     /* Wait for output thread: */
-
     if (output_thread.joinable())
       output_thread.join();
+
+    computing_timer["main loop"].stop();
 
     if (enable_compute_error) {
       /* Output final error: */
@@ -247,20 +241,10 @@ namespace ryujin
       compute_error(U, t);
     }
 
-    computing_timer.print_summary();
-    if (mpi_rank == 0) {
-#ifdef DEBUG_OUTPUT
-      auto &stream = deallog;
-#else
-      auto &stream = *filestream;
-#endif
-      stream << timer_output.str() << std::endl;
-    }
-
     print_throughput(cycle, t);
 
-    /* Detach deallog: */
 #ifdef DEBUG_OUTPUT
+    /* Detach deallog: */
     if (mpi_rank == 0) {
       deallog.detach();
     }
@@ -321,8 +305,6 @@ namespace ryujin
     deallog << "TimeLoop<dim, Number>::interpolate_initial_values(t = " << t
             << ")" << std::endl;
 #endif
-    TimerOutput::Scope timer(computing_timer,
-                             "time_loop - interpolate initial values");
 
     vector_type U;
 
@@ -356,7 +338,6 @@ namespace ryujin
 #ifdef DEBUG_OUTPUT
     deallog << "TimeLoop<dim, Number>::compute_error()" << std::endl;
 #endif
-    TimerOutput::Scope timer(computing_timer, "time_loop - compute error");
 
     constexpr auto problem_dimension =
         ProblemDescription<dim, Number>::problem_dimension;
@@ -487,7 +468,7 @@ namespace ryujin
      */
 
     if (output_thread.joinable()) {
-      TimerOutput::Scope timer(computing_timer, "time_loop - stalled output");
+      Scope scope(computing_timer, "stalled output");
       output_thread.join();
     }
 
@@ -800,7 +781,7 @@ namespace ryujin
 
 
   /**
-   * A small function that prints formatted section headings.
+   * Print a formatted head for a given cycle:
    */
   template <int dim, typename Number>
   void TimeLoop<dim, Number>::print_cycle(unsigned int cycle,
@@ -826,57 +807,38 @@ namespace ryujin
   {
     /* Print Jean-Luc and Martin metrics: */
 
-    const auto cpu_summary_data = computing_timer.get_summary_data(
-        TimerOutput::OutputData::total_cpu_time);
-    const auto wall_summary_data = computing_timer.get_summary_data(
-        TimerOutput::OutputData::total_wall_time);
+    const auto wall_time_statistics = Utilities::MPI::min_max_avg(
+        computing_timer["main loop"].wall_time(), mpi_communicator);
+    const double wall_time = wall_time_statistics.max;
 
-    double cpu_time =
-        std::accumulate(cpu_summary_data.begin(),
-                        cpu_summary_data.end(),
-                        0.,
-                        [](auto sum, auto it) { return sum + it.second; });
-    cpu_time = Utilities::MPI::sum(cpu_time, mpi_communicator);
+    const auto cpu_time_statistics = Utilities::MPI::min_max_avg(
+        computing_timer["main loop"].cpu_time(), mpi_communicator);
+    const double cpu_time = cpu_time_statistics.avg * n_mpi_processes;
 
-    const double wall_time =
-        std::accumulate(wall_summary_data.begin(),
-                        wall_summary_data.end(),
-                        0.,
-                        [](auto sum, auto it) { return sum + it.second; });
-
-    const double cpu_m_dofs_per_sec =
-        ((double)cycle) * ((double)offline_data.dof_handler().n_dofs()) / 1.e6 /
-        cpu_time;
     const double wall_m_dofs_per_sec =
         ((double)cycle) * ((double)offline_data.dof_handler().n_dofs()) / 1.e6 /
         wall_time;
 
-    /* Query data for number of restarts: */
-
-    const auto n_calls_summary_data =
-        computing_timer.get_summary_data(TimerOutput::OutputData::n_calls);
-    const auto n_euler_steps =
-        n_calls_summary_data.at("time_step - 1 compute d_ij, and alpha_i");
-
-    auto n_restart_euler_steps = n_euler_steps;
-    switch (TimeStep<dim, Number>::time_step_order_) {
-    case TimeStep<dim, Number>::TimeStepOrder::first_order:
-      n_restart_euler_steps -= cycle;
-      break;
-    case TimeStep<dim, Number>::TimeStepOrder::second_order:
-      n_restart_euler_steps -= 2. * cycle;
-      break;
-    case TimeStep<dim, Number>::TimeStepOrder::third_order:
-      n_restart_euler_steps -= 3. * cycle;
-      break;
-    }
+    const double cpu_m_dofs_per_sec =
+        ((double)cycle) * ((double)offline_data.dof_handler().n_dofs()) / 1.e6 /
+        cpu_time;
 
     std::ostringstream head;
+
     head << std::setprecision(4) << std::endl << std::endl;
-    head << "Throughput:  (CPU )  "                            //
-         << std::fixed << cpu_m_dofs_per_sec << " MQ/s  ("     //
-         << std::scientific << 1. / cpu_m_dofs_per_sec * 1.e-6 //
-         << " s/Qdof/cycle)" << std::endl;
+    head << "Throughput:  (CPU )  "                                    //
+         << std::fixed << cpu_m_dofs_per_sec << " MQ/s  ("             //
+         << std::scientific << 1. / cpu_m_dofs_per_sec * 1.e-6         //
+         << " s/Qdof/cycle)" << std::endl;                             //
+    head << "                     [cpu time skew: "                    //
+         << std::setprecision(2) << std::scientific                    //
+         << cpu_time_statistics.max - cpu_time_statistics.min << "s (" //
+         << std::setprecision(1) << std::setw(4) << std::setfill(' ')
+         << std::fixed
+         << 100. * (cpu_time_statistics.max - cpu_time_statistics.min) /
+                cpu_time_statistics.avg
+         << "%)]" << std::endl << std::endl;
+
     head << "             (WALL)  "                             //
          << std::fixed << wall_m_dofs_per_sec << " MQ/s  ("     //
          << std::scientific << 1. / wall_m_dofs_per_sec * 1.e-6 //
@@ -884,14 +846,19 @@ namespace ryujin
          << std::fixed << ((double)cycle) / wall_time           //
          << " cycles/s)  (avg dt = "                            //
          << std::scientific << t / ((double)cycle)              //
-         << ")" << std::endl;
-    head << "                     ["                                    //
-         << std::setprecision(0) << std::fixed << n_restart_euler_steps //
-         << " rsts  (" << std::setprecision(4) << std::scientific
-         << n_restart_euler_steps / ((double)cycle) << " rsts/cycle)]"
+         << ")" << std::endl;                                   //
+    head << "                     [wall-clock time skew: "      //
+         << std::setprecision(2) << std::scientific             //
+         << wall_time_statistics.max - wall_time_statistics.min << "s ]"
+         << std::endl;
+    head << "                     [ "                                    //
+         << std::setprecision(0) << std::fixed << time_step.n_restarts() //
+         << " rsts   (" << std::setprecision(2) << std::scientific
+         << time_step.n_restarts() / ((double)cycle) << " rsts/cycle) ]"
          << std::endl
          << std::endl;
-    head << "ETA:         " << std::fixed << std::setprecision(4)
+
+    head << "ETA:  " << std::fixed << std::setprecision(4)
          << ((t_final - t) / t * wall_time / 3600.) << " h" << std::endl;
 
     if (mpi_rank != 0)
@@ -946,16 +913,7 @@ namespace ryujin
                   << " ranks performing output !!!" << std::flush;
     }
 
-    computing_timer.print_summary();
-    auto summary = timer_output.str();
-    timer_output.str("");
-
-    if (mpi_rank == 0) {
-      /* Remove CPU statistics and unnecessary whitespace: */
-      std::cout << summary.substr(summary.length() / 2,
-                                  summary.length() / 2 - 2)
-                << std::endl;
-    }
+    // FIXME summary of section timers
 
     print_throughput(cycle, t, /*use_cout*/ true);
 

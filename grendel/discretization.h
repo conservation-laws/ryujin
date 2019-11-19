@@ -6,7 +6,6 @@
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/quadrature.h>
-#include <deal.II/base/timer.h>
 #include <deal.II/distributed/tria.h>
 #include <deal.II/fe/fe.h>
 #include <deal.II/fe/mapping.h>
@@ -41,7 +40,6 @@ namespace grendel
      * Constructor.
      */
     Discretization(const MPI_Comm &mpi_communicator,
-                   dealii::TimerOutput &computing_timer,
                    const std::string &subsection = "Discretization");
 
     /**
@@ -78,7 +76,6 @@ namespace grendel
 
   private:
     const MPI_Comm &mpi_communicator_;
-    dealii::TimerOutput &computing_timer_;
 
     /*
      * Configuration data used to create the triangulation and set up

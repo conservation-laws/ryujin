@@ -23,11 +23,9 @@ namespace grendel
 
   template <int dim>
   Discretization<dim>::Discretization(const MPI_Comm &mpi_communicator,
-                                      dealii::TimerOutput &computing_timer,
                                       const std::string &subsection)
       : ParameterAcceptor(subsection)
       , mpi_communicator_(mpi_communicator)
-      , computing_timer_(computing_timer)
   {
     geometry_ = "cylinder";
     add_parameter("geometry",
@@ -157,7 +155,6 @@ namespace grendel
 #ifdef DEBUG_OUTPUT
     deallog << "Discretization<dim>::prepare()" << std::endl;
 #endif
-    TimerOutput::Scope t(computing_timer_, "* discretization - prepare");
 
     if (!triangulation_)
       triangulation_.reset(

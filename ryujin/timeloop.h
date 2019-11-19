@@ -74,8 +74,8 @@ namespace ryujin
     /* Data: */
 
     const MPI_Comm &mpi_communicator;
-    std::ostringstream timer_output;
-    dealii::TimerOutput computing_timer;
+
+    std::map<std::string, dealii::Timer> computing_timer;
 
     grendel::Discretization<dim> discretization;
     grendel::OfflineData<dim, Number> offline_data;

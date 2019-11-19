@@ -8,7 +8,6 @@
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/partitioner.h>
-#include <deal.II/base/timer.h>
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/lac/affine_constraints.h>
 #include <deal.II/lac/la_parallel_vector.h>
@@ -42,7 +41,6 @@ namespace grendel
   {
   public:
     OfflineData(const MPI_Comm &mpi_communicator,
-                dealii::TimerOutput &computing_timer,
                 const grendel::Discretization<dim> &discretization,
                 const std::string &subsection = "OfflineData");
 
@@ -183,7 +181,6 @@ namespace grendel
     dealii::AffineConstraints<Number> affine_constraints_assembly_;
 
     const MPI_Comm &mpi_communicator_;
-    dealii::TimerOutput &computing_timer_;
 
     /**
      * A pointer to a discretization object.

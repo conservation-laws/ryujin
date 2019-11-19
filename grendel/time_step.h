@@ -35,7 +35,7 @@ namespace grendel
     using vector_type = std::array<scalar_type, problem_dimension>;
 
     TimeStep(const MPI_Comm &mpi_communicator,
-             dealii::TimerOutput &computing_timer,
+             std::map<std::string, dealii::Timer> &computing_timer,
              const grendel::OfflineData<dim, Number> &offline_data,
              const grendel::InitialValues<dim, Number> &initial_values,
              const std::string &subsection = "TimeStep");
@@ -109,11 +109,14 @@ namespace grendel
 
   private:
     const MPI_Comm &mpi_communicator_;
-    dealii::TimerOutput &computing_timer_;
+    std::map<std::string, dealii::Timer> &computing_timer_;
 
     dealii::SmartPointer<const grendel::OfflineData<dim, Number>> offline_data_;
     dealii::SmartPointer<const grendel::InitialValues<dim, Number>>
         initial_values_;
+
+    unsigned int n_restarts_;
+    ACCESSOR_READ_ONLY(n_restarts)
 
     /* Scratch data: */
 

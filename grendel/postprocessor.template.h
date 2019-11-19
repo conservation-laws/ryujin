@@ -42,12 +42,10 @@ namespace grendel
   template <int dim, typename Number>
   Postprocessor<dim, Number>::Postprocessor(
       const MPI_Comm &mpi_communicator,
-      dealii::TimerOutput &computing_timer,
       const grendel::OfflineData<dim, Number> &offline_data,
       const std::string &subsection /*= "Postprocessor"*/)
       : ParameterAcceptor(subsection)
       , mpi_communicator_(mpi_communicator)
-      , computing_timer_(computing_timer)
       , offline_data_(&offline_data)
   {
     schlieren_beta_ = 10.;
@@ -69,8 +67,6 @@ namespace grendel
 #ifdef DEBUG_OUTPUT
     deallog << "Postprocessor<dim, Number>::prepare()" << std::endl;
 #endif
-    TimerOutput::Scope t(computing_timer_,
-                         "* postprocessor  - prepare scratch space");
 
     const auto &partitioner = offline_data_->partitioner();
 
@@ -93,7 +89,6 @@ namespace grendel
 #ifdef DEBUG_OUTPUT
     deallog << "Postprocessor<dim, Number>::compute()" << std::endl;
 #endif
-    TimerOutput::Scope t(computing_timer_, "postprocessor - compute");
 
     const auto &affine_constraints = offline_data_->affine_constraints();
     const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
