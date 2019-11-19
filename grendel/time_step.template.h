@@ -281,12 +281,15 @@ namespace grendel
 
       LIKWID_MARKER_STOP("time_step_1");
       GRENDEL_PARALLEL_REGION_END
+    }
+
+    {
+      Scope scope(computing_timer_, "time step   - synchronization");
 
       /* Synchronize over all MPI processes: */
       alpha_.update_ghost_values();
       second_variations_.update_ghost_values();
     }
-
 
     /*
      * Step 2: Compute diagonal of d_ij, and maximal time-step size.
@@ -344,6 +347,10 @@ namespace grendel
 
       LIKWID_MARKER_STOP("time_step_2");
       GRENDEL_PARALLEL_REGION_END
+    }
+
+    {
+      Scope scope(computing_timer_, "time step   - synchronization");
 
       /* Synchronize over all MPI processes: */
       tau_max.store(Utilities::MPI::min(tau_max.load(), mpi_communicator_));
@@ -546,6 +553,10 @@ namespace grendel
 
       LIKWID_MARKER_STOP("time_step_3");
       GRENDEL_PARALLEL_REGION_END
+    }
+
+    {
+      Scope scope(computing_timer_, "time step   - synchronization");
 
       /* Synchronize over all MPI processes: */
       for (auto &it : r_)
@@ -685,14 +696,10 @@ namespace grendel
         LIKWID_MARKER_STOP("time_step_4");
         GRENDEL_PARALLEL_REGION_END
 
-        /* Synchronize over all MPI processes: */
-        lij_matrix_.update_ghost_rows();
-
       } else {
         /*
          * Step 5: compute l_ij (second and later rounds):
          */
-
         Scope scope(computing_timer_, "time step 5 - compute l_ij");
 
         GRENDEL_PARALLEL_REGION_BEGIN
@@ -741,11 +748,14 @@ namespace grendel
 
         LIKWID_MARKER_STOP("time_step_5");
         GRENDEL_PARALLEL_REGION_END
+      }
+
+      {
+        Scope scope(computing_timer_, "time step   - synchronization");
 
         /* Synchronize over all MPI processes: */
         lij_matrix_.update_ghost_rows();
       }
-
 
       /*
        * Step 6: Perform high-order update:
