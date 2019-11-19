@@ -787,14 +787,54 @@ namespace ryujin
   template <int dim, typename Number>
   void TimeLoop<dim, Number>::print_timers(bool use_cout)
   {
-    std::ostringstream head;
+    std::vector<std::ostringstream> output(computing_timer.size());
 
-    head << std::setprecision(2) << std::endl << std::endl;
-    head << "Timer statistics:";
+    const auto equalize = [&]() {
+      const auto ptr =
+          std::max_element(output.begin(),
+                           output.end(),
+                           [](const auto &left, const auto &right) {
+                             return left.str().length() < right.str().length();
+                           });
+      const auto length = ptr->str().length();
+      for (auto &it : output)
+        it << std::string(length - it.str().length() + 1, ' ');
+    };
 
-    for(auto &it : computing_timer) {
-      head << std::endl << "  " << it.first;
-    }
+    const auto print_wall_time = [&](auto &timer, auto &stream) {
+      const auto wall_time =
+          Utilities::MPI::min_max_avg(timer.wall_time(), mpi_communicator);
+
+      stream << std::setprecision(2) << std::fixed << std::setw(8)
+             << wall_time.max << "s [sk: " << std::setprecision(1)
+             << std::setw(4) << std::fixed
+             << 100. * (wall_time.max - wall_time.min) / wall_time.avg << "%]";
+    };
+
+    const auto print_cpu_time = [&](auto &timer, auto &stream) {
+      const auto cpu_time =
+          Utilities::MPI::min_max_avg(timer.cpu_time(), mpi_communicator);
+
+      stream << std::setprecision(2) << std::fixed << std::setw(8)
+             << cpu_time.avg * n_mpi_processes
+             << "s [sk: " << std::setprecision(1) << std::setw(4) << std::fixed
+             << 100. * (cpu_time.max - cpu_time.min) / cpu_time.avg << "%]";
+    };
+
+    auto jt = output.begin();
+    for (auto &it : computing_timer)
+      *jt++ << "  " << it.first;
+    equalize();
+
+    jt = output.begin();
+    for (auto &it : computing_timer)
+      print_wall_time(it.second, *jt++);
+    equalize();
+
+    jt = output.begin();
+    for (auto &it : computing_timer)
+      print_cpu_time(it.second, *jt++);
+    equalize();
 
     if (mpi_rank != 0)
       return;
@@ -805,7 +845,9 @@ namespace ryujin
     std::ostream &stream = use_cout ? std::cout : *filestream;
 #endif
 
-    stream << head.str() << std::endl;
+    stream << std::endl << std::endl << "Timer statistics:" << std::endl;
+    for (auto &it : output)
+      stream << it.str() << std::endl;
   }
 
 
