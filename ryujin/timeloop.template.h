@@ -79,11 +79,6 @@ namespace ryujin
     resume = false;
     add_parameter("resume", resume, "Resume an interrupted computation");
 
-    write_mesh = false;
-    add_parameter("write mesh",
-                  write_mesh,
-                  "Write out the (distributed) mesh in inp format");
-
     write_output_files = true;
     add_parameter("write output files",
                   write_output_files,
@@ -109,70 +104,61 @@ namespace ryujin
     deallog << "TimeLoop<dim, Number>::run()" << std::endl;
 #endif
 
-    /* Create distributed triangulation and output the triangulation: */
-    print_head("create triangulation");
-    discretization.prepare();
-
-    if (write_mesh) {
-#ifdef DEBUG_OUTPUT
-      deallog << "        output triangulation" << std::endl;
-#endif
-      std::ofstream output(base_name + "-triangulation-p" +
-                           std::to_string(mpi_rank) + ".inp");
-      GridOut().write_ucd(discretization.triangulation(), output);
-    }
-
-    /* Prepare data structures: */
-
-    print_head("compute offline data");
-
-    offline_data.prepare();
-    time_step.prepare();
-    postprocessor.prepare();
-
-    print_mpi_partition();
-
     Number t = 0.;
     unsigned int output_cycle = 0;
     vector_type U;
 
-    const auto &partitioner = offline_data.partitioner();
-    for (auto &it : U)
-      it.reinit(partitioner);
+    /* Prepare data structures: */
 
-    if (!resume) {
-      print_head("interpolate initial values");
+    print_head("initialize data structures");
 
-      U = interpolate_initial_values();
+    {
+      Scope scope(computing_timer, "initialize data structures");
 
-    } else {
+      discretization.prepare();
+      offline_data.prepare();
+      time_step.prepare();
+      postprocessor.prepare();
 
-      print_head("resume interrupted computation");
+      print_mpi_partition();
 
-      const auto &triangulation = discretization.triangulation();
-      const unsigned int i = triangulation.locally_owned_subdomain();
-      std::string name = base_name + "-checkpoint-" +
-                         dealii::Utilities::int_to_string(i, 4) + ".archive";
-      std::ifstream file(name, std::ios::binary);
+      const auto &partitioner = offline_data.partitioner();
+      for (auto &it : U)
+        it.reinit(partitioner);
 
-      boost::archive::binary_iarchive ia(file);
-      ia >> t >> output_cycle;
+      if (!resume) {
+        print_head("interpolate initial values");
+        U = interpolate_initial_values();
 
-      for (auto &it1 : U) {
-        for (auto &it2 : it1)
-          ia >> it2;
-        it1.update_ghost_values();
+      } else {
+
+        print_head("resume interrupted computation");
+
+        const auto &triangulation = discretization.triangulation();
+        const unsigned int i = triangulation.locally_owned_subdomain();
+        std::string name = base_name + "-checkpoint-" +
+                           dealii::Utilities::int_to_string(i, 4) + ".archive";
+        std::ifstream file(name, std::ios::binary);
+
+        boost::archive::binary_iarchive ia(file);
+        ia >> t >> output_cycle;
+
+        for (auto &it1 : U) {
+          for (auto &it2 : it1)
+            ia >> it2;
+          it1.update_ghost_values();
+        }
       }
     }
 
-    if (write_output_files)
+    if (write_output_files) {
       output(U, base_name + "-solution", t, output_cycle);
 
-    if (write_output_files && enable_compute_error) {
-      const auto analytic = interpolate_initial_values(t);
-      output(analytic, base_name + "-analytic_solution", t, output_cycle);
+      if (enable_compute_error) {
+        const auto analytic = interpolate_initial_values(t);
+        output(analytic, base_name + "-analytic_solution", t, output_cycle);
+      }
     }
-
     ++output_cycle;
 
     print_head("enter main loop");
@@ -193,25 +179,23 @@ namespace ryujin
       t += tau;
 
       if (t > output_cycle * output_granularity) {
-        if (write_output_files)
+        if (write_output_files) {
           output(U,
                  base_name + "-solution",
                  t,
                  output_cycle,
                  /*checkpoint*/ enable_checkpointing);
 
-        if (write_output_files && enable_compute_error) {
-          const auto analytic = interpolate_initial_values(t);
-          output(analytic, base_name + "-analytic_solution", t, output_cycle);
+          if (enable_compute_error) {
+            const auto analytic = interpolate_initial_values(t);
+            output(analytic, base_name + "-analytic_solution", t, output_cycle);
+          }
         }
-
         ++output_cycle;
 
 #ifndef DEBUG_OUTPUT
-        print_cycle(cycle, t);
         print_cycle_statistics(cycle, t, output_cycle);
 #endif
-        print_throughput(cycle, t);
       }
 
 #ifndef DEBUG_OUTPUT
@@ -234,13 +218,10 @@ namespace ryujin
 
     if (enable_compute_error) {
       /* Output final error: */
-
-      const auto &affine_constraints = offline_data.affine_constraints();
-      for (auto &it : U)
-        affine_constraints.distribute(it);
       compute_error(U, t);
     }
 
+    print_timers();
     print_throughput(cycle, t);
 
 #ifdef DEBUG_OUTPUT
@@ -472,7 +453,10 @@ namespace ryujin
       output_thread.join();
     }
 
-    postprocessor.compute(U, time_step.alpha());
+    {
+      Scope scope(computing_timer, "postprocessor");
+      postprocessor.compute(U, time_step.alpha());
+    }
 
     /* capture name, t, cycle, and checkpoint by value */
     const auto output_worker = [this, name, t, cycle, checkpoint]() {
@@ -801,6 +785,31 @@ namespace ryujin
 
 
   template <int dim, typename Number>
+  void TimeLoop<dim, Number>::print_timers(bool use_cout)
+  {
+    std::ostringstream head;
+
+    head << std::setprecision(2) << std::endl << std::endl;
+    head << "Timer statistics:";
+
+    for(auto &it : computing_timer) {
+      head << std::endl << "  " << it.first;
+    }
+
+    if (mpi_rank != 0)
+      return;
+
+#ifdef DEBUG_OUTPUT
+    auto &stream = deallog;
+#else
+    std::ostream &stream = use_cout ? std::cout : *filestream;
+#endif
+
+    stream << head.str() << std::endl;
+  }
+
+
+  template <int dim, typename Number>
   void TimeLoop<dim, Number>::print_throughput(unsigned int cycle,
                                                Number t,
                                                bool use_cout)
@@ -859,7 +868,7 @@ namespace ryujin
          << std::endl;
 
     head << "ETA:  " << std::fixed << std::setprecision(4)
-         << ((t_final - t) / t * wall_time / 3600.) << " h" << std::endl;
+         << ((t_final - t) / t * wall_time / 3600.) << " h";
 
     if (mpi_rank != 0)
       return;
@@ -913,8 +922,7 @@ namespace ryujin
                   << " ranks performing output !!!" << std::flush;
     }
 
-    // FIXME summary of section timers
-
+    print_timers(/*use_cout*/ true);
     print_throughput(cycle, t, /*use_cout*/ true);
 
   }

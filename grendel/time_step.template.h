@@ -385,7 +385,7 @@ namespace grendel
 
     {
       Scope scope(computing_timer_,
-                  "time step 3 - low-order update, limiter bounds, and r_i");
+                  "time step 3 - l.-o. update, bounds, and r_i");
 
       /* Parallel region */
       GRENDEL_PARALLEL_REGION_BEGIN
@@ -696,7 +696,7 @@ namespace grendel
          * Step 5: compute l_ij (second and later rounds):
          */
 
-        Scope scope(computing_timer_, "time_step 5 - compute l_ij");
+        Scope scope(computing_timer_, "time step 5 - compute l_ij");
 
         GRENDEL_PARALLEL_REGION_BEGIN
         LIKWID_MARKER_START("time_step_5");
@@ -759,7 +759,7 @@ namespace grendel
 
       {
         Scope scope(computing_timer_,
-                    "time step 6 - symmetrize l_ij, high-order update");
+                    "time step 6 - symmetrize l_ij, h.-o. update");
 
         GRENDEL_PARALLEL_REGION_BEGIN
         LIKWID_MARKER_START("time_step_6");

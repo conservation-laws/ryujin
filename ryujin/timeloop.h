@@ -49,6 +49,7 @@ namespace ryujin
                     const std::string &secondary = "",
                     bool use_cout = false);
     void print_cycle(unsigned int cycle, Number t, bool use_cout = false);
+    void print_timers(bool use_cout = false);
     void print_throughput(unsigned int cycle, Number t, bool use_cout = false);
     void print_cycle_statistics(unsigned int cycle,
                                 Number t,
@@ -66,7 +67,6 @@ namespace ryujin
     bool enable_checkpointing;
     bool resume;
 
-    bool write_mesh;
     bool write_output_files;
 
     bool enable_compute_error;
