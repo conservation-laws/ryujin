@@ -808,7 +808,7 @@ namespace ryujin
       stream << std::setprecision(2) << std::fixed << std::setw(8)
              << wall_time.max << "s [sk: " << std::setprecision(1)
              << std::setw(4) << std::fixed
-             << 100. * (wall_time.max - wall_time.min) / wall_time.avg << "%]";
+             << 100. * (wall_time.max - wall_time.avg) / wall_time.avg << "%]";
     };
 
     const auto print_cpu_time = [&](auto &timer, auto &stream) {
@@ -818,7 +818,7 @@ namespace ryujin
       stream << std::setprecision(2) << std::fixed << std::setw(8)
              << cpu_time.avg * n_mpi_processes
              << "s [sk: " << std::setprecision(1) << std::setw(4) << std::fixed
-             << 100. * (cpu_time.max - cpu_time.min) / cpu_time.avg << "%]";
+             << 100. * (cpu_time.max - cpu_time.avg) / cpu_time.avg << "%]";
     };
 
     auto jt = output.begin();
@@ -883,10 +883,10 @@ namespace ryujin
          << " s/Qdof/cycle)" << std::endl;                             //
     head << "                     [cpu time skew: "                    //
          << std::setprecision(2) << std::scientific                    //
-         << cpu_time_statistics.max - cpu_time_statistics.min << "s (" //
+         << cpu_time_statistics.max - cpu_time_statistics.avg << "s (" //
          << std::setprecision(1) << std::setw(4) << std::setfill(' ')
          << std::fixed
-         << 100. * (cpu_time_statistics.max - cpu_time_statistics.min) /
+         << 100. * (cpu_time_statistics.max - cpu_time_statistics.avg) /
                 cpu_time_statistics.avg
          << "%)]" << std::endl << std::endl;
 
@@ -900,7 +900,7 @@ namespace ryujin
          << ")" << std::endl;                                   //
     head << "                     [wall-clock time skew: "      //
          << std::setprecision(2) << std::scientific             //
-         << wall_time_statistics.max - wall_time_statistics.min << "s ]"
+         << wall_time_statistics.max - wall_time_statistics.avg << "s ]"
          << std::endl;
     head << "                     [ "                                    //
          << std::setprecision(0) << std::fixed << time_step.n_restarts() //
