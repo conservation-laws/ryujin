@@ -355,22 +355,20 @@ namespace grendel
 #ifdef DEBUG_OUTPUT
       deallog << "        computed tau_max = " << tau_max << std::endl;
 #endif
-    }
-
-    tau = (tau == Number(0.) ? tau_max.load() : tau);
+      tau = (tau == Number(0.) ? tau_max.load() : tau);
 #ifdef DEBUG_OUTPUT
-    deallog << "        perform time-step with tau = " << tau << std::endl;
+      deallog << "        perform time-step with tau = " << tau << std::endl;
 #endif
 
-    if (tau * cfl_update_ > tau_max.load() * cfl_max_) {
+      if (tau * cfl_update_ > tau_max.load() * cfl_max_) {
 #ifdef DEBUG_OUTPUT
-      deallog << "        insufficient CFL, refuse update and abort stepping"
-              << std::endl;
+        deallog << "        insufficient CFL, refuse update and abort stepping"
+                << std::endl;
 #endif
-      U[0] *= std::numeric_limits<Number>::quiet_NaN();
-      return tau_max;
+        U[0] *= std::numeric_limits<Number>::quiet_NaN();
+        return tau_max;
+      }
     }
-
 
     /*
      * Step 3: Low-order update, also compute limiter bounds, R_i
