@@ -398,32 +398,32 @@ namespace ryujin
       return;
 
 #ifdef DEBUG_OUTPUT
-      auto &stream = deallog;
+    auto &stream = deallog;
 #else
-      auto &stream = *filestream;
+    auto &stream = *filestream;
 #endif
 
-      print_head("compute error");
+    print_head("compute error");
 
-      stream << "Normalized consolidated Linf, L1, and L2 errors at "
-             << "final time" << std::endl;
-      stream << "#dofs = " << offline_data.dof_handler().n_dofs() << std::endl;
-      stream << "t     = " << t << std::endl;
-      stream << "Linf  = " << linf_norm << std::endl;
-      stream << "L1    = " << l1_norm << std::endl;
-      stream << "L2    = " << l2_norm << std::endl;
+    stream << "Normalized consolidated Linf, L1, and L2 errors at "
+           << "final time" << std::endl;
+    stream << "#dofs = " << offline_data.dof_handler().n_dofs() << std::endl;
+    stream << "t     = " << t << std::endl;
+    stream << "Linf  = " << linf_norm << std::endl;
+    stream << "L1    = " << l1_norm << std::endl;
+    stream << "L2    = " << l2_norm << std::endl;
 
 #ifndef DEBUG_OUTPUT
-      if (mpi_rank == 0) {
-        std::cout << "Normalized consolidated Linf, L1, and L2 errors at "
-                  << "final time" << std::endl;
-        std::cout << "#dofs = " << offline_data.dof_handler().n_dofs()
-                  << std::endl;
-        std::cout << "t     = " << t << std::endl;
-        std::cout << "Linf  = " << linf_norm << std::endl;
-        std::cout << "L1    = " << l1_norm << std::endl;
-        std::cout << "L2    = " << l2_norm << std::endl;
-      }
+    if (mpi_rank == 0) {
+      std::cout << "Normalized consolidated Linf, L1, and L2 errors at "
+                << "final time" << std::endl;
+      std::cout << "#dofs = " << offline_data.dof_handler().n_dofs()
+                << std::endl;
+      std::cout << "t     = " << t << std::endl;
+      std::cout << "Linf  = " << linf_norm << std::endl;
+      std::cout << "L1    = " << l1_norm << std::endl;
+      std::cout << "L2    = " << l2_norm << std::endl;
+    }
 #endif
   }
 
@@ -816,8 +816,8 @@ namespace ryujin
           Utilities::MPI::min_max_avg(timer.cpu_time(), mpi_communicator);
 
       stream << std::setprecision(2) << std::fixed << std::setw(8)
-             << cpu_time.avg * n_mpi_processes
-             << "s [sk: " << std::setprecision(1) << std::setw(4) << std::fixed
+             << cpu_time.sum << "s [sk: " << std::setprecision(1)
+             << std::setw(4) << std::fixed
              << 100. * (cpu_time.max - cpu_time.avg) / cpu_time.avg << "%]";
     };
 
@@ -864,7 +864,7 @@ namespace ryujin
 
     const auto cpu_time_statistics = Utilities::MPI::min_max_avg(
         computing_timer["main loop"].cpu_time(), mpi_communicator);
-    const double cpu_time = cpu_time_statistics.avg * n_mpi_processes;
+    const double cpu_time = cpu_time_statistics.sum;
 
     const double wall_m_dofs_per_sec =
         ((double)cycle) * ((double)offline_data.dof_handler().n_dofs()) / 1.e6 /
@@ -888,16 +888,17 @@ namespace ryujin
          << std::fixed
          << 100. * (cpu_time_statistics.max - cpu_time_statistics.avg) /
                 cpu_time_statistics.avg
-         << "%)]" << std::endl << std::endl;
+         << "%)]" << std::endl
+         << std::endl;
 
-    head << "             (WALL)  "                             //
-         << std::fixed << wall_m_dofs_per_sec << " MQ/s  ("     //
-         << std::scientific << 1. / wall_m_dofs_per_sec * 1.e-6 //
-         << " s/Qdof/cycle)  ("                                 //
-         << std::fixed << ((double)cycle) / wall_time           //
-         << " cycles/s)  (avg dt = "                            //
-         << std::scientific << t / ((double)cycle)              //
-         << ")" << std::endl;                                   //
+    head << "             (WALL)  "                                      //
+         << std::fixed << wall_m_dofs_per_sec << " MQ/s  ("              //
+         << std::scientific << 1. / wall_m_dofs_per_sec * 1.e-6          //
+         << " s/Qdof/cycle)  ("                                          //
+         << std::fixed << ((double)cycle) / wall_time                    //
+         << " cycles/s)  (avg dt = "                                     //
+         << std::scientific << t / ((double)cycle)                       //
+         << ")" << std::endl;                                            //
     head << "                     [ "                                    //
          << std::setprecision(0) << std::fixed << time_step.n_restarts() //
          << " rsts   (" << std::setprecision(2) << std::scientific
@@ -962,7 +963,6 @@ namespace ryujin
 
     print_timers(/*use_cout*/ true);
     print_throughput(cycle, t, /*use_cout*/ true);
-
   }
 
 
