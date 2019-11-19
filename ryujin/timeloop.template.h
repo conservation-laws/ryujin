@@ -806,7 +806,7 @@ namespace ryujin
           Utilities::MPI::min_max_avg(timer.wall_time(), mpi_communicator);
 
       stream << std::setprecision(2) << std::fixed << std::setw(8)
-             << wall_time.max << "s [sk: " << std::setprecision(1)
+             << wall_time.avg << "s [sk: " << std::setprecision(1)
              << std::setw(4) << std::fixed
              << 100. * (wall_time.max - wall_time.avg) / wall_time.avg << "%]";
     };
@@ -898,10 +898,6 @@ namespace ryujin
          << " cycles/s)  (avg dt = "                            //
          << std::scientific << t / ((double)cycle)              //
          << ")" << std::endl;                                   //
-    head << "                     [wall-clock time skew: "      //
-         << std::setprecision(2) << std::scientific             //
-         << wall_time_statistics.max - wall_time_statistics.avg << "s ]"
-         << std::endl;
     head << "                     [ "                                    //
          << std::setprecision(0) << std::fixed << time_step.n_restarts() //
          << " rsts   (" << std::setprecision(2) << std::scientific
