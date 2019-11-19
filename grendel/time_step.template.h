@@ -10,7 +10,6 @@
 #include <boost/range/irange.hpp>
 
 #include <atomic>
-#include <regex>
 
 #ifdef VALGRIND_CALLGRIND
 #include <valgrind/callgrind.h>

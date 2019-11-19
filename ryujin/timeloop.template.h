@@ -162,7 +162,7 @@ namespace ryujin
     ++output_cycle;
 
     print_head("enter main loop");
-    computing_timer["main loop"].start();
+    computing_timer["time loop"].start();
 
     /* Loop: */
 
@@ -214,7 +214,7 @@ namespace ryujin
     if (output_thread.joinable())
       output_thread.join();
 
-    computing_timer["main loop"].stop();
+    computing_timer["time loop"].stop();
 
     if (enable_compute_error) {
       /* Output final error: */
@@ -449,7 +449,7 @@ namespace ryujin
      */
 
     if (output_thread.joinable()) {
-      Scope scope(computing_timer, "stalled output");
+      Scope scope(computing_timer, "output stall");
       output_thread.join();
     }
 
@@ -462,6 +462,7 @@ namespace ryujin
     const auto output_worker = [this, name, t, cycle, checkpoint]() {
       /* Flag thread as active: */
       output_thread_active = 1;
+      Scope scope(computing_timer, "output write out");
 
       /* Checkpointing: */
 
@@ -811,13 +812,26 @@ namespace ryujin
              << 100. * (wall_time.max - wall_time.avg) / wall_time.avg << "%]";
     };
 
-    const auto print_cpu_time = [&](auto &timer, auto &stream) {
+    const auto cpu_time_statistics = Utilities::MPI::min_max_avg(
+        computing_timer["time loop"].cpu_time(), mpi_communicator);
+    const double total_cpu_time = cpu_time_statistics.sum;
+
+    const auto print_cpu_time = [&](auto &timer,
+                                    auto &stream,
+                                    bool percentage) {
       const auto cpu_time =
           Utilities::MPI::min_max_avg(timer.cpu_time(), mpi_communicator);
 
-      stream << std::setprecision(2) << std::fixed << std::setw(8)
-             << cpu_time.sum << "s [sk: " << std::setprecision(1)
-             << std::setw(4) << std::fixed
+      stream << std::setprecision(2) << std::fixed << std::setw(9)
+             << cpu_time.sum << "s ";
+
+      if (percentage)
+        stream << "(" << std::setprecision(1) << std::setw(4)
+               << 100. * cpu_time.sum / total_cpu_time << "%)";
+      else
+        stream << "       ";
+
+      stream << " [sk: " << std::setprecision(1) << std::setw(4) << std::fixed
              << 100. * (cpu_time.max - cpu_time.avg) / cpu_time.avg << "%]";
     };
 
@@ -833,7 +847,7 @@ namespace ryujin
 
     jt = output.begin();
     for (auto &it : computing_timer)
-      print_cpu_time(it.second, *jt++);
+      print_cpu_time(it.second, *jt++, it.first.find("time step ") == 0);
     equalize();
 
     if (mpi_rank != 0)
@@ -859,11 +873,11 @@ namespace ryujin
     /* Print Jean-Luc and Martin metrics: */
 
     const auto wall_time_statistics = Utilities::MPI::min_max_avg(
-        computing_timer["main loop"].wall_time(), mpi_communicator);
+        computing_timer["time loop"].wall_time(), mpi_communicator);
     const double wall_time = wall_time_statistics.max;
 
     const auto cpu_time_statistics = Utilities::MPI::min_max_avg(
-        computing_timer["main loop"].cpu_time(), mpi_communicator);
+        computing_timer["time loop"].cpu_time(), mpi_communicator);
     const double cpu_time = cpu_time_statistics.sum;
 
     const double wall_m_dofs_per_sec =
