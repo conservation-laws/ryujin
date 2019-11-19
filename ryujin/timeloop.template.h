@@ -193,9 +193,7 @@ namespace ryujin
         }
         ++output_cycle;
 
-#ifndef DEBUG_OUTPUT
         print_cycle_statistics(cycle, t, output_cycle);
-#endif
       }
 
 #ifndef DEBUG_OUTPUT
@@ -956,7 +954,9 @@ namespace ryujin
       std::ostringstream secondary;
       secondary << "at time t = " << std::setprecision(8) << std::fixed << t;
 
+#ifndef DEBUG_OUTPUT
       std::cout << "\033[2J\033[H" << std::endl;
+#endif
 
       print_head(primary.str(), secondary.str(), /*use_cout*/ true);
 

@@ -17,6 +17,9 @@ namespace grendel
         , section_(section)
     {
       computing_timer_[section_].start();
+#ifdef DEBUG_OUTPUT
+      dealii::deallog << section_ << std::endl;
+#endif
     }
 
     ~Scope()
