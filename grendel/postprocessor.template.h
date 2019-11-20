@@ -83,7 +83,8 @@ namespace grendel
       const auto &triangulation = dof_handler.get_triangulation();
 
       const auto max_level = triangulation.n_global_levels() - 1;
-      const auto min_level = max_level - std::min(coarsening_level_, max_level);
+      const auto output_level =
+          max_level - std::min(coarsening_level_, max_level);
 
       constrained_dofs_.initialize(dof_handler);
 
@@ -91,10 +92,10 @@ namespace grendel
       transfer_.build(dof_handler);
 
       for (auto &it : output_U_)
-        it.resize(min_level, max_level);
+        it.resize(output_level, max_level);
 
       for (auto &it : output_quantities_)
-        it.resize(min_level, max_level);
+        it.resize(output_level, max_level);
     }
   }
 
@@ -268,7 +269,7 @@ namespace grendel
     }
 
     /*
-     * Step 5: interpolate to carse mesh
+     * Step 5: interpolate to coarse mesh
      */
 
     if (coarsening_level_ != 0) {
