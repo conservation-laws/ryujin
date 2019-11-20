@@ -158,60 +158,6 @@ namespace grendel
       LIKWID_MARKER_START("time_step_1");
 
       /* Stored thread locally: */
-      Indicator<dim, VectorizedArray<Number>> indicator_simd;
-
-      /* Parallel SIMD loop: */
-
-      GRENDEL_OMP_FOR
-      for (unsigned int i = 0; i < n_internal; i += n_array_elements) {
-
-        const auto U_i = simd_gather(U, i);
-        indicator_simd.reset(U_i);
-
-        const auto mass = simd_gather(lumped_mass_matrix, i);
-        const auto hd_i = mass * measure_of_omega_inverse;
-
-        const unsigned int row_length = sparsity_simd.row_length(i);
-
-        /* Skip diagonal. */
-        const unsigned int *js = sparsity_simd.columns(i) + n_array_elements;
-        for (unsigned int col_idx = 1; col_idx < row_length;
-             ++col_idx, js += n_array_elements) {
-
-          bool all_below_diagonal = true;
-          for (unsigned int k = 0; k < n_array_elements; ++k)
-            if (js[k] >= i + k) {
-              all_below_diagonal = false;
-              break;
-            }
-
-          const auto U_j = simd_gather(U, js);
-
-          const auto c_ij = cij_matrix.get_vectorized_tensor(i, col_idx);
-          const auto beta_ij = betaij_matrix.get_vectorized_entry(i, col_idx);
-          indicator_simd.add(U_j, c_ij, beta_ij);
-
-          /* Only iterate over the upper triangular portion of d_ij */
-          if (all_below_diagonal)
-            continue;
-
-          const auto norm = c_ij.norm();
-          const auto n_ij = c_ij / norm;
-
-          const auto [lambda_max, p_star, n_iterations] =
-              RiemannSolver<dim, VectorizedArray<Number>>::compute(
-                  U_i, U_j, n_ij, hd_i);
-
-          const auto d = norm * lambda_max;
-
-          dij_matrix_.write_vectorized_entry(d, i, col_idx, true);
-        }
-
-        simd_scatter(alpha_, indicator_simd.alpha(hd_i), i);
-        simd_scatter(second_variations_, indicator_simd.second_variations(), i);
-      } /* parallel SIMD loop */
-
-      /* Stored thread locally: */
       Indicator<dim, Number> indicator_serial;
 
       /* Parallel non-vectorized loop: */
@@ -278,6 +224,60 @@ namespace grendel
         second_variations_.local_element(i) =
             indicator_serial.second_variations();
       } /* parallel non-vectorized loop */
+
+      /* Stored thread locally: */
+      Indicator<dim, VectorizedArray<Number>> indicator_simd;
+
+      /* Parallel SIMD loop: */
+
+      GRENDEL_OMP_FOR
+      for (unsigned int i = 0; i < n_internal; i += n_array_elements) {
+
+        const auto U_i = simd_gather(U, i);
+        indicator_simd.reset(U_i);
+
+        const auto mass = simd_gather(lumped_mass_matrix, i);
+        const auto hd_i = mass * measure_of_omega_inverse;
+
+        const unsigned int row_length = sparsity_simd.row_length(i);
+
+        /* Skip diagonal. */
+        const unsigned int *js = sparsity_simd.columns(i) + n_array_elements;
+        for (unsigned int col_idx = 1; col_idx < row_length;
+             ++col_idx, js += n_array_elements) {
+
+          bool all_below_diagonal = true;
+          for (unsigned int k = 0; k < n_array_elements; ++k)
+            if (js[k] >= i + k) {
+              all_below_diagonal = false;
+              break;
+            }
+
+          const auto U_j = simd_gather(U, js);
+
+          const auto c_ij = cij_matrix.get_vectorized_tensor(i, col_idx);
+          const auto beta_ij = betaij_matrix.get_vectorized_entry(i, col_idx);
+          indicator_simd.add(U_j, c_ij, beta_ij);
+
+          /* Only iterate over the upper triangular portion of d_ij */
+          if (all_below_diagonal)
+            continue;
+
+          const auto norm = c_ij.norm();
+          const auto n_ij = c_ij / norm;
+
+          const auto [lambda_max, p_star, n_iterations] =
+              RiemannSolver<dim, VectorizedArray<Number>>::compute(
+                  U_i, U_j, n_ij, hd_i);
+
+          const auto d = norm * lambda_max;
+
+          dij_matrix_.write_vectorized_entry(d, i, col_idx, true);
+        }
+
+        simd_scatter(alpha_, indicator_simd.alpha(hd_i), i);
+        simd_scatter(second_variations_, indicator_simd.second_variations(), i);
+      } /* parallel SIMD loop */
 
       LIKWID_MARKER_STOP("time_step_1");
       GRENDEL_PARALLEL_REGION_END
@@ -396,6 +396,80 @@ namespace grendel
       LIKWID_MARKER_START("time_step_3");
 
       /* Nota bene: This bounds variable is thread local: */
+      Limiter<dim, Number> limiter_serial;
+
+      /* Parallel non-vectorized loop: */
+
+      GRENDEL_OMP_FOR
+      for (unsigned int i = n_internal; i < n_owned; ++i) {
+
+        /* Skip constrained degrees of freedom */
+        const unsigned int row_length = sparsity_simd.row_length(i);
+        if (row_length == 1)
+          continue;
+
+        const auto U_i = gather(U, i);
+        auto U_i_new = U_i;
+
+        const auto f_i = ProblemDescription<dim, Number>::f(U_i);
+        const auto alpha_i = alpha_.local_element(i);
+        const auto variations_i = second_variations_.local_element(i);
+
+        const Number m_i = lumped_mass_matrix.local_element(i);
+        const Number m_i_inv = lumped_mass_matrix_inverse.local_element(i);
+
+        rank1_type r_i;
+
+        /* Clear bounds: */
+        limiter_serial.reset();
+        limiter_serial.reset_variations(variations_i);
+
+        const unsigned int *js = sparsity_simd.columns(i);
+        for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
+          const auto j = js[col_idx];
+
+          const auto U_j = gather(U, j);
+          const auto f_j = ProblemDescription<dim, Number>::f(U_j);
+          const auto alpha_j = alpha_.local_element(j);
+          const auto variations_j = second_variations_.local_element(j);
+
+          const auto c_ij = cij_matrix.get_tensor(i, col_idx);
+          const auto d_ij = dij_matrix_.get_entry(i, col_idx);
+          const Number d_ij_inv = Number(1.) / d_ij;
+
+          const auto d_ijH = Indicator<dim, Number>::indicator_ ==
+                                     Indicator<dim, Number>::Indicators::
+                                         entropy_viscosity_commutator
+                                 ? d_ij * (alpha_i + alpha_j) * Number(.5)
+                                 : d_ij * std::max(alpha_i, alpha_j);
+
+          dealii::Tensor<1, problem_dimension> U_ij_bar;
+
+          for (unsigned int k = 0; k < problem_dimension; ++k) {
+            const auto temp = (f_j[k] - f_i[k]) * c_ij;
+
+            r_i[k] += -temp + d_ijH * (U_j - U_i)[k];
+            U_ij_bar[k] =
+                Number(0.5) * (U_i[k] + U_j[k]) - Number(0.5) * temp * d_ij_inv;
+          }
+
+          U_i_new += tau * m_i_inv * Number(2.) * d_ij * U_ij_bar;
+
+          limiter_serial.accumulate(
+              U_i, U_j, U_ij_bar, /* is diagonal */ col_idx == 0);
+          const auto beta_ij = betaij_matrix.get_entry(i, col_idx);
+          limiter_serial.accumulate_variations(variations_j, beta_ij);
+        }
+
+        scatter(temp_euler_, U_i_new, i);
+        scatter(r_, r_i, i);
+
+        const Number hd_i = m_i * measure_of_omega_inverse;
+        limiter_serial.apply_relaxation(hd_i);
+        scatter(bounds_, limiter_serial.bounds(), i);
+      } /* parallel non-vectorized loop */
+
+      /* Nota bene: This bounds variable is thread local: */
       Limiter<dim, VectorizedArray<Number>> limiter_simd;
 
       /* Parallel SIMD loop: */
@@ -477,80 +551,6 @@ namespace grendel
         simd_scatter(bounds_, limiter_simd.bounds(), i);
       } /* parallel SIMD loop */
 
-      /* Nota bene: This bounds variable is thread local: */
-      Limiter<dim, Number> limiter_serial;
-
-      /* Parallel non-vectorized loop: */
-
-      GRENDEL_OMP_FOR
-      for (unsigned int i = n_internal; i < n_owned; ++i) {
-
-        /* Skip constrained degrees of freedom */
-        const unsigned int row_length = sparsity_simd.row_length(i);
-        if (row_length == 1)
-          continue;
-
-        const auto U_i = gather(U, i);
-        auto U_i_new = U_i;
-
-        const auto f_i = ProblemDescription<dim, Number>::f(U_i);
-        const auto alpha_i = alpha_.local_element(i);
-        const auto variations_i = second_variations_.local_element(i);
-
-        const Number m_i = lumped_mass_matrix.local_element(i);
-        const Number m_i_inv = lumped_mass_matrix_inverse.local_element(i);
-
-        rank1_type r_i;
-
-        /* Clear bounds: */
-        limiter_serial.reset();
-        limiter_serial.reset_variations(variations_i);
-
-        const unsigned int *js = sparsity_simd.columns(i);
-        for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
-          const auto j = js[col_idx];
-
-          const auto U_j = gather(U, j);
-          const auto f_j = ProblemDescription<dim, Number>::f(U_j);
-          const auto alpha_j = alpha_.local_element(j);
-          const auto variations_j = second_variations_.local_element(j);
-
-          const auto c_ij = cij_matrix.get_tensor(i, col_idx);
-          const auto d_ij = dij_matrix_.get_entry(i, col_idx);
-          const Number d_ij_inv = Number(1.) / d_ij;
-
-          const auto d_ijH = Indicator<dim, Number>::indicator_ ==
-                                     Indicator<dim, Number>::Indicators::
-                                         entropy_viscosity_commutator
-                                 ? d_ij * (alpha_i + alpha_j) * Number(.5)
-                                 : d_ij * std::max(alpha_i, alpha_j);
-
-          dealii::Tensor<1, problem_dimension> U_ij_bar;
-
-          for (unsigned int k = 0; k < problem_dimension; ++k) {
-            const auto temp = (f_j[k] - f_i[k]) * c_ij;
-
-            r_i[k] += -temp + d_ijH * (U_j - U_i)[k];
-            U_ij_bar[k] =
-                Number(0.5) * (U_i[k] + U_j[k]) - Number(0.5) * temp * d_ij_inv;
-          }
-
-          U_i_new += tau * m_i_inv * Number(2.) * d_ij * U_ij_bar;
-
-          limiter_serial.accumulate(
-              U_i, U_j, U_ij_bar, /* is diagonal */ col_idx == 0);
-          const auto beta_ij = betaij_matrix.get_entry(i, col_idx);
-          limiter_serial.accumulate_variations(variations_j, beta_ij);
-        }
-
-        scatter(temp_euler_, U_i_new, i);
-        scatter(r_, r_i, i);
-
-        const Number hd_i = m_i * measure_of_omega_inverse;
-        limiter_serial.apply_relaxation(hd_i);
-        scatter(bounds_, limiter_serial.bounds(), i);
-      } /* parallel non-vectorized loop */
-
       LIKWID_MARKER_STOP("time_step_3");
       GRENDEL_PARALLEL_REGION_END
     }
@@ -582,6 +582,59 @@ namespace grendel
 
         GRENDEL_PARALLEL_REGION_BEGIN
         LIKWID_MARKER_START("time_step_4");
+
+        /* Parallel non-vectorized loop: */
+
+        GRENDEL_OMP_FOR
+        for (unsigned int i = n_internal; i < n_owned; ++i) {
+
+          /* Skip constrained degrees of freedom */
+          const unsigned int row_length = sparsity_simd.row_length(i);
+          if (row_length == 1)
+            continue;
+
+          const auto bounds = gather_array(bounds_, i);
+          const auto U_i_new = gather(temp_euler_, i);
+
+          const Number m_i_inv = lumped_mass_matrix_inverse.local_element(i);
+          const auto alpha_i = alpha_.local_element(i);
+          const Number lambda_inv = Number(row_length - 1);
+          const auto U_i = gather(U, i);
+
+          const auto r_i = gather(r_, i);
+
+          const unsigned int *js = sparsity_simd.columns(i);
+          for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
+            const auto j = js[col_idx];
+            const Number m_j_inv = lumped_mass_matrix_inverse.local_element(j);
+
+            const auto m_ij = mass_matrix.get_entry(i, col_idx);
+            const auto b_ij =
+                (col_idx == 0 ? Number(1.) : Number(0.)) - m_ij * m_j_inv;
+            const auto b_ji =
+                (col_idx == 0 ? Number(1.) : Number(0.)) - m_ij * m_i_inv;
+
+            const auto d_ij = dij_matrix_.get_entry(i, col_idx);
+            const auto alpha_j = alpha_.local_element(j);
+            const auto d_ijH = Indicator<dim, Number>::indicator_ ==
+                                       Indicator<dim, Number>::Indicators::
+                                           entropy_viscosity_commutator
+                                   ? d_ij * (alpha_i + alpha_j) * Number(.5)
+                                   : d_ij * std::max(alpha_i, alpha_j);
+
+            const auto U_j = gather(U, j);
+            const auto r_j = gather(r_, j);
+
+            const auto p_ij =
+                tau * m_i_inv * lambda_inv *
+                ((d_ijH - d_ij) * (U_j - U_i) + b_ij * r_j - b_ji * r_i);
+            pij_matrix_.write_tensor(p_ij, i, col_idx);
+
+            const auto l_ij =
+                Limiter<dim, Number>::limit(bounds, U_i_new, p_ij);
+            lij_matrix_.write_entry(l_ij, i, col_idx);
+          }
+        } /* parallel non-vectorized loop */
 
         /* Parallel SIMD loop: */
 
@@ -640,59 +693,6 @@ namespace grendel
           }
         } /* parallel SIMD loop */
 
-        /* Parallel non-vectorized loop: */
-
-        GRENDEL_OMP_FOR
-        for (unsigned int i = n_internal; i < n_owned; ++i) {
-
-          /* Skip constrained degrees of freedom */
-          const unsigned int row_length = sparsity_simd.row_length(i);
-          if (row_length == 1)
-            continue;
-
-          const auto bounds = gather_array(bounds_, i);
-          const auto U_i_new = gather(temp_euler_, i);
-
-          const Number m_i_inv = lumped_mass_matrix_inverse.local_element(i);
-          const auto alpha_i = alpha_.local_element(i);
-          const Number lambda_inv = Number(row_length - 1);
-          const auto U_i = gather(U, i);
-
-          const auto r_i = gather(r_, i);
-
-          const unsigned int *js = sparsity_simd.columns(i);
-          for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
-            const auto j = js[col_idx];
-            const Number m_j_inv = lumped_mass_matrix_inverse.local_element(j);
-
-            const auto m_ij = mass_matrix.get_entry(i, col_idx);
-            const auto b_ij =
-                (col_idx == 0 ? Number(1.) : Number(0.)) - m_ij * m_j_inv;
-            const auto b_ji =
-                (col_idx == 0 ? Number(1.) : Number(0.)) - m_ij * m_i_inv;
-
-            const auto d_ij = dij_matrix_.get_entry(i, col_idx);
-            const auto alpha_j = alpha_.local_element(j);
-            const auto d_ijH = Indicator<dim, Number>::indicator_ ==
-                                       Indicator<dim, Number>::Indicators::
-                                           entropy_viscosity_commutator
-                                   ? d_ij * (alpha_i + alpha_j) * Number(.5)
-                                   : d_ij * std::max(alpha_i, alpha_j);
-
-            const auto U_j = gather(U, j);
-            const auto r_j = gather(r_, j);
-
-            const auto p_ij =
-                tau * m_i_inv * lambda_inv *
-                ((d_ijH - d_ij) * (U_j - U_i) + b_ij * r_j - b_ji * r_i);
-            pij_matrix_.write_tensor(p_ij, i, col_idx);
-
-            const auto l_ij =
-                Limiter<dim, Number>::limit(bounds, U_i_new, p_ij);
-            lij_matrix_.write_entry(l_ij, i, col_idx);
-          }
-        } /* parallel non-vectorized loop */
-
         LIKWID_MARKER_STOP("time_step_4");
         GRENDEL_PARALLEL_REGION_END
 
@@ -704,26 +704,6 @@ namespace grendel
 
         GRENDEL_PARALLEL_REGION_BEGIN
         LIKWID_MARKER_START("time_step_5");
-
-        /* Parallel SIMD loop: */
-
-        GRENDEL_OMP_FOR
-        for (unsigned int i = 0; i < n_internal; i += n_array_elements) {
-
-          const auto bounds = simd_gather_array(bounds_, i);
-          const auto U_i_new = simd_gather(temp_euler_, i);
-
-          const unsigned int row_length = sparsity_simd.row_length(i);
-          for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
-
-            const auto p_ij = pij_matrix_.get_vectorized_tensor(i, col_idx);
-
-            const auto l_ij = Limiter<dim, VectorizedArray<Number>>::limit(
-                bounds, U_i_new, p_ij);
-
-            lij_matrix_.write_vectorized_entry(l_ij, i, col_idx, true);
-          }
-        } /* parallel SIMD loop */
 
         /* Parallel non-vectorized loop: */
 
@@ -745,6 +725,26 @@ namespace grendel
             lij_matrix_.write_entry(l_ij, i, col_idx);
           }
         } /* parallel non-vectorized loop */
+
+        /* Parallel SIMD loop: */
+
+        GRENDEL_OMP_FOR
+        for (unsigned int i = 0; i < n_internal; i += n_array_elements) {
+
+          const auto bounds = simd_gather_array(bounds_, i);
+          const auto U_i_new = simd_gather(temp_euler_, i);
+
+          const unsigned int row_length = sparsity_simd.row_length(i);
+          for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
+
+            const auto p_ij = pij_matrix_.get_vectorized_tensor(i, col_idx);
+
+            const auto l_ij = Limiter<dim, VectorizedArray<Number>>::limit(
+                bounds, U_i_new, p_ij);
+
+            lij_matrix_.write_vectorized_entry(l_ij, i, col_idx, true);
+          }
+        } /* parallel SIMD loop */
 
         LIKWID_MARKER_STOP("time_step_5");
         GRENDEL_PARALLEL_REGION_END
@@ -770,54 +770,6 @@ namespace grendel
 
         GRENDEL_PARALLEL_REGION_BEGIN
         LIKWID_MARKER_START("time_step_6");
-
-        /* Parallel vectorized loop: */
-
-        GRENDEL_OMP_FOR
-        for (unsigned int i = 0; i < n_internal; i += n_array_elements) {
-
-          auto U_i_new = simd_gather(temp_euler_, i);
-
-          const unsigned int row_length = sparsity_simd.row_length(i);
-          const Number lambda = Number(1.) / Number(row_length - 1);
-
-          for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
-
-            VectorizedArray<Number> l_ji =
-                lij_matrix_.get_vectorized_transposed_entry(i, col_idx);
-            const auto l_ij =
-                std::min(lij_matrix_.get_vectorized_entry(i, col_idx), l_ji);
-
-            auto p_ij = pij_matrix_.get_vectorized_tensor(i, col_idx);
-
-            U_i_new += l_ij * lambda * p_ij;
-            p_ij *= (VectorizedArray<Number>(1.) - l_ij);
-
-            if (pass + 1 < n_passes)
-              pij_matrix_.write_vectorized_tensor(p_ij, i, col_idx, true);
-          }
-
-#ifdef CHECK_BOUNDS
-          using PD = ProblemDescription<dim, VectorizedArray<Number>>;
-          const auto rho_new = U_i_new[0];
-          const auto e_new = PD::internal_energy(U_i_new);
-          const auto s_new = PD::specific_entropy(U_i_new);
-
-          AssertThrowSIMD(rho_new,
-                          [](auto val) { return val > Number(0.); },
-                          dealii::ExcMessage("Negative density."));
-
-          AssertThrowSIMD(e_new,
-                          [](auto val) { return val > Number(0.); },
-                          dealii::ExcMessage("Negative internal energy."));
-
-          AssertThrowSIMD(s_new,
-                          [](auto val) { return val > Number(0.); },
-                          dealii::ExcMessage("Negative specific entropy."));
-#endif
-
-          simd_scatter(temp_euler_, U_i_new, i);
-        }
 
         /* Parallel non-vectorized loop: */
 
@@ -869,13 +821,61 @@ namespace grendel
           scatter(temp_euler_, U_i_new, i);
         } /* parallel non-vectorized loop */
 
+        /* Parallel vectorized loop: */
+
+        GRENDEL_OMP_FOR
+        for (unsigned int i = 0; i < n_internal; i += n_array_elements) {
+
+          auto U_i_new = simd_gather(temp_euler_, i);
+
+          const unsigned int row_length = sparsity_simd.row_length(i);
+          const Number lambda = Number(1.) / Number(row_length - 1);
+
+          for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
+
+            VectorizedArray<Number> l_ji =
+                lij_matrix_.get_vectorized_transposed_entry(i, col_idx);
+            const auto l_ij =
+                std::min(lij_matrix_.get_vectorized_entry(i, col_idx), l_ji);
+
+            auto p_ij = pij_matrix_.get_vectorized_tensor(i, col_idx);
+
+            U_i_new += l_ij * lambda * p_ij;
+            p_ij *= (VectorizedArray<Number>(1.) - l_ij);
+
+            if (pass + 1 < n_passes)
+              pij_matrix_.write_vectorized_tensor(p_ij, i, col_idx, true);
+          }
+
+#ifdef CHECK_BOUNDS
+          using PD = ProblemDescription<dim, VectorizedArray<Number>>;
+          const auto rho_new = U_i_new[0];
+          const auto e_new = PD::internal_energy(U_i_new);
+          const auto s_new = PD::specific_entropy(U_i_new);
+
+          AssertThrowSIMD(rho_new,
+                          [](auto val) { return val > Number(0.); },
+                          dealii::ExcMessage("Negative density."));
+
+          AssertThrowSIMD(e_new,
+                          [](auto val) { return val > Number(0.); },
+                          dealii::ExcMessage("Negative internal energy."));
+
+          AssertThrowSIMD(s_new,
+                          [](auto val) { return val > Number(0.); },
+                          dealii::ExcMessage("Negative specific entropy."));
+#endif
+
+          simd_scatter(temp_euler_, U_i_new, i);
+        }
+
         LIKWID_MARKER_STOP("time_step_6");
         GRENDEL_PARALLEL_REGION_END
       }
     } /* limiter_iter_ */
 
     /*
-     * Step 8: Fix boundary:
+     * Step 7: Fix boundary:
      */
 
     {
