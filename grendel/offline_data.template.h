@@ -49,6 +49,8 @@ namespace grendel
     dof_handler_.initialize(discretization_->triangulation(),
                             discretization_->finite_element());
 
+    dof_handler_.distribute_mg_dofs(); /* used for coarsened output */
+
     DoFRenumbering::Cuthill_McKee(dof_handler_);
 
 #ifdef USE_SIMD

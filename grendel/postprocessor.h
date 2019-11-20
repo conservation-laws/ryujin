@@ -8,6 +8,7 @@
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/grid/intergrid_map.h>
 #include <deal.II/lac/la_parallel_vector.templates.h>
+#include <deal.II/multigrid/mg_transfer_matrix_free.h>
 
 namespace grendel
 {
@@ -55,18 +56,18 @@ namespace grendel
     ACCESSOR_READ_ONLY(U)
 
     std::array<scalar_type, n_quantities> quantities_;
-    ACCESSOR_READ_ONLY(quantities)
-
-    std::array<dealii::Vector<Number>, problem_dimension> output_U_;
-    ACCESSOR_READ_ONLY(output_U)
-
-    std::array<dealii::Vector<Number>, n_quantities> output_quantities_;
-    ACCESSOR_READ_ONLY(output_quantities)
 
   private:
     const MPI_Comm &mpi_communicator_;
 
     dealii::SmartPointer<const grendel::OfflineData<dim, Number>> offline_data_;
+
+    dealii::MGConstrainedDoFs constrained_dofs_;
+    dealii::MGTransferMatrixFree<dim, Number> transfer_;
+
+    std::array<dealii::MGLevelObject<scalar_type>, problem_dimension> output_U_;
+    std::array<dealii::MGLevelObject<scalar_type>, n_quantities>
+        output_quantities_;
 
     /* Options: */
 

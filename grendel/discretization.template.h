@@ -157,8 +157,11 @@ namespace grendel
 #endif
 
     if (!triangulation_)
-      triangulation_.reset(
-          new parallel::distributed::Triangulation<dim>(mpi_communicator_));
+      triangulation_.reset(new parallel::distributed::Triangulation<dim>(
+          mpi_communicator_,
+          Triangulation<dim>::limit_level_difference_at_vertices,
+          dealii::parallel::distributed::Triangulation<
+              dim>::construct_multigrid_hierarchy));
 
     auto &triangulation = *triangulation_;
 

@@ -76,9 +76,26 @@ namespace grendel
     for (auto &it : quantities_)
       it.reinit(partitioner);
 
-    /* Prepare triangulation and dof_handler for coarsened output: */
+    if (coarsening_level_ != 0) {
+      /* Prepare MGTransferMatrixFre for coarsened output: */
 
-    AssertThrow(coarsening_level_ == 0, dealii::ExcNotImplemented());
+      const auto &dof_handler = offline_data_->dof_handler();
+      const auto &triangulation = dof_handler.get_triangulation();
+
+      const auto max_level = triangulation.n_global_levels() - 1;
+      const auto min_level = max_level - std::min(coarsening_level_, max_level);
+
+      constrained_dofs_.initialize(dof_handler);
+
+      transfer_.initialize_constraints(constrained_dofs_);
+      transfer_.build(dof_handler);
+
+      for (auto &it : output_U_)
+        it.resize(min_level, max_level);
+
+      for (auto &it : output_quantities_)
+        it.resize(min_level, max_level);
+    }
   }
 
 
@@ -249,51 +266,22 @@ namespace grendel
       affine_constraints.distribute(it);
       it.update_ghost_values();
     }
-  }
 
+    /*
+     * Step 5: interpolate to carse mesh
+     */
 
-  namespace
-  {
-    template <int dim, typename Number>
-    void interpolate_to_coarser_mesh(
-        const dealii::InterGridMap<dealii::DoFHandler<dim>> &intergridmap,
-        const dealii::LinearAlgebra::distributed::Vector<Number> &u_1,
-        dealii::Vector<Number> &u_2)
-    {
-      const auto &dof1 = intergridmap.get_source_grid();
-      auto cell_1 = dof1.begin();
-      const auto endc1 = dof1.end();
+    if (coarsening_level_ != 0) {
+      const auto &dof_handler = offline_data_->dof_handler();
 
-      Vector<Number> cache;
-      cache.reinit(cell_1->get_fe().dofs_per_cell);
+      for (unsigned int i = 0; i < problem_dimension; ++i)
+        transfer_.interpolate_to_mg(dof_handler, output_U_[i], U_[i]);
 
-      for (; cell_1 != endc1; ++cell_1) {
-        const auto cell_2 = intergridmap[cell_1];
-
-        if (cell_1->level() != cell_2->level())
-          continue;
-
-        if (!cell_1->active() && !cell_2->active())
-          continue;
-
-        /*
-         * We have to skip artificial cells on the first (distributed)
-         * triangulation:
-         */
-        auto cell = cell_1;
-        for (; !cell->active(); cell = cell->child(0))
-          ;
-        if (!cell->is_locally_owned())
-          continue;
-
-        cell_1->get_interpolated_dof_values(
-            u_1, cache, cell_2->active_fe_index());
-        cell_2->set_dof_values_by_interpolation(
-            cache, u_2, cell_2->active_fe_index());
-      }
+      for (unsigned int i = 0; i < n_quantities; ++i)
+        transfer_.interpolate_to_mg(
+            dof_handler, output_quantities_[i], quantities_[i]);
     }
-
-  } /* namespace */
+  }
 
 
   template <int dim, typename Number>
