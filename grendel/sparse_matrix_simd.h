@@ -54,7 +54,6 @@ namespace grendel
                 const dealii::DynamicSparsityPattern &sparsity,
                 const dealii::Utilities::MPI::Partitioner &partitioner);
 
-
     unsigned int stride_of_row(const unsigned int row) const;
 
     const unsigned int *columns(const unsigned int row) const;
@@ -162,13 +161,17 @@ namespace grendel
         const unsigned int position_within_column,
         const bool do_streaming_store = false);
 
+    /* Synchronize over MPI ranks: */
 
+    void update_ghost_rows_start(const unsigned int communication_channel = 0);
+    void update_ghost_rows_finish();
     void update_ghost_rows();
 
   private:
     const SparsityPatternSIMD<simd_length> *sparsity;
     dealii::AlignedVector<Number> data;
     dealii::AlignedVector<Number> exchange_buffer;
+    std::vector<MPI_Request> requests;
   };
 
   /*
@@ -489,17 +492,26 @@ namespace grendel
 
   template <typename Number, int n_components, int simd_length>
   inline void
-  SparseMatrixSIMD<Number, n_components, simd_length>::update_ghost_rows()
+  SparseMatrixSIMD<Number, n_components, simd_length>::update_ghost_rows_start(
+      const unsigned int communication_channel)
   {
 #ifdef DEAL_II_WITH_MPI
     Assert(n_components == 1,
            dealii::ExcMessage("Only scalar case implemented"));
+    AssertIndexRange(communication_channel, 200);
+
+    const unsigned int mpi_tag =
+        dealii::Utilities::MPI::internal::Tags::partitioner_export_start +
+        communication_channel;
+    Assert(mpi_tag <=
+               dealii::Utilities::MPI::internal::Tags::partitioner_export_end,
+           ExcInternalError());
 
     const std::size_t n_indices = sparsity->indices_to_be_sent.size();
     exchange_buffer.resize_fast(n_indices);
 
-    std::vector<MPI_Request> requests(sparsity->receive_targets.size() +
-                                      sparsity->send_targets.size());
+    requests.resize(sparsity->receive_targets.size() +
+                    sparsity->send_targets.size());
     {
       const auto &targets = sparsity->receive_targets;
       for (unsigned int p = 0; p < targets.size(); ++p) {
@@ -510,7 +522,7 @@ namespace grendel
                 sizeof(Number),
             MPI_BYTE,
             targets[p].first,
-            13,
+            mpi_tag,
             sparsity->mpi_communicator,
             &requests[p]);
         AssertThrowMPI(ierr);
@@ -534,17 +546,34 @@ namespace grendel
                 sizeof(Number),
             MPI_BYTE,
             targets[p].first,
-            13,
+            mpi_tag,
             sparsity->mpi_communicator,
             &requests[p + sparsity->receive_targets.size()]);
         AssertThrowMPI(ierr);
       }
     }
+#endif
+  }
 
+
+  template <typename Number, int n_components, int simd_length>
+  inline void SparseMatrixSIMD<Number, n_components, simd_length>::
+      update_ghost_rows_finish()
+  {
+#ifdef DEAL_II_WITH_MPI
     const int ierr =
         MPI_Waitall(requests.size(), requests.data(), MPI_STATUSES_IGNORE);
     AssertThrowMPI(ierr);
 #endif
+  }
+
+
+  template <typename Number, int n_components, int simd_length>
+  inline void
+  SparseMatrixSIMD<Number, n_components, simd_length>::update_ghost_rows()
+  {
+    update_ghost_rows_start();
+    update_ghost_rows_finish();
   }
 
 } // namespace grendel
