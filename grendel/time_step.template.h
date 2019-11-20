@@ -405,6 +405,8 @@ namespace grendel
       Scope scope(computing_timer_,
                   "time step 3 - l.-o. update, bounds, and r_i");
 
+      std::atomic_int n_threads_above_n_export_indices = 0;
+
       /* Parallel region */
       GRENDEL_PARALLEL_REGION_BEGIN
       LIKWID_MARKER_START("time_step_3");
@@ -485,11 +487,23 @@ namespace grendel
 
       /* Nota bene: This bounds variable is thread local: */
       Limiter<dim, VectorizedArray<Number>> limiter_simd;
+      bool above_n_export_indices = false;
 
       /* Parallel SIMD loop: */
 
       GRENDEL_OMP_FOR
       for (unsigned int i = 0; i < n_internal; i += n_array_elements) {
+
+        if (GRENDEL_UNLIKELY(above_n_export_indices == false &&
+                             i >= n_export_indices)) {
+          above_n_export_indices = true;
+          if(++n_threads_above_n_export_indices == omp_get_num_threads()) {
+            unsigned int channel = 2;
+            /* Synchronize over all MPI processes: */
+            for (auto &it : r_)
+              it.update_ghost_values_start(channel++);
+          }
+        }
 
         const auto U_i = simd_gather(U, i);
         auto U_i_new = U_i;
@@ -570,11 +584,11 @@ namespace grendel
     }
 
     {
-      Scope scope(computing_timer_, "time sync 3");
+      Scope scope(computing_timer_, "time sync 3 - wait");
 
       /* Synchronize over all MPI processes: */
       for (auto &it : r_)
-        it.update_ghost_values();
+        it.update_ghost_values_finish();
     }
 
     const unsigned int n_passes =
