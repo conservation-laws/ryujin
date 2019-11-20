@@ -806,8 +806,10 @@ namespace ryujin
 
       stream << std::setprecision(2) << std::fixed << std::setw(8)
              << wall_time.avg << "s [sk: " << std::setprecision(1)
-             << std::setw(4) << std::fixed
+             << std::setw(5) << std::fixed
              << 100. * (wall_time.max - wall_time.avg) / wall_time.avg << "%]";
+      unsigned int n = dealii::Utilities::needed_digits(n_mpi_processes);
+      stream << " [p" << std::setw(n) << wall_time.max_index << "]";
     };
 
     const auto cpu_time_statistics = Utilities::MPI::min_max_avg(
@@ -829,7 +831,7 @@ namespace ryujin
       else
         stream << "       ";
 
-      stream << " [sk: " << std::setprecision(1) << std::setw(4) << std::fixed
+      stream << " [sk: " << std::setprecision(1) << std::setw(5) << std::fixed
              << 100. * (cpu_time.max - cpu_time.avg) / cpu_time.avg << "%]";
     };
 
@@ -845,7 +847,7 @@ namespace ryujin
 
     jt = output.begin();
     for (auto &it : computing_timer)
-      print_cpu_time(it.second, *jt++, it.first.find("time step ") == 0);
+      print_cpu_time(it.second, *jt++, it.first.find("time s") == 0);
     equalize();
 
     if (mpi_rank != 0)

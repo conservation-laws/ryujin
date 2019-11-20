@@ -284,7 +284,7 @@ namespace grendel
     }
 
     {
-      Scope scope(computing_timer_, "time step   - synchronization");
+      Scope scope(computing_timer_, "time sync 1");
 
       /* Synchronize over all MPI processes: */
       alpha_.update_ghost_values();
@@ -350,7 +350,7 @@ namespace grendel
     }
 
     {
-      Scope scope(computing_timer_, "time step   - synchronization");
+      Scope scope(computing_timer_, "time sync 2");
 
       /* Synchronize over all MPI processes: */
       tau_max.store(Utilities::MPI::min(tau_max.load(), mpi_communicator_));
@@ -556,7 +556,7 @@ namespace grendel
     }
 
     {
-      Scope scope(computing_timer_, "time step   - synchronization");
+      Scope scope(computing_timer_, "time sync 3");
 
       /* Synchronize over all MPI processes: */
       for (auto &it : r_)
@@ -751,7 +751,7 @@ namespace grendel
       }
 
       {
-        Scope scope(computing_timer_, "time step   - synchronization");
+        Scope scope(computing_timer_, "time sync 45");
 
         /* Synchronize over all MPI processes: */
         lij_matrix_.update_ghost_rows();
