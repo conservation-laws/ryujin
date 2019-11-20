@@ -368,15 +368,21 @@ protected:
 
 
 /*
- * OpenMP parallel for loop options:
+ * OpenMP parallel for loop options and macros:
  */
 
 #define GRENDEL_PRAGMA(x) _Pragma(#x)
+
 #define GRENDEL_PARALLEL_REGION_BEGIN                                          \
   GRENDEL_PRAGMA(omp parallel default(shared))                                 \
   {
+
 #define GRENDEL_PARALLEL_REGION_END }
+
 #define GRENDEL_OMP_FOR                                                        \
   GRENDEL_PRAGMA(omp for)
+
+#define GRENDEL_LIKELY(x)   (__builtin_expect(!!(x), 1))
+#define GRENDEL_UNLIKELY(x) (__builtin_expect(!!(x), 0))
 
 #endif /* HELPER_H */

@@ -155,6 +155,8 @@ namespace grendel
     {
       Scope scope(computing_timer_, "time step 1 - compute d_ij, and alpha_i");
 
+      std::atomic_int n_threads_above_n_export_indices = 0;
+
       GRENDEL_PARALLEL_REGION_BEGIN
       LIKWID_MARKER_START("time_step_1");
 
@@ -228,11 +230,22 @@ namespace grendel
 
       /* Stored thread locally: */
       Indicator<dim, VectorizedArray<Number>> indicator_simd;
+      bool above_n_export_indices = false;
 
       /* Parallel SIMD loop: */
 
       GRENDEL_OMP_FOR
       for (unsigned int i = 0; i < n_internal; i += n_array_elements) {
+
+        if (GRENDEL_UNLIKELY(above_n_export_indices == false &&
+                             i >= n_export_indices)) {
+          above_n_export_indices = true;
+          if(++n_threads_above_n_export_indices == omp_get_num_threads()) {
+            /* Synchronize over all MPI processes: */
+            alpha_.update_ghost_values_start(/*channel*/ 0);
+            second_variations_.update_ghost_values_start(/*channel*/ 1);
+          }
+        }
 
         const auto U_i = simd_gather(U, i);
         indicator_simd.reset(U_i);
@@ -285,11 +298,11 @@ namespace grendel
     }
 
     {
-      Scope scope(computing_timer_, "time sync 1");
+      Scope scope(computing_timer_, "time sync 1 - wait");
 
       /* Synchronize over all MPI processes: */
-      alpha_.update_ghost_values();
-      second_variations_.update_ghost_values();
+      alpha_.update_ghost_values_finish();
+      second_variations_.update_ghost_values_finish();
     }
 
     /*

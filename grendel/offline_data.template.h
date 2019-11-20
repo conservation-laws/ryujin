@@ -54,7 +54,9 @@ namespace grendel
     // FIXME: Cuthill McKee isn't particularly useful...
     DoFRenumbering::Cuthill_McKee(dof_handler_);
 
+#ifdef DEBUG
     const unsigned int n_export_indices_preliminary =
+#endif
         DoFRenumbering::export_indices_first(dof_handler_, mpi_communicator_);
 
 #ifdef USE_SIMD
