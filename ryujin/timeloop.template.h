@@ -674,12 +674,13 @@ namespace ryujin
   template <int dim, typename Number>
   void TimeLoop<dim, Number>::print_mpi_partition()
   {
-    unsigned int dofs[2];
-    dofs[0] = offline_data.n_locally_owned();
-    dofs[1] = offline_data.n_locally_internal();
+    unsigned int dofs[4] = {offline_data.n_import_indices(),
+                            offline_data.n_locally_internal(),
+                            offline_data.n_locally_owned(),
+                            offline_data.n_locally_relevant()};
 
     if (mpi_rank > 0) {
-      MPI_Send(&dofs, 2, MPI_UNSIGNED, 0, 0, mpi_communicator);
+      MPI_Send(&dofs, 4, MPI_UNSIGNED, 0, 0, mpi_communicator);
 
     } else {
 
@@ -706,15 +707,15 @@ namespace ryujin
 
         if (p != 0)
           MPI_Recv(&dofs,
-                   2,
+                   4,
                    MPI_UNSIGNED,
                    p,
                    0,
                    mpi_communicator,
                    MPI_STATUS_IGNORE);
 
-        stream << ":\tlocal: " << dofs[0] << std::flush;
-        stream << "\tinternal: " << dofs[1] << std::endl;
+        stream << ":\t(exp) " << dofs[0] << ",\t(int) " << dofs[1]
+               << ",\t(own) " << dofs[2] << ",\t(rel) " << dofs[3] << std::endl;
       } /* p */
     }   /* mpi_rank */
   }
