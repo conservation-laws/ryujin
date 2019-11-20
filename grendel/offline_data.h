@@ -85,6 +85,12 @@ namespace grendel
     ACCESSOR_READ_ONLY_NO_DEREFERENCE(partitioner)
 
     /**
+     * FIXME
+     */
+    unsigned int n_import_indices_;
+    ACCESSOR_READ_ONLY(n_import_indices)
+
+    /**
      * Number of locally owned internal degrees of freedom: In (MPI rank)
      * local numbering all indices in the half open interval [0,
      * n_locally_internal_) are owned by this processor, have standard

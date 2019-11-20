@@ -59,6 +59,65 @@ namespace grendel
     using dealii::DoFRenumbering::Cuthill_McKee;
 
     /**
+     * Reorder all import indices in the locally owned index range to the
+     * start of the index range.
+     *
+     * This renumbering requires MPI communication in order to determine
+     * the set of import indices.
+     */
+    template <int dim>
+    unsigned int import_indices_first(dealii::DoFHandler<dim> &dof_handler,
+                                      const MPI_Comm &mpi_communicator)
+    {
+      using namespace dealii;
+
+      const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
+      const auto n_locally_owned = locally_owned.n_elements();
+
+      /* The locally owned index range has to be contiguous */
+      Assert(locally_owned.is_contiguous() == true,
+             dealii::ExcMessage(
+                 "Need a contiguous set of locally owned indices."));
+
+      /* Offset to translate from global to local index range */
+      const auto offset = n_locally_owned != 0 ? *locally_owned.begin() : 0;
+
+      IndexSet locally_relevant;
+      DoFTools::extract_locally_relevant_dofs(dof_handler, locally_relevant);
+
+      /* Create a temporary MPI partitioner: */
+
+      Utilities::MPI::Partitioner partitioner(
+          locally_owned, locally_relevant, mpi_communicator);
+
+      IndexSet import_indices(n_locally_owned);
+      for(const auto &it : partitioner.import_indices()) {
+        import_indices.add_range(it.first, it.second);
+      }
+
+      std::vector<dealii::types::global_dof_index> new_order(n_locally_owned);
+
+      const unsigned int n_import_indices = import_indices.n_elements();
+      unsigned int index_import = 0;
+      unsigned int index_rest = n_import_indices;
+      for (unsigned int i = 0; i < n_locally_owned; ++i) {
+        if (import_indices.is_element(i)) {
+          Assert(index_import < n_import_indices, dealii::ExcInternalError());
+          new_order[i] = offset + index_import++;
+        } else {
+          Assert(index_rest < n_locally_owned, dealii::ExcInternalError());
+          new_order[i] = offset + index_rest++;
+        }
+      }
+      Assert(index_import == n_import_indices, dealii::ExcInternalError());
+      Assert(index_rest == n_locally_owned, dealii::ExcInternalError());
+
+      dof_handler.renumber_dofs(new_order);
+
+      return n_import_indices;
+    }
+
+    /**
      * Reorder indices:
      *
      * In order to traverse over multiple rows of a (to be constructed)
