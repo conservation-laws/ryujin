@@ -87,8 +87,8 @@ namespace grendel
     /**
      * FIXME
      */
-    unsigned int n_import_indices_;
-    ACCESSOR_READ_ONLY(n_import_indices)
+    unsigned int n_export_indices_;
+    ACCESSOR_READ_ONLY(n_export_indices)
 
     /**
      * Number of locally owned internal degrees of freedom: In (MPI rank)

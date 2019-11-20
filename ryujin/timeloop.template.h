@@ -674,7 +674,7 @@ namespace ryujin
   template <int dim, typename Number>
   void TimeLoop<dim, Number>::print_mpi_partition()
   {
-    unsigned int dofs[4] = {offline_data.n_import_indices(),
+    unsigned int dofs[4] = {offline_data.n_export_indices(),
                             offline_data.n_locally_internal(),
                             offline_data.n_locally_owned(),
                             offline_data.n_locally_relevant()};

@@ -54,8 +54,8 @@ namespace grendel
     // FIXME: Cuthill McKee isn't particularly useful...
     DoFRenumbering::Cuthill_McKee(dof_handler_);
 
-    const unsigned int n_import_indices_preliminary =
-        DoFRenumbering::import_indices_first(dof_handler_, mpi_communicator_);
+    const unsigned int n_export_indices_preliminary =
+        DoFRenumbering::export_indices_first(dof_handler_, mpi_communicator_);
 
 #ifdef USE_SIMD
     n_locally_internal_ = DoFRenumbering::internal_range(dof_handler_);
@@ -86,16 +86,16 @@ namespace grendel
         locally_owned, locally_relevant, mpi_communicator_));
 
     /*
-     * Determine the subset [0, n_import_indices) of [0,
+     * Determine the subset [0, n_export_indices) of [0,
      * n_locally_internal) that has to be computed before MPI exchange
      * communication can be started.
      */
 
-    n_import_indices_ = 0;
+    n_export_indices_ = 0;
     for (const auto &it : partitioner_->import_indices())
       if (it.second <= n_locally_internal_)
-        n_import_indices_ = std::max(n_import_indices_, it.second);
-    Assert(n_import_indices_ <= n_import_indices_preliminary,
+        n_export_indices_ = std::max(n_export_indices_, it.second);
+    Assert(n_export_indices_ <= n_export_indices_preliminary,
            dealii::ExcInternalError());
 
     /* Set up affine constraints object: */

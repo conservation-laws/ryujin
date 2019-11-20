@@ -108,8 +108,9 @@ namespace grendel
 
     constexpr auto n_array_elements = VectorizedArray<Number>::n_array_elements;
 
-    const auto n_internal = offline_data_->n_locally_internal();
-    const auto n_owned = offline_data_->n_locally_owned();
+    const unsigned int n_export_indices = offline_data_->n_export_indices();
+    const unsigned int n_internal = offline_data_->n_locally_internal();
+    const unsigned int n_owned = offline_data_->n_locally_owned();
 
     /* References to precomputed matrices and the stencil: */
 

@@ -66,7 +66,7 @@ namespace grendel
      * the set of import indices.
      */
     template <int dim>
-    unsigned int import_indices_first(dealii::DoFHandler<dim> &dof_handler,
+    unsigned int export_indices_first(dealii::DoFHandler<dim> &dof_handler,
                                       const MPI_Comm &mpi_communicator)
     {
       using namespace dealii;
@@ -90,31 +90,31 @@ namespace grendel
       Utilities::MPI::Partitioner partitioner(
           locally_owned, locally_relevant, mpi_communicator);
 
-      IndexSet import_indices(n_locally_owned);
+      IndexSet export_indices(n_locally_owned);
       for(const auto &it : partitioner.import_indices()) {
-        import_indices.add_range(it.first, it.second);
+        export_indices.add_range(it.first, it.second);
       }
 
       std::vector<dealii::types::global_dof_index> new_order(n_locally_owned);
 
-      const unsigned int n_import_indices = import_indices.n_elements();
+      const unsigned int n_export_indices = export_indices.n_elements();
       unsigned int index_import = 0;
-      unsigned int index_rest = n_import_indices;
+      unsigned int index_rest = n_export_indices;
       for (unsigned int i = 0; i < n_locally_owned; ++i) {
-        if (import_indices.is_element(i)) {
-          Assert(index_import < n_import_indices, dealii::ExcInternalError());
+        if (export_indices.is_element(i)) {
+          Assert(index_import < n_export_indices, dealii::ExcInternalError());
           new_order[i] = offset + index_import++;
         } else {
           Assert(index_rest < n_locally_owned, dealii::ExcInternalError());
           new_order[i] = offset + index_rest++;
         }
       }
-      Assert(index_import == n_import_indices, dealii::ExcInternalError());
+      Assert(index_import == n_export_indices, dealii::ExcInternalError());
       Assert(index_rest == n_locally_owned, dealii::ExcInternalError());
 
       dof_handler.renumber_dofs(new_order);
 
-      return n_import_indices;
+      return n_export_indices;
     }
 
     /**
