@@ -926,9 +926,13 @@ namespace grendel
       LIKWID_MARKER_STOP("time_step_7");
     }
 
-    /* Synchronize over all MPI processes: */
-    for (auto &it : temp_euler_)
-      it.update_ghost_values();
+    {
+      Scope scope(computing_timer_, "time sync 7");
+
+      /* Synchronize over all MPI processes: */
+      for (auto &it : temp_euler_)
+        it.update_ghost_values();
+    }
 
     /* And finally update the result: */
     U.swap(temp_euler_);
