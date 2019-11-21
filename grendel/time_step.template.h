@@ -395,6 +395,9 @@ namespace grendel
       }
     }
 
+    constexpr unsigned int n_passes =
+        (order_ == Order::second_order ? limiter_iter_ : 0);
+
     /*
      * Step 3: Low-order update, also compute limiter bounds, R_i
      *
@@ -479,6 +482,27 @@ namespace grendel
               U_i, U_j, U_ij_bar, /* is diagonal */ col_idx == 0);
           const auto beta_ij = betaij_matrix.get_entry(i, col_idx);
           limiter_serial.accumulate_variations(variations_j, beta_ij);
+        }
+
+        if constexpr (n_passes == 0) {
+          /* Fix up boundary: */
+          const auto it = boundary_normal_map.find(i);
+          if (it != boundary_normal_map.end()) {
+            const auto &[normal, id, position] = it->second;
+
+            /* On boundary 1 remove the normal component of the momentum: */
+            if (id == Boundary::slip) {
+              auto m = ProblemDescription<dim, Number>::momentum(U_i_new);
+              m -= 1. * (m * normal) * normal;
+              for (unsigned int k = 0; k < dim; ++k)
+                U_i_new[k + 1] = m[k];
+            }
+
+            /* On boundary 2 enforce initial conditions: */
+            if (id == Boundary::dirichlet) {
+              U_i_new = initial_values_->initial_state(position, t + tau);
+            }
+          }
         }
 
         scatter(temp_euler_, U_i_new, i);
@@ -604,8 +628,6 @@ namespace grendel
         it.update_ghost_values_finish();
     }
 
-    const unsigned int n_passes =
-        (order_ == Order::second_order ? limiter_iter_ : 0);
     for (unsigned int pass = 0; pass < n_passes; ++pass) {
 
 #ifdef DEBUG_OUTPUT
@@ -834,7 +856,7 @@ namespace grendel
       }
 
       {
-        Scope scope(computing_timer_, "time sync 45- wait");
+        Scope scope(computing_timer_, "time step 5 - synchronization");
 
         /* Synchronize over all MPI processes: */
         lij_matrix_.update_ghost_rows_finish();
@@ -901,6 +923,25 @@ namespace grendel
                           dealii::ExcMessage("Negative specific entropy."));
 #endif
 
+          /* Fix up boundary: */
+          const auto it = boundary_normal_map.find(i);
+          if (pass + 1 == n_passes && it != boundary_normal_map.end()) {
+            const auto &[normal, id, position] = it->second;
+
+            /* On boundary 1 remove the normal component of the momentum: */
+            if (id == Boundary::slip) {
+              auto m = ProblemDescription<dim, Number>::momentum(U_i_new);
+              m -= 1. * (m * normal) * normal;
+              for (unsigned int k = 0; k < dim; ++k)
+                U_i_new[k + 1] = m[k];
+            }
+
+            /* On boundary 2 enforce initial conditions: */
+            if (id == Boundary::dirichlet) {
+              U_i_new = initial_values_->initial_state(position, t + tau);
+            }
+          }
+
           scatter(temp_euler_, U_i_new, i);
         } /* parallel non-vectorized loop */
 
@@ -957,60 +998,8 @@ namespace grendel
       }
     } /* limiter_iter_ */
 
-    /*
-     * Step 7: Fix boundary:
-     */
-
     {
-      Scope scope(computing_timer_, "time step 7 - fix boundary states");
-
-      LIKWID_MARKER_START("time_step_7");
-
-      const auto on_subranges = [&](const auto it1, const auto it2) {
-        for (auto it = it1; it != it2; ++it) {
-
-          const auto i = it->first;
-
-          /* Only iterate over locally owned subset */
-          if (i >= n_owned)
-            continue;
-
-          /* Skip constrained degrees of freedom */
-          const unsigned int row_length = sparsity_simd.row_length(i);
-          if (row_length == 1)
-            continue;
-
-          auto U_i = gather(temp_euler_, i);
-
-          const auto &[normal, id, position] = it->second;
-
-          /* On boundary 1 remove the normal component of the momentum: */
-
-          if (id == Boundary::slip) {
-            auto m = ProblemDescription<dim, Number>::momentum(U_i);
-            m -= 1. * (m * normal) * normal;
-            for (unsigned int k = 0; k < dim; ++k)
-              U_i[k + 1] = m[k];
-          }
-
-          /* On boundary 2 enforce initial conditions: */
-
-          if (id == Boundary::dirichlet) {
-            U_i = initial_values_->initial_state(position, t + tau);
-          }
-
-          scatter(temp_euler_, U_i, i);
-        }
-      };
-
-      // FIXME: This is currently not parallel:
-      on_subranges(boundary_normal_map.begin(), boundary_normal_map.end());
-
-      LIKWID_MARKER_STOP("time_step_7");
-    }
-
-    {
-      Scope scope(computing_timer_, "time step 7 - synchronization");
+      Scope scope(computing_timer_, "time step 6 - synchronization");
 
       /* Synchronize over all MPI processes: */
       for (auto &it : temp_euler_)
