@@ -305,14 +305,6 @@ namespace grendel
       }
     }
 
-    {
-      Scope scope(computing_timer_, "time sync 1 - wait");
-
-      /* Synchronize over all MPI processes: */
-      alpha_.update_ghost_values_finish();
-      second_variations_.update_ghost_values_finish();
-    }
-
     /*
      * Step 2: Compute diagonal of d_ij, and maximal time-step size.
      */
@@ -372,9 +364,13 @@ namespace grendel
     }
 
     {
-      Scope scope(computing_timer_, "time sync 2");
+      Scope scope(computing_timer_, "time step 2 - synchronization barrier");
 
       /* Synchronize over all MPI processes: */
+      alpha_.update_ghost_values_finish();
+      second_variations_.update_ghost_values_finish();
+
+      /* MPI Barrier: */
       tau_max.store(Utilities::MPI::min(tau_max.load(), mpi_communicator_));
 
       AssertThrow(!std::isnan(tau_max) && !std::isinf(tau_max) && tau_max > 0.,
@@ -601,7 +597,7 @@ namespace grendel
     }
 
     {
-      Scope scope(computing_timer_, "time sync 3 - wait");
+      Scope scope(computing_timer_, "time step 3 - synchronization");
 
       /* Synchronize over all MPI processes: */
       for (auto &it : r_)
@@ -1014,7 +1010,7 @@ namespace grendel
     }
 
     {
-      Scope scope(computing_timer_, "time sync 7");
+      Scope scope(computing_timer_, "time step 7 - synchronization");
 
       /* Synchronize over all MPI processes: */
       for (auto &it : temp_euler_)

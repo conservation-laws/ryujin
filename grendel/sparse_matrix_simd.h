@@ -505,7 +505,7 @@ namespace grendel
         communication_channel;
     Assert(mpi_tag <=
                dealii::Utilities::MPI::internal::Tags::partitioner_export_end,
-           ExcInternalError());
+           dealii::ExcInternalError());
 
     const std::size_t n_indices = sparsity->indices_to_be_sent.size();
     exchange_buffer.resize_fast(n_indices);
