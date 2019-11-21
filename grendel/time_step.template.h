@@ -7,7 +7,7 @@
 #include "indicator.h"
 #include "riemann_solver.h"
 
-#include <boost/range/irange.hpp>
+#include <omp.h>
 
 #include <atomic>
 
