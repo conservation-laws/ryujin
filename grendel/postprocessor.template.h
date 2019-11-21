@@ -108,13 +108,16 @@ namespace grendel
     deallog << "Postprocessor<dim, Number>::compute()" << std::endl;
 #endif
 
+    constexpr auto n_array_elements = VectorizedArray<Number>::n_array_elements;
+
     const auto &affine_constraints = offline_data_->affine_constraints();
     const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
     const auto &lumped_mass_matrix = offline_data_->lumped_mass_matrix();
     const auto &cij_matrix = offline_data_->cij_matrix();
     const auto &boundary_normal_map = offline_data_->boundary_normal_map();
 
-    const auto n_locally_owned = offline_data_->n_locally_owned();
+    const unsigned int n_internal = offline_data_->n_locally_internal();
+    const unsigned int n_locally_owned = offline_data_->n_locally_owned();
 
     /*
      * Step 1: Copy the current state vector over to output_vector:
@@ -152,7 +155,8 @@ namespace grendel
         /* Skip diagonal. */
         const unsigned int *js = sparsity_simd.columns(i);
         for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
-          const unsigned int j = js[col_idx];
+          const auto j = *(i < n_internal ? js + col_idx * n_array_elements
+                                          : js + col_idx);
 
           const auto U_j = gather(U, j);
           const auto m_j = ProblemDescription<dim, Number>::momentum(U_j);
