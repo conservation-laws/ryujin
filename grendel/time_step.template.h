@@ -293,8 +293,16 @@ namespace grendel
         simd_scatter(second_variations_, indicator_simd.second_variations(), i);
       } /* parallel SIMD loop */
 
+      --n_threads_above_n_export_indices;
+
       LIKWID_MARKER_STOP("time_step_1");
       GRENDEL_PARALLEL_REGION_END
+
+      if(n_threads_above_n_export_indices < 0) {
+        /* Synchronize over all MPI processes: */
+        alpha_.update_ghost_values_start(/*channel*/ 0);
+        second_variations_.update_ghost_values_start(/*channel*/ 1);
+      }
     }
 
     {
@@ -579,8 +587,17 @@ namespace grendel
         simd_scatter(bounds_, limiter_simd.bounds(), i);
       } /* parallel SIMD loop */
 
+      --n_threads_above_n_export_indices;
+
       LIKWID_MARKER_STOP("time_step_3");
       GRENDEL_PARALLEL_REGION_END
+
+      if(n_threads_above_n_export_indices < 0) {
+        /* Synchronize over all MPI processes: */
+        unsigned int channel = 2;
+        for (auto &it : r_)
+          it.update_ghost_values_start(channel++);
+      }
     }
 
     {
@@ -607,6 +624,8 @@ namespace grendel
          *                                (b_ij R_j - b_ji R_i) )
          */
         Scope scope(computing_timer_, "time step 4 - compute p_ij, and l_ij");
+
+        std::atomic_int n_threads_above_n_export_indices = 0;
 
         GRENDEL_PARALLEL_REGION_BEGIN
         LIKWID_MARKER_START("time_step_4");
@@ -666,8 +685,20 @@ namespace grendel
 
         /* Parallel SIMD loop: */
 
+        bool above_n_export_indices = false;
+
         GRENDEL_OMP_FOR
         for (unsigned int i = 0; i < n_internal; i += n_array_elements) {
+
+          if (GRENDEL_UNLIKELY(above_n_export_indices == false &&
+                               i >= n_export_indices)) {
+            above_n_export_indices = true;
+            if(++n_threads_above_n_export_indices == omp_get_num_threads()) {
+              /* Synchronize over all MPI processes: */
+              lij_matrix_.update_ghost_rows_start(
+                  /*channel*/ problem_dimension + 2);
+            }
+          }
 
           const auto bounds = simd_gather_array(bounds_, i);
           const auto U_i_new = simd_gather(temp_euler_, i);
@@ -721,14 +752,23 @@ namespace grendel
           }
         } /* parallel SIMD loop */
 
+        --n_threads_above_n_export_indices;
+
         LIKWID_MARKER_STOP("time_step_4");
         GRENDEL_PARALLEL_REGION_END
+
+        if(n_threads_above_n_export_indices < 0) {
+          lij_matrix_.update_ghost_rows_start(
+              /*channel*/ problem_dimension + 2);
+        }
 
       } else {
         /*
          * Step 5: compute l_ij (second and later rounds):
          */
         Scope scope(computing_timer_, "time step 5 - compute l_ij");
+
+        std::atomic_int n_threads_above_n_export_indices = 0;
 
         GRENDEL_PARALLEL_REGION_BEGIN
         LIKWID_MARKER_START("time_step_5");
@@ -756,8 +796,20 @@ namespace grendel
 
         /* Parallel SIMD loop: */
 
+        bool above_n_export_indices = false;
+
         GRENDEL_OMP_FOR
         for (unsigned int i = 0; i < n_internal; i += n_array_elements) {
+
+          if (GRENDEL_UNLIKELY(above_n_export_indices == false &&
+                               i >= n_export_indices)) {
+            above_n_export_indices = true;
+            if(++n_threads_above_n_export_indices == omp_get_num_threads()) {
+              /* Synchronize over all MPI processes: */
+              lij_matrix_.update_ghost_rows_start(
+                  /*channel*/ problem_dimension + 2);
+            }
+          }
 
           const auto bounds = simd_gather_array(bounds_, i);
           const auto U_i_new = simd_gather(temp_euler_, i);
@@ -774,15 +826,22 @@ namespace grendel
           }
         } /* parallel SIMD loop */
 
+        --n_threads_above_n_export_indices;
+
         LIKWID_MARKER_STOP("time_step_5");
         GRENDEL_PARALLEL_REGION_END
+
+        if(n_threads_above_n_export_indices < 0) {
+          lij_matrix_.update_ghost_rows_start(
+              /*channel*/ problem_dimension + 2);
+        }
       }
 
       {
-        Scope scope(computing_timer_, "time sync 45");
+        Scope scope(computing_timer_, "time sync 45- wait");
 
         /* Synchronize over all MPI processes: */
-        lij_matrix_.update_ghost_rows();
+        lij_matrix_.update_ghost_rows_finish();
       }
 
       /*
