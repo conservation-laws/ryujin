@@ -127,6 +127,8 @@ namespace grendel
     const Number measure_of_omega_inverse =
         Number(1.) / offline_data_->measure_of_omega();
 
+    /* An monotonically increasing "channel" variable for mpi_tags: */
+    unsigned int channel = 10;
 
     /*
      * Step 1: Compute off-diagonal d_ij, and alpha_i
@@ -242,8 +244,8 @@ namespace grendel
           above_n_export_indices = true;
           if(++n_threads_above_n_export_indices == omp_get_num_threads()) {
             /* Synchronize over all MPI processes: */
-            alpha_.update_ghost_values_start(/*channel*/ 0);
-            second_variations_.update_ghost_values_start(/*channel*/ 1);
+            alpha_.update_ghost_values_start(channel++);
+            second_variations_.update_ghost_values_start(channel++);
           }
         }
 
@@ -300,8 +302,8 @@ namespace grendel
 
       if(n_threads_above_n_export_indices < 0) {
         /* Synchronize over all MPI processes: */
-        alpha_.update_ghost_values_start(/*channel*/ 0);
-        second_variations_.update_ghost_values_start(/*channel*/ 1);
+        alpha_.update_ghost_values_start(channel++);
+        second_variations_.update_ghost_values_start(channel++);
       }
     }
 
@@ -526,7 +528,6 @@ namespace grendel
                              i >= n_export_indices)) {
           above_n_export_indices = true;
           if(++n_threads_above_n_export_indices == omp_get_num_threads()) {
-            unsigned int channel = 2;
             /* Synchronize over all MPI processes: */
             for (auto &it : r_)
               it.update_ghost_values_start(channel++);
@@ -614,7 +615,6 @@ namespace grendel
 
       if(n_threads_above_n_export_indices < 0) {
         /* Synchronize over all MPI processes: */
-        unsigned int channel = 2;
         for (auto &it : r_)
           it.update_ghost_values_start(channel++);
       }
@@ -626,6 +626,12 @@ namespace grendel
       /* Synchronize over all MPI processes: */
       for (auto &it : r_)
         it.update_ghost_values_finish();
+
+      /* If we do not do high-order, synchronize at this point: */
+      if constexpr (n_passes == 0) {
+        for (auto &it : temp_euler_)
+          it.update_ghost_values();
+      }
     }
 
     for (unsigned int pass = 0; pass < n_passes; ++pass) {
@@ -713,8 +719,7 @@ namespace grendel
             above_n_export_indices = true;
             if(++n_threads_above_n_export_indices == omp_get_num_threads()) {
               /* Synchronize over all MPI processes: */
-              lij_matrix_.update_ghost_rows_start(
-                  /*channel*/ problem_dimension + 2);
+              lij_matrix_.update_ghost_rows_start(channel++);
             }
           }
 
@@ -776,8 +781,7 @@ namespace grendel
         GRENDEL_PARALLEL_REGION_END
 
         if(n_threads_above_n_export_indices < 0) {
-          lij_matrix_.update_ghost_rows_start(
-              /*channel*/ problem_dimension + 2);
+          lij_matrix_.update_ghost_rows_start(channel++);
         }
 
       } else {
@@ -824,8 +828,7 @@ namespace grendel
             above_n_export_indices = true;
             if(++n_threads_above_n_export_indices == omp_get_num_threads()) {
               /* Synchronize over all MPI processes: */
-              lij_matrix_.update_ghost_rows_start(
-                  /*channel*/ problem_dimension + 2);
+              lij_matrix_.update_ghost_rows_start(channel++);
             }
           }
 
@@ -850,8 +853,7 @@ namespace grendel
         GRENDEL_PARALLEL_REGION_END
 
         if(n_threads_above_n_export_indices < 0) {
-          lij_matrix_.update_ghost_rows_start(
-              /*channel*/ problem_dimension + 2);
+          lij_matrix_.update_ghost_rows_start(channel++);
         }
       }
 
@@ -872,6 +874,8 @@ namespace grendel
       {
         Scope scope(computing_timer_,
                     "time step 6 - symmetrize l_ij, h.-o. update");
+
+        std::atomic_int n_threads_above_n_export_indices = 0;
 
         GRENDEL_PARALLEL_REGION_BEGIN
         LIKWID_MARKER_START("time_step_6");
@@ -947,8 +951,21 @@ namespace grendel
 
         /* Parallel vectorized loop: */
 
+        /* Set to false in the last pass: */
+        bool above_n_export_indices = (pass + 1 != n_passes);
+
         GRENDEL_OMP_FOR
         for (unsigned int i = 0; i < n_internal; i += n_array_elements) {
+
+          if (GRENDEL_UNLIKELY(above_n_export_indices == false &&
+                               i >= n_export_indices)) {
+            above_n_export_indices = true;
+            if (++n_threads_above_n_export_indices == omp_get_num_threads()) {
+              /* Synchronize over all MPI processes: */
+              for (auto &it : temp_euler_)
+                it.update_ghost_values_start(channel++);
+            }
+          }
 
           auto U_i_new = simd_gather(temp_euler_, i);
 
@@ -993,8 +1010,17 @@ namespace grendel
           simd_scatter(temp_euler_, U_i_new, i);
         }
 
+        if (pass + 1 == n_passes)
+          --n_threads_above_n_export_indices;
+
         LIKWID_MARKER_STOP("time_step_6");
         GRENDEL_PARALLEL_REGION_END
+
+        if(n_threads_above_n_export_indices < 0) {
+          /* Synchronize over all MPI processes: */
+          for (auto &it : temp_euler_)
+            it.update_ghost_values_start(channel++);
+        }
       }
     } /* limiter_iter_ */
 
@@ -1003,7 +1029,7 @@ namespace grendel
 
       /* Synchronize over all MPI processes: */
       for (auto &it : temp_euler_)
-        it.update_ghost_values();
+        it.update_ghost_values_finish();
     }
 
     /* And finally update the result: */
