@@ -488,7 +488,7 @@ namespace grendel
     GridGenerator::extrude_triangulation(tria1, 4, height, triangulation, true);
     GridTools::transform(
         [height](auto point) {
-          return point - dealii::Tensor<1, 3>{{0, 0, -height / 2.}};
+          return point - dealii::Tensor<1, 3>{{0, 0, height / 2.}};
         },
         triangulation);
 

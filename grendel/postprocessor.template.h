@@ -326,7 +326,7 @@ namespace grendel
      */
 
     data_out.set_cell_selection([this](const auto &cell) {
-      if (!cell->is_active())
+      if (!cell->is_active() || cell->is_artificial())
         return false;
 
       if (output_planes_.size() == 0)
