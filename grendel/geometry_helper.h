@@ -486,6 +486,11 @@ namespace grendel
         tria1, length, height, cylinder_position, cylinder_diameter);
 
     GridGenerator::extrude_triangulation(tria1, 4, height, triangulation, true);
+    GridTools::transform(
+        [height](auto point) {
+          return point - dealii::Tensor<1, 3>{{0, 0, -height / 2.}};
+        },
+        triangulation);
 
     /*
      * Reattach an appropriate manifold ID:
