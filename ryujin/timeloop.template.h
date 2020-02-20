@@ -48,7 +48,7 @@ namespace ryujin
                   initial_values,
                   "E - TimeStep")
       , postprocessor(
-            mpi_communicator, offline_data, "F - SchlierenPostprocessor")
+            mpi_communicator, offline_data, "F - Postprocessor")
       , mpi_rank(dealii::Utilities::MPI::this_mpi_process(mpi_communicator))
       , n_mpi_processes(
             dealii::Utilities::MPI::n_mpi_processes(mpi_communicator))
