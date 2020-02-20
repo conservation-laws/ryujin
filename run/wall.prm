@@ -30,7 +30,3 @@ subsection E - TimeStep
   set cfl max    = 0.9
   set cfl update = 0.8
 end
-
-subsection F - SchlierenPostprocessor
-  set schlieren beta  = 10
-end
