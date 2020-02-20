@@ -250,7 +250,7 @@ namespace grendel
         }   /* for j */
       }     /* for q */
 
-      for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f) {
+      for (auto f : GeometryInfo<dim>::face_indices()) {
         const auto face = cell->face(f);
         const auto id = face->boundary_id();
 
@@ -410,7 +410,7 @@ namespace grendel
       for (auto &matrix : cell_cij_matrix)
         matrix = 0.;
 
-      for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f) {
+      for (auto f : GeometryInfo<dim>::face_indices()) {
         const auto face = cell->face(f);
         const auto id = face->boundary_id();
 

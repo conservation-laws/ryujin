@@ -86,7 +86,7 @@ namespace grendel
      */
 
     for (auto cell : triangulation.active_cell_iterators()) {
-      for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f) {
+      for (auto f : GeometryInfo<dim>::face_indices()) {
         const auto face = cell->face(f);
 
         if (!face->at_boundary())
@@ -170,7 +170,7 @@ namespace grendel
      */
 
     for (auto cell : triangulation.active_cell_iterators()) {
-      for (unsigned int f = 0; f < GeometryInfo<2>::faces_per_cell; ++f) {
+      for (auto f : GeometryInfo<2>::face_indices()) {
         const auto face = cell->face(f);
 
         if (!face->at_boundary())
@@ -221,7 +221,7 @@ namespace grendel
      */
 
     for (auto cell : triangulation.active_cell_iterators()) {
-      for (unsigned int f = 0; f < GeometryInfo<2>::faces_per_cell; ++f) {
+      for (auto f : GeometryInfo<2>::face_indices()) {
         const auto face = cell->face(f);
 
         if (!face->at_boundary())
@@ -295,7 +295,7 @@ namespace grendel
      */
 
     for (auto cell : triangulation.active_cell_iterators()) {
-      for (unsigned int f = 0; f < GeometryInfo<2>::faces_per_cell; ++f) {
+      for (auto f : GeometryInfo<2>::face_indices()) {
         const auto face = cell->face(f);
 
         if (!face->at_boundary())
@@ -332,7 +332,7 @@ namespace grendel
         double distance =
             (cell->vertex(v) - Point<dim>(step_position, step_height)).norm();
         if (distance < 1.e-6) {
-          for (unsigned int f = 0; f < GeometryInfo<dim>::faces_per_cell; ++f) {
+          for (auto f : GeometryInfo<dim>::face_indices()) {
             const auto face = cell->face(f);
             if (face->at_boundary())
               face->set_manifold_id(Boundary::slip);
@@ -437,7 +437,7 @@ namespace grendel
      */
 
     for (auto cell : triangulation.active_cell_iterators()) {
-      for (unsigned int f = 0; f < GeometryInfo<2>::faces_per_cell; ++f) {
+      for (auto f : GeometryInfo<2>::face_indices()) {
         const auto face = cell->face(f);
 
         if (!face->at_boundary())
@@ -499,7 +499,7 @@ namespace grendel
      */
 
     for (auto cell : triangulation.active_cell_iterators()) {
-      for (unsigned int f = 0; f < GeometryInfo<3>::faces_per_cell; ++f) {
+      for (auto f : GeometryInfo<3>::face_indices()) {
         const auto face = cell->face(f);
 
         if (!face->at_boundary())
@@ -574,7 +574,7 @@ namespace grendel
      */
 
     for (auto cell : triangulation.active_cell_iterators()) {
-      for (unsigned int f = 0; f < GeometryInfo<2>::faces_per_cell; ++f) {
+      for (auto f : GeometryInfo<2>::face_indices()) {
         const auto face = cell->face(f);
 
         if (!face->at_boundary())
