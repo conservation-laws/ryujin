@@ -53,15 +53,17 @@ namespace grendel
                   schlieren_beta_,
                   "Beta factor used in the Schlieren postprocessor");
 
+    output_full_ = true;
+    add_parameter("output full", output_full_, "Output the full mesh");
+
     add_parameter(
         "output planes",
         output_planes_,
         "A vector of hyperplanes described by an origin, normal vector and a "
-        "tolerance. Only cell intersecting with the plane will be written out "
-        "to disc. If no hyperplane is specified, all active cells are "
-        "outputted. Example declaration of two hyper planes in 3D, one normal "
-        "to the x-axis and one normal to the y-axis: \"0,0,0 : 1,0,0 : 0.01 ; "
-        "0,0,0 : 0,1,0 : 0,01\"");
+        "tolerance. If nonempty, only cells intersecting with the plane will "
+        "be written out to disc. Example declaration of two hyper planes in "
+        "3D, one normal to the x-axis and one normal to the y-axis: \"0,0,0 : "
+        "1,0,0 : 0.01 ; 0,0,0 : 0,1,0 : 0,01\"");
 
 #if 0
     coarsening_level_ = 0;
@@ -316,44 +318,8 @@ namespace grendel
 
     const auto &discretization = offline_data_->discretization();
     const auto &mapping = discretization.mapping();
-    const auto &triangulation = discretization.triangulation();
 
     dealii::DataOut<dim> data_out;
-
-    /*
-     * Specify an output filter that selects only cells for output that are
-     * in the viscinity of a specified set of output planes:
-     */
-
-    data_out.set_cell_selection([this](const auto &cell) {
-      if (!cell->is_active() || cell->is_artificial())
-        return false;
-
-      if (output_planes_.size() == 0)
-        return true;
-
-      for (const auto &plane : output_planes_) {
-        const auto &[origin, normal, tolerance] = plane;
-
-        unsigned int above = 0;
-        unsigned int below = 0;
-
-        for (unsigned int v = 0; v < GeometryInfo<dim>::vertices_per_cell;
-             ++v) {
-          const auto vertex = cell->vertex(v);
-          const auto distance = (vertex - origin) * normal;
-          if (distance > -tolerance)
-            above++;
-          if (distance < tolerance)
-            below++;
-
-          if (above > 0 && below > 0)
-            return true;
-        }
-      }
-
-      return false;
-    });
 
     data_out.attach_dof_handler(offline_data_->dof_handler());
 
@@ -363,34 +329,55 @@ namespace grendel
     for (unsigned int i = 0; i < n_quantities; ++i)
       data_out.add_data_vector(quantities_[i], component_names[i]);
 
-    data_out.build_patches(mapping, discretization.finite_element().degree - 1);
-
     DataOutBase::VtkFlags flags(
         t, cycle, true, DataOutBase::VtkFlags::best_speed);
     data_out.set_flags(flags);
 
-    const auto filename = [&](const unsigned int i) -> std::string {
-      const auto seq = dealii::Utilities::int_to_string(i, 4);
-      return name + "-" + seq + ".vtu";
-    };
+    const auto patch_order = discretization.finite_element().degree - 1;
 
-    /* Write out local vtu: */
+    if (output_full_) {
+      data_out.build_patches(mapping, patch_order);
+      data_out.write_vtu_with_pvtu_record(
+          "", name, cycle, mpi_communicator_, 6);
+    }
 
-    const unsigned int i = triangulation.locally_owned_subdomain();
-    std::ofstream output(filename(i));
-    data_out.write_vtu(output);
+    if (output_planes_.size() != 0) {
+      /*
+       * Specify an output filter that selects only cells for output that are
+       * in the viscinity of a specified set of output planes:
+       */
 
-    if (dealii::Utilities::MPI::this_mpi_process(mpi_communicator_) == 0) {
-      /* Write out pvtu control file: */
+      data_out.set_cell_selection([this](const auto &cell) {
+        if (!cell->is_active() || cell->is_artificial())
+          return false;
 
-      std::vector<std::string> filenames;
-      for (unsigned int i = 0;
-           i < dealii::Utilities::MPI::n_mpi_processes(mpi_communicator_);
-           ++i)
-        filenames.push_back(filename(i));
+        if (output_planes_.size() == 0)
+          return true;
 
-      std::ofstream output(name + ".pvtu");
-      data_out.write_pvtu_record(output, filenames);
+        for (const auto &plane : output_planes_) {
+          const auto &[origin, normal, tolerance] = plane;
+
+          unsigned int above = 0;
+          unsigned int below = 0;
+
+          for (unsigned int v = 0; v < GeometryInfo<dim>::vertices_per_cell;
+               ++v) {
+            const auto vertex = cell->vertex(v);
+            const auto distance = (vertex - origin) * normal;
+            if (distance > -tolerance)
+              above++;
+            if (distance < tolerance)
+              below++;
+            if (above > 0 && below > 0)
+              return true;
+          }
+        }
+        return false;
+      });
+
+      data_out.build_patches(mapping, patch_order);
+      data_out.write_vtu_with_pvtu_record(
+          "", name + "-cut_planes", cycle, mpi_communicator_, 6);
     }
   }
 

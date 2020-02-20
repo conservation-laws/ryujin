@@ -73,6 +73,8 @@ namespace grendel
 
     Number schlieren_beta_;
 
+    bool output_full_;
+
     using plane_description =
         std::tuple<dealii::Point<dim, Number> /*origin*/,
                    dealii::Tensor<1, dim, Number> /*normal*/,

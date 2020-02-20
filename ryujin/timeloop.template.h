@@ -488,9 +488,7 @@ namespace ryujin
       }
 
       /* Data output: */
-
-      postprocessor.write_out_vtu(
-          name + "-" + Utilities::int_to_string(cycle, 6), t, cycle);
+      postprocessor.write_out_vtu(name, t, cycle);
 
 #ifdef DEBUG_OUTPUT
       deallog << "        Commit output (cycle = " << cycle << ")" << std::endl;
