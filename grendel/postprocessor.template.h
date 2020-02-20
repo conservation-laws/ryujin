@@ -53,11 +53,13 @@ namespace grendel
                   schlieren_beta_,
                   "Beta factor used in the Schlieren postprocessor");
 
+#if 0
     coarsening_level_ = 0;
     add_parameter(
         "coarsening level",
         coarsening_level_,
         "Number of coarsening steps applied before writing pvtu/vtu output");
+#endif
   }
 
 
@@ -76,8 +78,9 @@ namespace grendel
     for (auto &it : quantities_)
       it.reinit(partitioner);
 
+#if 0
     if (coarsening_level_ != 0) {
-      /* Prepare MGTransferMatrixFre for coarsened output: */
+      /* Prepare MGTransferMatrixFree for coarsened output: */
 
       const auto &dof_handler = offline_data_->dof_handler();
       const auto &triangulation = dof_handler.get_triangulation();
@@ -97,6 +100,7 @@ namespace grendel
       for (auto &it : output_quantities_)
         it.resize(output_level, max_level);
     }
+#endif
   }
 
 
@@ -272,6 +276,7 @@ namespace grendel
       it.update_ghost_values();
     }
 
+#if 0
     /*
      * Step 5: interpolate to coarse mesh
      */
@@ -286,6 +291,7 @@ namespace grendel
         transfer_.interpolate_to_mg(
             dof_handler, output_quantities_[i], quantities_[i]);
     }
+#endif
   }
 
 

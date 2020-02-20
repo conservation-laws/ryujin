@@ -21,11 +21,11 @@ namespace grendel
         ProblemDescription<dim, Number>::problem_dimension;
 
     using rank1_type = typename ProblemDescription<dim, Number>::rank1_type;
+    using curl_type = dealii::Tensor<1, dim == 2 ? 1 : dim, Number>;
 
     using scalar_type = dealii::LinearAlgebra::distributed::Vector<Number>;
     using vector_type = std::array<scalar_type, problem_dimension>;
 
-    using curl_type = dealii::Tensor<1, dim == 2 ? 1 : dim, Number>;
 
     /**
      * The number of postprocessed quantities:
@@ -62,18 +62,22 @@ namespace grendel
 
     dealii::SmartPointer<const grendel::OfflineData<dim, Number>> offline_data_;
 
+#if 0
     dealii::MGConstrainedDoFs constrained_dofs_;
     dealii::MGTransferMatrixFree<dim, Number> transfer_;
 
     std::array<dealii::MGLevelObject<scalar_type>, problem_dimension> output_U_;
     std::array<dealii::MGLevelObject<scalar_type>, n_quantities>
         output_quantities_;
+#endif
 
     /* Options: */
 
     Number schlieren_beta_;
 
+#if 0
     unsigned int coarsening_level_;
+#endif
   };
 
 } /* namespace grendel */
