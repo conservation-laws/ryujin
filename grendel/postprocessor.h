@@ -1,9 +1,9 @@
 #ifndef POSTPROCESSOR_H
 #define POSTPROCESSOR_H
 
-#include <compile_time_options.h>
 #include "offline_data.h"
 #include "problem_description.h"
+#include <compile_time_options.h>
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/grid/intergrid_map.h>
@@ -25,7 +25,6 @@ namespace grendel
 
     using scalar_type = dealii::LinearAlgebra::distributed::Vector<Number>;
     using vector_type = std::array<scalar_type, problem_dimension>;
-
 
     /**
      * The number of postprocessed quantities:
@@ -51,7 +50,6 @@ namespace grendel
     void write_out_vtu(std::string name, Number t, unsigned int cycle);
 
   protected:
-
     std::array<scalar_type, problem_dimension> U_;
     ACCESSOR_READ_ONLY(U)
 
@@ -74,6 +72,12 @@ namespace grendel
     /* Options: */
 
     Number schlieren_beta_;
+
+    using plane_description =
+        std::tuple<dealii::Point<dim, Number> /*origin*/,
+                   dealii::Tensor<1, dim, Number> /*normal*/,
+                   double /*tolerance*/>;
+    std::vector<plane_description> output_planes_;
 
 #if 0
     unsigned int coarsening_level_;

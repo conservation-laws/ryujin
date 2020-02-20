@@ -53,6 +53,16 @@ namespace grendel
                   schlieren_beta_,
                   "Beta factor used in the Schlieren postprocessor");
 
+    add_parameter(
+        "output planes",
+        output_planes_,
+        "A vector of hyperplanes described by an origin, normal vector and a "
+        "tolerance. Only cell intersecting with the plane will be written out "
+        "to disc. If no hyperplane is specified, all active cells are "
+        "outputted. Example declaration of two hyper planes in 3D, one normal "
+        "to the x-axis and one normal to the y-axis: \"0,0,0 : 1,0,0 : 0.01 ; "
+        "0,0,0 : 0,1,0 : 0,01\"");
+
 #if 0
     coarsening_level_ = 0;
     add_parameter(
@@ -309,6 +319,41 @@ namespace grendel
     const auto &triangulation = discretization.triangulation();
 
     dealii::DataOut<dim> data_out;
+
+    /*
+     * Specify an output filter that selects only cells for output that are
+     * in the viscinity of a specified set of output planes:
+     */
+
+    data_out.set_cell_selection([this](const auto &cell) {
+      if (!cell->is_active())
+        return false;
+
+      if (output_planes_.size() == 0)
+        return true;
+
+      for (const auto &plane : output_planes_) {
+        const auto &[origin, normal, tolerance] = plane;
+
+        unsigned int above = 0;
+        unsigned int below = 0;
+
+        for (unsigned int v = 0; v < GeometryInfo<dim>::vertices_per_cell;
+             ++v) {
+          const auto vertex = cell->vertex(v);
+          const auto distance = (vertex - origin) * normal;
+          if (distance > -tolerance)
+            above++;
+          if (distance < tolerance)
+            below++;
+
+          if (above > 0 && below > 0)
+            return true;
+        }
+      }
+
+      return false;
+    });
 
     data_out.attach_dof_handler(offline_data_->dof_handler());
 
