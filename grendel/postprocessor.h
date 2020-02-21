@@ -29,8 +29,7 @@ namespace grendel
     /**
      * The number of postprocessed quantities:
      */
-    static constexpr unsigned int n_quantities =
-        (dim == 1) ? 2 : (dim == 2) ? 3 : 5;
+    static constexpr unsigned int n_quantities = (dim == 1) ? 2 : 3;
 
     /**
      * An array holding all component names as a string.
@@ -72,6 +71,7 @@ namespace grendel
     /* Options: */
 
     Number schlieren_beta_;
+    Number vorticity_beta_;
 
     bool output_full_;
 

@@ -23,8 +23,8 @@ namespace grendel
       "schlieren", "vorticity", "alpha"};
 
   template <>
-  const std::array<std::string, 5> Postprocessor<3, double>::component_names{
-      "schlieren", "vorticity_1", "vorticity_2", "vorticity_3", "alpha"};
+  const std::array<std::string, 3> Postprocessor<3, double>::component_names{
+      "schlieren", "vorticity", "alpha"};
 
   template <>
   const std::array<std::string, 2> Postprocessor<1, float>::component_names{
@@ -35,8 +35,8 @@ namespace grendel
       "schlieren", "vorticity", "alpha"};
 
   template <>
-  const std::array<std::string, 5> Postprocessor<3, float>::component_names{
-      "schlieren", "vorticity_1", "vorticity_2", "vorticity_3", "alpha"};
+  const std::array<std::string, 3> Postprocessor<3, float>::component_names{
+      "schlieren", "vorticity", "alpha"};
 
 
   template <int dim, typename Number>
@@ -49,9 +49,16 @@ namespace grendel
       , offline_data_(&offline_data)
   {
     schlieren_beta_ = 10.;
-    add_parameter("schlieren beta",
-                  schlieren_beta_,
-                  "Beta factor used in the Schlieren postprocessor");
+    add_parameter(
+        "schlieren beta",
+        schlieren_beta_,
+        "Beta factor used in the exponential scale for the schlieren plot");
+
+    vorticity_beta_ = 10.;
+    add_parameter(
+        "vorticity beta",
+        vorticity_beta_,
+        "Beta factor used in the exponential scale for the vorticity");
 
     output_full_ = true;
     add_parameter("output full", output_full_, "Output the full mesh");
@@ -149,12 +156,16 @@ namespace grendel
 
     std::atomic<Number> r_i_max{0.};
     std::atomic<Number> r_i_min{std::numeric_limits<Number>::infinity()};
+    std::atomic<Number> v_i_max{0.};
+    std::atomic<Number> v_i_min{std::numeric_limits<Number>::infinity()};
 
     {
       GRENDEL_PARALLEL_REGION_BEGIN
 
       Number r_i_max_on_subrange = 0.;
       Number r_i_min_on_subrange = std::numeric_limits<Number>::infinity();
+      Number v_i_max_on_subrange = 0.;
+      Number v_i_min_on_subrange = std::numeric_limits<Number>::infinity();
 
       GRENDEL_OMP_FOR
       for (unsigned int i = 0; i < n_locally_owned; ++i) {
@@ -165,8 +176,8 @@ namespace grendel
         if (row_length == 1)
           continue;
 
-        Tensor<1, dim, Number> r_i;
-        curl_type vorticity;
+        Tensor<1, dim, Number> grad_rho_i;
+        curl_type curl_M_i;
 
         /* Skip diagonal. */
         const unsigned int *js = sparsity_simd.columns(i);
@@ -175,16 +186,16 @@ namespace grendel
                                           : js + col_idx);
 
           const auto U_j = gather(U, j);
-          const auto m_j = ProblemDescription<dim, Number>::momentum(U_j);
+          const auto M_j = ProblemDescription<dim, Number>::momentum(U_j);
 
           const auto c_ij = cij_matrix.get_tensor(i, col_idx);
 
-          r_i += c_ij * U_j[0];
+          grad_rho_i += c_ij * U_j[0];
 
           if constexpr (dim == 2) {
-            vorticity[0] += cross_product_2d(c_ij) * m_j;
+            curl_M_i[0] += cross_product_2d(c_ij) * M_j;
           } else if constexpr (dim == 3) {
-            vorticity += cross_product_3d(c_ij, m_j);
+            curl_M_i += cross_product_3d(c_ij, M_j);
           }
         }
 
@@ -193,13 +204,13 @@ namespace grendel
         const auto bnm_it = boundary_normal_map.find(i);
         if (bnm_it != boundary_normal_map.end()) {
           const auto [normal, id, _] = bnm_it->second;
+          /* FIXME: Think again about what to do exactly here... */
           if (id == Boundary::slip) {
-            r_i -= 1. * (r_i * normal) * normal;
+            grad_rho_i -= 1. * (grad_rho_i * normal) * normal;
           } else {
-            /* FIXME: This is not particularly elegant. On all other
-             * boundary types, we simply set r_i to zero. */
-            r_i = 0.;
+            grad_rho_i = 0.;
           }
+          curl_M_i = 0.;
         }
 
         /* Populate quantities: */
@@ -209,36 +220,40 @@ namespace grendel
 
         Tensor<1, n_quantities, Number> quantities;
 
-        quantities[0] = r_i.norm() / m_i;
-
-        vorticity /= (m_i * rho_i);
-        if constexpr (dim == 2) {
-          quantities[1] = vorticity[0];
-        } else if constexpr (dim == 3) {
-          quantities[1] = vorticity[0];
-          quantities[2] = vorticity[1];
+        quantities[0] = grad_rho_i.norm() / m_i;
+        if constexpr (dim > 1) {
+          quantities[1] = curl_M_i.norm() / (m_i * rho_i);
         }
-
         quantities[n_quantities - 1] = alpha.local_element(i);
 
         r_i_max_on_subrange = std::max(r_i_max_on_subrange, quantities[0]);
         r_i_min_on_subrange = std::min(r_i_min_on_subrange, quantities[0]);
+        if constexpr (dim > 1) {
+          v_i_max_on_subrange = std::max(v_i_max_on_subrange, quantities[1]);
+          v_i_min_on_subrange = std::min(v_i_min_on_subrange, quantities[1]);
+        }
 
         scatter(quantities_, quantities, i);
       }
 
       /* Synchronize over all threads: */
 
-      Number current_r_i_max = r_i_max.load();
-      while (
-          current_r_i_max < r_i_max_on_subrange &&
-          !r_i_max.compare_exchange_weak(current_r_i_max, r_i_max_on_subrange))
+      Number temp = r_i_max.load();
+      while (temp < r_i_max_on_subrange &&
+             !r_i_max.compare_exchange_weak(temp, r_i_max_on_subrange))
+        ;
+      temp = r_i_min.load();
+      while (temp > r_i_min_on_subrange &&
+             !r_i_min.compare_exchange_weak(temp, r_i_min_on_subrange))
         ;
 
-      Number current_r_i_min = r_i_min.load();
-      while (
-          current_r_i_min > r_i_min_on_subrange &&
-          !r_i_min.compare_exchange_weak(current_r_i_min, r_i_min_on_subrange))
+      temp = v_i_max.load();
+      while (temp < v_i_max_on_subrange &&
+             !v_i_max.compare_exchange_weak(temp, v_i_max_on_subrange))
+        ;
+      temp = v_i_min.load();
+      while (temp > v_i_min_on_subrange &&
+             !v_i_min.compare_exchange_weak(temp, v_i_min_on_subrange))
         ;
 
       GRENDEL_PARALLEL_REGION_END
@@ -248,9 +263,11 @@ namespace grendel
 
     r_i_max.store(Utilities::MPI::max(r_i_max.load(), mpi_communicator_));
     r_i_min.store(Utilities::MPI::min(r_i_min.load(), mpi_communicator_));
+    v_i_max.store(Utilities::MPI::max(v_i_max.load(), mpi_communicator_));
+    v_i_min.store(Utilities::MPI::min(v_i_min.load(), mpi_communicator_));
 
     /*
-     * Step 3: Normalize schlieren:
+     * Step 3: Normalize schlieren and vorticity:
      */
 
     {
@@ -265,10 +282,15 @@ namespace grendel
         if (row_length == 1)
           continue;
 
-        const auto r_i = quantities_[0].local_element(i);
-        quantities_[0].local_element(i) =
-            Number(1.) -
-            std::exp(-schlieren_beta_ * (r_i - r_i_min) / (r_i_max - r_i_min));
+        auto &r_i = quantities_[0].local_element(i);
+        r_i = Number(1.) - std::exp(-schlieren_beta_ * (r_i - r_i_min) /
+                                    (r_i_max - r_i_min));
+
+        if constexpr (dim > 1) {
+          auto &v_i = quantities_[1].local_element(i);
+          v_i = Number(1.) - std::exp(-vorticity_beta_ * (v_i - v_i_min) /
+                                      (v_i_max - v_i_min));
+        }
       }
 
       GRENDEL_PARALLEL_REGION_END
