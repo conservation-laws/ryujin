@@ -1,9 +1,12 @@
 #ifndef INITIAL_VALUES_TEMPLATE_H
 #define INITIAL_VALUES_TEMPLATE_H
 
+#include "helper.h"
+#include "initial_values.h"
 #include "simd.h"
 
-#include "initial_values.h"
+#include <deal.II/numerics/vector_tools.h>
+#include <deal.II/numerics/vector_tools.templates.h>
 
 #include <random>
 
@@ -263,6 +266,41 @@ namespace grendel
         return state;
       };
     }
+  }
+
+
+  template <int dim, typename Number>
+  typename InitialValues<dim, Number>::vector_type
+  InitialValues<dim, Number>::interpolate(const OfflineData<dim> &offline_data,
+                                          Number t)
+  {
+#ifdef DEBUG_OUTPUT
+    deallog << "InitialValues<dim, Number>::interpolate(t = " << t << ")"
+            << std::endl;
+#endif
+
+    vector_type U;
+
+    const auto &partitioner = offline_data.partitioner();
+    for (auto &it : U)
+      it.reinit(partitioner);
+
+    constexpr auto problem_dimension =
+        ProblemDescription<dim, Number>::problem_dimension;
+
+    const auto callable = [&](const auto &p) {
+      return initial_state(p, t);
+    };
+
+    for (unsigned int i = 0; i < problem_dimension; ++i)
+      VectorTools::interpolate(offline_data.dof_handler(),
+                               to_function<dim, Number>(callable, i),
+                               U[i]);
+
+    for (auto &it : U)
+      it.update_ghost_values();
+
+    return U;
   }
 
 } /* namespace grendel */

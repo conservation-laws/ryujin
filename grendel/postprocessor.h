@@ -46,7 +46,11 @@ namespace grendel
 
     void compute(const vector_type &U, const scalar_type &alpha);
 
-    void write_out_vtu(std::string name, Number t, unsigned int cycle);
+    void write_out(std::string name,
+                   Number t,
+                   unsigned int cycle,
+                   bool output_full = true,
+                   bool output_cutplanes = true);
 
   protected:
     std::array<scalar_type, problem_dimension> U_;
@@ -59,31 +63,16 @@ namespace grendel
 
     dealii::SmartPointer<const grendel::OfflineData<dim, Number>> offline_data_;
 
-#if 0
-    dealii::MGConstrainedDoFs constrained_dofs_;
-    dealii::MGTransferMatrixFree<dim, Number> transfer_;
-
-    std::array<dealii::MGLevelObject<scalar_type>, problem_dimension> output_U_;
-    std::array<dealii::MGLevelObject<scalar_type>, n_quantities>
-        output_quantities_;
-#endif
-
     /* Options: */
 
     Number schlieren_beta_;
     Number vorticity_beta_;
-
-    bool output_full_;
 
     using plane_description =
         std::tuple<dealii::Point<dim, Number> /*origin*/,
                    dealii::Tensor<1, dim, Number> /*normal*/,
                    double /*tolerance*/>;
     std::vector<plane_description> output_planes_;
-
-#if 0
-    unsigned int coarsening_level_;
-#endif
   };
 
 } /* namespace grendel */

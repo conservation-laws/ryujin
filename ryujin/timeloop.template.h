@@ -1,6 +1,7 @@
 #ifndef TIMELOOP_TEMPLATE_H
 #define TIMELOOP_TEMPLATE_H
 
+#include "checkpointing.h"
 #include "timeloop.h"
 
 #include <helper.h>
@@ -16,25 +17,18 @@
 #include <deal.II/numerics/vector_tools.h>
 #include <deal.II/numerics/vector_tools.templates.h>
 
-#include <boost/archive/binary_iarchive.hpp>
-#include <boost/archive/binary_oarchive.hpp>
-#include <boost/core/demangle.hpp>
-
 #ifdef CALLGRIND
 #include <valgrind/callgrind.h>
 #endif
 
-#include <filesystem>
 #include <fstream>
 #include <iomanip>
 
 using namespace dealii;
 using namespace grendel;
 
-
 namespace ryujin
 {
-
   template <int dim, typename Number>
   TimeLoop<dim, Number>::TimeLoop(const MPI_Comm &mpi_comm)
       : ParameterAcceptor("A - TimeLoop")
@@ -126,28 +120,16 @@ namespace ryujin
       for (auto &it : U)
         it.reinit(partitioner);
 
-      if (!resume) {
-        print_head("interpolate initial values");
-        U = interpolate_initial_values();
-
-      } else {
-
+      if (resume) {
         print_head("resume interrupted computation");
-
-        const auto &triangulation = discretization.triangulation();
-        const unsigned int i = triangulation.locally_owned_subdomain();
-        std::string name = base_name + "-checkpoint-" +
-                           dealii::Utilities::int_to_string(i, 4) + ".archive";
-        std::ifstream file(name, std::ios::binary);
-
-        boost::archive::binary_iarchive ia(file);
-        ia >> t >> output_cycle;
-
-        for (auto &it1 : U) {
-          for (auto &it2 : it1)
-            ia >> it2;
-          it1.update_ghost_values();
-        }
+        do_resume(base_name,
+                  discretization.triangulation().locally_owned_subdomain(),
+                  U,
+                  t,
+                  output_cycle);
+      } else {
+        print_head("interpolate initial values");
+        U = initial_values.interpolate(offline_data);
       }
     }
 
@@ -155,7 +137,7 @@ namespace ryujin
       output(U, base_name + "-solution", t, output_cycle);
 
       if (enable_compute_error) {
-        const auto analytic = interpolate_initial_values(t);
+        const auto analytic = initial_values.interpolate(offline_data, t);
         output(analytic, base_name + "-analytic_solution", t, output_cycle);
       }
     }
@@ -187,7 +169,7 @@ namespace ryujin
                  /*checkpoint*/ enable_checkpointing);
 
           if (enable_compute_error) {
-            const auto analytic = interpolate_initial_values(t);
+            const auto analytic = initial_values.interpolate(offline_data, t);
             output(analytic, base_name + "-analytic_solution", t, output_cycle);
           }
         }
@@ -277,40 +259,6 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  typename TimeLoop<dim, Number>::vector_type
-  TimeLoop<dim, Number>::interpolate_initial_values(Number t)
-  {
-#ifdef DEBUG_OUTPUT
-    deallog << "TimeLoop<dim, Number>::interpolate_initial_values(t = " << t
-            << ")" << std::endl;
-#endif
-
-    vector_type U;
-
-    const auto &partitioner = offline_data.partitioner();
-    for (auto &it : U)
-      it.reinit(partitioner);
-
-    constexpr auto problem_dimension =
-        ProblemDescription<dim, Number>::problem_dimension;
-
-    const auto callable = [&](const auto &p) {
-      return initial_values.initial_state(p, t);
-    };
-
-    for (unsigned int i = 0; i < problem_dimension; ++i)
-      VectorTools::interpolate(offline_data.dof_handler(),
-                               to_function<dim, Number>(callable, i),
-                               U[i]);
-
-    for (auto &it : U)
-      it.update_ghost_values();
-
-    return U;
-  }
-
-
-  template <int dim, typename Number>
   void TimeLoop<dim, Number>::compute_error(
       const typename TimeLoop<dim, Number>::vector_type &U, const Number t)
   {
@@ -330,7 +278,7 @@ namespace ryujin
     Number l1_norm = 0;
     Number l2_norm = 0;
 
-    auto analytic = interpolate_initial_values(t);
+    auto analytic = initial_values.interpolate(offline_data, t);
 
     for (unsigned int i = 0; i < problem_dimension; ++i) {
       auto &error = analytic[i];
@@ -468,27 +416,15 @@ namespace ryujin
 #ifdef DEBUG_OUTPUT
         deallog << "        Checkpointing" << std::endl;
 #endif
-
-        const auto &triangulation = discretization.triangulation();
-        const unsigned int i = triangulation.locally_owned_subdomain();
-
-        std::string name = base_name + "-checkpoint-" +
-                           dealii::Utilities::int_to_string(i, 4) + ".archive";
-
-        if (std::filesystem::exists(name))
-          std::filesystem::rename(name, name + "~");
-
-        std::ofstream file(name, std::ios::binary | std::ios::trunc);
-
-        boost::archive::binary_oarchive oa(file);
-        oa << t << cycle;
-        for (const auto &it1 : postprocessor.U())
-          for (const auto &it2 : it1)
-            oa << it2;
+        do_checkpoint(base_name,
+                      discretization.triangulation().locally_owned_subdomain(),
+                      postprocessor.U(),
+                      t,
+                      cycle);
       }
 
       /* Data output: */
-      postprocessor.write_out_vtu(name, t, cycle);
+      postprocessor.write_out(name, t, cycle);
 
 #ifdef DEBUG_OUTPUT
       deallog << "        Commit output (cycle = " << cycle << ")" << std::endl;
@@ -512,7 +448,6 @@ namespace ryujin
   /*
    * Output and logging related functions:
    */
-
 
   template <int dim, typename Number>
   void TimeLoop<dim, Number>::print_parameters()

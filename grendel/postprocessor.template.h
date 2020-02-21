@@ -60,25 +60,14 @@ namespace grendel
         vorticity_beta_,
         "Beta factor used in the exponential scale for the vorticity");
 
-    output_full_ = true;
-    add_parameter("output full", output_full_, "Output the full mesh");
-
     add_parameter(
         "output planes",
         output_planes_,
         "A vector of hyperplanes described by an origin, normal vector and a "
-        "tolerance. If nonempty, only cells intersecting with the plane will "
-        "be written out to disc. Example declaration of two hyper planes in "
-        "3D, one normal to the x-axis and one normal to the y-axis: \"0,0,0 : "
-        "1,0,0 : 0.01 ; 0,0,0 : 0,1,0 : 0,01\"");
-
-#if 0
-    coarsening_level_ = 0;
-    add_parameter(
-        "coarsening level",
-        coarsening_level_,
-        "Number of coarsening steps applied before writing pvtu/vtu output");
-#endif
+        "tolerance. The description is used to only output cells intersecting "
+        "with the planes for the \"cutplanes\" output. Example declaration of "
+        "two hyper planes in 3D, one normal to the x-axis and one normal to "
+        "the y-axis: \"0,0,0 : 1,0,0 : 0.01 ; 0,0,0 : 0,1,0 : 0,01\"");
   }
 
 
@@ -96,30 +85,6 @@ namespace grendel
 
     for (auto &it : quantities_)
       it.reinit(partitioner);
-
-#if 0
-    if (coarsening_level_ != 0) {
-      /* Prepare MGTransferMatrixFree for coarsened output: */
-
-      const auto &dof_handler = offline_data_->dof_handler();
-      const auto &triangulation = dof_handler.get_triangulation();
-
-      const auto max_level = triangulation.n_global_levels() - 1;
-      const auto output_level =
-          max_level - std::min(coarsening_level_, max_level);
-
-      constrained_dofs_.initialize(dof_handler);
-
-      transfer_.initialize_constraints(constrained_dofs_);
-      transfer_.build(dof_handler);
-
-      for (auto &it : output_U_)
-        it.resize(output_level, max_level);
-
-      for (auto &it : output_quantities_)
-        it.resize(output_level, max_level);
-    }
-#endif
   }
 
 
@@ -309,30 +274,15 @@ namespace grendel
       affine_constraints.distribute(it);
       it.update_ghost_values();
     }
-
-#if 0
-    /*
-     * Step 5: interpolate to coarse mesh
-     */
-
-    if (coarsening_level_ != 0) {
-      const auto &dof_handler = offline_data_->dof_handler();
-
-      for (unsigned int i = 0; i < problem_dimension; ++i)
-        transfer_.interpolate_to_mg(dof_handler, output_U_[i], U_[i]);
-
-      for (unsigned int i = 0; i < n_quantities; ++i)
-        transfer_.interpolate_to_mg(
-            dof_handler, output_quantities_[i], quantities_[i]);
-    }
-#endif
   }
 
 
   template <int dim, typename Number>
-  void Postprocessor<dim, Number>::write_out_vtu(std::string name,
-                                                 Number t,
-                                                 unsigned int cycle)
+  void Postprocessor<dim, Number>::write_out(std::string name,
+                                             Number t,
+                                             unsigned int cycle,
+                                             bool output_full,
+                                             bool output_cutplanes)
   {
     constexpr auto problem_dimension =
         ProblemDescription<dim, Number>::problem_dimension;
@@ -357,13 +307,13 @@ namespace grendel
 
     const auto patch_order = discretization.finite_element().degree - 1;
 
-    if (output_full_) {
+    if (output_full) {
       data_out.build_patches(mapping, patch_order);
       data_out.write_vtu_with_pvtu_record(
           "", name, cycle, mpi_communicator_, 6);
     }
 
-    if (output_planes_.size() != 0) {
+    if (output_cutplanes && output_planes_.size() != 0) {
       /*
        * Specify an output filter that selects only cells for output that are
        * in the viscinity of a specified set of output planes:

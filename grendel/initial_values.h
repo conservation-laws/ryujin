@@ -2,6 +2,7 @@
 #define INITIAL_VALUES_H
 
 #include <compile_time_options.h>
+#include "offline_data.h"
 #include "problem_description.h"
 
 #include <deal.II/base/parameter_acceptor.h>
@@ -22,9 +23,10 @@ namespace grendel
 
     static constexpr Number b = ProblemDescription<dim, Number>::b;
 
+    using scalar_type = dealii::LinearAlgebra::distributed::Vector<Number>;
+    using vector_type = std::array<scalar_type, problem_dimension>;
 
-    typedef dealii::Tensor<1, problem_dimension, Number> rank1_type;
-
+    using rank1_type = dealii::Tensor<1, problem_dimension, Number>;
 
     /**
      * Constructor.
@@ -53,6 +55,12 @@ namespace grendel
     const std::function<rank1_type(const dealii::Point<dim> &point, Number t)>
         &initial_state;
 
+    /**
+     * Given a reference to an OfflineData object this routine computes and
+     * returns a state vector populates with initial values for specified
+     * time @p t.
+     */
+    vector_type interpolate(const OfflineData<dim> &offline_data, Number t = 0);
 
   private:
     std::string configuration_;
