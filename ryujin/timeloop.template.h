@@ -56,27 +56,49 @@ namespace ryujin
 
     output_granularity = Number(0.01);
     add_parameter(
-        "output granularity", output_granularity, "time interval for output");
-
-    update_granularity = 10;
-    add_parameter(
-        "update granularity",
-        update_granularity,
-        "number of cycles after which output statistics are recomputed");
+        "output granularity",
+        output_granularity,
+        "The output granularity specifies the time interval after which output "
+        "routines are run. Further modified by \"*_multiplier\" options");
 
     enable_checkpointing = true;
-    add_parameter("enable checkpointing",
-                  enable_checkpointing,
-                  "Write out checkpoints to resume an interrupted computation "
-                  "at output granularity intervals");
+    add_parameter(
+        "enable checkpointing",
+        enable_checkpointing,
+        "Write out checkpoints to resume an interrupted computation "
+        "at output granularity intervals. The frequency is determined by "
+        "\"output granularity\" times \"output checkpoint multiplier\"");
 
-    resume = false;
-    add_parameter("resume", resume, "Resume an interrupted computation");
+    enable_output_full = true;
+    add_parameter("enable output full",
+                  enable_output_full,
+                  "Write out full pvtu records. The frequency is determined by "
+                  "\"output granularity\" times \"output full multiplier\"");
 
-    write_output_files = true;
-    add_parameter("write output files",
-                  write_output_files,
-                  "Write out postprocessed output files in vtu/pvtu format");
+    enable_output_cutplanes = true;
+    add_parameter(
+        "enable output cutplanes",
+        enable_output_cutplanes,
+        "Write out cutplanes pvtu records. The frequency is determined by "
+        "\"output granularity\" times \"output cutplanes multiplier\"");
+
+    output_checkpoint_multiplier = 1;
+    add_parameter("output checkpoint multiplier",
+                  output_checkpoint_multiplier,
+                  "Multiplicative modifier applied to \"output granularity\" "
+                  "that determines the checkpointing granularity");
+
+    output_full_multiplier = 1;
+    add_parameter("output full multiplier",
+                  output_full_multiplier,
+                  "Multiplicative modifier applied to \"output granularity\" "
+                  "that determines the full pvtu writeout granularity");
+
+    output_cutplanes_multiplier = 1;
+    add_parameter("output cutplanes multiplier",
+                  output_cutplanes_multiplier,
+                  "Multiplicative modifier applied to \"output granularity\" "
+                  "that determines the cutplanes pvtu writeout granularity");
 
     enable_compute_error = false;
     add_parameter("enable compute error",
@@ -84,6 +106,15 @@ namespace ryujin
                   "Flag to control whether we compute the Linfty Linf_norm of "
                   "the difference to an analytic solution. Implemented only "
                   "for certain initial state configurations.");
+
+    resume = false;
+    add_parameter("resume", resume, "Resume an interrupted computation");
+
+    terminal_update_interval = 10;
+    add_parameter("terminal update interval",
+                  terminal_update_interval,
+                  "number of cycles after which output statistics are "
+                  "recomputed and printed on the terminal");
   }
 
 
@@ -93,6 +124,9 @@ namespace ryujin
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeLoop<dim, Number>::run()" << std::endl;
 #endif
+
+    const bool write_output_files =
+        enable_checkpointing || enable_output_full || enable_output_cutplanes;
 
     initialize();
     print_parameters(logfile);
@@ -158,18 +192,16 @@ namespace ryujin
       const auto tau = time_step.step(U, t);
       t += tau;
 
-      if (t > output_cycle * output_granularity) {
-        if (write_output_files) {
-          output(U,
-                 base_name + "-solution",
-                 t,
-                 output_cycle,
-                 /*checkpoint*/ enable_checkpointing);
+      if (t > output_cycle * output_granularity && write_output_files) {
+        output(U,
+               base_name + "-solution",
+               t,
+               output_cycle,
+               /*checkpoint*/ true);
 
-          if (enable_compute_error) {
-            const auto analytic = initial_values.interpolate(offline_data, t);
-            output(analytic, base_name + "-analytic_solution", t, output_cycle);
-          }
+        if (enable_compute_error) {
+          const auto analytic = initial_values.interpolate(offline_data, t);
+          output(analytic, base_name + "-analytic_solution", t, output_cycle);
         }
         ++output_cycle;
 
@@ -177,7 +209,7 @@ namespace ryujin
       }
 
 #ifndef DEBUG_OUTPUT
-      if (cycle % update_granularity == 0)
+      if (cycle % terminal_update_interval == 0)
         print_cycle_statistics(cycle, t, output_cycle);
 #endif
     } /* end of loop */
@@ -371,7 +403,8 @@ namespace ryujin
 
       /* Checkpointing: */
 
-      if (checkpoint) {
+      if (checkpoint && (cycle % output_checkpoint_multiplier == 0) &&
+          enable_checkpointing) {
 #ifdef DEBUG_OUTPUT
         std::cout << "        Checkpointing" << std::endl;
 #endif
@@ -383,7 +416,13 @@ namespace ryujin
       }
 
       /* Data output: */
-      postprocessor.write_out(name, t, cycle);
+      postprocessor.write_out(name,
+                              t,
+                              cycle,
+                              (cycle % output_full_multiplier == 0) &&
+                                  enable_output_full,
+                              (cycle % output_cutplanes_multiplier == 0) &&
+                                  enable_output_cutplanes);
 
 #ifdef DEBUG_OUTPUT
       std::cout << "        Commit output (cycle = " << cycle << ")"

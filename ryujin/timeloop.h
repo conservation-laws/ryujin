@@ -62,14 +62,18 @@ namespace ryujin
     Number t_final;
     Number output_granularity;
 
-    unsigned int update_granularity;
-
     bool enable_checkpointing;
+    bool enable_output_full;
+    bool enable_output_cutplanes;
+    bool enable_compute_error;
+
+    unsigned int output_checkpoint_multiplier;
+    unsigned int output_full_multiplier;
+    unsigned int output_cutplanes_multiplier;
+
     bool resume;
 
-    bool write_output_files;
-
-    bool enable_compute_error;
+    unsigned int terminal_update_interval;
 
     /* Data: */
 
