@@ -67,7 +67,6 @@ namespace grendel
     /* Options: */
 
     Number schlieren_beta_;
-    Number vorticity_beta_;
 
     using plane_description =
         std::tuple<dealii::Point<dim, Number> /*origin*/,

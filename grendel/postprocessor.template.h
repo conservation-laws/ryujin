@@ -54,12 +54,6 @@ namespace grendel
         schlieren_beta_,
         "Beta factor used in the exponential scale for the schlieren plot");
 
-    vorticity_beta_ = 10.;
-    add_parameter(
-        "vorticity beta",
-        vorticity_beta_,
-        "Beta factor used in the exponential scale for the vorticity");
-
     add_parameter(
         "output planes",
         output_planes_,
