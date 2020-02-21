@@ -121,16 +121,12 @@ namespace grendel
 
     std::atomic<Number> r_i_max{0.};
     std::atomic<Number> r_i_min{std::numeric_limits<Number>::infinity()};
-    std::atomic<Number> v_i_max{0.};
-    std::atomic<Number> v_i_min{std::numeric_limits<Number>::infinity()};
 
     {
       GRENDEL_PARALLEL_REGION_BEGIN
 
       Number r_i_max_on_subrange = 0.;
       Number r_i_min_on_subrange = std::numeric_limits<Number>::infinity();
-      Number v_i_max_on_subrange = 0.;
-      Number v_i_min_on_subrange = std::numeric_limits<Number>::infinity();
 
       GRENDEL_OMP_FOR
       for (unsigned int i = 0; i < n_locally_owned; ++i) {
@@ -142,7 +138,7 @@ namespace grendel
           continue;
 
         Tensor<1, dim, Number> grad_rho_i;
-        curl_type curl_M_i;
+        curl_type curl_v_i;
 
         /* Skip diagonal. */
         const unsigned int *js = sparsity_simd.columns(i);
@@ -155,12 +151,14 @@ namespace grendel
 
           const auto c_ij = cij_matrix.get_tensor(i, col_idx);
 
-          grad_rho_i += c_ij * U_j[0];
+          const auto rho_j = U_j[0];
+
+          grad_rho_i += c_ij * rho_j;
 
           if constexpr (dim == 2) {
-            curl_M_i[0] += cross_product_2d(c_ij) * M_j;
+            curl_v_i[0] += cross_product_2d(c_ij) * M_j / rho_j;
           } else if constexpr (dim == 3) {
-            curl_M_i += cross_product_3d(c_ij, M_j);
+            curl_v_i += cross_product_3d(c_ij, M_j / rho_j);
           }
         }
 
@@ -175,28 +173,23 @@ namespace grendel
           } else {
             grad_rho_i = 0.;
           }
-          curl_M_i = 0.;
+          curl_v_i = 0.;
         }
 
         /* Populate quantities: */
 
-        const Number rho_i = U[0].local_element(i);
         const Number m_i = lumped_mass_matrix.local_element(i);
 
         Tensor<1, n_quantities, Number> quantities;
 
         quantities[0] = grad_rho_i.norm() / m_i;
         if constexpr (dim > 1) {
-          quantities[1] = curl_M_i.norm() / (m_i * rho_i);
+          quantities[1] = curl_v_i.norm() / m_i;
         }
         quantities[n_quantities - 1] = alpha.local_element(i);
 
         r_i_max_on_subrange = std::max(r_i_max_on_subrange, quantities[0]);
         r_i_min_on_subrange = std::min(r_i_min_on_subrange, quantities[0]);
-        if constexpr (dim > 1) {
-          v_i_max_on_subrange = std::max(v_i_max_on_subrange, quantities[1]);
-          v_i_min_on_subrange = std::min(v_i_min_on_subrange, quantities[1]);
-        }
 
         scatter(quantities_, quantities, i);
       }
@@ -212,15 +205,6 @@ namespace grendel
              !r_i_min.compare_exchange_weak(temp, r_i_min_on_subrange))
         ;
 
-      temp = v_i_max.load();
-      while (temp < v_i_max_on_subrange &&
-             !v_i_max.compare_exchange_weak(temp, v_i_max_on_subrange))
-        ;
-      temp = v_i_min.load();
-      while (temp > v_i_min_on_subrange &&
-             !v_i_min.compare_exchange_weak(temp, v_i_min_on_subrange))
-        ;
-
       GRENDEL_PARALLEL_REGION_END
     }
 
@@ -228,8 +212,6 @@ namespace grendel
 
     r_i_max.store(Utilities::MPI::max(r_i_max.load(), mpi_communicator_));
     r_i_min.store(Utilities::MPI::min(r_i_min.load(), mpi_communicator_));
-    v_i_max.store(Utilities::MPI::max(v_i_max.load(), mpi_communicator_));
-    v_i_min.store(Utilities::MPI::min(v_i_min.load(), mpi_communicator_));
 
     /*
      * Step 3: Normalize schlieren and vorticity:
@@ -250,12 +232,6 @@ namespace grendel
         auto &r_i = quantities_[0].local_element(i);
         r_i = Number(1.) - std::exp(-schlieren_beta_ * (r_i - r_i_min) /
                                     (r_i_max - r_i_min));
-
-        if constexpr (dim > 1) {
-          auto &v_i = quantities_[1].local_element(i);
-          v_i = Number(1.) - std::exp(-vorticity_beta_ * (v_i - v_i_min) /
-                                      (v_i_max - v_i_min));
-        }
       }
 
       GRENDEL_PARALLEL_REGION_END
