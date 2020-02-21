@@ -90,13 +90,12 @@ namespace ryujin
   template <int dim, typename Number>
   void TimeLoop<dim, Number>::run()
   {
-    initialize();
-
-    print_parameters();
-
 #ifdef DEBUG_OUTPUT
-    deallog << "TimeLoop<dim, Number>::run()" << std::endl;
+    std::cout << "TimeLoop<dim, Number>::run()" << std::endl;
 #endif
+
+    initialize();
+    print_parameters(logfile);
 
     Number t = 0.;
     unsigned int output_cycle = 0;
@@ -104,31 +103,30 @@ namespace ryujin
 
     /* Prepare data structures: */
 
-    print_head("initialize data structures");
-
     {
       Scope scope(computing_timer, "initialize data structures");
+      print_info("initializing data structures");
 
       discretization.prepare();
       offline_data.prepare();
       time_step.prepare();
       postprocessor.prepare();
 
-      print_mpi_partition();
+      print_mpi_partition(logfile);
 
       const auto &partitioner = offline_data.partitioner();
       for (auto &it : U)
         it.reinit(partitioner);
 
       if (resume) {
-        print_head("resume interrupted computation");
+        print_info("resuming interrupted computation");
         do_resume(base_name,
                   discretization.triangulation().locally_owned_subdomain(),
                   U,
                   t,
                   output_cycle);
       } else {
-        print_head("interpolate initial values");
+        print_info("interpolating initial values");
         U = initial_values.interpolate(offline_data);
       }
     }
@@ -143,7 +141,7 @@ namespace ryujin
     }
     ++output_cycle;
 
-    print_head("enter main loop");
+    print_info("entering main loop");
     computing_timer["time loop"].start();
 
     /* Loop: */
@@ -201,37 +199,21 @@ namespace ryujin
       compute_error(U, t);
     }
 
-    print_timers();
-    print_throughput(cycle, t);
-
-#ifdef DEBUG_OUTPUT
-    /* Detach deallog: */
-    if (mpi_rank == 0) {
-      deallog.detach();
-    }
-#endif
+    /* Write final timing statistics to logfile: */
+    print_timers(logfile);
+    print_throughput(cycle, t, logfile);
   }
 
 
-  /**
-   * Set up deallog output, read in parameters and initialize all objects.
-   */
   template <int dim, typename Number>
   void TimeLoop<dim, Number>::initialize()
   {
     /* Read in parameters and initialize all objects: */
 
     if (mpi_rank == 0) {
-
       std::cout << "[Init] initiating flux capacitor" << std::endl;
-      std::cout << "[Init] bringing warp core online" << std::endl;
-
-      std::cout << "[Init] read parameters and allocate objects" << std::endl;
-
       ParameterAcceptor::initialize("ryujin.prm");
-
     } else {
-
       ParameterAcceptor::initialize("ryujin.prm");
       return;
     }
@@ -241,20 +223,8 @@ namespace ryujin
     std::ofstream output(base_name + "-parameter.prm");
     ParameterAcceptor::prm.print_parameters(output, ParameterHandler::Text);
 
-    /* Prepare and attach logfile: */
-
-    filestream.reset(new std::ofstream(base_name + "-deallog.log"));
-
-#ifdef DEBUG_OUTPUT
-    deallog.pop();
-    deallog.attach(*filestream);
-    deallog.depth_console(4);
-    deallog.depth_file(4);
-#endif
-
-#ifdef DEBUG
-    deallog.push("DEBUG");
-#endif
+    /* Attach log file: */
+    logfile.open(base_name + ".log");
   }
 
 
@@ -263,7 +233,7 @@ namespace ryujin
       const typename TimeLoop<dim, Number>::vector_type &U, const Number t)
   {
 #ifdef DEBUG_OUTPUT
-    deallog << "TimeLoop<dim, Number>::compute_error()" << std::endl;
+    std::cout << "TimeLoop<dim, Number>::compute_error()" << std::endl;
 #endif
 
     constexpr auto problem_dimension =
@@ -343,34 +313,23 @@ namespace ryujin
     if (mpi_rank != 0)
       return;
 
-#ifdef DEBUG_OUTPUT
-    auto &stream = deallog;
-#else
-    auto &stream = *filestream;
-#endif
+    logfile << std::endl << "Computed errors:" << std::endl << std::endl;
 
-    print_head("compute error");
+    logfile << "Normalized consolidated Linf, L1, and L2 errors at "
+            << "final time" << std::endl;
+    logfile << "#dofs = " << offline_data.dof_handler().n_dofs() << std::endl;
+    logfile << "t     = " << t << std::endl;
+    logfile << "Linf  = " << linf_norm << std::endl;
+    logfile << "L1    = " << l1_norm << std::endl;
+    logfile << "L2    = " << l2_norm << std::endl;
 
-    stream << "Normalized consolidated Linf, L1, and L2 errors at "
-           << "final time" << std::endl;
-    stream << "#dofs = " << offline_data.dof_handler().n_dofs() << std::endl;
-    stream << "t     = " << t << std::endl;
-    stream << "Linf  = " << linf_norm << std::endl;
-    stream << "L1    = " << l1_norm << std::endl;
-    stream << "L2    = " << l2_norm << std::endl;
-
-#ifndef DEBUG_OUTPUT
-    if (mpi_rank == 0) {
-      std::cout << "Normalized consolidated Linf, L1, and L2 errors at "
-                << "final time" << std::endl;
-      std::cout << "#dofs = " << offline_data.dof_handler().n_dofs()
-                << std::endl;
-      std::cout << "t     = " << t << std::endl;
-      std::cout << "Linf  = " << linf_norm << std::endl;
-      std::cout << "L1    = " << l1_norm << std::endl;
-      std::cout << "L2    = " << l2_norm << std::endl;
-    }
-#endif
+    std::cout << "Normalized consolidated Linf, L1, and L2 errors at "
+              << "final time" << std::endl;
+    std::cout << "#dofs = " << offline_data.dof_handler().n_dofs() << std::endl;
+    std::cout << "t     = " << t << std::endl;
+    std::cout << "Linf  = " << linf_norm << std::endl;
+    std::cout << "L1    = " << l1_norm << std::endl;
+    std::cout << "L2    = " << l2_norm << std::endl;
   }
 
 
@@ -383,8 +342,8 @@ namespace ryujin
       bool checkpoint)
   {
 #ifdef DEBUG_OUTPUT
-    deallog << "TimeLoop<dim, Number>::output(t = " << t
-            << ", checkpoint = " << checkpoint << ")" << std::endl;
+    std::cout << "TimeLoop<dim, Number>::output(t = " << t
+              << ", checkpoint = " << checkpoint << ")" << std::endl;
 #endif
 
     /*
@@ -414,7 +373,7 @@ namespace ryujin
 
       if (checkpoint) {
 #ifdef DEBUG_OUTPUT
-        deallog << "        Checkpointing" << std::endl;
+        std::cout << "        Checkpointing" << std::endl;
 #endif
         do_checkpoint(base_name,
                       discretization.triangulation().locally_owned_subdomain(),
@@ -427,39 +386,35 @@ namespace ryujin
       postprocessor.write_out(name, t, cycle);
 
 #ifdef DEBUG_OUTPUT
-      deallog << "        Commit output (cycle = " << cycle << ")" << std::endl;
+      std::cout << "        Commit output (cycle = " << cycle << ")"
+                << std::endl;
 #endif
 
       /* Flag thread as inactive: */
       output_thread_active = 0;
     };
 
-    /*
-     * And spawn the thread:
-     */
+    /* And spawn the thread: */
 
 #ifdef DEBUG_OUTPUT
-    deallog << "        Schedule output (cycle = " << cycle << ")" << std::endl;
+    std::cout << "        Schedule output (cycle = " << cycle << ")"
+              << std::endl;
 #endif
 
     output_thread = std::move(std::thread(output_worker));
   }
 
+
   /*
    * Output and logging related functions:
    */
 
+
   template <int dim, typename Number>
-  void TimeLoop<dim, Number>::print_parameters()
+  void TimeLoop<dim, Number>::print_parameters(std::ostream &stream)
   {
     if (mpi_rank != 0)
       return;
-
-#ifdef DEBUG_OUTPUT
-    auto &stream = deallog;
-#else
-    auto &stream = *filestream;
-#endif
 
     /* Output commit and library informations: */
 
@@ -473,11 +428,11 @@ namespace ryujin
             << "  -  " << RYUJIN_GIT_REVISION << std::endl;
     stream << "#" << std::endl;
     stream << "###" << std::endl;
-    stream << std::endl;
 
     /* Print compile time parameters: */
 
-    stream << "Compile time parameters:" << std::endl;
+    stream << std::endl
+           << std::endl << "Compile time parameters:" << std::endl << std::endl;
 
     stream << "DIM == " << dim << std::endl;
     stream << "NUMBER == " << typeid(Number).name() << std::endl;
@@ -567,7 +522,6 @@ namespace ryujin
     stream << "RiemannSolver<dim, Number>::greedy_relax_bounds_ == "
             <<  RiemannSolver<dim, Number>::greedy_relax_bounds_ << std::endl;
 
-
     stream << "TimeStep<dim, Number>::order_ == ";
     switch (TimeStep<dim, Number>::order_) {
     case TimeStep<dim, Number>::Order::first_order:
@@ -595,17 +549,16 @@ namespace ryujin
 
     /* clang-format on */
 
-#ifndef DEBUG_OUTPUT
     stream << std::endl;
-    stream << "Run time parameters:" << std::endl;
+    stream << std::endl << "Run time parameters:" << std::endl << std::endl;
     ParameterAcceptor::prm.print_parameters(
         stream, ParameterHandler::OutputStyle::ShortText);
-#endif
+    stream << std::endl;
   }
 
 
   template <int dim, typename Number>
-  void TimeLoop<dim, Number>::print_mpi_partition()
+  void TimeLoop<dim, Number>::print_mpi_partition(std::ostream &stream)
   {
     unsigned int dofs[4] = {offline_data.n_export_indices(),
                             offline_data.n_locally_internal(),
@@ -617,11 +570,7 @@ namespace ryujin
 
     } else {
 
-#ifdef DEBUG_OUTPUT
-      auto &stream = deallog;
-#else
-      auto &stream = *filestream;
-#endif
+      stream << std::endl << "MPI partition:" << std::endl << std::endl;
 
       stream << "Number of MPI ranks: " << n_mpi_processes << std::endl;
       stream << "Number of threads:   " << MultithreadInfo::n_threads()
@@ -654,71 +603,8 @@ namespace ryujin
   }
 
 
-  /**
-   * A small function that prints formatted section headings.
-   */
   template <int dim, typename Number>
-  void TimeLoop<dim, Number>::print_head(const std::string &header,
-                                         const std::string &secondary,
-                                         bool use_cout)
-  {
-    if (mpi_rank != 0)
-      return;
-
-#ifdef DEBUG_OUTPUT
-    auto &stream = deallog;
-#else
-    std::ostream &stream = use_cout ? std::cout : *filestream;
-#endif
-
-    const auto header_size = header.size();
-    const auto padded_header = std::string((34 - header_size) / 2, ' ') +
-                               header +
-                               std::string((35 - header_size) / 2, ' ');
-
-    const auto secondary_size = secondary.size();
-    const auto padded_secondary = std::string((34 - secondary_size) / 2, ' ') +
-                                  secondary +
-                                  std::string((35 - secondary_size) / 2, ' ');
-
-    /* clang-format off */
-    stream << std::endl;
-    stream << "    ####################################################" << std::endl;
-    stream << "    #########                                  #########" << std::endl;
-    stream << "    #########"     <<  padded_header   <<     "#########" << std::endl;
-    stream << "    #########"     << padded_secondary <<     "#########" << std::endl;
-    stream << "    #########                                  #########" << std::endl;
-    stream << "    ####################################################" << std::endl;
-    stream << std::endl;
-    /* clang-format on */
-
-    if (secondary == "")
-      std::cout << "[Init] " << header << std::endl;
-  }
-
-
-  /**
-   * Print a formatted head for a given cycle:
-   */
-  template <int dim, typename Number>
-  void TimeLoop<dim, Number>::print_cycle(unsigned int cycle,
-                                          Number t,
-                                          bool use_cout)
-  {
-    std::ostringstream primary;
-    primary << "Cycle  " << Utilities::int_to_string(cycle, 6) //
-            << "  (" << std::fixed << std::setprecision(1)     //
-            << t / t_final * 100 << "%)";
-
-    std::ostringstream secondary;
-    secondary << "at time t = " << std::setprecision(8) << std::fixed << t;
-
-    print_head(primary.str(), secondary.str(), use_cout);
-  }
-
-
-  template <int dim, typename Number>
-  void TimeLoop<dim, Number>::print_timers(bool use_cout)
+  void TimeLoop<dim, Number>::print_timers(std::ostream &stream)
   {
     std::vector<std::ostringstream> output(computing_timer.size());
 
@@ -787,13 +673,8 @@ namespace ryujin
     if (mpi_rank != 0)
       return;
 
-#ifdef DEBUG_OUTPUT
-    auto &stream = deallog;
-#else
-    std::ostream &stream = use_cout ? std::cout : *filestream;
-#endif
-
-    stream << std::endl << std::endl << "Timer statistics:" << std::endl;
+    stream << std::endl;
+    stream << std::endl << "Timer statistics:" << std::endl << std::endl;
     for (auto &it : output)
       stream << it.str() << std::endl;
   }
@@ -802,7 +683,7 @@ namespace ryujin
   template <int dim, typename Number>
   void TimeLoop<dim, Number>::print_throughput(unsigned int cycle,
                                                Number t,
-                                               bool use_cout)
+                                               std::ostream &stream)
   {
     /* Print Jean-Luc and Martin metrics: */
 
@@ -860,13 +741,66 @@ namespace ryujin
     if (mpi_rank != 0)
       return;
 
-#ifdef DEBUG_OUTPUT
-    auto &stream = deallog;
-#else
-    std::ostream &stream = use_cout ? std::cout : *filestream;
-#endif
-
     stream << head.str() << std::endl;
+  }
+
+
+  template <int dim, typename Number>
+  void TimeLoop<dim, Number>::print_info(const std::string &header)
+  {
+    if (mpi_rank != 0)
+      return;
+
+    std::cout << "[Init] " << header << std::endl;
+  }
+
+
+  template <int dim, typename Number>
+  void TimeLoop<dim, Number>::print_head(const std::string &header,
+                                         const std::string &secondary)
+  {
+    if (mpi_rank != 0)
+      return;
+
+    const auto header_size = header.size();
+    const auto padded_header = std::string((34 - header_size) / 2, ' ') +
+                               header +
+                               std::string((35 - header_size) / 2, ' ');
+
+    const auto secondary_size = secondary.size();
+    const auto padded_secondary = std::string((34 - secondary_size) / 2, ' ') +
+                                  secondary +
+                                  std::string((35 - secondary_size) / 2, ' ');
+
+    /* clang-format off */
+    std::cout << std::endl;
+    std::cout << "    ####################################################" << std::endl;
+    std::cout << "    #########                                  #########" << std::endl;
+    std::cout << "    #########"     <<  padded_header   <<     "#########" << std::endl;
+    std::cout << "    #########"     << padded_secondary <<     "#########" << std::endl;
+    std::cout << "    #########                                  #########" << std::endl;
+    std::cout << "    ####################################################" << std::endl;
+    std::cout << std::endl;
+    /* clang-format on */
+  }
+
+
+  /**
+   * Print a formatted head for a given cycle:
+   */
+
+  template <int dim, typename Number>
+  void TimeLoop<dim, Number>::print_cycle(unsigned int cycle, Number t)
+  {
+    std::ostringstream primary;
+    primary << "Cycle  " << Utilities::int_to_string(cycle, 6) //
+            << "  (" << std::fixed << std::setprecision(1)     //
+            << t / t_final * 100 << "%)";
+
+    std::ostringstream secondary;
+    secondary << "at time t = " << std::setprecision(8) << std::fixed << t;
+
+    print_head(primary.str(), secondary.str());
   }
 
 
@@ -894,7 +828,7 @@ namespace ryujin
       std::cout << "\033[2J\033[H" << std::endl;
 #endif
 
-      print_head(primary.str(), secondary.str(), /*use_cout*/ true);
+      print_head(primary.str(), secondary.str());
 
       std::cout << std::endl;
       std::cout << "Information: [" << base_name << "] with "
@@ -911,8 +845,8 @@ namespace ryujin
                   << " ranks performing output !!!" << std::flush;
     }
 
-    print_timers(/*use_cout*/ true);
-    print_throughput(cycle, t, /*use_cout*/ true);
+    print_timers(std::cout);
+    print_throughput(cycle, t, std::cout);
   }
 
 

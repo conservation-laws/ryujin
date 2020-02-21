@@ -153,7 +153,7 @@ namespace grendel
   void Discretization<dim>::prepare()
   {
 #ifdef DEBUG_OUTPUT
-    deallog << "Discretization<dim>::prepare()" << std::endl;
+    std::cout << "Discretization<dim>::prepare()" << std::endl;
 #endif
 
     if (!triangulation_)
@@ -173,7 +173,7 @@ namespace grendel
       grid_in.attach_triangulation(triangulation);
 
 #ifdef DEBUG_OUTPUT
-      deallog << "        reading in \"" << grid_file_ << "\"" << std::endl;
+      std::cout << "        reading in \"" << grid_file_ << "\"" << std::endl;
 #endif
 
       std::ifstream file(grid_file_);
@@ -248,7 +248,7 @@ namespace grendel
           bdy_ids.end()) {
 
 #ifdef DEBUG_OUTPUT
-        deallog << "        collecting periodic faces" << std::endl;
+        std::cout << "        collecting periodic faces" << std::endl;
 #endif
 
         std::vector<dealii::GridTools::PeriodicFacePair<

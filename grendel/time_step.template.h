@@ -62,7 +62,7 @@ namespace grendel
   void TimeStep<dim, Number>::prepare()
   {
 #ifdef DEBUG_OUTPUT
-    deallog << "TimeStep<dim, Number>::prepare()" << std::endl;
+    std::cout << "TimeStep<dim, Number>::prepare()" << std::endl;
 #endif
 
     /* Initialize (global) vectors: */
@@ -99,7 +99,7 @@ namespace grendel
   Number TimeStep<dim, Number>::euler_step(vector_type &U, Number t, Number tau)
   {
 #ifdef DEBUG_OUTPUT
-    deallog << "TimeStep<dim, Number>::euler_step()" << std::endl;
+    std::cout << "TimeStep<dim, Number>::euler_step()" << std::endl;
 #endif
 
     CALLGRIND_START_INSTRUMENTATION
@@ -242,7 +242,7 @@ namespace grendel
         if (GRENDEL_UNLIKELY(above_n_export_indices == false &&
                              i >= n_export_indices)) {
           above_n_export_indices = true;
-          if(++n_threads_above_n_export_indices == omp_get_num_threads()) {
+          if (++n_threads_above_n_export_indices == omp_get_num_threads()) {
             /* Synchronize over all MPI processes: */
             alpha_.update_ghost_values_start(channel++);
             second_variations_.update_ghost_values_start(channel++);
@@ -300,7 +300,7 @@ namespace grendel
       LIKWID_MARKER_STOP("time_step_1");
       GRENDEL_PARALLEL_REGION_END
 
-      if(n_threads_above_n_export_indices < 0) {
+      if (n_threads_above_n_export_indices < 0) {
         /* Synchronize over all MPI processes: */
         alpha_.update_ghost_values_start(channel++);
         second_variations_.update_ghost_values_start(channel++);
@@ -380,17 +380,18 @@ namespace grendel
                              "do that. - We crashed."));
 
 #ifdef DEBUG_OUTPUT
-      deallog << "        computed tau_max = " << tau_max << std::endl;
+      std::cout << "        computed tau_max = " << tau_max << std::endl;
 #endif
       tau = (tau == Number(0.) ? tau_max.load() : tau);
 #ifdef DEBUG_OUTPUT
-      deallog << "        perform time-step with tau = " << tau << std::endl;
+      std::cout << "        perform time-step with tau = " << tau << std::endl;
 #endif
 
       if (tau * cfl_update_ > tau_max.load() * cfl_max_) {
 #ifdef DEBUG_OUTPUT
-        deallog << "        insufficient CFL, refuse update and abort stepping"
-                << std::endl;
+        std::cout
+            << "        insufficient CFL, refuse update and abort stepping"
+            << std::endl;
 #endif
         U[0] *= std::numeric_limits<Number>::quiet_NaN();
         return tau_max;
@@ -527,7 +528,7 @@ namespace grendel
         if (GRENDEL_UNLIKELY(above_n_export_indices == false &&
                              i >= n_export_indices)) {
           above_n_export_indices = true;
-          if(++n_threads_above_n_export_indices == omp_get_num_threads()) {
+          if (++n_threads_above_n_export_indices == omp_get_num_threads()) {
             /* Synchronize over all MPI processes: */
             for (auto &it : r_)
               it.update_ghost_values_start(channel++);
@@ -613,7 +614,7 @@ namespace grendel
       LIKWID_MARKER_STOP("time_step_3");
       GRENDEL_PARALLEL_REGION_END
 
-      if(n_threads_above_n_export_indices < 0) {
+      if (n_threads_above_n_export_indices < 0) {
         /* Synchronize over all MPI processes: */
         for (auto &it : r_)
           it.update_ghost_values_start(channel++);
@@ -637,7 +638,7 @@ namespace grendel
     for (unsigned int pass = 0; pass < n_passes; ++pass) {
 
 #ifdef DEBUG_OUTPUT
-      deallog << "        limiter pass " << pass + 1 << std::endl;
+      std::cout << "        limiter pass " << pass + 1 << std::endl;
 #endif
 
       if (pass == 0) {
@@ -717,7 +718,7 @@ namespace grendel
           if (GRENDEL_UNLIKELY(above_n_export_indices == false &&
                                i >= n_export_indices)) {
             above_n_export_indices = true;
-            if(++n_threads_above_n_export_indices == omp_get_num_threads()) {
+            if (++n_threads_above_n_export_indices == omp_get_num_threads()) {
               /* Synchronize over all MPI processes: */
               lij_matrix_.update_ghost_rows_start(channel++);
             }
@@ -780,7 +781,7 @@ namespace grendel
         LIKWID_MARKER_STOP("time_step_4");
         GRENDEL_PARALLEL_REGION_END
 
-        if(n_threads_above_n_export_indices < 0) {
+        if (n_threads_above_n_export_indices < 0) {
           lij_matrix_.update_ghost_rows_start(channel++);
         }
 
@@ -826,7 +827,7 @@ namespace grendel
           if (GRENDEL_UNLIKELY(above_n_export_indices == false &&
                                i >= n_export_indices)) {
             above_n_export_indices = true;
-            if(++n_threads_above_n_export_indices == omp_get_num_threads()) {
+            if (++n_threads_above_n_export_indices == omp_get_num_threads()) {
               /* Synchronize over all MPI processes: */
               lij_matrix_.update_ghost_rows_start(channel++);
             }
@@ -852,7 +853,7 @@ namespace grendel
         LIKWID_MARKER_STOP("time_step_5");
         GRENDEL_PARALLEL_REGION_END
 
-        if(n_threads_above_n_export_indices < 0) {
+        if (n_threads_above_n_export_indices < 0) {
           lij_matrix_.update_ghost_rows_start(channel++);
         }
       }
@@ -914,17 +915,20 @@ namespace grendel
           const auto s_new =
               ProblemDescription<dim, Number>::specific_entropy(U_i_new);
 
-          AssertThrowSIMD(rho_new,
-                          [](auto val) { return val > Number(0.); },
-                          dealii::ExcMessage("Negative density."));
+          AssertThrowSIMD(
+              rho_new,
+              [](auto val) { return val > Number(0.); },
+              dealii::ExcMessage("Negative density."));
 
-          AssertThrowSIMD(e_new,
-                          [](auto val) { return val > Number(0.); },
-                          dealii::ExcMessage("Negative internal energy."));
+          AssertThrowSIMD(
+              e_new,
+              [](auto val) { return val > Number(0.); },
+              dealii::ExcMessage("Negative internal energy."));
 
-          AssertThrowSIMD(s_new,
-                          [](auto val) { return val > Number(0.); },
-                          dealii::ExcMessage("Negative specific entropy."));
+          AssertThrowSIMD(
+              s_new,
+              [](auto val) { return val > Number(0.); },
+              dealii::ExcMessage("Negative specific entropy."));
 #endif
 
           /* Fix up boundary: */
@@ -994,17 +998,20 @@ namespace grendel
           const auto e_new = PD::internal_energy(U_i_new);
           const auto s_new = PD::specific_entropy(U_i_new);
 
-          AssertThrowSIMD(rho_new,
-                          [](auto val) { return val > Number(0.); },
-                          dealii::ExcMessage("Negative density."));
+          AssertThrowSIMD(
+              rho_new,
+              [](auto val) { return val > Number(0.); },
+              dealii::ExcMessage("Negative density."));
 
-          AssertThrowSIMD(e_new,
-                          [](auto val) { return val > Number(0.); },
-                          dealii::ExcMessage("Negative internal energy."));
+          AssertThrowSIMD(
+              e_new,
+              [](auto val) { return val > Number(0.); },
+              dealii::ExcMessage("Negative internal energy."));
 
-          AssertThrowSIMD(s_new,
-                          [](auto val) { return val > Number(0.); },
-                          dealii::ExcMessage("Negative specific entropy."));
+          AssertThrowSIMD(
+              s_new,
+              [](auto val) { return val > Number(0.); },
+              dealii::ExcMessage("Negative specific entropy."));
 #endif
 
           simd_scatter(temp_euler_, U_i_new, i);
@@ -1016,7 +1023,7 @@ namespace grendel
         LIKWID_MARKER_STOP("time_step_6");
         GRENDEL_PARALLEL_REGION_END
 
-        if(n_threads_above_n_export_indices < 0) {
+        if (n_threads_above_n_export_indices < 0) {
           /* Synchronize over all MPI processes: */
           for (auto &it : temp_euler_)
             it.update_ghost_values_start(channel++);
@@ -1045,7 +1052,7 @@ namespace grendel
   Number TimeStep<dim, Number>::ssph2_step(vector_type &U, Number t)
   {
 #ifdef DEBUG_OUTPUT
-    deallog << "TimeStep<dim, Number>::ssph2_step()" << std::endl;
+    std::cout << "TimeStep<dim, Number>::ssph2_step()" << std::endl;
 #endif
 
     Number tau_0 = 0.;
@@ -1071,7 +1078,7 @@ namespace grendel
     if (tau_2 * cfl_max_ < tau_1 * cfl_update_) {
       /* Restart and force smaller time step: */
 #ifdef DEBUG_OUTPUT
-      deallog << "        insufficient CFL, restart" << std::endl;
+      std::cout << "        insufficient CFL, restart" << std::endl;
 #endif
       tau_0 = tau_2 * cfl_update_;
       U.swap(temp_ssp_);
@@ -1090,7 +1097,7 @@ namespace grendel
   Number TimeStep<dim, Number>::ssprk3_step(vector_type &U, Number t)
   {
 #ifdef DEBUG_OUTPUT
-    deallog << "TimeStep<dim, Number>::ssprk3_step()" << std::endl;
+    std::cout << "TimeStep<dim, Number>::ssprk3_step()" << std::endl;
 #endif
 
     Number tau_0 = Number(0.);
@@ -1116,7 +1123,7 @@ namespace grendel
     if (tau_2 * cfl_max_ < tau_1 * cfl_update_) {
       /* Restart and force smaller time step: */
 #ifdef DEBUG_OUTPUT
-      deallog << "        insufficient CFL, restart" << std::endl;
+      std::cout << "        insufficient CFL, restart" << std::endl;
 #endif
       tau_0 = tau_2 * cfl_update_;
       U.swap(temp_ssp_);
@@ -1136,7 +1143,7 @@ namespace grendel
     if (tau_3 * cfl_max_ < tau_1 * cfl_update_) {
       /* Restart and force smaller time step: */
 #ifdef DEBUG_OUTPUT
-      deallog << "        insufficient CFL, restart" << std::endl;
+      std::cout << "        insufficient CFL, restart" << std::endl;
 #endif
       tau_0 = tau_3 * cfl_update_;
       U.swap(temp_ssp_);
@@ -1155,7 +1162,7 @@ namespace grendel
   Number TimeStep<dim, Number>::step(vector_type &U, Number t)
   {
 #ifdef DEBUG_OUTPUT
-    deallog << "TimeStep<dim, Number>::step()" << std::endl;
+    std::cout << "TimeStep<dim, Number>::step()" << std::endl;
 #endif
 
     switch (time_step_order_) {

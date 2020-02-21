@@ -75,7 +75,7 @@ namespace grendel
   void Postprocessor<dim, Number>::prepare()
   {
 #ifdef DEBUG_OUTPUT
-    deallog << "Postprocessor<dim, Number>::prepare()" << std::endl;
+    std::cout << "Postprocessor<dim, Number>::prepare()" << std::endl;
 #endif
 
     const auto &partitioner = offline_data_->partitioner();
@@ -93,7 +93,7 @@ namespace grendel
                                            const scalar_type &alpha)
   {
 #ifdef DEBUG_OUTPUT
-    deallog << "Postprocessor<dim, Number>::compute()" << std::endl;
+    std::cout << "Postprocessor<dim, Number>::compute()" << std::endl;
 #endif
 
     constexpr auto n_array_elements = VectorizedArray<Number>::n_array_elements;

@@ -1,10 +1,11 @@
 #ifndef OFFLINE_DATA_H
 #define OFFLINE_DATA_H
 
+#include <compile_time_options.h>
+
 #include "discretization.h"
 #include "helper.h"
 #include "sparse_matrix_simd.h"
-#include <compile_time_options.h>
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/partitioner.h>

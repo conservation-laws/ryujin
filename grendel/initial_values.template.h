@@ -275,8 +275,8 @@ namespace grendel
                                           Number t)
   {
 #ifdef DEBUG_OUTPUT
-    deallog << "InitialValues<dim, Number>::interpolate(t = " << t << ")"
-            << std::endl;
+    std::cout << "InitialValues<dim, Number>::interpolate(t = " << t << ")"
+              << std::endl;
 #endif
 
     vector_type U;
@@ -288,9 +288,7 @@ namespace grendel
     constexpr auto problem_dimension =
         ProblemDescription<dim, Number>::problem_dimension;
 
-    const auto callable = [&](const auto &p) {
-      return initial_state(p, t);
-    };
+    const auto callable = [&](const auto &p) { return initial_state(p, t); };
 
     for (unsigned int i = 0; i < problem_dimension; ++i)
       VectorTools::interpolate(offline_data.dof_handler(),

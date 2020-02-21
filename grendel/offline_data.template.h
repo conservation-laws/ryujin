@@ -41,7 +41,7 @@ namespace grendel
   void OfflineData<dim, Number>::setup()
   {
 #ifdef DEBUG_OUTPUT
-    deallog << "OfflineData<dim, Number>::setup()" << std::endl;
+    std::cout << "OfflineData<dim, Number>::setup()" << std::endl;
 #endif
 
     /* Initialize dof_handler and gather all locally owned indices: */
@@ -157,7 +157,7 @@ namespace grendel
   void OfflineData<dim, Number>::assemble()
   {
 #ifdef DEBUG_OUTPUT
-    deallog << "OfflineData<dim, Number>::assemble()" << std::endl;
+    std::cout << "OfflineData<dim, Number>::assemble()" << std::endl;
 #endif
 
     dealii::SparseMatrix<Number> mass_matrix_tmp;

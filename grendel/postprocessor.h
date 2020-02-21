@@ -1,9 +1,10 @@
 #ifndef POSTPROCESSOR_H
 #define POSTPROCESSOR_H
 
+#include <compile_time_options.h>
+
 #include "offline_data.h"
 #include "problem_description.h"
-#include <compile_time_options.h>
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/grid/intergrid_map.h>

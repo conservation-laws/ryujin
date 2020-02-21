@@ -382,7 +382,7 @@ protected:
 #define GRENDEL_OMP_FOR                                                        \
   GRENDEL_PRAGMA(omp for)
 
-#define GRENDEL_LIKELY(x)   (__builtin_expect(!!(x), 1))
+#define GRENDEL_LIKELY(x) (__builtin_expect(!!(x), 1))
 #define GRENDEL_UNLIKELY(x) (__builtin_expect(!!(x), 0))
 
 #endif /* HELPER_H */

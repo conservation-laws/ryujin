@@ -18,12 +18,15 @@ namespace grendel
     {
       computing_timer_[section_].start();
 #ifdef DEBUG_OUTPUT
-      dealii::deallog << section_ << std::endl;
+      std::cout << "{scoped timer} \"" << section_ << "\" started" << std::endl;
 #endif
     }
 
     ~Scope()
     {
+#ifdef DEBUG_OUTPUT
+      std::cout << "{scoped timer} \"" << section_ << "\" stopped" << std::endl;
+#endif
       computing_timer_[section_].stop();
     }
 

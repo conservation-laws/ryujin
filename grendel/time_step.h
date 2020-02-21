@@ -1,9 +1,10 @@
 #ifndef TIME_STEP_H
 #define TIME_STEP_H
 
+#include <compile_time_options.h>
+
 #include "helper.h"
 #include "simd.h"
-#include <compile_time_options.h>
 
 #include "limiter.h"
 

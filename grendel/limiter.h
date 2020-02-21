@@ -1,11 +1,12 @@
 #ifndef LIMITER_H
 #define LIMITER_H
 
+#include <compile_time_options.h>
+
 #include "helper.h"
 #include "newton.h"
 #include "offline_data.h"
 #include "simd.h"
-#include <compile_time_options.h>
 
 #include "problem_description.h"
 

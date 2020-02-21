@@ -41,14 +41,16 @@ namespace ryujin
                 unsigned int cycle,
                 bool checkpoint = false);
 
-    void print_parameters();
-    void print_mpi_partition();
+    void print_parameters(std::ostream &stream);
+    void print_mpi_partition(std::ostream &stream);
+    void print_timers(std::ostream &stream);
+    void print_throughput(unsigned int cycle, Number t, std::ostream &stream);
+
+    void print_info(const std::string &header);
     void print_head(const std::string &header,
-                    const std::string &secondary = "",
-                    bool use_cout = false);
-    void print_cycle(unsigned int cycle, Number t, bool use_cout = false);
-    void print_timers(bool use_cout = false);
-    void print_throughput(unsigned int cycle, Number t, bool use_cout = false);
+                    const std::string &secondary = "");
+
+    void print_cycle(unsigned int cycle, Number t);
     void print_cycle_statistics(unsigned int cycle,
                                 Number t,
                                 unsigned int output_cycle);
@@ -84,7 +86,7 @@ namespace ryujin
     const unsigned int mpi_rank;
     const unsigned int n_mpi_processes;
 
-    std::unique_ptr<std::ofstream> filestream; /* log file */
+    std::ofstream logfile; /* log file */
 
     std::thread output_thread;
     unsigned int output_thread_active;

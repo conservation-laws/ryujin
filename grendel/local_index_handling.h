@@ -43,14 +43,12 @@ namespace grendel
 
   template <typename VECTOR>
   void transform_to_local_range(
-      const dealii::Utilities::MPI::Partitioner &partitioner,
-      VECTOR &vector)
+      const dealii::Utilities::MPI::Partitioner &partitioner, VECTOR &vector)
   {
     std::transform(
-        vector.begin(),
-        vector.end(),
-        vector.begin(),
-        [&](auto index) { return partitioner.global_to_local(index); });
+        vector.begin(), vector.end(), vector.begin(), [&](auto index) {
+          return partitioner.global_to_local(index);
+        });
   }
 
 
@@ -91,7 +89,7 @@ namespace grendel
           locally_owned, locally_relevant, mpi_communicator);
 
       IndexSet export_indices(n_locally_owned);
-      for(const auto &it : partitioner.import_indices()) {
+      for (const auto &it : partitioner.import_indices()) {
         export_indices.add_range(it.first, it.second);
       }
 

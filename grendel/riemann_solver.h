@@ -2,6 +2,7 @@
 #define RIEMANN_SOLVER_H
 
 #include <compile_time_options.h>
+
 #include "helper.h"
 #include "simd.h"
 

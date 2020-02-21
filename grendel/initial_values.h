@@ -2,6 +2,7 @@
 #define INITIAL_VALUES_H
 
 #include <compile_time_options.h>
+
 #include "offline_data.h"
 #include "problem_description.h"
 
