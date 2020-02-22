@@ -61,7 +61,8 @@ namespace grendel
      * returns a state vector populates with initial values for specified
      * time @p t.
      */
-    vector_type interpolate(const OfflineData<dim> &offline_data, Number t = 0);
+    vector_type interpolate(const OfflineData<dim, Number> &offline_data,
+                            Number t = 0);
 
   private:
     std::string configuration_;

@@ -271,8 +271,8 @@ namespace grendel
 
   template <int dim, typename Number>
   typename InitialValues<dim, Number>::vector_type
-  InitialValues<dim, Number>::interpolate(const OfflineData<dim> &offline_data,
-                                          Number t)
+  InitialValues<dim, Number>::interpolate(
+      const OfflineData<dim, Number> &offline_data, Number t)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "InitialValues<dim, Number>::interpolate(t = " << t << ")"
