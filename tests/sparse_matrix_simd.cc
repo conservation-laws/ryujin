@@ -1,9 +1,8 @@
-
 #include <sparse_matrix_simd.h>
 
 int main()
 {
-  dealii::SparsityPattern spars(14, 14, 3);
+  dealii::DynamicSparsityPattern spars(14, 14);
   spars.add(0, 0);
   spars.add(0, 1);
   spars.add(0, 13);
@@ -18,8 +17,14 @@ int main()
   spars.add(13, 0);
   spars.compress();
 
-  grendel::SparsityPatternSIMD<4> my_sparsity(12, spars);
-  grendel::SparseMatrixSIMD<4, double> my_sparse(my_sparsity);
+  dealii::IndexSet locally_owned(14);
+  locally_owned.add_range(0, 14);
+  dealii::IndexSet locally_relevant(14);
+  dealii::Utilities::MPI::Partitioner partitioner(
+      locally_owned, locally_relevant, MPI_COMM_SELF);
+
+  grendel::SparsityPatternSIMD<4> my_sparsity(12, spars,partitioner);
+  grendel::SparseMatrixSIMD<double, 1, 4> my_sparse(my_sparsity);
   for (unsigned i = 0; i < 12; ++i)
     for (unsigned j = 0; j < 3; ++j)
       my_sparse.write_entry(i * 3 + j, i, j);

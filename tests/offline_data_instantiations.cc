@@ -1,3 +1,4 @@
+#include <sparse_matrix_simd.template.h>
 #include <offline_data.template.h>
 
 using namespace grendel;
