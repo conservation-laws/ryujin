@@ -12,6 +12,7 @@
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/timer.h>
 
+#include <fstream>
 #include <sstream>
 
 namespace ryujin
