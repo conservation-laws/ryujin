@@ -658,7 +658,7 @@ namespace ryujin
 
     unsigned int n = dealii::Utilities::needed_digits(n_mpi_processes);
 
-    output << std::endl << "Memory:      [MiB]";
+    output << std::endl << std::endl << "Memory:      [MiB]";
     output << std::setw(8) << data.min                        //
            << " [p" << std::setw(n) << data.min_index << "] " //
            << std::setw(8) << data.avg << " "                 //
@@ -739,7 +739,6 @@ namespace ryujin
     if (mpi_rank != 0)
       return;
 
-    stream << std::endl;
     stream << std::endl << "Timer statistics:" << std::endl << std::endl;
     for (auto &it : output)
       stream << it.str() << std::endl;
@@ -771,7 +770,7 @@ namespace ryujin
 
     std::ostringstream head;
 
-    head << std::setprecision(4) << std::endl << std::endl;
+    head << std::setprecision(4) << std::endl;
     head << "Throughput:  (CPU )  "                                    //
          << std::fixed << cpu_m_dofs_per_sec << " MQ/s  ("             //
          << std::scientific << 1. / cpu_m_dofs_per_sec * 1.e-6         //
