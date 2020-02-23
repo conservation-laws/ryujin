@@ -41,8 +41,7 @@ namespace ryujin
                   offline_data,
                   initial_values,
                   "E - TimeStep")
-      , postprocessor(
-            mpi_communicator, offline_data, "F - Postprocessor")
+      , postprocessor(mpi_communicator, offline_data, "F - Postprocessor")
       , mpi_rank(dealii::Utilities::MPI::this_mpi_process(mpi_communicator))
       , n_mpi_processes(
             dealii::Utilities::MPI::n_mpi_processes(mpi_communicator))
@@ -232,6 +231,7 @@ namespace ryujin
     }
 
     /* Write final timing statistics to logfile: */
+    print_memory_statistics(logfile);
     print_timers(logfile);
     print_throughput(cycle, t, logfile);
   }
@@ -643,6 +643,33 @@ namespace ryujin
 
 
   template <int dim, typename Number>
+  void TimeLoop<dim, Number>::print_memory_statistics(std::ostream &stream)
+  {
+    std::ostringstream output;
+
+    Utilities::System::MemoryStats stats;
+    Utilities::System::get_memory_stats(stats);
+
+    Utilities::MPI::MinMaxAvg data =
+        Utilities::MPI::min_max_avg(stats.VmRSS / 1024., mpi_communicator);
+
+    if (mpi_rank != 0)
+      return;
+
+    unsigned int n = dealii::Utilities::needed_digits(n_mpi_processes);
+
+    output << std::endl << "Memory:      [MiB]";
+    output << std::setw(8) << data.min                        //
+           << " [p" << std::setw(n) << data.min_index << "] " //
+           << std::setw(8) << data.avg << " "                 //
+           << std::setw(8) << data.max                        //
+           << " [p" << std::setw(n) << data.max_index << "]"; //
+
+    stream << output.str() << std::endl;
+  }
+
+
+  template <int dim, typename Number>
   void TimeLoop<dim, Number>::print_timers(std::ostream &stream)
   {
     std::vector<std::ostringstream> output(computing_timer.size());
@@ -675,24 +702,24 @@ namespace ryujin
         computing_timer["time loop"].cpu_time(), mpi_communicator);
     const double total_cpu_time = cpu_time_statistics.sum;
 
-    const auto print_cpu_time = [&](auto &timer,
-                                    auto &stream,
-                                    bool percentage) {
-      const auto cpu_time =
-          Utilities::MPI::min_max_avg(timer.cpu_time(), mpi_communicator);
+    const auto print_cpu_time =
+        [&](auto &timer, auto &stream, bool percentage) {
+          const auto cpu_time =
+              Utilities::MPI::min_max_avg(timer.cpu_time(), mpi_communicator);
 
-      stream << std::setprecision(2) << std::fixed << std::setw(9)
-             << cpu_time.sum << "s ";
+          stream << std::setprecision(2) << std::fixed << std::setw(9)
+                 << cpu_time.sum << "s ";
 
-      if (percentage)
-        stream << "(" << std::setprecision(1) << std::setw(4)
-               << 100. * cpu_time.sum / total_cpu_time << "%)";
-      else
-        stream << "       ";
+          if (percentage)
+            stream << "(" << std::setprecision(1) << std::setw(4)
+                   << 100. * cpu_time.sum / total_cpu_time << "%)";
+          else
+            stream << "       ";
 
-      stream << " [sk: " << std::setprecision(1) << std::setw(5) << std::fixed
-             << 100. * (cpu_time.max - cpu_time.avg) / cpu_time.avg << "%]";
-    };
+          stream << " [sk: " << std::setprecision(1) << std::setw(5)
+                 << std::fixed
+                 << 100. * (cpu_time.max - cpu_time.avg) / cpu_time.avg << "%]";
+        };
 
     auto jt = output.begin();
     for (auto &it : computing_timer)
@@ -884,6 +911,7 @@ namespace ryujin
                   << " ranks performing output !!!" << std::flush;
     }
 
+    print_memory_statistics(std::cout);
     print_timers(std::cout);
     print_throughput(cycle, t, std::cout);
   }

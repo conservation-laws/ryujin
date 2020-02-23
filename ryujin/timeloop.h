@@ -4,8 +4,8 @@
 #include <compile_time_options.h>
 
 #include <discretization.h>
-#include <offline_data.h>
 #include <initial_values.h>
+#include <offline_data.h>
 #include <postprocessor.h>
 #include <time_step.h>
 
@@ -44,6 +44,7 @@ namespace ryujin
 
     void print_parameters(std::ostream &stream);
     void print_mpi_partition(std::ostream &stream);
+    void print_memory_statistics(std::ostream &stream);
     void print_timers(std::ostream &stream);
     void print_throughput(unsigned int cycle, Number t, std::ostream &stream);
 
