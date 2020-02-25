@@ -20,7 +20,7 @@ end
 subsection B - Discretization
   set geometry                            = cylinder
 
-  set immersed cylinder - height          = 2
+  set immersed cylinder - height          = 2 # and width
   set immersed cylinder - length          = 4
   set immersed cylinder - object diameter = 0.5
   set immersed cylinder - object position = 0.6
@@ -40,6 +40,10 @@ subsection E - TimeStep
 end
 
 subsection F - Postprocessor
-  set output planes  = 0,0,0 : 1,0,0 : 0.001 ; 0,0,0 : 0,1,0 : 0.001 ; 0,0,0 : 0,0,1 : 0.001
+  set output planes  = \
+    0,0,0 : 1,0,0 : 0.001 ; 1,0,0 : 1,0,0 : 0.001 ; 2,0,0 : 1,0,0 : 0.001 ; 3,0,0 : 1,0,0 : 0.001 ; \
+    0,0,0 : 0,1,0 : 0.001 ; 0,0.5,0 : 0,1,0 : 0.001 ; 0,-0.5,0 : 0,1,0 : 0.001 ; \
+    0,0,0 : 0,0,1 : 0.001 ; 0,0,0.5 : 0,0,1 : 0.001 ; 0,0,-0.5 : 0,0,1 : 0.001
+
   set schlieren beta = 10
 end
