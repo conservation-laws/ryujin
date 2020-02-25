@@ -74,7 +74,6 @@ OPTION(CALLGRIND "Compile and link against the valgrind/callgrind instrumentatio
 
 ADD_SUBDIRECTORY(grendel)
 ADD_SUBDIRECTORY(ryujin)
-ADD_SUBDIRECTORY(run)
 
 ENABLE_TESTING()
 ADD_SUBDIRECTORY(tests)

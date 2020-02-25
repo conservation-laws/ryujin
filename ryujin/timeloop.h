@@ -50,12 +50,14 @@ namespace ryujin
 
     void print_info(const std::string &header);
     void print_head(const std::string &header,
-                    const std::string &secondary = "");
+                    const std::string &secondary,
+                    std::ostream &stream);
 
-    void print_cycle(unsigned int cycle, Number t);
     void print_cycle_statistics(unsigned int cycle,
                                 Number t,
-                                unsigned int output_cycle);
+                                unsigned int output_cycle,
+                                bool write_to_logfile = false,
+                                bool final_time = false);
 
     /* Options: */
 

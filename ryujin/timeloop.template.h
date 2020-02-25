@@ -183,7 +183,7 @@ namespace ryujin
     for (; t < t_final; ++cycle) {
 
 #ifdef DEBUG_OUTPUT
-      print_cycle(cycle, t);
+      std::cout << "\n\n###   cycle = " << cycle << "   ###\n\n" << std::endl;
 #endif
 
       /* Do a time step: */
@@ -204,13 +204,11 @@ namespace ryujin
         }
         ++output_cycle;
 
-        print_cycle_statistics(cycle, t, output_cycle);
+        print_cycle_statistics(cycle, t, output_cycle, /*logfile*/ true);
       }
 
-#ifndef DEBUG_OUTPUT
       if (cycle % terminal_update_interval == 0)
         print_cycle_statistics(cycle, t, output_cycle);
-#endif
     } /* end of loop */
 
     --cycle; /* We have actually performed one cycle less. */
@@ -231,9 +229,7 @@ namespace ryujin
     }
 
     /* Write final timing statistics to logfile: */
-    print_memory_statistics(logfile);
-    print_timers(logfile);
-    print_throughput(cycle, t, logfile);
+    print_cycle_statistics(cycle, t, output_cycle, /*final_time=*/ true);
   }
 
 
@@ -768,45 +764,45 @@ namespace ryujin
         ((double)cycle) * ((double)offline_data.dof_handler().n_dofs()) / 1.e6 /
         cpu_time;
 
-    std::ostringstream head;
+    std::ostringstream output;
 
-    head << std::setprecision(4) << std::endl;
-    head << "Throughput:  (CPU )  "                                    //
-         << std::fixed << cpu_m_dofs_per_sec << " MQ/s  ("             //
-         << std::scientific << 1. / cpu_m_dofs_per_sec * 1.e-6         //
-         << " s/Qdof/cycle)" << std::endl;                             //
-    head << "                     [cpu time skew: "                    //
-         << std::setprecision(2) << std::scientific                    //
-         << cpu_time_statistics.max - cpu_time_statistics.avg << "s (" //
-         << std::setprecision(1) << std::setw(4) << std::setfill(' ')
-         << std::fixed
-         << 100. * (cpu_time_statistics.max - cpu_time_statistics.avg) /
-                cpu_time_statistics.avg
-         << "%)]" << std::endl
-         << std::endl;
+    output << std::setprecision(4) << std::endl;
+    output << "Throughput:  (CPU )  "                                    //
+           << std::fixed << cpu_m_dofs_per_sec << " MQ/s  ("             //
+           << std::scientific << 1. / cpu_m_dofs_per_sec * 1.e-6         //
+           << " s/Qdof/cycle)" << std::endl;                             //
+    output << "                     [cpu time skew: "                    //
+           << std::setprecision(2) << std::scientific                    //
+           << cpu_time_statistics.max - cpu_time_statistics.avg << "s (" //
+           << std::setprecision(1) << std::setw(4) << std::setfill(' ')
+           << std::fixed
+           << 100. * (cpu_time_statistics.max - cpu_time_statistics.avg) /
+                  cpu_time_statistics.avg
+           << "%)]" << std::endl
+           << std::endl;
 
-    head << "             (WALL)  "                                      //
-         << std::fixed << wall_m_dofs_per_sec << " MQ/s  ("              //
-         << std::scientific << 1. / wall_m_dofs_per_sec * 1.e-6          //
-         << " s/Qdof/cycle)  ("                                          //
-         << std::fixed << ((double)cycle) / wall_time                    //
-         << " cycles/s)  (avg dt = "                                     //
-         << std::scientific << t / ((double)cycle)                       //
-         << ")" << std::endl;                                            //
-    head << "                     [ "                                    //
-         << std::setprecision(0) << std::fixed << time_step.n_restarts() //
-         << " rsts   (" << std::setprecision(2) << std::scientific
-         << time_step.n_restarts() / ((double)cycle) << " rsts/cycle) ]"
-         << std::endl
-         << std::endl;
+    output << "             (WALL)  "                                      //
+           << std::fixed << wall_m_dofs_per_sec << " MQ/s  ("              //
+           << std::scientific << 1. / wall_m_dofs_per_sec * 1.e-6          //
+           << " s/Qdof/cycle)  ("                                          //
+           << std::fixed << ((double)cycle) / wall_time                    //
+           << " cycles/s)  (avg dt = "                                     //
+           << std::scientific << t / ((double)cycle)                       //
+           << ")" << std::endl;                                            //
+    output << "                     [ "                                    //
+           << std::setprecision(0) << std::fixed << time_step.n_restarts() //
+           << " rsts   (" << std::setprecision(2) << std::scientific
+           << time_step.n_restarts() / ((double)cycle) << " rsts/cycle) ]"
+           << std::endl
+           << std::endl;
 
-    head << "ETA:  " << std::fixed << std::setprecision(4)
-         << ((t_final - t) / t * wall_time / 3600.) << " h";
+    output << "ETA:  " << std::fixed << std::setprecision(4)
+           << ((t_final - t) / t * wall_time / 3600.) << " h";
 
     if (mpi_rank != 0)
       return;
 
-    stream << head.str() << std::endl;
+    stream << output.str() << std::endl;
   }
 
 
@@ -822,7 +818,8 @@ namespace ryujin
 
   template <int dim, typename Number>
   void TimeLoop<dim, Number>::print_head(const std::string &header,
-                                         const std::string &secondary)
+                                         const std::string &secondary,
+                                         std::ostream &stream)
   {
     if (mpi_rank != 0)
       return;
@@ -838,81 +835,69 @@ namespace ryujin
                                   std::string((35 - secondary_size) / 2, ' ');
 
     /* clang-format off */
-    std::cout << std::endl;
-    std::cout << "    ####################################################" << std::endl;
-    std::cout << "    #########                                  #########" << std::endl;
-    std::cout << "    #########"     <<  padded_header   <<     "#########" << std::endl;
-    std::cout << "    #########"     << padded_secondary <<     "#########" << std::endl;
-    std::cout << "    #########                                  #########" << std::endl;
-    std::cout << "    ####################################################" << std::endl;
-    std::cout << std::endl;
+    stream << "\n";
+    stream << "    ####################################################\n";
+    stream << "    #########                                  #########\n";
+    stream << "    #########"     <<  padded_header   <<     "#########\n";
+    stream << "    #########"     << padded_secondary <<     "#########\n";
+    stream << "    #########                                  #########\n";
+    stream << "    ####################################################\n";
+    stream << std::endl;
     /* clang-format on */
   }
 
 
-  /**
-   * Print a formatted head for a given cycle:
-   */
-
   template <int dim, typename Number>
-  void TimeLoop<dim, Number>::print_cycle(unsigned int cycle, Number t)
+  void TimeLoop<dim, Number>::print_cycle_statistics(unsigned int cycle,
+                                                     Number t,
+                                                     unsigned int output_cycle,
+                                                     bool write_to_logfile,
+                                                     bool final_time)
   {
+    std::ostringstream output;
+
+    unsigned int n_active_writebacks =
+        Utilities::MPI::sum(output_thread_active, mpi_communicator);
+
     std::ostringstream primary;
-    primary << "Cycle  " << Utilities::int_to_string(cycle, 6) //
-            << "  (" << std::fixed << std::setprecision(1)     //
-            << t / t_final * 100 << "%)";
+    if (final_time) {
+      primary << "FINAL  (cycle " << Utilities::int_to_string(cycle, 6) << ")";
+    } else {
+      primary << "Cycle  " << Utilities::int_to_string(cycle, 6) //
+              << "  (" << std::fixed << std::setprecision(1)     //
+              << t / t_final * 100 << "%)";
+    }
 
     std::ostringstream secondary;
     secondary << "at time t = " << std::setprecision(8) << std::fixed << t;
 
-    print_head(primary.str(), secondary.str());
-  }
+    print_head(primary.str(), secondary.str(), output);
 
+    output << "\n"
+           << "Information: [" << base_name << "] with "
+           << offline_data.dof_handler().n_dofs() << " Qdofs on "
+           << n_mpi_processes << " ranks / " << MultithreadInfo::n_threads()
+           << " threads\n"
+           << "             Last output cycle " << output_cycle - 1
+           << " at t = " << output_granularity * (output_cycle - 1)
+           << std::endl;
 
-  /**
-   * A small function that prints formatted section headings.
-   */
-  template <int dim, typename Number>
-  void TimeLoop<dim, Number>::print_cycle_statistics(unsigned int cycle,
-                                                     Number t,
-                                                     unsigned int output_cycle)
-  {
-    unsigned int n_active_writebacks =
-        Utilities::MPI::sum(output_thread_active, mpi_communicator);
+    if (n_active_writebacks > 0)
+      output << "             !!! " << n_active_writebacks
+             << " ranks performing output !!!" << std::flush;
+
+    print_memory_statistics(output);
+    print_timers(output);
+    print_throughput(cycle, t, output);
 
     if (mpi_rank == 0) {
-      std::ostringstream primary;
-      primary << "Cycle  " << Utilities::int_to_string(cycle, 6) //
-              << "  (" << std::fixed << std::setprecision(1)     //
-              << t / t_final * 100 << "%)";
-
-      std::ostringstream secondary;
-      secondary << "at time t = " << std::setprecision(8) << std::fixed << t;
-
 #ifndef DEBUG_OUTPUT
-      std::cout << "\033[2J\033[H" << std::endl;
+      std::cout << "\033[2J\033[H";
 #endif
-
-      print_head(primary.str(), secondary.str());
-
-      std::cout << std::endl;
-      std::cout << "Information: [" << base_name << "] with "
-                << offline_data.dof_handler().n_dofs() << " Qdofs on "
-                << n_mpi_processes << " ranks / "
-                << MultithreadInfo::n_threads() << " threads" << std::endl;
-
-      std::cout << "             Last output cycle " << output_cycle - 1
-                << " at t = " << output_granularity * (output_cycle - 1)
-                << std::endl;
-
-      if (n_active_writebacks > 0)
-        std::cout << "             !!! " << n_active_writebacks
-                  << " ranks performing output !!!" << std::flush;
+      std::cout << output.str() << std::flush;
+      if (write_to_logfile)
+        logfile << "\n" << output.str() << std::flush;
     }
-
-    print_memory_statistics(std::cout);
-    print_timers(std::cout);
-    print_throughput(cycle, t, std::cout);
   }
 
 

@@ -1,0 +1,45 @@
+subsection A - TimeLoop
+  set basename                     = cylinder-3d
+
+  set enable checkpointing         = true
+  set enable output cutplanes      = true
+  set enable output full           = true
+
+  set final time                   = 5
+  set output granularity           = 0.01
+
+  set output checkpoint multiplier = 1
+  set output cutplanes multiplier  = 1
+  set output full multiplier       = 100
+
+  set resume                       = false
+
+  set terminal update interval     = 10
+end
+
+subsection B - Discretization
+  set geometry                            = cylinder
+
+  set immersed cylinder - height          = 2
+  set immersed cylinder - length          = 4
+  set immersed cylinder - object diameter = 0.5
+  set immersed cylinder - object position = 0.6
+
+  set initial refinement = 8
+end
+
+subsection D - InitialValues
+  set configuration               = uniform
+  set initial - 1d state          = 1.4, 3, 1 # rho, u, p
+  set initial - direction         = 1, 0, 0
+end
+
+subsection E - TimeStep
+  set cfl max    = 0.95
+  set cfl update = 0.90
+end
+
+subsection F - Postprocessor
+  set output planes  = 0,0,0 : 1,0,0 : 0.001 ; 0,0,0 : 0,1,0 : 0.001 ; 0,0,0 : 0,0,1 : 0.001
+  set schlieren beta = 10
+end
