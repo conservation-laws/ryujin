@@ -49,8 +49,6 @@ namespace grendel
     dof_handler_.initialize(discretization_->triangulation(),
                             discretization_->finite_element());
 
-    dof_handler_.distribute_mg_dofs(); /* used for coarsened output */
-
     // FIXME: Cuthill McKee isn't particularly useful...
     DoFRenumbering::Cuthill_McKee(dof_handler_);
 
