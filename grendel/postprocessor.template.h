@@ -48,6 +48,14 @@ namespace grendel
       , mpi_communicator_(mpi_communicator)
       , offline_data_(&offline_data)
   {
+    use_mpi_io_ = false;
+    add_parameter("use mpi io",
+                  use_mpi_io_,
+                  "If enabled write out one vtu file via MPI IO using "
+                  "write_vtu_in_parallel() instead of independent output files "
+                  "via write_vtu_with_pvtu_record()");
+
+
     schlieren_beta_ = 10.;
     add_parameter(
         "schlieren beta",
@@ -279,8 +287,13 @@ namespace grendel
 
     if (output_full) {
       data_out.build_patches(mapping, patch_order);
-      data_out.write_vtu_with_pvtu_record(
-          "", name, cycle, mpi_communicator_, 6);
+      if (use_mpi_io_) {
+        data_out.write_vtu_in_parallel(
+            name + Utilities::to_string(cycle, 6) + ".vtu", mpi_communicator_);
+      } else {
+        data_out.write_vtu_with_pvtu_record(
+            "", name, cycle, mpi_communicator_, 6);
+      }
     }
 
     if (output_cutplanes && output_planes_.size() != 0) {
@@ -318,8 +331,14 @@ namespace grendel
       });
 
       data_out.build_patches(mapping, patch_order);
-      data_out.write_vtu_with_pvtu_record(
-          "", name + "-cut_planes", cycle, mpi_communicator_, 6);
+      if (use_mpi_io_) {
+        data_out.write_vtu_in_parallel(
+            name + "-cut_planes_" + Utilities::to_string(cycle, 6) + ".vtu",
+            mpi_communicator_);
+      } else {
+        data_out.write_vtu_with_pvtu_record(
+            "", name + "-cut_planes", cycle, mpi_communicator_, 6);
+      }
     }
   }
 
