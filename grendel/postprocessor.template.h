@@ -305,7 +305,7 @@ namespace grendel
           for (unsigned int v = 0; v < GeometryInfo<dim>::vertices_per_cell;
                ++v) {
             const auto vertex = cell->vertex(v);
-            const auto distance = (vertex - origin) * normal;
+            const auto distance = (vertex - Point<dim>(origin)) * normal;
             if (distance > -tolerance)
               above++;
             if (distance < tolerance)
