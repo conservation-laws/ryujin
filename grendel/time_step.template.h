@@ -468,6 +468,7 @@ namespace grendel
                                          entropy_viscosity_commutator
                                  ? d_ij * (alpha_i + alpha_j) * Number(.5)
                                  : d_ij * std::max(alpha_i, alpha_j);
+          pij_matrix_.write_tensor((d_ijH - d_ij) * (U_j - U_i), i, col_idx);
 
           dealii::Tensor<1, problem_dimension> U_ij_bar;
 
@@ -581,6 +582,9 @@ namespace grendel
                                  ? d_ij * (alpha_i + alpha_j) * Number(.5)
                                  : d_ij * std::max(alpha_i, alpha_j);
 
+          pij_matrix_.write_vectorized_tensor(
+              (d_ijH - d_ij) * (U_j - U_i), i, col_idx, true);
+
           dealii::Tensor<1, problem_dimension, VectorizedArray<Number>>
               U_ij_bar;
 
@@ -669,9 +673,7 @@ namespace grendel
           const auto U_i_new = gather(temp_euler_, i);
 
           const Number m_i_inv = lumped_mass_matrix_inverse.local_element(i);
-          const auto alpha_i = alpha_.local_element(i);
           const Number lambda_inv = Number(row_length - 1);
-          const auto U_i = gather(U, i);
 
           const auto r_i = gather(r_, i);
 
@@ -686,20 +688,12 @@ namespace grendel
             const auto b_ji =
                 (col_idx == 0 ? Number(1.) : Number(0.)) - m_ij * m_i_inv;
 
-            const auto d_ij = dij_matrix_.get_entry(i, col_idx);
-            const auto alpha_j = alpha_.local_element(j);
-            const auto d_ijH = Indicator<dim, Number>::indicator_ ==
-                                       Indicator<dim, Number>::Indicators::
-                                           entropy_viscosity_commutator
-                                   ? d_ij * (alpha_i + alpha_j) * Number(.5)
-                                   : d_ij * std::max(alpha_i, alpha_j);
 
-            const auto U_j = gather(U, j);
             const auto r_j = gather(r_, j);
 
             const auto p_ij =
                 tau * m_i_inv * lambda_inv *
-                ((d_ijH - d_ij) * (U_j - U_i) + b_ij * r_j - b_ji * r_i);
+                (pij_matrix_.get_tensor(i, col_idx) + b_ij * r_j - b_ji * r_i);
             pij_matrix_.write_tensor(p_ij, i, col_idx);
 
             const auto l_ij =
@@ -727,10 +721,6 @@ namespace grendel
           const auto bounds = simd_gather_array(bounds_, i);
           const auto U_i_new = simd_gather(temp_euler_, i);
 
-          const auto U_i = simd_gather(U, i);
-
-          const auto alpha_i = simd_gather(alpha_, i);
-
           const auto m_i_inv = simd_gather(lumped_mass_matrix_inverse, i);
 
           const unsigned int row_length = sparsity_simd.row_length(i);
@@ -753,21 +743,12 @@ namespace grendel
                                             : VectorizedArray<Number>(0.)) -
                               m_ij * m_i_inv;
 
-            const auto d_ij = dij_matrix_.get_vectorized_entry(i, col_idx);
-            const auto alpha_j = simd_gather(alpha_, js);
-            const auto d_ijH = Indicator<dim, Number>::indicator_ ==
-                                       Indicator<dim, Number>::Indicators::
-                                           entropy_viscosity_commutator
-                                   ? d_ij * (alpha_i + alpha_j) * Number(.5)
-                                   : d_ij * std::max(alpha_i, alpha_j);
-
-            const auto U_j = simd_gather(U, js);
             const auto r_j = simd_gather(r_, js);
 
-            const auto p_ij =
-                tau * m_i_inv * lambda_inv *
-                ((d_ijH - d_ij) * (U_j - U_i) + b_ij * r_j - b_ji * r_i);
-            pij_matrix_.write_vectorized_tensor(p_ij, i, col_idx, true);
+            const auto p_ij = tau * m_i_inv * lambda_inv *
+                              (pij_matrix_.get_vectorized_tensor(i, col_idx) +
+                               b_ij * r_j - b_ji * r_i);
+            pij_matrix_.write_vectorized_tensor(p_ij, i, col_idx);
 
             const auto l_ij = Limiter<dim, VectorizedArray<Number>>::limit(
                 bounds, U_i_new, p_ij);
@@ -915,20 +896,17 @@ namespace grendel
           const auto s_new =
               ProblemDescription<dim, Number>::specific_entropy(U_i_new);
 
-          AssertThrowSIMD(
-              rho_new,
-              [](auto val) { return val > Number(0.); },
-              dealii::ExcMessage("Negative density."));
+          AssertThrowSIMD(rho_new,
+                          [](auto val) { return val > Number(0.); },
+                          dealii::ExcMessage("Negative density."));
 
-          AssertThrowSIMD(
-              e_new,
-              [](auto val) { return val > Number(0.); },
-              dealii::ExcMessage("Negative internal energy."));
+          AssertThrowSIMD(e_new,
+                          [](auto val) { return val > Number(0.); },
+                          dealii::ExcMessage("Negative internal energy."));
 
-          AssertThrowSIMD(
-              s_new,
-              [](auto val) { return val > Number(0.); },
-              dealii::ExcMessage("Negative specific entropy."));
+          AssertThrowSIMD(s_new,
+                          [](auto val) { return val > Number(0.); },
+                          dealii::ExcMessage("Negative specific entropy."));
 #endif
 
           /* Fix up boundary: */
@@ -998,20 +976,17 @@ namespace grendel
           const auto e_new = PD::internal_energy(U_i_new);
           const auto s_new = PD::specific_entropy(U_i_new);
 
-          AssertThrowSIMD(
-              rho_new,
-              [](auto val) { return val > Number(0.); },
-              dealii::ExcMessage("Negative density."));
+          AssertThrowSIMD(rho_new,
+                          [](auto val) { return val > Number(0.); },
+                          dealii::ExcMessage("Negative density."));
 
-          AssertThrowSIMD(
-              e_new,
-              [](auto val) { return val > Number(0.); },
-              dealii::ExcMessage("Negative internal energy."));
+          AssertThrowSIMD(e_new,
+                          [](auto val) { return val > Number(0.); },
+                          dealii::ExcMessage("Negative internal energy."));
 
-          AssertThrowSIMD(
-              s_new,
-              [](auto val) { return val > Number(0.); },
-              dealii::ExcMessage("Negative specific entropy."));
+          AssertThrowSIMD(s_new,
+                          [](auto val) { return val > Number(0.); },
+                          dealii::ExcMessage("Negative specific entropy."));
 #endif
 
           simd_scatter(temp_euler_, U_i_new, i);
