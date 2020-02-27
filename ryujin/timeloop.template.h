@@ -437,7 +437,8 @@ namespace ryujin
 #endif
 
     if (!postprocessor.use_mpi_io()) {
-      std::cout << "        Spawning worker thread" << std::endl;
+      if (mpi_rank == 0)
+        std::cout << "        Spawning worker thread" << std::endl;
       output_thread = std::move(std::thread(output_worker));
     } else {
       /* We unfortunately cannot run in a background thread if MPI IO is
