@@ -306,7 +306,7 @@ namespace grendel
         if (!cell->is_active() || cell->is_artificial())
           return false;
 
-        if (output_planes_.size() == 0)
+        if (cell->at_boundary())
           return true;
 
         for (const auto &plane : output_planes_) {
