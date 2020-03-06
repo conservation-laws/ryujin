@@ -1,6 +1,8 @@
 #ifndef DISCRETIZATION_TEMPLATE_H
 #define DISCRETIZATION_TEMPLATE_H
 
+#include <compile_time_options.h>
+
 #include "discretization.h"
 #include "geometry_helper.h"
 
@@ -131,9 +133,14 @@ namespace grendel
     /* Options: */
 
     refinement_ = 5;
-    add_parameter("initial refinement",
+    add_parameter("mesh refinement",
                   refinement_,
-                  "Initial refinement of the geometry");
+                  "number of refinement of global refinement steps");
+
+    repartitioning_ = true;
+    add_parameter("mesh repartitioning",
+                  repartitioning_,
+                  "try to equalize workload by repartitioning the mesh");
 
     order_mapping_ = 1;
     add_parameter("order mapping", order_mapping_, "Order of the mapping");
@@ -241,7 +248,7 @@ namespace grendel
     /* Handle periodic faces: */
 
     const auto bdy_ids = triangulation.get_boundary_ids();
-    if constexpr (dim != 1)
+    if constexpr (dim != 1) {
       if (std::find(bdy_ids.begin(), bdy_ids.end(), Boundary::periodic) !=
           bdy_ids.end()) {
 
@@ -261,7 +268,29 @@ namespace grendel
 
         triangulation.add_periodicity(periodic_faces);
       }
+    }
 
+    /*
+     * Attach cell weights and repartition:
+     *
+     * Due to the fact that half of the degrees of freedom of boundary
+     * cells cannot be SIMD parallelized we try to give these cells a
+     * higher weight to equalize the workload a bit more.
+     */
+
+    if (repartitioning_) {
+#ifdef USE_SIMD
+      triangulation.signals.cell_weight.connect(
+          [](const auto &cell, const auto /*status*/) -> unsigned int {
+            if (cell->at_boundary())
+              return 500u * (dealii::VectorizedArray<NUMBER>::n_array_elements);
+            else
+              return 0u;
+          });
+
+      triangulation.repartition();
+#endif
+    }
 
     if (geometry_ == "step") {
       triangulation.refine_global(refinement_ - 4);

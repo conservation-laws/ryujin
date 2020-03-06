@@ -108,6 +108,7 @@ namespace grendel
     double wall_position_;
 
     unsigned int refinement_;
+    bool repartitioning_;
 
     unsigned int order_finite_element_;
     unsigned int order_mapping_;
