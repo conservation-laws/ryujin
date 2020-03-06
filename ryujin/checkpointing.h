@@ -14,7 +14,7 @@
 namespace ryujin
 {
   /*
-   * Checkpoint restore helper functions:
+   * Checkpoint-restore helper functions:
    *
    * TODO: Some day, we should refactor this into a class and do something
    * smarter...

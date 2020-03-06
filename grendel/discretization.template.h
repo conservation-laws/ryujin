@@ -269,11 +269,11 @@ namespace grendel
       triangulation.refine_global(refinement_);
     }
 
-    mapping_.reset(new MappingQ<dim>(order_mapping_));
+    mapping_ = std::make_unique<MappingQ<dim>>(order_mapping_);
 
-    finite_element_.reset(new FE_Q<dim>(order_finite_element_));
+    finite_element_ = std::make_unique<FE_Q<dim>>(order_finite_element_);
 
-    quadrature_.reset(new QGauss<dim>(order_quadrature_));
+    quadrature_ = std::make_unique<QGauss<dim>>(order_quadrature_);
   }
 
 } /* namespace grendel */

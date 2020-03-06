@@ -82,8 +82,8 @@ namespace grendel
     n_locally_owned_ = locally_owned.n_elements();
     n_locally_relevant_ = locally_relevant.n_elements();
 
-    partitioner_.reset(new dealii::Utilities::MPI::Partitioner(
-        locally_owned, locally_relevant, mpi_communicator_));
+    partitioner_ = std::make_shared<dealii::Utilities::MPI::Partitioner>(
+        locally_owned, locally_relevant, mpi_communicator_);
 
     /*
      * Determine the subset [0, n_export_indices) of [0,
