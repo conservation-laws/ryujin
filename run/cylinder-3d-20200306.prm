@@ -25,7 +25,8 @@ subsection B - Discretization
   set immersed cylinder - object diameter = 0.5
   set immersed cylinder - object position = 0.6
 
-  set initial refinement = 8
+  set mesh refinement    = 8
+  set mesh repartitionig = true
 end
 
 subsection D - InitialValues

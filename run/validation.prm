@@ -10,7 +10,7 @@ end
 subsection B - Discretization
   set geometry           = tube analytical
 
-  set initial refinement = 7
+  set mesh refinement = 7
 
   set tube - diameter    = 20
   set tube - length      = 20
