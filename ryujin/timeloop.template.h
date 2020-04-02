@@ -487,7 +487,7 @@ namespace ryujin
     stream << "NUMBER == " << typeid(Number).name() << std::endl;
 
 #ifdef USE_SIMD
-    stream << "SIMD width == " << VectorizedArray<Number>::n_array_elements << std::endl;
+    stream << "SIMD width == " << VectorizedArray<Number>::size() << std::endl;
 #else
     stream << "SIMD width == " << "(( disabled ))" << std::endl;
 #endif

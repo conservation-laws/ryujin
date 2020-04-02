@@ -60,10 +60,10 @@ namespace grendel
 #ifdef USE_SIMD
     n_locally_internal_ = DoFRenumbering::internal_range(dof_handler_);
 
-    /* Round down to the nearest multiple of n_array_elements: */
+    /* Round down to the nearest multiple of the VectorizedArray width: */
     n_locally_internal_ =
         n_locally_internal_ -
-        n_locally_internal_ % VectorizedArray<Number>::n_array_elements;
+        n_locally_internal_ % VectorizedArray<Number>::size();
 #else
     /*
      * If USE_SIMD is not set, we disable all SIMD instructions by

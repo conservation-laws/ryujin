@@ -116,7 +116,7 @@ namespace grendel
     std::cout << "Postprocessor<dim, Number>::compute()" << std::endl;
 #endif
 
-    constexpr auto n_array_elements = VectorizedArray<Number>::n_array_elements;
+    constexpr auto simd_length = VectorizedArray<Number>::size();
 
     const auto &affine_constraints = offline_data_->affine_constraints();
     const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
@@ -163,7 +163,7 @@ namespace grendel
         /* Skip diagonal. */
         const unsigned int *js = sparsity_simd.columns(i);
         for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
-          const auto j = *(i < n_internal ? js + col_idx * n_array_elements
+          const auto j = *(i < n_internal ? js + col_idx * simd_length
                                           : js + col_idx);
 
           const auto U_j = gather(U, j);
@@ -274,10 +274,6 @@ namespace grendel
     /*
      * Step 5: Build patches:
      */
-
-    constexpr auto problem_dimension =
-        ProblemDescription<dim, Number>::problem_dimension;
-    constexpr auto n_quantities = Postprocessor<dim, Number>::n_quantities;
 
     const auto &discretization = offline_data_->discretization();
     const auto &mapping = discretization.mapping();

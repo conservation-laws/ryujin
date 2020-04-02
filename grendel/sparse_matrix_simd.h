@@ -11,7 +11,7 @@ namespace grendel
 {
   template <typename Number,
             int n_components = 1,
-            int simd_length = dealii::VectorizedArray<Number>::n_array_elements>
+            int simd_length = dealii::VectorizedArray<Number>::size()>
   class SparseMatrixSIMD;
 
   /**

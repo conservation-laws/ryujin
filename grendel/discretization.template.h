@@ -283,7 +283,7 @@ namespace grendel
       triangulation.signals.cell_weight.connect(
           [](const auto &cell, const auto /*status*/) -> unsigned int {
             if (cell->at_boundary())
-              return 500u * (dealii::VectorizedArray<NUMBER>::n_array_elements);
+              return 500u * (dealii::VectorizedArray<NUMBER>::size());
             else
               return 0u;
           });

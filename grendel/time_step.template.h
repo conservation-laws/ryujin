@@ -106,7 +106,7 @@ namespace grendel
 
     /* Index ranges for the iteration over the sparsity pattern : */
 
-    constexpr auto n_array_elements = VectorizedArray<Number>::n_array_elements;
+    constexpr auto simd_length = VectorizedArray<Number>::size();
 
     const unsigned int n_export_indices = offline_data_->n_export_indices();
     const unsigned int n_internal = offline_data_->n_locally_internal();
@@ -237,7 +237,7 @@ namespace grendel
       /* Parallel SIMD loop: */
 
       GRENDEL_OMP_FOR
-      for (unsigned int i = 0; i < n_internal; i += n_array_elements) {
+      for (unsigned int i = 0; i < n_internal; i += simd_length) {
 
         if (GRENDEL_UNLIKELY(above_n_export_indices == false &&
                              i >= n_export_indices)) {
@@ -258,12 +258,12 @@ namespace grendel
         const unsigned int row_length = sparsity_simd.row_length(i);
 
         /* Skip diagonal. */
-        const unsigned int *js = sparsity_simd.columns(i) + n_array_elements;
+        const unsigned int *js = sparsity_simd.columns(i) + simd_length;
         for (unsigned int col_idx = 1; col_idx < row_length;
-             ++col_idx, js += n_array_elements) {
+             ++col_idx, js += simd_length) {
 
           bool all_below_diagonal = true;
-          for (unsigned int k = 0; k < n_array_elements; ++k)
+          for (unsigned int k = 0; k < simd_length; ++k)
             if (js[k] >= i + k) {
               all_below_diagonal = false;
               break;
@@ -337,8 +337,8 @@ namespace grendel
 
         /* skip diagonal: */
         for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
-          const auto j = *(i < n_internal ? js + col_idx * n_array_elements
-                                          : js + col_idx);
+          const auto j =
+              *(i < n_internal ? js + col_idx * simd_length : js + col_idx);
 
           // fill lower triangular part of dij_matrix missing from step 1
           if (j < i) {
@@ -524,7 +524,7 @@ namespace grendel
       /* Parallel SIMD loop: */
 
       GRENDEL_OMP_FOR
-      for (unsigned int i = 0; i < n_internal; i += n_array_elements) {
+      for (unsigned int i = 0; i < n_internal; i += simd_length) {
 
         if (GRENDEL_UNLIKELY(above_n_export_indices == false &&
                              i >= n_export_indices)) {
@@ -561,7 +561,7 @@ namespace grendel
         const unsigned int row_length = sparsity_simd.row_length(i);
 
         for (unsigned int col_idx = 0; col_idx < row_length;
-             ++col_idx, js += n_array_elements) {
+             ++col_idx, js += simd_length) {
 
           const auto U_j = simd_gather(U, js);
 
@@ -707,7 +707,7 @@ namespace grendel
         bool above_n_export_indices = false;
 
         GRENDEL_OMP_FOR
-        for (unsigned int i = 0; i < n_internal; i += n_array_elements) {
+        for (unsigned int i = 0; i < n_internal; i += simd_length) {
 
           if (GRENDEL_UNLIKELY(above_n_export_indices == false &&
                                i >= n_export_indices)) {
@@ -731,7 +731,7 @@ namespace grendel
           const unsigned int *js = sparsity_simd.columns(i);
 
           for (unsigned int col_idx = 0; col_idx < row_length;
-               ++col_idx, js += n_array_elements) {
+               ++col_idx, js += simd_length) {
 
             const auto m_j_inv = simd_gather(lumped_mass_matrix_inverse, js);
 
@@ -803,7 +803,7 @@ namespace grendel
         bool above_n_export_indices = false;
 
         GRENDEL_OMP_FOR
-        for (unsigned int i = 0; i < n_internal; i += n_array_elements) {
+        for (unsigned int i = 0; i < n_internal; i += simd_length) {
 
           if (GRENDEL_UNLIKELY(above_n_export_indices == false &&
                                i >= n_export_indices)) {
@@ -896,17 +896,20 @@ namespace grendel
           const auto s_new =
               ProblemDescription<dim, Number>::specific_entropy(U_i_new);
 
-          AssertThrowSIMD(rho_new,
-                          [](auto val) { return val > Number(0.); },
-                          dealii::ExcMessage("Negative density."));
+          AssertThrowSIMD(
+              rho_new,
+              [](auto val) { return val > Number(0.); },
+              dealii::ExcMessage("Negative density."));
 
-          AssertThrowSIMD(e_new,
-                          [](auto val) { return val > Number(0.); },
-                          dealii::ExcMessage("Negative internal energy."));
+          AssertThrowSIMD(
+              e_new,
+              [](auto val) { return val > Number(0.); },
+              dealii::ExcMessage("Negative internal energy."));
 
-          AssertThrowSIMD(s_new,
-                          [](auto val) { return val > Number(0.); },
-                          dealii::ExcMessage("Negative specific entropy."));
+          AssertThrowSIMD(
+              s_new,
+              [](auto val) { return val > Number(0.); },
+              dealii::ExcMessage("Negative specific entropy."));
 #endif
 
           /* Fix up boundary: */
@@ -937,7 +940,7 @@ namespace grendel
         bool above_n_export_indices = (pass + 1 != n_passes);
 
         GRENDEL_OMP_FOR
-        for (unsigned int i = 0; i < n_internal; i += n_array_elements) {
+        for (unsigned int i = 0; i < n_internal; i += simd_length) {
 
           if (GRENDEL_UNLIKELY(above_n_export_indices == false &&
                                i >= n_export_indices)) {
@@ -976,17 +979,20 @@ namespace grendel
           const auto e_new = PD::internal_energy(U_i_new);
           const auto s_new = PD::specific_entropy(U_i_new);
 
-          AssertThrowSIMD(rho_new,
-                          [](auto val) { return val > Number(0.); },
-                          dealii::ExcMessage("Negative density."));
+          AssertThrowSIMD(
+              rho_new,
+              [](auto val) { return val > Number(0.); },
+              dealii::ExcMessage("Negative density."));
 
-          AssertThrowSIMD(e_new,
-                          [](auto val) { return val > Number(0.); },
-                          dealii::ExcMessage("Negative internal energy."));
+          AssertThrowSIMD(
+              e_new,
+              [](auto val) { return val > Number(0.); },
+              dealii::ExcMessage("Negative internal energy."));
 
-          AssertThrowSIMD(s_new,
-                          [](auto val) { return val > Number(0.); },
-                          dealii::ExcMessage("Negative specific entropy."));
+          AssertThrowSIMD(
+              s_new,
+              [](auto val) { return val > Number(0.); },
+              dealii::ExcMessage("Negative specific entropy."));
 #endif
 
           simd_scatter(temp_euler_, U_i_new, i);

@@ -29,17 +29,16 @@ namespace grendel
    * Given a callable object f(k), this function creates a std::array with
    * elements initialized as follows:
    *
-   *   { f(0) , f(1) , ... , f(n_array_elements - 1) }
+   *   { f(0) , f(1) , ... , f(length - 1) }
    *
    * We use this function to create an array of sparsity iterators that
    * cannot be default initialized.
    */
-  template <unsigned int n_array_elements, typename Functor>
+  template <unsigned int length, typename Functor>
   DEAL_II_ALWAYS_INLINE inline auto generate_iterators(Functor f)
-      -> std::array<decltype(f(0)), n_array_elements>
+      -> std::array<decltype(f(0)), length>
   {
-    return generate_iterators_impl<>(
-        f, std::make_index_sequence<n_array_elements>());
+    return generate_iterators_impl<>(f, std::make_index_sequence<length>());
   }
 
 
@@ -96,7 +95,7 @@ namespace grendel
 
   /**
    * Populate a VectorizedArray with
-   *   { U[i] , U[i + 1] , ... , U[i + n_array_elements - 1] }
+   *   { U[i] , U[i + 1] , ... , U[i + VectorizedArray::size() - 1] }
    */
   template <typename T1>
   DEAL_II_ALWAYS_INLINE inline dealii::VectorizedArray<typename T1::value_type>
@@ -110,9 +109,9 @@ namespace grendel
 
   /**
    * Populate an array of VectorizedArray with
-   *   { U[0][i] , U[0][i+1] , ... , U[0][i+n_array_elements-1] }
+   *   { U[0][i] , U[0][i+1] , ... , U[0][i+VectorizedArray::size()-1] }
    *   ...
-   *   { U[k-1][i] , U[k-1][i+1] , ... , U[k-1][i+n_array_elements-1] }
+   *   { U[k-1][i] , U[k-1][i+1] , ... , U[k-1][i+VectorizedArray::size()-1] }
    */
   template <typename T1, std::size_t k>
   DEAL_II_ALWAYS_INLINE inline dealii::
@@ -155,7 +154,7 @@ namespace grendel
       const T1 &U,
       const std::array<
           unsigned int,
-          dealii::VectorizedArray<typename T1::value_type>::n_array_elements>
+          dealii::VectorizedArray<typename T1::value_type>::size()>
           js)
   {
     dealii::VectorizedArray<typename T1::value_type> result;
@@ -183,7 +182,7 @@ namespace grendel
           const std::array<T1, k> &U,
           const std::array<unsigned int,
                            dealii::VectorizedArray<
-                               typename T1::value_type>::n_array_elements> js)
+                               typename T1::value_type>::size()> js)
   {
     dealii::Tensor<1, k, dealii::VectorizedArray<typename T1::value_type>>
         result;
@@ -287,7 +286,7 @@ namespace grendel
                     float>::value) {                                           \
     AssertThrow(condition(variable), exception);                               \
   } else {                                                                     \
-    for (unsigned int k = 0; k < decltype(variable)::n_array_elements; ++k) {  \
+    for (unsigned int k = 0; k < decltype(variable)::size(); ++k) {            \
       AssertThrow(condition((variable)[k]), exception);                        \
     }                                                                          \
   }

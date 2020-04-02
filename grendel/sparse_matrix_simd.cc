@@ -7,8 +7,7 @@ namespace grendel
 {
   /* instantiations */
 
-  template class SparsityPatternSIMD<
-      dealii::VectorizedArray<NUMBER>::n_array_elements>;
+  template class SparsityPatternSIMD<dealii::VectorizedArray<NUMBER>::size()>;
 
   template class SparseMatrixSIMD<NUMBER>;
 

@@ -139,7 +139,7 @@ namespace grendel
      * A sparsity pattern for matrices in vectorized format. Local
      * numbering.
      */
-    SparsityPatternSIMD<dealii::VectorizedArray<Number>::n_array_elements>
+    SparsityPatternSIMD<dealii::VectorizedArray<Number>::size()>
         sparsity_pattern_simd_;
     ACCESSOR_READ_ONLY(sparsity_pattern_simd)
 
