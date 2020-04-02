@@ -87,12 +87,30 @@ namespace grendel
 
     for (auto &it : quantities_)
       it.reinit(partitioner);
+
+    data_out_.attach_dof_handler(offline_data_->dof_handler());
+
+    for (unsigned int i = 0; i < problem_dimension; ++i)
+      data_out_.add_data_vector(
+          U_[i], ProblemDescription<dim, Number>::component_names[i]);
+    for (unsigned int i = 0; i < n_quantities; ++i)
+      data_out_.add_data_vector(quantities_[i], component_names[i]);
+
+    data_out_cutplanes_.attach_dof_handler(offline_data_->dof_handler());
+
+    for (unsigned int i = 0; i < problem_dimension; ++i)
+      data_out_cutplanes_.add_data_vector(
+          U_[i], ProblemDescription<dim, Number>::component_names[i]);
+    for (unsigned int i = 0; i < n_quantities; ++i)
+      data_out_cutplanes_.add_data_vector(quantities_[i], component_names[i]);
   }
 
 
   template <int dim, typename Number>
   void Postprocessor<dim, Number>::compute(const vector_type &U,
-                                           const scalar_type &alpha)
+                                           const scalar_type &alpha,
+                                           bool output_full,
+                                           bool output_cutplanes)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "Postprocessor<dim, Number>::compute()" << std::endl;
@@ -252,16 +270,11 @@ namespace grendel
       affine_constraints.distribute(it);
       it.update_ghost_values();
     }
-  }
 
+    /*
+     * Step 5: Build patches:
+     */
 
-  template <int dim, typename Number>
-  void Postprocessor<dim, Number>::write_out(std::string name,
-                                             Number t,
-                                             unsigned int cycle,
-                                             bool output_full,
-                                             bool output_cutplanes)
-  {
     constexpr auto problem_dimension =
         ProblemDescription<dim, Number>::problem_dimension;
     constexpr auto n_quantities = Postprocessor<dim, Number>::n_quantities;
@@ -269,31 +282,10 @@ namespace grendel
     const auto &discretization = offline_data_->discretization();
     const auto &mapping = discretization.mapping();
 
-    dealii::DataOut<dim> data_out;
-
-    data_out.attach_dof_handler(offline_data_->dof_handler());
-
-    for (unsigned int i = 0; i < problem_dimension; ++i)
-      data_out.add_data_vector(
-          U_[i], ProblemDescription<dim, Number>::component_names[i]);
-    for (unsigned int i = 0; i < n_quantities; ++i)
-      data_out.add_data_vector(quantities_[i], component_names[i]);
-
-    DataOutBase::VtkFlags flags(
-        t, cycle, true, DataOutBase::VtkFlags::best_speed);
-    data_out.set_flags(flags);
-
     const auto patch_order = discretization.finite_element().degree - 1;
 
     if (output_full) {
-      data_out.build_patches(mapping, patch_order);
-      if (use_mpi_io_) {
-        data_out.write_vtu_in_parallel(
-            name + Utilities::to_string(cycle, 6) + ".vtu", mpi_communicator_);
-      } else {
-        data_out.write_vtu_with_pvtu_record(
-            "", name, cycle, mpi_communicator_, 6);
-      }
+      data_out_.build_patches(mapping, patch_order);
     }
 
     if (output_cutplanes && output_planes_.size() != 0) {
@@ -301,8 +293,7 @@ namespace grendel
        * Specify an output filter that selects only cells for output that are
        * in the viscinity of a specified set of output planes:
        */
-
-      data_out.set_cell_selection([this](const auto &cell) {
+      data_out_cutplanes_.set_cell_selection([this](const auto &cell) {
         if (!cell->is_active() || cell->is_artificial())
           return false;
 
@@ -330,14 +321,44 @@ namespace grendel
         return false;
       });
 
-      data_out.build_patches(mapping, patch_order);
+      data_out_cutplanes_.build_patches(mapping, patch_order);
+    }
+  }
+
+
+  template <int dim, typename Number>
+  void Postprocessor<dim, Number>::write_out(std::string name,
+                                             Number t,
+                                             unsigned int cycle,
+                                             bool output_full,
+                                             bool output_cutplanes)
+  {
+    if (output_full) {
+      DataOutBase::VtkFlags flags(
+          t, cycle, true, DataOutBase::VtkFlags::best_speed);
+      data_out_.set_flags(flags);
+
       if (use_mpi_io_) {
-        data_out.write_vtu_in_parallel(
-            name + "-cut_planes_" + Utilities::to_string(cycle, 6) + ".vtu",
+        data_out_.write_vtu_in_parallel(
+            name + Utilities::to_string(cycle, 6) + ".vtu", mpi_communicator_);
+      } else {
+        data_out_.write_vtu_with_pvtu_record(
+            "", name, cycle, mpi_communicator_, 6);
+      }
+    }
+
+    if (output_cutplanes && output_planes_.size() != 0) {
+      DataOutBase::VtkFlags flags(
+          t, cycle, true, DataOutBase::VtkFlags::best_speed);
+      data_out_cutplanes_.set_flags(flags);
+
+      if (use_mpi_io_) {
+        data_out_cutplanes_.write_vtu_in_parallel(
+            name + "-cutplanes_" + Utilities::to_string(cycle, 6) + ".vtu",
             mpi_communicator_);
       } else {
-        data_out.write_vtu_with_pvtu_record(
-            "", name + "-cut_planes", cycle, mpi_communicator_, 6);
+        data_out_cutplanes_.write_vtu_with_pvtu_record(
+            "", name + "-cutplanes", cycle, mpi_communicator_, 6);
       }
     }
   }

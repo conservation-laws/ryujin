@@ -388,7 +388,12 @@ namespace ryujin
 
     {
       Scope scope(computing_timer, "postprocessor");
-      postprocessor.compute(U, time_step.alpha());
+      postprocessor.compute(U,
+                            time_step.alpha(),
+                            (cycle % output_full_multiplier == 0) &&
+                                enable_output_full,
+                            (cycle % output_cutplanes_multiplier == 0) &&
+                                enable_output_cutplanes);
     }
 
     /* capture name, t, cycle, and checkpoint by value */

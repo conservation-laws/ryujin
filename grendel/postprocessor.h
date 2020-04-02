@@ -45,7 +45,10 @@ namespace grendel
 
     void prepare();
 
-    void compute(const vector_type &U, const scalar_type &alpha);
+    void compute(const vector_type &U,
+                 const scalar_type &alpha,
+                 bool output_full = true,
+                 bool output_cutplanes = true);
 
     void write_out(std::string name,
                    Number t,
@@ -58,6 +61,9 @@ namespace grendel
     ACCESSOR_READ_ONLY(U)
 
     std::array<scalar_type, n_quantities> quantities_;
+
+    dealii::DataOut<dim> data_out_cutplanes_;
+    dealii::DataOut<dim> data_out_;
 
   private:
     const MPI_Comm &mpi_communicator_;
