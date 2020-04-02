@@ -218,8 +218,8 @@ namespace ryujin
 #endif
 
     /* Wait for output thread: */
-    if (output_thread.joinable())
-      output_thread.join();
+    if (background_thread_status.valid())
+      background_thread_status.wait();
 
     computing_timer["time loop"].stop();
 
@@ -381,9 +381,9 @@ namespace ryujin
      * one. This logic also serves as a mutex for the postprocessor class.
      */
 
-    if (output_thread.joinable()) {
+    if (background_thread_status.valid()) {
       Scope scope(computing_timer, "output stall");
-      output_thread.join();
+      background_thread_status.wait();
     }
 
     {
@@ -445,7 +445,8 @@ namespace ryujin
 #ifdef DEBUG_OUTPUT
       std::cout << "        Spawning worker thread" << std::endl;
 #endif
-      output_thread = std::move(std::thread(output_worker));
+      background_thread_status =
+          std::async(std::launch::async, output_worker);
     } else {
       /* We unfortunately cannot run in a background thread if MPI IO is
        * enabled. Simply call the worker instead. */

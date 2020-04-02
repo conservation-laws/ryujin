@@ -14,6 +14,7 @@
 
 #include <fstream>
 #include <sstream>
+#include <future>
 
 namespace ryujin
 {
@@ -96,7 +97,7 @@ namespace ryujin
 
     std::ofstream logfile; /* log file */
 
-    std::thread output_thread;
+    std::future<void> background_thread_status;
     unsigned int output_thread_active;
   };
 
