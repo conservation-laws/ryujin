@@ -1,7 +1,6 @@
 #ifndef TIMELOOP_TEMPLATE_H
 #define TIMELOOP_TEMPLATE_H
 
-#include "checkpointing.h"
 #include "timeloop.h"
 
 #include <helper.h>
@@ -59,7 +58,7 @@ namespace ryujin
         "The output granularity specifies the time interval after which output "
         "routines are run. Further modified by \"*_multiplier\" options");
 
-    enable_checkpointing = true;
+    enable_checkpointing = false;
     add_parameter(
         "enable checkpointing",
         enable_checkpointing,
@@ -123,6 +122,9 @@ namespace ryujin
     std::cout << "TimeLoop<dim, Number>::run()" << std::endl;
 #endif
 
+    AssertThrow(enable_checkpointing == false, ExcNotImplemented());
+    AssertThrow(resume == false, ExcNotImplemented());
+
     const bool write_output_files =
         enable_checkpointing || enable_output_full || enable_output_cutplanes;
 
@@ -152,11 +154,7 @@ namespace ryujin
 
       if (resume) {
         print_info("resuming interrupted computation");
-        do_resume(base_name,
-                  discretization.triangulation().locally_owned_subdomain(),
-                  U,
-                  t,
-                  output_cycle);
+        // FIXME: checkpointing
       } else {
         print_info("interpolating initial values");
         U = initial_values.interpolate(offline_data);
@@ -397,21 +395,7 @@ namespace ryujin
               enable_output_cutplanes);
     }
 
-#if 0
-    /* Checkpointing: */
-
-    if (checkpoint && (cycle % output_checkpoint_multiplier == 0) &&
-        enable_checkpointing) {
-#ifdef DEBUG_OUTPUT
-      std::cout << "        Checkpointing" << std::endl;
-#endif
-      do_checkpoint(base_name,
-                    discretization.triangulation().locally_owned_subdomain(),
-                    postprocessor.U(),
-                    t,
-                    cycle);
-    }
-#endif
+    // FIXME: Checkpointing
   }
 
 
