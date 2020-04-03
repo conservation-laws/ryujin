@@ -45,7 +45,6 @@ namespace ryujin
       , mpi_rank(dealii::Utilities::MPI::this_mpi_process(mpi_communicator))
       , n_mpi_processes(
             dealii::Utilities::MPI::n_mpi_processes(mpi_communicator))
-      , output_thread_active(0)
   {
     base_name = "cylinder";
     add_parameter("basename", base_name, "Base name for all output files");
@@ -218,8 +217,7 @@ namespace ryujin
 #endif
 
     /* Wait for output thread: */
-    if (background_thread_status.valid())
-      background_thread_status.wait();
+    postprocessor.wait();
 
     computing_timer["time loop"].stop();
 
@@ -375,83 +373,45 @@ namespace ryujin
 #endif
 
     /*
-     * Offload output to a worker thread.
-     *
-     * We wait for a previous thread to finish before we schedule a new
-     * one. This logic also serves as a mutex for the postprocessor class.
+     * We have to wait for a previous thread to finish before we schedule a
+     * new one.
      */
 
-    if (background_thread_status.valid()) {
+    {
       Scope scope(computing_timer, "output stall");
-      background_thread_status.wait();
+      postprocessor.wait();
     }
 
     {
       Scope scope(computing_timer, "postprocessor");
-      postprocessor.compute(U,
-                            time_step.alpha(),
-                            (cycle % output_full_multiplier == 0) &&
-                                enable_output_full,
-                            (cycle % output_cutplanes_multiplier == 0) &&
-                                enable_output_cutplanes);
-    }
-
-    /* capture name, t, cycle, and checkpoint by value */
-    const auto output_worker = [this, name, t, cycle, checkpoint]() {
-      /* Flag thread as active: */
-      output_thread_active = 1;
-      Scope scope(computing_timer, "output write out");
-
-      /* Checkpointing: */
-
-      if (checkpoint && (cycle % output_checkpoint_multiplier == 0) &&
-          enable_checkpointing) {
-#ifdef DEBUG_OUTPUT
-        std::cout << "        Checkpointing" << std::endl;
-#endif
-        do_checkpoint(base_name,
-                      discretization.triangulation().locally_owned_subdomain(),
-                      postprocessor.U(),
-                      t,
-                      cycle);
-      }
 
       /* Data output: */
-      postprocessor.write_out(name,
-                              t,
-                              cycle,
-                              (cycle % output_full_multiplier == 0) &&
-                                  enable_output_full,
-                              (cycle % output_cutplanes_multiplier == 0) &&
-                                  enable_output_cutplanes);
-
-#ifdef DEBUG_OUTPUT
-      std::cout << "        Commit output (cycle = " << cycle << ")"
-                << std::endl;
-#endif
-
-      /* Flag thread as inactive: */
-      output_thread_active = 0;
-    };
-
-    /* And spawn the thread: */
-
-#ifdef DEBUG_OUTPUT
-    std::cout << "        Schedule output (cycle = " << cycle << ")"
-              << std::endl;
-#endif
-
-    if (!postprocessor.use_mpi_io()) {
-#ifdef DEBUG_OUTPUT
-      std::cout << "        Spawning worker thread" << std::endl;
-#endif
-      background_thread_status =
-          std::async(std::launch::async, output_worker);
-    } else {
-      /* We unfortunately cannot run in a background thread if MPI IO is
-       * enabled. Simply call the worker instead. */
-      output_worker();
+      postprocessor.schedule_output(
+          U,
+          time_step.alpha(),
+          name,
+          t,
+          cycle,
+          (cycle % output_full_multiplier == 0) && enable_output_full,
+          (cycle % output_cutplanes_multiplier == 0) &&
+              enable_output_cutplanes);
     }
+
+#if 0
+    /* Checkpointing: */
+
+    if (checkpoint && (cycle % output_checkpoint_multiplier == 0) &&
+        enable_checkpointing) {
+#ifdef DEBUG_OUTPUT
+      std::cout << "        Checkpointing" << std::endl;
+#endif
+      do_checkpoint(base_name,
+                    discretization.triangulation().locally_owned_subdomain(),
+                    postprocessor.U(),
+                    t,
+                    cycle);
+    }
+#endif
   }
 
 
@@ -871,8 +831,8 @@ namespace ryujin
   {
     std::ostringstream output;
 
-    unsigned int n_active_writebacks =
-        Utilities::MPI::sum(output_thread_active, mpi_communicator);
+    unsigned int n_active_writebacks = Utilities::MPI::sum<unsigned int>(
+        postprocessor.is_active(), mpi_communicator);
 
     std::ostringstream primary;
     if (final_time) {

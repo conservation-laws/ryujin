@@ -96,9 +96,6 @@ namespace ryujin
     const unsigned int n_mpi_processes;
 
     std::ofstream logfile; /* log file */
-
-    std::future<void> background_thread_status;
-    unsigned int output_thread_active;
   };
 
 } // namespace ryujin

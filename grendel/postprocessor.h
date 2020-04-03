@@ -11,6 +11,8 @@
 #include <deal.II/lac/la_parallel_vector.templates.h>
 #include <deal.II/multigrid/mg_transfer_matrix_free.h>
 
+#include <future>
+
 namespace grendel
 {
 
@@ -45,16 +47,16 @@ namespace grendel
 
     void prepare();
 
-    void compute(const vector_type &U,
-                 const scalar_type &alpha,
-                 bool output_full = true,
-                 bool output_cutplanes = true);
+    void schedule_output(const vector_type &U,
+                         const scalar_type &alpha,
+                         std::string name,
+                         Number t,
+                         unsigned int cycle,
+                         bool output_full = true,
+                         bool output_cutplanes = true);
 
-    void write_out(std::string name,
-                   Number t,
-                   unsigned int cycle,
-                   bool output_full = true,
-                   bool output_cutplanes = true);
+    bool is_active();
+    void wait();
 
   protected:
     std::array<scalar_type, problem_dimension> U_;
@@ -62,13 +64,12 @@ namespace grendel
 
     std::array<scalar_type, n_quantities> quantities_;
 
-    dealii::DataOut<dim> data_out_cutplanes_;
-    dealii::DataOut<dim> data_out_;
-
   private:
     const MPI_Comm &mpi_communicator_;
 
     dealii::SmartPointer<const grendel::OfflineData<dim, Number>> offline_data_;
+
+    std::future<void> background_thread_status;
 
     /* Options: */
 
