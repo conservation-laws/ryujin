@@ -40,6 +40,9 @@ ELSE()
   STRING(REPLACE "-Xclang" "" DEAL_II_CXX_FLAGS "${DEAL_II_CXX_FLAGS}")
   STRING(REPLACE "-fcolor-diagnostics" "" DEAL_II_CXX_FLAGS "${DEAL_II_CXX_FLAGS}")
   STRING(REPLACE "-Qunused-arguments" "" DEAL_II_CXX_FLAGS "${DEAL_II_CXX_FLAGS}")
+  IF(CMAKE_CXX_COMPILER MATCHES "GNU")
+    STRING(APPEND DEAL_II_CXX_FLAGS "-fdiagnostics-color=always")
+  ENDIF()
 ENDIF()
 
 
