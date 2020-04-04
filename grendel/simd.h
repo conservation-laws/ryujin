@@ -35,7 +35,7 @@ namespace grendel
     using type = T;
   };
 
-  template <typename T, int width>
+  template <typename T, std::size_t width>
   struct get_value_type<dealii::VectorizedArray<T, width>> {
     using type = T;
   };
