@@ -40,8 +40,7 @@ namespace ryujin
     void output(const vector_type &U,
                 const std::string &name,
                 Number t,
-                unsigned int cycle,
-                bool checkpoint = false);
+                unsigned int cycle);
 
     void print_parameters(std::ostream &stream);
     void print_mpi_partition(std::ostream &stream);

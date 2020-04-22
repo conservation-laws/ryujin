@@ -125,6 +125,9 @@ namespace ryujin
     std::cout << "TimeLoop<dim, Number>::run()" << std::endl;
 #endif
 
+    AssertThrow(!enable_checkpointing || !enable_compute_error,
+                ExcNotImplemented());
+
     const bool write_output_files =
         enable_checkpointing || enable_output_full || enable_output_cutplanes;
 
@@ -154,11 +157,9 @@ namespace ryujin
 
       if (resume) {
         print_info("resuming interrupted computation");
-        do_resume(base_name,
-                  discretization.triangulation().locally_owned_subdomain(),
-                  U,
-                  t,
-                  output_cycle);
+        const auto id =
+            discretization.triangulation().locally_owned_subdomain();
+        do_resume(base_name, id, U, t, output_cycle);
         t_initial = t;
       } else {
         print_info("interpolating initial values");
@@ -194,11 +195,7 @@ namespace ryujin
       t += tau;
 
       if (t > output_cycle * output_granularity && write_output_files) {
-        output(U,
-               base_name + "-solution",
-               t,
-               output_cycle,
-               /*checkpoint*/ true);
+        output(U, base_name + "-solution", t, output_cycle);
 
         if (enable_compute_error) {
           const auto analytic = initial_values.interpolate(offline_data, t);
@@ -367,51 +364,36 @@ namespace ryujin
       const typename TimeLoop<dim, Number>::vector_type &U,
       const std::string &name,
       Number t,
-      unsigned int cycle,
-      bool checkpoint)
+      unsigned int cycle)
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "TimeLoop<dim, Number>::output(t = " << t
-              << ", checkpoint = " << checkpoint << ")" << std::endl;
+    std::cout << "TimeLoop<dim, Number>::output(t = " << t << ")" << std::endl;
 #endif
 
-    /*
-     * We have to wait for a previous thread to finish before we schedule a
-     * new one.
-     */
+    /* Data output: */
 
     {
+      /* Wait for a previous thread to finish before scheduling a new one: */
       Scope scope(computing_timer, "output stall");
       postprocessor.wait();
     }
 
     {
       Scope scope(computing_timer, "postprocessor");
-
-      /* Data output: */
+      const bool do_full_output =
+          (cycle % output_full_multiplier == 0) && enable_output_full;
+      const bool do_cutplanes =
+          (cycle % output_cutplanes_multiplier == 0) && enable_output_cutplanes;
       postprocessor.schedule_output(
-          U,
-          time_step.alpha(),
-          name,
-          t,
-          cycle,
-          (cycle % output_full_multiplier == 0) && enable_output_full,
-          (cycle % output_cutplanes_multiplier == 0) &&
-              enable_output_cutplanes);
+          U, time_step.alpha(), name, t, cycle, do_full_output, do_cutplanes);
     }
 
     /* Checkpointing: */
 
-    if (checkpoint && (cycle % output_checkpoint_multiplier == 0) &&
-        enable_checkpointing) {
-#ifdef DEBUG_OUTPUT
-      std::cout << "        Checkpointing" << std::endl;
-#endif
-      do_checkpoint(base_name,
-                    discretization.triangulation().locally_owned_subdomain(),
-                    postprocessor.U(),
-                    t,
-                    cycle);
+    if (cycle % output_checkpoint_multiplier == 0 && enable_checkpointing) {
+      Scope scope(computing_timer, "checkpointing");
+      const auto id = discretization.triangulation().locally_owned_subdomain();
+      do_checkpoint(base_name, id, U, t, cycle);
     }
   }
 
