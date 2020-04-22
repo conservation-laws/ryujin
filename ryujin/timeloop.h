@@ -64,6 +64,7 @@ namespace ryujin
 
     std::string base_name;
 
+    Number t_initial;
     Number t_final;
     Number output_granularity;
 

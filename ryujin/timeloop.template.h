@@ -49,6 +49,8 @@ namespace ryujin
     base_name = "cylinder";
     add_parameter("basename", base_name, "Base name for all output files");
 
+    t_initial = Number(0.);
+
     t_final = Number(5.);
     add_parameter("final time", t_final, "Final time");
 
@@ -157,6 +159,7 @@ namespace ryujin
                   U,
                   t,
                   output_cycle);
+        t_initial = t;
       } else {
         print_info("interpolating initial values");
         U = initial_values.interpolate(offline_data);
@@ -770,7 +773,7 @@ namespace ryujin
            << std::endl;
 
     output << "ETA:  " << std::fixed << std::setprecision(4)
-           << ((t_final - t) / t * wall_time / 3600.) << " h";
+           << ((t_final - t) / (t - t_initial) * wall_time / 3600.) << " h";
 
     if (mpi_rank != 0)
       return;
