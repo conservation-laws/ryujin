@@ -83,9 +83,6 @@ namespace grendel
 
     const auto &partitioner = offline_data_->partitioner();
 
-    for (auto &it : U_)
-      it.reinit(partitioner);
-
     for (auto &it : quantities_)
       it.reinit(partitioner);
   }
@@ -114,14 +111,6 @@ namespace grendel
 
     const unsigned int n_internal = offline_data_->n_locally_internal();
     const unsigned int n_locally_owned = offline_data_->n_locally_owned();
-
-    /*
-     * Step 1: Copy the current state vector over to output_vector:
-     */
-
-    for (unsigned int i = 0; i < problem_dimension; ++i) {
-      U_[i] = U[i];
-    }
 
     /*
      * Step 2: Compute r_i and r_i_max, r_i_min:
@@ -249,11 +238,6 @@ namespace grendel
      * Step 4: Fix up constraints and distribute:
      */
 
-    for (auto &it : U_) {
-      affine_constraints.distribute(it);
-      it.update_ghost_values();
-    }
-
     for (auto &it : quantities_) {
       affine_constraints.distribute(it);
       it.update_ghost_values();
@@ -275,7 +259,7 @@ namespace grendel
 
       for (unsigned int i = 0; i < problem_dimension; ++i)
         data_out->add_data_vector(
-            U_[i], ProblemDescription<dim, Number>::component_names[i]);
+            U[i], ProblemDescription<dim, Number>::component_names[i]);
       for (unsigned int i = 0; i < n_quantities; ++i)
         data_out->add_data_vector(quantities_[i], component_names[i]);
 
@@ -291,7 +275,7 @@ namespace grendel
 
       for (unsigned int i = 0; i < problem_dimension; ++i)
         data_out_cutplanes->add_data_vector(
-            U_[i], ProblemDescription<dim, Number>::component_names[i]);
+            U[i], ProblemDescription<dim, Number>::component_names[i]);
       for (unsigned int i = 0; i < n_quantities; ++i)
         data_out_cutplanes->add_data_vector(quantities_[i], component_names[i]);
 

@@ -59,8 +59,6 @@ namespace grendel
     void wait();
 
   protected:
-    std::array<scalar_type, problem_dimension> U_;
-    ACCESSOR_READ_ONLY(U)
 
     std::array<scalar_type, n_quantities> quantities_;
 
