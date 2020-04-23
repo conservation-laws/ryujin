@@ -95,6 +95,11 @@
 #define COMPUTE_SECOND_VARIATIONS true
 #endif
 
+#ifndef ENTROPY
+#define ENTROPY Entropy::mathematical
+// #define ENTROPY Entropy::harten
+#endif
+
 #ifndef SMOOTHNESS_INDICATOR
 // #define SMOOTHNESS_INDICATOR SmoothnessIndicators::rho
 // #define SMOOTHNESS_INDICATOR SmoothnessIndicators::internal_energy

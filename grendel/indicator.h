@@ -45,6 +45,15 @@ namespace grendel
         COMPUTE_SECOND_VARIATIONS;
 
     /*
+     * Options for entropy viscosity commutator:
+     */
+
+    static constexpr enum class Entropy {
+      mathematical,
+      harten
+    } evc_entropy_ = ENTROPY;
+
+    /*
      * Options for smoothness indicator:
      */
 
@@ -145,10 +154,16 @@ namespace grendel
     if constexpr (indicator_ == Indicators::entropy_viscosity_commutator) {
       rho_i = U_i[0];
       inverse_rho_i = Number(1.) / rho_i;
-      eta_i = ProblemDescription<dim, Number>::entropy(U_i);
+      eta_i = evc_entropy_ == Entropy::mathematical
+                  ? ProblemDescription<dim, Number>::mathematical_entropy(U_i)
+                  : ProblemDescription<dim, Number>::harten_entropy(U_i);
       f_i = ProblemDescription<dim, Number>::f(U_i);
 
-      d_eta_i = ProblemDescription<dim, Number>::entropy_derivative(U_i);
+      d_eta_i =
+          evc_entropy_ == Entropy::mathematical
+              ? ProblemDescription<dim,
+                                   Number>::mathematical_entropy_derivative(U_i)
+              : ProblemDescription<dim, Number>::harten_entropy_derivative(U_i);
       d_eta_i[0] -= eta_i / rho_i;
 
       left = 0.;
@@ -180,7 +195,10 @@ namespace grendel
     if constexpr (indicator_ == Indicators::entropy_viscosity_commutator) {
       const auto &rho_j = U_j[0];
       const auto m_j = ProblemDescription<dim, Number>::momentum(U_j);
-      const auto eta_j = ProblemDescription<dim, Number>::entropy(U_j);
+      const auto eta_j =
+          evc_entropy_ == Entropy::mathematical
+              ? ProblemDescription<dim, Number>::mathematical_entropy(U_j)
+              : ProblemDescription<dim, Number>::harten_entropy(U_j);
       const auto inverse_rho_j = Number(1.) / rho_j;
       const auto f_j = ProblemDescription<dim, Number>::f(U_j);
 

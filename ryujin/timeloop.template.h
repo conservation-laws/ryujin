@@ -472,6 +472,18 @@ namespace ryujin
       stream << "Indicator<dim, Number>::Indicators::smoothness_indicator" << std::endl;
     }
 
+    stream << "Indicator<dim, Number>::compute_second_variations_ == "
+            << Indicator<dim, Number>::compute_second_variations_ << std::endl;
+
+    stream << "Indicator<dim, Number>::evc_entropy_ == ";
+    switch (Indicator<dim, Number>::evc_entropy_) {
+    case Indicator<dim, Number>::Entropy::mathematical:
+      stream << "Indicator<dim, Number>::Entropy::mathematical" << std::endl;
+      break;
+    case Indicator<dim, Number>::Entropy::harten:
+      stream << "Indicator<dim, Number>::Entropy::harten" << std::endl;
+    }
+
     stream << "Indicator<dim, Number>::smoothness_indicator_ == ";
     switch (Indicator<dim, Number>::smoothness_indicator_) {
     case Indicator<dim, Number>::SmoothnessIndicators::rho:
@@ -489,9 +501,6 @@ namespace ryujin
 
     stream << "Indicator<dim, Number>::smoothness_indicator_power_ == "
             << Indicator<dim, Number>::smoothness_indicator_power_ << std::endl;
-
-    stream << "Indicator<dim, Number>::compute_second_variations_ == "
-            << Indicator<dim, Number>::compute_second_variations_ << std::endl;
 
     stream << "Limiter<dim, Number>::limiter_ == ";
     switch (Limiter<dim, Number>::limiter_) {

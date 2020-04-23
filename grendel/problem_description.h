@@ -161,7 +161,7 @@ namespace grendel
      *
      *   \eta = (rho^2 e) ^ (1 / (gamma + 1))
      */
-    static Number entropy(const rank1_type &U);
+    static Number harten_entropy(const rank1_type &U);
 
 
     /**
@@ -170,7 +170,21 @@ namespace grendel
      *
      *   \eta = (rho^2 e) ^ (1 / (gamma + 1))
      */
-    static rank1_type entropy_derivative(const rank1_type &U);
+    static rank1_type harten_entropy_derivative(const rank1_type &U);
+
+
+    /**
+     * For a given (2+dim dimensional) state vector <code>U</code>, compute
+     * and return the entropy \eta = p^(1/\gamma)
+     */
+    static Number mathematical_entropy(const rank1_type U);
+
+
+    /**
+     * For a given (2+dim dimensional) state vector <code>U</code>, compute
+     * and return the derivative \eta' of the entropy \eta = p^(1/\gamma)
+     */
+    static rank1_type mathematical_entropy_derivative(const rank1_type U);
 
 
     /**
@@ -307,7 +321,7 @@ namespace grendel
 
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline Number
-  ProblemDescription<dim, Number>::entropy(const rank1_type &U)
+  ProblemDescription<dim, Number>::harten_entropy(const rank1_type &U)
   {
     /*
      * We have
@@ -325,7 +339,8 @@ namespace grendel
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline
       typename ProblemDescription<dim, Number>::rank1_type
-      ProblemDescription<dim, Number>::entropy_derivative(const rank1_type &U)
+      ProblemDescription<dim, Number>::harten_entropy_derivative(
+          const rank1_type &U)
   {
     /*
      * With
@@ -355,6 +370,56 @@ namespace grendel
       result[1 + i] = -factor * m[i];
     }
     result[dim + 1] = factor * rho;
+
+    return result;
+  }
+
+
+  template <int dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline Number
+  ProblemDescription<dim, Number>::mathematical_entropy(const rank1_type U)
+  {
+    const auto p = pressure(U);
+    return grendel::pow(p, ScalarNumber(1. / gamma));
+  }
+
+
+  template <int dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline
+      typename ProblemDescription<dim, Number>::rank1_type
+      ProblemDescription<dim, Number>::mathematical_entropy_derivative(
+          const rank1_type U)
+  {
+    /*
+     * With
+     *   eta = p ^ (1/gamma)
+     *   p = (gamma - 1) * (rho e)
+     *   rho e = E - 1/2 |m|^2 / rho
+     *
+     * we get
+     *
+     *   eta' = (gamma - 1)/gamma p ^(1/gamma - 1) *
+     *
+     *     (1/2m^2/rho^2 , -m/rho , 1 )^T
+     *
+     * (Here we have set b = 0)
+     */
+
+    const Number &rho = U[0];
+    const auto u = momentum(U) / rho;
+    const auto p = pressure(U);
+
+    const auto factor =
+        (gamma - ScalarNumber(1.0)) / gamma *
+        grendel::pow(p, ScalarNumber(1.) / gamma - ScalarNumber(1.));
+
+    rank1_type result;
+
+    result[0] = factor * ScalarNumber(0.5) * u.norm_square();
+    result[dim + 1] = factor;
+    for (unsigned int i = 0; i < dim; ++i) {
+      result[1 + i] = -factor * u[i];
+    }
 
     return result;
   }
