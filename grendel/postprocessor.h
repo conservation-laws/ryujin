@@ -75,6 +75,7 @@ namespace grendel
     ACCESSOR_READ_ONLY(use_mpi_io)
 
     Number schlieren_beta_;
+    Number vorticity_beta_;
 
     using plane_description = std::tuple<dealii::Point<dim> /*origin*/,
                                          dealii::Tensor<1, dim> /*normal*/,

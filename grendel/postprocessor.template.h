@@ -63,6 +63,12 @@ namespace grendel
         schlieren_beta_,
         "Beta factor used in the exponential scale for the schlieren plot");
 
+    vorticity_beta_ = 10.;
+    add_parameter(
+        "vorticity beta",
+        vorticity_beta_,
+        "Beta factor used in the exponential scale for the vorticity");
+
     add_parameter(
         "output planes",
         output_planes_,
@@ -118,12 +124,16 @@ namespace grendel
 
     std::atomic<Number> r_i_max{0.};
     std::atomic<Number> r_i_min{std::numeric_limits<Number>::infinity()};
+    std::atomic<Number> v_i_max{0.};
+    std::atomic<Number> v_i_min{std::numeric_limits<Number>::infinity()};
 
     {
       GRENDEL_PARALLEL_REGION_BEGIN
 
       Number r_i_max_on_subrange = 0.;
       Number r_i_min_on_subrange = std::numeric_limits<Number>::infinity();
+      Number v_i_max_on_subrange = 0.;
+      Number v_i_min_on_subrange = std::numeric_limits<Number>::infinity();
 
       GRENDEL_OMP_FOR
       for (unsigned int i = 0; i < n_locally_owned; ++i) {
@@ -187,6 +197,10 @@ namespace grendel
 
         r_i_max_on_subrange = std::max(r_i_max_on_subrange, quantities[0]);
         r_i_min_on_subrange = std::min(r_i_min_on_subrange, quantities[0]);
+        if constexpr (dim > 1) {
+          v_i_max_on_subrange = std::max(v_i_max_on_subrange, quantities[1]);
+          v_i_min_on_subrange = std::min(v_i_min_on_subrange, quantities[1]);
+        }
 
         scatter(quantities_, quantities, i);
       }
@@ -202,6 +216,15 @@ namespace grendel
              !r_i_min.compare_exchange_weak(temp, r_i_min_on_subrange))
         ;
 
+      temp = v_i_max.load();
+      while (temp < v_i_max_on_subrange &&
+             !v_i_max.compare_exchange_weak(temp, v_i_max_on_subrange))
+        ;
+      temp = v_i_min.load();
+      while (temp > v_i_min_on_subrange &&
+             !v_i_min.compare_exchange_weak(temp, v_i_min_on_subrange))
+        ;
+
       GRENDEL_PARALLEL_REGION_END
     }
 
@@ -209,6 +232,8 @@ namespace grendel
 
     r_i_max.store(Utilities::MPI::max(r_i_max.load(), mpi_communicator_));
     r_i_min.store(Utilities::MPI::min(r_i_min.load(), mpi_communicator_));
+    v_i_max.store(Utilities::MPI::max(v_i_max.load(), mpi_communicator_));
+    v_i_min.store(Utilities::MPI::min(v_i_min.load(), mpi_communicator_));
 
     /*
      * Step 3: Normalize schlieren and vorticity:
@@ -229,6 +254,12 @@ namespace grendel
         auto &r_i = quantities_[0].local_element(i);
         r_i = Number(1.) - std::exp(-schlieren_beta_ * (r_i - r_i_min) /
                                     (r_i_max - r_i_min));
+
+        if constexpr (dim > 1) {
+          auto &v_i = quantities_[1].local_element(i);
+          v_i = Number(1.) - std::exp(-vorticity_beta_ * (v_i - v_i_min) /
+                                      (v_i_max - v_i_min));
+        }
       }
 
       GRENDEL_PARALLEL_REGION_END
