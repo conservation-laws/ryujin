@@ -42,6 +42,11 @@ namespace grendel
                   "Grid file (in gmsh msh format) that is read in when "
                   "geometry is set to file");
 
+    mesh_distortion_ = 0.;
+    add_parameter("mesh distortion",
+                  mesh_distortion_,
+                  "Strength of mesh distortion");
+
     /* Immersed triangle: */
 
     immersed_triangle_length_ = 3.;
@@ -297,6 +302,9 @@ namespace grendel
     } else {
       triangulation.refine_global(refinement_);
     }
+
+    if (std::abs(mesh_distortion_) > 1.0e-10)
+      GridTools::distort_random(mesh_distortion_, triangulation);
 
     mapping_ = std::make_unique<MappingQ<dim>>(order_mapping_);
 
