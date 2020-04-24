@@ -167,7 +167,7 @@ namespace grendel
 
       /* Parallel non-vectorized loop: */
 
-      GRENDEL_OMP_FOR
+      GRENDEL_OMP_FOR_NOWAIT
       for (unsigned int i = n_internal; i < n_owned; ++i) {
 
         const unsigned int row_length = sparsity_simd.row_length(i);
@@ -236,7 +236,7 @@ namespace grendel
 
       /* Parallel SIMD loop: */
 
-      GRENDEL_OMP_FOR
+      GRENDEL_OMP_FOR // wait
       for (unsigned int i = 0; i < n_internal; i += simd_length) {
 
         if (GRENDEL_UNLIKELY(above_n_export_indices == false &&
@@ -426,7 +426,7 @@ namespace grendel
 
       /* Parallel non-vectorized loop: */
 
-      GRENDEL_OMP_FOR
+      GRENDEL_OMP_FOR_NOWAIT
       for (unsigned int i = n_internal; i < n_owned; ++i) {
 
         /* Skip constrained degrees of freedom */
@@ -523,7 +523,7 @@ namespace grendel
 
       /* Parallel SIMD loop: */
 
-      GRENDEL_OMP_FOR
+      GRENDEL_OMP_FOR // wait
       for (unsigned int i = 0; i < n_internal; i += simd_length) {
 
         if (GRENDEL_UNLIKELY(above_n_export_indices == false &&
@@ -661,7 +661,7 @@ namespace grendel
 
         /* Parallel non-vectorized loop: */
 
-        GRENDEL_OMP_FOR
+        GRENDEL_OMP_FOR_NOWAIT
         for (unsigned int i = n_internal; i < n_owned; ++i) {
 
           /* Skip constrained degrees of freedom */
@@ -706,7 +706,7 @@ namespace grendel
 
         bool above_n_export_indices = false;
 
-        GRENDEL_OMP_FOR
+        GRENDEL_OMP_FOR // wait
         for (unsigned int i = 0; i < n_internal; i += simd_length) {
 
           if (GRENDEL_UNLIKELY(above_n_export_indices == false &&
@@ -779,7 +779,7 @@ namespace grendel
 
         /* Parallel non-vectorized loop: */
 
-        GRENDEL_OMP_FOR
+        GRENDEL_OMP_FOR_NOWAIT
         for (unsigned int i = n_internal; i < n_owned; ++i) {
 
           /* Skip constrained degrees of freedom */
@@ -802,7 +802,7 @@ namespace grendel
 
         bool above_n_export_indices = false;
 
-        GRENDEL_OMP_FOR
+        GRENDEL_OMP_FOR // wait
         for (unsigned int i = 0; i < n_internal; i += simd_length) {
 
           if (GRENDEL_UNLIKELY(above_n_export_indices == false &&
@@ -864,7 +864,7 @@ namespace grendel
 
         /* Parallel non-vectorized loop: */
 
-        GRENDEL_OMP_FOR
+        GRENDEL_OMP_FOR_NOWAIT
         for (unsigned int i = n_internal; i < n_owned; ++i) {
 
           /* Skip constrained degrees of freedom */
@@ -934,12 +934,12 @@ namespace grendel
           scatter(temp_euler_, U_i_new, i);
         } /* parallel non-vectorized loop */
 
-        /* Parallel vectorized loop: */
-
-        /* Set to false in the last pass: */
+        /* Only enable synchronization by setting to false in the last pass: */
         bool above_n_export_indices = (pass + 1 != n_passes);
 
-        GRENDEL_OMP_FOR
+        /* Parallel vectorized loop: */
+
+        GRENDEL_OMP_FOR // wait
         for (unsigned int i = 0; i < n_internal; i += simd_length) {
 
           if (GRENDEL_UNLIKELY(above_n_export_indices == false &&

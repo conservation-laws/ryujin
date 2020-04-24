@@ -378,8 +378,9 @@ protected:
 
 #define GRENDEL_PARALLEL_REGION_END }
 
-#define GRENDEL_OMP_FOR                                                        \
-  GRENDEL_PRAGMA(omp for)
+#define GRENDEL_OMP_FOR GRENDEL_PRAGMA(omp for)
+#define GRENDEL_OMP_FOR_NOWAIT GRENDEL_PRAGMA(omp for nowait)
+#define GRENDEL_OMP_BARRIER GRENDEL_PRAGMA(omp barrier)
 
 #define GRENDEL_LIKELY(x) (__builtin_expect(!!(x), 1))
 #define GRENDEL_UNLIKELY(x) (__builtin_expect(!!(x), 0))
