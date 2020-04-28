@@ -36,8 +36,8 @@
 
 #ifndef TIME_STEP_ORDER
 // #define TIME_STEP_ORDER TimeStepOrder::first_order
-#define TIME_STEP_ORDER TimeStepOrder::second_order
-// #define TIME_STEP_ORDER TimeStepOrder::third_order
+// #define TIME_STEP_ORDER TimeStepOrder::second_order
+#define TIME_STEP_ORDER TimeStepOrder::third_order
 #endif
 
 #ifndef LIMITER_ITER
@@ -96,8 +96,8 @@
 #endif
 
 #ifndef ENTROPY
-#define ENTROPY Entropy::mathematical
-// #define ENTROPY Entropy::harten
+// #define ENTROPY Entropy::mathematical
+#define ENTROPY Entropy::harten
 #endif
 
 #ifndef SMOOTHNESS_INDICATOR
