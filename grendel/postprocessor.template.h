@@ -190,7 +190,9 @@ namespace grendel
         Tensor<1, n_quantities, Number> quantities;
 
         quantities[0] = grad_rho_i.norm() / m_i;
-        if constexpr (dim > 1) {
+        if constexpr (dim == 2) {
+          quantities[1] = curl_v_i[0] / m_i;
+        } else if constexpr (dim == 3) {
           quantities[1] = curl_v_i.norm() / m_i;
         }
         quantities[n_quantities - 1] = alpha.local_element(i);
@@ -198,8 +200,10 @@ namespace grendel
         r_i_max_on_subrange = std::max(r_i_max_on_subrange, quantities[0]);
         r_i_min_on_subrange = std::min(r_i_min_on_subrange, quantities[0]);
         if constexpr (dim > 1) {
-          v_i_max_on_subrange = std::max(v_i_max_on_subrange, quantities[1]);
-          v_i_min_on_subrange = std::min(v_i_min_on_subrange, quantities[1]);
+          v_i_max_on_subrange =
+              std::max(v_i_max_on_subrange, std::abs(quantities[1]));
+          v_i_min_on_subrange =
+              std::min(v_i_min_on_subrange, std::abs(quantities[1]));
         }
 
         scatter(quantities_, quantities, i);
@@ -257,8 +261,11 @@ namespace grendel
 
         if constexpr (dim > 1) {
           auto &v_i = quantities_[1].local_element(i);
-          v_i = Number(1.) - std::exp(-vorticity_beta_ * (v_i - v_i_min) /
-                                      (v_i_max - v_i_min));
+          const auto magnitude =
+              Number(1.) -
+              std::exp(-vorticity_beta_ * (std::abs(v_i) - v_i_min) /
+                       (v_i_max - v_i_min));
+          v_i = std::copysign(magnitude, v_i);
         }
       }
 
