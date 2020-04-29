@@ -197,14 +197,16 @@ namespace ryujin
       const auto tau = time_step.step(U, t);
       t += tau;
 
-      if (t > output_cycle * output_granularity && write_output_files) {
-        output(U, base_name + "-solution", t, output_cycle);
-
-        if (enable_compute_error) {
-          const auto analytic = initial_values.interpolate(offline_data, t);
-          output(analytic, base_name + "-analytic_solution", t, output_cycle);
-        }
+      if (t > output_cycle * output_granularity) {
         ++output_cycle;
+
+        if (write_output_files) {
+          output(U, base_name + "-solution", t, output_cycle);
+          if (enable_compute_error) {
+            const auto analytic = initial_values.interpolate(offline_data, t);
+            output(analytic, base_name + "-analytic_solution", t, output_cycle);
+          }
+        }
 
         print_cycle_statistics(cycle, t, output_cycle, /*logfile*/ true);
       }
