@@ -285,8 +285,8 @@ namespace grendel
      * Step 5: DataOut:
      */
 
-    auto data_out = std::make_shared<dealii::DataOut<dim>>();
-    auto data_out_cutplanes = std::make_shared<dealii::DataOut<dim>>();
+    auto data_out = std::make_unique<dealii::DataOut<dim>>();
+    auto data_out_cutplanes = std::make_unique<dealii::DataOut<dim>>();
 
     const auto &discretization = offline_data_->discretization();
     const auto &mapping = discretization.mapping();
@@ -373,7 +373,9 @@ namespace grendel
       /* schedule asynchronous writeback: */
       background_thread_status = std::async(
           std::launch::async,
-          [=]() {
+          [=,
+           data_out = std::move(data_out),
+           data_out_cutplanes = std::move(data_out_cutplanes)]() mutable {
             if (output_full) {
               data_out->write_vtu_with_pvtu_record(
                   "", name, cycle, mpi_communicator_, 6);
@@ -382,6 +384,9 @@ namespace grendel
               data_out_cutplanes->write_vtu_with_pvtu_record(
                   "", name + "-cutplanes", cycle, mpi_communicator_, 6);
             }
+            /* Explicitly delete pointer to free up memory: */
+            data_out.reset();
+            data_out_cutplanes.reset();
           });
     }
   }
