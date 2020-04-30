@@ -198,8 +198,6 @@ namespace ryujin
       t += tau;
 
       if (t > output_cycle * output_granularity) {
-        ++output_cycle;
-
         if (write_output_files) {
           output(U, base_name + "-solution", t, output_cycle);
           if (enable_compute_error) {
@@ -207,6 +205,8 @@ namespace ryujin
             output(analytic, base_name + "-analytic_solution", t, output_cycle);
           }
         }
+
+        ++output_cycle;
 
         print_cycle_statistics(cycle, t, output_cycle, /*logfile*/ true);
       }
