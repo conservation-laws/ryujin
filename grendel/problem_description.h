@@ -314,8 +314,8 @@ namespace grendel
      * We have
      *   exp((gamma - 1)s) = (rho e) / rho ^ gamma
      */
-    const auto rho = U[0];
-    return internal_energy(U) / grendel::pow(rho, gamma);
+    const auto rho_inverse = ScalarNumber(1.) / U[0];
+    return internal_energy(U, rho_inverse) * grendel::pow(rho_inverse, gamma);
   }
 
 
