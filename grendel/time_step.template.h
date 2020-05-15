@@ -470,7 +470,7 @@ namespace grendel
                                  : d_ij * std::max(alpha_i, alpha_j);
           pij_matrix_.write_tensor((d_ijH - d_ij) * (U_j - U_i), i, col_idx);
 
-          dealii::Tensor<1, problem_dimension> U_ij_bar;
+          dealii::Tensor<1, problem_dimension, Number> U_ij_bar;
 
           for (unsigned int k = 0; k < problem_dimension; ++k) {
             const auto temp = (f_j[k] - f_i[k]) * c_ij;
