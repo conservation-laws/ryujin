@@ -1,3 +1,8 @@
+//
+// SPDX-License-Identifier: MIT
+// Copyright (C) 2020 by the ryujin authors
+//
+
 #ifndef GEOMETRY_HELPER_H
 #define GEOMETRY_HELPER_H
 

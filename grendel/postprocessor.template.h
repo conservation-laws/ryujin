@@ -1,3 +1,8 @@
+//
+// SPDX-License-Identifier: MIT
+// Copyright (C) 2020 by the ryujin authors
+//
+
 #ifndef POSTPROCESSOR_TEMPLATE_H
 #define POSTPROCESSOR_TEMPLATE_H
 

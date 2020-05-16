@@ -1,3 +1,8 @@
+//
+// SPDX-License-Identifier: MIT
+// Copyright (C) 2020 by the ryujin authors
+//
+
 #ifndef LIMITER_H
 #define LIMITER_H
 

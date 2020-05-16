@@ -1,3 +1,8 @@
+//
+// SPDX-License-Identifier: MIT
+// Copyright (C) 2020 by the ryujin authors
+//
+
 #ifndef OFFLINE_DATA_TEMPLATE_H
 #define OFFLINE_DATA_TEMPLATE_H
 

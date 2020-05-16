@@ -1,3 +1,8 @@
+//
+// SPDX-License-Identifier: MIT
+// Copyright (C) 2020 by the ryujin authors
+//
+
 #ifndef SPARSE_MATRIX_SIMD_TEMPLATE_H
 #define SPARSE_MATRIX_SIMD_TEMPLATE_H
 

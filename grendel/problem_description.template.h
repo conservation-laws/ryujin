@@ -1,3 +1,8 @@
+//
+// SPDX-License-Identifier: MIT
+// Copyright (C) 2020 by the ryujin authors
+//
+
 #ifndef PROBLEM_DESCRIPTION_TEMPLATE_H
 #define PROBLEM_DESCRIPTION_TEMPLATE_H
 

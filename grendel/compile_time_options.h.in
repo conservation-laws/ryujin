@@ -1,3 +1,8 @@
+//
+// SPDX-License-Identifier: MIT
+// Copyright (C) 2020 by the ryujin authors
+//
+
 #ifndef COMPILE_TIME_OPTIONS_H
 #define COMPILE_TIME_OPTIONS_H
 

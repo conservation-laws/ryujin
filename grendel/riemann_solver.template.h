@@ -1,3 +1,8 @@
+//
+// SPDX-License-Identifier: MIT
+// Copyright (C) 2020 by the ryujin authors
+//
+
 #ifndef RIEMANN_SOLVER_TEMPLATE_H
 #define RIEMANN_SOLVER_TEMPLATE_H
 

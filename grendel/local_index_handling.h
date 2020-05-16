@@ -1,3 +1,8 @@
+//
+// SPDX-License-Identifier: MIT
+// Copyright (C) 2020 by the ryujin authors
+//
+
 #ifndef LOCAL_INDEX_HANDLING_H
 #define LOCAL_INDEX_HANDLING_H
 
