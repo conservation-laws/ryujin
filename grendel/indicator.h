@@ -98,7 +98,7 @@ namespace grendel
     /* Temporary storage used for the entropy_viscosity_commutator: */
 
     Number rho_i = 0.;         // also used for second variations
-    Number inverse_rho_i = 0.; // also used for second variations
+    Number rho_i_inverse = 0.; // also used for second variations
     Number eta_i = 0.;
     rank2_type f_i;
     rank1_type d_eta_i;
@@ -153,18 +153,17 @@ namespace grendel
   {
     if constexpr (indicator_ == Indicators::entropy_viscosity_commutator) {
       rho_i = U_i[0];
-      inverse_rho_i = Number(1.) / rho_i;
+      rho_i_inverse = Number(1.) / rho_i;
       eta_i = evc_entropy_ == Entropy::mathematical
                   ? ProblemDescription<dim, Number>::mathematical_entropy(U_i)
                   : ProblemDescription<dim, Number>::harten_entropy(U_i);
-      f_i = ProblemDescription<dim, Number>::f(U_i);
 
       d_eta_i =
           evc_entropy_ == Entropy::mathematical
               ? ProblemDescription<dim,
                                    Number>::mathematical_entropy_derivative(U_i)
               : ProblemDescription<dim, Number>::harten_entropy_derivative(U_i);
-      d_eta_i[0] -= eta_i / rho_i;
+      d_eta_i[0] -= eta_i * rho_i_inverse;
 
       left = 0.;
       right *= 0.;
@@ -199,10 +198,10 @@ namespace grendel
           evc_entropy_ == Entropy::mathematical
               ? ProblemDescription<dim, Number>::mathematical_entropy(U_j)
               : ProblemDescription<dim, Number>::harten_entropy(U_j);
-      const auto inverse_rho_j = Number(1.) / rho_j;
+      const auto rho_j_inverse = Number(1.) / rho_j;
       const auto f_j = ProblemDescription<dim, Number>::f(U_j);
 
-      left += (eta_j * inverse_rho_j - eta_i * inverse_rho_i) * m_j * c_ij;
+      left += (eta_j * rho_j_inverse - eta_i * rho_i_inverse) * m_j * c_ij;
       for (unsigned int k = 0; k < problem_dimension; ++k)
         right[k] += (f_j[k] - f_i[k]) * c_ij;
     }
