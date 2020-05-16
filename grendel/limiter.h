@@ -62,6 +62,7 @@ namespace grendel
     void accumulate(const rank1_type &U_i,
                     const rank1_type &U_j,
                     const rank1_type &U_ij_bar,
+                    const Number entropy_j,
                     const bool is_diagonal_entry);
 
     void reset_variations(const Number variations_i);
@@ -127,6 +128,7 @@ namespace grendel
   Limiter<dim, Number>::accumulate(const rank1_type &U_i,
                                    const rank1_type &U_j,
                                    const rank1_type &U_ij_bar,
+                                   const Number entropy_j,
                                    const bool is_diagonal_entry)
   {
     auto &[rho_min, rho_max, s_min] = bounds_;
@@ -140,8 +142,7 @@ namespace grendel
 
 
     if constexpr (limiter_ == Limiters::specific_entropy) {
-      const auto s = ProblemDescription<dim, Number>::specific_entropy(U_j);
-      s_min = std::min(s_min, s);
+      s_min = std::min(s_min, entropy_j);
 
       if (!is_diagonal_entry) {
         const Number s_interp =

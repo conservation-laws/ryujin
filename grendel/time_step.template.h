@@ -132,8 +132,73 @@ namespace grendel
     const Number measure_of_omega_inverse =
         Number(1.) / offline_data_->measure_of_omega();
 
+    specific_entropies.resize(
+        n_owned + U[0].get_partitioner()->n_ghost_indices());
+    evc_entropies.resize(specific_entropies.size());
+    constexpr unsigned int size_fu = (dim + 1) * problem_dimension;
+    flux_and_u.resize(specific_entropies.size() * size_fu);
+
     /* An monotonically increasing "channel" variable for mpi_tags: */
     unsigned int channel = 10;
+
+    /*
+     * Step 0: Precompute f(U) and the entropies of U
+     */
+    {
+      Scope scope(computing_timer_, "time step 0 - compute f(U) and entropies");
+
+      GRENDEL_PARALLEL_REGION_BEGIN
+      LIKWID_MARKER_START("time_step_0");
+
+      const unsigned int size_regular =
+          specific_entropies.size() / simd_length * simd_length;
+
+      GRENDEL_OMP_FOR
+      for (unsigned int i = 0; i < size_regular; i += simd_length) {
+        const auto U_i = simd_gather(U, i);
+        const auto U_and_f_i = std::make_pair(
+            U_i, ProblemDescription<dim, VectorizedArray<Number>>::f(U_i));
+        unsigned int indices[simd_length];
+        for (unsigned int k = 0; k < simd_length; ++k)
+          indices[k] = (i + k) * size_fu;
+        vectorized_transpose_and_store(
+            false, size_fu, &U_and_f_i.first[0], indices, flux_and_u.data());
+
+        const auto specific_entropy =
+            ProblemDescription<dim, VectorizedArray<Number>>::specific_entropy(
+                U_i);
+        specific_entropy.store(specific_entropies.data() + i);
+        const auto evc_entropy =
+            Indicator<dim, double>::evc_entropy_ ==
+                    Indicator<dim, double>::Entropy::mathematical
+                ? ProblemDescription<dim, VectorizedArray<Number>>::
+                      mathematical_entropy(U_i)
+                : ProblemDescription<dim, VectorizedArray<Number>>::
+                      harten_entropy(U_i);
+        evc_entropy.store(evc_entropies.data() + i);
+      }
+
+      for (unsigned int i = size_regular; i < specific_entropies.size(); ++i) {
+        const auto U_i = gather(U, i);
+        const auto f_i = ProblemDescription<dim, Number>::f(U_i);
+        for (unsigned int k = 0; k < problem_dimension; ++k)
+          flux_and_u[i * size_fu + k] = U_i[k];
+        for (unsigned int k = 0; k < problem_dimension; ++k)
+          for (unsigned int j = 0; j < dim; ++j)
+            flux_and_u[i * size_fu + problem_dimension + k * dim + j] =
+                f_i[k][j];
+        specific_entropies[i] =
+            ProblemDescription<dim, Number>::specific_entropy(U_i);
+        evc_entropies[i] =
+            Indicator<dim, double>::evc_entropy_ ==
+                    Indicator<dim, double>::Entropy::mathematical
+                ? ProblemDescription<dim, Number>::mathematical_entropy(U_i)
+                : ProblemDescription<dim, Number>::harten_entropy(U_i);
+      }
+
+      LIKWID_MARKER_STOP("time_step_0");
+      GRENDEL_PARALLEL_REGION_END
+    }
 
     /*
      * Step 1: Compute off-diagonal d_ij, and alpha_i
@@ -181,22 +246,38 @@ namespace grendel
         if (row_length == 1)
           continue;
 
-        const auto U_i = gather(U, i);
+        Tensor<1, problem_dimension, Number> U_i;
+        for (unsigned int d = 0; d < problem_dimension; ++d)
+          U_i[d] = flux_and_u[i * size_fu + d];
+        Tensor<1, problem_dimension, Tensor<1, dim, Number>> f_i;
+        for (unsigned int d = 0; d < problem_dimension; ++d)
+          for (unsigned int e = 0; e < dim; ++e)
+            f_i[d][e] =
+                flux_and_u[i * size_fu + problem_dimension + d * dim + e];
 
         const Number mass = lumped_mass_matrix.local_element(i);
         const Number hd_i = mass * measure_of_omega_inverse;
 
-        indicator_serial.reset(U_i);
+        indicator_serial.reset(U_i, f_i, evc_entropies[i]);
 
         /* Skip diagonal. */
         const unsigned int *js = sparsity_simd.columns(i);
         for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
           const unsigned int j = js[col_idx];
 
-          const auto U_j = gather(U, j);
+          Tensor<1, problem_dimension, Number> U_j;
+          for (unsigned int d = 0; d < problem_dimension; ++d)
+            U_j[d] = flux_and_u[j * size_fu + d];
+
+          Tensor<1, problem_dimension, Tensor<1, dim, Number>> f_j;
+          for (unsigned int d = 0; d < problem_dimension; ++d)
+            for (unsigned int e = 0; e < dim; ++e)
+              f_j[d][e] =
+                  flux_and_u[j * size_fu + problem_dimension + d * dim + e];
+
           const auto c_ij = cij_matrix.get_tensor(i, col_idx);
           const auto beta_ij = betaij_matrix.get_entry(i, col_idx);
-          indicator_serial.add(U_j, c_ij, beta_ij);
+          indicator_serial.add(U_j, c_ij, beta_ij, evc_entropies[j], f_j);
 
           /* Only iterate over the upper triangular portion of d_ij */
           if (j <= i)
@@ -254,8 +335,20 @@ namespace grendel
           }
         }
 
-        const auto U_i = simd_gather(U, i);
-        indicator_simd.reset(U_i);
+        unsigned int indices[simd_length];
+        for (unsigned int v = 0; v < simd_length; ++v)
+          indices[v] = (i + v) * size_fu;
+        std::pair<Tensor<1, problem_dimension, VectorizedArray<Number>>,
+                  Tensor<1,
+                         problem_dimension,
+                         Tensor<1, dim, VectorizedArray<Number>>>>
+            U_and_f_i;
+        vectorized_load_and_transpose(
+            size_fu, flux_and_u.data(), indices, &U_and_f_i.first[0]);
+        VectorizedArray<Number> entropy_i;
+        entropy_i.load(evc_entropies.data() + i);
+
+        indicator_simd.reset(U_and_f_i.first, U_and_f_i.second, entropy_i);
 
         const auto mass = simd_gather(lumped_mass_matrix, i);
         const auto hd_i = mass * measure_of_omega_inverse;
@@ -274,11 +367,24 @@ namespace grendel
               break;
             }
 
-          const auto U_j = simd_gather(U, js);
+          VectorizedArray<Number> entropy_j;
+          entropy_j.gather(evc_entropies.data(), js);
+
+          for (unsigned int v = 0; v < simd_length; ++v)
+            indices[v] = size_fu * js[v];
+
+          std::pair<Tensor<1, problem_dimension, VectorizedArray<Number>>,
+                    Tensor<1,
+                           problem_dimension,
+                           Tensor<1, dim, VectorizedArray<Number>>>>
+              U_and_f_j;
+          vectorized_load_and_transpose(
+              size_fu, flux_and_u.data(), indices, &U_and_f_j.first[0]);
 
           const auto c_ij = cij_matrix.get_vectorized_tensor(i, col_idx);
           const auto beta_ij = betaij_matrix.get_vectorized_entry(i, col_idx);
-          indicator_simd.add(U_j, c_ij, beta_ij);
+          indicator_simd.add(
+              U_and_f_j.first, c_ij, beta_ij, entropy_j, U_and_f_j.second);
 
           /* Only iterate over the upper triangular portion of d_ij */
           if (all_below_diagonal)
@@ -289,7 +395,7 @@ namespace grendel
 
           const auto [lambda_max, p_star, n_iterations] =
               RiemannSolver<dim, VectorizedArray<Number>>::compute(
-                  U_i, U_j, n_ij, hd_i);
+                  U_and_f_i.first, U_and_f_j.first, n_ij, hd_i);
 
           const auto d = norm * lambda_max;
 
@@ -439,10 +545,16 @@ namespace grendel
         if (row_length == 1)
           continue;
 
-        const auto U_i = gather(U, i);
+        Tensor<1, problem_dimension, Number> U_i;
+        for (unsigned int d = 0; d < problem_dimension; ++d)
+          U_i[d] = flux_and_u[i * size_fu + d];
         auto U_i_new = U_i;
 
-        const auto f_i = ProblemDescription<dim, Number>::f(U_i);
+        Tensor<1, problem_dimension, Tensor<1, dim, Number>> f_i;
+        for (unsigned int d = 0; d < problem_dimension; ++d)
+          for (unsigned int e = 0; e < dim; ++e)
+            f_i[d][e] =
+                flux_and_u[i * size_fu + problem_dimension + d * dim + e];
         const auto alpha_i = alpha_.local_element(i);
         const auto variations_i = second_variations_.local_element(i);
 
@@ -459,12 +571,19 @@ namespace grendel
         for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
           const auto j = js[col_idx];
 
-          const auto U_j = gather(U, j);
-          const auto f_j = ProblemDescription<dim, Number>::f(U_j);
+          Tensor<1, problem_dimension, Number> U_j;
+          for (unsigned int d = 0; d < problem_dimension; ++d)
+            U_j[d] = flux_and_u[j * size_fu + d];
+
+          Tensor<1, problem_dimension, Tensor<1, dim, Number>> f_j;
+          for (unsigned int d = 0; d < problem_dimension; ++d)
+            for (unsigned int e = 0; e < dim; ++e)
+              f_j[d][e] =
+                  flux_and_u[j * size_fu + problem_dimension + d * dim + e];
+
           const auto alpha_j = alpha_.local_element(j);
           const auto variations_j = second_variations_.local_element(j);
 
-          const auto c_ij = cij_matrix.get_tensor(i, col_idx);
           const auto d_ij = dij_matrix_.get_entry(i, col_idx);
           const Number d_ij_inv = Number(1.) / d_ij;
 
@@ -476,6 +595,7 @@ namespace grendel
           pij_matrix_.write_tensor((d_ijH - d_ij) * (U_j - U_i), i, col_idx);
 
           dealii::Tensor<1, problem_dimension, Number> U_ij_bar;
+          const auto c_ij = cij_matrix.get_tensor(i, col_idx);
 
           for (unsigned int k = 0; k < problem_dimension; ++k) {
             const auto temp = (f_j[k] - f_i[k]) * c_ij;
@@ -487,8 +607,11 @@ namespace grendel
 
           U_i_new += tau * m_i_inv * Number(2.) * d_ij * U_ij_bar;
 
-          limiter_serial.accumulate(
-              U_i, U_j, U_ij_bar, /* is diagonal */ col_idx == 0);
+          limiter_serial.accumulate(U_i,
+                                    U_j,
+                                    U_ij_bar,
+                                    specific_entropies[j],
+                                    /* is diagonal */ col_idx == 0);
           const auto beta_ij = betaij_matrix.get_entry(i, col_idx);
           limiter_serial.accumulate_variations(variations_j, beta_ij);
         }
@@ -541,11 +664,17 @@ namespace grendel
           }
         }
 
-        const auto U_i = simd_gather(U, i);
-        auto U_i_new = U_i;
-
-        const auto f_i =
-            ProblemDescription<dim, VectorizedArray<Number>>::f(U_i);
+        unsigned int indices[simd_length];
+        for (unsigned int v = 0; v < simd_length; ++v)
+          indices[v] = (i + v) * size_fu;
+        std::pair<Tensor<1, problem_dimension, VectorizedArray<Number>>,
+                  Tensor<1,
+                         problem_dimension,
+                         Tensor<1, dim, VectorizedArray<Number>>>>
+            U_and_f_i;
+        vectorized_load_and_transpose(
+            size_fu, flux_and_u.data(), indices, &U_and_f_i.first[0]);
+        auto U_i_new = U_and_f_i.first;
 
         const auto alpha_i = simd_gather(alpha_, i);
         const auto variations_i = simd_gather(second_variations_, i);
@@ -568,15 +697,8 @@ namespace grendel
         for (unsigned int col_idx = 0; col_idx < row_length;
              ++col_idx, js += simd_length) {
 
-          const auto U_j = simd_gather(U, js);
-
-          const auto f_j =
-              ProblemDescription<dim, VectorizedArray<Number>>::f(U_j);
-
           const auto alpha_j = simd_gather(alpha_, js);
           const auto variations_j = simd_gather(second_variations_, js);
-
-          const auto c_ij = cij_matrix.get_vectorized_tensor(i, col_idx);
 
           const auto d_ij = dij_matrix_.get_vectorized_entry(i, col_idx);
           const auto d_ij_inv = Number(1.) / d_ij;
@@ -587,24 +709,45 @@ namespace grendel
                                  ? d_ij * (alpha_i + alpha_j) * Number(.5)
                                  : d_ij * std::max(alpha_i, alpha_j);
 
+          for (unsigned int v = 0; v < simd_length; ++v)
+            indices[v] = size_fu * js[v];
+
+          std::pair<Tensor<1, problem_dimension, VectorizedArray<Number>>,
+                    Tensor<1,
+                           problem_dimension,
+                           Tensor<1, dim, VectorizedArray<Number>>>>
+              U_and_f_j;
+          vectorized_load_and_transpose(
+              size_fu, flux_and_u.data(), indices, &U_and_f_j.first[0]);
+
           pij_matrix_.write_vectorized_tensor(
-              (d_ijH - d_ij) * (U_j - U_i), i, col_idx, true);
+              (d_ijH - d_ij) * (U_and_f_j.first - U_and_f_i.first),
+              i,
+              col_idx,
+              true);
 
           dealii::Tensor<1, problem_dimension, VectorizedArray<Number>>
               U_ij_bar;
+          const auto c_ij = cij_matrix.get_vectorized_tensor(i, col_idx);
 
           for (unsigned int k = 0; k < problem_dimension; ++k) {
-            const auto temp = (f_j[k] - f_i[k]) * c_ij;
+            const auto temp =
+                (U_and_f_j.second[k] - U_and_f_i.second[k]) * c_ij;
 
-            r_i[k] += -temp + d_ijH * (U_j - U_i)[k];
-            U_ij_bar[k] =
-                Number(0.5) * (U_i[k] + U_j[k]) - Number(0.5) * temp * d_ij_inv;
+            r_i[k] += -temp + d_ijH * (U_and_f_j.first[k] - U_and_f_i.first[k]);
+            U_ij_bar[k] = Number(0.5) * (U_and_f_i.first[k] +
+                                         U_and_f_j.first[k] - temp * d_ij_inv);
           }
 
           U_i_new += tau * m_i_inv * Number(2.) * d_ij * U_ij_bar;
 
-          limiter_simd.accumulate(
-              U_i, U_j, U_ij_bar, /* is diagonal */ col_idx == 0);
+          VectorizedArray<Number> entropy_j;
+          entropy_j.gather(specific_entropies.data(), js);
+          limiter_simd.accumulate(U_and_f_i.first,
+                                  U_and_f_j.first,
+                                  U_ij_bar,
+                                  entropy_j,
+                                  /* is diagonal */ col_idx == 0);
           const auto beta_ij = betaij_matrix.get_vectorized_entry(i, col_idx);
           limiter_simd.accumulate_variations(variations_j, beta_ij);
         }

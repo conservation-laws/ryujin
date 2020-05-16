@@ -80,7 +80,8 @@ namespace grendel
      * Reset temporary storage and initialize for a new row corresponding
      * to state vector U_i:
      */
-    void reset(const rank1_type &U_i);
+    void
+    reset(const rank1_type &U_i, const rank2_type &f_i, const Number entropy);
 
     /**
      * When looping over the sparsity row, add the contribution associated
@@ -88,7 +89,9 @@ namespace grendel
      */
     void add(const rank1_type &U_j,
              const dealii::Tensor<1, dim, Number> &c_ij,
-             const Number beta_ij);
+             const Number beta_ij,
+             const Number entropy_j,
+             const rank2_type &f_j);
     /**
      * Return the computed alpha_i value.
      */
@@ -153,15 +156,14 @@ namespace grendel
 
 
   template <int dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline void
-  Indicator<dim, Number>::reset(const rank1_type &U_i)
+  DEAL_II_ALWAYS_INLINE inline void Indicator<dim, Number>::reset(
+      const rank1_type &U_i, const rank2_type &f_i, const Number entropy)
   {
     if constexpr (indicator_ == Indicators::entropy_viscosity_commutator) {
       rho_i = U_i[0];
       rho_i_inverse = Number(1.) / rho_i;
-      eta_i = evc_entropy_ == Entropy::mathematical
-                  ? ProblemDescription<dim, Number>::mathematical_entropy(U_i)
-                  : ProblemDescription<dim, Number>::harten_entropy(U_i);
+      eta_i = entropy;
+      this->f_i = f_i;
 
       d_eta_i =
           evc_entropy_ == Entropy::mathematical
@@ -171,7 +173,7 @@ namespace grendel
       d_eta_i[0] -= eta_i * rho_i_inverse;
 
       left = 0.;
-      right *= 0.;
+      right = 0.;
     }
 
     if constexpr (indicator_ == Indicators::smoothness_indicator) {
@@ -194,17 +196,15 @@ namespace grendel
   DEAL_II_ALWAYS_INLINE inline void
   Indicator<dim, Number>::add(const rank1_type &U_j,
                               const dealii::Tensor<1, dim, Number> &c_ij,
-                              const Number beta_ij)
+                              const Number beta_ij,
+                              const Number entropy_j,
+                              const rank2_type &f_j)
   {
     if constexpr (indicator_ == Indicators::entropy_viscosity_commutator) {
       const auto &rho_j = U_j[0];
       const auto m_j = ProblemDescription<dim, Number>::momentum(U_j);
-      const auto eta_j =
-          evc_entropy_ == Entropy::mathematical
-              ? ProblemDescription<dim, Number>::mathematical_entropy(U_j)
-              : ProblemDescription<dim, Number>::harten_entropy(U_j);
+      const auto eta_j = entropy_j;
       const auto rho_j_inverse = Number(1.) / rho_j;
-      const auto f_j = ProblemDescription<dim, Number>::f(U_j);
 
       left += (eta_j * rho_j_inverse - eta_i * rho_i_inverse) * m_j * c_ij;
       for (unsigned int k = 0; k < problem_dimension; ++k)
