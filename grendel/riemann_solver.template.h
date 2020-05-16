@@ -637,22 +637,20 @@ namespace grendel
         const typename ProblemDescription<dim, Number>::rank1_type &U,
         const dealii::Tensor<1, dim, Number> &n_ij)
     {
-      const Number inv_density = Number(1.0) / U[0];
-
       const auto m = ProblemDescription<dim, Number>::momentum(U);
       const auto projected_momentum = n_ij * m;
       const auto perp = m - projected_momentum * n_ij;
 
+      const Number rho_inverse = Number(1.0) / U[0];
       typename ProblemDescription<1, Number>::rank1_type projected(
           {U[0],
            projected_momentum,
-           U[1 + dim] - Number(0.5) * perp.norm_square() * inv_density});
+           U[1 + dim] - Number(0.5) * perp.norm_square() * rho_inverse});
 
       return {projected[0],               // rho
-              projected[1] * inv_density, // u
-              ProblemDescription<1, Number>::pressure(projected, inv_density),
-              ProblemDescription<1, Number>::speed_of_sound(projected,
-                                                            inv_density)};
+              projected[1] * rho_inverse, // u
+              ProblemDescription<1, Number>::pressure(projected),
+              ProblemDescription<1, Number>::speed_of_sound(projected)};
     }
   } /* anonymous namespace */
 
