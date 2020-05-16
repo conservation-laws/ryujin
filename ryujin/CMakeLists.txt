@@ -1,23 +1,23 @@
-INCLUDE_DIRECTORIES(
+include_directories(
   ${CMAKE_SOURCE_DIR}/ryujin/
   ${CMAKE_SOURCE_DIR}/grendel/
   ${CMAKE_BINARY_DIR}/grendel/
   )
 
-ADD_EXECUTABLE(ryujin
+add_executable(ryujin
   ryujin.cc
   timeloop.cc
   )
 
-DEAL_II_SETUP_TARGET(ryujin)
-TARGET_LINK_LIBRARIES(ryujin grendel)
-TARGET_LINK_LIBRARIES(ryujin stdc++fs)
+deal_ii_setup_target(ryujin)
+target_link_librarieS(ryujin grendel)
+target_link_librarieS(ryujin stdc++fs)
 
-SET_PROPERTY(TARGET ryujin
+set_property(TARGET ryujin
   PROPERTY RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/run
   )
 
-SET_PROPERTY(TARGET ryujin APPEND PROPERTY COMPILE_DEFINITIONS
+set_property(TARGET ryujin APPEND PROPERTY COMPILE_DEFINITIONS
   RYUJIN_VERSION="${RYUJIN_VERSION}"
   RYUJIN_GIT_REVISION="${GIT_REVISION}"
   RYUJIN_GIT_SHORTREV="${GIT_SHORTREV}"

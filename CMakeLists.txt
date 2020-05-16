@@ -1,82 +1,81 @@
-SET(RYUJIN_VERSION 1.3.0)
+set(RYUJIN_VERSION 1.3.0)
 
-CMAKE_MINIMUM_REQUIRED(VERSION 3.5)
+cmake_minimum_required(VERSION 3.5)
 
-#
-# Find deal.II and setup up compiler flags:
-#
+find_package(deal.II 9.2 REQUIRED HINTS ${DEAL_II_DIR} $ENV{DEAL_II_DIR})
 
-FIND_PACKAGE(deal.II 9.0 REQUIRED HINTS ${DEAL_II_DIR} $ENV{DEAL_II_DIR})
-DEAL_II_INITIALIZE_CACHED_VARIABLES()
-DEAL_II_QUERY_GIT_INFORMATION()
+deal_ii_initialize_cached_variables()
+deal_ii_query_git_information()
 
-IF(NOT DEAL_II_WITH_MPI OR NOT DEAL_II_WITH_THREADS OR NOT DEAL_II_WITH_P4EST)
-  MESSAGE(FATAL_ERROR
+if(NOT DEAL_II_WITH_MPI OR NOT DEAL_II_WITH_THREADS OR NOT DEAL_II_WITH_P4EST)
+  message(FATAL_ERROR
     "Need a deal.II library with threads, mpi and p4est support enabled."
     )
-ENDIF()
+endif()
 
-PROJECT(ryujin CXX)
+project(ryujin CXX)
 
-STRING(APPEND DEAL_II_CXX_FLAGS " -fopenmp")
-STRING(APPEND DEAL_II_LINKER_FLAGS " -fopenmp")
+#
+# Set up compiler flags:
+#
 
-IF(CMAKE_CXX_COMPILER_ID MATCHES "clang")
-  STRING(APPEND DEAL_II_CXX_FLAGS
+string(APPEND DEAL_II_CXX_FLAGS " -fopenmp")
+string(APPEND DEAL_II_LINKER_FLAGS " -fopenmp -Wl,-as-needed")
+
+string(APPEND DEAL_II_CXX_FLAGS_RELEASE " -march=native -O3 -ffp-contract=fast")
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "clang")
+  string(APPEND DEAL_II_CXX_FLAGS
     " -Xclang -fcolor-diagnostics -Qunused-arguments"
     )
-  STRING(APPEND DEAL_II_LINKER_FLAGS " -Wl,-as-needed")
-
-  STRING(APPEND DEAL_II_CXX_FLAGS_RELEASE
-    " -march=native -Ofast -ffp-contract=fast"
-    )
-
-  STRING(APPEND DEAL_II_CXX_FLAGS_DEBUG
+  string(APPEND DEAL_II_CXX_FLAGS_DEBUG
     " -fsanitize=address -fsanitize-address-use-after-scope"
     )
-  STRING(APPEND DEAL_II_LINKER_FLAGS_DEBUG
+  string(APPEND DEAL_II_LINKER_FLAGS_DEBUG
     " -fsanitize=address -fsanitize-address-use-after-scope"
     )
+endif()
 
-ELSE()
-  STRING(REPLACE "-Xclang" "" DEAL_II_CXX_FLAGS "${DEAL_II_CXX_FLAGS}")
-  STRING(REPLACE "-fcolor-diagnostics" "" DEAL_II_CXX_FLAGS "${DEAL_II_CXX_FLAGS}")
-  STRING(REPLACE "-Qunused-arguments" "" DEAL_II_CXX_FLAGS "${DEAL_II_CXX_FLAGS}")
-  IF(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-    STRING(APPEND DEAL_II_CXX_FLAGS " -fdiagnostics-color=always")
-  ENDIF()
-ENDIF()
-
-
-IF(POLICY CMP0042)
-  CMAKE_POLICY(SET CMP0042 NEW)
-ENDIF()
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+  string(APPEND DEAL_II_CXX_FLAGS " -fdiagnostics-color=always")
+endif()
 
 #
 # Options:
 #
 
-SET(DIM "2" CACHE STRING "The dimension")
+set(DIM "2" CACHE STRING "The dimension")
 
-SET(NUMBER "double" CACHE STRING "The principal floating point type")
+set(NUMBER "double" CACHE STRING "The principal floating point type")
 
-OPTION(USE_SIMD "Use SIMD vectorization" ON)
+option(USE_SIMD "Use SIMD vectorization" ON)
 
-OPTION(USE_CUSTOM_POW "Use custom pow implementation" OFF)
+option(USE_CUSTOM_POW "Use custom pow implementation" ON)
 
-OPTION(CHECK_BOUNDS "Enable debug code paths that check limiter bounds" OFF)
+option(CHECK_BOUNDS "Enable debug code paths that check limiter bounds" OFF)
 
-OPTION(DEBUG_OUTPUT "Enable detailed time-step output" OFF)
+option(DEBUG_OUTPUT "Enable detailed time-step output" OFF)
 
-OPTION(LIKWID_PERFMON "Compile and link against the likwid instrumentation library" OFF)
-OPTION(CALLGRIND "Compile and link against the valgrind/callgrind instrumentation library" OFF)
+option(CALLGRIND
+  "Compile and link against the valgrind/callgrind instrumentation library" OFF
+  )
+
+option(LIKWID_PERFMON
+  "Compile and link against the likwid instrumentation library" OFF
+  )
+
+option(DOCUMENTATION
+  "Build the documentation with doxygen" OFF
+  )
 
 #
 # Set up the rest:
 #
 
-ADD_SUBDIRECTORY(grendel)
-ADD_SUBDIRECTORY(ryujin)
+add_subdirectory(grendel)
+add_subdirectory(ryujin)
 
-ENABLE_TESTING()
-ADD_SUBDIRECTORY(tests)
+enable_testing()
+add_subdirectory(tests)
+
+add_subdirectory(doc)

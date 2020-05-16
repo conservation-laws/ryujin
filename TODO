@@ -4,8 +4,6 @@ TODO:
 
  * Add to deal.II:
 
-   - ternary_ge
-
    - MatrixCommunicator
 
  * Think about optimizing

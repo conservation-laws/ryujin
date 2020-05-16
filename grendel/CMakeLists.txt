@@ -1,8 +1,8 @@
-INCLUDE_DIRECTORIES(
+include_directories(
   ${CMAKE_BINARY_DIR}/grendel/
   )
 
-ADD_LIBRARY(grendel SHARED
+add_library(grendel SHARED
   discretization.cc
   initial_values.cc
   limiter.cc
@@ -14,13 +14,13 @@ ADD_LIBRARY(grendel SHARED
   sparse_matrix_simd.cc
   time_step.cc
   )
-DEAL_II_SETUP_TARGET(grendel)
+deal_ii_setup_target(grendel)
 
-IF(LIKWID_PERFMON)
-  TARGET_LINK_LIBRARIES(grendel likwid likwid-hwloc likwid-lua)
-ENDIF()
+if(LIKWID_PERFMON)
+  target_link_libraries(grendel likwid likwid-hwloc likwid-lua)
+endif()
 
-CONFIGURE_FILE(
+configure_file(
   ${CMAKE_CURRENT_SOURCE_DIR}/compile_time_options.h.in
   ${CMAKE_CURRENT_BINARY_DIR}/compile_time_options.h
   )
