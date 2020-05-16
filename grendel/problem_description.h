@@ -212,10 +212,10 @@ namespace grendel
     /*
      * rho e = (E - 1/2*m^2/rho)
      */
-    const Number rho = U[0];
+    const Number rho_inverse = ScalarNumber(1.) / U[0];
     const auto m = momentum(U);
     const Number E = U[dim + 1];
-    return E - ScalarNumber(0.5) * m.norm_square() / rho;
+    return E - ScalarNumber(0.5) * m.norm_square() * rho_inverse;
   }
 
 
@@ -243,8 +243,8 @@ namespace grendel
      *   (rho e)' = (1/2m^2/rho^2, -m/rho , 1 )^T
      */
 
-    const Number rho = U[0];
-    const auto u = momentum(U) / rho;
+    const Number rho_inverse = ScalarNumber(1.0) / U[0];
+    const auto u = momentum(U) * rho_inverse;
 
     rank1_type result;
 
@@ -290,9 +290,9 @@ namespace grendel
   ProblemDescription<dim, Number>::speed_of_sound(const rank1_type &U)
   {
     /* c^2 = gamma * p / rho / (1 - b * rho) */
-    const Number rho = U[0];
+    const Number rho_inverse = ScalarNumber(1.) / U[0];
     const Number p = pressure(U);
-    return std::sqrt(gamma * p / rho);
+    return std::sqrt(gamma * p * rho_inverse);
   }
 
 
@@ -380,7 +380,7 @@ namespace grendel
   ProblemDescription<dim, Number>::mathematical_entropy(const rank1_type U)
   {
     const auto p = pressure(U);
-    return grendel::pow(p, ScalarNumber(1. / gamma));
+    return grendel::pow(p, gamma_inverse);
   }
 
 
@@ -406,12 +406,13 @@ namespace grendel
      */
 
     const Number &rho = U[0];
-    const auto u = momentum(U) / rho;
+    const Number rho_inverse = ScalarNumber(1.)/rho;
+    const auto u = momentum(U) * rho_inverse;
     const auto p = pressure(U);
 
     const auto factor =
-        (gamma - ScalarNumber(1.0)) / gamma *
-        grendel::pow(p, ScalarNumber(1.) / gamma - ScalarNumber(1.));
+        (gamma - ScalarNumber(1.0)) * gamma_inverse *
+        grendel::pow(p, gamma_inverse - ScalarNumber(1.));
 
     rank1_type result;
 
@@ -430,9 +431,9 @@ namespace grendel
       typename ProblemDescription<dim, Number>::rank2_type
       ProblemDescription<dim, Number>::f(const rank1_type &U)
   {
-    const Number rho_inverse = Number(1.) / U[0];
+    const Number rho_inverse = ScalarNumber(1.) / U[0];
     const auto m = momentum(U);
-    const auto p = pressure(U);
+    const auto p = pressure(U, rho_inverse);
     const Number E = U[dim + 1];
 
     rank2_type result;
