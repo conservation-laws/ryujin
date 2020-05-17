@@ -83,4 +83,6 @@ add_subdirectory(ryujin)
 enable_testing()
 add_subdirectory(tests)
 
-add_subdirectory(doc)
+IF(DOCUMENTATION)
+  add_subdirectory(doc)
+ENDIF()
