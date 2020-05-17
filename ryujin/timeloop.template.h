@@ -161,14 +161,11 @@ namespace ryujin
         it.reinit(partitioner);
 
       if (resume) {
-        MPI_Barrier(mpi_communicator); // FIXME
         print_info("resuming interrupted computation");
         const auto id =
             discretization.triangulation().locally_owned_subdomain();
         do_resume(base_name, id, U, t, output_cycle);
         t_initial = t;
-        MPI_Barrier(mpi_communicator);                         // FIXME
-        print_info("resuming interrupted computation - done"); // FIXME
       } else {
         print_info("interpolating initial values");
         U = initial_values.interpolate(offline_data);
@@ -392,7 +389,6 @@ namespace ryujin
 
     {
       Scope scope(computing_timer, "postprocessor");
-      MPI_Barrier(mpi_communicator); // FIXME
       print_info("scheduling output");
 
       const bool do_full_output =
@@ -401,21 +397,16 @@ namespace ryujin
           (cycle % output_cutplanes_multiplier == 0) && enable_output_cutplanes;
       postprocessor.schedule_output(
           U, time_step.alpha(), name, t, cycle, do_full_output, do_cutplanes);
-      MPI_Barrier(mpi_communicator);          // FIXME
-      print_info("scheduling output - done"); // FIXME
     }
 
     /* Checkpointing: */
 
     if (cycle % output_checkpoint_multiplier == 0 && enable_checkpointing) {
 
-      MPI_Barrier(mpi_communicator); // FIXME
       print_info("scheduling checkpointing");
       Scope scope(computing_timer, "checkpointing");
       const auto id = discretization.triangulation().locally_owned_subdomain();
       do_checkpoint(base_name, id, U, t, cycle);
-      MPI_Barrier(mpi_communicator);                 // FIXME
-      print_info("scheduling checkpointing - done"); // FIXME
     }
   }
 
