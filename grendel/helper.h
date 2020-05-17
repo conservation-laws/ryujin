@@ -12,6 +12,18 @@
 
 #include <type_traits>
 
+namespace dealii
+{
+  namespace LinearAlgebra
+  {
+    namespace distributed
+    {
+      template <typename T, typename MemorySpace>
+      class Vector;
+    }
+  } // namespace LinearAlgebra
+} // namespace dealii
+
 
 namespace grendel
 {
@@ -150,9 +162,6 @@ namespace grendel
   }
 
 
-  /*
-   * It's magic
-   */
   template <typename T1>
   DEAL_II_ALWAYS_INLINE inline dealii::VectorizedArray<typename T1::value_type>
   simd_gather(
@@ -166,6 +175,7 @@ namespace grendel
     result.gather(U.get_values(), js.data());
     return result;
   }
+
 
   template <typename T1>
   DEAL_II_ALWAYS_INLINE inline dealii::VectorizedArray<typename T1::value_type>
@@ -213,31 +223,87 @@ namespace grendel
   }
 
 
-  template <typename T1>
+  /**
+   * FIXME: Write documentation
+   */
+  template <typename T, typename M>
   DEAL_II_ALWAYS_INLINE inline void
-  simd_scatter(T1 &U,
-               const dealii::VectorizedArray<typename T1::value_type> &result,
+  simd_scatter(dealii::LinearAlgebra::distributed::Vector<T, M> &vector,
+               const dealii::VectorizedArray<T> &values,
                unsigned int i)
   {
-    result.store(U.get_values() + i);
+    values.store(vector.get_values() + i);
   }
 
 
-  template <typename T1, std::size_t k, typename T2>
-  DEAL_II_ALWAYS_INLINE inline void
-  simd_scatter(std::array<T1, k> &U, const T2 &result, unsigned int i)
-  {
-    for (unsigned int j = 0; j < k; ++j)
-      result[j].store(U[j].get_values() + i);
-  }
-
-
-  /*
-   * Convenience wrapper that creates a dealii::Function object out of a
-   * (fairly general) callable object:
+  /**
+   * FIXME: Write documentation
    */
+  template <typename T>
+  DEAL_II_ALWAYS_INLINE inline void
+  simd_scatter(dealii::AlignedVector<T> &vector,
+               const dealii::VectorizedArray<T> &values,
+               unsigned int i)
+  {
+    values.store(vector.data() + i);
+  }
 
 
+  /**
+   * FIXME: Write documentation
+   */
+  template <typename T1, typename T2>
+  DEAL_II_ALWAYS_INLINE inline void
+  simd_scatter(T1 &U, const T2 &result, unsigned int i)
+  {
+    constexpr size_t k = std::tuple_size<T1>::value;
+    for (unsigned int j = 0; j < k; ++j)
+      simd_scatter(U[j], result[j], i);
+  }
+
+
+  /**
+   * FIXME: Write documentation
+   */
+  template <typename T1, typename T2>
+  DEAL_II_ALWAYS_INLINE inline void
+  simd_scatter_vtas(T1 &vector, const T2 &entries, unsigned int i)
+  {
+    using Number = typename T1::value_type;
+
+    constexpr auto simd_length = dealii::VectorizedArray<Number>::size();
+    constexpr unsigned int flux_and_u_width =
+        sizeof(entries) / sizeof(Number) / simd_length;
+
+    const auto indices = generate_iterators<simd_length>(
+        [&](auto k) -> unsigned int { return (i + k) * flux_and_u_width; });
+
+    vectorized_transpose_and_store(false,
+                                   flux_and_u_width,
+                                   &entries.first[0],
+                                   indices.data(),
+                                   vector.data());
+  }
+
+
+  /**
+   * FIXME: Write documentation
+   */
+  template <typename T1, typename T2>
+  DEAL_II_ALWAYS_INLINE inline void
+  scatter_vtas(T1 &vector, const T2 &entries, unsigned int i)
+  {
+    using Number = typename T1::value_type;
+    constexpr unsigned int flux_and_u_width = sizeof(entries) / sizeof(Number);
+
+    const Number *values = &entries.first[0];
+
+    for (unsigned int k = 0; k < flux_and_u_width; ++k)
+      vector[i * flux_and_u_width + k] = values[k];
+  }
+
+
+#ifndef DOXYGEN
   namespace
   {
     template <int dim, typename Number, typename Callable>
@@ -262,10 +328,12 @@ namespace grendel
       const unsigned int k_;
     };
   } // namespace
+#endif
 
 
-  /*
-   * It's magic
+  /**
+   * Convenience wrapper that creates a dealii::Function object out of a
+   * (fairly general) callable object:
    */
   template <int dim, typename Number, typename Callable>
   ToFunction<dim, Number, Callable> to_function(const Callable &callable,
