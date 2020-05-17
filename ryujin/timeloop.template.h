@@ -174,7 +174,6 @@ namespace ryujin
 
     if (write_output_files) {
       output(U, base_name + "-solution", t, output_cycle);
-
       if (enable_compute_error) {
         const auto analytic = initial_values.interpolate(offline_data, t);
         output(analytic, base_name + "-analytic_solution", t, output_cycle);
@@ -217,24 +216,25 @@ namespace ryujin
         print_cycle_statistics(cycle, t, output_cycle);
     } /* end of loop */
 
-    --cycle; /* We have actually performed one cycle less. */
-
-#ifdef CALLGRIND
-    CALLGRIND_DUMP_STATS;
-#endif
-
     /* Wait for output thread: */
     postprocessor.wait();
 
+    /* We have actually performed one cycle less. */
+    --cycle;
+
     computing_timer["time loop"].stop();
+
+    /* Write final timing statistics to logfile: */
+    print_cycle_statistics(cycle, t, output_cycle, /*final_time=*/ true);
 
     if (enable_compute_error) {
       /* Output final error: */
       compute_error(U, t);
     }
 
-    /* Write final timing statistics to logfile: */
-    print_cycle_statistics(cycle, t, output_cycle, /*final_time=*/ true);
+#ifdef CALLGRIND
+    CALLGRIND_DUMP_STATS;
+#endif
   }
 
 
