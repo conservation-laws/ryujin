@@ -730,7 +730,7 @@ IMAGE_PATH             =
 # If FILTER_PATTERNS is specified, this tag will be
 # ignored.
 
-INPUT_FILTER           = ./filter
+INPUT_FILTER           =
 
 # The FILTER_PATTERNS tag can be used to specify filters on a per file pattern
 # basis.
@@ -849,7 +849,7 @@ GENERATE_HTML          = YES
 # If a relative path is entered the value of OUTPUT_DIRECTORY will be
 # put in front of it. If left blank `html' will be used as the default path.
 
-HTML_OUTPUT            = me
+HTML_OUTPUT            =
 
 # The HTML_FILE_EXTENSION tag can be used to specify the file extension for
 # each generated HTML page (for example: .htm,.php,.asp). If it is left blank

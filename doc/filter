@@ -1,7 +1,0 @@
-#!/usr/bin/perl -p
-
-# Make sure we can just write $...$ for formulas. However, undo that change
-# if the dollar sign was escaped with a backslash:
-
-s/\$/\@f\$/g;
-s/\\\@f\$/\$/g;
