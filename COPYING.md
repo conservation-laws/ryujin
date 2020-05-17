@@ -14,6 +14,16 @@ collaborators. See https://github.com/vectorclass/version2 and
 `simd-math/LICENSE`.
 
 
+Logo
+----
+
+The logo `doc/logo.png` shows a cropped portion of the painting "The
+Dragon" by Kunisada II Utagawa which is in the public domain.
+
+https://commons.wikimedia.org/wiki/File:Kunisada_II_The_Dragon.jpg
+https://en.wikipedia.org/wiki/Utagawa_Kunisada_II
+
+
 Contact
 -------
 
