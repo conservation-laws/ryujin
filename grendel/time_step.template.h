@@ -301,9 +301,8 @@ namespace grendel
 
       /* Parallel SIMD loop: */
 
-      GRENDEL_OMP_FOR // wait
-          for (unsigned int i = 0; i < n_internal; i += simd_length)
-      {
+      GRENDEL_OMP_FOR
+      for (unsigned int i = 0; i < n_internal; i += simd_length) {
 
         if (GRENDEL_UNLIKELY(above_n_export_indices == false &&
                              i >= n_export_indices)) {
@@ -592,9 +591,8 @@ namespace grendel
 
       /* Parallel SIMD loop: */
 
-      GRENDEL_OMP_FOR // wait
-          for (unsigned int i = 0; i < n_internal; i += simd_length)
-      {
+      GRENDEL_OMP_FOR
+      for (unsigned int i = 0; i < n_internal; i += simd_length) {
 
         if (GRENDEL_UNLIKELY(above_n_export_indices == false &&
                              i >= n_export_indices)) {
@@ -769,9 +767,8 @@ namespace grendel
 
         bool above_n_export_indices = false;
 
-        GRENDEL_OMP_FOR // wait
-            for (unsigned int i = 0; i < n_internal; i += simd_length)
-        {
+        GRENDEL_OMP_FOR
+        for (unsigned int i = 0; i < n_internal; i += simd_length) {
 
           if (GRENDEL_UNLIKELY(above_n_export_indices == false &&
                                i >= n_export_indices)) {
@@ -866,9 +863,8 @@ namespace grendel
 
         bool above_n_export_indices = false;
 
-        GRENDEL_OMP_FOR // wait
-            for (unsigned int i = 0; i < n_internal; i += simd_length)
-        {
+        GRENDEL_OMP_FOR
+        for (unsigned int i = 0; i < n_internal; i += simd_length) {
 
           if (GRENDEL_UNLIKELY(above_n_export_indices == false &&
                                i >= n_export_indices)) {
@@ -1004,9 +1000,8 @@ namespace grendel
 
         /* Parallel vectorized loop: */
 
-        GRENDEL_OMP_FOR // wait
-            for (unsigned int i = 0; i < n_internal; i += simd_length)
-        {
+        GRENDEL_OMP_FOR
+        for (unsigned int i = 0; i < n_internal; i += simd_length) {
 
           if (GRENDEL_UNLIKELY(above_n_export_indices == false &&
                                i >= n_export_indices)) {
