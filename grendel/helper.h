@@ -128,8 +128,7 @@ namespace grendel
     }
 
     template <typename T>
-    DEAL_II_ALWAYS_INLINE inline auto access_data(T &U)
-        -> decltype(U.data())
+    DEAL_II_ALWAYS_INLINE inline auto access_data(T &U) -> decltype(U.data())
     {
       return U.data();
     }
@@ -189,7 +188,8 @@ namespace grendel
    *
    *   { U[0][js[0]] , U[0][js[0]] , ... , U[0][js[VectorizedArray::size()-1]] }
    *   ...
-   *   { U[k-1][js[0]] , U[k-1][js[0]] , ... , U[k-1][js[VectorizedArray::size()-1]] }
+   *   { U[k-1][js[0]] , U[k-1][js[0]] , ... ,
+   * U[k-1][js[VectorizedArray::size()-1]] }
    */
   template <typename T1, std::size_t k, typename T2>
   DEAL_II_ALWAYS_INLINE inline dealii::
@@ -246,8 +246,7 @@ namespace grendel
    * FIXME: Write documentation
    */
   template <int dim, typename T1>
-  DEAL_II_ALWAYS_INLINE inline auto
-  simd_load_vlat(T1 &vector, unsigned int i)
+  DEAL_II_ALWAYS_INLINE inline auto simd_load_vlat(T1 &vector, unsigned int i)
   {
     using Number = typename T1::value_type;
     using PD = ProblemDescription<dim, dealii::VectorizedArray<Number>>;
@@ -272,8 +271,8 @@ namespace grendel
    * FIXME: Write documentation
    */
   template <int dim, typename T1>
-  DEAL_II_ALWAYS_INLINE inline auto
-  simd_load_vlat(T1 &vector, const unsigned int *js)
+  DEAL_II_ALWAYS_INLINE inline auto simd_load_vlat(T1 &vector,
+                                                   const unsigned int *js)
   {
     using Number = typename T1::value_type;
     using PD = ProblemDescription<dim, dealii::VectorizedArray<Number>>;

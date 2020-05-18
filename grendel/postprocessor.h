@@ -64,7 +64,6 @@ namespace grendel
     void wait();
 
   protected:
-
     std::array<scalar_type, n_quantities> quantities_;
 
   private:

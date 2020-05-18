@@ -95,8 +95,8 @@ namespace grendel
     static constexpr unsigned int flux_and_u_width =
         (dim + 1) * problem_dimension;
 
-    specific_entropies.resize(n_relevant);
-    evc_entropies.resize(n_relevant);
+    specific_entropies_.resize(n_relevant);
+    evc_entropies_.resize(n_relevant);
     u_and_flux_.resize(flux_and_u_width * n_relevant);
 
     /* Initialize local matrices: */
@@ -164,14 +164,14 @@ namespace grendel
         const auto f_i = PD::f(U_i);
 
         simd_store_vtas(u_and_flux_, std::make_pair(U_i, f_i), i);
-        simd_store(specific_entropies, PD::specific_entropy(U_i), i);
+        simd_store(specific_entropies_, PD::specific_entropy(U_i), i);
 
         const auto evc_entropy =
             Indicator<dim, double>::evc_entropy_ ==
                     Indicator<dim, double>::Entropy::mathematical
                 ? PD::mathematical_entropy(U_i)
                 : PD::harten_entropy(U_i);
-        simd_store(evc_entropies, evc_entropy, i);
+        simd_store(evc_entropies_, evc_entropy, i);
       }
 
       for (unsigned int i = size_regular; i < n_relevant; ++i) {
@@ -180,10 +180,10 @@ namespace grendel
 
         store_vtas(u_and_flux_, std::make_pair(U_i, f_i), i);
 
-        specific_entropies[i] =
+        specific_entropies_[i] =
             ProblemDescription<dim, Number>::specific_entropy(U_i);
 
-        evc_entropies[i] =
+        evc_entropies_[i] =
             Indicator<dim, double>::evc_entropy_ ==
                     Indicator<dim, double>::Entropy::mathematical
                 ? ProblemDescription<dim, Number>::mathematical_entropy(U_i)
@@ -245,7 +245,7 @@ namespace grendel
         const Number mass = lumped_mass_matrix.local_element(i);
         const Number hd_i = mass * measure_of_omega_inverse;
 
-        indicator_serial.reset(U_i, f_i, evc_entropies[i]);
+        indicator_serial.reset(U_i, f_i, evc_entropies_[i]);
 
         /* Skip diagonal. */
         const unsigned int *js = sparsity_simd.columns(i);
@@ -256,7 +256,7 @@ namespace grendel
 
           const auto c_ij = cij_matrix.get_tensor(i, col_idx);
           const auto beta_ij = betaij_matrix.get_entry(i, col_idx);
-          indicator_serial.add(U_j, c_ij, beta_ij, evc_entropies[j], f_j);
+          indicator_serial.add(U_j, c_ij, beta_ij, evc_entropies_[j], f_j);
 
           /* Only iterate over the upper triangular portion of d_ij */
           if (j <= i)
@@ -302,7 +302,8 @@ namespace grendel
       /* Parallel SIMD loop: */
 
       GRENDEL_OMP_FOR // wait
-      for (unsigned int i = 0; i < n_internal; i += simd_length) {
+          for (unsigned int i = 0; i < n_internal; i += simd_length)
+      {
 
         if (GRENDEL_UNLIKELY(above_n_export_indices == false &&
                              i >= n_export_indices)) {
@@ -315,7 +316,7 @@ namespace grendel
         }
 
         const auto &[U_i, f_i] = simd_load_vlat<dim>(u_and_flux_, i);
-        const auto entropy_i = simd_load(evc_entropies, i);
+        const auto entropy_i = simd_load(evc_entropies_, i);
 
         indicator_simd.reset(U_i, f_i, entropy_i);
 
@@ -337,7 +338,7 @@ namespace grendel
             }
 
           const auto &[U_j, f_j] = simd_load_vlat<dim>(u_and_flux_, js);
-          const auto entropy_j = simd_load(evc_entropies, js);
+          const auto entropy_j = simd_load(evc_entropies_, js);
 
           const auto c_ij = cij_matrix.get_vectorized_tensor(i, col_idx);
           const auto beta_ij = betaij_matrix.get_vectorized_entry(i, col_idx);
@@ -550,7 +551,7 @@ namespace grendel
           limiter_serial.accumulate(U_i,
                                     U_j,
                                     U_ij_bar,
-                                    specific_entropies[j],
+                                    specific_entropies_[j],
                                     /* is diagonal */ col_idx == 0);
           const auto beta_ij = betaij_matrix.get_entry(i, col_idx);
           limiter_serial.accumulate_variations(variations_j, beta_ij);
@@ -592,7 +593,8 @@ namespace grendel
       /* Parallel SIMD loop: */
 
       GRENDEL_OMP_FOR // wait
-      for (unsigned int i = 0; i < n_internal; i += simd_length) {
+          for (unsigned int i = 0; i < n_internal; i += simd_length)
+      {
 
         if (GRENDEL_UNLIKELY(above_n_export_indices == false &&
                              i >= n_export_indices)) {
@@ -655,7 +657,7 @@ namespace grendel
 
           U_i_new += tau * m_i_inv * Number(2.) * d_ij * U_ij_bar;
 
-          const auto entropy_j = simd_load(specific_entropies, js);
+          const auto entropy_j = simd_load(specific_entropies_, js);
           limiter_simd.accumulate(U_i,
                                   U_j,
                                   U_ij_bar,
@@ -768,7 +770,8 @@ namespace grendel
         bool above_n_export_indices = false;
 
         GRENDEL_OMP_FOR // wait
-        for (unsigned int i = 0; i < n_internal; i += simd_length) {
+            for (unsigned int i = 0; i < n_internal; i += simd_length)
+        {
 
           if (GRENDEL_UNLIKELY(above_n_export_indices == false &&
                                i >= n_export_indices)) {
@@ -864,7 +867,8 @@ namespace grendel
         bool above_n_export_indices = false;
 
         GRENDEL_OMP_FOR // wait
-        for (unsigned int i = 0; i < n_internal; i += simd_length) {
+            for (unsigned int i = 0; i < n_internal; i += simd_length)
+        {
 
           if (GRENDEL_UNLIKELY(above_n_export_indices == false &&
                                i >= n_export_indices)) {
@@ -1001,7 +1005,8 @@ namespace grendel
         /* Parallel vectorized loop: */
 
         GRENDEL_OMP_FOR // wait
-        for (unsigned int i = 0; i < n_internal; i += simd_length) {
+            for (unsigned int i = 0; i < n_internal; i += simd_length)
+        {
 
           if (GRENDEL_UNLIKELY(above_n_export_indices == false &&
                                i >= n_export_indices)) {

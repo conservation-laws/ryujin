@@ -48,9 +48,8 @@ namespace grendel
                   "geometry is set to file");
 
     mesh_distortion_ = 0.;
-    add_parameter("mesh distortion",
-                  mesh_distortion_,
-                  "Strength of mesh distortion");
+    add_parameter(
+        "mesh distortion", mesh_distortion_, "Strength of mesh distortion");
 
     /* Immersed triangle: */
 

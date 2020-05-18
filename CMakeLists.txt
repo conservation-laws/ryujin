@@ -27,7 +27,7 @@ project(ryujin CXX)
 string(APPEND DEAL_II_CXX_FLAGS " -fopenmp")
 string(APPEND DEAL_II_LINKER_FLAGS " -fopenmp -Wl,-as-needed")
 
-string(APPEND DEAL_II_CXX_FLAGS_RELEASE " -march=native -O3 -ffp-contract=fast")
+string(APPEND DEAL_II_CXX_FLAGS_RELEASE " -march=native -Ofast -ffp-contract=fast")
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   string(APPEND DEAL_II_CXX_FLAGS

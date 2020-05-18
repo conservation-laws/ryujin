@@ -143,8 +143,8 @@ namespace grendel
     vector_type temp_euler_;
     vector_type temp_ssp_;
 
-    dealii::AlignedVector<Number> specific_entropies;
-    dealii::AlignedVector<Number> evc_entropies;
+    dealii::AlignedVector<Number> specific_entropies_;
+    dealii::AlignedVector<Number> evc_entropies_;
     dealii::AlignedVector<Number> u_and_flux_;
 
     /* Options: */

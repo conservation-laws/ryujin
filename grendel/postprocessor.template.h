@@ -155,8 +155,8 @@ namespace grendel
         /* Skip diagonal. */
         const unsigned int *js = sparsity_simd.columns(i);
         for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
-          const auto j = *(i < n_internal ? js + col_idx * simd_length
-                                          : js + col_idx);
+          const auto j =
+              *(i < n_internal ? js + col_idx * simd_length : js + col_idx);
 
           const auto U_j = gather(U, j);
           const auto M_j = ProblemDescription<dim, Number>::momentum(U_j);

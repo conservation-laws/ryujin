@@ -360,13 +360,12 @@ namespace grendel
      */
 
     const Number &rho = U[0];
-    const Number rho_inverse = ScalarNumber(1.)/rho;
+    const Number rho_inverse = ScalarNumber(1.) / rho;
     const auto u = momentum(U) * rho_inverse;
     const auto p = pressure(U);
 
-    const auto factor =
-        (gamma - ScalarNumber(1.0)) * gamma_inverse *
-        grendel::pow(p, gamma_inverse - ScalarNumber(1.));
+    const auto factor = (gamma - ScalarNumber(1.0)) * gamma_inverse *
+                        grendel::pow(p, gamma_inverse - ScalarNumber(1.));
 
     rank1_type result;
 
