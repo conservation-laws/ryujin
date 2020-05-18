@@ -311,13 +311,14 @@ namespace grendel
     constexpr unsigned int problem_dimension = PD::rank2_type::dimension;
     constexpr unsigned int flux_and_u_width = (dim + 1) * problem_dimension;
 
-    const auto indices = generate_iterators<simd_length>(
-        [&](auto k) -> unsigned int { return (i + k) * flux_and_u_width; });
+    unsigned int indices[simd_length];
+    for (unsigned int v = 0; v < simd_length; ++v)
+      indices[v] = (i + v) * flux_and_u_width;
 
     std::pair<typename PD::rank1_type, typename PD::rank2_type> result;
 
     vectorized_load_and_transpose(
-        flux_and_u_width, vector.data(), indices.data(), &result.first[0]);
+        flux_and_u_width, vector.data(), indices, &result.first[0]);
 
     return result;
   }
@@ -337,13 +338,14 @@ namespace grendel
     constexpr unsigned int problem_dimension = PD::rank2_type::dimension;
     constexpr unsigned int flux_and_u_width = (dim + 1) * problem_dimension;
 
-    const auto indices = generate_iterators<simd_length>(
-        [&](auto k) -> unsigned int { return js[k] * flux_and_u_width; });
+    unsigned int indices[simd_length];
+    for (unsigned int v = 0; v < simd_length; ++v)
+      indices[v] = js[v] * flux_and_u_width;
 
     std::pair<typename PD::rank1_type, typename PD::rank2_type> result;
 
     vectorized_load_and_transpose(
-        flux_and_u_width, vector.data(), indices.data(), &result.first[0]);
+        flux_and_u_width, vector.data(), indices, &result.first[0]);
 
     return result;
   }
@@ -362,14 +364,12 @@ namespace grendel
     constexpr unsigned int flux_and_u_width =
         sizeof(entries) / sizeof(Number) / simd_length;
 
-    const auto indices = generate_iterators<simd_length>(
-        [&](auto k) -> unsigned int { return (i + k) * flux_and_u_width; });
+    unsigned int indices[simd_length];
+    for (unsigned int v = 0; v < simd_length; ++v)
+      indices[v] = (i + v) * flux_and_u_width;
 
-    vectorized_transpose_and_store(false,
-                                   flux_and_u_width,
-                                   &entries.first[0],
-                                   indices.data(),
-                                   vector.data());
+    vectorized_transpose_and_store(
+        false, flux_and_u_width, &entries.first[0], indices, vector.data());
   }
 
 
