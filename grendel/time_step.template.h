@@ -655,8 +655,7 @@ namespace grendel
 
           U_i_new += tau * m_i_inv * Number(2.) * d_ij * U_ij_bar;
 
-          VectorizedArray<Number> entropy_j;
-          entropy_j.gather(specific_entropies.data(), js);
+          const auto entropy_j = simd_load(specific_entropies, js);
           limiter_simd.accumulate(U_i,
                                   U_j,
                                   U_ij_bar,
