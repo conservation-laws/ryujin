@@ -6,7 +6,7 @@
 #ifndef CHECKPOINTING_H
 #define CHECKPOINTING_H
 
-#include <helper.h>
+#include <deal.II/base/utilities.h>
 
 #include <boost/archive/binary_iarchive.hpp>
 #include <boost/archive/binary_oarchive.hpp>

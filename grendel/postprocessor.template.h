@@ -6,8 +6,8 @@
 #ifndef POSTPROCESSOR_TEMPLATE_H
 #define POSTPROCESSOR_TEMPLATE_H
 
-#include "helper.h"
 #include "postprocessor.h"
+#include "simd.h"
 
 #include <deal.II/numerics/data_out.h>
 #include <deal.II/numerics/vector_tools.h>

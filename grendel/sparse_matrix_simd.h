@@ -10,7 +10,8 @@
 #include <deal.II/base/partitioner.h>
 #include <deal.II/lac/dynamic_sparsity_pattern.h>
 
-#include "helper.h"
+#include "openmp_macros.h"
+#include "simd.h"
 
 namespace grendel
 {

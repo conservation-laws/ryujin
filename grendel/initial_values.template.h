@@ -6,7 +6,6 @@
 #ifndef INITIAL_VALUES_TEMPLATE_H
 #define INITIAL_VALUES_TEMPLATE_H
 
-#include "helper.h"
 #include "initial_values.h"
 #include "simd.h"
 

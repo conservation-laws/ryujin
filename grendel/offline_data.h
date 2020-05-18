@@ -8,8 +8,8 @@
 
 #include <compile_time_options.h>
 
+#include "convenience_macros.h"
 #include "discretization.h"
-#include "helper.h"
 #include "sparse_matrix_simd.h"
 
 #include <deal.II/base/parameter_acceptor.h>

@@ -8,7 +8,7 @@
 
 #include <compile_time_options.h>
 
-#include "helper.h"
+#include "convenience_macros.h"
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/quadrature.h>

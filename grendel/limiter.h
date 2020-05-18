@@ -8,7 +8,6 @@
 
 #include <compile_time_options.h>
 
-#include "helper.h"
 #include "newton.h"
 #include "offline_data.h"
 #include "simd.h"

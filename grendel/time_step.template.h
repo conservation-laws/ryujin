@@ -6,7 +6,9 @@
 #ifndef TIME_STEP_TEMPLATE_H
 #define TIME_STEP_TEMPLATE_H
 
+#include "openmp_macros.h"
 #include "scope.h"
+#include "simd.h"
 #include "time_step.h"
 
 #include "indicator.h"

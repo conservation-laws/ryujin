@@ -8,7 +8,7 @@
 
 #include <compile_time_options.h>
 
-#include "helper.h"
+#include "convenience_macros.h"
 #include "simd.h"
 
 #include "limiter.h"

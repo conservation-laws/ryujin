@@ -9,7 +9,6 @@
 #include "checkpointing.h"
 #include "timeloop.h"
 
-#include <helper.h>
 #include <indicator.h>
 #include <limiter.h>
 #include <riemann_solver.h>
