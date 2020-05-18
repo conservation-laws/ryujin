@@ -6,32 +6,23 @@
 #ifndef HELPER_H
 #define HELPER_H
 
+#include "problem_description.h"
+
 #include <deal.II/base/function.h>
 #include <deal.II/base/tensor.h>
 #include <deal.II/base/vectorization.h>
 
 #include <type_traits>
 
-namespace dealii
-{
-  namespace LinearAlgebra
-  {
-    namespace distributed
-    {
-      template <typename T, typename MemorySpace>
-      class Vector;
-    }
-  } // namespace LinearAlgebra
-} // namespace dealii
-
 
 namespace grendel
 {
-
-  /*
-   * Packed iterator handling.
+  /**
+   * @name Packed index handling
    */
+  //@{
 
+#ifndef DOXYGEN
   namespace
   {
     template <typename Functor, size_t... Is>
@@ -41,6 +32,7 @@ namespace grendel
       return {f(Is)...};
     }
   } /* namespace */
+#endif
 
   /**
    * Given a callable object f(k), this function creates a std::array with
@@ -69,12 +61,16 @@ namespace grendel
       it++;
   }
 
-
-  /*
-   * Serial access to arrays of vectors
+  //@}
+  /**
+   * @name Serial access to arrays of vectors
    */
+  //@{
 
-
+  /**
+   * Return a tensor populated with the entries
+   *   { U[0][i] , U[1][i] , ... , U[k][i] }
+   */
   template <typename T1, std::size_t k, typename T2>
   DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, k, typename T1::value_type>
   gather(const std::array<T1, k> &U, const T2 i)
@@ -86,6 +82,9 @@ namespace grendel
   }
 
 
+  /**
+   * Variant of above function returning a std::array instead.
+   */
   template <typename T1, std::size_t k, typename T2>
   DEAL_II_ALWAYS_INLINE inline std::array<typename T1::value_type, k>
   gather_array(const std::array<T1, k> &U, const T2 i)
@@ -97,49 +96,111 @@ namespace grendel
   }
 
 
+  /**
+   * Write out the given tensor @p values into
+   *   { U[0][i] , U[1][i] , ... , U[k][i] }
+   */
   template <typename T1, std::size_t k1, typename T2, typename T3>
   DEAL_II_ALWAYS_INLINE inline void
-  scatter(std::array<T1, k1> &U, const T2 &result, const T3 i)
+  scatter(std::array<T1, k1> &U, const T2 &values, const T3 i)
   {
     for (unsigned int j = 0; j < k1; ++j)
-      U[j].local_element(i) = result[j];
+      U[j].local_element(i) = values[j];
   }
 
-
-  /*
-   * SIMD based access to vectors and arrays of vectors
+  //@}
+  /**
+   * @name SIMD based access to vectors and arrays of vectors
    */
+  //@{
+
+#ifndef DOXYGEN
+  namespace
+  {
+    // Some deal.II classes make the underlying data available via data(),
+    // others via get_values(). Let's provide a uniform access helper.
+
+    template <typename T>
+    DEAL_II_ALWAYS_INLINE inline auto access_data(T &U)
+        -> decltype(U.get_values())
+    {
+      return U.get_values();
+    }
+
+    template <typename T>
+    DEAL_II_ALWAYS_INLINE inline auto access_data(T &U)
+        -> decltype(U.data())
+    {
+      return U.data();
+    }
+  } /* namespace */
+#endif
 
   /**
-   * Populate a VectorizedArray with
+   * Return a VectorizedArray with
    *   { U[i] , U[i + 1] , ... , U[i + VectorizedArray::size() - 1] }
    */
   template <typename T1>
   DEAL_II_ALWAYS_INLINE inline dealii::VectorizedArray<typename T1::value_type>
-  simd_gather(const T1 &U, unsigned int i)
+  simd_load(const T1 &vector, unsigned int i)
   {
     dealii::VectorizedArray<typename T1::value_type> result;
-    result.load(U.get_values() + i);
+    result.load(access_data(vector) + i);
     return result;
   }
 
 
   /**
-   * Populate an array of VectorizedArray with
+   * Return a VectorizedArray with
+   *   { U[js[0] , U[js[1]] , ... , U[js[VectorizedArray::size() - 1]] }
+   */
+  template <typename T1>
+  DEAL_II_ALWAYS_INLINE inline dealii::VectorizedArray<typename T1::value_type>
+  simd_load(const T1 &vector, const unsigned int *js)
+  {
+    dealii::VectorizedArray<typename T1::value_type> result;
+    result.gather(access_data(vector), js);
+    return result;
+  }
+
+
+  /**
+   * Write out the given VectorizedArray to the vector
+   */
+  template <typename T1>
+  DEAL_II_ALWAYS_INLINE inline void
+  simd_store(T1 &vector,
+             const dealii::VectorizedArray<typename T1::value_type> &values,
+             unsigned int i)
+  {
+    values.store(access_data(vector) + i);
+  }
+
+
+  /**
+   * Return a tensor of VectorizedArray entries. If the @p index_argument
+   * is a plain `unsigned int` the result is
+   *
    *   { U[0][i] , U[0][i+1] , ... , U[0][i+VectorizedArray::size()-1] }
    *   ...
    *   { U[k-1][i] , U[k-1][i+1] , ... , U[k-1][i+VectorizedArray::size()-1] }
+   *
+   * If the @p index_argument parameter is a pointer the result is
+   *
+   *   { U[0][js[0]] , U[0][js[0]] , ... , U[0][js[VectorizedArray::size()-1]] }
+   *   ...
+   *   { U[k-1][js[0]] , U[k-1][js[0]] , ... , U[k-1][js[VectorizedArray::size()-1]] }
    */
-  template <typename T1, std::size_t k>
+  template <typename T1, std::size_t k, typename T2>
   DEAL_II_ALWAYS_INLINE inline dealii::
       Tensor<1, k, dealii::VectorizedArray<typename T1::value_type>>
-      simd_gather(const std::array<T1, k> &U, unsigned int i)
+      simd_gather(const std::array<T1, k> &U, T2 index_argument)
   {
     dealii::Tensor<1, k, dealii::VectorizedArray<typename T1::value_type>>
         result;
 
     for (unsigned int j = 0; j < k; ++j)
-      result[j].load(U[j].get_values() + i);
+      result[j] = simd_load(U[j], index_argument);
 
     return result;
   }
@@ -151,114 +212,85 @@ namespace grendel
   template <typename T1, std::size_t k, typename T2>
   DEAL_II_ALWAYS_INLINE inline std::
       array<dealii::VectorizedArray<typename T1::value_type>, k>
-      simd_gather_array(const std::array<T1, k> &U, const T2 i)
+      simd_gather_array(const std::array<T1, k> &U, const T2 index_argument)
   {
     std::array<dealii::VectorizedArray<typename T1::value_type>, k> result;
 
     for (unsigned int j = 0; j < k; ++j)
-      result[j].load(U[j].get_values() + i);
-
-    return result;
-  }
-
-
-  template <typename T1>
-  DEAL_II_ALWAYS_INLINE inline dealii::VectorizedArray<typename T1::value_type>
-  simd_gather(
-      const T1 &U,
-      const std::array<
-          unsigned int,
-          dealii::VectorizedArray<typename T1::value_type>::size()>
-          js)
-  {
-    dealii::VectorizedArray<typename T1::value_type> result;
-    result.gather(U.get_values(), js.data());
-    return result;
-  }
-
-
-  template <typename T1>
-  DEAL_II_ALWAYS_INLINE inline dealii::VectorizedArray<typename T1::value_type>
-  simd_gather(const T1 &U, const unsigned int *js)
-  {
-    dealii::VectorizedArray<typename T1::value_type> result;
-    result.gather(U.get_values(), js);
-    return result;
-  }
-
-
-  /*
-   * It's magic
-   */
-  template <typename T1, std::size_t k>
-  DEAL_II_ALWAYS_INLINE inline dealii::
-      Tensor<1, k, dealii::VectorizedArray<typename T1::value_type>>
-      simd_gather(
-          const std::array<T1, k> &U,
-          const std::array<unsigned int,
-                           dealii::VectorizedArray<
-                               typename T1::value_type>::size()> js)
-  {
-    dealii::Tensor<1, k, dealii::VectorizedArray<typename T1::value_type>>
-        result;
-
-    for (unsigned int j = 0; j < k; ++j)
-      result[j].gather(U[j].get_values(), js.data());
-
-    return result;
-  }
-
-  template <typename T1, std::size_t k>
-  DEAL_II_ALWAYS_INLINE inline dealii::
-      Tensor<1, k, dealii::VectorizedArray<typename T1::value_type>>
-      simd_gather(const std::array<T1, k> &U, const unsigned int *js)
-  {
-    dealii::Tensor<1, k, dealii::VectorizedArray<typename T1::value_type>>
-        result;
-
-    for (unsigned int j = 0; j < k; ++j)
-      result[j].gather(U[j].get_values(), js);
+      result[j] = simd_load(U[j], index_argument);
 
     return result;
   }
 
 
   /**
-   * FIXME: Write documentation
+   * Converse operation to simd_gather() and simd_gather_array()
    */
-  template <typename T, typename M>
+  template <typename T1, typename T2, typename T3>
   DEAL_II_ALWAYS_INLINE inline void
-  simd_scatter(dealii::LinearAlgebra::distributed::Vector<T, M> &vector,
-               const dealii::VectorizedArray<T> &values,
-               unsigned int i)
-  {
-    values.store(vector.get_values() + i);
-  }
-
-
-  /**
-   * FIXME: Write documentation
-   */
-  template <typename T>
-  DEAL_II_ALWAYS_INLINE inline void
-  simd_scatter(dealii::AlignedVector<T> &vector,
-               const dealii::VectorizedArray<T> &values,
-               unsigned int i)
-  {
-    values.store(vector.data() + i);
-  }
-
-
-  /**
-   * FIXME: Write documentation
-   */
-  template <typename T1, typename T2>
-  DEAL_II_ALWAYS_INLINE inline void
-  simd_scatter(T1 &U, const T2 &result, unsigned int i)
+  simd_scatter(T1 &U, const T2 &result, T3 index_argument)
   {
     constexpr size_t k = std::tuple_size<T1>::value;
     for (unsigned int j = 0; j < k; ++j)
-      simd_scatter(U[j], result[j], i);
+      simd_store(U[j], result[j], index_argument);
+  }
+
+  //@}
+  /**
+   * @name SIMD and serial vectorized transpose and store / load and
+   * transpose operations:
+   */
+  //@{
+
+  /**
+   * FIXME: Write documentation
+   */
+  template <int dim, typename T1>
+  DEAL_II_ALWAYS_INLINE inline auto
+  simd_load_vlat(T1 &vector, unsigned int i)
+  {
+    using Number = typename T1::value_type;
+    using PD = ProblemDescription<dim, dealii::VectorizedArray<Number>>;
+
+    constexpr auto simd_length = dealii::VectorizedArray<Number>::size();
+    constexpr unsigned int problem_dimension = PD::rank2_type::dimension;
+    constexpr unsigned int flux_and_u_width = (dim + 1) * problem_dimension;
+
+    const auto indices = generate_iterators<simd_length>(
+        [&](auto k) -> unsigned int { return (i + k) * flux_and_u_width; });
+
+    std::pair<typename PD::rank1_type, typename PD::rank2_type> result;
+
+    vectorized_load_and_transpose(
+        flux_and_u_width, vector.data(), indices.data(), &result.first[0]);
+
+    return result;
+  }
+
+
+  /**
+   * FIXME: Write documentation
+   */
+  template <int dim, typename T1>
+  DEAL_II_ALWAYS_INLINE inline auto
+  simd_load_vlat(T1 &vector, const unsigned int *js)
+  {
+    using Number = typename T1::value_type;
+    using PD = ProblemDescription<dim, dealii::VectorizedArray<Number>>;
+
+    constexpr auto simd_length = dealii::VectorizedArray<Number>::size();
+    constexpr unsigned int problem_dimension = PD::rank2_type::dimension;
+    constexpr unsigned int flux_and_u_width = (dim + 1) * problem_dimension;
+
+    const auto indices = generate_iterators<simd_length>(
+        [&](auto k) -> unsigned int { return js[k] * flux_and_u_width; });
+
+    std::pair<typename PD::rank1_type, typename PD::rank2_type> result;
+
+    vectorized_load_and_transpose(
+        flux_and_u_width, vector.data(), indices.data(), &result.first[0]);
+
+    return result;
   }
 
 
@@ -267,7 +299,7 @@ namespace grendel
    */
   template <typename T1, typename T2>
   DEAL_II_ALWAYS_INLINE inline void
-  simd_scatter_vtas(T1 &vector, const T2 &entries, unsigned int i)
+  simd_store_vtas(T1 &vector, const T2 &entries, unsigned int i)
   {
     using Number = typename T1::value_type;
 
@@ -287,11 +319,40 @@ namespace grendel
 
 
   /**
-   * FIXME: Write documentation
+   * Non-SIMD counterpart of vectorized load and transpose Read in the
+   * object @p entries from the @p i th position of the @p vector object.
+   */
+  template <int dim, typename T1>
+  DEAL_II_ALWAYS_INLINE inline auto load_vlat(const T1 &vector, unsigned int i)
+  {
+    using Number = typename T1::value_type;
+    using PD = ProblemDescription<dim, Number>;
+
+    constexpr unsigned int problem_dimension = PD::rank2_type::dimension;
+    constexpr unsigned int flux_and_u_width = (dim + 1) * problem_dimension;
+
+    typename PD::rank1_type U_i;
+    typename PD::rank2_type f_i;
+
+    for (unsigned int d = 0; d < problem_dimension; ++d)
+      U_i[d] = vector[i * flux_and_u_width + d];
+    for (unsigned int d = 0; d < problem_dimension; ++d)
+      for (unsigned int e = 0; e < dim; ++e)
+        f_i[d][e] =
+            vector[i * flux_and_u_width + problem_dimension + d * dim + e];
+
+    return std::make_pair(U_i, f_i);
+  }
+
+
+  /**
+   * Non-SIMD counterpart of vectorized transpose and store: Write out the
+   * object @p entries to the @p i th position of the @p vector
+   * object.
    */
   template <typename T1, typename T2>
   DEAL_II_ALWAYS_INLINE inline void
-  scatter_vtas(T1 &vector, const T2 &entries, unsigned int i)
+  store_vtas(T1 &vector, const T2 &entries, unsigned int i)
   {
     using Number = typename T1::value_type;
     constexpr unsigned int flux_and_u_width = sizeof(entries) / sizeof(Number);
@@ -301,6 +362,8 @@ namespace grendel
     for (unsigned int k = 0; k < flux_and_u_width; ++k)
       vector[i * flux_and_u_width + k] = values[k];
   }
+
+  //@}
 
 
 #ifndef DOXYGEN

@@ -145,10 +145,7 @@ namespace grendel
 
     dealii::AlignedVector<Number> specific_entropies;
     dealii::AlignedVector<Number> evc_entropies;
-
-    static constexpr unsigned int flux_and_u_width =
-        (dim + 1) * problem_dimension;
-    dealii::AlignedVector<Number> flux_and_u;
+    dealii::AlignedVector<Number> u_and_flux_;
 
     /* Options: */
 

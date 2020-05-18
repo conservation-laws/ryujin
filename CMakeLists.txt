@@ -29,7 +29,7 @@ string(APPEND DEAL_II_LINKER_FLAGS " -fopenmp -Wl,-as-needed")
 
 string(APPEND DEAL_II_CXX_FLAGS_RELEASE " -march=native -O3 -ffp-contract=fast")
 
-if(CMAKE_CXX_COMPILER_ID MATCHES "clang")
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   string(APPEND DEAL_II_CXX_FLAGS
     " -Xclang -fcolor-diagnostics -Qunused-arguments"
     )

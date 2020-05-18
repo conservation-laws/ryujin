@@ -8,7 +8,6 @@
 
 #include <compile_time_options.h>
 
-#include "helper.h"
 #include "simd.h"
 
 #include <deal.II/base/tensor.h>
