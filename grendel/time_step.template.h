@@ -703,9 +703,6 @@ namespace grendel
       }
     }
 
-    auto lij_matrix = &lij_matrix_;
-    auto lij_matrix_next = &lij_matrix_next_;
-
     for (unsigned int pass = 0; pass < n_passes; ++pass) {
 
 #ifdef DEBUG_OUTPUT
@@ -765,7 +762,7 @@ namespace grendel
 
             const auto l_ij =
                 Limiter<dim, Number>::limit(bounds, U_i_new, p_ij);
-            lij_matrix->write_entry(l_ij, i, col_idx);
+            lij_matrix_.write_entry(l_ij, i, col_idx);
           }
         } /* parallel non-vectorized loop */
 
@@ -781,7 +778,7 @@ namespace grendel
             above_n_export_indices = true;
             if (++n_threads_above_n_export_indices == omp_get_num_threads()) {
               /* Synchronize over all MPI processes: */
-              lij_matrix->update_ghost_rows_start(channel++);
+              lij_matrix_.update_ghost_rows_start(channel++);
             }
           }
 
@@ -820,7 +817,7 @@ namespace grendel
             const auto l_ij = Limiter<dim, VectorizedArray<Number>>::limit(
                 bounds, U_i_new, p_ij);
 
-            lij_matrix->write_vectorized_entry(l_ij, i, col_idx, true);
+            lij_matrix_.write_vectorized_entry(l_ij, i, col_idx, true);
           }
         } /* parallel SIMD loop */
 
@@ -830,7 +827,7 @@ namespace grendel
         GRENDEL_PARALLEL_REGION_END
 
         if (n_threads_above_n_export_indices < 0) {
-          lij_matrix->update_ghost_rows_start(channel++);
+          lij_matrix_.update_ghost_rows_start(channel++);
         }
       }
 
@@ -838,7 +835,7 @@ namespace grendel
         Scope scope(computing_timer_, "time step 5 - synchronization");
 
         /* Synchronize over all MPI processes: */
-        lij_matrix->update_ghost_rows_finish();
+        lij_matrix_.update_ghost_rows_finish();
       }
 
       /*
@@ -878,8 +875,8 @@ namespace grendel
           for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
             auto p_ij = pij_matrix_.get_tensor(i, col_idx);
 
-            const auto l_ji = lij_matrix->get_transposed_entry(i, col_idx);
-            const auto l_ij = std::min(lij_matrix->get_entry(i, col_idx), l_ji);
+            const auto l_ji = lij_matrix_.get_transposed_entry(i, col_idx);
+            const auto l_ij = std::min(lij_matrix_.get_entry(i, col_idx), l_ji);
 
             U_i_new += l_ij * lambda * p_ij;
             p_ij *= (1 - l_ij);
@@ -945,7 +942,7 @@ namespace grendel
             auto p_ij = pij_matrix_.get_tensor(i, col_idx);
             const auto l_ij =
               Limiter<dim, Number>::limit(bounds, U_i_new, p_ij);
-            lij_matrix_next->write_entry(l_ij, i, col_idx);
+            lij_matrix_next_.write_entry(l_ij, i, col_idx);
           }
         } /* parallel non-vectorized loop */
 
@@ -966,7 +963,7 @@ namespace grendel
                 for (auto &it : temp_euler_)
                   it.update_ghost_values_start(channel++);
               else
-                lij_matrix_next->update_ghost_rows_start(channel++);
+                lij_matrix_next_.update_ghost_rows_start(channel++);
             }
           }
 
@@ -978,9 +975,9 @@ namespace grendel
           for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
 
             VectorizedArray<Number> l_ji =
-                lij_matrix->get_vectorized_transposed_entry(i, col_idx);
+                lij_matrix_.get_vectorized_transposed_entry(i, col_idx);
             const auto l_ij =
-                std::min(lij_matrix->get_vectorized_entry(i, col_idx), l_ji);
+                std::min(lij_matrix_.get_vectorized_entry(i, col_idx), l_ji);
 
             auto p_ij = pij_matrix_.get_vectorized_tensor(i, col_idx);
 
@@ -1026,7 +1023,7 @@ namespace grendel
             const auto l_ij = Limiter<dim, VectorizedArray<Number>>::limit(
                 bounds, U_i_new, p_ij);
 
-            lij_matrix_next->write_vectorized_entry(l_ij, i, col_idx, true);
+            lij_matrix_next_.write_vectorized_entry(l_ij, i, col_idx, true);
           }
 
         }
@@ -1040,13 +1037,11 @@ namespace grendel
             for (auto &it : temp_euler_)
               it.update_ghost_values_start(channel++);
           else
-            lij_matrix_next->update_ghost_rows_start(channel++);
+            lij_matrix_next_.update_ghost_rows_start(channel++);
         }
       }
 
-      const auto tmp = lij_matrix;
-      lij_matrix = lij_matrix_next;
-      lij_matrix_next = tmp;
+      std::swap(lij_matrix_, lij_matrix_next_);
     } /* limiter_iter_ */
 
     {
