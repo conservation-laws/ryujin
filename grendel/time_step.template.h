@@ -629,7 +629,6 @@ namespace grendel
           const auto variations_j = simd_load(second_variations_, js);
 
           const auto d_ij = dij_matrix_.get_vectorized_entry(i, col_idx);
-          const auto d_ij_inv = Number(1.) / d_ij;
 
           const auto d_ijH = Indicator<dim, Number>::indicator_ ==
                                      Indicator<dim, Number>::Indicators::
@@ -645,6 +644,7 @@ namespace grendel
           dealii::Tensor<1, problem_dimension, VectorizedArray<Number>>
               U_ij_bar;
           const auto c_ij = cij_matrix.get_vectorized_tensor(i, col_idx);
+          const auto d_ij_inv = Number(1.) / d_ij;
 
           for (unsigned int k = 0; k < problem_dimension; ++k) {
             const auto temp = (f_j[k] - f_i[k]) * c_ij;
