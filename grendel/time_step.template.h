@@ -107,6 +107,7 @@ namespace grendel
 
     dij_matrix_.reinit(sparsity_simd);
     lij_matrix_.reinit(sparsity_simd);
+    lij_matrix_next_.reinit(sparsity_simd);
     pij_matrix_.reinit(sparsity_simd);
   }
 
@@ -702,6 +703,9 @@ namespace grendel
       }
     }
 
+    auto lij_matrix = &lij_matrix_;
+    auto lij_matrix_next = &lij_matrix_next_;
+
     for (unsigned int pass = 0; pass < n_passes; ++pass) {
 
 #ifdef DEBUG_OUTPUT
@@ -761,7 +765,7 @@ namespace grendel
 
             const auto l_ij =
                 Limiter<dim, Number>::limit(bounds, U_i_new, p_ij);
-            lij_matrix_.write_entry(l_ij, i, col_idx);
+            lij_matrix->write_entry(l_ij, i, col_idx);
           }
         } /* parallel non-vectorized loop */
 
@@ -777,7 +781,7 @@ namespace grendel
             above_n_export_indices = true;
             if (++n_threads_above_n_export_indices == omp_get_num_threads()) {
               /* Synchronize over all MPI processes: */
-              lij_matrix_.update_ghost_rows_start(channel++);
+              lij_matrix->update_ghost_rows_start(channel++);
             }
           }
 
@@ -816,7 +820,7 @@ namespace grendel
             const auto l_ij = Limiter<dim, VectorizedArray<Number>>::limit(
                 bounds, U_i_new, p_ij);
 
-            lij_matrix_.write_vectorized_entry(l_ij, i, col_idx, true);
+            lij_matrix->write_vectorized_entry(l_ij, i, col_idx, true);
           }
         } /* parallel SIMD loop */
 
@@ -826,79 +830,7 @@ namespace grendel
         GRENDEL_PARALLEL_REGION_END
 
         if (n_threads_above_n_export_indices < 0) {
-          lij_matrix_.update_ghost_rows_start(channel++);
-        }
-
-      } else {
-        /*
-         * Step 5: compute l_ij (second and later rounds):
-         */
-        Scope scope(computing_timer_, "time step 5 - compute l_ij");
-
-        std::atomic_int n_threads_above_n_export_indices = 0;
-
-        GRENDEL_PARALLEL_REGION_BEGIN
-        LIKWID_MARKER_START("time_step_5");
-
-        /* Parallel non-vectorized loop: */
-
-        GRENDEL_OMP_FOR_NOWAIT
-        for (unsigned int i = n_internal; i < n_owned; ++i) {
-
-          /* Skip constrained degrees of freedom */
-          const unsigned int row_length = sparsity_simd.row_length(i);
-          if (row_length == 1)
-            continue;
-
-          const auto bounds = gather_array(bounds_, i);
-          const auto U_i_new = gather(temp_euler_, i);
-
-          for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
-            auto p_ij = pij_matrix_.get_tensor(i, col_idx);
-            const auto l_ij =
-                Limiter<dim, Number>::limit(bounds, U_i_new, p_ij);
-            lij_matrix_.write_entry(l_ij, i, col_idx);
-          }
-        } /* parallel non-vectorized loop */
-
-        /* Parallel SIMD loop: */
-
-        bool above_n_export_indices = false;
-
-        GRENDEL_OMP_FOR
-        for (unsigned int i = 0; i < n_internal; i += simd_length) {
-
-          if (GRENDEL_UNLIKELY(above_n_export_indices == false &&
-                               i >= n_export_indices)) {
-            above_n_export_indices = true;
-            if (++n_threads_above_n_export_indices == omp_get_num_threads()) {
-              /* Synchronize over all MPI processes: */
-              lij_matrix_.update_ghost_rows_start(channel++);
-            }
-          }
-
-          const auto bounds = simd_gather_array(bounds_, i);
-          const auto U_i_new = simd_gather(temp_euler_, i);
-
-          const unsigned int row_length = sparsity_simd.row_length(i);
-          for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
-
-            const auto p_ij = pij_matrix_.get_vectorized_tensor(i, col_idx);
-
-            const auto l_ij = Limiter<dim, VectorizedArray<Number>>::limit(
-                bounds, U_i_new, p_ij);
-
-            lij_matrix_.write_vectorized_entry(l_ij, i, col_idx, true);
-          }
-        } /* parallel SIMD loop */
-
-        --n_threads_above_n_export_indices;
-
-        LIKWID_MARKER_STOP("time_step_5");
-        GRENDEL_PARALLEL_REGION_END
-
-        if (n_threads_above_n_export_indices < 0) {
-          lij_matrix_.update_ghost_rows_start(channel++);
+          lij_matrix->update_ghost_rows_start(channel++);
         }
       }
 
@@ -906,7 +838,7 @@ namespace grendel
         Scope scope(computing_timer_, "time step 5 - synchronization");
 
         /* Synchronize over all MPI processes: */
-        lij_matrix_.update_ghost_rows_finish();
+        lij_matrix->update_ghost_rows_finish();
       }
 
       /*
@@ -917,13 +849,17 @@ namespace grendel
        */
 
       {
+        std::string step_no = pass + 1 == n_passes ? "6" : "5";
+        std::string
+            additional_step = pass + 1 < n_passes ? ", next l_ij" : "";
         Scope scope(computing_timer_,
-                    "time step 6 - symmetrize l_ij, h.-o. update");
+                    "time step " + step_no + " - " +
+                    "symmetrize l_ij, h.-o. update" + additional_step);
 
         std::atomic_int n_threads_above_n_export_indices = 0;
 
         GRENDEL_PARALLEL_REGION_BEGIN
-        LIKWID_MARKER_START("time_step_6");
+        LIKWID_MARKER_START(("time_step_" + step_no).c_str());
 
         /* Parallel non-vectorized loop: */
 
@@ -942,8 +878,8 @@ namespace grendel
           for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
             auto p_ij = pij_matrix_.get_tensor(i, col_idx);
 
-            const auto l_ji = lij_matrix_.get_transposed_entry(i, col_idx);
-            const auto l_ij = std::min(lij_matrix_.get_entry(i, col_idx), l_ji);
+            const auto l_ji = lij_matrix->get_transposed_entry(i, col_idx);
+            const auto l_ij = std::min(lij_matrix->get_entry(i, col_idx), l_ji);
 
             U_i_new += l_ij * lambda * p_ij;
             p_ij *= (1 - l_ij);
@@ -995,10 +931,25 @@ namespace grendel
           }
 
           scatter(temp_euler_, U_i_new, i);
+
+          /* Update l_ij for next round */
+          if (pass + 1 == n_passes)
+            continue;
+
+          /* Skip constrained degrees of freedom */
+          if (row_length == 1)
+            continue;
+
+          const auto bounds = gather_array(bounds_, i);
+          for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
+            auto p_ij = pij_matrix_.get_tensor(i, col_idx);
+            const auto l_ij =
+              Limiter<dim, Number>::limit(bounds, U_i_new, p_ij);
+            lij_matrix_next->write_entry(l_ij, i, col_idx);
+          }
         } /* parallel non-vectorized loop */
 
-        /* Only enable synchronization by setting to false in the last pass: */
-        bool above_n_export_indices = (pass + 1 != n_passes);
+        bool above_n_export_indices = false;
 
         /* Parallel vectorized loop: */
 
@@ -1009,9 +960,13 @@ namespace grendel
                                i >= n_export_indices)) {
             above_n_export_indices = true;
             if (++n_threads_above_n_export_indices == omp_get_num_threads()) {
-              /* Synchronize over all MPI processes: */
-              for (auto &it : temp_euler_)
-                it.update_ghost_values_start(channel++);
+              /* Synchronize over all MPI processes, in last pass the U_i
+                 vector, else the lij matrix for the next round: */
+              if (pass + 1 == n_passes)
+                for (auto &it : temp_euler_)
+                  it.update_ghost_values_start(channel++);
+              else
+                lij_matrix_next->update_ghost_rows_start(channel++);
             }
           }
 
@@ -1023,9 +978,9 @@ namespace grendel
           for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
 
             VectorizedArray<Number> l_ji =
-                lij_matrix_.get_vectorized_transposed_entry(i, col_idx);
+                lij_matrix->get_vectorized_transposed_entry(i, col_idx);
             const auto l_ij =
-                std::min(lij_matrix_.get_vectorized_entry(i, col_idx), l_ji);
+                std::min(lij_matrix->get_vectorized_entry(i, col_idx), l_ji);
 
             auto p_ij = pij_matrix_.get_vectorized_tensor(i, col_idx);
 
@@ -1033,7 +988,7 @@ namespace grendel
             p_ij *= (VectorizedArray<Number>(1.) - l_ij);
 
             if (pass + 1 < n_passes)
-              pij_matrix_.write_vectorized_tensor(p_ij, i, col_idx, true);
+              pij_matrix_.write_vectorized_tensor(p_ij, i, col_idx);
           }
 
 #ifdef CHECK_BOUNDS
@@ -1059,20 +1014,39 @@ namespace grendel
 #endif
 
           simd_scatter(temp_euler_, U_i_new, i);
+
+          if (pass + 1 == n_passes)
+            continue;
+
+          const auto bounds = simd_gather_array(bounds_, i);
+          for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
+
+            const auto p_ij = pij_matrix_.get_vectorized_tensor(i, col_idx);
+
+            const auto l_ij = Limiter<dim, VectorizedArray<Number>>::limit(
+                bounds, U_i_new, p_ij);
+
+            lij_matrix_next->write_vectorized_entry(l_ij, i, col_idx, true);
+          }
+
         }
 
-        if (pass + 1 == n_passes)
-          --n_threads_above_n_export_indices;
-
-        LIKWID_MARKER_STOP("time_step_6");
+        LIKWID_MARKER_STOP(("time_step_" + step_no).c_str());
         GRENDEL_PARALLEL_REGION_END
 
         if (n_threads_above_n_export_indices < 0) {
           /* Synchronize over all MPI processes: */
-          for (auto &it : temp_euler_)
-            it.update_ghost_values_start(channel++);
+          if (pass + 1 == n_passes)
+            for (auto &it : temp_euler_)
+              it.update_ghost_values_start(channel++);
+          else
+            lij_matrix_next->update_ghost_rows_start(channel++);
         }
       }
+
+      const auto tmp = lij_matrix;
+      lij_matrix = lij_matrix_next;
+      lij_matrix_next = tmp;
     } /* limiter_iter_ */
 
     {

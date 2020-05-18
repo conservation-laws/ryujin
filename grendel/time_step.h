@@ -137,6 +137,7 @@ namespace grendel
 
     SparseMatrixSIMD<Number> dij_matrix_;
     SparseMatrixSIMD<Number> lij_matrix_;
+    SparseMatrixSIMD<Number> lij_matrix_next_;
 
     SparseMatrixSIMD<Number, problem_dimension> pij_matrix_;
 
