@@ -393,10 +393,10 @@ namespace grendel
 
     result[0] = m;
     for (unsigned int i = 0; i < dim; ++i) {
-      result[1 + i] = m * m[i] * rho_inverse;
+      result[1 + i] = m * (m[i] * rho_inverse);
       result[1 + i][i] += p;
     }
-    result[dim + 1] = m * rho_inverse * (E + p);
+    result[dim + 1] = m * (rho_inverse * (E + p));
 
     return result;
   }
