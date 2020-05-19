@@ -1,4 +1,5 @@
 #include <limiter.h>
+#include <simd.template.h>
 
 #include <deal.II/base/vectorization.h>
 

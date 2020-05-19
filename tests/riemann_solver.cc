@@ -5,6 +5,7 @@
 #include <problem_description.h>
 #include <riemann_solver.h>
 #include <riemann_solver.template.h>
+#include <simd.template.h>
 
 using namespace grendel;
 using namespace dealii;

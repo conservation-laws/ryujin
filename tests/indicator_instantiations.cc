@@ -1,4 +1,5 @@
 #include <indicator.h>
+#include <simd.template.h>
 
 #include <deal.II/base/vectorization.h>
 
