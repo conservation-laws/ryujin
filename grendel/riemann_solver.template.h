@@ -447,21 +447,6 @@ namespace grendel
       return {lambda_max, p_2, -1, std::array<Number, 5>()};
     }
 
-    /* If we are greedy, bail out early if we are in a situation with
-     * minimal density fluctuation: */
-    if constexpr (greedy_dij_ && newton_max_iter_ == 1) {
-      const Number rho_min = std::min(riemann_data_i[0], riemann_data_j[0]);
-      const Number rho_max = std::max(riemann_data_i[0], riemann_data_j[0]);
-
-      constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
-      if (std::max(Number(0.), rho_max * greedy_threshold_ - rho_min + eps) ==
-          Number(0.)) {
-        const Number lambda_max =
-            compute_lambda(riemann_data_i, riemann_data_j, p_2);
-        return {lambda_max, p_2, -1, std::array<Number, 5>()};
-      }
-    }
-
     Number p_1 =
         dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
             phi_p_max, Number(0.), p_max, p_min);
