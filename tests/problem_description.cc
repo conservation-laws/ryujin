@@ -1,4 +1,5 @@
 #include <problem_description.h>
+#include <simd.template.h>
 
 #include <deal.II/base/vectorization.h>
 
@@ -9,7 +10,8 @@ using namespace dealii;
 template <int dim, typename Number>
 void test()
 {
-  using rank1_type = typename ProblemDescription<dim, Number>::rank1_type;
+  using PD = ProblemDescription<dim, Number>;
+  using rank1_type = typename PD::rank1_type;
 
   const auto from_1d_state =
       [=](const dealii::Tensor<1, 3, Number> &state_1d) -> rank1_type {
@@ -34,30 +36,36 @@ void test()
   const auto U = from_1d_state(state_1d);
 
   std::cout << "dim = " << dim << std::endl;
-  std::cout << "momentum = "                                                  //
-            << ProblemDescription<dim, Number>::momentum(U)                   //
-            << std::endl;                                                     //
-  std::cout << "internal_energy = "                                           //
-            << ProblemDescription<dim, Number>::internal_energy(U)            //
-            << std::endl;                                                     //
-  std::cout << "internal_energy_derivative = "                                //
-            << ProblemDescription<dim, Number>::internal_energy_derivative(U) //
-            << std::endl;                                                     //
-  std::cout << "pressure = "                                                  //
-            << ProblemDescription<dim, Number>::pressure(U)                   //
-            << std::endl;                                                     //
-  std::cout << "specific_entropy = "                                          //
-            << ProblemDescription<dim, Number>::specific_entropy(U)           //
-            << std::endl;                                                     //
-  std::cout << "entropy = "                                                   //
-            << ProblemDescription<dim, Number>::entropy(U)                    //
-            << std::endl;                                                     //
-  std::cout << "entropy_derivative = "                                        //
-            << ProblemDescription<dim, Number>::entropy_derivative(U)         //
-            << std::endl;                                                     //
-  std::cout << "f = "                                                         //
-            << ProblemDescription<dim, Number>::f(U)                          //
-            << std::endl;                                                     //
+  std::cout << "momentum = "                          //
+            << PD::momentum(U)                        //
+            << std::endl;                             //
+  std::cout << "internal_energy = "                   //
+            << PD::internal_energy(U)                 //
+            << std::endl;                             //
+  std::cout << "internal_energy_derivative = "        //
+            << PD::internal_energy_derivative(U)      //
+            << std::endl;                             //
+  std::cout << "pressure = "                          //
+            << PD::pressure(U)                        //
+            << std::endl;                             //
+  std::cout << "specific_entropy = "                  //
+            << PD::specific_entropy(U)                //
+            << std::endl;                             //
+  std::cout << "harten entropy = "                    //
+            << PD::harten_entropy(U)                  //
+            << std::endl;                             //
+  std::cout << "harten_entropy_derivative = "         //
+            << PD::harten_entropy_derivative(U)       //
+            << std::endl;                             //
+  std::cout << "mathematical entropy = "              //
+            << PD::mathematical_entropy(U)            //
+            << std::endl;                             //
+  std::cout << "mathematical_entropy_derivative = "   //
+            << PD::mathematical_entropy_derivative(U) //
+            << std::endl;                             //
+  std::cout << "f = "                                 //
+            << PD::f(U)                               //
+            << std::endl;                             //
 }
 
 int main()
