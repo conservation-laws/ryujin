@@ -1,4 +1,5 @@
 #include <sparse_matrix_simd.h>
+#include <sparse_matrix_simd.template.h>
 
 int main()
 {
