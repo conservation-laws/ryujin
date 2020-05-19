@@ -80,15 +80,10 @@ namespace grendel
      * For two given 1D primitive states riemann_data_i and riemann_data_j,
      * compute an estimation of an upper bound for the maximum wavespeed
      * lambda.
-     *
-     * If necessary, we also compute and return bounds = {rho_min, rho_max,
-     * s_min, salpha_avg, salpha_flux} that are needed as bounds in the
-     * limiter for the "greedy d_ij" computation.
      */
     static std::tuple<Number /*lambda_max*/,
                       Number /*p_star*/,
-                      unsigned int /*iteration*/,
-                      std::array<Number, 5> /*bounds*/>
+                      unsigned int /*iteration*/>
     compute(const std::array<Number, 4> &riemann_data_i,
             const std::array<Number, 4> &riemann_data_j);
 
