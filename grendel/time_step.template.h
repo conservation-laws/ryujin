@@ -6,15 +6,13 @@
 #ifndef TIME_STEP_TEMPLATE_H
 #define TIME_STEP_TEMPLATE_H
 
-#include "openmp_macros.h"
+#include "openmp.h"
 #include "scope.h"
 #include "simd.h"
 #include "time_step.h"
 
 #include "indicator.h"
 #include "riemann_solver.h"
-
-#include <omp.h>
 
 #include <atomic>
 
@@ -224,7 +222,11 @@ namespace grendel
     {
       Scope scope(computing_timer_, "time step 1 - compute d_ij, and alpha_i");
 
-      std::atomic_int n_threads_above_n_export_indices = 0;
+      SynchronizationDispatch thread_dispatch([&]() {
+        /* Synchronize over all MPI processes: */
+        alpha_.update_ghost_values_start(channel++);
+        second_variations_.update_ghost_values_start(channel++);
+      });
 
       GRENDEL_PARALLEL_REGION_BEGIN
       LIKWID_MARKER_START("time_step_1");
@@ -300,22 +302,14 @@ namespace grendel
 
       /* Stored thread locally: */
       Indicator<dim, VectorizedArray<Number>> indicator_simd;
-      bool above_n_export_indices = false;
+      bool thread_ready = false;
 
       /* Parallel SIMD loop: */
 
       GRENDEL_OMP_FOR
       for (unsigned int i = 0; i < n_internal; i += simd_length) {
 
-        if (GRENDEL_UNLIKELY(above_n_export_indices == false &&
-                             i >= n_export_indices)) {
-          above_n_export_indices = true;
-          if (++n_threads_above_n_export_indices == omp_get_num_threads()) {
-            /* Synchronize over all MPI processes: */
-            alpha_.update_ghost_values_start(channel++);
-            second_variations_.update_ghost_values_start(channel++);
-          }
-        }
+        thread_dispatch.check(thread_ready, i >= n_export_indices);
 
         const auto &[U_i, f_i] = simd_load_vlat<dim>(u_and_flux_, i);
         const auto entropy_i = simd_load(evc_entropies_, i);
@@ -366,16 +360,8 @@ namespace grendel
         simd_store(second_variations_, indicator_simd.second_variations(), i);
       } /* parallel SIMD loop */
 
-      --n_threads_above_n_export_indices;
-
       LIKWID_MARKER_STOP("time_step_1");
       GRENDEL_PARALLEL_REGION_END
-
-      if (n_threads_above_n_export_indices < 0) {
-        /* Synchronize over all MPI processes: */
-        alpha_.update_ghost_values_start(channel++);
-        second_variations_.update_ghost_values_start(channel++);
-      }
     }
 
     /*
@@ -486,7 +472,11 @@ namespace grendel
       Scope scope(computing_timer_,
                   "time step 3 - l.-o. update, bounds, and r_i");
 
-      std::atomic_int n_threads_above_n_export_indices = 0;
+      SynchronizationDispatch thread_dispatch([&]() {
+        /* Synchronize over all MPI processes: */
+        for (auto &it : r_)
+          it.update_ghost_values_start(channel++);
+      });
 
       /* Parallel region */
       GRENDEL_PARALLEL_REGION_BEGIN
@@ -590,22 +580,14 @@ namespace grendel
 
       /* Nota bene: This bounds variable is thread local: */
       Limiter<dim, VectorizedArray<Number>> limiter_simd;
-      bool above_n_export_indices = false;
+      bool thread_ready = false;
 
       /* Parallel SIMD loop: */
 
       GRENDEL_OMP_FOR
       for (unsigned int i = 0; i < n_internal; i += simd_length) {
 
-        if (GRENDEL_UNLIKELY(above_n_export_indices == false &&
-                             i >= n_export_indices)) {
-          above_n_export_indices = true;
-          if (++n_threads_above_n_export_indices == omp_get_num_threads()) {
-            /* Synchronize over all MPI processes: */
-            for (auto &it : r_)
-              it.update_ghost_values_start(channel++);
-          }
-        }
+        thread_dispatch.check(thread_ready, i >= n_export_indices);
 
         const auto &[U_i, f_i] = simd_load_vlat<dim>(u_and_flux_, i);
         auto U_i_new = U_i;
@@ -677,16 +659,8 @@ namespace grendel
         simd_scatter(bounds_, limiter_simd.bounds(), i);
       } /* parallel SIMD loop */
 
-      --n_threads_above_n_export_indices;
-
       LIKWID_MARKER_STOP("time_step_3");
       GRENDEL_PARALLEL_REGION_END
-
-      if (n_threads_above_n_export_indices < 0) {
-        /* Synchronize over all MPI processes: */
-        for (auto &it : r_)
-          it.update_ghost_values_start(channel++);
-      }
     }
 
     {
@@ -718,7 +692,10 @@ namespace grendel
          */
         Scope scope(computing_timer_, "time step 4 - compute p_ij, and l_ij");
 
-        std::atomic_int n_threads_above_n_export_indices = 0;
+        SynchronizationDispatch thread_dispatch([&]() {
+          /* Synchronize over all MPI processes: */
+          lij_matrix_.update_ghost_rows_start(channel++);
+        });
 
         GRENDEL_PARALLEL_REGION_BEGIN
         LIKWID_MARKER_START("time_step_4");
@@ -768,19 +745,12 @@ namespace grendel
 
         /* Parallel SIMD loop: */
 
-        bool above_n_export_indices = false;
+        bool thread_ready = false;
 
         GRENDEL_OMP_FOR
         for (unsigned int i = 0; i < n_internal; i += simd_length) {
 
-          if (GRENDEL_UNLIKELY(above_n_export_indices == false &&
-                               i >= n_export_indices)) {
-            above_n_export_indices = true;
-            if (++n_threads_above_n_export_indices == omp_get_num_threads()) {
-              /* Synchronize over all MPI processes: */
-              lij_matrix_.update_ghost_rows_start(channel++);
-            }
-          }
+          thread_dispatch.check(thread_ready, i >= n_export_indices);
 
           const auto bounds = simd_gather_array(bounds_, i);
           const auto U_i_new = simd_gather(temp_euler_, i);
@@ -821,14 +791,8 @@ namespace grendel
           }
         } /* parallel SIMD loop */
 
-        --n_threads_above_n_export_indices;
-
         LIKWID_MARKER_STOP("time_step_4");
         GRENDEL_PARALLEL_REGION_END
-
-        if (n_threads_above_n_export_indices < 0) {
-          lij_matrix_.update_ghost_rows_start(channel++);
-        }
       }
 
       {
@@ -847,13 +811,19 @@ namespace grendel
 
       {
         std::string step_no = pass + 1 == n_passes ? "6" : "5";
-        std::string
-            additional_step = pass + 1 < n_passes ? ", next l_ij" : "";
+        std::string additional_step = pass + 1 < n_passes ? ", next l_ij" : "";
         Scope scope(computing_timer_,
                     "time step " + step_no + " - " +
-                    "symmetrize l_ij, h.-o. update" + additional_step);
+                        "symmetrize l_ij, h.-o. update" + additional_step);
 
-        std::atomic_int n_threads_above_n_export_indices = 0;
+        SynchronizationDispatch thread_dispatch([&]() {
+          /* Synchronize over all MPI processes: */
+          if (pass + 1 == n_passes)
+            for (auto &it : temp_euler_)
+              it.update_ghost_values_start(channel++);
+          else
+            lij_matrix_next_.update_ghost_rows_start(channel++);
+        });
 
         GRENDEL_PARALLEL_REGION_BEGIN
         LIKWID_MARKER_START(("time_step_" + step_no).c_str());
@@ -929,7 +899,7 @@ namespace grendel
 
           scatter(temp_euler_, U_i_new, i);
 
-          /* Update l_ij for next round */
+          /* Skip updating l_ij in the last round */
           if (pass + 1 == n_passes)
             continue;
 
@@ -941,31 +911,19 @@ namespace grendel
           for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
             auto p_ij = pij_matrix_.get_tensor(i, col_idx);
             const auto l_ij =
-              Limiter<dim, Number>::limit(bounds, U_i_new, p_ij);
+                Limiter<dim, Number>::limit(bounds, U_i_new, p_ij);
             lij_matrix_next_.write_entry(l_ij, i, col_idx);
           }
         } /* parallel non-vectorized loop */
 
-        bool above_n_export_indices = false;
+        bool thread_ready = false;
 
         /* Parallel vectorized loop: */
 
         GRENDEL_OMP_FOR
         for (unsigned int i = 0; i < n_internal; i += simd_length) {
 
-          if (GRENDEL_UNLIKELY(above_n_export_indices == false &&
-                               i >= n_export_indices)) {
-            above_n_export_indices = true;
-            if (++n_threads_above_n_export_indices == omp_get_num_threads()) {
-              /* Synchronize over all MPI processes, in last pass the U_i
-                 vector, else the lij matrix for the next round: */
-              if (pass + 1 == n_passes)
-                for (auto &it : temp_euler_)
-                  it.update_ghost_values_start(channel++);
-              else
-                lij_matrix_next_.update_ghost_rows_start(channel++);
-            }
-          }
+          thread_dispatch.check(thread_ready, i >= n_export_indices);
 
           auto U_i_new = simd_gather(temp_euler_, i);
 
@@ -1025,20 +983,10 @@ namespace grendel
 
             lij_matrix_next_.write_vectorized_entry(l_ij, i, col_idx, true);
           }
-
         }
 
         LIKWID_MARKER_STOP(("time_step_" + step_no).c_str());
         GRENDEL_PARALLEL_REGION_END
-
-        if (n_threads_above_n_export_indices < 0) {
-          /* Synchronize over all MPI processes: */
-          if (pass + 1 == n_passes)
-            for (auto &it : temp_euler_)
-              it.update_ghost_values_start(channel++);
-          else
-            lij_matrix_next_.update_ghost_rows_start(channel++);
-        }
       }
 
       std::swap(lij_matrix_, lij_matrix_next_);
