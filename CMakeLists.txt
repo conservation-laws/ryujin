@@ -53,9 +53,11 @@ set(DIM "2" CACHE STRING "The dimension")
 
 set(NUMBER "double" CACHE STRING "The principal floating point type")
 
-option(USE_SIMD "Use SIMD vectorization" ON)
+option(USE_COMMUNICATION_HIDING "Issue MPI synchronization of ghost values early" ON)
 
 option(USE_CUSTOM_POW "Use custom pow implementation" ON)
+
+option(USE_SIMD "Use SIMD vectorization" ON)
 
 option(CHECK_BOUNDS "Enable debug code paths that check limiter bounds" OFF)
 

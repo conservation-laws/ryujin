@@ -14,9 +14,11 @@
 
 #define NUMBER @NUMBER@
 
-#cmakedefine USE_SIMD
+#cmakedefine USE_COMMUNICATION_HIDING
 
 #cmakedefine USE_CUSTOM_POW
+
+#cmakedefine USE_SIMD
 
 #cmakedefine CHECK_BOUNDS
 

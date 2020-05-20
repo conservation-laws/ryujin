@@ -6,6 +6,8 @@
 #ifndef OPENMP_H
 #define OPENMP_H
 
+#include <compile_time_options.h>
+
 #include <deal.II/base/config.h>
 
 #include <atomic>
@@ -55,7 +57,13 @@ public:
   DEAL_II_ALWAYS_INLINE inline void check(bool &thread_ready,
                                           const bool condition)
   {
+#ifdef USE_COMMUNICATION_HIDING
     if (GRENDEL_UNLIKELY(thread_ready == false && condition)) {
+#else
+    (void)thread_ready;
+    (void)condition;
+    if constexpr (false) {
+#endif
       thread_ready = true;
       if (++n_threads_ready_ == omp_get_num_threads()) {
         executed_payload_ = true;
