@@ -222,7 +222,7 @@ namespace grendel
     {
       Scope scope(computing_timer_, "time step 1 - compute d_ij, and alpha_i");
 
-      SynchronizationDispatch thread_dispatch([&]() {
+      SynchronizationDispatch synchronization_dispatch([&]() {
         /* Synchronize over all MPI processes: */
         alpha_.update_ghost_values_start(channel++);
         second_variations_.update_ghost_values_start(channel++);
@@ -309,7 +309,7 @@ namespace grendel
       GRENDEL_OMP_FOR
       for (unsigned int i = 0; i < n_internal; i += simd_length) {
 
-        thread_dispatch.check(thread_ready, i >= n_export_indices);
+        synchronization_dispatch.check(thread_ready, i >= n_export_indices);
 
         const auto &[U_i, f_i] = simd_load_vlat<dim>(u_and_flux_, i);
         const auto entropy_i = simd_load(evc_entropies_, i);
@@ -472,7 +472,7 @@ namespace grendel
       Scope scope(computing_timer_,
                   "time step 3 - l.-o. update, bounds, and r_i");
 
-      SynchronizationDispatch thread_dispatch([&]() {
+      SynchronizationDispatch synchronization_dispatch([&]() {
         /* Synchronize over all MPI processes: */
         for (auto &it : r_)
           it.update_ghost_values_start(channel++);
@@ -587,7 +587,7 @@ namespace grendel
       GRENDEL_OMP_FOR
       for (unsigned int i = 0; i < n_internal; i += simd_length) {
 
-        thread_dispatch.check(thread_ready, i >= n_export_indices);
+        synchronization_dispatch.check(thread_ready, i >= n_export_indices);
 
         const auto &[U_i, f_i] = simd_load_vlat<dim>(u_and_flux_, i);
         auto U_i_new = U_i;
@@ -692,7 +692,7 @@ namespace grendel
          */
         Scope scope(computing_timer_, "time step 4 - compute p_ij, and l_ij");
 
-        SynchronizationDispatch thread_dispatch([&]() {
+        SynchronizationDispatch synchronization_dispatch([&]() {
           /* Synchronize over all MPI processes: */
           lij_matrix_.update_ghost_rows_start(channel++);
         });
@@ -750,7 +750,7 @@ namespace grendel
         GRENDEL_OMP_FOR
         for (unsigned int i = 0; i < n_internal; i += simd_length) {
 
-          thread_dispatch.check(thread_ready, i >= n_export_indices);
+          synchronization_dispatch.check(thread_ready, i >= n_export_indices);
 
           const auto bounds = simd_gather_array(bounds_, i);
           const auto U_i_new = simd_gather(temp_euler_, i);
@@ -816,7 +816,7 @@ namespace grendel
                     "time step " + step_no + " - " +
                         "symmetrize l_ij, h.-o. update" + additional_step);
 
-        SynchronizationDispatch thread_dispatch([&]() {
+        SynchronizationDispatch synchronization_dispatch([&]() {
           /* Synchronize over all MPI processes: */
           if (pass + 1 == n_passes)
             for (auto &it : temp_euler_)
@@ -923,7 +923,7 @@ namespace grendel
         GRENDEL_OMP_FOR
         for (unsigned int i = 0; i < n_internal; i += simd_length) {
 
-          thread_dispatch.check(thread_ready, i >= n_export_indices);
+          synchronization_dispatch.check(thread_ready, i >= n_export_indices);
 
           auto U_i_new = simd_gather(temp_euler_, i);
 
