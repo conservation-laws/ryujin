@@ -28,7 +28,7 @@ namespace grendel
 {
 
   template <int dim, typename Number = double>
-  class TimeStep : public dealii::ParameterAcceptor
+  class TimeStep final : public dealii::ParameterAcceptor
   {
   public:
     static constexpr unsigned int problem_dimension =
@@ -45,8 +45,6 @@ namespace grendel
              const grendel::OfflineData<dim, Number> &offline_data,
              const grendel::InitialValues<dim, Number> &initial_values,
              const std::string &subsection = "TimeStep");
-
-    virtual ~TimeStep() final = default;
 
     void prepare();
 

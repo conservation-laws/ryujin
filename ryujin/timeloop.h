@@ -25,13 +25,12 @@ namespace ryujin
 {
 
   template <int dim, typename Number = double>
-  class TimeLoop : public dealii::ParameterAcceptor
+  class TimeLoop final : public dealii::ParameterAcceptor
   {
   public:
     using vector_type = typename grendel::TimeStep<dim, Number>::vector_type;
 
     TimeLoop(const MPI_Comm &mpi_comm);
-    virtual ~TimeLoop() final = default;
 
     void run();
 

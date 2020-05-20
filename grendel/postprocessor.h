@@ -22,7 +22,7 @@ namespace grendel
 {
 
   template <int dim, typename Number = double>
-  class Postprocessor : public dealii::ParameterAcceptor
+  class Postprocessor final : public dealii::ParameterAcceptor
   {
   public:
     static constexpr unsigned int problem_dimension =
@@ -47,8 +47,6 @@ namespace grendel
     Postprocessor(const MPI_Comm &mpi_communicator,
                   const grendel::OfflineData<dim, Number> &offline_data,
                   const std::string &subsection = "Postprocessor");
-
-    virtual ~Postprocessor() final = default;
 
     void prepare();
 
