@@ -235,7 +235,6 @@ namespace grendel
       Indicator<dim, Number> indicator_serial;
 
       /* Parallel non-vectorized loop: */
-
       GRENDEL_OMP_FOR_NOWAIT
       for (unsigned int i = n_internal; i < n_owned; ++i) {
 
@@ -305,7 +304,6 @@ namespace grendel
       bool thread_ready = false;
 
       /* Parallel SIMD loop: */
-
       GRENDEL_OMP_FOR
       for (unsigned int i = 0; i < n_internal; i += simd_length) {
 
@@ -378,7 +376,6 @@ namespace grendel
       LIKWID_MARKER_START("time_step_2");
 
       /* Parallel non-vectorized loop: */
-
       GRENDEL_OMP_FOR
       for (unsigned int i = 0; i < n_owned; ++i) {
 
@@ -486,7 +483,6 @@ namespace grendel
       Limiter<dim, Number> limiter_serial;
 
       /* Parallel non-vectorized loop: */
-
       GRENDEL_OMP_FOR_NOWAIT
       for (unsigned int i = n_internal; i < n_owned; ++i) {
 
@@ -509,6 +505,7 @@ namespace grendel
         limiter_serial.reset();
         limiter_serial.reset_variations(variations_i);
 
+        ASM_LABEL("testor")
         const unsigned int *js = sparsity_simd.columns(i);
         for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
           const auto j = js[col_idx];

@@ -144,6 +144,13 @@ public:                                                                        \
                                                                                \
 protected:
 
+
+/**
+ * Injects a label into the generated assembly.
+ */
+#define ASM_LABEL(label) asm ("#" label);
+
+
 //@}
 
 #endif /* CONVENIENCE_MACROS_H */
