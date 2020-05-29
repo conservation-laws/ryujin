@@ -875,8 +875,9 @@ namespace grendel
               dealii::ExcMessage("Negative specific entropy."));
 #endif
 
-          /* Fix up boundary: */
+          /* In the last round */
           if (pass + 1 == n_passes) {
+            /* Fix up boundary: */
             const auto it = boundary_normal_map.find(i);
             if (it != boundary_normal_map.end()) {
               const auto &[normal, id, position] = it->second;
@@ -894,17 +895,14 @@ namespace grendel
                 U_i_new = initial_values_->initial_state(position, t + tau);
               }
             }
+
+            scatter(temp_euler_, U_i_new, i);
+
+            /* Skip updating l_ij */
+            continue;
           }
 
           scatter(temp_euler_, U_i_new, i);
-
-          /* Skip updating l_ij in the last round */
-          if (pass + 1 == n_passes)
-            continue;
-
-          /* Skip constrained degrees of freedom */
-          if (row_length == 1)
-            continue;
 
           const auto bounds = gather_array(bounds_, i);
           for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
