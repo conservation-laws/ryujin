@@ -1066,7 +1066,7 @@ namespace grendel
       temp_ssp_[k] = U[k];
 
     /* Step 1: U1 = U_old + tau * L(U_old) */
-    Number tau_1 = euler_step(U, tau_0);
+    Number tau_1 = euler_step(U, t, tau_0);
 
     AssertThrow(tau_1 >= tau_0,
                 ExcMessage("failed to recover from CFL violation"));
