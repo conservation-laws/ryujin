@@ -62,11 +62,11 @@ namespace grendel
     using dealii::DoFRenumbering::Cuthill_McKee;
 
     /**
-     * Reorder all import indices in the locally owned index range to the
+     * Reorder all export indices in the locally owned index range to the
      * start of the index range.
      *
      * This renumbering requires MPI communication in order to determine
-     * the set of import indices.
+     * the set of export indices.
      */
     template <int dim>
     unsigned int export_indices_first(dealii::DoFHandler<dim> &dof_handler,
