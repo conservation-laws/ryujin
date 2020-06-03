@@ -280,19 +280,35 @@ namespace grendel
     }
 
     /*
-     * Attach cell weights and repartition:
+     * Try to partition the mesh equilibrating the workload. The usual mesh
+     * partitioning heuristic that tries to partition the mesh such that
+     * every MPI rank has roughly the same number of locally owned degrees
+     * of freedom does not work well in our case due to the fact that
+     * boundary dofs are not SIMD parallelized. (In fact, every dof with
+     * "non-standard connectivity" is not SIMD parallelized. Those are
+     * however exceedingly rare (point irregularities in 2D, line
+     * irregularities in 3D) and we simply ignore them.)
      *
-     * Due to the fact that half of the degrees of freedom of boundary
-     * cells cannot be SIMD parallelized we try to give these cells a
-     * higher weight to equalize the workload a bit more.
+     * For the mesh partitioning scheme we have to supply an additional
+     * weight that gets added to the default weight of a cell which is
+     * 1000. Asymptotically we have one boundary dof per boundary cell (in
+     * any dimension). A rough benchmark reveals that the speedup due to
+     * SIMD vectorization is typically less than VectorizedArray::size() /
+     * 2. Boundary dofs are more expensive due to certain special treatment
+     * (additional symmetrization of d_ij, boundary fixup) so it should be
+     * safe to assume that the cost incurred is at least
+     * VectorizedArray::size() / 2.
      */
 
     if (repartitioning_) {
 #ifdef USE_SIMD
+      constexpr auto speedup = dealii::VectorizedArray<NUMBER>::size() / 2u;
+      constexpr unsigned int weight = 1000u;
+
       triangulation.signals.cell_weight.connect(
           [](const auto &cell, const auto /*status*/) -> unsigned int {
             if (cell->at_boundary())
-              return 500u * (dealii::VectorizedArray<NUMBER>::size());
+              return weight * (speedup == 0u ? 0u : speedup - 1u);
             else
               return 0u;
           });
