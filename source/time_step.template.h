@@ -63,6 +63,37 @@ namespace ryujin
   }
 
 
+  template <typename Number>
+  void initialize_multicomponent_vector(
+      const std::shared_ptr<const Utilities::MPI::Partitioner>
+          &scalar_partitioner,
+      const unsigned int length,
+      LinearAlgebra::distributed::Vector<Number> &vector)
+  {
+    IndexSet vector_owned_set(length * scalar_partitioner->size());
+    for (auto it = scalar_partitioner->locally_owned_range().begin_intervals();
+         it != scalar_partitioner->locally_owned_range().end_intervals();
+         ++it)
+      vector_owned_set.add_range(*it->begin() * length,
+                                 (it->last() + 1) * length);
+    vector_owned_set.compress();
+    IndexSet vector_ghost_set(length * scalar_partitioner->size());
+    for (auto it = scalar_partitioner->ghost_indices().begin_intervals();
+         it != scalar_partitioner->ghost_indices().end_intervals();
+         ++it)
+      vector_ghost_set.add_range(*it->begin() * length,
+                                 (it->last() + 1) * length);
+    vector_ghost_set.compress();
+    const auto vector_partitioner =
+        std::make_shared<const Utilities::MPI::Partitioner>(
+            vector_owned_set,
+            vector_ghost_set,
+            scalar_partitioner->get_mpi_communicator());
+
+    vector.reinit(vector_partitioner);
+  }
+
+
   template <int dim, typename Number>
   void TimeStep<dim, Number>::prepare()
   {
@@ -77,17 +108,12 @@ namespace ryujin
     second_variations_.reinit(partitioner);
     alpha_.reinit(partitioner);
 
-    for (auto &it : bounds_)
-      it.reinit(partitioner);
+    initialize_multicomponent_vector(partitioner, 3, bounds_);
 
-    for (auto &it : r_)
-      it.reinit(partitioner);
-
-    for (auto &it : temp_euler_)
-      it.reinit(partitioner);
-
-    for (auto &it : temp_ssp_)
-      it.reinit(partitioner);
+    initialize_multicomponent_vector(
+        partitioner, problem_dimension, temp_euler_);
+    temp_ssp_.reinit(temp_euler_);
+    r_.reinit(temp_euler_);
 
     /* Initialize local matrices: */
 
@@ -107,6 +133,13 @@ namespace ryujin
     lij_matrix_.reinit(sparsity_simd);
     lij_matrix_next_.reinit(sparsity_simd);
     pij_matrix_.reinit(sparsity_simd);
+  }
+
+
+  template <int dim, typename Number>
+  void TimeStep<dim, Number>::initialize_vector(vector_type &U) const
+  {
+    U.reinit(temp_euler_);
   }
 
 
@@ -161,7 +194,12 @@ namespace ryujin
       for (unsigned int i = 0; i < size_regular; i += simd_length) {
         using PD = ProblemDescription<dim, VectorizedArray<Number>>;
 
-        const auto U_i = simd_gather(U, i);
+        Tensor<1, problem_dimension, VectorizedArray<Number>> U_i;
+        unsigned int indices[VectorizedArray<Number>::size()];
+        for (unsigned int k = 0; k < VectorizedArray<Number>::size(); ++k)
+          indices[k] = (i + k) * problem_dimension;
+        vectorized_load_and_transpose(
+            problem_dimension, U.begin(), indices, &U_i[0]);
         const auto f_i = PD::f(U_i);
 
         simd_store_vtas(u_and_flux_, std::make_pair(U_i, f_i), i);
@@ -176,7 +214,9 @@ namespace ryujin
       }
 
       for (unsigned int i = size_regular; i < n_relevant; ++i) {
-        const auto U_i = gather(U, i);
+        Tensor<1, problem_dimension, Number> U_i;
+        for (unsigned int d = 0; d < problem_dimension; ++d)
+          U_i[d] = U.local_element(i * problem_dimension + d);
         const auto f_i = ProblemDescription<dim, Number>::f(U_i);
 
         store_vtas(u_and_flux_, std::make_pair(U_i, f_i), i);
@@ -471,8 +511,7 @@ namespace ryujin
 
       SynchronizationDispatch synchronization_dispatch([&]() {
         /* Synchronize over all MPI processes: */
-        for (auto &it : r_)
-          it.update_ghost_values_start(channel++);
+        r_.update_ghost_values_start(channel++);
       });
 
       /* Parallel region */
@@ -567,12 +606,15 @@ namespace ryujin
           }
         }
 
-        scatter(temp_euler_, U_i_new, i);
-        scatter(r_, r_i, i);
+        for (unsigned int d = 0; d < problem_dimension; ++d)
+          temp_euler_.local_element(i * problem_dimension + d) = U_i_new[d];
+        for (unsigned int d = 0; d < problem_dimension; ++d)
+          r_.local_element(i * problem_dimension + d) = r_i[d];
 
         const Number hd_i = m_i * measure_of_omega_inverse;
         limiter_serial.apply_relaxation(hd_i);
-        scatter(bounds_, limiter_serial.bounds(), i);
+        for (unsigned int d = 0; d < 3; ++d)
+          bounds_.local_element(i * 3 + d) = limiter_serial.bounds()[d];
       } /* parallel non-vectorized loop */
 
       /* Nota bene: This bounds variable is thread local: */
@@ -647,13 +689,24 @@ namespace ryujin
           limiter_simd.accumulate_variations(variations_j, beta_ij);
         }
 
-        simd_scatter(temp_euler_, U_i_new, i);
-        simd_scatter(r_, r_i, i);
+        unsigned int indices[VectorizedArray<Number>::size()];
+        for (unsigned int k = 0; k < VectorizedArray<Number>::size(); ++k)
+          indices[k] = (i + k) * problem_dimension;
+        vectorized_transpose_and_store(false,
+                                       problem_dimension,
+                                       &U_i_new[0],
+                                       indices,
+                                       temp_euler_.begin());
+        vectorized_transpose_and_store(
+            false, problem_dimension, &r_i[0], indices, r_.begin());
 
         const auto hd_i = m_i * measure_of_omega_inverse;
         limiter_simd.apply_relaxation(hd_i);
 
-        simd_scatter(bounds_, limiter_simd.bounds(), i);
+        for (unsigned int k = 0; k < VectorizedArray<Number>::size(); ++k)
+          indices[k] = (i + k) * 3;
+        vectorized_transpose_and_store(
+            false, 3, &limiter_simd.bounds()[0], indices, bounds_.begin());
       } /* parallel SIMD loop */
 
       LIKWID_MARKER_STOP("time_step_3");
@@ -664,13 +717,11 @@ namespace ryujin
       Scope scope(computing_timer_, "time step 3 - synchronization");
 
       /* Synchronize over all MPI processes: */
-      for (auto &it : r_)
-        it.update_ghost_values_finish();
+      r_.update_ghost_values_finish();
 
       /* If we do not do high-order, synchronize at this point: */
       if constexpr (n_passes == 0) {
-        for (auto &it : temp_euler_)
-          it.update_ghost_values();
+        temp_euler_.update_ghost_values();
       }
     }
 
@@ -707,13 +758,19 @@ namespace ryujin
           if (row_length == 1)
             continue;
 
-          const auto bounds = gather_array(bounds_, i);
-          const auto U_i_new = gather(temp_euler_, i);
+          std::array<Number, 3> bounds;
+          for (unsigned int d = 0; d < 3; ++d)
+            bounds[d] = bounds_.local_element(i * 3 + d);
+          Tensor<1, problem_dimension, Number> U_i_new;
+          for (unsigned int d = 0; d < problem_dimension; ++d)
+            U_i_new[d] = temp_euler_.local_element(i * problem_dimension + d);
 
           const Number m_i_inv = lumped_mass_matrix_inverse.local_element(i);
           const Number lambda_inv = Number(row_length - 1);
 
-          const auto r_i = gather(r_, i);
+          Tensor<1, problem_dimension, Number> r_i;
+          for (unsigned int d = 0; d < problem_dimension; ++d)
+            r_i[d] = r_.local_element(i * problem_dimension + d);
 
           const unsigned int *js = sparsity_simd.columns(i);
           for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
@@ -726,8 +783,9 @@ namespace ryujin
             const auto b_ji =
                 (col_idx == 0 ? Number(1.) : Number(0.)) - m_ij * m_i_inv;
 
-
-            const auto r_j = gather(r_, j);
+            Tensor<1, problem_dimension, Number> r_j;
+            for (unsigned int d = 0; d < problem_dimension; ++d)
+              r_j[d] = r_.local_element(j * problem_dimension + d);
 
             const auto p_ij =
                 tau * m_i_inv * lambda_inv *
@@ -749,15 +807,31 @@ namespace ryujin
 
           synchronization_dispatch.check(thread_ready, i >= n_export_indices);
 
-          const auto bounds = simd_gather_array(bounds_, i);
-          const auto U_i_new = simd_gather(temp_euler_, i);
+          std::array<VectorizedArray<Number>, 3> bounds;
+          {
+            unsigned int indices[VectorizedArray<Number>::size()];
+            for (unsigned int k = 0; k < VectorizedArray<Number>::size(); ++k)
+              indices[k] = (i + k) * 3;
+            vectorized_load_and_transpose(
+                3, bounds_.begin(), indices, &bounds[0]);
+          }
 
           const auto m_i_inv = simd_load(lumped_mass_matrix_inverse, i);
 
           const unsigned int row_length = sparsity_simd.row_length(i);
           const VectorizedArray<Number> lambda_inv = Number(row_length - 1);
 
-          const auto r_i = simd_gather(r_, i);
+          Tensor<1, problem_dimension, VectorizedArray<Number>> U_i_new;
+          Tensor<1, problem_dimension, VectorizedArray<Number>> r_i;
+          {
+            unsigned int indices[VectorizedArray<Number>::size()];
+            for (unsigned int k = 0; k < VectorizedArray<Number>::size(); ++k)
+              indices[k] = (i + k) * problem_dimension;
+            vectorized_load_and_transpose(
+                problem_dimension, temp_euler_.begin(), indices, &U_i_new[0]);
+            vectorized_load_and_transpose(
+                problem_dimension, r_.begin(), indices, &r_i[0]);
+          }
 
           const unsigned int *js = sparsity_simd.columns(i);
 
@@ -774,7 +848,14 @@ namespace ryujin
                                             : VectorizedArray<Number>(0.)) -
                               m_ij * m_i_inv;
 
-            const auto r_j = simd_gather(r_, js);
+            Tensor<1, problem_dimension, VectorizedArray<Number>> r_j;
+            {
+              unsigned int indices[VectorizedArray<Number>::size()];
+              for (unsigned int k = 0; k < VectorizedArray<Number>::size(); ++k)
+                indices[k] = js[k] * problem_dimension;
+              vectorized_load_and_transpose(
+                  problem_dimension, r_.begin(), indices, &r_j[0]);
+            }
 
             const auto p_ij = tau * m_i_inv * lambda_inv *
                               (pij_matrix_.get_vectorized_tensor(i, col_idx) +
@@ -816,8 +897,7 @@ namespace ryujin
         SynchronizationDispatch synchronization_dispatch([&]() {
           /* Synchronize over all MPI processes: */
           if (pass + 1 == n_passes)
-            for (auto &it : temp_euler_)
-              it.update_ghost_values_start(channel++);
+            temp_euler_.update_ghost_values_start(channel++);
           else
             lij_matrix_next_.update_ghost_rows_start(channel++);
         });
@@ -835,7 +915,9 @@ namespace ryujin
           if (row_length == 1)
             continue;
 
-          auto U_i_new = gather(temp_euler_, i);
+          Tensor<1, problem_dimension, Number> U_i_new;
+          for (unsigned int d = 0; d < problem_dimension; ++d)
+            U_i_new[d] = temp_euler_.local_element(i * problem_dimension + d);
 
           const Number lambda = Number(1.) / Number(row_length - 1);
 
@@ -859,20 +941,17 @@ namespace ryujin
           const auto s_new =
               ProblemDescription<dim, Number>::specific_entropy(U_i_new);
 
-          AssertThrowSIMD(
-              rho_new,
-              [](auto val) { return val > Number(0.); },
-              dealii::ExcMessage("Negative density."));
+          AssertThrowSIMD(rho_new,
+                          [](auto val) { return val > Number(0.); },
+                          dealii::ExcMessage("Negative density."));
 
-          AssertThrowSIMD(
-              e_new,
-              [](auto val) { return val > Number(0.); },
-              dealii::ExcMessage("Negative internal energy."));
+          AssertThrowSIMD(e_new,
+                          [](auto val) { return val > Number(0.); },
+                          dealii::ExcMessage("Negative internal energy."));
 
-          AssertThrowSIMD(
-              s_new,
-              [](auto val) { return val > Number(0.); },
-              dealii::ExcMessage("Negative specific entropy."));
+          AssertThrowSIMD(s_new,
+                          [](auto val) { return val > Number(0.); },
+                          dealii::ExcMessage("Negative specific entropy."));
 #endif
 
           /* In the last round */
@@ -896,15 +975,19 @@ namespace ryujin
               }
             }
 
-            scatter(temp_euler_, U_i_new, i);
+            for (unsigned int d = 0; d < problem_dimension; ++d)
+              temp_euler_.local_element(i * problem_dimension + d) = U_i_new[d];
 
             /* Skip updating l_ij */
             continue;
           }
 
-          scatter(temp_euler_, U_i_new, i);
+          for (unsigned int d = 0; d < problem_dimension; ++d)
+            temp_euler_.local_element(i * problem_dimension + d) = U_i_new[d];
 
-          const auto bounds = gather_array(bounds_, i);
+          std::array<Number, 3> bounds;
+          for (unsigned int d = 0; d < 3; ++d)
+            bounds[d] = bounds_.local_element(i * 3 + d);
           for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
             auto p_ij = pij_matrix_.get_tensor(i, col_idx);
             const auto l_ij =
@@ -922,7 +1005,14 @@ namespace ryujin
 
           synchronization_dispatch.check(thread_ready, i >= n_export_indices);
 
-          auto U_i_new = simd_gather(temp_euler_, i);
+          Tensor<1, problem_dimension, VectorizedArray<Number>> U_i_new;
+          {
+            unsigned int indices[VectorizedArray<Number>::size()];
+            for (unsigned int k = 0; k < VectorizedArray<Number>::size(); ++k)
+              indices[k] = (i + k) * problem_dimension;
+            vectorized_load_and_transpose(
+                problem_dimension, temp_euler_.begin(), indices, &U_i_new[0]);
+          }
 
           const unsigned int row_length = sparsity_simd.row_length(i);
           const Number lambda = Number(1.) / Number(row_length - 1);
@@ -949,28 +1039,41 @@ namespace ryujin
           const auto e_new = PD::internal_energy(U_i_new);
           const auto s_new = PD::specific_entropy(U_i_new);
 
-          AssertThrowSIMD(
-              rho_new,
-              [](auto val) { return val > Number(0.); },
-              dealii::ExcMessage("Negative density."));
+          AssertThrowSIMD(rho_new,
+                          [](auto val) { return val > Number(0.); },
+                          dealii::ExcMessage("Negative density."));
 
-          AssertThrowSIMD(
-              e_new,
-              [](auto val) { return val > Number(0.); },
-              dealii::ExcMessage("Negative internal energy."));
+          AssertThrowSIMD(e_new,
+                          [](auto val) { return val > Number(0.); },
+                          dealii::ExcMessage("Negative internal energy."));
 
-          AssertThrowSIMD(
-              s_new,
-              [](auto val) { return val > Number(0.); },
-              dealii::ExcMessage("Negative specific entropy."));
+          AssertThrowSIMD(s_new,
+                          [](auto val) { return val > Number(0.); },
+                          dealii::ExcMessage("Negative specific entropy."));
 #endif
 
-          simd_scatter(temp_euler_, U_i_new, i);
+          {
+            unsigned int indices[VectorizedArray<Number>::size()];
+            for (unsigned int k = 0; k < VectorizedArray<Number>::size(); ++k)
+              indices[k] = (i + k) * problem_dimension;
+            vectorized_transpose_and_store(false,
+                                           problem_dimension,
+                                           &U_i_new[0],
+                                           indices,
+                                           temp_euler_.begin());
+          }
 
           if (pass + 1 == n_passes)
             continue;
 
-          const auto bounds = simd_gather_array(bounds_, i);
+          std::array<VectorizedArray<Number>, 3> bounds;
+          {
+            unsigned int indices[VectorizedArray<Number>::size()];
+            for (unsigned int k = 0; k < VectorizedArray<Number>::size(); ++k)
+              indices[k] = (i + k) * 3;
+            vectorized_load_and_transpose(
+                3, bounds_.begin(), indices, &bounds[0]);
+          }
           for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
 
             const auto p_ij = pij_matrix_.get_vectorized_tensor(i, col_idx);
@@ -993,8 +1096,7 @@ namespace ryujin
       Scope scope(computing_timer_, "time step 6 - synchronization");
 
       /* Synchronize over all MPI processes: */
-      for (auto &it : temp_euler_)
-        it.update_ghost_values_finish();
+      temp_euler_.update_ghost_values_finish();
     }
 
     /* And finally update the result: */
@@ -1017,8 +1119,7 @@ namespace ryujin
 
   restart_ssph2_step:
     /* This also copies ghost elements: */
-    for (unsigned int k = 0; k < problem_dimension; ++k)
-      temp_ssp_[k] = U[k];
+    temp_ssp_ = U;
 
     /* Step 1: U1 = U_old + tau * L(U_old) */
     Number tau_1 = euler_step(U, t, tau_0);
@@ -1044,8 +1145,7 @@ namespace ryujin
       goto restart_ssph2_step;
     }
 
-    for (unsigned int k = 0; k < problem_dimension; ++k)
-      U[k].sadd(Number(1. / 2.), Number(1. / 2.), temp_ssp_[k]);
+    U.sadd(Number(1. / 2.), Number(1. / 2.), temp_ssp_);
 
     return tau_1;
   }
@@ -1062,8 +1162,7 @@ namespace ryujin
 
   restart_ssprk3_step:
     /* This also copies ghost elements: */
-    for (unsigned int k = 0; k < problem_dimension; ++k)
-      temp_ssp_[k] = U[k];
+    temp_ssp_ = U;
 
     /* Step 1: U1 = U_old + tau * L(U_old) */
     Number tau_1 = euler_step(U, t, tau_0);
@@ -1089,8 +1188,7 @@ namespace ryujin
       goto restart_ssprk3_step;
     }
 
-    for (unsigned int k = 0; k < problem_dimension; ++k)
-      U[k].sadd(Number(1. / 4.), Number(3. / 4.), temp_ssp_[k]);
+    U.sadd(Number(1. / 4.), Number(3. / 4.), temp_ssp_);
 
     /* Step 3: U_new = 1/3 U_old + 2/3 (U2 + tau L(U2)) */
     const Number tau_3 = euler_step(U, t, tau_1);
@@ -1109,8 +1207,7 @@ namespace ryujin
       goto restart_ssprk3_step;
     }
 
-    for (unsigned int k = 0; k < problem_dimension; ++k)
-      U[k].sadd(Number(2. / 3.), Number(1. / 3.), temp_ssp_[k]);
+    U.sadd(Number(2. / 3.), Number(1. / 3.), temp_ssp_);
 
     return tau_1;
   }

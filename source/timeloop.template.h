@@ -140,6 +140,8 @@ namespace ryujin
     Number t = 0.;
     unsigned int output_cycle = 0;
     vector_type U;
+    constexpr auto problem_dimension =
+        ProblemDescription<dim, Number>::problem_dimension;
 
     /* Prepare data structures: */
 
@@ -154,9 +156,7 @@ namespace ryujin
 
       print_mpi_partition(logfile);
 
-      const auto &partitioner = offline_data.partitioner();
-      for (auto &it : U)
-        it.reinit(partitioner);
+      time_step.initialize_vector(U);
 
       if (resume) {
         print_info("resuming interrupted computation");
@@ -166,14 +166,26 @@ namespace ryujin
         t_initial = t;
       } else {
         print_info("interpolating initial values");
-        U = initial_values.interpolate(offline_data);
+        const auto U_sep = initial_values.interpolate(offline_data);
+        for (unsigned int i = 0; i < offline_data.partitioner()->local_size();
+             ++i)
+          for (unsigned int d = 0; d < problem_dimension; ++d)
+            U.local_element(i * problem_dimension + d) =
+                U_sep[d].local_element(i);
       }
     }
 
     if (write_output_files) {
       output(U, base_name + "-solution", t, output_cycle);
       if (enable_compute_error) {
-        const auto analytic = initial_values.interpolate(offline_data, t);
+        const auto U_sep = initial_values.interpolate(offline_data, t);
+        LinearAlgebra::distributed::Vector<Number> analytic;
+        time_step.initialize_vector(analytic);
+        for (unsigned int i = 0; i < offline_data.partitioner()->local_size();
+             ++i)
+          for (unsigned int d = 0; d < problem_dimension; ++d)
+            analytic.local_element(i * problem_dimension + d) =
+                U_sep[d].local_element(i);
         output(analytic, base_name + "-analytic_solution", t, output_cycle);
       }
     }
@@ -200,7 +212,15 @@ namespace ryujin
         if (write_output_files) {
           output(U, base_name + "-solution", t, output_cycle);
           if (enable_compute_error) {
-            const auto analytic = initial_values.interpolate(offline_data, t);
+            const auto U_sep = initial_values.interpolate(offline_data, t);
+            LinearAlgebra::distributed::Vector<Number> analytic;
+            time_step.initialize_vector(analytic);
+            for (unsigned int i = 0;
+                 i < offline_data.partitioner()->local_size();
+                 ++i)
+              for (unsigned int d = 0; d < problem_dimension; ++d)
+                analytic.local_element(i * problem_dimension + d) =
+                    U_sep[d].local_element(i);
             output(analytic, base_name + "-analytic_solution", t, output_cycle);
           }
         }
@@ -223,7 +243,7 @@ namespace ryujin
     computing_timer["time loop"].stop();
 
     /* Write final timing statistics to logfile: */
-    print_cycle_statistics(cycle, t, output_cycle, /*final_time=*/ true);
+    print_cycle_statistics(cycle, t, output_cycle, /*final_time=*/true);
 
     if (enable_compute_error) {
       /* Output final error: */
@@ -311,7 +331,8 @@ namespace ryujin
 
       /* Compute norms of error: */
 
-      error -= U[i];
+      for (unsigned int j = 0; j < error.get_partitioner()->local_size(); ++j)
+        error.local_element(j) -= U.local_element(j * problem_dimension + i);
 
       const Number linf_norm_error =
           Utilities::MPI::max(error.linfty_norm(), mpi_communicator);

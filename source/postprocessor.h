@@ -31,8 +31,7 @@ namespace ryujin
     using rank1_type = typename ProblemDescription<dim, Number>::rank1_type;
     using curl_type = dealii::Tensor<1, dim == 2 ? 1 : dim, Number>;
 
-    using scalar_type = dealii::LinearAlgebra::distributed::Vector<Number>;
-    using vector_type = std::array<scalar_type, problem_dimension>;
+    using vector_type = dealii::LinearAlgebra::distributed::Vector<Number>;
 
     /**
      * The number of postprocessed quantities:
@@ -51,7 +50,7 @@ namespace ryujin
     void prepare();
 
     void schedule_output(const vector_type &U,
-                         const scalar_type &alpha,
+                         const vector_type &alpha,
                          std::string name,
                          Number t,
                          unsigned int cycle,
@@ -62,7 +61,7 @@ namespace ryujin
     void wait();
 
   protected:
-    std::array<scalar_type, n_quantities> quantities_;
+    std::array<vector_type, n_quantities> quantities_;
 
   private:
     const MPI_Comm &mpi_communicator_;

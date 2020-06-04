@@ -101,7 +101,7 @@ namespace ryujin
 
   template <int dim, typename Number>
   void Postprocessor<dim, Number>::schedule_output(const vector_type &U,
-                                                   const scalar_type &alpha,
+                                                   const vector_type &alpha,
                                                    std::string name,
                                                    Number t,
                                                    unsigned int cycle,
@@ -158,7 +158,9 @@ namespace ryujin
           const auto j =
               *(i < n_internal ? js + col_idx * simd_length : js + col_idx);
 
-          const auto U_j = gather(U, j);
+          Tensor<1, problem_dimension, Number> U_j;
+          for (unsigned int d = 0; d < problem_dimension; ++d)
+            U_j[d] = U.local_element(problem_dimension * j + d);
           const auto M_j = ProblemDescription<dim, Number>::momentum(U_j);
 
           const auto c_ij = cij_matrix.get_tensor(i, col_idx);
@@ -297,12 +299,23 @@ namespace ryujin
     const auto &mapping = discretization.mapping();
     const auto patch_order = discretization.finite_element().degree - 1;
 
+    std::array<LinearAlgebra::distributed::Vector<Number>, problem_dimension>
+        U_copy;
+    for (auto &it : U_copy)
+      it.reinit(offline_data_->partitioner());
+    for (unsigned int i = 0; i < offline_data_->partitioner()->local_size();
+         ++i)
+      for (unsigned int d = 0; d < problem_dimension; ++d)
+        U_copy[d].local_element(i) = U.local_element(i * problem_dimension + d);
+
     if (output_full) {
       data_out->attach_dof_handler(offline_data_->dof_handler());
 
-      for (unsigned int i = 0; i < problem_dimension; ++i)
+      for (unsigned int i = 0; i < problem_dimension; ++i) {
+        U_copy[i].update_ghost_values();
         data_out->add_data_vector(
-            U[i], ProblemDescription<dim, Number>::component_names[i]);
+            U_copy[i], ProblemDescription<dim, Number>::component_names[i]);
+      }
       for (unsigned int i = 0; i < n_quantities; ++i)
         data_out->add_data_vector(quantities_[i], component_names[i]);
 
@@ -318,7 +331,7 @@ namespace ryujin
 
       for (unsigned int i = 0; i < problem_dimension; ++i)
         data_out_cutplanes->add_data_vector(
-            U[i], ProblemDescription<dim, Number>::component_names[i]);
+            U_copy[i], ProblemDescription<dim, Number>::component_names[i]);
       for (unsigned int i = 0; i < n_quantities; ++i)
         data_out_cutplanes->add_data_vector(quantities_[i], component_names[i]);
 

@@ -37,8 +37,7 @@ namespace ryujin
     using rank1_type = typename ProblemDescription<dim, Number>::rank1_type;
     using rank2_type = typename ProblemDescription<dim, Number>::rank2_type;
 
-    using scalar_type = dealii::LinearAlgebra::distributed::Vector<Number>;
-    using vector_type = std::array<scalar_type, problem_dimension>;
+    using vector_type = dealii::LinearAlgebra::distributed::Vector<Number>;
 
     TimeStep(const MPI_Comm &mpi_communicator,
              std::map<std::string, dealii::Timer> &computing_timer,
@@ -47,6 +46,8 @@ namespace ryujin
              const std::string &subsection = "TimeStep");
 
     void prepare();
+
+    void initialize_vector(vector_type &U) const;
 
     /**
      * Given a reference to a previous state vector U perform an explicit
@@ -124,12 +125,12 @@ namespace ryujin
 
     /* Scratch data: */
 
-    scalar_type alpha_;
+    vector_type alpha_;
     ACCESSOR_READ_ONLY(alpha)
 
-    scalar_type second_variations_;
+    vector_type second_variations_;
 
-    typename Limiter<dim, Number>::vector_type bounds_;
+    vector_type bounds_;
 
     vector_type r_;
 

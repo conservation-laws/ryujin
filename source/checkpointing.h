@@ -36,11 +36,10 @@ namespace ryujin
     boost::archive::binary_iarchive ia(file);
     ia >> t >> output_cycle;
 
-    for (auto &it1 : U) {
-      for (auto &it2 : it1)
-        ia >> it2;
-      it1.update_ghost_values();
+    for (auto &it : U) {
+      ia >> it;
     }
+    U.update_ghost_values();
   };
 
   const auto do_checkpoint = [](const std::string &base_name,
@@ -58,9 +57,8 @@ namespace ryujin
 
     boost::archive::binary_oarchive oa(file);
     oa << t << output_cycle;
-    for (const auto &it1 : U)
-      for (const auto &it2 : it1)
-        oa << it2;
+    for (const auto &it : U)
+      oa << it;
   };
 } // namespace ryujin
 

@@ -30,9 +30,6 @@ namespace ryujin
 
     using rank1_type = typename ProblemDescription<dim, Number>::rank1_type;
 
-    using vector_type =
-        std::array<dealii::LinearAlgebra::distributed::Vector<Number>, 3>;
-
     using Bounds = std::array<Number, 3>;
 
     Limiter();
