@@ -5,7 +5,10 @@
 
 find_package(Doxygen REQUIRED)
 
-find_path(MATHJAX_PATH MathJax.js PATHS ${MATHJAX_PATH} $ENV{MATHJAX_PATH})
+find_path(MATHJAX_PATH MathJax.js PATHS
+  ${MATHJAX_PATH} $ENV{MATHJAX_PATH}
+  /usr/share/mathjax /usr/share/javascript/mathjax
+  )
 
 if(MATHJAX_PATH MATCHES "MATHJAX_PATH-NOTFOUND")
   set(MATHJAX_PATH "https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/")
