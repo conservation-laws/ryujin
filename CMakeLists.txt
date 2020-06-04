@@ -46,7 +46,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 #
-# Options:
+# External library and feature configuration:
 #
 
 option(CALLGRIND
