@@ -39,18 +39,18 @@ namespace grendel
 
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
 
+      const Number
+        denominator = ScalarNumber(1.) / (std::abs(P_rho) + eps * rho_max);
       t_r = dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
           rho_max,
           U_rho + t_r * P_rho,
-          (std::abs(rho_max - U_rho) + eps * rho_min) /
-              (std::abs(P_rho) + eps * rho_max),
+          (std::abs(rho_max - U_rho) + eps * rho_min) * denominator,
           t_r);
 
       t_r = dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
           U_rho + t_r * P_rho,
           rho_min,
-          (std::abs(rho_min - U_rho) + eps * rho_min) /
-              (std::abs(P_rho) + eps * rho_max),
+          (std::abs(rho_min - U_rho) + eps * rho_min) * denominator,
           t_r);
 
       /*
