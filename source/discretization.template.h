@@ -9,17 +9,11 @@
 #include <compile_time_options.h>
 
 #include "discretization.h"
+#include "grid_generator.h"
 
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/fe/fe_q.h>
-#include <deal.II/fe/fe_system.h>
-#include <deal.II/fe/mapping_q_eulerian.h>
-#include <deal.II/grid/filtered_iterator.h>
-#include <deal.II/grid/grid_generator.h>
-#include <deal.II/grid/grid_in.h>
-#include <deal.II/grid/grid_tools.h>
-#include <deal.II/grid/tria.h>
-#include <deal.II/numerics/vector_tools.h>
+#include <deal.II/fe/mapping_q.h>
 
 #include <fstream>
 
@@ -67,6 +61,9 @@ namespace ryujin
     order_quadrature_ = 3;
     add_parameter(
         "order quadrature", order_quadrature_, "Order of the quadrature rule");
+
+    geometry_list_.emplace(
+        std::move(std::make_unique<Geometries::Cylinder<dim>>(subsection)));
   }
 
 

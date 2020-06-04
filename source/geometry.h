@@ -39,33 +39,30 @@ namespace ryujin
     using Triangulation = typename Discretization<dim>::Triangulation;
 
     /**
-     * Constructor that initializes the dealii::ParameterAcceptor object
-     * with the subsection @p subsection concatenated with `+ "/" +
-     * name()`.
+     * Constructor taking geometry name @p name and a subsection @p
+     * subsection as an argument. The dealii::ParameterAcceptor is
+     * initialized with the subsubsection `subsection + "/" + name`.
      */
-    Geometry(std::string &subsection)
-        : ParameterAcceptor(subsection + "/" + name())
+    Geometry(const std::string &name, const std::string &subsection)
+        : ParameterAcceptor(subsection + "/" + name)
+        , name_(name)
     {
     }
-
-    /**
-     * Return the name of the geometry as std::string.
-     */
-    virtual const std::string &name() = 0;
 
     /**
      * Create the triangulation according to the appropriate geometry
      * description.
      */
     virtual void create_triangulation(Triangulation &triangulation) = 0;
-  };
 
-  /**
-   *
-   */
-  namespace Geometries
-  {
-  }
+  private:
+    const std::string name_;
+
+    /**
+     * Return the name of the geometry as (const reference) std::string
+     */
+    ACCESSOR_READ_ONLY(name)
+  };
 
 } /* namespace ryujin */
 

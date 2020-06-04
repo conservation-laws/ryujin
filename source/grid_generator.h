@@ -8,9 +8,14 @@
 
 #include <compile_time_options.h>
 
+#include "geometry.h"
+
+#include <deal.II/fe/fe_system.h>
 #include <deal.II/grid/grid_generator.h>
+#include <deal.II/grid/grid_in.h>
 #include <deal.II/grid/grid_tools.h>
 #include <deal.II/grid/manifold_lib.h>
+#include <deal.II/grid/tria.h>
 
 namespace ryujin
 {
@@ -22,6 +27,8 @@ namespace ryujin
    */
   namespace GridGenerator
   {
+    using namespace dealii::GridGenerator;
+
     /**
      * Create a 2D triangulation consisting of a rectangle with a prescribed
      * length and height with an insribed obstacle given by a centered,
@@ -33,22 +40,21 @@ namespace ryujin
      * @ingroup Discretization
      */
     template <int dim>
-    void
-    coarse_grid_triangle(dealii::parallel::distributed::Triangulation<dim> &,
-                         const double /*length*/,
-                         const double /*height*/,
-                         const double /*object_height*/)
+    void triangle(dealii::parallel::distributed::Triangulation<dim> &,
+                  const double /*length*/,
+                  const double /*height*/,
+                  const double /*object_height*/)
     {
       AssertThrow(false, dealii::ExcNotImplemented());
     }
 
 #ifndef DOXYGEN
     template <>
-    void coarse_grid_triangle<2>(
-        dealii::parallel::distributed::Triangulation<2> &triangulation,
-        const double length,
-        const double height,
-        const double object_height)
+    void
+    triangle<2>(dealii::parallel::distributed::Triangulation<2> &triangulation,
+                const double length,
+                const double height,
+                const double object_height)
     {
       constexpr int dim = 2;
 
@@ -90,7 +96,7 @@ namespace ryujin
         assign(cells[6].vertices, {6, 7, 8, 9});
       }
 
-      triangulation.triangulation(vertices, cells, SubCellData());
+      triangulation.create_triangulation(vertices, cells, SubCellData());
 
       /*
        * Set boundary ids:
@@ -131,11 +137,11 @@ namespace ryujin
      * @ingroup Discretization
      */
     template <int dim>
-    void coarse_grid_tube(dealii::parallel::distributed::Triangulation<dim> &,
-                          const double /*length*/,
-                          const double /*diameter*/,
-                          const bool /*prescribe*/,
-                          const bool /*periodic*/)
+    void tube(dealii::parallel::distributed::Triangulation<dim> &,
+              const double /*length*/,
+              const double /*diameter*/,
+              const bool /*prescribe*/,
+              const bool /*periodic*/)
     {
       AssertThrow(false, dealii::ExcNotImplemented());
     }
@@ -143,12 +149,11 @@ namespace ryujin
 
 #ifndef DOXYGEN
     template <>
-    void coarse_grid_tube<1>(
-        dealii::parallel::distributed::Triangulation<1> &triangulation,
-        const double length,
-        const double /*diameter*/,
-        const bool prescribe,
-        const bool periodic)
+    void tube<1>(dealii::parallel::distributed::Triangulation<1> &triangulation,
+                 const double length,
+                 const double /*diameter*/,
+                 const bool prescribe,
+                 const bool periodic)
     {
       dealii::GridGenerator::hyper_cube(triangulation, 0., length);
       const auto cell = triangulation.begin_active();
@@ -169,12 +174,11 @@ namespace ryujin
 
 
     template <>
-    void coarse_grid_tube<2>(
-        dealii::parallel::distributed::Triangulation<2> &triangulation,
-        const double length,
-        const double diameter,
-        const bool prescribe,
-        const bool /*periodic*/)
+    void tube<2>(dealii::parallel::distributed::Triangulation<2> &triangulation,
+                 const double length,
+                 const double diameter,
+                 const bool prescribe,
+                 const bool /*periodic*/)
     {
       using namespace dealii;
 
@@ -222,12 +226,11 @@ namespace ryujin
 
 
     template <>
-    void coarse_grid_tube<3>(
-        dealii::parallel::distributed::Triangulation<3> &triangulation,
-        const double length,
-        const double diameter,
-        const bool prescribe,
-        const bool /*periodic*/)
+    void tube<3>(dealii::parallel::distributed::Triangulation<3> &triangulation,
+                 const double length,
+                 const double diameter,
+                 const bool prescribe,
+                 const bool /*periodic*/)
     {
       using namespace dealii;
 
@@ -274,11 +277,11 @@ namespace ryujin
      * @ingroup Discretization
      */
     template <int dim>
-    void coarse_grid_step(dealii::parallel::distributed::Triangulation<dim> &,
-                          const double /*length*/,
-                          const double /*height*/,
-                          const double /*step_position*/,
-                          const double /*step_height*/)
+    void step(dealii::parallel::distributed::Triangulation<dim> &,
+              const double /*length*/,
+              const double /*height*/,
+              const double /*step_position*/,
+              const double /*step_height*/)
     {
       AssertThrow(false, dealii::ExcNotImplemented());
     }
@@ -286,12 +289,11 @@ namespace ryujin
 
 #ifndef DOXYGEN
     template <>
-    void coarse_grid_step<2>(
-        dealii::parallel::distributed::Triangulation<2> &triangulation,
-        const double length,
-        const double height,
-        const double step_position,
-        const double step_height)
+    void step<2>(dealii::parallel::distributed::Triangulation<2> &triangulation,
+                 const double length,
+                 const double height,
+                 const double step_position,
+                 const double step_height)
     {
       constexpr int dim = 2;
 
@@ -403,12 +405,11 @@ namespace ryujin
      */
 
     template <int dim>
-    void
-    coarse_grid_cylinder(dealii::parallel::distributed::Triangulation<dim> &,
-                         const double /*length*/,
-                         const double /*height*/,
-                         const double /*cylinder_position*/,
-                         const double /*cylinder_height*/)
+    void cylinder(dealii::parallel::distributed::Triangulation<dim> &,
+                  const double /*length*/,
+                  const double /*height*/,
+                  const double /*cylinder_position*/,
+                  const double /*cylinder_height*/)
     {
       AssertThrow(false, dealii::ExcNotImplemented());
     }
@@ -416,12 +417,12 @@ namespace ryujin
 
 #ifndef DOXYGEN
     template <>
-    void coarse_grid_cylinder<2>(
-        dealii::parallel::distributed::Triangulation<2> &triangulation,
-        const double length,
-        const double height,
-        const double cylinder_position,
-        const double cylinder_diameter)
+    void
+    cylinder<2>(dealii::parallel::distributed::Triangulation<2> &triangulation,
+                const double length,
+                const double height,
+                const double cylinder_position,
+                const double cylinder_diameter)
     {
       constexpr int dim = 2;
 
@@ -505,20 +506,19 @@ namespace ryujin
 
 
     template <>
-    void coarse_grid_cylinder<3>(
-        dealii::parallel::distributed::Triangulation<3> &triangulation,
-        const double length,
-        const double height,
-        const double cylinder_position,
-        const double cylinder_diameter)
+    void
+    cylinder<3>(dealii::parallel::distributed::Triangulation<3> &triangulation,
+                const double length,
+                const double height,
+                const double cylinder_position,
+                const double cylinder_diameter)
     {
       using namespace dealii;
 
       parallel::distributed::Triangulation<2> tria1(
           triangulation.get_communicator());
 
-      coarse_grid_cylinder(
-          tria1, length, height, cylinder_position, cylinder_diameter);
+      cylinder(tria1, length, height, cylinder_position, cylinder_diameter);
 
       GridGenerator::extrude_triangulation(
           tria1, 4, height, triangulation, true);
@@ -586,10 +586,10 @@ namespace ryujin
      */
 
     template <int dim>
-    void coarse_grid_wall(dealii::parallel::distributed::Triangulation<dim> &,
-                          const double /*length*/,
-                          const double /*height*/,
-                          const double /*wall_position*/)
+    void wall(dealii::parallel::distributed::Triangulation<dim> &,
+              const double /*length*/,
+              const double /*height*/,
+              const double /*wall_position*/)
     {
       AssertThrow(false, dealii::ExcNotImplemented());
     }
@@ -597,11 +597,10 @@ namespace ryujin
 
 #ifndef DOXYGEN
     template <>
-    void coarse_grid_wall<2>(
-        dealii::parallel::distributed::Triangulation<2> &triangulation,
-        const double length,
-        const double height,
-        const double wall_position)
+    void wall<2>(dealii::parallel::distributed::Triangulation<2> &triangulation,
+                 const double length,
+                 const double height,
+                 const double wall_position)
     {
       using namespace dealii;
 
@@ -653,7 +652,67 @@ namespace ryujin
     }
 #endif
 
-  } // namespace GridGenerator
+  } /* namespace GridGenerator */
+
+  /**
+   * A namespace for a number of benchmark geometries and dealii::GridIn
+   * wrappers.
+   *
+   * @ingroup Discretization
+   */
+  namespace Geometries
+  {
+    /**
+     * A 2D/3D cylinder configuration constructed with
+     * GridGenerator::cylinder().
+     *
+     * @ingroup Discretization
+     */
+    template <int dim>
+    class Cylinder : public Geometry<dim>
+    {
+    public:
+      Cylinder(const std::string subsection)
+          : Geometry<dim>("cylinder", subsection)
+      {
+        length_ = 4.;
+        this->add_parameter(
+            "length", length_, "length of computational domain");
+
+        height_ = 2.;
+        this->add_parameter(
+            "height", height_, "height of computational domain");
+
+        object_position_ = 0.6;
+        this->add_parameter("object position",
+                            object_position_,
+                            "x position of immersed cylinder center point");
+
+        object_diameter_ = 0.5;
+        this->add_parameter("object diameter",
+                            object_diameter_,
+                            "diameter of immersed cylinder");
+      }
+
+      virtual void create_triangulation(
+          typename Geometry<dim>::Triangulation &triangulation) final override
+      {
+        GridGenerator::cylinder(triangulation,
+                                length_,
+                                height_,
+                                object_position_,
+                                object_diameter_);
+      }
+
+    private:
+      double length_;
+      double height_;
+      double object_position_;
+      double object_diameter_;
+    };
+
+  } /* namespace Geometries */
+
 } /* namespace ryujin */
 
 #endif /* GRID_GENERATOR_H */
