@@ -151,30 +151,8 @@ namespace ryujin
      */
 
     std::string geometry_;
-    std::string grid_file_;
 
     double mesh_distortion_;
-
-    double immersed_triangle_length_;
-    double immersed_triangle_height_;
-    double immersed_triangle_object_height_;
-
-    double tube_length_;
-    double tube_diameter_;
-
-    double mach_step_length_;
-    double mach_step_height_;
-    double mach_step_step_position_;
-    double mach_step_step_height_;
-
-    double immersed_cylinder_length_;
-    double immersed_cylinder_height_;
-    double immersed_cylinder_object_position_;
-    double immersed_cylinder_object_diameter_;
-
-    double wall_length_;
-    double wall_height_;
-    double wall_position_;
 
     unsigned int refinement_;
     bool repartitioning_;
