@@ -9,6 +9,7 @@
 #include <compile_time_options.h>
 
 #include "convenience_macros.h"
+#include "geometry.h"
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/quadrature.h>
@@ -16,9 +17,11 @@
 #include <deal.II/fe/fe.h>
 #include <deal.II/fe/mapping.h>
 
+#include <memory>
+#include <set>
+
 namespace ryujin
 {
-
   /**
    * An enum of type dealii::types::boundary_id that provides an mnemonic
    * for prescribing different boundary conditions on faces.
@@ -145,11 +148,6 @@ namespace ryujin
     ACCESSOR_READ_ONLY(quadrature)
 
   private:
-    /*
-     * Configuration data used to create the triangulation and set up
-     * finite element, mapping and quadrature.
-     */
-
     std::string geometry_;
 
     double mesh_distortion_;
@@ -160,6 +158,8 @@ namespace ryujin
     unsigned int order_finite_element_;
     unsigned int order_mapping_;
     unsigned int order_quadrature_;
+
+    std::set<std::unique_ptr<Geometry<dim>>> geometry_list_;
   };
 
 } /* namespace ryujin */

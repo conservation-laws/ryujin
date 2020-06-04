@@ -32,17 +32,15 @@ namespace ryujin
                                       const std::string &subsection)
       : ParameterAcceptor(subsection)
       , mpi_communicator_(mpi_communicator)
-      , triangulation_(
-            std::make_unique<parallel::distributed::Triangulation<dim>>(
-                mpi_communicator_))
+      , triangulation_(std::make_unique<Triangulation>(mpi_communicator_))
   {
+    /* Options: */
+
     geometry_ = "cylinder";
     add_parameter("geometry",
                   geometry_,
-                  "Geometry. Valid names are \"none\", or one of the "
-                  "geometries described below.");
-
-    /* Options: */
+                  "Name of the geometry used to create the mesh. Valid names "
+                  "are given by andy of the subsections defined below.");
 
     refinement_ = 5;
     add_parameter("mesh refinement",
@@ -80,11 +78,22 @@ namespace ryujin
 #endif
 
     auto &triangulation = *triangulation_;
+    triangulation.clear();
 
-    if (geometry_ != "none")
-      triangulation.clear();
+    {
+      bool initialized = false;
+      for (auto &it : geometry_list_)
+        if (it->name() == geometry_) {
+          it->create_triangulation(triangulation);
+          initialized = true;
+          break;
+        }
 
-    // FIXME
+      AssertThrow(
+          initialized,
+          ExcMessage("Could not find a geometry description with name \"" +
+                     geometry_ + "\""));
+    }
 
     /* Handle periodic faces: */
 
@@ -111,6 +120,7 @@ namespace ryujin
       }
     }
 
+#ifdef USE_SIMD
     if (repartitioning_) {
       /*
        * Try to partition the mesh equilibrating the workload. The usual mesh
@@ -132,7 +142,6 @@ namespace ryujin
        * safe to assume that the cost incurred is at least
        * VectorizedArray::size() / 2.
        */
-#ifdef USE_SIMD
       constexpr auto speedup = dealii::VectorizedArray<NUMBER>::size() / 2u;
       constexpr unsigned int weight = 1000u;
 
@@ -145,8 +154,8 @@ namespace ryujin
           });
 
       triangulation.repartition();
-#endif
     }
+#endif
 
     triangulation.refine_global(refinement_);
 
@@ -154,9 +163,7 @@ namespace ryujin
       GridTools::distort_random(mesh_distortion_, triangulation);
 
     mapping_ = std::make_unique<MappingQ<dim>>(order_mapping_);
-
     finite_element_ = std::make_unique<FE_Q<dim>>(order_finite_element_);
-
     quadrature_ = std::make_unique<QGauss<dim>>(order_quadrature_);
   }
 
