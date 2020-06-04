@@ -137,8 +137,8 @@ namespace ryujin
              std::tuple<dealii::Tensor<1, dim, Number>,
                         dealii::types::boundary_id,
                         dealii::Point<dim>>>
-        boundary_normal_map_;
-    ACCESSOR_READ_ONLY(boundary_normal_map)
+        boundary_map_;
+    ACCESSOR_READ_ONLY(boundary_map)
 
     /**
      * A sparsity pattern for matrices in vectorized format. Local

@@ -171,7 +171,7 @@ namespace ryujin
     betaij_matrix_tmp.reinit(sparsity_pattern_assembly_);
     measure_of_omega_ = 0.;
 
-    boundary_normal_map_.clear();
+    boundary_map_.clear();
 
     const unsigned int dofs_per_cell =
         discretization_->finite_element().dofs_per_cell;
@@ -192,7 +192,7 @@ namespace ryujin
       auto &is_artificial = copy.is_artificial_;
       auto &local_dof_indices = copy.local_dof_indices_;
 
-      auto &local_boundary_normal_map = copy.local_boundary_normal_map_;
+      auto &local_boundary_map = copy.local_boundary_map_;
       auto &cell_mass_matrix = copy.cell_mass_matrix_;
       auto &cell_betaij_matrix = copy.cell_betaij_matrix_;
       auto &cell_cij_matrix = copy.cell_cij_matrix_;
@@ -217,7 +217,7 @@ namespace ryujin
       transform_to_local_range(*partitioner_, local_dof_indices);
 
       /* clear out copy data: */
-      local_boundary_normal_map.clear();
+      local_boundary_map.clear();
       cell_mass_matrix = 0.;
       cell_betaij_matrix = 0.;
       for (auto &matrix : cell_cij_matrix)
@@ -293,8 +293,8 @@ namespace ryujin
            * given degree of freedom (higher indicators take precedence):
            */
           const auto &[old_normal, old_id, _] =
-              local_boundary_normal_map[index];
-          local_boundary_normal_map[index] = std::make_tuple(
+              local_boundary_map[index];
+          local_boundary_map[index] = std::make_tuple(
               old_normal + normal, std::max(old_id, id), position);
         } /* j */
       }   /* f */
@@ -303,7 +303,7 @@ namespace ryujin
     const auto copy_local_to_global = [&](const auto &copy) {
       const auto &is_artificial = copy.is_artificial_;
       const auto &local_dof_indices = copy.local_dof_indices_;
-      const auto &local_boundary_normal_map = copy.local_boundary_normal_map_;
+      const auto &local_boundary_map = copy.local_boundary_map_;
       const auto &cell_mass_matrix = copy.cell_mass_matrix_;
       const auto &cell_cij_matrix = copy.cell_cij_matrix_;
       const auto &cell_betaij_matrix = copy.cell_betaij_matrix_;
@@ -312,8 +312,8 @@ namespace ryujin
       if (is_artificial)
         return;
 
-      for (const auto &it : local_boundary_normal_map) {
-        auto &[normal, id, position] = boundary_normal_map_[it.first];
+      for (const auto &it : local_boundary_map) {
+        auto &[normal, id, position] = boundary_map_[it.first];
         auto &[new_normal, new_id, new_position] = it.second;
 
         normal += new_normal;
@@ -373,7 +373,7 @@ namespace ryujin
     /*
      * Normalize our boundary normals:
      */
-    for (auto &it : boundary_normal_map_) {
+    for (auto &it : boundary_map_) {
       auto &[normal, id, _] = it.second;
       normal /= (normal.norm() + std::numeric_limits<Number>::epsilon());
     }
@@ -434,7 +434,7 @@ namespace ryujin
               continue;
 
             const auto &[normal_j, _1, _2] =
-                boundary_normal_map_[local_dof_indices[j]];
+                boundary_map_[local_dof_indices[j]];
 
             const auto value_JxW = fe_face_values.shape_value(j, q) * JxW;
 

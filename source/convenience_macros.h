@@ -77,7 +77,7 @@ namespace ryujin
 namespace
 {
   template <typename T>
-  class is_dereferenciable
+  class is_dereferenceable
   {
     template <typename C>
     static auto test(...) -> std::false_type;
@@ -95,7 +95,7 @@ namespace
 
   template <
       typename T,
-      typename = typename std::enable_if<!is_dereferenciable<T>::value>::type>
+      typename = typename std::enable_if<!is_dereferenceable<T>::value>::type>
   const T &dereference(T &t)
   {
     return t;
@@ -103,7 +103,7 @@ namespace
 
   template <
       typename T,
-      typename = typename std::enable_if<is_dereferenciable<T>::value>::type>
+      typename = typename std::enable_if<is_dereferenceable<T>::value>::type>
   auto dereference(T &t) -> const decltype(*t) &
   {
     return *t;

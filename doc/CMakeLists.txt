@@ -18,6 +18,7 @@ message(STATUS "Using MathJax path: »${MATHJAX_PATH}«")
 
 list(APPEND DOXYGEN_INPUT
   ${CMAKE_SOURCE_DIR}/source/
+  ${CMAKE_SOURCE_DIR}/doc/headers
   )
 string(REPLACE ";" " " DOXYGEN_INPUT "${DOXYGEN_INPUT}")
 
@@ -25,6 +26,7 @@ file(GLOB DOXYGEN_DEPEND
   ${CMAKE_CURRENT_SOURCE_DIR}/options.dox.in
   ${CMAKE_SOURCE_DIR}/source/*.h
   ${CMAKE_SOURCE_DIR}/source/*.cc
+  ${CMAKE_SOURCE_DIR}/doc/headers/*.h
   )
 
 configure_file(

@@ -172,7 +172,7 @@ namespace ryujin
     const auto &betaij_matrix = offline_data_->betaij_matrix();
     const auto &cij_matrix = offline_data_->cij_matrix();
 
-    const auto &boundary_normal_map = offline_data_->boundary_normal_map();
+    const auto &boundary_map = offline_data_->boundary_map();
     const Number measure_of_omega_inverse =
         Number(1.) / offline_data_->measure_of_omega();
 
@@ -319,8 +319,8 @@ namespace ryujin
            * symmetrize.
            */
 
-          if (boundary_normal_map.count(i) != 0 &&
-              boundary_normal_map.count(j) != 0) {
+          if (boundary_map.count(i) != 0 &&
+              boundary_map.count(j) != 0) {
 
             const auto c_ji = cij_matrix.get_transposed_tensor(i, col_idx);
             const auto norm_2 = c_ji.norm();
@@ -587,8 +587,8 @@ namespace ryujin
 
         if constexpr (n_passes == 0) {
           /* Fix up boundary: */
-          const auto it = boundary_normal_map.find(i);
-          if (it != boundary_normal_map.end()) {
+          const auto it = boundary_map.find(i);
+          if (it != boundary_map.end()) {
             const auto &[normal, id, position] = it->second;
 
             /* On boundary 1 remove the normal component of the momentum: */
@@ -957,8 +957,8 @@ namespace ryujin
           /* In the last round */
           if (pass + 1 == n_passes) {
             /* Fix up boundary: */
-            const auto it = boundary_normal_map.find(i);
-            if (it != boundary_normal_map.end()) {
+            const auto it = boundary_map.find(i);
+            if (it != boundary_map.end()) {
               const auto &[normal, id, position] = it->second;
 
               /* On boundary 1 remove the normal component of the momentum: */

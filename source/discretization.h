@@ -19,29 +19,90 @@
 namespace ryujin
 {
 
+  /**
+   * An enum of type dealii::types::boundary_id that provides an mnemonic
+   * for prescribing different boundary conditions on faces.
+   *
+   * @note In deal.II boundary ids are prescribed on faces. However, in our
+   * stencil-based method we need such an information for individual
+   * boundary degrees of freedom. This translation is done in
+   * OfflineData::prepare() when constructing the
+   * OfflineData::boundary_map_.
+   *
+   * @note Boundary ids are sorted by increasing order of precedence. This
+   * order is used when ambiguities arise for an individual degree of
+   * freedom in case of neighboring boundary faces with different boundary
+   * ids. More precisely, `dirichlet` takes precedence before `slip`,
+   * before `periodic`, and before `do_nothing`.
+   *
+   * @ingroup Discretization
+   */
   enum Boundary : dealii::types::boundary_id {
+    /**
+     * The "do nothing" outflow boundary condition: no special treatment of
+     * the boundary degree of freedom. For stability reasons it is
+     * important to ensure that this boundary id is only prescribed on
+     * degrees of freedom with a velocity vector pointing outward of the
+     * computational domain <b>and</b> coming from the interior of the
+     * domain.
+     */
     do_nothing = 0,
+
+    /**
+     * Prescribe periodic boundary conditions by identifying opposing
+     * degrees of freedom. This currently requires a mesh with "standard
+     * orientation".
+     */
     periodic = 1,
+
+    /**
+     * On (free) slip boundary degrees of freedom we enforce a vanishing
+     * normal component of the momentum. This is done by explicitly
+     * removing the normal component of the momentum for the degree of
+     * freedom at the end of TimeStep::euler_step().
+     */
     slip = 2,
+
+    /**
+     * On degrees of freedom marked as Dirichlet boundary we reset the
+     * state of the degree of freedom to the value of
+     * InitialData::initial_state(). Such Dirichlet conditions can only be
+     * meaningfully enforced as inflow conditions, i.e., the velocity
+     * vector associated with a Dirichlet boundary degree of freedom has to
+     * point into the computational domain, and no "backward travelling"
+     * shock front or other flow feature must reach a Dirichlet boundary
+     * degree of freedom during the computation.
+     */
     dirichlet = 3,
   };
 
   /**
-   * This class serves as a container for data related to the
-   * discretization. This includes the triangulation, finite element,
-   * mapping, and quadrature.
-   *
-   * This class uses dealii::ParameterAcceptor to handle parameters.
-   *
-   * After @p prepare() is called, the getter functions
+   * This class is as a container for data related to the discretization,
+   * this includes the triangulation, finite element, mapping, and
+   * quadrature. After prepare() is called, the getter functions
    * Discretization::triangulation(), Discretization::finite_element(),
    * Discretization::mapping(), and Discretization::quadrature() return
-   * valid const references.
+   * valid const references to the mentioned objects.
+   *
+   * The class uses dealii::ParameterAcceptor to handle a multitude of
+   * parameters to control the creation of meshes for a variety of
+   * benchmark configurations and to read in meshes in one of the formats
+   * supported by the deal.II library.
+   *
+   * @ingroup Discretization
    */
   template <int dim>
   class Discretization : public dealii::ParameterAcceptor
   {
   public:
+    /**
+     * A typdef for the deal.II triangulation that is used by this class.
+     * Depending on use case possible values are
+     * dealii::parallel::distributed::Triangulation and
+     * dealii::parallel::fullydistributed::Triangulation.
+     */
+    using Triangulation = dealii::parallel::distributed::Triangulation<dim>;
+
     /**
      * Constructor.
      */
@@ -55,34 +116,35 @@ namespace ryujin
     void prepare();
 
   protected:
+    const MPI_Comm &mpi_communicator_;
+
+    std::unique_ptr<Triangulation> triangulation_;
+    std::unique_ptr<const dealii::Mapping<dim>> mapping_;
+    std::unique_ptr<const dealii::FiniteElement<dim>> finite_element_;
+    std::unique_ptr<const dealii::Quadrature<dim>> quadrature_;
+
+  public:
     /**
-     * The triangulation and a getter function returning a const reference.
+     * Return a read-only const reference to the triangulation.
      */
-    std::unique_ptr<dealii::parallel::distributed::Triangulation<dim>>
-        triangulation_;
     ACCESSOR_READ_ONLY(triangulation)
 
     /**
-     * The mapping and a getter function returning a const reference.
+     * Return a read-only const reference to the mapping.
      */
-    std::unique_ptr<const dealii::Mapping<dim>> mapping_;
     ACCESSOR_READ_ONLY(mapping)
 
     /**
-     * The underlying finite element space.
+     * Return a read-only const reference to the finite element.
      */
-    std::unique_ptr<const dealii::FiniteElement<dim>> finite_element_;
     ACCESSOR_READ_ONLY(finite_element)
 
-    /*
-     * The quadrature used to for assembly.
+    /**
+     * Return a read-only const reference to the quadrature rule.
      */
-    std::unique_ptr<const dealii::Quadrature<dim>> quadrature_;
     ACCESSOR_READ_ONLY(quadrature)
 
   private:
-    const MPI_Comm &mpi_communicator_;
-
     /*
      * Configuration data used to create the triangulation and set up
      * finite element, mapping and quadrature.

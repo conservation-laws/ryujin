@@ -118,7 +118,7 @@ namespace ryujin
     const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
     const auto &lumped_mass_matrix = offline_data_->lumped_mass_matrix();
     const auto &cij_matrix = offline_data_->cij_matrix();
-    const auto &boundary_normal_map = offline_data_->boundary_normal_map();
+    const auto &boundary_map = offline_data_->boundary_map();
 
     const unsigned int n_internal = offline_data_->n_locally_internal();
     const unsigned int n_locally_owned = offline_data_->n_locally_owned();
@@ -178,8 +178,8 @@ namespace ryujin
 
         /* Fix up boundaries: */
 
-        const auto bnm_it = boundary_normal_map.find(i);
-        if (bnm_it != boundary_normal_map.end()) {
+        const auto bnm_it = boundary_map.find(i);
+        if (bnm_it != boundary_map.end()) {
           const auto [normal, id, _] = bnm_it->second;
           /* FIXME: Think again about what to do exactly here... */
           if (id == Boundary::slip) {
