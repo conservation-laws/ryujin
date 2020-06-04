@@ -73,7 +73,7 @@ namespace grendel
     std::vector<CellData<dim>> cells(7);
     {
       const auto assign = [](auto b, std::array<unsigned int, 4> a) {
-        std::copy(a.begin(), a.end(), b);
+        std::copy(a.begin(), a.end(), b.begin());
       };
       assign(cells[0].vertices, {0, 1, 4, 5});
       assign(cells[1].vertices, {1, 2, 5, 6});
