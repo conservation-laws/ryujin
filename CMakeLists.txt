@@ -27,7 +27,11 @@ project(ryujin CXX)
 string(APPEND DEAL_II_CXX_FLAGS " -fopenmp")
 string(APPEND DEAL_II_LINKER_FLAGS " -fopenmp -Wl,-as-needed")
 
-string(APPEND DEAL_II_CXX_FLAGS_RELEASE " -march=native -Ofast -ffp-contract=fast")
+string(APPEND DEAL_II_CXX_FLAGS_RELEASE " -O3 -ffp-contract=fast")
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+  string(APPEND DEAL_II_CXX_FLAGS " -fdiagnostics-color=always")
+endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   string(APPEND DEAL_II_CXX_FLAGS
@@ -41,9 +45,21 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     )
 endif()
 
-if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-  string(APPEND DEAL_II_CXX_FLAGS " -fdiagnostics-color=always")
-endif()
+#
+# Options:
+#
+
+option(CALLGRIND
+  "Compile and link against the valgrind/callgrind instrumentation library" OFF
+  )
+
+option(LIKWID_PERFMON
+  "Compile and link against the likwid instrumentation library" OFF
+  )
+
+option(DOCUMENTATION
+  "Build the documentation with doxygen" OFF
+  )
 
 #
 # Options:
@@ -63,26 +79,14 @@ option(CHECK_BOUNDS "Enable debug code paths that check limiter bounds" OFF)
 
 option(DEBUG_OUTPUT "Enable detailed time-step output" OFF)
 
-option(CALLGRIND
-  "Compile and link against the valgrind/callgrind instrumentation library" OFF
-  )
-
-option(LIKWID_PERFMON
-  "Compile and link against the likwid instrumentation library" OFF
-  )
-
-option(DOCUMENTATION
-  "Build the documentation with doxygen" OFF
-  )
-
 #
 # Set up the rest:
 #
 
-add_subdirectory(grendel)
-add_subdirectory(ryujin)
-
 enable_testing()
+
+add_subdirectory(source)
+
 add_subdirectory(tests)
 
 IF(DOCUMENTATION)

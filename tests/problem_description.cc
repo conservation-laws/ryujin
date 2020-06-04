@@ -3,7 +3,7 @@
 
 #include <deal.II/base/vectorization.h>
 
-using namespace grendel;
+using namespace ryujin;
 using namespace dealii;
 
 

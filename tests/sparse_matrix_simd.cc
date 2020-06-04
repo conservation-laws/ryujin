@@ -24,8 +24,8 @@ int main()
   dealii::Utilities::MPI::Partitioner partitioner(
       locally_owned, locally_relevant, MPI_COMM_SELF);
 
-  grendel::SparsityPatternSIMD<4> my_sparsity(12, spars,partitioner);
-  grendel::SparseMatrixSIMD<double, 1, 4> my_sparse(my_sparsity);
+  ryujin::SparsityPatternSIMD<4> my_sparsity(12, spars,partitioner);
+  ryujin::SparseMatrixSIMD<double, 1, 4> my_sparse(my_sparsity);
   for (unsigned i = 0; i < 12; ++i)
     for (unsigned j = 0; j < 3; ++j)
       my_sparse.write_entry(i * 3 + j, i, j);

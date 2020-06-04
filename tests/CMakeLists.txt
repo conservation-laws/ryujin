@@ -1,9 +1,9 @@
 include_directories(
   ${CMAKE_SOURCE_DIR}/ryujin/
-  ${CMAKE_SOURCE_DIR}/grendel/
-  ${CMAKE_BINARY_DIR}/grendel/
+  ${CMAKE_SOURCE_DIR}/ryujin/
+  ${CMAKE_BINARY_DIR}/ryujin/
   )
 
-set(test_libraries grendel)
+set(test_libraries ryujin)
 
 deal_ii_pickup_tests()

@@ -14,17 +14,14 @@ endif()
 message(STATUS "Using MathJax path: »${MATHJAX_PATH}«")
 
 list(APPEND DOXYGEN_INPUT
-  ${CMAKE_SOURCE_DIR}/grendel/
-  ${CMAKE_SOURCE_DIR}/ryujin/
+  ${CMAKE_SOURCE_DIR}/source/
   )
 string(REPLACE ";" " " DOXYGEN_INPUT "${DOXYGEN_INPUT}")
 
 file(GLOB DOXYGEN_DEPEND
   ${CMAKE_CURRENT_SOURCE_DIR}/options.dox.in
-  ${CMAKE_SOURCE_DIR}/grendel/*.h
-  ${CMAKE_SOURCE_DIR}/grendel/*.cc
-  ${CMAKE_SOURCE_DIR}/ryujin/*.h
-  ${CMAKE_SOURCE_DIR}/ryujin/*.cc
+  ${CMAKE_SOURCE_DIR}/source/*.h
+  ${CMAKE_SOURCE_DIR}/source/*.cc
   )
 
 configure_file(

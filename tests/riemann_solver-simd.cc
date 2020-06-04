@@ -7,7 +7,7 @@
 #include <riemann_solver.template.h>
 #include <simd.template.h>
 
-using namespace grendel;
+using namespace ryujin;
 using namespace dealii;
 
 int main()
