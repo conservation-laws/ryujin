@@ -500,7 +500,7 @@ namespace ryujin
     } else {
 
 #ifdef CHECK_BOUNDS
-      const auto phi_p_star = phi(riemann_data_i, riemann_data_j, p_star);
+      const auto phi_p_star = phi(riemann_data_i, riemann_data_j, p_2);
       AssertThrowSIMD(
           phi_p_star,
           [](auto val) { return val >= -newton_eps<ScalarNumber>; },
