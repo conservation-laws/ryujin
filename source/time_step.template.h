@@ -313,8 +313,7 @@ namespace ryujin
            * symmetrize.
            */
 
-          if (boundary_map.count(i) != 0 &&
-              boundary_map.count(j) != 0) {
+          if (boundary_map.count(i) != 0 && boundary_map.count(j) != 0) {
 
             const auto c_ji = cij_matrix.get_transposed_tensor(i, col_idx);
             const auto norm_2 = c_ji.norm();
@@ -572,7 +571,6 @@ namespace ryujin
                                          entropy_viscosity_commutator
                                  ? d_ij * (alpha_i + alpha_j) * Number(.5)
                                  : d_ij * std::max(alpha_i, alpha_j);
-          pij_matrix_.write_tensor((d_ijH - d_ij) * (U_j - U_i), i, col_idx);
 
           dealii::Tensor<1, problem_dimension, Number> U_ij_bar;
           const auto c_ij = cij_matrix.get_tensor(i, col_idx);
@@ -648,7 +646,8 @@ namespace ryujin
           vectorized_load_and_transpose(
               problem_dimension, U.begin(), indices, &U_i[0]);
         }
-        const auto f_i = ProblemDescription<dim, VectorizedArray<Number>>::f(U_i);
+        const auto f_i =
+            ProblemDescription<dim, VectorizedArray<Number>>::f(U_i);
         auto U_i_new = U_i;
         const auto alpha_i = simd_load(alpha_, i);
         const auto variations_i = simd_load(second_variations_, i);
@@ -689,15 +688,13 @@ namespace ryujin
                 problem_dimension, U.begin(), indices, &U_j[0]);
           }
 
-          pij_matrix_.write_vectorized_tensor(
-              (d_ijH - d_ij) * (U_j - U_i), i, col_idx, true);
-
           dealii::Tensor<1, problem_dimension, VectorizedArray<Number>>
               U_ij_bar;
           const auto c_ij = cij_matrix.get_vectorized_tensor(i, col_idx);
           const auto d_ij_inv = Number(1.) / d_ij;
 
-          const auto f_j = ProblemDescription<dim, VectorizedArray<Number>>::f(U_j);
+          const auto f_j =
+              ProblemDescription<dim, VectorizedArray<Number>>::f(U_j);
           for (unsigned int k = 0; k < problem_dimension; ++k) {
             const auto temp = (f_j[k] - f_i[k]) * c_ij;
 
@@ -792,9 +789,13 @@ namespace ryujin
           Tensor<1, problem_dimension, Number> U_i_new;
           for (unsigned int d = 0; d < problem_dimension; ++d)
             U_i_new[d] = temp_euler_.local_element(i * problem_dimension + d);
+          Tensor<1, problem_dimension, Number> U_i;
+          for (unsigned int d = 0; d < problem_dimension; ++d)
+            U_i[d] = U.local_element(i * problem_dimension + d);
 
           const Number m_i_inv = lumped_mass_matrix_inverse.local_element(i);
           const Number lambda_inv = Number(row_length - 1);
+          const auto alpha_i = alpha_.local_element(i);
 
           Tensor<1, problem_dimension, Number> r_i;
           for (unsigned int d = 0; d < problem_dimension; ++d)
@@ -804,6 +805,18 @@ namespace ryujin
           for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
             const auto j = js[col_idx];
             const Number m_j_inv = lumped_mass_matrix_inverse.local_element(j);
+
+            Tensor<1, problem_dimension, Number> U_j;
+            for (unsigned int d = 0; d < problem_dimension; ++d)
+              U_j[d] = U.local_element(j * problem_dimension + d);
+            const auto alpha_j = alpha_.local_element(j);
+
+            const auto d_ij = dij_matrix_.get_entry(i, col_idx);
+            const auto d_ijH = Indicator<dim, Number>::indicator_ ==
+                                       Indicator<dim, Number>::Indicators::
+                                           entropy_viscosity_commutator
+                                   ? d_ij * (alpha_i + alpha_j) * Number(.5)
+                                   : d_ij * std::max(alpha_i, alpha_j);
 
             const auto m_ij = mass_matrix.get_entry(i, col_idx);
             const auto b_ij =
@@ -817,7 +830,7 @@ namespace ryujin
 
             const auto p_ij =
                 tau * m_i_inv * lambda_inv *
-                (pij_matrix_.get_tensor(i, col_idx) + b_ij * r_j - b_ji * r_i);
+                ((d_ijH - d_ij) * (U_j - U_i) + b_ij * r_j - b_ji * r_i);
             pij_matrix_.write_tensor(p_ij, i, col_idx);
 
             const auto l_ij =
@@ -849,7 +862,7 @@ namespace ryujin
           const unsigned int row_length = sparsity_simd.row_length(i);
           const VectorizedArray<Number> lambda_inv = Number(row_length - 1);
 
-          Tensor<1, problem_dimension, VectorizedArray<Number>> U_i_new;
+          Tensor<1, problem_dimension, VectorizedArray<Number>> U_i_new, U_i;
           Tensor<1, problem_dimension, VectorizedArray<Number>> r_i;
           {
             unsigned int indices[VectorizedArray<Number>::size()];
@@ -858,8 +871,11 @@ namespace ryujin
             vectorized_load_and_transpose(
                 problem_dimension, temp_euler_.begin(), indices, &U_i_new[0]);
             vectorized_load_and_transpose(
+                problem_dimension, U.begin(), indices, &U_i[0]);
+            vectorized_load_and_transpose(
                 problem_dimension, r_.begin(), indices, &r_i[0]);
           }
+          const auto alpha_i = simd_load(alpha_, i);
 
           const unsigned int *js = sparsity_simd.columns(i);
 
@@ -867,6 +883,16 @@ namespace ryujin
                ++col_idx, js += simd_length) {
 
             const auto m_j_inv = simd_load(lumped_mass_matrix_inverse, js);
+
+            const auto alpha_j = simd_load(alpha_, js);
+
+            const auto d_ij = dij_matrix_.get_vectorized_entry(i, col_idx);
+
+            const auto d_ijH = Indicator<dim, Number>::indicator_ ==
+                                       Indicator<dim, Number>::Indicators::
+                                           entropy_viscosity_commutator
+                                   ? d_ij * (alpha_i + alpha_j) * Number(.5)
+                                   : d_ij * std::max(alpha_i, alpha_j);
 
             const auto m_ij = mass_matrix.get_vectorized_entry(i, col_idx);
             const auto b_ij = (col_idx == 0 ? VectorizedArray<Number>(1.)
@@ -876,19 +902,21 @@ namespace ryujin
                                             : VectorizedArray<Number>(0.)) -
                               m_ij * m_i_inv;
 
-            Tensor<1, problem_dimension, VectorizedArray<Number>> r_j;
+            Tensor<1, problem_dimension, VectorizedArray<Number>> r_j, U_j;
             {
               unsigned int indices[VectorizedArray<Number>::size()];
               for (unsigned int k = 0; k < VectorizedArray<Number>::size(); ++k)
                 indices[k] = js[k] * problem_dimension;
               vectorized_load_and_transpose(
                   problem_dimension, r_.begin(), indices, &r_j[0]);
+              vectorized_load_and_transpose(
+                  problem_dimension, U.begin(), indices, &U_j[0]);
             }
 
-            const auto p_ij = tau * m_i_inv * lambda_inv *
-                              (pij_matrix_.get_vectorized_tensor(i, col_idx) +
-                               b_ij * r_j - b_ji * r_i);
-            pij_matrix_.write_vectorized_tensor(p_ij, i, col_idx);
+            const auto p_ij =
+                tau * m_i_inv * lambda_inv *
+                ((d_ijH - d_ij) * (U_j - U_i) + b_ij * r_j - b_ji * r_i);
+            pij_matrix_.write_vectorized_tensor(p_ij, i, col_idx, true);
 
             const auto l_ij = Limiter<dim, VectorizedArray<Number>>::limit(
                 bounds, U_i_new, p_ij);
