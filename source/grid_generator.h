@@ -555,6 +555,44 @@ namespace ryujin
       double wall_position_;
     };
 
+
+    /**
+     * Describes the geometry used for validation: The unit hypercube with
+     * Dirichlet data.
+     *
+     * @ingroup Discretization
+     */
+    template <int dim>
+    class Validation : public Geometry<dim>
+    {
+    public:
+      Validation(const std::string subsection)
+          : Geometry<dim>("validation", subsection)
+      {
+        length_ = 20.;
+        this->add_parameter(
+            "length", length_, "length of computational domain");
+      }
+
+      virtual void create_triangulation(
+          typename Geometry<dim>::Triangulation &triangulation) final override
+      {
+        dealii::GridGenerator::hyper_cube(
+            triangulation, -0.5 * length_, 0.5 * length_);
+
+        for (auto cell : triangulation.active_cell_iterators())
+          for (auto f : dealii::GeometryInfo<dim>::face_indices()) {
+            const auto face = cell->face(f);
+            if (!face->at_boundary())
+              continue;
+            face->set_boundary_id(Boundary::dirichlet);
+          }
+      }
+
+    private:
+      double length_;
+    };
+
   } /* namespace Geometries */
 
 } /* namespace ryujin */

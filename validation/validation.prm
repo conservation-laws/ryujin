@@ -8,12 +8,13 @@ subsection A - TimeLoop
 end
 
 subsection B - Discretization
-  set geometry           = tube analytical
+  set geometry           = validation
 
   set mesh refinement = 7
 
-  set tube - diameter    = 20
-  set tube - length      = 20
+  subsection validation
+    set length = 20
+  end
 end
 
 subsection D - InitialValues
