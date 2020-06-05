@@ -8,6 +8,12 @@
 
 #include <deal.II/base/function.h>
 
+
+/**
+ * @name Various convenience macros
+ */
+//@{
+
 namespace ryujin
 {
 #ifndef DOXYGEN
@@ -176,7 +182,6 @@ protected:
  * @ingroup Miscellaneous
  */
 #define ASM_LABEL(label) asm ("#" label);
-
 
 //@}
 

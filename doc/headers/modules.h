@@ -12,3 +12,9 @@
  * Miscellaneous helper functions, macros and classes.
  */
 
+
+/**
+ * @defgroup SIMD SIMD
+ *
+ * SIMD related functions and classes.
+ */

@@ -14,28 +14,73 @@
 #include <omp.h>
 
 /**
- * @name OpenMP parallel for loop options and macros:
+ * @name OpenMP parallel for macros
  */
 //@{
 
+/**
+ * @todo write documentation
+ *
+ * @ingroup Miscellaneous
+ */
 #define RYUJIN_PRAGMA(x) _Pragma(#x)
 
+/**
+ * @todo write documentation
+ *
+ * @ingroup Miscellaneous
+ */
 #define RYUJIN_PARALLEL_REGION_BEGIN                                          \
   RYUJIN_PRAGMA(omp parallel default(shared))                                 \
   {
 
+/**
+ * @todo write documentation
+ *
+ * @ingroup Miscellaneous
+ */
 #define RYUJIN_PARALLEL_REGION_END }
 
+/**
+ * @todo write documentation
+ *
+ * @ingroup Miscellaneous
+ */
 #define RYUJIN_OMP_FOR RYUJIN_PRAGMA(omp for)
+
+/**
+ * @todo write documentation
+ *
+ * @ingroup Miscellaneous
+ */
 #define RYUJIN_OMP_FOR_NOWAIT RYUJIN_PRAGMA(omp for nowait)
+
+/**
+ * @todo write documentation
+ *
+ * @ingroup Miscellaneous
+ */
 #define RYUJIN_OMP_BARRIER RYUJIN_PRAGMA(omp barrier)
 
+/**
+ * @todo write documentation
+ *
+ * @ingroup Miscellaneous
+ */
 #define RYUJIN_LIKELY(x) (__builtin_expect(!!(x), 1))
+
+/**
+ * @todo write documentation
+ *
+ * @ingroup Miscellaneous
+ */
 #define RYUJIN_UNLIKELY(x) (__builtin_expect(!!(x), 0))
 
 
 /**
- * FIXME: Documentation
+ * @todo write documentation
+ *
+ * @ingroup Miscellaneous
  */
 template <typename Payload>
 class SynchronizationDispatch

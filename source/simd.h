@@ -23,20 +23,23 @@ namespace ryujin
   /**
    * Small helper class to extract the underlying scalar type of a
    * VectorizedArray, or return T directly.
+   *
+   * @ingroup SIMD
    */
+  //@{
   template <typename T>
   struct get_value_type {
     using type = T;
   };
 
 
-#ifndef DOXYGEN
   template <typename T, std::size_t width>
   struct get_value_type<dealii::VectorizedArray<T, width>> {
     using type = T;
   };
+  //@}
 
-
+#ifndef DOXYGEN
   namespace
   {
     template <typename Functor, size_t... Is>
@@ -56,6 +59,8 @@ namespace ryujin
    *
    * We use this function to create an array of sparsity iterators that
    * cannot be default initialized.
+   *
+   * @ingroup SIMD
    */
   template <unsigned int length, typename Functor>
   DEAL_II_ALWAYS_INLINE inline auto generate_iterators(Functor f)
@@ -67,6 +72,8 @@ namespace ryujin
 
   /**
    * Increment all iterators in an std::array simultaneously.
+   *
+   * @ingroup SIMD
    */
   template <typename T>
   DEAL_II_ALWAYS_INLINE inline void increment_iterators(T &iterators)
@@ -83,6 +90,8 @@ namespace ryujin
 
   /**
    * Return the positive part of a number.
+   *
+   * @ingroup SIMD
    */
   template <typename Number>
   inline DEAL_II_ALWAYS_INLINE Number positive_part(const Number number)
@@ -93,6 +102,8 @@ namespace ryujin
 
   /**
    * Return the negative part of a number.
+   *
+   * @ingroup SIMD
    */
   template <typename Number>
   inline DEAL_II_ALWAYS_INLINE Number negative_part(const Number number)
@@ -105,6 +116,8 @@ namespace ryujin
    * A wrapper around dealii::Utilities::fixed_power. We use a wrapper
    * instead of calling the function directly so that we can easily change
    * the implementation at one central place.
+   *
+   * @ingroup SIMD
    */
   template <int N, typename T>
   inline T fixed_power(const T x)
@@ -115,6 +128,8 @@ namespace ryujin
 
   /**
    * Custom implementation of a vectorized pow function.
+   *
+   * @ingroup SIMD
    */
   template <typename T>
   T pow(const T x, const typename get_value_type<T>::type b);
@@ -128,6 +143,8 @@ namespace ryujin
   /**
    * Return a tensor populated with the entries
    *   { U[0][i] , U[1][i] , ... , U[k][i] }
+   *
+   * @ingroup SIMD
    */
   template <typename T1, std::size_t k, typename T2>
   DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, k, typename T1::value_type>
@@ -142,6 +159,8 @@ namespace ryujin
 
   /**
    * Variant of above function returning a std::array instead.
+   *
+   * @ingroup SIMD
    */
   template <typename T1, std::size_t k, typename T2>
   DEAL_II_ALWAYS_INLINE inline std::array<typename T1::value_type, k>
@@ -157,6 +176,8 @@ namespace ryujin
   /**
    * Write out the given tensor @p values into
    *   { U[0][i] , U[1][i] , ... , U[k][i] }
+   *
+   * @ingroup SIMD
    */
   template <typename T1, std::size_t k1, typename T2, typename T3>
   DEAL_II_ALWAYS_INLINE inline void
@@ -196,6 +217,8 @@ namespace ryujin
   /**
    * Return a VectorizedArray with
    *   { U[i] , U[i + 1] , ... , U[i + VectorizedArray::size() - 1] }
+   *
+   * @ingroup SIMD
    */
   template <typename T1>
   DEAL_II_ALWAYS_INLINE inline dealii::VectorizedArray<typename T1::value_type>
@@ -210,6 +233,8 @@ namespace ryujin
   /**
    * Return a VectorizedArray with
    *   { U[js[0] , U[js[1]] , ... , U[js[VectorizedArray::size() - 1]] }
+   *
+   * @ingroup SIMD
    */
   template <typename T1>
   DEAL_II_ALWAYS_INLINE inline dealii::VectorizedArray<typename T1::value_type>
@@ -223,6 +248,8 @@ namespace ryujin
 
   /**
    * Write out the given VectorizedArray to the vector
+   *
+   * @ingroup SIMD
    */
   template <typename T1>
   DEAL_II_ALWAYS_INLINE inline void
@@ -248,6 +275,8 @@ namespace ryujin
    *   ...
    *   { U[k-1][js[0]] , U[k-1][js[0]] , ... ,
    * U[k-1][js[VectorizedArray::size()-1]] }
+   *
+   * @ingroup SIMD
    */
   template <typename T1, std::size_t k, typename T2>
   DEAL_II_ALWAYS_INLINE inline dealii::
@@ -266,6 +295,8 @@ namespace ryujin
 
   /**
    * Variant of above function that returns an array instead of a tensor
+   *
+   * @ingroup SIMD
    */
   template <typename T1, std::size_t k, typename T2>
   DEAL_II_ALWAYS_INLINE inline std::
@@ -283,6 +314,8 @@ namespace ryujin
 
   /**
    * Converse operation to simd_gather() and simd_gather_array()
+   *
+   * @ingroup SIMD
    */
   template <typename T1, typename T2, typename T3>
   DEAL_II_ALWAYS_INLINE inline void
@@ -301,7 +334,9 @@ namespace ryujin
   //@{
 
   /**
-   * FIXME: Write documentation
+   * @todo write documentation
+   *
+   * @ingroup SIMD
    */
   template <int dim, typename T1>
   DEAL_II_ALWAYS_INLINE inline auto simd_load_vlat(T1 &vector, unsigned int i)
@@ -327,7 +362,9 @@ namespace ryujin
 
 
   /**
-   * FIXME: Write documentation
+   * @todo write documentation
+   *
+   * @ingroup SIMD
    */
   template <int dim, typename T1>
   DEAL_II_ALWAYS_INLINE inline auto simd_load_vlat(T1 &vector,
@@ -354,7 +391,9 @@ namespace ryujin
 
 
   /**
-   * FIXME: Write documentation
+   * @todo write documentation
+   *
+   * @ingroup SIMD
    */
   template <typename T1, typename T2>
   DEAL_II_ALWAYS_INLINE inline void
@@ -378,6 +417,8 @@ namespace ryujin
   /**
    * Non-SIMD counterpart of vectorized load and transpose Read in the
    * object @p entries from the @p i th position of the @p vector object.
+   *
+   * @ingroup SIMD
    */
   template <int dim, typename T1>
   DEAL_II_ALWAYS_INLINE inline auto load_vlat(const T1 &vector, unsigned int i)
@@ -406,6 +447,8 @@ namespace ryujin
    * Non-SIMD counterpart of vectorized transpose and store: Write out the
    * object @p entries to the @p i th position of the @p vector
    * object.
+   *
+   * @ingroup SIMD
    */
   template <typename T1, typename T2>
   DEAL_II_ALWAYS_INLINE inline void

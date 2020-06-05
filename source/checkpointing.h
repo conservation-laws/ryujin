@@ -18,17 +18,23 @@
 
 namespace ryujin
 {
-  /*
-   * Checkpoint-restore helper functions:
+  /**
+   * Performs a resume operation. Given a @p base_name the function tries
+   * to locate correponding checkpoint files and will read in the saved
+   * state @p U at saved time @p t with saved output cycle @p output_cycle.
    *
-   * TODO: Some day, we should refactor this into a class and do something
+   * @todo Some day, we should refactor this into a class and do something
    * smarter...
+   *
+   * @ingroup Miscellaneous
    */
-  const auto do_resume = [](const std::string &base_name,
-                            unsigned int id,
-                            auto &U,
-                            auto &t,
-                            auto &output_cycle) {
+  template<typename T1, typename T2, typename T3>
+  void do_resume(const std::string &base_name,
+                 unsigned int id,
+                 T1 &U,
+                 T2 &t,
+                 T3 &output_cycle)
+  {
     std::string name = base_name + "-checkpoint-" +
                        dealii::Utilities::int_to_string(id, 4) + ".archive";
     std::ifstream file(name, std::ios::binary);
@@ -40,13 +46,26 @@ namespace ryujin
       ia >> it;
     }
     U.update_ghost_values();
-  };
+  }
 
-  const auto do_checkpoint = [](const std::string &base_name,
-                                unsigned int id,
-                                const auto &U,
-                                const auto t,
-                                const auto output_cycle) {
+
+  /**
+   * Writes out a checkpoint to disk. Given a @p base_name and a current
+   * state @p U at time @p t and output cycle @p output_cycle the function
+   * writes out the state to disk using boost::archive for serialization.
+   *
+   * @todo Some day, we should refactor this into a class and do something
+   * smarter...
+   *
+   * @ingroup Miscellaneous
+   */
+  template<typename T1, typename T2, typename T3>
+  void do_checkpoint(const std::string &base_name,
+                     unsigned int id,
+                     const T1 &U,
+                     const T2 t,
+                     const T3 output_cycle)
+  {
     std::string name = base_name + "-checkpoint-" +
                        dealii::Utilities::int_to_string(id, 4) + ".archive";
 
@@ -59,7 +78,7 @@ namespace ryujin
     oa << t << output_cycle;
     for (const auto &it : U)
       oa << it;
-  };
+  }
 } // namespace ryujin
 
 #endif /* CHECKPOINTING_H */
