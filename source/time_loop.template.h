@@ -3,15 +3,15 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#ifndef TIMELOOP_TEMPLATE_H
-#define TIMELOOP_TEMPLATE_H
+#ifndef TIME_LOOP_TEMPLATE_H
+#define TIME_LOOP_TEMPLATE_H
 
 #include "checkpointing.h"
 #include "indicator.h"
 #include "limiter.h"
 #include "riemann_solver.h"
 #include "scope.h"
-#include "timeloop.h"
+#include "time_loop.h"
 
 #include <deal.II/base/logstream.h>
 #include <deal.II/base/revision.h>
@@ -923,4 +923,4 @@ namespace ryujin
 
 } // namespace ryujin
 
-#endif /* TIMELOOP_TEMPLATE_H */
+#endif /* TIME_LOOP_TEMPLATE_H */

@@ -5,7 +5,7 @@
 
 #include <compile_time_options.h>
 
-#include "timeloop.h"
+#include "time_loop.h"
 
 #include <deal.II/base/utilities.h>
 #include <deal.II/base/multithread_info.h>

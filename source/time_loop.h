@@ -3,8 +3,8 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#ifndef TIMELOOP_H
-#define TIMELOOP_H
+#ifndef TIME_LOOP_H
+#define TIME_LOOP_H
 
 #include <compile_time_options.h>
 
@@ -104,4 +104,4 @@ namespace ryujin
 
 } // namespace ryujin
 
-#endif /* TIMELOOP_H */
+#endif /* TIME_LOOP_H */

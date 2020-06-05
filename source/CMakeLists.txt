@@ -23,7 +23,7 @@ add_executable(ryujin
   riemann_solver.cc
   simd.cc
   sparse_matrix_simd.cc
-  timeloop.cc
+  time_loop.cc
   time_step.cc
   )
 

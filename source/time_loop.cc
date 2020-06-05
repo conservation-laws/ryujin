@@ -3,7 +3,7 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#include "timeloop.template.h"
+#include "time_loop.template.h"
 
 namespace ryujin
 {
