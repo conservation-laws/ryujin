@@ -45,8 +45,8 @@ namespace ryujin
      * @ingroup Discretization
      */
 
-    template <int dim>
-    void cylinder(dealii::parallel::distributed::Triangulation<dim> &,
+    template <int dim, int spacedim, template <int, int> class Triangulation>
+    void cylinder(Triangulation<dim, spacedim> &,
                   const double /*length*/,
                   const double /*height*/,
                   const double /*cylinder_position*/,
@@ -57,19 +57,18 @@ namespace ryujin
 
 
 #ifndef DOXYGEN
-    template <>
-    void
-    cylinder<2>(dealii::parallel::distributed::Triangulation<2> &triangulation,
-                const double length,
-                const double height,
-                const double cylinder_position,
-                const double cylinder_diameter)
+    template <template <int, int> class Triangulation>
+    void cylinder(Triangulation<2, 2> &triangulation,
+                  const double length,
+                  const double height,
+                  const double cylinder_position,
+                  const double cylinder_diameter)
     {
       constexpr int dim = 2;
 
       using namespace dealii;
 
-      Triangulation<dim> tria1, tria2, tria3, tria4;
+      dealii::Triangulation<dim, dim> tria1, tria2, tria3, tria4, tria5;
 
       GridGenerator::hyper_cube_with_cylindrical_hole(
           tria1, cylinder_diameter / 2., cylinder_diameter, 0.5, 1, false);
@@ -93,7 +92,8 @@ namespace ryujin
           Point<2>(length - cylinder_position, height / 2.));
 
       GridGenerator::merge_triangulations(
-          {&tria1, &tria2, &tria3, &tria4}, triangulation, 1.e-12, true);
+          {&tria1, &tria2, &tria3, &tria4}, tria5, 1.e-12, true);
+      triangulation.copy_triangulation(tria5);
 
       /* Restore polar manifold for disc: */
 
@@ -146,28 +146,29 @@ namespace ryujin
     }
 
 
-    template <>
-    void
-    cylinder<3>(dealii::parallel::distributed::Triangulation<3> &triangulation,
-                const double length,
-                const double height,
-                const double cylinder_position,
-                const double cylinder_diameter)
+    template <template <int, int> class Triangulation>
+    void cylinder(Triangulation<3, 3> &triangulation,
+                  const double length,
+                  const double height,
+                  const double cylinder_position,
+                  const double cylinder_diameter)
     {
       using namespace dealii;
 
-      parallel::distributed::Triangulation<2> tria1(
-          triangulation.get_communicator());
+      dealii::Triangulation<2, 2> tria1;
 
       cylinder(tria1, length, height, cylinder_position, cylinder_diameter);
 
-      GridGenerator::extrude_triangulation(
-          tria1, 4, height, triangulation, true);
+      dealii::Triangulation<3, 3> tria2;
+
+      GridGenerator::extrude_triangulation(tria1, 4, height, tria2, true);
       GridTools::transform(
           [height](auto point) {
             return point - dealii::Tensor<1, 3>{{0, 0, height / 2.}};
           },
-          triangulation);
+          tria2);
+
+      triangulation.copy_triangulation(tria2);
 
       /*
        * Reattach an appropriate manifold ID:
@@ -222,8 +223,8 @@ namespace ryujin
      *
      * @ingroup Discretization
      */
-    template <int dim>
-    void step(dealii::parallel::distributed::Triangulation<dim> &,
+    template <int dim, int spacedim, template <int, int> class Triangulation>
+    void step(Triangulation<dim, dim> &,
               const double /*length*/,
               const double /*height*/,
               const double /*step_position*/,
@@ -234,23 +235,19 @@ namespace ryujin
 
 
 #ifndef DOXYGEN
-    template <>
-    void step<2>(dealii::parallel::distributed::Triangulation<2> &triangulation,
-                 const double length,
-                 const double height,
-                 const double step_position,
-                 const double step_height)
+    template <template <int, int> class Triangulation>
+    void step(Triangulation<2, 2> &triangulation,
+              const double length,
+              const double height,
+              const double step_position,
+              const double step_height)
     {
-      constexpr int dim = 2;
-
       using namespace dealii;
 
-      Triangulation<dim> tria1;
+      dealii::Triangulation<2, 2> tria1, tria2, tria3;
 
       GridGenerator::subdivided_hyper_rectangle(
           tria1, {15, 4}, Point<2>(0., step_height), Point<2>(length, height));
-
-      Triangulation<dim> tria2;
 
       GridGenerator::subdivided_hyper_rectangle(
           tria2,
@@ -258,7 +255,8 @@ namespace ryujin
           Point<2>(0., 0.),
           Point<2>(step_position, step_height));
 
-      GridGenerator::merge_triangulations(tria1, tria2, triangulation);
+      GridGenerator::merge_triangulations(tria1, tria2, tria3);
+      triangulation.copy_triangulation(tria3);
 
       /*
        * Set boundary ids:
@@ -294,16 +292,16 @@ namespace ryujin
 
       triangulation.refine_global(4);
 
-      Point<dim> point(step_position + 0.0125, step_height - 0.0125);
-      triangulation.set_manifold(1, SphericalManifold<dim>(point));
+      Point<2> point(step_position + 0.0125, step_height - 0.0125);
+      triangulation.set_manifold(1, SphericalManifold<2>(point));
 
       for (auto cell : triangulation.active_cell_iterators())
-        for (unsigned int v = 0; v < GeometryInfo<dim>::vertices_per_cell;
+        for (unsigned int v = 0; v < GeometryInfo<2>::vertices_per_cell;
              ++v) {
           double distance =
-              (cell->vertex(v) - Point<dim>(step_position, step_height)).norm();
+              (cell->vertex(v) - Point<2>(step_position, step_height)).norm();
           if (distance < 1.e-6) {
-            for (auto f : GeometryInfo<dim>::face_indices()) {
+            for (auto f : GeometryInfo<2>::face_indices()) {
               const auto face = cell->face(f);
               if (face->at_boundary())
                 face->set_manifold_id(Boundary::slip);
@@ -318,7 +316,7 @@ namespace ryujin
 
         cell->set_manifold_id(0); // reset manifold id again
 
-        for (unsigned int v = 0; v < GeometryInfo<dim>::vertices_per_cell;
+        for (unsigned int v = 0; v < GeometryInfo<2>::vertices_per_cell;
              ++v) {
           auto &vertex = cell->vertex(v);
 
@@ -347,8 +345,8 @@ namespace ryujin
      * @ingroup Discretization
      */
 
-    template <int dim>
-    void wall(dealii::parallel::distributed::Triangulation<dim> &,
+    template <int dim, int spacedim, template <int, int> class Triangulation>
+    void wall(Triangulation<dim, spacedim> &,
               const double /*length*/,
               const double /*height*/,
               const double /*wall_position*/)
@@ -358,25 +356,25 @@ namespace ryujin
 
 
 #ifndef DOXYGEN
-    template <>
-    void wall<2>(dealii::parallel::distributed::Triangulation<2> &triangulation,
-                 const double length,
-                 const double height,
-                 const double wall_position)
+    template <template <int, int> class Triangulation>
+    void wall(Triangulation<2, 2> &triangulation,
+              const double length,
+              const double height,
+              const double wall_position)
     {
       using namespace dealii;
 
-      Triangulation<2> tria1;
+      dealii::Triangulation<2, 2> tria1, tria2, tria3;
 
       GridGenerator::subdivided_hyper_rectangle(
           tria1, {18, 6}, Point<2>(wall_position, 0), Point<2>(length, height));
 
-      Triangulation<2> tria2;
-
       GridGenerator::subdivided_hyper_rectangle(
           tria2, {1, 6}, Point<2>(0., 0.), Point<2>(wall_position, height));
 
-      GridGenerator::merge_triangulations(tria1, tria2, triangulation);
+      GridGenerator::merge_triangulations(tria1, tria2, tria3);
+
+      triangulation.copy_triangulation(tria3);
 
       /*
        * Set boundary ids:
@@ -545,8 +543,7 @@ namespace ryujin
       virtual void create_triangulation(
           typename Geometry<dim>::Triangulation &triangulation) final override
       {
-        GridGenerator::wall(
-            triangulation, length_, height_, wall_position_);
+        GridGenerator::wall(triangulation, length_, height_, wall_position_);
       }
 
     private:
@@ -577,8 +574,9 @@ namespace ryujin
       virtual void create_triangulation(
           typename Geometry<dim>::Triangulation &triangulation) final override
       {
-        dealii::GridGenerator::hyper_cube(
-            triangulation, -0.5 * length_, 0.5 * length_);
+        dealii::Triangulation<dim, dim> tria1;
+        dealii::GridGenerator::hyper_cube(tria1, -0.5 * length_, 0.5 * length_);
+        triangulation.copy_triangulation(tria1);
 
         for (auto cell : triangulation.active_cell_iterators())
           for (auto f : dealii::GeometryInfo<dim>::face_indices()) {
