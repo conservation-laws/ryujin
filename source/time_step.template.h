@@ -179,7 +179,7 @@ namespace ryujin
      * Step 0: Precompute f(U) and the entropies of U
      */
     {
-      Scope scope(computing_timer_, "time step 0 - compute f(U) and entropies");
+      Scope scope(computing_timer_, "time step 0 - compute entropies");
 
       RYUJIN_PARALLEL_REGION_BEGIN
       LIKWID_MARKER_START("time_step_0");
