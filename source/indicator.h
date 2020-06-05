@@ -81,7 +81,7 @@ namespace ryujin
      * to state vector U_i:
      */
     void
-    reset(const rank1_type &U_i, const rank2_type &f_i, const Number entropy);
+    reset(const rank1_type &U_i, const Number entropy);
 
     /**
      * When looping over the sparsity row, add the contribution associated
@@ -90,8 +90,7 @@ namespace ryujin
     void add(const rank1_type &U_j,
              const dealii::Tensor<1, dim, Number> &c_ij,
              const Number beta_ij,
-             const Number entropy_j,
-             const rank2_type &f_j);
+             const Number entropy_j);
     /**
      * Return the computed alpha_i value.
      */
@@ -157,13 +156,13 @@ namespace ryujin
 
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline void Indicator<dim, Number>::reset(
-      const rank1_type &U_i, const rank2_type &f_i, const Number entropy)
+      const rank1_type &U_i, const Number entropy)
   {
     if constexpr (indicator_ == Indicators::entropy_viscosity_commutator) {
       rho_i = U_i[0];
       rho_i_inverse = Number(1.) / rho_i;
       eta_i = entropy;
-      this->f_i = f_i;
+      f_i = ProblemDescription<dim, Number>::f(U_i);
 
       d_eta_i =
           evc_entropy_ == Entropy::mathematical
@@ -197,14 +196,14 @@ namespace ryujin
   Indicator<dim, Number>::add(const rank1_type &U_j,
                               const dealii::Tensor<1, dim, Number> &c_ij,
                               const Number beta_ij,
-                              const Number entropy_j,
-                              const rank2_type &f_j)
+                              const Number entropy_j)
   {
     if constexpr (indicator_ == Indicators::entropy_viscosity_commutator) {
       const auto &rho_j = U_j[0];
-      const auto m_j = ProblemDescription<dim, Number>::momentum(U_j);
-      const auto eta_j = entropy_j;
       const auto rho_j_inverse = Number(1.) / rho_j;
+      const auto m_j = ProblemDescription<dim, Number>::momentum(U_j);
+      const auto f_j = ProblemDescription<dim, Number>::f(U_j);
+      const auto eta_j = entropy_j;
 
       left += (eta_j * rho_j_inverse - eta_i * rho_i_inverse) * m_j * c_ij;
       for (unsigned int k = 0; k < problem_dimension; ++k)

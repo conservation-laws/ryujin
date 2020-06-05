@@ -145,7 +145,6 @@ namespace ryujin
 
     dealii::AlignedVector<Number> specific_entropies_;
     dealii::AlignedVector<Number> evc_entropies_;
-    dealii::AlignedVector<Number> u_and_flux_;
 
     /* Options: */
 

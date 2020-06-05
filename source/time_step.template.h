@@ -118,12 +118,8 @@ namespace ryujin
     /* Initialize local matrices: */
 
     const unsigned int n_relevant = offline_data_->n_locally_relevant();
-    static constexpr unsigned int flux_and_u_width =
-        (dim + 1) * problem_dimension;
-
     specific_entropies_.resize(n_relevant);
     evc_entropies_.resize(n_relevant);
-    u_and_flux_.resize(flux_and_u_width * n_relevant);
 
     /* Initialize local matrices: */
 
@@ -200,9 +196,7 @@ namespace ryujin
           indices[k] = (i + k) * problem_dimension;
         vectorized_load_and_transpose(
             problem_dimension, U.begin(), indices, &U_i[0]);
-        const auto f_i = PD::f(U_i);
 
-        simd_store_vtas(u_and_flux_, std::make_pair(U_i, f_i), i);
         simd_store(specific_entropies_, PD::specific_entropy(U_i), i);
 
         const auto evc_entropy =
@@ -217,9 +211,6 @@ namespace ryujin
         Tensor<1, problem_dimension, Number> U_i;
         for (unsigned int d = 0; d < problem_dimension; ++d)
           U_i[d] = U.local_element(i * problem_dimension + d);
-        const auto f_i = ProblemDescription<dim, Number>::f(U_i);
-
-        store_vtas(u_and_flux_, std::make_pair(U_i, f_i), i);
 
         specific_entropies_[i] =
             ProblemDescription<dim, Number>::specific_entropy(U_i);
@@ -284,23 +275,26 @@ namespace ryujin
         if (row_length == 1)
           continue;
 
-        const auto &[U_i, f_i] = load_vlat<dim>(u_and_flux_, i);
-
+        Tensor<1, problem_dimension, Number> U_i;
+        for (unsigned int d = 0; d < problem_dimension; ++d)
+          U_i[d] = U.local_element(i * problem_dimension + d);
         const Number mass = lumped_mass_matrix.local_element(i);
         const Number hd_i = mass * measure_of_omega_inverse;
 
-        indicator_serial.reset(U_i, f_i, evc_entropies_[i]);
+        indicator_serial.reset(U_i, evc_entropies_[i]);
 
         /* Skip diagonal. */
         const unsigned int *js = sparsity_simd.columns(i);
         for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
           const unsigned int j = js[col_idx];
 
-          const auto &[U_j, f_j] = load_vlat<dim>(u_and_flux_, j);
+          Tensor<1, problem_dimension, Number> U_j;
+          for (unsigned int d = 0; d < problem_dimension; ++d)
+            U_j[d] = U.local_element(j * problem_dimension + d);
 
           const auto c_ij = cij_matrix.get_tensor(i, col_idx);
           const auto beta_ij = betaij_matrix.get_entry(i, col_idx);
-          indicator_serial.add(U_j, c_ij, beta_ij, evc_entropies_[j], f_j);
+          indicator_serial.add(U_j, c_ij, beta_ij, evc_entropies_[j]);
 
           /* Only iterate over the upper triangular portion of d_ij */
           if (j <= i)
@@ -349,10 +343,15 @@ namespace ryujin
 
         synchronization_dispatch.check(thread_ready, i >= n_export_indices);
 
-        const auto &[U_i, f_i] = simd_load_vlat<dim>(u_and_flux_, i);
+        Tensor<1, problem_dimension, VectorizedArray<Number>> U_i;
+        unsigned int indices[VectorizedArray<Number>::size()];
+        for (unsigned int k = 0; k < VectorizedArray<Number>::size(); ++k)
+          indices[k] = (i + k) * problem_dimension;
+        vectorized_load_and_transpose(
+            problem_dimension, U.begin(), indices, &U_i[0]);
         const auto entropy_i = simd_load(evc_entropies_, i);
 
-        indicator_simd.reset(U_i, f_i, entropy_i);
+        indicator_simd.reset(U_i, entropy_i);
 
         const auto mass = simd_load(lumped_mass_matrix, i);
         const auto hd_i = mass * measure_of_omega_inverse;
@@ -371,12 +370,19 @@ namespace ryujin
               break;
             }
 
-          const auto &[U_j, f_j] = simd_load_vlat<dim>(u_and_flux_, js);
+          Tensor<1, problem_dimension, VectorizedArray<Number>> U_j;
+          {
+            unsigned int indices[VectorizedArray<Number>::size()];
+            for (unsigned int k = 0; k < VectorizedArray<Number>::size(); ++k)
+              indices[k] = js[k] * problem_dimension;
+            vectorized_load_and_transpose(
+                problem_dimension, U.begin(), indices, &U_j[0]);
+          }
           const auto entropy_j = simd_load(evc_entropies_, js);
 
           const auto c_ij = cij_matrix.get_vectorized_tensor(i, col_idx);
           const auto beta_ij = betaij_matrix.get_vectorized_entry(i, col_idx);
-          indicator_simd.add(U_j, c_ij, beta_ij, entropy_j, f_j);
+          indicator_simd.add(U_j, c_ij, beta_ij, entropy_j);
 
           /* Only iterate over the upper triangular portion of d_ij */
           if (all_below_diagonal)
@@ -530,7 +536,10 @@ namespace ryujin
         if (row_length == 1)
           continue;
 
-        const auto &[U_i, f_i] = load_vlat<dim>(u_and_flux_, i);
+        Tensor<1, problem_dimension, Number> U_i;
+        for (unsigned int d = 0; d < problem_dimension; ++d)
+          U_i[d] = U.local_element(i * problem_dimension + d);
+        const auto f_i = ProblemDescription<dim, Number>::f(U_i);
         auto U_i_new = U_i;
         const auto alpha_i = alpha_.local_element(i);
         const auto variations_i = second_variations_.local_element(i);
@@ -549,7 +558,9 @@ namespace ryujin
         for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
           const auto j = js[col_idx];
 
-          const auto &[U_j, f_j] = load_vlat<dim>(u_and_flux_, j);
+          Tensor<1, problem_dimension, Number> U_j;
+          for (unsigned int d = 0; d < problem_dimension; ++d)
+            U_j[d] = U.local_element(j * problem_dimension + d);
           const auto alpha_j = alpha_.local_element(j);
           const auto variations_j = second_variations_.local_element(j);
 
@@ -565,6 +576,7 @@ namespace ryujin
 
           dealii::Tensor<1, problem_dimension, Number> U_ij_bar;
           const auto c_ij = cij_matrix.get_tensor(i, col_idx);
+          const auto f_j = ProblemDescription<dim, Number>::f(U_j);
 
           for (unsigned int k = 0; k < problem_dimension; ++k) {
             const auto temp = (f_j[k] - f_i[k]) * c_ij;
@@ -628,7 +640,15 @@ namespace ryujin
 
         synchronization_dispatch.check(thread_ready, i >= n_export_indices);
 
-        const auto &[U_i, f_i] = simd_load_vlat<dim>(u_and_flux_, i);
+        Tensor<1, problem_dimension, VectorizedArray<Number>> U_i;
+        {
+          unsigned int indices[VectorizedArray<Number>::size()];
+          for (unsigned int k = 0; k < VectorizedArray<Number>::size(); ++k)
+            indices[k] = (i + k) * problem_dimension;
+          vectorized_load_and_transpose(
+              problem_dimension, U.begin(), indices, &U_i[0]);
+        }
+        const auto f_i = ProblemDescription<dim, VectorizedArray<Number>>::f(U_i);
         auto U_i_new = U_i;
         const auto alpha_i = simd_load(alpha_, i);
         const auto variations_i = simd_load(second_variations_, i);
@@ -660,7 +680,14 @@ namespace ryujin
                                  ? d_ij * (alpha_i + alpha_j) * Number(.5)
                                  : d_ij * std::max(alpha_i, alpha_j);
 
-          const auto &[U_j, f_j] = simd_load_vlat<dim>(u_and_flux_, js);
+          Tensor<1, problem_dimension, VectorizedArray<Number>> U_j;
+          {
+            unsigned int indices[VectorizedArray<Number>::size()];
+            for (unsigned int k = 0; k < VectorizedArray<Number>::size(); ++k)
+              indices[k] = js[k] * problem_dimension;
+            vectorized_load_and_transpose(
+                problem_dimension, U.begin(), indices, &U_j[0]);
+          }
 
           pij_matrix_.write_vectorized_tensor(
               (d_ijH - d_ij) * (U_j - U_i), i, col_idx, true);
@@ -670,6 +697,7 @@ namespace ryujin
           const auto c_ij = cij_matrix.get_vectorized_tensor(i, col_idx);
           const auto d_ij_inv = Number(1.) / d_ij;
 
+          const auto f_j = ProblemDescription<dim, VectorizedArray<Number>>::f(U_j);
           for (unsigned int k = 0; k < problem_dimension; ++k) {
             const auto temp = (f_j[k] - f_i[k]) * c_ij;
 
