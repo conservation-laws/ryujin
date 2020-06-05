@@ -59,7 +59,9 @@ namespace ryujin
 #ifdef DEBUG
     const unsigned int n_export_indices_preliminary =
 #endif
+#ifdef USE_COMMUNICATION_HIDING
         DoFRenumbering::export_indices_first(dof_handler_, mpi_communicator_);
+#endif
 
 #ifdef USE_SIMD
     n_locally_internal_ = DoFRenumbering::internal_range(dof_handler_);
@@ -94,12 +96,17 @@ namespace ryujin
      * communication can be started.
      */
 
+#ifdef USE_COMMUNICATION_HIDING
     n_export_indices_ = 0;
     for (const auto &it : partitioner_->import_indices())
       if (it.second <= n_locally_internal_)
         n_export_indices_ = std::max(n_export_indices_, it.second);
+
     Assert(n_export_indices_ <= n_export_indices_preliminary,
            dealii::ExcInternalError());
+#else
+    n_export_indices_ = n_locally_internal_;
+#endif
 
     /* Set up affine constraints object: */
 
