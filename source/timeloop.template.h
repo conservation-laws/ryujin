@@ -798,8 +798,26 @@ namespace ryujin
            << std::endl
            << std::endl;
 
-    output << "ETA:  " << std::fixed << std::setprecision(4)
-           << ((t_final - t) / (t - t_initial) * wall_time / 3600.) << " h";
+    /* and print an ETA */
+    unsigned int eta =
+        static_cast<unsigned int>((t_final - t) / (t - t_initial) * wall_time);
+
+    output << "ETA:  ";
+
+    const unsigned int days = eta / (24 * 3600);
+    if (days > 0) {
+      output << days << " d  ";
+      eta %= 24 * 3600;
+    }
+
+    const unsigned int hours = eta / 3600;
+    if (hours > 0) {
+      output << hours << " h  ";
+      eta %= 3600;
+    }
+
+    const unsigned int minutes = eta / 60;
+    output << minutes << " min" << std::endl;
 
     if (mpi_rank != 0)
       return;
