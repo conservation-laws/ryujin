@@ -29,365 +29,6 @@ namespace ryujin
   {
     using namespace dealii::GridGenerator;
 
-    /**
-     * Create a 2D triangulation consisting of a rectangle with a prescribed
-     * length and height with an insribed obstacle given by a centered,
-     * equilateral triangle.
-     *
-     * Even though this function has a template parameter @p dim, it is only
-     * implemented for dimension 2.
-     *
-     * @ingroup Discretization
-     */
-    template <int dim>
-    void triangle(dealii::parallel::distributed::Triangulation<dim> &,
-                  const double /*length*/,
-                  const double /*height*/,
-                  const double /*object_height*/)
-    {
-      AssertThrow(false, dealii::ExcNotImplemented());
-    }
-
-#ifndef DOXYGEN
-    template <>
-    void
-    triangle<2>(dealii::parallel::distributed::Triangulation<2> &triangulation,
-                const double length,
-                const double height,
-                const double object_height)
-    {
-      constexpr int dim = 2;
-
-      using namespace dealii;
-
-      const double object_length = object_height * std::sqrt(3) / 2.;
-
-      const std::vector<Point<dim>> vertices{
-          {0., 0.},                            // 0, bottom left
-          {(length - object_length) / 2., 0.}, // 1, bottom center left
-          {(length + object_length) / 2., 0.}, // 2, bottom center right
-          {length, 0.},                        // 3, bottom right
-          {0., height / 2.},                   // 4, middle left
-          {(length - object_length) / 2., height / 2.}, // 5, middle center left
-          {(length + object_length) / 2.,
-           (height - object_height) / 2.}, // 6, middle lower center right
-          {length, (height - object_height) / 2.}, // 7, middle lower right
-          {(length + object_length) / 2.,
-           (height + object_height) / 2.}, // 8, middle upper center right
-          {length, (height + object_height) / 2.}, // 9, middle upper right
-          {0., height},                            // 10, top left
-          {(length - object_length) / 2., height}, // 11, top center left
-          {(length + object_length) / 2., height}, // 12, top center right
-          {length, height}                         // 13, top right
-      };
-
-      std::vector<CellData<dim>> cells(7);
-      {
-        const auto assign = [](auto b, std::array<unsigned int, 4> a) {
-          for (unsigned int i = 0; i < 4; ++i)
-            b[i] = a[i];
-        };
-        assign(cells[0].vertices, {0, 1, 4, 5});
-        assign(cells[1].vertices, {1, 2, 5, 6});
-        assign(cells[2].vertices, {2, 3, 6, 7});
-        assign(cells[3].vertices, {4, 5, 10, 11});
-        assign(cells[4].vertices, {5, 8, 11, 12});
-        assign(cells[5].vertices, {8, 9, 12, 13});
-        assign(cells[6].vertices, {6, 7, 8, 9});
-      }
-
-      triangulation.create_triangulation(vertices, cells, SubCellData());
-
-      /*
-       * Set boundary ids:
-       */
-
-      for (auto cell : triangulation.active_cell_iterators()) {
-        for (auto f : GeometryInfo<dim>::face_indices()) {
-          const auto face = cell->face(f);
-
-          if (!face->at_boundary())
-            continue;
-
-          /*
-           * We want slip boundary conditions (i.e. indicator 1) at top
-           * bottom and on the triangle. On the left and right side we leave
-           * the boundary indicator at 0, i.e. do nothing.
-           */
-          const auto center = face->center();
-          if (center[0] > 0. && center[0] < length)
-            face->set_boundary_id(Boundary::slip);
-        }
-      }
-    }
-#endif
-
-
-    /**
-     * Create an nD tube with a given length and diameter. More precisely,
-     * this is a line in 1D, a rectangle in 2D, and a cylinder in 3D.
-     *
-     * We set boundary indicator 0 on the left and right side to indicate "do
-     * nothing" boundary conditions, and boundary indicator 1 at the top and
-     * bottom side in 2D, as well as the curved portion of the boundary in 3D
-     * to indicate "slip boundary conditions".
-     *
-     * @todo Refactor prescribe/periodic into enum
-     *
-     * @ingroup Discretization
-     */
-    template <int dim>
-    void tube(dealii::parallel::distributed::Triangulation<dim> &,
-              const double /*length*/,
-              const double /*diameter*/,
-              const bool /*prescribe*/,
-              const bool /*periodic*/)
-    {
-      AssertThrow(false, dealii::ExcNotImplemented());
-    }
-
-
-#ifndef DOXYGEN
-    template <>
-    void tube<1>(dealii::parallel::distributed::Triangulation<1> &triangulation,
-                 const double length,
-                 const double /*diameter*/,
-                 const bool prescribe,
-                 const bool periodic)
-    {
-      dealii::GridGenerator::hyper_cube(triangulation, 0., length);
-      const auto cell = triangulation.begin_active();
-      if (prescribe) {
-        /* Dirichlet data: */
-        cell->face(0)->set_boundary_id(Boundary::dirichlet);
-        cell->face(1)->set_boundary_id(Boundary::dirichlet);
-      } else if (periodic) {
-        /* Periodic data: */
-        cell->face(0)->set_boundary_id(Boundary::periodic);
-        cell->face(1)->set_boundary_id(Boundary::periodic);
-      } else {
-        /* Do nothing: */
-        cell->face(0)->set_boundary_id(Boundary::do_nothing);
-        cell->face(1)->set_boundary_id(Boundary::do_nothing);
-      }
-    }
-
-
-    template <>
-    void tube<2>(dealii::parallel::distributed::Triangulation<2> &triangulation,
-                 const double length,
-                 const double diameter,
-                 const bool prescribe,
-                 const bool /*periodic*/)
-    {
-      using namespace dealii;
-
-      GridGenerator::hyper_rectangle(triangulation,
-                                     Point<2>(-length / 2., -diameter / 2.),
-                                     Point<2>(length / 2., diameter / 2.));
-
-      /*
-       * Set boundary ids:
-       */
-
-      for (auto cell : triangulation.active_cell_iterators()) {
-        for (auto f : GeometryInfo<2>::face_indices()) {
-          const auto face = cell->face(f);
-
-          if (!face->at_boundary())
-            continue;
-
-          if (prescribe) {
-            /* Dirichlet data: */
-            face->set_boundary_id(Boundary::dirichlet);
-
-          } else {
-
-            const auto center = face->center();
-            if (center[0] < -length / 2. + 1.e-6) {
-
-              /* Dirichlet conditions for inflow: */
-              face->set_boundary_id(Boundary::dirichlet);
-
-            } else if (center[0] > length / 2. - 1.e-6) {
-
-              /* The right side of the domain: */
-              face->set_boundary_id(Boundary::do_nothing);
-
-            } else {
-
-              /* Top and bottom of computational domain: */
-              face->set_boundary_id(Boundary::slip);
-            }
-          }
-        }
-      }
-    }
-
-
-    template <>
-    void tube<3>(dealii::parallel::distributed::Triangulation<3> &triangulation,
-                 const double length,
-                 const double diameter,
-                 const bool prescribe,
-                 const bool /*periodic*/)
-    {
-      using namespace dealii;
-
-      GridGenerator::cylinder(triangulation, diameter / 2., length / 2.);
-
-      /*
-       * Set boundary ids:
-       */
-
-      for (auto cell : triangulation.active_cell_iterators()) {
-        for (auto f : GeometryInfo<2>::face_indices()) {
-          const auto face = cell->face(f);
-
-          if (!face->at_boundary())
-            continue;
-
-          /*
-           * We want slip boundary conditions (i.e. indicator 1) at top and
-           * bottom of the rectangle. On the left side we enforce initial
-           * conditionas and leave the boundary indicator on the right side
-           * at 0, i.e. do nothing.
-           */
-
-          if (prescribe) {
-            /* Dirichlet data: */
-            face->set_boundary_id(Boundary::dirichlet);
-
-          } else {
-
-            AssertThrow(false, dealii::ExcNotImplemented());
-          }
-        }
-      }
-    }
-#endif
-
-
-    /**
-     * Create the 2D mach step triangulation.
-     *
-     * Even though this function has a template parameter @p dim, it is only
-     * implemented for dimension 2.
-     *
-     * @ingroup Discretization
-     */
-    template <int dim>
-    void step(dealii::parallel::distributed::Triangulation<dim> &,
-              const double /*length*/,
-              const double /*height*/,
-              const double /*step_position*/,
-              const double /*step_height*/)
-    {
-      AssertThrow(false, dealii::ExcNotImplemented());
-    }
-
-
-#ifndef DOXYGEN
-    template <>
-    void step<2>(dealii::parallel::distributed::Triangulation<2> &triangulation,
-                 const double length,
-                 const double height,
-                 const double step_position,
-                 const double step_height)
-    {
-      constexpr int dim = 2;
-
-      using namespace dealii;
-
-      Triangulation<dim> tria1;
-
-      GridGenerator::subdivided_hyper_rectangle(
-          tria1, {15, 4}, Point<2>(0., step_height), Point<2>(length, height));
-
-      Triangulation<dim> tria2;
-
-      GridGenerator::subdivided_hyper_rectangle(
-          tria2,
-          {3, 1},
-          Point<2>(0., 0.),
-          Point<2>(step_position, step_height));
-
-      GridGenerator::merge_triangulations(tria1, tria2, triangulation);
-
-      /*
-       * Set boundary ids:
-       */
-
-      for (auto cell : triangulation.active_cell_iterators()) {
-        for (auto f : GeometryInfo<2>::face_indices()) {
-          const auto face = cell->face(f);
-
-          if (!face->at_boundary())
-            continue;
-
-          /*
-           * We want slip boundary conditions (i.e. indicator 1) at top
-           * and bottom of the rectangle. On the left we set inflow
-           * conditions (i.e. indicator 2), and we do nothing on the right
-           * side (i.e. indicator 0).
-           */
-
-          const auto center = face->center();
-
-          if (center[0] > 0. + 1.e-6 && center[0] < length - 1.e-6)
-            face->set_boundary_id(Boundary::slip);
-
-          if (center[0] < 0. + 1.e-06)
-            face->set_boundary_id(Boundary::dirichlet);
-        }
-      }
-
-      /*
-       * Refine four times and round off corner with radius 0.0125:
-       */
-
-      triangulation.refine_global(4);
-
-      Point<dim> point(step_position + 0.0125, step_height - 0.0125);
-      triangulation.set_manifold(1, SphericalManifold<dim>(point));
-
-      for (auto cell : triangulation.active_cell_iterators())
-        for (unsigned int v = 0; v < GeometryInfo<dim>::vertices_per_cell;
-             ++v) {
-          double distance =
-              (cell->vertex(v) - Point<dim>(step_position, step_height)).norm();
-          if (distance < 1.e-6) {
-            for (auto f : GeometryInfo<dim>::face_indices()) {
-              const auto face = cell->face(f);
-              if (face->at_boundary())
-                face->set_manifold_id(Boundary::slip);
-              cell->set_manifold_id(1); // temporarily for second loop
-            }
-          }
-        }
-
-      for (auto cell : triangulation.active_cell_iterators()) {
-        if (cell->manifold_id() != 1)
-          continue;
-
-        cell->set_manifold_id(0); // reset manifold id again
-
-        for (unsigned int v = 0; v < GeometryInfo<dim>::vertices_per_cell;
-             ++v) {
-          auto &vertex = cell->vertex(v);
-
-          if (std::abs(vertex[0] - step_position) < 1.e-6 &&
-              vertex[1] > step_height - 1.e-6)
-            vertex[0] = step_position + 0.0125 * (1 - std::sqrt(1. / 2.));
-
-          if (std::abs(vertex[1] - step_height) < 1.e-6 &&
-              vertex[0] < step_position + 0.005)
-            vertex[1] = step_height - 0.0125 * (1 - std::sqrt(1. / 2.));
-        }
-      }
-    }
-#endif
-
 
     /**
      * Create a 2D/3D cylinder configuration with the given length and
@@ -574,6 +215,127 @@ namespace ryujin
 
 
     /**
+     * Create the 2D mach step triangulation.
+     *
+     * Even though this function has a template parameter @p dim, it is only
+     * implemented for dimension 2.
+     *
+     * @ingroup Discretization
+     */
+    template <int dim>
+    void step(dealii::parallel::distributed::Triangulation<dim> &,
+              const double /*length*/,
+              const double /*height*/,
+              const double /*step_position*/,
+              const double /*step_height*/)
+    {
+      AssertThrow(false, dealii::ExcNotImplemented());
+    }
+
+
+#ifndef DOXYGEN
+    template <>
+    void step<2>(dealii::parallel::distributed::Triangulation<2> &triangulation,
+                 const double length,
+                 const double height,
+                 const double step_position,
+                 const double step_height)
+    {
+      constexpr int dim = 2;
+
+      using namespace dealii;
+
+      Triangulation<dim> tria1;
+
+      GridGenerator::subdivided_hyper_rectangle(
+          tria1, {15, 4}, Point<2>(0., step_height), Point<2>(length, height));
+
+      Triangulation<dim> tria2;
+
+      GridGenerator::subdivided_hyper_rectangle(
+          tria2,
+          {3, 1},
+          Point<2>(0., 0.),
+          Point<2>(step_position, step_height));
+
+      GridGenerator::merge_triangulations(tria1, tria2, triangulation);
+
+      /*
+       * Set boundary ids:
+       */
+
+      for (auto cell : triangulation.active_cell_iterators()) {
+        for (auto f : GeometryInfo<2>::face_indices()) {
+          const auto face = cell->face(f);
+
+          if (!face->at_boundary())
+            continue;
+
+          /*
+           * We want slip boundary conditions (i.e. indicator 1) at top
+           * and bottom of the rectangle. On the left we set inflow
+           * conditions (i.e. indicator 2), and we do nothing on the right
+           * side (i.e. indicator 0).
+           */
+
+          const auto center = face->center();
+
+          if (center[0] > 0. + 1.e-6 && center[0] < length - 1.e-6)
+            face->set_boundary_id(Boundary::slip);
+
+          if (center[0] < 0. + 1.e-06)
+            face->set_boundary_id(Boundary::dirichlet);
+        }
+      }
+
+      /*
+       * Refine four times and round off corner with radius 0.0125:
+       */
+
+      triangulation.refine_global(4);
+
+      Point<dim> point(step_position + 0.0125, step_height - 0.0125);
+      triangulation.set_manifold(1, SphericalManifold<dim>(point));
+
+      for (auto cell : triangulation.active_cell_iterators())
+        for (unsigned int v = 0; v < GeometryInfo<dim>::vertices_per_cell;
+             ++v) {
+          double distance =
+              (cell->vertex(v) - Point<dim>(step_position, step_height)).norm();
+          if (distance < 1.e-6) {
+            for (auto f : GeometryInfo<dim>::face_indices()) {
+              const auto face = cell->face(f);
+              if (face->at_boundary())
+                face->set_manifold_id(Boundary::slip);
+              cell->set_manifold_id(1); // temporarily for second loop
+            }
+          }
+        }
+
+      for (auto cell : triangulation.active_cell_iterators()) {
+        if (cell->manifold_id() != 1)
+          continue;
+
+        cell->set_manifold_id(0); // reset manifold id again
+
+        for (unsigned int v = 0; v < GeometryInfo<dim>::vertices_per_cell;
+             ++v) {
+          auto &vertex = cell->vertex(v);
+
+          if (std::abs(vertex[0] - step_position) < 1.e-6 &&
+              vertex[1] > step_height - 1.e-6)
+            vertex[0] = step_position + 0.0125 * (1 - std::sqrt(1. / 2.));
+
+          if (std::abs(vertex[1] - step_height) < 1.e-6 &&
+              vertex[0] < step_position + 0.005)
+            vertex[1] = step_height - 0.0125 * (1 - std::sqrt(1. / 2.));
+        }
+      }
+    }
+#endif
+
+
+    /**
      * Create a 2D double-mach reflection wall configuration:
      *
      * A rectangular domain with given length and height. The boundary
@@ -709,6 +471,88 @@ namespace ryujin
       double height_;
       double object_position_;
       double object_diameter_;
+    };
+
+
+    /**
+     * A 2D Mach step configuration constructed with GridGenerator::step().
+     *
+     * @ingroup Discretization
+     */
+    template <int dim>
+    class Step : public Geometry<dim>
+    {
+    public:
+      Step(const std::string subsection)
+          : Geometry<dim>("step", subsection)
+      {
+        length_ = 3.;
+        this->add_parameter(
+            "length", length_, "length of computational domain");
+
+        height_ = 1.;
+        this->add_parameter(
+            "height", height_, "height of computational domain");
+
+        step_position_ = 0.6;
+        this->add_parameter(
+            "step position", step_position_, "x position of step");
+
+        step_height_ = 0.2;
+        this->add_parameter("step height", step_height_, "height of step");
+      }
+
+      virtual void create_triangulation(
+          typename Geometry<dim>::Triangulation &triangulation) final override
+      {
+        GridGenerator::step(
+            triangulation, length_, height_, step_position_, step_height_);
+      }
+
+    private:
+      double length_;
+      double height_;
+      double step_position_;
+      double step_height_;
+    };
+
+
+    /**
+     * A 2D Mach step configuration constructed with GridGenerator::step().
+     *
+     * @ingroup Discretization
+     */
+    template <int dim>
+    class Wall : public Geometry<dim>
+    {
+    public:
+      Wall(const std::string subsection)
+          : Geometry<dim>("wall", subsection)
+      {
+        length_ = 3.2;
+        this->add_parameter(
+            "length", length_, "length of computational domain");
+
+        height_ = 1.0;
+        this->add_parameter(
+            "height", height_, "height of computational domain");
+
+        wall_position_ = 1. / 6.;
+        this->add_parameter(
+            "wall position", wall_position_, "x position of wall");
+      }
+
+      virtual void create_triangulation(
+          typename Geometry<dim>::Triangulation &triangulation) final override
+      {
+        GridGenerator::wall(
+            triangulation, length_, height_, wall_position_);
+      }
+
+    private:
+      double length_;
+      double height_;
+      double wall_position_;
     };
 
   } /* namespace Geometries */

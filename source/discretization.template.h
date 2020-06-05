@@ -63,7 +63,9 @@ namespace ryujin
         "order quadrature", order_quadrature_, "Order of the quadrature rule");
 
     geometry_list_.emplace(
-        std::move(std::make_unique<Geometries::Cylinder<dim>>(subsection)));
+        std::make_unique<Geometries::Cylinder<dim>>(subsection));
+    geometry_list_.emplace(std::make_unique<Geometries::Step<dim>>(subsection));
+    geometry_list_.emplace(std::make_unique<Geometries::Wall<dim>>(subsection));
   }
 
 
