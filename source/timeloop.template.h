@@ -174,6 +174,7 @@ namespace ryujin
                 U_sep[d].local_element(i);
       }
     }
+    U.update_ghost_values();
 
     if (write_output_files) {
       output(U, base_name + "-solution", t, output_cycle);
@@ -186,6 +187,7 @@ namespace ryujin
           for (unsigned int d = 0; d < problem_dimension; ++d)
             analytic.local_element(i * problem_dimension + d) =
                 U_sep[d].local_element(i);
+        analytic.update_ghost_values();
         output(analytic, base_name + "-analytic_solution", t, output_cycle);
       }
     }
@@ -221,6 +223,7 @@ namespace ryujin
               for (unsigned int d = 0; d < problem_dimension; ++d)
                 analytic.local_element(i * problem_dimension + d) =
                     U_sep[d].local_element(i);
+            analytic.update_ghost_values();
             output(analytic, base_name + "-analytic_solution", t, output_cycle);
           }
         }

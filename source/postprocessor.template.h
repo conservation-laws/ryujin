@@ -307,15 +307,15 @@ namespace ryujin
          ++i)
       for (unsigned int d = 0; d < problem_dimension; ++d)
         U_copy[d].local_element(i) = U.local_element(i * problem_dimension + d);
+    for (auto &it : U_copy)
+      it.update_ghost_values();
 
     if (output_full) {
       data_out->attach_dof_handler(offline_data_->dof_handler());
 
-      for (unsigned int i = 0; i < problem_dimension; ++i) {
-        U_copy[i].update_ghost_values();
+      for (unsigned int i = 0; i < problem_dimension; ++i)
         data_out->add_data_vector(
             U_copy[i], ProblemDescription<dim, Number>::component_names[i]);
-      }
       for (unsigned int i = 0; i < n_quantities; ++i)
         data_out->add_data_vector(quantities_[i], component_names[i]);
 
