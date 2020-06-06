@@ -213,7 +213,8 @@ namespace ryujin
               std::min(v_i_min_on_subrange, std::abs(quantities[1]));
         }
 
-        scatter(quantities_, quantities, i);
+        for (unsigned int j = 0; j < n_quantities; ++j)
+          quantities_[j].local_element(i) = quantities[j];
       }
 
       /* Synchronize over all threads: */

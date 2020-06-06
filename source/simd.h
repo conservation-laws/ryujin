@@ -136,26 +136,6 @@ namespace ryujin
 
   //@}
   /**
-   * @name Serial access to arrays of vectors
-   */
-  //@{
-
-  /**
-   * Write out the given tensor @p values into
-   *   { U[0][i] , U[1][i] , ... , U[k][i] }
-   *
-   * @ingroup SIMD
-   */
-  template <typename T1, std::size_t k1, typename T2, typename T3>
-  DEAL_II_ALWAYS_INLINE inline void
-  scatter(std::array<T1, k1> &U, const T2 &values, const T3 i)
-  {
-    for (unsigned int j = 0; j < k1; ++j)
-      U[j].local_element(i) = values[j];
-  }
-
-  //@}
-  /**
    * @name SIMD based access to vectors and arrays of vectors
    */
   //@{
