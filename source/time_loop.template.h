@@ -336,6 +336,7 @@ namespace ryujin
 
       for (unsigned int j = 0; j < error.get_partitioner()->local_size(); ++j)
         error.local_element(j) -= U.local_element(j * problem_dimension + i);
+      error.update_ghost_values();
 
       const Number linf_norm_error =
           Utilities::MPI::max(error.linfty_norm(), mpi_communicator);
