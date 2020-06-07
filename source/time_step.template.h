@@ -574,15 +574,12 @@ namespace ryujin
           }
         }
 
-        for (unsigned int d = 0; d < problem_dimension; ++d)
-          temp_euler_.local_element(i * problem_dimension + d) = U_i_new[d];
-        for (unsigned int d = 0; d < problem_dimension; ++d)
-          r_.local_element(i * problem_dimension + d) = r_i[d];
+        temp_euler_.write_tensor(U_i_new, i);
+        r_.write_tensor(r_i, i);
 
         const Number hd_i = m_i * measure_of_omega_inverse;
         limiter_serial.apply_relaxation(hd_i);
-        for (unsigned int d = 0; d < 3; ++d)
-          bounds_.local_element(i * 3 + d) = limiter_serial.bounds()[d];
+        bounds_.write_tensor(limiter_serial.bounds(), i);
       } /* parallel non-vectorized loop */
 
       /* Nota bene: This bounds variable is thread local: */
@@ -672,24 +669,12 @@ namespace ryujin
           limiter_simd.accumulate_variations(variations_j, beta_ij);
         }
 
-        unsigned int indices[VectorizedArray<Number>::size()];
-        for (unsigned int k = 0; k < VectorizedArray<Number>::size(); ++k)
-          indices[k] = (i + k) * problem_dimension;
-        vectorized_transpose_and_store(false,
-                                       problem_dimension,
-                                       &U_i_new[0],
-                                       indices,
-                                       temp_euler_.begin());
-        vectorized_transpose_and_store(
-            false, problem_dimension, &r_i[0], indices, r_.begin());
+        temp_euler_.write_vectorized_tensor(U_i_new, i);
+        r_.write_vectorized_tensor(r_i, i);
 
         const auto hd_i = m_i * measure_of_omega_inverse;
         limiter_simd.apply_relaxation(hd_i);
-
-        for (unsigned int k = 0; k < VectorizedArray<Number>::size(); ++k)
-          indices[k] = (i + k) * 3;
-        vectorized_transpose_and_store(
-            false, 3, &limiter_simd.bounds()[0], indices, bounds_.begin());
+        bounds_.write_vectorized_tensor(limiter_simd.bounds(), i);
       } /* parallel SIMD loop */
 
       LIKWID_MARKER_STOP("time_step_3");
@@ -980,15 +965,13 @@ namespace ryujin
               }
             }
 
-            for (unsigned int d = 0; d < problem_dimension; ++d)
-              temp_euler_.local_element(i * problem_dimension + d) = U_i_new[d];
+            temp_euler_.write_tensor(U_i_new, i);
 
             /* Skip updating l_ij */
             continue;
           }
 
-          for (unsigned int d = 0; d < problem_dimension; ++d)
-            temp_euler_.local_element(i * problem_dimension + d) = U_i_new[d];
+          temp_euler_.write_tensor(U_i_new, i);
 
           std::array<Number, 3> bounds;
           for (unsigned int d = 0; d < 3; ++d)
@@ -1056,17 +1039,7 @@ namespace ryujin
                           [](auto val) { return val > Number(0.); },
                           dealii::ExcMessage("Negative specific entropy."));
 #endif
-
-          {
-            unsigned int indices[VectorizedArray<Number>::size()];
-            for (unsigned int k = 0; k < VectorizedArray<Number>::size(); ++k)
-              indices[k] = (i + k) * problem_dimension;
-            vectorized_transpose_and_store(false,
-                                           problem_dimension,
-                                           &U_i_new[0],
-                                           indices,
-                                           temp_euler_.begin());
-          }
+          temp_euler_.write_vectorized_tensor(U_i_new, i);
 
           if (pass + 1 == n_passes)
             continue;

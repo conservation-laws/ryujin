@@ -105,6 +105,17 @@ namespace ryujin
     template<typename Tensor = dealii::Tensor<1, n_comp, VectorizedArray>>
     Tensor get_vectorized_tensor(const unsigned int *js) const;
 
+    /**
+     * @todo write documentation
+     */
+    template <typename Tensor = dealii::Tensor<1, n_comp, Number>>
+    void write_tensor(const Tensor &tensor, const unsigned int i);
+
+    /**
+     * @todo write documentation
+     */
+    template <typename Tensor = dealii::Tensor<1, n_comp, VectorizedArray>>
+    void write_vectorized_tensor(const Tensor &tensor, const unsigned int i);
   };
 
 
@@ -195,6 +206,32 @@ namespace ryujin
     vectorized_load_and_transpose(n_comp, this->begin(), indices, &tensor[0]);
 
     return tensor;
+  }
+
+
+  template <typename Number, int n_comp, int simd_length>
+  template <typename Tensor>
+  DEAL_II_ALWAYS_INLINE inline void
+  MultiComponentVector<Number, n_comp, simd_length>::write_tensor(
+      const Tensor &tensor, const unsigned int i)
+  {
+    for (unsigned int d = 0; d < n_comp; ++d)
+      this->local_element(i * n_comp + d) = tensor[d];
+  }
+
+
+  template <typename Number, int n_comp, int simd_length>
+  template <typename Tensor>
+  DEAL_II_ALWAYS_INLINE inline void
+  MultiComponentVector<Number, n_comp, simd_length>::write_vectorized_tensor(
+      const Tensor &tensor, const unsigned int i)
+  {
+    unsigned int indices[VectorizedArray::size()];
+    for (unsigned int k = 0; k < VectorizedArray::size(); ++k)
+      indices[k] = (i + k) * n_comp;
+
+    vectorized_transpose_and_store(
+        false, n_comp, &tensor[0], indices, this->begin());
   }
 
 
