@@ -96,13 +96,6 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  void TimeStep<dim, Number>::initialize_vector(vector_type &U) const
-  {
-    U.reinit(temp_euler_);
-  }
-
-
-  template <int dim, typename Number>
   Number TimeStep<dim, Number>::euler_step(vector_type &U, Number t, Number tau)
   {
 #ifdef DEBUG_OUTPUT

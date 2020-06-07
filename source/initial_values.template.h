@@ -284,23 +284,25 @@ namespace ryujin
 #endif
 
     vector_type U;
-
-    const auto &partitioner = offline_data.scalar_partitioner();
-    for (auto &it : U)
-      it.reinit(partitioner);
+    U.reinit(offline_data.vector_partitioner());
 
     constexpr auto problem_dimension =
         ProblemDescription<dim, Number>::problem_dimension;
 
     const auto callable = [&](const auto &p) { return initial_state(p, t); };
 
-    for (unsigned int i = 0; i < problem_dimension; ++i)
-      VectorTools::interpolate(offline_data.dof_handler(),
-                               to_function<dim, Number>(callable, i),
-                               U[i]);
+    scalar_type temp;
+    const auto scalar_partitioner = offline_data.scalar_partitioner();
+    temp.reinit(scalar_partitioner);
 
-    for (auto &it : U)
-      it.update_ghost_values();
+    for (unsigned int d = 0; d < problem_dimension; ++d) {
+      VectorTools::interpolate(offline_data.dof_handler(),
+                               to_function<dim, Number>(callable, d),
+                               temp);
+      U.import_component(temp, d);
+    }
+
+    U.update_ghost_values();
 
     return U;
   }

@@ -29,10 +29,10 @@ namespace ryujin
 
     static constexpr Number b = ProblemDescription<dim, Number>::b;
 
-    using scalar_type = dealii::LinearAlgebra::distributed::Vector<Number>;
-    using vector_type = std::array<scalar_type, problem_dimension>;
+    using rank1_type = typename ProblemDescription<dim, Number>::rank1_type;
 
-    using rank1_type = dealii::Tensor<1, problem_dimension, Number>;
+    using scalar_type = typename OfflineData<dim, Number>::scalar_type;
+    using vector_type = typename OfflineData<dim, Number>::vector_type;
 
     /**
      * Constructor.

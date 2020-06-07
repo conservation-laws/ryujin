@@ -58,10 +58,32 @@ namespace ryujin
       : public dealii::LinearAlgebra::distributed::Vector<Number>
   {
   public:
+    using scalar_type =  dealii::LinearAlgebra::distributed::Vector<Number>;
+
     using dealii::LinearAlgebra::distributed::Vector<Number>::reinit;
+
+    /**
+     * @todo write documentation
+     */
     void reinit_with_scalar_partitioner(
         const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
             &scalar_partitioner);
+
+    /**
+     * @todo write documentation
+     *
+     * ... updates ghost values
+     */
+    void export_component(scalar_type &scalar_vector,
+                          unsigned int component) const;
+
+    /**
+     * @todo write documentation
+     *
+     * ... ghost values have to be updated by hand
+     */
+    void import_component(const scalar_type &scalar_vector,
+                          unsigned int component);
   };
 
 
@@ -75,6 +97,29 @@ namespace ryujin
 
     dealii::LinearAlgebra::distributed::Vector<Number>::reinit(
         vector_partitioner);
+  }
+
+
+  template <typename Number, int n_comp>
+  void MultiComponentVector<Number, n_comp>::export_component(
+      scalar_type &scalar_vector, unsigned int component) const
+  {
+    const auto local_size = scalar_vector.get_partitioner()->local_size();
+    for (unsigned int i = 0; i < local_size; ++i)
+      scalar_vector.local_element(i) =
+          this->local_element(i * n_comp + component);
+    scalar_vector.update_ghost_values();
+  }
+
+
+  template <typename Number, int n_comp>
+  void MultiComponentVector<Number, n_comp>::import_component(
+      const scalar_type &scalar_vector, unsigned int component)
+  {
+    const auto local_size = scalar_vector.get_partitioner()->local_size();
+    for (unsigned int i = 0; i < local_size; ++i)
+      this->local_element(i * n_comp + component) =
+          scalar_vector.local_element(i);
   }
 
 

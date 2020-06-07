@@ -28,7 +28,8 @@ namespace ryujin
   class TimeLoop final : public dealii::ParameterAcceptor
   {
   public:
-    using vector_type = typename ryujin::TimeStep<dim, Number>::vector_type;
+    using scalar_type = typename OfflineData<dim, Number>::scalar_type;
+    using vector_type = typename OfflineData<dim, Number>::vector_type;
 
     TimeLoop(const MPI_Comm &mpi_comm);
 

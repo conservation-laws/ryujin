@@ -14,7 +14,6 @@
 #include "limiter.h"
 
 #include "initial_values.h"
-#include "multicomponent_vector.h"
 #include "offline_data.h"
 #include "problem_description.h"
 #include "sparse_matrix_simd.h"
@@ -38,8 +37,8 @@ namespace ryujin
     using rank1_type = typename ProblemDescription<dim, Number>::rank1_type;
     using rank2_type = typename ProblemDescription<dim, Number>::rank2_type;
 
-    using scalar_type = dealii::LinearAlgebra::distributed::Vector<Number>;
-    using vector_type = MultiComponentVector<Number, problem_dimension>;
+    using scalar_type = typename OfflineData<dim, Number>::scalar_type;
+    using vector_type = typename OfflineData<dim, Number>::vector_type;
 
     TimeStep(const MPI_Comm &mpi_communicator,
              std::map<std::string, dealii::Timer> &computing_timer,
@@ -48,8 +47,6 @@ namespace ryujin
              const std::string &subsection = "TimeStep");
 
     void prepare();
-
-    void initialize_vector(vector_type &U) const;
 
     /**
      * Given a reference to a previous state vector U perform an explicit

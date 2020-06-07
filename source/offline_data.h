@@ -10,6 +10,7 @@
 
 #include "convenience_macros.h"
 #include "discretization.h"
+#include "multicomponent_vector.h"
 #include "sparse_matrix_simd.h"
 
 #include <deal.II/base/parameter_acceptor.h>
@@ -46,6 +47,12 @@ namespace ryujin
   class OfflineData : public dealii::ParameterAcceptor
   {
   public:
+    static constexpr unsigned int problem_dimension =
+        ProblemDescription<dim, Number>::problem_dimension;
+
+    using scalar_type = dealii::LinearAlgebra::distributed::Vector<Number>;
+    using vector_type = MultiComponentVector<Number, problem_dimension>;
+
     OfflineData(const MPI_Comm &mpi_communicator,
                 const ryujin::Discretization<dim> &discretization,
                 const std::string &subsection = "OfflineData");

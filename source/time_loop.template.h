@@ -140,8 +140,6 @@ namespace ryujin
     Number t = 0.;
     unsigned int output_cycle = 0;
     vector_type U;
-    constexpr auto problem_dimension =
-        ProblemDescription<dim, Number>::problem_dimension;
 
     /* Prepare data structures: */
 
@@ -156,7 +154,7 @@ namespace ryujin
 
       print_mpi_partition(logfile);
 
-      time_step.initialize_vector(U);
+      U.reinit(offline_data.vector_partitioner());
 
       if (resume) {
         print_info("resuming interrupted computation");
@@ -166,28 +164,14 @@ namespace ryujin
         t_initial = t;
       } else {
         print_info("interpolating initial values");
-        const auto U_sep = initial_values.interpolate(offline_data);
-        for (unsigned int i = 0; i < offline_data.scalar_partitioner()->local_size();
-             ++i)
-          for (unsigned int d = 0; d < problem_dimension; ++d)
-            U.local_element(i * problem_dimension + d) =
-                U_sep[d].local_element(i);
+        U = initial_values.interpolate(offline_data);
       }
     }
-    U.update_ghost_values();
 
     if (write_output_files) {
       output(U, base_name + "-solution", t, output_cycle);
       if (enable_compute_error) {
-        const auto U_sep = initial_values.interpolate(offline_data, t);
-        vector_type analytic;
-        time_step.initialize_vector(analytic);
-        for (unsigned int i = 0; i < offline_data.scalar_partitioner()->local_size();
-             ++i)
-          for (unsigned int d = 0; d < problem_dimension; ++d)
-            analytic.local_element(i * problem_dimension + d) =
-                U_sep[d].local_element(i);
-        analytic.update_ghost_values();
+        const auto analytic = initial_values.interpolate(offline_data, t);
         output(analytic, base_name + "-analytic_solution", t, output_cycle);
       }
     }
@@ -214,16 +198,7 @@ namespace ryujin
         if (write_output_files) {
           output(U, base_name + "-solution", t, output_cycle);
           if (enable_compute_error) {
-            const auto U_sep = initial_values.interpolate(offline_data, t);
-            vector_type analytic;
-            time_step.initialize_vector(analytic);
-            for (unsigned int i = 0;
-                 i < offline_data.scalar_partitioner()->local_size();
-                 ++i)
-              for (unsigned int d = 0; d < problem_dimension; ++d)
-                analytic.local_element(i * problem_dimension + d) =
-                    U_sep[d].local_element(i);
-            analytic.update_ghost_values();
+            const auto analytic = initial_values.interpolate(offline_data, t);
             output(analytic, base_name + "-analytic_solution", t, output_cycle);
           }
         }
@@ -302,18 +277,24 @@ namespace ryujin
     Number l1_norm = 0;
     Number l2_norm = 0;
 
-    auto analytic = initial_values.interpolate(offline_data, t);
+    const auto analytic = initial_values.interpolate(offline_data, t);
+
+    scalar_type analytic_component;
+    scalar_type error_component;
+    analytic_component.reinit(offline_data.scalar_partitioner());
+    error_component.reinit(offline_data.scalar_partitioner());
 
     for (unsigned int i = 0; i < problem_dimension; ++i) {
-      auto &error = analytic[i];
 
       /* Compute norms of analytic solution: */
 
-      const Number linf_norm_analytic =
-          Utilities::MPI::max(error.linfty_norm(), mpi_communicator);
+      analytic.export_component(analytic_component, i);
+
+      const Number linf_norm_analytic = Utilities::MPI::max(
+          analytic_component.linfty_norm(), mpi_communicator);
 
       VectorTools::integrate_difference(offline_data.dof_handler(),
-                                        error,
+                                        analytic_component,
                                         ZeroFunction<dim, Number>(),
                                         difference_per_cell,
                                         QGauss<dim>(3),
@@ -323,7 +304,7 @@ namespace ryujin
           Utilities::MPI::sum(difference_per_cell.l1_norm(), mpi_communicator);
 
       VectorTools::integrate_difference(offline_data.dof_handler(),
-                                        error,
+                                        analytic_component,
                                         ZeroFunction<dim, Number>(),
                                         difference_per_cell,
                                         QGauss<dim>(3),
@@ -334,15 +315,14 @@ namespace ryujin
 
       /* Compute norms of error: */
 
-      for (unsigned int j = 0; j < error.get_partitioner()->local_size(); ++j)
-        error.local_element(j) -= U.local_element(j * problem_dimension + i);
-      error.update_ghost_values();
+      U.export_component(error_component, i);
+      error_component -= analytic_component;
 
       const Number linf_norm_error =
-          Utilities::MPI::max(error.linfty_norm(), mpi_communicator);
+          Utilities::MPI::max(error_component.linfty_norm(), mpi_communicator);
 
       VectorTools::integrate_difference(offline_data.dof_handler(),
-                                        error,
+                                        error_component,
                                         ZeroFunction<dim, Number>(),
                                         difference_per_cell,
                                         QGauss<dim>(3),
@@ -352,7 +332,7 @@ namespace ryujin
           Utilities::MPI::sum(difference_per_cell.l1_norm(), mpi_communicator);
 
       VectorTools::integrate_difference(offline_data.dof_handler(),
-                                        error,
+                                        error_component,
                                         ZeroFunction<dim, Number>(),
                                         difference_per_cell,
                                         QGauss<dim>(3),
