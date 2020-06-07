@@ -128,6 +128,8 @@ namespace ryujin
     ACCESSOR_READ_ONLY(alpha)
 
     vector_type second_variations_;
+    vector_type specific_entropies_;
+    vector_type evc_entropies_;
 
     vector_type bounds_;
 
@@ -141,9 +143,6 @@ namespace ryujin
 
     vector_type temp_euler_;
     vector_type temp_ssp_;
-
-    dealii::AlignedVector<Number> specific_entropies_;
-    dealii::AlignedVector<Number> evc_entropies_;
 
     /* Options: */
 

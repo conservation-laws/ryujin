@@ -101,12 +101,14 @@ namespace ryujin
     std::cout << "TimeStep<dim, Number>::prepare()" << std::endl;
 #endif
 
-    /* Initialize (global) vectors: */
+    /* Initialize vectors: */
 
     const auto &partitioner = offline_data_->partitioner();
 
     second_variations_.reinit(partitioner);
     alpha_.reinit(partitioner);
+    specific_entropies_.reinit(partitioner);
+    evc_entropies_.reinit(partitioner);
 
     initialize_multicomponent_vector(partitioner, 3, bounds_);
 
@@ -115,13 +117,7 @@ namespace ryujin
     temp_ssp_.reinit(temp_euler_);
     r_.reinit(temp_euler_);
 
-    /* Initialize local matrices: */
-
-    const unsigned int n_relevant = offline_data_->n_locally_relevant();
-    specific_entropies_.resize(n_relevant);
-    evc_entropies_.resize(n_relevant);
-
-    /* Initialize local matrices: */
+    /* Initialize matrices: */
 
     const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
 
@@ -212,10 +208,10 @@ namespace ryujin
         for (unsigned int d = 0; d < problem_dimension; ++d)
           U_i[d] = U.local_element(i * problem_dimension + d);
 
-        specific_entropies_[i] =
+        specific_entropies_.local_element(i) =
             ProblemDescription<dim, Number>::specific_entropy(U_i);
 
-        evc_entropies_[i] =
+        evc_entropies_.local_element(i) =
             Indicator<dim, double>::evc_entropy_ ==
                     Indicator<dim, double>::Entropy::mathematical
                 ? ProblemDescription<dim, Number>::mathematical_entropy(U_i)
@@ -280,7 +276,7 @@ namespace ryujin
         const Number mass = lumped_mass_matrix.local_element(i);
         const Number hd_i = mass * measure_of_omega_inverse;
 
-        indicator_serial.reset(U_i, evc_entropies_[i]);
+        indicator_serial.reset(U_i, evc_entropies_.local_element(i));
 
         /* Skip diagonal. */
         const unsigned int *js = sparsity_simd.columns(i);
@@ -293,7 +289,8 @@ namespace ryujin
 
           const auto c_ij = cij_matrix.get_tensor(i, col_idx);
           const auto beta_ij = betaij_matrix.get_entry(i, col_idx);
-          indicator_serial.add(U_j, c_ij, beta_ij, evc_entropies_[j]);
+          indicator_serial.add(
+              U_j, c_ij, beta_ij, evc_entropies_.local_element(j));
 
           /* Only iterate over the upper triangular portion of d_ij */
           if (j <= i)
@@ -591,7 +588,7 @@ namespace ryujin
           limiter_serial.accumulate(U_i,
                                     U_j,
                                     U_ij_bar,
-                                    specific_entropies_[j],
+                                    specific_entropies_.local_element(j),
                                     /* is diagonal */ col_idx == 0);
           const auto beta_ij = betaij_matrix.get_entry(i, col_idx);
           limiter_serial.accumulate_variations(variations_j, beta_ij);

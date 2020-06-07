@@ -140,27 +140,6 @@ namespace ryujin
    */
   //@{
 
-#ifndef DOXYGEN
-  namespace
-  {
-    // Some deal.II classes make the underlying data available via data(),
-    // others via get_values(). Let's provide a uniform access helper.
-
-    template <typename T>
-    DEAL_II_ALWAYS_INLINE inline auto access_data(T &U)
-        -> decltype(U.get_values())
-    {
-      return U.get_values();
-    }
-
-    template <typename T>
-    DEAL_II_ALWAYS_INLINE inline auto access_data(T &U) -> decltype(U.data())
-    {
-      return U.data();
-    }
-  } /* namespace */
-#endif
-
   /**
    * Return a VectorizedArray with
    *   { U[i] , U[i + 1] , ... , U[i + VectorizedArray::size() - 1] }
@@ -172,7 +151,7 @@ namespace ryujin
   simd_load(const T1 &vector, unsigned int i)
   {
     dealii::VectorizedArray<typename T1::value_type> result;
-    result.load(access_data(vector) + i);
+    result.load(vector.get_values() + i);
     return result;
   }
 
@@ -188,7 +167,7 @@ namespace ryujin
   simd_load(const T1 &vector, const unsigned int *js)
   {
     dealii::VectorizedArray<typename T1::value_type> result;
-    result.gather(access_data(vector), js);
+    result.gather(vector.get_values(), js);
     return result;
   }
 
@@ -204,7 +183,7 @@ namespace ryujin
              const dealii::VectorizedArray<typename T1::value_type> &values,
              unsigned int i)
   {
-    values.store(access_data(vector) + i);
+    values.store(vector.get_values() + i);
   }
 
   //@}
