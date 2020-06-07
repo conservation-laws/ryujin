@@ -91,9 +91,8 @@ namespace ryujin
      * time step (and store the result in U). The function returns the
      * chosen time step size tau.
      *
-     * Depending on the approximation order (first or second order) this
-     * function chooses the 2nd order Heun, or the third order Runge Kutta
-     * time stepping scheme.
+     * This function switches between euler_step(), ssph2_step(), or
+     * ssprk3_step() depending on selected approximation order.
      */
     Number step(vector_type &U, Number t);
 

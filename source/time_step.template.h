@@ -254,7 +254,6 @@ namespace ryujin
       Scope scope(computing_timer_, "time step 1 - compute d_ij, and alpha_i");
 
       SynchronizationDispatch synchronization_dispatch([&]() {
-        /* Synchronize over all MPI processes: */
         alpha_.update_ghost_values_start(channel++);
         second_variations_.update_ghost_values_start(channel++);
       });
@@ -467,7 +466,6 @@ namespace ryujin
     {
       Scope scope(computing_timer_, "time step 2 - synchronization barrier");
 
-      /* Synchronize over all MPI processes: */
       alpha_.update_ghost_values_finish();
       second_variations_.update_ghost_values_finish();
 
@@ -515,8 +513,12 @@ namespace ryujin
                   "time step 3 - l.-o. update, bounds, and r_i");
 
       SynchronizationDispatch synchronization_dispatch([&]() {
-        /* Synchronize over all MPI processes: */
-        r_.update_ghost_values_start(channel++);
+        if constexpr (n_passes != 0) {
+          r_.update_ghost_values_start(channel++);
+        } else {
+          /* If we do not do high-order, synchronize at this point: */
+          temp_euler_.update_ghost_values_start(channel++);
+        }
       });
 
       /* Parallel region */
@@ -741,217 +743,208 @@ namespace ryujin
     {
       Scope scope(computing_timer_, "time step 3 - synchronization");
 
-      /* Synchronize over all MPI processes: */
-      r_.update_ghost_values_finish();
-
-      /* If we do not do high-order, synchronize at this point: */
-      if constexpr (n_passes == 0) {
-        temp_euler_.update_ghost_values();
+      if constexpr (n_passes != 0) {
+        r_.update_ghost_values_finish();
       }
     }
 
+    /*
+     * Step 4: Compute P_ij, and l_ij (first round):
+     *
+     *    P_ij = tau / m_i / lambda ( (d_ij^H - d_ij^L) (U_i - U_j) +
+     *                                (b_ij R_j - b_ji R_i) )
+     */
+
+    if constexpr (n_passes != 0) {
+      Scope scope(computing_timer_, "time step 4 - compute p_ij, and l_ij");
+
+      SynchronizationDispatch synchronization_dispatch([&]() {
+        lij_matrix_.update_ghost_rows_start(channel++);
+      });
+
+      RYUJIN_PARALLEL_REGION_BEGIN
+      LIKWID_MARKER_START("time_step_4");
+
+      /* Parallel non-vectorized loop: */
+
+      RYUJIN_OMP_FOR_NOWAIT
+      for (unsigned int i = n_internal; i < n_owned; ++i) {
+
+        /* Skip constrained degrees of freedom */
+        const unsigned int row_length = sparsity_simd.row_length(i);
+        if (row_length == 1)
+          continue;
+
+        std::array<Number, 3> bounds;
+        for (unsigned int d = 0; d < 3; ++d)
+          bounds[d] = bounds_.local_element(i * 3 + d);
+        Tensor<1, problem_dimension, Number> U_i_new;
+        for (unsigned int d = 0; d < problem_dimension; ++d)
+          U_i_new[d] = temp_euler_.local_element(i * problem_dimension + d);
+        Tensor<1, problem_dimension, Number> U_i;
+        for (unsigned int d = 0; d < problem_dimension; ++d)
+          U_i[d] = U.local_element(i * problem_dimension + d);
+
+        const Number m_i_inv = lumped_mass_matrix_inverse.local_element(i);
+        const Number lambda_inv = Number(row_length - 1);
+        const auto alpha_i = alpha_.local_element(i);
+
+        Tensor<1, problem_dimension, Number> r_i;
+        for (unsigned int d = 0; d < problem_dimension; ++d)
+          r_i[d] = r_.local_element(i * problem_dimension + d);
+
+        const unsigned int *js = sparsity_simd.columns(i);
+        for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
+          const auto j = js[col_idx];
+          const Number m_j_inv = lumped_mass_matrix_inverse.local_element(j);
+
+          Tensor<1, problem_dimension, Number> U_j;
+          for (unsigned int d = 0; d < problem_dimension; ++d)
+            U_j[d] = U.local_element(j * problem_dimension + d);
+          const auto alpha_j = alpha_.local_element(j);
+
+          const auto d_ij = dij_matrix_.get_entry(i, col_idx);
+          const auto d_ijH = Indicator<dim, Number>::indicator_ ==
+                                     Indicator<dim, Number>::Indicators::
+                                         entropy_viscosity_commutator
+                                 ? d_ij * (alpha_i + alpha_j) * Number(.5)
+                                 : d_ij * std::max(alpha_i, alpha_j);
+
+          const auto m_ij = mass_matrix.get_entry(i, col_idx);
+          const auto b_ij =
+              (col_idx == 0 ? Number(1.) : Number(0.)) - m_ij * m_j_inv;
+          const auto b_ji =
+              (col_idx == 0 ? Number(1.) : Number(0.)) - m_ij * m_i_inv;
+
+          Tensor<1, problem_dimension, Number> r_j;
+          for (unsigned int d = 0; d < problem_dimension; ++d)
+            r_j[d] = r_.local_element(j * problem_dimension + d);
+
+          const auto p_ij =
+              tau * m_i_inv * lambda_inv *
+              ((d_ijH - d_ij) * (U_j - U_i) + b_ij * r_j - b_ji * r_i);
+          pij_matrix_.write_tensor(p_ij, i, col_idx);
+
+          const auto l_ij = Limiter<dim, Number>::limit(bounds, U_i_new, p_ij);
+          lij_matrix_.write_entry(l_ij, i, col_idx);
+        }
+      } /* parallel non-vectorized loop */
+
+      /* Parallel SIMD loop: */
+
+      bool thread_ready = false;
+
+      RYUJIN_OMP_FOR
+      for (unsigned int i = 0; i < n_internal; i += simd_length) {
+
+        synchronization_dispatch.check(thread_ready, i >= n_export_indices);
+
+        std::array<VectorizedArray<Number>, 3> bounds;
+        {
+          unsigned int indices[VectorizedArray<Number>::size()];
+          for (unsigned int k = 0; k < VectorizedArray<Number>::size(); ++k)
+            indices[k] = (i + k) * 3;
+          vectorized_load_and_transpose(
+              3, bounds_.begin(), indices, &bounds[0]);
+        }
+
+        const auto m_i_inv = simd_load(lumped_mass_matrix_inverse, i);
+
+        const unsigned int row_length = sparsity_simd.row_length(i);
+        const VectorizedArray<Number> lambda_inv = Number(row_length - 1);
+
+        Tensor<1, problem_dimension, VectorizedArray<Number>> U_i_new, U_i;
+        Tensor<1, problem_dimension, VectorizedArray<Number>> r_i;
+        {
+          unsigned int indices[VectorizedArray<Number>::size()];
+          for (unsigned int k = 0; k < VectorizedArray<Number>::size(); ++k)
+            indices[k] = (i + k) * problem_dimension;
+          vectorized_load_and_transpose(
+              problem_dimension, temp_euler_.begin(), indices, &U_i_new[0]);
+          vectorized_load_and_transpose(
+              problem_dimension, U.begin(), indices, &U_i[0]);
+          vectorized_load_and_transpose(
+              problem_dimension, r_.begin(), indices, &r_i[0]);
+        }
+        const auto alpha_i = simd_load(alpha_, i);
+
+        const unsigned int *js = sparsity_simd.columns(i);
+
+        for (unsigned int col_idx = 0; col_idx < row_length;
+             ++col_idx, js += simd_length) {
+
+          const auto m_j_inv = simd_load(lumped_mass_matrix_inverse, js);
+
+          const auto alpha_j = simd_load(alpha_, js);
+
+          const auto d_ij = dij_matrix_.get_vectorized_entry(i, col_idx);
+
+          const auto d_ijH = Indicator<dim, Number>::indicator_ ==
+                                     Indicator<dim, Number>::Indicators::
+                                         entropy_viscosity_commutator
+                                 ? d_ij * (alpha_i + alpha_j) * Number(.5)
+                                 : d_ij * std::max(alpha_i, alpha_j);
+
+          const auto m_ij = mass_matrix.get_vectorized_entry(i, col_idx);
+          const auto b_ij = (col_idx == 0 ? VectorizedArray<Number>(1.)
+                                          : VectorizedArray<Number>(0.)) -
+                            m_ij * m_j_inv;
+          const auto b_ji = (col_idx == 0 ? VectorizedArray<Number>(1.)
+                                          : VectorizedArray<Number>(0.)) -
+                            m_ij * m_i_inv;
+
+          Tensor<1, problem_dimension, VectorizedArray<Number>> r_j, U_j;
+          {
+            unsigned int indices[VectorizedArray<Number>::size()];
+            for (unsigned int k = 0; k < VectorizedArray<Number>::size(); ++k)
+              indices[k] = js[k] * problem_dimension;
+            vectorized_load_and_transpose(
+                problem_dimension, r_.begin(), indices, &r_j[0]);
+            vectorized_load_and_transpose(
+                problem_dimension, U.begin(), indices, &U_j[0]);
+          }
+
+          const auto p_ij =
+              tau * m_i_inv * lambda_inv *
+              ((d_ijH - d_ij) * (U_j - U_i) + b_ij * r_j - b_ji * r_i);
+          pij_matrix_.write_vectorized_tensor(p_ij, i, col_idx, true);
+
+          const auto l_ij = Limiter<dim, VectorizedArray<Number>>::limit(
+              bounds, U_i_new, p_ij);
+
+          lij_matrix_.write_vectorized_entry(l_ij, i, col_idx, true);
+        }
+      } /* parallel SIMD loop */
+
+      LIKWID_MARKER_STOP("time_step_4");
+      RYUJIN_PARALLEL_REGION_END
+    }
+
+    {
+      Scope scope(computing_timer_, "time step 4 - synchronization");
+
+      lij_matrix_.update_ghost_rows_finish();
+    }
+
+    /*
+     * Step 5, 6, ..., 4 + n_passes: Perform high-order update:
+     *
+     *   Symmetrize l_ij
+     *   High-order update: += l_ij * lambda * P_ij
+     *   Compute next l_ij
+     */
+
     for (unsigned int pass = 0; pass < n_passes; ++pass) {
 
-#ifdef DEBUG_OUTPUT
-      std::cout << "        limiter pass " << pass + 1 << std::endl;
-#endif
-
-      if (pass == 0) {
-        /*
-         * Step 4: Compute P_ij and l_ij (first round):
-         *
-         *    P_ij = tau / m_i / lambda ( (d_ij^H - d_ij^L) (U_i - U_j) +
-         *                                (b_ij R_j - b_ji R_i) )
-         */
-        Scope scope(computing_timer_, "time step 4 - compute p_ij, and l_ij");
-
-        SynchronizationDispatch synchronization_dispatch([&]() {
-          /* Synchronize over all MPI processes: */
-          lij_matrix_.update_ghost_rows_start(channel++);
-        });
-
-        RYUJIN_PARALLEL_REGION_BEGIN
-        LIKWID_MARKER_START("time_step_4");
-
-        /* Parallel non-vectorized loop: */
-
-        RYUJIN_OMP_FOR_NOWAIT
-        for (unsigned int i = n_internal; i < n_owned; ++i) {
-
-          /* Skip constrained degrees of freedom */
-          const unsigned int row_length = sparsity_simd.row_length(i);
-          if (row_length == 1)
-            continue;
-
-          std::array<Number, 3> bounds;
-          for (unsigned int d = 0; d < 3; ++d)
-            bounds[d] = bounds_.local_element(i * 3 + d);
-          Tensor<1, problem_dimension, Number> U_i_new;
-          for (unsigned int d = 0; d < problem_dimension; ++d)
-            U_i_new[d] = temp_euler_.local_element(i * problem_dimension + d);
-          Tensor<1, problem_dimension, Number> U_i;
-          for (unsigned int d = 0; d < problem_dimension; ++d)
-            U_i[d] = U.local_element(i * problem_dimension + d);
-
-          const Number m_i_inv = lumped_mass_matrix_inverse.local_element(i);
-          const Number lambda_inv = Number(row_length - 1);
-          const auto alpha_i = alpha_.local_element(i);
-
-          Tensor<1, problem_dimension, Number> r_i;
-          for (unsigned int d = 0; d < problem_dimension; ++d)
-            r_i[d] = r_.local_element(i * problem_dimension + d);
-
-          const unsigned int *js = sparsity_simd.columns(i);
-          for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
-            const auto j = js[col_idx];
-            const Number m_j_inv = lumped_mass_matrix_inverse.local_element(j);
-
-            Tensor<1, problem_dimension, Number> U_j;
-            for (unsigned int d = 0; d < problem_dimension; ++d)
-              U_j[d] = U.local_element(j * problem_dimension + d);
-            const auto alpha_j = alpha_.local_element(j);
-
-            const auto d_ij = dij_matrix_.get_entry(i, col_idx);
-            const auto d_ijH = Indicator<dim, Number>::indicator_ ==
-                                       Indicator<dim, Number>::Indicators::
-                                           entropy_viscosity_commutator
-                                   ? d_ij * (alpha_i + alpha_j) * Number(.5)
-                                   : d_ij * std::max(alpha_i, alpha_j);
-
-            const auto m_ij = mass_matrix.get_entry(i, col_idx);
-            const auto b_ij =
-                (col_idx == 0 ? Number(1.) : Number(0.)) - m_ij * m_j_inv;
-            const auto b_ji =
-                (col_idx == 0 ? Number(1.) : Number(0.)) - m_ij * m_i_inv;
-
-            Tensor<1, problem_dimension, Number> r_j;
-            for (unsigned int d = 0; d < problem_dimension; ++d)
-              r_j[d] = r_.local_element(j * problem_dimension + d);
-
-            const auto p_ij =
-                tau * m_i_inv * lambda_inv *
-                ((d_ijH - d_ij) * (U_j - U_i) + b_ij * r_j - b_ji * r_i);
-            pij_matrix_.write_tensor(p_ij, i, col_idx);
-
-            const auto l_ij =
-                Limiter<dim, Number>::limit(bounds, U_i_new, p_ij);
-            lij_matrix_.write_entry(l_ij, i, col_idx);
-          }
-        } /* parallel non-vectorized loop */
-
-        /* Parallel SIMD loop: */
-
-        bool thread_ready = false;
-
-        RYUJIN_OMP_FOR
-        for (unsigned int i = 0; i < n_internal; i += simd_length) {
-
-          synchronization_dispatch.check(thread_ready, i >= n_export_indices);
-
-          std::array<VectorizedArray<Number>, 3> bounds;
-          {
-            unsigned int indices[VectorizedArray<Number>::size()];
-            for (unsigned int k = 0; k < VectorizedArray<Number>::size(); ++k)
-              indices[k] = (i + k) * 3;
-            vectorized_load_and_transpose(
-                3, bounds_.begin(), indices, &bounds[0]);
-          }
-
-          const auto m_i_inv = simd_load(lumped_mass_matrix_inverse, i);
-
-          const unsigned int row_length = sparsity_simd.row_length(i);
-          const VectorizedArray<Number> lambda_inv = Number(row_length - 1);
-
-          Tensor<1, problem_dimension, VectorizedArray<Number>> U_i_new, U_i;
-          Tensor<1, problem_dimension, VectorizedArray<Number>> r_i;
-          {
-            unsigned int indices[VectorizedArray<Number>::size()];
-            for (unsigned int k = 0; k < VectorizedArray<Number>::size(); ++k)
-              indices[k] = (i + k) * problem_dimension;
-            vectorized_load_and_transpose(
-                problem_dimension, temp_euler_.begin(), indices, &U_i_new[0]);
-            vectorized_load_and_transpose(
-                problem_dimension, U.begin(), indices, &U_i[0]);
-            vectorized_load_and_transpose(
-                problem_dimension, r_.begin(), indices, &r_i[0]);
-          }
-          const auto alpha_i = simd_load(alpha_, i);
-
-          const unsigned int *js = sparsity_simd.columns(i);
-
-          for (unsigned int col_idx = 0; col_idx < row_length;
-               ++col_idx, js += simd_length) {
-
-            const auto m_j_inv = simd_load(lumped_mass_matrix_inverse, js);
-
-            const auto alpha_j = simd_load(alpha_, js);
-
-            const auto d_ij = dij_matrix_.get_vectorized_entry(i, col_idx);
-
-            const auto d_ijH = Indicator<dim, Number>::indicator_ ==
-                                       Indicator<dim, Number>::Indicators::
-                                           entropy_viscosity_commutator
-                                   ? d_ij * (alpha_i + alpha_j) * Number(.5)
-                                   : d_ij * std::max(alpha_i, alpha_j);
-
-            const auto m_ij = mass_matrix.get_vectorized_entry(i, col_idx);
-            const auto b_ij = (col_idx == 0 ? VectorizedArray<Number>(1.)
-                                            : VectorizedArray<Number>(0.)) -
-                              m_ij * m_j_inv;
-            const auto b_ji = (col_idx == 0 ? VectorizedArray<Number>(1.)
-                                            : VectorizedArray<Number>(0.)) -
-                              m_ij * m_i_inv;
-
-            Tensor<1, problem_dimension, VectorizedArray<Number>> r_j, U_j;
-            {
-              unsigned int indices[VectorizedArray<Number>::size()];
-              for (unsigned int k = 0; k < VectorizedArray<Number>::size(); ++k)
-                indices[k] = js[k] * problem_dimension;
-              vectorized_load_and_transpose(
-                  problem_dimension, r_.begin(), indices, &r_j[0]);
-              vectorized_load_and_transpose(
-                  problem_dimension, U.begin(), indices, &U_j[0]);
-            }
-
-            const auto p_ij =
-                tau * m_i_inv * lambda_inv *
-                ((d_ijH - d_ij) * (U_j - U_i) + b_ij * r_j - b_ji * r_i);
-            pij_matrix_.write_vectorized_tensor(p_ij, i, col_idx, true);
-
-            const auto l_ij = Limiter<dim, VectorizedArray<Number>>::limit(
-                bounds, U_i_new, p_ij);
-
-            lij_matrix_.write_vectorized_entry(l_ij, i, col_idx, true);
-          }
-        } /* parallel SIMD loop */
-
-        LIKWID_MARKER_STOP("time_step_4");
-        RYUJIN_PARALLEL_REGION_END
-      }
+      std::string step_no = std::to_string(5 + pass);
+      std::string additional_step = pass + 1 < n_passes ? ", next l_ij" : "";
 
       {
-        Scope scope(computing_timer_, "time step 5 - synchronization");
-
-        /* Synchronize over all MPI processes: */
-        lij_matrix_.update_ghost_rows_finish();
-      }
-
-      /*
-       * Step 6: Perform high-order update:
-       *
-       *   Symmetrize l_ij
-       *   High-order update: += l_ij * lambda * P_ij
-       */
-
-      {
-        std::string step_no = pass + 1 == n_passes ? "6" : "5";
-        std::string additional_step = pass + 1 < n_passes ? ", next l_ij" : "";
         Scope scope(computing_timer_,
                     "time step " + step_no + " - " +
                         "symmetrize l_ij, h.-o. update" + additional_step);
 
         SynchronizationDispatch synchronization_dispatch([&]() {
-          /* Synchronize over all MPI processes: */
           if (pass + 1 == n_passes)
             temp_euler_.update_ghost_values_start(channel++);
           else
@@ -1145,15 +1138,18 @@ namespace ryujin
         RYUJIN_PARALLEL_REGION_END
       }
 
-      std::swap(lij_matrix_, lij_matrix_next_);
+      {
+        Scope scope(computing_timer_,
+                    "time step " + step_no + " - synchronization");
+
+        if (pass + 1 == n_passes)
+          temp_euler_.update_ghost_values_finish();
+        else {
+          lij_matrix_next_.update_ghost_rows_finish();
+          std::swap(lij_matrix_, lij_matrix_next_);
+        }
+      }
     } /* limiter_iter_ */
-
-    {
-      Scope scope(computing_timer_, "time step 6 - synchronization");
-
-      /* Synchronize over all MPI processes: */
-      temp_euler_.update_ghost_values_finish();
-    }
 
     /* And finally update the result: */
     U.swap(temp_euler_);
