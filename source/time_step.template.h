@@ -511,7 +511,6 @@ namespace ryujin
         limiter_serial.reset();
         limiter_serial.reset_variations(variations_i);
 
-        ASM_LABEL("testor")
         const unsigned int *js = sparsity_simd.columns(i);
         for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
           const auto j = js[col_idx];

@@ -299,7 +299,7 @@ namespace ryujin
       VectorTools::interpolate(offline_data.dof_handler(),
                                to_function<dim, Number>(callable, d),
                                temp);
-      U.import_component(temp, d);
+      U.insert_component(temp, d);
     }
 
     U.update_ghost_values();

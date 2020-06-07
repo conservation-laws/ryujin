@@ -53,14 +53,15 @@ namespace ryujin
    *
    * @ingroup SIMD
    */
-  template <typename Number, int n_comp>
+  template <typename Number,
+            int n_comp,
+            int simd_length = dealii::VectorizedArray<Number>::size()>
   class MultiComponentVector
       : public dealii::LinearAlgebra::distributed::Vector<Number>
   {
   public:
-    using scalar_type =  dealii::LinearAlgebra::distributed::Vector<Number>;
-
-    using dealii::LinearAlgebra::distributed::Vector<Number>::reinit;
+    using VectorizedArray = dealii::VectorizedArray<Number, simd_length>;
+    using scalar_type = dealii::LinearAlgebra::distributed::Vector<Number>;
 
     /**
      * @todo write documentation
@@ -74,23 +75,47 @@ namespace ryujin
      *
      * ... updates ghost values
      */
-    void export_component(scalar_type &scalar_vector,
-                          unsigned int component) const;
+    void extract_component(scalar_type &scalar_vector,
+                           unsigned int component) const;
 
     /**
      * @todo write documentation
      *
      * ... ghost values have to be updated by hand
      */
-    void import_component(const scalar_type &scalar_vector,
+    void insert_component(const scalar_type &scalar_vector,
                           unsigned int component);
+
+    /**
+     * @todo write documentation
+     */
+    template<typename Tensor = dealii::Tensor<1, n_comp, Number>>
+    Tensor get_tensor(const unsigned int i) const;
+
+    /**
+     * @todo write documentation
+     */
+    template<typename Tensor = dealii::Tensor<1, n_comp, VectorizedArray>>
+    Tensor get_vectorized_tensor(const unsigned int i) const;
+
+
+    /**
+     * @todo write documentation
+     */
+    template<typename Tensor = dealii::Tensor<1, n_comp, VectorizedArray>>
+    Tensor get_vectorized_tensor(const unsigned int *js) const;
+
   };
 
 
-  template <typename Number, int n_comp>
-  void MultiComponentVector<Number, n_comp>::reinit_with_scalar_partitioner(
-      const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
-          &scalar_partitioner)
+  /* Template definitions: */
+
+
+  template <typename Number, int n_comp, int simd_length>
+  void MultiComponentVector<Number, n_comp, simd_length>::
+      reinit_with_scalar_partitioner(
+          const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
+              &scalar_partitioner)
   {
     auto vector_partitioner =
         create_vector_partitioner<n_comp>(scalar_partitioner);
@@ -100,8 +125,8 @@ namespace ryujin
   }
 
 
-  template <typename Number, int n_comp>
-  void MultiComponentVector<Number, n_comp>::export_component(
+  template <typename Number, int n_comp, int simd_length>
+  void MultiComponentVector<Number, n_comp, simd_length>::extract_component(
       scalar_type &scalar_vector, unsigned int component) const
   {
     const auto local_size = scalar_vector.get_partitioner()->local_size();
@@ -112,14 +137,64 @@ namespace ryujin
   }
 
 
-  template <typename Number, int n_comp>
-  void MultiComponentVector<Number, n_comp>::import_component(
+  template <typename Number, int n_comp, int simd_length>
+  void MultiComponentVector<Number, n_comp, simd_length>::insert_component(
       const scalar_type &scalar_vector, unsigned int component)
   {
     const auto local_size = scalar_vector.get_partitioner()->local_size();
     for (unsigned int i = 0; i < local_size; ++i)
       this->local_element(i * n_comp + component) =
           scalar_vector.local_element(i);
+  }
+
+
+  /* Inline function  definitions: */
+
+
+  template <typename Number, int n_comp, int simd_length>
+  template <typename Tensor>
+  DEAL_II_ALWAYS_INLINE inline Tensor
+  MultiComponentVector<Number, n_comp, simd_length>::get_tensor(
+      const unsigned int i) const
+  {
+    Tensor tensor;
+    for (unsigned int d = 0; d < n_comp; ++d)
+      tensor[d] = this->local_element(i * n_comp + d);
+    return tensor;
+  }
+
+
+  template <typename Number, int n_comp, int simd_length>
+  template <typename Tensor>
+  DEAL_II_ALWAYS_INLINE inline Tensor
+  MultiComponentVector<Number, n_comp, simd_length>::get_vectorized_tensor(
+      const unsigned int i) const
+  {
+    Tensor tensor;
+    unsigned int indices[VectorizedArray::size()];
+    for (unsigned int k = 0; k < VectorizedArray::size(); ++k)
+      indices[k] = (i + k) * n_comp;
+
+    vectorized_load_and_transpose(n_comp, this->begin(), indices, &tensor[0]);
+
+    return tensor;
+  }
+
+
+  template <typename Number, int n_comp, int simd_length>
+  template <typename Tensor>
+  DEAL_II_ALWAYS_INLINE inline Tensor
+  MultiComponentVector<Number, n_comp, simd_length>::get_vectorized_tensor(
+      const unsigned int *js) const
+  {
+    Tensor tensor;
+    unsigned int indices[VectorizedArray::size()];
+    for (unsigned int k = 0; k < VectorizedArray::size(); ++k)
+      indices[k] = js[k] * n_comp;
+
+    vectorized_load_and_transpose(n_comp, this->begin(), indices, &tensor[0]);
+
+    return tensor;
   }
 
 

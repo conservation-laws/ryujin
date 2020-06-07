@@ -288,7 +288,7 @@ namespace ryujin
 
       /* Compute norms of analytic solution: */
 
-      analytic.export_component(analytic_component, i);
+      analytic.extract_component(analytic_component, i);
 
       const Number linf_norm_analytic = Utilities::MPI::max(
           analytic_component.linfty_norm(), mpi_communicator);
@@ -315,7 +315,7 @@ namespace ryujin
 
       /* Compute norms of error: */
 
-      U.export_component(error_component, i);
+      U.extract_component(error_component, i);
       error_component -= analytic_component;
 
       const Number linf_norm_error =
