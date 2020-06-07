@@ -92,7 +92,7 @@ namespace ryujin
     std::cout << "Postprocessor<dim, Number>::prepare()" << std::endl;
 #endif
 
-    const auto &partitioner = offline_data_->partitioner();
+    const auto &partitioner = offline_data_->scalar_partitioner();
 
     for (auto &it : quantities_)
       it.reinit(partitioner);
@@ -303,8 +303,9 @@ namespace ryujin
     std::array<LinearAlgebra::distributed::Vector<Number>, problem_dimension>
         U_copy;
     for (auto &it : U_copy)
-      it.reinit(offline_data_->partitioner());
-    for (unsigned int i = 0; i < offline_data_->partitioner()->local_size();
+      it.reinit(offline_data_->scalar_partitioner());
+    for (unsigned int i = 0;
+         i < offline_data_->scalar_partitioner()->local_size();
          ++i)
       for (unsigned int d = 0; d < problem_dimension; ++d)
         U_copy[d].local_element(i) = U.local_element(i * problem_dimension + d);

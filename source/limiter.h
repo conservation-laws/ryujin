@@ -30,7 +30,8 @@ namespace ryujin
 
     using rank1_type = typename ProblemDescription<dim, Number>::rank1_type;
 
-    using Bounds = std::array<Number, 3>;
+    static constexpr unsigned int n_bounds = 3;
+    using Bounds = std::array<Number, n_bounds>;
 
     Limiter();
 

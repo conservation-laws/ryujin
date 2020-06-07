@@ -167,7 +167,7 @@ namespace ryujin
       } else {
         print_info("interpolating initial values");
         const auto U_sep = initial_values.interpolate(offline_data);
-        for (unsigned int i = 0; i < offline_data.partitioner()->local_size();
+        for (unsigned int i = 0; i < offline_data.scalar_partitioner()->local_size();
              ++i)
           for (unsigned int d = 0; d < problem_dimension; ++d)
             U.local_element(i * problem_dimension + d) =
@@ -180,9 +180,9 @@ namespace ryujin
       output(U, base_name + "-solution", t, output_cycle);
       if (enable_compute_error) {
         const auto U_sep = initial_values.interpolate(offline_data, t);
-        LinearAlgebra::distributed::Vector<Number> analytic;
+        vector_type analytic;
         time_step.initialize_vector(analytic);
-        for (unsigned int i = 0; i < offline_data.partitioner()->local_size();
+        for (unsigned int i = 0; i < offline_data.scalar_partitioner()->local_size();
              ++i)
           for (unsigned int d = 0; d < problem_dimension; ++d)
             analytic.local_element(i * problem_dimension + d) =
@@ -215,10 +215,10 @@ namespace ryujin
           output(U, base_name + "-solution", t, output_cycle);
           if (enable_compute_error) {
             const auto U_sep = initial_values.interpolate(offline_data, t);
-            LinearAlgebra::distributed::Vector<Number> analytic;
+            vector_type analytic;
             time_step.initialize_vector(analytic);
             for (unsigned int i = 0;
-                 i < offline_data.partitioner()->local_size();
+                 i < offline_data.scalar_partitioner()->local_size();
                  ++i)
               for (unsigned int d = 0; d < problem_dimension; ++d)
                 analytic.local_element(i * problem_dimension + d) =

@@ -285,7 +285,7 @@ namespace ryujin
 
     vector_type U;
 
-    const auto &partitioner = offline_data.partitioner();
+    const auto &partitioner = offline_data.scalar_partitioner();
     for (auto &it : U)
       it.reinit(partitioner);
 

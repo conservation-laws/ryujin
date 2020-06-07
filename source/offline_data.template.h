@@ -7,7 +7,9 @@
 #define OFFLINE_DATA_TEMPLATE_H
 
 #include "local_index_handling.h"
+#include "multicomponent_vector.h"
 #include "offline_data.h"
+#include "problem_description.h"
 #include "scratch_data.h"
 #include "sparse_matrix_simd.h"
 
@@ -87,8 +89,13 @@ namespace ryujin
     n_locally_owned_ = locally_owned.n_elements();
     n_locally_relevant_ = locally_relevant.n_elements();
 
-    partitioner_ = std::make_shared<dealii::Utilities::MPI::Partitioner>(
+    scalar_partitioner_ = std::make_shared<dealii::Utilities::MPI::Partitioner>(
         locally_owned, locally_relevant, mpi_communicator_);
+
+    constexpr auto problem_dimension =
+        ProblemDescription<dim, Number>::problem_dimension;
+    vector_partitioner_ =
+        create_vector_partitioner<problem_dimension>(scalar_partitioner_);
 
     /*
      * Determine the subset [0, n_export_indices) of [0,
@@ -98,7 +105,7 @@ namespace ryujin
 
 #ifdef USE_COMMUNICATION_HIDING
     n_export_indices_ = 0;
-    for (const auto &it : partitioner_->import_indices())
+    for (const auto &it : scalar_partitioner_->import_indices())
       if (it.second <= n_locally_internal_)
         n_export_indices_ = std::max(n_export_indices_, it.second);
 
@@ -137,23 +144,28 @@ namespace ryujin
     affine_constraints_.close();
 
     affine_constraints_assembly_.copy_from(affine_constraints_);
-    transform_to_local_range(*partitioner_, affine_constraints_assembly_);
+    transform_to_local_range(*scalar_partitioner_,
+                             affine_constraints_assembly_);
 
     /* Create sparsity patterns: */
 
     DynamicSparsityPattern dsp(n_locally_relevant_, n_locally_relevant_);
 
-    DoFTools::make_local_sparsity_pattern(
-        *partitioner_, dof_handler_, dsp, affine_constraints_assembly_, false);
+    DoFTools::make_local_sparsity_pattern(*scalar_partitioner_,
+                                          dof_handler_,
+                                          dsp,
+                                          affine_constraints_assembly_,
+                                          false);
 
     sparsity_pattern_assembly_.copy_from(dsp);
 
-    sparsity_pattern_simd_.reinit(n_locally_internal_, dsp, *partitioner_);
+    sparsity_pattern_simd_.reinit(
+        n_locally_internal_, dsp, *scalar_partitioner_);
 
     /* Next we can (re)initialize all local matrices: */
 
-    lumped_mass_matrix_.reinit(partitioner_);
-    lumped_mass_matrix_inverse_.reinit(partitioner_);
+    lumped_mass_matrix_.reinit(scalar_partitioner_);
+    lumped_mass_matrix_inverse_.reinit(scalar_partitioner_);
 
     mass_matrix_.reinit(sparsity_pattern_simd_);
     betaij_matrix_.reinit(sparsity_pattern_simd_);
@@ -221,7 +233,7 @@ namespace ryujin
 
       local_dof_indices.resize(dofs_per_cell);
       cell->get_dof_indices(local_dof_indices);
-      transform_to_local_range(*partitioner_, local_dof_indices);
+      transform_to_local_range(*scalar_partitioner_, local_dof_indices);
 
       /* clear out copy data: */
       local_boundary_map.clear();
@@ -289,7 +301,7 @@ namespace ryujin
 
           // FIXME: This is a bloody hack:
           Point<dim> position;
-          const auto global_index = partitioner_->local_to_global(index);
+          const auto global_index = scalar_partitioner_->local_to_global(index);
           for (unsigned int v = 0; v < GeometryInfo<dim>::vertices_per_cell;
                ++v)
             if (cell->vertex_dof_index(v, 0) == global_index)
@@ -299,8 +311,7 @@ namespace ryujin
            * Ensure that we record the highest boundary indicator for a
            * given degree of freedom (higher indicators take precedence):
            */
-          const auto &[old_normal, old_id, _] =
-              local_boundary_map[index];
+          const auto &[old_normal, old_id, _] = local_boundary_map[index];
           local_boundary_map[index] = std::make_tuple(
               old_normal + normal, std::max(old_id, id), position);
         } /* j */
@@ -367,7 +378,7 @@ namespace ryujin
       Vector<Number> local_lumped_mass_matrix(mass_matrix_tmp.m());
       mass_matrix_tmp.vmult(local_lumped_mass_matrix, one);
 
-      for (unsigned int i = 0; i < partitioner_->local_size(); ++i) {
+      for (unsigned int i = 0; i < scalar_partitioner_->local_size(); ++i) {
         lumped_mass_matrix_.local_element(i) = local_lumped_mass_matrix(i);
         lumped_mass_matrix_inverse_.local_element(i) =
             1. / lumped_mass_matrix_.local_element(i);
@@ -412,7 +423,7 @@ namespace ryujin
 
       local_dof_indices.resize(dofs_per_cell);
       cell->get_dof_indices(local_dof_indices);
-      transform_to_local_range(*partitioner_, local_dof_indices);
+      transform_to_local_range(*scalar_partitioner_, local_dof_indices);
 
       /* clear out copy data: */
       for (auto &matrix : cell_cij_matrix)

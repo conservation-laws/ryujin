@@ -85,13 +85,24 @@ namespace ryujin
     ACCESSOR_READ_ONLY(affine_constraints)
 
     /**
-     * The MPI partitioner used in all distributed Vectors.
+     * An MPI partitioner for all parallel distributed vectors storing a
+     * scalar quantity.
      */
-    std::shared_ptr<const dealii::Utilities::MPI::Partitioner> partitioner_;
-    ACCESSOR_READ_ONLY_NO_DEREFERENCE(partitioner)
+    std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
+        scalar_partitioner_;
+    ACCESSOR_READ_ONLY_NO_DEREFERENCE(scalar_partitioner)
 
     /**
-     * FIXME
+     * An MPI partitioner for all parallel distributed vectors storing a
+     * vector-valued quantity of size
+     * ProblemDescription::problem_dimension.
+     */
+    std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
+        vector_partitioner_;
+    ACCESSOR_READ_ONLY_NO_DEREFERENCE(vector_partitioner)
+
+    /**
+     * @todo write documentation
      */
     unsigned int n_export_indices_;
     ACCESSOR_READ_ONLY(n_export_indices)

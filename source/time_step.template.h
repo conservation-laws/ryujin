@@ -63,37 +63,6 @@ namespace ryujin
   }
 
 
-  template <typename Number>
-  void initialize_multicomponent_vector(
-      const std::shared_ptr<const Utilities::MPI::Partitioner>
-          &scalar_partitioner,
-      const unsigned int length,
-      LinearAlgebra::distributed::Vector<Number> &vector)
-  {
-    IndexSet vector_owned_set(length * scalar_partitioner->size());
-    for (auto it = scalar_partitioner->locally_owned_range().begin_intervals();
-         it != scalar_partitioner->locally_owned_range().end_intervals();
-         ++it)
-      vector_owned_set.add_range(*it->begin() * length,
-                                 (it->last() + 1) * length);
-    vector_owned_set.compress();
-    IndexSet vector_ghost_set(length * scalar_partitioner->size());
-    for (auto it = scalar_partitioner->ghost_indices().begin_intervals();
-         it != scalar_partitioner->ghost_indices().end_intervals();
-         ++it)
-      vector_ghost_set.add_range(*it->begin() * length,
-                                 (it->last() + 1) * length);
-    vector_ghost_set.compress();
-    const auto vector_partitioner =
-        std::make_shared<const Utilities::MPI::Partitioner>(
-            vector_owned_set,
-            vector_ghost_set,
-            scalar_partitioner->get_mpi_communicator());
-
-    vector.reinit(vector_partitioner);
-  }
-
-
   template <int dim, typename Number>
   void TimeStep<dim, Number>::prepare()
   {
@@ -103,24 +72,22 @@ namespace ryujin
 
     /* Initialize vectors: */
 
-    const auto &partitioner = offline_data_->partitioner();
+    const auto &scalar_partitioner = offline_data_->scalar_partitioner();
+    second_variations_.reinit(scalar_partitioner);
+    alpha_.reinit(scalar_partitioner);
+    specific_entropies_.reinit(scalar_partitioner);
+    evc_entropies_.reinit(scalar_partitioner);
 
-    second_variations_.reinit(partitioner);
-    alpha_.reinit(partitioner);
-    specific_entropies_.reinit(partitioner);
-    evc_entropies_.reinit(partitioner);
+    bounds_.reinit_with_scalar_partitioner(scalar_partitioner);
 
-    initialize_multicomponent_vector(partitioner, 3, bounds_);
-
-    initialize_multicomponent_vector(
-        partitioner, problem_dimension, temp_euler_);
-    temp_ssp_.reinit(temp_euler_);
-    r_.reinit(temp_euler_);
+    const auto &vector_partitioner = offline_data_->vector_partitioner();
+    r_.reinit(vector_partitioner);
+    temp_euler_.reinit(vector_partitioner);
+    temp_ssp_.reinit(vector_partitioner);
 
     /* Initialize matrices: */
 
     const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
-
     dij_matrix_.reinit(sparsity_simd);
     lij_matrix_.reinit(sparsity_simd);
     lij_matrix_next_.reinit(sparsity_simd);

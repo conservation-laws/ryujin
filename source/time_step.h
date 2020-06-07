@@ -14,6 +14,7 @@
 #include "limiter.h"
 
 #include "initial_values.h"
+#include "multicomponent_vector.h"
 #include "offline_data.h"
 #include "problem_description.h"
 #include "sparse_matrix_simd.h"
@@ -37,7 +38,8 @@ namespace ryujin
     using rank1_type = typename ProblemDescription<dim, Number>::rank1_type;
     using rank2_type = typename ProblemDescription<dim, Number>::rank2_type;
 
-    using vector_type = dealii::LinearAlgebra::distributed::Vector<Number>;
+    using scalar_type = dealii::LinearAlgebra::distributed::Vector<Number>;
+    using vector_type = MultiComponentVector<Number, problem_dimension>;
 
     TimeStep(const MPI_Comm &mpi_communicator,
              std::map<std::string, dealii::Timer> &computing_timer,
@@ -124,14 +126,14 @@ namespace ryujin
 
     /* Scratch data: */
 
-    vector_type alpha_;
+    scalar_type alpha_;
     ACCESSOR_READ_ONLY(alpha)
 
-    vector_type second_variations_;
-    vector_type specific_entropies_;
-    vector_type evc_entropies_;
+    scalar_type second_variations_;
+    scalar_type specific_entropies_;
+    scalar_type evc_entropies_;
 
-    vector_type bounds_;
+    MultiComponentVector<Number, 3> bounds_;
 
     vector_type r_;
 
