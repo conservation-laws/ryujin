@@ -70,7 +70,7 @@ namespace ryujin
 
     const Bounds &bounds() const;
 
-    /*
+    /**
      * Given a state U and an update P this function computes and returns
      * the maximal t, obeying t_min < t < t_max, such that the selected
      * local minimum principles are obeyed.
@@ -213,3 +213,7 @@ namespace ryujin
 } /* namespace ryujin */
 
 #endif /* LIMITER_H */
+
+#ifdef OBSESSIVE_INLINING
+#include "limiter.template.h"
+#endif

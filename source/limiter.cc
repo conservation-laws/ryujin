@@ -11,6 +11,7 @@ namespace ryujin
 {
   /* instantiations */
 
+#ifndef OBSESSIVE_INLINING
   template NUMBER
   Limiter<DIM, NUMBER>::limit<Limiter<DIM, NUMBER>::Limiters::specific_entropy>(
       const std::array<NUMBER, 3> &,
@@ -42,5 +43,6 @@ namespace ryujin
       const rank1_type &,
       const VectorizedArray<NUMBER>,
       const VectorizedArray<NUMBER>);
+#endif
 
 } // namespace ryujin

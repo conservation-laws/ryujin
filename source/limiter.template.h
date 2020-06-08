@@ -12,7 +12,9 @@ namespace ryujin
 {
   template <int dim, typename Number>
   template <typename Limiter<dim, Number>::Limiters limiter, typename BOUNDS>
-  // DEAL_II_ALWAYS_INLINE inline
+#ifdef OBSESSIVE_INLINING
+  DEAL_II_ALWAYS_INLINE inline
+#endif
   Number Limiter<dim, Number>::limit(const BOUNDS &bounds,
                                      const rank1_type &U,
                                      const rank1_type &P,

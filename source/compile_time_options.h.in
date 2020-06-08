@@ -14,19 +14,20 @@
 
 #define NUMBER @NUMBER@
 
-#cmakedefine USE_COMMUNICATION_HIDING
-
-#cmakedefine USE_CUSTOM_POW
-
-#cmakedefine USE_SIMD
-
 #cmakedefine CHECK_BOUNDS
-
 #if defined(DEBUG) && !defined(CHECK_BOUNDS)
 #define CHECK_BOUNDS
 #endif
 
 #cmakedefine DEBUG_OUTPUT
+
+#cmakedefine OBSESSIVE_INLINING
+
+#cmakedefine USE_COMMUNICATION_HIDING
+
+#cmakedefine USE_CUSTOM_POW
+
+#cmakedefine USE_SIMD
 
 #cmakedefine LIKWID_PERFMON
 

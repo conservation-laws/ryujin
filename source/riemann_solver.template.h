@@ -32,7 +32,7 @@ namespace ryujin
      * Cost: 1x pow, 1x division, 2x sqrt
      */
     template <typename Number>
-    inline DEAL_II_ALWAYS_INLINE Number
+    DEAL_II_ALWAYS_INLINE inline Number
     f(const std::array<Number, 4> &primitive_state, const Number &p_star)
     {
       static_assert(ProblemDescription<1, Number>::b == 0.,
@@ -70,7 +70,7 @@ namespace ryujin
      * Cost: 1x pow, 3x division, 1x sqrt
      */
     template <typename Number>
-    inline DEAL_II_ALWAYS_INLINE Number
+    DEAL_II_ALWAYS_INLINE inline Number
     df(const std::array<Number, 4> &primitive_state, const Number &p_star)
     {
       static_assert(ProblemDescription<1, Number>::b == 0.,
@@ -117,7 +117,7 @@ namespace ryujin
      * Cost: 2x pow, 2x division, 4x sqrt
      */
     template <typename Number>
-    inline DEAL_II_ALWAYS_INLINE Number
+    DEAL_II_ALWAYS_INLINE inline Number
     phi(const std::array<Number, 4> &riemann_data_i,
         const std::array<Number, 4> &riemann_data_j,
         const Number &p)
@@ -137,7 +137,7 @@ namespace ryujin
      * Cost: 0x pow, 2x division, 2x sqrt
      */
     template <typename Number>
-    inline DEAL_II_ALWAYS_INLINE Number
+    DEAL_II_ALWAYS_INLINE inline Number
     phi_of_p_max(const std::array<Number, 4> &riemann_data_i,
                  const std::array<Number, 4> &riemann_data_j)
     {
@@ -172,7 +172,7 @@ namespace ryujin
      * Cost: 2x pow, 6x division, 2x sqrt
      */
     template <typename Number>
-    inline DEAL_II_ALWAYS_INLINE Number
+    DEAL_II_ALWAYS_INLINE inline Number
     dphi(const std::array<Number, 4> &riemann_data_i,
          const std::array<Number, 4> &riemann_data_j,
          const Number &p)
@@ -195,8 +195,9 @@ namespace ryujin
      * Cost: 0x pow, 1x division, 1x sqrt
      */
     template <typename Number>
-    inline DEAL_II_ALWAYS_INLINE Number lambda1_minus(
-        const std::array<Number, 4> &riemann_data, const Number p_star)
+    DEAL_II_ALWAYS_INLINE inline Number
+    lambda1_minus(const std::array<Number, 4> &riemann_data,
+                  const Number p_star)
     {
       using ScalarNumber = typename get_value_type<Number>::type;
 
@@ -220,8 +221,9 @@ namespace ryujin
      * Cost: 0x pow, 1x division, 1x sqrt
      */
     template <typename Number>
-    inline DEAL_II_ALWAYS_INLINE Number lambda3_plus(
-        const std::array<Number, 4> &primitive_state, const Number p_star)
+    DEAL_II_ALWAYS_INLINE inline Number
+    lambda3_plus(const std::array<Number, 4> &primitive_state,
+                 const Number p_star)
     {
       using ScalarNumber = typename get_value_type<Number>::type;
 
@@ -248,7 +250,7 @@ namespace ryujin
      * Cost: 0x pow, 4x division, 4x sqrt
      */
     template <typename Number>
-    inline DEAL_II_ALWAYS_INLINE std::array<Number, 2>
+    DEAL_II_ALWAYS_INLINE inline std::array<Number, 2>
     compute_gap(const std::array<Number, 4> &riemann_data_i,
                 const std::array<Number, 4> &riemann_data_j,
                 const Number p_1,
@@ -282,7 +284,7 @@ namespace ryujin
      * Cost: 0x pow, 2x division, 2x sqrt
      */
     template <typename Number>
-    inline DEAL_II_ALWAYS_INLINE Number
+    DEAL_II_ALWAYS_INLINE inline Number
     compute_lambda(const std::array<Number, 4> &riemann_data_i,
                    const std::array<Number, 4> &riemann_data_j,
                    const Number p_star)
@@ -303,7 +305,7 @@ namespace ryujin
      * Cost: 2x pow, 2x division, 0x sqrt
      */
     template <typename Number>
-    inline DEAL_II_ALWAYS_INLINE Number
+    DEAL_II_ALWAYS_INLINE inline Number
     p_star_two_rarefaction(const std::array<Number, 4> &riemann_data_i,
                            const std::array<Number, 4> &riemann_data_j)
     {
@@ -347,7 +349,7 @@ namespace ryujin
      * Cost: 2x pow, 2x division, 0x sqrt
      */
     template <typename Number>
-    inline DEAL_II_ALWAYS_INLINE std::array<Number, 4>
+    DEAL_II_ALWAYS_INLINE inline std::array<Number, 4>
     shock_and_expansion_density(const Number p_min,
                                 const Number p_max,
                                 const Number rho_p_min,
@@ -381,8 +383,10 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  std::tuple<Number, Number, unsigned int>
-  RiemannSolver<dim, Number>::compute(
+#ifdef OBSESSIVE_INLINING
+  DEAL_II_ALWAYS_INLINE inline
+#endif
+  std::tuple<Number, Number, unsigned int> RiemannSolver<dim, Number>::compute(
       const std::array<Number, 4> &riemann_data_i,
       const std::array<Number, 4> &riemann_data_j)
   {
@@ -521,7 +525,7 @@ namespace ryujin
      * that are needed in the limiter for the "greedy d_ij" computation.
      */
     template <typename Number>
-    inline DEAL_II_ALWAYS_INLINE std::array<Number, 5>
+    DEAL_II_ALWAYS_INLINE inline std::array<Number, 5>
     compute_bounds(const std::array<Number, 4> &riemann_data_i,
                    const std::array<Number, 4> &riemann_data_j,
                    const Number &p_1,
@@ -629,11 +633,13 @@ namespace ryujin
 
       const auto rho_e_i = p_i * gamma_minus_one_inverse;
       const auto s_i = rho_e_i * ryujin::pow(rho_i, -gamma);
-      const auto salpha_i = ryujin::pow(rho_e_i * rho_i, gamma_plus_one_inverse);
+      const auto salpha_i =
+          ryujin::pow(rho_e_i * rho_i, gamma_plus_one_inverse);
 
       const auto rho_e_j = p_j * gamma_minus_one_inverse;
       const auto s_j = rho_e_j * ryujin::pow(rho_j, -gamma);
-      const auto salpha_j = ryujin::pow(rho_e_j * rho_j, gamma_plus_one_inverse);
+      const auto salpha_j =
+          ryujin::pow(rho_e_j * rho_j, gamma_plus_one_inverse);
 
       const auto s_min = std::min(s_i, s_j);
 
@@ -656,7 +662,7 @@ namespace ryujin
      * approximative Riemann solver).
      */
     template <int dim, typename Number>
-    inline DEAL_II_ALWAYS_INLINE std::array<Number, 4> riemann_data_from_state(
+    DEAL_II_ALWAYS_INLINE inline std::array<Number, 4> riemann_data_from_state(
         const typename ProblemDescription<dim, Number>::rank1_type &U,
         const dealii::Tensor<1, dim, Number> &n_ij)
     {
@@ -679,11 +685,15 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  std::tuple<Number, Number, unsigned int> RiemannSolver<dim, Number>::compute(
-      const rank1_type &U_i,
-      const rank1_type &U_j,
-      const dealii::Tensor<1, dim, Number> &n_ij,
-      const Number hd_i)
+#ifdef OBSESSIVE_INLINING
+  DEAL_II_ALWAYS_INLINE inline
+#endif
+      std::tuple<Number, Number, unsigned int>
+      RiemannSolver<dim, Number>::compute(
+          const rank1_type &U_i,
+          const rank1_type &U_j,
+          const dealii::Tensor<1, dim, Number> &n_ij,
+          const Number hd_i)
   {
     const auto riemann_data_i = riemann_data_from_state(U_i, n_ij);
     const auto riemann_data_j = riemann_data_from_state(U_j, n_ij);

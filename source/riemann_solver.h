@@ -106,3 +106,7 @@ namespace ryujin
 } /* namespace ryujin */
 
 #endif /* RIEMANN_SOLVER_H */
+
+#ifdef OBSESSIVE_INLINING
+#include "riemann_solver.template.h"
+#endif

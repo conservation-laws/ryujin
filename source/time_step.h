@@ -130,7 +130,7 @@ namespace ryujin
     scalar_type specific_entropies_;
     scalar_type evc_entropies_;
 
-    MultiComponentVector<Number, 3> bounds_;
+    MultiComponentVector<Number, Limiter<dim, Number>::n_bounds> bounds_;
 
     vector_type r_;
 

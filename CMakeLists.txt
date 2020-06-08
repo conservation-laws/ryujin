@@ -79,6 +79,8 @@ option(CHECK_BOUNDS "Enable debug code paths that check limiter bounds" OFF)
 
 option(DEBUG_OUTPUT "Enable detailed time-step output" OFF)
 
+option(OBSESSIVE_INLINING "Also inline the Riemann solver and limiter calls" OFF)
+
 #
 # Set up the rest:
 #
