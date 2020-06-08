@@ -445,8 +445,8 @@ namespace ryujin
       Scope scope(computing_timer_,
                   "time step 3 - l.-o. update, bounds, and r_i");
 
-      SynchronizationDispatch synchronization_dispatch([&, n_passes]() {
-        if constexpr (n_passes != 0) {
+      SynchronizationDispatch synchronization_dispatch([&]() {
+        if (n_passes != 0) {
           r_.update_ghost_values_start(channel++);
         } else {
           /* If we do not do high-order, synchronize at this point: */

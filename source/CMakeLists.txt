@@ -43,4 +43,5 @@ if(LIKWID_PERFMON)
   target_link_libraries(ryujin likwid likwid-hwloc likwid-lua)
 endif()
 
+# FIXME: This is wrong if we link against libc++.
 target_link_libraries(ryujin stdc++fs)
