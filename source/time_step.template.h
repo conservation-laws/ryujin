@@ -833,10 +833,6 @@ namespace ryujin
             const auto l_ij = std::min(lij_matrix_.get_entry(i, col_idx), l_ji);
 
             U_i_new += l_ij * lambda * p_ij;
-            p_ij *= (1 - l_ij);
-
-            if (!last_round)
-              pij_matrix_.write_tensor(p_ij, i, col_idx);
           }
 
           /* In the last round */
@@ -894,10 +890,18 @@ namespace ryujin
               bounds_.template get_tensor<std::array<Number, 3>>(i);
 
           for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
+
+            const auto l_ji = lij_matrix_.get_transposed_entry(i, col_idx);
+            const auto old_l_ij = std::min(lij_matrix_.get_entry(i, col_idx), l_ji);
             auto p_ij = pij_matrix_.get_tensor(i, col_idx);
+            p_ij *= (1 - old_l_ij);
+            pij_matrix_.write_tensor(p_ij, i, col_idx);
+
             const auto l_ij =
                 Limiter<dim, Number>::limit(bounds, U_i_new, p_ij);
+
             lij_matrix_next_.write_entry(l_ij, i, col_idx);
+            pij_matrix_.write_tensor(p_ij, i, col_idx);
           }
         } /* parallel non-vectorized loop */
 
@@ -924,10 +928,6 @@ namespace ryujin
             auto p_ij = pij_matrix_.get_vectorized_tensor(i, col_idx);
 
             U_i_new += l_ij * lambda * p_ij;
-            p_ij *= (VA(1.) - l_ij);
-
-            if (!last_round)
-              pij_matrix_.write_vectorized_tensor(p_ij, i, col_idx);
           }
 
 #ifdef CHECK_BOUNDS
@@ -961,11 +961,17 @@ namespace ryujin
               bounds_.template get_vectorized_tensor<std::array<VA, 3>>(i);
           for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
 
-            const auto p_ij = pij_matrix_.get_vectorized_tensor(i, col_idx);
+            const auto l_ji =
+                lij_matrix_.get_vectorized_transposed_entry(i, col_idx);
+            const auto old_l_ij =
+                std::min(lij_matrix_.get_vectorized_entry(i, col_idx), l_ji);
+            auto p_ij = pij_matrix_.get_vectorized_tensor(i, col_idx);
+            p_ij *= (VA(1.) - old_l_ij);
 
             const auto l_ij = Limiter<dim, VA>::limit(bounds, U_i_new, p_ij);
 
             lij_matrix_next_.write_vectorized_entry(l_ij, i, col_idx, true);
+            pij_matrix_.write_vectorized_tensor(p_ij, i, col_idx);
           }
         }
 
