@@ -29,7 +29,7 @@ add_executable(ryujin
 
 deal_ii_setup_target(ryujin)
 
-set_property(TARGET ryujin APPEND PROPERTY COMPILE_DEFINITIONS
+set_property(SOURCE time_loop.cc APPEND PROPERTY COMPILE_DEFINITIONS
   RYUJIN_VERSION="${RYUJIN_VERSION}"
   RYUJIN_GIT_REVISION="${GIT_REVISION}"
   RYUJIN_GIT_SHORTREV="${GIT_SHORTREV}"
