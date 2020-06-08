@@ -905,8 +905,23 @@ namespace ryujin
             const auto new_l_ij =
                 Limiter<dim, Number>::limit(bounds, U_i_new, new_p_ij);
 
-            lij_matrix_next_.write_entry(new_l_ij, i, col_idx);
-            pij_matrix_.write_tensor(new_p_ij, i, col_idx);
+            if constexpr (n_passes == 2) {
+              /*
+               * Shortcut: We omit updating the p_ij vector and simply
+               * write (1 - l_ij^(1)) * l_ij^(2) into the l_ij matrix. This
+               * approach only works for two limiting steps.
+               */
+              lij_matrix_next_.write_entry(
+                  (Number(1.) - old_l_ij) * new_l_ij, i, col_idx);
+            } else {
+              /*
+               * @todo: This is expensive. If we ever end up using more
+               * than two limiter passes we should implement this by
+               * storing a scalar factor instead of writing back into p_ij.
+               */
+              lij_matrix_next_.write_entry(new_l_ij, i, col_idx);
+              pij_matrix_.write_tensor(new_p_ij, i, col_idx);
+            }
           }
         } /* parallel non-vectorized loop */
 
@@ -979,8 +994,25 @@ namespace ryujin
             const auto new_l_ij =
                 Limiter<dim, VA>::limit(bounds, U_i_new, new_p_ij);
 
-            lij_matrix_next_.write_vectorized_entry(new_l_ij, i, col_idx, true);
-            pij_matrix_.write_vectorized_tensor(new_p_ij, i, col_idx);
+            if constexpr (n_passes == 2) {
+              /*
+               * Shortcut: We omit updating the p_ij vector and simply
+               * write (1 - l_ij^(1)) * l_ij^(2) into the l_ij matrix. This
+               * approach only works for two limiting steps.
+               */
+              const auto entry =
+                  (VectorizedArray<Number>(1.) - old_l_ij) * new_l_ij;
+              lij_matrix_next_.write_vectorized_entry(entry, i, col_idx, true);
+            } else {
+              /*
+               * @todo: This is expensive. If we ever end up using more
+               * than two limiter passes we should implement this by
+               * storing a scalar factor instead of writing back into p_ij.
+               */
+              lij_matrix_next_.write_vectorized_entry(
+                  new_l_ij, i, col_idx, true);
+              pij_matrix_.write_vectorized_tensor(new_p_ij, i, col_idx);
+            }
           }
         }
 
