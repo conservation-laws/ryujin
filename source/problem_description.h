@@ -41,7 +41,9 @@ namespace ryujin
     const static std::array<std::string, dim + 2> component_names;
 
     /**
-     * Scalar number type
+     * Underlyqing scalar number type. This typedef unpacks a
+     * VectorizedArray and returns the underlying scalar number type
+     * (either float, or double).
      */
     using ScalarNumber = typename get_value_type<Number>::type;
 
@@ -81,13 +83,13 @@ namespace ryujin
 
 
     /**
-     * rank1_type denotes the storage type used for a state vector
+     * Denotes the storage type used for a state vector \f$\boldsymbol U\f$.
      */
     typedef dealii::Tensor<1, problem_dimension, Number> rank1_type;
 
 
     /**
-     * rank2_type denotes the storage type used for the range of f.
+     * Denotes the storage type used for the flux \f$\mathbf{f}\f$.
      */
     typedef dealii::Tensor<1, problem_dimension, dealii::Tensor<1, dim, Number>>
         rank2_type;

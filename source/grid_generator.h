@@ -554,8 +554,8 @@ namespace ryujin
 
 
     /**
-     * Describes the geometry used for validation: The unit hypercube with
-     * Dirichlet data.
+     * Describes a geometry used for validation: The (scaled) unit
+     * hypercube with Dirichlet data.
      *
      * @ingroup Discretization
      */

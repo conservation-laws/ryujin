@@ -19,73 +19,200 @@
 namespace ryujin
 {
 
+  /**
+   * This class implements two indicator strategies used to form the
+   * preliminary high-order update.
+   *
+   * The first one is a smoothness indicator as described in
+   * @cite GuermondEtAl2018 and that is similar in nature to smoothness
+   * indicators used in the finite volume communities (see for example
+   * @cite Jameson2017).
+   *
+   * @todo explain algorithmic details of the smoothness indicator
+   *
+   * The second indicator is an entropy-viscosity commutator as described
+   * in @cite GuermondEtAl2011 and @cite GuermondEtAl2018. For a given
+   * entropy \f$\eta\f$ (either the mathematical entropy, or a Harten
+   * entropy, see the documentation of ProblemDescription) we let
+   * \f$\eta'\f$ denote its derivative with respect to the state variables.
+   * We then compute a normalized entropy viscosity ratio \f$\alpha_i^n\f$
+   * for the state \f$\boldsymbol U_i^n\f$ as follows:
+   * \f{align}
+   *   \alpha_i^n\;=\;\frac{N_i^n}{D_i^n},
+   *   \quad
+   *   N_i^n\;:=\;\left|a_i^n- \eta'(\boldsymbol U^n_i)\cdot\boldsymbol
+   *   b_i^n +\frac{\eta(\boldsymbol U^n_i)}{\rho_i^n}\big(\boldsymbol
+   *   b_i^n\big)_1\right|,
+   *   \quad
+   *   D_i^n\;:=\;\left|a_i^n\right| +
+   *   \sum_{k=1}^{d+1}\left|\big(\eta'(\boldsymbol U^n_i)\big)_k-
+   *   \delta_{1k}\frac{\eta(\boldsymbol U^n_i)}{\rho_i^n}\right|
+   *   \,\left|\big(\boldsymbol b_i^n\big)_k\right|,
+   * \f}
+   * where where \f$\big(\,.\,\big)_k\f$ denotes the \f$k\f$-th component
+   * of a vector, \f$\delta_{ij}\f$ is Kronecker's delta, and where we have
+   * set
+   * \f{align}
+   *   a_i^n \;:=\;
+   *   \sum_{j\in\mathcal{I}_i}\left(\frac{\eta(\boldsymbol U_j^n)}{\rho_j^n}
+   *   -\frac{\eta(\boldsymbol U_i^n)}{\rho_i^n}\right)\,
+   *   \boldsymbol m_j^n\cdot\boldsymbol c_{ij},
+   *   \qquad
+   *   \boldsymbol b_i^n \;:=\;
+   *   \sum_{j\in\mathcal{I}_i}\left(\mathbf{f}(\boldsymbol U_j^n)-
+   *   \mathbf{f}(\boldsymbol U_i^n)\right)\cdot\boldsymbol c_{ij},
+   * \f}
+   *
+   * In addition, the class also computes second variations of the density
+   * \f$\rho\f$ that is used for relaxing the limiter bounds, see
+   * documentation of class Limiter.
+   *
+   * @ingroup EulerStep
+   */
   template <int dim, typename Number = double>
   class Indicator
   {
   public:
-    static constexpr unsigned int problem_dimension =
-        ProblemDescription<dim, Number>::problem_dimension;
+    /**
+     * @copydoc ProblemDescription::problem_dimension
+     */
+    // clang-format off
+    static constexpr unsigned int problem_dimension = ProblemDescription<dim, Number>::problem_dimension;
+    // clang-format on
 
+    /**
+     * @copydoc ProblemDescription::rank1_type
+     */
     using rank1_type = typename ProblemDescription<dim, Number>::rank1_type;
 
+    /**
+     * @copydoc ProblemDescription::rank2_type
+     */
     using rank2_type = typename ProblemDescription<dim, Number>::rank2_type;
 
     /**
-     * Scalar number type
+     * @copydoc ProblemDescription::ScalarNumber
      */
     using ScalarNumber = typename get_value_type<Number>::type;
 
-    /*
-     * Options:
+    /**
+     * An enum describing different indicator strategies
      */
-
-    static constexpr enum class Indicators {
+    enum class Indicators {
+      /**
+       * Indicator returns a constant zero, i.e., the high-order update is
+       * equal to an inviscid Galerkin update.
+       */
       zero,
+      /**
+       * Indicator returns a constant one, i.e., the high-order update is
+       * equal to the low-order update.
+       */
       one,
+      /** Use a smoothness indicator. */
       smoothness_indicator,
+      /** Use an entropy-viscosity commutator. */
       entropy_viscosity_commutator
-    } indicator_ = INDICATOR;
+    };
 
-    static constexpr bool compute_second_variations_ =
-        COMPUTE_SECOND_VARIATIONS;
-
-    /*
-     * Options for entropy viscosity commutator:
+    /**
+     * An enum describing different choices of entropies used for the
+     * entropy-viscosity commutator
      */
-
-    static constexpr enum class Entropy {
+    enum class Entropy {
+      /** The (scaled) mathematical entropy */
       mathematical,
+      /** A generalized Harten-type entropy */
       harten
-    } evc_entropy_ = ENTROPY;
+    };
 
-    /*
-     * Options for smoothness indicator:
+    /**
+     * An scalar physical quantity used for computing the smoothness
+     * indicator.
      */
-
-    static constexpr enum class SmoothnessIndicators {
+    enum class SmoothnessIndicators {
+      /** The density */
       rho,
+      /** The internal energy */
       internal_energy,
+      /** The pressure */
       pressure,
-    } smoothness_indicator_ = SMOOTHNESS_INDICATOR;
+    };
 
-    static constexpr ScalarNumber smoothness_indicator_alpha_0_ =
-        SMOOTHNESS_INDICATOR_ALPHA_0;
+    /**
+     * @name Indicator compile time options
+     */
+    //@{
 
-    static constexpr unsigned int smoothness_indicator_power_ =
-        SMOOTHNESS_INDICATOR_POWER;
+    // clang-format off
+    /**
+     * Selected indicator used for the preliminary high-order update.
+     * @ingroup CompileTimeOptions
+     */
+    static constexpr Indicators indicator_ = INDICATOR;
 
-    Indicator();
+    /**
+     * Compute second variations of the density.
+     * @ingroup CompileTimeOptions
+     */
+    static constexpr bool compute_second_variations_ = COMPUTE_SECOND_VARIATIONS;
+
+    /**
+     * Selected entropy used for the entropy-viscosity commutator.
+     * @ingroup CompileTimeOptions
+     */
+    static constexpr Entropy evc_entropy_ = ENTROPY;
+
+    /**
+     * Selected quantity used for the smoothness indicator.
+     * @ingroup CompileTimeOptions
+     */
+    static constexpr SmoothnessIndicators smoothness_indicator_ = SMOOTHNESS_INDICATOR;
+
+    /**
+     * Tuning parameter for the smoothness indicator.
+     * @ingroup CompileTimeOptions
+     */
+    static constexpr ScalarNumber smoothness_indicator_alpha_0_ = SMOOTHNESS_INDICATOR_ALPHA_0;
+
+    /**
+     * Tuning parameter for the smoothness indicator.cator.
+     * @ingroup CompileTimeOptions
+     */
+    static constexpr unsigned int smoothness_indicator_power_ = SMOOTHNESS_INDICATOR_POWER;
+    // clang-format on
+
+    //@}
+    /**
+     * @name Stencil-based computation of indicators
+     *
+     * Intended usage:
+     * ```
+     * Indicator<dim, Number> indicator;
+     * for (unsigned int i = n_internal; i < n_owned; ++i) {
+     *   // ...
+     *   indicator.reset(U_i, evc_entropies_i);
+     *   for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
+     *     // ...
+     *     indicator.add(U_j, c_ij, beta_ij, evc_entropies_j);
+     *   }
+     *   indicator.alpha(hd_i);
+     *   indicator.second_variations();
+     * }
+     * ```
+     */
+    //@{
 
     /**
      * Reset temporary storage and initialize for a new row corresponding
-     * to state vector U_i:
+     * to state vector U_i.
      */
     void
     reset(const rank1_type &U_i, const Number entropy);
 
     /**
      * When looping over the sparsity row, add the contribution associated
-     * with the neighboring state U_j:
+     * with the neighboring state U_j.
      */
     void add(const rank1_type &U_j,
              const dealii::Tensor<1, dim, Number> &c_ij,
@@ -101,8 +228,13 @@ namespace ryujin
      */
     Number second_variations();
 
+    //@}
+
   private:
-    /* Temporary storage used for the entropy_viscosity_commutator: */
+    /**
+     * @name
+     */
+    //@{
 
     Number rho_i = 0.;         // also used for second variations
     Number rho_i_inverse = 0.; // also used for second variations
@@ -125,13 +257,9 @@ namespace ryujin
 
     Number rho_second_variation_numerator = 0.;
     Number rho_second_variation_denominator = 0.;
+
+    //@}
   };
-
-
-  template <int dim, typename Number>
-  Indicator<dim, Number>::Indicator()
-  {
-  }
 
 
   namespace
