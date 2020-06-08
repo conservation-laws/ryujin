@@ -18,20 +18,34 @@
 
 namespace ryujin
 {
+  /**
+   * A class implementing a number of different initial value
+   * configurations.
+   *
+   * Given a position @p point the member function
+   * InitialValues::initial_state() returns the corresponding (conserved)
+   * initial state. The function is used to interpolate initial values and
+   * enforce Dirichlet boundary conditions. For the latter, the the
+   * function signature has an additional parameter @p t denoting the
+   * current time to allow for time-dependent (in-flow) Dirichlet data.
+   *
+   * For validation purposes a number of analytic solutions are implemented
+   * as well.
+   *
+   * @ingroup TimeLoop
+   */
   template <int dim, typename Number = double>
   class InitialValues : public dealii::ParameterAcceptor
   {
   public:
-    static constexpr unsigned int problem_dimension =
-        ProblemDescription<dim>::problem_dimension;
-
-    static constexpr Number gamma = ProblemDescription<dim, Number>::gamma;
-
-    static constexpr Number b = ProblemDescription<dim, Number>::b;
-
+    /**
+     * @copydoc ProblemDescription::rank1_type
+     */
     using rank1_type = typename ProblemDescription<dim, Number>::rank1_type;
 
-    using scalar_type = typename OfflineData<dim, Number>::scalar_type;
+    /**
+     * @copydoc OfflineData::vector_type
+     */
     using vector_type = typename OfflineData<dim, Number>::vector_type;
 
     /**
@@ -50,21 +64,23 @@ namespace ryujin
 
 
     /**
-     * Given a position @p point return the corresponding (conserved)
-     * initial state. This function is used to interpolate initial values.
-     *
-     * The additional time parameter "t" is for validation purposes.
-     * Sometimes we know the (analytic) solution of a test tube
-     * configuration and want to compare the numerical computation against
-     * it.
+     * Given a position @p point returns the corresponding (conserved)
+     * initial state. The function is used to interpolate initial values
+     * and enforce Dirichlet boundary conditions. For the latter, the the
+     * function signature has an additional parameter @p t denoting the
+     * current time to allow for time-dependent (in-flow) Dirichlet data.
      */
-    const std::function<rank1_type(const dealii::Point<dim> &point, Number t)>
-        &initial_state;
+    DEAL_II_ALWAYS_INLINE inline
+    rank1_type initial_state(const dealii::Point<dim> &point, Number t) const
+    {
+      return initial_state_(point, t);
+    }
+
 
     /**
-     * Given a reference to an OfflineData object this routine computes and
-     * returns a state vector populates with initial values for specified
-     * time @p t.
+     * Given a reference to an OfflineData object (that contains a
+     * dealii::DoFHandler) this routine computes and returns a state vector
+     * populated with initial values for a specified time @p t.
      */
     vector_type interpolate(const OfflineData<dim, Number> &offline_data,
                             Number t = 0);
@@ -85,8 +101,8 @@ namespace ryujin
     Number perturbation_;
 
     /*
-     * Internal function object that we used to implement the
-     * internal_state function for all internal states:
+     * Internal function object that we use to implement the internal_state
+     * function for all internal states:
      */
     std::function<rank1_type(const dealii::Point<dim> &point, Number t)>
         initial_state_;

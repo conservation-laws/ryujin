@@ -34,3 +34,10 @@
  *
  * SIMD related functions and classes.
  */
+
+
+/**
+ * @defgroup TimeLoop Time Loop
+ *
+ * This module contains classes and functions used in TimeLoop::run().
+ */

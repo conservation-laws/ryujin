@@ -21,10 +21,11 @@ namespace ryujin
   template <int dim, typename Number>
   InitialValues<dim, Number>::InitialValues(const std::string &subsection)
       : ParameterAcceptor(subsection)
-      , initial_state(initial_state_)
   {
     ParameterAcceptor::parse_parameters_call_back.connect(std::bind(
         &InitialValues<dim, Number>::parse_parameters_callback, this));
+
+    static constexpr Number gamma = ProblemDescription<dim, Number>::gamma;
 
     configuration_ = "uniform";
     add_parameter(
@@ -83,6 +84,11 @@ namespace ryujin
   template <int dim, typename Number>
   void InitialValues<dim, Number>::parse_parameters_callback()
   {
+    static constexpr unsigned int problem_dimension =
+        ProblemDescription<dim>::problem_dimension;
+    static constexpr Number gamma = ProblemDescription<dim, Number>::gamma;
+    static constexpr Number b = ProblemDescription<dim, Number>::b;
+
     /*
      * First, let's normalize the direction:
      */
@@ -288,6 +294,8 @@ namespace ryujin
 
     constexpr auto problem_dimension =
         ProblemDescription<dim, Number>::problem_dimension;
+
+    using scalar_type = typename OfflineData<dim, Number>::scalar_type;
 
     const auto callable = [&](const auto &p) { return initial_state(p, t); };
 
