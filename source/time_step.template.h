@@ -889,15 +889,15 @@ namespace ryujin
 
             temp_euler_.write_tensor(U_i_new, i);
 
-            /* Skip updating l_ij */
+            /* Skip computing new l_ij */
             continue;
           }
 
           temp_euler_.write_tensor(U_i_new, i);
 
-          std::array<Number, 3> bounds;
-          for (unsigned int d = 0; d < 3; ++d)
-            bounds[d] = bounds_.local_element(i * 3 + d);
+          const auto bounds =
+              bounds_.template get_tensor<std::array<Number, 3>>(i);
+
           for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
             auto p_ij = pij_matrix_.get_tensor(i, col_idx);
             const auto l_ij =
