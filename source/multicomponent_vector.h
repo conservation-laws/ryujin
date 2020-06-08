@@ -185,10 +185,10 @@ namespace ryujin
     Tensor tensor;
     unsigned int indices[VectorizedArray::size()];
     for (unsigned int k = 0; k < VectorizedArray::size(); ++k)
-      indices[k] = (i + k) * n_comp;
+      indices[k] = k * n_comp;
 
     dealii::vectorized_load_and_transpose(
-        n_comp, this->begin(), indices, &tensor[0]);
+        n_comp, this->begin() + i * n_comp, indices, &tensor[0]);
 
     return tensor;
   }
@@ -231,10 +231,10 @@ namespace ryujin
   {
     unsigned int indices[VectorizedArray::size()];
     for (unsigned int k = 0; k < VectorizedArray::size(); ++k)
-      indices[k] = (i + k) * n_comp;
+      indices[k] = k * n_comp;
 
     dealii::vectorized_transpose_and_store(
-        false, n_comp, &tensor[0], indices, this->begin());
+        false, n_comp, &tensor[0], indices, this->begin() + i * n_comp);
   }
 
 
