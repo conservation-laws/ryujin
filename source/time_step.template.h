@@ -812,8 +812,10 @@ namespace ryujin
         RYUJIN_PARALLEL_REGION_BEGIN
         LIKWID_MARKER_START(("time_step_" + step_no).c_str());
 
-        /* Parallel non-vectorized loop: */
+        /* Stored thread locally: */
+        AlignedVector<Number> lij_row_serial;
 
+        /* Parallel non-vectorized loop: */
         RYUJIN_OMP_FOR_NOWAIT
         for (unsigned int i = n_internal; i < n_owned; ++i) {
 
@@ -822,6 +824,8 @@ namespace ryujin
           if (row_length == 1)
             continue;
 
+          lij_row_serial.resize_fast(row_length);
+
           auto U_i_new = temp_euler_.get_tensor(i);
 
           const Number lambda = Number(1.) / Number(row_length - 1);
@@ -829,10 +833,14 @@ namespace ryujin
           for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
             auto p_ij = pij_matrix_.get_tensor(i, col_idx);
 
-            const auto l_ji = lij_matrix_.get_transposed_entry(i, col_idx);
-            const auto l_ij = std::min(lij_matrix_.get_entry(i, col_idx), l_ji);
+            const auto l_ij =
+                std::min(lij_matrix_.get_entry(i, col_idx),
+                         lij_matrix_.get_transposed_entry(i, col_idx));
 
             U_i_new += l_ij * lambda * p_ij;
+
+            if (!last_round)
+              lij_row_serial[col_idx] = l_ij;
           }
 
           /* In the last round */
@@ -890,25 +898,23 @@ namespace ryujin
               bounds_.template get_tensor<std::array<Number, 3>>(i);
 
           for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
+            const auto old_l_ij = lij_row_serial[col_idx];
+            const auto new_p_ij =
+                (Number(1.) - old_l_ij) * pij_matrix_.get_tensor(i, col_idx);
 
-            const auto l_ji = lij_matrix_.get_transposed_entry(i, col_idx);
-            const auto old_l_ij = std::min(lij_matrix_.get_entry(i, col_idx), l_ji);
-            auto p_ij = pij_matrix_.get_tensor(i, col_idx);
-            p_ij *= (1 - old_l_ij);
-            pij_matrix_.write_tensor(p_ij, i, col_idx);
+            const auto new_l_ij =
+                Limiter<dim, Number>::limit(bounds, U_i_new, new_p_ij);
 
-            const auto l_ij =
-                Limiter<dim, Number>::limit(bounds, U_i_new, p_ij);
-
-            lij_matrix_next_.write_entry(l_ij, i, col_idx);
-            pij_matrix_.write_tensor(p_ij, i, col_idx);
+            lij_matrix_next_.write_entry(new_l_ij, i, col_idx);
+            pij_matrix_.write_tensor(new_p_ij, i, col_idx);
           }
         } /* parallel non-vectorized loop */
 
+        /* Stored thread locally: */
+        AlignedVector<VectorizedArray<Number>> lij_row_simd;
         bool thread_ready = false;
 
         /* Parallel vectorized loop: */
-
         RYUJIN_OMP_FOR
         for (unsigned int i = 0; i < n_internal; i += simd_length) {
 
@@ -918,16 +924,20 @@ namespace ryujin
 
           const unsigned int row_length = sparsity_simd.row_length(i);
           const Number lambda = Number(1.) / Number(row_length - 1);
+          lij_row_simd.resize_fast(row_length);
 
           for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
 
-            VA l_ji = lij_matrix_.get_vectorized_transposed_entry(i, col_idx);
-            const auto l_ij =
-                std::min(lij_matrix_.get_vectorized_entry(i, col_idx), l_ji);
+            const auto l_ij = std::min(
+                lij_matrix_.get_vectorized_entry(i, col_idx),
+                lij_matrix_.get_vectorized_transposed_entry(i, col_idx));
 
             auto p_ij = pij_matrix_.get_vectorized_tensor(i, col_idx);
 
             U_i_new += l_ij * lambda * p_ij;
+
+            if (!last_round)
+              lij_row_simd[col_idx] = l_ij;
           }
 
 #ifdef CHECK_BOUNDS
@@ -961,17 +971,16 @@ namespace ryujin
               bounds_.template get_vectorized_tensor<std::array<VA, 3>>(i);
           for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
 
-            const auto l_ji =
-                lij_matrix_.get_vectorized_transposed_entry(i, col_idx);
-            const auto old_l_ij =
-                std::min(lij_matrix_.get_vectorized_entry(i, col_idx), l_ji);
-            auto p_ij = pij_matrix_.get_vectorized_tensor(i, col_idx);
-            p_ij *= (VA(1.) - old_l_ij);
+            const auto old_l_ij = lij_row_simd[col_idx];
 
-            const auto l_ij = Limiter<dim, VA>::limit(bounds, U_i_new, p_ij);
+            const auto new_p_ij = (VA(1.) - old_l_ij) *
+                                  pij_matrix_.get_vectorized_tensor(i, col_idx);
 
-            lij_matrix_next_.write_vectorized_entry(l_ij, i, col_idx, true);
-            pij_matrix_.write_vectorized_tensor(p_ij, i, col_idx);
+            const auto new_l_ij =
+                Limiter<dim, VA>::limit(bounds, U_i_new, new_p_ij);
+
+            lij_matrix_next_.write_vectorized_entry(new_l_ij, i, col_idx, true);
+            pij_matrix_.write_vectorized_tensor(new_p_ij, i, col_idx);
           }
         }
 
