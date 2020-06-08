@@ -146,13 +146,7 @@ namespace ryujin
       for (unsigned int i = 0; i < size_regular; i += simd_length) {
         using PD = ProblemDescription<dim, VectorizedArray<Number>>;
 
-        Tensor<1, problem_dimension, VectorizedArray<Number>> U_i;
-        unsigned int indices[VectorizedArray<Number>::size()];
-        for (unsigned int k = 0; k < VectorizedArray<Number>::size(); ++k)
-          indices[k] = (i + k) * problem_dimension;
-        vectorized_load_and_transpose(
-            problem_dimension, U.begin(), indices, &U_i[0]);
-
+        const auto U_i = U.get_vectorized_tensor(i);
         simd_store(specific_entropies_, PD::specific_entropy(U_i), i);
 
         const auto evc_entropy =
@@ -292,12 +286,7 @@ namespace ryujin
 
         synchronization_dispatch.check(thread_ready, i >= n_export_indices);
 
-        Tensor<1, problem_dimension, VectorizedArray<Number>> U_i;
-        unsigned int indices[VectorizedArray<Number>::size()];
-        for (unsigned int k = 0; k < VectorizedArray<Number>::size(); ++k)
-          indices[k] = (i + k) * problem_dimension;
-        vectorized_load_and_transpose(
-            problem_dimension, U.begin(), indices, &U_i[0]);
+        const auto U_i = U.get_vectorized_tensor(i);
         const auto entropy_i = simd_load(evc_entropies_, i);
 
         indicator_simd.reset(U_i, entropy_i);
@@ -319,14 +308,7 @@ namespace ryujin
               break;
             }
 
-          Tensor<1, problem_dimension, VectorizedArray<Number>> U_j;
-          {
-            unsigned int indices[VectorizedArray<Number>::size()];
-            for (unsigned int k = 0; k < VectorizedArray<Number>::size(); ++k)
-              indices[k] = js[k] * problem_dimension;
-            vectorized_load_and_transpose(
-                problem_dimension, U.begin(), indices, &U_j[0]);
-          }
+          const auto U_j = U.get_vectorized_tensor(js);
           const auto entropy_j = simd_load(evc_entropies_, js);
 
           const auto c_ij = cij_matrix.get_vectorized_tensor(i, col_idx);
@@ -463,7 +445,7 @@ namespace ryujin
       Scope scope(computing_timer_,
                   "time step 3 - l.-o. update, bounds, and r_i");
 
-      SynchronizationDispatch synchronization_dispatch([&]() {
+      SynchronizationDispatch synchronization_dispatch([&, n_passes]() {
         if constexpr (n_passes != 0) {
           r_.update_ghost_values_start(channel++);
         } else {
@@ -583,14 +565,7 @@ namespace ryujin
 
         synchronization_dispatch.check(thread_ready, i >= n_export_indices);
 
-        Tensor<1, problem_dimension, VectorizedArray<Number>> U_i;
-        {
-          unsigned int indices[VectorizedArray<Number>::size()];
-          for (unsigned int k = 0; k < VectorizedArray<Number>::size(); ++k)
-            indices[k] = (i + k) * problem_dimension;
-          vectorized_load_and_transpose(
-              problem_dimension, U.begin(), indices, &U_i[0]);
-        }
+        const auto U_i = U.get_vectorized_tensor(i);
         const auto f_i =
             ProblemDescription<dim, VectorizedArray<Number>>::f(U_i);
         auto U_i_new = U_i;
@@ -624,14 +599,7 @@ namespace ryujin
                                  ? d_ij * (alpha_i + alpha_j) * Number(.5)
                                  : d_ij * std::max(alpha_i, alpha_j);
 
-          Tensor<1, problem_dimension, VectorizedArray<Number>> U_j;
-          {
-            unsigned int indices[VectorizedArray<Number>::size()];
-            for (unsigned int k = 0; k < VectorizedArray<Number>::size(); ++k)
-              indices[k] = js[k] * problem_dimension;
-            vectorized_load_and_transpose(
-                problem_dimension, U.begin(), indices, &U_j[0]);
-          }
+          const auto U_j = U.get_vectorized_tensor(js);
 
           dealii::Tensor<1, problem_dimension, VectorizedArray<Number>>
               U_ij_bar;
@@ -689,9 +657,8 @@ namespace ryujin
     if constexpr (n_passes != 0) {
       Scope scope(computing_timer_, "time step 4 - compute p_ij, and l_ij");
 
-      SynchronizationDispatch synchronization_dispatch([&]() {
-        lij_matrix_.update_ghost_rows_start(channel++);
-      });
+      SynchronizationDispatch synchronization_dispatch(
+          [&]() { lij_matrix_.update_ghost_rows_start(channel++); });
 
       RYUJIN_PARALLEL_REGION_BEGIN
       LIKWID_MARKER_START("time_step_4");
@@ -761,33 +728,17 @@ namespace ryujin
 
         synchronization_dispatch.check(thread_ready, i >= n_export_indices);
 
-        std::array<VectorizedArray<Number>, 3> bounds;
-        {
-          unsigned int indices[VectorizedArray<Number>::size()];
-          for (unsigned int k = 0; k < VectorizedArray<Number>::size(); ++k)
-            indices[k] = (i + k) * 3;
-          vectorized_load_and_transpose(
-              3, bounds_.begin(), indices, &bounds[0]);
-        }
+        const auto bounds = bounds_.template get_vectorized_tensor<
+            std::array<VectorizedArray<Number>, 3>>(i);
 
         const auto m_i_inv = simd_load(lumped_mass_matrix_inverse, i);
 
         const unsigned int row_length = sparsity_simd.row_length(i);
         const VectorizedArray<Number> lambda_inv = Number(row_length - 1);
 
-        Tensor<1, problem_dimension, VectorizedArray<Number>> U_i_new, U_i;
-        Tensor<1, problem_dimension, VectorizedArray<Number>> r_i;
-        {
-          unsigned int indices[VectorizedArray<Number>::size()];
-          for (unsigned int k = 0; k < VectorizedArray<Number>::size(); ++k)
-            indices[k] = (i + k) * problem_dimension;
-          vectorized_load_and_transpose(
-              problem_dimension, temp_euler_.begin(), indices, &U_i_new[0]);
-          vectorized_load_and_transpose(
-              problem_dimension, U.begin(), indices, &U_i[0]);
-          vectorized_load_and_transpose(
-              problem_dimension, r_.begin(), indices, &r_i[0]);
-        }
+        const auto U_i_new = temp_euler_.get_vectorized_tensor(i);
+        const auto U_i = U.get_vectorized_tensor(i);
+        const auto r_i = r_.get_vectorized_tensor(i);
         const auto alpha_i = simd_load(alpha_, i);
 
         const unsigned int *js = sparsity_simd.columns(i);
@@ -815,16 +766,8 @@ namespace ryujin
                                           : VectorizedArray<Number>(0.)) -
                             m_ij * m_i_inv;
 
-          Tensor<1, problem_dimension, VectorizedArray<Number>> r_j, U_j;
-          {
-            unsigned int indices[VectorizedArray<Number>::size()];
-            for (unsigned int k = 0; k < VectorizedArray<Number>::size(); ++k)
-              indices[k] = js[k] * problem_dimension;
-            vectorized_load_and_transpose(
-                problem_dimension, r_.begin(), indices, &r_j[0]);
-            vectorized_load_and_transpose(
-                problem_dimension, U.begin(), indices, &U_j[0]);
-          }
+          const auto U_j = U.get_vectorized_tensor(js);
+          const auto r_j = r_.get_vectorized_tensor(js);
 
           const auto p_ij =
               tau * m_i_inv * lambda_inv *
@@ -972,14 +915,7 @@ namespace ryujin
 
           synchronization_dispatch.check(thread_ready, i >= n_export_indices);
 
-          Tensor<1, problem_dimension, VectorizedArray<Number>> U_i_new;
-          {
-            unsigned int indices[VectorizedArray<Number>::size()];
-            for (unsigned int k = 0; k < VectorizedArray<Number>::size(); ++k)
-              indices[k] = (i + k) * problem_dimension;
-            vectorized_load_and_transpose(
-                problem_dimension, temp_euler_.begin(), indices, &U_i_new[0]);
-          }
+          auto U_i_new = temp_euler_.get_vectorized_tensor(i);
 
           const unsigned int row_length = sparsity_simd.row_length(i);
           const Number lambda = Number(1.) / Number(row_length - 1);
@@ -1023,14 +959,8 @@ namespace ryujin
           if (pass + 1 == n_passes)
             continue;
 
-          std::array<VectorizedArray<Number>, 3> bounds;
-          {
-            unsigned int indices[VectorizedArray<Number>::size()];
-            for (unsigned int k = 0; k < VectorizedArray<Number>::size(); ++k)
-              indices[k] = (i + k) * 3;
-            vectorized_load_and_transpose(
-                3, bounds_.begin(), indices, &bounds[0]);
-          }
+          const auto bounds = bounds_.template get_vectorized_tensor<
+              std::array<VectorizedArray<Number>, 3>>(i);
           for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
 
             const auto p_ij = pij_matrix_.get_vectorized_tensor(i, col_idx);
