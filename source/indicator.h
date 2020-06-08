@@ -205,7 +205,7 @@ namespace ryujin
       const auto f_j = ProblemDescription<dim, Number>::f(U_j);
       const auto eta_j = entropy_j;
 
-      left += (eta_j * rho_j_inverse - eta_i * rho_i_inverse) * m_j * c_ij;
+      left += (eta_j * rho_j_inverse - eta_i * rho_i_inverse) * (m_j * c_ij);
       for (unsigned int k = 0; k < problem_dimension; ++k)
         right[k] += (f_j[k] - f_i[k]) * c_ij;
     }
