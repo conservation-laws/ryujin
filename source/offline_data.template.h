@@ -58,10 +58,10 @@ namespace ryujin
     // FIXME: Cuthill McKee isn't particularly useful...
     DoFRenumbering::Cuthill_McKee(dof_handler_);
 
+#ifdef USE_COMMUNICATION_HIDING
 #ifdef DEBUG
     const unsigned int n_export_indices_preliminary =
 #endif
-#ifdef USE_COMMUNICATION_HIDING
         DoFRenumbering::export_indices_first(dof_handler_, mpi_communicator_);
 #endif
 
