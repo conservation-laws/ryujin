@@ -9,6 +9,7 @@
 #include "simd.h"
 
 #include <deal.II/base/partitioner.h>
+#include <deal.II/base/vectorization.h>
 #include <deal.II/lac/la_parallel_vector.h>
 
 namespace ryujin
@@ -186,7 +187,8 @@ namespace ryujin
     for (unsigned int k = 0; k < VectorizedArray::size(); ++k)
       indices[k] = (i + k) * n_comp;
 
-    vectorized_load_and_transpose(n_comp, this->begin(), indices, &tensor[0]);
+    dealii::vectorized_load_and_transpose(
+        n_comp, this->begin(), indices, &tensor[0]);
 
     return tensor;
   }
@@ -203,7 +205,8 @@ namespace ryujin
     for (unsigned int k = 0; k < VectorizedArray::size(); ++k)
       indices[k] = js[k] * n_comp;
 
-    vectorized_load_and_transpose(n_comp, this->begin(), indices, &tensor[0]);
+    dealii::vectorized_load_and_transpose(
+        n_comp, this->begin(), indices, &tensor[0]);
 
     return tensor;
   }
@@ -230,7 +233,7 @@ namespace ryujin
     for (unsigned int k = 0; k < VectorizedArray::size(); ++k)
       indices[k] = (i + k) * n_comp;
 
-    vectorized_transpose_and_store(
+    dealii::vectorized_transpose_and_store(
         false, n_comp, &tensor[0], indices, this->begin());
   }
 

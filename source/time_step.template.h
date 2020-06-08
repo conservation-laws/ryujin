@@ -164,9 +164,7 @@ namespace ryujin
       }
 
       for (unsigned int i = size_regular; i < n_relevant; ++i) {
-        Tensor<1, problem_dimension, Number> U_i;
-        for (unsigned int d = 0; d < problem_dimension; ++d)
-          U_i[d] = U.local_element(i * problem_dimension + d);
+        const auto U_i = U.get_tensor(i);
 
         specific_entropies_.local_element(i) =
             ProblemDescription<dim, Number>::specific_entropy(U_i);
@@ -230,9 +228,7 @@ namespace ryujin
         if (row_length == 1)
           continue;
 
-        Tensor<1, problem_dimension, Number> U_i;
-        for (unsigned int d = 0; d < problem_dimension; ++d)
-          U_i[d] = U.local_element(i * problem_dimension + d);
+        const auto U_i = U.get_tensor(i);
         const Number mass = lumped_mass_matrix.local_element(i);
         const Number hd_i = mass * measure_of_omega_inverse;
 
@@ -243,9 +239,7 @@ namespace ryujin
         for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
           const unsigned int j = js[col_idx];
 
-          Tensor<1, problem_dimension, Number> U_j;
-          for (unsigned int d = 0; d < problem_dimension; ++d)
-            U_j[d] = U.local_element(j * problem_dimension + d);
+          const auto U_j = U.get_tensor(j);
 
           const auto c_ij = cij_matrix.get_tensor(i, col_idx);
           const auto beta_ij = betaij_matrix.get_entry(i, col_idx);
@@ -494,9 +488,7 @@ namespace ryujin
         if (row_length == 1)
           continue;
 
-        Tensor<1, problem_dimension, Number> U_i;
-        for (unsigned int d = 0; d < problem_dimension; ++d)
-          U_i[d] = U.local_element(i * problem_dimension + d);
+        const auto U_i = U.get_tensor(i);
         const auto f_i = ProblemDescription<dim, Number>::f(U_i);
         auto U_i_new = U_i;
         const auto alpha_i = alpha_.local_element(i);
@@ -515,9 +507,7 @@ namespace ryujin
         for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
           const auto j = js[col_idx];
 
-          Tensor<1, problem_dimension, Number> U_j;
-          for (unsigned int d = 0; d < problem_dimension; ++d)
-            U_j[d] = U.local_element(j * problem_dimension + d);
+          const auto U_j = U.get_tensor(j);
           const auto alpha_j = alpha_.local_element(j);
           const auto variations_j = second_variations_.local_element(j);
 
@@ -716,33 +706,28 @@ namespace ryujin
         if (row_length == 1)
           continue;
 
-        std::array<Number, 3> bounds;
-        for (unsigned int d = 0; d < 3; ++d)
-          bounds[d] = bounds_.local_element(i * 3 + d);
-        Tensor<1, problem_dimension, Number> U_i_new;
-        for (unsigned int d = 0; d < problem_dimension; ++d)
-          U_i_new[d] = temp_euler_.local_element(i * problem_dimension + d);
-        Tensor<1, problem_dimension, Number> U_i;
-        for (unsigned int d = 0; d < problem_dimension; ++d)
-          U_i[d] = U.local_element(i * problem_dimension + d);
+        const auto bounds =
+            bounds_.template get_tensor<std::array<Number, 3>>(i);
 
-        const Number m_i_inv = lumped_mass_matrix_inverse.local_element(i);
-        const Number lambda_inv = Number(row_length - 1);
+        const auto U_i_new = temp_euler_.get_tensor(i);
+        const auto U_i = U.get_tensor(i);
+        const auto r_i = r_.get_tensor(i);
+
         const auto alpha_i = alpha_.local_element(i);
-
-        Tensor<1, problem_dimension, Number> r_i;
-        for (unsigned int d = 0; d < problem_dimension; ++d)
-          r_i[d] = r_.local_element(i * problem_dimension + d);
+        const Number m_i_inv = lumped_mass_matrix_inverse.local_element(i);
 
         const unsigned int *js = sparsity_simd.columns(i);
+        const Number lambda_inv = Number(row_length - 1);
+
         for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
           const auto j = js[col_idx];
-          const Number m_j_inv = lumped_mass_matrix_inverse.local_element(j);
 
-          Tensor<1, problem_dimension, Number> U_j;
-          for (unsigned int d = 0; d < problem_dimension; ++d)
-            U_j[d] = U.local_element(j * problem_dimension + d);
+          const auto U_j = U.get_tensor(j);
+
+          const auto r_j = r_.get_tensor(j);
+
           const auto alpha_j = alpha_.local_element(j);
+          const Number m_j_inv = lumped_mass_matrix_inverse.local_element(j);
 
           const auto d_ij = dij_matrix_.get_entry(i, col_idx);
           const auto d_ijH = Indicator<dim, Number>::indicator_ ==
@@ -756,10 +741,6 @@ namespace ryujin
               (col_idx == 0 ? Number(1.) : Number(0.)) - m_ij * m_j_inv;
           const auto b_ji =
               (col_idx == 0 ? Number(1.) : Number(0.)) - m_ij * m_i_inv;
-
-          Tensor<1, problem_dimension, Number> r_j;
-          for (unsigned int d = 0; d < problem_dimension; ++d)
-            r_j[d] = r_.local_element(j * problem_dimension + d);
 
           const auto p_ij =
               tau * m_i_inv * lambda_inv *
@@ -905,9 +886,7 @@ namespace ryujin
           if (row_length == 1)
             continue;
 
-          Tensor<1, problem_dimension, Number> U_i_new;
-          for (unsigned int d = 0; d < problem_dimension; ++d)
-            U_i_new[d] = temp_euler_.local_element(i * problem_dimension + d);
+          auto U_i_new = temp_euler_.get_tensor(i);
 
           const Number lambda = Number(1.) / Number(row_length - 1);
 
