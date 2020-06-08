@@ -104,10 +104,11 @@ namespace ryujin
 
     CALLGRIND_START_INSTRUMENTATION
 
+    using VA = VectorizedArray<Number>;
+
     /* Index ranges for the iteration over the sparsity pattern : */
 
-    constexpr auto simd_length = VectorizedArray<Number>::size();
-
+    constexpr auto simd_length = VA::size();
     const unsigned int n_export_indices = offline_data_->n_export_indices();
     const unsigned int n_internal = offline_data_->n_locally_internal();
     const unsigned int n_owned = offline_data_->n_locally_owned();
@@ -144,7 +145,7 @@ namespace ryujin
 
       RYUJIN_OMP_FOR
       for (unsigned int i = 0; i < size_regular; i += simd_length) {
-        using PD = ProblemDescription<dim, VectorizedArray<Number>>;
+        using PD = ProblemDescription<dim, VA>;
 
         const auto U_i = U.get_vectorized_tensor(i);
         simd_store(specific_entropies_, PD::specific_entropy(U_i), i);
@@ -277,7 +278,7 @@ namespace ryujin
       } /* parallel non-vectorized loop */
 
       /* Stored thread locally: */
-      Indicator<dim, VectorizedArray<Number>> indicator_simd;
+      Indicator<dim, VA> indicator_simd;
       bool thread_ready = false;
 
       /* Parallel SIMD loop: */
@@ -323,8 +324,7 @@ namespace ryujin
           const auto n_ij = c_ij / norm;
 
           const auto [lambda_max, p_star, n_iterations] =
-              RiemannSolver<dim, VectorizedArray<Number>>::compute(
-                  U_i, U_j, n_ij, hd_i);
+              RiemannSolver<dim, VA>::compute(U_i, U_j, n_ij, hd_i);
 
           const auto d = norm * lambda_max;
 
@@ -555,7 +555,7 @@ namespace ryujin
       } /* parallel non-vectorized loop */
 
       /* Nota bene: This bounds variable is thread local: */
-      Limiter<dim, VectorizedArray<Number>> limiter_simd;
+      Limiter<dim, VA> limiter_simd;
       bool thread_ready = false;
 
       /* Parallel SIMD loop: */
@@ -566,8 +566,7 @@ namespace ryujin
         synchronization_dispatch.check(thread_ready, i >= n_export_indices);
 
         const auto U_i = U.get_vectorized_tensor(i);
-        const auto f_i =
-            ProblemDescription<dim, VectorizedArray<Number>>::f(U_i);
+        const auto f_i = ProblemDescription<dim, VA>::f(U_i);
         auto U_i_new = U_i;
         const auto alpha_i = simd_load(alpha_, i);
         const auto variations_i = simd_load(second_variations_, i);
@@ -575,7 +574,7 @@ namespace ryujin
         const auto m_i = simd_load(lumped_mass_matrix, i);
         const auto m_i_inv = simd_load(lumped_mass_matrix_inverse, i);
 
-        using PD = ProblemDescription<dim, VectorizedArray<Number>>;
+        using PD = ProblemDescription<dim, VA>;
         typename PD::rank1_type r_i;
 
         /* Clear bounds: */
@@ -601,13 +600,11 @@ namespace ryujin
 
           const auto U_j = U.get_vectorized_tensor(js);
 
-          dealii::Tensor<1, problem_dimension, VectorizedArray<Number>>
-              U_ij_bar;
+          dealii::Tensor<1, problem_dimension, VA> U_ij_bar;
           const auto c_ij = cij_matrix.get_vectorized_tensor(i, col_idx);
           const auto d_ij_inv = Number(1.) / d_ij;
 
-          const auto f_j =
-              ProblemDescription<dim, VectorizedArray<Number>>::f(U_j);
+          const auto f_j = ProblemDescription<dim, VA>::f(U_j);
           for (unsigned int k = 0; k < problem_dimension; ++k) {
             const auto temp = (f_j[k] - f_i[k]) * c_ij;
 
@@ -728,13 +725,13 @@ namespace ryujin
 
         synchronization_dispatch.check(thread_ready, i >= n_export_indices);
 
-        const auto bounds = bounds_.template get_vectorized_tensor<
-            std::array<VectorizedArray<Number>, 3>>(i);
+        const auto bounds =
+            bounds_.template get_vectorized_tensor<std::array<VA, 3>>(i);
 
         const auto m_i_inv = simd_load(lumped_mass_matrix_inverse, i);
 
         const unsigned int row_length = sparsity_simd.row_length(i);
-        const VectorizedArray<Number> lambda_inv = Number(row_length - 1);
+        const VA lambda_inv = Number(row_length - 1);
 
         const auto U_i_new = temp_euler_.get_vectorized_tensor(i);
         const auto U_i = U.get_vectorized_tensor(i);
@@ -759,12 +756,8 @@ namespace ryujin
                                  : d_ij * std::max(alpha_i, alpha_j);
 
           const auto m_ij = mass_matrix.get_vectorized_entry(i, col_idx);
-          const auto b_ij = (col_idx == 0 ? VectorizedArray<Number>(1.)
-                                          : VectorizedArray<Number>(0.)) -
-                            m_ij * m_j_inv;
-          const auto b_ji = (col_idx == 0 ? VectorizedArray<Number>(1.)
-                                          : VectorizedArray<Number>(0.)) -
-                            m_ij * m_i_inv;
+          const auto b_ij = (col_idx == 0 ? VA(1.) : VA(0.)) - m_ij * m_j_inv;
+          const auto b_ji = (col_idx == 0 ? VA(1.) : VA(0.)) - m_ij * m_i_inv;
 
           const auto U_j = U.get_vectorized_tensor(js);
           const auto r_j = r_.get_vectorized_tensor(js);
@@ -774,8 +767,7 @@ namespace ryujin
               ((d_ijH - d_ij) * (U_j - U_i) + b_ij * r_j - b_ji * r_i);
           pij_matrix_.write_vectorized_tensor(p_ij, i, col_idx, true);
 
-          const auto l_ij = Limiter<dim, VectorizedArray<Number>>::limit(
-              bounds, U_i_new, p_ij);
+          const auto l_ij = Limiter<dim, VA>::limit(bounds, U_i_new, p_ij);
 
           lij_matrix_.write_vectorized_entry(l_ij, i, col_idx, true);
         }
@@ -803,6 +795,7 @@ namespace ryujin
 
       std::string step_no = std::to_string(5 + pass);
       std::string additional_step = pass + 1 < n_passes ? ", next l_ij" : "";
+      bool last_round = (pass + 1 == n_passes);
 
       {
         Scope scope(computing_timer_,
@@ -810,7 +803,7 @@ namespace ryujin
                         "symmetrize l_ij, h.-o. update" + additional_step);
 
         SynchronizationDispatch synchronization_dispatch([&]() {
-          if (pass + 1 == n_passes)
+          if (last_round)
             temp_euler_.update_ghost_values_start(channel++);
           else
             lij_matrix_next_.update_ghost_rows_start(channel++);
@@ -842,32 +835,12 @@ namespace ryujin
             U_i_new += l_ij * lambda * p_ij;
             p_ij *= (1 - l_ij);
 
-            if (pass + 1 < n_passes)
+            if (!last_round)
               pij_matrix_.write_tensor(p_ij, i, col_idx);
           }
 
-#ifdef CHECK_BOUNDS
-          const auto rho_new = U_i_new[0];
-          const auto e_new =
-              ProblemDescription<dim, Number>::internal_energy(U_i_new);
-          const auto s_new =
-              ProblemDescription<dim, Number>::specific_entropy(U_i_new);
-
-          AssertThrowSIMD(rho_new,
-                          [](auto val) { return val > Number(0.); },
-                          dealii::ExcMessage("Negative density."));
-
-          AssertThrowSIMD(e_new,
-                          [](auto val) { return val > Number(0.); },
-                          dealii::ExcMessage("Negative internal energy."));
-
-          AssertThrowSIMD(s_new,
-                          [](auto val) { return val > Number(0.); },
-                          dealii::ExcMessage("Negative specific entropy."));
-#endif
-
           /* In the last round */
-          if (pass + 1 == n_passes) {
+          if (last_round) {
             /* Fix up boundary: */
             const auto it = boundary_map.find(i);
             if (it != boundary_map.end()) {
@@ -886,14 +859,36 @@ namespace ryujin
                 U_i_new = initial_values_->initial_state(position, t + tau);
               }
             }
-
-            temp_euler_.write_tensor(U_i_new, i);
-
-            /* Skip computing new l_ij */
-            continue;
           }
 
+#ifdef CHECK_BOUNDS
+          const auto rho_new = U_i_new[0];
+          const auto e_new =
+              ProblemDescription<dim, Number>::internal_energy(U_i_new);
+          const auto s_new =
+              ProblemDescription<dim, Number>::specific_entropy(U_i_new);
+
+          AssertThrowSIMD(
+              rho_new,
+              [](auto val) { return val > Number(0.); },
+              dealii::ExcMessage("Negative density."));
+
+          AssertThrowSIMD(
+              e_new,
+              [](auto val) { return val > Number(0.); },
+              dealii::ExcMessage("Negative internal energy."));
+
+          AssertThrowSIMD(
+              s_new,
+              [](auto val) { return val > Number(0.); },
+              dealii::ExcMessage("Negative specific entropy."));
+#endif
+
           temp_euler_.write_tensor(U_i_new, i);
+
+          /* Skip computating l_ij and updating p_ij in the last round */
+          if (last_round)
+            continue;
 
           const auto bounds =
               bounds_.template get_tensor<std::array<Number, 3>>(i);
@@ -922,51 +917,53 @@ namespace ryujin
 
           for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
 
-            VectorizedArray<Number> l_ji =
-                lij_matrix_.get_vectorized_transposed_entry(i, col_idx);
+            VA l_ji = lij_matrix_.get_vectorized_transposed_entry(i, col_idx);
             const auto l_ij =
                 std::min(lij_matrix_.get_vectorized_entry(i, col_idx), l_ji);
 
             auto p_ij = pij_matrix_.get_vectorized_tensor(i, col_idx);
 
             U_i_new += l_ij * lambda * p_ij;
-            p_ij *= (VectorizedArray<Number>(1.) - l_ij);
+            p_ij *= (VA(1.) - l_ij);
 
-            if (pass + 1 < n_passes)
+            if (!last_round)
               pij_matrix_.write_vectorized_tensor(p_ij, i, col_idx);
           }
 
 #ifdef CHECK_BOUNDS
-          using PD = ProblemDescription<dim, VectorizedArray<Number>>;
+          using PD = ProblemDescription<dim, VA>;
           const auto rho_new = U_i_new[0];
           const auto e_new = PD::internal_energy(U_i_new);
           const auto s_new = PD::specific_entropy(U_i_new);
 
-          AssertThrowSIMD(rho_new,
-                          [](auto val) { return val > Number(0.); },
-                          dealii::ExcMessage("Negative density."));
+          AssertThrowSIMD(
+              rho_new,
+              [](auto val) { return val > Number(0.); },
+              dealii::ExcMessage("Negative density."));
 
-          AssertThrowSIMD(e_new,
-                          [](auto val) { return val > Number(0.); },
-                          dealii::ExcMessage("Negative internal energy."));
+          AssertThrowSIMD(
+              e_new,
+              [](auto val) { return val > Number(0.); },
+              dealii::ExcMessage("Negative internal energy."));
 
-          AssertThrowSIMD(s_new,
-                          [](auto val) { return val > Number(0.); },
-                          dealii::ExcMessage("Negative specific entropy."));
+          AssertThrowSIMD(
+              s_new,
+              [](auto val) { return val > Number(0.); },
+              dealii::ExcMessage("Negative specific entropy."));
 #endif
           temp_euler_.write_vectorized_tensor(U_i_new, i);
 
-          if (pass + 1 == n_passes)
+          /* Skip computating l_ij and updating p_ij in the last round */
+          if (last_round)
             continue;
 
-          const auto bounds = bounds_.template get_vectorized_tensor<
-              std::array<VectorizedArray<Number>, 3>>(i);
+          const auto bounds =
+              bounds_.template get_vectorized_tensor<std::array<VA, 3>>(i);
           for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
 
             const auto p_ij = pij_matrix_.get_vectorized_tensor(i, col_idx);
 
-            const auto l_ij = Limiter<dim, VectorizedArray<Number>>::limit(
-                bounds, U_i_new, p_ij);
+            const auto l_ij = Limiter<dim, VA>::limit(bounds, U_i_new, p_ij);
 
             lij_matrix_next_.write_vectorized_entry(l_ij, i, col_idx, true);
           }
@@ -980,7 +977,7 @@ namespace ryujin
         Scope scope(computing_timer_,
                     "time step " + step_no + " - synchronization");
 
-        if (pass + 1 == n_passes)
+        if (last_round)
           temp_euler_.update_ghost_values_finish();
         else {
           lij_matrix_next_.update_ghost_rows_finish();
