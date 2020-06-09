@@ -78,14 +78,19 @@ namespace ryujin
 
     row_starts.resize_fast(sparsity.n_rows() + 1);
     column_indices.resize_fast(sparsity.n_nonzero_elements());
-    column_indices_transposed.resize_fast(sparsity.n_nonzero_elements());
+    indices_transposed.resize_fast(sparsity.n_nonzero_elements());
+    AssertThrow(sparsity.n_nonzero_elements() <
+                    std::numeric_limits<unsigned int>::max(),
+                dealii::ExcMessage("Transposed indices only support up to 4 "
+                                   "billion matrix entries per MPI rank. Try to"
+                                   " split into smaller problems with MPI"));
 
     /* Vectorized part: */
 
     row_starts[0] = 0;
 
     unsigned int *col_ptr = column_indices.data();
-    unsigned int *transposed_ptr = column_indices_transposed.data();
+    unsigned int *transposed_ptr = indices_transposed.data();
 
     for (unsigned int i = 0; i < n_internal_dofs; i += simd_length) {
       auto jts = generate_iterators<simd_length>(
@@ -93,8 +98,19 @@ namespace ryujin
 
       for (; jts[0] != sparsity.end(i); increment_iterators(jts))
         for (unsigned int k = 0; k < simd_length; ++k) {
-          *col_ptr++ = jts[k]->column();
-          *transposed_ptr++ = sparsity.row_position(jts[k]->column(), i + k);
+          const unsigned int column = jts[k]->column();
+          *col_ptr++ = column;
+          const std::size_t position = sparsity(column, i + k);
+          if (column < n_internal_dofs) {
+            const unsigned int my_row_length = sparsity.row_length(column);
+            const std::size_t position_diag = sparsity(column, column);
+            const std::size_t pos_within_row = position - position_diag;
+            const unsigned int simd_offset = column % simd_length;
+            *transposed_ptr++ = position - simd_offset * my_row_length -
+                                pos_within_row + simd_offset +
+                                pos_within_row * simd_length;
+          } else
+            *transposed_ptr++ = position;
         }
 
       row_starts[i / simd_length + 1] = col_ptr - column_indices.data();
@@ -106,8 +122,19 @@ namespace ryujin
 
     for (unsigned int i = n_internal_dofs; i < sparsity.n_rows(); ++i) {
       for (auto j = sparsity.begin(i); j != sparsity.end(i); ++j) {
-        *col_ptr++ = j->column();
-        *transposed_ptr++ = sparsity.row_position(j->column(), i);
+        const unsigned int column = j->column();
+        *col_ptr++ = column;
+        const std::size_t position = sparsity(column, i);
+        if (column < n_internal_dofs) {
+          const unsigned int my_row_length = sparsity.row_length(column);
+          const std::size_t position_diag = sparsity(column, column);
+          const std::size_t pos_within_row = position - position_diag;
+          const unsigned int simd_offset = column % simd_length;
+          *transposed_ptr++ = position - simd_offset * my_row_length -
+                              pos_within_row + simd_offset +
+                              pos_within_row * simd_length;
+        } else
+          *transposed_ptr++ = position;
       }
       row_starts[i + 1] = col_ptr - column_indices.data();
     }

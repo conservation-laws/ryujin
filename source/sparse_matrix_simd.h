@@ -76,7 +76,7 @@ namespace ryujin
 
     dealii::AlignedVector<std::size_t> row_starts;
     dealii::AlignedVector<unsigned int> column_indices;
-    dealii::AlignedVector<unsigned int> column_indices_transposed;
+    dealii::AlignedVector<unsigned int> indices_transposed;
 
     dealii::AlignedVector<std::size_t> indices_to_be_sent;
     std::vector<std::pair<unsigned int, unsigned int>> send_targets;
@@ -344,24 +344,49 @@ namespace ryujin
     AssertIndexRange(row, sparsity->row_starts.size() - 1);
     AssertIndexRange(position_within_column, sparsity->row_length(row));
 
-    const unsigned int my_rowstart =
-        row < sparsity->n_internal_dofs
-            ? sparsity->row_starts[row / simd_length] + row % simd_length
-            : sparsity->row_starts[row];
-    const unsigned int my_rowstride =
-        row < sparsity->n_internal_dofs ? simd_length : 1;
-    const unsigned int col =
-        row < sparsity->n_internal_dofs
-            ? sparsity->column_indices[my_rowstart +
-                                       position_within_column * simd_length]
-            : sparsity->column_indices[my_rowstart + position_within_column];
-
-    const unsigned int position_within_transposed_column =
-        sparsity
-            ->column_indices_transposed[my_rowstart +
-                                        position_within_column * my_rowstride];
-
-    return get_tensor(col, position_within_transposed_column);
+    dealii::Tensor<1, n_components, Number> result;
+    if (row < sparsity->n_internal_dofs) {
+      // go through vectorized part
+      const unsigned int simd_row = row / simd_length;
+      const unsigned int simd_offset = row % simd_length;
+      const std::size_t index =
+          sparsity->indices_transposed[sparsity->row_starts[simd_row] +
+                                       simd_offset +
+                                       position_within_column * simd_length];
+      if (n_components > 1) {
+        const unsigned int col =
+            sparsity
+                ->column_indices[sparsity->row_starts[simd_row] + simd_offset +
+                                 position_within_column * simd_length];
+        if (col < sparsity->n_internal_dofs)
+          for (unsigned int d = 0; d < n_components; ++d)
+            result[d] = data[index / simd_length * simd_length * n_components +
+                             simd_length * d + index % simd_length];
+        else
+          for (unsigned int d = 0; d < n_components; ++d)
+            result[d] = data[index * n_components + d];
+      } else
+        result[0] = data[index];
+    } else {
+      // go through standard part
+      const std::size_t index =
+          sparsity->indices_transposed[sparsity->row_starts[row] +
+                                       position_within_column];
+      if (n_components > 1) {
+        const unsigned int col =
+            sparsity->column_indices[sparsity->row_starts[row] +
+                                     position_within_column];
+        if (col < sparsity->n_internal_dofs)
+          for (unsigned int d = 0; d < n_components; ++d)
+            result[d] = data[index / simd_length * simd_length * n_components +
+                             simd_length * d + index % simd_length];
+        else
+          for (unsigned int d = 0; d < n_components; ++d)
+            result[d] = data[index * n_components + d];
+      } else
+        result[0] = data[index];
+    }
+    return result;
   }
 
 
@@ -383,24 +408,10 @@ namespace ryujin
            dealii::ExcMessage(
                "Access only supported for rows at the SIMD granularity"));
 
-    dealii::VectorizedArray<Number, simd_length> result = {};
-    for (unsigned int k = 0; k < simd_length; ++k) {
-      const unsigned int col =
-          sparsity->column_indices[sparsity->row_starts[row / simd_length] +
-                                   position_within_column * simd_length + k];
-      if (col < sparsity->n_internal_dofs)
-        result[k] = data[sparsity->row_starts[col / simd_length] +
-                         sparsity->column_indices_transposed
-                                 [sparsity->row_starts[row / simd_length] +
-                                  position_within_column * simd_length + k] *
-                             simd_length +
-                         col % simd_length];
-      else
-        result[k] = data[sparsity->row_starts[col] +
-                         sparsity->column_indices_transposed
-                             [sparsity->row_starts[row / simd_length] +
-                              position_within_column * simd_length + k]];
-    }
+    const unsigned int offset = sparsity->row_starts[row / simd_length] +
+                                position_within_column * simd_length;
+    dealii::VectorizedArray<Number, simd_length> result;
+    result.gather(data.data(), sparsity->indices_transposed.data() + offset);
     return result;
   }
 
