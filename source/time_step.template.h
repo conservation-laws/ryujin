@@ -640,7 +640,12 @@ namespace ryujin
       Scope scope(computing_timer_, "time step 3 - synchronization");
 
       if constexpr (n_passes != 0) {
+      }
+      if (n_passes != 0) {
         r_.update_ghost_values_finish();
+      } else {
+        /* If we do not do high-order, synchronize at this point: */
+        temp_euler_.update_ghost_values_finish();
       }
     }
 
@@ -777,7 +782,7 @@ namespace ryujin
       RYUJIN_PARALLEL_REGION_END
     }
 
-    {
+    if constexpr (n_passes != 0) {
       Scope scope(computing_timer_, "time step 4 - synchronization");
 
       lij_matrix_.update_ghost_rows_finish();
