@@ -672,9 +672,12 @@ namespace ryujin
       stream << std::setprecision(2) << std::fixed << std::setw(8)
              << wall_time.avg << "s [sk: " << std::setprecision(1)
              << std::setw(5) << std::fixed
+             << 100. * (wall_time.min - wall_time.avg) / wall_time.avg << "%/"
+             << std::setw(4) << std::fixed
              << 100. * (wall_time.max - wall_time.avg) / wall_time.avg << "%]";
       unsigned int n = dealii::Utilities::needed_digits(n_mpi_processes);
-      stream << " [p" << std::setw(n) << wall_time.max_index << "]";
+      stream << " [p" << std::setw(n) << wall_time.min_index << "/"
+             << wall_time.max_index << "]";
     };
 
     const auto cpu_time_statistics = Utilities::MPI::min_max_avg(
@@ -692,12 +695,6 @@ namespace ryujin
           if (percentage)
             stream << "(" << std::setprecision(1) << std::setw(4)
                    << 100. * cpu_time.sum / total_cpu_time << "%)";
-          else
-            stream << "       ";
-
-          stream << " [sk: " << std::setprecision(1) << std::setw(5)
-                 << std::fixed
-                 << 100. * (cpu_time.max - cpu_time.avg) / cpu_time.avg << "%]";
         };
 
     auto jt = output.begin();
