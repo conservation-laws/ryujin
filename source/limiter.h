@@ -18,62 +18,183 @@
 
 namespace ryujin
 {
-
+  /**
+   * The convex limiter.
+   *
+   * The class implements a convex limiting technique as described in @cite
+   * GuermondEtAl2018 and @cite KronbichlerMaier2020. Given a computed set
+   * of bounds and an update direction \f$\mathbf P_{ij}\f$ one can now
+   * determine a candidate \f$\tilde l_{ij}\f$ by computing
+   *
+   * \f{align}
+   *   \tilde l_{ij} = \max_{l\,\in\,[0,1]}
+   *   \,\Big\{\rho_{\text{min}}\,\le\,\rho\,(\mathbf U_i +\tilde l_{ij}\mathbf P_{ij})
+   *   \,\le\,\rho_{\text{max}},\quad
+   *   \phi_{\text{min}}\,\le\,\phi\,(\mathbf U_{i}+\tilde l_{ij}\mathbf P_{ij})\Big\},
+   * \f}
+   *
+   * where $\psi$ denots the specific entropy @cite KronbichlerMaier2020.
+   *
+   * Algorithmically this is accomplished as follows: Given an initial
+   * interval \f$[t_L,t_R]\f$, where \f$t_L\f$ is a good state, we first
+   * make the interval smaller ensuring the bounds on the density are
+   * fulfilled. If limiting on the specific entropy is selected we then
+   * then perform a quadratic Newton iteration (updating \f$[t_L,t_R]\f$
+   * solving for the root of a 3-convex function
+   * \f{align}
+   *     \Psi(\mathbf U)\;=\;\rho^{\gamma+1}(\mathbf U)\,\big(\phi(\mathbf U)-\phi_{\text{min}}\big).
+   * \f}
+   *
+   * @todo document local entropy inequality condition.
+   *
+   * @ingroup EulerStep
+   */
   template <int dim, typename Number = double>
   class Limiter
   {
   public:
-    static constexpr unsigned int problem_dimension =
-        ProblemDescription<dim, Number>::problem_dimension;
+    /**
+     * @copydoc ProblemDescription::problem_dimension
+     */
+    // clang-format off
+    static constexpr unsigned int problem_dimension = ProblemDescription<dim, Number>::problem_dimension;
+    // clang-format on
 
-    using ScalarNumber = typename get_value_type<Number>::type;
-
+    /**
+     * @copydoc ProblemDescription::rank1_type
+     */
     using rank1_type = typename ProblemDescription<dim, Number>::rank1_type;
 
-    static constexpr unsigned int n_bounds = 3;
-    using Bounds = std::array<Number, n_bounds>;
+    /**
+     * @copydoc ProblemDescription::ScalarNumber
+     */
+    using ScalarNumber = typename get_value_type<Number>::type;
 
+    /**
+     * An enum describing the thermodynamical quantities for which the
+     * invariant domain property is enforced by the limiter.
+     */
+    enum class Limiters {
+      /** Do not limit and accept full high-order update. */
+      none,
+      /** Enforce local bounds on density. */
+      rho,
+      /** Enforce local bounds on density and specific entropy. */
+      specific_entropy,
+      /**
+       * Enforce local bounds on density, specific entropy and enforce an
+       * entropy inequality using the Harten-type inequality
+       * ProblemDescription::harten_entropy().
+       */
+      entropy_inequality
+    };
+
+    /**
+     * Constructor.
+     */
     Limiter();
 
-    /*
-     * Options:
+    /**
+     * @name Limiter compile time options
      */
+    //@{
 
-    static constexpr enum class Limiters {
-      none,
-      rho,
-      specific_entropy,
-      entropy_inequality
-    } limiter_ = LIMITER;
+    // clang-format off
+    /**
+     * Selected final limiting stage.
+     * @ingroup CompileTimeOptions
+     */
+    static constexpr Limiters limiter_ = LIMITER;
 
+    /**
+     * Relax accumulated limiter bounds.
+     * @ingroup CompileTimeOptions
+     */
     static constexpr bool relax_bounds_ = LIMITER_RELAX_BOUNDS;
 
+    /**
+     * Order of mesh-size dependent coefficient in relaxation window.
+     * @ingroup CompileTimeOptions
+     */
     static constexpr unsigned int relaxation_order_ = LIMITER_RELAXATION_ORDER;
 
-    /*
-     * Accumulate bounds:
+    // clang-format on
+
+    //@}
+    /**
+     * @name Stencil-based accumulations of bounds
+     *
+     * Intended usage:
+     * ```
+     * Limiter<dim, Number> limiter;
+     * for (unsigned int i = n_internal; i < n_owned; ++i) {
+     *   // ...
+     *   limiter.reset(variations_i);
+     *   for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
+     *     // ...
+     *     limiter.accumulate(U_i, U_j, U_ij_bar, entropy_j, col_idx == 0);
+     *   }
+     *   limiter.apply_relaxation(hd_i);
+     *   limiter_serial.bounds();
+     * }
+     * ```
      */
+    //@{
 
-    void reset();
+    /**
+     * The number of stored entries in the bounds array.
+     *
+     * @todo determine number of bounds based on chosen limiter.
+     */
+    // clang-format off
+    static constexpr unsigned int n_bounds =
+          (limiter_ == Limiters::rho) ? 2
+        : (limiter_ == Limiters::specific_entropy) ? 3
+        : (limiter_ == Limiters::entropy_inequality) ? 5 : 0;
+    // clang-format on
 
+    /**
+     * Array type used to store accumulated bounds.
+     */
+    using Bounds = std::array<Number, n_bounds>;
+
+    /**
+     * Reset temporary storage and reinitialize variations for new index i.
+     */
+    void reset(const Number variations_i);
+
+    /**
+     * When looping over the sparsity row, add the contribution associated
+     * with the neighboring state U_j.
+     */
     void accumulate(const rank1_type &U_i,
                     const rank1_type &U_j,
                     const rank1_type &U_ij_bar,
+                    const Number beta_ij,
                     const Number entropy_j,
+                    const Number variations_j,
                     const bool is_diagonal_entry);
 
-    void reset_variations(const Number variations_i);
-
-    void accumulate_variations(const Number variations_j, const Number beta_ij);
-
+    /**
+     * Apply relaxation.
+     */
     void apply_relaxation(const Number hd_i);
 
+    /**
+     * Return the computed bounds.
+     */
     const Bounds &bounds() const;
 
+
+    //*}
+    /** @name */
+    //@{
+
     /**
-     * Given a state U and an update P this function computes and returns
-     * the maximal t, obeying t_min < t < t_max, such that the selected
-     * local minimum principles are obeyed.
+     * Given a state \f$\mathbf U\f$ and an update \f$\mathbf P\f$ this
+     * function computes and returns the maximal coefficient \f$t\f$,
+     * obeying \f$t_{\text{min}} < t < t_{\text{max}}\f$, such that the
+     * selected local minimum principles are obeyed.
      */
     template <Limiters limiter = limiter_, typename BOUNDS>
     static Number limit(const BOUNDS &bounds,
@@ -81,8 +202,12 @@ namespace ryujin
                         const rank1_type &P,
                         const Number t_min = Number(0.),
                         const Number t_max = Number(1.));
+    //*}
 
   private:
+    /** @name */
+    //@{
+
     Bounds bounds_;
 
     Number variations_i;
@@ -90,6 +215,8 @@ namespace ryujin
     Number rho_relaxation_denominator;
 
     Number s_interp_max;
+
+    //@}
   };
 
 
@@ -100,8 +227,13 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline void Limiter<dim, Number>::reset()
+  DEAL_II_ALWAYS_INLINE inline void
+  Limiter<dim, Number>::reset(const Number new_variations_i)
   {
+    if constexpr (relax_bounds_) {
+      variations_i = new_variations_i;
+    }
+
     auto &[rho_min, rho_max, s_min] = bounds_;
 
     if constexpr (limiter_ == Limiters::none)
@@ -125,9 +257,21 @@ namespace ryujin
   Limiter<dim, Number>::accumulate(const rank1_type &U_i,
                                    const rank1_type &U_j,
                                    const rank1_type &U_ij_bar,
+                                   const Number beta_ij,
                                    const Number entropy_j,
+                                   const Number variations_j,
                                    const bool is_diagonal_entry)
   {
+    /* Relaxation (the numerical constant 8 is up to debate): */
+    if constexpr (relax_bounds_) {
+      rho_relaxation_numerator +=
+          Number(8.0 * 0.5) * beta_ij * (variations_i + variations_j);
+
+      rho_relaxation_denominator += beta_ij;
+    }
+
+    /* Bounds: */
+
     auto &[rho_min, rho_max, s_min] = bounds_;
 
     if constexpr (limiter_ == Limiters::none)
@@ -136,7 +280,6 @@ namespace ryujin
     const auto rho_ij = U_ij_bar[0];
     rho_min = std::min(rho_min, rho_ij);
     rho_max = std::max(rho_max, rho_ij);
-
 
     if constexpr (limiter_ == Limiters::specific_entropy) {
       s_min = std::min(s_min, entropy_j);
@@ -148,27 +291,6 @@ namespace ryujin
         s_interp_max = std::max(s_interp_max, s_interp);
       }
     }
-  }
-
-
-  template <int dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline void
-  Limiter<dim, Number>::reset_variations(const Number new_variations_i)
-  {
-    variations_i = new_variations_i;
-  }
-
-
-  template <int dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline void
-  Limiter<dim, Number>::accumulate_variations(const Number variations_j,
-                                              const Number beta_ij)
-  {
-    /* The numerical constant 8 is up to debate... */
-    rho_relaxation_numerator +=
-        Number(8.0 * 0.5) * beta_ij * (variations_i + variations_j);
-
-    rho_relaxation_denominator += beta_ij;
   }
 
 

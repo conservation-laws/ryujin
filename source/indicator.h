@@ -261,7 +261,7 @@ namespace ryujin
     //@}
   };
 
-
+#ifndef DOXYGEN
   namespace
   {
     template <int dim, typename Number>
@@ -280,6 +280,7 @@ namespace ryujin
       }
     }
   } // namespace
+#endif
 
 
   template <int dim, typename Number>

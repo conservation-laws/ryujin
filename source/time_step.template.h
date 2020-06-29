@@ -482,8 +482,7 @@ namespace ryujin
         rank1_type r_i;
 
         /* Clear bounds: */
-        limiter_serial.reset();
-        limiter_serial.reset_variations(variations_i);
+        limiter_serial.reset(variations_i);
 
         const unsigned int *js = sparsity_simd.columns(i);
         for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
@@ -516,13 +515,15 @@ namespace ryujin
 
           U_i_new += tau * m_i_inv * Number(2.) * d_ij * U_ij_bar;
 
+          const auto beta_ij = betaij_matrix.get_entry(i, col_idx);
+
           limiter_serial.accumulate(U_i,
                                     U_j,
                                     U_ij_bar,
+                                    beta_ij,
                                     specific_entropies_.local_element(j),
+                                    variations_j,
                                     /* is diagonal */ col_idx == 0);
-          const auto beta_ij = betaij_matrix.get_entry(i, col_idx);
-          limiter_serial.accumulate_variations(variations_j, beta_ij);
         }
 
         if constexpr (n_passes == 0) {
@@ -578,8 +579,7 @@ namespace ryujin
         typename PD::rank1_type r_i;
 
         /* Clear bounds: */
-        limiter_simd.reset();
-        limiter_simd.reset_variations(variations_i);
+        limiter_simd.reset(variations_i);
 
         const unsigned int *js = sparsity_simd.columns(i);
         const unsigned int row_length = sparsity_simd.row_length(i);
@@ -614,14 +614,16 @@ namespace ryujin
 
           U_i_new += tau * m_i_inv * Number(2.) * d_ij * U_ij_bar;
 
+          const auto beta_ij = betaij_matrix.get_vectorized_entry(i, col_idx);
           const auto entropy_j = simd_load(specific_entropies_, js);
+
           limiter_simd.accumulate(U_i,
                                   U_j,
                                   U_ij_bar,
+                                  beta_ij,
                                   entropy_j,
+                                  variations_j,
                                   /* is diagonal */ col_idx == 0);
-          const auto beta_ij = betaij_matrix.get_vectorized_entry(i, col_idx);
-          limiter_simd.accumulate_variations(variations_j, beta_ij);
         }
 
         temp_euler_.write_vectorized_tensor(U_i_new, i);
