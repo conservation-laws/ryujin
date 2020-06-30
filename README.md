@@ -53,7 +53,7 @@ Martin Kronbichler <kronbichler@lnm.mw.tum.de>.
 Authors
 -------
 
-Martin Kronbichler ([@kronbichler](https://github.com/kronbichler)), Technical University of Munich, Germany
-Matthias Maier ([@tamiko](https://github.com/tamiko)), Texas A&M University, TX, USA
-Ignacio Tomas ([@itomasSNL](https://github.com/itomasSNL)), Texas A&M University, Sandia National Laboratories
-Eric Tovar ([@ejtovar](https://github.com/ejtovar)), Texas A&M University, TX, USA
+ - Martin Kronbichler ([@kronbichler](https://github.com/kronbichler)), Technical University of Munich, Germany
+ - Matthias Maier ([@tamiko](https://github.com/tamiko)), Texas A&M University, TX, USA
+ - Ignacio Tomas ([@itomasSNL](https://github.com/itomasSNL)), Texas A&M University, Sandia National Laboratories
+ - Eric Tovar ([@ejtovar](https://github.com/ejtovar)), Texas A&M University, TX, USA
