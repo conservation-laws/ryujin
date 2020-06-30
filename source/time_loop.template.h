@@ -134,7 +134,9 @@ namespace ryujin
     const bool write_output_files =
         enable_checkpointing || enable_output_full || enable_output_cutplanes;
 
-    initialize();
+    /* Attach log file: */
+    logfile.open(base_name + ".log");
+
     print_parameters(logfile);
 
     Number t = 0.;
@@ -231,29 +233,6 @@ namespace ryujin
 #ifdef CALLGRIND
     CALLGRIND_DUMP_STATS;
 #endif
-  }
-
-
-  template <int dim, typename Number>
-  void TimeLoop<dim, Number>::initialize()
-  {
-    /* Read in parameters and initialize all objects: */
-
-    if (mpi_rank == 0) {
-      std::cout << "[Init] initiating flux capacitor" << std::endl;
-      ParameterAcceptor::initialize("ryujin.prm");
-    } else {
-      ParameterAcceptor::initialize("ryujin.prm");
-      return;
-    }
-
-    /* Print out parameters to a prm file: */
-
-    std::ofstream output(base_name + "-parameter.prm");
-    ParameterAcceptor::prm.print_parameters(output, ParameterHandler::Text);
-
-    /* Attach log file: */
-    logfile.open(base_name + ".log");
   }
 
 
@@ -572,6 +551,11 @@ namespace ryujin
     ParameterAcceptor::prm.print_parameters(
         stream, ParameterHandler::OutputStyle::ShortText);
     stream << std::endl;
+
+    /* Also print out parameters to a prm file: */
+
+    std::ofstream output(base_name + "-parameter.prm");
+    ParameterAcceptor::prm.print_parameters(output, ParameterHandler::Text);
   }
 
 

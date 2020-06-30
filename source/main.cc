@@ -22,7 +22,10 @@ int main (int argc, char *argv[])
 {
   dealii::Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv);
 
-  /* Set the number of OpenMP threads to whatever deal.II allows for TBB: */
+  /*
+   * Set the number of OpenMP threads to whatever deal.II allows
+   * internally:
+   */
   omp_set_num_threads(dealii::MultithreadInfo::n_threads());
 
 #ifdef LIKWID_PERFMON
@@ -38,7 +41,14 @@ int main (int argc, char *argv[])
   ryujin::TimeLoop<DIM, NUMBER> time_loop(mpi_communicator);
 
   /* If necessary, create empty parameter file and exit: */
-  dealii::ParameterAcceptor::initialize("ryujin.prm");
+  std::cout << "[Init] initiating flux capacitor" << std::endl;
+
+  AssertThrow(
+      argc <= 2,
+      dealii::ExcMessage("Invalid number of parameters. At most one argument "
+                         "supported which has to be a parameter file"));
+
+  dealii::ParameterAcceptor::initialize(argc == 2 ? argv[1] : "ryujin.prm");
 
   time_loop.run();
 

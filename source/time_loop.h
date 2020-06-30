@@ -38,8 +38,6 @@ namespace ryujin
   private:
     /* Private methods for run(): */
 
-    void initialize();
-
     void compute_error(const vector_type &U, Number t);
 
     void output(const vector_type &U,
