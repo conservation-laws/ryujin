@@ -14,6 +14,14 @@
 
 namespace ryujin
 {
+  /**
+   * Given a @p partitioner the function converts an AffineConstraints
+   * object @p affine_constraints from the usual global numbering used in
+   * deal.II to an MPI-rank local numbering \f$[0,n]\f$, where \f$n\f$ is
+   * the number of locally relevant degrees of freedom.
+   *
+   * @ingroup FiniteElement
+   */
   template <typename Number>
   void transform_to_local_range(
       const dealii::Utilities::MPI::Partitioner &partitioner,
@@ -46,6 +54,14 @@ namespace ryujin
   }
 
 
+  /**
+   * Given a @p partitioner the function translates each element of a given
+   * vector @p vector from the usual global numbering used in deal.II to an
+   * MPI-rank local numbering \f$[0,n]\f$, where \f$n\f$ is the number of
+   * locally relevant degrees of freedom.
+   *
+   * @ingroup FiniteElement
+   */
   template <typename VECTOR>
   void transform_to_local_range(
       const dealii::Utilities::MPI::Partitioner &partitioner, VECTOR &vector)
@@ -57,8 +73,18 @@ namespace ryujin
   }
 
 
+  /**
+   * The DoFRenumbering namespace contains a number of custom dof
+   * renumbering functions.
+   *
+   * @ingroup FiniteElement
+   */
   namespace DoFRenumbering
   {
+    /**
+     * Import the Cuthill McKee reordering from deal.II into the current
+     * namespace.
+     */
     using dealii::DoFRenumbering::Cuthill_McKee;
 
     /**
@@ -67,6 +93,8 @@ namespace ryujin
      *
      * This renumbering requires MPI communication in order to determine
      * the set of export indices.
+     *
+     * @ingroup FiniteElement
      */
     template <int dim>
     unsigned int export_indices_first(dealii::DoFHandler<dim> &dof_handler,
@@ -120,6 +148,7 @@ namespace ryujin
       return n_export_indices;
     }
 
+
     /**
      * Reorder indices:
      *
@@ -136,7 +165,9 @@ namespace ryujin
      *  - has "standard" connectivity, i.e. 2, 8, or 26 neighboring DoFs
      *    (in 1, 2, 3D).
      *
-     *  Returns the right boundary n_internal of the internal index range.
+     * Returns the right boundary n_internal of the internal index range.
+     *
+     * @ingroup FiniteElement
      */
     template <int dim>
     unsigned int internal_range(dealii::DoFHandler<dim> &dof_handler)
@@ -214,14 +245,35 @@ namespace ryujin
   } // namespace DoFRenumbering
 
 
+  /**
+   * The DoFTools namespace contains a number of custom dof tools
+   * functions.
+   *
+   * @ingroup FiniteElement
+   */
   namespace DoFTools
   {
+    /** Import a function from deal.II into the current namespace. */
     using dealii::DoFTools::extract_locally_relevant_dofs;
+
+    /** Import a function from deal.II into the current namespace. */
     using dealii::DoFTools::make_hanging_node_constraints;
+
+    /** Import a function from deal.II into the current namespace. */
     using dealii::DoFTools::make_periodicity_constraints;
+
+    /** Import a function from deal.II into the current namespace. */
     using dealii::DoFTools::make_sparsity_pattern;
 
-
+    /**
+     * Given an MPI @p partitioner, @p dof_handler, and constraints @p
+     * affine_constraints this function creates a sparsity pattern that
+     * uses MPI-rank local numbering of indices (in the interval
+     * \f$[0,n]\f$, where \f$n\f$ is the number of locally relevant degrees
+     * of freedom) instead of the usual global numberinf used in deal.II.
+     *
+     * @ingroup FiniteElement
+     */
     template <int dim, typename Number, typename SPARSITY>
     void make_local_sparsity_pattern(
         const dealii::Utilities::MPI::Partitioner &partitioner,

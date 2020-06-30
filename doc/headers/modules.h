@@ -1,5 +1,8 @@
 /**
  * @defgroup CompileTimeOptions Compile time options
+ *
+ * Certain configuration options are provided as compile time constants to
+ * improve the performance of critical computer kernel sections.
  */
 
 
@@ -9,6 +12,11 @@
  * Several classes and helper functions for creating meshes for a number of
  * benchmark configurations and controlling the finite element
  * discretization.
+ */
+
+
+/**
+ * @defgroup FiniteElement Finite Element Formulation
  */
 
 

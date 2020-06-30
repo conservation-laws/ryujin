@@ -21,10 +21,10 @@ namespace ryujin
   /**
    * The convex limiter.
    *
-   * The class implements a convex limiting technique as described in @cite
-   * GuermondEtAl2018 and @cite KronbichlerMaier2020. Given a computed set
-   * of bounds and an update direction \f$\mathbf P_{ij}\f$ one can now
-   * determine a candidate \f$\tilde l_{ij}\f$ by computing
+   * The class implements a convex limiting technique as described in
+   * @cite GuermondEtAl2018 and @cite KronbichlerMaier2020. Given a
+   * computed set of bounds and an update direction \f$\mathbf P_{ij}\f$
+   * one can now determine a candidate \f$\tilde l_{ij}\f$ by computing
    *
    * \f{align}
    *   \tilde l_{ij} = \max_{l\,\in\,[0,1]}
@@ -33,7 +33,7 @@ namespace ryujin
    *   \phi_{\text{min}}\,\le\,\phi\,(\mathbf U_{i}+\tilde l_{ij}\mathbf P_{ij})\Big\},
    * \f}
    *
-   * where $\psi$ denots the specific entropy @cite KronbichlerMaier2020.
+   * where \f$\psi\f$ denots the specific entropy @cite KronbichlerMaier2020.
    *
    * Algorithmically this is accomplished as follows: Given an initial
    * interval \f$[t_L,t_R]\f$, where \f$t_L\f$ is a good state, we first
