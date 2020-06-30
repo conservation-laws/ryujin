@@ -3,7 +3,7 @@
 ## Copyright (C) 2020 by the ryujin authors
 ##
 
-set(RYUJIN_VERSION 1.5.0)
+set(RYUJIN_VERSION 1.6.0)
 
 cmake_minimum_required(VERSION 3.5)
 
