@@ -57,9 +57,7 @@ namespace ryujin
     using ScalarNumber = typename get_value_type<Number>::type;
     constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
 
-    /*
-     * Compute divided differences
-     */
+    /* Compute divided differences: */
 
     const auto scaling = ScalarNumber(1.) / (p_2 - p_1 + Number(eps));
 

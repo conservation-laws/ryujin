@@ -120,8 +120,8 @@ namespace ryujin
   };
 
 
+#ifndef DOXYGEN
   /* Template definitions: */
-
 
   template <typename Number, int n_comp, int simd_length>
   void MultiComponentVector<Number, n_comp, simd_length>::
@@ -159,9 +159,7 @@ namespace ryujin
           scalar_vector.local_element(i);
   }
 
-
   /* Inline function  definitions: */
-
 
   template <typename Number, int n_comp, int simd_length>
   template <typename Tensor>
@@ -236,7 +234,7 @@ namespace ryujin
     dealii::vectorized_transpose_and_store(
         false, n_comp, &tensor[0], indices, this->begin() + i * n_comp);
   }
-
+#endif
 
 } // namespace ryujin
 
