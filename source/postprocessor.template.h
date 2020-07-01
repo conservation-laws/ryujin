@@ -101,7 +101,7 @@ namespace ryujin
 
   template <int dim, typename Number>
   void Postprocessor<dim, Number>::schedule_output(const vector_type &U,
-                                                   const vector_type &alpha,
+                                                   const scalar_type &alpha,
                                                    std::string name,
                                                    Number t,
                                                    unsigned int cycle,
@@ -158,9 +158,7 @@ namespace ryujin
           const auto j =
               *(i < n_internal ? js + col_idx * simd_length : js + col_idx);
 
-          Tensor<1, problem_dimension, Number> U_j;
-          for (unsigned int d = 0; d < problem_dimension; ++d)
-            U_j[d] = U.local_element(problem_dimension * j + d);
+          const auto U_j = U.get_tensor(j);
           const auto M_j = ProblemDescription<dim, Number>::momentum(U_j);
 
           const auto c_ij = cij_matrix.get_tensor(i, col_idx);

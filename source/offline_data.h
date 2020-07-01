@@ -43,17 +43,35 @@ namespace ryujin
    * @note The offline data precomputed in this class is problem
    * independent, it only depends on the chosen geometry and ansatz stored
    * in the Discretization class.
+   *
+   * @ingroup TimeLoop
    */
   template <int dim, typename Number = double>
   class OfflineData : public dealii::ParameterAcceptor
   {
   public:
-    static constexpr unsigned int problem_dimension =
-        ProblemDescription<dim, Number>::problem_dimension;
+    /**
+     * @copydoc ProblemDescription::problem_dimension
+     */
+    // clang-format off
+    static constexpr unsigned int problem_dimension = ProblemDescription<dim, Number>::problem_dimension;
+    // clang-format on
 
+    /**
+     * Shorthand typedef for
+     * dealii::LinearAlgebra::distributed::Vector<Number>.
+     */
     using scalar_type = dealii::LinearAlgebra::distributed::Vector<Number>;
+
+    /**
+     * Shorthand typedef for a MultiComponentVector storing the current
+     * simulation state.
+     */
     using vector_type = MultiComponentVector<Number, problem_dimension>;
 
+    /**
+     * Constructor
+     */
     OfflineData(const MPI_Comm &mpi_communicator,
                 const ryujin::Discretization<dim> &discretization,
                 const std::string &subsection = "OfflineData");
