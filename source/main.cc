@@ -40,7 +40,6 @@ int main (int argc, char *argv[])
 
   ryujin::TimeLoop<DIM, NUMBER> time_loop(mpi_communicator);
 
-  /* If necessary, create empty parameter file and exit: */
   std::cout << "[Init] initiating flux capacitor" << std::endl;
 
   AssertThrow(

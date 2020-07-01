@@ -41,18 +41,37 @@ namespace ryujin
    * references.
    *
    * @note The offline data precomputed in this class is problem
-   * independent, it only depends on the Discretization.
+   * independent, it only depends on the chosen geometry and ansatz stored
+   * in the Discretization class.
+   *
+   * @ingroup TimeLoop
    */
   template <int dim, typename Number = double>
   class OfflineData : public dealii::ParameterAcceptor
   {
   public:
-    static constexpr unsigned int problem_dimension =
-        ProblemDescription<dim, Number>::problem_dimension;
+    /**
+     * @copydoc ProblemDescription::problem_dimension
+     */
+    // clang-format off
+    static constexpr unsigned int problem_dimension = ProblemDescription<dim, Number>::problem_dimension;
+    // clang-format on
 
+    /**
+     * Shorthand typedef for
+     * dealii::LinearAlgebra::distributed::Vector<Number>.
+     */
     using scalar_type = dealii::LinearAlgebra::distributed::Vector<Number>;
+
+    /**
+     * Shorthand typedef for a MultiComponentVector storing the current
+     * simulation state.
+     */
     using vector_type = MultiComponentVector<Number, problem_dimension>;
 
+    /**
+     * Constructor
+     */
     OfflineData(const MPI_Comm &mpi_communicator,
                 const ryujin::Discretization<dim> &discretization,
                 const std::string &subsection = "OfflineData");
@@ -79,24 +98,59 @@ namespace ryujin
     void assemble();
 
   protected:
-    /**
-     * The DofHandler for our (scalar) CG ansatz space in global numbering.
-     */
+
     dealii::DoFHandler<dim> dof_handler_;
+
+    dealii::AffineConstraints<Number> affine_constraints_;
+
+    std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
+        scalar_partitioner_;
+
+    std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
+        vector_partitioner_;
+
+    unsigned int n_export_indices_;
+    unsigned int n_locally_internal_;
+    unsigned int n_locally_owned_;
+    unsigned int n_locally_relevant_;
+
+    std::map<dealii::types::global_dof_index,
+             std::tuple<dealii::Tensor<1, dim, Number>,
+                        dealii::types::boundary_id,
+                        dealii::Point<dim>>>
+        boundary_map_;
+
+    SparsityPatternSIMD<dealii::VectorizedArray<Number>::size()>
+        sparsity_pattern_simd_;
+
+    SparseMatrixSIMD<Number> mass_matrix_;
+
+    dealii::LinearAlgebra::distributed::Vector<Number> lumped_mass_matrix_;
+    dealii::LinearAlgebra::distributed::Vector<Number>
+        lumped_mass_matrix_inverse_;
+
+    SparseMatrixSIMD<Number> betaij_matrix_;
+    SparseMatrixSIMD<Number, dim> cij_matrix_;
+
+    Number measure_of_omega_;
+
+  protected:
+    /**
+     * The DofHandler for our (scalar) CG ansatz space in (deal.II typical)
+     * global numbering.
+     */
     ACCESSOR_READ_ONLY(dof_handler)
 
     /**
-     * An AffineConstraints object storing constraints in global numbering.
+     * An AffineConstraints object storing constraints in (Deal.II typical)
+     * global numbering.
      */
-    dealii::AffineConstraints<Number> affine_constraints_;
     ACCESSOR_READ_ONLY(affine_constraints)
 
     /**
      * An MPI partitioner for all parallel distributed vectors storing a
      * scalar quantity.
      */
-    std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
-        scalar_partitioner_;
     ACCESSOR_READ_ONLY_NO_DEREFERENCE(scalar_partitioner)
 
     /**
@@ -104,14 +158,19 @@ namespace ryujin
      * vector-valued quantity of size
      * ProblemDescription::problem_dimension.
      */
-    std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
-        vector_partitioner_;
     ACCESSOR_READ_ONLY_NO_DEREFERENCE(vector_partitioner)
 
     /**
-     * @todo write documentation
+     * The subinterval \f$[0,\texttt{n_export_indices()})\f$ contains all
+     * (SIMD-vectorized) indices of the interval
+     * \f$[0,\texttt{n_locally_internal()})\f$ that are exported to
+     * neighboring MPI ranks.
+     *
+     * @note The interval \f$[\texttt{n_locally_internal()},
+     * \texttt{n_locally_relevant()})\f$ (consisting of non-SIMD-vectorized
+     * indices) contains additional degrees of freedom that might have to
+     * be exported to neighboring MPI ranks.
      */
-    unsigned int n_export_indices_;
     ACCESSOR_READ_ONLY(n_export_indices)
 
     /**
@@ -120,7 +179,6 @@ namespace ryujin
      * n_locally_internal_) are owned by this processor, have standard
      * connectivity, and are not situated at a boundary.
      */
-    unsigned int n_locally_internal_;
     ACCESSOR_READ_ONLY(n_locally_internal)
 
     /**
@@ -128,7 +186,6 @@ namespace ryujin
      * numbering all indices in the half open interval [0,
      * n_locally_owned_) are owned by this processor.
      */
-    unsigned int n_locally_owned_;
     ACCESSOR_READ_ONLY(n_locally_owned)
 
     /**
@@ -137,7 +194,6 @@ namespace ryujin
      * I.e.,  we can access the half open interval [0, n_locally_relevant_)
      * on this machine.
      */
-    unsigned int n_locally_relevant_;
     ACCESSOR_READ_ONLY(n_locally_relevant)
 
     /**
@@ -151,38 +207,27 @@ namespace ryujin
      * degrees of freedom after every time step (for example to implement
      * reflective boundary conditions).
      */
-    std::map<dealii::types::global_dof_index,
-             std::tuple<dealii::Tensor<1, dim, Number>,
-                        dealii::types::boundary_id,
-                        dealii::Point<dim>>>
-        boundary_map_;
     ACCESSOR_READ_ONLY(boundary_map)
 
     /**
      * A sparsity pattern for matrices in vectorized format. Local
      * numbering.
      */
-    SparsityPatternSIMD<dealii::VectorizedArray<Number>::size()>
-        sparsity_pattern_simd_;
     ACCESSOR_READ_ONLY(sparsity_pattern_simd)
 
     /**
      * The mass matrix. (SIMD storage, local numbering)
      */
-    SparseMatrixSIMD<Number> mass_matrix_;
     ACCESSOR_READ_ONLY(mass_matrix)
 
     /**
      * The lumped mass matrix.
      */
-    dealii::LinearAlgebra::distributed::Vector<Number> lumped_mass_matrix_;
     ACCESSOR_READ_ONLY(lumped_mass_matrix)
 
     /**
      * The inverse of the lumped mass matrix.
      */
-    dealii::LinearAlgebra::distributed::Vector<Number>
-        lumped_mass_matrix_inverse_;
     ACCESSOR_READ_ONLY(lumped_mass_matrix_inverse)
 
     /**
@@ -190,19 +235,16 @@ namespace ryujin
      *   $\beta_{ij} = \nabla\varphi_{j}\cdot\nabla\varphi_{i}$
      * (SIMD storage, local numbering)
      */
-    SparseMatrixSIMD<Number> betaij_matrix_;
     ACCESSOR_READ_ONLY(betaij_matrix)
 
     /**
      * The $(c_{ij})$ matrix. (SIMD storage, local numbering)
      */
-    SparseMatrixSIMD<Number, dim> cij_matrix_;
     ACCESSOR_READ_ONLY(cij_matrix)
 
     /**
      * Size of computational domain.
      */
-    Number measure_of_omega_;
     ACCESSOR_READ_ONLY(measure_of_omega)
 
   private:

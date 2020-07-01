@@ -21,6 +21,11 @@
 namespace ryujin
 {
 
+  /**
+   * @todo Write documentation.
+   *
+   * @ingroup TimeLoop
+   */
   template <int dim, typename Number = double>
   class Postprocessor final : public dealii::ParameterAcceptor
   {
@@ -28,10 +33,27 @@ namespace ryujin
     static constexpr unsigned int problem_dimension =
         ProblemDescription<dim, Number>::problem_dimension;
 
+    /**
+     * @copydoc ProblemDescription::rank1_type
+     */
     using rank1_type = typename ProblemDescription<dim, Number>::rank1_type;
+
+    /**
+     * @todo Write documentation.
+     */
     using curl_type = dealii::Tensor<1, dim == 2 ? 1 : dim, Number>;
 
-    using vector_type = dealii::LinearAlgebra::distributed::Vector<Number>;
+    /**
+     * Shorthand typedef for
+     * dealii::LinearAlgebra::distributed::Vector<Number>.
+     */
+    using scalar_type = dealii::LinearAlgebra::distributed::Vector<Number>;
+
+    /**
+     * Shorthand typedef for a MultiComponentVector storing the current
+     * simulation state.
+     */
+    using vector_type = MultiComponentVector<Number, problem_dimension>;
 
     /**
      * The number of postprocessed quantities:
@@ -39,29 +61,46 @@ namespace ryujin
     static constexpr unsigned int n_quantities = (dim == 1) ? 2 : 3;
 
     /**
-     * An array holding all component names as a string.
+     * An array of strings for all component names.
      */
     const static std::array<std::string, n_quantities> component_names;
 
+    /**
+     * Constructor.
+     */
     Postprocessor(const MPI_Comm &mpi_communicator,
                   const ryujin::OfflineData<dim, Number> &offline_data,
                   const std::string &subsection = "Postprocessor");
 
+    /**
+     * Prepare postprocessor. A call to @ref prepare() allocates temporary
+     * storage and is necessary before schedule_output() can be called.
+     */
     void prepare();
 
+    /**
+     * @todo Write documentation
+     */
     void schedule_output(const vector_type &U,
-                         const vector_type &alpha,
+                         const scalar_type &alpha,
                          std::string name,
                          Number t,
                          unsigned int cycle,
                          bool output_full = true,
                          bool output_cutplanes = true);
 
+    /**
+     * @todo Write documentation
+     */
     bool is_active();
+
+    /**
+     * @todo Write documentation
+     */
     void wait();
 
   protected:
-    std::array<vector_type, n_quantities> quantities_;
+    std::array<scalar_type, n_quantities> quantities_;
 
   private:
     const MPI_Comm &mpi_communicator_;
