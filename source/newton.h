@@ -14,35 +14,52 @@
 
 namespace ryujin
 {
-  /*
-   * Define a tolerance for the Newton iteration:
+  /**
+   * @name Quadratic Newton iteration compile time options
    */
+  //@{
+  /**
+   * The tolerance used for the Newton iteration
+   * @ingroup CompileTimeOptions
+   */
+#ifdef DOXYGEN
+  template <typename Number>
+  static constexpr auto newton_eps = NEWTON_EPS_DOUBLE or NEWTON_EPS_FLOAT;
+#else
   template <typename Number>
   static constexpr auto newton_eps = typename get_value_type<Number>::type(
       std::is_same<typename get_value_type<Number>::type, double>::value
           ? NEWTON_EPS_DOUBLE
           : NEWTON_EPS_FLOAT);
+#endif
 
-  /*
-   * Maximal number of Newton iterations we will perform:
+  /**
+   * Maximal number of Newton iterations
+   * @ingroup CompileTimeOptions
    */
   static constexpr unsigned int newton_max_iter = NEWTON_MAX_ITER;
 
-  /*
-   * Perform one step of a quadratic Newton iteration.
+  //@}
+  /**
+   * @name Functions
+   */
+  //@{
+
+  /**
+   * Perform one step of a quadratic Newton iteration, see @cite
+   * KronbichlerMaier2020, Algorithm 3.
    *
-   * See [1], p. 915f (4.8) and (4.9)
-   *
-   * Precondition:
-   *
-   *   p_1 <= p* <= p_2
-   *
-   *   phi(p_1) <= 0. <= phi(p_2), or phi(p_1) >= 0. >= phi(p_2)
-   *
-   *   phi''' < 0, or phi''' > 0
+   * For this, it has to hold true that \f$p_1\le p^\ast\le p_2\f$, and
+   * \f$\phi(p_1)\le 0\le \phi(p_2)\f$, or \f$\phi(p_1)\ge 0\ge
+   * \phi(p_2)\f$ and that \f$\phi\f$ itself is a 3-convex/concave
+   * function, i.e., \f$\phi'''<0\f$, or \f$\phi'''>0\f$.
    *
    * Modifies p_1 and P_2 ensures that p_1 <= p_2, and that p_1 (p_2) is
    * monotonically increasing (decreasing).
+   *
+   * @todo Write out the quadratic Newton step in more detail.
+   *
+   * @ingroup EulerStep
    */
   template <typename Number>
   DEAL_II_ALWAYS_INLINE inline void
@@ -108,6 +125,8 @@ namespace ryujin
 
     return;
   }
+
+  //@}
 
 } /* namespace ryujin */
 
