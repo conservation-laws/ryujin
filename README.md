@@ -20,7 +20,7 @@ References
 ----------
 
 If you use this software for an academic publications please cite the
-following reference:
+following reference ([preprint](https://arxiv.org/abs/2007.00094)):
 
 ```
 @article{ryujin2020,
