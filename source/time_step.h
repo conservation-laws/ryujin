@@ -27,28 +27,62 @@
 namespace ryujin
 {
   /**
+   * Explicit (strong stability preserving) time-stepping for the
+   * conservation law.
    *
+   * @ingroup EulerStep
    */
   template <int dim, typename Number = double>
   class TimeStep final : public dealii::ParameterAcceptor
   {
   public:
-    static constexpr unsigned int problem_dimension =
-        ProblemDescription<dim, Number>::problem_dimension;
+    /**
+     * @copydoc ProblemDescription::problem_dimension
+     */
+    // clang-format off
+    static constexpr unsigned int problem_dimension = ProblemDescription<dim, Number>::problem_dimension;
+    // clang-format on
 
+    /**
+     * @copydoc ProblemDescription::rank1_type
+     */
     using rank1_type = typename ProblemDescription<dim, Number>::rank1_type;
+
+    /**
+     * @copydoc ProblemDescription::rank2_type
+     */
     using rank2_type = typename ProblemDescription<dim, Number>::rank2_type;
 
+    /**
+     * @copydoc OfflineData::scalar_type
+     */
     using scalar_type = typename OfflineData<dim, Number>::scalar_type;
+
+    /**
+     * @copydoc OfflineData::vector_type
+     */
     using vector_type = typename OfflineData<dim, Number>::vector_type;
 
+    /**
+     * Constructor.
+     */
     TimeStep(const MPI_Comm &mpi_communicator,
              std::map<std::string, dealii::Timer> &computing_timer,
              const ryujin::OfflineData<dim, Number> &offline_data,
              const ryujin::InitialValues<dim, Number> &initial_values,
              const std::string &subsection = "TimeStep");
 
+    /**
+     * Prepare time stepping. A call to @ref prepare() allocates temporary
+     * storage and is necessary before any of the following time-stepping
+     * functions can be called.
+     */
     void prepare();
+
+    /**
+     * @name Functons for performing explicit time steps
+     */
+    //@{
 
     /**
      * Given a reference to a previous state vector U perform an explicit
@@ -69,9 +103,7 @@ namespace ryujin
      *
      *  - returns the computed maximal time step size tau_max
      *
-     * [Shu & Osher, Efficient Implementation of Essentially
-     * Non-oscillatory Shock-Capturing Schemes JCP 77:439-471 (1988), Eq.
-     * 2.15]
+     * See @cite Shu_1988, Eq. 2.15.
      */
     Number ssph2_step(vector_type &U, Number t);
 
@@ -81,9 +113,7 @@ namespace ryujin
      *
      *  - returns the computed maximal time step size tau_max
      *
-     * [Shu & Osher, Efficient Implementation of Essentially
-     * Non-oscillatory Shock-Capturing Schemes JCP 77:439-471 (1988), Eq.
-     * 2.18]
+     * See @cite Shu_1988, Eq. 2.18.
      */
     Number ssprk3_step(vector_type &U, Number t);
 
@@ -96,6 +126,8 @@ namespace ryujin
      * ssprk3_step() depending on selected approximation order.
      */
     Number step(vector_type &U, Number t);
+
+    //@}
 
     /* Options: */
 
@@ -113,6 +145,20 @@ namespace ryujin
     static constexpr unsigned int limiter_iter_ = LIMITER_ITER;
 
   private:
+    /**
+     * @name Run time options
+     */
+    //@{
+
+    Number cfl_update_;
+    Number cfl_max_;
+
+    //@}
+    /**
+     * @name Internal data
+     */
+    //@{
+
     const MPI_Comm &mpi_communicator_;
     std::map<std::string, dealii::Timer> &computing_timer_;
 
@@ -122,8 +168,6 @@ namespace ryujin
 
     unsigned int n_restarts_;
     ACCESSOR_READ_ONLY(n_restarts)
-
-    /* Scratch data: */
 
     scalar_type alpha_;
     ACCESSOR_READ_ONLY(alpha)
@@ -145,10 +189,7 @@ namespace ryujin
     vector_type temp_euler_;
     vector_type temp_ssp_;
 
-    /* Options: */
-
-    Number cfl_update_;
-    Number cfl_max_;
+    //@}
   };
 
 } /* namespace ryujin */

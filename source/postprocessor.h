@@ -71,16 +71,14 @@ namespace ryujin
     using curl_type = dealii::Tensor<1, dim == 2 ? 1 : dim, Number>;
 
     /**
-     * Shorthand typedef for
-     * dealii::LinearAlgebra::distributed::Vector<Number>.
+     * @copydoc OfflineData::scalar_type
      */
-    using scalar_type = dealii::LinearAlgebra::distributed::Vector<Number>;
+    using scalar_type = typename OfflineData<dim, Number>::scalar_type;
 
     /**
-     * Shorthand typedef for a MultiComponentVector storing the current
-     * simulation state.
+     * @copydoc OfflineData::vector_type
      */
-    using vector_type = MultiComponentVector<Number, problem_dimension>;
+    using vector_type = typename OfflineData<dim, Number>::vector_type;
 
     /**
      * The number of postprocessed quantities:
