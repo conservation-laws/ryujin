@@ -24,7 +24,7 @@ namespace ryujin
    * E]\f$, where \f$\rho\f$ denotes the density, \f$\textbf m\f$ is the
    * momentum, and \f$E\f$ is the total energy.
    *
-   * @ingroup EulerStep
+   * @ingroup EulerModule
    */
   template <int dim, typename Number = double>
   class ProblemDescription

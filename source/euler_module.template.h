@@ -3,13 +3,13 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#ifndef TIME_STEP_TEMPLATE_H
-#define TIME_STEP_TEMPLATE_H
+#ifndef EULER_MODULE_TEMPLATE_H
+#define EULER_MODULE_TEMPLATE_H
 
 #include "openmp.h"
 #include "scope.h"
 #include "simd.h"
-#include "time_step.h"
+#include "euler_module.h"
 
 #include "indicator.h"
 #include "riemann_solver.h"
@@ -1176,4 +1176,4 @@ namespace ryujin
 
 } /* namespace ryujin */
 
-#endif /* TIME_STEP_TEMPLATE_H */
+#endif /* EULER_MODULE_TEMPLATE_H */

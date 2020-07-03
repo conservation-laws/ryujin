@@ -47,7 +47,7 @@ namespace ryujin
    *
    * @todo document local entropy inequality condition.
    *
-   * @ingroup EulerStep
+   * @ingroup EulerModule
    */
   template <int dim, typename Number = double>
   class Limiter

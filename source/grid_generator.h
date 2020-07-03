@@ -23,7 +23,7 @@ namespace ryujin
    * This namespace provides a collection of functions for generating
    * triangulations for some benchmark configurations.
    *
-   * @ingroup Discretization
+   * @ingroup Mesh
    */
   namespace GridGenerator
   {
@@ -42,7 +42,7 @@ namespace ryujin
      * The 3D mesh is created by extruding the 2D mesh with a width equal
      * to the "height".
      *
-     * @ingroup Discretization
+     * @ingroup Mesh
      */
 
     template <int dim, int spacedim, template <int, int> class Triangulation>
@@ -221,7 +221,7 @@ namespace ryujin
      * Even though this function has a template parameter @p dim, it is only
      * implemented for dimension 2.
      *
-     * @ingroup Discretization
+     * @ingroup Mesh
      */
     template <int dim, int spacedim, template <int, int> class Triangulation>
     void step(Triangulation<dim, dim> &,
@@ -342,7 +342,7 @@ namespace ryujin
      * bottom side from `[0, wall_position)`. Slip boundary conditions are
      * enforced on the bottom side on `[wall_position, length)`.
      *
-     * @ingroup Discretization
+     * @ingroup Mesh
      */
 
     template <int dim, int spacedim, template <int, int> class Triangulation>
@@ -418,7 +418,7 @@ namespace ryujin
    * A namespace for a number of benchmark geometries and dealii::GridIn
    * wrappers.
    *
-   * @ingroup Discretization
+   * @ingroup Mesh
    */
   namespace Geometries
   {
@@ -426,7 +426,7 @@ namespace ryujin
      * A 2D/3D cylinder configuration constructed with
      * GridGenerator::cylinder().
      *
-     * @ingroup Discretization
+     * @ingroup Mesh
      */
     template <int dim>
     class Cylinder : public Geometry<dim>
@@ -475,7 +475,7 @@ namespace ryujin
     /**
      * A 2D Mach step configuration constructed with GridGenerator::step().
      *
-     * @ingroup Discretization
+     * @ingroup Mesh
      */
     template <int dim>
     class Step : public Geometry<dim>
@@ -518,7 +518,7 @@ namespace ryujin
     /**
      * A 2D Mach step configuration constructed with GridGenerator::step().
      *
-     * @ingroup Discretization
+     * @ingroup Mesh
      */
     template <int dim>
     class Wall : public Geometry<dim>
@@ -557,7 +557,7 @@ namespace ryujin
      * Describes a geometry used for validation: The (scaled) unit
      * hypercube with Dirichlet data.
      *
-     * @ingroup Discretization
+     * @ingroup Mesh
      */
     template <int dim>
     class Validation : public Geometry<dim>

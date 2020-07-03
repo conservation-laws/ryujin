@@ -7,7 +7,7 @@
 
 
 /**
- * @defgroup Discretization Discretization
+ * @defgroup Mesh Mesh generation and discretization
  *
  * Several classes and helper functions for creating meshes for a number of
  * benchmark configurations and controlling the finite element
@@ -16,12 +16,15 @@
 
 
 /**
- * @defgroup FiniteElement Finite Element Formulation
+ * @defgroup FiniteElement Finite element formulation
+ *
+ * Some helper functions for local index handling, dof renumbering,
+ * sparsity pattern and matrix assembly.
  */
 
 
 /**
- * @defgroup EulerStep Euler Update
+ * @defgroup EulerModule Euler Module
  *
  * This module contains classes and functions used during different stages
  * of the explicit Euler update performed in TimeStep::euler_step() and
@@ -45,7 +48,7 @@
 
 
 /**
- * @defgroup TimeLoop Time Loop
+ * @defgroup TimeLoop Time loop
  *
  * This module contains classes and functions used in TimeLoop::run().
  */

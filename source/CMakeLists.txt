@@ -14,6 +14,7 @@ include_directories(
 
 add_executable(ryujin
   discretization.cc
+  euler_module.cc
   initial_values.cc
   limiter.cc
   main.cc
@@ -24,7 +25,6 @@ add_executable(ryujin
   simd.cc
   sparse_matrix_simd.cc
   time_loop.cc
-  time_step.cc
   )
 
 deal_ii_setup_target(ryujin)

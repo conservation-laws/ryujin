@@ -3,8 +3,8 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#ifndef TIME_STEP_H
-#define TIME_STEP_H
+#ifndef EULER_MODULE_H
+#define EULER_MODULE_H
 
 #include <compile_time_options.h>
 
@@ -28,9 +28,9 @@ namespace ryujin
 {
   /**
    * Explicit (strong stability preserving) time-stepping for the
-   * conservation law.
+   * compressible Euler equations described in ProblemDescription.
    *
-   * @ingroup EulerStep
+   * @ingroup EulerModule
    */
   template <int dim, typename Number = double>
   class TimeStep final : public dealii::ParameterAcceptor
@@ -76,7 +76,7 @@ namespace ryujin
     /**
      * An enum for the approximation order in space.
      */
-    static constexpr enum class TimeStepOrder {
+    enum class TimeStepOrder {
       /** Perform a first-order explicit Euler step. */
       first_order,
       /** Perform an SSP-RK2 step (Heun's method). */
@@ -225,4 +225,4 @@ namespace ryujin
 
 } /* namespace ryujin */
 
-#endif /* TIME_STEP_H */
+#endif /* EULER_MODULE_H */

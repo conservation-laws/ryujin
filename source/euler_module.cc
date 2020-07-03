@@ -3,7 +3,7 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#include "time_step.template.h"
+#include "euler_module.template.h"
 
 namespace ryujin
 {

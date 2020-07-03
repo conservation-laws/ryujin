@@ -27,7 +27,7 @@ namespace ryujin
    *
    * The solver is based on @cite GuermondPopov2016b.
    *
-   * @ingroup EulerStep
+   * @ingroup EulerModule
    */
   template <int dim, typename Number = double>
   class RiemannSolver

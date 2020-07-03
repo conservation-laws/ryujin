@@ -67,7 +67,7 @@ namespace ryujin
    * \f$\rho\f$ that is used for relaxing the limiter bounds, see
    * documentation of class Limiter.
    *
-   * @ingroup EulerStep
+   * @ingroup EulerModule
    */
   template <int dim, typename Number = double>
   class Indicator

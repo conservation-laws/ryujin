@@ -12,7 +12,7 @@
 #include "initial_values.h"
 #include "offline_data.h"
 #include "postprocessor.h"
-#include "time_step.h"
+#include "euler_module.h"
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/timer.h>

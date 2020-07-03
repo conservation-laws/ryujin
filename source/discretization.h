@@ -38,7 +38,7 @@ namespace ryujin
    * ids. More precisely, `dirichlet` takes precedence before `slip`,
    * before `periodic`, and before `do_nothing`.
    *
-   * @ingroup Discretization
+   * @ingroup Mesh
    */
   enum Boundary : dealii::types::boundary_id {
     /**
@@ -92,7 +92,7 @@ namespace ryujin
    * benchmark configurations and to read in meshes in one of the formats
    * supported by the deal.II library.
    *
-   * @ingroup Discretization
+   * @ingroup Mesh
    */
   template <int dim>
   class Discretization : public dealii::ParameterAcceptor
