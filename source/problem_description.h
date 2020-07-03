@@ -189,7 +189,7 @@ namespace ryujin
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
-     * and return the derivative \eta' of the Harten-type entropy
+     * and return the derivative \f$\eta'\f$ of the Harten-type entropy
      * \f[
      *   \eta = (\rho^2 e) ^ {1 / (\gamma + 1)}.
      * \f]
@@ -206,7 +206,7 @@ namespace ryujin
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
-     * and return the derivative \eta' of the entropy \f$\eta =
+     * and return the derivative \f$\eta'\f$ of the entropy \f$\eta =
      * p^{1/\gamma}\f$.
      */
     static rank1_type mathematical_entropy_derivative(const rank1_type U);

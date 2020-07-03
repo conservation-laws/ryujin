@@ -46,8 +46,8 @@ namespace ryujin
   //@{
 
   /**
-   * Perform one step of a quadratic Newton iteration, see @cite
-   * KronbichlerMaier2020, Algorithm 3.
+   * Perform one step of a quadratic Newton iteration, see
+   * @cite KronbichlerMaier2020, Algorithm 3.
    *
    * For this, it has to hold true that \f$p_1\le p^\ast\le p_2\f$, and
    * \f$\phi(p_1)\le 0\le \phi(p_2)\f$, or \f$\phi(p_1)\ge 0\ge
