@@ -6,10 +6,10 @@
 #ifndef EULER_MODULE_TEMPLATE_H
 #define EULER_MODULE_TEMPLATE_H
 
+#include "euler_module.h"
 #include "openmp.h"
 #include "scope.h"
 #include "simd.h"
-#include "euler_module.h"
 
 #include "indicator.h"
 #include "riemann_solver.h"
@@ -40,12 +40,12 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  TimeStep<dim, Number>::TimeStep(
+  EulerModule<dim, Number>::EulerModule(
       const MPI_Comm &mpi_communicator,
       std::map<std::string, dealii::Timer> &computing_timer,
       const ryujin::OfflineData<dim, Number> &offline_data,
       const ryujin::InitialValues<dim, Number> &initial_values,
-      const std::string &subsection /*= "TimeStep"*/)
+      const std::string &subsection /*= "EulerModule"*/)
       : ParameterAcceptor(subsection)
       , mpi_communicator_(mpi_communicator)
       , computing_timer_(computing_timer)
@@ -64,10 +64,10 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  void TimeStep<dim, Number>::prepare()
+  void EulerModule<dim, Number>::prepare()
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "TimeStep<dim, Number>::prepare()" << std::endl;
+    std::cout << "EulerModule<dim, Number>::prepare()" << std::endl;
 #endif
 
     /* Initialize vectors: */
@@ -96,10 +96,11 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  Number TimeStep<dim, Number>::euler_step(vector_type &U, Number t, Number tau)
+  Number
+  EulerModule<dim, Number>::euler_step(vector_type &U, Number t, Number tau)
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "TimeStep<dim, Number>::euler_step()" << std::endl;
+    std::cout << "EulerModule<dim, Number>::euler_step()" << std::endl;
 #endif
 
     CALLGRIND_START_INSTRUMENTATION
@@ -1050,10 +1051,10 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  Number TimeStep<dim, Number>::ssph2_step(vector_type &U, Number t)
+  Number EulerModule<dim, Number>::ssph2_step(vector_type &U, Number t)
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "TimeStep<dim, Number>::ssph2_step()" << std::endl;
+    std::cout << "EulerModule<dim, Number>::ssph2_step()" << std::endl;
 #endif
 
     Number tau_0 = 0.;
@@ -1093,10 +1094,10 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  Number TimeStep<dim, Number>::ssprk3_step(vector_type &U, Number t)
+  Number EulerModule<dim, Number>::ssprk3_step(vector_type &U, Number t)
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "TimeStep<dim, Number>::ssprk3_step()" << std::endl;
+    std::cout << "EulerModule<dim, Number>::ssprk3_step()" << std::endl;
 #endif
 
     Number tau_0 = Number(0.);
@@ -1155,10 +1156,10 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  Number TimeStep<dim, Number>::step(vector_type &U, Number t)
+  Number EulerModule<dim, Number>::step(vector_type &U, Number t)
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "TimeStep<dim, Number>::step()" << std::endl;
+    std::cout << "EulerModule<dim, Number>::step()" << std::endl;
 #endif
 
     switch (time_step_order_) {

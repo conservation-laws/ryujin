@@ -37,8 +37,8 @@ namespace ryujin
       const ryujin::Discretization<dim> &discretization,
       const std::string &subsection /*= "OfflineData"*/)
       : ParameterAcceptor(subsection)
-      , mpi_communicator_(mpi_communicator)
       , discretization_(&discretization)
+      , mpi_communicator_(mpi_communicator)
   {
   }
 

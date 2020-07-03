@@ -39,11 +39,11 @@ namespace ryujin
       , discretization(mpi_communicator, "/B - Discretization")
       , offline_data(mpi_communicator, discretization, "/C - OfflineData")
       , initial_values("/D - InitialValues")
-      , time_step(mpi_communicator,
-                  computing_timer,
-                  offline_data,
-                  initial_values,
-                  "/E - TimeStep")
+      , euler_module(mpi_communicator,
+                     computing_timer,
+                     offline_data,
+                     initial_values,
+                     "/E - EulerModule")
       , postprocessor(mpi_communicator, offline_data, "/F - Postprocessor")
       , mpi_rank(dealii::Utilities::MPI::this_mpi_process(mpi_communicator))
       , n_mpi_processes(
@@ -151,7 +151,7 @@ namespace ryujin
 
       discretization.prepare();
       offline_data.prepare();
-      time_step.prepare();
+      euler_module.prepare();
       postprocessor.prepare();
 
       print_mpi_partition(logfile);
@@ -193,7 +193,7 @@ namespace ryujin
 
       /* Do a time step: */
 
-      const auto tau = time_step.step(U, t);
+      const auto tau = euler_module.step(U, t);
       t += tau;
 
       if (t > output_cycle * output_granularity) {
@@ -377,8 +377,14 @@ namespace ryujin
           (cycle % output_full_multiplier == 0) && enable_output_full;
       const bool do_cutplanes =
           (cycle % output_cutplanes_multiplier == 0) && enable_output_cutplanes;
-      postprocessor.schedule_output(
-          U, time_step.alpha(), name, t, cycle, do_full_output, do_cutplanes);
+
+      postprocessor.schedule_output(U,
+                                    euler_module.alpha(),
+                                    name,
+                                    t,
+                                    cycle,
+                                    do_full_output,
+                                    do_cutplanes);
     }
 
     /* Checkpointing: */
@@ -519,30 +525,30 @@ namespace ryujin
     stream << "RiemannSolver<dim, Number>::greedy_relax_bounds_ == "
             <<  RiemannSolver<dim, Number>::greedy_relax_bounds_ << std::endl;
 
-    stream << "TimeStep<dim, Number>::order_ == ";
-    switch (TimeStep<dim, Number>::order_) {
-    case TimeStep<dim, Number>::Order::first_order:
-      stream << "TimeStep<dim, Number>::Order::first_order" << std::endl;
+    stream << "EulerModule<dim, Number>::order_ == ";
+    switch (EulerModule<dim, Number>::order_) {
+    case EulerModule<dim, Number>::Order::first_order:
+      stream << "EulerModule<dim, Number>::Order::first_order" << std::endl;
       break;
-    case TimeStep<dim, Number>::Order::second_order:
-      stream << "TimeStep<dim, Number>::Order::second_order" << std::endl;
+    case EulerModule<dim, Number>::Order::second_order:
+      stream << "EulerModule<dim, Number>::Order::second_order" << std::endl;
     }
 
-    stream << "TimeStep<dim, Number>::time_step_order_ == ";
-    switch (TimeStep<dim, Number>::time_step_order_) {
-    case TimeStep<dim, Number>::TimeStepOrder::first_order:
-      stream << "TimeStep<dim, Number>::TimeStepOrder::first_order" << std::endl;
+    stream << "EulerModule<dim, Number>::time_step_order_ == ";
+    switch (EulerModule<dim, Number>::time_step_order_) {
+    case EulerModule<dim, Number>::TimeStepOrder::first_order:
+      stream << "EulerModule<dim, Number>::TimeStepOrder::first_order" << std::endl;
       break;
-    case TimeStep<dim, Number>::TimeStepOrder::second_order:
-      stream << "TimeStep<dim, Number>::TimeStepOrder::second_order" << std::endl;
+    case EulerModule<dim, Number>::TimeStepOrder::second_order:
+      stream << "EulerModule<dim, Number>::TimeStepOrder::second_order" << std::endl;
       break;
-    case TimeStep<dim, Number>::TimeStepOrder::third_order:
-      stream << "TimeStep<dim, Number>::TimeStepOrder::third_order" << std::endl;
+    case EulerModule<dim, Number>::TimeStepOrder::third_order:
+      stream << "EulerModule<dim, Number>::TimeStepOrder::third_order" << std::endl;
       break;
     }
 
-    stream << "TimeStep<dim, Number>::limiter_iter_ == "
-            <<  TimeStep<dim, Number>::limiter_iter_ << std::endl;
+    stream << "EulerModule<dim, Number>::limiter_iter_ == "
+            <<  EulerModule<dim, Number>::limiter_iter_ << std::endl;
 
     /* clang-format on */
 
@@ -745,18 +751,18 @@ namespace ryujin
            << "%)]" << std::endl
            << std::endl;
 
-    output << "             (WALL)  "                                      //
-           << std::fixed << wall_m_dofs_per_sec << " MQ/s  ("              //
-           << std::scientific << 1. / wall_m_dofs_per_sec * 1.e-6          //
-           << " s/Qdof/cycle)  ("                                          //
-           << std::fixed << ((double)cycle) / wall_time                    //
-           << " cycles/s)  (avg dt = "                                     //
-           << std::scientific << t / ((double)cycle)                       //
-           << ")" << std::endl;                                            //
-    output << "                     [ "                                    //
-           << std::setprecision(0) << std::fixed << time_step.n_restarts() //
+    output << "             (WALL)  "                                         //
+           << std::fixed << wall_m_dofs_per_sec << " MQ/s  ("                 //
+           << std::scientific << 1. / wall_m_dofs_per_sec * 1.e-6             //
+           << " s/Qdof/cycle)  ("                                             //
+           << std::fixed << ((double)cycle) / wall_time                       //
+           << " cycles/s)  (avg dt = "                                        //
+           << std::scientific << t / ((double)cycle)                          //
+           << ")" << std::endl;                                               //
+    output << "                     [ "                                       //
+           << std::setprecision(0) << std::fixed << euler_module.n_restarts() //
            << " rsts   (" << std::setprecision(2) << std::scientific
-           << time_step.n_restarts() / ((double)cycle) << " rsts/cycle) ]"
+           << euler_module.n_restarts() / ((double)cycle) << " rsts/cycle) ]"
            << std::endl
            << std::endl;
 

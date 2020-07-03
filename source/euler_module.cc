@@ -8,6 +8,6 @@
 namespace ryujin
 {
   /* instantiations */
-  template class ryujin::TimeStep<DIM, NUMBER>;
+  template class ryujin::EulerModule<DIM, NUMBER>;
 
 } /* namespace ryujin */

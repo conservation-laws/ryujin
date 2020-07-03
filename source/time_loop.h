@@ -123,7 +123,7 @@ namespace ryujin
     ryujin::Discretization<dim> discretization;
     ryujin::OfflineData<dim, Number> offline_data;
     ryujin::InitialValues<dim, Number> initial_values;
-    ryujin::TimeStep<dim, Number> time_step;
+    ryujin::EulerModule<dim, Number> euler_module;
     ryujin::Postprocessor<dim, Number> postprocessor;
 
     const unsigned int mpi_rank;

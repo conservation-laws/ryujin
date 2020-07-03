@@ -33,7 +33,7 @@ namespace ryujin
    * @ingroup EulerModule
    */
   template <int dim, typename Number = double>
-  class TimeStep final : public dealii::ParameterAcceptor
+  class EulerModule final : public dealii::ParameterAcceptor
   {
   public:
     /**
@@ -88,11 +88,11 @@ namespace ryujin
     /**
      * Constructor.
      */
-    TimeStep(const MPI_Comm &mpi_communicator,
-             std::map<std::string, dealii::Timer> &computing_timer,
-             const ryujin::OfflineData<dim, Number> &offline_data,
-             const ryujin::InitialValues<dim, Number> &initial_values,
-             const std::string &subsection = "TimeStep");
+    EulerModule(const MPI_Comm &mpi_communicator,
+                std::map<std::string, dealii::Timer> &computing_timer,
+                const ryujin::OfflineData<dim, Number> &offline_data,
+                const ryujin::InitialValues<dim, Number> &initial_values,
+                const std::string &subsection = "EulerModule");
 
     /**
      * Prepare time stepping. A call to @ref prepare() allocates temporary
@@ -102,7 +102,7 @@ namespace ryujin
     void prepare();
 
     /**
-     * @name TimeStep compile time options
+     * @name EulerModule compile time options
      */
     //@{
 
