@@ -155,13 +155,10 @@ namespace ryujin
      * In order to traverse over multiple rows of a (to be constructed)
      * sparsity pattern simultaneously using SIMD instructions we reorder
      * all locally owned degrees of freedom to ensure that a local index
-     * range [0, n_locally_internal_) \subset [0, n_locally_owned) is
-     * available that
-     *
+     * range \f$[0, \text{n_locally_internal_}) \subset [0,
+     * \text{n_locally_owned})\f$ is available that
      *  - contains no boundary dof
-     *
      *  - contains no foreign degree of freedom
-     *
      *  - has "standard" connectivity, i.e. 2, 8, or 26 neighboring DoFs
      *    (in 1, 2, 3D).
      *

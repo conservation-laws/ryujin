@@ -134,6 +134,8 @@ namespace ryujin
 
     Number measure_of_omega_;
 
+    dealii::SmartPointer<const ryujin::Discretization<dim>> discretization_;
+
   protected:
     /**
      * The DofHandler for our (scalar) CG ansatz space in (deal.II typical)
@@ -231,14 +233,14 @@ namespace ryujin
     ACCESSOR_READ_ONLY(lumped_mass_matrix_inverse)
 
     /**
-     * The stiffness matrix $(beta_{ij})$:
-     *   $\beta_{ij} = \nabla\varphi_{j}\cdot\nabla\varphi_{i}$
+     * The stiffness matrix \f$(beta_{ij})\f$:
+     *   \f$\beta_{ij} = \nabla\varphi_{j}\cdot\nabla\varphi_{i}\f$
      * (SIMD storage, local numbering)
      */
     ACCESSOR_READ_ONLY(betaij_matrix)
 
     /**
-     * The $(c_{ij})$ matrix. (SIMD storage, local numbering)
+     * The \f$(c_{ij})\f$ matrix. (SIMD storage, local numbering)
      */
     ACCESSOR_READ_ONLY(cij_matrix)
 
@@ -247,18 +249,17 @@ namespace ryujin
      */
     ACCESSOR_READ_ONLY(measure_of_omega)
 
+    /**
+     * Returns a reference of the underlying Discretization object.
+     */
+    ACCESSOR_READ_ONLY(discretization)
+
   private:
     /* Scratch storage: */
     dealii::SparsityPattern sparsity_pattern_assembly_;
     dealii::AffineConstraints<Number> affine_constraints_assembly_;
 
     const MPI_Comm &mpi_communicator_;
-
-    /**
-     * A pointer to a discretization object.
-     */
-    dealii::SmartPointer<const ryujin::Discretization<dim>> discretization_;
-    ACCESSOR_READ_ONLY(discretization)
   };
 
 } /* namespace ryujin */

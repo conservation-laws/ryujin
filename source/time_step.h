@@ -64,6 +64,28 @@ namespace ryujin
     using vector_type = typename OfflineData<dim, Number>::vector_type;
 
     /**
+     * An enum for the approximation order in space.
+     */
+    enum class Order {
+      /** Use the first-order provisional update. */
+      first_order,
+      /** Use the second order method with convex limiting. */
+      second_order
+    };
+
+    /**
+     * An enum for the approximation order in space.
+     */
+    static constexpr enum class TimeStepOrder {
+      /** Perform a first-order explicit Euler step. */
+      first_order,
+      /** Perform an SSP-RK2 step (Heun's method). */
+      second_order,
+      /** Perform an SSP-RK3 step (Third order Runge-Kutta method). */
+      third_order
+    };
+
+    /**
      * Constructor.
      */
     TimeStep(const MPI_Comm &mpi_communicator,
@@ -79,6 +101,30 @@ namespace ryujin
      */
     void prepare();
 
+    /**
+     * @name TimeStep compile time options
+     */
+    //@{
+
+    /**
+     * Selected approximation order in space.
+     * @ingroup CompileTimeOptions
+     */
+    static constexpr Order order_ = ORDER;
+
+    /**
+     * Selected approximation order in time.
+     * @ingroup CompileTimeOptions
+     */
+    static constexpr TimeStepOrder time_step_order_ = TIME_STEP_ORDER;
+
+    /**
+     * Selected number of limiter iterations.
+     * @ingroup CompileTimeOptions
+     */
+    static constexpr unsigned int limiter_iter_ = LIMITER_ITER;
+
+    //@}
     /**
      * @name Functons for performing explicit time steps
      */
@@ -128,21 +174,6 @@ namespace ryujin
     Number step(vector_type &U, Number t);
 
     //@}
-
-    /* Options: */
-
-    static constexpr enum class Order {
-      first_order,
-      second_order
-    } order_ = ORDER;
-
-    static constexpr enum class TimeStepOrder {
-      first_order,
-      second_order,
-      third_order
-    } time_step_order_ = TIME_STEP_ORDER;
-
-    static constexpr unsigned int limiter_iter_ = LIMITER_ITER;
 
   private:
     /**
