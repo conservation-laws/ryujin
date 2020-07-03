@@ -144,17 +144,10 @@ namespace ryujin
     void wait();
 
   private:
-    const MPI_Comm &mpi_communicator_;
-
-    dealii::SmartPointer<const ryujin::OfflineData<dim, Number>> offline_data_;
-
-    std::future<void> background_thread_status;
-
-    /* Scratch space: */
-
-    std::array<scalar_type, n_quantities> quantities_;
-
-    /* Options: */
+    /**
+     * @name Run time options
+     */
+    //@{
 
     bool use_mpi_io_;
     ACCESSOR_READ_ONLY(use_mpi_io)
@@ -165,7 +158,24 @@ namespace ryujin
     using plane_description = std::tuple<dealii::Point<dim> /*origin*/,
                                          dealii::Tensor<1, dim> /*normal*/,
                                          double /*tolerance*/>;
+
     std::vector<plane_description> output_planes_;
+
+    //@}
+    /**
+     * @name Internal data
+     */
+    //@{
+
+    const MPI_Comm &mpi_communicator_;
+
+    dealii::SmartPointer<const ryujin::OfflineData<dim, Number>> offline_data_;
+
+    std::future<void> background_thread_status;
+
+    std::array<scalar_type, n_quantities> quantities_;
+
+    //@}
   };
 
 } /* namespace ryujin */

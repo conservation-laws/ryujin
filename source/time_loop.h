@@ -24,19 +24,40 @@
 namespace ryujin
 {
 
+  /**
+   * The high-level time loop driving the computation.
+   *
+   * @ingroup TimeLoop
+   */
   template <int dim, typename Number = double>
   class TimeLoop final : public dealii::ParameterAcceptor
   {
   public:
+    /**
+     * @copydoc OfflineData::scalar_type
+     */
     using scalar_type = typename OfflineData<dim, Number>::scalar_type;
+
+    /**
+     * @copydoc OfflineData::vector_type
+     */
     using vector_type = typename OfflineData<dim, Number>::vector_type;
 
+    /**
+     * Constructor.
+     */
     TimeLoop(const MPI_Comm &mpi_comm);
 
+    /**
+     * Run the high-level time loop.
+     */
     void run();
 
-  private:
-    /* Private methods for run(): */
+  protected:
+    /**
+     * @name Private methods for run()
+     */
+    //@{
 
     void compute_error(const vector_type &U, Number t);
 
@@ -61,8 +82,14 @@ namespace ryujin
                                 unsigned int output_cycle,
                                 bool write_to_logfile = false,
                                 bool final_time = false);
+    //@}
 
-    /* Options: */
+  private:
+
+    /**
+     * @name Run time options
+     */
+    //@{
 
     std::string base_name;
 
@@ -83,7 +110,11 @@ namespace ryujin
 
     unsigned int terminal_update_interval;
 
-    /* Data: */
+    //@}
+    /**
+     * @name Internal data:
+     */
+    //@{
 
     const MPI_Comm &mpi_communicator;
 
@@ -99,6 +130,8 @@ namespace ryujin
     const unsigned int n_mpi_processes;
 
     std::ofstream logfile; /* log file */
+
+    //@}
   };
 
 } // namespace ryujin

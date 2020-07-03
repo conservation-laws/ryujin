@@ -148,6 +148,11 @@ namespace ryujin
     ACCESSOR_READ_ONLY(quadrature)
 
   private:
+    /**
+     * @name Run time options
+     */
+    //@{
+
     std::string geometry_;
 
     double mesh_distortion_;
@@ -159,7 +164,15 @@ namespace ryujin
     unsigned int order_mapping_;
     unsigned int order_quadrature_;
 
+    //@}
+    /**
+     * @name Internal data:
+     */
+    //@{
+
     std::set<std::unique_ptr<Geometry<dim>>> geometry_list_;
+
+    //@}
   };
 
 } /* namespace ryujin */

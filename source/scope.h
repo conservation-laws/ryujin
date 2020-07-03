@@ -13,9 +13,20 @@
 
 namespace ryujin
 {
+  /**
+   * A RAII scope for deal.II timer objects.
+   *
+   * This class does not perform MPI synchronization in contrast to the
+   * deal.II counterpart.
+   *
+   * @ingroup Miscellaneous
+   */
   class Scope
   {
   public:
+    /**
+     * Constructor. Starts a timer for the selected @p section.
+     */
     Scope(std::map<std::string, dealii::Timer> &computing_timer,
           const std::string &section)
         : computing_timer_(computing_timer)
@@ -27,6 +38,9 @@ namespace ryujin
 #endif
     }
 
+    /**
+     * Destructor. Stops the timer.
+     */
     ~Scope()
     {
 #ifdef DEBUG_OUTPUT

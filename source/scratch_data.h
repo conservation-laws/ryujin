@@ -14,10 +14,10 @@
 namespace ryujin
 {
 
-  /*
-   * internal scratch data for parallelized assembly.
+  /**
+   * Internal scratch data for thread parallelized assembly. See the
+   * deal.II Workstream documentation for details.
    */
-
   template <int dim>
   class AssemblyScratchData
   {
@@ -51,6 +51,10 @@ namespace ryujin
     dealii::FEFaceValues<dim> fe_face_values_;
   };
 
+  /**
+   * Internal copy data for thread parallelized assembly. See the deal.II
+   * Workstream documentation for details.
+   */
   template <int dim, typename Number = double>
   class AssemblyCopyData
   {

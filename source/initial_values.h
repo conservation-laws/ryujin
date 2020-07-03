@@ -86,6 +86,11 @@ namespace ryujin
                             Number t = 0);
 
   private:
+    /**
+     * @name Run time options
+     */
+    //@{
+
     std::string configuration_;
 
     dealii::Point<dim> initial_position_;
@@ -100,12 +105,20 @@ namespace ryujin
 
     Number perturbation_;
 
-    /*
+    //@}
+    /**
+     * @name Internal data:
+     */
+    //@{
+
+    /**
      * Internal function object that we use to implement the internal_state
      * function for all internal states:
      */
     std::function<rank1_type(const dealii::Point<dim> &point, Number t)>
         initial_state_;
+
+    //@}
   };
 
 } /* namespace ryujin */
