@@ -20,6 +20,7 @@ namespace ryujin
 {
   using namespace dealii;
 
+#ifndef DOXYGEN
   template <>
   const std::array<std::string, 2> Postprocessor<1, double>::component_names{
       "schlieren", "alpha"};
@@ -43,6 +44,7 @@ namespace ryujin
   template <>
   const std::array<std::string, 3> Postprocessor<3, float>::component_names{
       "schlieren", "vorticity", "alpha"};
+#endif
 
 
   template <int dim, typename Number>
@@ -402,7 +404,7 @@ namespace ryujin
               data_out_cutplanes->write_vtu_with_pvtu_record(
                   "", name + "-cutplanes", cycle, mpi_communicator_, 6);
             }
-            /* Explicitly delete pointer to free up memory: */
+            /* Explicitly delete pointer to free up memory early: */
             data_out.reset();
             data_out_cutplanes.reset();
           });

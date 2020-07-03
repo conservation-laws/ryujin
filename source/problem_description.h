@@ -18,13 +18,13 @@
 namespace ryujin
 {
   /**
-   * The nD compressible Euler problem
+   * The @p dim dimensional Euler problem.
    *
-   * We have a (2 + n) dimensional state space [rho, m_1, ..., m_n, E],
-   * where rho denotes the density, [m_1, ..., m_n] is the momentum vector
-   * field, and E is the total energy.
+   * We have a (2 + dim) dimensional state space \f$[\rho, \textbf m,
+   * E]\f$, where \f$\rho\f$ denotes the density, \f$\textbf m\f$ is the
+   * momentum, and \f$E\f$ is the total energy.
    *
-   * FIXME: Description
+   * @ingroup EulerStep
    */
   template <int dim, typename Number = double>
   class ProblemDescription
@@ -47,53 +47,79 @@ namespace ryujin
      */
     using ScalarNumber = typename get_value_type<Number>::type;
 
-    /**
-     * Gamma.
-     */
-    static constexpr ScalarNumber gamma = ScalarNumber(7.) / ScalarNumber(5.);
 
     /**
-     * 1 / Gamma.
+     * The storage type used for a state vector \f$\boldsymbol U\f$.
+     */
+    using rank1_type = dealii::Tensor<1, problem_dimension, Number>;
+
+
+    /**
+     * The storage type used for the flux \f$\mathbf{f}\f$.
+     */
+    using rank2_type =
+        dealii::Tensor<1, problem_dimension, dealii::Tensor<1, dim, Number>>;
+
+    /**
+     * @name ProblemDescription compile time options
+     */
+    //@{
+
+    /**
+     * Gamma \f$\gamma\f$.
+     * @ingroup CompileTimeOptions
+     */
+    static constexpr ScalarNumber gamma = GAMMA;
+
+    /**
+     * Covolume \f$b\f$.
+     * @ingroup CompileTimeOptions
+     */
+    static constexpr ScalarNumber b = COVOLUME;
+    static_assert(b == 0., "If you change this value, implement the rest...");
+
+    //@}
+    /**
+     * @name Compile-time constant derived quantities
+     */
+    //@{
+
+    /**
+     * \f[
+     *   \frac{1}{\gamma}
+     * \f]
      */
     static constexpr ScalarNumber gamma_inverse = ScalarNumber(1.) / gamma;
 
     /**
-     * 1 / (Gamma - 1).
+     * \f[
+     *   \frac{1}{\gamma - 1}
+     * \f]
      */
     static constexpr ScalarNumber gamma_minus_one_inverse =
         ScalarNumber(1.) / (gamma - ScalarNumber(1.));
 
     /**
-     * 1 / (Gamma + 1).
+     * \f[
+     *   \frac{1}{\gamma + 1}
+     * \f]
      */
     static constexpr ScalarNumber gamma_plus_one_inverse =
         ScalarNumber(1.) / (gamma + ScalarNumber(1.));
 
     /**
-     * (Gamma - 1) / (Gamma + 1).
+     * \f[
+     *   \frac{\gamma - 1}{\gamma + 1}
+     * \f]
      */
     static constexpr ScalarNumber gamma_minus_one_over_gamma_plus_one =
         (gamma - ScalarNumber(1.)) / (gamma + ScalarNumber(1.));
 
+    //@}
     /**
-     * Covolume b.
+     * @name Computing derived physical quantities.
      */
-    static constexpr ScalarNumber b = 0.;
-    static_assert(b == 0., "If you change this value, implement the rest...");
-
-
-    /**
-     * Denotes the storage type used for a state vector \f$\boldsymbol U\f$.
-     */
-    typedef dealii::Tensor<1, problem_dimension, Number> rank1_type;
-
-
-    /**
-     * Denotes the storage type used for the flux \f$\mathbf{f}\f$.
-     */
-    typedef dealii::Tensor<1, problem_dimension, dealii::Tensor<1, dim, Number>>
-        rank2_type;
-
+    //@{
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, return
@@ -104,21 +130,28 @@ namespace ryujin
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
-     * and return the internal energy \varepsilon = (\rho e).
+     * and return the internal energy \f$\varepsilon = (\rho e)\f$.
      */
     static Number internal_energy(const rank1_type &U);
 
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
-     * and return the derivative of the internal energy \varepsilon = (\rho e).
+     * and return the derivative of the internal energy
+     * \f$\varepsilon = (\rho e)\f$.
      */
     static rank1_type internal_energy_derivative(const rank1_type &U);
 
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
-     * and return the pressure .
+     * and return the pressure \f$p\f$.
+     *
+     * We assume that the pressure is given by a polytropic equation of
+     * state, i.e.,
+     * \f[
+     *   p = frac{\gamma - 1}{1 - b*\rho}\; (\rho e)
+     * \f]
      */
     static Number pressure(const rank1_type &U);
 
@@ -126,17 +159,19 @@ namespace ryujin
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
      * the (physical) speed of sound:
-     *
-     * Recall that
-     *   c^2 = gamma * p / rho / (1 - b * rho)
+     * \f[
+     *   c^2 = \frac{\gamma * p}{\rho\;(1 - b * \rho)}
+     * \f]
      */
     static Number speed_of_sound(const rank1_type &U);
 
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
-     * and return the specific entropy
-     * e^((\gamma-1)s) = (rho e) / rho ^ gamma.
+     * and return the (scaled) specific entropy
+     * \f[
+     *   e^{(\gamma-1)s} = \frac{\rho\,e}{\rho^\gamma}.
+     * \f]
      */
     static Number specific_entropy(const rank1_type &U);
 
@@ -144,8 +179,9 @@ namespace ryujin
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
      * and return the Harten-type entropy
-     *
-     *   \eta = (rho^2 e) ^ (1 / (gamma + 1))
+     * \f[
+     *   \eta = (\rho^2 e) ^ {1 / (\gamma + 1)}.
+     * \f]
      */
     static Number harten_entropy(const rank1_type &U);
 
@@ -153,32 +189,42 @@ namespace ryujin
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
      * and return the derivative \eta' of the Harten-type entropy
-     *
-     *   \eta = (rho^2 e) ^ (1 / (gamma + 1))
+     * \f[
+     *   \eta = (\rho^2 e) ^ {1 / (\gamma + 1)}.
+     * \f]
      */
     static rank1_type harten_entropy_derivative(const rank1_type &U);
 
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
-     * and return the entropy \eta = p^(1/\gamma)
+     * and return the entropy \f$\eta = p^{1/\gamma}\f$.
      */
     static Number mathematical_entropy(const rank1_type U);
 
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
-     * and return the derivative \eta' of the entropy \eta = p^(1/\gamma)
+     * and return the derivative \eta' of the entropy \f$\eta =
+     * p^{1/\gamma}\f$.
      */
     static rank1_type mathematical_entropy_derivative(const rank1_type U);
 
 
     /**
-     * Given a state @p U compute <code>f(U)</code>.
+     * Given a state @p U compute the flux
+     * \f[
+     * \begin{pmatrix}
+     *   \textbf m \\
+     *   \textbf v\otimes \textbf m + p\mathbb{I}_d \\
+     *   \textbf v(E+p)
+     * \end{pmatrix},
+     * \f]
      */
     static rank2_type f(const rank1_type &U);
   };
 
+  /* Inline definitions */
 
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, dim, Number>

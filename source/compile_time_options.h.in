@@ -34,6 +34,19 @@
 #cmakedefine VALGRIND_CALLGRIND
 
 /*
+ * class ProblemDescription:
+ */
+
+#ifndef GAMMA
+#define GAMMA ScalarNumber(7./5.)
+#endif
+
+#ifndef COVOLUME
+#define COVOLUME ScalarNumber(0.)
+#endif
+
+
+/*
  * class TimeStep:
  */
 

@@ -26,7 +26,9 @@
 
 namespace ryujin
 {
-
+  /**
+   *
+   */
   template <int dim, typename Number = double>
   class TimeStep final : public dealii::ParameterAcceptor
   {
