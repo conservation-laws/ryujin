@@ -69,13 +69,13 @@ namespace ryujin
      * Gamma \f$\gamma\f$.
      * @ingroup CompileTimeOptions
      */
-    static constexpr ScalarNumber gamma = GAMMA;
+    static constexpr ScalarNumber gamma = ScalarNumber(GAMMA);
 
     /**
      * Covolume \f$b\f$.
      * @ingroup CompileTimeOptions
      */
-    static constexpr ScalarNumber b = COVOLUME;
+    static constexpr ScalarNumber b = ScalarNumber(COVOLUME);
     static_assert(b == 0., "If you change this value, implement the rest...");
 
     //@}
@@ -89,7 +89,8 @@ namespace ryujin
      *   \frac{1}{\gamma}
      * \f]
      */
-    static constexpr ScalarNumber gamma_inverse = ScalarNumber(1.) / gamma;
+    static constexpr ScalarNumber gamma_inverse = //
+        ScalarNumber(1.) / gamma;
 
     /**
      * \f[
@@ -150,7 +151,7 @@ namespace ryujin
      * We assume that the pressure is given by a polytropic equation of
      * state, i.e.,
      * \f[
-     *   p = frac{\gamma - 1}{1 - b*\rho}\; (\rho e)
+     *   p = \frac{\gamma - 1}{1 - b*\rho}\; (\rho e)
      * \f]
      */
     static Number pressure(const rank1_type &U);

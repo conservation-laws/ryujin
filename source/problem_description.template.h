@@ -10,6 +10,7 @@
 
 namespace ryujin
 {
+#ifndef DOXYGEN
   template <>
   const std::array<std::string, 3> ProblemDescription<1>::component_names{
       "rho", "m", "E"};
@@ -34,6 +35,7 @@ namespace ryujin
   const std::array<std::string, 5>
       ProblemDescription<3, float>::component_names{
           "rho", "m_1", "m_2", "m_3", "E"};
+#endif
 
 } /* namespace ryujin */
 

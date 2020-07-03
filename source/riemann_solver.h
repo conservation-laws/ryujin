@@ -22,44 +22,53 @@ namespace ryujin
 
   /**
    * A fast approximative solver for the 1D Riemann problem. The solver
-   * ensures that the estimate lambda_max that is returned for the maximal
-   * wavespeed is a strict upper bound ensuring that all important
-   * invariance principles are obtained.
+   * ensures that the estimate \f$\lambda_{\text{max}}\f$ that is returned
+   * for the maximal wavespeed is a strict upper bound.
    *
-   * The solver is based on two publications [1,2].
+   * The solver is based on @cite GuermondPopov2016b.
    *
-   * References:
-   *   [1] J.-L. Guermond, B. Popov. Fast estimation from above for the
-   *       maximum wave speed in the Riemann problem for the Euler equations.
-   *
-   *   [2] J.-L. Guermond, et al. In progress.
+   * @ingroup EulerStep
    */
   template <int dim, typename Number = double>
   class RiemannSolver
   {
   public:
-    static constexpr unsigned int problem_dimension =
-        ProblemDescription<dim, Number>::problem_dimension;
+    /**
+     * @copydoc ProblemDescription::problem_dimension
+     */
+    // clang-format off
+    static constexpr unsigned int problem_dimension = ProblemDescription<dim, Number>::problem_dimension;
+    // clang-format on
 
+    /**
+     * @copydoc ProblemDescription::rank1_type
+     */
     using rank1_type = typename ProblemDescription<dim, Number>::rank1_type;
 
+    /**
+     * @copydoc ProblemDescription::ScalarNumber
+     */
     using ScalarNumber = typename get_value_type<Number>::type;
 
-    /*
-     * Options:
+    /**
+     * @name RiemannSolver compile time options
      */
+    //@{
 
+    /**
+     * Maximal number of Newton iterations used in the approximate Riemann to
+     * improve the upper bound \f$\lambda_{\text{max}}\f$ on the wavespeed.
+     * @ingroup CompileTimeOptions
+     */
     static constexpr unsigned int newton_max_iter_ = RIEMANN_NEWTON_MAX_ITER;
 
     /**
      * Try to improve the maximal wavespeed estimate. When enabled the
      * RiemannSolver also computes
-     *
      *  - appropriate bounds on density and specific entropy
-     *
      *  - average and flux of the state and a Harten entropy
-     *
      *  - does a full limiter pass against the inviscid Galerkin update
+     * @ingroup CompileTimeOptions
      */
     static constexpr bool greedy_dij_ = RIEMANN_GREEDY_DIJ;
 
@@ -70,11 +79,22 @@ namespace ryujin
      * density rho between two states is less than
      *   (1 - greedy_threshold_)/100 %
      * we simply don't do anything.
+     * @ingroup CompileTimeOptions
      */
-    static constexpr ScalarNumber greedy_threshold_ =
-        ScalarNumber(RIEMANN_GREEDY_THRESHOLD);
+    static constexpr ScalarNumber greedy_threshold_ = ScalarNumber(RIEMANN_GREEDY_THRESHOLD);
 
+    /**
+     * Relax computed bounds similarly to the mesh-dependent relaxation
+     * performed in the Limiter.
+     * @ingroup CompileTimeOptions
+     */
     static constexpr bool greedy_relax_bounds_ = RIEMANN_GREEDY_RELAX_BOUNDS;
+
+    //@}
+    /**
+     * @name Compute wavespeed estimates
+     */
+    //@{
 
     /**
      * For two given 1D primitive states riemann_data_i and riemann_data_j,
@@ -101,6 +121,8 @@ namespace ryujin
             const rank1_type &U_j,
             const dealii::Tensor<1, dim, Number> &n_ij,
             const Number hd_i = Number(0.));
+
+    //@}
   };
 
 } /* namespace ryujin */

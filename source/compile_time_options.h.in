@@ -38,11 +38,11 @@
  */
 
 #ifndef GAMMA
-#define GAMMA ScalarNumber(7./5.)
+#define GAMMA 7./5.
 #endif
 
 #ifndef COVOLUME
-#define COVOLUME ScalarNumber(0.)
+#define COVOLUME 0.
 #endif
 
 
