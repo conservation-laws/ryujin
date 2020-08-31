@@ -141,7 +141,8 @@ namespace ryujin
         enable_checkpointing || enable_output_full || enable_output_cutplanes;
 
     /* Attach log file: */
-    logfile.open(base_name + ".log");
+    if (mpi_rank == 0)
+      logfile.open(base_name + ".log");
 
     print_parameters(logfile);
 
