@@ -223,6 +223,8 @@ namespace ryujin
      * \f]
      */
     static rank2_type f(const rank1_type &U);
+
+    //@}
   };
 
   /* Inline definitions */

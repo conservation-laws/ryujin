@@ -14,6 +14,7 @@ include_directories(
 
 add_executable(ryujin
   discretization.cc
+  dissipation_module.cc
   euler_module.cc
   initial_values.cc
   limiter.cc

@@ -132,14 +132,12 @@ namespace ryujin
 
     /**
      * Given a reference to a previous state vector U perform an explicit
-     * euler step (and store the result in U). The function
+     * euler step (and store the result in U). The function returns the
+     * computed maximal time step size tau_max.
      *
-     *  - returns the computed maximal time step size tau_max
-     *
-     *  - performs a time step and populates the vector U_new by the
-     *    result. The time step is performed with either tau_max (if tau ==
-     *    0), or tau (if tau != 0). Here, tau_max is the computed maximal
-     *    time step size and tau is the optional third parameter.
+     * The time step is performed with either tau_max (if tau == 0), or tau
+     * (if tau != 0). Here, tau_max is the computed maximal time step size
+     * and tau is the optional third parameter.
      */
     Number euler_step(vector_type &U, Number t, Number tau = 0.);
 
