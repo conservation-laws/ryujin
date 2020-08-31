@@ -200,8 +200,24 @@ namespace ryujin
 
       /* Do a time step: */
 
-      const auto tau = euler_module.step(U, t);
-      t += tau;
+      if (problem_description.description() == "Euler") {
+
+        /* Pure hyperbolic update: */
+        const auto tau = euler_module.step(U, t);
+        t += tau;
+
+      } else if (problem_description.description() == "Navier Stokes") {
+
+        /* Strang's splitting: */
+        const auto tau = euler_module.step(U, t);
+        dissipation_module.step(U, t, 2. * tau);
+        euler_module.step(U, t + tau, tau);
+        t += 2. * tau;
+
+      } else {
+
+        AssertThrow(false, ExcMessage("Unknown problem description"));
+      }
 
       if (t > output_cycle * output_granularity) {
         if (write_output_files) {
