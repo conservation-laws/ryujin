@@ -1051,13 +1051,13 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  Number EulerModule<dim, Number>::ssph2_step(vector_type &U, Number t)
+  Number EulerModule<dim, Number>::ssph2_step(vector_type &U,
+                                              Number t,
+                                              Number tau_0 /*= 0*/)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "EulerModule<dim, Number>::ssph2_step()" << std::endl;
 #endif
-
-    Number tau_0 = 0.;
 
   restart_ssph2_step:
     /* This also copies ghost elements: */
@@ -1094,13 +1094,13 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  Number EulerModule<dim, Number>::ssprk3_step(vector_type &U, Number t)
+  Number EulerModule<dim, Number>::ssprk3_step(vector_type &U,
+                                               Number t,
+                                               Number tau_0 /*= 0*/)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "EulerModule<dim, Number>::ssprk3_step()" << std::endl;
 #endif
-
-    Number tau_0 = Number(0.);
 
   restart_ssprk3_step:
     /* This also copies ghost elements: */
@@ -1156,7 +1156,8 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  Number EulerModule<dim, Number>::step(vector_type &U, Number t)
+  Number
+  EulerModule<dim, Number>::step(vector_type &U, Number t, Number tau /*= 0*/)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "EulerModule<dim, Number>::step()" << std::endl;
@@ -1164,11 +1165,11 @@ namespace ryujin
 
     switch (time_step_order_) {
     case TimeStepOrder::first_order:
-      return euler_step(U, t);
+      return euler_step(U, t, tau);
     case TimeStepOrder::second_order:
-      return ssph2_step(U, t);
+      return ssph2_step(U, t, tau);
     case TimeStepOrder::third_order:
-      return ssprk3_step(U, t);
+      return ssprk3_step(U, t, tau);
     }
 
     __builtin_unreachable();

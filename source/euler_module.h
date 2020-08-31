@@ -143,23 +143,29 @@ namespace ryujin
 
     /**
      * Given a reference to a previous state vector U perform an explicit
-     * Heun 2nd order step (and store the result in U).
+     * Heun 2nd order step (and store the result in U). The function
+     * returns the computed maximal time step size tau_max.
      *
-     *  - returns the computed maximal time step size tau_max
+     * The time step is performed with either tau_max (if tau == 0), or tau
+     * (if tau != 0). Here, tau_max is the computed maximal time step size
+     * and tau is the optional third parameter.
      *
      * See @cite Shu_1988, Eq. 2.15.
      */
-    Number ssph2_step(vector_type &U, Number t);
+    Number ssph2_step(vector_type &U, Number t, Number tau = 0.);
 
     /**
      * Given a reference to a previous state vector U perform an explicit
-     * SSP Runge Kutta 3rd order step (and store the result in U).
+     * SSP Runge Kutta 3rd order step (and store the result in U). The
+     * function returns the computed maximal time step size tau_max.
      *
-     *  - returns the computed maximal time step size tau_max
+     * The time step is performed with either tau_max (if tau == 0), or tau
+     * (if tau != 0). Here, tau_max is the computed maximal time step size
+     * and tau is the optional third parameter.
      *
      * See @cite Shu_1988, Eq. 2.18.
      */
-    Number ssprk3_step(vector_type &U, Number t);
+    Number ssprk3_step(vector_type &U, Number t, Number tau = 0.);
 
     /**
      * Given a reference to a previous state vector U perform an explicit
@@ -168,8 +174,12 @@ namespace ryujin
      *
      * This function switches between euler_step(), ssph2_step(), or
      * ssprk3_step() depending on selected approximation order.
+     *
+     * The time step is performed with either tau_max (if tau == 0), or tau
+     * (if tau != 0). Here, tau_max is the computed maximal time step size
+     * and tau is the optional third parameter.
      */
-    Number step(vector_type &U, Number t);
+    Number step(vector_type &U, Number t, Number tau = 0.);
 
     //@}
 
