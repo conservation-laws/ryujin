@@ -64,28 +64,6 @@ namespace ryujin
     using vector_type = typename OfflineData<dim, Number>::vector_type;
 
     /**
-     * An enum for the approximation order in space.
-     */
-    enum class Order {
-      /** Use the first-order provisional update. */
-      first_order,
-      /** Use the second order method with convex limiting. */
-      second_order
-    };
-
-    /**
-     * An enum for the approximation order in space.
-     */
-    enum class TimeStepOrder {
-      /** Perform a first-order explicit Euler step. */
-      first_order,
-      /** Perform an SSP-RK2 step (Heun's method). */
-      second_order,
-      /** Perform an SSP-RK3 step (Third order Runge-Kutta method). */
-      third_order
-    };
-
-    /**
      * Constructor.
      */
     EulerModule(const MPI_Comm &mpi_communicator,
@@ -101,30 +79,6 @@ namespace ryujin
      */
     void prepare();
 
-    /**
-     * @name EulerModule compile time options
-     */
-    //@{
-
-    /**
-     * Selected approximation order in space.
-     * @ingroup CompileTimeOptions
-     */
-    static constexpr Order order_ = ORDER;
-
-    /**
-     * Selected approximation order in time.
-     * @ingroup CompileTimeOptions
-     */
-    static constexpr TimeStepOrder time_step_order_ = TIME_STEP_ORDER;
-
-    /**
-     * Selected number of limiter iterations.
-     * @ingroup CompileTimeOptions
-     */
-    static constexpr unsigned int limiter_iter_ = LIMITER_ITER;
-
-    //@}
     /**
      * @name Functons for performing explicit time steps
      */
@@ -191,6 +145,11 @@ namespace ryujin
 
     Number cfl_update_;
     Number cfl_max_;
+
+    unsigned int time_step_order_;
+    unsigned int limiter_iter_;
+
+    //@}
 
     //@}
     /**

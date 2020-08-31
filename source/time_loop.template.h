@@ -535,31 +535,6 @@ namespace ryujin
     stream << "RiemannSolver<dim, Number>::greedy_relax_bounds_ == "
             <<  RiemannSolver<dim, Number>::greedy_relax_bounds_ << std::endl;
 
-    stream << "EulerModule<dim, Number>::order_ == ";
-    switch (EulerModule<dim, Number>::order_) {
-    case EulerModule<dim, Number>::Order::first_order:
-      stream << "EulerModule<dim, Number>::Order::first_order" << std::endl;
-      break;
-    case EulerModule<dim, Number>::Order::second_order:
-      stream << "EulerModule<dim, Number>::Order::second_order" << std::endl;
-    }
-
-    stream << "EulerModule<dim, Number>::time_step_order_ == ";
-    switch (EulerModule<dim, Number>::time_step_order_) {
-    case EulerModule<dim, Number>::TimeStepOrder::first_order:
-      stream << "EulerModule<dim, Number>::TimeStepOrder::first_order" << std::endl;
-      break;
-    case EulerModule<dim, Number>::TimeStepOrder::second_order:
-      stream << "EulerModule<dim, Number>::TimeStepOrder::second_order" << std::endl;
-      break;
-    case EulerModule<dim, Number>::TimeStepOrder::third_order:
-      stream << "EulerModule<dim, Number>::TimeStepOrder::third_order" << std::endl;
-      break;
-    }
-
-    stream << "EulerModule<dim, Number>::limiter_iter_ == "
-            <<  EulerModule<dim, Number>::limiter_iter_ << std::endl;
-
     /* clang-format on */
 
     stream << std::endl;

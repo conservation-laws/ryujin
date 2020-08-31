@@ -60,6 +60,17 @@ namespace ryujin
     cfl_max_ = Number(1.0);
     add_parameter(
         "cfl max", cfl_max_, "Maximal admissible relative CFL constant");
+
+    time_step_order_ = 3;
+    add_parameter(
+        "time step order",
+        time_step_order_,
+        "Approximation order of time stepping method. Switches between Forward "
+        "Euler, SSP Heun, and SSP Runge Kutta 3rd order");
+
+    limiter_iter_ = 2;
+    add_parameter(
+        "limiter iterations", limiter_iter_, "Number of limiter iterations");
   }
 
 
@@ -429,9 +440,6 @@ namespace ryujin
       }
     }
 
-    constexpr unsigned int n_passes =
-        (order_ == Order::second_order ? limiter_iter_ : 0);
-
     /*
      * Step 3: Low-order update, also compute limiter bounds, R_i
      *
@@ -447,7 +455,7 @@ namespace ryujin
                   "time step 3 - l.-o. update, bounds, and r_i");
 
       SynchronizationDispatch synchronization_dispatch([&]() {
-        if (n_passes != 0) {
+        if (RYUJIN_LIKELY(limiter_iter_ != 0)) {
           r_.update_ghost_values_start(channel++);
         } else {
           /* If we do not do high-order, synchronize at this point: */
@@ -527,7 +535,7 @@ namespace ryujin
                                     /* is diagonal */ col_idx == 0);
         }
 
-        if constexpr (n_passes == 0) {
+        if (RYUJIN_UNLIKELY(limiter_iter_ == 0)) {
           /* Fix up boundary: */
           const auto it = boundary_map.find(i);
           if (it != boundary_map.end()) {
@@ -642,9 +650,7 @@ namespace ryujin
     {
       Scope scope(computing_timer_, "time step 3 - synchronization");
 
-      if constexpr (n_passes != 0) {
-      }
-      if (n_passes != 0) {
+      if (RYUJIN_LIKELY(limiter_iter_ != 0)) {
         r_.update_ghost_values_finish();
       } else {
         /* If we do not do high-order, synchronize at this point: */
@@ -659,7 +665,7 @@ namespace ryujin
      *                                (b_ij R_j - b_ji R_i) )
      */
 
-    if constexpr (n_passes != 0) {
+    if (RYUJIN_LIKELY(limiter_iter_ != 0)) {
       Scope scope(computing_timer_, "time step 4 - compute p_ij, and l_ij");
 
       SynchronizationDispatch synchronization_dispatch(
@@ -785,25 +791,26 @@ namespace ryujin
       RYUJIN_PARALLEL_REGION_END
     }
 
-    if constexpr (n_passes != 0) {
+    if (RYUJIN_LIKELY(limiter_iter_ != 0)) {
       Scope scope(computing_timer_, "time step 4 - synchronization");
 
       lij_matrix_.update_ghost_rows_finish();
     }
 
     /*
-     * Step 5, 6, ..., 4 + n_passes: Perform high-order update:
+     * Step 5, 6, ..., 4 + limiter_iter_: Perform high-order update:
      *
      *   Symmetrize l_ij
      *   High-order update: += l_ij * lambda * P_ij
      *   Compute next l_ij
      */
 
-    for (unsigned int pass = 0; pass < n_passes; ++pass) {
+    for (unsigned int pass = 0; pass < limiter_iter_; ++pass) {
 
       std::string step_no = std::to_string(5 + pass);
-      std::string additional_step = pass + 1 < n_passes ? ", next l_ij" : "";
-      bool last_round = (pass + 1 == n_passes);
+      std::string additional_step =
+          pass + 1 < limiter_iter_ ? ", next l_ij" : "";
+      bool last_round = (pass + 1 == limiter_iter_);
 
       {
         Scope scope(computing_timer_,
@@ -913,7 +920,11 @@ namespace ryujin
             const auto new_l_ij =
                 Limiter<dim, Number>::limit(bounds, U_i_new, new_p_ij);
 
-            if constexpr (n_passes == 2) {
+            /*
+             * FIXME: If this if statement causes too much of a performance
+             * penalty we could refactor it outside of the main loop.
+             */
+            if (RYUJIN_LIKELY(limiter_iter_ == 2)) {
               /*
                * Shortcut: We omit updating the p_ij vector and simply
                * write (1 - l_ij^(1)) * l_ij^(2) into the l_ij matrix. This
@@ -1002,7 +1013,11 @@ namespace ryujin
             const auto new_l_ij =
                 Limiter<dim, VA>::limit(bounds, U_i_new, new_p_ij);
 
-            if constexpr (n_passes == 2) {
+            /*
+             * FIXME: If this if statement causes too much of a performance
+             * penalty we could refactor it outside of the main loop.
+             */
+            if (RYUJIN_LIKELY(limiter_iter_ == 2)) {
               /*
                * Shortcut: We omit updating the p_ij vector and simply
                * write (1 - l_ij^(1)) * l_ij^(2) into the l_ij matrix. This
@@ -1164,12 +1179,17 @@ namespace ryujin
 #endif
 
     switch (time_step_order_) {
-    case TimeStepOrder::first_order:
+    case 1:
       return euler_step(U, t, tau);
-    case TimeStepOrder::second_order:
+    case 2:
       return ssph2_step(U, t, tau);
-    case TimeStepOrder::third_order:
+    case 3:
       return ssprk3_step(U, t, tau);
+    default:
+      AssertThrow(false,
+                  ExcMessage("The chosen order of the time stepping method "
+                             "must be in the interval [1, 3]"));
+      __builtin_trap();
     }
 
     __builtin_unreachable();
