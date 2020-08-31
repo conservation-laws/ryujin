@@ -4,3 +4,10 @@
 //
 
 #include "problem_description.template.h"
+
+namespace ryujin
+{
+  /* instantiations */
+  template class ryujin::ProblemDescription<DIM, NUMBER>;
+
+} /* namespace ryujin */

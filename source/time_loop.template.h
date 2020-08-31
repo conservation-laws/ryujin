@@ -36,15 +36,21 @@ namespace ryujin
   TimeLoop<dim, Number>::TimeLoop(const MPI_Comm &mpi_comm)
       : ParameterAcceptor("/A - TimeLoop")
       , mpi_communicator(mpi_comm)
-      , discretization(mpi_communicator, "/B - Discretization")
-      , offline_data(mpi_communicator, discretization, "/C - OfflineData")
-      , initial_values("/D - InitialValues")
+      , problem_description("/B - ProblemDescription")
+      , discretization(mpi_communicator, "/C - Discretization")
+      , offline_data(mpi_communicator, discretization, "/D - OfflineData")
+      , initial_values("/E - InitialValues")
       , euler_module(mpi_communicator,
                      computing_timer,
                      offline_data,
                      initial_values,
-                     "/E - EulerModule")
-      , postprocessor(mpi_communicator, offline_data, "/F - Postprocessor")
+                     "/F - EulerModule")
+      , dissipation_module(mpi_communicator,
+                           computing_timer,
+                           offline_data,
+                           initial_values,
+                           "/G - DissipationModule")
+      , postprocessor(mpi_communicator, offline_data, "/H - Postprocessor")
       , mpi_rank(dealii::Utilities::MPI::this_mpi_process(mpi_communicator))
       , n_mpi_processes(
             dealii::Utilities::MPI::n_mpi_processes(mpi_communicator))
@@ -152,6 +158,7 @@ namespace ryujin
       discretization.prepare();
       offline_data.prepare();
       euler_module.prepare();
+      dissipation_module.prepare();
       postprocessor.prepare();
 
       print_mpi_partition(logfile);
@@ -427,6 +434,9 @@ namespace ryujin
 
     stream << std::endl
            << std::endl << "Compile time parameters:" << std::endl << std::endl;
+
+    stream << "gamma == " << ProblemDescription<dim>::gamma << std::endl;
+    stream << "b == " << ProblemDescription<dim>::b << std::endl;
 
     stream << "DIM == " << dim << std::endl;
     stream << "NUMBER == " << typeid(Number).name() << std::endl;

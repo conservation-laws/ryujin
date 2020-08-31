@@ -9,10 +9,12 @@
 #include <compile_time_options.h>
 
 #include "discretization.h"
+#include "dissipation_module.h"
+#include "euler_module.h"
 #include "initial_values.h"
 #include "offline_data.h"
 #include "postprocessor.h"
-#include "euler_module.h"
+#include "problem_description.h"
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/timer.h>
@@ -120,10 +122,12 @@ namespace ryujin
 
     std::map<std::string, dealii::Timer> computing_timer;
 
+    ryujin::ProblemDescription<dim> problem_description;
     ryujin::Discretization<dim> discretization;
     ryujin::OfflineData<dim, Number> offline_data;
     ryujin::InitialValues<dim, Number> initial_values;
     ryujin::EulerModule<dim, Number> euler_module;
+    ryujin::DissipationModule<dim, Number> dissipation_module;
     ryujin::Postprocessor<dim, Number> postprocessor;
 
     const unsigned int mpi_rank;

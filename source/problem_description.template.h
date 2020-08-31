@@ -10,6 +10,31 @@
 
 namespace ryujin
 {
+  using namespace dealii;
+
+
+  template <int dim, typename Number>
+  ProblemDescription<dim, Number>::ProblemDescription(
+      const std::string &subsection /*= "ProblemDescription"*/)
+      : ParameterAcceptor(subsection)
+  {
+    description_ = "Euler";
+    add_parameter(
+        "Description",
+        description_,
+        "Description - valid options are \"Euler\" and \"Navier Stokes\"");
+
+    mu_ = Number(1.e-3);
+    add_parameter("mu", mu_, "Navier Stokes: Shear viscosity");
+
+    lambda_ = Number(0.);
+    add_parameter("lambda", lambda_, "Navier Stokes: Bulk viscosity");
+
+    kappa_ = Number(5.e-3);
+    add_parameter("kappa", kappa_, "Navier Stokes: Thermal conductivity");
+  }
+
+
 #ifndef DOXYGEN
   template <>
   const std::array<std::string, 3> ProblemDescription<1>::component_names{

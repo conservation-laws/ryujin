@@ -8,8 +8,10 @@
 
 #include <compile_time_options.h>
 
+#include "convenience_macros.h"
 #include "simd.h"
 
+#include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/tensor.h>
 
 #include <array>
@@ -18,7 +20,7 @@
 namespace ryujin
 {
   /**
-   * The @p dim dimensional Euler problem.
+   * Description of a @p dim dimensional hyperbolic conservation law.
    *
    * We have a (2 + dim) dimensional state space \f$[\rho, \textbf m,
    * E]\f$, where \f$\rho\f$ denotes the density, \f$\textbf m\f$ is the
@@ -27,7 +29,7 @@ namespace ryujin
    * @ingroup EulerModule
    */
   template <int dim, typename Number = double>
-  class ProblemDescription
+  class ProblemDescription final : public dealii::ParameterAcceptor
   {
   public:
     /**
@@ -47,18 +49,21 @@ namespace ryujin
      */
     using ScalarNumber = typename get_value_type<Number>::type;
 
-
     /**
      * The storage type used for a state vector \f$\boldsymbol U\f$.
      */
     using rank1_type = dealii::Tensor<1, problem_dimension, Number>;
-
 
     /**
      * The storage type used for the flux \f$\mathbf{f}\f$.
      */
     using rank2_type =
         dealii::Tensor<1, problem_dimension, dealii::Tensor<1, dim, Number>>;
+
+    /**
+     * Constructor.
+     */
+    ProblemDescription(const std::string &subsection = "ProblemDescription");
 
     /**
      * @name ProblemDescription compile time options
@@ -223,6 +228,21 @@ namespace ryujin
      * \f]
      */
     static rank2_type f(const rank1_type &U);
+
+    //@}
+
+  private:
+    /**
+     * @name Run time options
+     */
+    //@{
+
+    std::string description_;
+    ACCESSOR_READ_ONLY(description)
+
+    Number mu_;
+    Number lambda_;
+    Number kappa_;
 
     //@}
   };

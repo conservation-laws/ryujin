@@ -7,7 +7,11 @@ subsection A - TimeLoop
   set output granularity     = 0.2
 end
 
-subsection B - Discretization
+subsection B - ProblemDescription
+  set Description = Euler
+end
+
+subsection C - Discretization
   set geometry           = validation
 
   set mesh refinement = 7
@@ -17,7 +21,7 @@ subsection B - Discretization
   end
 end
 
-subsection D - InitialValues
+subsection E - InitialValues
   set configuration         = isentropic vortex
 
   set initial - 1d state    = 1.4, 0, 1
@@ -28,7 +32,7 @@ subsection D - InitialValues
   set vortex - beta         = 5
 end
 
-subsection E - TimeStep
+subsection F - EulerModule
   set cfl max    = 0.4
   set cfl update = 0.2
 end
