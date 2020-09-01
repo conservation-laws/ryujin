@@ -13,7 +13,6 @@
 #include "simd.h"
 
 #include <deal.II/base/vectorization.h>
-#include <deal.II/lac/la_parallel_vector.templates.h>
 
 
 namespace ryujin

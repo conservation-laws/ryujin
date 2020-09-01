@@ -14,8 +14,6 @@
 
 #include "problem_description.h"
 
-#include <deal.II/lac/la_parallel_vector.templates.h>
-
 namespace ryujin
 {
   /**

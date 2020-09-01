@@ -18,7 +18,7 @@
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/timer.h>
-#include <deal.II/lac/la_parallel_vector.h>
+#include <deal.II/lac/la_parallel_block_vector.h>
 #include <deal.II/lac/sparse_matrix.templates.h>
 #include <deal.II/lac/vector.h>
 
@@ -47,11 +47,6 @@ namespace ryujin
     using rank1_type = typename ProblemDescription<dim, Number>::rank1_type;
 
     /**
-     * @copydoc ProblemDescription::rank2_type
-     */
-    using rank2_type = typename ProblemDescription<dim, Number>::rank2_type;
-
-    /**
      * @copydoc OfflineData::scalar_type
      */
     using scalar_type = typename OfflineData<dim, Number>::scalar_type;
@@ -60,6 +55,13 @@ namespace ryujin
      * @copydoc OfflineData::vector_type
      */
     using vector_type = typename OfflineData<dim, Number>::vector_type;
+
+    /**
+     * A distributed block vector used for temporary storage of the
+     * velocity field.
+     */
+    using block_vector_type =
+        dealii::LinearAlgebra::distributed::BlockVector<Number>;
 
     /**
      * Constructor.
@@ -120,7 +122,12 @@ namespace ryujin
     dealii::SmartPointer<const ryujin::InitialValues<dim, Number>>
         initial_values_;
 
+    block_vector_type momentum_n_;
+    scalar_type density_n_;
+    scalar_type internal_energy_n_;
 
+    block_vector_type velocity_;
+    scalar_type internal_energy_;
     //@}
   };
 

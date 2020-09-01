@@ -148,7 +148,7 @@ namespace ryujin
      * Step 0: Precompute f(U) and the entropies of U
      */
     {
-      Scope scope(computing_timer_, "time step 0 - compute entropies");
+      Scope scope(computing_timer_, "time step [E] 0 - compute entropies");
 
       RYUJIN_PARALLEL_REGION_BEGIN
       LIKWID_MARKER_START("time_step_0");
@@ -212,7 +212,7 @@ namespace ryujin
      */
 
     {
-      Scope scope(computing_timer_, "time step 1 - compute d_ij, and alpha_i");
+      Scope scope(computing_timer_, "time step [E] 1 - compute d_ij, and alpha_i");
 
       SynchronizationDispatch synchronization_dispatch([&]() {
         alpha_.update_ghost_values_start(channel++);
@@ -358,7 +358,7 @@ namespace ryujin
     std::atomic<Number> tau_max{std::numeric_limits<Number>::infinity()};
 
     {
-      Scope scope(computing_timer_, "time step 2 - compute d_ii, and tau_max");
+      Scope scope(computing_timer_, "time step [E] 2 - compute d_ii, and tau_max");
 
       /* Parallel region */
       RYUJIN_PARALLEL_REGION_BEGIN
@@ -409,7 +409,7 @@ namespace ryujin
     }
 
     {
-      Scope scope(computing_timer_, "time step 2 - synchronization barrier");
+      Scope scope(computing_timer_, "time step [E] 2 - synchronization barrier");
 
       alpha_.update_ghost_values_finish();
       second_variations_.update_ghost_values_finish();
@@ -452,7 +452,7 @@ namespace ryujin
 
     {
       Scope scope(computing_timer_,
-                  "time step 3 - l.-o. update, bounds, and r_i");
+                  "time step [E] 3 - l.-o. update, bounds, and r_i");
 
       SynchronizationDispatch synchronization_dispatch([&]() {
         if (RYUJIN_LIKELY(limiter_iter_ != 0)) {
@@ -657,7 +657,7 @@ namespace ryujin
     }
 
     {
-      Scope scope(computing_timer_, "time step 3 - synchronization");
+      Scope scope(computing_timer_, "time step [E] 3 - synchronization");
 
       if (RYUJIN_LIKELY(limiter_iter_ != 0)) {
         r_.update_ghost_values_finish();
@@ -675,7 +675,7 @@ namespace ryujin
      */
 
     if (RYUJIN_LIKELY(limiter_iter_ != 0)) {
-      Scope scope(computing_timer_, "time step 4 - compute p_ij, and l_ij");
+      Scope scope(computing_timer_, "time step [E] 4 - compute p_ij, and l_ij");
 
       SynchronizationDispatch synchronization_dispatch(
           [&]() { lij_matrix_.update_ghost_rows_start(channel++); });
@@ -801,7 +801,7 @@ namespace ryujin
     }
 
     if (RYUJIN_LIKELY(limiter_iter_ != 0)) {
-      Scope scope(computing_timer_, "time step 4 - synchronization");
+      Scope scope(computing_timer_, "time step [E] 4 - synchronization");
 
       lij_matrix_.update_ghost_rows_finish();
     }
@@ -823,7 +823,7 @@ namespace ryujin
 
       {
         Scope scope(computing_timer_,
-                    "time step " + step_no + " - " +
+                    "time step [E] " + step_no + " - " +
                         "symmetrize l_ij, h.-o. update" + additional_step);
 
         SynchronizationDispatch synchronization_dispatch([&]() {
@@ -1054,7 +1054,7 @@ namespace ryujin
 
       {
         Scope scope(computing_timer_,
-                    "time step " + step_no + " - synchronization");
+                    "time step [E] " + step_no + " - synchronization");
 
         if (last_round)
           temp_euler_.update_ghost_values_finish();
