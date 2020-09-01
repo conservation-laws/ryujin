@@ -60,11 +60,24 @@ namespace ryujin
 
     /**
      * On (free) slip boundary degrees of freedom we enforce a vanishing
-     * normal component of the momentum. This is done by explicitly
-     * removing the normal component of the momentum for the degree of
-     * freedom at the end of TimeStep::euler_step().
+     * normal component of the momentum in the Euler module. This is done
+     * by explicitly removing the normal component of the momentum for the
+     * degree of freedom at the end of TimeStep::euler_step(). In the
+     * dissipation module \f$v\cdot n\f$ is enforced strongly which leads
+     * to a natural boundary condition on the symmetric stress tensor:
+     * \f$\tau\cdot\mathbb{S}(v)\cdot\n\f$.
      */
     slip = 2,
+
+    /**
+     * On no-slip boundary degrees of freedom we enforce a vanishing normal
+     * component of the momentum in the Euler module. This is done by
+     * explicitly removing the normal component of the momentum for the
+     * degree of freedom at the end of TimeStep::euler_step(). In the
+     * dissipation module a vanishing velocity \f$v=0f$ is enforced
+     * strongly.
+     */
+    no_slip = 3,
 
     /**
      * On degrees of freedom marked as Dirichlet boundary we reset the
@@ -76,7 +89,7 @@ namespace ryujin
      * shock front or other flow feature must reach a Dirichlet boundary
      * degree of freedom during the computation.
      */
-    dirichlet = 3,
+    dirichlet = 4,
   };
 
   /**

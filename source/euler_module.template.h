@@ -541,15 +541,24 @@ namespace ryujin
           if (it != boundary_map.end()) {
             const auto &[normal, id, position] = it->second;
 
-            /* On boundary 1 remove the normal component of the momentum: */
-            if (id == Boundary::slip) {
+            /*
+             * Remove the normal component of the momentum for slip and
+             * "no_slip" boundary conditions. It is a bit counterintuitive,
+             * but we have to treat "no_slip" boundary conditions the same
+             * way as "slip" boundary conditions in the Euler module. The
+             * reason lies in the Strang splitting that we use to separate
+             * the hyperbolic part from viscous effects. Only the latter
+             * can cause "no slip" and thus the actual enforcement of v = 0
+             * happens in the dissipation module.
+             */
+            if (id == Boundary::slip || id == Boundary::no_slip) {
               auto m = ProblemDescription<dim, Number>::momentum(U_i_new);
               m -= 1. * (m * normal) * normal;
               for (unsigned int k = 0; k < dim; ++k)
                 U_i_new[k + 1] = m[k];
             }
 
-            /* On boundary 2 enforce initial conditions: */
+            /* On Dirichlet boundaries enforce initial conditions: */
             if (id == Boundary::dirichlet) {
               U_i_new = initial_values_->initial_state(position, t + tau);
             }
@@ -865,15 +874,15 @@ namespace ryujin
             if (it != boundary_map.end()) {
               const auto &[normal, id, position] = it->second;
 
-              /* On boundary 1 remove the normal component of the momentum: */
-              if (id == Boundary::slip) {
+              /* see comment above */
+              if (id == Boundary::slip || id == Boundary::no_slip) {
                 auto m = ProblemDescription<dim, Number>::momentum(U_i_new);
                 m -= 1. * (m * normal) * normal;
                 for (unsigned int k = 0; k < dim; ++k)
                   U_i_new[k + 1] = m[k];
               }
 
-              /* On boundary 2 enforce initial conditions: */
+              /* see comment above */
               if (id == Boundary::dirichlet) {
                 U_i_new = initial_values_->initial_state(position, t + tau);
               }
