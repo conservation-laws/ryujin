@@ -1066,22 +1066,22 @@ namespace ryujin
     /* Step 1: U1 = U_old + tau * L(U_old) */
     Number tau_1 = euler_step(U, t, tau_0);
 
-    AssertThrow(tau_1 >= tau_0,
+    AssertThrow(tau_1 * cfl_max_ / cfl_update_ >= tau_0,
                 ExcMessage("failed to recover from CFL violation"));
     tau_1 = (tau_0 == 0. ? tau_1 : tau_0);
 
     /* Step 2: U2 = 1/2 U_old + 1/2 (U1 + tau L(U1)) */
     const Number tau_2 = euler_step(U, t, tau_1);
 
-    AssertThrow(tau_2 >= tau_0,
+    AssertThrow(tau_2 * cfl_max_ / cfl_update_ >= tau_0,
                 ExcMessage("failed to recover from CFL violation"));
 
-    if (tau_2 * cfl_max_ < tau_1 * cfl_update_) {
+    if (tau_2 * cfl_max_ / cfl_update_ < tau_1) {
       /* Restart and force smaller time step: */
 #ifdef DEBUG_OUTPUT
-      std::cout << "        insufficient CFL, restart" << std::endl;
+      std::cout << "        insufficient step size, restart" << std::endl;
 #endif
-      tau_0 = tau_2 * cfl_update_;
+      tau_0 = tau_2;
       U.swap(temp_ssp_);
       ++n_restarts_;
       goto restart_ssph2_step;
@@ -1109,22 +1109,22 @@ namespace ryujin
     /* Step 1: U1 = U_old + tau * L(U_old) */
     Number tau_1 = euler_step(U, t, tau_0);
 
-    AssertThrow(tau_1 >= tau_0,
+    AssertThrow(tau_1 * cfl_max_ / cfl_update_ >= tau_0,
                 ExcMessage("failed to recover from CFL violation"));
     tau_1 = (tau_0 == 0. ? tau_1 : tau_0);
 
     /* Step 2: U2 = 3/4 U_old + 1/4 (U1 + tau L(U1)) */
     const Number tau_2 = euler_step(U, t, tau_1);
 
-    AssertThrow(tau_2 >= tau_0,
+    AssertThrow(tau_2 * cfl_max_ / cfl_update_ >= tau_0,
                 ExcMessage("failed to recover from CFL violation"));
 
-    if (tau_2 * cfl_max_ < tau_1 * cfl_update_) {
+    if (tau_2 * cfl_max_ / cfl_update_ < tau_1) {
       /* Restart and force smaller time step: */
 #ifdef DEBUG_OUTPUT
-      std::cout << "        insufficient CFL, restart" << std::endl;
+      std::cout << "        insufficient step size, restart" << std::endl;
 #endif
-      tau_0 = tau_2 * cfl_update_;
+      tau_0 = tau_2;
       U.swap(temp_ssp_);
       ++n_restarts_;
       goto restart_ssprk3_step;
@@ -1135,15 +1135,15 @@ namespace ryujin
     /* Step 3: U_new = 1/3 U_old + 2/3 (U2 + tau L(U2)) */
     const Number tau_3 = euler_step(U, t, tau_1);
 
-    AssertThrow(tau_3 >= tau_0,
+    AssertThrow(tau_3 * cfl_max_ / cfl_update_ >= tau_0,
                 ExcMessage("failed to recover from CFL violation"));
 
     if (tau_3 * cfl_max_ < tau_1 * cfl_update_) {
       /* Restart and force smaller time step: */
 #ifdef DEBUG_OUTPUT
-      std::cout << "        insufficient CFL, restart" << std::endl;
+      std::cout << "        insufficient step size, restart" << std::endl;
 #endif
-      tau_0 = tau_3 * cfl_update_;
+      tau_0 = tau_3;
       U.swap(temp_ssp_);
       ++n_restarts_;
       goto restart_ssprk3_step;
