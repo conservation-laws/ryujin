@@ -554,6 +554,59 @@ namespace ryujin
 
 
     /**
+     * A 2D shocktube configuration for generating a viscous boundary
+     * layer.
+     *
+     * A rectangular domain with given length and height. The boundary
+     * conditions are Dirichlet conditions on the left of the domain,
+     * slip boundary conditions on the top, and no_slip boundary conditions
+     * on bottom and right boundary.
+     *
+     * @ingroup Mesh
+     */
+    template <int dim>
+    class ShockTube : public Geometry<dim>
+    {
+    public:
+      ShockTube(const std::string subsection)
+          : Geometry<dim>("shocktube", subsection)
+      {
+        length_ = 1.0;
+        this->add_parameter(
+            "length", length_, "length of computational domain");
+
+        height_ = 0.5;
+        this->add_parameter(
+            "height", height_, "height of computational domain");
+      }
+
+      virtual void create_triangulation(
+          typename Geometry<dim>::Triangulation &triangulation) final override
+      {
+        dealii::Triangulation<dim, dim> tria1;
+        dealii::GridGenerator::subdivided_hyper_rectangle(
+            tria1,
+            {2, 1},
+            dealii::Point<2>(),
+            dealii::Point<2>(length_, height_));
+        triangulation.copy_triangulation(tria1);
+
+        for (auto cell : triangulation.active_cell_iterators())
+          for (auto f : dealii::GeometryInfo<dim>::face_indices()) {
+            const auto face = cell->face(f);
+            if (!face->at_boundary())
+              continue;
+            face->set_boundary_id(Boundary::dirichlet);
+          }
+      }
+
+    private:
+      double length_;
+      double height_;
+    };
+
+
+    /**
      * Describes a geometry used for validation: The (scaled) unit
      * hypercube with Dirichlet data.
      *
