@@ -68,15 +68,19 @@ namespace ryujin
     /* Initialize vectors: */
 
     const auto &scalar_partitioner = offline_data_->scalar_partitioner();
+
+    momentum_n_.reinit(dim);
+    for (unsigned int i = 0; i < dim; ++i) {
+      momentum_n_.block(i).reinit(scalar_partitioner);
+    }
     density_n_.reinit(scalar_partitioner);
     internal_energy_n_.reinit(scalar_partitioner);
 
-    momentum_n_.reinit(dim);
     velocity_.reinit(dim);
     for (unsigned int i = 0; i < dim; ++i) {
-      momentum_n_.block(i).reinit(scalar_partitioner);
       velocity_.block(i).reinit(scalar_partitioner);
     }
+    internal_energy_.reinit(scalar_partitioner);
   }
 
 
@@ -151,6 +155,33 @@ namespace ryujin
 
       LIKWID_MARKER_START("time_step_n_1");
 
+      /*
+       * TODO:
+       *
+       * Here, we have to solve (5.4a).
+       *
+       * for the unknown V^{n+1/2} to be stored in the block vector velocity_
+       * with F_i^{n+1/2} = 0, and M_i^n stored in vector momentum_n_
+       *
+       * Matrix:            m_i rho_i delta_{ij} + 0.5 tau B_{ij}
+       * Right hand side:   m_i M_i^{n}
+       *
+       * We need to enforce the following boundary conditions:
+       *
+       *   V_i^{n+1/2} = 0     for dofs on boundary faces Boundary::no_slip
+       *   V_i^{n+1/2} * n = 0 for dofs on boundary faces Boundary::slip
+       *
+       *   V_i^{n+1/2} = ProblemDescription::momentum(initial_values_->initial_state(position, t + 0.5 * tau)) / rho_i
+       *                       for dofs on boundary faces Boundary::dirichlet
+       *
+       * Let's deal with Boundary::periodic later...
+       */
+      for (unsigned int i = 0; i < n_relevant; ++i)
+        for (unsigned int d = 0; d < dim; ++d)
+          velocity_.block(d).local_element(i) =
+              momentum_n_.block(d).local_element(i) /
+              density_n_.local_element(i);
+
       LIKWID_MARKER_STOP("time_step_n_1");
     }
 
@@ -161,6 +192,33 @@ namespace ryujin
       Scope scope(computing_timer_, "time step [N] 2 - update internal energy");
 
       LIKWID_MARKER_START("time_step_n_2");
+
+      /*
+       * TODO:
+       *
+       * Here, we have to solve (5.12).
+       *
+       * for the unknown e^{n+1/2} to be stored in the vector internal_energy_
+       * (specific internal energy) with (rho e)_i^n stored in internal_energy_n_
+       * (internal energy = specific internal energy * rho).
+       *
+       * Matrix:            m_i rho_i delta_{ij} + 0.5 tau beta_{ij}
+       * Right hand side:   m_i (rho e)_i^n + 0.5 \tau m_i K_i^{n+1/2}
+       *
+       * and K_i^{n+1/2} is given by formula (5.5).
+       *
+       * We need to enforce the following boundary conditions:
+       *
+       *   ... we probably should enforce Dirichlet conditions on
+       *       Boundary::dirichlet something like
+       *   e_i^{n+1/2} = ProblemDescription::internal_energy(initial_values_->initial_state(position, t + 0.5 * tau)) / rho_i
+       *
+       * Let's deal with Boundary::periodic later...
+       *
+       */
+      for (unsigned int i = 0; i < n_relevant; ++i)
+        internal_energy_.local_element(i) =
+            internal_energy_n_.local_element(i) / density_n_.local_element(i);
 
       LIKWID_MARKER_STOP("time_step_n_2");
     }
