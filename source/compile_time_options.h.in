@@ -45,26 +45,6 @@
 #define COVOLUME 0.
 #endif
 
-
-/*
- * class TimeStep:
- */
-
-#ifndef ORDER
-// #define ORDER Order::first_order
-#define ORDER Order::second_order
-#endif
-
-#ifndef TIME_STEP_ORDER
-// #define TIME_STEP_ORDER TimeStepOrder::first_order
-// #define TIME_STEP_ORDER TimeStepOrder::second_order
-#define TIME_STEP_ORDER TimeStepOrder::third_order
-#endif
-
-#ifndef LIMITER_ITER
-#define LIMITER_ITER 2
-#endif
-
 /*
  * quadratic Newton:
  */

@@ -122,7 +122,7 @@ namespace ryujin
 
     std::map<std::string, dealii::Timer> computing_timer;
 
-    ryujin::ProblemDescription<dim> problem_description;
+    ryujin::ProblemDescription<dim, Number> problem_description;
     ryujin::Discretization<dim> discretization;
     ryujin::OfflineData<dim, Number> offline_data;
     ryujin::InitialValues<dim, Number> initial_values;
