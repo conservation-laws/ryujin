@@ -119,6 +119,8 @@ namespace ryujin
 
     affine_constraints_.reinit(locally_relevant);
 
+    DoFTools::make_hanging_node_constraints(dof_handler_, affine_constraints_);
+
     const auto n_periodic_faces =
         discretization_->triangulation().get_periodic_face_map().size();
     if (n_periodic_faces != 0) {
@@ -138,8 +140,6 @@ namespace ryujin
         AssertThrow(false, dealii::ExcNotImplemented());
       }
     }
-
-    DoFTools::make_hanging_node_constraints(dof_handler_, affine_constraints_);
 
     affine_constraints_.close();
 

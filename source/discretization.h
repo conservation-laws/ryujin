@@ -138,6 +138,7 @@ namespace ryujin
     std::unique_ptr<const dealii::Mapping<dim>> mapping_;
     std::unique_ptr<const dealii::FiniteElement<dim>> finite_element_;
     std::unique_ptr<const dealii::Quadrature<dim>> quadrature_;
+    std::unique_ptr<const dealii::Quadrature<1>> quadrature_1d_;
 
   public:
     /**
@@ -159,6 +160,11 @@ namespace ryujin
      * Return a read-only const reference to the quadrature rule.
      */
     ACCESSOR_READ_ONLY(quadrature)
+
+    /**
+     * Return a read-only const reference to the 1D quadrature rule.
+     */
+    ACCESSOR_READ_ONLY(quadrature_1d)
 
   private:
     /**

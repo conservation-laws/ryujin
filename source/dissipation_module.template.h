@@ -44,12 +44,14 @@ namespace ryujin
       const MPI_Comm &mpi_communicator,
       std::map<std::string, dealii::Timer> &computing_timer,
       const ryujin::OfflineData<dim, Number> &offline_data,
+      const ryujin::ProblemDescription<dim, Number> &problem_description,
       const ryujin::InitialValues<dim, Number> &initial_values,
       const std::string &subsection /*= "DissipationModule"*/)
       : ParameterAcceptor(subsection)
       , mpi_communicator_(mpi_communicator)
       , computing_timer_(computing_timer)
       , offline_data_(&offline_data)
+      , problem_description_(&problem_description)
       , initial_values_(&initial_values)
   {
     tolerance_ = Number(1.0e-12);
@@ -69,18 +71,20 @@ namespace ryujin
 
     const auto &scalar_partitioner = offline_data_->scalar_partitioner();
 
-    momentum_n_.reinit(dim);
-    for (unsigned int i = 0; i < dim; ++i) {
-      momentum_n_.block(i).reinit(scalar_partitioner);
-    }
-    density_n_.reinit(scalar_partitioner);
-    internal_energy_n_.reinit(scalar_partitioner);
-
     velocity_.reinit(dim);
+    velocity_rhs_.reinit(dim);
     for (unsigned int i = 0; i < dim; ++i) {
       velocity_.block(i).reinit(scalar_partitioner);
+      velocity_rhs_.block(i).reinit(scalar_partitioner);
     }
+
     internal_energy_.reinit(scalar_partitioner);
+    internal_energy_rhs_.reinit(scalar_partitioner);
+
+    matrix_free_.reinit(offline_data_->discretization().mapping(),
+                        offline_data_->dof_handler(),
+                        offline_data_->affine_constraints(),
+                        offline_data_->discretization().quadrature_1d());
   }
 
 
@@ -96,6 +100,8 @@ namespace ryujin
 
     using VA = VectorizedArray<Number>;
 
+    const auto &lumped_mass_matrix = offline_data_->lumped_mass_matrix();
+
     /* Index ranges for the iteration over the sparsity pattern : */
 
     constexpr auto simd_length = VA::size();
@@ -107,7 +113,7 @@ namespace ryujin
      * FIXME: Memory access is suboptimal...
      */
     {
-      Scope scope(computing_timer_, "time step [N] 0 - copy vectors");
+      Scope scope(computing_timer_, "time step [N] 0 - build right hand side");
 
       RYUJIN_PARALLEL_REGION_BEGIN
       LIKWID_MARKER_START("time_step_0");
@@ -119,28 +125,26 @@ namespace ryujin
         using PD = ProblemDescription<dim, VA>;
 
         const auto U_i = U.get_vectorized_tensor(i);
-        const auto rho_i = U_i[0];
-        const auto m_i = PD::momentum(U_i);
+        const auto M_i = PD::momentum(U_i);
         const auto rho_e_i = PD::internal_energy(U_i);
+        const auto m_i = simd_load(lumped_mass_matrix, i);
 
-        simd_store(density_n_, rho_i, i);
         for (unsigned int d = 0; d < dim; ++d)
-          simd_store(momentum_n_.block(d), m_i[d], i);
-        simd_store(internal_energy_n_, rho_e_i, i);
+          simd_store(velocity_rhs_.block(d), m_i * (M_i[d]), i);
+        simd_store(internal_energy_rhs_, m_i * rho_e_i, i);
       }
 
       for (unsigned int i = size_regular; i < n_relevant; ++i) {
         using PD = ProblemDescription<dim, Number>;
 
         const auto U_i = U.get_tensor(i);
-        const auto rho_i = U_i[0];
-        const auto m_i = PD::momentum(U_i);
+        const auto M_i = PD::momentum(U_i);
         const auto rho_e_i = PD::internal_energy(U_i);
+        const auto m_i = lumped_mass_matrix.local_element(i);
 
-        density_n_.local_element(i) = rho_i;
         for (unsigned int d = 0; d < dim; ++d)
-          momentum_n_.block(d).local_element(i) = m_i[d];
-        internal_energy_n_.local_element(i) = rho_e_i;
+          velocity_rhs_.block(d).local_element(i) = m_i * M_i[d];
+        internal_energy_rhs_.local_element(i) = m_i * rho_e_i;
       }
 
       LIKWID_MARKER_STOP("time_step_0");
@@ -176,22 +180,17 @@ namespace ryujin
        *
        * Let's deal with Boundary::periodic later...
        */
-      for (unsigned int i = 0; i < n_relevant; ++i)
-        for (unsigned int d = 0; d < dim; ++d)
-          velocity_.block(d).local_element(i) =
-              momentum_n_.block(d).local_element(i) /
-              density_n_.local_element(i);
 
       LIKWID_MARKER_STOP("time_step_n_1");
     }
 
     /*
-     * Step 2: Solve internal energy update:
+     * Step 3: Solve internal energy update:
      */
     {
-      Scope scope(computing_timer_, "time step [N] 2 - update internal energy");
+      Scope scope(computing_timer_, "time step [N] 3 - update internal energy");
 
-      LIKWID_MARKER_START("time_step_n_2");
+      LIKWID_MARKER_START("time_step_n_3");
 
       /*
        * TODO:
@@ -216,23 +215,20 @@ namespace ryujin
        * Let's deal with Boundary::periodic later...
        *
        */
-      for (unsigned int i = 0; i < n_relevant; ++i)
-        internal_energy_.local_element(i) =
-            internal_energy_n_.local_element(i) / density_n_.local_element(i);
 
-      LIKWID_MARKER_STOP("time_step_n_2");
+      LIKWID_MARKER_STOP("time_step_n_3");
     }
 
     /*
-     * Step 3: Copy vectors
+     * Step 4: Copy vectors
      *
      * FIXME: Memory access is suboptimal...
      */
     {
-      Scope scope(computing_timer_, "time step [N] 3 - write back vectors");
+      Scope scope(computing_timer_, "time step [N] 4 - write back vectors");
 
       RYUJIN_PARALLEL_REGION_BEGIN
-      LIKWID_MARKER_START("time_step_0");
+      LIKWID_MARKER_START("time_step_4");
 
       const unsigned int size_regular = n_relevant / simd_length * simd_length;
 
@@ -260,7 +256,7 @@ namespace ryujin
           U_i[1 + d] = m_i_new[d];
         U_i[1 + dim] = E_i_new;
 
-        U.write_vectorized_tensor(U_i, i);
+        // U.write_vectorized_tensor(U_i, i);
       }
 
       for (unsigned int i = size_regular; i < n_relevant; ++i) {
@@ -286,10 +282,10 @@ namespace ryujin
           U_i[1 + d] = m_i_new[d];
         U_i[1 + dim] = E_i_new;
 
-        U.write_tensor(U_i, i);
+        // U.write_tensor(U_i, i);
       }
 
-      LIKWID_MARKER_STOP("time_step_0");
+      LIKWID_MARKER_STOP("time_step_4");
       RYUJIN_PARALLEL_REGION_END
     }
 

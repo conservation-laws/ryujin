@@ -48,6 +48,7 @@ namespace ryujin
       , dissipation_module(mpi_communicator,
                            computing_timer,
                            offline_data,
+                           problem_description,
                            initial_values,
                            "/G - DissipationModule")
       , postprocessor(mpi_communicator, offline_data, "/H - Postprocessor")
