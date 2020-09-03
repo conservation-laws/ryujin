@@ -21,6 +21,7 @@
 #include <deal.II/lac/la_parallel_block_vector.h>
 #include <deal.II/lac/sparse_matrix.templates.h>
 #include <deal.II/lac/vector.h>
+#include <deal.II/matrix_free/matrix_free.h>
 
 namespace ryujin
 {
@@ -113,6 +114,23 @@ namespace ryujin
 
     //@}
     /**
+     * @name Matrix Free solver
+     */
+    //@{
+
+    template <typename VectorType>
+    void local_velocity_contribution(
+        const dealii::MatrixFree<dim, Number> &data,
+        VectorType &dst,
+        const VectorType &src,
+        const std::pair<unsigned int, unsigned int> &cell_range) const;
+
+    template <typename VectorType>
+    void velocity_vmult(VectorType &dst, const VectorType &src) const;
+
+
+    //@}
+    /**
      * @name Internal data
      */
     //@{
@@ -133,6 +151,9 @@ namespace ryujin
 
     scalar_type internal_energy_;
     scalar_type internal_energy_rhs_;
+
+    scalar_type density_;
+    Number tau_;
 
     //@}
   };

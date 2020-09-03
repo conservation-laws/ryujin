@@ -241,8 +241,13 @@ namespace ryujin
     ACCESSOR_READ_ONLY(description)
 
     Number mu_;
+    ACCESSOR_READ_ONLY(mu)
+
     Number lambda_;
+    ACCESSOR_READ_ONLY(lambda)
+
     Number kappa_;
+    ACCESSOR_READ_ONLY(kappa)
 
     //@}
   };
