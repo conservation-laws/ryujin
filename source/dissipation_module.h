@@ -119,21 +119,7 @@ namespace ryujin
     //@{
 
     template <typename VectorType>
-    void local_velocity_contribution(
-        const dealii::MatrixFree<dim, Number> &data,
-        VectorType &dst,
-        const VectorType &src,
-        const std::pair<unsigned int, unsigned int> &cell_range) const;
-
-    template <typename VectorType>
     void velocity_vmult(VectorType &dst, const VectorType &src) const;
-
-    template <typename VectorType>
-    void local_internal_energy_contribution(
-        const dealii::MatrixFree<dim, Number> &data,
-        VectorType &dst,
-        const VectorType &src,
-        const std::pair<unsigned int, unsigned int> &cell_range) const;
 
     template <typename VectorType>
     void internal_energy_vmult(VectorType &dst, const VectorType &src) const;

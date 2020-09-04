@@ -97,48 +97,11 @@ namespace ryujin
 
   template <int dim, typename Number>
   template <typename VectorType>
-  void DissipationModule<dim, Number>::local_velocity_contribution(
-      const MatrixFree<dim, Number> &data,
-      VectorType &dst,
-      const VectorType &src,
-      const std::pair<unsigned int, unsigned int> &cell_range) const
-  {
-    FEEvaluation<dim, 1, 2, dim, Number> velocity(data);
-
-    const auto mu = problem_description_->mu();
-    const auto lambda = problem_description_->lambda();
-    const auto tau = tau_; /* FIXME */
-
-    for (unsigned int cell = cell_range.first; cell < cell_range.second;
-         ++cell) {
-      velocity.reinit(cell);
-      velocity.gather_evaluate(src, EvaluationFlags::gradients);
-
-      for (unsigned int q = 0; q < velocity.n_q_points; ++q) {
-
-        const auto symmetric_gradient = velocity.get_symmetric_gradient(q);
-        const auto divergence = trace(symmetric_gradient);
-
-        /* S = (mu nabla^S(v) + (lambda - 2/3*mu) div(v) Id) : nabla phi */
-        auto S = 2. * mu * symmetric_gradient;
-        for (unsigned int d = 0; d < dim; ++d)
-          S[d][d] += (lambda - 2. / 3. * mu) * divergence;
-
-        velocity.submit_symmetric_gradient(0.5 * tau * S, q);
-      }
-
-      velocity.integrate_scatter(EvaluationFlags::gradients, dst);
-    }
-  }
-
-
-  template <int dim, typename Number>
-  template <typename VectorType>
   void
   DissipationModule<dim, Number>::velocity_vmult(VectorType &dst,
                                                  const VectorType &src) const
   {
-    /* FIXME: This should probably be done within the matrix free loop */
+    /* Apply action of m_i rho_i V_i: */
 
     using VA = VectorizedArray<Number>;
     constexpr auto simd_length = VA::size();
@@ -175,10 +138,40 @@ namespace ryujin
       }
     }
 
+    /* Apply action of stress tensor: \sum_j B_ij V_j: */
+
     const auto integrator =
-        &DissipationModule<dim,
-                           Number>::local_velocity_contribution<VectorType>;
-    matrix_free_.cell_loop(integrator, this, dst, src);
+        [this](const auto &data, auto &dst, const auto &src, const auto range) {
+          FEEvaluation<dim, 1, 2, dim, Number> velocity(data);
+
+          const auto mu = problem_description_->mu();
+          const auto lambda = problem_description_->lambda();
+          const auto tau = tau_; /* FIXME */
+
+          for (unsigned int cell = range.first; cell < range.second; ++cell) {
+            velocity.reinit(cell);
+            velocity.gather_evaluate(src, EvaluationFlags::gradients);
+
+            for (unsigned int q = 0; q < velocity.n_q_points; ++q) {
+
+              const auto symmetric_gradient =
+                  velocity.get_symmetric_gradient(q);
+              const auto divergence = trace(symmetric_gradient);
+
+              // S = (mu nabla^S(v) + (lambda - 2/3*mu) div(v) Id) : nabla phi
+              auto S = 2. * mu * symmetric_gradient;
+              for (unsigned int d = 0; d < dim; ++d)
+                S[d][d] += (lambda - 2. / 3. * mu) * divergence;
+
+              velocity.submit_symmetric_gradient(0.5 * tau * S, q);
+            }
+
+            velocity.integrate_scatter(EvaluationFlags::gradients, dst);
+          }
+        };
+
+    matrix_free_.template cell_loop<block_vector_type, block_vector_type>(
+        integrator, dst, src, /* zero destination */ false);
 
     /* (5.4a) Fix up constrained degrees of freedom: */
 
@@ -218,37 +211,10 @@ namespace ryujin
 
   template <int dim, typename Number>
   template <typename VectorType>
-  void DissipationModule<dim, Number>::local_internal_energy_contribution(
-      const MatrixFree<dim, Number> &data,
-      VectorType &dst,
-      const VectorType &src,
-      const std::pair<unsigned int, unsigned int> &cell_range) const
-  {
-    FEEvaluation<dim, 1, 2, 1, Number> energy(data);
-
-    const auto factor = 0.5 * tau_ * problem_description_->kappa() *
-                        problem_description_->gamma_minus_one_inverse;
-
-    for (unsigned int cell = cell_range.first; cell < cell_range.second;
-         ++cell) {
-      energy.reinit(cell);
-      energy.gather_evaluate(src, EvaluationFlags::gradients);
-
-      for (unsigned int q = 0; q < energy.n_q_points; ++q) {
-        energy.submit_gradient(factor * energy.get_gradient(q), q);
-      }
-
-      energy.integrate_scatter(EvaluationFlags::gradients, dst);
-    }
-  }
-
-
-  template <int dim, typename Number>
-  template <typename VectorType>
   void DissipationModule<dim, Number>::internal_energy_vmult(
       VectorType &dst, const VectorType &src) const
   {
-    /* FIXME: This should probably be done within the matrix free loop */
+    /* Apply action of m_i rho_i e_i: */
 
     using VA = VectorizedArray<Number>;
     constexpr auto simd_length = VA::size();
@@ -280,12 +246,30 @@ namespace ryujin
       dst.local_element(i) = m_i * rho_i * e_i;
     }
 
-    const auto integrator =
-        &DissipationModule<dim, Number>::local_internal_energy_contribution<
-            VectorType>;
-    matrix_free_.cell_loop(integrator, this, dst, src);
+    /* Apply action of diffusion operator \sum_j beta_ij e_j: */
 
-    /* (5.4a) Fix up constrained degrees of freedom: */
+    const auto integrator = [this](const auto &data,
+                                   auto &dst,
+                                   const auto &src,
+                                   const auto range) {
+      FEEvaluation<dim, 1, 2, 1, Number> energy(data);
+      const auto factor = Number(0.5) * tau_ * problem_description_->kappa() *
+                          problem_description_->gamma_minus_one_inverse;
+
+      for (unsigned int cell = range.first; cell < range.second; ++cell) {
+        energy.reinit(cell);
+        energy.gather_evaluate(src, EvaluationFlags::gradients);
+        for (unsigned int q = 0; q < energy.n_q_points; ++q) {
+          energy.submit_gradient(factor * energy.get_gradient(q), q);
+        }
+        energy.integrate_scatter(EvaluationFlags::gradients, dst);
+      }
+    };
+
+    matrix_free_.template cell_loop<scalar_type, scalar_type>(
+        integrator, dst, src, /* zero destination */ false);
+
+    /* Fix up constrained degrees of freedom: */
 
     const auto &boundary_map = offline_data_->boundary_map();
 
@@ -294,7 +278,10 @@ namespace ryujin
       if (i >= n_owned)
         continue;
 
-      dst.local_element(i) = src.local_element(i);
+      const auto &[normal, id, position] = entry.second;
+      if (id == Boundary::dirichlet) {
+        dst.local_element(i) = src.local_element(i);
+      }
     }
   }
 
@@ -320,11 +307,14 @@ namespace ryujin
     const unsigned int size_regular = n_owned / simd_length * simd_length;
 
     /*
-     * Step 0: Build right hand sides for the velocity and the internal
-     * energy update. Also initialize the solution vectors.
+     * Step 0:
+     *
+     * Build right hand side for the velocity update.
+     * Also initialize solution vectors for internal energy and velocity
+     * update.
      */
     {
-      Scope scope(computing_timer_, "time step [N] 0 - build right hand sides");
+      Scope scope(computing_timer_, "time step [N] 0 - build velocities rhs");
 
       RYUJIN_PARALLEL_REGION_BEGIN
       LIKWID_MARKER_START("time_step_0");
@@ -345,7 +335,7 @@ namespace ryujin
           simd_store(velocity_.block(d), M_i[d] / rho_i, i);
           simd_store(velocity_rhs_.block(d), m_i * (M_i[d]), i);
         }
-        simd_store(internal_energy_rhs_, m_i * rho_e_i, i);
+        simd_store(internal_energy_, rho_e_i / rho_i, i);
       }
 
       RYUJIN_PARALLEL_REGION_END
@@ -365,7 +355,7 @@ namespace ryujin
           velocity_.block(d).local_element(i) = M_i[d] / rho_i;
           velocity_rhs_.block(d).local_element(i) = m_i * M_i[d];
         }
-        internal_energy_rhs_.local_element(i) = m_i * rho_e_i;
+        internal_energy_.local_element(i) = rho_e_i / rho_i;
       }
 
       /*
@@ -382,30 +372,42 @@ namespace ryujin
 
         const auto &[normal, id, position] = entry.second;
 
-        Tensor<1, dim, Number> V_i;
-        Tensor<1, dim, Number> RHS_i;
-
         if (id == Boundary::slip) {
-          /* remove normal component */
+          /* Remove normal component of velocity: */
+          Tensor<1, dim, Number> V_i;
+          Tensor<1, dim, Number> RHS_i;
           for (unsigned int d = 0; d < dim; ++d) {
             V_i[d] = velocity_.block(d).local_element(i);
             RHS_i[d] = velocity_rhs_.block(d).local_element(i);
           }
           V_i -= 1. * (V_i * normal) * normal;
           RHS_i -= 1. * (RHS_i * normal) * normal;
-        } else if (id == Boundary::no_slip) {
-          RHS_i = 0.;
-          V_i = 0.;
-        } else if (id == Boundary::dirichlet) {
-          const auto U_i =
-              initial_values_->initial_state(position, t + 0.5 * tau);
-          V_i = ProblemDescription<dim, Number>::momentum(U_i) / U_i[0];
-          RHS_i = V_i;
-        }
+          for (unsigned int d = 0; d < dim; ++d) {
+            velocity_.block(d).local_element(i) = V_i[d];
+            velocity_rhs_.block(d).local_element(i) = RHS_i[d];
+          }
 
-        for (unsigned int d = 0; d < dim; ++d) {
-          velocity_.block(d).local_element(i) = V_i[d];
-          velocity_rhs_.block(d).local_element(i) = RHS_i[d];
+        } else if (id == Boundary::no_slip) {
+
+          /* Set velocity to zero: */
+          for (unsigned int d = 0; d < dim; ++d) {
+            velocity_.block(d).local_element(i) = Number(0.);
+            velocity_rhs_.block(d).local_element(i) = Number(0.);
+          }
+
+        } else if (id == Boundary::dirichlet) {
+
+          /* Prescribe velocity: */
+          const auto U_i =
+              initial_values_->initial_state(position, t + Number(0.5) * tau);
+          const auto rho_i = U_i[0];
+          const auto V_i =
+              ProblemDescription<dim, Number>::momentum(U_i) / rho_i;
+
+          for (unsigned int d = 0; d < dim; ++d) {
+            velocity_.block(d).local_element(i) = V_i[d];
+            velocity_rhs_.block(d).local_element(i) = V_i[d];
+          }
         }
       }
 
@@ -421,7 +423,6 @@ namespace ryujin
       LIKWID_MARKER_START("time_step_n_1");
 
       tau_ = tau; /* FIXME */
-
 
       LinearOperator<block_vector_type, block_vector_type> velocity_operator;
       velocity_operator.vmult = [this](block_vector_type &dst,
@@ -470,8 +471,6 @@ namespace ryujin
                     velocity.get_symmetric_gradient(q);
                 const auto divergence = trace(symmetric_gradient);
 
-                /* S = (mu nabla^S(v) + (lambda - 2/3*mu) div(v) Id) : nabla phi
-                 */
                 auto S = 2. * mu * symmetric_gradient;
                 for (unsigned int d = 0; d < dim; ++d)
                   S[d][d] += (lambda - 2. / 3. * mu) * divergence;
@@ -483,8 +482,7 @@ namespace ryujin
           },
           internal_energy_rhs_,
           velocity_,
-          /* zero dst */ true);
-
+          /* zero destination */ true);
 
       using VA = VectorizedArray<Number>;
       constexpr auto simd_length = VA::size();
@@ -520,7 +518,7 @@ namespace ryujin
             m_i * (rho_i * e_i + 0.5 * tau * rhs_i);
       }
 
-      /* (5.12) Fix up constrained degrees of freedom: */
+      /* Fix up constrained degrees of freedom: */
 
       const auto &boundary_map = offline_data_->boundary_map();
 
@@ -529,9 +527,26 @@ namespace ryujin
         if (i >= n_owned)
           continue;
 
-        internal_energy_rhs_.local_element(i) = 0.0; /* FIXME */
-      }
+        const auto &[normal, id, position] = entry.second;
 
+        /*
+         * We enforce Neumann conditions (i.e., insulating boundary
+         * conditions) everywhere except for Dirichlet boundaries where we
+         * have to enforce prescribed conditions:
+         */
+
+        if (id == Boundary::dirichlet) {
+          /* Prescribe internal energy: */
+          const auto U_i =
+              initial_values_->initial_state(position, t + Number(0.5) * tau);
+          const auto rho_i = U_i[0];
+          const auto e_i =
+              ProblemDescription<dim, Number>::internal_energy(U_i) / rho_i;
+
+          internal_energy_.local_element(i) = e_i;
+          internal_energy_rhs_.local_element(i) = e_i;
+        }
+      }
 
       LIKWID_MARKER_STOP("time_step_n_2");
     }
@@ -543,33 +558,6 @@ namespace ryujin
       Scope scope(computing_timer_, "time step [N] 3 - update internal energy");
 
       LIKWID_MARKER_START("time_step_n_3");
-
-      /*
-       * TODO:
-       *
-       * Here, we have to solve (5.12).
-       *
-       * for the unknown e^{n+1/2} to be stored in the vector internal_energy_
-       * (specific internal energy) with (rho e)_i^n stored in
-       * internal_energy_n_ (internal energy = specific internal energy *
-       * rho).
-       *
-       * Matrix:            m_i rho_i delta_{ij} + 0.5 tau beta_{ij}
-       * Right hand side:   m_i (rho e)_i^n + 0.5 \tau m_i K_i^{n+1/2}
-       *
-       * and K_i^{n+1/2} is given by formula (5.5).
-       *
-       * We need to enforce the following boundary conditions:
-       *
-       *   ... we probably should enforce Dirichlet conditions on
-       *       Boundary::dirichlet something like
-       *   e_i^{n+1/2} =
-       * ProblemDescription::internal_energy(initial_values_->initial_state(position,
-       * t + 0.5 * tau)) / rho_i
-       *
-       * Let's deal with Boundary::periodic later...
-       *
-       */
 
       tau_ = tau; /* FIXME */
 

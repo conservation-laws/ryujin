@@ -615,16 +615,18 @@ namespace ryujin
             } else if (position[1] > height_ - 1.e-6) {
               /* top: slip */
               face->set_boundary_id(Boundary::slip);
-            } else if (constexpr dim == 3) {
-            } else if (position[2] < 1.e-6) {
-              /* left: no slip */
-              face->set_boundary_id(Boundary::no_slip);
-            } else if (position[2] > height_ - 1.e-6) {
-              /* right: slip */
-              face->set_boundary_id(Boundary::slip);
             }
-          }
-        }
+            if constexpr (dim == 3) {
+              if (position[2] < 1.e-6) {
+                /* left: no slip */
+                face->set_boundary_id(Boundary::no_slip);
+              } else if (position[2] > height_ - 1.e-6) {
+                /* right: slip */
+                face->set_boundary_id(Boundary::slip);
+              }
+            }
+          } /*for*/
+        }   /*for*/
       }
 
     private:
