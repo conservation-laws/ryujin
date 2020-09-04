@@ -217,6 +217,89 @@ namespace ryujin
 
 
   template <int dim, typename Number>
+  template <typename VectorType>
+  void DissipationModule<dim, Number>::local_internal_energy_contribution(
+      const MatrixFree<dim, Number> &data,
+      VectorType &dst,
+      const VectorType &src,
+      const std::pair<unsigned int, unsigned int> &cell_range) const
+  {
+    FEEvaluation<dim, 1, 2, 1, Number> energy(data);
+
+    const auto factor = 0.5 * tau_ * problem_description_->kappa() *
+                        problem_description_->gamma_minus_one_inverse;
+
+    for (unsigned int cell = cell_range.first; cell < cell_range.second;
+         ++cell) {
+      energy.reinit(cell);
+      energy.gather_evaluate(src, EvaluationFlags::gradients);
+
+      for (unsigned int q = 0; q < energy.n_q_points; ++q) {
+        energy.submit_gradient(factor * energy.get_gradient(q), q);
+      }
+
+      energy.integrate_scatter(EvaluationFlags::gradients, dst);
+    }
+  }
+
+
+  template <int dim, typename Number>
+  template <typename VectorType>
+  void DissipationModule<dim, Number>::internal_energy_vmult(
+      VectorType &dst, const VectorType &src) const
+  {
+    /* FIXME: This should probably be done within the matrix free loop */
+
+    using VA = VectorizedArray<Number>;
+    constexpr auto simd_length = VA::size();
+
+    const auto &lumped_mass_matrix = offline_data_->lumped_mass_matrix();
+    const unsigned int n_owned = offline_data_->n_locally_owned();
+    const unsigned int size_regular = n_owned / simd_length * simd_length;
+
+    RYUJIN_PARALLEL_REGION_BEGIN
+
+    RYUJIN_OMP_FOR
+    for (unsigned int i = 0; i < size_regular; i += simd_length) {
+      using PD = ProblemDescription<dim, VA>;
+
+      const auto m_i = simd_load(lumped_mass_matrix, i);
+      const auto rho_i = simd_load(density_, i);
+      const auto e_i = simd_load(src, i);
+      simd_store(dst, m_i * rho_i * e_i, i);
+    }
+
+    RYUJIN_PARALLEL_REGION_END
+
+    for (unsigned int i = size_regular; i < n_owned; ++i) {
+      using PD = ProblemDescription<dim, Number>;
+
+      const auto m_i = lumped_mass_matrix.local_element(i);
+      const auto rho_i = density_.local_element(i);
+      const auto e_i = src.local_element(i);
+      dst.local_element(i) = m_i * rho_i * e_i;
+    }
+
+    const auto integrator =
+        &DissipationModule<dim, Number>::local_internal_energy_contribution<
+            VectorType>;
+    matrix_free_.cell_loop(integrator, this, dst, src);
+
+    /* (5.4a) Fix up constrained degrees of freedom: */
+
+    const auto &boundary_map = offline_data_->boundary_map();
+
+    for (auto entry : boundary_map) {
+      const auto i = entry.first;
+      if (i >= n_owned)
+        continue;
+
+      dst.local_element(i) = src.local_element(i);
+    }
+  }
+
+
+  template <int dim, typename Number>
   Number
   DissipationModule<dim, Number>::step(vector_type &U, Number t, Number tau)
   {
@@ -356,6 +439,104 @@ namespace ryujin
     }
 
     /*
+     * Step 2: Build internal energy right hand side:
+     */
+    {
+      Scope scope(computing_timer_,
+                  "time step [N] 2 - build internal energy rhs");
+
+      LIKWID_MARKER_START("time_step_n_2");
+
+      matrix_free_.template cell_loop<scalar_type, block_vector_type>(
+          [this](const auto &data,
+                 auto &dst,
+                 const auto &src,
+                 const auto cell_range) {
+            FEEvaluation<dim, 1, 2, dim, Number> velocity(data);
+            FEEvaluation<dim, 1, 2, 1, Number> energy(data);
+
+            const auto mu = problem_description_->mu();
+            const auto lambda = problem_description_->lambda();
+
+            for (unsigned int cell = cell_range.first; cell < cell_range.second;
+                 ++cell) {
+              velocity.reinit(cell);
+              energy.reinit(cell);
+              velocity.gather_evaluate(src, EvaluationFlags::gradients);
+
+              for (unsigned int q = 0; q < velocity.n_q_points; ++q) {
+
+                const auto symmetric_gradient =
+                    velocity.get_symmetric_gradient(q);
+                const auto divergence = trace(symmetric_gradient);
+
+                /* S = (mu nabla^S(v) + (lambda - 2/3*mu) div(v) Id) : nabla phi
+                 */
+                auto S = 2. * mu * symmetric_gradient;
+                for (unsigned int d = 0; d < dim; ++d)
+                  S[d][d] += (lambda - 2. / 3. * mu) * divergence;
+
+                energy.submit_value(symmetric_gradient * S, q);
+              }
+              energy.integrate_scatter(EvaluationFlags::values, dst);
+            }
+          },
+          internal_energy_rhs_,
+          velocity_,
+          /* zero dst */ true);
+
+
+      using VA = VectorizedArray<Number>;
+      constexpr auto simd_length = VA::size();
+
+      const auto &lumped_mass_matrix = offline_data_->lumped_mass_matrix();
+      const unsigned int n_owned = offline_data_->n_locally_owned();
+      const unsigned int size_regular = n_owned / simd_length * simd_length;
+
+      RYUJIN_PARALLEL_REGION_BEGIN
+
+      RYUJIN_OMP_FOR
+      for (unsigned int i = 0; i < size_regular; i += simd_length) {
+        using PD = ProblemDescription<dim, VA>;
+
+        const auto m_i = simd_load(lumped_mass_matrix, i);
+        const auto rho_i = simd_load(density_, i);
+        const auto e_i = simd_load(internal_energy_, i);
+        const auto rhs_i = simd_load(internal_energy_rhs_, i);
+        simd_store(
+            internal_energy_rhs_, m_i * (rho_i * e_i + 0.5 * tau * rhs_i), i);
+      }
+
+      RYUJIN_PARALLEL_REGION_END
+
+      for (unsigned int i = size_regular; i < n_owned; ++i) {
+        using PD = ProblemDescription<dim, Number>;
+
+        const auto m_i = lumped_mass_matrix.local_element(i);
+        const auto rho_i = density_.local_element(i);
+        const auto e_i = internal_energy_.local_element(i);
+        const auto rhs_i = internal_energy_rhs_.local_element(i);
+        internal_energy_rhs_.local_element(i) =
+            m_i * (rho_i * e_i + 0.5 * tau * rhs_i);
+      }
+
+      /* (5.12) Fix up constrained degrees of freedom: */
+
+      const auto &boundary_map = offline_data_->boundary_map();
+
+      for (auto entry : boundary_map) {
+        const auto i = entry.first;
+        if (i >= n_owned)
+          continue;
+
+        internal_energy_rhs_.local_element(i) = 0.0; /* FIXME */
+      }
+
+
+      LIKWID_MARKER_STOP("time_step_n_2");
+    }
+
+    /*
      * Step 3: Solve internal energy update:
      */
     {
@@ -369,8 +550,9 @@ namespace ryujin
        * Here, we have to solve (5.12).
        *
        * for the unknown e^{n+1/2} to be stored in the vector internal_energy_
-       * (specific internal energy) with (rho e)_i^n stored in internal_energy_n_
-       * (internal energy = specific internal energy * rho).
+       * (specific internal energy) with (rho e)_i^n stored in
+       * internal_energy_n_ (internal energy = specific internal energy *
+       * rho).
        *
        * Matrix:            m_i rho_i delta_{ij} + 0.5 tau beta_{ij}
        * Right hand side:   m_i (rho e)_i^n + 0.5 \tau m_i K_i^{n+1/2}
@@ -381,11 +563,29 @@ namespace ryujin
        *
        *   ... we probably should enforce Dirichlet conditions on
        *       Boundary::dirichlet something like
-       *   e_i^{n+1/2} = ProblemDescription::internal_energy(initial_values_->initial_state(position, t + 0.5 * tau)) / rho_i
+       *   e_i^{n+1/2} =
+       * ProblemDescription::internal_energy(initial_values_->initial_state(position,
+       * t + 0.5 * tau)) / rho_i
        *
        * Let's deal with Boundary::periodic later...
        *
        */
+
+      tau_ = tau; /* FIXME */
+
+      LinearOperator<scalar_type, scalar_type> internal_energy_operator;
+      internal_energy_operator.vmult = [this](scalar_type &dst,
+                                              const scalar_type &src) {
+        internal_energy_vmult<scalar_type>(dst, src);
+      };
+
+      /* FIXME: Tune parameters */
+      SolverControl solver_control(200, tolerance_);
+      SolverCG<scalar_type> solver(solver_control);
+      solver.solve(internal_energy_operator,
+                   internal_energy_,
+                   internal_energy_rhs_,
+                   PreconditionIdentity());
 
       LIKWID_MARKER_STOP("time_step_n_3");
     }
