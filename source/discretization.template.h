@@ -168,7 +168,7 @@ namespace ryujin
     mapping_ = std::make_unique<MappingQ<dim>>(order_mapping_);
     finite_element_ = std::make_unique<FE_Q<dim>>(order_finite_element_);
     quadrature_ = std::make_unique<QGauss<dim>>(order_quadrature_);
-    quadrature_1d_ = std::make_unique<QGauss<1>>(order_quadrature_);
+    quadrature_1d_ = std::make_unique<QGauss<1>>(order_finite_element_ + 1);
   }
 
 } /* namespace ryujin */

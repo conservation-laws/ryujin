@@ -103,7 +103,7 @@ namespace ryujin
       const VectorType &src,
       const std::pair<unsigned int, unsigned int> &cell_range) const
   {
-    FEEvaluation<dim, 1, 3, dim, Number> velocity(data);
+    FEEvaluation<dim, 1, 2, dim, Number> velocity(data);
 
     const auto mu = problem_description_->mu();
     const auto lambda = problem_description_->lambda();
@@ -112,14 +112,12 @@ namespace ryujin
     for (unsigned int cell = cell_range.first; cell < cell_range.second;
          ++cell) {
       velocity.reinit(cell);
-      velocity.read_dof_values(src);
-      // FIXME: velocity.evaluate(EvaluationFlags::gradients);
-      velocity.evaluate(false, true);
+      velocity.gather_evaluate(src, EvaluationFlags::gradients);
 
       for (unsigned int q = 0; q < velocity.n_q_points; ++q) {
 
         const auto symmetric_gradient = velocity.get_symmetric_gradient(q);
-        const auto divergence = velocity.get_divergence(q);
+        const auto divergence = trace(symmetric_gradient);
 
         /* S = (mu nabla^S(v) + (lambda - 2/3*mu) div(v) Id) : nabla phi */
         auto S = 2. * mu * symmetric_gradient;
@@ -129,9 +127,7 @@ namespace ryujin
         velocity.submit_symmetric_gradient(0.5 * tau * S, q);
       }
 
-      // FIXME: velocity.integrate(EvaluationFlags::gradients);
-      velocity.integrate(false, true);
-      velocity.distribute_local_to_global(dst);
+      velocity.integrate_scatter(EvaluationFlags::gradients, dst);
     }
   }
 
@@ -148,8 +144,8 @@ namespace ryujin
     constexpr auto simd_length = VA::size();
 
     const auto &lumped_mass_matrix = offline_data_->lumped_mass_matrix();
-    const unsigned int n_relevant = offline_data_->n_locally_relevant();
-    const unsigned int size_regular = n_relevant / simd_length * simd_length;
+    const unsigned int n_owned = offline_data_->n_locally_owned();
+    const unsigned int size_regular = n_owned / simd_length * simd_length;
 
     RYUJIN_PARALLEL_REGION_BEGIN
 
@@ -167,7 +163,7 @@ namespace ryujin
 
     RYUJIN_PARALLEL_REGION_END
 
-    for (unsigned int i = size_regular; i < n_relevant; ++i) {
+    for (unsigned int i = size_regular; i < n_owned; ++i) {
       using PD = ProblemDescription<dim, Number>;
 
       const auto m_i = lumped_mass_matrix.local_element(i);
