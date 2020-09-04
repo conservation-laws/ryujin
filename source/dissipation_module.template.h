@@ -58,6 +58,8 @@ namespace ryujin
       , offline_data_(&offline_data)
       , problem_description_(&problem_description)
       , initial_values_(&initial_values)
+      , n_iterations_velocity_(0.)
+      , n_iterations_internal_energy_(0.)
   {
     tolerance_ = Number(1.0e-12);
     add_parameter("tolerance", tolerance_, "Tolerance for linear solvers");
@@ -436,6 +438,10 @@ namespace ryujin
       solver.solve(
           velocity_operator, velocity_, velocity_rhs_, PreconditionIdentity());
 
+      /* update exponential moving average */
+      n_iterations_velocity_ =
+          0.9 * n_iterations_velocity_ + 0.1 * solver_control.last_step();
+
       LIKWID_MARKER_STOP("time_step_n_1");
     }
 
@@ -574,6 +580,10 @@ namespace ryujin
                    internal_energy_,
                    internal_energy_rhs_,
                    PreconditionIdentity());
+
+      /* update exponential moving average */
+      n_iterations_internal_energy_ = 0.9 * n_iterations_internal_energy_ +
+                                      0.1 * solver_control.last_step();
 
       LIKWID_MARKER_STOP("time_step_n_3");
     }

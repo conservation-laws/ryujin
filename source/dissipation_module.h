@@ -140,6 +140,12 @@ namespace ryujin
     dealii::SmartPointer<const ryujin::InitialValues<dim, Number>>
         initial_values_;
 
+    double n_iterations_velocity_;
+    ACCESSOR_READ_ONLY(n_iterations_velocity)
+
+    double n_iterations_internal_energy_;
+    ACCESSOR_READ_ONLY(n_iterations_internal_energy)
+
     dealii::MatrixFree<dim, Number> matrix_free_;
 
     block_vector_type velocity_;
