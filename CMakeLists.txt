@@ -24,7 +24,7 @@ project(ryujin CXX)
 # Set up compiler flags:
 #
 
-string(APPEND DEAL_II_CXX_FLAGS " -fopenmp")
+string(APPEND DEAL_II_CXX_FLAGS " -fopenmp -std=c++17")
 string(APPEND DEAL_II_LINKER_FLAGS " -fopenmp -Wl,-as-needed")
 
 string(APPEND DEAL_II_CXX_FLAGS_RELEASE " -O3 -ffp-contract=fast")
