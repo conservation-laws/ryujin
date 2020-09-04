@@ -552,7 +552,7 @@ namespace ryujin
 
 
     /**
-     * A 2D shocktube configuration for generating a viscous boundary
+     * A 2D/3D shocktube configuration for generating a viscous boundary
      * layer.
      *
      * A rectangular domain with given length and height. The boundary
@@ -588,7 +588,7 @@ namespace ryujin
               {2, 1},
               dealii::Point<2>(),
               dealii::Point<2>(length_, height_));
-        else
+        else if constexpr (dim == 3)
           dealii::GridGenerator::subdivided_hyper_rectangle(
               tria1,
               {2, 1, 1},

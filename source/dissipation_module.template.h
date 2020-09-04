@@ -237,12 +237,11 @@ namespace ryujin
     const unsigned int size_regular = n_owned / simd_length * simd_length;
 
     /*
-     * Step 0: Copy vectors
-     *
-     * FIXME: Memory access is suboptimal...
+     * Step 0: Build right hand sides for the velocity and the internal
+     * energy update. Also initialize the solution vectors.
      */
     {
-      Scope scope(computing_timer_, "time step [N] 0 - build right hand side");
+      Scope scope(computing_timer_, "time step [N] 0 - build right hand sides");
 
       RYUJIN_PARALLEL_REGION_BEGIN
       LIKWID_MARKER_START("time_step_0");
@@ -259,8 +258,10 @@ namespace ryujin
 
         simd_store(density_, rho_i, i);
         /* (5.4a) */
-        for (unsigned int d = 0; d < dim; ++d)
+        for (unsigned int d = 0; d < dim; ++d) {
+          simd_store(velocity_.block(d), M_i[d] / rho_i, i);
           simd_store(velocity_rhs_.block(d), m_i * (M_i[d]), i);
+        }
         simd_store(internal_energy_rhs_, m_i * rho_e_i, i);
       }
 
@@ -277,15 +278,17 @@ namespace ryujin
 
         density_.local_element(i) = rho_i;
         /* (5.4a) */
-        for (unsigned int d = 0; d < dim; ++d)
+        for (unsigned int d = 0; d < dim; ++d) {
+          velocity_.block(d).local_element(i) = M_i[d] / rho_i;
           velocity_rhs_.block(d).local_element(i) = m_i * M_i[d];
+        }
         internal_energy_rhs_.local_element(i) = m_i * rho_e_i;
       }
 
       /*
        * We enforce boundary values by imposing them strongly in the
-       * iteration. Thus, set the right hand side to corresponding boundary
-       * values:
+       * iteration. Thus, set the initial vector and the right hand side to
+       * the corresponding boundary values:
        */
       const auto &boundary_map = offline_data_->boundary_map();
 
@@ -297,21 +300,30 @@ namespace ryujin
         const auto &[normal, id, position] = entry.second;
 
         Tensor<1, dim, Number> V_i;
+        Tensor<1, dim, Number> RHS_i;
+
         if (id == Boundary::slip) {
           /* remove normal component */
-          for (unsigned int d = 0; d < dim; ++d)
+          for (unsigned int d = 0; d < dim; ++d) {
             V_i[d] = velocity_.block(d).local_element(i);
+            RHS_i[d] = velocity_rhs_.block(d).local_element(i);
+          }
           V_i -= 1. * (V_i * normal) * normal;
+          RHS_i -= 1. * (RHS_i * normal) * normal;
         } else if (id == Boundary::no_slip) {
+          RHS_i = 0.;
           V_i = 0.;
         } else if (id == Boundary::dirichlet) {
           const auto U_i =
               initial_values_->initial_state(position, t + 0.5 * tau);
           V_i = ProblemDescription<dim, Number>::momentum(U_i) / U_i[0];
+          RHS_i = V_i;
         }
 
-        for (unsigned int d = 0; d < dim; ++d)
+        for (unsigned int d = 0; d < dim; ++d) {
           velocity_.block(d).local_element(i) = V_i[d];
+          velocity_rhs_.block(d).local_element(i) = RHS_i[d];
+        }
       }
 
       LIKWID_MARKER_STOP("time_step_0");
