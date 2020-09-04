@@ -38,28 +38,28 @@ namespace ryujin
 #ifndef DOXYGEN
   template <>
   const std::array<std::string, 3> ProblemDescription<1>::component_names{
-      "rho", "m", "E"};
+      {"rho", "m", "E"}};
 
   template <>
   const std::array<std::string, 4> ProblemDescription<2>::component_names{
-      "rho", "m_1", "m_2", "E"};
+      {"rho", "m_1", "m_2", "E"}};
 
   template <>
   const std::array<std::string, 5> ProblemDescription<3>::component_names{
-      "rho", "m_1", "m_2", "m_3", "E"};
+      {"rho", "m_1", "m_2", "m_3", "E"}};
 
   template <>
   const std::array<std::string, 3>
-      ProblemDescription<1, float>::component_names{"rho", "m", "E"};
+      ProblemDescription<1, float>::component_names{{"rho", "m", "E"}};
 
   template <>
   const std::array<std::string, 4>
-      ProblemDescription<2, float>::component_names{"rho", "m_1", "m_2", "E"};
+      ProblemDescription<2, float>::component_names{{"rho", "m_1", "m_2", "E"}};
 
   template <>
   const std::array<std::string, 5>
       ProblemDescription<3, float>::component_names{
-          "rho", "m_1", "m_2", "m_3", "E"};
+          {"rho", "m_1", "m_2", "m_3", "E"}};
 #endif
 
 } /* namespace ryujin */
