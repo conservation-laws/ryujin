@@ -16,6 +16,8 @@
 
 #include <deal.II/matrix_free/fe_evaluation.h>
 #include <deal.II/lac/linear_operator.h>
+#include <deal.II/lac/precondition.h>
+#include <deal.II/lac/solver_cg.h>
 
 #include <atomic>
 

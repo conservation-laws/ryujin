@@ -23,27 +23,27 @@ namespace ryujin
 #ifndef DOXYGEN
   template <>
   const std::array<std::string, 2> Postprocessor<1, double>::component_names{
-      "schlieren", "alpha"};
+      {"schlieren", "alpha"}};
 
   template <>
   const std::array<std::string, 3> Postprocessor<2, double>::component_names{
-      "schlieren", "vorticity", "alpha"};
+      {"schlieren", "vorticity", "alpha"}};
 
   template <>
   const std::array<std::string, 3> Postprocessor<3, double>::component_names{
-      "schlieren", "vorticity", "alpha"};
+      {"schlieren", "vorticity", "alpha"}};
 
   template <>
   const std::array<std::string, 2> Postprocessor<1, float>::component_names{
-      "schlieren", "alpha"};
+      {"schlieren", "alpha"}};
 
   template <>
   const std::array<std::string, 3> Postprocessor<2, float>::component_names{
-      "schlieren", "vorticity", "alpha"};
+      {"schlieren", "vorticity", "alpha"}};
 
   template <>
   const std::array<std::string, 3> Postprocessor<3, float>::component_names{
-      "schlieren", "vorticity", "alpha"};
+      {"schlieren", "vorticity", "alpha"}};
 #endif
 
 

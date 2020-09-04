@@ -268,7 +268,7 @@ namespace ryujin
       const Number gap =
           std::max(std::abs(nu_32 - nu_31), std::abs(nu_12 - nu_11));
 
-      return {gap, lambda_max};
+      return {{gap, lambda_max}};
     }
 
 
@@ -375,7 +375,7 @@ namespace ryujin
       const auto rho_p_max_exp =
           rho_p_max * ryujin::pow(p_2 / p_max, gamma_inverse);
 
-      return {rho_p_min_shk, rho_p_max_shk, rho_p_min_exp, rho_p_max_exp};
+      return {{rho_p_min_shk, rho_p_max_shk, rho_p_min_exp, rho_p_max_exp}};
     }
 
 
@@ -650,7 +650,7 @@ namespace ryujin
       /* flux of entropy: */
       const auto b = ScalarNumber(0.5) * (u_i * salpha_i - u_j * salpha_j);
 
-      return {rho_min, rho_max, s_min, a, b};
+      return {{rho_min, rho_max, s_min, a, b}};
     }
 
 
@@ -676,10 +676,10 @@ namespace ryujin
            projected_momentum,
            U[1 + dim] - Number(0.5) * perp.norm_square() * rho_inverse});
 
-      return {projected[0],               // rho
-              projected[1] * rho_inverse, // u
-              ProblemDescription<1, Number>::pressure(projected),
-              ProblemDescription<1, Number>::speed_of_sound(projected)};
+      return {{projected[0],               // rho
+               projected[1] * rho_inverse, // u
+               ProblemDescription<1, Number>::pressure(projected),
+               ProblemDescription<1, Number>::speed_of_sound(projected)}};
     }
   } /* anonymous namespace */
 

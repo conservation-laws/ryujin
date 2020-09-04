@@ -296,8 +296,7 @@ namespace ryujin
       triangulation.set_manifold(1, SphericalManifold<2>(point));
 
       for (auto cell : triangulation.active_cell_iterators())
-        for (unsigned int v = 0; v < GeometryInfo<2>::vertices_per_cell;
-             ++v) {
+        for (unsigned int v = 0; v < GeometryInfo<2>::vertices_per_cell; ++v) {
           double distance =
               (cell->vertex(v) - Point<2>(step_position, step_height)).norm();
           if (distance < 1.e-6) {
@@ -316,8 +315,7 @@ namespace ryujin
 
         cell->set_manifold_id(0); // reset manifold id again
 
-        for (unsigned int v = 0; v < GeometryInfo<2>::vertices_per_cell;
-             ++v) {
+        for (unsigned int v = 0; v < GeometryInfo<2>::vertices_per_cell; ++v) {
           auto &vertex = cell->vertex(v);
 
           if (std::abs(vertex[0] - step_position) < 1.e-6 &&
@@ -584,11 +582,18 @@ namespace ryujin
           typename Geometry<dim>::Triangulation &triangulation) final override
       {
         dealii::Triangulation<dim, dim> tria1;
-        dealii::GridGenerator::subdivided_hyper_rectangle(
-            tria1,
-            {2, 1},
-            dealii::Point<2>(),
-            dealii::Point<2>(length_, height_));
+        if constexpr (dim == 2)
+          dealii::GridGenerator::subdivided_hyper_rectangle(
+              tria1,
+              {2, 1},
+              dealii::Point<2>(),
+              dealii::Point<2>(length_, height_));
+        else
+          dealii::GridGenerator::subdivided_hyper_rectangle(
+              tria1,
+              {2, 1, 1},
+              dealii::Point<3>(),
+              dealii::Point<3>(length_, height_, height_));
         triangulation.copy_triangulation(tria1);
 
         for (auto cell : triangulation.active_cell_iterators())
