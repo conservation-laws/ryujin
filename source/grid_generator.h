@@ -596,13 +596,35 @@ namespace ryujin
               dealii::Point<3>(length_, height_, height_));
         triangulation.copy_triangulation(tria1);
 
-        for (auto cell : triangulation.active_cell_iterators())
+        for (auto cell : triangulation.active_cell_iterators()) {
           for (auto f : dealii::GeometryInfo<dim>::face_indices()) {
             const auto face = cell->face(f);
             if (!face->at_boundary())
               continue;
-            face->set_boundary_id(Boundary::dirichlet);
+
+            const auto position = face->center();
+            if (position[0] < 1.e-6) {
+              /* left: dirichlet */
+              face->set_boundary_id(Boundary::dirichlet);
+            } else if (position[0] > length_ - 1.e-6) {
+              /* right: no slip */
+              face->set_boundary_id(Boundary::no_slip);
+            } else if (position[1] < 1.e-6) {
+              /* bottom: no slip */
+              face->set_boundary_id(Boundary::no_slip);
+            } else if (position[1] > height_ - 1.e-6) {
+              /* top: slip */
+              face->set_boundary_id(Boundary::slip);
+            } else if (constexpr dim == 3) {
+            } else if (position[2] < 1.e-6) {
+              /* left: no slip */
+              face->set_boundary_id(Boundary::no_slip);
+            } else if (position[2] > height_ - 1.e-6) {
+              /* right: slip */
+              face->set_boundary_id(Boundary::slip);
+            }
           }
+        }
       }
 
     private:
