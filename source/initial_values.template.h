@@ -32,19 +32,19 @@ namespace ryujin
         "configuration",
         configuration_,
         "Configuration. Valid options are \"uniform\", \"shock front\", "
-        "\"contrast\", \"sod contrast\", \"isentropic vortex\"");
+        "\"contrast\", \"isentropic vortex\"");
 
     initial_direction_[0] = 1.;
     add_parameter(
         "initial - direction",
         initial_direction_,
-        "Initial direction of shock front, contrast, sod contrast, or vortex");
+        "Initial direction of shock front, contrast, or vortex");
 
     initial_position_[0] = 1.;
     add_parameter(
         "initial - position",
         initial_position_,
-        "Initial position of shock front, contrast, sod contrast, or vortex");
+        "Initial position of shock front, contrast, or vortex");
 
     initial_1d_state_[0] = gamma;
     initial_1d_state_[1] = 3.0;
@@ -181,34 +181,13 @@ namespace ryujin
        */
 
       initial_state_ = [=](const dealii::Point<dim> &point, Number /*t*/) {
-        const Number position_1d = Number((point - initial_position_)[1]);
+        const Number position_1d =
+            Number((point - initial_position_) * initial_direction_);
 
         if (position_1d > 0.) {
           return from_1d_state(initial_1d_state_);
         } else {
           return from_1d_state(initial_1d_state_contrast_);
-        }
-      };
-
-    } else if (configuration_ == "sod contrast") {
-
-      /*
-       * Contrast of the Sod shock tube:
-       */
-
-      dealii::Tensor<1, 3, Number> initial_1d_state_L{
-          {Number(0.125), Number(0.), Number(0.1)}};
-      dealii::Tensor<1, 3, Number> initial_1d_state_R{
-          {Number(1.), Number(0.), Number(1.)}};
-
-      initial_state_ = [=](const dealii::Point<dim> &point, Number /*t*/) {
-        const Number position_1d =
-            Number((point - initial_position_) * initial_direction_);
-
-        if (position_1d > 0.) {
-          return from_1d_state(initial_1d_state_L);
-        } else {
-          return from_1d_state(initial_1d_state_R);
         }
       };
 
