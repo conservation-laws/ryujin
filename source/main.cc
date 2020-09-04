@@ -40,7 +40,8 @@ int main (int argc, char *argv[])
 
   ryujin::TimeLoop<DIM, NUMBER> time_loop(mpi_communicator);
 
-  std::cout << "[Init] initiating flux capacitor" << std::endl;
+  if (dealii::Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
+    std::cout << "[Init] initiating flux capacitor" << std::endl;
 
   AssertThrow(
       argc <= 2,
