@@ -615,7 +615,7 @@ namespace ryujin
           U_i[1 + d] = m_i_new[d];
         U_i[1 + dim] = E_i_new;
 
-        // U.write_vectorized_tensor(U_i, i);
+        U.write_vectorized_tensor(U_i, i);
       }
 
       RYUJIN_PARALLEL_REGION_END
@@ -643,10 +643,10 @@ namespace ryujin
           U_i[1 + d] = m_i_new[d];
         U_i[1 + dim] = E_i_new;
 
-        // U.write_tensor(U_i, i);
+        U.write_tensor(U_i, i);
       }
 
-      // U.update_ghost_values();
+      U.update_ghost_values();
 
       LIKWID_MARKER_STOP("time_step_4");
     }
