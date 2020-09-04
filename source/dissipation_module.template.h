@@ -14,10 +14,10 @@
 #include "indicator.h"
 #include "riemann_solver.h"
 
-#include <deal.II/matrix_free/fe_evaluation.h>
 #include <deal.II/lac/linear_operator.h>
 #include <deal.II/lac/precondition.h>
 #include <deal.II/lac/solver_cg.h>
+#include <deal.II/matrix_free/fe_evaluation.h>
 
 #include <atomic>
 
@@ -60,8 +60,7 @@ namespace ryujin
       , initial_values_(&initial_values)
   {
     tolerance_ = Number(1.0e-12);
-    add_parameter(
-        "tolerance", tolerance_, "Tolerance for linear solvers");
+    add_parameter("tolerance", tolerance_, "Tolerance for linear solvers");
   }
 
 
@@ -74,7 +73,13 @@ namespace ryujin
 
     /* Initialize vectors: */
 
-    const auto &scalar_partitioner = offline_data_->scalar_partitioner();
+    matrix_free_.reinit(offline_data_->discretization().mapping(),
+                        offline_data_->dof_handler(),
+                        offline_data_->affine_constraints(),
+                        offline_data_->discretization().quadrature_1d());
+
+    const auto &scalar_partitioner =
+        matrix_free_.get_dof_info(0).vector_partitioner;
 
     velocity_.reinit(dim);
     velocity_rhs_.reinit(dim);
@@ -87,11 +92,6 @@ namespace ryujin
     internal_energy_rhs_.reinit(scalar_partitioner);
 
     density_.reinit(scalar_partitioner);
-
-    matrix_free_.reinit(offline_data_->discretization().mapping(),
-                        offline_data_->dof_handler(),
-                        offline_data_->affine_constraints(),
-                        offline_data_->discretization().quadrature_1d());
   }
 
 
@@ -230,8 +230,8 @@ namespace ryujin
     /* Index ranges for the iteration over the sparsity pattern : */
 
     constexpr auto simd_length = VA::size();
-    const unsigned int n_relevant = offline_data_->n_locally_relevant();
-    const unsigned int size_regular = n_relevant / simd_length * simd_length;
+    const unsigned int n_owned = offline_data_->n_locally_owned();
+    const unsigned int size_regular = n_owned / simd_length * simd_length;
 
     /*
      * Step 0: Copy vectors
@@ -263,7 +263,7 @@ namespace ryujin
 
       RYUJIN_PARALLEL_REGION_END
 
-      for (unsigned int i = size_regular; i < n_relevant; ++i) {
+      for (unsigned int i = size_regular; i < n_owned; ++i) {
         using PD = ProblemDescription<dim, Number>;
 
         const auto U_i = U.get_tensor(i);
@@ -288,6 +288,9 @@ namespace ryujin
 
       for (auto entry : boundary_map) {
         const auto i = entry.first;
+        if (i >= n_owned)
+          continue;
+
         const auto &[normal, id, position] = entry.second;
 
         Tensor<1, dim, Number> V_i;
@@ -383,7 +386,7 @@ namespace ryujin
       RYUJIN_PARALLEL_REGION_BEGIN
       LIKWID_MARKER_START("time_step_4");
 
-      const unsigned int size_regular = n_relevant / simd_length * simd_length;
+      const unsigned int size_regular = n_owned / simd_length * simd_length;
 
       RYUJIN_OMP_FOR
       for (unsigned int i = 0; i < size_regular; i += simd_length) {
@@ -414,7 +417,7 @@ namespace ryujin
 
       RYUJIN_PARALLEL_REGION_END
 
-      for (unsigned int i = size_regular; i < n_relevant; ++i) {
+      for (unsigned int i = size_regular; i < n_owned; ++i) {
         using PD = ProblemDescription<dim, Number>;
 
         auto U_i = U.get_tensor(i);
@@ -439,6 +442,8 @@ namespace ryujin
 
         // U.write_tensor(U_i, i);
       }
+
+      // U.update_ghost_values();
 
       LIKWID_MARKER_STOP("time_step_4");
     }
