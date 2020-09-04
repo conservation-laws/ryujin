@@ -186,6 +186,9 @@ namespace ryujin
 
     for (auto entry : boundary_map) {
       const auto i = entry.first;
+      if (i >= n_owned)
+        continue;
+
       const auto &[normal, id, position] = entry.second;
 
       Tensor<1, dim, Number> V_i;
