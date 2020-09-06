@@ -250,23 +250,22 @@ namespace ryujin
 
     /* Apply action of diffusion operator \sum_j beta_ij e_j: */
 
-    const auto integrator = [this](const auto &data,
-                                   auto &dst,
-                                   const auto &src,
-                                   const auto range) {
-      FEEvaluation<dim, 1, 2, 1, Number> energy(data);
-      const auto factor = Number(0.5) * tau_ * problem_description_->kappa() *
-                          problem_description_->gamma_minus_one_inverse;
+    const auto integrator =
+        [this](const auto &data, auto &dst, const auto &src, const auto range) {
+          FEEvaluation<dim, 1, 2, 1, Number> energy(data);
+          const auto factor = Number(0.5) * tau_ *
+                              problem_description_->kappa() *
+                              problem_description_->gamma_minus_one_inverse;
 
-      for (unsigned int cell = range.first; cell < range.second; ++cell) {
-        energy.reinit(cell);
-        energy.gather_evaluate(src, EvaluationFlags::gradients);
-        for (unsigned int q = 0; q < energy.n_q_points; ++q) {
-          energy.submit_gradient(factor * energy.get_gradient(q), q);
-        }
-        energy.integrate_scatter(EvaluationFlags::gradients, dst);
-      }
-    };
+          for (unsigned int cell = range.first; cell < range.second; ++cell) {
+            energy.reinit(cell);
+            energy.gather_evaluate(src, EvaluationFlags::gradients);
+            for (unsigned int q = 0; q < energy.n_q_points; ++q) {
+              energy.submit_gradient(factor * energy.get_gradient(q), q);
+            }
+            energy.integrate_scatter(EvaluationFlags::gradients, dst);
+          }
+        };
 
     matrix_free_.template cell_loop<scalar_type, scalar_type>(
         integrator, dst, src, /* zero destination */ false);
@@ -289,6 +288,72 @@ namespace ryujin
 
 
   template <int dim, typename Number>
+  class DiagonalMatrix
+  {
+  public:
+    /**
+     * @copydoc OfflineData::vector_type
+     */
+    using vector_type = typename DissipationModule<dim, Number>::scalar_type;
+
+    /**
+     * @copydoc DissipationModule::vector_type
+     */
+    using block_vector_type =
+        typename DissipationModule<dim, Number>::block_vector_type;
+
+    /**
+     * Constructor
+     */
+    DiagonalMatrix() = default;
+
+    /**
+     * Compute as the inverse of the density and the lumped mass matrix.
+     */
+    void reinit(const vector_type &lumped_mass_matrix,
+                const vector_type &density)
+    {
+      diagonal.reinit(density, true);
+
+      DEAL_II_OPENMP_SIMD_PRAGMA
+      for (unsigned int i = 0; i < density.get_partitioner()->local_size(); ++i)
+        diagonal.local_element(i) =
+            Number(1.0) /
+            (density.local_element(i) * lumped_mass_matrix.local_element(i));
+    }
+
+    /**
+     * Apply on a vector.
+     */
+    void vmult(vector_type &dst, const vector_type &src) const
+    {
+      DEAL_II_OPENMP_SIMD_PRAGMA
+      for (unsigned int i = 0; i < diagonal.get_partitioner()->local_size();
+           ++i)
+        dst.local_element(i) = diagonal.local_element(i) * src.local_element(i);
+    }
+
+    /**
+     * Apply on a block vector.
+     */
+    void vmult(block_vector_type &dst, const block_vector_type &src) const
+    {
+      AssertDimension(dim, dst.n_blocks());
+      AssertDimension(dim, src.n_blocks());
+      DEAL_II_OPENMP_SIMD_PRAGMA
+      for (unsigned int i = 0; i < diagonal.get_partitioner()->local_size();
+           ++i)
+        for (unsigned int d = 0; d < dim; ++d)
+          dst.block(d).local_element(i) =
+              diagonal.local_element(i) * src.block(d).local_element(i);
+    }
+
+  private:
+    vector_type diagonal;
+  };
+
+
+  template <int dim, typename Number>
   Number
   DissipationModule<dim, Number>::step(vector_type &U, Number t, Number tau)
   {
@@ -307,6 +372,8 @@ namespace ryujin
     constexpr auto simd_length = VA::size();
     const unsigned int n_owned = offline_data_->n_locally_owned();
     const unsigned int size_regular = n_owned / simd_length * simd_length;
+
+    DiagonalMatrix<dim, Number> diagonal_matrix;
 
     /*
      * Step 0:
@@ -413,6 +480,8 @@ namespace ryujin
         }
       }
 
+      diagonal_matrix.reinit(lumped_mass_matrix, density_);
+
       LIKWID_MARKER_STOP("time_step_0");
     }
 
@@ -436,7 +505,7 @@ namespace ryujin
       SolverControl solver_control(200, tolerance_);
       SolverCG<block_vector_type> solver(solver_control);
       solver.solve(
-          velocity_operator, velocity_, velocity_rhs_, PreconditionIdentity());
+          velocity_operator, velocity_, velocity_rhs_, diagonal_matrix);
 
       /* update exponential moving average */
       n_iterations_velocity_ =
@@ -579,7 +648,7 @@ namespace ryujin
       solver.solve(internal_energy_operator,
                    internal_energy_,
                    internal_energy_rhs_,
-                   PreconditionIdentity());
+                   diagonal_matrix);
 
       /* update exponential moving average */
       n_iterations_internal_energy_ = 0.9 * n_iterations_internal_energy_ +
