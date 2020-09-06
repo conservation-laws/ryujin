@@ -186,8 +186,8 @@ namespace ryujin
 
       const auto &[normal, id, position] = entry.second;
 
-      Tensor<1, dim, Number> V_i;
       if (id == Boundary::slip) {
+        Tensor<1, dim, Number> V_i;
         for (unsigned int d = 0; d < dim; ++d)
           V_i[d] = dst.block(d).local_element(i);
 
@@ -198,15 +198,15 @@ namespace ryujin
           V_i += 1. * (src_d * normal[d]) * normal;
         }
 
+        for (unsigned int d = 0; d < dim; ++d)
+          dst.block(d).local_element(i) = V_i[d];
+
       } else if (id == Boundary::no_slip || id == Boundary::dirichlet) {
 
-        /* set V_i to src vector: */
+        /* set dst to src vector: */
         for (unsigned int d = 0; d < dim; ++d)
-          V_i[d] = src.block(d).local_element(i);
+          dst.block(d).local_element(i) = src.block(d).local_element(i);
       }
-
-      for (unsigned int d = 0; d < dim; ++d)
-        dst.block(d).local_element(i) = V_i[d];
     }
   }
 
