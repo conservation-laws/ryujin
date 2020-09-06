@@ -502,7 +502,7 @@ namespace ryujin
       };
 
       /* FIXME: Tune parameters */
-      SolverControl solver_control(200, tolerance_);
+      SolverControl solver_control(1000, velocity_rhs_.l2_norm() * tolerance_);
       SolverCG<block_vector_type> solver(solver_control);
       solver.solve(
           velocity_operator, velocity_, velocity_rhs_, diagonal_matrix);
@@ -643,7 +643,8 @@ namespace ryujin
       };
 
       /* FIXME: Tune parameters */
-      SolverControl solver_control(200, tolerance_);
+      SolverControl solver_control(1000,
+                                   internal_energy_rhs_.l2_norm() * tolerance_);
       SolverCG<scalar_type> solver(solver_control);
       solver.solve(internal_energy_operator,
                    internal_energy_,
