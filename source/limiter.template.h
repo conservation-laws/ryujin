@@ -158,8 +158,10 @@ namespace ryujin
             rho_r * drho_e_r + (rho_e_r - gp1 * s_min * rho_r_gamma) * drho;
 
 #ifdef CHECK_BOUNDS
+        const auto psi = relaxation * relaxation * rho_l * rho_e_l -
+                         s_min * rho_l * rho_l_gamma;
         AssertThrowSIMD(
-            psi_l,
+            psi,
             [](auto val) { return val >= -100. * eps; },
             dealii::ExcMessage("Specific entropy minimum principle violated."));
 #endif
@@ -179,8 +181,8 @@ namespace ryujin
           ProblemDescription<dim, Number>::internal_energy(U_new);
       const auto s_new =
           ProblemDescription<dim, Number>::specific_entropy(U_new);
-      const auto psi =
-          relaxation * rho_new * e_new - s_min * ryujin::pow(rho_new, gp1);
+      const auto psi = relaxation * relaxation * rho_new * e_new -
+                       s_min * ryujin::pow(rho_new, gp1);
 
       AssertThrowSIMD(
           e_new,
