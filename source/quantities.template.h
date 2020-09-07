@@ -46,7 +46,7 @@ namespace ryujin
 
     output << "time";
     if (compute_conserved_quantities_)
-      std::cout << "\ttotal mass\ttotal momentum\ttotal energy";
+      output << "\ttotal mass\ttotal momentum\ttotal energy";
     output << std::endl;
   }
 
@@ -63,6 +63,7 @@ namespace ryujin
     if (compute_conserved_quantities_) {
       const unsigned int n_owned = offline_data_->n_locally_owned();
       const auto &lumped_mass_matrix = offline_data_->lumped_mass_matrix();
+      const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
 
       rank1_type summed_quantities;
 
@@ -72,6 +73,12 @@ namespace ryujin
 
       RYUJIN_OMP_FOR
       for (unsigned int i = 0; i < n_owned; ++i) {
+
+        /* Skip constrained degrees of freedom (periodic constraints) */
+        const unsigned int row_length = sparsity_simd.row_length(i);
+        if (row_length == 1)
+          continue;
+
         const auto m_i = lumped_mass_matrix.local_element(i);
         const auto U_i = U.get_tensor(i);
         summed_quantities_thread_local += m_i * U_i;

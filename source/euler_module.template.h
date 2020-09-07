@@ -231,9 +231,10 @@ namespace ryujin
 
         const unsigned int row_length = sparsity_simd.row_length(i);
 
-        /* Skip constrained degrees of freedom */
-        if (row_length == 1)
+        /* Skip constrained degrees of freedom (periodic constraints) */
+        if (row_length == 1) {
           continue;
+        }
 
         const auto U_i = U.get_tensor(i);
         const Number mass = lumped_mass_matrix.local_element(i);
@@ -370,7 +371,7 @@ namespace ryujin
 
         const unsigned int row_length = sparsity_simd.row_length(i);
 
-        /* Skip constrained degrees of freedom */
+        /* Skip constrained degrees of freedom (periodic constraints) */
         if (row_length == 1)
           continue;
 
@@ -474,7 +475,7 @@ namespace ryujin
       RYUJIN_OMP_FOR_NOWAIT
       for (unsigned int i = n_internal; i < n_owned; ++i) {
 
-        /* Skip constrained degrees of freedom */
+        /* Skip constrained degrees of freedom (periodic constraints) */
         const unsigned int row_length = sparsity_simd.row_length(i);
         if (row_length == 1)
           continue;
@@ -688,7 +689,7 @@ namespace ryujin
       RYUJIN_OMP_FOR_NOWAIT
       for (unsigned int i = n_internal; i < n_owned; ++i) {
 
-        /* Skip constrained degrees of freedom */
+        /* Skip constrained degrees of freedom (periodic constraints) */
         const unsigned int row_length = sparsity_simd.row_length(i);
         if (row_length == 1)
           continue;
@@ -843,7 +844,7 @@ namespace ryujin
         RYUJIN_OMP_FOR_NOWAIT
         for (unsigned int i = n_internal; i < n_owned; ++i) {
 
-          /* Skip constrained degrees of freedom */
+          /* Skip constrained degrees of freedom (periodic constraints) */
           const unsigned int row_length = sparsity_simd.row_length(i);
           if (row_length == 1)
             continue;

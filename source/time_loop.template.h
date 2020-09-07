@@ -193,6 +193,18 @@ namespace ryujin
       } else {
         print_info("interpolating initial values");
         U = initial_values.interpolate(offline_data);
+#ifdef DEBUG
+        /* Poison constrained degrees of freedom: */
+        const unsigned int n_relevant = offline_data.n_locally_relevant();
+        const auto &partitioner = offline_data.scalar_partitioner();
+        for (unsigned int i = 0; i < n_relevant; ++i) {
+          if (offline_data.affine_constraints().is_constrained(
+                  partitioner->local_to_global(i)))
+            U.write_tensor(dealii::Tensor<1, dim + 2, Number>() *
+                               std::numeric_limits<Number>::signaling_NaN(),
+                           i);
+        }
+#endif
       }
     }
 

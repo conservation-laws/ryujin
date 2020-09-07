@@ -121,17 +121,15 @@ namespace ryujin
 
     DoFTools::make_hanging_node_constraints(dof_handler_, affine_constraints_);
 
+    /*
+     * Enforce periodic boundary conditions. We assume that the mesh is in
+     * "normal configuration".
+     */
     const auto n_periodic_faces =
         discretization_->triangulation().get_periodic_face_map().size();
     if (n_periodic_faces != 0) {
-      /*
-       * Enforce periodic boundary conditions. We assume that the mesh is in
-       * "normal configuration". By convention we also omit enforcing
-       * periodicity in x direction. This avoids accidentally glueing the
-       * corner degrees of freedom together which leads to instability.
-       */
       if constexpr (dim != 1 && std::is_same<Number, double>::value) {
-        for (int i = 1; i < dim; ++i) /* omit x direction! */
+        for (int i = 0; i < dim; ++i)
           DoFTools::make_periodicity_constraints(dof_handler_,
                                                  /*b_id */ Boundary::periodic,
                                                  /*direction*/ i,
