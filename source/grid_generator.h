@@ -556,9 +556,9 @@ namespace ryujin
      * layer.
      *
      * A rectangular domain with given length and height. The boundary
-     * conditions are Dirichlet conditions on the left of the domain,
-     * slip boundary conditions on the top, and no_slip boundary conditions
-     * on bottom and right boundary.
+     * conditions are slip boundary conditions on the top, and no_slip
+     * boundary conditions on bottom, left and right boundary of the 2D
+     * domain.
      *
      * @ingroup Mesh
      */
@@ -604,8 +604,8 @@ namespace ryujin
 
             const auto position = face->center();
             if (position[0] < 1.e-6) {
-              /* left: dirichlet */
-              face->set_boundary_id(Boundary::dirichlet);
+              /* left: no slip */
+              face->set_boundary_id(Boundary::no_slip);
             } else if (position[0] > length_ - 1.e-6) {
               /* right: no slip */
               face->set_boundary_id(Boundary::no_slip);
@@ -615,14 +615,19 @@ namespace ryujin
             } else if (position[1] > height_ - 1.e-6) {
               /* top: slip */
               face->set_boundary_id(Boundary::slip);
-            }
-            if constexpr (dim == 3) {
-              if (position[2] < 1.e-6) {
-                /* left: no slip */
-                face->set_boundary_id(Boundary::no_slip);
-              } else if (position[2] > height_ - 1.e-6) {
-                /* right: slip */
-                face->set_boundary_id(Boundary::slip);
+            } else {
+              if constexpr (dim == 3) {
+                if (position[2] < 1.e-6) {
+                  /* left: no slip */
+                  face->set_boundary_id(Boundary::no_slip);
+                } else if (position[2] > height_ - 1.e-6) {
+                  /* right: slip */
+                  face->set_boundary_id(Boundary::slip);
+                } else {
+                  Assert(false, dealii::ExcInternalError());
+                }
+              } else {
+                Assert(false, dealii::ExcInternalError());
               }
             }
           } /*for*/
