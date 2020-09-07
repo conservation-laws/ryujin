@@ -52,6 +52,7 @@ namespace ryujin
                            initial_values,
                            "/G - DissipationModule")
       , postprocessor(mpi_communicator, offline_data, "/H - Postprocessor")
+      , quantities(mpi_communicator, offline_data, "/I - Quantities")
       , mpi_rank(dealii::Utilities::MPI::this_mpi_process(mpi_communicator))
       , n_mpi_processes(
             dealii::Utilities::MPI::n_mpi_processes(mpi_communicator))
@@ -92,6 +93,21 @@ namespace ryujin
         "Write out cutplanes pvtu records. The frequency is determined by "
         "\"output granularity\" times \"output cutplanes multiplier\"");
 
+    enable_compute_error = false;
+    add_parameter("enable compute error",
+                  enable_compute_error,
+                  "Flag to control whether we compute the Linfty Linf_norm of "
+                  "the difference to an analytic solution. Implemented only "
+                  "for certain initial state configurations.");
+
+    enable_compute_quantities = false;
+    add_parameter(
+        "enable compute quantities",
+        enable_compute_quantities,
+        "Flag to control whether we compute quantities of interest. The "
+        "frequency how often quantities are logged is determined by \"output "
+        "granularity\" times \"output quantities multiplier\"");
+
     output_checkpoint_multiplier = 1;
     add_parameter("output checkpoint multiplier",
                   output_checkpoint_multiplier,
@@ -110,12 +126,12 @@ namespace ryujin
                   "Multiplicative modifier applied to \"output granularity\" "
                   "that determines the cutplanes pvtu writeout granularity");
 
-    enable_compute_error = false;
-    add_parameter("enable compute error",
-                  enable_compute_error,
-                  "Flag to control whether we compute the Linfty Linf_norm of "
-                  "the difference to an analytic solution. Implemented only "
-                  "for certain initial state configurations.");
+    output_quantities_multiplier = 1;
+    add_parameter(
+        "output quantities multiplier",
+        output_quantities_multiplier,
+        "Multiplicative modifier applied to \"output granularity\" that "
+        "determines the writeout granularity for quantities of interest");
 
     resume = false;
     add_parameter("resume", resume, "Resume an interrupted computation");
@@ -162,6 +178,7 @@ namespace ryujin
       euler_module.prepare();
       dissipation_module.prepare();
       postprocessor.prepare();
+      quantities.prepare(base_name + "-quantities.log");
 
       print_mpi_partition(logfile);
 
@@ -186,6 +203,8 @@ namespace ryujin
         output(analytic, base_name + "-analytic_solution", t, output_cycle);
       }
     }
+    if (enable_compute_quantities)
+      quantities.compute(U, t);
     ++output_cycle;
 
     print_info("entering main loop");
@@ -229,6 +248,9 @@ namespace ryujin
             output(analytic, base_name + "-analytic_solution", t, output_cycle);
           }
         }
+        if (enable_compute_quantities &&
+            (output_cycle % output_quantities_multiplier == 0))
+          quantities.compute(U, t);
 
         ++output_cycle;
 

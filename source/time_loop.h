@@ -15,6 +15,7 @@
 #include "offline_data.h"
 #include "postprocessor.h"
 #include "problem_description.h"
+#include "quantities.h"
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/timer.h>
@@ -103,10 +104,12 @@ namespace ryujin
     bool enable_output_full;
     bool enable_output_cutplanes;
     bool enable_compute_error;
+    bool enable_compute_quantities;
 
     unsigned int output_checkpoint_multiplier;
     unsigned int output_full_multiplier;
     unsigned int output_cutplanes_multiplier;
+    unsigned int output_quantities_multiplier;
 
     bool resume;
 
@@ -129,6 +132,7 @@ namespace ryujin
     ryujin::EulerModule<dim, Number> euler_module;
     ryujin::DissipationModule<dim, Number> dissipation_module;
     ryujin::Postprocessor<dim, Number> postprocessor;
+    ryujin::Quantities<dim, Number> quantities;
 
     const unsigned int mpi_rank;
     const unsigned int n_mpi_processes;
