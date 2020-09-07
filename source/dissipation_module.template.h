@@ -160,7 +160,7 @@ namespace ryujin
                   velocity.get_symmetric_gradient(q);
               const auto divergence = trace(symmetric_gradient);
 
-              // S = (mu nabla^S(v) + (lambda - 2/3*mu) div(v) Id) : nabla phi
+              // S = (2 mu nabla^S(v) + (lambda - 2/3*mu) div(v) Id) : nabla phi
               auto S = 2. * mu * symmetric_gradient;
               for (unsigned int d = 0; d < dim; ++d)
                 S[d][d] += (lambda - 2. / 3. * mu) * divergence;
@@ -483,11 +483,15 @@ namespace ryujin
           const auto rho_i = U_i[0];
           const auto V_i =
               ProblemDescription<dim, Number>::momentum(U_i) / rho_i;
+          const auto e_i =
+              ProblemDescription<dim, Number>::internal_energy(U_i) / rho_i;
 
           for (unsigned int d = 0; d < dim; ++d) {
             velocity_.block(d).local_element(i) = V_i[d];
             velocity_rhs_.block(d).local_element(i) = V_i[d];
           }
+
+          internal_energy_.local_element(i) = e_i;
         }
       }
 
@@ -499,6 +503,7 @@ namespace ryujin
        */
 
       affine_constraints.set_zero(density_);
+      affine_constraints.set_zero(internal_energy_);
       for (unsigned int d = 0; d < dim; ++d) {
         affine_constraints.set_zero(velocity_.block(d));
         affine_constraints.set_zero(velocity_rhs_.block(d));
@@ -548,6 +553,7 @@ namespace ryujin
 
       LIKWID_MARKER_START("time_step_n_2");
 
+      /* Compute m_i K_i^{n+1/2}:  (5.5) */
       matrix_free_.template cell_loop<scalar_type, block_vector_type>(
           [this](const auto &data,
                  auto &dst,
@@ -597,12 +603,13 @@ namespace ryujin
       for (unsigned int i = 0; i < size_regular; i += simd_length) {
         using PD = ProblemDescription<dim, VA>;
 
+        const auto rhs_i = simd_load(internal_energy_rhs_, i);
         const auto m_i = simd_load(lumped_mass_matrix, i);
         const auto rho_i = simd_load(density_, i);
         const auto e_i = simd_load(internal_energy_, i);
-        const auto rhs_i = simd_load(internal_energy_rhs_, i);
+        /* rhs_i already contains m_i K_i^{n+1/2} */
         simd_store(
-            internal_energy_rhs_, m_i * (rho_i * e_i + 0.5 * tau * rhs_i), i);
+            internal_energy_rhs_, m_i * rho_i * e_i + 0.5 * tau * rhs_i, i);
       }
 
       RYUJIN_PARALLEL_REGION_END
@@ -641,8 +648,6 @@ namespace ryujin
           const auto rho_i = U_i[0];
           const auto e_i =
               ProblemDescription<dim, Number>::internal_energy(U_i) / rho_i;
-
-          internal_energy_.local_element(i) = e_i;
           internal_energy_rhs_.local_element(i) = e_i;
         }
       }
@@ -653,7 +658,6 @@ namespace ryujin
        * the stencil - consequently we have to remove constrained dofs from
        * the linear system.
        */
-      affine_constraints.set_zero(internal_energy_);
       affine_constraints.set_zero(internal_energy_rhs_);
 
       LIKWID_MARKER_STOP("time_step_n_2");
