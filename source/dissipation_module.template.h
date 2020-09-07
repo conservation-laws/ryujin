@@ -311,15 +311,23 @@ namespace ryujin
      * Compute as the inverse of the density and the lumped mass matrix.
      */
     void reinit(const vector_type &lumped_mass_matrix,
-                const vector_type &density)
+                const vector_type &density,
+                const AffineConstraints<Number> &affine_constraints)
     {
       diagonal.reinit(density, true);
 
       DEAL_II_OPENMP_SIMD_PRAGMA
-      for (unsigned int i = 0; i < density.get_partitioner()->local_size(); ++i)
+      for (unsigned int i = 0; i < density.get_partitioner()->local_size(); ++i) {
         diagonal.local_element(i) =
             Number(1.0) /
             (density.local_element(i) * lumped_mass_matrix.local_element(i));
+      }
+
+      /*
+       * Fix up diagonal entries for constrained degrees of freedom due to
+       * periodic boundary conditions.
+       */
+      affine_constraints.set_zero(diagonal);
     }
 
     /**
@@ -366,6 +374,7 @@ namespace ryujin
     using VA = VectorizedArray<Number>;
 
     const auto &lumped_mass_matrix = offline_data_->lumped_mass_matrix();
+    const auto &affine_constraints = offline_data_->affine_constraints();
 
     /* Index ranges for the iteration over the sparsity pattern : */
 
@@ -428,10 +437,12 @@ namespace ryujin
       }
 
       /*
-       * We enforce boundary values by imposing them strongly in the
-       * iteration. Thus, set the initial vector and the right hand side to
-       * the corresponding boundary values:
+       * Set up "strongly enforced" boundary conditions that are not stored
+       * in the AffineConstraints map. In this case we enforce boundary
+       * values by imposing them strongly in the iteration by setting the
+       * initial vector and the right hand side to the right value:
        */
+
       const auto &boundary_map = offline_data_->boundary_map();
 
       for (auto entry : boundary_map) {
@@ -480,7 +491,22 @@ namespace ryujin
         }
       }
 
-      diagonal_matrix.reinit(lumped_mass_matrix, density_);
+      /*
+       * Zero out constrained degrees of freedom due to periodic boundary
+       * conditions. These boundary conditions are enforced by modifying
+       * the stencil - consequently we have to remove constrained dofs from
+       * the linear system.
+       */
+
+      affine_constraints.set_zero(density_);
+      for (unsigned int d = 0; d < dim; ++d) {
+        affine_constraints.set_zero(velocity_.block(d));
+        affine_constraints.set_zero(velocity_rhs_.block(d));
+      }
+
+      /* Prepare preconditioner: */
+
+      diagonal_matrix.reinit(lumped_mass_matrix, density_, affine_constraints);
 
       LIKWID_MARKER_STOP("time_step_0");
     }
@@ -501,7 +527,6 @@ namespace ryujin
         velocity_vmult<block_vector_type>(dst, src);
       };
 
-      /* FIXME: Tune parameters */
       SolverControl solver_control(1000, velocity_rhs_.l2_norm() * tolerance_);
       SolverCG<block_vector_type> solver(solver_control);
       solver.solve(
@@ -593,7 +618,12 @@ namespace ryujin
             m_i * (rho_i * e_i + 0.5 * tau * rhs_i);
       }
 
-      /* Fix up constrained degrees of freedom: */
+      /*
+       * Set up "strongly enforced" boundary conditions that are not stored
+       * in the AffineConstraints map: We enforce Neumann conditions (i.e.,
+       * insulating boundary conditions) everywhere except for Dirichlet
+       * boundaries where we have to enforce prescribed conditions:
+       */
 
       const auto &boundary_map = offline_data_->boundary_map();
 
@@ -603,12 +633,6 @@ namespace ryujin
           continue;
 
         const auto &[normal, id, position] = entry.second;
-
-        /*
-         * We enforce Neumann conditions (i.e., insulating boundary
-         * conditions) everywhere except for Dirichlet boundaries where we
-         * have to enforce prescribed conditions:
-         */
 
         if (id == Boundary::dirichlet) {
           /* Prescribe internal energy: */
@@ -622,6 +646,15 @@ namespace ryujin
           internal_energy_rhs_.local_element(i) = e_i;
         }
       }
+
+      /*
+       * Zero out constrained degrees of freedom due to periodic boundary
+       * conditions. These boundary conditions are enforced by modifying
+       * the stencil - consequently we have to remove constrained dofs from
+       * the linear system.
+       */
+      affine_constraints.set_zero(internal_energy_);
+      affine_constraints.set_zero(internal_energy_rhs_);
 
       LIKWID_MARKER_STOP("time_step_n_2");
     }

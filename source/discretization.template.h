@@ -113,7 +113,7 @@ namespace ryujin
             typename dealii::Triangulation<dim>::cell_iterator>>
             periodic_faces;
 
-        for (int i = 1; i < dim; ++i) /* omit x direction! */
+        for (int i = 0; i < dim; ++i)
           GridTools::collect_periodic_faces(triangulation,
                                             /*b_id */ Boundary::periodic,
                                             /*direction*/ i,
