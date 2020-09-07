@@ -617,12 +617,13 @@ namespace ryujin
       for (unsigned int i = size_regular; i < n_owned; ++i) {
         using PD = ProblemDescription<dim, Number>;
 
+        const auto rhs_i = internal_energy_rhs_.local_element(i);
         const auto m_i = lumped_mass_matrix.local_element(i);
         const auto rho_i = density_.local_element(i);
         const auto e_i = internal_energy_.local_element(i);
-        const auto rhs_i = internal_energy_rhs_.local_element(i);
+        /* rhs_i already contains m_i K_i^{n+1/2} */
         internal_energy_rhs_.local_element(i) =
-            m_i * (rho_i * e_i + 0.5 * tau * rhs_i);
+            m_i * rho_i * e_i + 0.5 * tau * rhs_i;
       }
 
       /*
