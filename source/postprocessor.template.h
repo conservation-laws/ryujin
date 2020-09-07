@@ -126,6 +126,20 @@ namespace ryujin
     const unsigned int n_locally_owned = offline_data_->n_locally_owned();
 
     /*
+     * Step 1: Copy state vector:
+     */
+
+    std::array<scalar_type, problem_dimension> U_copy;
+    {
+      unsigned int d = 0;
+      for (auto &it : U_copy) {
+        it.reinit(offline_data_->scalar_partitioner());
+        U.extract_component(it, d++);
+        affine_constraints.distribute(it);
+      }
+    }
+
+    /*
      * Step 2: Compute r_i and r_i_max, r_i_min:
      */
 
@@ -160,7 +174,9 @@ namespace ryujin
           const auto j =
               *(i < n_internal ? js + col_idx * simd_length : js + col_idx);
 
-          const auto U_j = U.get_tensor(j);
+          rank1_type U_j;
+          for(unsigned int d = 0; d < problem_dimension; ++d)
+            U_j[d] = U_copy[d].local_element(j);
           const auto M_j = ProblemDescription<dim, Number>::momentum(U_j);
 
           const auto c_ij = cij_matrix.get_tensor(i, col_idx);
@@ -303,18 +319,6 @@ namespace ryujin
     const auto &discretization = offline_data_->discretization();
     const auto &mapping = discretization.mapping();
     const auto patch_order = discretization.finite_element().degree - 1;
-
-    std::array<LinearAlgebra::distributed::Vector<Number>, problem_dimension>
-        U_copy;
-    for (auto &it : U_copy)
-      it.reinit(offline_data_->scalar_partitioner());
-    for (unsigned int i = 0;
-         i < offline_data_->scalar_partitioner()->local_size();
-         ++i)
-      for (unsigned int d = 0; d < problem_dimension; ++d)
-        U_copy[d].local_element(i) = U.local_element(i * problem_dimension + d);
-    for (auto &it : U_copy)
-      it.update_ghost_values();
 
     if (output_full) {
       data_out->attach_dof_handler(offline_data_->dof_handler());
