@@ -240,12 +240,16 @@ namespace ryujin
       RYUJIN_PARALLEL_REGION_END
     }
 
-    /* And synchronize over all processors: */
+    /*
+     * And synchronize over all processors: Add +-eps to avoid division by
+     * zero in the exponentiation further down below.
+     */
 
-    r_i_max.store(Utilities::MPI::max(r_i_max.load(), mpi_communicator_));
-    r_i_min.store(Utilities::MPI::min(r_i_min.load(), mpi_communicator_));
-    v_i_max.store(Utilities::MPI::max(v_i_max.load(), mpi_communicator_));
-    v_i_min.store(Utilities::MPI::min(v_i_min.load(), mpi_communicator_));
+    constexpr auto eps = std::numeric_limits<Number>::epsilon();
+    r_i_max.store(Utilities::MPI::max(r_i_max.load() + eps, mpi_communicator_));
+    r_i_min.store(Utilities::MPI::min(r_i_min.load() - eps, mpi_communicator_));
+    v_i_max.store(Utilities::MPI::max(v_i_max.load() + eps, mpi_communicator_));
+    v_i_min.store(Utilities::MPI::min(v_i_min.load() - eps, mpi_communicator_));
 
     /*
      * Step 3: Normalize schlieren and vorticity:
