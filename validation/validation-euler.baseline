@@ -1,17 +1,17 @@
 #dofs =  4225, double, RK(3), baseline, Harten entropy
-t     = 2.00548
-Linf  = 0.0537578
-L1    = 0.000894238
-L2    = 0.00443569
+t     = 2.00176
+Linf  = 0.00544554
+L1    = 0.00040082
+L2    = 0.000941496
 
 #dofs = 16641, double, RK(3), baseline, Harten entropy
 t     = 2.00176
-Linf  = 0.00541287
-L1    = 0.000103591
-L2    = 0.000488169
+Linf  = 0.000640729
+L1    = 4.97618e-05
+L2    = 0.000116167
 
 #dofs = 66049, double, RK(3), baseline, Harten entropy
-t     = 2.00176
-Linf  = 0.000670568
-L1    = 1.27829e-05
-L2    = 6.10265e-05
+t     = 2.00084
+Linf  = 7.9443e-05
+L1    = 6.66571e-06
+L2    = 1.47832e-05

@@ -2,7 +2,7 @@ subsection A - TimeLoop
   set basename                = validation-euler
 
   set enable output cutplanes = false
-  set enable output full      = false
+  set enable output full      = true
   set enable compute error    = true
 
   set final time              = 2.0
@@ -19,19 +19,20 @@ subsection C - Discretization
   set mesh refinement = 7
 
   subsection validation
-    set length = 20
+    set length = 10
   end
 end
 
 subsection E - InitialValues
   set configuration         = isentropic vortex
 
-  set initial - 1d state    = 1.4, 0, 1
-  set initial - direction   = 1, 1
-  set initial - mach number = 1
-  set initial - position    = -1, -1
+  set direction   =  1,  1
+  set position    = -1, -1
 
-  set vortex - beta         = 5
+  subsection isentropic vortex
+    set mach number = 1
+    set beta        = 5
+  end
 end
 
 subsection F - EulerModule
