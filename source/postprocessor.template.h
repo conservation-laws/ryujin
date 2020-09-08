@@ -136,6 +136,7 @@ namespace ryujin
         it.reinit(offline_data_->scalar_partitioner());
         U.extract_component(it, d++);
         affine_constraints.distribute(it);
+        it.update_ghost_values();
       }
     }
 
