@@ -91,19 +91,61 @@ namespace ryujin
       }
 
       /* Roll second component of initial_direction onto x-axis: */
-      auto n_x = initial_direction[0];
-      auto n_y = initial_direction[1];
-      const auto norm = std::sqrt(n_x * n_x + n_y * n_y);
-      n_x /= norm;
-      n_y /= norm;
-      auto new_direction = direction;
-      if (norm > 1.0e-14) {
-        new_direction[0] = n_x * direction[0] + n_y * direction[1];
-        new_direction[1] = -n_y * direction[0] + n_x * direction[1];
+      {
+        auto n_x = initial_direction[0];
+        auto n_y = initial_direction[1];
+        const auto norm = std::sqrt(n_x * n_x + n_y * n_y);
+        n_x /= norm;
+        n_y /= norm;
+        auto new_direction = direction;
+        if (norm > 1.0e-14) {
+          new_direction[0] = n_x * direction[0] + n_y * direction[1];
+          new_direction[1] = -n_y * direction[0] + n_x * direction[1];
+        }
+        direction = new_direction;
       }
-      direction = new_direction;
 
       return Point<dim>() + direction;
+    };
+
+
+    /**
+     * Transform vector:
+     */
+    template <int dim, typename Number>
+    inline DEAL_II_ALWAYS_INLINE dealii::Tensor<1, dim, Number>
+    affine_transform_vector(const dealii::Tensor<1, dim> initial_direction,
+                            dealii::Tensor<1, dim, Number> direction)
+    {
+      {
+        auto n_x = initial_direction[0];
+        auto n_y = initial_direction[1];
+        const auto norm = std::sqrt(n_x * n_x + n_y * n_y);
+        n_x /= norm;
+        n_y /= norm;
+        auto new_direction = direction;
+        if (norm > 1.0e-14) {
+          new_direction[0] = n_x * direction[0] - n_y * direction[1];
+          new_direction[1] = n_y * direction[0] + n_x * direction[1];
+        }
+        direction = new_direction;
+      }
+
+      if constexpr (dim == 3) {
+        auto n_x = initial_direction[0];
+        auto n_z = initial_direction[2];
+        const auto norm = std::sqrt(n_x * n_x + n_z * n_z);
+        n_x /= norm;
+        n_z /= norm;
+        auto new_direction = direction;
+        if (norm > 1.0e-14) {
+          new_direction[0] = n_x * direction[0] - n_z * direction[2];
+          new_direction[2] = n_z * direction[0] + n_x * direction[2];
+        }
+        direction = new_direction;
+      }
+
+      return direction;
     };
   } /* namespace */
 
@@ -129,9 +171,14 @@ namespace ryujin
         if (it->name() == configuration_) {
           initial_state_ = [this, &it](const dealii::Point<dim> &point,
                                        Number t) {
-            return it->compute(
-                affine_transform(initial_direction_, initial_position_, point),
-                t);
+            const auto transformed_point =
+                affine_transform(initial_direction_, initial_position_, point);
+            auto state = it->compute(transformed_point, t);
+            auto M = ProblemDescription<dim, Number>::momentum(state);
+            M = affine_transform_vector(initial_direction_, M);
+            for (unsigned int d = 0; d < dim; ++d)
+              state[1 + d] = M[d];
+            return state;
           };
           initialized = true;
           break;
