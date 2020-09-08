@@ -284,11 +284,11 @@ namespace ryujin
             continue;
 
           dealii::Tensor<1, dim, Number> normal;
-          if (id == Boundary::slip) {
+          if (id == Boundary::slip || id == Boundary::no_slip) {
             /*
              * Only accumulate a normal if the boundary indicator is for
-             * slip boundary conditions. Otherwise we create a wrong normal
-             * in corners of the computational domain.
+             * slip or no_slip boundary conditions. Otherwise we create a
+             * wrong normal in corners of the computational domain.
              */
             for (unsigned int q = 0; q < n_face_q_points; ++q)
               normal += fe_face_values.normal_vector(q) *
@@ -434,7 +434,7 @@ namespace ryujin
         if (!face->at_boundary())
           continue;
 
-        if (id != Boundary::slip)
+        if (id != Boundary::slip && id != Boundary::no_slip)
           continue;
 
         fe_face_values.reinit(cell, f);
