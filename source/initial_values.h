@@ -10,6 +10,7 @@
 
 #include "offline_data.h"
 #include "problem_description.h"
+#include "initial_state.h"
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/tensor.h>
@@ -94,14 +95,8 @@ namespace ryujin
     std::string configuration_;
 
     dealii::Point<dim> initial_position_;
+
     dealii::Tensor<1, dim> initial_direction_;
-
-    dealii::Tensor<1, 3, Number> initial_1d_state_;
-    dealii::Tensor<1, 3, Number> initial_1d_state_contrast_;
-
-    Number initial_mach_number_;
-
-    Number initial_vortex_beta_;
 
     Number perturbation_;
 
@@ -111,10 +106,8 @@ namespace ryujin
      */
     //@{
 
-    /**
-     * Internal function object that we use to implement the internal_state
-     * function for all internal states:
-     */
+    std::set<std::unique_ptr<InitialState<dim, Number>>> initial_state_list_;
+
     std::function<rank1_type(const dealii::Point<dim> &point, Number t)>
         initial_state_;
 

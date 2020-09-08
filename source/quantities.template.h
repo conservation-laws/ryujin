@@ -87,7 +87,6 @@ namespace ryujin
         const auto U_i = U.get_tensor(i);
         summed_quantities_thread_local += m_i * U_i;
 
-        const auto rho_i = U_i[0];
         using PD = ProblemDescription<dim, Number>;
         const auto s_i = PD::specific_entropy(U_i);
         const auto rho_e_i = PD::internal_energy(U_i);
