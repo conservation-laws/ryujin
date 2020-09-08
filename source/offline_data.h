@@ -114,10 +114,10 @@ namespace ryujin
     unsigned int n_locally_owned_;
     unsigned int n_locally_relevant_;
 
-    std::map<dealii::types::global_dof_index,
-             std::tuple<dealii::Tensor<1, dim, Number>,
-                        dealii::types::boundary_id,
-                        dealii::Point<dim>>>
+    using boundary_description = std::tuple<dealii::Tensor<1, dim, Number>,
+                                            dealii::types::boundary_id,
+                                            dealii::Point<dim>>;
+    std::multimap<dealii::types::global_dof_index, boundary_description>
         boundary_map_;
 
     SparsityPatternSIMD<dealii::VectorizedArray<Number>::size()>

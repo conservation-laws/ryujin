@@ -538,8 +538,8 @@ namespace ryujin
 
         if (RYUJIN_UNLIKELY(limiter_iter_ == 0)) {
           /* Fix up boundary: */
-          const auto it = boundary_map.find(i);
-          if (it != boundary_map.end()) {
+          const auto range = boundary_map.equal_range(i);
+          for (auto it = range.first; it != range.second; ++it) {
             const auto &[normal, id, position] = it->second;
 
             /*
@@ -871,8 +871,8 @@ namespace ryujin
           /* In the last round */
           if (last_round) {
             /* Fix up boundary: */
-            const auto it = boundary_map.find(i);
-            if (it != boundary_map.end()) {
+            const auto range = boundary_map.equal_range(i);
+            for (auto it = range.first; it != range.second; ++it) {
               const auto &[normal, id, position] = it->second;
 
               /* see comment above */

@@ -28,15 +28,19 @@ namespace ryujin
    *
    * @note In deal.II boundary ids are prescribed on faces. However, in our
    * stencil-based method we need such an information for individual
-   * boundary degrees of freedom. This translation is done in
+   * boundary degrees of freedom. Thus, the face boundary indicator has to
+   * be translated to individual degrees of freedom which happens in
    * OfflineData::prepare() when constructing the
-   * OfflineData::boundary_map_.
+   * OfflineData::boundary_map_ object.
    *
-   * @note Boundary ids are sorted by increasing order of precedence. This
-   * order is used when ambiguities arise for an individual degree of
-   * freedom in case of neighboring boundary faces with different boundary
-   * ids. More precisely, `dirichlet` takes precedence before `slip`,
-   * before `periodic`, and before `do_nothing`.
+   * @note OfflineData::boundary_map_ is a std::multimap that stores all
+   * encountered boundary conditions for an individual degree of freedom.
+   * The individual algebraic constraint is applied in no particular order.
+   * It is thus important to ensure that neighboring boundary conditions,
+   * are compatible. For example, inflow conditions prescribed via a
+   * Boundary::dirichlet face neighboring a Boundary::no_slip face have to
+   * ensure that they prescribe a state compatible with the no slip
+   * condition, etc.
    *
    * @ingroup Mesh
    */

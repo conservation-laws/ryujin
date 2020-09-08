@@ -284,20 +284,16 @@ namespace ryujin
             continue;
 
           dealii::Tensor<1, dim, Number> normal;
-          if (id == Boundary::slip || id == Boundary::no_slip) {
-            /*
-             * Only accumulate a normal if the boundary indicator is for
-             * slip or no_slip boundary conditions. Otherwise we create a
-             * wrong normal in corners of the computational domain.
-             */
-            for (unsigned int q = 0; q < n_face_q_points; ++q)
-              normal += fe_face_values.normal_vector(q) *
-                        fe_face_values.shape_value(j, q);
-          }
+          for (unsigned int q = 0; q < n_face_q_points; ++q)
+            normal += fe_face_values.normal_vector(q) *
+                      fe_face_values.shape_value(j, q);
 
           const auto index = local_dof_indices[j];
 
-          // FIXME: This is a bloody hack:
+          /*
+           * This is a bloody hack: Use "vertex_dof_index" to retrieve the
+           * vertex associated to the current degree of freedom.
+           */
           Point<dim> position;
           const auto global_index = scalar_partitioner_->local_to_global(index);
           for (unsigned int v = 0; v < GeometryInfo<dim>::vertices_per_cell;
@@ -305,13 +301,7 @@ namespace ryujin
             if (cell->vertex_dof_index(v, 0) == global_index)
               position = cell->vertex(v);
 
-          /*
-           * Ensure that we record the highest boundary indicator for a
-           * given degree of freedom (higher indicators take precedence):
-           */
-          const auto &[old_normal, old_id, _] = local_boundary_map[index];
-          local_boundary_map[index] = std::make_tuple(
-              old_normal + normal, std::max(old_id, id), position);
+          local_boundary_map.insert({index, {normal, id, position}});
         } /* j */
       }   /* f */
     };
@@ -328,18 +318,9 @@ namespace ryujin
       if (is_artificial)
         return;
 
-      for (const auto &it : local_boundary_map) {
-        auto &[normal, id, position] = boundary_map_[it.first];
-        auto &[new_normal, new_id, new_position] = it.second;
+      boundary_map_.insert(local_boundary_map.begin(),
+                           local_boundary_map.end());
 
-        normal += new_normal;
-        /*
-         * Ensure that we record the highest boundary indicator for a given
-         * degree of freedom (higher indicators take precedence):
-         */
-        id = std::max(id, new_id);
-        position = new_position;
-      }
 
       affine_constraints_assembly_.distribute_local_to_global(
           cell_mass_matrix, local_dof_indices, mass_matrix_tmp);
@@ -387,13 +368,51 @@ namespace ryujin
     }
 
     /*
-     * Normalize our boundary normals:
+     * Update boundary map:
+     *
+     * At this point we have collected multiple cell contributions for each
+     * boundary degree of freedom. We now merge all entries that have the
+     * same boundary id and whose normals describe an acute angle of about
+     * 85 degrees or less.
+     */
+
+    const auto temporary_boundary_map = std::move(boundary_map_);
+    boundary_map_.clear();
+
+    std::set<dealii::types::global_dof_index> boundary_dofs;
+    for (auto entry : temporary_boundary_map) {
+      bool inserted = false;
+      const auto range = boundary_map_.equal_range(entry.first);
+      for (auto it = range.first; it != range.second; ++it) {
+        const auto &[new_normal, new_b_id, new_point] = entry.second;
+        auto &[normal, b_id, point] = it->second;
+
+        if (b_id != new_b_id)
+          continue;
+
+        Assert(point.distance(new_point) < 1.0e-16, dealii::ExcInternalError());
+
+        if (normal * new_normal / normal.norm() / new_normal.norm() > 0.08) {
+          /* Both normals describe an acute angle of 85 degrees or less. */
+          normal += new_normal;
+          inserted = true;
+        }
+      }
+      if (!inserted)
+        boundary_map_.insert(entry);
+    }
+
+    /*
+     * Normalize all normal vectors:
      */
     for (auto &it : boundary_map_) {
       auto &[normal, id, _] = it.second;
       normal /= (normal.norm() + std::numeric_limits<Number>::epsilon());
     }
 
+    // FIXME
+
+#if 0
     /*
      * Second pass: Fix up boundary cijs:
      */
@@ -486,6 +505,7 @@ namespace ryujin
                     copy_local_to_global_cij,
                     AssemblyScratchData<dim>(*discretization_),
                     AssemblyCopyData<dim, Number>());
+#endif
 
     betaij_matrix_.read_in(betaij_matrix_tmp);
     mass_matrix_.read_in(mass_matrix_tmp);
