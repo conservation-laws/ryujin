@@ -320,7 +320,7 @@ namespace ryujin
             dealii::ExcMessage("The left limiting velocity must be greater "
                                "than the right limiting velocity"));
         AssertThrow(
-            velocity_left_ > 0,
+            velocity_left_ > 0.,
             dealii::ExcMessage("The left limiting velocity must be positive"));
 
         const double velocity_origin =
@@ -336,7 +336,7 @@ namespace ryujin
           const double c_l =
               velocity_left_ / (velocity_left_ - velocity_right_);
           const double c_r =
-              velocity_left_ / (velocity_left_ - velocity_right_);
+              velocity_right_ / (velocity_left_ - velocity_right_);
           const double log_l = std::log(velocity_left_ - v) -
                                std::log(velocity_left_ - velocity_origin);
           const double log_r = std::log(v - velocity_right_) -
