@@ -379,9 +379,12 @@ namespace ryujin
       const Number l2_norm_error = Number(std::sqrt(Utilities::MPI::sum(
           std::pow(difference_per_cell.l2_norm(), 2), mpi_communicator)));
 
-      linf_norm += linf_norm_error / linf_norm_analytic;
-      l1_norm += l1_norm_error / l1_norm_analytic;
-      l2_norm += l2_norm_error / l2_norm_analytic;
+      if (linf_norm_analytic >= 1.0e-10)
+        linf_norm += linf_norm_error / linf_norm_analytic;
+      if (l1_norm_analytic >= 1.0e-10)
+        l1_norm += l1_norm_error / l1_norm_analytic;
+      if (l2_norm_analytic >= 1.0e-10)
+        l2_norm += l2_norm_error / l2_norm_analytic;
     }
 
     if (mpi_rank != 0)
