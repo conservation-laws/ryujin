@@ -411,7 +411,7 @@ namespace ryujin
       {
         /* (7.2) */
         constexpr double gamma = ProblemDescription<1, double>::gamma;
-        constexpr double factor = (gamma + 1) / (gamma - 1);
+        constexpr double R_infty = (gamma + 1) / (gamma - 1);
 
         /* (7.3) */
         const double x = point[0] - velocity_ * t;
@@ -421,7 +421,7 @@ namespace ryujin
         const double rho = density_left_ * velocity_left_ / v;
         Assert(rho > 0., dealii::ExcInternalError());
         const double e = 1. / (2. * gamma) *
-                         (factor * velocity_left_ * velocity_right_ - v * v);
+                         (R_infty * velocity_left_ * velocity_right_ - v * v);
         Assert(e > 0., dealii::ExcInternalError());
 
         return rank1_type(

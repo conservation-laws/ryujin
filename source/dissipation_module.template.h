@@ -255,7 +255,7 @@ namespace ryujin
           FEEvaluation<dim, 1, 2, 1, Number> energy(data);
           const auto factor = Number(0.5) * tau_ *
                               problem_description_->kappa() *
-                              problem_description_->gamma_minus_one_inverse;
+                              (problem_description_->gamma - Number(1.));
 
           for (unsigned int cell = range.first; cell < range.second; ++cell) {
             energy.reinit(cell);
