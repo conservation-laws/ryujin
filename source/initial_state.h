@@ -29,7 +29,7 @@ namespace ryujin
    * affine translation to the coordinate system; so additional
    * configuration options for location and direction are not needed.
    *
-   * @ingroup TimeLoop
+   * @ingroup InitialValues
    */
   template <int dim, typename Number>
   class InitialState : public dealii::ParameterAcceptor

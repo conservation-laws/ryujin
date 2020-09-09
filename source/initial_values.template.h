@@ -27,11 +27,10 @@ namespace ryujin
         &InitialValues<dim, Number>::parse_parameters_callback, this));
 
     configuration_ = "uniform";
-    add_parameter(
-        "configuration",
-        configuration_,
-        "Configuration. Valid options are \"uniform\", \"shock front\", "
-        "\"contrast\", \"isentropic vortex\", \"becker solution\"");
+    add_parameter("configuration",
+                  configuration_,
+                  "The initial state configuration. Valid names are given by "
+                  "any of the subsections defined below.");
 
     initial_direction_[0] = 1.;
     add_parameter(
@@ -60,6 +59,8 @@ namespace ryujin
         std::make_unique<ShockFront<dim, Number>>(subsection));
     initial_state_list_.emplace(
         std::make_unique<IsentropicVortex<dim, Number>>(subsection));
+    initial_state_list_.emplace(
+        std::make_unique<BeckerSolution<dim, Number>>(subsection));
   }
 
   namespace

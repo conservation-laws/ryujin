@@ -33,7 +33,7 @@ namespace ryujin
    * For validation purposes a number of analytic solutions are implemented
    * as well.
    *
-   * @ingroup TimeLoop
+   * @ingroup InitialValues
    */
   template <int dim, typename Number = double>
   class InitialValues : public dealii::ParameterAcceptor

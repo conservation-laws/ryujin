@@ -34,7 +34,7 @@ namespace ryujin
     add_parameter("geometry",
                   geometry_,
                   "Name of the geometry used to create the mesh. Valid names "
-                  "are given by andy of the subsections defined below.");
+                  "are given by any of the subsections defined below.");
 
     refinement_ = 5;
     add_parameter("mesh refinement",
