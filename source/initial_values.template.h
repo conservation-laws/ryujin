@@ -272,7 +272,10 @@ namespace ryujin
       } else if (id == Boundary::no_slip) {
 
         /* Set velocity to zero: */
-        U.write_tensor(rank1_type(), i);
+        auto U_i = U.get_tensor(i);
+        for (unsigned int k = 0; k < dim; ++k)
+          U_i[k + 1] = Number(0.);
+        U.write_tensor(U_i, i);
       }
     }
 
