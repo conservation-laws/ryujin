@@ -50,18 +50,6 @@ namespace ryujin
                   repartitioning_,
                   "try to equalize workload by repartitioning the mesh");
 
-    order_mapping_ = 1;
-    add_parameter("order mapping", order_mapping_, "Order of the mapping");
-
-    order_finite_element_ = 1;
-    add_parameter("order finite element",
-                  order_finite_element_,
-                  "Polynomial degree of the finite element space");
-
-    order_quadrature_ = 3;
-    add_parameter(
-        "order quadrature", order_quadrature_, "Order of the quadrature rule");
-
     geometry_list_.emplace(
         std::make_unique<Geometries::Cylinder<dim>>(subsection));
     geometry_list_.emplace(std::make_unique<Geometries::Step<dim>>(subsection));
@@ -165,10 +153,10 @@ namespace ryujin
     if (std::abs(mesh_distortion_) > 1.0e-10)
       GridTools::distort_random(mesh_distortion_, triangulation);
 
-    mapping_ = std::make_unique<MappingQ<dim>>(order_mapping_);
-    finite_element_ = std::make_unique<FE_Q<dim>>(order_finite_element_);
-    quadrature_ = std::make_unique<QGauss<dim>>(order_quadrature_);
-    quadrature_1d_ = std::make_unique<QGauss<1>>(order_finite_element_ + 1);
+    mapping_ = std::make_unique<MappingQ<dim>>(order_mapping);
+    finite_element_ = std::make_unique<FE_Q<dim>>(order_finite_element);
+    quadrature_ = std::make_unique<QGauss<dim>>(order_quadrature);
+    quadrature_1d_ = std::make_unique<QGauss<1>>(order_quadrature);
   }
 
 } /* namespace ryujin */

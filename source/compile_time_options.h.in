@@ -34,6 +34,23 @@
 #cmakedefine VALGRIND_CALLGRIND
 
 /*
+ * class Discretization:
+ */
+
+#ifndef ORDER_FINITE_ELEMENT
+#define ORDER_FINITE_ELEMENT 1
+#endif
+
+#ifndef ORDER_MAPPING
+#define ORDER_MAPPING 1
+#endif
+
+
+#ifndef ORDER_QUADRATURE
+#define ORDER_QUADRATURE 2
+#endif
+
+/*
  * class ProblemDescription:
  */
 

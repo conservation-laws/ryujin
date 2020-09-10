@@ -144,7 +144,9 @@ namespace ryujin
 
     const auto integrator =
         [this](const auto &data, auto &dst, const auto &src, const auto range) {
-          FEEvaluation<dim, 1, 2, dim, Number> velocity(data);
+          constexpr auto order_fe = Discretization<dim>::order_finite_element;
+          constexpr auto order_quad = Discretization<dim>::order_quadrature;
+          FEEvaluation<dim, order_fe, order_quad, dim, Number> velocity(data);
 
           const auto mu = problem_description_->mu();
           const auto lambda = problem_description_->lambda();
@@ -252,7 +254,9 @@ namespace ryujin
 
     const auto integrator =
         [this](const auto &data, auto &dst, const auto &src, const auto range) {
-          FEEvaluation<dim, 1, 2, 1, Number> energy(data);
+          constexpr auto order_fe = Discretization<dim>::order_finite_element;
+          constexpr auto order_quad = Discretization<dim>::order_quadrature;
+          FEEvaluation<dim, order_fe, order_quad, 1, Number> energy(data);
           const auto factor = Number(0.5) * tau_ *
                               problem_description_->kappa() *
                               (problem_description_->gamma - Number(1.));
@@ -559,8 +563,10 @@ namespace ryujin
                  auto &dst,
                  const auto &src,
                  const auto cell_range) {
-            FEEvaluation<dim, 1, 2, dim, Number> velocity(data);
-            FEEvaluation<dim, 1, 2, 1, Number> energy(data);
+            constexpr auto order_fe = Discretization<dim>::order_finite_element;
+            constexpr auto order_quad = Discretization<dim>::order_quadrature;
+            FEEvaluation<dim, order_fe, order_quad, dim, Number> velocity(data);
+            FEEvaluation<dim, order_fe, order_quad, 1, Number> energy(data);
 
             const auto mu = problem_description_->mu();
             const auto lambda = problem_description_->lambda();

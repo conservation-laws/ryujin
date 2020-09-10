@@ -135,6 +135,21 @@ namespace ryujin
      */
     void prepare();
 
+    /**
+     * @name ProblemDescription compile time options
+     */
+    //@{
+
+    static constexpr unsigned int order_finite_element = ORDER_FINITE_ELEMENT;
+    static constexpr unsigned int order_mapping = ORDER_MAPPING;
+    static constexpr unsigned int order_quadrature = ORDER_QUADRATURE;
+
+    //@}
+    /**
+     * @name
+     */
+    //@{
+
   protected:
     const MPI_Comm &mpi_communicator_;
 
@@ -171,6 +186,7 @@ namespace ryujin
     ACCESSOR_READ_ONLY(quadrature_1d)
 
   private:
+    //@}
     /**
      * @name Run time options
      */
@@ -182,10 +198,6 @@ namespace ryujin
 
     unsigned int refinement_;
     bool repartitioning_;
-
-    unsigned int order_finite_element_;
-    unsigned int order_mapping_;
-    unsigned int order_quadrature_;
 
     //@}
     /**
