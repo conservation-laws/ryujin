@@ -553,7 +553,7 @@ namespace ryujin
 
     /**
      * A 2D/3D shocktube configuration for generating a viscous boundary
-     * layer.
+     * layer for the compressible Navier Stokes equations.
      *
      * A rectangular domain with given length and height. The boundary
      * conditions are slip boundary conditions on the top, and no_slip
@@ -641,8 +641,11 @@ namespace ryujin
 
 
     /**
-     * Describes a geometry used for validation: The (scaled) unit
-     * hypercube with Dirichlet data.
+     * A square (or hypercube) domain used for running validation
+     * configurations. Per default Dirichlet boundary conditions are
+     * enforced throughout. If the @ref periodic_ parameter is set to true
+     * periodic boundary conditions are enforced in the y (and z)
+     * directions instead.
      *
      * @ingroup Mesh
      */
@@ -656,6 +659,12 @@ namespace ryujin
         length_ = 20.;
         this->add_parameter(
             "length", length_, "length of computational domain");
+
+        periodic_ = false;
+        this->add_parameter("periodic",
+                            periodic_,
+                            "enforce periodicity in y (and z) directions "
+                            "instead of Dirichlet conditions");
       }
 
       virtual void create_triangulation(
@@ -670,12 +679,25 @@ namespace ryujin
             const auto face = cell->face(f);
             if (!face->at_boundary())
               continue;
-            face->set_boundary_id(Boundary::dirichlet);
+            const auto position = face->center();
+            if (position[0] < -0.5 * length_ + 1.e-6)
+              /* left: dirichlet */
+              face->set_boundary_id(Boundary::dirichlet);
+            else if (position[0] > 0.5 * length_ - 1.e-6)
+              /* right: dirichlet */
+              face->set_boundary_id(Boundary::dirichlet);
+            else {
+              if (periodic_)
+                face->set_boundary_id(Boundary::periodic);
+              else
+                face->set_boundary_id(Boundary::dirichlet);
+            }
           }
       }
 
     private:
       double length_;
+      bool periodic_;
     };
 
   } /* namespace Geometries */

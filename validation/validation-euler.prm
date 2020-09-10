@@ -1,12 +1,13 @@
 subsection A - TimeLoop
-  set basename                = validation-euler
+  set basename                  = validation-euler
 
-  set enable output cutplanes = false
-  set enable output full      = true
-  set enable compute error    = true
+  set enable output cutplanes   = false
+  set enable output full        = true
+  set enable compute error      = true
+  set enable compute quantities = true
 
-  set final time              = 2.0
-  set output granularity      = 2.0
+  set final time                = 2.0
+  set output granularity        = 2.0
 end
 
 subsection B - ProblemDescription
@@ -14,20 +15,19 @@ subsection B - ProblemDescription
 end
 
 subsection C - Discretization
-  set geometry           = validation
-
+  set geometry        = validation
   set mesh refinement = 7
 
   subsection validation
-    set length = 10
+    set length   = 10
+    set periodic = false
   end
 end
 
 subsection E - InitialValues
-  set configuration         = isentropic vortex
-
-  set direction   =  1,  1
-  set position    = -1, -1
+  set configuration = isentropic vortex
+  set direction     =  1,  1
+  set position      = -1, -1
 
   subsection isentropic vortex
     set mach number = 1
@@ -36,6 +36,13 @@ subsection E - InitialValues
 end
 
 subsection F - EulerModule
-  set cfl max    = 0.4
-  set cfl update = 0.2
+  set cfl max            = 0.4
+  set cfl update         = 0.2
+
+  set limiter iterations = 2
+  set time step order    = 3
+end
+
+subsection I - Quantities
+  set compute conserved quantities = true
 end
