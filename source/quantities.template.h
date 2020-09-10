@@ -46,7 +46,7 @@ namespace ryujin
 
     output << "time";
     if (compute_conserved_quantities_)
-      output << "\ttotal mass\ttotal momentum\ttotal energy\ts_min\trho_e_min";
+      output << "\ttotal mass\ttotal momentum\ttotal energy\ts_min\te_min";
     output << std::endl;
   }
 
@@ -67,13 +67,13 @@ namespace ryujin
 
       rank1_type summed_quantities;
       Number s_min = std::numeric_limits<Number>::max();
-      Number rho_e_min = std::numeric_limits<Number>::max();
+      Number e_min = std::numeric_limits<Number>::max();
 
       RYUJIN_PARALLEL_REGION_BEGIN
 
       rank1_type summed_quantities_thread_local;
       Number s_min_thread_local = std::numeric_limits<Number>::max();
-      Number rho_e_min_thread_local = std::numeric_limits<Number>::max();
+      Number e_min_thread_local = std::numeric_limits<Number>::max();
 
       RYUJIN_OMP_FOR
       for (unsigned int i = 0; i < n_owned; ++i) {
@@ -89,16 +89,17 @@ namespace ryujin
 
         using PD = ProblemDescription<dim, Number>;
         const auto s_i = PD::specific_entropy(U_i);
-        const auto rho_e_i = PD::internal_energy(U_i);
+        const auto rho_i = U_i[0];
+        const auto e_i = PD::internal_energy(U_i) / rho_i;
         s_min_thread_local = std::min(s_min_thread_local, s_i);
-        rho_e_min_thread_local = std::min(rho_e_min_thread_local, rho_e_i);
+        e_min_thread_local = std::min(e_min_thread_local, e_i);
       }
 
       RYUJIN_OMP_CRITICAL
       {
         summed_quantities += summed_quantities_thread_local;
         s_min = std::min(s_min, s_min_thread_local);
-        rho_e_min = std::min(rho_e_min, rho_e_min_thread_local);
+        e_min = std::min(e_min, e_min_thread_local);
       }
 
       RYUJIN_PARALLEL_REGION_END
@@ -109,10 +110,11 @@ namespace ryujin
         if (mpi_rank == 0)
           output << "\t" << summed_quantities[k];
       }
+
       s_min = Utilities::MPI::min(s_min, mpi_communicator_);
-      rho_e_min = Utilities::MPI::min(rho_e_min, mpi_communicator_);
+      e_min = Utilities::MPI::min(e_min, mpi_communicator_);
       if (mpi_rank == 0)
-        output << "\t" << s_min << "\t" << rho_e_min;
+        output << "\t" << s_min << "\t" << e_min;
     }
 
     if (mpi_rank == 0)
