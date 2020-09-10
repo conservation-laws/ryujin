@@ -1,5 +1,5 @@
 subsection A - TimeLoop
-  set basename                  = validation-euler
+  set basename                  = validation-navier-stokes
 
   set enable output cutplanes   = false
   set enable output full        = true
