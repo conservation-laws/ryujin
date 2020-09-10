@@ -16,7 +16,7 @@
 
 
 /**
- * @defgroup InivitialValues Initial values and manufactured solutions
+ * @defgroup InitialValues Initial values and manufactured solutions
  *
  * Several classes and helper functions for initial value configuration.
  */

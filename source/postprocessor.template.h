@@ -195,17 +195,23 @@ namespace ryujin
 
         /* Fix up boundaries: */
 
-        const auto bnm_it = boundary_map.find(i);
-        if (bnm_it != boundary_map.end()) {
-          const auto [normal, id, _] = bnm_it->second;
-          /* FIXME: Think again about what to do exactly here... */
-          if (id == Boundary::slip) {
+        const auto range = boundary_map.equal_range(i);
+        for (auto it = range.first; it != range.second; ++it) {
+          const auto [normal, id, _] = it->second;
+          /* Remove normal components of the gradient on the boundary: */
+          if (id == Boundary::slip || id == Boundary::no_slip) {
             grad_rho_i -= 1. * (grad_rho_i * normal) * normal;
           } else {
             grad_rho_i = 0.;
           }
-          curl_v_i = 0.;
+          /* Only retain the normal component of the curl on the boundary: */
+          if constexpr (dim == 2) {
+            curl_v_i = 0.;
+          } else if constexpr (dim == 3) {
+            curl_v_i = (curl_v_i * normal) * normal;
+          }
         }
+
 
         /* Populate quantities: */
 

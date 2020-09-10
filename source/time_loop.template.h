@@ -423,24 +423,29 @@ namespace ryujin
     std::cout << "TimeLoop<dim, Number>::output(t = " << t << ")" << std::endl;
 #endif
 
-    /* Data output: */
+    const bool do_full_output =
+        (cycle % output_full_multiplier == 0) && enable_output_full;
+    const bool do_cutplanes =
+        (cycle % output_cutplanes_multiplier == 0) && enable_output_cutplanes;
+    const bool do_checkpointing =
+        (cycle % output_checkpoint_multiplier == 0) && enable_checkpointing;
 
+    /* There is nothing to do: */
+    if (!(do_full_output || do_cutplanes || do_checkpointing))
+      return;
+
+    /* Wait for a previous thread to finish before scheduling a new one: */
     {
-      /* Wait for a previous thread to finish before scheduling a new one: */
       Scope scope(computing_timer, "output stall");
       print_info("waiting for previous output cycle to finish");
 
       postprocessor.wait();
     }
 
-    {
+    /* Data output: */
+    if (do_full_output || do_cutplanes) {
       Scope scope(computing_timer, "postprocessor");
       print_info("scheduling output");
-
-      const bool do_full_output =
-          (cycle % output_full_multiplier == 0) && enable_output_full;
-      const bool do_cutplanes =
-          (cycle % output_cutplanes_multiplier == 0) && enable_output_cutplanes;
 
       postprocessor.schedule_output(U,
                                     euler_module.alpha(),
@@ -452,11 +457,10 @@ namespace ryujin
     }
 
     /* Checkpointing: */
-
-    if (cycle % output_checkpoint_multiplier == 0 && enable_checkpointing) {
-
-      print_info("scheduling checkpointing");
+    if (do_checkpointing) {
       Scope scope(computing_timer, "checkpointing");
+      print_info("scheduling checkpointing");
+
       const auto id = discretization.triangulation().locally_owned_subdomain();
       do_checkpoint(base_name, id, U, t, cycle);
     }
