@@ -354,6 +354,8 @@ namespace ryujin
       /* Compute norms of error: */
 
       U.extract_component(error_component, i);
+      /* Populate constrained dofs due to periodicity: */
+      offline_data.affine_constraints().distribute(error_component);
       error_component -= analytic_component;
 
       const Number linf_norm_error =
