@@ -243,8 +243,40 @@ namespace ryujin
       U.insert_component(temp, d);
     }
 
-    U.update_ghost_values();
+    const auto &boundary_map = offline_data.boundary_map();
+    const unsigned int n_owned = offline_data.n_locally_owned();
 
+    /*
+     * Cosmetic fix up: Ensure that the initial state is compatible with
+     * slip and no_slip boundary conditions. This ensures that nothing is
+     * ever transported out of slip and no slip boundaries - even if
+     * initial conditions happen to be set incorrectly.
+     */
+
+    for (auto entry : boundary_map) {
+      const auto i = entry.first;
+      if (i >= n_owned)
+        continue;
+
+      const auto &[normal, id, position] = entry.second;
+
+      if (id == Boundary::slip) {
+        /* Remove normal component of velocity: */
+        auto U_i = U.get_tensor(i);
+        auto m = ProblemDescription<dim, Number>::momentum(U_i);
+        m -= 1. * (m * normal) * normal;
+        for (unsigned int k = 0; k < dim; ++k)
+          U_i[k + 1] = m[k];
+        U.write_tensor(U_i, i);
+
+      } else if (id == Boundary::no_slip) {
+
+        /* Set velocity to zero: */
+        U.write_tensor(rank1_type(), i);
+      }
+    }
+
+    U.update_ghost_values();
     return U;
   }
 
