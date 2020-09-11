@@ -58,6 +58,8 @@ namespace ryujin
         std::make_unique<Geometries::ShockTube<dim>>(subsection));
     geometry_list_.emplace(
         std::make_unique<Geometries::Validation<dim>>(subsection));
+    geometry_list_.emplace(
+        std::make_unique<Geometries::Naca4<dim>>(subsection));
   }
 
 

@@ -700,6 +700,101 @@ namespace ryujin
       bool periodic_;
     };
 
+
+    /**
+     * A NACA 4 digit airfoil
+     *
+     * This geometry is created with the help of the deal.II NACA 4 digit
+     * airfoil generator.
+     *
+     * @ingroup Mesh
+     */
+    template <int dim>
+    class Naca4 : public Geometry<dim>
+    {
+    public:
+      Naca4(const std::string subsection)
+          : Geometry<dim>("naca 4 digit", subsection)
+      {
+        additional_data_.naca_id = "2412";
+        this->add_parameter(
+            "NACA id", additional_data_.naca_id, "Naca 4 digit serial number");
+
+        additional_data_.height = 3.0;
+        this->add_parameter(
+            "height",
+            additional_data_.height,
+            "Mesh height measured from airfoil nose to horizontal boundaries");
+
+        additional_data_.length_b2 = 5.0;
+        this->add_parameter("length b2",
+                            additional_data_.length_b2,
+                            "Length measured from airfoil leading edge to "
+                            "vertical outlet boundary");
+
+        additional_data_.incline_factor = 0.50;
+        this->add_parameter(
+            "incline factor",
+            additional_data_.incline_factor,
+            "Define obliqueness of the vertical mesh around the airfoil");
+
+        additional_data_.refinements = 6;
+        this->add_parameter("mesh refinement",
+                            additional_data_.refinements,
+                            "Number of global refinements");
+
+        additional_data_.airfoil_length = 1.0;
+        this->add_parameter("airfoil length",
+                            additional_data_.airfoil_length,
+                            "Airfoil length leading to trailing edge");
+
+        additional_data_.bias_factor = 2.0;
+        this->add_parameter(
+            "bias factor",
+            additional_data_.bias_factor,
+            "Factor to obtain a finer mesh at the airfoil surface");
+      }
+
+      virtual void create_triangulation(
+          typename Geometry<dim>::Triangulation &triangulation) final override
+      {
+        GridGenerator::Airfoil::create_triangulation(triangulation,
+                                                     additional_data_);
+
+        for (auto cell : triangulation.active_cell_iterators()) {
+          if (cell->is_artificial())
+            continue;
+
+          for (auto f : dealii::GeometryInfo<dim>::face_indices()) {
+            const auto face = cell->face(f);
+            if (!face->at_boundary())
+              continue;
+
+            /* Translate boundary ids: */
+
+            switch (face->boundary_id()) {
+            case 0: /* inlet */
+              face->set_boundary_id(Boundary::dirichlet);
+              break;
+            case 2: /* upper airfoil boundary */
+            case 3: /* lower airfoil boundary */
+              face->set_boundary_id(Boundary::no_slip);
+              break;
+            case 1: /* outlet */
+            case 4: /* upper far field */
+            case 5: /* lower far field */
+              face->set_boundary_id(Boundary::do_nothing);
+              break;
+            default:
+              AssertThrow(false, dealii::ExcInternalError());
+            }
+          } /* f*/
+        }   /* cell*/
+      }
+    private:
+      GridGenerator::Airfoil::AdditionalData additional_data_;
+    };
+
   } /* namespace Geometries */
 
 } /* namespace ryujin */
