@@ -182,8 +182,10 @@ namespace ryujin
       const auto offset = n_locally_owned != 0 ? *locally_owned.begin() : 0;
 
       const unsigned int dofs_per_cell = dof_handler.get_fe().dofs_per_cell;
-      std::vector<dealii::types::global_dof_index> local_dof_indices(
-          dofs_per_cell);
+      const unsigned int dofs_per_face = dof_handler.get_fe().dofs_per_face;
+      using dof_type =dealii::types::global_dof_index;
+      std::vector<dof_type> local_dof_indices(dofs_per_cell);
+      std::vector<dof_type> local_face_dof_indices(dofs_per_face);
 
       /*
        * First pass: Accumulate how many cells are associated with a
@@ -192,7 +194,7 @@ namespace ryujin
        * numbers::invalid_dof_index:
        */
 
-      std::vector<dealii::types::global_dof_index> new_order(n_locally_owned);
+      std::vector<dof_type> new_order(n_locally_owned);
 
       for (auto cell : dof_handler.active_cell_iterators()) {
         if (cell->is_artificial())
@@ -200,17 +202,33 @@ namespace ryujin
 
         cell->get_dof_indices(local_dof_indices);
 
+        /* Record what locally owned degrees of freedom we have seen: */
         for (unsigned int j = 0; j < dofs_per_cell; ++j) {
           const auto &index = local_dof_indices[j];
           if (!locally_owned.is_element(index))
             continue;
-
           Assert(index - offset < n_locally_owned, dealii::ExcInternalError());
           new_order[index - offset] += 1;
-        }
+        } /* j */
+
+        /* Explicitly poison boundary degrees of freedom: */
+        for (auto f : dealii::GeometryInfo<dim>::face_indices()) {
+          const auto face = cell->face(f);
+          if (!face->at_boundary())
+            continue;
+          face->get_dof_indices(local_face_dof_indices);
+          for (unsigned int j = 0; j < dofs_per_face; ++j) {
+            const auto &index = local_face_dof_indices[j];
+            if (!locally_owned.is_element(index))
+              continue;
+            Assert(index - offset < n_locally_owned,
+                   dealii::ExcInternalError());
+            new_order[index - offset] += 1000000;
+          } /* j */
+        }   /* f */
       }
 
-      constexpr dealii::types::global_dof_index standard_number_of_neighbors =
+      constexpr dof_type standard_number_of_neighbors =
           dim == 1 ? 2 : (dim == 2 ? 4 : 8);
 
       for (auto &it : new_order) {
@@ -222,7 +240,7 @@ namespace ryujin
 
       /* Second pass: Create renumbering. */
 
-      dealii::types::global_dof_index index = offset;
+      dof_type index = offset;
 
       unsigned int n_locally_internal = 0;
       for (auto &it : new_order)
