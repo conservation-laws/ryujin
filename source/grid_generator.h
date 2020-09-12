@@ -17,6 +17,8 @@
 #include <deal.II/grid/manifold_lib.h>
 #include <deal.II/grid/tria.h>
 
+#include <deal.II/grid/grid_out.h>
+
 namespace ryujin
 {
   /**
@@ -761,6 +763,12 @@ namespace ryujin
         GridGenerator::Airfoil::create_triangulation(triangulation,
                                                      additional_data_);
 
+        /*
+         * Set boundary ids:
+         */
+
+        AssertThrow(additional_data_.height > 0.5, dealii::ExcNotImplemented());
+
         for (auto cell : triangulation.active_cell_iterators()) {
           if (cell->is_artificial())
             continue;
@@ -770,27 +778,41 @@ namespace ryujin
             if (!face->at_boundary())
               continue;
 
-            /* Translate boundary ids: */
+            const auto center = face->center();
 
-            switch (face->boundary_id()) {
-            case 0: /* inlet */
-              face->set_boundary_id(Boundary::dirichlet);
-              break;
-            case 2: /* upper airfoil boundary */
-            case 3: /* lower airfoil boundary */
-              face->set_boundary_id(Boundary::no_slip);
-              break;
-            case 1: /* outlet */
-            case 4: /* upper far field */
-            case 5: /* lower far field */
-              face->set_boundary_id(Boundary::do_nothing);
-              break;
-            default:
+            static const unsigned int id_block_1 = 1;
+            static const unsigned int id_block_2 = 2;
+            static const unsigned int id_block_3 = 3;
+            static const unsigned int id_block_4 = 4;
+            static const unsigned int id_block_5 = 5;
+            static const unsigned int id_block_6 = 6;
+
+            const auto mid = cell->material_id();
+
+            if (mid == id_block_1 || mid == id_block_4) {
+              /* front section: */
+              if(center[0] < 0. || std::abs(center[1]) > 0.5)
+                face->set_boundary_id(Boundary::dirichlet); /* inlet */
+              else
+                face->set_boundary_id(Boundary::no_slip); /* airfoil */
+            } else if (mid == id_block_2 || mid == id_block_5) {
+              /* mid section: */
+              if (std::abs(center[1]) > 0.5)
+                face->set_boundary_id(Boundary::slip); /* FIXME: sides */
+              else
+                face->set_boundary_id(Boundary::no_slip); /* airfoil */
+            } else if (mid == id_block_3 || mid == id_block_6) {
+              if (std::abs(center[1]) > additional_data_.height - 1.0e-8)
+                face->set_boundary_id(Boundary::slip); /* FIXME: sides */
+              else
+                face->set_boundary_id(Boundary::do_nothing); /* outlet */
+            } else {
               AssertThrow(false, dealii::ExcInternalError());
             }
           } /* f*/
         }   /* cell*/
       }
+
     private:
       GridGenerator::Airfoil::AdditionalData additional_data_;
     };
