@@ -791,7 +791,7 @@ namespace ryujin
 
             if (mid == id_block_1 || mid == id_block_4) {
               /* front section: */
-              if(center[0] < 0. || std::abs(center[1]) > 0.5)
+              if(center[0] < -0.5 || std::abs(center[1]) > 0.5)
                 face->set_boundary_id(Boundary::dirichlet); /* inlet */
               else
                 face->set_boundary_id(Boundary::no_slip); /* airfoil */
