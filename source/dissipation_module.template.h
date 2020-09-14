@@ -257,9 +257,8 @@ namespace ryujin
           constexpr auto order_fe = Discretization<dim>::order_finite_element;
           constexpr auto order_quad = Discretization<dim>::order_quadrature;
           FEEvaluation<dim, order_fe, order_quad, 1, Number> energy(data);
-          const auto factor = Number(0.5) * tau_ *
-                              problem_description_->kappa() *
-                              (problem_description_->gamma - Number(1.));
+          const auto factor =
+              Number(0.5) * tau_ * problem_description_->cv_inverse_kappa();
 
           for (unsigned int cell = range.first; cell < range.second; ++cell) {
             energy.reinit(cell);

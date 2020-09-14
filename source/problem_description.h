@@ -246,8 +246,8 @@ namespace ryujin
     Number lambda_;
     ACCESSOR_READ_ONLY(lambda)
 
-    Number kappa_;
-    ACCESSOR_READ_ONLY(kappa)
+    Number cv_inverse_kappa_;
+    ACCESSOR_READ_ONLY(cv_inverse_kappa)
 
     //@}
   };

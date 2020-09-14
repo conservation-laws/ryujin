@@ -13,7 +13,7 @@ end
 subsection B - ProblemDescription
   set Description = Navier Stokes
 
-  set kappa       = 4.66666666666666e-2
+  set kappa       = 1.866666666666666e-2
   set lambda      = 0
   set mu          = 0.01
 end
