@@ -44,12 +44,14 @@ namespace ryujin
       const MPI_Comm &mpi_communicator,
       std::map<std::string, dealii::Timer> &computing_timer,
       const ryujin::OfflineData<dim, Number> &offline_data,
+      const ryujin::ProblemDescription<dim, Number> &problem_description,
       const ryujin::InitialValues<dim, Number> &initial_values,
       const std::string &subsection /*= "EulerModule"*/)
       : ParameterAcceptor(subsection)
       , mpi_communicator_(mpi_communicator)
       , computing_timer_(computing_timer)
       , offline_data_(&offline_data)
+      , problem_description_(&problem_description)
       , initial_values_(&initial_values)
       , n_restarts_(0)
   {

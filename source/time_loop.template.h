@@ -43,6 +43,7 @@ namespace ryujin
       , euler_module(mpi_communicator,
                      computing_timer,
                      offline_data,
+                     problem_description,
                      initial_values,
                      "/F - EulerModule")
       , dissipation_module(mpi_communicator,
