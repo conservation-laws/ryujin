@@ -6,149 +6,58 @@
 #ifndef COMPILE_TIME_OPTIONS_H
 #define COMPILE_TIME_OPTIONS_H
 
-/*
- * General compile-time options:
- */
+/* General compile-time options: */
 
 #define DIM @DIM@
-
 #define NUMBER @NUMBER@
 
 #cmakedefine CHECK_BOUNDS
+#cmakedefine DEBUG_OUTPUT
+#cmakedefine OBSESSIVE_INLINING
+#cmakedefine USE_COMMUNICATION_HIDING
+#cmakedefine USE_CUSTOM_POW
+#cmakedefine USE_SIMD
+#cmakedefine LIKWID_PERFMON
+#cmakedefine VALGRIND_CALLGRIND
+
 #if defined(DEBUG) && !defined(CHECK_BOUNDS)
 #define CHECK_BOUNDS
 #endif
 
-#cmakedefine DEBUG_OUTPUT
+/* class Discretization: */
 
-#cmakedefine OBSESSIVE_INLINING
+#define ORDER_FINITE_ELEMENT @ORDER_FINITE_ELEMENT@
+#define ORDER_MAPPING @ORDER_MAPPING@
+#define ORDER_QUADRATURE @ORDER_QUADRATURE@
 
-#cmakedefine USE_COMMUNICATION_HIDING
+/* quadratic Newton: */
 
-#cmakedefine USE_CUSTOM_POW
+#define NEWTON_EPS_DOUBLE @NEWTON_EPS_DOUBLE@
+#define NEWTON_EPS_FLOAT @NEWTON_EPS_FLOAT@
+#define NEWTON_MAX_ITER @NEWTON_MAX_ITER@
 
-#cmakedefine USE_SIMD
-
-#cmakedefine LIKWID_PERFMON
-
-#cmakedefine VALGRIND_CALLGRIND
-
-/*
- * class Discretization:
- */
-
-#ifndef ORDER_FINITE_ELEMENT
-#define ORDER_FINITE_ELEMENT 1
-#endif
-
-#ifndef ORDER_MAPPING
-#define ORDER_MAPPING 1
-#endif
-
-
-#ifndef ORDER_QUADRATURE
-#define ORDER_QUADRATURE 2
-#endif
-
-/*
- * class ProblemDescription:
- */
-
-#ifndef GAMMA
-#define GAMMA 7./5.
-#endif
-
-#ifndef COVOLUME
-#define COVOLUME 0.
-#endif
-
-/*
- * quadratic Newton:
- */
-
-#ifndef NEWTON_EPS_DOUBLE
-#define NEWTON_EPS_DOUBLE 1.e-10
-#endif
-
-#ifndef NEWTON_EPS_FLOAT
-#define NEWTON_EPS_FLOAT 1.e-4
-#endif
-
-#ifndef NEWTON_MAX_ITER
-#define NEWTON_MAX_ITER 2
-#endif
-
-/*
- * class RiemannSolver
- */
+/* class RiemannSolver */
 
 #ifndef RIEMANN_NEWTON_MAX_ITER
-#define RIEMANN_NEWTON_MAX_ITER 0
+#define RIEMANN_NEWTON_MAX_ITER @RIEMANN_NEWTON_MAX_ITER@
 #endif
+#define RIEMANN_GREEDY_DIJ @RIEMANN_GREEDY_DIJ@
+#define RIEMANN_GREEDY_THRESHOLD @RIEMANN_GREEDY_THRESHOLD@
+#define RIEMANN_GREEDY_RELAX_BOUNDS @RIEMANN_GREEDY_RELAX_BOUNDS@
 
-#ifndef RIEMANN_GREEDY_DIJ
-#define RIEMANN_GREEDY_DIJ false
-#endif
+/* class Indicator */
 
-#ifndef RIEMANN_GREEDY_THRESHOLD
-#define RIEMANN_GREEDY_THRESHOLD 1.00
-#endif
+#define INDICATOR @INDICATOR@
+#define COMPUTE_SECOND_VARIATIONS @COMPUTE_SECOND_VARIATIONS@
+#define ENTROPY @ENTROPY@
+#define SMOOTHNESS_INDICATOR @SMOOTHNESS_INDICATOR@
+#define SMOOTHNESS_INDICATOR_ALPHA_0 @SMOOTHNESS_INDICATOR_ALPHA_0@
+#define SMOOTHNESS_INDICATOR_POWER @SMOOTHNESS_INDICATOR_POWER@
 
-#ifndef RIEMANN_GREEDY_RELAX_BOUNDS
-#define RIEMANN_GREEDY_RELAX_BOUNDS false
-#endif
+/* class Limiter */
 
-/*
- * class Indicator
- */
-
-#ifndef INDICATOR
-// #define INDICATOR Indicators::zero
-// #define INDICATOR Indicators::one
-// #define INDICATOR Indicators::smoothness_indicator
-#define INDICATOR Indicators::entropy_viscosity_commutator
-#endif
-
-#ifndef COMPUTE_SECOND_VARIATIONS
-#define COMPUTE_SECOND_VARIATIONS true
-#endif
-
-#ifndef ENTROPY
-// #define ENTROPY Entropy::mathematical
-#define ENTROPY Entropy::harten
-#endif
-
-#ifndef SMOOTHNESS_INDICATOR
-// #define SMOOTHNESS_INDICATOR SmoothnessIndicators::rho
-// #define SMOOTHNESS_INDICATOR SmoothnessIndicators::internal_energy
-#define SMOOTHNESS_INDICATOR SmoothnessIndicators::pressure
-#endif
-
-#ifndef SMOOTHNESS_INDICATOR_ALPHA_0
-#define SMOOTHNESS_INDICATOR_ALPHA_0 0.
-#endif
-
-#ifndef SMOOTHNESS_INDICATOR_POWER
-#define SMOOTHNESS_INDICATOR_POWER 3
-#endif
-
-/*
- * class Limiter
- */
-
-#ifndef LIMITER
-// #define LIMITER Limiters::none
-// #define LIMITER Limiters::rho
-#define LIMITER Limiters::specific_entropy
-// #define LIMITER Limiters::entropy_inequality
-#endif
-
-#ifndef LIMITER_RELAX_BOUNDS
-#define LIMITER_RELAX_BOUNDS true
-#endif
-
-#ifndef LIMITER_RELAXATION_ORDER
-#define LIMITER_RELAXATION_ORDER 3
-#endif
+#define LIMITER @LIMITER@
+#define LIMITER_RELAX_BOUNDS @LIMITER_RELAX_BOUNDS@
+#define LIMITER_RELAXATION_ORDER @LIMITER_RELAXATION_ORDER@
 
 #endif /* COMPILE_TIME_OPTIONS_H */

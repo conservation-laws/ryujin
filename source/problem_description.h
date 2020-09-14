@@ -74,13 +74,13 @@ namespace ryujin
      * Gamma \f$\gamma\f$.
      * @ingroup CompileTimeOptions
      */
-    static constexpr ScalarNumber gamma = ScalarNumber(GAMMA);
+    static constexpr ScalarNumber gamma = ScalarNumber(7./5.);
 
     /**
      * Covolume \f$b\f$.
      * @ingroup CompileTimeOptions
      */
-    static constexpr ScalarNumber b = ScalarNumber(COVOLUME);
+    static constexpr ScalarNumber b = ScalarNumber(0.);
     static_assert(b == 0., "If you change this value, implement the rest...");
 
     //@}
