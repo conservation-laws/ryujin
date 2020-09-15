@@ -16,7 +16,7 @@ namespace
   DEAL_II_ALWAYS_INLINE inline auto
   from_primitive_state(const dealii::Tensor<1, 3, Number> &state_1d)
   {
-    using rank1_type = typename ProblemDescription<dim, Number>::rank1_type;
+    using rank1_type = typename ProblemDescription<dim>::template rank1_type<Number>;
     constexpr auto gamma = ProblemDescription<1, Number>::gamma;
 
     const auto &rho = state_1d[0];

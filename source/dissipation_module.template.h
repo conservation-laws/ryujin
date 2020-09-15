@@ -116,8 +116,6 @@ namespace ryujin
 
     RYUJIN_OMP_FOR
     for (unsigned int i = 0; i < size_regular; i += simd_length) {
-      using PD = ProblemDescription<dim, VA>;
-
       const auto m_i = simd_load(lumped_mass_matrix, i);
       const auto rho_i = simd_load(density_, i);
       for (unsigned int d = 0; d < dim; ++d) {
@@ -129,8 +127,6 @@ namespace ryujin
     RYUJIN_PARALLEL_REGION_END
 
     for (unsigned int i = size_regular; i < n_owned; ++i) {
-      using PD = ProblemDescription<dim, Number>;
-
       const auto m_i = lumped_mass_matrix.local_element(i);
       const auto rho_i = density_.local_element(i);
 
@@ -231,8 +227,6 @@ namespace ryujin
 
     RYUJIN_OMP_FOR
     for (unsigned int i = 0; i < size_regular; i += simd_length) {
-      using PD = ProblemDescription<dim, VA>;
-
       const auto m_i = simd_load(lumped_mass_matrix, i);
       const auto rho_i = simd_load(density_, i);
       const auto e_i = simd_load(src, i);
@@ -242,8 +236,6 @@ namespace ryujin
     RYUJIN_PARALLEL_REGION_END
 
     for (unsigned int i = size_regular; i < n_owned; ++i) {
-      using PD = ProblemDescription<dim, Number>;
-
       const auto m_i = lumped_mass_matrix.local_element(i);
       const auto rho_i = density_.local_element(i);
       const auto e_i = src.local_element(i);
@@ -320,7 +312,8 @@ namespace ryujin
       diagonal.reinit(density, true);
 
       DEAL_II_OPENMP_SIMD_PRAGMA
-      for (unsigned int i = 0; i < density.get_partitioner()->local_size(); ++i) {
+      for (unsigned int i = 0; i < density.get_partitioner()->local_size();
+           ++i) {
         diagonal.local_element(i) =
             Number(1.0) /
             (density.local_element(i) * lumped_mass_matrix.local_element(i));
@@ -402,12 +395,10 @@ namespace ryujin
 
       RYUJIN_OMP_FOR
       for (unsigned int i = 0; i < size_regular; i += simd_length) {
-        using PD = ProblemDescription<dim, VA>;
-
         const auto U_i = U.get_vectorized_tensor(i);
         const auto rho_i = U_i[0];
-        const auto M_i = PD::momentum(U_i);
-        const auto rho_e_i = PD::internal_energy(U_i);
+        const auto M_i = problem_description_->momentum(U_i);
+        const auto rho_e_i = problem_description_->internal_energy(U_i);
         const auto m_i = simd_load(lumped_mass_matrix, i);
 
         simd_store(density_, rho_i, i);
@@ -422,12 +413,10 @@ namespace ryujin
       RYUJIN_PARALLEL_REGION_END
 
       for (unsigned int i = size_regular; i < n_owned; ++i) {
-        using PD = ProblemDescription<dim, Number>;
-
         const auto U_i = U.get_tensor(i);
         const auto rho_i = U_i[0];
-        const auto M_i = PD::momentum(U_i);
-        const auto rho_e_i = PD::internal_energy(U_i);
+        const auto M_i = problem_description_->momentum(U_i);
+        const auto rho_e_i = problem_description_->internal_energy(U_i);
         const auto m_i = lumped_mass_matrix.local_element(i);
 
         density_.local_element(i) = rho_i;
@@ -484,10 +473,8 @@ namespace ryujin
           const auto U_i =
               initial_values_->initial_state(position, t + Number(0.5) * tau);
           const auto rho_i = U_i[0];
-          const auto V_i =
-              ProblemDescription<dim, Number>::momentum(U_i) / rho_i;
-          const auto e_i =
-              ProblemDescription<dim, Number>::internal_energy(U_i) / rho_i;
+          const auto V_i = problem_description_->momentum(U_i) / rho_i;
+          const auto e_i = problem_description_->internal_energy(U_i) / rho_i;
 
           for (unsigned int d = 0; d < dim; ++d) {
             velocity_.block(d).local_element(i) = V_i[d];
@@ -606,8 +593,6 @@ namespace ryujin
 
       RYUJIN_OMP_FOR
       for (unsigned int i = 0; i < size_regular; i += simd_length) {
-        using PD = ProblemDescription<dim, VA>;
-
         const auto rhs_i = simd_load(internal_energy_rhs_, i);
         const auto m_i = simd_load(lumped_mass_matrix, i);
         const auto rho_i = simd_load(density_, i);
@@ -620,8 +605,6 @@ namespace ryujin
       RYUJIN_PARALLEL_REGION_END
 
       for (unsigned int i = size_regular; i < n_owned; ++i) {
-        using PD = ProblemDescription<dim, Number>;
-
         const auto rhs_i = internal_energy_rhs_.local_element(i);
         const auto m_i = lumped_mass_matrix.local_element(i);
         const auto rho_i = density_.local_element(i);
@@ -652,8 +635,7 @@ namespace ryujin
           const auto U_i =
               initial_values_->initial_state(position, t + Number(0.5) * tau);
           const auto rho_i = U_i[0];
-          const auto e_i =
-              ProblemDescription<dim, Number>::internal_energy(U_i) / rho_i;
+          const auto e_i = problem_description_->internal_energy(U_i) / rho_i;
           internal_energy_rhs_.local_element(i) = e_i;
         }
       }
@@ -716,19 +698,17 @@ namespace ryujin
 
       RYUJIN_OMP_FOR
       for (unsigned int i = 0; i < size_regular; i += simd_length) {
-        using PD = ProblemDescription<dim, VA>;
-
         auto U_i = U.get_vectorized_tensor(i);
         const auto rho_i = U_i[0];
 
         /* (5.4b) */
-        auto m_i_new = -PD::momentum(U_i);
+        auto m_i_new = -problem_description_->momentum(U_i);
         for (unsigned int d = 0; d < dim; ++d) {
           m_i_new[d] += 2. * rho_i * simd_load(velocity_.block(d), i);
         }
 
         /* (5.12)f */
-        auto rho_e_i_new = -PD::internal_energy(U_i);
+        auto rho_e_i_new = -problem_description_->internal_energy(U_i);
         rho_e_i_new += 2. * rho_i * simd_load(internal_energy_, i);
 
         /* (5.18) */
@@ -744,19 +724,17 @@ namespace ryujin
       RYUJIN_PARALLEL_REGION_END
 
       for (unsigned int i = size_regular; i < n_owned; ++i) {
-        using PD = ProblemDescription<dim, Number>;
-
         auto U_i = U.get_tensor(i);
         const auto rho_i = U_i[0];
 
         /* (5.4b) */
-        auto m_i_new = -PD::momentum(U_i);
+        auto m_i_new = -problem_description_->momentum(U_i);
         for (unsigned int d = 0; d < dim; ++d) {
           m_i_new[d] += 2. * rho_i * velocity_.block(d).local_element(i);
         }
 
         /* (5.12)f */
-        auto rho_e_i_new = -PD::internal_energy(U_i);
+        auto rho_e_i_new = -problem_description_->internal_energy(U_i);
         rho_e_i_new += 2. * rho_i * internal_energy_.local_element(i);
 
         /* (5.18) */

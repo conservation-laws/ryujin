@@ -39,7 +39,7 @@ namespace ryujin
     /**
      * @copydoc ProblemDescription::rank1_type
      */
-    using rank1_type = typename ProblemDescription<dim, Number>::rank1_type;
+    using rank1_type = typename ProblemDescription<dim>::template rank1_type<Number>;
 
     /**
      * Type used to store a curl of an 2D/3D vector field. Departing from

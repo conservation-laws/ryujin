@@ -159,16 +159,16 @@ namespace ryujin
 
       RYUJIN_OMP_FOR
       for (unsigned int i = 0; i < size_regular; i += simd_length) {
-        using PD = ProblemDescription<dim, VA>;
-
         const auto U_i = U.get_vectorized_tensor(i);
-        simd_store(specific_entropies_, PD::specific_entropy(U_i), i);
+        simd_store(specific_entropies_,
+                   problem_description_->specific_entropy(U_i),
+                   i);
 
         const auto evc_entropy =
             Indicator<dim, double>::evc_entropy_ ==
                     Indicator<dim, double>::Entropy::mathematical
-                ? PD::mathematical_entropy(U_i)
-                : PD::harten_entropy(U_i);
+                ? problem_description_->mathematical_entropy(U_i)
+                : problem_description_->harten_entropy(U_i);
         simd_store(evc_entropies_, evc_entropy, i);
       }
 
@@ -176,13 +176,13 @@ namespace ryujin
         const auto U_i = U.get_tensor(i);
 
         specific_entropies_.local_element(i) =
-            ProblemDescription<dim, Number>::specific_entropy(U_i);
+            problem_description_->specific_entropy(U_i);
 
         evc_entropies_.local_element(i) =
             Indicator<dim, double>::evc_entropy_ ==
                     Indicator<dim, double>::Entropy::mathematical
-                ? ProblemDescription<dim, Number>::mathematical_entropy(U_i)
-                : ProblemDescription<dim, Number>::harten_entropy(U_i);
+                ? problem_description_->mathematical_entropy(U_i)
+                : problem_description_->harten_entropy(U_i);
       }
 
       LIKWID_MARKER_STOP("time_step_0");
@@ -483,7 +483,7 @@ namespace ryujin
           continue;
 
         const auto U_i = U.get_tensor(i);
-        const auto f_i = ProblemDescription<dim, Number>::f(U_i);
+        const auto f_i = problem_description_->f(U_i);
         auto U_i_new = U_i;
         const auto alpha_i = alpha_.local_element(i);
         const auto variations_i = second_variations_.local_element(i);
@@ -515,7 +515,7 @@ namespace ryujin
 
           dealii::Tensor<1, problem_dimension, Number> U_ij_bar;
           const auto c_ij = cij_matrix.get_tensor(i, col_idx);
-          const auto f_j = ProblemDescription<dim, Number>::f(U_j);
+          const auto f_j = problem_description_->f(U_j);
 
           for (unsigned int k = 0; k < problem_dimension; ++k) {
             const auto temp = (f_j[k] - f_i[k]) * c_ij;
@@ -555,7 +555,7 @@ namespace ryujin
              * happens in the dissipation module.
              */
             if (id == Boundary::slip || id == Boundary::no_slip) {
-              auto m = ProblemDescription<dim, Number>::momentum(U_i_new);
+              auto m = problem_description_->momentum(U_i_new);
               m -= 1. * (m * normal) * normal;
               for (unsigned int k = 0; k < dim; ++k)
                 U_i_new[k + 1] = m[k];
@@ -588,7 +588,7 @@ namespace ryujin
         synchronization_dispatch.check(thread_ready, i >= n_export_indices);
 
         const auto U_i = U.get_vectorized_tensor(i);
-        const auto f_i = ProblemDescription<dim, VA>::f(U_i);
+        const auto f_i = problem_description_->f(U_i);
         auto U_i_new = U_i;
         const auto alpha_i = simd_load(alpha_, i);
         const auto variations_i = simd_load(second_variations_, i);
@@ -596,8 +596,7 @@ namespace ryujin
         const auto m_i = simd_load(lumped_mass_matrix, i);
         const auto m_i_inv = simd_load(lumped_mass_matrix_inverse, i);
 
-        using PD = ProblemDescription<dim, VA>;
-        typename PD::rank1_type r_i;
+        typename ProblemDescription<dim>::template rank1_type<VA> r_i;
 
         /* Clear bounds: */
         limiter_simd.reset(variations_i);
@@ -625,7 +624,7 @@ namespace ryujin
           const auto c_ij = cij_matrix.get_vectorized_tensor(i, col_idx);
           const auto d_ij_inv = Number(1.) / d_ij;
 
-          const auto f_j = ProblemDescription<dim, VA>::f(U_j);
+          const auto f_j = problem_description_->f(U_j);
           for (unsigned int k = 0; k < problem_dimension; ++k) {
             const auto temp = (f_j[k] - f_i[k]) * c_ij;
 
@@ -879,7 +878,7 @@ namespace ryujin
 
               /* see comment above */
               if (id == Boundary::slip || id == Boundary::no_slip) {
-                auto m = ProblemDescription<dim, Number>::momentum(U_i_new);
+                auto m = problem_description_->momentum(U_i_new);
                 m -= 1. * (m * normal) * normal;
                 for (unsigned int k = 0; k < dim; ++k)
                   U_i_new[k + 1] = m[k];
@@ -894,10 +893,8 @@ namespace ryujin
 
 #ifdef CHECK_BOUNDS
           const auto rho_new = U_i_new[0];
-          const auto e_new =
-              ProblemDescription<dim, Number>::internal_energy(U_i_new);
-          const auto s_new =
-              ProblemDescription<dim, Number>::specific_entropy(U_i_new);
+          const auto e_new = problem_description_->internal_energy(U_i_new);
+          const auto s_new = problem_description_->specific_entropy(U_i_new);
 
           AssertThrowSIMD(
               rho_new,
@@ -987,10 +984,9 @@ namespace ryujin
           }
 
 #ifdef CHECK_BOUNDS
-          using PD = ProblemDescription<dim, VA>;
           const auto rho_new = U_i_new[0];
-          const auto e_new = PD::internal_energy(U_i_new);
-          const auto s_new = PD::specific_entropy(U_i_new);
+          const auto e_new = problem_description_->internal_energy(U_i_new);
+          const auto s_new = problem_description_->specific_entropy(U_i_new);
 
           AssertThrowSIMD(
               rho_new,

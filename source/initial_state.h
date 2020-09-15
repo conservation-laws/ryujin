@@ -38,7 +38,7 @@ namespace ryujin
     /**
      * @copydoc ProblemDescription::rank1_type
      */
-    using rank1_type = typename ProblemDescription<dim, Number>::rank1_type;
+    using rank1_type = typename ProblemDescription<dim>::template rank1_type<Number>;
 
     /**
      * Constructor taking geometry name @p name and a subsection @p

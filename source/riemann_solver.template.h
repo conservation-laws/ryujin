@@ -663,7 +663,7 @@ namespace ryujin
      */
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline std::array<Number, 4> riemann_data_from_state(
-        const typename ProblemDescription<dim, Number>::rank1_type &U,
+        const typename ProblemDescription<dim>::template rank1_type<Number> &U,
         const dealii::Tensor<1, dim, Number> &n_ij)
     {
       const auto m = ProblemDescription<dim, Number>::momentum(U);
@@ -671,7 +671,7 @@ namespace ryujin
       const auto perp = m - projected_momentum * n_ij;
 
       const Number rho_inverse = Number(1.0) / U[0];
-      typename ProblemDescription<1, Number>::rank1_type projected(
+      typename ProblemDescription<1>::rank1_type<Number> projected(
           {U[0],
            projected_momentum,
            U[1 + dim] - Number(0.5) * perp.norm_square() * rho_inverse});
