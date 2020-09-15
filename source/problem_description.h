@@ -257,6 +257,12 @@ namespace ryujin
     std::string description_;
     ACCESSOR_READ_ONLY(description)
 
+    Number schnuffel_gamma_;
+    ACCESSOR_READ_ONLY(schnuffel_gamma)
+
+    Number schnuffel_b_;
+    ACCESSOR_READ_ONLY(schnuffel_b)
+
     Number mu_;
     ACCESSOR_READ_ONLY(mu)
 

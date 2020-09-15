@@ -24,6 +24,12 @@ namespace ryujin
         description_,
         "Description - valid options are \"Euler\" and \"Navier Stokes\"");
 
+    schnuffel_gamma_ = Number(7. / 5.);
+    add_parameter("gamma", schnuffel_gamma_, "Euler: Ratio of specific heats");
+
+    schnuffel_b_ = Number(0.);
+    add_parameter("b", schnuffel_b_, "Euler: Covolume");
+
     mu_ = Number(1.e-3);
     add_parameter("mu", mu_, "Navier Stokes: Shear viscosity");
 
