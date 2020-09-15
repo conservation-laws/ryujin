@@ -55,13 +55,13 @@ namespace ryujin
      * @copydoc ProblemDescription::problem_dimension
      */
     // clang-format off
-    static constexpr unsigned int problem_dimension = ProblemDescription<dim>::problem_dimension;
+    static constexpr unsigned int problem_dimension = ProblemDescription::problem_dimension<dim>;
     // clang-format on
 
     /**
      * @copydoc ProblemDescription::rank1_type
      */
-    using rank1_type = typename ProblemDescription<dim>::template rank1_type<Number>;
+    using rank1_type = ProblemDescription::rank1_type<dim, Number>;
 
     /**
      * @copydoc ProblemDescription::ScalarNumber
@@ -159,7 +159,7 @@ namespace ryujin
     /**
      * Constructor taking a ProblemDescription instance as argument
      */
-    Limiter(const ProblemDescription<dim, ScalarNumber> &problem_description)
+    Limiter(const ProblemDescription &problem_description)
         : problem_description(problem_description)
     {
     }
@@ -203,20 +203,19 @@ namespace ryujin
      * selected local minimum principles are obeyed.
      */
     template <Limiters limiter = limiter_, typename BOUNDS>
-    static Number
-    limit(const ProblemDescription<dim, ScalarNumber> &problem_description,
-          const BOUNDS &bounds,
-          const rank1_type &U,
-          const rank1_type &P,
-          const Number t_min = Number(0.),
-          const Number t_max = Number(1.));
+    static Number limit(const ProblemDescription &problem_description,
+                        const BOUNDS &bounds,
+                        const rank1_type &U,
+                        const rank1_type &P,
+                        const Number t_min = Number(0.),
+                        const Number t_max = Number(1.));
     //*}
 
   private:
     /** @name */
     //@{
 
-    const ProblemDescription<dim, ScalarNumber> &problem_description;
+    const ProblemDescription &problem_description;
 
     Bounds bounds_;
 

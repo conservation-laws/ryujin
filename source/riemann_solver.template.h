@@ -17,379 +17,372 @@ namespace ryujin
 {
   using namespace dealii;
 
-  namespace
+  /*
+   * We construct a function phi(p) that is montone increasing in p,
+   * concave down and whose (weak) third derivative is non-negative and
+   * locally bounded [1, p. 912]. We also need to implement derivatives
+   * of phi for the quadratic Newton search:
+   */
+
+  /**
+   * See [1], page 912, (3.4).
+   *
+   * Cost: 1x pow, 1x division, 2x sqrt
+   */
+  template <int dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline Number
+  RiemannSolver<dim, Number>::
+  f(const std::array<Number, 4> &primitive_state, const Number &p_star)
   {
-    /*
-     * We construct a function phi(p) that is montone increasing in p,
-     * concave down and whose (weak) third derivative is non-negative and
-     * locally bounded [1, p. 912]. We also need to implement derivatives
-     * of phi for the quadratic Newton search:
-     */
+    using ScalarNumber = typename get_value_type<Number>::type;
 
-    /**
-     * See [1], page 912, (3.4).
-     *
-     * Cost: 1x pow, 1x division, 2x sqrt
-     */
-    template <typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    f(const std::array<Number, 4> &primitive_state, const Number &p_star)
-    {
-      static_assert(ProblemDescription<1, Number>::b == 0.,
-                    "If you change this value, implement the rest...");
+    const auto &[rho, u, p, a] = primitive_state;
 
-      using ScalarNumber = typename get_value_type<Number>::type;
+    const Number radicand_inverse =
+        ScalarNumber(0.5) * rho *
+        ((gamma + ScalarNumber(1.)) * p_star + (gamma - ScalarNumber(1.)) * p);
+    const Number true_value = (p_star - p) / std::sqrt(radicand_inverse);
 
-      constexpr auto gamma = ProblemDescription<1, Number>::gamma;
-      constexpr auto gamma_inverse =
-          ProblemDescription<1, Number>::gamma_inverse;
-      constexpr auto gamma_minus_one_inverse =
-          ProblemDescription<1, Number>::gamma_minus_one_inverse;
+    const auto exponent =
+        (gamma - ScalarNumber(1.)) * ScalarNumber(0.5) * gamma_inverse;
+    const Number factor = ryujin::pow(p_star / p, exponent) - Number(1.);
+    const auto false_value =
+        factor * ScalarNumber(2.) * a * gamma_minus_one_inverse;
 
-      const auto &[rho, u, p, a] = primitive_state;
+    return dealii::compare_and_apply_mask<
+        dealii::SIMDComparison::greater_than_or_equal>(
+        p_star, p, true_value, false_value);
+  }
 
-      const Number radicand_inverse = ScalarNumber(0.5) * rho *
-                                      ((gamma + ScalarNumber(1.)) * p_star +
-                                       (gamma - ScalarNumber(1.)) * p);
-      const Number true_value = (p_star - p) / std::sqrt(radicand_inverse);
+  /**
+   * See [1], page 912, (3.4).
+   *
+   * Cost: 1x pow, 3x division, 1x sqrt
+   */
+  template <int dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline Number
+  RiemannSolver<dim, Number>::
+  df(const std::array<Number, 4> &primitive_state, const Number &p_star)
+  {
+    using ScalarNumber = typename get_value_type<Number>::type;
 
-      const auto exponent =
-          (gamma - ScalarNumber(1.)) * ScalarNumber(0.5) * gamma_inverse;
-      const Number factor = ryujin::pow(p_star / p, exponent) - Number(1.);
-      const auto false_value =
-          factor * ScalarNumber(2.) * a * gamma_minus_one_inverse;
+    const auto &[rho, u, p, a] = primitive_state;
 
-      return dealii::compare_and_apply_mask<
-          dealii::SIMDComparison::greater_than_or_equal>(
-          p_star, p, true_value, false_value);
-    }
+    const Number radicand_inverse =
+        ScalarNumber(0.5) * rho *
+        ((gamma + ScalarNumber(1.)) * p_star + (gamma - ScalarNumber(1.)) * p);
+    const Number denominator =
+        (p_star + (gamma - ScalarNumber(1.)) * gamma_plus_one_inverse * p);
+    const Number true_value = (denominator - ScalarNumber(0.5) * (p_star - p)) /
+                              (denominator * std::sqrt(radicand_inverse));
 
-    /**
-     * See [1], page 912, (3.4).
-     *
-     * Cost: 1x pow, 3x division, 1x sqrt
-     */
-    template <typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    df(const std::array<Number, 4> &primitive_state, const Number &p_star)
-    {
-      static_assert(ProblemDescription<1, Number>::b == 0.,
-                    "If you change this value, implement the rest...");
+    const auto exponent =
+        (ScalarNumber(-1.) - gamma) * ScalarNumber(0.5) * gamma_inverse;
+    const Number factor = (gamma - ScalarNumber(1.)) * ScalarNumber(0.5) *
+                          gamma_inverse * ryujin::pow(p_star / p, exponent) / p;
+    const auto false_value =
+        factor * ScalarNumber(2.) * a * gamma_minus_one_inverse;
 
-      using ScalarNumber = typename get_value_type<Number>::type;
-
-      constexpr auto gamma = ProblemDescription<1, Number>::gamma;
-      constexpr auto gamma_inverse =
-          ProblemDescription<1, Number>::gamma_inverse;
-      constexpr auto gamma_minus_one_inverse =
-          ProblemDescription<1, Number>::gamma_minus_one_inverse;
-      constexpr auto gamma_plus_one_inverse =
-          ProblemDescription<1, Number>::gamma_plus_one_inverse;
-
-      const auto &[rho, u, p, a] = primitive_state;
-
-      const Number radicand_inverse = ScalarNumber(0.5) * rho *
-                                      ((gamma + ScalarNumber(1.)) * p_star +
-                                       (gamma - ScalarNumber(1.)) * p);
-      const Number denominator =
-          (p_star + (gamma - ScalarNumber(1.)) * gamma_plus_one_inverse * p);
-      const Number true_value =
-          (denominator - ScalarNumber(0.5) * (p_star - p)) /
-          (denominator * std::sqrt(radicand_inverse));
-
-      const auto exponent =
-          (ScalarNumber(-1.) - gamma) * ScalarNumber(0.5) * gamma_inverse;
-      const Number factor = (gamma - ScalarNumber(1.)) * ScalarNumber(0.5) *
-                            gamma_inverse * ryujin::pow(p_star / p, exponent) /
-                            p;
-      const auto false_value =
-          factor * ScalarNumber(2.) * a * gamma_minus_one_inverse;
-
-      return dealii::compare_and_apply_mask<
-          dealii::SIMDComparison::greater_than_or_equal>(
-          p_star, p, true_value, false_value);
-    }
+    return dealii::compare_and_apply_mask<
+        dealii::SIMDComparison::greater_than_or_equal>(
+        p_star, p, true_value, false_value);
+  }
 
 
-    /**
-     * See [1], page 912, (3.3).
-     *
-     * Cost: 2x pow, 2x division, 4x sqrt
-     */
-    template <typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    phi(const std::array<Number, 4> &riemann_data_i,
-        const std::array<Number, 4> &riemann_data_j,
-        const Number &p)
-    {
-      const Number &u_i = riemann_data_i[1];
-      const Number &u_j = riemann_data_j[1];
+  /**
+   * See [1], page 912, (3.3).
+   *
+   * Cost: 2x pow, 2x division, 4x sqrt
+   */
+  template <int dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline Number
+  RiemannSolver<dim, Number>::
+  phi(const std::array<Number, 4> &riemann_data_i,
+      const std::array<Number, 4> &riemann_data_j,
+      const Number &p)
+  {
+    const Number &u_i = riemann_data_i[1];
+    const Number &u_j = riemann_data_j[1];
 
-      return f(riemann_data_i, p) + f(riemann_data_j, p) + u_j - u_i;
-    }
-
-
-    /**
-     * This is a specialized variant of phi() that computes phi(p_max). It
-     * inlines the implementation of f() and eliminates all unnecessary
-     * branches in f().
-     *
-     * Cost: 0x pow, 2x division, 2x sqrt
-     */
-    template <typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    phi_of_p_max(const std::array<Number, 4> &riemann_data_i,
-                 const std::array<Number, 4> &riemann_data_j)
-    {
-      using ScalarNumber = typename get_value_type<Number>::type;
-
-      constexpr auto gamma = ProblemDescription<1, Number>::gamma;
-
-      const auto &[rho_i, u_i, p_i, a_i] = riemann_data_i;
-      const auto &[rho_j, u_j, p_j, a_j] = riemann_data_j;
-
-      const Number p_max = std::max(p_i, p_j);
-
-      const Number radicand_inverse_i = ScalarNumber(0.5) * rho_i *
-                                        ((gamma + ScalarNumber(1.)) * p_max +
-                                         (gamma - ScalarNumber(1.)) * p_i);
-
-      const Number value_i = (p_max - p_i) / std::sqrt(radicand_inverse_i);
-
-      const Number radicand_inverse_j = ScalarNumber(0.5) * rho_j *
-                                        ((gamma + ScalarNumber(1.)) * p_max +
-                                         (gamma - ScalarNumber(1.)) * p_j);
-
-      const Number value_j = (p_max - p_j) / std::sqrt(radicand_inverse_j);
-
-      return value_i + value_j + u_j - u_i;
-    }
+    return f(riemann_data_i, p) + f(riemann_data_j, p) + u_j - u_i;
+  }
 
 
-    /**
-     * See [1], page 912, (3.3).
-     *
-     * Cost: 2x pow, 6x division, 2x sqrt
-     */
-    template <typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    dphi(const std::array<Number, 4> &riemann_data_i,
-         const std::array<Number, 4> &riemann_data_j,
-         const Number &p)
-    {
-      return df(riemann_data_i, p) + df(riemann_data_j, p);
-    }
+  /**
+   * This is a specialized variant of phi() that computes phi(p_max). It
+   * inlines the implementation of f() and eliminates all unnecessary
+   * branches in f().
+   *
+   * Cost: 0x pow, 2x division, 2x sqrt
+   */
+  template <int dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline Number
+  RiemannSolver<dim, Number>::
+  phi_of_p_max(const std::array<Number, 4> &riemann_data_i,
+               const std::array<Number, 4> &riemann_data_j)
+  {
+    using ScalarNumber = typename get_value_type<Number>::type;
+
+    const auto &[rho_i, u_i, p_i, a_i] = riemann_data_i;
+    const auto &[rho_j, u_j, p_j, a_j] = riemann_data_j;
+
+    const Number p_max = std::max(p_i, p_j);
+
+    const Number radicand_inverse_i =
+        ScalarNumber(0.5) * rho_i *
+        ((gamma + ScalarNumber(1.)) * p_max + (gamma - ScalarNumber(1.)) * p_i);
+
+    const Number value_i = (p_max - p_i) / std::sqrt(radicand_inverse_i);
+
+    const Number radicand_inverse_j =
+        ScalarNumber(0.5) * rho_j *
+        ((gamma + ScalarNumber(1.)) * p_max + (gamma - ScalarNumber(1.)) * p_j);
+
+    const Number value_j = (p_max - p_j) / std::sqrt(radicand_inverse_j);
+
+    return value_i + value_j + u_j - u_i;
+  }
 
 
-    /*
-     * Next we construct approximations for the two extreme wave speeds of
-     * the Riemann fan [1, p. 912, (3.7) + (3.8)] and compute a gap (based
-     * on the quality of our current approximation of the two wave speeds)
-     * and an upper bound lambda_max of the maximal wave speed:
-     */
+  /**
+   * See [1], page 912, (3.3).
+   *
+   * Cost: 2x pow, 6x division, 2x sqrt
+   */
+  template <int dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline Number
+  RiemannSolver<dim, Number>::
+  dphi(const std::array<Number, 4> &riemann_data_i,
+       const std::array<Number, 4> &riemann_data_j,
+       const Number &p)
+  {
+    return df(riemann_data_i, p) + df(riemann_data_j, p);
+  }
 
 
-    /**
-     * see [1], page 912, (3.7)
-     *
-     * Cost: 0x pow, 1x division, 1x sqrt
-     */
-    template <typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    lambda1_minus(const std::array<Number, 4> &riemann_data,
-                  const Number p_star)
-    {
-      using ScalarNumber = typename get_value_type<Number>::type;
-
-      constexpr auto gamma = ProblemDescription<1, Number>::gamma;
-      constexpr auto gamma_inverse =
-          ProblemDescription<1, Number>::gamma_inverse;
-
-      const auto &[rho, u, p, a] = riemann_data;
-
-      const auto factor =
-          (gamma + ScalarNumber(1.0)) * ScalarNumber(0.5) * gamma_inverse;
-      const Number tmp = positive_part((p_star - p) / p);
-
-      return u - a * std::sqrt(Number(1.0) + factor * tmp);
-    }
+  /*
+   * Next we construct approximations for the two extreme wave speeds of
+   * the Riemann fan [1, p. 912, (3.7) + (3.8)] and compute a gap (based
+   * on the quality of our current approximation of the two wave speeds)
+   * and an upper bound lambda_max of the maximal wave speed:
+   */
 
 
-    /**
-     * see [1], page 912, (3.8)
-     *
-     * Cost: 0x pow, 1x division, 1x sqrt
-     */
-    template <typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    lambda3_plus(const std::array<Number, 4> &primitive_state,
+  /**
+   * see [1], page 912, (3.7)
+   *
+   * Cost: 0x pow, 1x division, 1x sqrt
+   */
+  template <int dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline Number
+  RiemannSolver<dim, Number>::
+  lambda1_minus(const std::array<Number, 4> &riemann_data, const Number p_star)
+  {
+    using ScalarNumber = typename get_value_type<Number>::type;
+
+    const auto &[rho, u, p, a] = riemann_data;
+
+    const auto factor =
+        (gamma + ScalarNumber(1.0)) * ScalarNumber(0.5) * gamma_inverse;
+    const Number tmp = positive_part((p_star - p) / p);
+
+    return u - a * std::sqrt(Number(1.0) + factor * tmp);
+  }
+
+
+  /**
+   * see [1], page 912, (3.8)
+   *
+   * Cost: 0x pow, 1x division, 1x sqrt
+   */
+  template <int dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline Number
+  RiemannSolver<dim, Number>::
+  lambda3_plus(const std::array<Number, 4> &primitive_state,
+               const Number p_star)
+  {
+    using ScalarNumber = typename get_value_type<Number>::type;
+
+    const auto &[rho, u, p, a] = primitive_state;
+
+    const Number factor =
+        (gamma + ScalarNumber(1.0)) * ScalarNumber(0.5) * gamma_inverse;
+    const Number tmp = positive_part((p_star - p) / p);
+    return u + a * std::sqrt(Number(1.0) + factor * tmp);
+  }
+
+
+  /**
+   * For two given primitive states <code>riemann_data_i</code> and
+   * <code>riemann_data_j</code>, and two guesses p_1 <= p* <= p_2,
+   * compute the gap in lambda between both guesses.
+   *
+   * See [1], page 914, (4.4a), (4.4b), (4.5), and (4.6)
+   *
+   * Cost: 0x pow, 4x division, 4x sqrt
+   */
+  template <int dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline std::array<Number, 2>
+  RiemannSolver<dim, Number>::
+  compute_gap(const std::array<Number, 4> &riemann_data_i,
+              const std::array<Number, 4> &riemann_data_j,
+              const Number p_1,
+              const Number p_2)
+  {
+    const Number nu_11 = lambda1_minus(riemann_data_i, p_2 /*SIC!*/);
+    const Number nu_12 = lambda1_minus(riemann_data_i, p_1 /*SIC!*/);
+
+    const Number nu_31 = lambda3_plus(riemann_data_j, p_1);
+    const Number nu_32 = lambda3_plus(riemann_data_j, p_2);
+
+    const Number lambda_max =
+        std::max(positive_part(nu_32), negative_part(nu_11));
+
+    const Number gap =
+        std::max(std::abs(nu_32 - nu_31), std::abs(nu_12 - nu_11));
+
+    return {{gap, lambda_max}};
+  }
+
+
+  /**
+   * For two given primitive states <code>riemann_data_i</code> and
+   * <code>riemann_data_j</code>, and a guess p_2, compute an upper bound
+   * for lambda.
+   *
+   * This is the same lambda_max as computed by compute_gap. The function
+   * simply avoids a number of unnecessary computations (in case we do
+   * not need to know the gap).
+   *
+   * Cost: 0x pow, 2x division, 2x sqrt
+   */
+  template <int dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline Number
+  RiemannSolver<dim, Number>::
+  compute_lambda(const std::array<Number, 4> &riemann_data_i,
+                 const std::array<Number, 4> &riemann_data_j,
                  const Number p_star)
-    {
-      using ScalarNumber = typename get_value_type<Number>::type;
+  {
+    const Number nu_11 = lambda1_minus(riemann_data_i, p_star);
+    const Number nu_32 = lambda3_plus(riemann_data_j, p_star);
 
-      constexpr auto gamma = ProblemDescription<1, Number>::gamma;
-      constexpr auto gamma_inverse =
-          ProblemDescription<1, Number>::gamma_inverse;
-
-      const auto &[rho, u, p, a] = primitive_state;
-
-      const Number factor =
-          (gamma + ScalarNumber(1.0)) * ScalarNumber(0.5) * gamma_inverse;
-      const Number tmp = positive_part((p_star - p) / p);
-      return u + a * std::sqrt(Number(1.0) + factor * tmp);
-    }
+    return std::max(positive_part(nu_32), negative_part(nu_11));
+  }
 
 
-    /**
-     * For two given primitive states <code>riemann_data_i</code> and
-     * <code>riemann_data_j</code>, and two guesses p_1 <= p* <= p_2,
-     * compute the gap in lambda between both guesses.
-     *
-     * See [1], page 914, (4.4a), (4.4b), (4.5), and (4.6)
-     *
-     * Cost: 0x pow, 4x division, 4x sqrt
+  /**
+   * Two-rarefaction approximation to p_star computed for two primitive
+   * states <code>riemann_data_i</code> and <code>riemann_data_j</code>.
+   *
+   * See [1], page 914, (4.3)
+   *
+   * Cost: 2x pow, 2x division, 0x sqrt
+   */
+  template <int dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline Number
+  RiemannSolver<dim, Number>::
+  p_star_two_rarefaction(const std::array<Number, 4> &riemann_data_i,
+                         const std::array<Number, 4> &riemann_data_j)
+  {
+    using ScalarNumber = typename get_value_type<Number>::type;
+
+    const auto &[rho_i, u_i, p_i, a_i] = riemann_data_i;
+    const auto &[rho_j, u_j, p_j, a_j] = riemann_data_j;
+
+    /*
+     * Nota bene (cf. [1, (4.3)]):
+     *   a_Z^0 * sqrt(1 - b * rho_Z) = a_Z * (1 - b * rho_Z)
+     * We have computed a_Z already, so we are simply going to use this
+     * identity below:
      */
-    template <typename Number>
-    DEAL_II_ALWAYS_INLINE inline std::array<Number, 2>
-    compute_gap(const std::array<Number, 4> &riemann_data_i,
-                const std::array<Number, 4> &riemann_data_j,
-                const Number p_1,
-                const Number p_2)
-    {
-      const Number nu_11 = lambda1_minus(riemann_data_i, p_2 /*SIC!*/);
-      const Number nu_12 = lambda1_minus(riemann_data_i, p_1 /*SIC!*/);
 
-      const Number nu_31 = lambda3_plus(riemann_data_j, p_1);
-      const Number nu_32 = lambda3_plus(riemann_data_j, p_2);
+    const auto factor = (gamma - ScalarNumber(1.)) * ScalarNumber(0.5);
 
-      const Number lambda_max =
-          std::max(positive_part(nu_32), negative_part(nu_11));
+    const Number numerator = a_i + a_j - factor * (u_j - u_i);
+    const Number denominator =
+        a_i * ryujin::pow(p_i / p_j, -factor * gamma_inverse) + a_j;
 
-      const Number gap =
-          std::max(std::abs(nu_32 - nu_31), std::abs(nu_12 - nu_11));
+    const auto exponent = ScalarNumber(2.0) * gamma * gamma_minus_one_inverse;
 
-      return {{gap, lambda_max}};
-    }
+    return p_j * ryujin::pow(numerator / denominator, exponent);
+  }
 
 
-    /**
-     * For two given primitive states <code>riemann_data_i</code> and
-     * <code>riemann_data_j</code>, and a guess p_2, compute an upper bound
-     * for lambda.
-     *
-     * This is the same lambda_max as computed by compute_gap. The function
-     * simply avoids a number of unnecessary computations (in case we do
-     * not need to know the gap).
-     *
-     * Cost: 0x pow, 2x division, 2x sqrt
-     */
-    template <typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    compute_lambda(const std::array<Number, 4> &riemann_data_i,
-                   const std::array<Number, 4> &riemann_data_j,
-                   const Number p_star)
-    {
-      const Number nu_11 = lambda1_minus(riemann_data_i, p_star);
-      const Number nu_32 = lambda3_plus(riemann_data_j, p_star);
+  /**
+   * Given the pressure minimum and maximum and two corresponding
+   * densities we compute approximations for the density of corresponding
+   * shock and expansion waves.
+   *
+   * [2] Formula (4.4)
+   *
+   * Cost: 2x pow, 2x division, 0x sqrt
+   */
+  template <int dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline std::array<Number, 4>
+  RiemannSolver<dim, Number>::
+  shock_and_expansion_density(const Number p_min,
+                              const Number p_max,
+                              const Number rho_p_min,
+                              const Number rho_p_max,
+                              const Number p_1,
+                              const Number p_2)
+  {
+    const auto gm1_gp2 = gamma_minus_one_over_gamma_plus_one;
 
-      return std::max(positive_part(nu_32), negative_part(nu_11));
-    }
+    const auto rho_p_min_shk =
+        rho_p_min * (gm1_gp2 * p_min + p_1) / (gm1_gp2 * p_1 + p_min);
 
+    const auto rho_p_max_shk =
+        rho_p_min * (gm1_gp2 * p_max + p_1) / (gm1_gp2 * p_1 + p_max);
 
-    /**
-     * Two-rarefaction approximation to p_star computed for two primitive
-     * states <code>riemann_data_i</code> and <code>riemann_data_j</code>.
-     *
-     * See [1], page 914, (4.3)
-     *
-     * Cost: 2x pow, 2x division, 0x sqrt
-     */
-    template <typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    p_star_two_rarefaction(const std::array<Number, 4> &riemann_data_i,
-                           const std::array<Number, 4> &riemann_data_j)
-    {
-      using ScalarNumber = typename get_value_type<Number>::type;
+    const auto rho_p_min_exp =
+        rho_p_min * ryujin::pow(p_2 / p_min, gamma_inverse);
 
-      constexpr auto gamma = ProblemDescription<1, Number>::gamma;
-      constexpr auto gamma_inverse =
-          ProblemDescription<1, Number>::gamma_inverse;
-      constexpr auto gamma_minus_one_inverse =
-          ProblemDescription<1, Number>::gamma_minus_one_inverse;
+    const auto rho_p_max_exp =
+        rho_p_max * ryujin::pow(p_2 / p_max, gamma_inverse);
 
-      const auto &[rho_i, u_i, p_i, a_i] = riemann_data_i;
-      const auto &[rho_j, u_j, p_j, a_j] = riemann_data_j;
+    return {{rho_p_min_shk, rho_p_max_shk, rho_p_min_exp, rho_p_max_exp}};
+  }
 
-      /*
-       * Nota bene (cf. [1, (4.3)]):
-       *   a_Z^0 * sqrt(1 - b * rho_Z) = a_Z * (1 - b * rho_Z)
-       * We have computed a_Z already, so we are simply going to use this
-       * identity below:
-       */
+  /**
+   * For a given (2+dim dimensional) state vector <code>U</code>, and a
+   * (normalized) "direction" n_ij, first compute the corresponding
+   * projected state in the corresponding 1D Riemann problem, and then
+   * compute and return the Riemann data [rho, u, p, a] (used in the
+   * approximative Riemann solver).
+   */
+  template <int dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline std::array<Number, 4>
+  RiemannSolver<dim, Number>::
+  riemann_data_from_state(const ProblemDescription &problem_description,
+                          const ProblemDescription::rank1_type<dim, Number> &U,
+                          const dealii::Tensor<1, dim, Number> &n_ij)
+  {
+    const auto m = problem_description.momentum(U);
+    const auto projected_momentum = n_ij * m;
+    const auto perp = m - projected_momentum * n_ij;
 
-      constexpr auto factor = (gamma - ScalarNumber(1.)) * ScalarNumber(0.5);
+    const Number rho_inverse = Number(1.0) / U[0];
+    ProblemDescription::rank1_type<1, Number> projected(
+        {U[0],
+         projected_momentum,
+         U[1 + dim] - Number(0.5) * perp.norm_square() * rho_inverse});
 
-      const Number numerator = a_i + a_j - factor * (u_j - u_i);
-      const Number denominator =
-          a_i * ryujin::pow(p_i / p_j, -factor * gamma_inverse) + a_j;
-
-      const auto exponent = ScalarNumber(2.0) * gamma * gamma_minus_one_inverse;
-
-      return p_j * ryujin::pow(numerator / denominator, exponent);
-    }
-
-
-    /**
-     * Given the pressure minimum and maximum and two corresponding
-     * densities we compute approximations for the density of corresponding
-     * shock and expansion waves.
-     *
-     * [2] Formula (4.4)
-     *
-     * Cost: 2x pow, 2x division, 0x sqrt
-     */
-    template <typename Number>
-    DEAL_II_ALWAYS_INLINE inline std::array<Number, 4>
-    shock_and_expansion_density(const Number p_min,
-                                const Number p_max,
-                                const Number rho_p_min,
-                                const Number rho_p_max,
-                                const Number p_1,
-                                const Number p_2)
-    {
-      constexpr auto gm1_gp2 =
-          ProblemDescription<1, Number>::gamma_minus_one_over_gamma_plus_one;
-
-      const auto rho_p_min_shk =
-          rho_p_min * (gm1_gp2 * p_min + p_1) / (gm1_gp2 * p_1 + p_min);
-
-      const auto rho_p_max_shk =
-          rho_p_min * (gm1_gp2 * p_max + p_1) / (gm1_gp2 * p_1 + p_max);
-
-      constexpr auto gamma_inverse =
-          ProblemDescription<1, Number>::gamma_inverse;
-
-      const auto rho_p_min_exp =
-          rho_p_min * ryujin::pow(p_2 / p_min, gamma_inverse);
-
-      const auto rho_p_max_exp =
-          rho_p_max * ryujin::pow(p_2 / p_max, gamma_inverse);
-
-      return {{rho_p_min_shk, rho_p_max_shk, rho_p_min_exp, rho_p_max_exp}};
-    }
-
-
-  } /* anonymous namespace */
+    return {{projected[0],               // rho
+             projected[1] * rho_inverse, // u
+             problem_description.pressure(projected),
+             problem_description.speed_of_sound(projected)}};
+  }
 
 
   template <int dim, typename Number>
 #ifdef OBSESSIVE_INLINING
   DEAL_II_ALWAYS_INLINE inline
 #endif
-  std::tuple<Number, Number, unsigned int> RiemannSolver<dim, Number>::compute(
-      const ProblemDescription<dim, ScalarNumber> &problem_description,
-      const std::array<Number, 4> &riemann_data_i,
-      const std::array<Number, 4> &riemann_data_j)
+      std::tuple<Number, Number, unsigned int>
+      RiemannSolver<dim, Number>::compute(
+          const std::array<Number, 4> &riemann_data_i,
+          const std::array<Number, 4> &riemann_data_j)
   {
     /*
      * Step 1:
@@ -498,47 +491,15 @@ namespace ryujin
     }
 
 #ifdef CHECK_BOUNDS
-      const auto phi_p_star = phi(riemann_data_i, riemann_data_j, p_2);
-      AssertThrowSIMD(
-          phi_p_star,
-          [](auto val) { return val >= -newton_eps<ScalarNumber>; },
-          dealii::ExcMessage("Invalid state in Riemann problem."));
+    const auto phi_p_star = phi(riemann_data_i, riemann_data_j, p_2);
+    AssertThrowSIMD(
+        phi_p_star,
+        [](auto val) { return val >= -newton_eps<ScalarNumber>; },
+        dealii::ExcMessage("Invalid state in Riemann problem."));
 #endif
 
-      return {lambda_max, p_2, i};
+    return {lambda_max, p_2, i};
   }
-
-  namespace
-  {
-    /**
-     * For a given (2+dim dimensional) state vector <code>U</code>, and a
-     * (normalized) "direction" n_ij, first compute the corresponding
-     * projected state in the corresponding 1D Riemann problem, and then
-     * compute and return the Riemann data [rho, u, p, a] (used in the
-     * approximative Riemann solver).
-     */
-    template <int dim, typename Number, typename Number2>
-    DEAL_II_ALWAYS_INLINE inline std::array<Number, 4> riemann_data_from_state(
-        const ProblemDescription<dim, Number2> &problem_description,
-        const typename ProblemDescription<dim>::template rank1_type<Number> &U,
-        const dealii::Tensor<1, dim, Number> &n_ij)
-    {
-      const auto m = problem_description.momentum(U);
-      const auto projected_momentum = n_ij * m;
-      const auto perp = m - projected_momentum * n_ij;
-
-      const Number rho_inverse = Number(1.0) / U[0];
-      typename ProblemDescription<1>::rank1_type<Number> projected(
-          {U[0],
-           projected_momentum,
-           U[1 + dim] - Number(0.5) * perp.norm_square() * rho_inverse});
-
-      return {{projected[0],               // rho
-               projected[1] * rho_inverse, // u
-               ProblemDescription<1, Number>::pressure(projected),
-               ProblemDescription<1, Number>::speed_of_sound(projected)}};
-    }
-  } /* anonymous namespace */
 
 
   template <int dim, typename Number>
@@ -547,7 +508,6 @@ namespace ryujin
 #endif
       std::tuple<Number, Number, unsigned int>
       RiemannSolver<dim, Number>::compute(
-          const ProblemDescription<dim, ScalarNumber> &problem_description,
           const rank1_type &U_i,
           const rank1_type &U_j,
           const dealii::Tensor<1, dim, Number> &n_ij)
@@ -557,9 +517,9 @@ namespace ryujin
     const auto riemann_data_j =
         riemann_data_from_state(problem_description, U_j, n_ij);
 
-    return compute(problem_description, riemann_data_i, riemann_data_j);
+    return compute(riemann_data_i, riemann_data_j);
   }
 
-} /* namespace ryujin */
+} // namespace ryujin
 
 #endif /* RIEMANN_SOLVER_TEMPLATE_H */

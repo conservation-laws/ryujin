@@ -87,12 +87,13 @@ namespace ryujin
         const auto U_i = U.get_tensor(i);
         summed_quantities_thread_local += m_i * U_i;
 
-        using PD = ProblemDescription<dim, Number>;
-        const auto s_i = PD::specific_entropy(U_i);
-        const auto rho_i = U_i[0];
-        const auto e_i = PD::internal_energy(U_i) / rho_i;
-        s_min_thread_local = std::min(s_min_thread_local, s_i);
-        e_min_thread_local = std::min(e_min_thread_local, e_i);
+        // FIXME
+//         const auto s_i = PD::specific_entropy(U_i);
+//         const double s_i = 0.;
+//         const auto rho_i = U_i[0];
+//         const auto e_i = PD::internal_energy(U_i) / rho_i;
+//         s_min_thread_local = std::min(s_min_thread_local, s_i);
+//         e_min_thread_local = std::min(e_min_thread_local, e_i);
       }
 
       RYUJIN_OMP_CRITICAL

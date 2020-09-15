@@ -136,7 +136,7 @@ namespace ryujin
     void prepare();
 
     /**
-     * @name ProblemDescription compile time options
+     * @name Discretization compile time options
      */
     //@{
 

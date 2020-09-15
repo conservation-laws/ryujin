@@ -54,13 +54,13 @@ namespace ryujin
      * @copydoc ProblemDescription::problem_dimension
      */
     // clang-format off
-    static constexpr unsigned int problem_dimension = ProblemDescription<dim>::problem_dimension;
+    static constexpr unsigned int problem_dimension = ProblemDescription::problem_dimension<dim>;
     // clang-format on
 
     /**
      * @copydoc ProblemDescription::rank1_type
      */
-    using rank1_type = typename ProblemDescription<dim>::template rank1_type<Number>;
+    using rank1_type = ProblemDescription::rank1_type<dim, Number>;
 
     /**
      * Type used to store a curl of an 2D/3D vector field. Departing from

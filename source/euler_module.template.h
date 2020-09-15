@@ -44,7 +44,7 @@ namespace ryujin
       const MPI_Comm &mpi_communicator,
       std::map<std::string, dealii::Timer> &computing_timer,
       const ryujin::OfflineData<dim, Number> &offline_data,
-      const ryujin::ProblemDescription<dim, Number> &problem_description,
+      const ryujin::ProblemDescription &problem_description,
       const ryujin::InitialValues<dim, Number> &initial_values,
       const std::string &subsection /*= "EulerModule"*/)
       : ParameterAcceptor(subsection)
@@ -225,6 +225,7 @@ namespace ryujin
       LIKWID_MARKER_START("time_step_1");
 
       /* Stored thread locally: */
+      RiemannSolver<dim, Number> riemann_solver_serial(*problem_description_);
       Indicator<dim, Number> indicator_serial(*problem_description_);
 
       /* Parallel non-vectorized loop: */
@@ -264,8 +265,7 @@ namespace ryujin
           const auto n_ij = c_ij / norm;
 
           const auto [lambda_max, p_star, n_iterations] =
-              RiemannSolver<dim, Number>::compute(
-                  *problem_description_, U_i, U_j, n_ij);
+              riemann_solver_serial.compute(U_i, U_j, n_ij);
 
           Number d = norm * lambda_max;
 
@@ -281,8 +281,7 @@ namespace ryujin
             const auto n_ji = c_ji / norm_2;
 
             auto [lambda_max_2, p_star_2, n_iterations_2] =
-                RiemannSolver<dim, Number>::compute(
-                    *problem_description_, U_j, U_i, n_ji);
+                riemann_solver_serial.compute(U_j, U_i, n_ji);
             d = std::max(d, norm_2 * lambda_max_2);
           }
 
@@ -295,6 +294,7 @@ namespace ryujin
       } /* parallel non-vectorized loop */
 
       /* Stored thread locally: */
+      RiemannSolver<dim, VA> riemann_solver_simd(*problem_description_);
       Indicator<dim, VA> indicator_simd(*problem_description_);
       bool thread_ready = false;
 
@@ -341,8 +341,7 @@ namespace ryujin
           const auto n_ij = c_ij / norm;
 
           const auto [lambda_max, p_star, n_iterations] =
-              RiemannSolver<dim, VA>::compute(
-                  *problem_description_, U_i, U_j, n_ij);
+              riemann_solver_simd.compute(U_i, U_j, n_ij);
 
           const auto d = norm * lambda_max;
 
@@ -599,7 +598,7 @@ namespace ryujin
         const auto m_i = simd_load(lumped_mass_matrix, i);
         const auto m_i_inv = simd_load(lumped_mass_matrix_inverse, i);
 
-        typename ProblemDescription<dim>::template rank1_type<VA> r_i;
+        ProblemDescription::rank1_type<dim, VA> r_i;
 
         /* Clear bounds: */
         limiter_simd.reset(variations_i);

@@ -93,7 +93,7 @@ namespace ryujin
         locally_owned, locally_relevant, mpi_communicator_);
 
     constexpr auto problem_dimension =
-        ProblemDescription<dim, Number>::problem_dimension;
+        ProblemDescription::problem_dimension<dim>;
     vector_partitioner_ =
         create_vector_partitioner<problem_dimension>(scalar_partitioner_);
 

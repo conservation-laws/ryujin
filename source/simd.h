@@ -13,8 +13,6 @@
 
 namespace ryujin
 {
-  template<int dim , typename Number> class ProblemDescription;
-
   /**
    * @name Type traits and packed index handling
    */

@@ -16,13 +16,12 @@ namespace ryujin
   DEAL_II_ALWAYS_INLINE inline
 #endif
       Number
-      Limiter<dim, Number>::limit(
-          const ProblemDescription<dim, ScalarNumber> &problem_description,
-          const BOUNDS &bounds,
-          const rank1_type &U,
-          const rank1_type &P,
-          const Number t_min /* = Number(0.) */,
-          const Number t_max /* = Number(1.) */)
+      Limiter<dim, Number>::limit(const ProblemDescription &problem_description,
+                                  const BOUNDS &bounds,
+                                  const rank1_type &U,
+                                  const rank1_type &P,
+                                  const Number t_min /* = Number(0.) */,
+                                  const Number t_max /* = Number(1.) */)
   {
     Number t_r = t_max;
 
@@ -85,8 +84,8 @@ namespace ryujin
 
     Number t_l = t_min; // good state
 
-    constexpr ScalarNumber gamma = ProblemDescription<dim, Number>::gamma;
-    constexpr ScalarNumber gp1 = gamma + ScalarNumber(1.);
+    const ScalarNumber gamma = problem_description.gamma();
+    const ScalarNumber gp1 = gamma + ScalarNumber(1.);
     constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
     /* relax the entropy inequalities by eps to counter roundoff errors */
     constexpr ScalarNumber relaxation = ScalarNumber(1.) + 10. * eps;

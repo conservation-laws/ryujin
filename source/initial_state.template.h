@@ -16,8 +16,8 @@ namespace
   DEAL_II_ALWAYS_INLINE inline auto
   from_primitive_state(const dealii::Tensor<1, 3, Number> &state_1d)
   {
-    using rank1_type = typename ProblemDescription<dim>::template rank1_type<Number>;
-    constexpr auto gamma = ProblemDescription<1, Number>::gamma;
+    using rank1_type = ProblemDescription::rank1_type<dim, Number>;
+    constexpr auto gamma = 1.4; //FIXME
 
     const auto &rho = state_1d[0];
     const auto &u = state_1d[1];
@@ -52,7 +52,7 @@ namespace ryujin
       Uniform(const std::string subsection)
           : InitialState<dim, Number>("uniform", subsection)
       {
-        constexpr auto gamma = ProblemDescription<1, Number>::gamma;
+        constexpr auto gamma = 1.4; //FIXME
         primitive_[0] = gamma;
         primitive_[1] = 3.0;
         primitive_[2] = 1.;
@@ -161,8 +161,8 @@ namespace ryujin
       {
         /* Compute post-shock state and S3: */
 
-        constexpr auto gamma = ProblemDescription<1, Number>::gamma;
-        constexpr auto b = ProblemDescription<1, Number>::b;
+        constexpr auto gamma = 1.4; // FIXME
+        constexpr auto b = 0.; // FIXME
 
         const auto &rho_R = primitive_right_[0];
         const auto &u_R = primitive_right_[1];
@@ -233,7 +233,7 @@ namespace ryujin
       virtual rank1_type compute(const dealii::Point<dim> &point,
                                  Number t) final override
       {
-        constexpr auto gamma = ProblemDescription<1, Number>::gamma;
+        constexpr auto gamma = 1.4; // FIXME
 
         if constexpr (dim == 2) {
           auto point_bar = point;
@@ -312,7 +312,7 @@ namespace ryujin
 
       void parse_parameters_callback()
       {
-        constexpr double gamma = ProblemDescription<1, double>::gamma;
+        constexpr double gamma = 1.4; // FIXME
 
         AssertThrow(
             velocity_left_ > velocity_right_,
@@ -409,7 +409,7 @@ namespace ryujin
                                  Number t) final override
       {
         /* (7.2) */
-        constexpr double gamma = ProblemDescription<1, double>::gamma;
+        constexpr double gamma = 1.4; // FIXME
         constexpr double R_infty = (gamma + 1) / (gamma - 1);
 
         /* (7.3) */

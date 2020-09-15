@@ -49,7 +49,7 @@ namespace ryujin
       const MPI_Comm &mpi_communicator,
       std::map<std::string, dealii::Timer> &computing_timer,
       const ryujin::OfflineData<dim, Number> &offline_data,
-      const ryujin::ProblemDescription<dim, Number> &problem_description,
+      const ryujin::ProblemDescription &problem_description,
       const ryujin::InitialValues<dim, Number> &initial_values,
       const std::string &subsection /*= "DissipationModule"*/)
       : ParameterAcceptor(subsection)

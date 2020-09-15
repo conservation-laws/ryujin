@@ -42,7 +42,7 @@ namespace ryujin
     /**
      * @copydoc ProblemDescription::rank1_type
      */
-    using rank1_type = typename ProblemDescription<dim>::template rank1_type<Number>;
+    using rank1_type = ProblemDescription::rank1_type<dim, Number>;
 
     /**
      * @copydoc OfflineData::vector_type

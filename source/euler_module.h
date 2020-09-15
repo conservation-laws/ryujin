@@ -39,19 +39,19 @@ namespace ryujin
      * @copydoc ProblemDescription::problem_dimension
      */
     // clang-format off
-    static constexpr unsigned int problem_dimension = ProblemDescription<dim>::problem_dimension;
+    static constexpr unsigned int problem_dimension = ProblemDescription::problem_dimension<dim>;
     // clang-format on
 
     /**
      * @copydoc ProblemDescription::rank1_type
      */
     using rank1_type =
-        typename ProblemDescription<dim>::template rank1_type<Number>;
+        ProblemDescription::rank1_type<dim, Number>;
 
     /**
      * @copydoc ProblemDescription::rank2_type
      */
-    using rank2_type = typename ProblemDescription<dim>::template rank2_type<Number>;
+    using rank2_type = ProblemDescription::rank2_type<dim, Number>;
 
     /**
      * @copydoc OfflineData::scalar_type
@@ -66,13 +66,12 @@ namespace ryujin
     /**
      * Constructor.
      */
-    EulerModule(
-        const MPI_Comm &mpi_communicator,
-        std::map<std::string, dealii::Timer> &computing_timer,
-        const ryujin::OfflineData<dim, Number> &offline_data,
-        const ryujin::ProblemDescription<dim, Number> &problem_description,
-        const ryujin::InitialValues<dim, Number> &initial_values,
-        const std::string &subsection = "EulerModule");
+    EulerModule(const MPI_Comm &mpi_communicator,
+                std::map<std::string, dealii::Timer> &computing_timer,
+                const ryujin::OfflineData<dim, Number> &offline_data,
+                const ryujin::ProblemDescription &problem_description,
+                const ryujin::InitialValues<dim, Number> &initial_values,
+                const std::string &subsection = "EulerModule");
 
     /**
      * Prepare time stepping. A call to @ref prepare() allocates temporary
@@ -163,8 +162,7 @@ namespace ryujin
     std::map<std::string, dealii::Timer> &computing_timer_;
 
     dealii::SmartPointer<const ryujin::OfflineData<dim, Number>> offline_data_;
-    dealii::SmartPointer<const ryujin::ProblemDescription<dim, Number>>
-        problem_description_;
+    dealii::SmartPointer<const ryujin::ProblemDescription> problem_description_;
     dealii::SmartPointer<const ryujin::InitialValues<dim, Number>>
         initial_values_;
 

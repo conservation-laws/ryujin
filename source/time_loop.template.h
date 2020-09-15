@@ -305,7 +305,7 @@ namespace ryujin
 #endif
 
     constexpr auto problem_dimension =
-        ProblemDescription<dim, Number>::problem_dimension;
+        ProblemDescription::problem_dimension<dim>;
 
     /* Compute L_inf norm: */
 

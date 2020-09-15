@@ -31,6 +31,7 @@ add_executable(ryujin
 
 deal_ii_setup_target(ryujin)
 
+if(false)
 if(NOT CMAKE_VERSION VERSION_LESS 3.16)
   target_precompile_headers(ryujin
     PRIVATE
@@ -118,6 +119,7 @@ if(NOT CMAKE_VERSION VERSION_LESS 3.16)
     <deal.II/numerics/vector_tools.h>
     <deal.II/numerics/vector_tools.templates.h>
     )
+endif()
 endif()
 
 set_property(SOURCE time_loop.cc APPEND PROPERTY COMPILE_DEFINITIONS

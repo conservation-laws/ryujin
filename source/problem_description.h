@@ -28,39 +28,33 @@ namespace ryujin
    *
    * @ingroup EulerModule
    */
-  template <int dim, typename Number = double>
   class ProblemDescription final : public dealii::ParameterAcceptor
   {
   public:
     /**
      * The dimension of the state space.
      */
+    template <int dim>
     static constexpr unsigned int problem_dimension = 2 + dim;
 
     /**
      * An array holding all component names as a string.
      */
-    const static std::array<std::string, dim + 2> component_names;
-
-    /**
-     * Underlyqing scalar number type. This typedef unpacks a
-     * VectorizedArray and returns the underlying scalar number type
-     * (either float, or double).
-     */
-    using ScalarNumber = typename get_value_type<Number>::type;
+    template <int dim>
+    static const std::array<std::string, dim + 2> component_names;
 
     /**
      * The storage type used for a state vector \f$\boldsymbol U\f$.
      */
-    template <typename Number2>
-    using rank1_type = dealii::Tensor<1, problem_dimension, Number2>;
+    template <int dim, typename Number>
+    using rank1_type = dealii::Tensor<1, problem_dimension<dim>, Number>;
 
     /**
      * The storage type used for the flux \f$\mathbf{f}\f$.
      */
-    template <typename Number2>
-    using rank2_type =
-        dealii::Tensor<1, problem_dimension, dealii::Tensor<1, dim, Number2>>;
+    template <int dim, typename Number>
+    using rank2_type = dealii::
+        Tensor<1, problem_dimension<dim>, dealii::Tensor<1, dim, Number>>;
 
     /**
      * Constructor.
@@ -68,62 +62,13 @@ namespace ryujin
     ProblemDescription(const std::string &subsection = "ProblemDescription");
 
     /**
-     * @name ProblemDescription compile time options
+     * Callback for ParameterAcceptor::initialize(). After we read in
+     * configuration parameters from the parameter file we have to do some
+     * (minor) preparatory work in this class to precompute some common
+     * quantities. Do this with a callback.
      */
-    //@{
+    void parse_parameters_callback();
 
-    /**
-     * Gamma \f$\gamma\f$.
-     * @ingroup CompileTimeOptions
-     */
-    static constexpr ScalarNumber gamma = ScalarNumber(7. / 5.);
-
-    /**
-     * Covolume \f$b\f$.
-     * @ingroup CompileTimeOptions
-     */
-    static constexpr ScalarNumber b = ScalarNumber(0.);
-    static_assert(b == 0., "If you change this value, implement the rest...");
-
-    //@}
-    /**
-     * @name Compile-time constant derived quantities
-     */
-    //@{
-
-    /**
-     * \f[
-     *   \frac{1}{\gamma}
-     * \f]
-     */
-    static constexpr ScalarNumber gamma_inverse = //
-        ScalarNumber(1.) / gamma;
-
-    /**
-     * \f[
-     *   \frac{1}{\gamma - 1}
-     * \f]
-     */
-    static constexpr ScalarNumber gamma_minus_one_inverse =
-        ScalarNumber(1.) / (gamma - ScalarNumber(1.));
-
-    /**
-     * \f[
-     *   \frac{1}{\gamma + 1}
-     * \f]
-     */
-    static constexpr ScalarNumber gamma_plus_one_inverse =
-        ScalarNumber(1.) / (gamma + ScalarNumber(1.));
-
-    /**
-     * \f[
-     *   \frac{\gamma - 1}{\gamma + 1}
-     * \f]
-     */
-    static constexpr ScalarNumber gamma_minus_one_over_gamma_plus_one =
-        (gamma - ScalarNumber(1.)) / (gamma + ScalarNumber(1.));
-
-    //@}
     /**
      * @name Computing derived physical quantities.
      */
@@ -133,17 +78,18 @@ namespace ryujin
      * For a given (2+dim dimensional) state vector <code>U</code>, return
      * the momentum vector <code>[U[1], ..., U[1+dim]]</code>.
      */
-    template <typename Number2>
-    static dealii::Tensor<1, dim, Number2>
-    momentum(const rank1_type<Number2> &U);
+    template <int problem_dim, typename Number>
+    static dealii::Tensor<1, problem_dim - 2, Number>
+    momentum(const dealii::Tensor<1, problem_dim, Number> &U);
 
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
      * and return the internal energy \f$\varepsilon = (\rho e)\f$.
      */
-    template <typename Number2>
-    static Number2 internal_energy(const rank1_type<Number2> &U);
+    template <int problem_dim, typename Number>
+    static Number
+    internal_energy(const dealii::Tensor<1, problem_dim, Number> &U);
 
 
     /**
@@ -151,9 +97,9 @@ namespace ryujin
      * and return the derivative of the internal energy
      * \f$\varepsilon = (\rho e)\f$.
      */
-    template <typename Number2>
-    static rank1_type<Number2>
-    internal_energy_derivative(const rank1_type<Number2> &U);
+    template <int problem_dim, typename Number>
+    static dealii::Tensor<1, problem_dim, Number>
+    internal_energy_derivative(const dealii::Tensor<1, problem_dim, Number> &U);
 
 
     /**
@@ -166,8 +112,8 @@ namespace ryujin
      *   p = \frac{\gamma - 1}{1 - b*\rho}\; (\rho e)
      * \f]
      */
-    template <typename Number2>
-    static Number2 pressure(const rank1_type<Number2> &U);
+    template <int problem_dim, typename Number>
+    Number pressure(const dealii::Tensor<1, problem_dim, Number> &U) const;
 
 
     /**
@@ -177,8 +123,9 @@ namespace ryujin
      *   c^2 = \frac{\gamma * p}{\rho\;(1 - b * \rho)}
      * \f]
      */
-    template <typename Number2>
-    static Number2 speed_of_sound(const rank1_type<Number2> &U);
+    template <int problem_dim, typename Number>
+    Number
+    speed_of_sound(const dealii::Tensor<1, problem_dim, Number> &U) const;
 
 
     /**
@@ -188,8 +135,9 @@ namespace ryujin
      *   e^{(\gamma-1)s} = \frac{\rho\,e}{\rho^\gamma}.
      * \f]
      */
-    template <typename Number2>
-    static Number2 specific_entropy(const rank1_type<Number2> &U);
+    template <int problem_dim, typename Number>
+    Number
+    specific_entropy(const dealii::Tensor<1, problem_dim, Number> &U) const;
 
 
     /**
@@ -199,8 +147,9 @@ namespace ryujin
      *   \eta = (\rho^2 e) ^ {1 / (\gamma + 1)}.
      * \f]
      */
-    template <typename Number2>
-    static Number2 harten_entropy(const rank1_type<Number2> &U);
+    template <int problem_dim, typename Number>
+    Number
+    harten_entropy(const dealii::Tensor<1, problem_dim, Number> &U) const;
 
 
     /**
@@ -210,17 +159,18 @@ namespace ryujin
      *   \eta = (\rho^2 e) ^ {1 / (\gamma + 1)}.
      * \f]
      */
-    template <typename Number2>
-    static rank1_type<Number2>
-    harten_entropy_derivative(const rank1_type<Number2> &U);
+    template <int problem_dim, typename Number>
+    dealii::Tensor<1, problem_dim, Number> harten_entropy_derivative(
+        const dealii::Tensor<1, problem_dim, Number> &U) const;
 
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
      * and return the entropy \f$\eta = p^{1/\gamma}\f$.
      */
-    template <typename Number2>
-    static Number2 mathematical_entropy(const rank1_type<Number2> U);
+    template <int problem_dim, typename Number>
+    Number
+    mathematical_entropy(const dealii::Tensor<1, problem_dim, Number> U) const;
 
 
     /**
@@ -228,9 +178,9 @@ namespace ryujin
      * and return the derivative \f$\eta'\f$ of the entropy \f$\eta =
      * p^{1/\gamma}\f$.
      */
-    template <typename Number2>
-    static rank1_type<Number2>
-    mathematical_entropy_derivative(const rank1_type<Number2> U);
+    template <int problem_dim, typename Number>
+    dealii::Tensor<1, problem_dim, Number> mathematical_entropy_derivative(
+        const dealii::Tensor<1, problem_dim, Number> U) const;
 
 
     /**
@@ -243,8 +193,9 @@ namespace ryujin
      * \end{pmatrix},
      * \f]
      */
-    template <typename Number2>
-    static rank2_type<Number2> f(const rank1_type<Number2> &U);
+    template <int problem_dim, typename Number>
+    rank2_type<problem_dim - 2, Number>
+    f(const dealii::Tensor<1, problem_dim, Number> &U) const;
 
     //@}
 
@@ -257,59 +208,69 @@ namespace ryujin
     std::string description_;
     ACCESSOR_READ_ONLY(description)
 
-    Number schnuffel_gamma_;
-    ACCESSOR_READ_ONLY(schnuffel_gamma)
+    double gamma_;
+    ACCESSOR_READ_ONLY(gamma)
 
-    Number schnuffel_b_;
-    ACCESSOR_READ_ONLY(schnuffel_b)
+    double b_;
+    ACCESSOR_READ_ONLY(b)
 
-    Number mu_;
+    double mu_;
     ACCESSOR_READ_ONLY(mu)
 
-    Number lambda_;
+    double lambda_;
     ACCESSOR_READ_ONLY(lambda)
 
-    Number cv_inverse_kappa_;
+    double cv_inverse_kappa_;
     ACCESSOR_READ_ONLY(cv_inverse_kappa)
+
+    //@}
+    /**
+     * @name Precomputed scalar quantitites
+     */
+    //@{
+    double gamma_inverse_;
+    double gamma_plus_one_inverse_;
 
     //@}
   };
 
   /* Inline definitions */
 
-  template <int dim, typename Number>
-  template <typename Number2>
-  DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, dim, Number2>
-  ProblemDescription<dim, Number>::momentum(const rank1_type<Number2> &U)
+  template <int problem_dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, problem_dim - 2, Number>
+  ProblemDescription::momentum(const dealii::Tensor<1, problem_dim, Number> &U)
   {
-    dealii::Tensor<1, dim, Number2> result;
+    constexpr int dim = problem_dim - 2;
+
+    dealii::Tensor<1, dim, Number> result;
     for (unsigned int i = 0; i < dim; ++i)
       result[i] = U[1 + i];
     return result;
   }
 
 
-  template <int dim, typename Number>
-  template <typename Number2>
-  DEAL_II_ALWAYS_INLINE inline Number2
-  ProblemDescription<dim, Number>::internal_energy(const rank1_type<Number2> &U)
+  template <int problem_dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline Number ProblemDescription::internal_energy(
+      const dealii::Tensor<1, problem_dim, Number> &U)
   {
     /*
      * rho e = (E - 1/2*m^2/rho)
      */
-    const Number2 rho_inverse = ScalarNumber(1.) / U[0];
+
+    constexpr int dim = problem_dim - 2;
+    using ScalarNumber = typename get_value_type<Number>::type;
+
+    const Number rho_inverse = ScalarNumber(1.) / U[0];
     const auto m = momentum(U);
-    const Number2 E = U[dim + 1];
+    const Number E = U[dim + 1];
     return E - ScalarNumber(0.5) * m.norm_square() * rho_inverse;
   }
 
 
-  template <int dim, typename Number>
-  template <typename Number2>
-  DEAL_II_ALWAYS_INLINE inline
-      typename ProblemDescription<dim, Number>::template rank1_type<Number2>
-      ProblemDescription<dim, Number>::internal_energy_derivative(
-          const rank1_type<Number2> &U)
+  template <int problem_dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, problem_dim, Number>
+  ProblemDescription::internal_energy_derivative(
+      const dealii::Tensor<1, problem_dim, Number> &U)
   {
     /*
      * With
@@ -318,10 +279,13 @@ namespace ryujin
      *   (rho e)' = (1/2m^2/rho^2, -m/rho , 1 )^T
      */
 
-    const Number2 rho_inverse = ScalarNumber(1.) / U[0];
+    constexpr int dim = problem_dim - 2;
+    using ScalarNumber = typename get_value_type<Number>::type;
+
+    const Number rho_inverse = ScalarNumber(1.) / U[0];
     const auto u = momentum(U) * rho_inverse;
 
-    rank1_type<Number2> result;
+    dealii::Tensor<1, problem_dim, Number> result;
 
     result[0] = ScalarNumber(0.5) * u.norm_square();
     for (unsigned int i = 0; i < dim; ++i) {
@@ -333,10 +297,9 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  template <typename Number2>
-  DEAL_II_ALWAYS_INLINE inline Number2
-  ProblemDescription<dim, Number>::pressure(const rank1_type<Number2> &U)
+  template <int problem_dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline Number ProblemDescription::pressure(
+      const dealii::Tensor<1, problem_dim, Number> &U) const
   {
     /*
      * With
@@ -348,61 +311,66 @@ namespace ryujin
      * (Here we have set b = 0)
      */
 
-    return (gamma - ScalarNumber(1.)) * internal_energy(U);
+    using ScalarNumber = typename get_value_type<Number>::type;
+    return (gamma_ - ScalarNumber(1.)) * internal_energy(U);
   }
 
 
-  template <int dim, typename Number>
-  template <typename Number2>
-  DEAL_II_ALWAYS_INLINE inline Number2
-  ProblemDescription<dim, Number>::speed_of_sound(const rank1_type<Number2> &U)
+  template <int problem_dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline Number ProblemDescription::speed_of_sound(
+      const dealii::Tensor<1, problem_dim, Number> &U) const
   {
     /* c^2 = gamma * p / rho / (1 - b * rho) */
-    const Number2 rho_inverse = ScalarNumber(1.) / U[0];
-    const Number2 p = pressure(U);
-    return std::sqrt(gamma * p * rho_inverse);
+
+    using ScalarNumber = typename get_value_type<Number>::type;
+
+    const Number rho_inverse = ScalarNumber(1.) / U[0];
+    const Number p = pressure(U);
+    return std::sqrt(gamma_ * p * rho_inverse);
   }
 
 
-  template <int dim, typename Number>
-  template <typename Number2>
-  DEAL_II_ALWAYS_INLINE inline Number2
-  ProblemDescription<dim, Number>::specific_entropy(
-      const rank1_type<Number2> &U)
+  template <int problem_dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline Number ProblemDescription::specific_entropy(
+      const dealii::Tensor<1, problem_dim, Number> &U) const
   {
     /*
      * We have
      *   exp((gamma - 1)s) = (rho e) / rho ^ gamma
      */
+
+    using ScalarNumber = typename get_value_type<Number>::type;
+
     const auto rho_inverse = ScalarNumber(1.) / U[0];
-    return internal_energy(U) * ryujin::pow(rho_inverse, gamma);
+    return internal_energy(U) * ryujin::pow(rho_inverse, gamma_);
   }
 
 
-  template <int dim, typename Number>
-  template <typename Number2>
-  DEAL_II_ALWAYS_INLINE inline Number2
-  ProblemDescription<dim, Number>::harten_entropy(const rank1_type<Number2> &U)
+  template <int problem_dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline Number ProblemDescription::harten_entropy(
+      const dealii::Tensor<1, problem_dim, Number> &U) const
   {
     /*
      * We have
      *   rho^2 e = \rho E - 1/2*m^2
      */
-    const Number2 rho = U[0];
-    const auto m = momentum(U);
-    const Number2 E = U[dim + 1];
 
-    const Number2 rho_rho_e = rho * E - ScalarNumber(0.5) * m.norm_square();
-    return ryujin::pow(rho_rho_e, gamma_plus_one_inverse);
+    constexpr int dim = problem_dim - 2;
+    using ScalarNumber = typename get_value_type<Number>::type;
+
+    const Number rho = U[0];
+    const auto m = momentum(U);
+    const Number E = U[dim + 1];
+
+    const Number rho_rho_e = rho * E - ScalarNumber(0.5) * m.norm_square();
+    return ryujin::pow(rho_rho_e, gamma_plus_one_inverse_);
   }
 
 
-  template <int dim, typename Number>
-  template <typename Number2>
-  DEAL_II_ALWAYS_INLINE inline
-      typename ProblemDescription<dim, Number>::template rank1_type<Number2>
-      ProblemDescription<dim, Number>::harten_entropy_derivative(
-          const rank1_type<Number2> &U)
+  template <int problem_dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, problem_dim, Number>
+  ProblemDescription::harten_entropy_derivative(
+      const dealii::Tensor<1, problem_dim, Number> &U) const
   {
     /*
      * With
@@ -415,16 +383,21 @@ namespace ryujin
      *
      * (Here we have set b = 0)
      */
-    const Number2 rho = U[0];
+
+    constexpr int dim = problem_dim - 2;
+    using ScalarNumber = typename get_value_type<Number>::type;
+
+    const Number rho = U[0];
     const auto m = momentum(U);
-    const Number2 E = U[dim + 1];
+    const Number E = U[dim + 1];
 
-    const Number2 rho_rho_e = rho * E - ScalarNumber(0.5) * m.norm_square();
+    const Number rho_rho_e = rho * E - ScalarNumber(0.5) * m.norm_square();
 
-    const auto factor = gamma_plus_one_inverse *
-                        ryujin::pow(rho_rho_e, -gamma * gamma_plus_one_inverse);
+    const auto factor =
+        gamma_plus_one_inverse_ *
+        ryujin::pow(rho_rho_e, -gamma_ * gamma_plus_one_inverse_);
 
-    rank1_type<Number2> result;
+    dealii::Tensor<1, problem_dim, Number> result;
 
     result[0] = factor * E;
     for (unsigned int i = 0; i < dim; ++i) {
@@ -436,23 +409,19 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  template <typename Number2>
-  DEAL_II_ALWAYS_INLINE inline Number2
-  ProblemDescription<dim, Number>::mathematical_entropy(
-      const rank1_type<Number2> U)
+  template <int problem_dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline Number ProblemDescription::mathematical_entropy(
+      const dealii::Tensor<1, problem_dim, Number> U) const
   {
     const auto p = pressure(U);
-    return ryujin::pow(p, gamma_inverse);
+    return ryujin::pow(p, gamma_inverse_);
   }
 
 
-  template <int dim, typename Number>
-  template <typename Number2>
-  DEAL_II_ALWAYS_INLINE inline
-      typename ProblemDescription<dim, Number>::template rank1_type<Number2>
-      ProblemDescription<dim, Number>::mathematical_entropy_derivative(
-          const rank1_type<Number2> U)
+  template <int problem_dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, problem_dim, Number>
+  ProblemDescription::mathematical_entropy_derivative(
+      const dealii::Tensor<1, problem_dim, Number> U) const
   {
     /*
      * With
@@ -469,15 +438,18 @@ namespace ryujin
      * (Here we have set b = 0)
      */
 
-    const Number2 &rho = U[0];
-    const Number2 rho_inverse = ScalarNumber(1.) / rho;
+    constexpr int dim = problem_dim - 2;
+    using ScalarNumber = typename get_value_type<Number>::type;
+
+    const Number &rho = U[0];
+    const Number rho_inverse = ScalarNumber(1.) / rho;
     const auto u = momentum(U) * rho_inverse;
     const auto p = pressure(U);
 
-    const auto factor = (gamma - ScalarNumber(1.0)) * gamma_inverse *
-                        ryujin::pow(p, gamma_inverse - ScalarNumber(1.));
+    const auto factor = (gamma_ - ScalarNumber(1.0)) * gamma_inverse_ *
+                        ryujin::pow(p, gamma_inverse_ - ScalarNumber(1.));
 
-    rank1_type<Number2> result;
+    dealii::Tensor<1, problem_dim, Number> result;
 
     result[0] = factor * ScalarNumber(0.5) * u.norm_square();
     result[dim + 1] = factor;
@@ -489,18 +461,20 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  template <typename Number2>
-  DEAL_II_ALWAYS_INLINE inline
-      typename ProblemDescription<dim, Number>::template rank2_type<Number2>
-      ProblemDescription<dim, Number>::f(const rank1_type<Number2> &U)
+  template <int problem_dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline ProblemDescription::rank2_type<problem_dim - 2,
+                                                              Number>
+  ProblemDescription::f(const dealii::Tensor<1, problem_dim, Number> &U) const
   {
-    const Number2 rho_inverse = ScalarNumber(1.) / U[0];
+    constexpr int dim = problem_dim - 2;
+    using ScalarNumber = typename get_value_type<Number>::type;
+
+    const Number rho_inverse = ScalarNumber(1.) / U[0];
     const auto m = momentum(U);
     const auto p = pressure(U);
-    const Number2 E = U[dim + 1];
+    const Number E = U[dim + 1];
 
-    rank2_type<Number2> result;
+    rank2_type<dim, Number> result;
 
     result[0] = m;
     for (unsigned int i = 0; i < dim; ++i) {

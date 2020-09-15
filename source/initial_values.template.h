@@ -155,7 +155,7 @@ namespace ryujin
   void InitialValues<dim, Number>::parse_parameters_callback()
   {
     static constexpr unsigned int problem_dimension =
-        ProblemDescription<dim>::problem_dimension;
+        ProblemDescription::problem_dimension<dim>;
 
     /* First, let's normalize the direction: */
 
@@ -175,7 +175,7 @@ namespace ryujin
             const auto transformed_point =
                 affine_transform(initial_direction_, initial_position_, point);
             auto state = it->compute(transformed_point, t);
-            auto M = ProblemDescription<dim, Number>::momentum(state);
+            auto M = ProblemDescription::momentum(state);
             M = affine_transform_vector(initial_direction_, M);
             for (unsigned int d = 0; d < dim; ++d)
               state[1 + d] = M[d];
@@ -226,7 +226,7 @@ namespace ryujin
     U.reinit(offline_data.vector_partitioner());
 
     constexpr auto problem_dimension =
-        ProblemDescription<dim, Number>::problem_dimension;
+        ProblemDescription::problem_dimension<dim>;
 
     using scalar_type = typename OfflineData<dim, Number>::scalar_type;
 
@@ -263,7 +263,7 @@ namespace ryujin
       if (id == Boundary::slip) {
         /* Remove normal component of velocity: */
         auto U_i = U.get_tensor(i);
-        auto m = ProblemDescription<dim, Number>::momentum(U_i);
+        auto m = ProblemDescription::momentum(U_i);
         m -= 1. * (m * normal) * normal;
         for (unsigned int k = 0; k < dim; ++k)
           U_i[k + 1] = m[k];

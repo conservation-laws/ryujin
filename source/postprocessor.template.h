@@ -178,7 +178,7 @@ namespace ryujin
           rank1_type U_j;
           for(unsigned int d = 0; d < problem_dimension; ++d)
             U_j[d] = U_copy[d].local_element(j);
-          const auto M_j = ProblemDescription<dim, Number>::momentum(U_j);
+          const auto M_j = ProblemDescription::momentum(U_j);
 
           const auto c_ij = cij_matrix.get_tensor(i, col_idx);
 
@@ -332,7 +332,7 @@ namespace ryujin
 
       for (unsigned int i = 0; i < problem_dimension; ++i)
         data_out->add_data_vector(
-            U_copy[i], ProblemDescription<dim, Number>::component_names[i]);
+            U_copy[i], ProblemDescription::component_names<dim>[i]);
       for (unsigned int i = 0; i < n_quantities; ++i)
         data_out->add_data_vector(quantities_[i], component_names[i]);
 
@@ -348,7 +348,7 @@ namespace ryujin
 
       for (unsigned int i = 0; i < problem_dimension; ++i)
         data_out_cutplanes->add_data_vector(
-            U_copy[i], ProblemDescription<dim, Number>::component_names[i]);
+            U_copy[i], ProblemDescription::component_names<dim>[i]);
       for (unsigned int i = 0; i < n_quantities; ++i)
         data_out_cutplanes->add_data_vector(quantities_[i], component_names[i]);
 

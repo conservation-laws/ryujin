@@ -76,20 +76,18 @@ namespace ryujin
      * @copydoc ProblemDescription::problem_dimension
      */
     // clang-format off
-    static constexpr unsigned int problem_dimension = ProblemDescription<dim>::problem_dimension;
+    static constexpr unsigned int problem_dimension = ProblemDescription::problem_dimension<dim>;
     // clang-format on
 
     /**
      * @copydoc ProblemDescription::rank1_type
      */
-    using rank1_type =
-        typename ProblemDescription<dim>::template rank1_type<Number>;
+    using rank1_type = ProblemDescription::rank1_type<dim, Number>;
 
     /**
      * @copydoc ProblemDescription::rank2_type
      */
-    using rank2_type =
-        typename ProblemDescription<dim>::template rank2_type<Number>;
+    using rank2_type = ProblemDescription::rank2_type<dim, Number>;
 
     /**
      * @copydoc ProblemDescription::ScalarNumber
@@ -207,7 +205,7 @@ namespace ryujin
     /**
      * Constructor taking a ProblemDescription instance as argument
      */
-    Indicator(const ProblemDescription<dim, ScalarNumber> &problem_description)
+    Indicator(const ProblemDescription &problem_description)
         : problem_description(problem_description)
     {
     }
@@ -245,7 +243,7 @@ namespace ryujin
      */
     //@{
 
-    const ProblemDescription<dim, ScalarNumber> &problem_description;
+    const ProblemDescription &problem_description;
 
     Number rho_i = 0.;         // also used for second variations
     Number rho_i_inverse = 0.; // also used for second variations
