@@ -63,34 +63,6 @@ namespace ryujin
      */
     static constexpr unsigned int newton_max_iter_ = RIEMANN_NEWTON_MAX_ITER;
 
-    /**
-     * Try to improve the maximal wavespeed estimate. When enabled the
-     * RiemannSolver also computes
-     *  - appropriate bounds on density and specific entropy
-     *  - average and flux of the state and a Harten entropy
-     *  - does a full limiter pass against the inviscid Galerkin update
-     * @ingroup CompileTimeOptions
-     */
-    static constexpr bool greedy_dij_ = RIEMANN_GREEDY_DIJ;
-
-    /**
-     * The above computation is obviously very expensive (similarly in cost
-     * to almost a complete high-order limiter pass). Therefore, we use a
-     * threshold for the greedy d_ij computation. If the variance in
-     * density rho between two states is less than
-     *   (1 - greedy_threshold_)/100 %
-     * we simply don't do anything.
-     * @ingroup CompileTimeOptions
-     */
-    static constexpr ScalarNumber greedy_threshold_ = ScalarNumber(RIEMANN_GREEDY_THRESHOLD);
-
-    /**
-     * Relax computed bounds similarly to the mesh-dependent relaxation
-     * performed in the Limiter.
-     * @ingroup CompileTimeOptions
-     */
-    static constexpr bool greedy_relax_bounds_ = RIEMANN_GREEDY_RELAX_BOUNDS;
-
     //@}
     /**
      * @name Compute wavespeed estimates
@@ -105,7 +77,7 @@ namespace ryujin
     static std::tuple<Number /*lambda_max*/,
                       Number /*p_star*/,
                       unsigned int /*iteration*/>
-    compute(const ProblemDescription<dim, Number> &problem_description,
+    compute(const ProblemDescription<dim, ScalarNumber> &problem_description,
             const std::array<Number, 4> &riemann_data_i,
             const std::array<Number, 4> &riemann_data_j);
 
@@ -119,11 +91,10 @@ namespace ryujin
     static std::tuple<Number /*lambda_max*/,
                       Number /*p_star*/,
                       unsigned int /*iteration*/>
-    compute(const ProblemDescription<dim, Number> &problem_description,
+    compute(const ProblemDescription<dim, ScalarNumber> &problem_description,
             const rank1_type &U_i,
             const rank1_type &U_j,
-            const dealii::Tensor<1, dim, Number> &n_ij,
-            const Number hd_i = Number(0.));
+            const dealii::Tensor<1, dim, Number> &n_ij);
 
     //@}
   };

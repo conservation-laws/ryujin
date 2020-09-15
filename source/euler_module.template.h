@@ -265,7 +265,7 @@ namespace ryujin
 
           const auto [lambda_max, p_star, n_iterations] =
               RiemannSolver<dim, Number>::compute(
-                  *problem_description_, U_i, U_j, n_ij, hd_i);
+                  *problem_description_, U_i, U_j, n_ij);
 
           Number d = norm * lambda_max;
 
@@ -282,7 +282,7 @@ namespace ryujin
 
             auto [lambda_max_2, p_star_2, n_iterations_2] =
                 RiemannSolver<dim, Number>::compute(
-                    *problem_description_, U_j, U_i, n_ji, hd_i);
+                    *problem_description_, U_j, U_i, n_ji);
             d = std::max(d, norm_2 * lambda_max_2);
           }
 
@@ -342,7 +342,7 @@ namespace ryujin
 
           const auto [lambda_max, p_star, n_iterations] =
               RiemannSolver<dim, VA>::compute(
-                  *problem_description_, U_i, U_j, n_ij, hd_i);
+                  *problem_description_, U_i, U_j, n_ij);
 
           const auto d = norm * lambda_max;
 

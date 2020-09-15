@@ -387,6 +387,7 @@ namespace ryujin
   DEAL_II_ALWAYS_INLINE inline
 #endif
   std::tuple<Number, Number, unsigned int> RiemannSolver<dim, Number>::compute(
+      const ProblemDescription<dim, ScalarNumber> &problem_description,
       const std::array<Number, 4> &riemann_data_i,
       const std::array<Number, 4> &riemann_data_j)
   {
@@ -496,13 +497,6 @@ namespace ryujin
       }
     }
 
-    if constexpr (greedy_dij_) {
-      /* FIXME: Abuse the interface and return p_1, p_2 instead of
-       * lambda_max, p_2 for the greedy_dij code path */
-      return {p_1, p_2, i};
-
-    } else {
-
 #ifdef CHECK_BOUNDS
       const auto phi_p_star = phi(riemann_data_i, riemann_data_j, p_2);
       AssertThrowSIMD(
@@ -512,148 +506,10 @@ namespace ryujin
 #endif
 
       return {lambda_max, p_2, i};
-    }
   }
-
 
   namespace
   {
-    /**
-     * For two given 1D primitive states riemann_data_i and riemann_data_j,
-     * and left and right estimates p_1 < p_star < p_2
-     * compute bounds = {rho_min, rho_max, s_min, salpha_avg, salpha_flux}
-     * that are needed in the limiter for the "greedy d_ij" computation.
-     */
-    template <typename Number>
-    DEAL_II_ALWAYS_INLINE inline std::array<Number, 5>
-    compute_bounds(const std::array<Number, 4> &riemann_data_i,
-                   const std::array<Number, 4> &riemann_data_j,
-                   const Number &p_1,
-                   const Number &p_2)
-    {
-      /*
-       * Step 3: In case of the greedy lambda_max computation we have to
-       * compute bounds on the density for the limiting process:
-       */
-
-      const Number p_min = std::min(riemann_data_i[2], riemann_data_j[2]);
-      const Number p_max = std::max(riemann_data_i[2], riemann_data_j[2]);
-
-      /* Get the density of the corresponding min and max states: */
-
-      const auto rho_p_min =
-          dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-              riemann_data_i[2],
-              riemann_data_j[2],
-              riemann_data_i[0],
-              riemann_data_j[0]);
-
-      const auto rho_p_max =
-          dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-              riemann_data_i[2],
-              riemann_data_j[2],
-              riemann_data_j[0],
-              riemann_data_i[0]);
-
-      const auto [rho_p_min_shk, rho_p_max_shk, rho_p_min_exp, rho_p_max_exp] =
-          shock_and_expansion_density(
-              p_min, p_max, rho_p_min, rho_p_max, p_1, p_2);
-
-      /*
-       * We have the following cases:
-       *
-       *  - phi(p_min) >= 0 : two expansion waves with
-       *
-       *      p_1 <= p* <= p_2 <= p_min <= p_max  (and p_2 == p_star_tilde)
-       *
-       *    thus, select [p_2, p_max] as limiter bounds and update
-       *
-       *      rho_min  =  min(rho_exp_min, rho_exp_max)
-       *
-       *  - phi(p_min) < 0 and phi(p_max) >= 0 : shock and expansion with
-       *
-       *      p_min <= p_1 <= p* <= p_2 <= min(p_max, p_star_tilde)
-       *
-       *    thus, select [p_min, p_max] as limiter bounds and update
-       *
-       *      rho_min  =  min(rho_min, rho_exp_max)
-       *      rho_max  =  max(rho_shk_min, rho_max)
-       *
-       *  - phi(p_min) < 0 and phi(p_max) < 0 : two shocks with
-       *
-       *      p_min <= p_max <= p_1 <= p* <= p_2 <= p_star_tilde
-       *
-       *    thus, select [p_min, p_1] as limiter bounds and update
-       *
-       *      rho_max  =  max(rho_shk_min, rho_shk_max)
-       *
-       * In summary, we do the following:
-       */
-
-      auto rho_min = std::min(rho_p_min, rho_p_max);
-      auto rho_max = std::max(rho_p_min, rho_p_max);
-
-      rho_min = std::min(rho_min, std::min(rho_p_min_exp, rho_p_max_exp));
-      rho_max = std::max(rho_max, std::max(rho_p_min_shk, rho_p_max_shk));
-
-      /*
-       * And finally we compute s_min of both states.
-       *
-       * Normally, we would just call ProblemDescription::specific_entropy,
-       * however, given the fact that we only have primitive variables
-       * available, we do a little dance here and avoid recomputing
-       * quantitites:
-       *
-       * The specific entropy is
-       *
-       *   s = p * 1/(gamma - 1) * rho ^ (- gamma)
-       *
-       * We also need entropy bounds (for both states) for enforcing an
-       * entropy inequality. We use a Harten-type entropy (with alpha = 1) of
-       * the form:
-       *
-       *   salpha  = (rho^2 e) ^ (1 / (gamma + 1))
-       *
-       * In primitive variables this translates to
-       *
-       *   salpha =  (p * 1/(gamma - 1) * rho) ^ (1 / (gamma + 1))
-       */
-
-      static_assert(ProblemDescription<1, Number>::b == 0.,
-                    "If you change this value, implement the rest...");
-
-      const auto &[rho_i, u_i, p_i, a_i] = riemann_data_i;
-      const auto &[rho_j, u_j, p_j, a_j] = riemann_data_j;
-
-      constexpr auto gamma = ProblemDescription<1, Number>::gamma;
-      constexpr auto gamma_minus_one_inverse =
-          ProblemDescription<1, Number>::gamma_minus_one_inverse;
-      constexpr auto gamma_plus_one_inverse =
-          ProblemDescription<1, Number>::gamma_plus_one_inverse;
-
-      const auto rho_e_i = p_i * gamma_minus_one_inverse;
-      const auto s_i = rho_e_i * ryujin::pow(rho_i, -gamma);
-      const auto salpha_i =
-          ryujin::pow(rho_e_i * rho_i, gamma_plus_one_inverse);
-
-      const auto rho_e_j = p_j * gamma_minus_one_inverse;
-      const auto s_j = rho_e_j * ryujin::pow(rho_j, -gamma);
-      const auto salpha_j =
-          ryujin::pow(rho_e_j * rho_j, gamma_plus_one_inverse);
-
-      const auto s_min = std::min(s_i, s_j);
-
-      using ScalarNumber = typename get_value_type<Number>::type;
-
-      /* average of entropy: */
-      const auto a = ScalarNumber(0.5) * (salpha_i + salpha_j);
-      /* flux of entropy: */
-      const auto b = ScalarNumber(0.5) * (u_i * salpha_i - u_j * salpha_j);
-
-      return {{rho_min, rho_max, s_min, a, b}};
-    }
-
-
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, and a
      * (normalized) "direction" n_ij, first compute the corresponding
@@ -661,9 +517,9 @@ namespace ryujin
      * compute and return the Riemann data [rho, u, p, a] (used in the
      * approximative Riemann solver).
      */
-    template <int dim, typename Number>
+    template <int dim, typename Number, typename Number2>
     DEAL_II_ALWAYS_INLINE inline std::array<Number, 4> riemann_data_from_state(
-        const ProblemDescription<dim, Number> &problem_description,
+        const ProblemDescription<dim, Number2> &problem_description,
         const typename ProblemDescription<dim>::template rank1_type<Number> &U,
         const dealii::Tensor<1, dim, Number> &n_ij)
     {
@@ -691,93 +547,17 @@ namespace ryujin
 #endif
       std::tuple<Number, Number, unsigned int>
       RiemannSolver<dim, Number>::compute(
-          const ProblemDescription<dim, Number> &problem_description,
+          const ProblemDescription<dim, ScalarNumber> &problem_description,
           const rank1_type &U_i,
           const rank1_type &U_j,
-          const dealii::Tensor<1, dim, Number> &n_ij,
-          const Number hd_i)
+          const dealii::Tensor<1, dim, Number> &n_ij)
   {
     const auto riemann_data_i =
         riemann_data_from_state(problem_description, U_i, n_ij);
     const auto riemann_data_j =
         riemann_data_from_state(problem_description, U_j, n_ij);
 
-    if constexpr (!greedy_dij_) {
-      return compute(riemann_data_i, riemann_data_j);
-    }
-
-    const auto &[p_1, p_2, i] = compute(riemann_data_i, riemann_data_j);
-    const auto lambda_max = compute_lambda(riemann_data_i, riemann_data_j, p_2);
-
-    /*
-     * If we are greedy, ensure that all the work we are about to do is
-     * actually beneficial. We do this by checking whether we have a
-     * contrast of more than greedy_threshold_ in the density. If not, cut
-     * it short:
-     */
-
-    const Number rho_min = std::min(riemann_data_i[0], riemann_data_j[0]);
-    const Number rho_max = std::max(riemann_data_i[0], riemann_data_j[0]);
-
-    constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
-    if (std::max(Number(0.), rho_max * greedy_threshold_ - rho_min + eps) ==
-        Number(0.)) {
-      return {lambda_max, p_2, i};
-    }
-
-    /*
-     * So, we are indeed greedy... Lets' try to minimize lambda_max as much
-     * as possible. We do this by simply limiting a bar state against an
-     * (almost) inviscid update:
-     */
-
-    /* bar state: U = 0.5 * (U_i + U_j) */
-    const auto U = ScalarNumber(0.5) * (U_i + U_j);
-
-    /* P = - 0.5 * (f_j - f_i) * n_ij */
-
-    const auto f_i = problem_description.f(U_i);
-    const auto f_j = problem_description.f(U_j);
-
-    dealii::Tensor<1, problem_dimension, Number> P;
-    for (unsigned int k = 0; k < problem_dimension; ++k)
-      P[k] = ScalarNumber(0.5) * (f_i[k] - f_j[k]) * n_ij;
-
-    auto bounds = compute_bounds(riemann_data_i, riemann_data_j, p_1, p_2);
-
-    (void)hd_i;
-    if constexpr (greedy_relax_bounds_) {
-      /*
-       * Relax entropy bounds a tiny bit: Note, we use a much smaller
-       * window r_i = h_i ^ (3/2) than is done for the second order
-       * limiting.
-       */
-      const Number factor = Number(1.) - hd_i;
-      std::get<2>(bounds) *= factor;
-      std::get<3>(bounds) *= factor;
-      std::get<4>(bounds) *= factor;
-    }
-
-    constexpr auto limiter = Limiter<dim, Number>::Limiters::entropy_inequality;
-    const auto lambda_greedy_inverse =
-        Limiter<dim, Number>::template limit<limiter>(
-            problem_description,
-            bounds,
-            U,
-            P,
-            ScalarNumber(1.) / lambda_max,
-            ScalarNumber(1000.) / lambda_max);
-
-    const auto lambda_greedy = ScalarNumber(1.) / lambda_greedy_inverse;
-
-#ifdef CHECK_BOUNDS
-    AssertThrowSIMD(
-        lambda_max - lambda_greedy,
-        [](auto val) { return val > -100. * newton_eps<ScalarNumber>; },
-        dealii::ExcMessage("Garbled up lambda_greedy."));
-#endif
-
-    return {std::min(lambda_greedy, lambda_max), p_2, i};
+    return compute(problem_description, riemann_data_i, riemann_data_j);
   }
 
 } /* namespace ryujin */

@@ -585,15 +585,6 @@ namespace ryujin
     stream << "RiemannSolver<dim, Number>::newton_max_iter_ == "
             <<  RiemannSolver<dim, Number>::newton_max_iter_ << std::endl;
 
-    stream << "RiemannSolver<dim, Number>::greedy_dij_ == "
-            <<  RiemannSolver<dim, Number>::greedy_dij_ << std::endl;
-
-    stream << "RiemannSolver<dim, Number>::greedy_threshold_ == "
-            <<  RiemannSolver<dim, Number>::greedy_threshold_ << std::endl;
-
-    stream << "RiemannSolver<dim, Number>::greedy_relax_bounds_ == "
-            <<  RiemannSolver<dim, Number>::greedy_relax_bounds_ << std::endl;
-
     /* clang-format on */
 
     stream << std::endl;
