@@ -663,10 +663,11 @@ namespace ryujin
      */
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline std::array<Number, 4> riemann_data_from_state(
+        const ProblemDescription<dim, Number> &problem_description,
         const typename ProblemDescription<dim>::template rank1_type<Number> &U,
         const dealii::Tensor<1, dim, Number> &n_ij)
     {
-      const auto m = ProblemDescription<dim, Number>::momentum(U);
+      const auto m = problem_description.momentum(U);
       const auto projected_momentum = n_ij * m;
       const auto perp = m - projected_momentum * n_ij;
 
@@ -690,13 +691,16 @@ namespace ryujin
 #endif
       std::tuple<Number, Number, unsigned int>
       RiemannSolver<dim, Number>::compute(
+          const ProblemDescription<dim, Number> &problem_description,
           const rank1_type &U_i,
           const rank1_type &U_j,
           const dealii::Tensor<1, dim, Number> &n_ij,
           const Number hd_i)
   {
-    const auto riemann_data_i = riemann_data_from_state(U_i, n_ij);
-    const auto riemann_data_j = riemann_data_from_state(U_j, n_ij);
+    const auto riemann_data_i =
+        riemann_data_from_state(problem_description, U_i, n_ij);
+    const auto riemann_data_j =
+        riemann_data_from_state(problem_description, U_j, n_ij);
 
     if constexpr (!greedy_dij_) {
       return compute(riemann_data_i, riemann_data_j);
@@ -732,8 +736,8 @@ namespace ryujin
 
     /* P = - 0.5 * (f_j - f_i) * n_ij */
 
-    const auto f_i = ProblemDescription<dim, Number>::f(U_i);
-    const auto f_j = ProblemDescription<dim, Number>::f(U_j);
+    const auto f_i = problem_description.f(U_i);
+    const auto f_j = problem_description.f(U_j);
 
     dealii::Tensor<1, problem_dimension, Number> P;
     for (unsigned int k = 0; k < problem_dimension; ++k)
@@ -757,6 +761,7 @@ namespace ryujin
     constexpr auto limiter = Limiter<dim, Number>::Limiters::entropy_inequality;
     const auto lambda_greedy_inverse =
         Limiter<dim, Number>::template limit<limiter>(
+            problem_description,
             bounds,
             U,
             P,

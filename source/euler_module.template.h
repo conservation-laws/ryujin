@@ -225,7 +225,7 @@ namespace ryujin
       LIKWID_MARKER_START("time_step_1");
 
       /* Stored thread locally: */
-      Indicator<dim, Number> indicator_serial;
+      Indicator<dim, Number> indicator_serial(*problem_description_);
 
       /* Parallel non-vectorized loop: */
       RYUJIN_OMP_FOR_NOWAIT
@@ -264,7 +264,8 @@ namespace ryujin
           const auto n_ij = c_ij / norm;
 
           const auto [lambda_max, p_star, n_iterations] =
-              RiemannSolver<dim, Number>::compute(U_i, U_j, n_ij, hd_i);
+              RiemannSolver<dim, Number>::compute(
+                  *problem_description_, U_i, U_j, n_ij, hd_i);
 
           Number d = norm * lambda_max;
 
@@ -280,7 +281,8 @@ namespace ryujin
             const auto n_ji = c_ji / norm_2;
 
             auto [lambda_max_2, p_star_2, n_iterations_2] =
-                RiemannSolver<dim, Number>::compute(U_j, U_i, n_ji, hd_i);
+                RiemannSolver<dim, Number>::compute(
+                    *problem_description_, U_j, U_i, n_ji, hd_i);
             d = std::max(d, norm_2 * lambda_max_2);
           }
 
@@ -293,7 +295,7 @@ namespace ryujin
       } /* parallel non-vectorized loop */
 
       /* Stored thread locally: */
-      Indicator<dim, VA> indicator_simd;
+      Indicator<dim, VA> indicator_simd(*problem_description_);
       bool thread_ready = false;
 
       /* Parallel SIMD loop: */
@@ -339,7 +341,8 @@ namespace ryujin
           const auto n_ij = c_ij / norm;
 
           const auto [lambda_max, p_star, n_iterations] =
-              RiemannSolver<dim, VA>::compute(U_i, U_j, n_ij, hd_i);
+              RiemannSolver<dim, VA>::compute(
+                  *problem_description_, U_i, U_j, n_ij, hd_i);
 
           const auto d = norm * lambda_max;
 
@@ -471,7 +474,7 @@ namespace ryujin
       LIKWID_MARKER_START("time_step_3");
 
       /* Nota bene: This bounds variable is thread local: */
-      Limiter<dim, Number> limiter_serial;
+      Limiter<dim, Number> limiter_serial(*problem_description_);
 
       /* Parallel non-vectorized loop: */
       RYUJIN_OMP_FOR_NOWAIT
@@ -577,7 +580,7 @@ namespace ryujin
       } /* parallel non-vectorized loop */
 
       /* Nota bene: This bounds variable is thread local: */
-      Limiter<dim, VA> limiter_simd;
+      Limiter<dim, VA> limiter_simd(*problem_description_);
       bool thread_ready = false;
 
       /* Parallel SIMD loop: */
@@ -736,7 +739,8 @@ namespace ryujin
               ((d_ijH - d_ij) * (U_j - U_i) + b_ij * r_j - b_ji * r_i);
           pij_matrix_.write_tensor(p_ij, i, col_idx);
 
-          const auto l_ij = Limiter<dim, Number>::limit(bounds, U_i_new, p_ij);
+          const auto l_ij = Limiter<dim, Number>::limit(
+              *problem_description_, bounds, U_i_new, p_ij);
           lij_matrix_.write_entry(l_ij, i, col_idx);
         }
       } /* parallel non-vectorized loop */
@@ -792,7 +796,8 @@ namespace ryujin
               ((d_ijH - d_ij) * (U_j - U_i) + b_ij * r_j - b_ji * r_i);
           pij_matrix_.write_vectorized_tensor(p_ij, i, col_idx, true);
 
-          const auto l_ij = Limiter<dim, VA>::limit(bounds, U_i_new, p_ij);
+          const auto l_ij = Limiter<dim, VA>::limit(
+              *problem_description_, bounds, U_i_new, p_ij);
 
           lij_matrix_.write_vectorized_entry(l_ij, i, col_idx, true);
         }
@@ -926,8 +931,8 @@ namespace ryujin
             const auto new_p_ij =
                 (Number(1.) - old_l_ij) * pij_matrix_.get_tensor(i, col_idx);
 
-            const auto new_l_ij =
-                Limiter<dim, Number>::limit(bounds, U_i_new, new_p_ij);
+            const auto new_l_ij = Limiter<dim, Number>::limit(
+                *problem_description_, bounds, U_i_new, new_p_ij);
 
             /*
              * FIXME: If this if statement causes too much of a performance
@@ -1018,8 +1023,8 @@ namespace ryujin
             const auto new_p_ij = (VA(1.) - old_l_ij) *
                                   pij_matrix_.get_vectorized_tensor(i, col_idx);
 
-            const auto new_l_ij =
-                Limiter<dim, VA>::limit(bounds, U_i_new, new_p_ij);
+            const auto new_l_ij = Limiter<dim, VA>::limit(
+                *problem_description_, bounds, U_i_new, new_p_ij);
 
             /*
              * FIXME: If this if statement causes too much of a performance

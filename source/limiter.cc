@@ -14,6 +14,7 @@ namespace ryujin
 #ifndef OBSESSIVE_INLINING
   template NUMBER
   Limiter<DIM, NUMBER>::limit<Limiter<DIM, NUMBER>::Limiters::specific_entropy>(
+      const ProblemDescription<DIM, NUMBER> &,
       const std::array<NUMBER, 3> &,
       const rank1_type &,
       const rank1_type &,
@@ -22,6 +23,7 @@ namespace ryujin
 
   template VectorizedArray<NUMBER> Limiter<DIM, VectorizedArray<NUMBER>>::limit<
       Limiter<DIM, VectorizedArray<NUMBER>>::Limiters::specific_entropy>(
+      const ProblemDescription<DIM, NUMBER> &,
       const std::array<VectorizedArray<NUMBER>, 3> &,
       const rank1_type &,
       const rank1_type &,
@@ -30,6 +32,7 @@ namespace ryujin
 
   template NUMBER Limiter<DIM, NUMBER>::limit<
       Limiter<DIM, NUMBER>::Limiters::entropy_inequality>(
+      const ProblemDescription<DIM, NUMBER> &,
       const std::array<NUMBER, 5> &,
       const rank1_type &,
       const rank1_type &,
@@ -38,6 +41,7 @@ namespace ryujin
 
   template VectorizedArray<NUMBER> Limiter<DIM, VectorizedArray<NUMBER>>::limit<
       Limiter<DIM, VectorizedArray<NUMBER>>::Limiters::entropy_inequality>(
+      const ProblemDescription<DIM, NUMBER> &,
       const std::array<VectorizedArray<NUMBER>, 5> &,
       const rank1_type &,
       const rank1_type &,

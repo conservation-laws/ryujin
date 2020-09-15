@@ -205,6 +205,14 @@ namespace ryujin
     //@{
 
     /**
+     * Constructor taking a ProblemDescription instance as argument
+     */
+    Indicator(const ProblemDescription<dim, ScalarNumber> &problem_description)
+        : problem_description(problem_description)
+    {
+    }
+
+    /**
      * Reset temporary storage and initialize for a new row corresponding
      * to state vector U_i.
      */
@@ -237,6 +245,8 @@ namespace ryujin
      */
     //@{
 
+    const ProblemDescription<dim, ScalarNumber> &problem_description;
+
     Number rho_i = 0.;         // also used for second variations
     Number rho_i_inverse = 0.; // also used for second variations
     Number eta_i = 0.;
@@ -262,27 +272,6 @@ namespace ryujin
     //@}
   };
 
-#ifndef DOXYGEN
-  namespace
-  {
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    smoothness_indicator(const typename Indicator<dim, Number>::rank1_type &U)
-    {
-      switch (Indicator<dim, Number>::smoothness_indicator_) {
-      case Indicator<dim, Number>::SmoothnessIndicators::rho:
-        return U[0];
-
-      case Indicator<dim, Number>::SmoothnessIndicators::internal_energy:
-        return ProblemDescription<dim, Number>::internal_energy(U);
-
-      case Indicator<dim, Number>::SmoothnessIndicators::pressure:
-        return ProblemDescription<dim, Number>::pressure(U);
-      }
-    }
-  } // namespace
-#endif
-
 
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline void Indicator<dim, Number>::reset(
@@ -292,13 +281,11 @@ namespace ryujin
       rho_i = U_i[0];
       rho_i_inverse = Number(1.) / rho_i;
       eta_i = entropy;
-      f_i = ProblemDescription<dim, Number>::f(U_i);
+      f_i = problem_description.f(U_i);
 
-      d_eta_i =
-          evc_entropy_ == Entropy::mathematical
-              ? ProblemDescription<dim,
-                                   Number>::mathematical_entropy_derivative(U_i)
-              : ProblemDescription<dim, Number>::harten_entropy_derivative(U_i);
+      d_eta_i = evc_entropy_ == Entropy::mathematical
+                    ? problem_description.mathematical_entropy_derivative(U_i)
+                    : problem_description.harten_entropy_derivative(U_i);
       d_eta_i[0] -= eta_i * rho_i_inverse;
 
       left = 0.;
@@ -309,8 +296,14 @@ namespace ryujin
       numerator = 0.;
       denominator = 0.;
       denominator_abs = 0.;
-
-      indicator_i = smoothness_indicator<dim, Number>(U_i);
+      switch (Indicator<dim, Number>::smoothness_indicator_) {
+      case Indicator<dim, Number>::SmoothnessIndicators::rho:
+        indicator_i = U_i[0];
+      case Indicator<dim, Number>::SmoothnessIndicators::internal_energy:
+        indicator_i = problem_description.internal_energy(U_i);
+      case Indicator<dim, Number>::SmoothnessIndicators::pressure:
+        indicator_i = problem_description.pressure(U_i);
+      }
     }
 
     if constexpr (compute_second_variations_) {
@@ -331,8 +324,8 @@ namespace ryujin
     if constexpr (indicator_ == Indicators::entropy_viscosity_commutator) {
       const auto &rho_j = U_j[0];
       const auto rho_j_inverse = Number(1.) / rho_j;
-      const auto m_j = ProblemDescription<dim, Number>::momentum(U_j);
-      const auto f_j = ProblemDescription<dim, Number>::f(U_j);
+      const auto m_j = problem_description.momentum(U_j);
+      const auto f_j = problem_description.f(U_j);
       const auto eta_j = entropy_j;
 
       left += (eta_j * rho_j_inverse - eta_i * rho_i_inverse) * (m_j * c_ij);
@@ -341,7 +334,15 @@ namespace ryujin
     }
 
     if constexpr (indicator_ == Indicators::smoothness_indicator) {
-      const auto indicator_j = smoothness_indicator<dim, Number>(U_j);
+      Number indicator_j;
+      switch (Indicator<dim, Number>::smoothness_indicator_) {
+      case Indicator<dim, Number>::SmoothnessIndicators::rho:
+        indicator_j = U_j[0];
+      case Indicator<dim, Number>::SmoothnessIndicators::internal_energy:
+        indicator_j = problem_description.internal_energy(U_j);
+      case Indicator<dim, Number>::SmoothnessIndicators::pressure:
+        indicator_j = problem_description.pressure(U_j);
+      }
 
       numerator += beta_ij * (indicator_i - indicator_j);
       denominator += std::abs(beta_ij) * std::abs(indicator_i - indicator_j);

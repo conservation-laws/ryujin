@@ -157,6 +157,14 @@ namespace ryujin
     using Bounds = std::array<Number, n_bounds>;
 
     /**
+     * Constructor taking a ProblemDescription instance as argument
+     */
+    Limiter(const ProblemDescription<dim, ScalarNumber> &problem_description)
+        : problem_description(problem_description)
+    {
+    }
+
+    /**
      * Reset temporary storage and reinitialize variations for new index i.
      */
     void reset(const Number variations_i);
@@ -195,16 +203,20 @@ namespace ryujin
      * selected local minimum principles are obeyed.
      */
     template <Limiters limiter = limiter_, typename BOUNDS>
-    static Number limit(const BOUNDS &bounds,
-                        const rank1_type &U,
-                        const rank1_type &P,
-                        const Number t_min = Number(0.),
-                        const Number t_max = Number(1.));
+    static Number
+    limit(const ProblemDescription<dim, ScalarNumber> &problem_description,
+          const BOUNDS &bounds,
+          const rank1_type &U,
+          const rank1_type &P,
+          const Number t_min = Number(0.),
+          const Number t_max = Number(1.));
     //*}
 
   private:
     /** @name */
     //@{
+
+    const ProblemDescription<dim, ScalarNumber> &problem_description;
 
     Bounds bounds_;
 
@@ -283,9 +295,8 @@ namespace ryujin
       s_min = std::min(s_min, entropy_j);
 
       if (!is_diagonal_entry) {
-        const Number s_interp =
-            ProblemDescription<dim, Number>::specific_entropy((U_i + U_j) *
-                                                              ScalarNumber(.5));
+        const Number s_interp = problem_description.specific_entropy(
+            (U_i + U_j) * ScalarNumber(.5));
         s_interp_max = std::max(s_interp_max, s_interp);
       }
     }
