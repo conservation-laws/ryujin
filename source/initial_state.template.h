@@ -27,6 +27,7 @@ namespace
 
     state[0] = rho;
     state[1] = rho * u;
+    // FIXME relocate to problem description
     state[dim + 1] = p / (gamma - Number(1.)) + Number(0.5) * rho * u * u;
 
     return state;
@@ -90,8 +91,7 @@ namespace ryujin
       Contrast(const std::string subsection)
           : InitialState<dim, Number>("contrast", subsection)
       {
-        constexpr auto gamma = ProblemDescription<1, Number>::gamma;
-        primitive_left_[0] = gamma;
+        primitive_left_[0] = 1.4;
         primitive_left_[1] = 0.0;
         primitive_left_[2] = 1.;
         this->add_parameter(
@@ -99,7 +99,7 @@ namespace ryujin
             primitive_left_,
             "Initial 1d primitive state (rho, u, p) on the left");
 
-        primitive_right_[0] = gamma;
+        primitive_right_[0] = 1.4;
         primitive_right_[1] = 0.0;
         primitive_right_[2] = 1.;
         this->add_parameter(
@@ -142,8 +142,7 @@ namespace ryujin
         dealii::ParameterAcceptor::parse_parameters_call_back.connect(std::bind(
             &ShockFront<dim, Number>::parse_parameters_callback, this));
 
-        constexpr auto gamma = ProblemDescription<1, Number>::gamma;
-        primitive_right_[0] = gamma;
+        primitive_right_[0] = 1.4;
         primitive_right_[1] = 0.0;
         primitive_right_[2] = 1.;
         this->add_parameter("primitive state",

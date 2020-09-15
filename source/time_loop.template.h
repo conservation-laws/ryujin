@@ -497,9 +497,6 @@ namespace ryujin
     stream << std::endl
            << std::endl << "Compile time parameters:" << std::endl << std::endl;
 
-    stream << "gamma == " << ProblemDescription<dim>::gamma << std::endl;
-    stream << "b == " << ProblemDescription<dim>::b << std::endl;
-
     stream << "DIM == " << dim << std::endl;
     stream << "NUMBER == " << typeid(Number).name() << std::endl;
 
