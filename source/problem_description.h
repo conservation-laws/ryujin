@@ -70,6 +70,20 @@ namespace ryujin
     void parse_parameters_callback();
 
     /**
+     * @name ProblemDescription compile time options
+     */
+    //@{
+
+    /**
+     * Use the co-volume equation of state instead of the ideal polytropic
+     * gas equation.
+     *
+     * @ingroup CompileTimeOptions
+     */
+    static constexpr bool covolume_ = COVOLUME;
+
+    //@}
+    /**
      * @name Computing derived physical quantities.
      */
     //@{
@@ -126,6 +140,9 @@ namespace ryujin
      * \f[
      *   p = \frac{\gamma - 1}{1 - b*\rho}\; (\rho e)
      * \f]
+     *
+     * @note If you want to set the covolume paramete @ref b_ to nonzero
+     * you have to enable the @ref covolume_ compile-time option.
      */
     template <int problem_dim, typename Number>
     Number pressure(const dealii::Tensor<1, problem_dim, Number> &U) const;
@@ -147,7 +164,8 @@ namespace ryujin
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
      * and return the (scaled) specific entropy
      * \f[
-     *   e^{(\gamma-1)s} = \frac{\rho\,e}{\rho^\gamma}.
+     *   e^{(\gamma-1)s} = \frac{\rho\,e}{\rho^\gamma}
+     *   (1 - b * \rho)^(\gamma -1).
      * \f]
      */
     template <int problem_dim, typename Number>

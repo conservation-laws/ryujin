@@ -51,6 +51,13 @@ namespace ryujin
      */
     gamma_inverse_ = 1. / gamma_;
     gamma_plus_one_inverse_ = 1. / (gamma_ + 1.);
+
+    static_assert(covolume_ == false, "not implemented");
+    if constexpr (!covolume_)
+      AssertThrow(b_ == 0.,
+                  dealii::ExcMessage(
+                      "ProblemDescription::covolume_ compile-time option set "
+                      "to false but nonzero co-volume prescribed."));
   }
 
 

@@ -585,6 +585,9 @@ namespace ryujin
     stream << "Limiter<dim, Number>::relaxation_order_ == "
             << Limiter<dim, Number>::relaxation_order_ << std::endl;
 
+    stream << "ProblemDescription::covolume_ == "
+            << ProblemDescription::covolume_ << std::endl;
+
     stream << "RiemannSolver<dim, Number>::newton_max_iter_ == "
             <<  RiemannSolver<dim, Number>::newton_max_iter_ << std::endl;
 

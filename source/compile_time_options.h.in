@@ -30,6 +30,10 @@
 #define ORDER_MAPPING @ORDER_MAPPING@
 #define ORDER_QUADRATURE @ORDER_QUADRATURE@
 
+/* class ProblemDescription: */
+
+#define COVOLUME @COVOLUME@
+
 /* quadratic Newton: */
 
 #define NEWTON_EPS_DOUBLE @NEWTON_EPS_DOUBLE@

@@ -78,6 +78,7 @@ option(OBSESSIVE_INLINING "Also inline the Riemann solver and limiter calls" OFF
 set(ORDER_FINITE_ELEMENT "1" CACHE STRING "Order of finite elements")
 set(ORDER_MAPPING "1" CACHE STRING "Order of mapping")
 set(ORDER_QUADRATURE "2" CACHE STRING "Order of quadrature")
+set(COVOLUME "false" CACHE STRING "Enable co-volume polytropic gas equation with nonzero co-volume")
 set(NEWTON_EPS_DOUBLE "1.e-10" CACHE STRING "EPS double for limiter Newton solver")
 set(NEWTON_EPS_FLOAT "1.e-4" CACHE STRING "EPS float for limiter Newton solver")
 set(NEWTON_MAX_ITER "2" CACHE STRING "Maximal number of iterations in limiter Newton solver")
@@ -93,6 +94,7 @@ set(LIMITER_RELAX_BOUNDS "true" CACHE STRING "Relax limiter bounds")
 set(LIMITER_RELAXATION_ORDER "3" CACHE STRING "Relaxation order for limiter bounds")
 mark_as_advanced(
   ORDER_FINITE_ELEMENT ORDER_MAPPING ORDER_QUADRATURE
+  COVOLUME
   NEWTON_EPS_DOUBLE NEWTON_EPS_FLOAT NEWTON_MAX_ITER
   RIEMANN_NEWTON_MAX_ITER
   INDICATOR COMPUTE_SECOND_VARIATIONS ENTROPY
