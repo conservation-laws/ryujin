@@ -14,7 +14,6 @@ subsection B - ProblemDescription
   set Description = Navier Stokes
 
   set gamma = 1.4
-  set b = 0.0
 
   set lambda      = 0
   set mu          = 0.01

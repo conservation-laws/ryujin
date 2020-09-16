@@ -555,10 +555,10 @@ namespace ryujin
     }
 
     stream << "Indicator<dim, Number>::smoothness_indicator_alpha_0_ == "
-            << Indicator<dim, Number>::smoothness_indicator_alpha_0_ << std::endl;
+           << Indicator<dim, Number>::smoothness_indicator_alpha_0_ << std::endl;
 
     stream << "Indicator<dim, Number>::smoothness_indicator_power_ == "
-            << Indicator<dim, Number>::smoothness_indicator_power_ << std::endl;
+           << Indicator<dim, Number>::smoothness_indicator_power_ << std::endl;
 
     stream << "Limiter<dim, Number>::limiter_ == ";
     switch (Limiter<dim, Number>::limiter_) {
@@ -577,19 +577,26 @@ namespace ryujin
     }
 
     stream << "ryujin::newton_max_iter == "
-            << ryujin::newton_max_iter << std::endl;
+           << ryujin::newton_max_iter << std::endl;
 
     stream << "Limiter<dim, Number>::relax_bounds_ == "
-            << Limiter<dim, Number>::relax_bounds_ << std::endl;
+           << Limiter<dim, Number>::relax_bounds_ << std::endl;
 
     stream << "Limiter<dim, Number>::relaxation_order_ == "
-            << Limiter<dim, Number>::relaxation_order_ << std::endl;
+           << Limiter<dim, Number>::relaxation_order_ << std::endl;
 
-    stream << "ProblemDescription::covolume_ == "
-            << ProblemDescription::covolume_ << std::endl;
+    stream << "ProblemDescription::equation_of_state_ == ";
+    switch (ProblemDescription::equation_of_state_) {
+    case ProblemDescription::EquationOfState::ideal_gas:
+      stream << "ProblemDescription::EquationOfState::ideal_gas" << std::endl;
+      break;
+    case ProblemDescription::EquationOfState::van_der_waals:
+      stream << "ProblemDescription::EquationOfState::van_der_waals" << std::endl;
+      break;
+    }
 
     stream << "RiemannSolver<dim, Number>::newton_max_iter_ == "
-            <<  RiemannSolver<dim, Number>::newton_max_iter_ << std::endl;
+           <<  RiemannSolver<dim, Number>::newton_max_iter_ << std::endl;
 
     /* clang-format on */
 

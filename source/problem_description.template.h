@@ -30,7 +30,9 @@ namespace ryujin
     add_parameter("gamma", gamma_, "Euler: Ratio of specific heats");
 
     b_ = 0.;
-    add_parameter("b", b_, "Euler: Covolume");
+    if constexpr (equation_of_state_ == EquationOfState::van_der_waals) {
+      add_parameter("b", b_, "Euler: Covolume");
+    }
 
     mu_ = 1.e-3;
     add_parameter("mu", mu_, "Navier Stokes: Shear viscosity");
@@ -52,12 +54,8 @@ namespace ryujin
     gamma_inverse_ = 1. / gamma_;
     gamma_plus_one_inverse_ = 1. / (gamma_ + 1.);
 
-    static_assert(covolume_ == false, "not implemented");
-    if constexpr (!covolume_)
-      AssertThrow(b_ == 0.,
-                  dealii::ExcMessage(
-                      "ProblemDescription::covolume_ compile-time option set "
-                      "to false but nonzero co-volume prescribed."));
+    static_assert(equation_of_state_ == EquationOfState::ideal_gas,
+                  "not implemented");
   }
 
 

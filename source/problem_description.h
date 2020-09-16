@@ -57,6 +57,31 @@ namespace ryujin
         Tensor<1, problem_dimension<dim>, dealii::Tensor<1, dim, Number>>;
 
     /**
+     * An enum describing the equation of state.
+     */
+    enum class EquationOfState {
+      /**
+       * Ideal polytropic gas equation of state described by the specific
+       * entropy
+       * \f{align}
+       *   s(\rho,e) - s_0 =
+       *   \log\left(e^{1/(\gamma-1)}\,\rho^{-1}\right).
+       * \f}
+       */
+      ideal_gas,
+      /**
+       * Van der Waals gas equation of state described by the specific
+       * entropy
+       * \f{align}
+       *   s(\rho,e) - s_0 =
+       *   \log\left(e^{1/(\gamma-1)}\,\left(\rho^{-1}-b\right)\right).
+       * \f}
+       */
+      van_der_waals
+    };
+
+
+    /**
      * Constructor.
      */
     ProblemDescription(const std::string &subsection = "ProblemDescription");
@@ -75,12 +100,11 @@ namespace ryujin
     //@{
 
     /**
-     * Use the co-volume equation of state instead of the ideal polytropic
-     * gas equation.
+     * Selected equation of state.
      *
      * @ingroup CompileTimeOptions
      */
-    static constexpr bool covolume_ = COVOLUME;
+    static constexpr EquationOfState equation_of_state_ = EQUATION_OF_STATE;
 
     //@}
     /**

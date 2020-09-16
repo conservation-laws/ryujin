@@ -32,7 +32,7 @@
 
 /* class ProblemDescription: */
 
-#define COVOLUME @COVOLUME@
+#define EQUATION_OF_STATE @EQUATION_OF_STATE@
 
 /* quadratic Newton: */
 
