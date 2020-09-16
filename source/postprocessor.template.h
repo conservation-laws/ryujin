@@ -182,7 +182,7 @@ namespace ryujin
 
           const auto c_ij = cij_matrix.get_tensor(i, col_idx);
 
-          const auto rho_j = U_j[0];
+          const auto rho_j = ProblemDescription::density(U_j);
 
           grad_rho_i += c_ij * rho_j;
 

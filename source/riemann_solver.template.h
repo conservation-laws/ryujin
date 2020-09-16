@@ -358,20 +358,22 @@ namespace ryujin
                           const ProblemDescription::rank1_type<dim, Number> &U,
                           const dealii::Tensor<1, dim, Number> &n_ij)
   {
+    const auto rho = problem_description.density(U);
+    const auto rho_inverse = Number(1.0) / rho;
+
     const auto m = problem_description.momentum(U);
-    const auto projected_momentum = n_ij * m;
-    const auto perp = m - projected_momentum * n_ij;
+    const auto proj_m = n_ij * m;
+    const auto perp = m - proj_m * n_ij;
 
-    const Number rho_inverse = Number(1.0) / U[0];
-    ProblemDescription::rank1_type<1, Number> projected(
-        {U[0],
-         projected_momentum,
-         U[1 + dim] - Number(0.5) * perp.norm_square() * rho_inverse});
+    const auto E = problem_description.total_energy(U) -
+                   Number(0.5) * perp.norm_square() * rho_inverse;
 
-    return {{projected[0],               // rho
-             projected[1] * rho_inverse, // u
-             problem_description.pressure(projected),
-             problem_description.speed_of_sound(projected)}};
+    const auto state =
+        ProblemDescription::rank1_type<1, Number>({rho, proj_m, E});
+    const auto p = problem_description.pressure(state);
+    const auto a = problem_description.speed_of_sound(state);
+
+    return {{rho, proj_m * rho_inverse, p, a}};
   }
 
 

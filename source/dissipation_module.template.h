@@ -396,7 +396,7 @@ namespace ryujin
       RYUJIN_OMP_FOR
       for (unsigned int i = 0; i < size_regular; i += simd_length) {
         const auto U_i = U.get_vectorized_tensor(i);
-        const auto rho_i = U_i[0];
+        const auto rho_i = problem_description_->density(U_i);
         const auto M_i = problem_description_->momentum(U_i);
         const auto rho_e_i = problem_description_->internal_energy(U_i);
         const auto m_i = simd_load(lumped_mass_matrix, i);
@@ -414,7 +414,7 @@ namespace ryujin
 
       for (unsigned int i = size_regular; i < n_owned; ++i) {
         const auto U_i = U.get_tensor(i);
-        const auto rho_i = U_i[0];
+        const auto rho_i = problem_description_->density(U_i);
         const auto M_i = problem_description_->momentum(U_i);
         const auto rho_e_i = problem_description_->internal_energy(U_i);
         const auto m_i = lumped_mass_matrix.local_element(i);
@@ -472,7 +472,7 @@ namespace ryujin
           /* Prescribe velocity: */
           const auto U_i =
               initial_values_->initial_state(position, t + Number(0.5) * tau);
-          const auto rho_i = U_i[0];
+          const auto rho_i = problem_description_->density(U_i);
           const auto V_i = problem_description_->momentum(U_i) / rho_i;
           const auto e_i = problem_description_->internal_energy(U_i) / rho_i;
 
@@ -634,7 +634,7 @@ namespace ryujin
           /* Prescribe internal energy: */
           const auto U_i =
               initial_values_->initial_state(position, t + Number(0.5) * tau);
-          const auto rho_i = U_i[0];
+          const auto rho_i = problem_description_->density(U_i);
           const auto e_i = problem_description_->internal_energy(U_i) / rho_i;
           internal_energy_rhs_.local_element(i) = e_i;
         }
@@ -698,7 +698,7 @@ namespace ryujin
       RYUJIN_OMP_FOR
       for (unsigned int i = 0; i < size_regular; i += simd_length) {
         auto U_i = U.get_vectorized_tensor(i);
-        const auto rho_i = U_i[0];
+        const auto rho_i = problem_description_->density(U_i);
 
         /* (5.4b) */
         auto m_i_new = -problem_description_->momentum(U_i);
@@ -724,7 +724,7 @@ namespace ryujin
 
       for (unsigned int i = size_regular; i < n_owned; ++i) {
         auto U_i = U.get_tensor(i);
-        const auto rho_i = U_i[0];
+        const auto rho_i = problem_description_->density(U_i);
 
         /* (5.4b) */
         auto m_i_new = -problem_description_->momentum(U_i);

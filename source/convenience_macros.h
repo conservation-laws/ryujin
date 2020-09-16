@@ -153,7 +153,8 @@ namespace
  */
 #define ACCESSOR_READ_ONLY(member)                                             \
 public:                                                                        \
-  decltype(dereference(member##_)) &member() const                             \
+  DEAL_II_ALWAYS_INLINE inline decltype(dereference(member##_)) &member()      \
+      const                                                                    \
   {                                                                            \
     return dereference(member##_);                                             \
   }                                                                            \
@@ -168,7 +169,7 @@ protected:
  */
 #define ACCESSOR_READ_ONLY_NO_DEREFERENCE(member)                              \
 public:                                                                        \
-  const decltype(member##_) &member() const                                    \
+  DEAL_II_ALWAYS_INLINE inline const decltype(member##_) &member() const       \
   {                                                                            \
     return member##_;                                                          \
   }                                                                            \

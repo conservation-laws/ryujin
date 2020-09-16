@@ -90,7 +90,7 @@ namespace ryujin
         summed_quantities_thread_local += m_i * U_i;
 
         const auto s_i = problem_description.specific_entropy(U_i);
-        const auto rho_i = U_i[0];
+        const auto rho_i = problem_description.density(U_i);
         const auto e_i = problem_description.internal_energy(U_i) / rho_i;
         s_min_thread_local = std::min(s_min_thread_local, s_i);
         e_min_thread_local = std::min(e_min_thread_local, e_i);

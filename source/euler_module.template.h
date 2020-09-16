@@ -896,7 +896,7 @@ namespace ryujin
           }
 
 #ifdef CHECK_BOUNDS
-          const auto rho_new = U_i_new[0];
+          const auto rho_new = problem_description_->density(U_i_new);
           const auto e_new = problem_description_->internal_energy(U_i_new);
           const auto s_new = problem_description_->specific_entropy(U_i_new);
 
@@ -988,7 +988,7 @@ namespace ryujin
           }
 
 #ifdef CHECK_BOUNDS
-          const auto rho_new = U_i_new[0];
+          const auto rho_new = problem_description_->density(U_i_new);
           const auto e_new = problem_description_->internal_energy(U_i_new);
           const auto s_new = problem_description_->specific_entropy(U_i_new);
 

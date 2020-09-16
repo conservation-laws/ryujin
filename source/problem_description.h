@@ -76,11 +76,26 @@ namespace ryujin
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, return
+     * the density <code>U[0]</code>
+     */
+    template <int problem_dim, typename Number>
+    static Number
+    density(const dealii::Tensor<1, problem_dim, Number> &U);
+
+    /**
+     * For a given (2+dim dimensional) state vector <code>U</code>, return
      * the momentum vector <code>[U[1], ..., U[1+dim]]</code>.
      */
     template <int problem_dim, typename Number>
     static dealii::Tensor<1, problem_dim - 2, Number>
     momentum(const dealii::Tensor<1, problem_dim, Number> &U);
+
+    /**
+     * For a given (2+dim dimensional) state vector <code>U</code>, return
+     * the total energy <code>U[1+dim]</code>
+     */
+    template <int problem_dim, typename Number>
+    static Number total_energy(const dealii::Tensor<1, problem_dim, Number> &U);
 
 
     /**
@@ -257,6 +272,14 @@ namespace ryujin
   /* Inline definitions */
 
   template <int problem_dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline Number
+  ProblemDescription::density(const dealii::Tensor<1, problem_dim, Number> &U)
+  {
+    return U[0];
+  }
+
+
+  template <int problem_dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, problem_dim - 2, Number>
   ProblemDescription::momentum(const dealii::Tensor<1, problem_dim, Number> &U)
   {
@@ -266,6 +289,15 @@ namespace ryujin
     for (unsigned int i = 0; i < dim; ++i)
       result[i] = U[1 + i];
     return result;
+  }
+
+
+  template <int problem_dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline Number ProblemDescription::total_energy(
+      const dealii::Tensor<1, problem_dim, Number> &U)
+  {
+    constexpr int dim = problem_dim - 2;
+    return U[1 + dim];
   }
 
 

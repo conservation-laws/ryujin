@@ -276,7 +276,7 @@ namespace ryujin
       const rank1_type &U_i, const Number entropy)
   {
     if constexpr (indicator_ == Indicators::entropy_viscosity_commutator) {
-      rho_i = U_i[0];
+      rho_i = problem_description.density(U_i);
       rho_i_inverse = Number(1.) / rho_i;
       eta_i = entropy;
       f_i = problem_description.f(U_i);
@@ -296,7 +296,7 @@ namespace ryujin
       denominator_abs = 0.;
       switch (Indicator<dim, Number>::smoothness_indicator_) {
       case Indicator<dim, Number>::SmoothnessIndicators::rho:
-        indicator_i = U_i[0];
+        indicator_i = problem_description.density(U_i);
       case Indicator<dim, Number>::SmoothnessIndicators::internal_energy:
         indicator_i = problem_description.internal_energy(U_i);
       case Indicator<dim, Number>::SmoothnessIndicators::pressure:
@@ -305,7 +305,7 @@ namespace ryujin
     }
 
     if constexpr (compute_second_variations_) {
-      rho_i = U_i[0];
+      rho_i = problem_description.density(U_i);
       rho_second_variation_numerator = 0.;
       rho_second_variation_denominator = 0.;
     }
@@ -320,7 +320,7 @@ namespace ryujin
                               const Number entropy_j)
   {
     if constexpr (indicator_ == Indicators::entropy_viscosity_commutator) {
-      const auto &rho_j = U_j[0];
+      const auto &rho_j = problem_description.density(U_j);
       const auto rho_j_inverse = Number(1.) / rho_j;
       const auto m_j = problem_description.momentum(U_j);
       const auto f_j = problem_description.f(U_j);
@@ -335,7 +335,7 @@ namespace ryujin
       Number indicator_j;
       switch (Indicator<dim, Number>::smoothness_indicator_) {
       case Indicator<dim, Number>::SmoothnessIndicators::rho:
-        indicator_j = U_j[0];
+        indicator_j = problem_description.density(U_j);
       case Indicator<dim, Number>::SmoothnessIndicators::internal_energy:
         indicator_j = problem_description.internal_energy(U_j);
       case Indicator<dim, Number>::SmoothnessIndicators::pressure:
@@ -349,7 +349,7 @@ namespace ryujin
     }
 
     if constexpr (compute_second_variations_) {
-      const auto &rho_j = U_j[0];
+      const auto &rho_j = problem_description.density(U_j);
 
       rho_second_variation_numerator += beta_ij * (rho_j - rho_i);
       rho_second_variation_denominator += beta_ij;

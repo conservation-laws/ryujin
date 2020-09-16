@@ -286,7 +286,7 @@ namespace ryujin
     if constexpr (limiter_ == Limiters::none)
       return;
 
-    const auto rho_ij = U_ij_bar[0];
+    const auto rho_ij = problem_description.density(U_ij_bar);
     rho_min = std::min(rho_min, rho_ij);
     rho_max = std::max(rho_max, rho_ij);
 
