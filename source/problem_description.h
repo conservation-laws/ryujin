@@ -182,6 +182,12 @@ namespace ryujin
     dealii::Tensor<1, problem_dim, Number> mathematical_entropy_derivative(
         const dealii::Tensor<1, problem_dim, Number> U) const;
 
+    //@}
+    /**
+     * @name Computing fluxes.
+     */
+    //@{
+
 
     /**
      * Given a state @p U compute the flux
@@ -196,6 +202,20 @@ namespace ryujin
     template <int problem_dim, typename Number>
     rank2_type<problem_dim - 2, Number>
     f(const dealii::Tensor<1, problem_dim, Number> &U) const;
+
+    //@}
+    /**
+     * @name Transforming to and from primitive states.
+     */
+    //@{
+
+    /*
+     * Given a primitive 1D state [rho, u, p], compute a conserved state
+     * with momentum parallel to e_1.
+     */
+    template <int dim, typename Number>
+    rank1_type<dim, Number>
+    from_primitive_state(const dealii::Tensor<1, 3, Number> &state_1d) const;
 
     //@}
 
@@ -484,6 +504,25 @@ namespace ryujin
     result[dim + 1] = m * (rho_inverse * (E + p));
 
     return result;
+  }
+
+
+  template <int dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline ProblemDescription::rank1_type<dim, Number>
+  ProblemDescription::from_primitive_state(
+      const dealii::Tensor<1, 3, Number> &state_1d) const
+  {
+    const auto &rho = state_1d[0];
+    const auto &u = state_1d[1];
+    const auto &p = state_1d[2];
+
+    rank1_type<dim, Number> state;
+
+    state[0] = rho;
+    state[1] = rho * u;
+    state[dim + 1] = p / (Number(gamma_ - 1.)) + Number(0.5) * rho * u * u;
+
+    return state;
   }
 
 

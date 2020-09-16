@@ -8,32 +8,6 @@
 
 #include "initial_state.h"
 
-namespace
-{
-  using namespace ryujin;
-
-  template <int dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline auto
-  from_primitive_state(const dealii::Tensor<1, 3, Number> &state_1d)
-  {
-    using rank1_type = ProblemDescription::rank1_type<dim, Number>;
-    constexpr auto gamma = 1.4; //FIXME
-
-    const auto &rho = state_1d[0];
-    const auto &u = state_1d[1];
-    const auto &p = state_1d[2];
-
-    rank1_type state;
-
-    state[0] = rho;
-    state[1] = rho * u;
-    // FIXME relocate to problem description
-    state[dim + 1] = p / (gamma - Number(1.)) + Number(0.5) * rho * u * u;
-
-    return state;
-  };
-}
-
 namespace ryujin
 {
   namespace InitialStates
@@ -49,11 +23,12 @@ namespace ryujin
     public:
       using typename InitialState<dim, Number>::rank1_type;
 
-      Uniform(const std::string subsection)
-          : InitialState<dim, Number>("uniform", subsection)
+      Uniform(const ProblemDescription &problem_description,
+              const std::string subsection)
+          : InitialState<dim, Number>(
+                problem_description, "uniform", subsection)
       {
-        constexpr auto gamma = 1.4; //FIXME
-        primitive_[0] = gamma;
+        primitive_[0] = this->problem_description.gamma();
         primitive_[1] = 3.0;
         primitive_[2] = 1.;
         this->add_parameter("primitive state",
@@ -64,7 +39,8 @@ namespace ryujin
       virtual rank1_type compute(const dealii::Point<dim> & /*point*/,
                                  Number /*t*/) final override
       {
-        return from_primitive_state<dim>(primitive_);
+        return this->problem_description.template from_primitive_state<dim>(
+            primitive_);
       }
 
     private:
@@ -88,10 +64,12 @@ namespace ryujin
     public:
       using typename InitialState<dim, Number>::rank1_type;
 
-      Contrast(const std::string subsection)
-          : InitialState<dim, Number>("contrast", subsection)
+      Contrast(const ProblemDescription &problem_description,
+               const std::string subsection)
+          : InitialState<dim, Number>(
+                problem_description, "contrast", subsection)
       {
-        primitive_left_[0] = 1.4;
+        primitive_left_[0] = this->problem_description.gamma();
         primitive_left_[1] = 0.0;
         primitive_left_[2] = 1.;
         this->add_parameter(
@@ -99,7 +77,7 @@ namespace ryujin
             primitive_left_,
             "Initial 1d primitive state (rho, u, p) on the left");
 
-        primitive_right_[0] = 1.4;
+        primitive_right_[0] = this->problem_description.gamma();
         primitive_right_[1] = 0.0;
         primitive_right_[2] = 1.;
         this->add_parameter(
@@ -111,10 +89,8 @@ namespace ryujin
       virtual rank1_type compute(const dealii::Point<dim> &point,
                                  Number /*t*/) final override
       {
-        if (point[0] > 0.)
-          return from_primitive_state<dim>(primitive_right_);
-        else
-          return from_primitive_state<dim>(primitive_left_);
+        return this->problem_description.template from_primitive_state<dim>(
+            point[0] > 0. ? primitive_right_ : primitive_left_);
       }
 
     private:
@@ -136,13 +112,15 @@ namespace ryujin
     public:
       using typename InitialState<dim, Number>::rank1_type;
 
-      ShockFront(const std::string subsection)
-          : InitialState<dim, Number>("shockfront", subsection)
+      ShockFront(const ProblemDescription &problem_description,
+                 const std::string subsection)
+          : InitialState<dim, Number>(
+                problem_description, "shockfront", subsection)
       {
         dealii::ParameterAcceptor::parse_parameters_call_back.connect(std::bind(
             &ShockFront<dim, Number>::parse_parameters_callback, this));
 
-        primitive_right_[0] = 1.4;
+        primitive_right_[0] = this->problem_description.gamma();
         primitive_right_[1] = 0.0;
         primitive_right_[2] = 1.;
         this->add_parameter("primitive state",
@@ -161,8 +139,8 @@ namespace ryujin
       {
         /* Compute post-shock state and S3: */
 
-        constexpr auto gamma = 1.4; // FIXME
-        constexpr auto b = 0.; // FIXME
+        const auto gamma = this->problem_description.gamma();
+        const auto b = this->problem_description.b();
 
         const auto &rho_R = primitive_right_[0];
         const auto &u_R = primitive_right_[1];
@@ -193,10 +171,8 @@ namespace ryujin
                                  Number t) final override
       {
         const Number position_1d = Number(point[0] - S3_ * t);
-        if (position_1d > 0.)
-          return from_primitive_state<dim>(primitive_right_);
-        else
-          return from_primitive_state<dim>(primitive_left_);
+        return this->problem_description.template from_primitive_state<dim>(
+            position_1d > 0. ? primitive_right_ : primitive_left_);
       }
 
     private:
@@ -219,8 +195,10 @@ namespace ryujin
     public:
       using typename InitialState<dim, Number>::rank1_type;
 
-      IsentropicVortex(const std::string subsection)
-          : InitialState<dim, Number>("isentropic vortex", subsection)
+      IsentropicVortex(const ProblemDescription &problem_description,
+                       const std::string subsection)
+          : InitialState<dim, Number>(
+                problem_description, "isentropic vortex", subsection)
       {
         mach_number_ = 2.0;
         this->add_parameter(
@@ -233,7 +211,7 @@ namespace ryujin
       virtual rank1_type compute(const dealii::Point<dim> &point,
                                  Number t) final override
       {
-        constexpr auto gamma = 1.4; // FIXME
+        const auto gamma = this->problem_description.gamma();
 
         if constexpr (dim == 2) {
           auto point_bar = point;
@@ -282,8 +260,10 @@ namespace ryujin
     public:
       using typename InitialState<dim, Number>::rank1_type;
 
-      BeckerSolution(const std::string subsection)
-          : InitialState<dim, Number>("becker solution", subsection)
+      BeckerSolution(const ProblemDescription &problem_description,
+                     const std::string subsection)
+          : InitialState<dim, Number>(
+                problem_description, "becker solution", subsection)
       {
         dealii::ParameterAcceptor::parse_parameters_call_back.connect(std::bind(
             &BeckerSolution<dim, Number>::parse_parameters_callback, this));
@@ -312,7 +292,7 @@ namespace ryujin
 
       void parse_parameters_callback()
       {
-        constexpr double gamma = 1.4; // FIXME
+        const double gamma = this->problem_description.gamma();
 
         AssertThrow(
             velocity_left_ > velocity_right_,
@@ -409,8 +389,8 @@ namespace ryujin
                                  Number t) final override
       {
         /* (7.2) */
-        constexpr double gamma = 1.4; // FIXME
-        constexpr double R_infty = (gamma + 1) / (gamma - 1);
+        const double gamma = this->problem_description.gamma();
+        const double R_infty = (gamma + 1) / (gamma - 1);
 
         /* (7.3) */
         const double x = point[0] - velocity_ * t;

@@ -52,7 +52,8 @@ namespace ryujin
     /**
      * Constructor.
      */
-    InitialValues(const std::string &subsection = "InitialValues");
+    InitialValues(const ProblemDescription &problem_description,
+                  const std::string &subsection = "InitialValues");
 
 
     /**
@@ -105,6 +106,8 @@ namespace ryujin
      * @name Internal data:
      */
     //@{
+
+    const ProblemDescription &problem_description;
 
     std::set<std::unique_ptr<InitialState<dim, Number>>> initial_state_list_;
 

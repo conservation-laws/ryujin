@@ -45,8 +45,11 @@ namespace ryujin
      * subsection as an argument. The dealii::ParameterAcceptor is
      * initialized with the subsubsection `subsection + "/" + name`.
      */
-    InitialState(const std::string &name, const std::string &subsection)
+    InitialState(const ProblemDescription &problem_description,
+                 const std::string &name,
+                 const std::string &subsection)
         : ParameterAcceptor(subsection + "/" + name)
+        , problem_description(problem_description)
         , name_(name)
     {
     }
@@ -59,6 +62,9 @@ namespace ryujin
      * current time to allow for time-dependent (in-flow) Dirichlet data.
      */
     virtual rank1_type compute(const dealii::Point<dim> &point, Number t) = 0;
+
+  protected:
+    const ProblemDescription &problem_description;
 
   private:
     const std::string name_;

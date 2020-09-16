@@ -39,7 +39,7 @@ namespace ryujin
       , problem_description("/B - ProblemDescription")
       , discretization(mpi_communicator, "/C - Discretization")
       , offline_data(mpi_communicator, discretization, "/D - OfflineData")
-      , initial_values("/E - InitialValues")
+      , initial_values(problem_description, "/E - InitialValues")
       , euler_module(mpi_communicator,
                      computing_timer,
                      offline_data,

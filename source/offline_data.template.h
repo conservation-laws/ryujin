@@ -55,7 +55,8 @@ namespace ryujin
     dof_handler_.initialize(discretization_->triangulation(),
                             discretization_->finite_element());
 
-    // FIXME: Cuthill McKee isn't particularly useful...
+    // Renumber degrees of freedom - Cuthill McKee actually helps with
+    // cache locality.
     DoFRenumbering::Cuthill_McKee(dof_handler_);
 
 #ifdef USE_COMMUNICATION_HIDING

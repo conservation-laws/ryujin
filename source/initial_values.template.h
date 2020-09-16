@@ -20,8 +20,11 @@ namespace ryujin
   using namespace dealii;
 
   template <int dim, typename Number>
-  InitialValues<dim, Number>::InitialValues(const std::string &subsection)
+  InitialValues<dim, Number>::InitialValues(
+      const ProblemDescription &problem_description,
+      const std::string &subsection)
       : ParameterAcceptor(subsection)
+      , problem_description(problem_description)
   {
     ParameterAcceptor::parse_parameters_call_back.connect(std::bind(
         &InitialValues<dim, Number>::parse_parameters_callback, this));
@@ -51,16 +54,16 @@ namespace ryujin
                   "initial state.");
 
     using namespace InitialStates;
-    initial_state_list_.emplace(
-        std::make_unique<Uniform<dim, Number>>(subsection));
-    initial_state_list_.emplace(
-        std::make_unique<Contrast<dim, Number>>(subsection));
-    initial_state_list_.emplace(
-        std::make_unique<ShockFront<dim, Number>>(subsection));
-    initial_state_list_.emplace(
-        std::make_unique<IsentropicVortex<dim, Number>>(subsection));
-    initial_state_list_.emplace(
-        std::make_unique<BeckerSolution<dim, Number>>(subsection));
+    initial_state_list_.emplace(std::make_unique<Uniform<dim, Number>>(
+        problem_description, subsection));
+    initial_state_list_.emplace(std::make_unique<Contrast<dim, Number>>(
+        problem_description, subsection));
+    initial_state_list_.emplace(std::make_unique<ShockFront<dim, Number>>(
+        problem_description, subsection));
+    initial_state_list_.emplace(std::make_unique<IsentropicVortex<dim, Number>>(
+        problem_description, subsection));
+    initial_state_list_.emplace(std::make_unique<BeckerSolution<dim, Number>>(
+        problem_description, subsection));
   }
 
   namespace
@@ -154,7 +157,7 @@ namespace ryujin
   template <int dim, typename Number>
   void InitialValues<dim, Number>::parse_parameters_callback()
   {
-    static constexpr unsigned int problem_dimension =
+    constexpr auto problem_dimension =
         ProblemDescription::problem_dimension<dim>;
 
     /* First, let's normalize the direction: */
@@ -175,7 +178,7 @@ namespace ryujin
             const auto transformed_point =
                 affine_transform(initial_direction_, initial_position_, point);
             auto state = it->compute(transformed_point, t);
-            auto M = ProblemDescription::momentum(state);
+            auto M = problem_description.momentum(state);
             M = affine_transform_vector(initial_direction_, M);
             for (unsigned int d = 0; d < dim; ++d)
               state[1 + d] = M[d];
@@ -263,7 +266,7 @@ namespace ryujin
       if (id == Boundary::slip) {
         /* Remove normal component of velocity: */
         auto U_i = U.get_tensor(i);
-        auto m = ProblemDescription::momentum(U_i);
+        auto m = problem_description.momentum(U_i);
         m -= 1. * (m * normal) * normal;
         for (unsigned int k = 0; k < dim; ++k)
           U_i[k + 1] = m[k];
