@@ -12,6 +12,9 @@ end
 
 subsection B - ProblemDescription
   set Description = Euler
+
+  set gamma = 1.4
+  set b = 0.0
 end
 
 subsection C - Discretization

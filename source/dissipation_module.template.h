@@ -667,7 +667,6 @@ namespace ryujin
         internal_energy_vmult<scalar_type>(dst, src);
       };
 
-      /* FIXME: Tune parameters */
       SolverControl solver_control(1000,
                                    internal_energy_rhs_.l2_norm() * tolerance_);
       SolverCG<scalar_type> solver(solver_control);
