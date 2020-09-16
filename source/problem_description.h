@@ -353,18 +353,10 @@ namespace ryujin
   DEAL_II_ALWAYS_INLINE inline Number ProblemDescription::pressure(
       const dealii::Tensor<1, problem_dim, Number> &U) const
   {
-    /*
-     * With
-     *   u = m / rho
-     *   e = rho^-1 E - 1/2 |u|^2
-     *   p(1-b rho) = (gamma - 1) e rho
-     * we get
-     *   p = (gamma - 1)/(1 - b*rho) * (rho e)
-     * (Here we have set b = 0)
-     */
+    /* p = (gamma - 1) / (1 - b * rho) * (rho e) */
 
     using ScalarNumber = typename get_value_type<Number>::type;
-    return (gamma_ - ScalarNumber(1.)) * internal_energy(U);
+    return ScalarNumber(gamma_ - 1.) * internal_energy(U);
   }
 
 
@@ -386,10 +378,7 @@ namespace ryujin
   DEAL_II_ALWAYS_INLINE inline Number ProblemDescription::specific_entropy(
       const dealii::Tensor<1, problem_dim, Number> &U) const
   {
-    /*
-     * We have
-     *   exp((gamma - 1)s) = (rho e) / rho ^ gamma
-     */
+    /* exp((gamma - 1)s) = (rho e) / rho ^ gamma */
 
     using ScalarNumber = typename get_value_type<Number>::type;
 
@@ -402,10 +391,7 @@ namespace ryujin
   DEAL_II_ALWAYS_INLINE inline Number ProblemDescription::harten_entropy(
       const dealii::Tensor<1, problem_dim, Number> &U) const
   {
-    /*
-     * We have
-     *   rho^2 e = \rho E - 1/2*m^2
-     */
+    /* rho^2 e = \rho E - 1/2*m^2 */
 
     constexpr int dim = problem_dim - 2;
     using ScalarNumber = typename get_value_type<Number>::type;
@@ -432,8 +418,6 @@ namespace ryujin
      * we get
      *
      *   eta' = 1/(gamma+1) * (rho^2 e) ^ -gamma/(gamma+1) * ( E , -m , rho )^T
-     *
-     * (Here we have set b = 0)
      */
 
     constexpr int dim = problem_dim - 2;
@@ -486,8 +470,6 @@ namespace ryujin
      *   eta' = (gamma - 1)/gamma p ^(1/gamma - 1) *
      *
      *     (1/2m^2/rho^2 , -m/rho , 1 )^T
-     *
-     * (Here we have set b = 0)
      */
 
     constexpr int dim = problem_dim - 2;
