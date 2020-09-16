@@ -18,11 +18,13 @@ namespace ryujin
   template <int dim, typename Number>
   Quantities<dim, Number>::Quantities(
       const MPI_Comm &mpi_communicator,
-      const ryujin::OfflineData<dim, Number> &offline_data,
+      const ProblemDescription &problem_description,
+      const OfflineData<dim, Number> &offline_data,
       const std::string &subsection /*= "Quantities"*/)
       : ParameterAcceptor(subsection)
       , mpi_communicator_(mpi_communicator)
       , mpi_rank(dealii::Utilities::MPI::this_mpi_process(mpi_communicator))
+      , problem_description(problem_description)
       , offline_data_(&offline_data)
   {
     compute_conserved_quantities_ = true;
@@ -87,13 +89,11 @@ namespace ryujin
         const auto U_i = U.get_tensor(i);
         summed_quantities_thread_local += m_i * U_i;
 
-        // FIXME
-//         const auto s_i = PD::specific_entropy(U_i);
-//         const double s_i = 0.;
-//         const auto rho_i = U_i[0];
-//         const auto e_i = PD::internal_energy(U_i) / rho_i;
-//         s_min_thread_local = std::min(s_min_thread_local, s_i);
-//         e_min_thread_local = std::min(e_min_thread_local, e_i);
+        const auto s_i = problem_description.specific_entropy(U_i);
+        const auto rho_i = U_i[0];
+        const auto e_i = problem_description.internal_energy(U_i) / rho_i;
+        s_min_thread_local = std::min(s_min_thread_local, s_i);
+        e_min_thread_local = std::min(e_min_thread_local, e_i);
       }
 
       RYUJIN_OMP_CRITICAL

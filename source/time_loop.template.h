@@ -28,7 +28,6 @@
 #include <iomanip>
 
 using namespace dealii;
-using namespace ryujin;
 
 namespace ryujin
 {
@@ -53,7 +52,10 @@ namespace ryujin
                            initial_values,
                            "/G - DissipationModule")
       , postprocessor(mpi_communicator, offline_data, "/H - Postprocessor")
-      , quantities(mpi_communicator, offline_data, "/I - Quantities")
+      , quantities(mpi_communicator,
+                   problem_description,
+                   offline_data,
+                   "/I - Quantities")
       , mpi_rank(dealii::Utilities::MPI::this_mpi_process(mpi_communicator))
       , n_mpi_processes(
             dealii::Utilities::MPI::n_mpi_processes(mpi_communicator))

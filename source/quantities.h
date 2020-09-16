@@ -62,8 +62,9 @@ namespace ryujin
      * Constructor.
      */
     Quantities(const MPI_Comm &mpi_communicator,
-                  const ryujin::OfflineData<dim, Number> &offline_data,
-                  const std::string &subsection = "Quantities");
+               const ProblemDescription &problem_description,
+               const OfflineData<dim, Number> &offline_data,
+               const std::string &subsection = "Quantities");
 
     /**
      * Prepare evaluation. A call to @ref prepare() allocates temporary
@@ -109,6 +110,7 @@ namespace ryujin
     const MPI_Comm &mpi_communicator_;
     const unsigned int mpi_rank;
 
+    const ProblemDescription &problem_description;
     dealii::SmartPointer<const ryujin::OfflineData<dim, Number>> offline_data_;
 
     std::ofstream output;
