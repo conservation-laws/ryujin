@@ -150,7 +150,11 @@ namespace ryujin
 
           for (unsigned int cell = range.first; cell < range.second; ++cell) {
             velocity.reinit(cell);
+#if DEAL_II_VERSION_GTE(9, 3, 0)
             velocity.gather_evaluate(src, EvaluationFlags::gradients);
+#else
+            velocity.gather_evaluate(src, false, true);
+#endif
 
             for (unsigned int q = 0; q < velocity.n_q_points; ++q) {
 
@@ -166,7 +170,11 @@ namespace ryujin
               velocity.submit_symmetric_gradient(0.5 * tau * S, q);
             }
 
+#if DEAL_II_VERSION_GTE(9, 3, 0)
             velocity.integrate_scatter(EvaluationFlags::gradients, dst);
+#else
+            velocity.integrate_scatter(false, true, dst);
+#endif
           }
         };
 
@@ -254,11 +262,19 @@ namespace ryujin
 
           for (unsigned int cell = range.first; cell < range.second; ++cell) {
             energy.reinit(cell);
+#if DEAL_II_VERSION_GTE(9, 3, 0)
             energy.gather_evaluate(src, EvaluationFlags::gradients);
+#else
+            energy.gather_evaluate(src, false, true);
+#endif
             for (unsigned int q = 0; q < energy.n_q_points; ++q) {
               energy.submit_gradient(factor * energy.get_gradient(q), q);
             }
+#if DEAL_II_VERSION_GTE(9, 3, 0)
             energy.integrate_scatter(EvaluationFlags::gradients, dst);
+#else
+            energy.integrate_scatter(false, true, dst);
+#endif
           }
         };
 
@@ -561,7 +577,11 @@ namespace ryujin
                  ++cell) {
               velocity.reinit(cell);
               energy.reinit(cell);
+#if DEAL_II_VERSION_GTE(9, 3, 0)
               velocity.gather_evaluate(src, EvaluationFlags::gradients);
+#else
+              velocity.gather_evaluate(src, false, true);
+#endif
 
               for (unsigned int q = 0; q < velocity.n_q_points; ++q) {
 
@@ -575,7 +595,11 @@ namespace ryujin
 
                 energy.submit_value(symmetric_gradient * S, q);
               }
+#if DEAL_II_VERSION_GTE(9, 3, 0)
               energy.integrate_scatter(EvaluationFlags::values, dst);
+#else
+              energy.integrate_scatter(true, false, dst);
+#endif
             }
           },
           internal_energy_rhs_,
