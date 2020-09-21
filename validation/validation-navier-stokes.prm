@@ -11,7 +11,7 @@ subsection A - TimeLoop
 end
 
 subsection B - ProblemDescription
-  set Description = Navier Stokes
+  set description = Navier Stokes
 
   set gamma = 1.4
 

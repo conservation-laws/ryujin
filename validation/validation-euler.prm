@@ -11,7 +11,7 @@ subsection A - TimeLoop
 end
 
 subsection B - ProblemDescription
-  set Description = Euler
+  set description = Euler
 
   set gamma = 1.4
 end

@@ -22,7 +22,7 @@ namespace ryujin
 
     description_ = "Euler";
     add_parameter(
-        "Description",
+        "description",
         description_,
         "Description - valid options are \"Euler\" and \"Navier Stokes\"");
 
