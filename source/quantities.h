@@ -21,7 +21,8 @@ namespace ryujin
 {
 
   /**
-   * A postprocessor class to compute scalar quantities of interest.
+   * A postprocessor class to compute integrated and scalar quantities of
+   * interest.
    *
    * @ingroup TimeLoop
    */
@@ -80,13 +81,8 @@ namespace ryujin
      * output cycle @p cycle) schedule a solution postprocessing and
      * output.
      *
-     * The function post-processes quantities synchronously and (depending
-     * on configuration options)
-     *
-     * The booleans @p output_full controls whether the full vector field
-     * is written out. Correspondingly, @p output_cutplanes controls
-     * whether cells in the vicinity of predefined cutplanes are written
-     * out.
+     * The function post-processes quantities synchronously depending on
+     * runtime configuration options.
      *
      * The function requires MPI communication and is not reentrant.
      */
