@@ -17,16 +17,16 @@ add_executable(ryujin
   dissipation_module.cc
   euler_module.cc
   initial_values.cc
+  integral_quantities.cc
   limiter.cc
   main.cc
   offline_data.cc
-  vtu_output.cc
   problem_description.cc
-  quantities.cc
   riemann_solver.cc
   simd.cc
   sparse_matrix_simd.cc
   time_loop.cc
+  vtu_output.cc
   )
 
 deal_ii_setup_target(ryujin)

@@ -12,17 +12,17 @@
 #include "dissipation_module.h"
 #include "euler_module.h"
 #include "initial_values.h"
+#include "integral_quantities.h"
 #include "offline_data.h"
-#include "vtu_output.h"
 #include "problem_description.h"
-#include "quantities.h"
+#include "vtu_output.h"
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/timer.h>
 
 #include <fstream>
-#include <sstream>
 #include <future>
+#include <sstream>
 
 namespace ryujin
 {
@@ -88,7 +88,6 @@ namespace ryujin
     //@}
 
   private:
-
     /**
      * @name Run time options
      */
@@ -132,7 +131,7 @@ namespace ryujin
     ryujin::EulerModule<dim, Number> euler_module;
     ryujin::DissipationModule<dim, Number> dissipation_module;
     ryujin::VTUOutput<dim, Number> vtu_output;
-    ryujin::Quantities<dim, Number> quantities;
+    ryujin::IntegralQuantities<dim, Number> integral_quantities;
 
     const unsigned int mpi_rank;
     const unsigned int n_mpi_processes;

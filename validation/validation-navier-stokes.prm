@@ -60,6 +60,6 @@ subsection G - DissipationModule
   set tolerance = 1e-16
 end
 
-subsection I - Quantities
+subsection I - IntegralQuantities
   set compute conserved quantities = true
 end

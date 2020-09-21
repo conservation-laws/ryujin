@@ -52,10 +52,10 @@ namespace ryujin
                            initial_values,
                            "/G - DissipationModule")
       , vtu_output(mpi_communicator, offline_data, "/H - VTUOutput")
-      , quantities(mpi_communicator,
-                   problem_description,
-                   offline_data,
-                   "/I - Quantities")
+      , integral_quantities(mpi_communicator,
+                            problem_description,
+                            offline_data,
+                            "/I - IntegralQuantities")
       , mpi_rank(dealii::Utilities::MPI::this_mpi_process(mpi_communicator))
       , n_mpi_processes(
             dealii::Utilities::MPI::n_mpi_processes(mpi_communicator))
@@ -181,7 +181,7 @@ namespace ryujin
       euler_module.prepare();
       dissipation_module.prepare();
       vtu_output.prepare();
-      quantities.prepare(base_name + "-quantities.log");
+      integral_quantities.prepare(base_name + "-integral_quantities.log");
 
       print_mpi_partition(logfile);
 
@@ -219,7 +219,7 @@ namespace ryujin
       }
     }
     if (enable_compute_quantities)
-      quantities.compute(U, t);
+      integral_quantities.compute(U, t);
     ++output_cycle;
 
     print_info("entering main loop");
@@ -265,7 +265,7 @@ namespace ryujin
         }
         if (enable_compute_quantities &&
             (output_cycle % output_quantities_multiplier == 0))
-          quantities.compute(U, t);
+          integral_quantities.compute(U, t);
 
         ++output_cycle;
 

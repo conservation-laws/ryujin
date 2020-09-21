@@ -45,6 +45,6 @@ subsection F - EulerModule
   set time step order    = 3
 end
 
-subsection I - Quantities
+subsection I - IntegralQuantities
   set compute conserved quantities = true
 end

@@ -3,8 +3,8 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#ifndef QUANTITIES_H
-#define QUANTITIES_H
+#ifndef INTEGRAL_QUANTITIES_H
+#define INTEGRAL_QUANTITIES_H
 
 #include <compile_time_options.h>
 
@@ -27,7 +27,7 @@ namespace ryujin
    * @ingroup TimeLoop
    */
   template <int dim, typename Number = double>
-  class Quantities final : public dealii::ParameterAcceptor
+  class IntegralQuantities final : public dealii::ParameterAcceptor
   {
   public:
     /**
@@ -62,10 +62,10 @@ namespace ryujin
     /**
      * Constructor.
      */
-    Quantities(const MPI_Comm &mpi_communicator,
-               const ProblemDescription &problem_description,
-               const OfflineData<dim, Number> &offline_data,
-               const std::string &subsection = "Quantities");
+    IntegralQuantities(const MPI_Comm &mpi_communicator,
+                       const ProblemDescription &problem_description,
+                       const OfflineData<dim, Number> &offline_data,
+                       const std::string &subsection = "IntegralQuantities");
 
     /**
      * Prepare evaluation. A call to @ref prepare() allocates temporary
@@ -86,8 +86,7 @@ namespace ryujin
      *
      * The function requires MPI communication and is not reentrant.
      */
-    void compute(const vector_type &U,
-                 Number t);
+    void compute(const vector_type &U, Number t);
 
   private:
     /**
@@ -95,7 +94,7 @@ namespace ryujin
      */
     //@{
 
-    bool compute_conserved_quantities_;
+    bool record_conserved_quantities_;
 
     //@}
     /**
@@ -116,4 +115,4 @@ namespace ryujin
 
 } /* namespace ryujin */
 
-#endif /* QUANTITIES_H */
+#endif /* INTEGRAL_QUANTITIES_H */
