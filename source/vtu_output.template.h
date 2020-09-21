@@ -3,11 +3,11 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#ifndef POSTPROCESSOR_TEMPLATE_H
-#define POSTPROCESSOR_TEMPLATE_H
+#ifndef VTU_OUTPUT_TEMPLATE_H
+#define VTU_OUTPUT_TEMPLATE_H
 
-#include "postprocessor.h"
 #include "simd.h"
+#include "vtu_output.h"
 
 #include <deal.II/numerics/data_out.h>
 #include <deal.II/numerics/vector_tools.h>
@@ -22,36 +22,36 @@ namespace ryujin
 
 #ifndef DOXYGEN
   template <>
-  const std::array<std::string, 2> Postprocessor<1, double>::component_names{
+  const std::array<std::string, 2> VTUOutput<1, double>::component_names{
       {"schlieren", "alpha"}};
 
   template <>
-  const std::array<std::string, 3> Postprocessor<2, double>::component_names{
+  const std::array<std::string, 3> VTUOutput<2, double>::component_names{
       {"schlieren", "vorticity", "alpha"}};
 
   template <>
-  const std::array<std::string, 3> Postprocessor<3, double>::component_names{
+  const std::array<std::string, 3> VTUOutput<3, double>::component_names{
       {"schlieren", "vorticity", "alpha"}};
 
   template <>
-  const std::array<std::string, 2> Postprocessor<1, float>::component_names{
+  const std::array<std::string, 2> VTUOutput<1, float>::component_names{
       {"schlieren", "alpha"}};
 
   template <>
-  const std::array<std::string, 3> Postprocessor<2, float>::component_names{
+  const std::array<std::string, 3> VTUOutput<2, float>::component_names{
       {"schlieren", "vorticity", "alpha"}};
 
   template <>
-  const std::array<std::string, 3> Postprocessor<3, float>::component_names{
+  const std::array<std::string, 3> VTUOutput<3, float>::component_names{
       {"schlieren", "vorticity", "alpha"}};
 #endif
 
 
   template <int dim, typename Number>
-  Postprocessor<dim, Number>::Postprocessor(
+  VTUOutput<dim, Number>::VTUOutput(
       const MPI_Comm &mpi_communicator,
       const ryujin::OfflineData<dim, Number> &offline_data,
-      const std::string &subsection /*= "Postprocessor"*/)
+      const std::string &subsection /*= "VTUOutput"*/)
       : ParameterAcceptor(subsection)
       , mpi_communicator_(mpi_communicator)
       , offline_data_(&offline_data)
@@ -88,10 +88,10 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  void Postprocessor<dim, Number>::prepare()
+  void VTUOutput<dim, Number>::prepare()
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "Postprocessor<dim, Number>::prepare()" << std::endl;
+    std::cout << "VTUOutput<dim, Number>::prepare()" << std::endl;
 #endif
 
     const auto &partitioner = offline_data_->scalar_partitioner();
@@ -102,16 +102,16 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  void Postprocessor<dim, Number>::schedule_output(const vector_type &U,
-                                                   const scalar_type &alpha,
-                                                   std::string name,
-                                                   Number t,
-                                                   unsigned int cycle,
-                                                   bool output_full,
-                                                   bool output_cutplanes)
+  void VTUOutput<dim, Number>::schedule_output(const vector_type &U,
+                                               const scalar_type &alpha,
+                                               std::string name,
+                                               Number t,
+                                               unsigned int cycle,
+                                               bool output_full,
+                                               bool output_cutplanes)
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "Postprocessor<dim, Number>::schedule_output()" << std::endl;
+    std::cout << "VTUOutput<dim, Number>::schedule_output()" << std::endl;
 #endif
 
     constexpr auto simd_length = VectorizedArray<Number>::size();
@@ -176,7 +176,7 @@ namespace ryujin
               *(i < n_internal ? js + col_idx * simd_length : js + col_idx);
 
           rank1_type U_j;
-          for(unsigned int d = 0; d < problem_dimension; ++d)
+          for (unsigned int d = 0; d < problem_dimension; ++d)
             U_j[d] = U_copy[d].local_element(j);
           const auto M_j = ProblemDescription::momentum(U_j);
 
@@ -331,8 +331,8 @@ namespace ryujin
       data_out->attach_dof_handler(offline_data_->dof_handler());
 
       for (unsigned int i = 0; i < problem_dimension; ++i)
-        data_out->add_data_vector(
-            U_copy[i], ProblemDescription::component_names<dim>[i]);
+        data_out->add_data_vector(U_copy[i],
+                                  ProblemDescription::component_names<dim>[i]);
       for (unsigned int i = 0; i < n_quantities; ++i)
         data_out->add_data_vector(quantities_[i], component_names[i]);
 
@@ -428,7 +428,7 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  void Postprocessor<dim, Number>::wait()
+  void VTUOutput<dim, Number>::wait()
   {
     if (background_thread_status.valid())
       background_thread_status.wait();
@@ -436,7 +436,7 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  bool Postprocessor<dim, Number>::is_active()
+  bool VTUOutput<dim, Number>::is_active()
   {
     if (!background_thread_status.valid())
       return false;
@@ -447,4 +447,4 @@ namespace ryujin
 
 } /* namespace ryujin */
 
-#endif /* POSTPROCESSOR_TEMPLATE_H */
+#endif /* VTU_OUTPUT_TEMPLATE_H */

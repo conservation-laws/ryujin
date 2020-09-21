@@ -51,7 +51,7 @@ namespace ryujin
                            problem_description,
                            initial_values,
                            "/G - DissipationModule")
-      , postprocessor(mpi_communicator, offline_data, "/H - Postprocessor")
+      , vtu_output(mpi_communicator, offline_data, "/H - VTUOutput")
       , quantities(mpi_communicator,
                    problem_description,
                    offline_data,
@@ -180,7 +180,7 @@ namespace ryujin
       offline_data.prepare();
       euler_module.prepare();
       dissipation_module.prepare();
-      postprocessor.prepare();
+      vtu_output.prepare();
       quantities.prepare(base_name + "-quantities.log");
 
       print_mpi_partition(logfile);
@@ -277,7 +277,7 @@ namespace ryujin
     } /* end of loop */
 
     /* Wait for output thread: */
-    postprocessor.wait();
+    vtu_output.wait();
 
     /* We have actually performed one cycle less. */
     --cycle;
@@ -443,21 +443,21 @@ namespace ryujin
       Scope scope(computing_timer, "output stall");
       print_info("waiting for previous output cycle to finish");
 
-      postprocessor.wait();
+      vtu_output.wait();
     }
 
     /* Data output: */
     if (do_full_output || do_cutplanes) {
-      Scope scope(computing_timer, "postprocessor");
+      Scope scope(computing_timer, "vtu output");
       print_info("scheduling output");
 
-      postprocessor.schedule_output(U,
-                                    euler_module.alpha(),
-                                    name,
-                                    t,
-                                    cycle,
-                                    do_full_output,
-                                    do_cutplanes);
+      vtu_output.schedule_output(U,
+                                 euler_module.alpha(),
+                                 name,
+                                 t,
+                                 cycle,
+                                 do_full_output,
+                                 do_cutplanes);
     }
 
     /* Checkpointing: */
@@ -811,7 +811,7 @@ namespace ryujin
            << std::setprecision(0) << std::fixed << euler_module.n_restarts() //
            << " rsts   (" << std::setprecision(2) << std::scientific
            << euler_module.n_restarts() / ((double)cycle) << " rsts/cycle) ]";
-    output << "[ "                                                    //
+    output << "[ "                                                        //
            << std::setprecision(2) << std::fixed                          //
            << dissipation_module.n_iterations_velocity() << " CG vel -- " //
            << dissipation_module.n_iterations_internal_energy()           //
@@ -897,7 +897,7 @@ namespace ryujin
     std::ostringstream output;
 
     unsigned int n_active_writebacks = Utilities::MPI::sum<unsigned int>(
-        postprocessor.is_active(), mpi_communicator);
+        vtu_output.is_active(), mpi_communicator);
 
     std::ostringstream primary;
     if (final_time) {

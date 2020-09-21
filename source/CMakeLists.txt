@@ -20,7 +20,7 @@ add_executable(ryujin
   limiter.cc
   main.cc
   offline_data.cc
-  postprocessor.cc
+  vtu_output.cc
   problem_description.cc
   quantities.cc
   riemann_solver.cc
@@ -40,7 +40,7 @@ if(NOT CMAKE_VERSION VERSION_LESS 3.16)
     initial_values.h
     multicomponent_vector.h
     offline_data.h
-    postprocessor.h
+    vtu_output.h
     problem_description.h
     riemann_solver.h
     scope.h

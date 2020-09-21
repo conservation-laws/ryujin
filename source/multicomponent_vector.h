@@ -119,9 +119,10 @@ namespace ryujin
      * The function calls scalar_vector.update_ghost_values() before
      * returning.
      *
-     * @note This function is used in the Postprocessor to unpack a single
-     * component out of our custom MultiComponentVector in order to call
-     * deal.II specific functions (that can only operate on scalar vectors).
+     * @note This function is used in the VTUOutput module to unpack a
+     * single component out of our custom MultiComponentVector in order to
+     * call deal.II specific functions (that can only operate on scalar
+     * vectors).
      */
     void extract_component(scalar_type &scalar_vector,
                            unsigned int component) const;

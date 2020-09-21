@@ -3,11 +3,11 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#include "postprocessor.template.h"
+#include "vtu_output.template.h"
 
 namespace ryujin
 {
   /* instantiations */
-  template class ryujin::Postprocessor<DIM, NUMBER>;
+  template class ryujin::VTUOutput<DIM, NUMBER>;
 
 } /* namespace ryujin */
