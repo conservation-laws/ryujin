@@ -47,11 +47,15 @@ namespace ryujin
                      "/F - EulerModule")
       , dissipation_module(mpi_communicator,
                            computing_timer,
-                           offline_data,
                            problem_description,
+                           offline_data,
                            initial_values,
                            "/G - DissipationModule")
       , vtu_output(mpi_communicator, offline_data, "/H - VTUOutput")
+      , point_quantities(mpi_communicator,
+                         problem_description,
+                         offline_data,
+                         "/I - PointQuantities")
       , integral_quantities(mpi_communicator,
                             problem_description,
                             offline_data,
@@ -177,10 +181,11 @@ namespace ryujin
       print_info("initializing data structures");
 
       discretization.prepare();
-      offline_data.prepare();
-      euler_module.prepare();
-      dissipation_module.prepare();
-      vtu_output.prepare();
+      offline_data.prepare();       // Storage: dim + 2 matrices; 2 vectors
+      euler_module.prepare();       // Storage: 3 * dim + 9 vectors
+      dissipation_module.prepare(); // Storage: 2 * dim + 2 vectors
+      vtu_output.prepare();         // Storage: dim + 5 vectors
+      point_quantities.prepare();   // Storage: 3 * dim + 1 vectors
       integral_quantities.prepare(base_name + "-integral_quantities.log");
 
       print_mpi_partition(logfile);
@@ -211,28 +216,43 @@ namespace ryujin
       }
     }
 
-    if (write_output_files) {
-      output(U, base_name + "-solution", t, output_cycle);
-      if (enable_compute_error) {
-        const auto analytic = initial_values.interpolate(offline_data, t);
-        output(analytic, base_name + "-analytic_solution", t, output_cycle);
-      }
-    }
-    if (enable_compute_quantities)
-      integral_quantities.compute(U, t);
-    ++output_cycle;
-
     print_info("entering main loop");
     computing_timer["time loop"].start();
 
     /* Loop: */
 
     unsigned int cycle = 1;
-    for (; t < t_final; ++cycle) {
+    for (;; ++cycle) {
 
 #ifdef DEBUG_OUTPUT
       std::cout << "\n\n###   cycle = " << cycle << "   ###\n\n" << std::endl;
 #endif
+
+      /* Perform output: */
+
+      if (t >= output_cycle * output_granularity) {
+        if (write_output_files) {
+          output(U, base_name + "-solution", t, output_cycle);
+          if (enable_compute_error) {
+            const auto analytic = initial_values.interpolate(offline_data, t);
+            output(analytic, base_name + "-analytic_solution", t, output_cycle);
+          }
+        }
+        if (enable_compute_quantities &&
+            (output_cycle % output_quantities_multiplier == 0)) {
+          point_quantities.compute(U, t);
+          integral_quantities.compute(U, t);
+        }
+
+        ++output_cycle;
+
+        print_cycle_statistics(cycle, t, output_cycle, /*logfile*/ true);
+      }
+
+      /* Break if we have reached the final time: */
+
+      if (t >= t_final)
+        break;
 
       /* Do a time step: */
 
@@ -255,25 +275,9 @@ namespace ryujin
         AssertThrow(false, ExcMessage("Unknown problem description"));
       }
 
-      if (t > output_cycle * output_granularity) {
-        if (write_output_files) {
-          output(U, base_name + "-solution", t, output_cycle);
-          if (enable_compute_error) {
-            const auto analytic = initial_values.interpolate(offline_data, t);
-            output(analytic, base_name + "-analytic_solution", t, output_cycle);
-          }
-        }
-        if (enable_compute_quantities &&
-            (output_cycle % output_quantities_multiplier == 0))
-          integral_quantities.compute(U, t);
-
-        ++output_cycle;
-
-        print_cycle_statistics(cycle, t, output_cycle, /*logfile*/ true);
-      }
-
       if (cycle % terminal_update_interval == 0)
         print_cycle_statistics(cycle, t, output_cycle);
+
     } /* end of loop */
 
     /* Wait for output thread: */

@@ -3,30 +3,36 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#ifndef INTEGRAL_QUANTITIES_H
-#define INTEGRAL_QUANTITIES_H
+#ifndef POINT_QUANTITIES_H
+#define POINT_QUANTITIES_H
 
 #include <compile_time_options.h>
 
+#include "convenience_macros.h"
+#include "simd.h"
+
+#include "initial_values.h"
 #include "offline_data.h"
 #include "problem_description.h"
+#include "sparse_matrix_simd.h"
 
 #include <deal.II/base/parameter_acceptor.h>
-#include <deal.II/grid/intergrid_map.h>
-#include <deal.II/multigrid/mg_transfer_matrix_free.h>
-
-#include <fstream>
+#include <deal.II/base/timer.h>
+#include <deal.II/lac/la_parallel_block_vector.h>
+#include <deal.II/lac/sparse_matrix.templates.h>
+#include <deal.II/lac/vector.h>
+#include <deal.II/matrix_free/matrix_free.h>
 
 namespace ryujin
 {
-
   /**
-   * A postprocessor class to compute integral quantities of interest.
+   * A postprocessor class to compute point values of quantities of
+   * interest.
    *
    * @ingroup TimeLoop
    */
   template <int dim, typename Number = double>
-  class IntegralQuantities final : public dealii::ParameterAcceptor
+  class PointQuantities final : public dealii::ParameterAcceptor
   {
   public:
     /**
@@ -59,20 +65,28 @@ namespace ryujin
     using vector_type = typename OfflineData<dim, Number>::vector_type;
 
     /**
+     * A distributed block vector used for temporary storage of the
+     * velocity field.
+     */
+    using block_vector_type =
+        dealii::LinearAlgebra::distributed::BlockVector<Number>;
+
+    /**
      * Constructor.
      */
-    IntegralQuantities(const MPI_Comm &mpi_communicator,
-                       const ProblemDescription &problem_description,
-                       const OfflineData<dim, Number> &offline_data,
-                       const std::string &subsection = "IntegralQuantities");
+    PointQuantities(const MPI_Comm &mpi_communicator,
+                    const ryujin::ProblemDescription &problem_description,
+                    const ryujin::OfflineData<dim, Number> &offline_data,
+                    const std::string &subsection = "PointQuantities");
 
     /**
      * Prepare evaluation. A call to @ref prepare() allocates temporary
      * storage and is necessary before compute() can be called.
      *
-     * A file descriptor to a log file @ref name is opened.
+     * Calling prepare() allocates temporary storage for additional (3 *
+     * dim + 1) scalar vectors of type OfflineData::scalar_type.
      */
-    void prepare(const std::string &name);
+    void prepare();
 
     /**
      * Given a state vector @p U and a scalar vector @p alpha (as well as a
@@ -87,13 +101,15 @@ namespace ryujin
      */
     void compute(const vector_type &U, Number t);
 
+    //@}
+
   private:
     /**
      * @name Run time options
      */
     //@{
 
-    bool record_conserved_quantities_;
+    // FIXME
 
     //@}
     /**
@@ -102,16 +118,20 @@ namespace ryujin
     //@{
 
     const MPI_Comm &mpi_communicator_;
-    const unsigned int mpi_rank;
 
-    const ProblemDescription &problem_description;
+    dealii::SmartPointer<const ryujin::ProblemDescription> problem_description_;
     dealii::SmartPointer<const ryujin::OfflineData<dim, Number>> offline_data_;
 
-    std::ofstream output;
+    dealii::MatrixFree<dim, Number> matrix_free_;
+
+    block_vector_type velocity_;
+    block_vector_type vorticity_;
+    block_vector_type boundary_stress_;
+    scalar_type pressure_;
 
     //@}
   };
 
 } /* namespace ryujin */
 
-#endif /* INTEGRAL_QUANTITIES_H */
+#endif /* POINT_QUANTITIES_H */

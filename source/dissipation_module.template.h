@@ -11,9 +11,6 @@
 #include "scope.h"
 #include "simd.h"
 
-#include "indicator.h"
-#include "riemann_solver.h"
-
 #include <deal.II/lac/linear_operator.h>
 #include <deal.II/lac/precondition.h>
 #include <deal.II/lac/solver_cg.h>
@@ -35,10 +32,6 @@
 #define LIKWID_MARKER_STOP(opt)
 #endif
 
-#if defined(CHECK_BOUNDS) && !defined(DEBUG)
-#define DEBUG
-#endif
-
 namespace ryujin
 {
   using namespace dealii;
@@ -48,15 +41,15 @@ namespace ryujin
   DissipationModule<dim, Number>::DissipationModule(
       const MPI_Comm &mpi_communicator,
       std::map<std::string, dealii::Timer> &computing_timer,
-      const ryujin::OfflineData<dim, Number> &offline_data,
       const ryujin::ProblemDescription &problem_description,
+      const ryujin::OfflineData<dim, Number> &offline_data,
       const ryujin::InitialValues<dim, Number> &initial_values,
       const std::string &subsection /*= "DissipationModule"*/)
       : ParameterAcceptor(subsection)
       , mpi_communicator_(mpi_communicator)
       , computing_timer_(computing_timer)
-      , offline_data_(&offline_data)
       , problem_description_(&problem_description)
+      , offline_data_(&offline_data)
       , initial_values_(&initial_values)
       , n_iterations_velocity_(0.)
       , n_iterations_internal_energy_(0.)

@@ -98,6 +98,9 @@ namespace ryujin
     /**
      * Prepare VTU output. A call to @ref prepare() allocates temporary
      * storage and is necessary before schedule_output() can be called.
+     *
+     * Calling prepare() allocates temporary storage for additional (dim +
+     * 5) scalar vectors of type OfflineData::scalar_type.
      */
     void prepare();
 
@@ -168,6 +171,7 @@ namespace ryujin
 
     std::future<void> background_thread_status;
 
+    std::array<scalar_type, problem_dimension> state_vector_;
     std::array<scalar_type, n_quantities> quantities_;
 
     //@}

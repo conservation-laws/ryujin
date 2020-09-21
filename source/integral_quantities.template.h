@@ -58,7 +58,7 @@ namespace ryujin
   void IntegralQuantities<dim, Number>::compute(const vector_type &U, Number t)
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "Quantities<dim, Number>::compute()" << std::endl;
+    std::cout << "IntegralQuantities<dim, Number>::compute()" << std::endl;
 #endif
     if (mpi_rank == 0)
       output << std::scientific << std::setprecision(14) << t;

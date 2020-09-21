@@ -69,8 +69,8 @@ namespace ryujin
      */
     DissipationModule(const MPI_Comm &mpi_communicator,
                       std::map<std::string, dealii::Timer> &computing_timer,
-                      const ryujin::OfflineData<dim, Number> &offline_data,
                       const ryujin::ProblemDescription &problem_description,
+                      const ryujin::OfflineData<dim, Number> &offline_data,
                       const ryujin::InitialValues<dim, Number> &initial_values,
                       const std::string &subsection = "DissipationModule");
 
@@ -133,8 +133,8 @@ namespace ryujin
     const MPI_Comm &mpi_communicator_;
     std::map<std::string, dealii::Timer> &computing_timer_;
 
-    dealii::SmartPointer<const ryujin::OfflineData<dim, Number>> offline_data_;
     dealii::SmartPointer<const ryujin::ProblemDescription> problem_description_;
+    dealii::SmartPointer<const ryujin::OfflineData<dim, Number>> offline_data_;
     dealii::SmartPointer<const ryujin::InitialValues<dim, Number>>
         initial_values_;
 

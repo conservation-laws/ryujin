@@ -21,6 +21,7 @@ add_executable(ryujin
   limiter.cc
   main.cc
   offline_data.cc
+  point_quantities.cc
   problem_description.cc
   riemann_solver.cc
   simd.cc

@@ -128,11 +128,9 @@ namespace ryujin
     /*
      * Step 1: Copy state vector:
      */
-
-    std::array<scalar_type, problem_dimension> U_copy;
     {
       unsigned int d = 0;
-      for (auto &it : U_copy) {
+      for (auto &it : state_vector_) {
         it.reinit(offline_data_->scalar_partitioner());
         U.extract_component(it, d++);
         affine_constraints.distribute(it);
@@ -177,7 +175,7 @@ namespace ryujin
 
           rank1_type U_j;
           for (unsigned int d = 0; d < problem_dimension; ++d)
-            U_j[d] = U_copy[d].local_element(j);
+            U_j[d] = state_vector_[d].local_element(j);
           const auto M_j = ProblemDescription::momentum(U_j);
 
           const auto c_ij = cij_matrix.get_tensor(i, col_idx);
@@ -331,7 +329,7 @@ namespace ryujin
       data_out->attach_dof_handler(offline_data_->dof_handler());
 
       for (unsigned int i = 0; i < problem_dimension; ++i)
-        data_out->add_data_vector(U_copy[i],
+        data_out->add_data_vector(state_vector_[i],
                                   ProblemDescription::component_names<dim>[i]);
       for (unsigned int i = 0; i < n_quantities; ++i)
         data_out->add_data_vector(quantities_[i], component_names[i]);
@@ -348,7 +346,7 @@ namespace ryujin
 
       for (unsigned int i = 0; i < problem_dimension; ++i)
         data_out_cutplanes->add_data_vector(
-            U_copy[i], ProblemDescription::component_names<dim>[i]);
+            state_vector_[i], ProblemDescription::component_names<dim>[i]);
       for (unsigned int i = 0; i < n_quantities; ++i)
         data_out_cutplanes->add_data_vector(quantities_[i], component_names[i]);
 

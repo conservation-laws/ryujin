@@ -30,10 +30,6 @@
 #define LIKWID_MARKER_STOP(opt)
 #endif
 
-#if defined(CHECK_BOUNDS) && !defined(DEBUG)
-#define DEBUG
-#endif
-
 namespace ryujin
 {
   using namespace dealii;

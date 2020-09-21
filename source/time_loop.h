@@ -14,6 +14,7 @@
 #include "initial_values.h"
 #include "integral_quantities.h"
 #include "offline_data.h"
+#include "point_quantities.h"
 #include "problem_description.h"
 #include "vtu_output.h"
 
@@ -131,6 +132,7 @@ namespace ryujin
     ryujin::EulerModule<dim, Number> euler_module;
     ryujin::DissipationModule<dim, Number> dissipation_module;
     ryujin::VTUOutput<dim, Number> vtu_output;
+    ryujin::PointQuantities<dim, Number> point_quantities;
     ryujin::IntegralQuantities<dim, Number> integral_quantities;
 
     const unsigned int mpi_rank;
