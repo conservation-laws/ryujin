@@ -41,10 +41,16 @@ namespace ryujin
 
     /* Initialize matrix free context: */
 
+    typename MatrixFree<dim, double>::AdditionalData additional_data;
+    additional_data.mapping_update_flags_boundary_faces =
+        (update_values | update_gradients | update_JxW_values |
+         update_normal_vectors);
+
     matrix_free_.reinit(offline_data_->discretization().mapping(),
                         offline_data_->dof_handler(),
                         offline_data_->affine_constraints(),
-                        offline_data_->discretization().quadrature_1d());
+                        offline_data_->discretization().quadrature_1d(),
+                        additional_data);
 
     const auto &scalar_partitioner =
         matrix_free_.get_dof_info(0).vector_partitioner;
@@ -173,6 +179,8 @@ namespace ryujin
           }
         }
       }
+
+      vorticity_.update_ghost_values();
     }
 
     /*
@@ -184,6 +192,7 @@ namespace ryujin
 
       constexpr auto order_fe = Discretization<dim>::order_finite_element;
       constexpr auto order_quad = Discretization<dim>::order_quadrature;
+
       FEFaceEvaluation<dim, order_fe, order_quad, dim, Number> velocity(
           matrix_free_);
       FEFaceEvaluation<dim, order_fe, order_quad, 1, Number> pressure(
@@ -195,7 +204,7 @@ namespace ryujin
       const auto lambda = problem_description_->lambda();
 
       const auto begin = matrix_free_.n_inner_face_batches();
-      const auto size = matrix_free_.n_inner_face_batches();
+      const auto size = matrix_free_.n_boundary_face_batches();
       for (unsigned int face = begin; face < begin + size; ++face) {
         const auto id = matrix_free_.get_boundary_id(face);
 
@@ -234,8 +243,23 @@ namespace ryujin
         velocity.integrate_scatter(true, false, boundary_stress_);
 #endif
       }
+
+      boundary_stress_.update_ghost_values();
     }
 
+    // DEBUG
+    {
+      dealii::DataOut<dim> data_out;
+      data_out.attach_dof_handler(offline_data_->dof_handler());
+      data_out.add_data_vector(boundary_stress_.block(0), "stress_0");
+      data_out.add_data_vector(boundary_stress_.block(1), "stress_1");
+      const auto &discretization = offline_data_->discretization();
+      const auto &mapping = discretization.mapping();
+      const auto patch_order = discretization.finite_element().degree - 1;
+      data_out.build_patches(mapping, patch_order);
+      data_out.write_vtu_in_parallel("stress-" + std::to_string(t) + ".vtu",
+                                     mpi_communicator_);
+    }
   }
 
 
