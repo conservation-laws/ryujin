@@ -297,10 +297,11 @@ namespace ryujin
            */
           Point<dim> position;
           const auto global_index = scalar_partitioner_->local_to_global(index);
-          for (unsigned int v = 0; v < GeometryInfo<dim>::vertices_per_cell;
-               ++v)
-            if (cell->vertex_dof_index(v, 0) == global_index)
+          for (auto v : GeometryInfo<dim>::vertex_indices())
+            if (cell->vertex_dof_index(v, 0) == global_index) {
               position = cell->vertex(v);
+              break;
+            }
 
           local_boundary_map.insert({index, {normal, id, position}});
         } /* j */

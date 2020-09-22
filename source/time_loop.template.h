@@ -241,7 +241,8 @@ namespace ryujin
         if (enable_compute_quantities &&
             (output_cycle % output_quantities_multiplier == 0)) {
           Scope scope(computing_timer, "quantities of interest");
-          point_quantities.compute(U, t);
+          point_quantities.compute(
+              U, base_name + "-point_quantities", t, output_cycle);
           integral_quantities.compute(U, t);
         }
 

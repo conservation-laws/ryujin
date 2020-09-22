@@ -85,6 +85,8 @@ namespace ryujin
      *
      * Calling prepare() allocates temporary storage for additional (3 *
      * dim + 1) scalar vectors of type OfflineData::scalar_type.
+     *
+     * The string parameter @ref name is used as base name for output files.
      */
     void prepare();
 
@@ -99,7 +101,10 @@ namespace ryujin
      *
      * The function requires MPI communication and is not reentrant.
      */
-    void compute(const vector_type &U, Number t);
+    void compute(const vector_type &U,
+                 std::string name,
+                 Number t,
+                 unsigned int cycle);
 
     //@}
 
@@ -109,7 +114,14 @@ namespace ryujin
      */
     //@{
 
-    // FIXME
+    using plane_description = std::tuple<dealii::Point<dim> /*origin*/,
+                                         dealii::Tensor<1, dim> /*normal*/,
+                                         double /*tolerance*/>;
+
+    std::vector<plane_description> output_planes_;
+
+    std::vector<std::map<dealii::types::global_dof_index, dealii::Point<dim>>>
+        cutplane_map_;
 
     //@}
     /**

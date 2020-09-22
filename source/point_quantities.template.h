@@ -6,11 +6,13 @@
 #ifndef POINT_QUANTITIES_TEMPLATE_H
 #define POINT_QUANTITIES_TEMPLATE_H
 
-#include "point_quantities.h"
 #include "openmp.h"
+#include "point_quantities.h"
 #include "scope.h"
+#include "scratch_data.h"
 #include "simd.h"
 
+#include <deal.II/base/work_stream.h>
 #include <deal.II/matrix_free/fe_evaluation.h>
 
 namespace ryujin
@@ -29,6 +31,14 @@ namespace ryujin
       , problem_description_(&problem_description)
       , offline_data_(&offline_data)
   {
+    add_parameter(
+        "output planes",
+        output_planes_,
+        "A vector of hyperplanes described by an origin, normal vector and a "
+        "tolerance. The description is used to only output point values for "
+        "vertices belonging to a cell cut by the cutplane. Example declaration "
+        "of two hyper planes in 3D, one normal to the x-axis and one normal to "
+        "the y-axis: \"0,0,0 : 1,0,0 : 0.01 ; 0,0,0 : 0,1,0 : 0,01\"");
   }
 
 
@@ -52,6 +62,8 @@ namespace ryujin
                         offline_data_->discretization().quadrature_1d(),
                         additional_data);
 
+    /* Initialize vectors: */
+
     const auto &scalar_partitioner =
         matrix_free_.get_dof_info(0).vector_partitioner;
 
@@ -67,11 +79,121 @@ namespace ryujin
     if constexpr (dim == 2)
       vorticity_.block(0).reinit(scalar_partitioner);
     pressure_.reinit(scalar_partitioner);
+
+    /*
+     * Collect local dof indices and associated point locations for the
+     * prescribed cut planes:
+     */
+    {
+      cutplane_map_.clear();
+
+      const auto &partitioner = offline_data_->scalar_partitioner();
+      const auto &discretization = offline_data_->discretization();
+      const unsigned int dofs_per_cell =
+          discretization.finite_element().dofs_per_cell;
+
+      const auto local_assemble_system =
+          [&](const auto &cell, auto &scratch, auto &copy) {
+            /* iterate over locally owned cells and the ghost layer */
+
+            auto &is_artificial = copy.is_artificial_;
+            auto &local_dof_indices = copy.local_dof_indices_;
+            auto &local_boundary_map = copy.local_boundary_map_;
+            auto &fe_values = scratch.fe_values_;
+
+            is_artificial = cell->is_artificial();
+            if (is_artificial)
+              return;
+
+            fe_values.reinit(cell);
+
+            local_dof_indices.resize(dofs_per_cell);
+            cell->get_dof_indices(local_dof_indices);
+
+            /* clear out copy data: */
+            local_boundary_map.clear();
+
+            unsigned int id = 0;
+            /* Record every matching cutplane: */
+            for (const auto &plane : output_planes_) {
+              const auto &[origin, normal, tolerance] = plane;
+
+              unsigned int above = 0;
+              unsigned int below = 0;
+              bool cut = false;
+
+              for (auto v : GeometryInfo<dim>::vertex_indices()) {
+                const auto vertex = cell->vertex(v);
+                const auto distance = (vertex - Point<dim>(origin)) * normal;
+                if (distance > -tolerance)
+                  above++;
+                if (distance < tolerance)
+                  below++;
+                if (above > 0 && below > 0) {
+                  cut = true;
+                  break;
+                }
+              }
+
+              if (cut) {
+                /* Record all vertex indices: */
+
+                for (unsigned int j = 0; j < dofs_per_cell; ++j) {
+                  /*
+                   * This is a bloody hack: Use "vertex_dof_index" to retrieve
+                   * the vertex associated to the current degree of freedom.
+                   */
+                  Point<dim> position;
+                  const auto global_index = local_dof_indices[j];
+                  for (auto v : GeometryInfo<dim>::vertex_indices())
+                    if (cell->vertex_dof_index(v, 0) == global_index) {
+                      position = cell->vertex(v);
+                      break;
+                    }
+
+                  const auto index = partitioner->global_to_local(global_index);
+
+                  /* Insert a dummy value for boundary normal */
+                  local_boundary_map.insert(
+                      {index, {dealii::Tensor<1, dim>(), id, position}});
+                } /* for j */
+              }
+              ++id;
+            } /* plane */
+          };
+
+      const auto copy_local_to_global = [&](const auto &copy) {
+        const auto &is_artificial = copy.is_artificial_;
+        const auto &local_boundary_map = copy.local_boundary_map_;
+
+        if (is_artificial)
+          return;
+
+        for (const auto entry : local_boundary_map) {
+          const auto &index = entry.first;
+          const auto &[normal, id , position] = entry.second;
+          cutplane_map_[id][index] = position;
+        }
+      };
+
+      cutplane_map_.resize(output_planes_.size());
+
+      const auto &dof_handler = offline_data_->dof_handler();
+      WorkStream::run(dof_handler.begin_active(),
+                      dof_handler.end(),
+                      local_assemble_system,
+                      copy_local_to_global,
+                      AssemblyScratchData<dim>(discretization),
+                      AssemblyCopyData<dim, Number>());
+    }
   }
 
 
   template <int dim, typename Number>
-  void PointQuantities<dim, Number>::compute(const vector_type &U, Number t)
+  void PointQuantities<dim, Number>::compute(const vector_type &U,
+                                             std::string name,
+                                             Number t,
+                                             unsigned int cycle)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "PointQuantities<dim, Number>::compute()" << std::endl;
@@ -83,7 +205,7 @@ namespace ryujin
     const unsigned int size_regular = n_owned / simd_length * simd_length;
 
     /*
-     * Step 0: Copy velocity:
+     * Step 0: Copy velocity and compute pressure:
      */
 
     {
@@ -179,8 +301,6 @@ namespace ryujin
           }
         }
       }
-
-      vorticity_.update_ghost_values();
     }
 
     /*
@@ -234,7 +354,7 @@ namespace ryujin
           for (unsigned int d = 0; d < dim; ++d)
             S[d][d] += (lambda - 2. / 3. * mu) * divergence - p;
 
-          velocity.submit_value(S * normal, q);
+          velocity.submit_value(-S * normal, q);
         }
 
 #if DEAL_II_VERSION_GTE(9, 3, 0)
@@ -243,25 +363,102 @@ namespace ryujin
         velocity.integrate_scatter(true, false, boundary_stress_);
 #endif
       }
+    }
 
+    /*
+     * Divide by lumped mass matrix:
+     */
+
+    {
+      const auto &lumped_mass_matrix_inverse =
+          offline_data_->lumped_mass_matrix_inverse();
+
+      RYUJIN_PARALLEL_REGION_BEGIN
+      RYUJIN_OMP_FOR
+      for (unsigned int i = 0; i < size_regular; i += simd_length) {
+        const auto m_i_inv = simd_load(lumped_mass_matrix_inverse, i);
+        for (unsigned int d = 0; d < dim; ++d) {
+          const auto f_i = simd_load(boundary_stress_.block(d), i);
+          simd_store(boundary_stress_.block(d), m_i_inv * f_i, i);
+          if constexpr (dim == 3) {
+            const auto v_i = simd_load(vorticity_.block(d), i);
+            simd_store(vorticity_.block(d), m_i_inv * v_i, i);
+          }
+        }
+        if constexpr (dim == 2) {
+          const auto v_i = simd_load(vorticity_.block(0), i);
+          simd_store(vorticity_.block(0), m_i_inv * v_i, i);
+        }
+      }
+      RYUJIN_PARALLEL_REGION_END
+
+      for (unsigned int i = size_regular; i < n_owned; ++i) {
+        const auto m_i_inv = lumped_mass_matrix_inverse.local_element(i);
+        for (unsigned int d = 0; d < dim; ++d) {
+          boundary_stress_.block(d).local_element(i) *= m_i_inv;
+          if constexpr (dim == 3)
+            vorticity_.block(d).local_element(i) *= m_i_inv;
+        }
+        if constexpr (dim == 2)
+          vorticity_.block(0).local_element(i) *= m_i_inv;
+      }
+
+      vorticity_.update_ghost_values();
       boundary_stress_.update_ghost_values();
     }
 
-    // DEBUG
-    {
-      dealii::DataOut<dim> data_out;
-      data_out.attach_dof_handler(offline_data_->dof_handler());
-      data_out.add_data_vector(boundary_stress_.block(0), "stress_0");
-      data_out.add_data_vector(boundary_stress_.block(1), "stress_1");
-      const auto &discretization = offline_data_->discretization();
-      const auto &mapping = discretization.mapping();
-      const auto patch_order = discretization.finite_element().degree - 1;
-      data_out.build_patches(mapping, patch_order);
-      data_out.write_vtu_in_parallel("stress-" + std::to_string(t) + ".vtu",
-                                     mpi_communicator_);
-    }
-  }
+    /*
+     * Collect all boundary points of interest and output to log file:
+     */
 
+    {
+      const auto &boundary_map = offline_data_->boundary_map();
+
+      using entry = std::tuple<dealii::Point<dim> /*position*/,
+                               dealii::Tensor<1, dim, Number> /*normal*/,
+                               rank1_type /*state*/,
+                               dealii::Tensor<1, dim, Number> /*stress*/>;
+
+      std::vector<entry> entries;
+      for (const auto &it : boundary_map) {
+
+        /* Only record locally owned degrees of freedom */
+        const auto i = it.first;
+        if (i >= n_owned)
+          continue;
+
+        const auto &[normal, id, position] = it.second;
+
+        const auto U_i = U.get_tensor(i);
+        Tensor<1, dim, Number> Sn_i;
+        for (unsigned int d = 0; d < dim; ++d)
+          Sn_i[d] = boundary_stress_.block(d).local_element(i);
+
+        entries.push_back({position, normal, U_i, Sn_i});
+      }
+
+      const auto all = Utilities::MPI::gather(mpi_communicator_, entries);
+
+      if (Utilities::MPI::this_mpi_process(mpi_communicator_) == 0) {
+        std::ofstream output(name + "-boundary_values-" +
+                             Utilities::to_string(cycle, 6) + ".log");
+
+        output << std::scientific << std::setprecision(14) << t;
+        output << "# t = " << t << std::endl;
+        output << "position\tnormal\tstate (rho,M,E)\tstress" << std::endl;
+
+        for (const auto &contribution : all) {
+          for (const auto &entry : contribution) {
+            const auto &[position, normal, U_i, Sn_i] = entry;
+            output << position << "\t" << normal << "\t" << U_i << "\t" << Sn_i
+                   << std::endl;
+          }
+        }
+      }
+    }
+
+    // TODO
+  }
 
 } /* namespace ryujin */
 
