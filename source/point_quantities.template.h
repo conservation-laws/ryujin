@@ -50,17 +50,17 @@ namespace ryujin
         matrix_free_.get_dof_info(0).vector_partitioner;
 
     velocity_.reinit(dim);
+    vorticity_.reinit(dim == 2 ? 1 : dim);
     boundary_stress_.reinit(dim);
-    if constexpr (dim >= 2)
-      vorticity_.reinit(dim == 2 ? 1 : dim);
     for (unsigned int i = 0; i < dim; ++i) {
       velocity_.block(i).reinit(scalar_partitioner);
-      boundary_stress_.block(i).reinit(scalar_partitioner);
       if constexpr (dim == 3)
         vorticity_.block(i).reinit(scalar_partitioner);
+      boundary_stress_.block(i).reinit(scalar_partitioner);
     }
     if constexpr (dim == 2)
       vorticity_.block(0).reinit(scalar_partitioner);
+    pressure_.reinit(scalar_partitioner);
   }
 
 
@@ -79,6 +79,7 @@ namespace ryujin
     /*
      * Step 0: Copy velocity:
      */
+
     {
       RYUJIN_PARALLEL_REGION_BEGIN
       RYUJIN_OMP_FOR
@@ -111,12 +112,13 @@ namespace ryujin
     /*
      * Step 1: Compute vorticity:
      */
+
     {
       matrix_free_.template cell_loop<block_vector_type, block_vector_type>(
-          [this](const auto &data,
-                 auto &dst,
-                 const auto &src,
-                 const auto cell_range) {
+          [](const auto &data,
+             auto &dst,
+             const auto &src,
+             const auto cell_range) {
             constexpr auto order_fe = Discretization<dim>::order_finite_element;
             constexpr auto order_quad = Discretization<dim>::order_quadrature;
             FEEvaluation<dim, order_fe, order_quad, dim, Number> velocity(data);
@@ -146,13 +148,94 @@ namespace ryujin
           vorticity_,
           velocity_,
           /* zero destination */ true);
+
+      /* Fix up boundary: */
+
+      for (auto it : offline_data_->boundary_map()) {
+        const auto i = it.first;
+        if (i >= n_owned)
+          continue;
+
+        const auto [normal, id, _] = it.second;
+
+        /* Only retain the normal component of the curl on the boundary: */
+
+        if (id == Boundary::slip || id == Boundary::no_slip) {
+          if constexpr (dim == 2) {
+            vorticity_.block(0).local_element(i) = 0.;
+          } else if constexpr (dim == 3) {
+            Tensor<1, dim, Number> curl_v_i;
+            for (unsigned int d = 0; d < dim; ++d)
+              curl_v_i[d] = vorticity_.block(d).local_element(i);
+            curl_v_i = (curl_v_i * normal) * normal;
+            for (unsigned int d = 0; d < dim; ++d)
+              vorticity_.block(d).local_element(i) = curl_v_i[d];
+          }
+        }
+      }
     }
 
     /*
-     * Step 2: Compute vorticity:
+     * Step 2: Boundary stress:
      */
+
     {
+      /* We simply integrate over all boundary faces by hand: */
+
+      constexpr auto order_fe = Discretization<dim>::order_finite_element;
+      constexpr auto order_quad = Discretization<dim>::order_quadrature;
+      FEFaceEvaluation<dim, order_fe, order_quad, dim, Number> velocity(
+          matrix_free_);
+      FEFaceEvaluation<dim, order_fe, order_quad, 1, Number> pressure(
+          matrix_free_);
+
+      boundary_stress_ = 0.;
+
+      const auto mu = problem_description_->mu();
+      const auto lambda = problem_description_->lambda();
+
+      const auto begin = matrix_free_.n_inner_face_batches();
+      const auto size = matrix_free_.n_inner_face_batches();
+      for (unsigned int face = begin; face < begin + size; ++face) {
+        const auto id = matrix_free_.get_boundary_id(face);
+
+        /* only compute on slip and no_slip boundary conditions */
+        if (id != Boundary::slip && id != Boundary::no_slip)
+          continue;
+
+        velocity.reinit(face);
+        pressure.reinit(face);
+#if DEAL_II_VERSION_GTE(9, 3, 0)
+        velocity.gather_evaluate(velocity_, EvaluationFlags::gradients);
+        pressure.gather_evaluate(pressure_, EvaluationFlags::values);
+#else
+        velocity.gather_evaluate(velocity_, false, true);
+        pressure.gather_evaluate(pressure_, true, false);
+#endif
+        for (unsigned int q = 0; q < velocity.n_q_points; ++q) {
+          const auto normal = velocity.get_normal_vector(q);
+
+          const auto symmetric_gradient = velocity.get_symmetric_gradient(q);
+          const auto divergence = trace(symmetric_gradient);
+
+          const auto p = pressure.get_value(q);
+
+          // S = (2 mu nabla^S(v) + (lambda - 2/3*mu) div(v) Id) - p * Id
+          auto S = 2. * mu * symmetric_gradient;
+          for (unsigned int d = 0; d < dim; ++d)
+            S[d][d] += (lambda - 2. / 3. * mu) * divergence - p;
+
+          velocity.submit_value(S * normal, q);
+        }
+
+#if DEAL_II_VERSION_GTE(9, 3, 0)
+        velocity.integrate_scatter(EvaluationFlags::values, boundary_stress_);
+#else
+        velocity.integrate_scatter(true, false, boundary_stress_);
+#endif
+      }
     }
+
   }
 
 
