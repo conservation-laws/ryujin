@@ -139,6 +139,7 @@ namespace ryujin
     block_vector_type velocity_;
     block_vector_type vorticity_;
     block_vector_type boundary_stress_;
+    scalar_type lumped_boundary_mass_;
     scalar_type pressure_;
 
     //@}

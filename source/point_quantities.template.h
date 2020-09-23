@@ -78,12 +78,53 @@ namespace ryujin
     }
     if constexpr (dim == 2)
       vorticity_.block(0).reinit(scalar_partitioner);
+
+    lumped_boundary_mass_.reinit(scalar_partitioner);
     pressure_.reinit(scalar_partitioner);
+
+    /*
+     * Compute lumped boundary mass matrix:
+     */
+
+    {
+      /* We simply integrate over all boundary faces by hand: */
+
+      constexpr auto order_fe = Discretization<dim>::order_finite_element;
+      constexpr auto order_quad = Discretization<dim>::order_quadrature;
+
+      FEFaceEvaluation<dim, order_fe, order_quad, 1, Number> phi(matrix_free_);
+
+      lumped_boundary_mass_ = 0.;
+
+      const auto begin = matrix_free_.n_inner_face_batches();
+      const auto size = matrix_free_.n_boundary_face_batches();
+      for (unsigned int face = begin; face < begin + size; ++face) {
+        const auto id = matrix_free_.get_boundary_id(face);
+
+        /* only compute on slip and no_slip boundary conditions */
+        if (id != Boundary::slip && id != Boundary::no_slip)
+          continue;
+
+        phi.reinit(face);
+        for (unsigned int q = 0; q < phi.n_q_points; ++q) {
+          phi.submit_value(1., q);
+        }
+
+#if DEAL_II_VERSION_GTE(9, 3, 0)
+        phi.integrate_scatter(EvaluationFlags::values, lumped_boundary_mass_);
+#else
+        phi.integrate_scatter(true, false, lumped_boundary_mass_
+#endif
+      }
+
+      lumped_boundary_mass_.update_ghost_values();
+    }
 
     /*
      * Collect local dof indices and associated point locations for the
      * prescribed cut planes:
      */
+
     {
       cutplane_map_.clear();
 
@@ -301,6 +342,40 @@ namespace ryujin
           }
         }
       }
+
+      /* Divide by lumped mass matrix: */
+
+      const auto &lumped_mass_matrix_inverse =
+          offline_data_->lumped_mass_matrix_inverse();
+
+      RYUJIN_PARALLEL_REGION_BEGIN
+      RYUJIN_OMP_FOR
+      for (unsigned int i = 0; i < size_regular; i += simd_length) {
+        const auto m_i_inv = simd_load(lumped_mass_matrix_inverse, i);
+        for (unsigned int d = 0; d < dim; ++d) {
+          if constexpr (dim == 3) {
+            const auto v_i = simd_load(vorticity_.block(d), i);
+            simd_store(vorticity_.block(d), m_i_inv * v_i, i);
+          }
+        }
+        if constexpr (dim == 2) {
+          const auto v_i = simd_load(vorticity_.block(0), i);
+          simd_store(vorticity_.block(0), m_i_inv * v_i, i);
+        }
+      }
+      RYUJIN_PARALLEL_REGION_END
+
+      for (unsigned int i = size_regular; i < n_owned; ++i) {
+        const auto m_i_inv = lumped_mass_matrix_inverse.local_element(i);
+        for (unsigned int d = 0; d < dim; ++d) {
+          if constexpr (dim == 3)
+            vorticity_.block(d).local_element(i) *= m_i_inv;
+        }
+        if constexpr (dim == 2)
+          vorticity_.block(0).local_element(i) *= m_i_inv;
+      }
+
+      vorticity_.update_ghost_values();
     }
 
     /*
@@ -366,48 +441,6 @@ namespace ryujin
     }
 
     /*
-     * Divide by lumped mass matrix:
-     */
-
-    {
-      const auto &lumped_mass_matrix_inverse =
-          offline_data_->lumped_mass_matrix_inverse();
-
-      RYUJIN_PARALLEL_REGION_BEGIN
-      RYUJIN_OMP_FOR
-      for (unsigned int i = 0; i < size_regular; i += simd_length) {
-        const auto m_i_inv = simd_load(lumped_mass_matrix_inverse, i);
-        for (unsigned int d = 0; d < dim; ++d) {
-          const auto f_i = simd_load(boundary_stress_.block(d), i);
-          simd_store(boundary_stress_.block(d), m_i_inv * f_i, i);
-          if constexpr (dim == 3) {
-            const auto v_i = simd_load(vorticity_.block(d), i);
-            simd_store(vorticity_.block(d), m_i_inv * v_i, i);
-          }
-        }
-        if constexpr (dim == 2) {
-          const auto v_i = simd_load(vorticity_.block(0), i);
-          simd_store(vorticity_.block(0), m_i_inv * v_i, i);
-        }
-      }
-      RYUJIN_PARALLEL_REGION_END
-
-      for (unsigned int i = size_regular; i < n_owned; ++i) {
-        const auto m_i_inv = lumped_mass_matrix_inverse.local_element(i);
-        for (unsigned int d = 0; d < dim; ++d) {
-          boundary_stress_.block(d).local_element(i) *= m_i_inv;
-          if constexpr (dim == 3)
-            vorticity_.block(d).local_element(i) *= m_i_inv;
-        }
-        if constexpr (dim == 2)
-          vorticity_.block(0).local_element(i) *= m_i_inv;
-      }
-
-      vorticity_.update_ghost_values();
-      boundary_stress_.update_ghost_values();
-    }
-
-    /*
      * Collect all boundary points of interest and output to log file:
      */
 
@@ -430,11 +463,13 @@ namespace ryujin
         const auto &[normal, id, position] = it.second;
 
         const auto U_i = U.get_tensor(i);
+        const auto m_i = lumped_boundary_mass_.local_element(i);
+
         Tensor<1, dim, Number> Sn_i;
         for (unsigned int d = 0; d < dim; ++d)
           Sn_i[d] = boundary_stress_.block(d).local_element(i);
 
-        entries.push_back({position, normal, U_i, Sn_i});
+        entries.push_back({position, normal, U_i, Sn_i / m_i});
       }
 
       const auto all = Utilities::MPI::gather(mpi_communicator_, entries);
@@ -443,9 +478,9 @@ namespace ryujin
         std::ofstream output(name + "-boundary_values-" +
                              Utilities::to_string(cycle, 6) + ".log");
 
-        output << std::scientific << std::setprecision(14) << t;
+        output << std::scientific << std::setprecision(14);
         output << "# t = " << t << std::endl;
-        output << "position\tnormal\tstate (rho,M,E)\tstress" << std::endl;
+        output << "# position\tnormal\tstate (rho,M,E)\tstress" << std::endl;
 
         for (const auto &contribution : all) {
           for (const auto &entry : contribution) {
