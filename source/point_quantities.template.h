@@ -390,8 +390,6 @@ namespace ryujin
 
       FEFaceEvaluation<dim, order_fe, order_quad, dim, Number> velocity(
           matrix_free_);
-      FEFaceEvaluation<dim, order_fe, order_quad, 1, Number> pressure(
-          matrix_free_);
 
       boundary_stress_ = 0.;
 
@@ -408,13 +406,10 @@ namespace ryujin
           continue;
 
         velocity.reinit(face);
-        pressure.reinit(face);
 #if DEAL_II_VERSION_GTE(9, 3, 0)
         velocity.gather_evaluate(velocity_, EvaluationFlags::gradients);
-        pressure.gather_evaluate(pressure_, EvaluationFlags::values);
 #else
         velocity.gather_evaluate(velocity_, false, true);
-        pressure.gather_evaluate(pressure_, true, false);
 #endif
         for (unsigned int q = 0; q < velocity.n_q_points; ++q) {
           const auto normal = velocity.get_normal_vector(q);
@@ -422,14 +417,12 @@ namespace ryujin
           const auto symmetric_gradient = velocity.get_symmetric_gradient(q);
           const auto divergence = trace(symmetric_gradient);
 
-          const auto p = pressure.get_value(q);
-
           // S = (2 mu nabla^S(v) + (lambda - 2/3*mu) div(v) Id) - p * Id
           auto S = 2. * mu * symmetric_gradient;
           for (unsigned int d = 0; d < dim; ++d)
-            S[d][d] += (lambda - 2. / 3. * mu) * divergence - p;
+            S[d][d] += (lambda - 2. / 3. * mu) * divergence;
 
-          velocity.submit_value(-S * normal, q);
+          velocity.submit_value(S * (-normal), q);
         }
 
 #if DEAL_II_VERSION_GTE(9, 3, 0)
@@ -450,7 +443,8 @@ namespace ryujin
       using entry = std::tuple<dealii::Point<dim> /*position*/,
                                dealii::Tensor<1, dim, Number> /*normal*/,
                                rank1_type /*state*/,
-                               dealii::Tensor<1, dim, Number> /*stress*/>;
+                               dealii::Tensor<1, dim, Number> /*stress*/,
+                               Number /*pressure*/>;
 
       std::vector<entry> entries;
       for (const auto &it : boundary_map) {
@@ -464,12 +458,13 @@ namespace ryujin
 
         const auto U_i = U.get_tensor(i);
         const auto m_i = lumped_boundary_mass_.local_element(i);
+        const auto P_i = pressure_.local_element(i);
 
         Tensor<1, dim, Number> Sn_i;
         for (unsigned int d = 0; d < dim; ++d)
           Sn_i[d] = boundary_stress_.block(d).local_element(i);
 
-        entries.push_back({position, normal, U_i, Sn_i / m_i});
+        entries.push_back({position, normal, U_i, Sn_i / m_i, P_i});
       }
 
       const auto all = Utilities::MPI::gather(mpi_communicator_, entries);
@@ -480,13 +475,14 @@ namespace ryujin
 
         output << std::scientific << std::setprecision(14);
         output << "# t = " << t << std::endl;
-        output << "# position\tnormal\tstate (rho,M,E)\tstress" << std::endl;
+        output << "# position\tnormal\tstate (rho,M,E)\tstress\tpressure"
+               << std::endl;
 
         for (const auto &contribution : all) {
           for (const auto &entry : contribution) {
-            const auto &[position, normal, U_i, Sn_i] = entry;
-            output << position << "\t" << normal << "\t" << U_i << "\t" << Sn_i
-                   << std::endl;
+            const auto &[position, normal, U_i, Sn_i, P_i] = entry;
+            output << position << "\t" << normal << "\t" //
+                   << U_i << "\t" << Sn_i << "\t" << P_i << std::endl;
           }
         }
       }
