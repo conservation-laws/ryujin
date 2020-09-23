@@ -15,6 +15,16 @@
 #include <deal.II/base/work_stream.h>
 #include <deal.II/matrix_free/fe_evaluation.h>
 
+DEAL_II_NAMESPACE_OPEN
+template <int rank, int dim, typename Number>
+bool operator<(const Tensor<rank, dim, Number> &left,
+               const Tensor<rank, dim, Number> &right)
+{
+  return std::lexicographical_compare(
+      left.begin_raw(), left.end_raw(), right.begin_raw(), right.end_raw());
+}
+DEAL_II_NAMESPACE_CLOSE
+
 namespace ryujin
 {
   using namespace dealii;
@@ -467,7 +477,17 @@ namespace ryujin
         entries.push_back({position, normal, U_i, Sn_i / m_i, P_i});
       }
 
-      const auto all = Utilities::MPI::gather(mpi_communicator_, entries);
+      std::vector<entry> all_entries;
+      {
+        const auto received =
+            Utilities::MPI::gather(mpi_communicator_, entries);
+        for (auto &&it : received)
+          std::move(
+              std::begin(it), std::end(it), std::back_inserter(all_entries));
+
+
+        std::sort(all_entries.begin(), all_entries.end());
+      }
 
       if (Utilities::MPI::this_mpi_process(mpi_communicator_) == 0) {
         std::ofstream output(name + "-boundary_values-" +
@@ -478,12 +498,10 @@ namespace ryujin
         output << "# position\tnormal\tstate (rho,M,E)\tstress\tpressure"
                << std::endl;
 
-        for (const auto &contribution : all) {
-          for (const auto &entry : contribution) {
-            const auto &[position, normal, U_i, Sn_i, P_i] = entry;
-            output << position << "\t" << normal << "\t" //
-                   << U_i << "\t" << Sn_i << "\t" << P_i << std::endl;
-          }
+        for (const auto &entry : all_entries) {
+          const auto &[position, normal, U_i, Sn_i, P_i] = entry;
+          output << position << "\t" << normal << "\t" //
+                 << U_i << "\t" << Sn_i << "\t" << P_i << std::endl;
         }
       }
     }
