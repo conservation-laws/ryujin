@@ -125,7 +125,7 @@ namespace ryujin
 #if DEAL_II_VERSION_GTE(9, 3, 0)
         phi.integrate_scatter(EvaluationFlags::values, lumped_boundary_mass_);
 #else
-        phi.integrate_scatter(true, false, lumped_boundary_mass_
+        phi.integrate_scatter(true, false, lumped_boundary_mass_);
 #endif
       }
 
@@ -288,6 +288,9 @@ namespace ryujin
         }
         pressure_.local_element(i) = P_i;
       }
+
+      velocity_.update_ghost_values();
+      pressure_.update_ghost_values();
     }
 
     /*
@@ -443,6 +446,8 @@ namespace ryujin
         velocity.integrate_scatter(true, false, boundary_stress_);
 #endif
       }
+
+      boundary_stress_.update_ghost_values();
     }
 
     /*
