@@ -15,6 +15,8 @@
 #include <deal.II/base/work_stream.h>
 #include <deal.II/matrix_free/fe_evaluation.h>
 
+#include <fstream>
+
 DEAL_II_NAMESPACE_OPEN
 template <int rank, int dim, typename Number>
 bool operator<(const Tensor<rank, dim, Number> &left,

@@ -110,7 +110,7 @@ namespace ryujin
       }
 
       return Point<dim>() + direction;
-    };
+    }
 
 
     /**
@@ -150,7 +150,7 @@ namespace ryujin
       }
 
       return direction;
-    };
+    }
   } /* namespace */
 
 
