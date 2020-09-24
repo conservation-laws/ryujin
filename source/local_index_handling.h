@@ -11,6 +11,7 @@
 #include <deal.II/dofs/dof_renumbering.h>
 #include <deal.II/dofs/dof_tools.h>
 #include <deal.II/lac/affine_constraints.h>
+#include <deal.II/lac/dynamic_sparsity_pattern.h>
 
 namespace ryujin
 {
@@ -169,6 +170,8 @@ namespace ryujin
     template <int dim>
     unsigned int internal_range(dealii::DoFHandler<dim> &dof_handler)
     {
+      using namespace dealii;
+
       const auto &locally_owned = dof_handler.locally_owned_dofs();
       const auto n_locally_owned = locally_owned.n_elements();
 
@@ -181,61 +184,59 @@ namespace ryujin
       /* Offset to translate from global to local index range */
       const auto offset = n_locally_owned != 0 ? *locally_owned.begin() : 0;
 
-      const unsigned int dofs_per_cell = dof_handler.get_fe().dofs_per_cell;
-      const unsigned int dofs_per_face = dof_handler.get_fe().dofs_per_face;
-      using dof_type =dealii::types::global_dof_index;
-      std::vector<dof_type> local_dof_indices(dofs_per_cell);
-      std::vector<dof_type> local_face_dof_indices(dofs_per_face);
-
-      /*
-       * First pass: Accumulate how many cells are associated with a
-       * given degree of freedom and mark all degrees of freedom shared
-       * with a different number of cells than 2, 4, or 8 with
-       * numbers::invalid_dof_index:
-       */
-
+      using dof_type = dealii::types::global_dof_index;
       std::vector<dof_type> new_order(n_locally_owned);
 
-      for (auto cell : dof_handler.active_cell_iterators()) {
-        if (cell->is_artificial())
-          continue;
+      {
+        /*
+         * Set up a temporary sparsity pattern to determine connectivity:
+         * (We do this with global numbering)
+         */
 
-        cell->get_dof_indices(local_dof_indices);
+        IndexSet locally_relevant;
+        DoFTools::extract_locally_relevant_dofs(dof_handler, locally_relevant);
 
-        /* Record what locally owned degrees of freedom we have seen: */
-        for (unsigned int j = 0; j < dofs_per_cell; ++j) {
-          const auto &index = local_dof_indices[j];
-          if (!locally_owned.is_element(index))
-            continue;
-          Assert(index - offset < n_locally_owned, dealii::ExcInternalError());
-          new_order[index - offset] += 1;
-        } /* j */
+        AffineConstraints<double> affine_constraints;
+        affine_constraints.reinit(locally_relevant);
+        DoFTools::make_hanging_node_constraints(dof_handler,
+                                                affine_constraints);
+
+        DynamicSparsityPattern dsp(locally_relevant);
+        DoFTools::make_sparsity_pattern(
+            dof_handler, dsp, affine_constraints, false);
+
+        /* Mark all non-standard degrees of freedom: */
+
+        constexpr unsigned int standard_connectivity =
+            dim == 1 ? 3 : (dim == 2 ? 9 : 27);
+
+        for (unsigned int i = 0; i < n_locally_owned; ++i)
+          if (dsp.row_length(offset + i) != standard_connectivity)
+            new_order[i] = dealii::numbers::invalid_dof_index;
 
         /* Explicitly poison boundary degrees of freedom: */
-        for (auto f : dealii::GeometryInfo<dim>::face_indices()) {
-          const auto face = cell->face(f);
-          if (!face->at_boundary())
+
+        const unsigned int dofs_per_face = dof_handler.get_fe().dofs_per_face;
+        std::vector<dof_type> local_face_dof_indices(dofs_per_face);
+
+        for (auto &cell : dof_handler.active_cell_iterators()) {
+          if (!cell->at_boundary())
             continue;
-          face->get_dof_indices(local_face_dof_indices);
-          for (unsigned int j = 0; j < dofs_per_face; ++j) {
-            const auto &index = local_face_dof_indices[j];
-            if (!locally_owned.is_element(index))
+          for (auto f : dealii::GeometryInfo<dim>::face_indices()) {
+            const auto face = cell->face(f);
+            if (!face->at_boundary())
               continue;
-            Assert(index - offset < n_locally_owned,
-                   dealii::ExcInternalError());
-            new_order[index - offset] += 1000000;
-          } /* j */
-        }   /* f */
-      }
-
-      constexpr dof_type standard_number_of_neighbors =
-          dim == 1 ? 2 : (dim == 2 ? 4 : 8);
-
-      for (auto &it : new_order) {
-        if (it == standard_number_of_neighbors)
-          it = 0;
-        else
-          it = dealii::numbers::invalid_dof_index;
+            face->get_dof_indices(local_face_dof_indices);
+            for (unsigned int j = 0; j < dofs_per_face; ++j) {
+              const auto &index = local_face_dof_indices[j];
+              if (!locally_owned.is_element(index))
+                continue;
+              Assert(index >= offset && index - offset < n_locally_owned,
+                     dealii::ExcInternalError());
+              new_order[index - offset] = dealii::numbers::invalid_dof_index;
+            }
+          }
+        }
       }
 
       /* Second pass: Create renumbering. */
