@@ -139,7 +139,6 @@ namespace ryujin
 
           const auto mu = problem_description_->mu();
           const auto lambda = problem_description_->lambda();
-          const auto tau = tau_; /* FIXME */
 
           for (unsigned int cell = range.first; cell < range.second; ++cell) {
             velocity.reinit(cell);
@@ -160,7 +159,7 @@ namespace ryujin
               for (unsigned int d = 0; d < dim; ++d)
                 S[d][d] += (lambda - 2. / 3. * mu) * divergence;
 
-              velocity.submit_symmetric_gradient(0.5 * tau * S, q);
+              velocity.submit_symmetric_gradient(0.5 * tau_ * S, q);
             }
 
 #if DEAL_II_VERSION_GTE(9, 3, 0)
@@ -390,6 +389,17 @@ namespace ryujin
     DiagonalMatrix<dim, Number> diagonal_matrix;
 
     /*
+     * Set time step size and record the time t_{n+1/2} for the computed
+     * velocity.
+     *
+     * This is a but ugly: tau_ is internally used in velocity_vmult() and
+     * internal_energy_vmult().
+     */
+
+    tau_ = tau;
+    t_interp_ = t + 0.5 * tau;
+
+    /*
      * Step 0:
      *
      * Build right hand side for the velocity update.
@@ -522,8 +532,6 @@ namespace ryujin
       Scope scope(computing_timer_, "time step [N] 1 - update velocities");
 
       LIKWID_MARKER_START("time_step_n_1");
-
-      tau_ = tau; /* FIXME */
 
       LinearOperator<block_vector_type, block_vector_type> velocity_operator;
       velocity_operator.vmult = [this](block_vector_type &dst,
@@ -675,8 +683,6 @@ namespace ryujin
       Scope scope(computing_timer_, "time step [N] 3 - update internal energy");
 
       LIKWID_MARKER_START("time_step_n_3");
-
-      tau_ = tau; /* FIXME */
 
       LinearOperator<scalar_type, scalar_type> internal_energy_operator;
       internal_energy_operator.vmult = [this](scalar_type &dst,

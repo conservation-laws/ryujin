@@ -147,13 +147,19 @@ namespace ryujin
     dealii::MatrixFree<dim, Number> matrix_free_;
 
     block_vector_type velocity_;
+    ACCESSOR_READ_ONLY(velocity)
+
     block_vector_type velocity_rhs_;
 
     scalar_type internal_energy_;
     scalar_type internal_energy_rhs_;
 
     scalar_type density_;
+
     Number tau_;
+
+    Number t_interp_;
+    ACCESSOR_READ_ONLY(t_interp)
 
     //@}
   };

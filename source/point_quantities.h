@@ -91,19 +91,17 @@ namespace ryujin
     void prepare();
 
     /**
-     * Given a state vector @p U and a scalar vector @p alpha (as well as a
-     * file name prefix @p name, the current time @p t, and the current
-     * output cycle @p cycle) schedule a solution postprocessing and
-     * output.
-     *
-     * The function post-processes quantities synchronously depending on
-     * runtime configuration options.
+     * Takes a state vector @p U at time t (obtained at the end of a full
+     * Strang step) and a velocity vector @p velocity computed at time
+     * \f$t_(n+1/2)\f$ (@p t_interp) during the implicit parabolic step.
      *
      * The function requires MPI communication and is not reentrant.
      */
     void compute(const vector_type &U,
+                 const Number t,
+                 const block_vector_type &velocity_interp,
+                 const Number t_interp,
                  std::string name,
-                 Number t,
                  unsigned int cycle);
 
     //@}
@@ -137,8 +135,10 @@ namespace ryujin
     dealii::MatrixFree<dim, Number> matrix_free_;
 
     block_vector_type velocity_;
+    block_vector_type velocity_interp_;
     block_vector_type vorticity_;
     block_vector_type boundary_stress_;
+    block_vector_type boundary_stress_interp_;
     scalar_type lumped_boundary_mass_;
     scalar_type pressure_;
 

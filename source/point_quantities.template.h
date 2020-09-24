@@ -80,13 +80,17 @@ namespace ryujin
         matrix_free_.get_dof_info(0).vector_partitioner;
 
     velocity_.reinit(dim);
+    velocity_interp_.reinit(dim);
     vorticity_.reinit(dim == 2 ? 1 : dim);
     boundary_stress_.reinit(dim);
+    boundary_stress_interp_.reinit(dim);
     for (unsigned int i = 0; i < dim; ++i) {
       velocity_.block(i).reinit(scalar_partitioner);
+      velocity_interp_.block(i).reinit(scalar_partitioner);
       if constexpr (dim == 3)
         vorticity_.block(i).reinit(scalar_partitioner);
       boundary_stress_.block(i).reinit(scalar_partitioner);
+      boundary_stress_interp_.block(i).reinit(scalar_partitioner);
     }
     if constexpr (dim == 2)
       vorticity_.block(0).reinit(scalar_partitioner);
@@ -94,13 +98,9 @@ namespace ryujin
     lumped_boundary_mass_.reinit(scalar_partitioner);
     pressure_.reinit(scalar_partitioner);
 
-    /*
-     * Compute lumped boundary mass matrix:
-     */
+    /* Compute lumped boundary mass matrix: */
 
     {
-      /* We simply integrate over all boundary faces by hand: */
-
       constexpr auto order_fe = Discretization<dim>::order_finite_element;
       constexpr auto order_quad = Discretization<dim>::order_quadrature;
 
@@ -113,7 +113,7 @@ namespace ryujin
       for (unsigned int face = begin; face < begin + size; ++face) {
         const auto id = matrix_free_.get_boundary_id(face);
 
-        /* only compute on slip and no_slip boundary conditions */
+        /* only compute on slip and no_slip boundaries */
         if (id != Boundary::slip && id != Boundary::no_slip)
           continue;
 
@@ -125,7 +125,7 @@ namespace ryujin
 #if DEAL_II_VERSION_GTE(9, 3, 0)
         phi.integrate_scatter(EvaluationFlags::values, lumped_boundary_mass_);
 #else
-        phi.integrate_scatter(true, false, lumped_boundary_mass_);
+        phi.integrate_scatter(true, false, lumped_boundary_mass_
 #endif
       }
 
@@ -224,7 +224,7 @@ namespace ryujin
 
         for (const auto entry : local_boundary_map) {
           const auto &index = entry.first;
-          const auto &[normal, id , position] = entry.second;
+          const auto &[normal, id, position] = entry.second;
           cutplane_map_[id][index] = position;
         }
       };
@@ -243,10 +243,13 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  void PointQuantities<dim, Number>::compute(const vector_type &U,
-                                             std::string name,
-                                             Number t,
-                                             unsigned int cycle)
+  void PointQuantities<dim, Number>::compute(
+      const vector_type &U,
+      const Number t,
+      const block_vector_type &velocity_interp,
+      const Number t_interp,
+      std::string name,
+      unsigned int cycle)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "PointQuantities<dim, Number>::compute()" << std::endl;
@@ -262,6 +265,12 @@ namespace ryujin
      */
 
     {
+      for (unsigned int d = 0; d < dim; ++d) {
+        velocity_interp_.block(d).copy_locally_owned_data_from(
+            velocity_interp.block(d));
+        velocity_interp_.block(d).update_ghost_values();
+      }
+
       RYUJIN_PARALLEL_REGION_BEGIN
       RYUJIN_OMP_FOR
       for (unsigned int i = 0; i < size_regular; i += simd_length) {
@@ -286,13 +295,15 @@ namespace ryujin
         for (unsigned int d = 0; d < dim; ++d) {
           velocity_.block(d).local_element(i) = M_i[d] / rho_i;
         }
-        pressure_.local_element(i) = P_i;
-      }
+         pressure_.local_element(i) = P_i;
+       }
 
       velocity_.update_ghost_values();
+      velocity_interp_.update_ghost_values();
       pressure_.update_ghost_values();
     }
 
+#if 0
     /*
      * Step 1: Compute vorticity:
      */
@@ -392,21 +403,23 @@ namespace ryujin
 
       vorticity_.update_ghost_values();
     }
+#endif
 
     /*
      * Step 2: Boundary stress:
      */
 
     {
-      /* We simply integrate over all boundary faces by hand: */
-
       constexpr auto order_fe = Discretization<dim>::order_finite_element;
       constexpr auto order_quad = Discretization<dim>::order_quadrature;
 
       FEFaceEvaluation<dim, order_fe, order_quad, dim, Number> velocity(
           matrix_free_);
+      FEFaceEvaluation<dim, order_fe, order_quad, dim, Number> velocity_interp(
+          matrix_free_);
 
       boundary_stress_ = 0.;
+      boundary_stress_interp_ = 0.;
 
       const auto mu = problem_description_->mu();
       const auto lambda = problem_description_->lambda();
@@ -416,38 +429,51 @@ namespace ryujin
       for (unsigned int face = begin; face < begin + size; ++face) {
         const auto id = matrix_free_.get_boundary_id(face);
 
-        /* only compute on slip and no_slip boundary conditions */
+        /* only compute on slip and no_slip boundaries */
         if (id != Boundary::slip && id != Boundary::no_slip)
           continue;
 
         velocity.reinit(face);
+        velocity_interp.reinit(face);
 #if DEAL_II_VERSION_GTE(9, 3, 0)
         velocity.gather_evaluate(velocity_, EvaluationFlags::gradients);
+        velocity_interp.gather_evaluate(velocity_interp_,
+                                        EvaluationFlags::gradients);
 #else
         velocity.gather_evaluate(velocity_, false, true);
+        velocity_interp.gather_evaluate(velocity_interp_,
+                                        EvaluationFlags::gradients);
 #endif
         for (unsigned int q = 0; q < velocity.n_q_points; ++q) {
           const auto normal = velocity.get_normal_vector(q);
-
-          const auto symmetric_gradient = velocity.get_symmetric_gradient(q);
-          const auto divergence = trace(symmetric_gradient);
-
-          // S = (2 mu nabla^S(v) + (lambda - 2/3*mu) div(v) Id) - p * Id
-          auto S = 2. * mu * symmetric_gradient;
-          for (unsigned int d = 0; d < dim; ++d)
-            S[d][d] += (lambda - 2. / 3. * mu) * divergence;
-
-          velocity.submit_value(S * (-normal), q);
+          {
+            const auto symmetric_gradient = velocity.get_symmetric_gradient(q);
+            const auto divergence = trace(symmetric_gradient);
+            auto S = 2. * mu * symmetric_gradient;
+            for (unsigned int d = 0; d < dim; ++d)
+              S[d][d] += (lambda - 2. / 3. * mu) * divergence;
+            velocity.submit_value(S * (-normal), q);
+          }
+          {
+            const auto symmetric_gradient =
+                velocity_interp.get_symmetric_gradient(q);
+            const auto divergence = trace(symmetric_gradient);
+            auto S = 2. * mu * symmetric_gradient;
+            for (unsigned int d = 0; d < dim; ++d)
+              S[d][d] += (lambda - 2. / 3. * mu) * divergence;
+            velocity_interp.submit_value(S * (-normal), q);
+          }
         }
 
 #if DEAL_II_VERSION_GTE(9, 3, 0)
         velocity.integrate_scatter(EvaluationFlags::values, boundary_stress_);
+        velocity_interp.integrate_scatter(EvaluationFlags::values,
+                                          boundary_stress_interp_);
 #else
         velocity.integrate_scatter(true, false, boundary_stress_);
+        velocity_interp.integrate_scatter(true, false, boundary_stress_interp_);
 #endif
       }
-
-      boundary_stress_.update_ghost_values();
     }
 
     /*
@@ -457,11 +483,13 @@ namespace ryujin
     {
       const auto &boundary_map = offline_data_->boundary_map();
 
-      using entry = std::tuple<dealii::Point<dim> /*position*/,
-                               dealii::Tensor<1, dim, Number> /*normal*/,
-                               rank1_type /*state*/,
-                               dealii::Tensor<1, dim, Number> /*stress*/,
-                               Number /*pressure*/>;
+      using entry = std::tuple<Point<dim>,              // position
+                               Number,                  // lumped boundary mass
+                               Tensor<1, dim, Number>,  // normal
+                               rank1_type,              // state
+                               Number,                  // pressure
+                               Tensor<1, dim, Number>,  // stress
+                               Tensor<1, dim, Number>>; // stress interp
 
       std::vector<entry> entries;
       for (const auto &it : boundary_map) {
@@ -478,20 +506,24 @@ namespace ryujin
         const auto P_i = pressure_.local_element(i);
 
         Tensor<1, dim, Number> Sn_i;
-        for (unsigned int d = 0; d < dim; ++d)
+        Tensor<1, dim, Number> Sn_i_interp;
+        for (unsigned int d = 0; d < dim; ++d) {
           Sn_i[d] = boundary_stress_.block(d).local_element(i);
+          Sn_i_interp[d] = boundary_stress_interp_.block(d).local_element(i);
+        }
 
-        entries.push_back({position, normal, U_i, Sn_i / m_i, P_i});
+        entries.push_back(
+            {position, m_i, normal, U_i, P_i, Sn_i / m_i, Sn_i_interp / m_i});
       }
 
       std::vector<entry> all_entries;
       {
         const auto received =
             Utilities::MPI::gather(mpi_communicator_, entries);
+
         for (auto &&it : received)
           std::move(
               std::begin(it), std::end(it), std::back_inserter(all_entries));
-
 
         std::sort(all_entries.begin(), all_entries.end());
       }
@@ -501,14 +533,18 @@ namespace ryujin
                              Utilities::to_string(cycle, 6) + ".log");
 
         output << std::scientific << std::setprecision(14);
-        output << "# t = " << t << std::endl;
-        output << "# position\tnormal\tstate (rho,M,E)\tstress\tpressure"
+        output << "# stress_interp at time t = " << t_interp << std::endl;
+        output << "# state and pressure at time t = " << t << std::endl;
+        output << "# position\tlumped boundary mass\tnormal\t"
+               << "state (rho,M,E)\tpressure\tstress\tstress_interp"
                << std::endl;
 
         for (const auto &entry : all_entries) {
-          const auto &[position, normal, U_i, Sn_i, P_i] = entry;
-          output << position << "\t" << normal << "\t" //
-                 << U_i << "\t" << Sn_i << "\t" << P_i << std::endl;
+          const auto &[position, m_i, normal, U_i, P_i, Sn_i, Sn_i_interp] =
+              entry;
+          output << position << "\t" << m_i << "\t" << normal << "\t"         //
+                 << U_i << "\t" << P_i << "\t" << Sn_i << "\t" << Sn_i_interp //
+                 << std::endl;
         }
       }
     }
