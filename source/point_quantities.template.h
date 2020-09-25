@@ -67,6 +67,8 @@ namespace ryujin
     additional_data.mapping_update_flags_boundary_faces =
         (update_values | update_gradients | update_JxW_values |
          update_normal_vectors);
+    additional_data.tasks_parallel_scheme =
+        MatrixFree<dim, double>::AdditionalData::none;
 
     matrix_free_.reinit(offline_data_->discretization().mapping(),
                         offline_data_->dof_handler(),
@@ -295,8 +297,8 @@ namespace ryujin
         for (unsigned int d = 0; d < dim; ++d) {
           velocity_.block(d).local_element(i) = M_i[d] / rho_i;
         }
-         pressure_.local_element(i) = P_i;
-       }
+        pressure_.local_element(i) = P_i;
+      }
 
       velocity_.update_ghost_values();
       velocity_interp_.update_ghost_values();
