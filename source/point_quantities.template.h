@@ -151,13 +151,13 @@ namespace ryujin
           [&](const auto &cell, auto &scratch, auto &copy) {
             /* iterate over locally owned cells and the ghost layer */
 
-            auto &is_artificial = copy.is_artificial_;
+            auto &is_locally_owned = copy.is_locally_owned_;
             auto &local_dof_indices = copy.local_dof_indices_;
             auto &local_boundary_map = copy.local_boundary_map_;
             auto &fe_values = scratch.fe_values_;
 
-            is_artificial = cell->is_artificial();
-            if (is_artificial)
+            is_locally_owned = cell->is_locally_owned();
+            if (!is_locally_owned)
               return;
 
             fe_values.reinit(cell);
@@ -218,10 +218,10 @@ namespace ryujin
           };
 
       const auto copy_local_to_global = [&](const auto &copy) {
-        const auto &is_artificial = copy.is_artificial_;
+        const auto &is_locally_owned = copy.is_locally_owned_;
         const auto &local_boundary_map = copy.local_boundary_map_;
 
-        if (is_artificial)
+        if (is_locally_owned)
           return;
 
         for (const auto entry : local_boundary_map) {

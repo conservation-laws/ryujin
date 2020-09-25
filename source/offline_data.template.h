@@ -55,8 +55,11 @@ namespace ryujin
     dof_handler_.initialize(discretization_->triangulation(),
                             discretization_->finite_element());
 
-    // Renumber degrees of freedom - Cuthill McKee actually helps with
-    // cache locality.
+    /*
+     * Renumbering:
+     */
+
+    /* Cuthill McKee actually helps with cache locality. */
     DoFRenumbering::Cuthill_McKee(dof_handler_);
 
 #ifdef USE_COMMUNICATION_HIDING
@@ -67,7 +70,8 @@ namespace ryujin
 #endif
 
 #ifdef USE_SIMD
-    n_locally_internal_ = DoFRenumbering::internal_range(dof_handler_);
+    n_locally_internal_ =
+        DoFRenumbering::internal_range(dof_handler_, mpi_communicator_);
 
     /* Round down to the nearest multiple of the VectorizedArray width: */
     n_locally_internal_ = n_locally_internal_ -
@@ -80,12 +84,74 @@ namespace ryujin
     n_locally_internal_ = 0;
 #endif
 
-    /* Set up partitioner: */
+    /*
+     * First, we set up the locally_relevant index set, determine (globally
+     * indexed) affine constraints and create a (globally indexed) sparsity
+     * pattern:
+     */
 
     const IndexSet &locally_owned = dof_handler_.locally_owned_dofs();
 
     IndexSet locally_relevant;
     DoFTools::extract_locally_relevant_dofs(dof_handler_, locally_relevant);
+
+    affine_constraints_.reinit(locally_relevant);
+    DoFTools::make_hanging_node_constraints(dof_handler_, affine_constraints_);
+
+    /*
+     * Enforce periodic boundary conditions. We assume that the mesh is in
+     * "normal configuration".
+     */
+    const auto n_periodic_faces =
+        discretization_->triangulation().get_periodic_face_map().size();
+    if (n_periodic_faces != 0) {
+      if constexpr (dim != 1 && std::is_same<Number, double>::value) {
+        for (int i = 0; i < dim; ++i)
+          DoFTools::make_periodicity_constraints(dof_handler_,
+                                                 /*b_id */ Boundary::periodic,
+                                                 /*direction*/ i,
+                                                 affine_constraints_);
+      } else {
+        AssertThrow(false, dealii::ExcNotImplemented());
+      }
+    }
+
+    affine_constraints_.close();
+
+    sparsity_pattern_.reinit(
+        dof_handler_.n_dofs(), dof_handler_.n_dofs(), locally_relevant);
+    DoFTools::make_sparsity_pattern(
+        dof_handler_, sparsity_pattern_, affine_constraints_, false);
+
+    /*
+     * We have to complete the local stencil to have consistent size over
+     * all MPI ranks. Otherwise, MPI synchronization in our
+     * SparseMatrixSIMD class will fail.
+     */
+
+    SparsityTools::distribute_sparsity_pattern(
+        sparsity_pattern_, locally_owned, mpi_communicator_, locally_relevant);
+
+    /*
+     * Next, we enlarge the locally relevant set to include all additional
+     * couplings:
+     */
+
+    {
+      IndexSet additional_dofs(dof_handler_.n_dofs());
+
+      for (auto &entry : sparsity_pattern_)
+        if (!locally_relevant.is_element(entry.column())) {
+          Assert(locally_owned.is_element(entry.row()), ExcInternalError());
+          additional_dofs.add_index(entry.column());
+        }
+
+      additional_dofs.compress();
+      locally_relevant.add_indices(additional_dofs);
+      locally_relevant.compress();
+    }
+
+    /* Set up partitioner: */
 
     n_locally_owned_ = locally_owned.n_elements();
     n_locally_relevant_ = locally_relevant.n_elements();
@@ -116,50 +182,14 @@ namespace ryujin
     n_export_indices_ = n_locally_internal_;
 #endif
 
-    /* Set up affine constraints object: */
-
-    affine_constraints_.reinit(locally_relevant);
-
-    DoFTools::make_hanging_node_constraints(dof_handler_, affine_constraints_);
-
     /*
-     * Enforce periodic boundary conditions. We assume that the mesh is in
-     * "normal configuration".
+     * Set up SIMD sparsity pattern in local numbering. Nota bene: The
+     * SparsityPatternSIMD::reinit() function will translates the pattern
+     * from global deal.II (typical) dof indexing to local indices.
      */
-    const auto n_periodic_faces =
-        discretization_->triangulation().get_periodic_face_map().size();
-    if (n_periodic_faces != 0) {
-      if constexpr (dim != 1 && std::is_same<Number, double>::value) {
-        for (int i = 0; i < dim; ++i)
-          DoFTools::make_periodicity_constraints(dof_handler_,
-                                                 /*b_id */ Boundary::periodic,
-                                                 /*direction*/ i,
-                                                 affine_constraints_);
-      } else {
-        AssertThrow(false, dealii::ExcNotImplemented());
-      }
-    }
-
-    affine_constraints_.close();
-
-    affine_constraints_assembly_.copy_from(affine_constraints_);
-    transform_to_local_range(*scalar_partitioner_,
-                             affine_constraints_assembly_);
-
-    /* Create sparsity patterns: */
-
-    DynamicSparsityPattern dsp(n_locally_relevant_, n_locally_relevant_);
-
-    DoFTools::make_local_sparsity_pattern(*scalar_partitioner_,
-                                          dof_handler_,
-                                          dsp,
-                                          affine_constraints_assembly_,
-                                          false);
-
-    sparsity_pattern_assembly_.copy_from(dsp);
 
     sparsity_pattern_simd_.reinit(
-        n_locally_internal_, dsp, *scalar_partitioner_);
+        n_locally_internal_, sparsity_pattern_, *scalar_partitioner_);
 
     /* Next we can (re)initialize all local matrices: */
 
@@ -179,17 +209,39 @@ namespace ryujin
     std::cout << "OfflineData<dim, Number>::assemble()" << std::endl;
 #endif
 
+    measure_of_omega_ = 0.;
+    boundary_map_.clear();
+
+    /*
+     * FIXME: The following code is horrendous:
+     *  - we should add support for assembly directly to SparseMatrixSIMD.
+     *  - we should add support for compress(VectorOperation::add) to
+     *    SparseMatrixSIMD
+     */
+
+    AffineConstraints<Number> affine_constraints_assembly;
+    affine_constraints_assembly.copy_from(affine_constraints_);
+    transform_to_local_range(*scalar_partitioner_, affine_constraints_assembly);
+
+    SparsityPattern sparsity_pattern_assembly;
+    {
+      DynamicSparsityPattern dsp(n_locally_relevant_, n_locally_relevant_);
+      for (const auto &entry : sparsity_pattern_) {
+        const auto i = scalar_partitioner_->global_to_local(entry.row());
+        const auto j = scalar_partitioner_->global_to_local(entry.column());
+        dsp.add(i, j);
+      }
+      sparsity_pattern_assembly.copy_from(dsp);
+    }
+
     dealii::SparseMatrix<Number> mass_matrix_tmp;
-    mass_matrix_tmp.reinit(sparsity_pattern_assembly_);
+    dealii::SparseMatrix<Number> betaij_matrix_tmp;
     std::array<dealii::SparseMatrix<Number>, dim> cij_matrix_tmp;
 
+    mass_matrix_tmp.reinit(sparsity_pattern_assembly);
+    betaij_matrix_tmp.reinit(sparsity_pattern_assembly);
     for (auto &matrix : cij_matrix_tmp)
-      matrix.reinit(sparsity_pattern_assembly_);
-    dealii::SparseMatrix<Number> betaij_matrix_tmp;
-    betaij_matrix_tmp.reinit(sparsity_pattern_assembly_);
-    measure_of_omega_ = 0.;
-
-    boundary_map_.clear();
+      matrix.reinit(sparsity_pattern_assembly);
 
     const unsigned int dofs_per_cell =
         discretization_->finite_element().dofs_per_cell;
@@ -197,7 +249,7 @@ namespace ryujin
     const unsigned int n_q_points = discretization_->quadrature().size();
 
     /*
-     * First pass: Assemble all matrices:
+     * Now, assemble all matrices:
      */
 
     /* The local, per-cell assembly routine: */
@@ -207,7 +259,7 @@ namespace ryujin
                                            auto &copy) {
       /* iterate over locally owned cells and the ghost layer */
 
-      auto &is_artificial = copy.is_artificial_;
+      auto &is_locally_owned = copy.is_locally_owned_;
       auto &local_dof_indices = copy.local_dof_indices_;
 
       auto &local_boundary_map = copy.local_boundary_map_;
@@ -219,8 +271,8 @@ namespace ryujin
       auto &fe_values = scratch.fe_values_;
       auto &fe_face_values = scratch.fe_face_values_;
 
-      is_artificial = cell->is_artificial();
-      if (is_artificial)
+      is_locally_owned = cell->is_locally_owned();
+      if (!is_locally_owned)
         return;
 
       cell_mass_matrix.reinit(dofs_per_cell, dofs_per_cell);
@@ -245,8 +297,7 @@ namespace ryujin
       for (unsigned int q_point = 0; q_point < n_q_points; ++q_point) {
         const auto JxW = fe_values.JxW(q_point);
 
-        if (cell->is_locally_owned())
-          cell_measure += Number(JxW);
+        cell_measure += Number(JxW);
 
         for (unsigned int j = 0; j < dofs_per_cell; ++j) {
 
@@ -309,7 +360,7 @@ namespace ryujin
     };
 
     const auto copy_local_to_global = [&](const auto &copy) {
-      const auto &is_artificial = copy.is_artificial_;
+      const auto &is_locally_owned = copy.is_locally_owned_;
       const auto &local_dof_indices = copy.local_dof_indices_;
       const auto &local_boundary_map = copy.local_boundary_map_;
       const auto &cell_mass_matrix = copy.cell_mass_matrix_;
@@ -317,22 +368,22 @@ namespace ryujin
       const auto &cell_betaij_matrix = copy.cell_betaij_matrix_;
       const auto &cell_measure = copy.cell_measure_;
 
-      if (is_artificial)
+      if (!is_locally_owned)
         return;
 
       boundary_map_.insert(local_boundary_map.begin(),
                            local_boundary_map.end());
 
 
-      affine_constraints_assembly_.distribute_local_to_global(
+      affine_constraints_assembly.distribute_local_to_global(
           cell_mass_matrix, local_dof_indices, mass_matrix_tmp);
 
       for (int k = 0; k < dim; ++k) {
-        affine_constraints_assembly_.distribute_local_to_global(
+        affine_constraints_assembly.distribute_local_to_global(
             cell_cij_matrix[k], local_dof_indices, cij_matrix_tmp[k]);
       }
 
-      affine_constraints_assembly_.distribute_local_to_global(
+      affine_constraints_assembly.distribute_local_to_global(
           cell_betaij_matrix, local_dof_indices, betaij_matrix_tmp);
 
       measure_of_omega_ += cell_measure;
@@ -411,6 +462,16 @@ namespace ryujin
       auto &[normal, id, _] = it.second;
       normal /= (normal.norm() + std::numeric_limits<Number>::epsilon());
     }
+
+#ifdef DEBUG
+    /*
+     * Sanity check: The mass matrix must have a stencil with nonzero
+     * entries.
+     */
+    for(const auto &entry : mass_matrix_tmp)
+      Assert(std::abs(entry.value()) > 1.0e-16,
+             ExcMessage("Stencil with zero mass matrix entries encountered."));
+#endif
 
     betaij_matrix_.read_in(betaij_matrix_tmp);
     mass_matrix_.read_in(mass_matrix_tmp);

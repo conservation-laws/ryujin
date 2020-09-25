@@ -59,7 +59,7 @@ namespace ryujin
   class AssemblyCopyData
   {
   public:
-    bool is_artificial_;
+    bool is_locally_owned_;
     std::vector<dealii::types::global_dof_index> local_dof_indices_;
     std::multimap<dealii::types::global_dof_index,
                   std::tuple<dealii::Tensor<1, dim>,

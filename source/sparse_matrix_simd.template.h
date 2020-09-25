@@ -50,19 +50,23 @@ namespace ryujin
         partitioner.local_size() + partitioner.n_ghost_indices();
 
     /*
-     * First, create a static sparsity pattern where the only off-processor
-     * rows are the one for which locally owned rows request the transpose
-     * entries. This will be the one we finally compute on.
+     * First, create a static sparsity pattern (in local indexing( where
+     * the only off-processor rows are the one for which locally owned rows
+     * request the transpose entries. This will be the one we finally
+     * compute on.
      */
 
     dealii::DynamicSparsityPattern dsp_minimal(n_locally_relevant_dofs,
                                                n_locally_relevant_dofs);
     for (unsigned int i = 0; i < n_locally_owned_dofs; ++i) {
-      for (auto it = dsp.begin(i); it != dsp.end(i); ++it) {
-        const unsigned int col = it->column();
-        dsp_minimal.add(i, col);
-        if (col >= n_locally_owned_dofs) {
-          dsp_minimal.add(col, i);
+      const auto global_row = partitioner.local_to_global(i);
+      for (auto it = dsp.begin(global_row); it != dsp.end(global_row); ++it) {
+        const auto global_column = it->column();
+        const auto j = partitioner.global_to_local(global_column);
+        dsp_minimal.add(i, j);
+        if (j >= n_locally_owned_dofs) {
+          Assert(j < n_locally_relevant_dofs, dealii::ExcInternalError());
+          dsp_minimal.add(j, i);
         }
       }
     }

@@ -121,6 +121,8 @@ namespace ryujin
     std::multimap<dealii::types::global_dof_index, boundary_description>
         boundary_map_;
 
+    dealii::DynamicSparsityPattern sparsity_pattern_;
+
     SparsityPatternSIMD<dealii::VectorizedArray<Number>::size()>
         sparsity_pattern_simd_;
 
@@ -213,6 +215,12 @@ namespace ryujin
     ACCESSOR_READ_ONLY(boundary_map)
 
     /**
+     * A sparsity pattern for (standard deal.II) matrices storing indices
+     * in (Deal.II typical) global numbering.
+     */
+    ACCESSOR_READ_ONLY(sparsity_pattern)
+
+    /**
      * A sparsity pattern for matrices in vectorized format. Local
      * numbering.
      */
@@ -256,9 +264,6 @@ namespace ryujin
     ACCESSOR_READ_ONLY(discretization)
 
   private:
-    /* Scratch storage: */
-    dealii::SparsityPattern sparsity_pattern_assembly_;
-    dealii::AffineConstraints<Number> affine_constraints_assembly_;
 
     const MPI_Comm &mpi_communicator_;
   };
