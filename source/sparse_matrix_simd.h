@@ -48,9 +48,11 @@ namespace ryujin
   public:
     SparsityPatternSIMD();
 
-    SparsityPatternSIMD(const unsigned int n_internal_dofs,
-                        const dealii::DynamicSparsityPattern &sparsity,
-                        const dealii::Utilities::MPI::Partitioner &partitioner);
+    SparsityPatternSIMD(
+        const unsigned int n_internal_dofs,
+        const dealii::DynamicSparsityPattern &sparsity,
+        const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
+            &partitioner);
 
 
     /**
@@ -58,7 +60,8 @@ namespace ryujin
      */
     void reinit(const unsigned int n_internal_dofs,
                 const dealii::DynamicSparsityPattern &sparsity,
-                const dealii::Utilities::MPI::Partitioner &partitioner);
+                const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
+                    &partitioner);
 
     unsigned int stride_of_row(const unsigned int row) const;
 
@@ -73,6 +76,7 @@ namespace ryujin
   private:
     unsigned int n_internal_dofs;
     unsigned int n_locally_owned_dofs;
+    std::shared_ptr<const dealii::Utilities::MPI::Partitioner> partitioner;
 
     dealii::AlignedVector<std::size_t> row_starts;
     dealii::AlignedVector<unsigned int> column_indices;
@@ -107,9 +111,13 @@ namespace ryujin
 
     void reinit(const SparsityPatternSIMD<simd_length> &sparsity);
 
-    void read_in(const std::array<dealii::SparseMatrix<Number>, n_components>
-                     &sparse_matrix);
-    void read_in(const dealii::SparseMatrix<Number> &sparse_matrix);
+    template <typename SparseMatrix>
+    void read_in(const std::array<SparseMatrix, n_components> &sparse_matrix,
+                 bool locally_indexed = true);
+
+    template <typename SparseMatrix>
+    void read_in(const SparseMatrix &sparse_matrix,
+                 bool locally_indexed = true);
 
     using VectorizedArray = dealii::VectorizedArray<Number, simd_length>;
 

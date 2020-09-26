@@ -11,7 +11,7 @@
 #include "offline_data.h"
 #include "problem_description.h"
 #include "scratch_data.h"
-#include "sparse_matrix_simd.h"
+#include "sparse_matrix_simd.template.h" /* instantiate read_in */
 
 #include <deal.II/base/graph_coloring.h>
 #include <deal.II/base/parallel.h>
@@ -189,7 +189,7 @@ namespace ryujin
      */
 
     sparsity_pattern_simd_.reinit(
-        n_locally_internal_, sparsity_pattern_, *scalar_partitioner_);
+        n_locally_internal_, sparsity_pattern_, scalar_partitioner_);
 
     /* Next we can (re)initialize all local matrices: */
 
