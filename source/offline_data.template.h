@@ -21,11 +21,14 @@
 #include <deal.II/fe/fe_values.h>
 #include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/lac/la_parallel_vector.h>
+#ifdef DEAL_II_WITH_TRILINOS
+#include <deal.II/lac/trilinos_sparse_matrix.h>
+#endif
 
 #include <boost/range/irange.hpp>
 #include <boost/range/iterator_range.hpp>
 
-#undef DEAL_II_WITH_TRILINOS // FIXME
+// #undef  DEAL_II_WITH_TRILINOS FIXME
 
 namespace ryujin
 {
@@ -49,12 +52,6 @@ namespace ryujin
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "OfflineData<dim, Number>::setup()" << std::endl;
-#endif
-
-#ifndef DEAL_II_WITH_TRILINOS
-    AssertThrow(true,
-                ExcMessage("ryujin was built without Trilinos support - no "
-                           "hanging node support available"));
 #endif
 
     /* Initialize dof_handler and gather all locally owned indices: */
@@ -105,6 +102,12 @@ namespace ryujin
     affine_constraints_.reinit(locally_relevant);
     DoFTools::make_hanging_node_constraints(dof_handler_, affine_constraints_);
 
+#ifndef DEAL_II_WITH_TRILINOS
+    AssertThrow(affine_constraints_.n_constraints() == 0,
+                ExcMessage("ryujin was built without Trilinos support - no "
+                           "hanging node support available"));
+#endif
+
     /*
      * Enforce periodic boundary conditions. We assume that the mesh is in
      * "normal configuration".
@@ -131,6 +134,12 @@ namespace ryujin
     DoFTools::make_sparsity_pattern(
         dof_handler_, sparsity_pattern_, affine_constraints_, false);
 #else
+    /*
+     * In case we use dealii::SparseMatrix<Number> for assembly we need a
+     * sparsity pattern that also includes the full locally relevant -
+     * locally relevant coupling block. This gets thrown out again later,
+     * but nevertheless we have to add it.
+     */
     DoFTools::make_extended_sparsity_pattern(
         dof_handler_, sparsity_pattern_, affine_constraints_, false);
 #endif
@@ -225,9 +234,26 @@ namespace ryujin
     boundary_map_.clear();
 
 #ifdef DEAL_II_WITH_TRILINOS
+    /* Variant using TrilinosWrappers::SparseMatrix with global numbering */
+
+    const auto &affine_constraints_assembly = affine_constraints_;
+
+    const IndexSet &locally_owned = dof_handler_.locally_owned_dofs();
+    TrilinosWrappers::SparsityPattern trilinos_sparsity_pattern;
+    trilinos_sparsity_pattern.reinit(
+        locally_owned, sparsity_pattern_, mpi_communicator_);
+
+    TrilinosWrappers::SparseMatrix mass_matrix_tmp;
+    TrilinosWrappers::SparseMatrix betaij_matrix_tmp;
+    std::array<TrilinosWrappers::SparseMatrix, dim> cij_matrix_tmp;
+
+    mass_matrix_tmp.reinit(trilinos_sparsity_pattern);
+    betaij_matrix_tmp.reinit(trilinos_sparsity_pattern);
+    for (auto &matrix : cij_matrix_tmp)
+      matrix.reinit(trilinos_sparsity_pattern);
 
 #else
-    /* Variant using deal.II SparseMatrix in local numbering */
+    /* Variant using deal.II SparseMatrix with local numbering */
 
     AffineConstraints<Number> affine_constraints_assembly;
     affine_constraints_assembly.copy_from(affine_constraints_);
@@ -304,9 +330,6 @@ namespace ryujin
 
       local_dof_indices.resize(dofs_per_cell);
       cell->get_dof_indices(local_dof_indices);
-#ifndef DEAL_II_WITH_TRILINOS
-      transform_to_local_range(*scalar_partitioner_, local_dof_indices);
-#endif
 
       /* clear out copy data: */
       local_boundary_map.clear();
@@ -363,14 +386,14 @@ namespace ryujin
             normal += fe_face_values.normal_vector(q) *
                       fe_face_values.shape_value(j, q);
 
-          const auto index = local_dof_indices[j];
+          const auto global_index = local_dof_indices[j];
+          const auto index = scalar_partitioner_->global_to_local(global_index);
 
           /*
            * This is a bloody hack: Use "vertex_dof_index" to retrieve the
            * vertex associated to the current degree of freedom.
            */
           Point<dim> position;
-          const auto global_index = scalar_partitioner_->local_to_global(index);
           for (auto v : GeometryInfo<dim>::vertex_indices())
             if (cell->vertex_dof_index(v, 0) == global_index) {
               position = cell->vertex(v);
@@ -384,7 +407,7 @@ namespace ryujin
 
     const auto copy_local_to_global = [&](const auto &copy) {
       const auto &is_locally_owned = copy.is_locally_owned_;
-      const auto &local_dof_indices = copy.local_dof_indices_;
+      auto local_dof_indices = copy.local_dof_indices_; /* make a copy */
       const auto &local_boundary_map = copy.local_boundary_map_;
       const auto &cell_mass_matrix = copy.cell_mass_matrix_;
       const auto &cell_cij_matrix = copy.cell_cij_matrix_;
@@ -396,6 +419,10 @@ namespace ryujin
 
       boundary_map_.insert(local_boundary_map.begin(),
                            local_boundary_map.end());
+
+#ifndef DEAL_II_WITH_TRILINOS
+      transform_to_local_range(*scalar_partitioner_, local_dof_indices);
+#endif
 
       affine_constraints_assembly.distribute_local_to_global(
           cell_mass_matrix, local_dof_indices, mass_matrix_tmp);
@@ -421,11 +448,27 @@ namespace ryujin
     measure_of_omega_ =
         Utilities::MPI::sum(measure_of_omega_, mpi_communicator_);
 
+#ifdef DEAL_II_WITH_TRILINOS
+    betaij_matrix_tmp.compress(VectorOperation::add);
+    mass_matrix_tmp.compress(VectorOperation::add);
+    for (auto &it : cij_matrix_tmp)
+      it.compress(VectorOperation::add);
+#endif
+
     /*
      * Create lumped mass matrix:
      */
 
     {
+#ifdef DEAL_II_WITH_TRILINOS
+      scalar_type one(lumped_mass_matrix_);
+      one = 1.;
+
+      mass_matrix_tmp.vmult(lumped_mass_matrix_, one);
+      lumped_mass_matrix_.compress(VectorOperation::add);
+
+#else
+
       Vector<Number> one(mass_matrix_tmp.m());
       one = 1.;
 
@@ -434,11 +477,13 @@ namespace ryujin
 
       for (unsigned int i = 0; i < scalar_partitioner_->local_size(); ++i) {
         lumped_mass_matrix_.local_element(i) = local_lumped_mass_matrix(i);
+      lumped_mass_matrix_.update_ghost_values();
+#endif
+
+      for (unsigned int i = 0; i < scalar_partitioner_->local_size(); ++i) {
         lumped_mass_matrix_inverse_.local_element(i) =
             1. / lumped_mass_matrix_.local_element(i);
       }
-
-      lumped_mass_matrix_.update_ghost_values();
       lumped_mass_matrix_inverse_.update_ghost_values();
     }
 
@@ -490,12 +535,16 @@ namespace ryujin
      * Sanity check: The mass matrix must have a stencil with nonzero
      * entries.
      */
-    for(const auto &entry : mass_matrix_tmp)
-      Assert(std::abs(entry.value()) > 1.0e-16,
-             ExcMessage("Stencil with zero mass matrix entries encountered."));
+// FIXME
+//     for(const auto &entry : mass_matrix_tmp)
+//       Assert(std::abs(entry.value()) > 1.0e-16,
+//              ExcMessage("Stencil with zero mass matrix entries encountered."));
 #endif
 
 #ifdef DEAL_II_WITH_TRILINOS
+    betaij_matrix_.read_in(betaij_matrix_tmp, /*locally_indexed*/ false);
+    mass_matrix_.read_in(mass_matrix_tmp, /*locally_indexed*/ false);
+    cij_matrix_.read_in(cij_matrix_tmp, /*locally_indexed*/ false);
 #else
     betaij_matrix_.read_in(betaij_matrix_tmp, /*locally_indexed*/ true);
     mass_matrix_.read_in(mass_matrix_tmp, /*locally_indexed*/ true);
