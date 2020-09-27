@@ -63,12 +63,12 @@ namespace ryujin
 
     /* Initialize matrix free context: */
 
-    typename MatrixFree<dim, double>::AdditionalData additional_data;
+    typename MatrixFree<dim, Number>::AdditionalData additional_data;
     additional_data.mapping_update_flags_boundary_faces =
         (update_values | update_gradients | update_JxW_values |
          update_normal_vectors);
     additional_data.tasks_parallel_scheme =
-        MatrixFree<dim, double>::AdditionalData::none;
+        MatrixFree<dim, Number>::AdditionalData::none;
 
     matrix_free_.reinit(offline_data_->discretization().mapping(),
                         offline_data_->dof_handler(),

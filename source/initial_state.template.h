@@ -346,9 +346,9 @@ namespace ryujin
         find_velocity = [=](double x) {
           /* Return extremal cases: */
           if (x <= x_left)
-            return velocity_left_;
+            return double(velocity_left_);
           if (x >= x_right)
-            return velocity_right_;
+            return double(velocity_right_);
 
           /* Interpolate initial guess: */
           const auto nu = 0.5 * std::tanh(10. * (x - 0.5 * (x_right + x_left)) /
@@ -404,10 +404,10 @@ namespace ryujin
         Assert(e > 0., dealii::ExcInternalError());
 
         return rank1_type(
-            {rho,
-             rho * (velocity_ + v),
-             0.,
-             rho * (e + 0.5 * (velocity_ + v) * (velocity_ + v))});
+            {Number(rho),
+             Number(rho * (velocity_ + v)),
+             Number(0.),
+             Number(rho * (e + 0.5 * (velocity_ + v) * (velocity_ + v)))});
       }
 
     private:

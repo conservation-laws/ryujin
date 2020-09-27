@@ -238,7 +238,16 @@ namespace ryujin
 #ifdef DEAL_II_WITH_TRILINOS
     /* Variant using TrilinosWrappers::SparseMatrix with global numbering */
 
-    const auto &affine_constraints_assembly = affine_constraints_;
+    AffineConstraints<double> affine_constraints_assembly;
+    for (auto line : affine_constraints_.get_lines()) {
+      affine_constraints_assembly.add_line(line.index);
+      for (auto entry : line.entries)
+        affine_constraints_assembly.add_entry(
+            line.index, entry.first, entry.second);
+      affine_constraints_assembly.set_inhomogeneity(line.index,
+                                                    line.inhomogeneity);
+    }
+    affine_constraints_assembly.close();
 
     const IndexSet &locally_owned = dof_handler_.locally_owned_dofs();
     TrilinosWrappers::SparsityPattern trilinos_sparsity_pattern;
@@ -445,7 +454,11 @@ namespace ryujin
                     local_assemble_system,
                     copy_local_to_global,
                     AssemblyScratchData<dim>(*discretization_),
+#ifdef DEAL_II_WITH_TRILINOS
+                    AssemblyCopyData<dim, double>());
+#else
                     AssemblyCopyData<dim, Number>());
+#endif
 
     measure_of_omega_ =
         Utilities::MPI::sum(measure_of_omega_, mpi_communicator_);
@@ -463,11 +476,22 @@ namespace ryujin
 
     {
 #ifdef DEAL_II_WITH_TRILINOS
-      scalar_type one(lumped_mass_matrix_);
+      using scalar_type = dealii::LinearAlgebra::distributed::Vector<double>;
+      scalar_type one(scalar_partitioner_);
       one = 1.;
 
-      mass_matrix_tmp.vmult(lumped_mass_matrix_, one);
+      scalar_type local_lumped_mass_matrix(scalar_partitioner_);
+      mass_matrix_tmp.vmult(local_lumped_mass_matrix, one);
       lumped_mass_matrix_.compress(VectorOperation::add);
+
+      for (unsigned int i = 0; i < scalar_partitioner_->local_size(); ++i) {
+        lumped_mass_matrix_.local_element(i) =
+            local_lumped_mass_matrix.local_element(i);
+        lumped_mass_matrix_inverse_.local_element(i) =
+            1. / lumped_mass_matrix_.local_element(i);
+      }
+      lumped_mass_matrix_.update_ghost_values();
+      lumped_mass_matrix_inverse_.update_ghost_values();
 
 #else
 
@@ -479,14 +503,12 @@ namespace ryujin
 
       for (unsigned int i = 0; i < scalar_partitioner_->local_size(); ++i) {
         lumped_mass_matrix_.local_element(i) = local_lumped_mass_matrix(i);
-      lumped_mass_matrix_.update_ghost_values();
-#endif
-
-      for (unsigned int i = 0; i < scalar_partitioner_->local_size(); ++i) {
         lumped_mass_matrix_inverse_.local_element(i) =
             1. / lumped_mass_matrix_.local_element(i);
       }
+      lumped_mass_matrix_.update_ghost_values();
       lumped_mass_matrix_inverse_.update_ghost_values();
+#endif
     }
 
     /*
