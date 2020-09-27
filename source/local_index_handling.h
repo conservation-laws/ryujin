@@ -282,17 +282,14 @@ namespace ryujin
     using dealii::DoFTools::make_sparsity_pattern;
 
     /**
-     * Given an MPI @p partitioner, @p dof_handler, and constraints @p
-     * affine_constraints this function creates a sparsity pattern that
-     * uses MPI-rank local numbering of indices (in the interval
-     * \f$[0,n]\f$, where \f$n\f$ is the number of locally relevant degrees
-     * of freedom) instead of the usual global numberinf used in deal.II.
+     * Given a @p dof_handler, and constraints @p affine_constraints this
+     * function creates an extended sparsity pattern that also includes
+     * locally relevant to locally relevant couplings.
      *
      * @ingroup FiniteElement
      */
     template <int dim, typename Number, typename SPARSITY>
-    void make_local_sparsity_pattern(
-        const dealii::Utilities::MPI::Partitioner &partitioner,
+    void make_extended_sparsity_pattern(
         const dealii::DoFHandler<dim> &dof_handler,
         SPARSITY &dsp,
         const dealii::AffineConstraints<Number> &affine_constraints,
@@ -308,7 +305,6 @@ namespace ryujin
 
         /* translate into local index ranges: */
         cell->get_dof_indices(dof_indices);
-        transform_to_local_range(partitioner, dof_indices);
 
         affine_constraints.add_entries_local_to_global(
             dof_indices, dsp, keep_constrained);

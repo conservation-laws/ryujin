@@ -25,6 +25,7 @@
 #include <boost/range/irange.hpp>
 #include <boost/range/iterator_range.hpp>
 
+#undef DEAL_II_WITH_TRILINOS // FIXME
 
 namespace ryujin
 {
@@ -48,6 +49,12 @@ namespace ryujin
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "OfflineData<dim, Number>::setup()" << std::endl;
+#endif
+
+#ifndef DEAL_II_WITH_TRILINOS
+    AssertThrow(true,
+                ExcMessage("ryujin was built without Trilinos support - no "
+                           "hanging node support available"));
 #endif
 
     /* Initialize dof_handler and gather all locally owned indices: */
@@ -120,8 +127,13 @@ namespace ryujin
 
     sparsity_pattern_.reinit(
         dof_handler_.n_dofs(), dof_handler_.n_dofs(), locally_relevant);
+#ifdef DEAL_II_WITH_TRILINOS
     DoFTools::make_sparsity_pattern(
         dof_handler_, sparsity_pattern_, affine_constraints_, false);
+#else
+    DoFTools::make_extended_sparsity_pattern(
+        dof_handler_, sparsity_pattern_, affine_constraints_, false);
+#endif
 
     /*
      * We have to complete the local stencil to have consistent size over
@@ -212,12 +224,10 @@ namespace ryujin
     measure_of_omega_ = 0.;
     boundary_map_.clear();
 
-    /*
-     * FIXME: The following code is horrendous:
-     *  - we should add support for assembly directly to SparseMatrixSIMD.
-     *  - we should add support for compress(VectorOperation::add) to
-     *    SparseMatrixSIMD
-     */
+#ifdef DEAL_II_WITH_TRILINOS
+
+#else
+    /* Variant using deal.II SparseMatrix in local numbering */
 
     AffineConstraints<Number> affine_constraints_assembly;
     affine_constraints_assembly.copy_from(affine_constraints_);
@@ -242,6 +252,7 @@ namespace ryujin
     betaij_matrix_tmp.reinit(sparsity_pattern_assembly);
     for (auto &matrix : cij_matrix_tmp)
       matrix.reinit(sparsity_pattern_assembly);
+#endif
 
     const unsigned int dofs_per_cell =
         discretization_->finite_element().dofs_per_cell;
@@ -271,7 +282,16 @@ namespace ryujin
       auto &fe_values = scratch.fe_values_;
       auto &fe_face_values = scratch.fe_face_values_;
 
+#ifdef DEAL_II_WITH_TRILINOS
       is_locally_owned = cell->is_locally_owned();
+#else
+      /*
+       * When using a local dealii::SparseMatrix<Number> we don not have a
+       * compress(VectorOperation::add) available. In this case just
+       * assemble contributions over the locally
+       */
+      is_locally_owned = !cell->is_artificial();
+#endif
       if (!is_locally_owned)
         return;
 
@@ -284,7 +304,9 @@ namespace ryujin
 
       local_dof_indices.resize(dofs_per_cell);
       cell->get_dof_indices(local_dof_indices);
+#ifndef DEAL_II_WITH_TRILINOS
       transform_to_local_range(*scalar_partitioner_, local_dof_indices);
+#endif
 
       /* clear out copy data: */
       local_boundary_map.clear();
@@ -297,7 +319,8 @@ namespace ryujin
       for (unsigned int q_point = 0; q_point < n_q_points; ++q_point) {
         const auto JxW = fe_values.JxW(q_point);
 
-        cell_measure += Number(JxW);
+        if (cell->is_locally_owned())
+          cell_measure += Number(JxW);
 
         for (unsigned int j = 0; j < dofs_per_cell; ++j) {
 
@@ -373,7 +396,6 @@ namespace ryujin
 
       boundary_map_.insert(local_boundary_map.begin(),
                            local_boundary_map.end());
-
 
       affine_constraints_assembly.distribute_local_to_global(
           cell_mass_matrix, local_dof_indices, mass_matrix_tmp);
@@ -473,9 +495,12 @@ namespace ryujin
              ExcMessage("Stencil with zero mass matrix entries encountered."));
 #endif
 
-    betaij_matrix_.read_in(betaij_matrix_tmp);
-    mass_matrix_.read_in(mass_matrix_tmp);
-    cij_matrix_.read_in(cij_matrix_tmp);
+#ifdef DEAL_II_WITH_TRILINOS
+#else
+    betaij_matrix_.read_in(betaij_matrix_tmp, /*locally_indexed*/ true);
+    mass_matrix_.read_in(mass_matrix_tmp, /*locally_indexed*/ true);
+    cij_matrix_.read_in(cij_matrix_tmp, /*locally_indexed*/ true);
+#endif
   }
 
 } /* namespace ryujin */
