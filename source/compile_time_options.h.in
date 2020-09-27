@@ -19,6 +19,7 @@
 #cmakedefine USE_SIMD
 #cmakedefine LIKWID_PERFMON
 #cmakedefine VALGRIND_CALLGRIND
+#cmakedefine FORCE_DEAL_II_SPARSE_MATRIX
 
 #if defined(DEBUG) && !defined(CHECK_BOUNDS)
 #define CHECK_BOUNDS

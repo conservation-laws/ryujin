@@ -28,7 +28,9 @@
 #include <boost/range/irange.hpp>
 #include <boost/range/iterator_range.hpp>
 
-// #undef  DEAL_II_WITH_TRILINOS FIXME
+#ifdef FORCE_DEAL_II_SPARSE_MATRIX
+#undef DEAL_II_WITH_TRILINOS
+#endif
 
 namespace ryujin
 {
