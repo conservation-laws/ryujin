@@ -12,6 +12,7 @@
 #include <deal.II/dofs/dof_tools.h>
 #include <deal.II/lac/affine_constraints.h>
 #include <deal.II/lac/dynamic_sparsity_pattern.h>
+#include <deal.II/lac/sparsity_tools.h>
 
 namespace ryujin
 {
@@ -168,7 +169,8 @@ namespace ryujin
      * @ingroup FiniteElement
      */
     template <int dim>
-    unsigned int internal_range(dealii::DoFHandler<dim> &dof_handler)
+    unsigned int internal_range(dealii::DoFHandler<dim> &dof_handler,
+                                const MPI_Comm &mpi_communicator)
     {
       using namespace dealii;
 
@@ -189,8 +191,10 @@ namespace ryujin
 
       {
         /*
-         * Set up a temporary sparsity pattern to determine connectivity:
-         * (We do this with global numbering)
+         * Set up a temporary sparsity pattern to determine connectivity.
+         * This duplicates some code from offline_data.template.h; but the
+         * resulting sparsity pattern that we create here has to be thrown
+         * away anyway after renumbering.
          */
 
         IndexSet locally_relevant;
@@ -200,10 +204,14 @@ namespace ryujin
         affine_constraints.reinit(locally_relevant);
         DoFTools::make_hanging_node_constraints(dof_handler,
                                                 affine_constraints);
+        affine_constraints.close();
 
         DynamicSparsityPattern dsp(locally_relevant);
         DoFTools::make_sparsity_pattern(
             dof_handler, dsp, affine_constraints, false);
+
+        SparsityTools::distribute_sparsity_pattern(
+            dsp, locally_owned, mpi_communicator, locally_relevant);
 
         /* Mark all non-standard degrees of freedom: */
 
