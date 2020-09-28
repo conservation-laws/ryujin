@@ -81,7 +81,7 @@ namespace ryujin
       RYUJIN_OMP_FOR
       for (unsigned int i = 0; i < n_owned; ++i) {
 
-        /* Skip constrained degrees of freedom (periodic constraints) */
+        /* Skip constrained degrees of freedom: */
         const unsigned int row_length = sparsity_simd.row_length(i);
         if (row_length == 1)
           continue;

@@ -230,7 +230,7 @@ namespace ryujin
 
         const unsigned int row_length = sparsity_simd.row_length(i);
 
-        /* Skip constrained degrees of freedom (periodic constraints) */
+        /* Skip constrained degrees of freedom: */
         if (row_length == 1) {
           continue;
         }
@@ -371,7 +371,7 @@ namespace ryujin
 
         const unsigned int row_length = sparsity_simd.row_length(i);
 
-        /* Skip constrained degrees of freedom (periodic constraints) */
+        /* Skip constrained degrees of freedom: */
         if (row_length == 1)
           continue;
 
@@ -475,7 +475,7 @@ namespace ryujin
       RYUJIN_OMP_FOR_NOWAIT
       for (unsigned int i = n_internal; i < n_owned; ++i) {
 
-        /* Skip constrained degrees of freedom (periodic constraints) */
+        /* Skip constrained degrees of freedom: */
         const unsigned int row_length = sparsity_simd.row_length(i);
         if (row_length == 1)
           continue;
@@ -688,7 +688,7 @@ namespace ryujin
       RYUJIN_OMP_FOR_NOWAIT
       for (unsigned int i = n_internal; i < n_owned; ++i) {
 
-        /* Skip constrained degrees of freedom (periodic constraints) */
+        /* Skip constrained degrees of freedom: */
         const unsigned int row_length = sparsity_simd.row_length(i);
         if (row_length == 1)
           continue;
@@ -845,7 +845,7 @@ namespace ryujin
         RYUJIN_OMP_FOR_NOWAIT
         for (unsigned int i = n_internal; i < n_owned; ++i) {
 
-          /* Skip constrained degrees of freedom (periodic constraints) */
+          /* Skip constrained degrees of freedom: */
           const unsigned int row_length = sparsity_simd.row_length(i);
           if (row_length == 1)
             continue;
