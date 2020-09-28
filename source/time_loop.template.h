@@ -458,7 +458,7 @@ namespace ryujin
 
     /* Data output: */
     if (do_full_output || do_cutplanes) {
-      Scope scope(computing_timer, "vtu output");
+      Scope scope(computing_timer, "output vtu");
       print_info("scheduling output");
 
       vtu_output.schedule_output(U,

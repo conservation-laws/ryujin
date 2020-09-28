@@ -61,5 +61,5 @@ subsection G - DissipationModule
 end
 
 subsection I - IntegralQuantities
-  set compute conserved quantities = true
+  set record conserved quantities = true
 end
