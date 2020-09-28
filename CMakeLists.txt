@@ -31,6 +31,7 @@ string(APPEND DEAL_II_CXX_FLAGS_RELEASE " -O3 -ffp-contract=fast")
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
   string(APPEND DEAL_II_CXX_FLAGS " -fdiagnostics-color=always")
+  string(REPLACE "-Qunused-arguments" "" DEAL_II_CXX_FLAGS "${DEAL_II_CXX_FLAGS}")
 endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
