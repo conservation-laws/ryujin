@@ -578,25 +578,58 @@ namespace ryujin
         height_ = 0.5;
         this->add_parameter(
             "height", height_, "height of computational domain");
+
+        subdivisions_x_ = 2;
+        this->add_parameter("subdivisions x",
+                            subdivisions_x_,
+                            "number of subdivisions in x direction");
+
+        subdivisions_y_ = 1;
+        this->add_parameter("subdivisions y",
+                            subdivisions_y_,
+                            "number of subdivisions in y direction");
+
+        grading_push_forward_ = dim == 2 ? "x;y" : "x;y;z;";
+        this->add_parameter("grading push forward",
+                            grading_push_forward_,
+                            "push forward of grading manifold");
+
+        grading_pull_back_ = dim == 2 ? "x;y" : "x;y;z;";
+        this->add_parameter("grading pull back",
+                            grading_pull_back_,
+                            "pull back of grading manifold");
       }
 
       virtual void create_triangulation(
           typename Geometry<dim>::Triangulation &triangulation) final override
       {
+        /* create mesh: */
+
         dealii::Triangulation<dim, dim> tria1;
         if constexpr (dim == 2)
           dealii::GridGenerator::subdivided_hyper_rectangle(
               tria1,
-              {2, 1},
+              {subdivisions_x_, subdivisions_y_},
               dealii::Point<2>(),
               dealii::Point<2>(length_, height_));
         else if constexpr (dim == 3)
           dealii::GridGenerator::subdivided_hyper_rectangle(
               tria1,
-              {2, 1, 1},
+              {subdivisions_x_, subdivisions_y_, subdivisions_y_},
               dealii::Point<3>(),
               dealii::Point<3>(length_, height_, height_));
         triangulation.copy_triangulation(tria1);
+
+        /* create grading: */
+
+        if (grading_push_forward_ != (dim == 2 ? "x;y" : "x;y;z;")) {
+          dealii::FunctionManifold<dim> grading(grading_push_forward_,
+                                                grading_pull_back_);
+          triangulation.set_all_manifold_ids(1);
+          triangulation.set_manifold(1, grading);
+        }
+
+        /* set boundary ids: */
 
         for (auto cell : triangulation.active_cell_iterators()) {
           for (auto f : dealii::GeometryInfo<dim>::face_indices()) {
@@ -639,6 +672,10 @@ namespace ryujin
     private:
       double length_;
       double height_;
+      unsigned int subdivisions_x_;
+      unsigned int subdivisions_y_;
+      std::string grading_push_forward_;
+      std::string grading_pull_back_;
     };
 
 
