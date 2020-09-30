@@ -140,6 +140,14 @@ namespace ryujin
 
   private:
     /**
+     * @name Internally used time-stepping primitives
+     */
+    //@{
+
+    Number single_step(vector_type &U, Number t, Number tau);
+
+    //@}
+    /**
      * @name Run time options
      */
     //@{
