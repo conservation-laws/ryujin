@@ -249,10 +249,6 @@ namespace ryujin
                                    output_cycle);
           integral_quantities.compute(U, t);
         }
-
-        ++output_cycle;
-
-        print_cycle_statistics(cycle, t, output_cycle, /*logfile*/ true);
       }
 
       /* Break if we have reached the final time: */
@@ -281,9 +277,14 @@ namespace ryujin
         AssertThrow(false, ExcMessage("Unknown problem description"));
       }
 
-      if (cycle % terminal_update_interval == 0)
-        print_cycle_statistics(cycle, t, output_cycle);
+      if (t >= output_cycle * output_granularity) {
+        ++output_cycle;
+        print_cycle_statistics(cycle, t, output_cycle, /*logfile*/ true);
 
+      } else if (cycle % terminal_update_interval == 0) {
+
+        print_cycle_statistics(cycle, t, output_cycle);
+      }
     } /* end of loop */
 
     /* Wait for output thread: */
