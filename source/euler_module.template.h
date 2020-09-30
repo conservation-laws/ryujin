@@ -554,7 +554,7 @@ namespace ryujin
              */
             if (id == Boundary::slip || id == Boundary::no_slip) {
               auto m = problem_description_->momentum(U_i_new);
-              m -= 1. * (m * normal) * normal;
+              m -= Number(1.) * (m * normal) * normal;
               for (unsigned int k = 0; k < dim; ++k)
                 U_i_new[k + 1] = m[k];
             }
@@ -879,7 +879,7 @@ namespace ryujin
               /* see comment above */
               if (id == Boundary::slip || id == Boundary::no_slip) {
                 auto m = problem_description_->momentum(U_i_new);
-                m -= 1. * (m * normal) * normal;
+                m -= Number(1.) * (m * normal) * normal;
                 for (unsigned int k = 0; k < dim; ++k)
                   U_i_new[k + 1] = m[k];
               }
