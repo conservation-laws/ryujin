@@ -393,7 +393,8 @@ namespace ryujin
       /* synchronous IO */
       if (output_full) {
         data_out->write_vtu_in_parallel(
-            name + Utilities::to_string(cycle, 6) + ".vtu", mpi_communicator_);
+            name + "_" + Utilities::to_string(cycle, 6) + ".vtu",
+            mpi_communicator_);
       }
       if (output_cutplanes && output_planes_.size() != 0) {
         data_out_cutplanes->write_vtu_in_parallel(
