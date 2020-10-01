@@ -112,8 +112,7 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  Number
-  EulerModule<dim, Number>::single_step(vector_type &U, Number tau)
+  Number EulerModule<dim, Number>::single_step(vector_type &U, Number tau)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "EulerModule<dim, Number>::single_step()" << std::endl;
@@ -217,7 +216,8 @@ namespace ryujin
      */
 
     {
-      Scope scope(computing_timer_, "time step [E] 1 - compute d_ij, and alpha_i");
+      Scope scope(computing_timer_,
+                  "time step [E] 1 - compute d_ij, and alpha_i");
 
       SynchronizationDispatch synchronization_dispatch([&]() {
         alpha_.update_ghost_values_start(channel++);
@@ -366,7 +366,8 @@ namespace ryujin
     std::atomic<Number> tau_max{std::numeric_limits<Number>::infinity()};
 
     {
-      Scope scope(computing_timer_, "time step [E] 2 - compute d_ii, and tau_max");
+      Scope scope(computing_timer_,
+                  "time step [E] 2 - compute d_ii, and tau_max");
 
       /* Parallel region */
       RYUJIN_PARALLEL_REGION_BEGIN
@@ -417,7 +418,13 @@ namespace ryujin
     }
 
     {
-      Scope scope(computing_timer_, "time step [E] 2 - synchronization barrier");
+#ifdef SPLIT_SYNCHRONIZATION_TIMERS
+      Scope scope(computing_timer_,
+                  "time step [E] 2 - synchronization barrier");
+#else
+      Scope scope(computing_timer_,
+                  "time step [E] 2 - compute d_ii, and tau_max");
+#endif
 
       alpha_.update_ghost_values_finish();
       second_variations_.update_ghost_values_finish();
@@ -630,7 +637,12 @@ namespace ryujin
     }
 
     {
+#ifdef SPLIT_SYNCHRONIZATION_TIMERS
       Scope scope(computing_timer_, "time step [E] 3 - synchronization");
+#else
+      Scope scope(computing_timer_,
+                  "time step [E] 3 - l.-o. update, bounds, and r_i");
+#endif
 
       if (RYUJIN_LIKELY(limiter_iter_ != 0))
         r_.update_ghost_values_finish();
@@ -772,7 +784,11 @@ namespace ryujin
     }
 
     if (RYUJIN_LIKELY(limiter_iter_ != 0)) {
+#ifdef SPLIT_SYNCHRONIZATION_TIMERS
       Scope scope(computing_timer_, "time step [E] 4 - synchronization");
+#else
+      Scope scope(computing_timer_, "time step [E] 4 - compute p_ij, and l_ij");
+#endif
 
       lij_matrix_.update_ghost_rows_finish();
     }
@@ -997,8 +1013,14 @@ namespace ryujin
       }
 
       {
+#ifdef SPLIT_SYNCHRONIZATION_TIMERS
         Scope scope(computing_timer_,
                     "time step [E] " + step_no + " - synchronization");
+#else
+        Scope scope(computing_timer_,
+                    "time step [E] " + step_no + " - " +
+                        "symmetrize l_ij, h.-o. update" + additional_step);
+#endif
 
         if (!last_round) {
           lij_matrix_next_.update_ghost_rows_finish();
