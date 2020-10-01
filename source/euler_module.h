@@ -160,6 +160,8 @@ namespace ryujin
     unsigned int time_step_order_;
     unsigned int limiter_iter_;
 
+    bool enforce_noslip_;
+
     //@}
 
     //@}

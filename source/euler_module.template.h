@@ -51,11 +51,11 @@ namespace ryujin
       , initial_values_(&initial_values)
       , n_restarts_(0)
   {
-    cfl_update_ = Number(0.95);
+    cfl_update_ = Number(0.80);
     add_parameter(
         "cfl update", cfl_update_, "relative CFL constant used for update");
 
-    cfl_max_ = Number(1.0);
+    cfl_max_ = Number(0.90);
     add_parameter(
         "cfl max", cfl_max_, "Maximal admissible relative CFL constant");
 
@@ -69,6 +69,13 @@ namespace ryujin
     limiter_iter_ = 2;
     add_parameter(
         "limiter iterations", limiter_iter_, "Number of limiter iterations");
+
+    enforce_noslip_ = true;
+    add_parameter(
+        "enforce noslip",
+        enforce_noslip_,
+        "Enforce no-slip boundary conditions. If set to false no-slip "
+        "boundaries will be treated as slip boundary conditions");
   }
 
 
@@ -1028,29 +1035,30 @@ namespace ryujin
 
       const auto &[normal, id, position] = entry.second;
 
-      if (id == Boundary::slip || id == Boundary::no_slip) {
-        /*
-         * Remove the normal component of the momentum for slip and
-         * "no_slip" boundary conditions. It is a bit counterintuitive,
-         * but we have to treat "no_slip" boundary conditions the same
-         * way as "slip" boundary conditions in the Euler module. The
-         * reason lies in the Strang splitting that we use to separate
-         * the hyperbolic part from viscous effects. Only the latter
-         * can cause "no slip" and thus the actual enforcement of v = 0
-         * happens in the dissipation module.
-         */
-        auto U_i = U.get_tensor(i);
+      if (id == Boundary::do_nothing)
+        continue;
+
+      auto U_i = U.get_tensor(i);
+
+      if (id == Boundary::slip ||
+          (id == Boundary::no_slip && !enforce_noslip_)) {
+        /* Remove the normal component of the momentum: */
         auto m = problem_description_->momentum(U_i);
         m -= 1. * (m * normal) * normal;
         for (unsigned int k = 0; k < dim; ++k)
           U_i[k + 1] = m[k];
-        U.write_tensor(U_i, i);
+
+      } else if (id == Boundary::no_slip) {
+        /* Enforce no-slip conditions: */
+        for (unsigned int k = 0; k < dim; ++k)
+          U_i[k + 1] = Number(0.);
 
       } else if (id == Boundary::dirichlet) {
         /* On Dirichlet boundaries enforce initial conditions: */
-        const auto U_i = initial_values_->initial_state(position, t);
-        U.write_tensor(U_i, i);
+        U_i = initial_values_->initial_state(position, t);
       }
+
+      U.write_tensor(U_i, i);
     }
 
     U.update_ghost_values();
