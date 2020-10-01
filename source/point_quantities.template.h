@@ -131,7 +131,7 @@ namespace ryujin
 #endif
       }
 
-      lumped_boundary_mass_.update_ghost_values();
+      lumped_boundary_mass_.compress(VectorOperation::add);
     }
 
     /*
@@ -476,6 +476,9 @@ namespace ryujin
         velocity_interp.integrate_scatter(true, false, boundary_stress_interp_);
 #endif
       }
+
+      boundary_stress_.compress(VectorOperation::add);
+      boundary_stress_interp_.compress(VectorOperation::add);
     }
 
     /*
