@@ -56,6 +56,9 @@ namespace ryujin
   {
     tolerance_ = Number(1.0e-12);
     add_parameter("tolerance", tolerance_, "Tolerance for linear solvers");
+
+    shift_ = Number(0.0);
+    add_parameter("shift", shift_, "Implicit shift applied to the Crank Nicolson scheme");
   }
 
 
@@ -129,7 +132,7 @@ namespace ryujin
       }
     }
 
-    /* Apply action of stress tensor: \sum_j B_ij V_j: */
+    /* Apply action of stress tensor: + theta * \sum_j B_ij V_j: */
 
     const auto integrator =
         [this](const auto &data, auto &dst, const auto &src, const auto range) {
@@ -159,7 +162,7 @@ namespace ryujin
               for (unsigned int d = 0; d < dim; ++d)
                 S[d][d] += (lambda - 2. / 3. * mu) * divergence;
 
-              velocity.submit_symmetric_gradient(0.5 * tau_ * S, q);
+              velocity.submit_symmetric_gradient(theta_ * tau_ * S, q);
             }
 
 #if DEAL_II_VERSION_GTE(9, 3, 0)
@@ -250,7 +253,7 @@ namespace ryujin
           constexpr auto order_quad = Discretization<dim>::order_quadrature;
           FEEvaluation<dim, order_fe, order_quad, 1, Number> energy(data);
           const auto factor =
-              Number(0.5) * tau_ * problem_description_->cv_inverse_kappa();
+              theta_ * tau_ * problem_description_->cv_inverse_kappa();
 
           for (unsigned int cell = range.first; cell < range.second; ++cell) {
             energy.reinit(cell);
@@ -397,7 +400,8 @@ namespace ryujin
      */
 
     tau_ = tau;
-    t_interp_ = t + 0.5 * tau;
+    theta_ = Number(0.5) + shift_ * tau; // FIXME
+    t_interp_ = t + theta_ * tau;
 
     /*
      * Step 0:
@@ -490,7 +494,7 @@ namespace ryujin
 
           /* Prescribe velocity: */
           const auto U_i =
-              initial_values_->initial_state(position, t + Number(0.5) * tau);
+              initial_values_->initial_state(position, t + theta_ * tau_);
           const auto rho_i = problem_description_->density(U_i);
           const auto V_i = problem_description_->momentum(U_i) / rho_i;
           const auto e_i = problem_description_->internal_energy(U_i) / rho_i;
@@ -624,7 +628,7 @@ namespace ryujin
         const auto e_i = simd_load(internal_energy_, i);
         /* rhs_i already contains m_i K_i^{n+1/2} */
         simd_store(
-            internal_energy_rhs_, m_i * rho_i * e_i + 0.5 * tau * rhs_i, i);
+            internal_energy_rhs_, m_i * rho_i * e_i + theta_ * tau_ * rhs_i, i);
       }
 
       RYUJIN_PARALLEL_REGION_END
@@ -636,7 +640,7 @@ namespace ryujin
         const auto e_i = internal_energy_.local_element(i);
         /* rhs_i already contains m_i K_i^{n+1/2} */
         internal_energy_rhs_.local_element(i) =
-            m_i * rho_i * e_i + 0.5 * tau * rhs_i;
+            m_i * rho_i * e_i + theta_ * tau_ * rhs_i;
       }
 
       /*
@@ -658,7 +662,7 @@ namespace ryujin
         if (id == Boundary::dirichlet) {
           /* Prescribe internal energy: */
           const auto U_i =
-              initial_values_->initial_state(position, t + Number(0.5) * tau);
+              initial_values_->initial_state(position, t + theta_ * tau_);
           const auto rho_i = problem_description_->density(U_i);
           const auto e_i = problem_description_->internal_energy(U_i) / rho_i;
           internal_energy_rhs_.local_element(i) = e_i;
@@ -711,6 +715,8 @@ namespace ryujin
      * FIXME: Memory access is suboptimal...
      */
     {
+      const auto alpha = Number(1.) / theta_;
+
       Scope scope(computing_timer_, "time step [N] 4 - write back vectors");
 
       RYUJIN_PARALLEL_REGION_BEGIN
@@ -724,14 +730,16 @@ namespace ryujin
         const auto rho_i = problem_description_->density(U_i);
 
         /* (5.4b) */
-        auto m_i_new = -problem_description_->momentum(U_i);
+        auto m_i_new =
+            (Number(1.) - alpha) * problem_description_->momentum(U_i);
         for (unsigned int d = 0; d < dim; ++d) {
-          m_i_new[d] += 2. * rho_i * simd_load(velocity_.block(d), i);
+          m_i_new[d] += alpha * rho_i * simd_load(velocity_.block(d), i);
         }
 
         /* (5.12)f */
-        auto rho_e_i_new = -problem_description_->internal_energy(U_i);
-        rho_e_i_new += 2. * rho_i * simd_load(internal_energy_, i);
+        auto rho_e_i_new =
+            (Number(1.0) - alpha) * problem_description_->internal_energy(U_i);
+        rho_e_i_new += alpha * rho_i * simd_load(internal_energy_, i);
 
         /* (5.18) */
         const auto E_i_new = rho_e_i_new + 0.5 * m_i_new * m_i_new / rho_i;
@@ -750,14 +758,16 @@ namespace ryujin
         const auto rho_i = problem_description_->density(U_i);
 
         /* (5.4b) */
-        auto m_i_new = -problem_description_->momentum(U_i);
+        auto m_i_new =
+            (Number(1.) - alpha) * problem_description_->momentum(U_i);
         for (unsigned int d = 0; d < dim; ++d) {
-          m_i_new[d] += 2. * rho_i * velocity_.block(d).local_element(i);
+          m_i_new[d] += alpha * rho_i * velocity_.block(d).local_element(i);
         }
 
         /* (5.12)f */
-        auto rho_e_i_new = -problem_description_->internal_energy(U_i);
-        rho_e_i_new += 2. * rho_i * internal_energy_.local_element(i);
+        auto rho_e_i_new =
+            (Number(1.) - alpha) * problem_description_->internal_energy(U_i);
+        rho_e_i_new += alpha * rho_i * internal_energy_.local_element(i);
 
         /* (5.18) */
         const auto E_i_new = rho_e_i_new + 0.5 * m_i_new * m_i_new / rho_i;

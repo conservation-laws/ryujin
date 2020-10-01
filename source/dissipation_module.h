@@ -110,6 +110,7 @@ namespace ryujin
     //@{
 
     Number tolerance_;
+    Number shift_;
 
     //@}
     /**
@@ -157,6 +158,7 @@ namespace ryujin
     scalar_type density_;
 
     Number tau_;
+    Number theta_;
 
     Number t_interp_;
     ACCESSOR_READ_ONLY(t_interp)
