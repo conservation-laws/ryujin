@@ -106,7 +106,7 @@ namespace ryujin
 
   template <int dim, typename Number>
   Number
-  EulerModule<dim, Number>::single_step(vector_type &U, Number t, Number tau)
+  EulerModule<dim, Number>::single_step(vector_type &U, Number tau)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "EulerModule<dim, Number>::single_step()" << std::endl;
@@ -456,12 +456,8 @@ namespace ryujin
                   "time step [E] 3 - l.-o. update, bounds, and r_i");
 
       SynchronizationDispatch synchronization_dispatch([&]() {
-        if (RYUJIN_LIKELY(limiter_iter_ != 0)) {
+        if (RYUJIN_LIKELY(limiter_iter_ != 0))
           r_.update_ghost_values_start(channel++);
-        } else {
-          /* If we do not do high-order, synchronize at this point: */
-          temp_euler_.update_ghost_values_start(channel++);
-        }
       });
 
       /* Parallel region */
@@ -534,36 +530,6 @@ namespace ryujin
                                     specific_entropies_.local_element(j),
                                     variations_j,
                                     /* is diagonal */ col_idx == 0);
-        }
-
-        if (RYUJIN_UNLIKELY(limiter_iter_ == 0)) {
-          /* Fix up boundary: */
-          const auto range = boundary_map.equal_range(i);
-          for (auto it = range.first; it != range.second; ++it) {
-            const auto &[normal, id, position] = it->second;
-
-            /*
-             * Remove the normal component of the momentum for slip and
-             * "no_slip" boundary conditions. It is a bit counterintuitive,
-             * but we have to treat "no_slip" boundary conditions the same
-             * way as "slip" boundary conditions in the Euler module. The
-             * reason lies in the Strang splitting that we use to separate
-             * the hyperbolic part from viscous effects. Only the latter
-             * can cause "no slip" and thus the actual enforcement of v = 0
-             * happens in the dissipation module.
-             */
-            if (id == Boundary::slip || id == Boundary::no_slip) {
-              auto m = problem_description_->momentum(U_i_new);
-              m -= Number(1.) * (m * normal) * normal;
-              for (unsigned int k = 0; k < dim; ++k)
-                U_i_new[k + 1] = m[k];
-            }
-
-            /* On Dirichlet boundaries enforce initial conditions: */
-            if (id == Boundary::dirichlet) {
-              U_i_new = initial_values_->initial_state(position, t + tau);
-            }
-          }
         }
 
         temp_euler_.write_tensor(U_i_new, i);
@@ -659,12 +625,8 @@ namespace ryujin
     {
       Scope scope(computing_timer_, "time step [E] 3 - synchronization");
 
-      if (RYUJIN_LIKELY(limiter_iter_ != 0)) {
+      if (RYUJIN_LIKELY(limiter_iter_ != 0))
         r_.update_ghost_values_finish();
-      } else {
-        /* If we do not do high-order, synchronize at this point: */
-        temp_euler_.update_ghost_values_finish();
-      }
     }
 
     /*
@@ -829,9 +791,7 @@ namespace ryujin
                         "symmetrize l_ij, h.-o. update" + additional_step);
 
         SynchronizationDispatch synchronization_dispatch([&]() {
-          if (last_round)
-            temp_euler_.update_ghost_values_start(channel++);
-          else
+          if (!last_round)
             lij_matrix_next_.update_ghost_rows_start(channel++);
         });
 
@@ -867,28 +827,6 @@ namespace ryujin
 
             if (!last_round)
               lij_row_serial[col_idx] = l_ij;
-          }
-
-          /* In the last round */
-          if (last_round) {
-            /* Fix up boundary: */
-            const auto range = boundary_map.equal_range(i);
-            for (auto it = range.first; it != range.second; ++it) {
-              const auto &[normal, id, position] = it->second;
-
-              /* see comment above */
-              if (id == Boundary::slip || id == Boundary::no_slip) {
-                auto m = problem_description_->momentum(U_i_new);
-                m -= Number(1.) * (m * normal) * normal;
-                for (unsigned int k = 0; k < dim; ++k)
-                  U_i_new[k + 1] = m[k];
-              }
-
-              /* see comment above */
-              if (id == Boundary::dirichlet) {
-                U_i_new = initial_values_->initial_state(position, t + tau);
-              }
-            }
           }
 
 #ifdef CHECK_BOUNDS
@@ -1055,9 +993,7 @@ namespace ryujin
         Scope scope(computing_timer_,
                     "time step [E] " + step_no + " - synchronization");
 
-        if (last_round)
-          temp_euler_.update_ghost_values_finish();
-        else {
+        if (!last_round) {
           lij_matrix_next_.update_ghost_rows_finish();
           std::swap(lij_matrix_, lij_matrix_next_);
         }
@@ -1074,6 +1010,54 @@ namespace ryujin
 
 
   template <int dim, typename Number>
+  void EulerModule<dim, Number>::apply_boundary_conditions(vector_type &U,
+                                                           Number t)
+  {
+#ifdef DEBUG_OUTPUT
+    std::cout << "EulerModule<dim, Number>::apply_boundary_conditions()"
+              << std::endl;
+#endif
+
+    const auto &boundary_map = offline_data_->boundary_map();
+    const unsigned int n_owned = offline_data_->n_locally_owned();
+
+    for (auto entry : boundary_map) {
+      const auto i = entry.first;
+      if (i >= n_owned)
+        continue;
+
+      const auto &[normal, id, position] = entry.second;
+
+      if (id == Boundary::slip || id == Boundary::no_slip) {
+        /*
+         * Remove the normal component of the momentum for slip and
+         * "no_slip" boundary conditions. It is a bit counterintuitive,
+         * but we have to treat "no_slip" boundary conditions the same
+         * way as "slip" boundary conditions in the Euler module. The
+         * reason lies in the Strang splitting that we use to separate
+         * the hyperbolic part from viscous effects. Only the latter
+         * can cause "no slip" and thus the actual enforcement of v = 0
+         * happens in the dissipation module.
+         */
+        auto U_i = U.get_tensor(i);
+        auto m = problem_description_->momentum(U_i);
+        m -= 1. * (m * normal) * normal;
+        for (unsigned int k = 0; k < dim; ++k)
+          U_i[k + 1] = m[k];
+        U.write_tensor(U_i, i);
+
+      } else if (id == Boundary::dirichlet) {
+        /* On Dirichlet boundaries enforce initial conditions: */
+        const auto U_i = initial_values_->initial_state(position, t);
+        U.write_tensor(U_i, i);
+      }
+    }
+
+    U.update_ghost_values();
+  }
+
+
+  template <int dim, typename Number>
   Number EulerModule<dim, Number>::euler_step(vector_type &U,
                                               Number t,
                                               Number tau_0 /*= 0*/)
@@ -1082,7 +1066,8 @@ namespace ryujin
     std::cout << "EulerModule<dim, Number>::euler_step()" << std::endl;
 #endif
 
-    Number tau_1 = single_step(U, t, tau_0);
+    Number tau_1 = single_step(U, tau_0);
+    apply_boundary_conditions(U, t + tau_1);
     return tau_1;
   }
 
@@ -1101,14 +1086,16 @@ namespace ryujin
     temp_ssp_ = U;
 
     /* Step 1: U1 = U_old + tau * L(U_old) */
-    Number tau_1 = single_step(U, t, tau_0);
+    Number tau_1 = single_step(U, tau_0);
+    apply_boundary_conditions(U, t + tau_1);
 
     AssertThrow(tau_1 * cfl_max_ / cfl_update_ >= tau_0,
                 ExcMessage("failed to recover from CFL violation"));
     tau_1 = (tau_0 == 0. ? tau_1 : tau_0);
 
     /* Step 2: U2 = 1/2 U_old + 1/2 (U1 + tau L(U1)) */
-    const Number tau_2 = single_step(U, t, tau_1);
+    const Number tau_2 = single_step(U, tau_1);
+    apply_boundary_conditions(U, t + tau_1);
 
     AssertThrow(tau_2 * cfl_max_ / cfl_update_ >= tau_0,
                 ExcMessage("failed to recover from CFL violation"));
@@ -1144,14 +1131,16 @@ namespace ryujin
     temp_ssp_ = U;
 
     /* Step 1: U1 = U_old + tau * L(U_old) */
-    Number tau_1 = single_step(U, t, tau_0);
+    Number tau_1 = single_step(U, tau_0);
+    apply_boundary_conditions(U, t + tau_1);
 
     AssertThrow(tau_1 * cfl_max_ / cfl_update_ >= tau_0,
                 ExcMessage("failed to recover from CFL violation"));
     tau_1 = (tau_0 == 0. ? tau_1 : tau_0);
 
     /* Step 2: U2 = 3/4 U_old + 1/4 (U1 + tau L(U1)) */
-    const Number tau_2 = single_step(U, t, tau_1);
+    const Number tau_2 = single_step(U, tau_1);
+    apply_boundary_conditions(U, t + tau_1);
 
     AssertThrow(tau_2 * cfl_max_ / cfl_update_ >= tau_0,
                 ExcMessage("failed to recover from CFL violation"));
@@ -1170,7 +1159,8 @@ namespace ryujin
     U.sadd(Number(1. / 4.), Number(3. / 4.), temp_ssp_);
 
     /* Step 3: U_new = 1/3 U_old + 2/3 (U2 + tau L(U2)) */
-    const Number tau_3 = single_step(U, t, tau_1);
+    const Number tau_3 = single_step(U, tau_1);
+    apply_boundary_conditions(U, t + tau_1);
 
     AssertThrow(tau_3 * cfl_max_ / cfl_update_ >= tau_0,
                 ExcMessage("failed to recover from CFL violation"));

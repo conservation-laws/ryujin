@@ -144,7 +144,9 @@ namespace ryujin
      */
     //@{
 
-    Number single_step(vector_type &U, Number t, Number tau);
+    Number single_step(vector_type &U, Number tau);
+
+    void apply_boundary_conditions(vector_type &U, Number t);
 
     //@}
     /**
