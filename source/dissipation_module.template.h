@@ -71,10 +71,15 @@ namespace ryujin
 
     /* Initialize vectors: */
 
+    typename MatrixFree<dim, Number>::AdditionalData additional_data;
+    additional_data.tasks_parallel_scheme =
+        MatrixFree<dim, Number>::AdditionalData::none;
+
     matrix_free_.reinit(offline_data_->discretization().mapping(),
                         offline_data_->dof_handler(),
                         offline_data_->affine_constraints(),
-                        offline_data_->discretization().quadrature_1d());
+                        offline_data_->discretization().quadrature_1d(),
+                        additional_data);
 
     const auto &scalar_partitioner =
         matrix_free_.get_dof_info(0).vector_partitioner;
