@@ -82,17 +82,13 @@ namespace ryujin
         matrix_free_.get_dof_info(0).vector_partitioner;
 
     velocity_.reinit(dim);
-    velocity_interp_.reinit(dim);
     vorticity_.reinit(dim == 2 ? 1 : dim);
     boundary_stress_.reinit(dim);
-    boundary_stress_interp_.reinit(dim);
     for (unsigned int i = 0; i < dim; ++i) {
       velocity_.block(i).reinit(scalar_partitioner);
-      velocity_interp_.block(i).reinit(scalar_partitioner);
       if constexpr (dim == 3)
         vorticity_.block(i).reinit(scalar_partitioner);
       boundary_stress_.block(i).reinit(scalar_partitioner);
-      boundary_stress_interp_.block(i).reinit(scalar_partitioner);
     }
     if constexpr (dim == 2)
       vorticity_.block(0).reinit(scalar_partitioner);
@@ -248,8 +244,6 @@ namespace ryujin
   void PointQuantities<dim, Number>::compute(
       const vector_type &U,
       const Number t,
-      const block_vector_type &velocity_interp,
-      const Number t_interp,
       std::string name,
       unsigned int cycle)
   {
@@ -267,12 +261,6 @@ namespace ryujin
      */
 
     {
-      for (unsigned int d = 0; d < dim; ++d) {
-        velocity_interp_.block(d).copy_locally_owned_data_from(
-            velocity_interp.block(d));
-        velocity_interp_.block(d).update_ghost_values();
-      }
-
       RYUJIN_PARALLEL_REGION_BEGIN
       RYUJIN_OMP_FOR
       for (unsigned int i = 0; i < size_regular; i += simd_length) {
@@ -301,7 +289,6 @@ namespace ryujin
       }
 
       velocity_.update_ghost_values();
-      velocity_interp_.update_ghost_values();
       pressure_.update_ghost_values();
     }
 
@@ -417,11 +404,8 @@ namespace ryujin
 
       FEFaceEvaluation<dim, order_fe, order_quad, dim, Number> velocity(
           matrix_free_);
-      FEFaceEvaluation<dim, order_fe, order_quad, dim, Number> velocity_interp(
-          matrix_free_);
 
       boundary_stress_ = 0.;
-      boundary_stress_interp_ = 0.;
 
       const auto mu = problem_description_->mu();
       const auto lambda = problem_description_->lambda();
@@ -436,49 +420,30 @@ namespace ryujin
           continue;
 
         velocity.reinit(face);
-        velocity_interp.reinit(face);
 #if DEAL_II_VERSION_GTE(9, 3, 0)
         velocity.gather_evaluate(velocity_, EvaluationFlags::gradients);
-        velocity_interp.gather_evaluate(velocity_interp_,
-                                        EvaluationFlags::gradients);
 #else
         velocity.gather_evaluate(velocity_, false, true);
-        velocity_interp.gather_evaluate(velocity_interp_,
-                                        EvaluationFlags::gradients);
 #endif
         for (unsigned int q = 0; q < velocity.n_q_points; ++q) {
           const auto normal = velocity.get_normal_vector(q);
-          {
-            const auto symmetric_gradient = velocity.get_symmetric_gradient(q);
-            const auto divergence = trace(symmetric_gradient);
-            auto S = 2. * mu * symmetric_gradient;
-            for (unsigned int d = 0; d < dim; ++d)
-              S[d][d] += (lambda - 2. / 3. * mu) * divergence;
-            velocity.submit_value(S * (-normal), q);
-          }
-          {
-            const auto symmetric_gradient =
-                velocity_interp.get_symmetric_gradient(q);
-            const auto divergence = trace(symmetric_gradient);
-            auto S = 2. * mu * symmetric_gradient;
-            for (unsigned int d = 0; d < dim; ++d)
-              S[d][d] += (lambda - 2. / 3. * mu) * divergence;
-            velocity_interp.submit_value(S * (-normal), q);
-          }
+
+          const auto symmetric_gradient = velocity.get_symmetric_gradient(q);
+          const auto divergence = trace(symmetric_gradient);
+          auto S = 2. * mu * symmetric_gradient;
+          for (unsigned int d = 0; d < dim; ++d)
+            S[d][d] += (lambda - 2. / 3. * mu) * divergence;
+          velocity.submit_value(S * (-normal), q);
         }
 
 #if DEAL_II_VERSION_GTE(9, 3, 0)
         velocity.integrate_scatter(EvaluationFlags::values, boundary_stress_);
-        velocity_interp.integrate_scatter(EvaluationFlags::values,
-                                          boundary_stress_interp_);
 #else
         velocity.integrate_scatter(true, false, boundary_stress_);
-        velocity_interp.integrate_scatter(true, false, boundary_stress_interp_);
 #endif
       }
 
       boundary_stress_.compress(VectorOperation::add);
-      boundary_stress_interp_.compress(VectorOperation::add);
     }
 
     /*
@@ -493,8 +458,7 @@ namespace ryujin
                                Tensor<1, dim, Number>,  // normal
                                rank1_type,              // state
                                Number,                  // pressure
-                               Tensor<1, dim, Number>,  // stress
-                               Tensor<1, dim, Number>>; // stress interp
+                               Tensor<1, dim, Number>>; // stress
 
       std::vector<entry> entries;
       for (const auto &it : boundary_map) {
@@ -511,14 +475,11 @@ namespace ryujin
         const auto P_i = pressure_.local_element(i);
 
         Tensor<1, dim, Number> Sn_i;
-        Tensor<1, dim, Number> Sn_i_interp;
         for (unsigned int d = 0; d < dim; ++d) {
           Sn_i[d] = boundary_stress_.block(d).local_element(i);
-          Sn_i_interp[d] = boundary_stress_interp_.block(d).local_element(i);
         }
 
-        entries.push_back(
-            {position, m_i, normal, U_i, P_i, Sn_i / m_i, Sn_i_interp / m_i});
+        entries.push_back({position, m_i, normal, U_i, P_i, Sn_i / m_i});
       }
 
       std::vector<entry> all_entries;
@@ -538,17 +499,16 @@ namespace ryujin
                              Utilities::to_string(cycle, 6) + ".log");
 
         output << std::scientific << std::setprecision(14);
-        output << "# stress_interp at time t = " << t_interp << std::endl;
         output << "# state and pressure at time t = " << t << std::endl;
         output << "# position\tlumped boundary mass\tnormal\t"
-               << "state (rho,M,E)\tpressure\tstress\tstress_interp"
+               << "state (rho,M,E)\tpressure\tstress"
                << std::endl;
 
         for (const auto &entry : all_entries) {
-          const auto &[position, m_i, normal, U_i, P_i, Sn_i, Sn_i_interp] =
+          const auto &[position, m_i, normal, U_i, P_i, Sn_i] =
               entry;
-          output << position << "\t" << m_i << "\t" << normal << "\t"         //
-                 << U_i << "\t" << P_i << "\t" << Sn_i << "\t" << Sn_i_interp //
+          output << position << "\t" << m_i << "\t" << normal << "\t" //
+                 << U_i << "\t" << P_i << "\t" << Sn_i                //
                  << std::endl;
         }
       }

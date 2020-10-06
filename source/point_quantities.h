@@ -99,8 +99,6 @@ namespace ryujin
      */
     void compute(const vector_type &U,
                  const Number t,
-                 const block_vector_type &velocity_interp,
-                 const Number t_interp,
                  std::string name,
                  unsigned int cycle);
 
@@ -135,10 +133,8 @@ namespace ryujin
     dealii::MatrixFree<dim, Number> matrix_free_;
 
     block_vector_type velocity_;
-    block_vector_type velocity_interp_;
     block_vector_type vorticity_;
     block_vector_type boundary_stress_;
-    block_vector_type boundary_stress_interp_;
     scalar_type lumped_boundary_mass_;
     scalar_type pressure_;
 
