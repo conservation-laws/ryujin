@@ -325,8 +325,6 @@ namespace ryujin
           }
         }
       }
-
-      vorticity_.update_ghost_values();
     }
 
     /*
