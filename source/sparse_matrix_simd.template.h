@@ -304,10 +304,10 @@ namespace ryujin
       }
     }
 
-    const auto n_rows = sparsity->n_rows();
     RYUJIN_OMP_FOR
-    for (unsigned int i = sparsity->n_internal_dofs; i < n_rows; ++i) {
-
+    for (unsigned int i = sparsity->n_internal_dofs;
+         i < sparsity->n_locally_owned_dofs;
+         ++i) {
       const unsigned int row_length = sparsity->row_length(i);
       const unsigned int *js = sparsity->columns(i);
       for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx, ++js) {
@@ -364,9 +364,10 @@ namespace ryujin
       }
     }
 
-    const auto n_rows = sparsity->n_rows();
     RYUJIN_OMP_FOR
-    for (unsigned int i = sparsity->n_internal_dofs; i < n_rows; ++i) {
+    for (unsigned int i = sparsity->n_internal_dofs;
+         i < sparsity->n_locally_owned_dofs;
+         ++i) {
 
       const unsigned int row_length = sparsity->row_length(i);
       const unsigned int *js = sparsity->columns(i);

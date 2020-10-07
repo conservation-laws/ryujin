@@ -575,6 +575,9 @@ namespace ryujin
     mass_matrix_.read_in(mass_matrix_tmp, /*locally_indexed*/ true);
     cij_matrix_.read_in(cij_matrix_tmp, /*locally_indexed*/ true);
 #endif
+    betaij_matrix_.update_ghost_rows();
+    mass_matrix_.update_ghost_rows();
+    cij_matrix_.update_ghost_rows();
   }
 
 } /* namespace ryujin */
