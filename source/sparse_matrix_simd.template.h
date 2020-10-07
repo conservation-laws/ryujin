@@ -296,7 +296,7 @@ namespace ryujin
             if (locally_indexed)
               temp[d][k] = sparse_matrix[d](i + k, js[k]);
             else
-              temp[d][k] = sparse_matrix[d](
+              temp[d][k] = sparse_matrix[d].el(
                   sparsity->partitioner->local_to_global(i + k),
                   sparsity->partitioner->local_to_global(js[k]));
 
@@ -317,9 +317,9 @@ namespace ryujin
           if (locally_indexed)
             temp[d] = sparse_matrix[d](i, js[0]);
           else
-            temp[d] =
-                sparse_matrix[d](sparsity->partitioner->local_to_global(i),
-                                 sparsity->partitioner->local_to_global(js[0]));
+            temp[d] = sparse_matrix[d].el(
+                sparsity->partitioner->local_to_global(i),
+                sparsity->partitioner->local_to_global(js[0]));
         write_tensor(temp, i, col_idx);
       }
     }
@@ -357,7 +357,7 @@ namespace ryujin
             temp[k] = sparse_matrix(i + k, js[k]);
           else
             temp[k] =
-                sparse_matrix(sparsity->partitioner->local_to_global(i + k),
+                sparse_matrix.el(sparsity->partitioner->local_to_global(i + k),
                               sparsity->partitioner->local_to_global(js[k]));
 
         write_vectorized_entry(temp, i, col_idx, true);
@@ -375,8 +375,9 @@ namespace ryujin
         const auto temp =
             locally_indexed
                 ? sparse_matrix(i, js[0])
-                : sparse_matrix(sparsity->partitioner->local_to_global(i),
-                                sparsity->partitioner->local_to_global(js[0]));
+                : sparse_matrix.el(
+                      sparsity->partitioner->local_to_global(i),
+                      sparsity->partitioner->local_to_global(js[0]));
         write_entry(temp, i, col_idx);
       }
     }

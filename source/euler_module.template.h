@@ -266,6 +266,7 @@ namespace ryujin
           if (boundary_map.count(i) != 0 && boundary_map.count(j) != 0) {
 
             const auto c_ji = cij_matrix.get_transposed_tensor(i, col_idx);
+            Assert(c_ji.norm() > 1.e-12, ExcInternalError());
             const auto norm_2 = c_ji.norm();
             const auto n_ji = c_ji / norm_2;
 
