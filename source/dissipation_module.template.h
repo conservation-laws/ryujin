@@ -7,6 +7,7 @@
 #define DISSIPATION_MODULE_TEMPLATE_H
 
 #include "dissipation_module.h"
+#include "introspection.h"
 #include "openmp.h"
 #include "scope.h"
 #include "simd.h"
@@ -17,20 +18,6 @@
 #include <deal.II/matrix_free/fe_evaluation.h>
 
 #include <atomic>
-
-#ifdef VALGRIND_CALLGRIND
-#include <valgrind/callgrind.h>
-#else
-#define CALLGRIND_START_INSTRUMENTATION
-#define CALLGRIND_STOP_INSTRUMENTATION
-#endif
-
-#ifdef LIKWID_PERFMON
-#include <likwid.h>
-#else
-#define LIKWID_MARKER_START(opt)
-#define LIKWID_MARKER_STOP(opt)
-#endif
 
 namespace ryujin
 {

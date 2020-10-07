@@ -8,6 +8,7 @@
 
 #include "checkpointing.h"
 #include "indicator.h"
+#include "introspection.h"
 #include "limiter.h"
 #include "riemann_solver.h"
 #include "scope.h"
@@ -19,10 +20,6 @@
 #include <deal.II/grid/grid_out.h>
 #include <deal.II/numerics/vector_tools.h>
 #include <deal.II/numerics/vector_tools.templates.h>
-
-#ifdef CALLGRIND
-#include <valgrind/callgrind.h>
-#endif
 
 #include <fstream>
 #include <iomanip>

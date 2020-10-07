@@ -5,43 +5,38 @@
 
 #include <compile_time_options.h>
 
+#include "introspection.h"
 #include "time_loop.h"
 
-#include <deal.II/base/utilities.h>
 #include <deal.II/base/multithread_info.h>
+#include <deal.II/base/utilities.h>
 
 #include <omp.h>
-
-#ifdef LIKWID_PERFMON
-  #include <likwid.h>
-#endif
 
 #include <fstream>
 
 int main (int argc, char *argv[])
 {
-  dealii::Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv);
+  LSAN_DISABLE
 
-  /*
-   * Set the number of OpenMP threads to whatever deal.II allows
-   * internally:
-   */
+  dealii::Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv);
   omp_set_num_threads(dealii::MultithreadInfo::n_threads());
 
 #ifdef LIKWID_PERFMON
   LIKWID_MARKER_INIT;
-#pragma omp parallel
-  {
-    LIKWID_MARKER_THREADINIT;
-  }
+  RYUJIN_PARALLEL_REGION_BEGIN
+  LIKWID_MARKER_THREADINIT;
+  RYUJIN_PARALLEL_REGION_END
 #endif
+
+  LSAN_ENABLE
 
   MPI_Comm mpi_communicator(MPI_COMM_WORLD);
 
   ryujin::TimeLoop<DIM, NUMBER> time_loop(mpi_communicator);
 
   if (dealii::Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
-    std::cout << "[Init] initiating flux capacitor" << std::endl;
+    std::cout << "[INFO] initiating flux capacitor" << std::endl;
 
   AssertThrow(
       argc <= 2,

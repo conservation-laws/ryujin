@@ -7,28 +7,14 @@
 #define EULER_MODULE_TEMPLATE_H
 
 #include "euler_module.h"
+#include "indicator.h"
+#include "introspection.h"
 #include "openmp.h"
+#include "riemann_solver.h"
 #include "scope.h"
 #include "simd.h"
 
-#include "indicator.h"
-#include "riemann_solver.h"
-
 #include <atomic>
-
-#ifdef VALGRIND_CALLGRIND
-#include <valgrind/callgrind.h>
-#else
-#define CALLGRIND_START_INSTRUMENTATION
-#define CALLGRIND_STOP_INSTRUMENTATION
-#endif
-
-#ifdef LIKWID_PERFMON
-#include <likwid.h>
-#else
-#define LIKWID_MARKER_START(opt)
-#define LIKWID_MARKER_STOP(opt)
-#endif
 
 namespace ryujin
 {
