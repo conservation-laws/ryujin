@@ -12,6 +12,7 @@
 #include "scratch_data.h"
 #include "simd.h"
 
+#include <deal.II/base/function_parser.h>
 #include <deal.II/base/work_stream.h>
 #include <deal.II/matrix_free/fe_evaluation.h>
 
@@ -43,14 +44,19 @@ namespace ryujin
       , problem_description_(&problem_description)
       , offline_data_(&offline_data)
   {
-    add_parameter(
-        "output planes",
-        output_planes_,
-        "A vector of hyperplanes described by an origin, normal vector and a "
-        "tolerance. The description is used to only output point values for "
-        "vertices belonging to a cell cut by the cutplane. Example declaration "
-        "of two hyper planes in 3D, one normal to the x-axis and one normal to "
-        "the y-axis: \"0,0,0 : 1,0,0 : 0.01 ; 0,0,0 : 0,1,0 : 0,01\"");
+    add_parameter("interior manifolds",
+                  interior_manifolds_,
+                  "List of level set functions describing interior manifolds. "
+                  "The description is used to only output point values for "
+                  "vertices belonging to a certain level set.");
+
+    boundary_manifolds_.push_back({"upper_boundary", "y - 1.0"});
+    boundary_manifolds_.push_back({"lower_boundary", "y"});
+    add_parameter("boundary manifolds",
+                  boundary_manifolds_,
+                  "List of level set functions describing boundary. The "
+                  "description is used to only output point values for "
+                  "boundary vertices belonging to a certain level set.");
   }
 
 
@@ -114,8 +120,7 @@ namespace ryujin
         /* only compute on slip and no_slip boundaries */
         if (id != Boundary::slip && id != Boundary::no_slip)
           continue;
-
-        phi.reinit(face);
+phi.reinit(face);
         for (unsigned int q = 0; q < phi.n_q_points; ++q) {
           phi.submit_value(1., q);
         }
@@ -130,113 +135,32 @@ namespace ryujin
       lumped_boundary_mass_.compress(VectorOperation::add);
     }
 
-    /*
-     * Collect local dof indices and associated point locations for the
-     * prescribed cut planes:
-     */
+    /* Create boundary maps: */
 
-    {
-      cutplane_map_.clear();
+    const unsigned int n_owned = offline_data_->n_locally_owned();
 
-      const auto &partitioner = offline_data_->scalar_partitioner();
-      const auto &discretization = offline_data_->discretization();
-      const unsigned int dofs_per_cell =
-          discretization.finite_element().dofs_per_cell;
+    boundary_maps_.clear();
+    std::transform(
+        boundary_manifolds_.begin(),
+        boundary_manifolds_.end(),
+        std::back_inserter(boundary_maps_),
+        [this, n_owned](auto it) {
+          const auto &[name, expression] = it;
+          FunctionParser<dim> level_set_function(expression);
 
-      const auto local_assemble_system =
-          [&](const auto &cell, auto &scratch, auto &copy) {
-            /* iterate over locally owned cells and the ghost layer */
+          std::multimap<dealii::types::global_dof_index, boundary_description>
+              map;
 
-            auto &is_locally_owned = copy.is_locally_owned_;
-            auto &local_dof_indices = copy.local_dof_indices_;
-            auto &local_boundary_map = copy.local_boundary_map_;
-            auto &fe_values = scratch.fe_values_;
+          for (const auto &entry : offline_data_->boundary_map()) {
+            if (entry.first >= n_owned)
+              continue;
 
-            is_locally_owned = cell->is_locally_owned();
-            if (!is_locally_owned)
-              return;
-
-            fe_values.reinit(cell);
-
-            local_dof_indices.resize(dofs_per_cell);
-            cell->get_dof_indices(local_dof_indices);
-
-            /* clear out copy data: */
-            local_boundary_map.clear();
-
-            unsigned int id = 0;
-            /* Record every matching cutplane: */
-            for (const auto &plane : output_planes_) {
-              const auto &[origin, normal, tolerance] = plane;
-
-              unsigned int above = 0;
-              unsigned int below = 0;
-              bool cut = false;
-
-              for (auto v : GeometryInfo<dim>::vertex_indices()) {
-                const auto vertex = cell->vertex(v);
-                const auto distance = (vertex - Point<dim>(origin)) * normal;
-                if (distance > -tolerance)
-                  above++;
-                if (distance < tolerance)
-                  below++;
-                if (above > 0 && below > 0) {
-                  cut = true;
-                  break;
-                }
-              }
-
-              if (cut) {
-                /* Record all vertex indices: */
-
-                for (unsigned int j = 0; j < dofs_per_cell; ++j) {
-                  /*
-                   * This is a bloody hack: Use "vertex_dof_index" to retrieve
-                   * the vertex associated to the current degree of freedom.
-                   */
-                  Point<dim> position;
-                  const auto global_index = local_dof_indices[j];
-                  for (auto v : GeometryInfo<dim>::vertex_indices())
-                    if (cell->vertex_dof_index(v, 0) == global_index) {
-                      position = cell->vertex(v);
-                      break;
-                    }
-
-                  const auto index = partitioner->global_to_local(global_index);
-
-                  /* Insert a dummy value for boundary normal */
-                  local_boundary_map.insert(
-                      {index, {dealii::Tensor<1, dim>(), id, position}});
-                } /* for j */
-              }
-              ++id;
-            } /* plane */
-          };
-
-      const auto copy_local_to_global = [&](const auto &copy) {
-        const auto &is_locally_owned = copy.is_locally_owned_;
-        const auto &local_boundary_map = copy.local_boundary_map_;
-
-        if (is_locally_owned)
-          return;
-
-        for (const auto entry : local_boundary_map) {
-          const auto &index = entry.first;
-          const auto &[normal, id, position] = entry.second;
-          cutplane_map_[id][index] = position;
-        }
-      };
-
-      cutplane_map_.resize(output_planes_.size());
-
-      const auto &dof_handler = offline_data_->dof_handler();
-      WorkStream::run(dof_handler.begin_active(),
-                      dof_handler.end(),
-                      local_assemble_system,
-                      copy_local_to_global,
-                      AssemblyScratchData<dim>(discretization),
-                      AssemblyCopyData<dim, Number>());
-    }
+            const auto position = std::get<2>(entry.second);
+            if (std::abs(level_set_function.value(position)) < 1.e-12)
+              map.insert(entry);
+          }
+          return std::make_tuple(name, map);
+        });
   }
 
 
@@ -450,8 +374,8 @@ namespace ryujin
      * Collect all boundary points of interest and output to log file:
      */
 
-    {
-      const auto &boundary_map = offline_data_->boundary_map();
+    for (const auto &it : boundary_maps_) {
+      const auto &[description, boundary_map] = it;
 
       using entry = std::tuple<Point<dim>,              // position
                                Number,                  // lumped boundary mass
@@ -495,7 +419,7 @@ namespace ryujin
       }
 
       if (Utilities::MPI::this_mpi_process(mpi_communicator_) == 0) {
-        std::ofstream output(name + "-boundary_values-" +
+        std::ofstream output(name + "-" + description + "-" +
                              Utilities::to_string(cycle, 6) + ".log");
 
         output << std::scientific << std::setprecision(14);
@@ -512,9 +436,7 @@ namespace ryujin
                  << std::endl;
         }
       }
-    }
-
-    // TODO
+    } /* boundary_maps_ */
   }
 
 } /* namespace ryujin */

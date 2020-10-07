@@ -110,14 +110,9 @@ namespace ryujin
      */
     //@{
 
-    using plane_description = std::tuple<dealii::Point<dim> /*origin*/,
-                                         dealii::Tensor<1, dim> /*normal*/,
-                                         double /*tolerance*/>;
+    std::vector<std::tuple<std::string, std::string>> interior_manifolds_;
 
-    std::vector<plane_description> output_planes_;
-
-    std::vector<std::map<dealii::types::global_dof_index, dealii::Point<dim>>>
-        cutplane_map_;
+    std::vector<std::tuple<std::string, std::string>> boundary_manifolds_;
 
     //@}
     /**
@@ -127,8 +122,15 @@ namespace ryujin
 
     const MPI_Comm &mpi_communicator_;
 
-    dealii::SmartPointer<const ryujin::ProblemDescription> problem_description_;
-    dealii::SmartPointer<const ryujin::OfflineData<dim, Number>> offline_data_;
+    dealii::SmartPointer<const ProblemDescription> problem_description_;
+    dealii::SmartPointer<const OfflineData<dim, Number>> offline_data_;
+
+    using boundary_description =
+        typename OfflineData<dim, Number>::boundary_description;
+    std::vector<std::tuple<
+        std::string,
+        std::multimap<dealii::types::global_dof_index, boundary_description>>>
+        boundary_maps_;
 
     dealii::MatrixFree<dim, Number> matrix_free_;
 

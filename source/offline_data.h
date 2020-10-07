@@ -71,6 +71,14 @@ namespace ryujin
     using vector_type = MultiComponentVector<Number, problem_dimension>;
 
     /**
+     * A tuple describing global dof index, boundary normal and position of
+     * a boundary degree of freedom.
+     */
+    using boundary_description = std::tuple<dealii::Tensor<1, dim, Number>,
+                                            dealii::types::boundary_id,
+                                            dealii::Point<dim>>;
+
+    /**
      * Constructor
      */
     OfflineData(const MPI_Comm &mpi_communicator,
@@ -115,9 +123,6 @@ namespace ryujin
     unsigned int n_locally_owned_;
     unsigned int n_locally_relevant_;
 
-    using boundary_description = std::tuple<dealii::Tensor<1, dim, Number>,
-                                            dealii::types::boundary_id,
-                                            dealii::Point<dim>>;
     std::multimap<dealii::types::global_dof_index, boundary_description>
         boundary_map_;
 
