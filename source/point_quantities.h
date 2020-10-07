@@ -125,6 +125,11 @@ namespace ryujin
     dealii::SmartPointer<const ProblemDescription> problem_description_;
     dealii::SmartPointer<const OfflineData<dim, Number>> offline_data_;
 
+    std::vector<std::tuple<
+        std::string,
+        std::map<dealii::types::global_dof_index, dealii::Point<dim>>>>
+        interior_maps_;
+
     using boundary_description =
         typename OfflineData<dim, Number>::boundary_description;
     std::vector<std::tuple<
@@ -138,7 +143,6 @@ namespace ryujin
     block_vector_type vorticity_;
     block_vector_type boundary_stress_;
     scalar_type lumped_boundary_mass_;
-    scalar_type pressure_;
 
     //@}
   };
