@@ -521,8 +521,6 @@ namespace ryujin
       const unsigned int communication_channel)
   {
 #ifdef DEAL_II_WITH_MPI
-    Assert(n_components == 1,
-           dealii::ExcMessage("Only scalar case implemented"));
     AssertIndexRange(communication_channel, 200);
 
     const unsigned int mpi_tag =
@@ -533,7 +531,7 @@ namespace ryujin
            dealii::ExcInternalError());
 
     const std::size_t n_indices = sparsity->indices_to_be_sent.size();
-    exchange_buffer.resize_fast(n_indices);
+    exchange_buffer.resize_fast(n_components * n_indices);
 
     requests.resize(sparsity->receive_targets.size() +
                     sparsity->send_targets.size());
@@ -541,10 +539,12 @@ namespace ryujin
       const auto &targets = sparsity->receive_targets;
       for (unsigned int p = 0; p < targets.size(); ++p) {
         const int ierr = MPI_Irecv(
-            data.data() + sparsity->row_starts[sparsity->n_locally_owned_dofs] +
-                (p == 0 ? 0 : targets[p - 1].second),
+            data.data() +
+                n_components *
+                    (sparsity->row_starts[sparsity->n_locally_owned_dofs] +
+                     (p == 0 ? 0 : targets[p - 1].second)),
             (targets[p].second - (p == 0 ? 0 : targets[p - 1].second)) *
-                sizeof(Number),
+                n_components * sizeof(Number),
             MPI_BYTE,
             targets[p].first,
             mpi_tag,
@@ -558,7 +558,10 @@ namespace ryujin
 
     RYUJIN_OMP_FOR
     for (std::size_t c = 0; c < n_indices; ++c)
-      exchange_buffer[c] = data[sparsity->indices_to_be_sent[c]];
+      for (unsigned int comp = 0; comp < n_components; ++comp)
+        exchange_buffer[n_components * c + comp] =
+            data[n_components * sparsity->indices_to_be_sent[c] +
+                 comp ];
 
     RYUJIN_PARALLEL_REGION_END
 
@@ -566,9 +569,10 @@ namespace ryujin
       const auto &targets = sparsity->send_targets;
       for (unsigned int p = 0; p < targets.size(); ++p) {
         const int ierr = MPI_Isend(
-            exchange_buffer.data() + (p == 0 ? 0 : targets[p - 1].second),
+            exchange_buffer.data() +
+                n_components * (p == 0 ? 0 : targets[p - 1].second),
             (targets[p].second - (p == 0 ? 0 : targets[p - 1].second)) *
-                sizeof(Number),
+                n_components * sizeof(Number),
             MPI_BYTE,
             targets[p].first,
             mpi_tag,

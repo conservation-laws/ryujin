@@ -566,7 +566,6 @@ namespace ryujin
 #endif
 
 #ifdef DEAL_II_WITH_TRILINOS
-#error "TrilinosMatrix currently not supported"
     betaij_matrix_.read_in(betaij_matrix_tmp, /*locally_indexed*/ false);
     mass_matrix_.read_in(mass_matrix_tmp, /*locally_indexed*/ false);
     cij_matrix_.read_in(cij_matrix_tmp, /*locally_indexed*/ false);
