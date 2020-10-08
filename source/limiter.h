@@ -88,11 +88,6 @@ namespace ryujin
     };
 
     /**
-     * Constructor.
-     */
-    Limiter();
-
-    /**
      * @name Limiter compile time options
      */
     //@{
@@ -227,12 +222,6 @@ namespace ryujin
 
     //@}
   };
-
-
-  template <int dim, typename Number>
-  Limiter<dim, Number>::Limiter()
-  {
-  }
 
 
   template <int dim, typename Number>
