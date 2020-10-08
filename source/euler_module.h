@@ -105,7 +105,7 @@ namespace ryujin
      * (if tau != 0). Here, tau_max is the computed maximal time step size
      * and tau is the optional third parameter.
      *
-     * See @cite Shu_1988, Eq. 2.15.
+     * See @cite Shu1988, Eq. 2.15.
      */
     Number ssph2_step(vector_type &U, Number t, Number tau = 0.);
 
@@ -118,7 +118,7 @@ namespace ryujin
      * (if tau != 0). Here, tau_max is the computed maximal time step size
      * and tau is the optional third parameter.
      *
-     * See @cite Shu_1988, Eq. 2.18.
+     * See @cite Shu1988, Eq. 2.18.
      */
     Number ssprk3_step(vector_type &U, Number t, Number tau = 0.);
 
