@@ -4,10 +4,11 @@ ryujin
 ======
 
 Ryujin is a high-performance second-order colocation-type finite-element
-scheme for solving the compressible Euler equations of gas dynamics on
-unstructured meshes. The solver is based on the convex limiting technique
-introduced by [Guermond et al.](https://doi.org/10.1137/17M1149961) and
-uses the finite element library [deal.II](https://github.com/dealii/dealii)
+scheme for solving the compressible Navier-Stokes and Euler equations of
+gas dynamics on unstructured meshes. The solver is based on the convex
+limiting technique introduced by [Guermond et
+al.](https://doi.org/10.1137/17M1149961) and uses the finite element
+library [deal.II](https://github.com/dealii/dealii)
 ([website](https://www.dealii.org)).
 
 As such it is <i>invariant-domain preserving</i>, the solver maintains
@@ -20,16 +21,26 @@ References
 ----------
 
 If you use this software for an academic publications please cite the
-following reference ([preprint](https://arxiv.org/abs/2007.00094)):
+following references ([preprint](https://arxiv.org/abs/2007.00094),
+[preprint](https://arxiv.org/abs/2009.06022)):
 
 ```
 @article{ryujin2020,
   title   = {Massively parallel 3D computation of the compressible Euler
-      equations with an invariant-domain preserving second-order
-      finite-element scheme}
+    equations with an invariant-domain preserving second-order
+    finite-element scheme}
   author  = {Matthias Maier and Martin Kronbichler},
   year    = {2020},
   journal = {submitted}
+}
+
+@article{navier-stokes2020,
+  title = {Second-order invariant domain preserving approximation of the
+    compressible Navier--Stokes equations},
+  author = {Jean-Luc Guermond and Matthias Maier and Bojan Popov and
+    Ignacio Tomas},
+  year = {2020},
+  journal = {submitted},
 }
 ```
 
