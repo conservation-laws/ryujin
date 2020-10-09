@@ -170,8 +170,14 @@ namespace ryujin
               const auto index =
                   scalar_partitioner->global_to_local(global_index);
 
-              /* only record owned dofs */
+              /* skip nonlocal */
               if (index >= n_owned)
+                continue;
+
+              /* skip constrained */
+              if (offline_data_->affine_constraints().is_constrained(
+                      offline_data_->scalar_partitioner()->local_to_global(
+                          index)))
                 continue;
 
               map.insert({index, position});
@@ -195,7 +201,14 @@ namespace ryujin
           std::multimap<types::global_dof_index, boundary_description> map;
 
           for (const auto &entry : offline_data_->boundary_map()) {
+            /* skip nonlocal */
             if (entry.first >= n_owned)
+              continue;
+
+            /* skip constrained */
+            if (offline_data_->affine_constraints().is_constrained(
+                    offline_data_->scalar_partitioner()->local_to_global(
+                        entry.first)))
               continue;
 
             const auto position = std::get<2>(entry.second);
