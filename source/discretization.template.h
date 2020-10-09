@@ -15,6 +15,8 @@
 #include <deal.II/fe/fe_q.h>
 #include <deal.II/fe/mapping_q.h>
 
+#include <deal.II/grid/grid_out.h>
+
 #include <fstream>
 
 namespace ryujin
@@ -59,7 +61,7 @@ namespace ryujin
     geometry_list_.emplace(
         std::make_unique<Geometries::Validation<dim>>(subsection));
     geometry_list_.emplace(
-        std::make_unique<Geometries::Naca4<dim>>(subsection));
+        std::make_unique<Geometries::Airfoil<dim>>(subsection));
   }
 
 
