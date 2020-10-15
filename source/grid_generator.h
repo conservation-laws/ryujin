@@ -376,17 +376,18 @@ namespace ryujin
             } else {
               /* Handle radial faces: */
 
-              for (const auto v : dealii::GeometryInfo<1>::vertex_indices()) {
-                const auto vertex = face->vertex(v);
-                unsigned int index = 4;
-                for (auto candidate : radial_vertices) {
-                  if ((vertex - candidate).norm() < 1.0e-10) {
-                    Assert(index < 10, dealii::ExcInternalError());
-                    face->set_manifold_id(index);
-                    break;
-                  }
-                  index++;
+              unsigned int index = 4;
+              for (auto candidate : radial_vertices) {
+                const auto direction_1 = candidate - face->vertex(0);
+                const auto direction_2 = face->vertex(1) - face->vertex(0);
+                if (direction_1.norm() < 1.0e-10 ||
+                    std::abs(cross_product_2d(direction_1) * direction_2) <
+                        1.0e-10) {
+                  Assert(index < 10, dealii::ExcInternalError());
+                  face->set_manifold_id(index);
+                  break;
                 }
+                index++;
               }
             }
           } /* f */
