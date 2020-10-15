@@ -15,8 +15,6 @@
 #include <deal.II/fe/fe_q.h>
 #include <deal.II/fe/mapping_q.h>
 
-#include <deal.II/grid/grid_out.h>
-
 #include <fstream>
 
 namespace ryujin

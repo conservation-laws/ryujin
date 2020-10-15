@@ -17,7 +17,6 @@
 #include <deal.II/base/logstream.h>
 #include <deal.II/base/revision.h>
 #include <deal.II/base/work_stream.h>
-#include <deal.II/grid/grid_out.h>
 #include <deal.II/numerics/vector_tools.h>
 #include <deal.II/numerics/vector_tools.templates.h>
 

@@ -13,10 +13,10 @@
 #include <deal.II/fe/fe_system.h>
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/grid/grid_in.h>
+#include <deal.II/grid/grid_out.h>
 #include <deal.II/grid/grid_tools.h>
 #include <deal.II/grid/manifold_lib.h>
 #include <deal.II/grid/tria.h>
-
 
 namespace ryujin
 {
@@ -213,160 +213,243 @@ namespace ryujin
                  const std::function<double(const double)> &psi_upper,
                  const std::function<double(const double)> &psi_lower,
                  const double outer_radius,
-                 const double grading)
+                 const double grading,
+                 const double grading_epsilon,
+                 unsigned int n_anisotropic_refinements)
     {
       /* by convention, psi_front(0.) returns the "back length" */
       const auto back_length = psi_front(0.);
 
-      if (std::abs(psi_upper(back_length) - psi_lower(back_length)) < 1.0e-10) {
-        /* Coarse mesh for sharp trailing edge: */
+      /* sharp trailing edge? */
+      const bool sharp_trailing_edge =
+          std::abs(psi_upper(back_length) - psi_lower(back_length)) < 1.0e-10;
+      AssertThrow(
+          sharp_trailing_edge ||
+              std::abs(psi_upper(back_length) - psi_lower(back_length)) >
+                  0.01 * back_length,
+          dealii::ExcMessage("Blunt trailing edge has a width of less than "
+                             "1% of the trailing airfoil length."));
 
-        /* Front part: */
+      /* Front part: */
 
-        const std::vector<dealii::Point<2>> vertices1{
-            {-outer_radius, 0.0},                                      // 0
-            {airfoil_center[0] - psi_front(M_PI), airfoil_center[1]},  // 1
-            {-0.5 * outer_radius, -std::sqrt(3.) / 2. * outer_radius}, // 2
-            {0.5 * outer_radius, -std::sqrt(3.) / 2. * outer_radius},  // 3
-            {airfoil_center[0], airfoil_center[1] + psi_lower(0)},     // 4
-            {airfoil_center[0] + back_length,                          //
-             airfoil_center[1] + psi_lower(back_length)},              // 5
-            {airfoil_center[0], airfoil_center[1] + psi_upper(0)},     // 6
-            {-0.5 * outer_radius, std::sqrt(3.) / 2. * outer_radius},  // 7
-            {0.5 * outer_radius, std::sqrt(3.) / 2. * outer_radius},   // 8
-        };
+      std::vector<dealii::Point<2>> vertices1{
+          {-outer_radius, 0.0},                                      // 0
+          {airfoil_center[0] - psi_front(M_PI), airfoil_center[1]},  // 1
+          {-0.5 * outer_radius, -std::sqrt(3.) / 2. * outer_radius}, // 2
+          {0.5 * outer_radius, -std::sqrt(3.) / 2. * outer_radius},  // 3
+          {airfoil_center[0], airfoil_center[1] + psi_lower(0)},     // 4
+          {airfoil_center[0] + back_length,                          //
+           airfoil_center[1] + psi_lower(back_length)},              // 5
+          {airfoil_center[0], airfoil_center[1] + psi_upper(0)},     // 6
+          {-0.5 * outer_radius, std::sqrt(3.) / 2. * outer_radius},  // 7
+          {0.5 * outer_radius, std::sqrt(3.) / 2. * outer_radius},   // 8
+      };
 
-        std::vector<dealii::CellData<2>> cells1(4);
-        cells1[0].vertices = {2, 3, 4, 5};
-        cells1[1].vertices = {0, 2, 1, 4};
-        cells1[2].vertices = {7, 0, 6, 1};
+      std::vector<dealii::CellData<2>> cells1(4);
+      cells1[0].vertices = {2, 3, 4, 5};
+      cells1[1].vertices = {0, 2, 1, 4};
+      cells1[2].vertices = {7, 0, 6, 1};
+      if (sharp_trailing_edge) {
         cells1[3].vertices = {8, 7, 5, 6};
+      } else {
+        vertices1.push_back({airfoil_center[0] + back_length,
+                             airfoil_center[1] + psi_upper(back_length)});
+        cells1[3].vertices = {8, 7, 9, 6};
+      }
 
-        dealii::Triangulation<2> tria1;
-        tria1.create_triangulation(vertices1, cells1, dealii::SubCellData());
+      dealii::Triangulation<2> tria1;
+      tria1.create_triangulation(vertices1, cells1, dealii::SubCellData());
 
-        /* Back part: */
+      dealii::Triangulation<2> tria2;
+
+      if (sharp_trailing_edge) {
+        /* Back part for sharp trailing edge: */
 
         const std::vector<dealii::Point<2>> vertices2{
             {0.5 * outer_radius, -std::sqrt(3.) / 2. * outer_radius}, // 0
-            {airfoil_center[0] + back_length,                         //
-             airfoil_center[1] + psi_lower(back_length)},             // 1
-            {0.5 * outer_radius, std::sqrt(3.) / 2. * outer_radius},  // 2
-            {outer_radius, -0.5 * outer_radius},                      // 3
-            {outer_radius, 0.0},                                      // 4
-            {outer_radius, 0.5 * outer_radius},                       // 5
+            {airfoil_center[0] + back_length,
+             airfoil_center[1] + psi_lower(back_length)},            // 1
+            {0.5 * outer_radius, std::sqrt(3.) / 2. * outer_radius}, // 2
+            {outer_radius, -0.5 * outer_radius},                     // 3
+            {outer_radius, 0.0},                                     // 4
+            {outer_radius, 0.5 * outer_radius},                      // 5
         };
 
         std::vector<dealii::CellData<2>> cells2(2);
         cells2[0].vertices = {0, 3, 1, 4};
         cells2[1].vertices = {1, 4, 2, 5};
 
-        dealii::Triangulation<2> tria2;
         tria2.create_triangulation(vertices2, cells2, dealii::SubCellData());
 
-        dealii::Triangulation<2> tria3;
-        GridGenerator::merge_triangulations(
-            {&tria1, &tria2}, tria3, 1.e-12, true);
-
-        triangulation.copy_triangulation(tria3);
-
       } else {
-        /* Coarse mesh for blunt trailing edge: */
-        AssertThrow(false, dealii::ExcNotImplemented());
+        /* Back part for blunt trailing edge: */
 
-        // FIXME
+        /* Good width for the anisotropically refined center trailing cell: */
+        double trailing_height =
+            0.5 / (0.5 + std::pow(2., n_anisotropic_refinements)) * 0.5 *
+            outer_radius;
+
+        const std::vector<dealii::Point<2>> vertices2{
+            {0.5 * outer_radius, -std::sqrt(3.) / 2. * outer_radius}, // 0
+            {airfoil_center[0] + back_length,
+             airfoil_center[1] + psi_lower(back_length)}, // 1
+            {airfoil_center[0] + back_length,
+             airfoil_center[1] + psi_upper(back_length)},            // 2
+            {0.5 * outer_radius, std::sqrt(3.) / 2. * outer_radius}, // 3
+            {outer_radius, -0.5 * outer_radius},                     // 4
+            {outer_radius, -trailing_height},                        // 5
+            {outer_radius, trailing_height},                         // 6
+            {outer_radius, 0.5 * outer_radius},                      // 7
+        };
+
+        std::vector<dealii::CellData<2>> cells2(3);
+        cells2[0].vertices = {0, 4, 1, 5};
+        cells2[1].vertices = {1, 5, 2, 6};
+        cells2[2].vertices = {2, 6, 3, 7};
+
+        tria2.create_triangulation(vertices2, cells2, dealii::SubCellData());
       }
 
+      dealii::Triangulation<2> tria3;
+      GridGenerator::merge_triangulations(
+          {&tria1, &tria2}, tria3, 1.e-12, true);
+
       /*
-       * Set manifold IDs and attach manifolds:
+       * Helper lambda to set manifold IDs and attach manifolds:
+       *
        *   1 -> upper airfoil (inner boundary)
        *   2 -> lower airfoil (inner boundary)
        *   3 -> spherical manifold (outer boundary)
        *   4 -> grading front (interior face)
-       *   5 -> grading front (interior face)
-       *   6 -> grading front (interior face)
-       *   7 -> grading back (interior face)
-       *   8 -> transfinite interpolation
+       *   5 -> grading upper airfoil (interior face)
+       *   6 -> grading lower airfoil (interior face)
+       *   7 -> grading upper back (interior face)
+       *   8 -> grading lower back (interior face)
+       *   9 -> transfinite interpolation
        */
+      const auto attach_manifolds = [&](auto &triangulation) {
+        triangulation.set_all_manifold_ids(9);
 
-      triangulation.set_all_manifold_ids(8);
+        /* all possible vertices for the four (or six) radials: */
+        const std::vector<dealii::Point<2>> radial_vertices{
+            {airfoil_center[0] - psi_front(M_PI), airfoil_center[1]}, // front
+            {airfoil_center[0], airfoil_center[1] + psi_upper(0)},    // upper
+            {airfoil_center[0], airfoil_center[1] + psi_lower(0)},    // lower
+            {airfoil_center[0] + back_length,
+             airfoil_center[1] + psi_upper(back_length)}, // upper back
+            {airfoil_center[0] + back_length,
+             airfoil_center[1] + psi_lower(back_length)}, // lower back
+        };
 
-      /* all vertices for the four radials: */
-      const std::vector<dealii::Point<2>> radial_vertices{
-          {airfoil_center[0] - psi_front(M_PI), airfoil_center[1]}, // front
-          {airfoil_center[0], airfoil_center[1] + psi_lower(0)},    // lower
-          {airfoil_center[0] + back_length,                         //
-           airfoil_center[1] + psi_lower(back_length)},             // back
-          {airfoil_center[0], airfoil_center[1] + psi_upper(0)},    // upper
-      };
+        for (auto cell : triangulation.active_cell_iterators()) {
 
-      for (auto cell : triangulation.active_cell_iterators()) {
+          for (auto f : dealii::GeometryInfo<2>::face_indices()) {
+            const auto face = cell->face(f);
 
-        for (auto f : dealii::GeometryInfo<2>::face_indices()) {
-          const auto face = cell->face(f);
+            if (face->at_boundary()) {
+              /* Handle boundary faces: */
 
-          if (face->at_boundary()) {
-            /* Handle boundary faces: */
+              bool airfoil = true;
+              bool spherical_boundary = true;
 
-            bool airfoil = true;
-            bool spherical_boundary = true;
+              for (const auto v : dealii::GeometryInfo<1>::vertex_indices())
+                if (std::abs((face->vertex(v)).norm() - outer_radius) < 1.0e-10)
+                  airfoil = false;
+                else
+                  spherical_boundary = false;
 
-            for (const auto v : dealii::GeometryInfo<1>::vertex_indices())
-              if (std::abs((face->vertex(v)).norm() - outer_radius) < 1.0e-10)
-                airfoil = false;
-              else
-                spherical_boundary = false;
+              if (spherical_boundary) {
+                face->set_manifold_id(3);
+              }
 
-            if (spherical_boundary) {
-              face->set_manifold_id(3);
-            }
-
-            if (airfoil) {
-              if (face->center()[1] - airfoil_center[1] >= 0.)
-                face->set_manifold_id(1);
-              else
-                face->set_manifold_id(2);
-            }
-
-          } else {
-            /* Handle radial faces: */
-
-            for (const auto v : dealii::GeometryInfo<1>::vertex_indices()) {
-              const auto vertex = face->vertex(v);
-              unsigned int index = 4;
-              for (auto candidate : radial_vertices) {
-                if ((vertex - candidate).norm() < 1.0e-10) {
-                  face->set_manifold_id(index);
-                  break;
+              if (airfoil) {
+                if (face->center()[0] <
+                    airfoil_center[0] + back_length - 1.e-6) {
+                  if (face->center()[1] >= airfoil_center[1]) {
+                    face->set_manifold_id(1);
+                  } else {
+                    face->set_manifold_id(2);
+                  }
                 }
-                index++;
+              }
+
+            } else {
+              /* Handle radial faces: */
+
+              for (const auto v : dealii::GeometryInfo<1>::vertex_indices()) {
+                const auto vertex = face->vertex(v);
+                unsigned int index = 4;
+                for (auto candidate : radial_vertices) {
+                  if ((vertex - candidate).norm() < 1.0e-10) {
+                    Assert(index < 10, dealii::ExcInternalError());
+                    face->set_manifold_id(index);
+                    break;
+                  }
+                  index++;
+                }
               }
             }
-          }
-        } /* f */
-      }   /* cell */
+          } /* f */
+        }   /* cell */
 
-      Manifolds::AirfoilManifold airfoil_manifold_upper{
-          airfoil_center, psi_front, psi_upper, psi_lower, true};
-      triangulation.set_manifold(1, airfoil_manifold_upper);
+        Manifolds::AirfoilManifold airfoil_manifold_upper{
+            airfoil_center, psi_front, psi_upper, psi_lower, true};
+        triangulation.set_manifold(1, airfoil_manifold_upper);
 
-      Manifolds::AirfoilManifold airfoil_manifold_lower{
-          airfoil_center, psi_front, psi_upper, psi_lower, false};
-      triangulation.set_manifold(2, airfoil_manifold_lower);
+        Manifolds::AirfoilManifold airfoil_manifold_lower{
+            airfoil_center, psi_front, psi_upper, psi_lower, false};
+        triangulation.set_manifold(2, airfoil_manifold_lower);
 
-      dealii::SphericalManifold<2> spherical_manifold;
-      triangulation.set_manifold(3, spherical_manifold);
+        dealii::SphericalManifold<2> spherical_manifold;
+        triangulation.set_manifold(3, spherical_manifold);
 
-      unsigned int index = 4;
-      for (auto vertex : radial_vertices) {
-        Manifolds::GradingManifold manifold{vertex, grading, 0.03};
-        triangulation.set_manifold(index, manifold);
-        index++;
+        unsigned int index = 4;
+        for (auto vertex : radial_vertices) {
+          Manifolds::GradingManifold manifold{vertex, grading, grading_epsilon};
+          triangulation.set_manifold(index, manifold);
+          index++;
+        }
+        Assert(index == 9, dealii::ExcInternalError());
+
+        dealii::TransfiniteInterpolationManifold<2> transfinite;
+        transfinite.initialize(triangulation);
+        triangulation.set_manifold(9, transfinite);
+      };
+
+      attach_manifolds(tria3);
+
+      /* Anisotropic pre refinement: */
+
+      if (sharp_trailing_edge) {
+        Assert(n_anisotropic_refinements == 0, dealii::ExcNotImplemented());
+
+      } else {
+
+        /* mark critical cell: */
+        for (auto cell : tria3.active_cell_iterators())
+          if (cell->center()[0] > airfoil_center[0] + back_length &&
+              std::abs(cell->center()[1]) <=
+                  1.1 * std::abs(airfoil_center[1]) + 1.0e-6)
+            cell->set_material_id(2);
+
+        for (unsigned int i = 0; i < n_anisotropic_refinements; ++i) {
+          for (auto cell : tria3.active_cell_iterators())
+            if (cell->material_id() == 2)
+              cell->set_refine_flag(dealii::RefinementCase<2>::cut_axis(0));
+            else
+              cell->set_refine_flag();
+
+          tria3.execute_coarsening_and_refinement();
+        }
       }
 
-      dealii::TransfiniteInterpolationManifold<2> transfinite;
-      transfinite.initialize(triangulation);
-      triangulation.set_manifold(8, transfinite);
+      /* Flatten triangulation and create distributed coarse triangulation: */
+
+      dealii::Triangulation<2> tria4;
+      GridGenerator::flatten_triangulation(tria3, tria4);
+      triangulation.copy_triangulation(tria4);
+      /* We have to re-attach manifolds after flattening and copying: */
+      attach_manifolds(triangulation);
 
       /* Set boundary ids: */
 
@@ -1112,7 +1195,17 @@ namespace ryujin
 
         grading_ = 5.;
         this->add_parameter(
-            "grading", grading_, "strength of grading into the airfoil");
+            "grading exponent", grading_, "graded mesh: exponent");
+
+        grading_epsilon_ = 0.03;
+        this->add_parameter("grading epsilon",
+                            grading_epsilon_,
+                            "graded mesh: regularization parameter");
+
+        n_anisotropic_refinements_ = 0;
+        this->add_parameter("anisotropic pre refinement",
+                            n_anisotropic_refinements_,
+                            "number of anisotropic pre refinement steps");
       }
 
       virtual void create_triangulation(
@@ -1134,18 +1227,20 @@ namespace ryujin
           return r;
         };
 
+        const double bluntness = 0.025;
+
         const auto psi_upper = [=](const double x) {
           if (x > back_length)
-            return 0.00;
-          return 1.0 * front_radius + (0.00 - 1.0 * front_radius) * x * x /
+            return bluntness;
+          return 1.0 * front_radius + (bluntness - 1.0 * front_radius) * x * x /
                                           back_length / back_length;
         };
 
         const auto psi_lower = [=](const double x) {
           if (x > back_length)
-            return -0.00;
-          return -1.0 * front_radius - (0.00 - 1.0 * front_radius) * x * x /
-                                           back_length / back_length;
+            return -bluntness;
+          return -1.0 * front_radius - (bluntness - 1.0 * front_radius) * x *
+                                           x / back_length / back_length;
         };
 
         GridGenerator::airfoil(triangulation,
@@ -1154,7 +1249,9 @@ namespace ryujin
                                psi_upper,
                                psi_lower,
                                0.5 * length_,
-                               grading_);
+                               grading_,
+                               grading_epsilon_,
+                               n_anisotropic_refinements_);
       }
 
     private:
@@ -1162,6 +1259,8 @@ namespace ryujin
       double airfoil_length_;
       double length_;
       double grading_;
+      double grading_epsilon_;
+      unsigned int n_anisotropic_refinements_;
     };
 
   } /* namespace Geometries */
