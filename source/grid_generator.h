@@ -144,7 +144,7 @@ namespace ryujin
         auto point = polar_manifold.pull_back(space_point);
         Assert(point[0] >= 0., dealii::ExcInternalError());
         point[0] = std::pow(point[0] + epsilon, 1. / grading) -
-                   std::pow(epsilon, 1. / grading);
+                   std::pow(epsilon, 1. / grading) + 1.e-14;
         const auto chart_point = polar_manifold.push_forward(point);
         return chart_point;
       }
@@ -155,7 +155,7 @@ namespace ryujin
         auto point = polar_manifold.pull_back(chart_point);
         point[0] =
             std::pow(point[0] + std::pow(epsilon, 1. / grading), grading) -
-            epsilon;
+            epsilon + 1.e-14;
         Assert(point[0] >= 0., dealii::ExcInternalError());
         return polar_manifold.push_forward(point);
       }
@@ -282,12 +282,23 @@ namespace ryujin
        *   1 -> upper airfoil (inner boundary)
        *   2 -> lower airfoil (inner boundary)
        *   3 -> spherical manifold (outer boundary)
-       *   4 -> grading front (interior faces)
-       *   5 -> grading back (interior faces)
-       *   6 -> transfinite interpolation
+       *   4 -> grading front (interior face)
+       *   5 -> grading front (interior face)
+       *   6 -> grading front (interior face)
+       *   7 -> grading back (interior face)
+       *   8 -> transfinite interpolation
        */
 
-      triangulation.set_all_manifold_ids(6);
+      triangulation.set_all_manifold_ids(8);
+
+      /* all vertices for the four radials: */
+      const std::vector<dealii::Point<2>> radial_vertices{
+          {airfoil_center[0] - psi_front(M_PI), airfoil_center[1]}, // front
+          {airfoil_center[0], airfoil_center[1] + psi_lower(0)},    // lower
+          {airfoil_center[0] + back_length,                         //
+           airfoil_center[1] + psi_lower(back_length)},             // back
+          {airfoil_center[0], airfoil_center[1] + psi_upper(0)},    // upper
+      };
 
       for (auto cell : triangulation.active_cell_iterators()) {
 
@@ -318,13 +329,19 @@ namespace ryujin
             }
 
           } else {
+            /* Handle radial faces: */
 
-            /* Handle interior faces: */
-            if (face->center()[0] <= airfoil_center[0] ||
-                face->center()[0] <= 0.)
-              face->set_manifold_id(4);
-            else
-              face->set_manifold_id(5);
+            for (const auto v : dealii::GeometryInfo<1>::vertex_indices()) {
+              const auto vertex = face->vertex(v);
+              unsigned int index = 4;
+              for (auto candidate : radial_vertices) {
+                if ((vertex - candidate).norm() < 1.0e-10) {
+                  face->set_manifold_id(index);
+                  break;
+                }
+                index++;
+              }
+            }
           }
         } /* f */
       }   /* cell */
@@ -340,20 +357,16 @@ namespace ryujin
       dealii::SphericalManifold<2> spherical_manifold;
       triangulation.set_manifold(3, spherical_manifold);
 
-      Manifolds::GradingManifold grading_manifold_front{
-          airfoil_center, grading, 0.0};
-      triangulation.set_manifold(4, grading_manifold_front);
-
-      Manifolds::GradingManifold grading_manifold_back{
-          dealii::Point<2>(airfoil_center[0] + back_length, airfoil_center[1]),
-          grading,
-          /* the front radius is a good candiate for epsilon */
-          0.15 * psi_front(M_PI)};
-      triangulation.set_manifold(5, grading_manifold_back);
+      unsigned int index = 4;
+      for (auto vertex : radial_vertices) {
+        Manifolds::GradingManifold manifold{vertex, grading, 0.03};
+        triangulation.set_manifold(index, manifold);
+        index++;
+      }
 
       dealii::TransfiniteInterpolationManifold<2> transfinite;
       transfinite.initialize(triangulation);
-      triangulation.set_manifold(6, transfinite);
+      triangulation.set_manifold(8, transfinite);
 
       /* Set boundary ids: */
 
@@ -1113,7 +1126,7 @@ namespace ryujin
         const auto psi_front = [=](const double phi) {
           if (std::abs(phi) < 1.0e-10)
             return back_length;
-          const auto a = 0.2 * front_radius;
+          const auto a = 1.0 * front_radius;
           const auto b = front_radius;
           const auto r = a * b /
                          std::sqrt((a * std::cos(phi)) * (a * std::cos(phi)) +
@@ -1124,14 +1137,14 @@ namespace ryujin
         const auto psi_upper = [=](const double x) {
           if (x > back_length)
             return 0.00;
-          return 0.2 * front_radius + (0.00 - 0.2 * front_radius) * x * x /
+          return 1.0 * front_radius + (0.00 - 1.0 * front_radius) * x * x /
                                           back_length / back_length;
         };
 
         const auto psi_lower = [=](const double x) {
           if (x > back_length)
             return -0.00;
-          return -0.2 * front_radius - (0.00 - 0.2 * front_radius) * x * x /
+          return -1.0 * front_radius - (0.00 - 1.0 * front_radius) * x * x /
                                            back_length / back_length;
         };
 
