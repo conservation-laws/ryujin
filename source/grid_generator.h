@@ -455,6 +455,29 @@ namespace ryujin
       /* Set boundary ids: */
 
       // FIXME
+      for (auto cell : triangulation.active_cell_iterators()) {
+        for (auto f : dealii::GeometryInfo<2>::face_indices()) {
+          const auto face = cell->face(f);
+          if (face->at_boundary()) {
+            /* Handle boundary faces: */
+
+            bool airfoil = true;
+            bool spherical_boundary = true;
+
+            for (const auto v : dealii::GeometryInfo<1>::vertex_indices())
+              if (std::abs((face->vertex(v)).norm() - outer_radius) < 1.0e-10)
+                airfoil = false;
+              else
+                spherical_boundary = false;
+
+            if (spherical_boundary)
+              face->set_boundary_id(Boundary::dirichlet);
+
+            if (airfoil)
+              face->set_boundary_id(Boundary::no_slip);
+          }
+        }
+      }
     }
 #endif
 
@@ -1214,8 +1237,8 @@ namespace ryujin
       {
         /* FIXME: */
 
-        const double front_radius = 0.3 * airfoil_length_;
-        const double back_length = 0.7 * airfoil_length_;
+        const double front_radius = 0.1 * airfoil_length_;
+        const double back_length = 0.9 * airfoil_length_;
 
         const auto psi_front = [=](const double phi) {
           if (std::abs(phi) < 1.0e-10)
@@ -1228,7 +1251,7 @@ namespace ryujin
           return r;
         };
 
-        const double bluntness = 0.025;
+        const double bluntness = 0.005;
 
         const auto psi_upper = [=](const double x) {
           if (x > back_length)
