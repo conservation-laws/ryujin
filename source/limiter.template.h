@@ -133,10 +133,14 @@ namespace ryujin
 
         auto psi_l = relaxation * rho_l * rho_e_l - s_min * rho_l * rho_l_gamma;
 
-        /* Shortcut: In the majority of cases only at most one Newton iteration
-         * is necessary because we reach Psi(t_l) \approx 0 quickly. Just return
-         * in this case: */
-        if (std::max(Number(0.), psi_l - newton_eps<Number>) == Number(0.))
+        /* Break if all psi_l values are within a prescribed tolerance: */
+        if (std::max(Number(0.),
+                     dealii::compare_and_apply_mask<
+                         dealii::SIMDComparison::greater_than>(
+                         psi_r,
+                         Number(0.),
+                         Number(0.),
+                         psi_l - newton_eps<Number>)) == Number(0.))
           break;
 
         /* We got unlucky and have to perform a Newton step: */
@@ -278,10 +282,14 @@ namespace ryujin
 
         auto psi_l = average_l * average_gamma_l - rho_l * rho_e_l * relaxation;
 
-        /* Shortcut: In the majority of cases only at most one Newton iteration
-         * is necessary because we reach Psi(t_l) \approx 0 quickly. Just return
-         * in this case: */
-        if (std::min(Number(0.), psi_l + newton_eps<Number>) == Number(0.))
+        /* Break if all psi_l values are within a prescribed tolerance: */
+        if (std::min(Number(0.),
+                     dealii::compare_and_apply_mask<
+                         dealii::SIMDComparison::less_than_or_equal>(
+                         psi_r,
+                         Number(0.),
+                         Number(0.),
+                         psi_l + newton_eps<Number>)) == Number(0.))
           break;
 
         /* We got unlucky and have to perform a Newton step: */
