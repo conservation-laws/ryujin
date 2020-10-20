@@ -9,6 +9,7 @@
 #include <compile_time_options.h>
 
 #include "geometry.h"
+#include "transfinite_interpolation.template.h"
 
 #include <deal.II/fe/fe_system.h>
 #include <deal.II/grid/grid_generator.h>
@@ -412,7 +413,7 @@ namespace ryujin
       }
       Assert(index == 9, dealii::ExcInternalError());
 
-      dealii::TransfiniteInterpolationManifold<2> transfinite;
+      ryujin::TransfiniteInterpolationManifold<2> transfinite;
       transfinite.initialize(coarse_triangulation);
       coarse_triangulation.set_manifold(9, transfinite);
 
