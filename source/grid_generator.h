@@ -417,29 +417,47 @@ namespace ryujin
       transfinite.initialize(coarse_triangulation);
       coarse_triangulation.set_manifold(9, transfinite);
 
-      /* Anisotropic pre refinement: */
+      /*
+       * Anisotropic pre refinement:
+       */
 
-      if (sharp_trailing_edge) {
-        Assert(n_anisotropic_refinements == 0, dealii::ExcNotImplemented());
+      /* Mark critical cells with a temporary material id: */
+      for (auto cell : coarse_triangulation.active_cell_iterators()) {
 
-      } else {
-
-        /* mark critical cell: */
-        for (auto cell : coarse_triangulation.active_cell_iterators())
+        /* in case of a blunt edge we refine the trailing cell: */
+        if (!sharp_trailing_edge)
           if (cell->center()[0] > airfoil_center[0] + back_length &&
               std::abs(cell->center()[1]) <=
                   1.1 * std::abs(airfoil_center[1]) + 1.0e-6)
             cell->set_material_id(2);
 
-        for (unsigned int i = 0; i < n_anisotropic_refinements; ++i) {
-          for (auto cell : coarse_triangulation.active_cell_iterators())
-            if (cell->material_id() == 2)
-              cell->set_refine_flag(dealii::RefinementCase<2>::cut_axis(0));
-            else
-              cell->set_refine_flag();
+        /*
+         * Let us also insert additional radials on the upper (back) and
+         * lower (back) side of the airfoil
+         */
+        if (cell->center()[0] > airfoil_center[0] &&
+            cell->center()[0] <
+                0.5 * (airfoil_center[0] + back_length + 0.5 * outer_radius))
+          cell->set_material_id(3);
+      }
 
-          coarse_triangulation.execute_coarsening_and_refinement();
-        }
+      /* Upper and lower cell on airfoil: */
+      for (unsigned int i = 0; i < 1; ++i) {
+        for (auto cell : coarse_triangulation.active_cell_iterators())
+          if (cell->material_id() == 3)
+            cell->set_refine_flag(dealii::RefinementCase<2>::cut_axis(0));
+
+        coarse_triangulation.execute_coarsening_and_refinement();
+      }
+
+      /* Tailing cell: */
+      for (unsigned int i = 0; i < n_anisotropic_refinements; ++i) {
+        for (auto cell : coarse_triangulation.active_cell_iterators())
+          if (cell->material_id() == 2)
+            cell->set_refine_flag(dealii::RefinementCase<2>::cut_axis(0));
+          else
+            cell->set_refine_flag();
+        coarse_triangulation.execute_coarsening_and_refinement();
       }
 
       /* Flatten triangulation and create distributed coarse triangulation: */
