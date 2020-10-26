@@ -9,6 +9,7 @@
 #include <compile_time_options.h>
 
 #include "discretization.h"
+#include "grid_airfoil.h"
 #include "grid_generator.h"
 
 #include <deal.II/base/quadrature_lib.h>
