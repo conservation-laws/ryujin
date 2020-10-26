@@ -8,6 +8,7 @@
 
 #include <compile_time_options.h>
 
+#include "cubic_spline.h"
 #include "geometry.h"
 #include "transfinite_interpolation.template.h"
 
@@ -498,6 +499,158 @@ namespace ryujin
 #endif
   } /* namespace GridGenerator */
 
+
+  namespace
+  {
+    /**
+     * @todo Documentation
+     */
+    std::array<std::vector<double>, 4>
+    naca_4digit_points(const std::string &serial_number,
+                       const unsigned int n_samples)
+    {
+      std::array<unsigned int, 4> digit;
+      std::transform(serial_number.begin(),
+                     serial_number.end(),
+                     digit.begin(),
+                     [](auto it) { return it - '0'; });
+
+      /* thickness */
+      const double t = 0.1 * digit[2] + 0.01 * digit[3];
+      AssertThrow(t > 0.,
+                  dealii::ExcMessage("Invalid NACA 4 digit serial number"));
+
+      /* maximal chamber */
+      const double m = 0.01 * digit[0];
+      /* x position of maximal chamber */
+      const double p = 0.1 * digit[1];
+
+      std::vector<double> x_upper;
+      std::vector<double> y_upper;
+      std::vector<double> x_lower;
+      std::vector<double> y_lower;
+
+      for (unsigned int i = 0; i < n_samples; i++) {
+        const double x = 1. * i / (n_samples - 1);
+        const double y =
+            5. * t *
+            (0.2969 * std::sqrt(x) +
+             x * (-0.126 + x * (-0.3516 + x * (0.2843 + x * (-0.1036)))));
+
+        const double y_c = (x < p) ? m / (p * p) * (2. * p * x - x * x)
+                                   : m / ((1. - p) * (1. - p)) *
+                                         (1. - 2. * p + 2. * p * x - x * x);
+
+        const double dy_c = (x < p) ? 2. * m / (p * p) * (p - x)
+                                    : 2. * m / ((1. - p) * (1. - p)) * (p - x);
+
+        const double theta = std::atan(dy_c);
+
+        x_upper.emplace_back(x - y * std::sin(theta));
+        y_upper.emplace_back(y_c + y * std::cos(theta));
+        x_lower.emplace_back(x + y * std::sin(theta));
+        y_lower.emplace_back(y_c - y * std::cos(theta));
+      }
+
+      /* Fix up roundoff errors: */
+      y_upper.front() = 0.;
+      y_upper.back() = 0.;
+      y_lower.front() = 0.;
+      y_lower.back() = 0.;
+
+      return {x_upper, y_upper, x_lower, y_lower};
+    }
+
+
+    /**
+     * @todo Documentation
+     */
+    std::array<std::function<double(const double)>, 3>
+    create_psi(const std::vector<double> &x_upper,
+               const std::vector<double> &y_upper,
+               const std::vector<double> &x_lower,
+               const std::vector<double> &y_lower,
+               const double x_center)
+    {
+      Assert(x_upper.size() >= 2, dealii::ExcInternalError());
+      Assert(x_upper.front() == 0. && x_upper.back() == 1.,
+             dealii::ExcInternalError());
+      Assert(std::is_sorted(x_upper.begin(), x_upper.end()), dealii::ExcInternalError());
+
+      Assert(x_lower.size() >= 2, dealii::ExcInternalError());
+      Assert(x_lower.front() == 0. && x_lower.back() == 1.,
+             dealii::ExcInternalError());
+      Assert(std::is_sorted(x_lower.begin(), x_lower.end()),
+             dealii::ExcInternalError());
+
+      Assert(y_upper.size() == x_upper.size(), dealii::ExcInternalError());
+      Assert(y_upper.front() == 0. && y_upper.back() >= 0.,
+             dealii::ExcInternalError());
+
+      Assert(y_lower.size() == x_lower.size(), dealii::ExcInternalError());
+      Assert(y_lower.front() == 0. && y_lower.back() <= 0.,
+             dealii::ExcInternalError());
+
+      Assert(0. < x_center && x_center < 1., dealii::ExcInternalError());
+
+      CubicSpline upper_airfoil(x_upper, y_upper);
+      auto psi_upper = [upper_airfoil, x_center](const double x) {
+        return upper_airfoil.eval(x + x_center);
+      };
+
+      CubicSpline lower_airfoil(x_lower, y_lower);
+      auto psi_lower = [lower_airfoil, x_center](const double x) {
+        return lower_airfoil.eval(x + x_center);
+      };
+
+      /* Create a combined point set for psi_front: */
+
+      auto x_combined = x_upper;
+      std::reverse(x_combined.begin(), x_combined.end());
+      x_combined.pop_back();
+      x_combined.insert(x_combined.end(), x_lower.begin(), x_lower.end());
+
+      auto y_combined = y_upper;
+      std::reverse(y_combined.begin(), y_combined.end());
+      y_combined.pop_back();
+      y_combined.insert(y_combined.end(), y_lower.begin(), y_lower.end());
+
+      /* Translate into polar coordinates: */
+
+      for (unsigned int i = 0; i < y_combined.size(); ++i) {
+        const auto x = x_combined[i] - x_center;
+        const auto y = y_combined[i];
+
+        const auto rho = std::sqrt(x * x + y * y);
+        auto phi = std::atan2(y, x);
+        if (phi < 0)
+          phi += 2 * dealii::numbers::PI;
+
+        x_combined[i] = phi;
+        y_combined[i] = rho;
+      }
+
+      /* Ensure that x_combined is monotonically increasing: */
+      if(x_combined.back() == 0.)
+        x_combined.back() = 2. * dealii::numbers::PI;
+      Assert(std::is_sorted(x_combined.begin(), x_combined.end()),
+             dealii::ExcInternalError());
+
+      CubicSpline front_airfoil(x_combined, y_combined);
+      auto psi_front = [front_airfoil, x_center](const double phi) {
+        /* By convention we return the "back length" for phi == 0.: */
+        if (phi == 0.)
+          return 1. - x_center;
+
+        return front_airfoil.eval(phi);
+      };
+
+      return {psi_front, psi_upper, psi_lower};
+    }
+
+
+  } // namespace
+
   /**
    * A namespace for a number of benchmark geometries and dealii::GridIn
    * wrappers.
@@ -551,37 +704,15 @@ namespace ryujin
       virtual void create_triangulation(
           typename Geometry<dim>::Triangulation &triangulation) final override
       {
-        /* FIXME: */
+        /* FIXME */
 
-        const double front_radius = 0.1 * airfoil_length_;
-        const double back_length = 0.9 * airfoil_length_;
+        const auto [x_upper, y_upper, x_lower, y_lower] =
+            naca_4digit_points("4212", 10);
 
-        const auto psi_front = [=](const double phi) {
-          if (std::abs(phi) < 1.0e-10)
-            return back_length;
-          const auto a = 1.0 * front_radius;
-          const auto b = front_radius;
-          const auto r = a * b /
-                         std::sqrt((a * std::cos(phi)) * (a * std::cos(phi)) +
-                                   (b * std::sin(phi)) * (b * std::sin(phi)));
-          return r;
-        };
+        const double x_center = 0.3; /* FIXME */
 
-        const double bluntness = 0.005;
-
-        const auto psi_upper = [=](const double x) {
-          if (x > back_length)
-            return bluntness;
-          return 1.0 * front_radius + (bluntness - 1.0 * front_radius) * x * x /
-                                          back_length / back_length;
-        };
-
-        const auto psi_lower = [=](const double x) {
-          if (x > back_length)
-            return -bluntness;
-          return -1.0 * front_radius - (bluntness - 1.0 * front_radius) * x *
-                                           x / back_length / back_length;
-        };
+        const auto [psi_front, psi_upper, psi_lower] =
+            create_psi(x_upper, y_upper, x_lower, y_lower, x_center);
 
         GridGenerator::airfoil(triangulation,
                                airfoil_center_,
