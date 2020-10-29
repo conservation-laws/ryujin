@@ -216,7 +216,8 @@ namespace ryujin
                  const double outer_radius,
                  const double grading,
                  const double grading_epsilon,
-                 unsigned int n_anisotropic_refinements)
+                 unsigned int n_anisotropic_refinements_airfoil,
+                 unsigned int n_anisotropic_refinements_trailing)
     {
       /* by convention, psi_front(0.) returns the "back length" */
       const auto back_length = psi_front(0.);
@@ -287,8 +288,8 @@ namespace ryujin
 
         /* Good width for the anisotropically refined center trailing cell: */
         double trailing_height =
-            0.5 / (0.5 + std::pow(2., n_anisotropic_refinements)) * 0.5 *
-            outer_radius;
+            0.5 / (0.5 + std::pow(2., n_anisotropic_refinements_airfoil)) *
+            0.5 * outer_radius;
 
         const std::vector<dealii::Point<2>> vertices2{
             {0.5 * outer_radius, -std::sqrt(3.) / 2. * outer_radius}, // 0
@@ -442,8 +443,7 @@ namespace ryujin
       }
 
       /* Upper and lower cell on airfoil: */
-      constexpr unsigned int n_radial_refinements = 1;
-      for (unsigned int i = 0; i < n_radial_refinements; ++i) {
+      for (unsigned int i = 0; i < n_anisotropic_refinements_airfoil; ++i) {
         for (auto cell : coarse_triangulation.active_cell_iterators())
           if (cell->material_id() == 3)
             cell->set_refine_flag(dealii::RefinementCase<2>::cut_axis(0));
@@ -452,7 +452,7 @@ namespace ryujin
       }
 
       /* Tailing cell: */
-      for (unsigned int i = 0; i < n_anisotropic_refinements; ++i) {
+      for (unsigned int i = 0; i < n_anisotropic_refinements_trailing; ++i) {
         for (auto cell : coarse_triangulation.active_cell_iterators())
           if (cell->material_id() == 2)
             cell->set_refine_flag(dealii::RefinementCase<2>::cut_axis(0));
@@ -695,10 +695,17 @@ namespace ryujin
                             grading_epsilon_,
                             "graded mesh: regularization parameter");
 
-        n_anisotropic_refinements_ = 0;
-        this->add_parameter("anisotropic pre refinement",
-                            n_anisotropic_refinements_,
-                            "number of anisotropic pre refinement steps");
+        n_anisotropic_refinements_airfoil_ = 2;
+        this->add_parameter(
+            "anisotropic pre refinement airfoil",
+            n_anisotropic_refinements_airfoil_,
+            "number of anisotropic pre refinement steps for the airfoil");
+
+        n_anisotropic_refinements_trailing_ = 0;
+        this->add_parameter("anisotropic pre refinement trailing",
+                            n_anisotropic_refinements_trailing_,
+                            "number of anisotropic pre refinement steps for "
+                            "the blunt trailing edge cell");
       }
 
       virtual void create_triangulation(
@@ -722,7 +729,8 @@ namespace ryujin
                                0.5 * length_,
                                grading_,
                                grading_epsilon_,
-                               n_anisotropic_refinements_);
+                               n_anisotropic_refinements_airfoil_,
+                               n_anisotropic_refinements_trailing_);
       }
 
     private:
@@ -731,7 +739,8 @@ namespace ryujin
       double length_;
       double grading_;
       double grading_epsilon_;
-      unsigned int n_anisotropic_refinements_;
+      unsigned int n_anisotropic_refinements_airfoil_;
+      unsigned int n_anisotropic_refinements_trailing_;
     };
 
   } /* namespace Geometries */
