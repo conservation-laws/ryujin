@@ -730,8 +730,7 @@ namespace ryujin
 
         grading_epsilon_ = 0.03;
         this->add_parameter("grading epsilon",
-                            grading_epsilon_,
-                            "graded mesh: regularization parameter");
+                            grading_epsilon_, "graded mesh: regularization parameter");
 
         n_anisotropic_refinements_airfoil_ = 2;
         this->add_parameter(
@@ -754,7 +753,7 @@ namespace ryujin
         const auto [x_upper, y_upper, x_lower, y_lower] =
             naca_4digit_points("2412", 100);
 
-        const double x_center = 0.1; /* FIXME */
+        const double x_center = 0.075; /* FIXME */
         const double y_center = 0.0; /* FIXME */
 
         const auto [psi_front, psi_upper, psi_lower] =
