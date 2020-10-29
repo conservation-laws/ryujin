@@ -570,7 +570,8 @@ namespace ryujin
                const std::vector<double> &y_upper,
                const std::vector<double> &x_lower,
                const std::vector<double> &y_lower,
-               const double x_center)
+               const double x_center,
+               const double y_center)
     {
       Assert(x_upper.size() >= 2, dealii::ExcInternalError());
       Assert(x_upper.front() == 0. && x_upper.back() == 1.,
@@ -594,32 +595,69 @@ namespace ryujin
       Assert(0. < x_center && x_center < 1., dealii::ExcInternalError());
 
       CubicSpline upper_airfoil(x_upper, y_upper);
-      auto psi_upper = [upper_airfoil, x_center](const double x) {
-        return upper_airfoil.eval(x + x_center);
+      auto psi_upper = [upper_airfoil, x_center, y_center](const double x) {
+        /* Past the trailing edge return the the final upper y position: */
+        if (x > 1. - x_center)
+          return upper_airfoil.eval(1.0) - y_center;
+        return upper_airfoil.eval(x + x_center) - y_center;
       };
 
       CubicSpline lower_airfoil(x_lower, y_lower);
-      auto psi_lower = [lower_airfoil, x_center](const double x) {
-        return lower_airfoil.eval(x + x_center);
+      auto psi_lower = [lower_airfoil, x_center, y_center](const double x) {
+        /* Past the trailing edge return the the final lower y position: */
+        if (x > 1. - x_center)
+          return lower_airfoil.eval(1.0) - y_center;
+        return lower_airfoil.eval(x + x_center) - y_center;
       };
 
-      /* Create a combined point set for psi_front: */
+      /*
+       * Create a combined point set for psi_front:
+       */
 
-      auto x_combined = x_upper;
+      std::vector<double> x_combined;
+      std::vector<double> y_combined;
+
+      for (std::size_t i = 0; i < x_upper.size(); ++i) {
+        if (x_upper[i] >= x_center)
+          break;
+        x_combined.push_back(x_upper[i]);
+        y_combined.push_back(y_upper[i]);
+      }
+
+      /*
+       * We are about to create a spline interpolation in polar coordinates
+       * for the front part. In order to blend this interpolation with the
+       * two splines for the upper and lower part that we have just created
+       * we have to add some additional sample points around the
+       * coordinates were we glue together
+       */
+      for (double x : {x_center, x_center + 0.01, x_center + 0.02}) {
+        x_combined.push_back(x);
+        y_combined.push_back(upper_airfoil.eval(x));
+      }
+
       std::reverse(x_combined.begin(), x_combined.end());
-      x_combined.pop_back();
-      x_combined.insert(x_combined.end(), x_lower.begin(), x_lower.end());
-
-      auto y_combined = y_upper;
       std::reverse(y_combined.begin(), y_combined.end());
+      x_combined.pop_back();
       y_combined.pop_back();
-      y_combined.insert(y_combined.end(), y_lower.begin(), y_lower.end());
+
+      for (std::size_t i = 0; i < x_lower.size(); ++i) {
+        if (x_lower[i] >= x_center)
+          break;
+        x_combined.push_back(x_lower[i]);
+        y_combined.push_back(y_lower[i]);
+      }
+
+      for (double x : {x_center, x_center + 0.01, x_center + 0.02}) {
+        x_combined.push_back(x);
+        y_combined.push_back(lower_airfoil.eval(x));
+      }
 
       /* Translate into polar coordinates: */
 
       for (unsigned int i = 0; i < y_combined.size(); ++i) {
         const auto x = x_combined[i] - x_center;
-        const auto y = y_combined[i];
+        const auto y = y_combined[i] - y_center;
 
         const auto rho = std::sqrt(x * x + y * y);
         auto phi = std::atan2(y, x);
@@ -714,12 +752,13 @@ namespace ryujin
         /* FIXME */
 
         const auto [x_upper, y_upper, x_lower, y_lower] =
-            naca_4digit_points("4212", 10);
+            naca_4digit_points("2412", 100);
 
-        const double x_center = 0.3; /* FIXME */
+        const double x_center = 0.1; /* FIXME */
+        const double y_center = 0.0; /* FIXME */
 
         const auto [psi_front, psi_upper, psi_lower] =
-            create_psi(x_upper, y_upper, x_lower, y_lower, x_center);
+            create_psi(x_upper, y_upper, x_lower, y_lower, x_center, y_center);
 
         GridGenerator::airfoil(triangulation,
                                airfoil_center_,
