@@ -480,13 +480,14 @@ namespace ryujin
       const Tensor<1, spacedim> old_residual = residual;
       while (alpha > 1e-4) {
         Point<dim> guess = chart_point + alpha * update;
-        residual =
+        const Tensor<1, dim> residual_guess =
             point - compute_transfinite_interpolation(
                         *cell, guess, coarse_cell_is_flat[cell->index()]);
-        const double residual_norm_new = residual.norm_square();
+        const double residual_norm_new = residual_guess.norm_square();
         if (residual_norm_new < residual_norm_square) {
           residual_norm_square = residual_norm_new;
           chart_point += alpha * update;
+          residual = residual_guess;
           break;
         } else
           alpha *= 0.5;
@@ -521,7 +522,7 @@ namespace ryujin
       // prevent division by zero. This number should be scale-invariant
       // because Jinv_deltaf carries no units and x is in reference
       // coordinates.
-      if (std::abs(delta_x * Jinv_deltaf) > 1e-12) {
+      if (std::abs(delta_x * Jinv_deltaf) > 1e-12 && !must_recompute_jacobian) {
         const Tensor<1, dim> factor =
             (delta_x - Jinv_deltaf) / (delta_x * Jinv_deltaf);
         Tensor<1, spacedim> jac_update;
