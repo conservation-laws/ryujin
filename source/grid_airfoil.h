@@ -712,17 +712,28 @@ namespace ryujin
           : Geometry<dim>("airfoil", subsection)
       {
         airfoil_center_[0] = -.5;
-        this->add_parameter(
-            "airfoil center", airfoil_center_, "center position of airfoil");
+        this->add_parameter("airfoil center",
+                            airfoil_center_,
+                            "center position of airfoil in the mesh");
 
         airfoil_length_ = 1.;
         this->add_parameter("airfoil length",
                             airfoil_length_,
                             "length of airfoil (leading to trailing edge)");
 
-        length_ = 5.;
+        airfoil_type_ = "NACA 2412";
         this->add_parameter(
-            "length", length_, "length of computational domain (diameter)");
+            "airfoil type", airfoil_type_, "airfoil type and serial number");
+
+        psi_center_[0] = 0.05;
+        this->add_parameter("psi center",
+                            psi_center_,
+                            "center position of airfoil for sampling psi");
+
+        psi_samples_ = 100;
+        this->add_parameter("psi samples",
+                            psi_samples_,
+                            "number of samples used for generating spline psi");
 
         grading_ = 5.;
         this->add_parameter(
@@ -730,7 +741,12 @@ namespace ryujin
 
         grading_epsilon_ = 0.03;
         this->add_parameter("grading epsilon",
-                            grading_epsilon_, "graded mesh: regularization parameter");
+                            grading_epsilon_,
+                            "graded mesh: regularization parameter");
+
+        length_ = 5.;
+        this->add_parameter(
+            "length", length_, "length of computational domain (diameter)");
 
         n_anisotropic_refinements_airfoil_ = 2;
         this->add_parameter(
@@ -748,16 +764,15 @@ namespace ryujin
       virtual void create_triangulation(
           typename Geometry<dim>::Triangulation &triangulation) final override
       {
-        /* FIXME */
+        const auto [x_upper, y_upper, x_lower, y_lower] = [&]() {
+          if (airfoil_type_.rfind("NACA ", 0) == 0) {
+            return naca_4digit_points(airfoil_type_.substr(6), psi_samples_);
+          }
+          AssertThrow(false, ExcMessage("Unknown airfoil type"));
+        }();
 
-        const auto [x_upper, y_upper, x_lower, y_lower] =
-            naca_4digit_points("2412", 100);
-
-        const double x_center = 0.075; /* FIXME */
-        const double y_center = 0.0; /* FIXME */
-
-        const auto [psi_front, psi_upper, psi_lower] =
-            create_psi(x_upper, y_upper, x_lower, y_lower, x_center, y_center);
+        const auto [psi_front, psi_upper, psi_lower] = create_psi(
+            x_upper, y_upper, x_lower, y_lower, psi_center_[0], psi_center_[1]);
 
         GridGenerator::airfoil(triangulation,
                                airfoil_center_,
@@ -774,6 +789,9 @@ namespace ryujin
     private:
       dealii::Point<dim> airfoil_center_;
       double airfoil_length_;
+      std::string airfoil_type_;
+      dealii::Point<dim> psi_center_;
+      unsigned int psi_samples_;
       double length_;
       double grading_;
       double grading_epsilon_;
