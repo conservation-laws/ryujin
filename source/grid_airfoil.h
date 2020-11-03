@@ -509,6 +509,8 @@ namespace ryujin
     naca_4digit_points(const std::string &serial_number,
                        const unsigned int n_samples)
     {
+      AssertThrow(serial_number.size() == 4,
+                  dealii::ExcMessage("Invalid NACA 4 digit serial number"));
       std::array<unsigned int, 4> digit;
       std::transform(serial_number.begin(),
                      serial_number.end(),
@@ -766,7 +768,7 @@ namespace ryujin
       {
         const auto [x_upper, y_upper, x_lower, y_lower] = [&]() {
           if (airfoil_type_.rfind("NACA ", 0) == 0) {
-            return naca_4digit_points(airfoil_type_.substr(6), psi_samples_);
+            return naca_4digit_points(airfoil_type_.substr(5), psi_samples_);
           }
           AssertThrow(false, ExcMessage("Unknown airfoil type"));
         }();
