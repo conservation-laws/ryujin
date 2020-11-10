@@ -775,18 +775,18 @@ namespace ryujin
                             "center position of airfoil for sampling psi");
 
 
-        airfoil_center_[0] = -.5;
+        airfoil_center_[0] = -.2;
         this->add_parameter("airfoil center",
                             airfoil_center_,
                             "position of airfoil center in the mesh");
 
         /* Parameters affecting mesh generation: */
 
-        grading_ = 5.;
+        grading_ = 6.;
         this->add_parameter(
             "grading exponent", grading_, "graded mesh: exponent");
 
-        grading_epsilon_ = 0.03;
+        grading_epsilon_ = 0.02;
         this->add_parameter("grading epsilon",
                             grading_epsilon_,
                             "graded mesh: regularization parameter");
@@ -795,7 +795,7 @@ namespace ryujin
         this->add_parameter(
             "length", length_, "length of computational domain (diameter)");
 
-        n_anisotropic_refinements_airfoil_ = 2;
+        n_anisotropic_refinements_airfoil_ = 1;
         this->add_parameter(
             "anisotropic pre refinement airfoil",
             n_anisotropic_refinements_airfoil_,
