@@ -203,7 +203,10 @@ namespace ryujin
                  const std::function<double(const double)> &,
                  const std::function<double(const double)> &,
                  const double,
-                 const double)
+                 const double,
+                 const double,
+                 unsigned int,
+                 unsigned int)
     {
       AssertThrow(false, dealii::ExcNotImplemented());
     }
