@@ -700,9 +700,41 @@ namespace ryujin
   namespace Geometries
   {
     /**
-     * A 2D Airfoil
+     * A generic 2D Airfoil
      *
-     * @todo Description
+     * This class implements a generic 2D airfoil. Various runtime
+     * parameters select the airfoil type (such as NACA 4 digit, some ONERA
+     * airfoils, etc) and meshing behavior. The mesh construction is
+     * divided into various steps:
+     *
+     * 1/ Parametrization:
+     *
+     * Depending on various runtime parameters a parameterization \f$ y =
+     * \psi_{\text{up./lo.}}(x)\f$ on the upper and lower trailing edge as
+     * well as a parameterization in polar coordinates
+     * \f$ r = \psi_{\text{fr.}}(\phi) \f$ for the nose part is constructed.
+     * This is done by taking a sample of points on the upper and lower
+     * part of the airfoil and computing intermediate points with a cubic
+     * spline interpolation. Relevant runtime parameters are `airfoil type`
+     * to specify the type and serial number, `psi samples` to control the
+     * number of samples taken (if admissible), and `psi center` to control
+     * the center point for constructing the parametrizations
+     * \f$\psi_{\text{x}}\f$. The samples are assumed to be normalized so
+     * that the front is located at \f$(0,0)\f$ and the trailing (or blunt
+     * edge) at \f$(1,0)\f$, or \f$(1,\ast)\f$, respectively. The
+     * coordinate system is then shifted by the `psi center` point so that
+     * the parameterizations \f$y = \hat\psi_{\text{up./lo.}}(x)\f$ expect
+     * input in the range \f$\hat x\in[0,1-x_{\text{psi center}}]\f$. In the
+     * same spirit \f$\hat\psi_{\text{fr.}}(\phi)\f$ expects input in the
+     * range \f$\pi/2\le\phi\le3\pi/2\f$ and will return
+     * \f$\psi_{\text{fr.}}(\pi) = -x_{\text{psi center}}\f$. Also a final
+     * step the normalized parametrizations \f$\hat\psi\f$ are rescaled
+     * with the runtime parameter `airfoil length` so that the resulting
+     * airfoil has overall length `airfoil length` instead of 1.
+     *
+     * 2/ Meshing:
+     *
+     * TODO
      *
      * @ingroup Mesh
      */
@@ -713,29 +745,34 @@ namespace ryujin
       Airfoil(const std::string subsection)
           : Geometry<dim>("airfoil", subsection)
       {
-        airfoil_center_[0] = -.5;
-        this->add_parameter("airfoil center",
-                            airfoil_center_,
-                            "center position of airfoil in the mesh");
+        /* Parameters affecting parameterization: */
+
+        airfoil_type_ = "NACA 2412";
+        this->add_parameter(
+            "airfoil type", airfoil_type_, "airfoil type and serial number");
 
         airfoil_length_ = 1.;
         this->add_parameter("airfoil length",
                             airfoil_length_,
                             "length of airfoil (leading to trailing edge)");
 
-        airfoil_type_ = "NACA 2412";
-        this->add_parameter(
-            "airfoil type", airfoil_type_, "airfoil type and serial number");
+        psi_samples_ = 100;
+        this->add_parameter("psi samples",
+                            psi_samples_,
+                            "number of samples used for generating spline psi");
 
         psi_center_[0] = 0.05;
         this->add_parameter("psi center",
                             psi_center_,
                             "center position of airfoil for sampling psi");
 
-        psi_samples_ = 100;
-        this->add_parameter("psi samples",
-                            psi_samples_,
-                            "number of samples used for generating spline psi");
+
+        airfoil_center_[0] = -.5;
+        this->add_parameter("airfoil center",
+                            airfoil_center_,
+                            "position of airfoil center in the mesh");
+
+        /* Parameters affecting mesh generation: */
 
         grading_ = 5.;
         this->add_parameter(
@@ -766,12 +803,28 @@ namespace ryujin
       virtual void create_triangulation(
           typename Geometry<dim>::Triangulation &triangulation) final override
       {
+        /*
+         * Step 1: Create parametrization:
+         *
+         * Runtime parameters: airfoil_type_, airfoil_length_, psi_center_,
+         * psi_samples_
+         */
+
         const auto [x_upper, y_upper, x_lower, y_lower] = [&]() {
           if (airfoil_type_.rfind("NACA ", 0) == 0) {
             return naca_4digit_points(airfoil_type_.substr(5), psi_samples_);
           }
           AssertThrow(false, ExcMessage("Unknown airfoil type"));
         }();
+
+
+        /*
+         * Step 2: Create mesh and attach manifolds:
+         *
+         * Runtime parameters: double grading_, double grading_epsilon_,
+         * double length_, unsigned int n_anisotropic_refinements_airfoil_,
+         * unsigned int n_anisotropic_refinements_trailing_
+         */
 
         const auto [psi_front, psi_upper, psi_lower] = create_psi(
             x_upper, y_upper, x_lower, y_lower, psi_center_[0], psi_center_[1]);
