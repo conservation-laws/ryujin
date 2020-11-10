@@ -41,6 +41,7 @@ namespace ryujin
           , psi_upper(psi_upper)
           , psi_lower(psi_lower)
           , upper_side(upper_side)
+          , ratio_(psi_front(0.) / psi_front(M_PI))
           , polar_manifold()
       {
         Assert(std::abs(psi_upper(0.) - psi_front(0.5 * M_PI)) < 1.0e-10,
@@ -61,11 +62,11 @@ namespace ryujin
           if (upper_side) {
             /* upper back airfoil part */
             chart_point[0] = 1. + coordinate[1] - psi_upper(coordinate[0]);
-            chart_point[1] = 0.5 * M_PI - coordinate[0];
+            chart_point[1] = 0.5 * M_PI - ratio_ * coordinate[0];
           } else {
             /* lower back airfoil part */
             chart_point[0] = 1. - coordinate[1] + psi_lower(coordinate[0]);
-            chart_point[1] = 1.5 * M_PI + coordinate[0];
+            chart_point[1] = 1.5 * M_PI + ratio_ * coordinate[0];
           }
         } else {
           /* front part */
@@ -87,13 +88,13 @@ namespace ryujin
         if (chart_point[1] < 0.5 * M_PI) {
           Assert(upper_side, dealii::ExcInternalError());
           /* upper back airfoil part */
-          coordinate[0] = 0.5 * M_PI - chart_point[1];
+          coordinate[0] = (0.5 * M_PI - chart_point[1]) / ratio_;
           Assert(coordinate[0] >= -1.0e-10, dealii::ExcInternalError());
           coordinate[1] = chart_point[0] - 1. + psi_upper(coordinate[0]);
         } else if (chart_point[1] > 1.5 * M_PI) {
           Assert(!upper_side, dealii::ExcInternalError());
           /* lower back airfoil part */
-          coordinate[0] = chart_point[1] - 1.5 * M_PI;
+          coordinate[0] = (chart_point[1] - 1.5 * M_PI) / ratio_;
           Assert(coordinate[0] >= -1.0e-10, dealii::ExcInternalError());
           coordinate[1] = 1. - chart_point[0] + psi_lower(coordinate[0]);
         } else {
@@ -117,6 +118,8 @@ namespace ryujin
       const std::function<double(const double)> psi_upper;
       const std::function<double(const double)> psi_lower;
       const bool upper_side;
+
+      const double ratio_;
 
       dealii::PolarManifold<dim> polar_manifold;
     };
