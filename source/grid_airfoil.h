@@ -573,7 +573,8 @@ namespace ryujin
                const std::vector<double> &x_lower,
                const std::vector<double> &y_lower,
                const double x_center,
-               const double y_center)
+               const double y_center,
+               const double scaling = 1.)
     {
       Assert(x_upper.size() >= 2, dealii::ExcInternalError());
       Assert(x_upper.front() == 0. && x_upper.back() == 1.,
@@ -597,20 +598,24 @@ namespace ryujin
       Assert(0. < x_center && x_center < 1., dealii::ExcInternalError());
 
       CubicSpline upper_airfoil(x_upper, y_upper);
-      auto psi_upper = [upper_airfoil, x_center, y_center](const double x) {
-        /* Past the trailing edge return the the final upper y position: */
-        if (x > 1. - x_center)
-          return upper_airfoil.eval(1.0) - y_center;
-        return upper_airfoil.eval(x + x_center) - y_center;
-      };
+      auto psi_upper =
+          [upper_airfoil, x_center, y_center, scaling](const double x_hat) {
+            /* Past the trailing edge return the the final upper y position: */
+            const double x = x_hat / scaling;
+            if (x > 1. - x_center)
+              return scaling * (upper_airfoil.eval(1.0) - y_center);
+            return scaling * (upper_airfoil.eval(x + x_center) - y_center);
+          };
 
       CubicSpline lower_airfoil(x_lower, y_lower);
-      auto psi_lower = [lower_airfoil, x_center, y_center](const double x) {
-        /* Past the trailing edge return the the final lower y position: */
-        if (x > 1. - x_center)
-          return lower_airfoil.eval(1.0) - y_center;
-        return lower_airfoil.eval(x + x_center) - y_center;
-      };
+      auto psi_lower =
+          [lower_airfoil, x_center, y_center, scaling](const double x_hat) {
+            /* Past the trailing edge return the the final lower y position: */
+            const double x = x_hat / scaling;
+            if (x > 1. - x_center)
+              return scaling * (lower_airfoil.eval(1.0) - y_center);
+            return scaling * (lower_airfoil.eval(x + x_center) - y_center);
+          };
 
       /*
        * Create a combined point set for psi_front:
@@ -677,12 +682,12 @@ namespace ryujin
              dealii::ExcInternalError());
 
       CubicSpline front_airfoil(x_combined, y_combined);
-      auto psi_front = [front_airfoil, x_center](const double phi) {
+      auto psi_front = [front_airfoil, x_center, scaling](const double phi) {
         /* By convention we return the "back length" for phi == 0.: */
         if (phi == 0.)
-          return 1. - x_center;
+          return scaling * (1. - x_center);
 
-        return front_airfoil.eval(phi);
+        return scaling * front_airfoil.eval(phi);
       };
 
       return {psi_front, psi_upper, psi_lower};
@@ -817,6 +822,14 @@ namespace ryujin
           AssertThrow(false, ExcMessage("Unknown airfoil type"));
         }();
 
+        const auto [psi_front, psi_upper, psi_lower] =
+            create_psi(x_upper,
+                       y_upper,
+                       x_lower,
+                       y_lower,
+                       psi_center_[0],
+                       psi_center_[1],
+                       airfoil_length_);
 
         /*
          * Step 2: Create mesh and attach manifolds:
@@ -825,9 +838,6 @@ namespace ryujin
          * double length_, unsigned int n_anisotropic_refinements_airfoil_,
          * unsigned int n_anisotropic_refinements_trailing_
          */
-
-        const auto [psi_front, psi_upper, psi_lower] = create_psi(
-            x_upper, y_upper, x_lower, y_lower, psi_center_[0], psi_center_[1]);
 
         GridGenerator::airfoil(triangulation,
                                airfoil_center_,
