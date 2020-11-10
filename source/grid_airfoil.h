@@ -239,10 +239,10 @@ namespace ryujin
           {airfoil_center[0] - psi_front(M_PI), airfoil_center[1]},  // 1
           {-0.5 * outer_radius, -std::sqrt(3.) / 2. * outer_radius}, // 2
           {0.5 * outer_radius, -std::sqrt(3.) / 2. * outer_radius},  // 3
-          {airfoil_center[0], airfoil_center[1] + psi_lower(0)},     // 4
+          {0., airfoil_center[1] + psi_lower(-airfoil_center[0])},   // 4
           {airfoil_center[0] + back_length,                          //
            airfoil_center[1] + psi_lower(back_length)},              // 5
-          {airfoil_center[0], airfoil_center[1] + psi_upper(0)},     // 6
+          {0., airfoil_center[1] + psi_upper(-airfoil_center[0])},   // 6
           {-0.5 * outer_radius, std::sqrt(3.) / 2. * outer_radius},  // 7
           {0.5 * outer_radius, std::sqrt(3.) / 2. * outer_radius},   // 8
       };
@@ -336,8 +336,8 @@ namespace ryujin
       /* all possible vertices for the four (or six) radials: */
       const std::vector<dealii::Point<2>> radial_vertices{
           {airfoil_center[0] - psi_front(M_PI), airfoil_center[1]}, // front
-          {airfoil_center[0], airfoil_center[1] + psi_upper(0)},    // upper
-          {airfoil_center[0], airfoil_center[1] + psi_lower(0)},    // lower
+          {0., airfoil_center[1] + psi_upper(-airfoil_center[0])},  // upper
+          {0., airfoil_center[1] + psi_lower(-airfoil_center[0])},  // lower
           {airfoil_center[0] + back_length,
            airfoil_center[1] + psi_upper(back_length)}, // upper back
           {airfoil_center[0] + back_length,
