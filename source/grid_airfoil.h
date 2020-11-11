@@ -871,30 +871,31 @@ namespace ryujin
         for (auto cell : triangulation.active_cell_iterators()) {
           for (auto f : dealii::GeometryInfo<dim>::face_indices()) {
             const auto face = cell->face(f);
-            if (face->at_boundary()) {
-              /* Handle boundary faces: */
 
-              bool airfoil = true;
-              bool spherical_boundary = true;
+            /* Handle boundary faces: */
+            if (!face->at_boundary())
+              continue;
 
-              const auto &indices =
-                  dealii::GeometryInfo<dim - 1>::vertex_indices();
-              for (const auto v : indices) {
-                const auto vert = face->vertex(v);
-                const auto radius_sqr = vert[0] * vert[0] + vert[1] * vert[1];
-                if (std::abs(radius_sqr - outer_radius * outer_radius) <
-                    1.0 - 10)
-                  airfoil = false;
-                else
-                  spherical_boundary = false;
-              }
+            bool airfoil = true;
+            bool spherical_boundary = true;
 
-              if (spherical_boundary)
-                face->set_boundary_id(Boundary::dirichlet);
-              else if (airfoil)
-                face->set_boundary_id(Boundary::no_slip);
+            const auto &indices =
+                dealii::GeometryInfo<dim - 1>::vertex_indices();
+            for (const auto v : indices) {
+              const auto vert = face->vertex(v);
+              const auto radius_sqr = vert[0] * vert[0] + vert[1] * vert[1];
+              if (radius_sqr >= outer_radius * outer_radius - 1.0e-10)
+                airfoil = false;
               else
-                face->set_boundary_id(Boundary::periodic);
+                spherical_boundary = false;
+            }
+
+            if (spherical_boundary) {
+              face->set_boundary_id(Boundary::dirichlet);
+            } else if (airfoil) {
+              face->set_boundary_id(Boundary::no_slip);
+            } else {
+              face->set_boundary_id(Boundary::periodic);
             }
           }
         }
