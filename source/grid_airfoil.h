@@ -306,6 +306,52 @@ namespace ryujin
     /**
      * @todo Documentation
      */
+    std::array<std::vector<double>, 4>
+    nasa_sc2(const std::string &serial_number)
+    {
+      if (serial_number == "0714") {
+        std::vector<double> x_upper{
+            .0,  .002, .005, .01, .02, .03, .04, .05, .07, .1,  .12, .15,
+            .17, .2,   .22,  .25, .27, .3,  .33, .35, .38, .4,  .43, .45,
+            .48, .50,  .53,  .55, .57, .6,  .62, .65, .68, .7,  .72, .75,
+            .77, .8,   .82,  .85, .87, .9,  .92, .95, .97, .98, .99, 1.};
+
+        std::vector<double> y_upper{
+            .0,    .0095, .0158, .0219, .0293,  .0343,  .0381,  .0411,
+            .0462, .0518, .0548, .0585, .0606,  .0632,  .0646,  .0664,
+            .0673, .0685, .0692, .0696, .0698,  .0697,  .0695,  .0692,
+            .0684, .0678, .0666, .0656, .0645,  .0625,  .0610,  .0585,
+            .0555, .0533, .0509, .0469, .0439,  .0389,  .0353,  .0294,
+            .0251, .0181, .0131, .0049, -.0009, -.0039, -.0071, -.0104};
+
+        std::vector<double> x_lower{
+            .0,  .002, .005, .01, .02, .03, .04, .05, .07, .1,  .12, .15, .17,
+            .20, .22,  .25,  .28, .3,  .32, .35, .37, .4,  .42, .45, .48, .5,
+            .53, .55,  .58,  .6,  .63, .65, .68, .70, .73, .75, .77, .80, .83,
+            .85, .87,  .89,  .92, .94, .95, .96, .97, .98, .99, 1.};
+
+        std::vector<double> y_lower{
+            .0,     -.0093, -.016,  -.0221, -.0295, -.0344, -.0381, -.0412,
+            -.0462, -.0517, -.0547, -.0585, -.0606, -.0633, -.0647, -.0666,
+            -.068,  -.0687, -.0692, -.0696, -.0696, -.0692, -.0688, -.0676,
+            -.0657, -.0644, -.0614, -.0588, -.0543, -.0509, -.0451, -.041,
+            -.0346, -.0302, -.0235, -.0192, -.0150, -.0093, -.0048, -.0024,
+            -.0013, -.0008, -.0016, -.0035, -.0049, -.0066, -.0085, -.0109,
+            -.0137, -.0163};
+
+        return {x_upper, y_upper, x_lower, y_lower};
+
+      } else {
+
+        AssertThrow(false,
+                    dealii::ExcMessage("Invalid NASA SC(2) serial number"));
+      }
+    }
+
+
+    /**
+     * @todo Documentation
+     */
     std::array<std::function<double(const double)>, 3>
     create_psi(const std::vector<double> &x_upper,
                const std::vector<double> &y_upper,
@@ -328,12 +374,12 @@ namespace ryujin
              dealii::ExcInternalError());
 
       Assert(y_upper.size() == x_upper.size(), dealii::ExcInternalError());
-      Assert(y_upper.front() == 0. && y_upper.back() >= 0.,
-             dealii::ExcInternalError());
+      Assert(y_upper.front() == 0., dealii::ExcInternalError());
 
       Assert(y_lower.size() == x_lower.size(), dealii::ExcInternalError());
-      Assert(y_lower.front() == 0. && y_lower.back() <= 0.,
-             dealii::ExcInternalError());
+      Assert(y_lower.front() == 0., dealii::ExcInternalError());
+
+      Assert(y_lower.back() < y_upper.back(), dealii::ExcInternalError());
 
       Assert(0. < x_center && x_center < 1., dealii::ExcInternalError());
 
@@ -348,6 +394,7 @@ namespace ryujin
           };
 
       CubicSpline lower_airfoil(x_lower, y_lower);
+
       auto psi_lower =
           [lower_airfoil, x_center, y_center, scaling](const double x_hat) {
             /* Past the trailing edge return the the final lower y position: */
@@ -566,6 +613,8 @@ namespace ryujin
         const auto [x_upper, y_upper, x_lower, y_lower] = [&]() {
           if (airfoil_type_.rfind("NACA ", 0) == 0) {
             return naca_4digit_points(airfoil_type_.substr(5), psi_samples_);
+          } else if (airfoil_type_.rfind("NASA SC(2) ", 0) == 0) {
+            return nasa_sc2(airfoil_type_.substr(11));
           }
           AssertThrow(false, ExcMessage("Unknown airfoil type"));
         }();
@@ -597,9 +646,9 @@ namespace ryujin
         AssertThrow(
             sharp_trailing_edge ||
                 std::abs(psi_upper(back_length) - psi_lower(back_length)) >
-                    0.01 * back_length,
+                    0.001 * back_length,
             dealii::ExcMessage("Blunt trailing edge has a width of less than "
-                               "1% of the trailing airfoil length."));
+                               "0.1% of the trailing airfoil length."));
 
         /* Front part: */
         dealii::Triangulation<2> tria_front;
@@ -799,14 +848,17 @@ namespace ryujin
          * n_anisotropic_refinements_trailing_
          */
 
+        const double trailing_height =
+            0.5 / (0.5 + std::pow(2., n_anisotropic_refinements_airfoil_)) *
+            0.5 * outer_radius;
+
         /* Mark critical cells with a temporary material id: */
         for (auto cell : coarse_triangulation.active_cell_iterators()) {
 
           /* in case of a blunt edge we refine the trailing cell: */
           if (!sharp_trailing_edge)
             if (cell->center()[0] > airfoil_center_[0] + back_length &&
-                std::abs(cell->center()[1]) <=
-                    1.1 * std::abs(airfoil_center_[1]) + 1.0e-6)
+                std::abs(cell->center()[1]) <= trailing_height)
               cell->set_material_id(2);
 
           /*
@@ -884,7 +936,8 @@ namespace ryujin
             for (const auto v : indices) {
               const auto vert = face->vertex(v);
               const auto radius_sqr = vert[0] * vert[0] + vert[1] * vert[1];
-              if (radius_sqr >= outer_radius * outer_radius - 1.0e-10)
+              if (radius_sqr >= outer_radius * outer_radius - 1.0e-10 ||
+                  vert(v) > outer_radius - 1.0 - 6)
                 airfoil = false;
               else
                 spherical_boundary = false;
