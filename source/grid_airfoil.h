@@ -38,13 +38,14 @@ namespace ryujin
                       const std::function<double(const double)> &psi_front,
                       const std::function<double(const double)> &psi_upper,
                       const std::function<double(const double)> &psi_lower,
-                      const bool upper_side)
+                      const bool upper_side,
+                      const double psi_ratio = 1.0)
           : airfoil_center(airfoil_center)
           , psi_front(psi_front)
           , psi_upper(psi_upper)
           , psi_lower(psi_lower)
           , upper_side(upper_side)
-          , ratio_(psi_front(0.) / psi_front(M_PI))
+          , ratio_(psi_ratio * psi_front(0.) / psi_front(M_PI))
           , polar_manifold()
       {
         Assert(std::abs(psi_upper(0.) - psi_front(0.5 * M_PI)) < 1.0e-10,
@@ -111,8 +112,13 @@ namespace ryujin
 
       std::unique_ptr<dealii::Manifold<dim, dim>> clone() const final override
       {
-        return std::make_unique<AirfoilManifold<dim>>(
-            airfoil_center, psi_front, psi_upper, psi_lower, upper_side);
+        const double psi_ratio = ratio_ * psi_front(M_PI) / psi_front(0.);
+        return std::make_unique<AirfoilManifold<dim>>(airfoil_center,
+                                                      psi_front,
+                                                      psi_upper,
+                                                      psi_lower,
+                                                      upper_side,
+                                                      psi_ratio);
       }
 
     private:
@@ -539,11 +545,11 @@ namespace ryujin
       {
         /* Parameters affecting parameterization: */
 
-        airfoil_type_ = "NACA 2412";
+        airfoil_type_ = "NASA SC(2) 0714";
         this->add_parameter(
             "airfoil type", airfoil_type_, "airfoil type and serial number");
 
-        airfoil_length_ = 1.;
+        airfoil_length_ = 2.;
         this->add_parameter("airfoil length",
                             airfoil_length_,
                             "length of airfoil (leading to trailing edge)");
@@ -558,15 +564,23 @@ namespace ryujin
                             psi_center_,
                             "center position of airfoil for sampling psi");
 
+        psi_ratio_ = 0.30;
+        this->add_parameter(
+            "psi ratio",
+            psi_ratio_,
+            "Scaling parameter for averages in curved nose region, can be "
+            "adjusted by hand to equliabrate the size of faces at the nose "
+            "part of the airfoil");
 
-        airfoil_center_[0] = -.2;
+
+        airfoil_center_[0] = -.5;
         this->add_parameter("airfoil center",
                             airfoil_center_,
                             "position of airfoil center in the mesh");
 
         /* Parameters affecting mesh generation: */
 
-        grading_ = 6.;
+        grading_ = 5.5;
         this->add_parameter(
             "grading exponent", grading_, "graded mesh: exponent");
 
@@ -575,7 +589,7 @@ namespace ryujin
                             grading_epsilon_,
                             "graded mesh: regularization parameter");
 
-        height_ = 5.;
+        height_ = 6.;
         this->add_parameter(
             "height", height_, "height of computational domain");
 
@@ -588,7 +602,7 @@ namespace ryujin
             n_anisotropic_refinements_airfoil_,
             "number of anisotropic pre refinement steps for the airfoil");
 
-        n_anisotropic_refinements_trailing_ = 0;
+        n_anisotropic_refinements_trailing_ = 3;
         this->add_parameter("anisotropic pre refinement trailing",
                             n_anisotropic_refinements_trailing_,
                             "number of anisotropic pre refinement steps for "
@@ -818,11 +832,15 @@ namespace ryujin
         }   /* cell */
 
         Manifolds::AirfoilManifold airfoil_manifold_upper{
-            airfoil_center_, psi_front, psi_upper, psi_lower, true};
+            airfoil_center_, psi_front, psi_upper, psi_lower, true, psi_ratio_};
         coarse_triangulation.set_manifold(1, airfoil_manifold_upper);
 
-        Manifolds::AirfoilManifold airfoil_manifold_lower{
-            airfoil_center_, psi_front, psi_upper, psi_lower, false};
+        Manifolds::AirfoilManifold airfoil_manifold_lower{airfoil_center_,
+                                                          psi_front,
+                                                          psi_upper,
+                                                          psi_lower,
+                                                          false,
+                                                          psi_ratio_};
         coarse_triangulation.set_manifold(2, airfoil_manifold_lower);
 
         dealii::SphericalManifold<2> spherical_manifold;
@@ -959,6 +977,7 @@ namespace ryujin
       double airfoil_length_;
       std::string airfoil_type_;
       dealii::Point<2> psi_center_;
+      double psi_ratio_;
       unsigned int psi_samples_;
       double height_;
       double width_;
