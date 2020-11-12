@@ -937,7 +937,7 @@ namespace ryujin
               const auto vert = face->vertex(v);
               const auto radius_sqr = vert[0] * vert[0] + vert[1] * vert[1];
               if (radius_sqr >= outer_radius * outer_radius - 1.0e-10 ||
-                  vert(v) > outer_radius - 1.0 - 6)
+                  vert[0] > airfoil_center_[0] + 1.001 * back_length)
                 airfoil = false;
               else
                 spherical_boundary = false;
