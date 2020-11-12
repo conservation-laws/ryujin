@@ -16,6 +16,9 @@
 #include <deal.II/lac/precondition.h>
 #include <deal.II/lac/solver_cg.h>
 #include <deal.II/matrix_free/fe_evaluation.h>
+#include <deal.II/multigrid/mg_coarse.h>
+#include <deal.II/multigrid/mg_matrix.h>
+#include <deal.II/multigrid/multigrid.h>
 
 #include <atomic>
 
@@ -51,7 +54,8 @@ namespace ryujin
                   "stopping criterion");
 
     shift_ = Number(0.0);
-    add_parameter("shift", shift_, "Implicit shift applied to the Crank Nicolson scheme");
+    add_parameter(
+        "shift", shift_, "Implicit shift applied to the Crank Nicolson scheme");
   }
 
 
@@ -88,125 +92,41 @@ namespace ryujin
     internal_energy_rhs_.reinit(scalar_partitioner);
 
     density_.reinit(scalar_partitioner);
-  }
 
+    const unsigned int n_levels =
+        offline_data_->dof_handler().get_triangulation().n_global_levels();
+    MGLevelObject<IndexSet> relevant_sets(0, n_levels - 1);
+    for (unsigned int level = 0; level < n_levels; ++level)
+      DoFTools::extract_locally_relevant_level_dofs(
+          offline_data_->dof_handler(), level, relevant_sets[level]);
+    mg_constrained_dofs_.initialize(offline_data_->dof_handler(),
+                                    relevant_sets);
+    std::set<types::boundary_id> boundary_ids;
+    boundary_ids.insert(Boundary::dirichlet);
+    boundary_ids.insert(Boundary::no_slip);
+    mg_constrained_dofs_.make_zero_boundary_constraints(
+        offline_data_->dof_handler(), boundary_ids);
 
-  template <int dim, typename Number>
-  template <typename VectorType>
-  void
-  DissipationModule<dim, Number>::velocity_vmult(VectorType &dst,
-                                                 const VectorType &src) const
-  {
-    /* Apply action of m_i rho_i V_i: */
-
-    using VA = VectorizedArray<Number>;
-    constexpr auto simd_length = VA::size();
-
-    const auto &lumped_mass_matrix = offline_data_->lumped_mass_matrix();
-    const unsigned int n_owned = offline_data_->n_locally_owned();
-    const unsigned int size_regular = n_owned / simd_length * simd_length;
-
-    RYUJIN_PARALLEL_REGION_BEGIN
-
-    RYUJIN_OMP_FOR
-    for (unsigned int i = 0; i < size_regular; i += simd_length) {
-      const auto m_i = simd_load(lumped_mass_matrix, i);
-      const auto rho_i = simd_load(density_, i);
-      for (unsigned int d = 0; d < dim; ++d) {
-        const auto temp = simd_load(src.block(d), i);
-        simd_store(dst.block(d), m_i * rho_i * temp, i);
-      }
+    level_matrix_free_.resize(0, n_levels - 1);
+    level_density_.resize(0, n_levels - 1);
+    for (unsigned int level = 0; level < n_levels; ++level) {
+      additional_data.mg_level = level;
+      AffineConstraints<double> constraints(relevant_sets[level]);
+      constraints.add_lines(mg_constrained_dofs_.get_boundary_indices(level));
+      constraints.merge(mg_constrained_dofs_.get_level_constraints(level));
+      constraints.close();
+      level_matrix_free_[level].reinit(
+          offline_data_->discretization().mapping(),
+          offline_data_->dof_handler(),
+          constraints,
+          offline_data_->discretization().quadrature_1d(),
+          additional_data);
+      level_matrix_free_[level].initialize_dof_vector(level_density_[level]);
     }
 
-    RYUJIN_PARALLEL_REGION_END
-
-    for (unsigned int i = size_regular; i < n_owned; ++i) {
-      const auto m_i = lumped_mass_matrix.local_element(i);
-      const auto rho_i = density_.local_element(i);
-
-      for (unsigned int d = 0; d < dim; ++d) {
-        const auto temp = src.block(d).local_element(i);
-        dst.block(d).local_element(i) = m_i * rho_i * temp;
-      }
-    }
-
-    /* Apply action of stress tensor: + theta * \sum_j B_ij V_j: */
-
-    const auto integrator =
-        [this](const auto &data, auto &dst, const auto &src, const auto range) {
-          constexpr auto order_fe = Discretization<dim>::order_finite_element;
-          constexpr auto order_quad = Discretization<dim>::order_quadrature;
-          FEEvaluation<dim, order_fe, order_quad, dim, Number> velocity(data);
-
-          const auto mu = problem_description_->mu();
-          const auto lambda = problem_description_->lambda();
-
-          for (unsigned int cell = range.first; cell < range.second; ++cell) {
-            velocity.reinit(cell);
-#if DEAL_II_VERSION_GTE(9, 3, 0)
-            velocity.gather_evaluate(src, EvaluationFlags::gradients);
-#else
-            velocity.gather_evaluate(src, false, true);
-#endif
-
-            for (unsigned int q = 0; q < velocity.n_q_points; ++q) {
-
-              const auto symmetric_gradient =
-                  velocity.get_symmetric_gradient(q);
-              const auto divergence = trace(symmetric_gradient);
-
-              // S = (2 mu nabla^S(v) + (lambda - 2/3*mu) div(v) Id) : nabla phi
-              auto S = 2. * mu * symmetric_gradient;
-              for (unsigned int d = 0; d < dim; ++d)
-                S[d][d] += (lambda - 2. / 3. * mu) * divergence;
-
-              velocity.submit_symmetric_gradient(theta_ * tau_ * S, q);
-            }
-
-#if DEAL_II_VERSION_GTE(9, 3, 0)
-            velocity.integrate_scatter(EvaluationFlags::gradients, dst);
-#else
-            velocity.integrate_scatter(false, true, dst);
-#endif
-          }
-        };
-
-    matrix_free_.template cell_loop<block_vector_type, block_vector_type>(
-        integrator, dst, src, /* zero destination */ false);
-
-    /* (5.4a) Fix up constrained degrees of freedom: */
-
-    const auto &boundary_map = offline_data_->boundary_map();
-
-    for (auto entry : boundary_map) {
-      const auto i = entry.first;
-      if (i >= n_owned)
-        continue;
-
-      const auto &[normal, id, position] = entry.second;
-
-      if (id == Boundary::slip) {
-        Tensor<1, dim, Number> V_i;
-        for (unsigned int d = 0; d < dim; ++d)
-          V_i[d] = dst.block(d).local_element(i);
-
-        /* replace normal component by source */
-        V_i -= 1. * (V_i * normal) * normal;
-        for (unsigned int d = 0; d < dim; ++d) {
-          const auto src_d = src.block(d).local_element(i);
-          V_i += 1. * (src_d * normal[d]) * normal;
-        }
-
-        for (unsigned int d = 0; d < dim; ++d)
-          dst.block(d).local_element(i) = V_i[d];
-
-      } else if (id == Boundary::no_slip || id == Boundary::dirichlet) {
-
-        /* set dst to src vector: */
-        for (unsigned int d = 0; d < dim; ++d)
-          dst.block(d).local_element(i) = src.block(d).local_element(i);
-      }
-    }
+    mg_transfer_.build(offline_data_->dof_handler(),
+                       mg_constrained_dofs_,
+                       level_matrix_free_);
   }
 
 
@@ -289,81 +209,6 @@ namespace ryujin
       }
     }
   }
-
-
-  template <int dim, typename Number>
-  class DiagonalMatrix
-  {
-  public:
-    /**
-     * @copydoc OfflineData::vector_type
-     */
-    using vector_type = typename DissipationModule<dim, Number>::scalar_type;
-
-    /**
-     * @copydoc DissipationModule::vector_type
-     */
-    using block_vector_type =
-        typename DissipationModule<dim, Number>::block_vector_type;
-
-    /**
-     * Constructor
-     */
-    DiagonalMatrix() = default;
-
-    /**
-     * Compute as the inverse of the density and the lumped mass matrix.
-     */
-    void reinit(const vector_type &lumped_mass_matrix,
-                const vector_type &density,
-                const AffineConstraints<Number> &affine_constraints)
-    {
-      diagonal.reinit(density, true);
-
-      DEAL_II_OPENMP_SIMD_PRAGMA
-      for (unsigned int i = 0; i < density.get_partitioner()->local_size();
-           ++i) {
-        diagonal.local_element(i) =
-            Number(1.0) /
-            (density.local_element(i) * lumped_mass_matrix.local_element(i));
-      }
-
-      /*
-       * Fix up diagonal entries for constrained degrees of freedom due to
-       * periodic boundary conditions.
-       */
-      affine_constraints.set_zero(diagonal);
-    }
-
-    /**
-     * Apply on a vector.
-     */
-    void vmult(vector_type &dst, const vector_type &src) const
-    {
-      DEAL_II_OPENMP_SIMD_PRAGMA
-      for (unsigned int i = 0; i < diagonal.get_partitioner()->local_size();
-           ++i)
-        dst.local_element(i) = diagonal.local_element(i) * src.local_element(i);
-    }
-
-    /**
-     * Apply on a block vector.
-     */
-    void vmult(block_vector_type &dst, const block_vector_type &src) const
-    {
-      AssertDimension(dim, dst.n_blocks());
-      AssertDimension(dim, src.n_blocks());
-      DEAL_II_OPENMP_SIMD_PRAGMA
-      for (unsigned int i = 0; i < diagonal.get_partitioner()->local_size();
-           ++i)
-        for (unsigned int d = 0; d < dim; ++d)
-          dst.block(d).local_element(i) =
-              diagonal.local_element(i) * src.block(d).local_element(i);
-    }
-
-  private:
-    vector_type diagonal;
-  };
 
 
   template <int dim, typename Number>
@@ -524,6 +369,33 @@ namespace ryujin
 
       diagonal_matrix.reinit(lumped_mass_matrix, density_, affine_constraints);
 
+        MGLevelObject<typename PreconditionChebyshev<
+            VelocityMatrix<dim, Number>,
+            LinearAlgebra::distributed::BlockVector<Number>,
+            DiagonalMatrix<dim, Number>>::AdditionalData>
+            smoother_data(0, level_matrix_free_.max_level());
+
+        level_velocity_matrices_.resize(0, level_matrix_free_.max_level());
+        mg_transfer_.interpolate_to_mg(
+            offline_data_->dof_handler(), level_density_, density_);
+
+        for (unsigned int level = level_matrix_free_.min_level();
+             level <= level_matrix_free_.max_level();
+             ++level) {
+          level_velocity_matrices_[level].initialize(*problem_description_,
+                                                     *offline_data_,
+                                                     level_matrix_free_[level],
+                                                     level_density_[level],
+                                                     theta_ * tau_,
+                                                     level);
+          level_velocity_matrices_[level].compute_diagonal(
+              smoother_data[level].preconditioner);
+          smoother_data[level].smoothing_range = 15.;
+          smoother_data[level].degree = 3;
+          smoother_data[level].eig_cg_n_iterations = 15;
+        }
+        mg_smoother_.initialize(level_velocity_matrices_, smoother_data);
+
       LIKWID_MARKER_STOP("time_step_0");
     }
 
@@ -535,11 +407,25 @@ namespace ryujin
 
       LIKWID_MARKER_START("time_step_n_1");
 
-      LinearOperator<block_vector_type, block_vector_type> velocity_operator;
-      velocity_operator.vmult = [this](block_vector_type &dst,
-                                       const block_vector_type &src) {
-        velocity_vmult<block_vector_type>(dst, src);
-      };
+      VelocityMatrix<dim, Number> velocity_operator;
+      velocity_operator.initialize(*problem_description_,
+                                   *offline_data_,
+                                   matrix_free_,
+                                   density_,
+                                   theta_ * tau_);
+
+      MGCoarseGridApplySmoother<LinearAlgebra::distributed::BlockVector<Number>>
+          mg_coarse;
+      mg_coarse.initialize(mg_smoother_);
+      mg::Matrix<LinearAlgebra::distributed::BlockVector<Number>> mg_matrix(
+          level_velocity_matrices_);
+
+      Multigrid<LinearAlgebra::distributed::BlockVector<Number>> mg(
+          mg_matrix, mg_coarse, mg_transfer_, mg_smoother_, mg_smoother_);
+      PreconditionMG<dim,
+                     LinearAlgebra::distributed::BlockVector<Number>,
+                     MGTransferVelocity<dim, Number>>
+          preconditioner(offline_data_->dof_handler(), mg, mg_transfer_);
 
       SolverControl solver_control(1000,
                                    (tolerance_linfty_norm_
@@ -547,8 +433,7 @@ namespace ryujin
                                         : velocity_rhs_.l2_norm()) *
                                        tolerance_);
       SolverCG<block_vector_type> solver(solver_control);
-      solver.solve(
-          velocity_operator, velocity_, velocity_rhs_, diagonal_matrix);
+      solver.solve(velocity_operator, velocity_, velocity_rhs_, preconditioner);
 
       /* update exponential moving average */
       n_iterations_velocity_ =

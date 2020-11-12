@@ -409,7 +409,8 @@ namespace ryujin
           std::launch::async,
           [=,
            data_out = std::move(data_out),
-           data_out_cutplanes = std::move(data_out_cutplanes)]() mutable {
+           data_out_cutplanes = std::move(data_out_cutplanes),
+           this]() mutable {
             if (output_full) {
               data_out->write_vtu_with_pvtu_record(
                   "", name, cycle, mpi_communicator_, 6);

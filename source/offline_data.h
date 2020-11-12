@@ -107,7 +107,6 @@ namespace ryujin
     void assemble();
 
   protected:
-
     dealii::DoFHandler<dim> dof_handler_;
 
     dealii::AffineConstraints<Number> affine_constraints_;
@@ -136,6 +135,9 @@ namespace ryujin
     dealii::LinearAlgebra::distributed::Vector<Number> lumped_mass_matrix_;
     dealii::LinearAlgebra::distributed::Vector<Number>
         lumped_mass_matrix_inverse_;
+
+    std::vector<dealii::LinearAlgebra::distributed::Vector<Number>>
+        level_lumped_mass_matrix_;
 
     SparseMatrixSIMD<Number> betaij_matrix_;
     SparseMatrixSIMD<Number, dim> cij_matrix_;
@@ -247,6 +249,12 @@ namespace ryujin
     ACCESSOR_READ_ONLY(lumped_mass_matrix_inverse)
 
     /**
+     * The lumped mass matrix on all levels of the grid in case multilevel
+     * support was enabled.
+     */
+    ACCESSOR_READ_ONLY(level_lumped_mass_matrix)
+
+    /**
      * The stiffness matrix \f$(beta_{ij})\f$:
      *   \f$\beta_{ij} = \nabla\varphi_{j}\cdot\nabla\varphi_{i}\f$
      * (SIMD storage, local numbering)
@@ -269,7 +277,6 @@ namespace ryujin
     ACCESSOR_READ_ONLY(discretization)
 
   private:
-
     const MPI_Comm &mpi_communicator_;
   };
 

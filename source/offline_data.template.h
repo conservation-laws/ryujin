@@ -511,6 +511,45 @@ namespace ryujin
 #endif
     }
 
+    dof_handler_.distribute_mg_dofs();
+    {
+      AffineConstraints level_constraints;
+      // TODO not yet thread-parallel and without periodicity
+      level_lumped_mass_matrix_.resize(
+          dof_handler_.get_triangulation().n_global_levels());
+      for (unsigned int level = 0; level < level_lumped_mass_matrix_.size();
+           ++level) {
+        IndexSet relevant_dofs;
+        dealii::DoFTools::extract_locally_relevant_level_dofs(
+            dof_handler_, level, relevant_dofs);
+        level_lumped_mass_matrix_[level].reinit(
+            dof_handler_.locally_owned_mg_dofs(level),
+            relevant_dofs,
+            lumped_mass_matrix_.get_mpi_communicator());
+        std::vector<types::global_dof_index> dof_indices(
+            dof_handler_.get_fe().dofs_per_cell);
+        Vector<Number> mass_values(dof_handler_.get_fe().dofs_per_cell);
+        FEValues<dim> fe_values(discretization_->mapping(),
+                                dof_handler_.get_fe(),
+                                QGauss<dim>(dof_handler_.get_fe().degree + 1),
+                                update_values | update_JxW_values);
+        for (const auto &cell : dof_handler_.cell_iterators_on_level(level))
+          if (cell->is_locally_owned_on_level()) {
+            fe_values.reinit(cell);
+            for (unsigned int i = 0; i < mass_values.size(); ++i) {
+              double sum = 0;
+              for (unsigned int q = 0; q < fe_values.n_quadrature_points; ++q)
+                sum += fe_values.shape_value(i, q) * fe_values.JxW(q);
+              mass_values(i) = sum;
+            }
+            cell->get_mg_dof_indices(dof_indices);
+            level_constraints.distribute_local_to_global(
+                mass_values, dof_indices, level_lumped_mass_matrix_[level]);
+          }
+        level_lumped_mass_matrix_[level].compress(VectorOperation::add);
+      }
+    }
+
     /*
      * Update boundary map:
      *
@@ -562,7 +601,8 @@ namespace ryujin
 // FIXME
 //     for(const auto &entry : mass_matrix_tmp)
 //       Assert(std::abs(entry.value()) > 1.0e-16,
-//              ExcMessage("Stencil with zero mass matrix entries encountered."));
+//              ExcMessage("Stencil with zero mass matrix entries
+//              encountered."));
 #endif
 
 #ifdef DEAL_II_WITH_TRILINOS

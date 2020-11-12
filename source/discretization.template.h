@@ -27,7 +27,11 @@ namespace ryujin
                                       const std::string &subsection)
       : ParameterAcceptor(subsection)
       , mpi_communicator_(mpi_communicator)
-      , triangulation_(std::make_unique<Triangulation>(mpi_communicator_))
+      , triangulation_(std::make_unique<Triangulation>(
+            mpi_communicator_,
+            dealii::Triangulation<dim>::limit_level_difference_at_vertices,
+            dealii::parallel::distributed::Triangulation<
+                dim>::construct_multigrid_hierarchy))
   {
     /* Options: */
 

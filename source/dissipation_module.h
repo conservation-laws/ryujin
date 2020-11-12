@@ -15,16 +15,24 @@
 #include "offline_data.h"
 #include "problem_description.h"
 #include "sparse_matrix_simd.h"
+#include "velocity_matrix.h"
 
+#include <deal.II/base/mg_level_object.h>
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/timer.h>
 #include <deal.II/lac/la_parallel_block_vector.h>
+#include <deal.II/lac/precondition.h>
 #include <deal.II/lac/sparse_matrix.templates.h>
 #include <deal.II/lac/vector.h>
 #include <deal.II/matrix_free/matrix_free.h>
+#include <deal.II/multigrid/mg_smoother.h>
+#include <deal.II/multigrid/mg_transfer_matrix_free.h>
 
 namespace ryujin
 {
+  template <int, typename>
+  class DiagonalMatrix;
+
   /**
    * Minimum entropy guaranteeing second-order time stepping for the
    * parabolic limit equations.
@@ -120,9 +128,6 @@ namespace ryujin
     //@{
 
     template <typename VectorType>
-    void velocity_vmult(VectorType &dst, const VectorType &src) const;
-
-    template <typename VectorType>
     void internal_energy_vmult(VectorType &dst, const VectorType &src) const;
 
 
@@ -163,6 +168,20 @@ namespace ryujin
 
     Number t_interp_;
     ACCESSOR_READ_ONLY(t_interp)
+
+    dealii::MGLevelObject<dealii::MatrixFree<dim, Number>> level_matrix_free_;
+    dealii::MGLevelObject<scalar_type> level_density_;
+    MGTransferVelocity<dim, Number> mg_transfer_;
+    dealii::MGLevelObject<VelocityMatrix<dim, Number>> level_velocity_matrices_;
+    dealii::MGConstrainedDoFs mg_constrained_dofs_;
+
+    dealii::mg::SmootherRelaxation<
+        dealii::PreconditionChebyshev<
+            VelocityMatrix<dim, Number>,
+            dealii::LinearAlgebra::distributed::BlockVector<Number>,
+            DiagonalMatrix<dim, Number>>,
+        dealii::LinearAlgebra::distributed::BlockVector<Number>>
+        mg_smoother_;
 
     //@}
   };
