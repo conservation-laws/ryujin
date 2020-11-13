@@ -13,6 +13,7 @@
 #include "scope.h"
 #include "simd.h"
 
+#include <deal.II/base/vectorization.h>
 #include <deal.II/matrix_free/fe_evaluation.h>
 #include <deal.II/multigrid/mg_base.h>
 #include <deal.II/multigrid/mg_transfer_matrix_free.h>
@@ -254,7 +255,7 @@ namespace ryujin
       const auto &lumped_mass_matrix =
           offline_data_->level_lumped_mass_matrix()[level_];
 
-      unsigned int dummy;
+      unsigned int dummy = 0;
       matrix_free_->template cell_loop<vector_type, unsigned int>(
           [this](const auto &data, auto &dst, const auto &, const auto range) {
             constexpr auto order_fe = Discretization<dim>::order_finite_element;
@@ -272,7 +273,7 @@ namespace ryujin
                   velocity.begin_dof_values()[j] =
                       dealii::VectorizedArray<Number>();
                 velocity.begin_dof_values()[i] =
-                    make_vectorized_array<Number>(1.);
+                    dealii::make_vectorized_array<Number>(1.);
                 apply_local_operator(velocity);
                 scalar.begin_dof_values()[i] = velocity.begin_dof_values()[i];
               }
