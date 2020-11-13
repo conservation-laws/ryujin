@@ -962,7 +962,10 @@ namespace ryujin
             }
 
             if (spherical_boundary) {
-              face->set_boundary_id(Boundary::dirichlet);
+              if (face->center()[0] < 0.)
+                face->set_boundary_id(Boundary::dirichlet);
+              else
+                face->set_boundary_id(Boundary::do_nothing);
             } else if (airfoil) {
               face->set_boundary_id(Boundary::no_slip);
             } else {
