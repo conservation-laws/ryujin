@@ -816,11 +816,11 @@ namespace ryujin
            << std::setprecision(0) << std::fixed << euler_module.n_restarts() //
            << " rsts   (" << std::setprecision(2) << std::scientific
            << euler_module.n_restarts() / ((double)cycle) << " rsts/cycle) ]";
-    output << "[ "                                                        //
-           << std::setprecision(2) << std::fixed                          //
-           << dissipation_module.n_iterations_velocity() << " CG vel -- " //
-           << dissipation_module.n_iterations_internal_energy()           //
-           << " CG int ]" << std::endl
+    output << "[ "                                                         //
+           << std::setprecision(2) << std::fixed                           //
+           << dissipation_module.n_iterations_velocity() << " GMG vel -- " //
+           << dissipation_module.n_iterations_internal_energy()            //
+           << " GMG int ]" << std::endl
            << std::endl;
 
     /* and print an ETA */
