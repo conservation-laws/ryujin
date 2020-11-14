@@ -94,6 +94,14 @@ namespace ryujin
      * degree of freedom during the computation.
      */
     dirichlet = 4,
+
+    /**
+     * On degrees of freedom marked as a "flexible" Dirichlet boundary we
+     * reset the state of the degree of freedom to the value of
+     * InitialData::initial_state() if the state of the degree of freedom
+     * is inflow. Otherwise we do nothing.
+     */
+    flexible = 5,
   };
 
   /**

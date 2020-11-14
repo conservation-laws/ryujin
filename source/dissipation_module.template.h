@@ -194,7 +194,7 @@ namespace ryujin
         for (unsigned int d = 0; d < dim; ++d)
           dst.block(d).local_element(i) = V_i[d];
 
-      } else if (id == Boundary::no_slip || id == Boundary::dirichlet) {
+      } else if (id == Boundary::no_slip || id == Boundary::dirichlet || id == Boundary::flexible) {
 
         /* set dst to src vector: */
         for (unsigned int d = 0; d < dim; ++d)
@@ -278,7 +278,7 @@ namespace ryujin
         continue;
 
       const auto &[normal, id, position] = entry.second;
-      if (id == Boundary::dirichlet) {
+      if (id == Boundary::dirichlet || id == Boundary::flexible) {
         dst.local_element(i) = src.local_element(i);
       }
     }
@@ -482,7 +482,7 @@ namespace ryujin
             velocity_rhs_.block(d).local_element(i) = Number(0.);
           }
 
-        } else if (id == Boundary::dirichlet) {
+        } else if (id == Boundary::dirichlet || id == Boundary::flexible) {
 
           /* Prescribe velocity: */
           const auto U_i =
@@ -651,7 +651,7 @@ namespace ryujin
 
         const auto &[normal, id, position] = entry.second;
 
-        if (id == Boundary::dirichlet) {
+        if (id == Boundary::dirichlet || id == Boundary::flexible) {
           /* Prescribe internal energy: */
           const auto U_i =
               initial_values_->initial_state(position, t + theta_ * tau_);

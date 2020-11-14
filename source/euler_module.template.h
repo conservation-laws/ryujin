@@ -1065,6 +1065,11 @@ namespace ryujin
       } else if (id == Boundary::dirichlet) {
         /* On Dirichlet boundaries enforce initial conditions: */
         U_i = initial_values_->initial_state(position, t);
+
+      } else if (id == Boundary::flexible) {
+        const auto m = problem_description_->momentum(U_i);
+        if (m * normal < 0.)
+          U_i = initial_values_->initial_state(position, t);
       }
 
       U.write_tensor(U_i, i);
