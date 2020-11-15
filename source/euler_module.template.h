@@ -1067,9 +1067,10 @@ namespace ryujin
         U_i = initial_values_->initial_state(position, t);
 
       } else if (id == Boundary::flexible) {
-        const auto m = problem_description_->momentum(U_i);
+        const auto U_i_new = initial_values_->initial_state(position, t);
+        const auto m = problem_description_->momentum(U_i_new);
         if (m * normal < 0.)
-          U_i = initial_values_->initial_state(position, t);
+          U_i = U_i_new;
       }
 
       U.write_tensor(U_i, i);
