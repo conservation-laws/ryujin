@@ -56,6 +56,8 @@ namespace ryujin
     using namespace InitialStates;
     initial_state_list_.emplace(std::make_unique<Uniform<dim, Number>>(
         problem_description, subsection));
+    initial_state_list_.emplace(std::make_unique<RampUp<dim, Number>>(
+        problem_description, subsection));
     initial_state_list_.emplace(std::make_unique<Contrast<dim, Number>>(
         problem_description, subsection));
     initial_state_list_.emplace(std::make_unique<ShockFront<dim, Number>>(
