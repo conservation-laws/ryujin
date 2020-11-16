@@ -75,8 +75,10 @@ namespace ryujin
     /* Initialize vectors: */
 
     const auto &scalar_partitioner = offline_data_->scalar_partitioner();
-    second_variations_.reinit(scalar_partitioner);
+
+    residual_mu_.reinit(scalar_partitioner);
     alpha_.reinit(scalar_partitioner);
+    second_variations_.reinit(scalar_partitioner);
     specific_entropies_.reinit(scalar_partitioner);
     evc_entropies_.reinit(scalar_partitioner);
 
@@ -1231,6 +1233,35 @@ namespace ryujin
     }
 
     __builtin_unreachable();
+  }
+
+  template <int dim, typename Number>
+  void EulerModule<dim, Number>::compute_residual_mu()
+  {
+#ifdef DEBUG_OUTPUT
+    std::cout << "EulerModule<dim, Number>::compute_residual_mu()" << std::endl;
+#endif
+
+    const unsigned int n_owned = offline_data_->n_locally_owned();
+    const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
+    const auto &betaij_matrix = offline_data_->betaij_matrix();
+
+    RYUJIN_PARALLEL_REGION_BEGIN
+
+    RYUJIN_OMP_FOR
+    for (unsigned int i = 0; i < n_owned; ++i) {
+        const auto alpha_i = alpha_.local_element(i);
+        const auto d_ii = dij_matrix_.get_entry(i, 0);
+        const unsigned int row_length = sparsity_simd.row_length(i);
+        const auto beta_ii = betaij_matrix.get_entry(i, 0);
+
+        residual_mu_.local_element(i) =
+            -1. * alpha_i * d_ii / (row_length * beta_ii);
+    }
+
+    RYUJIN_PARALLEL_REGION_END
+
+    residual_mu_.update_ghost_values();
   }
 
 

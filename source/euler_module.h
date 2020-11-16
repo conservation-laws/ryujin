@@ -137,8 +137,21 @@ namespace ryujin
     Number step(vector_type &U, Number t, Number tau = 0.);
 
     //@}
+    /**
+     * @name Functons for postprocessing
+     */
+    //@{
+
+    /**
+     * Computes an estimate for the local residual viscosity:
+     * \f{align}
+     *   \alpha_i\,\big(-d_{ii}^{L,n}\big)\frac{1}{\#\mathcal{I}(i)}\beta_{ii}^{-1}
+     * \f}
+     */
+    void compute_residual_mu();
 
   private:
+    //@}
     /**
      * @name Internally used time-stepping primitives
      */
@@ -181,8 +194,10 @@ namespace ryujin
     unsigned int n_restarts_;
     ACCESSOR_READ_ONLY(n_restarts)
 
+    scalar_type residual_mu_;
+    ACCESSOR_READ_ONLY(residual_mu)
+
     scalar_type alpha_;
-    ACCESSOR_READ_ONLY(alpha)
 
     scalar_type second_variations_;
     scalar_type specific_entropies_;
@@ -193,6 +208,7 @@ namespace ryujin
     vector_type r_;
 
     SparseMatrixSIMD<Number> dij_matrix_;
+
     SparseMatrixSIMD<Number> lij_matrix_;
     SparseMatrixSIMD<Number> lij_matrix_next_;
 

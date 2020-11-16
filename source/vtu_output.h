@@ -41,7 +41,8 @@ namespace ryujin
    * \mathbf{c}_{ij} \times \mathbf{m}_j / \rho_j. \f]
    *
    * In addition, the generated VTU output also contains the full state
-   * vector, and the indicator field \f$\alpha_i\f$.
+   * vector, and a local estimate of the effective residual viscosity
+   * \f$\mu_{\text{res}}\f$ caused by the graph viscosity stabilization.
    *
    * @ingroup TimeLoop
    */
