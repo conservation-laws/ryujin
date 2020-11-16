@@ -110,6 +110,7 @@ namespace ryujin
     //@{
 
     Number tolerance_;
+    bool tolerance_linfty_norm_;
     Number shift_;
 
     //@}

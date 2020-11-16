@@ -44,6 +44,12 @@ namespace ryujin
     tolerance_ = Number(1.0e-12);
     add_parameter("tolerance", tolerance_, "Tolerance for linear solvers");
 
+    tolerance_linfty_norm_ = true;
+    add_parameter("tolerance linfty norm",
+                  tolerance_linfty_norm_,
+                  "Use the l_infty norm instead of the l_2 norm for the "
+                  "stopping criterion");
+
     shift_ = Number(0.0);
     add_parameter("shift", shift_, "Implicit shift applied to the Crank Nicolson scheme");
   }
@@ -535,7 +541,11 @@ namespace ryujin
         velocity_vmult<block_vector_type>(dst, src);
       };
 
-      SolverControl solver_control(1000, velocity_.linfty_norm() * tolerance_);
+      SolverControl solver_control(1000,
+                                   (tolerance_linfty_norm_
+                                        ? velocity_rhs_.linfty_norm()
+                                        : velocity_rhs_.l2_norm()) *
+                                       tolerance_);
       SolverCG<block_vector_type> solver(solver_control);
       solver.solve(
           velocity_operator, velocity_, velocity_rhs_, diagonal_matrix);
@@ -687,7 +697,11 @@ namespace ryujin
       };
 
       SolverControl solver_control(1000,
-                                   internal_energy_.linfty_norm() * tolerance_);
+                                   (tolerance_linfty_norm_
+                                        ? internal_energy_rhs_.linfty_norm()
+                                        : internal_energy_rhs_.l2_norm()) *
+                                       tolerance_);
+
       SolverCG<scalar_type> solver(solver_control);
       solver.solve(internal_energy_operator,
                    internal_energy_,
