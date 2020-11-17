@@ -162,8 +162,10 @@ namespace ryujin
      * Construct a boundary map for a given set of DoFHandler iterators.
      */
     template <typename ITERATOR1, typename ITERATOR2>
-    boundary_map_type construct_boundary_map(const ITERATOR1 &begin,
-                                             const ITERATOR2 &end) const;
+    boundary_map_type construct_boundary_map(
+        const ITERATOR1 &begin,
+        const ITERATOR2 &end,
+        const dealii::Utilities::MPI::Partitioner &partitioner) const;
 
   protected:
     /**

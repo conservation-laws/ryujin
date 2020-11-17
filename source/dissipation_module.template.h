@@ -112,8 +112,8 @@ namespace ryujin
     for (unsigned int level = 0; level < n_levels; ++level) {
       additional_data.mg_level = level;
       AffineConstraints<double> constraints(relevant_sets[level]);
-      constraints.add_lines(mg_constrained_dofs_.get_boundary_indices(level));
-      constraints.merge(mg_constrained_dofs_.get_level_constraints(level));
+      //constraints.add_lines(mg_constrained_dofs_.get_boundary_indices(level));
+      //constraints.merge(mg_constrained_dofs_.get_level_constraints(level));
       constraints.close();
       level_matrix_free_[level].reinit(
           offline_data_->discretization().mapping(),

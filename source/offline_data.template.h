@@ -301,75 +301,74 @@ namespace ryujin
 
     /* The local, per-cell assembly routine: */
 
-    const auto local_assemble_system = [&](const auto &cell,
-                                           auto &scratch,
-                                           auto &copy) {
-      /* iterate over locally owned cells and the ghost layer */
+    const auto local_assemble_system =
+        [&](const auto &cell, auto &scratch, auto &copy) {
+          /* iterate over locally owned cells and the ghost layer */
 
-      auto &is_locally_owned = copy.is_locally_owned_;
-      auto &local_dof_indices = copy.local_dof_indices_;
+          auto &is_locally_owned = copy.is_locally_owned_;
+          auto &local_dof_indices = copy.local_dof_indices_;
 
-      auto &cell_mass_matrix = copy.cell_mass_matrix_;
-      auto &cell_betaij_matrix = copy.cell_betaij_matrix_;
-      auto &cell_cij_matrix = copy.cell_cij_matrix_;
-      auto &cell_measure = copy.cell_measure_;
+          auto &cell_mass_matrix = copy.cell_mass_matrix_;
+          auto &cell_betaij_matrix = copy.cell_betaij_matrix_;
+          auto &cell_cij_matrix = copy.cell_cij_matrix_;
+          auto &cell_measure = copy.cell_measure_;
 
-      auto &fe_values = scratch.fe_values_;
+          auto &fe_values = scratch.fe_values_;
 
 #ifdef DEAL_II_WITH_TRILINOS
-      is_locally_owned = cell->is_locally_owned();
+          is_locally_owned = cell->is_locally_owned();
 #else
-      /*
-       * When using a local dealii::SparseMatrix<Number> we don not have a
-       * compress(VectorOperation::add) available. In this case just
-       * assemble contributions over the locally
-       */
-      is_locally_owned = !cell->is_artificial();
+          /*
+           * When using a local dealii::SparseMatrix<Number> we don not have a
+           * compress(VectorOperation::add) available. In this case just
+           * assemble contributions over the locally
+           */
+          is_locally_owned = !cell->is_artificial();
 #endif
-      if (!is_locally_owned)
-        return;
+          if (!is_locally_owned)
+            return;
 
-      cell_mass_matrix.reinit(dofs_per_cell, dofs_per_cell);
-      cell_betaij_matrix.reinit(dofs_per_cell, dofs_per_cell);
-      for (auto &matrix : cell_cij_matrix)
-        matrix.reinit(dofs_per_cell, dofs_per_cell);
+          cell_mass_matrix.reinit(dofs_per_cell, dofs_per_cell);
+          cell_betaij_matrix.reinit(dofs_per_cell, dofs_per_cell);
+          for (auto &matrix : cell_cij_matrix)
+            matrix.reinit(dofs_per_cell, dofs_per_cell);
 
-      fe_values.reinit(cell);
+          fe_values.reinit(cell);
 
-      local_dof_indices.resize(dofs_per_cell);
-      cell->get_dof_indices(local_dof_indices);
+          local_dof_indices.resize(dofs_per_cell);
+          cell->get_dof_indices(local_dof_indices);
 
-      /* clear out copy data: */
-      cell_mass_matrix = 0.;
-      cell_betaij_matrix = 0.;
-      for (auto &matrix : cell_cij_matrix)
-        matrix = 0.;
-      cell_measure = 0.;
+          /* clear out copy data: */
+          cell_mass_matrix = 0.;
+          cell_betaij_matrix = 0.;
+          for (auto &matrix : cell_cij_matrix)
+            matrix = 0.;
+          cell_measure = 0.;
 
-      for (unsigned int q_point = 0; q_point < n_q_points; ++q_point) {
-        const auto JxW = fe_values.JxW(q_point);
+          for (unsigned int q_point = 0; q_point < n_q_points; ++q_point) {
+            const auto JxW = fe_values.JxW(q_point);
 
-        if (cell->is_locally_owned())
-          cell_measure += Number(JxW);
+            if (cell->is_locally_owned())
+              cell_measure += Number(JxW);
 
-        for (unsigned int j = 0; j < dofs_per_cell; ++j) {
-          const auto value_JxW = fe_values.shape_value(j, q_point) * JxW;
-          const auto grad_JxW = fe_values.shape_grad(j, q_point) * JxW;
+            for (unsigned int j = 0; j < dofs_per_cell; ++j) {
+              const auto value_JxW = fe_values.shape_value(j, q_point) * JxW;
+              const auto grad_JxW = fe_values.shape_grad(j, q_point) * JxW;
 
-          for (unsigned int i = 0; i < dofs_per_cell; ++i) {
+              for (unsigned int i = 0; i < dofs_per_cell; ++i) {
 
-            const auto value = fe_values.shape_value(i, q_point);
-            const auto grad = fe_values.shape_grad(i, q_point);
+                const auto value = fe_values.shape_value(i, q_point);
+                const auto grad = fe_values.shape_grad(i, q_point);
 
-            cell_mass_matrix(i, j) += Number(value * value_JxW);
-            cell_betaij_matrix(i, j) += Number(grad * grad_JxW);
-            for (unsigned int d = 0; d < dim; ++d)
-              cell_cij_matrix[d](i, j) += Number((value * grad_JxW)[d]);
+                cell_mass_matrix(i, j) += Number(value * value_JxW);
+                cell_betaij_matrix(i, j) += Number(grad * grad_JxW);
+                for (unsigned int d = 0; d < dim; ++d)
+                  cell_cij_matrix[d](i, j) += Number((value * grad_JxW)[d]);
 
-          } /* for i */
-        }   /* for j */
-      }     /* for q */
-    };
+              } /* for i */
+            }   /* for j */
+          }     /* for q */
+        };
 
     const auto copy_local_to_global = [&](const auto &copy) {
       const auto &is_locally_owned = copy.is_locally_owned_;
@@ -477,8 +476,8 @@ namespace ryujin
 
     /* Populate boundary map: */
 
-    boundary_map_ = construct_boundary_map(dof_handler_.begin_active(),
-                                           dof_handler_.end());
+    boundary_map_ = construct_boundary_map(
+        dof_handler_.begin_active(), dof_handler_.end(), *scalar_partitioner_);
   }
 
 
@@ -486,7 +485,8 @@ namespace ryujin
   void OfflineData<dim, Number>::create_multigrid_data()
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "OfflineData<dim, Number>::compute_boundary_map()" << std::endl;
+    std::cout << "OfflineData<dim, Number>::compute_boundary_map()"
+              << std::endl;
 #endif
 
     dof_handler_.distribute_mg_dofs();
@@ -496,15 +496,17 @@ namespace ryujin
     AffineConstraints level_constraints;
     // TODO not yet thread-parallel and without periodicity
 
+    level_boundary_map_.resize(n_levels);
     level_lumped_mass_matrix_.resize(n_levels);
     for (unsigned int level = 0; level < n_levels; ++level) {
       IndexSet relevant_dofs;
       dealii::DoFTools::extract_locally_relevant_level_dofs(
           dof_handler_, level, relevant_dofs);
-      level_lumped_mass_matrix_[level].reinit(
+      const auto partitioner = std::make_shared<Utilities::MPI::Partitioner>(
           dof_handler_.locally_owned_mg_dofs(level),
           relevant_dofs,
           lumped_mass_matrix_.get_mpi_communicator());
+      level_lumped_mass_matrix_[level].reinit(partitioner);
       std::vector<types::global_dof_index> dof_indices(
           dof_handler_.get_fe().dofs_per_cell);
       Vector<Number> mass_values(dof_handler_.get_fe().dofs_per_cell);
@@ -528,14 +530,13 @@ namespace ryujin
               mass_values, dof_indices, level_lumped_mass_matrix_[level]);
         }
       level_lumped_mass_matrix_[level].compress(VectorOperation::add);
-    }
 
-    /* Populate boundary map: */
+      /* Populate boundary map: */
 
-    level_boundary_map_.resize(n_levels);
-    for (unsigned int level = 0; level < n_levels; ++level) {
-      level_boundary_map_[level] = construct_boundary_map(
-          dof_handler_.begin(level), dof_handler_.end(level)); // CHECK
+      level_boundary_map_[level] =
+          construct_boundary_map(dof_handler_.begin_mg(level),
+                                 dof_handler_.end_mg(level),
+                                 *partitioner);
     }
   }
 
@@ -543,11 +544,14 @@ namespace ryujin
   template <int dim, typename Number>
   template <typename ITERATOR1, typename ITERATOR2>
   typename OfflineData<dim, Number>::boundary_map_type
-  OfflineData<dim, Number>::construct_boundary_map(const ITERATOR1 &begin,
-                                                   const ITERATOR2 &end) const
+  OfflineData<dim, Number>::construct_boundary_map(
+      const ITERATOR1 &begin,
+      const ITERATOR2 &end,
+      const Utilities::MPI::Partitioner &partitioner) const
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "OfflineData<dim, Number>::compute_boundary_map()" << std::endl;
+    std::cout << "OfflineData<dim, Number>::compute_boundary_map()"
+              << std::endl;
 #endif
 
     decltype(boundary_map_) preliminary_map;
@@ -571,7 +575,7 @@ namespace ryujin
     for (auto cell = begin; cell != end; ++cell) {
 
 #ifdef DEAL_II_WITH_TRILINOS
-      if (!cell->is_locally_owned_on_level()) // CHECK
+      if (!cell->is_locally_owned_on_level())
         continue;
 #else
       /*
@@ -579,12 +583,14 @@ namespace ryujin
        * compress(VectorOperation::add) available. In this case just
        * assemble contributions over the locally
        */
-      if (cell->is_artificial()) // CHECK
+      if ((cell->is_active() && cell->is_artificial()) ||
+          cell->level_subdomain_id() ==
+              dealii::numbers::artificial_subdomain_id)
         continue;
 #endif
 
       local_dof_indices.resize(dofs_per_cell);
-      cell->get_active_or_mg_dof_indices(local_dof_indices); // CHECK
+      cell->get_active_or_mg_dof_indices(local_dof_indices);
 
       for (auto f : GeometryInfo<dim>::face_indices()) {
         const auto face = cell->face(f);
@@ -607,7 +613,7 @@ namespace ryujin
                       fe_face_values.shape_value(j, q);
 
           const auto global_index = local_dof_indices[j];
-          const auto index = scalar_partitioner_->global_to_local(global_index);
+          const auto index = partitioner.global_to_local(global_index);
 
           Point<dim> position =
               discretization_->mapping().transform_unit_to_real_cell(

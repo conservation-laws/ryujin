@@ -75,10 +75,19 @@ namespace ryujin
     }
 
     /**
+     * Get access to the internal vector to be externally filled.
+     */
+    block_vector_type &get_block_vector()
+    {
+      return diagonal_block;
+    }
+
+    /**
      * Apply on a vector.
      */
     void vmult(vector_type &dst, const vector_type &src) const
     {
+      AssertDimension(diagonal_block.size(), 0);
       DEAL_II_OPENMP_SIMD_PRAGMA
       for (unsigned int i = 0; i < diagonal.get_partitioner()->local_size();
            ++i)
@@ -92,16 +101,28 @@ namespace ryujin
     {
       AssertDimension(dim, dst.n_blocks());
       AssertDimension(dim, src.n_blocks());
-      DEAL_II_OPENMP_SIMD_PRAGMA
-      for (unsigned int i = 0; i < diagonal.get_partitioner()->local_size();
-           ++i)
-        for (unsigned int d = 0; d < dim; ++d)
-          dst.block(d).local_element(i) =
-              diagonal.local_element(i) * src.block(d).local_element(i);
+      if (diagonal_block.size() == 0) {
+        DEAL_II_OPENMP_SIMD_PRAGMA
+        for (unsigned int i = 0; i < diagonal.get_partitioner()->local_size();
+             ++i)
+          for (unsigned int d = 0; d < dim; ++d)
+            dst.block(d).local_element(i) =
+                diagonal.local_element(i) * src.block(d).local_element(i);
+      } else
+        for (unsigned int d = 0; d < dim; ++d) {
+          DEAL_II_OPENMP_SIMD_PRAGMA
+          for (unsigned int i = 0;
+               i < src.block(d).get_partitioner()->local_size();
+               ++i)
+            dst.block(d).local_element(i) =
+                diagonal_block.block(d).local_element(i) *
+                src.block(d).local_element(i);
+        }
     }
 
   private:
     vector_type diagonal;
+    block_vector_type diagonal_block;
   };
 
 
@@ -204,42 +225,40 @@ namespace ryujin
 
       /* (5.4a) Fix up constrained degrees of freedom: */
 
-      if (level_ == dealii::numbers::invalid_unsigned_int) {
-        const auto &boundary_map = offline_data_->boundary_map();
+      const auto &boundary_map =
+          level_ == dealii::numbers::invalid_unsigned_int
+              ? offline_data_->boundary_map()
+              : offline_data_->level_boundary_map()[level_];
 
-        for (auto entry : boundary_map) {
-          const auto i = entry.first;
-          if (i >= n_owned)
-            continue;
+      for (auto entry : boundary_map) {
+        const auto i = entry.first;
+        if (i >= n_owned)
+          continue;
 
-          const auto &[normal, id, position] = entry.second;
+        const auto &[normal, id, position] = entry.second;
 
-          if (id == Boundary::slip) {
-            dealii::Tensor<1, dim, Number> V_i;
-            for (unsigned int d = 0; d < dim; ++d)
-              V_i[d] = dst.block(d).local_element(i);
+        if (id == Boundary::slip) {
+          dealii::Tensor<1, dim, Number> V_i;
+          for (unsigned int d = 0; d < dim; ++d)
+            V_i[d] = dst.block(d).local_element(i);
 
-            /* replace normal component by source */
-            V_i -= 1. * (V_i * normal) * normal;
-            for (unsigned int d = 0; d < dim; ++d) {
-              const auto src_d = src.block(d).local_element(i);
-              V_i += 1. * (src_d * normal[d]) * normal;
-            }
-
-            for (unsigned int d = 0; d < dim; ++d)
-              dst.block(d).local_element(i) = V_i[d];
-
-          } else if (id == Boundary::no_slip || id == Boundary::dirichlet) {
-
-            /* set dst to src vector: */
-            for (unsigned int d = 0; d < dim; ++d)
-              dst.block(d).local_element(i) = src.block(d).local_element(i);
+          /* replace normal component by source */
+          V_i -= 1. * (V_i * normal) * normal;
+          for (unsigned int d = 0; d < dim; ++d) {
+            const auto src_d = src.block(d).local_element(i);
+            V_i += 1. * (src_d * normal[d]) * normal;
           }
-        }
-      } else
-        for (const unsigned int i : matrix_free_->get_constrained_dofs())
+
+          for (unsigned int d = 0; d < dim; ++d)
+            dst.block(d).local_element(i) = V_i[d];
+
+        } else if (id == Boundary::no_slip || id == Boundary::dirichlet) {
+
+          /* set dst to src vector: */
           for (unsigned int d = 0; d < dim; ++d)
             dst.block(d).local_element(i) = src.block(d).local_element(i);
+        }
+      }
     }
 
     void
@@ -248,57 +267,91 @@ namespace ryujin
       Assert(level_ != dealii::numbers::invalid_unsigned_int,
              dealii::ExcNotImplemented());
       matrix = std::make_shared<DiagonalMatrix<dim, Number>>();
-      dealii::LinearAlgebra::distributed::Vector<Number> &vector =
-          matrix->get_vector();
-      matrix_free_->initialize_dof_vector(vector);
+      dealii::LinearAlgebra::distributed::BlockVector<Number> &vector =
+          matrix->get_block_vector();
+      vector.reinit(dim);
+      for (unsigned int d = 0; d < dim; ++d)
+        matrix_free_->initialize_dof_vector(vector.block(d));
+      vector.collect_sizes();
 
       const auto &lumped_mass_matrix =
           offline_data_->level_lumped_mass_matrix()[level_];
 
       unsigned int dummy = 0;
-      matrix_free_->template cell_loop<vector_type, unsigned int>(
+      matrix_free_->template cell_loop<block_vector_type, unsigned int>(
           [this](const auto &data, auto &dst, const auto &, const auto range) {
             constexpr auto order_fe = Discretization<dim>::order_finite_element;
             constexpr auto order_quad = Discretization<dim>::order_quadrature;
             dealii::FEEvaluation<dim, order_fe, order_quad, dim, Number>
                 velocity(data);
-            dealii::FEEvaluation<dim, order_fe, order_quad, 1, Number> scalar(
+            dealii::FEEvaluation<dim, order_fe, order_quad, dim, Number> writer(
                 data);
 
             for (unsigned int cell = range.first; cell < range.second; ++cell) {
               velocity.reinit(cell);
-              scalar.reinit(cell);
-              for (unsigned int i = 0; i < velocity.dofs_per_component; ++i) {
+              writer.reinit(cell);
+              for (unsigned int i = 0; i < velocity.dofs_per_cell; ++i) {
                 for (unsigned int j = 0; j < velocity.dofs_per_cell; ++j)
                   velocity.begin_dof_values()[j] =
                       dealii::VectorizedArray<Number>();
                 velocity.begin_dof_values()[i] =
                     dealii::make_vectorized_array<Number>(1.);
                 apply_local_operator(velocity);
-                scalar.begin_dof_values()[i] = velocity.begin_dof_values()[i];
+                writer.begin_dof_values()[i] = velocity.begin_dof_values()[i];
               }
-              scalar.distribute_local_to_global(dst);
+              writer.distribute_local_to_global(dst);
             }
           },
           vector,
           dummy,
           /* zero destination */ true);
 
+      const unsigned int n_owned =
+          lumped_mass_matrix.get_partitioner()->local_size();
+
       RYUJIN_PARALLEL_REGION_BEGIN
 
       RYUJIN_OMP_FOR
-      for (unsigned int i = 0;
-           i < lumped_mass_matrix.get_partitioner()->local_size();
-           ++i) {
+      for (unsigned int i = 0; i < n_owned; ++i) {
         const auto m_i = lumped_mass_matrix.local_element(i);
         const auto rho_i = density_->local_element(i);
-        vector.local_element(i) = 1. / (m_i * rho_i + vector.local_element(i));
+        for (unsigned int d = 0; d < dim; ++d)
+          vector.block(d).local_element(i) =
+              1. / (m_i * rho_i + vector.block(d).local_element(i));
       }
 
       RYUJIN_PARALLEL_REGION_END
 
-      for (const unsigned int i : matrix_free_->get_constrained_dofs())
-        vector.local_element(i) = 1.;
+      const auto &boundary_map = offline_data_->level_boundary_map()[level_];
+
+      for (auto entry : boundary_map) {
+        const auto i = entry.first;
+        if (i >= n_owned)
+          continue;
+
+        const auto &[normal, id, position] = entry.second;
+
+        if (id == Boundary::slip) {
+          dealii::Tensor<1, dim, Number> V_i;
+          for (unsigned int d = 0; d < dim; ++d)
+            V_i[d] = vector.block(d).local_element(i);
+
+          /* replace normal component by 1. */
+          V_i -= 1. * (V_i * normal) * normal;
+          for (unsigned int d = 0; d < dim; ++d) {
+            V_i += 1. * (1. * normal[d]) * normal;
+          }
+
+          for (unsigned int d = 0; d < dim; ++d)
+            vector.block(d).local_element(i) = V_i[d];
+
+        } else if (id == Boundary::no_slip || id == Boundary::dirichlet) {
+
+          /* set dst to src vector: */
+          for (unsigned int d = 0; d < dim; ++d)
+            vector.block(d).local_element(i) = 1.;
+        }
+      }
     }
 
   private:
