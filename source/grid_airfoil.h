@@ -916,6 +916,7 @@ namespace ryujin
          */
 
         dealii::Triangulation<2> tria3;
+        tria3.set_mesh_smoothing(triangulation.get_mesh_smoothing());
         GridGenerator::flatten_triangulation(coarse_triangulation, tria3);
 
         if constexpr (dim == 2) {
@@ -926,6 +927,7 @@ namespace ryujin
         } else {
           /* extrude mesh: */
           dealii::Triangulation<3, 3> tria4;
+          tria4.set_mesh_smoothing(triangulation.get_mesh_smoothing());
           GridGenerator::extrude_triangulation(
               tria3, subdivisions_z_, width_, tria4);
           triangulation.copy_triangulation(tria4);

@@ -90,6 +90,7 @@ namespace ryujin
           Point<2>(cylinder_diameter, -height / 2.),
           Point<2>(length - cylinder_position, height / 2.));
 
+      tria5.set_mesh_smoothing(triangulation.get_mesh_smoothing());
       GridGenerator::merge_triangulations(
           {&tria1, &tria2, &tria3, &tria4}, tria5, 1.e-12, true);
       triangulation.copy_triangulation(tria5);
@@ -159,6 +160,7 @@ namespace ryujin
       cylinder(tria1, length, height, cylinder_position, cylinder_diameter);
 
       dealii::Triangulation<3, 3> tria2;
+      tria2.set_mesh_smoothing(triangulation.get_mesh_smoothing());
 
       GridGenerator::extrude_triangulation(tria1, 4, height, tria2, true);
       GridTools::transform(
@@ -244,6 +246,7 @@ namespace ryujin
       using namespace dealii;
 
       dealii::Triangulation<2, 2> tria1, tria2, tria3;
+      tria3.set_mesh_smoothing(triangulation.get_mesh_smoothing());
 
       GridGenerator::subdivided_hyper_rectangle(
           tria1, {15, 4}, Point<2>(0., step_height), Point<2>(length, height));
@@ -362,6 +365,7 @@ namespace ryujin
       using namespace dealii;
 
       dealii::Triangulation<2, 2> tria1, tria2, tria3;
+      tria3.set_mesh_smoothing(triangulation.get_mesh_smoothing());
 
       GridGenerator::subdivided_hyper_rectangle(
           tria1, {18, 6}, Point<2>(wall_position, 0), Point<2>(length, height));
@@ -603,6 +607,7 @@ namespace ryujin
         /* create mesh: */
 
         dealii::Triangulation<dim, dim> tria1;
+        tria1.set_mesh_smoothing(triangulation.get_mesh_smoothing());
         if constexpr (dim == 2)
           dealii::GridGenerator::subdivided_hyper_rectangle(
               tria1,
@@ -707,6 +712,7 @@ namespace ryujin
           typename Geometry<dim>::Triangulation &triangulation) final override
       {
         dealii::Triangulation<dim, dim> tria1;
+        tria1.set_mesh_smoothing(triangulation.get_mesh_smoothing());
         dealii::GridGenerator::hyper_cube(tria1, -0.5 * length_, 0.5 * length_);
         triangulation.copy_triangulation(tria1);
 
