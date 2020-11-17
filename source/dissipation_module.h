@@ -159,27 +159,30 @@ namespace ryujin
     Number t_interp_;
     ACCESSOR_READ_ONLY(t_interp)
 
-    dealii::MGLevelObject<dealii::MatrixFree<dim, Number>> level_matrix_free_;
+    dealii::MGLevelObject<dealii::MatrixFree<dim, float>> level_matrix_free_;
     dealii::MGConstrainedDoFs mg_constrained_dofs_;
-    dealii::MGLevelObject<scalar_type> level_density_;
-    MGTransferVelocity<dim, Number> mg_transfer_velocity_;
-    dealii::MGLevelObject<VelocityMatrix<dim, Number>> level_velocity_matrices_;
-    MGTransferEnergy<dim, Number> mg_transfer_energy_;
-    dealii::MGLevelObject<EnergyMatrix<dim, Number>> level_energy_matrices_;
+    dealii::MGLevelObject<dealii::LinearAlgebra::distributed::Vector<float>>
+        level_density_;
+    MGTransferVelocity<dim, float> mg_transfer_velocity_;
+    dealii::MGLevelObject<VelocityMatrix<dim, float, Number>>
+        level_velocity_matrices_;
+    MGTransferEnergy<dim, float> mg_transfer_energy_;
+    dealii::MGLevelObject<EnergyMatrix<dim, float, Number>>
+        level_energy_matrices_;
 
     dealii::mg::SmootherRelaxation<
         dealii::PreconditionChebyshev<
-            VelocityMatrix<dim, Number>,
-            dealii::LinearAlgebra::distributed::BlockVector<Number>,
-            DiagonalMatrix<dim, Number>>,
-        dealii::LinearAlgebra::distributed::BlockVector<Number>>
+            VelocityMatrix<dim, float, Number>,
+            dealii::LinearAlgebra::distributed::BlockVector<float>,
+            DiagonalMatrix<dim, float>>,
+        dealii::LinearAlgebra::distributed::BlockVector<float>>
         mg_smoother_velocity_;
 
     dealii::mg::SmootherRelaxation<
         dealii::PreconditionChebyshev<
-            EnergyMatrix<dim, Number>,
-            dealii::LinearAlgebra::distributed::Vector<Number>>,
-        dealii::LinearAlgebra::distributed::Vector<Number>>
+            EnergyMatrix<dim, float, Number>,
+            dealii::LinearAlgebra::distributed::Vector<float>>,
+        dealii::LinearAlgebra::distributed::Vector<float>>
         mg_smoother_energy_;
 
     //@}

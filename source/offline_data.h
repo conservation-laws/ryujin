@@ -146,7 +146,7 @@ namespace ryujin
     dealii::LinearAlgebra::distributed::Vector<Number>
         lumped_mass_matrix_inverse_;
 
-    std::vector<dealii::LinearAlgebra::distributed::Vector<Number>>
+    std::vector<dealii::LinearAlgebra::distributed::Vector<float>>
         level_lumped_mass_matrix_;
 
     SparseMatrixSIMD<Number> betaij_matrix_;

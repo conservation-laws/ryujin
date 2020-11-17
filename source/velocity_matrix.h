@@ -127,7 +127,7 @@ namespace ryujin
   };
 
 
-  template <int dim, typename Number>
+  template <int dim, typename Number, typename Number2>
   class VelocityMatrix : public dealii::Subscriptor
   {
   public:
@@ -139,7 +139,7 @@ namespace ryujin
 
     void initialize(
         const ProblemDescription &problem_description,
-        const OfflineData<dim, Number> &offline_data,
+        const OfflineData<dim, Number2> &offline_data,
         const dealii::MatrixFree<dim, Number> &matrix_free,
         const dealii::LinearAlgebra::distributed::Vector<Number> &density,
         const Number theta_x_tau,
@@ -165,19 +165,23 @@ namespace ryujin
       using VA = dealii::VectorizedArray<Number>;
       constexpr auto simd_length = VA::size();
 
-      const auto &lumped_mass_matrix =
-          level_ != dealii::numbers::invalid_unsigned_int
-              ? offline_data_->level_lumped_mass_matrix()[level_]
-              : offline_data_->lumped_mass_matrix();
+      const vector_type *lumped_mass_matrix = nullptr;
+      if constexpr (std::is_same<Number, Number2>::value) {
+        Assert(level == numbers::invalid_unsigned_int,
+               dealii::ExcInternalError());
+        lumped_mass_matrix = &offline_data_->lumped_mass_matrix();
+      } else
+        lumped_mass_matrix = &offline_data_->level_lumped_mass_matrix()[level_];
+
       const unsigned int n_owned =
-          lumped_mass_matrix.get_partitioner()->local_size();
+          lumped_mass_matrix->get_partitioner()->local_size();
       const unsigned int size_regular = n_owned / simd_length * simd_length;
 
       RYUJIN_PARALLEL_REGION_BEGIN
 
       RYUJIN_OMP_FOR
       for (unsigned int i = 0; i < size_regular; i += simd_length) {
-        const auto m_i = simd_load(lumped_mass_matrix, i);
+        const auto m_i = simd_load(*lumped_mass_matrix, i);
         const auto rho_i = simd_load(*density_, i);
         for (unsigned int d = 0; d < dim; ++d) {
           const auto temp = simd_load(src.block(d), i);
@@ -188,7 +192,7 @@ namespace ryujin
       RYUJIN_PARALLEL_REGION_END
 
       for (unsigned int i = size_regular; i < n_owned; ++i) {
-        const auto m_i = lumped_mass_matrix.local_element(i);
+        const auto m_i = lumped_mass_matrix->local_element(i);
         const auto rho_i = density_->local_element(i);
 
         for (unsigned int d = 0; d < dim; ++d) {
@@ -231,7 +235,8 @@ namespace ryujin
         if (i >= n_owned)
           continue;
 
-        const auto &[normal, id, position] = entry.second;
+        const auto &[normal_number, id, position] = entry.second;
+        const dealii::Tensor<1, dim, Number> normal = normal_number;
 
         if (id == Boundary::slip) {
           dealii::Tensor<1, dim, Number> V_i;
@@ -324,7 +329,8 @@ namespace ryujin
         if (i >= n_owned)
           continue;
 
-        const auto &[normal, id, position] = entry.second;
+        const auto &[normal_number, id, position] = entry.second;
+        const dealii::Tensor<1, dim, Number> normal = normal_number;
 
         if (id == Boundary::slip) {
           dealii::Tensor<1, dim, Number> V_i;
@@ -351,7 +357,7 @@ namespace ryujin
 
   private:
     const ProblemDescription *problem_description_;
-    const OfflineData<dim, Number> *offline_data_;
+    const OfflineData<dim, Number2> *offline_data_;
     const dealii::MatrixFree<dim, Number> *matrix_free_;
     const vector_type *density_;
     Number theta_x_tau_;
@@ -433,9 +439,11 @@ namespace ryujin
             to_level, dst.block(block), src.block(block));
     }
 
-    void interpolate_to_mg(const dealii::DoFHandler<dim> &dof_handler,
-                           dealii::MGLevelObject<scalar_type> &dst,
-                           const scalar_type &src) const
+    template <typename Number2>
+    void interpolate_to_mg(
+        const dealii::DoFHandler<dim> &dof_handler,
+        dealii::MGLevelObject<scalar_type> &dst,
+        const dealii::LinearAlgebra::distributed::Vector<Number2> &src) const
     {
       if (dst[0].size() == 0)
         for (unsigned int l = 0; l <= dst.max_level(); ++l)
@@ -443,9 +451,12 @@ namespace ryujin
       transfer_.interpolate_to_mg(dof_handler, dst, src);
     }
 
-    void interpolate_to_mg(const dealii::DoFHandler<dim> &dof_handler,
-                           dealii::MGLevelObject<vector_type> &dst,
-                           const vector_type &src) const
+    template <typename Number2>
+    void interpolate_to_mg(
+        const dealii::DoFHandler<dim> &dof_handler,
+        dealii::MGLevelObject<vector_type> &dst,
+        const dealii::LinearAlgebra::distributed::BlockVector<Number2> &src)
+        const
     {
       if (dst[0].size() == 0)
         for (unsigned int l = 0; l <= dst.max_level(); ++l) {
@@ -466,9 +477,12 @@ namespace ryujin
       }
     }
 
-    void copy_to_mg(const dealii::DoFHandler<dim> &dof_handler,
-                    dealii::MGLevelObject<vector_type> &dst,
-                    const vector_type &src) const
+    template <typename Number2>
+    void
+    copy_to_mg(const dealii::DoFHandler<dim> &dof_handler,
+               dealii::MGLevelObject<vector_type> &dst,
+               const dealii::LinearAlgebra::distributed::BlockVector<Number2>
+                   &src) const
     {
       if (dst[0].size() == 0)
         for (unsigned int l = 0; l <= dst.max_level(); ++l) {
@@ -488,9 +502,11 @@ namespace ryujin
       }
     }
 
-    void copy_from_mg(const dealii::DoFHandler<dim> &dof_handler,
-                      vector_type &dst,
-                      const dealii::MGLevelObject<vector_type> &src) const
+    template <typename Number2>
+    void
+    copy_from_mg(const dealii::DoFHandler<dim> &dof_handler,
+                 dealii::LinearAlgebra::distributed::BlockVector<Number2> &dst,
+                 const dealii::MGLevelObject<vector_type> &src) const
     {
       for (unsigned int block = 0; block < dst.n_blocks(); ++block) {
         for (unsigned int level = scalar_vector.min_level();
@@ -510,7 +526,7 @@ namespace ryujin
   };
 
 
-  template <int dim, typename Number>
+  template <int dim, typename Number, typename Number2>
   class EnergyMatrix : public dealii::Subscriptor
   {
   public:
@@ -519,7 +535,7 @@ namespace ryujin
     EnergyMatrix(){};
 
     void initialize(
-        const OfflineData<dim, Number> &offline_data,
+        const OfflineData<dim, Number2> &offline_data,
         const dealii::MatrixFree<dim, Number> &matrix_free,
         const dealii::LinearAlgebra::distributed::Vector<Number> &density,
         const Number time_factor,
@@ -555,19 +571,23 @@ namespace ryujin
       using VA = dealii::VectorizedArray<Number>;
       constexpr auto simd_length = VA::size();
 
-      const vector_type &lumped_mass_matrix =
-          level_ != dealii::numbers::invalid_unsigned_int
-              ? offline_data_->level_lumped_mass_matrix()[level_]
-              : offline_data_->lumped_mass_matrix();
+      const vector_type *lumped_mass_matrix = nullptr;
+      if constexpr (std::is_same<Number, Number2>::value) {
+        Assert(level == numbers::invalid_unsigned_int,
+               dealii::ExcInternalError());
+        lumped_mass_matrix = &offline_data_->lumped_mass_matrix();
+      } else
+        lumped_mass_matrix = &offline_data_->level_lumped_mass_matrix()[level_];
+
       const unsigned int n_owned =
-          lumped_mass_matrix.get_partitioner()->local_size();
+          lumped_mass_matrix->get_partitioner()->local_size();
       const unsigned int size_regular = n_owned / simd_length * simd_length;
 
       RYUJIN_PARALLEL_REGION_BEGIN
 
       RYUJIN_OMP_FOR
       for (unsigned int i = 0; i < size_regular; i += simd_length) {
-        const auto m_i = simd_load(lumped_mass_matrix, i);
+        const auto m_i = simd_load(*lumped_mass_matrix, i);
         const auto rho_i = simd_load(*density_, i);
         const auto e_i = simd_load(src, i);
         simd_store(dst, m_i * rho_i * e_i, i);
@@ -576,7 +596,7 @@ namespace ryujin
       RYUJIN_PARALLEL_REGION_END
 
       for (unsigned int i = size_regular; i < n_owned; ++i) {
-        const auto m_i = lumped_mass_matrix.local_element(i);
+        const auto m_i = lumped_mass_matrix->local_element(i);
         const auto rho_i = density_->local_element(i);
         const auto e_i = src.local_element(i);
         dst.local_element(i) = m_i * rho_i * e_i;
@@ -690,7 +710,7 @@ namespace ryujin
     }
 
   private:
-    const OfflineData<dim, Number> *offline_data_;
+    const OfflineData<dim, Number2> *offline_data_;
     const dealii::MatrixFree<dim, Number> *matrix_free_;
     const dealii::LinearAlgebra::distributed::Vector<Number> *density_;
     Number factor_;
@@ -728,11 +748,12 @@ namespace ryujin
       level_matrix_free_ = &matrix_free;
     }
 
+    template <typename Number2>
     void copy_to_mg(
         const dealii::DoFHandler<dim> &dof_handler,
         dealii::MGLevelObject<
             dealii::LinearAlgebra::distributed::Vector<Number>> &dst,
-        const dealii::LinearAlgebra::distributed::Vector<Number> &src) const
+        const dealii::LinearAlgebra::distributed::Vector<Number2> &src) const
     {
       if (dst[0].size() == 0)
         for (unsigned int l = 0; l <= dst.max_level(); ++l)

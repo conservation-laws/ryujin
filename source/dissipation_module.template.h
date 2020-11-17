@@ -107,10 +107,14 @@ namespace ryujin
     mg_constrained_dofs_.make_zero_boundary_constraints(
         offline_data_->dof_handler(), boundary_ids);
 
+    typename MatrixFree<dim, float>::AdditionalData additional_data_level;
+    additional_data_level.tasks_parallel_scheme =
+        MatrixFree<dim, float>::AdditionalData::none;
+
     level_matrix_free_.resize(0, n_levels - 1);
     level_density_.resize(0, n_levels - 1);
     for (unsigned int level = 0; level < n_levels; ++level) {
-      additional_data.mg_level = level;
+      additional_data_level.mg_level = level;
       AffineConstraints<double> constraints(relevant_sets[level]);
       // constraints.add_lines(mg_constrained_dofs_.get_boundary_indices(level));
       // constraints.merge(mg_constrained_dofs_.get_level_constraints(level));
@@ -120,7 +124,7 @@ namespace ryujin
           offline_data_->dof_handler(),
           constraints,
           offline_data_->discretization().quadrature_1d(),
-          additional_data);
+          additional_data_level);
       level_matrix_free_[level].initialize_dof_vector(level_density_[level]);
     }
 
@@ -297,9 +301,9 @@ namespace ryujin
        */
       if (cycle % 4 == 1) {
         MGLevelObject<typename PreconditionChebyshev<
-            VelocityMatrix<dim, Number>,
-            LinearAlgebra::distributed::BlockVector<Number>,
-            DiagonalMatrix<dim, Number>>::AdditionalData>
+            VelocityMatrix<dim, float, Number>,
+            LinearAlgebra::distributed::BlockVector<float>,
+            DiagonalMatrix<dim, float>>::AdditionalData>
             smoother_data(0, level_matrix_free_.max_level());
 
         level_velocity_matrices_.resize(0, level_matrix_free_.max_level());
@@ -336,28 +340,28 @@ namespace ryujin
 
       LIKWID_MARKER_START("time_step_n_1");
 
-      VelocityMatrix<dim, Number> velocity_operator;
+      VelocityMatrix<dim, Number, Number> velocity_operator;
       velocity_operator.initialize(*problem_description_,
                                    *offline_data_,
                                    matrix_free_,
                                    density_,
                                    theta_ * tau_);
 
-      MGCoarseGridApplySmoother<LinearAlgebra::distributed::BlockVector<Number>>
+      MGCoarseGridApplySmoother<LinearAlgebra::distributed::BlockVector<float>>
           mg_coarse;
       mg_coarse.initialize(mg_smoother_velocity_);
-      mg::Matrix<LinearAlgebra::distributed::BlockVector<Number>> mg_matrix(
+      mg::Matrix<LinearAlgebra::distributed::BlockVector<float>> mg_matrix(
           level_velocity_matrices_);
 
-      Multigrid<LinearAlgebra::distributed::BlockVector<Number>> mg(
+      Multigrid<LinearAlgebra::distributed::BlockVector<float>> mg(
           mg_matrix,
           mg_coarse,
           mg_transfer_velocity_,
           mg_smoother_velocity_,
           mg_smoother_velocity_);
       PreconditionMG<dim,
-                     LinearAlgebra::distributed::BlockVector<Number>,
-                     MGTransferVelocity<dim, Number>>
+                     LinearAlgebra::distributed::BlockVector<float>,
+                     MGTransferVelocity<dim, float>>
           preconditioner(
               offline_data_->dof_handler(), mg, mg_transfer_velocity_);
 
@@ -505,8 +509,8 @@ namespace ryujin
        */
       if (cycle % 4 == 1) {
         MGLevelObject<typename PreconditionChebyshev<
-            EnergyMatrix<dim, Number>,
-            LinearAlgebra::distributed::Vector<Number>>::AdditionalData>
+            EnergyMatrix<dim, float, Number>,
+            LinearAlgebra::distributed::Vector<float>>::AdditionalData>
             smoother_data(0, level_matrix_free_.max_level());
 
         level_energy_matrices_.resize(0, level_matrix_free_.max_level());
@@ -541,28 +545,28 @@ namespace ryujin
 
       LIKWID_MARKER_START("time_step_n_3");
 
-      EnergyMatrix<dim, Number> energy_operator;
+      EnergyMatrix<dim, Number, Number> energy_operator;
       energy_operator.initialize(*offline_data_,
                                  matrix_free_,
                                  density_,
                                  theta_ * tau_ *
                                      problem_description_->cv_inverse_kappa());
 
-      MGCoarseGridApplySmoother<LinearAlgebra::distributed::Vector<Number>>
+      MGCoarseGridApplySmoother<LinearAlgebra::distributed::Vector<float>>
           mg_coarse;
       mg_coarse.initialize(mg_smoother_energy_);
-      mg::Matrix<LinearAlgebra::distributed::Vector<Number>> mg_matrix(
+      mg::Matrix<LinearAlgebra::distributed::Vector<float>> mg_matrix(
           level_energy_matrices_);
 
-      Multigrid<LinearAlgebra::distributed::Vector<Number>> mg(
+      Multigrid<LinearAlgebra::distributed::Vector<float>> mg(
           mg_matrix,
           mg_coarse,
           mg_transfer_energy_,
           mg_smoother_energy_,
           mg_smoother_energy_);
       PreconditionMG<dim,
-                     LinearAlgebra::distributed::Vector<Number>,
-                     MGTransferEnergy<dim, Number>>
+                     LinearAlgebra::distributed::Vector<float>,
+                     MGTransferEnergy<dim, float>>
           preconditioner(offline_data_->dof_handler(), mg, mg_transfer_energy_);
 
       SolverControl solver_control(1000,

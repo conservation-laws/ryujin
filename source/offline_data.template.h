@@ -493,7 +493,7 @@ namespace ryujin
 
     const auto n_levels = dof_handler_.get_triangulation().n_global_levels();
 
-    AffineConstraints level_constraints;
+    AffineConstraints<float> level_constraints;
     // TODO not yet thread-parallel and without periodicity
 
     level_boundary_map_.resize(n_levels);
