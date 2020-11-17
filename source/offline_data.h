@@ -94,6 +94,7 @@ namespace ryujin
       setup();
       assemble();
       create_boundary_map();
+      create_multigrid_data();
     }
 
     /**
@@ -111,6 +112,11 @@ namespace ryujin
      * Create boundary map.
      */
     void create_boundary_map();
+
+    /**
+     * Create boundary map.
+     */
+    void create_multigrid_data();
 
   protected:
     dealii::DoFHandler<dim> dof_handler_;
@@ -130,6 +136,8 @@ namespace ryujin
 
     std::multimap<dealii::types::global_dof_index, boundary_description>
         boundary_map_;
+
+    std::vector<decltype(boundary_map_)> level_boundary_map_;
 
     dealii::DynamicSparsityPattern sparsity_pattern_;
 
@@ -226,6 +234,12 @@ namespace ryujin
      * reflective boundary conditions).
      */
     ACCESSOR_READ_ONLY(boundary_map)
+
+    /**
+     * The boundary map on all levels of the grid in case multilevel
+     * support was enabled.
+     */
+    ACCESSOR_READ_ONLY(level_boundary_map)
 
     /**
      * A sparsity pattern for (standard deal.II) matrices storing indices
