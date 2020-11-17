@@ -14,6 +14,7 @@
 #include "simd.h"
 
 #include <deal.II/base/vectorization.h>
+#include <deal.II/lac/diagonal_matrix.h>
 #include <deal.II/matrix_free/fe_evaluation.h>
 #include <deal.II/multigrid/mg_base.h>
 #include <deal.II/multigrid/mg_transfer_matrix_free.h>
@@ -152,11 +153,6 @@ namespace ryujin
       level_ = level;
     }
 
-    void set_theta_x_tau(const Number theta_x_tau)
-    {
-      theta_x_tau_ = theta_x_tau;
-    }
-
     void Tvmult(block_vector_type &dst, const block_vector_type &src) const
     {
       vmult(dst, src);
@@ -267,8 +263,7 @@ namespace ryujin
       Assert(level_ != dealii::numbers::invalid_unsigned_int,
              dealii::ExcNotImplemented());
       matrix = std::make_shared<DiagonalMatrix<dim, Number>>();
-      dealii::LinearAlgebra::distributed::BlockVector<Number> &vector =
-          matrix->get_block_vector();
+      block_vector_type &vector = matrix->get_block_vector();
       vector.reinit(dim);
       for (unsigned int d = 0; d < dim; ++d)
         matrix_free_->initialize_dof_vector(vector.block(d));
@@ -358,7 +353,7 @@ namespace ryujin
     const ProblemDescription *problem_description_;
     const OfflineData<dim, Number> *offline_data_;
     const dealii::MatrixFree<dim, Number> *matrix_free_;
-    const dealii::LinearAlgebra::distributed::Vector<Number> *density_;
+    const vector_type *density_;
     Number theta_x_tau_;
     unsigned int level_;
 
@@ -512,6 +507,243 @@ namespace ryujin
     const dealii::MGLevelObject<dealii::MatrixFree<dim, Number>>
         *level_matrix_free_;
     mutable dealii::MGLevelObject<scalar_type> scalar_vector;
+  };
+
+
+  template <int dim, typename Number>
+  class EnergyMatrix : public dealii::Subscriptor
+  {
+  public:
+    using vector_type = dealii::LinearAlgebra::distributed::Vector<Number>;
+
+    EnergyMatrix(){};
+
+    void initialize(
+        const OfflineData<dim, Number> &offline_data,
+        const dealii::MatrixFree<dim, Number> &matrix_free,
+        const dealii::LinearAlgebra::distributed::Vector<Number> &density,
+        const Number time_factor,
+        const unsigned int level = dealii::numbers::invalid_unsigned_int)
+    {
+      offline_data_ = &offline_data;
+      matrix_free_ = &matrix_free;
+      density_ = &density;
+      factor_ = time_factor;
+      level_ = level;
+    }
+
+    void Tvmult(vector_type &dst, const vector_type &src) const
+    {
+      vmult(dst, src);
+    }
+
+    dealii::types::global_dof_index m() const
+    {
+      return density_->size();
+    }
+
+    Number el(const unsigned int, const unsigned int) const
+    {
+      Assert(false, dealii::ExcNotImplemented());
+      return Number();
+    }
+
+    void vmult(vector_type &dst, const vector_type &src) const
+    {
+      /* Apply action of m_i rho_i V_i: */
+
+      using VA = dealii::VectorizedArray<Number>;
+      constexpr auto simd_length = VA::size();
+
+      const vector_type &lumped_mass_matrix =
+          level_ != dealii::numbers::invalid_unsigned_int
+              ? offline_data_->level_lumped_mass_matrix()[level_]
+              : offline_data_->lumped_mass_matrix();
+      const unsigned int n_owned =
+          lumped_mass_matrix.get_partitioner()->local_size();
+      const unsigned int size_regular = n_owned / simd_length * simd_length;
+
+      RYUJIN_PARALLEL_REGION_BEGIN
+
+      RYUJIN_OMP_FOR
+      for (unsigned int i = 0; i < size_regular; i += simd_length) {
+        const auto m_i = simd_load(lumped_mass_matrix, i);
+        const auto rho_i = simd_load(*density_, i);
+        const auto e_i = simd_load(src, i);
+        simd_store(dst, m_i * rho_i * e_i, i);
+      }
+
+      RYUJIN_PARALLEL_REGION_END
+
+      for (unsigned int i = size_regular; i < n_owned; ++i) {
+        const auto m_i = lumped_mass_matrix.local_element(i);
+        const auto rho_i = density_->local_element(i);
+        const auto e_i = src.local_element(i);
+        dst.local_element(i) = m_i * rho_i * e_i;
+      }
+
+      /* Apply action of diffusion operator \sum_j beta_ij e_j: */
+
+      const auto integrator = [this](const auto &data,
+                                     auto &dst,
+                                     const auto &src,
+                                     const auto range) {
+        constexpr auto order_fe = Discretization<dim>::order_finite_element;
+        constexpr auto order_quad = Discretization<dim>::order_quadrature;
+        dealii::FEEvaluation<dim, order_fe, order_quad, 1, Number> energy(data);
+
+        for (unsigned int cell = range.first; cell < range.second; ++cell) {
+          energy.reinit(cell);
+          energy.read_dof_values(src);
+          apply_local_operator(energy);
+          energy.distribute_local_to_global(dst);
+        }
+      };
+
+      matrix_free_->template cell_loop<vector_type, vector_type>(
+          integrator, dst, src, /* zero destination */ false);
+
+      /* Fix up constrained degrees of freedom: */
+
+      const auto &boundary_map = offline_data_->boundary_map();
+
+      for (auto entry : boundary_map) {
+        const auto i = entry.first;
+        if (i >= n_owned)
+          continue;
+
+        const auto &[normal, id, position] = entry.second;
+        if (id == Boundary::dirichlet) {
+          dst.local_element(i) = src.local_element(i);
+        }
+      }
+    }
+
+    void compute_diagonal(
+        std::shared_ptr<dealii::DiagonalMatrix<vector_type>> &matrix) const
+    {
+      Assert(level_ != dealii::numbers::invalid_unsigned_int,
+             dealii::ExcNotImplemented());
+      matrix = std::make_shared<dealii::DiagonalMatrix<vector_type>>();
+      vector_type &vector = matrix->get_vector();
+      matrix_free_->initialize_dof_vector(vector);
+
+      const vector_type &lumped_mass_matrix =
+          offline_data_->level_lumped_mass_matrix()[level_];
+
+      unsigned int dummy = 0;
+      matrix_free_->template cell_loop<vector_type, unsigned int>(
+          [this](const auto &data, auto &dst, const auto &, const auto range) {
+            constexpr auto order_fe = Discretization<dim>::order_finite_element;
+            constexpr auto order_quad = Discretization<dim>::order_quadrature;
+            dealii::FEEvaluation<dim, order_fe, order_quad, 1, Number> energy(
+                data);
+            dealii::FEEvaluation<dim, order_fe, order_quad, 1, Number> writer(
+                data);
+
+            for (unsigned int cell = range.first; cell < range.second; ++cell) {
+              energy.reinit(cell);
+              writer.reinit(cell);
+              for (unsigned int i = 0; i < energy.dofs_per_cell; ++i) {
+                for (unsigned int j = 0; j < energy.dofs_per_cell; ++j)
+                  energy.begin_dof_values()[j] =
+                      dealii::VectorizedArray<Number>();
+                energy.begin_dof_values()[i] =
+                    dealii::make_vectorized_array<Number>(1.);
+                apply_local_operator(energy);
+                writer.begin_dof_values()[i] = energy.begin_dof_values()[i];
+              }
+              writer.distribute_local_to_global(dst);
+            }
+          },
+          vector,
+          dummy,
+          /* zero destination */ true);
+
+      const unsigned int n_owned =
+          lumped_mass_matrix.get_partitioner()->local_size();
+
+      RYUJIN_PARALLEL_REGION_BEGIN
+
+      RYUJIN_OMP_FOR
+      for (unsigned int i = 0; i < n_owned; ++i) {
+        const auto m_i = lumped_mass_matrix.local_element(i);
+        const auto rho_i = density_->local_element(i);
+        vector.local_element(i) = 1. / (m_i * rho_i + vector.local_element(i));
+      }
+
+      RYUJIN_PARALLEL_REGION_END
+
+      const auto &boundary_map = offline_data_->level_boundary_map()[level_];
+
+      for (auto entry : boundary_map) {
+        const auto i = entry.first;
+        if (i >= n_owned)
+          continue;
+
+        const auto &[normal, id, position] = entry.second;
+        if (id == Boundary::dirichlet) {
+          vector.local_element(i) = 1.;
+          ;
+        }
+      }
+    }
+
+  private:
+    const OfflineData<dim, Number> *offline_data_;
+    const dealii::MatrixFree<dim, Number> *matrix_free_;
+    const dealii::LinearAlgebra::distributed::Vector<Number> *density_;
+    Number factor_;
+    unsigned int level_;
+
+    template <typename Evaluator>
+    void apply_local_operator(Evaluator &energy) const
+    {
+#if DEAL_II_VERSION_GTE(9, 3, 0)
+      energy.evaluate(dealii::EvaluationFlags::gradients);
+#else
+      energy.evaluate(false, true);
+#endif
+      for (unsigned int q = 0; q < energy.n_q_points; ++q) {
+        energy.submit_gradient(factor_ * energy.get_gradient(q), q);
+      }
+#if DEAL_II_VERSION_GTE(9, 3, 0)
+      energy.integrate(dealii::EvaluationFlags::gradients);
+#else
+      energy.integrate(false, true);
+#endif
+    }
+  };
+
+
+  template <int dim, typename Number>
+  class MGTransferEnergy : public dealii::MGTransferMatrixFree<dim, Number>
+  {
+  public:
+    void build(const dealii::DoFHandler<dim> &dof_handler,
+               const dealii::MGLevelObject<dealii::MatrixFree<dim, Number>>
+                   &matrix_free)
+    {
+      dealii::MGTransferMatrixFree<dim, Number>::build(dof_handler);
+      level_matrix_free_ = &matrix_free;
+    }
+
+    void copy_to_mg(
+        const dealii::DoFHandler<dim> &dof_handler,
+        dealii::MGLevelObject<
+            dealii::LinearAlgebra::distributed::Vector<Number>> &dst,
+        const dealii::LinearAlgebra::distributed::Vector<Number> &src) const
+    {
+      if (dst[0].size() == 0)
+        for (unsigned int l = 0; l <= dst.max_level(); ++l)
+          (*level_matrix_free_)[l].initialize_dof_vector(dst[l]);
+      dealii::MGTransferMatrixFree<dim, Number>::copy_to_mg(
+          dof_handler, dst, src);
+    }
+
+  private:
+    const dealii::MGLevelObject<dealii::MatrixFree<dim, Number>>
+        *level_matrix_free_;
   };
 } /* namespace ryujin */
 

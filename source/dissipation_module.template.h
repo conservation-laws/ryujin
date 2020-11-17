@@ -124,89 +124,9 @@ namespace ryujin
       level_matrix_free_[level].initialize_dof_vector(level_density_[level]);
     }
 
-    mg_transfer_.build(
+    mg_transfer_velocity_.build(
         offline_data_->dof_handler(), mg_constrained_dofs_, level_matrix_free_);
-  }
-
-
-  template <int dim, typename Number>
-  template <typename VectorType>
-  void DissipationModule<dim, Number>::internal_energy_vmult(
-      VectorType &dst, const VectorType &src) const
-  {
-    /* Apply action of m_i rho_i e_i: */
-
-    using VA = VectorizedArray<Number>;
-    constexpr auto simd_length = VA::size();
-
-    const auto &lumped_mass_matrix = offline_data_->lumped_mass_matrix();
-    const unsigned int n_owned = offline_data_->n_locally_owned();
-    const unsigned int size_regular = n_owned / simd_length * simd_length;
-
-    RYUJIN_PARALLEL_REGION_BEGIN
-
-    RYUJIN_OMP_FOR
-    for (unsigned int i = 0; i < size_regular; i += simd_length) {
-      const auto m_i = simd_load(lumped_mass_matrix, i);
-      const auto rho_i = simd_load(density_, i);
-      const auto e_i = simd_load(src, i);
-      simd_store(dst, m_i * rho_i * e_i, i);
-    }
-
-    RYUJIN_PARALLEL_REGION_END
-
-    for (unsigned int i = size_regular; i < n_owned; ++i) {
-      const auto m_i = lumped_mass_matrix.local_element(i);
-      const auto rho_i = density_.local_element(i);
-      const auto e_i = src.local_element(i);
-      dst.local_element(i) = m_i * rho_i * e_i;
-    }
-
-    /* Apply action of diffusion operator \sum_j beta_ij e_j: */
-
-    const auto integrator =
-        [this](const auto &data, auto &dst, const auto &src, const auto range) {
-          constexpr auto order_fe = Discretization<dim>::order_finite_element;
-          constexpr auto order_quad = Discretization<dim>::order_quadrature;
-          FEEvaluation<dim, order_fe, order_quad, 1, Number> energy(data);
-          const auto factor =
-              theta_ * tau_ * problem_description_->cv_inverse_kappa();
-
-          for (unsigned int cell = range.first; cell < range.second; ++cell) {
-            energy.reinit(cell);
-#if DEAL_II_VERSION_GTE(9, 3, 0)
-            energy.gather_evaluate(src, EvaluationFlags::gradients);
-#else
-            energy.gather_evaluate(src, false, true);
-#endif
-            for (unsigned int q = 0; q < energy.n_q_points; ++q) {
-              energy.submit_gradient(factor * energy.get_gradient(q), q);
-            }
-#if DEAL_II_VERSION_GTE(9, 3, 0)
-            energy.integrate_scatter(EvaluationFlags::gradients, dst);
-#else
-            energy.integrate_scatter(false, true, dst);
-#endif
-          }
-        };
-
-    matrix_free_.template cell_loop<scalar_type, scalar_type>(
-        integrator, dst, src, /* zero destination */ false);
-
-    /* Fix up constrained degrees of freedom: */
-
-    const auto &boundary_map = offline_data_->boundary_map();
-
-    for (auto entry : boundary_map) {
-      const auto i = entry.first;
-      if (i >= n_owned)
-        continue;
-
-      const auto &[normal, id, position] = entry.second;
-      if (id == Boundary::dirichlet) {
-        dst.local_element(i) = src.local_element(i);
-      }
-    }
+    mg_transfer_energy_.build(offline_data_->dof_handler(), level_matrix_free_);
   }
 
 
@@ -383,7 +303,7 @@ namespace ryujin
             smoother_data(0, level_matrix_free_.max_level());
 
         level_velocity_matrices_.resize(0, level_matrix_free_.max_level());
-        mg_transfer_.interpolate_to_mg(
+        mg_transfer_velocity_.interpolate_to_mg(
             offline_data_->dof_handler(), level_density_, density_);
 
         for (unsigned int level = level_matrix_free_.min_level();
@@ -401,7 +321,8 @@ namespace ryujin
           smoother_data[level].degree = 3;
           smoother_data[level].eig_cg_n_iterations = 10;
         }
-        mg_smoother_.initialize(level_velocity_matrices_, smoother_data);
+        mg_smoother_velocity_.initialize(level_velocity_matrices_,
+                                         smoother_data);
       }
 
       LIKWID_MARKER_STOP("time_step_0");
@@ -424,16 +345,21 @@ namespace ryujin
 
       MGCoarseGridApplySmoother<LinearAlgebra::distributed::BlockVector<Number>>
           mg_coarse;
-      mg_coarse.initialize(mg_smoother_);
+      mg_coarse.initialize(mg_smoother_velocity_);
       mg::Matrix<LinearAlgebra::distributed::BlockVector<Number>> mg_matrix(
           level_velocity_matrices_);
 
       Multigrid<LinearAlgebra::distributed::BlockVector<Number>> mg(
-          mg_matrix, mg_coarse, mg_transfer_, mg_smoother_, mg_smoother_);
+          mg_matrix,
+          mg_coarse,
+          mg_transfer_velocity_,
+          mg_smoother_velocity_,
+          mg_smoother_velocity_);
       PreconditionMG<dim,
                      LinearAlgebra::distributed::BlockVector<Number>,
                      MGTransferVelocity<dim, Number>>
-          preconditioner(offline_data_->dof_handler(), mg, mg_transfer_);
+          preconditioner(
+              offline_data_->dof_handler(), mg, mg_transfer_velocity_);
 
       SolverControl solver_control(1000,
                                    (tolerance_linfty_norm_
@@ -572,6 +498,38 @@ namespace ryujin
        */
       affine_constraints.set_zero(internal_energy_rhs_);
 
+      /*
+       * Update MG matrices all 4 time steps; this is a balance because more
+       * refreshes will render the approximation better, at some additional
+       * cost.
+       */
+      if (cycle % 4 == 1) {
+        MGLevelObject<typename PreconditionChebyshev<
+            EnergyMatrix<dim, Number>,
+            LinearAlgebra::distributed::Vector<Number>>::AdditionalData>
+            smoother_data(0, level_matrix_free_.max_level());
+
+        level_energy_matrices_.resize(0, level_matrix_free_.max_level());
+
+        for (unsigned int level = level_matrix_free_.min_level();
+             level <= level_matrix_free_.max_level();
+             ++level) {
+          level_energy_matrices_[level].initialize(
+              *offline_data_,
+              level_matrix_free_[level],
+              level_density_[level],
+              theta_ * tau_ * problem_description_->cv_inverse_kappa(),
+              level);
+          level_energy_matrices_[level].compute_diagonal(
+              smoother_data[level].preconditioner);
+          smoother_data[level].smoothing_range = 15.;
+          smoother_data[level].degree = 3;
+          smoother_data[level].eig_cg_n_iterations = 10;
+        }
+        mg_smoother_energy_.initialize(level_energy_matrices_, smoother_data);
+      }
+
+
       LIKWID_MARKER_STOP("time_step_n_2");
     }
 
@@ -583,11 +541,29 @@ namespace ryujin
 
       LIKWID_MARKER_START("time_step_n_3");
 
-      LinearOperator<scalar_type, scalar_type> internal_energy_operator;
-      internal_energy_operator.vmult = [this](scalar_type &dst,
-                                              const scalar_type &src) {
-        internal_energy_vmult<scalar_type>(dst, src);
-      };
+      EnergyMatrix<dim, Number> energy_operator;
+      energy_operator.initialize(*offline_data_,
+                                 matrix_free_,
+                                 density_,
+                                 theta_ * tau_ *
+                                     problem_description_->cv_inverse_kappa());
+
+      MGCoarseGridApplySmoother<LinearAlgebra::distributed::Vector<Number>>
+          mg_coarse;
+      mg_coarse.initialize(mg_smoother_energy_);
+      mg::Matrix<LinearAlgebra::distributed::Vector<Number>> mg_matrix(
+          level_energy_matrices_);
+
+      Multigrid<LinearAlgebra::distributed::Vector<Number>> mg(
+          mg_matrix,
+          mg_coarse,
+          mg_transfer_energy_,
+          mg_smoother_energy_,
+          mg_smoother_energy_);
+      PreconditionMG<dim,
+                     LinearAlgebra::distributed::Vector<Number>,
+                     MGTransferEnergy<dim, Number>>
+          preconditioner(offline_data_->dof_handler(), mg, mg_transfer_energy_);
 
       SolverControl solver_control(1000,
                                    (tolerance_linfty_norm_
@@ -596,10 +572,10 @@ namespace ryujin
                                        tolerance_);
 
       SolverCG<scalar_type> solver(solver_control);
-      solver.solve(internal_energy_operator,
+      solver.solve(energy_operator,
                    internal_energy_,
                    internal_energy_rhs_,
-                   diagonal_matrix);
+                   preconditioner);
 
       /* update exponential moving average */
       n_iterations_internal_energy_ = 0.9 * n_iterations_internal_energy_ +

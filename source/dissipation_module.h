@@ -123,16 +123,6 @@ namespace ryujin
 
     //@}
     /**
-     * @name Matrix Free solver
-     */
-    //@{
-
-    template <typename VectorType>
-    void internal_energy_vmult(VectorType &dst, const VectorType &src) const;
-
-
-    //@}
-    /**
      * @name Internal data
      */
     //@{
@@ -170,10 +160,12 @@ namespace ryujin
     ACCESSOR_READ_ONLY(t_interp)
 
     dealii::MGLevelObject<dealii::MatrixFree<dim, Number>> level_matrix_free_;
-    dealii::MGLevelObject<scalar_type> level_density_;
-    MGTransferVelocity<dim, Number> mg_transfer_;
-    dealii::MGLevelObject<VelocityMatrix<dim, Number>> level_velocity_matrices_;
     dealii::MGConstrainedDoFs mg_constrained_dofs_;
+    dealii::MGLevelObject<scalar_type> level_density_;
+    MGTransferVelocity<dim, Number> mg_transfer_velocity_;
+    dealii::MGLevelObject<VelocityMatrix<dim, Number>> level_velocity_matrices_;
+    MGTransferEnergy<dim, Number> mg_transfer_energy_;
+    dealii::MGLevelObject<EnergyMatrix<dim, Number>> level_energy_matrices_;
 
     dealii::mg::SmootherRelaxation<
         dealii::PreconditionChebyshev<
@@ -181,7 +173,14 @@ namespace ryujin
             dealii::LinearAlgebra::distributed::BlockVector<Number>,
             DiagonalMatrix<dim, Number>>,
         dealii::LinearAlgebra::distributed::BlockVector<Number>>
-        mg_smoother_;
+        mg_smoother_velocity_;
+
+    dealii::mg::SmootherRelaxation<
+        dealii::PreconditionChebyshev<
+            EnergyMatrix<dim, Number>,
+            dealii::LinearAlgebra::distributed::Vector<Number>>,
+        dealii::LinearAlgebra::distributed::Vector<Number>>
+        mg_smoother_energy_;
 
     //@}
   };
