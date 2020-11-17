@@ -474,11 +474,77 @@ namespace ryujin
     betaij_matrix_.update_ghost_rows();
     mass_matrix_.update_ghost_rows();
     cij_matrix_.update_ghost_rows();
+
+    /* Populate boundary map: */
+
+    boundary_map_ = construct_boundary_map(dof_handler_.begin_active(),
+                                           dof_handler_.end());
   }
 
 
   template <int dim, typename Number>
-  void OfflineData<dim, Number>::create_boundary_map()
+  void OfflineData<dim, Number>::create_multigrid_data()
+  {
+#ifdef DEBUG_OUTPUT
+    std::cout << "OfflineData<dim, Number>::compute_boundary_map()" << std::endl;
+#endif
+
+    dof_handler_.distribute_mg_dofs();
+
+    const auto n_levels = dof_handler_.get_triangulation().n_global_levels();
+
+    AffineConstraints level_constraints;
+    // TODO not yet thread-parallel and without periodicity
+
+    level_lumped_mass_matrix_.resize(n_levels);
+    for (unsigned int level = 0; level < n_levels; ++level) {
+      IndexSet relevant_dofs;
+      dealii::DoFTools::extract_locally_relevant_level_dofs(
+          dof_handler_, level, relevant_dofs);
+      level_lumped_mass_matrix_[level].reinit(
+          dof_handler_.locally_owned_mg_dofs(level),
+          relevant_dofs,
+          lumped_mass_matrix_.get_mpi_communicator());
+      std::vector<types::global_dof_index> dof_indices(
+          dof_handler_.get_fe().dofs_per_cell);
+      Vector<Number> mass_values(dof_handler_.get_fe().dofs_per_cell);
+      FEValues<dim> fe_values(discretization_->mapping(),
+                              discretization_->finite_element(),
+                              discretization_->quadrature(),
+                              update_values | update_JxW_values);
+      for (const auto &cell : dof_handler_.cell_iterators_on_level(level))
+        // TODO for assembly with dealii::SparseMatrix and local
+        // numbering this probably has to read !cell->is_artificial()
+        if (cell->is_locally_owned_on_level()) {
+          fe_values.reinit(cell);
+          for (unsigned int i = 0; i < mass_values.size(); ++i) {
+            double sum = 0;
+            for (unsigned int q = 0; q < fe_values.n_quadrature_points; ++q)
+              sum += fe_values.shape_value(i, q) * fe_values.JxW(q);
+            mass_values(i) = sum;
+          }
+          cell->get_mg_dof_indices(dof_indices);
+          level_constraints.distribute_local_to_global(
+              mass_values, dof_indices, level_lumped_mass_matrix_[level]);
+        }
+      level_lumped_mass_matrix_[level].compress(VectorOperation::add);
+    }
+
+    /* Populate boundary map: */
+
+    level_boundary_map_.resize(n_levels);
+    for (unsigned int level = 0; level < n_levels; ++level) {
+      level_boundary_map_[level] = construct_boundary_map(
+          dof_handler_.begin(level), dof_handler_.end(level)); // CHECK
+    }
+  }
+
+
+  template <int dim, typename Number>
+  template <typename ITERATOR1, typename ITERATOR2>
+  typename OfflineData<dim, Number>::boundary_map_type
+  OfflineData<dim, Number>::construct_boundary_map(const ITERATOR1 &begin,
+                                                   const ITERATOR2 &end) const
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "OfflineData<dim, Number>::compute_boundary_map()" << std::endl;
@@ -499,12 +565,13 @@ namespace ryujin
     const unsigned int dofs_per_cell =
         discretization_->finite_element().dofs_per_cell;
 
-    const auto begin = dof_handler_.begin_active();
-    const auto end = dof_handler_.end();
+    const auto support_points =
+        discretization_->finite_element().get_unit_support_points();
+
     for (auto cell = begin; cell != end; ++cell) {
 
 #ifdef DEAL_II_WITH_TRILINOS
-      if (!cell->is_locally_owned())
+      if (!cell->is_locally_owned_on_level()) // CHECK
         continue;
 #else
       /*
@@ -512,12 +579,12 @@ namespace ryujin
        * compress(VectorOperation::add) available. In this case just
        * assemble contributions over the locally
        */
-      if (cell->is_artificial())
+      if (cell->is_artificial()) // CHECK
         continue;
 #endif
 
       local_dof_indices.resize(dofs_per_cell);
-      cell->get_dof_indices(local_dof_indices);
+      cell->get_active_or_mg_dof_indices(local_dof_indices); // CHECK
 
       for (auto f : GeometryInfo<dim>::face_indices()) {
         const auto face = cell->face(f);
@@ -542,16 +609,9 @@ namespace ryujin
           const auto global_index = local_dof_indices[j];
           const auto index = scalar_partitioner_->global_to_local(global_index);
 
-          /*
-           * This is a bloody hack: Use "vertex_dof_index" to retrieve the
-           * vertex associated to the current degree of freedom.
-           */
-          Point<dim> position;
-          for (auto v : GeometryInfo<dim>::vertex_indices())
-            if (cell->vertex_dof_index(v, 0) == global_index) {
-              position = cell->vertex(v);
-              break;
-            }
+          Point<dim> position =
+              discretization_->mapping().transform_unit_to_real_cell(
+                  cell, support_points[j]);
 
           preliminary_map.insert({index, {normal, id, position}});
         } /* j */
@@ -567,11 +627,11 @@ namespace ryujin
      * 85 degrees or less.
      */
 
-    boundary_map_.clear();
+    decltype(boundary_map_) filtered_map;
     std::set<dealii::types::global_dof_index> boundary_dofs;
     for (auto entry : preliminary_map) {
       bool inserted = false;
-      const auto range = boundary_map_.equal_range(entry.first);
+      const auto range = filtered_map.equal_range(entry.first);
       for (auto it = range.first; it != range.second; ++it) {
         const auto &[new_normal, new_b_id, new_point] = entry.second;
         auto &[normal, b_id, point] = it->second;
@@ -588,69 +648,17 @@ namespace ryujin
         }
       }
       if (!inserted)
-        boundary_map_.insert(entry);
+        filtered_map.insert(entry);
     }
 
     /* Normalize all normal vectors: */
 
-    for (auto &it : boundary_map_) {
+    for (auto &it : filtered_map) {
       auto &[normal, id, _] = it.second;
       normal /= (normal.norm() + std::numeric_limits<Number>::epsilon());
     }
-  }
 
-
-  template <int dim, typename Number>
-  void OfflineData<dim, Number>::create_multigrid_data()
-  {
-#ifdef DEBUG_OUTPUT
-    std::cout << "OfflineData<dim, Number>::compute_boundary_map()" << std::endl;
-#endif
-
-    dof_handler_.distribute_mg_dofs();
-
-    {
-      AffineConstraints level_constraints;
-      // TODO not yet thread-parallel and without periodicity
-      level_lumped_mass_matrix_.resize(
-          dof_handler_.get_triangulation().n_global_levels());
-      for (unsigned int level = 0; level < level_lumped_mass_matrix_.size();
-           ++level) {
-        IndexSet relevant_dofs;
-        dealii::DoFTools::extract_locally_relevant_level_dofs(
-            dof_handler_, level, relevant_dofs);
-        level_lumped_mass_matrix_[level].reinit(
-            dof_handler_.locally_owned_mg_dofs(level),
-            relevant_dofs,
-            lumped_mass_matrix_.get_mpi_communicator());
-        std::vector<types::global_dof_index> dof_indices(
-            dof_handler_.get_fe().dofs_per_cell);
-        Vector<Number> mass_values(dof_handler_.get_fe().dofs_per_cell);
-        FEValues<dim> fe_values(discretization_->mapping(),
-                                discretization_->finite_element(),
-                                discretization_->quadrature(),
-                                update_values | update_JxW_values);
-        for (const auto &cell : dof_handler_.cell_iterators_on_level(level))
-          // TODO for assembly with dealii::SparseMatrix and local
-          // numbering this probably has to read !cell->is_artificial()
-          if (cell->is_locally_owned_on_level()) {
-            fe_values.reinit(cell);
-            for (unsigned int i = 0; i < mass_values.size(); ++i) {
-              double sum = 0;
-              for (unsigned int q = 0; q < fe_values.n_quadrature_points; ++q)
-                sum += fe_values.shape_value(i, q) * fe_values.JxW(q);
-              mass_values(i) = sum;
-            }
-            cell->get_mg_dof_indices(dof_indices);
-            level_constraints.distribute_local_to_global(
-                mass_values, dof_indices, level_lumped_mass_matrix_[level]);
-          }
-        level_lumped_mass_matrix_[level].compress(VectorOperation::add);
-      }
-    }
-
-    {
-    }
+    return filtered_map;
   }
 
 } /* namespace ryujin */

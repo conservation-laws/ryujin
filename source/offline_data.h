@@ -93,7 +93,6 @@ namespace ryujin
     {
       setup();
       assemble();
-      create_boundary_map();
       create_multigrid_data();
     }
 
@@ -109,16 +108,11 @@ namespace ryujin
     void assemble();
 
     /**
-     * Create boundary map.
-     */
-    void create_boundary_map();
-
-    /**
-     * Create boundary map.
+     * Create multigrid data.
      */
     void create_multigrid_data();
 
-  protected:
+  private:
     dealii::DoFHandler<dim> dof_handler_;
 
     dealii::AffineConstraints<Number> affine_constraints_;
@@ -134,10 +128,12 @@ namespace ryujin
     unsigned int n_locally_owned_;
     unsigned int n_locally_relevant_;
 
-    std::multimap<dealii::types::global_dof_index, boundary_description>
-        boundary_map_;
+    using boundary_map_type =
+        std::multimap<dealii::types::global_dof_index, boundary_description>;
 
-    std::vector<decltype(boundary_map_)> level_boundary_map_;
+    boundary_map_type boundary_map_;
+
+    std::vector<boundary_map_type> level_boundary_map_;
 
     dealii::DynamicSparsityPattern sparsity_pattern_;
 
@@ -159,6 +155,15 @@ namespace ryujin
     Number measure_of_omega_;
 
     dealii::SmartPointer<const ryujin::Discretization<dim>> discretization_;
+
+    const MPI_Comm &mpi_communicator_;
+
+    /**
+     * Construct a boundary map for a given set of DoFHandler iterators.
+     */
+    template <typename ITERATOR1, typename ITERATOR2>
+    boundary_map_type construct_boundary_map(const ITERATOR1 &begin,
+                                             const ITERATOR2 &end) const;
 
   protected:
     /**
@@ -295,8 +300,6 @@ namespace ryujin
      * Returns a reference of the underlying Discretization object.
      */
     ACCESSOR_READ_ONLY(discretization)
-
-    const MPI_Comm &mpi_communicator_;
   };
 
 } /* namespace ryujin */
