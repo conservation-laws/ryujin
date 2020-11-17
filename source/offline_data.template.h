@@ -233,7 +233,6 @@ namespace ryujin
 #endif
 
     measure_of_omega_ = 0.;
-    boundary_map_.clear();
 
 #ifdef DEAL_II_WITH_TRILINOS
     /* Variant using TrilinosWrappers::SparseMatrix with global numbering */
@@ -310,14 +309,12 @@ namespace ryujin
       auto &is_locally_owned = copy.is_locally_owned_;
       auto &local_dof_indices = copy.local_dof_indices_;
 
-      auto &local_boundary_map = copy.local_boundary_map_;
       auto &cell_mass_matrix = copy.cell_mass_matrix_;
       auto &cell_betaij_matrix = copy.cell_betaij_matrix_;
       auto &cell_cij_matrix = copy.cell_cij_matrix_;
       auto &cell_measure = copy.cell_measure_;
 
       auto &fe_values = scratch.fe_values_;
-      auto &fe_face_values = scratch.fe_face_values_;
 
 #ifdef DEAL_II_WITH_TRILINOS
       is_locally_owned = cell->is_locally_owned();
@@ -343,7 +340,6 @@ namespace ryujin
       cell->get_dof_indices(local_dof_indices);
 
       /* clear out copy data: */
-      local_boundary_map.clear();
       cell_mass_matrix = 0.;
       cell_betaij_matrix = 0.;
       for (auto &matrix : cell_cij_matrix)
@@ -357,7 +353,6 @@ namespace ryujin
           cell_measure += Number(JxW);
 
         for (unsigned int j = 0; j < dofs_per_cell; ++j) {
-
           const auto value_JxW = fe_values.shape_value(j, q_point) * JxW;
           const auto grad_JxW = fe_values.shape_grad(j, q_point) * JxW;
 
@@ -367,59 +362,18 @@ namespace ryujin
             const auto grad = fe_values.shape_grad(i, q_point);
 
             cell_mass_matrix(i, j) += Number(value * value_JxW);
-
             cell_betaij_matrix(i, j) += Number(grad * grad_JxW);
-
             for (unsigned int d = 0; d < dim; ++d)
               cell_cij_matrix[d](i, j) += Number((value * grad_JxW)[d]);
 
           } /* for i */
         }   /* for j */
       }     /* for q */
-
-      for (auto f : GeometryInfo<dim>::face_indices()) {
-        const auto face = cell->face(f);
-        const auto id = face->boundary_id();
-
-        if (!face->at_boundary())
-          continue;
-
-        fe_face_values.reinit(cell, f);
-        const unsigned int n_face_q_points = scratch.face_quadrature_.size();
-
-        for (unsigned int j = 0; j < dofs_per_cell; ++j) {
-
-          if (!discretization_->finite_element().has_support_on_face(j, f))
-            continue;
-
-          dealii::Tensor<1, dim, Number> normal;
-          for (unsigned int q = 0; q < n_face_q_points; ++q)
-            normal += fe_face_values.normal_vector(q) *
-                      fe_face_values.shape_value(j, q);
-
-          const auto global_index = local_dof_indices[j];
-          const auto index = scalar_partitioner_->global_to_local(global_index);
-
-          /*
-           * This is a bloody hack: Use "vertex_dof_index" to retrieve the
-           * vertex associated to the current degree of freedom.
-           */
-          Point<dim> position;
-          for (auto v : GeometryInfo<dim>::vertex_indices())
-            if (cell->vertex_dof_index(v, 0) == global_index) {
-              position = cell->vertex(v);
-              break;
-            }
-
-          local_boundary_map.insert({index, {normal, id, position}});
-        } /* j */
-      }   /* f */
     };
 
     const auto copy_local_to_global = [&](const auto &copy) {
       const auto &is_locally_owned = copy.is_locally_owned_;
       auto local_dof_indices = copy.local_dof_indices_; /* make a copy */
-      const auto &local_boundary_map = copy.local_boundary_map_;
       const auto &cell_mass_matrix = copy.cell_mass_matrix_;
       const auto &cell_cij_matrix = copy.cell_cij_matrix_;
       const auto &cell_betaij_matrix = copy.cell_betaij_matrix_;
@@ -427,9 +381,6 @@ namespace ryujin
 
       if (!is_locally_owned)
         return;
-
-      boundary_map_.insert(local_boundary_map.begin(),
-                           local_boundary_map.end());
 
 #ifndef DEAL_II_WITH_TRILINOS
       transform_to_local_range(*scalar_partitioner_, local_dof_indices);
@@ -550,8 +501,103 @@ namespace ryujin
       }
     }
 
+#ifdef DEAL_II_WITH_TRILINOS
+    betaij_matrix_.read_in(betaij_matrix_tmp, /*locally_indexed*/ false);
+    mass_matrix_.read_in(mass_matrix_tmp, /*locally_indexed*/ false);
+    cij_matrix_.read_in(cij_matrix_tmp, /*locally_indexed*/ false);
+#else
+    betaij_matrix_.read_in(betaij_matrix_tmp, /*locally_indexed*/ true);
+    mass_matrix_.read_in(mass_matrix_tmp, /*locally_indexed*/ true);
+    cij_matrix_.read_in(cij_matrix_tmp, /*locally_indexed*/ true);
+#endif
+    betaij_matrix_.update_ghost_rows();
+    mass_matrix_.update_ghost_rows();
+    cij_matrix_.update_ghost_rows();
+  }
+
+
+  template <int dim, typename Number>
+  void OfflineData<dim, Number>::create_boundary_map()
+  {
+#ifdef DEBUG_OUTPUT
+    std::cout << "OfflineData<dim, Number>::compute_boundary_map()" << std::endl;
+#endif
+
+    decltype(boundary_map_) preliminary_map;
+
+    std::vector<dealii::types::global_dof_index> local_dof_indices;
+
+    const dealii::QGauss<dim - 1> face_quadrature(3);
+    dealii::FEFaceValues<dim> fe_face_values(discretization_->mapping(),
+                                             discretization_->finite_element(),
+                                             face_quadrature,
+                                             dealii::update_normal_vectors |
+                                                 dealii::update_values |
+                                                 dealii::update_JxW_values);
+
+    const unsigned int dofs_per_cell =
+        discretization_->finite_element().dofs_per_cell;
+
+    auto cell = dof_handler_.begin_active();
+    for (; cell != dof_handler_.end(); ++cell) {
+
+#ifdef DEAL_II_WITH_TRILINOS
+      if (!cell->is_locally_owned())
+        continue;
+#else
+      /*
+       * When using a local dealii::SparseMatrix<Number> we don not have a
+       * compress(VectorOperation::add) available. In this case just
+       * assemble contributions over the locally
+       */
+      if (cell->is_artificial())
+        continue;
+#endif
+
+      local_dof_indices.resize(dofs_per_cell);
+      cell->get_dof_indices(local_dof_indices);
+
+      for (auto f : GeometryInfo<dim>::face_indices()) {
+        const auto face = cell->face(f);
+        const auto id = face->boundary_id();
+
+        if (!face->at_boundary())
+          continue;
+
+        fe_face_values.reinit(cell, f);
+        const unsigned int n_face_q_points = face_quadrature.size();
+
+        for (unsigned int j = 0; j < dofs_per_cell; ++j) {
+
+          if (!discretization_->finite_element().has_support_on_face(j, f))
+            continue;
+
+          dealii::Tensor<1, dim, Number> normal;
+          for (unsigned int q = 0; q < n_face_q_points; ++q)
+            normal += fe_face_values.normal_vector(q) *
+                      fe_face_values.shape_value(j, q);
+
+          const auto global_index = local_dof_indices[j];
+          const auto index = scalar_partitioner_->global_to_local(global_index);
+
+          /*
+           * This is a bloody hack: Use "vertex_dof_index" to retrieve the
+           * vertex associated to the current degree of freedom.
+           */
+          Point<dim> position;
+          for (auto v : GeometryInfo<dim>::vertex_indices())
+            if (cell->vertex_dof_index(v, 0) == global_index) {
+              position = cell->vertex(v);
+              break;
+            }
+
+          preliminary_map.insert({index, {normal, id, position}});
+        } /* j */
+      }   /* f */
+    }     /* cell */
+
     /*
-     * Update boundary map:
+     * Filter boundary map:
      *
      * At this point we have collected multiple cell contributions for each
      * boundary degree of freedom. We now merge all entries that have the
@@ -559,11 +605,10 @@ namespace ryujin
      * 85 degrees or less.
      */
 
-    const auto temporary_boundary_map = std::move(boundary_map_);
-    boundary_map_.clear();
 
+    boundary_map_.clear();
     std::set<dealii::types::global_dof_index> boundary_dofs;
-    for (auto entry : temporary_boundary_map) {
+    for (auto entry : preliminary_map) {
       bool inserted = false;
       const auto range = boundary_map_.equal_range(entry.first);
       for (auto it = range.first; it != range.second; ++it) {
@@ -588,35 +633,11 @@ namespace ryujin
     /*
      * Normalize all normal vectors:
      */
+
     for (auto &it : boundary_map_) {
       auto &[normal, id, _] = it.second;
       normal /= (normal.norm() + std::numeric_limits<Number>::epsilon());
     }
-
-#ifdef DEBUG
-    /*
-     * Sanity check: The mass matrix must have a stencil with nonzero
-     * entries.
-     */
-// FIXME
-//     for(const auto &entry : mass_matrix_tmp)
-//       Assert(std::abs(entry.value()) > 1.0e-16,
-//              ExcMessage("Stencil with zero mass matrix entries
-//              encountered."));
-#endif
-
-#ifdef DEAL_II_WITH_TRILINOS
-    betaij_matrix_.read_in(betaij_matrix_tmp, /*locally_indexed*/ false);
-    mass_matrix_.read_in(mass_matrix_tmp, /*locally_indexed*/ false);
-    cij_matrix_.read_in(cij_matrix_tmp, /*locally_indexed*/ false);
-#else
-    betaij_matrix_.read_in(betaij_matrix_tmp, /*locally_indexed*/ true);
-    mass_matrix_.read_in(mass_matrix_tmp, /*locally_indexed*/ true);
-    cij_matrix_.read_in(cij_matrix_tmp, /*locally_indexed*/ true);
-#endif
-    betaij_matrix_.update_ghost_rows();
-    mass_matrix_.update_ghost_rows();
-    cij_matrix_.update_ghost_rows();
   }
 
 } /* namespace ryujin */

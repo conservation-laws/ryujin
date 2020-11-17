@@ -93,6 +93,7 @@ namespace ryujin
     {
       setup();
       assemble();
+      create_boundary_map();
     }
 
     /**
@@ -105,6 +106,11 @@ namespace ryujin
      * Assemble all matrices.
      */
     void assemble();
+
+    /**
+     * Create boundary map.
+     */
+    void create_boundary_map();
 
   protected:
     dealii::DoFHandler<dim> dof_handler_;
@@ -276,7 +282,6 @@ namespace ryujin
      */
     ACCESSOR_READ_ONLY(discretization)
 
-  private:
     const MPI_Comm &mpi_communicator_;
   };
 
