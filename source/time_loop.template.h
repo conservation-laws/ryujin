@@ -262,7 +262,7 @@ namespace ryujin
 
         /* Strang's splitting: */
         const auto tau = euler_module.step(U, t);
-        dissipation_module.step(U, t, 2. * tau);
+        dissipation_module.step(U, t, 2. * tau, cycle);
         euler_module.step(U, t + tau, tau);
         t += 2. * tau;
 

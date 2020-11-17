@@ -112,8 +112,8 @@ namespace ryujin
     for (unsigned int level = 0; level < n_levels; ++level) {
       additional_data.mg_level = level;
       AffineConstraints<double> constraints(relevant_sets[level]);
-      //constraints.add_lines(mg_constrained_dofs_.get_boundary_indices(level));
-      //constraints.merge(mg_constrained_dofs_.get_level_constraints(level));
+      // constraints.add_lines(mg_constrained_dofs_.get_boundary_indices(level));
+      // constraints.merge(mg_constrained_dofs_.get_level_constraints(level));
       constraints.close();
       level_matrix_free_[level].reinit(
           offline_data_->discretization().mapping(),
@@ -124,9 +124,8 @@ namespace ryujin
       level_matrix_free_[level].initialize_dof_vector(level_density_[level]);
     }
 
-    mg_transfer_.build(offline_data_->dof_handler(),
-                       mg_constrained_dofs_,
-                       level_matrix_free_);
+    mg_transfer_.build(
+        offline_data_->dof_handler(), mg_constrained_dofs_, level_matrix_free_);
   }
 
 
@@ -212,8 +211,10 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  Number
-  DissipationModule<dim, Number>::step(vector_type &U, Number t, Number tau)
+  Number DissipationModule<dim, Number>::step(vector_type &U,
+                                              Number t,
+                                              Number tau,
+                                              unsigned int cycle)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "DissipationModule<dim, Number>::step()" << std::endl;
@@ -238,7 +239,7 @@ namespace ryujin
      * Set time step size and record the time t_{n+1/2} for the computed
      * velocity.
      *
-     * This is a but ugly: tau_ is internally used in velocity_vmult() and
+     * This is a bit ugly: tau_ is internally used in velocity_vmult() and
      * internal_energy_vmult().
      */
 
@@ -369,6 +370,12 @@ namespace ryujin
 
       diagonal_matrix.reinit(lumped_mass_matrix, density_, affine_constraints);
 
+      /*
+       * Update MG matrices all 4 time steps; this is a balance because more
+       * refreshes will render the approximation better, at some additional
+       * cost.
+       */
+      if (cycle % 4 == 1) {
         MGLevelObject<typename PreconditionChebyshev<
             VelocityMatrix<dim, Number>,
             LinearAlgebra::distributed::BlockVector<Number>,
@@ -392,9 +399,10 @@ namespace ryujin
               smoother_data[level].preconditioner);
           smoother_data[level].smoothing_range = 15.;
           smoother_data[level].degree = 3;
-          smoother_data[level].eig_cg_n_iterations = 15;
+          smoother_data[level].eig_cg_n_iterations = 10;
         }
         mg_smoother_.initialize(level_velocity_matrices_, smoother_data);
+      }
 
       LIKWID_MARKER_STOP("time_step_0");
     }

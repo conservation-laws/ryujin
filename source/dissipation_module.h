@@ -107,7 +107,7 @@ namespace ryujin
      *    0), or tau (if tau != 0). Here, tau_max is the computed maximal
      *    time step size and tau is the optional third parameter.
      */
-    Number step(vector_type &U, Number t, Number tau);
+    Number step(vector_type &U, Number t, Number tau, unsigned int cycle);
 
     //@}
 
