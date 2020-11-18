@@ -1028,8 +1028,8 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  void EulerModule<dim, Number>::apply_boundary_conditions(vector_type &U,
-                                                           Number t)
+  void EulerModule<dim, Number>::apply_boundary_conditions(
+      vector_type &U, const vector_type &U_old, Number t)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "EulerModule<dim, Number>::apply_boundary_conditions()"
@@ -1058,24 +1058,77 @@ namespace ryujin
         m -= 1. * (m * normal) * normal;
         for (unsigned int k = 0; k < dim; ++k)
           U_i[k + 1] = m[k];
+        U.write_tensor(U_i, i);
+        continue;
 
       } else if (id == Boundary::no_slip) {
         /* Enforce no-slip conditions: */
         for (unsigned int k = 0; k < dim; ++k)
           U_i[k + 1] = Number(0.);
+        U.write_tensor(U_i, i);
+        continue;
 
       } else if (id == Boundary::dirichlet) {
         /* On Dirichlet boundaries enforce initial conditions: */
         U_i = initial_values_->initial_state(position, t);
+        U.write_tensor(U_i, i);
+        continue;
 
       } else if (id == Boundary::flexible) {
-        const auto U_i_new = initial_values_->initial_state(position, t);
-        const auto m = problem_description_->momentum(U_i_new);
-        if (m * normal < 0.)
-          U_i = U_i_new;
-      }
+        const auto m = problem_description_->momentum(U_i);
 
-      U.write_tensor(U_i, i);
+        /* Set Dirichlet data on inflow boundary: */
+        if (m * normal <= 0.) {
+          U_i = initial_values_->initial_state(position, t);
+          U.write_tensor(U_i, i);
+          continue;
+        }
+
+        const auto a = problem_description_->speed_of_sound(U_i);
+        const auto rho = problem_description_->density(U_i);
+        const auto vn = m * normal / rho;
+
+        /* Do nothing on supersonic outflow boundaries: */
+        if (vn > a) {
+          /* do nothing */
+          continue;
+        }
+
+        /*
+         * Construct left and right eigenvectors b_1 c_1 from an interpolated
+         * state U_i_bar:
+         */
+
+        const auto U_i_old = U_old.get_tensor(i);
+        const auto U_i_bar = 0.5 * (U_i_old + U_i);
+
+        const auto rho_bar = problem_description_->density(U_i_bar);
+        const auto m_bar = problem_description_->momentum(U_i_bar);
+        const auto v_bar = m_bar / rho_bar;
+        const auto a_bar = problem_description_->speed_of_sound(U_i_bar);
+        const auto gamma = problem_description_->gamma();
+
+        rank1_type b_1;
+        const auto e_k = 0.5 * v_bar.norm_square();
+        b_1[0] = (gamma - 1.) * e_k + a_bar * v_bar * normal;
+        for (unsigned int i = 0; i < dim; ++i)
+          b_1[1 + i] = (1. - gamma) * v_bar[i] - a_bar * normal[i];
+        b_1[dim + 1] = gamma - 1.;
+        b_1 /= 2. * a_bar * a_bar;
+
+        rank1_type c_1;
+        c_1[0] = 1.;
+        for (unsigned int i = 0; i < dim; ++i)
+          c_1[1 + i] = v_bar[i] - a_bar * normal[i];
+        c_1[dim + 1] =
+            a_bar * a_bar / (gamma - 1) + e_k - a_bar * (v_bar * normal);
+
+        /* Replace b_1/c_1 component: */
+        U_i = U_i + c_1 * (b_1 * U_i_old - b_1 * U_i);
+
+        U.write_tensor(U_i, i);
+        continue;
+      }
     }
 
     U.update_ghost_values();
@@ -1092,7 +1145,7 @@ namespace ryujin
 #endif
 
     Number tau_1 = single_step(U, tau_0);
-    apply_boundary_conditions(U, t + tau_1);
+    apply_boundary_conditions(U, temp_euler_, t + tau_1);
     return tau_1;
   }
 
@@ -1112,7 +1165,7 @@ namespace ryujin
 
     /* Step 1: U1 = U_old + tau * L(U_old) */
     Number tau_1 = single_step(U, tau_0);
-    apply_boundary_conditions(U, t + tau_1);
+    apply_boundary_conditions(U, temp_ssp_, t + tau_1);
 
     AssertThrow(tau_1 * cfl_max_ / cfl_update_ >= tau_0,
                 ExcMessage("failed to recover from CFL violation"));
@@ -1136,7 +1189,7 @@ namespace ryujin
     }
 
     U.sadd(Number(1. / 2.), Number(1. / 2.), temp_ssp_);
-    apply_boundary_conditions(U, t + tau_1);
+    apply_boundary_conditions(U, temp_ssp_, t + tau_1);
 
     return tau_1;
   }
@@ -1158,7 +1211,7 @@ namespace ryujin
     /* Step 1: U1 = U_old + tau * L(U_old) at time t + tau_1 */
 
     Number tau_1 = single_step(U, tau_0);
-    apply_boundary_conditions(U, t + tau_1);
+    apply_boundary_conditions(U, temp_ssp_, t + tau_1);
 
     AssertThrow(tau_1 * cfl_max_ / cfl_update_ >= tau_0,
                 ExcMessage("failed to recover from CFL violation"));
@@ -1183,7 +1236,7 @@ namespace ryujin
     }
 
     U.sadd(Number(1. / 4.), Number(3. / 4.), temp_ssp_);
-    apply_boundary_conditions(U, t + 0.5 * tau_1);
+    apply_boundary_conditions(U, temp_ssp_, t + 0.5 * tau_1);
 
     /* Step 3: U_new = 1/3 U_old + 2/3 (U2 + tau L(U2)) at time t + tau_1 */
 
@@ -1204,7 +1257,7 @@ namespace ryujin
     }
 
     U.sadd(Number(2. / 3.), Number(1. / 3.), temp_ssp_);
-    apply_boundary_conditions(U, t + tau_1);
+    apply_boundary_conditions(U, temp_ssp_, t + tau_1);
 
     return tau_1;
   }
