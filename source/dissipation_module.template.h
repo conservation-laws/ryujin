@@ -365,17 +365,37 @@ namespace ryujin
           preconditioner(
               offline_data_->dof_handler(), mg, mg_transfer_velocity_);
 
-      SolverControl solver_control(1000,
-                                   (tolerance_linfty_norm_
-                                        ? velocity_rhs_.linfty_norm()
-                                        : velocity_rhs_.l2_norm()) *
-                                       tolerance_);
-      SolverCG<block_vector_type> solver(solver_control);
-      solver.solve(velocity_operator, velocity_, velocity_rhs_, preconditioner);
+      /*
+       * Multigrid might lack robustness for some cases, so in case it takes
+       * too many iterations we better switch to the more robust plain
+       * conjugate gradient method.
+       */
+      try {
+        SolverControl solver_control(12,
+                                     (tolerance_linfty_norm_
+                                          ? velocity_rhs_.linfty_norm()
+                                          : velocity_rhs_.l2_norm()) *
+                                         tolerance_);
+        SolverCG<block_vector_type> solver(solver_control);
+        solver.solve(
+            velocity_operator, velocity_, velocity_rhs_, preconditioner);
+        /* update exponential moving average */
+        n_iterations_velocity_ =
+            0.9 * n_iterations_velocity_ + 0.1 * solver_control.last_step();
+      } catch (SolverControl::NoConvergence &) {
+        SolverControl solver_control(1000,
+                                     (tolerance_linfty_norm_
+                                          ? velocity_rhs_.linfty_norm()
+                                          : velocity_rhs_.l2_norm()) *
+                                         tolerance_);
+        SolverCG<block_vector_type> solver(solver_control);
+        solver.solve(
+            velocity_operator, velocity_, velocity_rhs_, diagonal_matrix);
+        /* update exponential moving average */
+        n_iterations_velocity_ =
+            0.9 * n_iterations_velocity_ + 0.1 * solver_control.last_step();
+      }
 
-      /* update exponential moving average */
-      n_iterations_velocity_ =
-          0.9 * n_iterations_velocity_ + 0.1 * solver_control.last_step();
 
       LIKWID_MARKER_STOP("time_step_n_1");
     }
@@ -569,21 +589,39 @@ namespace ryujin
                      MGTransferEnergy<dim, float>>
           preconditioner(offline_data_->dof_handler(), mg, mg_transfer_energy_);
 
-      SolverControl solver_control(1000,
-                                   (tolerance_linfty_norm_
-                                        ? internal_energy_rhs_.linfty_norm()
-                                        : internal_energy_rhs_.l2_norm()) *
-                                       tolerance_);
+      try {
+        SolverControl solver_control(15,
+                                     (tolerance_linfty_norm_
+                                          ? internal_energy_rhs_.linfty_norm()
+                                          : internal_energy_rhs_.l2_norm()) *
+                                         tolerance_);
 
-      SolverCG<scalar_type> solver(solver_control);
-      solver.solve(energy_operator,
-                   internal_energy_,
-                   internal_energy_rhs_,
-                   preconditioner);
+        SolverCG<scalar_type> solver(solver_control);
+        solver.solve(energy_operator,
+                     internal_energy_,
+                     internal_energy_rhs_,
+                     preconditioner);
 
-      /* update exponential moving average */
-      n_iterations_internal_energy_ = 0.9 * n_iterations_internal_energy_ +
-                                      0.1 * solver_control.last_step();
+        /* update exponential moving average */
+        n_iterations_internal_energy_ = 0.9 * n_iterations_internal_energy_ +
+                                        0.1 * solver_control.last_step();
+      } catch (SolverControl::NoConvergence &) {
+        SolverControl solver_control(1000,
+                                     (tolerance_linfty_norm_
+                                          ? internal_energy_rhs_.linfty_norm()
+                                          : internal_energy_rhs_.l2_norm()) *
+                                         tolerance_);
+
+        SolverCG<scalar_type> solver(solver_control);
+        solver.solve(energy_operator,
+                     internal_energy_,
+                     internal_energy_rhs_,
+                     diagonal_matrix);
+
+        /* update exponential moving average */
+        n_iterations_internal_energy_ = 0.9 * n_iterations_internal_energy_ +
+                                        0.1 * solver_control.last_step();
+      }
 
       LIKWID_MARKER_STOP("time_step_n_3");
     }
