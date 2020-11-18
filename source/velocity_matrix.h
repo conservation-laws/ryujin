@@ -167,7 +167,7 @@ namespace ryujin
 
       const vector_type *lumped_mass_matrix = nullptr;
       if constexpr (std::is_same<Number, Number2>::value) {
-        Assert(level == numbers::invalid_unsigned_int,
+        Assert(level_ == dealii::numbers::invalid_unsigned_int,
                dealii::ExcInternalError());
         lumped_mass_matrix = &offline_data_->lumped_mass_matrix();
       } else
@@ -573,7 +573,7 @@ namespace ryujin
 
       const vector_type *lumped_mass_matrix = nullptr;
       if constexpr (std::is_same<Number, Number2>::value) {
-        Assert(level == numbers::invalid_unsigned_int,
+        Assert(level_ == dealii::numbers::invalid_unsigned_int,
                dealii::ExcInternalError());
         lumped_mass_matrix = &offline_data_->lumped_mass_matrix();
       } else

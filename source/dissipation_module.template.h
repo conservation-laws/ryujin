@@ -50,7 +50,7 @@ namespace ryujin
                   "Use geometric multigrid for velocity component");
 
     use_gmg_internal_energy_ = false;
-    add_parameter("geometric multigrid internal_energy",
+    add_parameter("geometric multigrid internal energy",
                   use_gmg_internal_energy_,
                   "Use geometric multigrid for internal energy component");
 
@@ -105,7 +105,7 @@ namespace ryujin
 
     /* Initialize multigrid: */
 
-    if(!use_gmg_velocity_ && !use_gmg_internal_energy_)
+    if (!use_gmg_velocity_ && !use_gmg_internal_energy_)
       return;
 
     const unsigned int n_levels =
