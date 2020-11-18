@@ -321,7 +321,7 @@ namespace ryujin
                                                      level);
           level_velocity_matrices_[level].compute_diagonal(
               smoother_data[level].preconditioner);
-          smoother_data[level].smoothing_range = 15.;
+          smoother_data[level].smoothing_range = 8.;
           smoother_data[level].degree = 3;
           smoother_data[level].eig_cg_n_iterations = 10;
         }
@@ -391,9 +391,9 @@ namespace ryujin
         SolverCG<block_vector_type> solver(solver_control);
         solver.solve(
             velocity_operator, velocity_, velocity_rhs_, diagonal_matrix);
-        /* update exponential moving average */
-        n_iterations_velocity_ =
-            0.9 * n_iterations_velocity_ + 0.1 * solver_control.last_step();
+        /* update exponential moving average, counting also GMG iterations */
+        n_iterations_velocity_ = 0.9 * n_iterations_velocity_ +
+                                 0.1 * (12 + solver_control.last_step());
       }
 
 
@@ -618,9 +618,9 @@ namespace ryujin
                      internal_energy_rhs_,
                      diagonal_matrix);
 
-        /* update exponential moving average */
+        /* update exponential moving average, counting also GMG iterations */
         n_iterations_internal_energy_ = 0.9 * n_iterations_internal_energy_ +
-                                        0.1 * solver_control.last_step();
+                                        0.1 * (15 + solver_control.last_step());
       }
 
       LIKWID_MARKER_STOP("time_step_n_3");
