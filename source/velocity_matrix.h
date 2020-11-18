@@ -452,32 +452,6 @@ namespace ryujin
     }
 
     template <typename Number2>
-    void interpolate_to_mg(
-        const dealii::DoFHandler<dim> &dof_handler,
-        dealii::MGLevelObject<vector_type> &dst,
-        const dealii::LinearAlgebra::distributed::BlockVector<Number2> &src)
-        const
-    {
-      if (dst[0].size() == 0)
-        for (unsigned int l = 0; l <= dst.max_level(); ++l) {
-          dst[l].reinit(src.n_blocks());
-          for (unsigned int block = 0; block < src.n_blocks(); ++block)
-            (*level_matrix_free_)[l].initialize_dof_vector(dst[l].block(block));
-          dst[l].collect_sizes();
-        }
-
-      for (unsigned int block = 0; block < src.n_blocks(); ++block) {
-        transfer_.interpolate_to_mg(
-            dof_handler, scalar_vector, src.block(block));
-        for (unsigned int level = scalar_vector.min_level();
-             level < scalar_vector.max_level();
-             ++level)
-          dst[level].block(block).copy_locally_owned_data_from(
-              scalar_vector[level]);
-      }
-    }
-
-    template <typename Number2>
     void
     copy_to_mg(const dealii::DoFHandler<dim> &dof_handler,
                dealii::MGLevelObject<vector_type> &dst,
