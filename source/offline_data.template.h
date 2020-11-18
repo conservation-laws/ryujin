@@ -319,9 +319,10 @@ namespace ryujin
           is_locally_owned = cell->is_locally_owned();
 #else
           /*
-           * When using a local dealii::SparseMatrix<Number> we don not have a
-           * compress(VectorOperation::add) available. In this case just
-           * assemble contributions over the locally
+           * When using a local dealii::SparseMatrix<Number> we don not
+           * have a compress(VectorOperation::add) available. In this case
+           * we assemble contributions over all locally relevant (non
+           * artificial) cells.
            */
           is_locally_owned = !cell->is_artificial();
 #endif
@@ -550,7 +551,7 @@ namespace ryujin
       const Utilities::MPI::Partitioner &partitioner) const
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "OfflineData<dim, Number>::compute_boundary_map()"
+    std::cout << "OfflineData<dim, Number>::construct_boundary_map()"
               << std::endl;
 #endif
 
@@ -580,8 +581,8 @@ namespace ryujin
 #else
       /*
        * When using a local dealii::SparseMatrix<Number> we don not have a
-       * compress(VectorOperation::add) available. In this case just
-       * assemble contributions over the locally
+       * compress(VectorOperation::add) available. In this case we assemble
+       * contributions over all locally relevant (non artificial) cells.
        */
       if ((cell->is_active() && cell->is_artificial()) ||
           cell->level_subdomain_id() ==

@@ -44,10 +44,20 @@ namespace ryujin
       , n_iterations_velocity_(0.)
       , n_iterations_internal_energy_(0.)
   {
+    use_gmg_velocity_ = false;
+    add_parameter("geometric multigrid velocity",
+                  use_gmg_velocity_,
+                  "Use geometric multigrid for velocity component");
+
+    use_gmg_internal_energy_ = false;
+    add_parameter("geometric multigrid internal_energy",
+                  use_gmg_internal_energy_,
+                  "Use geometric multigrid for internal energy component");
+
     tolerance_ = Number(1.0e-12);
     add_parameter("tolerance", tolerance_, "Tolerance for linear solvers");
 
-    tolerance_linfty_norm_ = true;
+    tolerance_linfty_norm_ = false;
     add_parameter("tolerance linfty norm",
                   tolerance_linfty_norm_,
                   "Use the l_infty norm instead of the l_2 norm for the "
@@ -92,6 +102,11 @@ namespace ryujin
     internal_energy_rhs_.reinit(scalar_partitioner);
 
     density_.reinit(scalar_partitioner);
+
+    /* Initialize multigrid: */
+
+    if(!use_gmg_velocity_ && !use_gmg_internal_energy_)
+      return;
 
     const unsigned int n_levels =
         offline_data_->dof_handler().get_triangulation().n_global_levels();
@@ -169,7 +184,6 @@ namespace ryujin
 
     tau_ = tau;
     theta_ = Number(0.5) + shift_ * tau; // FIXME
-    t_interp_ = t + theta_ * tau;
 
     /*
      * Step 0:
@@ -299,7 +313,7 @@ namespace ryujin
        * refreshes will render the approximation better, at some additional
        * cost.
        */
-      if (cycle % 4 == 1) {
+      if (use_gmg_velocity_ && (cycle % 4 == 1)) {
         MGLevelObject<typename PreconditionChebyshev<
             VelocityMatrix<dim, float, Number>,
             LinearAlgebra::distributed::BlockVector<float>,
@@ -347,23 +361,10 @@ namespace ryujin
                                    density_,
                                    theta_ * tau_);
 
-      MGCoarseGridApplySmoother<LinearAlgebra::distributed::BlockVector<float>>
-          mg_coarse;
-      mg_coarse.initialize(mg_smoother_velocity_);
-      mg::Matrix<LinearAlgebra::distributed::BlockVector<float>> mg_matrix(
-          level_velocity_matrices_);
-
-      Multigrid<LinearAlgebra::distributed::BlockVector<float>> mg(
-          mg_matrix,
-          mg_coarse,
-          mg_transfer_velocity_,
-          mg_smoother_velocity_,
-          mg_smoother_velocity_);
-      PreconditionMG<dim,
-                     LinearAlgebra::distributed::BlockVector<float>,
-                     MGTransferVelocity<dim, float>>
-          preconditioner(
-              offline_data_->dof_handler(), mg, mg_transfer_velocity_);
+      const auto tolerance_velocity =
+          (tolerance_linfty_norm_ ? velocity_rhs_.linfty_norm()
+                                  : velocity_rhs_.l2_norm()) *
+          tolerance_;
 
       /*
        * Multigrid might lack robustness for some cases, so in case it takes
@@ -371,31 +372,47 @@ namespace ryujin
        * conjugate gradient method.
        */
       try {
-        SolverControl solver_control(12,
-                                     (tolerance_linfty_norm_
-                                          ? velocity_rhs_.linfty_norm()
-                                          : velocity_rhs_.l2_norm()) *
-                                         tolerance_);
+        if (!use_gmg_velocity_)
+          throw SolverControl::NoConvergence(0, 0.);
+
+        using bvt_float = LinearAlgebra::distributed::BlockVector<float>;
+
+        MGCoarseGridApplySmoother<bvt_float> mg_coarse;
+        mg_coarse.initialize(mg_smoother_velocity_);
+
+        mg::Matrix<bvt_float> mg_matrix(level_velocity_matrices_);
+
+        Multigrid<bvt_float> mg(mg_matrix,
+                                mg_coarse,
+                                mg_transfer_velocity_,
+                                mg_smoother_velocity_,
+                                mg_smoother_velocity_);
+
+        const auto &dof_handler = offline_data_->dof_handler();
+        PreconditionMG<dim, bvt_float, MGTransferVelocity<dim, float>>
+            preconditioner(dof_handler, mg, mg_transfer_velocity_);
+
+        SolverControl solver_control(12, tolerance_velocity);
         SolverCG<block_vector_type> solver(solver_control);
         solver.solve(
             velocity_operator, velocity_, velocity_rhs_, preconditioner);
+
         /* update exponential moving average */
         n_iterations_velocity_ =
             0.9 * n_iterations_velocity_ + 0.1 * solver_control.last_step();
+
       } catch (SolverControl::NoConvergence &) {
-        SolverControl solver_control(1000,
-                                     (tolerance_linfty_norm_
-                                          ? velocity_rhs_.linfty_norm()
-                                          : velocity_rhs_.l2_norm()) *
-                                         tolerance_);
+
+        SolverControl solver_control(1000, tolerance_velocity);
         SolverCG<block_vector_type> solver(solver_control);
         solver.solve(
             velocity_operator, velocity_, velocity_rhs_, diagonal_matrix);
-        /* update exponential moving average, counting also GMG iterations */
-        n_iterations_velocity_ = 0.9 * n_iterations_velocity_ +
-                                 0.1 * (12 + solver_control.last_step());
-      }
 
+        /* update exponential moving average, counting also GMG iterations */
+        n_iterations_velocity_ *= 0.9;
+        n_iterations_velocity_ += 0.1 * (use_gmg_velocity_ ? 12 : 0) +
+                                  0.1 * solver_control.last_step();
+      }
 
       LIKWID_MARKER_STOP("time_step_n_1");
     }
@@ -527,7 +544,7 @@ namespace ryujin
        * refreshes will render the approximation better, at some additional
        * cost.
        */
-      if (cycle % 4 == 1) {
+      if (use_gmg_internal_energy_ && (cycle % 4 == 1)) {
         MGLevelObject<typename PreconditionChebyshev<
             EnergyMatrix<dim, float, Number>,
             LinearAlgebra::distributed::Vector<float>>::AdditionalData>
@@ -553,7 +570,6 @@ namespace ryujin
         mg_smoother_energy_.initialize(level_energy_matrices_, smoother_data);
       }
 
-
       LIKWID_MARKER_STOP("time_step_n_2");
     }
 
@@ -572,30 +588,31 @@ namespace ryujin
                                  theta_ * tau_ *
                                      problem_description_->cv_inverse_kappa());
 
-      MGCoarseGridApplySmoother<LinearAlgebra::distributed::Vector<float>>
-          mg_coarse;
-      mg_coarse.initialize(mg_smoother_energy_);
-      mg::Matrix<LinearAlgebra::distributed::Vector<float>> mg_matrix(
-          level_energy_matrices_);
-
-      Multigrid<LinearAlgebra::distributed::Vector<float>> mg(
-          mg_matrix,
-          mg_coarse,
-          mg_transfer_energy_,
-          mg_smoother_energy_,
-          mg_smoother_energy_);
-      PreconditionMG<dim,
-                     LinearAlgebra::distributed::Vector<float>,
-                     MGTransferEnergy<dim, float>>
-          preconditioner(offline_data_->dof_handler(), mg, mg_transfer_energy_);
+      const auto tolerance_internal_energy =
+          (tolerance_linfty_norm_ ? internal_energy_rhs_.linfty_norm()
+                                  : internal_energy_rhs_.l2_norm()) *
+          tolerance_;
 
       try {
-        SolverControl solver_control(15,
-                                     (tolerance_linfty_norm_
-                                          ? internal_energy_rhs_.linfty_norm()
-                                          : internal_energy_rhs_.l2_norm()) *
-                                         tolerance_);
+        if (!use_gmg_internal_energy_)
+          throw SolverControl::NoConvergence(0, 0.);
 
+        using vt_float = LinearAlgebra::distributed::Vector<float>;
+        MGCoarseGridApplySmoother<vt_float> mg_coarse;
+        mg_coarse.initialize(mg_smoother_energy_);
+        mg::Matrix<vt_float> mg_matrix(level_energy_matrices_);
+
+        Multigrid<vt_float> mg(mg_matrix,
+                               mg_coarse,
+                               mg_transfer_energy_,
+                               mg_smoother_energy_,
+                               mg_smoother_energy_);
+
+        const auto &dof_handler = offline_data_->dof_handler();
+        PreconditionMG<dim, vt_float, MGTransferEnergy<dim, float>>
+            preconditioner(dof_handler, mg, mg_transfer_energy_);
+
+        SolverControl solver_control(15, tolerance_internal_energy);
         SolverCG<scalar_type> solver(solver_control);
         solver.solve(energy_operator,
                      internal_energy_,
@@ -605,13 +622,10 @@ namespace ryujin
         /* update exponential moving average */
         n_iterations_internal_energy_ = 0.9 * n_iterations_internal_energy_ +
                                         0.1 * solver_control.last_step();
-      } catch (SolverControl::NoConvergence &) {
-        SolverControl solver_control(1000,
-                                     (tolerance_linfty_norm_
-                                          ? internal_energy_rhs_.linfty_norm()
-                                          : internal_energy_rhs_.l2_norm()) *
-                                         tolerance_);
 
+      } catch (SolverControl::NoConvergence &) {
+
+        SolverControl solver_control(1000, tolerance_internal_energy);
         SolverCG<scalar_type> solver(solver_control);
         solver.solve(energy_operator,
                      internal_energy_,
@@ -619,8 +633,10 @@ namespace ryujin
                      diagonal_matrix);
 
         /* update exponential moving average, counting also GMG iterations */
-        n_iterations_internal_energy_ = 0.9 * n_iterations_internal_energy_ +
-                                        0.1 * (15 + solver_control.last_step());
+        n_iterations_internal_energy_ *= 0.9;
+        n_iterations_internal_energy_ +=
+            0.1 * (use_gmg_internal_energy_ ? 15 : 0) +
+            0.1 * solver_control.last_step();
       }
 
       LIKWID_MARKER_STOP("time_step_n_3");

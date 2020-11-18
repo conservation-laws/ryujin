@@ -117,8 +117,15 @@ namespace ryujin
      */
     //@{
 
+    bool use_gmg_velocity_;
+    ACCESSOR_READ_ONLY(use_gmg_velocity)
+
+    bool use_gmg_internal_energy_;
+    ACCESSOR_READ_ONLY(use_gmg_internal_energy)
+
     Number tolerance_;
     bool tolerance_linfty_norm_;
+
     Number shift_;
 
     //@}
@@ -155,9 +162,6 @@ namespace ryujin
 
     Number tau_;
     Number theta_;
-
-    Number t_interp_;
-    ACCESSOR_READ_ONLY(t_interp)
 
     dealii::MGLevelObject<dealii::MatrixFree<dim, float>> level_matrix_free_;
     dealii::MGConstrainedDoFs mg_constrained_dofs_;

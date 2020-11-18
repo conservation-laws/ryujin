@@ -789,14 +789,15 @@ namespace ryujin
 
     std::ostringstream output;
 
+    /* clang-format off */
     output << std::setprecision(4) << std::endl;
-    output << "Throughput:  (CPU )  "                                    //
-           << std::fixed << cpu_m_dofs_per_sec << " MQ/s  ("             //
-           << std::scientific << 1. / cpu_m_dofs_per_sec * 1.e-6         //
-           << " s/Qdof/cycle)" << std::endl;                             //
-    output << "                     [cpu time skew: "                    //
-           << std::setprecision(2) << std::scientific                    //
-           << cpu_time_statistics.max - cpu_time_statistics.avg << "s (" //
+    output << "Throughput:  (CPU )  "
+           << std::fixed << cpu_m_dofs_per_sec << " MQ/s  ("
+           << std::scientific << 1. / cpu_m_dofs_per_sec * 1.e-6
+           << " s/Qdof/cycle)" << std::endl;
+    output << "                     [cpu time skew: "
+           << std::setprecision(2) << std::scientific
+           << cpu_time_statistics.max - cpu_time_statistics.avg << "s ("
            << std::setprecision(1) << std::setw(4) << std::setfill(' ')
            << std::fixed
            << 100. * (cpu_time_statistics.max - cpu_time_statistics.avg) /
@@ -804,24 +805,29 @@ namespace ryujin
            << "%)]" << std::endl
            << std::endl;
 
-    output << "             (WALL)  "                                         //
-           << std::fixed << wall_m_dofs_per_sec << " MQ/s  ("                 //
-           << std::scientific << 1. / wall_m_dofs_per_sec * 1.e-6             //
-           << " s/Qdof/cycle)  ("                                             //
-           << std::fixed << ((double)cycle) / wall_time                       //
-           << " cycles/s)  (avg dt = "                                        //
-           << std::scientific << t / ((double)cycle)                          //
-           << ")" << std::endl;                                               //
-    output << "                     [ "                                       //
-           << std::setprecision(0) << std::fixed << euler_module.n_restarts() //
+    output << "             (WALL)  "
+           << std::fixed << wall_m_dofs_per_sec << " MQ/s  ("
+           << std::scientific << 1. / wall_m_dofs_per_sec * 1.e-6
+           << " s/Qdof/cycle)  ("
+           << std::fixed << ((double)cycle) / wall_time
+           << " cycles/s)  (avg dt = "
+           << std::scientific << t / ((double)cycle)
+           << ")" << std::endl;
+
+    output << "                     [ "
+           << std::setprecision(0) << std::fixed << euler_module.n_restarts()
            << " rsts   (" << std::setprecision(2) << std::scientific
            << euler_module.n_restarts() / ((double)cycle) << " rsts/cycle) ]";
-    output << "[ "                                                         //
-           << std::setprecision(2) << std::fixed                           //
-           << dissipation_module.n_iterations_velocity() << " GMG vel -- " //
-           << dissipation_module.n_iterations_internal_energy()            //
-           << " GMG int ]" << std::endl
+
+    output << "[ "
+           << std::setprecision(2) << std::fixed
+           << dissipation_module.n_iterations_velocity()
+           << (dissipation_module.use_gmg_velocity() ? " GMG vel -- " : " CG vel -- ")
+           << dissipation_module.n_iterations_internal_energy()
+           << (dissipation_module.use_gmg_internal_energy() ? " GMG int ]" : " CG int ]")
+           << std::endl
            << std::endl;
+    /* clang-format on */
 
     /* and print an ETA */
     unsigned int eta =
