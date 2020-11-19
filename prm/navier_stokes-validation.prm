@@ -57,7 +57,11 @@ subsection F - EulerModule
 end
 
 subsection G - DissipationModule
-  set tolerance = 1e-16
+  set tolerance                           = 1e-16
+  set tolerance linfty norm               = false
+
+  set geometric multigrid velocity        = false
+  set geometric multigrid internal energy = false
 end
 
 subsection I - IntegralQuantities

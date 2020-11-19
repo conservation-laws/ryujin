@@ -1,0 +1,370 @@
+# Listing of Parameters
+# ---------------------
+subsection A - TimeLoop
+  # Base name for all output files
+  set basename                     = cylinder
+
+  # Write out checkpoints to resume an interrupted computation at output
+  # granularity intervals. The frequency is determined by "output granularity"
+  # times "output checkpoint multiplier"
+  set enable checkpointing         = false
+
+  # Flag to control whether we compute the Linfty Linf_norm of the difference
+  # to an analytic solution. Implemented only for certain initial state
+  # configurations.
+  set enable compute error         = false
+
+  # Flag to control whether we compute quantities of interest. The frequency
+  # how often quantities are logged is determined by "output granularity"
+  # times "output quantities multiplier"
+  set enable compute quantities    = false
+
+  # Write out cutplanes pvtu records. The frequency is determined by "output
+  # granularity" times "output cutplanes multiplier"
+  set enable output cutplanes      = true
+
+  # Write out full pvtu records. The frequency is determined by "output
+  # granularity" times "output full multiplier"
+  set enable output full           = true
+
+  # Final time
+  set final time                   = 5
+
+  # Multiplicative modifier applied to "output granularity" that determines
+  # the checkpointing granularity
+  set output checkpoint multiplier = 1
+
+  # Multiplicative modifier applied to "output granularity" that determines
+  # the cutplanes pvtu writeout granularity
+  set output cutplanes multiplier  = 1
+
+  # Multiplicative modifier applied to "output granularity" that determines
+  # the full pvtu writeout granularity
+  set output full multiplier       = 1
+
+  # The output granularity specifies the time interval after which output
+  # routines are run. Further modified by "*_multiplier" options
+  set output granularity           = 0.01
+
+  # Multiplicative modifier applied to "output granularity" that determines
+  # the writeout granularity for quantities of interest
+  set output quantities multiplier = 1
+
+  # Resume an interrupted computation
+  set resume                       = false
+
+  # number of cycles after which output statistics are recomputed and printed
+  # on the terminal
+  set terminal update interval     = 10
+end
+
+
+subsection B - ProblemDescription
+  # Description - valid options are "Euler" and "Navier Stokes"
+  set description = Euler
+
+  # Euler: Ratio of specific heats
+  set gamma       = 1.4
+
+  # Navier Stokes: Scaled thermal conductivity c_v^{-1} kappa
+  set kappa       = 0.0186667
+
+  # Navier Stokes: Bulk viscosity
+  set lambda      = 0
+
+  # Navier Stokes: Shear viscosity
+  set mu          = 0.001
+end
+
+
+subsection C - Discretization
+  # Name of the geometry used to create the mesh. Valid names are given by any
+  # of the subsections defined below.
+  set geometry            = cylinder
+
+  # Strength of mesh distortion
+  set mesh distortion     = 0
+
+  # number of refinement of global refinement steps
+  set mesh refinement     = 5
+
+  # try to equalize workload by repartitioning the mesh
+  set mesh repartitioning = true
+
+
+  subsection airfoil
+    # position of airfoil center in the mesh
+    set airfoil center                      = -0.5, 0
+
+    # length of airfoil (leading to trailing edge)
+    set airfoil length                      = 2
+
+    # airfoil type and serial number
+    set airfoil type                        = NASA SC(2) 0714
+
+    # number of anisotropic pre refinement steps for the airfoil
+    set anisotropic pre refinement airfoil  = 1
+
+    # number of anisotropic pre refinement steps for the blunt trailing edge
+    # cell
+    set anisotropic pre refinement trailing = 3
+
+    # graded mesh: regularization parameter
+    set grading epsilon                     = 0.02
+
+    # graded mesh: exponent
+    set grading exponent                    = 5.5
+
+    # height of computational domain
+    set height                              = 6
+
+    # center position of airfoil for sampling psi
+    set psi center                          = 0.05, 0
+
+    # Scaling parameter for averages in curved nose region, can be adjusted by
+    # hand to equliabrate the size of faces at the nose part of the airfoil
+    set psi ratio                           = 0.3
+
+    # number of samples used for generating spline psi
+    set psi samples                         = 100
+
+    # number of subdivisions in z direction
+    set subdivisions z                      = 2
+
+    # width of computational domain
+    set width                               = 1
+  end
+
+  subsection cylinder
+    # height of computational domain
+    set height          = 2
+
+    # length of computational domain
+    set length          = 4
+
+    # diameter of immersed cylinder
+    set object diameter = 0.5
+
+    # x position of immersed cylinder center point
+    set object position = 0.6
+  end
+
+  subsection shocktube
+    # pull back of grading manifold
+    set grading pull back    = x;y
+
+    # push forward of grading manifold
+    set grading push forward = x;y
+
+    # height of computational domain
+    set height               = 0.5
+
+    # length of computational domain
+    set length               = 1
+
+    # number of subdivisions in x direction
+    set subdivisions x       = 2
+
+    # number of subdivisions in y direction
+    set subdivisions y       = 1
+  end
+
+  subsection step
+    # height of computational domain
+    set height        = 1
+
+    # length of computational domain
+    set length        = 3
+
+    # height of step
+    set step height   = 0.2
+
+    # x position of step
+    set step position = 0.6
+  end
+
+  subsection validation
+    # length of computational domain
+    set length   = 20
+
+    # enforce periodicity in y (and z) directions instead of Dirichlet
+    # conditions
+    set periodic = false
+  end
+
+  subsection wall
+    # height of computational domain
+    set height        = 1
+
+    # length of computational domain
+    set length        = 3.2
+
+    # x position of wall
+    set wall position = 0.166667
+  end
+
+end
+
+
+subsection D - OfflineData
+end
+
+
+subsection E - InitialValues
+  # The initial state configuration. Valid names are given by any of the
+  # subsections defined below.
+  set configuration = uniform
+
+  # Initial direction of shock front, contrast, or vortex
+  set direction     = 1, 0
+
+  # Add a random perturbation of the specified magnitude to the initial
+  # state.
+  set perturbation  = 0
+
+  # Initial position of shock front, contrast, or vortex
+  set position      = 1, 0
+
+
+  subsection becker solution
+    # Left limit density
+    set density left            = 1
+
+    # Shear viscosity
+    set mu                      = 0.01
+
+    # Velocity used to apply a Galilean transformation to the otherwise
+    # stationary solution
+    set velocity galilean frame = 0.2
+
+    # Left limit velocity
+    set velocity left           = 1
+
+    # Right limit velocity
+    set velocity right          = 0.259259
+  end
+
+  subsection contrast
+    # Initial 1d primitive state (rho, u, p) on the left
+    set primitive state left  = 1.4, 0, 1
+
+    # Initial 1d primitive state (rho, u, p) on the right
+    set primitive state right = 1.4, 0, 1
+  end
+
+  subsection isentropic vortex
+    # vortex strength beta
+    set beta        = 5
+
+    # Mach number of isentropic vortex
+    set mach number = 2
+  end
+
+  subsection ramp up
+    # Final 1d primitive state (rho, u, p)
+    set primitive state final   = 1.4, 3, 1
+
+    # Initial 1d primitive state (rho, u, p)
+    set primitive state initial = 1.4, 0, 1
+
+    # Time from which on the final state is attained)
+    set time final              = 1
+
+    # Time until which initial state is prescribed
+    set time initial            = 0
+  end
+
+  subsection shockfront
+    # Mach number of shock front (S1, S3 = mach * a_L/R)
+    set mach number     = 2
+
+    # Initial 1d primitive state (rho, u, p) before the shock (to the right)
+    set primitive state = 1.4, 0, 1
+  end
+
+  subsection uniform
+    # Initial 1d primitive state (rho, u, p)
+    set primitive state = 1.4, 3, 1
+  end
+
+end
+
+
+subsection F - EulerModule
+  # Maximal admissible relative CFL constant
+  set cfl max            = 0.9
+
+  # relative CFL constant used for update
+  set cfl update         = 0.8
+
+  # Enforce no-slip boundary conditions. If set to false no-slip boundaries
+  # will be treated as slip boundary conditions
+  set enforce noslip     = true
+
+  # Number of limiter iterations
+  set limiter iterations = 2
+
+  # Approximation order of time stepping method. Switches between Forward
+  # Euler, SSP Heun, and SSP Runge Kutta 3rd order
+  set time step order    = 3
+end
+
+
+subsection G - DissipationModule
+  # Use geometric multigrid for internal energy component
+  set geometric multigrid internal energy = false
+
+  # Use geometric multigrid for velocity component
+  set geometric multigrid velocity        = false
+
+  # Implicit shift applied to the Crank Nicolson scheme
+  set shift                               = 0
+
+  # Tolerance for linear solvers
+  set tolerance                           = 1e-12
+
+  # Use the l_infty norm instead of the l_2 norm for the stopping criterion
+  set tolerance linfty norm               = false
+end
+
+
+subsection H - VTUOutput
+  # A vector of hyperplanes described by an origin, normal vector and a
+  # tolerance. The description is used to only output cells intersecting with
+  # the planes for the "cutplanes" output. Example declaration of two hyper
+  # planes in 3D, one normal to the x-axis and one normal to the y-axis:
+  # "0,0,0 : 1,0,0 : 0.01 ; 0,0,0 : 0,1,0 : 0,01"
+  set output planes  =
+
+  # Beta factor used in the exponential scale for the schlieren plot
+  set schlieren beta = 10
+
+  # If enabled write out one vtu file via MPI IO using write_vtu_in_parallel()
+  # instead of independent output files via write_vtu_with_pvtu_record()
+  set use mpi io     = false
+
+  # Beta factor used in the exponential scale for the vorticity
+  set vorticity beta = 10
+end
+
+
+subsection I - IntegralQuantities
+  # Compute integrals of conserved quantities and write results to the
+  # "[basename]-integral_quantities.log" at specified intervals
+  set record conserved quantities = true
+end
+
+
+subsection I - PointQuantities
+  # List of level set functions describing boundary. The description is used
+  # to only output point values for boundary vertices belonging to a certain
+  # level set.
+  set boundary manifolds = upper_boundary : y - 1.0, lower_boundary : y
+
+  # List of level set functions describing interior manifolds. The description
+  # is used to only output point values for vertices belonging to a certain
+  # level set.
+  set interior manifolds =
+end
+
+
