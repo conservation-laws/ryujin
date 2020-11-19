@@ -21,7 +21,7 @@
 #
 
 subsection A - TimeLoop
-  set basename                     = shocktube
+  set basename                     = graded-enforced-L10
 
   set enable checkpointing         = false
   set enable compute quantities    = true
@@ -73,8 +73,8 @@ subsection E - InitialValues
 end
 
 subsection F - EulerModule
-  set cfl max            = 0.50
-  set cfl update         = 0.45
+  set cfl max            = 0.90
+  set cfl update         = 0.80
 
   set enforce noslip     = true
 
@@ -86,8 +86,8 @@ subsection G - DissipationModule
   set tolerance                           = 1e-10
   set tolerance linfty norm               = false
 
-  set geometric multigrid internal energy = false
-  set geometric multigrid velocity        = false
+  set geometric multigrid internal energy = true
+  set geometric multigrid velocity        = true
 
   set shift                               = 0
 end
