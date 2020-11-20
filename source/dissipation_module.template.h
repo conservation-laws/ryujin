@@ -45,14 +45,55 @@ namespace ryujin
       , n_iterations_internal_energy_(0.)
   {
     use_gmg_velocity_ = false;
-    add_parameter("geometric multigrid velocity",
+    add_parameter("multigrid velocity",
                   use_gmg_velocity_,
                   "Use geometric multigrid for velocity component");
 
+    gmg_max_iter_vel_ = 12;
+    add_parameter("multigrid velocity - max iter",
+                  gmg_max_iter_vel_,
+                  "Maximal number of CG iterations with GMG smoother");
+
+    gmg_smoother_range_vel_ = 8.;
+    add_parameter("multigrid velocity - chebyshev range",
+                  gmg_smoother_range_vel_,
+                  "Chebyshev smoother: eigenvalue range parameter");
+
+    gmg_smoother_max_eig_vel_ = 2.0;
+    add_parameter("multigrid velocity - chebyshev max eig",
+                  gmg_smoother_max_eig_vel_,
+                  "Chebyshev smoother: maximal eigenvalue");
+
     use_gmg_internal_energy_ = false;
-    add_parameter("geometric multigrid internal energy",
+    add_parameter("multigrid energy",
                   use_gmg_internal_energy_,
                   "Use geometric multigrid for internal energy component");
+
+    gmg_max_iter_en_ = 15;
+    add_parameter("multigrid energy - max iter",
+                  gmg_max_iter_en_,
+                  "Maximal number of CG iterations with GMG smoother");
+
+    gmg_smoother_range_en_ = 15.;
+    add_parameter("multigrid energy - chebyshev range",
+                  gmg_smoother_range_en_,
+                  "Chebyshev smoother: eigenvalue range parameter");
+
+    gmg_smoother_max_eig_en_ = 2.0;
+    add_parameter("multigrid energy - chebyshev max eig",
+                  gmg_smoother_max_eig_en_,
+                  "Chebyshev smoother: maximal eigenvalue");
+
+    gmg_smoother_degree_ = 3;
+    add_parameter("multigrid - chebyshev degree",
+                  gmg_smoother_degree_,
+                  "Chebyshev smoother: degree");
+
+    gmg_smoother_n_cg_iter_ = 10;
+    add_parameter("multigrid - chebyshev cg iter",
+                  gmg_smoother_n_cg_iter_,
+                  "Chebyshev smoother: number of CG iterations to approximate "
+                  "eigenvalue");
 
     tolerance_ = Number(1.0e-12);
     add_parameter("tolerance", tolerance_, "Tolerance for linear solvers");
@@ -335,9 +376,11 @@ namespace ryujin
                                                      level);
           level_velocity_matrices_[level].compute_diagonal(
               smoother_data[level].preconditioner);
-          smoother_data[level].smoothing_range = 8.;
-          smoother_data[level].degree = 3;
-          smoother_data[level].eig_cg_n_iterations = 10;
+          smoother_data[level].smoothing_range = gmg_smoother_range_vel_;
+          smoother_data[level].degree = gmg_smoother_degree_;
+          smoother_data[level].eig_cg_n_iterations = gmg_smoother_n_cg_iter_;
+          if (gmg_smoother_n_cg_iter_ == 0)
+            smoother_data[level].max_eigenvalue = gmg_smoother_max_eig_vel_;
         }
         mg_smoother_velocity_.initialize(level_velocity_matrices_,
                                          smoother_data);
@@ -392,7 +435,7 @@ namespace ryujin
         PreconditionMG<dim, bvt_float, MGTransferVelocity<dim, float>>
             preconditioner(dof_handler, mg, mg_transfer_velocity_);
 
-        SolverControl solver_control(12, tolerance_velocity);
+        SolverControl solver_control(gmg_max_iter_vel_, tolerance_velocity);
         SolverCG<block_vector_type> solver(solver_control);
         solver.solve(
             velocity_operator, velocity_, velocity_rhs_, preconditioner);
@@ -410,8 +453,9 @@ namespace ryujin
 
         /* update exponential moving average, counting also GMG iterations */
         n_iterations_velocity_ *= 0.9;
-        n_iterations_velocity_ += 0.1 * (use_gmg_velocity_ ? 12 : 0) +
-                                  0.1 * solver_control.last_step();
+        n_iterations_velocity_ +=
+            0.1 * (use_gmg_velocity_ ? gmg_max_iter_vel_ : 0) +
+            0.1 * solver_control.last_step();
       }
 
       LIKWID_MARKER_STOP("time_step_n_1");
@@ -563,9 +607,11 @@ namespace ryujin
               level);
           level_energy_matrices_[level].compute_diagonal(
               smoother_data[level].preconditioner);
-          smoother_data[level].smoothing_range = 15.;
-          smoother_data[level].degree = 3;
-          smoother_data[level].eig_cg_n_iterations = 10;
+          smoother_data[level].smoothing_range = gmg_smoother_range_en_;
+          smoother_data[level].degree = gmg_smoother_degree_;
+          smoother_data[level].eig_cg_n_iterations = gmg_smoother_n_cg_iter_;
+          if (gmg_smoother_n_cg_iter_ == 0)
+            smoother_data[level].max_eigenvalue = gmg_smoother_max_eig_en_;
         }
         mg_smoother_energy_.initialize(level_energy_matrices_, smoother_data);
       }
@@ -612,7 +658,8 @@ namespace ryujin
         PreconditionMG<dim, vt_float, MGTransferEnergy<dim, float>>
             preconditioner(dof_handler, mg, mg_transfer_energy_);
 
-        SolverControl solver_control(15, tolerance_internal_energy);
+        SolverControl solver_control(gmg_max_iter_en_,
+                                     tolerance_internal_energy);
         SolverCG<scalar_type> solver(solver_control);
         solver.solve(energy_operator,
                      internal_energy_,
@@ -635,7 +682,8 @@ namespace ryujin
         /* update exponential moving average, counting also GMG iterations */
         n_iterations_internal_energy_ *= 0.9;
         n_iterations_internal_energy_ +=
-            0.1 * (use_gmg_internal_energy_ ? 15 : 0) +
+            0.1 *
+                (use_gmg_internal_energy_ ? gmg_max_iter_en_ : 0) +
             0.1 * solver_control.last_step();
       }
 

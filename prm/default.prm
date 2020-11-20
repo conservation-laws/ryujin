@@ -311,20 +311,44 @@ end
 
 
 subsection G - DissipationModule
+  # Chebyshev smoother: number of CG iterations to approximate eigenvalue
+  set multigrid - chebyshev cg iter          = 10
+
+  # Chebyshev smoother: degree
+  set multigrid - chebyshev degree           = 3
+
   # Use geometric multigrid for internal energy component
-  set geometric multigrid internal energy = false
+  set multigrid energy                       = false
+
+  # Chebyshev smoother: maximal eigenvalue
+  set multigrid energy - chebyshev max eig   = 2
+
+  # Chebyshev smoother: eigenvalue range parameter
+  set multigrid energy - chebyshev range     = 15
+
+  # Maximal number of CG iterations with GMG smoother
+  set multigrid energy - max iter            = 15
 
   # Use geometric multigrid for velocity component
-  set geometric multigrid velocity        = false
+  set multigrid velocity                     = false
+
+  # Chebyshev smoother: maximal eigenvalue
+  set multigrid velocity - chebyshev max eig = 2
+
+  # Chebyshev smoother: eigenvalue range parameter
+  set multigrid velocity - chebyshev range   = 8
+
+  # Maximal number of CG iterations with GMG smoother
+  set multigrid velocity - max iter          = 12
 
   # Implicit shift applied to the Crank Nicolson scheme
-  set shift                               = 0
+  set shift                                  = 0
 
   # Tolerance for linear solvers
-  set tolerance                           = 1e-12
+  set tolerance                              = 1e-12
 
   # Use the l_infty norm instead of the l_2 norm for the stopping criterion
-  set tolerance linfty norm               = false
+  set tolerance linfty norm                  = false
 end
 
 
@@ -334,7 +358,7 @@ subsection H - VTUOutput
   # the planes for the "cutplanes" output. Example declaration of two hyper
   # planes in 3D, one normal to the x-axis and one normal to the y-axis:
   # "0,0,0 : 1,0,0 : 0.01 ; 0,0,0 : 0,1,0 : 0,01"
-  set output planes  =
+  set output planes  = 
 
   # Beta factor used in the exponential scale for the schlieren plot
   set schlieren beta = 10
@@ -364,7 +388,7 @@ subsection I - PointQuantities
   # List of level set functions describing interior manifolds. The description
   # is used to only output point values for vertices belonging to a certain
   # level set.
-  set interior manifolds =
+  set interior manifolds = 
 end
 
 

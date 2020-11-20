@@ -83,13 +83,23 @@ subsection F - EulerModule
 end
 
 subsection G - DissipationModule
-  set tolerance                           = 1e-10
-  set tolerance linfty norm               = false
+  set tolerance                              = 1e-10
+  set tolerance linfty norm                  = false
 
-  set geometric multigrid internal energy = true
-  set geometric multigrid velocity        = true
+  set multigrid - chebyshev degree           = 3
+  set multigrid - chebyshev cg iter          = 0
 
-  set shift                               = 0
+  set multigrid energy                       = true
+  set multigrid energy - chebyshev max eig   = 2.0
+  set multigrid energy - chebyshev range     = 15.0
+  set multigrid energy - max iter            = 15
+
+  set multigrid velocity                     = true
+  set multigrid velocity - chebyshev max eig = 2.0
+  set multigrid velocity - chebyshev range   = 8.0
+  set multigrid velocity - max iter          = 12
+
+  set shift                                  = 0
 end
 
 subsection H - VTUOutput

@@ -128,6 +128,15 @@ namespace ryujin
 
     Number shift_;
 
+    unsigned int gmg_max_iter_vel_;
+    unsigned int gmg_max_iter_en_;
+    double gmg_smoother_range_vel_;
+    double gmg_smoother_range_en_;
+    double gmg_smoother_max_eig_vel_;
+    double gmg_smoother_max_eig_en_;
+    unsigned int gmg_smoother_degree_;
+    unsigned int gmg_smoother_n_cg_iter_;
+
     //@}
     /**
      * @name Internal data
