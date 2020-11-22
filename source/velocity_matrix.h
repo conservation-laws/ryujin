@@ -445,8 +445,8 @@ namespace ryujin
         dealii::MGLevelObject<scalar_type> &dst,
         const dealii::LinearAlgebra::distributed::Vector<Number2> &src) const
     {
-      if (dst[0].size() == 0)
-        for (unsigned int l = 0; l <= dst.max_level(); ++l)
+      if (dst[dst.min_level()].size() == 0)
+        for (unsigned int l = dst.min_level(); l <= dst.max_level(); ++l)
           (*level_matrix_free_)[l].initialize_dof_vector(dst[l]);
       transfer_.interpolate_to_mg(dof_handler, dst, src);
     }
@@ -458,8 +458,8 @@ namespace ryujin
                const dealii::LinearAlgebra::distributed::BlockVector<Number2>
                    &src) const
     {
-      if (dst[0].size() == 0)
-        for (unsigned int l = 0; l <= dst.max_level(); ++l) {
+      if (dst[dst.min_level()].size() == 0)
+        for (unsigned int l = dst.min_level(); l <= dst.max_level(); ++l) {
           dst[l].reinit(src.n_blocks());
           for (unsigned int block = 0; block < src.n_blocks(); ++block)
             (*level_matrix_free_)[l].initialize_dof_vector(dst[l].block(block));
@@ -468,8 +468,7 @@ namespace ryujin
 
       for (unsigned int block = 0; block < src.n_blocks(); ++block) {
         transfer_.copy_to_mg(dof_handler, scalar_vector, src.block(block));
-        for (unsigned int level = scalar_vector.min_level();
-             level <= scalar_vector.max_level();
+        for (unsigned int level = dst.min_level(); level <= dst.max_level();
              ++level)
           dst[level].block(block).copy_locally_owned_data_from(
               scalar_vector[level]);
@@ -483,8 +482,7 @@ namespace ryujin
                  const dealii::MGLevelObject<vector_type> &src) const
     {
       for (unsigned int block = 0; block < dst.n_blocks(); ++block) {
-        for (unsigned int level = scalar_vector.min_level();
-             level <= scalar_vector.max_level();
+        for (unsigned int level = src.min_level(); level <= src.max_level();
              ++level)
           scalar_vector[level].copy_locally_owned_data_from(
               src[level].block(block));
@@ -729,8 +727,8 @@ namespace ryujin
             dealii::LinearAlgebra::distributed::Vector<Number>> &dst,
         const dealii::LinearAlgebra::distributed::Vector<Number2> &src) const
     {
-      if (dst[0].size() == 0)
-        for (unsigned int l = 0; l <= dst.max_level(); ++l)
+      if (dst[dst.min_level()].size() == 0)
+        for (unsigned int l = dst.min_level(); l <= dst.max_level(); ++l)
           (*level_matrix_free_)[l].initialize_dof_vector(dst[l]);
       dealii::MGTransferMatrixFree<dim, Number>::copy_to_mg(
           dof_handler, dst, src);

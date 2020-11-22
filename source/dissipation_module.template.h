@@ -95,6 +95,12 @@ namespace ryujin
                   "Chebyshev smoother: number of CG iterations to approximate "
                   "eigenvalue");
 
+    gmg_min_level_ = 0;
+    add_parameter("multigrid - min level",
+                  gmg_min_level_,
+                  "Minimal mesh level to be visited in the geometric multigrid "
+                  "cycle where the coarse grid solver (Chebyshev) is called");
+
     tolerance_ = Number(1.0e-12);
     add_parameter("tolerance", tolerance_, "Tolerance for linear solvers");
 
@@ -151,6 +157,7 @@ namespace ryujin
 
     const unsigned int n_levels =
         offline_data_->dof_handler().get_triangulation().n_global_levels();
+    const unsigned int min_level = std::min(gmg_min_level_, n_levels - 1);
     MGLevelObject<IndexSet> relevant_sets(0, n_levels - 1);
     for (unsigned int level = 0; level < n_levels; ++level)
       DoFTools::extract_locally_relevant_level_dofs(
@@ -167,9 +174,9 @@ namespace ryujin
     additional_data_level.tasks_parallel_scheme =
         MatrixFree<dim, float>::AdditionalData::none;
 
-    level_matrix_free_.resize(0, n_levels - 1);
-    level_density_.resize(0, n_levels - 1);
-    for (unsigned int level = 0; level < n_levels; ++level) {
+    level_matrix_free_.resize(min_level, n_levels - 1);
+    level_density_.resize(min_level, n_levels - 1);
+    for (unsigned int level = min_level; level < n_levels; ++level) {
       additional_data_level.mg_level = level;
       AffineConstraints<double> constraints(relevant_sets[level]);
       // constraints.add_lines(mg_constrained_dofs_.get_boundary_indices(level));
@@ -359,9 +366,11 @@ namespace ryujin
             VelocityMatrix<dim, float, Number>,
             LinearAlgebra::distributed::BlockVector<float>,
             DiagonalMatrix<dim, float>>::AdditionalData>
-            smoother_data(0, level_matrix_free_.max_level());
+            smoother_data(level_matrix_free_.min_level(),
+                          level_matrix_free_.max_level());
 
-        level_velocity_matrices_.resize(0, level_matrix_free_.max_level());
+        level_velocity_matrices_.resize(level_matrix_free_.min_level(),
+                                        level_matrix_free_.max_level());
         mg_transfer_velocity_.interpolate_to_mg(
             offline_data_->dof_handler(), level_density_, density_);
 
@@ -376,11 +385,18 @@ namespace ryujin
                                                      level);
           level_velocity_matrices_[level].compute_diagonal(
               smoother_data[level].preconditioner);
-          smoother_data[level].smoothing_range = gmg_smoother_range_vel_;
-          smoother_data[level].degree = gmg_smoother_degree_;
-          smoother_data[level].eig_cg_n_iterations = gmg_smoother_n_cg_iter_;
-          if (gmg_smoother_n_cg_iter_ == 0)
-            smoother_data[level].max_eigenvalue = gmg_smoother_max_eig_vel_;
+          if (level == level_matrix_free_.min_level()) {
+            smoother_data[level].degree = numbers::invalid_unsigned_int;
+            smoother_data[level].eig_cg_n_iterations =
+                numbers::invalid_unsigned_int;
+            smoother_data[level].smoothing_range = 1e-3;
+          } else {
+            smoother_data[level].degree = gmg_smoother_degree_;
+            smoother_data[level].eig_cg_n_iterations = gmg_smoother_n_cg_iter_;
+            smoother_data[level].smoothing_range = gmg_smoother_range_vel_;
+            if (gmg_smoother_n_cg_iter_ == 0)
+              smoother_data[level].max_eigenvalue = gmg_smoother_max_eig_vel_;
+          }
         }
         mg_smoother_velocity_.initialize(level_velocity_matrices_,
                                          smoother_data);
@@ -429,7 +445,9 @@ namespace ryujin
                                 mg_coarse,
                                 mg_transfer_velocity_,
                                 mg_smoother_velocity_,
-                                mg_smoother_velocity_);
+                                mg_smoother_velocity_,
+                                level_velocity_matrices_.min_level(),
+                                level_velocity_matrices_.max_level());
 
         const auto &dof_handler = offline_data_->dof_handler();
         PreconditionMG<dim, bvt_float, MGTransferVelocity<dim, float>>
@@ -592,9 +610,11 @@ namespace ryujin
         MGLevelObject<typename PreconditionChebyshev<
             EnergyMatrix<dim, float, Number>,
             LinearAlgebra::distributed::Vector<float>>::AdditionalData>
-            smoother_data(0, level_matrix_free_.max_level());
+            smoother_data(level_matrix_free_.min_level(),
+                          level_matrix_free_.max_level());
 
-        level_energy_matrices_.resize(0, level_matrix_free_.max_level());
+        level_energy_matrices_.resize(level_matrix_free_.min_level(),
+                                      level_matrix_free_.max_level());
 
         for (unsigned int level = level_matrix_free_.min_level();
              level <= level_matrix_free_.max_level();
@@ -607,11 +627,18 @@ namespace ryujin
               level);
           level_energy_matrices_[level].compute_diagonal(
               smoother_data[level].preconditioner);
-          smoother_data[level].smoothing_range = gmg_smoother_range_en_;
-          smoother_data[level].degree = gmg_smoother_degree_;
-          smoother_data[level].eig_cg_n_iterations = gmg_smoother_n_cg_iter_;
-          if (gmg_smoother_n_cg_iter_ == 0)
-            smoother_data[level].max_eigenvalue = gmg_smoother_max_eig_en_;
+          if (level == level_matrix_free_.min_level()) {
+            smoother_data[level].degree = numbers::invalid_unsigned_int;
+            smoother_data[level].eig_cg_n_iterations =
+                numbers::invalid_unsigned_int;
+            smoother_data[level].smoothing_range = 1e-3;
+          } else {
+            smoother_data[level].degree = gmg_smoother_degree_;
+            smoother_data[level].eig_cg_n_iterations = gmg_smoother_n_cg_iter_;
+            smoother_data[level].smoothing_range = gmg_smoother_range_en_;
+            if (gmg_smoother_n_cg_iter_ == 0)
+              smoother_data[level].max_eigenvalue = gmg_smoother_max_eig_en_;
+          }
         }
         mg_smoother_energy_.initialize(level_energy_matrices_, smoother_data);
       }
@@ -652,7 +679,9 @@ namespace ryujin
                                mg_coarse,
                                mg_transfer_energy_,
                                mg_smoother_energy_,
-                               mg_smoother_energy_);
+                               mg_smoother_energy_,
+                               level_energy_matrices_.min_level(),
+                               level_energy_matrices_.max_level());
 
         const auto &dof_handler = offline_data_->dof_handler();
         PreconditionMG<dim, vt_float, MGTransferEnergy<dim, float>>
@@ -682,8 +711,7 @@ namespace ryujin
         /* update exponential moving average, counting also GMG iterations */
         n_iterations_internal_energy_ *= 0.9;
         n_iterations_internal_energy_ +=
-            0.1 *
-                (use_gmg_internal_energy_ ? gmg_max_iter_en_ : 0) +
+            0.1 * (use_gmg_internal_energy_ ? gmg_max_iter_en_ : 0) +
             0.1 * solver_control.last_step();
       }
 
