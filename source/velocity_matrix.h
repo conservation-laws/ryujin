@@ -597,7 +597,10 @@ namespace ryujin
 
       /* Fix up constrained degrees of freedom: */
 
-      const auto &boundary_map = offline_data_->boundary_map();
+      const auto &boundary_map =
+          (level_ == dealii::numbers::invalid_unsigned_int)
+              ? offline_data_->boundary_map()
+              : offline_data_->level_boundary_map()[level_];
 
       for (auto entry : boundary_map) {
         const auto i = entry.first;
