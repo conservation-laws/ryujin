@@ -305,7 +305,7 @@ namespace ryujin
       y_lower.front() = 0.;
       y_lower.back() = 0.;
 
-      return {x_upper, y_upper, x_lower, y_lower};
+      return {{x_upper, y_upper, x_lower, y_lower}};
     }
 
 
@@ -345,7 +345,7 @@ namespace ryujin
             -.0013, -.0008, -.0016, -.0035, -.0049, -.0066, -.0085, -.0109,
             -.0137, -.0163};
 
-        return {x_upper, y_upper, x_lower, y_lower};
+        return {{x_upper, y_upper, x_lower, y_lower}};
 
       } else {
 
@@ -389,6 +389,7 @@ namespace ryujin
 
       Assert(0. < x_center && x_center < 1., dealii::ExcInternalError());
 
+#ifdef DEAL_II_WITH_GSL
       CubicSpline upper_airfoil(x_upper, y_upper);
       auto psi_upper =
           [upper_airfoil, x_center, y_center, scaling](const double x_hat) {
@@ -483,7 +484,12 @@ namespace ryujin
         return scaling * front_airfoil.eval(phi);
       };
 
-      return {psi_front, psi_upper, psi_lower};
+      return {{psi_front, psi_upper, psi_lower}};
+#else
+      AssertThrow(false, dealii::
+                  ExcNotImplemented("Airfoil grid needs deal.II with GSL"));
+      return {};
+#endif
     }
 
 
