@@ -15,7 +15,7 @@
 #include "offline_data.h"
 #include "problem_description.h"
 #include "sparse_matrix_simd.h"
-#include "velocity_matrix.h"
+#include "dissipation_gmg_operators.h"
 
 #include <deal.II/base/mg_level_object.h>
 #include <deal.II/base/parameter_acceptor.h>

@@ -3,8 +3,8 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#ifndef VELOCITY_MATRIX_H
-#define VELOCITY_MATRIX_H
+#ifndef DISSIPATION_GMG_OPERATORS_H
+#define DISSIPATION_GMG_OPERATORS_H
 
 #include "introspection.h"
 #include "offline_data.h"
