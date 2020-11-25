@@ -608,9 +608,8 @@ namespace ryujin
           continue;
 
         const auto &[normal, id, position] = entry.second;
-        if (id == Boundary::dirichlet) {
+        if (id == Boundary::dirichlet)
           dst.local_element(i) = src.local_element(i);
-        }
       }
     }
 
@@ -677,10 +676,8 @@ namespace ryujin
           continue;
 
         const auto &[normal, id, position] = entry.second;
-        if (id == Boundary::dirichlet) {
+        if (id == Boundary::dirichlet)
           vector.local_element(i) = 1.;
-          ;
-        }
       }
     }
 
