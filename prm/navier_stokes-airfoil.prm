@@ -1,0 +1,92 @@
+subsection A - TimeLoop
+  set basename                     = airfoil-l37-M0.8
+
+  set enable checkpointing         = false
+  set enable compute quantities    = true
+  set enable output full           = true
+  set enable output cutplanes      = false
+
+  set final time                   = 0.05000
+  set output granularity           = 0.00005
+
+  set output checkpoint multiplier = 10
+  set output full multiplier       = 100
+  set output quantities multiplier = 1
+
+  set resume = false
+end
+
+subsection B - ProblemDescription
+  set description = Navier Stokes
+
+  # Air at 10km height
+  set gamma       = 1.401
+  set mu          = 1.458e-5
+  set lambda      = 0
+  set kappa       = 2.798e-5
+end
+
+subsection C - Discretization
+  set geometry            = airfoil
+  set mesh refinement     = 7
+
+  subsection airfoil
+    set airfoil type                        = NASA SC(2) 0714
+    set airfoil center                      = -0.50, 0.
+    set airfoil length                      =  2.0
+    set psi center                          =  0.05, 0.
+    set psi ratio                           =  0.30
+    set height                              =  6.0
+    set width                               =  4.0
+    set grading exponent                    =  5.5000
+    set grading epsilon                     =  0.0100
+    set anisotropic pre refinement airfoil  =  1
+    set anisotropic pre refinement trailing =  3
+    set subdivisions z                      =  2
+  end
+end
+
+subsection E - InitialValues
+  set configuration = uniform
+  set direction     = 0.9945, 0.1045
+  set position      = 0., 0.
+
+  subsection uniform
+    # Air at 10km height and flow at Mach 0.8
+    # rho [kg/m^3], v [m/s], p [N/m^2]
+    set primitive state = 0.4135, 236.32, 2.650e4
+  end
+end
+
+subsection F - EulerModule
+  set cfl max            = 0.99
+  set cfl update         = 0.90
+
+  set enforce noslip     = true
+
+  set limiter iterations = 3
+  set time step order    = 3
+end
+
+subsection G - DissipationModule
+  set tolerance = 1e-14
+  set tolerance linfty norm = false
+
+  set shift     = 0
+end
+
+subsection H - VTUOutput
+  set use mpi io     = true
+
+  set schlieren beta = 10
+  set vorticity beta = 10
+end
+
+subsection I - IntegralQuantities
+  set record conserved quantities = false
+end
+
+subsection I - PointQuantities
+  set boundary manifolds = airfoil : floor (0.25 * x * x + 0.25 * y * y)
+  set interior manifolds =
+end
