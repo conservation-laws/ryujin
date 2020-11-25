@@ -19,6 +19,20 @@ int main (int argc, char *argv[])
 {
   LSAN_DISABLE
 
+#if defined(DENORMALS_ARE_ZERO) && defined(__x86_64)
+  /*
+   * Change rounding mode on X86-64 architecture: Denormals are flushed to
+   * zero to avoid computing on denormals which can slow down computations
+   * significantly.
+   */
+#define MXCSR_DAZ (1 << 6) /* Enable denormals are zero mode */
+#define MXCSR_FTZ (1 << 15) /* Enable flush to zero mode */
+
+  unsigned int mxcsr = __builtin_ia32_stmxcsr();
+  mxcsr |= MXCSR_DAZ | MXCSR_FTZ;
+  __builtin_ia32_ldmxcsr(mxcsr);
+#endif
+
   dealii::Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv);
   omp_set_num_threads(dealii::MultithreadInfo::n_threads());
 

@@ -13,13 +13,14 @@
 
 #cmakedefine CHECK_BOUNDS
 #cmakedefine DEBUG_OUTPUT
+#cmakedefine DENORMALS_ARE_ZERO
+#cmakedefine FORCE_DEAL_II_SPARSE_MATRIX
+#cmakedefine LIKWID_PERFMON
 #cmakedefine OBSESSIVE_INLINING
 #cmakedefine USE_COMMUNICATION_HIDING
 #cmakedefine USE_CUSTOM_POW
 #cmakedefine USE_SIMD
-#cmakedefine LIKWID_PERFMON
 #cmakedefine VALGRIND_CALLGRIND
-#cmakedefine FORCE_DEAL_II_SPARSE_MATRIX
 
 #if defined(DEBUG) && !defined(CHECK_BOUNDS)
 #define CHECK_BOUNDS
