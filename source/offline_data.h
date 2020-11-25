@@ -113,7 +113,7 @@ namespace ryujin
     void create_multigrid_data();
 
   private:
-    dealii::DoFHandler<dim> dof_handler_;
+    std::unique_ptr<dealii::DoFHandler<dim>> dof_handler_;
 
     dealii::AffineConstraints<Number> affine_constraints_;
 

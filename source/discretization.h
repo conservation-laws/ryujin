@@ -169,6 +169,14 @@ namespace ryujin
 
   public:
     /**
+     * Return a mutable reference to the triangulation.
+     */
+    Triangulation &triangulation()
+    {
+      return *triangulation_;
+    }
+
+    /**
      * Return a read-only const reference to the triangulation.
      */
     ACCESSOR_READ_ONLY(triangulation)

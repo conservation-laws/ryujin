@@ -56,28 +56,32 @@ namespace ryujin
     std::cout << "OfflineData<dim, Number>::setup()" << std::endl;
 #endif
 
-    /* Initialize dof_handler and gather all locally owned indices: */
+    /* Initialize dof handler: */
 
-    dof_handler_.initialize(discretization_->triangulation(),
-                            discretization_->finite_element());
+    if (!dof_handler_)
+      dof_handler_ = std::make_unique<dealii::DoFHandler<dim>>(
+          discretization_->triangulation());
+    auto &dof_handler = *dof_handler_;
+
+    dof_handler.distribute_dofs(discretization_->finite_element());
 
     /*
      * Renumbering:
      */
 
     /* Cuthill McKee actually helps with cache locality. */
-    DoFRenumbering::Cuthill_McKee(dof_handler_);
+    DoFRenumbering::Cuthill_McKee(dof_handler);
 
 #ifdef USE_COMMUNICATION_HIDING
 #ifdef DEBUG
     const unsigned int n_export_indices_preliminary =
 #endif
-        DoFRenumbering::export_indices_first(dof_handler_, mpi_communicator_);
+        DoFRenumbering::export_indices_first(dof_handler, mpi_communicator_);
 #endif
 
 #ifdef USE_SIMD
     n_locally_internal_ =
-        DoFRenumbering::internal_range(dof_handler_, mpi_communicator_);
+        DoFRenumbering::internal_range(dof_handler, mpi_communicator_);
 
     /* Round down to the nearest multiple of the VectorizedArray width: */
     n_locally_internal_ = n_locally_internal_ -
@@ -96,13 +100,13 @@ namespace ryujin
      * pattern:
      */
 
-    const IndexSet &locally_owned = dof_handler_.locally_owned_dofs();
+    const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
 
     IndexSet locally_relevant;
-    DoFTools::extract_locally_relevant_dofs(dof_handler_, locally_relevant);
+    DoFTools::extract_locally_relevant_dofs(dof_handler, locally_relevant);
 
     affine_constraints_.reinit(locally_relevant);
-    DoFTools::make_hanging_node_constraints(dof_handler_, affine_constraints_);
+    DoFTools::make_hanging_node_constraints(dof_handler, affine_constraints_);
 
 #ifndef DEAL_II_WITH_TRILINOS
     AssertThrow(affine_constraints_.n_constraints() == 0,
@@ -119,7 +123,7 @@ namespace ryujin
     if (n_periodic_faces != 0) {
       if constexpr (dim != 1 && std::is_same<Number, double>::value) {
         for (int i = 0; i < dim; ++i)
-          DoFTools::make_periodicity_constraints(dof_handler_,
+          DoFTools::make_periodicity_constraints(dof_handler,
                                                  /*b_id */ Boundary::periodic,
                                                  /*direction*/ i,
                                                  affine_constraints_);
@@ -131,10 +135,10 @@ namespace ryujin
     affine_constraints_.close();
 
     sparsity_pattern_.reinit(
-        dof_handler_.n_dofs(), dof_handler_.n_dofs(), locally_relevant);
+        dof_handler.n_dofs(), dof_handler.n_dofs(), locally_relevant);
 #ifdef DEAL_II_WITH_TRILINOS
     DoFTools::make_sparsity_pattern(
-        dof_handler_, sparsity_pattern_, affine_constraints_, false);
+        dof_handler, sparsity_pattern_, affine_constraints_, false);
 #else
     /*
      * In case we use dealii::SparseMatrix<Number> for assembly we need a
@@ -143,7 +147,7 @@ namespace ryujin
      * but nevertheless we have to add it.
      */
     DoFTools::make_extended_sparsity_pattern(
-        dof_handler_, sparsity_pattern_, affine_constraints_, false);
+        dof_handler, sparsity_pattern_, affine_constraints_, false);
 #endif
 
     /*
@@ -161,7 +165,7 @@ namespace ryujin
      */
 
     {
-      IndexSet additional_dofs(dof_handler_.n_dofs());
+      IndexSet additional_dofs(dof_handler.n_dofs());
 
       for (auto &entry : sparsity_pattern_)
         if (!locally_relevant.is_element(entry.column())) {
@@ -232,6 +236,8 @@ namespace ryujin
     std::cout << "OfflineData<dim, Number>::assemble()" << std::endl;
 #endif
 
+    auto &dof_handler = *dof_handler_;
+
     measure_of_omega_ = 0.;
 
 #ifdef DEAL_II_WITH_TRILINOS
@@ -248,7 +254,7 @@ namespace ryujin
     }
     affine_constraints_assembly.close();
 
-    const IndexSet &locally_owned = dof_handler_.locally_owned_dofs();
+    const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
     TrilinosWrappers::SparsityPattern trilinos_sparsity_pattern;
     trilinos_sparsity_pattern.reinit(
         locally_owned, sparsity_pattern_, mpi_communicator_);
@@ -400,8 +406,8 @@ namespace ryujin
       measure_of_omega_ += cell_measure;
     };
 
-    WorkStream::run(dof_handler_.begin_active(),
-                    dof_handler_.end(),
+    WorkStream::run(dof_handler.begin_active(),
+                    dof_handler.end(),
                     local_assemble_system,
                     copy_local_to_global,
                     AssemblyScratchData<dim>(*discretization_),
@@ -478,7 +484,7 @@ namespace ryujin
     /* Populate boundary map: */
 
     boundary_map_ = construct_boundary_map(
-        dof_handler_.begin_active(), dof_handler_.end(), *scalar_partitioner_);
+        dof_handler.begin_active(), dof_handler.end(), *scalar_partitioner_);
   }
 
 
@@ -490,9 +496,11 @@ namespace ryujin
               << std::endl;
 #endif
 
-    dof_handler_.distribute_mg_dofs();
+    auto &dof_handler = *dof_handler_;
 
-    const auto n_levels = dof_handler_.get_triangulation().n_global_levels();
+    dof_handler.distribute_mg_dofs();
+
+    const auto n_levels = dof_handler.get_triangulation().n_global_levels();
 
     AffineConstraints<float> level_constraints;
     // TODO not yet thread-parallel and without periodicity
@@ -502,20 +510,20 @@ namespace ryujin
     for (unsigned int level = 0; level < n_levels; ++level) {
       IndexSet relevant_dofs;
       dealii::DoFTools::extract_locally_relevant_level_dofs(
-          dof_handler_, level, relevant_dofs);
+          dof_handler, level, relevant_dofs);
       const auto partitioner = std::make_shared<Utilities::MPI::Partitioner>(
-          dof_handler_.locally_owned_mg_dofs(level),
+          dof_handler.locally_owned_mg_dofs(level),
           relevant_dofs,
           lumped_mass_matrix_.get_mpi_communicator());
       level_lumped_mass_matrix_[level].reinit(partitioner);
       std::vector<types::global_dof_index> dof_indices(
-          dof_handler_.get_fe().dofs_per_cell);
-      Vector<Number> mass_values(dof_handler_.get_fe().dofs_per_cell);
+          dof_handler.get_fe().dofs_per_cell);
+      Vector<Number> mass_values(dof_handler.get_fe().dofs_per_cell);
       FEValues<dim> fe_values(discretization_->mapping(),
                               discretization_->finite_element(),
                               discretization_->quadrature(),
                               update_values | update_JxW_values);
-      for (const auto &cell : dof_handler_.cell_iterators_on_level(level))
+      for (const auto &cell : dof_handler.cell_iterators_on_level(level))
         // TODO for assembly with dealii::SparseMatrix and local
         // numbering this probably has to read !cell->is_artificial()
         if (cell->is_locally_owned_on_level()) {
@@ -534,10 +542,8 @@ namespace ryujin
 
       /* Populate boundary map: */
 
-      level_boundary_map_[level] =
-          construct_boundary_map(dof_handler_.begin_mg(level),
-                                 dof_handler_.end_mg(level),
-                                 *partitioner);
+      level_boundary_map_[level] = construct_boundary_map(
+          dof_handler.begin_mg(level), dof_handler.end_mg(level), *partitioner);
     }
   }
 

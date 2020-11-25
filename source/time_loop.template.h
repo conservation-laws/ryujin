@@ -172,11 +172,7 @@ namespace ryujin
 
     /* Prepare data structures: */
 
-    {
-      Scope scope(computing_timer, "initialize data structures");
-      print_info("initializing data structures");
-
-      discretization.prepare();
+    const auto prepare_compute_kernels = [&]() {
       offline_data.prepare();       // Storage: dim + 2 matrices; 2 vectors
       euler_module.prepare();       // Storage: 3 * dim + 9 vectors
       dissipation_module.prepare(); // Storage: 2 * dim + 2 vectors
@@ -186,6 +182,14 @@ namespace ryujin
         integral_quantities.prepare(base_name + "-integral_quantities.log");
 
       print_mpi_partition(logfile);
+    };
+
+    {
+      Scope scope(computing_timer, "initialize data structures");
+      print_info("initializing data structures");
+
+      discretization.prepare();
+      prepare_compute_kernels();
 
       U.reinit(offline_data.vector_partitioner());
 
