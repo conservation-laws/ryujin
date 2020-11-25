@@ -387,8 +387,7 @@ namespace ryujin
               smoother_data[level].preconditioner);
           if (level == level_matrix_free_.min_level()) {
             smoother_data[level].degree = numbers::invalid_unsigned_int;
-            smoother_data[level].eig_cg_n_iterations =
-                numbers::invalid_unsigned_int;
+            smoother_data[level].eig_cg_n_iterations = 500;
             smoother_data[level].smoothing_range = 1e-3;
           } else {
             smoother_data[level].degree = gmg_smoother_degree_;
@@ -629,8 +628,7 @@ namespace ryujin
               smoother_data[level].preconditioner);
           if (level == level_matrix_free_.min_level()) {
             smoother_data[level].degree = numbers::invalid_unsigned_int;
-            smoother_data[level].eig_cg_n_iterations =
-                numbers::invalid_unsigned_int;
+            smoother_data[level].eig_cg_n_iterations = 500;
             smoother_data[level].smoothing_range = 1e-3;
           } else {
             smoother_data[level].degree = gmg_smoother_degree_;
