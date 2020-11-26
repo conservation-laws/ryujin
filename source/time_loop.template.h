@@ -12,6 +12,7 @@
 #include "limiter.h"
 #include "riemann_solver.h"
 #include "scope.h"
+#include "solution_transfer.h"
 #include "time_loop.h"
 
 #include <deal.II/base/logstream.h>
@@ -67,6 +68,11 @@ namespace ryujin
 
     t_final = Number(5.);
     add_parameter("final time", t_final, "Final time");
+
+    add_parameter("refinement timepoints",
+                  t_refinements,
+                  "List of points in (simulation) time at which the mesh will "
+                  "be globally refined");
 
     output_granularity = Number(0.01);
     add_parameter(
@@ -185,7 +191,7 @@ namespace ryujin
     };
 
     {
-      Scope scope(computing_timer, "initialize data structures");
+      Scope scope(computing_timer, "(re)initialize data structures");
       print_info("initializing data structures");
 
       discretization.prepare();
@@ -248,6 +254,36 @@ namespace ryujin
         }
         ++output_cycle;
       }
+
+      /* Perform global refinement: */
+
+      const auto new_end = std::remove_if(
+          t_refinements.begin(), t_refinements.end(), [&](const Number &t_ref) {
+            if (t < t_ref)
+              return false;
+
+            Scope scope(computing_timer, "(re)initialize data structures");
+
+            print_info("performing global refinement");
+
+            SolutionTransfer<dim, Number> solution_transfer(
+                offline_data, problem_description);
+
+            auto &triangulation = discretization.triangulation();
+            for (auto &cell : triangulation.active_cell_iterators())
+              cell->set_refine_flag();
+            triangulation.prepare_coarsening_and_refinement();
+
+            solution_transfer.prepare_for_interpolation(U);
+
+            triangulation.execute_coarsening_and_refinement();
+            prepare_compute_kernels();
+
+            solution_transfer.interpolate(U);
+
+            return true;
+          });
+      t_refinements.erase(new_end, t_refinements.end());
 
       /* Break if we have reached the final time: */
 

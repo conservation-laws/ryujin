@@ -98,6 +98,8 @@ namespace ryujin
 
     Number t_initial;
     Number t_final;
+    std::vector<Number> t_refinements;
+
     Number output_granularity;
 
     bool enable_checkpointing;
