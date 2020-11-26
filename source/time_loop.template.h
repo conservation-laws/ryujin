@@ -184,9 +184,6 @@ namespace ryujin
       dissipation_module.prepare(); // Storage: 2 * dim + 2 vectors
       vtu_output.prepare();         // Storage: dim + 5 vectors
       point_quantities.prepare();   // Storage: 3 * dim + 1 vectors
-      if (enable_compute_quantities)
-        integral_quantities.prepare(base_name + "-integral_quantities.log");
-
       print_mpi_partition(logfile);
     };
 
@@ -196,6 +193,8 @@ namespace ryujin
 
       discretization.prepare();
       prepare_compute_kernels();
+      if (enable_compute_quantities)
+        integral_quantities.prepare(base_name + "-integral_quantities.log");
 
       U.reinit(offline_data.vector_partitioner());
 
