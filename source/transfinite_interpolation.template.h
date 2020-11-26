@@ -448,8 +448,11 @@ namespace ryujin
       // using secant-like methods (one gradient calculation in 3D costs as
       // much as 3 more iterations). this usually happens close to convergence
       // and one more step with the finite-differenced Jacobian leads to
-      // convergence
-      if (must_recompute_jacobian || i % 9 == 0) {
+      // convergence. however, we should not make the update too close to
+      // termination either because of cancellation effects an finite
+      // difference accuracy.
+      if (must_recompute_jacobian ||
+          (residual_norm_square > 1e4 * tolerance && i % 7 == 0)) {
         // if the determinant is zero or negative, the mapping is either not
         // invertible or already has inverted and we are outside the valid
         // chart region. Note that the Jacobian here represents the
@@ -495,11 +498,21 @@ namespace ryujin
       // If alpha got very small, it is likely due to a bad Jacobian
       // approximation with Broyden's method (relatively far away from the
       // zero), which can be corrected by the outer loop when a Newton update
-      // is recomputed. The second case is when the Jacobian is actually bad
-      // and we should fail as early as possible. Since we cannot really
-      // distinguish the two, we must continue here in any case.
-      if (alpha <= 1e-4)
-        must_recompute_jacobian = true;
+      // is recomputed. The second case is when we either have roundoff errors
+      // and cannot further improve the approximation or the Jacobian is
+      // actually bad and we should fail as early as possible. Since we cannot
+      // really distinguish the two, we must continue here in any case.
+      if (alpha <= 1e-4) {
+        // If we just recomputed the Jacobian by finite differences, we must
+        // stop. If the reached tolerance was sufficiently small (less than
+        // the square root of the tolerance), we return the best estimate,
+        // else we return the invalid point.
+        if (must_recompute_jacobian == true) {
+          return residual_norm_square < std::sqrt(tolerance) ? chart_point
+                                                             : outside;
+        } else
+          must_recompute_jacobian = true;
+      }
 
       // update the inverse Jacobian with "Broyden's good method" and
       // Sherman-Morrison formula for the update of the inverse, see
@@ -522,7 +535,8 @@ namespace ryujin
       // prevent division by zero. This number should be scale-invariant
       // because Jinv_deltaf carries no units and x is in reference
       // coordinates.
-      if (std::abs(delta_x * Jinv_deltaf) > 1e-12 && !must_recompute_jacobian) {
+      if (std::abs(delta_x * Jinv_deltaf) > 0.1 * tolerance &&
+          !must_recompute_jacobian) {
         const Tensor<1, dim> factor =
             (delta_x - Jinv_deltaf) / (delta_x * Jinv_deltaf);
         Tensor<1, spacedim> jac_update;
@@ -836,13 +850,14 @@ namespace ryujin
           message << "Looking at cell " << cell->id()
                   << " with vertices: " << std::endl;
           for (const unsigned int v : GeometryInfo<dim>::vertex_indices())
-            message << cell->vertex(v) << "    ";
+            message << std::setprecision(16) << " " << cell->vertex(v)
+                    << "    ";
           message << std::endl;
           message << "Transformation to chart coordinates: " << std::endl;
           for (unsigned int i = 0; i < surrounding_points.size(); ++i) {
             compute_chart_point(cell, i);
-            message << surrounding_points[i] << " -> " << chart_points[i]
-                    << std::endl;
+            message << std::setprecision(16) << surrounding_points[i] << " -> "
+                    << chart_points[i] << std::endl;
           }
         }
 
