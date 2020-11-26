@@ -50,6 +50,10 @@ subsection A - TimeLoop
   # the writeout granularity for quantities of interest
   set output quantities multiplier = 1
 
+  # List of points in (simulation) time at which the mesh will be globally
+  # refined
+  set refinement timepoints        = 
+
   # Resume an interrupted computation
   set resume                       = false
 
@@ -316,6 +320,10 @@ subsection G - DissipationModule
 
   # Chebyshev smoother: degree
   set multigrid - chebyshev degree           = 3
+
+  # Minimal mesh level to be visited in the geometric multigrid cycle where
+  # the coarse grid solver (Chebyshev) is called
+  set multigrid - min level                  = 0
 
   # Use geometric multigrid for internal energy component
   set multigrid energy                       = false
