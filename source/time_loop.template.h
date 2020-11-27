@@ -808,55 +808,100 @@ namespace ryujin
                                                Number t,
                                                std::ostream &stream)
   {
-    /* Print Jean-Luc and Martin metrics: */
+    /*
+     * @fixme The global state kept in this function should be refactored
+     * into its own class object.
+     */
+    static struct {
+      unsigned int cycle = 0;
+      double t = 0.;
+      double cpu_time_sum = 0.;
+      double cpu_time_avg = 0.;
+      double cpu_time_min = 0.;
+      double cpu_time_max = 0.;
+      double wall_time = 0.;
+    } previous, current;
 
-    const auto wall_time_statistics = Utilities::MPI::min_max_avg(
-        computing_timer["time loop"].wall_time(), mpi_communicator);
-    const double wall_time = wall_time_statistics.max;
+    /* Update statistics: */
 
-    const auto cpu_time_statistics = Utilities::MPI::min_max_avg(
-        computing_timer["time loop"].cpu_time(), mpi_communicator);
-    const double cpu_time = cpu_time_statistics.sum;
+    {
+      previous = current;
+
+      current.cycle = cycle;
+      current.t = t;
+
+      const auto wall_time_statistics = Utilities::MPI::min_max_avg(
+          computing_timer["time loop"].wall_time(), mpi_communicator);
+      current.wall_time = wall_time_statistics.max;
+
+      const auto cpu_time_statistics = Utilities::MPI::min_max_avg(
+          computing_timer["time loop"].cpu_time(), mpi_communicator);
+      current.cpu_time_sum = cpu_time_statistics.sum;
+      current.cpu_time_avg = cpu_time_statistics.avg;
+      current.cpu_time_min = cpu_time_statistics.min;
+      current.cpu_time_max = cpu_time_statistics.max;
+    }
+
+    /* Take averages: */
+
+    double delta_cycles = current.cycle - previous.cycle;
+    const double cycles_per_second =
+        delta_cycles / (current.wall_time - previous.wall_time);
 
     const double wall_m_dofs_per_sec =
-        ((double)cycle) * ((double)offline_data.dof_handler().n_dofs()) / 1.e6 /
-        wall_time;
+        delta_cycles * ((double)offline_data.dof_handler().n_dofs()) / 1.e6 /
+        (current.wall_time - previous.wall_time);
 
     const double cpu_m_dofs_per_sec =
-        ((double)cycle) * ((double)offline_data.dof_handler().n_dofs()) / 1.e6 /
-        cpu_time;
+        delta_cycles * ((double)offline_data.dof_handler().n_dofs()) / 1.e6 /
+        (current.cpu_time_sum - previous.cpu_time_sum);
+
+    double cpu_time_skew =
+        (current.cpu_time_max - current.cpu_time_min - //
+         previous.cpu_time_max + previous.cpu_time_min) /
+        delta_cycles;
+    /* avoid printing small negative numbers: */
+    cpu_time_skew = std::max(0., cpu_time_skew);
+
+    const double cpu_time_skew_percentage =
+        cpu_time_skew * delta_cycles /
+        (current.cpu_time_avg - previous.cpu_time_avg);
+
+    const double delta_time = current.t - previous.t;
+    const double time_per_second =
+        delta_time / (current.wall_time - previous.wall_time);
+
+    /* Print Jean-Luc and Martin metrics: */
 
     std::ostringstream output;
 
     /* clang-format off */
-    output << std::setprecision(4) << std::endl;
+    output << std::endl;
+
     output << "Throughput:  (CPU )  "
-           << std::fixed << cpu_m_dofs_per_sec << " MQ/s  ("
+           << std::setprecision(4) << std::fixed << cpu_m_dofs_per_sec
+           << " MQ/s  ("
            << std::scientific << 1. / cpu_m_dofs_per_sec * 1.e-6
            << " s/Qdof/cycle)" << std::endl;
+
     output << "                     [cpu time skew: "
-           << std::setprecision(2) << std::scientific
-           << cpu_time_statistics.max - cpu_time_statistics.avg << "s ("
-           << std::setprecision(1) << std::setw(4) << std::setfill(' ')
-           << std::fixed
-           << 100. * (cpu_time_statistics.max - cpu_time_statistics.avg) /
-                  cpu_time_statistics.avg
-           << "%)]" << std::endl
-           << std::endl;
+           << std::setprecision(2) << std::scientific << cpu_time_skew
+           << "s/cycle ("
+           << std::setprecision(1) << std::setw(4) << std::setfill(' ') << std::fixed
+           << 100. * cpu_time_skew_percentage
+           << "%)]" << std::endl << std::endl;
 
     output << "             (WALL)  "
-           << std::fixed << wall_m_dofs_per_sec << " MQ/s  ("
+           << std::fixed << wall_m_dofs_per_sec
+           << " MQ/s  ("
            << std::scientific << 1. / wall_m_dofs_per_sec * 1.e-6
            << " s/Qdof/cycle)  ("
-           << std::fixed << ((double)cycle) / wall_time
-           << " cycles/s)  (avg dt = "
-           << std::scientific << t / ((double)cycle)
-           << ")" << std::endl;
+           << std::fixed << cycles_per_second
+           << " cycles/s)" << std::endl;
 
     output << "                     [ "
            << std::setprecision(0) << std::fixed << euler_module.n_restarts()
-           << " rsts   (" << std::setprecision(2) << std::scientific
-           << euler_module.n_restarts() / ((double)cycle) << " rsts/cycle) ]";
+           << " rsts ]";
 
     output << "[ "
            << std::setprecision(2) << std::fixed
@@ -864,13 +909,18 @@ namespace ryujin
            << (dissipation_module.use_gmg_velocity() ? " GMG vel -- " : " CG vel -- ")
            << dissipation_module.n_iterations_internal_energy()
            << (dissipation_module.use_gmg_internal_energy() ? " GMG int ]" : " CG int ]")
-           << std::endl
            << std::endl;
+
+    output << "                     dt = "
+           << std::scientific << std::setprecision(2) << delta_time
+           << " ( "
+           << time_per_second
+           << " dt/s)" << std::endl << std::endl;
     /* clang-format on */
 
     /* and print an ETA */
     unsigned int eta =
-        static_cast<unsigned int>((t_final - t) / (t - t_initial) * wall_time);
+        static_cast<unsigned int>((t_final - t) / time_per_second);
 
     output << "ETA:  ";
 
