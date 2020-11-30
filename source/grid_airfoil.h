@@ -789,10 +789,8 @@ namespace ryujin
         };
 
         for (auto cell : coarse_triangulation.active_cell_iterators()) {
-
           for (auto f : dealii::GeometryInfo<2>::face_indices()) {
             const auto face = cell->face(f);
-
             if (face->at_boundary()) {
               /* Handle boundary faces: */
 
@@ -808,7 +806,6 @@ namespace ryujin
               if (spherical_boundary) {
                 face->set_manifold_id(3);
               }
-
               if (airfoil) {
                 if (face->center()[0] <
                     airfoil_center_[0] + back_length - 1.e-6) {
@@ -819,10 +816,8 @@ namespace ryujin
                   }
                 }
               }
-
             } else {
               /* Handle radial faces: */
-
               unsigned int index = 4;
               for (auto candidate : radial_vertices) {
                 if (candidate.distance(face->vertex(0)) < 1.0e-10 || //
@@ -836,6 +831,40 @@ namespace ryujin
             }
           } /* f */
         }   /* cell */
+
+        /*
+         * Set up a transfinite grading manifold:
+         *
+         * We first create a transfinite interpolation manifold for the
+         * grading without curvature information on the spherical and the
+         * airfoil part.
+         *
+         * This manifold is then used to create a second transfinite
+         * interpolation manifold that contains the spherical and airfoil
+         * curvature and uses the first transfinite interpolation manifold
+         * as chart manifold.
+         */
+
+        unsigned int index = 4;
+        for (auto vertex : radial_vertices) {
+          Manifolds::GradingManifold manifold{
+              vertex, grading_, grading_epsilon_};
+          coarse_triangulation.set_manifold(index, manifold);
+          index++;
+        }
+        Assert(index == 9, dealii::ExcInternalError());
+
+        ryujin::TransfiniteInterpolationManifold<2> transfinite_grading;
+        transfinite_grading.initialize(coarse_triangulation);
+
+        /* Remove grading manifold: */
+
+        for (unsigned int index = 4; index < 9; ++index)
+          coarse_triangulation.reset_manifold(index);
+
+        /*
+         * Add curvature information and create final transfinite manifold:
+         */
 
         Manifolds::AirfoilManifold airfoil_manifold_upper{
             airfoil_center_, psi_front, psi_upper, psi_lower, true, psi_ratio_};
@@ -852,17 +881,9 @@ namespace ryujin
         dealii::SphericalManifold<2> spherical_manifold;
         coarse_triangulation.set_manifold(3, spherical_manifold);
 
-        unsigned int index = 4;
-        for (auto vertex : radial_vertices) {
-          Manifolds::GradingManifold manifold{
-              vertex, grading_, grading_epsilon_};
-          coarse_triangulation.set_manifold(index, manifold);
-          index++;
-        }
-        Assert(index == 9, dealii::ExcInternalError());
-
         ryujin::TransfiniteInterpolationManifold<2> transfinite;
-        transfinite.initialize(coarse_triangulation);
+        transfinite.initialize(coarse_triangulation, transfinite_grading);
+
         coarse_triangulation.set_manifold(9, transfinite);
 
         /*

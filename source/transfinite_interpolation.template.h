@@ -32,7 +32,7 @@ namespace ryujin
   {
     auto ptr = new TransfiniteInterpolationManifold<dim, spacedim>();
     if (triangulation.n_levels() != 0)
-      ptr->initialize(triangulation);
+      ptr->initialize(triangulation, *chart_manifold);
     return std::unique_ptr<Manifold<dim, spacedim>>(ptr);
   }
 
