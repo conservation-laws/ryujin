@@ -142,48 +142,66 @@ namespace ryujin
     {
     public:
       GradingManifold(const dealii::Point<dim> center,
+                      const dealii::Tensor<1, dim> direction,
                       const double grading,
                       const double epsilon)
           : center(center)
+          , direction(direction)
           , grading(grading)
           , epsilon(epsilon)
-          , polar_manifold(center)
       {
       }
 
       virtual dealii::Point<dim>
       pull_back(const dealii::Point<dim> &space_point) const final override
       {
-        auto point = polar_manifold.pull_back(space_point);
-        Assert(point[0] >= 0., dealii::ExcInternalError());
-        point[0] = std::pow(point[0] + epsilon, 1. / grading) -
-                   std::pow(epsilon, 1. / grading) + 1.e-14;
-        const auto chart_point = polar_manifold.push_forward(point);
-        return chart_point;
+        auto chart_point = space_point - center;
+
+        for (unsigned int d = 0; d < dim; ++d) {
+          if (std::abs(direction[d]) > 1.0e-10) {
+            const double x = chart_point[d] * std::copysign(1., direction[d]);
+            Assert(x + epsilon > 0, dealii::ExcInternalError());
+            const double x_hat = std::pow(x + epsilon, 1. / grading) -
+                                 std::pow(epsilon, 1. / grading) + 1.e-14;
+            chart_point[d] += (x_hat - x) * std::copysign(1., direction[d]);
+          }
+        }
+
+        return dealii::Point<dim>() + chart_point;
       }
 
       virtual dealii::Point<dim>
       push_forward(const dealii::Point<dim> &chart_point) const final override
       {
-        auto point = polar_manifold.pull_back(chart_point);
-        point[0] =
-            std::pow(point[0] + std::pow(epsilon, 1. / grading), grading) -
-            epsilon + 1.e-14;
-        Assert(point[0] >= 0., dealii::ExcInternalError());
-        return polar_manifold.push_forward(point);
+        auto space_point = chart_point;
+
+        for (unsigned int d = 0; d < dim; ++d) {
+          if (std::abs(direction[d]) > 1.0e-10) {
+            const double x_hat =
+                space_point[d] * std::copysign(1., direction[d]);
+            Assert(x_hat + std::pow(epsilon, 1. / grading) > 0,
+                   dealii::ExcInternalError());
+            const double x =
+                std::pow(x_hat + std::pow(epsilon, 1. / grading), grading) -
+                epsilon + 1.e-14;
+            space_point[d] += (x - x_hat) * std::copysign(1., direction[d]);
+          }
+        }
+
+        return center + (space_point - dealii::Point<dim>());
       }
 
       std::unique_ptr<dealii::Manifold<dim, dim>> clone() const final override
       {
-        return std::make_unique<GradingManifold<dim>>(center, grading, epsilon);
+        return std::make_unique<GradingManifold<dim>>(
+            center, direction, grading, epsilon);
       }
 
     private:
       const dealii::Point<dim> center;
+      const dealii::Tensor<1, dim> direction;
       const double grading;
       const double epsilon;
-
-      dealii::PolarManifold<dim> polar_manifold;
     };
 
 
@@ -826,10 +844,7 @@ namespace ryujin
         dealii::SphericalManifold<2> spherical_manifold;
         coarse_triangulation.set_manifold(3, spherical_manifold);
 
-        /*
-         * Colorize internal cells and add transfinite interpolation
-         * manifolds:
-         */
+        /* Create transfinite interpolation manifolds: */
 
         Assert(!sharp_trailing_edge || (coarse_triangulation.n_cells() == 6),
                dealii::ExcInternalError());
@@ -839,21 +854,43 @@ namespace ryujin
         std::vector<std::unique_ptr<dealii::Manifold<dim, dim>>> manifolds;
 
         for (unsigned int i = 0; i < (sharp_trailing_edge ? 6 : 7); ++i) {
-          const auto &cell = std::next(coarse_triangulation.begin_active(), i);
           const auto index = 10 + i;
 
-          cell->set_manifold_id(index);
+          dealii::Point<2> center;
+          dealii::Tensor<1, 2> direction;
 
+          if (i < 4) {
+            /* cells: bottom center, bottom front, top front, top center */
+            direction[1] = 1.;
+          } else if (i == 4) {
+            /* cell: bottom trailing */
+            center[0] = 1.;
+            direction[0] = -1.;
+            direction[1] = 1.;
+          } else if (i == (sharp_trailing_edge ? 5 : 6)) {
+            /* cell: top trailing */
+            center[1] = 1.;
+            direction[0] = 1.;
+            direction[1] = -1.;
+          } else {
+            /* cell: center trailing (blunt) */
+            center[0] = 1.;
+            direction[0] = -1.;
+          }
+
+          Manifolds::GradingManifold<dim> grading{
+              center, direction, grading_, grading_epsilon_};
           auto transfinite =
               std::make_unique<ryujin::TransfiniteInterpolationManifold<2>>();
-          transfinite->initialize(coarse_triangulation);
+          transfinite->initialize(coarse_triangulation, grading);
+
           coarse_triangulation.set_manifold(index, *transfinite);
           manifolds.push_back(std::move(transfinite));
         }
 
         /*
-         * use transfinite interpolation manifold for all geometric
-         * objects:
+         * Use transfinite interpolation manifold for all geometric objects
+         * and remove unneeded manifolds:
          */
 
         coarse_triangulation.reset_manifold(1);
@@ -927,6 +964,15 @@ namespace ryujin
 
         if constexpr (dim == 2) {
           triangulation.copy_triangulation(tria3);
+
+          /*
+           * Somewhere during flattening the triangulation and copying we
+           * lost all manifold ids on faces:
+           */
+          for (auto &cell : triangulation.active_cell_iterators()) {
+            const auto id = cell->manifold_id();
+            cell->set_all_manifold_ids(id);
+          }
 
           unsigned int index = 10;
           for (const auto &manifold : manifolds)
