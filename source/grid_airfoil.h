@@ -764,107 +764,52 @@ namespace ryujin
          * Step 3: Set manifold IDs and attach manifolds to preliminary
          * coarse triangulation:
          *
+         * Curvature for boundaries:
          *   1 -> upper airfoil (inner boundary)
          *   2 -> lower airfoil (inner boundary)
          *   3 -> spherical manifold (outer boundary)
-         *   4 -> grading front (interior face)
-         *   5 -> grading upper airfoil (interior face)
-         *   6 -> grading lower airfoil (interior face)
-         *   7 -> grading upper back (interior face)
-         *   8 -> grading lower back (interior face)
-         *   9 -> transfinite interpolation
+         *
+         * Transfinite interpolation with grading on coarse cells:
+         *
+         *  10 -> bottom center cell
+         *  11 -> bottom front cell
+         *  12 -> top front cell
+         *  13 -> top center cell
+         *  14 -> bottom trailing cell
+         *  15 -> top trailing cell (sharp), center trailing cell (blunt)
+         *  16 -> top trailing cell (blunt)
          */
 
-        coarse_triangulation.set_all_manifold_ids(9);
-
-        /* all possible vertices for the four (or six) radials: */
-        const std::vector<dealii::Point<2>> radial_vertices{
-            {airfoil_center_[0] - psi_front(M_PI), airfoil_center_[1]}, // front
-            {0., airfoil_center_[1] + psi_upper(-airfoil_center_[0])},  // upper
-            {0., airfoil_center_[1] + psi_lower(-airfoil_center_[0])},  // lower
-            {airfoil_center_[0] + back_length,
-             airfoil_center_[1] + psi_upper(back_length)}, // upper back
-            {airfoil_center_[0] + back_length,
-             airfoil_center_[1] + psi_lower(back_length)}, // lower back
-        };
+        /* Colorize boundary faces and add curvature information: */
 
         for (auto cell : coarse_triangulation.active_cell_iterators()) {
           for (auto f : dealii::GeometryInfo<2>::face_indices()) {
             const auto face = cell->face(f);
-            if (face->at_boundary()) {
-              /* Handle boundary faces: */
+            if (!face->at_boundary())
+              continue;
 
-              bool airfoil = true;
-              bool spherical_boundary = true;
+            bool airfoil = true;
+            bool spherical_boundary = true;
+            for (const auto v : dealii::GeometryInfo<1>::vertex_indices())
+              if (std::abs((face->vertex(v)).norm() - outer_radius) < 1.0e-10)
+                airfoil = false;
+              else
+                spherical_boundary = false;
 
-              for (const auto v : dealii::GeometryInfo<1>::vertex_indices())
-                if (std::abs((face->vertex(v)).norm() - outer_radius) < 1.0e-10)
-                  airfoil = false;
-                else
-                  spherical_boundary = false;
-
-              if (spherical_boundary) {
-                face->set_manifold_id(3);
-              }
-              if (airfoil) {
-                if (face->center()[0] <
-                    airfoil_center_[0] + back_length - 1.e-6) {
-                  if (face->center()[1] >= airfoil_center_[1]) {
-                    face->set_manifold_id(1);
-                  } else {
-                    face->set_manifold_id(2);
-                  }
+            if (spherical_boundary) {
+              face->set_manifold_id(3);
+            } else if (airfoil) {
+              if (face->center()[0] <
+                  airfoil_center_[0] + back_length - 1.e-6) {
+                if (face->center()[1] >= airfoil_center_[1]) {
+                  face->set_manifold_id(1);
+                } else {
+                  face->set_manifold_id(2);
                 }
-              }
-            } else {
-              /* Handle radial faces: */
-              unsigned int index = 4;
-              for (auto candidate : radial_vertices) {
-                if (candidate.distance(face->vertex(0)) < 1.0e-10 || //
-                    candidate.distance(face->vertex(1)) < 1.0e-10) {
-                  Assert(index < 10, dealii::ExcInternalError());
-                  face->set_manifold_id(index);
-                  break;
-                }
-                index++;
               }
             }
           } /* f */
         }   /* cell */
-
-        /*
-         * Set up a transfinite grading manifold:
-         *
-         * We first create a transfinite interpolation manifold for the
-         * grading without curvature information on the spherical and the
-         * airfoil part.
-         *
-         * This manifold is then used to create a second transfinite
-         * interpolation manifold that contains the spherical and airfoil
-         * curvature and uses the first transfinite interpolation manifold
-         * as chart manifold.
-         */
-
-        unsigned int index = 4;
-        for (auto vertex : radial_vertices) {
-          Manifolds::GradingManifold manifold{
-              vertex, grading_, grading_epsilon_};
-          coarse_triangulation.set_manifold(index, manifold);
-          index++;
-        }
-        Assert(index == 9, dealii::ExcInternalError());
-
-        ryujin::TransfiniteInterpolationManifold<2> transfinite_grading;
-        transfinite_grading.initialize(coarse_triangulation);
-
-        /* Remove grading manifold: */
-
-        for (unsigned int index = 4; index < 9; ++index)
-          coarse_triangulation.reset_manifold(index);
-
-        /*
-         * Add curvature information and create final transfinite manifold:
-         */
 
         Manifolds::AirfoilManifold airfoil_manifold_upper{
             airfoil_center_, psi_front, psi_upper, psi_lower, true, psi_ratio_};
@@ -881,10 +826,44 @@ namespace ryujin
         dealii::SphericalManifold<2> spherical_manifold;
         coarse_triangulation.set_manifold(3, spherical_manifold);
 
-        ryujin::TransfiniteInterpolationManifold<2> transfinite;
-        transfinite.initialize(coarse_triangulation, transfinite_grading);
+        /*
+         * Colorize internal cells and add transfinite interpolation
+         * manifolds:
+         */
 
-        coarse_triangulation.set_manifold(9, transfinite);
+        Assert(!sharp_trailing_edge || (coarse_triangulation.n_cells() == 6),
+               dealii::ExcInternalError());
+        Assert(sharp_trailing_edge || (coarse_triangulation.n_cells() == 7),
+               dealii::ExcInternalError());
+
+        std::vector<std::unique_ptr<dealii::Manifold<dim, dim>>> manifolds;
+
+        for (unsigned int i = 0; i < (sharp_trailing_edge ? 6 : 7); ++i) {
+          const auto &cell = std::next(coarse_triangulation.begin_active(), i);
+          const auto index = 10 + i;
+
+          cell->set_manifold_id(index);
+
+          auto transfinite =
+              std::make_unique<ryujin::TransfiniteInterpolationManifold<2>>();
+          transfinite->initialize(coarse_triangulation);
+          coarse_triangulation.set_manifold(index, *transfinite);
+          manifolds.push_back(std::move(transfinite));
+        }
+
+        /*
+         * use transfinite interpolation manifold for all geometric
+         * objects:
+         */
+
+        coarse_triangulation.reset_manifold(1);
+        coarse_triangulation.reset_manifold(2);
+        coarse_triangulation.reset_manifold(3);
+        for (unsigned int i = 0; i < (sharp_trailing_edge ? 6 : 7); ++i) {
+          const auto &cell = std::next(coarse_triangulation.begin_active(), i);
+          const auto index = 10 + i;
+          cell->set_all_manifold_ids(index);
+        }
 
         /*
          * Step 4: Anisotropic pre refinement.
@@ -948,10 +927,13 @@ namespace ryujin
 
         if constexpr (dim == 2) {
           triangulation.copy_triangulation(tria3);
-          triangulation.set_all_manifold_ids(9);
-          triangulation.set_manifold(9, transfinite);
+
+          unsigned int index = 10;
+          for (const auto &manifold : manifolds)
+            triangulation.set_manifold(index++, *manifold);
 
         } else {
+
           /* extrude mesh: */
           dealii::Triangulation<3, 3> tria4;
           tria4.set_mesh_smoothing(triangulation.get_mesh_smoothing());
@@ -959,10 +941,9 @@ namespace ryujin
               tria3, subdivisions_z_, width_, tria4);
           triangulation.copy_triangulation(tria4);
 
-          /* extrude transfinite manifold */
-          Manifolds::ExtrudedManifold<3> extruded_transfinite(transfinite);
-          triangulation.set_all_manifold_ids(9);
-          triangulation.set_manifold(9, extruded_transfinite);
+          AssertThrow(false,
+                      dealii::ExcMessage(
+                          "manifold ids for 3D airfoil not implemented"));
         }
 
         /* Set boundary ids: */
