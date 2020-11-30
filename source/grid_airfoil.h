@@ -852,27 +852,18 @@ namespace ryujin
                dealii::ExcInternalError());
 
         std::vector<std::unique_ptr<dealii::Manifold<dim, dim>>> manifolds;
+        manifolds.resize(sharp_trailing_edge ? 6 : 7);
 
-        for (unsigned int i = 0; i < (sharp_trailing_edge ? 6 : 7); ++i) {
+        for (auto i : {0, 1, 2, 3, 5}) {
           const auto index = 10 + i;
 
           dealii::Point<2> center;
           dealii::Tensor<1, 2> direction;
-
           if (i < 4) {
             /* cells: bottom center, bottom front, top front, top center */
             direction[1] = 1.;
-          } else if (i == 4) {
-            /* cell: bottom trailing */
-            center[0] = 1.;
-            direction[0] = -1.;
-            direction[1] = 1.;
-          } else if (i == (sharp_trailing_edge ? 5 : 6)) {
-            /* cell: top trailing */
-            center[1] = 1.;
-            direction[0] = 1.;
-            direction[1] = -1.;
           } else {
+            Assert(i == 5, dealii::ExcInternalError());
             /* cell: center trailing (blunt) */
             center[0] = 1.;
             direction[0] = -1.;
@@ -880,13 +871,18 @@ namespace ryujin
 
           Manifolds::GradingManifold<dim> grading{
               center, direction, grading_, grading_epsilon_};
+
           auto transfinite =
               std::make_unique<ryujin::TransfiniteInterpolationManifold<2>>();
           transfinite->initialize(coarse_triangulation, grading);
 
           coarse_triangulation.set_manifold(index, *transfinite);
-          manifolds.push_back(std::move(transfinite));
+          manifolds[i] = std::move(transfinite);
         }
+
+        /* Remove erroneous manifold: */
+        if (sharp_trailing_edge)
+          coarse_triangulation.reset_manifold(5);
 
         /*
          * Use transfinite interpolation manifold for all geometric objects
@@ -899,7 +895,24 @@ namespace ryujin
         for (unsigned int i = 0; i < (sharp_trailing_edge ? 6 : 7); ++i) {
           const auto &cell = std::next(coarse_triangulation.begin_active(), i);
           const auto index = 10 + i;
-          cell->set_all_manifold_ids(index);
+          if (i == 4 || i == (sharp_trailing_edge ? 5 : 6))
+            cell->set_manifold_id(index);
+          else
+            cell->set_all_manifold_ids(index);
+        }
+
+        /*
+         * Attach separate transfinite interpolation manifolds (without a
+         * grading)  to the top and bottom trailing cells:
+         */
+
+        for (auto i : {4, sharp_trailing_edge ? 5 : 6}) {
+          const auto index = 10 + i;
+          auto transfinite =
+              std::make_unique<ryujin::TransfiniteInterpolationManifold<2>>();
+          transfinite->initialize(coarse_triangulation);
+          coarse_triangulation.set_manifold(index, *transfinite);
+          manifolds[i] = std::move(transfinite);
         }
 
         /*
@@ -971,7 +984,8 @@ namespace ryujin
            */
           for (auto &cell : triangulation.active_cell_iterators()) {
             const auto id = cell->manifold_id();
-            cell->set_all_manifold_ids(id);
+            if (id != 14 && id != (sharp_trailing_edge? 15 : 16))
+              cell->set_all_manifold_ids(id);
           }
 
           unsigned int index = 10;
