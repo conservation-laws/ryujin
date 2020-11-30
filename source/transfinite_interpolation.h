@@ -30,7 +30,9 @@ namespace ryujin
 
     virtual std::unique_ptr<Manifold<dim, spacedim>> clone() const override;
 
-    void initialize(const Triangulation<dim, spacedim> &triangulation);
+    void initialize(
+        const Triangulation<dim, spacedim> &triangulation,
+        const Manifold<dim, spacedim> &chart_manifold = FlatManifold<dim>());
 
     virtual Point<spacedim>
     get_new_point(const ArrayView<const Point<spacedim>> &surrounding_points,
@@ -69,7 +71,7 @@ namespace ryujin
 
     std::vector<bool> coarse_cell_is_flat;
 
-    FlatManifold<dim> chart_manifold;
+    std::unique_ptr<Manifold<dim, spacedim>> chart_manifold;
   };
 
 } // namespace ryujin

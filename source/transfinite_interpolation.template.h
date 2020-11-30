@@ -39,10 +39,13 @@ namespace ryujin
 
   template <int dim, int spacedim>
   void TransfiniteInterpolationManifold<dim, spacedim>::initialize(
-      const Triangulation<dim, spacedim> &external_triangulation)
+      const Triangulation<dim, spacedim> &external_triangulation,
+      const Manifold<dim, spacedim> &chart_manifold)
   {
     this->triangulation.clear();
     this->triangulation.copy_triangulation(external_triangulation);
+
+    this->chart_manifold = chart_manifold.clone();
 
     level_coarse = triangulation.last()->level();
     coarse_cell_is_flat.resize(triangulation.n_cells(level_coarse), false);
@@ -889,7 +892,7 @@ namespace ryujin
         compute_chart_points(surrounding_points, chart_points_view);
 
     const Point<dim> p_chart =
-        chart_manifold.get_new_point(chart_points_view, weights);
+        chart_manifold->get_new_point(chart_points_view, weights);
 
     return push_forward(cell, p_chart);
   }
@@ -913,10 +916,10 @@ namespace ryujin
 
     boost::container::small_vector<Point<dim>, 100> new_points_on_chart(
         weights.size(0));
-    chart_manifold.get_new_points(chart_points_view,
-                                  weights,
-                                  make_array_view(new_points_on_chart.begin(),
-                                                  new_points_on_chart.end()));
+    chart_manifold->get_new_points(chart_points_view,
+                                   weights,
+                                   make_array_view(new_points_on_chart.begin(),
+                                                   new_points_on_chart.end()));
 
     for (unsigned int row = 0; row < weights.size(0); ++row)
       new_points[row] = push_forward(cell, new_points_on_chart[row]);
