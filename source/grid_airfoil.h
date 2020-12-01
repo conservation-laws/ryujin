@@ -1211,7 +1211,7 @@ namespace ryujin
             }
 
             if (spherical_boundary) {
-              face->set_boundary_id(Boundary::flexible);
+              face->set_boundary_id(Boundary::dynamic);
             } else if (airfoil) {
               face->set_boundary_id(Boundary::no_slip);
             } else {

@@ -241,6 +241,19 @@ namespace ryujin
 
     //@}
     /**
+     * @name Computing left/right eigenvectors of the linearized boundary
+     * flux
+     */
+    //@{
+
+    template <int component, int problem_dim, typename Number>
+    std::array<dealii::Tensor<1, problem_dim, Number>, 2>
+    linearized_eigenvector(
+        const dealii::Tensor<1, problem_dim, Number> &U,
+        const dealii::Tensor<1, problem_dim - 2, Number> &normal) const;
+
+    //@}
+    /**
      * @name Computing fluxes.
      */
     //@{
@@ -534,6 +547,63 @@ namespace ryujin
     }
 
     return result;
+  }
+
+
+  template <int component, int problem_dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline
+  std::array<dealii::Tensor<1, problem_dim, Number>, 2>
+  ProblemDescription::linearized_eigenvector(
+      const dealii::Tensor<1, problem_dim, Number> &U,
+      const dealii::Tensor<1, problem_dim - 2, Number> &normal) const
+  {
+    static_assert(component == 1 || component == problem_dim,
+                  "Only first and last eigenvectors implemented");
+
+    constexpr int dim = problem_dim - 2;
+
+    const auto rho = density(U);
+    const auto m = momentum(U);
+    const auto v = m / rho;
+    const auto a = speed_of_sound(U);
+    const auto gamma = this->gamma();
+
+    rank1_type<dim, Number> b;
+    rank1_type<dim, Number> c;
+
+    const auto e_k = 0.5 * v.norm_square();
+
+    switch(component) {
+    case 1:
+      b[0] = (gamma - 1.) * e_k + a * v * normal;
+      for (unsigned int i = 0; i < dim; ++i)
+        b[1 + i] = (1. - gamma) * v[i] - a * normal[i];
+      b[dim + 1] = gamma - 1.;
+      b /= 2. * a * a;
+
+      c[0] = 1.;
+      for (unsigned int i = 0; i < dim; ++i)
+        c[1 + i] = v[i] - a * normal[i];
+      c[dim + 1] = a * a / (gamma - 1) + e_k - a * (v * normal);
+
+      return {b, c};
+
+    case problem_dim:
+      b[0] = (gamma - 1.) * e_k - a * v * normal;
+      for (unsigned int i = 0; i < dim; ++i)
+        b[1 + i] = (1. - gamma) * v[i] + a * normal[i];
+      b[dim + 1] = gamma - 1.;
+      b /= 2. * a * a;
+
+      c[0] = 1.;
+      for (unsigned int i = 0; i < dim; ++i)
+        c[1 + i] = v[i] + a * normal[i];
+      c[dim + 1] = a * a / (gamma - 1) + e_k + a * (v * normal);
+
+      return {b, c};
+    }
+
+    __builtin_unreachable();
   }
 
 

@@ -1058,77 +1058,55 @@ namespace ryujin
         m -= 1. * (m * normal) * normal;
         for (unsigned int k = 0; k < dim; ++k)
           U_i[k + 1] = m[k];
-        U.write_tensor(U_i, i);
-        continue;
 
       } else if (id == Boundary::no_slip) {
         /* Enforce no-slip conditions: */
         for (unsigned int k = 0; k < dim; ++k)
           U_i[k + 1] = Number(0.);
-        U.write_tensor(U_i, i);
-        continue;
 
       } else if (id == Boundary::dirichlet) {
         /* On Dirichlet boundaries enforce initial conditions: */
         U_i = initial_values_->initial_state(position, t);
-        U.write_tensor(U_i, i);
-        continue;
 
-      } else if (id == Boundary::flexible) {
+      } else if (id == Boundary::dynamic) {
         const auto m = problem_description_->momentum(U_i);
-
-        /* Set Dirichlet data on inflow boundary: */
-        if (m * normal <= 0.) {
-          U_i = initial_values_->initial_state(position, t);
-          U.write_tensor(U_i, i);
-          continue;
-        }
-
-        const auto a = problem_description_->speed_of_sound(U_i);
         const auto rho = problem_description_->density(U_i);
+        const auto a = problem_description_->speed_of_sound(U_i);
         const auto vn = m * normal / rho;
 
-        /* Do nothing on supersonic outflow boundaries: */
-        if (vn > a) {
-          /* do nothing */
-          continue;
+        /* Supersonic inflow: set full Dirichlet data. */
+        if (vn < -a) {
+          U_i = initial_values_->initial_state(position, t);
         }
 
-        /*
-         * Construct left and right eigenvectors b_1 c_1 from an interpolated
-         * state U_i_bar:
-         */
+        /* Subsonic inflow: tba */
+        if (vn >= -a && vn <= 0.) {
+          const auto U_i_bar = initial_values_->initial_state(position, t);
+          const auto &[b_4, c_4] =
+              problem_description_->linearized_eigenvector<problem_dimension>(
+                  U_i_bar, normal);
 
-        const auto U_i_old = U_old.get_tensor(i);
-        const auto U_i_bar = 0.5 * (U_i_old + U_i);
+          /* Keep b_4/c_4 component: */
+          U_i = U_i_bar + c_4 * (b_4 * U_i - b_4 * U_i_bar);
+        }
 
-        const auto rho_bar = problem_description_->density(U_i_bar);
-        const auto m_bar = problem_description_->momentum(U_i_bar);
-        const auto v_bar = m_bar / rho_bar;
-        const auto a_bar = problem_description_->speed_of_sound(U_i_bar);
-        const auto gamma = problem_description_->gamma();
+        /* Subsonic outflow: tba */
+        if (vn > 0.  && vn <= a) {
+          const auto &[b_1, c_1] =
+              problem_description_->linearized_eigenvector<1>(U_i, normal);
 
-        rank1_type b_1;
-        const auto e_k = 0.5 * v_bar.norm_square();
-        b_1[0] = (gamma - 1.) * e_k + a_bar * v_bar * normal;
-        for (unsigned int i = 0; i < dim; ++i)
-          b_1[1 + i] = (1. - gamma) * v_bar[i] - a_bar * normal[i];
-        b_1[dim + 1] = gamma - 1.;
-        b_1 /= 2. * a_bar * a_bar;
+          /* Replace b_1/c_1 component: */
+          const auto U_i_bar = initial_values_->initial_state(position, t);
+          U_i = U_i + c_1 * (b_1 * U_i_bar - b_1 * U_i);
+        }
 
-        rank1_type c_1;
-        c_1[0] = 1.;
-        for (unsigned int i = 0; i < dim; ++i)
-          c_1[1 + i] = v_bar[i] - a_bar * normal[i];
-        c_1[dim + 1] =
-            a_bar * a_bar / (gamma - 1) + e_k - a_bar * (v_bar * normal);
-
-        /* Replace b_1/c_1 component: */
-        U_i = U_i + c_1 * (b_1 * U_i_old - b_1 * U_i);
-
-        U.write_tensor(U_i, i);
-        continue;
+        /* Supersonic outflow: do nothing. */
+        if (vn > a) {
+          continue;
+        }
       }
+
+      U.write_tensor(U_i, i);
     }
 
     U.update_ghost_values();
