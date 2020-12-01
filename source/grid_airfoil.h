@@ -890,8 +890,11 @@ namespace ryujin
             direction[0] = -1.;
           }
 
-          Manifolds::GradingManifold<dim> grading{
-              center, direction, grading_, grading_epsilon_};
+          Manifolds::GradingManifold<dim> grading{center,
+                                                  direction,
+                                                  grading_,
+                                                  (i == 5 ? 0.1 : 0.0) +
+                                                      grading_epsilon_};
 
           auto transfinite =
               std::make_unique<ryujin::TransfiniteInterpolationManifold<2>>();
