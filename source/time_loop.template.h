@@ -822,6 +822,8 @@ namespace ryujin
       double wall_time = 0.;
     } previous, current;
 
+    static double time_per_second_exp = 0.;
+
     /* Update statistics: */
 
     {
@@ -919,8 +921,9 @@ namespace ryujin
     /* clang-format on */
 
     /* and print an ETA */
+    time_per_second_exp = 0.8 * time_per_second_exp + 0.2 * time_per_second;
     unsigned int eta =
-        static_cast<unsigned int>((t_final - t) / time_per_second);
+        static_cast<unsigned int>((t_final - t) / time_per_second_exp);
 
     output << "ETA:  ";
 
