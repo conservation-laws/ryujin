@@ -1164,8 +1164,7 @@ namespace ryujin
            */
           for (auto &cell : triangulation.active_cell_iterators()) {
             const auto id = cell->manifold_id();
-            if (id != 14 && id != (sharp_trailing_edge? 15 : 16))
-              cell->set_all_manifold_ids(id);
+            cell->set_all_manifold_ids(id);
           }
 
           unsigned int index = 10;
