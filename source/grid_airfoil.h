@@ -152,6 +152,21 @@ namespace ryujin
       {
       }
 
+      /* FIXME: find out why weights are not normalized. */
+      virtual Point<dim>
+      get_new_point(const ArrayView<const Point<dim>> &surrounding_points,
+                    const ArrayView<const double> &weights) const override
+      {
+        if(weights[0] > 1.0)
+          return surrounding_points[0];
+
+        if(weights[1] > 1.0)
+          return surrounding_points[1];
+
+        return dealii::ChartManifold<dim>::get_new_point(surrounding_points,
+                                                         weights);
+      }
+
       virtual dealii::Point<dim>
       pull_back(const dealii::Point<dim> &space_point) const final override
       {
