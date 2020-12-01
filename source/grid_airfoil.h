@@ -854,6 +854,12 @@ namespace ryujin
         std::vector<std::unique_ptr<dealii::Manifold<dim, dim>>> manifolds;
         manifolds.resize(sharp_trailing_edge ? 6 : 7);
 
+        /* FIXME: Remove workaround - mark cells as off limit: */
+        std::next(coarse_triangulation.begin_active(), 4)->set_material_id(42);
+        std::next(coarse_triangulation.begin_active(),
+                  sharp_trailing_edge ? 5 : 6)
+            ->set_material_id(42);
+
         for (auto i : {0, 1, 2, 3, 5}) {
           const auto index = 10 + i;
 
@@ -903,8 +909,16 @@ namespace ryujin
 
         /*
          * Attach separate transfinite interpolation manifolds (without a
-         * grading)  to the top and bottom trailing cells:
+         * grading) to the top and bottom trailing cells:
          */
+
+        /* FIXME: Remove workaround - mark cells as off limit: */
+        for (auto cell : coarse_triangulation.active_cell_iterators())
+          cell->set_material_id(42);
+        std::next(coarse_triangulation.begin_active(), 4)->set_material_id(0);
+        std::next(coarse_triangulation.begin_active(),
+                  sharp_trailing_edge ? 5 : 6)
+            ->set_material_id(0);
 
         for (auto i : {4, sharp_trailing_edge ? 5 : 6}) {
           const auto index = 10 + i;

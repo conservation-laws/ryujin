@@ -577,6 +577,10 @@ namespace ryujin
     boost::container::small_vector<std::pair<double, unsigned int>, 200>
         distances_and_cells;
     for (; cell != endc; ++cell) {
+      /* FIXME: Remove workaround - ignore certain cells. */
+      if(cell->material_id() == 42)
+        continue;
+
       std::array<Point<spacedim>, GeometryInfo<dim>::vertices_per_cell>
           vertices;
       for (const unsigned int vertex_n : GeometryInfo<dim>::vertex_indices()) {
