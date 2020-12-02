@@ -722,18 +722,7 @@ namespace ryujin
             if (!face->at_boundary())
               continue;
             const auto position = face->center();
-            if (position[0] < -0.5 * length_ + 1.e-6)
-              /* left: dirichlet */
-              face->set_boundary_id(Boundary::dirichlet);
-            else if (position[0] > 0.5 * length_ - 1.e-6)
-              /* right: dirichlet */
-              face->set_boundary_id(Boundary::dirichlet);
-            else {
-              if (periodic_)
-                face->set_boundary_id(Boundary::periodic);
-              else
-                face->set_boundary_id(Boundary::dirichlet);
-            }
+            face->set_boundary_id(Boundary::dynamic);
           }
       }
 
