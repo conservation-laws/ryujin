@@ -89,14 +89,6 @@ namespace ryujin
 
   private:
     /**
-     * @name Run time options
-     */
-    //@{
-
-    bool record_conserved_quantities_;
-
-    //@}
-    /**
      * @name Internal data
      */
     //@{
