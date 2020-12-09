@@ -581,7 +581,14 @@ namespace ryujin
 
     for (auto cell = begin; cell != end; ++cell) {
 
-#ifdef DEAL_II_WITH_TRILINOS
+      // TODO: This is a workaround: If DEAL_II_WITH_TRIILNOS is enabled
+      // and we have a locally refined mesh we have to communicate the
+      // ghost layer stored in the boundary map with all neighboring nodes.
+      //
+      // As a cheap workaround let's simply use the assembly over all
+      // non-artificial cells at the moment. This breaks when we work with
+      // locally refined meshes.
+#if defined(DEAL_II_WITH_TRILINOS) && false
       if (!cell->is_locally_owned_on_level())
         continue;
 #else
