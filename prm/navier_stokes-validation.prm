@@ -65,5 +65,4 @@ subsection G - DissipationModule
 end
 
 subsection I - IntegralQuantities
-  set record conserved quantities = true
 end

@@ -381,9 +381,6 @@ end
 
 
 subsection I - IntegralQuantities
-  # Compute integrals of conserved quantities and write results to the
-  # "[basename]-integral_quantities.log" at specified intervals
-  set record conserved quantities = true
 end
 
 

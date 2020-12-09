@@ -110,7 +110,6 @@ subsection H - VTUOutput
 end
 
 subsection I - IntegralQuantities
-  set record conserved quantities = true
 end
 
 subsection I - PointQuantities
