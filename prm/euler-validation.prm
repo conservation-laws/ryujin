@@ -1,7 +1,6 @@
 subsection A - TimeLoop
   set basename                  = validation-euler
 
-  set enable output cutplanes   = false
   set enable output full        = true
   set enable compute error      = true
   set enable compute quantities = true

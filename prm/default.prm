@@ -19,13 +19,13 @@ subsection A - TimeLoop
   # times "output quantities multiplier"
   set enable compute quantities    = false
 
-  # Write out cutplanes pvtu records. The frequency is determined by "output
-  # granularity" times "output cutplanes multiplier"
-  set enable output cutplanes      = true
-
   # Write out full pvtu records. The frequency is determined by "output
   # granularity" times "output full multiplier"
-  set enable output full           = true
+  set enable output full           = false
+
+  # Write out levelsets pvtu records. The frequency is determined by "output
+  # granularity" times "output levelsets multiplier"
+  set enable output levelsets      = false
 
   # Final time
   set final time                   = 5
@@ -35,16 +35,16 @@ subsection A - TimeLoop
   set output checkpoint multiplier = 1
 
   # Multiplicative modifier applied to "output granularity" that determines
-  # the cutplanes pvtu writeout granularity
-  set output cutplanes multiplier  = 1
-
-  # Multiplicative modifier applied to "output granularity" that determines
   # the full pvtu writeout granularity
   set output full multiplier       = 1
 
   # The output granularity specifies the time interval after which output
   # routines are run. Further modified by "*_multiplier" options
   set output granularity           = 0.01
+
+  # Multiplicative modifier applied to "output granularity" that determines
+  # the levelsets pvtu writeout granularity
+  set output levelsets multiplier  = 1
 
   # Multiplicative modifier applied to "output granularity" that determines
   # the writeout granularity for quantities of interest
@@ -93,7 +93,7 @@ subsection C - Discretization
   set mesh refinement     = 5
 
   # try to equalize workload by repartitioning the mesh
-  set mesh repartitioning = true
+  set mesh repartitioning = false
 
 
   subsection airfoil

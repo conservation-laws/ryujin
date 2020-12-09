@@ -23,10 +23,8 @@
 subsection A - TimeLoop
   set basename                     = graded-enforced-L10
 
-  set enable checkpointing         = false
   set enable compute quantities    = true
   set enable output full           = true
-  set enable output cutplanes      = false
 
   set final time                   = 1.00
   set output granularity           = 0.01

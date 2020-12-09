@@ -104,13 +104,13 @@ namespace ryujin
 
     bool enable_checkpointing;
     bool enable_output_full;
-    bool enable_output_cutplanes;
+    bool enable_output_levelsets;
     bool enable_compute_error;
     bool enable_compute_quantities;
 
     unsigned int output_checkpoint_multiplier;
     unsigned int output_full_multiplier;
-    unsigned int output_cutplanes_multiplier;
+    unsigned int output_levelsets_multiplier;
     unsigned int output_quantities_multiplier;
 
     bool resume;

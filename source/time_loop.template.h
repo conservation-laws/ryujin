@@ -89,18 +89,18 @@ namespace ryujin
         "at output granularity intervals. The frequency is determined by "
         "\"output granularity\" times \"output checkpoint multiplier\"");
 
-    enable_output_full = true;
+    enable_output_full = false;
     add_parameter("enable output full",
                   enable_output_full,
                   "Write out full pvtu records. The frequency is determined by "
                   "\"output granularity\" times \"output full multiplier\"");
 
-    enable_output_cutplanes = true;
+    enable_output_levelsets = false;
     add_parameter(
-        "enable output cutplanes",
-        enable_output_cutplanes,
-        "Write out cutplanes pvtu records. The frequency is determined by "
-        "\"output granularity\" times \"output cutplanes multiplier\"");
+        "enable output levelsets",
+        enable_output_levelsets,
+        "Write out levelsets pvtu records. The frequency is determined by "
+        "\"output granularity\" times \"output levelsets multiplier\"");
 
     enable_compute_error = false;
     add_parameter("enable compute error",
@@ -129,11 +129,11 @@ namespace ryujin
                   "Multiplicative modifier applied to \"output granularity\" "
                   "that determines the full pvtu writeout granularity");
 
-    output_cutplanes_multiplier = 1;
-    add_parameter("output cutplanes multiplier",
-                  output_cutplanes_multiplier,
+    output_levelsets_multiplier = 1;
+    add_parameter("output levelsets multiplier",
+                  output_levelsets_multiplier,
                   "Multiplicative modifier applied to \"output granularity\" "
-                  "that determines the cutplanes pvtu writeout granularity");
+                  "that determines the levelsets pvtu writeout granularity");
 
     output_quantities_multiplier = 1;
     add_parameter(
@@ -164,7 +164,7 @@ namespace ryujin
                 ExcNotImplemented());
 
     const bool write_output_files =
-        enable_checkpointing || enable_output_full || enable_output_cutplanes;
+        enable_checkpointing || enable_output_full || enable_output_levelsets;
 
     /* Attach log file: */
     if (mpi_rank == 0)
@@ -471,13 +471,13 @@ namespace ryujin
 
     const bool do_full_output =
         (cycle % output_full_multiplier == 0) && enable_output_full;
-    const bool do_cutplanes =
-        (cycle % output_cutplanes_multiplier == 0) && enable_output_cutplanes;
+    const bool do_levelsets =
+        (cycle % output_levelsets_multiplier == 0) && enable_output_levelsets;
     const bool do_checkpointing =
         (cycle % output_checkpoint_multiplier == 0) && enable_checkpointing;
 
     /* There is nothing to do: */
-    if (!(do_full_output || do_cutplanes || do_checkpointing))
+    if (!(do_full_output || do_levelsets || do_checkpointing))
       return;
 
     /* Wait for a previous thread to finish before scheduling a new one: */
@@ -489,7 +489,7 @@ namespace ryujin
     }
 
     /* Data output: */
-    if (do_full_output || do_cutplanes) {
+    if (do_full_output || do_levelsets) {
       Scope scope(computing_timer, "output vtu");
       print_info("scheduling output");
 
@@ -501,7 +501,7 @@ namespace ryujin
                                  t,
                                  cycle,
                                  do_full_output,
-                                 do_cutplanes);
+                                 do_levelsets);
     }
 
     /* Checkpointing: */
@@ -858,10 +858,9 @@ namespace ryujin
         delta_cycles * ((double)offline_data.dof_handler().n_dofs()) / 1.e6 /
         (current.cpu_time_sum - previous.cpu_time_sum);
 
-    double cpu_time_skew =
-        (current.cpu_time_max - current.cpu_time_min - //
-         previous.cpu_time_max + previous.cpu_time_min) /
-        delta_cycles;
+    double cpu_time_skew = (current.cpu_time_max - current.cpu_time_min - //
+                            previous.cpu_time_max + previous.cpu_time_min) /
+                           delta_cycles;
     /* avoid printing small negative numbers: */
     cpu_time_skew = std::max(0., cpu_time_skew);
 

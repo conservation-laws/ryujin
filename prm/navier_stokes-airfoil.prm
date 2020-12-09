@@ -1,10 +1,8 @@
 subsection A - TimeLoop
   set basename                     = airfoil-l37-M0.8
 
-  set enable checkpointing         = false
   set enable compute quantities    = true
   set enable output full           = true
-  set enable output cutplanes      = false
 
   set final time                   = 0.05000
   set output granularity           = 0.00005

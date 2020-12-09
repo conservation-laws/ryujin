@@ -50,7 +50,7 @@ namespace ryujin
     add_parameter(
         "mesh distortion", mesh_distortion_, "Strength of mesh distortion");
 
-    repartitioning_ = true;
+    repartitioning_ = false;
     add_parameter("mesh repartitioning",
                   repartitioning_,
                   "try to equalize workload by repartitioning the mesh");
