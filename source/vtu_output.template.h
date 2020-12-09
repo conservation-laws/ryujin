@@ -9,6 +9,7 @@
 #include "simd.h"
 #include "vtu_output.h"
 
+#include <deal.II/base/function_parser.h>
 #include <deal.II/numerics/data_out.h>
 #include <deal.II/numerics/vector_tools.h>
 
@@ -76,14 +77,10 @@ namespace ryujin
         vorticity_beta_,
         "Beta factor used in the exponential scale for the vorticity");
 
-    add_parameter(
-        "output planes",
-        output_planes_,
-        "A vector of hyperplanes described by an origin, normal vector and a "
-        "tolerance. The description is used to only output cells intersecting "
-        "with the planes for the \"cutplanes\" output. Example declaration of "
-        "two hyper planes in 3D, one normal to the x-axis and one normal to "
-        "the y-axis: \"0,0,0 : 1,0,0 : 0.01 ; 0,0,0 : 0,1,0 : 0,01\"");
+    add_parameter("manifolds",
+                  manifolds_,
+                  "List of level set functions. The description is used to "
+                  "only output cells that intersect the given level set.");
   }
 
 
@@ -108,7 +105,7 @@ namespace ryujin
                                                Number t,
                                                unsigned int cycle,
                                                bool output_full,
-                                               bool output_cutplanes)
+                                               bool output_levelsets)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "VTUOutput<dim, Number>::schedule_output()" << std::endl;
@@ -319,7 +316,7 @@ namespace ryujin
      */
 
     auto data_out = std::make_unique<dealii::DataOut<dim>>();
-    auto data_out_cutplanes = std::make_unique<dealii::DataOut<dim>>();
+    auto data_out_levelsets = std::make_unique<dealii::DataOut<dim>>();
 
     const auto &discretization = offline_data_->discretization();
     const auto &mapping = discretization.mapping();
@@ -341,52 +338,54 @@ namespace ryujin
       data_out->set_flags(flags);
     }
 
-    if (output_cutplanes && output_planes_.size() != 0) {
-      data_out_cutplanes->attach_dof_handler(offline_data_->dof_handler());
+    if (output_levelsets && manifolds_.size() != 0) {
+      data_out_levelsets->attach_dof_handler(offline_data_->dof_handler());
 
       for (unsigned int i = 0; i < problem_dimension; ++i)
-        data_out_cutplanes->add_data_vector(
+        data_out_levelsets->add_data_vector(
             state_vector_[i], ProblemDescription::component_names<dim>[i]);
       for (unsigned int i = 0; i < n_quantities; ++i)
-        data_out_cutplanes->add_data_vector(quantities_[i], component_names[i]);
+        data_out_levelsets->add_data_vector(quantities_[i], component_names[i]);
 
       /*
        * Specify an output filter that selects only cells for output that are
        * in the viscinity of a specified set of output planes:
        */
-      data_out_cutplanes->set_cell_selection([this](const auto &cell) {
-        if (!cell->is_active() || cell->is_artificial())
-          return false;
 
-        if (cell->at_boundary())
-          return true;
+      std::vector<std::shared_ptr<FunctionParser<dim>>> level_set_functions;
+      for (const auto &expression : manifolds_)
+        level_set_functions.emplace_back(
+            std::make_shared<FunctionParser<dim>>(expression));
 
-        for (const auto &plane : output_planes_) {
-          const auto &[origin, normal, tolerance] = plane;
+      data_out_levelsets->set_cell_selection(
+          [level_set_functions](const auto &cell) {
+            if (!cell->is_active() || cell->is_artificial())
+              return false;
 
-          unsigned int above = 0;
-          unsigned int below = 0;
+            for (const auto &function : level_set_functions) {
 
-          for (unsigned int v = 0; v < GeometryInfo<dim>::vertices_per_cell;
-               ++v) {
-            const auto vertex = cell->vertex(v);
-            const auto distance = (vertex - Point<dim>(origin)) * normal;
-            if (distance > -tolerance)
-              above++;
-            if (distance < tolerance)
-              below++;
-            if (above > 0 && below > 0)
-              return true;
-          }
-        }
-        return false;
-      });
+              unsigned int above = 0;
+              unsigned int below = 0;
 
-      data_out_cutplanes->build_patches(mapping, patch_order);
+              for (unsigned int v = 0; v < GeometryInfo<dim>::vertices_per_cell;
+                   ++v) {
+                const auto vertex = cell->vertex(v);
+                if (function->value(vertex) >= 0.)
+                  above++;
+                if (function->value(vertex) <= 0.)
+                  below++;
+                if (above > 0 && below > 0)
+                  return true;
+              }
+            }
+            return false;
+          });
+
+      data_out_levelsets->build_patches(mapping, patch_order);
 
       DataOutBase::VtkFlags flags(
           t, cycle, true, DataOutBase::VtkFlags::best_speed);
-      data_out_cutplanes->set_flags(flags);
+      data_out_levelsets->set_flags(flags);
     }
 
     if (use_mpi_io_) {
@@ -396,9 +395,9 @@ namespace ryujin
             name + "_" + Utilities::to_string(cycle, 6) + ".vtu",
             mpi_communicator_);
       }
-      if (output_cutplanes && output_planes_.size() != 0) {
-        data_out_cutplanes->write_vtu_in_parallel(
-            name + "-cutplanes_" + Utilities::to_string(cycle, 6) + ".vtu",
+      if (output_levelsets && manifolds_.size() != 0) {
+        data_out_levelsets->write_vtu_in_parallel(
+            name + "-levelsets_" + Utilities::to_string(cycle, 6) + ".vtu",
             mpi_communicator_);
       }
 
@@ -409,18 +408,18 @@ namespace ryujin
           std::launch::async,
           [=,
            data_out = std::move(data_out),
-           data_out_cutplanes = std::move(data_out_cutplanes)]() mutable {
+           data_out_levelsets = std::move(data_out_levelsets)]() mutable {
             if (output_full) {
               data_out->write_vtu_with_pvtu_record(
                   "", name, cycle, mpi_communicator_, 6);
             }
-            if (output_cutplanes && output_planes_.size() != 0) {
-              data_out_cutplanes->write_vtu_with_pvtu_record(
-                  "", name + "-cutplanes", cycle, mpi_communicator_, 6);
+            if (output_levelsets && manifolds_.size() != 0) {
+              data_out_levelsets->write_vtu_with_pvtu_record(
+                  "", name + "-levelsets", cycle, mpi_communicator_, 6);
             }
             /* Explicitly delete pointer to free up memory early: */
             data_out.reset();
-            data_out_cutplanes.reset();
+            data_out_levelsets.reset();
           });
     }
   }

@@ -154,11 +154,7 @@ namespace ryujin
     Number schlieren_beta_;
     Number vorticity_beta_;
 
-    using plane_description = std::tuple<dealii::Point<dim> /*origin*/,
-                                         dealii::Tensor<1, dim> /*normal*/,
-                                         double /*tolerance*/>;
-
-    std::vector<plane_description> output_planes_;
+    std::vector<std::string> manifolds_;
 
     //@}
     /**

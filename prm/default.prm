@@ -361,12 +361,9 @@ end
 
 
 subsection H - VTUOutput
-  # A vector of hyperplanes described by an origin, normal vector and a
-  # tolerance. The description is used to only output cells intersecting with
-  # the planes for the "cutplanes" output. Example declaration of two hyper
-  # planes in 3D, one normal to the x-axis and one normal to the y-axis:
-  # "0,0,0 : 1,0,0 : 0.01 ; 0,0,0 : 0,1,0 : 0,01"
-  set output planes  = 
+  # List of level set functions. The description is used to only output cells
+  # that intersect the given level set.
+  set manifolds      = 
 
   # Beta factor used in the exponential scale for the schlieren plot
   set schlieren beta = 10

@@ -188,7 +188,6 @@ namespace ryujin
 
     /* Create boundary maps: */
 
-
     boundary_maps_.clear();
     std::transform(
         boundary_manifolds_.begin(),
