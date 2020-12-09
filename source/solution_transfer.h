@@ -64,6 +64,7 @@ namespace ryujin
     void prepare_for_interpolation(const vector_type &U)
     {
       const auto &scalar_partitioner = offline_data_->scalar_partitioner();
+      const auto &affine_constraints = offline_data_->affine_constraints();
 
       state_.resize(problem_dimension);
       for (auto &it : state_)
@@ -85,8 +86,10 @@ namespace ryujin
         state_[1 + dim].local_element(i) = e_i;
       }
 
-      for (auto &it : state_)
+      for (auto &it : state_) {
+        affine_constraints.distribute(it);
         it.update_ghost_values();
+      }
 
       std::vector<const scalar_type *> ptr_state;
       std::transform(state_.begin(),
