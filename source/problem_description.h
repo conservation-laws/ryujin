@@ -241,15 +241,31 @@ namespace ryujin
 
     //@}
     /**
-     * @name Computing left/right eigenvectors of the linearized boundary
-     * flux
+     * @name Special functions for boundary states
      */
     //@{
 
+    /**
+     * For a given state @p U and normal direction @p normal returns the
+     * n-th pair of left and right eigenvectors of the linearized normal
+     * flux.
+     */
     template <int component, int problem_dim, typename Number>
     std::array<dealii::Tensor<1, problem_dim, Number>, 2>
     linearized_eigenvector(
         const dealii::Tensor<1, problem_dim, Number> &U,
+        const dealii::Tensor<1, problem_dim - 2, Number> &normal) const;
+
+    /**
+     * Decomposes a given state @p U into Riemann invariants and then
+     * replaces the first or second Riemann characteristic from the one
+     * taken from @p U_bar state.
+     */
+    template <int component, int problem_dim, typename Number>
+    dealii::Tensor<1, problem_dim, Number>
+    prescribe_riemann_characteristic(
+        const dealii::Tensor<1, problem_dim, Number> &U,
+        const dealii::Tensor<1, problem_dim, Number> &U_bar,
         const dealii::Tensor<1, problem_dim - 2, Number> &normal) const;
 
     //@}
@@ -607,9 +623,67 @@ namespace ryujin
   }
 
 
+  template <int component, int problem_dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline
+  dealii::Tensor<1, problem_dim, Number>
+  ProblemDescription::prescribe_riemann_characteristic(
+          const dealii::Tensor<1, problem_dim, Number> &U,
+          const dealii::Tensor<1, problem_dim, Number> &U_bar,
+          const dealii::Tensor<1, problem_dim - 2, Number> &normal) const
+  {
+    static_assert(component == 1 || component == 2,
+                  "component has to be 1 or 2");
+
+    constexpr int dim = problem_dim - 2;
+
+    const auto m = momentum(U);
+    const auto rho = density(U);
+    const auto a = speed_of_sound(U);
+    const auto vn = m * normal / rho;
+
+    const auto m_bar = momentum(U_bar);
+    const auto rho_bar = density(U_bar);
+    const auto a_bar = speed_of_sound(U_bar);
+    const auto vn_bar = m_bar * normal / rho_bar;
+
+    /* First Riemann characteristic: v* n - 2 / (gamma - 1) * a */
+
+    const auto R_1 = component == 1 ? vn_bar - 2. * a_bar / (gamma_ - 1.)
+                                    : vn - 2. * a / (gamma_ - 1.);
+
+    /* Second Riemann characteristic: v* n + 2 / (gamma - 1) * a */
+
+    const auto R_2 = component == 2 ? vn_bar + 2. * a_bar / (gamma_ - 1.)
+                                    : vn + 2. * a / (gamma_ - 1.);
+
+    const auto p = pressure(U);
+    const auto s = p / ryujin::pow(rho, gamma_);
+
+    const auto vperp = m / rho - vn * normal;
+
+    const auto vn_new = 0.5 * (R_1 + R_2);
+
+    auto rho_new =
+        1. / (gamma_ * s) * ryujin::pow((gamma_ - 1.) / 4. * (R_2 - R_1), 2);
+    rho_new = ryujin::pow(rho_new, 1. / (gamma_ - 1.));
+
+    const auto p_new = s * std::pow(rho_new, gamma_);
+
+    rank1_type<dim, Number> U_new;
+    U_new[0] = rho_new;
+    for (unsigned int d = 0; d < dim; ++d) {
+      U_new[1 + d] = rho_new * (vn_new * normal + vperp)[d];
+    }
+    U_new[1 + dim] = p_new / (gamma_ - 1.) +
+                     0.5 * rho_new * (vn_new * vn_new + vperp.norm_square());
+
+    return U_new;
+  }
+
+
   template <int problem_dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline ProblemDescription::rank2_type<problem_dim - 2,
-                                                              Number>
+  DEAL_II_ALWAYS_INLINE inline
+  ProblemDescription::rank2_type<problem_dim - 2, Number>
   ProblemDescription::f(const dealii::Tensor<1, problem_dim, Number> &U) const
   {
     constexpr int dim = problem_dim - 2;

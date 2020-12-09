@@ -159,9 +159,7 @@ namespace ryujin
 
     Number single_step(vector_type &U, Number tau);
 
-    void apply_boundary_conditions(vector_type &U,
-                                   const vector_type &U_old,
-                                   Number t);
+    void apply_boundary_conditions(vector_type &U, Number t);
 
     //@}
     /**

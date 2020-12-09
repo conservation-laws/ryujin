@@ -1028,8 +1028,8 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  void EulerModule<dim, Number>::apply_boundary_conditions(
-      vector_type &U, const vector_type &U_old, Number t)
+  void EulerModule<dim, Number>::apply_boundary_conditions(vector_type &U,
+                                                           Number t)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "EulerModule<dim, Number>::apply_boundary_conditions()"
@@ -1069,109 +1069,43 @@ namespace ryujin
         U_i = initial_values_->initial_state(position, t);
 
       } else if (id == Boundary::dynamic) {
+        /*
+         * On dynamic boundary conditions, we distinguish four cases:
+         *
+         *  - supersonic inflow: prescribe full state
+         *  - subsonic inflow:
+         *      decompose into Riemann invariants and leave R_2
+         *      characteristic untouched.
+         *  - supersonic outflow: do nothing
+         *  - subsonic outflow:
+         *      decompose into Riemann invariants and prescribe incoming
+         *      R_1 characteristic.
+         */
         const auto m = problem_description_->momentum(U_i);
         const auto rho = problem_description_->density(U_i);
         const auto a = problem_description_->speed_of_sound(U_i);
         const auto vn = m * normal / rho;
 
-        /* Supersonic inflow: set full Dirichlet data. */
+        /* Supersonic inflow: */
         if (vn < -a) {
           U_i = initial_values_->initial_state(position, t);
         }
 
-        /* Subsonic inflow: tba */
+        /* Subsonic inflow: */
         if (vn >= -a && vn <= 0.) {
-
-          const auto U_i_bar = U_i;
-          U_i = initial_values_->initial_state(position, t);
-
-          const auto m = problem_description_->momentum(U_i);
-          const auto rho = problem_description_->density(U_i);
-          const auto a = problem_description_->speed_of_sound(U_i);
-          const auto vn = m * normal / rho;
-
-          const auto m_bar = problem_description_->momentum(U_i_bar);
-          const auto rho_bar = problem_description_->density(U_i_bar);
-          const auto a_bar = problem_description_->speed_of_sound(U_i_bar);
-          const auto vn_bar = m_bar * normal / rho_bar;
-
-          const auto gamma = problem_description_->gamma();
-
-          // v* n - 2 / (gamma - 1) * a
-          const auto R_1 = vn - 2. * a / (gamma - 1);
-
-          // v* n + 2 / (gamma - 1) * a
-          const auto R_2_bar = vn_bar + 2. * a_bar / (gamma - 1);
-
-          const auto p = problem_description_->pressure(U_i);
-          const auto s = p / ryujin::pow(rho, gamma);
-
-          const auto vperp = m / rho - vn * normal;
-
-          const auto vn_new = 0.5 * (R_1 + R_2_bar);
-
-          auto rho_new = 1. / (gamma * s) *
-                         ryujin::pow((gamma - 1.) / 4. * (R_2_bar - R_1), 2);
-          rho_new = ryujin::pow(rho_new, 1. / (gamma - 1));
-
-          const auto p_new = s * std::pow(rho_new, gamma);
-
-          rank1_type U_i_new;
-          U_i_new[0] = rho_new;
-          for (unsigned int d = 0; d < dim; ++d) {
-            U_i_new[1 + d] = rho_new * (vn_new * normal + vperp)[d];
-          }
-          U_i_new[1 + dim] =
-              p_new / (gamma - 1) +
-              0.5 * rho_new * (vn_new * vn_new + vperp.norm_square());
-
-          U_i = U_i_new;
-        }
-
-        /* Subsonic outflow: tba */
-        if (vn > 0.  && vn <= a) {
-
           const auto U_i_bar = initial_values_->initial_state(position, t);
-
-          const auto m_bar = problem_description_->momentum(U_i_bar);
-          const auto rho_bar = problem_description_->density(U_i_bar);
-          const auto a_bar = problem_description_->speed_of_sound(U_i_bar);
-          const auto vn_bar = m_bar * normal / rho_bar;
-
-          const auto gamma = problem_description_->gamma();
-
-          // v* n - 2 / (gamma - 1) * a
-          const auto R_1_bar = vn_bar - 2. * a_bar / (gamma - 1);
-
-          // v* n + 2 / (gamma - 1) * a
-          const auto R_2 = vn + 2. * a / (gamma - 1);
-
-          const auto p = problem_description_->pressure(U_i);
-          const auto s = p / ryujin::pow(rho, gamma);
-
-          const auto vperp = m / rho - vn * normal;
-
-          const auto vn_new = 0.5 * (R_1_bar + R_2);
-
-          auto rho_new = 1. / (gamma * s) *
-                         ryujin::pow((gamma - 1.) / 4. * (R_2 - R_1_bar), 2);
-          rho_new = ryujin::pow(rho_new, 1. / (gamma - 1));
-
-          const auto p_new = s * std::pow(rho_new, gamma);
-
-          rank1_type U_i_new;
-          U_i_new[0] = rho_new;
-          for (unsigned int d = 0; d < dim; ++d) {
-            U_i_new[1 + d] = rho_new * (vn_new * normal + vperp)[d];
-          }
-          U_i_new[1 + dim] =
-              p_new / (gamma - 1) +
-              0.5 * rho_new * (vn_new * vn_new + vperp.norm_square());
-
-          U_i = U_i_new;
+          U_i = problem_description_->prescribe_riemann_characteristic<2>(
+              U_i_bar, U_i, normal);
         }
 
-        /* Supersonic outflow: do nothing. */
+        /* Subsonic outflow: */
+        if (vn > 0.  && vn <= a) {
+          const auto U_i_bar = initial_values_->initial_state(position, t);
+          U_i = problem_description_->prescribe_riemann_characteristic<1>(
+              U_i, U_i_bar, normal);
+        }
+
+        /* Supersonic outflow: */
         if (vn > a) {
           continue;
         }
@@ -1194,7 +1128,7 @@ namespace ryujin
 #endif
 
     Number tau_1 = single_step(U, tau_0);
-    apply_boundary_conditions(U, temp_euler_, t + tau_1);
+    apply_boundary_conditions(U, t + tau_1);
     return tau_1;
   }
 
@@ -1214,7 +1148,7 @@ namespace ryujin
 
     /* Step 1: U1 = U_old + tau * L(U_old) */
     Number tau_1 = single_step(U, tau_0);
-    apply_boundary_conditions(U, temp_ssp_, t + tau_1);
+    apply_boundary_conditions(U, t + tau_1);
 
     AssertThrow(tau_1 * cfl_max_ / cfl_update_ >= tau_0,
                 ExcMessage("failed to recover from CFL violation"));
@@ -1238,7 +1172,7 @@ namespace ryujin
     }
 
     U.sadd(Number(1. / 2.), Number(1. / 2.), temp_ssp_);
-    apply_boundary_conditions(U, temp_ssp_, t + tau_1);
+    apply_boundary_conditions(U, t + tau_1);
 
     return tau_1;
   }
@@ -1260,7 +1194,7 @@ namespace ryujin
     /* Step 1: U1 = U_old + tau * L(U_old) at time t + tau_1 */
 
     Number tau_1 = single_step(U, tau_0);
-    apply_boundary_conditions(U, temp_ssp_, t + tau_1);
+    apply_boundary_conditions(U, t + tau_1);
 
     AssertThrow(tau_1 * cfl_max_ / cfl_update_ >= tau_0,
                 ExcMessage("failed to recover from CFL violation"));
@@ -1285,7 +1219,7 @@ namespace ryujin
     }
 
     U.sadd(Number(1. / 4.), Number(3. / 4.), temp_ssp_);
-    apply_boundary_conditions(U, temp_ssp_, t + 0.5 * tau_1);
+    apply_boundary_conditions(U, t + 0.5 * tau_1);
 
     /* Step 3: U_new = 1/3 U_old + 2/3 (U2 + tau L(U2)) at time t + tau_1 */
 
@@ -1306,7 +1240,7 @@ namespace ryujin
     }
 
     U.sadd(Number(2. / 3.), Number(1. / 3.), temp_ssp_);
-    apply_boundary_conditions(U, temp_ssp_, t + tau_1);
+    apply_boundary_conditions(U, t + tau_1);
 
     return tau_1;
   }
