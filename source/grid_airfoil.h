@@ -808,6 +808,12 @@ namespace ryujin
                             grading_epsilon_,
                             "graded mesh: regularization parameter");
 
+        grading_epsilon_trailing_ = 0.01;
+        this->add_parameter(
+            "grading epsilon trailing",
+            grading_epsilon_trailing_,
+            "graded mesh: regularization parameter for trailing cells");
+
         height_ = 6.;
         this->add_parameter(
             "height", height_, "height of computational domain");
@@ -1072,11 +1078,11 @@ namespace ryujin
             direction[0] = -1.;
           }
 
-          Manifolds::GradingManifold<dim> grading{center,
-                                                  direction,
-                                                  grading_,
-                                                  (i == 5 ? 0.1 : 0.0) +
-                                                      grading_epsilon_};
+          Manifolds::GradingManifold<dim> grading{
+              center,
+              direction,
+              grading_,
+              i == 5 ? grading_epsilon_trailing_ : grading_epsilon_};
 
           auto transfinite =
               std::make_unique<ryujin::TransfiniteInterpolationManifold<2>>();
@@ -1266,6 +1272,7 @@ namespace ryujin
       double width_;
       double grading_;
       double grading_epsilon_;
+      double grading_epsilon_trailing_;
       unsigned int n_anisotropic_refinements_airfoil_;
       unsigned int n_anisotropic_refinements_trailing_;
       unsigned int subdivisions_z_;
