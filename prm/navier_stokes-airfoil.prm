@@ -18,14 +18,17 @@
 subsection A - TimeLoop
   set basename                     = oat15a-2M
 
+  set enable checkpointing         = true
   set enable compute quantities    = true
   set enable output full           = true
 
-  set final time                   = 0.05000
-  set output granularity           = 0.00005
+  set final time                   = 0.06000
+  set output granularity           = 0.00001
 
-  set output checkpoint multiplier = 10
-  set output full multiplier       = 100
+  set refinement timepoints        = 0.02, 0.04
+
+  set output checkpoint multiplier = 40
+  set output full multiplier       = 20
   set output quantities multiplier = 1
 
   set terminal update interval     = 30
@@ -46,6 +49,7 @@ end
 subsection C - Discretization
   set geometry            = airfoil
   set mesh refinement     = 5
+  set mesh repartitioning = true
 
   subsection airfoil
     set airfoil type                        = ONERA OAT15a
@@ -53,10 +57,10 @@ subsection C - Discretization
     set airfoil length                      =  0.4905
     set psi center                          =  0.03, 0.
     set psi ratio                           =  1.00
-    set height                              =  6.0
+    set height                              =  2.0
     set width                               =  4.0
     set grading exponent                    =  6.0000
-    set grading epsilon                     =  0.0005
+    set grading epsilon                     =  0.0001
     set grading epsilon trailing            =  0.0100
     set anisotropic pre refinement airfoil  =  1
     set anisotropic pre refinement trailing =  3
@@ -78,8 +82,8 @@ subsection E - InitialValues
 end
 
 subsection F - EulerModule
-  set cfl max            = 0.99
-  set cfl update         = 0.90
+  set cfl max            = 3.60
+  set cfl update         = 3.50
 
   set enforce noslip     = true
 
