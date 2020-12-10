@@ -1,10 +1,27 @@
+#
+# Computation of C_P/C_F values of the ONERA OAT15a airfoil.
+#
+# See [1, §4.5]: "Test case #4: transonic buffet over the supercritical
+#                OAT15A airfoil"
+#
+# The free-stream state is that of air at 10km height and at Mach 0.73.
+#
+# The chord length has been set to c = 0.4905m, so that the Reynolds number
+# (based on freestream velocity and the chord) is precisely equal to
+# 3 * 10^6. Angle of attack of the airfoil is 3.5 deg.
+#
+# [1] S.~Deck, N.~Renard. Towards an enhanced protection of attached
+#     boundary layers in hybrid RANS/LES methods. Journal of Computational
+#     Physics, 400:108970, 2020.
+#
+
 subsection A - TimeLoop
-  set basename                     = airfoil-l37-M0.8
+  set basename                     = oat15a-2M
 
   set enable compute quantities    = true
   set enable output full           = true
 
-  set final time                   = 0.05000
+  set final time                   = 0.00000
   set output granularity           = 0.00005
 
   set output checkpoint multiplier = 10
@@ -26,33 +43,34 @@ end
 
 subsection C - Discretization
   set geometry            = airfoil
-  set mesh refinement     = 7
+  set mesh refinement     = 4
 
   subsection airfoil
-    set airfoil type                        = NASA SC(2) 0714
-    set airfoil center                      = -0.50, 0.
-    set airfoil length                      =  2.0
-    set psi center                          =  0.05, 0.
-    set psi ratio                           =  0.30
+    set airfoil type                        = ONERA OAT15a
+    set airfoil center                      = -0.1226, 0.
+    set airfoil length                      =  0.4905
+    set psi center                          =  0.03, 0.
+    set psi ratio                           =  1.00
     set height                              =  6.0
     set width                               =  4.0
-    set grading exponent                    =  5.5000
-    set grading epsilon                     =  0.0100
+    set grading exponent                    =  6.0000
+    set grading epsilon                     =  0.0005
     set anisotropic pre refinement airfoil  =  1
-    set anisotropic pre refinement trailing =  3
+    set anisotropic pre refinement trailing =  4
     set subdivisions z                      =  2
   end
 end
 
 subsection E - InitialValues
   set configuration = uniform
-  set direction     = 0.9945, 0.1045
+  # 3.5deg angle of attack:
+  set direction     = 0.99813, 0.061049
   set position      = 0., 0.
 
   subsection uniform
-    # Air at 10km height and flow at Mach 0.8
+    # Air at 10km height and flow at Mach 0.73
     # rho [kg/m^3], v [m/s], p [N/m^2]
-    set primitive state = 0.4135, 236.32, 2.650e4
+    set primitive state = 0.4135, 215.64, 2.650e4
   end
 end
 
