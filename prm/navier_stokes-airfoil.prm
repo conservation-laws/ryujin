@@ -21,12 +21,14 @@ subsection A - TimeLoop
   set enable compute quantities    = true
   set enable output full           = true
 
-  set final time                   = 0.00000
+  set final time                   = 0.05000
   set output granularity           = 0.00005
 
   set output checkpoint multiplier = 10
   set output full multiplier       = 100
   set output quantities multiplier = 1
+
+  set terminal update interval     = 30
 
   set resume = false
 end
@@ -43,7 +45,7 @@ end
 
 subsection C - Discretization
   set geometry            = airfoil
-  set mesh refinement     = 4
+  set mesh refinement     = 5
 
   subsection airfoil
     set airfoil type                        = ONERA OAT15a
@@ -55,8 +57,9 @@ subsection C - Discretization
     set width                               =  4.0
     set grading exponent                    =  6.0000
     set grading epsilon                     =  0.0005
+    set grading epsilon trailing            =  0.0100
     set anisotropic pre refinement airfoil  =  1
-    set anisotropic pre refinement trailing =  4
+    set anisotropic pre refinement trailing =  3
     set subdivisions z                      =  2
   end
 end
