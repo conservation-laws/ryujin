@@ -26,7 +26,7 @@ following references ([preprint](https://arxiv.org/abs/2007.00094),
 
 ```
 @article{ryujin2020,
-  title   = {Massively parallel 3D computation of the compressible Euler
+  title   = {Efficient parallel 3D computation of the compressible Euler
     equations with an invariant-domain preserving second-order
     finite-element scheme}
   author  = {Matthias Maier and Martin Kronbichler},
