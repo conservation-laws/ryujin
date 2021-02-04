@@ -12,9 +12,9 @@ find_package(deal.II 9.2 REQUIRED HINTS ${DEAL_II_DIR} $ENV{DEAL_II_DIR})
 deal_ii_initialize_cached_variables()
 deal_ii_query_git_information()
 
-if(NOT DEAL_II_WITH_MPI OR NOT DEAL_II_WITH_THREADS OR NOT DEAL_II_WITH_P4EST)
+if(NOT DEAL_II_WITH_MPI OR NOT DEAL_II_WITH_P4EST)
   message(FATAL_ERROR
-    "Need a deal.II library with threads, mpi and p4est support enabled."
+    "Need a deal.II library with mpi and p4est support enabled."
     )
 endif()
 
