@@ -3,12 +3,13 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#ifndef POSTPROCESSOR_TEMPLATE_H
-#define POSTPROCESSOR_TEMPLATE_H
+#ifndef VTU_OUTPUT_TEMPLATE_H
+#define VTU_OUTPUT_TEMPLATE_H
 
-#include "postprocessor.h"
 #include "simd.h"
+#include "vtu_output.h"
 
+#include <deal.II/base/function_parser.h>
 #include <deal.II/numerics/data_out.h>
 #include <deal.II/numerics/vector_tools.h>
 
@@ -22,36 +23,36 @@ namespace ryujin
 
 #ifndef DOXYGEN
   template <>
-  const std::array<std::string, 2> Postprocessor<1, double>::component_names{
-      "schlieren", "alpha"};
+  const std::array<std::string, 2> VTUOutput<1, double>::component_names{
+      {"schlieren", "residual_mu"}};
 
   template <>
-  const std::array<std::string, 3> Postprocessor<2, double>::component_names{
-      "schlieren", "vorticity", "alpha"};
+  const std::array<std::string, 3> VTUOutput<2, double>::component_names{
+      {"schlieren", "vorticity", "residual_mu"}};
 
   template <>
-  const std::array<std::string, 3> Postprocessor<3, double>::component_names{
-      "schlieren", "vorticity", "alpha"};
+  const std::array<std::string, 3> VTUOutput<3, double>::component_names{
+      {"schlieren", "vorticity", "residual_mu"}};
 
   template <>
-  const std::array<std::string, 2> Postprocessor<1, float>::component_names{
-      "schlieren", "alpha"};
+  const std::array<std::string, 2> VTUOutput<1, float>::component_names{
+      {"schlieren", "residual_mu"}};
 
   template <>
-  const std::array<std::string, 3> Postprocessor<2, float>::component_names{
-      "schlieren", "vorticity", "alpha"};
+  const std::array<std::string, 3> VTUOutput<2, float>::component_names{
+      {"schlieren", "vorticity", "residual_mu"}};
 
   template <>
-  const std::array<std::string, 3> Postprocessor<3, float>::component_names{
-      "schlieren", "vorticity", "alpha"};
+  const std::array<std::string, 3> VTUOutput<3, float>::component_names{
+      {"schlieren", "vorticity", "residual_mu"}};
 #endif
 
 
   template <int dim, typename Number>
-  Postprocessor<dim, Number>::Postprocessor(
+  VTUOutput<dim, Number>::VTUOutput(
       const MPI_Comm &mpi_communicator,
       const ryujin::OfflineData<dim, Number> &offline_data,
-      const std::string &subsection /*= "Postprocessor"*/)
+      const std::string &subsection /*= "VTUOutput"*/)
       : ParameterAcceptor(subsection)
       , mpi_communicator_(mpi_communicator)
       , offline_data_(&offline_data)
@@ -76,22 +77,18 @@ namespace ryujin
         vorticity_beta_,
         "Beta factor used in the exponential scale for the vorticity");
 
-    add_parameter(
-        "output planes",
-        output_planes_,
-        "A vector of hyperplanes described by an origin, normal vector and a "
-        "tolerance. The description is used to only output cells intersecting "
-        "with the planes for the \"cutplanes\" output. Example declaration of "
-        "two hyper planes in 3D, one normal to the x-axis and one normal to "
-        "the y-axis: \"0,0,0 : 1,0,0 : 0.01 ; 0,0,0 : 0,1,0 : 0,01\"");
+    add_parameter("manifolds",
+                  manifolds_,
+                  "List of level set functions. The description is used to "
+                  "only output cells that intersect the given level set.");
   }
 
 
   template <int dim, typename Number>
-  void Postprocessor<dim, Number>::prepare()
+  void VTUOutput<dim, Number>::prepare()
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "Postprocessor<dim, Number>::prepare()" << std::endl;
+    std::cout << "VTUOutput<dim, Number>::prepare()" << std::endl;
 #endif
 
     const auto &partitioner = offline_data_->scalar_partitioner();
@@ -102,16 +99,16 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  void Postprocessor<dim, Number>::schedule_output(const vector_type &U,
-                                                   const scalar_type &alpha,
-                                                   std::string name,
-                                                   Number t,
-                                                   unsigned int cycle,
-                                                   bool output_full,
-                                                   bool output_cutplanes)
+  void VTUOutput<dim, Number>::schedule_output(const vector_type &U,
+                                               const scalar_type &residual_mu,
+                                               std::string name,
+                                               Number t,
+                                               unsigned int cycle,
+                                               bool output_full,
+                                               bool output_levelsets)
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "Postprocessor<dim, Number>::schedule_output()" << std::endl;
+    std::cout << "VTUOutput<dim, Number>::schedule_output()" << std::endl;
 #endif
 
     constexpr auto simd_length = VectorizedArray<Number>::size();
@@ -124,6 +121,19 @@ namespace ryujin
 
     const unsigned int n_internal = offline_data_->n_locally_internal();
     const unsigned int n_locally_owned = offline_data_->n_locally_owned();
+
+    /*
+     * Step 1: Copy state vector:
+     */
+    {
+      unsigned int d = 0;
+      for (auto &it : state_vector_) {
+        it.reinit(offline_data_->scalar_partitioner());
+        U.extract_component(it, d++);
+        affine_constraints.distribute(it);
+        it.update_ghost_values();
+      }
+    }
 
     /*
      * Step 2: Compute r_i and r_i_max, r_i_min:
@@ -160,12 +170,14 @@ namespace ryujin
           const auto j =
               *(i < n_internal ? js + col_idx * simd_length : js + col_idx);
 
-          const auto U_j = U.get_tensor(j);
-          const auto M_j = ProblemDescription<dim, Number>::momentum(U_j);
+          rank1_type U_j;
+          for (unsigned int d = 0; d < problem_dimension; ++d)
+            U_j[d] = state_vector_[d].local_element(j);
+          const auto M_j = ProblemDescription::momentum(U_j);
 
           const auto c_ij = cij_matrix.get_tensor(i, col_idx);
 
-          const auto rho_j = U_j[0];
+          const auto rho_j = ProblemDescription::density(U_j);
 
           grad_rho_i += c_ij * rho_j;
 
@@ -178,17 +190,23 @@ namespace ryujin
 
         /* Fix up boundaries: */
 
-        const auto bnm_it = boundary_map.find(i);
-        if (bnm_it != boundary_map.end()) {
-          const auto [normal, id, _] = bnm_it->second;
-          /* FIXME: Think again about what to do exactly here... */
-          if (id == Boundary::slip) {
+        const auto range = boundary_map.equal_range(i);
+        for (auto it = range.first; it != range.second; ++it) {
+          const auto [normal, id, _] = it->second;
+          /* Remove normal components of the gradient on the boundary: */
+          if (id == Boundary::slip || id == Boundary::no_slip) {
             grad_rho_i -= 1. * (grad_rho_i * normal) * normal;
           } else {
             grad_rho_i = 0.;
           }
-          curl_v_i = 0.;
+          /* Only retain the normal component of the curl on the boundary: */
+          if constexpr (dim == 2) {
+            curl_v_i = 0.;
+          } else if constexpr (dim == 3) {
+            curl_v_i = (curl_v_i * normal) * normal;
+          }
         }
+
 
         /* Populate quantities: */
 
@@ -202,7 +220,7 @@ namespace ryujin
         } else if constexpr (dim == 3) {
           quantities[1] = curl_v_i.norm() / m_i;
         }
-        quantities[n_quantities - 1] = alpha.local_element(i);
+        quantities[n_quantities - 1] = residual_mu.local_element(i);
 
         r_i_max_on_subrange = std::max(r_i_max_on_subrange, quantities[0]);
         r_i_min_on_subrange = std::min(r_i_min_on_subrange, quantities[0]);
@@ -240,12 +258,16 @@ namespace ryujin
       RYUJIN_PARALLEL_REGION_END
     }
 
-    /* And synchronize over all processors: */
+    /*
+     * And synchronize over all processors: Add +-eps to avoid division by
+     * zero in the exponentiation further down below.
+     */
 
-    r_i_max.store(Utilities::MPI::max(r_i_max.load(), mpi_communicator_));
-    r_i_min.store(Utilities::MPI::min(r_i_min.load(), mpi_communicator_));
-    v_i_max.store(Utilities::MPI::max(v_i_max.load(), mpi_communicator_));
-    v_i_min.store(Utilities::MPI::min(v_i_min.load(), mpi_communicator_));
+    constexpr auto eps = std::numeric_limits<Number>::epsilon();
+    r_i_max.store(Utilities::MPI::max(r_i_max.load() + eps, mpi_communicator_));
+    r_i_min.store(Utilities::MPI::min(r_i_min.load() - eps, mpi_communicator_));
+    v_i_max.store(Utilities::MPI::max(v_i_max.load() + eps, mpi_communicator_));
+    v_i_min.store(Utilities::MPI::min(v_i_min.load() - eps, mpi_communicator_));
 
     /*
      * Step 3: Normalize schlieren and vorticity:
@@ -294,30 +316,18 @@ namespace ryujin
      */
 
     auto data_out = std::make_unique<dealii::DataOut<dim>>();
-    auto data_out_cutplanes = std::make_unique<dealii::DataOut<dim>>();
+    auto data_out_levelsets = std::make_unique<dealii::DataOut<dim>>();
 
     const auto &discretization = offline_data_->discretization();
     const auto &mapping = discretization.mapping();
     const auto patch_order = discretization.finite_element().degree - 1;
 
-    std::array<LinearAlgebra::distributed::Vector<Number>, problem_dimension>
-        U_copy;
-    for (auto &it : U_copy)
-      it.reinit(offline_data_->scalar_partitioner());
-    for (unsigned int i = 0;
-         i < offline_data_->scalar_partitioner()->local_size();
-         ++i)
-      for (unsigned int d = 0; d < problem_dimension; ++d)
-        U_copy[d].local_element(i) = U.local_element(i * problem_dimension + d);
-    for (auto &it : U_copy)
-      it.update_ghost_values();
-
     if (output_full) {
       data_out->attach_dof_handler(offline_data_->dof_handler());
 
       for (unsigned int i = 0; i < problem_dimension; ++i)
-        data_out->add_data_vector(
-            U_copy[i], ProblemDescription<dim, Number>::component_names[i]);
+        data_out->add_data_vector(state_vector_[i],
+                                  ProblemDescription::component_names<dim>[i]);
       for (unsigned int i = 0; i < n_quantities; ++i)
         data_out->add_data_vector(quantities_[i], component_names[i]);
 
@@ -328,63 +338,66 @@ namespace ryujin
       data_out->set_flags(flags);
     }
 
-    if (output_cutplanes && output_planes_.size() != 0) {
-      data_out_cutplanes->attach_dof_handler(offline_data_->dof_handler());
+    if (output_levelsets && manifolds_.size() != 0) {
+      data_out_levelsets->attach_dof_handler(offline_data_->dof_handler());
 
       for (unsigned int i = 0; i < problem_dimension; ++i)
-        data_out_cutplanes->add_data_vector(
-            U_copy[i], ProblemDescription<dim, Number>::component_names[i]);
+        data_out_levelsets->add_data_vector(
+            state_vector_[i], ProblemDescription::component_names<dim>[i]);
       for (unsigned int i = 0; i < n_quantities; ++i)
-        data_out_cutplanes->add_data_vector(quantities_[i], component_names[i]);
+        data_out_levelsets->add_data_vector(quantities_[i], component_names[i]);
 
       /*
        * Specify an output filter that selects only cells for output that are
        * in the viscinity of a specified set of output planes:
        */
-      data_out_cutplanes->set_cell_selection([this](const auto &cell) {
-        if (!cell->is_active() || cell->is_artificial())
-          return false;
 
-        if (cell->at_boundary())
-          return true;
+      std::vector<std::shared_ptr<FunctionParser<dim>>> level_set_functions;
+      for (const auto &expression : manifolds_)
+        level_set_functions.emplace_back(
+            std::make_shared<FunctionParser<dim>>(expression));
 
-        for (const auto &plane : output_planes_) {
-          const auto &[origin, normal, tolerance] = plane;
+      data_out_levelsets->set_cell_selection(
+          [level_set_functions](const auto &cell) {
+            if (!cell->is_active() || cell->is_artificial())
+              return false;
 
-          unsigned int above = 0;
-          unsigned int below = 0;
+            for (const auto &function : level_set_functions) {
 
-          for (unsigned int v = 0; v < GeometryInfo<dim>::vertices_per_cell;
-               ++v) {
-            const auto vertex = cell->vertex(v);
-            const auto distance = (vertex - Point<dim>(origin)) * normal;
-            if (distance > -tolerance)
-              above++;
-            if (distance < tolerance)
-              below++;
-            if (above > 0 && below > 0)
-              return true;
-          }
-        }
-        return false;
-      });
+              unsigned int above = 0;
+              unsigned int below = 0;
 
-      data_out_cutplanes->build_patches(mapping, patch_order);
+              for (unsigned int v = 0; v < GeometryInfo<dim>::vertices_per_cell;
+                   ++v) {
+                const auto vertex = cell->vertex(v);
+                if (function->value(vertex) >= 0.)
+                  above++;
+                if (function->value(vertex) <= 0.)
+                  below++;
+                if (above > 0 && below > 0)
+                  return true;
+              }
+            }
+            return false;
+          });
+
+      data_out_levelsets->build_patches(mapping, patch_order);
 
       DataOutBase::VtkFlags flags(
           t, cycle, true, DataOutBase::VtkFlags::best_speed);
-      data_out_cutplanes->set_flags(flags);
+      data_out_levelsets->set_flags(flags);
     }
 
     if (use_mpi_io_) {
       /* synchronous IO */
       if (output_full) {
         data_out->write_vtu_in_parallel(
-            name + Utilities::to_string(cycle, 6) + ".vtu", mpi_communicator_);
+            name + "_" + Utilities::to_string(cycle, 6) + ".vtu",
+            mpi_communicator_);
       }
-      if (output_cutplanes && output_planes_.size() != 0) {
-        data_out_cutplanes->write_vtu_in_parallel(
-            name + "-cutplanes_" + Utilities::to_string(cycle, 6) + ".vtu",
+      if (output_levelsets && manifolds_.size() != 0) {
+        data_out_levelsets->write_vtu_in_parallel(
+            name + "-levelsets_" + Utilities::to_string(cycle, 6) + ".vtu",
             mpi_communicator_);
       }
 
@@ -395,25 +408,25 @@ namespace ryujin
           std::launch::async,
           [=,
            data_out = std::move(data_out),
-           data_out_cutplanes = std::move(data_out_cutplanes)]() mutable {
+           data_out_levelsets = std::move(data_out_levelsets)]() mutable {
             if (output_full) {
               data_out->write_vtu_with_pvtu_record(
                   "", name, cycle, mpi_communicator_, 6);
             }
-            if (output_cutplanes && output_planes_.size() != 0) {
-              data_out_cutplanes->write_vtu_with_pvtu_record(
-                  "", name + "-cutplanes", cycle, mpi_communicator_, 6);
+            if (output_levelsets && manifolds_.size() != 0) {
+              data_out_levelsets->write_vtu_with_pvtu_record(
+                  "", name + "-levelsets", cycle, mpi_communicator_, 6);
             }
             /* Explicitly delete pointer to free up memory early: */
             data_out.reset();
-            data_out_cutplanes.reset();
+            data_out_levelsets.reset();
           });
     }
   }
 
 
   template <int dim, typename Number>
-  void Postprocessor<dim, Number>::wait()
+  void VTUOutput<dim, Number>::wait()
   {
     if (background_thread_status.valid())
       background_thread_status.wait();
@@ -421,7 +434,7 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  bool Postprocessor<dim, Number>::is_active()
+  bool VTUOutput<dim, Number>::is_active()
   {
     if (!background_thread_status.valid())
       return false;
@@ -432,4 +445,4 @@ namespace ryujin
 
 } /* namespace ryujin */
 
-#endif /* POSTPROCESSOR_TEMPLATE_H */
+#endif /* VTU_OUTPUT_TEMPLATE_H */

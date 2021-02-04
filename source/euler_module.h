@@ -20,7 +20,6 @@
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/timer.h>
-#include <deal.II/lac/la_parallel_vector.h>
 #include <deal.II/lac/sparse_matrix.templates.h>
 #include <deal.II/lac/vector.h>
 
@@ -40,18 +39,19 @@ namespace ryujin
      * @copydoc ProblemDescription::problem_dimension
      */
     // clang-format off
-    static constexpr unsigned int problem_dimension = ProblemDescription<dim, Number>::problem_dimension;
+    static constexpr unsigned int problem_dimension = ProblemDescription::problem_dimension<dim>;
     // clang-format on
 
     /**
      * @copydoc ProblemDescription::rank1_type
      */
-    using rank1_type = typename ProblemDescription<dim, Number>::rank1_type;
+    using rank1_type =
+        ProblemDescription::rank1_type<dim, Number>;
 
     /**
      * @copydoc ProblemDescription::rank2_type
      */
-    using rank2_type = typename ProblemDescription<dim, Number>::rank2_type;
+    using rank2_type = ProblemDescription::rank2_type<dim, Number>;
 
     /**
      * @copydoc OfflineData::scalar_type
@@ -64,33 +64,12 @@ namespace ryujin
     using vector_type = typename OfflineData<dim, Number>::vector_type;
 
     /**
-     * An enum for the approximation order in space.
-     */
-    enum class Order {
-      /** Use the first-order provisional update. */
-      first_order,
-      /** Use the second order method with convex limiting. */
-      second_order
-    };
-
-    /**
-     * An enum for the approximation order in space.
-     */
-    enum class TimeStepOrder {
-      /** Perform a first-order explicit Euler step. */
-      first_order,
-      /** Perform an SSP-RK2 step (Heun's method). */
-      second_order,
-      /** Perform an SSP-RK3 step (Third order Runge-Kutta method). */
-      third_order
-    };
-
-    /**
      * Constructor.
      */
     EulerModule(const MPI_Comm &mpi_communicator,
                 std::map<std::string, dealii::Timer> &computing_timer,
                 const ryujin::OfflineData<dim, Number> &offline_data,
+                const ryujin::ProblemDescription &problem_description,
                 const ryujin::InitialValues<dim, Number> &initial_values,
                 const std::string &subsection = "EulerModule");
 
@@ -102,66 +81,46 @@ namespace ryujin
     void prepare();
 
     /**
-     * @name EulerModule compile time options
-     */
-    //@{
-
-    /**
-     * Selected approximation order in space.
-     * @ingroup CompileTimeOptions
-     */
-    static constexpr Order order_ = ORDER;
-
-    /**
-     * Selected approximation order in time.
-     * @ingroup CompileTimeOptions
-     */
-    static constexpr TimeStepOrder time_step_order_ = TIME_STEP_ORDER;
-
-    /**
-     * Selected number of limiter iterations.
-     * @ingroup CompileTimeOptions
-     */
-    static constexpr unsigned int limiter_iter_ = LIMITER_ITER;
-
-    //@}
-    /**
      * @name Functons for performing explicit time steps
      */
     //@{
 
     /**
      * Given a reference to a previous state vector U perform an explicit
-     * euler step (and store the result in U). The function
+     * euler step (and store the result in U). The function returns the
+     * computed maximal time step size tau_max.
      *
-     *  - returns the computed maximal time step size tau_max
-     *
-     *  - performs a time step and populates the vector U_new by the
-     *    result. The time step is performed with either tau_max (if tau ==
-     *    0), or tau (if tau != 0). Here, tau_max is the computed maximal
-     *    time step size and tau is the optional third parameter.
+     * The time step is performed with either tau_max (if tau == 0), or tau
+     * (if tau != 0). Here, tau_max is the computed maximal time step size
+     * and tau is the optional third parameter.
      */
     Number euler_step(vector_type &U, Number t, Number tau = 0.);
 
     /**
      * Given a reference to a previous state vector U perform an explicit
-     * Heun 2nd order step (and store the result in U).
+     * Heun 2nd order step (and store the result in U). The function
+     * returns the computed maximal time step size tau_max.
      *
-     *  - returns the computed maximal time step size tau_max
+     * The time step is performed with either tau_max (if tau == 0), or tau
+     * (if tau != 0). Here, tau_max is the computed maximal time step size
+     * and tau is the optional third parameter.
      *
-     * See @cite Shu_1988, Eq. 2.15.
+     * See @cite Shu1988, Eq. 2.15.
      */
-    Number ssph2_step(vector_type &U, Number t);
+    Number ssph2_step(vector_type &U, Number t, Number tau = 0.);
 
     /**
      * Given a reference to a previous state vector U perform an explicit
-     * SSP Runge Kutta 3rd order step (and store the result in U).
+     * SSP Runge Kutta 3rd order step (and store the result in U). The
+     * function returns the computed maximal time step size tau_max.
      *
-     *  - returns the computed maximal time step size tau_max
+     * The time step is performed with either tau_max (if tau == 0), or tau
+     * (if tau != 0). Here, tau_max is the computed maximal time step size
+     * and tau is the optional third parameter.
      *
-     * See @cite Shu_1988, Eq. 2.18.
+     * See @cite Shu1988, Eq. 2.18.
      */
-    Number ssprk3_step(vector_type &U, Number t);
+    Number ssprk3_step(vector_type &U, Number t, Number tau = 0.);
 
     /**
      * Given a reference to a previous state vector U perform an explicit
@@ -170,12 +129,39 @@ namespace ryujin
      *
      * This function switches between euler_step(), ssph2_step(), or
      * ssprk3_step() depending on selected approximation order.
+     *
+     * The time step is performed with either tau_max (if tau == 0), or tau
+     * (if tau != 0). Here, tau_max is the computed maximal time step size
+     * and tau is the optional third parameter.
      */
-    Number step(vector_type &U, Number t);
+    Number step(vector_type &U, Number t, Number tau = 0.);
 
     //@}
+    /**
+     * @name Functons for postprocessing
+     */
+    //@{
+
+    /**
+     * Computes an estimate for the local residual viscosity:
+     * \f{align}
+     *   \alpha_i\,\big(-d_{ii}^{L,n}\big)\frac{1}{\#\mathcal{I}(i)}\beta_{ii}^{-1}
+     * \f}
+     */
+    void compute_residual_mu();
 
   private:
+    //@}
+    /**
+     * @name Internally used time-stepping primitives
+     */
+    //@{
+
+    Number single_step(vector_type &U, Number tau);
+
+    void apply_boundary_conditions(vector_type &U, Number t);
+
+    //@}
     /**
      * @name Run time options
      */
@@ -183,6 +169,13 @@ namespace ryujin
 
     Number cfl_update_;
     Number cfl_max_;
+
+    unsigned int time_step_order_;
+    unsigned int limiter_iter_;
+
+    bool enforce_noslip_;
+
+    //@}
 
     //@}
     /**
@@ -194,14 +187,17 @@ namespace ryujin
     std::map<std::string, dealii::Timer> &computing_timer_;
 
     dealii::SmartPointer<const ryujin::OfflineData<dim, Number>> offline_data_;
+    dealii::SmartPointer<const ryujin::ProblemDescription> problem_description_;
     dealii::SmartPointer<const ryujin::InitialValues<dim, Number>>
         initial_values_;
 
     unsigned int n_restarts_;
     ACCESSOR_READ_ONLY(n_restarts)
 
+    scalar_type residual_mu_;
+    ACCESSOR_READ_ONLY(residual_mu)
+
     scalar_type alpha_;
-    ACCESSOR_READ_ONLY(alpha)
 
     scalar_type second_variations_;
     scalar_type specific_entropies_;
@@ -212,6 +208,7 @@ namespace ryujin
     vector_type r_;
 
     SparseMatrixSIMD<Number> dij_matrix_;
+
     SparseMatrixSIMD<Number> lij_matrix_;
     SparseMatrixSIMD<Number> lij_matrix_next_;
 

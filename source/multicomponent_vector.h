@@ -95,6 +95,12 @@ namespace ryujin
     using scalar_type = dealii::LinearAlgebra::distributed::Vector<Number>;
 
     /**
+     * We want to use the assignment operator of the virtual base class, so
+     * specify that here.
+     */
+    using scalar_type::operator=;
+
+    /**
      * Reinitializes the MultiComponentVector with a scalar MPI
      * partitioner. The function calls create_vector_partitioner()
      * internally to create and store a corresponding "vector" MPI
@@ -113,9 +119,10 @@ namespace ryujin
      * The function calls scalar_vector.update_ghost_values() before
      * returning.
      *
-     * @note This function is used in the Postprocessor to unpack a single
-     * component out of our custom MultiComponentVector in order to call
-     * deal.II specific functions (that can only operate on scalar vectors).
+     * @note This function is used in the VTUOutput module to unpack a
+     * single component out of our custom MultiComponentVector in order to
+     * call deal.II specific functions (that can only operate on scalar
+     * vectors).
      */
     void extract_component(scalar_type &scalar_vector,
                            unsigned int component) const;
@@ -140,7 +147,7 @@ namespace ryujin
      * Return a dealii::Tensor populated with the @p n_comp component
      * vector stored at index @p i.
      */
-    template<typename Tensor = dealii::Tensor<1, n_comp, Number>>
+    template <typename Tensor = dealii::Tensor<1, n_comp, Number>>
     Tensor get_tensor(const unsigned int i) const;
 
     /**
@@ -148,7 +155,7 @@ namespace ryujin
      * the @p n_comp component vectors stored at indices i, i+1, ...,
      * i+simd_length-1.
      */
-    template<typename Tensor = dealii::Tensor<1, n_comp, VectorizedArray>>
+    template <typename Tensor = dealii::Tensor<1, n_comp, VectorizedArray>>
     Tensor get_vectorized_tensor(const unsigned int i) const;
 
 
@@ -159,7 +166,7 @@ namespace ryujin
      * ..., *(js+simd_length-1), i.e., @p js has to point to an array of
      * size @p simd_length containing all indices.
      */
-    template<typename Tensor = dealii::Tensor<1, n_comp, VectorizedArray>>
+    template <typename Tensor = dealii::Tensor<1, n_comp, VectorizedArray>>
     Tensor get_vectorized_tensor(const unsigned int *js) const;
 
     /**
@@ -167,7 +174,8 @@ namespace ryujin
      * with the values supplied by @p tensor.
      *
      * @note @p tensor can be an arbitrary indexable container, such as
-     * dealii::Tensor or std::array, that has an `operator[]()` returning a @p Number.
+     * dealii::Tensor or std::array, that has an `operator[]()` returning a @p
+     * Number.
      */
     template <typename Tensor = dealii::Tensor<1, n_comp, Number>>
     void write_tensor(const Tensor &tensor, const unsigned int i);
@@ -183,8 +191,7 @@ namespace ryujin
      * VectorizedArray<Number>.
      */
     template <typename Tensor = dealii::Tensor<1, n_comp, VectorizedArray>>
-    void write_vectorized_tensor(const Tensor &tensor, const unsigned int
-                                 i);
+    void write_vectorized_tensor(const Tensor &tensor, const unsigned int i);
   };
 
 

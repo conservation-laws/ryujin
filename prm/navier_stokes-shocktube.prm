@@ -1,0 +1,116 @@
+#
+# Navier-Stokes Shocktube Benchmark
+#
+# See [1,2].
+#
+# The shocktube consists of a square cavity (0,1)^2 with a diaphragm at
+# {x=0.5} separating it in two parts. The fluid is initially at rest. The
+# state on the left-hand side of the diaphragm is (rho_L=120, v_L=0,
+# p_L=rho_L/gamma). The right state is (rho_R=1.2, v_R=0, p_R=rho_R/gamma).
+#
+# We use the ideal gas equation of state p = (gamma - 1) rho e with
+# gamma=1.4. The bulk viscosity is set to 0. The Prandtl number is Pr=0.73.
+#
+#
+# [1] V.~Daru and C.~Tenaud. Evaluation of TVD high resolution schemes for
+#     unsteady viscous shocked flows. Computers & Fluids, 30(1):89-113, 2001
+#
+# [2] V.~Daru and C.~Tenaud. Numerical simulation of the viscous shock tube
+#     problem by using a high resolution monotonicity-preserving scheme.
+#      Computers & Fluids, 38(3):664-676, 2009.
+#
+
+subsection A - TimeLoop
+  set basename                     = graded-enforced-L10
+
+  set enable compute quantities    = true
+  set enable output full           = true
+
+  set final time                   = 1.00
+  set output granularity           = 0.01
+
+  set output full multiplier       = 100
+  set output quantities multiplier = 1
+end
+
+subsection B - ProblemDescription
+  set description = Navier Stokes
+
+  set mu          = 1.0e-3
+  set lambda      = 0
+
+  # Scaled thermal conductivity c_v^{-1} kappa  =  mu * gamma / Pr
+  set kappa       = 1.91780821918e-3
+end
+
+subsection C - Discretization
+  set geometry            = shocktube
+  set mesh refinement     = 10
+  set mesh repartitioning = true
+
+  subsection shocktube
+    set height               = 0.5
+    set length               = 1
+
+    set grading pull back    = x;(1-y)^5.
+    set grading push forward = x;1-y^(1./5.)
+    set subdivisions x       = 2
+    set subdivisions y       = 1
+  end
+end
+
+subsection E - InitialValues
+  set configuration = contrast
+  set direction     = 1, 0
+  set position      = 0.5, 0
+
+  subsection contrast
+    set primitive state left  = 120, 0, 85.7142857143
+    set primitive state right = 1.2, 0, 0.857142857143
+  end
+end
+
+subsection F - EulerModule
+  set cfl max            = 0.90
+  set cfl update         = 0.80
+
+  set enforce noslip     = true
+
+  set limiter iterations = 2
+  set time step order    = 3
+end
+
+subsection G - DissipationModule
+  set tolerance                              = 1e-10
+  set tolerance linfty norm                  = false
+
+  set multigrid - chebyshev degree           = 3
+  set multigrid - chebyshev cg iter          = 0
+
+  set multigrid energy                       = true
+  set multigrid energy - chebyshev max eig   = 2.0
+  set multigrid energy - chebyshev range     = 15.0
+  set multigrid energy - max iter            = 15
+
+  set multigrid velocity                     = true
+  set multigrid velocity - chebyshev max eig = 2.0
+  set multigrid velocity - chebyshev range   = 8.0
+  set multigrid velocity - max iter          = 12
+
+  set shift                                  = 0
+end
+
+subsection H - VTUOutput
+  set use mpi io     = true
+
+  set schlieren beta = 10
+  set vorticity beta = 10
+end
+
+subsection I - IntegralQuantities
+end
+
+subsection I - PointQuantities
+  set boundary manifolds = lower_boundary : y
+  set interior manifolds =
+end

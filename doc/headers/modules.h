@@ -16,6 +16,13 @@
 
 
 /**
+ * @defgroup InitialValues Initial values and manufactured solutions
+ *
+ * Several classes and helper functions for initial value configuration.
+ */
+
+
+/**
  * @defgroup FiniteElement Finite element formulation
  *
  * Some helper functions for local index handling, dof renumbering,
@@ -27,9 +34,17 @@
  * @defgroup EulerModule Euler Module
  *
  * This module contains classes and functions used during different stages
- * of the explicit Euler update performed in TimeStep::euler_step() and
+ * of the explicit Euler update performed in EulerStep::euler_step() and
  * higher-order time-stepping primitives based on the low-order)
- * TimeStep::euler_step() update.
+ * EulerStep::euler_step() update.
+ */
+
+
+/**
+ * @defgroup NavierModule Navier Stokes Module
+ *
+ * This module contains classes and functions used during different stages
+ * of the implicit parabolic update in the Strang splitting.
  */
 
 

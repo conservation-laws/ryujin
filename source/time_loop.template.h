@@ -8,27 +8,23 @@
 
 #include "checkpointing.h"
 #include "indicator.h"
+#include "introspection.h"
 #include "limiter.h"
 #include "riemann_solver.h"
 #include "scope.h"
+#include "solution_transfer.h"
 #include "time_loop.h"
 
 #include <deal.II/base/logstream.h>
 #include <deal.II/base/revision.h>
 #include <deal.II/base/work_stream.h>
-#include <deal.II/grid/grid_out.h>
 #include <deal.II/numerics/vector_tools.h>
 #include <deal.II/numerics/vector_tools.templates.h>
-
-#ifdef CALLGRIND
-#include <valgrind/callgrind.h>
-#endif
 
 #include <fstream>
 #include <iomanip>
 
 using namespace dealii;
-using namespace ryujin;
 
 namespace ryujin
 {
@@ -36,15 +32,31 @@ namespace ryujin
   TimeLoop<dim, Number>::TimeLoop(const MPI_Comm &mpi_comm)
       : ParameterAcceptor("/A - TimeLoop")
       , mpi_communicator(mpi_comm)
-      , discretization(mpi_communicator, "/B - Discretization")
-      , offline_data(mpi_communicator, discretization, "/C - OfflineData")
-      , initial_values("/D - InitialValues")
+      , problem_description("/B - ProblemDescription")
+      , discretization(mpi_communicator, "/C - Discretization")
+      , offline_data(mpi_communicator, discretization, "/D - OfflineData")
+      , initial_values(problem_description, "/E - InitialValues")
       , euler_module(mpi_communicator,
                      computing_timer,
                      offline_data,
+                     problem_description,
                      initial_values,
-                     "/E - EulerModule")
-      , postprocessor(mpi_communicator, offline_data, "/F - Postprocessor")
+                     "/F - EulerModule")
+      , dissipation_module(mpi_communicator,
+                           computing_timer,
+                           problem_description,
+                           offline_data,
+                           initial_values,
+                           "/G - DissipationModule")
+      , vtu_output(mpi_communicator, offline_data, "/H - VTUOutput")
+      , point_quantities(mpi_communicator,
+                         problem_description,
+                         offline_data,
+                         "/I - PointQuantities")
+      , integral_quantities(mpi_communicator,
+                            problem_description,
+                            offline_data,
+                            "/I - IntegralQuantities")
       , mpi_rank(dealii::Utilities::MPI::this_mpi_process(mpi_communicator))
       , n_mpi_processes(
             dealii::Utilities::MPI::n_mpi_processes(mpi_communicator))
@@ -56,6 +68,11 @@ namespace ryujin
 
     t_final = Number(5.);
     add_parameter("final time", t_final, "Final time");
+
+    add_parameter("refinement timepoints",
+                  t_refinements,
+                  "List of points in (simulation) time at which the mesh will "
+                  "be globally refined");
 
     output_granularity = Number(0.01);
     add_parameter(
@@ -72,18 +89,33 @@ namespace ryujin
         "at output granularity intervals. The frequency is determined by "
         "\"output granularity\" times \"output checkpoint multiplier\"");
 
-    enable_output_full = true;
+    enable_output_full = false;
     add_parameter("enable output full",
                   enable_output_full,
                   "Write out full pvtu records. The frequency is determined by "
                   "\"output granularity\" times \"output full multiplier\"");
 
-    enable_output_cutplanes = true;
+    enable_output_levelsets = false;
     add_parameter(
-        "enable output cutplanes",
-        enable_output_cutplanes,
-        "Write out cutplanes pvtu records. The frequency is determined by "
-        "\"output granularity\" times \"output cutplanes multiplier\"");
+        "enable output levelsets",
+        enable_output_levelsets,
+        "Write out levelsets pvtu records. The frequency is determined by "
+        "\"output granularity\" times \"output levelsets multiplier\"");
+
+    enable_compute_error = false;
+    add_parameter("enable compute error",
+                  enable_compute_error,
+                  "Flag to control whether we compute the Linfty Linf_norm of "
+                  "the difference to an analytic solution. Implemented only "
+                  "for certain initial state configurations.");
+
+    enable_compute_quantities = false;
+    add_parameter(
+        "enable compute quantities",
+        enable_compute_quantities,
+        "Flag to control whether we compute quantities of interest. The "
+        "frequency how often quantities are logged is determined by \"output "
+        "granularity\" times \"output quantities multiplier\"");
 
     output_checkpoint_multiplier = 1;
     add_parameter("output checkpoint multiplier",
@@ -97,18 +129,18 @@ namespace ryujin
                   "Multiplicative modifier applied to \"output granularity\" "
                   "that determines the full pvtu writeout granularity");
 
-    output_cutplanes_multiplier = 1;
-    add_parameter("output cutplanes multiplier",
-                  output_cutplanes_multiplier,
+    output_levelsets_multiplier = 1;
+    add_parameter("output levelsets multiplier",
+                  output_levelsets_multiplier,
                   "Multiplicative modifier applied to \"output granularity\" "
-                  "that determines the cutplanes pvtu writeout granularity");
+                  "that determines the levelsets pvtu writeout granularity");
 
-    enable_compute_error = false;
-    add_parameter("enable compute error",
-                  enable_compute_error,
-                  "Flag to control whether we compute the Linfty Linf_norm of "
-                  "the difference to an analytic solution. Implemented only "
-                  "for certain initial state configurations.");
+    output_quantities_multiplier = 1;
+    add_parameter(
+        "output quantities multiplier",
+        output_quantities_multiplier,
+        "Multiplicative modifier applied to \"output granularity\" that "
+        "determines the writeout granularity for quantities of interest");
 
     resume = false;
     add_parameter("resume", resume, "Resume an interrupted computation");
@@ -132,10 +164,11 @@ namespace ryujin
                 ExcNotImplemented());
 
     const bool write_output_files =
-        enable_checkpointing || enable_output_full || enable_output_cutplanes;
+        enable_checkpointing || enable_output_full || enable_output_levelsets;
 
     /* Attach log file: */
-    logfile.open(base_name + ".log");
+    if (mpi_rank == 0)
+      logfile.open(base_name + ".log");
 
     print_parameters(logfile);
 
@@ -145,16 +178,23 @@ namespace ryujin
 
     /* Prepare data structures: */
 
+    const auto prepare_compute_kernels = [&]() {
+      offline_data.prepare();       // Storage: dim + 2 matrices; 2 vectors
+      euler_module.prepare();       // Storage: 3 * dim + 9 vectors
+      dissipation_module.prepare(); // Storage: 2 * dim + 2 vectors
+      vtu_output.prepare();         // Storage: dim + 5 vectors
+      point_quantities.prepare();   // Storage: 3 * dim + 1 vectors
+      print_mpi_partition(logfile);
+    };
+
     {
-      Scope scope(computing_timer, "initialize data structures");
+      Scope scope(computing_timer, "(re)initialize data structures");
       print_info("initializing data structures");
 
       discretization.prepare();
-      offline_data.prepare();
-      euler_module.prepare();
-      postprocessor.prepare();
-
-      print_mpi_partition(logfile);
+      prepare_compute_kernels();
+      if (enable_compute_quantities)
+        integral_quantities.prepare(base_name + "-integral_quantities.log");
 
       U.reinit(offline_data.vector_partitioner());
 
@@ -167,17 +207,20 @@ namespace ryujin
       } else {
         print_info("interpolating initial values");
         U = initial_values.interpolate(offline_data);
+#ifdef DEBUG
+        /* Poison constrained degrees of freedom: */
+        const unsigned int n_relevant = offline_data.n_locally_relevant();
+        const auto &partitioner = offline_data.scalar_partitioner();
+        for (unsigned int i = 0; i < n_relevant; ++i) {
+          if (offline_data.affine_constraints().is_constrained(
+                  partitioner->local_to_global(i)))
+            U.write_tensor(dealii::Tensor<1, dim + 2, Number>() *
+                               std::numeric_limits<Number>::signaling_NaN(),
+                           i);
+        }
+#endif
       }
     }
-
-    if (write_output_files) {
-      output(U, base_name + "-solution", t, output_cycle);
-      if (enable_compute_error) {
-        const auto analytic = initial_values.interpolate(offline_data, t);
-        output(analytic, base_name + "-analytic_solution", t, output_cycle);
-      }
-    }
-    ++output_cycle;
 
     print_info("entering main loop");
     computing_timer["time loop"].start();
@@ -185,18 +228,15 @@ namespace ryujin
     /* Loop: */
 
     unsigned int cycle = 1;
-    for (; t < t_final; ++cycle) {
+    for (;; ++cycle) {
 
 #ifdef DEBUG_OUTPUT
       std::cout << "\n\n###   cycle = " << cycle << "   ###\n\n" << std::endl;
 #endif
 
-      /* Do a time step: */
+      /* Perform output: */
 
-      const auto tau = euler_module.step(U, t);
-      t += tau;
-
-      if (t > output_cycle * output_granularity) {
+      if (t >= output_cycle * output_granularity) {
         if (write_output_files) {
           output(U, base_name + "-solution", t, output_cycle);
           if (enable_compute_error) {
@@ -204,18 +244,82 @@ namespace ryujin
             output(analytic, base_name + "-analytic_solution", t, output_cycle);
           }
         }
-
+        if (enable_compute_quantities &&
+            (output_cycle % output_quantities_multiplier == 0)) {
+          Scope scope(computing_timer, "quantities of interest");
+          point_quantities.compute(
+              U, t, base_name + "-point_quantities", output_cycle);
+          integral_quantities.compute(U, t);
+        }
         ++output_cycle;
-
-        print_cycle_statistics(cycle, t, output_cycle, /*logfile*/ true);
       }
 
-      if (cycle % terminal_update_interval == 0)
+      /* Perform global refinement: */
+
+      const auto new_end = std::remove_if(
+          t_refinements.begin(), t_refinements.end(), [&](const Number &t_ref) {
+            if (t < t_ref)
+              return false;
+
+            Scope scope(computing_timer, "(re)initialize data structures");
+
+            print_info("performing global refinement");
+
+            SolutionTransfer<dim, Number> solution_transfer(
+                offline_data, problem_description);
+
+            auto &triangulation = discretization.triangulation();
+            for (auto &cell : triangulation.active_cell_iterators())
+              cell->set_refine_flag();
+            triangulation.prepare_coarsening_and_refinement();
+
+            solution_transfer.prepare_for_interpolation(U);
+
+            triangulation.execute_coarsening_and_refinement();
+            prepare_compute_kernels();
+
+            solution_transfer.interpolate(U);
+
+            return true;
+          });
+      t_refinements.erase(new_end, t_refinements.end());
+
+      /* Break if we have reached the final time: */
+
+      if (t >= t_final)
+        break;
+
+      /* Do a time step: */
+
+      if (problem_description.description() == "Euler") {
+
+        /* Pure hyperbolic update: */
+        const auto tau = euler_module.step(U, t);
+        t += tau;
+
+      } else if (problem_description.description() == "Navier Stokes") {
+
+        /* Strang's splitting: */
+        const auto tau = euler_module.step(U, t);
+        dissipation_module.step(U, t, 2. * tau, cycle);
+        euler_module.step(U, t + tau, tau);
+        t += 2. * tau;
+
+      } else {
+
+        AssertThrow(false, ExcMessage("Unknown problem description"));
+      }
+
+      /* Print and record cycle statistics: */
+
+      if (t >= output_cycle * output_granularity)
+        print_cycle_statistics(cycle, t, output_cycle, /*logfile*/ true);
+      else if (cycle % terminal_update_interval == 0)
         print_cycle_statistics(cycle, t, output_cycle);
     } /* end of loop */
 
     /* Wait for output thread: */
-    postprocessor.wait();
+    vtu_output.wait();
 
     /* We have actually performed one cycle less. */
     --cycle;
@@ -245,7 +349,7 @@ namespace ryujin
 #endif
 
     constexpr auto problem_dimension =
-        ProblemDescription<dim, Number>::problem_dimension;
+        ProblemDescription::problem_dimension<dim>;
 
     /* Compute L_inf norm: */
 
@@ -274,7 +378,7 @@ namespace ryujin
 
       VectorTools::integrate_difference(offline_data.dof_handler(),
                                         analytic_component,
-                                        ZeroFunction<dim, Number>(),
+                                        Functions::ZeroFunction<dim, Number>(),
                                         difference_per_cell,
                                         QGauss<dim>(3),
                                         VectorTools::L1_norm);
@@ -284,7 +388,7 @@ namespace ryujin
 
       VectorTools::integrate_difference(offline_data.dof_handler(),
                                         analytic_component,
-                                        ZeroFunction<dim, Number>(),
+                                        Functions::ZeroFunction<dim, Number>(),
                                         difference_per_cell,
                                         QGauss<dim>(3),
                                         VectorTools::L2_norm);
@@ -295,6 +399,9 @@ namespace ryujin
       /* Compute norms of error: */
 
       U.extract_component(error_component, i);
+      /* Populate constrained dofs due to periodicity: */
+      offline_data.affine_constraints().distribute(error_component);
+      error_component.update_ghost_values();
       error_component -= analytic_component;
 
       const Number linf_norm_error =
@@ -302,7 +409,7 @@ namespace ryujin
 
       VectorTools::integrate_difference(offline_data.dof_handler(),
                                         error_component,
-                                        ZeroFunction<dim, Number>(),
+                                        Functions::ZeroFunction<dim, Number>(),
                                         difference_per_cell,
                                         QGauss<dim>(3),
                                         VectorTools::L1_norm);
@@ -312,7 +419,7 @@ namespace ryujin
 
       VectorTools::integrate_difference(offline_data.dof_handler(),
                                         error_component,
-                                        ZeroFunction<dim, Number>(),
+                                        Functions::ZeroFunction<dim, Number>(),
                                         difference_per_cell,
                                         QGauss<dim>(3),
                                         VectorTools::L2_norm);
@@ -320,9 +427,12 @@ namespace ryujin
       const Number l2_norm_error = Number(std::sqrt(Utilities::MPI::sum(
           std::pow(difference_per_cell.l2_norm(), 2), mpi_communicator)));
 
-      linf_norm += linf_norm_error / linf_norm_analytic;
-      l1_norm += l1_norm_error / l1_norm_analytic;
-      l2_norm += l2_norm_error / l2_norm_analytic;
+      if (linf_norm_analytic >= 1.0e-10)
+        linf_norm += linf_norm_error / linf_norm_analytic;
+      if (l1_norm_analytic >= 1.0e-10)
+        l1_norm += l1_norm_error / l1_norm_analytic;
+      if (l2_norm_analytic >= 1.0e-10)
+        l2_norm += l2_norm_error / l2_norm_analytic;
     }
 
     if (mpi_rank != 0)
@@ -359,40 +469,46 @@ namespace ryujin
     std::cout << "TimeLoop<dim, Number>::output(t = " << t << ")" << std::endl;
 #endif
 
-    /* Data output: */
+    const bool do_full_output =
+        (cycle % output_full_multiplier == 0) && enable_output_full;
+    const bool do_levelsets =
+        (cycle % output_levelsets_multiplier == 0) && enable_output_levelsets;
+    const bool do_checkpointing =
+        (cycle % output_checkpoint_multiplier == 0) && enable_checkpointing;
 
+    /* There is nothing to do: */
+    if (!(do_full_output || do_levelsets || do_checkpointing))
+      return;
+
+    /* Wait for a previous thread to finish before scheduling a new one: */
     {
-      /* Wait for a previous thread to finish before scheduling a new one: */
       Scope scope(computing_timer, "output stall");
       print_info("waiting for previous output cycle to finish");
 
-      postprocessor.wait();
+      vtu_output.wait();
     }
 
-    {
-      Scope scope(computing_timer, "postprocessor");
+    /* Data output: */
+    if (do_full_output || do_levelsets) {
+      Scope scope(computing_timer, "output vtu");
       print_info("scheduling output");
 
-      const bool do_full_output =
-          (cycle % output_full_multiplier == 0) && enable_output_full;
-      const bool do_cutplanes =
-          (cycle % output_cutplanes_multiplier == 0) && enable_output_cutplanes;
+      euler_module.compute_residual_mu();
 
-      postprocessor.schedule_output(U,
-                                    euler_module.alpha(),
-                                    name,
-                                    t,
-                                    cycle,
-                                    do_full_output,
-                                    do_cutplanes);
+      vtu_output.schedule_output(U,
+                                 euler_module.residual_mu(),
+                                 name,
+                                 t,
+                                 cycle,
+                                 do_full_output,
+                                 do_levelsets);
     }
 
     /* Checkpointing: */
-
-    if (cycle % output_checkpoint_multiplier == 0 && enable_checkpointing) {
-
-      print_info("scheduling checkpointing");
+    if (do_checkpointing) {
       Scope scope(computing_timer, "checkpointing");
+      print_info("scheduling checkpointing");
+
       const auto id = discretization.triangulation().locally_owned_subdomain();
       do_checkpoint(base_name, id, U, t, cycle);
     }
@@ -483,10 +599,10 @@ namespace ryujin
     }
 
     stream << "Indicator<dim, Number>::smoothness_indicator_alpha_0_ == "
-            << Indicator<dim, Number>::smoothness_indicator_alpha_0_ << std::endl;
+           << Indicator<dim, Number>::smoothness_indicator_alpha_0_ << std::endl;
 
     stream << "Indicator<dim, Number>::smoothness_indicator_power_ == "
-            << Indicator<dim, Number>::smoothness_indicator_power_ << std::endl;
+           << Indicator<dim, Number>::smoothness_indicator_power_ << std::endl;
 
     stream << "Limiter<dim, Number>::limiter_ == ";
     switch (Limiter<dim, Number>::limiter_) {
@@ -505,50 +621,26 @@ namespace ryujin
     }
 
     stream << "ryujin::newton_max_iter == "
-            << ryujin::newton_max_iter << std::endl;
+           << ryujin::newton_max_iter << std::endl;
 
     stream << "Limiter<dim, Number>::relax_bounds_ == "
-            << Limiter<dim, Number>::relax_bounds_ << std::endl;
+           << Limiter<dim, Number>::relax_bounds_ << std::endl;
 
     stream << "Limiter<dim, Number>::relaxation_order_ == "
-            << Limiter<dim, Number>::relaxation_order_ << std::endl;
+           << Limiter<dim, Number>::relaxation_order_ << std::endl;
+
+    stream << "ProblemDescription::equation_of_state_ == ";
+    switch (ProblemDescription::equation_of_state_) {
+    case ProblemDescription::EquationOfState::ideal_gas:
+      stream << "ProblemDescription::EquationOfState::ideal_gas" << std::endl;
+      break;
+    case ProblemDescription::EquationOfState::van_der_waals:
+      stream << "ProblemDescription::EquationOfState::van_der_waals" << std::endl;
+      break;
+    }
 
     stream << "RiemannSolver<dim, Number>::newton_max_iter_ == "
-            <<  RiemannSolver<dim, Number>::newton_max_iter_ << std::endl;
-
-    stream << "RiemannSolver<dim, Number>::greedy_dij_ == "
-            <<  RiemannSolver<dim, Number>::greedy_dij_ << std::endl;
-
-    stream << "RiemannSolver<dim, Number>::greedy_threshold_ == "
-            <<  RiemannSolver<dim, Number>::greedy_threshold_ << std::endl;
-
-    stream << "RiemannSolver<dim, Number>::greedy_relax_bounds_ == "
-            <<  RiemannSolver<dim, Number>::greedy_relax_bounds_ << std::endl;
-
-    stream << "EulerModule<dim, Number>::order_ == ";
-    switch (EulerModule<dim, Number>::order_) {
-    case EulerModule<dim, Number>::Order::first_order:
-      stream << "EulerModule<dim, Number>::Order::first_order" << std::endl;
-      break;
-    case EulerModule<dim, Number>::Order::second_order:
-      stream << "EulerModule<dim, Number>::Order::second_order" << std::endl;
-    }
-
-    stream << "EulerModule<dim, Number>::time_step_order_ == ";
-    switch (EulerModule<dim, Number>::time_step_order_) {
-    case EulerModule<dim, Number>::TimeStepOrder::first_order:
-      stream << "EulerModule<dim, Number>::TimeStepOrder::first_order" << std::endl;
-      break;
-    case EulerModule<dim, Number>::TimeStepOrder::second_order:
-      stream << "EulerModule<dim, Number>::TimeStepOrder::second_order" << std::endl;
-      break;
-    case EulerModule<dim, Number>::TimeStepOrder::third_order:
-      stream << "EulerModule<dim, Number>::TimeStepOrder::third_order" << std::endl;
-      break;
-    }
-
-    stream << "EulerModule<dim, Number>::limiter_iter_ == "
-            <<  EulerModule<dim, Number>::limiter_iter_ << std::endl;
+           <<  RiemannSolver<dim, Number>::newton_max_iter_ << std::endl;
 
     /* clang-format on */
 
@@ -716,59 +808,121 @@ namespace ryujin
                                                Number t,
                                                std::ostream &stream)
   {
-    /* Print Jean-Luc and Martin metrics: */
+    /*
+     * @fixme The global state kept in this function should be refactored
+     * into its own class object.
+     */
+    static struct {
+      unsigned int cycle = 0;
+      double t = 0.;
+      double cpu_time_sum = 0.;
+      double cpu_time_avg = 0.;
+      double cpu_time_min = 0.;
+      double cpu_time_max = 0.;
+      double wall_time = 0.;
+    } previous, current;
 
-    const auto wall_time_statistics = Utilities::MPI::min_max_avg(
-        computing_timer["time loop"].wall_time(), mpi_communicator);
-    const double wall_time = wall_time_statistics.max;
+    static double time_per_second_exp = 0.;
 
-    const auto cpu_time_statistics = Utilities::MPI::min_max_avg(
-        computing_timer["time loop"].cpu_time(), mpi_communicator);
-    const double cpu_time = cpu_time_statistics.sum;
+    /* Update statistics: */
+
+    {
+      previous = current;
+
+      current.cycle = cycle;
+      current.t = t;
+
+      const auto wall_time_statistics = Utilities::MPI::min_max_avg(
+          computing_timer["time loop"].wall_time(), mpi_communicator);
+      current.wall_time = wall_time_statistics.max;
+
+      const auto cpu_time_statistics = Utilities::MPI::min_max_avg(
+          computing_timer["time loop"].cpu_time(), mpi_communicator);
+      current.cpu_time_sum = cpu_time_statistics.sum;
+      current.cpu_time_avg = cpu_time_statistics.avg;
+      current.cpu_time_min = cpu_time_statistics.min;
+      current.cpu_time_max = cpu_time_statistics.max;
+    }
+
+    /* Take averages: */
+
+    double delta_cycles = current.cycle - previous.cycle;
+    const double cycles_per_second =
+        delta_cycles / (current.wall_time - previous.wall_time);
 
     const double wall_m_dofs_per_sec =
-        ((double)cycle) * ((double)offline_data.dof_handler().n_dofs()) / 1.e6 /
-        wall_time;
+        delta_cycles * ((double)offline_data.dof_handler().n_dofs()) / 1.e6 /
+        (current.wall_time - previous.wall_time);
 
     const double cpu_m_dofs_per_sec =
-        ((double)cycle) * ((double)offline_data.dof_handler().n_dofs()) / 1.e6 /
-        cpu_time;
+        delta_cycles * ((double)offline_data.dof_handler().n_dofs()) / 1.e6 /
+        (current.cpu_time_sum - previous.cpu_time_sum);
+
+    double cpu_time_skew = (current.cpu_time_max - current.cpu_time_min - //
+                            previous.cpu_time_max + previous.cpu_time_min) /
+                           delta_cycles;
+    /* avoid printing small negative numbers: */
+    cpu_time_skew = std::max(0., cpu_time_skew);
+
+    const double cpu_time_skew_percentage =
+        cpu_time_skew * delta_cycles /
+        (current.cpu_time_avg - previous.cpu_time_avg);
+
+    const double delta_time = current.t - previous.t;
+    const double time_per_second =
+        delta_time / (current.wall_time - previous.wall_time);
+
+    /* Print Jean-Luc and Martin metrics: */
 
     std::ostringstream output;
 
-    output << std::setprecision(4) << std::endl;
-    output << "Throughput:  (CPU )  "                                    //
-           << std::fixed << cpu_m_dofs_per_sec << " MQ/s  ("             //
-           << std::scientific << 1. / cpu_m_dofs_per_sec * 1.e-6         //
-           << " s/Qdof/cycle)" << std::endl;                             //
-    output << "                     [cpu time skew: "                    //
-           << std::setprecision(2) << std::scientific                    //
-           << cpu_time_statistics.max - cpu_time_statistics.avg << "s (" //
-           << std::setprecision(1) << std::setw(4) << std::setfill(' ')
-           << std::fixed
-           << 100. * (cpu_time_statistics.max - cpu_time_statistics.avg) /
-                  cpu_time_statistics.avg
-           << "%)]" << std::endl
+    /* clang-format off */
+    output << std::endl;
+
+    output << "Throughput:  (CPU )  "
+           << std::setprecision(4) << std::fixed << cpu_m_dofs_per_sec
+           << " MQ/s  ("
+           << std::scientific << 1. / cpu_m_dofs_per_sec * 1.e-6
+           << " s/Qdof/cycle)" << std::endl;
+
+    output << "                     [cpu time skew: "
+           << std::setprecision(2) << std::scientific << cpu_time_skew
+           << "s/cycle ("
+           << std::setprecision(1) << std::setw(4) << std::setfill(' ') << std::fixed
+           << 100. * cpu_time_skew_percentage
+           << "%)]" << std::endl << std::endl;
+
+    output << "             (WALL)  "
+           << std::fixed << wall_m_dofs_per_sec
+           << " MQ/s  ("
+           << std::scientific << 1. / wall_m_dofs_per_sec * 1.e-6
+           << " s/Qdof/cycle)  ("
+           << std::fixed << cycles_per_second
+           << " cycles/s)" << std::endl;
+
+    output << "                     [ "
+           << std::setprecision(0) << std::fixed << euler_module.n_restarts()
+           << " rsts ]";
+
+    output << "[ "
+           << std::setprecision(2) << std::fixed
+           << dissipation_module.n_iterations_velocity()
+           << (dissipation_module.use_gmg_velocity() ? " GMG vel -- " : " CG vel -- ")
+           << dissipation_module.n_iterations_internal_energy()
+           << (dissipation_module.use_gmg_internal_energy() ? " GMG int ]" : " CG int ]")
            << std::endl;
 
-    output << "             (WALL)  "                                         //
-           << std::fixed << wall_m_dofs_per_sec << " MQ/s  ("                 //
-           << std::scientific << 1. / wall_m_dofs_per_sec * 1.e-6             //
-           << " s/Qdof/cycle)  ("                                             //
-           << std::fixed << ((double)cycle) / wall_time                       //
-           << " cycles/s)  (avg dt = "                                        //
-           << std::scientific << t / ((double)cycle)                          //
-           << ")" << std::endl;                                               //
-    output << "                     [ "                                       //
-           << std::setprecision(0) << std::fixed << euler_module.n_restarts() //
-           << " rsts   (" << std::setprecision(2) << std::scientific
-           << euler_module.n_restarts() / ((double)cycle) << " rsts/cycle) ]"
-           << std::endl
-           << std::endl;
+    output << "                     dt = "
+           << std::scientific << std::setprecision(2) << delta_time
+           << " ( "
+           << time_per_second
+           << " dt/s)" << std::endl << std::endl;
+    /* clang-format on */
 
     /* and print an ETA */
+    time_per_second_exp = 0.8 * time_per_second_exp + 0.2 * time_per_second;
     unsigned int eta =
-        static_cast<unsigned int>((t_final - t) / (t - t_initial) * wall_time);
+        static_cast<unsigned int>((t_final - t) / time_per_second_exp);
 
     output << "ETA:  ";
 
@@ -845,7 +999,7 @@ namespace ryujin
     std::ostringstream output;
 
     unsigned int n_active_writebacks = Utilities::MPI::sum<unsigned int>(
-        postprocessor.is_active(), mpi_communicator);
+        vtu_output.is_active(), mpi_communicator);
 
     std::ostringstream primary;
     if (final_time) {

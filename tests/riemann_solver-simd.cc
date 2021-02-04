@@ -16,6 +16,11 @@ int main()
 
   constexpr int dim = 1;
 
+  ProblemDescription problem_description;
+  const double gamma = problem_description.gamma();
+  const double b = problem_description.b();
+  RiemannSolver<dim, Number> riemann_solver(problem_description);
+
   const auto riemann_data = [&](const auto &state) {
     const Number rho = state[0];
     const Number u = state[1];
@@ -25,7 +30,6 @@ int main()
     result[0] = rho;
     result[1] = u;
     result[2] = p;
-    constexpr double gamma = ProblemDescription<dim, Number>::gamma;
     result[3] = std::sqrt(gamma * p / rho);
     return result;
   };
@@ -37,7 +41,7 @@ int main()
     const auto rd_i = riemann_data(U_i);
     const auto rd_j = riemann_data(U_j);
     const auto [lambda_max, p_star, n_iterations] =
-        RiemannSolver<dim, Number>::compute(rd_i, rd_j);
+        riemann_solver.compute(rd_i, rd_j);
     std::cout << lambda_max << std::endl;
     std::cout << p_star << std::endl;
     std::cout << n_iterations << std::endl << std::endl;
@@ -45,9 +49,6 @@ int main()
 
   std::cout << std::setprecision(16);
   std::cout << std::scientific;
-
-  constexpr auto gamma = ProblemDescription<dim, Number>::gamma;
-  constexpr auto b = ProblemDescription<dim, Number>::b;
 
   std::cout << "gamma: " << gamma << std::endl;
   std::cout << "b: " << b << std::endl;

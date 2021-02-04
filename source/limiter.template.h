@@ -15,11 +15,13 @@ namespace ryujin
 #ifdef OBSESSIVE_INLINING
   DEAL_II_ALWAYS_INLINE inline
 #endif
-  Number Limiter<dim, Number>::limit(const BOUNDS &bounds,
-                                     const rank1_type &U,
-                                     const rank1_type &P,
-                                     const Number t_min /* = Number(0.) */,
-                                     const Number t_max /* = Number(1.) */)
+      Number
+      Limiter<dim, Number>::limit(const ProblemDescription &problem_description,
+                                  const BOUNDS &bounds,
+                                  const rank1_type &U,
+                                  const rank1_type &P,
+                                  const Number t_min /* = Number(0.) */,
+                                  const Number t_max /* = Number(1.) */)
   {
     Number t_r = t_max;
 
@@ -33,8 +35,8 @@ namespace ryujin
      */
 
     {
-      const auto &U_rho = U[0];
-      const auto &P_rho = P[0];
+      const auto &U_rho = problem_description.density(U);
+      const auto &P_rho = problem_description.density(P);
 
       const auto &rho_min = std::get<0>(bounds);
       const auto &rho_max = std::get<1>(bounds);
@@ -63,7 +65,7 @@ namespace ryujin
       t_r = std::max(t_r, t_min);
 
 #ifdef CHECK_BOUNDS
-      const auto new_density = (U + t_r * P)[0];
+      const auto new_density = problem_description.density(U + t_r * P);
       AssertThrowSIMD(
           new_density,
           [](auto val) { return val > 0.; },
@@ -82,8 +84,8 @@ namespace ryujin
 
     Number t_l = t_min; // good state
 
-    constexpr ScalarNumber gamma = ProblemDescription<dim, Number>::gamma;
-    constexpr ScalarNumber gp1 = gamma + ScalarNumber(1.);
+    const ScalarNumber gamma = problem_description.gamma();
+    const ScalarNumber gp1 = gamma + ScalarNumber(1.);
     constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
     /* relax the entropy inequalities by eps to counter roundoff errors */
     constexpr ScalarNumber relaxation = ScalarNumber(1.) + 10. * eps;
@@ -109,10 +111,9 @@ namespace ryujin
       for (unsigned int n = 0; n < newton_max_iter; ++n) {
 
         const auto U_r = U + t_r * P;
-        const auto rho_r = U_r[0];
+        const auto rho_r = problem_description.density(U_r);
         const auto rho_r_gamma = ryujin::pow(rho_r, gamma);
-        const auto rho_e_r =
-            ProblemDescription<dim, Number>::internal_energy(U_r);
+        const auto rho_e_r = problem_description.internal_energy(U_r);
 
         auto psi_r = relaxation * rho_r * rho_e_r - s_min * rho_r * rho_r_gamma;
 
@@ -126,10 +127,9 @@ namespace ryujin
           break;
 
         const auto U_l = U + t_l * P;
-        const auto rho_l = U_l[0];
+        const auto rho_l = problem_description.density(U_l);
         const auto rho_l_gamma = ryujin::pow(rho_l, gamma);
-        const auto rho_e_l =
-            ProblemDescription<dim, Number>::internal_energy(U_l);
+        const auto rho_e_l = problem_description.internal_energy(U_l);
 
         auto psi_l = relaxation * rho_l * rho_e_l - s_min * rho_l * rho_l_gamma;
 
@@ -145,21 +145,21 @@ namespace ryujin
 
         /* We got unlucky and have to perform a Newton step: */
 
-        const auto drho = P[0];
+        const auto drho = problem_description.density(P);
         const auto drho_e_l =
-            ProblemDescription<dim, Number>::internal_energy_derivative(U_l) *
-            P;
+            problem_description.internal_energy_derivative(U_l) * P;
         const auto drho_e_r =
-            ProblemDescription<dim, Number>::internal_energy_derivative(U_r) *
-            P;
+            problem_description.internal_energy_derivative(U_r) * P;
         const auto dpsi_l =
             rho_l * drho_e_l + (rho_e_l - gp1 * s_min * rho_l_gamma) * drho;
         const auto dpsi_r =
             rho_r * drho_e_r + (rho_e_r - gp1 * s_min * rho_r_gamma) * drho;
 
 #ifdef CHECK_BOUNDS
+        const auto psi = relaxation * relaxation * rho_l * rho_e_l -
+                         s_min * rho_l * rho_l_gamma;
         AssertThrowSIMD(
-            psi_l,
+            psi,
             [](auto val) { return val >= -100. * eps; },
             dealii::ExcMessage("Specific entropy minimum principle violated."));
 #endif
@@ -174,13 +174,11 @@ namespace ryujin
 
 #ifdef CHECK_BOUNDS
       const auto U_new = U + t_l * P;
-      const auto rho_new = U_new[0];
-      const auto e_new =
-          ProblemDescription<dim, Number>::internal_energy(U_new);
-      const auto s_new =
-          ProblemDescription<dim, Number>::specific_entropy(U_new);
-      const auto psi =
-          relaxation * rho_new * e_new - s_min * ryujin::pow(rho_new, gp1);
+      const auto rho_new = problem_description.density(U_new);
+      const auto e_new = problem_description.internal_energy(U_new);
+      const auto s_new = problem_description.specific_entropy(U_new);
+      const auto psi = relaxation * relaxation * rho_new * e_new -
+                       s_min * ryujin::pow(rho_new, gp1);
 
       AssertThrowSIMD(
           e_new,
@@ -255,9 +253,8 @@ namespace ryujin
       for (unsigned int n = 0; n < newton_max_iter; ++n) {
 
         const auto U_r = U + t_r * P;
-        const auto rho_r = U_r[0];
-        const auto rho_e_r =
-            ProblemDescription<dim, Number>::internal_energy(U_r);
+        const auto rho_r = problem_description.density(U_r);
+        const auto rho_e_r = problem_description.internal_energy(U_r);
         const auto average_r = positive_part(a + b * t_r);
         const auto average_gamma_r = std::pow(average_r, gamma);
 
@@ -274,9 +271,8 @@ namespace ryujin
           break;
 
         const auto U_l = U + t_l * P;
-        const auto rho_l = U_l[0];
-        const auto rho_e_l =
-            ProblemDescription<dim, Number>::internal_energy(U_l);
+        const auto rho_l = problem_description.density(U_l);
+        const auto rho_e_l = problem_description.internal_energy(U_l);
         const auto average_l = positive_part(a + b * t_l);
         const auto average_gamma_l = std::pow(average_l, gamma);
 
@@ -294,13 +290,11 @@ namespace ryujin
 
         /* We got unlucky and have to perform a Newton step: */
 
-        const auto drho = P[0];
+        const auto drho = problem_description.density(P);
         const auto drho_e_l =
-            ProblemDescription<dim, Number>::internal_energy_derivative(U_l) *
-            P;
+            problem_description.internal_energy_derivative(U_l) * P;
         const auto drho_e_r =
-            ProblemDescription<dim, Number>::internal_energy_derivative(U_r) *
-            P;
+            problem_description.internal_energy_derivative(U_r) * P;
 
         const auto dpsi_l =
             gp1 * average_gamma_l * b - rho_e_l * drho - rho_l * drho_e_l;
@@ -324,8 +318,8 @@ namespace ryujin
 
 #ifdef CHECK_BOUNDS
       const auto U_new = U + t_l * P;
-      const auto rho_rho_e =
-          U_new[0] * ProblemDescription<dim, Number>::internal_energy(U_new);
+      const auto rho_rho_e = problem_description.density(U_new) *
+                             problem_description.internal_energy(U_new);
       const auto avg = ryujin::pow(positive_part(a + b * t_l), gp1);
 
       AssertThrowSIMD(

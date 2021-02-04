@@ -21,10 +21,10 @@ int main()
   dealii::IndexSet locally_owned(14);
   locally_owned.add_range(0, 14);
   dealii::IndexSet locally_relevant(14);
-  dealii::Utilities::MPI::Partitioner partitioner(
+  auto partitioner = std::make_shared<dealii::Utilities::MPI::Partitioner>(
       locally_owned, locally_relevant, MPI_COMM_SELF);
 
-  ryujin::SparsityPatternSIMD<4> my_sparsity(12, spars,partitioner);
+  ryujin::SparsityPatternSIMD<4> my_sparsity(12, spars, partitioner);
   ryujin::SparseMatrixSIMD<double, 1, 4> my_sparse(my_sparsity);
   for (unsigned i = 0; i < 12; ++i)
     for (unsigned j = 0; j < 3; ++j)

@@ -83,6 +83,13 @@
 #define RYUJIN_OMP_BARRIER RYUJIN_PRAGMA(omp barrier)
 
 /**
+ * Annotate a critical section that has to be accessed sequentially.
+ *
+ * @ingroup Miscellaneous
+ */
+#define RYUJIN_OMP_CRITICAL RYUJIN_PRAGMA(omp critical)
+
+/**
  * Compiler hint annotating a boolean to be likely true.
  *
  * Intended use:

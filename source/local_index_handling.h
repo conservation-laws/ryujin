@@ -11,6 +11,8 @@
 #include <deal.II/dofs/dof_renumbering.h>
 #include <deal.II/dofs/dof_tools.h>
 #include <deal.II/lac/affine_constraints.h>
+#include <deal.II/lac/dynamic_sparsity_pattern.h>
+#include <deal.II/lac/sparsity_tools.h>
 
 namespace ryujin
 {
@@ -167,8 +169,11 @@ namespace ryujin
      * @ingroup FiniteElement
      */
     template <int dim>
-    unsigned int internal_range(dealii::DoFHandler<dim> &dof_handler)
+    unsigned int internal_range(dealii::DoFHandler<dim> &dof_handler,
+                                const MPI_Comm &mpi_communicator)
     {
+      using namespace dealii;
+
       const auto &locally_owned = dof_handler.locally_owned_dofs();
       const auto n_locally_owned = locally_owned.n_elements();
 
@@ -181,48 +186,70 @@ namespace ryujin
       /* Offset to translate from global to local index range */
       const auto offset = n_locally_owned != 0 ? *locally_owned.begin() : 0;
 
-      const unsigned int dofs_per_cell = dof_handler.get_fe().dofs_per_cell;
-      std::vector<dealii::types::global_dof_index> local_dof_indices(
-          dofs_per_cell);
+      using dof_type = dealii::types::global_dof_index;
+      std::vector<dof_type> new_order(n_locally_owned);
 
-      /*
-       * First pass: Accumulate how many cells are associated with a
-       * given degree of freedom and mark all degrees of freedom shared
-       * with a different number of cells than 2, 4, or 8 with
-       * numbers::invalid_dof_index:
-       */
+      {
+        /*
+         * Set up a temporary sparsity pattern to determine connectivity.
+         * This duplicates some code from offline_data.template.h; but the
+         * resulting sparsity pattern that we create here has to be thrown
+         * away anyway after renumbering.
+         */
 
-      std::vector<dealii::types::global_dof_index> new_order(n_locally_owned);
+        IndexSet locally_relevant;
+        DoFTools::extract_locally_relevant_dofs(dof_handler, locally_relevant);
 
-      for (auto cell : dof_handler.active_cell_iterators()) {
-        if (cell->is_artificial())
-          continue;
+        AffineConstraints<double> affine_constraints;
+        affine_constraints.reinit(locally_relevant);
+        DoFTools::make_hanging_node_constraints(dof_handler,
+                                                affine_constraints);
+        affine_constraints.close();
 
-        cell->get_dof_indices(local_dof_indices);
+        DynamicSparsityPattern dsp(locally_relevant);
+        DoFTools::make_sparsity_pattern(
+            dof_handler, dsp, affine_constraints, false);
 
-        for (unsigned int j = 0; j < dofs_per_cell; ++j) {
-          const auto &index = local_dof_indices[j];
-          if (!locally_owned.is_element(index))
+        SparsityTools::distribute_sparsity_pattern(
+            dsp, locally_owned, mpi_communicator, locally_relevant);
+
+        /* Mark all non-standard degrees of freedom: */
+
+        constexpr unsigned int standard_connectivity =
+            dim == 1 ? 3 : (dim == 2 ? 9 : 27);
+
+        for (unsigned int i = 0; i < n_locally_owned; ++i)
+          if (dsp.row_length(offset + i) != standard_connectivity)
+            new_order[i] = dealii::numbers::invalid_dof_index;
+
+        /* Explicitly poison boundary degrees of freedom: */
+
+        const unsigned int dofs_per_face = dof_handler.get_fe().dofs_per_face;
+        std::vector<dof_type> local_face_dof_indices(dofs_per_face);
+
+        for (auto &cell : dof_handler.active_cell_iterators()) {
+          if (!cell->at_boundary())
             continue;
-
-          Assert(index - offset < n_locally_owned, dealii::ExcInternalError());
-          new_order[index - offset] += 1;
+          for (auto f : dealii::GeometryInfo<dim>::face_indices()) {
+            const auto face = cell->face(f);
+            if (!face->at_boundary())
+              continue;
+            face->get_dof_indices(local_face_dof_indices);
+            for (unsigned int j = 0; j < dofs_per_face; ++j) {
+              const auto &index = local_face_dof_indices[j];
+              if (!locally_owned.is_element(index))
+                continue;
+              Assert(index >= offset && index - offset < n_locally_owned,
+                     dealii::ExcInternalError());
+              new_order[index - offset] = dealii::numbers::invalid_dof_index;
+            }
+          }
         }
-      }
-
-      constexpr dealii::types::global_dof_index standard_number_of_neighbors =
-          dim == 1 ? 2 : (dim == 2 ? 4 : 8);
-
-      for (auto &it : new_order) {
-        if (it == standard_number_of_neighbors)
-          it = 0;
-        else
-          it = dealii::numbers::invalid_dof_index;
       }
 
       /* Second pass: Create renumbering. */
 
-      dealii::types::global_dof_index index = offset;
+      dof_type index = offset;
 
       unsigned int n_locally_internal = 0;
       for (auto &it : new_order)
@@ -263,17 +290,14 @@ namespace ryujin
     using dealii::DoFTools::make_sparsity_pattern;
 
     /**
-     * Given an MPI @p partitioner, @p dof_handler, and constraints @p
-     * affine_constraints this function creates a sparsity pattern that
-     * uses MPI-rank local numbering of indices (in the interval
-     * \f$[0,n]\f$, where \f$n\f$ is the number of locally relevant degrees
-     * of freedom) instead of the usual global numberinf used in deal.II.
+     * Given a @p dof_handler, and constraints @p affine_constraints this
+     * function creates an extended sparsity pattern that also includes
+     * locally relevant to locally relevant couplings.
      *
      * @ingroup FiniteElement
      */
     template <int dim, typename Number, typename SPARSITY>
-    void make_local_sparsity_pattern(
-        const dealii::Utilities::MPI::Partitioner &partitioner,
+    void make_extended_sparsity_pattern(
         const dealii::DoFHandler<dim> &dof_handler,
         SPARSITY &dsp,
         const dealii::AffineConstraints<Number> &affine_constraints,
@@ -289,7 +313,6 @@ namespace ryujin
 
         /* translate into local index ranges: */
         cell->get_dof_indices(dof_indices);
-        transform_to_local_range(partitioner, dof_indices);
 
         affine_constraints.add_entries_local_to_global(
             dof_indices, dsp, keep_constrained);

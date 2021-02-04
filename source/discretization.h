@@ -28,15 +28,19 @@ namespace ryujin
    *
    * @note In deal.II boundary ids are prescribed on faces. However, in our
    * stencil-based method we need such an information for individual
-   * boundary degrees of freedom. This translation is done in
+   * boundary degrees of freedom. Thus, the face boundary indicator has to
+   * be translated to individual degrees of freedom which happens in
    * OfflineData::prepare() when constructing the
-   * OfflineData::boundary_map_.
+   * OfflineData::boundary_map_ object.
    *
-   * @note Boundary ids are sorted by increasing order of precedence. This
-   * order is used when ambiguities arise for an individual degree of
-   * freedom in case of neighboring boundary faces with different boundary
-   * ids. More precisely, `dirichlet` takes precedence before `slip`,
-   * before `periodic`, and before `do_nothing`.
+   * @note OfflineData::boundary_map_ is a std::multimap that stores all
+   * encountered boundary conditions for an individual degree of freedom.
+   * The individual algebraic constraint is applied in no particular order.
+   * It is thus important to ensure that neighboring boundary conditions,
+   * are compatible. For example, inflow conditions prescribed via a
+   * Boundary::dirichlet face neighboring a Boundary::no_slip face have to
+   * ensure that they prescribe a state compatible with the no slip
+   * condition, etc.
    *
    * @ingroup Mesh
    */
@@ -60,11 +64,24 @@ namespace ryujin
 
     /**
      * On (free) slip boundary degrees of freedom we enforce a vanishing
-     * normal component of the momentum. This is done by explicitly
-     * removing the normal component of the momentum for the degree of
-     * freedom at the end of TimeStep::euler_step().
+     * normal component of the momentum in the Euler module. This is done
+     * by explicitly removing the normal component of the momentum for the
+     * degree of freedom at the end of TimeStep::euler_step(). In the
+     * dissipation module \f$v\cdot n\f$ is enforced strongly which leads
+     * to a natural boundary condition on the symmetric stress tensor:
+     * \f$\tau\cdot\mathbb{S}(v)\cdot\n\f$.
      */
     slip = 2,
+
+    /**
+     * On no-slip boundary degrees of freedom we enforce a vanishing normal
+     * component of the momentum in the Euler module. This is done by
+     * explicitly removing the normal component of the momentum for the
+     * degree of freedom at the end of TimeStep::euler_step(). In the
+     * dissipation module a vanishing velocity \f$v=0f$ is enforced
+     * strongly.
+     */
+    no_slip = 3,
 
     /**
      * On degrees of freedom marked as Dirichlet boundary we reset the
@@ -76,7 +93,15 @@ namespace ryujin
      * shock front or other flow feature must reach a Dirichlet boundary
      * degree of freedom during the computation.
      */
-    dirichlet = 3,
+    dirichlet = 4,
+
+    /**
+     * On degrees of freedom marked as a "dynamic" Dirichlet boundary we
+     * reset the state of the degree of freedom to the value of
+     * InitialData::initial_state() if the state of the degree of freedom
+     * is inflow. Otherwise we do nothing.
+     */
+    dynamic = 5,
   };
 
   /**
@@ -118,6 +143,21 @@ namespace ryujin
      */
     void prepare();
 
+    /**
+     * @name Discretization compile time options
+     */
+    //@{
+
+    static constexpr unsigned int order_finite_element = ORDER_FINITE_ELEMENT;
+    static constexpr unsigned int order_mapping = ORDER_MAPPING;
+    static constexpr unsigned int order_quadrature = ORDER_QUADRATURE;
+
+    //@}
+    /**
+     * @name
+     */
+    //@{
+
   protected:
     const MPI_Comm &mpi_communicator_;
 
@@ -125,8 +165,17 @@ namespace ryujin
     std::unique_ptr<const dealii::Mapping<dim>> mapping_;
     std::unique_ptr<const dealii::FiniteElement<dim>> finite_element_;
     std::unique_ptr<const dealii::Quadrature<dim>> quadrature_;
+    std::unique_ptr<const dealii::Quadrature<1>> quadrature_1d_;
 
   public:
+    /**
+     * Return a mutable reference to the triangulation.
+     */
+    Triangulation &triangulation()
+    {
+      return *triangulation_;
+    }
+
     /**
      * Return a read-only const reference to the triangulation.
      */
@@ -147,7 +196,13 @@ namespace ryujin
      */
     ACCESSOR_READ_ONLY(quadrature)
 
+    /**
+     * Return a read-only const reference to the 1D quadrature rule.
+     */
+    ACCESSOR_READ_ONLY(quadrature_1d)
+
   private:
+    //@}
     /**
      * @name Run time options
      */
@@ -159,10 +214,6 @@ namespace ryujin
 
     unsigned int refinement_;
     bool repartitioning_;
-
-    unsigned int order_finite_element_;
-    unsigned int order_mapping_;
-    unsigned int order_quadrature_;
 
     //@}
     /**

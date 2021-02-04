@@ -10,11 +10,14 @@ using namespace dealii;
 template <int dim, typename Number>
 void test()
 {
-  using PD = ProblemDescription<dim, Number>;
-  using rank1_type = typename PD::rank1_type;
+  ProblemDescription problem_description;
+  problem_description.parse_parameters_callback();
+
+  using rank1_type = typename ProblemDescription::rank1_type<dim, Number>;
 
   const auto from_1d_state =
-      [=](const dealii::Tensor<1, 3, Number> &state_1d) -> rank1_type {
+      [&problem_description](
+          const dealii::Tensor<1, 3, Number> &state_1d) -> rank1_type {
     const auto &rho = state_1d[0];
     const auto &u = state_1d[1];
     const auto &p = state_1d[2];
@@ -23,49 +26,48 @@ void test()
 
     state[0] = rho;
     state[1] = rho * u;
-    state[dim + 1] =
-        p / (ProblemDescription<dim>::gamma - 1.) + 0.5 * rho * u * u;
+    state[dim + 1] = p / (problem_description.gamma() - 1.) + 0.5 * rho * u * u;
 
     return state;
   };
 
   dealii::Tensor<1, 3, Number> state_1d;
-  state_1d[0] = ProblemDescription<dim>::gamma;
+  state_1d[0] = problem_description.gamma();
   state_1d[1] = 3.;
   state_1d[2] = 1.;
   const auto U = from_1d_state(state_1d);
 
   std::cout << "dim = " << dim << std::endl;
-  std::cout << "momentum = "                          //
-            << PD::momentum(U)                        //
-            << std::endl;                             //
-  std::cout << "internal_energy = "                   //
-            << PD::internal_energy(U)                 //
-            << std::endl;                             //
-  std::cout << "internal_energy_derivative = "        //
-            << PD::internal_energy_derivative(U)      //
-            << std::endl;                             //
-  std::cout << "pressure = "                          //
-            << PD::pressure(U)                        //
-            << std::endl;                             //
-  std::cout << "specific_entropy = "                  //
-            << PD::specific_entropy(U)                //
-            << std::endl;                             //
-  std::cout << "harten entropy = "                    //
-            << PD::harten_entropy(U)                  //
-            << std::endl;                             //
-  std::cout << "harten_entropy_derivative = "         //
-            << PD::harten_entropy_derivative(U)       //
-            << std::endl;                             //
-  std::cout << "mathematical entropy = "              //
-            << PD::mathematical_entropy(U)            //
-            << std::endl;                             //
-  std::cout << "mathematical_entropy_derivative = "   //
-            << PD::mathematical_entropy_derivative(U) //
-            << std::endl;                             //
-  std::cout << "f = "                                 //
-            << PD::f(U)                               //
-            << std::endl;                             //
+  std::cout << "momentum = "                                          //
+            << problem_description.momentum(U)                        //
+            << std::endl;                                             //
+  std::cout << "internal_energy = "                                   //
+            << problem_description.internal_energy(U)                 //
+            << std::endl;                                             //
+  std::cout << "internal_energy_derivative = "                        //
+            << problem_description.internal_energy_derivative(U)      //
+            << std::endl;                                             //
+  std::cout << "pressure = "                                          //
+            << problem_description.pressure(U)                        //
+            << std::endl;                                             //
+  std::cout << "specific_entropy = "                                  //
+            << problem_description.specific_entropy(U)                //
+            << std::endl;                                             //
+  std::cout << "harten entropy = "                                    //
+            << problem_description.harten_entropy(U)                  //
+            << std::endl;                                             //
+  std::cout << "harten_entropy_derivative = "                         //
+            << problem_description.harten_entropy_derivative(U)       //
+            << std::endl;                                             //
+  std::cout << "mathematical entropy = "                              //
+            << problem_description.mathematical_entropy(U)            //
+            << std::endl;                                             //
+  std::cout << "mathematical_entropy_derivative = "                   //
+            << problem_description.mathematical_entropy_derivative(U) //
+            << std::endl;                                             //
+  std::cout << "f = "                                                 //
+            << problem_description.f(U)                               //
+            << std::endl;                                             //
 }
 
 int main()

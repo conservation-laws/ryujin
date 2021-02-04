@@ -14,21 +14,25 @@ include_directories(
 
 add_executable(ryujin
   discretization.cc
+  dissipation_module.cc
   euler_module.cc
   initial_values.cc
+  integral_quantities.cc
   limiter.cc
   main.cc
   offline_data.cc
-  postprocessor.cc
+  point_quantities.cc
   problem_description.cc
   riemann_solver.cc
   simd.cc
   sparse_matrix_simd.cc
   time_loop.cc
+  vtu_output.cc
   )
 
 deal_ii_setup_target(ryujin)
 
+if(false)
 if(NOT CMAKE_VERSION VERSION_LESS 3.16)
   target_precompile_headers(ryujin
     PRIVATE
@@ -37,7 +41,7 @@ if(NOT CMAKE_VERSION VERSION_LESS 3.16)
     initial_values.h
     multicomponent_vector.h
     offline_data.h
-    postprocessor.h
+    vtu_output.h
     problem_description.h
     riemann_solver.h
     scope.h
@@ -103,14 +107,20 @@ if(NOT CMAKE_VERSION VERSION_LESS 3.16)
     <deal.II/lac/full_matrix.h>
     <deal.II/lac/la_parallel_vector.h>
     <deal.II/lac/la_parallel_vector.templates.h>
+    <deal.II/lac/linear_operator.h>
+    <deal.II/lac/precondition.h>
+    <deal.II/lac/solver_cg.h>
     <deal.II/lac/sparse_matrix.h>
     <deal.II/lac/sparse_matrix.templates.h>
     <deal.II/lac/vector.h>
+    <deal.II/matrix_free/fe_evaluation.h>
+    <deal.II/matrix_free/matrix_free.h>
     <deal.II/multigrid/mg_transfer_matrix_free.h>
     <deal.II/numerics/data_out.h>
     <deal.II/numerics/vector_tools.h>
     <deal.II/numerics/vector_tools.templates.h>
     )
+endif()
 endif()
 
 set_property(SOURCE time_loop.cc APPEND PROPERTY COMPILE_DEFINITIONS

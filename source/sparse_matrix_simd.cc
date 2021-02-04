@@ -21,6 +21,6 @@ namespace ryujin
 #endif
 
   template class SparseMatrixSIMD<NUMBER,
-                                  ProblemDescription<DIM>::problem_dimension>;
+                                  ProblemDescription::problem_dimension<DIM>>;
 
 } /* namespace ryujin */

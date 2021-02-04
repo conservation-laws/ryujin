@@ -5,42 +5,52 @@
 
 #include <compile_time_options.h>
 
+#include "introspection.h"
 #include "time_loop.h"
 
-#include <deal.II/base/utilities.h>
 #include <deal.II/base/multithread_info.h>
+#include <deal.II/base/utilities.h>
 
 #include <omp.h>
-
-#ifdef LIKWID_PERFMON
-  #include <likwid.h>
-#endif
 
 #include <fstream>
 
 int main (int argc, char *argv[])
 {
-  dealii::Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv);
+  LSAN_DISABLE
 
+#if defined(DENORMALS_ARE_ZERO) && defined(__x86_64)
   /*
-   * Set the number of OpenMP threads to whatever deal.II allows
-   * internally:
+   * Change rounding mode on X86-64 architecture: Denormals are flushed to
+   * zero to avoid computing on denormals which can slow down computations
+   * significantly.
    */
+#define MXCSR_DAZ (1 << 6) /* Enable denormals are zero mode */
+#define MXCSR_FTZ (1 << 15) /* Enable flush to zero mode */
+
+  unsigned int mxcsr = __builtin_ia32_stmxcsr();
+  mxcsr |= MXCSR_DAZ | MXCSR_FTZ;
+  __builtin_ia32_ldmxcsr(mxcsr);
+#endif
+
+  dealii::Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv);
   omp_set_num_threads(dealii::MultithreadInfo::n_threads());
 
 #ifdef LIKWID_PERFMON
   LIKWID_MARKER_INIT;
-#pragma omp parallel
-  {
-    LIKWID_MARKER_THREADINIT;
-  }
+  RYUJIN_PARALLEL_REGION_BEGIN
+  LIKWID_MARKER_THREADINIT;
+  RYUJIN_PARALLEL_REGION_END
 #endif
+
+  LSAN_ENABLE
 
   MPI_Comm mpi_communicator(MPI_COMM_WORLD);
 
   ryujin::TimeLoop<DIM, NUMBER> time_loop(mpi_communicator);
 
-  std::cout << "[Init] initiating flux capacitor" << std::endl;
+  if (dealii::Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
+    std::cout << "[INFO] initiating flux capacitor" << std::endl;
 
   AssertThrow(
       argc <= 2,

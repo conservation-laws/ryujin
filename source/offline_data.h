@@ -11,6 +11,7 @@
 #include "convenience_macros.h"
 #include "discretization.h"
 #include "multicomponent_vector.h"
+#include "problem_description.h"
 #include "sparse_matrix_simd.h"
 
 #include <deal.II/base/parameter_acceptor.h>
@@ -54,7 +55,7 @@ namespace ryujin
      * @copydoc ProblemDescription::problem_dimension
      */
     // clang-format off
-    static constexpr unsigned int problem_dimension = ProblemDescription<dim, Number>::problem_dimension;
+    static constexpr unsigned int problem_dimension = ProblemDescription::problem_dimension<dim>;
     // clang-format on
 
     /**
@@ -68,6 +69,14 @@ namespace ryujin
      * simulation state.
      */
     using vector_type = MultiComponentVector<Number, problem_dimension>;
+
+    /**
+     * A tuple describing global dof index, boundary normal and position of
+     * a boundary degree of freedom.
+     */
+    using boundary_description = std::tuple<dealii::Tensor<1, dim, Number>,
+                                            dealii::types::boundary_id,
+                                            dealii::Point<dim>>;
 
     /**
      * Constructor
@@ -84,6 +93,7 @@ namespace ryujin
     {
       setup();
       assemble();
+      create_multigrid_data();
     }
 
     /**
@@ -97,9 +107,13 @@ namespace ryujin
      */
     void assemble();
 
-  protected:
+    /**
+     * Create multigrid data.
+     */
+    void create_multigrid_data();
 
-    dealii::DoFHandler<dim> dof_handler_;
+  private:
+    std::unique_ptr<dealii::DoFHandler<dim>> dof_handler_;
 
     dealii::AffineConstraints<Number> affine_constraints_;
 
@@ -114,11 +128,14 @@ namespace ryujin
     unsigned int n_locally_owned_;
     unsigned int n_locally_relevant_;
 
-    std::map<dealii::types::global_dof_index,
-             std::tuple<dealii::Tensor<1, dim, Number>,
-                        dealii::types::boundary_id,
-                        dealii::Point<dim>>>
-        boundary_map_;
+    using boundary_map_type =
+        std::multimap<dealii::types::global_dof_index, boundary_description>;
+
+    boundary_map_type boundary_map_;
+
+    std::vector<boundary_map_type> level_boundary_map_;
+
+    dealii::DynamicSparsityPattern sparsity_pattern_;
 
     SparsityPatternSIMD<dealii::VectorizedArray<Number>::size()>
         sparsity_pattern_simd_;
@@ -129,12 +146,26 @@ namespace ryujin
     dealii::LinearAlgebra::distributed::Vector<Number>
         lumped_mass_matrix_inverse_;
 
+    std::vector<dealii::LinearAlgebra::distributed::Vector<float>>
+        level_lumped_mass_matrix_;
+
     SparseMatrixSIMD<Number> betaij_matrix_;
     SparseMatrixSIMD<Number, dim> cij_matrix_;
 
     Number measure_of_omega_;
 
     dealii::SmartPointer<const ryujin::Discretization<dim>> discretization_;
+
+    const MPI_Comm &mpi_communicator_;
+
+    /**
+     * Construct a boundary map for a given set of DoFHandler iterators.
+     */
+    template <typename ITERATOR1, typename ITERATOR2>
+    boundary_map_type construct_boundary_map(
+        const ITERATOR1 &begin,
+        const ITERATOR2 &end,
+        const dealii::Utilities::MPI::Partitioner &partitioner) const;
 
   protected:
     /**
@@ -212,6 +243,18 @@ namespace ryujin
     ACCESSOR_READ_ONLY(boundary_map)
 
     /**
+     * The boundary map on all levels of the grid in case multilevel
+     * support was enabled.
+     */
+    ACCESSOR_READ_ONLY(level_boundary_map)
+
+    /**
+     * A sparsity pattern for (standard deal.II) matrices storing indices
+     * in (Deal.II typical) global numbering.
+     */
+    ACCESSOR_READ_ONLY(sparsity_pattern)
+
+    /**
      * A sparsity pattern for matrices in vectorized format. Local
      * numbering.
      */
@@ -231,6 +274,12 @@ namespace ryujin
      * The inverse of the lumped mass matrix.
      */
     ACCESSOR_READ_ONLY(lumped_mass_matrix_inverse)
+
+    /**
+     * The lumped mass matrix on all levels of the grid in case multilevel
+     * support was enabled.
+     */
+    ACCESSOR_READ_ONLY(level_lumped_mass_matrix)
 
     /**
      * The stiffness matrix \f$(beta_{ij})\f$:
@@ -253,13 +302,6 @@ namespace ryujin
      * Returns a reference of the underlying Discretization object.
      */
     ACCESSOR_READ_ONLY(discretization)
-
-  private:
-    /* Scratch storage: */
-    dealii::SparsityPattern sparsity_pattern_assembly_;
-    dealii::AffineConstraints<Number> affine_constraints_assembly_;
-
-    const MPI_Comm &mpi_communicator_;
   };
 
 } /* namespace ryujin */

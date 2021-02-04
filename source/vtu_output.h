@@ -3,8 +3,8 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#ifndef POSTPROCESSOR_H
-#define POSTPROCESSOR_H
+#ifndef VTU_OUTPUT_H
+#define VTU_OUTPUT_H
 
 #include <compile_time_options.h>
 
@@ -13,7 +13,6 @@
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/grid/intergrid_map.h>
-#include <deal.II/lac/la_parallel_vector.templates.h>
 #include <deal.II/multigrid/mg_transfer_matrix_free.h>
 
 #include <future>
@@ -22,46 +21,46 @@ namespace ryujin
 {
 
   /**
-   * the Postprocessor class implements a number of postprocessing
+   * the VTUOutput class implements a number of postprocessing
    * primitives in particular for a scaled and normalized Schlieren-like
    * plot, and a scaled and normalized magnitude of the vorticity. The
    * normalization is computed as follows:
    * \f[
-   *   \text{quantity}[i] = \exp\left(-\beta \frac{ |\mathbf q_i| - \min_k |\mathbf q_k|}
+   *   \text{quantity}[i] = \exp\left(-\beta \frac{ |\mathbf q_i| - \min_k
+   * |\mathbf q_k|}
    *   {\max_k |\mathbf q_k| - \min_k |\mathbf q_k|}\right),
    * \f]
    * where \f$\mathbf q_i\f$ is either
    *  - the gradient of the density postprocessed as follows,
    *    \f[
-   *       \mathbf q_i =  \frac{1}{m_i}\;\sum_{j\in \mathcal{J}(i)} \mathbf{c}_{ij}
-   *       \rho_j;
-   *    \f]
+   *       \mathbf q_i =  \frac{1}{m_i}\;\sum_{j\in \mathcal{J}(i)}
+   * \mathbf{c}_{ij} \rho_j; \f]
    *  - the vorticity of the velocity field postprocessed as follows,
    *    \f[
-   *       \mathbf q_i =  \frac{1}{m_i}\;\sum_{j\in \mathcal{J}(i)} \mathbf{c}_{ij} \times
-   *       \mathbf{m}_j / \rho_j.
-   *    \f]
+   *       \mathbf q_i =  \frac{1}{m_i}\;\sum_{j\in \mathcal{J}(i)}
+   * \mathbf{c}_{ij} \times \mathbf{m}_j / \rho_j. \f]
    *
-   * In addition, the postprocessor currently outputs the state vector, and
-   * the indicator field \f$\alpha_i\f$.
+   * In addition, the generated VTU output also contains the full state
+   * vector, and a local estimate of the effective residual viscosity
+   * \f$\mu_{\text{res}}\f$ caused by the graph viscosity stabilization.
    *
    * @ingroup TimeLoop
    */
   template <int dim, typename Number = double>
-  class Postprocessor final : public dealii::ParameterAcceptor
+  class VTUOutput final : public dealii::ParameterAcceptor
   {
   public:
     /**
      * @copydoc ProblemDescription::problem_dimension
      */
     // clang-format off
-    static constexpr unsigned int problem_dimension = ProblemDescription<dim, Number>::problem_dimension;
+    static constexpr unsigned int problem_dimension = ProblemDescription::problem_dimension<dim>;
     // clang-format on
 
     /**
      * @copydoc ProblemDescription::rank1_type
      */
-    using rank1_type = typename ProblemDescription<dim, Number>::rank1_type;
+    using rank1_type = ProblemDescription::rank1_type<dim, Number>;
 
     /**
      * Type used to store a curl of an 2D/3D vector field. Departing from
@@ -93,23 +92,25 @@ namespace ryujin
     /**
      * Constructor.
      */
-    Postprocessor(const MPI_Comm &mpi_communicator,
-                  const ryujin::OfflineData<dim, Number> &offline_data,
-                  const std::string &subsection = "Postprocessor");
+    VTUOutput(const MPI_Comm &mpi_communicator,
+              const ryujin::OfflineData<dim, Number> &offline_data,
+              const std::string &subsection = "VTUOutput");
 
     /**
-     * Prepare postprocessor. A call to @ref prepare() allocates temporary
+     * Prepare VTU output. A call to @ref prepare() allocates temporary
      * storage and is necessary before schedule_output() can be called.
+     *
+     * Calling prepare() allocates temporary storage for additional (dim +
+     * 5) scalar vectors of type OfflineData::scalar_type.
      */
     void prepare();
 
     /**
      * Given a state vector @p U and a scalar vector @p alpha (as well as a
      * file name prefix @p name, the current time @p t, and the current
-     * output cycle @p cycle) schedule a solution postprocessing and
-     * output.
+     * output cycle @p cycle) schedule a solution output.
      *
-     * The function post-processes quantities synchronously and (depending
+     * The function post-processes quantities synchronously, and (depending
      * on configuration options) schedules the write-out asynchronously
      * onto a background worker thread. This implies that @p U and @p alpha
      * can again be modified once schedule_output() returned.
@@ -153,11 +154,7 @@ namespace ryujin
     Number schlieren_beta_;
     Number vorticity_beta_;
 
-    using plane_description = std::tuple<dealii::Point<dim> /*origin*/,
-                                         dealii::Tensor<1, dim> /*normal*/,
-                                         double /*tolerance*/>;
-
-    std::vector<plane_description> output_planes_;
+    std::vector<std::string> manifolds_;
 
     //@}
     /**
@@ -171,6 +168,7 @@ namespace ryujin
 
     std::future<void> background_thread_status;
 
+    std::array<scalar_type, problem_dimension> state_vector_;
     std::array<scalar_type, n_quantities> quantities_;
 
     //@}
@@ -178,4 +176,4 @@ namespace ryujin
 
 } /* namespace ryujin */
 
-#endif /* POSTPROCESSOR_H */
+#endif /* VTU_OUTPUT_H */

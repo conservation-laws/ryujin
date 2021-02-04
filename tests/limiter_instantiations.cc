@@ -16,13 +16,13 @@ template class ryujin::Limiter<1, float>;
 template class ryujin::Limiter<2, float>;
 template class ryujin::Limiter<3, float>;
 
-// template class ryujin::Limiter<1, VectorizedArray<double>>;
-// template class ryujin::Limiter<2, VectorizedArray<double>>;
-// template class ryujin::Limiter<3, VectorizedArray<double>>;
+template class ryujin::Limiter<1, VectorizedArray<double>>;
+template class ryujin::Limiter<2, VectorizedArray<double>>;
+template class ryujin::Limiter<3, VectorizedArray<double>>;
 
-// template class ryujin::Limiter<1, VectorizedArray<float>>;
-// template class ryujin::Limiter<2, VectorizedArray<float>>;
-// template class ryujin::Limiter<3, VectorizedArray<float>>;
+template class ryujin::Limiter<1, VectorizedArray<float>>;
+template class ryujin::Limiter<2, VectorizedArray<float>>;
+template class ryujin::Limiter<3, VectorizedArray<float>>;
 
 int main()
 {

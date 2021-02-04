@@ -14,8 +14,6 @@
 
 #include "problem_description.h"
 
-#include <deal.II/lac/la_parallel_vector.templates.h>
-
 namespace ryujin
 {
   /**
@@ -57,13 +55,13 @@ namespace ryujin
      * @copydoc ProblemDescription::problem_dimension
      */
     // clang-format off
-    static constexpr unsigned int problem_dimension = ProblemDescription<dim, Number>::problem_dimension;
+    static constexpr unsigned int problem_dimension = ProblemDescription::problem_dimension<dim>;
     // clang-format on
 
     /**
      * @copydoc ProblemDescription::rank1_type
      */
-    using rank1_type = typename ProblemDescription<dim, Number>::rank1_type;
+    using rank1_type = ProblemDescription::rank1_type<dim, Number>;
 
     /**
      * @copydoc ProblemDescription::ScalarNumber
@@ -88,11 +86,6 @@ namespace ryujin
        */
       entropy_inequality
     };
-
-    /**
-     * Constructor.
-     */
-    Limiter();
 
     /**
      * @name Limiter compile time options
@@ -159,6 +152,14 @@ namespace ryujin
     using Bounds = std::array<Number, n_bounds>;
 
     /**
+     * Constructor taking a ProblemDescription instance as argument
+     */
+    Limiter(const ProblemDescription &problem_description)
+        : problem_description(problem_description)
+    {
+    }
+
+    /**
      * Reset temporary storage and reinitialize variations for new index i.
      */
     void reset(const Number variations_i);
@@ -197,7 +198,8 @@ namespace ryujin
      * selected local minimum principles are obeyed.
      */
     template <Limiters limiter = limiter_, typename BOUNDS>
-    static Number limit(const BOUNDS &bounds,
+    static Number limit(const ProblemDescription &problem_description,
+                        const BOUNDS &bounds,
                         const rank1_type &U,
                         const rank1_type &P,
                         const Number t_min = Number(0.),
@@ -207,6 +209,8 @@ namespace ryujin
   private:
     /** @name */
     //@{
+
+    const ProblemDescription &problem_description;
 
     Bounds bounds_;
 
@@ -218,12 +222,6 @@ namespace ryujin
 
     //@}
   };
-
-
-  template <int dim, typename Number>
-  Limiter<dim, Number>::Limiter()
-  {
-  }
 
 
   template <int dim, typename Number>
@@ -277,7 +275,7 @@ namespace ryujin
     if constexpr (limiter_ == Limiters::none)
       return;
 
-    const auto rho_ij = U_ij_bar[0];
+    const auto rho_ij = problem_description.density(U_ij_bar);
     rho_min = std::min(rho_min, rho_ij);
     rho_max = std::max(rho_max, rho_ij);
 
@@ -285,9 +283,8 @@ namespace ryujin
       s_min = std::min(s_min, entropy_j);
 
       if (!is_diagonal_entry) {
-        const Number s_interp =
-            ProblemDescription<dim, Number>::specific_entropy((U_i + U_j) *
-                                                              ScalarNumber(.5));
+        const Number s_interp = problem_description.specific_entropy(
+            (U_i + U_j) * ScalarNumber(.5));
         s_interp_max = std::max(s_interp_max, s_interp);
       }
     }

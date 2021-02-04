@@ -13,6 +13,7 @@
 #include <deal.II/fe/fe_system.h>
 #include <deal.II/grid/grid_generator.h>
 #include <deal.II/grid/grid_in.h>
+#include <deal.II/grid/grid_out.h>
 #include <deal.II/grid/grid_tools.h>
 #include <deal.II/grid/manifold_lib.h>
 #include <deal.II/grid/tria.h>
@@ -29,7 +30,6 @@ namespace ryujin
   {
     using namespace dealii::GridGenerator;
 
-
     /**
      * Create a 2D/3D cylinder configuration with the given length and
      * height.
@@ -44,7 +44,6 @@ namespace ryujin
      *
      * @ingroup Mesh
      */
-
     template <int dim, int spacedim, template <int, int> class Triangulation>
     void cylinder(Triangulation<dim, spacedim> &,
                   const double /*length*/,
@@ -91,6 +90,7 @@ namespace ryujin
           Point<2>(cylinder_diameter, -height / 2.),
           Point<2>(length - cylinder_position, height / 2.));
 
+      tria5.set_mesh_smoothing(triangulation.get_mesh_smoothing());
       GridGenerator::merge_triangulations(
           {&tria1, &tria2, &tria3, &tria4}, tria5, 1.e-12, true);
       triangulation.copy_triangulation(tria5);
@@ -160,6 +160,7 @@ namespace ryujin
       cylinder(tria1, length, height, cylinder_position, cylinder_diameter);
 
       dealii::Triangulation<3, 3> tria2;
+      tria2.set_mesh_smoothing(triangulation.get_mesh_smoothing());
 
       GridGenerator::extrude_triangulation(tria1, 4, height, tria2, true);
       GridTools::transform(
@@ -245,6 +246,7 @@ namespace ryujin
       using namespace dealii;
 
       dealii::Triangulation<2, 2> tria1, tria2, tria3;
+      tria3.set_mesh_smoothing(triangulation.get_mesh_smoothing());
 
       GridGenerator::subdivided_hyper_rectangle(
           tria1, {15, 4}, Point<2>(0., step_height), Point<2>(length, height));
@@ -296,8 +298,7 @@ namespace ryujin
       triangulation.set_manifold(1, SphericalManifold<2>(point));
 
       for (auto cell : triangulation.active_cell_iterators())
-        for (unsigned int v = 0; v < GeometryInfo<2>::vertices_per_cell;
-             ++v) {
+        for (unsigned int v = 0; v < GeometryInfo<2>::vertices_per_cell; ++v) {
           double distance =
               (cell->vertex(v) - Point<2>(step_position, step_height)).norm();
           if (distance < 1.e-6) {
@@ -316,8 +317,7 @@ namespace ryujin
 
         cell->set_manifold_id(0); // reset manifold id again
 
-        for (unsigned int v = 0; v < GeometryInfo<2>::vertices_per_cell;
-             ++v) {
+        for (unsigned int v = 0; v < GeometryInfo<2>::vertices_per_cell; ++v) {
           auto &vertex = cell->vertex(v);
 
           if (std::abs(vertex[0] - step_position) < 1.e-6 &&
@@ -365,6 +365,7 @@ namespace ryujin
       using namespace dealii;
 
       dealii::Triangulation<2, 2> tria1, tria2, tria3;
+      tria3.set_mesh_smoothing(triangulation.get_mesh_smoothing());
 
       GridGenerator::subdivided_hyper_rectangle(
           tria1, {18, 6}, Point<2>(wall_position, 0), Point<2>(length, height));
@@ -554,8 +555,138 @@ namespace ryujin
 
 
     /**
-     * Describes a geometry used for validation: The (scaled) unit
-     * hypercube with Dirichlet data.
+     * A 2D/3D shocktube configuration for generating a viscous boundary
+     * layer for the compressible Navier Stokes equations.
+     *
+     * A rectangular domain with given length and height. The boundary
+     * conditions are slip boundary conditions on the top, and no_slip
+     * boundary conditions on bottom, left and right boundary of the 2D
+     * domain.
+     *
+     * @ingroup Mesh
+     */
+    template <int dim>
+    class ShockTube : public Geometry<dim>
+    {
+    public:
+      ShockTube(const std::string subsection)
+          : Geometry<dim>("shocktube", subsection)
+      {
+        length_ = 1.0;
+        this->add_parameter(
+            "length", length_, "length of computational domain");
+
+        height_ = 0.5;
+        this->add_parameter(
+            "height", height_, "height of computational domain");
+
+        subdivisions_x_ = 2;
+        this->add_parameter("subdivisions x",
+                            subdivisions_x_,
+                            "number of subdivisions in x direction");
+
+        subdivisions_y_ = 1;
+        this->add_parameter("subdivisions y",
+                            subdivisions_y_,
+                            "number of subdivisions in y direction");
+
+        grading_push_forward_ = dim == 2 ? "x;y" : "x;y;z;";
+        this->add_parameter("grading push forward",
+                            grading_push_forward_,
+                            "push forward of grading manifold");
+
+        grading_pull_back_ = dim == 2 ? "x;y" : "x;y;z;";
+        this->add_parameter("grading pull back",
+                            grading_pull_back_,
+                            "pull back of grading manifold");
+      }
+
+      virtual void create_triangulation(
+          typename Geometry<dim>::Triangulation &triangulation) final override
+      {
+        /* create mesh: */
+
+        dealii::Triangulation<dim, dim> tria1;
+        tria1.set_mesh_smoothing(triangulation.get_mesh_smoothing());
+        if constexpr (dim == 2)
+          dealii::GridGenerator::subdivided_hyper_rectangle(
+              tria1,
+              {subdivisions_x_, subdivisions_y_},
+              dealii::Point<2>(),
+              dealii::Point<2>(length_, height_));
+        else if constexpr (dim == 3)
+          dealii::GridGenerator::subdivided_hyper_rectangle(
+              tria1,
+              {subdivisions_x_, subdivisions_y_, subdivisions_y_},
+              dealii::Point<3>(),
+              dealii::Point<3>(length_, height_, height_));
+        triangulation.copy_triangulation(tria1);
+
+        /* create grading: */
+
+        if (grading_push_forward_ != (dim == 2 ? "x;y" : "x;y;z;")) {
+          dealii::FunctionManifold<dim> grading(grading_push_forward_,
+                                                grading_pull_back_);
+          triangulation.set_all_manifold_ids(1);
+          triangulation.set_manifold(1, grading);
+        }
+
+        /* set boundary ids: */
+
+        for (auto cell : triangulation.active_cell_iterators()) {
+          for (auto f : dealii::GeometryInfo<dim>::face_indices()) {
+            const auto face = cell->face(f);
+            if (!face->at_boundary())
+              continue;
+
+            const auto position = face->center();
+            if (position[0] < 1.e-6) {
+              /* left: no slip */
+              face->set_boundary_id(Boundary::no_slip);
+            } else if (position[0] > length_ - 1.e-6) {
+              /* right: no slip */
+              face->set_boundary_id(Boundary::no_slip);
+            } else if (position[1] < 1.e-6) {
+              /* bottom: no slip */
+              face->set_boundary_id(Boundary::no_slip);
+            } else if (position[1] > height_ - 1.e-6) {
+              /* top: slip */
+              face->set_boundary_id(Boundary::slip);
+            } else {
+              if constexpr (dim == 3) {
+                if (position[2] < 1.e-6) {
+                  /* left: no slip */
+                  face->set_boundary_id(Boundary::no_slip);
+                } else if (position[2] > height_ - 1.e-6) {
+                  /* right: slip */
+                  face->set_boundary_id(Boundary::slip);
+                } else {
+                  Assert(false, dealii::ExcInternalError());
+                }
+              } else {
+                Assert(false, dealii::ExcInternalError());
+              }
+            }
+          } /*for*/
+        }   /*for*/
+      }
+
+    private:
+      double length_;
+      double height_;
+      unsigned int subdivisions_x_;
+      unsigned int subdivisions_y_;
+      std::string grading_push_forward_;
+      std::string grading_pull_back_;
+    };
+
+
+    /**
+     * A square (or hypercube) domain used for running validation
+     * configurations. Per default Dirichlet boundary conditions are
+     * enforced throughout. If the @ref periodic_ parameter is set to true
+     * periodic boundary conditions are enforced in the y (and z)
+     * directions instead.
      *
      * @ingroup Mesh
      */
@@ -569,12 +700,19 @@ namespace ryujin
         length_ = 20.;
         this->add_parameter(
             "length", length_, "length of computational domain");
+
+        periodic_ = false;
+        this->add_parameter("periodic",
+                            periodic_,
+                            "enforce periodicity in y (and z) directions "
+                            "instead of Dirichlet conditions");
       }
 
       virtual void create_triangulation(
           typename Geometry<dim>::Triangulation &triangulation) final override
       {
         dealii::Triangulation<dim, dim> tria1;
+        tria1.set_mesh_smoothing(triangulation.get_mesh_smoothing());
         dealii::GridGenerator::hyper_cube(tria1, -0.5 * length_, 0.5 * length_);
         triangulation.copy_triangulation(tria1);
 
@@ -583,14 +721,26 @@ namespace ryujin
             const auto face = cell->face(f);
             if (!face->at_boundary())
               continue;
-            face->set_boundary_id(Boundary::dirichlet);
+            const auto position = face->center();
+            if (position[0] < -0.5 * length_ + 1.e-6)
+              /* left: dirichlet */
+              face->set_boundary_id(Boundary::dirichlet);
+            else if (position[0] > 0.5 * length_ - 1.e-6)
+              /* right: dirichlet */
+              face->set_boundary_id(Boundary::dirichlet);
+            else {
+              if (periodic_)
+                face->set_boundary_id(Boundary::periodic);
+              else
+                face->set_boundary_id(Boundary::dirichlet);
+            }
           }
       }
 
     private:
       double length_;
+      bool periodic_;
     };
-
   } /* namespace Geometries */
 
 } /* namespace ryujin */

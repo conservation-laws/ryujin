@@ -9,6 +9,7 @@
 #include <compile_time_options.h>
 
 #include "discretization.h"
+#include "grid_airfoil.h"
 #include "grid_generator.h"
 
 #include <deal.II/base/quadrature_lib.h>
@@ -26,7 +27,11 @@ namespace ryujin
                                       const std::string &subsection)
       : ParameterAcceptor(subsection)
       , mpi_communicator_(mpi_communicator)
-      , triangulation_(std::make_unique<Triangulation>(mpi_communicator_))
+      , triangulation_(std::make_unique<Triangulation>(
+            mpi_communicator_,
+            dealii::Triangulation<dim>::limit_level_difference_at_vertices,
+            dealii::parallel::distributed::Triangulation<
+                dim>::construct_multigrid_hierarchy))
   {
     /* Options: */
 
@@ -34,7 +39,7 @@ namespace ryujin
     add_parameter("geometry",
                   geometry_,
                   "Name of the geometry used to create the mesh. Valid names "
-                  "are given by andy of the subsections defined below.");
+                  "are given by any of the subsections defined below.");
 
     refinement_ = 5;
     add_parameter("mesh refinement",
@@ -45,29 +50,21 @@ namespace ryujin
     add_parameter(
         "mesh distortion", mesh_distortion_, "Strength of mesh distortion");
 
-    repartitioning_ = true;
+    repartitioning_ = false;
     add_parameter("mesh repartitioning",
                   repartitioning_,
                   "try to equalize workload by repartitioning the mesh");
-
-    order_mapping_ = 1;
-    add_parameter("order mapping", order_mapping_, "Order of the mapping");
-
-    order_finite_element_ = 1;
-    add_parameter("order finite element",
-                  order_finite_element_,
-                  "Polynomial degree of the finite element space");
-
-    order_quadrature_ = 3;
-    add_parameter(
-        "order quadrature", order_quadrature_, "Order of the quadrature rule");
 
     geometry_list_.emplace(
         std::make_unique<Geometries::Cylinder<dim>>(subsection));
     geometry_list_.emplace(std::make_unique<Geometries::Step<dim>>(subsection));
     geometry_list_.emplace(std::make_unique<Geometries::Wall<dim>>(subsection));
     geometry_list_.emplace(
+        std::make_unique<Geometries::ShockTube<dim>>(subsection));
+    geometry_list_.emplace(
         std::make_unique<Geometries::Validation<dim>>(subsection));
+    geometry_list_.emplace(
+        std::make_unique<Geometries::Airfoil<dim>>(subsection));
   }
 
 
@@ -111,7 +108,7 @@ namespace ryujin
             typename dealii::Triangulation<dim>::cell_iterator>>
             periodic_faces;
 
-        for (int i = 1; i < dim; ++i) /* omit x direction! */
+        for (int i = 0; i < dim; ++i)
           GridTools::collect_periodic_faces(triangulation,
                                             /*b_id */ Boundary::periodic,
                                             /*direction*/ i,
@@ -163,9 +160,10 @@ namespace ryujin
     if (std::abs(mesh_distortion_) > 1.0e-10)
       GridTools::distort_random(mesh_distortion_, triangulation);
 
-    mapping_ = std::make_unique<MappingQ<dim>>(order_mapping_);
-    finite_element_ = std::make_unique<FE_Q<dim>>(order_finite_element_);
-    quadrature_ = std::make_unique<QGauss<dim>>(order_quadrature_);
+    mapping_ = std::make_unique<MappingQ<dim>>(order_mapping);
+    finite_element_ = std::make_unique<FE_Q<dim>>(order_finite_element);
+    quadrature_ = std::make_unique<QGauss<dim>>(order_quadrature);
+    quadrature_1d_ = std::make_unique<QGauss<1>>(order_quadrature);
   }
 
 } /* namespace ryujin */

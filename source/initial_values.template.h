@@ -6,6 +6,7 @@
 #ifndef INITIAL_VALUES_TEMPLATE_H
 #define INITIAL_VALUES_TEMPLATE_H
 
+#include "initial_state.template.h"
 #include "initial_values.h"
 #include "simd.h"
 
@@ -19,248 +20,185 @@ namespace ryujin
   using namespace dealii;
 
   template <int dim, typename Number>
-  InitialValues<dim, Number>::InitialValues(const std::string &subsection)
+  InitialValues<dim, Number>::InitialValues(
+      const ProblemDescription &problem_description,
+      const std::string &subsection)
       : ParameterAcceptor(subsection)
+      , problem_description(problem_description)
   {
     ParameterAcceptor::parse_parameters_call_back.connect(std::bind(
         &InitialValues<dim, Number>::parse_parameters_callback, this));
 
-    static constexpr Number gamma = ProblemDescription<dim, Number>::gamma;
-
     configuration_ = "uniform";
-    add_parameter(
-        "configuration",
-        configuration_,
-        "Configuration. Valid options are \"uniform\", \"shock front\", "
-        "\"contrast\", \"sod contrast\", \"isentropic vortex\"");
+    add_parameter("configuration",
+                  configuration_,
+                  "The initial state configuration. Valid names are given by "
+                  "any of the subsections defined below.");
 
     initial_direction_[0] = 1.;
     add_parameter(
-        "initial - direction",
+        "direction",
         initial_direction_,
-        "Initial direction of shock front, contrast, sod contrast, or vortex");
+        "Initial direction of shock front, contrast, or vortex");
 
     initial_position_[0] = 1.;
     add_parameter(
-        "initial - position",
+        "position",
         initial_position_,
-        "Initial position of shock front, contrast, sod contrast, or vortex");
-
-    initial_1d_state_[0] = gamma;
-    initial_1d_state_[1] = 3.0;
-    initial_1d_state_[2] = 1.;
-    add_parameter("initial - 1d state",
-                  initial_1d_state_,
-                  "Initial 1d state (rho, u, p) of the uniform, shock front, "
-                  "and contrast configurations");
-
-    initial_1d_state_contrast_[0] = gamma;
-    initial_1d_state_contrast_[1] = 3.0;
-    initial_1d_state_contrast_[2] = 1.;
-    add_parameter(
-        "initial - 1d state contrast",
-        initial_1d_state_contrast_,
-        "Contrast 1d state (rho, u, p) of the contrast configuration");
-
-    initial_mach_number_ = 2.0;
-    add_parameter("initial - mach number",
-                  initial_mach_number_,
-                  "Mach number of shock front (S1, S3 = mach * a_L/R), or "
-                  "isentropic vortex");
-
-    initial_vortex_beta_ = 5.0;
-    add_parameter("vortex - beta",
-                  initial_vortex_beta_,
-                  "Isentropic vortex strength beta");
+        "Initial position of shock front, contrast, or vortex");
 
     perturbation_ = 0.;
     add_parameter("perturbation",
                   perturbation_,
                   "Add a random perturbation of the specified magnitude to the "
                   "initial state.");
+
+    using namespace InitialStates;
+    initial_state_list_.emplace(std::make_unique<Uniform<dim, Number>>(
+        problem_description, subsection));
+    initial_state_list_.emplace(std::make_unique<RampUp<dim, Number>>(
+        problem_description, subsection));
+    initial_state_list_.emplace(std::make_unique<Contrast<dim, Number>>(
+        problem_description, subsection));
+    initial_state_list_.emplace(std::make_unique<ShockFront<dim, Number>>(
+        problem_description, subsection));
+    initial_state_list_.emplace(std::make_unique<IsentropicVortex<dim, Number>>(
+        problem_description, subsection));
+    initial_state_list_.emplace(std::make_unique<BeckerSolution<dim, Number>>(
+        problem_description, subsection));
   }
+
+  namespace
+  {
+    /**
+     * An affine transformation:
+     */
+    template <int dim>
+    inline DEAL_II_ALWAYS_INLINE dealii::Point<dim>
+    affine_transform(const dealii::Tensor<1, dim> initial_direction,
+                     const dealii::Point<dim> initial_position,
+                     const dealii::Point<dim> x)
+    {
+      auto direction = x - initial_position;
+
+      /* Roll third component of initial_direction onto xy-plane: */
+      if constexpr (dim == 3) {
+        auto n_x = initial_direction[0];
+        auto n_z = initial_direction[2];
+        const auto norm = std::sqrt(n_x * n_x + n_z * n_z);
+        n_x /= norm;
+        n_z /= norm;
+        auto new_direction = direction;
+        if (norm > 1.0e-14) {
+          new_direction[0] = n_x * direction[0] + n_z * direction[2];
+          new_direction[2] = -n_z * direction[0] + n_x * direction[2];
+        }
+        direction = new_direction;
+      }
+
+      /* Roll second component of initial_direction onto x-axis: */
+      {
+        auto n_x = initial_direction[0];
+        auto n_y = initial_direction[1];
+        const auto norm = std::sqrt(n_x * n_x + n_y * n_y);
+        n_x /= norm;
+        n_y /= norm;
+        auto new_direction = direction;
+        if (norm > 1.0e-14) {
+          new_direction[0] = n_x * direction[0] + n_y * direction[1];
+          new_direction[1] = -n_y * direction[0] + n_x * direction[1];
+        }
+        direction = new_direction;
+      }
+
+      return Point<dim>() + direction;
+    }
+
+
+    /**
+     * Transform vector:
+     */
+    template <int dim, typename Number>
+    inline DEAL_II_ALWAYS_INLINE dealii::Tensor<1, dim, Number>
+    affine_transform_vector(const dealii::Tensor<1, dim> initial_direction,
+                            dealii::Tensor<1, dim, Number> direction)
+    {
+      {
+        auto n_x = initial_direction[0];
+        auto n_y = initial_direction[1];
+        const auto norm = std::sqrt(n_x * n_x + n_y * n_y);
+        n_x /= norm;
+        n_y /= norm;
+        auto new_direction = direction;
+        if (norm > 1.0e-14) {
+          new_direction[0] = n_x * direction[0] - n_y * direction[1];
+          new_direction[1] = n_y * direction[0] + n_x * direction[1];
+        }
+        direction = new_direction;
+      }
+
+      if constexpr (dim == 3) {
+        auto n_x = initial_direction[0];
+        auto n_z = initial_direction[2];
+        const auto norm = std::sqrt(n_x * n_x + n_z * n_z);
+        n_x /= norm;
+        n_z /= norm;
+        auto new_direction = direction;
+        if (norm > 1.0e-14) {
+          new_direction[0] = n_x * direction[0] - n_z * direction[2];
+          new_direction[2] = n_z * direction[0] + n_x * direction[2];
+        }
+        direction = new_direction;
+      }
+
+      return direction;
+    }
+  } /* namespace */
 
 
   template <int dim, typename Number>
   void InitialValues<dim, Number>::parse_parameters_callback()
   {
-    static constexpr unsigned int problem_dimension =
-        ProblemDescription<dim>::problem_dimension;
-    static constexpr Number gamma = ProblemDescription<dim, Number>::gamma;
-    static constexpr Number b = ProblemDescription<dim, Number>::b;
+    constexpr auto problem_dimension =
+        ProblemDescription::problem_dimension<dim>;
 
-    /*
-     * First, let's normalize the direction:
-     */
+    /* First, let's normalize the direction: */
 
     AssertThrow(
         initial_direction_.norm() != 0.,
         ExcMessage("Initial shock front direction is set to the zero vector."));
     initial_direction_ /= initial_direction_.norm();
 
-    /*
-     * Create a small lambda that translates a 1D state (rho, u, p) into an
-     * nD state:
-     */
+    /* Populate std::function object: */
 
-    const auto from_1d_state =
-        [=](const dealii::Tensor<1, 3, Number> &state_1d) -> rank1_type {
-      const auto &rho = state_1d[0];
-      const auto &u = state_1d[1];
-      const auto &p = state_1d[2];
-
-      rank1_type state;
-
-      state[0] = rho;
-      for (unsigned int i = 0; i < dim; ++i)
-        state[1 + i] = rho * u * Number(initial_direction_[i]);
-      state[dim + 1] = p / (gamma - Number(1.)) + Number(0.5) * rho * u * u;
-
-      return state;
-    };
-
-
-    /*
-     * Now populate the initial_state_ function object:
-     */
-
-    if (configuration_ == "uniform") {
-
-      /*
-       * A uniform flow:
-       */
-
-      initial_state_ = [=](const dealii::Point<dim> & /*point*/, Number /*t*/) {
-        return from_1d_state(initial_1d_state_);
-      };
-
-    } else if (configuration_ == "shock front") {
-
-      /*
-       * Mach shock front S1/S3:
-       */
-
-      const auto &rho_R = initial_1d_state_[0];
-      const auto &u_R = initial_1d_state_[1];
-      const auto &p_R = initial_1d_state_[2];
-      const Number mach_S = initial_mach_number_;
-
-      /* a_R^2 = gamma * p / rho / (1 - b * rho) */
-      const Number a_R = std::sqrt(gamma * p_R / rho_R / (1 - b * rho_R));
-      const Number mach_R = u_R / a_R;
-
-      const Number S3 = mach_S * a_R;
-      const Number delta_mach = mach_R - mach_S;
-
-      const Number rho_L =
-          rho_R * (gamma + Number(1.)) * delta_mach * delta_mach /
-          ((gamma - Number(1.)) * delta_mach * delta_mach + Number(2.));
-      Number u_L = (Number(1.) - rho_R / rho_L) * S3 + rho_R / rho_L * u_R;
-      Number p_L = p_R *
-                   (Number(2.) * gamma * delta_mach * delta_mach -
-                    (gamma - Number(1.))) /
-                   (gamma + Number(1.));
-
-      dealii::Tensor<1, 3, Number> initial_1d_state_L{{rho_L, u_L, p_L}};
-
-      initial_state_ = [=](const dealii::Point<dim> &point, Number t) {
-        const Number position_1d =
-            Number((point - initial_position_) * initial_direction_ - S3 * t);
-
-        if (position_1d > 0.) {
-          return from_1d_state(initial_1d_state_);
-        } else {
-          return from_1d_state(initial_1d_state_L);
+    {
+      bool initialized = false;
+      for (auto &it : initial_state_list_)
+        if (it->name() == configuration_) {
+          initial_state_ = [this, &it](const dealii::Point<dim> &point,
+                                       Number t) {
+            const auto transformed_point =
+                affine_transform(initial_direction_, initial_position_, point);
+            auto state = it->compute(transformed_point, t);
+            auto M = problem_description.momentum(state);
+            M = affine_transform_vector(initial_direction_, M);
+            for (unsigned int d = 0; d < dim; ++d)
+              state[1 + d] = M[d];
+            return state;
+          };
+          initialized = true;
+          break;
         }
-      };
 
-    } else if (configuration_ == "contrast") {
-
-      /*
-       * A contrast:
-       */
-
-      initial_state_ = [=](const dealii::Point<dim> &point, Number /*t*/) {
-        const Number position_1d = Number((point - initial_position_)[1]);
-
-        if (position_1d > 0.) {
-          return from_1d_state(initial_1d_state_);
-        } else {
-          return from_1d_state(initial_1d_state_contrast_);
-        }
-      };
-
-    } else if (configuration_ == "sod contrast") {
-
-      /*
-       * Contrast of the Sod shock tube:
-       */
-
-      dealii::Tensor<1, 3, Number> initial_1d_state_L{
-          {Number(0.125), Number(0.), Number(0.1)}};
-      dealii::Tensor<1, 3, Number> initial_1d_state_R{
-          {Number(1.), Number(0.), Number(1.)}};
-
-      initial_state_ = [=](const dealii::Point<dim> &point, Number /*t*/) {
-        const Number position_1d =
-            Number((point - initial_position_) * initial_direction_);
-
-        if (position_1d > 0.) {
-          return from_1d_state(initial_1d_state_L);
-        } else {
-          return from_1d_state(initial_1d_state_R);
-        }
-      };
-
-    } else if (configuration_ == "isentropic vortex") {
-
-      /*
-       * 2D isentropic vortex problem. See section 5.6 of Euler-convex
-       * limiting paper by Guermond et al.
-       */
-
-      if constexpr (dim == 2) {
-        initial_state_ = [=](const dealii::Point<dim> &point, Number t) {
-          const auto point_bar = point - initial_position_ -
-                                 initial_direction_ * initial_mach_number_ * t;
-          const Number r_square = Number(point_bar.norm_square());
-
-          const Number factor = initial_vortex_beta_ / Number(2. * M_PI) *
-                                exp(Number(0.5) - Number(0.5) * r_square);
-
-          const Number T = Number(1.) - (gamma - Number(1.)) /
-                                            (Number(2.) * gamma) * factor *
-                                            factor;
-
-          const Number u =
-              Number(initial_direction_[0]) * initial_mach_number_ -
-              factor * Number(point_bar[1]);
-
-          const Number v =
-              Number(initial_direction_[1]) * initial_mach_number_ +
-              factor * Number(point_bar[0]);
-
-          const Number rho = ryujin::pow(T, Number(1.) / (gamma - Number(1.)));
-          const Number p = ryujin::pow(rho, gamma);
-          const Number E =
-              p / (gamma - Number(1.)) + Number(0.5) * rho * (u * u + v * v);
-
-          return rank1_type({rho, rho * u, rho * v, E});
-        };
-
-      } else {
-
-        AssertThrow(false, dealii::ExcNotImplemented());
-      }
-
-    } else {
-
-      AssertThrow(false, dealii::ExcMessage("Unknown initial state."));
+      AssertThrow(
+          initialized,
+          ExcMessage(
+              "Could not find an initial state description with name \"" +
+              configuration_ + "\""));
     }
 
-    /*
-     * Add a random perturbation to the original function object:
-     */
+    /* Add a random perturbation to the original function object: */
+
     if (perturbation_ != 0.) {
       initial_state_ = [old_state = this->initial_state_,
                         perturbation = this->perturbation_](
@@ -293,7 +231,7 @@ namespace ryujin
     U.reinit(offline_data.vector_partitioner());
 
     constexpr auto problem_dimension =
-        ProblemDescription<dim, Number>::problem_dimension;
+        ProblemDescription::problem_dimension<dim>;
 
     using scalar_type = typename OfflineData<dim, Number>::scalar_type;
 
@@ -310,8 +248,43 @@ namespace ryujin
       U.insert_component(temp, d);
     }
 
-    U.update_ghost_values();
+    const auto &boundary_map = offline_data.boundary_map();
+    const unsigned int n_owned = offline_data.n_locally_owned();
 
+    /*
+     * Cosmetic fix up: Ensure that the initial state is compatible with
+     * slip and no_slip boundary conditions. This ensures that nothing is
+     * ever transported out of slip and no slip boundaries - even if
+     * initial conditions happen to be set incorrectly.
+     */
+
+    for (auto entry : boundary_map) {
+      const auto i = entry.first;
+      if (i >= n_owned)
+        continue;
+
+      const auto &[normal, id, position] = entry.second;
+
+      if (id == Boundary::slip) {
+        /* Remove normal component of velocity: */
+        auto U_i = U.get_tensor(i);
+        auto m = problem_description.momentum(U_i);
+        m -= 1. * (m * normal) * normal;
+        for (unsigned int k = 0; k < dim; ++k)
+          U_i[k + 1] = m[k];
+        U.write_tensor(U_i, i);
+
+      } else if (id == Boundary::no_slip) {
+
+        /* Set velocity to zero: */
+        auto U_i = U.get_tensor(i);
+        for (unsigned int k = 0; k < dim; ++k)
+          U_i[k + 1] = Number(0.);
+        U.write_tensor(U_i, i);
+      }
+    }
+
+    U.update_ghost_values();
     return U;
   }
 

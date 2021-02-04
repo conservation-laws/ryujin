@@ -9,17 +9,21 @@
 #include <compile_time_options.h>
 
 #include "discretization.h"
-#include "initial_values.h"
-#include "offline_data.h"
-#include "postprocessor.h"
+#include "dissipation_module.h"
 #include "euler_module.h"
+#include "initial_values.h"
+#include "integral_quantities.h"
+#include "offline_data.h"
+#include "point_quantities.h"
+#include "problem_description.h"
+#include "vtu_output.h"
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/timer.h>
 
 #include <fstream>
-#include <sstream>
 #include <future>
+#include <sstream>
 
 namespace ryujin
 {
@@ -85,7 +89,6 @@ namespace ryujin
     //@}
 
   private:
-
     /**
      * @name Run time options
      */
@@ -95,16 +98,20 @@ namespace ryujin
 
     Number t_initial;
     Number t_final;
+    std::vector<Number> t_refinements;
+
     Number output_granularity;
 
     bool enable_checkpointing;
     bool enable_output_full;
-    bool enable_output_cutplanes;
+    bool enable_output_levelsets;
     bool enable_compute_error;
+    bool enable_compute_quantities;
 
     unsigned int output_checkpoint_multiplier;
     unsigned int output_full_multiplier;
-    unsigned int output_cutplanes_multiplier;
+    unsigned int output_levelsets_multiplier;
+    unsigned int output_quantities_multiplier;
 
     bool resume;
 
@@ -120,11 +127,15 @@ namespace ryujin
 
     std::map<std::string, dealii::Timer> computing_timer;
 
+    ryujin::ProblemDescription problem_description;
     ryujin::Discretization<dim> discretization;
     ryujin::OfflineData<dim, Number> offline_data;
     ryujin::InitialValues<dim, Number> initial_values;
     ryujin::EulerModule<dim, Number> euler_module;
-    ryujin::Postprocessor<dim, Number> postprocessor;
+    ryujin::DissipationModule<dim, Number> dissipation_module;
+    ryujin::VTUOutput<dim, Number> vtu_output;
+    ryujin::PointQuantities<dim, Number> point_quantities;
+    ryujin::IntegralQuantities<dim, Number> integral_quantities;
 
     const unsigned int mpi_rank;
     const unsigned int n_mpi_processes;

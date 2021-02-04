@@ -27,7 +27,8 @@ namespace ryujin
   SparsityPatternSIMD<simd_length>::SparsityPatternSIMD(
       const unsigned int n_internal_dofs,
       const dealii::DynamicSparsityPattern &sparsity,
-      const dealii::Utilities::MPI::Partitioner &partitioner)
+      const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
+          &partitioner)
       : n_internal_dofs(0)
       , mpi_communicator(MPI_COMM_SELF)
   {
@@ -39,30 +40,36 @@ namespace ryujin
   void SparsityPatternSIMD<simd_length>::reinit(
       const unsigned int n_internal_dofs,
       const dealii::DynamicSparsityPattern &dsp,
-      const dealii::Utilities::MPI::Partitioner &partitioner)
+      const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
+          &partitioner)
   {
-    this->mpi_communicator = partitioner.get_mpi_communicator();
+    this->mpi_communicator = partitioner->get_mpi_communicator();
 
     this->n_internal_dofs = n_internal_dofs;
-    this->n_locally_owned_dofs = partitioner.local_size();
+    this->n_locally_owned_dofs = partitioner->local_size();
+    this->partitioner = partitioner;
 
     const auto n_locally_relevant_dofs =
-        partitioner.local_size() + partitioner.n_ghost_indices();
+        partitioner->local_size() + partitioner->n_ghost_indices();
 
     /*
-     * First, create a static sparsity pattern where the only off-processor
-     * rows are the one for which locally owned rows request the transpose
-     * entries. This will be the one we finally compute on.
+     * First, create a static sparsity pattern (in local indexing( where
+     * the only off-processor rows are the one for which locally owned rows
+     * request the transpose entries. This will be the one we finally
+     * compute on.
      */
 
     dealii::DynamicSparsityPattern dsp_minimal(n_locally_relevant_dofs,
                                                n_locally_relevant_dofs);
     for (unsigned int i = 0; i < n_locally_owned_dofs; ++i) {
-      for (auto it = dsp.begin(i); it != dsp.end(i); ++it) {
-        const unsigned int col = it->column();
-        dsp_minimal.add(i, col);
-        if (col >= n_locally_owned_dofs) {
-          dsp_minimal.add(col, i);
+      const auto global_row = partitioner->local_to_global(i);
+      for (auto it = dsp.begin(global_row); it != dsp.end(global_row); ++it) {
+        const auto global_column = it->column();
+        const auto j = partitioner->global_to_local(global_column);
+        dsp_minimal.add(i, j);
+        if (j >= n_locally_owned_dofs) {
+          Assert(j < n_locally_relevant_dofs, dealii::ExcInternalError());
+          dsp_minimal.add(j, i);
         }
       }
     }
@@ -150,7 +157,7 @@ namespace ryujin
        * in the partitioner of the index range:
        */
 
-      const auto &ghost_targets = partitioner.ghost_targets();
+      const auto &ghost_targets = partitioner->ghost_targets();
 
       auto vec_gt = ghost_targets.begin();
       receive_targets.resize(ghost_targets.size());
@@ -169,7 +176,7 @@ namespace ryujin
       }
 
       std::vector<unsigned int> import_indices_part;
-      for (auto i : partitioner.import_indices())
+      for (auto i : partitioner->import_indices())
         for (unsigned int j = i.first; j < i.second; ++j)
           import_indices_part.push_back(j);
 
@@ -182,14 +189,14 @@ namespace ryujin
        */
 
       AssertDimension(import_indices_part.size(),
-                      partitioner.n_import_indices());
+                      partitioner->n_import_indices());
 
       indices_to_be_sent.clear();
-      send_targets.resize(partitioner.import_targets().size());
+      send_targets.resize(partitioner->import_targets().size());
       auto idx = import_indices_part.begin();
 
-      for (unsigned int p = 0; p < partitioner.import_targets().size(); ++p) {
-        for (unsigned int c = 0; c < partitioner.import_targets()[p].second;
+      for (unsigned int p = 0; p < partitioner->import_targets().size(); ++p) {
+        for (unsigned int c = 0; c < partitioner->import_targets()[p].second;
              ++c, ++idx) {
           const unsigned int row = *idx;
           indices_to_be_sent.push_back(row < n_internal_dofs
@@ -206,7 +213,7 @@ namespace ryujin
                       : row_starts[row] + (jt - sparsity.begin(row)));
         }
 
-        send_targets[p].first = partitioner.import_targets()[p].first;
+        send_targets[p].first = partitioner->import_targets()[p].first;
         send_targets[p].second = indices_to_be_sent.size();
       }
 
@@ -221,14 +228,14 @@ namespace ryujin
         receive_counter += sparsity.row_length(i);
         ++loc_count;
         if (loc_count == vec_gt->second) {
-          receive_targets[vec_gt - partitioner.ghost_targets().begin()].second =
-              receive_counter;
+          receive_targets[vec_gt - partitioner->ghost_targets().begin()]
+              .second = receive_counter;
           loc_count = 0;
           ++vec_gt;
         }
       }
 
-      Assert(vec_gt == partitioner.ghost_targets().end(),
+      Assert(vec_gt == partitioner->ghost_targets().end(),
              dealii::ExcInternalError());
     }
   }
@@ -260,9 +267,10 @@ namespace ryujin
 
 
   template <typename Number, int n_components, int simd_length>
+  template <typename SparseMatrix>
   void SparseMatrixSIMD<Number, n_components, simd_length>::read_in(
-      const std::array<dealii::SparseMatrix<Number>, n_components>
-          &sparse_matrix)
+      const std::array<SparseMatrix, n_components> &sparse_matrix,
+      bool locally_indexed /*= true*/)
   {
     RYUJIN_PARALLEL_REGION_BEGIN
 
@@ -285,23 +293,33 @@ namespace ryujin
         dealii::Tensor<1, n_components, VectorizedArray> temp;
         for (unsigned int k = 0; k < simd_length; ++k)
           for (unsigned int d = 0; d < n_components; ++d)
-            temp[d][k] = sparse_matrix[d](i + k, js[k]);
+            if (locally_indexed)
+              temp[d][k] = sparse_matrix[d](i + k, js[k]);
+            else
+              temp[d][k] = sparse_matrix[d].el(
+                  sparsity->partitioner->local_to_global(i + k),
+                  sparsity->partitioner->local_to_global(js[k]));
 
         write_vectorized_tensor(temp, i, col_idx, true);
       }
     }
 
-    const auto n_rows = sparsity->n_rows();
     RYUJIN_OMP_FOR
-    for (unsigned int i = sparsity->n_internal_dofs; i < n_rows; ++i) {
-
+    for (unsigned int i = sparsity->n_internal_dofs;
+         i < sparsity->n_locally_owned_dofs;
+         ++i) {
       const unsigned int row_length = sparsity->row_length(i);
       const unsigned int *js = sparsity->columns(i);
       for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx, ++js) {
 
         dealii::Tensor<1, n_components, Number> temp;
         for (unsigned int d = 0; d < n_components; ++d)
-          temp[d] = sparse_matrix[d](i, js[0]);
+          if (locally_indexed)
+            temp[d] = sparse_matrix[d](i, js[0]);
+          else
+            temp[d] = sparse_matrix[d].el(
+                sparsity->partitioner->local_to_global(i),
+                sparsity->partitioner->local_to_global(js[0]));
         write_tensor(temp, i, col_idx);
       }
     }
@@ -311,8 +329,9 @@ namespace ryujin
 
 
   template <typename Number, int n_components, int simd_length>
+  template <typename SparseMatrix>
   void SparseMatrixSIMD<Number, n_components, simd_length>::read_in(
-      const dealii::SparseMatrix<Number> &sparse_matrix)
+      const SparseMatrix &sparse_matrix, bool locally_indexed /*= true*/)
   {
     RYUJIN_PARALLEL_REGION_BEGIN
 
@@ -334,21 +353,32 @@ namespace ryujin
 
         dealii::VectorizedArray<Number, simd_length> temp = {};
         for (unsigned int k = 0; k < simd_length; ++k)
-          temp[k] = sparse_matrix(i + k, js[k]);
+          if (locally_indexed)
+            temp[k] = sparse_matrix(i + k, js[k]);
+          else
+            temp[k] =
+                sparse_matrix.el(sparsity->partitioner->local_to_global(i + k),
+                              sparsity->partitioner->local_to_global(js[k]));
 
         write_vectorized_entry(temp, i, col_idx, true);
       }
     }
 
-    const auto n_rows = sparsity->n_rows();
     RYUJIN_OMP_FOR
-    for (unsigned int i = sparsity->n_internal_dofs; i < n_rows; ++i) {
+    for (unsigned int i = sparsity->n_internal_dofs;
+         i < sparsity->n_locally_owned_dofs;
+         ++i) {
 
       const unsigned int row_length = sparsity->row_length(i);
       const unsigned int *js = sparsity->columns(i);
       for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx, ++js) {
 
-        const auto temp = sparse_matrix(i, js[0]);
+        const auto temp =
+            locally_indexed
+                ? sparse_matrix(i, js[0])
+                : sparse_matrix.el(
+                      sparsity->partitioner->local_to_global(i),
+                      sparsity->partitioner->local_to_global(js[0]));
         write_entry(temp, i, col_idx);
       }
     }

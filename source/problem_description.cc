@@ -4,3 +4,7 @@
 //
 
 #include "problem_description.template.h"
+
+namespace ryujin
+{
+} /* namespace ryujin */

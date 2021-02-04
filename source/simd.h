@@ -13,8 +13,6 @@
 
 namespace ryujin
 {
-  template<int dim , typename Number> class ProblemDescription;
-
   /**
    * @name Type traits and packed index handling
    */
@@ -46,7 +44,7 @@ namespace ryujin
     auto generate_iterators_impl(Functor f, std::index_sequence<Is...>)
         -> std::array<decltype(f(0)), sizeof...(Is)>
     {
-      return {f(Is)...};
+      return {{f(Is)...}};
     }
   } /* namespace */
 #endif

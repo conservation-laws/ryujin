@@ -3,11 +3,11 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#include "postprocessor.template.h"
+#include "dissipation_module.template.h"
 
 namespace ryujin
 {
   /* instantiations */
-  template class ryujin::Postprocessor<DIM, NUMBER>;
+  template class ryujin::DissipationModule<DIM, NUMBER>;
 
 } /* namespace ryujin */
