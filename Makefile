@@ -8,9 +8,16 @@ default: all
 
 SOURCEDIR:=$(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
 BUILDDIR:=build
-GENERATOR:=Ninja
-MAKE_COMMAND:=ninja
-MAKE_FILE:=build.ninja
+
+ifeq (, $(shell which ninja))
+  GENERATOR:="Unix Makefiles"
+  MAKE_COMMAND:=make
+  MAKE_FILE:=Makefile
+else
+  GENERATOR:=Ninja
+  MAKE_COMMAND:=ninja
+  MAKE_FILE:=build.ninja
+endif
 
 NP:=2
 MPIRUN:=mpirun --bind-to none --oversubscribe -np $(NP)
