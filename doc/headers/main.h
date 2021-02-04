@@ -20,17 +20,23 @@
   misc  [label="Miscellaneous", URL="\ref Miscellaneous"];
   mesh  [label="Mesh generation and discretization", URL="\ref Mesh"];
   euler [label="Euler Module", URL="\ref EulerModule"];
+  dissipation [label="Dissipation Module", URL="\ref DissipationModule"];
   loop  [label="Time loop", URL="\ref TimeLoop"];
 
-
+  fe   -> mesh  [color="black",style="solid"];
   copt -> euler [color="black",style="solid"];
   simd -> euler [color="black",style="solid"];
-  fe   -> mesh  [color="black",style="solid"];
   fe   -> euler [color="black",style="solid"];
   misc -> euler [color="black",style="solid"];
-  misc -> loop  [color="black",style="solid"];
   mesh -> euler [color="black",style="solid"];
+  copt -> dissipation [color="black",style="solid"];
+  simd -> dissipation [color="black",style="solid"];
+  fe   -> dissipation [color="black",style="solid"];
+  misc -> dissipation [color="black",style="solid"];
+  mesh -> dissipation [color="black",style="solid"];
+  misc -> loop  [color="black",style="solid"];
   euler -> loop [color="black",style="solid"];
+  dissipation -> loop [color="black",style="solid"];
 }
  * @enddot
  *

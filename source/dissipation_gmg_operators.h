@@ -23,6 +23,9 @@
 
 namespace ryujin
 {
+  /**
+   * @ingroup DissipationModule
+   */
   template <int dim, typename Number>
   class DiagonalMatrix
   {
@@ -127,6 +130,9 @@ namespace ryujin
   };
 
 
+  /**
+   * @ingroup DissipationModule
+   */
   template <int dim, typename Number, typename Number2>
   class VelocityMatrix : public dealii::Subscriptor
   {
@@ -397,6 +403,9 @@ namespace ryujin
   };
 
 
+  /**
+   * @ingroup DissipationModule
+   */
   template <int dim, typename Number>
   class MGTransferVelocity
       : public dealii::MGTransferBase<
@@ -498,6 +507,9 @@ namespace ryujin
   };
 
 
+  /**
+   * @ingroup DissipationModule
+   */
   template <int dim, typename Number, typename Number2>
   class EnergyMatrix : public dealii::Subscriptor
   {
@@ -708,6 +720,9 @@ namespace ryujin
   };
 
 
+  /**
+   * @ingroup DissipationModule
+   */
   template <int dim, typename Number>
   class MGTransferEnergy : public dealii::MGTransferMatrixFree<dim, Number>
   {

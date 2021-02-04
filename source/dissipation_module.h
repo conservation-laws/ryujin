@@ -37,7 +37,7 @@ namespace ryujin
    * Minimum entropy guaranteeing second-order time stepping for the
    * parabolic limit equations.
    *
-   * @ingroup NavierModule
+   * @ingroup DissipationModule
    */
   template <int dim, typename Number = double>
   class DissipationModule final : public dealii::ParameterAcceptor

@@ -31,20 +31,18 @@
 
 
 /**
- * @defgroup EulerModule Euler Module
+ * @defgroup DissipationModule Dissipation Module
  *
  * This module contains classes and functions used during different stages
- * of the explicit Euler update performed in EulerStep::euler_step() and
- * higher-order time-stepping primitives based on the low-order)
- * EulerStep::euler_step() update.
+ * of the implicit diffusion update performed in DissipationModule::step().
  */
 
 
 /**
- * @defgroup NavierModule Navier Stokes Module
+ * @defgroup EulerModule Euler Module
  *
  * This module contains classes and functions used during different stages
- * of the implicit parabolic update in the Strang splitting.
+ * of the explicit Euler update performed in EulerModule::step().
  */
 
 
