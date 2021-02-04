@@ -17,6 +17,14 @@ use of ad-hoc tuning parameters.
 
 Ryujin is freely available under the terms of the [MIT license](COPYING.md).
 
+Resources
+---------
+
+ - [Installation instructions](https://conservation-laws.43-1.org/doxygen/Installation.html)
+ - [Usage instructions](https://conservation-laws.43-1.org/doxygen/Usage.html)
+ - [Doxygen documentation](https://conservation-laws.43-1.org/doxygen)
+ - [Website](https://conservation-laws.43-1.org/)
+
 References
 ----------
 
@@ -49,17 +57,6 @@ following references ([preprint](https://arxiv.org/abs/2007.00094),
   url = {https://arxiv.org/abs/2009.06022},
 }
 ```
-
-Resources
----------
-
-A detailed doxygen documentation can be found
-[here](https://conservation-laws.43-1.org/doxygen). The doxygen
-documentation contains detailed
-[Installation](https://conservation-laws.43-1.org/doxygen/Installation.html)
-and [Usage](https://conservation-laws.43-1.org/doxygen/Usage.html)
-instructions. General information about the overarching software project
-can be found [here](https://conservation-laws.43-1.org/).
 
 Contact
 -------

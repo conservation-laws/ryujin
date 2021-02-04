@@ -24,9 +24,11 @@ MPIRUN:=mpirun --bind-to none --oversubscribe -np $(NP)
 EXECUTABLE:=ryujin
 PARAMETER_FILE:=$(EXECUTABLE).prm
 
+EDITOR ?= vi
+
 edit: all
 	@if [ \! -f $(BUILDDIR)/run/$(PARAMETER_FILE) ]; then cd $(BUILDDIR)/run; $(MPIRUN) ./$(EXECUTABLE); fi
-	@vim $(BUILDDIR)/run/$(PARAMETER_FILE)
+	@$(EDITOR) $(BUILDDIR)/run/$(PARAMETER_FILE)
 
 run: all
 	@cd $(BUILDDIR)/run && time ASAN_OPTIONS=detect_leaks=0 $(MPIRUN) ./$(EXECUTABLE)
