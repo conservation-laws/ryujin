@@ -31,7 +31,8 @@ following references ([preprint](https://arxiv.org/abs/2007.00094),
     finite-element scheme}
   author  = {Matthias Maier and Martin Kronbichler},
   year    = {2020},
-  journal = {submitted}
+  journal = {submitted},
+  url = {https://arxiv.org/abs/2007.00094},
 }
 
 @article{navier-stokes2020,
@@ -39,8 +40,13 @@ following references ([preprint](https://arxiv.org/abs/2007.00094),
     compressible Navier--Stokes equations},
   author = {Jean-Luc Guermond and Matthias Maier and Bojan Popov and
     Ignacio Tomas},
-  year = {2020},
-  journal = {submitted},
+  journal = {Computer Methods in Applied Mechanics and Engineering},
+  year = {2021},
+  volume  = {375},
+  number = {1},
+  pages = {113608},
+  doi = {10.1016/j.cma.2020.113608},
+  url = {https://arxiv.org/abs/2009.06022},
 }
 ```
 
