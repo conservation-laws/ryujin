@@ -20,10 +20,10 @@ Ryujin is freely available under the terms of the [MIT license](COPYING.md).
 Resources
 ---------
 
- - [Installation instructions](https://conservation-laws.43-1.org/doxygen/Installation.html)
- - [Usage instructions](https://conservation-laws.43-1.org/doxygen/Usage.html)
- - [Doxygen documentation](https://conservation-laws.43-1.org/doxygen)
- - [Website](https://conservation-laws.43-1.org/)
+ - [Installation instructions](https://conservation-laws.org/ryujin/doxygen/Installation.html)
+ - [Usage instructions](https://conservation-laws.org/ryujin/doxygen/Usage.html)
+ - [Doxygen documentation](https://conservation-laws.org/ryujin/doxygen)
+ - [Website](https://conservation-laws.org/)
 
 References
 ----------
