@@ -162,8 +162,12 @@ namespace ryujin
     for (unsigned int level = 0; level < n_levels; ++level)
       DoFTools::extract_locally_relevant_level_dofs(
           offline_data_->dof_handler(), level, relevant_sets[level]);
+#if DEAL_II_VERSION_GTE(9, 3, 0)
     mg_constrained_dofs_.initialize(offline_data_->dof_handler(),
                                     relevant_sets);
+#else
+    mg_constrained_dofs_.initialize(offline_data_->dof_handler());
+#endif
     std::set<types::boundary_id> boundary_ids;
     boundary_ids.insert(Boundary::dirichlet);
     boundary_ids.insert(Boundary::no_slip);
@@ -508,7 +512,8 @@ namespace ryujin
 #if DEAL_II_VERSION_GTE(9, 3, 0)
               velocity.gather_evaluate(src, EvaluationFlags::gradients);
 #else
-              velocity.gather_evaluate(src, false, true);
+              velocity.read_dof_values(src);
+              velocity.evaluate(false, true);
 #endif
 
               for (unsigned int q = 0; q < velocity.n_q_points; ++q) {

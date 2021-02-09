@@ -8,6 +8,8 @@
 
 #include "transfinite_interpolation.h"
 
+#include <boost/container/small_vector.hpp>
+
 namespace ryujin
 {
 
@@ -578,7 +580,7 @@ namespace ryujin
         distances_and_cells;
     for (; cell != endc; ++cell) {
       /* FIXME: Remove workaround - ignore certain cells. */
-      if(cell->material_id() == 42)
+      if (cell->material_id() == 42)
         continue;
 
       std::array<Point<spacedim>, GeometryInfo<dim>::vertices_per_cell>

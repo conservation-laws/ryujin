@@ -127,7 +127,7 @@ namespace ryujin
 #if DEAL_II_VERSION_GTE(9, 3, 0)
         phi.integrate_scatter(EvaluationFlags::values, lumped_boundary_mass_);
 #else
-        phi.integrate_scatter(true, false, lumped_boundary_mass_
+        phi.integrate_scatter(true, false, lumped_boundary_mass_);
 #endif
       }
 
@@ -294,7 +294,8 @@ namespace ryujin
 #if DEAL_II_VERSION_GTE(9, 3, 0)
               velocity.gather_evaluate(src, EvaluationFlags::gradients);
 #else
-              velocity.gather_evaluate(src, false, true);
+              velocity.read_dof_values(src);
+              velocity.evaluate(false, true);
 #endif
               for (unsigned int q = 0; q < velocity.n_q_points; ++q) {
                 const auto curl = velocity.get_curl(q);
@@ -303,7 +304,8 @@ namespace ryujin
 #if DEAL_II_VERSION_GTE(9, 3, 0)
               vorticity.integrate_scatter(EvaluationFlags::values, dst);
 #else
-              vorticity.integrate_scatter(true, false, dst);
+              vorticity.integrate(true, false);
+              vorticity.distribute_local_to_global(dst);
 #endif
             }
           },
@@ -374,7 +376,8 @@ namespace ryujin
 #if DEAL_II_VERSION_GTE(9, 3, 0)
         velocity.gather_evaluate(velocity_, EvaluationFlags::gradients);
 #else
-        velocity.gather_evaluate(velocity_, false, true);
+        velocity.read_dof_values(velocity_);
+        velocity.evaluate(false, true);
 #endif
         for (unsigned int q = 0; q < velocity.n_q_points; ++q) {
           const auto normal = velocity.get_normal_vector(q);
@@ -390,7 +393,8 @@ namespace ryujin
 #if DEAL_II_VERSION_GTE(9, 3, 0)
         velocity.integrate_scatter(EvaluationFlags::values, boundary_stress_);
 #else
-        velocity.integrate_scatter(true, false, boundary_stress_);
+        velocity.integrate(true, false);
+        velocity.distribute_local_to_global(boundary_stress_);
 #endif
       }
 
