@@ -23,6 +23,27 @@
 
 namespace ryujin
 {
+  namespace
+  {
+    /**
+     * A small helper function to assign values to either a c-style
+     * array (how vertices are stored in deal.II version 9.2 and
+     * earlier), or a std::array (how vertices are stored in deal.II
+     * version 9.3 onwards).
+     */
+    template <typename T, typename T2>
+    inline void assign(T &array,
+                       const std::initializer_list<T2> &initializer_list)
+    {
+      /* accomodate for a possible c-style array... */
+      Assert(std::size(array) == std::size(initializer_list),
+             dealii::ExcMessage(
+                 "size of initializer list and array does not match"));
+      std::copy(
+          initializer_list.begin(), initializer_list.end(), std::begin(array));
+    }
+  } // namespace
+
   namespace Manifolds
   {
     /**
@@ -909,15 +930,15 @@ namespace ryujin
           };
 
           std::vector<dealii::CellData<2>> cells(4);
-          cells[0].vertices = {2, 3, 4, 5};
-          cells[1].vertices = {0, 2, 1, 4};
-          cells[2].vertices = {7, 0, 6, 1};
+          assign(cells[0].vertices, {2, 3, 4, 5});
+          assign(cells[1].vertices, {0, 2, 1, 4});
+          assign(cells[2].vertices, {7, 0, 6, 1});
           if (sharp_trailing_edge) {
-            cells[3].vertices = {8, 7, 5, 6};
+            assign(cells[3].vertices, {8, 7, 5, 6});
           } else {
             vertices.push_back({airfoil_center_[0] + back_length,
                                 airfoil_center_[1] + psi_upper(back_length)});
-            cells[3].vertices = {8, 7, 9, 6};
+            assign(cells[3].vertices, {8, 7, 9, 6});
           }
 
           tria_front.create_triangulation(
@@ -941,8 +962,8 @@ namespace ryujin
           };
 
           std::vector<dealii::CellData<2>> cells(2);
-          cells[0].vertices = {0, 3, 1, 4};
-          cells[1].vertices = {1, 4, 2, 5};
+          assign(cells[0].vertices, {0, 3, 1, 4});
+          assign(cells[1].vertices, {1, 4, 2, 5});
 
           tria_back.create_triangulation(
               vertices, cells, dealii::SubCellData());
@@ -969,9 +990,9 @@ namespace ryujin
           };
 
           std::vector<dealii::CellData<2>> cells(3);
-          cells[0].vertices = {0, 4, 1, 5};
-          cells[1].vertices = {1, 5, 2, 6};
-          cells[2].vertices = {2, 6, 3, 7};
+          assign(cells[0].vertices, {0, 4, 1, 5});
+          assign(cells[1].vertices, {1, 5, 2, 6});
+          assign(cells[2].vertices, {2, 6, 3, 7});
 
           tria_back.create_triangulation(
               vertices, cells, dealii::SubCellData());
