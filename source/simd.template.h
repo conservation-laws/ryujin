@@ -15,6 +15,22 @@ DEAL_II_ENABLE_EXTRA_DIAGNOSTICS
 
 namespace ryujin
 {
+  template <>
+  // DEAL_II_ALWAYS_INLINE inline
+  dealii::VectorizedArray<float, 1>
+  pow(const dealii::VectorizedArray<float, 1> x, const float b)
+  {
+    return std::pow(x.data, b);
+  }
+
+  template <>
+  // DEAL_II_ALWAYS_INLINE inline
+  dealii::VectorizedArray<double, 1>
+  pow(const dealii::VectorizedArray<double, 1> x, const double b)
+  {
+    return std::pow(x.data, b);
+  }
+
 #if DEAL_II_COMPILER_VECTORIZATION_LEVEL >= 1 && defined(__SSE2__) &&          \
     defined(USE_CUSTOM_POW)
 
