@@ -67,6 +67,8 @@
  * @code
  * git clone https://github.com/conservation-laws/ryujin
  * cd ryujin
+ * git submodule init
+ * git submodule update
  * make release
  * @endcode
 *
