@@ -81,6 +81,7 @@ option(OBSESSIVE_INLINING "Also inline the Riemann solver and limiter calls" OFF
 option(USE_COMMUNICATION_HIDING "Issue MPI synchronization of ghost values early" ON)
 option(USE_CUSTOM_POW "Use custom pow implementation" ON)
 option(USE_SIMD "Use SIMD vectorization" ON)
+option(PRECOMPILE_HEADERS "Precompile headers for faster (re)compilation" OFF)
 
 set(ORDER_FINITE_ELEMENT "1" CACHE STRING "Order of finite elements")
 set(ORDER_MAPPING "1" CACHE STRING "Order of mapping")

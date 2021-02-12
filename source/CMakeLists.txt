@@ -32,21 +32,41 @@ add_executable(ryujin
 
 deal_ii_setup_target(ryujin)
 
-if(false)
-if(NOT CMAKE_VERSION VERSION_LESS 3.16)
+if(PRECOMPILE_HEADERS AND NOT CMAKE_VERSION VERSION_LESS 3.16)
   target_precompile_headers(ryujin
     PRIVATE
+    checkpointing.h
+    convenience_macros.h
+    cubic_spline.h
     discretization.h
+    dissipation_gmg_operators.h
+    dissipation_module.h
+    euler_module.h
     geometry.h
+    grid_airfoil.h
+    grid_generator.h
+    indicator.h
+    initial_state.h
     initial_values.h
+    integral_quantities.h
+    introspection.h
+    limiter.h
+    local_index_handling.h
     multicomponent_vector.h
+    newton.h
     offline_data.h
-    vtu_output.h
+    openmp.h
+    point_quantities.h
     problem_description.h
     riemann_solver.h
     scope.h
     scratch_data.h
+    simd.h
+    solution_transfer.h
     sparse_matrix_simd.h
+    time_loop.h
+    transfinite_interpolation.h
+    vtu_output.h
     <array>
     <atomic>
     <chrono>
@@ -120,7 +140,6 @@ if(NOT CMAKE_VERSION VERSION_LESS 3.16)
     <deal.II/numerics/vector_tools.h>
     <deal.II/numerics/vector_tools.templates.h>
     )
-endif()
 endif()
 
 set_property(SOURCE time_loop.cc APPEND PROPERTY COMPILE_DEFINITIONS

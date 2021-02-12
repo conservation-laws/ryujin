@@ -160,7 +160,7 @@ namespace ryujin
     const unsigned int min_level = std::min(gmg_min_level_, n_levels - 1);
     MGLevelObject<IndexSet> relevant_sets(0, n_levels - 1);
     for (unsigned int level = 0; level < n_levels; ++level)
-      DoFTools::extract_locally_relevant_level_dofs(
+      dealii::DoFTools::extract_locally_relevant_level_dofs(
           offline_data_->dof_handler(), level, relevant_sets[level]);
 #if DEAL_II_VERSION_GTE(9, 3, 0)
     mg_constrained_dofs_.initialize(offline_data_->dof_handler(),
