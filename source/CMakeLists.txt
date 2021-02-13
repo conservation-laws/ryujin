@@ -156,7 +156,20 @@ if(LIKWID_PERFMON)
   target_link_libraries(ryujin likwid likwid-hwloc likwid-lua)
 endif()
 
-# FIXME: The actual check should be whether we are using libstdc++
-if(NOT CMAKE_CXX_COMPILER_ID MATCHES "AppleClang")
+#
+# For GNU libstdc++ we have to make sure to also link against libstdc++fs:
+#
+
+include(CheckCXXSourceCompiles)
+
+check_cxx_source_compiles("
+  #include <iostream>
+  #ifndef __GLIBCXX__
+  #error NOT LIBSTDCPP
+  #endif
+  int main() {}"
+  LIBSTDCPP
+  )
+if(LIBSTDCPP)
   target_link_libraries(ryujin stdc++fs)
 endif()
