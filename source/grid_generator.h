@@ -67,7 +67,8 @@ namespace ryujin
 
       using namespace dealii;
 
-      dealii::Triangulation<dim, dim> tria1, tria2, tria3, tria4, tria5;
+      dealii::Triangulation<dim, dim> tria1, tria2, tria3, tria4, tria5, tria6,
+          tria7;
 
       GridGenerator::hyper_cube_with_cylindrical_hole(
           tria1, cylinder_diameter / 2., cylinder_diameter, 0.5, 1, false);
@@ -75,25 +76,40 @@ namespace ryujin
       GridGenerator::subdivided_hyper_rectangle(
           tria2,
           {2, 1},
-          Point<2>(-cylinder_diameter, cylinder_diameter),
-          Point<2>(cylinder_diameter, height / 2.));
-
-      GridGenerator::subdivided_hyper_rectangle(
-          tria3,
-          {2, 1},
           Point<2>(-cylinder_diameter, -cylinder_diameter),
           Point<2>(cylinder_diameter, -height / 2.));
 
       GridGenerator::subdivided_hyper_rectangle(
+          tria3,
+          {2, 1},
+          Point<2>(-cylinder_diameter, cylinder_diameter),
+          Point<2>(cylinder_diameter, height / 2.));
+
+      GridGenerator::subdivided_hyper_rectangle(
           tria4,
-          {6, 4},
-          Point<2>(cylinder_diameter, -height / 2.),
+          {6, 2},
+          Point<2>(cylinder_diameter, -cylinder_diameter),
+          Point<2>(length - cylinder_position, cylinder_diameter));
+
+      GridGenerator::subdivided_hyper_rectangle(
+          tria5,
+          {6, 1},
+          Point<2>(cylinder_diameter, cylinder_diameter),
           Point<2>(length - cylinder_position, height / 2.));
 
-      tria5.set_mesh_smoothing(triangulation.get_mesh_smoothing());
+      GridGenerator::subdivided_hyper_rectangle(
+          tria6,
+          {6, 1},
+          Point<2>(cylinder_diameter, -height / 2.),
+          Point<2>(length - cylinder_position, -cylinder_diameter));
+
+      tria7.set_mesh_smoothing(triangulation.get_mesh_smoothing());
       GridGenerator::merge_triangulations(
-          {&tria1, &tria2, &tria3, &tria4}, tria5, 1.e-12, true);
-      triangulation.copy_triangulation(tria5);
+          {&tria1, &tria2, &tria3, &tria4, &tria5, &tria6},
+          tria7,
+          1.e-12,
+          true);
+      triangulation.copy_triangulation(tria7);
 
       /* Restore polar manifold for disc: */
 
