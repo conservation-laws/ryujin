@@ -3,7 +3,7 @@
 ryujin
 ======
 
-Ryujin is a high-performance second-order colocation-type finite-element
+Ryujin is a high-performance second-order collocation-type finite-element
 scheme for solving the compressible Navier-Stokes and Euler equations of
 gas dynamics on unstructured meshes. The solver is based on the convex
 limiting technique introduced by [Guermond et
@@ -24,6 +24,14 @@ Resources
  - [Usage instructions](https://conservation-laws.org/ryujin/doxygen/Usage.html)
  - [Doxygen documentation](https://conservation-laws.org/ryujin/doxygen)
  - [Website](https://conservation-laws.org/)
+
+Videos
+------
+
+<h4>Compressible Euler flow (Mach 3) past a cylinder: (click on image)</h4>
+
+[<img src="https://img.youtube.com/vi/pPP26zelb0M/0.jpg" width="400"/>](https://www.youtube.com/watch?v=pPP26zelb0M)
+[<img src="https://img.youtube.com/vi/vBCRAF_c8m8/0.jpg" width="400"/>](https://www.youtube.com/watch?v=vBCRAF_c8m8)
 
 References
 ----------
