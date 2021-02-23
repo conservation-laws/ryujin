@@ -407,7 +407,7 @@ namespace ryujin
     }
 
     {
-#ifdef SPLIT_SYNCHRONIZATION_TIMERS
+#if defined(SPLIT_SYNCHRONIZATION_TIMERS) || defined(DEBUG_OUTPUT)
       Scope scope(computing_timer_,
                   "time step [E] 2 - synchronization barrier");
 #else
@@ -626,7 +626,7 @@ namespace ryujin
     }
 
     {
-#ifdef SPLIT_SYNCHRONIZATION_TIMERS
+#if defined(SPLIT_SYNCHRONIZATION_TIMERS) || defined(DEBUG_OUTPUT)
       Scope scope(computing_timer_, "time step [E] 3 - synchronization");
 #else
       Scope scope(computing_timer_,
@@ -773,7 +773,7 @@ namespace ryujin
     }
 
     if (RYUJIN_LIKELY(limiter_iter_ != 0)) {
-#ifdef SPLIT_SYNCHRONIZATION_TIMERS
+#if defined(SPLIT_SYNCHRONIZATION_TIMERS) || defined(DEBUG_OUTPUT)
       Scope scope(computing_timer_, "time step [E] 4 - synchronization");
 #else
       Scope scope(computing_timer_, "time step [E] 4 - compute p_ij, and l_ij");
@@ -1002,7 +1002,7 @@ namespace ryujin
       }
 
       {
-#ifdef SPLIT_SYNCHRONIZATION_TIMERS
+#if defined(SPLIT_SYNCHRONIZATION_TIMERS) || defined(DEBUG_OUTPUT)
         Scope scope(computing_timer_,
                     "time step [E] " + step_no + " - synchronization");
 #else
@@ -1099,7 +1099,7 @@ namespace ryujin
         }
 
         /* Subsonic outflow: */
-        if (vn > 0.  && vn <= a) {
+        if (vn > 0. && vn <= a) {
           const auto U_i_bar = initial_values_->initial_state(position, t);
           U_i = problem_description_->prescribe_riemann_characteristic<1>(
               U_i, U_i_bar, normal);
@@ -1286,13 +1286,13 @@ namespace ryujin
 
     RYUJIN_OMP_FOR
     for (unsigned int i = 0; i < n_owned; ++i) {
-        const auto alpha_i = alpha_.local_element(i);
-        const auto d_ii = dij_matrix_.get_entry(i, 0);
-        const unsigned int row_length = sparsity_simd.row_length(i);
-        const auto beta_ii = betaij_matrix.get_entry(i, 0);
+      const auto alpha_i = alpha_.local_element(i);
+      const auto d_ii = dij_matrix_.get_entry(i, 0);
+      const unsigned int row_length = sparsity_simd.row_length(i);
+      const auto beta_ii = betaij_matrix.get_entry(i, 0);
 
-        residual_mu_.local_element(i) =
-            -1. * alpha_i * d_ii / (row_length * beta_ii);
+      residual_mu_.local_element(i) =
+          -1. * alpha_i * d_ii / (row_length * beta_ii);
     }
 
     RYUJIN_PARALLEL_REGION_END
