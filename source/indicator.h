@@ -296,10 +296,13 @@ namespace ryujin
       switch (Indicator<dim, Number>::smoothness_indicator_) {
       case Indicator<dim, Number>::SmoothnessIndicators::rho:
         indicator_i = problem_description.density(U_i);
+        break;
       case Indicator<dim, Number>::SmoothnessIndicators::internal_energy:
         indicator_i = problem_description.internal_energy(U_i);
+        break;
       case Indicator<dim, Number>::SmoothnessIndicators::pressure:
         indicator_i = problem_description.pressure(U_i);
+        break;
       }
     }
 
@@ -335,10 +338,13 @@ namespace ryujin
       switch (Indicator<dim, Number>::smoothness_indicator_) {
       case Indicator<dim, Number>::SmoothnessIndicators::rho:
         indicator_j = problem_description.density(U_j);
+        break;
       case Indicator<dim, Number>::SmoothnessIndicators::internal_energy:
         indicator_j = problem_description.internal_energy(U_j);
+        break;
       case Indicator<dim, Number>::SmoothnessIndicators::pressure:
         indicator_j = problem_description.pressure(U_j);
+        break;
       }
 
       numerator += beta_ij * (indicator_i - indicator_j);

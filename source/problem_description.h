@@ -588,7 +588,7 @@ namespace ryujin
 
     const auto e_k = 0.5 * v.norm_square();
 
-    switch(component) {
+    switch (component) {
     case 1:
       b[0] = (gamma - 1.) * e_k + a * v * normal;
       for (unsigned int i = 0; i < dim; ++i)
