@@ -3,8 +3,7 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#ifndef LOCAL_INDEX_HANDLING_H
-#define LOCAL_INDEX_HANDLING_H
+#pragma once
 
 #include <deal.II/base/partitioner.h>
 #include <deal.II/dofs/dof_handler.h>
@@ -321,5 +320,3 @@ namespace ryujin
   } // namespace DoFTools
 
 } // namespace ryujin
-
-#endif /* LOCAL_INDEX_HANDLING_H */

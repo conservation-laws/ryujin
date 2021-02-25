@@ -3,8 +3,7 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#ifndef EULER_MODULE_TEMPLATE_H
-#define EULER_MODULE_TEMPLATE_H
+#pragma once
 
 #include "euler_module.h"
 #include "indicator.h"
@@ -1302,5 +1301,3 @@ namespace ryujin
 
 
 } /* namespace ryujin */
-
-#endif /* EULER_MODULE_TEMPLATE_H */

@@ -3,8 +3,7 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#ifndef SCRATCH_DATA_H
-#define SCRATCH_DATA_H
+#pragma once
 
 #include "discretization.h"
 
@@ -60,5 +59,3 @@ namespace ryujin
   };
 
 } // namespace ryujin
-
-#endif /* SCRATCH_DATA_H */

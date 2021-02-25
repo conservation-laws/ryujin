@@ -3,8 +3,7 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#ifndef INDICATOR_H
-#define INDICATOR_H
+#pragma once
 
 #include <compile_time_options.h>
 
@@ -417,5 +416,3 @@ namespace ryujin
 
 
 } /* namespace ryujin */
-
-#endif /* INDICATOR_H */

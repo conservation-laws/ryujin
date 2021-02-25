@@ -3,8 +3,7 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#ifndef PROBLEM_DESCRIPTION_TEMPLATE_H
-#define PROBLEM_DESCRIPTION_TEMPLATE_H
+#pragma once
 
 #include "problem_description.h"
 
@@ -76,5 +75,3 @@ namespace ryujin
 #endif
 
 } /* namespace ryujin */
-
-#endif /* PROBLEM_DESCRIPTION_TEMPLATE_H */

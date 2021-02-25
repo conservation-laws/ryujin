@@ -3,8 +3,7 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#ifndef CUBIC_SPLINE_H
-#define CUBIC_SPLINE_H
+#pragma once
 
 #ifdef DEAL_II_WITH_GSL
 #include <gsl/gsl_spline.h>
@@ -60,5 +59,3 @@ namespace ryujin
 }
 
 #endif
-
-#endif /* CUBIC_SPLINE_H */

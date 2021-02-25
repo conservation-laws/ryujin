@@ -3,8 +3,7 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#ifndef OFFLINE_DATA_H
-#define OFFLINE_DATA_H
+#pragma once
 
 #include <compile_time_options.h>
 
@@ -305,5 +304,3 @@ namespace ryujin
   };
 
 } /* namespace ryujin */
-
-#endif /* OFFLINE_DATA_H */

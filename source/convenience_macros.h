@@ -3,11 +3,9 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#ifndef CONVENIENCE_MACROS_H
-#define CONVENIENCE_MACROS_H
+#pragma once
 
 #include <deal.II/base/function.h>
-
 
 /**
  * @name Various convenience macros
@@ -185,5 +183,3 @@ protected:
 #define ASM_LABEL(label) asm ("#" label);
 
 //@}
-
-#endif /* CONVENIENCE_MACROS_H */

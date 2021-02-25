@@ -3,8 +3,7 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#ifndef POINT_QUANTITIES_TEMPLATE_H
-#define POINT_QUANTITIES_TEMPLATE_H
+#pragma once
 
 #include "openmp.h"
 #include "point_quantities.h"
@@ -535,5 +534,3 @@ namespace ryujin
   }
 
 } /* namespace ryujin */
-
-#endif /* POINT_QUANTITIES_TEMPLATE_H */

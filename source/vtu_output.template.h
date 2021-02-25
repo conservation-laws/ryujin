@@ -3,8 +3,7 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#ifndef VTU_OUTPUT_TEMPLATE_H
-#define VTU_OUTPUT_TEMPLATE_H
+#pragma once
 
 #include "simd.h"
 #include "vtu_output.h"
@@ -445,5 +444,3 @@ namespace ryujin
   }
 
 } /* namespace ryujin */
-
-#endif /* VTU_OUTPUT_TEMPLATE_H */

@@ -3,8 +3,7 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#ifndef LIMITER_TEMPLATE_H
-#define LIMITER_TEMPLATE_H
+#pragma once
 
 #include "limiter.h"
 
@@ -333,5 +332,3 @@ namespace ryujin
   }
 
 } /* namespace ryujin */
-
-#endif /* LIMITER_TEMPLATE_H */

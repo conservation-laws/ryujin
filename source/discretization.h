@@ -3,8 +3,7 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#ifndef DISCRETIZATION_H
-#define DISCRETIZATION_H
+#pragma once
 
 #include <compile_time_options.h>
 
@@ -227,5 +226,3 @@ namespace ryujin
   };
 
 } /* namespace ryujin */
-
-#endif /* DISCRETIZATION_H */

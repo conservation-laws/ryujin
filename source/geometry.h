@@ -3,8 +3,7 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#ifndef GEOMETRY_H
-#define GEOMETRY_H
+#pragma once
 
 #include <compile_time_options.h>
 
@@ -65,5 +64,3 @@ namespace ryujin
   };
 
 } /* namespace ryujin */
-
-#endif /* GEOMETRY_H */

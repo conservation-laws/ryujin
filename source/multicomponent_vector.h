@@ -3,8 +3,7 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#ifndef MULTICOMPONENT_VECTOR_H
-#define MULTICOMPONENT_VECTOR_H
+#pragma once
 
 #include "simd.h"
 
@@ -320,6 +319,3 @@ namespace ryujin
 #endif
 
 } // namespace ryujin
-
-
-#endif /* MULTICOMPONENT_VECTOR_H */

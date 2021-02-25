@@ -3,8 +3,7 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#ifndef CHECKPOINTING_H
-#define CHECKPOINTING_H
+#pragma once
 
 #include <deal.II/base/utilities.h>
 
@@ -80,5 +79,3 @@ namespace ryujin
       oa << it;
   }
 } // namespace ryujin
-
-#endif /* CHECKPOINTING_H */

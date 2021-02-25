@@ -3,8 +3,7 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#ifndef INITIAL_VALUES_TEMPLATE_H
-#define INITIAL_VALUES_TEMPLATE_H
+#pragma once
 
 #include "initial_state.template.h"
 #include "initial_values.h"
@@ -289,5 +288,3 @@ namespace ryujin
   }
 
 } /* namespace ryujin */
-
-#endif /* INITIAL_VALUES_TEMPLATE_H */

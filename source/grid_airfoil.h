@@ -3,8 +3,7 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#ifndef GRID_AIRFOIL_H
-#define GRID_AIRFOIL_H
+#pragma once
 
 #include <compile_time_options.h>
 
@@ -1302,5 +1301,3 @@ namespace ryujin
   } /* namespace Geometries */
 
 } /* namespace ryujin */
-
-#endif /* GRID_AIRFOIL_H */

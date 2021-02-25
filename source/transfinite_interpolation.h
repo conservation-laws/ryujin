@@ -4,8 +4,7 @@
 // Copyright (C) 2008 - 2020 by David Wells
 //
 
-#ifndef TRANSFINITE_INTERPOLATION_H
-#define TRANSFINITE_INTERPOLATION_H
+#pragma once
 
 #include <deal.II/base/config.h>
 #include <deal.II/grid/manifold.h>
@@ -75,5 +74,3 @@ namespace ryujin
   };
 
 } // namespace ryujin
-
-#endif /* TRANSFINITE_INTERPOLATION_H */

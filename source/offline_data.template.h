@@ -3,8 +3,7 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#ifndef OFFLINE_DATA_TEMPLATE_H
-#define OFFLINE_DATA_TEMPLATE_H
+#pragma once
 
 #include "local_index_handling.h"
 #include "multicomponent_vector.h"
@@ -682,5 +681,3 @@ namespace ryujin
   }
 
 } /* namespace ryujin */
-
-#endif /* OFFLINE_DATA_TEMPLATE_H */

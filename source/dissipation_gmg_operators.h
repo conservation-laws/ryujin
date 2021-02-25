@@ -3,8 +3,7 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#ifndef DISSIPATION_GMG_OPERATORS_H
-#define DISSIPATION_GMG_OPERATORS_H
+#pragma once
 
 #include "introspection.h"
 #include "offline_data.h"
@@ -754,5 +753,3 @@ namespace ryujin
         *level_matrix_free_;
   };
 } /* namespace ryujin */
-
-#endif /* DISSIPATION_MODULE_TEMPLATE_H */

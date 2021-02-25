@@ -3,8 +3,7 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#ifndef SPARSE_MATRIX_SIMD
-#define SPARSE_MATRIX_SIMD
+#pragma once
 
 #include <deal.II/base/aligned_vector.h>
 #include <deal.II/base/partitioner.h>
@@ -606,5 +605,3 @@ namespace ryujin
   }
 
 } // namespace ryujin
-
-#endif

@@ -3,8 +3,7 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#ifndef INTEGRAL_QUANTITIES_TEMPLATE_H
-#define INTEGRAL_QUANTITIES_TEMPLATE_H
+#pragma once
 
 #include "integral_quantities.h"
 #include "simd.h"
@@ -118,5 +117,3 @@ namespace ryujin
   }
 
 } /* namespace ryujin */
-
-#endif /* INTEGRAL_QUANTITIES_TEMPLATE_H */

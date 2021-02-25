@@ -3,8 +3,7 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#ifndef SCOPE_H
-#define SCOPE_H
+#pragma once
 
 #include <deal.II/base/timer.h>
 
@@ -54,5 +53,3 @@ namespace ryujin
     const std::string section_;
   };
 } // namespace ryujin
-
-#endif /* SCOPE_H */

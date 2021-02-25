@@ -3,8 +3,7 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#ifndef SPARSE_MATRIX_SIMD_TEMPLATE_H
-#define SPARSE_MATRIX_SIMD_TEMPLATE_H
+#pragma once
 
 #include "sparse_matrix_simd.h"
 
@@ -387,5 +386,3 @@ namespace ryujin
   }
 
 } // namespace ryujin
-
-#endif /* SPARSE_MATRIX_SIMD_TEMPLATE_H */

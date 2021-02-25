@@ -3,8 +3,8 @@
 // Copyright (C) 2007 - 2020 by Martin Kronbichler
 // Copyright (C) 2008 - 2020 by David Wells
 //
-#ifndef TRANSFINITE_INTERPOLATION_TEMPLATE_H
-#define TRANSFINITE_INTERPOLATION_TEMPLATE_H
+
+#pragma once
 
 #include "transfinite_interpolation.h"
 
@@ -932,5 +932,3 @@ namespace ryujin
   }
 
 } // namespace ryujin
-
-#endif /* TRANSFINITE_INTERPOLATION_TEMPLATE_H */

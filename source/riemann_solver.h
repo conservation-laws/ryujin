@@ -3,8 +3,7 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#ifndef RIEMANN_SOLVER_H
-#define RIEMANN_SOLVER_H
+#pragma once
 
 #include <compile_time_options.h>
 
@@ -263,8 +262,6 @@ namespace ryujin
   };
 
 } /* namespace ryujin */
-
-#endif /* RIEMANN_SOLVER_H */
 
 #ifdef OBSESSIVE_INLINING
 #include "riemann_solver.template.h"

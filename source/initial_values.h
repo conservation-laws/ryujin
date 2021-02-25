@@ -3,8 +3,7 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#ifndef INITIAL_VALUES_H
-#define INITIAL_VALUES_H
+#pragma once
 
 #include <compile_time_options.h>
 
@@ -118,5 +117,3 @@ namespace ryujin
   };
 
 } /* namespace ryujin */
-
-#endif /* INITIAL_VALUES_H */

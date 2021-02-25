@@ -3,8 +3,7 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#ifndef LIMITER_H
-#define LIMITER_H
+#pragma once
 
 #include <compile_time_options.h>
 
@@ -330,8 +329,6 @@ namespace ryujin
   }
 
 } /* namespace ryujin */
-
-#endif /* LIMITER_H */
 
 #ifdef OBSESSIVE_INLINING
 #include "limiter.template.h"

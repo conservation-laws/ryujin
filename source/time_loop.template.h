@@ -3,8 +3,7 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#ifndef TIME_LOOP_TEMPLATE_H
-#define TIME_LOOP_TEMPLATE_H
+#pragma once
 
 #include "checkpointing.h"
 #include "indicator.h"
@@ -1044,5 +1043,3 @@ namespace ryujin
 
 
 } // namespace ryujin
-
-#endif /* TIME_LOOP_TEMPLATE_H */

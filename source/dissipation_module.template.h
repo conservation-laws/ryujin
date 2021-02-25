@@ -3,8 +3,7 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#ifndef DISSIPATION_MODULE_TEMPLATE_H
-#define DISSIPATION_MODULE_TEMPLATE_H
+#pragma once
 
 #include "dissipation_module.h"
 #include "introspection.h"
@@ -803,5 +802,3 @@ namespace ryujin
 
 
 } /* namespace ryujin */
-
-#endif /* DISSIPATION_MODULE_TEMPLATE_H */

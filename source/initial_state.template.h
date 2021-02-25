@@ -3,8 +3,7 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#ifndef INITIAL_STATE_TEMPLATE_H
-#define INITIAL_STATE_TEMPLATE_H
+#pragma once
 
 #include "initial_state.h"
 
@@ -496,5 +495,3 @@ namespace ryujin
 
   } /* namespace IinitialStates */
 } /* namespace ryujin */
-
-#endif /* INITIAL_STATE_TEMPLATE_H */

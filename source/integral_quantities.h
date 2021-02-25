@@ -3,8 +3,7 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#ifndef INTEGRAL_QUANTITIES_H
-#define INTEGRAL_QUANTITIES_H
+#pragma once
 
 #include <compile_time_options.h>
 
@@ -105,5 +104,3 @@ namespace ryujin
   };
 
 } /* namespace ryujin */
-
-#endif /* INTEGRAL_QUANTITIES_H */

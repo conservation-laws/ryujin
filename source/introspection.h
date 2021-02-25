@@ -3,8 +3,7 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#ifndef INTROSPECTION_H
-#define INTROSPECTION_H
+#pragma once
 
 /*
  * Valgrind
@@ -43,5 +42,3 @@
 #define LSAN_ENABLE __lsan_enable();
 #endif
 #endif
-
-#endif /* INTROSPECTION_H */

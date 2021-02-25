@@ -3,8 +3,7 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#ifndef GRID_GENERATOR_H
-#define GRID_GENERATOR_H
+#pragma once
 
 #include <compile_time_options.h>
 
@@ -760,5 +759,3 @@ namespace ryujin
   } /* namespace Geometries */
 
 } /* namespace ryujin */
-
-#endif /* GRID_GENERATOR_H */

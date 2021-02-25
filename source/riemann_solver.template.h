@@ -3,8 +3,7 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#ifndef RIEMANN_SOLVER_TEMPLATE_H
-#define RIEMANN_SOLVER_TEMPLATE_H
+#pragma once
 
 #include <compile_time_options.h>
 
@@ -523,5 +522,3 @@ namespace ryujin
   }
 
 } // namespace ryujin
-
-#endif /* RIEMANN_SOLVER_TEMPLATE_H */

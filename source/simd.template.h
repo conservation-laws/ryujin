@@ -3,8 +3,7 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#ifndef SIMD_TEMPLATE_H
-#define SIMD_TEMPLATE_H
+#pragma once
 
 #include "simd.h"
 
@@ -145,5 +144,3 @@ namespace ryujin
 #endif
 
 } // namespace ryujin
-
-#endif /* SIMD_TEMPLATE_H */

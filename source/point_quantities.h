@@ -3,8 +3,7 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#ifndef POINT_QUANTITIES_H
-#define POINT_QUANTITIES_H
+#pragma once
 
 #include <compile_time_options.h>
 
@@ -148,5 +147,3 @@ namespace ryujin
   };
 
 } /* namespace ryujin */
-
-#endif /* POINT_QUANTITIES_H */

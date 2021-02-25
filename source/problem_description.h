@@ -3,8 +3,7 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#ifndef PROBLEM_DESCRIPTION_H
-#define PROBLEM_DESCRIPTION_H
+#pragma once
 
 #include <compile_time_options.h>
 
@@ -725,7 +724,4 @@ namespace ryujin
     return state;
   }
 
-
 } /* namespace ryujin */
-
-#endif /* PROBLEM_DESCRIPTION_H */

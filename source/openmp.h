@@ -3,8 +3,7 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#ifndef OPENMP_H
-#define OPENMP_H
+#pragma once
 
 #include <compile_time_options.h>
 
@@ -171,5 +170,3 @@ namespace ryujin
 } // namespace ryujin
 
 //@}
-
-#endif /* OPENMP_H */
