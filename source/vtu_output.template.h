@@ -370,9 +370,10 @@ namespace ryujin
               for (unsigned int v = 0; v < GeometryInfo<dim>::vertices_per_cell;
                    ++v) {
                 const auto vertex = cell->vertex(v);
-                if (function->value(vertex) >= 0.)
+                constexpr auto eps = std::numeric_limits<Number>::epsilon();
+                if (function->value(vertex) >= 0. - 100. * eps)
                   above++;
-                if (function->value(vertex) <= 0.)
+                if (function->value(vertex) <= 0. + 100. * eps)
                   below++;
                 if (above > 0 && below > 0)
                   return true;
