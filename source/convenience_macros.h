@@ -46,8 +46,7 @@ namespace ryujin
    * Convenience wrapper that creates a (scalar) dealii::Function object
    * out of a (fairly general) callable object returning array-like values.
    * An example usage is given by the interpolation of initial values
-   * performed in
-   * InitialValues::interpolate();
+   * performed in InitialValues::interpolate();
    * ```
    * for(unsigned int i = 0; i < problem_dimension; ++i)
    *   dealii::VectorTools::interpolate(
@@ -79,8 +78,8 @@ namespace ryujin
  * is just a plain double or float, then this macro defaults to a simple
  * call to `dealii::AssertThrow(condition(variable), exception)`. Otherwise
  * (if `decltype(variable)` has a subscript operator `operator[]`, the
- * `dealii::AssertThrow` macro is expanded for all components of the @p
- * variable.
+ * `dealii::AssertThrow` macro is expanded for all components of the
+ * @p variable.
  *
  * @ingroup Miscellaneous
  */
@@ -98,7 +97,7 @@ namespace ryujin
     }                                                                          \
   }
 
-
+#ifndef DOXYGEN
 namespace
 {
   template <typename T>
@@ -134,6 +133,7 @@ namespace
     return *t;
   }
 } /* anonymous namespace */
+#endif
 
 /**
  * A convenience macro that automatically writes out an accessor (or
