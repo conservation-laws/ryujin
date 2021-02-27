@@ -10,6 +10,8 @@ using namespace dealii;
 template <int dim, typename Number>
 void test()
 {
+  std::cout << std::setprecision(10);
+
   ProblemDescription problem_description;
   problem_description.parse_parameters_callback();
 
