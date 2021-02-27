@@ -1,0 +1,51 @@
+subsection A - TimeLoop
+  set basename                  = validation-euler-l6
+
+  set enable output full        = false
+  set enable compute quantities = false
+
+  set enable compute error      = true
+
+  set final time                = 2.0
+
+  set output granularity        = 2.0
+  set terminal update interval  = 0
+end
+
+subsection B - ProblemDescription
+  set description = Euler
+  set gamma = 1.4
+end
+
+subsection C - Discretization
+  set geometry        = validation
+  set mesh refinement = 6
+
+  subsection validation
+    set length   = 10
+    set periodic = false
+  end
+end
+
+subsection E - InitialValues
+  set configuration = isentropic vortex
+  set direction     =  1,  1
+  set position      = -1, -1
+
+  subsection isentropic vortex
+    set mach number = 1
+    set beta        = 5
+  end
+end
+
+subsection F - EulerModule
+  set cfl max            = 0.4
+  set cfl update         = 0.2
+
+  set limiter iterations = 2
+  set time step order    = 3
+end
+
+subsection I - IntegralQuantities
+end
+

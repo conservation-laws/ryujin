@@ -4,12 +4,13 @@ if(NOT ${CMAKE_VERSION} VERSION_LESS 3.15)
     ${CMAKE_BINARY_DIR}/source/
     )
 
-  add_library(tests SHARED $<TARGET_OBJECTS:ryujin>)
-  deal_ii_setup_target(tests)
+  add_library(testdriver SHARED $<TARGET_OBJECTS:ryujin>)
+  deal_ii_setup_target(testdriver)
   if(LIKWID_PERFMON)
-    target_link_libraries(tests likwid likwid-hwloc likwid-lua)
+    target_link_libraries(testdriver likwid likwid-hwloc likwid-lua)
   endif()
 
-  set(TEST_LIBRARIES tests)
+  set(TEST_TARGET ryujin)
+  set(TEST_LIBRARIES testdriver)
   deal_ii_pickup_tests()
 endif()
