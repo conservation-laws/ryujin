@@ -313,7 +313,9 @@ namespace ryujin
 
       if (t >= output_cycle * output_granularity)
         print_cycle_statistics(cycle, t, output_cycle, /*logfile*/ true);
-      else if (cycle % terminal_update_interval == 0)
+
+      if (terminal_update_interval != 0 &&
+          cycle % terminal_update_interval == 0)
         print_cycle_statistics(cycle, t, output_cycle);
     } /* end of loop */
 
@@ -1032,14 +1034,15 @@ namespace ryujin
     print_throughput(cycle, t, output);
 
     if (mpi_rank == 0) {
-#ifndef DEBUG_OUTPUT
-      std::cout << "\033[2J\033[H";
-#endif
-      std::cout << output.str() << std::flush;
-      if (write_to_logfile)
+      if (write_to_logfile) {
         logfile << "\n" << output.str() << std::flush;
+      } else {
+#ifndef DEBUG_OUTPUT
+        std::cout << "\033[2J\033[H";
+#endif
+        std::cout << output.str() << std::flush;
+      }
     }
   }
-
 
 } // namespace ryujin
