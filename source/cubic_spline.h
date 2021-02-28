@@ -80,8 +80,6 @@ namespace ryujin
      */
     inline double eval(double x) const
     {
-      Assert(x < *x_.rbegin(), dealii::ExcInternalError());
-      Assert(x > *x_.begin(), dealii::ExcInternalError());
       return gsl_spline_eval(spline, x, accel);
     }
 
