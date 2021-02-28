@@ -3,6 +3,9 @@
 
 #include <deal.II/base/vectorization.h>
 
+#include <iostream>
+#include <iomanip>
+
 using namespace ryujin;
 using namespace dealii;
 
