@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include "openmp.h"
+
 /**
  * @name Various macros and include for instrumentation via valgrind,
  * likwid, and clang lsan.
@@ -37,6 +39,17 @@
 #endif
 
 
+
+/**
+ * Wrapper macro initializing likwid introspection. Used in main().
+ */
+#define LIKWID_INIT
+
+/**
+ * Wrapper macro finalizing likwid introspection. Used in main().
+ */
+#define LIKWID_CLOSE
+
 /**
  * A set of macros that start and stop likwid instrumentation (if support
  * for likwid is enabled). We currently wrap the hot paths in the
@@ -57,14 +70,21 @@
 #define LIKWID_MARKER_STOP(opt)
 
 #ifdef LIKWID_PERFMON
+#undef LIKWID_INIT
+#undef LIKWID_CLOSE
 #undef LIKWID_MARKER_START
 #undef LIKWID_MARKER_STOP
 #include <likwid.h>
+
+#define LIKWID_INIT                                                            \
+  LIKWID_MARKER_INIT;                                                          \
+  RYUJIN_PARALLEL_REGION_BEGIN                                                 \
+  LIKWID_MARKER_THREADINIT;                                                    \
+  RYUJIN_PARALLEL_REGION_END
+
+#define LIKWID_CLOSE LIKWID_MARKER_CLOSE;
 #endif
 
-/*
- * Clang address sanitizer
- */
 
 
 /**

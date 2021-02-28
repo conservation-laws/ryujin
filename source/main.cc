@@ -17,8 +17,6 @@
 
 int main (int argc, char *argv[])
 {
-  LSAN_DISABLE
-
 #if defined(DENORMALS_ARE_ZERO) && defined(__x86_64)
   /*
    * Change rounding mode on X86-64 architecture: Denormals are flushed to
@@ -33,17 +31,12 @@ int main (int argc, char *argv[])
   __builtin_ia32_ldmxcsr(mxcsr);
 #endif
 
+  LSAN_DISABLE
   dealii::Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv);
   omp_set_num_threads(dealii::MultithreadInfo::n_threads());
-
-#ifdef LIKWID_PERFMON
-  LIKWID_MARKER_INIT;
-  RYUJIN_PARALLEL_REGION_BEGIN
-  LIKWID_MARKER_THREADINIT;
-  RYUJIN_PARALLEL_REGION_END
-#endif
-
   LSAN_ENABLE
+
+  LIKWID_INIT
 
   MPI_Comm mpi_communicator(MPI_COMM_WORLD);
 
@@ -61,9 +54,7 @@ int main (int argc, char *argv[])
 
   time_loop.run();
 
-#ifdef LIKWID_PERFMON
-  LIKWID_MARKER_CLOSE;
-#endif
+  LIKWID_CLOSE;
 
   return 0;
 }
