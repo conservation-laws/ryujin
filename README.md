@@ -41,28 +41,27 @@ following references ([preprint](https://arxiv.org/abs/2007.00094),
 [preprint](https://arxiv.org/abs/2009.06022)):
 
 ```
-@article{ryujin2020,
-  title   = {Efficient parallel 3D computation of the compressible Euler
-    equations with an invariant-domain preserving second-order
-    finite-element scheme}
-  author  = {Matthias Maier and Martin Kronbichler},
-  year    = {2020},
-  journal = {submitted},
+@article {ryujin-2021-a,
+  author = {Matthias Maier and Martin Kronbichler},
+  title = {Efficient parallel 3D computation of the compressible Euler equations
+    with an invariant-domain preserving second-order finite-element scheme},
   url = {https://arxiv.org/abs/2007.00094},
+  journal = {ACM Transactions on Parallel Computing},
+  year = {2021},
+  volume = {accepted},
+  pages = {},
 }
 
-@article{navier-stokes2020,
-  title = {Second-order invariant domain preserving approximation of the
-    compressible Navier--Stokes equations},
-  author = {Jean-Luc Guermond and Matthias Maier and Bojan Popov and
-    Ignacio Tomas},
+@article{ryujin-2021-b,
+  author = {Jean-Luc Guermond and Matthias Maier and Bojan Popov and Ignacio Tomas},
+  title = {Second-order invariant domain preserving approximation of the compressible Navier--Stokes equations},
+  doi = {10.1016/j.cma.2020.113608},
+  url = {https://arxiv.org/abs/2009.06022},
   journal = {Computer Methods in Applied Mechanics and Engineering},
   year = {2021},
   volume  = {375},
   number = {1},
   pages = {113608},
-  doi = {10.1016/j.cma.2020.113608},
-  url = {https://arxiv.org/abs/2009.06022},
 }
 ```
 
