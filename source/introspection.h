@@ -5,34 +5,85 @@
 
 #pragma once
 
-/*
- * Valgrind
+/**
+ * @name Various macros and include for instrumentation via valgrind,
+ * likwid, and clang lsan.
  */
+//@{
+
+/**
+ * A set of macros that start and stop callgrind instrumentation (if the
+ * executable is run with valgrind). We currently wrap the hot paths in the
+ * Euler and Navier-Stokes modules in the EulerModule::step() and
+ * DissipationModule::step() functions. Usage:
+ *
+ * @code
+ * CALLGRIND_START_INSTRUMENTATION
+ * // critical compute kernel section
+ * CALLGRIND_STOP_INSTRUMENTATION
+ * @endcode
+ */
+#define CALLGRIND_START_INSTRUMENTATION
+
+/**
+ * @copydoc CALLGRIND_START_INSTRUMENTATION
+ */
+#define CALLGRIND_STOP_INSTRUMENTATION
 
 #ifdef VALGRIND_CALLGRIND
+#undef CALLGRIND_START_INSTRUMENTATION
+#undef CALLGRIND_STOP_INSTRUMENTATION
 #include <valgrind/callgrind.h>
-#else
-#define CALLGRIND_START_INSTRUMENTATION
-#define CALLGRIND_STOP_INSTRUMENTATION
 #endif
 
-/*
- * Likwid
+
+/**
+ * A set of macros that start and stop likwid instrumentation (if support
+ * for likwid is enabled). We currently wrap the hot paths in the
+ * Euler and Navier-Stokes modules in the EulerModule::step() and
+ * DissipationModule::step() functions. Usage:
+ *
+ * @code
+ * LIKWID_MARKER_START("string identifier")
+ * // critical compute kernel section
+ * LIKWID_MARKER_STOP("string identifier")
+ * @endcode
  */
+#define LIKWID_MARKER_START(opt)
+
+/**
+ * @copydoc LIKWID_MARKER_START
+ */
+#define LIKWID_MARKER_STOP(opt)
 
 #ifdef LIKWID_PERFMON
+#undef LIKWID_MARKER_START
+#undef LIKWID_MARKER_STOP
 #include <likwid.h>
-#else
-#define LIKWID_MARKER_START(opt)
-#define LIKWID_MARKER_STOP(opt)
 #endif
 
 /*
  * Clang address sanitizer
  */
 
+
+/**
+ * Explicitly disable/enable the LLVM/Clang LeakSanitiver
+ *
+ * @code
+ * LSAN_DISABLE
+ * // Calling some external code path that is leaky and that we cannot
+ * // control...
+ * LSAN_ENABLE
+ * @endcode
+ */
 #define LSAN_DISABLE
+
+/**
+ * @copydoc LSAN_DISABLE
+ */
 #define LSAN_ENABLE
+
 #if defined(__clang__) && defined(DEBUG)
 #if __has_feature(address_sanitizer)
 #include <sanitizer/lsan_interface.h>
@@ -42,3 +93,5 @@
 #define LSAN_ENABLE __lsan_enable();
 #endif
 #endif
+
+//@}

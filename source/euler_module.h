@@ -28,6 +28,11 @@ namespace ryujin
    * Explicit (strong stability preserving) time-stepping for the
    * compressible Euler equations described in ProblemDescription.
    *
+   * This module is described in detail in @cite KronbichlerMaier2021, Alg.
+   * 1.
+   *
+   * @todo Write out some more documentation
+   *
    * @ingroup EulerModule
    */
   template <int dim, typename Number = double>

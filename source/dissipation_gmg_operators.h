@@ -23,6 +23,11 @@
 namespace ryujin
 {
   /**
+   * A diagonal matrix used as a preconditioner for the non-multigrid CG
+   * iteration. The diagonal matrix is constructed by computing
+   * \f$d_i=1/(\rho_i m_i)\f$ for a given lumped mass matrix \f$ m_i \f$,
+   * and a density field \f$ \rho_i \f$.
+   *
    * @ingroup DissipationModule
    */
   template <int dim, typename Number>
@@ -46,7 +51,8 @@ namespace ryujin
     DiagonalMatrix() = default;
 
     /**
-     * Compute as the inverse of the density and the lumped mass matrix.
+     * Compute the inverse of a given density \f$ \rho_i \f$ and a given
+     * lumped mass matrix \f$ m_i \f$, viz., \f$d_i=1/(\rho_i m_i)\f$.
      */
     void reinit(const vector_type &lumped_mass_matrix,
                 const vector_type &density,

@@ -1487,6 +1487,7 @@ INCLUDE_FILE_PATTERNS  =
 
 PREDEFINED             = DOXYGEN=1 \
                          DEBUG=1 \
+                         DEAL_II_WITH_GSL=1 \
                          decltype(B)=auto
 
 # If the MACRO_EXPANSION and EXPAND_ONLY_PREDEF tags are set to YES then

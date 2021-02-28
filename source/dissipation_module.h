@@ -34,7 +34,61 @@ namespace ryujin
 
   /**
    * Minimum entropy guaranteeing second-order time stepping for the
-   * parabolic limit equations.
+   * parabolic limiting equation @cite GuermondEtAl2021, Eq. 3.3:
+   * \f{align}
+   *   \newcommand{\bbm}{{\boldsymbol m}}
+   *   \newcommand{\bef}{{\boldsymbol f}}
+   *   \newcommand{\bk}{{\boldsymbol k}}
+   *   \newcommand{\bu}{{\boldsymbol u}}
+   *   \newcommand{\bv}{{\boldsymbol v}}
+   *   \newcommand{\bn}{{\boldsymbol n}}
+   *   \newcommand{\pols}{{\mathbb s}}
+   *   \newcommand{\Hflux}{\bk}
+   *   &\partial_t \rho  =  0,
+   *   \\
+   *   &\partial_t \bbm - \nabla\cdot(\pols(\bv)) = \bef,
+   *   \\
+   *   &\partial_t E   + \nabla\cdot(\Hflux(\bu)- \pols(\bv) \bv) = \bef\cdot\bv,
+   *   \\
+   *   &\bv_{|\partial D}=\boldsymbol 0, \qquad \Hflux(\bu)\cdot\bn_{|\partial D}=0 .
+   * \f}
+   *
+   * Internally, the module first performs an explicit second order
+   * Crank-Nicolson step updating the velocity @cite GuermondEtAl2021, Eq.
+   * 5.5:
+   * \f{align}
+   *   \begin{cases}
+   *     \newcommand\bsfV{{\textbf V}}
+   *     \newcommand{\polB}{{\mathbb B}}
+   *     \newcommand{\calI}{{\mathcal I}}
+   *     \newcommand\bsfF{{\textbf F}}
+   *     \newcommand\bsfM{{\textbf M}}
+   *     \newcommand{\upint}{^\circ}
+   *     \newcommand{\upbnd}{^\partial}
+   *     \newcommand{\dt}{{\tau}}
+   *     \newcommand{\calV}{{\mathcal V}}
+   *     \varrho^{n}_i m_i \bsfV^{n+\frac{1}{2}} +
+   *     \tfrac12 \dt\sum_{j\in\calI(i)} \polB_{ij} \bsfV^{n+\frac{1}{2}} =
+   *     m_i \bsfM_i^{n} + \tfrac12 \dt m_i \bsfF_i^{n+\frac12},
+   *     & \forall i\in \calV\upint
+   *     \\[0.3em]
+   *     \bsfV_i^{n+\frac{1}{2}} = \boldsymbol 0, &  \forall i\in \calV\upbnd,
+   *   \end{cases}
+   * \f}
+   * We then postprocess and compute an internal energy update with a
+   * second Crank-Nicolson step, @cite GuermondEtAl2021, Eq. 5.13:
+   * \f{align}
+   *     \newcommand\sfe{{\mathsf e}}
+   *     \newcommand{\upHnph}{^{\text{H},n+\frac{1}{2}}}
+   *     \newcommand{\calI}{{\mathcal I}}
+   *     \newcommand\sfK{{\mathsf K}}
+   *     \newcommand{\calV}{{\mathcal V}}
+   *     m_i \varrho_i^{n}(\sfe_i{\upHnph} - \sfe_i^{n})+\tfrac12\dt
+   *     \sum_{j\in\calI(i)} \beta_{ij}\sfe_i{\upHnph}
+   *     = \tfrac12 \dt m_i\sfK_i^{n+\frac{1}{2}}, \qquad \forall i\in \calV.
+   * \f}
+   *
+   * @todo Provide more details about boundary conditions.
    *
    * @ingroup DissipationModule
    */

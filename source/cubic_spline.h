@@ -11,11 +11,29 @@
 namespace ryujin
 {
   /**
-   * @todo Documentation
+   * A cubic spline class implemented as a thin wrapper around the GSL
+   * spline library functions.
+   *
+   * Usage:
+   * @code
+   * std::vector<double> xs{0.0, 0.2, 0.4, 0.6, 0.8, 1.0};
+   * std::vector<double> ys{1.0, 0.2, 5.0, 2.0, 1.0, 10.0};
+   * CubicSpline spline(xs, ys);
+   *
+   * spline.eval(0.5);
+   * @endcode
+   *
+   * @ingroup Mesh
    */
   class CubicSpline
   {
   public:
+    /**
+     * Constructor.
+     *
+     * @pre The supplied vectors @p x and @p y must have the same size and
+     * must contain at least two elements. The vector @p x must be sorted
+     */
     CubicSpline(const std::vector<double> &x,
                 const std::vector<double> &y) noexcept
         : x_(x)
@@ -32,21 +50,38 @@ namespace ryujin
       accel = gsl_interp_accel_alloc();
     }
 
+    /**
+     * Copy constructor.
+     */
     CubicSpline(const CubicSpline &copy)
         : CubicSpline(copy.x_, copy.y_)
     {
     }
 
-    CubicSpline& operator=(const CubicSpline& copy) = delete;
+    /**
+     * The copy assignment operator is deleted.
+     */
+    CubicSpline& operator=(const CubicSpline&) = delete;
 
+    /**
+     * Destructor.
+     */
     ~CubicSpline()
     {
       gsl_interp_accel_free(accel);
       gsl_spline_free(spline);
     }
 
-    DEAL_II_ALWAYS_INLINE inline double eval(double x) const
+    /**
+     * Evaluate the cubic spline at a given point @p x.
+     *
+     * @pre The point @p x must lie within the interval described by the
+     * largest and smallest support point supplied to the constructor.
+     */
+    inline double eval(double x) const
     {
+      Assert(x < *x_.rbegin(), dealii::ExcInternalError());
+      Assert(x > *x_.begin(), dealii::ExcInternalError());
       return gsl_spline_eval(spline, x, accel);
     }
 
