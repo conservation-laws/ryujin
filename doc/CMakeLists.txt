@@ -50,3 +50,8 @@ add_custom_command(
 add_custom_target(doxygen ALL
   DEPENDS ${CMAKE_BINARY_DIR}/doxygen.log
   )
+
+install(DIRECTORY
+  ${CMAKE_CURRENT_BINARY_DIR}/html
+  DESTINATION ${CMAKE_INSTALL_DOCDIR}
+  )

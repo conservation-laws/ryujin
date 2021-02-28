@@ -9,6 +9,10 @@ cmake_minimum_required(VERSION 3.5)
 
 find_package(deal.II 9.2 REQUIRED HINTS ${DEAL_II_DIR} $ENV{DEAL_II_DIR})
 
+set(CMAKE_CXX_FLAGS_RELEASE "-Ofast -ffp-contract=fast" CACHE STRING
+  "Flags used by the compiler during release builds."
+  )
+
 deal_ii_initialize_cached_variables()
 deal_ii_query_git_information()
 
@@ -31,8 +35,6 @@ if(NOT ${DEAL_II_WITH_CXX17})
   string(APPEND DEAL_II_CXX_FLAGS " -std=c++17")
 endif()
 
-string(APPEND DEAL_II_CXX_FLAGS_RELEASE " -O3 -ffp-contract=fast")
-
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
   string(APPEND DEAL_II_CXX_FLAGS " -fdiagnostics-color=always")
   string(REPLACE "-Qunused-arguments" "" DEAL_II_CXX_FLAGS "${DEAL_II_CXX_FLAGS}")
@@ -51,6 +53,19 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 #
+# Respect user overrides performed via CMAKE_CXX_FLAGS/CMAKE_EXE_LINKER_FLAGS
+#
+
+string(APPEND DEAL_II_CXX_FLAGS " $ENV{CXXFLAGS} ${CMAKE_CXX_FLAGS}")
+string(APPEND DEAL_II_CXX_FLAGS_DEBUG " ${CMAKE_CXX_FLAGS_DEBUG}")
+string(APPEND DEAL_II_CXX_FLAGS_RELEASE " ${CMAKE_CXX_FLAGS_RELEASE}")
+string(APPEND DEAL_II_LINKER_FLAGS " $ENV{LDFLAGS} ${CMAKE_EXE_LINKER_FLAGS}")
+set(CMAKE_CXX_FLAGS "")
+set(CMAKE_CXX_FLAGS_RELEASE "")
+set(CMAKE_CXX_FLAGS_DEBUG "")
+set(CMAKE_EXE_LINKER_FLAGS "")
+
+#
 # External library and feature configuration:
 #
 
@@ -59,7 +74,7 @@ option(CALLGRIND
   )
 
 option(DOCUMENTATION
-  "Build the documentation with doxygen" OFF
+  "Build documentation with doxygen" OFF
   )
 
 option(LIKWID_PERFMON
@@ -115,10 +130,12 @@ mark_as_advanced(
 # Set up the rest:
 #
 
-enable_testing()
+include(GNUInstallDirs)
 
 add_subdirectory(source)
+add_subdirectory(prm)
 
+enable_testing()
 add_subdirectory(tests)
 
 IF(DOCUMENTATION)

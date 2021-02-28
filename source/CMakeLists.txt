@@ -174,3 +174,7 @@ check_cxx_source_compiles("
 if(LIBSTDCPP)
   target_link_libraries(ryujin stdc++fs)
 endif()
+
+install(TARGETS ryujin
+  DESTINATION ${CMAKE_INSTALL_BINDIR}
+  )
