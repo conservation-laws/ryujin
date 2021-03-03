@@ -1074,7 +1074,7 @@ namespace ryujin
         Assert(sharp_trailing_edge || (coarse_triangulation.n_cells() == 7),
                dealii::ExcInternalError());
 
-        std::vector<std::unique_ptr<dealii::Manifold<dim, dim>>> manifolds;
+        std::vector<std::unique_ptr<dealii::Manifold<2, 2>>> manifolds;
         manifolds.resize(sharp_trailing_edge ? 6 : 7);
 
         /* FIXME: Remove workaround - mark cells as off limit: */
@@ -1098,7 +1098,7 @@ namespace ryujin
             direction[0] = -1.;
           }
 
-          Manifolds::GradingManifold<dim> grading{
+          Manifolds::GradingManifold<2> grading{
               center,
               direction,
               grading_,
@@ -1211,11 +1211,11 @@ namespace ryujin
          * Runtime parameters: width_, subdivisions_z_ (for dim == 3)
          */
 
-        dealii::Triangulation<2> tria3;
-        tria3.set_mesh_smoothing(triangulation.get_mesh_smoothing());
-        GridGenerator::flatten_triangulation(coarse_triangulation, tria3);
-
         if constexpr (dim == 2) {
+          /* Flatten manifold: */
+          dealii::Triangulation<2> tria3;
+          tria3.set_mesh_smoothing(triangulation.get_mesh_smoothing());
+          GridGenerator::flatten_triangulation(coarse_triangulation, tria3);
           triangulation.copy_triangulation(tria3);
 
           /*
@@ -1233,6 +1233,10 @@ namespace ryujin
 
         } else {
 
+          /* Flatten manifold: */
+          dealii::Triangulation<2> tria3;
+          GridGenerator::flatten_triangulation(coarse_triangulation, tria3);
+
           /* extrude mesh: */
           dealii::Triangulation<3, 3> tria4;
           tria4.set_mesh_smoothing(triangulation.get_mesh_smoothing());
@@ -1243,6 +1247,7 @@ namespace ryujin
           AssertThrow(false,
                       dealii::ExcMessage(
                           "manifold ids for 3D airfoil not implemented"));
+          __builtin_trap();
         }
 
         /* Set boundary ids: */
