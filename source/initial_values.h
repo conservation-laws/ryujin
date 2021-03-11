@@ -52,6 +52,7 @@ namespace ryujin
      * Constructor.
      */
     InitialValues(const ProblemDescription &problem_description,
+                  const OfflineData<dim, Number> &offline_data,
                   const std::string &subsection = "InitialValues");
 
 
@@ -79,12 +80,10 @@ namespace ryujin
 
 
     /**
-     * Given a reference to an OfflineData object (that contains a
-     * dealii::DoFHandler) this routine computes and returns a state vector
-     * populated with initial values for a specified time @p t.
+     * This routine computes and returns a state vector populated with
+     * initial values for a specified time @p t.
      */
-    vector_type interpolate(const OfflineData<dim, Number> &offline_data,
-                            Number t = 0);
+    vector_type interpolate(Number t = 0);
 
   private:
     /**
@@ -106,7 +105,8 @@ namespace ryujin
      */
     //@{
 
-    const ProblemDescription &problem_description;
+    dealii::SmartPointer<const ProblemDescription> problem_description_;
+    dealii::SmartPointer<const OfflineData<dim, Number>> offline_data_;
 
     std::set<std::unique_ptr<InitialState<dim, Number>>> initial_state_list_;
 

@@ -21,9 +21,11 @@ namespace ryujin
   template <int dim, typename Number>
   InitialValues<dim, Number>::InitialValues(
       const ProblemDescription &problem_description,
+      const OfflineData<dim, Number> &offline_data,
       const std::string &subsection)
       : ParameterAcceptor(subsection)
-      , problem_description(problem_description)
+      , problem_description_(&problem_description)
+      , offline_data_(&offline_data)
   {
     ParameterAcceptor::parse_parameters_call_back.connect(std::bind(
         &InitialValues<dim, Number>::parse_parameters_callback, this));
@@ -54,17 +56,17 @@ namespace ryujin
 
     using namespace InitialStates;
     initial_state_list_.emplace(std::make_unique<Uniform<dim, Number>>(
-        problem_description, subsection));
+        *problem_description_, subsection));
     initial_state_list_.emplace(std::make_unique<RampUp<dim, Number>>(
-        problem_description, subsection));
+        *problem_description_, subsection));
     initial_state_list_.emplace(std::make_unique<Contrast<dim, Number>>(
-        problem_description, subsection));
+        *problem_description_, subsection));
     initial_state_list_.emplace(std::make_unique<ShockFront<dim, Number>>(
-        problem_description, subsection));
+        *problem_description_, subsection));
     initial_state_list_.emplace(std::make_unique<IsentropicVortex<dim, Number>>(
-        problem_description, subsection));
+        *problem_description_, subsection));
     initial_state_list_.emplace(std::make_unique<BeckerSolution<dim, Number>>(
-        problem_description, subsection));
+        *problem_description_, subsection));
   }
 
   namespace
@@ -179,7 +181,7 @@ namespace ryujin
             const auto transformed_point =
                 affine_transform(initial_direction_, initial_position_, point);
             auto state = it->compute(transformed_point, t);
-            auto M = problem_description.momentum(state);
+            auto M = problem_description_->momentum(state);
             M = affine_transform_vector(initial_direction_, M);
             for (unsigned int d = 0; d < dim; ++d)
               state[1 + d] = M[d];
@@ -218,8 +220,7 @@ namespace ryujin
 
   template <int dim, typename Number>
   typename InitialValues<dim, Number>::vector_type
-  InitialValues<dim, Number>::interpolate(
-      const OfflineData<dim, Number> &offline_data, Number t)
+  InitialValues<dim, Number>::interpolate(Number t)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "InitialValues<dim, Number>::interpolate(t = " << t << ")"
@@ -227,7 +228,7 @@ namespace ryujin
 #endif
 
     vector_type U;
-    U.reinit(offline_data.vector_partitioner());
+    U.reinit(offline_data_->vector_partitioner());
 
     constexpr auto problem_dimension =
         ProblemDescription::problem_dimension<dim>;
@@ -237,18 +238,18 @@ namespace ryujin
     const auto callable = [&](const auto &p) { return initial_state(p, t); };
 
     scalar_type temp;
-    const auto scalar_partitioner = offline_data.scalar_partitioner();
+    const auto scalar_partitioner = offline_data_->scalar_partitioner();
     temp.reinit(scalar_partitioner);
 
     for (unsigned int d = 0; d < problem_dimension; ++d) {
-      VectorTools::interpolate(offline_data.dof_handler(),
+      VectorTools::interpolate(offline_data_->dof_handler(),
                                to_function<dim, Number>(callable, d),
                                temp);
       U.insert_component(temp, d);
     }
 
-    const auto &boundary_map = offline_data.boundary_map();
-    const unsigned int n_owned = offline_data.n_locally_owned();
+    const auto &boundary_map = offline_data_->boundary_map();
+    const unsigned int n_owned = offline_data_->n_locally_owned();
 
     /*
      * Cosmetic fix up: Ensure that the initial state is compatible with
@@ -267,7 +268,7 @@ namespace ryujin
       if (id == Boundary::slip) {
         /* Remove normal component of velocity: */
         auto U_i = U.get_tensor(i);
-        auto m = problem_description.momentum(U_i);
+        auto m = problem_description_->momentum(U_i);
         m -= 1. * (m * normal) * normal;
         for (unsigned int k = 0; k < dim; ++k)
           U_i[k + 1] = m[k];

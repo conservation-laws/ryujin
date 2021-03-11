@@ -34,7 +34,7 @@ namespace ryujin
       , problem_description("/B - ProblemDescription")
       , discretization(mpi_communicator, "/C - Discretization")
       , offline_data(mpi_communicator, discretization, "/D - OfflineData")
-      , initial_values(problem_description, "/E - InitialValues")
+      , initial_values(problem_description, offline_data, "/E - InitialValues")
       , euler_module(mpi_communicator,
                      computing_timer,
                      offline_data,
@@ -205,7 +205,7 @@ namespace ryujin
         t_initial = t;
       } else {
         print_info("interpolating initial values");
-        U = initial_values.interpolate(offline_data);
+        U = initial_values.interpolate();
 #ifdef DEBUG
         /* Poison constrained degrees of freedom: */
         const unsigned int n_relevant = offline_data.n_locally_relevant();
@@ -239,7 +239,7 @@ namespace ryujin
         if (write_output_files) {
           output(U, base_name + "-solution", t, output_cycle);
           if (enable_compute_error) {
-            const auto analytic = initial_values.interpolate(offline_data, t);
+            const auto analytic = initial_values.interpolate(t);
             output(analytic, base_name + "-analytic_solution", t, output_cycle);
           }
         }
@@ -361,7 +361,7 @@ namespace ryujin
     Number l1_norm = 0;
     Number l2_norm = 0;
 
-    const auto analytic = initial_values.interpolate(offline_data, t);
+    const auto analytic = initial_values.interpolate(t);
 
     scalar_type analytic_component;
     scalar_type error_component;
