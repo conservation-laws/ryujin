@@ -99,7 +99,7 @@ subsection G - DissipationModule
 end
 
 subsection H - VTUOutput
-  set use mpi io     = true
+  set use mpi io     = false
 
   set schlieren beta = 10
   set vorticity beta = 10
