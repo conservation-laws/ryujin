@@ -328,7 +328,8 @@ namespace ryujin
     computing_timer["time loop"].stop();
 
     /* Write final timing statistics to logfile: */
-    print_cycle_statistics(cycle, t, output_cycle, /*final_time=*/true);
+    print_cycle_statistics(
+        cycle, t, output_cycle, /*logfile*/ true, /*final_time=*/true);
 
     if (enable_compute_error) {
       /* Output final error: */
@@ -807,13 +808,14 @@ namespace ryujin
   template <int dim, typename Number>
   void TimeLoop<dim, Number>::print_throughput(unsigned int cycle,
                                                Number t,
-                                               std::ostream &stream)
+                                               std::ostream &stream,
+                                               bool final_time)
   {
     /*
      * @fixme The global state kept in this function should be refactored
      * into its own class object.
      */
-    static struct {
+    static struct Data {
       unsigned int cycle = 0;
       double t = 0.;
       double cpu_time_sum = 0.;
@@ -844,6 +846,9 @@ namespace ryujin
       current.cpu_time_min = cpu_time_statistics.min;
       current.cpu_time_max = cpu_time_statistics.max;
     }
+
+    if(final_time)
+      previous = Data();
 
     /* Take averages: */
 
@@ -1031,7 +1036,7 @@ namespace ryujin
 
     print_memory_statistics(output);
     print_timers(output);
-    print_throughput(cycle, t, output);
+    print_throughput(cycle, t, output, /*final_time*/ final_time);
 
     if (mpi_rank == 0) {
       if (write_to_logfile) {

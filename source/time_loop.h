@@ -73,7 +73,10 @@ namespace ryujin
     void print_mpi_partition(std::ostream &stream);
     void print_memory_statistics(std::ostream &stream);
     void print_timers(std::ostream &stream);
-    void print_throughput(unsigned int cycle, Number t, std::ostream &stream);
+    void print_throughput(unsigned int cycle,
+                          Number t,
+                          std::ostream &stream,
+                          bool fina_time = false);
 
     void print_info(const std::string &header);
     void print_head(const std::string &header,
