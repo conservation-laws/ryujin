@@ -178,9 +178,17 @@ namespace ryujin
 
       const vector_type *lumped_mass_matrix = nullptr;
       if constexpr (std::is_same<Number, Number2>::value) {
-        Assert(level_ == dealii::numbers::invalid_unsigned_int,
-               dealii::ExcInternalError());
-        lumped_mass_matrix = &offline_data_->lumped_mass_matrix();
+        if constexpr (std::is_same<Number, float>::value) {
+          if (level_ == dealii::numbers::invalid_unsigned_int)
+            lumped_mass_matrix = &offline_data_->lumped_mass_matrix();
+          else
+            lumped_mass_matrix =
+                &offline_data_->level_lumped_mass_matrix()[level_];
+        } else {
+          Assert(level_ == dealii::numbers::invalid_unsigned_int,
+                 dealii::ExcInternalError());
+          lumped_mass_matrix = &offline_data_->lumped_mass_matrix();
+        }
       } else
         lumped_mass_matrix = &offline_data_->level_lumped_mass_matrix()[level_];
 
@@ -562,9 +570,17 @@ namespace ryujin
 
       const vector_type *lumped_mass_matrix = nullptr;
       if constexpr (std::is_same<Number, Number2>::value) {
-        Assert(level_ == dealii::numbers::invalid_unsigned_int,
-               dealii::ExcInternalError());
-        lumped_mass_matrix = &offline_data_->lumped_mass_matrix();
+        if constexpr (std::is_same<Number, float>::value) {
+          if (level_ == dealii::numbers::invalid_unsigned_int)
+            lumped_mass_matrix = &offline_data_->lumped_mass_matrix();
+          else
+            lumped_mass_matrix =
+                &offline_data_->level_lumped_mass_matrix()[level_];
+        } else {
+          Assert(level_ == dealii::numbers::invalid_unsigned_int,
+                 dealii::ExcInternalError());
+          lumped_mass_matrix = &offline_data_->lumped_mass_matrix();
+        }
       } else
         lumped_mass_matrix = &offline_data_->level_lumped_mass_matrix()[level_];
 
