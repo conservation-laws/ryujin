@@ -17,6 +17,7 @@
 #cmakedefine FORCE_DEAL_II_SPARSE_MATRIX
 #cmakedefine LIKWID_PERFMON
 #cmakedefine OBSESSIVE_INLINING
+#cmakedefine SPLIT_SYNCHRONIZATION_TIMERS
 #cmakedefine USE_COMMUNICATION_HIDING
 #cmakedefine USE_CUSTOM_POW
 #cmakedefine USE_SIMD
