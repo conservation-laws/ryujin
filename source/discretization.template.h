@@ -92,31 +92,6 @@ namespace ryujin
                      geometry_ + "\""));
     }
 
-    /* Handle periodic faces: */
-
-    const auto bdy_ids = triangulation.get_boundary_ids();
-    if constexpr (dim != 1) {
-      if (std::find(bdy_ids.begin(), bdy_ids.end(), Boundary::periodic) !=
-          bdy_ids.end()) {
-
-#ifdef DEBUG_OUTPUT
-        std::cout << "        collecting periodic faces" << std::endl;
-#endif
-
-        std::vector<dealii::GridTools::PeriodicFacePair<
-            typename dealii::Triangulation<dim>::cell_iterator>>
-            periodic_faces;
-
-        for (int i = 0; i < dim; ++i)
-          GridTools::collect_periodic_faces(triangulation,
-                                            /*b_id */ Boundary::periodic,
-                                            /*direction*/ i,
-                                            periodic_faces);
-
-        triangulation.add_periodicity(periodic_faces);
-      }
-    }
-
 #ifdef USE_SIMD
     if (repartitioning_) {
       /*

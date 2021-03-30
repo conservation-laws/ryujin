@@ -1253,6 +1253,7 @@ namespace ryujin
         /*
          * Reattach manifolds:
          */
+
         if constexpr (dim == 2) {
           unsigned int index = 10;
           for (const auto &manifold : manifolds)
@@ -1300,6 +1301,21 @@ namespace ryujin
               face->set_boundary_id(Boundary::periodic);
             }
           }
+        }
+
+        /* Add periodicity: */
+
+        if constexpr (dim == 3) {
+          std::vector<dealii::GridTools::PeriodicFacePair<
+              typename dealii::Triangulation<dim>::cell_iterator>>
+              periodic_faces;
+
+          GridTools::collect_periodic_faces(triangulation,
+                                            /*b_id */ Boundary::periodic,
+                                            /*direction*/ 2,
+                                            periodic_faces);
+
+          triangulation.add_periodicity(periodic_faces);
         }
       }
 

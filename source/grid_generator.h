@@ -750,6 +750,20 @@ namespace ryujin
                 face->set_boundary_id(Boundary::dirichlet);
             }
           }
+
+        if(periodic_) {
+          std::vector<dealii::GridTools::PeriodicFacePair<
+              typename dealii::Triangulation<dim>::cell_iterator>>
+              periodic_faces;
+
+          for (int direction = 1; direction < dim; ++direction)
+            GridTools::collect_periodic_faces(triangulation,
+                                              /*b_id */ Boundary::periodic,
+                                              /*direction*/ direction,
+                                              periodic_faces);
+
+          triangulation.add_periodicity(periodic_faces);
+        }
       }
 
     private:

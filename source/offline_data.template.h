@@ -18,6 +18,7 @@
 #include <deal.II/dofs/dof_renumbering.h>
 #include <deal.II/dofs/dof_tools.h>
 #include <deal.II/fe/fe_values.h>
+#include <deal.II/grid/grid_tools.h>
 #include <deal.II/lac/dynamic_sparsity_pattern.h>
 #include <deal.II/lac/la_parallel_vector.h>
 #ifdef DEAL_II_WITH_TRILINOS
@@ -117,18 +118,32 @@ namespace ryujin
      * Enforce periodic boundary conditions. We assume that the mesh is in
      * "normal configuration".
      */
-    const auto n_periodic_faces =
-        discretization_->triangulation().get_periodic_face_map().size();
-    if (n_periodic_faces != 0) {
-      if constexpr (dim != 1 && std::is_same<Number, double>::value) {
-        for (int i = 0; i < dim; ++i)
-          DoFTools::make_periodicity_constraints(dof_handler,
-                                                 /*b_id */ Boundary::periodic,
-                                                 /*direction*/ i,
-                                                 affine_constraints_);
-      } else {
-        AssertThrow(false, dealii::ExcNotImplemented());
-      }
+
+    const auto periodic_faces =
+        discretization_->triangulation().get_periodic_face_map();
+
+    for (const auto &[left, value] : periodic_faces) {
+      const auto &[right, orientation] = value;
+
+      typename DoFHandler<dim>::cell_iterator dof_cell_left(
+          &left.first->get_triangulation(),
+          left.first->level(),
+          left.first->index(),
+          &dof_handler);
+
+      typename DoFHandler<dim>::cell_iterator dof_cell_right(
+          &right.first->get_triangulation(),
+          right.first->level(),
+          right.first->index(),
+          &dof_handler);
+
+      DoFTools::make_periodicity_constraints(dof_cell_left->face(left.second),
+                                             dof_cell_right->face(right.second),
+                                             affine_constraints_,
+                                             ComponentMask(),
+                                             /* orientation */ orientation[0],
+                                             /* flip */ orientation[1],
+                                             /* rotation */ orientation[2]);
     }
 
     affine_constraints_.close();
