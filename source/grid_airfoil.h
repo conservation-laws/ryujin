@@ -1021,7 +1021,10 @@ namespace ryujin
          *  16 -> top trailing cell (blunt)
          */
 
-        /* Colorize boundary faces and add curvature information: */
+        /*
+         * Colorize boundary faces and add manifolds for curvature
+         * information on boundaries:
+         */
 
         for (auto cell : coarse_triangulation.active_cell_iterators()) {
           for (auto f : dealii::GeometryInfo<2>::face_indices()) {
@@ -1056,18 +1059,17 @@ namespace ryujin
             airfoil_center_, psi_front, psi_upper, psi_lower, true, psi_ratio_};
         coarse_triangulation.set_manifold(1, airfoil_manifold_upper);
 
-        Manifolds::AirfoilManifold airfoil_manifold_lower{airfoil_center_,
-                                                          psi_front,
-                                                          psi_upper,
-                                                          psi_lower,
-                                                          false,
-                                                          psi_ratio_};
+        Manifolds::AirfoilManifold airfoil_manifold_lower{
+            airfoil_center_, psi_front, psi_upper, psi_lower, false, psi_ratio_};
         coarse_triangulation.set_manifold(2, airfoil_manifold_lower);
 
         dealii::SphericalManifold<2> spherical_manifold;
         coarse_triangulation.set_manifold(3, spherical_manifold);
 
-        /* Create transfinite interpolation manifolds: */
+        /*
+         * Create transfinite interpolation manifolds for the interior of
+         * the 2D coarse cells:
+         */
 
         Assert(!sharp_trailing_edge || (coarse_triangulation.n_cells() == 6),
                dealii::ExcInternalError());
@@ -1078,10 +1080,11 @@ namespace ryujin
         manifolds.resize(sharp_trailing_edge ? 6 : 7);
 
         /* FIXME: Remove workaround - mark cells as off limit: */
-        std::next(coarse_triangulation.begin_active(), 4)->set_material_id(42);
-        std::next(coarse_triangulation.begin_active(),
-                  sharp_trailing_edge ? 5 : 6)
-            ->set_material_id(42);
+        // WORKAROUND
+        const auto first_cell = coarse_triangulation.begin_active();
+        std::next(first_cell, 4)->set_material_id(42);
+        std::next(first_cell, sharp_trailing_edge ? 5 : 6)->set_material_id(42);
+        // end WORKAROUND
 
         for (auto i : {0, 1, 2, 3, 5}) {
           const auto index = 10 + i;
@@ -1117,20 +1120,27 @@ namespace ryujin
           coarse_triangulation.reset_manifold(5);
 
         /*
-         * Use transfinite interpolation manifold for all geometric objects
-         * and remove unneeded manifolds:
+         * Remove unneeded manifolds now. Our custom
+         * TransfiniteInterpolationManifolds did copy all necessary
+         * geometry information from the coarse grid already. The boundary
+         * manifolds are thus not needed any more.
          */
 
         coarse_triangulation.reset_manifold(1);
         coarse_triangulation.reset_manifold(2);
         coarse_triangulation.reset_manifold(3);
+
+        /* We can set the final sequence of manifold ids: */
         for (unsigned int i = 0; i < (sharp_trailing_edge ? 6 : 7); ++i) {
           const auto &cell = std::next(coarse_triangulation.begin_active(), i);
           const auto index = 10 + i;
-          if (i == 4 || i == (sharp_trailing_edge ? 5 : 6))
+          if (i == 4 || i == (sharp_trailing_edge ? 5 : 6)) {
+            cell->set_material_id(index);
             cell->set_manifold_id(index);
-          else
+          } else {
+            cell->set_material_id(index);
             cell->set_all_manifold_ids(index);
+          }
         }
 
         /*
@@ -1139,12 +1149,13 @@ namespace ryujin
          */
 
         /* FIXME: Remove workaround - mark cells as off limit: */
+        // WORKAROUND
         for (auto cell : coarse_triangulation.active_cell_iterators())
           cell->set_material_id(42);
-        std::next(coarse_triangulation.begin_active(), 4)->set_material_id(0);
-        std::next(coarse_triangulation.begin_active(),
-                  sharp_trailing_edge ? 5 : 6)
-            ->set_material_id(0);
+        // const auto first_cell = coarse_triangulation.begin_active();
+        std::next(first_cell, 4)->set_material_id(0);
+        std::next(first_cell, sharp_trailing_edge ? 5 : 6)->set_material_id(0);
+        // end WORKAROUND
 
         for (auto i : {4, sharp_trailing_edge ? 5 : 6}) {
           const auto index = 10 + i;
@@ -1156,53 +1167,44 @@ namespace ryujin
         }
 
         /*
+         * For good measure, also set material ids:
+         */
+
+        for (unsigned int i = 0; i < (sharp_trailing_edge ? 6 : 7); ++i) {
+          const auto &cell = std::next(coarse_triangulation.begin_active(), i);
+          const auto index = 10 + i;
+          cell->set_material_id(index);
+        }
+
+        /*
          * Step 4: Anisotropic pre refinement.
          *
          * Runtime parameters: n_anisotropic_refinements_airfoil_,
          * n_anisotropic_refinements_trailing_
          */
 
-        const double trailing_height =
-            0.5 / (0.5 + std::pow(2., n_anisotropic_refinements_airfoil_)) *
-            0.5 * outer_radius;
-
-        /* Mark critical cells with a temporary material id: */
-        for (auto cell : coarse_triangulation.active_cell_iterators()) {
-
-          /* in case of a blunt edge we refine the trailing cell: */
-          if (!sharp_trailing_edge)
-            if (cell->center()[0] > airfoil_center_[0] + back_length &&
-                std::abs(cell->center()[1]) <= trailing_height)
-              cell->set_material_id(2);
-
-          /*
-           * Let us also insert additional radials on the upper (back) and
-           * lower (back) side of the airfoil
-           */
-          if (cell->center()[0] > airfoil_center_[0] &&
-              cell->center()[0] <
-                  0.5 * (airfoil_center_[0] + back_length + 0.5 * outer_radius))
-            cell->set_material_id(3);
-        }
-
-        /* Upper and lower cell on airfoil: */
+        /* Additional radials in upper and lower cell on airfoil (material
+         * ids 10 and 13): */
         for (unsigned int i = 0; i < n_anisotropic_refinements_airfoil_; ++i) {
-          for (auto cell : coarse_triangulation.active_cell_iterators())
-            if (cell->material_id() == 3)
+          for (auto cell : coarse_triangulation.active_cell_iterators()) {
+            const auto id = cell->material_id();
+            if (id == 10 || id == 13)
               cell->set_refine_flag(dealii::RefinementCase<2>::cut_axis(0));
+          }
 
           coarse_triangulation.execute_coarsening_and_refinement();
         }
 
-        /* Tailing cell: */
-        for (unsigned int i = 0; i < n_anisotropic_refinements_trailing_; ++i) {
-          for (auto cell : coarse_triangulation.active_cell_iterators())
-            if (cell->material_id() == 2)
-              cell->set_refine_flag(dealii::RefinementCase<2>::cut_axis(0));
-            else
-              cell->set_refine_flag();
-          coarse_triangulation.execute_coarsening_and_refinement();
-        }
+        /* Anisotropic refinement into trailing cell (material id 15): */
+        if (!sharp_trailing_edge)
+          for (auto i = 0; i < n_anisotropic_refinements_trailing_; ++i) {
+            for (auto cell : coarse_triangulation.active_cell_iterators())
+              if (cell->material_id() == 15)
+                cell->set_refine_flag(dealii::RefinementCase<2>::cut_axis(0));
+              else
+                cell->set_refine_flag();
+            coarse_triangulation.execute_coarsening_and_refinement();
+          }
 
         /*
          * Step 5: Flatten triangulation, create distributed coarse
@@ -1244,10 +1246,11 @@ namespace ryujin
               tria3, subdivisions_z_, width_, tria4);
           triangulation.copy_triangulation(tria4);
 
-          AssertThrow(false,
-                      dealii::ExcMessage(
-                          "manifold ids for 3D airfoil not implemented"));
-          __builtin_trap();
+          // FIXME
+
+          //unsigned int index = 10;
+          //for (const auto &manifold : manifolds)
+          //triangulation.set_manifold(index++, *manifold);
         }
 
         /* Set boundary ids: */
