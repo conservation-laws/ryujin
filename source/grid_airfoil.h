@@ -1135,10 +1135,8 @@ namespace ryujin
           const auto &cell = std::next(coarse_triangulation.begin_active(), i);
           const auto index = 10 + i;
           if (i == 4 || i == (sharp_trailing_edge ? 5 : 6)) {
-            cell->set_material_id(index);
             cell->set_manifold_id(index);
           } else {
-            cell->set_material_id(index);
             cell->set_all_manifold_ids(index);
           }
         }
@@ -1167,7 +1165,8 @@ namespace ryujin
         }
 
         /*
-         * For good measure, also set material ids:
+         * For good measure, also set material ids. We will need those
+         * in a minute to reconstruct material ids...
          */
 
         for (unsigned int i = 0; i < (sharp_trailing_edge ? 6 : 7); ++i) {
@@ -1197,7 +1196,7 @@ namespace ryujin
 
         /* Anisotropic refinement into trailing cell (material id 15): */
         if (!sharp_trailing_edge)
-          for (auto i = 0; i < n_anisotropic_refinements_trailing_; ++i) {
+          for (unsigned i = 0; i < n_anisotropic_refinements_trailing_; ++i) {
             for (auto cell : coarse_triangulation.active_cell_iterators())
               if (cell->material_id() == 15)
                 cell->set_refine_flag(dealii::RefinementCase<2>::cut_axis(0));
@@ -1218,22 +1217,11 @@ namespace ryujin
           dealii::Triangulation<2> tria3;
           tria3.set_mesh_smoothing(triangulation.get_mesh_smoothing());
           GridGenerator::flatten_triangulation(coarse_triangulation, tria3);
+
           triangulation.copy_triangulation(tria3);
 
-          /*
-           * Somewhere during flattening the triangulation and copying we
-           * lost all manifold ids on faces:
-           */
-          for (auto &cell : triangulation.active_cell_iterators()) {
-            const auto id = cell->manifold_id();
-            cell->set_all_manifold_ids(id);
-          }
-
-          unsigned int index = 10;
-          for (const auto &manifold : manifolds)
-            triangulation.set_manifold(index++, *manifold);
-
         } else {
+          static_assert(dim == 3);
 
           /* Flatten manifold: */
           dealii::Triangulation<2> tria3;
@@ -1244,13 +1232,39 @@ namespace ryujin
           tria4.set_mesh_smoothing(triangulation.get_mesh_smoothing());
           GridGenerator::extrude_triangulation(
               tria3, subdivisions_z_, width_, tria4);
+
           triangulation.copy_triangulation(tria4);
+        }
 
-          // FIXME
+        /*
+         * Somewhere during flattening the triangulation, extruding and
+         * copying, all manifold ids got lost. Reconstruct manifold IDs
+         * from the material ids we set earlier:
+         */
 
-          //unsigned int index = 10;
-          //for (const auto &manifold : manifolds)
-          //triangulation.set_manifold(index++, *manifold);
+        for (auto &cell : triangulation.active_cell_iterators()) {
+          const auto id = cell->material_id();
+          if (id == 14 || id == (sharp_trailing_edge ? 15 : 16))
+            cell->set_material_id(id);
+          else
+            cell->set_all_manifold_ids(id);
+        }
+
+        /*
+         * Reattach manifolds:
+         */
+        if constexpr (dim == 2) {
+          unsigned int index = 10;
+          for (const auto &manifold : manifolds)
+            triangulation.set_manifold(index++, *manifold);
+
+        } else {
+          static_assert(dim == 3);
+
+          unsigned int index = 10;
+          for (const auto &manifold : manifolds)
+            triangulation.set_manifold(
+                index++, Manifolds::ExtrudedManifold<3>(*manifold));
         }
 
         /* Set boundary ids: */
