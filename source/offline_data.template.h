@@ -137,13 +137,18 @@ namespace ryujin
           right.first->index(),
           &dof_handler);
 
-      DoFTools::make_periodicity_constraints(dof_cell_left->face(left.second),
-                                             dof_cell_right->face(right.second),
-                                             affine_constraints_,
-                                             ComponentMask(),
-                                             /* orientation */ orientation[0],
-                                             /* flip */ orientation[1],
-                                             /* rotation */ orientation[2]);
+      if constexpr (dim != 1 && std::is_same<Number, double>::value) {
+        DoFTools::make_periodicity_constraints(
+            dof_cell_left->face(left.second),
+            dof_cell_right->face(right.second),
+            affine_constraints_,
+            ComponentMask(),
+            /* orientation */ orientation[0],
+            /* flip */ orientation[1],
+            /* rotation */ orientation[2]);
+      } else {
+        AssertThrow(false, dealii::ExcNotImplemented());
+      }
     }
 
     affine_constraints_.close();
