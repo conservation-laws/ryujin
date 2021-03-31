@@ -1293,12 +1293,35 @@ namespace ryujin
                 spherical_boundary = false;
             }
 
-            if (spherical_boundary) {
+            bool periodic_face = (dim == 3);
+
+            if constexpr (dim == 3) {
+              const auto &indices =
+                  dealii::GeometryInfo<dim - 1>::vertex_indices();
+              bool not_left = false;
+              bool not_right = false;
+              for (const auto v : indices) {
+                const auto vert = face->vertex(v);
+                if (vert[2] > 1.0e-10)
+                  not_left = true;
+                if (vert[2] < width_ - 1.0e-10)
+                  not_right = true;
+                if (not_left && not_right) {
+                  periodic_face = false;
+                  break;
+                }
+              }
+            }
+
+            if (periodic_face) {
+              face->set_boundary_id(Boundary::periodic);
+            } else if (spherical_boundary) {
               face->set_boundary_id(Boundary::dynamic);
             } else if (airfoil) {
               face->set_boundary_id(Boundary::no_slip);
             } else {
-              face->set_boundary_id(Boundary::periodic);
+              Assert(false, dealii::ExcInternalError());
+              __builtin_trap();
             }
           }
         }
