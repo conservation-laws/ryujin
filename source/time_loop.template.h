@@ -809,6 +809,7 @@ namespace ryujin
   void TimeLoop<dim, Number>::print_throughput(unsigned int cycle,
                                                Number t,
                                                std::ostream &stream,
+                                               bool update,
                                                bool final_time)
   {
     /*
@@ -830,7 +831,8 @@ namespace ryujin
     /* Update statistics: */
 
     {
-      previous = current;
+      if (update)
+        previous = current;
 
       current.cycle = cycle;
       current.t = t;
@@ -1036,7 +1038,11 @@ namespace ryujin
 
     print_memory_statistics(output);
     print_timers(output);
-    print_throughput(cycle, t, output, /*final_time*/ final_time);
+    print_throughput(cycle,
+                     t,
+                     output,
+                     /*update*/ !write_to_logfile,
+                     /*final_time*/ final_time);
 
     if (mpi_rank == 0) {
       if (write_to_logfile) {

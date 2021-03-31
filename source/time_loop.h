@@ -76,7 +76,8 @@ namespace ryujin
     void print_throughput(unsigned int cycle,
                           Number t,
                           std::ostream &stream,
-                          bool fina_time = false);
+                          bool update = true,
+                          bool final_time = false);
 
     void print_info(const std::string &header);
     void print_head(const std::string &header,
