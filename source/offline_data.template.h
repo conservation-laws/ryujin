@@ -612,7 +612,7 @@ namespace ryujin
         continue;
 #else
       /*
-       * When using a local dealii::SparseMatrix<Number> we don not have a
+       * When using a local dealii::SparseMatrix<Number> we do not have a
        * compress(VectorOperation::add) available. In this case we assemble
        * contributions over all locally relevant (non artificial) cells.
        */
@@ -630,6 +630,14 @@ namespace ryujin
         const auto id = face->boundary_id();
 
         if (!face->at_boundary())
+          continue;
+
+        /*
+         * Skip periodic boundary faces. For our algorithm these are
+         * interior degrees of freedom (if not simultaneously located at
+         * another boundary as well).
+         */
+        if(id == Boundary::periodic)
           continue;
 
         fe_face_values.reinit(cell, f);
