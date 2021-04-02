@@ -22,17 +22,19 @@
 subsection A - TimeLoop
   set basename                     = oat15a-2d
 
+  set enable output full           = true
+  set enable output levelsets      = false
   set enable checkpointing         = true
   set enable compute quantities    = true
-  set enable output full           = true
 
-  set final time                   = 0.10000
-  set output granularity           = 0.00001
+  set final time                   = 0.2500
+  set output granularity           = 0.0001
 
-  set refinement timepoints        = 0.02, 0.04
+  set refinement timepoints        = 0.0020, 0.0050
 
-  set output checkpoint multiplier = 100
-  set output full multiplier       = 10
+  set output full multiplier       = 50
+  set output levelsets multiplier  = 50
+  set output checkpoint multiplier = 25
   set output quantities multiplier = 1
 
   set terminal update interval     = 20
@@ -53,7 +55,7 @@ end
 
 subsection C - Discretization
   set geometry            = airfoil
-  set mesh refinement     = 5
+  set mesh refinement     = 4
   set mesh repartitioning = false
 
   subsection airfoil
@@ -61,15 +63,15 @@ subsection C - Discretization
     set airfoil center                      = -0.0613, 0.
     set airfoil length                      =  0.2300
     set psi center                          =  0.03, 0.
-    set psi ratio                           =  1.00
+    set psi ratio                           =  3.00
     set height                              =  1.0
-    set width                               =  0.0
+    set width                               =  0.046
     set grading exponent                    =  6.0000
     set grading epsilon                     =  0.0005
     set grading epsilon trailing            =  0.0100
     set anisotropic pre refinement airfoil  =  1
     set anisotropic pre refinement trailing =  3
-    set subdivisions z                      =  2
+    set subdivisions z                      =  9
   end
 end
 
@@ -87,8 +89,8 @@ subsection E - InitialValues
 end
 
 subsection F - EulerModule
-  set cfl max            = 1.00
-  set cfl update         = 0.90
+  set cfl max            = 4.0
+  set cfl update         = 3.9
 
   set enforce noslip     = true
 
@@ -104,7 +106,9 @@ subsection G - DissipationModule
 end
 
 subsection H - VTUOutput
-  set use mpi io     = false
+  set manifolds      =
+
+  set use mpi io     = true
 
   set schlieren beta = 10
   set vorticity beta = 10
@@ -114,6 +118,6 @@ subsection I - IntegralQuantities
 end
 
 subsection I - PointQuantities
-  set boundary manifolds = airfoil : floor (0.25 * x * x + 0.25 * y * y)
+  set boundary manifolds = airfoil : floor (x * x / 0.0266 + 36 * y * y / 0.0266)
   set interior manifolds =
 end
