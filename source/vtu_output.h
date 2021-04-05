@@ -57,9 +57,9 @@ namespace ryujin
     // clang-format on
 
     /**
-     * @copydoc ProblemDescription::rank1_type
+     * @copydoc ProblemDescription::state_type
      */
-    using rank1_type = ProblemDescription::rank1_type<dim, Number>;
+    using state_type = ProblemDescription::state_type<dim, Number>;
 
     /**
      * Type used to store a curl of an 2D/3D vector field. Departing from

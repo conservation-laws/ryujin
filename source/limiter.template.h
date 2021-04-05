@@ -17,8 +17,8 @@ namespace ryujin
       Number
       Limiter<dim, Number>::limit(const ProblemDescription &problem_description,
                                   const BOUNDS &bounds,
-                                  const rank1_type &U,
-                                  const rank1_type &P,
+                                  const state_type &U,
+                                  const state_type &P,
                                   const Number t_min /* = Number(0.) */,
                                   const Number t_max /* = Number(1.) */)
   {

@@ -20,7 +20,7 @@ namespace ryujin
     class Uniform : public InitialState<dim, Number>
     {
     public:
-      using typename InitialState<dim, Number>::rank1_type;
+      using typename InitialState<dim, Number>::state_type;
 
       Uniform(const ProblemDescription &problem_description,
               const std::string subsection)
@@ -35,7 +35,7 @@ namespace ryujin
                             "Initial 1d primitive state (rho, u, p)");
       }
 
-      virtual rank1_type compute(const dealii::Point<dim> & /*point*/,
+      virtual state_type compute(const dealii::Point<dim> & /*point*/,
                                  Number /*t*/) final override
       {
         return this->problem_description.template from_primitive_state<dim>(
@@ -59,7 +59,7 @@ namespace ryujin
     class RampUp : public InitialState<dim, Number>
     {
     public:
-      using typename InitialState<dim, Number>::rank1_type;
+      using typename InitialState<dim, Number>::state_type;
 
       RampUp(const ProblemDescription &problem_description,
              const std::string subsection)
@@ -91,7 +91,7 @@ namespace ryujin
                             "Time from which on the final state is attained)");
       }
 
-      virtual rank1_type compute(const dealii::Point<dim> & /*point*/,
+      virtual state_type compute(const dealii::Point<dim> & /*point*/,
                                  Number t) final override
       {
         if (t <= t_initial_)
@@ -135,7 +135,7 @@ namespace ryujin
     class Contrast : public InitialState<dim, Number>
     {
     public:
-      using typename InitialState<dim, Number>::rank1_type;
+      using typename InitialState<dim, Number>::state_type;
 
       Contrast(const ProblemDescription &problem_description,
                const std::string subsection)
@@ -159,7 +159,7 @@ namespace ryujin
             "Initial 1d primitive state (rho, u, p) on the right");
       }
 
-      virtual rank1_type compute(const dealii::Point<dim> &point,
+      virtual state_type compute(const dealii::Point<dim> &point,
                                  Number /*t*/) final override
       {
         return this->problem_description.template from_primitive_state<dim>(
@@ -183,7 +183,7 @@ namespace ryujin
     class ShockFront : public InitialState<dim, Number>
     {
     public:
-      using typename InitialState<dim, Number>::rank1_type;
+      using typename InitialState<dim, Number>::state_type;
 
       ShockFront(const ProblemDescription &problem_description,
                  const std::string subsection)
@@ -240,7 +240,7 @@ namespace ryujin
         primitive_left_[2] = p_L;
       }
 
-      virtual rank1_type compute(const dealii::Point<dim> &point,
+      virtual state_type compute(const dealii::Point<dim> &point,
                                  Number t) final override
       {
         const Number position_1d = Number(point[0] - S3_ * t);
@@ -266,7 +266,7 @@ namespace ryujin
     class IsentropicVortex : public InitialState<dim, Number>
     {
     public:
-      using typename InitialState<dim, Number>::rank1_type;
+      using typename InitialState<dim, Number>::state_type;
 
       IsentropicVortex(const ProblemDescription &problem_description,
                        const std::string subsection)
@@ -281,7 +281,7 @@ namespace ryujin
         this->add_parameter("beta", beta_, "vortex strength beta");
       }
 
-      virtual rank1_type compute(const dealii::Point<dim> &point,
+      virtual state_type compute(const dealii::Point<dim> &point,
                                  Number t) final override
       {
         const auto gamma = this->problem_description.gamma();
@@ -307,11 +307,11 @@ namespace ryujin
           const Number E =
               p / (gamma - Number(1.)) + Number(0.5) * rho * (u * u + v * v);
 
-          return rank1_type({rho, rho * u, rho * v, E});
+          return state_type({rho, rho * u, rho * v, E});
 
         } else {
           AssertThrow(false, dealii::ExcNotImplemented());
-          return rank1_type();
+          return state_type();
         }
       }
 
@@ -331,7 +331,7 @@ namespace ryujin
     class BeckerSolution : public InitialState<dim, Number>
     {
     public:
-      using typename InitialState<dim, Number>::rank1_type;
+      using typename InitialState<dim, Number>::state_type;
 
       BeckerSolution(const ProblemDescription &problem_description,
                      const std::string subsection)
@@ -458,7 +458,7 @@ namespace ryujin
         };
       }
 
-      virtual rank1_type compute(const dealii::Point<dim> &point,
+      virtual state_type compute(const dealii::Point<dim> &point,
                                  Number t) final override
       {
         /* (7.2) */
@@ -476,7 +476,7 @@ namespace ryujin
                          (R_infty * velocity_left_ * velocity_right_ - v * v);
         Assert(e > 0., dealii::ExcInternalError());
 
-        return rank1_type(
+        return state_type(
             {Number(rho),
              Number(rho * (velocity_ + v)),
              Number(0.),

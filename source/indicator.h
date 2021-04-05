@@ -79,14 +79,14 @@ namespace ryujin
     // clang-format on
 
     /**
-     * @copydoc ProblemDescription::rank1_type
+     * @copydoc ProblemDescription::state_type
      */
-    using rank1_type = ProblemDescription::rank1_type<dim, Number>;
+    using state_type = ProblemDescription::state_type<dim, Number>;
 
     /**
-     * @copydoc ProblemDescription::rank2_type
+     * @copydoc ProblemDescription::flux_type
      */
-    using rank2_type = ProblemDescription::rank2_type<dim, Number>;
+    using flux_type = ProblemDescription::flux_type<dim, Number>;
 
     /**
      * @copydoc ProblemDescription::ScalarNumber
@@ -214,13 +214,13 @@ namespace ryujin
      * to state vector U_i.
      */
     void
-    reset(const rank1_type &U_i, const Number entropy);
+    reset(const state_type &U_i, const Number entropy);
 
     /**
      * When looping over the sparsity row, add the contribution associated
      * with the neighboring state U_j.
      */
-    void add(const rank1_type &U_j,
+    void add(const state_type &U_j,
              const dealii::Tensor<1, dim, Number> &c_ij,
              const Number beta_ij,
              const Number entropy_j);
@@ -247,11 +247,11 @@ namespace ryujin
     Number rho_i = 0.;         // also used for second variations
     Number rho_i_inverse = 0.; // also used for second variations
     Number eta_i = 0.;
-    rank2_type f_i;
-    rank1_type d_eta_i;
+    flux_type f_i;
+    state_type d_eta_i;
 
     Number left = 0.;
-    rank1_type right;
+    state_type right;
 
     /* Temporary storage used for the smoothness indicator: */
 
@@ -272,7 +272,7 @@ namespace ryujin
 
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline void Indicator<dim, Number>::reset(
-      const rank1_type &U_i, const Number entropy)
+      const state_type &U_i, const Number entropy)
   {
     if constexpr (indicator_ == Indicators::entropy_viscosity_commutator) {
       rho_i = problem_description.density(U_i);
@@ -316,7 +316,7 @@ namespace ryujin
 
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline void
-  Indicator<dim, Number>::add(const rank1_type &U_j,
+  Indicator<dim, Number>::add(const state_type &U_j,
                               const dealii::Tensor<1, dim, Number> &c_ij,
                               const Number beta_ij,
                               const Number entropy_j)

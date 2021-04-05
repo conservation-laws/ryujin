@@ -47,15 +47,15 @@ namespace ryujin
     // clang-format on
 
     /**
-     * @copydoc ProblemDescription::rank1_type
+     * @copydoc ProblemDescription::state_type
      */
-    using rank1_type =
-        ProblemDescription::rank1_type<dim, Number>;
+    using state_type =
+        ProblemDescription::state_type<dim, Number>;
 
     /**
-     * @copydoc ProblemDescription::rank2_type
+     * @copydoc ProblemDescription::flux_type
      */
-    using rank2_type = ProblemDescription::rank2_type<dim, Number>;
+    using flux_type = ProblemDescription::flux_type<dim, Number>;
 
     /**
      * @copydoc OfflineData::scalar_type

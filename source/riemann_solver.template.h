@@ -354,7 +354,7 @@ namespace ryujin
   DEAL_II_ALWAYS_INLINE inline std::array<Number, 4>
   RiemannSolver<dim, Number>::
   riemann_data_from_state(const ProblemDescription &problem_description,
-                          const ProblemDescription::rank1_type<dim, Number> &U,
+                          const ProblemDescription::state_type<dim, Number> &U,
                           const dealii::Tensor<1, dim, Number> &n_ij)
   {
     const auto rho = problem_description.density(U);
@@ -368,7 +368,7 @@ namespace ryujin
                    Number(0.5) * perp.norm_square() * rho_inverse;
 
     const auto state =
-        ProblemDescription::rank1_type<1, Number>({rho, proj_m, E});
+        ProblemDescription::state_type<1, Number>({rho, proj_m, E});
     const auto p = problem_description.pressure(state);
     const auto a = problem_description.speed_of_sound(state);
 
@@ -509,8 +509,8 @@ namespace ryujin
 #endif
       std::tuple<Number, Number, unsigned int>
       RiemannSolver<dim, Number>::compute(
-          const rank1_type &U_i,
-          const rank1_type &U_j,
+          const state_type &U_i,
+          const state_type &U_j,
           const dealii::Tensor<1, dim, Number> &n_ij)
   {
     const auto riemann_data_i =

@@ -16,8 +16,8 @@ namespace ryujin
   Limiter<DIM, NUMBER>::limit<Limiter<DIM, NUMBER>::Limiters::specific_entropy>(
       const ProblemDescription &,
       const std::array<NUMBER, 3> &,
-      const rank1_type &,
-      const rank1_type &,
+      const state_type &,
+      const state_type &,
       const NUMBER,
       const NUMBER);
 
@@ -25,8 +25,8 @@ namespace ryujin
       Limiter<DIM, VectorizedArray<NUMBER>>::Limiters::specific_entropy>(
       const ProblemDescription &,
       const std::array<VectorizedArray<NUMBER>, 3> &,
-      const rank1_type &,
-      const rank1_type &,
+      const state_type &,
+      const state_type &,
       const VectorizedArray<NUMBER>,
       const VectorizedArray<NUMBER>);
 
@@ -34,8 +34,8 @@ namespace ryujin
       Limiter<DIM, NUMBER>::Limiters::entropy_inequality>(
       const ProblemDescription &,
       const std::array<NUMBER, 5> &,
-      const rank1_type &,
-      const rank1_type &,
+      const state_type &,
+      const state_type &,
       const NUMBER,
       const NUMBER);
 
@@ -43,8 +43,8 @@ namespace ryujin
       Limiter<DIM, VectorizedArray<NUMBER>>::Limiters::entropy_inequality>(
       const ProblemDescription &,
       const std::array<VectorizedArray<NUMBER>, 5> &,
-      const rank1_type &,
-      const rank1_type &,
+      const state_type &,
+      const state_type &,
       const VectorizedArray<NUMBER>,
       const VectorizedArray<NUMBER>);
 #endif

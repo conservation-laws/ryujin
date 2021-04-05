@@ -46,13 +46,13 @@ namespace ryujin
      * The storage type used for a state vector \f$\boldsymbol U\f$.
      */
     template <int dim, typename Number>
-    using rank1_type = dealii::Tensor<1, problem_dimension<dim>, Number>;
+    using state_type = dealii::Tensor<1, problem_dimension<dim>, Number>;
 
     /**
      * The storage type used for the flux \f$\mathbf{f}\f$.
      */
     template <int dim, typename Number>
-    using rank2_type = dealii::
+    using flux_type = dealii::
         Tensor<1, problem_dimension<dim>, dealii::Tensor<1, dim, Number>>;
 
     /**
@@ -285,7 +285,7 @@ namespace ryujin
      * \f]
      */
     template <int problem_dim, typename Number>
-    rank2_type<problem_dim - 2, Number>
+    flux_type<problem_dim - 2, Number>
     f(const dealii::Tensor<1, problem_dim, Number> &U) const;
 
     //@}
@@ -299,7 +299,7 @@ namespace ryujin
      * with momentum parallel to e_1.
      */
     template <int dim, typename Number>
-    rank1_type<dim, Number>
+    state_type<dim, Number>
     from_primitive_state(const dealii::Tensor<1, 3, Number> &state_1d) const;
 
     //@}
@@ -583,8 +583,8 @@ namespace ryujin
     const auto a = speed_of_sound(U);
     const auto gamma = this->gamma();
 
-    rank1_type<dim, Number> b;
-    rank1_type<dim, Number> c;
+    state_type<dim, Number> b;
+    state_type<dim, Number> c;
 
     const auto e_k = 0.5 * v.norm_square();
 
@@ -668,7 +668,7 @@ namespace ryujin
 
     const auto p_new = s * std::pow(rho_new, gamma_);
 
-    rank1_type<dim, Number> U_new;
+    state_type<dim, Number> U_new;
     U_new[0] = rho_new;
     for (unsigned int d = 0; d < dim; ++d) {
       U_new[1 + d] = rho_new * (vn_new * normal + vperp)[d];
@@ -682,7 +682,7 @@ namespace ryujin
 
   template <int problem_dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline
-  ProblemDescription::rank2_type<problem_dim - 2, Number>
+  ProblemDescription::flux_type<problem_dim - 2, Number>
   ProblemDescription::f(const dealii::Tensor<1, problem_dim, Number> &U) const
   {
     constexpr int dim = problem_dim - 2;
@@ -693,7 +693,7 @@ namespace ryujin
     const auto p = pressure(U);
     const Number E = U[dim + 1];
 
-    rank2_type<dim, Number> result;
+    flux_type<dim, Number> result;
 
     result[0] = m;
     for (unsigned int i = 0; i < dim; ++i) {
@@ -707,7 +707,7 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline ProblemDescription::rank1_type<dim, Number>
+  DEAL_II_ALWAYS_INLINE inline ProblemDescription::state_type<dim, Number>
   ProblemDescription::from_primitive_state(
       const dealii::Tensor<1, 3, Number> &state_1d) const
   {
@@ -715,7 +715,7 @@ namespace ryujin
     const auto &u = state_1d[1];
     const auto &p = state_1d[2];
 
-    rank1_type<dim, Number> state;
+    state_type<dim, Number> state;
 
     state[0] = rho;
     state[1] = rho * u;

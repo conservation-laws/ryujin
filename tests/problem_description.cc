@@ -18,16 +18,16 @@ void test()
   ProblemDescription problem_description;
   problem_description.parse_parameters_callback();
 
-  using rank1_type = typename ProblemDescription::rank1_type<dim, Number>;
+  using state_type = typename ProblemDescription::state_type<dim, Number>;
 
   const auto from_1d_state =
       [&problem_description](
-          const dealii::Tensor<1, 3, Number> &state_1d) -> rank1_type {
+          const dealii::Tensor<1, 3, Number> &state_1d) -> state_type {
     const auto &rho = state_1d[0];
     const auto &u = state_1d[1];
     const auto &p = state_1d[2];
 
-    rank1_type state;
+    state_type state;
 
     state[0] = rho;
     state[1] = rho * u;

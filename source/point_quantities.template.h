@@ -409,7 +409,7 @@ namespace ryujin
 
       using entry = std::tuple<Point<dim>, // position
                                Number,     // lumped mass
-                               rank1_type, // state
+                               state_type, // state
                                Number,     // pressure
                                curl_type>; // vorticity
 
@@ -476,7 +476,7 @@ namespace ryujin
       using entry = std::tuple<Point<dim>,              // position
                                Number,                  // lumped boundary mass
                                Tensor<1, dim, Number>,  // normal
-                               rank1_type,              // state
+                               state_type,              // state
                                Number,                  // pressure
                                Tensor<1, dim, Number>>; // stress
 

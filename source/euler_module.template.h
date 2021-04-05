@@ -487,7 +487,7 @@ namespace ryujin
         const Number m_i = lumped_mass_matrix.local_element(i);
         const Number m_i_inv = lumped_mass_matrix_inverse.local_element(i);
 
-        rank1_type r_i;
+        state_type r_i;
 
         /* Clear bounds: */
         limiter_serial.reset(variations_i);
@@ -558,7 +558,7 @@ namespace ryujin
         const auto m_i = simd_load(lumped_mass_matrix, i);
         const auto m_i_inv = simd_load(lumped_mass_matrix_inverse, i);
 
-        ProblemDescription::rank1_type<dim, VA> r_i;
+        ProblemDescription::state_type<dim, VA> r_i;
 
         /* Clear bounds: */
         limiter_simd.reset(variations_i);

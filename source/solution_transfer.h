@@ -32,9 +32,9 @@ namespace ryujin
     // clang-format on
 
     /**
-     * @copydoc ProblemDescription::rank1_type
+     * @copydoc ProblemDescription::state_type
      */
-    using rank1_type = ProblemDescription::rank1_type<dim, Number>;
+    using state_type = ProblemDescription::state_type<dim, Number>;
 
     /**
      * @copydoc OfflineData::scalar_type
@@ -126,7 +126,7 @@ namespace ryujin
 
       for(unsigned int i = 0; i < n_owned; ++i) {
 
-        rank1_type U_i;
+        state_type U_i;
 
         const auto rho_i = interpolated_state_[0].local_element(i);
         auto E_i = rho_i * interpolated_state_[1 + dim].local_element(i);

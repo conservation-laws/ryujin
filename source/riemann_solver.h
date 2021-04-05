@@ -40,9 +40,9 @@ namespace ryujin
     // clang-format on
 
     /**
-     * @copydoc ProblemDescription::rank1_type
+     * @copydoc ProblemDescription::state_type
      */
-    using rank1_type = ProblemDescription::rank1_type<dim, Number>;
+    using state_type = ProblemDescription::state_type<dim, Number>;
 
     /**
      * @copydoc ProblemDescription::ScalarNumber
@@ -101,8 +101,8 @@ namespace ryujin
     std::tuple<Number /*lambda_max*/,
                Number /*p_star*/,
                unsigned int /*iteration*/>
-    compute(const rank1_type &U_i,
-            const rank1_type &U_j,
+    compute(const state_type &U_i,
+            const state_type &U_j,
             const dealii::Tensor<1, dim, Number> &n_ij);
 
     //@}
@@ -247,7 +247,7 @@ namespace ryujin
      */
     std::array<Number, 4> riemann_data_from_state(
         const ProblemDescription &problem_description,
-        const ProblemDescription::rank1_type<dim, Number> &U,
+        const ProblemDescription::state_type<dim, Number> &U,
         const dealii::Tensor<1, dim, Number> &n_ij);
 
   private:

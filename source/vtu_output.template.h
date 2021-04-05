@@ -169,7 +169,7 @@ namespace ryujin
           const auto j =
               *(i < n_internal ? js + col_idx * simd_length : js + col_idx);
 
-          rank1_type U_j;
+          state_type U_j;
           for (unsigned int d = 0; d < problem_dimension; ++d)
             U_j[d] = state_vector_[d].local_element(j);
           const auto M_j = ProblemDescription::momentum(U_j);

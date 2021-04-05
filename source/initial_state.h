@@ -35,9 +35,9 @@ namespace ryujin
   {
   public:
     /**
-     * @copydoc ProblemDescription::rank1_type
+     * @copydoc ProblemDescription::state_type
      */
-    using rank1_type = ProblemDescription::rank1_type<dim, Number>;
+    using state_type = ProblemDescription::state_type<dim, Number>;
 
     /**
      * Constructor taking geometry name @p name and a subsection @p
@@ -60,7 +60,7 @@ namespace ryujin
      * function signature has an additional parameter @p t denoting the
      * current time to allow for time-dependent (in-flow) Dirichlet data.
      */
-    virtual rank1_type compute(const dealii::Point<dim> &point, Number t) = 0;
+    virtual state_type compute(const dealii::Point<dim> &point, Number t) = 0;
 
   protected:
     const ProblemDescription &problem_description;

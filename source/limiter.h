@@ -58,9 +58,9 @@ namespace ryujin
     // clang-format on
 
     /**
-     * @copydoc ProblemDescription::rank1_type
+     * @copydoc ProblemDescription::state_type
      */
-    using rank1_type = ProblemDescription::rank1_type<dim, Number>;
+    using state_type = ProblemDescription::state_type<dim, Number>;
 
     /**
      * @copydoc ProblemDescription::ScalarNumber
@@ -167,9 +167,9 @@ namespace ryujin
      * When looping over the sparsity row, add the contribution associated
      * with the neighboring state U_j.
      */
-    void accumulate(const rank1_type &U_i,
-                    const rank1_type &U_j,
-                    const rank1_type &U_ij_bar,
+    void accumulate(const state_type &U_i,
+                    const state_type &U_j,
+                    const state_type &U_ij_bar,
                     const Number beta_ij,
                     const Number entropy_j,
                     const Number variations_j,
@@ -199,8 +199,8 @@ namespace ryujin
     template <Limiters limiter = limiter_, typename BOUNDS>
     static Number limit(const ProblemDescription &problem_description,
                         const BOUNDS &bounds,
-                        const rank1_type &U,
-                        const rank1_type &P,
+                        const state_type &U,
+                        const state_type &P,
                         const Number t_min = Number(0.),
                         const Number t_max = Number(1.));
     //*}
@@ -251,9 +251,9 @@ namespace ryujin
 
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline void
-  Limiter<dim, Number>::accumulate(const rank1_type &U_i,
-                                   const rank1_type &U_j,
-                                   const rank1_type &U_ij_bar,
+  Limiter<dim, Number>::accumulate(const state_type &U_i,
+                                   const state_type &U_j,
+                                   const state_type &U_ij_bar,
                                    const Number beta_ij,
                                    const Number entropy_j,
                                    const Number variations_j,

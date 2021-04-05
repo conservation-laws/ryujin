@@ -39,9 +39,9 @@ namespace ryujin
   {
   public:
     /**
-     * @copydoc ProblemDescription::rank1_type
+     * @copydoc ProblemDescription::state_type
      */
-    using rank1_type = ProblemDescription::rank1_type<dim, Number>;
+    using state_type = ProblemDescription::state_type<dim, Number>;
 
     /**
      * @copydoc OfflineData::vector_type
@@ -73,7 +73,7 @@ namespace ryujin
      * current time to allow for time-dependent (in-flow) Dirichlet data.
      */
     DEAL_II_ALWAYS_INLINE inline
-    rank1_type initial_state(const dealii::Point<dim> &point, Number t) const
+    state_type initial_state(const dealii::Point<dim> &point, Number t) const
     {
       return initial_state_(point, t);
     }
@@ -110,7 +110,7 @@ namespace ryujin
 
     std::set<std::unique_ptr<InitialState<dim, Number>>> initial_state_list_;
 
-    std::function<rank1_type(const dealii::Point<dim> &point, Number t)>
+    std::function<state_type(const dealii::Point<dim> &point, Number t)>
         initial_state_;
 
     //@}

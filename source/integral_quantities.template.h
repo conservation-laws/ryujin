@@ -53,7 +53,7 @@ namespace ryujin
     const auto &lumped_mass_matrix = offline_data_->lumped_mass_matrix();
     const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
 
-    rank1_type summed_quantities;
+    state_type summed_quantities;
     Number s_min = std::numeric_limits<Number>::max();
     Number e_min = std::numeric_limits<Number>::max();
     Number e = 0.;
@@ -61,7 +61,7 @@ namespace ryujin
 
     RYUJIN_PARALLEL_REGION_BEGIN
 
-    rank1_type summed_quantities_thread_local;
+    state_type summed_quantities_thread_local;
     Number s_min_thread_local = std::numeric_limits<Number>::max();
     Number e_min_thread_local = std::numeric_limits<Number>::max();
     Number e_local = 0.;
