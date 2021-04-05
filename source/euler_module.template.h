@@ -503,11 +503,7 @@ namespace ryujin
           const auto d_ij = dij_matrix_.get_entry(i, col_idx);
           const Number d_ij_inv = Number(1.) / d_ij;
 
-          const auto d_ijH = Indicator<dim, Number>::indicator_ ==
-                                     Indicator<dim, Number>::Indicators::
-                                         entropy_viscosity_commutator
-                                 ? d_ij * (alpha_i + alpha_j) * Number(.5)
-                                 : d_ij * std::max(alpha_i, alpha_j);
+          const auto d_ijH = d_ij * (alpha_i + alpha_j) * Number(.5);
 
           dealii::Tensor<1, problem_dimension, Number> U_ij_bar;
           const auto c_ij = cij_matrix.get_tensor(i, col_idx);
