@@ -406,13 +406,8 @@ namespace ryujin
     }
 
     {
-#if defined(SPLIT_SYNCHRONIZATION_TIMERS) || defined(DEBUG_OUTPUT)
       Scope scope(computing_timer_,
                   "time step [E] 2 - synchronization barrier");
-#else
-      Scope scope(computing_timer_,
-                  "time step [E] 2 - compute d_ii, and tau_max");
-#endif
 
       alpha_.update_ghost_values_finish();
       second_variations_.update_ghost_values_finish();
