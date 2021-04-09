@@ -94,7 +94,7 @@ subsection F - EulerModule
 
   set enforce noslip     = true
 
-  set limiter iterations = 3
+  set limiter iterations = 2
   set time step order    = 3
 end
 
