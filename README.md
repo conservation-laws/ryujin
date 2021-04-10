@@ -36,7 +36,7 @@ Videos
 References
 ----------
 
-If you use this software for an academic publications please cite the
+If you use this software for an academic publication please cite the
 following references ([preprint](https://arxiv.org/abs/2007.00094),
 [preprint](https://arxiv.org/abs/2009.06022)):
 
