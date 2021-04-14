@@ -407,6 +407,16 @@ namespace ryujin
       LIKWID_MARKER_STOP("time_step_0");
     }
 
+#ifdef CHECK_BOUNDS
+    /* Compute the global minimum of the internal energy: */
+
+    // .begin() and .end() denote the locally owned index range:
+    auto e_min_old =
+        *std::min_element(internal_energy_.begin(), internal_energy_.end());
+
+    e_min_old = Utilities::MPI::min(e_min_old, mpi_communicator_);
+#endif
+
     /*
      * Step 1: Solve velocity update:
      */
@@ -716,6 +726,21 @@ namespace ryujin
             0.1 * (use_gmg_internal_energy_ ? gmg_max_iter_en_ : 0) +
             0.1 * solver_control.last_step();
       }
+
+#ifdef CHECK_BOUNDS
+      /*
+       * Check for local minimum principle on internal energy:
+       */
+
+      // .begin() and .end() denote the locally owned index range:
+      auto e_min_new =
+          *std::min_element(internal_energy_.begin(), internal_energy_.end());
+
+      constexpr Number eps = std::numeric_limits<Number>::epsilon();
+      AssertThrow(
+          e_min_new >= e_min_old - 100. * eps,
+          dealii::ExcMessage("Specific entropy minimum principle violated."));
+#endif
 
       LIKWID_MARKER_STOP("time_step_n_3");
     }
