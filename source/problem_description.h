@@ -116,8 +116,7 @@ namespace ryujin
      * the density <code>U[0]</code>
      */
     template <int problem_dim, typename Number>
-    static Number
-    density(const dealii::Tensor<1, problem_dim, Number> &U);
+    static Number density(const dealii::Tensor<1, problem_dim, Number> &U);
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, return
@@ -258,11 +257,11 @@ namespace ryujin
     /**
      * Decomposes a given state @p U into Riemann invariants and then
      * replaces the first or second Riemann characteristic from the one
-     * taken from @p U_bar state.
+     * taken from @p U_bar state. Note that the @p U_bar state is just the
+     * prescribed dirichlet values.
      */
     template <int component, int problem_dim, typename Number>
-    dealii::Tensor<1, problem_dim, Number>
-    prescribe_riemann_characteristic(
+    dealii::Tensor<1, problem_dim, Number> prescribe_riemann_characteristic(
         const dealii::Tensor<1, problem_dim, Number> &U,
         const dealii::Tensor<1, problem_dim, Number> &U_bar,
         const dealii::Tensor<1, problem_dim - 2, Number> &normal) const;
@@ -566,11 +565,11 @@ namespace ryujin
 
 
   template <int component, int problem_dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline
-  std::array<dealii::Tensor<1, problem_dim, Number>, 2>
-  ProblemDescription::linearized_eigenvector(
-      const dealii::Tensor<1, problem_dim, Number> &U,
-      const dealii::Tensor<1, problem_dim - 2, Number> &normal) const
+  DEAL_II_ALWAYS_INLINE inline std::
+      array<dealii::Tensor<1, problem_dim, Number>, 2>
+      ProblemDescription::linearized_eigenvector(
+          const dealii::Tensor<1, problem_dim, Number> &U,
+          const dealii::Tensor<1, problem_dim - 2, Number> &normal) const
   {
     static_assert(component == 1 || component == problem_dim,
                   "Only first and last eigenvectors implemented");
@@ -623,12 +622,11 @@ namespace ryujin
 
 
   template <int component, int problem_dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline
-  dealii::Tensor<1, problem_dim, Number>
+  DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, problem_dim, Number>
   ProblemDescription::prescribe_riemann_characteristic(
-          const dealii::Tensor<1, problem_dim, Number> &U,
-          const dealii::Tensor<1, problem_dim, Number> &U_bar,
-          const dealii::Tensor<1, problem_dim - 2, Number> &normal) const
+      const dealii::Tensor<1, problem_dim, Number> &U,
+      const dealii::Tensor<1, problem_dim, Number> &U_bar,
+      const dealii::Tensor<1, problem_dim - 2, Number> &normal) const
   {
     static_assert(component == 1 || component == 2,
                   "component has to be 1 or 2");
@@ -681,8 +679,8 @@ namespace ryujin
 
 
   template <int problem_dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline
-  ProblemDescription::flux_type<problem_dim - 2, Number>
+  DEAL_II_ALWAYS_INLINE inline ProblemDescription::flux_type<problem_dim - 2,
+                                                             Number>
   ProblemDescription::f(const dealii::Tensor<1, problem_dim, Number> &U) const
   {
     constexpr int dim = problem_dim - 2;
