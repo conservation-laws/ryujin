@@ -177,10 +177,10 @@ namespace ryujin
       get_new_point(const ArrayView<const Point<dim>> &surrounding_points,
                     const ArrayView<const double> &weights) const override
       {
-        if(weights[0] > 1.0)
+        if (weights[0] > 1.0)
           return surrounding_points[0];
 
-        if(weights[1] > 1.0)
+        if (weights[1] > 1.0)
           return surrounding_points[1];
 
         return dealii::ChartManifold<dim>::get_new_point(surrounding_points,
@@ -252,7 +252,8 @@ namespace ryujin
       {
       }
 
-      virtual std::unique_ptr<Manifold<dim>> clone() const override{
+      virtual std::unique_ptr<Manifold<dim>> clone() const override
+      {
         return std::make_unique<ExtrudedManifold<dim>>(*manifold);
       }
 
@@ -411,8 +412,7 @@ namespace ryujin
     /**
      * @todo Documentation
      */
-    std::array<std::vector<double>, 4>
-    onera(const std::string &serial_number)
+    std::array<std::vector<double>, 4> onera(const std::string &serial_number)
     {
       if (serial_number == "OAT15a") {
         std::vector<double> x_upper{
@@ -719,8 +719,9 @@ namespace ryujin
 
       return {{psi_front, psi_upper, psi_lower}};
 #else
-      AssertThrow(false, dealii::
-                  ExcNotImplemented("Airfoil grid needs deal.II with GSL"));
+      AssertThrow(
+          false,
+          dealii::ExcNotImplemented("Airfoil grid needs deal.II with GSL"));
       return {};
 #endif
     }
@@ -1059,8 +1060,12 @@ namespace ryujin
             airfoil_center_, psi_front, psi_upper, psi_lower, true, psi_ratio_};
         coarse_triangulation.set_manifold(1, airfoil_manifold_upper);
 
-        Manifolds::AirfoilManifold airfoil_manifold_lower{
-            airfoil_center_, psi_front, psi_upper, psi_lower, false, psi_ratio_};
+        Manifolds::AirfoilManifold airfoil_manifold_lower{airfoil_center_,
+                                                          psi_front,
+                                                          psi_upper,
+                                                          psi_lower,
+                                                          false,
+                                                          psi_ratio_};
         coarse_triangulation.set_manifold(2, airfoil_manifold_lower);
 
         dealii::SphericalManifold<2> spherical_manifold;

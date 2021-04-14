@@ -493,5 +493,5 @@ namespace ryujin
       std::function<double(double)> find_velocity;
     };
 
-  } /* namespace IinitialStates */
+  } // namespace InitialStates
 } /* namespace ryujin */

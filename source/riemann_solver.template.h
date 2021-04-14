@@ -30,8 +30,8 @@ namespace ryujin
    */
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline Number
-  RiemannSolver<dim, Number>::
-  f(const std::array<Number, 4> &primitive_state, const Number &p_star)
+  RiemannSolver<dim, Number>::f(const std::array<Number, 4> &primitive_state,
+                                const Number &p_star)
   {
     using ScalarNumber = typename get_value_type<Number>::type;
 
@@ -60,8 +60,8 @@ namespace ryujin
    */
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline Number
-  RiemannSolver<dim, Number>::
-  df(const std::array<Number, 4> &primitive_state, const Number &p_star)
+  RiemannSolver<dim, Number>::df(const std::array<Number, 4> &primitive_state,
+                                 const Number &p_star)
   {
     using ScalarNumber = typename get_value_type<Number>::type;
 
@@ -95,10 +95,9 @@ namespace ryujin
    */
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline Number
-  RiemannSolver<dim, Number>::
-  phi(const std::array<Number, 4> &riemann_data_i,
-      const std::array<Number, 4> &riemann_data_j,
-      const Number &p)
+  RiemannSolver<dim, Number>::phi(const std::array<Number, 4> &riemann_data_i,
+                                  const std::array<Number, 4> &riemann_data_j,
+                                  const Number &p)
   {
     const Number &u_i = riemann_data_i[1];
     const Number &u_j = riemann_data_j[1];
@@ -115,10 +114,9 @@ namespace ryujin
    * Cost: 0x pow, 2x division, 2x sqrt
    */
   template <int dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline Number
-  RiemannSolver<dim, Number>::
-  phi_of_p_max(const std::array<Number, 4> &riemann_data_i,
-               const std::array<Number, 4> &riemann_data_j)
+  DEAL_II_ALWAYS_INLINE inline Number RiemannSolver<dim, Number>::phi_of_p_max(
+      const std::array<Number, 4> &riemann_data_i,
+      const std::array<Number, 4> &riemann_data_j)
   {
     using ScalarNumber = typename get_value_type<Number>::type;
 
@@ -150,10 +148,9 @@ namespace ryujin
    */
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline Number
-  RiemannSolver<dim, Number>::
-  dphi(const std::array<Number, 4> &riemann_data_i,
-       const std::array<Number, 4> &riemann_data_j,
-       const Number &p)
+  RiemannSolver<dim, Number>::dphi(const std::array<Number, 4> &riemann_data_i,
+                                   const std::array<Number, 4> &riemann_data_j,
+                                   const Number &p)
   {
     return df(riemann_data_i, p) + df(riemann_data_j, p);
   }
@@ -173,9 +170,8 @@ namespace ryujin
    * Cost: 0x pow, 1x division, 1x sqrt
    */
   template <int dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline Number
-  RiemannSolver<dim, Number>::
-  lambda1_minus(const std::array<Number, 4> &riemann_data, const Number p_star)
+  DEAL_II_ALWAYS_INLINE inline Number RiemannSolver<dim, Number>::lambda1_minus(
+      const std::array<Number, 4> &riemann_data, const Number p_star)
   {
     using ScalarNumber = typename get_value_type<Number>::type;
 
@@ -195,10 +191,8 @@ namespace ryujin
    * Cost: 0x pow, 1x division, 1x sqrt
    */
   template <int dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline Number
-  RiemannSolver<dim, Number>::
-  lambda3_plus(const std::array<Number, 4> &primitive_state,
-               const Number p_star)
+  DEAL_II_ALWAYS_INLINE inline Number RiemannSolver<dim, Number>::lambda3_plus(
+      const std::array<Number, 4> &primitive_state, const Number p_star)
   {
     using ScalarNumber = typename get_value_type<Number>::type;
 
@@ -222,11 +216,11 @@ namespace ryujin
    */
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline std::array<Number, 2>
-  RiemannSolver<dim, Number>::
-  compute_gap(const std::array<Number, 4> &riemann_data_i,
-              const std::array<Number, 4> &riemann_data_j,
-              const Number p_1,
-              const Number p_2)
+  RiemannSolver<dim, Number>::compute_gap(
+      const std::array<Number, 4> &riemann_data_i,
+      const std::array<Number, 4> &riemann_data_j,
+      const Number p_1,
+      const Number p_2)
   {
     const Number nu_11 = lambda1_minus(riemann_data_i, p_2 /*SIC!*/);
     const Number nu_12 = lambda1_minus(riemann_data_i, p_1 /*SIC!*/);
@@ -257,10 +251,10 @@ namespace ryujin
    */
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline Number
-  RiemannSolver<dim, Number>::
-  compute_lambda(const std::array<Number, 4> &riemann_data_i,
-                 const std::array<Number, 4> &riemann_data_j,
-                 const Number p_star)
+  RiemannSolver<dim, Number>::compute_lambda(
+      const std::array<Number, 4> &riemann_data_i,
+      const std::array<Number, 4> &riemann_data_j,
+      const Number p_star)
   {
     const Number nu_11 = lambda1_minus(riemann_data_i, p_star);
     const Number nu_32 = lambda3_plus(riemann_data_j, p_star);
@@ -279,9 +273,9 @@ namespace ryujin
    */
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline Number
-  RiemannSolver<dim, Number>::
-  p_star_two_rarefaction(const std::array<Number, 4> &riemann_data_i,
-                         const std::array<Number, 4> &riemann_data_j)
+  RiemannSolver<dim, Number>::p_star_two_rarefaction(
+      const std::array<Number, 4> &riemann_data_i,
+      const std::array<Number, 4> &riemann_data_j)
   {
     using ScalarNumber = typename get_value_type<Number>::type;
 
@@ -318,13 +312,13 @@ namespace ryujin
    */
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline std::array<Number, 4>
-  RiemannSolver<dim, Number>::
-  shock_and_expansion_density(const Number p_min,
-                              const Number p_max,
-                              const Number rho_p_min,
-                              const Number rho_p_max,
-                              const Number p_1,
-                              const Number p_2)
+  RiemannSolver<dim, Number>::shock_and_expansion_density(
+      const Number p_min,
+      const Number p_max,
+      const Number rho_p_min,
+      const Number rho_p_max,
+      const Number p_1,
+      const Number p_2)
   {
     const auto gm1_gp2 = gamma_minus_one_over_gamma_plus_one;
 
@@ -352,10 +346,10 @@ namespace ryujin
    */
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline std::array<Number, 4>
-  RiemannSolver<dim, Number>::
-  riemann_data_from_state(const ProblemDescription &problem_description,
-                          const ProblemDescription::state_type<dim, Number> &U,
-                          const dealii::Tensor<1, dim, Number> &n_ij)
+  RiemannSolver<dim, Number>::riemann_data_from_state(
+      const ProblemDescription &problem_description,
+      const ProblemDescription::state_type<dim, Number> &U,
+      const dealii::Tensor<1, dim, Number> &n_ij)
   {
     const auto rho = problem_description.density(U);
     const auto rho_inverse = Number(1.0) / rho;

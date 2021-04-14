@@ -10,11 +10,11 @@
 #include "convenience_macros.h"
 #include "simd.h"
 
+#include "dissipation_gmg_operators.h"
 #include "initial_values.h"
 #include "offline_data.h"
 #include "problem_description.h"
 #include "sparse_matrix_simd.h"
-#include "dissipation_gmg_operators.h"
 
 #include <deal.II/base/mg_level_object.h>
 #include <deal.II/base/parameter_acceptor.h>
@@ -48,10 +48,11 @@ namespace ryujin
    *   \\
    *   &\partial_t \bbm - \nabla\cdot(\pols(\bv)) = \bef,
    *   \\
-   *   &\partial_t E   + \nabla\cdot(\Hflux(\bu)- \pols(\bv) \bv) = \bef\cdot\bv,
+   *   &\partial_t E   + \nabla\cdot(\Hflux(\bu)- \pols(\bv) \bv) =
+   * \bef\cdot\bv,
    *   \\
-   *   &\bv_{|\partial D}=\boldsymbol 0, \qquad \Hflux(\bu)\cdot\bn_{|\partial D}=0 .
-   * \f}
+   *   &\bv_{|\partial D}=\boldsymbol 0, \qquad \Hflux(\bu)\cdot\bn_{|\partial
+   * D}=0 . \f}
    *
    * Internally, the module first performs an explicit second order
    * Crank-Nicolson step updating the velocity @cite GuermondEtAl2021, Eq.

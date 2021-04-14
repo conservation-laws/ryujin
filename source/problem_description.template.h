@@ -40,7 +40,9 @@ namespace ryujin
     add_parameter("lambda", lambda_, "Navier Stokes: Bulk viscosity");
 
     cv_inverse_kappa_ = 1.866666666666666e-2;
-    add_parameter("kappa", cv_inverse_kappa_, "Navier Stokes: Scaled thermal conductivity c_v^{-1} kappa");
+    add_parameter("kappa",
+                  cv_inverse_kappa_,
+                  "Navier Stokes: Scaled thermal conductivity c_v^{-1} kappa");
 
     parse_parameters_callback();
   }

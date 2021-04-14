@@ -180,6 +180,6 @@ protected:
  *
  * @ingroup Miscellaneous
  */
-#define ASM_LABEL(label) asm ("#" label);
+#define ASM_LABEL(label) asm("#" label);
 
 //@}

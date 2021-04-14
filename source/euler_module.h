@@ -49,8 +49,7 @@ namespace ryujin
     /**
      * @copydoc ProblemDescription::state_type
      */
-    using state_type =
-        ProblemDescription::state_type<dim, Number>;
+    using state_type = ProblemDescription::state_type<dim, Number>;
 
     /**
      * @copydoc ProblemDescription::flux_type

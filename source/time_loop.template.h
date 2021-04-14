@@ -849,7 +849,7 @@ namespace ryujin
       current.cpu_time_max = cpu_time_statistics.max;
     }
 
-    if(final_time)
+    if (final_time)
       previous = Data();
 
     /* Take averages: */

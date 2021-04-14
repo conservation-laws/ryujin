@@ -42,8 +42,8 @@ namespace ryujin
 
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
 
-      const Number
-        denominator = ScalarNumber(1.) / (std::abs(P_rho) + eps * rho_max);
+      const Number denominator =
+          ScalarNumber(1.) / (std::abs(P_rho) + eps * rho_max);
       t_r = dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
           rho_max,
           U_rho + t_r * P_rho,

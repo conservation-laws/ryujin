@@ -357,7 +357,7 @@ namespace ryujin
           else
             temp[k] =
                 sparse_matrix.el(sparsity->partitioner->local_to_global(i + k),
-                              sparsity->partitioner->local_to_global(js[k]));
+                                 sparsity->partitioner->local_to_global(js[k]));
 
         write_vectorized_entry(temp, i, col_idx, true);
       }

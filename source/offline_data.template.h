@@ -637,7 +637,7 @@ namespace ryujin
          * interior degrees of freedom (if not simultaneously located at
          * another boundary as well).
          */
-        if(id == Boundary::periodic)
+        if (id == Boundary::periodic)
           continue;
 
         fe_face_values.reinit(cell, f);

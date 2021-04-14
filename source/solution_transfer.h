@@ -73,7 +73,7 @@ namespace ryujin
 
       /* copy over density, velocity and internal energy: */
 
-      for(unsigned int i = 0; i < n_owned; ++i) {
+      for (unsigned int i = 0; i < n_owned; ++i) {
         const auto U_i = U.get_tensor(i);
         const auto rho_i = problem_description_->density(U_i);
         const auto v_i = problem_description_->momentum(U_i) / rho_i;
@@ -124,7 +124,7 @@ namespace ryujin
 
       /* copy over density, velocity and internal energy: */
 
-      for(unsigned int i = 0; i < n_owned; ++i) {
+      for (unsigned int i = 0; i < n_owned; ++i) {
 
         state_type U_i;
 
@@ -132,7 +132,7 @@ namespace ryujin
         auto E_i = rho_i * interpolated_state_[1 + dim].local_element(i);
 
         U_i[0] = rho_i;
-        for(unsigned int d = 0; d < dim; ++d) {
+        for (unsigned int d = 0; d < dim; ++d) {
           const auto v_i = interpolated_state_[1 + d].local_element(i);
           U_i[1 + d] = rho_i * v_i;
           E_i += 0.5 * rho_i * v_i * v_i;

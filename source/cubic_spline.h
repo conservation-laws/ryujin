@@ -61,7 +61,7 @@ namespace ryujin
     /**
      * The copy assignment operator is deleted.
      */
-    CubicSpline& operator=(const CubicSpline&) = delete;
+    CubicSpline &operator=(const CubicSpline &) = delete;
 
     /**
      * Destructor.
@@ -89,6 +89,6 @@ namespace ryujin
     gsl_spline *spline;
     mutable gsl_interp_accel *accel;
   };
-}
+} // namespace ryujin
 
 #endif

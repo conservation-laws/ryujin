@@ -15,7 +15,7 @@
 
 #include <fstream>
 
-int main (int argc, char *argv[])
+int main(int argc, char *argv[])
 {
 #if defined(DENORMALS_ARE_ZERO) && defined(__x86_64)
   /*
@@ -23,7 +23,7 @@ int main (int argc, char *argv[])
    * zero to avoid computing on denormals which can slow down computations
    * significantly.
    */
-#define MXCSR_DAZ (1 << 6) /* Enable denormals are zero mode */
+#define MXCSR_DAZ (1 << 6)  /* Enable denormals are zero mode */
 #define MXCSR_FTZ (1 << 15) /* Enable flush to zero mode */
 
   unsigned int mxcsr = __builtin_ia32_stmxcsr();

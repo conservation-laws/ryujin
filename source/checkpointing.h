@@ -27,7 +27,7 @@ namespace ryujin
    *
    * @ingroup Miscellaneous
    */
-  template<typename T1, typename T2, typename T3>
+  template <typename T1, typename T2, typename T3>
   void do_resume(const std::string &base_name,
                  unsigned int id,
                  T1 &U,
@@ -58,7 +58,7 @@ namespace ryujin
    *
    * @ingroup Miscellaneous
    */
-  template<typename T1, typename T2, typename T3>
+  template <typename T1, typename T2, typename T3>
   void do_checkpoint(const std::string &base_name,
                      unsigned int id,
                      const T1 &U,

@@ -836,17 +836,20 @@ namespace ryujin
           const auto e_new = problem_description_->internal_energy(U_i_new);
           const auto s_new = problem_description_->specific_entropy(U_i_new);
 
-          AssertThrowSIMD(rho_new,
-                          [](auto val) { return val > Number(0.); },
-                          dealii::ExcMessage("Negative density."));
+          AssertThrowSIMD(
+              rho_new,
+              [](auto val) { return val > Number(0.); },
+              dealii::ExcMessage("Negative density."));
 
-          AssertThrowSIMD(e_new,
-                          [](auto val) { return val > Number(0.); },
-                          dealii::ExcMessage("Negative internal energy."));
+          AssertThrowSIMD(
+              e_new,
+              [](auto val) { return val > Number(0.); },
+              dealii::ExcMessage("Negative internal energy."));
 
-          AssertThrowSIMD(s_new,
-                          [](auto val) { return val > Number(0.); },
-                          dealii::ExcMessage("Negative specific entropy."));
+          AssertThrowSIMD(
+              s_new,
+              [](auto val) { return val > Number(0.); },
+              dealii::ExcMessage("Negative specific entropy."));
 #endif
 
           temp_euler_.write_tensor(U_i_new, i);
@@ -925,17 +928,20 @@ namespace ryujin
           const auto e_new = problem_description_->internal_energy(U_i_new);
           const auto s_new = problem_description_->specific_entropy(U_i_new);
 
-          AssertThrowSIMD(rho_new,
-                          [](auto val) { return val > Number(0.); },
-                          dealii::ExcMessage("Negative density."));
+          AssertThrowSIMD(
+              rho_new,
+              [](auto val) { return val > Number(0.); },
+              dealii::ExcMessage("Negative density."));
 
-          AssertThrowSIMD(e_new,
-                          [](auto val) { return val > Number(0.); },
-                          dealii::ExcMessage("Negative internal energy."));
+          AssertThrowSIMD(
+              e_new,
+              [](auto val) { return val > Number(0.); },
+              dealii::ExcMessage("Negative internal energy."));
 
-          AssertThrowSIMD(s_new,
-                          [](auto val) { return val > Number(0.); },
-                          dealii::ExcMessage("Negative specific entropy."));
+          AssertThrowSIMD(
+              s_new,
+              [](auto val) { return val > Number(0.); },
+              dealii::ExcMessage("Negative specific entropy."));
 #endif
           temp_euler_.write_vectorized_tensor(U_i_new, i);
 

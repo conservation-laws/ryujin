@@ -7,9 +7,9 @@
 
 #include <compile_time_options.h>
 
+#include "initial_state.h"
 #include "offline_data.h"
 #include "problem_description.h"
-#include "initial_state.h"
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/tensor.h>
@@ -72,8 +72,8 @@ namespace ryujin
      * function signature has an additional parameter @p t denoting the
      * current time to allow for time-dependent (in-flow) Dirichlet data.
      */
-    DEAL_II_ALWAYS_INLINE inline
-    state_type initial_state(const dealii::Point<dim> &point, Number t) const
+    DEAL_II_ALWAYS_INLINE inline state_type
+    initial_state(const dealii::Point<dim> &point, Number t) const
     {
       return initial_state_(point, t);
     }

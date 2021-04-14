@@ -751,7 +751,7 @@ namespace ryujin
             }
           }
 
-        if(periodic_) {
+        if (periodic_) {
           std::vector<dealii::GridTools::PeriodicFacePair<
               typename dealii::Triangulation<dim>::cell_iterator>>
               periodic_faces;

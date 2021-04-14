@@ -213,8 +213,7 @@ namespace ryujin
      * Reset temporary storage and initialize for a new row corresponding
      * to state vector U_i.
      */
-    void
-    reset(const state_type &U_i, const Number entropy);
+    void reset(const state_type &U_i, const Number entropy);
 
     /**
      * When looping over the sparsity row, add the contribution associated
@@ -271,8 +270,8 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline void Indicator<dim, Number>::reset(
-      const state_type &U_i, const Number entropy)
+  DEAL_II_ALWAYS_INLINE inline void
+  Indicator<dim, Number>::reset(const state_type &U_i, const Number entropy)
   {
     if constexpr (indicator_ == Indicators::entropy_viscosity_commutator) {
       rho_i = problem_description.density(U_i);

@@ -37,16 +37,14 @@ namespace ryujin
                   "any of the subsections defined below.");
 
     initial_direction_[0] = 1.;
-    add_parameter(
-        "direction",
-        initial_direction_,
-        "Initial direction of shock front, contrast, or vortex");
+    add_parameter("direction",
+                  initial_direction_,
+                  "Initial direction of shock front, contrast, or vortex");
 
     initial_position_[0] = 1.;
-    add_parameter(
-        "position",
-        initial_position_,
-        "Initial position of shock front, contrast, or vortex");
+    add_parameter("position",
+                  initial_position_,
+                  "Initial position of shock front, contrast, or vortex");
 
     perturbation_ = 0.;
     add_parameter("perturbation",

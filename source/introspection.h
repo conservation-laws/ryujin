@@ -39,7 +39,6 @@
 #endif
 
 
-
 /**
  * Wrapper macro initializing likwid introspection. Used in main().
  */
@@ -84,7 +83,6 @@
 
 #define LIKWID_CLOSE LIKWID_MARKER_CLOSE;
 #endif
-
 
 
 /**

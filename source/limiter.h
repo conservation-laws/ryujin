@@ -25,10 +25,11 @@ namespace ryujin
    *
    * \f{align}
    *   \tilde l_{ij} = \max_{l\,\in\,[0,1]}
-   *   \,\Big\{\rho_{\text{min}}\,\le\,\rho\,(\mathbf U_i +\tilde l_{ij}\mathbf P_{ij})
+   *   \,\Big\{\rho_{\text{min}}\,\le\,\rho\,(\mathbf U_i +\tilde l_{ij}\mathbf
+   * P_{ij})
    *   \,\le\,\rho_{\text{max}},\quad
-   *   \phi_{\text{min}}\,\le\,\phi\,(\mathbf U_{i}+\tilde l_{ij}\mathbf P_{ij})\Big\},
-   * \f}
+   *   \phi_{\text{min}}\,\le\,\phi\,(\mathbf U_{i}+\tilde l_{ij}\mathbf
+   * P_{ij})\Big\}, \f}
    *
    * where \f$\psi\f$ denots the specific entropy @cite KronbichlerMaier2021.
    *
@@ -39,8 +40,8 @@ namespace ryujin
    * then perform a quadratic Newton iteration (updating \f$[t_L,t_R]\f$
    * solving for the root of a 3-convex function
    * \f{align}
-   *     \Psi(\mathbf U)\;=\;\rho^{\gamma+1}(\mathbf U)\,\big(\phi(\mathbf U)-\phi_{\text{min}}\big).
-   * \f}
+   *     \Psi(\mathbf U)\;=\;\rho^{\gamma+1}(\mathbf U)\,\big(\phi(\mathbf
+   * U)-\phi_{\text{min}}\big). \f}
    *
    * @todo document local entropy inequality condition.
    *
