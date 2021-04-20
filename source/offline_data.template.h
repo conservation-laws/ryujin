@@ -263,6 +263,7 @@ namespace ryujin
     /* Variant using TrilinosWrappers::SparseMatrix with global numbering */
 
     AffineConstraints<double> affine_constraints_assembly;
+    affine_constraints_assembly.reinit(affine_constraints_.get_local_lines());
     for (auto line : affine_constraints_.get_lines()) {
       affine_constraints_assembly.add_line(line.index);
       for (auto entry : line.entries)
