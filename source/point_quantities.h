@@ -20,7 +20,6 @@
 #include <deal.II/lac/la_parallel_block_vector.h>
 #include <deal.II/lac/sparse_matrix.templates.h>
 #include <deal.II/lac/vector.h>
-#include <deal.II/matrix_free/matrix_free.h>
 
 namespace ryujin
 {
@@ -135,8 +134,6 @@ namespace ryujin
         std::string,
         std::multimap<dealii::types::global_dof_index, boundary_description>>>
         boundary_maps_;
-
-    dealii::MatrixFree<dim, Number> matrix_free_;
 
     block_vector_type velocity_;
     block_vector_type vorticity_;

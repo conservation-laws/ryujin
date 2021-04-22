@@ -13,7 +13,7 @@
 
 #include <deal.II/base/function_parser.h>
 #include <deal.II/base/work_stream.h>
-#include <deal.II/matrix_free/fe_evaluation.h>
+#include <deal.II/dofs/dof_tools.h>
 
 #include <fstream>
 
@@ -66,25 +66,14 @@ namespace ryujin
     std::cout << "PointQuantities<dim, Number>::prepare()" << std::endl;
 #endif
 
-    /* Initialize matrix free context: */
-
-    typename MatrixFree<dim, Number>::AdditionalData additional_data;
-    additional_data.mapping_update_flags_boundary_faces =
-        (update_values | update_gradients | update_JxW_values |
-         update_normal_vectors);
-    additional_data.tasks_parallel_scheme =
-        MatrixFree<dim, Number>::AdditionalData::none;
-
-    matrix_free_.reinit(offline_data_->discretization().mapping(),
-                        offline_data_->dof_handler(),
-                        offline_data_->affine_constraints(),
-                        offline_data_->discretization().quadrature_1d(),
-                        additional_data);
-
-    /* Initialize vectors: */
-
-    const auto &scalar_partitioner =
-        matrix_free_.get_dof_info(0).vector_partitioner;
+    IndexSet relevant_dofs;
+    DoFTools::extract_locally_relevant_dofs(offline_data_->dof_handler(),
+                                            relevant_dofs);
+    const auto scalar_partitioner =
+        std::make_shared<Utilities::MPI::Partitioner>(
+            offline_data_->dof_handler().locally_owned_dofs(),
+            relevant_dofs,
+            offline_data_->dof_handler().get_communicator());
 
     velocity_.reinit(dim);
     vorticity_.reinit(dim == 2 ? 1 : dim);
@@ -103,32 +92,35 @@ namespace ryujin
     /* Compute lumped boundary mass matrix: */
 
     {
-      constexpr auto order_fe = Discretization<dim>::order_finite_element;
-      constexpr auto order_quad = Discretization<dim>::order_quadrature;
+      const QGauss<dim - 1> quad(Discretization<dim>::order_quadrature);
+      FEFaceValues<dim> fe_face_values(
+          offline_data_->discretization().mapping(),
+          offline_data_->dof_handler().get_fe(),
+          quad,
+          update_values | update_JxW_values);
+      Vector<Number> cell_rhs(
+          offline_data_->dof_handler().get_fe().dofs_per_cell);
+      std::vector<types::global_dof_index> dof_indices(cell_rhs.size());
 
-      FEFaceEvaluation<dim, order_fe, order_quad, 1, Number> phi(matrix_free_);
-
-      lumped_boundary_mass_ = 0.;
-
-      const auto begin = matrix_free_.n_inner_face_batches();
-      const auto size = matrix_free_.n_boundary_face_batches();
-      for (unsigned int face = begin; face < begin + size; ++face) {
-        const auto id = matrix_free_.get_boundary_id(face);
-
-        /* only compute on slip and no_slip boundaries */
-        if (id != Boundary::slip && id != Boundary::no_slip)
-          continue;
-        phi.reinit(face);
-        for (unsigned int q = 0; q < phi.n_q_points; ++q) {
-          phi.submit_value(1., q);
-        }
-
-#if DEAL_II_VERSION_GTE(9, 3, 0)
-        phi.integrate_scatter(EvaluationFlags::values, lumped_boundary_mass_);
-#else
-        phi.integrate_scatter(true, false, lumped_boundary_mass_);
-#endif
-      }
+      for (const auto &cell :
+           offline_data_->dof_handler().active_cell_iterators())
+        if (cell->is_locally_owned())
+          for (const unsigned int face : GeometryInfo<dim>::face_indices())
+            if (cell->at_boundary(face) &&
+                (cell->face(face)->boundary_id() == Boundary::slip ||
+                 cell->face(face)->boundary_id() == Boundary::no_slip)) {
+              fe_face_values.reinit(cell, face);
+              for (unsigned int i = 0; i < cell_rhs.size(); ++i) {
+                double sum = 0;
+                for (unsigned int q = 0; q < quad.size(); ++q)
+                  sum +=
+                      fe_face_values.shape_value(i, q) * fe_face_values.JxW(q);
+                cell_rhs(i) = sum;
+              }
+              cell->get_dof_indices(dof_indices);
+              offline_data_->affine_constraints().distribute_local_to_global(
+                  cell_rhs, dof_indices, lumped_boundary_mass_);
+            }
 
       lumped_boundary_mass_.compress(VectorOperation::add);
     }
@@ -246,7 +238,7 @@ namespace ryujin
         const auto M_i = problem_description_->momentum(U_i);
 
         for (unsigned int d = 0; d < dim; ++d) {
-          simd_store(velocity_.block(d), M_i[d] / rho_i, i);
+          simd_store(velocity_.block(d), M_i[d] * (Number(1.) / rho_i), i);
         }
       }
       RYUJIN_PARALLEL_REGION_END
@@ -257,7 +249,7 @@ namespace ryujin
         const auto M_i = problem_description_->momentum(U_i);
 
         for (unsigned int d = 0; d < dim; ++d) {
-          velocity_.block(d).local_element(i) = M_i[d] / rho_i;
+          velocity_.block(d).local_element(i) = M_i[d] * (Number(1.) / rho_i);
         }
       }
 
@@ -274,43 +266,52 @@ namespace ryujin
        * divided by the lumped mass matrix (or multiplied with the inverse
        * of the full mass matrix).
        */
-
-      matrix_free_.template cell_loop<block_vector_type, block_vector_type>(
-          [](const auto &data,
-             auto &dst,
-             const auto &src,
-             const auto cell_range) {
-            constexpr auto order_fe = Discretization<dim>::order_finite_element;
-            constexpr auto order_quad = Discretization<dim>::order_quadrature;
-            FEEvaluation<dim, order_fe, order_quad, dim, Number> velocity(data);
-            FEEvaluation<dim, order_fe, order_quad, dim == 2 ? 1 : dim, Number>
-                vorticity(data);
-
-            for (unsigned int cell = cell_range.first; cell < cell_range.second;
-                 ++cell) {
-              velocity.reinit(cell);
-              vorticity.reinit(cell);
-#if DEAL_II_VERSION_GTE(9, 3, 0)
-              velocity.gather_evaluate(src, EvaluationFlags::gradients);
-#else
-              velocity.read_dof_values(src);
-              velocity.evaluate(false, true);
-#endif
-              for (unsigned int q = 0; q < velocity.n_q_points; ++q) {
-                const auto curl = velocity.get_curl(q);
-                vorticity.submit_value(curl, q);
+      vorticity_ = 0;
+      const QGauss<dim> quad(Discretization<dim>::order_quadrature);
+      FEValues<dim> fe_values(offline_data_->discretization().mapping(),
+                              offline_data_->dof_handler().get_fe(),
+                              quad,
+                              update_values | update_gradients |
+                                  update_JxW_values);
+      std::array<Vector<Number>, dim> cell_rhs;
+      for (auto c : cell_rhs)
+        c.reinit(offline_data_->dof_handler().get_fe().dofs_per_cell);
+      std::array<std::vector<Tensor<1, dim, Number>>, dim> velocity_gradients;
+      for (auto c : velocity_gradients)
+        c.resize(quad.size());
+      std::vector<types::global_dof_index> dof_indices(cell_rhs[0].size());
+      for (const auto &cell :
+           offline_data_->dof_handler().active_cell_iterators())
+        if (cell->is_locally_owned()) {
+          fe_values.reinit(cell);
+          for (unsigned int d = 0; d < dim; ++d)
+            fe_values.get_function_gradients(velocity_.block(d),
+                                             velocity_gradients[d]);
+          for (unsigned int i = 0; i < cell_rhs[0].size(); ++i) {
+            Tensor<1, dim> sum;
+            for (unsigned int q = 0; q < quad.size(); ++q) {
+              Tensor<1, dim> curl;
+              if (dim == 2)
+                curl[0] =
+                    velocity_gradients[1][q][0] - velocity_gradients[0][q][1];
+              else if (dim == 3) {
+                curl[0] =
+                    velocity_gradients[2][q][1] - velocity_gradients[1][q][2];
+                curl[1] =
+                    velocity_gradients[0][q][2] - velocity_gradients[2][q][0];
+                curl[2] =
+                    velocity_gradients[1][q][0] - velocity_gradients[0][q][1];
               }
-#if DEAL_II_VERSION_GTE(9, 3, 0)
-              vorticity.integrate_scatter(EvaluationFlags::values, dst);
-#else
-              vorticity.integrate(true, false);
-              vorticity.distribute_local_to_global(dst);
-#endif
+              sum += curl * (fe_values.shape_value(i, q) * fe_values.JxW(q));
             }
-          },
-          vorticity_,
-          velocity_,
-          /* zero destination */ true);
+            for (unsigned int d = 0; d < dim; ++d)
+              cell_rhs[d][i] = sum[d];
+          }
+          cell->get_dof_indices(dof_indices);
+          for (unsigned int d = 0; d < (dim == 3 ? 3 : 1); ++d)
+            offline_data_->affine_constraints().distribute_local_to_global(
+                cell_rhs[d], dof_indices, vorticity_.block(d));
+        }
 
       vorticity_.compress(VectorOperation::add);
 
@@ -351,51 +352,60 @@ namespace ryujin
        * of the full mass matrix).
        */
 
-      constexpr auto order_fe = Discretization<dim>::order_finite_element;
-      constexpr auto order_quad = Discretization<dim>::order_quadrature;
-
-      FEFaceEvaluation<dim, order_fe, order_quad, dim, Number> velocity(
-          matrix_free_);
-
       boundary_stress_ = 0.;
 
       const auto mu = problem_description_->mu();
       const auto lambda = problem_description_->lambda();
 
-      const auto begin = matrix_free_.n_inner_face_batches();
-      const auto size = matrix_free_.n_boundary_face_batches();
-      for (unsigned int face = begin; face < begin + size; ++face) {
-        const auto id = matrix_free_.get_boundary_id(face);
+      const QGauss<dim - 1> quad(Discretization<dim>::order_quadrature);
+      FEFaceValues<dim> fe_face_values(
+          offline_data_->discretization().mapping(),
+          offline_data_->dof_handler().get_fe(),
+          quad,
+          update_values | update_JxW_values | update_normal_vectors);
+      std::array<Vector<Number>, dim> cell_rhs;
+      for (auto c : cell_rhs)
+        c.reinit(offline_data_->dof_handler().get_fe().dofs_per_cell);
+      std::array<std::vector<Tensor<1, dim, Number>>, dim> velocity_gradients;
+      for (auto c : velocity_gradients)
+        c.resize(quad.size());
+      std::vector<types::global_dof_index> dof_indices(cell_rhs.size());
 
-        /* only compute on slip and no_slip boundaries */
-        if (id != Boundary::slip && id != Boundary::no_slip)
-          continue;
-
-        velocity.reinit(face);
-#if DEAL_II_VERSION_GTE(9, 3, 0)
-        velocity.gather_evaluate(velocity_, EvaluationFlags::gradients);
-#else
-        velocity.read_dof_values(velocity_);
-        velocity.evaluate(false, true);
-#endif
-        for (unsigned int q = 0; q < velocity.n_q_points; ++q) {
-          const auto normal = velocity.get_normal_vector(q);
-
-          const auto symmetric_gradient = velocity.get_symmetric_gradient(q);
-          const auto divergence = trace(symmetric_gradient);
-          auto S = 2. * mu * symmetric_gradient;
-          for (unsigned int d = 0; d < dim; ++d)
-            S[d][d] += (lambda - 2. / 3. * mu) * divergence;
-          velocity.submit_value(S * (-normal), q);
-        }
-
-#if DEAL_II_VERSION_GTE(9, 3, 0)
-        velocity.integrate_scatter(EvaluationFlags::values, boundary_stress_);
-#else
-        velocity.integrate(true, false);
-        velocity.distribute_local_to_global(boundary_stress_);
-#endif
-      }
+      for (const auto &cell :
+           offline_data_->dof_handler().active_cell_iterators())
+        if (cell->is_locally_owned())
+          for (const unsigned int face : GeometryInfo<dim>::face_indices())
+            if (cell->at_boundary(face) &&
+                (cell->face(face)->boundary_id() == Boundary::slip ||
+                 cell->face(face)->boundary_id() == Boundary::no_slip)) {
+              fe_face_values.reinit(cell, face);
+              for (unsigned int d = 0; d < dim; ++d)
+                fe_face_values.get_function_gradients(velocity_.block(d),
+                                                      velocity_gradients[d]);
+              for (unsigned int i = 0; i < cell_rhs[0].size(); ++i) {
+                Tensor<1, dim> sum;
+                for (unsigned int q = 0; q < quad.size(); ++q) {
+                  Tensor<2, dim> u_grad;
+                  for (unsigned int d = 0; d < dim; ++d)
+                    for (unsigned int e = 0; e < dim; ++e)
+                      u_grad[d][e] = velocity_gradients[d][q][e];
+                  const auto symmetric_gradient = symmetrize(u_grad);
+                  const auto divergence = trace(symmetric_gradient);
+                  auto S = 2. * mu * symmetric_gradient;
+                  for (unsigned int d = 0; d < dim; ++d)
+                    S[d][d] += (lambda - 2. / 3. * mu) * divergence;
+                  const auto result = S * (-fe_face_values.normal_vector(q));
+                  sum += result * (fe_face_values.shape_value(i, q) *
+                                   fe_face_values.JxW(q));
+                }
+                for (unsigned int d = 0; d < dim; ++d)
+                  cell_rhs[d](i) = sum[d];
+              }
+              cell->get_dof_indices(dof_indices);
+              for (unsigned int d = 0; d < dim; ++d)
+                offline_data_->affine_constraints().distribute_local_to_global(
+                    cell_rhs[d], dof_indices, boundary_stress_.block(d));
+            }
 
       boundary_stress_.compress(VectorOperation::add);
     }
