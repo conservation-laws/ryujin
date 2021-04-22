@@ -429,7 +429,6 @@ namespace ryujin
                 for (unsigned int d = 0; d < dim; ++d)
                   cell_rhs[d][i] = sum[d];
               }
-              cell->get_dof_indices(dof_indices);
               for (unsigned int d = 0; d < dim; ++d)
                 offline_data_->affine_constraints().distribute_local_to_global(
                     cell_rhs[d], dof_indices, boundary_stress_.block(d));
