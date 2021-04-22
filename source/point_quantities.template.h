@@ -268,6 +268,8 @@ namespace ryujin
        */
       vorticity_ = 0;
       const QGauss<dim> quad(Discretization<dim>::order_quadrature);
+      constexpr unsigned int n_q_points =
+          Utilities::pow(Discretization<dim>::order_quadrature, dim);
       FEValues<dim> fe_values(offline_data_->discretization().mapping(),
                               offline_data_->dof_handler().get_fe(),
                               quad,
@@ -276,39 +278,50 @@ namespace ryujin
       std::array<Vector<Number>, dim> cell_rhs;
       for (auto c : cell_rhs)
         c.reinit(offline_data_->dof_handler().get_fe().dofs_per_cell);
-      std::array<std::vector<Tensor<1, dim, Number>>, dim> velocity_gradients;
-      for (auto c : velocity_gradients)
-        c.resize(quad.size());
+      constexpr int curl_dim = (dim > 2 ? dim : 1);
+      std::vector<Tensor<1, curl_dim>> curls(n_q_points);
       std::vector<types::global_dof_index> dof_indices(cell_rhs[0].size());
+
       for (const auto &cell :
            offline_data_->dof_handler().active_cell_iterators())
         if (cell->is_locally_owned()) {
           fe_values.reinit(cell);
+          cell->get_dof_indices(dof_indices);
+
+          /* Interpolate gradient to q-points including constraints */
           for (unsigned int d = 0; d < dim; ++d)
-            fe_values.get_function_gradients(velocity_.block(d),
-                                             velocity_gradients[d]);
-          for (unsigned int i = 0; i < cell_rhs[0].size(); ++i) {
-            Tensor<1, dim> sum;
-            for (unsigned int q = 0; q < quad.size(); ++q) {
-              Tensor<1, dim> curl;
-              if (dim == 2)
-                curl[0] =
-                    velocity_gradients[1][q][0] - velocity_gradients[0][q][1];
-              else if (dim == 3) {
-                curl[0] =
-                    velocity_gradients[2][q][1] - velocity_gradients[1][q][2];
-                curl[1] =
-                    velocity_gradients[0][q][2] - velocity_gradients[2][q][0];
-                curl[2] =
-                    velocity_gradients[1][q][0] - velocity_gradients[0][q][1];
-              }
-              sum += curl * (fe_values.shape_value(i, q) * fe_values.JxW(q));
+            offline_data_->affine_constraints().get_dof_values(
+                velocity_.block(d),
+                dof_indices.data(),
+                cell_rhs[d].begin(),
+                cell_rhs[d].end());
+          for (unsigned int q = 0; q < n_q_points; ++q) {
+            Tensor<2, dim> u_grad;
+            for (unsigned int i = 0; i < cell_rhs[0].size(); ++i) {
+              const auto &shape_grad = fe_values.shape_grad(i, q);
+              for (unsigned int d = 0; d < dim; ++d)
+                u_grad[d] += shape_grad * cell_rhs[d](i);
             }
-            for (unsigned int d = 0; d < dim; ++d)
+            if (dim == 2)
+              curls[q][0] = u_grad[1][0] - u_grad[0][1];
+            else if (dim == 3) {
+              curls[q][0] = u_grad[2][1] - u_grad[1][2];
+              curls[q][1] = u_grad[0][2] - u_grad[2][0];
+              curls[q][2] = u_grad[1][0] - u_grad[0][1];
+            }
+            curls[q] *= fe_values.JxW(q);
+          }
+
+          /* Multiply by test function and sum over quadrature points */
+          for (unsigned int i = 0; i < cell_rhs[0].size(); ++i) {
+            Tensor<1, curl_dim> sum;
+            const double *shape_i = &fe_values.shape_value(i, 0);
+            for (unsigned int q = 0; q < n_q_points; ++q)
+              sum += shape_i[q] * curls[q];
+            for (unsigned int d = 0; d < curl_dim; ++d)
               cell_rhs[d][i] = sum[d];
           }
-          cell->get_dof_indices(dof_indices);
-          for (unsigned int d = 0; d < (dim == 3 ? 3 : 1); ++d)
+          for (unsigned int d = 0; d < curl_dim; ++d)
             offline_data_->affine_constraints().distribute_local_to_global(
                 cell_rhs[d], dof_indices, vorticity_.block(d));
         }
@@ -358,6 +371,8 @@ namespace ryujin
       const auto lambda = problem_description_->lambda();
 
       const QGauss<dim - 1> quad(Discretization<dim>::order_quadrature);
+      constexpr unsigned int n_q_points =
+          Utilities::pow(Discretization<dim>::order_quadrature, dim - 1);
       FEFaceValues<dim> fe_face_values(
           offline_data_->discretization().mapping(),
           offline_data_->dof_handler().get_fe(),
@@ -366,9 +381,7 @@ namespace ryujin
       std::array<Vector<Number>, dim> cell_rhs;
       for (auto c : cell_rhs)
         c.reinit(offline_data_->dof_handler().get_fe().dofs_per_cell);
-      std::array<std::vector<Tensor<1, dim, Number>>, dim> velocity_gradients;
-      for (auto c : velocity_gradients)
-        c.resize(quad.size());
+      std::vector<Tensor<1, dim>> stresses(n_q_points);
       std::vector<types::global_dof_index> dof_indices(cell_rhs.size());
 
       for (const auto &cell :
@@ -379,27 +392,42 @@ namespace ryujin
                 (cell->face(face)->boundary_id() == Boundary::slip ||
                  cell->face(face)->boundary_id() == Boundary::no_slip)) {
               fe_face_values.reinit(cell, face);
+
+              cell->get_dof_indices(dof_indices);
+
+              /* Interpolate gradient to q-points including constraints */
               for (unsigned int d = 0; d < dim; ++d)
-                fe_face_values.get_function_gradients(velocity_.block(d),
-                                                      velocity_gradients[d]);
+                offline_data_->affine_constraints().get_dof_values(
+                    velocity_.block(d),
+                    dof_indices.data(),
+                    cell_rhs[d].begin(),
+                    cell_rhs[d].end());
+              for (unsigned int q = 0; q < n_q_points; ++q) {
+                Tensor<2, dim> u_grad;
+                for (unsigned int i = 0; i < cell_rhs[0].size(); ++i) {
+                  const auto &shape_grad = fe_face_values.shape_grad(i, q);
+                  for (unsigned int d = 0; d < dim; ++d)
+                    u_grad[d] += shape_grad * cell_rhs[d](i);
+                }
+
+                const auto symmetric_gradient = symmetrize(u_grad);
+                const auto divergence = trace(symmetric_gradient);
+                auto S = 2. * mu * symmetric_gradient;
+                for (unsigned int d = 0; d < dim; ++d)
+                  S[d][d] += (lambda - 2. / 3. * mu) * divergence;
+                const auto result = S * (-fe_face_values.normal_vector(q) *
+                                         fe_face_values.JxW(q));
+                stresses[q] = result;
+              }
+
+              /* Multiply by test function and sum over quadrature points */
               for (unsigned int i = 0; i < cell_rhs[0].size(); ++i) {
                 Tensor<1, dim> sum;
-                for (unsigned int q = 0; q < quad.size(); ++q) {
-                  Tensor<2, dim> u_grad;
-                  for (unsigned int d = 0; d < dim; ++d)
-                    for (unsigned int e = 0; e < dim; ++e)
-                      u_grad[d][e] = velocity_gradients[d][q][e];
-                  const auto symmetric_gradient = symmetrize(u_grad);
-                  const auto divergence = trace(symmetric_gradient);
-                  auto S = 2. * mu * symmetric_gradient;
-                  for (unsigned int d = 0; d < dim; ++d)
-                    S[d][d] += (lambda - 2. / 3. * mu) * divergence;
-                  const auto result = S * (-fe_face_values.normal_vector(q));
-                  sum += result * (fe_face_values.shape_value(i, q) *
-                                   fe_face_values.JxW(q));
-                }
+                const double *shape_i = &fe_face_values.shape_value(i, 0);
+                for (unsigned int q = 0; q < n_q_points; ++q)
+                  sum += shape_i[q] * stresses[q];
                 for (unsigned int d = 0; d < dim; ++d)
-                  cell_rhs[d](i) = sum[d];
+                  cell_rhs[d][i] = sum[d];
               }
               cell->get_dof_indices(dof_indices);
               for (unsigned int d = 0; d < dim; ++d)
