@@ -662,19 +662,23 @@ namespace ryujin
   template <int dim, typename Number>
   void TimeLoop<dim, Number>::print_mpi_partition(std::ostream &stream)
   {
-    /* Convert to double - we'll be taking averages in a minute */
+    /*
+     * Fixme: this conversion to double is really not elegant. We should
+     * improve the Utilities::MPI::min_max_avg function in deal.II to
+     * handle different data types
+     */
 
     std::vector<double> values = {
-        static_cast<double>(offline_data.n_export_indices()),
-        static_cast<double>(offline_data.n_locally_internal()),
-        static_cast<double>(offline_data.n_locally_owned()),
-        static_cast<double>(offline_data.n_locally_relevant()),
-        static_cast<double>(offline_data.n_export_indices()) /
-            static_cast<double>(offline_data.n_locally_relevant()),
-        static_cast<double>(offline_data.n_locally_internal()) /
-            static_cast<double>(offline_data.n_locally_relevant()),
-        static_cast<double>(offline_data.n_locally_owned()) /
-            static_cast<double>(offline_data.n_locally_relevant())};
+        (double)offline_data.n_export_indices(),
+        (double)offline_data.n_locally_internal(),
+        (double)offline_data.n_locally_owned(),
+        (double)offline_data.n_locally_relevant(),
+        (double)offline_data.n_export_indices() /
+            (double)offline_data.n_locally_relevant(),
+        (double)offline_data.n_locally_internal() /
+            (double)offline_data.n_locally_relevant(),
+        (double)offline_data.n_locally_owned() /
+            (double)offline_data.n_locally_relevant()};
 
     const auto data = Utilities::MPI::min_max_avg(values, mpi_communicator);
 
@@ -688,22 +692,37 @@ namespace ryujin
     const auto print_snippet = [&output, n](const std::string &name,
                                             const auto &values) {
       output << name << ": ";
-      output << std::setw(9) << std::setprecision(0)
-             << static_cast<unsigned int>(values.min) << " [p" << std::setw(n)
-             << values.min_index << "] " << std::setw(9)
-             << static_cast<unsigned int>(values.avg) << " " << std::setw(9)
-             << static_cast<unsigned int>(values.max) << " [p" << std::setw(n)
-             << values.max_index << "]";
+      output << std::setw(9) << (unsigned int)values.min          //
+             << " [p" << std::setw(n) << values.min_index << "] " //
+             << std::setw(9) << (unsigned int)values.avg << " "   //
+             << std::setw(9) << (unsigned int)values.max          //
+             << " [p" << std::setw(n) << values.max_index << "]"; //
+    };
+
+    const auto print_percentages = [&output, n](const auto &percentages) {
+      output << std::endl << "                  ";
+      output << "  (" << std::setw(3) << std::setprecision(2)
+             << percentages.min * 100 << "% )"
+             << " [p" << std::setw(n) << percentages.min_index << "] "
+             << "   (" << std::setw(3) << std::setprecision(2)
+             << percentages.avg * 100 << "% )"
+             << " "
+             << "   (" << std::setw(3) << std::setprecision(2)
+             << percentages.max * 100 << "% )"
+             << " [p" << std::setw(n) << percentages.max_index << "]";
     };
 
     output << std::endl << std::endl << "Partition:   ";
     print_snippet("exp", data[0]);
+    print_percentages(data[4]);
 
     output << std::endl << "             ";
     print_snippet("int", data[1]);
+    print_percentages(data[5]);
 
     output << std::endl << "             ";
     print_snippet("own", data[2]);
+    print_percentages(data[6]);
 
     output << std::endl << "             ";
     print_snippet("rel", data[3]);
