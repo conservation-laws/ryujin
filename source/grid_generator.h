@@ -519,7 +519,7 @@ namespace ryujin
       virtual void create_triangulation(
           typename Geometry<dim>::Triangulation &triangulation) final override
       {
-        GridGenerator::step<dim, dim>(
+        GridGenerator::step(
             triangulation, length_, height_, step_position_, step_height_);
       }
 
