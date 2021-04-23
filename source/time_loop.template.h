@@ -676,8 +676,7 @@ namespace ryujin
         static_cast<double>(offline_data.n_locally_owned()) /
             static_cast<double>(offline_data.n_locally_relevant())};
 
-    const auto data =
-        Utilities::MPI::min_max_avg(values, mpi_communicator);
+    const auto data = Utilities::MPI::min_max_avg(values, mpi_communicator);
 
     if (mpi_rank != 0)
       return;
@@ -687,13 +686,14 @@ namespace ryujin
     unsigned int n = dealii::Utilities::needed_digits(n_mpi_processes);
 
     const auto print_snippet = [&output, n](const std::string &name,
-                                         const auto &values) {
+                                            const auto &values) {
       output << name << ": ";
-      output << std::setw(9) << std::setprecision(0) << values.min //
-             << " [p" << std::setw(n) << values.min_index << "] "  //
-             << std::setw(9) << values.avg << " "                  //
-             << std::setw(9) << values.max                         //
-             << " [p" << std::setw(n) << values.max_index << "]";  //
+      output << std::setw(9) << std::setprecision(0)
+             << static_cast<unsigned int>(values.min) << " [p" << std::setw(n)
+             << values.min_index << "] " << std::setw(9)
+             << static_cast<unsigned int>(values.avg) << " " << std::setw(9)
+             << static_cast<unsigned int>(values.max) << " [p" << std::setw(n)
+             << values.max_index << "]";
     };
 
     output << std::endl << std::endl << "Partition:   ";
