@@ -662,54 +662,59 @@ namespace ryujin
   template <int dim, typename Number>
   void TimeLoop<dim, Number>::print_mpi_partition(std::ostream &stream)
   {
-    unsigned int dofs[4] = {offline_data.n_export_indices(),
-                            offline_data.n_locally_internal(),
-                            offline_data.n_locally_owned(),
-                            offline_data.n_locally_relevant()};
+    /* Convert to double - we'll be taking averages in a minute */
 
-    if (mpi_rank > 0) {
-      MPI_Send(&dofs, 4, MPI_UNSIGNED, 0, 0, mpi_communicator);
+    std::vector<double> values = {
+        static_cast<double>(offline_data.n_export_indices()),
+        static_cast<double>(offline_data.n_locally_internal()),
+        static_cast<double>(offline_data.n_locally_owned()),
+        static_cast<double>(offline_data.n_locally_relevant()),
+        static_cast<double>(offline_data.n_export_indices()) /
+            static_cast<double>(offline_data.n_locally_relevant()),
+        static_cast<double>(offline_data.n_locally_internal()) /
+            static_cast<double>(offline_data.n_locally_relevant()),
+        static_cast<double>(offline_data.n_locally_owned()) /
+            static_cast<double>(offline_data.n_locally_relevant())};
 
-    } else {
+    const auto data =
+        Utilities::MPI::min_max_avg(values, mpi_communicator);
 
-      stream << std::endl << "MPI partition:" << std::endl << std::endl;
+    if (mpi_rank != 0)
+      return;
 
-      stream << "Number of MPI ranks: " << n_mpi_processes << std::endl;
-      stream << "Number of threads:   " << MultithreadInfo::n_threads()
-             << std::endl;
+    std::ostringstream output;
 
-      /* Print out the DoF distribution: */
+    unsigned int n = dealii::Utilities::needed_digits(n_mpi_processes);
 
-      const auto n_dofs = offline_data.dof_handler().n_dofs();
+    const auto print_snippet = [&output, n](const std::string &name,
+                                         const auto &values) {
+      output << name << ": ";
+      output << std::setw(9) << std::setprecision(0) << values.min //
+             << " [p" << std::setw(n) << values.min_index << "] "  //
+             << std::setw(9) << values.avg << " "                  //
+             << std::setw(9) << values.max                         //
+             << " [p" << std::setw(n) << values.max_index << "]";  //
+    };
 
-      stream << "Qdofs: " << n_dofs
-             << " global DoFs, local DoF distribution:" << std::endl;
+    output << std::endl << std::endl << "Partition:   ";
+    print_snippet("exp", data[0]);
 
+    output << std::endl << "             ";
+    print_snippet("int", data[1]);
 
-      for (unsigned int p = 0; p < n_mpi_processes; ++p) {
-        stream << "    Rank " << p << std::flush;
+    output << std::endl << "             ";
+    print_snippet("own", data[2]);
 
-        if (p != 0)
-          MPI_Recv(&dofs,
-                   4,
-                   MPI_UNSIGNED,
-                   p,
-                   0,
-                   mpi_communicator,
-                   MPI_STATUS_IGNORE);
+    output << std::endl << "             ";
+    print_snippet("rel", data[3]);
 
-        stream << ":\t(exp) " << dofs[0] << ",\t(int) " << dofs[1]
-               << ",\t(own) " << dofs[2] << ",\t(rel) " << dofs[3] << std::endl;
-      } /* p */
-    }   /* mpi_rank */
+    stream << output.str() << std::endl;
   }
 
 
   template <int dim, typename Number>
   void TimeLoop<dim, Number>::print_memory_statistics(std::ostream &stream)
   {
-    std::ostringstream output;
-
     Utilities::System::MemoryStats stats;
     Utilities::System::get_memory_stats(stats);
 
@@ -718,6 +723,8 @@ namespace ryujin
 
     if (mpi_rank != 0)
       return;
+
+    std::ostringstream output;
 
     unsigned int n = dealii::Utilities::needed_digits(n_mpi_processes);
 
