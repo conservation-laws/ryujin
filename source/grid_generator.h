@@ -345,6 +345,16 @@ namespace ryujin
         }
       }
     }
+
+    template <template <int, int> class Triangulation>
+    void step(Triangulation<3, 3> &,
+              const double,
+              const double,
+              const double,
+              const double)
+    {
+      AssertThrow(false, dealii::ExcNotImplemented());
+    }
 #endif
 
 
