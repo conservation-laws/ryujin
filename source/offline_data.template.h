@@ -527,7 +527,10 @@ namespace ryujin
 
     level_boundary_map_.resize(n_levels);
     level_lumped_mass_matrix_.resize(n_levels);
+
     for (unsigned int level = 0; level < n_levels; ++level) {
+      /* Assemble lumped mass matrix vector: */
+
       IndexSet relevant_dofs;
       dealii::DoFTools::extract_locally_relevant_level_dofs(
           dof_handler, level, relevant_dofs);
