@@ -360,9 +360,9 @@ namespace ryujin
 
     if (boundary_maps_.size() != 0) {
       /*
-       * Nota bene: This computes "m_i Sn_i", i.e., the result has to be
-       * divided by the lumped mass matrix (or multiplied with the inverse
-       * of the full mass matrix).
+       * Nota bene: This computes "m^\partial_i Sn_i", i.e., the result has
+       * to be divided by the lumped boundary mass matrix (or multiplied
+       * with the inverse of the full boundary mass matrix).
        */
 
       boundary_stress_ = 0.;
