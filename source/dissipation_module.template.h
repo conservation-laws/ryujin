@@ -739,7 +739,7 @@ namespace ryujin
       constexpr Number eps = std::numeric_limits<Number>::epsilon();
       AssertThrow(
           e_min_new >= e_min_old - 100. * eps,
-          dealii::ExcMessage("Specific entropy minimum principle violated."));
+          dealii::ExcMessage("Internal entropy minimum principle violated."));
 #endif
 
       LIKWID_MARKER_STOP("time_step_n_3");
