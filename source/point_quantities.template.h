@@ -377,12 +377,13 @@ namespace ryujin
           offline_data_->discretization().mapping(),
           offline_data_->dof_handler().get_fe(),
           quad,
-          update_values | update_JxW_values | update_normal_vectors);
+          update_values | update_gradients | update_JxW_values |
+              update_normal_vectors);
       std::array<Vector<Number>, dim> cell_rhs;
-      for (auto c : cell_rhs)
+      for (auto &c : cell_rhs)
         c.reinit(offline_data_->dof_handler().get_fe().dofs_per_cell);
       std::vector<Tensor<1, dim>> stresses(n_q_points);
-      std::vector<types::global_dof_index> dof_indices(cell_rhs.size());
+      std::vector<types::global_dof_index> dof_indices(cell_rhs[0].size());
 
       for (const auto &cell :
            offline_data_->dof_handler().active_cell_iterators())
