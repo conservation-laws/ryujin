@@ -134,9 +134,6 @@ namespace ryujin
         std::multimap<dealii::types::global_dof_index, boundary_description>>>
         boundary_maps_;
 
-    block_vector_type velocity_;
-    block_vector_type vorticity_;
-    block_vector_type boundary_stress_;
     scalar_type lumped_boundary_mass_;
 
     //@}
