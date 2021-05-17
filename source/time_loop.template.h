@@ -487,12 +487,8 @@ namespace ryujin
       Scope scope(computing_timer, "output vtu");
       print_info("scheduling output");
 
-      vtu_output.schedule_output(U,
-                                 name,
-                                 t,
-                                 cycle,
-                                 do_full_output,
-                                 do_levelsets);
+      vtu_output.schedule_output(
+          U, name, t, cycle, do_full_output, do_levelsets);
     }
 
     /* Checkpointing: */

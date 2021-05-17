@@ -140,7 +140,6 @@ namespace ryujin
     Number step(vector_type &U, Number t, Number tau = 0.);
 
   private:
-
     //@}
     /**
      * @name Internally used time-stepping primitives

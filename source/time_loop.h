@@ -12,8 +12,8 @@
 #include "euler_module.h"
 #include "initial_values.h"
 #include "offline_data.h"
-#include "quantities.h"
 #include "problem_description.h"
+#include "quantities.h"
 #include "vtu_output.h"
 
 #include <deal.II/base/parameter_acceptor.h>
