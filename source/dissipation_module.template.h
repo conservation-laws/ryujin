@@ -298,7 +298,7 @@ namespace ryujin
         if (i >= n_owned)
           continue;
 
-        const auto &[normal, id, position] = entry.second;
+        const auto &[normal, mass, id, position] = entry.second;
 
         if (id == Boundary::slip) {
           /* Remove normal component of velocity: */
@@ -594,7 +594,7 @@ namespace ryujin
         if (i >= n_owned)
           continue;
 
-        const auto &[normal, id, position] = entry.second;
+        const auto &[normal, mass, id, position] = entry.second;
 
         if (id == Boundary::dirichlet) {
           /* Prescribe internal energy: */

@@ -604,13 +604,15 @@ namespace ryujin
 
     for (auto cell = begin; cell != end; ++cell) {
 
-      // TODO: This is a workaround: If DEAL_II_WITH_TRIILNOS is enabled
-      // and we have a locally refined mesh we have to communicate the
-      // ghost layer stored in the boundary map with all neighboring nodes.
-      //
-      // As a cheap workaround let's simply use the assembly over all
-      // non-artificial cells at the moment. This breaks when we work with
-      // locally refined meshes.
+      /*
+       * TODO: This is a workaround: If DEAL_II_WITH_TRIILNOS is enabled
+       * and we have a locally refined mesh we have to communicate the
+       * ghost layer stored in the boundary map with all neighboring nodes.
+       *
+       * As a cheap workaround let's simply use the assembly over all
+       * non-artificial cells at the moment. This breaks when we work with
+       * locally refined meshes.
+       */
 #if defined(DEAL_II_WITH_TRILINOS) && false
       if (!cell->is_locally_owned_on_level())
         continue;
@@ -652,10 +654,18 @@ namespace ryujin
           if (!discretization_->finite_element().has_support_on_face(j, f))
             continue;
 
+          Number mass = 0.;
           dealii::Tensor<1, dim, Number> normal;
-          for (unsigned int q = 0; q < n_face_q_points; ++q)
+
+          for (unsigned int q = 0; q < n_face_q_points; ++q) {
+            /*
+             * We currently do not use this specific definition of a lumped
+             * boundary mass value...
+             */
+            mass += fe_face_values.shape_value(j, q);
             normal += fe_face_values.normal_vector(q) *
                       fe_face_values.shape_value(j, q);
+          }
 
           const auto global_index = local_dof_indices[j];
           const auto index = partitioner.global_to_local(global_index);
@@ -664,7 +674,7 @@ namespace ryujin
               discretization_->mapping().transform_unit_to_real_cell(
                   cell, support_points[j]);
 
-          preliminary_map.insert({index, {normal, id, position}});
+          preliminary_map.insert({index, {normal, mass, id, position}});
         } /* j */
       }   /* f */
     }     /* cell */
@@ -684,16 +694,17 @@ namespace ryujin
       bool inserted = false;
       const auto range = filtered_map.equal_range(entry.first);
       for (auto it = range.first; it != range.second; ++it) {
-        const auto &[new_normal, new_b_id, new_point] = entry.second;
-        auto &[normal, b_id, point] = it->second;
+        const auto &[new_normal, new_mass, new_id, new_point] = entry.second;
+        auto &[normal, mass, id, point] = it->second;
 
-        if (b_id != new_b_id)
+        if (id != new_id)
           continue;
 
         Assert(point.distance(new_point) < 1.0e-16, dealii::ExcInternalError());
 
         if (normal * new_normal / normal.norm() / new_normal.norm() > 0.08) {
           /* Both normals describe an acute angle of 85 degrees or less. */
+          mass += new_mass;
           normal += new_normal;
           inserted = true;
         }
@@ -705,8 +716,12 @@ namespace ryujin
     /* Normalize all normal vectors: */
 
     for (auto &it : filtered_map) {
-      auto &[normal, id, _] = it.second;
-      normal /= (normal.norm() + std::numeric_limits<Number>::epsilon());
+      auto &[normal, mass, id, _] = it.second;
+      const auto new_mass =
+          normal.norm() + std::numeric_limits<Number>::epsilon();
+      /* Replace boundary mass with new definition: */
+      mass = new_mass;
+      normal /= new_mass;
     }
 
     return filtered_map;

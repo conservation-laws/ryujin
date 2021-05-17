@@ -254,7 +254,7 @@ namespace ryujin
         if (i >= n_owned)
           continue;
 
-        const auto &[normal_number, id, position] = entry.second;
+        const auto &[normal_number, mass, id, position] = entry.second;
         const dealii::Tensor<1, dim, Number> normal = normal_number;
 
         if (id == Boundary::slip) {
@@ -348,7 +348,7 @@ namespace ryujin
         if (i >= n_owned)
           continue;
 
-        const auto &[normal_number, id, position] = entry.second;
+        const auto &[normal_number, mass, id, position] = entry.second;
         const dealii::Tensor<1, dim, Number> normal = normal_number;
 
         if (id == Boundary::slip) {
@@ -640,7 +640,7 @@ namespace ryujin
         if (i >= n_owned)
           continue;
 
-        const auto &[normal, id, position] = entry.second;
+        const auto &[normal, mass, id, position] = entry.second;
         if (id == Boundary::dirichlet)
           dst.local_element(i) = src.local_element(i);
       }
@@ -708,7 +708,7 @@ namespace ryujin
         if (i >= n_owned)
           continue;
 
-        const auto &[normal, id, position] = entry.second;
+        const auto &[normal, mass, id, position] = entry.second;
         if (id == Boundary::dirichlet)
           vector.local_element(i) = 1.;
       }
