@@ -107,8 +107,6 @@ subsection H - VTUOutput
   set vorticity beta = 10
 end
 
-subsection I - IntegralQuantities
-end
 
 subsection I - PointQuantities
   set boundary manifolds = lower_boundary : y

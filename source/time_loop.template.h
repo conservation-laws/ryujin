@@ -52,10 +52,6 @@ namespace ryujin
                          problem_description,
                          offline_data,
                          "/I - PointQuantities")
-      , integral_quantities(mpi_communicator,
-                            problem_description,
-                            offline_data,
-                            "/I - IntegralQuantities")
       , mpi_rank(dealii::Utilities::MPI::this_mpi_process(mpi_communicator))
       , n_mpi_processes(
             dealii::Utilities::MPI::n_mpi_processes(mpi_communicator))
@@ -192,8 +188,6 @@ namespace ryujin
 
       discretization.prepare();
       prepare_compute_kernels();
-      if (enable_compute_quantities)
-        integral_quantities.prepare(base_name + "-integral_quantities.log");
 
       U.reinit(offline_data.vector_partitioner());
 
@@ -248,7 +242,6 @@ namespace ryujin
           Scope scope(computing_timer, "quantities of interest");
           point_quantities.compute(
               U, t, base_name + "-point_quantities", output_cycle);
-          integral_quantities.compute(U, t);
         }
         ++output_cycle;
       }

@@ -42,6 +42,7 @@ subsection A - TimeLoop
   set resume = false
 end
 
+
 subsection B - ProblemDescription
   set description = Navier Stokes
 
@@ -52,6 +53,7 @@ subsection B - ProblemDescription
   # Scaled thermal conductivity c_v^{-1} kappa
   set kappa       = 3.616e-5
 end
+
 
 subsection C - Discretization
   set geometry            = airfoil
@@ -75,6 +77,7 @@ subsection C - Discretization
   end
 end
 
+
 subsection E - InitialValues
   set configuration = uniform
   # 3.5deg angle of attack:
@@ -88,6 +91,7 @@ subsection E - InitialValues
   end
 end
 
+
 subsection F - EulerModule
   set cfl max            = 4.0
   set cfl update         = 3.9
@@ -98,12 +102,14 @@ subsection F - EulerModule
   set time step order    = 3
 end
 
+
 subsection G - DissipationModule
   set tolerance = 1e-14
   set tolerance linfty norm = false
 
   set shift     = 0
 end
+
 
 subsection H - VTUOutput
   set manifolds      =
@@ -114,8 +120,6 @@ subsection H - VTUOutput
   set vorticity beta = 10
 end
 
-subsection I - IntegralQuantities
-end
 
 subsection I - PointQuantities
   set boundary manifolds = airfoil : floor (x * x / 0.0266 + 36 * y * y / 0.0266)

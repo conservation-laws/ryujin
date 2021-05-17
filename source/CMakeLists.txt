@@ -17,7 +17,6 @@ add_executable(ryujin
   dissipation_module.cc
   euler_module.cc
   initial_values.cc
-  integral_quantities.cc
   limiter.cc
   main.cc
   offline_data.cc
@@ -48,7 +47,6 @@ if(PRECOMPILE_HEADERS AND NOT CMAKE_VERSION VERSION_LESS 3.16)
     indicator.h
     initial_state.h
     initial_values.h
-    integral_quantities.h
     introspection.h
     limiter.h
     local_index_handling.h
