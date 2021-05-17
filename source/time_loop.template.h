@@ -488,10 +488,7 @@ namespace ryujin
       Scope scope(computing_timer, "output vtu");
       print_info("scheduling output");
 
-      euler_module.compute_residual_mu();
-
       vtu_output.schedule_output(U,
-                                 euler_module.residual_mu(),
                                  name,
                                  t,
                                  cycle,

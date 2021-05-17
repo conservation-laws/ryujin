@@ -23,27 +23,27 @@ namespace ryujin
 #ifndef DOXYGEN
   template <>
   const std::array<std::string, 2> VTUOutput<1, double>::component_names{
-      {"schlieren", "residual_mu"}};
+      {"schlieren"}};
 
   template <>
   const std::array<std::string, 3> VTUOutput<2, double>::component_names{
-      {"schlieren", "vorticity", "residual_mu"}};
+      {"schlieren", "vorticity"}};
 
   template <>
   const std::array<std::string, 3> VTUOutput<3, double>::component_names{
-      {"schlieren", "vorticity", "residual_mu"}};
+      {"schlieren", "vorticity"}};
 
   template <>
   const std::array<std::string, 2> VTUOutput<1, float>::component_names{
-      {"schlieren", "residual_mu"}};
+      {"schlieren"}};
 
   template <>
   const std::array<std::string, 3> VTUOutput<2, float>::component_names{
-      {"schlieren", "vorticity", "residual_mu"}};
+      {"schlieren", "vorticity"}};
 
   template <>
   const std::array<std::string, 3> VTUOutput<3, float>::component_names{
-      {"schlieren", "vorticity", "residual_mu"}};
+      {"schlieren", "vorticity"}};
 #endif
 
 
@@ -99,7 +99,6 @@ namespace ryujin
 
   template <int dim, typename Number>
   void VTUOutput<dim, Number>::schedule_output(const vector_type &U,
-                                               const scalar_type &residual_mu,
                                                std::string name,
                                                Number t,
                                                unsigned int cycle,
@@ -219,7 +218,6 @@ namespace ryujin
         } else if constexpr (dim == 3) {
           quantities[1] = curl_v_i.norm() / m_i;
         }
-        quantities[n_quantities - 1] = residual_mu.local_element(i);
 
         r_i_max_on_subrange = std::max(r_i_max_on_subrange, quantities[0]);
         r_i_min_on_subrange = std::min(r_i_min_on_subrange, quantities[0]);

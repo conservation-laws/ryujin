@@ -105,14 +105,14 @@ namespace ryujin
     void prepare();
 
     /**
-     * Given a state vector @p U and a scalar vector @p alpha (as well as a
-     * file name prefix @p name, the current time @p t, and the current
-     * output cycle @p cycle) schedule a solution output.
+     * Given a state vector @p U and a file name prefix @p name, the
+     * current time @p t, and the current output cycle @p cycle) schedule a
+     * solution output.
      *
      * The function post-processes quantities synchronously, and (depending
      * on configuration options) schedules the write-out asynchronously
-     * onto a background worker thread. This implies that @p U and @p alpha
-     * can again be modified once schedule_output() returned.
+     * onto a background worker thread. This implies that @p U can again be
+     * modified once schedule_output() returned.
      *
      * The booleans @p output_full controls whether the full vector field
      * is written out. Correspondingly, @p output_cutplanes controls
@@ -122,7 +122,6 @@ namespace ryujin
      * The function requires MPI communication and is not reentrant.
      */
     void schedule_output(const vector_type &U,
-                         const scalar_type &alpha,
                          std::string name,
                          Number t,
                          unsigned int cycle,
