@@ -48,10 +48,10 @@ namespace ryujin
                            initial_values,
                            "/G - DissipationModule")
       , vtu_output(mpi_communicator, offline_data, "/H - VTUOutput")
-      , point_quantities(mpi_communicator,
-                         problem_description,
-                         offline_data,
-                         "/I - PointQuantities")
+      , quantities(mpi_communicator,
+                   problem_description,
+                   offline_data,
+                   "/I - PointQuantities")
       , mpi_rank(dealii::Utilities::MPI::this_mpi_process(mpi_communicator))
       , n_mpi_processes(
             dealii::Utilities::MPI::n_mpi_processes(mpi_communicator))
@@ -178,7 +178,7 @@ namespace ryujin
       euler_module.prepare();       // Storage: 3 * dim + 9 vectors
       dissipation_module.prepare(); // Storage: 2 * dim + 2 vectors
       vtu_output.prepare();         // Storage: dim + 5 vectors
-      point_quantities.prepare();   // Storage: 3 * dim + 1 vectors
+      quantities.prepare();         // Storage: 3 * dim + 1 vectors
       print_mpi_partition(logfile);
     };
 
@@ -240,8 +240,7 @@ namespace ryujin
         if (enable_compute_quantities &&
             (output_cycle % output_quantities_multiplier == 0)) {
           Scope scope(computing_timer, "quantities of interest");
-          point_quantities.compute(
-              U, t, base_name + "-point_quantities", output_cycle);
+          quantities.compute(U, t, base_name + "-quantities", output_cycle);
         }
         ++output_cycle;
       }

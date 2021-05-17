@@ -108,7 +108,7 @@ subsection H - VTUOutput
 end
 
 
-subsection I - PointQuantities
+subsection I - Quantities
   set boundary manifolds = lower_boundary : y
   set interior manifolds =
 end

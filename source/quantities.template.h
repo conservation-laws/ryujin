@@ -6,7 +6,7 @@
 #pragma once
 
 #include "openmp.h"
-#include "point_quantities.h"
+#include "quantities.h"
 #include "scope.h"
 #include "scratch_data.h"
 #include "simd.h"
@@ -33,11 +33,11 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  PointQuantities<dim, Number>::PointQuantities(
+  Quantities<dim, Number>::Quantities(
       const MPI_Comm &mpi_communicator,
       const ryujin::ProblemDescription &problem_description,
       const ryujin::OfflineData<dim, Number> &offline_data,
-      const std::string &subsection /*= "PointQuantities"*/)
+      const std::string &subsection /*= "Quantities"*/)
       : ParameterAcceptor(subsection)
       , mpi_communicator_(mpi_communicator)
       , problem_description_(&problem_description)
@@ -60,10 +60,10 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  void PointQuantities<dim, Number>::prepare()
+  void Quantities<dim, Number>::prepare()
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "PointQuantities<dim, Number>::prepare()" << std::endl;
+    std::cout << "Quantities<dim, Number>::prepare()" << std::endl;
 #endif
 
     IndexSet relevant_dofs;
@@ -211,13 +211,13 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  void PointQuantities<dim, Number>::compute(const vector_type &U,
-                                             const Number t,
-                                             std::string name,
-                                             unsigned int cycle)
+  void Quantities<dim, Number>::compute(const vector_type &U,
+                                        const Number t,
+                                        std::string name,
+                                        unsigned int cycle)
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "PointQuantities<dim, Number>::compute()" << std::endl;
+    std::cout << "Quantities<dim, Number>::compute()" << std::endl;
 #endif
 
     using VA = VectorizedArray<Number>;

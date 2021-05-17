@@ -24,13 +24,12 @@
 namespace ryujin
 {
   /**
-   * A postprocessor class to compute point values of quantities of
-   * interest.
+   * A postprocessor class for quantities of interest.
    *
    * @ingroup TimeLoop
    */
   template <int dim, typename Number = double>
-  class PointQuantities final : public dealii::ParameterAcceptor
+  class Quantities final : public dealii::ParameterAcceptor
   {
   public:
     /**
@@ -72,10 +71,10 @@ namespace ryujin
     /**
      * Constructor.
      */
-    PointQuantities(const MPI_Comm &mpi_communicator,
-                    const ryujin::ProblemDescription &problem_description,
-                    const ryujin::OfflineData<dim, Number> &offline_data,
-                    const std::string &subsection = "PointQuantities");
+    Quantities(const MPI_Comm &mpi_communicator,
+               const ryujin::ProblemDescription &problem_description,
+               const ryujin::OfflineData<dim, Number> &offline_data,
+               const std::string &subsection = "Quantities");
 
     /**
      * Prepare evaluation. A call to @ref prepare() allocates temporary

@@ -20,7 +20,7 @@ add_executable(ryujin
   limiter.cc
   main.cc
   offline_data.cc
-  point_quantities.cc
+  quantities.cc
   problem_description.cc
   riemann_solver.cc
   simd.cc
@@ -54,7 +54,7 @@ if(PRECOMPILE_HEADERS AND NOT CMAKE_VERSION VERSION_LESS 3.16)
     newton.h
     offline_data.h
     openmp.h
-    point_quantities.h
+    quantities.h
     problem_description.h
     riemann_solver.h
     scope.h

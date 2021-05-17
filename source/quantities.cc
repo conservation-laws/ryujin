@@ -3,11 +3,11 @@
 // Copyright (C) 2020 - 2021 by the ryujin authors
 //
 
-#include "point_quantities.template.h"
+#include "quantities.template.h"
 
 namespace ryujin
 {
   /* instantiations */
-  template class ryujin::PointQuantities<DIM, NUMBER>;
+  template class ryujin::Quantities<DIM, NUMBER>;
 
 } /* namespace ryujin */

@@ -377,7 +377,7 @@ subsection H - VTUOutput
 end
 
 
-subsection I - PointQuantities
+subsection I - Quantities
   # List of level set functions describing boundary. The description is used
   # to only output point values for boundary vertices belonging to a certain
   # level set.

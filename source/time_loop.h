@@ -12,7 +12,7 @@
 #include "euler_module.h"
 #include "initial_values.h"
 #include "offline_data.h"
-#include "point_quantities.h"
+#include "quantities.h"
 #include "problem_description.h"
 #include "vtu_output.h"
 
@@ -136,7 +136,7 @@ namespace ryujin
     ryujin::EulerModule<dim, Number> euler_module;
     ryujin::DissipationModule<dim, Number> dissipation_module;
     ryujin::VTUOutput<dim, Number> vtu_output;
-    ryujin::PointQuantities<dim, Number> point_quantities;
+    ryujin::Quantities<dim, Number> quantities;
 
     const unsigned int mpi_rank;
     const unsigned int n_mpi_processes;

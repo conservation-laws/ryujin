@@ -121,7 +121,7 @@ subsection H - VTUOutput
 end
 
 
-subsection I - PointQuantities
+subsection I - Quantities
   set boundary manifolds = airfoil : floor (x * x / 0.0266 + 36 * y * y / 0.0266)
   set interior manifolds =
 end
