@@ -47,15 +47,20 @@ namespace ryujin
                   interior_manifolds_,
                   "List of level set functions describing interior manifolds. "
                   "The description is used to only output point values for "
-                  "vertices belonging to a certain level set.");
+                  "vertices belonging to a certain level set. "
+                  "Format: '<name> : <level set formula> : <options> , [...] "
+                  "(options: integrate_time, integrate_space)");
 
-    boundary_manifolds_.push_back({"upper_boundary", "y - 1.0"});
-    boundary_manifolds_.push_back({"lower_boundary", "y"});
+    boundary_manifolds_.push_back(
+        {"upper_boundary", "y - 1.0", "integrate_time"});
+    boundary_manifolds_.push_back({"lower_boundary", "y", "integrate_time"});
     add_parameter("boundary manifolds",
                   boundary_manifolds_,
                   "List of level set functions describing boundary. The "
                   "description is used to only output point values for "
-                  "boundary vertices belonging to a certain level set.");
+                  "boundary vertices belonging to a certain level set. "
+                  "Format: '<name> : <level set formula> : <options> , [...] "
+                  "(options: integrate_time, integrate_space)");
   }
 
 
@@ -85,7 +90,7 @@ namespace ryujin
         boundary_manifolds_.end(),
         std::back_inserter(boundary_maps_),
         [this, n_owned](auto it) {
-          const auto &[name, expression] = it;
+          const auto &[name, expression, option] = it;
           FunctionParser<dim> level_set_function(expression);
 
           std::vector<boundary_point> map;
@@ -145,9 +150,10 @@ namespace ryujin
 
       if (Utilities::MPI::this_mpi_process(mpi_communicator_) == 0) {
 
-        std::ofstream output(base_name_ + "-" + description + "-points.log");
+        std::ofstream output(base_name_ + "-" + description + "-points.dat");
         output << std::scientific << std::setprecision(14);
 
+        output << "#" << std::endl;
         output << "# position\tnormal\tnormal mass\tboundary mass" << std::endl;
 
         unsigned int rank = 0;
@@ -165,6 +171,90 @@ namespace ryujin
 
 
   template <int dim, typename Number>
+  void Quantities<dim, Number>::accumulate_internal(
+      const vector_type &U,
+      const std::vector<boundary_point> &boundary_map,
+      std::vector<boundary_value> &val_new)
+  {
+    std::transform(
+        boundary_map.begin(),
+        boundary_map.end(),
+        val_new.begin(),
+        [&](auto point) -> boundary_value {
+          const auto &[i, n_i, nm_i, bm_i, id, x_i] = point;
+
+          const auto U_i = U.get_tensor(i);
+          const auto rho_i = problem_description_->density(U_i);
+          const auto m_i = problem_description_->momentum(U_i);
+          const auto v_i = m_i / rho_i;
+          const auto p_i = problem_description_->pressure(U_i);
+
+          // FIXME: acquire symmetric diffusion tensor s(U)
+          // from dissipation module
+          const auto S_i = dealii::Tensor<2, dim, Number>();
+          const auto tau_n_i = S_i * n_i;
+
+          if constexpr (dim == 1)
+            return {state_type{{rho_i, v_i[0], p_i}},
+                    state_type{{rho_i * rho_i, v_i[0] * v_i[0], p_i * p_i}},
+                    tau_n_i,
+                    p_i * n_i};
+          else if constexpr (dim == 2)
+            return {state_type{{rho_i, v_i[0], v_i[1], p_i}},
+                    state_type{{rho_i * rho_i,
+                                v_i[0] * v_i[0],
+                                v_i[1] * v_i[1],
+                                p_i * p_i}},
+                    tau_n_i,
+                    p_i * n_i};
+          else
+            return {state_type{{rho_i, v_i[0], v_i[1], v_i[2], p_i}},
+                    state_type{{rho_i * rho_i,
+                                v_i[0] * v_i[0],
+                                v_i[1] * v_i[1],
+                                v_i[2] * v_i[2],
+                                p_i * p_i}},
+                    tau_n_i,
+                    p_i * n_i};
+        });
+  }
+
+
+  template <int dim, typename Number>
+  void Quantities<dim, Number>::write_out_internal(
+      std::ostream &output,
+      const std::vector<boundary_value> &values,
+      const Number scale)
+  {
+    /*
+     * FIXME: This currently distributes boundary maps to all MPI ranks.
+     * This is unnecessarily wasteful. Ideally, we should do MPI IO with
+     * only MPI ranks participating who actually have boundary values.
+     */
+
+    const auto received =
+        Utilities::MPI::gather(mpi_communicator_, values);
+
+    if (Utilities::MPI::this_mpi_process(mpi_communicator_) == 0) {
+
+      output << "# primitive state (rho, u, p)\t2nd moments (rho^2, u_i^2, "
+                "p^2)\tboundary stress\tpressure normal"
+             << std::endl;
+
+      unsigned int rank = 0;
+      for (const auto &entries : received) {
+        output << "# rank " << rank++ << std::endl;
+        for (const auto &entry : entries) {
+          const auto &[state, state_square, tau_n, pn] = entry;
+          output << scale * state << "\t" << scale * state_square << "\t"
+                 << scale * tau_n << "\t" << scale * pn << std::endl;
+        } /*entry*/
+      }   /*entries*/
+    }
+  }
+
+
+  template <int dim, typename Number>
   void Quantities<dim, Number>::accumulate(const vector_type &U, const Number t)
   {
 #ifdef DEBUG_OUTPUT
@@ -172,55 +262,22 @@ namespace ryujin
 #endif
 
     for (std::size_t i = 0; i < boundary_maps_.size(); ++i) {
+
+      const auto options = std::get<2>(boundary_manifolds_[i]);
+
+      /* skip if we don't average in time: */
+      if(options.find("integrate_time") == std::string::npos)
+        continue;
+
       const auto boundary_map = std::get<1>(boundary_maps_[i]);
       auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
           boundary_statistics_[i];
 
+      std::swap(t_old, t_new);
+      std::swap(val_old, val_new);
+
       /* accumulate new values */
-
-      std::transform(boundary_map.begin(),
-                     boundary_map.end(),
-                     val_new.begin(),
-                     [&](auto point) -> boundary_value {
-                       const auto &[i, n_i, nm_i, bm_i, id, x_i] = point;
-
-                       const auto U_i = U.get_tensor(i);
-                       const auto rho_i = problem_description_->density(U_i);
-                       const auto m_i = problem_description_->momentum(U_i);
-                       const auto v_i = m_i / rho_i;
-                       const auto p_i = problem_description_->pressure(U_i);
-
-                       // FIXME: acquire symmetric diffusion tensor s(U)
-                       // from dissipation module
-                       const auto S_i = dealii::Tensor<2, dim, Number>();
-                       const auto tau_n_i = S_i * n_i;
-
-                       if constexpr (dim == 1)
-                         return {
-                             state_type{{rho_i, v_i[0], p_i}},
-                             state_type{
-                                 {rho_i * rho_i, v_i[0] * v_i[0], p_i * p_i}},
-                             tau_n_i,
-                             p_i * n_i};
-                       else if constexpr (dim == 2)
-                         return {state_type{{rho_i, v_i[0], v_i[1], p_i}},
-                                 state_type{{rho_i * rho_i,
-                                             v_i[0] * v_i[0],
-                                             v_i[1] * v_i[1],
-                                             p_i * p_i}},
-                                 tau_n_i,
-                                 p_i * n_i};
-                       else
-                         return {
-                             state_type{{rho_i, v_i[0], v_i[1], v_i[2], p_i}},
-                             state_type{{rho_i * rho_i,
-                                         v_i[0] * v_i[0],
-                                         v_i[1] * v_i[1],
-                                         v_i[2] * v_i[2],
-                                         p_i * p_i}},
-                             tau_n_i,
-                             p_i * n_i};
-                     });
+      accumulate_internal(U, boundary_map, val_new);
 
       if (RYUJIN_UNLIKELY(t_old == Number(0.) && t_new == Number(0.))) {
         /* We have not accumulated any statistics yet: */
@@ -245,11 +302,56 @@ namespace ryujin
         }
         t_sum += tau;
       }
-
-      std::swap(t_old, t_new);
-      std::swap(val_old, val_new);
     }
+  }
 
+
+  template <int dim, typename Number>
+  void Quantities<dim, Number>::write_out(const vector_type &U,
+                                          const Number t,
+                                          unsigned int cycle)
+  {
+#ifdef DEBUG_OUTPUT
+    std::cout << "Quantities<dim, Number>::write_out()" << std::endl;
+#endif
+
+    for (std::size_t i = 0; i < boundary_maps_.size(); ++i) {
+
+      const auto description = std::get<0>(boundary_manifolds_[i]);
+      const auto options = std::get<2>(boundary_manifolds_[i]);
+
+      if (options.find("integrate_time") == std::string::npos) {
+        /*
+         * We do not average in time, compute and write out instantaneous field:
+         */
+
+        const auto boundary_map = std::get<1>(boundary_maps_[i]);
+        auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
+            boundary_statistics_[i];
+        accumulate_internal(U, boundary_map, val_new);
+
+        std::string file_name = base_name_ + "-" + description + "-values-" +
+                                Utilities::to_string(cycle, 6) + ".dat";
+        std::ofstream output(file_name);
+
+        output << std::scientific << std::setprecision(14);
+        output << "# at t = " << t << std::endl;
+        write_out_internal(output, val_new, Number(1.));
+
+      } else {
+
+        std::string file_name = base_name_ + "-" + description + "-values.dat";
+        std::ofstream output(file_name);
+
+        auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
+            boundary_statistics_[i];
+
+        output << std::scientific << std::setprecision(14);
+        output << "# averaged from t = " << t_new - t_sum << " to " << t_new
+               << std::endl;
+        write_out_internal(output, val_sum, Number(1.) / t_sum);
+      }
+    }
   }
 
 } /* namespace ryujin */

@@ -51,7 +51,7 @@ namespace ryujin
       , quantities(mpi_communicator,
                    problem_description,
                    offline_data,
-                   "/I - PointQuantities")
+                   "/I - Quantities")
       , mpi_rank(dealii::Utilities::MPI::this_mpi_process(mpi_communicator))
       , n_mpi_processes(
             dealii::Utilities::MPI::n_mpi_processes(mpi_communicator))
@@ -226,7 +226,9 @@ namespace ryujin
 #ifdef DEBUG_OUTPUT
       std::cout << "\n\n###   cycle = " << cycle << "   ###\n\n" << std::endl;
 #endif
+
       /* Accumulate quantities of interest: */
+
       if (enable_compute_quantities) {
         Scope scope(computing_timer, "quantities of interest - accumulate");
         quantities.accumulate(U, t);
@@ -244,9 +246,8 @@ namespace ryujin
         }
         if (enable_compute_quantities &&
             (output_cycle % output_quantities_multiplier == 0)) {
-          Scope scope(computing_timer, "quantities of interest - output");
-          // FIXME
-          // quantities.compute(U, t, base_name + "-quantities", output_cycle);
+          Scope scope(computing_timer, "quantities of interest - write out");
+          quantities.write_out(U, t, output_cycle);
         }
         ++output_cycle;
       }

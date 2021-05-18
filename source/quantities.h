@@ -94,6 +94,11 @@ namespace ryujin
      */
     void accumulate(const vector_type &U, const Number t);
 
+    /**
+     * Write quantities of interest to designated output files.
+     */
+    void write_out(const vector_type &U, const Number t, unsigned int cycle);
+
     //@}
 
   private:
@@ -102,15 +107,18 @@ namespace ryujin
      */
     //@{
 
-    std::vector<std::tuple<std::string, std::string>> interior_manifolds_;
+    std::vector<std::tuple<std::string, std::string, std::string>>
+        interior_manifolds_;
 
-    std::vector<std::tuple<std::string, std::string>> boundary_manifolds_;
+    std::vector<std::tuple<std::string, std::string, std::string>>
+        boundary_manifolds_;
 
     //@}
     /**
      * @name Internal data
      */
     //@{
+
 
     const MPI_Comm &mpi_communicator_;
 
@@ -164,6 +172,22 @@ namespace ryujin
     std::vector<boundary_statistic> boundary_statistics_;
 
     std::string base_name_;
+
+    //@}
+    /**
+     * @name Internal methods
+     */
+    //@{
+
+    void accumulate_internal(
+        const vector_type &U,
+        const std::vector<boundary_point> &boundary_map,
+        std::vector<boundary_value> &new_val);
+
+
+    void write_out_internal(std::ostream &output,
+                            const std::vector<boundary_value> &values,
+                            const Number scale);
 
     //@}
   };
