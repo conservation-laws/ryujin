@@ -79,6 +79,9 @@ namespace ryujin
      * Create interior maps:
      */
 
+    // FIXME
+    AssertThrow(interior_manifolds_.empty(), dealii::ExcNotImplemented());
+
     const unsigned int n_owned = offline_data_->n_locally_owned();
 
     interior_maps_.clear();
@@ -155,12 +158,16 @@ namespace ryujin
                         entry.first)))
               continue;
 
-            const auto position = std::get<2>(entry.second);
+            const auto position = std::get<3>(entry.second);
             if (std::abs(level_set_function.value(position)) < 1.e-12)
               map.insert(entry);
           }
           return std::make_tuple(name, map);
         });
+
+    /*
+     *
+     */
   }
 
 

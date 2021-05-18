@@ -74,8 +74,8 @@ namespace ryujin
      * and position of the boundary degree of freedom.
      */
     using boundary_description = std::tuple<dealii::Tensor<1, dim, Number>,
-                                            dealii::types::boundary_id,
                                             Number,
+                                            dealii::types::boundary_id,
                                             dealii::Point<dim>>;
 
     /**

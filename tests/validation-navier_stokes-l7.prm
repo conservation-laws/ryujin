@@ -65,6 +65,3 @@ subsection G - DissipationModule
   set multigrid velocity    = false
   set multigrid energy      = false
 end
-
-subsection I - IntegralQuantities
-end

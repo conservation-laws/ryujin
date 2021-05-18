@@ -716,7 +716,7 @@ namespace ryujin
     /* Normalize all normal vectors: */
 
     for (auto &it : filtered_map) {
-      auto &[normal, mass, id, _] = it.second;
+      auto &[normal, mass, id, point] = it.second;
       const auto new_mass =
           normal.norm() + std::numeric_limits<Number>::epsilon();
       /* Replace boundary mass with new definition: */
