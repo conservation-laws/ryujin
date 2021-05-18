@@ -654,17 +654,15 @@ namespace ryujin
           if (!discretization_->finite_element().has_support_on_face(j, f))
             continue;
 
-          Number mass = 0.;
+          Number boundary_mass = 0.;
           dealii::Tensor<1, dim, Number> normal;
 
           for (unsigned int q = 0; q < n_face_q_points; ++q) {
-            /*
-             * We currently do not use this specific definition of a lumped
-             * boundary mass value...
-             */
-            mass += fe_face_values.shape_value(j, q);
-            normal += fe_face_values.normal_vector(q) *
-                      fe_face_values.shape_value(j, q);
+            const auto JxW = fe_face_values.JxW(q);
+            const auto phi_i = fe_face_values.shape_value(j, q);
+
+            boundary_mass += phi_i * JxW;
+            normal += phi_i * fe_face_values.normal_vector(q) * JxW;
           }
 
           const auto global_index = local_dof_indices[j];
@@ -674,7 +672,12 @@ namespace ryujin
               discretization_->mapping().transform_unit_to_real_cell(
                   cell, support_points[j]);
 
-          preliminary_map.insert({index, {normal, mass, id, position}});
+          /*
+           * Temporarily insert a (wrong) boundary mass value for the
+           * normal mass. We'll fix this later.
+           */
+          preliminary_map.insert(
+              {index, {normal, boundary_mass, boundary_mass, id, position}});
         } /* j */
       }   /* f */
     }     /* cell */
@@ -694,8 +697,12 @@ namespace ryujin
       bool inserted = false;
       const auto range = filtered_map.equal_range(entry.first);
       for (auto it = range.first; it != range.second; ++it) {
-        const auto &[new_normal, new_mass, new_id, new_point] = entry.second;
-        auto &[normal, mass, id, point] = it->second;
+        const auto &[new_normal,
+                     new_normal_mass,
+                     new_boundary_mass,
+                     new_id,
+                     new_point] = entry.second;
+        auto &[normal, normal_mass, boundary_mass, id, point] = it->second;
 
         if (id != new_id)
           continue;
@@ -704,8 +711,8 @@ namespace ryujin
 
         if (normal * new_normal / normal.norm() / new_normal.norm() > 0.08) {
           /* Both normals describe an acute angle of 85 degrees or less. */
-          mass += new_mass;
           normal += new_normal;
+          boundary_mass += new_boundary_mass;
           inserted = true;
         }
       }
@@ -716,12 +723,12 @@ namespace ryujin
     /* Normalize all normal vectors: */
 
     for (auto &it : filtered_map) {
-      auto &[normal, mass, id, point] = it.second;
-      const auto new_mass =
+      auto &[normal, normal_mass, boundary_mass, id, point] = it.second;
+      const auto new_normal_mass =
           normal.norm() + std::numeric_limits<Number>::epsilon();
       /* Replace boundary mass with new definition: */
-      mass = new_mass;
-      normal /= new_mass;
+      normal_mass = new_normal_mass;
+      normal /= new_normal_mass;
     }
 
     return filtered_map;

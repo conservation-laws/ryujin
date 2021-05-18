@@ -261,7 +261,8 @@ namespace ryujin
       if (i >= n_owned)
         continue;
 
-      const auto &[normal, mass, id, position] = entry.second;
+      const auto normal = std::get<0>(entry.second);
+      const auto id = std::get<3>(entry.second);
 
       if (id == Boundary::slip) {
         /* Remove normal component of velocity: */

@@ -190,7 +190,8 @@ namespace ryujin
 
         const auto range = boundary_map.equal_range(i);
         for (auto it = range.first; it != range.second; ++it) {
-          const auto [normal, mass, id, position] = it->second;
+          const auto normal = std::get<0>(it->second);
+          const auto id = std::get<3>(it->second);
           /* Remove normal components of the gradient on the boundary: */
           if (id == Boundary::slip || id == Boundary::no_slip) {
             grad_rho_i -= 1. * (grad_rho_i * normal) * normal;

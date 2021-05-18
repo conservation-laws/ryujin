@@ -80,7 +80,9 @@ namespace ryujin
      */
 
     // FIXME
-    AssertThrow(interior_manifolds_.empty(), dealii::ExcNotImplemented());
+    AssertThrow(interior_manifolds_.empty(),
+                dealii::ExcMessage("Not implemented. Output for interior "
+                                   "manifolds has not been written yet."));
 
     const unsigned int n_owned = offline_data_->n_locally_owned();
 
@@ -158,7 +160,7 @@ namespace ryujin
                         entry.first)))
               continue;
 
-            const auto position = std::get<3>(entry.second);
+            const auto position = std::get<4>(entry.second);
             if (std::abs(level_set_function.value(position)) < 1.e-12)
               map.insert(entry);
           }

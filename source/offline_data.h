@@ -70,13 +70,16 @@ namespace ryujin
     using vector_type = MultiComponentVector<Number, problem_dimension>;
 
     /**
-     * A tuple describing global dof index, boundary normal, boundary mass,
-     * and position of the boundary degree of freedom.
+     * A tuple describing global dof index, boundary normal, normal mass,
+     * boundary mass, boundary id, and position of the boundary degree of
+     * freedom.
      */
-    using boundary_description = std::tuple<dealii::Tensor<1, dim, Number>,
-                                            Number,
-                                            dealii::types::boundary_id,
-                                            dealii::Point<dim>>;
+    using boundary_description =
+        std::tuple<dealii::Tensor<1, dim, Number> /*normal*/,
+                   Number /*normal mass*/,
+                   Number /*boundary mass*/,
+                   dealii::types::boundary_id /*id*/,
+                   dealii::Point<dim>> /*position*/;
 
     /**
      * Constructor
