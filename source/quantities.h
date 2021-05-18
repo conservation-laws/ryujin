@@ -89,15 +89,10 @@ namespace ryujin
 
     /**
      * Takes a state vector @p U at time t (obtained at the end of a full
-     * Strang step) and a velocity vector @p velocity computed at time
-     * \f$t_(n+1/2)\f$ (@p t_interp) during the implicit parabolic step.
-     *
-     * The function requires MPI communication and is not reentrant.
+     * Strang step) and accumulates statistics for quantities of interests
+     * for all defined manifolds.
      */
-    void compute(const vector_type &U,
-                 const Number t,
-                 std::string name,
-                 unsigned int cycle);
+    void accumulate(const vector_type &U, const Number t);
 
     //@}
 
@@ -135,8 +130,40 @@ namespace ryujin
                    dealii::types::boundary_id /*id*/,
                    dealii::Point<dim>> /*position*/;
 
+    /**
+     * The boundary map.
+     */
     std::vector<std::tuple<std::string, std::vector<boundary_point>>>
         boundary_maps_;
+
+    /**
+     * A tutple describing boundary values we are interested in: the
+     * primitive state and its second moment, boundary stresses and normal
+     * pressure force.
+     */
+    using boundary_value =
+        std::tuple<state_type /* primitive state */,
+                   state_type /* primitive state second moment */,
+                   dealii::Tensor<1, dim, Number> /* tau_n */,
+                   dealii::Tensor<1, dim, Number> /* pn */>;
+
+    /**
+     * Tempoaral statistics we store for each boundary manifold.
+     */
+    using boundary_statistic =
+        std::tuple<std::vector<boundary_value> /* values old */,
+                   std::vector<boundary_value> /* values new */,
+                   std::vector<boundary_value> /* values sum */,
+                   Number /* t old */,
+                   Number /* t new */,
+                   Number /* t sum */>;
+
+    /**
+     * Associated statistics for The boundary map.
+     */
+    std::vector<boundary_statistic> boundary_statistics_;
+
+    std::string base_name_;
 
     //@}
   };

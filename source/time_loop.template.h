@@ -226,6 +226,11 @@ namespace ryujin
 #ifdef DEBUG_OUTPUT
       std::cout << "\n\n###   cycle = " << cycle << "   ###\n\n" << std::endl;
 #endif
+      /* Accumulate quantities of interest: */
+      if (enable_compute_quantities) {
+        Scope scope(computing_timer, "quantities of interest - accumulate");
+        quantities.accumulate(U, t);
+      }
 
       /* Perform output: */
 
@@ -239,8 +244,9 @@ namespace ryujin
         }
         if (enable_compute_quantities &&
             (output_cycle % output_quantities_multiplier == 0)) {
-          Scope scope(computing_timer, "quantities of interest");
-          quantities.compute(U, t, base_name + "-quantities", output_cycle);
+          Scope scope(computing_timer, "quantities of interest - output");
+          // FIXME
+          // quantities.compute(U, t, base_name + "-quantities", output_cycle);
         }
         ++output_cycle;
       }

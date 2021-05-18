@@ -66,6 +66,8 @@ namespace ryujin
     std::cout << "Quantities<dim, Number>::prepare()" << std::endl;
 #endif
 
+    base_name_ = name;
+
     // FIXME
     AssertThrow(interior_manifolds_.empty(),
                 dealii::ExcMessage("Not implemented. Output for interior "
@@ -74,7 +76,7 @@ namespace ryujin
     const unsigned int n_owned = offline_data_->n_locally_owned();
 
     /*
-     * Create boundary maps:
+     * Create boundary maps and allocate statistics vector:
      */
 
     boundary_maps_.clear();
@@ -112,6 +114,19 @@ namespace ryujin
           return std::make_tuple(name, map);
         });
 
+    boundary_statistics_.clear();
+    boundary_statistics_.resize(boundary_manifolds_.size());
+
+    for (std::size_t i = 0; i < boundary_maps_.size(); ++i) {
+      const auto n_entries = std::get<1>(boundary_maps_[i]).size();
+      auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
+          boundary_statistics_[i];
+      val_old.resize(n_entries);
+      val_new.resize(n_entries);
+      val_sum.resize(n_entries);
+      t_old = t_new = t_sum = 0.;
+    }
+
     /*
      * Output boundary maps:
      */
@@ -130,7 +145,7 @@ namespace ryujin
 
       if (Utilities::MPI::this_mpi_process(mpi_communicator_) == 0) {
 
-        std::ofstream output(name + "-" + description + "-points.log");
+        std::ofstream output(base_name_ + "-" + description + "-points.log");
         output << std::scientific << std::setprecision(14);
 
         output << "# position\tnormal\tnormal mass\tboundary mass" << std::endl;
@@ -146,20 +161,95 @@ namespace ryujin
         }   /*entries*/
       }
     }
-
-
   }
 
 
   template <int dim, typename Number>
-  void Quantities<dim, Number>::compute(const vector_type &U,
-                                        const Number t,
-                                        std::string name,
-                                        unsigned int cycle)
+  void Quantities<dim, Number>::accumulate(const vector_type &U, const Number t)
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "Quantities<dim, Number>::compute()" << std::endl;
+    std::cout << "Quantities<dim, Number>::accumulate()" << std::endl;
 #endif
+
+    for (std::size_t i = 0; i < boundary_maps_.size(); ++i) {
+      const auto boundary_map = std::get<1>(boundary_maps_[i]);
+      auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
+          boundary_statistics_[i];
+
+      /* accumulate new values */
+
+      std::transform(boundary_map.begin(),
+                     boundary_map.end(),
+                     val_new.begin(),
+                     [&](auto point) -> boundary_value {
+                       const auto &[i, n_i, nm_i, bm_i, id, x_i] = point;
+
+                       const auto U_i = U.get_tensor(i);
+                       const auto rho_i = problem_description_->density(U_i);
+                       const auto m_i = problem_description_->momentum(U_i);
+                       const auto v_i = m_i / rho_i;
+                       const auto p_i = problem_description_->pressure(U_i);
+
+                       // FIXME: acquire symmetric diffusion tensor s(U)
+                       // from dissipation module
+                       const auto S_i = dealii::Tensor<2, dim, Number>();
+                       const auto tau_n_i = S_i * n_i;
+
+                       if constexpr (dim == 1)
+                         return {
+                             state_type{{rho_i, v_i[0], p_i}},
+                             state_type{
+                                 {rho_i * rho_i, v_i[0] * v_i[0], p_i * p_i}},
+                             tau_n_i,
+                             p_i * n_i};
+                       else if constexpr (dim == 2)
+                         return {state_type{{rho_i, v_i[0], v_i[1], p_i}},
+                                 state_type{{rho_i * rho_i,
+                                             v_i[0] * v_i[0],
+                                             v_i[1] * v_i[1],
+                                             p_i * p_i}},
+                                 tau_n_i,
+                                 p_i * n_i};
+                       else
+                         return {
+                             state_type{{rho_i, v_i[0], v_i[1], v_i[2], p_i}},
+                             state_type{{rho_i * rho_i,
+                                         v_i[0] * v_i[0],
+                                         v_i[1] * v_i[1],
+                                         v_i[2] * v_i[2],
+                                         p_i * p_i}},
+                             tau_n_i,
+                             p_i * n_i};
+                     });
+
+      if (RYUJIN_UNLIKELY(t_old == Number(0.) && t_new == Number(0.))) {
+        /* We have not accumulated any statistics yet: */
+        t_old = t - 1.;
+        t_new = t;
+
+      } else {
+
+        t_new = t;
+        const Number tau = t_new - t_old;
+
+        for (std::size_t i = 0; i < val_sum.size(); ++i) {
+          /* sometimes I miss haskell's type classes... */
+          std::get<0>(val_sum[i]) += 0.5 * tau * std::get<0>(val_old[i]);
+          std::get<0>(val_sum[i]) += 0.5 * tau * std::get<0>(val_new[i]);
+          std::get<1>(val_sum[i]) += 0.5 * tau * std::get<1>(val_old[i]);
+          std::get<1>(val_sum[i]) += 0.5 * tau * std::get<1>(val_new[i]);
+          std::get<2>(val_sum[i]) += 0.5 * tau * std::get<2>(val_old[i]);
+          std::get<2>(val_sum[i]) += 0.5 * tau * std::get<2>(val_new[i]);
+          std::get<3>(val_sum[i]) += 0.5 * tau * std::get<3>(val_old[i]);
+          std::get<3>(val_sum[i]) += 0.5 * tau * std::get<3>(val_new[i]);
+        }
+        t_sum += tau;
+      }
+
+      std::swap(t_old, t_new);
+      std::swap(val_old, val_new);
+    }
+
   }
 
 } /* namespace ryujin */
