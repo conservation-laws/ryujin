@@ -137,7 +137,7 @@ namespace ryujin
 
         unsigned int rank = 0;
         for (const auto &entries : received) {
-          output << "# rank " << rank << std::endl;
+          output << "# rank " << rank++ << std::endl;
           for (const auto &entry : entries) {
             const auto &[index, n_i, nm_i, bm_i, id, x_i] = entry;
             output << x_i << "\t" << n_i << "\t" << nm_i << "\t" << bm_i

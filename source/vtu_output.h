@@ -81,7 +81,7 @@ namespace ryujin
     /**
      * The number of postprocessed quantities:
      */
-    static constexpr unsigned int n_quantities = (dim == 1) ? 2 : 3;
+    static constexpr unsigned int n_quantities = (dim == 1) ? 1 : 2;
 
     /**
      * An array of strings for all component names.

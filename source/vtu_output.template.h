@@ -22,27 +22,27 @@ namespace ryujin
 
 #ifndef DOXYGEN
   template <>
-  const std::array<std::string, 2> VTUOutput<1, double>::component_names{
+  const std::array<std::string, 1> VTUOutput<1, double>::component_names{
       {"schlieren"}};
 
   template <>
-  const std::array<std::string, 3> VTUOutput<2, double>::component_names{
+  const std::array<std::string, 2> VTUOutput<2, double>::component_names{
       {"schlieren", "vorticity"}};
 
   template <>
-  const std::array<std::string, 3> VTUOutput<3, double>::component_names{
+  const std::array<std::string, 2> VTUOutput<3, double>::component_names{
       {"schlieren", "vorticity"}};
 
   template <>
-  const std::array<std::string, 2> VTUOutput<1, float>::component_names{
+  const std::array<std::string, 1> VTUOutput<1, float>::component_names{
       {"schlieren"}};
 
   template <>
-  const std::array<std::string, 3> VTUOutput<2, float>::component_names{
+  const std::array<std::string, 2> VTUOutput<2, float>::component_names{
       {"schlieren", "vorticity"}};
 
   template <>
-  const std::array<std::string, 3> VTUOutput<3, float>::component_names{
+  const std::array<std::string, 2> VTUOutput<3, float>::component_names{
       {"schlieren", "vorticity"}};
 #endif
 
