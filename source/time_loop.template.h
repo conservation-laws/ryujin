@@ -178,7 +178,7 @@ namespace ryujin
       euler_module.prepare();       // Storage: 3 * dim + 9 vectors
       dissipation_module.prepare(); // Storage: 2 * dim + 2 vectors
       vtu_output.prepare();         // Storage: dim + 5 vectors
-      quantities.prepare();         // Storage: 3 * dim + 1 vectors
+      quantities.prepare(base_name + "-quantities"); // Storage: FIXME
       print_mpi_partition(logfile);
     };
 

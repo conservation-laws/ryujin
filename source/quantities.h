@@ -85,7 +85,7 @@ namespace ryujin
      *
      * The string parameter @ref name is used as base name for output files.
      */
-    void prepare();
+    void prepare(std::string name);
 
     /**
      * Takes a state vector @p U at time t (obtained at the end of a full
@@ -122,19 +122,21 @@ namespace ryujin
     dealii::SmartPointer<const ProblemDescription> problem_description_;
     dealii::SmartPointer<const OfflineData<dim, Number>> offline_data_;
 
-    std::vector<std::tuple<
-        std::string,
-        std::map<dealii::types::global_dof_index, dealii::Point<dim>>>>
-        interior_maps_;
+    /**
+     * A tuple describing (local) dof index, boundary normal, normal mass,
+     * boundary mass, boundary id, and position of the boundary degree of
+     * freedom.
+     */
+    using boundary_point =
+        std::tuple<dealii::types::global_dof_index /*local dof index*/,
+                   dealii::Tensor<1, dim, Number> /*normal*/,
+                   Number /*normal mass*/,
+                   Number /*boundary mass*/,
+                   dealii::types::boundary_id /*id*/,
+                   dealii::Point<dim>> /*position*/;
 
-    using boundary_description =
-        typename OfflineData<dim, Number>::boundary_description;
-    std::vector<std::tuple<
-        std::string,
-        std::multimap<dealii::types::global_dof_index, boundary_description>>>
+    std::vector<std::tuple<std::string, std::vector<boundary_point>>>
         boundary_maps_;
-
-    scalar_type lumped_boundary_mass_;
 
     //@}
   };

@@ -60,24 +60,11 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  void Quantities<dim, Number>::prepare()
+  void Quantities<dim, Number>::prepare(std::string name)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "Quantities<dim, Number>::prepare()" << std::endl;
 #endif
-
-    IndexSet relevant_dofs;
-    DoFTools::extract_locally_relevant_dofs(offline_data_->dof_handler(),
-                                            relevant_dofs);
-    const auto scalar_partitioner =
-        std::make_shared<Utilities::MPI::Partitioner>(
-            offline_data_->dof_handler().locally_owned_dofs(),
-            relevant_dofs,
-            offline_data_->dof_handler().get_communicator());
-
-    /*
-     * Create interior maps:
-     */
 
     // FIXME
     AssertThrow(interior_manifolds_.empty(),
@@ -85,54 +72,6 @@ namespace ryujin
                                    "manifolds has not been written yet."));
 
     const unsigned int n_owned = offline_data_->n_locally_owned();
-
-    interior_maps_.clear();
-    std::transform(
-        interior_manifolds_.begin(),
-        interior_manifolds_.end(),
-        std::back_inserter(interior_maps_),
-        [this, n_owned](auto it) {
-          const auto &[name, expression] = it;
-          FunctionParser<dim> level_set_function(expression);
-
-          std::map<types::global_dof_index, Point<dim>> map;
-
-          const auto &dof_handler = offline_data_->dof_handler();
-          const auto &scalar_partitioner = offline_data_->scalar_partitioner();
-
-          for (auto &cell : dof_handler.active_cell_iterators()) {
-
-            /* skip non-local cells */
-            if (!cell->is_locally_owned())
-              continue;
-
-            for (auto v : GeometryInfo<dim>::vertex_indices()) {
-
-              const auto position = cell->vertex(v);
-
-              /* only record points sufficiently close to the level set */
-              if (std::abs(level_set_function.value(position)) > 1.e-12)
-                continue;
-
-              const auto global_index = cell->vertex_dof_index(v, 0);
-              const auto index =
-                  scalar_partitioner->global_to_local(global_index);
-
-              /* skip nonlocal */
-              if (index >= n_owned)
-                continue;
-
-              /* skip constrained */
-              if (offline_data_->affine_constraints().is_constrained(
-                      offline_data_->scalar_partitioner()->local_to_global(
-                          index)))
-                continue;
-
-              map.insert({index, position});
-            }
-          }
-          return std::make_tuple(name, map);
-        });
 
     /*
      * Create boundary maps:
@@ -147,7 +86,7 @@ namespace ryujin
           const auto &[name, expression] = it;
           FunctionParser<dim> level_set_function(expression);
 
-          std::multimap<types::global_dof_index, boundary_description> map;
+          std::vector<boundary_point> map;
 
           for (const auto &entry : offline_data_->boundary_map()) {
             /* skip nonlocal */
@@ -160,16 +99,55 @@ namespace ryujin
                         entry.first)))
               continue;
 
-            const auto position = std::get<4>(entry.second);
+            const auto &[normal, normal_mass, boundary_mass, id, position] =
+                entry.second;
             if (std::abs(level_set_function.value(position)) < 1.e-12)
-              map.insert(entry);
+              map.push_back({entry.first,
+                             normal,
+                             normal_mass,
+                             boundary_mass,
+                             id,
+                             position});
           }
           return std::make_tuple(name, map);
         });
 
     /*
-     *
+     * Output boundary maps:
      */
+
+    for (const auto &it : boundary_maps_) {
+      const auto &[description, boundary_map] = it;
+
+      /*
+       * FIXME: This currently distributes boundary maps to all MPI ranks.
+       * This is unnecessarily wasteful. Ideally, we should do MPI IO with
+       * only MPI ranks participating who actually have boundary values.
+       */
+
+      const auto received =
+          Utilities::MPI::gather(mpi_communicator_, boundary_map);
+
+      if (Utilities::MPI::this_mpi_process(mpi_communicator_) == 0) {
+
+        std::ofstream output(name + "-" + description + "-points.log");
+        output << std::scientific << std::setprecision(14);
+
+        output << "# position\tnormal\tnormal mass\tboundary mass" << std::endl;
+
+        unsigned int rank = 0;
+        for (const auto &entries : received) {
+          output << "# rank " << rank << std::endl;
+          for (const auto &entry : entries) {
+            const auto &[index, n_i, nm_i, bm_i, id, x_i] = entry;
+            output << x_i << "\t" << n_i << "\t" << nm_i << "\t" << bm_i
+                   << std::endl;
+          } /*entry*/
+        }   /*entries*/
+      }
+    }
+
+
   }
 
 
