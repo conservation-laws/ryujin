@@ -72,7 +72,7 @@ namespace ryujin
     t_output = Number(0.);
     add_parameter(
         "output start time",
-        output_granularity,
+        t_output,
         "Postprocessing, computation of averages and output is postponed until "
         "the simulation time has reached the specified output start time");
 
@@ -243,15 +243,15 @@ namespace ryujin
 
       /* Perform output: */
 
-      if (t >= output_cycle * output_granularity && t >= t_output) {
-        if (write_output_files) {
+      if (t >= output_cycle * output_granularity) {
+        if (t >= t_output && write_output_files) {
           output(U, base_name + "-solution", t, output_cycle);
           if (enable_compute_error) {
             const auto analytic = initial_values.interpolate(t);
             output(analytic, base_name + "-analytic_solution", t, output_cycle);
           }
         }
-        if (enable_compute_quantities &&
+        if (t >= t_output && enable_compute_quantities &&
             (output_cycle % output_quantities_multiplier == 0)) {
           Scope scope(computing_timer,
                       "time step [P] X - write out quantities");
