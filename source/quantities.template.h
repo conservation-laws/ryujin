@@ -239,28 +239,28 @@ namespace ryujin
           return result;
         });
 
-      /* synchronize MPI ranks (MPI Barrier): */
+    /* synchronize MPI ranks (MPI Barrier): */
 
-      nm_sum = Utilities::MPI::sum(nm_sum, mpi_communicator_);
-      bm_sum = Utilities::MPI::sum(bm_sum, mpi_communicator_);
+    nm_sum = Utilities::MPI::sum(nm_sum, mpi_communicator_);
+    bm_sum = Utilities::MPI::sum(bm_sum, mpi_communicator_);
 
-      std::get<0>(spatial_average) =
-          Utilities::MPI::sum(std::get<0>(spatial_average), mpi_communicator_);
-      std::get<1>(spatial_average) =
-          Utilities::MPI::sum(std::get<1>(spatial_average), mpi_communicator_);
-      std::get<2>(spatial_average) =
-          Utilities::MPI::sum(std::get<2>(spatial_average), mpi_communicator_);
-      std::get<3>(spatial_average) =
-          Utilities::MPI::sum(std::get<3>(spatial_average), mpi_communicator_);
+    std::get<0>(spatial_average) =
+        Utilities::MPI::sum(std::get<0>(spatial_average), mpi_communicator_);
+    std::get<1>(spatial_average) =
+        Utilities::MPI::sum(std::get<1>(spatial_average), mpi_communicator_);
+    std::get<2>(spatial_average) =
+        Utilities::MPI::sum(std::get<2>(spatial_average), mpi_communicator_);
+    std::get<3>(spatial_average) =
+        Utilities::MPI::sum(std::get<3>(spatial_average), mpi_communicator_);
 
-      /* take average: */
+    /* take average: */
 
-      std::get<0>(spatial_average) /= bm_sum;
-      std::get<1>(spatial_average) /= bm_sum;
-      std::get<2>(spatial_average) /= nm_sum;
-      std::get<3>(spatial_average) /= nm_sum;
+    std::get<0>(spatial_average) /= bm_sum;
+    std::get<1>(spatial_average) /= bm_sum;
+    std::get<2>(spatial_average) /= nm_sum;
+    std::get<3>(spatial_average) /= nm_sum;
 
-      return spatial_average;
+    return spatial_average;
   }
 
 
@@ -276,8 +276,7 @@ namespace ryujin
      * only MPI ranks participating who actually have boundary values.
      */
 
-    const auto received =
-        Utilities::MPI::gather(mpi_communicator_, values);
+    const auto received = Utilities::MPI::gather(mpi_communicator_, values);
 
     if (Utilities::MPI::this_mpi_process(mpi_communicator_) == 0) {
 
@@ -349,7 +348,8 @@ namespace ryujin
 
       /* accumulate new values */
 
-      const auto spatial_average = accumulate_internal(U, boundary_map, val_new);
+      const auto spatial_average =
+          accumulate_internal(U, boundary_map, val_new);
 
       /* Average in time with trapezoidal rule: */
 
