@@ -1026,7 +1026,8 @@ namespace ryujin
 #endif
 
     Scope scope(computing_timer_,
-                "time step [E] X - apply boundary conditions");
+                "time step [E] " + std::to_string(5 + limiter_iter_) +
+                    " - apply boundary conditions");
 
     const auto &boundary_map = offline_data_->boundary_map();
     const unsigned int n_owned = offline_data_->n_locally_owned();

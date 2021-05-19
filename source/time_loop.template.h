@@ -230,7 +230,7 @@ namespace ryujin
       /* Accumulate quantities of interest: */
 
       if (enable_compute_quantities) {
-        Scope scope(computing_timer, "quantities of interest - accumulate");
+        Scope scope(computing_timer, "time step [P] X - accumulate quantities");
         quantities.accumulate(U, t);
       }
 
@@ -246,7 +246,8 @@ namespace ryujin
         }
         if (enable_compute_quantities &&
             (output_cycle % output_quantities_multiplier == 0)) {
-          Scope scope(computing_timer, "quantities of interest - write out");
+          Scope scope(computing_timer,
+                      "time step [P] X - write out quantities");
           quantities.write_out(U, t, output_cycle);
         }
         ++output_cycle;
@@ -483,7 +484,7 @@ namespace ryujin
 
     /* Wait for a previous thread to finish before scheduling a new one: */
     {
-      Scope scope(computing_timer, "output stall");
+      Scope scope(computing_timer, "time step [P] Y - output stall");
       print_info("waiting for previous output cycle to finish");
 
       vtu_output.wait();
@@ -491,7 +492,7 @@ namespace ryujin
 
     /* Data output: */
     if (do_full_output || do_levelsets) {
-      Scope scope(computing_timer, "output vtu");
+      Scope scope(computing_timer, "time step [P] Y - output vtu");
       print_info("scheduling output");
 
       vtu_output.schedule_output(
@@ -500,7 +501,7 @@ namespace ryujin
 
     /* Checkpointing: */
     if (do_checkpointing) {
-      Scope scope(computing_timer, "checkpointing");
+      Scope scope(computing_timer, "time step [P] Z - checkpointing");
       print_info("scheduling checkpointing");
 
       const auto id = discretization.triangulation().locally_owned_subdomain();
@@ -810,8 +811,12 @@ namespace ryujin
     equalize();
 
     jt = output.begin();
-    for (auto &it : computing_timer)
-      print_cpu_time(it.second, *jt++, it.first.find("time s") == 0);
+    bool compute_percentages = false;
+    for (auto &it : computing_timer) {
+      print_cpu_time(it.second, *jt++, compute_percentages);
+      if (it.first.find("time loop") == 0)
+        compute_percentages = true;
+    }
     equalize();
 
     if (mpi_rank != 0)
