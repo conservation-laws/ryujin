@@ -22,12 +22,13 @@
 subsection A - TimeLoop
   set basename                     = oat15a-3d
 
-  set enable output full           = true
+  set enable output full           = false
   set enable output levelsets      = true
   set enable checkpointing         = true
   set enable compute quantities    = true
 
-  set final time                   = 0.2000
+  set final time                   = 0.2200
+  set output start time            = 0.0200
   set output granularity           = 0.0001
 
   set refinement timepoints        = 0.0020
@@ -122,6 +123,5 @@ end
 
 
 subsection I - Quantities
-  set boundary manifolds = airfoil : floor (x * x / 0.0266 + 36 * y * y / 0.0266)
-  set interior manifolds =
+  set boundary manifolds = airfoil : floor (x * x / 0.0266 + 36 * y * y / 0.0266) : time_averaged space_averaged
 end
