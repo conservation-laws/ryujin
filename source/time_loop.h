@@ -102,6 +102,7 @@ namespace ryujin
     Number t_final;
     std::vector<Number> t_refinements;
 
+    Number t_output;
     Number output_granularity;
 
     bool enable_checkpointing;

@@ -69,6 +69,13 @@ namespace ryujin
                   "List of points in (simulation) time at which the mesh will "
                   "be globally refined");
 
+    t_output = Number(0.);
+    add_parameter(
+        "output start time",
+        output_granularity,
+        "Postprocessing, computation of averages and output is postponed until "
+        "the simulation time has reached the specified output start time");
+
     output_granularity = Number(0.01);
     add_parameter(
         "output granularity",
@@ -229,14 +236,14 @@ namespace ryujin
 
       /* Accumulate quantities of interest: */
 
-      if (enable_compute_quantities) {
+      if (enable_compute_quantities && t >= t_output) {
         Scope scope(computing_timer, "time step [P] X - accumulate quantities");
         quantities.accumulate(U, t);
       }
 
       /* Perform output: */
 
-      if (t >= output_cycle * output_granularity) {
+      if (t >= output_cycle * output_granularity && t >= t_output) {
         if (write_output_files) {
           output(U, base_name + "-solution", t, output_cycle);
           if (enable_compute_error) {
