@@ -12,6 +12,7 @@
 #include "simd.h"
 
 #include <deal.II/base/function_parser.h>
+#include <deal.II/base/mpi.templates.h>
 #include <deal.II/base/work_stream.h>
 #include <deal.II/dofs/dof_tools.h>
 
@@ -238,6 +239,22 @@ namespace ryujin
           return result;
         });
 
+      /* synchronize MPI ranks (MPI Barrier): */
+
+      nm_sum = Utilities::MPI::sum(nm_sum, mpi_communicator_);
+      bm_sum = Utilities::MPI::sum(bm_sum, mpi_communicator_);
+
+      std::get<0>(spatial_average) =
+          Utilities::MPI::sum(std::get<0>(spatial_average), mpi_communicator_);
+      std::get<1>(spatial_average) =
+          Utilities::MPI::sum(std::get<1>(spatial_average), mpi_communicator_);
+      std::get<2>(spatial_average) =
+          Utilities::MPI::sum(std::get<2>(spatial_average), mpi_communicator_);
+      std::get<3>(spatial_average) =
+          Utilities::MPI::sum(std::get<3>(spatial_average), mpi_communicator_);
+
+      /* take average: */
+
       std::get<0>(spatial_average) /= bm_sum;
       std::get<1>(spatial_average) /= bm_sum;
       std::get<2>(spatial_average) /= nm_sum;
@@ -380,8 +397,9 @@ namespace ryujin
       const auto description = std::get<0>(boundary_manifolds_[i]);
       const auto options = std::get<2>(boundary_manifolds_[i]);
 
+      /* Compute and output instantaneous field: */
+
       if (options.find("instantaneous") != std::string::npos) {
-        /* Compute and output instantaneous field: */
 
         const auto boundary_map = std::get<1>(boundary_maps_[i]);
         auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
@@ -406,8 +424,9 @@ namespace ryujin
         write_out_internal(output, val_new, Number(1.));
       }
 
+      /* Output time averaged field: */
+
       if (options.find("time_averaged") != std::string::npos) {
-        /* Output time averaged field: */
 
         std::string file_name =
             base_name_ + "-" + description + "-time_averaged.dat";
@@ -423,8 +442,9 @@ namespace ryujin
         write_out_internal(output, val_sum, Number(1.) / t_sum);
       }
 
+      /* Output space averaged field: */
+
       if (options.find("space_averaged") != std::string::npos) {
-        /* Output space averaged field: */
 
         auto &time_series = boundary_time_series_[i];
 
