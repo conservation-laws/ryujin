@@ -170,6 +170,8 @@ namespace ryujin
      * Associated statistics for The boundary map.
      */
     std::vector<boundary_statistic> boundary_statistics_;
+    std::vector<std::vector<std::tuple<Number, boundary_value>>>
+        boundary_time_series_;
 
     std::string base_name_;
 
@@ -179,15 +181,19 @@ namespace ryujin
      */
     //@{
 
-    void accumulate_internal(
-        const vector_type &U,
-        const std::vector<boundary_point> &boundary_map,
-        std::vector<boundary_value> &new_val);
-
+    boundary_value
+    accumulate_internal(const vector_type &U,
+                        const std::vector<boundary_point> &boundary_map,
+                        std::vector<boundary_value> &new_val);
 
     void write_out_internal(std::ostream &output,
                             const std::vector<boundary_value> &values,
                             const Number scale);
+
+    void write_out_time_series(
+        std::ostream &output,
+        const std::vector<std::tuple<Number, boundary_value>> &values,
+        bool append);
 
     //@}
   };
