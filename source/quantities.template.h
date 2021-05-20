@@ -74,6 +74,7 @@ namespace ryujin
 #endif
 
     base_name_ = name;
+    first_cycle_ = true;
 
     // FIXME
     AssertThrow(interior_manifolds_.empty(),
@@ -454,7 +455,8 @@ namespace ryujin
         std::ofstream output;
         output << std::scientific << std::setprecision(14);
 
-        if (cycle == 0) {
+        if (first_cycle_) {
+          first_cycle_ = false;
           output.open(file_name, std::ofstream::out | std::ofstream::trunc);
           write_out_time_series(output, time_series, /*append*/ false);
 

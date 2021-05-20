@@ -174,6 +174,7 @@ namespace ryujin
         boundary_time_series_;
 
     std::string base_name_;
+    bool first_cycle_;
 
     //@}
     /**
