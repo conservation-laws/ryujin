@@ -26,6 +26,7 @@
 #include <deal.II/matrix_free/matrix_free.h>
 #include <deal.II/multigrid/mg_smoother.h>
 #include <deal.II/multigrid/mg_transfer_matrix_free.h>
+#include <deal.II/multigrid/mg_transfer.templates.h>
 
 namespace ryujin
 {
