@@ -119,7 +119,7 @@ namespace ryujin
      * "normal configuration".
      */
 
-    const auto periodic_faces =
+    const auto &periodic_faces =
         discretization_->triangulation().get_periodic_face_map();
 
     for (const auto &[left, value] : periodic_faces) {
