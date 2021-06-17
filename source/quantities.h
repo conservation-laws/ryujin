@@ -145,7 +145,7 @@ namespace ryujin
         boundary_maps_;
 
     /**
-     * A tutple describing boundary values we are interested in: the
+     * A tuple describing boundary values we are interested in: the
      * primitive state and its second moment, boundary stresses and normal
      * pressure force.
      */
