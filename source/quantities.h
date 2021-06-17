@@ -142,7 +142,7 @@ namespace ryujin
      * The boundary map.
      */
     std::vector<std::tuple<std::string, std::vector<boundary_point>>>
-        boundary_maps_;
+        boundary_maps_; /* FIXME: convert to map */
 
     /**
      * A tuple describing boundary values we are interested in: the
@@ -156,7 +156,7 @@ namespace ryujin
                    dealii::Tensor<1, dim, Number> /* pn */>;
 
     /**
-     * Tempoaral statistics we store for each boundary manifold.
+     * Temporal statistics we store for each boundary manifold.
      */
     using boundary_statistic =
         std::tuple<std::vector<boundary_value> /* values old */,
@@ -172,6 +172,40 @@ namespace ryujin
     std::vector<boundary_statistic> boundary_statistics_;
     std::vector<std::vector<std::tuple<Number, boundary_value>>>
         boundary_time_series_;
+
+    /**
+     * A tuple describing (local) dof index, mass, and position of an
+     * interior degree of freedom.
+     */
+    using interior_point =
+        std::tuple<dealii::types::global_dof_index /*local dof index*/,
+                   Number /*mass*/,
+                   dealii::Point<dim>> /*position*/;
+
+    /**
+     * The interior map.
+     */
+    std::vector<std::tuple<std::string, std::vector<interior_point>>>
+        interior_maps_; /* FIXME: convert to map */
+
+    /**
+     * A tuple describing interior values we are interested in: the
+     * primitive state and its second moment.
+     */
+    using interior_value =
+        std::tuple<state_type /* primitive state */,
+                   state_type /* primitive state second moment */>;
+
+    /**
+     * Temporal statistics we store for each interior manifold.
+     */
+    using interior_statistic =
+        std::tuple<std::vector<interior_value> /* values old */,
+                   std::vector<interior_value> /* values new */,
+                   std::vector<interior_value> /* values sum */,
+                   Number /* t old */,
+                   Number /* t new */,
+                   Number /* t sum */>;
 
     std::string base_name_;
     bool first_cycle_;
