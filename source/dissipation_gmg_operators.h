@@ -20,6 +20,12 @@
 
 #include <atomic>
 
+#if DEAL_II_VERSION_GTE(9, 3, 0)
+#define LOCAL_SIZE locally_owned_size
+#else
+#define LOCAL_SIZE local_size
+#endif
+
 namespace ryujin
 {
   /**
@@ -61,7 +67,7 @@ namespace ryujin
       diagonal.reinit(density, true);
 
       DEAL_II_OPENMP_SIMD_PRAGMA
-      for (unsigned int i = 0; i < density.get_partitioner()->local_size();
+      for (unsigned int i = 0; i < density.get_partitioner()->LOCAL_SIZE();
            ++i) {
         diagonal.local_element(i) =
             Number(1.0) /
@@ -98,7 +104,7 @@ namespace ryujin
     {
       AssertDimension(diagonal_block.size(), 0);
       DEAL_II_OPENMP_SIMD_PRAGMA
-      for (unsigned int i = 0; i < diagonal.get_partitioner()->local_size();
+      for (unsigned int i = 0; i < diagonal.get_partitioner()->LOCAL_SIZE();
            ++i)
         dst.local_element(i) = diagonal.local_element(i) * src.local_element(i);
     }
@@ -112,7 +118,7 @@ namespace ryujin
       AssertDimension(dim, src.n_blocks());
       if (diagonal_block.size() == 0) {
         DEAL_II_OPENMP_SIMD_PRAGMA
-        for (unsigned int i = 0; i < diagonal.get_partitioner()->local_size();
+        for (unsigned int i = 0; i < diagonal.get_partitioner()->LOCAL_SIZE();
              ++i)
           for (unsigned int d = 0; d < dim; ++d)
             dst.block(d).local_element(i) =
@@ -121,7 +127,7 @@ namespace ryujin
         for (unsigned int d = 0; d < dim; ++d) {
           DEAL_II_OPENMP_SIMD_PRAGMA
           for (unsigned int i = 0;
-               i < src.block(d).get_partitioner()->local_size();
+               i < src.block(d).get_partitioner()->LOCAL_SIZE();
                ++i)
             dst.block(d).local_element(i) =
                 diagonal_block.block(d).local_element(i) *
@@ -193,7 +199,7 @@ namespace ryujin
         lumped_mass_matrix = &offline_data_->level_lumped_mass_matrix()[level_];
 
       const unsigned int n_owned =
-          lumped_mass_matrix->get_partitioner()->local_size();
+          lumped_mass_matrix->get_partitioner()->LOCAL_SIZE();
       const unsigned int size_regular = n_owned / simd_length * simd_length;
 
       RYUJIN_PARALLEL_REGION_BEGIN
@@ -326,7 +332,7 @@ namespace ryujin
           /* zero destination */ true);
 
       const unsigned int n_owned =
-          lumped_mass_matrix.get_partitioner()->local_size();
+          lumped_mass_matrix.get_partitioner()->LOCAL_SIZE();
 
       RYUJIN_PARALLEL_REGION_BEGIN
 
@@ -585,7 +591,7 @@ namespace ryujin
         lumped_mass_matrix = &offline_data_->level_lumped_mass_matrix()[level_];
 
       const unsigned int n_owned =
-          lumped_mass_matrix->get_partitioner()->local_size();
+          lumped_mass_matrix->get_partitioner()->LOCAL_SIZE();
       const unsigned int size_regular = n_owned / simd_length * simd_length;
 
       RYUJIN_PARALLEL_REGION_BEGIN
@@ -688,7 +694,7 @@ namespace ryujin
           /* zero destination */ true);
 
       const unsigned int n_owned =
-          lumped_mass_matrix.get_partitioner()->local_size();
+          lumped_mass_matrix.get_partitioner()->LOCAL_SIZE();
 
       RYUJIN_PARALLEL_REGION_BEGIN
 
@@ -775,3 +781,5 @@ namespace ryujin
         *level_matrix_free_;
   };
 } /* namespace ryujin */
+
+#undef LOCAL_SIZE

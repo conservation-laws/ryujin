@@ -11,6 +11,12 @@
 #include <deal.II/base/vectorization.h>
 #include <deal.II/lac/la_parallel_vector.h>
 
+#if DEAL_II_VERSION_GTE(9, 3, 0)
+#define LOCAL_SIZE locally_owned_size
+#else
+#define LOCAL_SIZE local_size
+#endif
+
 namespace ryujin
 {
   /**
@@ -215,11 +221,11 @@ namespace ryujin
   void MultiComponentVector<Number, n_comp, simd_length>::extract_component(
       scalar_type &scalar_vector, unsigned int component) const
   {
-    Assert(n_comp * scalar_vector.get_partitioner()->local_size() ==
-               this->get_partitioner()->local_size(),
+    Assert(n_comp * scalar_vector.get_partitioner()->LOCAL_SIZE() ==
+               this->get_partitioner()->LOCAL_SIZE(),
            dealii::ExcMessage("Called with a scalar_vector argument that has "
                               "incompatible local range."));
-    const auto local_size = scalar_vector.get_partitioner()->local_size();
+    const auto local_size = scalar_vector.get_partitioner()->LOCAL_SIZE();
     for (unsigned int i = 0; i < local_size; ++i)
       scalar_vector.local_element(i) =
           this->local_element(i * n_comp + component);
@@ -231,11 +237,11 @@ namespace ryujin
   void MultiComponentVector<Number, n_comp, simd_length>::insert_component(
       const scalar_type &scalar_vector, unsigned int component)
   {
-    Assert(n_comp * scalar_vector.get_partitioner()->local_size() ==
-               this->get_partitioner()->local_size(),
+    Assert(n_comp * scalar_vector.get_partitioner()->LOCAL_SIZE() ==
+               this->get_partitioner()->LOCAL_SIZE(),
            dealii::ExcMessage("Called with a scalar_vector argument that has "
                               "incompatible local range."));
-    const auto local_size = scalar_vector.get_partitioner()->local_size();
+    const auto local_size = scalar_vector.get_partitioner()->LOCAL_SIZE();
     for (unsigned int i = 0; i < local_size; ++i)
       this->local_element(i * n_comp + component) =
           scalar_vector.local_element(i);
@@ -319,3 +325,5 @@ namespace ryujin
 #endif
 
 } // namespace ryujin
+
+#undef LOCAL_SIZE
