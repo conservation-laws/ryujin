@@ -247,7 +247,7 @@ namespace ryujin
       Scope scope(computing_timer_, "time step [N] 0 - build velocities rhs");
 
       RYUJIN_PARALLEL_REGION_BEGIN
-      LIKWID_MARKER_START("time_step_0");
+      LIKWID_MARKER_START("time_step_n_0");
 
       RYUJIN_OMP_FOR
       for (unsigned int i = 0; i < size_regular; i += simd_length) {
@@ -406,7 +406,7 @@ namespace ryujin
                                          smoother_data);
       }
 
-      LIKWID_MARKER_STOP("time_step_0");
+      LIKWID_MARKER_STOP("time_step_n_0");
     }
 
 #ifdef CHECK_BOUNDS
@@ -759,7 +759,7 @@ namespace ryujin
       Scope scope(computing_timer_, "time step [N] 4 - write back vectors");
 
       RYUJIN_PARALLEL_REGION_BEGIN
-      LIKWID_MARKER_START("time_step_4");
+      LIKWID_MARKER_START("time_step_n_4");
 
       const unsigned int size_regular = n_owned / simd_length * simd_length;
 
@@ -820,7 +820,7 @@ namespace ryujin
 
       U.update_ghost_values();
 
-      LIKWID_MARKER_STOP("time_step_4");
+      LIKWID_MARKER_STOP("time_step_n_4");
     }
 
     CALLGRIND_STOP_INSTRUMENTATION
