@@ -205,6 +205,13 @@ namespace ryujin
                    Number /* t new */,
                    Number /* t sum */>;
 
+    /**
+     * Associated statistics for The interior map.
+     */
+    std::map<std::string, interior_statistic> interior_statistics_;
+    std::map<std::string, std::vector<std::tuple<Number, interior_value>>>
+        interior_time_series_;
+
     std::string base_name_;
     bool first_cycle_;
 
@@ -214,18 +221,32 @@ namespace ryujin
      */
     //@{
 
+    interior_value
+    accumulate_interior(const vector_type &U,
+                        const std::vector<interior_point> &interior_map,
+                        std::vector<interior_value> &new_val);
+
+    void write_out_interior(std::ostream &output,
+                            const std::vector<interior_value> &values,
+                            const Number scale);
+
     boundary_value
-    accumulate_internal(const vector_type &U,
+    accumulate_boundary(const vector_type &U,
                         const std::vector<boundary_point> &boundary_map,
                         std::vector<boundary_value> &new_val);
 
-    void write_out_internal(std::ostream &output,
+    void write_out_boundary(std::ostream &output,
                             const std::vector<boundary_value> &values,
                             const Number scale);
 
     void write_out_time_series(
         std::ostream &output,
         const std::vector<std::tuple<Number, boundary_value>> &values,
+        bool append);
+
+    void interior_write_out_time_series(
+        std::ostream &output,
+        const std::vector<std::tuple<Number, interior_value>> &values,
         bool append);
 
     //@}
