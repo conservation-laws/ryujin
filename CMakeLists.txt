@@ -28,8 +28,13 @@ project(ryujin CXX)
 # Set up compiler flags:
 #
 
-string(APPEND DEAL_II_CXX_FLAGS " -fopenmp")
-string(APPEND DEAL_II_LINKER_FLAGS " -fopenmp -Wl,-as-needed")
+if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
+  string(APPEND DEAL_II_CXX_FLAGS " -Xpreprocessor -fopenmp")
+  string(APPEND DEAL_II_LINKER_FLAGS " -Xpreprocessor -fopenmp")
+else()
+  string(APPEND DEAL_II_CXX_FLAGS " -fopenmp")
+  string(APPEND DEAL_II_LINKER_FLAGS " -fopenmp -Wl,-as-needed")
+endif()
 
 if(NOT ${DEAL_II_WITH_CXX17})
   string(APPEND DEAL_II_CXX_FLAGS " -std=c++17")
