@@ -141,8 +141,7 @@ namespace ryujin
     /**
      * The boundary map.
      */
-    std::vector<std::tuple<std::string, std::vector<boundary_point>>>
-        boundary_maps_; /* FIXME: convert to map */
+    std::map<std::string, std::vector<boundary_point>> boundary_maps_;
 
     /**
      * A tuple describing boundary values we are interested in: the
@@ -169,8 +168,8 @@ namespace ryujin
     /**
      * Associated statistics for The boundary map.
      */
-    std::vector<boundary_statistic> boundary_statistics_;
-    std::vector<std::vector<std::tuple<Number, boundary_value>>>
+    std::map<std::string, boundary_statistic> boundary_statistics_;
+    std::map<std::string, std::vector<std::tuple<Number, boundary_value>>>
         boundary_time_series_;
 
     /**
@@ -185,8 +184,7 @@ namespace ryujin
     /**
      * The interior map.
      */
-    std::vector<std::tuple<std::string, std::vector<interior_point>>>
-        interior_maps_; /* FIXME: convert to map */
+    std::map<std::string, std::vector<interior_point>> interior_maps_;
 
     /**
      * A tuple describing interior values we are interested in: the

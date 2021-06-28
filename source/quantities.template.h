@@ -85,13 +85,18 @@ namespace ryujin
 
     /*
      * Create boundary maps and allocate statistics vector:
+     *
+     * We want to loop over the boundary_map() once and populate the map
+     * object boundary_maps_. We have to create a vector of
+     * boundary_manifolds.size() that holds a std::vector<boundary_point>
+     * for each map entry.
      */
 
     boundary_maps_.clear();
     std::transform(
         boundary_manifolds_.begin(),
         boundary_manifolds_.end(),
-        std::back_inserter(boundary_maps_),
+        std::inserter(boundary_maps_, boundary_maps_.end()),
         [this, n_owned](auto it) {
           const auto &[name, expression, option] = it;
           FunctionParser<dim> level_set_function(expression);
@@ -119,16 +124,19 @@ namespace ryujin
                              id,
                              position});
           }
-          return std::make_tuple(name, map);
+          return std::make_pair(name, map);
         });
 
-    boundary_statistics_.clear();
-    boundary_statistics_.resize(boundary_manifolds_.size());
+    /*
+     * Clear statistics and time series:
+     */
 
-    for (std::size_t i = 0; i < boundary_maps_.size(); ++i) {
-      const auto n_entries = std::get<1>(boundary_maps_[i]).size();
+    boundary_statistics_.clear();
+
+    for (const auto &[name, boundary_map] : boundary_maps_) {
+      const auto n_entries = boundary_map.size();
       auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
-          boundary_statistics_[i];
+          boundary_statistics_[name];
       val_old.resize(n_entries);
       val_new.resize(n_entries);
       val_sum.resize(n_entries);
@@ -136,14 +144,12 @@ namespace ryujin
     }
 
     boundary_time_series_.clear();
-    boundary_time_series_.resize(boundary_manifolds_.size());
 
     /*
      * Output boundary maps:
      */
 
-    for (const auto &it : boundary_maps_) {
-      const auto &[description, boundary_map] = it;
+    for (const auto &[name, boundary_map] : boundary_maps_) {
 
       /*
        * FIXME: This currently distributes boundary maps to all MPI ranks.
@@ -156,7 +162,7 @@ namespace ryujin
 
       if (Utilities::MPI::this_mpi_process(mpi_communicator_) == 0) {
 
-        std::ofstream output(base_name_ + "-" + description + "-points.dat");
+        std::ofstream output(base_name_ + "-" + name + "-points.dat");
         output << std::scientific << std::setprecision(14);
 
         output << "#\n# position\tnormal\tnormal mass\tboundary mass\n";
@@ -331,18 +337,25 @@ namespace ryujin
     std::cout << "Quantities<dim, Number>::accumulate()" << std::endl;
 #endif
 
-    for (std::size_t i = 0; i < boundary_maps_.size(); ++i) {
+    for (const auto &[name, boundary_map] : boundary_maps_) {
 
-      const auto options = std::get<2>(boundary_manifolds_[i]);
+      /* Find the correct option string in boundary_manifolds_ (a vector) */
+      const auto it =
+          std::find_if(boundary_manifolds_.begin(),
+                       boundary_manifolds_.end(),
+                       [&, name = std::cref(name)](const auto &element) {
+                         return std::get<0>(element) == name.get();
+                       });
+      Assert(it != boundary_manifolds_.end(), dealii::ExcInternalError());
+      const auto options = std::get<2>(*it);
 
       /* skip if we don't average in space or time: */
       if (options.find("time_averaged") == std::string::npos &&
           options.find("space_averaged") == std::string::npos)
         continue;
 
-      const auto boundary_map = std::get<1>(boundary_maps_[i]);
       auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
-          boundary_statistics_[i];
+          boundary_statistics_[name];
 
       std::swap(t_old, t_new);
       std::swap(val_old, val_new);
@@ -379,7 +392,7 @@ namespace ryujin
       }
 
       /* Record average in space: */
-      boundary_time_series_[i].push_back({t, spatial_average});
+      boundary_time_series_[name].push_back({t, spatial_average});
     }
   }
 
@@ -393,18 +406,24 @@ namespace ryujin
     std::cout << "Quantities<dim, Number>::write_out()" << std::endl;
 #endif
 
-    for (std::size_t i = 0; i < boundary_maps_.size(); ++i) {
+    for (const auto &[name, boundary_map] : boundary_maps_) {
 
-      const auto description = std::get<0>(boundary_manifolds_[i]);
-      const auto options = std::get<2>(boundary_manifolds_[i]);
+      /* Find the correct option string in boundary_manifolds_ (a vector) */
+      const auto it =
+          std::find_if(boundary_manifolds_.begin(),
+                       boundary_manifolds_.end(),
+                       [&, name = std::cref(name)](const auto &element) {
+                         return std::get<0>(element) == name.get();
+                       });
+      Assert(it != boundary_manifolds_.end(), dealii::ExcInternalError());
+      const auto options = std::get<2>(*it);
 
       /* Compute and output instantaneous field: */
 
       if (options.find("instantaneous") != std::string::npos) {
 
-        const auto boundary_map = std::get<1>(boundary_maps_[i]);
         auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
-            boundary_statistics_[i];
+            boundary_statistics_[name];
 
         /* We have not computed any updated statistics yet: */
 
@@ -414,7 +433,7 @@ namespace ryujin
         else
           AssertThrow(t_new == t, dealii::ExcInternalError());
 
-        std::string file_name = base_name_ + "-" + description +
+        std::string file_name = base_name_ + "-" + name +
                                 "-instantaneous-" +
                                 Utilities::to_string(cycle, 6) + ".dat";
         std::ofstream output(file_name);
@@ -430,11 +449,11 @@ namespace ryujin
       if (options.find("time_averaged") != std::string::npos) {
 
         std::string file_name =
-            base_name_ + "-" + description + "-time_averaged.dat";
+            base_name_ + "-" + name + "-time_averaged.dat";
         std::ofstream output(file_name);
 
         auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
-            boundary_statistics_[i];
+            boundary_statistics_[name];
 
         output << std::scientific << std::setprecision(14);
         output << "# averaged from t = " << t_new - t_sum << " to t = " << t_new
@@ -447,10 +466,10 @@ namespace ryujin
 
       if (options.find("space_averaged") != std::string::npos) {
 
-        auto &time_series = boundary_time_series_[i];
+        auto &time_series = boundary_time_series_[name];
 
         std::string file_name =
-            base_name_ + "-" + description + "-space_averaged_time_series.dat";
+            base_name_ + "-" + name + "-space_averaged_time_series.dat";
 
         std::ofstream output;
         output << std::scientific << std::setprecision(14);
@@ -468,6 +487,7 @@ namespace ryujin
 
         time_series.clear();
       }
+
     } /* i */
   }
 
