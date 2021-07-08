@@ -34,8 +34,17 @@ namespace ryujin
                  T2 &t,
                  T3 &output_cycle)
   {
-    std::string name = base_name + "-checkpoint-" +
-                       dealii::Utilities::int_to_string(id, 4) + ".archive";
+    std::string number = dealii::Utilities::int_to_string(id, 5);
+
+    std::string directory = std::string("checkpoints/") + number.substr(0, 1) +
+                            "/" + number.substr(1, 1) + "/" +
+                            number.substr(2, 1) + "/" + number.substr(3, 1);
+
+    std::filesystem::create_directories(directory);
+
+    std::string name =
+        directory + "/" + base_name + "-checkpoint-" + number + ".archive";
+
     std::ifstream file(name, std::ios::binary);
 
     boost::archive::binary_iarchive ia(file);
@@ -65,8 +74,16 @@ namespace ryujin
                      const T2 t,
                      const T3 output_cycle)
   {
-    std::string name = base_name + "-checkpoint-" +
-                       dealii::Utilities::int_to_string(id, 4) + ".archive";
+    std::string number = dealii::Utilities::int_to_string(id, 5);
+
+    std::string directory = std::string("checkpoints/") + number.substr(0, 1) +
+                            "/" + number.substr(1, 1) + "/" +
+                            number.substr(2, 1) + "/" + number.substr(3, 1);
+
+    std::filesystem::create_directories(directory);
+
+    std::string name =
+        directory + "/" + base_name + "-checkpoint-" + number + ".archive";
 
     if (std::filesystem::exists(name))
       std::filesystem::rename(name, name + "~");
