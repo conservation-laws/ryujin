@@ -5,7 +5,10 @@
 
 #pragma once
 
+#include "offline_data.h"
+
 #include <deal.II/base/utilities.h>
+#include <deal.II/distributed/solution_transfer.h>
 
 #include <boost/archive/binary_iarchive.hpp>
 #include <boost/archive/binary_oarchive.hpp>
@@ -22,38 +25,74 @@ namespace ryujin
    * to locate correponding checkpoint files and will read in the saved
    * state @p U at saved time @p t with saved output cycle @p output_cycle.
    *
-   * @todo Some day, we should refactor this into a class and do something
-   * smarter...
-   *
    * @ingroup Miscellaneous
    */
-  template <typename T1, typename T2, typename T3>
-  void do_resume(const std::string &base_name,
-                 unsigned int id,
+  template <int dim, typename Number, typename T1>
+  void do_resume(const OfflineData<dim, Number> &offline_data,
+                 const std::string &base_name,
+                 const unsigned int id,
                  T1 &U,
-                 T2 &t,
-                 T3 &output_cycle)
+                 Number &t,
+                 unsigned int &output_cycle,
+                 const MPI_Comm &mpi_communicator)
   {
-    std::string number = dealii::Utilities::int_to_string(id, 5);
+    const auto &dof_handler = offline_data.dof_handler();
 
-    std::string directory = std::string("checkpoints/") + number.substr(0, 1) +
-                            "/" + number.substr(1, 1) + "/" +
-                            number.substr(2, 1) + "/" + number.substr(3, 1);
+    /* Create temporary scalar component vectors: */
 
-    std::filesystem::create_directories(directory);
+    const auto &scalar_partitioner = offline_data.scalar_partitioner();
+    static constexpr unsigned int problem_dimension =
+        ProblemDescription::problem_dimension<dim>;
 
-    std::string name =
-        directory + "/" + base_name + "-checkpoint-" + number + ".archive";
+    using scalar_type = typename OfflineData<dim, Number>::scalar_type;
+    std::array<scalar_type, problem_dimension> state_vector;
+    for (auto &it : state_vector) {
+      it.reinit(scalar_partitioner);
+    }
 
-    std::ifstream file(name, std::ios::binary);
+    /* Create SolutionTransfer object, attach state vector and deserialize: */
 
-    boost::archive::binary_iarchive ia(file);
-    ia >> t >> output_cycle;
+    dealii::parallel::distributed::SolutionTransfer<dim, scalar_type>
+        solution_transfer(dof_handler);
 
-    for (auto &it : U) {
-      ia >> it;
+    std::vector<scalar_type *> ptr_state;
+    std::transform(state_vector.begin(),
+                   state_vector.end(),
+                   std::back_inserter(ptr_state),
+                   [](auto &it) { return &it; });
+
+    solution_transfer.deserialize(ptr_state);
+
+    unsigned int d = 0;
+    for (auto &it : state_vector) {
+      U.insert_component(it, d++);
     }
     U.update_ghost_values();
+
+    /* Read in and broadcast metadata: */
+
+    std::string name = base_name + "-checkpoint";
+
+    if (id == 0) {
+      std::string meta = name + ".metadata";
+
+      std::ifstream file(meta, std::ios::binary);
+      boost::archive::binary_iarchive ia(file);
+      ia >> t >> output_cycle;
+    }
+
+    int ierr;
+    if constexpr (std::is_same_v<Number, double>)
+      ierr = MPI_Bcast(&t, 1, MPI_DOUBLE, 0, mpi_communicator);
+    else
+      ierr = MPI_Bcast(&t, 1, MPI_FLOAT, 0, mpi_communicator);
+    AssertThrowMPI(ierr);
+
+    ierr = MPI_Bcast(&output_cycle, 1, MPI_UNSIGNED, 0, mpi_communicator);
+    AssertThrowMPI(ierr);
+
+    ierr = MPI_Barrier(mpi_communicator);
+    AssertThrowMPI(ierr);
   }
 
 
@@ -67,32 +106,65 @@ namespace ryujin
    *
    * @ingroup Miscellaneous
    */
-  template <typename T1, typename T2, typename T3>
-  void do_checkpoint(const std::string &base_name,
-                     unsigned int id,
+  template <int dim, typename Number, typename T1>
+  void do_checkpoint(const OfflineData<dim, Number> &offline_data,
+                     const std::string &base_name,
+                     const unsigned int id,
                      const T1 &U,
-                     const T2 t,
-                     const T3 output_cycle)
+                     const Number t,
+                     const unsigned int output_cycle,
+                     const MPI_Comm &mpi_communicator)
   {
-    std::string number = dealii::Utilities::int_to_string(id, 5);
+    const auto &triangulation = offline_data.discretization().triangulation();
+    const auto &dof_handler = offline_data.dof_handler();
 
-    std::string directory = std::string("checkpoints/") + number.substr(0, 1) +
-                            "/" + number.substr(1, 1) + "/" +
-                            number.substr(2, 1) + "/" + number.substr(3, 1);
+    /* Copy state into scalar component vectors: */
 
-    std::filesystem::create_directories(directory);
+    const auto &scalar_partitioner = offline_data.scalar_partitioner();
+    static constexpr unsigned int problem_dimension =
+        ProblemDescription::problem_dimension<dim>;
 
-    std::string name =
-        directory + "/" + base_name + "-checkpoint-" + number + ".archive";
+    using scalar_type = typename OfflineData<dim, Number>::scalar_type;
+    std::array<scalar_type, problem_dimension> state_vector;
+    unsigned int d = 0;
+    for (auto &it : state_vector) {
+      it.reinit(scalar_partitioner);
+      U.extract_component(it, d++);
+    }
 
-    if (std::filesystem::exists(name))
-      std::filesystem::rename(name, name + "~");
+    /* Create SolutionTransfer object, attach state vector and write out: */
 
-    std::ofstream file(name, std::ios::binary | std::ios::trunc);
+    dealii::parallel::distributed::SolutionTransfer<dim, scalar_type>
+        solution_transfer(dof_handler);
 
-    boost::archive::binary_oarchive oa(file);
-    oa << t << output_cycle;
-    for (const auto &it : U)
-      oa << it;
+    std::vector<const scalar_type *> ptr_state;
+    std::transform(state_vector.begin(),
+                   state_vector.end(),
+                   std::back_inserter(ptr_state),
+                   [](auto &it) { return &it; });
+    solution_transfer.prepare_for_serialization(ptr_state);
+
+    std::string name = base_name + "-checkpoint";
+
+    if (id == 0) {
+      for (const std::string suffix :
+           {".mesh", ".mesh_fixed.data", ".mesh.info", ".metadata"})
+        if (std::filesystem::exists(name + suffix))
+          std::filesystem::rename(name + suffix, name + suffix + "~");
+    }
+
+    triangulation.save(name + ".mesh");
+
+    /* Metadata: */
+
+    if (id == 0) {
+      std::string meta = name + ".metadata";
+      std::ofstream file(meta, std::ios::binary | std::ios::trunc);
+      boost::archive::binary_oarchive oa(file);
+      oa << t << output_cycle;
+    }
+
+    const int ierr = MPI_Barrier(mpi_communicator);
+    AssertThrowMPI(ierr);
   }
 } // namespace ryujin

@@ -162,9 +162,6 @@ namespace ryujin
     std::cout << "TimeLoop<dim, Number>::run()" << std::endl;
 #endif
 
-    AssertThrow(!enable_checkpointing || !enable_compute_error,
-                ExcNotImplemented());
-
     const bool write_output_files =
         enable_checkpointing || enable_output_full || enable_output_levelsets;
 
@@ -193,19 +190,33 @@ namespace ryujin
       Scope scope(computing_timer, "(re)initialize data structures");
       print_info("initializing data structures");
 
-      discretization.prepare();
-      prepare_compute_kernels();
-
-      U.reinit(offline_data.vector_partitioner());
-
       if (resume) {
-        print_info("resuming interrupted computation");
+        print_info("resuming computation: recreating mesh");
+        discretization.refinement() = 0; /* do not refine */
+        discretization.prepare();
+        discretization.triangulation().load(base_name + "-checkpoint.mesh");
+
+        print_info("preparing compute kernels");
+        prepare_compute_kernels();
+
+        print_info("resuming computation: loading state vector");
+        U.reinit(offline_data.vector_partitioner());
         const auto id =
             discretization.triangulation().locally_owned_subdomain();
-        do_resume(base_name, id, U, t, output_cycle);
+        do_resume(
+            offline_data, base_name, id, U, t, output_cycle, mpi_communicator);
         t_initial = t;
+
       } else {
+
+        print_info("creating mesh");
+        discretization.prepare();
+
+        print_info("preparing compute kernels");
+        prepare_compute_kernels();
+
         print_info("interpolating initial values");
+        U.reinit(offline_data.vector_partitioner());
         U = initial_values.interpolate();
 #ifdef DEBUG
         /* Poison constrained degrees of freedom: */
@@ -512,7 +523,7 @@ namespace ryujin
       print_info("scheduling checkpointing");
 
       const auto id = discretization.triangulation().locally_owned_subdomain();
-      do_checkpoint(base_name, id, U, t, cycle);
+      do_checkpoint(offline_data, base_name, id, U, t, cycle, mpi_communicator);
     }
   }
 

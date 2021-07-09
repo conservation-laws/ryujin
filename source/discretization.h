@@ -176,6 +176,14 @@ namespace ryujin
     }
 
     /**
+     * Return a mutable reference to the refinement variable.
+     */
+    unsigned int &refinement()
+    {
+      return refinement_;
+    }
+
+    /**
      * Return a read-only const reference to the triangulation.
      */
     ACCESSOR_READ_ONLY(triangulation)
@@ -212,6 +220,7 @@ namespace ryujin
     double mesh_distortion_;
 
     unsigned int refinement_;
+
     bool repartitioning_;
 
     //@}
