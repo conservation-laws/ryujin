@@ -207,6 +207,13 @@ namespace ryujin
             offline_data, base_name, id, U, t, output_cycle, mpi_communicator);
         t_initial = t;
 
+        /* Remove outdated refinement timestamps: */
+        const auto new_end =
+            std::remove_if(t_refinements.begin(),
+                           t_refinements.end(),
+                           [&](const Number &t_ref) { return (t >= t_ref); });
+        t_refinements.erase(new_end, t_refinements.end());
+
       } else {
 
         print_info("creating mesh");
