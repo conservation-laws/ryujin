@@ -201,10 +201,8 @@ namespace ryujin
 
         print_info("resuming computation: loading state vector");
         U.reinit(offline_data.vector_partitioner());
-        const auto id =
-            discretization.triangulation().locally_owned_subdomain();
         do_resume(
-            offline_data, base_name, id, U, t, output_cycle, mpi_communicator);
+            offline_data, base_name, U, t, output_cycle, mpi_communicator);
         t_initial = t;
 
         /* Remove outdated refinement timestamps: */
@@ -529,8 +527,7 @@ namespace ryujin
       Scope scope(computing_timer, "time step [P] Z - checkpointing");
       print_info("scheduling checkpointing");
 
-      const auto id = discretization.triangulation().locally_owned_subdomain();
-      do_checkpoint(offline_data, base_name, id, U, t, cycle, mpi_communicator);
+      do_checkpoint(offline_data, base_name, U, t, cycle, mpi_communicator);
     }
   }
 

@@ -30,7 +30,6 @@ namespace ryujin
   template <int dim, typename Number, typename T1>
   void do_resume(const OfflineData<dim, Number> &offline_data,
                  const std::string &base_name,
-                 const unsigned int id,
                  T1 &U,
                  Number &t,
                  unsigned int &output_cycle,
@@ -73,7 +72,7 @@ namespace ryujin
 
     std::string name = base_name + "-checkpoint";
 
-    if (id == 0) {
+    if(dealii::Utilities::MPI::this_mpi_process(mpi_communicator) == 0) {
       std::string meta = name + ".metadata";
 
       std::ifstream file(meta, std::ios::binary);
@@ -109,7 +108,6 @@ namespace ryujin
   template <int dim, typename Number, typename T1>
   void do_checkpoint(const OfflineData<dim, Number> &offline_data,
                      const std::string &base_name,
-                     const unsigned int id,
                      const T1 &U,
                      const Number t,
                      const unsigned int output_cycle,
@@ -146,7 +144,7 @@ namespace ryujin
 
     std::string name = base_name + "-checkpoint";
 
-    if (id == 0) {
+    if(dealii::Utilities::MPI::this_mpi_process(mpi_communicator) == 0) {
       for (const std::string suffix :
            {".mesh", ".mesh_fixed.data", ".mesh.info", ".metadata"})
         if (std::filesystem::exists(name + suffix))
@@ -157,7 +155,7 @@ namespace ryujin
 
     /* Metadata: */
 
-    if (id == 0) {
+    if(dealii::Utilities::MPI::this_mpi_process(mpi_communicator) == 0) {
       std::string meta = name + ".metadata";
       std::ofstream file(meta, std::ios::binary | std::ios::trunc);
       boost::archive::binary_oarchive oa(file);
