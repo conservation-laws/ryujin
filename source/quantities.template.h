@@ -45,9 +45,6 @@ namespace ryujin
       , offline_data_(&offline_data)
   {
 
-    interior_manifolds_.push_back(
-        {"behind_disk", "x - 0.3", "time_averaged instantaneous"});
-
     add_parameter("interior manifolds",
                   interior_manifolds_,
                   "List of level set functions describing interior manifolds. "
@@ -56,10 +53,6 @@ namespace ryujin
                   "Format: '<name> : <level set formula> : <options> , [...] "
                   "(options: time_averaged, space_averaged, instantaneous)");
 
-    boundary_manifolds_.push_back(
-        {"upper_boundary", "y - 1.0", "time_averaged instantaneous"});
-    boundary_manifolds_.push_back(
-        {"lower_boundary", "y + 1.0", "time_averaged instantaneous"});
     add_parameter("boundary manifolds",
                   boundary_manifolds_,
                   "List of level set functions describing boundary. The "
