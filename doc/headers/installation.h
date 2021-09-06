@@ -32,12 +32,12 @@
  *   apt install cmake make g++ ninja-build git ca-certificates
  * @endcode
  *
- * <h4>For Ubuntu LTS:</h4>
+ * <h4>For Ubuntu LTS 20.04:</h4>
  *
- * In order to add the backports <a href="https://launchpad.net/~ginggs/+archive/ubuntu/deal.ii-9.2.0-backports">PPA</a>
+ * In order to add the backports <a href="https://launchpad.net/~ginggs/+archive/ubuntu/deal.ii-9.3.0-backports">PPA</a>
  * issue the following commands:
  * @code
- *   sudo add-apt-repository ppa:ginggs/deal.ii-9.2.0-backports
+ *   sudo add-apt-repository ppa:ginggs/deal.ii-9.3.0-backports
  *   sudo apt update
  *   sudo apt install libdeal.ii-dev
  * @endcode
