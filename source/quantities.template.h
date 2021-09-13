@@ -755,7 +755,7 @@ namespace ryujin
 
       if (options.find("time_averaged") != std::string::npos) {
 
-        std::string file_name = base_name_ + "-R" + name +
+        std::string file_name = base_name_ + name + "-R" +
                                 std::to_string(output_cycle_averages_) + "-" +
                                 "-time_averaged.dat";
         std::ofstream output(file_name);
@@ -851,9 +851,9 @@ namespace ryujin
 
       if (options.find("time_averaged") != std::string::npos) {
 
-        std::string file_name = base_name_ + "-R" +
-                                name + std::to_string(output_cycle_averages_) +
-                                "-" + "-time_averaged.dat";
+        std::string file_name = base_name_ + name + "-R" +
+                                std::to_string(output_cycle_averages_) + "-" +
+                                "-time_averaged.dat";
         std::ofstream output(file_name);
 
         auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
