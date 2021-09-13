@@ -43,6 +43,8 @@ namespace ryujin
       , mpi_communicator_(mpi_communicator)
       , problem_description_(&problem_description)
       , offline_data_(&offline_data)
+      , output_cycle_mesh_(0)
+      , output_cycle_averages_(0)
   {
 
     add_parameter("interior manifolds",
@@ -749,7 +751,9 @@ namespace ryujin
 
       if (options.find("time_averaged") != std::string::npos) {
 
-        std::string file_name = base_name_ + "-" + name + "-time_averaged.dat";
+        std::string file_name = base_name_ + "-R" +
+                                std::to_string(output_cycle_averages_) + "-" +
+                                name + "-time_averaged.dat";
         std::ofstream output(file_name);
 
         auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
@@ -760,6 +764,18 @@ namespace ryujin
                << std::endl;
 
         write_out_interior(output, val_sum, Number(1.) / t_sum);
+
+        interior_statistics_.clear();
+
+        for (const auto &[name, interior_map] : interior_maps_) {
+          const auto n_entries = interior_map.size();
+          auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
+              interior_statistics_[name];
+          val_old.resize(n_entries);
+          val_new.resize(n_entries);
+          val_sum.resize(n_entries);
+          t_old = t_new = t_sum = 0.;
+        }
       }
 
       /* Output space averaged field: */
@@ -831,7 +847,9 @@ namespace ryujin
 
       if (options.find("time_averaged") != std::string::npos) {
 
-        std::string file_name = base_name_ + "-" + name + "-time_averaged.dat";
+        std::string file_name = base_name_ + "-R" +
+                                std::to_string(output_cycle_averages_) + "-" +
+                                name + "-time_averaged.dat";
         std::ofstream output(file_name);
 
         auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
@@ -842,6 +860,18 @@ namespace ryujin
                << std::endl;
 
         write_out_boundary(output, val_sum, Number(1.) / t_sum);
+
+        boundary_statistics_.clear();
+
+        for (const auto &[name, boundary_map] : boundary_maps_) {
+          const auto n_entries = boundary_map.size();
+          auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
+              boundary_statistics_[name];
+          val_old.resize(n_entries);
+          val_new.resize(n_entries);
+          val_sum.resize(n_entries);
+          t_old = t_new = t_sum = 0.;
+        }
       }
 
       /* Output space averaged field: */
@@ -871,6 +901,8 @@ namespace ryujin
       }
 
     } /* i */
+
+    output_cycle_averages_++;
   }
 
 } /* namespace ryujin */

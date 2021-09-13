@@ -215,6 +215,9 @@ namespace ryujin
     std::string base_name_;
     bool first_cycle_;
 
+    unsigned int output_cycle_averages_;
+    unsigned_int_output_cycle_mesh_;
+
     //@}
     /**
      * @name Internal methods
