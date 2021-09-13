@@ -216,7 +216,6 @@ namespace ryujin
     bool first_cycle_;
 
     unsigned int output_cycle_averages_;
-    unsigned_int_output_cycle_mesh_;
 
     //@}
     /**

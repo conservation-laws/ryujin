@@ -43,7 +43,6 @@ namespace ryujin
       , mpi_communicator_(mpi_communicator)
       , problem_description_(&problem_description)
       , offline_data_(&offline_data)
-      , output_cycle_mesh_(0)
       , output_cycle_averages_(0)
   {
 
@@ -193,7 +192,9 @@ namespace ryujin
 
       if (Utilities::MPI::this_mpi_process(mpi_communicator_) == 0) {
 
-        std::ofstream output(base_name_ + "-" + name + "-points.dat");
+        std::ofstream output(base_name_ + "-" + name + "-R" +
+                             std::to_string(output_cycle_averages_) +
+                             "-points.dat");
         output << std::scientific << std::setprecision(14);
 
         output << "#\n# position\tinterior mass\n";
@@ -291,7 +292,10 @@ namespace ryujin
 
       if (Utilities::MPI::this_mpi_process(mpi_communicator_) == 0) {
 
-        std::ofstream output(base_name_ + "-" + name + "-points.dat");
+        std::ofstream output(base_name_ + "-" + name + "-R" +
+                             std::to_string(output_cycle_averages_) +
+                             "-points.dat");
+
         output << std::scientific << std::setprecision(14);
 
         output << "#\n# position\tnormal\tnormal mass\tboundary mass\n";
