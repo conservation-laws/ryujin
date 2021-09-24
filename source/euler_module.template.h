@@ -1074,9 +1074,9 @@ namespace ryujin
       if (restart_possible_)
         throw Restart();
       else if (dealii::Utilities::MPI::this_mpi_process(mpi_communicator_) == 0)
-        std::cout
-            << "[INFO] Insufficient CFL: Invariant domain violation detected"
-            << std::endl;
+        std::cout << "[INFO] Euler module: Insufficient CFL: Invariant domain "
+                     "violation detected"
+                  << std::endl;
     }
 
     /* Update the result and return tau_max: */
