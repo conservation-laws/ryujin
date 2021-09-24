@@ -142,7 +142,7 @@ namespace ryujin
     unsigned int channel = 10;
 
     /* A boolean signalling that a restart is necessary: */
-    bool restart = false;
+    std::atomic<bool> restart = false;
 
     /*
      * Step 0: Precompute f(U) and the entropies of U
@@ -1047,7 +1047,8 @@ namespace ryujin
     CALLGRIND_STOP_INSTRUMENTATION
 
     /* Do we have to restart? */
-    restart = Utilities::MPI::logical_or(restart, mpi_communicator_);
+    restart.store(
+        Utilities::MPI::logical_or(restart.load(), mpi_communicator_));
     if (restart) {
       /* Only issue a restart if adaptive CFL selection is enabled: */
       if (cfl_max_ > cfl_min_)
