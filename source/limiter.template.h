@@ -30,7 +30,7 @@ namespace ryujin
 
     constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
     constexpr ScalarNumber relax = ScalarNumber(1.) + 10. * eps;
-    constexpr ScalarNumber relaxbig = ScalarNumber(1.) + 1000. * eps;
+    constexpr ScalarNumber relaxbig = ScalarNumber(1.) + 3000. * eps;
 
     /*
      * First limit the density rho.

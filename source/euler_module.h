@@ -167,8 +167,6 @@ namespace ryujin
 
     Number cfl_min_;
     Number cfl_max_;
-    Number cfl_;
-    ACCESSOR_READ_ONLY(cfl)
 
     unsigned int time_step_order_;
     unsigned int limiter_iter_;
@@ -190,6 +188,11 @@ namespace ryujin
     dealii::SmartPointer<const ryujin::ProblemDescription> problem_description_;
     dealii::SmartPointer<const ryujin::InitialValues<dim, Number>>
         initial_values_;
+
+    Number cfl_;
+    ACCESSOR_READ_ONLY(cfl)
+
+    bool restart_possible_;
 
     unsigned int n_restarts_;
     ACCESSOR_READ_ONLY(n_restarts)

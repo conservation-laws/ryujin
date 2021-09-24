@@ -1071,8 +1071,7 @@ namespace ryujin
     restart.store(
         Utilities::MPI::logical_or(restart.load(), mpi_communicator_));
     if (restart) {
-      /* Only issue a restart if adaptive CFL selection is enabled: */
-      if (cfl_max_ > cfl_min_)
+      if (restart_possible_)
         throw Restart();
       else if (dealii::Utilities::MPI::this_mpi_process(mpi_communicator_) == 0)
         std::cout
@@ -1196,7 +1195,7 @@ namespace ryujin
     /* If single_step() throws, it doesn't update U, so no cleanup needed. */
 
     Number tau_1 = single_step(U, tau_0);
-    if (tau_1 < 0.9 * tau_0 && cfl_min_ != cfl_max_)
+    if (tau_1 < 0.9 * tau_0 && restart_possible_)
       throw Restart(); /* restart if tau_max differs by more than 10% */
 
     apply_boundary_conditions(U, t + tau_1);
@@ -1221,7 +1220,7 @@ namespace ryujin
       /* Step 1: U1 = U_old + tau * L(U_old) */
 
       Number tau_1 = single_step(U, tau_0);
-      if (tau_1 < 0.9 * tau_0 && cfl_min_ != cfl_max_)
+      if (tau_1 < 0.9 * tau_0 && restart_possible_)
         throw Restart(); /* restart if tau_max differs by more than 10% */
 
       apply_boundary_conditions(U, t + tau_1);
@@ -1231,7 +1230,7 @@ namespace ryujin
       /* Step 2: U2 = 1/2 U_old + 1/2 (U1 + tau L(U1)) */
 
       const Number tau_2 = single_step(U, tau_1);
-      if (tau_2 < 0.9 * tau_1 && cfl_min_ != cfl_max_)
+      if (tau_2 < 0.9 * tau_1 && restart_possible_)
         throw Restart(); /* restart if tau_max differs by more than 10% */
 
       U.sadd(Number(1. / 2.), Number(1. / 2.), temp_ssp_);
@@ -1263,7 +1262,7 @@ namespace ryujin
       /* Step 1: U1 = U_old + tau * L(U_old) at time t + tau_1 */
 
       Number tau_1 = single_step(U, tau_0);
-      if (tau_1 < 0.9 * tau_0 && cfl_min_ != cfl_max_)
+      if (tau_1 < 0.9 * tau_0 && restart_possible_)
         throw Restart(); /* restart if tau_max differs by more than 10% */
 
       apply_boundary_conditions(U, t + tau_1);
@@ -1273,7 +1272,7 @@ namespace ryujin
       /* Step 2: U2 = 3/4 U_old + 1/4 (U1 + tau L(U1)) at time t + 0.5 tau_1*/
 
       const Number tau_2 = single_step(U, tau_1);
-      if (tau_2 < 0.9 * tau_1 && cfl_min_ != cfl_max_)
+      if (tau_2 < 0.9 * tau_1 && restart_possible_)
         throw Restart(); /* restart if tau_max differs by more than 10% */
 
       U.sadd(Number(1. / 4.), Number(3. / 4.), temp_ssp_);
@@ -1282,7 +1281,7 @@ namespace ryujin
       /* Step 3: U_new = 1/3 U_old + 2/3 (U2 + tau L(U2)) at time t + tau_1 */
 
       const Number tau_3 = single_step(U, tau_1);
-      if (tau_3 < 0.9 * tau_1 && cfl_min_ != cfl_max_)
+      if (tau_3 < 0.9 * tau_1 && restart_possible_)
         throw Restart(); /* restart if tau_max differs by more than 10% */
 
       U.sadd(Number(2. / 3.), Number(1. / 3.), temp_ssp_);
@@ -1311,6 +1310,14 @@ namespace ryujin
         /* Opportunistically increase current cfl by 2%: */
         cfl_ = std::min(cfl_max_, 1.02 * cfl_);
 
+        /*
+         * Record whether a restart is possible at all:
+         *  - We must not be in a second stage of a Strang splitting (i.e.,
+         *    prescribed tau == 0.)
+         *  - The current update cfl_ must be larger than cfl_min_.
+         */
+        restart_possible_ = (tau == 0.) && (cfl_ > cfl_min_);
+
         switch (time_step_order_) {
         case 1:
           return euler_step(U, t, tau);
@@ -1325,12 +1332,9 @@ namespace ryujin
           __builtin_trap();
         }
       } catch (Restart &) {
-        AssertThrow(
-            cfl_ > 1.02 * cfl_min_,
-            ExcMessage("I'm sorry, Dave. I'm afraid I can't do that.\nFailed "
-                       "to recover from invariant domain violation."));
 
         /* Restart signalled, decrease CFL number by 20% and try again: */
+        Assert(cfl_ > cfl_min_, ExcInternalError());
         n_restarts_++;
         cfl_ = std::max(cfl_min_, 0.80 * cfl_);
       }
