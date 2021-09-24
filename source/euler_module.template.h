@@ -1154,8 +1154,13 @@ namespace ryujin
 #endif
 
     /* If single_step() throws, it doesn't update U, so no cleanup needed. */
+
     Number tau_1 = single_step(U, tau_0);
+    if (tau_1 < 0.9 * tau_0 && cfl_min_ != cfl_max_)
+      throw Restart(); /* restart if tau_max differs by more than 10% */
+
     apply_boundary_conditions(U, t + tau_1);
+
     return tau_1;
   }
 
@@ -1174,13 +1179,21 @@ namespace ryujin
       temp_ssp_ = U;
 
       /* Step 1: U1 = U_old + tau * L(U_old) */
+
       Number tau_1 = single_step(U, tau_0);
+      if (tau_1 < 0.9 * tau_0 && cfl_min_ != cfl_max_)
+        throw Restart(); /* restart if tau_max differs by more than 10% */
+
       apply_boundary_conditions(U, t + tau_1);
 
       tau_1 = (tau_0 == 0. ? tau_1 : tau_0);
 
       /* Step 2: U2 = 1/2 U_old + 1/2 (U1 + tau L(U1)) */
+
       const Number tau_2 = single_step(U, tau_1);
+      if (tau_2 < 0.9 * tau_1 && cfl_min_ != cfl_max_)
+        throw Restart(); /* restart if tau_max differs by more than 10% */
+
       U.sadd(Number(1. / 2.), Number(1. / 2.), temp_ssp_);
       apply_boundary_conditions(U, t + tau_1);
 
@@ -1210,6 +1223,9 @@ namespace ryujin
       /* Step 1: U1 = U_old + tau * L(U_old) at time t + tau_1 */
 
       Number tau_1 = single_step(U, tau_0);
+      if (tau_1 < 0.9 * tau_0 && cfl_min_ != cfl_max_)
+        throw Restart(); /* restart if tau_max differs by more than 10% */
+
       apply_boundary_conditions(U, t + tau_1);
 
       tau_1 = (tau_0 == 0. ? tau_1 : tau_0);
@@ -1217,12 +1233,18 @@ namespace ryujin
       /* Step 2: U2 = 3/4 U_old + 1/4 (U1 + tau L(U1)) at time t + 0.5 tau_1*/
 
       const Number tau_2 = single_step(U, tau_1);
+      if (tau_2 < 0.9 * tau_1 && cfl_min_ != cfl_max_)
+        throw Restart(); /* restart if tau_max differs by more than 10% */
+
       U.sadd(Number(1. / 4.), Number(3. / 4.), temp_ssp_);
       apply_boundary_conditions(U, t + 0.5 * tau_1);
 
       /* Step 3: U_new = 1/3 U_old + 2/3 (U2 + tau L(U2)) at time t + tau_1 */
 
       const Number tau_3 = single_step(U, tau_1);
+      if (tau_3 < 0.9 * tau_1 && cfl_min_ != cfl_max_)
+        throw Restart(); /* restart if tau_max differs by more than 10% */
+
       U.sadd(Number(2. / 3.), Number(1. / 3.), temp_ssp_);
       apply_boundary_conditions(U, t + tau_1);
 
