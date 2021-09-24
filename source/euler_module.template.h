@@ -841,24 +841,33 @@ namespace ryujin
           }
 
 #ifdef CHECK_BOUNDS
-          const auto rho_new = problem_description_->density(U_i_new);
-          const auto e_new = problem_description_->internal_energy(U_i_new);
-          const auto s_new = problem_description_->specific_entropy(U_i_new);
+          {
+            const auto rho_new = problem_description_->density(U_i_new);
+            const auto e_new = problem_description_->internal_energy(U_i_new);
+            const auto s_new = problem_description_->specific_entropy(U_i_new);
 
-          AssertThrowSIMD(
-              rho_new,
-              [](auto val) { return val > Number(0.); },
-              dealii::ExcMessage("Negative density."));
-
-          AssertThrowSIMD(
-              e_new,
-              [](auto val) { return val > Number(0.); },
-              dealii::ExcMessage("Negative internal energy."));
-
-          AssertThrowSIMD(
-              s_new,
-              [](auto val) { return val > Number(0.); },
-              dealii::ExcMessage("Negative specific entropy."));
+            const auto test =
+                dealii::compare_and_apply_mask<
+                    dealii::SIMDComparison::greater_than>(
+                    rho_new, Number(0.), Number(0.), Number(-1.)) +
+                dealii::compare_and_apply_mask<
+                    dealii::SIMDComparison::greater_than>(
+                    e_new, Number(0.), Number(0.), Number(-1.)) +
+                dealii::compare_and_apply_mask<
+                    dealii::SIMDComparison::greater_than>(
+                    s_new, Number(0.), Number(0.), Number(-1.));
+            if (!(test == Number(0.))) {
+#ifdef DEBUG_OUTPUT
+              std::cout << std::fixed << std::setprecision(16);
+              std::cout << "Bounds violation: Negative rho, e, s detected!"
+                        << std::endl;
+              std::cout << "rho: !!! " << rho_new << std::endl;
+              std::cout << "int: !!! " << e_new << std::endl;
+              std::cout << "ent: !!! " << s_new << std::endl << std::endl;
+#endif
+              restart = true;
+            }
+          }
 #endif
 
           temp_euler_.write_tensor(U_i_new, i);
@@ -937,25 +946,35 @@ namespace ryujin
           }
 
 #ifdef CHECK_BOUNDS
-          const auto rho_new = problem_description_->density(U_i_new);
-          const auto e_new = problem_description_->internal_energy(U_i_new);
-          const auto s_new = problem_description_->specific_entropy(U_i_new);
+          {
+            const auto rho_new = problem_description_->density(U_i_new);
+            const auto e_new = problem_description_->internal_energy(U_i_new);
+            const auto s_new = problem_description_->specific_entropy(U_i_new);
 
-          AssertThrowSIMD(
-              rho_new,
-              [](auto val) { return val > Number(0.); },
-              dealii::ExcMessage("Negative density."));
-
-          AssertThrowSIMD(
-              e_new,
-              [](auto val) { return val > Number(0.); },
-              dealii::ExcMessage("Negative internal energy."));
-
-          AssertThrowSIMD(
-              s_new,
-              [](auto val) { return val > Number(0.); },
-              dealii::ExcMessage("Negative specific entropy."));
+            const auto test =
+                dealii::compare_and_apply_mask<
+                    dealii::SIMDComparison::greater_than>(
+                    rho_new, VA(0.), VA(0.), VA(-1.)) +
+                dealii::compare_and_apply_mask<
+                    dealii::SIMDComparison::greater_than>(
+                    e_new, VA(0.), VA(0.), VA(-1.)) +
+                dealii::compare_and_apply_mask<
+                    dealii::SIMDComparison::greater_than>(
+                    s_new, VA(0.), VA(0.), VA(-1.));
+            if (!(test == VA(0.))) {
+#ifdef DEBUG_OUTPUT
+              std::cout << std::fixed << std::setprecision(16);
+              std::cout << "Bounds violation: Negative rho, e, s detected!"
+                        << std::endl;
+              std::cout << "rho: !!! " << rho_new << std::endl;
+              std::cout << "int: !!! " << e_new << std::endl;
+              std::cout << "ent: !!! " << s_new << std::endl << std::endl;
 #endif
+              restart = true;
+            }
+          }
+#endif
+
           temp_euler_.write_vectorized_tensor(U_i_new, i);
 
           /* Skip computating l_ij and updating p_ij in the last round */
