@@ -24,6 +24,15 @@
 
 namespace ryujin
 {
+
+  /**
+   * A class signalling a restart, thrown in EulerModule::single_step and
+   * caught at various places.
+   */
+  class Restart final
+  {
+  };
+
   /**
    * Explicit (strong stability preserving) time-stepping for the
    * compressible Euler equations described in ProblemDescription.

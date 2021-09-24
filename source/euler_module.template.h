@@ -19,10 +19,6 @@ namespace ryujin
 {
   using namespace dealii;
 
-  /* A struct signalling a restart, thrown in EulerModule::single_step. */
-  struct Restart {
-  };
-
   template <int dim, typename Number>
   EulerModule<dim, Number>::EulerModule(
       const MPI_Comm &mpi_communicator,
