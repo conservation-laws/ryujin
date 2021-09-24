@@ -94,7 +94,7 @@ end
 
 subsection F - EulerModule
   set cfl max            = 4.0
-  set cfl update         = 3.9
+  set cfl min            = 0.5
 
   set enforce noslip     = true
 

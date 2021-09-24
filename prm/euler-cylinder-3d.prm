@@ -70,8 +70,8 @@ end
 
 
 subsection F - EulerModule
-  set cfl max            = 1.0
-  set cfl update         = 0.9
+  set cfl max            = 0.9
+  set cfl min            = 0.9
 
   set limiter iterations = 2
   set time step order    = 3

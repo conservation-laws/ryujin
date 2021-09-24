@@ -301,8 +301,8 @@ subsection F - EulerModule
   # Maximal admissible relative CFL constant
   set cfl max            = 0.9
 
-  # relative CFL constant used for update
-  set cfl update         = 0.8
+  # Minimal admissible relative CFL constnat
+  set cfl min            = 0.9
 
   # Enforce no-slip boundary conditions. If set to false no-slip boundaries
   # will be treated as slip boundary conditions
