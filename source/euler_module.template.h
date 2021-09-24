@@ -1034,8 +1034,15 @@ namespace ryujin
 
     /* Do we have to restart? */
     restart = Utilities::MPI::logical_or(restart, mpi_communicator_);
-    if (restart)
-      throw Restart();
+    if (restart) {
+      /* Only issue a restart if adaptive CFL selection is enabled: */
+      if (cfl_max_ > cfl_min_)
+        throw Restart();
+      else if (dealii::Utilities::MPI::this_mpi_process(mpi_communicator_) == 0)
+        std::cout
+            << "[INFO] Insufficient CFL: Invariant domain violation detected"
+            << std::endl;
+    }
 
     /* Update the result and return tau_max: */
     U.swap(temp_euler_);
