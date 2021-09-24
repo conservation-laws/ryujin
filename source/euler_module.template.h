@@ -701,9 +701,13 @@ namespace ryujin
               *problem_description_, bounds, U_i_new, p_ij);
           lij_matrix_.write_entry(l_ij, i, col_idx);
 
-          /* Unsuccessful with current CFL -> restart */
-          if (!success)
+          /*
+           * Unsuccessful with current CFL: Force a restart if the degree
+           * of freedom is not located at the boundary:
+           */
+          if (!success && boundary_map.count(i) == 0) {
             restart = true;
+          }
         }
       } /* parallel non-vectorized loop */
 
@@ -1257,15 +1261,13 @@ namespace ryujin
         }
       } catch (Restart &) {
         AssertThrow(
-            cfl_ > cfl_min_,
+            cfl_ > 1.02 * cfl_min_,
             ExcMessage("I'm sorry, Dave. I'm afraid I can't do that. - Failed "
                        "to recover from invariant domain violation."));
 
         /* Restart signalled, decrease CFL number by 20% and try again: */
         n_restarts_++;
-
         cfl_ = std::max(cfl_min_, 0.80 * cfl_);
-
       }
     }
 

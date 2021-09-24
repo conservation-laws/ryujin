@@ -22,10 +22,15 @@ namespace ryujin
                                   const Number t_min /* = Number(0.) */,
                                   const Number t_max /* = Number(1.) */)
   {
+    bool success = true;
     Number t_r = t_max;
 
     if constexpr (limiter == Limiters::none)
-      return {t_r, true};
+      return {t_r, success};
+
+    constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
+    constexpr ScalarNumber relax = ScalarNumber(1.) + 10. * eps;
+    constexpr ScalarNumber relaxbig = ScalarNumber(1.) + 1000. * eps;
 
     /*
      * First limit the density rho.
@@ -40,7 +45,19 @@ namespace ryujin
       const auto &rho_min = std::get<0>(bounds);
       const auto &rho_max = std::get<1>(bounds);
 
-      constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
+      /*
+       * Verify that U_rho is within bounds. This property might be
+       * violated for relative CFL numbers larger than 1.
+       */
+      if (!((std::max(Number(0.), U_rho - relaxbig * rho_max) == Number(0.)) &&
+            (std::max(Number(0.), rho_min - relaxbig * U_rho) == Number(0.)))) {
+        // FIXME
+//         std::cout << std::fixed << std::setprecision(16);
+//         std::cout << "(crit) min: " << rho_min << std::endl;
+//         std::cout << "(crit) rho: " << U_rho << std::endl;
+//         std::cout << "(crit) max: " << rho_max << std::endl << std::endl;
+        success = false;
+      }
 
       const Number denominator =
           ScalarNumber(1.) / (std::abs(P_rho) + eps * rho_max);
@@ -64,16 +81,26 @@ namespace ryujin
       t_r = std::max(t_r, t_min);
 
 #ifdef CHECK_BOUNDS
-      const auto new_density = problem_description.density(U + t_r * P);
-      AssertThrowSIMD(
-          new_density,
-          [](auto val) { return val > 0.; },
-          dealii::ExcMessage("Negative density."));
+      /*
+       * Verify that the new state is within bounds:
+       */
+      const auto n_rho = problem_description.density(U + t_r * P);
+      if (!((std::max(Number(0.), n_rho - relaxbig * rho_max) == Number(0.)) &&
+            (std::max(Number(0.), rho_min - relaxbig * n_rho) == Number(0.)))) {
+#ifdef DEBUG_OUTPUT
+        std::cout << std::fixed << std::setprecision(16);
+        std::cout << "Density bounds violated:" << std::endl;
+        std::cout << "min: " << rho_min << std::endl;
+        std::cout << "rho: " << n_rho << std::endl;
+        std::cout << "max: " << rho_max << std::endl << std::endl;
+#endif
+        success = false;
+      }
 #endif
     }
 
     if constexpr (limiter == Limiters::rho)
-      return {t_r, true};
+      return {t_r, success};
 
     /*
      * Then limit the specific entropy:
@@ -85,9 +112,6 @@ namespace ryujin
 
     const ScalarNumber gamma = problem_description.gamma();
     const ScalarNumber gp1 = gamma + ScalarNumber(1.);
-    constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
-    /* relax the entropy inequalities by eps to counter roundoff errors */
-    constexpr ScalarNumber relaxation = ScalarNumber(1.) + 10. * eps;
 
     {
       /*
@@ -114,7 +138,7 @@ namespace ryujin
         const auto rho_r_gamma = ryujin::pow(rho_r, gamma);
         const auto rho_e_r = problem_description.internal_energy(U_r);
 
-        auto psi_r = relaxation * rho_r * rho_e_r - s_min * rho_r * rho_r_gamma;
+        auto psi_r = relax * rho_r * rho_e_r - s_min * rho_r * rho_r_gamma;
 
         /* If psi_r > 0 the right state is fine, force returning t_r by
          * setting t_l = t_r: */
@@ -130,7 +154,19 @@ namespace ryujin
         const auto rho_l_gamma = ryujin::pow(rho_l, gamma);
         const auto rho_e_l = problem_description.internal_energy(U_l);
 
-        auto psi_l = relaxation * rho_l * rho_e_l - s_min * rho_l * rho_l_gamma;
+        auto psi_l = relax * rho_l * rho_e_l - s_min * rho_l * rho_l_gamma;
+
+        /*
+         * Verify that the left state is within bounds. This property might
+         * be violated for relative CFL numbers larger than 1.
+         */
+        if (n == 0 &&
+            !(std::min(Number(0.), psi_l + 100. * eps) == Number(0.))) {
+          // FIXME
+//           std::cout << std::fixed << std::setprecision(16);
+//           std::cout << "(crit) Psi left: " << psi_l << std::endl;
+          success = false;
+        }
 
         /* Break if all psi_l values are within a prescribed tolerance: */
         if (std::max(Number(0.),
@@ -154,15 +190,6 @@ namespace ryujin
         const auto dpsi_r =
             rho_r * drho_e_r + (rho_e_r - gp1 * s_min * rho_r_gamma) * drho;
 
-#ifdef CHECK_BOUNDS
-        const auto psi = relaxation * relaxation * rho_l * rho_e_l -
-                         s_min * rho_l * rho_l_gamma;
-        AssertThrowSIMD(
-            psi,
-            [](auto val) { return val >= -100. * eps; },
-            dealii::ExcMessage("Specific entropy minimum principle violated."));
-#endif
-
         quadratic_newton_step(
             t_l, t_r, psi_l, psi_r, dpsi_l, dpsi_r, Number(-1.));
 
@@ -172,32 +199,35 @@ namespace ryujin
       }
 
 #ifdef CHECK_BOUNDS
-      const auto U_new = U + t_l * P;
-      const auto rho_new = problem_description.density(U_new);
-      const auto e_new = problem_description.internal_energy(U_new);
-      const auto s_new = problem_description.specific_entropy(U_new);
-      const auto psi = relaxation * relaxation * rho_new * e_new -
-                       s_min * ryujin::pow(rho_new, gp1);
+      /*
+       * Verify that the new state is within bounds:
+       */
+      {
+        const auto U_new = U + t_l * P;
+        const auto rho_new = problem_description.density(U_new);
+        const auto e_new = problem_description.internal_energy(U_new);
+        const auto psi =
+            relax * relax * rho_new * e_new - s_min * ryujin::pow(rho_new, gp1);
 
-      AssertThrowSIMD(
-          e_new,
-          [](auto val) { return val > 0.; },
-          dealii::ExcMessage("Negative internal energy."));
+        if (!((std::min(Number(0.), e_new) == Number(0.)) &&
+              (std::min(Number(0.), psi + 100. * eps) == Number(0.))
 
-      AssertThrowSIMD(
-          s_new,
-          [](auto val) { return val > 0.; },
-          dealii::ExcMessage("Negative specific entropy."));
-
-      AssertThrowSIMD(
-          psi,
-          [](auto val) { return val >= -100. * eps; },
-          dealii::ExcMessage("Specific entropy minimum principle violated."));
+                  )) {
+#ifdef DEBUG_OUTPUT
+          std::cout << std::fixed << std::setprecision(16);
+          std::cout << "Specific entropy minimum principle violated:"
+                    << std::endl;
+          std::cout << "int: !!! 0 <= " << e_new << std::endl;
+          std::cout << "Psi: !!! 0 <= " << psi << std::endl << std::endl;
+#endif
+          success = false;
+        }
+      }
 #endif
     }
 
     if constexpr (limiter == Limiters::specific_entropy)
-      return {t_l, true};
+      return {t_l, success};
 
     /*
      * Limit based on an entropy inequality:
@@ -230,6 +260,8 @@ namespace ryujin
      * in this case because this immediately accepts the right state.
      */
 
+    static_assert(limiter != Limiters::entropy_inequality, "codepath untested");
+
     t_r = t_l;   // bad state
     t_l = t_min; // good state
 
@@ -257,7 +289,7 @@ namespace ryujin
         const auto average_r = positive_part(a + b * t_r);
         const auto average_gamma_r = std::pow(average_r, gamma);
 
-        auto psi_r = average_r * average_gamma_r - rho_r * rho_e_r * relaxation;
+        auto psi_r = average_r * average_gamma_r - rho_r * rho_e_r * relax;
 
         /* If psi_r <= 0 the right state is fine, force returning t_r by
          * setting t_l = t_r: */
@@ -275,7 +307,7 @@ namespace ryujin
         const auto average_l = positive_part(a + b * t_l);
         const auto average_gamma_l = std::pow(average_l, gamma);
 
-        auto psi_l = average_l * average_gamma_l - rho_l * rho_e_l * relaxation;
+        auto psi_l = average_l * average_gamma_l - rho_l * rho_e_l * relax;
 
         /* Break if all psi_l values are within a prescribed tolerance: */
         if (std::min(Number(0.),
@@ -322,13 +354,13 @@ namespace ryujin
       const auto avg = ryujin::pow(positive_part(a + b * t_l), gp1);
 
       AssertThrowSIMD(
-          avg - rho_rho_e * relaxation,
+          avg - rho_rho_e * relax,
           [](auto val) { return val < 1000. * eps; },
           dealii::ExcMessage("Entropy inequality violated."));
 #endif
     }
 
-    return {t_l, true};
+    return {t_l, success};
   }
 
 } /* namespace ryujin */
