@@ -19,6 +19,9 @@ namespace ryujin
 {
   using namespace dealii;
 
+  /* A struct signalling a restart, thrown in EulerModule::single_step. */
+  struct Restart {
+  };
 
   template <int dim, typename Number>
   EulerModule<dim, Number>::EulerModule(
@@ -99,7 +102,7 @@ namespace ryujin
 
     AssertThrow(cfl_min_ > 0. && cfl_min_ <= 1.,
                 ExcMessage("cfl min must be a positive value <= 1.0"));
-    AssertThrow(cfl_max_ > cfl_min_,
+    AssertThrow(cfl_max_ >= cfl_min_,
                 ExcMessage("cfl max must be greater or equal than cfl min"));
 
     cfl_ = cfl_min_;
@@ -142,6 +145,9 @@ namespace ryujin
 
     /* A monotonically increasing "channel" variable for mpi_tags: */
     unsigned int channel = 10;
+
+    /* A boolean signalling that a restart is necessary: */
+    bool restart = false;
 
     /*
      * Step 0: Precompute f(U) and the entropies of U
@@ -433,8 +439,6 @@ namespace ryujin
       std::cout << "        computed tau_max = " << tau_max << std::endl;
       std::cout << "        perform time-step with tau = " << tau << std::endl;
 #endif
-
-      // FIXME
     }
 
     /*
@@ -693,9 +697,13 @@ namespace ryujin
               ((d_ijH - d_ij) * (U_j - U_i) + b_ij * r_j - b_ji * r_i);
           pij_matrix_.write_tensor(p_ij, i, col_idx);
 
-          const auto l_ij = Limiter<dim, Number>::limit(
+          const auto &[l_ij, success] = Limiter<dim, Number>::limit(
               *problem_description_, bounds, U_i_new, p_ij);
           lij_matrix_.write_entry(l_ij, i, col_idx);
+
+          /* Unsuccessful with current CFL -> restart */
+          if (!success)
+            restart = true;
         }
       } /* parallel non-vectorized loop */
 
@@ -750,10 +758,13 @@ namespace ryujin
               ((d_ijH - d_ij) * (U_j - U_i) + b_ij * r_j - b_ji * r_i);
           pij_matrix_.write_vectorized_tensor(p_ij, i, col_idx, true);
 
-          const auto l_ij = Limiter<dim, VA>::limit(
+          const auto &[l_ij, success] = Limiter<dim, VA>::limit(
               *problem_description_, bounds, U_i_new, p_ij);
-
           lij_matrix_.write_vectorized_entry(l_ij, i, col_idx, true);
+
+          /* Unsuccessful with current CFL -> restart */
+          if (!success)
+            restart = true;
         }
       } /* parallel SIMD loop */
 
@@ -865,8 +876,12 @@ namespace ryujin
             const auto new_p_ij =
                 (Number(1.) - old_l_ij) * pij_matrix_.get_tensor(i, col_idx);
 
-            const auto new_l_ij = Limiter<dim, Number>::limit(
+            const auto &[new_l_ij, success] = Limiter<dim, Number>::limit(
                 *problem_description_, bounds, U_i_new, new_p_ij);
+
+            /* Unsuccessful with current CFL -> restart */
+            if (!success)
+              restart = true;
 
             /*
              * FIXME: If this if statement causes too much of a performance
@@ -957,8 +972,12 @@ namespace ryujin
             const auto new_p_ij = (VA(1.) - old_l_ij) *
                                   pij_matrix_.get_vectorized_tensor(i, col_idx);
 
-            const auto new_l_ij = Limiter<dim, VA>::limit(
+            const auto &[new_l_ij, success] = Limiter<dim, VA>::limit(
                 *problem_description_, bounds, U_i_new, new_p_ij);
+
+            /* Unsuccessful with current CFL -> restart */
+            if (!success)
+              restart = true;
 
             /*
              * FIXME: If this if statement causes too much of a performance
@@ -1007,11 +1026,15 @@ namespace ryujin
       }
     } /* limiter_iter_ */
 
-    /* And finally update the result: */
-    U.swap(temp_euler_);
-
     CALLGRIND_STOP_INSTRUMENTATION
 
+    /* Do we have to restart? */
+    restart = Utilities::MPI::logical_or(restart, mpi_communicator_);
+    if (restart)
+      throw Restart();
+
+    /* Update the result and return tau_max: */
+    U.swap(temp_euler_);
     return tau_max;
   }
 
@@ -1123,6 +1146,7 @@ namespace ryujin
     std::cout << "EulerModule<dim, Number>::euler_step()" << std::endl;
 #endif
 
+    /* If single_step() throws, it doesn't update U, so no cleanup needed. */
     Number tau_1 = single_step(U, tau_0);
     apply_boundary_conditions(U, t + tau_1);
     return tau_1;
@@ -1138,21 +1162,28 @@ namespace ryujin
     std::cout << "EulerModule<dim, Number>::ssph2_step()" << std::endl;
 #endif
 
-    /* This also copies ghost elements: */
-    temp_ssp_ = U;
+    try {
+      /* This also copies ghost elements: */
+      temp_ssp_ = U;
 
-    /* Step 1: U1 = U_old + tau * L(U_old) */
-    Number tau_1 = single_step(U, tau_0);
-    apply_boundary_conditions(U, t + tau_1);
+      /* Step 1: U1 = U_old + tau * L(U_old) */
+      Number tau_1 = single_step(U, tau_0);
+      apply_boundary_conditions(U, t + tau_1);
 
-    tau_1 = (tau_0 == 0. ? tau_1 : tau_0);
+      tau_1 = (tau_0 == 0. ? tau_1 : tau_0);
 
-    /* Step 2: U2 = 1/2 U_old + 1/2 (U1 + tau L(U1)) */
-    const Number tau_2 = single_step(U, tau_1);
-    U.sadd(Number(1. / 2.), Number(1. / 2.), temp_ssp_);
-    apply_boundary_conditions(U, t + tau_1);
+      /* Step 2: U2 = 1/2 U_old + 1/2 (U1 + tau L(U1)) */
+      const Number tau_2 = single_step(U, tau_1);
+      U.sadd(Number(1. / 2.), Number(1. / 2.), temp_ssp_);
+      apply_boundary_conditions(U, t + tau_1);
 
-    return tau_1;
+      return tau_1;
+
+    } catch (Restart &) {
+      /* clean up and rethrow: */
+      U = temp_ssp_;
+      throw;
+    }
   }
 
 
@@ -1165,29 +1196,36 @@ namespace ryujin
     std::cout << "EulerModule<dim, Number>::ssprk3_step()" << std::endl;
 #endif
 
-    /* This also copies ghost elements: */
-    temp_ssp_ = U;
+    try {
+      /* This also copies ghost elements: */
+      temp_ssp_ = U;
 
-    /* Step 1: U1 = U_old + tau * L(U_old) at time t + tau_1 */
+      /* Step 1: U1 = U_old + tau * L(U_old) at time t + tau_1 */
 
-    Number tau_1 = single_step(U, tau_0);
-    apply_boundary_conditions(U, t + tau_1);
+      Number tau_1 = single_step(U, tau_0);
+      apply_boundary_conditions(U, t + tau_1);
 
-    tau_1 = (tau_0 == 0. ? tau_1 : tau_0);
+      tau_1 = (tau_0 == 0. ? tau_1 : tau_0);
 
-    /* Step 2: U2 = 3/4 U_old + 1/4 (U1 + tau L(U1)) at time t + 0.5 tau_1*/
+      /* Step 2: U2 = 3/4 U_old + 1/4 (U1 + tau L(U1)) at time t + 0.5 tau_1*/
 
-    const Number tau_2 = single_step(U, tau_1);
-    U.sadd(Number(1. / 4.), Number(3. / 4.), temp_ssp_);
-    apply_boundary_conditions(U, t + 0.5 * tau_1);
+      const Number tau_2 = single_step(U, tau_1);
+      U.sadd(Number(1. / 4.), Number(3. / 4.), temp_ssp_);
+      apply_boundary_conditions(U, t + 0.5 * tau_1);
 
-    /* Step 3: U_new = 1/3 U_old + 2/3 (U2 + tau L(U2)) at time t + tau_1 */
+      /* Step 3: U_new = 1/3 U_old + 2/3 (U2 + tau L(U2)) at time t + tau_1 */
 
-    const Number tau_3 = single_step(U, tau_1);
-    U.sadd(Number(2. / 3.), Number(1. / 3.), temp_ssp_);
-    apply_boundary_conditions(U, t + tau_1);
+      const Number tau_3 = single_step(U, tau_1);
+      U.sadd(Number(2. / 3.), Number(1. / 3.), temp_ssp_);
+      apply_boundary_conditions(U, t + tau_1);
 
-    return tau_1;
+      return tau_1;
+
+    } catch (Restart &) {
+      /* clean up and rethrow: */
+      U = temp_ssp_;
+      throw;
+    }
   }
 
 
@@ -1198,19 +1236,37 @@ namespace ryujin
 #ifdef DEBUG_OUTPUT
     std::cout << "EulerModule<dim, Number>::step()" << std::endl;
 #endif
+    while(true) {
+      try {
 
-    switch (time_step_order_) {
-    case 1:
-      return euler_step(U, t, tau);
-    case 2:
-      return ssph2_step(U, t, tau);
-    case 3:
-      return ssprk3_step(U, t, tau);
-    default:
-      AssertThrow(false,
-                  ExcMessage("The chosen order of the time stepping method "
-                             "must be in the interval [1, 3]"));
-      __builtin_trap();
+        /* Opportunistically increase current cfl by 2%: */
+        cfl_ = std::min(cfl_max_, 1.02 * cfl_);
+
+        switch (time_step_order_) {
+        case 1:
+          return euler_step(U, t, tau);
+        case 2:
+          return ssph2_step(U, t, tau);
+        case 3:
+          return ssprk3_step(U, t, tau);
+        default:
+          AssertThrow(false,
+                      ExcMessage("The chosen order of the time stepping method "
+                                 "must be in the interval [1, 3]"));
+          __builtin_trap();
+        }
+      } catch (Restart &) {
+        AssertThrow(
+            cfl_ > cfl_min_,
+            ExcMessage("I'm sorry, Dave. I'm afraid I can't do that. - Failed "
+                       "to recover from invariant domain violation."));
+
+        /* Restart signalled, decrease CFL number by 20% and try again: */
+        n_restarts_++;
+
+        cfl_ = std::max(cfl_min_, 0.80 * cfl_);
+
+      }
     }
 
     __builtin_unreachable();

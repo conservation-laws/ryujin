@@ -198,12 +198,13 @@ namespace ryujin
      * selected local minimum principles are obeyed.
      */
     template <Limiters limiter = limiter_, typename BOUNDS>
-    static Number limit(const ProblemDescription &problem_description,
-                        const BOUNDS &bounds,
-                        const state_type &U,
-                        const state_type &P,
-                        const Number t_min = Number(0.),
-                        const Number t_max = Number(1.));
+    static std::tuple<Number, bool>
+    limit(const ProblemDescription &problem_description,
+          const BOUNDS &bounds,
+          const state_type &U,
+          const state_type &P,
+          const Number t_min = Number(0.),
+          const Number t_max = Number(1.));
     //*}
 
   private:

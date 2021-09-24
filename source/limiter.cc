@@ -12,7 +12,7 @@ namespace ryujin
   /* instantiations */
 
 #ifndef OBSESSIVE_INLINING
-  template NUMBER
+  template std::tuple<NUMBER, bool>
   Limiter<DIM, NUMBER>::limit<Limiter<DIM, NUMBER>::Limiters::specific_entropy>(
       const ProblemDescription &,
       const std::array<NUMBER, 3> &,
@@ -21,7 +21,8 @@ namespace ryujin
       const NUMBER,
       const NUMBER);
 
-  template VectorizedArray<NUMBER> Limiter<DIM, VectorizedArray<NUMBER>>::limit<
+  template std::tuple<VectorizedArray<NUMBER>, bool>
+  Limiter<DIM, VectorizedArray<NUMBER>>::limit<
       Limiter<DIM, VectorizedArray<NUMBER>>::Limiters::specific_entropy>(
       const ProblemDescription &,
       const std::array<VectorizedArray<NUMBER>, 3> &,
@@ -30,7 +31,7 @@ namespace ryujin
       const VectorizedArray<NUMBER>,
       const VectorizedArray<NUMBER>);
 
-  template NUMBER Limiter<DIM, NUMBER>::limit<
+  template std::tuple<NUMBER, bool> Limiter<DIM, NUMBER>::limit<
       Limiter<DIM, NUMBER>::Limiters::entropy_inequality>(
       const ProblemDescription &,
       const std::array<NUMBER, 5> &,
@@ -39,7 +40,8 @@ namespace ryujin
       const NUMBER,
       const NUMBER);
 
-  template VectorizedArray<NUMBER> Limiter<DIM, VectorizedArray<NUMBER>>::limit<
+  template std::tuple<VectorizedArray<NUMBER>, bool>
+  Limiter<DIM, VectorizedArray<NUMBER>>::limit<
       Limiter<DIM, VectorizedArray<NUMBER>>::Limiters::entropy_inequality>(
       const ProblemDescription &,
       const std::array<VectorizedArray<NUMBER>, 5> &,

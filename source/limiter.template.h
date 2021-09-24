@@ -14,7 +14,7 @@ namespace ryujin
 #ifdef OBSESSIVE_INLINING
   DEAL_II_ALWAYS_INLINE inline
 #endif
-      Number
+      std::tuple<Number, bool>
       Limiter<dim, Number>::limit(const ProblemDescription &problem_description,
                                   const BOUNDS &bounds,
                                   const state_type &U,
@@ -25,7 +25,7 @@ namespace ryujin
     Number t_r = t_max;
 
     if constexpr (limiter == Limiters::none)
-      return t_r;
+      return {t_r, true};
 
     /*
      * First limit the density rho.
@@ -73,7 +73,7 @@ namespace ryujin
     }
 
     if constexpr (limiter == Limiters::rho)
-      return t_r;
+      return {t_r, true};
 
     /*
      * Then limit the specific entropy:
@@ -197,7 +197,7 @@ namespace ryujin
     }
 
     if constexpr (limiter == Limiters::specific_entropy)
-      return t_l;
+      return {t_l, true};
 
     /*
      * Limit based on an entropy inequality:
@@ -328,7 +328,7 @@ namespace ryujin
 #endif
     }
 
-    return t_l;
+    return {t_l, true};
   }
 
 } /* namespace ryujin */
