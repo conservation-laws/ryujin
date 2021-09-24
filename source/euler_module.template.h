@@ -96,8 +96,7 @@ namespace ryujin
 
     /* Reset cfl_ number to save default value: */
 
-    AssertThrow(cfl_min_ > 0. && cfl_min_ <= 1.,
-                ExcMessage("cfl min must be a positive value <= 1.0"));
+    AssertThrow(cfl_min_ > 0., ExcMessage("cfl min must be a positive value"));
     AssertThrow(cfl_max_ >= cfl_min_,
                 ExcMessage("cfl max must be greater or equal than cfl min"));
 
