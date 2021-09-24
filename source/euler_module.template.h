@@ -36,9 +36,9 @@ namespace ryujin
       , initial_values_(&initial_values)
       , n_restarts_(0)
   {
-    cfl_update_ = Number(0.80);
+    cfl_min_ = Number(0.80);
     add_parameter(
-        "cfl update", cfl_update_, "relative CFL constant used for update");
+        "cfl min", cfl_min_, "Minimal admissible relative CFL constant");
 
     cfl_max_ = Number(0.90);
     add_parameter(
@@ -95,8 +95,14 @@ namespace ryujin
     lij_matrix_next_.reinit(sparsity_simd);
     pij_matrix_.reinit(sparsity_simd);
 
-    /* Reset cfl_ number to default value: */
-    cfl_ = cfl_update_;
+    /* Reset cfl_ number to save default value: */
+
+    AssertThrow(cfl_min_ > 0. && cfl_min_ <= 1.,
+                ExcMessage("cfl min must be a positive value <= 1.0"));
+    AssertThrow(cfl_max_ > cfl_min_,
+                ExcMessage("cfl max must be greater or equal than cfl min"));
+
+    cfl_ = cfl_min_;
   }
 
 
@@ -395,7 +401,7 @@ namespace ryujin
         dij_matrix_.write_entry(d_sum, i, 0);
 
         const Number mass = lumped_mass_matrix.local_element(i);
-        const Number tau = cfl_update_ * mass / (Number(-2.) * d_sum);
+        const Number tau = cfl_ * mass / (Number(-2.) * d_sum);
 
         Number current_tau_max = tau_max.load();
         while (current_tau_max > tau &&
@@ -421,23 +427,14 @@ namespace ryujin
                   ExcMessage("I'm sorry, Dave. I'm afraid I can't "
                              "do that. - We crashed."));
 
+      tau = (tau == Number(0.) ? tau_max.load() : tau);
+
 #ifdef DEBUG_OUTPUT
       std::cout << "        computed tau_max = " << tau_max << std::endl;
-#endif
-      tau = (tau == Number(0.) ? tau_max.load() : tau);
-#ifdef DEBUG_OUTPUT
       std::cout << "        perform time-step with tau = " << tau << std::endl;
 #endif
 
-      if (tau * cfl_update_ > tau_max.load() * cfl_max_) {
-#ifdef DEBUG_OUTPUT
-        std::cout
-            << "        insufficient CFL, refuse update and abort stepping"
-            << std::endl;
-#endif
-        U[0] *= std::numeric_limits<Number>::quiet_NaN();
-        return tau_max;
-      }
+      // FIXME
     }
 
     /*
@@ -1135,13 +1132,12 @@ namespace ryujin
   template <int dim, typename Number>
   Number EulerModule<dim, Number>::ssph2_step(vector_type &U,
                                               Number t,
-                                              Number tau_0 /*= 0*/)
+                                              Number tau_0 /*= 0.*/)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "EulerModule<dim, Number>::ssph2_step()" << std::endl;
 #endif
 
-  restart_ssph2_step:
     /* This also copies ghost elements: */
     temp_ssp_ = U;
 
@@ -1149,27 +1145,10 @@ namespace ryujin
     Number tau_1 = single_step(U, tau_0);
     apply_boundary_conditions(U, t + tau_1);
 
-    AssertThrow(tau_1 * cfl_max_ / cfl_update_ >= tau_0,
-                ExcMessage("failed to recover from CFL violation"));
     tau_1 = (tau_0 == 0. ? tau_1 : tau_0);
 
     /* Step 2: U2 = 1/2 U_old + 1/2 (U1 + tau L(U1)) */
     const Number tau_2 = single_step(U, tau_1);
-
-    AssertThrow(tau_2 * cfl_max_ / cfl_update_ >= tau_0,
-                ExcMessage("failed to recover from CFL violation"));
-
-    if (tau_2 * cfl_max_ / cfl_update_ < tau_1) {
-      /* Restart and force smaller time step: */
-#ifdef DEBUG_OUTPUT
-      std::cout << "        insufficient step size, restart" << std::endl;
-#endif
-      tau_0 = tau_2;
-      U.swap(temp_ssp_);
-      ++n_restarts_;
-      goto restart_ssph2_step;
-    }
-
     U.sadd(Number(1. / 2.), Number(1. / 2.), temp_ssp_);
     apply_boundary_conditions(U, t + tau_1);
 
@@ -1186,7 +1165,6 @@ namespace ryujin
     std::cout << "EulerModule<dim, Number>::ssprk3_step()" << std::endl;
 #endif
 
-  restart_ssprk3_step:
     /* This also copies ghost elements: */
     temp_ssp_ = U;
 
@@ -1195,49 +1173,17 @@ namespace ryujin
     Number tau_1 = single_step(U, tau_0);
     apply_boundary_conditions(U, t + tau_1);
 
-    AssertThrow(tau_1 * cfl_max_ / cfl_update_ >= tau_0,
-                ExcMessage("failed to recover from CFL violation"));
     tau_1 = (tau_0 == 0. ? tau_1 : tau_0);
 
     /* Step 2: U2 = 3/4 U_old + 1/4 (U1 + tau L(U1)) at time t + 0.5 tau_1*/
 
     const Number tau_2 = single_step(U, tau_1);
-
-    AssertThrow(tau_2 * cfl_max_ / cfl_update_ >= tau_0,
-                ExcMessage("failed to recover from CFL violation"));
-
-    if (tau_2 * cfl_max_ / cfl_update_ < tau_1) {
-      /* Restart and force smaller time step: */
-#ifdef DEBUG_OUTPUT
-      std::cout << "        insufficient step size, restart" << std::endl;
-#endif
-      tau_0 = tau_2;
-      U.swap(temp_ssp_);
-      ++n_restarts_;
-      goto restart_ssprk3_step;
-    }
-
     U.sadd(Number(1. / 4.), Number(3. / 4.), temp_ssp_);
     apply_boundary_conditions(U, t + 0.5 * tau_1);
 
     /* Step 3: U_new = 1/3 U_old + 2/3 (U2 + tau L(U2)) at time t + tau_1 */
 
     const Number tau_3 = single_step(U, tau_1);
-
-    AssertThrow(tau_3 * cfl_max_ / cfl_update_ >= tau_0,
-                ExcMessage("failed to recover from CFL violation"));
-
-    if (tau_3 * cfl_max_ < tau_1 * cfl_update_) {
-      /* Restart and force smaller time step: */
-#ifdef DEBUG_OUTPUT
-      std::cout << "        insufficient step size, restart" << std::endl;
-#endif
-      tau_0 = tau_3;
-      U.swap(temp_ssp_);
-      ++n_restarts_;
-      goto restart_ssprk3_step;
-    }
-
     U.sadd(Number(2. / 3.), Number(1. / 3.), temp_ssp_);
     apply_boundary_conditions(U, t + tau_1);
 

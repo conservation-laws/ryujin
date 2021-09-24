@@ -156,9 +156,8 @@ namespace ryujin
      */
     //@{
 
-    Number cfl_update_;
+    Number cfl_min_;
     Number cfl_max_;
-
     Number cfl_;
     ACCESSOR_READ_ONLY(cfl)
 
