@@ -159,6 +159,9 @@ namespace ryujin
     Number cfl_update_;
     Number cfl_max_;
 
+    Number cfl_;
+    ACCESSOR_READ_ONLY(cfl)
+
     unsigned int time_step_order_;
     unsigned int limiter_iter_;
 

@@ -94,6 +94,9 @@ namespace ryujin
     lij_matrix_.reinit(sparsity_simd);
     lij_matrix_next_.reinit(sparsity_simd);
     pij_matrix_.reinit(sparsity_simd);
+
+    /* Reset cfl_ number to default value: */
+    cfl_ = cfl_update_;
   }
 
 

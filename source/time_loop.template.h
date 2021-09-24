@@ -946,9 +946,11 @@ namespace ryujin
            << std::fixed << cycles_per_second
            << " cycles/s)" << std::endl;
 
-    output << "                     [ "
+    output << "                     [ CFL = "
+           << std::setprecision(2) << std::fixed << euler_module.cfl()
+           << " ("
            << std::setprecision(0) << std::fixed << euler_module.n_restarts()
-           << " rsts ]";
+           << " rsts) ]";
 
     output << "[ "
            << std::setprecision(2) << std::fixed
