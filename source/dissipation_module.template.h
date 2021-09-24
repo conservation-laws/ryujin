@@ -40,6 +40,7 @@ namespace ryujin
       , problem_description_(&problem_description)
       , offline_data_(&offline_data)
       , initial_values_(&initial_values)
+      , n_warnings_(0)
       , n_iterations_velocity_(0.)
       , n_iterations_internal_energy_(0.)
   {
@@ -738,6 +739,7 @@ namespace ryujin
 
         constexpr Number eps = std::numeric_limits<Number>::epsilon();
         if (e_min_new < e_min_old * (1. - 1000. * eps)) {
+          n_warnings_++;
           if (dealii::Utilities::MPI::this_mpi_process(mpi_communicator_) == 0)
             std::cout << "[INFO] Dissipation module: Insufficient CFL: "
                          "Invariant domain violation detected"

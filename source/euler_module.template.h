@@ -34,6 +34,7 @@ namespace ryujin
       , problem_description_(&problem_description)
       , initial_values_(&initial_values)
       , n_restarts_(0)
+      , n_warnings_(0)
   {
     cfl_min_ = Number(0.80);
     add_parameter(
@@ -1073,10 +1074,13 @@ namespace ryujin
     if (restart) {
       if (restart_possible_)
         throw Restart();
-      else if (dealii::Utilities::MPI::this_mpi_process(mpi_communicator_) == 0)
-        std::cout << "[INFO] Euler module: Insufficient CFL: Invariant domain "
-                     "violation detected"
-                  << std::endl;
+      else {
+        n_warnings_++;
+        if (dealii::Utilities::MPI::this_mpi_process(mpi_communicator_) == 0)
+          std::cout << "[INFO] Euler module: Insufficient CFL: Invariant "
+                       "domain violation detected"
+                    << std::endl;
+      }
     }
 
     /* Update the result and return tau_max: */

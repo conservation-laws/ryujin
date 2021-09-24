@@ -950,7 +950,9 @@ namespace ryujin
            << std::setprecision(2) << std::fixed << euler_module.cfl()
            << " ("
            << std::setprecision(0) << std::fixed << euler_module.n_restarts()
-           << " rsts) ]";
+           << " rsts) ("
+           << std::setprecision(0) << std::fixed << euler_module.n_warnings() + dissipation_module.n_warnings()
+           << " warn) ]";
 
     output << "[ "
            << std::setprecision(2) << std::fixed

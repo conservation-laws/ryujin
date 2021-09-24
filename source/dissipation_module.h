@@ -207,6 +207,9 @@ namespace ryujin
     dealii::SmartPointer<const ryujin::InitialValues<dim, Number>>
         initial_values_;
 
+    unsigned int n_warnings_;
+    ACCESSOR_READ_ONLY(n_warnings)
+
     double n_iterations_velocity_;
     ACCESSOR_READ_ONLY(n_iterations_velocity)
 

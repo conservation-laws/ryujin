@@ -197,6 +197,9 @@ namespace ryujin
     unsigned int n_restarts_;
     ACCESSOR_READ_ONLY(n_restarts)
 
+    unsigned int n_warnings_;
+    ACCESSOR_READ_ONLY(n_warnings)
+
     scalar_type alpha_;
 
     scalar_type second_variations_;
