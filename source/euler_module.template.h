@@ -424,9 +424,10 @@ namespace ryujin
       /* MPI Barrier: */
       tau_max.store(Utilities::MPI::min(tau_max.load(), mpi_communicator_));
 
-      AssertThrow(!std::isnan(tau_max) && !std::isinf(tau_max) && tau_max > 0.,
-                  ExcMessage("I'm sorry, Dave. I'm afraid I can't "
-                             "do that. - We crashed."));
+      AssertThrow(
+          !std::isnan(tau_max) && !std::isinf(tau_max) && tau_max > 0.,
+          ExcMessage(
+              "I'm sorry, Dave. I'm afraid I can't do that.\nWe crashed."));
 
       tau = (tau == Number(0.) ? tau_max.load() : tau);
 
@@ -698,10 +699,18 @@ namespace ryujin
 
           /*
            * Unsuccessful with current CFL: Force a restart if the degree
-           * of freedom is not located at the boundary:
+           * of freedom is not an inflow / Dirichlet boundary dof:
            */
-          if (!success && boundary_map.count(i) == 0) {
-            restart = true;
+          if (!success) {
+            bool restart_needed = true;
+            const auto range = boundary_map.equal_range(i);
+            for (auto it = range.first; it != range.second; ++it) {
+              const auto id = std::get<3>(it->second);
+              if (id == Boundary::dirichlet || id == Boundary::dynamic)
+                restart_needed = false;
+            }
+            if (restart_needed)
+              restart = true;
           }
         }
       } /* parallel non-vectorized loop */
@@ -887,9 +896,21 @@ namespace ryujin
             const auto &[new_l_ij, success] = Limiter<dim, Number>::limit(
                 *problem_description_, bounds, U_i_new, new_p_ij);
 
-            /* Unsuccessful with current CFL -> restart */
-            if (!success)
-              restart = true;
+            /*
+             * Unsuccessful with current CFL: Force a restart if the degree
+             * of freedom is not an inflow / Dirichlet boundary dof:
+             */
+            if (!success) {
+              bool restart_needed = true;
+              const auto range = boundary_map.equal_range(i);
+              for (auto it = range.first; it != range.second; ++it) {
+                const auto id = std::get<3>(it->second);
+                if (id == Boundary::dirichlet || id == Boundary::dynamic)
+                  restart_needed = false;
+              }
+              if (restart_needed)
+                restart = true;
+            }
 
             /*
              * FIXME: If this if statement causes too much of a performance
@@ -1306,7 +1327,7 @@ namespace ryujin
       } catch (Restart &) {
         AssertThrow(
             cfl_ > 1.02 * cfl_min_,
-            ExcMessage("I'm sorry, Dave. I'm afraid I can't do that. - Failed "
+            ExcMessage("I'm sorry, Dave. I'm afraid I can't do that.\nFailed "
                        "to recover from invariant domain violation."));
 
         /* Restart signalled, decrease CFL number by 20% and try again: */
