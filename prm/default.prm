@@ -50,10 +50,6 @@ subsection A - TimeLoop
   # the writeout granularity for quantities of interest
   set output quantities multiplier = 1
 
-  # Postprocessing, computation of averages and output is postponed until the
-  # simulation time has reached the specified output start time
-  set output start time            = 0
-
   # List of points in (simulation) time at which the mesh will be globally
   # refined
   set refinement timepoints        = 
