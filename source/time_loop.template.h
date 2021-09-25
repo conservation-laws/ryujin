@@ -914,9 +914,10 @@ namespace ryujin
         cpu_time_skew * delta_cycles /
         (current.cpu_time_avg - previous.cpu_time_avg);
 
-    const double delta_time = current.t - previous.t;
+    const double delta_time =
+        (current.t - previous.t) / (current.cycle - previous.cycle);
     const double time_per_second =
-        delta_time / (current.wall_time - previous.wall_time);
+        (current.t - previous.t) / (current.wall_time - previous.wall_time);
 
     /* Print Jean-Luc and Martin metrics: */
 
