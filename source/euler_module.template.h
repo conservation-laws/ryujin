@@ -771,7 +771,7 @@ namespace ryujin
               *problem_description_, bounds, U_i_new, p_ij);
           lij_matrix_.write_vectorized_entry(l_ij, i, col_idx, true);
 
-          /* Unsuccessful with current CFL -> restart */
+          /* Unsuccessful with current CFL, force a restart. */
           if (!success)
             restart = true;
         }
@@ -1015,7 +1015,7 @@ namespace ryujin
             const auto &[new_l_ij, success] = Limiter<dim, VA>::limit(
                 *problem_description_, bounds, U_i_new, new_p_ij);
 
-            /* Unsuccessful with current CFL -> restart */
+            /* Unsuccessful with current CFL, force a restart. */
             if (!success)
               restart = true;
 
