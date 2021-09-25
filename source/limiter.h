@@ -122,7 +122,7 @@ namespace ryujin
      * Limiter<dim, Number> limiter;
      * for (unsigned int i = n_internal; i < n_owned; ++i) {
      *   // ...
-     *   limiter.reset(variations_i);
+     *   limiter.reset(entropy_i, variations_i);
      *   for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
      *     // ...
      *     limiter.accumulate(U_i, U_j, U_ij_bar, entropy_j, col_idx == 0);
@@ -162,7 +162,7 @@ namespace ryujin
     /**
      * Reset temporary storage and reinitialize variations for new index i.
      */
-    void reset(const Number variations_i);
+    void reset(const Number entropy_i, const Number variations_i);
 
     /**
      * When looping over the sparsity row, add the contribution associated
@@ -227,7 +227,8 @@ namespace ryujin
 
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline void
-  Limiter<dim, Number>::reset(const Number new_variations_i)
+  Limiter<dim, Number>::reset(const Number entropy_i,
+                              const Number new_variations_i)
   {
     if constexpr (relax_bounds_) {
       variations_i = new_variations_i;
@@ -245,7 +246,7 @@ namespace ryujin
     rho_relaxation_denominator = Number(0.);
 
     if constexpr (limiter_ == Limiters::specific_entropy) {
-      s_min = Number(std::numeric_limits<ScalarNumber>::max());
+      s_min = entropy_i;
       s_interp_max = Number(0.);
     }
   }

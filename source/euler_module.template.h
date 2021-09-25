@@ -493,7 +493,7 @@ namespace ryujin
         state_type r_i;
 
         /* Clear bounds: */
-        limiter_serial.reset(variations_i);
+        limiter_serial.reset(evc_entropies_.local_element(i), variations_i);
 
         const unsigned int *js = sparsity_simd.columns(i);
         for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
@@ -556,6 +556,7 @@ namespace ryujin
         const auto f_i = problem_description_->f(U_i);
         auto U_i_new = U_i;
         const auto alpha_i = simd_load(alpha_, i);
+        const auto entropy_i = simd_load(evc_entropies_, i);
         const auto variations_i = simd_load(second_variations_, i);
 
         const auto m_i = simd_load(lumped_mass_matrix, i);
@@ -564,7 +565,7 @@ namespace ryujin
         ProblemDescription::state_type<dim, VA> r_i;
 
         /* Clear bounds: */
-        limiter_simd.reset(variations_i);
+        limiter_simd.reset(entropy_i, variations_i);
 
         const unsigned int *js = sparsity_simd.columns(i);
         const unsigned int row_length = sparsity_simd.row_length(i);
