@@ -61,6 +61,12 @@ namespace ryujin
         enforce_noslip_,
         "Enforce no-slip boundary conditions. If set to false no-slip "
         "boundaries will be treated as slip boundary conditions");
+
+    cfl_with_boundary_dofs_ = false;
+    add_parameter("cfl with boundary dofs",
+                  cfl_with_boundary_dofs_,
+                  "Use also the local wave-speed estimate d_ij of boundary "
+                  "dofs when computing the maximal admissible step size");
   }
 
 
@@ -405,10 +411,12 @@ namespace ryujin
         const Number mass = lumped_mass_matrix.local_element(i);
         const Number tau = cfl_ * mass / (Number(-2.) * d_sum);
 
-        Number current_tau_max = tau_max.load();
-        while (current_tau_max > tau &&
-               !tau_max.compare_exchange_weak(current_tau_max, tau))
-          ;
+        if (boundary_map.count(i) == 0 || cfl_with_boundary_dofs_) {
+          Number current_tau_max = tau_max.load();
+          while (current_tau_max > tau &&
+                 !tau_max.compare_exchange_weak(current_tau_max, tau))
+            ;
+        }
       } /* parallel non-vectorized loop */
 
       LIKWID_MARKER_STOP("time_step_2");

@@ -172,6 +172,7 @@ namespace ryujin
     unsigned int limiter_iter_;
 
     bool enforce_noslip_;
+    bool cfl_with_boundary_dofs_;
 
     //@}
 
