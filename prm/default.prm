@@ -299,21 +299,25 @@ end
 
 subsection F - EulerModule
   # Maximal admissible relative CFL constant
-  set cfl max            = 0.9
+  set cfl max                = 0.9
 
-  # Minimal admissible relative CFL constnat
-  set cfl min            = 0.9
+  # Minimal admissible relative CFL constant
+  set cfl min                = 0.8
+
+  # Use also the local wave-speed estimate d_ij of boundary dofs when
+  # computing the maximal admissible step size
+  set cfl with boundary dofs = false
 
   # Enforce no-slip boundary conditions. If set to false no-slip boundaries
   # will be treated as slip boundary conditions
-  set enforce noslip     = true
+  set enforce noslip         = true
 
   # Number of limiter iterations
-  set limiter iterations = 2
+  set limiter iterations     = 2
 
   # Approximation order of time stepping method. Switches between Forward
   # Euler, SSP Heun, and SSP Runge Kutta 3rd order
-  set time step order    = 3
+  set time step order        = 3
 end
 
 
@@ -385,13 +389,13 @@ subsection I - Quantities
   # to only output point values for boundary vertices belonging to a certain
   # level set. Format: '<name> : <level set formula> : <options> , [...]
   # (options: time_averaged, space_averaged, instantaneous)
-  set boundary manifolds = upper_boundary : y - 1.0 : time_averaged instantaneous, lower_boundary : y + 1.0 : time_averaged instantaneous
+  set boundary manifolds = 
 
   # List of level set functions describing interior manifolds. The description
   # is used to only output point values for vertices belonging to a certain
   # level set. Format: '<name> : <level set formula> : <options> , [...]
   # (options: time_averaged, space_averaged, instantaneous)
-  set interior manifolds = behind_disk : x - 0.3 : time_averaged instantaneous
+  set interior manifolds = 
 end
 
 
