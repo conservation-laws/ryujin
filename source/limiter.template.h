@@ -51,11 +51,12 @@ namespace ryujin
        */
       if (!((std::max(Number(0.), U_rho - relaxbig * rho_max) == Number(0.)) &&
             (std::max(Number(0.), rho_min - relaxbig * U_rho) == Number(0.)))) {
-        // FIXME
-//         std::cout << std::fixed << std::setprecision(16);
-//         std::cout << "(crit) min: " << rho_min << std::endl;
-//         std::cout << "(crit) rho: " << U_rho << std::endl;
-//         std::cout << "(crit) max: " << rho_max << std::endl << std::endl;
+#ifdef DEBUG_OUTPUT
+        std::cout << std::fixed << std::setprecision(16);
+        std::cout << "(crit) min: " << rho_min << std::endl;
+        std::cout << "(crit) rho: " << U_rho << std::endl;
+        std::cout << "(crit) max: " << rho_max << std::endl << std::endl;
+#endif
         success = false;
       }
 
@@ -162,9 +163,10 @@ namespace ryujin
          */
         if (n == 0 &&
             !(std::min(Number(0.), psi_l + 100. * eps) == Number(0.))) {
-          // FIXME
-//           std::cout << std::fixed << std::setprecision(16);
-//           std::cout << "(crit) Psi left: " << psi_l << std::endl;
+#ifdef DEBUG_OUTPUT
+          std::cout << std::fixed << std::setprecision(16);
+          std::cout << "(crit) Psi left: " << psi_l << std::endl;
+#endif
           success = false;
         }
 

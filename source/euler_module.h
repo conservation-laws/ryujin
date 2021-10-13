@@ -26,21 +26,10 @@ namespace ryujin
 {
 
   /**
-   * A class signalling a restart, thrown in EulerModule::single_step and
-   * caught at various places.
-   */
-  class Restart final
-  {
-  };
-
-  /**
-   * Explicit (strong stability preserving) time-stepping for the
-   * compressible Euler equations described in ProblemDescription.
+   * Explicit forward Euler time-stepping for hyperbolic systems with
+   * convex limiting.
    *
-   * This module is described in detail in @cite ryujin-2021-1, Alg.
-   * 1.
-   *
-   * @todo Write out some more documentation
+   * This module is described in detail in @cite ryujin-2021-1, Alg. 1.
    *
    * @ingroup EulerModule
    */
@@ -106,49 +95,10 @@ namespace ryujin
      * (if tau != 0). Here, tau_max is the computed maximal time step size
      * and tau is the optional third parameter.
      */
-    Number euler_step(vector_type &U, Number t, Number tau = 0.);
-
-    /**
-     * Given a reference to a previous state vector U perform an explicit
-     * Heun 2nd order step (and store the result in U). The function
-     * returns the computed maximal time step size tau_max.
-     *
-     * The time step is performed with either tau_max (if tau == 0), or tau
-     * (if tau != 0). Here, tau_max is the computed maximal time step size
-     * and tau is the optional third parameter.
-     *
-     * See @cite Shu1988, Eq. 2.15.
-     */
-    Number ssph2_step(vector_type &U, Number t, Number tau = 0.);
-
-    /**
-     * Given a reference to a previous state vector U perform an explicit
-     * SSP Runge Kutta 3rd order step (and store the result in U). The
-     * function returns the computed maximal time step size tau_max.
-     *
-     * The time step is performed with either tau_max (if tau == 0), or tau
-     * (if tau != 0). Here, tau_max is the computed maximal time step size
-     * and tau is the optional third parameter.
-     *
-     * See @cite Shu1988, Eq. 2.18.
-     */
-    Number ssprk3_step(vector_type &U, Number t, Number tau = 0.);
-
-    /**
-     * Given a reference to a previous state vector U perform an explicit
-     * time step (and store the result in U). The function returns the
-     * chosen time step size tau.
-     *
-     * This function switches between euler_step(), ssph2_step(), or
-     * ssprk3_step() depending on selected approximation order.
-     *
-     * The time step is performed with either tau_max (if tau == 0), or tau
-     * (if tau != 0). Here, tau_max is the computed maximal time step size
-     * and tau is the optional third parameter.
-     */
     Number step(vector_type &U, Number t, Number tau = 0.);
 
   private:
+
     //@}
     /**
      * @name Internally used time-stepping primitives
@@ -165,13 +115,8 @@ namespace ryujin
      */
     //@{
 
-    Number cfl_min_;
-    Number cfl_max_;
-
-    unsigned int time_step_order_;
     unsigned int limiter_iter_;
 
-    bool enforce_noslip_;
     bool cfl_with_boundary_dofs_;
 
     //@}
@@ -193,8 +138,6 @@ namespace ryujin
     Number cfl_;
     ACCESSOR_READ_ONLY(cfl)
 
-    bool restart_possible_;
-
     unsigned int n_restarts_;
     ACCESSOR_READ_ONLY(n_restarts)
 
@@ -202,7 +145,6 @@ namespace ryujin
     ACCESSOR_READ_ONLY(n_warnings)
 
     scalar_type alpha_;
-
     scalar_type second_variations_;
     scalar_type specific_entropies_;
     scalar_type evc_entropies_;
@@ -211,6 +153,7 @@ namespace ryujin
 
     vector_type r_;
 
+    // FIXME
     SparseMatrixSIMD<Number> dij_matrix_;
 
     SparseMatrixSIMD<Number> lij_matrix_;
@@ -218,8 +161,8 @@ namespace ryujin
 
     SparseMatrixSIMD<Number, problem_dimension> pij_matrix_;
 
+    // FIXME
     vector_type temp_euler_;
-    vector_type temp_ssp_;
 
     //@}
   };

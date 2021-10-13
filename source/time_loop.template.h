@@ -171,11 +171,11 @@ namespace ryujin
     /* Prepare data structures: */
 
     const auto prepare_compute_kernels = [&]() {
-      offline_data.prepare();       // Storage: dim + 2 matrices; 2 vectors
-      euler_module.prepare();       // Storage: 3 * dim + 9 vectors
-      dissipation_module.prepare(); // Storage: 2 * dim + 2 vectors
-      vtu_output.prepare();         // Storage: dim + 5 vectors
-      quantities.prepare(base_name + "-quantities"); // Storage: FIXME
+      offline_data.prepare();
+      euler_module.prepare();
+      dissipation_module.prepare();
+      vtu_output.prepare();
+      quantities.prepare(base_name + "-quantities");
       print_mpi_partition(logfile);
     };
 
@@ -306,24 +306,7 @@ namespace ryujin
 
       /* Do a time step: */
 
-      if (problem_description.description() == "Euler") {
-
-        /* Pure hyperbolic update: */
-        const auto tau = euler_module.step(U, t);
-        t += tau;
-
-      } else if (problem_description.description() == "Navier Stokes") {
-
-        /* Strang's splitting: */
-        const auto tau = euler_module.step(U, t);
-        dissipation_module.step(U, t, 2. * tau, cycle);
-        euler_module.step(U, t + tau, tau);
-        t += 2. * tau;
-
-      } else {
-
-        AssertThrow(false, ExcMessage("Unknown problem description"));
-      }
+      // FIXME
 
       /* Print and record cycle statistics: */
 

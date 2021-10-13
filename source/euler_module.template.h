@@ -36,37 +36,18 @@ namespace ryujin
       , n_restarts_(0)
       , n_warnings_(0)
   {
-    cfl_min_ = Number(0.80);
-    add_parameter(
-        "cfl min", cfl_min_, "Minimal admissible relative CFL constant");
-
-    cfl_max_ = Number(0.90);
-    add_parameter(
-        "cfl max", cfl_max_, "Maximal admissible relative CFL constant");
-
-    time_step_order_ = 3;
-    add_parameter(
-        "time step order",
-        time_step_order_,
-        "Approximation order of time stepping method. Switches between Forward "
-        "Euler, SSP Heun, and SSP Runge Kutta 3rd order");
-
     limiter_iter_ = 2;
     add_parameter(
         "limiter iterations", limiter_iter_, "Number of limiter iterations");
-
-    enforce_noslip_ = true;
-    add_parameter(
-        "enforce noslip",
-        enforce_noslip_,
-        "Enforce no-slip boundary conditions. If set to false no-slip "
-        "boundaries will be treated as slip boundary conditions");
 
     cfl_with_boundary_dofs_ = false;
     add_parameter("cfl with boundary dofs",
                   cfl_with_boundary_dofs_,
                   "Use also the local wave-speed estimate d_ij of boundary "
                   "dofs when computing the maximal admissible step size");
+
+    // FIXME
+    cfl_ = 0.8;
   }
 
 
@@ -91,7 +72,6 @@ namespace ryujin
     const auto &vector_partitioner = offline_data_->vector_partitioner();
     r_.reinit(vector_partitioner);
     temp_euler_.reinit(vector_partitioner);
-    temp_ssp_.reinit(vector_partitioner);
 
     /* Initialize matrices: */
 
@@ -100,14 +80,6 @@ namespace ryujin
     lij_matrix_.reinit(sparsity_simd);
     lij_matrix_next_.reinit(sparsity_simd);
     pij_matrix_.reinit(sparsity_simd);
-
-    /* Reset cfl_ number to save default value: */
-
-    AssertThrow(cfl_min_ > 0., ExcMessage("cfl min must be a positive value"));
-    AssertThrow(cfl_max_ >= cfl_min_,
-                ExcMessage("cfl max must be greater or equal than cfl min"));
-
-    cfl_ = cfl_min_;
   }
 
 
@@ -409,6 +381,7 @@ namespace ryujin
         dij_matrix_.write_entry(d_sum, i, 0);
 
         const Number mass = lumped_mass_matrix.local_element(i);
+        // FIXME
         const Number tau = cfl_ * mass / (Number(-2.) * d_sum);
 
         if (boundary_map.count(i) == 0 || cfl_with_boundary_dofs_) {
@@ -708,6 +681,8 @@ namespace ryujin
               *problem_description_, bounds, U_i_new, p_ij);
           lij_matrix_.write_entry(l_ij, i, col_idx);
 
+#if 0
+          // FIXME
           /*
            * Unsuccessful with current CFL: Force a restart if the degree
            * of freedom is not an inflow / Dirichlet boundary dof:
@@ -723,6 +698,7 @@ namespace ryujin
             if (restart_needed)
               restart = true;
           }
+#endif
         }
       } /* parallel non-vectorized loop */
 
@@ -907,6 +883,8 @@ namespace ryujin
             const auto &[new_l_ij, success] = Limiter<dim, Number>::limit(
                 *problem_description_, bounds, U_i_new, new_p_ij);
 
+#if 0
+            // FIXME
             /*
              * Unsuccessful with current CFL: Force a restart if the degree
              * of freedom is not an inflow / Dirichlet boundary dof:
@@ -922,6 +900,7 @@ namespace ryujin
               if (restart_needed)
                 restart = true;
             }
+#endif
 
             /*
              * FIXME: If this if statement causes too much of a performance
@@ -1078,6 +1057,8 @@ namespace ryujin
 
     CALLGRIND_STOP_INSTRUMENTATION
 
+#if 0
+    // FIXME
     /* Do we have to restart? */
     restart.store(
         Utilities::MPI::logical_or(restart.load(), mpi_communicator_));
@@ -1092,6 +1073,7 @@ namespace ryujin
                     << std::endl;
       }
     }
+#endif
 
     /* Update the result and return tau_max: */
     U.swap(temp_euler_);
@@ -1128,8 +1110,7 @@ namespace ryujin
 
       auto U_i = U.get_tensor(i);
 
-      if (id == Boundary::slip ||
-          (id == Boundary::no_slip && !enforce_noslip_)) {
+      if (id == Boundary::slip || id == Boundary::no_slip) {
         /* Remove the normal component of the momentum: */
         auto m = problem_description_->momentum(U_i);
         m -= 1. * (m * normal) * normal;
@@ -1198,162 +1179,16 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  Number EulerModule<dim, Number>::euler_step(vector_type &U,
-                                              Number t,
-                                              Number tau_0 /*= 0*/)
-  {
-#ifdef DEBUG_OUTPUT
-    std::cout << "EulerModule<dim, Number>::euler_step()" << std::endl;
-#endif
-
-    /* If single_step() throws, it doesn't update U, so no cleanup needed. */
-
-    Number tau_1 = single_step(U, tau_0);
-    if (tau_1 < 0.9 * tau_0 && restart_possible_)
-      throw Restart(); /* restart if tau_max differs by more than 10% */
-
-    apply_boundary_conditions(U, t + tau_1);
-
-    return tau_1;
-  }
-
-
-  template <int dim, typename Number>
-  Number EulerModule<dim, Number>::ssph2_step(vector_type &U,
-                                              Number t,
-                                              Number tau_0 /*= 0.*/)
-  {
-#ifdef DEBUG_OUTPUT
-    std::cout << "EulerModule<dim, Number>::ssph2_step()" << std::endl;
-#endif
-
-    try {
-      /* This also copies ghost elements: */
-      temp_ssp_ = U;
-
-      /* Step 1: U1 = U_old + tau * L(U_old) */
-
-      Number tau_1 = single_step(U, tau_0);
-      if (tau_1 < 0.9 * tau_0 && restart_possible_)
-        throw Restart(); /* restart if tau_max differs by more than 10% */
-
-      apply_boundary_conditions(U, t + tau_1);
-
-      tau_1 = (tau_0 == 0. ? tau_1 : tau_0);
-
-      /* Step 2: U2 = 1/2 U_old + 1/2 (U1 + tau L(U1)) */
-
-      const Number tau_2 = single_step(U, tau_1);
-      if (tau_2 < 0.9 * tau_1 && restart_possible_)
-        throw Restart(); /* restart if tau_max differs by more than 10% */
-
-      U.sadd(Number(1. / 2.), Number(1. / 2.), temp_ssp_);
-      apply_boundary_conditions(U, t + tau_1);
-
-      return tau_1;
-
-    } catch (Restart &) {
-      /* clean up and rethrow: */
-      U = temp_ssp_;
-      throw;
-    }
-  }
-
-
-  template <int dim, typename Number>
-  Number EulerModule<dim, Number>::ssprk3_step(vector_type &U,
-                                               Number t,
-                                               Number tau_0 /*= 0*/)
-  {
-#ifdef DEBUG_OUTPUT
-    std::cout << "EulerModule<dim, Number>::ssprk3_step()" << std::endl;
-#endif
-
-    try {
-      /* This also copies ghost elements: */
-      temp_ssp_ = U;
-
-      /* Step 1: U1 = U_old + tau * L(U_old) at time t + tau_1 */
-
-      Number tau_1 = single_step(U, tau_0);
-      if (tau_1 < 0.9 * tau_0 && restart_possible_)
-        throw Restart(); /* restart if tau_max differs by more than 10% */
-
-      apply_boundary_conditions(U, t + tau_1);
-
-      tau_1 = (tau_0 == 0. ? tau_1 : tau_0);
-
-      /* Step 2: U2 = 3/4 U_old + 1/4 (U1 + tau L(U1)) at time t + 0.5 tau_1*/
-
-      const Number tau_2 = single_step(U, tau_1);
-      if (tau_2 < 0.9 * tau_1 && restart_possible_)
-        throw Restart(); /* restart if tau_max differs by more than 10% */
-
-      U.sadd(Number(1. / 4.), Number(3. / 4.), temp_ssp_);
-      apply_boundary_conditions(U, t + 0.5 * tau_1);
-
-      /* Step 3: U_new = 1/3 U_old + 2/3 (U2 + tau L(U2)) at time t + tau_1 */
-
-      const Number tau_3 = single_step(U, tau_1);
-      if (tau_3 < 0.9 * tau_1 && restart_possible_)
-        throw Restart(); /* restart if tau_max differs by more than 10% */
-
-      U.sadd(Number(2. / 3.), Number(1. / 3.), temp_ssp_);
-      apply_boundary_conditions(U, t + tau_1);
-
-      return tau_1;
-
-    } catch (Restart &) {
-      /* clean up and rethrow: */
-      U = temp_ssp_;
-      throw;
-    }
-  }
-
-
-  template <int dim, typename Number>
   Number
-  EulerModule<dim, Number>::step(vector_type &U, Number t, Number tau /*= 0*/)
+  EulerModule<dim, Number>::step(vector_type &U, Number t, Number tau_0 /*= 0*/)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "EulerModule<dim, Number>::step()" << std::endl;
 #endif
-    while(true) {
-      try {
 
-        /* Opportunistically increase current cfl by 2%: */
-        cfl_ = std::min(cfl_max_, 1.02 * cfl_);
-
-        /*
-         * Record whether a restart is possible at all:
-         *  - We must not be in a second stage of a Strang splitting (i.e.,
-         *    prescribed tau == 0.)
-         *  - The current update cfl_ must be larger than cfl_min_.
-         */
-        restart_possible_ = (tau == 0.) && (cfl_ > cfl_min_);
-
-        switch (time_step_order_) {
-        case 1:
-          return euler_step(U, t, tau);
-        case 2:
-          return ssph2_step(U, t, tau);
-        case 3:
-          return ssprk3_step(U, t, tau);
-        default:
-          AssertThrow(false,
-                      ExcMessage("The chosen order of the time stepping method "
-                                 "must be in the interval [1, 3]"));
-          __builtin_trap();
-        }
-      } catch (Restart &) {
-
-        /* Restart signalled, decrease CFL number by 20% and try again: */
-        Assert(cfl_ > cfl_min_, ExcInternalError());
-        n_restarts_++;
-        cfl_ = std::max(cfl_min_, 0.80 * cfl_);
-      }
-    }
-
-    __builtin_unreachable();
+    Number tau_1 = single_step(U, tau_0);
+    apply_boundary_conditions(U, t + tau_1);
+    return tau_1;
   }
+
 } /* namespace ryujin */
