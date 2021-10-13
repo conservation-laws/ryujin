@@ -121,7 +121,7 @@ namespace ryujin
     unsigned int channel = 10;
 
     /* A boolean signalling that a restart is necessary: */
-    std::atomic<bool> restart = false;
+    std::atomic<bool> restart_needed = false;
 
     /*
      * Step 0: Precompute f(U) and the entropies of U
@@ -381,7 +381,6 @@ namespace ryujin
         dij_matrix_.write_entry(d_sum, i, 0);
 
         const Number mass = lumped_mass_matrix.local_element(i);
-        // FIXME
         const Number tau = cfl_ * mass / (Number(-2.) * d_sum);
 
         if (boundary_map.count(i) == 0 || cfl_with_boundary_dofs_) {
@@ -681,24 +680,9 @@ namespace ryujin
               *problem_description_, bounds, U_i_new, p_ij);
           lij_matrix_.write_entry(l_ij, i, col_idx);
 
-#if 0
-          // FIXME
-          /*
-           * Unsuccessful with current CFL: Force a restart if the degree
-           * of freedom is not an inflow / Dirichlet boundary dof:
-           */
-          if (!success) {
-            bool restart_needed = true;
-            const auto range = boundary_map.equal_range(i);
-            for (auto it = range.first; it != range.second; ++it) {
-              const auto id = std::get<3>(it->second);
-              if (id == Boundary::dirichlet || id == Boundary::dynamic)
-                restart_needed = false;
-            }
-            if (restart_needed)
-              restart = true;
-          }
-#endif
+          /* Unsuccessful with current CFL, force a restart. */
+          if (!success)
+            restart_needed = true;
         }
       } /* parallel non-vectorized loop */
 
@@ -759,7 +743,7 @@ namespace ryujin
 
           /* Unsuccessful with current CFL, force a restart. */
           if (!success)
-            restart = true;
+            restart_needed = true;
         }
       } /* parallel SIMD loop */
 
@@ -861,7 +845,7 @@ namespace ryujin
               std::cout << "int: !!! " << e_new << std::endl;
               std::cout << "ent: !!! " << s_new << std::endl << std::endl;
 #endif
-              restart = true;
+              restart_needed = true;
             }
           }
 #endif
@@ -883,24 +867,9 @@ namespace ryujin
             const auto &[new_l_ij, success] = Limiter<dim, Number>::limit(
                 *problem_description_, bounds, U_i_new, new_p_ij);
 
-#if 0
-            // FIXME
-            /*
-             * Unsuccessful with current CFL: Force a restart if the degree
-             * of freedom is not an inflow / Dirichlet boundary dof:
-             */
-            if (!success) {
-              bool restart_needed = true;
-              const auto range = boundary_map.equal_range(i);
-              for (auto it = range.first; it != range.second; ++it) {
-                const auto id = std::get<3>(it->second);
-                if (id == Boundary::dirichlet || id == Boundary::dynamic)
-                  restart_needed = false;
-              }
-              if (restart_needed)
-                restart = true;
-            }
-#endif
+            /* Unsuccessful with current CFL, force a restart. */
+            if (!success)
+              restart_needed = true;
 
             /*
              * FIXME: If this if statement causes too much of a performance
@@ -981,7 +950,7 @@ namespace ryujin
               std::cout << "int: !!! " << e_new << std::endl;
               std::cout << "ent: !!! " << s_new << std::endl << std::endl;
 #endif
-              restart = true;
+              restart_needed = true;
             }
           }
 #endif
@@ -1006,7 +975,7 @@ namespace ryujin
 
             /* Unsuccessful with current CFL, force a restart. */
             if (!success)
-              restart = true;
+              restart_needed = true;
 
             /*
              * FIXME: If this if statement causes too much of a performance
@@ -1057,23 +1026,13 @@ namespace ryujin
 
     CALLGRIND_STOP_INSTRUMENTATION
 
-#if 0
-    // FIXME
     /* Do we have to restart? */
-    restart.store(
-        Utilities::MPI::logical_or(restart.load(), mpi_communicator_));
-    if (restart) {
-      if (restart_possible_)
-        throw Restart();
-      else {
-        n_warnings_++;
-        if (dealii::Utilities::MPI::this_mpi_process(mpi_communicator_) == 0)
-          std::cout << "[INFO] Euler module: Insufficient CFL: Invariant "
-                       "domain violation detected"
-                    << std::endl;
-      }
+    restart_needed.store(
+        Utilities::MPI::logical_or(restart_needed.load(), mpi_communicator_));
+
+    if (restart_needed) {
+      // FIXME: Put restart logic back in place.
     }
-#endif
 
     /* Update the result and return tau_max: */
     U.swap(temp_euler_);
