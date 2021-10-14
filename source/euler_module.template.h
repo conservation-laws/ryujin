@@ -453,6 +453,10 @@ namespace ryujin
       RYUJIN_PARALLEL_REGION_BEGIN
       LIKWID_MARKER_START("time_step_3");
 
+      const Number alpha_n =
+          -std::accumulate(alphas.begin(), alphas.end(), -1.);
+      Assert(0. < alpha_n && alpha_n <= 1., dealii::ExcInternalError());
+
       /* Nota bene: This bounds variable is thread local: */
       Limiter<dim, Number> limiter_serial(*problem_description_);
 
@@ -467,6 +471,14 @@ namespace ryujin
 
         const auto U_i = old_U.get_tensor(i);
         const auto f_i = problem_description_->f(U_i);
+
+        std::array<state_type, l> U_iHs;
+        std::array<flux_type, l> f_iHs;
+        for (unsigned int n = 0; n < l; ++n) {
+          U_iHs[n] = Us[n].get().get_tensor(i);
+          f_iHs[n] = problem_description_->f(U_iHs[n]);
+        }
+
         auto U_i_new = U_i;
         const auto alpha_i = alpha_.local_element(i);
         const auto variations_i = second_variations_.local_element(i);
@@ -485,6 +497,17 @@ namespace ryujin
           const auto j = js[col_idx];
 
           const auto U_j = old_U.get_tensor(j);
+          const auto f_j = problem_description_->f(U_j);
+
+          std::array<state_type, l> U_jHs;
+          std::array<flux_type, l> f_jHs;
+          std::array<Number, l> d_ijHs;
+          for (unsigned int n = 0; n < l; ++n) {
+            U_jHs[n] = Us[n].get().get_tensor(j);
+            f_jHs[n] = problem_description_->f(U_jHs[n]);
+            d_ijHs[n] = dijHs[n].get().get_entry(i, col_idx);
+          }
+
           const auto alpha_j = alpha_.local_element(j);
           const auto variations_j = second_variations_.local_element(j);
 
@@ -497,14 +520,24 @@ namespace ryujin
 
           dealii::Tensor<1, problem_dimension, Number> U_ij_bar;
           const auto c_ij = cij_matrix.get_tensor(i, col_idx);
-          const auto f_j = problem_description_->f(U_j);
 
           for (unsigned int k = 0; k < problem_dimension; ++k) {
             const auto temp = (f_j[k] - f_i[k]) * c_ij;
-
             r_i[k] += -temp + d_ijH * (U_j - U_i)[k];
             U_ij_bar[k] =
                 Number(0.5) * (U_i[k] + U_j[k]) - Number(0.5) * temp * d_ij_inv;
+          }
+
+          // FIXME: Verify
+          if constexpr (l != 0) {
+            r_i *= alpha_n;
+            for (unsigned int n = 0; n < l; ++n) {
+              for (unsigned int k = 0; k < problem_dimension; ++k) {
+                const auto temp = (f_jHs[n][k] - f_iHs[n][k]) * c_ij;
+                r_i[k] +=
+                    -alphas[n] * (temp + d_ijHs[n] * (U_jHs[n] - U_iHs[n])[k]);
+              }
+            }
           }
 
           U_i_new += tau * m_i_inv * Number(2.) * d_ij * U_ij_bar;
@@ -541,6 +574,14 @@ namespace ryujin
 
         const auto U_i = old_U.get_vectorized_tensor(i);
         const auto f_i = problem_description_->f(U_i);
+
+        std::array<ProblemDescription::state_type<dim, VA>, l> U_iHs;
+        std::array<ProblemDescription::flux_type<dim, VA>, l> f_iHs;
+        for (unsigned int n = 0; n < l; ++n) {
+          U_iHs[n] = Us[n].get().get_vectorized_tensor(i);
+          f_iHs[n] = problem_description_->f(U_iHs[n]);
+        }
+
         auto U_i_new = U_i;
         const auto alpha_i = simd_load(alpha_, i);
         const auto specific_entropy_i = simd_load(specific_entropies_, i);
@@ -560,6 +601,18 @@ namespace ryujin
         for (unsigned int col_idx = 0; col_idx < row_length;
              ++col_idx, js += simd_length) {
 
+          const auto U_j = old_U.get_vectorized_tensor(js);
+          const auto f_j = problem_description_->f(U_j);
+
+          std::array<ProblemDescription::state_type<dim, VA>, l> U_jHs;
+          std::array<ProblemDescription::flux_type<dim, VA>, l> f_jHs;
+          std::array<VA, l> d_ijHs;
+          for (unsigned int n = 0; n < l; ++n) {
+            U_jHs[n] = Us[n].get().get_vectorized_tensor(js);
+            f_jHs[n] = problem_description_->f(U_jHs[n]);
+            d_ijHs[n] = dijHs[n].get().get_vectorized_entry(i, col_idx);
+          }
+
           const auto alpha_j = simd_load(alpha_, js);
           const auto variations_j = simd_load(second_variations_, js);
 
@@ -569,18 +622,27 @@ namespace ryujin
           /* Store high order graph viscosity in new_dijH */
           new_dijH.write_vectorized_entry(d_ijH, i, col_idx, true);
 
-          const auto U_j = old_U.get_vectorized_tensor(js);
-
           dealii::Tensor<1, problem_dimension, VA> U_ij_bar;
           const auto c_ij = cij_matrix.get_vectorized_tensor(i, col_idx);
           const auto d_ij_inv = Number(1.) / d_ij;
 
-          const auto f_j = problem_description_->f(U_j);
           for (unsigned int k = 0; k < problem_dimension; ++k) {
             const auto temp = (f_j[k] - f_i[k]) * c_ij;
 
             r_i[k] += -temp + d_ijH * (U_j[k] - U_i[k]);
             U_ij_bar[k] = Number(0.5) * (U_i[k] + U_j[k] - temp * d_ij_inv);
+          }
+
+          // FIXME: Verify
+          if constexpr (l != 0) {
+            r_i *= alpha_n;
+            for (unsigned int n = 0; n < l; ++n) {
+              for (unsigned int k = 0; k < problem_dimension; ++k) {
+                const auto temp = (f_jHs[n][k] - f_iHs[n][k]) * c_ij;
+                r_i[k] +=
+                    -alphas[n] * (temp + d_ijHs[n] * (U_jHs[n] - U_iHs[n])[k]);
+              }
+            }
           }
 
           U_i_new += tau * m_i_inv * Number(2.) * d_ij * U_ij_bar;
