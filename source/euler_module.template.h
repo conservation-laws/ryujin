@@ -92,7 +92,7 @@ namespace ryujin
       const std::array<Number, l> alphas,
       vector_type &new_U,
       SparseMatrixSIMD<Number> &new_dijH,
-      Number tau) const
+      Number tau /* = 0 */) const
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "EulerModule<dim, Number>::single_step()" << std::endl;

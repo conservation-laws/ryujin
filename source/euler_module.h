@@ -100,14 +100,15 @@ namespace ryujin
      * and tau is the optional third parameter.
      */
     template <unsigned int l>
-    Number step(
-      const vector_type &old_U,
-      std::array<std::reference_wrapper<const vector_type>, l> Us,
-      std::array<std::reference_wrapper<const SparseMatrixSIMD<Number>>, l> dijHs,
-      const std::array<Number, l> alphas,
-      vector_type &new_U,
-      SparseMatrixSIMD<Number> &new_dijH,
-      Number tau) const;
+    Number
+    step(const vector_type &old_U,
+         std::array<std::reference_wrapper<const vector_type>, l> Us,
+         std::array<std::reference_wrapper<const SparseMatrixSIMD<Number>>, l>
+             dijHs,
+         const std::array<Number, l> alphas,
+         vector_type &new_U,
+         SparseMatrixSIMD<Number> &new_dijH,
+         Number tau = 0.) const;
 
     /**
      * TODO documentation

@@ -52,7 +52,7 @@ namespace ryujin
     /**
      * TODO documentation
      */
-    Number step(vector_type &U, Number t, Number tau = 0.);
+    Number step(vector_type &U, Number t);
 
   private:
 
@@ -79,9 +79,8 @@ namespace ryujin
     dealii::SmartPointer<const ryujin::DissipationModule<dim, Number>>
         dissipation_module_;
 
-    // FIXME: remove
-    mutable SparseMatrixSIMD<Number> my_dij;
-    mutable vector_type my_U;
+    mutable std::vector<SparseMatrixSIMD<Number>> temp_dij;
+    mutable std::vector<vector_type> temp_U;
 
     //@}
   };

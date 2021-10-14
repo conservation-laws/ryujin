@@ -39,27 +39,60 @@ namespace ryujin
 #endif
 
     const auto &vector_partitioner = offline_data_->vector_partitioner();
-    my_U.reinit(vector_partitioner);
 
     const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
-    my_dij.reinit(sparsity_simd);
+
+    /* SSP-RK3 */
+
+    // FIXME
+    temp_U.resize(3);
+    temp_dij.resize(3);
+    for(unsigned int n = 0; n < 3; ++n) {
+      temp_U[n].reinit(vector_partitioner);
+      temp_dij[n].reinit(sparsity_simd);
+    }
+
   }
 
 
   template <int dim, typename Number>
-  Number TimeIntegrator<dim, Number>::step(vector_type &U,
-                                           Number t,
-                                           Number tau_0 /*= 0*/)
+  Number TimeIntegrator<dim, Number>::step(vector_type &U, Number t)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeIntegrator<dim, Number>::step()" << std::endl;
 #endif
 
-    Number tau_1 =
-        euler_module_->template step<0>(U, {}, {}, {}, my_U, my_dij, tau_0);
-    euler_module_->apply_boundary_conditions(my_U, t + tau_1);
-    U.swap(my_U);
-    return tau_1;
-  }
+    /* Forward Euler step: */
 
+#if 0
+    Number tau =
+        euler_module_->template step<0>(U, {}, {}, {}, my_U, my_dij);
+    euler_module_->apply_boundary_conditions(my_U, t + tau);
+    U.swap(my_U);
+    return tau;
+#endif
+
+    /* SSP-RK3, see @cite Shu1988, Eq. 2.18. */
+    {
+      /* Step 1: U1 = U_old + tau * L(U_old) at time t + tau */
+      Number tau = euler_module_->template step<0>(
+          U, {}, {}, {}, temp_U[0], temp_dij[0]);
+      euler_module_->apply_boundary_conditions(temp_U[0], t + tau);
+
+      /* Step 2: U2 = 3/4 U_old + 1/4 (U1 + tau L(U1)) at time t + 0.5 tau */
+      euler_module_->template step<0>(
+          temp_U[0], {}, {}, {}, temp_U[1], temp_dij[1]);
+      temp_U[1].sadd(Number(1. / 4.), Number(3. / 4.), U);
+      euler_module_->apply_boundary_conditions(temp_U[1], t + 0.5 * tau);
+
+      /* Step 3: U3 = 1/3 U_old + 2/3 (U2 + tau L(U2)) at time t + tau */
+      euler_module_->template step<0>(
+          temp_U[1], {}, {}, {}, temp_U[2], temp_dij[2]);
+      temp_U[2].sadd(Number(2. / 3.), Number(1. / 3.), U);
+      euler_module_->apply_boundary_conditions(temp_U[2], t + tau);
+
+      U.swap(temp_U[2]);
+      return tau;
+    }
+  }
 } /* namespace ryujin */
