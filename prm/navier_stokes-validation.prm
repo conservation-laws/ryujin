@@ -48,11 +48,12 @@ subsection E - InitialValues
 end
 
 subsection F - EulerModule
-  set cfl max            = 0.30
-  set cfl min            = 0.30
+  set cfl max                = 0.30
+  set cfl min                = 0.30
+  set cfl with boundary dofs = true
 
-  set limiter iterations = 2
-  set time step order    = 2
+  set limiter iterations     = 2
+  set time step order        = 2
 end
 
 subsection G - DissipationModule

@@ -37,9 +37,10 @@ subsection E - InitialValues
 end
 
 subsection F - EulerModule
-  set cfl max            = 0.2
-  set cfl min            = 0.2
+  set cfl max                = 0.2
+  set cfl min                = 0.2
+  set cfl with boundary dofs = true
 
-  set limiter iterations = 2
-  set time step order    = 3
+  set limiter iterations     = 2
+  set time step order        = 3
 end
