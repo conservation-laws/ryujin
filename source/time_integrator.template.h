@@ -65,15 +65,19 @@ namespace ryujin
     /* Forward Euler step: */
 
 #if 0
-    Number tau =
-        euler_module_->template step<0>(U, {}, {}, {}, my_U, my_dij);
-    euler_module_->apply_boundary_conditions(my_U, t + tau);
-    U.swap(my_U);
-    return tau;
+    {
+      Number tau =
+          euler_module_->template step<0>(U, {}, {}, {}, temp_U[0], temp_dij[0]);
+      euler_module_->apply_boundary_conditions(temp_U[0], t + tau);
+      U.swap(temp_U[0]);
+      return tau;
+    }
 #endif
 
-    /* SSP-RK3, see @cite Shu1988, Eq. 2.18. */
+#if 0
     {
+      /* SSP-RK3, see @cite Shu1988, Eq. 2.18. */
+
       /* Step 1: U1 = U_old + tau * L(U_old) at time t + tau */
       Number tau = euler_module_->template step<0>(
           U, {}, {}, {}, temp_U[0], temp_dij[0]);
@@ -94,5 +98,39 @@ namespace ryujin
       U.swap(temp_U[2]);
       return tau;
     }
+#endif
+
+    {
+      /* RK(3,3,1) */
+
+      /* Step 1: U1 <- {U, 1} at time t + tau */
+      Number tau = euler_module_->template step<0>(
+          U, {}, {}, {}, temp_U[0], temp_dij[0]);
+      euler_module_->apply_boundary_conditions(temp_U[0], t + tau);
+
+      /* Step 2: U2 <- {U1, 2} and {U, -1} */
+      euler_module_->template step<1>(temp_U[0],
+                                      {U},
+                                      {temp_dij[0]},
+                                      {Number(-1.)},
+                                      temp_U[1],
+                                      temp_dij[1],
+                                      tau);
+      euler_module_->apply_boundary_conditions(temp_U[1], t + 2. * tau);
+
+      /* Step 3: U3 <- {U2, 9/4} and {U1, -2} and {U, 3/4} */
+      euler_module_->template step<2>(temp_U[1],
+                                      {U, temp_U[0]},
+                                      {temp_dij[0], temp_dij[1]},
+                                      {Number(0.75), Number(-2.)},
+                                      temp_U[2],
+                                      temp_dij[2],
+                                      tau);
+      euler_module_->apply_boundary_conditions(temp_U[2], t + 3. * tau);
+
+      U.swap(temp_U[2]);
+      return tau;
+    }
+
   }
 } /* namespace ryujin */

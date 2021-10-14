@@ -447,7 +447,6 @@ namespace ryujin
 
       const Number alpha_n =
           -std::accumulate(alphas.begin(), alphas.end(), -1.);
-      Assert(0. < alpha_n && alpha_n <= 1., dealii::ExcInternalError());
 
       /* Parallel region */
       RYUJIN_PARALLEL_REGION_BEGIN
@@ -694,7 +693,6 @@ namespace ryujin
 
       const Number alpha_n =
           -std::accumulate(alphas.begin(), alphas.end(), -1.);
-      Assert(0. < alpha_n && alpha_n <= 1., dealii::ExcInternalError());
 
       RYUJIN_PARALLEL_REGION_BEGIN
       LIKWID_MARKER_START("time_step_4");
