@@ -146,10 +146,10 @@ namespace ryujin
     Number cfl_;
     ACCESSOR_READ_ONLY(cfl)
 
-    unsigned int n_restarts_;
+    mutable unsigned int n_restarts_;
     ACCESSOR_READ_ONLY(n_restarts)
 
-    unsigned int n_warnings_;
+    mutable unsigned int n_warnings_;
     ACCESSOR_READ_ONLY(n_warnings)
 
     mutable scalar_type alpha_;
