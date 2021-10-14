@@ -79,16 +79,12 @@ namespace ryujin
     lij_matrix_.reinit(sparsity_simd);
     lij_matrix_next_.reinit(sparsity_simd);
     pij_matrix_.reinit(sparsity_simd);
-
-
-    my_dij.reinit(sparsity_simd);
-    my_U.reinit(vector_partitioner);
   }
 
 
   template <int dim, typename Number>
   template <unsigned int l>
-  Number EulerModule<dim, Number>::single_step(
+  Number EulerModule<dim, Number>::step(
       const vector_type &old_U,
       std::array<std::reference_wrapper<const vector_type>, l> Us,
       std::array<std::reference_wrapper<const SparseMatrixSIMD<Number>>, l>
@@ -1292,23 +1288,6 @@ namespace ryujin
     }
 
     U.update_ghost_values();
-  }
-
-
-
-  template <int dim, typename Number>
-  Number EulerModule<dim, Number>::step(vector_type &U,
-                                        Number t,
-                                        Number tau_0 /*= 0*/) const
-  {
-#ifdef DEBUG_OUTPUT
-    std::cout << "EulerModule<dim, Number>::step()" << std::endl;
-#endif
-
-    Number tau_1 = single_step<0>(U, {}, {}, {}, my_U, my_dij, tau_0);
-    apply_boundary_conditions(my_U, t + tau_1);
-    U.swap(my_U);
-    return tau_1;
   }
 
 } /* namespace ryujin */

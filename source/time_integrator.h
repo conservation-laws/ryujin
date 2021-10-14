@@ -34,6 +34,7 @@ namespace ryujin
     TimeIntegrator(
         const MPI_Comm &mpi_communicator,
         std::map<std::string, dealii::Timer> &computing_timer,
+        const ryujin::OfflineData<dim, Number> &offline_data,
         const ryujin::EulerModule<dim, Number> &euler_module,
         const ryujin::DissipationModule<dim, Number> &dissipation_module,
         const std::string &subsection = "TimeIntegrator");
@@ -72,10 +73,15 @@ namespace ryujin
     const MPI_Comm &mpi_communicator_;
     std::map<std::string, dealii::Timer> &computing_timer_;
 
+    dealii::SmartPointer<const ryujin::OfflineData<dim, Number>> offline_data_;
     dealii::SmartPointer<const ryujin::EulerModule<dim, Number>> euler_module_;
 
     dealii::SmartPointer<const ryujin::DissipationModule<dim, Number>>
         dissipation_module_;
+
+    // FIXME: remove
+    mutable SparseMatrixSIMD<Number> my_dij;
+    mutable vector_type my_U;
 
     //@}
   };

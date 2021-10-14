@@ -89,6 +89,8 @@ namespace ryujin
     //@{
 
     /**
+     * TODO documentation
+     *
      * Given a reference to a previous state vector U perform an explicit
      * euler step (and store the result in U). The function returns the
      * computed maximal time step size tau_max.
@@ -97,32 +99,24 @@ namespace ryujin
      * (if tau != 0). Here, tau_max is the computed maximal time step size
      * and tau is the optional third parameter.
      */
-    Number step(vector_type &U, Number t, Number tau = 0.) const;
-
-  private:
-
-    //@}
-    /**
-     * @name Internally used time-stepping primitives
-     */
-    //@{
+    template <unsigned int l>
+    Number step(
+      const vector_type &old_U,
+      std::array<std::reference_wrapper<const vector_type>, l> Us,
+      std::array<std::reference_wrapper<const SparseMatrixSIMD<Number>>, l> dijHs,
+      const std::array<Number, l> alphas,
+      vector_type &new_U,
+      SparseMatrixSIMD<Number> &new_dijH,
+      Number tau) const;
 
     /**
      * TODO documentation
      */
-    template <unsigned int l>
-    Number single_step(
-        const vector_type &old_U,
-        std::array<std::reference_wrapper<const vector_type>, l> Us,
-        std::array<std::reference_wrapper<const SparseMatrixSIMD<Number>>, l> dijHs,
-        const std::array<Number, l> alphas,
-        vector_type &new_U,
-        SparseMatrixSIMD<Number> &new_dijH,
-        Number tau) const;
-
     void apply_boundary_conditions(vector_type &U, Number t) const;
 
-    //@}
+  private:
+
+   //@}
     /**
      * @name Run time options
      */
@@ -170,10 +164,6 @@ namespace ryujin
     mutable SparseMatrixSIMD<Number> lij_matrix_;
     mutable SparseMatrixSIMD<Number> lij_matrix_next_;
     mutable SparseMatrixSIMD<Number, problem_dimension> pij_matrix_;
-
-    // FIXME: remove
-    mutable SparseMatrixSIMD<Number> my_dij;
-    mutable vector_type my_U;
 
     //@}
   };

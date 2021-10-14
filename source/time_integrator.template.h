@@ -7,6 +7,8 @@
 
 #include "time_integrator.h"
 
+#include "euler_module.template.h"
+
 namespace ryujin
 {
   using namespace dealii;
@@ -15,12 +17,14 @@ namespace ryujin
   TimeIntegrator<dim, Number>::TimeIntegrator(
       const MPI_Comm &mpi_communicator,
       std::map<std::string, dealii::Timer> &computing_timer,
+      const ryujin::OfflineData<dim, Number> &offline_data,
       const ryujin::EulerModule<dim, Number> &euler_module,
       const ryujin::DissipationModule<dim, Number> &dissipation_module,
       const std::string &subsection /*= "TimeIntegrator"*/)
       : ParameterAcceptor(subsection)
       , mpi_communicator_(mpi_communicator)
       , computing_timer_(computing_timer)
+      , offline_data_(&offline_data)
       , euler_module_(&euler_module)
       , dissipation_module_(&dissipation_module)
   {
@@ -33,6 +37,12 @@ namespace ryujin
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeIntegrator<dim, Number>::prepare()" << std::endl;
 #endif
+
+    const auto &vector_partitioner = offline_data_->vector_partitioner();
+    my_U.reinit(vector_partitioner);
+
+    const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
+    my_dij.reinit(sparsity_simd);
   }
 
 
@@ -45,7 +55,11 @@ namespace ryujin
     std::cout << "TimeIntegrator<dim, Number>::step()" << std::endl;
 #endif
 
-    return euler_module_->step(U, t, tau_0);
+    Number tau_1 =
+        euler_module_->template step<0>(U, {}, {}, {}, my_U, my_dij, tau_0);
+    euler_module_->apply_boundary_conditions(my_U, t + tau_1);
+    U.swap(my_U);
+    return tau_1;
   }
 
 } /* namespace ryujin */

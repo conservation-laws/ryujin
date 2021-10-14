@@ -49,6 +49,7 @@ namespace ryujin
                            "/G - DissipationModule")
       , time_integrator(mpi_communicator,
                         computing_timer,
+                        offline_data,
                         euler_module,
                         dissipation_module,
                         "/H - TimeIntegrator")
