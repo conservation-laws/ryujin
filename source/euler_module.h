@@ -22,6 +22,8 @@
 #include <deal.II/lac/sparse_matrix.templates.h>
 #include <deal.II/lac/vector.h>
 
+#include <functional>
+
 namespace ryujin
 {
 
@@ -105,7 +107,18 @@ namespace ryujin
      */
     //@{
 
-    Number single_step(vector_type &U, Number tau) const;
+    /**
+     * TODO documentation
+     */
+    template <unsigned int l>
+    Number single_step(
+        const vector_type &old_U,
+        std::array<std::reference_wrapper<const vector_type>, l> Us,
+        std::array<std::reference_wrapper<const SparseMatrixSIMD<Number>>, l> dijHs,
+        const std::array<Number, l> alphas,
+        vector_type &new_U,
+        SparseMatrixSIMD<Number> &new_dijH,
+        Number tau) const;
 
     void apply_boundary_conditions(vector_type &U, Number t) const;
 
@@ -153,16 +166,13 @@ namespace ryujin
 
     mutable vector_type r_;
 
-    // FIXME
-    mutable SparseMatrixSIMD<Number> dij_matrix_;
-
     mutable SparseMatrixSIMD<Number> lij_matrix_;
     mutable SparseMatrixSIMD<Number> lij_matrix_next_;
-
     mutable SparseMatrixSIMD<Number, problem_dimension> pij_matrix_;
 
-    // FIXME
-    mutable vector_type temp_euler_;
+    // FIXME: remove
+    mutable SparseMatrixSIMD<Number> my_dij;
+    mutable vector_type my_U;
 
     //@}
   };
