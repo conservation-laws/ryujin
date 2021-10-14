@@ -95,7 +95,7 @@ namespace ryujin
      * (if tau != 0). Here, tau_max is the computed maximal time step size
      * and tau is the optional third parameter.
      */
-    Number step(vector_type &U, Number t, Number tau = 0.);
+    Number step(vector_type &U, Number t, Number tau = 0.) const;
 
   private:
 
@@ -105,9 +105,9 @@ namespace ryujin
      */
     //@{
 
-    Number single_step(vector_type &U, Number tau);
+    Number single_step(vector_type &U, Number tau) const;
 
-    void apply_boundary_conditions(vector_type &U, Number t);
+    void apply_boundary_conditions(vector_type &U, Number t) const;
 
     //@}
     /**
@@ -144,25 +144,25 @@ namespace ryujin
     unsigned int n_warnings_;
     ACCESSOR_READ_ONLY(n_warnings)
 
-    scalar_type alpha_;
-    scalar_type second_variations_;
-    scalar_type specific_entropies_;
-    scalar_type evc_entropies_;
+    mutable scalar_type alpha_;
+    mutable scalar_type second_variations_;
+    mutable scalar_type specific_entropies_;
+    mutable scalar_type evc_entropies_;
 
-    MultiComponentVector<Number, Limiter<dim, Number>::n_bounds> bounds_;
+    mutable MultiComponentVector<Number, Limiter<dim, Number>::n_bounds> bounds_;
 
-    vector_type r_;
-
-    // FIXME
-    SparseMatrixSIMD<Number> dij_matrix_;
-
-    SparseMatrixSIMD<Number> lij_matrix_;
-    SparseMatrixSIMD<Number> lij_matrix_next_;
-
-    SparseMatrixSIMD<Number, problem_dimension> pij_matrix_;
+    mutable vector_type r_;
 
     // FIXME
-    vector_type temp_euler_;
+    mutable SparseMatrixSIMD<Number> dij_matrix_;
+
+    mutable SparseMatrixSIMD<Number> lij_matrix_;
+    mutable SparseMatrixSIMD<Number> lij_matrix_next_;
+
+    mutable SparseMatrixSIMD<Number, problem_dimension> pij_matrix_;
+
+    // FIXME
+    mutable vector_type temp_euler_;
 
     //@}
   };

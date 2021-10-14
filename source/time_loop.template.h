@@ -47,11 +47,16 @@ namespace ryujin
                            offline_data,
                            initial_values,
                            "/G - DissipationModule")
-      , vtu_output(mpi_communicator, offline_data, "/H - VTUOutput")
+      , time_integrator(mpi_communicator,
+                        computing_timer,
+                        euler_module,
+                        dissipation_module,
+                        "/H - TimeIntegrator")
+      , vtu_output(mpi_communicator, offline_data, "/I - VTUOutput")
       , quantities(mpi_communicator,
                    problem_description,
                    offline_data,
-                   "/I - Quantities")
+                   "/J - Quantities")
       , mpi_rank(dealii::Utilities::MPI::this_mpi_process(mpi_communicator))
       , n_mpi_processes(
             dealii::Utilities::MPI::n_mpi_processes(mpi_communicator))
@@ -174,6 +179,7 @@ namespace ryujin
       offline_data.prepare();
       euler_module.prepare();
       dissipation_module.prepare();
+      time_integrator.prepare();
       vtu_output.prepare();
       quantities.prepare(base_name + "-quantities");
       print_mpi_partition(logfile);
@@ -306,7 +312,8 @@ namespace ryujin
 
       /* Do a time step: */
 
-      // FIXME
+      const auto tau = time_integrator.step(U, t);
+      t += tau;
 
       /* Print and record cycle statistics: */
 

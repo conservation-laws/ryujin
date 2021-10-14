@@ -47,7 +47,7 @@ namespace ryujin
                   "dofs when computing the maximal admissible step size");
 
     // FIXME
-    cfl_ = 0.8;
+    cfl_ = 0.2;
   }
 
 
@@ -84,7 +84,7 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  Number EulerModule<dim, Number>::single_step(vector_type &U, Number tau)
+  Number EulerModule<dim, Number>::single_step(vector_type &U, Number tau) const
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "EulerModule<dim, Number>::single_step()" << std::endl;
@@ -1042,7 +1042,7 @@ namespace ryujin
 
   template <int dim, typename Number>
   void EulerModule<dim, Number>::apply_boundary_conditions(vector_type &U,
-                                                           Number t)
+                                                           Number t) const
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "EulerModule<dim, Number>::apply_boundary_conditions()"
@@ -1138,8 +1138,9 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  Number
-  EulerModule<dim, Number>::step(vector_type &U, Number t, Number tau_0 /*= 0*/)
+  Number EulerModule<dim, Number>::step(vector_type &U,
+                                        Number t,
+                                        Number tau_0 /*= 0*/) const
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "EulerModule<dim, Number>::step()" << std::endl;
