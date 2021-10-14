@@ -129,7 +129,7 @@ namespace ryujin
       euler_module_->apply_boundary_conditions(temp_U[2], t + 3. * tau);
 
       U.swap(temp_U[2]);
-      return tau;
+      return Number(3.) * tau;
     }
 
   }

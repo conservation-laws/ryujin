@@ -518,20 +518,16 @@ namespace ryujin
 
           for (unsigned int k = 0; k < problem_dimension; ++k) {
             const auto temp = (f_j[k] - f_i[k]) * c_ij;
-            r_i[k] += -temp + d_ijH * (U_j - U_i)[k];
+            r_i[k] += alpha_n * (-temp + d_ijH * (U_j[k] - U_i[k]));
             U_ij_bar[k] =
                 Number(0.5) * (U_i[k] + U_j[k]) - Number(0.5) * temp * d_ij_inv;
           }
 
-          // FIXME: Verify
-          if constexpr (l != 0) {
-            r_i *= alpha_n;
-            for (unsigned int n = 0; n < l; ++n) {
-              for (unsigned int k = 0; k < problem_dimension; ++k) {
-                const auto temp = (f_jHs[n][k] - f_iHs[n][k]) * c_ij;
-                r_i[k] +=
-                    -alphas[n] * (temp + d_ijHs[n] * (U_jHs[n] - U_iHs[n])[k]);
-              }
+          for (unsigned int n = 0; n < l; ++n) {
+            for (unsigned int k = 0; k < problem_dimension; ++k) {
+              const auto temp = (f_jHs[n][k] - f_iHs[n][k]) * c_ij;
+              r_i[k] +=
+                  alphas[n] * (-temp + d_ijHs[n] * (U_jHs[n][k] - U_iHs[n][k]));
             }
           }
 
@@ -624,19 +620,15 @@ namespace ryujin
           for (unsigned int k = 0; k < problem_dimension; ++k) {
             const auto temp = (f_j[k] - f_i[k]) * c_ij;
 
-            r_i[k] += -temp + d_ijH * (U_j[k] - U_i[k]);
+            r_i[k] += alpha_n * (-temp + d_ijH * (U_j[k] - U_i[k]));
             U_ij_bar[k] = Number(0.5) * (U_i[k] + U_j[k] - temp * d_ij_inv);
           }
 
-          // FIXME: Verify
-          if constexpr (l != 0) {
-            r_i *= alpha_n;
-            for (unsigned int n = 0; n < l; ++n) {
-              for (unsigned int k = 0; k < problem_dimension; ++k) {
-                const auto temp = (f_jHs[n][k] - f_iHs[n][k]) * c_ij;
-                r_i[k] +=
-                    -alphas[n] * (temp + d_ijHs[n] * (U_jHs[n] - U_iHs[n])[k]);
-              }
+          for (unsigned int n = 0; n < l; ++n) {
+            for (unsigned int k = 0; k < problem_dimension; ++k) {
+              const auto temp = (f_jHs[n][k] - f_iHs[n][k]) * c_ij;
+              r_i[k] +=
+                  alphas[n] * (-temp + d_ijHs[n] * (U_jHs[n][k] - U_iHs[n][k]));
             }
           }
 
@@ -772,15 +764,14 @@ namespace ryujin
             const auto f_j = problem_description_->f(U_j);
             for (unsigned int k = 0; k < problem_dimension; ++k) {
               const auto temp = (f_j[k] - f_i[k]) * c_ij;
-              p_ij[k] += (alpha_n - Number(1.)) * temp;
+              p_ij[k] += (alpha_n - Number(1.)) * (-temp);
             }
 
-            // FIXME: verify
             for (unsigned int n = 0; n < l; ++n) {
               p_ij += alphas[n] * d_ijHs[n] * (U_jHs[n] - U_iHs[n]);
               for (unsigned int k = 0; k < problem_dimension; ++k) {
                 const auto temp = (f_jHs[n][k] - f_iHs[n][k]) * c_ij;
-                p_ij[k] += alphas[n] * temp;
+                p_ij[k] += alphas[n] * (-temp);
               }
             }
           }
@@ -872,7 +863,7 @@ namespace ryujin
 
             for (unsigned int k = 0; k < problem_dimension; ++k) {
               const auto temp = (f_j[k] - f_i[k]) * c_ij;
-              p_ij[k] += (alpha_n - Number(1.)) * temp;
+              p_ij[k] += (alpha_n - Number(1.)) * (-temp);
             }
 
             // FIXME: verify
@@ -880,7 +871,7 @@ namespace ryujin
               p_ij += alphas[n] * d_ijHs[n] * (U_jHs[n] - U_iHs[n]);
               for (unsigned int k = 0; k < problem_dimension; ++k) {
                 const auto temp = (f_jHs[n][k] - f_iHs[n][k]) * c_ij;
-                p_ij[k] += alphas[n] * temp;
+                p_ij[k] += alphas[n] * (-temp);
               }
             }
           }
