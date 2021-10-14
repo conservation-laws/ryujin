@@ -449,13 +449,13 @@ namespace ryujin
           r_.update_ghost_values_start(channel++);
       });
 
-      /* Parallel region */
-      RYUJIN_PARALLEL_REGION_BEGIN
-      LIKWID_MARKER_START("time_step_3");
-
       const Number alpha_n =
           -std::accumulate(alphas.begin(), alphas.end(), -1.);
       Assert(0. < alpha_n && alpha_n <= 1., dealii::ExcInternalError());
+
+      /* Parallel region */
+      RYUJIN_PARALLEL_REGION_BEGIN
+      LIKWID_MARKER_START("time_step_3");
 
       /* Nota bene: This bounds variable is thread local: */
       Limiter<dim, Number> limiter_serial(*problem_description_);
@@ -696,6 +696,10 @@ namespace ryujin
       SynchronizationDispatch synchronization_dispatch(
           [&]() { lij_matrix_.update_ghost_rows_start(channel++); });
 
+      const Number alpha_n =
+          -std::accumulate(alphas.begin(), alphas.end(), -1.);
+      Assert(0. < alpha_n && alpha_n <= 1., dealii::ExcInternalError());
+
       RYUJIN_PARALLEL_REGION_BEGIN
       LIKWID_MARKER_START("time_step_4");
 
@@ -715,6 +719,14 @@ namespace ryujin
         const auto U_i_new = new_U.get_tensor(i);
         const auto U_i = old_U.get_tensor(i);
         const auto f_i = problem_description_->f(U_i);
+
+        std::array<state_type, l> U_iHs;
+        std::array<flux_type, l> f_iHs;
+        for (unsigned int n = 0; n < l; ++n) {
+          U_iHs[n] = Us[n].get().get_tensor(i);
+          f_iHs[n] = problem_description_->f(U_iHs[n]);
+        }
+
         const auto r_i = r_.get_tensor(i);
 
         const auto alpha_i = alpha_.local_element(i);
@@ -727,9 +739,19 @@ namespace ryujin
         for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
           const auto j = js[col_idx];
 
+          const auto U_j = old_U.get_tensor(j);
+
+          std::array<state_type, l> U_jHs;
+          std::array<flux_type, l> f_jHs;
+          std::array<Number, l> d_ijHs;
+          for (unsigned int n = 0; n < l; ++n) {
+            U_jHs[n] = Us[n].get().get_tensor(j);
+            f_jHs[n] = problem_description_->f(U_jHs[n]);
+            d_ijHs[n] = dijHs[n].get().get_entry(i, col_idx);
+          }
+
           const auto c_ij = cij_matrix.get_tensor(i, col_idx);
 
-          const auto U_j = old_U.get_tensor(j);
           const auto r_j = r_.get_tensor(j);
 
           const auto alpha_j = alpha_.local_element(j);
@@ -745,21 +767,31 @@ namespace ryujin
 
           /* Contributions from graph viscosity and mass matrix correction: */
 
-          auto p_ij = factor * (-d_ij * (U_j - U_i) + b_ij * r_j - b_ji * r_i);
+          auto p_ij = -d_ij * (U_j - U_i) + b_ij * r_j - b_ji * r_i;
 
           const auto d_ijH =  d_ij * (alpha_i + alpha_j) * Number(.5);
-          p_ij += factor * d_ijH * (U_j - U_i);
+          p_ij += alpha_n * d_ijH * (U_j - U_i);
 
           if constexpr (l != 0) {
             /* Flux contributions: */
 
             const auto f_j = problem_description_->f(U_j);
-
             for (unsigned int k = 0; k < problem_dimension; ++k) {
               const auto temp = (f_j[k] - f_i[k]) * c_ij;
-              p_ij[k] += factor * (temp - 0.99999999999999 * temp); // FIXME
+              p_ij[k] += (alpha_n - Number(1.)) * temp;
+            }
+
+            // FIXME: verify
+            for (unsigned int n = 0; n < l; ++n) {
+              p_ij += alphas[n] * d_ijHs[n] * (U_jHs[n] - U_iHs[n]);
+              for (unsigned int k = 0; k < problem_dimension; ++k) {
+                const auto temp = (f_jHs[n][k] - f_iHs[n][k]) * c_ij;
+                p_ij[k] += alphas[n] * temp;
+              }
             }
           }
+
+          p_ij *= factor;
 
           pij_matrix_.write_tensor(p_ij, i, col_idx);
 
@@ -790,6 +822,14 @@ namespace ryujin
         const auto U_i_new = new_U.get_vectorized_tensor(i);
         const auto U_i = old_U.get_vectorized_tensor(i);
         const auto f_i = problem_description_->f(U_i);
+
+        std::array<ProblemDescription::state_type<dim, VA>, l> U_iHs;
+        std::array<ProblemDescription::flux_type<dim, VA>, l> f_iHs;
+        for (unsigned int n = 0; n < l; ++n) {
+          U_iHs[n] = Us[n].get().get_vectorized_tensor(i);
+          f_iHs[n] = problem_description_->f(U_iHs[n]);
+        }
+
         const auto r_i = r_.get_vectorized_tensor(i);
         const auto alpha_i = simd_load(alpha_, i);
 
@@ -801,9 +841,18 @@ namespace ryujin
         for (unsigned int col_idx = 0; col_idx < row_length;
              ++col_idx, js += simd_length) {
 
-          const auto c_ij = cij_matrix.get_vectorized_tensor(i, col_idx);
-
           const auto U_j = old_U.get_vectorized_tensor(js);
+
+          std::array<ProblemDescription::state_type<dim, VA>, l> U_jHs;
+          std::array<ProblemDescription::flux_type<dim, VA>, l> f_jHs;
+          std::array<VA, l> d_ijHs;
+          for (unsigned int n = 0; n < l; ++n) {
+            U_jHs[n] = Us[n].get().get_vectorized_tensor(js);
+            f_jHs[n] = problem_description_->f(U_jHs[n]);
+            d_ijHs[n] = dijHs[n].get().get_vectorized_entry(i, col_idx);
+          }
+
+          const auto c_ij = cij_matrix.get_vectorized_tensor(i, col_idx);
           const auto r_j = r_.get_vectorized_tensor(js);
 
           const auto alpha_j = simd_load(alpha_, js);
@@ -817,10 +866,10 @@ namespace ryujin
 
           /* Contributions from graph viscosity and mass matrix correction: */
 
-          auto p_ij = factor * (-d_ij * (U_j - U_i) + b_ij * r_j - b_ji * r_i);
+          auto p_ij = -d_ij * (U_j - U_i) + b_ij * r_j - b_ji * r_i;
 
           const auto d_ijH =  d_ij * (alpha_i + alpha_j) * Number(.5);
-          p_ij += factor * d_ijH * (U_j - U_i);
+          p_ij += alpha_n * d_ijH * (U_j - U_i);
 
           if constexpr (l != 0) {
             /* Flux contributions: */
@@ -829,9 +878,20 @@ namespace ryujin
 
             for (unsigned int k = 0; k < problem_dimension; ++k) {
               const auto temp = (f_j[k] - f_i[k]) * c_ij;
-              p_ij[k] += factor * (temp - 0.99999999999999 * temp); // FIXME
+              p_ij[k] += (alpha_n - Number(1.)) * temp;
+            }
+
+            // FIXME: verify
+            for (unsigned int n = 0; n < l; ++n) {
+              p_ij += alphas[n] * d_ijHs[n] * (U_jHs[n] - U_iHs[n]);
+              for (unsigned int k = 0; k < problem_dimension; ++k) {
+                const auto temp = (f_jHs[n][k] - f_iHs[n][k]) * c_ij;
+                p_ij[k] += alphas[n] * temp;
+              }
             }
           }
+
+          p_ij *= factor;
 
           pij_matrix_.write_vectorized_tensor(p_ij, i, col_idx, true);
 
