@@ -75,6 +75,7 @@ namespace ryujin
     /* Initialize matrices: */
 
     const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
+    dij_matrix_.reinit(sparsity_simd);
     lij_matrix_.reinit(sparsity_simd);
     lij_matrix_next_.reinit(sparsity_simd);
     pij_matrix_.reinit(sparsity_simd);
@@ -94,7 +95,7 @@ namespace ryujin
           dijHs,
       const std::array<Number, l> alphas,
       vector_type &new_U,
-      SparseMatrixSIMD<Number> &dij_matrix,
+      SparseMatrixSIMD<Number> &new_dijH,
       Number tau) const
   {
 #ifdef DEBUG_OUTPUT
@@ -275,7 +276,7 @@ namespace ryujin
             d = std::max(d, norm_2 * lambda_max_2);
           }
 
-          dij_matrix.write_entry(d, i, col_idx);
+          dij_matrix_.write_entry(d, i, col_idx);
         }
 
         alpha_.local_element(i) = indicator_serial.alpha(hd_i);
@@ -335,7 +336,7 @@ namespace ryujin
 
           const auto d = norm * lambda_max;
 
-          dij_matrix.write_vectorized_entry(d, i, col_idx, true);
+          dij_matrix_.write_vectorized_entry(d, i, col_idx, true);
         }
 
         simd_store(alpha_, indicator_simd.alpha(hd_i), i);
@@ -381,15 +382,15 @@ namespace ryujin
 
           // fill lower triangular part of dij_matrix missing from step 1
           if (j < i) {
-            const auto d_ji = dij_matrix.get_transposed_entry(i, col_idx);
-            dij_matrix.write_entry(d_ji, i, col_idx);
+            const auto d_ji = dij_matrix_.get_transposed_entry(i, col_idx);
+            dij_matrix_.write_entry(d_ji, i, col_idx);
           }
 
-          d_sum -= dij_matrix.get_entry(i, col_idx);
+          d_sum -= dij_matrix_.get_entry(i, col_idx);
         }
 
         /* write diagonal element */
-        dij_matrix.write_entry(d_sum, i, 0);
+        dij_matrix_.write_entry(d_sum, i, 0);
 
         const Number mass = lumped_mass_matrix.local_element(i);
         const Number tau = cfl_ * mass / (Number(-2.) * d_sum);
@@ -487,10 +488,12 @@ namespace ryujin
           const auto alpha_j = alpha_.local_element(j);
           const auto variations_j = second_variations_.local_element(j);
 
-          const auto d_ij = dij_matrix.get_entry(i, col_idx);
+          const auto d_ij = dij_matrix_.get_entry(i, col_idx);
           const Number d_ij_inv = Number(1.) / d_ij;
 
           const auto d_ijH = d_ij * (alpha_i + alpha_j) * Number(.5);
+          /* Store high order graph viscosity in new_dijH */
+          new_dijH.write_entry(d_ijH, i, col_idx);
 
           dealii::Tensor<1, problem_dimension, Number> U_ij_bar;
           const auto c_ij = cij_matrix.get_tensor(i, col_idx);
@@ -560,9 +563,11 @@ namespace ryujin
           const auto alpha_j = simd_load(alpha_, js);
           const auto variations_j = simd_load(second_variations_, js);
 
-          const auto d_ij = dij_matrix.get_vectorized_entry(i, col_idx);
+          const auto d_ij = dij_matrix_.get_vectorized_entry(i, col_idx);
 
           const auto d_ijH = d_ij * (alpha_i + alpha_j) * Number(.5);
+          /* Store high order graph viscosity in new_dijH */
+          new_dijH.write_vectorized_entry(d_ijH, i, col_idx, true);
 
           const auto U_j = old_U.get_vectorized_tensor(js);
 
@@ -668,7 +673,7 @@ namespace ryujin
           const auto alpha_j = alpha_.local_element(j);
           const Number m_j_inv = lumped_mass_matrix_inverse.local_element(j);
 
-          const auto d_ij = dij_matrix.get_entry(i, col_idx);
+          const auto d_ij = dij_matrix_.get_entry(i, col_idx);
 
           const auto m_ij = mass_matrix.get_entry(i, col_idx);
           const auto b_ij =
@@ -683,16 +688,15 @@ namespace ryujin
           const auto d_ijH =  d_ij * (alpha_i + alpha_j) * Number(.5);
           p_ij += factor * d_ijH * (U_j - U_i);
 
-          /* Update d_ij_matrix to store high order graph viscosity */
-          dij_matrix.write_entry(d_ijH, i, col_idx);
+          if constexpr (l != 0) {
+            /* Flux contributions: */
 
-          /* Flux contributions: */
+            const auto f_j = problem_description_->f(U_j);
 
-          const auto f_j = problem_description_->f(U_j);
-
-          for (unsigned int k = 0; k < problem_dimension; ++k) {
-            const auto temp = (f_j[k] - f_i[k]) * c_ij;
-            p_ij[k] += factor * (temp - 0.99999999999999 * temp); // FIXME
+            for (unsigned int k = 0; k < problem_dimension; ++k) {
+              const auto temp = (f_j[k] - f_i[k]) * c_ij;
+              p_ij[k] += factor * (temp - 0.99999999999999 * temp); // FIXME
+            }
           }
 
           pij_matrix_.write_tensor(p_ij, i, col_idx);
@@ -743,7 +747,7 @@ namespace ryujin
           const auto alpha_j = simd_load(alpha_, js);
           const auto m_j_inv = simd_load(lumped_mass_matrix_inverse, js);
 
-          const auto d_ij = dij_matrix.get_vectorized_entry(i, col_idx);
+          const auto d_ij = dij_matrix_.get_vectorized_entry(i, col_idx);
 
           const auto m_ij = mass_matrix.get_vectorized_entry(i, col_idx);
           const auto b_ij = (col_idx == 0 ? VA(1.) : VA(0.)) - m_ij * m_j_inv;
@@ -756,16 +760,15 @@ namespace ryujin
           const auto d_ijH =  d_ij * (alpha_i + alpha_j) * Number(.5);
           p_ij += factor * d_ijH * (U_j - U_i);
 
-          /* Update d_ij_matrix to store high order graph viscosity */
-          dij_matrix.write_vectorized_entry(d_ijH, i, col_idx, true);
+          if constexpr (l != 0) {
+            /* Flux contributions: */
 
-          /* Flux contributions: */
+            const auto f_j = problem_description_->f(U_j);
 
-          const auto f_j = problem_description_->f(U_j);
-
-          for (unsigned int k = 0; k < problem_dimension; ++k) {
-            const auto temp = (f_j[k] - f_i[k]) * c_ij;
-            p_ij[k] += factor * (temp - 0.99999999999999 * temp); // FIXME
+            for (unsigned int k = 0; k < problem_dimension; ++k) {
+              const auto temp = (f_j[k] - f_i[k]) * c_ij;
+              p_ij[k] += factor * (temp - 0.99999999999999 * temp); // FIXME
+            }
           }
 
           pij_matrix_.write_vectorized_tensor(p_ij, i, col_idx, true);
