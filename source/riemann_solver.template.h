@@ -291,7 +291,14 @@ namespace ryujin
 
     const auto factor = (gamma - ScalarNumber(1.)) * ScalarNumber(0.5);
 
-    const Number numerator = a_i + a_j - factor * (u_j - u_i);
+    /*
+     * Nota bene (cf. [1, (3.6)]: The condition "numerator > 0" is the
+     * well-known non-vacuum condition. In case we encounter numerator <= 0
+     * then p_star = 0 is the correct pressure to compute the wave speed.
+     * Therefore, all we have to do is to take the positive part of the
+     * expression:
+     */
+    const Number numerator = positive_part(a_i + a_j - factor * (u_j - u_i));
     const Number denominator =
         a_i * ryujin::pow(p_i / p_j, -factor * gamma_inverse) + a_j;
 
