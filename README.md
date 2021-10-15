@@ -36,25 +36,32 @@ Videos
 References
 ----------
 
-If you use this software for an academic publication please cite the
-following references ([preprint](https://arxiv.org/abs/2007.00094),
-[preprint](https://arxiv.org/abs/2009.06022)):
+If you use this software for an academic publication please consider citing
+some of the following references
+([[1](https://arxiv.org/abs/2007.00094)],
+[[2](https://arxiv.org/abs/2009.06022)],
+[[3](https://arxiv.org/abs/2106.02159})]):
 
 ```
-@article {ryujin-2021-a,
+@article {ryujin-2021-1,
   author = {Matthias Maier and Martin Kronbichler},
-  title = {Efficient parallel 3D computation of the compressible Euler equations
-    with an invariant-domain preserving second-order finite-element scheme},
+  title = {Efficient parallel 3D computation of the compressible Euler
+    equations with an invariant-domain preserving second-order
+    finite-element scheme},
+  doi = {10.1145/3470637},
   url = {https://arxiv.org/abs/2007.00094},
   journal = {ACM Transactions on Parallel Computing},
   year = {2021},
-  volume = {accepted},
-  pages = {},
+  volume = {8},
+  number = {3},
+  pages = {16:1-30},
 }
 
-@article{ryujin-2021-b,
-  author = {Jean-Luc Guermond and Matthias Maier and Bojan Popov and Ignacio Tomas},
-  title = {Second-order invariant domain preserving approximation of the compressible Navier--Stokes equations},
+@article{ryujin-2021-2,
+  author = {Jean-Luc Guermond and Matthias Maier and Bojan Popov and
+    Ignacio Tomas},
+  title = {Second-order invariant domain preserving approximation of the
+    compressible Navier--Stokes equations},
   doi = {10.1016/j.cma.2020.113608},
   url = {https://arxiv.org/abs/2009.06022},
   journal = {Computer Methods in Applied Mechanics and Engineering},
@@ -62,6 +69,19 @@ following references ([preprint](https://arxiv.org/abs/2007.00094),
   volume  = {375},
   number = {1},
   pages = {113608},
+}
+
+@article{ryujin-2021-3,
+  author = {Jean-Luc~Guermond and Martin Kronbichler and Matthias Maier and
+    Bojan Popov and Ignacio Tomas},
+  title = {On the implementation of a robust and efficient finite
+    element-based parallel solver for the compressible Navier-stokes
+    equations},
+  url = {https://arxiv.org/abs/2106.02159},
+  journal = {Computer Methods in Applied Mechanics and Engineering},
+  year = {2021},
+  volume = {accepted},
+  pages = {},
 }
 ```
 

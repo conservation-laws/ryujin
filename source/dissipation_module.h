@@ -35,7 +35,7 @@ namespace ryujin
 
   /**
    * Minimum entropy guaranteeing second-order time stepping for the
-   * parabolic limiting equation @cite GuermondEtAl2021, Eq. 3.3:
+   * parabolic limiting equation @cite ryujin-2021-2, Eq. 3.3:
    * \f{align}
    *   \newcommand{\bbm}{{\boldsymbol m}}
    *   \newcommand{\bef}{{\boldsymbol f}}
@@ -56,7 +56,7 @@ namespace ryujin
    * D}=0 . \f}
    *
    * Internally, the module first performs an explicit second order
-   * Crank-Nicolson step updating the velocity @cite GuermondEtAl2021, Eq.
+   * Crank-Nicolson step updating the velocity @cite ryujin-2021-2, Eq.
    * 5.5:
    * \f{align}
    *   \begin{cases}
@@ -78,7 +78,7 @@ namespace ryujin
    *   \end{cases}
    * \f}
    * We then postprocess and compute an internal energy update with a
-   * second Crank-Nicolson step, @cite GuermondEtAl2021, Eq. 5.13:
+   * second Crank-Nicolson step, @cite ryujin-2021-2, Eq. 5.13:
    * \f{align}
    *     \newcommand\sfe{{\mathsf e}}
    *     \newcommand{\upHnph}{^{\text{H},n+\frac{1}{2}}}
