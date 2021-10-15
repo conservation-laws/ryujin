@@ -28,6 +28,13 @@ namespace ryujin
       , euler_module_(&euler_module)
       , dissipation_module_(&dissipation_module)
   {
+    cfl_min_ = Number(0.80);
+    add_parameter(
+        "cfl min", cfl_min_, "Minimal admissible relative CFL constant");
+
+    cfl_max_ = Number(0.90);
+    add_parameter(
+        "cfl max", cfl_max_, "Maximal admissible relative CFL constant");
   }
 
 
@@ -38,20 +45,30 @@ namespace ryujin
     std::cout << "TimeIntegrator<dim, Number>::prepare()" << std::endl;
 #endif
 
-    const auto &vector_partitioner = offline_data_->vector_partitioner();
-
-    const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
+    /* Resize temporary storage to appropriate sizes: */
 
     /* SSP-RK3 */
-
     // FIXME
     temp_U.resize(3);
-    temp_dij.resize(3);
-    for(unsigned int n = 0; n < 3; ++n) {
-      temp_U[n].reinit(vector_partitioner);
-      temp_dij[n].reinit(sparsity_simd);
-    }
+    temp_dij.resize(2);
 
+    /* Initialize temporary vectors and matrices: */
+
+    const auto &vector_partitioner = offline_data_->vector_partitioner();
+    for (auto &it : temp_U)
+      it.reinit(vector_partitioner);
+
+    const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
+    for (auto &it : temp_dij)
+      it.reinit(sparsity_simd);
+
+    /* Reset CFL to save starting value: */
+
+    AssertThrow(cfl_min_ > 0., ExcMessage("cfl min must be a positive value"));
+    AssertThrow(cfl_max_ >= cfl_min_,
+                ExcMessage("cfl max must be greater or equal than cfl min"));
+
+    euler_module_->cfl(cfl_max_);
   }
 
 
@@ -127,7 +144,7 @@ namespace ryujin
                                              {temp_dij[0], temp_dij[1]},
                                              {Number(0.75), Number(-2.)},
                                              temp_U[2],
-                                             temp_dij[2],
+                                             temp_dij[1],
                                              tau);
       euler_module_->apply_boundary_conditions(temp_U[2], t + 3. * tau);
 

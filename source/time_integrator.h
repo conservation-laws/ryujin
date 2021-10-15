@@ -62,6 +62,9 @@ namespace ryujin
      */
     //@{
 
+    Number cfl_min_;
+    Number cfl_max_;
+
     //@}
 
     //@}
@@ -79,8 +82,8 @@ namespace ryujin
     dealii::SmartPointer<const ryujin::DissipationModule<dim, Number>>
         dissipation_module_;
 
-    mutable std::vector<SparseMatrixSIMD<Number>> temp_dij;
-    mutable std::vector<vector_type> temp_U;
+    std::vector<SparseMatrixSIMD<Number>> temp_dij;
+    std::vector<vector_type> temp_U;
 
     //@}
   };
