@@ -26,6 +26,13 @@
 
 namespace ryujin
 {
+  /**
+   * A class signalling a restart, thrown in EulerModule::single_step and
+   * caught at various places.
+   */
+  class Restart final
+  {
+  };
 
   /**
    * Explicit forward Euler time-stepping for hyperbolic systems with
@@ -89,31 +96,114 @@ namespace ryujin
     //@{
 
     /**
-     * TODO documentation
+     * Given a reference to a previous state vector @ref old_U perform an
+     * explicit euler step (and store the result in @ref new_U). The
+     * function returns the computed maximal time step size tau_max
+     * according to the CFL condition.
      *
-     * Given a reference to a previous state vector U perform an explicit
-     * euler step (and store the result in U). The function returns the
-     * computed maximal time step size tau_max.
+     * The time step is performed with either tau_max (if @ref tau is set
+     * to 0), or tau (if @ref tau is nonzero). Here, tau_max is the
+     * computed maximal time step size and @ref tau is the last parameter
+     * of the function.
      *
-     * The time step is performed with either tau_max (if tau == 0), or tau
-     * (if tau != 0). Here, tau_max is the computed maximal time step size
-     * and tau is the optional third parameter.
+     * The function takes an optional array of states @ref stage_U
+     * and high-order graph viscosities @ref stage_dij together with a an
+     * array of weights @ref stage_weights to construct a modified
+     * high-order flux. The standard high-order flux reads (cf @cite
+     * ryujin-2021-1, Eq. 12):
+     * \f{align}
+     *   \newcommand{\bR}{{\boldsymbol R}}
+     *   \newcommand{\bU}{{\boldsymbol U}}
+     *   \newcommand\bUni{\bU^n_i}
+     *   \newcommand\bUnj{\bU^n_j}
+     *   \newcommand{\polf}{{\mathbb f}}
+     *   \newcommand\Ii{\mathcal{I}(i)}
+     *   \newcommand{\bc}{{\boldsymbol c}}
+     *   \sum_{j\in\Ii} \frac{m_{ij}}{m_{j}}
+     *   \;
+     *   \frac{m_{j}}{\tau_n}\big(
+     *   \tilde\bU_j^{H,n+1} - \bU_j^{n}\big)
+     *   \;=\;
+     *   \bR^n_i,
+     *   \qquad\text{with}\quad
+     *   \bR^n_i\;:=\;
+     *   \sum_{j\in\Ii}\Big(-\polf(\bUnj) \cdot\bc_{ij}
+     *   +d_{ij}^{H,n}\big(\bUnj-\bUni\big)\Big).
+     * \f}
+     * Instead, the function assembles the modified high-order flux:
+     * \f{align}
+     *   \newcommand{\bR}{{\boldsymbol R}}
+     *   \newcommand{\bU}{{\boldsymbol U}}
+     *   \newcommand\bUnis{\bU^{s,n}_i}
+     *   \newcommand\bUnjs{\bU^{s,n}_j}
+     *   \newcommand{\polf}{{\mathbb f}}
+     *   \newcommand\Ii{\mathcal{I}(i)}
+     *   \newcommand{\bc}{{\boldsymbol c}}
+     *   \tilde{\bR}^n_i\;:=\;
+     *   \big(1-\sum_{s=\{1:stages\}}\omega_s\big)\bR^n_i
+     *   \;+\;
+     *   \sum_{s=\{1:stages\}}\omega_s
+     *   \sum_{j\in\Ii}\Big(-\polf(\bUnjs) \cdot\bc_{ij}
+     *   +d_{ij}^{H,s,n}\big(\bUnjs-\bUnis\big)\Big),
+     * \f}
+     * where \f$\omega_s\f$ denotes the weigths for the given stages.
+     *
+     * If the template parameter @ref record_dij is set to true, then the
+     * new high-order flux is written back into the supplied @ref new_dij
+     * matrix. If the template parameter is false, then the supplied
+     * parameter is ignored.
      */
-    template <unsigned int l>
+    template <unsigned int stages, bool record_dij = false>
     Number
     step(const vector_type &old_U,
-         std::array<std::reference_wrapper<const vector_type>, l> Us,
-         std::array<std::reference_wrapper<const SparseMatrixSIMD<Number>>, l>
-             dijHs,
-         const std::array<Number, l> alphas,
+         std::array<std::reference_wrapper<const vector_type>, stages> stage_U,
+         std::array<std::reference_wrapper<const SparseMatrixSIMD<Number>>,
+                    stages> stage_dij,
+         const std::array<Number, stages> stage_weights,
          vector_type &new_U,
-         SparseMatrixSIMD<Number> &new_dijH,
-         Number tau = 0.) const;
+         SparseMatrixSIMD<Number> &new_dij,
+         Number tau = Number(0.)) const;
 
     /**
-     * TODO documentation
+     * This function postprocesses a given state @ref U to conform with all
+     * prescribed boundary conditions at time @ref t. This implies that on
+     * slip (and no-slip) boundaries the normal momentum is set to zero; on
+     * Dirichlet boundaries the appropriate state at time @ref t is
+     * substituted; and on "flexible" boundaries depending on the fact
+     * whether we have supersonic or subsonic inflow/outflow the
+     * appropriate Riemann invariant is prescribed. See @cite ryujin-2021-3
+     * for details.
      */
     void apply_boundary_conditions(vector_type &U, Number t) const;
+
+    /**
+     * Sets the relative CFL number used for computing an appropriate
+     * time-step size to the given value. The CFL number must be a positive
+     * value. If chosen to be within the interval \f$(0,1)\f$ then the
+     * low-order update and limiting stages guarantee invariant domain
+     * preservation.
+     */
+    void cfl(Number new_cfl) const
+    {
+      Assert(cfl_ > Number(0.), dealii::ExcInternalError());
+      cfl_ = new_cfl;
+    }
+
+    /**
+     * Controls the behavior on invariant domain violation or CFL
+     * violation: If exception throwing is enabled then the
+     * EulerModule::step() function will raise a ryujin::Restart exception
+     * if it encounters an invariant domain violation of the low-order
+     * update in the limiter, or if it detects a large discrepancy between
+     * the chosen time-step size and the safe upper limit controlled by the
+     * CFL condition. If exception throwing is disabled, then this class
+     * will simply print a warning and record the fact that an issue
+     * occurred.
+     */
+    void throw_exception(bool new_value) const
+    {
+      throw_exception_ = new_value;
+    }
 
   private:
 
@@ -143,8 +233,10 @@ namespace ryujin
     dealii::SmartPointer<const ryujin::InitialValues<dim, Number>>
         initial_values_;
 
-    Number cfl_;
+    mutable Number cfl_;
     ACCESSOR_READ_ONLY(cfl)
+
+    mutable bool throw_exception_;
 
     mutable unsigned int n_restarts_;
     ACCESSOR_READ_ONLY(n_restarts)
