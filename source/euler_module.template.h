@@ -28,13 +28,13 @@ namespace ryujin
       const ryujin::InitialValues<dim, Number> &initial_values,
       const std::string &subsection /*= "EulerModule"*/)
       : ParameterAcceptor(subsection)
+      , id_violation_strategy_(IDViolationStrategy::warn)
       , mpi_communicator_(mpi_communicator)
       , computing_timer_(computing_timer)
       , offline_data_(&offline_data)
       , problem_description_(&problem_description)
       , initial_values_(&initial_values)
       , cfl_(0.2)
-      , throw_exception_(false)
       , n_restarts_(0)
       , n_warnings_(0)
   {
@@ -1175,15 +1175,17 @@ namespace ryujin
         Utilities::MPI::logical_or(restart_needed.load(), mpi_communicator_));
 
     if (restart_needed) {
-      if (throw_exception_) {
-        n_restarts_++;
-        throw Restart();
-      } else {
+      switch (id_violation_strategy_) {
+      case IDViolationStrategy::warn:
         n_warnings_++;
         if (dealii::Utilities::MPI::this_mpi_process(mpi_communicator_) == 0)
           std::cout << "[INFO] Euler module: Insufficient CFL: Invariant "
                        "domain violation detected"
                     << std::endl;
+        break;
+      case IDViolationStrategy::raise_exception:
+        n_restarts_++;
+        throw Restart();
       }
     }
 

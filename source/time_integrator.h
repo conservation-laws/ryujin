@@ -40,17 +40,28 @@ namespace ryujin
         const std::string &subsection = "TimeIntegrator");
 
     /**
-     * TODO documentation
+     * Prepare time integration. A call to @ref prepare() allocates
+     * temporary storage and is necessary before any of the following
+     * time-stepping functions can be called.
      */
     void prepare();
 
     /**
-     * @name Functons for performing explicit time steps
+     * @name Functions for performing explicit time steps
      */
     //@{
 
     /**
-     * TODO documentation
+     * Given a reference to a previous state vector U perform an explicit
+     * time step (and store the result in U). The function returns the
+     * chosen time step size tau.
+     *
+     * @note This function switches between different Runge-Kutta methods
+     * depending on chosen runtime parameters.
+     *
+     * @note Depending on chosen run time parameters different CFL
+     * adaptation and recovery strategies for invariant domain violations
+     * are used.
      */
     Number step(vector_type &U, Number t);
 

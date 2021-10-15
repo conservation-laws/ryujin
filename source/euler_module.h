@@ -152,6 +152,11 @@ namespace ryujin
      * new high-order flux is written back into the supplied @ref new_dij
      * matrix. If the template parameter is false, then the supplied
      * parameter is ignored.
+     *
+     * @note The routine does not automatically update ghost vectors of the
+     * distributed vector @ref new_U. It is best to simply call
+     * EulerModule::apply_boundary_conditions() on the appropriate vector
+     * immediately after performing a time step.
      */
     template <unsigned int stages, bool record_dij = false>
     Number
@@ -173,6 +178,9 @@ namespace ryujin
      * whether we have supersonic or subsonic inflow/outflow the
      * appropriate Riemann invariant is prescribed. See @cite ryujin-2021-3
      * for details.
+     *
+     * @note The routine does update ghost vectors of the distributed
+     * vector @ref U
      */
     void apply_boundary_conditions(vector_type &U, Number t) const;
 
@@ -190,20 +198,32 @@ namespace ryujin
     }
 
     /**
-     * Controls the behavior on invariant domain violation or CFL
-     * violation: If exception throwing is enabled then the
-     * EulerModule::step() function will raise a ryujin::Restart exception
-     * if it encounters an invariant domain violation of the low-order
-     * update in the limiter, or if it detects a large discrepancy between
-     * the chosen time-step size and the safe upper limit controlled by the
-     * CFL condition. If exception throwing is disabled, then this class
-     * will simply print a warning and record the fact that an issue
-     * occurred.
+     * An enum controlling the behavior on detection of an invariant domain
+     * or CFL violation. Such a case might occur for either aggressive CFL
+     * numbers > 1, and/or later stages in the Runge Kutta scheme when the
+     * time step tau is prescribed.
+     *
+     * The invariant domain violation is detected in the limiter and
+     * typically implies that the low-order update is already out of
+     * bounds. We further do a quick sanity check whether the computed
+     * step size tau_max and the prescribed step size tau are within an
+     * acceptable tolerance of about 10%.
      */
-    void throw_exception(bool new_value) const
-    {
-      throw_exception_ = new_value;
-    }
+    enum class IDViolationStrategy {
+      /**
+       * Warn about an invariant domain violation but take no further
+       * action.
+       */
+      warn,
+
+      /**
+       * Raise a ryujin::Restart exception on domain violation. This
+       * exception can be caught in TimeIntegrator and various different
+       * actions (adapt CFL and retry) can be taken depending on chosen
+       * strategy.
+       */
+      raise_exception,
+    } id_violation_strategy_;
 
   private:
 
@@ -235,8 +255,6 @@ namespace ryujin
 
     mutable Number cfl_;
     ACCESSOR_READ_ONLY(cfl)
-
-    mutable bool throw_exception_;
 
     mutable unsigned int n_restarts_;
     ACCESSOR_READ_ONLY(n_restarts)
