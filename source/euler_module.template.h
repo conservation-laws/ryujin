@@ -866,7 +866,6 @@ namespace ryujin
               p_ij[k] += (alpha_n - Number(1.)) * (-temp);
             }
 
-            // FIXME: verify
             for (unsigned int n = 0; n < l; ++n) {
               p_ij += alphas[n] * d_ijHs[n] * (U_jHs[n] - U_iHs[n]);
               for (unsigned int k = 0; k < problem_dimension; ++k) {
