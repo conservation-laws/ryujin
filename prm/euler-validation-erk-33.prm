@@ -37,10 +37,15 @@ subsection E - InitialValues
 end
 
 subsection F - EulerModule
-  set cfl max                = 0.2
-  set cfl min                = 0.2
-  set cfl with boundary dofs = true
-
+  set cfl with boundary dofs = false
   set limiter iterations     = 2
-  set time step order        = 3
+end
+
+
+subsection H - TimeIntegrator
+  set cfl min            = 0.2
+  set cfl max            = 0.2
+  set cfl recovery strategy = none
+
+  set time stepping scheme  = erk 33
 end

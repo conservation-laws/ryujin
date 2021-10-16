@@ -1,0 +1,29 @@
+#dofs =  4225, double, ERK(3,3,1), baseline, Harten entropy
+t     = 2.00692
+Linf  = 0.00546674
+L1    = 0.000401598
+L2    = 0.000944022
+
+#dofs = 16641
+t     = 2.00063
+Linf  = 0.000640614
+L1    = 4.95103e-05
+L2    = 0.000116085
+
+#dofs = 66049, double, ERK(3,3,1), baseline, Harten entropy
+t     = 2.00062
+Linf  = 7.93944e-05
+L1    = 6.53998e-06
+L2    = 1.47541e-05
+
+#dofs = 263169, double, ERK(3,3,1), baseline, Harten entropy
+t     = 2.00081
+Linf  = 9.75687e-06
+L1    = 8.75723e-07
+L2    = 1.88156e-06
+
+#dofs = 1050625, double, ERK(3,3,1), baseline, Harten entropy
+t     = 2.00024
+Linf  = 1.20063e-06
+L1    = 1.22745e-07
+L2    = 2.43871e-07

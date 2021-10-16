@@ -64,20 +64,20 @@ end
 
 
 subsection B - ProblemDescription
-  # Description - valid options are "Euler" and "Navier Stokes"
-  set description = Euler
-
   # Euler: Ratio of specific heats
-  set gamma       = 1.4
+  set gamma        = 1.4
 
   # Navier Stokes: Scaled thermal conductivity c_v^{-1} kappa
-  set kappa       = 0.0186667
+  set kappa        = 0.0186667
 
   # Navier Stokes: Bulk viscosity
-  set lambda      = 0
+  set lambda       = 0
 
   # Navier Stokes: Shear viscosity
-  set mu          = 0.001
+  set mu           = 0.001
+
+  # Problem type - valid options are "Euler" and "Navier Stokes"
+  set problem type = Euler
 end
 
 
@@ -298,26 +298,12 @@ end
 
 
 subsection F - EulerModule
-  # Maximal admissible relative CFL constant
-  set cfl max                = 0.9
-
-  # Minimal admissible relative CFL constant
-  set cfl min                = 0.8
-
   # Use also the local wave-speed estimate d_ij of boundary dofs when
   # computing the maximal admissible step size
   set cfl with boundary dofs = false
 
-  # Enforce no-slip boundary conditions. If set to false no-slip boundaries
-  # will be treated as slip boundary conditions
-  set enforce noslip         = true
-
   # Number of limiter iterations
   set limiter iterations     = 2
-
-  # Approximation order of time stepping method. Switches between Forward
-  # Euler, SSP Heun, and SSP Runge Kutta 3rd order
-  set time step order        = 3
 end
 
 
@@ -367,7 +353,24 @@ subsection G - DissipationModule
 end
 
 
-subsection H - VTUOutput
+subsection H - TimeIntegrator
+  # Minimal admissible relative CFL constant. How this parameter is used
+  # depends on the chosen CFL recovery strategy
+  set cfl min               = 0.45
+
+  # Maximal admissible relative CFL constant. How this parameter is used
+  # depends on the chosen CFL recovery strategy
+  set cfl max               = 0.9
+
+  # CFL/invariant domain violation recovery strategy: none, bang bang control
+  set cfl recovery strategy = bang bang control
+
+  # Time stepping scheme: ssprk 33, erk 33
+  set time stepping scheme  = erk 33
+end
+
+
+subsection I - VTUOutput
   # List of level set functions. The description is used to only output cells
   # that intersect the given level set.
   set manifolds      = 
@@ -384,7 +387,7 @@ subsection H - VTUOutput
 end
 
 
-subsection I - Quantities
+subsection J - Quantities
   # List of level set functions describing boundary. The description is used
   # to only output point values for boundary vertices belonging to a certain
   # level set. Format: '<name> : <level set formula> : <options> , [...]

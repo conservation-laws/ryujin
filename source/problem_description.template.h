@@ -21,9 +21,9 @@ namespace ryujin
 
     problem_type_ = ProblemType::euler;
     add_parameter(
-        "problem type",
+        "description",
         problem_type_,
-        "Problem type - valid options are \"Euler\" and \"Navier Stokes\"");
+        "Description - valid options are \"Euler\" and \"Navier Stokes\"");
 
     gamma_ = 7. / 5.;
     add_parameter("gamma", gamma_, "Euler: Ratio of specific heats");

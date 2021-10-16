@@ -1,7 +1,7 @@
 #
-# The 2D disc configuration.
+# A Mache 3 2D disc configuration.
 #
-# The geometry is a 2D disc  of diameter 0.5 positioned in a 2D channel of
+# The geometry is a 2D disc of diameter 0.5 positioned in a 2D channel of
 # length 4, height 2 and width 2.
 #
 
@@ -11,14 +11,14 @@ subsection A - TimeLoop
   set enable checkpointing         = false
   set enable compute quantities    = false
   set enable output full           = true
-  set enable output levelsets      = true
+  set enable output levelsets      = false
 
   set final time                   = 5.00
   set output granularity           = 0.01
 
   set output checkpoint multiplier = 1
   set output quantities multiplier = 1
-  set output full multiplier       = 100
+  set output full multiplier       = 1
   set output levelsets multiplier  = 1
 
   set terminal update interval     = 10
@@ -35,7 +35,7 @@ end
 subsection C - Discretization
   set geometry            = cylinder
 
-  set mesh refinement     = 6
+  set mesh refinement     = 7
   set mesh repartitioning = false
 
   subsection cylinder
@@ -50,8 +50,8 @@ end
 subsection E - InitialValues
   set configuration = uniform
 
-  set direction     = 1, 0, 0, 0
-  set position      = 1, 0, 0, 0
+  set direction     = 1, 0
+  set position      = 1, 0
 
   set perturbation  = 0
 
@@ -62,17 +62,21 @@ end
 
 
 subsection F - EulerModule
-  set cfl max            = 0.9
-  set cfl min            = 0.9
-
   set limiter iterations = 2
-  set time step order    = 3
 end
 
 
-subsection H - VTUOutput
-  set manifolds      = x, y, z, x^2+y^2-0.25*0.25
+subsection H - TimeIntegrator
+  set cfl min            = 0.45
+  set cfl max            = 0.90
 
+  set cfl recovery strategy = bang bang control
+
+  set time stepping scheme  = erk 33
+end
+
+
+subsection I - VTUOutput
   set schlieren beta = 10
   set vorticity beta = 10
 
