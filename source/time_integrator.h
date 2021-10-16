@@ -8,6 +8,7 @@
 #include <compile_time_options.h>
 
 #include "convenience_macros.h"
+#include "patterns_conversion.h"
 
 #include "dissipation_module.h"
 #include "euler_module.h"
@@ -70,83 +71,16 @@ namespace ryujin
   };
 }
 
-#ifndef doxygen
-/*
- * Boilerplate for automatic translation between runtime parameter string
- * and enum classes:
- */
-DEAL_II_NAMESPACE_OPEN
-template<>
-struct Patterns::Tools::Convert<ryujin::CFLRecoveryStrategy> {
-  using T = typename ryujin::CFLRecoveryStrategy;
+#ifndef DOXYGEN
+DECLARE_ENUM(ryujin::CFLRecoveryStrategy,
+             LIST({ryujin::CFLRecoveryStrategy::none, "none"},
+                  {ryujin::CFLRecoveryStrategy::bang_bang_control,
+                   "bang bang control"}));
 
-  static std::unique_ptr<Patterns::PatternBase> to_pattern()
-  {
-    return std::make_unique<Patterns::Selection>("none|bang bang control");
-  }
-
-  static std::string to_string(const T &t, const Patterns::PatternBase &)
-  {
-    switch (t) {
-    case ryujin::CFLRecoveryStrategy::none:
-      return "none";
-    case ryujin::CFLRecoveryStrategy::bang_bang_control:
-      return "bang bang control";
-    }
-  }
-
-  static T
-  to_value(const std::string &s,
-           const Patterns::PatternBase &pattern = *Convert<T>::to_pattern())
-  {
-    AssertThrow(pattern.match(s), ExcNoMatch(s, pattern.description()))
-
-    if (s == "none")
-      return ryujin::CFLRecoveryStrategy::none;
-    else if (s == "bang bang control")
-      return ryujin::CFLRecoveryStrategy::bang_bang_control;
-    else {
-      AssertThrow(false, ExcInternalError());
-    }
-  }
-};
-
-template<>
-struct Patterns::Tools::Convert<ryujin::TimeSteppingScheme> {
-  using T = typename ryujin::TimeSteppingScheme;
-
-  static std::unique_ptr<Patterns::PatternBase> to_pattern()
-  {
-    return std::make_unique<Patterns::Selection>("ssprk 33|erk 33");
-  }
-
-  static std::string to_string(const T &t, const Patterns::PatternBase &)
-  {
-    switch (t) {
-    case ryujin::TimeSteppingScheme::ssprk_33:
-      return "ssprk 33";
-    case ryujin::TimeSteppingScheme::erk_33:
-      return "erk 33";
-    }
-  }
-
-  static T
-  to_value(const std::string &s,
-           const Patterns::PatternBase &pattern = *Convert<T>::to_pattern())
-  {
-    AssertThrow(pattern.match(s), ExcNoMatch(s, pattern.description()));
-    if (s == "ssprk 33")
-      return ryujin::TimeSteppingScheme::ssprk_33;
-    else if (s == "erk 33")
-      return ryujin::TimeSteppingScheme::erk_33;
-    else {
-      AssertThrow(false, ExcInternalError());
-    }
-  }
-};
-DEAL_II_NAMESPACE_CLOSE
+DECLARE_ENUM(ryujin::TimeSteppingScheme,
+             LIST({ryujin::TimeSteppingScheme::ssprk_33, "ssprk 33"},
+                  {ryujin::TimeSteppingScheme::erk_33, "erk 33"}));
 #endif
-
 
 namespace ryujin
 {

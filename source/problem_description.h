@@ -8,6 +8,7 @@
 #include <compile_time_options.h>
 
 #include "convenience_macros.h"
+#include "patterns_conversion.h"
 #include "simd.h"
 
 #include <deal.II/base/parameter_acceptor.h>
@@ -34,49 +35,9 @@ namespace ryujin
   };
 }
 
-#ifndef doxygen
-/*
- * Boilerplate for automatic translation between runtime parameter string
- * and enum classes:
- */
-DEAL_II_NAMESPACE_OPEN
-template<>
-struct Patterns::Tools::Convert<ryujin::ProblemType> {
-  using T = typename ryujin::ProblemType;
-
-  static std::unique_ptr<Patterns::PatternBase> to_pattern()
-  {
-    return std::make_unique<Patterns::Selection>("Euler|Navier Stokes");
-  }
-
-  static std::string to_string(const T &t, const Patterns::PatternBase &)
-  {
-    switch (t) {
-    case ryujin::ProblemType::euler:
-      return "Euler";
-    case ryujin::ProblemType::navier_stokes:
-      return "Navier Stokes";
-    }
-  }
-
-  static T
-  to_value(const std::string &s,
-           const Patterns::PatternBase &pattern = *Convert<T>::to_pattern())
-  {
-    AssertThrow(pattern.match(s), ExcNoMatch(s, pattern.description()))
-
-    if (s == "Euler")
-      return ryujin::ProblemType::euler;
-    else if (s == "Navier Stokes")
-      return ryujin::ProblemType::navier_stokes;
-    else {
-      AssertThrow(false, ExcInternalError());
-    }
-  }
-};
-DEAL_II_NAMESPACE_CLOSE
-#endif
-
+DECLARE_ENUM(ryujin::ProblemType,
+             LIST({ryujin::ProblemType::euler, "Euler"},
+                  {ryujin::ProblemType::navier_stokes, "Navier Stokes"}));
 
 namespace ryujin
 {
