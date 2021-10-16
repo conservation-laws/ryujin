@@ -28,13 +28,30 @@ namespace ryujin
       , euler_module_(&euler_module)
       , dissipation_module_(&dissipation_module)
   {
-    cfl_min_ = Number(0.80);
+    cfl_min_ = Number(0.45);
     add_parameter(
-        "cfl min", cfl_min_, "Minimal admissible relative CFL constant");
+        "cfl min",
+        cfl_min_,
+        "Minimal admissible relative CFL constant. How this parameter is used "
+        "depends on the chosen CFL recovery strategy");
 
     cfl_max_ = Number(0.90);
     add_parameter(
-        "cfl max", cfl_max_, "Maximal admissible relative CFL constant");
+        "cfl max",
+        cfl_max_,
+        "Maximal admissible relative CFL constant. How this parameter is used "
+        "depends on the chosen CFL recovery strategy");
+
+    cfl_recovery_strategy_ = CFLRecoveryStrategy::bang_bang_control;
+    add_parameter("cfl recovery strategy",
+                  cfl_recovery_strategy_,
+                  "CFL/invariant domain violation recovery strategy: none, "
+                  "bang bang control");
+
+    time_stepping_scheme_ = TimeSteppingScheme::erk_33;
+    add_parameter("time stepping scheme",
+                  time_stepping_scheme_,
+                  "Time stepping scheme: ssprk 33, erk 33");
   }
 
 
@@ -62,7 +79,7 @@ namespace ryujin
     for (auto &it : temp_dij)
       it.reinit(sparsity_simd);
 
-    /* Reset CFL to save starting value: */
+    /* Reset CFL to canonical starting value: */
 
     AssertThrow(cfl_min_ > 0., ExcMessage("cfl min must be a positive value"));
     AssertThrow(cfl_max_ >= cfl_min_,

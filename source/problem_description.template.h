@@ -19,11 +19,11 @@ namespace ryujin
     ParameterAcceptor::parse_parameters_call_back.connect(
         std::bind(&ProblemDescription::parse_parameters_callback, this));
 
-    description_ = "Euler";
+    problem_type_ = ProblemType::euler;
     add_parameter(
-        "description",
-        description_,
-        "Description - valid options are \"Euler\" and \"Navier Stokes\"");
+        "problem type",
+        problem_type_,
+        "Problem type - valid options are \"Euler\" and \"Navier Stokes\"");
 
     gamma_ = 7. / 5.;
     add_parameter("gamma", gamma_, "Euler: Ratio of specific heats");

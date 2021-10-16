@@ -19,6 +19,68 @@
 namespace ryujin
 {
   /**
+   * The chosen problem type
+   */
+  enum class ProblemType {
+    /**
+     * The compressible Euler equations
+     */
+    euler,
+
+    /**
+     * The compressible Navier-Stokes equations
+     */
+    navier_stokes,
+  };
+}
+
+#ifndef doxygen
+/*
+ * Boilerplate for automatic translation between runtime parameter string
+ * and enum classes:
+ */
+DEAL_II_NAMESPACE_OPEN
+template<>
+struct Patterns::Tools::Convert<ryujin::ProblemType> {
+  using T = typename ryujin::ProblemType;
+
+  static std::unique_ptr<Patterns::PatternBase> to_pattern()
+  {
+    return std::make_unique<Patterns::Selection>("Euler|Navier Stokes");
+  }
+
+  static std::string to_string(const T &t, const Patterns::PatternBase &)
+  {
+    switch (t) {
+    case ryujin::ProblemType::euler:
+      return "Euler";
+    case ryujin::ProblemType::navier_stokes:
+      return "Navier Stokes";
+    }
+  }
+
+  static T
+  to_value(const std::string &s,
+           const Patterns::PatternBase &pattern = *Convert<T>::to_pattern())
+  {
+    AssertThrow(pattern.match(s), ExcNoMatch(s, pattern.description()))
+
+    if (s == "Euler")
+      return ryujin::ProblemType::euler;
+    else if (s == "Navier Stokes")
+      return ryujin::ProblemType::navier_stokes;
+    else {
+      AssertThrow(false, ExcInternalError());
+    }
+  }
+};
+DEAL_II_NAMESPACE_CLOSE
+#endif
+
+
+namespace ryujin
+{
+  /**
    * Description of a @p dim dimensional hyperbolic conservation law.
    *
    * We have a (2 + dim) dimensional state space \f$[\rho, \textbf m,
@@ -309,8 +371,8 @@ namespace ryujin
      */
     //@{
 
-    std::string description_;
-    ACCESSOR_READ_ONLY(description)
+    ProblemType problem_type_;
+    ACCESSOR_READ_ONLY(problem_type)
 
     double gamma_;
     ACCESSOR_READ_ONLY(gamma)
