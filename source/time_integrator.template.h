@@ -102,11 +102,36 @@ namespace ryujin
     std::cout << "TimeIntegrator<dim, Number>::step()" << std::endl;
 #endif
 
-    switch (time_stepping_scheme_) {
-    case TimeSteppingScheme::ssprk_33:
-      return step_ssprk_33(U, t);
-    case TimeSteppingScheme::erk_33:
-      return step_erk_33(U, t);
+    const auto single_step = [&]() {
+      switch (time_stepping_scheme_) {
+      case TimeSteppingScheme::ssprk_33:
+        return step_ssprk_33(U, t);
+      case TimeSteppingScheme::erk_33:
+        return step_erk_33(U, t);
+      }
+    };
+
+    if (cfl_recovery_strategy_ == CFLRecoveryStrategy::bang_bang_control) {
+      euler_module_->id_violation_strategy_ =
+          IDViolationStrategy::raise_exception;
+      euler_module_->cfl(cfl_max_);
+    }
+
+    try {
+      return single_step();
+
+    } catch(ryujin::Restart) {
+
+      AssertThrow(cfl_recovery_strategy_ != CFLRecoveryStrategy::none,
+                  dealii::ExcInternalError());
+
+      if (cfl_recovery_strategy_ == CFLRecoveryStrategy::bang_bang_control) {
+        euler_module_->id_violation_strategy_ = IDViolationStrategy::warn;
+        euler_module_->cfl(cfl_min_);
+        return single_step();
+      }
+
+      __builtin_unreachable();
     }
   }
 

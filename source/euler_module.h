@@ -27,12 +27,42 @@
 namespace ryujin
 {
   /**
+   * An enum controlling the behavior on detection of an invariant domain
+   * or CFL violation. Such a case might occur for either aggressive CFL
+   * numbers > 1, and/or later stages in the Runge Kutta scheme when the
+   * time step tau is prescribed.
+   *
+   * The invariant domain violation is detected in the limiter and
+   * typically implies that the low-order update is already out of
+   * bounds. We further do a quick sanity check whether the computed
+   * step size tau_max and the prescribed step size tau are within an
+   * acceptable tolerance of about 10%.
+   */
+  enum class IDViolationStrategy {
+    /**
+     * Warn about an invariant domain violation but take no further
+     * action.
+     */
+    warn,
+
+    /**
+     * Raise a ryujin::Restart exception on domain violation. This
+     * exception can be caught in TimeIntegrator and various different
+     * actions (adapt CFL and retry) can be taken depending on chosen
+     * strategy.
+     */
+    raise_exception,
+  };
+
+
+  /**
    * A class signalling a restart, thrown in EulerModule::single_step and
    * caught at various places.
    */
   class Restart final
   {
   };
+
 
   /**
    * Explicit forward Euler time-stepping for hyperbolic systems with
@@ -197,33 +227,7 @@ namespace ryujin
       cfl_ = new_cfl;
     }
 
-    /**
-     * An enum controlling the behavior on detection of an invariant domain
-     * or CFL violation. Such a case might occur for either aggressive CFL
-     * numbers > 1, and/or later stages in the Runge Kutta scheme when the
-     * time step tau is prescribed.
-     *
-     * The invariant domain violation is detected in the limiter and
-     * typically implies that the low-order update is already out of
-     * bounds. We further do a quick sanity check whether the computed
-     * step size tau_max and the prescribed step size tau are within an
-     * acceptable tolerance of about 10%.
-     */
-    enum class IDViolationStrategy {
-      /**
-       * Warn about an invariant domain violation but take no further
-       * action.
-       */
-      warn,
-
-      /**
-       * Raise a ryujin::Restart exception on domain violation. This
-       * exception can be caught in TimeIntegrator and various different
-       * actions (adapt CFL and retry) can be taken depending on chosen
-       * strategy.
-       */
-      raise_exception,
-    } id_violation_strategy_;
+    mutable IDViolationStrategy id_violation_strategy_;
 
   private:
 
