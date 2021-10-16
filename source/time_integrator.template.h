@@ -73,6 +73,10 @@ namespace ryujin
       temp_U_.resize(3);
       temp_dij_.resize(2);
       break;
+    case TimeSteppingScheme::erk_43:
+      temp_U_.resize(4);
+      temp_dij_.resize(2);
+      break;
     }
 
     /* Initialize temporary vectors and matrices: */
@@ -108,6 +112,8 @@ namespace ryujin
         return step_ssprk_33(U, t);
       case TimeSteppingScheme::erk_33:
         return step_erk_33(U, t);
+      case TimeSteppingScheme::erk_43:
+        return step_erk_43(U, t);
       }
     };
 
@@ -197,5 +203,54 @@ namespace ryujin
 
     U.swap(temp_U_[2]);
     return 3. * tau;
+  }
+
+
+  template <int dim, typename Number>
+  Number TimeIntegrator<dim, Number>::step_erk_43(vector_type &U, Number t)
+  {
+#ifdef DEBUG_OUTPUT
+    std::cout << "TimeIntegrator<dim, Number>::step_erk_43()" << std::endl;
+#endif
+
+    /* Step 1: U1 <- {U, 1} at time t + tau */
+    Number tau = euler_module_->template step<0, true>(
+        U, {}, {}, {}, temp_U_[0], temp_dij_[0]);
+    euler_module_->apply_boundary_conditions(temp_U_[0], t + tau);
+
+
+    /* Step 2: U2 <- {U1, 2} and {U, -1} at time t + 2 tau */
+    euler_module_->template step<1, true>(temp_U_[0],
+                                          {U},
+                                          {temp_dij_[0]},
+                                          {Number(-1.)},
+                                          temp_U_[1],
+                                          temp_dij_[1],
+                                          tau);
+    euler_module_->apply_boundary_conditions(temp_U_[1], t + 2. * tau);
+
+
+    /* Step 3: U3 <- {U2, 2} and {U1, -1} at time t + 3 tau */
+    euler_module_->template step<1, true>(temp_U_[1],
+                                          {temp_U_[0]},
+                                          {temp_dij_[1]},
+                                          {Number(-1.)},
+                                          temp_U_[2],
+                                          temp_dij_[0], // sic!
+                                          tau);
+    euler_module_->apply_boundary_conditions(temp_U_[2], t + 3. * tau);
+
+    /* Step 4: U4 <- {U3, 8/3} and {U2,-10/3} and {U1, 5/3} at time t + 4 tau */
+    euler_module_->template step<2, false>(temp_U_[2],
+                                           {temp_U_[0], temp_U_[1]},
+                                           {temp_dij_[1], temp_dij_[0]},
+                                           {Number(5. / 3.), Number(-10. / 3.)},
+                                           temp_U_[3],
+                                           dummy_,
+                                           tau);
+    euler_module_->apply_boundary_conditions(temp_U_[3], t + 4. * tau);
+
+    U.swap(temp_U_[3]);
+    return 4. * tau;
   }
 } /* namespace ryujin */
