@@ -69,7 +69,7 @@ DEAL_II_NAMESPACE_CLOSE
   namespace dealii                                                             \
   {                                                                            \
     template <>                                                                \
-    struct ::dealii::ConversionHelper<type> : std::true_type {                 \
+    struct ConversionHelper<type> : std::true_type {                           \
       const std::vector<std::tuple<type, std::string>> conversion_table = {s}; \
     };                                                                         \
   }
