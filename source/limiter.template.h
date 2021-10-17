@@ -30,7 +30,7 @@ namespace ryujin
 
     constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
     constexpr ScalarNumber relax = ScalarNumber(1.) + 10. * eps;
-    constexpr ScalarNumber relaxbig = ScalarNumber(1.) + 3000. * eps;
+    constexpr ScalarNumber relaxbig = ScalarNumber(1.) + 10000. * eps;
 
     /*
      * First limit the density rho.
@@ -162,7 +162,7 @@ namespace ryujin
          * be violated for relative CFL numbers larger than 1.
          */
         if (n == 0 &&
-            !(std::min(Number(0.), psi_l + 100. * eps) == Number(0.))) {
+            !(std::min(Number(0.), psi_l + Number(100. * eps)) == Number(0.))) {
 #ifdef DEBUG_OUTPUT
           std::cout << std::fixed << std::setprecision(16);
           std::cout << "(low order - critical) Psi left: " << psi_l << std::endl;
