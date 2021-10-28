@@ -61,6 +61,13 @@ namespace ryujin
                   "boundary vertices belonging to a certain level set. "
                   "Format: '<name> : <level set formula> : <options> , [...] "
                   "(options: time_averaged, space_averaged, instantaneous)");
+
+    clear_temporal_statistics_on_writeout_ = true;
+    add_parameter("clear statistics on writeout",
+                  clear_temporal_statistics_on_writeout_,
+                  "If set to true then all temporal statistics (for "
+                  "\"time_averaged\" quantities) accumulated so far are reset "
+                  "each time a writeout of quantities is performed");
   }
 
 
@@ -74,18 +81,12 @@ namespace ryujin
     base_name_ = name;
     first_cycle_ = true;
 
-    // FIXME
-    // AssertThrow(interior_manifolds_.empty(),
-    //             dealii::ExcMessage("Not implemented. Output for interior "
-    //                                "manifolds has not been written yet."));
-
     const unsigned int n_owned = offline_data_->n_locally_owned();
 
     /*
      * Create interior maps and allocate statistics.
      *
-     * We have to loop over the cells and populate the std::map
-     * interior_maps_.
+     * We have to loop over the cells and populate the std::map interior_maps_.
      */
 
     interior_maps_.clear();
@@ -160,24 +161,7 @@ namespace ryujin
           return std::make_pair(name, map);
         });
 
-    /*
-     * Clear statistics and time series:
-     */
-    interior_statistics_.clear();
-
-    for (const auto &[name, interior_map] : interior_maps_) {
-      const auto n_entries = interior_map.size();
-      auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
-          interior_statistics_[name];
-      val_old.resize(n_entries);
-      val_new.resize(n_entries);
-      val_sum.resize(n_entries);
-      t_old = t_new = t_sum = 0.;
-    }
-
-    /*
-     * Output interior maps:
-     */
+    /* Output interior maps: */
 
     for (const auto &[name, interior_map] : interior_maps_) {
 
@@ -211,7 +195,6 @@ namespace ryujin
         output << std::flush;
       }
     }
-
 
     /*
      * Create boundary maps and allocate statistics vector:
@@ -258,24 +241,6 @@ namespace ryujin
         });
 
     /*
-     * Clear statistics and time series:
-     */
-
-    boundary_statistics_.clear();
-
-    for (const auto &[name, boundary_map] : boundary_maps_) {
-      const auto n_entries = boundary_map.size();
-      auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
-          boundary_statistics_[name];
-      val_old.resize(n_entries);
-      val_new.resize(n_entries);
-      val_sum.resize(n_entries);
-      t_old = t_new = t_sum = 0.;
-    }
-
-    boundary_time_series_.clear();
-
-    /*
      * Output boundary maps:
      */
 
@@ -313,7 +278,47 @@ namespace ryujin
         output << std::flush;
       }
     }
+
+    /* Clear statistics: */
+    clear_statistics();
   }
+
+
+
+  template <int dim, typename Number>
+  void Quantities<dim, Number>::clear_statistics()
+  {
+    /* Clear statistics and time series for interior maps: */
+
+    interior_statistics_.clear();
+
+    for (const auto &[name, interior_map] : interior_maps_) {
+      const auto n_entries = interior_map.size();
+      auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
+          interior_statistics_[name];
+      val_old.resize(n_entries);
+      val_new.resize(n_entries);
+      val_sum.resize(n_entries);
+      t_old = t_new = t_sum = 0.;
+    }
+
+    /* Clear statistics and time series for boundary maps: */
+
+    boundary_statistics_.clear();
+
+    for (const auto &[name, boundary_map] : boundary_maps_) {
+      const auto n_entries = boundary_map.size();
+      auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
+          boundary_statistics_[name];
+      val_old.resize(n_entries);
+      val_new.resize(n_entries);
+      val_sum.resize(n_entries);
+      t_old = t_new = t_sum = 0.;
+    }
+
+    boundary_time_series_.clear();
+  }
+
 
 
   template <int dim, typename Number>
@@ -631,7 +636,7 @@ namespace ryujin
         const Number tau = t_new - t_old;
 
         for (std::size_t i = 0; i < val_sum.size(); ++i) {
-          /* sometimes I miss haskell's type classes... */
+          /* sometimes I miss Haskell's type classes... */
           std::get<0>(val_sum[i]) += 0.5 * tau * std::get<0>(val_old[i]);
           std::get<0>(val_sum[i]) += 0.5 * tau * std::get<0>(val_new[i]);
           std::get<1>(val_sum[i]) += 0.5 * tau * std::get<1>(val_old[i]);
@@ -686,7 +691,7 @@ namespace ryujin
         const Number tau = t_new - t_old;
 
         for (std::size_t i = 0; i < val_sum.size(); ++i) {
-          /* sometimes I miss haskell's type classes... */
+          /* sometimes I miss Haskell's type classes... */
           std::get<0>(val_sum[i]) += 0.5 * tau * std::get<0>(val_old[i]);
           std::get<0>(val_sum[i]) += 0.5 * tau * std::get<0>(val_new[i]);
           std::get<1>(val_sum[i]) += 0.5 * tau * std::get<1>(val_old[i]);
@@ -769,17 +774,6 @@ namespace ryujin
 
         write_out_interior(output, val_sum, Number(1.) / t_sum);
 
-        interior_statistics_.clear();
-
-        for (const auto &[name, interior_map] : interior_maps_) {
-          const auto n_entries = interior_map.size();
-          auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
-              interior_statistics_[name];
-          val_old.resize(n_entries);
-          val_new.resize(n_entries);
-          val_sum.resize(n_entries);
-          t_old = t_new = t_sum = 0.;
-        }
       }
 
       /* Output space averaged field: */
@@ -864,18 +858,6 @@ namespace ryujin
                << std::endl;
 
         write_out_boundary(output, val_sum, Number(1.) / t_sum);
-
-        boundary_statistics_.clear();
-
-        for (const auto &[name, boundary_map] : boundary_maps_) {
-          const auto n_entries = boundary_map.size();
-          auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
-              boundary_statistics_[name];
-          val_old.resize(n_entries);
-          val_new.resize(n_entries);
-          val_sum.resize(n_entries);
-          t_old = t_new = t_sum = 0.;
-        }
       }
 
       /* Output space averaged field: */
@@ -907,6 +889,9 @@ namespace ryujin
     } /* i */
 
     output_cycle_averages_++;
+
+    if(clear_temporal_statistics_on_writeout_)
+      clear_statistics();
   }
 
 } /* namespace ryujin */

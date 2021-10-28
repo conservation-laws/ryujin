@@ -113,6 +113,8 @@ namespace ryujin
     std::vector<std::tuple<std::string, std::string, std::string>>
         boundary_manifolds_;
 
+    bool clear_temporal_statistics_on_writeout_;
+
     //@}
     /**
      * @name Internal data
@@ -222,6 +224,8 @@ namespace ryujin
      * @name Internal methods
      */
     //@{
+
+    void clear_statistics();
 
     interior_value
     accumulate_interior(const vector_type &U,
