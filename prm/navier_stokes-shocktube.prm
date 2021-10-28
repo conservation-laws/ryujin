@@ -71,13 +71,9 @@ subsection E - InitialValues
 end
 
 subsection F - EulerModule
-  set cfl min            = 0.80
-  set cfl max            = 0.80
-
-  set enforce noslip     = true
+  set cfl with boundary dofs = true
 
   set limiter iterations = 2
-  set time step order    = 3
 end
 
 subsection G - DissipationModule
@@ -100,7 +96,14 @@ subsection G - DissipationModule
   set shift                                  = 0
 end
 
-subsection H - VTUOutput
+subsection H - TimeIntegrator
+  set cfl min                = 0.80
+  set cfl max                = 0.80
+  set cfl recovery strategy = none
+  set time stepping scheme  = erk 33
+end
+
+subsection I - VTUOutput
   set use mpi io     = false
 
   set schlieren beta = 10
@@ -108,7 +111,7 @@ subsection H - VTUOutput
 end
 
 
-subsection I - Quantities
-  set boundary manifolds = lower_boundary : y
+subsection J - Quantities
+  set boundary manifolds = lower_boundary : y : time_averaged space_averaged
   set interior manifolds =
 end
