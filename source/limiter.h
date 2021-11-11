@@ -122,10 +122,10 @@ namespace ryujin
      * Limiter<dim, Number> limiter;
      * for (unsigned int i = n_internal; i < n_owned; ++i) {
      *   // ...
-     *   limiter.reset(entropy_i, variations_i);
+     *   limiter.reset(specific_entropy_i, variations_i);
      *   for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
      *     // ...
-     *     limiter.accumulate(U_i, U_j, U_ij_bar, entropy_j, col_idx == 0);
+     *     limiter.accumulate(U_i, U_j, U_ij_bar, specific_entropy_j, col_idx == 0);
      *   }
      *   limiter.apply_relaxation(hd_i);
      *   limiter_serial.bounds();
@@ -162,7 +162,7 @@ namespace ryujin
     /**
      * Reset temporary storage and reinitialize variations for new index i.
      */
-    void reset(const Number entropy_i, const Number variations_i);
+    void reset(const Number specific_entropy_i, const Number variations_i);
 
     /**
      * When looping over the sparsity row, add the contribution associated
@@ -172,7 +172,7 @@ namespace ryujin
                     const state_type &U_j,
                     const state_type &U_ij_bar,
                     const Number beta_ij,
-                    const Number entropy_j,
+                    const Number specific_entropy_j,
                     const Number variations_j,
                     const bool is_diagonal_entry);
 
@@ -227,7 +227,7 @@ namespace ryujin
 
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline void
-  Limiter<dim, Number>::reset(const Number entropy_i,
+  Limiter<dim, Number>::reset(const Number specific_entropy_i,
                               const Number new_variations_i)
   {
     if constexpr (relax_bounds_) {
@@ -246,7 +246,7 @@ namespace ryujin
     rho_relaxation_denominator = Number(0.);
 
     if constexpr (limiter_ == Limiters::specific_entropy) {
-      s_min = entropy_i;
+      s_min = specific_entropy_i;
       s_interp_max = Number(0.);
     }
   }
@@ -258,7 +258,7 @@ namespace ryujin
                                    const state_type &U_j,
                                    const state_type &U_ij_bar,
                                    const Number beta_ij,
-                                   const Number entropy_j,
+                                   const Number specific_entropy_j,
                                    const Number variations_j,
                                    const bool is_diagonal_entry)
   {
@@ -282,7 +282,7 @@ namespace ryujin
     rho_max = std::max(rho_max, rho_ij);
 
     if constexpr (limiter_ == Limiters::specific_entropy) {
-      s_min = std::min(s_min, entropy_j);
+      s_min = std::min(s_min, specific_entropy_j);
 
       if (!is_diagonal_entry) {
         const Number s_interp = problem_description.specific_entropy(
