@@ -72,4 +72,5 @@ DEAL_II_NAMESPACE_CLOSE
     struct ConversionHelper<type> : std::true_type {                           \
       const std::vector<std::tuple<type, std::string>> conversion_table = {s}; \
     };                                                                         \
-  }
+  }                                                                            \
+  static_assert(true, "")

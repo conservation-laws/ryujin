@@ -188,7 +188,7 @@ namespace ryujin
      * EulerModule::apply_boundary_conditions() on the appropriate vector
      * immediately after performing a time step.
      */
-    template <unsigned int stages, bool record_dij = false>
+    template <int stages, bool record_dij = false>
     Number
     step(const vector_type &old_U,
          std::array<std::reference_wrapper<const vector_type>, stages> stage_U,

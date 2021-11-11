@@ -83,7 +83,7 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  template <unsigned int stages, bool record_dij>
+  template <int stages, bool record_dij>
   Number EulerModule<dim, Number>::step(
       const vector_type &old_U,
       std::array<std::reference_wrapper<const vector_type>, stages> stage_U,
@@ -469,7 +469,7 @@ namespace ryujin
 
         std::array<state_type, stages> U_iHs;
         std::array<flux_type, stages> f_iHs;
-        for (unsigned int s = 0; s < stages; ++s) {
+        for (int s = 0; s < stages; ++s) {
           U_iHs[s] = stage_U[s].get().get_tensor(i);
           f_iHs[s] = problem_description_->f(U_iHs[s]);
         }
@@ -497,7 +497,7 @@ namespace ryujin
           std::array<state_type, stages> U_jHs;
           std::array<flux_type, stages> f_jHs;
           std::array<Number, stages> d_ijHs;
-          for (unsigned int s = 0; s < stages; ++s) {
+          for (int s = 0; s < stages; ++s) {
             U_jHs[s] = stage_U[s].get().get_tensor(j);
             f_jHs[s] = problem_description_->f(U_jHs[s]);
             d_ijHs[s] = stage_dij[s].get().get_entry(i, col_idx);
@@ -524,7 +524,7 @@ namespace ryujin
                 Number(0.5) * (U_i[k] + U_j[k]) - Number(0.5) * temp * d_ij_inv;
           }
 
-          for (unsigned int s = 0; s < stages; ++s) {
+          for (int s = 0; s < stages; ++s) {
             for (unsigned int k = 0; k < problem_dimension; ++k) {
               const auto temp = (f_jHs[s][k] - f_iHs[s][k]) * c_ij;
               r_i[k] += stage_weights[s] *
@@ -569,7 +569,7 @@ namespace ryujin
 
         std::array<ProblemDescription::state_type<dim, VA>, stages> U_iHs;
         std::array<ProblemDescription::flux_type<dim, VA>, stages> f_iHs;
-        for (unsigned int s = 0; s < stages; ++s) {
+        for (int s = 0; s < stages; ++s) {
           U_iHs[s] = stage_U[s].get().get_vectorized_tensor(i);
           f_iHs[s] = problem_description_->f(U_iHs[s]);
         }
@@ -599,7 +599,7 @@ namespace ryujin
           std::array<ProblemDescription::state_type<dim, VA>, stages> U_jHs;
           std::array<ProblemDescription::flux_type<dim, VA>, stages> f_jHs;
           std::array<VA, stages> d_ijHs;
-          for (unsigned int s = 0; s < stages; ++s) {
+          for (int s = 0; s < stages; ++s) {
             U_jHs[s] = stage_U[s].get().get_vectorized_tensor(js);
             f_jHs[s] = problem_description_->f(U_jHs[s]);
             d_ijHs[s] = stage_dij[s].get().get_vectorized_entry(i, col_idx);
@@ -626,7 +626,7 @@ namespace ryujin
             U_ij_bar[k] = Number(0.5) * (U_i[k] + U_j[k] - temp * d_ij_inv);
           }
 
-          for (unsigned int s = 0; s < stages; ++s) {
+          for (int s = 0; s < stages; ++s) {
             for (unsigned int k = 0; k < problem_dimension; ++k) {
               const auto temp = (f_jHs[s][k] - f_iHs[s][k]) * c_ij;
               r_i[k] += stage_weights[s] *
@@ -710,7 +710,7 @@ namespace ryujin
 
         std::array<state_type, stages> U_iHs;
         std::array<flux_type, stages> f_iHs;
-        for (unsigned int s = 0; s < stages; ++s) {
+        for (int s = 0; s < stages; ++s) {
           U_iHs[s] = stage_U[s].get().get_tensor(i);
           f_iHs[s] = problem_description_->f(U_iHs[s]);
         }
@@ -732,7 +732,7 @@ namespace ryujin
           std::array<state_type, stages> U_jHs;
           std::array<flux_type, stages> f_jHs;
           std::array<Number, stages> d_ijHs;
-          for (unsigned int s = 0; s < stages; ++s) {
+          for (int s = 0; s < stages; ++s) {
             U_jHs[s] = stage_U[s].get().get_tensor(j);
             f_jHs[s] = problem_description_->f(U_jHs[s]);
             d_ijHs[s] = stage_dij[s].get().get_entry(i, col_idx);
@@ -769,7 +769,7 @@ namespace ryujin
               p_ij[k] += (weight - Number(1.)) * (-temp);
             }
 
-            for (unsigned int s = 0; s < stages; ++s) {
+            for (int s = 0; s < stages; ++s) {
               p_ij += stage_weights[s] * d_ijHs[s] * (U_jHs[s] - U_iHs[s]);
               for (unsigned int k = 0; k < problem_dimension; ++k) {
                 const auto temp = (f_jHs[s][k] - f_iHs[s][k]) * c_ij;
@@ -812,7 +812,7 @@ namespace ryujin
 
         std::array<ProblemDescription::state_type<dim, VA>, stages> U_iHs;
         std::array<ProblemDescription::flux_type<dim, VA>, stages> f_iHs;
-        for (unsigned int s = 0; s < stages; ++s) {
+        for (int s = 0; s < stages; ++s) {
           U_iHs[s] = stage_U[s].get().get_vectorized_tensor(i);
           f_iHs[s] = problem_description_->f(U_iHs[s]);
         }
@@ -833,7 +833,7 @@ namespace ryujin
           std::array<ProblemDescription::state_type<dim, VA>, stages> U_jHs;
           std::array<ProblemDescription::flux_type<dim, VA>, stages> f_jHs;
           std::array<VA, stages> d_ijHs;
-          for (unsigned int s = 0; s < stages; ++s) {
+          for (int s = 0; s < stages; ++s) {
             U_jHs[s] = stage_U[s].get().get_vectorized_tensor(js);
             f_jHs[s] = problem_description_->f(U_jHs[s]);
             d_ijHs[s] = stage_dij[s].get().get_vectorized_entry(i, col_idx);
@@ -868,7 +868,7 @@ namespace ryujin
               p_ij[k] += (weight - Number(1.)) * (-temp);
             }
 
-            for (unsigned int s = 0; s < stages; ++s) {
+            for (int s = 0; s < stages; ++s) {
               p_ij += stage_weights[s] * d_ijHs[s] * (U_jHs[s] - U_iHs[s]);
               for (unsigned int k = 0; k < problem_dimension; ++k) {
                 const auto temp = (f_jHs[s][k] - f_iHs[s][k]) * c_ij;
