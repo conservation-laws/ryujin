@@ -587,6 +587,9 @@ namespace ryujin
       stream << "Indicator<dim, Number>::Entropy::harten" << std::endl;
     }
 
+    stream << "Indicator<dim, Number>::evc_alpha_0_ == "
+           << Indicator<dim, Number>::evc_alpha_0_ << std::endl;
+
     stream << "Indicator<dim, Number>::smoothness_indicator_ == ";
     switch (Indicator<dim, Number>::smoothness_indicator_) {
     case Indicator<dim, Number>::SmoothnessIndicators::rho:

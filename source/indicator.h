@@ -153,13 +153,19 @@ namespace ryujin
      * Compute second variations of the density.
      * @ingroup CompileTimeOptions
      */
-    static constexpr bool compute_second_variations_ = COMPUTE_SECOND_VARIATIONS;
+    static constexpr bool compute_second_variations_ = INDICATOR_SECOND_VARIATIONS;
 
     /**
      * Selected entropy used for the entropy-viscosity commutator.
      * @ingroup CompileTimeOptions
      */
-    static constexpr Entropy evc_entropy_ = ENTROPY;
+    static constexpr Entropy evc_entropy_ = INDICATOR_ENTROPY;
+
+    /**
+     * Tuning parameter for entropy viscosity commutator.
+     * @ingroup CompileTimeOptions
+     */
+    static constexpr ScalarNumber evc_alpha_0_ = INDICATOR_ALPHA_0;
 
     /**
      * Selected quantity used for the smoothness indicator.
@@ -385,7 +391,7 @@ namespace ryujin
 
       const auto quotient =
           std::abs(numerator) / (denominator + hd_i * std::abs(eta_i));
-      return quotient;
+      return std::min(Number(1.), evc_alpha_0_ * quotient);
     }
 
     if constexpr (indicator_ == Indicators::smoothness_indicator) {
