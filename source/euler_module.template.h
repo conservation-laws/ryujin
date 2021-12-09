@@ -496,11 +496,9 @@ namespace ryujin
 
           std::array<state_type, stages> U_jHs;
           std::array<flux_type, stages> f_jHs;
-          std::array<Number, stages> d_ijHs;
           for (int s = 0; s < stages; ++s) {
             U_jHs[s] = stage_U[s].get().get_tensor(j);
             f_jHs[s] = problem_description_->f(U_jHs[s]);
-            d_ijHs[s] = stage_dij[s].get().get_entry(i, col_idx);
           }
 
           const auto alpha_j = alpha_.local_element(j);
@@ -510,16 +508,13 @@ namespace ryujin
           const Number d_ij_inv = Number(1.) / d_ij;
 
           const auto d_ijH = d_ij * (alpha_i + alpha_j) * Number(.5);
-          /* Store high order graph viscosity in new_dij */
-          if (record_dij)
-            new_dij.write_entry(d_ijH, i, col_idx);
 
           dealii::Tensor<1, problem_dimension, Number> U_ij_bar;
           const auto c_ij = cij_matrix.get_tensor(i, col_idx);
 
           for (unsigned int k = 0; k < problem_dimension; ++k) {
             const auto temp = (f_j[k] - f_i[k]) * c_ij;
-            r_i[k] += weight * (-temp + d_ijH * (U_j[k] - U_i[k]));
+            r_i[k] += weight * (-temp) + d_ijH * (U_j[k] - U_i[k]);
             U_ij_bar[k] =
                 Number(0.5) * (U_i[k] + U_j[k]) - Number(0.5) * temp * d_ij_inv;
           }
@@ -527,8 +522,7 @@ namespace ryujin
           for (int s = 0; s < stages; ++s) {
             for (unsigned int k = 0; k < problem_dimension; ++k) {
               const auto temp = (f_jHs[s][k] - f_iHs[s][k]) * c_ij;
-              r_i[k] += stage_weights[s] *
-                        (-temp + d_ijHs[s] * (U_jHs[s][k] - U_iHs[s][k]));
+              r_i[k] += stage_weights[s] * (-temp);
             }
           }
 
@@ -598,11 +592,9 @@ namespace ryujin
 
           std::array<ProblemDescription::state_type<dim, VA>, stages> U_jHs;
           std::array<ProblemDescription::flux_type<dim, VA>, stages> f_jHs;
-          std::array<VA, stages> d_ijHs;
           for (int s = 0; s < stages; ++s) {
             U_jHs[s] = stage_U[s].get().get_vectorized_tensor(js);
             f_jHs[s] = problem_description_->f(U_jHs[s]);
-            d_ijHs[s] = stage_dij[s].get().get_vectorized_entry(i, col_idx);
           }
 
           const auto alpha_j = simd_load(alpha_, js);
@@ -611,9 +603,6 @@ namespace ryujin
           const auto d_ij = dij_matrix_.get_vectorized_entry(i, col_idx);
 
           const auto d_ijH = d_ij * (alpha_i + alpha_j) * Number(.5);
-          /* Store high order graph viscosity in new_dij */
-          if (record_dij)
-            new_dij.write_vectorized_entry(d_ijH, i, col_idx, true);
 
           dealii::Tensor<1, problem_dimension, VA> U_ij_bar;
           const auto c_ij = cij_matrix.get_vectorized_tensor(i, col_idx);
@@ -622,15 +611,14 @@ namespace ryujin
           for (unsigned int k = 0; k < problem_dimension; ++k) {
             const auto temp = (f_j[k] - f_i[k]) * c_ij;
 
-            r_i[k] += weight * (-temp + d_ijH * (U_j[k] - U_i[k]));
+            r_i[k] += weight * (-temp) + d_ijH * (U_j[k] - U_i[k]);
             U_ij_bar[k] = Number(0.5) * (U_i[k] + U_j[k] - temp * d_ij_inv);
           }
 
           for (int s = 0; s < stages; ++s) {
             for (unsigned int k = 0; k < problem_dimension; ++k) {
               const auto temp = (f_jHs[s][k] - f_iHs[s][k]) * c_ij;
-              r_i[k] += stage_weights[s] *
-                        (-temp + d_ijHs[s] * (U_jHs[s][k] - U_iHs[s][k]));
+              r_i[k] += stage_weights[s] * (-temp);
             }
           }
 
@@ -731,11 +719,9 @@ namespace ryujin
 
           std::array<state_type, stages> U_jHs;
           std::array<flux_type, stages> f_jHs;
-          std::array<Number, stages> d_ijHs;
           for (int s = 0; s < stages; ++s) {
             U_jHs[s] = stage_U[s].get().get_tensor(j);
             f_jHs[s] = problem_description_->f(U_jHs[s]);
-            d_ijHs[s] = stage_dij[s].get().get_entry(i, col_idx);
           }
 
           const auto c_ij = cij_matrix.get_tensor(i, col_idx);
@@ -758,7 +744,7 @@ namespace ryujin
           auto p_ij = -d_ij * (U_j - U_i) + b_ij * r_j - b_ji * r_i;
 
           const auto d_ijH =  d_ij * (alpha_i + alpha_j) * Number(.5);
-          p_ij += weight * d_ijH * (U_j - U_i);
+          p_ij += d_ijH * (U_j - U_i);
 
           if constexpr (stages != 0) {
             /* Flux contributions: */
@@ -770,7 +756,6 @@ namespace ryujin
             }
 
             for (int s = 0; s < stages; ++s) {
-              p_ij += stage_weights[s] * d_ijHs[s] * (U_jHs[s] - U_iHs[s]);
               for (unsigned int k = 0; k < problem_dimension; ++k) {
                 const auto temp = (f_jHs[s][k] - f_iHs[s][k]) * c_ij;
                 p_ij[k] += stage_weights[s] * (-temp);
@@ -832,11 +817,9 @@ namespace ryujin
 
           std::array<ProblemDescription::state_type<dim, VA>, stages> U_jHs;
           std::array<ProblemDescription::flux_type<dim, VA>, stages> f_jHs;
-          std::array<VA, stages> d_ijHs;
           for (int s = 0; s < stages; ++s) {
             U_jHs[s] = stage_U[s].get().get_vectorized_tensor(js);
             f_jHs[s] = problem_description_->f(U_jHs[s]);
-            d_ijHs[s] = stage_dij[s].get().get_vectorized_entry(i, col_idx);
           }
 
           const auto c_ij = cij_matrix.get_vectorized_tensor(i, col_idx);
@@ -856,7 +839,7 @@ namespace ryujin
           auto p_ij = -d_ij * (U_j - U_i) + b_ij * r_j - b_ji * r_i;
 
           const auto d_ijH =  d_ij * (alpha_i + alpha_j) * Number(.5);
-          p_ij += weight * d_ijH * (U_j - U_i);
+          p_ij += d_ijH * (U_j - U_i);
 
           if constexpr (stages != 0) {
             /* Flux contributions: */
@@ -869,7 +852,6 @@ namespace ryujin
             }
 
             for (int s = 0; s < stages; ++s) {
-              p_ij += stage_weights[s] * d_ijHs[s] * (U_jHs[s] - U_iHs[s]);
               for (unsigned int k = 0; k < problem_dimension; ++k) {
                 const auto temp = (f_jHs[s][k] - f_iHs[s][k]) * c_ij;
                 p_ij[k] += stage_weights[s] * (-temp);
