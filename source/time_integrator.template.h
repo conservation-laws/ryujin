@@ -150,19 +150,16 @@ namespace ryujin
     /* SSP-RK3, see @cite Shu1988, Eq. 2.18. */
 
     /* Step 1: U1 = U_old + tau * L(U_old) at time t + tau */
-    Number tau = euler_module_->template step<0, false>(
-        U, {}, {}, {}, temp_U_[0], dummy_);
+    Number tau = euler_module_->template step<0>(U, {}, {}, temp_U_[0]);
     euler_module_->apply_boundary_conditions(temp_U_[0], t + tau);
 
     /* Step 2: U2 = 3/4 U_old + 1/4 (U1 + tau L(U1)) at time t + tau */
-    euler_module_->template step<0, false>(
-        temp_U_[0], {}, {}, {}, temp_U_[1], dummy_);
+    euler_module_->template step<0>(temp_U_[0], {}, {}, temp_U_[1]);
     temp_U_[1].sadd(Number(1. / 4.), Number(3. / 4.), U);
     euler_module_->apply_boundary_conditions(temp_U_[1], t + tau);
 
     /* Step 3: U3 = 1/3 U_old + 2/3 (U2 + tau L(U2)) at time t + 0.5 * tau */
-    euler_module_->template step<0, false>(
-        temp_U_[1], {}, {}, {}, temp_U_[0], dummy_);
+    euler_module_->template step<0>(temp_U_[1], {}, {}, temp_U_[0]);
     temp_U_[0].sadd(Number(2. / 3.), Number(1. / 3.), U);
     euler_module_->apply_boundary_conditions(temp_U_[0], t + 0.5 * tau);
 
@@ -179,28 +176,20 @@ namespace ryujin
 #endif
 
     /* Step 1: U1 <- {U, 1} at time t + tau */
-    Number tau = euler_module_->template step<0, true>(
-        U, {}, {}, {}, temp_U_[0], temp_dij_[0]);
+    Number tau = euler_module_->template step<0>(U, {}, {}, temp_U_[0]);
     euler_module_->apply_boundary_conditions(temp_U_[0], t + tau);
 
     /* Step 2: U2 <- {U1, 2} and {U, -1} at time t + 2 tau */
-    euler_module_->template step<1, true>(temp_U_[0],
-                                          {{U}},
-                                          {{temp_dij_[0]}},
-                                          {{Number(-1.)}},
-                                          temp_U_[1],
-                                          temp_dij_[1],
-                                          tau);
+    euler_module_->template step<1>(
+        temp_U_[0], {{U}}, {{Number(-1.)}}, temp_U_[1], tau);
     euler_module_->apply_boundary_conditions(temp_U_[1], t + 2. * tau);
 
     /* Step 3: U3 <- {U2, 9/4} and {U1, -2} and {U, 3/4} at time t + 3 tau */
-    euler_module_->template step<2, false>(temp_U_[1],
-                                           {{U, temp_U_[0]}},
-                                           {{temp_dij_[0], temp_dij_[1]}},
-                                           {{Number(0.75), Number(-2.)}},
-                                           temp_U_[2],
-                                           dummy_,
-                                           tau);
+    euler_module_->template step<2>(temp_U_[1],
+                                    {{U, temp_U_[0]}},
+                                    {{Number(0.75), Number(-2.)}},
+                                    temp_U_[2],
+                                    tau);
     euler_module_->apply_boundary_conditions(temp_U_[2], t + 3. * tau);
 
     U.swap(temp_U_[2]);
@@ -216,40 +205,27 @@ namespace ryujin
 #endif
 
     /* Step 1: U1 <- {U, 1} at time t + tau */
-    Number tau = euler_module_->template step<0, true>(
-        U, {}, {}, {}, temp_U_[0], temp_dij_[0]);
+    Number tau = euler_module_->template step<0>(U, {}, {}, temp_U_[0]);
     euler_module_->apply_boundary_conditions(temp_U_[0], t + tau);
 
 
     /* Step 2: U2 <- {U1, 2} and {U, -1} at time t + 2 tau */
-    euler_module_->template step<1, true>(temp_U_[0],
-                                          {{U}},
-                                          {{temp_dij_[0]}},
-                                          {{Number(-1.)}},
-                                          temp_U_[1],
-                                          temp_dij_[1],
-                                          tau);
+    euler_module_->template step<1>(
+        temp_U_[0], {{U}}, {{Number(-1.)}}, temp_U_[1], tau);
     euler_module_->apply_boundary_conditions(temp_U_[1], t + 2. * tau);
 
 
     /* Step 3: U3 <- {U2, 2} and {U1, -1} at time t + 3 tau */
-    euler_module_->template step<1, true>(temp_U_[1],
-                                          {{temp_U_[0]}},
-                                          {{temp_dij_[1]}},
-                                          {{Number(-1.)}},
-                                          temp_U_[2],
-                                          temp_dij_[0], // sic!
-                                          tau);
+    euler_module_->template step<1>(
+        temp_U_[1], {{temp_U_[0]}}, {{Number(-1.)}}, temp_U_[2], tau);
     euler_module_->apply_boundary_conditions(temp_U_[2], t + 3. * tau);
 
     /* Step 4: U4 <- {U3, 8/3} and {U2,-10/3} and {U1, 5/3} at time t + 4 tau */
-    euler_module_->template step<2, false>(temp_U_[2],
-                                           {{temp_U_[0], temp_U_[1]}},
-                                           {{temp_dij_[1], temp_dij_[0]}},
-                                           {{Number(5. / 3.), Number(-10. / 3.)}},
-                                           temp_U_[3],
-                                           dummy_,
-                                           tau);
+    euler_module_->template step<2>(temp_U_[2],
+                                    {{temp_U_[0], temp_U_[1]}},
+                                    {{Number(5. / 3.), Number(-10. / 3.)}},
+                                    temp_U_[3],
+                                    tau);
     euler_module_->apply_boundary_conditions(temp_U_[3], t + 4. * tau);
 
     U.swap(temp_U_[3]);

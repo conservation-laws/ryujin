@@ -83,15 +83,12 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  template <int stages, bool record_dij>
+  template <int stages>
   Number EulerModule<dim, Number>::step(
       const vector_type &old_U,
       std::array<std::reference_wrapper<const vector_type>, stages> stage_U,
-      std::array<std::reference_wrapper<const SparseMatrixSIMD<Number>>, stages>
-          stage_dij,
       const std::array<Number, stages> stage_weights,
       vector_type &new_U,
-      SparseMatrixSIMD<Number> &new_dij,
       Number tau /*= 0.*/) const
   {
 #ifdef DEBUG_OUTPUT

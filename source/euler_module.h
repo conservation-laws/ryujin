@@ -136,11 +136,10 @@ namespace ryujin
      * computed maximal time step size and @ref tau is the last parameter
      * of the function.
      *
-     * The function takes an optional array of states @ref stage_U
-     * and high-order graph viscosities @ref stage_dij together with a an
-     * array of weights @ref stage_weights to construct a modified
-     * high-order flux. The standard high-order flux reads (cf @cite
-     * ryujin-2021-1, Eq. 12):
+     * The function takes an optional array of states @ref stage_U together
+     * with a an array of weights @ref stage_weights to construct a
+     * modified high-order flux. The standard high-order flux reads
+     * (cf @cite ryujin-2021-1, Eq. 12):
      * \f{align}
      *   \newcommand{\bR}{{\boldsymbol R}}
      *   \newcommand{\bU}{{\boldsymbol U}}
@@ -178,25 +177,17 @@ namespace ryujin
      * \f}
      * where \f$\omega_s\f$ denotes the weigths for the given stages.
      *
-     * If the template parameter @ref record_dij is set to true, then the
-     * new high-order flux is written back into the supplied @ref new_dij
-     * matrix. If the template parameter is false, then the supplied
-     * parameter is ignored.
-     *
      * @note The routine does not automatically update ghost vectors of the
      * distributed vector @ref new_U. It is best to simply call
      * EulerModule::apply_boundary_conditions() on the appropriate vector
      * immediately after performing a time step.
      */
-    template <int stages, bool record_dij = false>
+    template <int stages>
     Number
     step(const vector_type &old_U,
          std::array<std::reference_wrapper<const vector_type>, stages> stage_U,
-         std::array<std::reference_wrapper<const SparseMatrixSIMD<Number>>,
-                    stages> stage_dij,
          const std::array<Number, stages> stage_weights,
          vector_type &new_U,
-         SparseMatrixSIMD<Number> &new_dij,
          Number tau = Number(0.)) const;
 
     /**
