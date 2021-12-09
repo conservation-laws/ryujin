@@ -206,7 +206,6 @@ namespace ryujin
     dealii::SmartPointer<const ryujin::DissipationModule<dim, Number>>
         dissipation_module_;
 
-    std::vector<SparseMatrixSIMD<Number>> temp_dij_;
     std::vector<vector_type> temp_U_;
 
     //@}

@@ -67,15 +67,12 @@ namespace ryujin
     switch (time_stepping_scheme_) {
     case TimeSteppingScheme::ssprk_33:
       temp_U_.resize(2);
-      temp_dij_.resize(0);
       break;
     case TimeSteppingScheme::erk_33:
       temp_U_.resize(3);
-      temp_dij_.resize(2);
       break;
     case TimeSteppingScheme::erk_43:
       temp_U_.resize(4);
-      temp_dij_.resize(2);
       break;
     }
 
@@ -84,10 +81,6 @@ namespace ryujin
     const auto &vector_partitioner = offline_data_->vector_partitioner();
     for (auto &it : temp_U_)
       it.reinit(vector_partitioner);
-
-    const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
-    for (auto &it : temp_dij_)
-      it.reinit(sparsity_simd);
 
     /* Reset CFL to canonical starting value: */
 
@@ -128,7 +121,7 @@ namespace ryujin
     try {
       return single_step();
 
-    } catch(ryujin::Restart) {
+    } catch (ryujin::Restart) {
 
       AssertThrow(cfl_recovery_strategy_ != CFLRecoveryStrategy::none,
                   dealii::ExcInternalError());
