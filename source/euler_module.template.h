@@ -729,6 +729,7 @@ namespace ryujin
           const Number m_j_inv = lumped_mass_matrix_inverse.local_element(j);
 
           const auto d_ij = dij_matrix_.get_entry(i, col_idx);
+          const auto d_ijH =  d_ij * (alpha_i + alpha_j) * Number(.5);
 
           const auto m_ij = mass_matrix.get_entry(i, col_idx);
           const auto b_ij =
@@ -738,10 +739,7 @@ namespace ryujin
 
           /* Contributions from graph viscosity and mass matrix correction: */
 
-          auto p_ij = -d_ij * (U_j - U_i) + b_ij * r_j - b_ji * r_i;
-
-          const auto d_ijH =  d_ij * (alpha_i + alpha_j) * Number(.5);
-          p_ij += d_ijH * (U_j - U_i);
+          auto p_ij = (d_ijH - d_ij) * (U_j - U_i) + b_ij * r_j - b_ji * r_i;
 
           if constexpr (stages != 0) {
             /* Flux contributions: */
@@ -826,6 +824,7 @@ namespace ryujin
           const auto m_j_inv = simd_load(lumped_mass_matrix_inverse, js);
 
           const auto d_ij = dij_matrix_.get_vectorized_entry(i, col_idx);
+          const auto d_ijH =  d_ij * (alpha_i + alpha_j) * Number(.5);
 
           const auto m_ij = mass_matrix.get_vectorized_entry(i, col_idx);
           const auto b_ij = (col_idx == 0 ? VA(1.) : VA(0.)) - m_ij * m_j_inv;
@@ -833,10 +832,7 @@ namespace ryujin
 
           /* Contributions from graph viscosity and mass matrix correction: */
 
-          auto p_ij = -d_ij * (U_j - U_i) + b_ij * r_j - b_ji * r_i;
-
-          const auto d_ijH =  d_ij * (alpha_i + alpha_j) * Number(.5);
-          p_ij += d_ijH * (U_j - U_i);
+          auto p_ij = (d_ijH - d_ij) * (U_j - U_i) + b_ij * r_j - b_ji * r_i;
 
           if constexpr (stages != 0) {
             /* Flux contributions: */
