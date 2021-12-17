@@ -49,10 +49,10 @@ subsection B - ProblemDescription
   # Air at sea level:
   set gamma       = 1.401
   # dynamic viscosity [mu] = Ns/m^2
-  set mu          = 1.789e-5
+  set mu          = 1.844e-5
   set lambda      = 0
   # Scaled thermal conductivity [c_v^{-1}\kappa] = Kg/ms
-  set kappa       = 3.616e-5
+  set kappa       = 6.436e-5
 end
 
 
@@ -88,7 +88,7 @@ subsection E - InitialValues
   subsection uniform
     # Air at sea level and flow at Mach 0.73
     # [rho] = kg/m^3, [v] = m/s, [p] = N/m^2
-    set primitive state = 1.225, 248.42, 1.013e5
+    set primitive state = 1.185, 252.59, 1.013e5
   end
 end
 
