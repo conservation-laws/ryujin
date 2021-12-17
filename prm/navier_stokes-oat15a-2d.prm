@@ -46,11 +46,12 @@ end
 subsection B - ProblemDescription
   set description = Navier Stokes
 
-  # Air at sea level
+  # Air at sea level:
   set gamma       = 1.401
+  # dynamic viscosity [mu] = Ns/m^2
   set mu          = 1.789e-5
   set lambda      = 0
-  # Scaled thermal conductivity c_v^{-1} kappa
+  # Scaled thermal conductivity [c_v^{-1}\kappa] = Kg/ms
   set kappa       = 3.616e-5
 end
 
@@ -86,7 +87,7 @@ subsection E - InitialValues
 
   subsection uniform
     # Air at sea level and flow at Mach 0.73
-    # rho [kg/m^3], v [m/s], p [N/m^2]
+    # [rho] = kg/m^3, [v] = m/s, [p] = N/m^2
     set primitive state = 1.225, 248.42, 1.013e5
   end
 end
