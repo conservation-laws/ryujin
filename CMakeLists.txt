@@ -118,7 +118,7 @@ set(RIEMANN_NEWTON_MAX_ITER "0" CACHE STRING "Maximal number of iterations in Ri
 set(INDICATOR "Indicators::entropy_viscosity_commutator" CACHE STRING "Indicator for preliminary high-order method")
 set(INDICATOR_SECOND_VARIATIONS "true" CACHE STRING "Use second variations")
 set(INDICATOR_ENTROPY "Entropy::harten" CACHE STRING "Entropy for entropy-viscosity commutator")
-set(INDICATOR_ALPHA_0 "2." CACHE STRING "alpha_0 factor for entropy-viscosity commutator")
+set(INDICATOR_ALPHA_0 "1." CACHE STRING "alpha_0 factor for entropy-viscosity commutator")
 set(SMOOTHNESS_INDICATOR "SmoothnessIndicators::pressure" CACHE STRING "Quantity used in smoothness indicator")
 set(SMOOTHNESS_INDICATOR_ALPHA_0 "0." CACHE STRING "alpha_0 factor of smoothness indicator")
 set(SMOOTHNESS_INDICATOR_POWER "3" CACHE STRING "exponent of smoothness indicator")
@@ -130,7 +130,7 @@ mark_as_advanced(
   EQUATION_OF_STATE
   NEWTON_EPS_DOUBLE NEWTON_EPS_FLOAT NEWTON_MAX_ITER
   RIEMANN_NEWTON_MAX_ITER
-  INDICATOR COMPUTE_SECOND_VARIATIONS ENTROPY
+  INDICATOR INDICATOR_ALPHA_0 INDICATOR_SECOND_VARIATIONS INDICATOR_ENTROPY
   SMOOTHNESS_INDICATOR SMOOTHNESS_INDICATOR_ALPHA_0
   SMOOTHNESS_INDICATOR_POWER
   LIMITER LIMITER_RELAX_BOUNDS LIMITER_RELAXATION_ORDER
