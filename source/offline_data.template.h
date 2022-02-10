@@ -79,18 +79,15 @@ namespace ryujin
     DoFRenumbering::Cuthill_McKee(dof_handler);
 
 #ifdef USE_COMMUNICATION_HIDING
-#ifdef DEBUG
-    const unsigned int n_export_indices_preliminary =
-#endif
-        DoFRenumbering::export_indices_first(dof_handler, mpi_communicator_);
+    DoFRenumbering::export_indices_first(dof_handler, mpi_communicator_);
 #endif
 
-    n_locally_internal_ =
-        DoFRenumbering::internal_range(dof_handler, mpi_communicator_);
-
-    /* Round down to the nearest multiple of the VectorizedArray width: */
-    n_locally_internal_ = n_locally_internal_ -
-                          n_locally_internal_ % VectorizedArray<Number>::size();
+    /*
+     * Group degrees of freedom that have the same stencil size in groups
+     * of multiples of the VectorizedArray<Number>::size().
+     */
+    n_locally_internal_ = DoFRenumbering::internal_range(
+        dof_handler, mpi_communicator_, VectorizedArray<Number>::size());
 
     /*
      * First, we set up the locally_relevant index set, determine (globally
@@ -219,11 +216,23 @@ namespace ryujin
     for (const auto &it : scalar_partitioner_->import_indices())
       if (it.second <= n_locally_internal_)
         n_export_indices_ = std::max(n_export_indices_, it.second);
-
-    Assert(n_export_indices_ <= n_export_indices_preliminary,
-           dealii::ExcInternalError());
 #else
     n_export_indices_ = n_locally_internal_;
+#endif
+
+    Assert(n_export_indices_ <= n_locally_internal_, ExcInternalError());
+
+#ifdef DEBUG
+    const auto offset = n_locally_owned_ != 0 ? *locally_owned.begin() : 0;
+    unsigned int group_row_length = 0;
+    for (unsigned int i = 0; i < n_locally_internal_; ++i) {
+      if (i % VectorizedArray<Number>::size() == 0) {
+        group_row_length = sparsity_pattern_.row_length(offset + i);
+      } else {
+        Assert(group_row_length == sparsity_pattern_.row_length(offset + i),
+               ExcInternalError());
+      }
+    }
 #endif
 
     /*

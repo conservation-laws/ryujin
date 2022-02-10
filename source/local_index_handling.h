@@ -157,11 +157,8 @@ namespace ryujin
      * sparsity pattern simultaneously using SIMD instructions we reorder
      * all locally owned degrees of freedom to ensure that a local index
      * range \f$[0, \text{n_locally_internal_}) \subset [0,
-     * \text{n_locally_owned})\f$ is available that
-     *  - contains no boundary dof
-     *  - contains no foreign degree of freedom
-     *  - has "standard" connectivity, i.e. 2, 8, or 26 neighboring DoFs
-     *    (in 1, 2, 3D).
+     * \text{n_locally_owned})\f$ is available that groups dofs with same
+     * stencil size in groups of multiples of @p group_size
      *
      * Returns the right boundary n_internal of the internal index range.
      *
@@ -169,7 +166,8 @@ namespace ryujin
      */
     template <int dim>
     unsigned int internal_range(dealii::DoFHandler<dim> &dof_handler,
-                                const MPI_Comm &mpi_communicator)
+                                const MPI_Comm &mpi_communicator,
+                                const std::size_t group_size)
     {
       using namespace dealii;
 
@@ -187,81 +185,65 @@ namespace ryujin
 
       using dof_type = dealii::types::global_dof_index;
       std::vector<dof_type> new_order(n_locally_owned);
+      dof_type current_index = offset;
 
-      {
-        /*
-         * Set up a temporary sparsity pattern to determine connectivity.
-         * This duplicates some code from offline_data.template.h; but the
-         * resulting sparsity pattern that we create here has to be thrown
-         * away anyway after renumbering.
-         */
+      /*
+       * Set up a temporary sparsity pattern to determine connectivity.
+       * This duplicates some code from offline_data.template.h; but the
+       * resulting sparsity pattern that we create here has to be thrown
+       * away anyway after renumbering.
+       */
 
-        IndexSet locally_relevant;
-        DoFTools::extract_locally_relevant_dofs(dof_handler, locally_relevant);
+      IndexSet locally_relevant;
+      DoFTools::extract_locally_relevant_dofs(dof_handler, locally_relevant);
 
-        AffineConstraints<double> affine_constraints;
-        affine_constraints.reinit(locally_relevant);
-        DoFTools::make_hanging_node_constraints(dof_handler,
-                                                affine_constraints);
-        affine_constraints.close();
+      AffineConstraints<double> affine_constraints;
+      affine_constraints.reinit(locally_relevant);
+      DoFTools::make_hanging_node_constraints(dof_handler, affine_constraints);
+      affine_constraints.close();
 
-        DynamicSparsityPattern dsp(locally_relevant);
-        DoFTools::make_sparsity_pattern(
-            dof_handler, dsp, affine_constraints, false);
+      DynamicSparsityPattern dsp(locally_relevant);
+      DoFTools::make_sparsity_pattern(
+          dof_handler, dsp, affine_constraints, false);
 
-        SparsityTools::distribute_sparsity_pattern(
-            dsp, locally_owned, mpi_communicator, locally_relevant);
+      SparsityTools::distribute_sparsity_pattern(
+          dsp, locally_owned, mpi_communicator, locally_relevant);
 
-        /* Mark all non-standard degrees of freedom: */
+      /*
+       * Sort degrees of freedom into a map grouped by stencil size. Write
+       * out dof indices into the new_order vector in groups of group_size
+       * and with same stencil size.
+       */
 
-        constexpr unsigned int standard_connectivity =
-            dim == 1 ? 3 : (dim == 2 ? 9 : 27);
+      std::map<unsigned int, std::set<dof_type>> bins;
 
-        for (unsigned int i = 0; i < n_locally_owned; ++i)
-          if (dsp.row_length(offset + i) != standard_connectivity)
-            new_order[i] = dealii::numbers::invalid_dof_index;
+      for (unsigned int i = 0; i < n_locally_owned; ++i) {
+        const dof_type index = i;
+        const unsigned int row_length = dsp.row_length(offset + index);
+        bins[row_length].insert(index);
 
-        /* Explicitly poison boundary degrees of freedom: */
-
-        const unsigned int dofs_per_face = dof_handler.get_fe().dofs_per_face;
-        std::vector<dof_type> local_face_dof_indices(dofs_per_face);
-
-        for (auto &cell : dof_handler.active_cell_iterators()) {
-          if (!cell->at_boundary())
-            continue;
-          for (auto f : dealii::GeometryInfo<dim>::face_indices()) {
-            const auto face = cell->face(f);
-            if (!face->at_boundary())
-              continue;
-            face->get_dof_indices(local_face_dof_indices);
-            for (unsigned int j = 0; j < dofs_per_face; ++j) {
-              const auto &index = local_face_dof_indices[j];
-              if (!locally_owned.is_element(index))
-                continue;
-              Assert(index >= offset && index - offset < n_locally_owned,
-                     dealii::ExcInternalError());
-              new_order[index - offset] = dealii::numbers::invalid_dof_index;
-            }
-          }
+        if (bins[row_length].size() == group_size) {
+          for (const auto &index : bins[row_length])
+            new_order[index] = current_index++;
+          bins.erase(row_length);
         }
       }
 
-      /* Second pass: Create renumbering. */
+      unsigned int n_locally_internal = current_index - offset;
 
-      dof_type index = offset;
+      /* Write out the rest. */
 
-      unsigned int n_locally_internal = 0;
-      for (auto &it : new_order)
-        if (it != dealii::numbers::invalid_dof_index) {
-          it = index++;
-          n_locally_internal++;
-        }
+      for (const auto &entries : bins) {
+        Assert(entries.second.size() > 0, ExcInternalError());
+        for (const auto &index : entries.second)
+          new_order[index] = current_index++;
+      }
 
-      for (auto &it : new_order)
-        if (it == dealii::numbers::invalid_dof_index)
-          it = index++;
+      Assert(current_index == offset + n_locally_owned, ExcInternalError());
 
       dof_handler.renumber_dofs(new_order);
+
+      Assert(n_locally_internal % group_size == 0, ExcInternalError());
 
       return n_locally_internal;
     }
