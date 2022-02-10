@@ -154,6 +154,7 @@ namespace ryujin
         simd_store(evc_entropies_, evc_entropy, i);
       }
 
+      RYUJIN_OMP_FOR
       for (unsigned int i = size_regular; i < n_relevant; ++i) {
         const auto U_i = old_U.get_tensor(i);
 
@@ -298,6 +299,11 @@ namespace ryujin
 
         const unsigned int row_length = sparsity_simd.row_length(i);
 
+        /* Skip constrained degrees of freedom: */
+        if (row_length == 1) {
+          continue;
+        }
+
         /* Skip diagonal. */
         const unsigned int *js = sparsity_simd.columns(i) + simd_length;
         for (unsigned int col_idx = 1; col_idx < row_length;
@@ -338,6 +344,46 @@ namespace ryujin
 
       LIKWID_MARKER_STOP("time_step_1");
       RYUJIN_PARALLEL_REGION_END
+    }
+
+    {
+      Scope scope(computing_timer_,
+                  "time step [E] 1b- compute d_ji when needed");
+
+      RiemannSolver<dim, Number> riemann_solver_serial(*problem_description_);
+
+      /* FIXME: non-parallel... */
+      for (auto entry : boundary_map) {
+        const auto i = entry.first;
+        if (i >= n_owned)
+          continue;
+
+        const auto U_i = old_U.get_tensor(i);
+
+        const unsigned int row_length = sparsity_simd.row_length(i);
+        const unsigned int *js = sparsity_simd.columns(i);
+
+        /* skip diagonal: */
+        for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
+          const auto j =
+              *(i < n_internal ? js + col_idx * simd_length : js + col_idx);
+
+          if (boundary_map.count(j) != 0) {
+            const auto U_j = old_U.get_tensor(j);
+
+            const auto c_ji = cij_matrix.get_transposed_tensor(i, col_idx);
+            Assert(c_ji.norm() > 1.e-12, ExcInternalError());
+            const auto norm = c_ji.norm();
+            const auto n_ji = c_ji / norm;
+            auto [lambda_max_2, p_star_2, n_iterations_2] =
+                riemann_solver_serial.compute(U_j, U_i, n_ji);
+
+            auto d = dij_matrix_.get_entry(i, col_idx);
+            d = std::max(d, norm * lambda_max_2);
+            dij_matrix_.write_entry(d, i, col_idx);
+          }
+        }
+      }
     }
 
     /*
