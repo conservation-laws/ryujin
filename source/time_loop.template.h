@@ -548,11 +548,7 @@ namespace ryujin
     stream << "DIM == " << dim << std::endl;
     stream << "NUMBER == " << typeid(Number).name() << std::endl;
 
-#ifdef USE_SIMD
     stream << "SIMD width == " << VectorizedArray<Number>::size() << std::endl;
-#else
-    stream << "SIMD width == " << "(( disabled ))" << std::endl;
-#endif
 
 #ifdef USE_CUSTOM_POW
     stream << "serial pow == broadcasted pow(Vec4f)/pow(Vec2d)" << std::endl;

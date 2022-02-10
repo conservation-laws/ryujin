@@ -92,7 +92,6 @@ namespace ryujin
                      geometry_ + "\""));
     }
 
-#ifdef USE_SIMD
     if (repartitioning_) {
       /*
        * Try to partition the mesh equilibrating the workload. The usual mesh
@@ -127,7 +126,6 @@ namespace ryujin
 
       triangulation.repartition();
     }
-#endif
 
     triangulation.refine_global(refinement_);
 
