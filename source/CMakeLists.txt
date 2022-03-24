@@ -31,6 +31,8 @@ add_executable(ryujin
 
 deal_ii_setup_target(ryujin)
 
+target_link_libraries(ryujin ${OpenMP_CXX_LIBRARIES})
+
 if(PRECOMPILE_HEADERS AND NOT CMAKE_VERSION VERSION_LESS 3.16)
   target_precompile_headers(ryujin
     PRIVATE
