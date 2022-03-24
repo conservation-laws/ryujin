@@ -30,6 +30,14 @@ project(ryujin CXX)
 
 find_package(OpenMP REQUIRED)
 string(APPEND DEAL_II_CXX_FLAGS " ${OpenMP_CXX_FLAGS}")
+#
+# Work around a bug with brew on darwin where libomp.dylib gets silently
+# dropped from the link line even though we try to add the library with a
+# proper target_link_libraries() call...
+#
+if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
+  string(APPEND DEAL_II_LINKER_FLAGS " ${OpenMP_CXX_LIBRARIES}")
+endif()
 
 if(NOT ${DEAL_II_WITH_CXX17})
   string(APPEND DEAL_II_CXX_FLAGS " -std=c++17")
