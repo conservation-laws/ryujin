@@ -86,7 +86,7 @@ namespace ryujin
 
     AssertThrow(cfl_min_ > 0., ExcMessage("cfl min must be a positive value"));
     AssertThrow(cfl_max_ >= cfl_min_,
-                ExcMessage("cfl max must be greater or equal than cfl min"));
+                ExcMessage("cfl max must be greater than or equal to cfl min"));
 
     euler_module_->cfl(cfl_max_);
   }
@@ -98,6 +98,12 @@ namespace ryujin
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeIntegrator<dim, Number>::step()" << std::endl;
 #endif
+
+    AssertThrow(euler_module_->problem_description().problem_type() ==
+                        ProblemType::euler ||
+                    time_stepping_scheme_ == TimeSteppingScheme::ssprk_33,
+                ExcMessage("Timestepping scheme \"spprk 33\" required for "
+                           "problem type \"Navier Stokes\""));
 
     const auto single_step = [&]() {
       switch (time_stepping_scheme_) {

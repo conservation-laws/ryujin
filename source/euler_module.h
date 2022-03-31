@@ -245,6 +245,7 @@ namespace ryujin
 
     dealii::SmartPointer<const ryujin::OfflineData<dim, Number>> offline_data_;
     dealii::SmartPointer<const ryujin::ProblemDescription> problem_description_;
+    ACCESSOR_READ_ONLY(problem_description)
     dealii::SmartPointer<const ryujin::InitialValues<dim, Number>>
         initial_values_;
 
