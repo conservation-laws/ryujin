@@ -236,6 +236,10 @@ namespace ryujin
 
     tau_ = tau;
     theta_ = Number(0.5) + shift_ * tau; // FIXME
+#ifdef DEBUG_OUTPUT
+      std::cout << "        perform time-step with tau = " << tau << std::endl;
+      std::cout << "        (shift: " << shift_ << ")" << std::endl;
+#endif
 
     /*
      * Step 0:

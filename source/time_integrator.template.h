@@ -124,9 +124,9 @@ namespace ryujin
           temp_U_strang_ = U;
           const Number tau = step_ssprk_33(temp_U_strang_, t);
           dissipation_module_->step(temp_U_strang_, t, Number(2.) * tau, cycle);
-          step_ssprk_33(temp_U_strang_, t + tau, Number(2.) * tau);
+          step_ssprk_33(temp_U_strang_, t + tau, tau);
           U = temp_U_strang_;
-          return tau;
+          return Number(2.) * tau;
         } else {
           return step_ssprk_33(U, t);
         }
