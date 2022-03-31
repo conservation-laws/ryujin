@@ -107,7 +107,7 @@ namespace ryujin
     AssertThrow(euler_module_->problem_description().problem_type() ==
                         ProblemType::euler ||
                     time_stepping_scheme_ == TimeSteppingScheme::ssprk_33,
-                ExcMessage("Timestepping scheme \"spprk 33\" required for "
+                ExcMessage("Timestepping scheme \"ssprk 33\" required for "
                            "problem type \"Navier Stokes\""));
 
     const auto single_step = [&]() {
