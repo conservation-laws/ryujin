@@ -313,7 +313,7 @@ namespace ryujin
 
       /* Do a time step: */
 
-      const auto tau = time_integrator.step(U, t);
+      const auto tau = time_integrator.step(U, t, cycle);
       t += tau;
 
       /* Print and record cycle statistics: */

@@ -205,7 +205,7 @@ namespace ryujin
   Number DissipationModule<dim, Number>::step(vector_type &U,
                                               Number t,
                                               Number tau,
-                                              unsigned int cycle)
+                                              unsigned int cycle) const
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "DissipationModule<dim, Number>::step()" << std::endl;

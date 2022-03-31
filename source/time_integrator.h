@@ -149,15 +149,19 @@ namespace ryujin
      * adaptation and recovery strategies for invariant domain violations
      * are used.
      */
-    Number step(vector_type &U, Number t);
+    Number step(vector_type &U, Number t, unsigned int cycle);
 
     /**
      * Given a reference to a previous state vector U performs an explicit
      * third-order strong-stability preserving Runge-Kutta SSPRK(3,3,1/3)
      * time step (and store the result in U). The function returns the
      * chosen time step size tau.
+     *
+     * If the parameter @ref tau is set to a nonzero value then the
+     * supplied value is used for time stepping instead of the computed
+     * maximal time step size.
      */
-    Number step_ssprk_33(vector_type &U, Number t);
+    Number step_ssprk_33(vector_type &U, Number t, Number tau = Number(0.));
 
     /**
      * Given a reference to a previous state vector U performs an explicit
@@ -207,6 +211,7 @@ namespace ryujin
         dissipation_module_;
 
     std::vector<vector_type> temp_U_;
+    vector_type temp_U_strang_; // FIXME: refactor
 
     //@}
   };

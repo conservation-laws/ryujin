@@ -81,6 +81,9 @@ namespace ryujin
     const auto &vector_partitioner = offline_data_->vector_partitioner();
     for (auto &it : temp_U_)
       it.reinit(vector_partitioner);
+    if (euler_module_->problem_description().problem_type() ==
+        ProblemType::navier_stokes)
+      temp_U_strang_.reinit(vector_partitioner); // FIXME: refactor
 
     /* Reset CFL to canonical starting value: */
 
@@ -93,7 +96,9 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  Number TimeIntegrator<dim, Number>::step(vector_type &U, Number t)
+  Number TimeIntegrator<dim, Number>::step(vector_type &U,
+                                           Number t,
+                                           unsigned int cycle)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeIntegrator<dim, Number>::step()" << std::endl;
@@ -108,7 +113,26 @@ namespace ryujin
     const auto single_step = [&]() {
       switch (time_stepping_scheme_) {
       case TimeSteppingScheme::ssprk_33:
-        return step_ssprk_33(U, t);
+        //
+        // FIXME: refactor
+        //
+        // Let us put the Strang split here for now - we will have to
+        // refactor this once the dirk schemes are implemented
+        //
+        if (euler_module_->problem_description().problem_type() ==
+            ProblemType::navier_stokes) {
+          temp_U_strang_ = U;
+          const Number tau = step_ssprk_33(temp_U_strang_, t);
+          dissipation_module_->step(temp_U_strang_, t, Number(2.) * tau, cycle);
+          step_ssprk_33(temp_U_strang_, t + tau, Number(2.) * tau);
+          U = temp_U_strang_;
+          return tau;
+        } else {
+          return step_ssprk_33(U, t);
+        }
+        //
+        // end FIXME
+        //
       case TimeSteppingScheme::erk_33:
         return step_erk_33(U, t);
       case TimeSteppingScheme::erk_43:
@@ -144,12 +168,14 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  Number TimeIntegrator<dim, Number>::step_ssprk_33(vector_type &U, Number t)
+  Number TimeIntegrator<dim, Number>::step_ssprk_33(vector_type &U,
+                                                    Number t,
+                                                    Number tau /*=Number(0.)*/)
   {
     /* SSP-RK3, see @cite Shu1988, Eq. 2.18. */
 
     /* Step 1: U1 = U_old + tau * L(U_old) at time t + tau */
-    Number tau = euler_module_->template step<0>(U, {}, {}, temp_U_[0]);
+    tau = euler_module_->template step<0>(U, {}, {}, temp_U_[0], tau);
     euler_module_->apply_boundary_conditions(temp_U_[0], t + tau);
 
     /* Step 2: U2 = 3/4 U_old + 1/4 (U1 + tau L(U1)) at time t + tau */
