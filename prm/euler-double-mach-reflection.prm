@@ -1,0 +1,86 @@
+#
+# A Mache 3 2D disc configuration.
+#
+# The geometry is a 2D disc of diameter 0.5 positioned in a 2D channel of
+# length 4, height 2 and width 2.
+#
+
+subsection A - TimeLoop
+  set basename                     = dbmr
+
+  set enable checkpointing         = false
+  set enable compute quantities    = false
+  set enable output full           = true
+  set enable output levelsets      = false
+
+  set final time                   = 0.20
+  set output granularity           = 0.01
+
+  set output checkpoint multiplier = 1
+  set output quantities multiplier = 1
+  set output full multiplier       = 1
+  set output levelsets multiplier  = 1
+
+  set terminal update interval     = 10
+end
+
+
+subsection B - ProblemDescription
+  set description = Euler
+
+  set gamma       = 1.4
+end
+
+
+subsection C - Discretization
+  set geometry            = wall
+
+  set mesh refinement     = 7
+  set mesh repartitioning = false
+
+  subsection wall
+    set height        = 1
+    set length        = 3.2
+    set wall position = 0.166667
+  end
+end
+
+
+subsection E - InitialValues
+  set configuration = shockfront
+
+  set direction     = 0.8660254, -0.5
+  set position      = 0.166667, 0
+
+  subsection shockfront
+    set mach number     = 10
+    set primitive state = 1.4, 0, 1
+  end
+end
+
+
+subsection F - EulerModule
+  set limiter iterations = 2
+end
+
+
+subsection H - TimeIntegrator
+  set cfl min            = 0.90
+  set cfl max            = 0.90
+
+  set cfl recovery strategy = none
+
+  set time stepping scheme  = ssprk 33
+end
+
+
+subsection I - VTUOutput
+  set manifolds      = 
+
+  set schlieren beta = 10
+  set vorticity beta = 10
+
+  set use mpi io     = true
+end
+
+
