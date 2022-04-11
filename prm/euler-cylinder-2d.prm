@@ -77,6 +77,8 @@ end
 
 
 subsection I - VTUOutput
+  set manifolds      = 
+
   set schlieren beta = 10
   set vorticity beta = 10
 

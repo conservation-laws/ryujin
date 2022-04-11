@@ -107,10 +107,10 @@ end
 
 
 subsection H - TimeIntegrator
-  set cfl min               = 4.0
-  set cfl max               = 4.0
-  set cfl recovery strategy = none
-  set time stepping scheme  = erk 33
+  set cfl min               = 0.8
+  set cfl max               = 2.0
+  set cfl recovery strategy = bang bang control
+  set time stepping scheme  = ssprk 33
 end
 
 

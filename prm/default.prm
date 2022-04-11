@@ -64,20 +64,20 @@ end
 
 
 subsection B - ProblemDescription
+  # Description - valid options are "Euler" and "Navier Stokes"
+  set description = Euler
+
   # Euler: Ratio of specific heats
-  set gamma        = 1.4
+  set gamma       = 1.4
 
   # Navier Stokes: Scaled thermal conductivity c_v^{-1} kappa
-  set kappa        = 0.0186667
+  set kappa       = 0.0186667
 
   # Navier Stokes: Bulk viscosity
-  set lambda       = 0
+  set lambda      = 0
 
   # Navier Stokes: Shear viscosity
-  set mu           = 0.001
-
-  # Problem type - valid options are "Euler" and "Navier Stokes"
-  set problem type = Euler
+  set mu          = 0.001
 end
 
 
@@ -354,13 +354,13 @@ end
 
 
 subsection H - TimeIntegrator
-  # Minimal admissible relative CFL constant. How this parameter is used
-  # depends on the chosen CFL recovery strategy
-  set cfl min               = 0.45
-
   # Maximal admissible relative CFL constant. How this parameter is used
   # depends on the chosen CFL recovery strategy
   set cfl max               = 0.9
+
+  # Minimal admissible relative CFL constant. How this parameter is used
+  # depends on the chosen CFL recovery strategy
+  set cfl min               = 0.45
 
   # CFL/invariant domain violation recovery strategy: none, bang bang control
   set cfl recovery strategy = bang bang control
@@ -392,13 +392,18 @@ subsection J - Quantities
   # to only output point values for boundary vertices belonging to a certain
   # level set. Format: '<name> : <level set formula> : <options> , [...]
   # (options: time_averaged, space_averaged, instantaneous)
-  set boundary manifolds = 
+  set boundary manifolds           = 
+
+  # If set to true then all temporal statistics (for "time_averaged"
+  # quantities) accumulated so far are reset each time a writeout of
+  # quantities is performed
+  set clear statistics on writeout = true
 
   # List of level set functions describing interior manifolds. The description
   # is used to only output point values for vertices belonging to a certain
   # level set. Format: '<name> : <level set formula> : <options> , [...]
   # (options: time_averaged, space_averaged, instantaneous)
-  set interior manifolds = 
+  set interior manifolds           = 
 end
 
 
