@@ -1,8 +1,5 @@
 #
-# A Mache 3 2D disc configuration.
-#
-# The geometry is a 2D disc of diameter 0.5 positioned in a 2D channel of
-# length 4, height 2 and width 2.
+# A Mach 10 double mach reflection configuration
 #
 
 subsection A - TimeLoop
