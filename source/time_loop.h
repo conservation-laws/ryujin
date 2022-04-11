@@ -14,6 +14,7 @@
 #include "offline_data.h"
 #include "problem_description.h"
 #include "quantities.h"
+#include "time_integrator.h"
 #include "vtu_output.h"
 
 #include <deal.II/base/parameter_acceptor.h>
@@ -135,6 +136,7 @@ namespace ryujin
     ryujin::InitialValues<dim, Number> initial_values;
     ryujin::EulerModule<dim, Number> euler_module;
     ryujin::DissipationModule<dim, Number> dissipation_module;
+    ryujin::TimeIntegrator<dim, Number> time_integrator;
     ryujin::VTUOutput<dim, Number> vtu_output;
     ryujin::Quantities<dim, Number> quantities;
 

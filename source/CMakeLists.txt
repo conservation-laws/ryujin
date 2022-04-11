@@ -20,11 +20,12 @@ add_executable(ryujin
   limiter.cc
   main.cc
   offline_data.cc
-  quantities.cc
   problem_description.cc
+  quantities.cc
   riemann_solver.cc
   simd.cc
   sparse_matrix_simd.cc
+  time_integrator.cc
   time_loop.cc
   vtu_output.cc
   )

@@ -22,8 +22,38 @@
 #include <deal.II/lac/sparse_matrix.templates.h>
 #include <deal.II/lac/vector.h>
 
+#include <functional>
+
 namespace ryujin
 {
+  /**
+   * An enum controlling the behavior on detection of an invariant domain
+   * or CFL violation. Such a case might occur for either aggressive CFL
+   * numbers > 1, and/or later stages in the Runge Kutta scheme when the
+   * time step tau is prescribed.
+   *
+   * The invariant domain violation is detected in the limiter and
+   * typically implies that the low-order update is already out of
+   * bounds. We further do a quick sanity check whether the computed
+   * step size tau_max and the prescribed step size tau are within an
+   * acceptable tolerance of about 10%.
+   */
+  enum class IDViolationStrategy {
+    /**
+     * Warn about an invariant domain violation but take no further
+     * action.
+     */
+    warn,
+
+    /**
+     * Raise a ryujin::Restart exception on domain violation. This
+     * exception can be caught in TimeIntegrator and various different
+     * actions (adapt CFL and retry) can be taken depending on chosen
+     * strategy.
+     */
+    raise_exception,
+  };
+
 
   /**
    * A class signalling a restart, thrown in EulerModule::single_step and
@@ -33,14 +63,12 @@ namespace ryujin
   {
   };
 
+
   /**
-   * Explicit (strong stability preserving) time-stepping for the
-   * compressible Euler equations described in ProblemDescription.
+   * Explicit forward Euler time-stepping for hyperbolic systems with
+   * convex limiting.
    *
-   * This module is described in detail in @cite ryujin-2021-1, Alg.
-   * 1.
-   *
-   * @todo Write out some more documentation
+   * This module is described in detail in @cite ryujin-2021-1, Alg. 1.
    *
    * @ingroup EulerModule
    */
@@ -98,80 +126,110 @@ namespace ryujin
     //@{
 
     /**
-     * Given a reference to a previous state vector U perform an explicit
-     * euler step (and store the result in U). The function returns the
-     * computed maximal time step size tau_max.
+     * Given a reference to a previous state vector @ref old_U perform an
+     * explicit euler step (and store the result in @ref new_U). The
+     * function returns the computed maximal time step size tau_max
+     * according to the CFL condition.
      *
-     * The time step is performed with either tau_max (if tau == 0), or tau
-     * (if tau != 0). Here, tau_max is the computed maximal time step size
-     * and tau is the optional third parameter.
+     * The time step is performed with either tau_max (if @ref tau is set
+     * to 0), or tau (if @ref tau is nonzero). Here, tau_max is the
+     * computed maximal time step size and @ref tau is the last parameter
+     * of the function.
+     *
+     * The function takes an optional array of states @ref stage_U together
+     * with a an array of weights @ref stage_weights to construct a
+     * modified high-order flux. The standard high-order flux reads
+     * (cf @cite ryujin-2021-1, Eq. 12):
+     * \f{align}
+     *   \newcommand{\bR}{{\boldsymbol R}}
+     *   \newcommand{\bU}{{\boldsymbol U}}
+     *   \newcommand\bUni{\bU^n_i}
+     *   \newcommand\bUnj{\bU^n_j}
+     *   \newcommand{\polf}{{\mathbb f}}
+     *   \newcommand\Ii{\mathcal{I}(i)}
+     *   \newcommand{\bc}{{\boldsymbol c}}
+     *   \sum_{j\in\Ii} \frac{m_{ij}}{m_{j}}
+     *   \;
+     *   \frac{m_{j}}{\tau_n}\big(
+     *   \tilde\bU_j^{H,n+1} - \bU_j^{n}\big)
+     *   \;=\;
+     *   \bR^n_i,
+     *   \qquad\text{with}\quad
+     *   \bR^n_i\;:=\;
+     *   \sum_{j\in\Ii}\Big(-\polf(\bUnj) \cdot\bc_{ij}
+     *   +d_{ij}^{H,n}\big(\bUnj-\bUni\big)\Big).
+     * \f}
+     * Instead, the function assembles the modified high-order flux:
+     * \f{align}
+     *   \newcommand{\bR}{{\boldsymbol R}}
+     *   \newcommand{\bU}{{\boldsymbol U}}
+     *   \newcommand\bUnis{\bU^{s,n}_i}
+     *   \newcommand\bUnjs{\bU^{s,n}_j}
+     *   \newcommand{\polf}{{\mathbb f}}
+     *   \newcommand\Ii{\mathcal{I}(i)}
+     *   \newcommand{\bc}{{\boldsymbol c}}
+     *   \tilde{\bR}^n_i\;:=\;
+     *   \big(1-\sum_{s=\{1:stages\}}\omega_s\big)\bR^n_i
+     *   \;+\;
+     *   \sum_{s=\{1:stages\}}\omega_s
+     *   \sum_{j\in\Ii}\Big(-\polf(\bUnjs) \cdot\bc_{ij}
+     *   +d_{ij}^{H,s,n}\big(\bUnjs-\bUnis\big)\Big),
+     * \f}
+     * where \f$\omega_s\f$ denotes the weigths for the given stages.
+     *
+     * @note The routine does not automatically update ghost vectors of the
+     * distributed vector @ref new_U. It is best to simply call
+     * EulerModule::apply_boundary_conditions() on the appropriate vector
+     * immediately after performing a time step.
      */
-    Number euler_step(vector_type &U, Number t, Number tau = 0.);
+    template <int stages>
+    Number
+    step(const vector_type &old_U,
+         std::array<std::reference_wrapper<const vector_type>, stages> stage_U,
+         const std::array<Number, stages> stage_weights,
+         vector_type &new_U,
+         Number tau = Number(0.)) const;
 
     /**
-     * Given a reference to a previous state vector U perform an explicit
-     * Heun 2nd order step (and store the result in U). The function
-     * returns the computed maximal time step size tau_max.
+     * This function postprocesses a given state @ref U to conform with all
+     * prescribed boundary conditions at time @ref t. This implies that on
+     * slip (and no-slip) boundaries the normal momentum is set to zero; on
+     * Dirichlet boundaries the appropriate state at time @ref t is
+     * substituted; and on "flexible" boundaries depending on the fact
+     * whether we have supersonic or subsonic inflow/outflow the
+     * appropriate Riemann invariant is prescribed. See @cite ryujin-2021-3
+     * for details.
      *
-     * The time step is performed with either tau_max (if tau == 0), or tau
-     * (if tau != 0). Here, tau_max is the computed maximal time step size
-     * and tau is the optional third parameter.
-     *
-     * See @cite Shu1988, Eq. 2.15.
+     * @note The routine does update ghost vectors of the distributed
+     * vector @ref U
      */
-    Number ssph2_step(vector_type &U, Number t, Number tau = 0.);
+    void apply_boundary_conditions(vector_type &U, Number t) const;
 
     /**
-     * Given a reference to a previous state vector U perform an explicit
-     * SSP Runge Kutta 3rd order step (and store the result in U). The
-     * function returns the computed maximal time step size tau_max.
-     *
-     * The time step is performed with either tau_max (if tau == 0), or tau
-     * (if tau != 0). Here, tau_max is the computed maximal time step size
-     * and tau is the optional third parameter.
-     *
-     * See @cite Shu1988, Eq. 2.18.
+     * Sets the relative CFL number used for computing an appropriate
+     * time-step size to the given value. The CFL number must be a positive
+     * value. If chosen to be within the interval \f$(0,1)\f$ then the
+     * low-order update and limiting stages guarantee invariant domain
+     * preservation.
      */
-    Number ssprk3_step(vector_type &U, Number t, Number tau = 0.);
+    void cfl(Number new_cfl) const
+    {
+      Assert(cfl_ > Number(0.), dealii::ExcInternalError());
+      cfl_ = new_cfl;
+    }
 
-    /**
-     * Given a reference to a previous state vector U perform an explicit
-     * time step (and store the result in U). The function returns the
-     * chosen time step size tau.
-     *
-     * This function switches between euler_step(), ssph2_step(), or
-     * ssprk3_step() depending on selected approximation order.
-     *
-     * The time step is performed with either tau_max (if tau == 0), or tau
-     * (if tau != 0). Here, tau_max is the computed maximal time step size
-     * and tau is the optional third parameter.
-     */
-    Number step(vector_type &U, Number t, Number tau = 0.);
+    mutable IDViolationStrategy id_violation_strategy_;
 
   private:
-    //@}
-    /**
-     * @name Internally used time-stepping primitives
-     */
-    //@{
 
-    Number single_step(vector_type &U, Number tau);
-
-    void apply_boundary_conditions(vector_type &U, Number t);
-
-    //@}
+   //@}
     /**
      * @name Run time options
      */
     //@{
 
-    Number cfl_min_;
-    Number cfl_max_;
-
-    unsigned int time_step_order_;
     unsigned int limiter_iter_;
 
-    bool enforce_noslip_;
     bool cfl_with_boundary_dofs_;
 
     //@}
@@ -187,39 +245,32 @@ namespace ryujin
 
     dealii::SmartPointer<const ryujin::OfflineData<dim, Number>> offline_data_;
     dealii::SmartPointer<const ryujin::ProblemDescription> problem_description_;
+    ACCESSOR_READ_ONLY(problem_description)
     dealii::SmartPointer<const ryujin::InitialValues<dim, Number>>
         initial_values_;
 
-    Number cfl_;
+    mutable Number cfl_;
     ACCESSOR_READ_ONLY(cfl)
 
-    bool restart_possible_;
-
-    unsigned int n_restarts_;
+    mutable unsigned int n_restarts_;
     ACCESSOR_READ_ONLY(n_restarts)
 
-    unsigned int n_warnings_;
+    mutable unsigned int n_warnings_;
     ACCESSOR_READ_ONLY(n_warnings)
 
-    scalar_type alpha_;
+    mutable scalar_type alpha_;
+    mutable scalar_type second_variations_;
+    mutable scalar_type specific_entropies_;
+    mutable scalar_type evc_entropies_;
 
-    scalar_type second_variations_;
-    scalar_type specific_entropies_;
-    scalar_type evc_entropies_;
+    mutable MultiComponentVector<Number, Limiter<dim, Number>::n_bounds> bounds_;
 
-    MultiComponentVector<Number, Limiter<dim, Number>::n_bounds> bounds_;
+    mutable vector_type r_;
 
-    vector_type r_;
-
-    SparseMatrixSIMD<Number> dij_matrix_;
-
-    SparseMatrixSIMD<Number> lij_matrix_;
-    SparseMatrixSIMD<Number> lij_matrix_next_;
-
-    SparseMatrixSIMD<Number, problem_dimension> pij_matrix_;
-
-    vector_type temp_euler_;
-    vector_type temp_ssp_;
+    mutable SparseMatrixSIMD<Number> dij_matrix_;
+    mutable SparseMatrixSIMD<Number> lij_matrix_;
+    mutable SparseMatrixSIMD<Number> lij_matrix_next_;
+    mutable SparseMatrixSIMD<Number, problem_dimension> pij_matrix_;
 
     //@}
   };

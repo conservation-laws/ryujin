@@ -47,11 +47,17 @@ namespace ryujin
                            offline_data,
                            initial_values,
                            "/G - DissipationModule")
-      , vtu_output(mpi_communicator, offline_data, "/H - VTUOutput")
+      , time_integrator(mpi_communicator,
+                        computing_timer,
+                        offline_data,
+                        euler_module,
+                        dissipation_module,
+                        "/H - TimeIntegrator")
+      , vtu_output(mpi_communicator, offline_data, "/I - VTUOutput")
       , quantities(mpi_communicator,
                    problem_description,
                    offline_data,
-                   "/I - Quantities")
+                   "/J - Quantities")
       , mpi_rank(dealii::Utilities::MPI::this_mpi_process(mpi_communicator))
       , n_mpi_processes(
             dealii::Utilities::MPI::n_mpi_processes(mpi_communicator))
@@ -171,11 +177,12 @@ namespace ryujin
     /* Prepare data structures: */
 
     const auto prepare_compute_kernels = [&]() {
-      offline_data.prepare();       // Storage: dim + 2 matrices; 2 vectors
-      euler_module.prepare();       // Storage: 3 * dim + 9 vectors
-      dissipation_module.prepare(); // Storage: 2 * dim + 2 vectors
-      vtu_output.prepare();         // Storage: dim + 5 vectors
-      quantities.prepare(base_name + "-quantities"); // Storage: FIXME
+      offline_data.prepare();
+      euler_module.prepare();
+      dissipation_module.prepare();
+      time_integrator.prepare();
+      vtu_output.prepare();
+      quantities.prepare(base_name + "-quantities");
       print_mpi_partition(logfile);
     };
 
@@ -306,24 +313,8 @@ namespace ryujin
 
       /* Do a time step: */
 
-      if (problem_description.description() == "Euler") {
-
-        /* Pure hyperbolic update: */
-        const auto tau = euler_module.step(U, t);
-        t += tau;
-
-      } else if (problem_description.description() == "Navier Stokes") {
-
-        /* Strang's splitting: */
-        const auto tau = euler_module.step(U, t);
-        dissipation_module.step(U, t, 2. * tau, cycle);
-        euler_module.step(U, t + tau, tau);
-        t += 2. * tau;
-
-      } else {
-
-        AssertThrow(false, ExcMessage("Unknown problem description"));
-      }
+      const auto tau = time_integrator.step(U, t, cycle);
+      t += tau;
 
       /* Print and record cycle statistics: */
 
@@ -557,11 +548,7 @@ namespace ryujin
     stream << "DIM == " << dim << std::endl;
     stream << "NUMBER == " << typeid(Number).name() << std::endl;
 
-#ifdef USE_SIMD
     stream << "SIMD width == " << VectorizedArray<Number>::size() << std::endl;
-#else
-    stream << "SIMD width == " << "(( disabled ))" << std::endl;
-#endif
 
 #ifdef USE_CUSTOM_POW
     stream << "serial pow == broadcasted pow(Vec4f)/pow(Vec2d)" << std::endl;
@@ -595,6 +582,9 @@ namespace ryujin
     case Indicator<dim, Number>::Entropy::harten:
       stream << "Indicator<dim, Number>::Entropy::harten" << std::endl;
     }
+
+    stream << "Indicator<dim, Number>::evc_alpha_0_ == "
+           << Indicator<dim, Number>::evc_alpha_0_ << std::endl;
 
     stream << "Indicator<dim, Number>::smoothness_indicator_ == ";
     switch (Indicator<dim, Number>::smoothness_indicator_) {

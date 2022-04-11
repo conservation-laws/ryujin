@@ -15,6 +15,7 @@ if(NOT ${CMAKE_VERSION} VERSION_LESS 3.15
 
   add_library(testdriver SHARED $<TARGET_OBJECTS:ryujin>)
   deal_ii_setup_target(testdriver)
+  target_link_libraries(testdriver ${OpenMP_CXX_LIBRARIES})
   if(LIKWID_PERFMON)
     target_link_libraries(testdriver likwid likwid-hwloc likwid-lua)
   endif()

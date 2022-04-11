@@ -9,8 +9,8 @@
 #
 # [1] Maier, Kronbichler: Efficient parallel 3D computation of the
 #     compressible Euler equations with an invariant-domain preserving
-#     second-order finite-element scheme, ACM TOPC, to appear
-#     https://arxiv.org/abs/2007.00094
+#     second-order finite-element scheme, ACM TOPC 2021, vol 8,
+#     DOI 10.1145/3470637, https://arxiv.org/abs/2007.00094
 #
 
 subsection A - TimeLoop
@@ -70,15 +70,21 @@ end
 
 
 subsection F - EulerModule
-  set cfl max            = 0.9
-  set cfl min            = 0.9
-
   set limiter iterations = 2
-  set time step order    = 3
 end
 
 
-subsection H - VTUOutput
+subsection H - TimeIntegrator
+  set cfl min            = 0.45
+  set cfl max            = 0.90
+
+  set cfl recovery strategy = bang bang control
+
+  set time stepping scheme  = erk 33
+end
+
+
+subsection I - VTUOutput
   set manifolds      = x, y, z, x^2+y^2-0.25*0.25
 
   set schlieren beta = 10

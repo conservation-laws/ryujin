@@ -85,20 +85,12 @@ namespace ryujin
         DoFRenumbering::export_indices_first(dof_handler, mpi_communicator_);
 #endif
 
-#ifdef USE_SIMD
     n_locally_internal_ =
         DoFRenumbering::internal_range(dof_handler, mpi_communicator_);
 
     /* Round down to the nearest multiple of the VectorizedArray width: */
     n_locally_internal_ = n_locally_internal_ -
                           n_locally_internal_ % VectorizedArray<Number>::size();
-#else
-    /*
-     * If USE_SIMD is not set, we disable all SIMD instructions by
-     * setting the [0, n_locally_internal) range to [0,0).
-     */
-    n_locally_internal_ = 0;
-#endif
 
     /*
      * First, we set up the locally_relevant index set, determine (globally

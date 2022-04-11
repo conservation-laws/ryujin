@@ -94,13 +94,7 @@ end
 
 
 subsection F - EulerModule
-  set cfl max            = 4.0
-  set cfl min            = 0.5
-
-  set enforce noslip     = true
-
   set limiter iterations = 2
-  set time step order    = 3
 end
 
 
@@ -112,7 +106,15 @@ subsection G - DissipationModule
 end
 
 
-subsection H - VTUOutput
+subsection H - TimeIntegrator
+  set cfl min               = 4.0
+  set cfl max               = 4.0
+  set cfl recovery strategy = none
+  set time stepping scheme  = erk 33
+end
+
+
+subsection I - VTUOutput
   set manifolds      = x-0.075, x-0.15, y, y-0.01, y+0.01, z-0.023, z-0.0115, z-0.0345
 
   set use mpi io     = true
@@ -122,6 +124,6 @@ subsection H - VTUOutput
 end
 
 
-subsection I - Quantities
+subsection J - Quantities
   set boundary manifolds = airfoil : floor (x * x / 0.0266 + 36 * y * y / 0.0266) : time_averaged space_averaged
 end

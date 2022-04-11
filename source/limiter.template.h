@@ -30,7 +30,7 @@ namespace ryujin
 
     constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
     constexpr ScalarNumber relax = ScalarNumber(1.) + 10. * eps;
-    constexpr ScalarNumber relaxbig = ScalarNumber(1.) + 3000. * eps;
+    constexpr ScalarNumber relaxbig = ScalarNumber(1.) + 10000. * eps;
 
     /*
      * First limit the density rho.
@@ -51,11 +51,12 @@ namespace ryujin
        */
       if (!((std::max(Number(0.), U_rho - relaxbig * rho_max) == Number(0.)) &&
             (std::max(Number(0.), rho_min - relaxbig * U_rho) == Number(0.)))) {
-        // FIXME
-//         std::cout << std::fixed << std::setprecision(16);
-//         std::cout << "(crit) min: " << rho_min << std::endl;
-//         std::cout << "(crit) rho: " << U_rho << std::endl;
-//         std::cout << "(crit) max: " << rho_max << std::endl << std::endl;
+#ifdef DEBUG_OUTPUT
+        std::cout << std::fixed << std::setprecision(16);
+        std::cout << "(low order - critical) min: " << rho_min << std::endl;
+        std::cout << "(low order - critical) rho: " << U_rho << std::endl;
+        std::cout << "(low order - critical) max: " << rho_max << std::endl << std::endl;
+#endif
         success = false;
       }
 
@@ -90,9 +91,9 @@ namespace ryujin
 #ifdef DEBUG_OUTPUT
         std::cout << std::fixed << std::setprecision(16);
         std::cout << "Density bounds violated:" << std::endl;
-        std::cout << "min: " << rho_min << std::endl;
-        std::cout << "rho: " << n_rho << std::endl;
-        std::cout << "max: " << rho_max << std::endl << std::endl;
+        std::cout << "(high order) min: " << rho_min << std::endl;
+        std::cout << "(high order) rho: " << n_rho << std::endl;
+        std::cout << "(high order) max: " << rho_max << std::endl << std::endl;
 #endif
         success = false;
       }
@@ -161,10 +162,11 @@ namespace ryujin
          * be violated for relative CFL numbers larger than 1.
          */
         if (n == 0 &&
-            !(std::min(Number(0.), psi_l + 100. * eps) == Number(0.))) {
-          // FIXME
-//           std::cout << std::fixed << std::setprecision(16);
-//           std::cout << "(crit) Psi left: " << psi_l << std::endl;
+            !(std::min(Number(0.), psi_l + Number(100. * eps)) == Number(0.))) {
+#ifdef DEBUG_OUTPUT
+          std::cout << std::fixed << std::setprecision(16);
+          std::cout << "(low order - critical) Psi left: " << psi_l << std::endl;
+#endif
           success = false;
         }
 
@@ -217,8 +219,8 @@ namespace ryujin
           std::cout << std::fixed << std::setprecision(16);
           std::cout << "Specific entropy minimum principle violated:"
                     << std::endl;
-          std::cout << "int: !!! 0 <= " << e_new << std::endl;
-          std::cout << "Psi: !!! 0 <= " << psi << std::endl << std::endl;
+          std::cout << "(high order) int: !!! 0 <= " << e_new << std::endl;
+          std::cout << "(high order) Psi: !!! 0 <= " << psi << std::endl << std::endl;
 #endif
           success = false;
         }

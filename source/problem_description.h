@@ -8,6 +8,7 @@
 #include <compile_time_options.h>
 
 #include "convenience_macros.h"
+#include "patterns_conversion.h"
 #include "simd.h"
 
 #include <deal.II/base/parameter_acceptor.h>
@@ -15,6 +16,28 @@
 
 #include <array>
 #include <functional>
+
+namespace ryujin
+{
+  /**
+   * The chosen problem type
+   */
+  enum class ProblemType {
+    /**
+     * The compressible Euler equations
+     */
+    euler,
+
+    /**
+     * The compressible Navier-Stokes equations
+     */
+    navier_stokes,
+  };
+}
+
+DECLARE_ENUM(ryujin::ProblemType,
+             LIST({ryujin::ProblemType::euler, "Euler"},
+                  {ryujin::ProblemType::navier_stokes, "Navier Stokes"}));
 
 namespace ryujin
 {
@@ -309,8 +332,8 @@ namespace ryujin
      */
     //@{
 
-    std::string description_;
-    ACCESSOR_READ_ONLY(description)
+    ProblemType problem_type_;
+    ACCESSOR_READ_ONLY(problem_type)
 
     double gamma_;
     ACCESSOR_READ_ONLY(gamma)

@@ -51,11 +51,9 @@ subsection E - InitialValues
 end
 
 subsection F - EulerModule
-  set cfl max            = 1.00
-  set cfl update         = 0.90
+  set cfl with boundary dofs = true
 
-  set limiter iterations = 2
-  set time step order    = 2
+  set limiter iterations     = 2
 end
 
 subsection G - DissipationModule
@@ -64,4 +62,11 @@ subsection G - DissipationModule
 
   set multigrid velocity    = false
   set multigrid energy      = false
+end
+
+subsection H - TimeIntegrator
+  set cfl min                = 0.30
+  set cfl max                = 0.30
+  set cfl recovery strategy = none
+  set time stepping scheme  = ssprk 33
 end

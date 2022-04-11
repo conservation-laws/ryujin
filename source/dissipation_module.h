@@ -162,7 +162,7 @@ namespace ryujin
      *    0), or tau (if tau != 0). Here, tau_max is the computed maximal
      *    time step size and tau is the optional third parameter.
      */
-    Number step(vector_type &U, Number t, Number tau, unsigned int cycle);
+    Number step(vector_type &U, Number t, Number tau, unsigned int cycle) const;
 
     //@}
 
@@ -203,46 +203,49 @@ namespace ryujin
     std::map<std::string, dealii::Timer> &computing_timer_;
 
     dealii::SmartPointer<const ryujin::ProblemDescription> problem_description_;
+    ACCESSOR_READ_ONLY(problem_description)
     dealii::SmartPointer<const ryujin::OfflineData<dim, Number>> offline_data_;
     dealii::SmartPointer<const ryujin::InitialValues<dim, Number>>
         initial_values_;
 
-    unsigned int n_warnings_;
+    mutable unsigned int n_warnings_;
     ACCESSOR_READ_ONLY(n_warnings)
 
-    double n_iterations_velocity_;
+    mutable double n_iterations_velocity_;
     ACCESSOR_READ_ONLY(n_iterations_velocity)
 
-    double n_iterations_internal_energy_;
+    mutable double n_iterations_internal_energy_;
     ACCESSOR_READ_ONLY(n_iterations_internal_energy)
 
-    dealii::MatrixFree<dim, Number> matrix_free_;
+    mutable dealii::MatrixFree<dim, Number> matrix_free_;
 
-    block_vector_type velocity_;
+    mutable block_vector_type velocity_;
     ACCESSOR_READ_ONLY(velocity)
 
-    block_vector_type velocity_rhs_;
+    mutable block_vector_type velocity_rhs_;
 
-    scalar_type internal_energy_;
-    scalar_type internal_energy_rhs_;
+    mutable scalar_type internal_energy_;
+    mutable scalar_type internal_energy_rhs_;
 
-    scalar_type density_;
+    mutable scalar_type density_;
 
-    Number tau_;
-    Number theta_;
+    mutable Number tau_;
+    mutable Number theta_;
 
-    dealii::MGLevelObject<dealii::MatrixFree<dim, float>> level_matrix_free_;
-    dealii::MGConstrainedDoFs mg_constrained_dofs_;
-    dealii::MGLevelObject<dealii::LinearAlgebra::distributed::Vector<float>>
+    mutable dealii::MGLevelObject<dealii::MatrixFree<dim, float>>
+        level_matrix_free_;
+    mutable dealii::MGConstrainedDoFs mg_constrained_dofs_;
+    mutable dealii::MGLevelObject<
+        dealii::LinearAlgebra::distributed::Vector<float>>
         level_density_;
-    MGTransferVelocity<dim, float> mg_transfer_velocity_;
-    dealii::MGLevelObject<VelocityMatrix<dim, float, Number>>
+    mutable MGTransferVelocity<dim, float> mg_transfer_velocity_;
+    mutable dealii::MGLevelObject<VelocityMatrix<dim, float, Number>>
         level_velocity_matrices_;
-    MGTransferEnergy<dim, float> mg_transfer_energy_;
-    dealii::MGLevelObject<EnergyMatrix<dim, float, Number>>
+    mutable MGTransferEnergy<dim, float> mg_transfer_energy_;
+    mutable dealii::MGLevelObject<EnergyMatrix<dim, float, Number>>
         level_energy_matrices_;
 
-    dealii::mg::SmootherRelaxation<
+    mutable dealii::mg::SmootherRelaxation<
         dealii::PreconditionChebyshev<
             VelocityMatrix<dim, float, Number>,
             dealii::LinearAlgebra::distributed::BlockVector<float>,
@@ -250,7 +253,7 @@ namespace ryujin
         dealii::LinearAlgebra::distributed::BlockVector<float>>
         mg_smoother_velocity_;
 
-    dealii::mg::SmootherRelaxation<
+    mutable dealii::mg::SmootherRelaxation<
         dealii::PreconditionChebyshev<
             EnergyMatrix<dim, float, Number>,
             dealii::LinearAlgebra::distributed::Vector<float>>,

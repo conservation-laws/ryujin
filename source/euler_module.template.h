@@ -28,45 +28,26 @@ namespace ryujin
       const ryujin::InitialValues<dim, Number> &initial_values,
       const std::string &subsection /*= "EulerModule"*/)
       : ParameterAcceptor(subsection)
+      , id_violation_strategy_(IDViolationStrategy::warn)
       , mpi_communicator_(mpi_communicator)
       , computing_timer_(computing_timer)
       , offline_data_(&offline_data)
       , problem_description_(&problem_description)
       , initial_values_(&initial_values)
+      , cfl_(0.2)
       , n_restarts_(0)
       , n_warnings_(0)
   {
-    cfl_min_ = Number(0.80);
-    add_parameter(
-        "cfl min", cfl_min_, "Minimal admissible relative CFL constant");
-
-    cfl_max_ = Number(0.90);
-    add_parameter(
-        "cfl max", cfl_max_, "Maximal admissible relative CFL constant");
-
-    time_step_order_ = 3;
-    add_parameter(
-        "time step order",
-        time_step_order_,
-        "Approximation order of time stepping method. Switches between Forward "
-        "Euler, SSP Heun, and SSP Runge Kutta 3rd order");
-
     limiter_iter_ = 2;
     add_parameter(
         "limiter iterations", limiter_iter_, "Number of limiter iterations");
-
-    enforce_noslip_ = true;
-    add_parameter(
-        "enforce noslip",
-        enforce_noslip_,
-        "Enforce no-slip boundary conditions. If set to false no-slip "
-        "boundaries will be treated as slip boundary conditions");
 
     cfl_with_boundary_dofs_ = false;
     add_parameter("cfl with boundary dofs",
                   cfl_with_boundary_dofs_,
                   "Use also the local wave-speed estimate d_ij of boundary "
                   "dofs when computing the maximal admissible step size");
+
   }
 
 
@@ -90,8 +71,6 @@ namespace ryujin
 
     const auto &vector_partitioner = offline_data_->vector_partitioner();
     r_.reinit(vector_partitioner);
-    temp_euler_.reinit(vector_partitioner);
-    temp_ssp_.reinit(vector_partitioner);
 
     /* Initialize matrices: */
 
@@ -100,19 +79,17 @@ namespace ryujin
     lij_matrix_.reinit(sparsity_simd);
     lij_matrix_next_.reinit(sparsity_simd);
     pij_matrix_.reinit(sparsity_simd);
-
-    /* Reset cfl_ number to save default value: */
-
-    AssertThrow(cfl_min_ > 0., ExcMessage("cfl min must be a positive value"));
-    AssertThrow(cfl_max_ >= cfl_min_,
-                ExcMessage("cfl max must be greater or equal than cfl min"));
-
-    cfl_ = cfl_min_;
   }
 
 
   template <int dim, typename Number>
-  Number EulerModule<dim, Number>::single_step(vector_type &U, Number tau)
+  template <int stages>
+  Number EulerModule<dim, Number>::step(
+      const vector_type &old_U,
+      std::array<std::reference_wrapper<const vector_type>, stages> stage_U,
+      const std::array<Number, stages> stage_weights,
+      vector_type &new_U,
+      Number tau /*= 0.*/) const
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "EulerModule<dim, Number>::single_step()" << std::endl;
@@ -149,7 +126,7 @@ namespace ryujin
     unsigned int channel = 10;
 
     /* A boolean signalling that a restart is necessary: */
-    std::atomic<bool> restart = false;
+    std::atomic<bool> restart_needed = false;
 
     /*
      * Step 0: Precompute f(U) and the entropies of U
@@ -164,7 +141,7 @@ namespace ryujin
 
       RYUJIN_OMP_FOR
       for (unsigned int i = 0; i < size_regular; i += simd_length) {
-        const auto U_i = U.get_vectorized_tensor(i);
+        const auto U_i = old_U.get_vectorized_tensor(i);
         simd_store(specific_entropies_,
                    problem_description_->specific_entropy(U_i),
                    i);
@@ -178,7 +155,7 @@ namespace ryujin
       }
 
       for (unsigned int i = size_regular; i < n_relevant; ++i) {
-        const auto U_i = U.get_tensor(i);
+        const auto U_i = old_U.get_tensor(i);
 
         specific_entropies_.local_element(i) =
             problem_description_->specific_entropy(U_i);
@@ -245,7 +222,7 @@ namespace ryujin
           continue;
         }
 
-        const auto U_i = U.get_tensor(i);
+        const auto U_i = old_U.get_tensor(i);
         const Number mass = lumped_mass_matrix.local_element(i);
         const Number hd_i = mass * measure_of_omega_inverse;
 
@@ -256,7 +233,7 @@ namespace ryujin
         for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
           const unsigned int j = js[col_idx];
 
-          const auto U_j = U.get_tensor(j);
+          const auto U_j = old_U.get_tensor(j);
 
           const auto c_ij = cij_matrix.get_tensor(i, col_idx);
           const auto beta_ij = betaij_matrix.get_entry(i, col_idx);
@@ -311,7 +288,7 @@ namespace ryujin
 
         synchronization_dispatch.check(thread_ready, i >= n_export_indices);
 
-        const auto U_i = U.get_vectorized_tensor(i);
+        const auto U_i = old_U.get_vectorized_tensor(i);
         const auto entropy_i = simd_load(evc_entropies_, i);
 
         indicator_simd.reset(U_i, entropy_i);
@@ -333,7 +310,7 @@ namespace ryujin
               break;
             }
 
-          const auto U_j = U.get_vectorized_tensor(js);
+          const auto U_j = old_U.get_vectorized_tensor(js);
           const auto entropy_j = simd_load(evc_entropies_, js);
 
           const auto c_ij = cij_matrix.get_vectorized_tensor(i, col_idx);
@@ -465,6 +442,9 @@ namespace ryujin
           r_.update_ghost_values_start(channel++);
       });
 
+      const Number weight =
+          -std::accumulate(stage_weights.begin(), stage_weights.end(), -1.);
+
       /* Parallel region */
       RYUJIN_PARALLEL_REGION_BEGIN
       LIKWID_MARKER_START("time_step_3");
@@ -481,8 +461,16 @@ namespace ryujin
         if (row_length == 1)
           continue;
 
-        const auto U_i = U.get_tensor(i);
+        const auto U_i = old_U.get_tensor(i);
         const auto f_i = problem_description_->f(U_i);
+
+        std::array<state_type, stages> U_iHs;
+        std::array<flux_type, stages> f_iHs;
+        for (int s = 0; s < stages; ++s) {
+          U_iHs[s] = stage_U[s].get().get_tensor(i);
+          f_iHs[s] = problem_description_->f(U_iHs[s]);
+        }
+
         auto U_i_new = U_i;
         const auto alpha_i = alpha_.local_element(i);
         const auto variations_i = second_variations_.local_element(i);
@@ -500,7 +488,16 @@ namespace ryujin
         for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
           const auto j = js[col_idx];
 
-          const auto U_j = U.get_tensor(j);
+          const auto U_j = old_U.get_tensor(j);
+          const auto f_j = problem_description_->f(U_j);
+
+          std::array<state_type, stages> U_jHs;
+          std::array<flux_type, stages> f_jHs;
+          for (int s = 0; s < stages; ++s) {
+            U_jHs[s] = stage_U[s].get().get_tensor(j);
+            f_jHs[s] = problem_description_->f(U_jHs[s]);
+          }
+
           const auto alpha_j = alpha_.local_element(j);
           const auto variations_j = second_variations_.local_element(j);
 
@@ -511,14 +508,19 @@ namespace ryujin
 
           dealii::Tensor<1, problem_dimension, Number> U_ij_bar;
           const auto c_ij = cij_matrix.get_tensor(i, col_idx);
-          const auto f_j = problem_description_->f(U_j);
 
           for (unsigned int k = 0; k < problem_dimension; ++k) {
             const auto temp = (f_j[k] - f_i[k]) * c_ij;
-
-            r_i[k] += -temp + d_ijH * (U_j - U_i)[k];
+            r_i[k] += weight * (-temp) + d_ijH * (U_j[k] - U_i[k]);
             U_ij_bar[k] =
                 Number(0.5) * (U_i[k] + U_j[k]) - Number(0.5) * temp * d_ij_inv;
+          }
+
+          for (int s = 0; s < stages; ++s) {
+            for (unsigned int k = 0; k < problem_dimension; ++k) {
+              const auto temp = (f_jHs[s][k] - f_iHs[s][k]) * c_ij;
+              r_i[k] += stage_weights[s] * (-temp);
+            }
           }
 
           U_i_new += tau * m_i_inv * Number(2.) * d_ij * U_ij_bar;
@@ -534,7 +536,7 @@ namespace ryujin
                                     /* is diagonal */ col_idx == 0);
         }
 
-        temp_euler_.write_tensor(U_i_new, i);
+        new_U.write_tensor(U_i_new, i);
         r_.write_tensor(r_i, i);
 
         const Number hd_i = m_i * measure_of_omega_inverse;
@@ -553,8 +555,16 @@ namespace ryujin
 
         synchronization_dispatch.check(thread_ready, i >= n_export_indices);
 
-        const auto U_i = U.get_vectorized_tensor(i);
+        const auto U_i = old_U.get_vectorized_tensor(i);
         const auto f_i = problem_description_->f(U_i);
+
+        std::array<ProblemDescription::state_type<dim, VA>, stages> U_iHs;
+        std::array<ProblemDescription::flux_type<dim, VA>, stages> f_iHs;
+        for (int s = 0; s < stages; ++s) {
+          U_iHs[s] = stage_U[s].get().get_vectorized_tensor(i);
+          f_iHs[s] = problem_description_->f(U_iHs[s]);
+        }
+
         auto U_i_new = U_i;
         const auto alpha_i = simd_load(alpha_, i);
         const auto specific_entropy_i = simd_load(specific_entropies_, i);
@@ -574,29 +584,39 @@ namespace ryujin
         for (unsigned int col_idx = 0; col_idx < row_length;
              ++col_idx, js += simd_length) {
 
+          const auto U_j = old_U.get_vectorized_tensor(js);
+          const auto f_j = problem_description_->f(U_j);
+
+          std::array<ProblemDescription::state_type<dim, VA>, stages> U_jHs;
+          std::array<ProblemDescription::flux_type<dim, VA>, stages> f_jHs;
+          for (int s = 0; s < stages; ++s) {
+            U_jHs[s] = stage_U[s].get().get_vectorized_tensor(js);
+            f_jHs[s] = problem_description_->f(U_jHs[s]);
+          }
+
           const auto alpha_j = simd_load(alpha_, js);
           const auto variations_j = simd_load(second_variations_, js);
 
           const auto d_ij = dij_matrix_.get_vectorized_entry(i, col_idx);
 
-          const auto d_ijH = Indicator<dim, Number>::indicator_ ==
-                                     Indicator<dim, Number>::Indicators::
-                                         entropy_viscosity_commutator
-                                 ? d_ij * (alpha_i + alpha_j) * Number(.5)
-                                 : d_ij * std::max(alpha_i, alpha_j);
-
-          const auto U_j = U.get_vectorized_tensor(js);
+          const auto d_ijH = d_ij * (alpha_i + alpha_j) * Number(.5);
 
           dealii::Tensor<1, problem_dimension, VA> U_ij_bar;
           const auto c_ij = cij_matrix.get_vectorized_tensor(i, col_idx);
           const auto d_ij_inv = Number(1.) / d_ij;
 
-          const auto f_j = problem_description_->f(U_j);
           for (unsigned int k = 0; k < problem_dimension; ++k) {
             const auto temp = (f_j[k] - f_i[k]) * c_ij;
 
-            r_i[k] += -temp + d_ijH * (U_j[k] - U_i[k]);
+            r_i[k] += weight * (-temp) + d_ijH * (U_j[k] - U_i[k]);
             U_ij_bar[k] = Number(0.5) * (U_i[k] + U_j[k] - temp * d_ij_inv);
+          }
+
+          for (int s = 0; s < stages; ++s) {
+            for (unsigned int k = 0; k < problem_dimension; ++k) {
+              const auto temp = (f_jHs[s][k] - f_iHs[s][k]) * c_ij;
+              r_i[k] += stage_weights[s] * (-temp);
+            }
           }
 
           U_i_new += tau * m_i_inv * Number(2.) * d_ij * U_ij_bar;
@@ -613,7 +633,7 @@ namespace ryujin
                                   /* is diagonal */ col_idx == 0);
         }
 
-        temp_euler_.write_vectorized_tensor(U_i_new, i);
+        new_U.write_vectorized_tensor(U_i_new, i);
         r_.write_vectorized_tensor(r_i, i);
 
         const auto hd_i = m_i * measure_of_omega_inverse;
@@ -650,6 +670,9 @@ namespace ryujin
       SynchronizationDispatch synchronization_dispatch(
           [&]() { lij_matrix_.update_ghost_rows_start(channel++); });
 
+      const Number weight =
+          -std::accumulate(stage_weights.begin(), stage_weights.end(), -1.);
+
       RYUJIN_PARALLEL_REGION_BEGIN
       LIKWID_MARKER_START("time_step_4");
 
@@ -666,8 +689,17 @@ namespace ryujin
         const auto bounds =
             bounds_.template get_tensor<std::array<Number, 3>>(i);
 
-        const auto U_i_new = temp_euler_.get_tensor(i);
-        const auto U_i = U.get_tensor(i);
+        const auto U_i_new = new_U.get_tensor(i);
+        const auto U_i = old_U.get_tensor(i);
+        const auto f_i = problem_description_->f(U_i);
+
+        std::array<state_type, stages> U_iHs;
+        std::array<flux_type, stages> f_iHs;
+        for (int s = 0; s < stages; ++s) {
+          U_iHs[s] = stage_U[s].get().get_tensor(i);
+          f_iHs[s] = problem_description_->f(U_iHs[s]);
+        }
+
         const auto r_i = r_.get_tensor(i);
 
         const auto alpha_i = alpha_.local_element(i);
@@ -675,11 +707,21 @@ namespace ryujin
 
         const unsigned int *js = sparsity_simd.columns(i);
         const Number lambda_inv = Number(row_length - 1);
+        const auto factor = tau * m_i_inv * lambda_inv;
 
         for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
           const auto j = js[col_idx];
 
-          const auto U_j = U.get_tensor(j);
+          const auto U_j = old_U.get_tensor(j);
+
+          std::array<state_type, stages> U_jHs;
+          std::array<flux_type, stages> f_jHs;
+          for (int s = 0; s < stages; ++s) {
+            U_jHs[s] = stage_U[s].get().get_tensor(j);
+            f_jHs[s] = problem_description_->f(U_jHs[s]);
+          }
+
+          const auto c_ij = cij_matrix.get_tensor(i, col_idx);
 
           const auto r_j = r_.get_tensor(j);
 
@@ -687,11 +729,7 @@ namespace ryujin
           const Number m_j_inv = lumped_mass_matrix_inverse.local_element(j);
 
           const auto d_ij = dij_matrix_.get_entry(i, col_idx);
-          const auto d_ijH = Indicator<dim, Number>::indicator_ ==
-                                     Indicator<dim, Number>::Indicators::
-                                         entropy_viscosity_commutator
-                                 ? d_ij * (alpha_i + alpha_j) * Number(.5)
-                                 : d_ij * std::max(alpha_i, alpha_j);
+          const auto d_ijH =  d_ij * (alpha_i + alpha_j) * Number(.5);
 
           const auto m_ij = mass_matrix.get_entry(i, col_idx);
           const auto b_ij =
@@ -699,30 +737,38 @@ namespace ryujin
           const auto b_ji =
               (col_idx == 0 ? Number(1.) : Number(0.)) - m_ij * m_i_inv;
 
-          const auto p_ij =
-              tau * m_i_inv * lambda_inv *
-              ((d_ijH - d_ij) * (U_j - U_i) + b_ij * r_j - b_ji * r_i);
+          /* Contributions from graph viscosity and mass matrix correction: */
+
+          auto p_ij = (d_ijH - d_ij) * (U_j - U_i) + b_ij * r_j - b_ji * r_i;
+
+          if constexpr (stages != 0) {
+            /* Flux contributions: */
+
+            const auto f_j = problem_description_->f(U_j);
+            for (unsigned int k = 0; k < problem_dimension; ++k) {
+              const auto temp = (f_j[k] - f_i[k]) * c_ij;
+              p_ij[k] += (weight - Number(1.)) * (-temp);
+            }
+
+            for (int s = 0; s < stages; ++s) {
+              for (unsigned int k = 0; k < problem_dimension; ++k) {
+                const auto temp = (f_jHs[s][k] - f_iHs[s][k]) * c_ij;
+                p_ij[k] += stage_weights[s] * (-temp);
+              }
+            }
+          }
+
+          p_ij *= factor;
+
           pij_matrix_.write_tensor(p_ij, i, col_idx);
 
           const auto &[l_ij, success] = Limiter<dim, Number>::limit(
               *problem_description_, bounds, U_i_new, p_ij);
           lij_matrix_.write_entry(l_ij, i, col_idx);
 
-          /*
-           * Unsuccessful with current CFL: Force a restart if the degree
-           * of freedom is not an inflow / Dirichlet boundary dof:
-           */
-          if (!success) {
-            bool restart_needed = true;
-            const auto range = boundary_map.equal_range(i);
-            for (auto it = range.first; it != range.second; ++it) {
-              const auto id = std::get<3>(it->second);
-              if (id == Boundary::dirichlet || id == Boundary::dynamic)
-                restart_needed = false;
-            }
-            if (restart_needed)
-              restart = true;
-          }
+          /* Unsuccessful with current CFL, force a restart. */
+          if (!success)
+            restart_needed = true;
         }
       } /* parallel non-vectorized loop */
 
@@ -740,41 +786,74 @@ namespace ryujin
 
         const auto m_i_inv = simd_load(lumped_mass_matrix_inverse, i);
 
-        const unsigned int row_length = sparsity_simd.row_length(i);
-        const VA lambda_inv = Number(row_length - 1);
+        const auto U_i_new = new_U.get_vectorized_tensor(i);
+        const auto U_i = old_U.get_vectorized_tensor(i);
+        const auto f_i = problem_description_->f(U_i);
 
-        const auto U_i_new = temp_euler_.get_vectorized_tensor(i);
-        const auto U_i = U.get_vectorized_tensor(i);
+        std::array<ProblemDescription::state_type<dim, VA>, stages> U_iHs;
+        std::array<ProblemDescription::flux_type<dim, VA>, stages> f_iHs;
+        for (int s = 0; s < stages; ++s) {
+          U_iHs[s] = stage_U[s].get().get_vectorized_tensor(i);
+          f_iHs[s] = problem_description_->f(U_iHs[s]);
+        }
+
         const auto r_i = r_.get_vectorized_tensor(i);
         const auto alpha_i = simd_load(alpha_, i);
 
         const unsigned int *js = sparsity_simd.columns(i);
+        const unsigned int row_length = sparsity_simd.row_length(i);
+        const VA lambda_inv = Number(row_length - 1);
+        const auto factor = tau * m_i_inv * lambda_inv;
 
         for (unsigned int col_idx = 0; col_idx < row_length;
              ++col_idx, js += simd_length) {
 
-          const auto m_j_inv = simd_load(lumped_mass_matrix_inverse, js);
+          const auto U_j = old_U.get_vectorized_tensor(js);
+
+          std::array<ProblemDescription::state_type<dim, VA>, stages> U_jHs;
+          std::array<ProblemDescription::flux_type<dim, VA>, stages> f_jHs;
+          for (int s = 0; s < stages; ++s) {
+            U_jHs[s] = stage_U[s].get().get_vectorized_tensor(js);
+            f_jHs[s] = problem_description_->f(U_jHs[s]);
+          }
+
+          const auto c_ij = cij_matrix.get_vectorized_tensor(i, col_idx);
+          const auto r_j = r_.get_vectorized_tensor(js);
 
           const auto alpha_j = simd_load(alpha_, js);
+          const auto m_j_inv = simd_load(lumped_mass_matrix_inverse, js);
 
           const auto d_ij = dij_matrix_.get_vectorized_entry(i, col_idx);
-
-          const auto d_ijH = Indicator<dim, Number>::indicator_ ==
-                                     Indicator<dim, Number>::Indicators::
-                                         entropy_viscosity_commutator
-                                 ? d_ij * (alpha_i + alpha_j) * Number(.5)
-                                 : d_ij * std::max(alpha_i, alpha_j);
+          const auto d_ijH =  d_ij * (alpha_i + alpha_j) * Number(.5);
 
           const auto m_ij = mass_matrix.get_vectorized_entry(i, col_idx);
           const auto b_ij = (col_idx == 0 ? VA(1.) : VA(0.)) - m_ij * m_j_inv;
           const auto b_ji = (col_idx == 0 ? VA(1.) : VA(0.)) - m_ij * m_i_inv;
 
-          const auto U_j = U.get_vectorized_tensor(js);
-          const auto r_j = r_.get_vectorized_tensor(js);
+          /* Contributions from graph viscosity and mass matrix correction: */
 
-          const auto p_ij =
-              tau * m_i_inv * lambda_inv *
-              ((d_ijH - d_ij) * (U_j - U_i) + b_ij * r_j - b_ji * r_i);
+          auto p_ij = (d_ijH - d_ij) * (U_j - U_i) + b_ij * r_j - b_ji * r_i;
+
+          if constexpr (stages != 0) {
+            /* Flux contributions: */
+
+            const auto f_j = problem_description_->f(U_j);
+
+            for (unsigned int k = 0; k < problem_dimension; ++k) {
+              const auto temp = (f_j[k] - f_i[k]) * c_ij;
+              p_ij[k] += (weight - Number(1.)) * (-temp);
+            }
+
+            for (int s = 0; s < stages; ++s) {
+              for (unsigned int k = 0; k < problem_dimension; ++k) {
+                const auto temp = (f_jHs[s][k] - f_iHs[s][k]) * c_ij;
+                p_ij[k] += stage_weights[s] * (-temp);
+              }
+            }
+          }
+
+          p_ij *= factor;
+
           pij_matrix_.write_vectorized_tensor(p_ij, i, col_idx, true);
 
           const auto &[l_ij, success] = Limiter<dim, VA>::limit(
@@ -783,7 +862,7 @@ namespace ryujin
 
           /* Unsuccessful with current CFL, force a restart. */
           if (!success)
-            restart = true;
+            restart_needed = true;
         }
       } /* parallel SIMD loop */
 
@@ -843,7 +922,7 @@ namespace ryujin
 
           lij_row_serial.resize_fast(row_length);
 
-          auto U_i_new = temp_euler_.get_tensor(i);
+          auto U_i_new = new_U.get_tensor(i);
 
           const Number lambda = Number(1.) / Number(row_length - 1);
 
@@ -885,12 +964,12 @@ namespace ryujin
               std::cout << "int: !!! " << e_new << std::endl;
               std::cout << "ent: !!! " << s_new << std::endl << std::endl;
 #endif
-              restart = true;
+              restart_needed = true;
             }
           }
 #endif
 
-          temp_euler_.write_tensor(U_i_new, i);
+          new_U.write_tensor(U_i_new, i);
 
           /* Skip computating l_ij and updating p_ij in the last round */
           if (last_round)
@@ -907,21 +986,9 @@ namespace ryujin
             const auto &[new_l_ij, success] = Limiter<dim, Number>::limit(
                 *problem_description_, bounds, U_i_new, new_p_ij);
 
-            /*
-             * Unsuccessful with current CFL: Force a restart if the degree
-             * of freedom is not an inflow / Dirichlet boundary dof:
-             */
-            if (!success) {
-              bool restart_needed = true;
-              const auto range = boundary_map.equal_range(i);
-              for (auto it = range.first; it != range.second; ++it) {
-                const auto id = std::get<3>(it->second);
-                if (id == Boundary::dirichlet || id == Boundary::dynamic)
-                  restart_needed = false;
-              }
-              if (restart_needed)
-                restart = true;
-            }
+            /* Unsuccessful with current CFL, force a restart. */
+            if (!success)
+              restart_needed = true;
 
             /*
              * FIXME: If this if statement causes too much of a performance
@@ -957,7 +1024,7 @@ namespace ryujin
 
           synchronization_dispatch.check(thread_ready, i >= n_export_indices);
 
-          auto U_i_new = temp_euler_.get_vectorized_tensor(i);
+          auto U_i_new = new_U.get_vectorized_tensor(i);
 
           const unsigned int row_length = sparsity_simd.row_length(i);
           const Number lambda = Number(1.) / Number(row_length - 1);
@@ -1002,12 +1069,12 @@ namespace ryujin
               std::cout << "int: !!! " << e_new << std::endl;
               std::cout << "ent: !!! " << s_new << std::endl << std::endl;
 #endif
-              restart = true;
+              restart_needed = true;
             }
           }
 #endif
 
-          temp_euler_.write_vectorized_tensor(U_i_new, i);
+          new_U.write_vectorized_tensor(U_i_new, i);
 
           /* Skip computating l_ij and updating p_ij in the last round */
           if (last_round)
@@ -1027,7 +1094,7 @@ namespace ryujin
 
             /* Unsuccessful with current CFL, force a restart. */
             if (!success)
-              restart = true;
+              restart_needed = true;
 
             /*
              * FIXME: If this if statement causes too much of a performance
@@ -1079,29 +1146,33 @@ namespace ryujin
     CALLGRIND_STOP_INSTRUMENTATION
 
     /* Do we have to restart? */
-    restart.store(
-        Utilities::MPI::logical_or(restart.load(), mpi_communicator_));
-    if (restart) {
-      if (restart_possible_)
-        throw Restart();
-      else {
+    restart_needed.store(
+        Utilities::MPI::logical_or(restart_needed.load(), mpi_communicator_));
+
+    if (restart_needed) {
+      switch (id_violation_strategy_) {
+      case IDViolationStrategy::warn:
         n_warnings_++;
         if (dealii::Utilities::MPI::this_mpi_process(mpi_communicator_) == 0)
           std::cout << "[INFO] Euler module: Insufficient CFL: Invariant "
                        "domain violation detected"
                     << std::endl;
+        break;
+      case IDViolationStrategy::raise_exception:
+        n_restarts_++;
+        throw Restart();
       }
     }
 
     /* Update the result and return tau_max: */
-    U.swap(temp_euler_);
     return tau_max;
   }
 
 
+
   template <int dim, typename Number>
   void EulerModule<dim, Number>::apply_boundary_conditions(vector_type &U,
-                                                           Number t)
+                                                           Number t) const
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "EulerModule<dim, Number>::apply_boundary_conditions()"
@@ -1128,8 +1199,7 @@ namespace ryujin
 
       auto U_i = U.get_tensor(i);
 
-      if (id == Boundary::slip ||
-          (id == Boundary::no_slip && !enforce_noslip_)) {
+      if (id == Boundary::slip || id == Boundary::no_slip) {
         /* Remove the normal component of the momentum: */
         auto m = problem_description_->momentum(U_i);
         m -= 1. * (m * normal) * normal;
@@ -1196,164 +1266,4 @@ namespace ryujin
     U.update_ghost_values();
   }
 
-
-  template <int dim, typename Number>
-  Number EulerModule<dim, Number>::euler_step(vector_type &U,
-                                              Number t,
-                                              Number tau_0 /*= 0*/)
-  {
-#ifdef DEBUG_OUTPUT
-    std::cout << "EulerModule<dim, Number>::euler_step()" << std::endl;
-#endif
-
-    /* If single_step() throws, it doesn't update U, so no cleanup needed. */
-
-    Number tau_1 = single_step(U, tau_0);
-    if (tau_1 < 0.9 * tau_0 && restart_possible_)
-      throw Restart(); /* restart if tau_max differs by more than 10% */
-
-    apply_boundary_conditions(U, t + tau_1);
-
-    return tau_1;
-  }
-
-
-  template <int dim, typename Number>
-  Number EulerModule<dim, Number>::ssph2_step(vector_type &U,
-                                              Number t,
-                                              Number tau_0 /*= 0.*/)
-  {
-#ifdef DEBUG_OUTPUT
-    std::cout << "EulerModule<dim, Number>::ssph2_step()" << std::endl;
-#endif
-
-    try {
-      /* This also copies ghost elements: */
-      temp_ssp_ = U;
-
-      /* Step 1: U1 = U_old + tau * L(U_old) */
-
-      Number tau_1 = single_step(U, tau_0);
-      if (tau_1 < 0.9 * tau_0 && restart_possible_)
-        throw Restart(); /* restart if tau_max differs by more than 10% */
-
-      apply_boundary_conditions(U, t + tau_1);
-
-      tau_1 = (tau_0 == 0. ? tau_1 : tau_0);
-
-      /* Step 2: U2 = 1/2 U_old + 1/2 (U1 + tau L(U1)) */
-
-      const Number tau_2 = single_step(U, tau_1);
-      if (tau_2 < 0.9 * tau_1 && restart_possible_)
-        throw Restart(); /* restart if tau_max differs by more than 10% */
-
-      U.sadd(Number(1. / 2.), Number(1. / 2.), temp_ssp_);
-      apply_boundary_conditions(U, t + tau_1);
-
-      return tau_1;
-
-    } catch (Restart &) {
-      /* clean up and rethrow: */
-      U = temp_ssp_;
-      throw;
-    }
-  }
-
-
-  template <int dim, typename Number>
-  Number EulerModule<dim, Number>::ssprk3_step(vector_type &U,
-                                               Number t,
-                                               Number tau_0 /*= 0*/)
-  {
-#ifdef DEBUG_OUTPUT
-    std::cout << "EulerModule<dim, Number>::ssprk3_step()" << std::endl;
-#endif
-
-    try {
-      /* This also copies ghost elements: */
-      temp_ssp_ = U;
-
-      /* Step 1: U1 = U_old + tau * L(U_old) at time t + tau_1 */
-
-      Number tau_1 = single_step(U, tau_0);
-      if (tau_1 < 0.9 * tau_0 && restart_possible_)
-        throw Restart(); /* restart if tau_max differs by more than 10% */
-
-      apply_boundary_conditions(U, t + tau_1);
-
-      tau_1 = (tau_0 == 0. ? tau_1 : tau_0);
-
-      /* Step 2: U2 = 3/4 U_old + 1/4 (U1 + tau L(U1)) at time t + 0.5 tau_1*/
-
-      const Number tau_2 = single_step(U, tau_1);
-      if (tau_2 < 0.9 * tau_1 && restart_possible_)
-        throw Restart(); /* restart if tau_max differs by more than 10% */
-
-      U.sadd(Number(1. / 4.), Number(3. / 4.), temp_ssp_);
-      apply_boundary_conditions(U, t + 0.5 * tau_1);
-
-      /* Step 3: U_new = 1/3 U_old + 2/3 (U2 + tau L(U2)) at time t + tau_1 */
-
-      const Number tau_3 = single_step(U, tau_1);
-      if (tau_3 < 0.9 * tau_1 && restart_possible_)
-        throw Restart(); /* restart if tau_max differs by more than 10% */
-
-      U.sadd(Number(2. / 3.), Number(1. / 3.), temp_ssp_);
-      apply_boundary_conditions(U, t + tau_1);
-
-      return tau_1;
-
-    } catch (Restart &) {
-      /* clean up and rethrow: */
-      U = temp_ssp_;
-      throw;
-    }
-  }
-
-
-  template <int dim, typename Number>
-  Number
-  EulerModule<dim, Number>::step(vector_type &U, Number t, Number tau /*= 0*/)
-  {
-#ifdef DEBUG_OUTPUT
-    std::cout << "EulerModule<dim, Number>::step()" << std::endl;
-#endif
-    while(true) {
-      try {
-
-        /* Opportunistically increase current cfl by 2%: */
-        cfl_ = std::min(cfl_max_, 1.02 * cfl_);
-
-        /*
-         * Record whether a restart is possible at all:
-         *  - We must not be in a second stage of a Strang splitting (i.e.,
-         *    prescribed tau == 0.)
-         *  - The current update cfl_ must be larger than cfl_min_.
-         */
-        restart_possible_ = (tau == 0.) && (cfl_ > cfl_min_);
-
-        switch (time_step_order_) {
-        case 1:
-          return euler_step(U, t, tau);
-        case 2:
-          return ssph2_step(U, t, tau);
-        case 3:
-          return ssprk3_step(U, t, tau);
-        default:
-          AssertThrow(false,
-                      ExcMessage("The chosen order of the time stepping method "
-                                 "must be in the interval [1, 3]"));
-          __builtin_trap();
-        }
-      } catch (Restart &) {
-
-        /* Restart signalled, decrease CFL number by 20% and try again: */
-        Assert(cfl_ > cfl_min_, ExcInternalError());
-        n_restarts_++;
-        cfl_ = std::max(cfl_min_, 0.80 * cfl_);
-      }
-    }
-
-    __builtin_unreachable();
-  }
 } /* namespace ryujin */
