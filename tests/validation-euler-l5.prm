@@ -39,9 +39,13 @@ subsection E - InitialValues
 end
 
 subsection F - EulerModule
-  set cfl max            = 0.4
-  set cfl update         = 0.2
+  set cfl with boundary dofs = false
+  set limiter iterations     = 2
+end
 
-  set limiter iterations = 2
-  set time step order    = 3
+subsection H - TimeIntegrator
+  set cfl min            = 0.2
+  set cfl max            = 0.2
+  set cfl recovery strategy = none
+  set time stepping scheme  = ssprk 33
 end
