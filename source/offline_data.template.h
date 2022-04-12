@@ -512,6 +512,25 @@ namespace ryujin
 
     boundary_map_ = construct_boundary_map(
         dof_handler.begin_active(), dof_handler.end(), *scalar_partitioner_);
+
+    /* Extract coupling boundary pairs: */
+
+    coupling_boundary_pairs_.clear();
+    for (auto entry : boundary_map_) {
+      const auto i = entry.first;
+      if (i >= n_locally_owned_)
+        continue;
+      const unsigned int row_length = sparsity_pattern_simd_.row_length(i);
+      const unsigned int *js = sparsity_pattern_simd_.columns(i);
+      constexpr auto simd_length = VectorizedArray<Number>::size();
+      /* skip diagonal: */
+      for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
+        const auto j = *(i < n_locally_internal_ ? js + col_idx * simd_length
+                                                 : js + col_idx);
+        if (boundary_map_.count(j) != 0)
+          coupling_boundary_pairs_.push_back({i, col_idx, j});
+      }
+    }
   }
 
 
@@ -696,6 +715,8 @@ namespace ryujin
      * boundary degree of freedom. We now merge all entries that have the
      * same boundary id and whose normals describe an acute angle of about
      * 85 degrees or less.
+     *
+     * FIXME: is this robust in 3D?
      */
 
     decltype(boundary_map_) filtered_map;
