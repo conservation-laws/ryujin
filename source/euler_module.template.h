@@ -144,7 +144,7 @@ namespace ryujin
 
       RYUJIN_OMP_FOR
       for (unsigned int i = 0; i < size_regular; i += simd_length) {
-        const auto U_i = old_U.get_vectorized_tensor(i);
+        const auto U_i = old_U.template get_tensor<VA>(i);
         simd_store(specific_entropies_,
                    problem_description_->specific_entropy(U_i),
                    i);
@@ -292,7 +292,7 @@ namespace ryujin
 
         synchronization_dispatch.check(thread_ready, i >= n_export_indices);
 
-        const auto U_i = old_U.get_vectorized_tensor(i);
+        const auto U_i = old_U.template get_tensor<VA>(i);
         const auto entropy_i = simd_load(evc_entropies_, i);
 
         indicator_simd.reset(U_i, entropy_i);
@@ -319,7 +319,7 @@ namespace ryujin
               break;
             }
 
-          const auto U_j = old_U.get_vectorized_tensor(js);
+          const auto U_j = old_U.template get_tensor<VA>(js);
           const auto entropy_j = simd_load(evc_entropies_, js);
 
           const auto c_ij = cij_matrix.template get_tensor<VA>(i, col_idx);
@@ -588,13 +588,13 @@ namespace ryujin
 
         synchronization_dispatch.check(thread_ready, i >= n_export_indices);
 
-        const auto U_i = old_U.get_vectorized_tensor(i);
+        const auto U_i = old_U.template get_tensor<VA>(i);
         const auto f_i = problem_description_->f(U_i);
 
         std::array<ProblemDescription::state_type<dim, VA>, stages> U_iHs;
         std::array<ProblemDescription::flux_type<dim, VA>, stages> f_iHs;
         for (int s = 0; s < stages; ++s) {
-          U_iHs[s] = stage_U[s].get().get_vectorized_tensor(i);
+          U_iHs[s] = stage_U[s].get().template get_tensor<VA>(i);
           f_iHs[s] = problem_description_->f(U_iHs[s]);
         }
 
@@ -617,13 +617,13 @@ namespace ryujin
         for (unsigned int col_idx = 0; col_idx < row_length;
              ++col_idx, js += simd_length) {
 
-          const auto U_j = old_U.get_vectorized_tensor(js);
+          const auto U_j = old_U.template get_tensor<VA>(js);
           const auto f_j = problem_description_->f(U_j);
 
           std::array<ProblemDescription::state_type<dim, VA>, stages> U_jHs;
           std::array<ProblemDescription::flux_type<dim, VA>, stages> f_jHs;
           for (int s = 0; s < stages; ++s) {
-            U_jHs[s] = stage_U[s].get().get_vectorized_tensor(js);
+            U_jHs[s] = stage_U[s].get().template get_tensor<VA>(js);
             f_jHs[s] = problem_description_->f(U_jHs[s]);
           }
 
@@ -666,12 +666,12 @@ namespace ryujin
                                   /* is diagonal */ col_idx == 0);
         }
 
-        new_U.write_vectorized_tensor(U_i_new, i);
-        r_.write_vectorized_tensor(r_i, i);
+        new_U.template write_tensor<VA>(U_i_new, i);
+        r_.template write_tensor<VA>(r_i, i);
 
         const auto hd_i = m_i * measure_of_omega_inverse;
         limiter_simd.apply_relaxation(hd_i);
-        bounds_.write_vectorized_tensor(limiter_simd.bounds(), i);
+        bounds_.template write_tensor<VA>(limiter_simd.bounds(), i);
       } /* parallel SIMD loop */
 
       LIKWID_MARKER_STOP("time_step_3");
@@ -720,7 +720,7 @@ namespace ryujin
           continue;
 
         const auto bounds =
-            bounds_.template get_tensor<std::array<Number, 3>>(i);
+            bounds_.template get_tensor<Number, std::array<Number, 3>>(i);
 
         const auto U_i_new = new_U.get_tensor(i);
         const auto U_i = old_U.get_tensor(i);
@@ -815,22 +815,22 @@ namespace ryujin
         synchronization_dispatch.check(thread_ready, i >= n_export_indices);
 
         const auto bounds =
-            bounds_.template get_vectorized_tensor<std::array<VA, 3>>(i);
+            bounds_.template get_tensor<VA, std::array<VA, 3>>(i);
 
         const auto m_i_inv = simd_load(lumped_mass_matrix_inverse, i);
 
-        const auto U_i_new = new_U.get_vectorized_tensor(i);
-        const auto U_i = old_U.get_vectorized_tensor(i);
+        const auto U_i_new = new_U.template get_tensor<VA>(i);
+        const auto U_i = old_U.template get_tensor<VA>(i);
         const auto f_i = problem_description_->f(U_i);
 
         std::array<ProblemDescription::state_type<dim, VA>, stages> U_iHs;
         std::array<ProblemDescription::flux_type<dim, VA>, stages> f_iHs;
         for (int s = 0; s < stages; ++s) {
-          U_iHs[s] = stage_U[s].get().get_vectorized_tensor(i);
+          U_iHs[s] = stage_U[s].get().template get_tensor<VA>(i);
           f_iHs[s] = problem_description_->f(U_iHs[s]);
         }
 
-        const auto r_i = r_.get_vectorized_tensor(i);
+        const auto r_i = r_.template get_tensor<VA>(i);
         const auto alpha_i = simd_load(alpha_, i);
 
         const unsigned int *js = sparsity_simd.columns(i);
@@ -841,17 +841,17 @@ namespace ryujin
         for (unsigned int col_idx = 0; col_idx < row_length;
              ++col_idx, js += simd_length) {
 
-          const auto U_j = old_U.get_vectorized_tensor(js);
+          const auto U_j = old_U.template get_tensor<VA>(js);
 
           std::array<ProblemDescription::state_type<dim, VA>, stages> U_jHs;
           std::array<ProblemDescription::flux_type<dim, VA>, stages> f_jHs;
           for (int s = 0; s < stages; ++s) {
-            U_jHs[s] = stage_U[s].get().get_vectorized_tensor(js);
+            U_jHs[s] = stage_U[s].get().template get_tensor<VA>(js);
             f_jHs[s] = problem_description_->f(U_jHs[s]);
           }
 
           const auto c_ij = cij_matrix.template get_tensor<VA>(i, col_idx);
-          const auto r_j = r_.get_vectorized_tensor(js);
+          const auto r_j = r_.template get_tensor<VA>(js);
 
           const auto alpha_j = simd_load(alpha_, js);
           const auto m_j_inv = simd_load(lumped_mass_matrix_inverse, js);
@@ -1009,7 +1009,7 @@ namespace ryujin
             continue;
 
           const auto bounds =
-              bounds_.template get_tensor<std::array<Number, 3>>(i);
+              bounds_.template get_tensor<Number, std::array<Number, 3>>(i);
 
           for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
             const auto old_l_ij = lij_row_serial[col_idx];
@@ -1057,7 +1057,7 @@ namespace ryujin
 
           synchronization_dispatch.check(thread_ready, i >= n_export_indices);
 
-          auto U_i_new = new_U.get_vectorized_tensor(i);
+          auto U_i_new = new_U.template get_tensor<VA>(i);
 
           const unsigned int row_length = sparsity_simd.row_length(i);
           const Number lambda = Number(1.) / Number(row_length - 1);
@@ -1107,14 +1107,14 @@ namespace ryujin
           }
 #endif
 
-          new_U.write_vectorized_tensor(U_i_new, i);
+          new_U.template write_tensor<VA>(U_i_new, i);
 
           /* Skip computating l_ij and updating p_ij in the last round */
           if (last_round)
             continue;
 
           const auto bounds =
-              bounds_.template get_vectorized_tensor<std::array<VA, 3>>(i);
+              bounds_.template get_tensor<VA, std::array<VA, 3>>(i);
           for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
 
             const auto old_l_ij = lij_row_simd[col_idx];

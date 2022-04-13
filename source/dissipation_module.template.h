@@ -256,7 +256,7 @@ namespace ryujin
 
       RYUJIN_OMP_FOR
       for (unsigned int i = 0; i < size_regular; i += simd_length) {
-        const auto U_i = U.get_vectorized_tensor(i);
+        const auto U_i = U.template get_tensor<VA>(i);
         const auto rho_i = problem_description_->density(U_i);
         const auto M_i = problem_description_->momentum(U_i);
         const auto rho_e_i = problem_description_->internal_energy(U_i);
@@ -771,7 +771,7 @@ namespace ryujin
 
       RYUJIN_OMP_FOR
       for (unsigned int i = 0; i < size_regular; i += simd_length) {
-        auto U_i = U.get_vectorized_tensor(i);
+        auto U_i = U.template get_tensor<VA>(i);
         const auto rho_i = problem_description_->density(U_i);
 
         /* (5.4b) */
@@ -793,7 +793,7 @@ namespace ryujin
           U_i[1 + d] = m_i_new[d];
         U_i[1 + dim] = E_i_new;
 
-        U.write_vectorized_tensor(U_i, i);
+        U.template write_tensor<VA>(U_i, i);
       }
 
       RYUJIN_PARALLEL_REGION_END
