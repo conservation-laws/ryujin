@@ -152,19 +152,10 @@ namespace ryujin
     T result;
 
     if constexpr (std::is_same<T, typename get_value_type<T>::type>::value) {
-      /*
-       * Non-vectorized slow access. Supports all row indices in
-       * [0,n_owned)
-       */
-
+      /* Non-vectorized sequential access. */
       result = vector.local_element(i);
-
     } else {
-      /*
-       * Vectorized fast access. Indices must be in the range
-       * [0,n_internal), index must be divisible by simd_length
-       */
-
+      /* Vectorized fast access. index must be divisible by simd_length */
       result.load(vector.get_values() + i);
     }
 
@@ -188,19 +179,10 @@ namespace ryujin
     T result;
 
     if constexpr (std::is_same<T, typename get_value_type<T>::type>::value) {
-      /*
-       * Non-vectorized slow access. Supports all row indices in
-       * [0,n_owned)
-       */
-
+      /* Non-vectorized sequential access. */
       result = vector.local_element(js[0]);
-
     } else {
-      /*
-       * Vectorized fast access. Indices must be in the range
-       * [0,n_internal), index must be divisible by simd_length
-       */
-
+      /* Vectorized fast access. index must be divisible by simd_length */
       result.gather(vector.get_values(), js);
     }
 
@@ -222,19 +204,10 @@ namespace ryujin
                   "dummy type mismatch");
 
     if constexpr (std::is_same<T, typename get_value_type<T>::type>::value) {
-      /*
-       * Non-vectorized slow access. Supports all row indices in
-       * [0,n_owned)
-       */
-
+      /* Non-vectorized sequential access. */
       vector.local_element(i) = values;
-
     } else {
-      /*
-       * Vectorized fast access. Indices must be in the range
-       * [0,n_internal), index must be divisible by simd_length
-       */
-
+      /* Vectorized fast access. index must be divisible by simd_length */
       values.store(vector.get_values() + i);
     }
   }

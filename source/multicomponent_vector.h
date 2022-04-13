@@ -252,20 +252,14 @@ namespace ryujin
     Tensor tensor;
 
     if constexpr (std::is_same<Number, Number2>::value) {
-      /*
-       * Non-vectorized slow access. Supports all row indices in
-       * [0,n_owned)
-       */
+      /* Non-vectorized sequential access. */
 
       for (unsigned int d = 0; d < n_comp; ++d)
         tensor[d] = this->local_element(i * n_comp + d);
 
     } else if constexpr (std::is_same<VectorizedArray, Number2>::value) {
-      /*
-       * Vectorized fast access. Indices must be in the range
-       * [0,n_internal), index must be divisible by simd_length
-       */
 
+      /* Vectorized fast access. index must be divisible by simd_length */
       unsigned int indices[VectorizedArray::size()];
       for (unsigned int k = 0; k < VectorizedArray::size(); ++k)
         indices[k] = k * n_comp;
@@ -294,19 +288,13 @@ namespace ryujin
 
 
     if constexpr (std::is_same<Number, Number2>::value) {
-      /*
-       * Non-vectorized slow access. Supports all row indices in
-       * [0,n_owned)
-       */
+      /* Non-vectorized sequential access. */
 
       for (unsigned int d = 0; d < n_comp; ++d)
         tensor[d] = this->local_element(js[0] * n_comp + d);
 
     } else if constexpr (std::is_same<VectorizedArray, Number2>::value) {
-      /*
-       * Vectorized fast access. Indices must be in the range
-       * [0,n_internal), index must be divisible by simd_length
-       */
+      /* Vectorized fast access. index must be divisible by simd_length */
 
       unsigned int indices[VectorizedArray::size()];
       for (unsigned int k = 0; k < VectorizedArray::size(); ++k)
@@ -334,19 +322,13 @@ namespace ryujin
                   "dummy type mismatch");
 
     if constexpr (std::is_same<Number, Number2>::value) {
-      /*
-       * Non-vectorized slow access. Supports all row indices in
-       * [0,n_owned)
-       */
+      /* Non-vectorized sequential access. */
 
       for (unsigned int d = 0; d < n_comp; ++d)
         this->local_element(i * n_comp + d) = tensor[d];
 
     } else if constexpr (std::is_same<VectorizedArray, Number2>::value) {
-      /*
-       * Vectorized fast access. Indices must be in the range
-       * [0,n_internal), index must be divisible by simd_length
-       */
+      /* Vectorized fast access. index must be divisible by simd_length */
 
       unsigned int indices[VectorizedArray::size()];
       for (unsigned int k = 0; k < VectorizedArray::size(); ++k)
