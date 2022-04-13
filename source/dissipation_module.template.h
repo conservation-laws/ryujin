@@ -237,8 +237,8 @@ namespace ryujin
     tau_ = tau;
     theta_ = Number(0.5) + shift_ * tau; // FIXME
 #ifdef DEBUG_OUTPUT
-      std::cout << "        perform time-step with tau = " << tau << std::endl;
-      std::cout << "        (shift: " << shift_ << ")" << std::endl;
+    std::cout << "        perform time-step with tau = " << tau << std::endl;
+    std::cout << "        (shift: " << shift_ << ")" << std::endl;
 #endif
 
     /*
@@ -260,15 +260,15 @@ namespace ryujin
         const auto rho_i = problem_description_->density(U_i);
         const auto M_i = problem_description_->momentum(U_i);
         const auto rho_e_i = problem_description_->internal_energy(U_i);
-        const auto m_i = simd_load(lumped_mass_matrix, i);
+        const auto m_i = load_value<VA>(lumped_mass_matrix, i);
 
-        simd_store(density_, rho_i, i);
+        store_value<VA>(density_, rho_i, i);
         /* (5.4a) */
         for (unsigned int d = 0; d < dim; ++d) {
-          simd_store(velocity_.block(d), M_i[d] / rho_i, i);
-          simd_store(velocity_rhs_.block(d), m_i * (M_i[d]), i);
+          store_value<VA>(velocity_.block(d), M_i[d] / rho_i, i);
+          store_value<VA>(velocity_rhs_.block(d), m_i * (M_i[d]), i);
         }
-        simd_store(internal_energy_, rho_e_i / rho_i, i);
+        store_value<VA>(internal_energy_, rho_e_i / rho_i, i);
       }
 
       RYUJIN_PARALLEL_REGION_END
@@ -563,12 +563,12 @@ namespace ryujin
 
       RYUJIN_OMP_FOR
       for (unsigned int i = 0; i < size_regular; i += simd_length) {
-        const auto rhs_i = simd_load(internal_energy_rhs_, i);
-        const auto m_i = simd_load(lumped_mass_matrix, i);
-        const auto rho_i = simd_load(density_, i);
-        const auto e_i = simd_load(internal_energy_, i);
+        const auto rhs_i = load_value<VA>(internal_energy_rhs_, i);
+        const auto m_i = load_value<VA>(lumped_mass_matrix, i);
+        const auto rho_i = load_value<VA>(density_, i);
+        const auto e_i = load_value<VA>(internal_energy_, i);
         /* rhs_i already contains m_i K_i^{n+1/2} */
-        simd_store(
+        store_value<VA>(
             internal_energy_rhs_, m_i * rho_i * e_i + theta_ * tau_ * rhs_i, i);
       }
 
@@ -778,13 +778,13 @@ namespace ryujin
         auto m_i_new =
             (Number(1.) - alpha) * problem_description_->momentum(U_i);
         for (unsigned int d = 0; d < dim; ++d) {
-          m_i_new[d] += alpha * rho_i * simd_load(velocity_.block(d), i);
+          m_i_new[d] += alpha * rho_i * load_value<VA>(velocity_.block(d), i);
         }
 
         /* (5.12)f */
         auto rho_e_i_new =
             (Number(1.0) - alpha) * problem_description_->internal_energy(U_i);
-        rho_e_i_new += alpha * rho_i * simd_load(internal_energy_, i);
+        rho_e_i_new += alpha * rho_i * load_value<VA>(internal_energy_, i);
 
         /* (5.18) */
         const auto E_i_new = rho_e_i_new + 0.5 * m_i_new * m_i_new / rho_i;

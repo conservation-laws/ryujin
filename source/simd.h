@@ -143,12 +143,31 @@ namespace ryujin
    *
    * @ingroup SIMD
    */
-  template <typename T1>
-  DEAL_II_ALWAYS_INLINE inline dealii::VectorizedArray<typename T1::value_type>
-  simd_load(const T1 &vector, unsigned int i)
+  template <typename T, typename V>
+  DEAL_II_ALWAYS_INLINE inline T load_value(const V &vector, unsigned int i)
   {
-    dealii::VectorizedArray<typename T1::value_type> result;
-    result.load(vector.get_values() + i);
+    static_assert(std::is_same<typename get_value_type<T>::type,
+                               typename V::value_type>::value,
+                  "dummy type mismatch");
+    T result;
+
+    if constexpr (std::is_same<T, typename get_value_type<T>::type>::value) {
+      /*
+       * Non-vectorized slow access. Supports all row indices in
+       * [0,n_owned)
+       */
+
+      result = vector.local_element(i);
+
+    } else {
+      /*
+       * Vectorized fast access. Indices must be in the range
+       * [0,n_internal), index must be divisible by simd_length
+       */
+
+      result.load(vector.get_values() + i);
+    }
+
     return result;
   }
 
@@ -159,12 +178,32 @@ namespace ryujin
    *
    * @ingroup SIMD
    */
-  template <typename T1>
-  DEAL_II_ALWAYS_INLINE inline dealii::VectorizedArray<typename T1::value_type>
-  simd_load(const T1 &vector, const unsigned int *js)
+  template <typename T, typename V>
+  DEAL_II_ALWAYS_INLINE inline T load_value(const V &vector,
+                                            const unsigned int *js)
   {
-    dealii::VectorizedArray<typename T1::value_type> result;
-    result.gather(vector.get_values(), js);
+    static_assert(std::is_same<typename get_value_type<T>::type,
+                               typename V::value_type>::value,
+                  "dummy type mismatch");
+    T result;
+
+    if constexpr (std::is_same<T, typename get_value_type<T>::type>::value) {
+      /*
+       * Non-vectorized slow access. Supports all row indices in
+       * [0,n_owned)
+       */
+
+      result = vector.local_element(js[0]);
+
+    } else {
+      /*
+       * Vectorized fast access. Indices must be in the range
+       * [0,n_internal), index must be divisible by simd_length
+       */
+
+      result.gather(vector.get_values(), js);
+    }
+
     return result;
   }
 
@@ -174,13 +213,30 @@ namespace ryujin
    *
    * @ingroup SIMD
    */
-  template <typename T1>
+  template <typename T, typename V>
   DEAL_II_ALWAYS_INLINE inline void
-  simd_store(T1 &vector,
-             const dealii::VectorizedArray<typename T1::value_type> &values,
-             unsigned int i)
+  store_value(V &vector, const T &values, unsigned int i)
   {
-    values.store(vector.get_values() + i);
+    static_assert(std::is_same<typename get_value_type<T>::type,
+                               typename V::value_type>::value,
+                  "dummy type mismatch");
+
+    if constexpr (std::is_same<T, typename get_value_type<T>::type>::value) {
+      /*
+       * Non-vectorized slow access. Supports all row indices in
+       * [0,n_owned)
+       */
+
+      vector.local_element(i) = values;
+
+    } else {
+      /*
+       * Vectorized fast access. Indices must be in the range
+       * [0,n_internal), index must be divisible by simd_length
+       */
+
+      values.store(vector.get_values() + i);
+    }
   }
 
   //@}

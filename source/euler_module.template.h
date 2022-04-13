@@ -145,7 +145,7 @@ namespace ryujin
       RYUJIN_OMP_FOR
       for (unsigned int i = 0; i < size_regular; i += simd_length) {
         const auto U_i = old_U.template get_tensor<VA>(i);
-        simd_store(specific_entropies_,
+        store_value<VA>(specific_entropies_,
                    problem_description_->specific_entropy(U_i),
                    i);
 
@@ -154,7 +154,7 @@ namespace ryujin
                     Indicator<dim, double>::Entropy::mathematical
                 ? problem_description_->mathematical_entropy(U_i)
                 : problem_description_->harten_entropy(U_i);
-        simd_store(evc_entropies_, evc_entropy, i);
+        store_value<VA>(evc_entropies_, evc_entropy, i);
       }
 
       RYUJIN_OMP_FOR
@@ -293,11 +293,11 @@ namespace ryujin
         synchronization_dispatch.check(thread_ready, i >= n_export_indices);
 
         const auto U_i = old_U.template get_tensor<VA>(i);
-        const auto entropy_i = simd_load(evc_entropies_, i);
+        const auto entropy_i = load_value<VA>(evc_entropies_, i);
 
         indicator_simd.reset(U_i, entropy_i);
 
-        const auto mass = simd_load(lumped_mass_matrix, i);
+        const auto mass = load_value<VA>(lumped_mass_matrix, i);
         const auto hd_i = mass * measure_of_omega_inverse;
 
         const unsigned int row_length = sparsity_simd.row_length(i);
@@ -320,7 +320,7 @@ namespace ryujin
             }
 
           const auto U_j = old_U.template get_tensor<VA>(js);
-          const auto entropy_j = simd_load(evc_entropies_, js);
+          const auto entropy_j = load_value<VA>(evc_entropies_, js);
 
           const auto c_ij = cij_matrix.template get_tensor<VA>(i, col_idx);
           const auto beta_ij = betaij_matrix.template get_entry<VA>(i, col_idx);
@@ -341,8 +341,9 @@ namespace ryujin
           dij_matrix_.write_entry(d, i, col_idx, true);
         }
 
-        simd_store(alpha_, indicator_simd.alpha(hd_i), i);
-        simd_store(second_variations_, indicator_simd.second_variations(), i);
+        store_value<VA>(alpha_, indicator_simd.alpha(hd_i), i);
+        store_value<VA>(
+            second_variations_, indicator_simd.second_variations(), i);
       } /* parallel SIMD loop */
 
       LIKWID_MARKER_STOP("time_step_1");
@@ -599,12 +600,12 @@ namespace ryujin
         }
 
         auto U_i_new = U_i;
-        const auto alpha_i = simd_load(alpha_, i);
-        const auto specific_entropy_i = simd_load(specific_entropies_, i);
-        const auto variations_i = simd_load(second_variations_, i);
+        const auto alpha_i = load_value<VA>(alpha_, i);
+        const auto specific_entropy_i = load_value<VA>(specific_entropies_, i);
+        const auto variations_i = load_value<VA>(second_variations_, i);
 
-        const auto m_i = simd_load(lumped_mass_matrix, i);
-        const auto m_i_inv = simd_load(lumped_mass_matrix_inverse, i);
+        const auto m_i = load_value<VA>(lumped_mass_matrix, i);
+        const auto m_i_inv = load_value<VA>(lumped_mass_matrix_inverse, i);
 
         ProblemDescription::state_type<dim, VA> r_i;
 
@@ -627,8 +628,8 @@ namespace ryujin
             f_jHs[s] = problem_description_->f(U_jHs[s]);
           }
 
-          const auto alpha_j = simd_load(alpha_, js);
-          const auto variations_j = simd_load(second_variations_, js);
+          const auto alpha_j = load_value<VA>(alpha_, js);
+          const auto variations_j = load_value<VA>(second_variations_, js);
 
           const auto d_ij = dij_matrix_.template get_entry<VA>(i, col_idx);
 
@@ -655,7 +656,7 @@ namespace ryujin
           U_i_new += tau * m_i_inv * Number(2.) * d_ij * U_ij_bar;
 
           const auto beta_ij = betaij_matrix.template get_entry<VA>(i, col_idx);
-          const auto specific_entropy_j = simd_load(specific_entropies_, js);
+          const auto specific_entropy_j = load_value<VA>(specific_entropies_, js);
 
           limiter_simd.accumulate(U_i,
                                   U_j,
@@ -817,7 +818,7 @@ namespace ryujin
         const auto bounds =
             bounds_.template get_tensor<VA, std::array<VA, 3>>(i);
 
-        const auto m_i_inv = simd_load(lumped_mass_matrix_inverse, i);
+        const auto m_i_inv = load_value<VA>(lumped_mass_matrix_inverse, i);
 
         const auto U_i_new = new_U.template get_tensor<VA>(i);
         const auto U_i = old_U.template get_tensor<VA>(i);
@@ -831,7 +832,7 @@ namespace ryujin
         }
 
         const auto r_i = r_.template get_tensor<VA>(i);
-        const auto alpha_i = simd_load(alpha_, i);
+        const auto alpha_i = load_value<VA>(alpha_, i);
 
         const unsigned int *js = sparsity_simd.columns(i);
         const unsigned int row_length = sparsity_simd.row_length(i);
@@ -853,8 +854,8 @@ namespace ryujin
           const auto c_ij = cij_matrix.template get_tensor<VA>(i, col_idx);
           const auto r_j = r_.template get_tensor<VA>(js);
 
-          const auto alpha_j = simd_load(alpha_, js);
-          const auto m_j_inv = simd_load(lumped_mass_matrix_inverse, js);
+          const auto alpha_j = load_value<VA>(alpha_, js);
+          const auto m_j_inv = load_value<VA>(lumped_mass_matrix_inverse, js);
 
           const auto d_ij = dij_matrix_.template get_entry<VA>(i, col_idx);
           const auto d_ijH =  d_ij * (alpha_i + alpha_j) * Number(.5);
