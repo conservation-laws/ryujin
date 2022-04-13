@@ -89,8 +89,8 @@ namespace ryujin
     using dealii::DoFRenumbering::Cuthill_McKee;
 
     /**
-     * Reorder all export indices in the locally owned index range to the
-     * start of the index range.
+     * Reorder all (strides of) locally internal indices that contain
+     * export indices to the start of the index range.
      *
      * This renumbering requires MPI communication in order to determine
      * the set of export indices.
@@ -99,7 +99,9 @@ namespace ryujin
      */
     template <int dim>
     unsigned int export_indices_first(dealii::DoFHandler<dim> &dof_handler,
-                                      const MPI_Comm &mpi_communicator)
+                                      const MPI_Comm &mpi_communicator,
+                                      const unsigned int n_locally_internal,
+                                      const std::size_t group_size)
     {
       using namespace dealii;
 
@@ -129,20 +131,62 @@ namespace ryujin
 
       std::vector<dealii::types::global_dof_index> new_order(n_locally_owned);
 
-      const unsigned int n_export_indices = export_indices.n_elements();
-      unsigned int index_import = 0;
-      unsigned int index_rest = n_export_indices;
-      for (unsigned int i = 0; i < n_locally_owned; ++i) {
-        if (export_indices.is_element(i)) {
-          Assert(index_import < n_export_indices, dealii::ExcInternalError());
-          new_order[i] = offset + index_import++;
+      /*
+       * First pass: reorder all strides containing export indices and mark
+       * all other indices with numbers::invalid_dof_index:
+       */
+
+      unsigned int n_export_indices = 0;
+
+      Assert(n_locally_internal <= n_locally_owned, dealii::ExcInternalError());
+
+      for (unsigned int i = 0; i < n_locally_internal; i+= group_size) {
+        bool export_index_present = false;
+        for (unsigned int j = 0; j < group_size; ++j) {
+          if (export_indices.is_element(i + j)) {
+            export_index_present = true;
+            break;
+          }
+        }
+
+        if (export_index_present) {
+          Assert(n_export_indices % group_size == 0,
+                 dealii::ExcInternalError());
+          for (unsigned int j = 0; j < group_size; ++j) {
+            new_order[i + j] = offset + n_export_indices++;
+          }
         } else {
-          Assert(index_rest < n_locally_owned, dealii::ExcInternalError());
-          new_order[i] = offset + index_rest++;
+          for (unsigned int j = 0; j < group_size; ++j)
+            new_order[i + j] = dealii::numbers::invalid_dof_index;
         }
       }
-      Assert(index_import == n_export_indices, dealii::ExcInternalError());
-      Assert(index_rest == n_locally_owned, dealii::ExcInternalError());
+
+      Assert(n_export_indices >= export_indices.n_elements(),
+             dealii::ExcInternalError());
+
+      unsigned int running_index = n_export_indices;
+
+      /*
+       * Second pass: append the rest:
+       */
+
+      for (unsigned int i = 0; i < n_locally_internal; i += group_size) {
+        if (new_order[i] == dealii::numbers::invalid_dof_index) {
+          for (unsigned int j = 0; j < group_size; ++j) {
+            Assert(new_order[i + j] == dealii::numbers::invalid_dof_index,
+                   dealii::ExcInternalError());
+            new_order[i + j] = offset + running_index++;
+          }
+        }
+      }
+
+      Assert(running_index == n_locally_internal, dealii::ExcInternalError());
+
+      for (unsigned int i = n_locally_internal; i < n_locally_owned; i++) {
+        new_order[i] = offset + running_index++;
+      }
+
+      Assert(running_index == n_locally_owned, dealii::ExcInternalError());
 
       dof_handler.renumber_dofs(new_order);
 

@@ -78,16 +78,28 @@ namespace ryujin
     /* Cuthill McKee actually helps with cache locality. */
     DoFRenumbering::Cuthill_McKee(dof_handler);
 
-#ifdef USE_COMMUNICATION_HIDING
-    DoFRenumbering::export_indices_first(dof_handler, mpi_communicator_);
-#endif
-
     /*
      * Group degrees of freedom that have the same stencil size in groups
      * of multiples of the VectorizedArray<Number>::size().
      */
     n_locally_internal_ = DoFRenumbering::internal_range(
         dof_handler, mpi_communicator_, VectorizedArray<Number>::size());
+
+    /*
+     * Reorder all (strides of) locally internal indices that contain
+     * export indices to the start of the index range. This reordering
+     * preserves the binning introduced by
+     * DoFRenumbering::internal_range().
+     */
+#ifdef USE_COMMUNICATION_HIDING
+    n_export_indices_ =
+        DoFRenumbering::export_indices_first(dof_handler,
+                                             mpi_communicator_,
+                                             n_locally_internal_,
+                                             VectorizedArray<Number>::size());
+#else
+    n_export_indices_ = n_locally_internal_;
+#endif
 
     /*
      * First, we set up the locally_relevant index set, determine (globally
@@ -211,16 +223,16 @@ namespace ryujin
      * communication can be started.
      */
 
-#ifdef USE_COMMUNICATION_HIDING
-    n_export_indices_ = 0;
+#ifdef DEBUG
+    unsigned int control = 0;
     for (const auto &it : scalar_partitioner_->import_indices())
       if (it.second <= n_locally_internal_)
-        n_export_indices_ = std::max(n_export_indices_, it.second);
-#else
-    n_export_indices_ = n_locally_internal_;
+        control = std::max(control, it.second);
+
+    Assert(control <= n_export_indices_, ExcInternalError());
+    Assert(n_export_indices_ <= n_locally_internal_, ExcInternalError());
 #endif
 
-    Assert(n_export_indices_ <= n_locally_internal_, ExcInternalError());
 
 #ifdef DEBUG
     const auto offset = n_locally_owned_ != 0 ? *locally_owned.begin() : 0;
