@@ -71,12 +71,23 @@ namespace ryujin
 
     dof_handler.distribute_dofs(discretization_->finite_element());
 
+    n_locally_owned_ = dof_handler.locally_owned_dofs().n_elements();
+
     /*
      * Renumbering:
      */
 
     /* Cuthill McKee actually helps with cache locality. */
     DoFRenumbering::Cuthill_McKee(dof_handler);
+
+#ifdef USE_COMMUNICATION_HIDING
+    /*
+     * Reorder all export indices at the beginning of the locally_internal index
+     * range to achieve a better packging:
+     */
+    DoFRenumbering::export_indices_first(
+        dof_handler, mpi_communicator_, n_locally_owned_, 1);
+#endif
 
     /*
      * Group degrees of freedom that have the same stencil size in groups
@@ -206,7 +217,8 @@ namespace ryujin
 
     /* Set up partitioner: */
 
-    n_locally_owned_ = locally_owned.n_elements();
+    Assert(n_locally_owned_ == locally_owned.n_elements(),
+           dealii::ExcInternalError());
     n_locally_relevant_ = locally_relevant.n_elements();
 
     scalar_partitioner_ = std::make_shared<dealii::Utilities::MPI::Partitioner>(
