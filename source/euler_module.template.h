@@ -82,6 +82,33 @@ namespace ryujin
   }
 
 
+  namespace
+  {
+    template <typename T>
+    bool all_below_diagonal(unsigned int i, const unsigned int *js)
+    {
+      if constexpr (std::is_same<T, typename get_value_type<T>::type>::value) {
+        /* Non-vectorized sequential access. */
+        const auto j = *js;
+        return j <= i;
+
+      } else {
+        /* Vectorized fast access. index must be divisible by simd_length */
+
+        constexpr auto simd_length = T::size();
+
+        bool all_below_diagonal = true;
+        for (unsigned int k = 0; k < simd_length; ++k)
+          if (js[k] >= i + k) {
+            all_below_diagonal = false;
+            break;
+          }
+        return all_below_diagonal;
+      }
+    }
+  } // namespace
+
+
   template <int dim, typename Number>
   template <int stages>
   Number EulerModule<dim, Number>::step(
@@ -256,23 +283,6 @@ namespace ryujin
 
           Number d = norm * lambda_max;
 
-          /*
-           * In case both dofs are located at the boundary we have to
-           * symmetrize.
-           */
-
-          if (boundary_map.count(i) != 0 && boundary_map.count(j) != 0) {
-
-            const auto c_ji = cij_matrix.get_transposed_tensor(i, col_idx);
-            Assert(c_ji.norm() > 1.e-12, ExcInternalError());
-            const auto norm_2 = c_ji.norm();
-            const auto n_ji = c_ji / norm_2;
-
-            auto [lambda_max_2, p_star_2, n_iterations_2] =
-                riemann_solver_serial.compute(U_j, U_i, n_ji);
-            d = std::max(d, norm_2 * lambda_max_2);
-          }
-
           dij_matrix_.write_entry(d, i, col_idx);
         }
 
@@ -312,13 +322,6 @@ namespace ryujin
         for (unsigned int col_idx = 1; col_idx < row_length;
              ++col_idx, js += simd_length) {
 
-          bool all_below_diagonal = true;
-          for (unsigned int k = 0; k < simd_length; ++k)
-            if (js[k] >= i + k) {
-              all_below_diagonal = false;
-              break;
-            }
-
           const auto U_j = old_U.template get_tensor<VA>(js);
           const auto entropy_j = load_value<VA>(evc_entropies_, js);
 
@@ -327,7 +330,7 @@ namespace ryujin
           indicator_simd.add(U_j, c_ij, beta_ij, entropy_j);
 
           /* Only iterate over the upper triangular portion of d_ij */
-          if (all_below_diagonal)
+          if (all_below_diagonal<VA>(i, js))
             continue;
 
           const auto norm = c_ij.norm();
@@ -346,18 +349,10 @@ namespace ryujin
             second_variations_, indicator_simd.second_variations(), i);
       } /* parallel SIMD loop */
 
-      LIKWID_MARKER_STOP("time_step_1");
-      RYUJIN_PARALLEL_REGION_END
-    }
-
-    {
-      Scope scope(computing_timer_,
-                  "time step [E] 1b- compute d_ji when needed");
-
-      RiemannSolver<dim, Number> riemann_solver_serial(*problem_description_);
-
-      /* FIXME: non-parallel... */
-      for (const auto &entry : coupling_boundary_pairs) {
+      /* Parallel non-vectorized loop: */
+      RYUJIN_OMP_FOR
+      for (std::size_t k = 0; k < coupling_boundary_pairs.size(); ++k) {
+        const auto &entry = coupling_boundary_pairs[k];
         const auto &[i, col_idx, j] = entry;
         const auto U_i = old_U.get_tensor(i);
         const auto U_j = old_U.get_tensor(j);
@@ -371,7 +366,10 @@ namespace ryujin
         auto d = dij_matrix_.get_entry(i, col_idx);
         d = std::max(d, norm * lambda_max_2);
         dij_matrix_.write_entry(d, i, col_idx);
-      }
+      } /* parallel non-vectorized loop */
+
+      LIKWID_MARKER_STOP("time_step_1");
+      RYUJIN_PARALLEL_REGION_END
     }
 
     /*
