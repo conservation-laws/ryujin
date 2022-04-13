@@ -1067,7 +1067,7 @@ namespace ryujin
 
             const auto l_ij = std::min(
                 lij_matrix_.template get_entry<VA>(i, col_idx),
-                lij_matrix_.get_vectorized_transposed_entry(i, col_idx));
+                lij_matrix_.template get_transposed_entry<VA>(i, col_idx));
 
             auto p_ij = pij_matrix_.template get_tensor<VA>(i, col_idx);
 

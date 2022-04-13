@@ -166,19 +166,33 @@ namespace ryujin
 
     /* Get transposed scalar or tensor-valued entry: */
 
-    Number
+    /**
+     * return the transposed (scalar) entry indexed by @ref row and
+     * @ref position_within_column.
+     *
+     * @note If the template argument @ref Number2
+     * is a vetorized array a specialized, faster access will be performed.
+     * In this case the index @ref row must be within the interval
+     * [0, n_internal_dofs) and must be divisible by simd_length.
+     */
+    template <typename Number2 = Number>
+    Number2
     get_transposed_entry(const unsigned int row,
                          const unsigned int position_within_column) const;
 
-    dealii::Tensor<1, n_components, Number>
+    /**
+     * return the transposed tensor-valued entry indexed by @ref row and
+     * @ref position_within_column.
+     *
+     * @note If the template argument @ref Number2
+     * is a vetorized array a specialized, faster access will be performed.
+     * In this case the index @ref row must be within the interval
+     * [0, n_internal_dofs) and must be divisible by simd_length.
+     */
+    template <typename Number2 = Number>
+    dealii::Tensor<1, n_components, Number2>
     get_transposed_tensor(const unsigned int row,
                           const unsigned int position_within_column) const;
-
-    VectorizedArray get_vectorized_transposed_entry(
-        const unsigned int row,
-        const unsigned int position_within_column) const;
-
-    /* FIXME: Implement get_vectorized_transposed_tensor */
 
     /* Write scalar or tensor entry: */
 
@@ -324,8 +338,7 @@ namespace ryujin
                    d];
       }
 
-    } else {
-
+    } else if constexpr (std::is_same<VectorizedArray, Number2>::value) {
       /*
        * Vectorized fast access. Indices must be in the range
        * [0,n_internal), index must be divisible by simd_length
@@ -345,6 +358,10 @@ namespace ryujin
 
       for (unsigned int d = 0; d < n_components; ++d)
         result[d].load(load_pos + d * simd_length);
+
+    } else {
+      /* not implemented */
+      __builtin_trap();
     }
 
     return result;
@@ -352,92 +369,96 @@ namespace ryujin
 
 
   template <typename Number, int n_components, int simd_length>
-  DEAL_II_ALWAYS_INLINE inline Number
+  template <typename Number2>
+  DEAL_II_ALWAYS_INLINE inline Number2
   SparseMatrixSIMD<Number, n_components, simd_length>::get_transposed_entry(
       const unsigned int row, const unsigned int position_within_column) const
   {
-    return get_transposed_tensor(row, position_within_column)[0];
+    return get_transposed_tensor<Number2>(row, position_within_column)[0];
   }
 
 
   template <typename Number, int n_components, int simd_length>
-  DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, n_components, Number>
+  template <typename Number2>
+  DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, n_components, Number2>
   SparseMatrixSIMD<Number, n_components, simd_length>::get_transposed_tensor(
       const unsigned int row, const unsigned int position_within_column) const
   {
     Assert(sparsity != nullptr, dealii::ExcNotInitialized());
-
     AssertIndexRange(row, sparsity->row_starts.size() - 1);
     AssertIndexRange(position_within_column, sparsity->row_length(row));
 
-    dealii::Tensor<1, n_components, Number> result;
-    if (row < sparsity->n_internal_dofs) {
-      // go through vectorized part
-      const unsigned int simd_row = row / simd_length;
-      const unsigned int simd_offset = row % simd_length;
-      const std::size_t index =
-          sparsity->indices_transposed[sparsity->row_starts[simd_row] +
+    dealii::Tensor<1, n_components, Number2> result;
+
+    if constexpr (std::is_same<Number, Number2>::value) {
+      if (row < sparsity->n_internal_dofs) {
+        // go through vectorized part
+        const unsigned int simd_row = row / simd_length;
+        const unsigned int simd_offset = row % simd_length;
+        const std::size_t index =
+            sparsity->indices_transposed[sparsity->row_starts[simd_row] +
+                                         simd_offset +
+                                         position_within_column * simd_length];
+        if (n_components > 1) {
+          const unsigned int col =
+              sparsity->column_indices[sparsity->row_starts[simd_row] +
                                        simd_offset +
                                        position_within_column * simd_length];
-      if (n_components > 1) {
-        const unsigned int col =
-            sparsity
-                ->column_indices[sparsity->row_starts[simd_row] + simd_offset +
-                                 position_within_column * simd_length];
-        if (col < sparsity->n_internal_dofs)
-          for (unsigned int d = 0; d < n_components; ++d)
-            result[d] = data[index / simd_length * simd_length * n_components +
-                             simd_length * d + index % simd_length];
-        else
-          for (unsigned int d = 0; d < n_components; ++d)
-            result[d] = data[index * n_components + d];
-      } else
-        result[0] = data[index];
-    } else {
-      // go through standard part
-      const std::size_t index =
-          sparsity->indices_transposed[sparsity->row_starts[row] +
+          if (col < sparsity->n_internal_dofs)
+            for (unsigned int d = 0; d < n_components; ++d)
+              result[d] =
+                  data[index / simd_length * simd_length * n_components +
+                       simd_length * d + index % simd_length];
+          else
+            for (unsigned int d = 0; d < n_components; ++d)
+              result[d] = data[index * n_components + d];
+        } else
+          result[0] = data[index];
+      } else {
+        // go through standard part
+        const std::size_t index =
+            sparsity->indices_transposed[sparsity->row_starts[row] +
+                                         position_within_column];
+        if (n_components > 1) {
+          const unsigned int col =
+              sparsity->column_indices[sparsity->row_starts[row] +
                                        position_within_column];
-      if (n_components > 1) {
-        const unsigned int col =
-            sparsity->column_indices[sparsity->row_starts[row] +
-                                     position_within_column];
-        if (col < sparsity->n_internal_dofs)
-          for (unsigned int d = 0; d < n_components; ++d)
-            result[d] = data[index / simd_length * simd_length * n_components +
-                             simd_length * d + index % simd_length];
-        else
-          for (unsigned int d = 0; d < n_components; ++d)
-            result[d] = data[index * n_components + d];
-      } else
-        result[0] = data[index];
+          if (col < sparsity->n_internal_dofs)
+            for (unsigned int d = 0; d < n_components; ++d)
+              result[d] =
+                  data[index / simd_length * simd_length * n_components +
+                       simd_length * d + index % simd_length];
+          else
+            for (unsigned int d = 0; d < n_components; ++d)
+              result[d] = data[index * n_components + d];
+        } else
+          result[0] = data[index];
+      }
+
+    } else if constexpr (std::is_same<VectorizedArray, Number2>::value &&
+                         (n_components == 1)) {
+      /*
+       * Vectorized fast access. Indices must be in the range
+       * [0,n_internal), index must be divisible by simd_length
+       */
+
+      Assert(row < sparsity->n_internal_dofs,
+             dealii::ExcMessage(
+                 "Vectorized access only possible in vectorized part"));
+      Assert(row % simd_length == 0,
+             dealii::ExcMessage(
+                 "Access only supported for rows at the SIMD granularity"));
+
+      const unsigned int offset = sparsity->row_starts[row / simd_length] +
+                                  position_within_column * simd_length;
+      result[0].gather(data.data(),
+                       sparsity->indices_transposed.data() + offset);
+
+    } else {
+      /* not implemented */
+      __builtin_trap();
     }
-    return result;
-  }
 
-
-  template <typename Number, int n_components, int simd_length>
-  DEAL_II_ALWAYS_INLINE inline dealii::VectorizedArray<Number, simd_length>
-  SparseMatrixSIMD<Number, n_components, simd_length>::
-      get_vectorized_transposed_entry(
-          const unsigned int row,
-          const unsigned int position_within_column) const
-  {
-    Assert(sparsity != nullptr, dealii::ExcNotInitialized());
-
-    AssertIndexRange(row, sparsity->row_starts.size() - 1);
-    AssertIndexRange(position_within_column, sparsity->row_length(row));
-    Assert(row < sparsity->n_internal_dofs,
-           dealii::ExcMessage(
-               "Vectorized access only possible in vectorized part"));
-    Assert(row % simd_length == 0,
-           dealii::ExcMessage(
-               "Access only supported for rows at the SIMD granularity"));
-
-    const unsigned int offset = sparsity->row_starts[row / simd_length] +
-                                position_within_column * simd_length;
-    dealii::VectorizedArray<Number, simd_length> result;
-    result.gather(data.data(), sparsity->indices_transposed.data() + offset);
     return result;
   }
 
