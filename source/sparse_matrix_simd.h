@@ -45,8 +45,16 @@ namespace ryujin
   class SparsityPatternSIMD
   {
   public:
+    /**
+     * Default constructor.
+     */
     SparsityPatternSIMD();
 
+    /**
+     * Constructor taking a sparsity pattern template, an MPI partitioner
+     * and the number of (regular) internal dofs as an argument. The
+     * constructor calls SparsityPatternSIMD::reinit() internally.
+     */
     SparsityPatternSIMD(
         const unsigned int n_internal_dofs,
         const dealii::DynamicSparsityPattern &sparsity,
@@ -55,13 +63,20 @@ namespace ryujin
 
 
     /**
-     *
+     * Reinit function that reinitializes the SIMD sparsity pattern for a
+     * given sparsity pattern template, an MPI partitioner and the number
+     * of (regular) internal dofs.
      */
     void reinit(const unsigned int n_internal_dofs,
                 const dealii::DynamicSparsityPattern &sparsity,
                 const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
                     &partitioner);
 
+    /**
+     * Return the "stride size" of a given row index. The function returns
+     * simd_length for all indices in the range [0, n_internal_dofs) and 1
+     * otherwise.
+     */
     unsigned int stride_of_row(const unsigned int row) const;
 
     const unsigned int *columns(const unsigned int row) const;
@@ -122,20 +137,32 @@ namespace ryujin
 
     /* Get scalar or tensor-valued entry: */
 
-    Number get_entry(const unsigned int row,
-                     const unsigned int position_within_column) const;
+    /**
+     * return the (scalar) entry indexed by @ref row and
+     * @ref position_within_column.
+     *
+     * @note If the template argument @ref Number2
+     * is a vetorized array a specialized, faster access will be performed.
+     * In this case the index @ref row must be within the interval
+     * [0, n_internal_dofs) and must be divisible by simd_length.
+     */
+    template <typename Number2 = Number>
+    Number2 get_entry(const unsigned int row,
+                      const unsigned int position_within_column) const;
 
-    dealii::Tensor<1, n_components, Number>
+    /**
+     * return the tensor-valued entry indexed by @ref row and
+     * @ref position_within_column.
+     *
+     * @note If the template argument @ref Number2
+     * is a vetorized array a specialized, faster access will be performed.
+     * In this case the index @ref row must be within the interval
+     * [0, n_internal_dofs) and must be divisible by simd_length.
+     */
+    template <typename Number2 = Number>
+    dealii::Tensor<1, n_components, Number2>
     get_tensor(const unsigned int row,
                const unsigned int position_within_column) const;
-
-    VectorizedArray
-    get_vectorized_entry(const unsigned int row,
-                         const unsigned int position_within_column) const;
-
-    dealii::Tensor<1, n_components, VectorizedArray>
-    get_vectorized_tensor(const unsigned int row,
-                          const unsigned int position_within_column) const;
 
     /* Get transposed scalar or tensor-valued entry: */
 
@@ -253,81 +280,73 @@ namespace ryujin
 
 
   template <typename Number, int n_components, int simd_length>
-  DEAL_II_ALWAYS_INLINE inline Number
+  template <typename Number2>
+  DEAL_II_ALWAYS_INLINE inline Number2
   SparseMatrixSIMD<Number, n_components, simd_length>::get_entry(
       const unsigned int row, const unsigned int position_within_column) const
   {
-    return get_tensor(row, position_within_column)[0];
+    return get_tensor<Number2>(row, position_within_column)[0];
   }
 
 
   template <typename Number, int n_components, int simd_length>
-  DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, n_components, Number>
+  template <typename Number2>
+  DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, n_components, Number2>
   SparseMatrixSIMD<Number, n_components, simd_length>::get_tensor(
       const unsigned int row, const unsigned int position_within_column) const
   {
     Assert(sparsity != nullptr, dealii::ExcNotInitialized());
-
     AssertIndexRange(row, sparsity->row_starts.size() - 1);
     AssertIndexRange(position_within_column, sparsity->row_length(row));
 
-    dealii::Tensor<1, n_components, Number> result;
-    if (row < sparsity->n_internal_dofs) {
-      // go through vectorized part
-      const unsigned int simd_row = row / simd_length;
-      const unsigned int simd_offset = row % simd_length;
-      for (unsigned int d = 0; d < n_components; ++d)
-        result[d] = data[(sparsity->row_starts[simd_row] +
-                          position_within_column * simd_length) *
-                             n_components +
-                         d * simd_length + simd_offset];
+    dealii::Tensor<1, n_components, Number2> result;
+
+    if constexpr (std::is_same<Number, Number2>::value) {
+      /*
+       * Non-vectorized slow access. Supports all row indices in
+       * [0,n_owned)
+       */
+      if (row < sparsity->n_internal_dofs) {
+        // go through vectorized part
+        const unsigned int simd_row = row / simd_length;
+        const unsigned int simd_offset = row % simd_length;
+        for (unsigned int d = 0; d < n_components; ++d)
+          result[d] = data[(sparsity->row_starts[simd_row] +
+                            position_within_column * simd_length) *
+                               n_components +
+                           d * simd_length + simd_offset];
+      } else {
+        // go through standard part
+        for (unsigned int d = 0; d < n_components; ++d)
+          result[d] =
+              data[(sparsity->row_starts[row] + position_within_column) *
+                       n_components +
+                   d];
+      }
+
     } else {
-      // go through standard part
+
+      /*
+       * Vectorized fast access. Indices must be in the range
+       * [0,n_internal), index must be divisible by simd_length
+       */
+
+      Assert(row < sparsity->n_internal_dofs,
+             dealii::ExcMessage(
+                 "Vectorized access only possible in vectorized part"));
+      Assert(row % simd_length == 0,
+             dealii::ExcMessage(
+                 "Access only supported for rows at the SIMD granularity"));
+
+      const Number *load_pos =
+          data.data() + (sparsity->row_starts[row / simd_length] +
+                         position_within_column * simd_length) *
+                            n_components;
+
       for (unsigned int d = 0; d < n_components; ++d)
-        result[d] = data[(sparsity->row_starts[row] + position_within_column) *
-                             n_components +
-                         d];
+        result[d].load(load_pos + d * simd_length);
     }
 
-    return result;
-  }
-
-
-  template <typename Number, int n_components, int simd_length>
-  DEAL_II_ALWAYS_INLINE inline dealii::VectorizedArray<Number, simd_length>
-  SparseMatrixSIMD<Number, n_components, simd_length>::get_vectorized_entry(
-      const unsigned int row, const unsigned int position_within_column) const
-  {
-    return get_vectorized_tensor(row, position_within_column)[0];
-  }
-
-
-  template <typename Number, int n_components, int simd_length>
-  DEAL_II_ALWAYS_INLINE inline auto
-  SparseMatrixSIMD<Number, n_components, simd_length>::get_vectorized_tensor(
-      const unsigned int row, const unsigned int position_within_column) const
-      -> dealii::Tensor<1, n_components, VectorizedArray>
-  {
-    Assert(sparsity != nullptr, dealii::ExcNotInitialized());
-
-    AssertIndexRange(row, sparsity->row_starts.size() - 1);
-    AssertIndexRange(position_within_column, sparsity->row_length(row));
-    Assert(row < sparsity->n_internal_dofs,
-           dealii::ExcMessage(
-               "Vectorized access only possible in vectorized part"));
-    Assert(row % simd_length == 0,
-           dealii::ExcMessage(
-               "Access only supported for rows at the SIMD granularity"));
-
-    dealii::
-        Tensor<1, n_components, dealii::VectorizedArray<Number, simd_length>>
-            result;
-    const Number *load_pos =
-        data.data() + (sparsity->row_starts[row / simd_length] +
-                       position_within_column * simd_length) *
-                          n_components;
-    for (unsigned int d = 0; d < n_components; ++d)
-      result[d].load(load_pos + d * simd_length);
     return result;
   }
 

@@ -322,8 +322,8 @@ namespace ryujin
           const auto U_j = old_U.get_vectorized_tensor(js);
           const auto entropy_j = simd_load(evc_entropies_, js);
 
-          const auto c_ij = cij_matrix.get_vectorized_tensor(i, col_idx);
-          const auto beta_ij = betaij_matrix.get_vectorized_entry(i, col_idx);
+          const auto c_ij = cij_matrix.template get_tensor<VA>(i, col_idx);
+          const auto beta_ij = betaij_matrix.template get_entry<VA>(i, col_idx);
           indicator_simd.add(U_j, c_ij, beta_ij, entropy_j);
 
           /* Only iterate over the upper triangular portion of d_ij */
@@ -630,12 +630,12 @@ namespace ryujin
           const auto alpha_j = simd_load(alpha_, js);
           const auto variations_j = simd_load(second_variations_, js);
 
-          const auto d_ij = dij_matrix_.get_vectorized_entry(i, col_idx);
+          const auto d_ij = dij_matrix_.template get_entry<VA>(i, col_idx);
 
           const auto d_ijH = d_ij * (alpha_i + alpha_j) * Number(.5);
 
           dealii::Tensor<1, problem_dimension, VA> U_ij_bar;
-          const auto c_ij = cij_matrix.get_vectorized_tensor(i, col_idx);
+          const auto c_ij = cij_matrix.template get_tensor<VA>(i, col_idx);
           const auto d_ij_inv = Number(1.) / d_ij;
 
           for (unsigned int k = 0; k < problem_dimension; ++k) {
@@ -654,7 +654,7 @@ namespace ryujin
 
           U_i_new += tau * m_i_inv * Number(2.) * d_ij * U_ij_bar;
 
-          const auto beta_ij = betaij_matrix.get_vectorized_entry(i, col_idx);
+          const auto beta_ij = betaij_matrix.template get_entry<VA>(i, col_idx);
           const auto specific_entropy_j = simd_load(specific_entropies_, js);
 
           limiter_simd.accumulate(U_i,
@@ -850,16 +850,16 @@ namespace ryujin
             f_jHs[s] = problem_description_->f(U_jHs[s]);
           }
 
-          const auto c_ij = cij_matrix.get_vectorized_tensor(i, col_idx);
+          const auto c_ij = cij_matrix.template get_tensor<VA>(i, col_idx);
           const auto r_j = r_.get_vectorized_tensor(js);
 
           const auto alpha_j = simd_load(alpha_, js);
           const auto m_j_inv = simd_load(lumped_mass_matrix_inverse, js);
 
-          const auto d_ij = dij_matrix_.get_vectorized_entry(i, col_idx);
+          const auto d_ij = dij_matrix_.template get_entry<VA>(i, col_idx);
           const auto d_ijH =  d_ij * (alpha_i + alpha_j) * Number(.5);
 
-          const auto m_ij = mass_matrix.get_vectorized_entry(i, col_idx);
+          const auto m_ij = mass_matrix.template get_entry<VA>(i, col_idx);
           const auto b_ij = (col_idx == 0 ? VA(1.) : VA(0.)) - m_ij * m_j_inv;
           const auto b_ji = (col_idx == 0 ? VA(1.) : VA(0.)) - m_ij * m_i_inv;
 
@@ -1066,10 +1066,10 @@ namespace ryujin
           for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
 
             const auto l_ij = std::min(
-                lij_matrix_.get_vectorized_entry(i, col_idx),
+                lij_matrix_.template get_entry<VA>(i, col_idx),
                 lij_matrix_.get_vectorized_transposed_entry(i, col_idx));
 
-            auto p_ij = pij_matrix_.get_vectorized_tensor(i, col_idx);
+            auto p_ij = pij_matrix_.template get_tensor<VA>(i, col_idx);
 
             U_i_new += l_ij * lambda * p_ij;
 
@@ -1120,7 +1120,7 @@ namespace ryujin
             const auto old_l_ij = lij_row_simd[col_idx];
 
             const auto new_p_ij = (VA(1.) - old_l_ij) *
-                                  pij_matrix_.get_vectorized_tensor(i, col_idx);
+                                  pij_matrix_.template get_tensor<VA>(i, col_idx);
 
             const auto &[new_l_ij, success] = Limiter<dim, VA>::limit(
                 *problem_description_, bounds, U_i_new, new_p_ij);
