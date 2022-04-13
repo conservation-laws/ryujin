@@ -338,7 +338,7 @@ namespace ryujin
 
           const auto d = norm * lambda_max;
 
-          dij_matrix_.write_vectorized_entry(d, i, col_idx, true);
+          dij_matrix_.write_entry(d, i, col_idx, true);
         }
 
         simd_store(alpha_, indicator_simd.alpha(hd_i), i);
@@ -887,11 +887,11 @@ namespace ryujin
 
           p_ij *= factor;
 
-          pij_matrix_.write_vectorized_tensor(p_ij, i, col_idx, true);
+          pij_matrix_.write_tensor(p_ij, i, col_idx, true);
 
           const auto &[l_ij, success] = Limiter<dim, VA>::limit(
               *problem_description_, bounds, U_i_new, p_ij);
-          lij_matrix_.write_vectorized_entry(l_ij, i, col_idx, true);
+          lij_matrix_.write_entry(l_ij, i, col_idx, true);
 
           /* Unsuccessful with current CFL, force a restart. */
           if (!success)
@@ -1141,16 +1141,15 @@ namespace ryujin
                */
               const auto entry =
                   (VectorizedArray<Number>(1.) - old_l_ij) * new_l_ij;
-              lij_matrix_next_.write_vectorized_entry(entry, i, col_idx, true);
+              lij_matrix_next_.write_entry(entry, i, col_idx, true);
             } else {
               /*
                * @todo: This is expensive. If we ever end up using more
                * than two limiter passes we should implement this by
                * storing a scalar factor instead of writing back into p_ij.
                */
-              lij_matrix_next_.write_vectorized_entry(
-                  new_l_ij, i, col_idx, true);
-              pij_matrix_.write_vectorized_tensor(new_p_ij, i, col_idx);
+              lij_matrix_next_.write_entry(new_l_ij, i, col_idx, true);
+              pij_matrix_.write_tensor(new_p_ij, i, col_idx);
             }
           }
         }

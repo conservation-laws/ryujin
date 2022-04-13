@@ -196,29 +196,42 @@ namespace ryujin
 
     /* Write scalar or tensor entry: */
 
-    void write_entry(const Number entry,
+    /**
+     * Write a (scalar valued) @ref entry to the matrix indexed by @ref row
+     * and @ref position_within_column.
+     *
+     * @note If the template argument @ref Number2
+     * is a vetorized array a specialized, faster access will be performed.
+     * In this case the index @ref row must be within the interval
+     * [0, n_internal_dofs) and must be divisible by simd_length.
+     */
+    template <typename Number2 = Number>
+    void write_entry(const Number2 entry,
                      const unsigned int row,
-                     const unsigned int position_within_column);
+                     const unsigned int position_within_column,
+                     const bool do_streaming_store = false);
 
-    void write_tensor(const dealii::Tensor<1, n_components, Number> &entry,
+    /**
+     * Write a tensor-valued @ref entry to the matrix indexed by @ref row
+     * and @ref position_within_column.
+     *
+     * @note If the template argument @ref Number2
+     * is a vetorized array a specialized, faster access will be performed.
+     * In this case the index @ref row must be within the interval
+     * [0, n_internal_dofs) and must be divisible by simd_length.
+     */
+    template <typename Number2 = Number>
+    void write_tensor(const dealii::Tensor<1, n_components, Number2> &entry,
                       const unsigned int row,
-                      const unsigned int position_within_column);
-
-    void write_vectorized_entry(const VectorizedArray entry,
-                                const unsigned int row,
-                                const unsigned int position_within_column,
-                                const bool do_streaming_store = false);
-
-    void write_vectorized_tensor(
-        const dealii::Tensor<1, n_components, VectorizedArray> &entry,
-        const unsigned int row,
-        const unsigned int position_within_column,
-        const bool do_streaming_store = false);
+                      const unsigned int position_within_column,
+                      const bool do_streaming_store = false);
 
     /* Synchronize over MPI ranks: */
 
     void update_ghost_rows_start(const unsigned int communication_channel = 0);
+
     void update_ghost_rows_finish();
+
     void update_ghost_rows();
 
   private:
@@ -391,6 +404,11 @@ namespace ryujin
     dealii::Tensor<1, n_components, Number2> result;
 
     if constexpr (std::is_same<Number, Number2>::value) {
+      /*
+       * Non-vectorized slow access. Supports all row indices in
+       * [0,n_owned)
+       */
+
       if (row < sparsity->n_internal_dofs) {
         // go through vectorized part
         const unsigned int simd_row = row / simd_length;
@@ -464,93 +482,90 @@ namespace ryujin
 
 
   template <typename Number, int n_components, int simd_length>
+  template <typename Number2>
   DEAL_II_ALWAYS_INLINE inline void
   SparseMatrixSIMD<Number, n_components, simd_length>::write_entry(
-      const Number entry,
+      const Number2 entry,
       const unsigned int row,
-      const unsigned int position_within_column)
+      const unsigned int position_within_column,
+      const bool do_streaming_store)
   {
-    dealii::Tensor<1, n_components, Number> result;
+    Assert(sparsity != nullptr, dealii::ExcNotInitialized());
+    AssertIndexRange(row, sparsity->row_starts.size() - 1);
+    AssertIndexRange(position_within_column, sparsity->row_length(row));
+
+    dealii::Tensor<1, n_components, Number2> result;
     result[0] = entry;
 
-    write_tensor(result, row, position_within_column);
+    write_tensor<Number2>(
+        result, row, position_within_column, do_streaming_store);
   }
 
 
   template <typename Number, int n_components, int simd_length>
+  template <typename Number2>
   DEAL_II_ALWAYS_INLINE inline void
   SparseMatrixSIMD<Number, n_components, simd_length>::write_tensor(
-      const dealii::Tensor<1, n_components, Number> &entry,
+      const dealii::Tensor<1, n_components, Number2> &entry,
       const unsigned int row,
-      const unsigned int position_within_column)
+      const unsigned int position_within_column,
+      const bool do_streaming_store)
   {
     Assert(sparsity != nullptr, dealii::ExcNotInitialized());
-
     AssertIndexRange(row, sparsity->row_starts.size() - 1);
     AssertIndexRange(position_within_column, sparsity->row_length(row));
 
-    if (row < sparsity->n_internal_dofs) {
-      // go through vectorized part
-      const unsigned int simd_row = row / simd_length;
-      const unsigned int simd_offset = row % simd_length;
-      for (unsigned int d = 0; d < n_components; ++d)
-        data[(sparsity->row_starts[simd_row] +
-              position_within_column * simd_length) *
-                 n_components +
-             d * simd_length + simd_offset] = entry[d];
+    if constexpr (std::is_same<Number, Number2>::value) {
+      /*
+       * Non-vectorized slow access. Supports all row indices in
+       * [0,n_owned)
+       */
+
+      if (row < sparsity->n_internal_dofs) {
+        // go through vectorized part
+        const unsigned int simd_row = row / simd_length;
+        const unsigned int simd_offset = row % simd_length;
+        for (unsigned int d = 0; d < n_components; ++d)
+          data[(sparsity->row_starts[simd_row] +
+                position_within_column * simd_length) *
+                   n_components +
+               d * simd_length + simd_offset] = entry[d];
+      } else {
+        // go through standard part
+        for (unsigned int d = 0; d < n_components; ++d)
+          data[(sparsity->row_starts[row] + position_within_column) *
+                   n_components +
+               d] = entry[d];
+      }
+
+    } else if constexpr (std::is_same<VectorizedArray, Number2>::value) {
+      /*
+       * Vectorized fast access. Indices must be in the range
+       * [0,n_internal), index must be divisible by simd_length
+       */
+
+      Assert(row < sparsity->n_internal_dofs,
+             dealii::ExcMessage(
+                 "Vectorized access only possible in vectorized part"));
+      Assert(row % simd_length == 0,
+             dealii::ExcMessage(
+                 "Access only supported for rows at the SIMD granularity"));
+
+      Number *store_pos =
+          data.data() + (sparsity->row_starts[row / simd_length] +
+                         position_within_column * simd_length) *
+                            n_components;
+      if (do_streaming_store)
+        for (unsigned int d = 0; d < n_components; ++d)
+          entry[d].streaming_store(store_pos + d * simd_length);
+      else
+        for (unsigned int d = 0; d < n_components; ++d)
+          entry[d].store(store_pos + d * simd_length);
+
     } else {
-      // go through standard part
-      for (unsigned int d = 0; d < n_components; ++d)
-        data[(sparsity->row_starts[row] + position_within_column) *
-                 n_components +
-             d] = entry[d];
+      /* not implemented */
+      __builtin_trap();
     }
-  }
-
-
-  template <typename Number, int n_components, int simd_length>
-  DEAL_II_ALWAYS_INLINE inline void
-  SparseMatrixSIMD<Number, n_components, simd_length>::write_vectorized_entry(
-      const dealii::VectorizedArray<Number, simd_length> entry,
-      const unsigned int row,
-      const unsigned int position_within_column,
-      const bool do_streaming_store)
-  {
-    dealii::Tensor<1, n_components, VectorizedArray> tensor;
-    tensor[0] = entry;
-
-    write_vectorized_tensor(
-        tensor, row, position_within_column, do_streaming_store);
-  }
-
-
-  template <typename Number, int n_components, int simd_length>
-  DEAL_II_ALWAYS_INLINE inline void
-  SparseMatrixSIMD<Number, n_components, simd_length>::write_vectorized_tensor(
-      const dealii::Tensor<1, n_components, VectorizedArray> &entry,
-      const unsigned int row,
-      const unsigned int position_within_column,
-      const bool do_streaming_store)
-  {
-    Assert(sparsity != nullptr, dealii::ExcNotInitialized());
-
-    AssertIndexRange(row, sparsity->row_starts.size() - 1);
-    AssertIndexRange(position_within_column, sparsity->row_length(row));
-    Assert(row < sparsity->n_internal_dofs,
-           dealii::ExcMessage(
-               "Vectorized access only possible in vectorized part"));
-    Assert(row % simd_length == 0,
-           dealii::ExcMessage(
-               "Access only supported for rows at the SIMD granularity"));
-    Number *store_pos = data.data() + (sparsity->row_starts[row / simd_length] +
-                                       position_within_column * simd_length) *
-                                          n_components;
-    if (do_streaming_store)
-      for (unsigned int d = 0; d < n_components; ++d)
-        entry[d].streaming_store(store_pos + d * simd_length);
-    else
-      for (unsigned int d = 0; d < n_components; ++d)
-        entry[d].store(store_pos + d * simd_length);
   }
 
 
