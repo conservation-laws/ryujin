@@ -56,68 +56,15 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  void OfflineData<dim, Number>::setup()
+  void OfflineData<dim, Number>::create_constraints_and_sparsity_pattern()
   {
-#ifdef DEBUG_OUTPUT
-    std::cout << "OfflineData<dim, Number>::setup()" << std::endl;
-#endif
-
-    /* Initialize dof handler: */
-
-    if (!dof_handler_)
-      dof_handler_ = std::make_unique<dealii::DoFHandler<dim>>(
-          discretization_->triangulation());
-    auto &dof_handler = *dof_handler_;
-
-    dof_handler.distribute_dofs(discretization_->finite_element());
-
-    n_locally_owned_ = dof_handler.locally_owned_dofs().n_elements();
-
-    /*
-     * Renumbering:
-     */
-
-    /* Cuthill McKee actually helps with cache locality. */
-    DoFRenumbering::Cuthill_McKee(dof_handler);
-
-#ifdef USE_COMMUNICATION_HIDING
-    /*
-     * Reorder all export indices at the beginning of the locally_internal index
-     * range to achieve a better packging:
-     */
-    DoFRenumbering::export_indices_first(
-        dof_handler, mpi_communicator_, n_locally_owned_, 1);
-#endif
-
-    /*
-     * Group degrees of freedom that have the same stencil size in groups
-     * of multiples of the VectorizedArray<Number>::size().
-     */
-    n_locally_internal_ = DoFRenumbering::internal_range(
-        dof_handler, mpi_communicator_, VectorizedArray<Number>::size());
-
-    /*
-     * Reorder all (strides of) locally internal indices that contain
-     * export indices to the start of the index range. This reordering
-     * preserves the binning introduced by
-     * DoFRenumbering::internal_range().
-     */
-#ifdef USE_COMMUNICATION_HIDING
-    n_export_indices_ =
-        DoFRenumbering::export_indices_first(dof_handler,
-                                             mpi_communicator_,
-                                             n_locally_internal_,
-                                             VectorizedArray<Number>::size());
-#else
-    n_export_indices_ = n_locally_internal_;
-#endif
-
     /*
      * First, we set up the locally_relevant index set, determine (globally
      * indexed) affine constraints and create a (globally indexed) sparsity
      * pattern:
      */
 
+    auto &dof_handler = *dof_handler_;
     const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
 
     IndexSet locally_relevant;
@@ -195,27 +142,98 @@ namespace ryujin
 
     SparsityTools::distribute_sparsity_pattern(
         sparsity_pattern_, locally_owned, mpi_communicator_, locally_relevant);
+  }
+
+
+  template <int dim, typename Number>
+  void OfflineData<dim, Number>::setup()
+  {
+#ifdef DEBUG_OUTPUT
+    std::cout << "OfflineData<dim, Number>::setup()" << std::endl;
+#endif
 
     /*
-     * Next, we enlarge the locally relevant set to include all additional
-     * couplings:
+     * Initialize dof handler:
      */
 
-    {
-      IndexSet additional_dofs(dof_handler.n_dofs());
+    const auto &triangulation = discretization_->triangulation();
+    if (!dof_handler_)
+      dof_handler_ = std::make_unique<dealii::DoFHandler<dim>>(triangulation);
+    auto &dof_handler = *dof_handler_;
 
-      for (auto &entry : sparsity_pattern_)
-        if (!locally_relevant.is_element(entry.column())) {
-          Assert(locally_owned.is_element(entry.row()), ExcInternalError());
-          additional_dofs.add_index(entry.column());
-        }
+    dof_handler.distribute_dofs(discretization_->finite_element());
 
-      additional_dofs.compress();
-      locally_relevant.add_indices(additional_dofs);
-      locally_relevant.compress();
+    n_locally_owned_ = dof_handler.locally_owned_dofs().n_elements();
+
+    /*
+     * Renumbering:
+     */
+
+    /* Cuthill McKee actually helps with cache locality. */
+    DoFRenumbering::Cuthill_McKee(dof_handler);
+
+    /*
+     * Reorder all export indices at the beginning of the locally_internal index
+     * range to achieve a better packging:
+     */
+    DoFRenumbering::export_indices_first(
+        dof_handler, mpi_communicator_, n_locally_owned_, 1);
+
+    /*
+     * Group degrees of freedom that have the same stencil size in groups
+     * of multiples of the VectorizedArray<Number>::size().
+     *
+     * In order to determine the stencil size we have to create a first,
+     * temporary sparsity pattern:
+     */
+    create_constraints_and_sparsity_pattern();
+    n_locally_internal_ =
+        DoFRenumbering::internal_range(dof_handler,
+                                       sparsity_pattern_,
+                                       VectorizedArray<Number>::size());
+
+    /*
+     * Reorder all (strides of) locally internal indices that contain
+     * export indices to the start of the index range. This reordering
+     * preserves the binning introduced by
+     * DoFRenumbering::internal_range().
+     */
+    n_export_indices_ =
+        DoFRenumbering::export_indices_first(dof_handler,
+                                             mpi_communicator_,
+                                             n_locally_internal_,
+                                             VectorizedArray<Number>::size());
+    /*
+     * Create final sparsity pattern:
+     */
+
+    create_constraints_and_sparsity_pattern();
+    const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
+
+#ifdef DEBUG
+    /*
+     * Check that after all the dof manipulation and setup we still end up
+     * with indices in [0, locally_internal) that have uniform stencil size
+     * within a stride.
+     */
+    const auto offset = n_locally_owned_ != 0 ? *locally_owned.begin() : 0;
+    unsigned int group_row_length = 0;
+    for (unsigned int i = 0; i < n_locally_internal_; ++i) {
+      if (i % VectorizedArray<Number>::size() == 0) {
+        group_row_length = sparsity_pattern_.row_length(offset + i);
+      } else {
+        Assert(group_row_length == sparsity_pattern_.row_length(offset + i),
+               ExcInternalError());
+      }
     }
+#endif
 
-    /* Set up partitioner: */
+    /*
+     * Set up partitioner:
+     */
+
+    IndexSet locally_relevant;
+    DoFTools::extract_locally_relevant_dofs(dof_handler, locally_relevant);
 
     Assert(n_locally_owned_ == locally_owned.n_elements(),
            dealii::ExcInternalError());
@@ -230,6 +248,7 @@ namespace ryujin
         create_vector_partitioner<problem_dimension>(scalar_partitioner_);
 
 #ifdef DEBUG
+    /* Check that n_export_indices_ is valid: */
     unsigned int control = 0;
     for (const auto &it : scalar_partitioner_->import_indices())
       if (it.second <= n_locally_internal_)
@@ -237,20 +256,6 @@ namespace ryujin
 
     Assert(control <= n_export_indices_, ExcInternalError());
     Assert(n_export_indices_ <= n_locally_internal_, ExcInternalError());
-#endif
-
-
-#ifdef DEBUG
-    const auto offset = n_locally_owned_ != 0 ? *locally_owned.begin() : 0;
-    unsigned int group_row_length = 0;
-    for (unsigned int i = 0; i < n_locally_internal_; ++i) {
-      if (i % VectorizedArray<Number>::size() == 0) {
-        group_row_length = sparsity_pattern_.row_length(offset + i);
-      } else {
-        Assert(group_row_length == sparsity_pattern_.row_length(offset + i),
-               ExcInternalError());
-      }
-    }
 #endif
 
     /*
@@ -262,7 +267,9 @@ namespace ryujin
     sparsity_pattern_simd_.reinit(
         n_locally_internal_, sparsity_pattern_, scalar_partitioner_);
 
-    /* Next we can (re)initialize all local matrices: */
+    /*
+     * Next we can (re)initialize all local matrices:
+     */
 
     lumped_mass_matrix_.reinit(scalar_partitioner_);
     lumped_mass_matrix_inverse_.reinit(scalar_partitioner_);

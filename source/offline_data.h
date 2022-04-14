@@ -99,6 +99,14 @@ namespace ryujin
       create_multigrid_data();
     }
 
+  private:
+
+    /**
+     * Set up affine constraints and sparsity pattern. Internally used in
+     * setup().
+     */
+    void create_constraints_and_sparsity_pattern();
+
     /**
      * Set up DoFHandler, all IndexSet objects and the SparsityPattern.
      * Initialize matrix storage.
@@ -115,7 +123,6 @@ namespace ryujin
      */
     void create_multigrid_data();
 
-  private:
     std::unique_ptr<dealii::DoFHandler<dim>> dof_handler_;
 
     dealii::AffineConstraints<Number> affine_constraints_;
