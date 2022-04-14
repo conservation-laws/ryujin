@@ -133,8 +133,12 @@ namespace ryujin
 
     using boundary_map_type =
         std::multimap<dealii::types::global_dof_index, boundary_description>;
-
+    using coupling_boundary_pairs_type =
+        std::vector<std::tuple<dealii::types::global_dof_index,
+                               unsigned int,
+                               dealii::types::global_dof_index>>;
     boundary_map_type boundary_map_;
+    coupling_boundary_pairs_type coupling_boundary_pairs_;
 
     std::vector<boundary_map_type> level_boundary_map_;
 
@@ -244,6 +248,14 @@ namespace ryujin
      * reflective boundary conditions).
      */
     ACCESSOR_READ_ONLY(boundary_map)
+
+    /**
+     * A vector of tuples describing coupling degrees of freedom i and j
+     * where both degrees of freedom are collocated at the boundary (and
+     * hence the d_ij matrix has to be symmetrized). The function returns a
+     * reference to a vector of tuples consisting of (i, col_idx, j).
+     */
+    ACCESSOR_READ_ONLY(coupling_boundary_pairs)
 
     /**
      * The boundary map on all levels of the grid in case multilevel

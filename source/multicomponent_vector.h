@@ -151,52 +151,44 @@ namespace ryujin
     /**
      * Return a dealii::Tensor populated with the @p n_comp component
      * vector stored at index @p i.
+     *
+     * If the template parameter @tref Number2 is a VectorizedArray then
+     * the function returns a SIMD vectorized dealii::Tensor populated with
+     * entries from the @p n_comp component vectors stored at indices i,
+     * i+1, ..., i+simd_length-1.
      */
-    template <typename Tensor = dealii::Tensor<1, n_comp, Number>>
+    template <typename Number2 = Number,
+              typename Tensor = dealii::Tensor<1, n_comp, Number2>>
     Tensor get_tensor(const unsigned int i) const;
 
     /**
-     * Returns a SIMD vectorized dealii::Tensor populated with entries from
-     * the @p n_comp component vectors stored at indices i, i+1, ...,
-     * i+simd_length-1.
-     */
-    template <typename Tensor = dealii::Tensor<1, n_comp, VectorizedArray>>
-    Tensor get_vectorized_tensor(const unsigned int i) const;
-
-
-    /**
      * Variant of above function.
+     *
      * Returns a SIMD vectorized dealii::Tensor populated with entries from
      * the @p n_comp component vectors stored at indices *(js), *(js+1),
      * ..., *(js+simd_length-1), i.e., @p js has to point to an array of
      * size @p simd_length containing all indices.
      */
-    template <typename Tensor = dealii::Tensor<1, n_comp, VectorizedArray>>
-    Tensor get_vectorized_tensor(const unsigned int *js) const;
+    template <typename Number2 = Number,
+              typename Tensor = dealii::Tensor<1, n_comp, Number2>>
+    Tensor get_tensor(const unsigned int *js) const;
 
     /**
      * Update the values of the @p n_comp component vector at index @p i
      * with the values supplied by @p tensor.
      *
-     * @note @p tensor can be an arbitrary indexable container, such as
-     * dealii::Tensor or std::array, that has an `operator[]()` returning a @p
-     * Number.
-     */
-    template <typename Tensor = dealii::Tensor<1, n_comp, Number>>
-    void write_tensor(const Tensor &tensor, const unsigned int i);
-
-    /**
-     * Variant of above function taking a SIMD vectorized @p tensor as
-     * argument instead. Updates the values of the @p n_comp component
-     * vectors at indices i, i+1, ..., i+simd_length_1. with the values
-     * supplied by @p tensor.
+     * If the template parameter @tref Number2 is a VectorizedArray then
+     * the function takes a SIMD vectorized @p tensor as argument instead
+     * and updates the values of the @p n_comp component vectors at indices
+     * i, i+1, ..., i+simd_length_1. with the values supplied by @p tensor.
      *
      * @note @p tensor can be an arbitrary indexable container, such as
-     * dealii::Tensor or std::array, that has an `operator[]()` returning a
-     * VectorizedArray<Number>.
+     * dealii::Tensor or std::array, that has an `operator[]()` returning a @p
+     * Number, and has a type trait `value_type`.
      */
-    template <typename Tensor = dealii::Tensor<1, n_comp, VectorizedArray>>
-    void write_vectorized_tensor(const Tensor &tensor, const unsigned int i);
+    template <typename Number2 = Number,
+              typename Tensor = dealii::Tensor<1, n_comp, Number2>>
+    void write_tensor(const Tensor &tensor, const unsigned int i);
   };
 
 
@@ -250,77 +242,105 @@ namespace ryujin
   /* Inline function  definitions: */
 
   template <typename Number, int n_comp, int simd_length>
-  template <typename Tensor>
+  template <typename Number2, typename Tensor>
   DEAL_II_ALWAYS_INLINE inline Tensor
   MultiComponentVector<Number, n_comp, simd_length>::get_tensor(
       const unsigned int i) const
   {
+    static_assert(std::is_same<Number2, typename Tensor::value_type>::value,
+                  "dummy type mismatch");
     Tensor tensor;
-    for (unsigned int d = 0; d < n_comp; ++d)
-      tensor[d] = this->local_element(i * n_comp + d);
+
+    if constexpr (std::is_same<Number, Number2>::value) {
+      /* Non-vectorized sequential access. */
+
+      for (unsigned int d = 0; d < n_comp; ++d)
+        tensor[d] = this->local_element(i * n_comp + d);
+
+    } else if constexpr (std::is_same<VectorizedArray, Number2>::value) {
+
+      /* Vectorized fast access. index must be divisible by simd_length */
+      unsigned int indices[VectorizedArray::size()];
+      for (unsigned int k = 0; k < VectorizedArray::size(); ++k)
+        indices[k] = k * n_comp;
+
+      dealii::vectorized_load_and_transpose(
+          n_comp, this->begin() + i * n_comp, indices, &tensor[0]);
+
+    } else {
+      /* not implemented */
+      __builtin_trap();
+    }
+
     return tensor;
   }
 
 
   template <typename Number, int n_comp, int simd_length>
-  template <typename Tensor>
+  template <typename Number2, typename Tensor>
   DEAL_II_ALWAYS_INLINE inline Tensor
-  MultiComponentVector<Number, n_comp, simd_length>::get_vectorized_tensor(
-      const unsigned int i) const
-  {
-    Tensor tensor;
-    unsigned int indices[VectorizedArray::size()];
-    for (unsigned int k = 0; k < VectorizedArray::size(); ++k)
-      indices[k] = k * n_comp;
-
-    dealii::vectorized_load_and_transpose(
-        n_comp, this->begin() + i * n_comp, indices, &tensor[0]);
-
-    return tensor;
-  }
-
-
-  template <typename Number, int n_comp, int simd_length>
-  template <typename Tensor>
-  DEAL_II_ALWAYS_INLINE inline Tensor
-  MultiComponentVector<Number, n_comp, simd_length>::get_vectorized_tensor(
+  MultiComponentVector<Number, n_comp, simd_length>::get_tensor(
       const unsigned int *js) const
   {
+    static_assert(std::is_same<Number2, typename Tensor::value_type>::value,
+                  "dummy type mismatch");
     Tensor tensor;
-    unsigned int indices[VectorizedArray::size()];
-    for (unsigned int k = 0; k < VectorizedArray::size(); ++k)
-      indices[k] = js[k] * n_comp;
 
-    dealii::vectorized_load_and_transpose(
-        n_comp, this->begin(), indices, &tensor[0]);
+
+    if constexpr (std::is_same<Number, Number2>::value) {
+      /* Non-vectorized sequential access. */
+
+      for (unsigned int d = 0; d < n_comp; ++d)
+        tensor[d] = this->local_element(js[0] * n_comp + d);
+
+    } else if constexpr (std::is_same<VectorizedArray, Number2>::value) {
+      /* Vectorized fast access. index must be divisible by simd_length */
+
+      unsigned int indices[VectorizedArray::size()];
+      for (unsigned int k = 0; k < VectorizedArray::size(); ++k)
+        indices[k] = js[k] * n_comp;
+
+      dealii::vectorized_load_and_transpose(
+          n_comp, this->begin(), indices, &tensor[0]);
+
+    } else {
+      /* not implemented */
+      __builtin_trap();
+    }
 
     return tensor;
   }
 
 
   template <typename Number, int n_comp, int simd_length>
-  template <typename Tensor>
+  template <typename Number2, typename Tensor>
   DEAL_II_ALWAYS_INLINE inline void
   MultiComponentVector<Number, n_comp, simd_length>::write_tensor(
       const Tensor &tensor, const unsigned int i)
   {
-    for (unsigned int d = 0; d < n_comp; ++d)
-      this->local_element(i * n_comp + d) = tensor[d];
-  }
+    static_assert(std::is_same<Number2, typename Tensor::value_type>::value,
+                  "dummy type mismatch");
 
+    if constexpr (std::is_same<Number, Number2>::value) {
+      /* Non-vectorized sequential access. */
 
-  template <typename Number, int n_comp, int simd_length>
-  template <typename Tensor>
-  DEAL_II_ALWAYS_INLINE inline void
-  MultiComponentVector<Number, n_comp, simd_length>::write_vectorized_tensor(
-      const Tensor &tensor, const unsigned int i)
-  {
-    unsigned int indices[VectorizedArray::size()];
-    for (unsigned int k = 0; k < VectorizedArray::size(); ++k)
-      indices[k] = k * n_comp;
+      for (unsigned int d = 0; d < n_comp; ++d)
+        this->local_element(i * n_comp + d) = tensor[d];
 
-    dealii::vectorized_transpose_and_store(
-        false, n_comp, &tensor[0], indices, this->begin() + i * n_comp);
+    } else if constexpr (std::is_same<VectorizedArray, Number2>::value) {
+      /* Vectorized fast access. index must be divisible by simd_length */
+
+      unsigned int indices[VectorizedArray::size()];
+      for (unsigned int k = 0; k < VectorizedArray::size(); ++k)
+        indices[k] = k * n_comp;
+
+      dealii::vectorized_transpose_and_store(
+          false, n_comp, &tensor[0], indices, this->begin() + i * n_comp);
+
+    } else {
+      /* not implemented */
+      __builtin_trap();
+    }
   }
 #endif
 

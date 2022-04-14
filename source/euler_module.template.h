@@ -47,7 +47,6 @@ namespace ryujin
                   cfl_with_boundary_dofs_,
                   "Use also the local wave-speed estimate d_ij of boundary "
                   "dofs when computing the maximal admissible step size");
-
   }
 
 
@@ -80,6 +79,49 @@ namespace ryujin
     lij_matrix_next_.reinit(sparsity_simd);
     pij_matrix_.reinit(sparsity_simd);
   }
+
+
+  namespace
+  {
+    /**
+     * Internally used: returns true if all indices are on the lower
+     * triangular.
+     */
+    template <typename T>
+    bool all_below_diagonal(unsigned int i, const unsigned int *js)
+    {
+      if constexpr (std::is_same<T, typename get_value_type<T>::type>::value) {
+        /* Non-vectorized sequential access. */
+        const auto j = *js;
+        return j < i;
+
+      } else {
+        /* Vectorized fast access. index must be divisible by simd_length */
+
+        constexpr auto simd_length = T::size();
+
+        bool all_below_diagonal = true;
+        for (unsigned int k = 0; k < simd_length; ++k)
+          if (js[k] >= i + k) {
+            all_below_diagonal = false;
+            break;
+          }
+        return all_below_diagonal;
+      }
+    }
+
+    /**
+     * Return the stride size:
+     */
+
+    template <typename Number>
+    unsigned int get_stride_size = 1;
+
+    template <typename Number>
+    unsigned int get_stride_size<VectorizedArray<Number>> =
+        VectorizedArray<Number>::size();
+
+  } // namespace
 
 
   template <int dim, typename Number>
@@ -119,6 +161,9 @@ namespace ryujin
     const auto &cij_matrix = offline_data_->cij_matrix();
 
     const auto &boundary_map = offline_data_->boundary_map();
+    const auto &coupling_boundary_pairs =
+        offline_data_->coupling_boundary_pairs();
+
     const Number measure_of_omega_inverse =
         Number(1.) / offline_data_->measure_of_omega();
 
@@ -141,19 +186,20 @@ namespace ryujin
 
       RYUJIN_OMP_FOR
       for (unsigned int i = 0; i < size_regular; i += simd_length) {
-        const auto U_i = old_U.get_vectorized_tensor(i);
-        simd_store(specific_entropies_,
-                   problem_description_->specific_entropy(U_i),
-                   i);
+        const auto U_i = old_U.template get_tensor<VA>(i);
+        store_value<VA>(specific_entropies_,
+                        problem_description_->specific_entropy(U_i),
+                        i);
 
         const auto evc_entropy =
             Indicator<dim, double>::evc_entropy_ ==
                     Indicator<dim, double>::Entropy::mathematical
                 ? problem_description_->mathematical_entropy(U_i)
                 : problem_description_->harten_entropy(U_i);
-        simd_store(evc_entropies_, evc_entropy, i);
+        store_value<VA>(evc_entropies_, evc_entropy, i);
       }
 
+      RYUJIN_OMP_FOR
       for (unsigned int i = size_regular; i < n_relevant; ++i) {
         const auto U_i = old_U.get_tensor(i);
 
@@ -207,134 +253,71 @@ namespace ryujin
       RYUJIN_PARALLEL_REGION_BEGIN
       LIKWID_MARKER_START("time_step_1");
 
-      /* Stored thread locally: */
-      RiemannSolver<dim, Number> riemann_solver_serial(*problem_description_);
-      Indicator<dim, Number> indicator_serial(*problem_description_);
+      auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
+        using T = decltype(sentinel);
+        unsigned int stride_size = get_stride_size<T>;
 
-      /* Parallel non-vectorized loop: */
-      RYUJIN_OMP_FOR_NOWAIT
-      for (unsigned int i = n_internal; i < n_owned; ++i) {
+        /* Stored thread locally: */
+        RiemannSolver<dim, T> riemann_solver(*problem_description_);
+        Indicator<dim, T> indicator(*problem_description_);
+        bool thread_ready = false;
 
-        const unsigned int row_length = sparsity_simd.row_length(i);
+        RYUJIN_OMP_FOR_NOWAIT
+        for (unsigned int i = left; i < right; i += stride_size) {
 
-        /* Skip constrained degrees of freedom: */
-        if (row_length == 1) {
-          continue;
-        }
-
-        const auto U_i = old_U.get_tensor(i);
-        const Number mass = lumped_mass_matrix.local_element(i);
-        const Number hd_i = mass * measure_of_omega_inverse;
-
-        indicator_serial.reset(U_i, evc_entropies_.local_element(i));
-
-        /* Skip diagonal. */
-        const unsigned int *js = sparsity_simd.columns(i);
-        for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
-          const unsigned int j = js[col_idx];
-
-          const auto U_j = old_U.get_tensor(j);
-
-          const auto c_ij = cij_matrix.get_tensor(i, col_idx);
-          const auto beta_ij = betaij_matrix.get_entry(i, col_idx);
-          indicator_serial.add(
-              U_j, c_ij, beta_ij, evc_entropies_.local_element(j));
-
-          /* Only iterate over the upper triangular portion of d_ij */
-          if (j <= i)
+          /* Skip constrained degrees of freedom: */
+          const unsigned int row_length = sparsity_simd.row_length(i);
+          if (row_length == 1)
             continue;
 
-          const auto norm = c_ij.norm();
-          const auto n_ij = c_ij / norm;
+          synchronization_dispatch.check(
+              thread_ready, i >= n_export_indices && i < n_internal);
 
-          const auto [lambda_max, p_star, n_iterations] =
-              riemann_solver_serial.compute(U_i, U_j, n_ij);
+          const auto U_i = old_U.template get_tensor<T>(i);
+          const auto entropy_i = load_value<T>(evc_entropies_, i);
 
-          Number d = norm * lambda_max;
+          indicator.reset(U_i, entropy_i);
 
-          /*
-           * In case both dofs are located at the boundary we have to
-           * symmetrize.
-           */
+          const auto mass = load_value<T>(lumped_mass_matrix, i);
+          const auto hd_i = mass * measure_of_omega_inverse;
 
-          if (boundary_map.count(i) != 0 && boundary_map.count(j) != 0) {
+          /* Skip diagonal. */
+          const unsigned int *js = sparsity_simd.columns(i) + stride_size;
+          for (unsigned int col_idx = 1; col_idx < row_length;
+               ++col_idx, js += stride_size) {
 
-            const auto c_ji = cij_matrix.get_transposed_tensor(i, col_idx);
-            Assert(c_ji.norm() > 1.e-12, ExcInternalError());
-            const auto norm_2 = c_ji.norm();
-            const auto n_ji = c_ji / norm_2;
+            const auto U_j = old_U.template get_tensor<T>(js);
+            const auto entropy_j = load_value<T>(evc_entropies_, js);
 
-            auto [lambda_max_2, p_star_2, n_iterations_2] =
-                riemann_solver_serial.compute(U_j, U_i, n_ji);
-            d = std::max(d, norm_2 * lambda_max_2);
+            const auto c_ij = cij_matrix.template get_tensor<T>(i, col_idx);
+            const auto beta_ij =
+                betaij_matrix.template get_entry<T>(i, col_idx);
+            indicator.add(U_j, c_ij, beta_ij, entropy_j);
+
+            /* Only iterate over the upper triangular portion of d_ij */
+            if (all_below_diagonal<T>(i, js))
+              continue;
+
+            const auto norm = c_ij.norm();
+            const auto n_ij = c_ij / norm;
+
+            const auto [lambda_max, p_star, n_iterations] =
+                riemann_solver.compute(U_i, U_j, n_ij);
+
+            const auto d = norm * lambda_max;
+
+            dij_matrix_.write_entry(d, i, col_idx, true);
           }
 
-          dij_matrix_.write_entry(d, i, col_idx);
+          store_value<T>(alpha_, indicator.alpha(hd_i), i);
+          store_value<T>(second_variations_, indicator.second_variations(), i);
         }
+      };
 
-        alpha_.local_element(i) = indicator_serial.alpha(hd_i);
-        second_variations_.local_element(i) =
-            indicator_serial.second_variations();
-      } /* parallel non-vectorized loop */
-
-      /* Stored thread locally: */
-      RiemannSolver<dim, VA> riemann_solver_simd(*problem_description_);
-      Indicator<dim, VA> indicator_simd(*problem_description_);
-      bool thread_ready = false;
-
-      /* Parallel SIMD loop: */
-      RYUJIN_OMP_FOR
-      for (unsigned int i = 0; i < n_internal; i += simd_length) {
-
-        synchronization_dispatch.check(thread_ready, i >= n_export_indices);
-
-        const auto U_i = old_U.get_vectorized_tensor(i);
-        const auto entropy_i = simd_load(evc_entropies_, i);
-
-        indicator_simd.reset(U_i, entropy_i);
-
-        const auto mass = simd_load(lumped_mass_matrix, i);
-        const auto hd_i = mass * measure_of_omega_inverse;
-
-        const unsigned int row_length = sparsity_simd.row_length(i);
-
-        /* Skip diagonal. */
-        const unsigned int *js = sparsity_simd.columns(i) + simd_length;
-        for (unsigned int col_idx = 1; col_idx < row_length;
-             ++col_idx, js += simd_length) {
-
-          bool all_below_diagonal = true;
-          for (unsigned int k = 0; k < simd_length; ++k)
-            if (js[k] >= i + k) {
-              all_below_diagonal = false;
-              break;
-            }
-
-          const auto U_j = old_U.get_vectorized_tensor(js);
-          const auto entropy_j = simd_load(evc_entropies_, js);
-
-          const auto c_ij = cij_matrix.get_vectorized_tensor(i, col_idx);
-          const auto beta_ij = betaij_matrix.get_vectorized_entry(i, col_idx);
-          indicator_simd.add(U_j, c_ij, beta_ij, entropy_j);
-
-          /* Only iterate over the upper triangular portion of d_ij */
-          if (all_below_diagonal)
-            continue;
-
-          const auto norm = c_ij.norm();
-          const auto n_ij = c_ij / norm;
-
-          const auto [lambda_max, p_star, n_iterations] =
-              riemann_solver_simd.compute(U_i, U_j, n_ij);
-
-          const auto d = norm * lambda_max;
-
-          dij_matrix_.write_vectorized_entry(d, i, col_idx, true);
-        }
-
-        simd_store(alpha_, indicator_simd.alpha(hd_i), i);
-        simd_store(second_variations_, indicator_simd.second_variations(), i);
-      } /* parallel SIMD loop */
+      /* Parallel non-vectorized loop: */
+      loop(Number(), n_internal, n_owned);
+      /* Parallel vectorized SIMD loop: */
+      loop(VA(), 0, n_internal);
 
       LIKWID_MARKER_STOP("time_step_1");
       RYUJIN_PARALLEL_REGION_END
@@ -347,28 +330,50 @@ namespace ryujin
     std::atomic<Number> tau_max{std::numeric_limits<Number>::infinity()};
 
     {
-      Scope scope(computing_timer_,
-                  "time step [E] 2 - compute d_ii, and tau_max");
+      Scope scope(
+          computing_timer_,
+          "time step [E] 2 - compute bdry d_ij, diag d_ii, and tau_max");
 
       /* Parallel region */
       RYUJIN_PARALLEL_REGION_BEGIN
       LIKWID_MARKER_START("time_step_2");
 
-      /* Parallel non-vectorized loop: */
-      RYUJIN_OMP_FOR
+      /* Complete d_ij at boundary: */
+
+      RiemannSolver<dim> riemann_solver(*problem_description_);
+
+      RYUJIN_OMP_FOR /* with barrier */
+      for (std::size_t k = 0; k < coupling_boundary_pairs.size(); ++k) {
+        const auto &entry = coupling_boundary_pairs[k];
+        const auto &[i, col_idx, j] = entry;
+        const auto U_i = old_U.get_tensor(i);
+        const auto U_j = old_U.get_tensor(j);
+        const auto c_ji = cij_matrix.get_transposed_tensor(i, col_idx);
+        Assert(c_ji.norm() > 1.e-12, ExcInternalError());
+        const auto norm = c_ji.norm();
+        const auto n_ji = c_ji / norm;
+        auto [lambda_max_2, p_star_2, n_iterations_2] =
+            riemann_solver.compute(U_j, U_i, n_ji);
+
+        auto d = dij_matrix_.get_entry(i, col_idx);
+        d = std::max(d, norm * lambda_max_2);
+        dij_matrix_.write_entry(d, i, col_idx);
+      }
+
+      /* Symmetrize d_ij: */
+
+      RYUJIN_OMP_FOR /* with barrier */
       for (unsigned int i = 0; i < n_owned; ++i) {
 
-        const unsigned int row_length = sparsity_simd.row_length(i);
-
         /* Skip constrained degrees of freedom: */
+        const unsigned int row_length = sparsity_simd.row_length(i);
         if (row_length == 1)
           continue;
 
         Number d_sum = Number(0.);
 
-        const unsigned int *js = sparsity_simd.columns(i);
-
         /* skip diagonal: */
+        const unsigned int *js = sparsity_simd.columns(i);
         for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
           const auto j =
               *(i < n_internal ? js + col_idx * simd_length : js + col_idx);
@@ -394,7 +399,7 @@ namespace ryujin
                  !tau_max.compare_exchange_weak(current_tau_max, tau))
             ;
         }
-      } /* parallel non-vectorized loop */
+      }
 
       LIKWID_MARKER_STOP("time_step_2");
       RYUJIN_PARALLEL_REGION_END
@@ -438,7 +443,7 @@ namespace ryujin
                   "time step [E] 3 - l.-o. update, bounds, and r_i");
 
       SynchronizationDispatch synchronization_dispatch([&]() {
-        if (RYUJIN_LIKELY(limiter_iter_ != 0))
+        if (limiter_iter_ != 0)
           r_.update_ghost_values_start(channel++);
       });
 
@@ -449,197 +454,114 @@ namespace ryujin
       RYUJIN_PARALLEL_REGION_BEGIN
       LIKWID_MARKER_START("time_step_3");
 
-      /* Nota bene: This bounds variable is thread local: */
-      Limiter<dim, Number> limiter_serial(*problem_description_);
+      auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
+        using T = decltype(sentinel);
+        unsigned int stride_size = get_stride_size<T>;
+
+        /* Stored thread locally: */
+        Limiter<dim, T> limiter(*problem_description_);
+        bool thread_ready = false;
+
+        RYUJIN_OMP_FOR_NOWAIT
+        for (unsigned int i = left; i < right; i += stride_size) {
+
+          /* Skip constrained degrees of freedom: */
+          const unsigned int row_length = sparsity_simd.row_length(i);
+          if (row_length == 1)
+            continue;
+
+          synchronization_dispatch.check(
+              thread_ready, i >= n_export_indices && i < n_internal);
+
+          const auto U_i = old_U.template get_tensor<T>(i);
+          const auto f_i = problem_description_->f(U_i);
+
+          std::array<ProblemDescription::state_type<dim, T>, stages> U_iHs;
+          std::array<ProblemDescription::flux_type<dim, T>, stages> f_iHs;
+          for (int s = 0; s < stages; ++s) {
+            U_iHs[s] = stage_U[s].get().template get_tensor<T>(i);
+            f_iHs[s] = problem_description_->f(U_iHs[s]);
+          }
+
+          auto U_i_new = U_i;
+          const auto alpha_i = load_value<T>(alpha_, i);
+          const auto specific_entropy_i = load_value<T>(specific_entropies_, i);
+          const auto variations_i = load_value<T>(second_variations_, i);
+
+          const auto m_i = load_value<T>(lumped_mass_matrix, i);
+          const auto m_i_inv = load_value<T>(lumped_mass_matrix_inverse, i);
+
+          ProblemDescription::state_type<dim, T> r_i;
+
+          /* Clear bounds: */
+          limiter.reset(specific_entropy_i, variations_i);
+
+          const unsigned int *js = sparsity_simd.columns(i);
+          for (unsigned int col_idx = 0; col_idx < row_length;
+               ++col_idx, js += stride_size) {
+
+            const auto U_j = old_U.template get_tensor<T>(js);
+            const auto f_j = problem_description_->f(U_j);
+
+            std::array<ProblemDescription::state_type<dim, T>, stages> U_jHs;
+            std::array<ProblemDescription::flux_type<dim, T>, stages> f_jHs;
+            for (int s = 0; s < stages; ++s) {
+              U_jHs[s] = stage_U[s].get().template get_tensor<T>(js);
+              f_jHs[s] = problem_description_->f(U_jHs[s]);
+            }
+
+            const auto alpha_j = load_value<T>(alpha_, js);
+            const auto variations_j = load_value<T>(second_variations_, js);
+
+            const auto d_ij = dij_matrix_.template get_entry<T>(i, col_idx);
+            const auto d_ijH = d_ij * (alpha_i + alpha_j) * Number(.5);
+
+            dealii::Tensor<1, problem_dimension, T> U_ij_bar;
+            const auto c_ij = cij_matrix.template get_tensor<T>(i, col_idx);
+            const auto d_ij_inv = Number(1.) / d_ij;
+
+            for (unsigned int k = 0; k < problem_dimension; ++k) {
+              const auto temp = (f_j[k] - f_i[k]) * c_ij;
+              r_i[k] += weight * (-temp) + d_ijH * (U_j[k] - U_i[k]);
+              U_ij_bar[k] = Number(0.5) * (U_i[k] + U_j[k] - temp * d_ij_inv);
+            }
+
+            for (int s = 0; s < stages; ++s) {
+              for (unsigned int k = 0; k < problem_dimension; ++k) {
+                const auto temp = (f_jHs[s][k] - f_iHs[s][k]) * c_ij;
+                r_i[k] += stage_weights[s] * (-temp);
+              }
+            }
+
+            U_i_new += tau * m_i_inv * Number(2.) * d_ij * U_ij_bar;
+
+            const auto beta_ij =
+                betaij_matrix.template get_entry<T>(i, col_idx);
+            const auto specific_entropy_j =
+                load_value<T>(specific_entropies_, js);
+
+            limiter.accumulate(U_i,
+                               U_j,
+                               U_ij_bar,
+                               beta_ij,
+                               specific_entropy_j,
+                               variations_j,
+                               /* is diagonal */ col_idx == 0);
+          }
+
+          new_U.template write_tensor<T>(U_i_new, i);
+          r_.template write_tensor<T>(r_i, i);
+
+          const auto hd_i = m_i * measure_of_omega_inverse;
+          limiter.apply_relaxation(hd_i);
+          bounds_.template write_tensor<T>(limiter.bounds(), i);
+        }
+      };
 
       /* Parallel non-vectorized loop: */
-      RYUJIN_OMP_FOR_NOWAIT
-      for (unsigned int i = n_internal; i < n_owned; ++i) {
-
-        /* Skip constrained degrees of freedom: */
-        const unsigned int row_length = sparsity_simd.row_length(i);
-        if (row_length == 1)
-          continue;
-
-        const auto U_i = old_U.get_tensor(i);
-        const auto f_i = problem_description_->f(U_i);
-
-        std::array<state_type, stages> U_iHs;
-        std::array<flux_type, stages> f_iHs;
-        for (int s = 0; s < stages; ++s) {
-          U_iHs[s] = stage_U[s].get().get_tensor(i);
-          f_iHs[s] = problem_description_->f(U_iHs[s]);
-        }
-
-        auto U_i_new = U_i;
-        const auto alpha_i = alpha_.local_element(i);
-        const auto variations_i = second_variations_.local_element(i);
-
-        const Number m_i = lumped_mass_matrix.local_element(i);
-        const Number m_i_inv = lumped_mass_matrix_inverse.local_element(i);
-
-        state_type r_i;
-
-        /* Clear bounds: */
-        limiter_serial.reset(specific_entropies_.local_element(i),
-                             variations_i);
-
-        const unsigned int *js = sparsity_simd.columns(i);
-        for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
-          const auto j = js[col_idx];
-
-          const auto U_j = old_U.get_tensor(j);
-          const auto f_j = problem_description_->f(U_j);
-
-          std::array<state_type, stages> U_jHs;
-          std::array<flux_type, stages> f_jHs;
-          for (int s = 0; s < stages; ++s) {
-            U_jHs[s] = stage_U[s].get().get_tensor(j);
-            f_jHs[s] = problem_description_->f(U_jHs[s]);
-          }
-
-          const auto alpha_j = alpha_.local_element(j);
-          const auto variations_j = second_variations_.local_element(j);
-
-          const auto d_ij = dij_matrix_.get_entry(i, col_idx);
-          const Number d_ij_inv = Number(1.) / d_ij;
-
-          const auto d_ijH = d_ij * (alpha_i + alpha_j) * Number(.5);
-
-          dealii::Tensor<1, problem_dimension, Number> U_ij_bar;
-          const auto c_ij = cij_matrix.get_tensor(i, col_idx);
-
-          for (unsigned int k = 0; k < problem_dimension; ++k) {
-            const auto temp = (f_j[k] - f_i[k]) * c_ij;
-            r_i[k] += weight * (-temp) + d_ijH * (U_j[k] - U_i[k]);
-            U_ij_bar[k] =
-                Number(0.5) * (U_i[k] + U_j[k]) - Number(0.5) * temp * d_ij_inv;
-          }
-
-          for (int s = 0; s < stages; ++s) {
-            for (unsigned int k = 0; k < problem_dimension; ++k) {
-              const auto temp = (f_jHs[s][k] - f_iHs[s][k]) * c_ij;
-              r_i[k] += stage_weights[s] * (-temp);
-            }
-          }
-
-          U_i_new += tau * m_i_inv * Number(2.) * d_ij * U_ij_bar;
-
-          const auto beta_ij = betaij_matrix.get_entry(i, col_idx);
-
-          limiter_serial.accumulate(U_i,
-                                    U_j,
-                                    U_ij_bar,
-                                    beta_ij,
-                                    specific_entropies_.local_element(j),
-                                    variations_j,
-                                    /* is diagonal */ col_idx == 0);
-        }
-
-        new_U.write_tensor(U_i_new, i);
-        r_.write_tensor(r_i, i);
-
-        const Number hd_i = m_i * measure_of_omega_inverse;
-        limiter_serial.apply_relaxation(hd_i);
-        bounds_.write_tensor(limiter_serial.bounds(), i);
-      } /* parallel non-vectorized loop */
-
-      /* Nota bene: This bounds variable is thread local: */
-      Limiter<dim, VA> limiter_simd(*problem_description_);
-      bool thread_ready = false;
-
-      /* Parallel SIMD loop: */
-
-      RYUJIN_OMP_FOR
-      for (unsigned int i = 0; i < n_internal; i += simd_length) {
-
-        synchronization_dispatch.check(thread_ready, i >= n_export_indices);
-
-        const auto U_i = old_U.get_vectorized_tensor(i);
-        const auto f_i = problem_description_->f(U_i);
-
-        std::array<ProblemDescription::state_type<dim, VA>, stages> U_iHs;
-        std::array<ProblemDescription::flux_type<dim, VA>, stages> f_iHs;
-        for (int s = 0; s < stages; ++s) {
-          U_iHs[s] = stage_U[s].get().get_vectorized_tensor(i);
-          f_iHs[s] = problem_description_->f(U_iHs[s]);
-        }
-
-        auto U_i_new = U_i;
-        const auto alpha_i = simd_load(alpha_, i);
-        const auto specific_entropy_i = simd_load(specific_entropies_, i);
-        const auto variations_i = simd_load(second_variations_, i);
-
-        const auto m_i = simd_load(lumped_mass_matrix, i);
-        const auto m_i_inv = simd_load(lumped_mass_matrix_inverse, i);
-
-        ProblemDescription::state_type<dim, VA> r_i;
-
-        /* Clear bounds: */
-        limiter_simd.reset(specific_entropy_i, variations_i);
-
-        const unsigned int *js = sparsity_simd.columns(i);
-        const unsigned int row_length = sparsity_simd.row_length(i);
-
-        for (unsigned int col_idx = 0; col_idx < row_length;
-             ++col_idx, js += simd_length) {
-
-          const auto U_j = old_U.get_vectorized_tensor(js);
-          const auto f_j = problem_description_->f(U_j);
-
-          std::array<ProblemDescription::state_type<dim, VA>, stages> U_jHs;
-          std::array<ProblemDescription::flux_type<dim, VA>, stages> f_jHs;
-          for (int s = 0; s < stages; ++s) {
-            U_jHs[s] = stage_U[s].get().get_vectorized_tensor(js);
-            f_jHs[s] = problem_description_->f(U_jHs[s]);
-          }
-
-          const auto alpha_j = simd_load(alpha_, js);
-          const auto variations_j = simd_load(second_variations_, js);
-
-          const auto d_ij = dij_matrix_.get_vectorized_entry(i, col_idx);
-
-          const auto d_ijH = d_ij * (alpha_i + alpha_j) * Number(.5);
-
-          dealii::Tensor<1, problem_dimension, VA> U_ij_bar;
-          const auto c_ij = cij_matrix.get_vectorized_tensor(i, col_idx);
-          const auto d_ij_inv = Number(1.) / d_ij;
-
-          for (unsigned int k = 0; k < problem_dimension; ++k) {
-            const auto temp = (f_j[k] - f_i[k]) * c_ij;
-
-            r_i[k] += weight * (-temp) + d_ijH * (U_j[k] - U_i[k]);
-            U_ij_bar[k] = Number(0.5) * (U_i[k] + U_j[k] - temp * d_ij_inv);
-          }
-
-          for (int s = 0; s < stages; ++s) {
-            for (unsigned int k = 0; k < problem_dimension; ++k) {
-              const auto temp = (f_jHs[s][k] - f_iHs[s][k]) * c_ij;
-              r_i[k] += stage_weights[s] * (-temp);
-            }
-          }
-
-          U_i_new += tau * m_i_inv * Number(2.) * d_ij * U_ij_bar;
-
-          const auto beta_ij = betaij_matrix.get_vectorized_entry(i, col_idx);
-          const auto specific_entropy_j = simd_load(specific_entropies_, js);
-
-          limiter_simd.accumulate(U_i,
-                                  U_j,
-                                  U_ij_bar,
-                                  beta_ij,
-                                  specific_entropy_j,
-                                  variations_j,
-                                  /* is diagonal */ col_idx == 0);
-        }
-
-        new_U.write_vectorized_tensor(U_i_new, i);
-        r_.write_vectorized_tensor(r_i, i);
-
-        const auto hd_i = m_i * measure_of_omega_inverse;
-        limiter_simd.apply_relaxation(hd_i);
-        bounds_.write_vectorized_tensor(limiter_simd.bounds(), i);
-      } /* parallel SIMD loop */
+      loop(Number(), n_internal, n_owned);
+      /* Parallel vectorized SIMD loop: */
+      loop(VA(), 0, n_internal);
 
       LIKWID_MARKER_STOP("time_step_3");
       RYUJIN_PARALLEL_REGION_END
@@ -653,7 +575,7 @@ namespace ryujin
                   "time step [E] 3 - l.-o. update, bounds, and r_i");
 #endif
 
-      if (RYUJIN_LIKELY(limiter_iter_ != 0))
+      if (limiter_iter_ != 0)
         r_.update_ghost_values_finish();
     }
 
@@ -664,7 +586,7 @@ namespace ryujin
      *                                (b_ij R_j - b_ji R_i) )
      */
 
-    if (RYUJIN_LIKELY(limiter_iter_ != 0)) {
+    if (limiter_iter_ != 0) {
       Scope scope(computing_timer_, "time step [E] 4 - compute p_ij, and l_ij");
 
       SynchronizationDispatch synchronization_dispatch(
@@ -676,201 +598,117 @@ namespace ryujin
       RYUJIN_PARALLEL_REGION_BEGIN
       LIKWID_MARKER_START("time_step_4");
 
+      auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
+        using T = decltype(sentinel);
+        unsigned int stride_size = get_stride_size<T>;
+
+        /* Stored thread locally: */
+        bool thread_ready = false;
+
+        RYUJIN_OMP_FOR_NOWAIT
+        for (unsigned int i = left; i < right; i += stride_size) {
+
+          /* Skip constrained degrees of freedom: */
+          const unsigned int row_length = sparsity_simd.row_length(i);
+          if (row_length == 1)
+            continue;
+
+          synchronization_dispatch.check(
+              thread_ready, i >= n_export_indices && i < n_internal);
+
+          const auto bounds =
+              bounds_.template get_tensor<T, std::array<T, 3>>(i);
+
+          const auto m_i_inv = load_value<T>(lumped_mass_matrix_inverse, i);
+
+          const auto U_i_new = new_U.template get_tensor<T>(i);
+          const auto U_i = old_U.template get_tensor<T>(i);
+          const auto f_i = problem_description_->f(U_i);
+
+          std::array<ProblemDescription::state_type<dim, T>, stages> U_iHs;
+          std::array<ProblemDescription::flux_type<dim, T>, stages> f_iHs;
+          for (int s = 0; s < stages; ++s) {
+            U_iHs[s] = stage_U[s].get().template get_tensor<T>(i);
+            f_iHs[s] = problem_description_->f(U_iHs[s]);
+          }
+
+          const auto r_i = r_.template get_tensor<T>(i);
+          const auto alpha_i = load_value<T>(alpha_, i);
+          const auto lambda_inv = Number(row_length - 1);
+          const auto factor = tau * m_i_inv * lambda_inv;
+
+          const unsigned int *js = sparsity_simd.columns(i);
+          for (unsigned int col_idx = 0; col_idx < row_length;
+               ++col_idx, js += stride_size) {
+
+            const auto U_j = old_U.template get_tensor<T>(js);
+
+            std::array<ProblemDescription::state_type<dim, T>, stages> U_jHs;
+            std::array<ProblemDescription::flux_type<dim, T>, stages> f_jHs;
+            for (int s = 0; s < stages; ++s) {
+              U_jHs[s] = stage_U[s].get().template get_tensor<T>(js);
+              f_jHs[s] = problem_description_->f(U_jHs[s]);
+            }
+
+            const auto c_ij = cij_matrix.template get_tensor<T>(i, col_idx);
+            const auto r_j = r_.template get_tensor<T>(js);
+
+            const auto alpha_j = load_value<T>(alpha_, js);
+            const auto m_j_inv = load_value<T>(lumped_mass_matrix_inverse, js);
+
+            const auto d_ij = dij_matrix_.template get_entry<T>(i, col_idx);
+            const auto d_ijH = d_ij * (alpha_i + alpha_j) * Number(.5);
+
+            const auto m_ij = mass_matrix.template get_entry<T>(i, col_idx);
+            const auto b_ij = (col_idx == 0 ? T(1.) : T(0.)) - m_ij * m_j_inv;
+            const auto b_ji = (col_idx == 0 ? T(1.) : T(0.)) - m_ij * m_i_inv;
+
+            /* Contributions from graph viscosity and mass matrix correction: */
+
+            auto p_ij = (d_ijH - d_ij) * (U_j - U_i) + b_ij * r_j - b_ji * r_i;
+
+            if constexpr (stages != 0) {
+              /* Flux contributions: */
+
+              const auto f_j = problem_description_->f(U_j);
+
+              for (unsigned int k = 0; k < problem_dimension; ++k) {
+                const auto temp = (f_j[k] - f_i[k]) * c_ij;
+                p_ij[k] += (weight - Number(1.)) * (-temp);
+              }
+
+              for (int s = 0; s < stages; ++s) {
+                for (unsigned int k = 0; k < problem_dimension; ++k) {
+                  const auto temp = (f_jHs[s][k] - f_iHs[s][k]) * c_ij;
+                  p_ij[k] += stage_weights[s] * (-temp);
+                }
+              }
+            }
+
+            p_ij *= factor;
+            pij_matrix_.write_tensor(p_ij, i, col_idx, true);
+
+            const auto &[l_ij, success] = Limiter<dim, T>::limit(
+                *problem_description_, bounds, U_i_new, p_ij);
+            lij_matrix_.template write_entry<T>(l_ij, i, col_idx, true);
+
+            /* Unsuccessful with current CFL, force a restart. */
+            if (!success)
+              restart_needed = true;
+          }
+        }
+      };
+
       /* Parallel non-vectorized loop: */
-
-      RYUJIN_OMP_FOR_NOWAIT
-      for (unsigned int i = n_internal; i < n_owned; ++i) {
-
-        /* Skip constrained degrees of freedom: */
-        const unsigned int row_length = sparsity_simd.row_length(i);
-        if (row_length == 1)
-          continue;
-
-        const auto bounds =
-            bounds_.template get_tensor<std::array<Number, 3>>(i);
-
-        const auto U_i_new = new_U.get_tensor(i);
-        const auto U_i = old_U.get_tensor(i);
-        const auto f_i = problem_description_->f(U_i);
-
-        std::array<state_type, stages> U_iHs;
-        std::array<flux_type, stages> f_iHs;
-        for (int s = 0; s < stages; ++s) {
-          U_iHs[s] = stage_U[s].get().get_tensor(i);
-          f_iHs[s] = problem_description_->f(U_iHs[s]);
-        }
-
-        const auto r_i = r_.get_tensor(i);
-
-        const auto alpha_i = alpha_.local_element(i);
-        const Number m_i_inv = lumped_mass_matrix_inverse.local_element(i);
-
-        const unsigned int *js = sparsity_simd.columns(i);
-        const Number lambda_inv = Number(row_length - 1);
-        const auto factor = tau * m_i_inv * lambda_inv;
-
-        for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
-          const auto j = js[col_idx];
-
-          const auto U_j = old_U.get_tensor(j);
-
-          std::array<state_type, stages> U_jHs;
-          std::array<flux_type, stages> f_jHs;
-          for (int s = 0; s < stages; ++s) {
-            U_jHs[s] = stage_U[s].get().get_tensor(j);
-            f_jHs[s] = problem_description_->f(U_jHs[s]);
-          }
-
-          const auto c_ij = cij_matrix.get_tensor(i, col_idx);
-
-          const auto r_j = r_.get_tensor(j);
-
-          const auto alpha_j = alpha_.local_element(j);
-          const Number m_j_inv = lumped_mass_matrix_inverse.local_element(j);
-
-          const auto d_ij = dij_matrix_.get_entry(i, col_idx);
-          const auto d_ijH =  d_ij * (alpha_i + alpha_j) * Number(.5);
-
-          const auto m_ij = mass_matrix.get_entry(i, col_idx);
-          const auto b_ij =
-              (col_idx == 0 ? Number(1.) : Number(0.)) - m_ij * m_j_inv;
-          const auto b_ji =
-              (col_idx == 0 ? Number(1.) : Number(0.)) - m_ij * m_i_inv;
-
-          /* Contributions from graph viscosity and mass matrix correction: */
-
-          auto p_ij = (d_ijH - d_ij) * (U_j - U_i) + b_ij * r_j - b_ji * r_i;
-
-          if constexpr (stages != 0) {
-            /* Flux contributions: */
-
-            const auto f_j = problem_description_->f(U_j);
-            for (unsigned int k = 0; k < problem_dimension; ++k) {
-              const auto temp = (f_j[k] - f_i[k]) * c_ij;
-              p_ij[k] += (weight - Number(1.)) * (-temp);
-            }
-
-            for (int s = 0; s < stages; ++s) {
-              for (unsigned int k = 0; k < problem_dimension; ++k) {
-                const auto temp = (f_jHs[s][k] - f_iHs[s][k]) * c_ij;
-                p_ij[k] += stage_weights[s] * (-temp);
-              }
-            }
-          }
-
-          p_ij *= factor;
-
-          pij_matrix_.write_tensor(p_ij, i, col_idx);
-
-          const auto &[l_ij, success] = Limiter<dim, Number>::limit(
-              *problem_description_, bounds, U_i_new, p_ij);
-          lij_matrix_.write_entry(l_ij, i, col_idx);
-
-          /* Unsuccessful with current CFL, force a restart. */
-          if (!success)
-            restart_needed = true;
-        }
-      } /* parallel non-vectorized loop */
-
-      /* Parallel SIMD loop: */
-
-      bool thread_ready = false;
-
-      RYUJIN_OMP_FOR
-      for (unsigned int i = 0; i < n_internal; i += simd_length) {
-
-        synchronization_dispatch.check(thread_ready, i >= n_export_indices);
-
-        const auto bounds =
-            bounds_.template get_vectorized_tensor<std::array<VA, 3>>(i);
-
-        const auto m_i_inv = simd_load(lumped_mass_matrix_inverse, i);
-
-        const auto U_i_new = new_U.get_vectorized_tensor(i);
-        const auto U_i = old_U.get_vectorized_tensor(i);
-        const auto f_i = problem_description_->f(U_i);
-
-        std::array<ProblemDescription::state_type<dim, VA>, stages> U_iHs;
-        std::array<ProblemDescription::flux_type<dim, VA>, stages> f_iHs;
-        for (int s = 0; s < stages; ++s) {
-          U_iHs[s] = stage_U[s].get().get_vectorized_tensor(i);
-          f_iHs[s] = problem_description_->f(U_iHs[s]);
-        }
-
-        const auto r_i = r_.get_vectorized_tensor(i);
-        const auto alpha_i = simd_load(alpha_, i);
-
-        const unsigned int *js = sparsity_simd.columns(i);
-        const unsigned int row_length = sparsity_simd.row_length(i);
-        const VA lambda_inv = Number(row_length - 1);
-        const auto factor = tau * m_i_inv * lambda_inv;
-
-        for (unsigned int col_idx = 0; col_idx < row_length;
-             ++col_idx, js += simd_length) {
-
-          const auto U_j = old_U.get_vectorized_tensor(js);
-
-          std::array<ProblemDescription::state_type<dim, VA>, stages> U_jHs;
-          std::array<ProblemDescription::flux_type<dim, VA>, stages> f_jHs;
-          for (int s = 0; s < stages; ++s) {
-            U_jHs[s] = stage_U[s].get().get_vectorized_tensor(js);
-            f_jHs[s] = problem_description_->f(U_jHs[s]);
-          }
-
-          const auto c_ij = cij_matrix.get_vectorized_tensor(i, col_idx);
-          const auto r_j = r_.get_vectorized_tensor(js);
-
-          const auto alpha_j = simd_load(alpha_, js);
-          const auto m_j_inv = simd_load(lumped_mass_matrix_inverse, js);
-
-          const auto d_ij = dij_matrix_.get_vectorized_entry(i, col_idx);
-          const auto d_ijH =  d_ij * (alpha_i + alpha_j) * Number(.5);
-
-          const auto m_ij = mass_matrix.get_vectorized_entry(i, col_idx);
-          const auto b_ij = (col_idx == 0 ? VA(1.) : VA(0.)) - m_ij * m_j_inv;
-          const auto b_ji = (col_idx == 0 ? VA(1.) : VA(0.)) - m_ij * m_i_inv;
-
-          /* Contributions from graph viscosity and mass matrix correction: */
-
-          auto p_ij = (d_ijH - d_ij) * (U_j - U_i) + b_ij * r_j - b_ji * r_i;
-
-          if constexpr (stages != 0) {
-            /* Flux contributions: */
-
-            const auto f_j = problem_description_->f(U_j);
-
-            for (unsigned int k = 0; k < problem_dimension; ++k) {
-              const auto temp = (f_j[k] - f_i[k]) * c_ij;
-              p_ij[k] += (weight - Number(1.)) * (-temp);
-            }
-
-            for (int s = 0; s < stages; ++s) {
-              for (unsigned int k = 0; k < problem_dimension; ++k) {
-                const auto temp = (f_jHs[s][k] - f_iHs[s][k]) * c_ij;
-                p_ij[k] += stage_weights[s] * (-temp);
-              }
-            }
-          }
-
-          p_ij *= factor;
-
-          pij_matrix_.write_vectorized_tensor(p_ij, i, col_idx, true);
-
-          const auto &[l_ij, success] = Limiter<dim, VA>::limit(
-              *problem_description_, bounds, U_i_new, p_ij);
-          lij_matrix_.write_vectorized_entry(l_ij, i, col_idx, true);
-
-          /* Unsuccessful with current CFL, force a restart. */
-          if (!success)
-            restart_needed = true;
-        }
-      } /* parallel SIMD loop */
+      loop(Number(), n_internal, n_owned);
+      /* Parallel vectorized SIMD loop: */
+      loop(VA(), 0, n_internal);
 
       LIKWID_MARKER_STOP("time_step_4");
       RYUJIN_PARALLEL_REGION_END
     }
 
-    if (RYUJIN_LIKELY(limiter_iter_ != 0)) {
+    if (limiter_iter_ != 0) {
 #if defined(SPLIT_SYNCHRONIZATION_TIMERS) || defined(DEBUG_OUTPUT)
       Scope scope(computing_timer_, "time step [E] 4 - synchronization");
 #else
@@ -908,219 +746,123 @@ namespace ryujin
         RYUJIN_PARALLEL_REGION_BEGIN
         LIKWID_MARKER_START(("time_step_" + step_no).c_str());
 
-        /* Stored thread locally: */
-        AlignedVector<Number> lij_row_serial;
+        auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
+          using T = decltype(sentinel);
+          unsigned int stride_size = get_stride_size<T>;
+
+          /* Stored thread locally: */
+          AlignedVector<T> lij_row;
+          bool thread_ready = false;
+
+          RYUJIN_OMP_FOR_NOWAIT
+          for (unsigned int i = left; i < right; i += stride_size) {
+
+            /* Skip constrained degrees of freedom: */
+            const unsigned int row_length = sparsity_simd.row_length(i);
+            if (row_length == 1)
+              continue;
+
+            synchronization_dispatch.check(
+                thread_ready, i >= n_export_indices && i < n_internal);
+
+            auto U_i_new = new_U.template get_tensor<T>(i);
+
+            const Number lambda = Number(1.) / Number(row_length - 1);
+            lij_row.resize_fast(row_length);
+
+            for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
+
+              const auto l_ij = std::min(
+                  lij_matrix_.template get_entry<T>(i, col_idx),
+                  lij_matrix_.template get_transposed_entry<T>(i, col_idx));
+
+              auto p_ij = pij_matrix_.template get_tensor<T>(i, col_idx);
+
+              U_i_new += l_ij * lambda * p_ij;
+
+              if (!last_round)
+                lij_row[col_idx] = l_ij;
+            }
+
+#ifdef CHECK_BOUNDS
+            {
+              const auto rho_new = problem_description_->density(U_i_new);
+              const auto e_new = problem_description_->internal_energy(U_i_new);
+              const auto s_new =
+                  problem_description_->specific_entropy(U_i_new);
+
+              using namespace dealii;
+              constexpr auto gt = dealii::SIMDComparison::greater_than;
+              const auto test =
+                  compare_and_apply_mask<gt>(rho_new, T(0.), T(0.), T(-1.)) + //
+                  compare_and_apply_mask<gt>(e_new, T(0.), T(0.), T(-1.)) +   //
+                  compare_and_apply_mask<gt>(s_new, T(0.), T(0.), T(-1.));
+              if (!(test == T(0.))) {
+#ifdef DEBUG_OUTPUT
+                std::cout << std::fixed << std::setprecision(16);
+                std::cout << "Bounds violation: Negative rho, e, s detected!"
+                          << std::endl;
+                std::cout << "rho: !!! " << rho_new << std::endl;
+                std::cout << "int: !!! " << e_new << std::endl;
+                std::cout << "ent: !!! " << s_new << std::endl << std::endl;
+#endif
+                restart_needed = true;
+              }
+            }
+#endif
+
+            new_U.template write_tensor<T>(U_i_new, i);
+
+            /* Skip computating l_ij and updating p_ij in the last round */
+            if (last_round)
+              continue;
+
+            const auto bounds =
+                bounds_.template get_tensor<T, std::array<T, 3>>(i);
+            for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
+
+              const auto old_l_ij = lij_row[col_idx];
+
+              const auto new_p_ij =
+                  (T(1.) - old_l_ij) *
+                  pij_matrix_.template get_tensor<T>(i, col_idx);
+
+              const auto &[new_l_ij, success] = Limiter<dim, T>::limit(
+                  *problem_description_, bounds, U_i_new, new_p_ij);
+
+              /* Unsuccessful with current CFL, force a restart. */
+              if (!success)
+                restart_needed = true;
+
+              /*
+               * FIXME: If this if statement causes too much of a performance
+               * penalty we could refactor it outside of the main loop.
+               */
+              if (RYUJIN_LIKELY(limiter_iter_ == 2)) {
+                /*
+                 * Shortcut: We omit updating the p_ij vector and simply
+                 * write (1 - l_ij^(1)) * l_ij^(2) into the l_ij matrix. This
+                 * approach only works for two limiting steps.
+                 */
+                const auto entry = (T(1.) - old_l_ij) * new_l_ij;
+                lij_matrix_next_.write_entry(entry, i, col_idx, true);
+              } else {
+                /*
+                 * @todo: This is expensive. If we ever end up using more
+                 * than two limiter passes we should implement this by
+                 * storing a scalar factor instead of writing back into p_ij.
+                 */
+                lij_matrix_next_.write_entry(new_l_ij, i, col_idx, true);
+                pij_matrix_.write_tensor(new_p_ij, i, col_idx);
+              }
+            }
+          }
+        };
 
         /* Parallel non-vectorized loop: */
-        RYUJIN_OMP_FOR_NOWAIT
-        for (unsigned int i = n_internal; i < n_owned; ++i) {
-
-          /* Skip constrained degrees of freedom: */
-          const unsigned int row_length = sparsity_simd.row_length(i);
-          if (row_length == 1)
-            continue;
-
-          lij_row_serial.resize_fast(row_length);
-
-          auto U_i_new = new_U.get_tensor(i);
-
-          const Number lambda = Number(1.) / Number(row_length - 1);
-
-          for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
-            auto p_ij = pij_matrix_.get_tensor(i, col_idx);
-
-            const auto l_ij =
-                std::min(lij_matrix_.get_entry(i, col_idx),
-                         lij_matrix_.get_transposed_entry(i, col_idx));
-
-            U_i_new += l_ij * lambda * p_ij;
-
-            if (!last_round)
-              lij_row_serial[col_idx] = l_ij;
-          }
-
-#ifdef CHECK_BOUNDS
-          {
-            const auto rho_new = problem_description_->density(U_i_new);
-            const auto e_new = problem_description_->internal_energy(U_i_new);
-            const auto s_new = problem_description_->specific_entropy(U_i_new);
-
-            const auto test =
-                dealii::compare_and_apply_mask<
-                    dealii::SIMDComparison::greater_than>(
-                    rho_new, Number(0.), Number(0.), Number(-1.)) +
-                dealii::compare_and_apply_mask<
-                    dealii::SIMDComparison::greater_than>(
-                    e_new, Number(0.), Number(0.), Number(-1.)) +
-                dealii::compare_and_apply_mask<
-                    dealii::SIMDComparison::greater_than>(
-                    s_new, Number(0.), Number(0.), Number(-1.));
-            if (!(test == Number(0.))) {
-#ifdef DEBUG_OUTPUT
-              std::cout << std::fixed << std::setprecision(16);
-              std::cout << "Bounds violation: Negative rho, e, s detected!"
-                        << std::endl;
-              std::cout << "rho: !!! " << rho_new << std::endl;
-              std::cout << "int: !!! " << e_new << std::endl;
-              std::cout << "ent: !!! " << s_new << std::endl << std::endl;
-#endif
-              restart_needed = true;
-            }
-          }
-#endif
-
-          new_U.write_tensor(U_i_new, i);
-
-          /* Skip computating l_ij and updating p_ij in the last round */
-          if (last_round)
-            continue;
-
-          const auto bounds =
-              bounds_.template get_tensor<std::array<Number, 3>>(i);
-
-          for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
-            const auto old_l_ij = lij_row_serial[col_idx];
-            const auto new_p_ij =
-                (Number(1.) - old_l_ij) * pij_matrix_.get_tensor(i, col_idx);
-
-            const auto &[new_l_ij, success] = Limiter<dim, Number>::limit(
-                *problem_description_, bounds, U_i_new, new_p_ij);
-
-            /* Unsuccessful with current CFL, force a restart. */
-            if (!success)
-              restart_needed = true;
-
-            /*
-             * FIXME: If this if statement causes too much of a performance
-             * penalty we could refactor it outside of the main loop.
-             */
-            if (RYUJIN_LIKELY(limiter_iter_ == 2)) {
-              /*
-               * Shortcut: We omit updating the p_ij vector and simply
-               * write (1 - l_ij^(1)) * l_ij^(2) into the l_ij matrix. This
-               * approach only works for two limiting steps.
-               */
-              lij_matrix_next_.write_entry(
-                  (Number(1.) - old_l_ij) * new_l_ij, i, col_idx);
-            } else {
-              /*
-               * @todo: This is expensive. If we ever end up using more
-               * than two limiter passes we should implement this by
-               * storing a scalar factor instead of writing back into p_ij.
-               */
-              lij_matrix_next_.write_entry(new_l_ij, i, col_idx);
-              pij_matrix_.write_tensor(new_p_ij, i, col_idx);
-            }
-          }
-        } /* parallel non-vectorized loop */
-
-        /* Stored thread locally: */
-        AlignedVector<VectorizedArray<Number>> lij_row_simd;
-        bool thread_ready = false;
-
-        /* Parallel vectorized loop: */
-        RYUJIN_OMP_FOR
-        for (unsigned int i = 0; i < n_internal; i += simd_length) {
-
-          synchronization_dispatch.check(thread_ready, i >= n_export_indices);
-
-          auto U_i_new = new_U.get_vectorized_tensor(i);
-
-          const unsigned int row_length = sparsity_simd.row_length(i);
-          const Number lambda = Number(1.) / Number(row_length - 1);
-          lij_row_simd.resize_fast(row_length);
-
-          for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
-
-            const auto l_ij = std::min(
-                lij_matrix_.get_vectorized_entry(i, col_idx),
-                lij_matrix_.get_vectorized_transposed_entry(i, col_idx));
-
-            auto p_ij = pij_matrix_.get_vectorized_tensor(i, col_idx);
-
-            U_i_new += l_ij * lambda * p_ij;
-
-            if (!last_round)
-              lij_row_simd[col_idx] = l_ij;
-          }
-
-#ifdef CHECK_BOUNDS
-          {
-            const auto rho_new = problem_description_->density(U_i_new);
-            const auto e_new = problem_description_->internal_energy(U_i_new);
-            const auto s_new = problem_description_->specific_entropy(U_i_new);
-
-            const auto test =
-                dealii::compare_and_apply_mask<
-                    dealii::SIMDComparison::greater_than>(
-                    rho_new, VA(0.), VA(0.), VA(-1.)) +
-                dealii::compare_and_apply_mask<
-                    dealii::SIMDComparison::greater_than>(
-                    e_new, VA(0.), VA(0.), VA(-1.)) +
-                dealii::compare_and_apply_mask<
-                    dealii::SIMDComparison::greater_than>(
-                    s_new, VA(0.), VA(0.), VA(-1.));
-            if (!(test == VA(0.))) {
-#ifdef DEBUG_OUTPUT
-              std::cout << std::fixed << std::setprecision(16);
-              std::cout << "Bounds violation: Negative rho, e, s detected!"
-                        << std::endl;
-              std::cout << "rho: !!! " << rho_new << std::endl;
-              std::cout << "int: !!! " << e_new << std::endl;
-              std::cout << "ent: !!! " << s_new << std::endl << std::endl;
-#endif
-              restart_needed = true;
-            }
-          }
-#endif
-
-          new_U.write_vectorized_tensor(U_i_new, i);
-
-          /* Skip computating l_ij and updating p_ij in the last round */
-          if (last_round)
-            continue;
-
-          const auto bounds =
-              bounds_.template get_vectorized_tensor<std::array<VA, 3>>(i);
-          for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
-
-            const auto old_l_ij = lij_row_simd[col_idx];
-
-            const auto new_p_ij = (VA(1.) - old_l_ij) *
-                                  pij_matrix_.get_vectorized_tensor(i, col_idx);
-
-            const auto &[new_l_ij, success] = Limiter<dim, VA>::limit(
-                *problem_description_, bounds, U_i_new, new_p_ij);
-
-            /* Unsuccessful with current CFL, force a restart. */
-            if (!success)
-              restart_needed = true;
-
-            /*
-             * FIXME: If this if statement causes too much of a performance
-             * penalty we could refactor it outside of the main loop.
-             */
-            if (RYUJIN_LIKELY(limiter_iter_ == 2)) {
-              /*
-               * Shortcut: We omit updating the p_ij vector and simply
-               * write (1 - l_ij^(1)) * l_ij^(2) into the l_ij matrix. This
-               * approach only works for two limiting steps.
-               */
-              const auto entry =
-                  (VectorizedArray<Number>(1.) - old_l_ij) * new_l_ij;
-              lij_matrix_next_.write_vectorized_entry(entry, i, col_idx, true);
-            } else {
-              /*
-               * @todo: This is expensive. If we ever end up using more
-               * than two limiter passes we should implement this by
-               * storing a scalar factor instead of writing back into p_ij.
-               */
-              lij_matrix_next_.write_vectorized_entry(
-                  new_l_ij, i, col_idx, true);
-              pij_matrix_.write_vectorized_tensor(new_p_ij, i, col_idx);
-            }
-          }
-        }
+        loop(Number(), n_internal, n_owned);
+        /* Parallel vectorized SIMD loop: */
+        loop(VA(), 0, n_internal);
 
         LIKWID_MARKER_STOP(("time_step_" + step_no).c_str());
         RYUJIN_PARALLEL_REGION_END
@@ -1146,6 +888,7 @@ namespace ryujin
     CALLGRIND_STOP_INSTRUMENTATION
 
     /* Do we have to restart? */
+
     restart_needed.store(
         Utilities::MPI::logical_or(restart_needed.load(), mpi_communicator_));
 
@@ -1167,7 +910,6 @@ namespace ryujin
     /* Update the result and return tau_max: */
     return tau_max;
   }
-
 
 
   template <int dim, typename Number>

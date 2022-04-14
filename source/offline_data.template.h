@@ -71,6 +71,8 @@ namespace ryujin
 
     dof_handler.distribute_dofs(discretization_->finite_element());
 
+    n_locally_owned_ = dof_handler.locally_owned_dofs().n_elements();
+
     /*
      * Renumbering:
      */
@@ -79,18 +81,36 @@ namespace ryujin
     DoFRenumbering::Cuthill_McKee(dof_handler);
 
 #ifdef USE_COMMUNICATION_HIDING
-#ifdef DEBUG
-    const unsigned int n_export_indices_preliminary =
-#endif
-        DoFRenumbering::export_indices_first(dof_handler, mpi_communicator_);
+    /*
+     * Reorder all export indices at the beginning of the locally_internal index
+     * range to achieve a better packging:
+     */
+    DoFRenumbering::export_indices_first(
+        dof_handler, mpi_communicator_, n_locally_owned_, 1);
 #endif
 
-    n_locally_internal_ =
-        DoFRenumbering::internal_range(dof_handler, mpi_communicator_);
+    /*
+     * Group degrees of freedom that have the same stencil size in groups
+     * of multiples of the VectorizedArray<Number>::size().
+     */
+    n_locally_internal_ = DoFRenumbering::internal_range(
+        dof_handler, mpi_communicator_, VectorizedArray<Number>::size());
 
-    /* Round down to the nearest multiple of the VectorizedArray width: */
-    n_locally_internal_ = n_locally_internal_ -
-                          n_locally_internal_ % VectorizedArray<Number>::size();
+    /*
+     * Reorder all (strides of) locally internal indices that contain
+     * export indices to the start of the index range. This reordering
+     * preserves the binning introduced by
+     * DoFRenumbering::internal_range().
+     */
+#ifdef USE_COMMUNICATION_HIDING
+    n_export_indices_ =
+        DoFRenumbering::export_indices_first(dof_handler,
+                                             mpi_communicator_,
+                                             n_locally_internal_,
+                                             VectorizedArray<Number>::size());
+#else
+    n_export_indices_ = n_locally_internal_;
+#endif
 
     /*
      * First, we set up the locally_relevant index set, determine (globally
@@ -197,7 +217,8 @@ namespace ryujin
 
     /* Set up partitioner: */
 
-    n_locally_owned_ = locally_owned.n_elements();
+    Assert(n_locally_owned_ == locally_owned.n_elements(),
+           dealii::ExcInternalError());
     n_locally_relevant_ = locally_relevant.n_elements();
 
     scalar_partitioner_ = std::make_shared<dealii::Utilities::MPI::Partitioner>(
@@ -214,16 +235,28 @@ namespace ryujin
      * communication can be started.
      */
 
-#ifdef USE_COMMUNICATION_HIDING
-    n_export_indices_ = 0;
+#ifdef DEBUG
+    unsigned int control = 0;
     for (const auto &it : scalar_partitioner_->import_indices())
       if (it.second <= n_locally_internal_)
-        n_export_indices_ = std::max(n_export_indices_, it.second);
+        control = std::max(control, it.second);
 
-    Assert(n_export_indices_ <= n_export_indices_preliminary,
-           dealii::ExcInternalError());
-#else
-    n_export_indices_ = n_locally_internal_;
+    Assert(control <= n_export_indices_, ExcInternalError());
+    Assert(n_export_indices_ <= n_locally_internal_, ExcInternalError());
+#endif
+
+
+#ifdef DEBUG
+    const auto offset = n_locally_owned_ != 0 ? *locally_owned.begin() : 0;
+    unsigned int group_row_length = 0;
+    for (unsigned int i = 0; i < n_locally_internal_; ++i) {
+      if (i % VectorizedArray<Number>::size() == 0) {
+        group_row_length = sparsity_pattern_.row_length(offset + i);
+      } else {
+        Assert(group_row_length == sparsity_pattern_.row_length(offset + i),
+               ExcInternalError());
+      }
+    }
 #endif
 
     /*
@@ -503,6 +536,25 @@ namespace ryujin
 
     boundary_map_ = construct_boundary_map(
         dof_handler.begin_active(), dof_handler.end(), *scalar_partitioner_);
+
+    /* Extract coupling boundary pairs: */
+
+    coupling_boundary_pairs_.clear();
+    for (auto entry : boundary_map_) {
+      const auto i = entry.first;
+      if (i >= n_locally_owned_)
+        continue;
+      const unsigned int row_length = sparsity_pattern_simd_.row_length(i);
+      const unsigned int *js = sparsity_pattern_simd_.columns(i);
+      constexpr auto simd_length = VectorizedArray<Number>::size();
+      /* skip diagonal: */
+      for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
+        const auto j = *(i < n_locally_internal_ ? js + col_idx * simd_length
+                                                 : js + col_idx);
+        if (boundary_map_.count(j) != 0)
+          coupling_boundary_pairs_.push_back({i, col_idx, j});
+      }
+    }
   }
 
 
@@ -687,6 +739,8 @@ namespace ryujin
      * boundary degree of freedom. We now merge all entries that have the
      * same boundary id and whose normals describe an acute angle of about
      * 85 degrees or less.
+     *
+     * FIXME: is this robust in 3D?
      */
 
     decltype(boundary_map_) filtered_map;
