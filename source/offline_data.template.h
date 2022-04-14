@@ -229,12 +229,6 @@ namespace ryujin
     vector_partitioner_ =
         create_vector_partitioner<problem_dimension>(scalar_partitioner_);
 
-    /*
-     * Determine the subset [0, n_export_indices) of [0,
-     * n_locally_internal) that has to be computed before MPI exchange
-     * communication can be started.
-     */
-
 #ifdef DEBUG
     unsigned int control = 0;
     for (const auto &it : scalar_partitioner_->import_indices())
