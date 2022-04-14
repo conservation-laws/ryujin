@@ -3,6 +3,8 @@
 
 int main()
 {
+  using VA = dealii::VectorizedArray<double>;
+
   dealii::DynamicSparsityPattern spars(14, 14);
   spars.add(0, 0);
   spars.add(0, 1);
@@ -28,11 +30,11 @@ int main()
   ryujin::SparseMatrixSIMD<double, 1, 4> my_sparse(my_sparsity);
   for (unsigned i = 0; i < 12; ++i)
     for (unsigned j = 0; j < 3; ++j)
-      my_sparse.write_entry(i * 3 + j, i, j);
-  my_sparse.write_entry(36, 12, 0);
-  my_sparse.write_entry(37, 12, 1);
-  my_sparse.write_entry(38, 13, 0);
-  my_sparse.write_entry(39, 13, 1);
+      my_sparse.write_entry(double(i * 3 + j), i, j);
+  my_sparse.write_entry(36., 12, 0);
+  my_sparse.write_entry(37., 12, 1);
+  my_sparse.write_entry(38., 13, 0);
+  my_sparse.write_entry(39., 13, 1);
   std::cout << "Matrix entries row by row" << std::endl;
   for (unsigned int i = 0; i < my_sparsity.n_rows(); ++i) {
     for (unsigned int j = 0; j < my_sparsity.row_length(i); ++j) {
@@ -44,7 +46,7 @@ int main()
   std::cout << "Matrix entries by SIMD rows" << std::endl;
   for (unsigned int i = 0; i < 12; i += 4) {
     for (unsigned int j = 0; j < 3; ++j) {
-      const auto a = my_sparse.get_vectorized_entry(i, j);
+      const auto a = my_sparse.template get_entry<VA>(i, j);
       std::cout << a << "   ";
     }
     std::cout << std::endl;
@@ -65,7 +67,7 @@ int main()
   std::cout << "Matrix entries transposed by SIMD row" << std::endl;
   for (unsigned int i = 0; i < 12; i += 4) {
     for (unsigned int j = 0; j < 3; ++j) {
-      const auto a = my_sparse.get_vectorized_transposed_entry(i, j);
+      const auto a = my_sparse.template get_transposed_entry<VA>(i, j);
       std::cout << a << "   ";
     }
     std::cout << std::endl;
