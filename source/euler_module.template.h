@@ -179,39 +179,35 @@ namespace ryujin
     {
       Scope scope(computing_timer_, "time step [E] 0 - compute entropies");
 
+      const unsigned int size_regular = n_relevant / simd_length * simd_length;
+
       RYUJIN_PARALLEL_REGION_BEGIN
       LIKWID_MARKER_START("time_step_0");
 
-      const unsigned int size_regular = n_relevant / simd_length * simd_length;
+      auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
+        using T = decltype(sentinel);
+        unsigned int stride_size = get_stride_size<T>;
 
-      RYUJIN_OMP_FOR
-      for (unsigned int i = 0; i < size_regular; i += simd_length) {
-        const auto U_i = old_U.template get_tensor<VA>(i);
-        store_value<VA>(specific_entropies_,
-                        problem_description_->specific_entropy(U_i),
-                        i);
+        RYUJIN_OMP_FOR_NOWAIT
+        for (unsigned int i = left; i < right; i += stride_size) {
+          const auto U_i = old_U.template get_tensor<T>(i);
 
-        const auto evc_entropy =
-            Indicator<dim, double>::evc_entropy_ ==
-                    Indicator<dim, double>::Entropy::mathematical
-                ? problem_description_->mathematical_entropy(U_i)
-                : problem_description_->harten_entropy(U_i);
-        store_value<VA>(evc_entropies_, evc_entropy, i);
-      }
+          const auto s_i = problem_description_->specific_entropy(U_i);
+          store_value<T>(specific_entropies_, s_i, i);
 
-      RYUJIN_OMP_FOR
-      for (unsigned int i = size_regular; i < n_relevant; ++i) {
-        const auto U_i = old_U.get_tensor(i);
+          const auto evc_entropy =
+              Indicator<dim, double>::evc_entropy_ ==
+                      Indicator<dim, double>::Entropy::mathematical
+                  ? problem_description_->mathematical_entropy(U_i)
+                  : problem_description_->harten_entropy(U_i);
+          store_value<T>(evc_entropies_, evc_entropy, i);
+        }
+      };
 
-        specific_entropies_.local_element(i) =
-            problem_description_->specific_entropy(U_i);
-
-        evc_entropies_.local_element(i) =
-            Indicator<dim, double>::evc_entropy_ ==
-                    Indicator<dim, double>::Entropy::mathematical
-                ? problem_description_->mathematical_entropy(U_i)
-                : problem_description_->harten_entropy(U_i);
-      }
+      /* Parallel non-vectorized loop: */
+      loop(Number(), size_regular, n_relevant);
+      /* Parallel vectorized SIMD loop: */
+      loop(VA(), 0, size_regular);
 
       LIKWID_MARKER_STOP("time_step_0");
       RYUJIN_PARALLEL_REGION_END
