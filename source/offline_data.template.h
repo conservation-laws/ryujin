@@ -232,11 +232,24 @@ namespace ryujin
      * Set up partitioner:
      */
 
-    IndexSet locally_relevant;
-    DoFTools::extract_locally_relevant_dofs(dof_handler, locally_relevant);
-
     Assert(n_locally_owned_ == locally_owned.n_elements(),
            dealii::ExcInternalError());
+
+    IndexSet locally_relevant;
+    DoFTools::extract_locally_relevant_dofs(dof_handler, locally_relevant);
+    /* Enlarge the locally relevant set to include all additional couplings: */
+    {
+      IndexSet additional_dofs(dof_handler.n_dofs());
+      for (auto &entry : sparsity_pattern_)
+        if (!locally_relevant.is_element(entry.column())) {
+          Assert(locally_owned.is_element(entry.row()), ExcInternalError());
+          additional_dofs.add_index(entry.column());
+        }
+      additional_dofs.compress();
+      locally_relevant.add_indices(additional_dofs);
+      locally_relevant.compress();
+    }
+
     n_locally_relevant_ = locally_relevant.n_elements();
 
     scalar_partitioner_ = std::make_shared<dealii::Utilities::MPI::Partitioner>(
