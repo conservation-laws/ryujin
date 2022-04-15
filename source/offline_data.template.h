@@ -705,6 +705,11 @@ namespace ryujin
           if (!discretization_->finite_element().has_support_on_face(j, f))
             continue;
 
+          /* Skip constrained degrees of freedom: */
+          const unsigned int row_length = sparsity_pattern_simd_.row_length(j);
+          if (row_length == 1)
+            continue;
+
           Number boundary_mass = 0.;
           dealii::Tensor<1, dim, Number> normal;
 

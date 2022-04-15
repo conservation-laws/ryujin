@@ -161,8 +161,15 @@ namespace ryujin
         }
       }
 
-      Assert(n_export_indices >= export_indices.n_elements(),
+#if DEBUG
+      unsigned int n_other = 0;
+      for (unsigned int i = n_locally_internal; i < n_locally_owned; ++i)
+        if (export_indices.is_element(i))
+            n_other++;
+
+      Assert(n_other + n_export_indices >= export_indices.n_elements(),
              dealii::ExcInternalError());
+#endif
 
       unsigned int running_index = n_export_indices;
 
