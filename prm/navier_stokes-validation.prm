@@ -53,7 +53,7 @@ end
 
 
 subsection F - EulerModule
-  set cfl with boundary dofs = true
+  set cfl with boundary dofs = false
 
   set limiter iterations     = 2
 end
