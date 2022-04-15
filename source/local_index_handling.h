@@ -197,7 +197,101 @@ namespace ryujin
 
       dof_handler.renumber_dofs(new_order);
 
+      Assert(n_export_indices % group_size == 0, dealii::ExcInternalError());
+      Assert(n_export_indices < n_locally_internal, dealii::ExcInternalError());
       return n_export_indices;
+    }
+
+
+    /**
+     * Reorder all strides of inconsistent locally internal indices to the
+     * end of the locally internal index range.
+     *
+     * @ingroup FiniteElement
+     */
+    template <int dim>
+    unsigned int
+    inconsistent_strides_last(dealii::DoFHandler<dim> &dof_handler,
+                              const dealii::DynamicSparsityPattern &sparsity,
+                              const unsigned int n_locally_internal,
+                              const std::size_t group_size)
+    {
+      using namespace dealii;
+
+      const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
+      const auto n_locally_owned = locally_owned.n_elements();
+
+      /* The locally owned index range has to be contiguous */
+      Assert(locally_owned.is_contiguous() == true,
+             dealii::ExcMessage(
+                 "Need a contiguous set of locally owned indices."));
+
+      /* Offset to translate from global to local index range */
+      const auto offset = n_locally_owned != 0 ? *locally_owned.begin() : 0;
+
+      std::vector<dealii::types::global_dof_index> new_order(n_locally_owned);
+
+      /*
+       * First pass: keep all strides with consistent row length at the
+       * beginning of the locally internal index range and mark all other
+       * indices with numbers::invalid_dof_index:
+       */
+
+      unsigned int n_consistent_range = 0;
+
+      Assert(n_locally_internal <= n_locally_owned, dealii::ExcInternalError());
+
+      for (unsigned int i = 0; i < n_locally_internal; i+= group_size) {
+
+        bool stride_is_consistent = true;
+        const auto group_row_length = sparsity.row_length(offset + i);
+        for (unsigned int j = 0; j < group_size; ++j) {
+          if (group_row_length != sparsity.row_length(offset + i + j)) {
+            stride_is_consistent = false;
+            break;
+          }
+        }
+
+        if (stride_is_consistent) {
+          for (unsigned int j = 0; j < group_size; ++j) {
+            new_order[i + j] = offset + n_consistent_range++;
+          }
+        } else {
+          for (unsigned int j = 0; j < group_size; ++j)
+            new_order[i + j] = dealii::numbers::invalid_dof_index;
+        }
+      }
+
+      /*
+       * Second pass: append the rest:
+       */
+
+      unsigned int running_index = n_consistent_range;
+
+      for (unsigned int i = 0; i < n_locally_internal; i += group_size) {
+        if (new_order[i] == dealii::numbers::invalid_dof_index) {
+          for (unsigned int j = 0; j < group_size; ++j) {
+            Assert(new_order[i + j] == dealii::numbers::invalid_dof_index,
+                   dealii::ExcInternalError());
+            new_order[i + j] = offset + running_index++;
+          }
+        }
+      }
+
+      Assert(running_index == n_locally_internal, dealii::ExcInternalError());
+
+      for (unsigned int i = n_locally_internal; i < n_locally_owned; i++) {
+        new_order[i] = offset + running_index++;
+      }
+
+      Assert(running_index == n_locally_owned, dealii::ExcInternalError());
+
+      dof_handler.renumber_dofs(new_order);
+
+      Assert(n_consistent_range % group_size == 0, dealii::ExcInternalError());
+      Assert(n_consistent_range < n_locally_internal,
+             dealii::ExcInternalError());
+      return n_consistent_range;
     }
 
 

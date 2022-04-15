@@ -169,7 +169,6 @@ namespace ryujin
      * Renumbering:
      */
 
-    /* Cuthill McKee actually helps with cache locality. */
     DoFRenumbering::Cuthill_McKee(dof_handler);
 
     /*
@@ -203,35 +202,77 @@ namespace ryujin
                                              mpi_communicator_,
                                              n_locally_internal_,
                                              VectorizedArray<Number>::size());
+
+    /*
+     * A small lambda to check for stride-level consistency of the internal
+     * index range:
+     */
+    const auto consistent_stride_range = [&]() {
+      constexpr auto group_size = VectorizedArray<Number>::size();
+      const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
+      const auto offset = n_locally_owned_ != 0 ? *locally_owned.begin() : 0;
+
+      unsigned int group_row_length = 0;
+      unsigned int i = 0;
+      for (; i < n_locally_internal_; ++i) {
+        if (i % group_size == 0) {
+          group_row_length = sparsity_pattern_.row_length(offset + i);
+        } else {
+          if (group_row_length != sparsity_pattern_.row_length(offset + i)) {
+            break;
+          }
+        }
+      }
+      return i / group_size * group_size;
+    };
+
     /*
      * Create final sparsity pattern:
      */
 
-    create_constraints_and_sparsity_pattern();
-    const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
-
-#ifdef DEBUG
-    /*
-     * Check that after all the dof manipulation and setup we still end up
-     * with indices in [0, locally_internal) that have uniform stencil size
-     * within a stride.
-     */
-    const auto offset = n_locally_owned_ != 0 ? *locally_owned.begin() : 0;
-    unsigned int group_row_length = 0;
-    for (unsigned int i = 0; i < n_locally_internal_; ++i) {
-      if (i % VectorizedArray<Number>::size() == 0) {
-        group_row_length = sparsity_pattern_.row_length(offset + i);
-      } else {
-        Assert(group_row_length == sparsity_pattern_.row_length(offset + i),
-               ExcInternalError());
+    const auto &periodic_faces =
+        discretization_->triangulation().get_periodic_face_map();
+    if (periodic_faces.size() > 0) {
+      /*
+       * Workaround: The elimination procedure for periodically constrained
+       * degrees of freedom is unfortunately not terribly stable. It might
+       * happen that we end up with an inconsistent local range.
+       */
+      create_constraints_and_sparsity_pattern();
+      if (consistent_stride_range() != n_locally_internal_) {
+        /*
+         * In this case we try to fix up the numbering by pushing affected
+         * strides to the end and slightly lowering the n_locally_internal_
+         * marker.
+         */
+        n_locally_internal_ = DoFRenumbering::inconsistent_strides_last(
+            dof_handler,
+            sparsity_pattern_,
+            n_locally_internal_,
+            VectorizedArray<Number>::size());
+        create_constraints_and_sparsity_pattern();
+        n_locally_internal_ = consistent_stride_range();
       }
-    }
+
+    } else {
+
+      create_constraints_and_sparsity_pattern();
+#ifdef DEBUG
+      /*
+       * Check that after all the dof manipulation and setup we still end up
+       * with indices in [0, locally_internal) that have uniform stencil size
+       * within a stride.
+       */
+      Assert(consistent_stride_range() == n_locally_internal_,
+             dealii::ExcInternalError());
 #endif
+    }
 
     /*
      * Set up partitioner:
      */
 
+    const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
     Assert(n_locally_owned_ == locally_owned.n_elements(),
            dealii::ExcInternalError());
 
