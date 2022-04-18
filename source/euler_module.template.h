@@ -937,7 +937,7 @@ namespace ryujin
 
       auto U_i = U.get_tensor(i);
 
-      if (id == Boundary::slip || id == Boundary::no_slip) {
+      if (id == Boundary::slip) {
         /* Remove the normal component of the momentum: */
         auto m = problem_description_->momentum(U_i);
         m -= 1. * (m * normal) * normal;
