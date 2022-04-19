@@ -198,7 +198,7 @@ namespace ryujin
       dof_handler.renumber_dofs(new_order);
 
       Assert(n_export_indices % group_size == 0, dealii::ExcInternalError());
-      Assert(n_export_indices < n_locally_internal, dealii::ExcInternalError());
+      Assert(n_export_indices <= n_locally_internal, dealii::ExcInternalError());
       return n_export_indices;
     }
 
