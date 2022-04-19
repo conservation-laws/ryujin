@@ -301,16 +301,33 @@ namespace ryujin
     vector_partitioner_ =
         create_vector_partitioner<problem_dimension>(scalar_partitioner_);
 
-#ifdef DEBUG
-    /* Check that n_export_indices_ is valid: */
-    unsigned int control = 0;
-    for (const auto &it : scalar_partitioner_->import_indices())
-      if (it.second <= n_locally_internal_)
-        control = std::max(control, it.second);
 
-    Assert(control <= n_export_indices_, ExcInternalError());
-    Assert(n_export_indices_ <= n_locally_internal_, ExcInternalError());
+    if (periodic_faces.size() > 0) {
+      /*
+       * In case of periodic boundary conditions we might need to update
+       * n_export_indices_ again - just do it unconiditionally
+       */
+      n_export_indices_ = 0;
+      for (const auto &it : scalar_partitioner_->import_indices())
+        if (it.second <= n_locally_internal_)
+          n_export_indices_ = std::max(n_export_indices_, it.second);
+
+      constexpr auto simd_length = VectorizedArray<Number>::size();
+      n_export_indices_ =
+          (n_export_indices_ + simd_length - 1) / simd_length * simd_length;
+      Assert(n_export_indices_ <= n_locally_internal_, ExcInternalError());
+#ifdef DEBUG
+    } else {
+      /* Check that n_export_indices_ is valid: */
+      unsigned int control = 0;
+      for (const auto &it : scalar_partitioner_->import_indices())
+        if (it.second <= n_locally_internal_)
+          control = std::max(control, it.second);
+
+      Assert(control <= n_export_indices_, ExcInternalError());
+      Assert(n_export_indices_ <= n_locally_internal_, ExcInternalError());
 #endif
+    }
 
     /*
      * Set up SIMD sparsity pattern in local numbering. Nota bene: The
