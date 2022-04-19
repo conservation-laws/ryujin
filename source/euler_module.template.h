@@ -147,7 +147,6 @@ namespace ryujin
     const unsigned int n_export_indices = offline_data_->n_export_indices();
     const unsigned int n_internal = offline_data_->n_locally_internal();
     const unsigned int n_owned = offline_data_->n_locally_owned();
-    const unsigned int n_relevant = offline_data_->n_locally_relevant();
 
     /* References to precomputed matrices and the stencil: */
 
@@ -179,10 +178,16 @@ namespace ryujin
     {
       Scope scope(computing_timer_, "time step [E] 0 - compute entropies");
 
-      const unsigned int size_regular = n_relevant / simd_length * simd_length;
+      SynchronizationDispatch synchronization_dispatch([&]() {
+        specific_entropies_.update_ghost_values_start(channel++);
+        evc_entropies_.update_ghost_values_start(channel++);
+      });
 
       RYUJIN_PARALLEL_REGION_BEGIN
       LIKWID_MARKER_START("time_step_0");
+
+      /* Stored thread locally: */
+      bool thread_ready = false;
 
       auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
         using T = decltype(sentinel);
@@ -190,6 +195,15 @@ namespace ryujin
 
         RYUJIN_OMP_FOR_NOWAIT
         for (unsigned int i = left; i < right; i += stride_size) {
+
+          /* Skip constrained degrees of freedom: */
+          const unsigned int row_length = sparsity_simd.row_length(i);
+          if (row_length == 1)
+            continue;
+
+          synchronization_dispatch.check(
+              thread_ready, i >= n_export_indices && i < n_internal);
+
           const auto U_i = old_U.template get_tensor<T>(i);
 
           const auto s_i = problem_description_->specific_entropy(U_i);
@@ -205,12 +219,23 @@ namespace ryujin
       };
 
       /* Parallel non-vectorized loop: */
-      loop(Number(), size_regular, n_relevant);
+      loop(Number(), n_internal, n_owned);
       /* Parallel vectorized SIMD loop: */
-      loop(VA(), 0, size_regular);
+      loop(VA(), 0, n_internal);
 
       LIKWID_MARKER_STOP("time_step_0");
       RYUJIN_PARALLEL_REGION_END
+    }
+
+    {
+#if defined(SPLIT_SYNCHRONIZATION_TIMERS) || defined(DEBUG_OUTPUT)
+      Scope scope(computing_timer_, "time step [E] 0 - synchronization");
+#else
+      Scope scope(computing_timer_, "time step [E] 0 - compute entropies");
+#endif
+
+      specific_entropies_.update_ghost_values_finish();
+      evc_entropies_.update_ghost_values_finish();
     }
 
     /*
