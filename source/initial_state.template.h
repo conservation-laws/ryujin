@@ -286,32 +286,36 @@ namespace ryujin
       {
         const auto gamma = this->problem_description.gamma();
 
-        if constexpr (dim == 2) {
-          auto point_bar = point;
-          point_bar[0] -= mach_number_ * t;
 
-          const Number r_square = Number(point_bar.norm_square());
+        /* In 3D we simply project onto the 2d plane: */
+        dealii::Point<2> point_bar;
+        point_bar[0] = point[0] - mach_number_ * t;
+        point_bar[1] = point[1];
 
-          const Number factor = beta_ / Number(2. * M_PI) *
-                                exp(Number(0.5) - Number(0.5) * r_square);
+        const Number r_square = Number(point_bar.norm_square());
 
-          const Number T = Number(1.) - (gamma - Number(1.)) /
-                                            (Number(2.) * gamma) * factor *
-                                            factor;
+        const Number factor = beta_ / Number(2. * M_PI) *
+                              exp(Number(0.5) - Number(0.5) * r_square);
 
-          const Number u = mach_number_ - factor * Number(point_bar[1]);
-          const Number v = factor * Number(point_bar[0]);
+        const Number T = Number(1.) - (gamma - Number(1.)) /
+                                          (Number(2.) * gamma) * factor *
+                                          factor;
 
-          const Number rho = ryujin::pow(T, Number(1.) / (gamma - Number(1.)));
-          const Number p = ryujin::pow(rho, gamma);
-          const Number E =
-              p / (gamma - Number(1.)) + Number(0.5) * rho * (u * u + v * v);
+        const Number u = mach_number_ - factor * Number(point_bar[1]);
+        const Number v = factor * Number(point_bar[0]);
 
+        const Number rho = ryujin::pow(T, Number(1.) / (gamma - Number(1.)));
+        const Number p = ryujin::pow(rho, gamma);
+        const Number E =
+            p / (gamma - Number(1.)) + Number(0.5) * rho * (u * u + v * v);
+
+        if constexpr (dim == 2)
           return state_type({rho, rho * u, rho * v, E});
-
-        } else {
+        else if constexpr (dim == 3)
+          return state_type({rho, rho * u, rho * v, Number(0.), E});
+        else {
           AssertThrow(false, dealii::ExcNotImplemented());
-          return state_type();
+          __builtin_trap();
         }
       }
 
