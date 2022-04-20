@@ -72,16 +72,17 @@ some of the following references
 }
 
 @article{ryujin-2021-3,
-  author = {Jean-Luc~Guermond and Martin Kronbichler and Matthias Maier and
+  author = {Jean-Luc Guermond and Martin Kronbichler and Matthias Maier and
     Bojan Popov and Ignacio Tomas},
   title = {On the implementation of a robust and efficient finite
     element-based parallel solver for the compressible Navier-stokes
     equations},
+  doi = {10.1016/j.cma.2021.114250},
   url = {https://arxiv.org/abs/2106.02159},
   journal = {Computer Methods in Applied Mechanics and Engineering},
-  year = {2021},
-  volume = {accepted},
-  pages = {},
+  year = {2022},
+  volume = {389},
+  pages = {114250},
 }
 ```
 
