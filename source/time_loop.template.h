@@ -334,7 +334,11 @@ namespace ryujin
 
     computing_timer["time loop"].stop();
 
-    /* Write final timing statistics to logfile: */
+    /* Write final timing statistics to screen and logfile: */
+    if (terminal_update_interval != 0) {
+      print_cycle_statistics(
+          cycle, t, output_cycle, /*logfile*/ false, /*final_time=*/true);
+    }
     print_cycle_statistics(
         cycle, t, output_cycle, /*logfile*/ true, /*final_time=*/true);
 
