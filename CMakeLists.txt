@@ -114,13 +114,9 @@ set(NEWTON_EPS_DOUBLE "1.e-10" CACHE STRING "EPS double for limiter Newton solve
 set(NEWTON_EPS_FLOAT "1.e-4" CACHE STRING "EPS float for limiter Newton solver")
 set(NEWTON_MAX_ITER "2" CACHE STRING "Maximal number of iterations in limiter Newton solver")
 set(RIEMANN_NEWTON_MAX_ITER "0" CACHE STRING "Maximal number of iterations in Riemann solver")
-set(INDICATOR "Indicators::entropy_viscosity_commutator" CACHE STRING "Indicator for preliminary high-order method")
 set(INDICATOR_SECOND_VARIATIONS "true" CACHE STRING "Use second variations")
 set(INDICATOR_ENTROPY "Entropy::harten" CACHE STRING "Entropy for entropy-viscosity commutator")
 set(INDICATOR_ALPHA_0 "1." CACHE STRING "alpha_0 factor for entropy-viscosity commutator")
-set(SMOOTHNESS_INDICATOR "SmoothnessIndicators::pressure" CACHE STRING "Quantity used in smoothness indicator")
-set(SMOOTHNESS_INDICATOR_ALPHA_0 "0." CACHE STRING "alpha_0 factor of smoothness indicator")
-set(SMOOTHNESS_INDICATOR_POWER "3" CACHE STRING "exponent of smoothness indicator")
 set(LIMITER "Limiters::specific_entropy" CACHE STRING "Select limiter")
 set(LIMITER_RELAX_BOUNDS "true" CACHE STRING "Relax limiter bounds")
 set(LIMITER_RELAXATION_ORDER "3" CACHE STRING "Relaxation order for limiter bounds")
@@ -129,9 +125,7 @@ mark_as_advanced(
   EQUATION_OF_STATE
   NEWTON_EPS_DOUBLE NEWTON_EPS_FLOAT NEWTON_MAX_ITER
   RIEMANN_NEWTON_MAX_ITER
-  INDICATOR INDICATOR_ALPHA_0 INDICATOR_SECOND_VARIATIONS INDICATOR_ENTROPY
-  SMOOTHNESS_INDICATOR SMOOTHNESS_INDICATOR_ALPHA_0
-  SMOOTHNESS_INDICATOR_POWER
+  INDICATOR_ALPHA_0 INDICATOR_SECOND_VARIATIONS INDICATOR_ENTROPY
   LIMITER LIMITER_RELAX_BOUNDS LIMITER_RELAXATION_ORDER
   )
 

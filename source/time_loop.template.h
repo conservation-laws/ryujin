@@ -556,21 +556,6 @@ namespace ryujin
     stream << "serial pow == std::pow"<< std::endl;
 #endif
 
-    stream << "Indicator<dim, Number>::indicators_ == ";
-    switch (Indicator<dim, Number>::indicator_) {
-    case Indicator<dim, Number>::Indicators::zero:
-      stream << "Indicator<dim, Number>::Indicators::zero" << std::endl;
-      break;
-    case Indicator<dim, Number>::Indicators::one:
-      stream << "Indicator<dim, Number>::Indicators::one" << std::endl;
-      break;
-    case Indicator<dim, Number>::Indicators::entropy_viscosity_commutator:
-      stream << "Indicator<dim, Number>::Indicators::entropy_viscosity_commutator" << std::endl;
-      break;
-    case Indicator<dim, Number>::Indicators::smoothness_indicator:
-      stream << "Indicator<dim, Number>::Indicators::smoothness_indicator" << std::endl;
-    }
-
     stream << "Indicator<dim, Number>::compute_second_variations_ == "
             << Indicator<dim, Number>::compute_second_variations_ << std::endl;
 
@@ -585,24 +570,6 @@ namespace ryujin
 
     stream << "Indicator<dim, Number>::evc_alpha_0_ == "
            << Indicator<dim, Number>::evc_alpha_0_ << std::endl;
-
-    stream << "Indicator<dim, Number>::smoothness_indicator_ == ";
-    switch (Indicator<dim, Number>::smoothness_indicator_) {
-    case Indicator<dim, Number>::SmoothnessIndicators::rho:
-      stream << "Indicator<dim, Number>::SmoothnessIndicators::rho" << std::endl;
-      break;
-    case Indicator<dim, Number>::SmoothnessIndicators::internal_energy:
-      stream << "Indicator<dim, Number>::SmoothnessIndicators::internal_energy" << std::endl;
-      break;
-    case Indicator<dim, Number>::SmoothnessIndicators::pressure:
-      stream << "Indicator<dim, Number>::SmoothnessIndicators::pressure" << std::endl;
-    }
-
-    stream << "Indicator<dim, Number>::smoothness_indicator_alpha_0_ == "
-           << Indicator<dim, Number>::smoothness_indicator_alpha_0_ << std::endl;
-
-    stream << "Indicator<dim, Number>::smoothness_indicator_power_ == "
-           << Indicator<dim, Number>::smoothness_indicator_power_ << std::endl;
 
     stream << "Limiter<dim, Number>::limiter_ == ";
     switch (Limiter<dim, Number>::limiter_) {

@@ -18,17 +18,10 @@ namespace ryujin
 {
 
   /**
-   * This class implements two indicator strategies used to form the
+   * This class implements an indicator strategy used to form the
    * preliminary high-order update.
    *
-   * The first one is a smoothness indicator as described in
-   * @cite GuermondEtAl2018 and that is similar in nature to smoothness
-   * indicators used in the finite volume communities (see for example
-   * @cite Jameson2017).
-   *
-   * @todo explain algorithmic details of the smoothness indicator
-   *
-   * The second indicator is an entropy-viscosity commutator as described
+   * The indicator is an entropy-viscosity commutator as described
    * in @cite GuermondEtAl2011 and @cite GuermondEtAl2018. For a given
    * entropy \f$\eta\f$ (either the mathematical entropy, or a Harten
    * entropy, see the documentation of ProblemDescription) we let
@@ -94,26 +87,6 @@ namespace ryujin
     using ScalarNumber = typename get_value_type<Number>::type;
 
     /**
-     * An enum describing different indicator strategies
-     */
-    enum class Indicators {
-      /**
-       * Indicator returns a constant zero, i.e., the high-order update is
-       * equal to an inviscid Galerkin update.
-       */
-      zero,
-      /**
-       * Indicator returns a constant one, i.e., the high-order update is
-       * equal to the low-order update.
-       */
-      one,
-      /** Use a smoothness indicator. */
-      smoothness_indicator,
-      /** Use an entropy-viscosity commutator. */
-      entropy_viscosity_commutator
-    };
-
-    /**
      * An enum describing different choices of entropies used for the
      * entropy-viscosity commutator
      */
@@ -125,29 +98,11 @@ namespace ryujin
     };
 
     /**
-     * An scalar physical quantity used for computing the smoothness
-     * indicator.
-     */
-    enum class SmoothnessIndicators {
-      /** The density */
-      rho,
-      /** The internal energy */
-      internal_energy,
-      /** The pressure */
-      pressure,
-    };
-
-    /**
      * @name Indicator compile time options
      */
     //@{
 
     // clang-format off
-    /**
-     * Selected indicator used for the preliminary high-order update.
-     * @ingroup CompileTimeOptions
-     */
-    static constexpr Indicators indicator_ = INDICATOR;
 
     /**
      * Compute second variations of the density.
@@ -166,24 +121,6 @@ namespace ryujin
      * @ingroup CompileTimeOptions
      */
     static constexpr ScalarNumber evc_alpha_0_ = INDICATOR_ALPHA_0;
-
-    /**
-     * Selected quantity used for the smoothness indicator.
-     * @ingroup CompileTimeOptions
-     */
-    static constexpr SmoothnessIndicators smoothness_indicator_ = SMOOTHNESS_INDICATOR;
-
-    /**
-     * Tuning parameter for the smoothness indicator.
-     * @ingroup CompileTimeOptions
-     */
-    static constexpr ScalarNumber smoothness_indicator_alpha_0_ = SMOOTHNESS_INDICATOR_ALPHA_0;
-
-    /**
-     * Tuning parameter for the smoothness indicator.cator.
-     * @ingroup CompileTimeOptions
-     */
-    static constexpr unsigned int smoothness_indicator_power_ = SMOOTHNESS_INDICATOR_POWER;
     // clang-format on
 
     //@}
@@ -260,11 +197,11 @@ namespace ryujin
 
     /* Temporary storage used for the smoothness indicator: */
 
-    Number indicator_i = 0.;
+    //     Number indicator_i = 0.;
 
-    Number numerator = 0.;
-    Number denominator = 0.;
-    Number denominator_abs = 0.;
+    //     Number numerator = 0.;
+    //     Number denominator = 0.;
+    //     Number denominator_abs = 0.;
 
     /* Temporary storage used to compute second variations: */
 
@@ -279,37 +216,18 @@ namespace ryujin
   DEAL_II_ALWAYS_INLINE inline void
   Indicator<dim, Number>::reset(const state_type &U_i, const Number entropy)
   {
-    if constexpr (indicator_ == Indicators::entropy_viscosity_commutator) {
-      rho_i = problem_description.density(U_i);
-      rho_i_inverse = Number(1.) / rho_i;
-      eta_i = entropy;
-      f_i = problem_description.f(U_i);
+    rho_i = problem_description.density(U_i);
+    rho_i_inverse = Number(1.) / rho_i;
+    eta_i = entropy;
+    f_i = problem_description.f(U_i);
 
-      d_eta_i = evc_entropy_ == Entropy::mathematical
-                    ? problem_description.mathematical_entropy_derivative(U_i)
-                    : problem_description.harten_entropy_derivative(U_i);
-      d_eta_i[0] -= eta_i * rho_i_inverse;
+    d_eta_i = evc_entropy_ == Entropy::mathematical
+                  ? problem_description.mathematical_entropy_derivative(U_i)
+                  : problem_description.harten_entropy_derivative(U_i);
+    d_eta_i[0] -= eta_i * rho_i_inverse;
 
-      left = 0.;
-      right = 0.;
-    }
-
-    if constexpr (indicator_ == Indicators::smoothness_indicator) {
-      numerator = 0.;
-      denominator = 0.;
-      denominator_abs = 0.;
-      switch (Indicator<dim, Number>::smoothness_indicator_) {
-      case Indicator<dim, Number>::SmoothnessIndicators::rho:
-        indicator_i = problem_description.density(U_i);
-        break;
-      case Indicator<dim, Number>::SmoothnessIndicators::internal_energy:
-        indicator_i = problem_description.internal_energy(U_i);
-        break;
-      case Indicator<dim, Number>::SmoothnessIndicators::pressure:
-        indicator_i = problem_description.pressure(U_i);
-        break;
-      }
-    }
+    left = 0.;
+    right = 0.;
 
     if constexpr (compute_second_variations_) {
       rho_i = problem_description.density(U_i);
@@ -326,37 +244,15 @@ namespace ryujin
                               const Number beta_ij,
                               const Number entropy_j)
   {
-    if constexpr (indicator_ == Indicators::entropy_viscosity_commutator) {
-      const auto &rho_j = problem_description.density(U_j);
-      const auto rho_j_inverse = Number(1.) / rho_j;
-      const auto m_j = problem_description.momentum(U_j);
-      const auto f_j = problem_description.f(U_j);
-      const auto eta_j = entropy_j;
+    const auto &rho_j = problem_description.density(U_j);
+    const auto rho_j_inverse = Number(1.) / rho_j;
+    const auto m_j = problem_description.momentum(U_j);
+    const auto f_j = problem_description.f(U_j);
+    const auto eta_j = entropy_j;
 
-      left += (eta_j * rho_j_inverse - eta_i * rho_i_inverse) * (m_j * c_ij);
-      for (unsigned int k = 0; k < problem_dimension; ++k)
-        right[k] += (f_j[k] - f_i[k]) * c_ij;
-    }
-
-    if constexpr (indicator_ == Indicators::smoothness_indicator) {
-      Number indicator_j;
-      switch (Indicator<dim, Number>::smoothness_indicator_) {
-      case Indicator<dim, Number>::SmoothnessIndicators::rho:
-        indicator_j = problem_description.density(U_j);
-        break;
-      case Indicator<dim, Number>::SmoothnessIndicators::internal_energy:
-        indicator_j = problem_description.internal_energy(U_j);
-        break;
-      case Indicator<dim, Number>::SmoothnessIndicators::pressure:
-        indicator_j = problem_description.pressure(U_j);
-        break;
-      }
-
-      numerator += beta_ij * (indicator_i - indicator_j);
-      denominator += std::abs(beta_ij) * std::abs(indicator_i - indicator_j);
-      denominator_abs +=
-          std::abs(beta_ij) * (std::abs(indicator_i) + std::abs(indicator_j));
-    }
+    left += (eta_j * rho_j_inverse - eta_i * rho_i_inverse) * (m_j * c_ij);
+    for (unsigned int k = 0; k < problem_dimension; ++k)
+      right[k] += (f_j[k] - f_i[k]) * c_ij;
 
     if constexpr (compute_second_variations_) {
       const auto &rho_j = problem_description.density(U_j);
@@ -373,46 +269,16 @@ namespace ryujin
   {
     using ScalarNumber = typename get_value_type<Number>::type;
 
-    if constexpr (indicator_ == Indicators::zero) {
-      return Number(0.);
+    Number numerator = left;
+    Number denominator = std::abs(left);
+    for (unsigned int k = 0; k < problem_dimension; ++k) {
+      numerator -= d_eta_i[k] * right[k];
+      denominator += std::abs(d_eta_i[k] * right[k]);
     }
 
-    if constexpr (indicator_ == Indicators::one) {
-      return Number(1.);
-    }
-
-    if constexpr (indicator_ == Indicators::entropy_viscosity_commutator) {
-      Number numerator = left;
-      Number denominator = std::abs(left);
-      for (unsigned int k = 0; k < problem_dimension; ++k) {
-        numerator -= d_eta_i[k] * right[k];
-        denominator += std::abs(d_eta_i[k] * right[k]);
-      }
-
-      const auto quotient =
-          std::abs(numerator) / (denominator + hd_i * std::abs(eta_i));
-      return std::min(Number(1.), evc_alpha_0_ * quotient);
-    }
-
-    if constexpr (indicator_ == Indicators::smoothness_indicator) {
-      const Number beta_i = std::abs(numerator) / denominator_abs;
-
-      const Number ratio = std::abs(numerator) / denominator;
-      const Number alpha_i =
-          dealii::Utilities::fixed_power<smoothness_indicator_power_>(
-              std::max(ratio - smoothness_indicator_alpha_0_, Number(0.))) /
-          dealii::Utilities::fixed_power<smoothness_indicator_power_>(
-              1 - smoothness_indicator_alpha_0_);
-
-      return dealii::compare_and_apply_mask<
-          dealii::SIMDComparison::greater_than>(denominator,
-                                                ScalarNumber(1.0e-7) *
-                                                    denominator_abs,
-                                                std::min(alpha_i, beta_i),
-                                                beta_i);
-    }
-
-    __builtin_unreachable();
+    const auto quotient =
+        std::abs(numerator) / (denominator + hd_i * std::abs(eta_i));
+    return std::min(Number(1.), evc_alpha_0_ * quotient);
   }
 
 
@@ -424,6 +290,5 @@ namespace ryujin
     return rho_second_variation_numerator /
            (rho_second_variation_denominator + Number(eps));
   }
-
 
 } /* namespace ryujin */
