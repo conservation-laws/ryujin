@@ -98,7 +98,7 @@ set(NUMBER "double" CACHE STRING "The principal floating point type")
 
 option(CHECK_BOUNDS "Enable debug code paths that check limiter bounds" OFF)
 option(DEBUG_OUTPUT "Enable detailed time-step output" OFF)
-option(DENORMALS_ARE_ZERO "Set the \"denormals are zero\" and \"flush to zero\" bits in the MXCSR register" OFF)
+option(DENORMALS_ARE_ZERO "Set the \"denormals are zero\" and \"flush to zero\" bits in the MXCSR register" ON)
 option(FORCE_DEAL_II_SPARSE_MATRIX "Always use dealii::SparseMatrix instead of TrilinosWrappers::SparseMatrix for assembly" OFF)
 option(OBSESSIVE_INLINING "Also inline the Riemann solver and limiter calls" OFF)
 option(USE_COMMUNICATION_HIDING "Issue MPI synchronization of ghost values early" ON)
