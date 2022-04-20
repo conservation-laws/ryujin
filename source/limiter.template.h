@@ -29,8 +29,8 @@ namespace ryujin
       return {t_r, success};
 
     constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
-    constexpr ScalarNumber relax = ScalarNumber(1.) + 10. * eps;
-    constexpr ScalarNumber relaxbig = ScalarNumber(1.) + 10000. * eps;
+    constexpr ScalarNumber relax = ScalarNumber(1. + 10. * eps);
+    constexpr ScalarNumber relaxbig = ScalarNumber(1. + 10000. * eps);
 
     /*
      * First limit the density rho.
@@ -211,16 +211,17 @@ namespace ryujin
         const auto psi =
             relax * relax * rho_new * e_new - s_min * ryujin::pow(rho_new, gp1);
 
-        if (!((std::min(Number(0.), e_new) == Number(0.)) &&
-              (std::min(Number(0.), psi + 100. * eps) == Number(0.))
-
-                  )) {
+        const bool e_valid = std::min(Number(0.), e_new) == Number(0.);
+        const bool psi_valid =
+            std::min(Number(0.), psi + ScalarNumber(100.) * eps) == Number(0.);
+        if (!e_valid || !psi_valid) {
 #ifdef DEBUG_OUTPUT
           std::cout << std::fixed << std::setprecision(16);
           std::cout << "Specific entropy minimum principle violated:"
                     << std::endl;
           std::cout << "(high order) int: !!! 0 <= " << e_new << std::endl;
-          std::cout << "(high order) Psi: !!! 0 <= " << psi << std::endl << std::endl;
+          std::cout << "(high order) Psi: !!! 0 <= " << psi << std::endl
+                    << std::endl;
 #endif
           success = false;
         }

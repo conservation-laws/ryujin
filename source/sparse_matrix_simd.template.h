@@ -356,7 +356,7 @@ namespace ryujin
       for (unsigned int col_idx = 0; col_idx < row_length;
            ++col_idx, js += simd_length) {
 
-        dealii::VectorizedArray<Number, simd_length> temp = {};
+        VectorizedArray temp = {};
         for (unsigned int k = 0; k < simd_length; ++k)
           if (locally_indexed)
             temp[k] = sparse_matrix(i + k, js[k]);
@@ -378,7 +378,7 @@ namespace ryujin
       const unsigned int *js = sparsity->columns(i);
       for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx, ++js) {
 
-        const auto temp =
+        const Number temp =
             locally_indexed
                 ? sparse_matrix(i, js[0])
                 : sparse_matrix.el(

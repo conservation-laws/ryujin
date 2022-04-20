@@ -361,7 +361,7 @@ namespace ryujin
 
       /* Complete d_ij at boundary: */
 
-      RiemannSolver<dim> riemann_solver(*problem_description_);
+      RiemannSolver<dim, Number> riemann_solver(*problem_description_);
 
       RYUJIN_OMP_FOR /* with barrier */
       for (std::size_t k = 0; k < coupling_boundary_pairs.size(); ++k) {
