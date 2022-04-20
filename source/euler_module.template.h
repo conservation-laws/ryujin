@@ -209,11 +209,7 @@ namespace ryujin
           const auto s_i = problem_description_->specific_entropy(U_i);
           store_value<T>(specific_entropies_, s_i, i);
 
-          const auto evc_entropy =
-              Indicator<dim, double>::evc_entropy_ ==
-                      Indicator<dim, double>::Entropy::mathematical
-                  ? problem_description_->mathematical_entropy(U_i)
-                  : problem_description_->harten_entropy(U_i);
+          const auto evc_entropy = problem_description_->harten_entropy(U_i);
           store_value<T>(evc_entropies_, evc_entropy, i);
         }
       };
@@ -296,8 +292,10 @@ namespace ryujin
 
           const auto U_i = old_U.template get_tensor<T>(i);
           const auto entropy_i = load_value<T>(evc_entropies_, i);
+          const auto entropy_derivative_i =
+              problem_description_->harten_entropy_derivative(U_i);
 
-          indicator.reset(U_i, entropy_i);
+          indicator.reset(U_i, entropy_i, entropy_derivative_i);
 
           const auto mass = load_value<T>(lumped_mass_matrix, i);
           const auto hd_i = mass * measure_of_omega_inverse;

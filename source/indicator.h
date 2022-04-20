@@ -87,44 +87,6 @@ namespace ryujin
     using ScalarNumber = typename get_value_type<Number>::type;
 
     /**
-     * An enum describing different choices of entropies used for the
-     * entropy-viscosity commutator
-     */
-    enum class Entropy {
-      /** The (scaled) mathematical entropy */
-      mathematical,
-      /** A generalized Harten-type entropy */
-      harten
-    };
-
-    /**
-     * @name Indicator compile time options
-     */
-    //@{
-
-    // clang-format off
-
-    /**
-     * Compute second variations of the density.
-     * @ingroup CompileTimeOptions
-     */
-    static constexpr bool compute_second_variations_ = INDICATOR_SECOND_VARIATIONS;
-
-    /**
-     * Selected entropy used for the entropy-viscosity commutator.
-     * @ingroup CompileTimeOptions
-     */
-    static constexpr Entropy evc_entropy_ = INDICATOR_ENTROPY;
-
-    /**
-     * Tuning parameter for entropy viscosity commutator.
-     * @ingroup CompileTimeOptions
-     */
-    static constexpr ScalarNumber evc_alpha_0_ = INDICATOR_ALPHA_0;
-    // clang-format on
-
-    //@}
-    /**
      * @name Stencil-based computation of indicators
      *
      * Intended usage:
@@ -132,10 +94,10 @@ namespace ryujin
      * Indicator<dim, Number> indicator;
      * for (unsigned int i = n_internal; i < n_owned; ++i) {
      *   // ...
-     *   indicator.reset(U_i, evc_entropies_i);
+     *   indicator.reset(U_i, evc_entropy_i, evc_entropy_derivative_i);
      *   for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
      *     // ...
-     *     indicator.add(U_j, c_ij, beta_ij, evc_entropies_j);
+     *     indicator.add(U_j, c_ij, beta_ij, evc_entropy_j);
      *   }
      *   indicator.alpha(hd_i);
      *   indicator.second_variations();
@@ -156,7 +118,10 @@ namespace ryujin
      * Reset temporary storage and initialize for a new row corresponding
      * to state vector U_i.
      */
-    void reset(const state_type &U_i, const Number entropy);
+    void reset(
+        const state_type &U_i,
+        const Number entropy,
+        const dealii::Tensor<1, problem_dimension, Number> &entropy_derivative);
 
     /**
      * When looping over the sparsity row, add the contribution associated
@@ -213,27 +178,28 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline void
-  Indicator<dim, Number>::reset(const state_type &U_i, const Number entropy)
+  DEAL_II_ALWAYS_INLINE inline void Indicator<dim, Number>::reset(
+      const state_type &U_i,
+      const Number entropy,
+      const dealii::Tensor<1, problem_dimension, Number> &entropy_derivative)
   {
+    /* entropy viscosity commutator: */
+
     rho_i = problem_description.density(U_i);
     rho_i_inverse = Number(1.) / rho_i;
     eta_i = entropy;
-    f_i = problem_description.f(U_i);
-
-    d_eta_i = evc_entropy_ == Entropy::mathematical
-                  ? problem_description.mathematical_entropy_derivative(U_i)
-                  : problem_description.harten_entropy_derivative(U_i);
+    d_eta_i = entropy_derivative;
     d_eta_i[0] -= eta_i * rho_i_inverse;
+    f_i = problem_description.f(U_i);
 
     left = 0.;
     right = 0.;
 
-    if constexpr (compute_second_variations_) {
-      rho_i = problem_description.density(U_i);
-      rho_second_variation_numerator = 0.;
-      rho_second_variation_denominator = 0.;
-    }
+    /* second variations: */
+
+    rho_i = problem_description.density(U_i);
+    rho_second_variation_numerator = 0.;
+    rho_second_variation_denominator = 0.;
   }
 
 
@@ -244,6 +210,8 @@ namespace ryujin
                               const Number beta_ij,
                               const Number entropy_j)
   {
+    /* entropy viscosity commutator: */
+
     const auto &rho_j = problem_description.density(U_j);
     const auto rho_j_inverse = Number(1.) / rho_j;
     const auto m_j = problem_description.momentum(U_j);
@@ -254,12 +222,10 @@ namespace ryujin
     for (unsigned int k = 0; k < problem_dimension; ++k)
       right[k] += (f_j[k] - f_i[k]) * c_ij;
 
-    if constexpr (compute_second_variations_) {
-      const auto &rho_j = problem_description.density(U_j);
+    /* second variations: */
 
-      rho_second_variation_numerator += beta_ij * (rho_j - rho_i);
-      rho_second_variation_denominator += beta_ij;
-    }
+    rho_second_variation_numerator += beta_ij * (rho_j - rho_i);
+    rho_second_variation_denominator += beta_ij;
   }
 
 
@@ -276,6 +242,8 @@ namespace ryujin
       denominator += std::abs(d_eta_i[k] * right[k]);
     }
 
+    /* FIXME: this can be refactoring into a runtime parameter... */
+    const ScalarNumber evc_alpha_0_ = ScalarNumber(1.);
     const auto quotient =
         std::abs(numerator) / (denominator + hd_i * std::abs(eta_i));
     return std::min(Number(1.), evc_alpha_0_ * quotient);

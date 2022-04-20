@@ -556,21 +556,6 @@ namespace ryujin
     stream << "serial pow == std::pow"<< std::endl;
 #endif
 
-    stream << "Indicator<dim, Number>::compute_second_variations_ == "
-            << Indicator<dim, Number>::compute_second_variations_ << std::endl;
-
-    stream << "Indicator<dim, Number>::evc_entropy_ == ";
-    switch (Indicator<dim, Number>::evc_entropy_) {
-    case Indicator<dim, Number>::Entropy::mathematical:
-      stream << "Indicator<dim, Number>::Entropy::mathematical" << std::endl;
-      break;
-    case Indicator<dim, Number>::Entropy::harten:
-      stream << "Indicator<dim, Number>::Entropy::harten" << std::endl;
-    }
-
-    stream << "Indicator<dim, Number>::evc_alpha_0_ == "
-           << Indicator<dim, Number>::evc_alpha_0_ << std::endl;
-
     stream << "Limiter<dim, Number>::limiter_ == ";
     switch (Limiter<dim, Number>::limiter_) {
     case Limiter<dim, Number>::Limiters::none:
