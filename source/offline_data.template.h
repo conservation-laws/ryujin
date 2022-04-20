@@ -614,17 +614,20 @@ namespace ryujin
     coupling_boundary_pairs_.clear();
     for (auto entry : boundary_map_) {
       const auto i = entry.first;
-      if (i >= n_locally_owned_)
-        continue;
+      Assert(i <= n_locally_owned_, dealii::ExcInternalError());
+
       const unsigned int row_length = sparsity_pattern_simd_.row_length(i);
+      Assert(row_length > 1, dealii::ExcInternalError());
+
       const unsigned int *js = sparsity_pattern_simd_.columns(i);
       constexpr auto simd_length = VectorizedArray<Number>::size();
       /* skip diagonal: */
       for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
         const auto j = *(i < n_locally_internal_ ? js + col_idx * simd_length
                                                  : js + col_idx);
-        if (boundary_map_.count(j) != 0)
+        if (boundary_map_.count(j) != 0) {
           coupling_boundary_pairs_.push_back({i, col_idx, j});
+        }
       }
     }
   }
@@ -634,7 +637,7 @@ namespace ryujin
   void OfflineData<dim, Number>::create_multigrid_data()
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "OfflineData<dim, Number>::compute_boundary_map()"
+    std::cout << "OfflineData<dim, Number>::create_multigrid_data()"
               << std::endl;
 #endif
 
@@ -726,29 +729,8 @@ namespace ryujin
 
     for (auto cell = begin; cell != end; ++cell) {
 
-      /*
-       * TODO: This is a workaround: If DEAL_II_WITH_TRIILNOS is enabled
-       * and we have a locally refined mesh we have to communicate the
-       * ghost layer stored in the boundary map with all neighboring nodes.
-       *
-       * As a cheap workaround let's simply use the assembly over all
-       * non-artificial cells at the moment. This breaks when we work with
-       * locally refined meshes.
-       */
-#if defined(DEAL_II_WITH_TRILINOS) && false
       if (!cell->is_locally_owned_on_level())
         continue;
-#else
-      /*
-       * When using a local dealii::SparseMatrix<Number> we do not have a
-       * compress(VectorOperation::add) available. In this case we assemble
-       * contributions over all locally relevant (non artificial) cells.
-       */
-      if ((cell->is_active() && cell->is_artificial()) ||
-          cell->level_subdomain_id() ==
-              dealii::numbers::artificial_subdomain_id)
-        continue;
-#endif
 
       local_dof_indices.resize(dofs_per_cell);
       cell->get_active_or_mg_dof_indices(local_dof_indices);
@@ -776,11 +758,6 @@ namespace ryujin
           if (!discretization_->finite_element().has_support_on_face(j, f))
             continue;
 
-          /* Skip constrained degrees of freedom: */
-          const unsigned int row_length = sparsity_pattern_simd_.row_length(j);
-          if (row_length == 1)
-            continue;
-
           Number boundary_mass = 0.;
           dealii::Tensor<1, dim, Number> normal;
 
@@ -794,6 +771,16 @@ namespace ryujin
 
           const auto global_index = local_dof_indices[j];
           const auto index = partitioner.global_to_local(global_index);
+
+          /* Skip nonlocal degrees of freedom: */
+          if (index >= n_locally_owned_)
+            continue;
+
+          /* Skip constrained degrees of freedom: */
+          const unsigned int row_length =
+              sparsity_pattern_simd_.row_length(index);
+          if (row_length == 1)
+            continue;
 
           Point<dim> position =
               discretization_->mapping().transform_unit_to_real_cell(
