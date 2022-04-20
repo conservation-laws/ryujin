@@ -27,3 +27,23 @@ t     = 2.00024
 Linf  = 1.20076e-06
 L1    = 1.22744e-07
 L2    = 2.43871e-07
+
+
+
+#dofs =  4225, float, ERK(3,3,1), baseline, Harten entropy
+t     = 2.00693
+Linf  = 0.0054715
+L1    = 0.000403722
+L2    = 0.000944413
+
+#dofs = 16641, float, ERK(3,3,1), baseline, Harten entropy
+t     = 2.00063
+Linf  = 0.000657314
+L1    = 5.98743e-05
+L2    = 0.000118905
+
+#dofs = 66049, float, ERK(3,3,1), baseline, Harten entropy
+t     = 2.00061
+Linf  = 0.000163494
+L1    = 2.87595e-05
+L2    = 3.67441e-05
