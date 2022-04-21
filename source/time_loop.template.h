@@ -560,30 +560,8 @@ namespace ryujin
     stream << "serial pow == std::pow"<< std::endl;
 #endif
 
-    stream << "Limiter<dim, Number>::limiter_ == ";
-    switch (Limiter<dim, Number>::limiter_) {
-    case Limiter<dim, Number>::Limiters::none:
-      stream << "Limiter<dim, Number>::Limiters::none" << std::endl;
-      break;
-    case Limiter<dim, Number>::Limiters::rho:
-      stream << "Limiter<dim, Number>::Limiters::rho" << std::endl;
-      break;
-    case Limiter<dim, Number>::Limiters::specific_entropy:
-      stream << "Limiter<dim, Number>::Limiters::specific_entropy" << std::endl;
-      break;
-    case Limiter<dim, Number>::Limiters::entropy_inequality:
-      stream << "Limiter<dim, Number>::Limiters::entropy_inequality" << std::endl;
-      break;
-    }
-
     stream << "ryujin::newton_max_iter == "
            << ryujin::newton_max_iter << std::endl;
-
-    stream << "Limiter<dim, Number>::relax_bounds_ == "
-           << Limiter<dim, Number>::relax_bounds_ << std::endl;
-
-    stream << "Limiter<dim, Number>::relaxation_order_ == "
-           << Limiter<dim, Number>::relaxation_order_ << std::endl;
 
     stream << "ProblemDescription::equation_of_state_ == ";
     switch (ProblemDescription::equation_of_state_) {

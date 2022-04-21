@@ -43,8 +43,6 @@ namespace ryujin
    *     \Psi(\mathbf U)\;=\;\rho^{\gamma+1}(\mathbf U)\,\big(\phi(\mathbf
    * U)-\phi_{\text{min}}\big). \f}
    *
-   * @todo document local entropy inequality condition.
-   *
    * @ingroup EulerModule
    */
   template <int dim, typename Number = double>
@@ -69,41 +67,11 @@ namespace ryujin
     using ScalarNumber = typename get_value_type<Number>::type;
 
     /**
-     * An enum describing the thermodynamical quantities for which the
-     * invariant domain property is enforced by the limiter.
-     */
-    enum class Limiters {
-      /** Do not limit and accept full high-order update. */
-      none,
-      /** Enforce local bounds on density. */
-      rho,
-      /** Enforce local bounds on density and specific entropy. */
-      specific_entropy,
-      /**
-       * Enforce local bounds on density, specific entropy and enforce an
-       * entropy inequality using the Harten-type inequality
-       * ProblemDescription::harten_entropy().
-       */
-      entropy_inequality
-    };
-
-    /**
      * @name Limiter compile time options
      */
     //@{
 
     // clang-format off
-    /**
-     * Selected final limiting stage.
-     * @ingroup CompileTimeOptions
-     */
-    static constexpr Limiters limiter_ = LIMITER;
-
-    /**
-     * Relax accumulated limiter bounds.
-     * @ingroup CompileTimeOptions
-     */
-    static constexpr bool relax_bounds_ = LIMITER_RELAX_BOUNDS;
 
     /**
      * Order of mesh-size dependent coefficient in relaxation window.
@@ -128,7 +96,7 @@ namespace ryujin
      *     limiter.accumulate(U_i, U_j, U_ij_bar, specific_entropy_j, col_idx == 0);
      *   }
      *   limiter.apply_relaxation(hd_i);
-     *   limiter_serial.bounds();
+     *   limiter.bounds();
      * }
      * ```
      */
@@ -136,15 +104,8 @@ namespace ryujin
 
     /**
      * The number of stored entries in the bounds array.
-     *
-     * @todo determine number of bounds based on chosen limiter.
      */
-    // clang-format off
-    static constexpr unsigned int n_bounds =
-          (limiter_ == Limiters::rho) ? 2
-        : (limiter_ == Limiters::specific_entropy) ? 3
-        : (limiter_ == Limiters::entropy_inequality) ? 5 : 0;
-    // clang-format on
+    static constexpr unsigned int n_bounds = 3;
 
     /**
      * Array type used to store accumulated bounds.
@@ -197,10 +158,9 @@ namespace ryujin
      * obeying \f$t_{\text{min}} < t < t_{\text{max}}\f$, such that the
      * selected local minimum principles are obeyed.
      */
-    template <Limiters limiter = limiter_, typename BOUNDS>
     static std::tuple<Number, bool>
     limit(const ProblemDescription &problem_description,
-          const BOUNDS &bounds,
+          const Bounds &bounds,
           const state_type &U,
           const state_type &P,
           const Number t_min = Number(0.),
@@ -230,14 +190,9 @@ namespace ryujin
   Limiter<dim, Number>::reset(const Number specific_entropy_i,
                               const Number new_variations_i)
   {
-    if constexpr (relax_bounds_) {
-      variations_i = new_variations_i;
-    }
+    variations_i = new_variations_i;
 
     auto &[rho_min, rho_max, s_min] = bounds_;
-
-    if constexpr (limiter_ == Limiters::none)
-      return;
 
     rho_min = Number(std::numeric_limits<ScalarNumber>::max());
     rho_max = Number(0.);
@@ -245,10 +200,8 @@ namespace ryujin
     rho_relaxation_numerator = Number(0.);
     rho_relaxation_denominator = Number(0.);
 
-    if constexpr (limiter_ == Limiters::specific_entropy) {
-      s_min = specific_entropy_i;
-      s_interp_max = Number(0.);
-    }
+    s_min = specific_entropy_i;
+    s_interp_max = Number(0.);
   }
 
 
@@ -263,32 +216,25 @@ namespace ryujin
                                    const bool is_diagonal_entry)
   {
     /* Relaxation (the numerical constant 8 is up to debate): */
-    if constexpr (relax_bounds_) {
-      rho_relaxation_numerator +=
-          Number(8.0 * 0.5) * beta_ij * (variations_i + variations_j);
+    rho_relaxation_numerator +=
+        Number(8.0 * 0.5) * beta_ij * (variations_i + variations_j);
 
-      rho_relaxation_denominator += beta_ij;
-    }
+    rho_relaxation_denominator += beta_ij;
 
     /* Bounds: */
 
     auto &[rho_min, rho_max, s_min] = bounds_;
 
-    if constexpr (limiter_ == Limiters::none)
-      return;
-
     const auto rho_ij = problem_description.density(U_ij_bar);
     rho_min = std::min(rho_min, rho_ij);
     rho_max = std::max(rho_max, rho_ij);
 
-    if constexpr (limiter_ == Limiters::specific_entropy) {
-      s_min = std::min(s_min, specific_entropy_j);
+    s_min = std::min(s_min, specific_entropy_j);
 
-      if (!is_diagonal_entry) {
-        const Number s_interp = problem_description.specific_entropy(
-            (U_i + U_j) * ScalarNumber(.5));
-        s_interp_max = std::max(s_interp_max, s_interp);
-      }
+    if (!is_diagonal_entry) {
+      const Number s_interp =
+          problem_description.specific_entropy((U_i + U_j) * ScalarNumber(.5));
+      s_interp_max = std::max(s_interp_max, s_interp);
     }
   }
 
@@ -297,13 +243,7 @@ namespace ryujin
   DEAL_II_ALWAYS_INLINE inline void
   Limiter<dim, Number>::apply_relaxation(Number hd_i)
   {
-    if constexpr (!relax_bounds_)
-      return;
-
     auto &[rho_min, rho_max, s_min] = bounds_;
-
-    if constexpr (limiter_ == Limiters::none)
-      return;
 
     const Number r_i =
         Number(2.) * dealii::Utilities::fixed_power<relaxation_order_>(
@@ -317,10 +257,8 @@ namespace ryujin
     rho_min = std::max((Number(1.) - r_i) * rho_min, rho_min - rho_relaxation);
     rho_max = std::min((Number(1.) + r_i) * rho_max, rho_max + rho_relaxation);
 
-    if constexpr (limiter_ == Limiters::specific_entropy) {
-      s_min = std::max((Number(1.) - r_i) * s_min,
-                       Number(2.) * s_min - s_interp_max);
-    }
+    s_min =
+        std::max((Number(1.) - r_i) * s_min, Number(2.) * s_min - s_interp_max);
   }
 
 

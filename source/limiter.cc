@@ -12,17 +12,15 @@ namespace ryujin
   /* instantiations */
 
   template std::tuple<NUMBER, bool>
-  Limiter<DIM, NUMBER>::limit<Limiter<DIM, NUMBER>::Limiters::specific_entropy>(
-      const ProblemDescription &,
-      const std::array<NUMBER, 3> &,
-      const state_type &,
-      const state_type &,
-      const NUMBER,
-      const NUMBER);
+  Limiter<DIM, NUMBER>::limit(const ProblemDescription &,
+                              const std::array<NUMBER, 3> &,
+                              const state_type &,
+                              const state_type &,
+                              const NUMBER,
+                              const NUMBER);
 
   template std::tuple<VectorizedArray<NUMBER>, bool>
-  Limiter<DIM, VectorizedArray<NUMBER>>::limit<
-      Limiter<DIM, VectorizedArray<NUMBER>>::Limiters::specific_entropy>(
+  Limiter<DIM, VectorizedArray<NUMBER>>::limit(
       const ProblemDescription &,
       const std::array<VectorizedArray<NUMBER>, 3> &,
       const state_type &,
