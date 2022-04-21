@@ -576,8 +576,7 @@ namespace ryujin
                                U_ij_bar,
                                beta_ij,
                                specific_entropy_j,
-                               variations_j,
-                               /* is diagonal */ col_idx == 0);
+                               variations_j);
           }
 
           new_U.template write_tensor<T>(U_i_new, i);

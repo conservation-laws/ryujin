@@ -119,8 +119,7 @@ namespace ryujin
                     const state_type &U_ij_bar,
                     const Number beta_ij,
                     const Number specific_entropy_j,
-                    const Number variations_j,
-                    const bool is_diagonal_entry);
+                    const Number variations_j);
 
     /**
      * Apply relaxation.
@@ -199,8 +198,7 @@ namespace ryujin
                                    const state_type &U_ij_bar,
                                    const Number beta_ij,
                                    const Number specific_entropy_j,
-                                   const Number variations_j,
-                                   const bool is_diagonal_entry)
+                                   const Number variations_j)
   {
     /* Relaxation (the numerical constant 8 is up to debate): */
     rho_relaxation_numerator +=
@@ -218,11 +216,9 @@ namespace ryujin
 
     s_min = std::min(s_min, specific_entropy_j);
 
-    if (!is_diagonal_entry) {
-      const Number s_interp =
-          problem_description.specific_entropy((U_i + U_j) * ScalarNumber(.5));
-      s_interp_max = std::max(s_interp_max, s_interp);
-    }
+    const Number s_interp =
+        problem_description.specific_entropy((U_i + U_j) * ScalarNumber(.5));
+    s_interp_max = std::max(s_interp_max, s_interp);
   }
 
 
