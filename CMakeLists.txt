@@ -111,17 +111,11 @@ set(ORDER_QUADRATURE "2" CACHE STRING "Order of quadrature")
 set(EQUATION_OF_STATE "EquationOfState::ideal_gas" CACHE STRING "Equation of state")
 set(NEWTON_EPS_DOUBLE "1.e-10" CACHE STRING "EPS double for limiter Newton solver")
 set(NEWTON_EPS_FLOAT "1.e-4" CACHE STRING "EPS float for limiter Newton solver")
-set(NEWTON_MAX_ITER "2" CACHE STRING "Maximal number of iterations in limiter Newton solver")
 set(RIEMANN_NEWTON_MAX_ITER "0" CACHE STRING "Maximal number of iterations in Riemann solver")
-set(LIMITER "Limiters::specific_entropy" CACHE STRING "Select limiter")
-set(LIMITER_RELAX_BOUNDS "true" CACHE STRING "Relax limiter bounds")
-set(LIMITER_RELAXATION_ORDER "3" CACHE STRING "Relaxation order for limiter bounds")
 mark_as_advanced(
   ORDER_FINITE_ELEMENT ORDER_MAPPING ORDER_QUADRATURE
   EQUATION_OF_STATE
   NEWTON_EPS_DOUBLE NEWTON_EPS_FLOAT NEWTON_MAX_ITER
-  RIEMANN_NEWTON_MAX_ITER
-  LIMITER LIMITER_RELAX_BOUNDS LIMITER_RELAXATION_ORDER
   )
 
 #

@@ -66,21 +66,6 @@ namespace ryujin
      */
     using ScalarNumber = typename get_value_type<Number>::type;
 
-    /**
-     * @name Limiter compile time options
-     */
-    //@{
-
-    // clang-format off
-
-    /**
-     * Order of mesh-size dependent coefficient in relaxation window.
-     * @ingroup CompileTimeOptions
-     */
-    static constexpr unsigned int relaxation_order_ = LIMITER_RELAXATION_ORDER;
-
-    // clang-format on
-
     //@}
     /**
      * @name Stencil-based accumulations of bounds
@@ -245,6 +230,7 @@ namespace ryujin
   {
     auto &[rho_min, rho_max, s_min] = bounds_;
 
+    constexpr unsigned int relaxation_order_ = 3;
     const Number r_i =
         Number(2.) * dealii::Utilities::fixed_power<relaxation_order_>(
                          std::sqrt(std::sqrt(hd_i)));
