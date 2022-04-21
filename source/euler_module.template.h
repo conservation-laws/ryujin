@@ -76,7 +76,6 @@ namespace ryujin
     const auto &scalar_partitioner = offline_data_->scalar_partitioner();
 
     alpha_.reinit(scalar_partitioner);
-    second_variations_.reinit(scalar_partitioner);
     specific_entropies_.reinit(scalar_partitioner);
     evc_entropies_.reinit(scalar_partitioner);
 
@@ -278,7 +277,6 @@ namespace ryujin
 
       SynchronizationDispatch synchronization_dispatch([&]() {
         alpha_.update_ghost_values_start(channel++);
-        second_variations_.update_ghost_values_start(channel++);
       });
 
       RYUJIN_PARALLEL_REGION_BEGIN
@@ -323,9 +321,7 @@ namespace ryujin
             const auto entropy_j = load_value<T>(evc_entropies_, js);
 
             const auto c_ij = cij_matrix.template get_tensor<T>(i, col_idx);
-            const auto beta_ij =
-                betaij_matrix.template get_entry<T>(i, col_idx);
-            indicator.add(U_j, c_ij, beta_ij, entropy_j);
+            indicator.add(U_j, c_ij, entropy_j);
 
             /* Only iterate over the upper triangular portion of d_ij */
             if (all_below_diagonal<T>(i, js))
@@ -343,7 +339,6 @@ namespace ryujin
           }
 
           store_value<T>(alpha_, indicator.alpha(hd_i), i);
-          store_value<T>(second_variations_, indicator.second_variations(), i);
         }
       };
 
@@ -442,7 +437,6 @@ namespace ryujin
                   "time step [E] 2 - synchronization barrier");
 
       alpha_.update_ghost_values_finish();
-      second_variations_.update_ghost_values_finish();
 
       /* MPI Barrier: */
       tau_max.store(Utilities::MPI::min(tau_max.load(), mpi_communicator_));
@@ -517,7 +511,6 @@ namespace ryujin
           auto U_i_new = U_i;
           const auto alpha_i = load_value<T>(alpha_, i);
           const auto specific_entropy_i = load_value<T>(specific_entropies_, i);
-          const auto variations_i = load_value<T>(second_variations_, i);
 
           const auto m_i = load_value<T>(lumped_mass_matrix, i);
           const auto m_i_inv = load_value<T>(lumped_mass_matrix_inverse, i);
@@ -525,7 +518,7 @@ namespace ryujin
           ProblemDescription::state_type<dim, T> r_i;
 
           /* Clear bounds: */
-          limiter.reset(specific_entropy_i, variations_i);
+          limiter.reset(specific_entropy_i);
 
           const unsigned int *js = sparsity_simd.columns(i);
           for (unsigned int col_idx = 0; col_idx < row_length;
@@ -542,7 +535,6 @@ namespace ryujin
             }
 
             const auto alpha_j = load_value<T>(alpha_, js);
-            const auto variations_j = load_value<T>(second_variations_, js);
 
             const auto d_ij = dij_matrix_.template get_entry<T>(i, col_idx);
             const auto d_ijH = d_ij * (alpha_i + alpha_j) * Number(.5);
@@ -571,12 +563,7 @@ namespace ryujin
             const auto specific_entropy_j =
                 load_value<T>(specific_entropies_, js);
 
-            limiter.accumulate(U_i,
-                               U_j,
-                               U_ij_bar,
-                               beta_ij,
-                               specific_entropy_j,
-                               variations_j);
+            limiter.accumulate(U_i, U_j, U_ij_bar, beta_ij, specific_entropy_j);
           }
 
           new_U.template write_tensor<T>(U_i_new, i);

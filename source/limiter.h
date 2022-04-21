@@ -75,7 +75,7 @@ namespace ryujin
      * Limiter<dim, Number> limiter;
      * for (unsigned int i = n_internal; i < n_owned; ++i) {
      *   // ...
-     *   limiter.reset(specific_entropy_i, variations_i);
+     *   limiter.reset(specific_entropy_i);
      *   for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
      *     // ...
      *     limiter.accumulate(U_i, U_j, U_ij_bar, specific_entropy_j, col_idx == 0);
@@ -106,9 +106,9 @@ namespace ryujin
     }
 
     /**
-     * Reset temporary storage and reinitialize variations for new index i.
+     * Reset temporary storage
      */
-    void reset(const Number specific_entropy_i, const Number variations_i);
+    void reset(const Number specific_entropy_i);
 
     /**
      * When looping over the sparsity row, add the contribution associated
@@ -118,8 +118,7 @@ namespace ryujin
                     const state_type &U_j,
                     const state_type &U_ij_bar,
                     const Number beta_ij,
-                    const Number specific_entropy_j,
-                    const Number variations_j);
+                    const Number specific_entropy_j);
 
     /**
      * Apply relaxation.
@@ -161,7 +160,6 @@ namespace ryujin
 
     Bounds bounds_;
 
-    Number variations_i;
     Number rho_relaxation_numerator;
     Number rho_relaxation_denominator;
 
@@ -173,11 +171,8 @@ namespace ryujin
 
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline void
-  Limiter<dim, Number>::reset(const Number specific_entropy_i,
-                              const Number new_variations_i)
+  Limiter<dim, Number>::reset(const Number specific_entropy_i)
   {
-    variations_i = new_variations_i;
-
     auto &[rho_min, rho_max, s_min] = bounds_;
 
     rho_min = Number(std::numeric_limits<ScalarNumber>::max());
@@ -197,15 +192,8 @@ namespace ryujin
                                    const state_type &U_j,
                                    const state_type &U_ij_bar,
                                    const Number beta_ij,
-                                   const Number specific_entropy_j,
-                                   const Number variations_j)
+                                   const Number specific_entropy_j)
   {
-    /* Relaxation (the numerical constant 8 is up to debate): */
-    rho_relaxation_numerator +=
-        Number(8.0 * 0.5) * beta_ij * (variations_i + variations_j);
-
-    rho_relaxation_denominator += beta_ij;
-
     /* Bounds: */
 
     auto &[rho_min, rho_max, s_min] = bounds_;
@@ -215,6 +203,13 @@ namespace ryujin
     rho_max = std::max(rho_max, rho_ij);
 
     s_min = std::min(s_min, specific_entropy_j);
+
+    /* Relaxation: */
+
+    const auto rho_i = problem_description.density(U_i);
+    const auto rho_j = problem_description.density(U_j);
+    rho_relaxation_numerator += beta_ij * (rho_i + rho_j);
+    rho_relaxation_denominator += beta_ij;
 
     const Number s_interp =
         problem_description.specific_entropy((U_i + U_j) * ScalarNumber(.5));

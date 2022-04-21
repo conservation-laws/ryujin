@@ -261,7 +261,6 @@ namespace ryujin
     ACCESSOR_READ_ONLY(n_warnings)
 
     mutable scalar_type alpha_;
-    mutable scalar_type second_variations_;
     mutable scalar_type specific_entropies_;
     mutable scalar_type evc_entropies_;
 

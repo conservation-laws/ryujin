@@ -54,10 +54,6 @@ namespace ryujin
    *   \mathbf{f}(\boldsymbol U_i^n)\right)\cdot\boldsymbol c_{ij},
    * \f}
    *
-   * In addition, the class also computes second variations of the density
-   * \f$\rho\f$ that is used for relaxing the limiter bounds, see
-   * documentation of class Limiter.
-   *
    * @ingroup EulerModule
    */
   template <int dim, typename Number = double>
@@ -97,10 +93,9 @@ namespace ryujin
      *   indicator.reset(U_i, evc_entropy_i, evc_entropy_derivative_i);
      *   for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
      *     // ...
-     *     indicator.add(U_j, c_ij, beta_ij, evc_entropy_j);
+     *     indicator.add(U_j, c_ij, evc_entropy_j);
      *   }
      *   indicator.alpha(hd_i);
-     *   indicator.second_variations();
      * }
      * ```
      */
@@ -129,17 +124,11 @@ namespace ryujin
      */
     void add(const state_type &U_j,
              const dealii::Tensor<1, dim, Number> &c_ij,
-             const Number beta_ij,
              const Number entropy_j);
     /**
      * Return the computed alpha_i value.
      */
     Number alpha(const Number h_i);
-
-    /**
-     * Return the computed second variation of rho.
-     */
-    Number second_variations();
 
     //@}
 
@@ -151,27 +140,13 @@ namespace ryujin
 
     const ProblemDescription &problem_description;
 
-    Number rho_i = 0.;         // also used for second variations
-    Number rho_i_inverse = 0.; // also used for second variations
+    Number rho_i_inverse = 0.;
     Number eta_i = 0.;
     flux_type f_i;
     state_type d_eta_i;
 
     Number left = 0.;
     state_type right;
-
-    /* Temporary storage used for the smoothness indicator: */
-
-    //     Number indicator_i = 0.;
-
-    //     Number numerator = 0.;
-    //     Number denominator = 0.;
-    //     Number denominator_abs = 0.;
-
-    /* Temporary storage used to compute second variations: */
-
-    Number rho_second_variation_numerator = 0.;
-    Number rho_second_variation_denominator = 0.;
 
     //@}
   };
@@ -185,7 +160,7 @@ namespace ryujin
   {
     /* entropy viscosity commutator: */
 
-    rho_i = problem_description.density(U_i);
+    const auto &rho_i = problem_description.density(U_i);
     rho_i_inverse = Number(1.) / rho_i;
     eta_i = entropy;
     d_eta_i = entropy_derivative;
@@ -194,12 +169,6 @@ namespace ryujin
 
     left = 0.;
     right = 0.;
-
-    /* second variations: */
-
-    rho_i = problem_description.density(U_i);
-    rho_second_variation_numerator = 0.;
-    rho_second_variation_denominator = 0.;
   }
 
 
@@ -207,7 +176,6 @@ namespace ryujin
   DEAL_II_ALWAYS_INLINE inline void
   Indicator<dim, Number>::add(const state_type &U_j,
                               const dealii::Tensor<1, dim, Number> &c_ij,
-                              const Number beta_ij,
                               const Number entropy_j)
   {
     /* entropy viscosity commutator: */
@@ -221,11 +189,6 @@ namespace ryujin
     left += (eta_j * rho_j_inverse - eta_i * rho_i_inverse) * (m_j * c_ij);
     for (unsigned int k = 0; k < problem_dimension; ++k)
       right[k] += (f_j[k] - f_i[k]) * c_ij;
-
-    /* second variations: */
-
-    rho_second_variation_numerator += beta_ij * (rho_j - rho_i);
-    rho_second_variation_denominator += beta_ij;
   }
 
 
@@ -247,16 +210,6 @@ namespace ryujin
     const auto quotient =
         std::abs(numerator) / (denominator + hd_i * std::abs(eta_i));
     return std::min(Number(1.), evc_alpha_0_ * quotient);
-  }
-
-
-  template <int dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline Number
-  Indicator<dim, Number>::second_variations()
-  {
-    constexpr Number eps = std::numeric_limits<Number>::epsilon();
-    return rho_second_variation_numerator /
-           (rho_second_variation_denominator + Number(eps));
   }
 
 } /* namespace ryujin */
