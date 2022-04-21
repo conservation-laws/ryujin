@@ -320,7 +320,7 @@ namespace ryujin
             const auto norm = c_ij.norm();
             const auto n_ij = c_ij / norm;
 
-            const auto [lambda_max, p_star, n_iterations] =
+            const auto [lambda_max, p_star] =
                 riemann_solver.compute(U_i, U_j, n_ij);
 
             const auto d = norm * lambda_max;
@@ -371,8 +371,7 @@ namespace ryujin
         Assert(c_ji.norm() > 1.e-12, ExcInternalError());
         const auto norm = c_ji.norm();
         const auto n_ji = c_ji / norm;
-        auto [lambda_max_2, p_star_2, n_iterations_2] =
-            riemann_solver.compute(U_j, U_i, n_ji);
+        auto [lambda_max_2, p_star_2] = riemann_solver.compute(U_j, U_i, n_ji);
 
         auto d = dij_matrix_.get_entry(i, col_idx);
         d = std::max(d, norm * lambda_max_2);

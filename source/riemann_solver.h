@@ -5,8 +5,6 @@
 
 #pragma once
 
-#include <compile_time_options.h>
-
 #include "simd.h"
 
 #include "problem_description.h"
@@ -18,7 +16,6 @@
 
 namespace ryujin
 {
-
   /**
    * A fast approximative solver for the 1D Riemann problem. The solver
    * ensures that the estimate \f$\lambda_{\text{max}}\f$ that is returned
@@ -50,19 +47,6 @@ namespace ryujin
     using ScalarNumber = typename get_value_type<Number>::type;
 
     /**
-     * @name RiemannSolver compile time options
-     */
-    //@{
-
-    /**
-     * Maximal number of Newton iterations used in the approximate Riemann to
-     * improve the upper bound \f$\lambda_{\text{max}}\f$ on the wavespeed.
-     * @ingroup CompileTimeOptions
-     */
-    static constexpr unsigned int newton_max_iter_ = RIEMANN_NEWTON_MAX_ITER;
-
-    //@}
-    /**
      * @name Compute wavespeed estimates
      */
     //@{
@@ -86,8 +70,7 @@ namespace ryujin
      * lambda.
      */
     std::tuple<Number /*lambda_max*/,
-               Number /*p_star*/,
-               unsigned int /*iteration*/>
+               Number /*p_star*/>
     compute(const std::array<Number, 4> &riemann_data_i,
             const std::array<Number, 4> &riemann_data_j);
 
@@ -99,8 +82,7 @@ namespace ryujin
      * iterations used in the solver to find it.
      */
     std::tuple<Number /*lambda_max*/,
-               Number /*p_star*/,
-               unsigned int /*iteration*/>
+               Number /*p_star*/>
     compute(const state_type &U_i,
             const state_type &U_j,
             const dealii::Tensor<1, dim, Number> &n_ij);
@@ -110,52 +92,23 @@ namespace ryujin
   protected:
     /** @name Internal functions used in the Riemann solver */
     //@{
-    /**
-     * See [1], page 912, (3.4).
-     *
-     * Cost: 1x pow, 1x division, 2x sqrt
-     */
-    Number f(const std::array<Number, 4> &primitive_state,
-             const Number &p_star);
-
-    /**
-     * See [1], page 912, (3.4).
-     *
-     * Cost: 1x pow, 3x division, 1x sqrt
-     */
-    Number df(const std::array<Number, 4> &primitive_state,
-              const Number &p_star);
-
 
     /**
      * See [1], page 912, (3.3).
      *
-     * Cost: 2x pow, 2x division, 4x sqrt
-     */
-    Number phi(const std::array<Number, 4> &riemann_data_i,
-               const std::array<Number, 4> &riemann_data_j,
-               const Number &p);
-
-
-    /**
-     * This is a specialized variant of phi() that computes phi(p_max). It
-     * inlines the implementation of f() and eliminates all unnecessary
-     * branches in f().
+     * The approximate Riemann solver is based on a function phi(p) that is
+     * montone increasing in p, concave down and whose (weak) third
+     * derivative is non-negative and locally bounded [1, p. 912]. Because
+     * we actually do not perform any iteration for computing our wavespeed
+     * estimate we can get away by only implementing a specialized variant
+     * of the phi function that computes phi(p_max). It inlines the
+     * implementation of the "f" function and eliminates all unnecessary
+     * branches in "f".
      *
      * Cost: 0x pow, 2x division, 2x sqrt
      */
     Number phi_of_p_max(const std::array<Number, 4> &riemann_data_i,
                         const std::array<Number, 4> &riemann_data_j);
-
-
-    /**
-     * See [1], page 912, (3.3).
-     *
-     * Cost: 2x pow, 6x division, 2x sqrt
-     */
-    Number dphi(const std::array<Number, 4> &riemann_data_i,
-                const std::array<Number, 4> &riemann_data_j,
-                const Number &p);
 
 
     /**
@@ -174,22 +127,6 @@ namespace ryujin
      */
     Number lambda3_plus(const std::array<Number, 4> &primitive_state,
                         const Number p_star);
-
-
-    /**
-     * For two given primitive states <code>riemann_data_i</code> and
-     * <code>riemann_data_j</code>, and two guesses p_1 <= p* <= p_2,
-     * compute the gap in lambda between both guesses.
-     *
-     * See [1], page 914, (4.4a), (4.4b), (4.5), and (4.6)
-     *
-     * Cost: 0x pow, 4x division, 4x sqrt
-     */
-    std::array<Number, 2>
-    compute_gap(const std::array<Number, 4> &riemann_data_i,
-                const std::array<Number, 4> &riemann_data_j,
-                const Number p_1,
-                const Number p_2);
 
 
     /**
@@ -218,24 +155,6 @@ namespace ryujin
      */
     Number p_star_two_rarefaction(const std::array<Number, 4> &riemann_data_i,
                                   const std::array<Number, 4> &riemann_data_j);
-
-
-    /**
-     * Given the pressure minimum and maximum and two corresponding
-     * densities we compute approximations for the density of corresponding
-     * shock and expansion waves.
-     *
-     * [2] Formula (4.4)
-     *
-     * Cost: 2x pow, 2x division, 0x sqrt
-     */
-    inline std::array<Number, 4>
-    shock_and_expansion_density(const Number p_min,
-                                const Number p_max,
-                                const Number rho_p_min,
-                                const Number rho_p_max,
-                                const Number p_1,
-                                const Number p_2);
 
 
     /**

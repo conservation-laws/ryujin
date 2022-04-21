@@ -573,9 +573,6 @@ namespace ryujin
       break;
     }
 
-    stream << "RiemannSolver<dim, Number>::newton_max_iter_ == "
-           <<  RiemannSolver<dim, Number>::newton_max_iter_ << std::endl;
-
     /* clang-format on */
 
     stream << std::endl;
