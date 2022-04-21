@@ -109,9 +109,6 @@ set(ORDER_FINITE_ELEMENT "1" CACHE STRING "Order of finite elements")
 set(ORDER_MAPPING "1" CACHE STRING "Order of mapping")
 set(ORDER_QUADRATURE "2" CACHE STRING "Order of quadrature")
 set(EQUATION_OF_STATE "EquationOfState::ideal_gas" CACHE STRING "Equation of state")
-set(NEWTON_EPS_DOUBLE "1.e-10" CACHE STRING "EPS double for limiter Newton solver")
-set(NEWTON_EPS_FLOAT "1.e-4" CACHE STRING "EPS float for limiter Newton solver")
-set(RIEMANN_NEWTON_MAX_ITER "0" CACHE STRING "Maximal number of iterations in Riemann solver")
 mark_as_advanced(
   ORDER_FINITE_ELEMENT ORDER_MAPPING ORDER_QUADRATURE
   EQUATION_OF_STATE

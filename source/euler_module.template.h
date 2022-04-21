@@ -42,6 +42,20 @@ namespace ryujin
     add_parameter(
         "limiter iterations", limiter_iter_, "Number of limiter iterations");
 
+    if constexpr (std::is_same<Number, double>::value)
+      limiter_newton_tolerance_ = 1.e-10;
+    else
+      limiter_newton_tolerance_ = 1.e-4;
+    add_parameter("limiter newton tolerance",
+                  limiter_newton_tolerance_,
+                  "Tolerance for the quadratic newton stopping criterion");
+
+    limiter_newton_max_iter_ = 2;
+    add_parameter("limiter newton max iterations",
+                  limiter_newton_max_iter_,
+                  "Maximal number of quadratic newton iterations performed "
+                  "during limiting");
+
     cfl_with_boundary_dofs_ = false;
     add_parameter("cfl with boundary dofs",
                   cfl_with_boundary_dofs_,
@@ -704,8 +718,13 @@ namespace ryujin
             p_ij *= factor;
             pij_matrix_.write_tensor(p_ij, i, col_idx, true);
 
-            const auto &[l_ij, success] = Limiter<dim, T>::limit(
-                *problem_description_, bounds, U_i_new, p_ij);
+            const auto &[l_ij, success] =
+                Limiter<dim, T>::limit(*problem_description_,
+                                       bounds,
+                                       U_i_new,
+                                       p_ij,
+                                       limiter_newton_tolerance_,
+                                       limiter_newton_max_iter_);
             lij_matrix_.template write_entry<T>(l_ij, i, col_idx, true);
 
             /* Unsuccessful with current CFL, force a restart. */
@@ -843,8 +862,13 @@ namespace ryujin
                   (T(1.) - old_l_ij) *
                   pij_matrix_.template get_tensor<T>(i, col_idx);
 
-              const auto &[new_l_ij, success] = Limiter<dim, T>::limit(
-                  *problem_description_, bounds, U_i_new, new_p_ij);
+              const auto &[new_l_ij, success] =
+                  Limiter<dim, T>::limit(*problem_description_,
+                                         bounds,
+                                         U_i_new,
+                                         new_p_ij,
+                                         limiter_newton_tolerance_,
+                                         limiter_newton_max_iter_);
 
               /* Unsuccessful with current CFL, force a restart. */
               if (!success)

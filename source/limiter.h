@@ -148,6 +148,8 @@ namespace ryujin
           const Bounds &bounds,
           const state_type &U,
           const state_type &P,
+          const ScalarNumber newton_tolerance,
+          const unsigned int newton_max_iter,
           const Number t_min = Number(0.),
           const Number t_max = Number(1.));
     //*}

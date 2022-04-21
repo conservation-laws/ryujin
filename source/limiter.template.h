@@ -15,6 +15,8 @@ namespace ryujin
                               const Bounds &bounds,
                               const state_type &U,
                               const state_type &P,
+                              const ScalarNumber newton_tolerance,
+                              const unsigned int newton_max_iter,
                               const Number t_min /* = Number(0.) */,
                               const Number t_max /* = Number(1.) */)
   {
@@ -161,13 +163,12 @@ namespace ryujin
         }
 
         /* Break if all psi_l values are within a prescribed tolerance: */
-        if (std::max(Number(0.),
-                     dealii::compare_and_apply_mask<
-                         dealii::SIMDComparison::greater_than>(
-                         psi_r,
-                         Number(0.),
-                         Number(0.),
-                         psi_l - newton_eps<Number>)) == Number(0.))
+        if (std::max(
+                Number(0.),
+                dealii::compare_and_apply_mask<
+                    dealii::SIMDComparison::greater_than>(
+                    psi_r, Number(0.), Number(0.), psi_l - newton_tolerance)) ==
+            Number(0.))
           break;
 
         /* We got unlucky and have to perform a Newton step: */
@@ -186,8 +187,8 @@ namespace ryujin
             t_l, t_r, psi_l, psi_r, dpsi_l, dpsi_r, Number(-1.));
 
         /* Let's error on the safe side: */
-        t_l -= ScalarNumber(0.2) * newton_eps<Number>;
-        t_r += ScalarNumber(0.2) * newton_eps<Number>;
+        t_l -= ScalarNumber(0.2) * newton_tolerance;
+        t_r += ScalarNumber(0.2) * newton_tolerance;
       }
 
 #ifdef CHECK_BOUNDS

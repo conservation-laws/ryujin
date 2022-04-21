@@ -560,19 +560,6 @@ namespace ryujin
     stream << "serial pow == std::pow"<< std::endl;
 #endif
 
-    stream << "ryujin::newton_max_iter == "
-           << ryujin::newton_max_iter << std::endl;
-
-    stream << "ProblemDescription::equation_of_state_ == ";
-    switch (ProblemDescription::equation_of_state_) {
-    case ProblemDescription::EquationOfState::ideal_gas:
-      stream << "ProblemDescription::EquationOfState::ideal_gas" << std::endl;
-      break;
-    case ProblemDescription::EquationOfState::van_der_waals:
-      stream << "ProblemDescription::EquationOfState::van_der_waals" << std::endl;
-      break;
-    }
-
     /* clang-format on */
 
     stream << std::endl;

@@ -17,6 +17,8 @@ namespace ryujin
                               const state_type &,
                               const state_type &,
                               const NUMBER,
+                              const unsigned int,
+                              const NUMBER,
                               const NUMBER);
 
   template std::tuple<VectorizedArray<NUMBER>, bool>
@@ -25,6 +27,8 @@ namespace ryujin
       const std::array<VectorizedArray<NUMBER>, 3> &,
       const state_type &,
       const state_type &,
+      const NUMBER,
+      const unsigned int,
       const VectorizedArray<NUMBER>,
       const VectorizedArray<NUMBER>);
 
