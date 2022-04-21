@@ -126,7 +126,8 @@ namespace ryujin
      *
      * @ingroup CompileTimeOptions
      */
-    static constexpr EquationOfState equation_of_state_ = EQUATION_OF_STATE;
+    static constexpr EquationOfState equation_of_state_ =
+        EquationOfState::ideal_gas;
 
     //@}
     /**

@@ -100,7 +100,6 @@ option(CHECK_BOUNDS "Enable debug code paths that check limiter bounds" OFF)
 option(DEBUG_OUTPUT "Enable detailed time-step output" OFF)
 option(DENORMALS_ARE_ZERO "Set the \"denormals are zero\" and \"flush to zero\" bits in the MXCSR register" ON)
 option(FORCE_DEAL_II_SPARSE_MATRIX "Always use dealii::SparseMatrix instead of TrilinosWrappers::SparseMatrix for assembly" OFF)
-option(USE_COMMUNICATION_HIDING "Issue MPI synchronization of ghost values early" ON)
 option(USE_CUSTOM_POW "Use custom pow implementation" ON)
 option(PRECOMPILE_HEADERS "Precompile headers for faster (re)compilation" OFF)
 option(SPLIT_SYNCHRONIZATION_TIMERS "Split synchronization timers" OFF)
@@ -108,12 +107,6 @@ option(SPLIT_SYNCHRONIZATION_TIMERS "Split synchronization timers" OFF)
 set(ORDER_FINITE_ELEMENT "1" CACHE STRING "Order of finite elements")
 set(ORDER_MAPPING "1" CACHE STRING "Order of mapping")
 set(ORDER_QUADRATURE "2" CACHE STRING "Order of quadrature")
-set(EQUATION_OF_STATE "EquationOfState::ideal_gas" CACHE STRING "Equation of state")
-mark_as_advanced(
-  ORDER_FINITE_ELEMENT ORDER_MAPPING ORDER_QUADRATURE
-  EQUATION_OF_STATE
-  NEWTON_EPS_DOUBLE NEWTON_EPS_FLOAT NEWTON_MAX_ITER
-  )
 
 #
 # Set up the rest:

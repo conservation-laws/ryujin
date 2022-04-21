@@ -3,8 +3,7 @@
 // Copyright (C) 2020 by the ryujin authors
 //
 
-#ifndef COMPILE_TIME_OPTIONS_H
-#define COMPILE_TIME_OPTIONS_H
+#pragma once
 
 /* General compile-time options: */
 
@@ -25,14 +24,8 @@
 #define CHECK_BOUNDS
 #endif
 
-/* class Discretization: */
+/* Discretization: */
 
 #define ORDER_FINITE_ELEMENT @ORDER_FINITE_ELEMENT@
 #define ORDER_MAPPING @ORDER_MAPPING@
 #define ORDER_QUADRATURE @ORDER_QUADRATURE@
-
-/* class ProblemDescription: */
-
-#define EQUATION_OF_STATE @EQUATION_OF_STATE@
-
-#endif /* COMPILE_TIME_OPTIONS_H */
