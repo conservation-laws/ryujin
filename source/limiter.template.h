@@ -11,16 +11,13 @@ namespace ryujin
 {
   template <int dim, typename Number>
   template <typename Limiter<dim, Number>::Limiters limiter, typename BOUNDS>
-#ifdef OBSESSIVE_INLINING
-  DEAL_II_ALWAYS_INLINE inline
-#endif
-      std::tuple<Number, bool>
-      Limiter<dim, Number>::limit(const ProblemDescription &problem_description,
-                                  const BOUNDS &bounds,
-                                  const state_type &U,
-                                  const state_type &P,
-                                  const Number t_min /* = Number(0.) */,
-                                  const Number t_max /* = Number(1.) */)
+  std::tuple<Number, bool>
+  Limiter<dim, Number>::limit(const ProblemDescription &problem_description,
+                              const BOUNDS &bounds,
+                              const state_type &U,
+                              const state_type &P,
+                              const Number t_min /* = Number(0.) */,
+                              const Number t_max /* = Number(1.) */)
   {
     bool success = true;
     Number t_r = t_max;

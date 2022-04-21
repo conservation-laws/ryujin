@@ -262,7 +262,3 @@ namespace ryujin
   };
 
 } /* namespace ryujin */
-
-#ifdef OBSESSIVE_INLINING
-#include "riemann_solver.template.h"
-#endif

@@ -332,7 +332,3 @@ namespace ryujin
   }
 
 } /* namespace ryujin */
-
-#ifdef OBSESSIVE_INLINING
-#include "limiter.template.h"
-#endif

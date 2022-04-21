@@ -11,7 +11,6 @@ namespace ryujin
 {
   /* instantiations */
 
-#ifndef OBSESSIVE_INLINING
   template std::tuple<NUMBER, bool>
   Limiter<DIM, NUMBER>::limit<Limiter<DIM, NUMBER>::Limiters::specific_entropy>(
       const ProblemDescription &,
@@ -30,6 +29,5 @@ namespace ryujin
       const state_type &,
       const VectorizedArray<NUMBER>,
       const VectorizedArray<NUMBER>);
-#endif
 
 } // namespace ryujin

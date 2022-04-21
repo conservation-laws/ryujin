@@ -378,13 +378,9 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-#ifdef OBSESSIVE_INLINING
-  DEAL_II_ALWAYS_INLINE inline
-#endif
-      std::tuple<Number, Number, unsigned int>
-      RiemannSolver<dim, Number>::compute(
-          const std::array<Number, 4> &riemann_data_i,
-          const std::array<Number, 4> &riemann_data_j)
+  std::tuple<Number, Number, unsigned int> RiemannSolver<dim, Number>::compute(
+      const std::array<Number, 4> &riemann_data_i,
+      const std::array<Number, 4> &riemann_data_j)
   {
     /*
      * Step 1:
@@ -505,14 +501,10 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-#ifdef OBSESSIVE_INLINING
-  DEAL_II_ALWAYS_INLINE inline
-#endif
-      std::tuple<Number, Number, unsigned int>
-      RiemannSolver<dim, Number>::compute(
-          const state_type &U_i,
-          const state_type &U_j,
-          const dealii::Tensor<1, dim, Number> &n_ij)
+  std::tuple<Number, Number, unsigned int> RiemannSolver<dim, Number>::compute(
+      const state_type &U_i,
+      const state_type &U_j,
+      const dealii::Tensor<1, dim, Number> &n_ij)
   {
     const auto riemann_data_i =
         riemann_data_from_state(problem_description, U_i, n_ij);
