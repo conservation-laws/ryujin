@@ -925,82 +925,30 @@ namespace ryujin
                     " - apply boundary conditions");
 
     const auto &boundary_map = offline_data_->boundary_map();
-    const unsigned int n_owned = offline_data_->n_locally_owned();
 
     for (auto entry : boundary_map) {
       const auto i = entry.first;
-      if (i >= n_owned)
-        continue;
 
       const auto &[normal, normal_mass, boundary_mass, id, position] =
           entry.second;
+
+      /*
+       * Relay the task of applying appropriate boundary conditions to the
+       * Problem Description.
+       */
 
       if (id == Boundary::do_nothing)
         continue;
 
       auto U_i = U.get_tensor(i);
 
-      if (id == Boundary::slip) {
-        /* Remove the normal component of the momentum: */
-        auto m = problem_description_->momentum(U_i);
-        m -= 1. * (m * normal) * normal;
-        for (unsigned int k = 0; k < dim; ++k)
-          U_i[k + 1] = m[k];
+      /* Use a lambda to avoid computing unnecessary state values */
+      auto get_dirichlet_data = [position = position, t = t, this]() {
+        return initial_values_->initial_state(position, t);
+      };
 
-      } else if (id == Boundary::no_slip) {
-        /* Enforce no-slip conditions: */
-        for (unsigned int k = 0; k < dim; ++k)
-          U_i[k + 1] = Number(0.);
-
-      } else if (id == Boundary::dirichlet) {
-        /* On Dirichlet boundaries enforce initial conditions: */
-        U_i = initial_values_->initial_state(position, t);
-
-      } else if (id == Boundary::dynamic) {
-        /*
-         * On dynamic boundary conditions, we distinguish four cases:
-         *
-         *  - supersonic inflow: prescribe full state
-         *  - subsonic inflow:
-         *      decompose into Riemann invariants and leave R_2
-         *      characteristic untouched.
-         *  - supersonic outflow: do nothing
-         *  - subsonic outflow:
-         *      decompose into Riemann invariants and prescribe incoming
-         *      R_1 characteristic.
-         */
-        const auto m = problem_description_->momentum(U_i);
-        const auto rho = problem_description_->density(U_i);
-        const auto a = problem_description_->speed_of_sound(U_i);
-        const auto vn = m * normal / rho;
-
-        /* Supersonic inflow: */
-        if (vn < -a) {
-          U_i = initial_values_->initial_state(position, t);
-        }
-
-        /* Subsonic inflow: */
-        if (vn >= -a && vn <= 0.) {
-          const auto U_i_dirichlet =
-              initial_values_->initial_state(position, t);
-          U_i = problem_description_->prescribe_riemann_characteristic<2>(
-              U_i_dirichlet, U_i, normal);
-        }
-
-        /* Subsonic outflow: */
-        if (vn > 0. && vn <= a) {
-          const auto U_i_dirichlet =
-              initial_values_->initial_state(position, t);
-          U_i = problem_description_->prescribe_riemann_characteristic<1>(
-              U_i, U_i_dirichlet, normal);
-        }
-
-        /* Supersonic outflow: */
-        if (vn > a) {
-          continue;
-        }
-      }
-
+      U_i = problem_description_->apply_boundary_conditions(
+          id, U_i, normal, get_dirichlet_data);
       U.write_tensor(U_i, i);
     }
 

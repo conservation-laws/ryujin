@@ -8,6 +8,7 @@
 #include <compile_time_options.h>
 
 #include "convenience_macros.h"
+#include "discretization.h"
 #include "patterns_conversion.h"
 #include "simd.h"
 
@@ -33,7 +34,7 @@ namespace ryujin
      */
     navier_stokes,
   };
-}
+} // namespace ryujin
 
 DECLARE_ENUM(ryujin::ProblemType,
              LIST({ryujin::ProblemType::euler, "Euler"},
@@ -296,6 +297,31 @@ namespace ryujin
         const dealii::Tensor<1, problem_dim, Number> &U,
         const dealii::Tensor<1, problem_dim, Number> &U_bar,
         const dealii::Tensor<1, problem_dim - 2, Number> &normal) const;
+
+    /**
+     * Apply boundary conditions.
+     *
+     * For the compressible Euler equations we have:
+     *
+     *  - Dirichlet boundary conditions by prescribing the return value of
+     *    get_dirichlet_data() as is.
+     *
+     *  - Slip boundary conditions where we remove the normal component of
+     *    the momentum.
+     *
+     *  - No slip boundary conditions where we set the momentum to 0.
+     *
+     *  - "Dynamic boundary" conditions that prescribe different Riemann
+     *    invariants from the return value of get_dirichlet_data()
+     *    depending on the flow state (supersonic versus subsonic, outflow
+     *    versus inflow).
+     */
+    template <int problem_dim, typename Number, typename Lambda>
+    dealii::Tensor<1, problem_dim, Number>
+    apply_boundary_conditions(dealii::types::boundary_id id,
+                              dealii::Tensor<1, problem_dim, Number> U,
+                              const dealii::Tensor<1, problem_dim - 2> &normal,
+                              Lambda get_dirichlet_data) const;
 
     //@}
     /**
@@ -735,6 +761,71 @@ namespace ryujin
                      0.5 * rho_new * (vn_new * vn_new + vperp.norm_square());
 
     return U_new;
+  }
+
+
+  template <int problem_dim, typename Number, typename Lambda>
+  DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, problem_dim, Number>
+  ProblemDescription::apply_boundary_conditions(
+      dealii::types::boundary_id id,
+      dealii::Tensor<1, problem_dim, Number> U,
+      const dealii::Tensor<1, problem_dim - 2> &normal,
+      Lambda get_dirichlet_data) const
+  {
+    constexpr auto dim = problem_dim - 2;
+
+    if (id == Boundary::dirichlet) {
+      U = get_dirichlet_data();
+
+    } else if (id == Boundary::slip) {
+      auto m = momentum(U);
+      m -= 1. * (m * normal) * normal;
+      for (unsigned int k = 0; k < dim; ++k)
+        U[k + 1] = m[k];
+
+    } else if (id == Boundary::no_slip) {
+      for (unsigned int k = 0; k < dim; ++k)
+        U[k + 1] = Number(0.);
+
+    } else if (id == Boundary::dynamic) {
+      /*
+       * On dynamic boundary conditions, we distinguish four cases:
+       *
+       *  - supersonic inflow: prescribe full state
+       *  - subsonic inflow:
+       *      decompose into Riemann invariants and leave R_2
+       *      characteristic untouched.
+       *  - supersonic outflow: do nothing
+       *  - subsonic outflow:
+       *      decompose into Riemann invariants and prescribe incoming
+       *      R_1 characteristic.
+       */
+      const auto m = momentum(U);
+      const auto rho = density(U);
+      const auto a = speed_of_sound(U);
+      const auto vn = m * normal / rho;
+
+      /* Supersonic inflow: */
+      if (vn < -a) {
+        U = get_dirichlet_data();
+      }
+
+      /* Subsonic inflow: */
+      if (vn >= -a && vn <= 0.) {
+        const auto U_dirichlet = get_dirichlet_data();
+        U = prescribe_riemann_characteristic<2>(U_dirichlet, U, normal);
+      }
+
+      /* Subsonic outflow: */
+      if (vn > 0. && vn <= a) {
+        const auto U_dirichlet = get_dirichlet_data();
+        U = prescribe_riemann_characteristic<1>(U, U_dirichlet, normal);
+      }
+
+      /* Supersonic outflow: do nothing, i.e., keep U as is */
+    }
+
+    return U;
   }
 
 
