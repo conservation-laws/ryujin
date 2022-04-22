@@ -281,8 +281,21 @@ namespace ryujin
 
     /* Clear statistics: */
     clear_statistics();
-  }
 
+    /* Prepare header string: */
+    const auto &names =
+        problem_description_->template primitive_component_names<dim>;
+    header_ =
+        std::accumulate(std::begin(names),
+                        std::end(names),
+                        std::string(),
+                        [](std::string &description, auto name) {
+                          return description.empty()
+                                     ? std::string("primitive state (") + name
+                                     : description + ", " + name;
+                        }) +
+        ")\t and 2nd moments\n";
+  }
 
 
   template <int dim, typename Number>
@@ -371,6 +384,7 @@ namespace ryujin
   }
 
 
+
   template <int dim, typename Number>
   void Quantities<dim, Number>::write_out_interior(
       std::ostream &output,
@@ -387,16 +401,7 @@ namespace ryujin
 
     if (Utilities::MPI::this_mpi_process(mpi_communicator_) == 0) {
 
-      const auto &names =
-          problem_description_->template primitive_component_names<dim>;
-      output << std::accumulate(
-          std::begin(names), std::end(names), std::string(),
-          [](std::string &description, auto name) {
-            return description.empty()
-                       ? std::string("# primitive state (") + name
-                       : description + ", " + name;
-          });
-      output << ")\t and 2nd moments\n";
+      output << "# " << header_;
 
       unsigned int rank = 0;
       for (const auto &entries : received) {
@@ -411,6 +416,7 @@ namespace ryujin
     }
   }
 
+
   template <int dim, typename Number>
   auto Quantities<dim, Number>::accumulate_boundary(
       const vector_type &U,
@@ -418,8 +424,7 @@ namespace ryujin
       std::vector<boundary_value> &val_new) -> boundary_value
   {
     boundary_value spatial_average;
-    Number nm_sum = Number(0.);
-    Number bm_sum = Number(0.);
+    Number boundary_mass_sum = Number(0.);
 
     std::transform(
         boundary_map.begin(),
@@ -429,74 +434,38 @@ namespace ryujin
           const auto &[i, n_i, nm_i, bm_i, id, x_i] = point;
 
           const auto U_i = U.get_tensor(i);
-          const auto rho_i = problem_description_->density(U_i);
-          const auto m_i = problem_description_->momentum(U_i);
-          const auto v_i = m_i / rho_i;
-          const auto p_i = problem_description_->pressure(U_i);
-
-          // FIXME: compute symmetric diffusion tensor s(U) over stencil
-          const auto S_i = dealii::Tensor<2, dim, Number>();
-          const auto tau_n_i = S_i * n_i;
+          const auto primitive_state =
+              problem_description_->to_primitive_state(U_i);
 
           boundary_value result;
+          std::get<0>(result) = primitive_state;
+          /* Compute second moments of the primitive state: */
+          std::get<1>(result) = schur_product(primitive_state, primitive_state);
 
-          if constexpr (dim == 1)
-            result = {state_type{{rho_i, v_i[0], p_i}},
-                      state_type{{rho_i * rho_i, v_i[0] * v_i[0], p_i * p_i}},
-                      tau_n_i,
-                      p_i * n_i};
-          else if constexpr (dim == 2)
-            result = {state_type{{rho_i, v_i[0], v_i[1], p_i}},
-                      state_type{{rho_i * rho_i,
-                                  v_i[0] * v_i[0],
-                                  v_i[1] * v_i[1],
-                                  p_i * p_i}},
-                      tau_n_i,
-                      p_i * n_i};
-          else
-            result = {state_type{{rho_i, v_i[0], v_i[1], v_i[2], p_i}},
-                      state_type{{rho_i * rho_i,
-                                  v_i[0] * v_i[0],
-                                  v_i[1] * v_i[1],
-                                  v_i[2] * v_i[2],
-                                  p_i * p_i}},
-                      tau_n_i,
-                      p_i * n_i};
-
-          bm_sum += bm_i;
+          boundary_mass_sum += bm_i;
           std::get<0>(spatial_average) += bm_i * std::get<0>(result);
           std::get<1>(spatial_average) += bm_i * std::get<1>(result);
-
-          nm_sum += nm_i;
-          std::get<2>(spatial_average) += nm_i * std::get<2>(result);
-          std::get<3>(spatial_average) += nm_i * std::get<3>(result);
 
           return result;
         });
 
     /* synchronize MPI ranks (MPI Barrier): */
 
-    nm_sum = Utilities::MPI::sum(nm_sum, mpi_communicator_);
-    bm_sum = Utilities::MPI::sum(bm_sum, mpi_communicator_);
-
+    boundary_mass_sum =
+        Utilities::MPI::sum(boundary_mass_sum, mpi_communicator_);
     std::get<0>(spatial_average) =
         Utilities::MPI::sum(std::get<0>(spatial_average), mpi_communicator_);
     std::get<1>(spatial_average) =
         Utilities::MPI::sum(std::get<1>(spatial_average), mpi_communicator_);
-    std::get<2>(spatial_average) =
-        Utilities::MPI::sum(std::get<2>(spatial_average), mpi_communicator_);
-    std::get<3>(spatial_average) =
-        Utilities::MPI::sum(std::get<3>(spatial_average), mpi_communicator_);
 
     /* take average: */
 
-    std::get<0>(spatial_average) /= bm_sum;
-    std::get<1>(spatial_average) /= bm_sum;
-    std::get<2>(spatial_average) /= nm_sum;
-    std::get<3>(spatial_average) /= nm_sum;
+    std::get<0>(spatial_average) /= boundary_mass_sum;
+    std::get<1>(spatial_average) /= boundary_mass_sum;
 
     return spatial_average;
   }
+
 
   template <int dim, typename Number>
   void Quantities<dim, Number>::write_out_boundary(
@@ -514,16 +483,14 @@ namespace ryujin
 
     if (Utilities::MPI::this_mpi_process(mpi_communicator_) == 0) {
 
-      output << "# primitive state (rho, u, p)\t2nd moments (rho^2, u_i^2, "
-                "p^2)\tboundary stress\tpressure normal\n";
+      output << "# " << header_;
 
       unsigned int rank = 0;
       for (const auto &entries : received) {
         output << "# rank " << rank++ << "\n";
         for (const auto &entry : entries) {
-          const auto &[state, state_square, tau_n, pn] = entry;
-          output << scale * state << "\t" << scale * state_square << "\t"
-                 << scale * tau_n << "\t" << scale * pn << "\n";
+          const auto &[state, state_square] = entry;
+          output << scale * state << "\t" << scale * state_square << "\n";
         } /*entry*/
       }   /*entries*/
 
@@ -540,8 +507,7 @@ namespace ryujin
     if (Utilities::MPI::this_mpi_process(mpi_communicator_) == 0) {
 
       if (!append)
-        output << "# time t\tprimitive state (rho, u, p)\t2nd moments (rho^2, "
-                  "u_i^2, p^2)\n";
+        output << "# time t\t" << header_;
 
       for (const auto &entry : values) {
         const auto t = std::get<0>(entry);
@@ -563,15 +529,13 @@ namespace ryujin
     if (Utilities::MPI::this_mpi_process(mpi_communicator_) == 0) {
 
       if (!append)
-        output << "# time t\tprimitive state (rho, u, p)\t2nd moments (rho^2, "
-                  "u_i^2, p^2)\tboundary stress\tpressure normal\n";
+        output << "# time t\t" << header_;
 
       for (const auto &entry : values) {
         const auto t = std::get<0>(entry);
-        const auto &[state, state_square, tau_n, pn] = std::get<1>(entry);
+        const auto &[state, state_square] = std::get<1>(entry);
 
-        output << t << "\t" << state << "\t" << state_square << "\t" << tau_n
-               << "\t" << pn << "\n";
+        output << t << "\t" << state << "\t" << state_square << "\n";
       }
 
       output << std::flush;
@@ -688,10 +652,6 @@ namespace ryujin
           std::get<0>(val_sum[i]) += 0.5 * tau * std::get<0>(val_new[i]);
           std::get<1>(val_sum[i]) += 0.5 * tau * std::get<1>(val_old[i]);
           std::get<1>(val_sum[i]) += 0.5 * tau * std::get<1>(val_new[i]);
-          std::get<2>(val_sum[i]) += 0.5 * tau * std::get<2>(val_old[i]);
-          std::get<2>(val_sum[i]) += 0.5 * tau * std::get<2>(val_new[i]);
-          std::get<3>(val_sum[i]) += 0.5 * tau * std::get<3>(val_old[i]);
-          std::get<3>(val_sum[i]) += 0.5 * tau * std::get<3>(val_new[i]);
         }
         t_sum += tau;
       }

@@ -137,9 +137,7 @@ namespace ryujin
      */
     using boundary_value =
         std::tuple<primitive_state_type /* primitive state */,
-                   primitive_state_type /* primitive state second moment */,
-                   dealii::Tensor<1, dim, Number> /* tau_n */, // FIXME
-                   dealii::Tensor<1, dim, Number> /* pn */>;   // FIXME
+                   primitive_state_type /* primitive state second moment */>;
 
     /**
      * Temporal statistics we store for each boundary manifold.
@@ -211,6 +209,8 @@ namespace ryujin
     //@{
 
     void clear_statistics();
+
+    std::string header_;
 
     interior_value
     accumulate_interior(const vector_type &U,
