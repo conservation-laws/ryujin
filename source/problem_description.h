@@ -346,17 +346,41 @@ namespace ryujin
 
     //@}
     /**
-     * @name Transforming to and from primitive states.
+     * @name State transformations (primitive states, expanding
+     * dimensionality, etc.)
      */
     //@{
 
     /*
-     * Given a primitive 1D state [rho, u, p], compute a conserved state
-     * with momentum parallel to e_1.
+     * Given a state vector associated with @ref dim2 spatial dimensions
+     * return an "expanded" version of the state vector associated with
+     * @ref dim1 spatial dimensions where the momentum vector is projected
+     * onto the first @ref dim2 unit directions of the @ref dim1
+     * dimensional euclidean space.
+     *
+     * @precondition dim1 has to be larger or equal than dim2.
      */
-    template <int dim, typename Number>
-    state_type<dim, Number>
-    from_primitive_state(const dealii::Tensor<1, 3, Number> &state_1d) const;
+    template <int dim1,
+              int prob_dim2,
+              typename Number,
+              typename = typename std::enable_if<(dim1 + 2 >= prob_dim2)>::type>
+    state_type<dim1, Number>
+    expand_state(const dealii::Tensor<1, prob_dim2, Number> &state) const;
+
+    /*
+     * Given a primitive state [rho, u_1, ..., u_d, p] return a conserved
+     * state
+     */
+    template <int problem_dim, typename Number>
+    dealii::Tensor<1, problem_dim, Number> from_primitive_state(
+        const dealii::Tensor<1, problem_dim, Number> &primitive_state) const;
+
+    /*
+     * Given a conserved state return a primitive state [rho, u_1, ..., u_d, p]
+     */
+    template <int problem_dim, typename Number>
+    dealii::Tensor<1, problem_dim, Number> to_primitive_state(
+        const dealii::Tensor<1, problem_dim, Number> &primitive_state) const;
 
     //@}
 
@@ -855,22 +879,64 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline ProblemDescription::state_type<dim, Number>
-  ProblemDescription::from_primitive_state(
-      const dealii::Tensor<1, 3, Number> &state_1d) const
+  template <int dim1, int prob_dim2, typename Number, typename>
+  ProblemDescription::state_type<dim1, Number> ProblemDescription::expand_state(
+      const dealii::Tensor<1, prob_dim2, Number> &state) const
   {
-    const auto &rho = state_1d[0];
-    const auto &u = state_1d[1];
-    const auto &p = state_1d[2];
+    constexpr auto dim2 = prob_dim2 - 2;
 
-    state_type<dim, Number> state;
+    state_type<dim1, Number> result;
+    result[0] = state[0];
+    result[dim1 + 1] = state[dim2 + 1];
+    for (unsigned int i = 1; i < dim2 + 1; ++i)
+      result[i] = state[i];
 
-    state[0] = rho;
-    state[1] = rho * u;
+    return result;
+  }
+
+
+  template <int problem_dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, problem_dim, Number>
+  ProblemDescription::from_primitive_state(
+      const dealii::Tensor<1, problem_dim, Number> &primitive_state) const
+  {
+    constexpr auto dim = problem_dim - 2;
+
+    const auto &rho = primitive_state[0];
+    /* extract velocity: */
+    const auto u = /*SIC!*/ momentum(primitive_state);
+    const auto &p = primitive_state[dim + 1];
+
+    auto state = primitive_state;
+    /* Fix up momentum: */
+    for (unsigned int i = 1; i < dim + 1; ++i)
+      state[i] *= rho;
+    /* Compute total energy: */
     state[dim + 1] = p / (Number(gamma_ - 1.)) + Number(0.5) * rho * u * u;
 
     return state;
+  }
+
+
+  template <int problem_dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, problem_dim, Number>
+  ProblemDescription::to_primitive_state(
+      const dealii::Tensor<1, problem_dim, Number> &state) const
+  {
+    constexpr auto dim = problem_dim - 2;
+
+    const auto &rho = state[0];
+    const auto rho_inverse = Number(1.) / rho;
+    const auto p = pressure(state);
+
+    auto primitive_state = state;
+    /* Fix up velocity: */
+    for (unsigned int i = 1; i < dim + 1; ++i)
+      primitive_state[i] *= rho_inverse;
+    /* Set pressure: */
+    primitive_state[dim + 1] = p;
+
+    return primitive_state;
   }
 
 } /* namespace ryujin */

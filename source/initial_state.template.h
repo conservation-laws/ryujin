@@ -38,12 +38,13 @@ namespace ryujin
       virtual state_type compute(const dealii::Point<dim> & /*point*/,
                                  Number /*t*/) final override
       {
-        return this->problem_description.template from_primitive_state<dim>(
-            primitive_);
+        const auto temp =
+            this->problem_description.from_primitive_state(primitive_);
+        return this->problem_description.template expand_state<dim>(temp);
       }
 
     private:
-      dealii::Tensor<1, 3, Number> primitive_;
+      dealii::Tensor<1, dim + 1, Number> primitive_;
     };
 
 
@@ -94,22 +95,24 @@ namespace ryujin
       virtual state_type compute(const dealii::Point<dim> & /*point*/,
                                  Number t) final override
       {
-        if (t <= t_initial_)
-          return this->problem_description.template from_primitive_state<dim>(
-              primitive_initial_);
+        dealii::Tensor<1, 3, Number> primitive;
 
-        if (t >= t_final_)
-          return this->problem_description.template from_primitive_state<dim>(
-              primitive_final_);
+        if (t <= t_initial_) {
+          primitive = primitive_initial_;
+        } else if (t >= t_final_) {
+          primitive = primitive_final_;
+        } else {
+          const Number factor =
+              std::cos(0.5 * M_PI * (t - t_initial_) / (t_final_ - t_initial_));
 
-        const Number factor =
-            std::cos(0.5 * M_PI * (t - t_initial_) / (t_final_ - t_initial_));
+          const Number alpha = factor * factor;
+          const Number beta = Number(1.) - alpha;
+          primitive = alpha * primitive_initial_ + beta * primitive_final_;
+        }
 
-        const Number alpha = factor * factor;
-        const Number beta = 1. - alpha;
-
-        return this->problem_description.template from_primitive_state<dim>(
-            alpha * primitive_initial_ + beta * primitive_final_);
+        const auto &problem_description = this->problem_description;
+        const auto temp = problem_description.from_primitive_state(primitive);
+        return problem_description.template expand_state<dim>(temp);
       }
 
     private:
@@ -162,8 +165,9 @@ namespace ryujin
       virtual state_type compute(const dealii::Point<dim> &point,
                                  Number /*t*/) final override
       {
-        return this->problem_description.template from_primitive_state<dim>(
+        const auto temp = this->problem_description.from_primitive_state(
             point[0] > 0. ? primitive_right_ : primitive_left_);
+        return this->problem_description.template expand_state<dim>(temp);
       }
 
     private:
@@ -244,8 +248,10 @@ namespace ryujin
                                  Number t) final override
       {
         const Number position_1d = Number(point[0] - S3_ * t);
-        return this->problem_description.template from_primitive_state<dim>(
+
+        const auto temp = this->problem_description.from_primitive_state(
             position_1d > 0. ? primitive_right_ : primitive_left_);
+        return this->problem_description.template expand_state<dim>(temp);
       }
 
     private:
