@@ -61,16 +61,29 @@ namespace ryujin
     static constexpr unsigned int problem_dimension = 2 + dim;
 
     /**
-     * An array holding all component names as a string.
+     * The storage type used for a (conserved) state vector \f$\boldsymbol U\f$.
+     */
+    template <int dim, typename Number>
+    using state_type = dealii::Tensor<1, problem_dimension<dim>, Number>;
+
+    /**
+     * An array holding all component names of the conserved state as a string.
      */
     template <int dim>
     static const std::array<std::string, dim + 2> component_names;
 
     /**
-     * The storage type used for a state vector \f$\boldsymbol U\f$.
+     * The storage type used for a primitive state vector.
      */
     template <int dim, typename Number>
-    using state_type = dealii::Tensor<1, problem_dimension<dim>, Number>;
+    using primitive_state_type =
+        dealii::Tensor<1, problem_dimension<dim>, Number>;
+
+    /**
+     * An array holding all component names of the primitive state as a string.
+     */
+    template <int dim>
+    static const std::array<std::string, dim + 2> primitive_component_names;
 
     /**
      * The storage type used for the flux \f$\mathbf{f}\f$.
