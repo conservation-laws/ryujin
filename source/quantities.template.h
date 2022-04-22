@@ -301,60 +301,59 @@ namespace ryujin
   template <int dim, typename Number>
   void Quantities<dim, Number>::clear_statistics()
   {
-    /* Clear statistics and time series for interior maps: */
+    const auto reset = [](const auto &manifold_map, auto &statistics_map) {
+      for (const auto &[name, data_map] : manifold_map) {
+        const auto n_entries = data_map.size();
+        auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
+            statistics_map[name];
+        val_old.resize(n_entries);
+        val_new.resize(n_entries);
+        val_sum.resize(n_entries);
+        t_old = t_new = t_sum = 0.;
+      }
+    };
+
+    /* Clear statistics and time series: */
 
     interior_statistics_.clear();
-
-    for (const auto &[name, interior_map] : interior_maps_) {
-      const auto n_entries = interior_map.size();
-      auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
-          interior_statistics_[name];
-      val_old.resize(n_entries);
-      val_new.resize(n_entries);
-      val_sum.resize(n_entries);
-      t_old = t_new = t_sum = 0.;
-    }
-
-    /* Clear statistics and time series for boundary maps: */
+    reset(interior_maps_, interior_statistics_);
+    interior_time_series_.clear();
 
     boundary_statistics_.clear();
-
-    for (const auto &[name, boundary_map] : boundary_maps_) {
-      const auto n_entries = boundary_map.size();
-      auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
-          boundary_statistics_[name];
-      val_old.resize(n_entries);
-      val_new.resize(n_entries);
-      val_sum.resize(n_entries);
-      t_old = t_new = t_sum = 0.;
-    }
-
+    reset(boundary_maps_, boundary_statistics_);
     boundary_time_series_.clear();
   }
 
 
-
   template <int dim, typename Number>
-  auto Quantities<dim, Number>::accumulate_interior(
+  template <typename point_type, typename value_type>
+  value_type Quantities<dim, Number>::internal_accumulate(
       const vector_type &U,
-      const std::vector<interior_point> &interior_map,
-      std::vector<interior_value> &val_new) -> interior_value
+      const std::vector<point_type> &points_vector,
+      std::vector<value_type> &val_new)
   {
-    interior_value spatial_average;
+    value_type spatial_average;
     Number mass_sum = Number(0.);
 
     std::transform(
-        interior_map.begin(),
-        interior_map.end(),
+        points_vector.begin(),
+        points_vector.end(),
         val_new.begin(),
-        [&](auto point) -> interior_value {
-          const auto &[i, mass_i, x_i] = point;
+        [&](auto point) -> value_type {
+          const auto i = std::get<0>(point);
+          /*
+           * Small trick to get the correct index for retrieving the
+           * boundary mass.
+           */
+          constexpr auto index =
+              std::is_same<point_type, interior_point>::value ? 1 : 3;
+          const auto mass_i = std::get<index>(point);
 
           const auto U_i = U.get_tensor(i);
           const auto primitive_state =
               problem_description_->to_primitive_state(U_i);
 
-          interior_value result;
+          value_type result;
           std::get<0>(result) = primitive_state;
           /* Compute second moments of the primitive state: */
           std::get<1>(result) = schur_product(primitive_state, primitive_state);
@@ -384,11 +383,11 @@ namespace ryujin
   }
 
 
-
   template <int dim, typename Number>
-  void Quantities<dim, Number>::write_out_interior(
+  template <typename value_type>
+  void Quantities<dim, Number>::internal_write_out(
       std::ostream &output,
-      const std::vector<interior_value> &values,
+      const std::vector<value_type> &values,
       const Number scale)
   {
     /*
@@ -418,90 +417,10 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  auto Quantities<dim, Number>::accumulate_boundary(
-      const vector_type &U,
-      const std::vector<boundary_point> &boundary_map,
-      std::vector<boundary_value> &val_new) -> boundary_value
-  {
-    boundary_value spatial_average;
-    Number boundary_mass_sum = Number(0.);
-
-    std::transform(
-        boundary_map.begin(),
-        boundary_map.end(),
-        val_new.begin(),
-        [&](auto point) -> boundary_value {
-          const auto &[i, n_i, nm_i, bm_i, id, x_i] = point;
-
-          const auto U_i = U.get_tensor(i);
-          const auto primitive_state =
-              problem_description_->to_primitive_state(U_i);
-
-          boundary_value result;
-          std::get<0>(result) = primitive_state;
-          /* Compute second moments of the primitive state: */
-          std::get<1>(result) = schur_product(primitive_state, primitive_state);
-
-          boundary_mass_sum += bm_i;
-          std::get<0>(spatial_average) += bm_i * std::get<0>(result);
-          std::get<1>(spatial_average) += bm_i * std::get<1>(result);
-
-          return result;
-        });
-
-    /* synchronize MPI ranks (MPI Barrier): */
-
-    boundary_mass_sum =
-        Utilities::MPI::sum(boundary_mass_sum, mpi_communicator_);
-    std::get<0>(spatial_average) =
-        Utilities::MPI::sum(std::get<0>(spatial_average), mpi_communicator_);
-    std::get<1>(spatial_average) =
-        Utilities::MPI::sum(std::get<1>(spatial_average), mpi_communicator_);
-
-    /* take average: */
-
-    std::get<0>(spatial_average) /= boundary_mass_sum;
-    std::get<1>(spatial_average) /= boundary_mass_sum;
-
-    return spatial_average;
-  }
-
-
-  template <int dim, typename Number>
-  void Quantities<dim, Number>::write_out_boundary(
+  template <typename value_type>
+  void Quantities<dim, Number>::internal_write_out_time_series(
       std::ostream &output,
-      const std::vector<boundary_value> &values,
-      const Number scale)
-  {
-    /*
-     * FIXME: This currently distributes boundary maps to all MPI ranks.
-     * This is unnecessarily wasteful. Ideally, we should do MPI IO with
-     * only MPI ranks participating who actually have boundary values.
-     */
-
-    const auto received = Utilities::MPI::gather(mpi_communicator_, values);
-
-    if (Utilities::MPI::this_mpi_process(mpi_communicator_) == 0) {
-
-      output << "# " << header_;
-
-      unsigned int rank = 0;
-      for (const auto &entries : received) {
-        output << "# rank " << rank++ << "\n";
-        for (const auto &entry : entries) {
-          const auto &[state, state_square] = entry;
-          output << scale * state << "\t" << scale * state_square << "\n";
-        } /*entry*/
-      }   /*entries*/
-
-      output << std::flush;
-    }
-  }
-
-  template <int dim, typename Number>
-  void Quantities<dim, Number>::interior_write_out_time_series(
-      std::ostream &output,
-      const std::vector<std::tuple<Number, interior_value>> &values,
+      const std::vector<std::tuple<Number, value_type>> &values,
       bool append)
   {
     if (Utilities::MPI::this_mpi_process(mpi_communicator_) == 0) {
@@ -520,27 +439,6 @@ namespace ryujin
     }
   }
 
-  template <int dim, typename Number>
-  void Quantities<dim, Number>::write_out_time_series(
-      std::ostream &output,
-      const std::vector<std::tuple<Number, boundary_value>> &values,
-      bool append)
-  {
-    if (Utilities::MPI::this_mpi_process(mpi_communicator_) == 0) {
-
-      if (!append)
-        output << "# time t\t" << header_;
-
-      for (const auto &entry : values) {
-        const auto t = std::get<0>(entry);
-        const auto &[state, state_square] = std::get<1>(entry);
-
-        output << t << "\t" << state << "\t" << state_square << "\n";
-      }
-
-      output << std::flush;
-    }
-  }
 
 
   template <int dim, typename Number>
@@ -550,116 +448,74 @@ namespace ryujin
     std::cout << "Quantities<dim, Number>::accumulate()" << std::endl;
 #endif
 
-    /* For interior_maps_ */
-    for (const auto &[name, interior_map] : interior_maps_) {
+    const auto accumulate = [&](const auto &point_maps,
+                                const auto &manifolds,
+                                auto &statistics,
+                                auto &time_series) {
+      for (const auto &[name, point_map] : point_maps) {
 
-      /* Find the correct option string in interior_manifolds_ (a vector) */
-      const auto it =
-          std::find_if(interior_manifolds_.begin(),
-                       interior_manifolds_.end(),
-                       [&, name = std::cref(name)](const auto &element) {
-                         return std::get<0>(element) == name.get();
-                       });
-      Assert(it != interior_manifolds_.end(), dealii::ExcInternalError());
-      const auto options = std::get<2>(*it);
+        /* Find the correct option string in manifolds (a vector) */
+        const auto it =
+            std::find_if(manifolds.begin(),
+                         manifolds.end(),
+                         [&, name = std::cref(name)](const auto &element) {
+                           return std::get<0>(element) == name.get();
+                         });
+        Assert(it != manifolds.end(), dealii::ExcInternalError());
+        const auto options = std::get<2>(*it);
 
-      /* skip if we don't average in space or time: */
-      if (options.find("time_averaged") == std::string::npos &&
-          options.find("space_averaged") == std::string::npos)
-        continue;
+        /* skip if we don't average in space or time: */
+        if (options.find("time_averaged") == std::string::npos &&
+            options.find("space_averaged") == std::string::npos)
+          continue;
 
-      auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
-          interior_statistics_[name];
+        auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
+            statistics[name];
 
-      std::swap(t_old, t_new);
-      std::swap(val_old, val_new);
+        std::swap(t_old, t_new);
+        std::swap(val_old, val_new);
 
-      /* accumulate new values */
+        /* accumulate new values */
 
-      const auto spatial_average =
-          accumulate_interior(U, interior_map, val_new);
+        const auto spatial_average = internal_accumulate(U, point_map, val_new);
 
-      /* Average in time with trapezoidal rule: */
+        /* Average in time with trapezoidal rule: */
 
-      if (RYUJIN_UNLIKELY(t_old == Number(0.) && t_new == Number(0.))) {
-        /* We have not accumulated any statistics yet: */
-        t_old = t - 1.;
-        t_new = t;
+        if (RYUJIN_UNLIKELY(t_old == Number(0.) && t_new == Number(0.))) {
+          /* We have not accumulated any statistics yet: */
+          t_old = t - 1.;
+          t_new = t;
 
-      } else {
+        } else {
 
-        t_new = t;
-        const Number tau = t_new - t_old;
+          t_new = t;
+          const Number tau = t_new - t_old;
 
-        for (std::size_t i = 0; i < val_sum.size(); ++i) {
-          /* sometimes I miss Haskell's type classes... */
-          std::get<0>(val_sum[i]) += 0.5 * tau * std::get<0>(val_old[i]);
-          std::get<0>(val_sum[i]) += 0.5 * tau * std::get<0>(val_new[i]);
-          std::get<1>(val_sum[i]) += 0.5 * tau * std::get<1>(val_old[i]);
-          std::get<1>(val_sum[i]) += 0.5 * tau * std::get<1>(val_new[i]);
+          for (std::size_t i = 0; i < val_sum.size(); ++i) {
+            std::get<0>(val_sum[i]) += 0.5 * tau * std::get<0>(val_old[i]);
+            std::get<0>(val_sum[i]) += 0.5 * tau * std::get<0>(val_new[i]);
+            std::get<1>(val_sum[i]) += 0.5 * tau * std::get<1>(val_old[i]);
+            std::get<1>(val_sum[i]) += 0.5 * tau * std::get<1>(val_new[i]);
+          }
+          t_sum += tau;
         }
-        t_sum += tau;
+
+        /* Record average in space: */
+        time_series[name].push_back({t, spatial_average});
       }
+    };
 
-      /* Record average in space: */
-      interior_time_series_[name].push_back({t, spatial_average});
-    }
+    accumulate(interior_maps_,
+               interior_manifolds_,
+               interior_statistics_,
+               interior_time_series_);
 
-    /* For Boundary maps */
-    for (const auto &[name, boundary_map] : boundary_maps_) {
-
-      /* Find the correct option string in boundary_manifolds_ (a vector) */
-      const auto it =
-          std::find_if(boundary_manifolds_.begin(),
-                       boundary_manifolds_.end(),
-                       [&, name = std::cref(name)](const auto &element) {
-                         return std::get<0>(element) == name.get();
-                       });
-      Assert(it != boundary_manifolds_.end(), dealii::ExcInternalError());
-      const auto options = std::get<2>(*it);
-
-      /* skip if we don't average in space or time: */
-      if (options.find("time_averaged") == std::string::npos &&
-          options.find("space_averaged") == std::string::npos)
-        continue;
-
-      auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
-          boundary_statistics_[name];
-
-      std::swap(t_old, t_new);
-      std::swap(val_old, val_new);
-
-      /* accumulate new values */
-
-      const auto spatial_average =
-          accumulate_boundary(U, boundary_map, val_new);
-
-      /* Average in time with trapezoidal rule: */
-
-      if (RYUJIN_UNLIKELY(t_old == Number(0.) && t_new == Number(0.))) {
-        /* We have not accumulated any statistics yet: */
-        t_old = t - 1.;
-        t_new = t;
-
-      } else {
-
-        t_new = t;
-        const Number tau = t_new - t_old;
-
-        for (std::size_t i = 0; i < val_sum.size(); ++i) {
-          /* sometimes I miss Haskell's type classes... */
-          std::get<0>(val_sum[i]) += 0.5 * tau * std::get<0>(val_old[i]);
-          std::get<0>(val_sum[i]) += 0.5 * tau * std::get<0>(val_new[i]);
-          std::get<1>(val_sum[i]) += 0.5 * tau * std::get<1>(val_old[i]);
-          std::get<1>(val_sum[i]) += 0.5 * tau * std::get<1>(val_new[i]);
-        }
-        t_sum += tau;
-      }
-
-      /* Record average in space: */
-      boundary_time_series_[name].push_back({t, spatial_average});
-    }
+    accumulate(boundary_maps_,
+               boundary_manifolds_,
+               boundary_statistics_,
+               boundary_time_series_);
   }
+
 
 
   template <int dim, typename Number>
@@ -671,178 +527,113 @@ namespace ryujin
     std::cout << "Quantities<dim, Number>::write_out()" << std::endl;
 #endif
 
-    for (const auto &[name, interior_map] : interior_maps_) {
+    const auto write_out = [&](const auto &point_maps,
+                               const auto &manifolds,
+                               auto &statistics,
+                               auto &time_series) {
+      for (const auto &[name, point_map] : point_maps) {
 
-      /* Find the correct option string in interior_manifolds_ (a vector) */
-      const auto it =
-          std::find_if(interior_manifolds_.begin(),
-                       interior_manifolds_.end(),
-                       [&, name = std::cref(name)](const auto &element) {
-                         return std::get<0>(element) == name.get();
-                       });
-      Assert(it != interior_manifolds_.end(), dealii::ExcInternalError());
-      const auto options = std::get<2>(*it);
+        /* Find the correct option string in manifolds (a vector) */
+        const auto it =
+            std::find_if(manifolds.begin(),
+                         manifolds.end(),
+                         [&, name = std::cref(name)](const auto &element) {
+                           return std::get<0>(element) == name.get();
+                         });
+        Assert(it != manifolds.end(), dealii::ExcInternalError());
+        const auto options = std::get<2>(*it);
 
-      /* Compute and output instantaneous field: */
+        /*
+         * Compute and output instantaneous field:
+         */
 
-      if (options.find("instantaneous") != std::string::npos) {
+        if (options.find("instantaneous") != std::string::npos) {
 
-        auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
-            interior_statistics_[name];
+          auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
+              statistics[name];
 
-        /* We have not computed any updated statistics yet: */
+          /* We have not computed any updated statistics yet: */
 
-        if (options.find("time_averaged") == std::string::npos &&
-            options.find("space_averaged") == std::string::npos)
-          accumulate_interior(U, interior_map, val_new);
-        else
-          AssertThrow(t_new == t, dealii::ExcInternalError());
+          if (options.find("time_averaged") == std::string::npos &&
+              options.find("space_averaged") == std::string::npos)
+            internal_accumulate(U, point_map, val_new);
+          else
+            AssertThrow(t_new == t, dealii::ExcInternalError());
 
-        std::string file_name = base_name_ + "-" + name + "-instantaneous-" +
-                                Utilities::to_string(cycle, 6) + ".dat";
-        std::ofstream output(file_name);
+          std::string file_name = base_name_ + "-" + name + "-instantaneous-" +
+                                  Utilities::to_string(cycle, 6) + ".dat";
+          std::ofstream output(file_name);
 
-        output << std::scientific << std::setprecision(14);
-        output << "# at t = " << t << std::endl;
+          output << std::scientific << std::setprecision(14);
+          output << "# at t = " << t << std::endl;
 
-        write_out_interior(output, val_new, Number(1.));
-      }
-
-      /* Output time averaged field: */
-
-      if (options.find("time_averaged") != std::string::npos) {
-
-        std::string file_name = base_name_ + "-" + name + "-R" +
-                                std::to_string(output_cycle_averages_) +
-                                "-time_averaged.dat";
-        std::ofstream output(file_name);
-
-        auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
-            interior_statistics_[name];
-
-        output << std::scientific << std::setprecision(14);
-        output << "# averaged from t = " << t_new - t_sum << " to t = " << t_new
-               << std::endl;
-
-        write_out_interior(output, val_sum, Number(1.) / t_sum);
-
-      }
-
-      /* Output space averaged field: */
-
-      if (options.find("space_averaged") != std::string::npos) {
-
-        auto &time_series = interior_time_series_[name];
-
-        std::string file_name =
-            base_name_ + "-" + name + "-space_averaged_time_series.dat";
-
-        std::ofstream output;
-        output << std::scientific << std::setprecision(14);
-
-        if (first_cycle_) {
-          first_cycle_ = false;
-          output.open(file_name, std::ofstream::out | std::ofstream::trunc);
-          interior_write_out_time_series(output, time_series, /*append*/ false);
-
-        } else {
-
-          output.open(file_name, std::ofstream::out | std::ofstream::app);
-          interior_write_out_time_series(output, time_series, /*append*/ true);
+          internal_write_out(output, val_new, Number(1.));
         }
 
-        time_series.clear();
-      }
+        /*
+         * Output time averaged field:
+         */
 
-    } /* i */
+        if (options.find("time_averaged") != std::string::npos) {
 
-    for (const auto &[name, boundary_map] : boundary_maps_) {
+          std::string file_name = base_name_ + "-" + name + "-R" +
+                                  std::to_string(output_cycle_averages_) +
+                                  "-time_averaged.dat";
+          std::ofstream output(file_name);
 
-      /* Find the correct option string in boundary_manifolds_ (a vector) */
-      const auto it =
-          std::find_if(boundary_manifolds_.begin(),
-                       boundary_manifolds_.end(),
-                       [&, name = std::cref(name)](const auto &element) {
-                         return std::get<0>(element) == name.get();
-                       });
-      Assert(it != boundary_manifolds_.end(), dealii::ExcInternalError());
-      const auto options = std::get<2>(*it);
+          auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
+              statistics[name];
 
-      /* Compute and output instantaneous field: */
+          output << std::scientific << std::setprecision(14);
+          output << "# averaged from t = " << t_new - t_sum
+                 << " to t = " << t_new << std::endl;
 
-      if (options.find("instantaneous") != std::string::npos) {
-
-        auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
-            boundary_statistics_[name];
-
-        /* We have not computed any updated statistics yet: */
-
-        if (options.find("time_averaged") == std::string::npos &&
-            options.find("space_averaged") == std::string::npos)
-          accumulate_boundary(U, boundary_map, val_new);
-        else
-          AssertThrow(t_new == t, dealii::ExcInternalError());
-
-        std::string file_name = base_name_ + "-" + name + "-instantaneous-" +
-                                Utilities::to_string(cycle, 6) + ".dat";
-        std::ofstream output(file_name);
-
-        output << std::scientific << std::setprecision(14);
-        output << "# at t = " << t << std::endl;
-
-        write_out_boundary(output, val_new, Number(1.));
-      }
-
-      /* Output time averaged field: */
-
-      if (options.find("time_averaged") != std::string::npos) {
-
-        std::string file_name = base_name_ + "-" + name + "-R" +
-                                std::to_string(output_cycle_averages_) +
-                                "-time_averaged.dat";
-        std::ofstream output(file_name);
-
-        auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
-            boundary_statistics_[name];
-
-        output << std::scientific << std::setprecision(14);
-        output << "# averaged from t = " << t_new - t_sum << " to t = " << t_new
-               << std::endl;
-
-        write_out_boundary(output, val_sum, Number(1.) / t_sum);
-      }
-
-      /* Output space averaged field: */
-
-      if (options.find("space_averaged") != std::string::npos) {
-
-        auto &time_series = boundary_time_series_[name];
-
-        std::string file_name =
-            base_name_ + "-" + name + "-space_averaged_time_series.dat";
-
-        std::ofstream output;
-        output << std::scientific << std::setprecision(14);
-
-        if (first_cycle_) {
-          first_cycle_ = false;
-          output.open(file_name, std::ofstream::out | std::ofstream::trunc);
-          write_out_time_series(output, time_series, /*append*/ false);
-
-        } else {
-
-          output.open(file_name, std::ofstream::out | std::ofstream::app);
-          write_out_time_series(output, time_series, /*append*/ true);
+          internal_write_out(output, val_sum, Number(1.) / t_sum);
         }
 
-        time_series.clear();
-      }
+        /*
+         * Output space averaged field:
+         */
 
-    } /* i */
+        if (options.find("space_averaged") != std::string::npos) {
+
+          auto &series = time_series[name];
+
+          std::string file_name =
+              base_name_ + "-" + name + "-space_averaged_time_series.dat";
+
+          std::ofstream output;
+          output << std::scientific << std::setprecision(14);
+
+          if (first_cycle_) {
+            first_cycle_ = false;
+            output.open(file_name, std::ofstream::out | std::ofstream::trunc);
+            internal_write_out_time_series(output, series, /*append*/ false);
+
+          } else {
+
+            output.open(file_name, std::ofstream::out | std::ofstream::app);
+            internal_write_out_time_series(output, series, /*append*/ true);
+          }
+
+          series.clear();
+        }
+      }
+    };
+
+    write_out(interior_maps_,
+              interior_manifolds_,
+              interior_statistics_,
+              interior_time_series_);
+
+    write_out(boundary_maps_,
+              boundary_manifolds_,
+              boundary_statistics_,
+              boundary_time_series_);
 
     output_cycle_averages_++;
 
-    if(clear_temporal_statistics_on_writeout_)
+    if (clear_temporal_statistics_on_writeout_)
       clear_statistics();
   }
 

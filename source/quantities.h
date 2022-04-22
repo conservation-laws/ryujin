@@ -103,7 +103,6 @@ namespace ryujin
      */
     //@{
 
-
     const MPI_Comm &mpi_communicator_;
 
     dealii::SmartPointer<const ProblemDescription> problem_description_;
@@ -212,32 +211,20 @@ namespace ryujin
 
     std::string header_;
 
-    interior_value
-    accumulate_interior(const vector_type &U,
-                        const std::vector<interior_point> &interior_map,
-                        std::vector<interior_value> &new_val);
+    template <typename point_type, typename value_type>
+    value_type internal_accumulate(const vector_type &U,
+                                   const std::vector<point_type> &interior_map,
+                                   std::vector<value_type> &new_val);
 
-    void write_out_interior(std::ostream &output,
-                            const std::vector<interior_value> &values,
+    template <typename value_type>
+    void internal_write_out(std::ostream &output,
+                            const std::vector<value_type> &values,
                             const Number scale);
 
-    boundary_value
-    accumulate_boundary(const vector_type &U,
-                        const std::vector<boundary_point> &boundary_map,
-                        std::vector<boundary_value> &new_val);
-
-    void write_out_boundary(std::ostream &output,
-                            const std::vector<boundary_value> &values,
-                            const Number scale);
-
-    void write_out_time_series(
+    template <typename value_type>
+    void internal_write_out_time_series(
         std::ostream &output,
-        const std::vector<std::tuple<Number, boundary_value>> &values,
-        bool append);
-
-    void interior_write_out_time_series(
-        std::ostream &output,
-        const std::vector<std::tuple<Number, interior_value>> &values,
+        const std::vector<std::tuple<Number, value_type>> &values,
         bool append);
 
     //@}

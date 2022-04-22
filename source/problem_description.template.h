@@ -82,12 +82,12 @@ namespace ryujin
   template <>
   const std::array<std::string, 4>
       ProblemDescription::primitive_component_names<2>{
-          {"rho", "u_1", "u_2", "p"}};
+          {"rho", "v_1", "v_2", "p"}};
 
   template <>
   const std::array<std::string, 5>
       ProblemDescription::primitive_component_names<3>{
-          {"rho", "u_1", "u_2", "u_3", "p"}};
+          {"rho", "v_1", "v_2", "v_3", "p"}};
 #endif
 
 } /* namespace ryujin */
