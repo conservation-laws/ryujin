@@ -66,19 +66,18 @@ namespace ryujin
      */
     using ScalarNumber = typename get_value_type<Number>::type;
 
-    //@}
     /**
-     * @name Stencil-based accumulations of bounds
+     * @name Stencil-based computation of bounds
      *
      * Intended usage:
      * ```
      * Limiter<dim, Number> limiter;
      * for (unsigned int i = n_internal; i < n_owned; ++i) {
      *   // ...
-     *   limiter.reset(specific_entropy_i);
+     *   limiter.reset(i, U_i);
      *   for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
      *     // ...
-     *     limiter.accumulate(U_i, U_j, U_ij_bar, specific_entropy_j, col_idx == 0);
+     *     limiter.accumulate(js, U_j, U_ij_bar, beta_ij);
      *   }
      *   limiter.apply_relaxation(hd_i);
      *   limiter.bounds();
@@ -98,27 +97,47 @@ namespace ryujin
     using Bounds = std::array<Number, n_bounds>;
 
     /**
+     * The number of precomputed values.
+     */
+    static constexpr unsigned int n_precomputed_values = 1;
+
+    /**
+     * Array type used for precomputed values.
+     */
+    using PrecomputedValues = std::array<Number, n_precomputed_values>;
+
+    /**
+     * Precomputed values for a given state.
+     */
+    static PrecomputedValues
+    precompute_values(const ProblemDescription &problem_description,
+                      const state_type &U);
+
+    /**
      * Constructor taking a ProblemDescription instance as argument
      */
-    Limiter(const ProblemDescription &problem_description)
+    Limiter(const ProblemDescription &problem_description,
+            const MultiComponentVector<ScalarNumber, n_precomputed_values>
+                &precomputed_values)
         : problem_description(problem_description)
+        , precomputed_values(precomputed_values)
     {
     }
 
     /**
      * Reset temporary storage
      */
-    void reset(const Number specific_entropy_i);
+    void reset(const unsigned int i);
 
     /**
      * When looping over the sparsity row, add the contribution associated
      * with the neighboring state U_j.
      */
-    void accumulate(const state_type &U_i,
+    void accumulate(const unsigned int *js,
+                    const state_type &U_i,
                     const state_type &U_j,
                     const state_type &U_ij_bar,
-                    const Number beta_ij,
-                    const Number specific_entropy_j);
+                    const Number beta_ij);
 
     /**
      * Apply relaxation.
@@ -130,9 +149,8 @@ namespace ryujin
      */
     const Bounds &bounds() const;
 
-
     //*}
-    /** @name */
+    /** @name Convex limiter */
     //@{
 
     /**
@@ -158,11 +176,13 @@ namespace ryujin
 
     const ProblemDescription &problem_description;
 
+    const MultiComponentVector<ScalarNumber, n_precomputed_values>
+        &precomputed_values;
+
     Bounds bounds_;
 
     Number rho_relaxation_numerator;
     Number rho_relaxation_denominator;
-
     Number s_interp_max;
 
     //@}
@@ -170,29 +190,46 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline void
-  Limiter<dim, Number>::reset(const Number specific_entropy_i)
+  DEAL_II_ALWAYS_INLINE inline typename Limiter<dim, Number>::PrecomputedValues
+  Limiter<dim, Number>::precompute_values(
+      const ProblemDescription &problem_description, const state_type &U_i)
   {
+    PrecomputedValues result;
+    result[0] = problem_description.specific_entropy(U_i);
+    return result;
+  }
+
+
+  template <int dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline void Limiter<dim, Number>::reset(unsigned int i)
+  {
+    /* Bounds: */
+
     auto &[rho_min, rho_max, s_min] = bounds_;
 
     rho_min = Number(std::numeric_limits<ScalarNumber>::max());
     rho_max = Number(0.);
 
+    const auto &[specific_entropy] =
+        precomputed_values.template get_tensor<Number, PrecomputedValues>(i);
+
+    s_min = specific_entropy;
+
+    /* Relaxation: */
+
     rho_relaxation_numerator = Number(0.);
     rho_relaxation_denominator = Number(0.);
-
-    s_min = specific_entropy_i;
     s_interp_max = Number(0.);
   }
 
 
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline void
-  Limiter<dim, Number>::accumulate(const state_type &U_i,
+  Limiter<dim, Number>::accumulate(const unsigned int *js,
+                                   const state_type &U_i,
                                    const state_type &U_j,
                                    const state_type &U_ij_bar,
-                                   const Number beta_ij,
-                                   const Number specific_entropy_j)
+                                   const Number beta_ij)
   {
     /* Bounds: */
 
@@ -202,6 +239,8 @@ namespace ryujin
     rho_min = std::min(rho_min, rho_ij);
     rho_max = std::max(rho_max, rho_ij);
 
+    const auto &[specific_entropy_j] =
+        precomputed_values.template get_tensor<Number, PrecomputedValues>(js);
     s_min = std::min(s_min, specific_entropy_j);
 
     /* Relaxation: */

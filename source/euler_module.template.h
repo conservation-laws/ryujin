@@ -75,10 +75,12 @@ namespace ryujin
 
     const auto &scalar_partitioner = offline_data_->scalar_partitioner();
 
+    indicator_precomputed_values_.reinit_with_scalar_partitioner(
+        scalar_partitioner);
     alpha_.reinit(scalar_partitioner);
-    specific_entropies_.reinit(scalar_partitioner);
-    evc_entropies_.reinit(scalar_partitioner);
 
+    limiter_precomputed_values_.reinit_with_scalar_partitioner(
+        scalar_partitioner);
     bounds_.reinit_with_scalar_partitioner(scalar_partitioner);
 
     const auto &vector_partitioner = offline_data_->vector_partitioner();
@@ -189,11 +191,11 @@ namespace ryujin
      * Step 0: Precompute f(U) and the entropies of U
      */
     {
-      Scope scope(computing_timer_, "time step [E] 0 - compute entropies");
+      Scope scope(computing_timer_, "time step [E] 0 - precompute values");
 
       SynchronizationDispatch synchronization_dispatch([&]() {
-        specific_entropies_.update_ghost_values_start(channel++);
-        evc_entropies_.update_ghost_values_start(channel++);
+        indicator_precomputed_values_.update_ghost_values_start(channel++);
+        limiter_precomputed_values_.update_ghost_values_start(channel++);
       });
 
       RYUJIN_PARALLEL_REGION_BEGIN
@@ -219,11 +221,13 @@ namespace ryujin
 
           const auto U_i = old_U.template get_tensor<T>(i);
 
-          const auto s_i = problem_description_->specific_entropy(U_i);
-          store_value<T>(specific_entropies_, s_i, i);
+          const auto ind_val_i =
+              Indicator<dim, T>::precompute_values(*problem_description_, U_i);
+          indicator_precomputed_values_.template write_tensor<T>(ind_val_i, i);
 
-          const auto evc_entropy = problem_description_->harten_entropy(U_i);
-          store_value<T>(evc_entropies_, evc_entropy, i);
+          const auto lim_val_i =
+              Limiter<dim, T>::precompute_values(*problem_description_, U_i);
+          limiter_precomputed_values_.template write_tensor<T>(lim_val_i, i);
         }
       };
 
@@ -240,11 +244,11 @@ namespace ryujin
 #if defined(SPLIT_SYNCHRONIZATION_TIMERS) || defined(DEBUG_OUTPUT)
       Scope scope(computing_timer_, "time step [E] 0 - synchronization");
 #else
-      Scope scope(computing_timer_, "time step [E] 0 - compute entropies");
+      Scope scope(computing_timer_, "time step [E] 0 - precompute values");
 #endif
 
-      specific_entropies_.update_ghost_values_finish();
-      evc_entropies_.update_ghost_values_finish();
+      indicator_precomputed_values_.update_ghost_values_finish();
+      limiter_precomputed_values_.update_ghost_values_finish();
     }
 
     /*
@@ -288,7 +292,8 @@ namespace ryujin
 
         /* Stored thread locally: */
         RiemannSolver<dim, T> riemann_solver(*problem_description_);
-        Indicator<dim, T> indicator(*problem_description_);
+        Indicator<dim, T> indicator(*problem_description_,
+                                    indicator_precomputed_values_);
         bool thread_ready = false;
 
         RYUJIN_OMP_FOR_NOWAIT
@@ -303,14 +308,8 @@ namespace ryujin
               thread_ready, i >= n_export_indices && i < n_internal);
 
           const auto U_i = old_U.template get_tensor<T>(i);
-          const auto entropy_i = load_value<T>(evc_entropies_, i);
-          const auto entropy_derivative_i =
-              problem_description_->harten_entropy_derivative(U_i);
 
-          indicator.reset(U_i, entropy_i, entropy_derivative_i);
-
-          const auto mass = load_value<T>(lumped_mass_matrix, i);
-          const auto hd_i = mass * measure_of_omega_inverse;
+          indicator.reset(i, U_i);
 
           /* Skip diagonal. */
           const unsigned int *js = sparsity_simd.columns(i) + stride_size;
@@ -318,10 +317,10 @@ namespace ryujin
                ++col_idx, js += stride_size) {
 
             const auto U_j = old_U.template get_tensor<T>(js);
-            const auto entropy_j = load_value<T>(evc_entropies_, js);
 
             const auto c_ij = cij_matrix.template get_tensor<T>(i, col_idx);
-            indicator.add(U_j, c_ij, entropy_j);
+
+            indicator.add(js, U_j, c_ij);
 
             /* Only iterate over the upper triangular portion of d_ij */
             if (all_below_diagonal<T>(i, js))
@@ -338,6 +337,8 @@ namespace ryujin
             dij_matrix_.write_entry(d, i, col_idx, true);
           }
 
+          const auto mass = load_value<T>(lumped_mass_matrix, i);
+          const auto hd_i = mass * measure_of_omega_inverse;
           store_value<T>(alpha_, indicator.alpha(hd_i), i);
         }
       };
@@ -485,7 +486,8 @@ namespace ryujin
         unsigned int stride_size = get_stride_size<T>;
 
         /* Stored thread locally: */
-        Limiter<dim, T> limiter(*problem_description_);
+        Limiter<dim, T> limiter(*problem_description_,
+                                limiter_precomputed_values_);
         bool thread_ready = false;
 
         RYUJIN_OMP_FOR_NOWAIT
@@ -510,15 +512,13 @@ namespace ryujin
 
           auto U_i_new = U_i;
           const auto alpha_i = load_value<T>(alpha_, i);
-          const auto specific_entropy_i = load_value<T>(specific_entropies_, i);
 
           const auto m_i = load_value<T>(lumped_mass_matrix, i);
           const auto m_i_inv = load_value<T>(lumped_mass_matrix_inverse, i);
 
-          ProblemDescription::state_type<dim, T> r_i;
+          limiter.reset(i);
 
-          /* Clear bounds: */
-          limiter.reset(specific_entropy_i);
+          ProblemDescription::state_type<dim, T> r_i;
 
           const unsigned int *js = sparsity_simd.columns(i);
           for (unsigned int col_idx = 0; col_idx < row_length;
@@ -560,10 +560,7 @@ namespace ryujin
 
             const auto beta_ij =
                 betaij_matrix.template get_entry<T>(i, col_idx);
-            const auto specific_entropy_j =
-                load_value<T>(specific_entropies_, js);
-
-            limiter.accumulate(U_i, U_j, U_ij_bar, beta_ij, specific_entropy_j);
+            limiter.accumulate(js, U_i, U_j, U_ij_bar, beta_ij);
           }
 
           new_U.template write_tensor<T>(U_i_new, i);

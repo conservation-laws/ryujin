@@ -90,10 +90,10 @@ namespace ryujin
      * Indicator<dim, Number> indicator;
      * for (unsigned int i = n_internal; i < n_owned; ++i) {
      *   // ...
-     *   indicator.reset(U_i, evc_entropy_i, evc_entropy_derivative_i);
+     *   indicator.reset(i, U_i);
      *   for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
      *     // ...
-     *     indicator.add(U_j, c_ij, evc_entropy_j);
+     *     indicator.add(js, U_j, c_ij);
      *   }
      *   indicator.alpha(hd_i);
      * }
@@ -102,10 +102,30 @@ namespace ryujin
     //@{
 
     /**
+     * The number of precomputed values.
+     */
+    static constexpr unsigned int n_precomputed_values = 1;
+
+    /**
+     * Array type used for precomputed values.
+     */
+    using PrecomputedValues = std::array<Number, n_precomputed_values>;
+
+    /**
+     * Precomputed values for a given state.
+     */
+    static PrecomputedValues
+    precompute_values(const ProblemDescription &problem_description,
+                      const state_type &U);
+
+    /**
      * Constructor taking a ProblemDescription instance as argument
      */
-    Indicator(const ProblemDescription &problem_description)
+    Indicator(const ProblemDescription &problem_description,
+              const MultiComponentVector<ScalarNumber, n_precomputed_values>
+                  &precomputed_values)
         : problem_description(problem_description)
+        , precomputed_values(precomputed_values)
     {
     }
 
@@ -113,18 +133,16 @@ namespace ryujin
      * Reset temporary storage and initialize for a new row corresponding
      * to state vector U_i.
      */
-    void reset(
-        const state_type &U_i,
-        const Number entropy,
-        const dealii::Tensor<1, problem_dimension, Number> &entropy_derivative);
+    void reset(const unsigned int i, const state_type &U_i);
 
     /**
      * When looping over the sparsity row, add the contribution associated
      * with the neighboring state U_j.
      */
-    void add(const state_type &U_j,
-             const dealii::Tensor<1, dim, Number> &c_ij,
-             const Number entropy_j);
+    void add(const unsigned int *js,
+             const state_type &U_j,
+             const dealii::Tensor<1, dim, Number> &c_ij);
+
     /**
      * Return the computed alpha_i value.
      */
@@ -140,6 +158,9 @@ namespace ryujin
 
     const ProblemDescription &problem_description;
 
+    const MultiComponentVector<ScalarNumber, n_precomputed_values>
+        &precomputed_values;
+
     Number rho_i_inverse = 0.;
     Number eta_i = 0.;
     flux_type f_i;
@@ -153,17 +174,33 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline void Indicator<dim, Number>::reset(
-      const state_type &U_i,
-      const Number entropy,
-      const dealii::Tensor<1, problem_dimension, Number> &entropy_derivative)
+  DEAL_II_ALWAYS_INLINE inline
+      typename Indicator<dim, Number>::PrecomputedValues
+      Indicator<dim, Number>::precompute_values(
+          const ProblemDescription &problem_description, const state_type &U_i)
+  {
+    PrecomputedValues result;
+    const auto &rho_i = problem_description.density(U_i);
+    result[0] = Number(1.) / rho_i;
+    result[1] = problem_description.harten_entropy(U_i);
+    return result;
+  }
+
+
+  template <int dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline void
+  Indicator<dim, Number>::reset(const unsigned int i, const state_type &U_i)
   {
     /* entropy viscosity commutator: */
 
-    const auto &rho_i = problem_description.density(U_i);
+    const auto &[harten_entropy] =
+        precomputed_values.template get_tensor<Number, PrecomputedValues>(i);
+
+    const auto rho_i = problem_description.density(U_i);
     rho_i_inverse = Number(1.) / rho_i;
-    eta_i = entropy;
-    d_eta_i = entropy_derivative;
+    eta_i = harten_entropy;
+
+    d_eta_i = problem_description.harten_entropy_derivative(U_i);
     d_eta_i[0] -= eta_i * rho_i_inverse;
     f_i = problem_description.f(U_i);
 
@@ -174,17 +211,20 @@ namespace ryujin
 
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline void
-  Indicator<dim, Number>::add(const state_type &U_j,
-                              const dealii::Tensor<1, dim, Number> &c_ij,
-                              const Number entropy_j)
+  Indicator<dim, Number>::add(const unsigned int *js,
+                              const state_type &U_j,
+                              const dealii::Tensor<1, dim, Number> &c_ij)
   {
     /* entropy viscosity commutator: */
 
-    const auto &rho_j = problem_description.density(U_j);
+    const auto &[eta_j] =
+        precomputed_values.template get_tensor<Number, PrecomputedValues>(js);
+
+    const auto rho_j = problem_description.density(U_j);
     const auto rho_j_inverse = Number(1.) / rho_j;
+
     const auto m_j = problem_description.momentum(U_j);
     const auto f_j = problem_description.f(U_j);
-    const auto eta_j = entropy_j;
 
     left += (eta_j * rho_j_inverse - eta_i * rho_i_inverse) * (m_j * c_ij);
     for (unsigned int k = 0; k < problem_dimension; ++k)
