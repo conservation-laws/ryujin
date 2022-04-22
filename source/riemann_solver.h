@@ -69,10 +69,8 @@ namespace ryujin
      * compute an estimation of an upper bound for the maximum wavespeed
      * lambda.
      */
-    std::tuple<Number /*lambda_max*/,
-               Number /*p_star*/>
-    compute(const std::array<Number, 4> &riemann_data_i,
-            const std::array<Number, 4> &riemann_data_j);
+    Number compute(const std::array<Number, 4> &riemann_data_i,
+                   const std::array<Number, 4> &riemann_data_j);
 
     /**
      * For two given states U_i a U_j and a (normalized) "direction" n_ij
@@ -81,11 +79,9 @@ namespace ryujin
      * Returns a tuple consisting of lambda max and the number of Newton
      * iterations used in the solver to find it.
      */
-    std::tuple<Number /*lambda_max*/,
-               Number /*p_star*/>
-    compute(const state_type &U_i,
-            const state_type &U_j,
-            const dealii::Tensor<1, dim, Number> &n_ij);
+    Number compute(const state_type &U_i,
+                   const state_type &U_j,
+                   const dealii::Tensor<1, dim, Number> &n_ij);
 
     //@}
 

@@ -100,7 +100,7 @@ namespace ryujin
   {
     /**
      * Internally used: returns true if all indices are on the lower
-     * triangular.
+     * triangular part of the matrix.
      */
     template <typename T>
     bool all_below_diagonal(unsigned int i, const unsigned int *js)
@@ -188,7 +188,7 @@ namespace ryujin
     std::atomic<bool> restart_needed = false;
 
     /*
-     * Step 0: Precompute f(U) and the entropies of U
+     * Step 0: Precompute values
      */
     {
       Scope scope(computing_timer_, "time step [E] 0 - precompute values");
@@ -328,10 +328,7 @@ namespace ryujin
 
             const auto norm = c_ij.norm();
             const auto n_ij = c_ij / norm;
-
-            const auto [lambda_max, p_star] =
-                riemann_solver.compute(U_i, U_j, n_ij);
-
+            const auto lambda_max = riemann_solver.compute(U_i, U_j, n_ij);
             const auto d = norm * lambda_max;
 
             dij_matrix_.write_entry(d, i, col_idx, true);
@@ -381,10 +378,10 @@ namespace ryujin
         Assert(c_ji.norm() > 1.e-12, ExcInternalError());
         const auto norm = c_ji.norm();
         const auto n_ji = c_ji / norm;
-        auto [lambda_max_2, p_star_2] = riemann_solver.compute(U_j, U_i, n_ji);
+        auto lambda_max = riemann_solver.compute(U_j, U_i, n_ji);
 
         auto d = dij_matrix_.get_entry(i, col_idx);
-        d = std::max(d, norm * lambda_max_2);
+        d = std::max(d, norm * lambda_max);
         dij_matrix_.write_entry(d, i, col_idx);
       }
 
@@ -803,29 +800,8 @@ namespace ryujin
             }
 
 #ifdef CHECK_BOUNDS
-            {
-              const auto rho_new = problem_description_->density(U_i_new);
-              const auto e_new = problem_description_->internal_energy(U_i_new);
-              const auto s_new =
-                  problem_description_->specific_entropy(U_i_new);
-
-              using namespace dealii;
-              constexpr auto gt = dealii::SIMDComparison::greater_than;
-              const auto test =
-                  compare_and_apply_mask<gt>(rho_new, T(0.), T(0.), T(-1.)) + //
-                  compare_and_apply_mask<gt>(e_new, T(0.), T(0.), T(-1.)) +   //
-                  compare_and_apply_mask<gt>(s_new, T(0.), T(0.), T(-1.));
-              if (!(test == T(0.))) {
-#ifdef DEBUG_OUTPUT
-                std::cout << std::fixed << std::setprecision(16);
-                std::cout << "Bounds violation: Negative rho, e, s detected!"
-                          << std::endl;
-                std::cout << "rho: !!! " << rho_new << std::endl;
-                std::cout << "int: !!! " << e_new << std::endl;
-                std::cout << "ent: !!! " << s_new << std::endl << std::endl;
-#endif
-                restart_needed = true;
-              }
+            if (!problem_description_->is_admissible(U_i_new)) {
+              restart_needed = true;
             }
 #endif
 

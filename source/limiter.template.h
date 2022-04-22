@@ -48,9 +48,10 @@ namespace ryujin
             (std::max(Number(0.), rho_min - relaxbig * U_rho) == Number(0.)))) {
 #ifdef DEBUG_OUTPUT
         std::cout << std::fixed << std::setprecision(16);
-        std::cout << "(low order - critical) min: " << rho_min << std::endl;
-        std::cout << "(low order - critical) rho: " << U_rho << std::endl;
-        std::cout << "(low order - critical) max: " << rho_max << std::endl << std::endl;
+        std::cout << "Bounds violation: low-order density (critical)!\n";
+        std::cout << "\t\trho min: " << rho_min << "\n";
+        std::cout << "\t\trho:     " << U_rho << s "\n";
+        std::cout << "\t\trho max: " << rho_max << "\n" << std::endl;
 #endif
         success = false;
       }
@@ -85,10 +86,10 @@ namespace ryujin
             (std::max(Number(0.), rho_min - relaxbig * n_rho) == Number(0.)))) {
 #ifdef DEBUG_OUTPUT
         std::cout << std::fixed << std::setprecision(16);
-        std::cout << "Density bounds violated:" << std::endl;
-        std::cout << "(high order) min: " << rho_min << std::endl;
-        std::cout << "(high order) rho: " << n_rho << std::endl;
-        std::cout << "(high order) max: " << rho_max << std::endl << std::endl;
+        std::cout << "Bounds violation: high-order density!\n";
+        std::cout << "\t\trho min: " << rho_min << "\n";
+        std::cout << "\t\trho:     " << n_rho << s "\n";
+        std::cout << "\t\trho max: " << rho_max << "\n" << std::endl;
 #endif
         success = false;
       }
@@ -157,7 +158,9 @@ namespace ryujin
             !(std::min(Number(0.), psi_l + Number(100. * eps)) == Number(0.))) {
 #ifdef DEBUG_OUTPUT
           std::cout << std::fixed << std::setprecision(16);
-          std::cout << "(low order - critical) Psi left: " << psi_l << std::endl;
+          std::cout
+              << "Bounds violation: low-order specific entropy (critical)!\n";
+          std::cout << "\t\tPsi left: 0 <= " << psi_l << "\n" << std::endl;
 #endif
           success = false;
         }
@@ -208,11 +211,9 @@ namespace ryujin
         if (!e_valid || !psi_valid) {
 #ifdef DEBUG_OUTPUT
           std::cout << std::fixed << std::setprecision(16);
-          std::cout << "Specific entropy minimum principle violated:"
-                    << std::endl;
-          std::cout << "(high order) int: !!! 0 <= " << e_new << std::endl;
-          std::cout << "(high order) Psi: !!! 0 <= " << psi << std::endl
-                    << std::endl;
+          std::cout << "Bounds violation: high-order specific entropy!\n";
+          std::cout << "\t\tInt: 0 <= " << e_new << "\n";
+          std::cout << "\t\tPsi: 0 <= " << psi_l << "\n" << std::endl;
 #endif
           success = false;
         }

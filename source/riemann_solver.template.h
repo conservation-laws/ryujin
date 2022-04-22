@@ -208,7 +208,7 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  std::tuple<Number, Number> RiemannSolver<dim, Number>::compute(
+  Number RiemannSolver<dim, Number>::compute(
       const std::array<Number, 4> &riemann_data_i,
       const std::array<Number, 4> &riemann_data_j)
   {
@@ -258,15 +258,12 @@ namespace ryujin
         dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
             phi_p_max, Number(0.), p_star_tilde, std::min(p_max, p_star_tilde));
 
-    const Number lambda_max =
-        compute_lambda(riemann_data_i, riemann_data_j, p_2);
-
-    return {lambda_max, p_2};
+    return compute_lambda(riemann_data_i, riemann_data_j, p_2);
   }
 
 
   template <int dim, typename Number>
-  std::tuple<Number, Number> RiemannSolver<dim, Number>::compute(
+  Number RiemannSolver<dim, Number>::compute(
       const state_type &U_i,
       const state_type &U_j,
       const dealii::Tensor<1, dim, Number> &n_ij)

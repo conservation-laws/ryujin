@@ -169,8 +169,24 @@ namespace ryujin
           const Number t_min = Number(0.),
           const Number t_max = Number(1.));
     //*}
+    /**
+     * @name Verify invariant domain property
+     */
+    //@{
+
+    /**
+     * Returns whether the state @ref U is located in the invariant domain
+     * described by @ref bounds. If @ref U is a vectorized state then the
+     * function returns true if all vectorized values are located in the
+     * invariant domain.
+     */
+    static bool
+    is_in_invariant_domain(const ProblemDescription &problem_description,
+                           const Bounds &bounds,
+                           const state_type &U);
 
   private:
+    //*}
     /** @name */
     //@{
 
@@ -285,6 +301,19 @@ namespace ryujin
   Limiter<dim, Number>::bounds() const
   {
     return bounds_;
+  }
+
+
+  template <int dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline bool
+  Limiter<dim, Number>::is_in_invariant_domain(
+      const ProblemDescription &/*problem_description*/,
+      const Bounds &/*bounds*/,
+      const state_type &/*U*/)
+  {
+    AssertThrow(false, dealii::ExcNotImplemented());
+    __builtin_trap();
+    return true;
   }
 
 } /* namespace ryujin */

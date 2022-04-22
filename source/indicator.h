@@ -180,9 +180,7 @@ namespace ryujin
           const ProblemDescription &problem_description, const state_type &U_i)
   {
     PrecomputedValues result;
-    const auto &rho_i = problem_description.density(U_i);
-    result[0] = Number(1.) / rho_i;
-    result[1] = problem_description.harten_entropy(U_i);
+    result[0] = problem_description.harten_entropy(U_i);
     return result;
   }
 

@@ -102,7 +102,6 @@ namespace ryujin
       van_der_waals
     };
 
-
     /**
      * Constructor.
      */
@@ -260,6 +259,14 @@ namespace ryujin
     template <int problem_dim, typename Number>
     dealii::Tensor<1, problem_dim, Number> mathematical_entropy_derivative(
         const dealii::Tensor<1, problem_dim, Number> U) const;
+
+    /**
+     * Returns whether the state @ref U is admissible. If @ref U is a
+     * vectorized state then @ref U is admissible if all vectorized values
+     * are admissible.
+     */
+    template <int problem_dim, typename Number>
+    bool is_admissible(const dealii::Tensor<1, problem_dim, Number> &U) const;
 
     //@}
     /**
@@ -585,6 +592,35 @@ namespace ryujin
     }
 
     return result;
+  }
+
+
+  template <int problem_dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline bool ProblemDescription::is_admissible(
+      const dealii::Tensor<1, problem_dim, Number> &U) const
+  {
+    const auto rho_new = density(U);
+    const auto e_new = internal_energy(U);
+    const auto s_new = specific_entropy(U);
+
+    constexpr auto gt = dealii::SIMDComparison::greater_than;
+    using T = Number;
+    const auto test =
+        dealii::compare_and_apply_mask<gt>(rho_new, T(0.), T(0.), T(-1.)) + //
+        dealii::compare_and_apply_mask<gt>(e_new, T(0.), T(0.), T(-1.)) +   //
+        dealii::compare_and_apply_mask<gt>(s_new, T(0.), T(0.), T(-1.));
+
+#ifdef DEBUG_OUTPUT
+    if (test != Number(0.)) {
+      std::cout << std::fixed << std::setprecision(16);
+      std::cout << "Bounds violation: Negative state [rho, e, s] detected!\n";
+      std::cout << "\t\trho: " << rho_new << "\n";
+      std::cout << "\t\tint: " << e_new << "\n";
+      std::cout << "\t\tent: " << s_new << "\n" << std::endl;
+    }
+#endif
+
+    return (test == Number(0.));
   }
 
 
