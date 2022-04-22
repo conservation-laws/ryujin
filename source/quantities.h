@@ -33,40 +33,20 @@ namespace ryujin
   {
   public:
     /**
-     * @copydoc ProblemDescription::problem_dimension
-     */
-    // clang-format off
-    static constexpr unsigned int problem_dimension = ProblemDescription::problem_dimension<dim>;
-    // clang-format on
-
-    /**
      * @copydoc ProblemDescription::state_type
      */
     using state_type = ProblemDescription::state_type<dim, Number>;
 
     /**
-     * Type used to store a curl of an 2D/3D vector field. Departing from
-     * mathematical rigor, in 2D this is a number (stored as
-     * `Tensor<1,1>`), in 3D this is a rank 1 tensor.
+     * @copydoc ProblemDescription::primitive_state_type
      */
-    using curl_type = dealii::Tensor<1, dim == 2 ? 1 : dim, Number>;
-
-    /**
-     * @copydoc OfflineData::scalar_type
-     */
-    using scalar_type = typename OfflineData<dim, Number>::scalar_type;
+    using primitive_state_type =
+        ProblemDescription::primitive_state_type<dim, Number>;
 
     /**
      * @copydoc OfflineData::vector_type
      */
     using vector_type = typename OfflineData<dim, Number>::vector_type;
-
-    /**
-     * A distributed block vector used for temporary storage of the
-     * velocity field.
-     */
-    using block_vector_type =
-        dealii::LinearAlgebra::distributed::BlockVector<Number>;
 
     /**
      * Constructor.
@@ -78,10 +58,12 @@ namespace ryujin
 
     /**
      * Prepare evaluation. A call to @ref prepare() allocates temporary
-     * storage and is necessary before compute() can be called.
+     * storage and is necessary before accumulate() and write_out() can be
+     * called.
      *
-     * Calling prepare() allocates temporary storage for additional (3 *
-     * dim + 1) scalar vectors of type OfflineData::scalar_type.
+     * Calling prepare() allocates temporary storage for various boundary
+     * and interior maps. The storage requirement varies according to the
+     * supplied manifold descriptions.
      *
      * The string parameter @ref name is used as base name for output files.
      */
@@ -131,6 +113,9 @@ namespace ryujin
      * A tuple describing (local) dof index, boundary normal, normal mass,
      * boundary mass, boundary id, and position of the boundary degree of
      * freedom.
+     *
+     * @fixme This type only differs from the one used in OfflineData by
+     * including a DoF index. It might be better to combine both.
      */
     using boundary_point =
         std::tuple<dealii::types::global_dof_index /*local dof index*/,
@@ -151,10 +136,10 @@ namespace ryujin
      * pressure force.
      */
     using boundary_value =
-        std::tuple<state_type /* primitive state */,
-                   state_type /* primitive state second moment */,
-                   dealii::Tensor<1, dim, Number> /* tau_n */,
-                   dealii::Tensor<1, dim, Number> /* pn */>;
+        std::tuple<primitive_state_type /* primitive state */,
+                   primitive_state_type /* primitive state second moment */,
+                   dealii::Tensor<1, dim, Number> /* tau_n */, // FIXME
+                   dealii::Tensor<1, dim, Number> /* pn */>;   // FIXME
 
     /**
      * Temporal statistics we store for each boundary manifold.
@@ -193,8 +178,8 @@ namespace ryujin
      * primitive state and its second moment.
      */
     using interior_value =
-        std::tuple<state_type /* primitive state */,
-                   state_type /* primitive state second moment */>;
+        std::tuple<primitive_state_type /* primitive state */,
+                   primitive_state_type /* primitive state second moment */>;
 
     /**
      * Temporal statistics we store for each interior manifold.

@@ -129,7 +129,7 @@ namespace ryujin
 
               /*
                * Insert index, interior mass value and position into
-               a preliminary map if we satisfy level set condition.
+               * a preliminary map if we satisfy level set condition.
                */
 
               if (std::abs(level_set_function.value(position)) > 1.e-12)
@@ -338,29 +338,13 @@ namespace ryujin
           const auto &[i, mass_i, x_i] = point;
 
           const auto U_i = U.get_tensor(i);
-          const auto rho_i = problem_description_->density(U_i);
-          const auto m_i = problem_description_->momentum(U_i);
-          const auto v_i = m_i / rho_i;
-          const auto p_i = problem_description_->pressure(U_i);
+          const auto primitive_state =
+              problem_description_->to_primitive_state(U_i);
 
           interior_value result;
-
-          if constexpr (dim == 1)
-            result = {state_type{{rho_i, v_i[0], p_i}},
-                      state_type{{rho_i * rho_i, v_i[0] * v_i[0], p_i * p_i}}};
-          else if constexpr (dim == 2)
-            result = {state_type{{rho_i, v_i[0], v_i[1], p_i}},
-                      state_type{{rho_i * rho_i,
-                                  v_i[0] * v_i[0],
-                                  v_i[1] * v_i[1],
-                                  p_i * p_i}}};
-          else
-            result = {state_type{{rho_i, v_i[0], v_i[1], v_i[2], p_i}},
-                      state_type{{rho_i * rho_i,
-                                  v_i[0] * v_i[0],
-                                  v_i[1] * v_i[1],
-                                  v_i[2] * v_i[2],
-                                  p_i * p_i}}};
+          std::get<0>(result) = primitive_state;
+          /* Compute second moments of the primitive state: */
+          std::get<1>(result) = schur_product(primitive_state, primitive_state);
 
           mass_sum += mass_i;
           std::get<0>(spatial_average) += mass_i * std::get<0>(result);
@@ -403,8 +387,16 @@ namespace ryujin
 
     if (Utilities::MPI::this_mpi_process(mpi_communicator_) == 0) {
 
-      output << "# primitive state (rho, u, p)\t2nd moments (rho^2, u_i^2, "
-                "p^2)\n";
+      const auto &names =
+          problem_description_->template primitive_component_names<dim>;
+      output << std::accumulate(
+          std::begin(names), std::end(names), std::string(),
+          [](std::string &description, auto name) {
+            return description.empty()
+                       ? std::string("# primitive state (") + name
+                       : description + ", " + name;
+          });
+      output << ")\t and 2nd moments\n";
 
       unsigned int rank = 0;
       for (const auto &entries : received) {
