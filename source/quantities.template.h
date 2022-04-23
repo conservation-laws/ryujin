@@ -32,6 +32,23 @@ namespace ryujin
 {
   using namespace dealii;
 
+  namespace
+  {
+    template <typename T>
+    const std::string &get_options_from_name(const T &manifolds,
+                                             std::string name)
+    {
+      const auto it =
+          std::find_if(manifolds.begin(),
+                       manifolds.end(),
+                       [&, name = std::cref(name)](const auto &element) {
+                         return std::get<0>(element) == name.get();
+                       });
+      Assert(it != manifolds.end(), dealii::ExcInternalError());
+      return std::get<2>(*it);
+    }
+  } // namespace
+
 
   template <int dim, typename Number>
   Quantities<dim, Number>::Quantities(
@@ -168,6 +185,11 @@ namespace ryujin
 
 
     for (const auto &[name, interior_map] : interior_maps_) {
+      /* Skip outputting the boundary map for spatial averages. */
+      const auto &options = get_options_from_name(interior_manifolds_, name);
+      if (options.find("instantaneous") == std::string::npos &&
+          options.find("time_averaged") == std::string::npos)
+        continue;
 
       /*
        * FIXME: This currently distributes boundary maps to all MPI ranks.
@@ -249,6 +271,11 @@ namespace ryujin
      */
 
     for (const auto &[name, boundary_map] : boundary_maps_) {
+      /* Skip outputting the boundary map for spatial averages. */
+      const auto &options = get_options_from_name(boundary_manifolds_, name);
+      if (options.find("instantaneous") == std::string::npos &&
+          options.find("time_averaged") == std::string::npos)
+        continue;
 
       /*
        * FIXME: This currently distributes boundary maps to all MPI ranks.
@@ -457,15 +484,8 @@ namespace ryujin
                                 auto &time_series) {
       for (const auto &[name, point_map] : point_maps) {
 
-        /* Find the correct option string in manifolds (a vector) */
-        const auto it =
-            std::find_if(manifolds.begin(),
-                         manifolds.end(),
-                         [&, name = std::cref(name)](const auto &element) {
-                           return std::get<0>(element) == name.get();
-                         });
-        Assert(it != manifolds.end(), dealii::ExcInternalError());
-        const auto options = std::get<2>(*it);
+        /* Find the correct option string in manifolds */
+        const auto &options = get_options_from_name(manifolds, name);
 
         /* skip if we don't average in space or time: */
         if (options.find("time_averaged") == std::string::npos &&
@@ -536,15 +556,8 @@ namespace ryujin
                                auto &time_series) {
       for (const auto &[name, point_map] : point_maps) {
 
-        /* Find the correct option string in manifolds (a vector) */
-        const auto it =
-            std::find_if(manifolds.begin(),
-                         manifolds.end(),
-                         [&, name = std::cref(name)](const auto &element) {
-                           return std::get<0>(element) == name.get();
-                         });
-        Assert(it != manifolds.end(), dealii::ExcInternalError());
-        const auto options = std::get<2>(*it);
+        /* Find the correct option string in manifolds */
+        const auto &options = get_options_from_name(manifolds, name);
 
         const auto prefix =
             base_name_ + "-" + name + "-R" + Utilities::to_string(cycle, 4);
