@@ -16,7 +16,11 @@ namespace ryujin
 {
 
   /**
-   * @todo Documentation
+   * A solution transfer class that interpolates a given state U (in
+   * conserved variables) to a refined/coarsened mesh. The class first
+   * transforms the conserved state into primitive variables and then
+   * interpolates/restricts the primitive state field via deal.II's
+   * SolutionTransfer mechanism.
    *
    * @ingroup TimeLoop
    */
@@ -58,7 +62,12 @@ namespace ryujin
     }
 
     /**
-     * @todo Documentation
+     * Read in a state vector (in conserved quantities). The function
+     * populates an auxiliary distributed vectors that store the given
+     * state in primitive variables and then calls the underlying deal.II
+     * SolutionTransfer::prepare_for_coarsening_and_refinement();
+     *
+     * This function has to be called before the actual grid refinement.
      */
     void prepare_for_interpolation(const vector_type &U)
     {
@@ -71,18 +80,15 @@ namespace ryujin
 
       const unsigned int n_owned = offline_data_->n_locally_owned();
 
-      /* copy over density, velocity and internal energy: */
+      /* copy over the primitive state: */
 
       for (unsigned int i = 0; i < n_owned; ++i) {
         const auto U_i = U.get_tensor(i);
-        const auto rho_i = problem_description_->density(U_i);
-        const auto v_i = problem_description_->momentum(U_i) / rho_i;
-        const auto e_i = problem_description_->internal_energy(U_i) / rho_i;
+        const auto primitive_state =
+            problem_description_->to_primitive_state(U_i);
 
-        state_[0].local_element(i) = rho_i;
-        for (unsigned int d = 0; d < dim; ++d)
-          state_[1 + d].local_element(i) = v_i[d];
-        state_[1 + dim].local_element(i) = e_i;
+        for(unsigned int k = 0; k < problem_dimension; ++k)
+          state_[k].local_element(i) = primitive_state[k];
       }
 
       for (auto &it : state_) {
@@ -99,7 +105,11 @@ namespace ryujin
     }
 
     /**
-     * @todo Documentation
+     * Finalize the state vector transfer by calling
+     * SolutionTransfer::interpolate() and repopulating the state vector
+     * (in conserved quantities).
+     *
+     * This function has to be called after the actual grid refinement.
      */
     void interpolate(vector_type &U)
     {
@@ -126,23 +136,13 @@ namespace ryujin
 
       const unsigned int n_owned = offline_data_->n_locally_owned();
 
-      /* copy over density, velocity and internal energy: */
+      /* copy over primitive_state: */
 
       for (unsigned int i = 0; i < n_owned; ++i) {
-
         state_type U_i;
-
-        const auto rho_i = interpolated_state_[0].local_element(i);
-        auto E_i = rho_i * interpolated_state_[1 + dim].local_element(i);
-
-        U_i[0] = rho_i;
-        for (unsigned int d = 0; d < dim; ++d) {
-          const auto v_i = interpolated_state_[1 + d].local_element(i);
-          U_i[1 + d] = rho_i * v_i;
-          E_i += 0.5 * rho_i * v_i * v_i;
-        }
-
-        U_i[1 + dim] = E_i;
+        for(unsigned int k = 0; k < problem_dimension; ++k)
+          U_i[k] = interpolated_state_[k].local_element(i);
+        U_i = problem_description_->from_primitive_state(U_i);
 
         U.write_tensor(U_i, i);
       }
