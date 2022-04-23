@@ -182,7 +182,8 @@ namespace ryujin
       dissipation_module.prepare();
       time_integrator.prepare();
       vtu_output.prepare();
-      quantities.prepare(base_name + "-quantities");
+      /* We skip the first output cycle for quantities: */
+      quantities.prepare(base_name, output_cycle == 0 ? 1 : output_cycle);
       print_mpi_partition(logfile);
     };
 
@@ -204,6 +205,9 @@ namespace ryujin
         do_resume(
             offline_data, base_name, U, t, output_cycle, mpi_communicator);
         t_initial = t;
+
+        /* Workaround: Reinitialize Quantities with correct output cycle: */
+        quantities.prepare(base_name, output_cycle);
 
         /* Remove outdated refinement timestamps: */
         const auto new_end =
@@ -268,7 +272,8 @@ namespace ryujin
           }
         }
         if (enable_compute_quantities &&
-            (output_cycle % output_quantities_multiplier == 0)) {
+            (output_cycle % output_quantities_multiplier == 0) &&
+            (output_cycle > 0)) {
           Scope scope(computing_timer,
                       "time step [P] X - write out quantities");
           quantities.write_out(U, t, output_cycle);

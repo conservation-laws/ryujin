@@ -43,7 +43,9 @@ namespace ryujin
       , mpi_communicator_(mpi_communicator)
       , problem_description_(&problem_description)
       , offline_data_(&offline_data)
-      , output_cycle_averages_(0)
+      , base_name_("")
+      , time_series_cycle_(1)
+      , first_cycle_(true)
   {
 
     add_parameter("interior manifolds",
@@ -72,13 +74,14 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  void Quantities<dim, Number>::prepare(std::string name)
+  void Quantities<dim, Number>::prepare(std::string name, unsigned int cycle)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "Quantities<dim, Number>::prepare()" << std::endl;
 #endif
 
     base_name_ = name;
+    time_series_cycle_ = cycle;
     first_cycle_ = true;
 
     const unsigned int n_owned = offline_data_->n_locally_owned();
@@ -163,6 +166,7 @@ namespace ryujin
 
     /* Output interior maps: */
 
+
     for (const auto &[name, interior_map] : interior_maps_) {
 
       /*
@@ -177,8 +181,8 @@ namespace ryujin
       if (Utilities::MPI::this_mpi_process(mpi_communicator_) == 0) {
 
         std::ofstream output(base_name_ + "-" + name + "-R" +
-                             std::to_string(output_cycle_averages_) +
-                             "-points.dat");
+                             Utilities::to_string(cycle, 4) + "-points.dat");
+
         output << std::scientific << std::setprecision(14);
 
         output << "#\n# position\tinterior mass\n";
@@ -258,8 +262,7 @@ namespace ryujin
       if (Utilities::MPI::this_mpi_process(mpi_communicator_) == 0) {
 
         std::ofstream output(base_name_ + "-" + name + "-R" +
-                             std::to_string(output_cycle_averages_) +
-                             "-points.dat");
+                             Utilities::to_string(cycle, 4) + "-points.dat");
 
         output << std::scientific << std::setprecision(14);
 
@@ -543,6 +546,9 @@ namespace ryujin
         Assert(it != manifolds.end(), dealii::ExcInternalError());
         const auto options = std::get<2>(*it);
 
+        const auto prefix =
+            base_name_ + "-" + name + "-R" + Utilities::to_string(cycle, 4);
+
         /*
          * Compute and output instantaneous field:
          */
@@ -560,9 +566,7 @@ namespace ryujin
           else
             AssertThrow(t_new == t, dealii::ExcInternalError());
 
-          std::string file_name = base_name_ + "-" + name + "-instantaneous-" +
-                                  Utilities::to_string(cycle, 6) + ".dat";
-          std::ofstream output(file_name);
+          std::ofstream output(prefix + "-instantaneous.dat");
 
           output << std::scientific << std::setprecision(14);
           output << "# at t = " << t << std::endl;
@@ -576,10 +580,7 @@ namespace ryujin
 
         if (options.find("time_averaged") != std::string::npos) {
 
-          std::string file_name = base_name_ + "-" + name + "-R" +
-                                  std::to_string(output_cycle_averages_) +
-                                  "-time_averaged.dat";
-          std::ofstream output(file_name);
+          std::ofstream output(prefix + "-time_averaged.dat");
 
           auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
               statistics[name];
@@ -599,10 +600,11 @@ namespace ryujin
 
           auto &series = time_series[name];
 
-          std::string file_name =
-              base_name_ + "-" + name + "-space_averaged_time_series.dat";
-
           std::ofstream output;
+          const auto file_name = base_name_ + "-" + name + "-R" +
+                                 Utilities::to_string(time_series_cycle_, 4) +
+                                 "-space_averaged_time_series.dat";
+
           output << std::scientific << std::setprecision(14);
 
           if (first_cycle_) {
@@ -630,8 +632,6 @@ namespace ryujin
               boundary_manifolds_,
               boundary_statistics_,
               boundary_time_series_);
-
-    output_cycle_averages_++;
 
     if (clear_temporal_statistics_on_writeout_)
       clear_statistics();

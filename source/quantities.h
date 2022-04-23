@@ -67,7 +67,7 @@ namespace ryujin
      *
      * The string parameter @ref name is used as base name for output files.
      */
-    void prepare(std::string name);
+    void prepare(std::string name, unsigned int cycle);
 
     /**
      * Takes a state vector @p U at time t (obtained at the end of a full
@@ -197,9 +197,8 @@ namespace ryujin
         interior_time_series_;
 
     std::string base_name_;
+    unsigned int time_series_cycle_;
     bool first_cycle_;
-
-    unsigned int output_cycle_averages_;
 
     //@}
     /**
