@@ -8,6 +8,6 @@
 namespace ryujin
 {
   /* instantiations */
-  template class ryujin::DissipationModule<DIM, NUMBER>;
+  template class DissipationModule<DIM, NUMBER>;
 
 } /* namespace ryujin */

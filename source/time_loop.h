@@ -12,6 +12,7 @@
 #include "euler_module.h"
 #include "initial_values.h"
 #include "offline_data.h"
+#include "postprocessor.h"
 #include "problem_description.h"
 #include "quantities.h"
 #include "time_integrator.h"
@@ -137,6 +138,7 @@ namespace ryujin
     ryujin::EulerModule<dim, Number> euler_module;
     ryujin::DissipationModule<dim, Number> dissipation_module;
     ryujin::TimeIntegrator<dim, Number> time_integrator;
+    ryujin::Postprocessor<dim, Number> postprocessor;
     ryujin::VTUOutput<dim, Number> vtu_output;
     ryujin::Quantities<dim, Number> quantities;
 

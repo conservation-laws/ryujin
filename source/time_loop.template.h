@@ -53,7 +53,10 @@ namespace ryujin
                         euler_module,
                         dissipation_module,
                         "/H - TimeIntegrator")
-      , vtu_output(mpi_communicator, offline_data, "/I - VTUOutput")
+      , postprocessor(
+            mpi_communicator, offline_data, "/I - VTUOutput/Postprocessor")
+      , vtu_output(
+            mpi_communicator, offline_data, postprocessor, "/I - VTUOutput")
       , quantities(mpi_communicator,
                    problem_description,
                    offline_data,
@@ -181,6 +184,7 @@ namespace ryujin
       euler_module.prepare();
       dissipation_module.prepare();
       time_integrator.prepare();
+      postprocessor.prepare();
       vtu_output.prepare();
       /* We skip the first output cycle for quantities: */
       quantities.prepare(base_name, output_cycle == 0 ? 1 : output_cycle);
@@ -330,9 +334,6 @@ namespace ryujin
           cycle % terminal_update_interval == 0)
         print_cycle_statistics(cycle, t, output_cycle);
     } /* end of loop */
-
-    /* Wait for output thread: */
-    vtu_output.wait();
 
     /* We have actually performed one cycle less. */
     --cycle;
@@ -498,19 +499,12 @@ namespace ryujin
     if (!(do_full_output || do_levelsets || do_checkpointing))
       return;
 
-    /* Wait for a previous thread to finish before scheduling a new one: */
-    {
-      Scope scope(computing_timer, "time step [P] Y - output stall");
-      print_info("waiting for previous output cycle to finish");
-
-      vtu_output.wait();
-    }
-
     /* Data output: */
     if (do_full_output || do_levelsets) {
       Scope scope(computing_timer, "time step [P] Y - output vtu");
       print_info("scheduling output");
 
+      postprocessor.compute(U);
       vtu_output.schedule_output(
           U, name, t, cycle, do_full_output, do_levelsets);
     }
@@ -962,9 +956,6 @@ namespace ryujin
   {
     std::ostringstream output;
 
-    unsigned int n_active_writebacks = Utilities::MPI::sum<unsigned int>(
-        vtu_output.is_active(), mpi_communicator);
-
     std::ostringstream primary;
     if (final_time) {
       primary << "FINAL  (cycle " << Utilities::int_to_string(cycle, 6) << ")";
@@ -985,12 +976,7 @@ namespace ryujin
            << n_mpi_processes << " ranks / " << MultithreadInfo::n_threads()
            << " threads\n"
            << "             Last output cycle " << output_cycle - 1
-           << " at t = " << output_granularity * (output_cycle - 1)
-           << std::endl;
-
-    if (n_active_writebacks > 0)
-      output << "             !!! " << n_active_writebacks
-             << " ranks performing output !!!" << std::flush;
+           << " at t = " << output_granularity * (output_cycle - 1);
 
     print_memory_statistics(output);
     print_timers(output);

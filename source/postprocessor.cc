@@ -3,11 +3,11 @@
 // Copyright (C) 2020 - 2021 by the ryujin authors
 //
 
-#include "quantities.template.h"
+#include "postprocessor.template.h"
 
 namespace ryujin
 {
   /* instantiations */
-  template class Quantities<DIM, NUMBER>;
+  template class Postprocessor<DIM, NUMBER>;
 
 } /* namespace ryujin */

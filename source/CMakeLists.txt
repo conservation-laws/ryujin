@@ -20,6 +20,7 @@ add_executable(ryujin
   limiter.cc
   main.cc
   offline_data.cc
+  postprocessor.cc
   problem_description.cc
   quantities.cc
   riemann_solver.cc
@@ -58,6 +59,7 @@ if(PRECOMPILE_HEADERS AND NOT CMAKE_VERSION VERSION_LESS 3.16)
     offline_data.h
     openmp.h
     quantities.h
+    postprocessor.h
     problem_description.h
     riemann_solver.h
     scope.h

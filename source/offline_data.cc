@@ -8,6 +8,6 @@
 namespace ryujin
 {
   /* instantiations */
-  template class ryujin::OfflineData<DIM, NUMBER>;
+  template class OfflineData<DIM, NUMBER>;
 
 } /* namespace ryujin */

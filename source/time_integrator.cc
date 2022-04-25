@@ -8,6 +8,6 @@
 namespace ryujin
 {
   /* instantiations */
-  template class ryujin::TimeIntegrator<DIM, NUMBER>;
+  template class TimeIntegrator<DIM, NUMBER>;
 
 } /* namespace ryujin */

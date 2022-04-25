@@ -8,6 +8,6 @@
 namespace ryujin
 {
   /* instantiations */
-  template class ryujin::Discretization<DIM>;
+  template class Discretization<DIM>;
 
 } /* namespace ryujin */
