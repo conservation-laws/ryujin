@@ -6,16 +6,13 @@
 #pragma once
 
 #include <compile_time_options.h>
+#include <newton.h>
+#include <simd.h>
 
-#include "limiter.h"
-#include "newton.h"
 #include "riemann_solver.h"
-#include "simd.h"
 
 namespace ryujin
 {
-  using namespace dealii;
-
   /*
    * The approximate Riemann solver is based on a function phi(p) that is
    * montone increasing in p, concave down and whose (weak) third
@@ -184,24 +181,24 @@ namespace ryujin
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline std::array<Number, 4>
   RiemannSolver<dim, Number>::riemann_data_from_state(
-      const ProblemDescription &problem_description,
-      const ProblemDescription::state_type<dim, Number> &U,
+      const HyperbolicSystem &hyperbolic_system,
+      const HyperbolicSystem::state_type<dim, Number> &U,
       const dealii::Tensor<1, dim, Number> &n_ij)
   {
-    const auto rho = problem_description.density(U);
+    const auto rho = hyperbolic_system.density(U);
     const auto rho_inverse = Number(1.0) / rho;
 
-    const auto m = problem_description.momentum(U);
+    const auto m = hyperbolic_system.momentum(U);
     const auto proj_m = n_ij * m;
     const auto perp = m - proj_m * n_ij;
 
-    const auto E = problem_description.total_energy(U) -
+    const auto E = hyperbolic_system.total_energy(U) -
                    Number(0.5) * perp.norm_square() * rho_inverse;
 
     const auto state =
-        ProblemDescription::state_type<1, Number>({rho, proj_m, E});
-    const auto p = problem_description.pressure(state);
-    const auto a = problem_description.speed_of_sound(state);
+        HyperbolicSystem::state_type<1, Number>({rho, proj_m, E});
+    const auto p = hyperbolic_system.pressure(state);
+    const auto a = hyperbolic_system.speed_of_sound(state);
 
     return {{rho, proj_m * rho_inverse, p, a}};
   }
@@ -269,11 +266,11 @@ namespace ryujin
       const dealii::Tensor<1, dim, Number> &n_ij)
   {
     const auto riemann_data_i =
-        riemann_data_from_state(problem_description, U_i, n_ij);
+        riemann_data_from_state(hyperbolic_system, U_i, n_ij);
     const auto riemann_data_j =
-        riemann_data_from_state(problem_description, U_j, n_ij);
+        riemann_data_from_state(hyperbolic_system, U_j, n_ij);
 
     return compute(riemann_data_i, riemann_data_j);
   }
 
-} // namespace ryujin
+} /* namespace ryujin */

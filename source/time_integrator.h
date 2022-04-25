@@ -106,7 +106,6 @@ namespace ryujin
   class TimeIntegrator final : public dealii::ParameterAcceptor
   {
   public:
-
     std::string cfl_recovery_strategy_string_;
 
     /**
@@ -179,7 +178,6 @@ namespace ryujin
     Number step_erk_43(vector_type &U, Number t);
 
   private:
-
     //@}
     /**
      * @name Run time options

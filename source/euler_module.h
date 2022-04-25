@@ -7,15 +7,14 @@
 
 #include <compile_time_options.h>
 
+#include <indicator.h>
+#include <limiter.h>
+#include <hyperbolic_system.h>
+
 #include "convenience_macros.h"
-#include "simd.h"
-
-#include "indicator.h"
-#include "limiter.h"
-
 #include "initial_values.h"
 #include "offline_data.h"
-#include "problem_description.h"
+#include "simd.h"
 #include "sparse_matrix_simd.h"
 
 #include <deal.II/base/parameter_acceptor.h>
@@ -78,21 +77,21 @@ namespace ryujin
   {
   public:
     /**
-     * @copydoc ProblemDescription::problem_dimension
+     * @copydoc HyperbolicSystem::problem_dimension
      */
     // clang-format off
-    static constexpr unsigned int problem_dimension = ProblemDescription::problem_dimension<dim>;
+    static constexpr unsigned int problem_dimension = HyperbolicSystem::problem_dimension<dim>;
     // clang-format on
 
     /**
-     * @copydoc ProblemDescription::state_type
+     * @copydoc HyperbolicSystem::state_type
      */
-    using state_type = ProblemDescription::state_type<dim, Number>;
+    using state_type = HyperbolicSystem::state_type<dim, Number>;
 
     /**
-     * @copydoc ProblemDescription::flux_type
+     * @copydoc HyperbolicSystem::flux_type
      */
-    using flux_type = ProblemDescription::flux_type<dim, Number>;
+    using flux_type = HyperbolicSystem::flux_type<dim, Number>;
 
     /**
      * @copydoc OfflineData::scalar_type
@@ -110,7 +109,7 @@ namespace ryujin
     EulerModule(const MPI_Comm &mpi_communicator,
                 std::map<std::string, dealii::Timer> &computing_timer,
                 const ryujin::OfflineData<dim, Number> &offline_data,
-                const ryujin::ProblemDescription &problem_description,
+                const ryujin::HyperbolicSystem &hyperbolic_system,
                 const ryujin::InitialValues<dim, Number> &initial_values,
                 const std::string &subsection = "EulerModule");
 
@@ -222,8 +221,7 @@ namespace ryujin
     mutable IDViolationStrategy id_violation_strategy_;
 
   private:
-
-   //@}
+    //@}
     /**
      * @name Run time options
      */
@@ -247,8 +245,8 @@ namespace ryujin
     std::map<std::string, dealii::Timer> &computing_timer_;
 
     dealii::SmartPointer<const ryujin::OfflineData<dim, Number>> offline_data_;
-    dealii::SmartPointer<const ryujin::ProblemDescription> problem_description_;
-    ACCESSOR_READ_ONLY(problem_description)
+    dealii::SmartPointer<const ryujin::HyperbolicSystem> hyperbolic_system_;
+    ACCESSOR_READ_ONLY(hyperbolic_system)
     dealii::SmartPointer<const ryujin::InitialValues<dim, Number>>
         initial_values_;
 
@@ -269,7 +267,7 @@ namespace ryujin
     static constexpr auto n_lim = Limiter<dim, Number>::n_precomputed_values;
     mutable MultiComponentVector<Number, n_lim> limiter_precomputed_values_;
 
-    static constexpr auto n_bounds =  Limiter<dim, Number>::n_bounds;
+    static constexpr auto n_bounds = Limiter<dim, Number>::n_bounds;
     mutable MultiComponentVector<Number, n_bounds> bounds_;
 
     mutable vector_type r_;

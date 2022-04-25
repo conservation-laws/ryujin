@@ -5,12 +5,13 @@
 
 #pragma once
 
-#include "introspection.h"
-#include "offline_data.h"
-#include "openmp.h"
-#include "problem_description.h"
-#include "scope.h"
-#include "simd.h"
+#include "../euler_equations/hyperbolic_system.h"
+
+#include <introspection.h>
+#include <offline_data.h>
+#include <openmp.h>
+#include <scope.h>
+#include <simd.h>
 
 #include <deal.II/base/vectorization.h>
 #include <deal.II/lac/diagonal_matrix.h>
@@ -155,14 +156,14 @@ namespace ryujin
     VelocityMatrix(){};
 
     void initialize(
-        const ProblemDescription &problem_description,
+        const HyperbolicSystem &hyperbolic_system,
         const OfflineData<dim, Number2> &offline_data,
         const dealii::MatrixFree<dim, Number> &matrix_free,
         const dealii::LinearAlgebra::distributed::Vector<Number> &density,
         const Number theta_x_tau,
         const unsigned int level = dealii::numbers::invalid_unsigned_int)
     {
-      problem_description_ = &problem_description;
+      hyperbolic_system_ = &problem_description;
       offline_data_ = &offline_data;
       matrix_free_ = &matrix_free;
       density_ = &density;
@@ -381,7 +382,7 @@ namespace ryujin
     }
 
   private:
-    const ProblemDescription *problem_description_;
+    const HyperbolicSystem *hyperbolic_system_;
     const OfflineData<dim, Number2> *offline_data_;
     const dealii::MatrixFree<dim, Number> *matrix_free_;
     const vector_type *density_;
@@ -391,8 +392,8 @@ namespace ryujin
     template <typename Evaluator>
     void apply_local_operator(Evaluator &velocity) const
     {
-      const auto mu = problem_description_->mu();
-      const auto lambda = problem_description_->lambda();
+      const auto mu = hyperbolic_system_->mu();
+      const auto lambda = hyperbolic_system_->lambda();
 
 #if DEAL_II_VERSION_GTE(9, 3, 0)
       velocity.evaluate(dealii::EvaluationFlags::gradients);
@@ -780,6 +781,6 @@ namespace ryujin
     const dealii::MGLevelObject<dealii::MatrixFree<dim, Number>>
         *level_matrix_free_;
   };
-} /* namespace ryujin */
+} // namespace ryujin
 
 #undef LOCAL_SIZE

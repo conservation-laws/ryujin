@@ -30,14 +30,14 @@ namespace ryujin
   DissipationModule<dim, Number>::DissipationModule(
       const MPI_Comm &mpi_communicator,
       std::map<std::string, dealii::Timer> &computing_timer,
-      const ryujin::ProblemDescription &problem_description,
-      const ryujin::OfflineData<dim, Number> &offline_data,
-      const ryujin::InitialValues<dim, Number> &initial_values,
+      const HyperbolicSystem &hyperbolic_system,
+      const OfflineData<dim, Number> &offline_data,
+      const InitialValues<dim, Number> &initial_values,
       const std::string &subsection /*= "DissipationModule"*/)
       : ParameterAcceptor(subsection)
       , mpi_communicator_(mpi_communicator)
       , computing_timer_(computing_timer)
-      , problem_description_(&problem_description)
+      , hyperbolic_system_(&problem_description)
       , offline_data_(&offline_data)
       , initial_values_(&initial_values)
       , n_warnings_(0)
@@ -257,9 +257,9 @@ namespace ryujin
       RYUJIN_OMP_FOR
       for (unsigned int i = 0; i < size_regular; i += simd_length) {
         const auto U_i = U.template get_tensor<VA>(i);
-        const auto rho_i = problem_description_->density(U_i);
-        const auto M_i = problem_description_->momentum(U_i);
-        const auto rho_e_i = problem_description_->internal_energy(U_i);
+        const auto rho_i = hyperbolic_system_->density(U_i);
+        const auto M_i = hyperbolic_system_->momentum(U_i);
+        const auto rho_e_i = hyperbolic_system_->internal_energy(U_i);
         const auto m_i = load_value<VA>(lumped_mass_matrix, i);
 
         store_value<VA>(density_, rho_i, i);
@@ -275,9 +275,9 @@ namespace ryujin
 
       for (unsigned int i = size_regular; i < n_owned; ++i) {
         const auto U_i = U.get_tensor(i);
-        const auto rho_i = problem_description_->density(U_i);
-        const auto M_i = problem_description_->momentum(U_i);
-        const auto rho_e_i = problem_description_->internal_energy(U_i);
+        const auto rho_i = hyperbolic_system_->density(U_i);
+        const auto M_i = hyperbolic_system_->momentum(U_i);
+        const auto rho_e_i = hyperbolic_system_->internal_energy(U_i);
         const auto m_i = lumped_mass_matrix.local_element(i);
 
         density_.local_element(i) = rho_i;
@@ -335,9 +335,9 @@ namespace ryujin
           /* Prescribe velocity: */
           const auto U_i =
               initial_values_->initial_state(position, t + theta_ * tau_);
-          const auto rho_i = problem_description_->density(U_i);
-          const auto V_i = problem_description_->momentum(U_i) / rho_i;
-          const auto e_i = problem_description_->internal_energy(U_i) / rho_i;
+          const auto rho_i = hyperbolic_system_->density(U_i);
+          const auto V_i = hyperbolic_system_->momentum(U_i) / rho_i;
+          const auto e_i = hyperbolic_system_->internal_energy(U_i) / rho_i;
 
           for (unsigned int d = 0; d < dim; ++d) {
             velocity_.block(d).local_element(i) = V_i[d];
@@ -387,7 +387,7 @@ namespace ryujin
         for (unsigned int level = level_matrix_free_.min_level();
              level <= level_matrix_free_.max_level();
              ++level) {
-          level_velocity_matrices_[level].initialize(*problem_description_,
+          level_velocity_matrices_[level].initialize(*hyperbolic_system_,
                                                      *offline_data_,
                                                      level_matrix_free_[level],
                                                      level_density_[level],
@@ -430,7 +430,7 @@ namespace ryujin
       LIKWID_MARKER_START("time_step_n_1");
 
       VelocityMatrix<dim, Number, Number> velocity_operator;
-      velocity_operator.initialize(*problem_description_,
+      velocity_operator.initialize(*hyperbolic_system_,
                                    *offline_data_,
                                    matrix_free_,
                                    density_,
@@ -515,8 +515,8 @@ namespace ryujin
             FEEvaluation<dim, order_fe, order_quad, dim, Number> velocity(data);
             FEEvaluation<dim, order_fe, order_quad, 1, Number> energy(data);
 
-            const auto mu = problem_description_->mu();
-            const auto lambda = problem_description_->lambda();
+            const auto mu = hyperbolic_system_->mu();
+            const auto lambda = hyperbolic_system_->lambda();
 
             for (unsigned int cell = cell_range.first; cell < cell_range.second;
                  ++cell) {
@@ -605,8 +605,8 @@ namespace ryujin
           /* Prescribe internal energy: */
           const auto U_i =
               initial_values_->initial_state(position, t + theta_ * tau_);
-          const auto rho_i = problem_description_->density(U_i);
-          const auto e_i = problem_description_->internal_energy(U_i) / rho_i;
+          const auto rho_i = hyperbolic_system_->density(U_i);
+          const auto e_i = hyperbolic_system_->internal_energy(U_i) / rho_i;
           internal_energy_rhs_.local_element(i) = e_i;
         }
       }
@@ -641,7 +641,7 @@ namespace ryujin
               *offline_data_,
               level_matrix_free_[level],
               level_density_[level],
-              theta_ * tau_ * problem_description_->cv_inverse_kappa(),
+              theta_ * tau_ * hyperbolic_system_->cv_inverse_kappa(),
               level);
           level_energy_matrices_[level].compute_diagonal(
               smoother_data[level].preconditioner);
@@ -676,7 +676,7 @@ namespace ryujin
                                  matrix_free_,
                                  density_,
                                  theta_ * tau_ *
-                                     problem_description_->cv_inverse_kappa());
+                                     hyperbolic_system_->cv_inverse_kappa());
 
       const auto tolerance_internal_energy =
           (tolerance_linfty_norm_ ? internal_energy_rhs_.linfty_norm()
@@ -772,18 +772,17 @@ namespace ryujin
       RYUJIN_OMP_FOR
       for (unsigned int i = 0; i < size_regular; i += simd_length) {
         auto U_i = U.template get_tensor<VA>(i);
-        const auto rho_i = problem_description_->density(U_i);
+        const auto rho_i = hyperbolic_system_->density(U_i);
 
         /* (5.4b) */
-        auto m_i_new =
-            (Number(1.) - alpha) * problem_description_->momentum(U_i);
+        auto m_i_new = (Number(1.) - alpha) * hyperbolic_system_->momentum(U_i);
         for (unsigned int d = 0; d < dim; ++d) {
           m_i_new[d] += alpha * rho_i * load_value<VA>(velocity_.block(d), i);
         }
 
         /* (5.12)f */
         auto rho_e_i_new =
-            (Number(1.0) - alpha) * problem_description_->internal_energy(U_i);
+            (Number(1.0) - alpha) * hyperbolic_system_->internal_energy(U_i);
         rho_e_i_new += alpha * rho_i * load_value<VA>(internal_energy_, i);
 
         /* (5.18) */
@@ -800,18 +799,17 @@ namespace ryujin
 
       for (unsigned int i = size_regular; i < n_owned; ++i) {
         auto U_i = U.get_tensor(i);
-        const auto rho_i = problem_description_->density(U_i);
+        const auto rho_i = hyperbolic_system_->density(U_i);
 
         /* (5.4b) */
-        auto m_i_new =
-            (Number(1.) - alpha) * problem_description_->momentum(U_i);
+        auto m_i_new = (Number(1.) - alpha) * hyperbolic_system_->momentum(U_i);
         for (unsigned int d = 0; d < dim; ++d) {
           m_i_new[d] += alpha * rho_i * velocity_.block(d).local_element(i);
         }
 
         /* (5.12)f */
         auto rho_e_i_new =
-            (Number(1.) - alpha) * problem_description_->internal_energy(U_i);
+            (Number(1.) - alpha) * hyperbolic_system_->internal_energy(U_i);
         rho_e_i_new += alpha * rho_i * internal_energy_.local_element(i);
 
         /* (5.18) */
@@ -835,4 +833,4 @@ namespace ryujin
   }
 
 
-} /* namespace ryujin */
+} // namespace ryujin

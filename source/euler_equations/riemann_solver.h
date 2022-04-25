@@ -5,9 +5,9 @@
 
 #pragma once
 
-#include "simd.h"
+#include "hyperbolic_system.h"
 
-#include "problem_description.h"
+#include <simd.h>
 
 #include <deal.II/base/point.h>
 #include <deal.II/base/tensor.h>
@@ -30,19 +30,19 @@ namespace ryujin
   {
   public:
     /**
-     * @copydoc ProblemDescription::problem_dimension
+     * @copydoc HyperbolicSystem::problem_dimension
      */
     // clang-format off
-    static constexpr unsigned int problem_dimension = ProblemDescription::problem_dimension<dim>;
+    static constexpr unsigned int problem_dimension = HyperbolicSystem::problem_dimension<dim>;
     // clang-format on
 
     /**
-     * @copydoc ProblemDescription::state_type
+     * @copydoc HyperbolicSystem::state_type
      */
-    using state_type = ProblemDescription::state_type<dim, Number>;
+    using state_type = HyperbolicSystem::state_type<dim, Number>;
 
     /**
-     * @copydoc ProblemDescription::ScalarNumber
+     * @copydoc HyperbolicSystem::ScalarNumber
      */
     using ScalarNumber = typename get_value_type<Number>::type;
 
@@ -52,11 +52,11 @@ namespace ryujin
     //@{
 
     /**
-     * Constructor taking a ProblemDescription instance as argument
+     * Constructor taking a HyperbolicSystem instance as argument
      */
-    RiemannSolver(const ProblemDescription &problem_description)
-        : problem_description(problem_description)
-        , gamma(problem_description.gamma())
+    RiemannSolver(const HyperbolicSystem &hyperbolic_system)
+        : hyperbolic_system(hyperbolic_system)
+        , gamma(hyperbolic_system.gamma())
         , gamma_inverse(1. / gamma)
         , gamma_minus_one_inverse(1. / (gamma - 1.))
         , gamma_minus_one_over_gamma_plus_one((gamma - 1.) / (gamma + 1.))
@@ -160,13 +160,13 @@ namespace ryujin
      * compute and return the Riemann data [rho, u, p, a] (used in the
      * approximative Riemann solver).
      */
-    std::array<Number, 4> riemann_data_from_state(
-        const ProblemDescription &problem_description,
-        const ProblemDescription::state_type<dim, Number> &U,
-        const dealii::Tensor<1, dim, Number> &n_ij);
+    std::array<Number, 4>
+    riemann_data_from_state(const HyperbolicSystem &hyperbolic_system,
+                            const HyperbolicSystem::state_type<dim, Number> &U,
+                            const dealii::Tensor<1, dim, Number> &n_ij);
 
   private:
-    const ProblemDescription &problem_description;
+    const HyperbolicSystem &hyperbolic_system;
     const ScalarNumber gamma;
     const ScalarNumber gamma_inverse;
     const ScalarNumber gamma_minus_one_inverse;

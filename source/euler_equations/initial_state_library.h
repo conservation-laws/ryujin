@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "initial_state.h"
+#include <initial_state.h>
 
 namespace ryujin
 {
@@ -22,12 +22,11 @@ namespace ryujin
     public:
       using typename InitialState<dim, Number>::state_type;
 
-      Uniform(const ProblemDescription &problem_description,
+      Uniform(const HyperbolicSystem &hyperbolic_system,
               const std::string subsection)
-          : InitialState<dim, Number>(
-                problem_description, "uniform", subsection)
+          : InitialState<dim, Number>(hyperbolic_system, "uniform", subsection)
       {
-        primitive_[0] = this->problem_description.gamma();
+        primitive_[0] = this->hyperbolic_system.gamma();
         primitive_[1] = 3.0;
         primitive_[2] = 1.;
         this->add_parameter("primitive state",
@@ -39,8 +38,8 @@ namespace ryujin
                                  Number /*t*/) final override
       {
         const auto temp =
-            this->problem_description.from_primitive_state(primitive_);
-        return this->problem_description.template expand_state<dim>(temp);
+            this->hyperbolic_system.from_primitive_state(primitive_);
+        return this->hyperbolic_system.template expand_state<dim>(temp);
       }
 
     private:
@@ -62,19 +61,18 @@ namespace ryujin
     public:
       using typename InitialState<dim, Number>::state_type;
 
-      RampUp(const ProblemDescription &problem_description,
+      RampUp(const HyperbolicSystem &hyperbolic_system,
              const std::string subsection)
-          : InitialState<dim, Number>(
-                problem_description, "ramp up", subsection)
+          : InitialState<dim, Number>(hyperbolic_system, "ramp up", subsection)
       {
-        primitive_initial_[0] = this->problem_description.gamma();
+        primitive_initial_[0] = this->hyperbolic_system.gamma();
         primitive_initial_[1] = 0.0;
         primitive_initial_[2] = 1.;
         this->add_parameter("primitive state initial",
                             primitive_initial_,
                             "Initial 1d primitive state (rho, u, p)");
 
-        primitive_final_[0] = this->problem_description.gamma();
+        primitive_final_[0] = this->hyperbolic_system.gamma();
         primitive_final_[1] = 3.0;
         primitive_final_[2] = 1.;
         this->add_parameter("primitive state final",
@@ -110,9 +108,9 @@ namespace ryujin
           primitive = alpha * primitive_initial_ + beta * primitive_final_;
         }
 
-        const auto &problem_description = this->problem_description;
-        const auto temp = problem_description.from_primitive_state(primitive);
-        return problem_description.template expand_state<dim>(temp);
+        const auto &hyperbolic_system = this->hyperbolic_system;
+        const auto temp = hyperbolic_system.from_primitive_state(primitive);
+        return hyperbolic_system.template expand_state<dim>(temp);
       }
 
     private:
@@ -140,12 +138,11 @@ namespace ryujin
     public:
       using typename InitialState<dim, Number>::state_type;
 
-      Contrast(const ProblemDescription &problem_description,
+      Contrast(const HyperbolicSystem &hyperbolic_system,
                const std::string subsection)
-          : InitialState<dim, Number>(
-                problem_description, "contrast", subsection)
+          : InitialState<dim, Number>(hyperbolic_system, "contrast", subsection)
       {
-        primitive_left_[0] = this->problem_description.gamma();
+        primitive_left_[0] = this->hyperbolic_system.gamma();
         primitive_left_[1] = 0.0;
         primitive_left_[2] = 1.;
         this->add_parameter(
@@ -153,7 +150,7 @@ namespace ryujin
             primitive_left_,
             "Initial 1d primitive state (rho, u, p) on the left");
 
-        primitive_right_[0] = this->problem_description.gamma();
+        primitive_right_[0] = this->hyperbolic_system.gamma();
         primitive_right_[1] = 0.0;
         primitive_right_[2] = 1.;
         this->add_parameter(
@@ -165,9 +162,9 @@ namespace ryujin
       virtual state_type compute(const dealii::Point<dim> &point,
                                  Number /*t*/) final override
       {
-        const auto temp = this->problem_description.from_primitive_state(
+        const auto temp = this->hyperbolic_system.from_primitive_state(
             point[0] > 0. ? primitive_right_ : primitive_left_);
-        return this->problem_description.template expand_state<dim>(temp);
+        return this->hyperbolic_system.template expand_state<dim>(temp);
       }
 
     private:
@@ -189,15 +186,15 @@ namespace ryujin
     public:
       using typename InitialState<dim, Number>::state_type;
 
-      ShockFront(const ProblemDescription &problem_description,
+      ShockFront(const HyperbolicSystem &hyperbolic_system,
                  const std::string subsection)
           : InitialState<dim, Number>(
-                problem_description, "shockfront", subsection)
+                hyperbolic_system, "shockfront", subsection)
       {
         dealii::ParameterAcceptor::parse_parameters_call_back.connect(std::bind(
             &ShockFront<dim, Number>::parse_parameters_callback, this));
 
-        primitive_right_[0] = this->problem_description.gamma();
+        primitive_right_[0] = this->hyperbolic_system.gamma();
         primitive_right_[1] = 0.0;
         primitive_right_[2] = 1.;
         this->add_parameter("primitive state",
@@ -216,8 +213,8 @@ namespace ryujin
       {
         /* Compute post-shock state and S3: */
 
-        const auto gamma = this->problem_description.gamma();
-        const auto b = this->problem_description.b();
+        const auto gamma = this->hyperbolic_system.gamma();
+        const auto b = this->hyperbolic_system.b();
 
         const auto &rho_R = primitive_right_[0];
         const auto &u_R = primitive_right_[1];
@@ -249,9 +246,9 @@ namespace ryujin
       {
         const Number position_1d = Number(point[0] - S3_ * t);
 
-        const auto temp = this->problem_description.from_primitive_state(
+        const auto temp = this->hyperbolic_system.from_primitive_state(
             position_1d > 0. ? primitive_right_ : primitive_left_);
-        return this->problem_description.template expand_state<dim>(temp);
+        return this->hyperbolic_system.template expand_state<dim>(temp);
       }
 
     private:
@@ -274,10 +271,10 @@ namespace ryujin
     public:
       using typename InitialState<dim, Number>::state_type;
 
-      IsentropicVortex(const ProblemDescription &problem_description,
+      IsentropicVortex(const HyperbolicSystem &hyperbolic_system,
                        const std::string subsection)
           : InitialState<dim, Number>(
-                problem_description, "isentropic vortex", subsection)
+                hyperbolic_system, "isentropic vortex", subsection)
       {
         mach_number_ = 2.0;
         this->add_parameter(
@@ -290,7 +287,7 @@ namespace ryujin
       virtual state_type compute(const dealii::Point<dim> &point,
                                  Number t) final override
       {
-        const auto gamma = this->problem_description.gamma();
+        const auto gamma = this->hyperbolic_system.gamma();
 
 
         /* In 3D we simply project onto the 2d plane: */
@@ -343,10 +340,10 @@ namespace ryujin
     public:
       using typename InitialState<dim, Number>::state_type;
 
-      BeckerSolution(const ProblemDescription &problem_description,
+      BeckerSolution(const HyperbolicSystem &hyperbolic_system,
                      const std::string subsection)
           : InitialState<dim, Number>(
-                problem_description, "becker solution", subsection)
+                hyperbolic_system, "becker solution", subsection)
       {
         dealii::ParameterAcceptor::parse_parameters_call_back.connect(std::bind(
             &BeckerSolution<dim, Number>::parse_parameters_callback, this));
@@ -375,7 +372,7 @@ namespace ryujin
 
       void parse_parameters_callback()
       {
-        const double gamma = this->problem_description.gamma();
+        const double gamma = this->hyperbolic_system.gamma();
 
         AssertThrow(
             velocity_left_ > velocity_right_,
@@ -472,7 +469,7 @@ namespace ryujin
                                  Number t) final override
       {
         /* (7.2) */
-        const double gamma = this->problem_description.gamma();
+        const double gamma = this->hyperbolic_system.gamma();
         const double R_infty = (gamma + 1) / (gamma - 1);
 
         /* (7.3) */
@@ -511,25 +508,24 @@ namespace ryujin
      * @ingroup InitialValues
      */
     template <int dim, typename Number, typename T>
-    void populate_initial_state_list(
-        T &initial_state_list,
-        const ProblemDescription &problem_description,
-        const std::string &subsection)
+    void populate_initial_state_list(T &initial_state_list,
+                                     const HyperbolicSystem &hyperbolic_system,
+                                     const std::string &subsection)
     {
       initial_state_list.emplace(std::make_unique<Uniform<dim, Number>>(
-          problem_description, subsection));
-      initial_state_list.emplace(std::make_unique<RampUp<dim, Number>>(
-          problem_description, subsection));
-      initial_state_list.emplace(std::make_unique<Contrast<dim, Number>>(
-          problem_description, subsection));
-      initial_state_list.emplace(std::make_unique<ShockFront<dim, Number>>(
-          problem_description, subsection));
+          hyperbolic_system, subsection));
       initial_state_list.emplace(
-          std::make_unique<IsentropicVortex<dim, Number>>(problem_description,
+          std::make_unique<RampUp<dim, Number>>(hyperbolic_system, subsection));
+      initial_state_list.emplace(std::make_unique<Contrast<dim, Number>>(
+          hyperbolic_system, subsection));
+      initial_state_list.emplace(std::make_unique<ShockFront<dim, Number>>(
+          hyperbolic_system, subsection));
+      initial_state_list.emplace(
+          std::make_unique<IsentropicVortex<dim, Number>>(hyperbolic_system,
                                                           subsection));
       initial_state_list.emplace(std::make_unique<BeckerSolution<dim, Number>>(
-          problem_description, subsection));
+          hyperbolic_system, subsection));
     }
 
-  } // namespace InitialStates
-} /* namespace ryujin */
+  } // namespace InitialStateLibrary
+} // namespace ryujin

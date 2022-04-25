@@ -6,11 +6,10 @@
 #pragma once
 
 #include <compile_time_options.h>
-
-#include "convenience_macros.h"
-#include "discretization.h"
-#include "patterns_conversion.h"
-#include "simd.h"
+#include <convenience_macros.h>
+#include <discretization.h>
+#include <patterns_conversion.h>
+#include <simd.h>
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/tensor.h>
@@ -38,7 +37,8 @@ namespace ryujin
 
 DECLARE_ENUM(ryujin::ProblemType,
              LIST({ryujin::ProblemType::euler, "Euler"},
-                  {ryujin::ProblemType::navier_stokes, "Navier Stokes"}));
+                  {ryujin::ProblemType::navier_stokes,
+                   "Navier Stokes"}));
 
 namespace ryujin
 {
@@ -51,7 +51,7 @@ namespace ryujin
    *
    * @ingroup EulerModule
    */
-  class ProblemDescription final : public dealii::ParameterAcceptor
+  class HyperbolicSystem final : public dealii::ParameterAcceptor
   {
   public:
     /**
@@ -119,7 +119,7 @@ namespace ryujin
     /**
      * Constructor.
      */
-    ProblemDescription(const std::string &subsection = "ProblemDescription");
+    HyperbolicSystem(const std::string &subsection = "HyperbolicSystem");
 
     /**
      * Callback for ParameterAcceptor::initialize(). After we read in
@@ -130,7 +130,7 @@ namespace ryujin
     void parse_parameters_callback();
 
     /**
-     * @name ProblemDescription compile time options
+     * @name HyperbolicSystem compile time options
      */
     //@{
 
@@ -436,7 +436,7 @@ namespace ryujin
 
   template <int problem_dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline Number
-  ProblemDescription::density(const dealii::Tensor<1, problem_dim, Number> &U)
+  HyperbolicSystem::density(const dealii::Tensor<1, problem_dim, Number> &U)
   {
     return U[0];
   }
@@ -444,7 +444,7 @@ namespace ryujin
 
   template <int problem_dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, problem_dim - 2, Number>
-  ProblemDescription::momentum(const dealii::Tensor<1, problem_dim, Number> &U)
+  HyperbolicSystem::momentum(const dealii::Tensor<1, problem_dim, Number> &U)
   {
     constexpr int dim = problem_dim - 2;
 
@@ -456,7 +456,7 @@ namespace ryujin
 
 
   template <int problem_dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline Number ProblemDescription::total_energy(
+  DEAL_II_ALWAYS_INLINE inline Number HyperbolicSystem::total_energy(
       const dealii::Tensor<1, problem_dim, Number> &U)
   {
     constexpr int dim = problem_dim - 2;
@@ -465,7 +465,7 @@ namespace ryujin
 
 
   template <int problem_dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline Number ProblemDescription::internal_energy(
+  DEAL_II_ALWAYS_INLINE inline Number HyperbolicSystem::internal_energy(
       const dealii::Tensor<1, problem_dim, Number> &U)
   {
     /*
@@ -484,7 +484,7 @@ namespace ryujin
 
   template <int problem_dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, problem_dim, Number>
-  ProblemDescription::internal_energy_derivative(
+  HyperbolicSystem::internal_energy_derivative(
       const dealii::Tensor<1, problem_dim, Number> &U)
   {
     /*
@@ -513,7 +513,7 @@ namespace ryujin
 
 
   template <int problem_dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline Number ProblemDescription::pressure(
+  DEAL_II_ALWAYS_INLINE inline Number HyperbolicSystem::pressure(
       const dealii::Tensor<1, problem_dim, Number> &U) const
   {
     /* p = (gamma - 1) / (1 - b * rho) * (rho e) */
@@ -524,7 +524,7 @@ namespace ryujin
 
 
   template <int problem_dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline Number ProblemDescription::speed_of_sound(
+  DEAL_II_ALWAYS_INLINE inline Number HyperbolicSystem::speed_of_sound(
       const dealii::Tensor<1, problem_dim, Number> &U) const
   {
     /* c^2 = gamma * p / rho / (1 - b * rho) */
@@ -538,7 +538,7 @@ namespace ryujin
 
 
   template <int problem_dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline Number ProblemDescription::specific_entropy(
+  DEAL_II_ALWAYS_INLINE inline Number HyperbolicSystem::specific_entropy(
       const dealii::Tensor<1, problem_dim, Number> &U) const
   {
     /* exp((gamma - 1)s) = (rho e) / rho ^ gamma */
@@ -551,7 +551,7 @@ namespace ryujin
 
 
   template <int problem_dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline Number ProblemDescription::harten_entropy(
+  DEAL_II_ALWAYS_INLINE inline Number HyperbolicSystem::harten_entropy(
       const dealii::Tensor<1, problem_dim, Number> &U) const
   {
     /* rho^2 e = \rho E - 1/2*m^2 */
@@ -570,7 +570,7 @@ namespace ryujin
 
   template <int problem_dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, problem_dim, Number>
-  ProblemDescription::harten_entropy_derivative(
+  HyperbolicSystem::harten_entropy_derivative(
       const dealii::Tensor<1, problem_dim, Number> &U) const
   {
     /*
@@ -609,7 +609,7 @@ namespace ryujin
 
 
   template <int problem_dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline Number ProblemDescription::mathematical_entropy(
+  DEAL_II_ALWAYS_INLINE inline Number HyperbolicSystem::mathematical_entropy(
       const dealii::Tensor<1, problem_dim, Number> U) const
   {
     const auto p = pressure(U);
@@ -619,7 +619,7 @@ namespace ryujin
 
   template <int problem_dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, problem_dim, Number>
-  ProblemDescription::mathematical_entropy_derivative(
+  HyperbolicSystem::mathematical_entropy_derivative(
       const dealii::Tensor<1, problem_dim, Number> U) const
   {
     /*
@@ -659,7 +659,7 @@ namespace ryujin
 
 
   template <int problem_dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline bool ProblemDescription::is_admissible(
+  DEAL_II_ALWAYS_INLINE inline bool HyperbolicSystem::is_admissible(
       const dealii::Tensor<1, problem_dim, Number> &U) const
   {
     const auto rho_new = density(U);
@@ -690,7 +690,7 @@ namespace ryujin
   template <int component, int problem_dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline std::
       array<dealii::Tensor<1, problem_dim, Number>, 2>
-      ProblemDescription::linearized_eigenvector(
+      HyperbolicSystem::linearized_eigenvector(
           const dealii::Tensor<1, problem_dim, Number> &U,
           const dealii::Tensor<1, problem_dim - 2, Number> &normal) const
   {
@@ -746,7 +746,7 @@ namespace ryujin
 
   template <int component, int problem_dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, problem_dim, Number>
-  ProblemDescription::prescribe_riemann_characteristic(
+  HyperbolicSystem::prescribe_riemann_characteristic(
       const dealii::Tensor<1, problem_dim, Number> &U,
       const dealii::Tensor<1, problem_dim, Number> &U_bar,
       const dealii::Tensor<1, problem_dim - 2, Number> &normal) const
@@ -803,7 +803,7 @@ namespace ryujin
 
   template <int problem_dim, typename Number, typename Lambda>
   DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, problem_dim, Number>
-  ProblemDescription::apply_boundary_conditions(
+  HyperbolicSystem::apply_boundary_conditions(
       dealii::types::boundary_id id,
       dealii::Tensor<1, problem_dim, Number> U,
       const dealii::Tensor<1, problem_dim - 2> &normal,
@@ -867,9 +867,9 @@ namespace ryujin
 
 
   template <int problem_dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline ProblemDescription::flux_type<problem_dim - 2,
-                                                             Number>
-  ProblemDescription::f(const dealii::Tensor<1, problem_dim, Number> &U) const
+  DEAL_II_ALWAYS_INLINE inline HyperbolicSystem::flux_type<problem_dim - 2,
+                                                           Number>
+  HyperbolicSystem::f(const dealii::Tensor<1, problem_dim, Number> &U) const
   {
     constexpr int dim = problem_dim - 2;
     using ScalarNumber = typename get_value_type<Number>::type;
@@ -893,7 +893,7 @@ namespace ryujin
 
 
   template <int dim1, int prob_dim2, typename Number, typename>
-  ProblemDescription::state_type<dim1, Number> ProblemDescription::expand_state(
+  HyperbolicSystem::state_type<dim1, Number> HyperbolicSystem::expand_state(
       const dealii::Tensor<1, prob_dim2, Number> &state) const
   {
     constexpr auto dim2 = prob_dim2 - 2;
@@ -910,7 +910,7 @@ namespace ryujin
 
   template <int problem_dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, problem_dim, Number>
-  ProblemDescription::from_primitive_state(
+  HyperbolicSystem::from_primitive_state(
       const dealii::Tensor<1, problem_dim, Number> &primitive_state) const
   {
     constexpr auto dim = problem_dim - 2;
@@ -933,7 +933,7 @@ namespace ryujin
 
   template <int problem_dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, problem_dim, Number>
-  ProblemDescription::to_primitive_state(
+  HyperbolicSystem::to_primitive_state(
       const dealii::Tensor<1, problem_dim, Number> &state) const
   {
     constexpr auto dim = problem_dim - 2;

@@ -5,7 +5,8 @@
 
 #pragma once
 
-#include "initial_state_library.h"
+#include <initial_state_library.h>
+
 #include "initial_values.h"
 #include "simd.h"
 
@@ -20,11 +21,11 @@ namespace ryujin
 
   template <int dim, typename Number>
   InitialValues<dim, Number>::InitialValues(
-      const ProblemDescription &problem_description,
+      const HyperbolicSystem &hyperbolic_system,
       const OfflineData<dim, Number> &offline_data,
       const std::string &subsection)
       : ParameterAcceptor(subsection)
-      , problem_description_(&problem_description)
+      , hyperbolic_system_(&hyperbolic_system)
       , offline_data_(&offline_data)
   {
     ParameterAcceptor::parse_parameters_call_back.connect(std::bind(
@@ -57,7 +58,7 @@ namespace ryujin
      * configurations defined in the InitialStateLibrary namespace:
      */
     InitialStateLibrary::populate_initial_state_list<dim, Number>(
-        initial_state_list_, *problem_description_, subsection);
+        initial_state_list_, *hyperbolic_system_, subsection);
   }
 
   namespace
@@ -151,8 +152,7 @@ namespace ryujin
   template <int dim, typename Number>
   void InitialValues<dim, Number>::parse_parameters_callback()
   {
-    constexpr auto problem_dimension =
-        ProblemDescription::problem_dimension<dim>;
+    constexpr auto problem_dimension = HyperbolicSystem::problem_dimension<dim>;
 
     /* First, let's normalize the direction: */
 
@@ -172,7 +172,7 @@ namespace ryujin
             const auto transformed_point =
                 affine_transform(initial_direction_, initial_position_, point);
             auto state = it->compute(transformed_point, t);
-            auto M = problem_description_->momentum(state);
+            auto M = hyperbolic_system_->momentum(state);
             M = affine_transform_vector(initial_direction_, M);
             for (unsigned int d = 0; d < dim; ++d)
               state[1 + d] = M[d];
@@ -221,8 +221,7 @@ namespace ryujin
     vector_type U;
     U.reinit(offline_data_->vector_partitioner());
 
-    constexpr auto problem_dimension =
-        ProblemDescription::problem_dimension<dim>;
+    constexpr auto problem_dimension = HyperbolicSystem::problem_dimension<dim>;
 
     using scalar_type = typename OfflineData<dim, Number>::scalar_type;
 
@@ -259,7 +258,7 @@ namespace ryujin
 
       if (id == Boundary::slip || id == Boundary::no_slip) {
         auto U_i = U.get_tensor(i);
-        U_i = problem_description_->apply_boundary_conditions(
+        U_i = hyperbolic_system_->apply_boundary_conditions(
             id, U_i, normal, [&]() { return U_i; });
         U.write_tensor(U_i, i);
       }

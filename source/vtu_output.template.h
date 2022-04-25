@@ -95,7 +95,7 @@ namespace ryujin
 
       for (unsigned int i = 0; i < problem_dimension; ++i)
         data_out->add_data_vector(state_vector_[i],
-                                  ProblemDescription::component_names<dim>[i]);
+                                  HyperbolicSystem::component_names<dim>[i]);
 
       constexpr auto n_quantities = Postprocessor<dim, Number>::n_quantities;
       for (unsigned int i = 0; i < n_quantities; ++i)
@@ -114,7 +114,7 @@ namespace ryujin
 
       for (unsigned int i = 0; i < problem_dimension; ++i)
         data_out_levelsets->add_data_vector(
-            state_vector_[i], ProblemDescription::component_names<dim>[i]);
+            state_vector_[i], HyperbolicSystem::component_names<dim>[i]);
 
       constexpr auto n_quantities = Postprocessor<dim, Number>::n_quantities;
       for (unsigned int i = 0; i < n_quantities; ++i)

@@ -5,8 +5,9 @@
 
 #pragma once
 
-#include "simd.h"
 #include "postprocessor.h"
+
+#include <simd.h>
 
 #include <deal.II/base/function_parser.h>
 #include <deal.II/numerics/data_out.h>
@@ -18,9 +19,6 @@
 
 namespace ryujin
 {
-  using namespace dealii;
-
-
 #ifndef DOXYGEN
   template <>
   const std::array<std::string, 1> Postprocessor<1, double>::component_names{
@@ -94,7 +92,7 @@ namespace ryujin
 
     const auto &affine_constraints = offline_data_->affine_constraints();
 
-    constexpr auto simd_length = VectorizedArray<Number>::size();
+    constexpr auto simd_length = dealii::VectorizedArray<Number>::size();
 
     const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
     const auto &lumped_mass_matrix = offline_data_->lumped_mass_matrix();
@@ -131,7 +129,7 @@ namespace ryujin
         if (row_length == 1)
           continue;
 
-        Tensor<1, dim, Number> grad_rho_i;
+        dealii::Tensor<1, dim, Number> grad_rho_i;
         curl_type curl_v_i;
 
         /* Skip diagonal. */
@@ -141,11 +139,11 @@ namespace ryujin
               *(i < n_internal ? js + col_idx * simd_length : js + col_idx);
 
           const auto U_j = U.get_tensor(j);
-          const auto M_j = ProblemDescription::momentum(U_j);
+          const auto M_j = HyperbolicSystem::momentum(U_j);
 
           const auto c_ij = cij_matrix.get_tensor(i, col_idx);
 
-          const auto rho_j = ProblemDescription::density(U_j);
+          const auto rho_j = HyperbolicSystem::density(U_j);
 
           grad_rho_i += c_ij * rho_j;
 
@@ -180,7 +178,7 @@ namespace ryujin
 
         const Number m_i = lumped_mass_matrix.local_element(i);
 
-        Tensor<1, n_quantities, Number> quantities;
+        dealii::Tensor<1, n_quantities, Number> quantities;
 
         quantities[0] = grad_rho_i.norm() / m_i;
         if constexpr (dim == 2) {
@@ -231,10 +229,13 @@ namespace ryujin
      */
 
     constexpr auto eps = std::numeric_limits<Number>::epsilon();
-    r_i_max.store(Utilities::MPI::max(r_i_max.load() + eps, mpi_communicator_));
-    r_i_min.store(Utilities::MPI::min(r_i_min.load() - eps, mpi_communicator_));
-    v_i_max.store(Utilities::MPI::max(v_i_max.load() + eps, mpi_communicator_));
-    v_i_min.store(Utilities::MPI::min(v_i_min.load() - eps, mpi_communicator_));
+    {
+      namespace MPI = dealii::Utilities::MPI;
+      r_i_max.store(MPI::max(r_i_max.load() + eps, mpi_communicator_));
+      r_i_min.store(MPI::min(r_i_min.load() - eps, mpi_communicator_));
+      v_i_max.store(MPI::max(v_i_max.load() + eps, mpi_communicator_));
+      v_i_min.store(MPI::min(v_i_min.load() - eps, mpi_communicator_));
+    }
 
     /*
      * Step 3: Normalize schlieren and vorticity:
@@ -279,4 +280,4 @@ namespace ryujin
     }
   }
 
-} /* namespace ryujin */
+} // namespace ryujin

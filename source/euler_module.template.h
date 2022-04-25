@@ -5,11 +5,11 @@
 
 #pragma once
 
+#include <riemann_solver.h>
+
 #include "euler_module.h"
-#include "indicator.h"
 #include "introspection.h"
 #include "openmp.h"
-#include "riemann_solver.h"
 #include "scope.h"
 #include "simd.h"
 
@@ -24,7 +24,7 @@ namespace ryujin
       const MPI_Comm &mpi_communicator,
       std::map<std::string, dealii::Timer> &computing_timer,
       const ryujin::OfflineData<dim, Number> &offline_data,
-      const ryujin::ProblemDescription &problem_description,
+      const ryujin::HyperbolicSystem &hyperbolic_system,
       const ryujin::InitialValues<dim, Number> &initial_values,
       const std::string &subsection /*= "EulerModule"*/)
       : ParameterAcceptor(subsection)
@@ -32,7 +32,7 @@ namespace ryujin
       , mpi_communicator_(mpi_communicator)
       , computing_timer_(computing_timer)
       , offline_data_(&offline_data)
-      , problem_description_(&problem_description)
+      , hyperbolic_system_(&hyperbolic_system)
       , initial_values_(&initial_values)
       , cfl_(0.2)
       , n_restarts_(0)
@@ -222,11 +222,11 @@ namespace ryujin
           const auto U_i = old_U.template get_tensor<T>(i);
 
           const auto ind_val_i =
-              Indicator<dim, T>::precompute_values(*problem_description_, U_i);
+              Indicator<dim, T>::precompute_values(*hyperbolic_system_, U_i);
           indicator_precomputed_values_.template write_tensor<T>(ind_val_i, i);
 
           const auto lim_val_i =
-              Limiter<dim, T>::precompute_values(*problem_description_, U_i);
+              Limiter<dim, T>::precompute_values(*hyperbolic_system_, U_i);
           limiter_precomputed_values_.template write_tensor<T>(lim_val_i, i);
         }
       };
@@ -279,9 +279,8 @@ namespace ryujin
       Scope scope(computing_timer_,
                   "time step [E] 1 - compute d_ij, and alpha_i");
 
-      SynchronizationDispatch synchronization_dispatch([&]() {
-        alpha_.update_ghost_values_start(channel++);
-      });
+      SynchronizationDispatch synchronization_dispatch(
+          [&]() { alpha_.update_ghost_values_start(channel++); });
 
       RYUJIN_PARALLEL_REGION_BEGIN
       LIKWID_MARKER_START("time_step_1");
@@ -291,8 +290,8 @@ namespace ryujin
         unsigned int stride_size = get_stride_size<T>;
 
         /* Stored thread locally: */
-        RiemannSolver<dim, T> riemann_solver(*problem_description_);
-        Indicator<dim, T> indicator(*problem_description_,
+        RiemannSolver<dim, T> riemann_solver(*hyperbolic_system_);
+        Indicator<dim, T> indicator(*hyperbolic_system_,
                                     indicator_precomputed_values_);
         bool thread_ready = false;
 
@@ -366,10 +365,11 @@ namespace ryujin
 
       /* Complete d_ij at boundary: */
 
-      RiemannSolver<dim, Number> riemann_solver(*problem_description_);
+      RiemannSolver<dim, Number> riemann_solver(*hyperbolic_system_);
 
       RYUJIN_OMP_FOR /* with barrier */
-      for (std::size_t k = 0; k < coupling_boundary_pairs.size(); ++k) {
+          for (std::size_t k = 0; k < coupling_boundary_pairs.size(); ++k)
+      {
         const auto &entry = coupling_boundary_pairs[k];
         const auto &[i, col_idx, j] = entry;
         const auto U_i = old_U.get_tensor(i);
@@ -388,7 +388,8 @@ namespace ryujin
       /* Symmetrize d_ij: */
 
       RYUJIN_OMP_FOR /* with barrier */
-      for (unsigned int i = 0; i < n_owned; ++i) {
+          for (unsigned int i = 0; i < n_owned; ++i)
+      {
 
         /* Skip constrained degrees of freedom: */
         const unsigned int row_length = sparsity_simd.row_length(i);
@@ -483,7 +484,7 @@ namespace ryujin
         unsigned int stride_size = get_stride_size<T>;
 
         /* Stored thread locally: */
-        Limiter<dim, T> limiter(*problem_description_,
+        Limiter<dim, T> limiter(*hyperbolic_system_,
                                 limiter_precomputed_values_);
         bool thread_ready = false;
 
@@ -499,7 +500,7 @@ namespace ryujin
               thread_ready, i >= n_export_indices && i < n_internal);
 
           const auto U_i = old_U.template get_tensor<T>(i);
-          const auto f_i = problem_description_->f(U_i);
+          const auto f_i = hyperbolic_system_->f(U_i);
 
           std::array<ProblemDescription::flux_type<dim, T>, stages> f_iHs;
           for (int s = 0; s < stages; ++s) {
@@ -515,20 +516,20 @@ namespace ryujin
 
           limiter.reset(i);
 
-          ProblemDescription::state_type<dim, T> r_i;
+          HyperbolicSystem::state_type<dim, T> r_i;
 
           const unsigned int *js = sparsity_simd.columns(i);
           for (unsigned int col_idx = 0; col_idx < row_length;
                ++col_idx, js += stride_size) {
 
             const auto U_j = old_U.template get_tensor<T>(js);
-            const auto f_j = problem_description_->f(U_j);
+            const auto f_j = hyperbolic_system_->f(U_j);
 
-            std::array<ProblemDescription::state_type<dim, T>, stages> U_jHs;
-            std::array<ProblemDescription::flux_type<dim, T>, stages> f_jHs;
+            std::array<HyperbolicSystem::state_type<dim, T>, stages> U_jHs;
+            std::array<HyperbolicSystem::flux_type<dim, T>, stages> f_jHs;
             for (int s = 0; s < stages; ++s) {
               U_jHs[s] = stage_U[s].get().template get_tensor<T>(js);
-              f_jHs[s] = problem_description_->f(U_jHs[s]);
+              f_jHs[s] = hyperbolic_system_->f(U_jHs[s]);
             }
 
             const auto alpha_j = load_value<T>(alpha_, js);
@@ -634,7 +635,7 @@ namespace ryujin
 
           const auto U_i_new = new_U.template get_tensor<T>(i);
           const auto U_i = old_U.template get_tensor<T>(i);
-          const auto f_i = problem_description_->f(U_i);
+          const auto f_i = hyperbolic_system_->f(U_i);
 
           std::array<ProblemDescription::flux_type<dim, T>, stages> f_iHs;
           for (int s = 0; s < stages; ++s) {
@@ -653,11 +654,11 @@ namespace ryujin
 
             const auto U_j = old_U.template get_tensor<T>(js);
 
-            std::array<ProblemDescription::state_type<dim, T>, stages> U_jHs;
-            std::array<ProblemDescription::flux_type<dim, T>, stages> f_jHs;
+            std::array<HyperbolicSystem::state_type<dim, T>, stages> U_jHs;
+            std::array<HyperbolicSystem::flux_type<dim, T>, stages> f_jHs;
             for (int s = 0; s < stages; ++s) {
               U_jHs[s] = stage_U[s].get().template get_tensor<T>(js);
-              f_jHs[s] = problem_description_->f(U_jHs[s]);
+              f_jHs[s] = hyperbolic_system_->f(U_jHs[s]);
             }
 
             const auto c_ij = cij_matrix.template get_tensor<T>(i, col_idx);
@@ -680,7 +681,7 @@ namespace ryujin
             if constexpr (stages != 0) {
               /* Flux contributions: */
 
-              const auto f_j = problem_description_->f(U_j);
+              const auto f_j = hyperbolic_system_->f(U_j);
 
               for (unsigned int k = 0; k < problem_dimension; ++k) {
                 const auto temp = (f_j[k] + f_i[k]) * c_ij;
@@ -699,7 +700,7 @@ namespace ryujin
             pij_matrix_.write_tensor(p_ij, i, col_idx, true);
 
             const auto &[l_ij, success] =
-                Limiter<dim, T>::limit(*problem_description_,
+                Limiter<dim, T>::limit(*hyperbolic_system_,
                                        bounds,
                                        U_i_new,
                                        p_ij,
@@ -800,7 +801,7 @@ namespace ryujin
             }
 
 #ifdef CHECK_BOUNDS
-            if (!problem_description_->is_admissible(U_i_new)) {
+            if (!hyperbolic_system_->is_admissible(U_i_new)) {
               restart_needed = true;
             }
 #endif
@@ -822,7 +823,7 @@ namespace ryujin
                   pij_matrix_.template get_tensor<T>(i, col_idx);
 
               const auto &[new_l_ij, success] =
-                  Limiter<dim, T>::limit(*problem_description_,
+                  Limiter<dim, T>::limit(*hyperbolic_system_,
                                          bounds,
                                          U_i_new,
                                          new_p_ij,
@@ -947,7 +948,7 @@ namespace ryujin
         return initial_values_->initial_state(position, t);
       };
 
-      U_i = problem_description_->apply_boundary_conditions(
+      U_i = hyperbolic_system_->apply_boundary_conditions(
           id, U_i, normal, get_dirichlet_data);
       U.write_tensor(U_i, i);
     }

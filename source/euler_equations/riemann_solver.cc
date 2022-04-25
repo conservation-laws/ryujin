@@ -12,6 +12,6 @@ namespace ryujin
   /* instantiations */
 
   template class RiemannSolver<DIM, NUMBER>;
-  template class RiemannSolver<DIM, VectorizedArray<NUMBER>>;
+  template class RiemannSolver<DIM, dealii::VectorizedArray<NUMBER>>;
 
 } /* namespace ryujin */

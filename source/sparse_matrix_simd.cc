@@ -5,7 +5,7 @@
 
 #include <compile_time_options.h>
 
-#include "problem_description.h"
+#include "hyperbolic_system.h"
 #include "sparse_matrix_simd.template.h"
 
 namespace ryujin
@@ -21,6 +21,6 @@ namespace ryujin
 #endif
 
   template class SparseMatrixSIMD<NUMBER,
-                                  ProblemDescription::problem_dimension<DIM>>;
+                                  HyperbolicSystem::problem_dimension<DIM>>;
 
 } /* namespace ryujin */

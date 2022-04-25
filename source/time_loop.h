@@ -7,13 +7,14 @@
 
 #include <compile_time_options.h>
 
+#include <hyperbolic_system.h>
+#include <postprocessor.h>
+
 #include "discretization.h"
 #include "dissipation_module.h"
 #include "euler_module.h"
 #include "initial_values.h"
 #include "offline_data.h"
-#include "postprocessor.h"
-#include "problem_description.h"
 #include "quantities.h"
 #include "time_integrator.h"
 #include "vtu_output.h"
@@ -131,7 +132,7 @@ namespace ryujin
 
     std::map<std::string, dealii::Timer> computing_timer;
 
-    ryujin::ProblemDescription problem_description;
+    ryujin::HyperbolicSystem hyperbolic_system;
     ryujin::Discretization<dim> discretization;
     ryujin::OfflineData<dim, Number> offline_data;
     ryujin::InitialValues<dim, Number> initial_values;

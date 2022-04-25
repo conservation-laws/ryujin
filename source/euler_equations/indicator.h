@@ -5,18 +5,17 @@
 
 #pragma once
 
-#include <compile_time_options.h>
+#include "hyperbolic_system.h"
 
-#include "offline_data.h"
-#include "problem_description.h"
-#include "simd.h"
+#include <compile_time_options.h>
+#include <multicomponent_vector.h>
+#include <simd.h>
 
 #include <deal.II/base/vectorization.h>
 
 
 namespace ryujin
 {
-
   /**
    * This class implements an indicator strategy used to form the
    * preliminary high-order update.
@@ -24,7 +23,7 @@ namespace ryujin
    * The indicator is an entropy-viscosity commutator as described
    * in @cite GuermondEtAl2011 and @cite GuermondEtAl2018. For a given
    * entropy \f$\eta\f$ (either the mathematical entropy, or a Harten
-   * entropy, see the documentation of ProblemDescription) we let
+   * entropy, see the documentation of HyperbolicSystem) we let
    * \f$\eta'\f$ denote its derivative with respect to the state variables.
    * We then compute a normalized entropy viscosity ratio \f$\alpha_i^n\f$
    * for the state \f$\boldsymbol U_i^n\f$ as follows:
@@ -61,24 +60,24 @@ namespace ryujin
   {
   public:
     /**
-     * @copydoc ProblemDescription::problem_dimension
+     * @copydoc HyperbolicSystem::problem_dimension
      */
     // clang-format off
-    static constexpr unsigned int problem_dimension = ProblemDescription::problem_dimension<dim>;
+    static constexpr unsigned int problem_dimension = HyperbolicSystem::problem_dimension<dim>;
     // clang-format on
 
     /**
-     * @copydoc ProblemDescription::state_type
+     * @copydoc HyperbolicSystem::state_type
      */
-    using state_type = ProblemDescription::state_type<dim, Number>;
+    using state_type = HyperbolicSystem::state_type<dim, Number>;
 
     /**
-     * @copydoc ProblemDescription::flux_type
+     * @copydoc HyperbolicSystem::flux_type
      */
-    using flux_type = ProblemDescription::flux_type<dim, Number>;
+    using flux_type = HyperbolicSystem::flux_type<dim, Number>;
 
     /**
-     * @copydoc ProblemDescription::ScalarNumber
+     * @copydoc HyperbolicSystem::ScalarNumber
      */
     using ScalarNumber = typename get_value_type<Number>::type;
 
@@ -115,16 +114,16 @@ namespace ryujin
      * Precomputed values for a given state.
      */
     static PrecomputedValues
-    precompute_values(const ProblemDescription &problem_description,
+    precompute_values(const HyperbolicSystem &hyperbolic_system,
                       const state_type &U);
 
     /**
-     * Constructor taking a ProblemDescription instance as argument
+     * Constructor taking a HyperbolicSystem instance as argument
      */
-    Indicator(const ProblemDescription &problem_description,
+    Indicator(const HyperbolicSystem &hyperbolic_system,
               const MultiComponentVector<ScalarNumber, n_precomputed_values>
                   &precomputed_values)
-        : problem_description(problem_description)
+        : hyperbolic_system(hyperbolic_system)
         , precomputed_values(precomputed_values)
     {
     }
@@ -156,7 +155,7 @@ namespace ryujin
      */
     //@{
 
-    const ProblemDescription &problem_description;
+    const HyperbolicSystem &hyperbolic_system;
 
     const MultiComponentVector<ScalarNumber, n_precomputed_values>
         &precomputed_values;
@@ -177,10 +176,10 @@ namespace ryujin
   DEAL_II_ALWAYS_INLINE inline
       typename Indicator<dim, Number>::PrecomputedValues
       Indicator<dim, Number>::precompute_values(
-          const ProblemDescription &problem_description, const state_type &U_i)
+          const HyperbolicSystem &hyperbolic_system, const state_type &U_i)
   {
     PrecomputedValues result;
-    result[0] = problem_description.harten_entropy(U_i);
+    result[0] = hyperbolic_system.harten_entropy(U_i);
     return result;
   }
 
@@ -194,13 +193,13 @@ namespace ryujin
     const auto &[harten_entropy] =
         precomputed_values.template get_tensor<Number, PrecomputedValues>(i);
 
-    const auto rho_i = problem_description.density(U_i);
+    const auto rho_i = hyperbolic_system.density(U_i);
     rho_i_inverse = Number(1.) / rho_i;
     eta_i = harten_entropy;
 
-    d_eta_i = problem_description.harten_entropy_derivative(U_i);
+    d_eta_i = hyperbolic_system.harten_entropy_derivative(U_i);
     d_eta_i[0] -= eta_i * rho_i_inverse;
-    f_i = problem_description.f(U_i);
+    f_i = hyperbolic_system.f(U_i);
 
     left = 0.;
     right = 0.;
@@ -218,11 +217,11 @@ namespace ryujin
     const auto &[eta_j] =
         precomputed_values.template get_tensor<Number, PrecomputedValues>(js);
 
-    const auto rho_j = problem_description.density(U_j);
+    const auto rho_j = hyperbolic_system.density(U_j);
     const auto rho_j_inverse = Number(1.) / rho_j;
 
-    const auto m_j = problem_description.momentum(U_j);
-    const auto f_j = problem_description.f(U_j);
+    const auto m_j = hyperbolic_system.momentum(U_j);
+    const auto f_j = hyperbolic_system.f(U_j);
 
     left += (eta_j * rho_j_inverse - eta_i * rho_i_inverse) * (m_j * c_ij);
     for (unsigned int k = 0; k < problem_dimension; ++k)
@@ -250,4 +249,4 @@ namespace ryujin
     return std::min(Number(1.), evc_alpha_0_ * quotient);
   }
 
-} /* namespace ryujin */
+} // namespace ryujin

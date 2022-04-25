@@ -10,4 +10,4 @@ namespace ryujin
   /* instantiations */
   template class DissipationModule<DIM, NUMBER>;
 
-} /* namespace ryujin */
+} // namespace ryujin

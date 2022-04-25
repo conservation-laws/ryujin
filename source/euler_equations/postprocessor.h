@@ -5,10 +5,10 @@
 
 #pragma once
 
-#include <compile_time_options.h>
+#include "hyperbolic_system.h"
 
-#include "offline_data.h"
-#include "problem_description.h"
+#include <compile_time_options.h>
+#include <offline_data.h>
 
 #include <deal.II/base/parameter_acceptor.h>
 
@@ -45,16 +45,16 @@ namespace ryujin
   {
   public:
     /**
-     * @copydoc ProblemDescription::problem_dimension
+     * @copydoc HyperbolicSystem::problem_dimension
      */
     // clang-format off
-    static constexpr unsigned int problem_dimension = ProblemDescription::problem_dimension<dim>;
+    static constexpr unsigned int problem_dimension = HyperbolicSystem::problem_dimension<dim>;
     // clang-format on
 
     /**
-     * @copydoc ProblemDescription::state_type
+     * @copydoc HyperbolicSystem::state_type
      */
-    using state_type = ProblemDescription::state_type<dim, Number>;
+    using state_type = HyperbolicSystem::state_type<dim, Number>;
 
     /**
      * Type used to store a curl of an 2D/3D vector field. Departing from
@@ -150,4 +150,4 @@ namespace ryujin
     //@}
   };
 
-} /* namespace ryujin */
+} // namespace ryujin

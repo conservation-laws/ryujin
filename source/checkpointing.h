@@ -41,7 +41,7 @@ namespace ryujin
 
     const auto &scalar_partitioner = offline_data.scalar_partitioner();
     static constexpr unsigned int problem_dimension =
-        ProblemDescription::problem_dimension<dim>;
+        HyperbolicSystem::problem_dimension<dim>;
 
     using scalar_type = typename OfflineData<dim, Number>::scalar_type;
     std::array<scalar_type, problem_dimension> state_vector;
@@ -72,7 +72,7 @@ namespace ryujin
 
     std::string name = base_name + "-checkpoint";
 
-    if(dealii::Utilities::MPI::this_mpi_process(mpi_communicator) == 0) {
+    if (dealii::Utilities::MPI::this_mpi_process(mpi_communicator) == 0) {
       std::string meta = name + ".metadata";
 
       std::ifstream file(meta, std::ios::binary);
@@ -120,7 +120,7 @@ namespace ryujin
 
     const auto &scalar_partitioner = offline_data.scalar_partitioner();
     static constexpr unsigned int problem_dimension =
-        ProblemDescription::problem_dimension<dim>;
+        HyperbolicSystem::problem_dimension<dim>;
 
     using scalar_type = typename OfflineData<dim, Number>::scalar_type;
     std::array<scalar_type, problem_dimension> state_vector;
@@ -144,7 +144,7 @@ namespace ryujin
 
     std::string name = base_name + "-checkpoint";
 
-    if(dealii::Utilities::MPI::this_mpi_process(mpi_communicator) == 0) {
+    if (dealii::Utilities::MPI::this_mpi_process(mpi_communicator) == 0) {
       for (const std::string suffix :
            {".mesh", ".mesh_fixed.data", ".mesh.info", ".metadata"})
         if (std::filesystem::exists(name + suffix))
@@ -155,7 +155,7 @@ namespace ryujin
 
     /* Metadata: */
 
-    if(dealii::Utilities::MPI::this_mpi_process(mpi_communicator) == 0) {
+    if (dealii::Utilities::MPI::this_mpi_process(mpi_communicator) == 0) {
       std::string meta = name + ".metadata";
       std::ofstream file(meta, std::ios::binary | std::ios::trunc);
       boost::archive::binary_oarchive oa(file);

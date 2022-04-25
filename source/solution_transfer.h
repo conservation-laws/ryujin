@@ -7,8 +7,9 @@
 
 #include <compile_time_options.h>
 
+#include <hyperbolic_system.h>
+
 #include "offline_data.h"
-#include "problem_description.h"
 
 #include <deal.II/distributed/solution_transfer.h>
 
@@ -29,16 +30,16 @@ namespace ryujin
   {
   public:
     /**
-     * @copydoc ProblemDescription::problem_dimension
+     * @copydoc HyperbolicSystem::problem_dimension
      */
     // clang-format off
-    static constexpr unsigned int problem_dimension = ProblemDescription::problem_dimension<dim>;
+    static constexpr unsigned int problem_dimension = HyperbolicSystem::problem_dimension<dim>;
     // clang-format on
 
     /**
-     * @copydoc ProblemDescription::state_type
+     * @copydoc HyperbolicSystem::state_type
      */
-    using state_type = ProblemDescription::state_type<dim, Number>;
+    using state_type = HyperbolicSystem::state_type<dim, Number>;
 
     /**
      * @copydoc OfflineData::scalar_type
@@ -54,9 +55,9 @@ namespace ryujin
      * Constructor.
      */
     SolutionTransfer(const ryujin::OfflineData<dim, Number> &offline_data,
-                     const ryujin::ProblemDescription &problem_description)
+                     const ryujin::HyperbolicSystem &hyperbolic_system)
         : offline_data_(&offline_data)
-        , problem_description_(&problem_description)
+        , hyperbolic_system_(&hyperbolic_system)
         , solution_transfer_(offline_data.dof_handler())
     {
     }
@@ -85,9 +86,9 @@ namespace ryujin
       for (unsigned int i = 0; i < n_owned; ++i) {
         const auto U_i = U.get_tensor(i);
         const auto primitive_state =
-            problem_description_->to_primitive_state(U_i);
+            hyperbolic_system_->to_primitive_state(U_i);
 
-        for(unsigned int k = 0; k < problem_dimension; ++k)
+        for (unsigned int k = 0; k < problem_dimension; ++k)
           state_[k].local_element(i) = primitive_state[k];
       }
 
@@ -120,7 +121,7 @@ namespace ryujin
       interpolated_state_.resize(problem_dimension);
       for (auto &it : interpolated_state_) {
         it.reinit(scalar_partitioner);
-#if DEAL_II_VERSION_GTE(9,3,0)
+#if DEAL_II_VERSION_GTE(9, 3, 0)
         it.zero_out_ghost_values();
 #else
         it.zero_out_ghosts();
@@ -140,9 +141,9 @@ namespace ryujin
 
       for (unsigned int i = 0; i < n_owned; ++i) {
         state_type U_i;
-        for(unsigned int k = 0; k < problem_dimension; ++k)
+        for (unsigned int k = 0; k < problem_dimension; ++k)
           U_i[k] = interpolated_state_[k].local_element(i);
-        U_i = problem_description_->from_primitive_state(U_i);
+        U_i = hyperbolic_system_->from_primitive_state(U_i);
 
         U.write_tensor(U_i, i);
       }
@@ -157,7 +158,7 @@ namespace ryujin
      */
     //@{
     dealii::SmartPointer<const ryujin::OfflineData<dim, Number>> offline_data_;
-    dealii::SmartPointer<const ryujin::ProblemDescription> problem_description_;
+    dealii::SmartPointer<const ryujin::HyperbolicSystem> hyperbolic_system_;
 
     dealii::parallel::distributed::SolutionTransfer<dim, scalar_type>
         solution_transfer_;

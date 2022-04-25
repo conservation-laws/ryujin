@@ -5,19 +5,16 @@
 
 #pragma once
 
-#include "problem_description.h"
+#include "hyperbolic_system.h"
 
 namespace ryujin
 {
-  using namespace dealii;
-
-
-  ProblemDescription::ProblemDescription(
-      const std::string &subsection /*= "ProblemDescription"*/)
+  HyperbolicSystem::HyperbolicSystem(
+      const std::string &subsection /*= "HyperbolicSystem"*/)
       : ParameterAcceptor(subsection)
   {
     ParameterAcceptor::parse_parameters_call_back.connect(
-        std::bind(&ProblemDescription::parse_parameters_callback, this));
+        std::bind(&HyperbolicSystem::parse_parameters_callback, this));
 
     problem_type_ = ProblemType::euler;
     add_parameter(
@@ -48,7 +45,7 @@ namespace ryujin
   }
 
 
-  void ProblemDescription::parse_parameters_callback()
+  void HyperbolicSystem::parse_parameters_callback()
   {
     /*
      * Precompute a number of derived gamma coefficients that contain
@@ -64,29 +61,29 @@ namespace ryujin
 
 #ifndef DOXYGEN
   template <>
-  const std::array<std::string, 3> ProblemDescription::component_names<1>{
+  const std::array<std::string, 3> HyperbolicSystem::component_names<1>{
       {"rho", "m", "E"}};
 
   template <>
-  const std::array<std::string, 4> ProblemDescription::component_names<2>{
+  const std::array<std::string, 4> HyperbolicSystem::component_names<2>{
       {"rho", "m_1", "m_2", "E"}};
 
   template <>
-  const std::array<std::string, 5> ProblemDescription::component_names<3>{
+  const std::array<std::string, 5> HyperbolicSystem::component_names<3>{
       {"rho", "m_1", "m_2", "m_3", "E"}};
 
   template <>
   const std::array<std::string, 3>
-      ProblemDescription::primitive_component_names<1>{{"rho", "u", "p"}};
+      HyperbolicSystem::primitive_component_names<1>{{"rho", "u", "p"}};
 
   template <>
   const std::array<std::string, 4>
-      ProblemDescription::primitive_component_names<2>{
+      HyperbolicSystem::primitive_component_names<2>{
           {"rho", "v_1", "v_2", "p"}};
 
   template <>
   const std::array<std::string, 5>
-      ProblemDescription::primitive_component_names<3>{
+      HyperbolicSystem::primitive_component_names<3>{
           {"rho", "v_1", "v_2", "v_3", "p"}};
 #endif
 

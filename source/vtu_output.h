@@ -7,9 +7,10 @@
 
 #include <compile_time_options.h>
 
+#include <hyperbolic_system.h>
+#include <postprocessor.h>
+
 #include "offline_data.h"
-#include "postprocessor.h"
-#include "problem_description.h"
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/grid/intergrid_map.h>
@@ -32,10 +33,10 @@ namespace ryujin
   {
   public:
     /**
-     * @copydoc ProblemDescription::problem_dimension
+     * @copydoc HyperbolicSystem::problem_dimension
      */
     // clang-format off
-    static constexpr unsigned int problem_dimension = ProblemDescription::problem_dimension<dim>;
+    static constexpr unsigned int problem_dimension = HyperbolicSystem::problem_dimension<dim>;
     // clang-format on
 
     /**

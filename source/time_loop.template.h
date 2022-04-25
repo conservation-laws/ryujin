@@ -6,10 +6,7 @@
 #pragma once
 
 #include "checkpointing.h"
-#include "indicator.h"
 #include "introspection.h"
-#include "limiter.h"
-#include "riemann_solver.h"
 #include "scope.h"
 #include "solution_transfer.h"
 #include "time_loop.h"
@@ -31,19 +28,19 @@ namespace ryujin
   TimeLoop<dim, Number>::TimeLoop(const MPI_Comm &mpi_comm)
       : ParameterAcceptor("/A - TimeLoop")
       , mpi_communicator(mpi_comm)
-      , problem_description("/B - ProblemDescription")
+      , hyperbolic_system("/B - HyperbolicSystem")
       , discretization(mpi_communicator, "/C - Discretization")
       , offline_data(mpi_communicator, discretization, "/D - OfflineData")
-      , initial_values(problem_description, offline_data, "/E - InitialValues")
+      , initial_values(hyperbolic_system, offline_data, "/E - InitialValues")
       , euler_module(mpi_communicator,
                      computing_timer,
                      offline_data,
-                     problem_description,
+                     hyperbolic_system,
                      initial_values,
                      "/F - EulerModule")
       , dissipation_module(mpi_communicator,
                            computing_timer,
-                           problem_description,
+                           hyperbolic_system,
                            offline_data,
                            initial_values,
                            "/G - DissipationModule")
@@ -58,7 +55,7 @@ namespace ryujin
       , vtu_output(
             mpi_communicator, offline_data, postprocessor, "/I - VTUOutput")
       , quantities(mpi_communicator,
-                   problem_description,
+                   hyperbolic_system,
                    offline_data,
                    "/J - Quantities")
       , mpi_rank(dealii::Utilities::MPI::this_mpi_process(mpi_communicator))
@@ -296,8 +293,8 @@ namespace ryujin
 
             print_info("performing global refinement");
 
-            SolutionTransfer<dim, Number> solution_transfer(
-                offline_data, problem_description);
+            SolutionTransfer<dim, Number> solution_transfer(offline_data,
+                                                            hyperbolic_system);
 
             auto &triangulation = discretization.triangulation();
             for (auto &cell : triangulation.active_cell_iterators())
@@ -367,8 +364,7 @@ namespace ryujin
     std::cout << "TimeLoop<dim, Number>::compute_error()" << std::endl;
 #endif
 
-    constexpr auto problem_dimension =
-        ProblemDescription::problem_dimension<dim>;
+    constexpr auto problem_dimension = HyperbolicSystem::problem_dimension<dim>;
 
     /* Compute L_inf norm: */
 
@@ -862,13 +858,14 @@ namespace ryujin
            << std::setprecision(0) << std::fixed << euler_module.n_warnings() + dissipation_module.n_warnings()
            << " warn) ]";
 
-    output << "[ "
-           << std::setprecision(2) << std::fixed
-           << dissipation_module.n_iterations_velocity()
-           << (dissipation_module.use_gmg_velocity() ? " GMG vel -- " : " CG vel -- ")
-           << dissipation_module.n_iterations_internal_energy()
-           << (dissipation_module.use_gmg_internal_energy() ? " GMG int ]" : " CG int ]")
-           << std::endl;
+// FIXME
+//     output << "[ "
+//            << std::setprecision(2) << std::fixed
+//            << dissipation_module.n_iterations_velocity()
+//            << (dissipation_module.use_gmg_velocity() ? " GMG vel -- " : " CG vel -- ")
+//            << dissipation_module.n_iterations_internal_energy()
+//            << (dissipation_module.use_gmg_internal_energy() ? " GMG int ]" : " CG int ]")
+//            << std::endl;
 
     output << "                     dt = "
            << std::scientific << std::setprecision(2) << delta_time

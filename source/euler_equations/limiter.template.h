@@ -11,7 +11,7 @@ namespace ryujin
 {
   template <int dim, typename Number>
   std::tuple<Number, bool>
-  Limiter<dim, Number>::limit(const ProblemDescription &problem_description,
+  Limiter<dim, Number>::limit(const HyperbolicSystem &hyperbolic_system,
                               const Bounds &bounds,
                               const state_type &U,
                               const state_type &P,
@@ -34,8 +34,8 @@ namespace ryujin
      */
 
     {
-      const auto &U_rho = problem_description.density(U);
-      const auto &P_rho = problem_description.density(P);
+      const auto &U_rho = hyperbolic_system.density(U);
+      const auto &P_rho = hyperbolic_system.density(P);
 
       const auto &rho_min = std::get<0>(bounds);
       const auto &rho_max = std::get<1>(bounds);
@@ -81,7 +81,7 @@ namespace ryujin
       /*
        * Verify that the new state is within bounds:
        */
-      const auto n_rho = problem_description.density(U + t_r * P);
+      const auto n_rho = hyperbolic_system.density(U + t_r * P);
       if (!((std::max(Number(0.), n_rho - relaxbig * rho_max) == Number(0.)) &&
             (std::max(Number(0.), rho_min - relaxbig * n_rho) == Number(0.)))) {
 #ifdef DEBUG_OUTPUT
@@ -104,7 +104,7 @@ namespace ryujin
 
     Number t_l = t_min; // good state
 
-    const ScalarNumber gamma = problem_description.gamma();
+    const ScalarNumber gamma = hyperbolic_system.gamma();
     const ScalarNumber gp1 = gamma + ScalarNumber(1.);
 
     {
@@ -128,9 +128,9 @@ namespace ryujin
       for (unsigned int n = 0; n < newton_max_iter; ++n) {
 
         const auto U_r = U + t_r * P;
-        const auto rho_r = problem_description.density(U_r);
+        const auto rho_r = hyperbolic_system.density(U_r);
         const auto rho_r_gamma = ryujin::pow(rho_r, gamma);
-        const auto rho_e_r = problem_description.internal_energy(U_r);
+        const auto rho_e_r = hyperbolic_system.internal_energy(U_r);
 
         auto psi_r = relax * rho_r * rho_e_r - s_min * rho_r * rho_r_gamma;
 
@@ -144,9 +144,9 @@ namespace ryujin
           break;
 
         const auto U_l = U + t_l * P;
-        const auto rho_l = problem_description.density(U_l);
+        const auto rho_l = hyperbolic_system.density(U_l);
         const auto rho_l_gamma = ryujin::pow(rho_l, gamma);
-        const auto rho_e_l = problem_description.internal_energy(U_l);
+        const auto rho_e_l = hyperbolic_system.internal_energy(U_l);
 
         auto psi_l = relax * rho_l * rho_e_l - s_min * rho_l * rho_l_gamma;
 
@@ -176,11 +176,11 @@ namespace ryujin
 
         /* We got unlucky and have to perform a Newton step: */
 
-        const auto drho = problem_description.density(P);
+        const auto drho = hyperbolic_system.density(P);
         const auto drho_e_l =
-            problem_description.internal_energy_derivative(U_l) * P;
+            hyperbolic_system.internal_energy_derivative(U_l) * P;
         const auto drho_e_r =
-            problem_description.internal_energy_derivative(U_r) * P;
+            hyperbolic_system.internal_energy_derivative(U_r) * P;
         const auto dpsi_l =
             rho_l * drho_e_l + (rho_e_l - gp1 * s_min * rho_l_gamma) * drho;
         const auto dpsi_r =
@@ -200,8 +200,8 @@ namespace ryujin
        */
       {
         const auto U_new = U + t_l * P;
-        const auto rho_new = problem_description.density(U_new);
-        const auto e_new = problem_description.internal_energy(U_new);
+        const auto rho_new = hyperbolic_system.density(U_new);
+        const auto e_new = hyperbolic_system.internal_energy(U_new);
         const auto psi =
             relax * relax * rho_new * e_new - s_min * ryujin::pow(rho_new, gp1);
 
@@ -224,4 +224,4 @@ namespace ryujin
     return {t_l, success};
   }
 
-} /* namespace ryujin */
+} // namespace ryujin

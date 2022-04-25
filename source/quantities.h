@@ -7,12 +7,12 @@
 
 #include <compile_time_options.h>
 
-#include "convenience_macros.h"
-#include "simd.h"
+#include <hyperbolic_system.h>
 
+#include "convenience_macros.h"
 #include "initial_values.h"
 #include "offline_data.h"
-#include "problem_description.h"
+#include "simd.h"
 #include "sparse_matrix_simd.h"
 
 #include <deal.II/base/parameter_acceptor.h>
@@ -33,15 +33,15 @@ namespace ryujin
   {
   public:
     /**
-     * @copydoc ProblemDescription::state_type
+     * @copydoc HyperbolicSystem::state_type
      */
-    using state_type = ProblemDescription::state_type<dim, Number>;
+    using state_type = HyperbolicSystem::state_type<dim, Number>;
 
     /**
-     * @copydoc ProblemDescription::primitive_state_type
+     * @copydoc HyperbolicSystem::primitive_state_type
      */
     using primitive_state_type =
-        ProblemDescription::primitive_state_type<dim, Number>;
+        HyperbolicSystem::primitive_state_type<dim, Number>;
 
     /**
      * @copydoc OfflineData::vector_type
@@ -52,7 +52,7 @@ namespace ryujin
      * Constructor.
      */
     Quantities(const MPI_Comm &mpi_communicator,
-               const ryujin::ProblemDescription &problem_description,
+               const ryujin::HyperbolicSystem &hyperbolic_system,
                const ryujin::OfflineData<dim, Number> &offline_data,
                const std::string &subsection = "Quantities");
 
@@ -105,7 +105,7 @@ namespace ryujin
 
     const MPI_Comm &mpi_communicator_;
 
-    dealii::SmartPointer<const ProblemDescription> problem_description_;
+    dealii::SmartPointer<const HyperbolicSystem> hyperbolic_system_;
     dealii::SmartPointer<const OfflineData<dim, Number>> offline_data_;
 
     /**

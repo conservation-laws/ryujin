@@ -51,7 +51,8 @@ struct Patterns::Tools::
   {
     AssertThrow(pattern.match(s), ExcNoMatch(s, pattern.description()))
 
-    static const auto conversion_table = ConversionHelper<T>().conversion_table;
+        static const auto conversion_table =
+            ConversionHelper<T>().conversion_table;
     for (const auto &it : conversion_table) {
       if (std::get<1>(it) == s)
         return std::get<0>(it);

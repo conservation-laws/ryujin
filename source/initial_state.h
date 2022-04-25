@@ -7,8 +7,9 @@
 
 #include <compile_time_options.h>
 
+#include <hyperbolic_system.h>
+
 #include "convenience_macros.h"
-#include "problem_description.h"
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/tensor.h>
@@ -35,20 +36,20 @@ namespace ryujin
   {
   public:
     /**
-     * @copydoc ProblemDescription::state_type
+     * @copydoc HyperbolicSystem::state_type
      */
-    using state_type = ProblemDescription::state_type<dim, Number>;
+    using state_type = HyperbolicSystem::state_type<dim, Number>;
 
     /**
      * Constructor taking geometry name @p name and a subsection @p
      * subsection as an argument. The dealii::ParameterAcceptor is
      * initialized with the subsubsection `subsection + "/" + name`.
      */
-    InitialState(const ProblemDescription &problem_description,
+    InitialState(const HyperbolicSystem &hyperbolic_system,
                  const std::string &name,
                  const std::string &subsection)
         : ParameterAcceptor(subsection + "/" + name)
-        , problem_description(problem_description)
+        , hyperbolic_system(hyperbolic_system)
         , name_(name)
     {
     }
@@ -63,7 +64,7 @@ namespace ryujin
     virtual state_type compute(const dealii::Point<dim> &point, Number t) = 0;
 
   protected:
-    const ProblemDescription &problem_description;
+    const HyperbolicSystem &hyperbolic_system;
 
   private:
     const std::string name_;

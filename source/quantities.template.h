@@ -53,12 +53,12 @@ namespace ryujin
   template <int dim, typename Number>
   Quantities<dim, Number>::Quantities(
       const MPI_Comm &mpi_communicator,
-      const ryujin::ProblemDescription &problem_description,
+      const ryujin::HyperbolicSystem &hyperbolic_system,
       const ryujin::OfflineData<dim, Number> &offline_data,
       const std::string &subsection /*= "Quantities"*/)
       : ParameterAcceptor(subsection)
       , mpi_communicator_(mpi_communicator)
-      , problem_description_(&problem_description)
+      , hyperbolic_system_(&hyperbolic_system)
       , offline_data_(&offline_data)
       , base_name_("")
       , time_series_cycle_(1)
@@ -314,7 +314,7 @@ namespace ryujin
 
     /* Prepare header string: */
     const auto &names =
-        problem_description_->template primitive_component_names<dim>;
+        hyperbolic_system_->template primitive_component_names<dim>;
     header_ =
         std::accumulate(std::begin(names),
                         std::end(names),
@@ -381,7 +381,7 @@ namespace ryujin
 
           const auto U_i = U.get_tensor(i);
           const auto primitive_state =
-              problem_description_->to_primitive_state(U_i);
+              hyperbolic_system_->to_primitive_state(U_i);
 
           value_type result;
           std::get<0>(result) = primitive_state;
@@ -470,7 +470,6 @@ namespace ryujin
   }
 
 
-
   template <int dim, typename Number>
   void Quantities<dim, Number>::accumulate(const vector_type &U, const Number t)
   {
@@ -538,7 +537,6 @@ namespace ryujin
                boundary_statistics_,
                boundary_time_series_);
   }
-
 
 
   template <int dim, typename Number>

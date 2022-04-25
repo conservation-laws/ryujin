@@ -5,13 +5,12 @@
 
 #pragma once
 
+#include "hyperbolic_system.h"
+
 #include <compile_time_options.h>
-
-#include "newton.h"
-#include "offline_data.h"
-#include "simd.h"
-
-#include "problem_description.h"
+#include <multicomponent_vector.h>
+#include <newton.h>
+#include <simd.h>
 
 namespace ryujin
 {
@@ -50,19 +49,19 @@ namespace ryujin
   {
   public:
     /**
-     * @copydoc ProblemDescription::problem_dimension
+     * @copydoc HyperbolicSystem::problem_dimension
      */
     // clang-format off
-    static constexpr unsigned int problem_dimension = ProblemDescription::problem_dimension<dim>;
+    static constexpr unsigned int problem_dimension = HyperbolicSystem::problem_dimension<dim>;
     // clang-format on
 
     /**
-     * @copydoc ProblemDescription::state_type
+     * @copydoc HyperbolicSystem::state_type
      */
-    using state_type = ProblemDescription::state_type<dim, Number>;
+    using state_type = HyperbolicSystem::state_type<dim, Number>;
 
     /**
-     * @copydoc ProblemDescription::ScalarNumber
+     * @copydoc HyperbolicSystem::ScalarNumber
      */
     using ScalarNumber = typename get_value_type<Number>::type;
 
@@ -110,16 +109,16 @@ namespace ryujin
      * Precomputed values for a given state.
      */
     static PrecomputedValues
-    precompute_values(const ProblemDescription &problem_description,
+    precompute_values(const HyperbolicSystem &hyperbolic_system,
                       const state_type &U);
 
     /**
-     * Constructor taking a ProblemDescription instance as argument
+     * Constructor taking a HyperbolicSystem instance as argument
      */
-    Limiter(const ProblemDescription &problem_description,
+    Limiter(const HyperbolicSystem &hyperbolic_system,
             const MultiComponentVector<ScalarNumber, n_precomputed_values>
                 &precomputed_values)
-        : problem_description(problem_description)
+        : hyperbolic_system(hyperbolic_system)
         , precomputed_values(precomputed_values)
     {
     }
@@ -160,7 +159,7 @@ namespace ryujin
      * selected local minimum principles are obeyed.
      */
     static std::tuple<Number, bool>
-    limit(const ProblemDescription &problem_description,
+    limit(const HyperbolicSystem &hyperbolic_system,
           const Bounds &bounds,
           const state_type &U,
           const state_type &P,
@@ -181,7 +180,7 @@ namespace ryujin
      * invariant domain.
      */
     static bool
-    is_in_invariant_domain(const ProblemDescription &problem_description,
+    is_in_invariant_domain(const HyperbolicSystem &hyperbolic_system,
                            const Bounds &bounds,
                            const state_type &U);
 
@@ -190,7 +189,7 @@ namespace ryujin
     /** @name */
     //@{
 
-    const ProblemDescription &problem_description;
+    const HyperbolicSystem &hyperbolic_system;
 
     const MultiComponentVector<ScalarNumber, n_precomputed_values>
         &precomputed_values;
@@ -208,10 +207,10 @@ namespace ryujin
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline typename Limiter<dim, Number>::PrecomputedValues
   Limiter<dim, Number>::precompute_values(
-      const ProblemDescription &problem_description, const state_type &U_i)
+      const HyperbolicSystem &hyperbolic_system, const state_type &U_i)
   {
     PrecomputedValues result;
-    result[0] = problem_description.specific_entropy(U_i);
+    result[0] = hyperbolic_system.specific_entropy(U_i);
     return result;
   }
 
@@ -251,7 +250,7 @@ namespace ryujin
 
     auto &[rho_min, rho_max, s_min] = bounds_;
 
-    const auto rho_ij = problem_description.density(U_ij_bar);
+    const auto rho_ij = hyperbolic_system.density(U_ij_bar);
     rho_min = std::min(rho_min, rho_ij);
     rho_max = std::max(rho_max, rho_ij);
 
@@ -261,13 +260,13 @@ namespace ryujin
 
     /* Relaxation: */
 
-    const auto rho_i = problem_description.density(U_i);
-    const auto rho_j = problem_description.density(U_j);
+    const auto rho_i = hyperbolic_system.density(U_i);
+    const auto rho_j = hyperbolic_system.density(U_j);
     rho_relaxation_numerator += beta_ij * (rho_i + rho_j);
     rho_relaxation_denominator += beta_ij;
 
     const Number s_interp =
-        problem_description.specific_entropy((U_i + U_j) * ScalarNumber(.5));
+        hyperbolic_system.specific_entropy((U_i + U_j) * ScalarNumber(.5));
     s_interp_max = std::max(s_interp_max, s_interp);
   }
 
@@ -307,13 +306,13 @@ namespace ryujin
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline bool
   Limiter<dim, Number>::is_in_invariant_domain(
-      const ProblemDescription &/*problem_description*/,
-      const Bounds &/*bounds*/,
-      const state_type &/*U*/)
+      const HyperbolicSystem & /*hyperbolic_system*/,
+      const Bounds & /*bounds*/,
+      const state_type & /*U*/)
   {
     AssertThrow(false, dealii::ExcNotImplemented());
     __builtin_trap();
     return true;
   }
 
-} /* namespace ryujin */
+} // namespace ryujin

@@ -7,10 +7,11 @@
 
 #include <compile_time_options.h>
 
+#include <hyperbolic_system.h>
+
 #include "convenience_macros.h"
 #include "discretization.h"
 #include "multicomponent_vector.h"
-#include "problem_description.h"
 #include "sparse_matrix_simd.h"
 
 #include <deal.II/base/parameter_acceptor.h>
@@ -24,7 +25,6 @@
 
 namespace ryujin
 {
-
   /**
    * A class to store all data that can be precomputed offline.
    *
@@ -51,10 +51,10 @@ namespace ryujin
   {
   public:
     /**
-     * @copydoc ProblemDescription::problem_dimension
+     * @copydoc HyperbolicSystem::problem_dimension
      */
     // clang-format off
-    static constexpr unsigned int problem_dimension = ProblemDescription::problem_dimension<dim>;
+    static constexpr unsigned int problem_dimension = HyperbolicSystem::problem_dimension<dim>;
     // clang-format on
 
     /**
@@ -100,7 +100,6 @@ namespace ryujin
     }
 
   private:
-
     /**
      * Set up affine constraints and sparsity pattern. Internally used in
      * setup().
@@ -203,7 +202,7 @@ namespace ryujin
     /**
      * An MPI partitioner for all parallel distributed vectors storing a
      * vector-valued quantity of size
-     * ProblemDescription::problem_dimension.
+     * HyperbolicSystem::problem_dimension.
      */
     ACCESSOR_READ_ONLY_NO_DEREFERENCE(vector_partitioner)
 
