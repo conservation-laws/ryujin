@@ -13,16 +13,22 @@ include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}
   )
 
+# Detect whether we are building against GCC's libstdc++.
+include(CheckCXXSourceCompiles)
+check_cxx_source_compiles("
+  #include <iostream>
+  #ifndef __GLIBCXX__
+  #error NOT LIBSTDCPP
+  #endif
+  int main() {}"
+  LIBSTDCPP
+  )
 
+#
+# Common source files:
+#
 
-
-  ${CMAKE_CURRENT_SOURCE_DIR}/euler_equations // FIXME
-
-add_subdirectory(euler_equations)
-#add_subdirectory(navier_stokes_equations) // FIXME
-
-add_executable(ryujin
-  $<TARGET_OBJECTS:euler_equations>
+set(COMMON_SOURCE_FILES
   discretization.cc
   euler_module.cc
   initial_values.cc
@@ -36,43 +42,55 @@ add_executable(ryujin
   vtu_output.cc
   )
 
-deal_ii_setup_target(ryujin)
-
-target_link_libraries(ryujin ${OpenMP_CXX_LIBRARIES})
-
 set_property(SOURCE time_loop.cc APPEND PROPERTY COMPILE_DEFINITIONS
   RYUJIN_VERSION="${RYUJIN_VERSION}"
   RYUJIN_GIT_REVISION="${GIT_REVISION}"
   RYUJIN_GIT_SHORTREV="${GIT_SHORTREV}"
   )
 
-set_property(TARGET ryujin
-  PROPERTY RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/run
-  )
-
-if(LIKWID_PERFMON)
-  target_link_libraries(ryujin likwid likwid-hwloc likwid-lua)
-endif()
-
 #
-# For GNU libstdc++ we have to make sure to also link against libstdc++fs:
+# Equation-specific source files:
 #
 
-include(CheckCXXSourceCompiles)
-
-check_cxx_source_compiles("
-  #include <iostream>
-  #ifndef __GLIBCXX__
-  #error NOT LIBSTDCPP
-  #endif
-  int main() {}"
-  LIBSTDCPP
-  )
-
-if(LIBSTDCPP)
-  target_link_libraries(ryujin stdc++fs)
+if("${INSTANTIATED_EQUATIONS}" STREQUAL "")
+  set(INSTANTIATED_EQUATIONS
+    "euler_equations"
+    )
 endif()
 
-install(TARGETS ryujin
-  DESTINATION ${CMAKE_INSTALL_BINDIR}
-  )
+foreach(EQUATION ${INSTANTIATED_EQUATIONS})
+  # define obj_${EQUATION}_detail object library:
+  add_subdirectory(${EQUATION})
+
+  add_library(obj_${EQUATION}_common
+    ${COMMON_SOURCE_FILES}
+    )
+  target_include_directories(obj_${EQUATION}_common PRIVATE
+      ${CMAKE_CURRENT_SOURCE_DIR}/${EQUATION}
+    )
+  deal_ii_setup_target(obj_${EQUATION}_common)
+
+  add_executable(${EQUATION}
+    $<TARGET_OBJECTS:obj_${EQUATION}_detail>
+    $<TARGET_OBJECTS:obj_${EQUATION}_common>
+    )
+  deal_ii_setup_target(${EQUATION})
+  target_link_libraries(${EQUATION} ${OpenMP_CXX_LIBRARIES})
+
+  set_property(TARGET ${EQUATION}
+    PROPERTY RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/run
+    )
+
+  if(LIKWID_PERFMON)
+    target_link_libraries(${EQUATION} likwid likwid-hwloc likwid-lua)
+  endif()
+
+  # For GNU libstdc++ we have to make sure to also link against libstdc++fs.
+  if(LIBSTDCPP)
+    target_link_libraries(${EQUATION} stdc++fs)
+  endif()
+
+  install(TARGETS ${EQUATION}
+    DESTINATION ${CMAKE_INSTALL_BINDIR}
+    )
+endforeach()
