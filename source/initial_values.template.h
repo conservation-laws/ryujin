@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "initial_state.template.h"
+#include "initial_state_library.h"
 #include "initial_values.h"
 #include "simd.h"
 
@@ -52,19 +52,12 @@ namespace ryujin
                   "Add a random perturbation of the specified magnitude to the "
                   "initial state.");
 
-    using namespace InitialStates;
-    initial_state_list_.emplace(std::make_unique<Uniform<dim, Number>>(
-        *problem_description_, subsection));
-    initial_state_list_.emplace(std::make_unique<RampUp<dim, Number>>(
-        *problem_description_, subsection));
-    initial_state_list_.emplace(std::make_unique<Contrast<dim, Number>>(
-        *problem_description_, subsection));
-    initial_state_list_.emplace(std::make_unique<ShockFront<dim, Number>>(
-        *problem_description_, subsection));
-    initial_state_list_.emplace(std::make_unique<IsentropicVortex<dim, Number>>(
-        *problem_description_, subsection));
-    initial_state_list_.emplace(std::make_unique<BeckerSolution<dim, Number>>(
-        *problem_description_, subsection));
+    /*
+     * And finally populate the initial state list with all initial state
+     * configurations defined in the InitialStateLibrary namespace:
+     */
+    InitialStateLibrary::populate_initial_state_list<dim, Number>(
+        initial_state_list_, *problem_description_, subsection);
   }
 
   namespace
@@ -264,21 +257,10 @@ namespace ryujin
       const auto normal = std::get<0>(entry.second);
       const auto id = std::get<3>(entry.second);
 
-      if (id == Boundary::slip) {
-        /* Remove normal component of velocity: */
+      if (id == Boundary::slip || id == Boundary::no_slip) {
         auto U_i = U.get_tensor(i);
-        auto m = problem_description_->momentum(U_i);
-        m -= 1. * (m * normal) * normal;
-        for (unsigned int k = 0; k < dim; ++k)
-          U_i[k + 1] = m[k];
-        U.write_tensor(U_i, i);
-
-      } else if (id == Boundary::no_slip) {
-
-        /* Set velocity to zero: */
-        auto U_i = U.get_tensor(i);
-        for (unsigned int k = 0; k < dim; ++k)
-          U_i[k + 1] = Number(0.);
+        U_i = problem_description_->apply_boundary_conditions(
+            id, U_i, normal, [&]() { return U_i; });
         U.write_tensor(U_i, i);
       }
     }

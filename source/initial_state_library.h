@@ -9,7 +9,7 @@
 
 namespace ryujin
 {
-  namespace InitialStates
+  namespace InitialStateLibrary
   {
     /**
      * Uniform initial state defined by a given primitive state.
@@ -502,6 +502,34 @@ namespace ryujin
       std::function<std::tuple<double, double>(double, double)> psi;
       std::function<double(double)> find_velocity;
     };
+
+
+    /**
+     * Populate a given container with all initial state defined in this
+     * namespace
+     *
+     * @ingroup InitialValues
+     */
+    template <int dim, typename Number, typename T>
+    void populate_initial_state_list(
+        T &initial_state_list,
+        const ProblemDescription &problem_description,
+        const std::string &subsection)
+    {
+      initial_state_list.emplace(std::make_unique<Uniform<dim, Number>>(
+          problem_description, subsection));
+      initial_state_list.emplace(std::make_unique<RampUp<dim, Number>>(
+          problem_description, subsection));
+      initial_state_list.emplace(std::make_unique<Contrast<dim, Number>>(
+          problem_description, subsection));
+      initial_state_list.emplace(std::make_unique<ShockFront<dim, Number>>(
+          problem_description, subsection));
+      initial_state_list.emplace(
+          std::make_unique<IsentropicVortex<dim, Number>>(problem_description,
+                                                          subsection));
+      initial_state_list.emplace(std::make_unique<BeckerSolution<dim, Number>>(
+          problem_description, subsection));
+    }
 
   } // namespace InitialStates
 } /* namespace ryujin */
