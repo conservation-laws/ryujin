@@ -20,29 +20,6 @@
 namespace ryujin
 {
   /**
-   * The chosen problem type
-   */
-  enum class ProblemType {
-    /**
-     * The compressible Euler equations
-     */
-    euler,
-
-    /**
-     * The compressible Navier-Stokes equations
-     */
-    navier_stokes,
-  };
-} // namespace ryujin
-
-DECLARE_ENUM(ryujin::ProblemType,
-             LIST({ryujin::ProblemType::euler, "Euler"},
-                  {ryujin::ProblemType::navier_stokes,
-                   "Navier Stokes"}));
-
-namespace ryujin
-{
-  /**
    * Description of a @p dim dimensional hyperbolic conservation law.
    *
    * We have a (2 + dim) dimensional state space \f$[\rho, \textbf m,
@@ -402,9 +379,6 @@ namespace ryujin
      * @name Run time options
      */
     //@{
-
-    ProblemType problem_type_;
-    ACCESSOR_READ_ONLY(problem_type)
 
     double gamma_;
     ACCESSOR_READ_ONLY(gamma)

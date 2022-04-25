@@ -81,9 +81,6 @@ namespace ryujin
     const auto &vector_partitioner = offline_data_->vector_partitioner();
     for (auto &it : temp_U_)
       it.reinit(vector_partitioner);
-    if (euler_module_->hyperbolic_system().problem_type() ==
-        ProblemType::navier_stokes)
-      temp_U_strang_.reinit(vector_partitioner); // FIXME: refactor
 
     /* Reset CFL to canonical starting value: */
 
@@ -104,35 +101,10 @@ namespace ryujin
     std::cout << "TimeIntegrator<dim, Number>::step()" << std::endl;
 #endif
 
-    AssertThrow(euler_module_->hyperbolic_system().problem_type() ==
-                        ProblemType::euler ||
-                    time_stepping_scheme_ == TimeSteppingScheme::ssprk_33,
-                ExcMessage("Timestepping scheme \"ssprk 33\" required for "
-                           "problem type \"Navier Stokes\""));
-
     const auto single_step = [&]() {
       switch (time_stepping_scheme_) {
       case TimeSteppingScheme::ssprk_33:
-        //
-        // FIXME: refactor
-        //
-        // Let us put the Strang split here for now - we will have to
-        // refactor this once the dirk schemes are implemented
-        //
-        if (euler_module_->hyperbolic_system().problem_type() ==
-            ProblemType::navier_stokes) {
-          temp_U_strang_ = U;
-          const Number tau = step_ssprk_33(temp_U_strang_, t);
-          dissipation_module_->step(temp_U_strang_, t, Number(2.) * tau, cycle);
-          step_ssprk_33(temp_U_strang_, t + tau, tau);
-          U = temp_U_strang_;
-          return Number(2.) * tau;
-        } else {
-          return step_ssprk_33(U, t);
-        }
-        //
-        // end FIXME
-        //
+        return step_ssprk_33(U, t);
       case TimeSteppingScheme::erk_33:
         return step_erk_33(U, t);
       case TimeSteppingScheme::erk_43:
