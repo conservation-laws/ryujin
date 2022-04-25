@@ -25,18 +25,21 @@ check_cxx_source_compiles("
   )
 
 #
-# Common source files:
+# Common and dependent source files:
 #
 
 set(COMMON_SOURCE_FILES
   discretization.cc
+  simd.cc
+  sparse_matrix_simd.cc
+  )
+
+set(DEPENDENT_SOURCE_FILES
   euler_module.cc
   initial_values.cc
   main.cc
   offline_data.cc
   quantities.cc
-  simd.cc
-  sparse_matrix_simd.cc
   time_integrator.cc
   time_loop.cc
   vtu_output.cc
@@ -47,6 +50,9 @@ set_property(SOURCE time_loop.cc APPEND PROPERTY COMPILE_DEFINITIONS
   RYUJIN_GIT_REVISION="${GIT_REVISION}"
   RYUJIN_GIT_SHORTREV="${GIT_SHORTREV}"
   )
+
+add_library(obj_common ${COMMON_SOURCE_FILES})
+deal_ii_setup_target(obj_common)
 
 #
 # Equation-specific source files:
@@ -59,20 +65,21 @@ if("${INSTANTIATED_EQUATIONS}" STREQUAL "")
 endif()
 
 foreach(EQUATION ${INSTANTIATED_EQUATIONS})
-  # define obj_${EQUATION}_detail object library:
+  # define obj_${EQUATION} object library:
   add_subdirectory(${EQUATION})
 
-  add_library(obj_${EQUATION}_common
-    ${COMMON_SOURCE_FILES}
+  add_library(obj_dependent_${EQUATION}
+    ${DEPENDENT_SOURCE_FILES}
     )
-  target_include_directories(obj_${EQUATION}_common PRIVATE
+  target_include_directories(obj_dependent_${EQUATION} PRIVATE
       ${CMAKE_CURRENT_SOURCE_DIR}/${EQUATION}
     )
-  deal_ii_setup_target(obj_${EQUATION}_common)
+  deal_ii_setup_target(obj_dependent_${EQUATION})
 
   add_executable(${EQUATION}
-    $<TARGET_OBJECTS:obj_${EQUATION}_detail>
-    $<TARGET_OBJECTS:obj_${EQUATION}_common>
+    $<TARGET_OBJECTS:obj_common>
+    $<TARGET_OBJECTS:obj_dependent_${EQUATION}>
+    $<TARGET_OBJECTS:obj_${EQUATION}>
     )
   deal_ii_setup_target(${EQUATION})
   target_link_libraries(${EQUATION} ${OpenMP_CXX_LIBRARIES})

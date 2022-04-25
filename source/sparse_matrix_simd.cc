@@ -5,7 +5,6 @@
 
 #include <compile_time_options.h>
 
-#include "hyperbolic_system.h"
 #include "sparse_matrix_simd.template.h"
 
 namespace ryujin
@@ -19,8 +18,4 @@ namespace ryujin
 #if DIM != 1
   template class SparseMatrixSIMD<NUMBER, DIM>;
 #endif
-
-  template class SparseMatrixSIMD<NUMBER,
-                                  HyperbolicSystem::problem_dimension<DIM>>;
-
 } /* namespace ryujin */

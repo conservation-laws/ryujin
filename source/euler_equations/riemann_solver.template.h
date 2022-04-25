@@ -6,10 +6,11 @@
 #pragma once
 
 #include <compile_time_options.h>
-#include <newton.h>
-#include <simd.h>
 
 #include "riemann_solver.h"
+
+#include <newton.h>
+#include <simd.h>
 
 namespace ryujin
 {

@@ -95,7 +95,7 @@ namespace ryujin
   template <int dim, typename Number>
   Number TimeIntegrator<dim, Number>::step(vector_type &U,
                                            Number t,
-                                           unsigned int cycle)
+                                           unsigned int /*cycle*/)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeIntegrator<dim, Number>::step()" << std::endl;
