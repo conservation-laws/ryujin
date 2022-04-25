@@ -370,7 +370,7 @@ namespace ryujin
      */
     template <int problem_dim, typename Number>
     dealii::Tensor<1, problem_dim, Number> to_primitive_state(
-        const dealii::Tensor<1, problem_dim, Number> &primitive_state) const;
+        const dealii::Tensor<1, problem_dim, Number> &state) const;
 
     //@}
 
