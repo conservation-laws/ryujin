@@ -740,7 +740,7 @@ namespace ryujin
     if (mpi_rank != 0)
       return;
 
-    stream << std::endl << "Timer statistics:" << std::endl << std::endl;
+    stream << std::endl << "Timer statistics:\n";
     for (auto &it : output)
       stream << it.str() << std::endl;
   }
@@ -829,28 +829,28 @@ namespace ryujin
     /* clang-format off */
     output << std::endl;
 
-    output << "Throughput:  (CPU )  "
+    output << "Throughput:\n  CPU : "
            << std::setprecision(4) << std::fixed << cpu_m_dofs_per_sec
            << " MQ/s  ("
            << std::scientific << 1. / cpu_m_dofs_per_sec * 1.e-6
            << " s/Qdof/cycle)" << std::endl;
 
-    output << "                     [cpu time skew: "
+    output << "        [cpu time skew: "
            << std::setprecision(2) << std::scientific << cpu_time_skew
            << "s/cycle ("
            << std::setprecision(1) << std::setw(4) << std::setfill(' ') << std::fixed
            << 100. * cpu_time_skew_percentage
-           << "%)]" << std::endl << std::endl;
+           << "%)]" << std::endl;
 
-    output << "             (WALL)  "
-           << std::fixed << wall_m_dofs_per_sec
+    output << "  WALL: "
+           << std::setprecision(4) << std::fixed << wall_m_dofs_per_sec
            << " MQ/s  ("
            << std::scientific << 1. / wall_m_dofs_per_sec * 1.e-6
            << " s/Qdof/cycle)  ("
-           << std::fixed << cycles_per_second
+           << std::setprecision(2) << std::fixed << cycles_per_second
            << " cycles/s)" << std::endl;
 
-    output << "                     [ CFL = "
+    output << "        [ CFL = "
            << std::setprecision(2) << std::fixed << euler_module.cfl()
            << " ("
            << std::setprecision(0) << std::fixed << euler_module.n_restarts()
@@ -858,20 +858,18 @@ namespace ryujin
            << std::setprecision(0) << std::fixed << euler_module.n_warnings() + dissipation_module.n_warnings()
            << " warn) ]";
 
-// FIXME
-//     output << "[ "
-//            << std::setprecision(2) << std::fixed
-//            << dissipation_module.n_iterations_velocity()
-//            << (dissipation_module.use_gmg_velocity() ? " GMG vel -- " : " CG vel -- ")
-//            << dissipation_module.n_iterations_internal_energy()
-//            << (dissipation_module.use_gmg_internal_energy() ? " GMG int ]" : " CG int ]")
-//            << std::endl;
+    output << "[ "
+           << std::setprecision(2) << std::fixed
+           << std::setw(3) << 0
+           << " GMG vel -- "
+           << std::setw(3) << 0
+           << " GMG int ]";
 
-    output << "                     dt = "
+    output << "[ dt = "
            << std::scientific << std::setprecision(2) << delta_time
            << " ( "
            << time_per_second
-           << " dt/s)" << std::endl << std::endl;
+           << " dt/s) ]" << std::endl;
     /* clang-format on */
 
     /* and print an ETA */
@@ -879,7 +877,7 @@ namespace ryujin
     unsigned int eta =
         static_cast<unsigned int>((t_final - t) / time_per_second_exp);
 
-    output << "ETA:  ";
+    output << "  ETA : ";
 
     const unsigned int days = eta / (24 * 3600);
     if (days > 0) {
@@ -894,7 +892,7 @@ namespace ryujin
     }
 
     const unsigned int minutes = eta / 60;
-    output << minutes << " min" << std::endl;
+    output << minutes << " min";
 
     if (mpi_rank != 0)
       return;
@@ -967,8 +965,7 @@ namespace ryujin
 
     print_head(primary.str(), secondary.str(), output);
 
-    output << "\n"
-           << "Information: [" << base_name << "] with "
+    output << "Information: [" << base_name << "] with "
            << offline_data.dof_handler().n_dofs() << " Qdofs on "
            << n_mpi_processes << " ranks / " << MultithreadInfo::n_threads()
            << " threads\n"
