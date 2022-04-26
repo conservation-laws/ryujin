@@ -172,10 +172,10 @@ namespace ryujin
             const auto transformed_point =
                 affine_transform(initial_direction_, initial_position_, point);
             auto state = it->compute(transformed_point, t);
-            auto M = hyperbolic_system_->momentum(state);
-            M = affine_transform_vector(initial_direction_, M);
-            for (unsigned int d = 0; d < dim; ++d)
-              state[1 + d] = M[d];
+            state = hyperbolic_system_->apply_galilei_transform(
+                state, [&](const auto &momentum) {
+                  return affine_transform_vector(initial_direction_, momentum);
+                });
             return state;
           };
           initialized = true;

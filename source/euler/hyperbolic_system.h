@@ -301,7 +301,7 @@ namespace ryujin
     //@}
     /**
      * @name State transformations (primitive states, expanding
-     * dimensionality, etc.)
+     * dimensionality, Galilei transform, etc.)
      */
     //@{
 
@@ -335,6 +335,16 @@ namespace ryujin
     template <int problem_dim, typename Number>
     dealii::Tensor<1, problem_dim, Number> to_primitive_state(
         const dealii::Tensor<1, problem_dim, Number> &state) const;
+
+    /*
+     * Transform the current state according to a  given operator @ref
+     * momentum_transform acting on  a @p dim dimensional momentum (or
+     * velocity) vector.
+     */
+    template <int problem_dim, typename Number, typename Lambda>
+    dealii::Tensor<1, problem_dim, Number>
+    apply_galilei_transform(const dealii::Tensor<1, problem_dim, Number> &state,
+                            const Lambda &lambda) const;
 
     //@}
 
@@ -876,6 +886,22 @@ namespace ryujin
     primitive_state[dim + 1] = p;
 
     return primitive_state;
+  }
+
+
+  template <int problem_dim, typename Number, typename Lambda>
+  dealii::Tensor<1, problem_dim, Number>
+  HyperbolicSystem::apply_galilei_transform(
+      const dealii::Tensor<1, problem_dim, Number> &state,
+      const Lambda &lambda) const
+  {
+    constexpr auto dim = problem_dim - 2;
+
+    auto result = state;
+    auto M = lambda(momentum(state));
+    for (unsigned int d = 0; d < dim; ++d)
+      result[1 + d] = M[d];
+    return result;
   }
 
 } /* namespace ryujin */
