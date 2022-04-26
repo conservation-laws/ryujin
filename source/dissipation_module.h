@@ -41,7 +41,8 @@ namespace ryujin
         const HyperbolicSystem & /*hyperbolic_system*/,
         const OfflineData<dim, Number> & /*offline_data*/,
         const InitialValues<dim, Number> & /*initial_values*/,
-        const std::string & /*subsection*/ = "DissipationModule")
+        const std::string &subsection = "DissipationModule")
+        : ParameterAcceptor(subsection)
     {
       // do nothing
     }

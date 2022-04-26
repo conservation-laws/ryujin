@@ -29,6 +29,7 @@ namespace ryujin
       : ParameterAcceptor("/A - TimeLoop")
       , mpi_communicator(mpi_comm)
       , hyperbolic_system("/B - HyperbolicSystem")
+      , parabolic_system("/B - ParabolicSystem")
       , discretization(mpi_communicator, "/C - Discretization")
       , offline_data(mpi_communicator, discretization, "/D - OfflineData")
       , initial_values(hyperbolic_system, offline_data, "/E - InitialValues")

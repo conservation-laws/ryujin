@@ -8,6 +8,7 @@
 #include <compile_time_options.h>
 
 #include <hyperbolic_system.h>
+#include <parabolic_system.h>
 #include <postprocessor.h>
 
 #include "discretization.h"
@@ -139,16 +140,17 @@ namespace ryujin
 
     std::map<std::string, dealii::Timer> computing_timer;
 
-    ryujin::HyperbolicSystem hyperbolic_system;
-    ryujin::Discretization<dim> discretization;
-    ryujin::OfflineData<dim, Number> offline_data;
-    ryujin::InitialValues<dim, Number> initial_values;
-    ryujin::EulerModule<dim, Number> euler_module;
-    ryujin::DissipationModule<dim, Number> dissipation_module;
-    ryujin::TimeIntegrator<dim, Number> time_integrator;
-    ryujin::Postprocessor<dim, Number> postprocessor;
-    ryujin::VTUOutput<dim, Number> vtu_output;
-    ryujin::Quantities<dim, Number> quantities;
+    HyperbolicSystem hyperbolic_system;
+    ParabolicSystem parabolic_system;
+    Discretization<dim> discretization;
+    OfflineData<dim, Number> offline_data;
+    InitialValues<dim, Number> initial_values;
+    EulerModule<dim, Number> euler_module;
+    DissipationModule<dim, Number> dissipation_module;
+    TimeIntegrator<dim, Number> time_integrator;
+    Postprocessor<dim, Number> postprocessor;
+    VTUOutput<dim, Number> vtu_output;
+    Quantities<dim, Number> quantities;
 
     const unsigned int mpi_rank;
     const unsigned int n_mpi_processes;
