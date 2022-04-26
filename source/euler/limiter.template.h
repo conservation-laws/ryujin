@@ -50,7 +50,7 @@ namespace ryujin
         std::cout << std::fixed << std::setprecision(16);
         std::cout << "Bounds violation: low-order density (critical)!\n";
         std::cout << "\t\trho min: " << rho_min << "\n";
-        std::cout << "\t\trho:     " << U_rho << s "\n";
+        std::cout << "\t\trho:     " << U_rho << "\n";
         std::cout << "\t\trho max: " << rho_max << "\n" << std::endl;
 #endif
         success = false;
@@ -88,7 +88,7 @@ namespace ryujin
         std::cout << std::fixed << std::setprecision(16);
         std::cout << "Bounds violation: high-order density!\n";
         std::cout << "\t\trho min: " << rho_min << "\n";
-        std::cout << "\t\trho:     " << n_rho << s "\n";
+        std::cout << "\t\trho:     " << n_rho << "\n";
         std::cout << "\t\trho max: " << rho_max << "\n" << std::endl;
 #endif
         success = false;
@@ -213,7 +213,7 @@ namespace ryujin
           std::cout << std::fixed << std::setprecision(16);
           std::cout << "Bounds violation: high-order specific entropy!\n";
           std::cout << "\t\tInt: 0 <= " << e_new << "\n";
-          std::cout << "\t\tPsi: 0 <= " << psi_l << "\n" << std::endl;
+          std::cout << "\t\tPsi: 0 <= " << psi << "\n" << std::endl;
 #endif
           success = false;
         }

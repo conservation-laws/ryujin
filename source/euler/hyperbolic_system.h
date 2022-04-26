@@ -648,7 +648,7 @@ namespace ryujin
         dealii::compare_and_apply_mask<gt>(s_new, T(0.), T(0.), T(-1.));
 
 #ifdef DEBUG_OUTPUT
-    if (test != Number(0.)) {
+    if (!(test == Number(0.))) {
       std::cout << std::fixed << std::setprecision(16);
       std::cout << "Bounds violation: Negative state [rho, e, s] detected!\n";
       std::cout << "\t\trho: " << rho_new << "\n";

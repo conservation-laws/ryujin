@@ -60,7 +60,7 @@ deal_ii_setup_target(obj_common)
 
 if("${INSTANTIATED_EQUATIONS}" STREQUAL "")
   set(INSTANTIATED_EQUATIONS
-    "euler_equations"
+    "euler"
     )
 endif()
 
