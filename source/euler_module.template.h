@@ -126,18 +126,6 @@ namespace ryujin
         return all_below_diagonal;
       }
     }
-
-    /**
-     * Return the stride size:
-     */
-
-    template <typename Number>
-    unsigned int get_stride_size = 1;
-
-    template <typename Number>
-    unsigned int get_stride_size<VectorizedArray<Number>> =
-        VectorizedArray<Number>::size();
-
   } // namespace
 
 

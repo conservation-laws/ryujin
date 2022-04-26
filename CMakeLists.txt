@@ -23,6 +23,7 @@ if(NOT DEAL_II_WITH_MPI OR NOT DEAL_II_WITH_P4EST)
 endif()
 
 project(ryujin CXX)
+string(APPEND DEAL_II_CXX_FLAGS " -Wfatal-errors")
 
 #
 # Set up compiler flags:

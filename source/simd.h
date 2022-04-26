@@ -36,6 +36,19 @@ namespace ryujin
   };
   //@}
 
+  /**
+   * Return the stride size:
+   *
+   * @ingroup SIMD
+   */
+  //@{
+  template <typename T>
+  unsigned int get_stride_size = 1;
+
+  template <typename T, std::size_t width>
+  unsigned int get_stride_size<dealii::VectorizedArray<T, width>> = width;
+  //@}
+
 #ifndef DOXYGEN
   namespace
   {
