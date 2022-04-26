@@ -619,7 +619,7 @@ namespace ryujin
               thread_ready, i >= n_export_indices && i < n_internal);
 
           const auto bounds =
-              bounds_.template get_tensor<T, std::array<T, 3>>(i);
+              bounds_.template get_tensor<T, std::array<T, n_bounds>>(i);
 
           const auto m_i_inv = load_value<T>(lumped_mass_matrix_inverse, i);
 
@@ -803,7 +803,7 @@ namespace ryujin
               continue;
 
             const auto bounds =
-                bounds_.template get_tensor<T, std::array<T, 3>>(i);
+                bounds_.template get_tensor<T, std::array<T, n_bounds>>(i);
             for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
 
               const auto old_l_ij = lij_row[col_idx];
