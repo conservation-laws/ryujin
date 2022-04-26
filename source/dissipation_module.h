@@ -20,11 +20,17 @@ namespace ryujin
   class DissipationModule final : public dealii::ParameterAcceptor
   {
   public:
+    /**
+     * @copydoc HyperbolicSystem::problem_dimension
+     */
+    // clang-format off
+    static constexpr unsigned int problem_dimension = HyperbolicSystem::problem_dimension<dim>;
+    // clang-format on
 
     /**
-     * @copydoc OfflineData::vector_type
+     * Typedef for a MultiComponentVector storing the state U.
      */
-    using vector_type = typename OfflineData<dim, Number>::vector_type;
+    using vector_type = MultiComponentVector<Number, problem_dimension>;
 
     /**
      * Constructor.

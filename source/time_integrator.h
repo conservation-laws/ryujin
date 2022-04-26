@@ -7,12 +7,13 @@
 
 #include <compile_time_options.h>
 
-#include "convenience_macros.h"
-#include "patterns_conversion.h"
+#include <hyperbolic_system.h>
 
+#include "convenience_macros.h"
 #include "dissipation_module.h"
 #include "euler_module.h"
 #include "offline_data.h"
+#include "patterns_conversion.h"
 
 namespace ryujin
 {
@@ -106,12 +107,17 @@ namespace ryujin
   class TimeIntegrator final : public dealii::ParameterAcceptor
   {
   public:
-    std::string cfl_recovery_strategy_string_;
+    /**
+     * @copydoc HyperbolicSystem::problem_dimension
+     */
+    // clang-format off
+    static constexpr unsigned int problem_dimension = HyperbolicSystem::problem_dimension<dim>;
+    // clang-format on
 
     /**
-     * @copydoc OfflineData::vector_type
+     * Typedef for a MultiComponentVector storing the state U.
      */
-    using vector_type = typename OfflineData<dim, Number>::vector_type;
+    using vector_type = MultiComponentVector<Number, problem_dimension>;
 
     /**
      * Constructor.

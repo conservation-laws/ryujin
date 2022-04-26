@@ -30,6 +30,8 @@ check_cxx_source_compiles("
 
 set(COMMON_SOURCE_FILES
   discretization.cc
+  multicomponent_vector.cc
+  offline_data.cc
   simd.cc
   sparse_matrix_simd.cc
   )
@@ -38,7 +40,6 @@ set(DEPENDENT_SOURCE_FILES
   euler_module.cc
   initial_values.cc
   main.cc
-  offline_data.cc
   quantities.cc
   time_integrator.cc
   time_loop.cc
@@ -51,7 +52,7 @@ set_property(SOURCE time_loop.cc APPEND PROPERTY COMPILE_DEFINITIONS
   RYUJIN_GIT_SHORTREV="${GIT_SHORTREV}"
   )
 
-add_library(obj_common ${COMMON_SOURCE_FILES})
+add_library(obj_common OBJECT ${COMMON_SOURCE_FILES})
 deal_ii_setup_target(obj_common)
 
 #
@@ -68,9 +69,7 @@ foreach(EQUATION ${INSTANTIATED_EQUATIONS})
   # define obj_${EQUATION} object library:
   add_subdirectory(${EQUATION})
 
-  add_library(obj_dependent_${EQUATION}
-    ${DEPENDENT_SOURCE_FILES}
-    )
+  add_library(obj_dependent_${EQUATION} OBJECT ${DEPENDENT_SOURCE_FILES})
   target_include_directories(obj_dependent_${EQUATION} PRIVATE
       ${CMAKE_CURRENT_SOURCE_DIR}/${EQUATION}
     )

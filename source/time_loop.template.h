@@ -177,7 +177,7 @@ namespace ryujin
     /* Prepare data structures: */
 
     const auto prepare_compute_kernels = [&]() {
-      offline_data.prepare();
+      offline_data.prepare(HyperbolicSystem::problem_dimension<dim>);
       euler_module.prepare();
       dissipation_module.prepare();
       time_integrator.prepare();

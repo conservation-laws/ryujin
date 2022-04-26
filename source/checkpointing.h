@@ -6,6 +6,7 @@
 #pragma once
 
 #include "offline_data.h"
+#include "multicomponent_vector.h"
 
 #include <deal.II/base/utilities.h>
 #include <deal.II/distributed/solution_transfer.h>
@@ -27,10 +28,10 @@ namespace ryujin
    *
    * @ingroup Miscellaneous
    */
-  template <int dim, typename Number, typename T1>
+  template <int dim, typename Number, int n_comp, int simd_length>
   void do_resume(const OfflineData<dim, Number> &offline_data,
                  const std::string &base_name,
-                 T1 &U,
+                 MultiComponentVector<Number, n_comp, simd_length> &U,
                  Number &t,
                  unsigned int &output_cycle,
                  const MPI_Comm &mpi_communicator)
@@ -40,11 +41,9 @@ namespace ryujin
     /* Create temporary scalar component vectors: */
 
     const auto &scalar_partitioner = offline_data.scalar_partitioner();
-    static constexpr unsigned int problem_dimension =
-        HyperbolicSystem::problem_dimension<dim>;
 
     using scalar_type = typename OfflineData<dim, Number>::scalar_type;
-    std::array<scalar_type, problem_dimension> state_vector;
+    std::array<scalar_type, n_comp> state_vector;
     for (auto &it : state_vector) {
       it.reinit(scalar_partitioner);
     }
@@ -105,10 +104,10 @@ namespace ryujin
    *
    * @ingroup Miscellaneous
    */
-  template <int dim, typename Number, typename T1>
+  template <int dim, typename Number, int n_comp, int simd_length>
   void do_checkpoint(const OfflineData<dim, Number> &offline_data,
                      const std::string &base_name,
-                     const T1 &U,
+                     const MultiComponentVector<Number, n_comp, simd_length> &U,
                      const Number t,
                      const unsigned int output_cycle,
                      const MPI_Comm &mpi_communicator)
@@ -119,11 +118,9 @@ namespace ryujin
     /* Copy state into scalar component vectors: */
 
     const auto &scalar_partitioner = offline_data.scalar_partitioner();
-    static constexpr unsigned int problem_dimension =
-        HyperbolicSystem::problem_dimension<dim>;
 
     using scalar_type = typename OfflineData<dim, Number>::scalar_type;
-    std::array<scalar_type, problem_dimension> state_vector;
+    std::array<scalar_type, n_comp> state_vector;
     unsigned int d = 0;
     for (auto &it : state_vector) {
       it.reinit(scalar_partitioner);

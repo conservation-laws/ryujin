@@ -81,7 +81,7 @@ namespace ryujin
     /**
      * @copydoc OfflineData::vector_type
      */
-    using vector_type = typename OfflineData<dim, Number>::vector_type;
+    using vector_type = MultiComponentVector<Number, problem_dimension>;
 
     /**
      * Constructor.

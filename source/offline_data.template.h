@@ -145,7 +145,7 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  void OfflineData<dim, Number>::setup()
+  void OfflineData<dim, Number>::setup(const unsigned int problem_dimension)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "OfflineData<dim, Number>::setup()" << std::endl;
@@ -294,7 +294,7 @@ namespace ryujin
         locally_owned, locally_relevant, mpi_communicator_);
 
     vector_partitioner_ =
-        create_vector_partitioner<problem_dimension>(scalar_partitioner_);
+        create_vector_partitioner(scalar_partitioner_, problem_dimension);
 
 
     if (periodic_faces.size() > 0) {

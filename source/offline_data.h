@@ -7,8 +7,6 @@
 
 #include <compile_time_options.h>
 
-#include <hyperbolic_system.h>
-
 #include "convenience_macros.h"
 #include "discretization.h"
 #include "multicomponent_vector.h"
@@ -51,23 +49,10 @@ namespace ryujin
   {
   public:
     /**
-     * @copydoc HyperbolicSystem::problem_dimension
-     */
-    // clang-format off
-    static constexpr unsigned int problem_dimension = HyperbolicSystem::problem_dimension<dim>;
-    // clang-format on
-
-    /**
      * Shorthand typedef for
      * dealii::LinearAlgebra::distributed::Vector<Number>.
      */
     using scalar_type = dealii::LinearAlgebra::distributed::Vector<Number>;
-
-    /**
-     * Shorthand typedef for a MultiComponentVector storing the current
-     * simulation state.
-     */
-    using vector_type = MultiComponentVector<Number, problem_dimension>;
 
     /**
      * A tuple describing global dof index, boundary normal, normal mass,
@@ -91,10 +76,13 @@ namespace ryujin
     /**
      * Prepare offline data. A call to @ref prepare() internally calls
      * @ref setup() and @ref assemble().
+     *
+     * The @ref problem_dimension parameter is used to setup up an
+     * appropriately sized vector partitioner for the MultiComponentVector.
      */
-    void prepare()
+    void prepare(const unsigned int problem_dimension)
     {
-      setup();
+      setup(problem_dimension);
       assemble();
       create_multigrid_data();
     }
@@ -109,8 +97,11 @@ namespace ryujin
     /**
      * Set up DoFHandler, all IndexSet objects and the SparsityPattern.
      * Initialize matrix storage.
+     *
+     * The @ref problem_dimension parameter is used to setup up an
+     * appropriately sized vector partitioner for the MultiComponentVector.
      */
-    void setup();
+    void setup(const unsigned int problem_dimension);
 
     /**
      * Assemble all matrices.
