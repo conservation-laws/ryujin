@@ -17,15 +17,15 @@ namespace ryujin
         std::bind(&ParabolicSystem::parse_parameters_callback, this));
 
     mu_ = 1.e-3;
-    add_parameter("mu", mu_, "Navier Stokes: Shear viscosity");
+    add_parameter("mu", mu_, "The shear viscosity");
 
     lambda_ = 0.;
-    add_parameter("lambda", lambda_, "Navier Stokes: Bulk viscosity");
+    add_parameter("lambda", lambda_, "The bulk viscosity");
 
     cv_inverse_kappa_ = 1.866666666666666e-2;
     add_parameter("kappa",
                   cv_inverse_kappa_,
-                  "Navier Stokes: Scaled thermal conductivity c_v^{-1} kappa");
+                  "The scaled thermal conductivity c_v^{-1} kappa");
 
     parse_parameters_callback();
   }

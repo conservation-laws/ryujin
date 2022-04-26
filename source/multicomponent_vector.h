@@ -178,6 +178,10 @@ namespace ryujin
           const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
               &scalar_partitioner)
   {
+    /* Special case of a zero component vector */
+    if (n_comp == 0)
+      return;
+
     auto vector_partitioner =
         create_vector_partitioner(scalar_partitioner, n_comp);
 
@@ -190,6 +194,10 @@ namespace ryujin
   void MultiComponentVector<Number, n_comp, simd_length>::extract_component(
       scalar_type &scalar_vector, unsigned int component) const
   {
+    Assert(n_comp > 0,
+           dealii::ExcMessage(
+               "Cannot extract from a vector with zero components."));
+
     Assert(n_comp * scalar_vector.get_partitioner()->LOCAL_SIZE() ==
                this->get_partitioner()->LOCAL_SIZE(),
            dealii::ExcMessage("Called with a scalar_vector argument that has "
@@ -206,6 +214,10 @@ namespace ryujin
   void MultiComponentVector<Number, n_comp, simd_length>::insert_component(
       const scalar_type &scalar_vector, unsigned int component)
   {
+    Assert(n_comp > 0,
+           dealii::ExcMessage(
+               "Cannot insert into a vector with zero components."));
+
     Assert(n_comp * scalar_vector.get_partitioner()->LOCAL_SIZE() ==
                this->get_partitioner()->LOCAL_SIZE(),
            dealii::ExcMessage("Called with a scalar_vector argument that has "
@@ -227,6 +239,10 @@ namespace ryujin
     static_assert(std::is_same<Number2, typename Tensor::value_type>::value,
                   "dummy type mismatch");
     Tensor tensor;
+
+    /* Special case of a zero component vector */
+    if constexpr (n_comp == 0)
+      return tensor;
 
     if constexpr (std::is_same<Number, Number2>::value) {
       /* Non-vectorized sequential access. */
@@ -263,6 +279,9 @@ namespace ryujin
                   "dummy type mismatch");
     Tensor tensor;
 
+    /* Special case of a zero component vector */
+    if constexpr (n_comp == 0)
+      return tensor;
 
     if constexpr (std::is_same<Number, Number2>::value) {
       /* Non-vectorized sequential access. */
@@ -297,6 +316,10 @@ namespace ryujin
   {
     static_assert(std::is_same<Number2, typename Tensor::value_type>::value,
                   "dummy type mismatch");
+
+    /* Special case of a zero component vector */
+    if constexpr (n_comp == 0)
+      return;
 
     if constexpr (std::is_same<Number, Number2>::value) {
       /* Non-vectorized sequential access. */

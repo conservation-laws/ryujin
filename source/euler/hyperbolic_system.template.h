@@ -17,7 +17,7 @@ namespace ryujin
         std::bind(&HyperbolicSystem::parse_parameters_callback, this));
 
     gamma_ = 7. / 5.;
-    add_parameter("gamma", gamma_, "Euler: Ratio of specific heats");
+    add_parameter("gamma", gamma_, "The ratio of specific heats");
 
     parse_parameters_callback();
   }
