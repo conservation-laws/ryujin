@@ -19,22 +19,6 @@ namespace ryujin
     gamma_ = 7. / 5.;
     add_parameter("gamma", gamma_, "Euler: Ratio of specific heats");
 
-    b_ = 0.;
-    if constexpr (equation_of_state_ == EquationOfState::van_der_waals) {
-      add_parameter("b", b_, "Euler: Covolume");
-    }
-
-    mu_ = 1.e-3;
-    add_parameter("mu", mu_, "Navier Stokes: Shear viscosity");
-
-    lambda_ = 0.;
-    add_parameter("lambda", lambda_, "Navier Stokes: Bulk viscosity");
-
-    cv_inverse_kappa_ = 1.866666666666666e-2;
-    add_parameter("kappa",
-                  cv_inverse_kappa_,
-                  "Navier Stokes: Scaled thermal conductivity c_v^{-1} kappa");
-
     parse_parameters_callback();
   }
 
@@ -47,9 +31,6 @@ namespace ryujin
      */
     gamma_inverse_ = 1. / gamma_;
     gamma_plus_one_inverse_ = 1. / (gamma_ + 1.);
-
-    static_assert(equation_of_state_ == EquationOfState::ideal_gas,
-                  "not implemented");
   }
 
 

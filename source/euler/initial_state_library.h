@@ -216,7 +216,7 @@ namespace ryujin
         /* Compute post-shock state and S3: */
 
         const auto gamma = this->hyperbolic_system.gamma();
-        const auto b = this->hyperbolic_system.b();
+        const Number b = Number(0.); // FIXME
 
         const auto &rho_R = primitive_right_[0];
         const auto &u_R = primitive_right_[1];
