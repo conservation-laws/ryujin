@@ -107,28 +107,28 @@ namespace ryujin
      */
     //@{
 
-    std::string base_name;
+    std::string base_name_;
 
-    Number t_initial;
-    Number t_final;
-    std::vector<Number> t_refinements;
+    Number t_initial_;
+    Number t_final_;
+    std::vector<Number> t_refinements_;
 
-    Number output_granularity;
+    Number output_granularity_;
 
-    bool enable_checkpointing;
-    bool enable_output_full;
-    bool enable_output_levelsets;
-    bool enable_compute_error;
-    bool enable_compute_quantities;
+    bool enable_checkpointing_;
+    bool enable_output_full_;
+    bool enable_output_levelsets_;
+    bool enable_compute_error_;
+    bool enable_compute_quantities_;
 
-    unsigned int output_checkpoint_multiplier;
-    unsigned int output_full_multiplier;
-    unsigned int output_levelsets_multiplier;
-    unsigned int output_quantities_multiplier;
+    unsigned int output_checkpoint_multiplier_;
+    unsigned int output_full_multiplier_;
+    unsigned int output_levelsets_multiplier_;
+    unsigned int output_quantities_multiplier_;
 
-    bool resume;
+    bool resume_;
 
-    unsigned int terminal_update_interval;
+    unsigned int terminal_update_interval_;
 
     //@}
     /**
@@ -136,26 +136,26 @@ namespace ryujin
      */
     //@{
 
-    const MPI_Comm &mpi_communicator;
+    const MPI_Comm &mpi_communicator_;
 
-    std::map<std::string, dealii::Timer> computing_timer;
+    std::map<std::string, dealii::Timer> computing_timer_;
 
-    HyperbolicSystem hyperbolic_system;
-    ParabolicSystem parabolic_system;
-    Discretization<dim> discretization;
-    OfflineData<dim, Number> offline_data;
-    InitialValues<dim, Number> initial_values;
-    EulerModule<dim, Number> euler_module;
-    DissipationModule<dim, Number> dissipation_module;
-    TimeIntegrator<dim, Number> time_integrator;
-    Postprocessor<dim, Number> postprocessor;
-    VTUOutput<dim, Number> vtu_output;
-    Quantities<dim, Number> quantities;
+    HyperbolicSystem hyperbolic_system_;
+    ParabolicSystem parabolic_system_;
+    Discretization<dim> discretization_;
+    OfflineData<dim, Number> offline_data_;
+    InitialValues<dim, Number> initial_values_;
+    EulerModule<dim, Number> euler_module_;
+    DissipationModule<dim, Number> dissipation_module_;
+    TimeIntegrator<dim, Number> time_integrator_;
+    Postprocessor<dim, Number> postprocessor_;
+    VTUOutput<dim, Number> vtu_output_;
+    Quantities<dim, Number> quantities_;
 
-    const unsigned int mpi_rank;
-    const unsigned int n_mpi_processes;
+    const unsigned int mpi_rank_;
+    const unsigned int n_mpi_processes_;
 
-    std::ofstream logfile; /* log file */
+    std::ofstream logfile_; /* log file */
 
     //@}
   };

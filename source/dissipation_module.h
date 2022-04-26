@@ -6,8 +6,8 @@
 #pragma once
 
 #include <compile_time_options.h>
-
 #include <hyperbolic_system.h>
+#include <parabolic_system.h>
 
 #include <deal.II/base/timer.h>
 
@@ -16,6 +16,11 @@
 
 namespace ryujin
 {
+  /**
+   * Implicit theta time-stepping for parabolic systems.
+   *
+   * @ingroup DissipationModule
+   */
   template <int dim, typename Number = double>
   class DissipationModule final : public dealii::ParameterAcceptor
   {
@@ -36,31 +41,16 @@ namespace ryujin
      * Constructor.
      */
     DissipationModule(
-        const MPI_Comm & /*mpi_communicator*/,
-        std::map<std::string, dealii::Timer> & /*computing_timer*/,
-        const HyperbolicSystem & /*hyperbolic_system*/,
-        const OfflineData<dim, Number> & /*offline_data*/,
-        const InitialValues<dim, Number> & /*initial_values*/,
-        const std::string &subsection = "DissipationModule")
-        : ParameterAcceptor(subsection)
-    {
-      // do nothing
-    }
+        const MPI_Comm & mpi_communicator,
+        std::map<std::string, dealii::Timer> & computing_timer,
+        const ParabolicSystem & parabolic_system,
+        const OfflineData<dim, Number> & offline_data,
+        const InitialValues<dim, Number> & initial_values,
+        const std::string &subsection = "DissipationModule");
 
-    void prepare()
-    {
-      // do nothing
-    }
+    void prepare();
 
-
-    Number step(vector_type & /*U*/,
-                Number /*t*/,
-                Number tau,
-                unsigned int /*cycle*/) const
-    {
-      // do nothing
-      return tau;
-    }
+    Number step(vector_type &U, Number t, Number tau, unsigned int cycle) const;
 
   private:
     mutable unsigned int n_warnings_;

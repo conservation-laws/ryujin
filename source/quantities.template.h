@@ -54,11 +54,13 @@ namespace ryujin
   Quantities<dim, Number>::Quantities(
       const MPI_Comm &mpi_communicator,
       const ryujin::HyperbolicSystem &hyperbolic_system,
+      const ryujin::ParabolicSystem &parabolic_system,
       const ryujin::OfflineData<dim, Number> &offline_data,
       const std::string &subsection /*= "Quantities"*/)
       : ParameterAcceptor(subsection)
       , mpi_communicator_(mpi_communicator)
       , hyperbolic_system_(&hyperbolic_system)
+      , parabolic_system_(&parabolic_system)
       , offline_data_(&offline_data)
       , base_name_("")
       , time_series_cycle_(1)

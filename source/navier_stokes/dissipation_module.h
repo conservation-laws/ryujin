@@ -89,8 +89,6 @@ namespace ryujin
    *     = \tfrac12 \dt m_i\sfK_i^{n+\frac{1}{2}}, \qquad \forall i\in \calV.
    * \f}
    *
-   * @todo Provide more details about boundary conditions.
-   *
    * @ingroup DissipationModule
    */
   template <int dim, typename Number = double>
