@@ -7,8 +7,6 @@
 
 #include <compile_time_options.h>
 
-#include <hyperbolic_system.h>
-
 #include "convenience_macros.h"
 
 #include <deal.II/base/parameter_acceptor.h>
@@ -25,20 +23,20 @@ namespace ryujin
    *
    * @note By convention all initial state configurations described by this
    * class shall be centered at the origin (0, 0) and facing in positive x
-   * direction. The InitialValues wrapper class alread allows to apply an
+   * direction. The InitialValues wrapper class already allows to apply an
    * affine translation to the coordinate system; so additional
    * configuration options for location and direction are not needed.
    *
    * @ingroup InitialValues
    */
-  template <int dim, typename Number>
+  template <int dim, typename Number, typename HyperbolicSystem>
   class InitialState : public dealii::ParameterAcceptor
   {
   public:
     /**
      * @copydoc HyperbolicSystem::state_type
      */
-    using state_type = HyperbolicSystem::state_type<dim, Number>;
+    using state_type = typename HyperbolicSystem::template state_type<dim, Number>;
 
     /**
      * Constructor taking geometry name @p name and a subsection @p
