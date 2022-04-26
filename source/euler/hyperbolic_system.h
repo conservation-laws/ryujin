@@ -47,7 +47,8 @@ namespace ryujin
      * An array holding all component names of the conserved state as a string.
      */
     template <int dim>
-    static const std::array<std::string, dim + 2> component_names;
+    static const std::array<std::string, problem_dimension<dim>>
+        component_names;
 
     /**
      * The storage type used for a primitive state vector.
@@ -60,7 +61,8 @@ namespace ryujin
      * An array holding all component names of the primitive state as a string.
      */
     template <int dim>
-    static const std::array<std::string, dim + 2> primitive_component_names;
+    static const std::array<std::string, problem_dimension<dim>>
+        primitive_component_names;
 
     /**
      * The storage type used for the flux \f$\mathbf{f}\f$.
