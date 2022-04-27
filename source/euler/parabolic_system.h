@@ -74,6 +74,16 @@ namespace ryujin
     static constexpr unsigned int n_implicit_systems = 2;
 
     /**
+     * The block size of the decoupled systems.
+     *
+     * First we have a velocity block of size dim followed by a scalar
+     * internal energy block (size 1).
+     */
+    template <int dim>
+    static constexpr std::array<unsigned int, n_implicit_systems> //
+        block_sizes = {dim, 1};
+
+    /**
      * An array holding a string naming all linear subsystems
      */
     static const std::array<std::string, n_implicit_systems>
@@ -87,7 +97,8 @@ namespace ryujin
     void parse_parameters_callback();
 
     /**
-     * @name Run time options
+     * @name Routines used transfering states, and assembling the diagonal
+     * part of the linear system.
      */
     //@{
 
@@ -98,6 +109,17 @@ namespace ryujin
     template <int problem_dim, typename Number>
     dealii::Tensor<1, problem_dim - 1, Number> to_parabolic_state(
         const dealii::Tensor<1, problem_dim, Number> &hyperbolic_state) const;
+
+    /**
+     * Given a conserved state vector @p hyperbolic_state and a parabolic
+     * state @p parabolic_state this function returns a hyperbolic_state in
+     * conserved quantities composed of velocity and internal energy from
+     * the parabolic state and density from the hyperbolic state.
+     */
+    template <int problem_dim, typename Number>
+    dealii::Tensor<1, problem_dim + 1, Number> from_parabolic_state(
+        dealii::Tensor<1, problem_dim + 1, Number> U,
+        const dealii::Tensor<1, problem_dim, Number> &parabolic_state) const;
 
     /**
      * Given a conserved state vector @p hyperbolic_state and a (lumped)
@@ -111,15 +133,30 @@ namespace ryujin
         const Number &m) const;
 
     /**
-     * Given a conserved state vector @p hyperbolic_state and a parabolic
-     * state @p parabolic_state this function returns a hyperbolic_state in
-     * conserved quantities composed of velocity and internal energy from
-     * the parabolic state and density from the hyperbolic state.
+     * Given a conserved state vector @p hyperbolic_state and a (lumped)
+     * mass @p m, return an appropriate diagonal scaling for the linear
+     * system, in our case \f$(\rho m_i)^{-1}\f$.
      */
     template <int problem_dim, typename Number>
-    dealii::Tensor<1, problem_dim + 1, Number> from_parabolic_state(
-        dealii::Tensor<1, problem_dim + 1, Number> U,
-        const dealii::Tensor<1, problem_dim, Number> &parabolic_state) const;
+    Number compute_diagonal_scaling(
+        const dealii::Tensor<1, problem_dim, Number> &hyperbolic_state,
+        const Number &m) const;
+
+    /**
+     * Given a conserved state vector @p hyperbolic_state and a (lumped)
+     * mass @p m, return the "diagonal action" of the linear subsystem. In
+     * our case this is a multiplication by \f$(m_i \rho)\f$.
+     */
+    template <int problem_dim, typename Number>
+    Number compute_diagonal_action(
+        const dealii::Tensor<1, problem_dim, Number> &hyperbolic_state,
+        const Number &m) const;
+
+    //@}
+    /**
+     * @name Routines used for enforcing and applying boundary conditions
+     */
+    //@{
 
     /**
      * Apply boundary conditions.
@@ -136,11 +173,34 @@ namespace ryujin
      *  - No slip boundary conditions where we set the velocity to 0.
      */
     template <int problem_dim, typename Number, typename Lambda>
-    dealii::Tensor<1, problem_dim, Number>
-    apply_boundary_conditions(dealii::types::boundary_id id,
-                              dealii::Tensor<1, problem_dim, Number> U,
-                              const dealii::Tensor<1, problem_dim - 1> &normal,
-                              Lambda get_dirichlet_data) const;
+    dealii::Tensor<1, problem_dim, Number> apply_boundary_conditions(
+        dealii::types::boundary_id id,
+        dealii::Tensor<1, problem_dim, Number> U,
+        const dealii::Tensor<1, problem_dim - 1, Number> &normal,
+        Lambda get_dirichlet_data) const;
+
+    /**
+     * "Propagate the action" of boundary conditions in the linear
+     * operator.
+     *
+     * For the parabolic diffusion problem we have:
+     *
+     *  - Dirichlet boundary conditions: Copy the src state to the
+     *    destination state.
+     *
+     *  - No slip boundary conditions: Copy the velocity component of the
+     *    src state to the destination state.
+     *    the velocity.
+     *
+     *  - Slip boundary conditions: Copy the velocity normal component of
+     *    the source state over to the dst state.
+     */
+    template <int problem_dim, typename Number>
+    dealii::Tensor<1, problem_dim, Number> apply_boundary_action(
+        dealii::types::boundary_id id,
+        dealii::Tensor<1, problem_dim, Number> dst,
+        const dealii::Tensor<1, problem_dim - 1, Number> &normal,
+        const dealii::Tensor<1, problem_dim, Number> &src) const;
 
     //@}
   private:
@@ -208,6 +268,26 @@ namespace ryujin
   }
 
 
+  template <int pd, typename Number>
+  DEAL_II_ALWAYS_INLINE inline Number ParabolicSystem::compute_diagonal_scaling(
+      const dealii::Tensor<1, pd, Number> &hyperbolic_state,
+      const Number &m) const
+  {
+    const auto rho = HyperbolicSystem::density(hyperbolic_state);
+    return Number(1.) / (rho * m);
+  }
+
+
+  template <int pd, typename Number>
+  DEAL_II_ALWAYS_INLINE inline Number ParabolicSystem::compute_diagonal_action(
+      const dealii::Tensor<1, pd, Number> &hyperbolic_state,
+      const Number &m) const
+  {
+    const auto rho = HyperbolicSystem::density(hyperbolic_state);
+    return (rho * m);
+  }
+
+
   template <int problem_dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, problem_dim + 1, Number>
   ParabolicSystem::from_parabolic_state(
@@ -234,7 +314,7 @@ namespace ryujin
   ParabolicSystem::apply_boundary_conditions(
       dealii::types::boundary_id id,
       dealii::Tensor<1, problem_dim, Number> V,
-      const dealii::Tensor<1, problem_dim - 1> &normal,
+      const dealii::Tensor<1, problem_dim - 1, Number> &normal,
       Lambda get_dirichlet_data) const
   {
     constexpr auto dim = problem_dim - 1;
@@ -263,6 +343,42 @@ namespace ryujin
     }
 
     return V;
+  }
+
+
+  template <int problem_dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, problem_dim, Number>
+  ParabolicSystem::apply_boundary_action(
+      dealii::types::boundary_id id,
+      dealii::Tensor<1, problem_dim, Number> dst,
+      const dealii::Tensor<1, problem_dim - 1, Number> &normal,
+      const dealii::Tensor<1, problem_dim, Number> &src) const
+  {
+    constexpr auto dim = problem_dim - 1;
+
+    if (id == Boundary::slip) {
+      /* Replace normal component of velocity: */
+      dealii::Tensor<1, dim> velocity_dst, velocity_src;
+      for (unsigned int d = 0; d < dim; ++d) {
+        velocity_dst[d] = dst[d];
+        velocity_src[d] = src[d];
+      }
+      velocity_dst += ((velocity_src - velocity_dst) * normal) * normal;
+      for (unsigned int d = 0; d < dim; ++d)
+        dst[d] = velocity_dst[d];
+
+    } else if (id == Boundary::no_slip) {
+      /* Replace velocity: */
+      for (unsigned int d = 0; d < dim; ++d) {
+        dst[d] = src[d];
+      }
+
+    } else if (id == Boundary::dirichlet) {
+      /* Replace velocity and internal energy: */
+      dst = src;
+    }
+
+    return dst;
   }
 
 } /* namespace ryujin */

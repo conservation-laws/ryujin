@@ -107,7 +107,7 @@ namespace ryujin
     if constexpr (n_implicit_systems == 0)
       return;
 
-    /* Initialize matrix free context and vectors: */
+    /* Initialize matrix free context, diagonal preconditioner, and vectors: */
 
     typename MatrixFree<dim, Number>::AdditionalData additional_data;
     additional_data.tasks_parallel_scheme =
@@ -122,6 +122,26 @@ namespace ryujin
     const auto &scalar_partitioner =
         matrix_free_.get_dof_info(0).vector_partitioner;
 
+    diagonal_preconditioner_.reinit(scalar_partitioner);
+
+    static_assert(n_implicit_systems <= 2, "not implemented");
+
+    if constexpr (n_implicit_systems >= 1) {
+      dissipation_operator_[0].reinit(
+          matrix_free_,
+          scalar_partitioner,
+          [this](block_vector_type &dst, const block_vector_type &src) mutable
+          -> void { this->apply_boundary_action(dst, src); });
+    }
+
+    if constexpr (n_implicit_systems >= 2) {
+      dissipation_operator_[1].reinit(
+          matrix_free_,
+          scalar_partitioner,
+          [this](block_vector_type &dst, const block_vector_type &src) mutable
+          -> void { this->apply_boundary_action(dst, src); });
+    }
+
     solution_.reinit(parabolic_problem_dimension);
     right_hand_side_.reinit(parabolic_problem_dimension);
     for (unsigned int i = 0; i < parabolic_problem_dimension; ++i) {
@@ -135,7 +155,7 @@ namespace ryujin
             use_gmg_.begin(), use_gmg_.end(), [](auto value) { return value; }))
       return;
 
-    __builtin_trap(); // FIXME
+    __builtin_trap(); // FIXME: GMG
   }
 
 
@@ -178,7 +198,7 @@ namespace ryujin
      */
     {
       Scope scope(computing_timer_,
-                  "time step [N] 0 - initialize vectors and build rhs");
+                  "time step [N] 0 - initialize scaling, vectors and rhs");
 
       RYUJIN_PARALLEL_REGION_BEGIN
       LIKWID_MARKER_START("time_step_n_0");
@@ -198,9 +218,17 @@ namespace ryujin
           const auto m_i = load_value<T>(lumped_mass_matrix, i);
           const auto U_i = U.template get_tensor<T>(i);
 
+          store_value<T>(diagonal_preconditioner_.scaling_vector(),
+                         parabolic_system_->compute_diagonal_scaling(U_i, m_i),
+                         i);
+
+          for (auto &it : dissipation_operator_)
+            store_value<T>(it.diagonal_action(),
+                           parabolic_system_->compute_diagonal_action(U_i, m_i),
+                           i);
+
           const auto &[V_i, rhs_i] =
               parabolic_system_->compute_parabolic_state_and_rhs(U_i, m_i);
-
           for (unsigned int d = 0; d < parabolic_problem_dimension; ++d) {
             store_value<T>(solution_.block(d), V_i[d], i);
             store_value<T>(right_hand_side_.block(d), rhs_i[d], i);
@@ -222,7 +250,7 @@ namespace ryujin
        * values by imposing them strongly in the iteration by setting the
        * initial vector and the right hand side to the right value:
        */
-      enforce_boundary_values(t + theta_ * tau);
+      set_boundary_values(t + theta_ * tau);
 
       /*
        * Zero out constrained degrees of freedom due to periodic boundary
@@ -230,6 +258,7 @@ namespace ryujin
        * the stencil - consequently we have to remove constrained dofs from
        * the linear system.
        */
+      affine_constraints.set_zero(diagonal_preconditioner_.scaling_vector());
       for (unsigned int d = 0; d < parabolic_problem_dimension; ++d) {
         affine_constraints.set_zero(solution_.block(d));
         affine_constraints.set_zero(right_hand_side_.block(d));
@@ -240,8 +269,7 @@ namespace ryujin
       bool last_round = (pass + 1 == n_implicit_systems);
 
       /*
-       * Step 1, 3, ..., 0 + 2 * n_implicit_systems - 1:
-       * Solve linear system.
+       * Step 1, 3: Solve linear system.
        */
       {
         std::string step_no = std::to_string(1 + 2 * pass);
@@ -252,14 +280,37 @@ namespace ryujin
 
         LIKWID_MARKER_START(("time_step_n_" + step_no).c_str());
 
-        // FIXME
+        const auto tolerance =
+            (tolerance_linfty_norm_ ? right_hand_side_.linfty_norm()
+                                    : right_hand_side_.l2_norm()) *
+            tolerance_;
+
+        try {
+          throw SolverControl::NoConvergence(0, 0.);
+
+          // FIXME: GMG
+
+        } catch (SolverControl::NoConvergence &) {
+
+          SolverControl solver_control(1000, tolerance);
+          SolverCG<block_vector_type> solver(solver_control);
+          solver.solve(dissipation_operator_[pass],
+                       solution_,
+                       right_hand_side_,
+                       diagonal_preconditioner_);
+
+          /* update exponential moving average, counting also GMG iterations */
+          n_iterations_[pass] *= 0.9;
+          n_iterations_[pass] +=
+              0.1 * (use_gmg_[pass] ? gmg_max_iter_[pass] : 0) +
+              0.1 * solver_control.last_step();
+        }
 
         LIKWID_MARKER_STOP(("time_step_n_" + step_no).c_str());
       }
 
       /*
-       * Step 2, 4, ..., 0 + 2 * n_implicit_systems - 2:
-       * Update right hand side.
+       * Step 2: Update right hand side.
        */
       if (!last_round) {
         std::string step_no = std::to_string(2 + 2 * pass);
@@ -327,7 +378,7 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  void DissipationModule<dim, Number>::enforce_boundary_values(Number t) const
+  void DissipationModule<dim, Number>::set_boundary_values(Number t) const
   {
     const auto &boundary_map = offline_data_->boundary_map();
 
@@ -352,10 +403,42 @@ namespace ryujin
 
       V_i = parabolic_system_->apply_boundary_conditions(
           id, V_i, normal, get_dirichlet_data);
+      rhs_i = parabolic_system_->apply_boundary_conditions(
+          id, rhs_i, normal, get_dirichlet_data);
 
       for (unsigned int d = 0; d < parabolic_problem_dimension; ++d) {
         store_value<Number>(solution_.block(d), V_i[d], i);
         store_value<Number>(right_hand_side_.block(d), rhs_i[d], i);
+      }
+    }
+  }
+
+
+  template <int dim, typename Number>
+  void DissipationModule<dim, Number>::apply_boundary_action(
+      block_vector_type &dst, const block_vector_type &src) const
+  {
+    const auto &boundary_map = offline_data_->boundary_map();
+
+    for (auto entry : boundary_map) {
+      const auto i = entry.first;
+      const auto &[normal, normal_mass, boundary_mass, id, position] =
+          entry.second;
+
+      if (id == Boundary::do_nothing)
+        continue;
+
+      parabolic_state_type dst_i, src_i;
+      for (unsigned int d = 0; d < parabolic_problem_dimension; ++d) {
+        src_i[d] = load_value<Number>(src.block(d), i);
+        dst_i[d] = load_value<Number>(dst.block(d), i);
+      }
+
+      dst_i =
+          parabolic_system_->apply_boundary_action(id, dst_i, normal, src_i);
+
+      for (unsigned int d = 0; d < parabolic_problem_dimension; ++d) {
+        store_value<Number>(dst.block(d), dst_i[d], i);
       }
     }
   }

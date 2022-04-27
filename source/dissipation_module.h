@@ -9,6 +9,8 @@
 #include <hyperbolic_system.h>
 #include <parabolic_system.h>
 
+#include "diagonal_preconditioner.h"
+#include "dissipation_operator.h"
 #include "initial_values.h"
 #include "offline_data.h"
 
@@ -100,8 +102,10 @@ namespace ryujin
      */
     //@{
 
-    void enforce_boundary_values(Number t) const;
+    void set_boundary_values(Number t) const;
 
+    void apply_boundary_action(block_vector_type &dst,
+                               const block_vector_type &src) const;
 
     /**
      * @name Run time options
@@ -141,7 +145,14 @@ namespace ryujin
     mutable std::array<double, n_implicit_systems> n_iterations_;
     ACCESSOR_READ_ONLY(n_iterations)
 
+    // Data structures for CG solver:
+
     mutable dealii::MatrixFree<dim, Number> matrix_free_;
+    mutable DiagonalPreconditioner<dim, Number> diagonal_preconditioner_;
+    mutable std::array<DissipationOperator<dim, Number>, n_implicit_systems>
+        dissipation_operator_;
+
+    // Solution vector and right-hand side:
 
     mutable block_vector_type solution_;
     mutable block_vector_type right_hand_side_;
