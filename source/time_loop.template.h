@@ -701,12 +701,20 @@ namespace ryujin
       const auto wall_time =
           Utilities::MPI::min_max_avg(timer.wall_time(), mpi_communicator_);
 
+      constexpr auto eps = std::numeric_limits<double>::epsilon();
+      /*
+       * Cut off at 99.9% to avoid silly percentages cluttering up the
+       * output.
+       */
+      const auto skew_negative = std::max(
+          100. * (wall_time.min - wall_time.avg) / wall_time.avg - eps, -99.9);
+      const auto skew_positive = std::min(
+          100. * (wall_time.max - wall_time.avg) / wall_time.avg + eps, 99.9);
+
       stream << std::setprecision(2) << std::fixed << std::setw(8)
              << wall_time.avg << "s [sk: " << std::setprecision(1)
-             << std::setw(5) << std::fixed
-             << 100. * (wall_time.min - wall_time.avg) / wall_time.avg << "%/"
-             << std::setw(4) << std::fixed
-             << 100. * (wall_time.max - wall_time.avg) / wall_time.avg << "%]";
+             << std::setw(5) << std::fixed << skew_negative << "%/"
+             << std::setw(4) << std::fixed << skew_positive << "%]";
       unsigned int n = dealii::Utilities::needed_digits(n_mpi_processes_);
       stream << " [p" << std::setw(n) << wall_time.min_index << "/"
              << wall_time.max_index << "]";
@@ -869,14 +877,17 @@ namespace ryujin
            << std::setprecision(0) << std::fixed << euler_module_.n_warnings() + dissipation_module_.n_warnings()
            << " warn) ]";
 
-    output << "[ "
-           << std::setprecision(2) << std::fixed
-           << std::setw(3) << 0
-           << " GMG vel -- "
-           << std::setw(3) << 0
-           << " GMG int ]";
+    output << "[ " << std::setprecision(2) << std::fixed << std::setw(3);
+    for (unsigned int c = 0; c < parabolic_system_.n_implicit_systems; ++c) {
+      output << dissipation_module_.n_iterations()[c]
+             << (dissipation_module_.use_gmg()[c] ? " GMG " : " CG ")
+             << parabolic_system_.implicit_system_names[c];
+      if (c != parabolic_system_.n_implicit_systems - 1)
+        output << " - ";
+    }
+    output << " ]" << std::endl;
 
-    output << "[ dt = "
+    output << "        [ dt = "
            << std::scientific << std::setprecision(2) << delta_time
            << " ( "
            << time_per_second
@@ -888,7 +899,7 @@ namespace ryujin
     unsigned int eta =
         static_cast<unsigned int>((t_final_ - t) / time_per_second_exp);
 
-    output << "  ETA : ";
+    output << "\n  ETA : ";
 
     const unsigned int days = eta / (24 * 3600);
     if (days > 0) {
