@@ -34,4 +34,19 @@ namespace ryujin
   void ParabolicSystem::parse_parameters_callback()
   {
   }
+
+
+#ifndef DOXYGEN
+  template <>
+  const std::array<std::string, 2>
+      ParabolicSystem::parabolic_component_names<1>{{"v", "e"}};
+
+  template <>
+  const std::array<std::string, 3>
+      ParabolicSystem::parabolic_component_names<2>{{"v_1", "v_2", "e"}};
+
+  template <>
+  const std::array<std::string, 4>
+      ParabolicSystem::parabolic_component_names<3>{{"v_1", "v_2", "v_3", "e"}};
+#endif
 } /* namespace ryujin */

@@ -41,6 +41,7 @@ namespace ryujin
       , offline_data_(&offline_data)
       , initial_values_(&initial_values)
       , n_warnings_(0)
+      , theta_(0.5)
   {
     tolerance_ = Number(1.0e-12);
     add_parameter("tolerance", tolerance_, "Tolerance for linear solvers");
@@ -140,7 +141,7 @@ namespace ryujin
 
   template <int dim, typename Number>
   Number DissipationModule<dim, Number>::step(vector_type &U,
-                                              Number /*t*/,
+                                              Number t,
                                               Number tau,
                                               unsigned int /*cycle*/) const
   {
@@ -167,7 +168,6 @@ namespace ryujin
     /* Index ranges for the iteration over the sparsity pattern : */
 
     const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
-    constexpr auto simd_length = VA::size();
     const unsigned int n_internal = offline_data_->n_locally_internal();
     const unsigned int n_owned = offline_data_->n_locally_owned();
 
@@ -215,10 +215,149 @@ namespace ryujin
 
       LIKWID_MARKER_STOP("time_step_n_0");
       RYUJIN_PARALLEL_REGION_END
+
+      /*
+       * Set up "strongly enforced" boundary conditions that are not stored
+       * in the AffineConstraints map. In this case we enforce boundary
+       * values by imposing them strongly in the iteration by setting the
+       * initial vector and the right hand side to the right value:
+       */
+      enforce_boundary_values(t + theta_ * tau);
+
+      /*
+       * Zero out constrained degrees of freedom due to periodic boundary
+       * conditions. These boundary conditions are enforced by modifying
+       * the stencil - consequently we have to remove constrained dofs from
+       * the linear system.
+       */
+      for (unsigned int d = 0; d < parabolic_problem_dimension; ++d) {
+        affine_constraints.set_zero(solution_.block(d));
+        affine_constraints.set_zero(right_hand_side_.block(d));
+      }
     }
 
+    for (unsigned int pass = 0; pass < n_implicit_systems; ++pass) {
+      bool last_round = (pass + 1 == n_implicit_systems);
+
+      /*
+       * Step 1, 3, ..., 0 + 2 * n_implicit_systems - 1:
+       * Solve linear system.
+       */
+      {
+        std::string step_no = std::to_string(1 + 2 * pass);
+        std::string description = //
+            "time step [N] " + step_no + " - solve parabolic (sub)system [" +
+            parabolic_system_->implicit_system_names[pass] + "]";
+        Scope scope(computing_timer_, description);
+
+        LIKWID_MARKER_START(("time_step_n_" + step_no).c_str());
+
+        // FIXME
+
+        LIKWID_MARKER_STOP(("time_step_n_" + step_no).c_str());
+      }
+
+      /*
+       * Step 2, 4, ..., 0 + 2 * n_implicit_systems - 2:
+       * Update right hand side.
+       */
+      if (!last_round) {
+        std::string step_no = std::to_string(2 + 2 * pass);
+        std::string description = //
+            "time step [N] " + step_no + " - update right hand side [" +
+            parabolic_system_->implicit_system_names[pass] + "]";
+        Scope scope(computing_timer_, description);
+
+        LIKWID_MARKER_START(("time_step_n_" + step_no).c_str());
+
+        // FIXME
+
+        LIKWID_MARKER_STOP(("time_step_n_" + step_no).c_str());
+      }
+    }
+
+    /*
+     * Step 2 * n_implicit_systems: Write back vectors
+     */
+    {
+      std::string step_no = std::to_string(2 * n_implicit_systems);
+      Scope scope(computing_timer_,
+                  "time step [N] " + step_no + " - write back vectors");
+
+      const auto alpha = Number(1.) / theta_;
+
+      RYUJIN_PARALLEL_REGION_BEGIN
+      LIKWID_MARKER_START(("time_step_n_" + step_no).c_str());
+
+      auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
+        using T = decltype(sentinel);
+        unsigned int stride_size = get_stride_size<T>;
+
+        RYUJIN_OMP_FOR_NOWAIT
+        for (unsigned int i = left; i < right; i += stride_size) {
+
+          /* Skip constrained degrees of freedom: */
+          const unsigned int row_length = sparsity_simd.row_length(i);
+          if (row_length == 1)
+            continue;
+
+          auto U_i = U.template get_tensor<T>(i);
+
+          auto V_i = parabolic_system_->to_parabolic_state(U_i);
+          V_i *= (Number(1.) - alpha);
+          for (unsigned int d = 0; d < parabolic_problem_dimension; ++d)
+            V_i[d] += alpha * load_value<T>(solution_.block(d), i);
+
+          U_i = parabolic_system_->from_parabolic_state(U_i, V_i);
+          U.template write_tensor<T>(U_i, i);
+        }
+      };
+
+      /* Parallel non-vectorized loop: */
+      loop(Number(), n_internal, n_owned);
+      /* Parallel vectorized SIMD loop: */
+      loop(VA(), 0, n_internal);
+
+      LIKWID_MARKER_STOP(("time_step_n_" + step_no).c_str());
+      RYUJIN_PARALLEL_REGION_END
+    }
 
     return tau;
+  }
+
+
+  template <int dim, typename Number>
+  void DissipationModule<dim, Number>::enforce_boundary_values(Number t) const
+  {
+    const auto &boundary_map = offline_data_->boundary_map();
+
+    for (auto entry : boundary_map) {
+      const auto i = entry.first;
+      const auto &[normal, normal_mass, boundary_mass, id, position] =
+          entry.second;
+
+      if (id == Boundary::do_nothing)
+        continue;
+
+      parabolic_state_type V_i, rhs_i;
+      for (unsigned int d = 0; d < parabolic_problem_dimension; ++d) {
+        V_i[d] = load_value<Number>(solution_.block(d), i);
+        rhs_i[d] = load_value<Number>(right_hand_side_.block(d), i);
+      }
+
+      /* Use a lambda to avoid computing unnecessary state values */
+      auto get_dirichlet_data = [position = position, t = t, this]() {
+        return initial_values_->initial_state(position, t);
+      };
+
+      V_i = parabolic_system_->apply_boundary_conditions(
+          id, V_i, normal, get_dirichlet_data);
+
+      for (unsigned int d = 0; d < parabolic_problem_dimension; ++d) {
+        store_value<Number>(solution_.block(d), V_i[d], i);
+        store_value<Number>(right_hand_side_.block(d), rhs_i[d], i);
+      }
+    }
   }
 
 } // namespace ryujin

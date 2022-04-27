@@ -30,9 +30,8 @@ namespace ryujin
     /**
      * @copydoc HyperbolicSystem::problem_dimension
      */
-    // clang-format off
-    static constexpr unsigned int problem_dimension = HyperbolicSystem::problem_dimension<dim>;
-    // clang-format on
+    static constexpr unsigned int problem_dimension =
+        HyperbolicSystem::problem_dimension<dim>;
 
     /**
      * Typedef for a MultiComponentVector storing the state U.
@@ -42,16 +41,20 @@ namespace ryujin
     /**
      * @copydoc Parabolic_system::parabolic_problem_dimension
      */
-    // clang-format off
-    static constexpr unsigned int parabolic_problem_dimension = ParabolicSystem::parabolic_problem_dimension<dim>;
-    // clang-format on
+    static constexpr unsigned int parabolic_problem_dimension =
+        ParabolicSystem::parabolic_problem_dimension<dim>;
+
+    /**
+     * @copydoc Parabolic_system::parabolic_state_type
+     */
+    using parabolic_state_type =
+        ParabolicSystem::parabolic_state_type<dim, Number>;
 
     /**
      * @copydoc ParabolicSystem::n_implicit_systems
      */
-    // clang-format off
-    static constexpr unsigned int n_implicit_systems = ParabolicSystem::n_implicit_systems;
-    // clang-format on
+    static constexpr unsigned int n_implicit_systems =
+        ParabolicSystem::n_implicit_systems;
 
     /**
      * A distributed block vector used for temporary storage of the
@@ -92,6 +95,14 @@ namespace ryujin
 
   private:
     //@}
+    /**
+     * @name Private methods for step()
+     */
+    //@{
+
+    void enforce_boundary_values(Number t) const;
+
+
     /**
      * @name Run time options
      */

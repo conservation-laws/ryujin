@@ -7,4 +7,6 @@
 
 namespace ryujin
 {
+  const std::array<std::string, ParabolicSystem::n_implicit_systems>
+      ParabolicSystem::implicit_system_names{{"vel", "int"}};
 } /* namespace ryujin */
