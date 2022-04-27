@@ -82,8 +82,6 @@ namespace ryujin
     for (auto &it : temp_U_)
       it.reinit(vector_partitioner);
 
-    temp_U_strang_.reinit(vector_partitioner); // FIXME: refactor
-
     /* Reset CFL to canonical starting value: */
 
     AssertThrow(cfl_min_ > 0., ExcMessage("cfl min must be a positive value"));
@@ -97,7 +95,7 @@ namespace ryujin
   template <int dim, typename Number>
   Number TimeIntegrator<dim, Number>::step(vector_type &U,
                                            Number t,
-                                           unsigned int cycle)
+                                           unsigned int /*cycle*/)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeIntegrator<dim, Number>::step()" << std::endl;
@@ -106,15 +104,7 @@ namespace ryujin
     const auto single_step = [&]() {
       switch (time_stepping_scheme_) {
       case TimeSteppingScheme::ssprk_33:
-        // FIXME: refactor
-        {
-          temp_U_strang_ = U;
-          const Number tau = step_ssprk_33(temp_U_strang_, t);
-          dissipation_module_->step(temp_U_strang_, t, Number(2.) * tau, cycle);
-          step_ssprk_33(temp_U_strang_, t + tau, tau);
-          U = temp_U_strang_;
-          return Number(2.) * tau;
-        }
+        return step_ssprk_33(U, t);
       case TimeSteppingScheme::erk_33:
         return step_erk_33(U, t);
       case TimeSteppingScheme::erk_43:
