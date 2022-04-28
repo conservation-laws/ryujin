@@ -29,7 +29,6 @@ namespace ryujin
       : ParameterAcceptor("/A - TimeLoop")
       , mpi_communicator_(mpi_comm)
       , hyperbolic_system_("/B - HyperbolicSystem")
-      , parabolic_system_("/B - ParabolicSystem")
       , discretization_(mpi_communicator_, "/C - Discretization")
       , offline_data_(mpi_communicator_, discretization_, "/D - OfflineData")
       , initial_values_(hyperbolic_system_, offline_data_, "/E - InitialValues")
@@ -39,28 +38,19 @@ namespace ryujin
                       hyperbolic_system_,
                       initial_values_,
                       "/F - EulerModule")
-      , dissipation_module_(mpi_communicator_,
-                            computing_timer_,
-                            parabolic_system_,
-                            offline_data_,
-                            initial_values_,
-                            "/G - DissipationModule")
       , time_integrator_(mpi_communicator_,
                          computing_timer_,
                          offline_data_,
                          euler_module_,
-                         dissipation_module_,
                          "/H - TimeIntegrator")
       , postprocessor_(mpi_communicator_,
                        hyperbolic_system_,
-                       parabolic_system_,
                        offline_data_,
                        "/I - VTUOutput/Postprocessor")
       , vtu_output_(
             mpi_communicator_, offline_data_, postprocessor_, "/I - VTUOutput")
       , quantities_(mpi_communicator_,
                     hyperbolic_system_,
-                    parabolic_system_,
                     offline_data_,
                     "/J - Quantities")
       , mpi_rank_(dealii::Utilities::MPI::this_mpi_process(mpi_communicator_))
@@ -185,7 +175,6 @@ namespace ryujin
     const auto prepare_compute_kernels = [&]() {
       offline_data_.prepare(HyperbolicSystem::problem_dimension<dim>);
       euler_module_.prepare();
-      dissipation_module_.prepare();
       time_integrator_.prepare();
       postprocessor_.prepare();
       vtu_output_.prepare();
@@ -874,18 +863,8 @@ namespace ryujin
            << " ("
            << std::setprecision(0) << std::fixed << euler_module_.n_restarts()
            << " rsts) ("
-           << std::setprecision(0) << std::fixed << euler_module_.n_warnings() + dissipation_module_.n_warnings()
+           << std::setprecision(0) << std::fixed << euler_module_.n_warnings()
            << " warn) ]";
-
-    output << "[ " << std::setprecision(2) << std::fixed << std::setw(3);
-    for (unsigned int c = 0; c < parabolic_system_.n_implicit_systems; ++c) {
-      output << dissipation_module_.n_iterations()[c]
-             << (dissipation_module_.use_gmg()[c] ? " GMG " : " CG ")
-             << parabolic_system_.implicit_system_names[c];
-      if (c != parabolic_system_.n_implicit_systems - 1)
-        output << " - ";
-    }
-    output << " ]" << std::endl;
 
     output << "        [ dt = "
            << std::scientific << std::setprecision(2) << delta_time

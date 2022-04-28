@@ -19,14 +19,12 @@ namespace ryujin
       std::map<std::string, dealii::Timer> &computing_timer,
       const ryujin::OfflineData<dim, Number> &offline_data,
       const ryujin::EulerModule<dim, Number> &euler_module,
-      const ryujin::DissipationModule<dim, Number> &dissipation_module,
       const std::string &subsection /*= "TimeIntegrator"*/)
       : ParameterAcceptor(subsection)
       , mpi_communicator_(mpi_communicator)
       , computing_timer_(computing_timer)
       , offline_data_(&offline_data)
       , euler_module_(&euler_module)
-      , dissipation_module_(&dissipation_module)
   {
     cfl_min_ = Number(0.45);
     add_parameter(

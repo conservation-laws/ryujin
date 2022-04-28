@@ -8,11 +8,9 @@
 #include <compile_time_options.h>
 
 #include <hyperbolic_system.h>
-#include <parabolic_system.h>
 #include <postprocessor.h>
 
 #include "discretization.h"
-#include "dissipation_module.h"
 #include "euler_module.h"
 #include "initial_values.h"
 #include "offline_data.h"
@@ -141,12 +139,10 @@ namespace ryujin
     std::map<std::string, dealii::Timer> computing_timer_;
 
     HyperbolicSystem hyperbolic_system_;
-    ParabolicSystem parabolic_system_;
     Discretization<dim> discretization_;
     OfflineData<dim, Number> offline_data_;
     InitialValues<dim, Number> initial_values_;
     EulerModule<dim, Number> euler_module_;
-    DissipationModule<dim, Number> dissipation_module_;
     TimeIntegrator<dim, Number> time_integrator_;
     Postprocessor<dim, Number> postprocessor_;
     VTUOutput<dim, Number> vtu_output_;

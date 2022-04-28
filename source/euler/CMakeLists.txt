@@ -7,7 +7,6 @@ add_library(obj_euler OBJECT
   limiter.cc
   postprocessor.cc
   hyperbolic_system.cc
-  parabolic_system.cc
   riemann_solver.cc
   )
 deal_ii_setup_target(obj_euler)

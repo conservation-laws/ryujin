@@ -37,7 +37,6 @@ set(COMMON_SOURCE_FILES
   )
 
 set(DEPENDENT_SOURCE_FILES
-  dissipation_module.cc
   euler_module.cc
   initial_values.cc
   main.cc

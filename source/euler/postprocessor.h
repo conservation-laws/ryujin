@@ -6,7 +6,6 @@
 #pragma once
 
 #include "hyperbolic_system.h"
-#include "parabolic_system.h"
 
 #include <compile_time_options.h>
 #include <offline_data.h>
@@ -89,7 +88,6 @@ namespace ryujin
      */
     Postprocessor(const MPI_Comm &mpi_communicator,
                   const ryujin::HyperbolicSystem &hyperbolic_system,
-                  const ryujin::ParabolicSystem &parabolic_system,
                   const ryujin::OfflineData<dim, Number> &offline_data,
                   const std::string &subsection = "Postprocessor");
 
@@ -146,7 +144,6 @@ namespace ryujin
     const MPI_Comm &mpi_communicator_;
 
     dealii::SmartPointer<const HyperbolicSystem> hyperbolic_system_;
-    dealii::SmartPointer<const ParabolicSystem> parabolic_system_;
     dealii::SmartPointer<const ryujin::OfflineData<dim, Number>> offline_data_;
 
     mutable std::array<scalar_type, n_quantities> quantities_;

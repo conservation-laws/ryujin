@@ -8,7 +8,6 @@
 #include <compile_time_options.h>
 
 #include <hyperbolic_system.h>
-#include <parabolic_system.h>
 
 #include "convenience_macros.h"
 #include "initial_values.h"
@@ -61,7 +60,6 @@ namespace ryujin
      */
     Quantities(const MPI_Comm &mpi_communicator,
                const ryujin::HyperbolicSystem &hyperbolic_system,
-               const ryujin::ParabolicSystem &parabolic_system,
                const ryujin::OfflineData<dim, Number> &offline_data,
                const std::string &subsection = "Quantities");
 
@@ -115,7 +113,6 @@ namespace ryujin
     const MPI_Comm &mpi_communicator_;
 
     dealii::SmartPointer<const HyperbolicSystem> hyperbolic_system_;
-    dealii::SmartPointer<const ParabolicSystem> parabolic_system_;
     dealii::SmartPointer<const OfflineData<dim, Number>> offline_data_;
 
     /**

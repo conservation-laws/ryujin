@@ -10,7 +10,6 @@
 #include <hyperbolic_system.h>
 
 #include "convenience_macros.h"
-#include "dissipation_module.h"
 #include "euler_module.h"
 #include "offline_data.h"
 #include "patterns_conversion.h"
@@ -127,7 +126,6 @@ namespace ryujin
         std::map<std::string, dealii::Timer> &computing_timer,
         const ryujin::OfflineData<dim, Number> &offline_data,
         const ryujin::EulerModule<dim, Number> &euler_module,
-        const ryujin::DissipationModule<dim, Number> &dissipation_module,
         const std::string &subsection = "TimeIntegrator");
 
     /**
@@ -210,9 +208,6 @@ namespace ryujin
 
     dealii::SmartPointer<const ryujin::OfflineData<dim, Number>> offline_data_;
     dealii::SmartPointer<const ryujin::EulerModule<dim, Number>> euler_module_;
-
-    dealii::SmartPointer<const ryujin::DissipationModule<dim, Number>>
-        dissipation_module_;
 
     std::vector<vector_type> temp_U_;
     vector_type temp_U_strang_; // FIXME: refactor
