@@ -38,7 +38,7 @@ namespace ryujin
    * vector, and a local estimate of the effective residual viscosity
    * \f$\mu_{\text{res}}\f$ caused by the graph viscosity stabilization.
    *
-   * @ingroup TimeLoop
+   * @ingroup EulerEquations
    */
   template <int dim, typename Number = double>
   class Postprocessor final : public dealii::ParameterAcceptor

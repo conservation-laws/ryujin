@@ -17,10 +17,12 @@
   simd  [label="SIMD", URL="\ref SIMD"];
   fe    [label="Finite element formulation", URL="\ref FiniteElement"];
   misc  [label="Miscellaneous", URL="\ref Miscellaneous"];
-  mesh  [label="Mesh generation and discretization", URL="\ref Mesh"];
+  mesh  [label="Discretization", URL="\ref Mesh"];
   hyperbolic [label="Hyperbolic Module", URL="\ref HyperbolicModule"];
   parabolic [label="Parabolic Module", URL="\ref ParabolicModule"];
   loop  [label="Time loop", URL="\ref TimeLoop"];
+  euler [label="Euler Equations", URL="\ref EulerEquations"];
+  navier [label="Navier Stokes Equations", URL="\ref NavierStokesEquations"];
 
   fe   -> mesh  [color="black",style="solid"];
   simd -> hyperbolic [color="black",style="solid"];
@@ -34,6 +36,9 @@
   misc -> loop  [color="black",style="solid"];
   hyperbolic -> loop [color="black",style="solid"];
   parabolic -> loop [color="black",style="solid"];
+  euler -> hyperbolic [color="black",style="solid"];
+  navier -> hyperbolic [color="black",style="solid"];
+  navier -> parabolic [color="black",style="solid"];
 }
  * @enddot
  *

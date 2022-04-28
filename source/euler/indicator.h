@@ -53,7 +53,7 @@ namespace ryujin
    *   \mathbf{f}(\boldsymbol U_i^n)\right)\cdot\boldsymbol c_{ij},
    * \f}
    *
-   * @ingroup HyperbolicModule
+   * @ingroup EulerEquations
    */
   template <int dim, typename Number = double>
   class Indicator

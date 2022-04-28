@@ -42,7 +42,7 @@ namespace ryujin
    *     \Psi(\mathbf U)\;=\;\rho^{\gamma+1}(\mathbf U)\,\big(\phi(\mathbf
    * U)-\phi_{\text{min}}\big). \f}
    *
-   * @ingroup HyperbolicModule
+   * @ingroup EulerEquations
    */
   template <int dim, typename Number = double>
   class Limiter

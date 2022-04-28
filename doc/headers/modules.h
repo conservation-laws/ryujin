@@ -39,6 +39,30 @@
 
 
 /**
+ * @defgroup ParabolicModule Parabolic Module
+ *
+ * This module contains classes and functions used during different stages
+ * of the implicit parabolic update performed in ParabolicModule::step().
+ */
+
+
+/**
+ * @defgroup EulerEquations The Compressible Euler Equations
+ *
+ * This module contains classes and functions related to solving the
+ * compressible Euler equations of gas dynamics.
+ */
+
+
+/**
+ * @defgroup NavierStokesEquations The Compressible Navier Stokes Equations
+ *
+ * This module contains classes and functions related to solving the
+ * compressible Navier Stokes equations.
+ */
+
+
+/**
  * @defgroup Miscellaneous Miscellaneous
  *
  * Miscellaneous helper functions, macros and classes.

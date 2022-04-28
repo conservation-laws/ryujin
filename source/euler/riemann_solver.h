@@ -23,7 +23,7 @@ namespace ryujin
    *
    * The solver is based on @cite GuermondPopov2016b.
    *
-   * @ingroup HyperbolicModule
+   * @ingroup EulerEquations
    */
   template <int dim, typename Number = double>
   class RiemannSolver
