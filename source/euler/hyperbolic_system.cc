@@ -7,4 +7,6 @@
 
 namespace ryujin
 {
+  const std::string HyperbolicSystem::problem_name =
+      "Compressible Euler equations (polytropic EOS)";
 } /* namespace ryujin */

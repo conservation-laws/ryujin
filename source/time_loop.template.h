@@ -658,8 +658,8 @@ namespace ryujin
 
     unsigned int n = dealii::Utilities::needed_digits(n_mpi_processes_);
 
-    output << std::endl << std::endl << "Memory:      [MiB]";
-    output << std::setw(8) << data.min                        //
+    output << "\nMemory:      [MiB]"                          //
+           << std::setw(8) << data.min                        //
            << " [p" << std::setw(n) << data.min_index << "] " //
            << std::setw(8) << data.avg << " "                 //
            << std::setw(8) << data.max                        //
@@ -864,7 +864,7 @@ namespace ryujin
            << std::setprecision(0) << std::fixed << hyperbolic_module_.n_restarts()
            << " rsts) ("
            << std::setprecision(0) << std::fixed << hyperbolic_module_.n_warnings()
-           << " warn) ]";
+           << " warn) ]" << std::endl;
 
     output << "        [ dt = "
            << std::scientific << std::setprecision(2) << delta_time
@@ -966,12 +966,13 @@ namespace ryujin
 
     print_head(primary.str(), secondary.str(), output);
 
-    output << "Information: [" << base_name_ << "] with "
-           << offline_data_.dof_handler().n_dofs() << " Qdofs on "
-           << n_mpi_processes_ << " ranks / " << MultithreadInfo::n_threads()
-           << " threads\n"
-           << "             Last output cycle " << output_cycle - 1
-           << " at t = " << output_granularity_ * (output_cycle - 1);
+    output << "Information: (HYP) " << hyperbolic_system_.problem_name        //
+           << "\n             [" << base_name_ << "] with "                   //
+           << offline_data_.dof_handler().n_dofs() << " Qdofs on "            //
+           << n_mpi_processes_ << " ranks / " << MultithreadInfo::n_threads() //
+           << " threads."                                                     //
+           << "\n             Last output cycle " << output_cycle - 1         //
+           << " at t = " << output_granularity_ * (output_cycle - 1) << "\n"; //
 
     print_memory_statistics(output);
     print_timers(output);
