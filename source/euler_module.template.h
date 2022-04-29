@@ -497,11 +497,10 @@ namespace ryujin
           const auto U_i = old_U.template get_tensor<T>(i);
           const auto f_i = problem_description_->f(U_i);
 
-          std::array<ProblemDescription::state_type<dim, T>, stages> U_iHs;
           std::array<ProblemDescription::flux_type<dim, T>, stages> f_iHs;
           for (int s = 0; s < stages; ++s) {
-            U_iHs[s] = stage_U[s].get().template get_tensor<T>(i);
-            f_iHs[s] = problem_description_->f(U_iHs[s]);
+            const auto temp = stage_U[s].get().template get_tensor<T>(i);
+            f_iHs[s] = problem_description_->f(temp);
           }
 
           auto U_i_new = U_i;
@@ -646,11 +645,10 @@ namespace ryujin
           const auto U_i = old_U.template get_tensor<T>(i);
           const auto f_i = problem_description_->f(U_i);
 
-          std::array<ProblemDescription::state_type<dim, T>, stages> U_iHs;
           std::array<ProblemDescription::flux_type<dim, T>, stages> f_iHs;
           for (int s = 0; s < stages; ++s) {
-            U_iHs[s] = stage_U[s].get().template get_tensor<T>(i);
-            f_iHs[s] = problem_description_->f(U_iHs[s]);
+            const auto temp = stage_U[s].get().template get_tensor<T>(i);
+            f_iHs[s] = problem_description_->f(temp);
           }
 
           const auto r_i = r_.template get_tensor<T>(i);
