@@ -692,13 +692,13 @@ namespace ryujin
               const auto f_j = problem_description_->f(U_j);
 
               for (unsigned int k = 0; k < problem_dimension; ++k) {
-                const auto temp = (f_j[k] - f_i[k]) * c_ij;
+                const auto temp = (f_j[k] + f_i[k]) * c_ij;
                 p_ij[k] += (weight - Number(1.)) * (-temp);
               }
 
               for (int s = 0; s < stages; ++s) {
                 for (unsigned int k = 0; k < problem_dimension; ++k) {
-                  const auto temp = (f_jHs[s][k] - f_iHs[s][k]) * c_ij;
+                  const auto temp = (f_jHs[s][k] + f_iHs[s][k]) * c_ij;
                   p_ij[k] += stage_weights[s] * (-temp);
                 }
               }

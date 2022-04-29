@@ -172,7 +172,7 @@ namespace ryujin
      *   \big(1-\sum_{s=\{1:stages\}}\omega_s\big)\bR^n_i
      *   \;+\;
      *   \sum_{s=\{1:stages\}}\omega_s
-     *   \sum_{j\in\Ii}\Big(-\polf(\bUnjs) \cdot\bc_{ij}
+     *   \sum_{j\in\Ii}\Big(-\polf(\bUnis)-\polf(\bUnjs) \cdot\bc_{ij}
      *   +d_{ij}^{H,s,n}\big(\bUnjs-\bUnis\big)\Big),
      * \f}
      * where \f$\omega_s\f$ denotes the weigths for the given stages.
