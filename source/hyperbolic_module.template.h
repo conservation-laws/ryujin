@@ -526,14 +526,13 @@ namespace ryujin
             const auto d_ij = dij_matrix_.template get_entry<T>(i, col_idx);
             const auto d_ijH = d_ij * (alpha_i + alpha_j) * Number(.5);
 
-            dealii::Tensor<1, problem_dimension, T> U_ij_bar;
             const auto c_ij = cij_matrix.template get_tensor<T>(i, col_idx);
             const auto d_ij_inv = Number(1.) / d_ij;
 
             for (unsigned int k = 0; k < problem_dimension; ++k) {
               const auto temp = (f_j[k] - f_i[k]) * c_ij;
               r_i[k] += weight * (-temp) + d_ijH * (U_j[k] - U_i[k]);
-              U_ij_bar[k] = Number(0.5) * (U_i[k] + U_j[k] - temp * d_ij_inv);
+              U_i_new[k] += tau * m_i_inv * (-temp + d_ij * (U_j[k] - U_i[k]));
             }
 
             for (int s = 0; s < stages; ++s) {
@@ -543,11 +542,10 @@ namespace ryujin
               }
             }
 
-            U_i_new += tau * m_i_inv * Number(2.) * d_ij * U_ij_bar;
 
             const auto beta_ij =
                 betaij_matrix.template get_entry<T>(i, col_idx);
-            limiter.accumulate(js, U_i, U_j, U_ij_bar, beta_ij);
+            limiter.accumulate(js, U_i, U_j, d_ij_inv * c_ij, beta_ij);
           }
 
           new_U.template write_tensor<T>(U_i_new, i);

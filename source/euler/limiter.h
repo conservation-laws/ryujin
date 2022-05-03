@@ -135,7 +135,7 @@ namespace ryujin
     void accumulate(const unsigned int *js,
                     const state_type &U_i,
                     const state_type &U_j,
-                    const state_type &U_ij_bar,
+                    const dealii::Tensor<1, dim, Number> &scaled_c_ij,
                     const Number beta_ij);
 
     /**
@@ -239,20 +239,26 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline void
-  Limiter<dim, Number>::accumulate(const unsigned int *js,
-                                   const state_type &U_i,
-                                   const state_type &U_j,
-                                   const state_type &U_ij_bar,
-                                   const Number beta_ij)
+  DEAL_II_ALWAYS_INLINE inline void Limiter<dim, Number>::accumulate(
+      const unsigned int *js,
+      const state_type &U_i,
+      const state_type &U_j,
+      const dealii::Tensor<1, dim, Number> &scaled_c_ij,
+      const Number beta_ij)
   {
     /* Bounds: */
 
     auto &[rho_min, rho_max, s_min] = bounds_;
 
-    const auto rho_ij = hyperbolic_system.density(U_ij_bar);
-    rho_min = std::min(rho_min, rho_ij);
-    rho_max = std::max(rho_max, rho_ij);
+    const auto rho_i = hyperbolic_system.density(U_i);
+    const auto m_i = hyperbolic_system.momentum(U_i);
+    const auto rho_j = hyperbolic_system.density(U_j);
+    const auto m_j = hyperbolic_system.momentum(U_j);
+    const auto rho_ij_bar =
+        ScalarNumber(0.5) *
+        (rho_i + rho_j + (m_i - m_j) * scaled_c_ij);
+    rho_min = std::min(rho_min, rho_ij_bar);
+    rho_max = std::max(rho_max, rho_ij_bar);
 
     const auto &[specific_entropy_j] =
         precomputed_values.template get_tensor<Number, PrecomputedValues>(js);
@@ -260,8 +266,6 @@ namespace ryujin
 
     /* Relaxation: */
 
-    const auto rho_i = hyperbolic_system.density(U_i);
-    const auto rho_j = hyperbolic_system.density(U_j);
     rho_relaxation_numerator += beta_ij * (rho_i + rho_j);
     rho_relaxation_denominator += beta_ij;
 
