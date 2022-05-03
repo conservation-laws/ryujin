@@ -515,11 +515,10 @@ namespace ryujin
             const auto U_j = old_U.template get_tensor<T>(js);
             const auto f_j = hyperbolic_system_->f(U_j);
 
-            std::array<HyperbolicSystem::state_type<dim, T>, stages> U_jHs;
             std::array<HyperbolicSystem::flux_type<dim, T>, stages> f_jHs;
             for (int s = 0; s < stages; ++s) {
-              U_jHs[s] = stage_U[s].get().template get_tensor<T>(js);
-              f_jHs[s] = hyperbolic_system_->f(U_jHs[s]);
+              const auto temp = stage_U[s].get().template get_tensor<T>(js);
+              f_jHs[s] = hyperbolic_system_->f(temp);
             }
 
             const auto alpha_j = load_value<T>(alpha_, js);
@@ -644,11 +643,10 @@ namespace ryujin
 
             const auto U_j = old_U.template get_tensor<T>(js);
 
-            std::array<HyperbolicSystem::state_type<dim, T>, stages> U_jHs;
             std::array<HyperbolicSystem::flux_type<dim, T>, stages> f_jHs;
             for (int s = 0; s < stages; ++s) {
-              U_jHs[s] = stage_U[s].get().template get_tensor<T>(js);
-              f_jHs[s] = hyperbolic_system_->f(U_jHs[s]);
+              const auto temp = stage_U[s].get().template get_tensor<T>(js);
+              f_jHs[s] = hyperbolic_system_->f(temp);
             }
 
             const auto c_ij = cij_matrix.template get_tensor<T>(i, col_idx);
