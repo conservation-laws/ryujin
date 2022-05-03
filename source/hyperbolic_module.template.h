@@ -7,7 +7,7 @@
 
 #include <riemann_solver.h>
 
-#include "euler_module.h"
+#include "hyperbolic_module.h"
 #include "introspection.h"
 #include "openmp.h"
 #include "scope.h"
@@ -22,13 +22,13 @@ namespace ryujin
   using namespace dealii;
 
   template <int dim, typename Number>
-  EulerModule<dim, Number>::EulerModule(
+  HyperbolicModule<dim, Number>::HyperbolicModule(
       const MPI_Comm &mpi_communicator,
       std::map<std::string, dealii::Timer> &computing_timer,
       const ryujin::OfflineData<dim, Number> &offline_data,
       const ryujin::HyperbolicSystem &hyperbolic_system,
       const ryujin::InitialValues<dim, Number> &initial_values,
-      const std::string &subsection /*= "EulerModule"*/)
+      const std::string &subsection /*= "HyperbolicModule"*/)
       : ParameterAcceptor(subsection)
       , id_violation_strategy_(IDViolationStrategy::warn)
       , mpi_communicator_(mpi_communicator)
@@ -67,10 +67,10 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  void EulerModule<dim, Number>::prepare()
+  void HyperbolicModule<dim, Number>::prepare()
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "EulerModule<dim, Number>::prepare()" << std::endl;
+    std::cout << "HyperbolicModule<dim, Number>::prepare()" << std::endl;
 #endif
 
     /* Initialize vectors: */
@@ -131,7 +131,7 @@ namespace ryujin
 
   template <int dim, typename Number>
   template <int stages>
-  Number EulerModule<dim, Number>::step(
+  Number HyperbolicModule<dim, Number>::step(
       const vector_type &old_U,
       std::array<std::reference_wrapper<const vector_type>, stages> stage_U,
       const std::array<Number, stages> stage_weights,
@@ -139,7 +139,7 @@ namespace ryujin
       Number tau /*= 0.*/) const
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "EulerModule<dim, Number>::single_step()" << std::endl;
+    std::cout << "HyperbolicModule<dim, Number>::single_step()" << std::endl;
 #endif
 
     CALLGRIND_START_INSTRUMENTATION
@@ -903,11 +903,11 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  void EulerModule<dim, Number>::apply_boundary_conditions(vector_type &U,
+  void HyperbolicModule<dim, Number>::apply_boundary_conditions(vector_type &U,
                                                            Number t) const
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "EulerModule<dim, Number>::apply_boundary_conditions()"
+    std::cout << "HyperbolicModule<dim, Number>::apply_boundary_conditions()"
               << std::endl;
 #endif
 

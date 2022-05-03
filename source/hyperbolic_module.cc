@@ -3,11 +3,11 @@
 // Copyright (C) 2020 - 2021 by the ryujin authors
 //
 
-#include "euler_module.template.h"
+#include "hyperbolic_module.template.h"
 
 namespace ryujin
 {
   /* instantiations */
-  template class EulerModule<DIM, NUMBER>;
+  template class HyperbolicModule<DIM, NUMBER>;
 
 } /* namespace ryujin */

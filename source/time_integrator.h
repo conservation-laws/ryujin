@@ -10,7 +10,7 @@
 #include <hyperbolic_system.h>
 
 #include "convenience_macros.h"
-#include "euler_module.h"
+#include "hyperbolic_module.h"
 #include "offline_data.h"
 #include "patterns_conversion.h"
 
@@ -100,7 +100,10 @@ DECLARE_ENUM(ryujin::TimeSteppingScheme,
 namespace ryujin
 {
   /**
-   * TODO documentation
+   * The TimeIntegrator class implements IMEX timestepping strategies based
+   * on explicit and diagonally-implicit Runge Kutta schemes.
+   *
+   * @ingroup TimeLoop
    */
   template <int dim, typename Number = double>
   class TimeIntegrator final : public dealii::ParameterAcceptor
@@ -121,12 +124,11 @@ namespace ryujin
     /**
      * Constructor.
      */
-    TimeIntegrator(
-        const MPI_Comm &mpi_communicator,
-        std::map<std::string, dealii::Timer> &computing_timer,
-        const ryujin::OfflineData<dim, Number> &offline_data,
-        const ryujin::EulerModule<dim, Number> &euler_module,
-        const std::string &subsection = "TimeIntegrator");
+    TimeIntegrator(const MPI_Comm &mpi_communicator,
+                   std::map<std::string, dealii::Timer> &computing_timer,
+                   const ryujin::OfflineData<dim, Number> &offline_data,
+                   const ryujin::HyperbolicModule<dim, Number> &hyperbolic_module,
+                   const std::string &subsection = "TimeIntegrator");
 
     /**
      * Prepare time integration. A call to @ref prepare() allocates
@@ -207,7 +209,8 @@ namespace ryujin
     std::map<std::string, dealii::Timer> &computing_timer_;
 
     dealii::SmartPointer<const ryujin::OfflineData<dim, Number>> offline_data_;
-    dealii::SmartPointer<const ryujin::EulerModule<dim, Number>> euler_module_;
+    dealii::SmartPointer<const ryujin::HyperbolicModule<dim, Number>>
+        hyperbolic_module_;
 
     std::vector<vector_type> temp_U_;
     vector_type temp_U_strang_; // FIXME: refactor

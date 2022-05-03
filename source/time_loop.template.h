@@ -32,16 +32,16 @@ namespace ryujin
       , discretization_(mpi_communicator_, "/C - Discretization")
       , offline_data_(mpi_communicator_, discretization_, "/D - OfflineData")
       , initial_values_(hyperbolic_system_, offline_data_, "/E - InitialValues")
-      , euler_module_(mpi_communicator_,
-                      computing_timer_,
-                      offline_data_,
-                      hyperbolic_system_,
-                      initial_values_,
-                      "/F - EulerModule")
+      , hyperbolic_module_(mpi_communicator_,
+                           computing_timer_,
+                           offline_data_,
+                           hyperbolic_system_,
+                           initial_values_,
+                           "/F - HyperbolicModule")
       , time_integrator_(mpi_communicator_,
                          computing_timer_,
                          offline_data_,
-                         euler_module_,
+                         hyperbolic_module_,
                          "/H - TimeIntegrator")
       , postprocessor_(mpi_communicator_,
                        hyperbolic_system_,
@@ -174,7 +174,7 @@ namespace ryujin
 
     const auto prepare_compute_kernels = [&]() {
       offline_data_.prepare(HyperbolicSystem::problem_dimension<dim>);
-      euler_module_.prepare();
+      hyperbolic_module_.prepare();
       time_integrator_.prepare();
       postprocessor_.prepare();
       vtu_output_.prepare();
@@ -859,11 +859,11 @@ namespace ryujin
            << " cycles/s)" << std::endl;
 
     output << "        [ CFL = "
-           << std::setprecision(2) << std::fixed << euler_module_.cfl()
+           << std::setprecision(2) << std::fixed << hyperbolic_module_.cfl()
            << " ("
-           << std::setprecision(0) << std::fixed << euler_module_.n_restarts()
+           << std::setprecision(0) << std::fixed << hyperbolic_module_.n_restarts()
            << " rsts) ("
-           << std::setprecision(0) << std::fixed << euler_module_.n_warnings()
+           << std::setprecision(0) << std::fixed << hyperbolic_module_.n_warnings()
            << " warn) ]";
 
     output << "        [ dt = "

@@ -7,9 +7,9 @@
 
 #include <compile_time_options.h>
 
+#include <hyperbolic_system.h>
 #include <indicator.h>
 #include <limiter.h>
-#include <hyperbolic_system.h>
 
 #include "convenience_macros.h"
 #include "initial_values.h"
@@ -37,6 +37,8 @@ namespace ryujin
    * bounds. We further do a quick sanity check whether the computed
    * step size tau_max and the prescribed step size tau are within an
    * acceptable tolerance of about 10%.
+   *
+   * @ingroup TimeLoop
    */
   enum class IDViolationStrategy {
     /**
@@ -56,8 +58,10 @@ namespace ryujin
 
 
   /**
-   * A class signalling a restart, thrown in EulerModule::single_step and
+   * A class signalling a restart, thrown in HyperbolicModule::single_step and
    * caught at various places.
+   *
+   * @ingroup TimeLoop
    */
   class Restart final
   {
@@ -70,10 +74,10 @@ namespace ryujin
    *
    * This module is described in detail in @cite ryujin-2021-1, Alg. 1.
    *
-   * @ingroup EulerModule
+   * @ingroup HyperbolicModule
    */
   template <int dim, typename Number = double>
-  class EulerModule final : public dealii::ParameterAcceptor
+  class HyperbolicModule final : public dealii::ParameterAcceptor
   {
   public:
     /**
@@ -106,12 +110,12 @@ namespace ryujin
     /**
      * Constructor.
      */
-    EulerModule(const MPI_Comm &mpi_communicator,
+    HyperbolicModule(const MPI_Comm &mpi_communicator,
                 std::map<std::string, dealii::Timer> &computing_timer,
                 const ryujin::OfflineData<dim, Number> &offline_data,
                 const ryujin::HyperbolicSystem &hyperbolic_system,
                 const ryujin::InitialValues<dim, Number> &initial_values,
-                const std::string &subsection = "EulerModule");
+                const std::string &subsection = "HyperbolicModule");
 
     /**
      * Prepare time stepping. A call to @ref prepare() allocates temporary
@@ -169,7 +173,7 @@ namespace ryujin
      *   \newcommand\Ii{\mathcal{I}(i)}
      *   \newcommand{\bc}{{\boldsymbol c}}
      *   \tilde{\bR}^n_i\;:=\;
-     *   \big(1-\sum_{s=\{1:stages\}}\omega_s\big)\bR^n_i
+     *   \big(1-\sum_{s=\{1:\text{stages}\}}\omega_s\big)\bR^n_i
      *   \;+\;
      *   \sum_{s=\{1:stages\}}\omega_s
      *   \sum_{j\in\Ii}\Big(-\polf(\bUnis)-\polf(\bUnjs) \cdot\bc_{ij}
@@ -179,7 +183,7 @@ namespace ryujin
      *
      * @note The routine does not automatically update ghost vectors of the
      * distributed vector @ref new_U. It is best to simply call
-     * EulerModule::apply_boundary_conditions() on the appropriate vector
+     * HyperbolicModule::apply_boundary_conditions() on the appropriate vector
      * immediately after performing a time step.
      */
     template <int stages>

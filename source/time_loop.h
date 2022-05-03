@@ -11,7 +11,7 @@
 #include <postprocessor.h>
 
 #include "discretization.h"
-#include "euler_module.h"
+#include "hyperbolic_module.h"
 #include "initial_values.h"
 #include "offline_data.h"
 #include "quantities.h"
@@ -142,7 +142,7 @@ namespace ryujin
     Discretization<dim> discretization_;
     OfflineData<dim, Number> offline_data_;
     InitialValues<dim, Number> initial_values_;
-    EulerModule<dim, Number> euler_module_;
+    HyperbolicModule<dim, Number> hyperbolic_module_;
     TimeIntegrator<dim, Number> time_integrator_;
     Postprocessor<dim, Number> postprocessor_;
     VTUOutput<dim, Number> vtu_output_;

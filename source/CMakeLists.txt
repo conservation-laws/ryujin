@@ -37,7 +37,7 @@ set(COMMON_SOURCE_FILES
   )
 
 set(DEPENDENT_SOURCE_FILES
-  euler_module.cc
+  hyperbolic_module.cc
   initial_values.cc
   main.cc
   quantities.cc

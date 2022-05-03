@@ -32,7 +32,7 @@ namespace ryujin
    *
    * @todo Write out the quadratic Newton step in more detail.
    *
-   * @ingroup EulerModule
+   * @ingroup HyperbolicModule
    */
   template <typename Number>
   DEAL_II_ALWAYS_INLINE inline void

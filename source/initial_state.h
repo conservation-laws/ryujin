@@ -36,7 +36,8 @@ namespace ryujin
     /**
      * @copydoc HyperbolicSystem::state_type
      */
-    using state_type = typename HyperbolicSystem::template state_type<dim, Number>;
+    using state_type =
+        typename HyperbolicSystem::template state_type<dim, Number>;
 
     /**
      * Constructor taking geometry name @p name and a subsection @p

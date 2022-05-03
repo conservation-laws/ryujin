@@ -26,7 +26,7 @@ namespace ryujin
    * E]\f$, where \f$\rho\f$ denotes the density, \f$\textbf m\f$ is the
    * momentum, and \f$E\f$ is the total energy.
    *
-   * @ingroup EulerModule
+   * @ingroup HyperbolicModule
    */
   class HyperbolicSystem final : public dealii::ParameterAcceptor
   {
