@@ -73,6 +73,9 @@ foreach(EQUATION ${INSTANTIATED_EQUATIONS})
   target_include_directories(obj_dependent_${EQUATION} PRIVATE
       ${CMAKE_CURRENT_SOURCE_DIR}/${EQUATION}
     )
+  target_compile_definitions(obj_dependent_${EQUATION}
+    PRIVATE EXECUTABLE_NAME="${EQUATION}"
+    )
   deal_ii_setup_target(obj_dependent_${EQUATION})
 
   add_executable(${EQUATION}

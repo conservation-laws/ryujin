@@ -50,7 +50,8 @@ int main(int argc, char *argv[])
       dealii::ExcMessage("Invalid number of parameters. At most one argument "
                          "supported which has to be a parameter file"));
 
-  dealii::ParameterAcceptor::initialize(argc == 2 ? argv[1] : "ryujin.prm");
+  dealii::ParameterAcceptor::initialize(
+      argc == 2 ? argv[1] : std::string(EXECUTABLE_NAME) + ".prm");
 
   time_loop.run();
 
