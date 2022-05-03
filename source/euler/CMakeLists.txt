@@ -10,3 +10,4 @@ add_library(obj_euler OBJECT
   riemann_solver.cc
   )
 deal_ii_setup_target(obj_euler)
+target_include_directories(obj_euler PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
