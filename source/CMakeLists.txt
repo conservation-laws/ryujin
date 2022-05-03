@@ -25,7 +25,7 @@ check_cxx_source_compiles("
   )
 
 #
-# Common and dependent source files:
+# Common and equation-independent source files and target:
 #
 
 set(COMMON_SOURCE_FILES
@@ -35,6 +35,13 @@ set(COMMON_SOURCE_FILES
   simd.cc
   sparse_matrix_simd.cc
   )
+
+add_library(obj_common OBJECT ${COMMON_SOURCE_FILES})
+deal_ii_setup_target(obj_common)
+
+#
+# Common, equation-dependent source files:
+#
 
 set(DEPENDENT_SOURCE_FILES
   hyperbolic_module.cc
@@ -52,9 +59,6 @@ set_property(SOURCE time_loop.cc APPEND PROPERTY COMPILE_DEFINITIONS
   RYUJIN_GIT_SHORTREV="${GIT_SHORTREV}"
   )
 
-add_library(obj_common OBJECT ${COMMON_SOURCE_FILES})
-deal_ii_setup_target(obj_common)
-
 #
 # Equation-specific source files:
 #
@@ -69,22 +73,11 @@ foreach(EQUATION ${INSTANTIATED_EQUATIONS})
   # define obj_${EQUATION} object library:
   add_subdirectory(${EQUATION})
 
-  add_library(obj_dependent_${EQUATION} OBJECT ${DEPENDENT_SOURCE_FILES})
-  target_include_directories(obj_dependent_${EQUATION} PRIVATE
-      ${CMAKE_CURRENT_SOURCE_DIR}/${EQUATION}
-    )
-  target_compile_definitions(obj_dependent_${EQUATION}
-    PRIVATE EXECUTABLE_NAME="${EQUATION}"
-    )
-  deal_ii_setup_target(obj_dependent_${EQUATION})
-
-  add_executable(${EQUATION}
-    $<TARGET_OBJECTS:obj_common>
-    $<TARGET_OBJECTS:obj_dependent_${EQUATION}>
-    $<TARGET_OBJECTS:obj_${EQUATION}>
-    )
+  add_executable(${EQUATION} ${DEPENDENT_SOURCE_FILES})
   deal_ii_setup_target(${EQUATION})
-  target_link_libraries(${EQUATION} ${OpenMP_CXX_LIBRARIES})
+  target_link_libraries(${EQUATION}
+    obj_common obj_${EQUATION} ${OpenMP_CXX_LIBRARIES}
+    )
 
   set_property(TARGET ${EQUATION}
     PROPERTY RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/run
@@ -99,7 +92,8 @@ foreach(EQUATION ${INSTANTIATED_EQUATIONS})
     target_link_libraries(${EQUATION} stdc++fs)
   endif()
 
-  install(TARGETS ${EQUATION}
-    DESTINATION ${CMAKE_INSTALL_BINDIR}
-    )
-endforeach()
+  install(TARGETS ${EQUATION} DESTINATION ${CMAKE_INSTALL_BINDIR})
+endmacro()
+
+setup_equation("euler")
+setup_equation("shallow_water")
