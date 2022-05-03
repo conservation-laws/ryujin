@@ -492,10 +492,10 @@ namespace ryujin
           const auto U_i = old_U.template get_tensor<T>(i);
           const auto f_i = hyperbolic_system_->f(U_i);
 
-          std::array<ProblemDescription::flux_type<dim, T>, stages> f_iHs;
+          std::array<HyperbolicSystem::flux_type<dim, T>, stages> f_iHs;
           for (int s = 0; s < stages; ++s) {
             const auto temp = stage_U[s].get().template get_tensor<T>(i);
-            f_iHs[s] = problem_description_->f(temp);
+            f_iHs[s] = hyperbolic_system_->f(temp);
           }
 
           auto U_i_new = U_i;
@@ -627,10 +627,10 @@ namespace ryujin
           const auto U_i = old_U.template get_tensor<T>(i);
           const auto f_i = hyperbolic_system_->f(U_i);
 
-          std::array<ProblemDescription::flux_type<dim, T>, stages> f_iHs;
+          std::array<HyperbolicSystem::flux_type<dim, T>, stages> f_iHs;
           for (int s = 0; s < stages; ++s) {
             const auto temp = stage_U[s].get().template get_tensor<T>(i);
-            f_iHs[s] = problem_description_->f(temp);
+            f_iHs[s] = hyperbolic_system_->f(temp);
           }
 
           const auto r_i = r_.template get_tensor<T>(i);
