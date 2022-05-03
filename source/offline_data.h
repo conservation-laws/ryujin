@@ -10,7 +10,6 @@
 #include "convenience_macros.h"
 #include "discretization.h"
 #include "multicomponent_vector.h"
-#include "problem_description.h"
 #include "sparse_matrix_simd.h"
 
 #include <deal.II/base/parameter_acceptor.h>
@@ -24,7 +23,6 @@
 
 namespace ryujin
 {
-
   /**
    * A class to store all data that can be precomputed offline.
    *
@@ -51,23 +49,10 @@ namespace ryujin
   {
   public:
     /**
-     * @copydoc ProblemDescription::problem_dimension
-     */
-    // clang-format off
-    static constexpr unsigned int problem_dimension = ProblemDescription::problem_dimension<dim>;
-    // clang-format on
-
-    /**
      * Shorthand typedef for
      * dealii::LinearAlgebra::distributed::Vector<Number>.
      */
     using scalar_type = dealii::LinearAlgebra::distributed::Vector<Number>;
-
-    /**
-     * Shorthand typedef for a MultiComponentVector storing the current
-     * simulation state.
-     */
-    using vector_type = MultiComponentVector<Number, problem_dimension>;
 
     /**
      * A tuple describing global dof index, boundary normal, normal mass,
@@ -91,16 +76,18 @@ namespace ryujin
     /**
      * Prepare offline data. A call to @ref prepare() internally calls
      * @ref setup() and @ref assemble().
+     *
+     * The @ref problem_dimension parameter is used to setup up an
+     * appropriately sized vector partitioner for the MultiComponentVector.
      */
-    void prepare()
+    void prepare(const unsigned int problem_dimension)
     {
-      setup();
+      setup(problem_dimension);
       assemble();
       create_multigrid_data();
     }
 
   private:
-
     /**
      * Set up affine constraints and sparsity pattern. Internally used in
      * setup().
@@ -110,8 +97,11 @@ namespace ryujin
     /**
      * Set up DoFHandler, all IndexSet objects and the SparsityPattern.
      * Initialize matrix storage.
+     *
+     * The @ref problem_dimension parameter is used to setup up an
+     * appropriately sized vector partitioner for the MultiComponentVector.
      */
-    void setup();
+    void setup(const unsigned int problem_dimension);
 
     /**
      * Assemble all matrices.
@@ -203,7 +193,7 @@ namespace ryujin
     /**
      * An MPI partitioner for all parallel distributed vectors storing a
      * vector-valued quantity of size
-     * ProblemDescription::problem_dimension.
+     * HyperbolicSystem::problem_dimension.
      */
     ACCESSOR_READ_ONLY_NO_DEREFERENCE(vector_partitioner)
 

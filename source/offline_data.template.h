@@ -8,7 +8,6 @@
 #include "local_index_handling.h"
 #include "multicomponent_vector.h"
 #include "offline_data.h"
-#include "problem_description.h"
 #include "scratch_data.h"
 #include "sparse_matrix_simd.template.h" /* instantiate read_in */
 
@@ -146,7 +145,7 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  void OfflineData<dim, Number>::setup()
+  void OfflineData<dim, Number>::setup(const unsigned int problem_dimension)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "OfflineData<dim, Number>::setup()" << std::endl;
@@ -186,10 +185,8 @@ namespace ryujin
      * temporary sparsity pattern:
      */
     create_constraints_and_sparsity_pattern();
-    n_locally_internal_ =
-        DoFRenumbering::internal_range(dof_handler,
-                                       sparsity_pattern_,
-                                       VectorizedArray<Number>::size());
+    n_locally_internal_ = DoFRenumbering::internal_range(
+        dof_handler, sparsity_pattern_, VectorizedArray<Number>::size());
 
     /*
      * Reorder all (strides of) locally internal indices that contain
@@ -296,10 +293,8 @@ namespace ryujin
     scalar_partitioner_ = std::make_shared<dealii::Utilities::MPI::Partitioner>(
         locally_owned, locally_relevant, mpi_communicator_);
 
-    constexpr auto problem_dimension =
-        ProblemDescription::problem_dimension<dim>;
     vector_partitioner_ =
-        create_vector_partitioner<problem_dimension>(scalar_partitioner_);
+        create_vector_partitioner(scalar_partitioner_, problem_dimension);
 
 
     if (periodic_faces.size() > 0) {

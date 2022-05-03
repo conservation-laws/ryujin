@@ -5,7 +5,8 @@
 
 #pragma once
 
-#include "initial_state.template.h"
+#include <initial_state_library.h>
+
 #include "initial_values.h"
 #include "simd.h"
 
@@ -20,11 +21,11 @@ namespace ryujin
 
   template <int dim, typename Number>
   InitialValues<dim, Number>::InitialValues(
-      const ProblemDescription &problem_description,
+      const HyperbolicSystem &hyperbolic_system,
       const OfflineData<dim, Number> &offline_data,
       const std::string &subsection)
       : ParameterAcceptor(subsection)
-      , problem_description_(&problem_description)
+      , hyperbolic_system_(&hyperbolic_system)
       , offline_data_(&offline_data)
   {
     ParameterAcceptor::parse_parameters_call_back.connect(std::bind(
@@ -52,19 +53,12 @@ namespace ryujin
                   "Add a random perturbation of the specified magnitude to the "
                   "initial state.");
 
-    using namespace InitialStates;
-    initial_state_list_.emplace(std::make_unique<Uniform<dim, Number>>(
-        *problem_description_, subsection));
-    initial_state_list_.emplace(std::make_unique<RampUp<dim, Number>>(
-        *problem_description_, subsection));
-    initial_state_list_.emplace(std::make_unique<Contrast<dim, Number>>(
-        *problem_description_, subsection));
-    initial_state_list_.emplace(std::make_unique<ShockFront<dim, Number>>(
-        *problem_description_, subsection));
-    initial_state_list_.emplace(std::make_unique<IsentropicVortex<dim, Number>>(
-        *problem_description_, subsection));
-    initial_state_list_.emplace(std::make_unique<BeckerSolution<dim, Number>>(
-        *problem_description_, subsection));
+    /*
+     * And finally populate the initial state list with all initial state
+     * configurations defined in the InitialStateLibrary namespace:
+     */
+    InitialStateLibrary::populate_initial_state_list<dim, Number>(
+        initial_state_list_, *hyperbolic_system_, subsection);
   }
 
   namespace
@@ -158,8 +152,7 @@ namespace ryujin
   template <int dim, typename Number>
   void InitialValues<dim, Number>::parse_parameters_callback()
   {
-    constexpr auto problem_dimension =
-        ProblemDescription::problem_dimension<dim>;
+    constexpr auto problem_dimension = HyperbolicSystem::problem_dimension<dim>;
 
     /* First, let's normalize the direction: */
 
@@ -179,10 +172,10 @@ namespace ryujin
             const auto transformed_point =
                 affine_transform(initial_direction_, initial_position_, point);
             auto state = it->compute(transformed_point, t);
-            auto M = problem_description_->momentum(state);
-            M = affine_transform_vector(initial_direction_, M);
-            for (unsigned int d = 0; d < dim; ++d)
-              state[1 + d] = M[d];
+            state = hyperbolic_system_->apply_galilei_transform(
+                state, [&](const auto &momentum) {
+                  return affine_transform_vector(initial_direction_, momentum);
+                });
             return state;
           };
           initialized = true;
@@ -228,8 +221,7 @@ namespace ryujin
     vector_type U;
     U.reinit(offline_data_->vector_partitioner());
 
-    constexpr auto problem_dimension =
-        ProblemDescription::problem_dimension<dim>;
+    constexpr auto problem_dimension = HyperbolicSystem::problem_dimension<dim>;
 
     using scalar_type = typename OfflineData<dim, Number>::scalar_type;
 
@@ -264,21 +256,10 @@ namespace ryujin
       const auto normal = std::get<0>(entry.second);
       const auto id = std::get<3>(entry.second);
 
-      if (id == Boundary::slip) {
-        /* Remove normal component of velocity: */
+      if (id == Boundary::slip || id == Boundary::no_slip) {
         auto U_i = U.get_tensor(i);
-        auto m = problem_description_->momentum(U_i);
-        m -= 1. * (m * normal) * normal;
-        for (unsigned int k = 0; k < dim; ++k)
-          U_i[k + 1] = m[k];
-        U.write_tensor(U_i, i);
-
-      } else if (id == Boundary::no_slip) {
-
-        /* Set velocity to zero: */
-        auto U_i = U.get_tensor(i);
-        for (unsigned int k = 0; k < dim; ++k)
-          U_i[k + 1] = Number(0.);
+        U_i = hyperbolic_system_->apply_boundary_conditions(
+            id, U_i, normal, [&]() { return U_i; });
         U.write_tensor(U_i, i);
       }
     }

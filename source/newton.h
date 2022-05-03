@@ -14,32 +14,6 @@
 namespace ryujin
 {
   /**
-   * @name Quadratic Newton iteration compile time options
-   */
-  //@{
-  /**
-   * The tolerance used for the Newton iteration
-   * @ingroup CompileTimeOptions
-   */
-#ifdef DOXYGEN
-  template <typename Number>
-  static constexpr auto newton_eps = NEWTON_EPS_DOUBLE or NEWTON_EPS_FLOAT;
-#else
-  template <typename Number>
-  static constexpr auto newton_eps = typename get_value_type<Number>::type(
-      std::is_same<typename get_value_type<Number>::type, double>::value
-          ? NEWTON_EPS_DOUBLE
-          : NEWTON_EPS_FLOAT);
-#endif
-
-  /**
-   * Maximal number of Newton iterations
-   * @ingroup CompileTimeOptions
-   */
-  static constexpr unsigned int newton_max_iter = NEWTON_MAX_ITER;
-
-  //@}
-  /**
    * @name Functions
    */
   //@{
@@ -58,7 +32,7 @@ namespace ryujin
    *
    * @todo Write out the quadratic Newton step in more detail.
    *
-   * @ingroup EulerModule
+   * @ingroup HyperbolicModule
    */
   template <typename Number>
   DEAL_II_ALWAYS_INLINE inline void

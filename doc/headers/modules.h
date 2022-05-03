@@ -1,12 +1,4 @@
 /**
- * @defgroup CompileTimeOptions Compile time options
- *
- * Certain configuration options are provided as compile time constants to
- * improve the performance of critical computer kernel sections.
- */
-
-
-/**
  * @defgroup Mesh Mesh generation and discretization
  *
  * Several classes and helper functions for creating meshes for a number of
@@ -39,10 +31,34 @@
 
 
 /**
- * @defgroup EulerModule Euler Module
+ * @defgroup HyperbolicModule Hyperbolic Module
  *
  * This module contains classes and functions used during different stages
- * of the explicit Euler update performed in EulerModule::step().
+ * of the explicit hyperbolic update performed in HyperbolicModule::step().
+ */
+
+
+/**
+ * @defgroup ParabolicModule Parabolic Module
+ *
+ * This module contains classes and functions used during different stages
+ * of the implicit parabolic update performed in ParabolicModule::step().
+ */
+
+
+/**
+ * @defgroup EulerEquations The Compressible Euler Equations
+ *
+ * This module contains classes and functions related to solving the
+ * compressible Euler equations of gas dynamics.
+ */
+
+
+/**
+ * @defgroup NavierStokesEquations The Compressible Navier Stokes Equations
+ *
+ * This module contains classes and functions related to solving the
+ * compressible Navier Stokes equations.
  */
 
 

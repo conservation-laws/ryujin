@@ -8,7 +8,6 @@
 #include <compile_time_options.h>
 
 #include "convenience_macros.h"
-#include "problem_description.h"
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/tensor.h>
@@ -24,31 +23,32 @@ namespace ryujin
    *
    * @note By convention all initial state configurations described by this
    * class shall be centered at the origin (0, 0) and facing in positive x
-   * direction. The InitialValues wrapper class alread allows to apply an
+   * direction. The InitialValues wrapper class already allows to apply an
    * affine translation to the coordinate system; so additional
    * configuration options for location and direction are not needed.
    *
    * @ingroup InitialValues
    */
-  template <int dim, typename Number>
+  template <int dim, typename Number, typename HyperbolicSystem>
   class InitialState : public dealii::ParameterAcceptor
   {
   public:
     /**
-     * @copydoc ProblemDescription::state_type
+     * @copydoc HyperbolicSystem::state_type
      */
-    using state_type = ProblemDescription::state_type<dim, Number>;
+    using state_type =
+        typename HyperbolicSystem::template state_type<dim, Number>;
 
     /**
      * Constructor taking geometry name @p name and a subsection @p
      * subsection as an argument. The dealii::ParameterAcceptor is
      * initialized with the subsubsection `subsection + "/" + name`.
      */
-    InitialState(const ProblemDescription &problem_description,
+    InitialState(const HyperbolicSystem &hyperbolic_system,
                  const std::string &name,
                  const std::string &subsection)
         : ParameterAcceptor(subsection + "/" + name)
-        , problem_description(problem_description)
+        , hyperbolic_system(hyperbolic_system)
         , name_(name)
     {
     }
@@ -63,7 +63,7 @@ namespace ryujin
     virtual state_type compute(const dealii::Point<dim> &point, Number t) = 0;
 
   protected:
-    const ProblemDescription &problem_description;
+    const HyperbolicSystem &hyperbolic_system;
 
   private:
     const std::string name_;

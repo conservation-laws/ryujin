@@ -16,7 +16,7 @@
 /**
  * A set of macros that start and stop callgrind instrumentation (if the
  * executable is run with valgrind). We currently wrap the hot paths in the
- * Euler and Navier-Stokes modules in the EulerModule::step() and
+ * Euler and Navier-Stokes modules in the HyperbolicModule::step() and
  * DissipationModule::step() functions. Usage:
  *
  * @code
@@ -52,7 +52,7 @@
 /**
  * A set of macros that start and stop likwid instrumentation (if support
  * for likwid is enabled). We currently wrap the hot paths in the
- * Euler and Navier-Stokes modules in the EulerModule::step() and
+ * Euler and Navier-Stokes modules in the HyperbolicModule::step() and
  * DissipationModule::step() functions. Usage:
  *
  * @code

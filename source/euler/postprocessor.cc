@@ -3,11 +3,11 @@
 // Copyright (C) 2020 - 2021 by the ryujin authors
 //
 
-#include "euler_module.template.h"
+#include "postprocessor.template.h"
 
 namespace ryujin
 {
   /* instantiations */
-  template class ryujin::EulerModule<DIM, NUMBER>;
+  template class Postprocessor<DIM, NUMBER>;
 
 } /* namespace ryujin */

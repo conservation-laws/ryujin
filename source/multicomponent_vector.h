@@ -38,34 +38,11 @@ namespace ryujin
    *
    * @ingroup SIMD
    */
-  template <int n_comp>
   std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
   create_vector_partitioner(
       const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
-          &scalar_partitioner)
-  {
-    dealii::IndexSet vector_owned_set(n_comp * scalar_partitioner->size());
-    for (auto it = scalar_partitioner->locally_owned_range().begin_intervals();
-         it != scalar_partitioner->locally_owned_range().end_intervals();
-         ++it)
-      vector_owned_set.add_range(*it->begin() * n_comp,
-                                 (it->last() + 1) * n_comp);
-    vector_owned_set.compress();
-    dealii::IndexSet vector_ghost_set(n_comp * scalar_partitioner->size());
-    for (auto it = scalar_partitioner->ghost_indices().begin_intervals();
-         it != scalar_partitioner->ghost_indices().end_intervals();
-         ++it)
-      vector_ghost_set.add_range(*it->begin() * n_comp,
-                                 (it->last() + 1) * n_comp);
-    vector_ghost_set.compress();
-    const auto vector_partitioner =
-        std::make_shared<const dealii::Utilities::MPI::Partitioner>(
-            vector_owned_set,
-            vector_ghost_set,
-            scalar_partitioner->get_mpi_communicator());
-
-    return vector_partitioner;
-  }
+          &scalar_partitioner,
+      const unsigned int n_components);
 
 
   /**
@@ -201,8 +178,12 @@ namespace ryujin
           const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
               &scalar_partitioner)
   {
+    /* Special case of a zero component vector */
+    if (n_comp == 0)
+      return;
+
     auto vector_partitioner =
-        create_vector_partitioner<n_comp>(scalar_partitioner);
+        create_vector_partitioner(scalar_partitioner, n_comp);
 
     dealii::LinearAlgebra::distributed::Vector<Number>::reinit(
         vector_partitioner);
@@ -213,6 +194,10 @@ namespace ryujin
   void MultiComponentVector<Number, n_comp, simd_length>::extract_component(
       scalar_type &scalar_vector, unsigned int component) const
   {
+    Assert(n_comp > 0,
+           dealii::ExcMessage(
+               "Cannot extract from a vector with zero components."));
+
     Assert(n_comp * scalar_vector.get_partitioner()->LOCAL_SIZE() ==
                this->get_partitioner()->LOCAL_SIZE(),
            dealii::ExcMessage("Called with a scalar_vector argument that has "
@@ -229,6 +214,10 @@ namespace ryujin
   void MultiComponentVector<Number, n_comp, simd_length>::insert_component(
       const scalar_type &scalar_vector, unsigned int component)
   {
+    Assert(n_comp > 0,
+           dealii::ExcMessage(
+               "Cannot insert into a vector with zero components."));
+
     Assert(n_comp * scalar_vector.get_partitioner()->LOCAL_SIZE() ==
                this->get_partitioner()->LOCAL_SIZE(),
            dealii::ExcMessage("Called with a scalar_vector argument that has "
@@ -250,6 +239,10 @@ namespace ryujin
     static_assert(std::is_same<Number2, typename Tensor::value_type>::value,
                   "dummy type mismatch");
     Tensor tensor;
+
+    /* Special case of a zero component vector */
+    if constexpr (n_comp == 0)
+      return tensor;
 
     if constexpr (std::is_same<Number, Number2>::value) {
       /* Non-vectorized sequential access. */
@@ -286,6 +279,9 @@ namespace ryujin
                   "dummy type mismatch");
     Tensor tensor;
 
+    /* Special case of a zero component vector */
+    if constexpr (n_comp == 0)
+      return tensor;
 
     if constexpr (std::is_same<Number, Number2>::value) {
       /* Non-vectorized sequential access. */
@@ -320,6 +316,10 @@ namespace ryujin
   {
     static_assert(std::is_same<Number2, typename Tensor::value_type>::value,
                   "dummy type mismatch");
+
+    /* Special case of a zero component vector */
+    if constexpr (n_comp == 0)
+      return;
 
     if constexpr (std::is_same<Number, Number2>::value) {
       /* Non-vectorized sequential access. */

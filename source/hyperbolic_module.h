@@ -7,14 +7,14 @@
 
 #include <compile_time_options.h>
 
+#include <hyperbolic_system.h>
+#include <indicator.h>
+#include <limiter.h>
+
 #include "convenience_macros.h"
-#include "simd.h"
-
-#include "limiter.h"
-
 #include "initial_values.h"
 #include "offline_data.h"
-#include "problem_description.h"
+#include "simd.h"
 #include "sparse_matrix_simd.h"
 
 #include <deal.II/base/parameter_acceptor.h>
@@ -37,6 +37,8 @@ namespace ryujin
    * bounds. We further do a quick sanity check whether the computed
    * step size tau_max and the prescribed step size tau are within an
    * acceptable tolerance of about 10%.
+   *
+   * @ingroup TimeLoop
    */
   enum class IDViolationStrategy {
     /**
@@ -56,8 +58,10 @@ namespace ryujin
 
 
   /**
-   * A class signalling a restart, thrown in EulerModule::single_step and
+   * A class signalling a restart, thrown in HyperbolicModule::single_step and
    * caught at various places.
+   *
+   * @ingroup TimeLoop
    */
   class Restart final
   {
@@ -70,28 +74,28 @@ namespace ryujin
    *
    * This module is described in detail in @cite ryujin-2021-1, Alg. 1.
    *
-   * @ingroup EulerModule
+   * @ingroup HyperbolicModule
    */
   template <int dim, typename Number = double>
-  class EulerModule final : public dealii::ParameterAcceptor
+  class HyperbolicModule final : public dealii::ParameterAcceptor
   {
   public:
     /**
-     * @copydoc ProblemDescription::problem_dimension
+     * @copydoc HyperbolicSystem::problem_dimension
      */
     // clang-format off
-    static constexpr unsigned int problem_dimension = ProblemDescription::problem_dimension<dim>;
+    static constexpr unsigned int problem_dimension = HyperbolicSystem::problem_dimension<dim>;
     // clang-format on
 
     /**
-     * @copydoc ProblemDescription::state_type
+     * @copydoc HyperbolicSystem::state_type
      */
-    using state_type = ProblemDescription::state_type<dim, Number>;
+    using state_type = HyperbolicSystem::state_type<dim, Number>;
 
     /**
-     * @copydoc ProblemDescription::flux_type
+     * @copydoc HyperbolicSystem::flux_type
      */
-    using flux_type = ProblemDescription::flux_type<dim, Number>;
+    using flux_type = HyperbolicSystem::flux_type<dim, Number>;
 
     /**
      * @copydoc OfflineData::scalar_type
@@ -99,19 +103,19 @@ namespace ryujin
     using scalar_type = typename OfflineData<dim, Number>::scalar_type;
 
     /**
-     * @copydoc OfflineData::vector_type
+     * Typedef for a MultiComponentVector storing the state U.
      */
-    using vector_type = typename OfflineData<dim, Number>::vector_type;
+    using vector_type = MultiComponentVector<Number, problem_dimension>;
 
     /**
      * Constructor.
      */
-    EulerModule(const MPI_Comm &mpi_communicator,
+    HyperbolicModule(const MPI_Comm &mpi_communicator,
                 std::map<std::string, dealii::Timer> &computing_timer,
                 const ryujin::OfflineData<dim, Number> &offline_data,
-                const ryujin::ProblemDescription &problem_description,
+                const ryujin::HyperbolicSystem &hyperbolic_system,
                 const ryujin::InitialValues<dim, Number> &initial_values,
-                const std::string &subsection = "EulerModule");
+                const std::string &subsection = "HyperbolicModule");
 
     /**
      * Prepare time stepping. A call to @ref prepare() allocates temporary
@@ -169,7 +173,7 @@ namespace ryujin
      *   \newcommand\Ii{\mathcal{I}(i)}
      *   \newcommand{\bc}{{\boldsymbol c}}
      *   \tilde{\bR}^n_i\;:=\;
-     *   \big(1-\sum_{s=\{1:stages\}}\omega_s\big)\bR^n_i
+     *   \big(1-\sum_{s=\{1:\text{stages}\}}\omega_s\big)\bR^n_i
      *   \;+\;
      *   \sum_{s=\{1:stages\}}\omega_s
      *   \sum_{j\in\Ii}\Big(-\polf(\bUnis)-\polf(\bUnjs) \cdot\bc_{ij}
@@ -179,7 +183,7 @@ namespace ryujin
      *
      * @note The routine does not automatically update ghost vectors of the
      * distributed vector @ref new_U. It is best to simply call
-     * EulerModule::apply_boundary_conditions() on the appropriate vector
+     * HyperbolicModule::apply_boundary_conditions() on the appropriate vector
      * immediately after performing a time step.
      */
     template <int stages>
@@ -221,14 +225,15 @@ namespace ryujin
     mutable IDViolationStrategy id_violation_strategy_;
 
   private:
-
-   //@}
+    //@}
     /**
      * @name Run time options
      */
     //@{
 
     unsigned int limiter_iter_;
+    Number limiter_newton_tolerance_;
+    unsigned int limiter_newton_max_iter_;
 
     bool cfl_with_boundary_dofs_;
 
@@ -244,8 +249,8 @@ namespace ryujin
     std::map<std::string, dealii::Timer> &computing_timer_;
 
     dealii::SmartPointer<const ryujin::OfflineData<dim, Number>> offline_data_;
-    dealii::SmartPointer<const ryujin::ProblemDescription> problem_description_;
-    ACCESSOR_READ_ONLY(problem_description)
+    dealii::SmartPointer<const ryujin::HyperbolicSystem> hyperbolic_system_;
+    ACCESSOR_READ_ONLY(hyperbolic_system)
     dealii::SmartPointer<const ryujin::InitialValues<dim, Number>>
         initial_values_;
 
@@ -258,12 +263,16 @@ namespace ryujin
     mutable unsigned int n_warnings_;
     ACCESSOR_READ_ONLY(n_warnings)
 
-    mutable scalar_type alpha_;
-    mutable scalar_type second_variations_;
-    mutable scalar_type specific_entropies_;
-    mutable scalar_type evc_entropies_;
+    static constexpr auto n_ind = Indicator<dim, Number>::n_precomputed_values;
+    mutable MultiComponentVector<Number, n_ind> indicator_precomputed_values_;
 
-    mutable MultiComponentVector<Number, Limiter<dim, Number>::n_bounds> bounds_;
+    mutable scalar_type alpha_;
+
+    static constexpr auto n_lim = Limiter<dim, Number>::n_precomputed_values;
+    mutable MultiComponentVector<Number, n_lim> limiter_precomputed_values_;
+
+    static constexpr auto n_bounds = Limiter<dim, Number>::n_bounds;
+    mutable MultiComponentVector<Number, n_bounds> bounds_;
 
     mutable vector_type r_;
 

@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "multicomponent_vector.h"
 #include "offline_data.h"
 
 #include <deal.II/base/utilities.h>
@@ -27,10 +28,10 @@ namespace ryujin
    *
    * @ingroup Miscellaneous
    */
-  template <int dim, typename Number, typename T1>
+  template <int dim, typename Number, int n_comp, int simd_length>
   void do_resume(const OfflineData<dim, Number> &offline_data,
                  const std::string &base_name,
-                 T1 &U,
+                 MultiComponentVector<Number, n_comp, simd_length> &U,
                  Number &t,
                  unsigned int &output_cycle,
                  const MPI_Comm &mpi_communicator)
@@ -40,11 +41,9 @@ namespace ryujin
     /* Create temporary scalar component vectors: */
 
     const auto &scalar_partitioner = offline_data.scalar_partitioner();
-    static constexpr unsigned int problem_dimension =
-        ProblemDescription::problem_dimension<dim>;
 
     using scalar_type = typename OfflineData<dim, Number>::scalar_type;
-    std::array<scalar_type, problem_dimension> state_vector;
+    std::array<scalar_type, n_comp> state_vector;
     for (auto &it : state_vector) {
       it.reinit(scalar_partitioner);
     }
@@ -72,7 +71,7 @@ namespace ryujin
 
     std::string name = base_name + "-checkpoint";
 
-    if(dealii::Utilities::MPI::this_mpi_process(mpi_communicator) == 0) {
+    if (dealii::Utilities::MPI::this_mpi_process(mpi_communicator) == 0) {
       std::string meta = name + ".metadata";
 
       std::ifstream file(meta, std::ios::binary);
@@ -105,10 +104,10 @@ namespace ryujin
    *
    * @ingroup Miscellaneous
    */
-  template <int dim, typename Number, typename T1>
+  template <int dim, typename Number, int n_comp, int simd_length>
   void do_checkpoint(const OfflineData<dim, Number> &offline_data,
                      const std::string &base_name,
-                     const T1 &U,
+                     const MultiComponentVector<Number, n_comp, simd_length> &U,
                      const Number t,
                      const unsigned int output_cycle,
                      const MPI_Comm &mpi_communicator)
@@ -119,11 +118,9 @@ namespace ryujin
     /* Copy state into scalar component vectors: */
 
     const auto &scalar_partitioner = offline_data.scalar_partitioner();
-    static constexpr unsigned int problem_dimension =
-        ProblemDescription::problem_dimension<dim>;
 
     using scalar_type = typename OfflineData<dim, Number>::scalar_type;
-    std::array<scalar_type, problem_dimension> state_vector;
+    std::array<scalar_type, n_comp> state_vector;
     unsigned int d = 0;
     for (auto &it : state_vector) {
       it.reinit(scalar_partitioner);
@@ -144,7 +141,7 @@ namespace ryujin
 
     std::string name = base_name + "-checkpoint";
 
-    if(dealii::Utilities::MPI::this_mpi_process(mpi_communicator) == 0) {
+    if (dealii::Utilities::MPI::this_mpi_process(mpi_communicator) == 0) {
       for (const std::string suffix :
            {".mesh", ".mesh_fixed.data", ".mesh.info", ".metadata"})
         if (std::filesystem::exists(name + suffix))
@@ -155,7 +152,7 @@ namespace ryujin
 
     /* Metadata: */
 
-    if(dealii::Utilities::MPI::this_mpi_process(mpi_communicator) == 0) {
+    if (dealii::Utilities::MPI::this_mpi_process(mpi_communicator) == 0) {
       std::string meta = name + ".metadata";
       std::ofstream file(meta, std::ios::binary | std::ios::trunc);
       boost::archive::binary_oarchive oa(file);

@@ -68,7 +68,7 @@ namespace ryujin
      * degree of freedom at the end of TimeStep::euler_step(). In the
      * dissipation module \f$v\cdot n\f$ is enforced strongly which leads
      * to a natural boundary condition on the symmetric stress tensor:
-     * \f$\tau\cdot\mathbb{S}(v)\cdot\n\f$.
+     * \f$\tau\cdot\mathbb{S}(v)\cdot\vec n\f$.
      */
     slip = 2,
 

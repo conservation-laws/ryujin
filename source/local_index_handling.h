@@ -140,7 +140,7 @@ namespace ryujin
 
       Assert(n_locally_internal <= n_locally_owned, dealii::ExcInternalError());
 
-      for (unsigned int i = 0; i < n_locally_internal; i+= group_size) {
+      for (unsigned int i = 0; i < n_locally_internal; i += group_size) {
         bool export_index_present = false;
         for (unsigned int j = 0; j < group_size; ++j) {
           if (export_indices.is_element(i + j)) {
@@ -165,7 +165,7 @@ namespace ryujin
       unsigned int n_other = 0;
       for (unsigned int i = n_locally_internal; i < n_locally_owned; ++i)
         if (export_indices.is_element(i))
-            n_other++;
+          n_other++;
 
       Assert(n_other + n_export_indices >= export_indices.n_elements(),
              dealii::ExcInternalError());
@@ -198,7 +198,8 @@ namespace ryujin
       dof_handler.renumber_dofs(new_order);
 
       Assert(n_export_indices % group_size == 0, dealii::ExcInternalError());
-      Assert(n_export_indices <= n_locally_internal, dealii::ExcInternalError());
+      Assert(n_export_indices <= n_locally_internal,
+             dealii::ExcInternalError());
       return n_export_indices;
     }
 
@@ -241,7 +242,7 @@ namespace ryujin
 
       Assert(n_locally_internal <= n_locally_owned, dealii::ExcInternalError());
 
-      for (unsigned int i = 0; i < n_locally_internal; i+= group_size) {
+      for (unsigned int i = 0; i < n_locally_internal; i += group_size) {
 
         bool stride_is_consistent = true;
         const auto group_row_length = sparsity.row_length(offset + i);

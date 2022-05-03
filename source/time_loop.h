@@ -7,12 +7,13 @@
 
 #include <compile_time_options.h>
 
+#include <hyperbolic_system.h>
+#include <postprocessor.h>
+
 #include "discretization.h"
-#include "dissipation_module.h"
-#include "euler_module.h"
+#include "hyperbolic_module.h"
 #include "initial_values.h"
 #include "offline_data.h"
-#include "problem_description.h"
 #include "quantities.h"
 #include "time_integrator.h"
 #include "vtu_output.h"
@@ -37,14 +38,21 @@ namespace ryujin
   {
   public:
     /**
+     * @copydoc HyperbolicSystem::problem_dimension
+     */
+    // clang-format off
+    static constexpr unsigned int problem_dimension = HyperbolicSystem::problem_dimension<dim>;
+    // clang-format on
+
+    /**
      * @copydoc OfflineData::scalar_type
      */
     using scalar_type = typename OfflineData<dim, Number>::scalar_type;
 
     /**
-     * @copydoc OfflineData::vector_type
+     * Typedef for a MultiComponentVector storing the state U.
      */
-    using vector_type = typename OfflineData<dim, Number>::vector_type;
+    using vector_type = MultiComponentVector<Number, problem_dimension>;
 
     /**
      * Constructor.
@@ -97,28 +105,28 @@ namespace ryujin
      */
     //@{
 
-    std::string base_name;
+    std::string base_name_;
 
-    Number t_initial;
-    Number t_final;
-    std::vector<Number> t_refinements;
+    Number t_initial_;
+    Number t_final_;
+    std::vector<Number> t_refinements_;
 
-    Number output_granularity;
+    Number output_granularity_;
 
-    bool enable_checkpointing;
-    bool enable_output_full;
-    bool enable_output_levelsets;
-    bool enable_compute_error;
-    bool enable_compute_quantities;
+    bool enable_checkpointing_;
+    bool enable_output_full_;
+    bool enable_output_levelsets_;
+    bool enable_compute_error_;
+    bool enable_compute_quantities_;
 
-    unsigned int output_checkpoint_multiplier;
-    unsigned int output_full_multiplier;
-    unsigned int output_levelsets_multiplier;
-    unsigned int output_quantities_multiplier;
+    unsigned int output_checkpoint_multiplier_;
+    unsigned int output_full_multiplier_;
+    unsigned int output_levelsets_multiplier_;
+    unsigned int output_quantities_multiplier_;
 
-    bool resume;
+    bool resume_;
 
-    unsigned int terminal_update_interval;
+    unsigned int terminal_update_interval_;
 
     //@}
     /**
@@ -126,24 +134,24 @@ namespace ryujin
      */
     //@{
 
-    const MPI_Comm &mpi_communicator;
+    const MPI_Comm &mpi_communicator_;
 
-    std::map<std::string, dealii::Timer> computing_timer;
+    std::map<std::string, dealii::Timer> computing_timer_;
 
-    ryujin::ProblemDescription problem_description;
-    ryujin::Discretization<dim> discretization;
-    ryujin::OfflineData<dim, Number> offline_data;
-    ryujin::InitialValues<dim, Number> initial_values;
-    ryujin::EulerModule<dim, Number> euler_module;
-    ryujin::DissipationModule<dim, Number> dissipation_module;
-    ryujin::TimeIntegrator<dim, Number> time_integrator;
-    ryujin::VTUOutput<dim, Number> vtu_output;
-    ryujin::Quantities<dim, Number> quantities;
+    HyperbolicSystem hyperbolic_system_;
+    Discretization<dim> discretization_;
+    OfflineData<dim, Number> offline_data_;
+    InitialValues<dim, Number> initial_values_;
+    HyperbolicModule<dim, Number> hyperbolic_module_;
+    TimeIntegrator<dim, Number> time_integrator_;
+    Postprocessor<dim, Number> postprocessor_;
+    VTUOutput<dim, Number> vtu_output_;
+    Quantities<dim, Number> quantities_;
 
-    const unsigned int mpi_rank;
-    const unsigned int n_mpi_processes;
+    const unsigned int mpi_rank_;
+    const unsigned int n_mpi_processes_;
 
-    std::ofstream logfile; /* log file */
+    std::ofstream logfile_; /* log file */
 
     //@}
   };

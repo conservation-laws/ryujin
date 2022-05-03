@@ -23,6 +23,7 @@ if(NOT DEAL_II_WITH_MPI OR NOT DEAL_II_WITH_P4EST)
 endif()
 
 project(ryujin CXX)
+string(APPEND DEAL_II_CXX_FLAGS " -Wfatal-errors")
 
 #
 # Set up compiler flags:
@@ -100,40 +101,12 @@ option(CHECK_BOUNDS "Enable debug code paths that check limiter bounds" OFF)
 option(DEBUG_OUTPUT "Enable detailed time-step output" OFF)
 option(DENORMALS_ARE_ZERO "Set the \"denormals are zero\" and \"flush to zero\" bits in the MXCSR register" ON)
 option(FORCE_DEAL_II_SPARSE_MATRIX "Always use dealii::SparseMatrix instead of TrilinosWrappers::SparseMatrix for assembly" OFF)
-option(OBSESSIVE_INLINING "Also inline the Riemann solver and limiter calls" OFF)
-option(USE_COMMUNICATION_HIDING "Issue MPI synchronization of ghost values early" ON)
 option(USE_CUSTOM_POW "Use custom pow implementation" ON)
-option(PRECOMPILE_HEADERS "Precompile headers for faster (re)compilation" OFF)
 option(SPLIT_SYNCHRONIZATION_TIMERS "Split synchronization timers" OFF)
 
 set(ORDER_FINITE_ELEMENT "1" CACHE STRING "Order of finite elements")
 set(ORDER_MAPPING "1" CACHE STRING "Order of mapping")
 set(ORDER_QUADRATURE "2" CACHE STRING "Order of quadrature")
-set(EQUATION_OF_STATE "EquationOfState::ideal_gas" CACHE STRING "Equation of state")
-set(NEWTON_EPS_DOUBLE "1.e-10" CACHE STRING "EPS double for limiter Newton solver")
-set(NEWTON_EPS_FLOAT "1.e-4" CACHE STRING "EPS float for limiter Newton solver")
-set(NEWTON_MAX_ITER "2" CACHE STRING "Maximal number of iterations in limiter Newton solver")
-set(RIEMANN_NEWTON_MAX_ITER "0" CACHE STRING "Maximal number of iterations in Riemann solver")
-set(INDICATOR "Indicators::entropy_viscosity_commutator" CACHE STRING "Indicator for preliminary high-order method")
-set(INDICATOR_SECOND_VARIATIONS "true" CACHE STRING "Use second variations")
-set(INDICATOR_ENTROPY "Entropy::harten" CACHE STRING "Entropy for entropy-viscosity commutator")
-set(INDICATOR_ALPHA_0 "1." CACHE STRING "alpha_0 factor for entropy-viscosity commutator")
-set(SMOOTHNESS_INDICATOR "SmoothnessIndicators::pressure" CACHE STRING "Quantity used in smoothness indicator")
-set(SMOOTHNESS_INDICATOR_ALPHA_0 "0." CACHE STRING "alpha_0 factor of smoothness indicator")
-set(SMOOTHNESS_INDICATOR_POWER "3" CACHE STRING "exponent of smoothness indicator")
-set(LIMITER "Limiters::specific_entropy" CACHE STRING "Select limiter")
-set(LIMITER_RELAX_BOUNDS "true" CACHE STRING "Relax limiter bounds")
-set(LIMITER_RELAXATION_ORDER "3" CACHE STRING "Relaxation order for limiter bounds")
-mark_as_advanced(
-  ORDER_FINITE_ELEMENT ORDER_MAPPING ORDER_QUADRATURE
-  EQUATION_OF_STATE
-  NEWTON_EPS_DOUBLE NEWTON_EPS_FLOAT NEWTON_MAX_ITER
-  RIEMANN_NEWTON_MAX_ITER
-  INDICATOR INDICATOR_ALPHA_0 INDICATOR_SECOND_VARIATIONS INDICATOR_ENTROPY
-  SMOOTHNESS_INDICATOR SMOOTHNESS_INDICATOR_ALPHA_0
-  SMOOTHNESS_INDICATOR_POWER
-  LIMITER LIMITER_RELAX_BOUNDS LIMITER_RELAXATION_ORDER
-  )
 
 #
 # Set up the rest:
@@ -144,8 +117,8 @@ include(GNUInstallDirs)
 add_subdirectory(source)
 add_subdirectory(prm)
 
-enable_testing()
-add_subdirectory(tests)
+#enable_testing()
+#add_subdirectory(tests)
 
 IF(DOCUMENTATION)
   add_subdirectory(doc)

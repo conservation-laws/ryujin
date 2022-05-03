@@ -8,6 +8,6 @@
 namespace ryujin
 {
   /* instantiations */
-  template class ryujin::Quantities<DIM, NUMBER>;
+  template class Quantities<DIM, NUMBER>;
 
 } /* namespace ryujin */

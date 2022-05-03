@@ -7,12 +7,12 @@
 
 #include <compile_time_options.h>
 
-#include "convenience_macros.h"
-#include "simd.h"
+#include <hyperbolic_system.h>
 
+#include "convenience_macros.h"
 #include "initial_values.h"
 #include "offline_data.h"
-#include "problem_description.h"
+#include "simd.h"
 #include "sparse_matrix_simd.h"
 
 #include <deal.II/base/parameter_acceptor.h>
@@ -33,59 +33,48 @@ namespace ryujin
   {
   public:
     /**
-     * @copydoc ProblemDescription::problem_dimension
+     * @copydoc HyperbolicSystem::problem_dimension
      */
     // clang-format off
-    static constexpr unsigned int problem_dimension = ProblemDescription::problem_dimension<dim>;
+    static constexpr unsigned int problem_dimension = HyperbolicSystem::problem_dimension<dim>;
     // clang-format on
 
     /**
-     * @copydoc ProblemDescription::state_type
+     * @copydoc HyperbolicSystem::state_type
      */
-    using state_type = ProblemDescription::state_type<dim, Number>;
+    using state_type = HyperbolicSystem::state_type<dim, Number>;
 
     /**
-     * Type used to store a curl of an 2D/3D vector field. Departing from
-     * mathematical rigor, in 2D this is a number (stored as
-     * `Tensor<1,1>`), in 3D this is a rank 1 tensor.
+     * @copydoc HyperbolicSystem::primitive_state_type
      */
-    using curl_type = dealii::Tensor<1, dim == 2 ? 1 : dim, Number>;
+    using primitive_state_type =
+        HyperbolicSystem::primitive_state_type<dim, Number>;
 
     /**
-     * @copydoc OfflineData::scalar_type
+     * Typedef for a MultiComponentVector storing the state U.
      */
-    using scalar_type = typename OfflineData<dim, Number>::scalar_type;
-
-    /**
-     * @copydoc OfflineData::vector_type
-     */
-    using vector_type = typename OfflineData<dim, Number>::vector_type;
-
-    /**
-     * A distributed block vector used for temporary storage of the
-     * velocity field.
-     */
-    using block_vector_type =
-        dealii::LinearAlgebra::distributed::BlockVector<Number>;
+    using vector_type = MultiComponentVector<Number, problem_dimension>;
 
     /**
      * Constructor.
      */
     Quantities(const MPI_Comm &mpi_communicator,
-               const ryujin::ProblemDescription &problem_description,
+               const ryujin::HyperbolicSystem &hyperbolic_system,
                const ryujin::OfflineData<dim, Number> &offline_data,
                const std::string &subsection = "Quantities");
 
     /**
      * Prepare evaluation. A call to @ref prepare() allocates temporary
-     * storage and is necessary before compute() can be called.
+     * storage and is necessary before accumulate() and write_out() can be
+     * called.
      *
-     * Calling prepare() allocates temporary storage for additional (3 *
-     * dim + 1) scalar vectors of type OfflineData::scalar_type.
+     * Calling prepare() allocates temporary storage for various boundary
+     * and interior maps. The storage requirement varies according to the
+     * supplied manifold descriptions.
      *
      * The string parameter @ref name is used as base name for output files.
      */
-    void prepare(std::string name);
+    void prepare(std::string name, unsigned int cycle);
 
     /**
      * Takes a state vector @p U at time t (obtained at the end of a full
@@ -121,16 +110,18 @@ namespace ryujin
      */
     //@{
 
-
     const MPI_Comm &mpi_communicator_;
 
-    dealii::SmartPointer<const ProblemDescription> problem_description_;
+    dealii::SmartPointer<const HyperbolicSystem> hyperbolic_system_;
     dealii::SmartPointer<const OfflineData<dim, Number>> offline_data_;
 
     /**
      * A tuple describing (local) dof index, boundary normal, normal mass,
      * boundary mass, boundary id, and position of the boundary degree of
      * freedom.
+     *
+     * @fixme This type only differs from the one used in OfflineData by
+     * including a DoF index. It might be better to combine both.
      */
     using boundary_point =
         std::tuple<dealii::types::global_dof_index /*local dof index*/,
@@ -151,10 +142,8 @@ namespace ryujin
      * pressure force.
      */
     using boundary_value =
-        std::tuple<state_type /* primitive state */,
-                   state_type /* primitive state second moment */,
-                   dealii::Tensor<1, dim, Number> /* tau_n */,
-                   dealii::Tensor<1, dim, Number> /* pn */>;
+        std::tuple<primitive_state_type /* primitive state */,
+                   primitive_state_type /* primitive state second moment */>;
 
     /**
      * Temporal statistics we store for each boundary manifold.
@@ -193,8 +182,8 @@ namespace ryujin
      * primitive state and its second moment.
      */
     using interior_value =
-        std::tuple<state_type /* primitive state */,
-                   state_type /* primitive state second moment */>;
+        std::tuple<primitive_state_type /* primitive state */,
+                   primitive_state_type /* primitive state second moment */>;
 
     /**
      * Temporal statistics we store for each interior manifold.
@@ -215,9 +204,8 @@ namespace ryujin
         interior_time_series_;
 
     std::string base_name_;
+    unsigned int time_series_cycle_;
     bool first_cycle_;
-
-    unsigned int output_cycle_averages_;
 
     //@}
     /**
@@ -227,32 +215,22 @@ namespace ryujin
 
     void clear_statistics();
 
-    interior_value
-    accumulate_interior(const vector_type &U,
-                        const std::vector<interior_point> &interior_map,
-                        std::vector<interior_value> &new_val);
+    std::string header_;
 
-    void write_out_interior(std::ostream &output,
-                            const std::vector<interior_value> &values,
+    template <typename point_type, typename value_type>
+    value_type internal_accumulate(const vector_type &U,
+                                   const std::vector<point_type> &interior_map,
+                                   std::vector<value_type> &new_val);
+
+    template <typename value_type>
+    void internal_write_out(std::ostream &output,
+                            const std::vector<value_type> &values,
                             const Number scale);
 
-    boundary_value
-    accumulate_boundary(const vector_type &U,
-                        const std::vector<boundary_point> &boundary_map,
-                        std::vector<boundary_value> &new_val);
-
-    void write_out_boundary(std::ostream &output,
-                            const std::vector<boundary_value> &values,
-                            const Number scale);
-
-    void write_out_time_series(
+    template <typename value_type>
+    void internal_write_out_time_series(
         std::ostream &output,
-        const std::vector<std::tuple<Number, boundary_value>> &values,
-        bool append);
-
-    void interior_write_out_time_series(
-        std::ostream &output,
-        const std::vector<std::tuple<Number, interior_value>> &values,
+        const std::vector<std::tuple<Number, value_type>> &values,
         bool append);
 
     //@}

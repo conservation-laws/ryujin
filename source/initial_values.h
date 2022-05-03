@@ -7,9 +7,10 @@
 
 #include <compile_time_options.h>
 
+#include <hyperbolic_system.h>
+
 #include "initial_state.h"
 #include "offline_data.h"
-#include "problem_description.h"
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/tensor.h>
@@ -39,19 +40,26 @@ namespace ryujin
   {
   public:
     /**
-     * @copydoc ProblemDescription::state_type
+     * @copydoc HyperbolicSystem::problem_dimension
      */
-    using state_type = ProblemDescription::state_type<dim, Number>;
+    // clang-format off
+    static constexpr unsigned int problem_dimension = HyperbolicSystem::problem_dimension<dim>;
+    // clang-format on
 
     /**
-     * @copydoc OfflineData::vector_type
+     * @copydoc HyperbolicSystem::state_type
      */
-    using vector_type = typename OfflineData<dim, Number>::vector_type;
+    using state_type = HyperbolicSystem::state_type<dim, Number>;
+
+    /**
+     * Typedef for a MultiComponentVector storing the state U.
+     */
+    using vector_type = MultiComponentVector<Number, problem_dimension>;
 
     /**
      * Constructor.
      */
-    InitialValues(const ProblemDescription &problem_description,
+    InitialValues(const HyperbolicSystem &hyperbolic_system,
                   const OfflineData<dim, Number> &offline_data,
                   const std::string &subsection = "InitialValues");
 
@@ -105,10 +113,11 @@ namespace ryujin
      */
     //@{
 
-    dealii::SmartPointer<const ProblemDescription> problem_description_;
+    dealii::SmartPointer<const HyperbolicSystem> hyperbolic_system_;
     dealii::SmartPointer<const OfflineData<dim, Number>> offline_data_;
 
-    std::set<std::unique_ptr<InitialState<dim, Number>>> initial_state_list_;
+    std::set<std::unique_ptr<InitialState<dim, Number, HyperbolicSystem>>>
+        initial_state_list_;
 
     std::function<state_type(const dealii::Point<dim> &point, Number t)>
         initial_state_;

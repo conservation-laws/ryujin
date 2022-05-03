@@ -7,8 +7,10 @@
 
 #include <compile_time_options.h>
 
+#include <hyperbolic_system.h>
+#include <postprocessor.h>
+
 #include "offline_data.h"
-#include "problem_description.h"
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/grid/intergrid_map.h>
@@ -20,28 +22,9 @@ namespace ryujin
 {
 
   /**
-   * the VTUOutput class implements a number of postprocessing
-   * primitives in particular for a scaled and normalized Schlieren-like
-   * plot, and a scaled and normalized magnitude of the vorticity. The
-   * normalization is computed as follows:
-   * \f[
-   *   \text{quantity}[i] = \exp\left(-\beta \frac{ |\mathbf q_i| - \min_k
-   * |\mathbf q_k|}
-   *   {\max_k |\mathbf q_k| - \min_k |\mathbf q_k|}\right),
-   * \f]
-   * where \f$\mathbf q_i\f$ is either
-   *  - the gradient of the density postprocessed as follows,
-   *    \f[
-   *       \mathbf q_i =  \frac{1}{m_i}\;\sum_{j\in \mathcal{J}(i)}
-   * \mathbf{c}_{ij} \rho_j; \f]
-   *  - the vorticity of the velocity field postprocessed as follows,
-   *    \f[
-   *       \mathbf q_i =  \frac{1}{m_i}\;\sum_{j\in \mathcal{J}(i)}
-   * \mathbf{c}_{ij} \times \mathbf{m}_j / \rho_j. \f]
-   *
-   * In addition, the generated VTU output also contains the full state
-   * vector, and a local estimate of the effective residual viscosity
-   * \f$\mu_{\text{res}}\f$ caused by the graph viscosity stabilization.
+   * the VTUOutput class implements output of the conserved state vector
+   * and a number of postprocessed quantities computed by the Postprocessor
+   * class.
    *
    * @ingroup TimeLoop
    */
@@ -50,23 +33,11 @@ namespace ryujin
   {
   public:
     /**
-     * @copydoc ProblemDescription::problem_dimension
+     * @copydoc HyperbolicSystem::problem_dimension
      */
     // clang-format off
-    static constexpr unsigned int problem_dimension = ProblemDescription::problem_dimension<dim>;
+    static constexpr unsigned int problem_dimension = HyperbolicSystem::problem_dimension<dim>;
     // clang-format on
-
-    /**
-     * @copydoc ProblemDescription::state_type
-     */
-    using state_type = ProblemDescription::state_type<dim, Number>;
-
-    /**
-     * Type used to store a curl of an 2D/3D vector field. Departing from
-     * mathematical rigor, in 2D this is a number (stored as
-     * `Tensor<1,1>`), in 3D this is a rank 1 tensor.
-     */
-    using curl_type = dealii::Tensor<1, dim == 2 ? 1 : dim, Number>;
 
     /**
      * @copydoc OfflineData::scalar_type
@@ -74,25 +45,16 @@ namespace ryujin
     using scalar_type = typename OfflineData<dim, Number>::scalar_type;
 
     /**
-     * @copydoc OfflineData::vector_type
+     * Typedef for a MultiComponentVector storing the state U.
      */
-    using vector_type = typename OfflineData<dim, Number>::vector_type;
-
-    /**
-     * The number of postprocessed quantities:
-     */
-    static constexpr unsigned int n_quantities = (dim == 1) ? 1 : 2;
-
-    /**
-     * An array of strings for all component names.
-     */
-    const static std::array<std::string, n_quantities> component_names;
+    using vector_type = MultiComponentVector<Number, problem_dimension>;
 
     /**
      * Constructor.
      */
     VTUOutput(const MPI_Comm &mpi_communicator,
               const ryujin::OfflineData<dim, Number> &offline_data,
+              const ryujin::Postprocessor<dim, Number> &postprocessor,
               const std::string &subsection = "VTUOutput");
 
     /**
@@ -128,18 +90,6 @@ namespace ryujin
                          bool output_full = true,
                          bool output_cutplanes = true);
 
-    /**
-     * Returns true if at least one background thread is active writing out
-     * the solution to disk.
-     */
-    bool is_active();
-
-    /**
-     * Wait for all background threads to finish writing out the solution
-     * to disk.
-     */
-    void wait();
-
   private:
     /**
      * @name Run time options
@@ -147,10 +97,6 @@ namespace ryujin
     //@{
 
     bool use_mpi_io_;
-    ACCESSOR_READ_ONLY(use_mpi_io)
-
-    Number schlieren_beta_;
-    Number vorticity_beta_;
 
     std::vector<std::string> manifolds_;
 
@@ -163,11 +109,12 @@ namespace ryujin
     const MPI_Comm &mpi_communicator_;
 
     dealii::SmartPointer<const ryujin::OfflineData<dim, Number>> offline_data_;
+    dealii::SmartPointer<const ryujin::Postprocessor<dim, Number>>
+        postprocessor_;
 
     std::future<void> background_thread_status;
 
     std::array<scalar_type, problem_dimension> state_vector_;
-    std::array<scalar_type, n_quantities> quantities_;
 
     //@}
   };

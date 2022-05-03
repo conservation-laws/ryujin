@@ -11,9 +11,7 @@ namespace ryujin
 {
   /* instantiations */
 
-#ifndef OBSESSIVE_INLINING
-  template class ryujin::RiemannSolver<DIM, NUMBER>;
-  template class ryujin::RiemannSolver<DIM, VectorizedArray<NUMBER>>;
-#endif
+  template class RiemannSolver<DIM, NUMBER>;
+  template class RiemannSolver<DIM, dealii::VectorizedArray<NUMBER>>;
 
 } /* namespace ryujin */

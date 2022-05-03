@@ -8,6 +8,6 @@
 namespace ryujin
 {
   /* instantiations */
-  template class ryujin::InitialValues<DIM, NUMBER>;
+  template class InitialValues<DIM, NUMBER>;
 
 } /* namespace ryujin */
