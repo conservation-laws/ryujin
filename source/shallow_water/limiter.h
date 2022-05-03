@@ -14,36 +14,6 @@
 
 namespace ryujin
 {
-  /**
-   * The convex limiter.
-   *
-   * The class implements a convex limiting technique as described in
-   * @cite GuermondEtAl2018 and @cite ryujin-2021-1. Given a
-   * computed set of bounds and an update direction \f$\mathbf P_{ij}\f$
-   * one can now determine a candidate \f$\tilde l_{ij}\f$ by computing
-   *
-   * \f{align}
-   *   \tilde l_{ij} = \max_{l\,\in\,[0,1]}
-   *   \,\Big\{\rho_{\text{min}}\,\le\,\rho\,(\mathbf U_i +\tilde l_{ij}\mathbf
-   * P_{ij})
-   *   \,\le\,\rho_{\text{max}},\quad
-   *   \phi_{\text{min}}\,\le\,\phi\,(\mathbf U_{i}+\tilde l_{ij}\mathbf
-   * P_{ij})\Big\}, \f}
-   *
-   * where \f$\psi\f$ denots the specific entropy @cite ryujin-2021-1.
-   *
-   * Algorithmically this is accomplished as follows: Given an initial
-   * interval \f$[t_L,t_R]\f$, where \f$t_L\f$ is a good state, we first
-   * make the interval smaller ensuring the bounds on the density are
-   * fulfilled. If limiting on the specific entropy is selected we then
-   * then perform a quadratic Newton iteration (updating \f$[t_L,t_R]\f$
-   * solving for the root of a 3-convex function
-   * \f{align}
-   *     \Psi(\mathbf U)\;=\;\rho^{\gamma+1}(\mathbf U)\,\big(\phi(\mathbf
-   * U)-\phi_{\text{min}}\big). \f}
-   *
-   * @ingroup EulerEquations
-   */
   template <int dim, typename Number = double>
   class Limiter
   {
@@ -196,10 +166,6 @@ namespace ryujin
 
     Bounds bounds_;
 
-    Number rho_relaxation_numerator;
-    Number rho_relaxation_denominator;
-    Number s_interp_max;
-
     //@}
   };
 
@@ -210,7 +176,6 @@ namespace ryujin
       const HyperbolicSystem &hyperbolic_system, const state_type &U_i)
   {
     PrecomputedValues result;
-    result[0] = hyperbolic_system.specific_entropy(U_i);
     return result;
   }
 
@@ -218,23 +183,6 @@ namespace ryujin
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline void Limiter<dim, Number>::reset(unsigned int i)
   {
-    /* Bounds: */
-
-    auto &[rho_min, rho_max, s_min] = bounds_;
-
-    rho_min = Number(std::numeric_limits<ScalarNumber>::max());
-    rho_max = Number(0.);
-
-    const auto &[specific_entropy] =
-        precomputed_values.template get_tensor<Number, PrecomputedValues>(i);
-
-    s_min = specific_entropy;
-
-    /* Relaxation: */
-
-    rho_relaxation_numerator = Number(0.);
-    rho_relaxation_denominator = Number(0.);
-    s_interp_max = Number(0.);
   }
 
 
@@ -246,32 +194,6 @@ namespace ryujin
       const dealii::Tensor<1, dim, Number> &scaled_c_ij,
       const Number beta_ij)
   {
-    /* Bounds: */
-
-    auto &[rho_min, rho_max, s_min] = bounds_;
-
-    const auto rho_i = hyperbolic_system.density(U_i);
-    const auto m_i = hyperbolic_system.momentum(U_i);
-    const auto rho_j = hyperbolic_system.density(U_j);
-    const auto m_j = hyperbolic_system.momentum(U_j);
-    const auto rho_ij_bar =
-        ScalarNumber(0.5) *
-        (rho_i + rho_j + (m_i - m_j) * scaled_c_ij);
-    rho_min = std::min(rho_min, rho_ij_bar);
-    rho_max = std::max(rho_max, rho_ij_bar);
-
-    const auto &[specific_entropy_j] =
-        precomputed_values.template get_tensor<Number, PrecomputedValues>(js);
-    s_min = std::min(s_min, specific_entropy_j);
-
-    /* Relaxation: */
-
-    rho_relaxation_numerator += beta_ij * (rho_i + rho_j);
-    rho_relaxation_denominator += beta_ij;
-
-    const Number s_interp =
-        hyperbolic_system.specific_entropy((U_i + U_j) * ScalarNumber(.5));
-    s_interp_max = std::max(s_interp_max, s_interp);
   }
 
 
@@ -279,23 +201,6 @@ namespace ryujin
   DEAL_II_ALWAYS_INLINE inline void
   Limiter<dim, Number>::apply_relaxation(Number hd_i)
   {
-    auto &[rho_min, rho_max, s_min] = bounds_;
-
-    constexpr unsigned int relaxation_order_ = 3;
-    const Number r_i =
-        Number(2.) * dealii::Utilities::fixed_power<relaxation_order_>(
-                         std::sqrt(std::sqrt(hd_i)));
-
-    constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
-    const Number rho_relaxation =
-        std::abs(rho_relaxation_numerator) /
-        (std::abs(rho_relaxation_denominator) + Number(eps));
-
-    rho_min = std::max((Number(1.) - r_i) * rho_min, rho_min - rho_relaxation);
-    rho_max = std::min((Number(1.) + r_i) * rho_max, rho_max + rho_relaxation);
-
-    s_min =
-        std::max((Number(1.) - r_i) * s_min, Number(2.) * s_min - s_interp_max);
   }
 
 

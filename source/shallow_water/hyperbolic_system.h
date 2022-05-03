@@ -20,13 +20,13 @@
 namespace ryujin
 {
   /**
-   * Description of a @p dim dimensional hyperbolic conservation law.
+   * Description of a @p dim dimensional hyperbolic conservation law
+   * modeling the shallow water equations.
    *
-   * We have a (2 + dim) dimensional state space \f$[\rho, \textbf m,
-   * E]\f$, where \f$\rho\f$ denotes the density, \f$\textbf m\f$ is the
-   * momentum, and \f$E\f$ is the total energy.
+   * We have a (1 + dim) dimensional state space \f$[h, \textbf m]\f$, where
+   * \f$h\f$ denotes the water depth, abd \f$\textbf m\f$ is the momentum.
    *
-   * @ingroup EulerEquations
+   * @ingroup ShallowWaterEquations
    */
   class HyperbolicSystem final : public dealii::ParameterAcceptor
   {
@@ -41,7 +41,7 @@ namespace ryujin
      * The dimension of the state space.
      */
     template <int dim>
-    static constexpr unsigned int problem_dimension = 2 + dim;
+    static constexpr unsigned int problem_dimension = 1 + dim;
 
     /**
      * The storage type used for a (conserved) state vector \f$\boldsymbol U\f$.
@@ -96,130 +96,89 @@ namespace ryujin
     //@{
 
     /**
-     * For a given (2+dim dimensional) state vector <code>U</code>, return
-     * the density <code>U[0]</code>
+     * For a given (1+dim dimensional) state vector <code>U</code>, return
+     * the water depth <code>U[0]</code>
      */
     template <int problem_dim, typename Number>
-    static Number density(const dealii::Tensor<1, problem_dim, Number> &U);
+    static Number water_depth(const dealii::Tensor<1, problem_dim, Number> &U);
 
     /**
-     * For a given (2+dim dimensional) state vector <code>U</code>, return
+     * For a given (1+dim dimensional) state vector <code>U</code>, return
      * the momentum vector <code>[U[1], ..., U[1+dim]]</code>.
      */
     template <int problem_dim, typename Number>
-    static dealii::Tensor<1, problem_dim - 2, Number>
+    static dealii::Tensor<1, problem_dim - 1, Number>
     momentum(const dealii::Tensor<1, problem_dim, Number> &U);
 
     /**
-     * For a given (2+dim dimensional) state vector <code>U</code>, return
-     * the total energy <code>U[1+dim]</code>
-     */
-    template <int problem_dim, typename Number>
-    static Number total_energy(const dealii::Tensor<1, problem_dim, Number> &U);
-
-
-    /**
-     * For a given (2+dim dimensional) state vector <code>U</code>, compute
-     * and return the internal energy \f$\varepsilon = (\rho e)\f$.
-     */
-    template <int problem_dim, typename Number>
-    static Number
-    internal_energy(const dealii::Tensor<1, problem_dim, Number> &U);
-
-
-    /**
-     * For a given (2+dim dimensional) state vector <code>U</code>, compute
-     * and return the derivative of the internal energy
-     * \f$\varepsilon = (\rho e)\f$.
-     */
-    template <int problem_dim, typename Number>
-    static dealii::Tensor<1, problem_dim, Number>
-    internal_energy_derivative(const dealii::Tensor<1, problem_dim, Number> &U);
-
-
-    /**
-     * For a given (2+dim dimensional) state vector <code>U</code>, compute
-     * and return the pressure \f$p\f$.
-     *
-     * We assume that the pressure is given by a polytropic equation of
-     * state, i.e.,
+     * For a given (1+dim dimensional) state vector <code>U</code>, return
+     * the regularized inverse of the water depth.
      * \f[
-     *   p = \frac{\gamma - 1}{1 - b*\rho}\; (\rho e)
+     *   1/h -> 2 h / (h^2 + max(h, h_tiny))
      * \f]
-     *
-     * @note If you want to set the covolume paramete @ref b_ to nonzero
-     * you have to enable the @ref covolume_ compile-time option.
+     */
+    template <int problem_dim, typename Number>
+    Number
+    inverse_water_depth(const dealii::Tensor<1, problem_dim, Number> &U) const;
+
+    /**
+     * For a given (1+dim dimensional) state vector <code>U</code>, compute
+     * and return the kinetic energy.
+     * \f[
+     *   KE = 1/2 |m|^2 / h
+     * \f]
+     */
+    template <int problem_dim, typename Number>
+    Number
+    kinetic_energy(const dealii::Tensor<1, problem_dim, Number> &U) const;
+
+    /**
+     * For a given (1+dim dimensional) state vector <code>U</code> and
+     * left/right topography states <code>Z_left</code> and
+     * <code>Z_right</code>, return the star_state <code>U_star</code>
+     */
+    template <int problem_dim, typename Number>
+    dealii::Tensor<1, problem_dim, Number>
+    star_state(const dealii::Tensor<1, problem_dim, Number> &U,
+               const Number &Z_left,
+               const Number &Z_right) const;
+
+    /**
+     * For a given (state dimensional) state vector <code>U</code>, compute
+     * and return the hydrostatic pressure \f$p\f$:
+     * \f[
+     *   p = 1/2 g h^2
+     * \f]
      */
     template <int problem_dim, typename Number>
     Number pressure(const dealii::Tensor<1, problem_dim, Number> &U) const;
 
-
     /**
-     * For a given (2+dim dimensional) state vector <code>U</code>, compute
+     * For a given (1+dim dimensional) state vector <code>U</code>, compute
      * the (physical) speed of sound:
      * \f[
-     *   c^2 = \frac{\gamma * p}{\rho\;(1 - b * \rho)}
+     *   c^2 = g * h
      * \f]
      */
     template <int problem_dim, typename Number>
     Number
     speed_of_sound(const dealii::Tensor<1, problem_dim, Number> &U) const;
 
-
     /**
-     * For a given (2+dim dimensional) state vector <code>U</code>, compute
-     * and return the (scaled) specific entropy
-     * \f[
-     *   e^{(\gamma-1)s} = \frac{\rho\,e}{\rho^\gamma}
-     *   (1 - b * \rho)^(\gamma -1).
-     * \f]
+     * For a given (1+dim dimensional) state vector <code>U</code>, compute
+     * and return the entropy \f$\eta = 1/2 g h^2 + 1/2 |m|^2 / h\f$.
      */
     template <int problem_dim, typename Number>
     Number
-    specific_entropy(const dealii::Tensor<1, problem_dim, Number> &U) const;
-
-
-    /**
-     * For a given (2+dim dimensional) state vector <code>U</code>, compute
-     * and return the Harten-type entropy
-     * \f[
-     *   \eta = (\rho^2 e) ^ {1 / (\gamma + 1)}.
-     * \f]
-     */
-    template <int problem_dim, typename Number>
-    Number
-    harten_entropy(const dealii::Tensor<1, problem_dim, Number> &U) const;
-
+    mathematical_entropy(const dealii::Tensor<1, problem_dim, Number> &U) const;
 
     /**
-     * For a given (2+dim dimensional) state vector <code>U</code>, compute
-     * and return the derivative \f$\eta'\f$ of the Harten-type entropy
-     * \f[
-     *   \eta = (\rho^2 e) ^ {1 / (\gamma + 1)}.
-     * \f]
-     */
-    template <int problem_dim, typename Number>
-    dealii::Tensor<1, problem_dim, Number> harten_entropy_derivative(
-        const dealii::Tensor<1, problem_dim, Number> &U) const;
-
-
-    /**
-     * For a given (2+dim dimensional) state vector <code>U</code>, compute
-     * and return the entropy \f$\eta = p^{1/\gamma}\f$.
-     */
-    template <int problem_dim, typename Number>
-    Number
-    mathematical_entropy(const dealii::Tensor<1, problem_dim, Number> U) const;
-
-
-    /**
-     * For a given (2+dim dimensional) state vector <code>U</code>, compute
-     * and return the derivative \f$\eta'\f$ of the entropy \f$\eta =
-     * p^{1/\gamma}\f$.
+     * For a given (1+dim dimensional) state vector <code>U</code>, compute
+     * and return the derivative \f$\eta'\f$ of the entropy defined above.
      */
     template <int problem_dim, typename Number>
     dealii::Tensor<1, problem_dim, Number> mathematical_entropy_derivative(
-        const dealii::Tensor<1, problem_dim, Number> U) const;
+        const dealii::Tensor<1, problem_dim, Number> &U) const;
 
     /**
      * Returns whether the state @ref U is admissible. If @ref U is a
@@ -231,32 +190,73 @@ namespace ryujin
 
     //@}
     /**
+     * @name Functions for physical source terms
+     */
+    //@{
+
+    /**
+     * For given (1+dim dimensional) state vectors <code>U_i</code> and
+     * <code>U_j</code> and topography states <code>Z_i</code> and
+     * <code>Z_j</code> and <code>c_ij</code> vector, return the Shallow Water
+     * topography source
+     */
+    template <int problem_dim, typename Number>
+    dealii::Tensor<1, problem_dim - 1, Number> swe_topography_source(
+        const dealii::Tensor<1, problem_dim, Number> &U_i,
+        const dealii::Tensor<1, problem_dim, Number> &U_j,
+        const Number &Z_i,
+        const Number &Z_j,
+        const dealii::Tensor<1, problem_dim - 1, Number> &c_ij) const;
+
+    /**
+     * This functions returns a (1+dim dimensional) state vector for
+     * physical source terms that depend on the stencil. These functions
+     * often involve the gradient of a scalar field.
+     */
+    template <int problem_dim, typename Number>
+    dealii::Tensor<1, problem_dim, Number> compute_stencil_sources(
+        const dealii::Tensor<1, problem_dim, Number> &U_i,
+        const dealii::Tensor<1, problem_dim, Number> &U_j,
+        const Number &Z_i,
+        const Number &Z_j,
+        const dealii::Tensor<1, problem_dim - 1, Number> &c_ij) const;
+
+    /**
+     * For a given (1+dim dimensional) state vector <code>U</code> and
+     * time step <code>dt<code>, return the Glaucker-Mannings friction source
+     */
+    template <int problem_dim, typename Number>
+    dealii::Tensor<1, problem_dim - 1, Number>
+    friction_source(const dealii::Tensor<1, problem_dim, Number> &U,
+                    const Number &tau) const;
+
+    /**
+     * This function returns a (1+dim dimensional) state vector of
+     * physical source terms that are nodal based (ie do not depend on the
+     * stencil).
+     */
+    template <int problem_dim, typename Number>
+    dealii::Tensor<1, problem_dim, Number>
+    compute_nodal_sources(const dealii::Tensor<1, problem_dim, Number> &U_i,
+                          const Number &dt) const;
+
+
+    //@}
+    /**
      * @name Special functions for boundary states
      */
     //@{
 
     /**
-     * For a given state @p U and normal direction @p normal returns the
-     * n-th pair of left and right eigenvectors of the linearized normal
-     * flux.
-     */
-    template <int component, int problem_dim, typename Number>
-    std::array<dealii::Tensor<1, problem_dim, Number>, 2>
-    linearized_eigenvector(
-        const dealii::Tensor<1, problem_dim, Number> &U,
-        const dealii::Tensor<1, problem_dim - 2, Number> &normal) const;
-
-    /**
      * Decomposes a given state @p U into Riemann invariants and then
      * replaces the first or second Riemann characteristic from the one
-     * taken from @p U_bar state. Note that the @p U_bar state is just the
-     * prescribed dirichlet values.
+     * taken from @p U_bar state.
      */
     template <int component, int problem_dim, typename Number>
     dealii::Tensor<1, problem_dim, Number> prescribe_riemann_characteristic(
         const dealii::Tensor<1, problem_dim, Number> &U,
         const dealii::Tensor<1, problem_dim, Number> &U_bar,
-        const dealii::Tensor<1, problem_dim - 2, Number> &normal) const;
+        const dealii::Tensor<1, problem_dim - 1, Number> &normal) const;
 
     /**
      * Apply boundary conditions.
@@ -280,7 +280,7 @@ namespace ryujin
     dealii::Tensor<1, problem_dim, Number>
     apply_boundary_conditions(dealii::types::boundary_id id,
                               dealii::Tensor<1, problem_dim, Number> U,
-                              const dealii::Tensor<1, problem_dim - 2> &normal,
+                              const dealii::Tensor<1, problem_dim - 1> &normal,
                               Lambda get_dirichlet_data) const;
 
     //@}
@@ -296,12 +296,11 @@ namespace ryujin
      * \begin{pmatrix}
      *   \textbf m \\
      *   \textbf v\otimes \textbf m + p\mathbb{I}_d \\
-     *   \textbf v(E+p)
      * \end{pmatrix},
      * \f]
      */
     template <int problem_dim, typename Number>
-    flux_type<problem_dim - 2, Number>
+    flux_type<problem_dim - 1, Number>
     flux(const dealii::Tensor<1, problem_dim, Number> &U) const;
 
     //@}
@@ -360,16 +359,38 @@ namespace ryujin
      */
     //@{
 
-    double gamma_;
-    ACCESSOR_READ_ONLY(gamma)
+    double gravity_;
+    ACCESSOR_READ_ONLY(gravity)
+
+    double reference_water_depth_;
+    ACCESSOR_READ_ONLY(reference_water_depth)
+
+    double dry_state_tolerance_;
+    ACCESSOR_READ_ONLY(dry_state_tolerance)
+
+    double mannings_;
+    ACCESSOR_READ_ONLY(mannings)
 
     //@}
     /**
      * @name Precomputed scalar quantitites
      */
     //@{
-    double gamma_inverse_;
-    double gamma_plus_one_inverse_;
+    double h_tiny_;
+    ACCESSOR_READ_ONLY(h_tiny)
+
+    double gravity_inverse_;
+
+    double g_mannings_sqd_;
+
+    double reference_speed_;
+    ACCESSOR_READ_ONLY(reference_speed)
+
+    double h_kinetic_energy_tiny_;
+    ACCESSOR_READ_ONLY(h_kinetic_energy_tiny)
+
+    double tiny_entropy_number_;
+    ACCESSOR_READ_ONLY(tiny_entropy_number)
 
     //@}
   };
@@ -378,79 +399,67 @@ namespace ryujin
 
   template <int problem_dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline Number
-  HyperbolicSystem::density(const dealii::Tensor<1, problem_dim, Number> &U)
+  HyperbolicSystem::water_depth(const dealii::Tensor<1, problem_dim, Number> &U)
   {
     return U[0];
   }
 
 
   template <int problem_dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, problem_dim - 2, Number>
+  DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, problem_dim - 1, Number>
   HyperbolicSystem::momentum(const dealii::Tensor<1, problem_dim, Number> &U)
   {
-    constexpr int dim = problem_dim - 2;
+    constexpr int dim = problem_dim - 1;
 
     dealii::Tensor<1, dim, Number> result;
+
     for (unsigned int i = 0; i < dim; ++i)
       result[i] = U[1 + i];
     return result;
   }
 
-
   template <int problem_dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline Number HyperbolicSystem::total_energy(
-      const dealii::Tensor<1, problem_dim, Number> &U)
+  DEAL_II_ALWAYS_INLINE inline Number HyperbolicSystem::inverse_water_depth(
+      const dealii::Tensor<1, problem_dim, Number> &U) const
   {
-    constexpr int dim = problem_dim - 2;
-    return U[1 + dim];
-  }
-
-
-  template <int problem_dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline Number HyperbolicSystem::internal_energy(
-      const dealii::Tensor<1, problem_dim, Number> &U)
-  {
-    /*
-     * rho e = (E - 1/2*m^2/rho)
-     */
-
-    constexpr int dim = problem_dim - 2;
     using ScalarNumber = typename get_value_type<Number>::type;
 
-    const Number rho_inverse = ScalarNumber(1.) / U[0];
-    const auto m = momentum(U);
-    const Number E = U[dim + 1];
-    return E - ScalarNumber(0.5) * m.norm_square() * rho_inverse;
+    const Number &h = U[0];
+    const Number h_max = std::max(h, Number(h_tiny_));
+    const Number denom = h * h + h_max * h_max;
+
+    return ScalarNumber(2.) * h / denom;
   }
 
+  template <int problem_dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline Number HyperbolicSystem::kinetic_energy(
+      const dealii::Tensor<1, problem_dim, Number> &U) const
+  {
+    /* KE = 1/2 h |v|^2 */
+
+    using ScalarNumber = typename get_value_type<Number>::type;
+
+    const auto h = water_depth(U);
+    const auto vel = momentum(U) * inverse_water_depth(U);
+
+    return ScalarNumber(0.5) * h * vel.norm_square();
+  }
 
   template <int problem_dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, problem_dim, Number>
-  HyperbolicSystem::internal_energy_derivative(
-      const dealii::Tensor<1, problem_dim, Number> &U)
+  HyperbolicSystem::star_state(const dealii::Tensor<1, problem_dim, Number> &U,
+                               const Number &Z_left,
+                               const Number &Z_right) const
   {
-    /*
-     * With
-     *   rho e = E - 1/2 |m|^2 / rho
-     * we get
-     *   (rho e)' = (1/2m^2/rho^2, -m/rho , 1 )^T
-     */
 
-    constexpr int dim = problem_dim - 2;
-    using ScalarNumber = typename get_value_type<Number>::type;
+    dealii::Tensor<1, problem_dim, Number> local_star_state;
 
-    const Number rho_inverse = ScalarNumber(1.) / U[0];
-    const auto u = momentum(U) * rho_inverse;
+    const Number Z_max = std::max(Z_left, Z_right);
+    const Number H_star = std::max(Number(0.), U[0] + Z_left - Z_max);
 
-    dealii::Tensor<1, problem_dim, Number> result;
+    local_star_state = U * H_star * inverse_water_depth(U);
 
-    result[0] = ScalarNumber(0.5) * u.norm_square();
-    for (unsigned int i = 0; i < dim; ++i) {
-      result[1 + i] = -u[i];
-    }
-    result[dim + 1] = ScalarNumber(1.);
-
-    return result;
+    return local_star_state;
   }
 
 
@@ -458,10 +467,108 @@ namespace ryujin
   DEAL_II_ALWAYS_INLINE inline Number HyperbolicSystem::pressure(
       const dealii::Tensor<1, problem_dim, Number> &U) const
   {
-    /* p = (gamma - 1) / (1 - b * rho) * (rho e) */
+    /* p = 1/2 g h^2 */
 
     using ScalarNumber = typename get_value_type<Number>::type;
-    return ScalarNumber(gamma_ - 1.) * internal_energy(U);
+
+    const Number h_sqd = U[0] * U[0];
+
+    return ScalarNumber(0.5 * gravity_) * h_sqd;
+  }
+
+  template <int problem_dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, problem_dim - 1, Number>
+  HyperbolicSystem::swe_topography_source(
+      const dealii::Tensor<1, problem_dim, Number> &U_i,
+      const dealii::Tensor<1, problem_dim, Number> &U_j,
+      const Number &Z_i,
+      const Number &Z_j,
+      const dealii::Tensor<1, problem_dim - 1, Number> &c_ij) const
+  {
+    using ScalarNumber = typename get_value_type<Number>::type;
+
+    const Number &H_i = U_i[0];
+    const Number &H_j = U_j[0];
+
+    const Number left_term = -H_i * (Z_j - Z_i);
+    const Number right_term = ScalarNumber(0.5) * (H_j - H_i) * (H_j - H_i);
+
+    const Number source = ScalarNumber(gravity_) * (left_term + right_term);
+
+    return source * c_ij;
+  }
+
+  template <int problem_dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, problem_dim, Number>
+  HyperbolicSystem::compute_stencil_sources(
+      const dealii::Tensor<1, problem_dim, Number> &U_i,
+      const dealii::Tensor<1, problem_dim, Number> &U_j,
+      const Number &Z_i,
+      const Number &Z_j,
+      const dealii::Tensor<1, problem_dim - 1, Number> &c_ij) const
+  {
+    constexpr int dim = problem_dim - 1;
+
+    dealii::Tensor<1, problem_dim, Number> stencil_sources;
+
+    /* water depth sources */
+    stencil_sources[0] = Number(0.);
+
+    /* Momentum sources */
+    const auto topography_source =
+        swe_topography_source(U_i, U_j, Z_i, Z_j, c_ij);
+
+    for (unsigned int i = 0; i < dim; ++i) {
+      stencil_sources[1 + i] = topography_source[i];
+    }
+
+    return stencil_sources;
+  }
+
+  template <int problem_dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, problem_dim - 1, Number>
+  HyperbolicSystem::friction_source(
+      const dealii::Tensor<1, problem_dim, Number> &U, const Number &tau) const
+  {
+    using ScalarNumber = typename get_value_type<Number>::type;
+
+    const Number h_max = std::max(U[0], Number(h_tiny_));
+    const Number h_star = ryujin::pow(h_max, ScalarNumber(4. / 3.));
+
+    const auto velocity = momentum(U) * inverse_water_depth(U);
+    const Number velocity_norm = velocity.norm();
+
+    const Number small_number =
+        ScalarNumber(2. * g_mannings_sqd_) * tau * velocity_norm;
+
+    const auto numerator =
+        -ScalarNumber(2. * g_mannings_sqd_) * momentum(U) * velocity_norm;
+    const Number denominator = h_star + std::max(h_star, small_number);
+
+    return numerator / denominator;
+  }
+
+  /* Inline functions for source terms */
+  template <int problem_dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, problem_dim, Number>
+  HyperbolicSystem::compute_nodal_sources(
+      const dealii::Tensor<1, problem_dim, Number> &U_i, const Number &dt) const
+  {
+    constexpr int dim = problem_dim - 1;
+
+    dealii::Tensor<1, problem_dim, Number> nodal_sources;
+
+    /* water depth sources */
+    nodal_sources[0] = Number(0.);
+
+    /* Momentum sources */
+    dealii::Tensor<1, dim, Number> friction = friction_source(U_i, dt);
+
+    for (unsigned int i = 0; i < dim; ++i) {
+      nodal_sources[1 + i] = friction[i];
+    }
+
+    return nodal_sources;
   }
 
 
@@ -469,131 +576,53 @@ namespace ryujin
   DEAL_II_ALWAYS_INLINE inline Number HyperbolicSystem::speed_of_sound(
       const dealii::Tensor<1, problem_dim, Number> &U) const
   {
-    /* c^2 = gamma * p / rho / (1 - b * rho) */
-
+    /* c^2 = g * h */
     using ScalarNumber = typename get_value_type<Number>::type;
-
-    const Number rho_inverse = ScalarNumber(1.) / U[0];
-    const Number p = pressure(U);
-    return std::sqrt(gamma_ * p * rho_inverse);
-  }
-
-
-  template <int problem_dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline Number HyperbolicSystem::specific_entropy(
-      const dealii::Tensor<1, problem_dim, Number> &U) const
-  {
-    /* exp((gamma - 1)s) = (rho e) / rho ^ gamma */
-
-    using ScalarNumber = typename get_value_type<Number>::type;
-
-    const auto rho_inverse = ScalarNumber(1.) / U[0];
-    return internal_energy(U) * ryujin::pow(rho_inverse, gamma_);
-  }
-
-
-  template <int problem_dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline Number HyperbolicSystem::harten_entropy(
-      const dealii::Tensor<1, problem_dim, Number> &U) const
-  {
-    /* rho^2 e = \rho E - 1/2*m^2 */
-
-    constexpr int dim = problem_dim - 2;
-    using ScalarNumber = typename get_value_type<Number>::type;
-
-    const Number rho = U[0];
-    const auto m = momentum(U);
-    const Number E = U[dim + 1];
-
-    const Number rho_rho_e = rho * E - ScalarNumber(0.5) * m.norm_square();
-    return ryujin::pow(rho_rho_e, gamma_plus_one_inverse_);
-  }
-
-
-  template <int problem_dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, problem_dim, Number>
-  HyperbolicSystem::harten_entropy_derivative(
-      const dealii::Tensor<1, problem_dim, Number> &U) const
-  {
-    /*
-     * With
-     *   eta = (rho^2 e) ^ 1/(gamma+1)
-     *   rho^2 e = rho * E - 1/2 |m|^2
-     *
-     * we get
-     *
-     *   eta' = 1/(gamma+1) * (rho^2 e) ^ -gamma/(gamma+1) * ( E , -m , rho )^T
-     */
-
-    constexpr int dim = problem_dim - 2;
-    using ScalarNumber = typename get_value_type<Number>::type;
-
-    const Number rho = U[0];
-    const auto m = momentum(U);
-    const Number E = U[dim + 1];
-
-    const Number rho_rho_e = rho * E - ScalarNumber(0.5) * m.norm_square();
-
-    const auto factor =
-        gamma_plus_one_inverse_ *
-        ryujin::pow(rho_rho_e, -gamma_ * gamma_plus_one_inverse_);
-
-    dealii::Tensor<1, problem_dim, Number> result;
-
-    result[0] = factor * E;
-    for (unsigned int i = 0; i < dim; ++i) {
-      result[1 + i] = -factor * m[i];
-    }
-    result[dim + 1] = factor * rho;
-
-    return result;
+    return std::sqrt(ScalarNumber(gravity_) * U[0]);
   }
 
 
   template <int problem_dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline Number HyperbolicSystem::mathematical_entropy(
-      const dealii::Tensor<1, problem_dim, Number> U) const
+      const dealii::Tensor<1, problem_dim, Number> &U) const
   {
     const auto p = pressure(U);
-    return ryujin::pow(p, gamma_inverse_);
+    const auto k_e = kinetic_energy(U);
+    return p + k_e;
   }
 
 
   template <int problem_dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, problem_dim, Number>
   HyperbolicSystem::mathematical_entropy_derivative(
-      const dealii::Tensor<1, problem_dim, Number> U) const
+      const dealii::Tensor<1, problem_dim, Number> &U) const
   {
     /*
      * With
-     *   eta = p ^ (1/gamma)
-     *   p = (gamma - 1) * (rho e)
-     *   rho e = E - 1/2 |m|^2 / rho
+     *   eta = 1/2 g h^2 + 1/2 |m|^2 / h
      *
      * we get
      *
-     *   eta' = (gamma - 1)/gamma p ^(1/gamma - 1) *
+     *   eta' = (g h - 1/2 |vel|^2, vel)
      *
-     *     (1/2m^2/rho^2 , -m/rho , 1 )^T
+     * where vel = m / h
      */
 
-    constexpr int dim = problem_dim - 2;
+    constexpr int dim = problem_dim - 1;
     using ScalarNumber = typename get_value_type<Number>::type;
-
-    const Number &rho = U[0];
-    const Number rho_inverse = ScalarNumber(1.) / rho;
-    const auto u = momentum(U) * rho_inverse;
-    const auto p = pressure(U);
-
-    const auto factor = (gamma_ - ScalarNumber(1.0)) * gamma_inverse_ *
-                        ryujin::pow(p, gamma_inverse_ - ScalarNumber(1.));
 
     dealii::Tensor<1, problem_dim, Number> result;
 
-    result[0] = factor * ScalarNumber(0.5) * u.norm_square();
-    result[dim + 1] = factor;
+    const Number &h = U[0];
+    const auto vel = momentum(U) * inverse_water_depth(U);
+
+    // water depth component
+    result[0] =
+        ScalarNumber(gravity_) * h - ScalarNumber(0.5) * vel.norm_square();
+
+    // momentum components
     for (unsigned int i = 0; i < dim; ++i) {
-      result[1 + i] = -factor * u[i];
+      result[1 + i] = vel[i];
     }
 
     return result;
@@ -604,24 +633,18 @@ namespace ryujin
   DEAL_II_ALWAYS_INLINE inline bool HyperbolicSystem::is_admissible(
       const dealii::Tensor<1, problem_dim, Number> &U) const
   {
-    const auto rho_new = density(U);
-    const auto e_new = internal_energy(U);
-    const auto s_new = specific_entropy(U);
+    const auto h_new = water_depth(U);
 
     constexpr auto gt = dealii::SIMDComparison::greater_than;
     using T = Number;
     const auto test =
-        dealii::compare_and_apply_mask<gt>(rho_new, T(0.), T(0.), T(-1.)) + //
-        dealii::compare_and_apply_mask<gt>(e_new, T(0.), T(0.), T(-1.)) +   //
-        dealii::compare_and_apply_mask<gt>(s_new, T(0.), T(0.), T(-1.));
+        dealii::compare_and_apply_mask<gt>(h_new, T(0.), T(0.), T(-1.));
 
 #ifdef DEBUG_OUTPUT
     if (!(test == Number(0.))) {
       std::cout << std::fixed << std::setprecision(16);
-      std::cout << "Bounds violation: Negative state [rho, e, s] detected!\n";
-      std::cout << "\t\trho: " << rho_new << "\n";
-      std::cout << "\t\tint: " << e_new << "\n";
-      std::cout << "\t\tent: " << s_new << "\n" << std::endl;
+      std::cout << "Bounds violation: Negative state [h] detected!\n";
+      std::cout << "\t\trho: " << h_new << "\n" << std::endl;
     }
 #endif
 
@@ -630,114 +653,48 @@ namespace ryujin
 
 
   template <int component, int problem_dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline std::
-      array<dealii::Tensor<1, problem_dim, Number>, 2>
-      HyperbolicSystem::linearized_eigenvector(
-          const dealii::Tensor<1, problem_dim, Number> &U,
-          const dealii::Tensor<1, problem_dim - 2, Number> &normal) const
-  {
-    static_assert(component == 1 || component == problem_dim,
-                  "Only first and last eigenvectors implemented");
-
-    constexpr int dim = problem_dim - 2;
-
-    const auto rho = density(U);
-    const auto m = momentum(U);
-    const auto v = m / rho;
-    const auto a = speed_of_sound(U);
-    const auto gamma = this->gamma();
-
-    state_type<dim, Number> b;
-    state_type<dim, Number> c;
-
-    const auto e_k = 0.5 * v.norm_square();
-
-    switch (component) {
-    case 1:
-      b[0] = (gamma - 1.) * e_k + a * v * normal;
-      for (unsigned int i = 0; i < dim; ++i)
-        b[1 + i] = (1. - gamma) * v[i] - a * normal[i];
-      b[dim + 1] = gamma - 1.;
-      b /= 2. * a * a;
-
-      c[0] = 1.;
-      for (unsigned int i = 0; i < dim; ++i)
-        c[1 + i] = v[i] - a * normal[i];
-      c[dim + 1] = a * a / (gamma - 1) + e_k - a * (v * normal);
-
-      return {b, c};
-
-    case problem_dim:
-      b[0] = (gamma - 1.) * e_k - a * v * normal;
-      for (unsigned int i = 0; i < dim; ++i)
-        b[1 + i] = (1. - gamma) * v[i] + a * normal[i];
-      b[dim + 1] = gamma - 1.;
-      b /= 2. * a * a;
-
-      c[0] = 1.;
-      for (unsigned int i = 0; i < dim; ++i)
-        c[1 + i] = v[i] + a * normal[i];
-      c[dim + 1] = a * a / (gamma - 1) + e_k + a * (v * normal);
-
-      return {b, c};
-    }
-
-    __builtin_unreachable();
-  }
-
-
-  template <int component, int problem_dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, problem_dim, Number>
   HyperbolicSystem::prescribe_riemann_characteristic(
       const dealii::Tensor<1, problem_dim, Number> &U,
       const dealii::Tensor<1, problem_dim, Number> &U_bar,
-      const dealii::Tensor<1, problem_dim - 2, Number> &normal) const
+      const dealii::Tensor<1, problem_dim - 1, Number> &normal) const
   {
+
+    constexpr int dim = problem_dim - 1;
+
+    /* Note that U_bar are the dirichlet values that are prescribed */
     static_assert(component == 1 || component == 2,
                   "component has to be 1 or 2");
 
-    constexpr int dim = problem_dim - 2;
-
     const auto m = momentum(U);
-    const auto rho = density(U);
     const auto a = speed_of_sound(U);
-    const auto vn = m * normal / rho;
+    const auto vn = m * normal * inverse_water_depth(U);
 
     const auto m_bar = momentum(U_bar);
-    const auto rho_bar = density(U_bar);
     const auto a_bar = speed_of_sound(U_bar);
-    const auto vn_bar = m_bar * normal / rho_bar;
+    const auto vn_bar = m_bar * normal * inverse_water_depth(U_bar);
 
-    /* First Riemann characteristic: v* n - 2 / (gamma - 1) * a */
+    /* First Riemann characteristic: v * n - 2 * a */
 
-    const auto R_1 = component == 1 ? vn_bar - 2. * a_bar / (gamma_ - 1.)
-                                    : vn - 2. * a / (gamma_ - 1.);
+    const auto R_1 = component == 1 ? vn_bar - 2. * a_bar : vn - 2. * a;
 
-    /* Second Riemann characteristic: v* n + 2 / (gamma - 1) * a */
+    /* Second Riemann characteristic: v * n + 2 * a */
 
-    const auto R_2 = component == 2 ? vn_bar + 2. * a_bar / (gamma_ - 1.)
-                                    : vn + 2. * a / (gamma_ - 1.);
+    const auto R_2 = component == 2 ? vn_bar + 2. * a_bar : vn + 2. * a;
 
-    const auto p = pressure(U);
-    const auto s = p / ryujin::pow(rho, gamma_);
-
-    const auto vperp = m / rho - vn * normal;
+    const auto vperp = m * inverse_water_depth(U) - vn * normal;
 
     const auto vn_new = 0.5 * (R_1 + R_2);
 
-    auto rho_new =
-        1. / (gamma_ * s) * ryujin::pow((gamma_ - 1.) / 4. * (R_2 - R_1), 2);
-    rho_new = ryujin::pow(rho_new, 1. / (gamma_ - 1.));
-
-    const auto p_new = s * std::pow(rho_new, gamma_);
+    const auto h_new = gravity_inverse_ * ryujin::pow((R_2 - R_1) / 4., 2);
 
     state_type<dim, Number> U_new;
-    U_new[0] = rho_new;
+
+    U_new[0] = h_new;
+
     for (unsigned int d = 0; d < dim; ++d) {
-      U_new[1 + d] = rho_new * (vn_new * normal + vperp)[d];
+      U_new[1 + d] = h_new * (vn_new * normal + vperp)[d];
     }
-    U_new[1 + dim] = p_new / (gamma_ - 1.) +
-                     0.5 * rho_new * (vn_new * vn_new + vperp.norm_square());
 
     return U_new;
   }
@@ -748,10 +705,10 @@ namespace ryujin
   HyperbolicSystem::apply_boundary_conditions(
       dealii::types::boundary_id id,
       dealii::Tensor<1, problem_dim, Number> U,
-      const dealii::Tensor<1, problem_dim - 2> &normal,
+      const dealii::Tensor<1, problem_dim - 1> &normal,
       Lambda get_dirichlet_data) const
   {
-    constexpr auto dim = problem_dim - 2;
+    constexpr auto dim = problem_dim - 1;
 
     if (id == Boundary::dirichlet) {
       U = get_dirichlet_data();
@@ -780,9 +737,9 @@ namespace ryujin
        *      R_1 characteristic.
        */
       const auto m = momentum(U);
-      const auto rho = density(U);
+      const auto h_inverse = inverse_water_depth(U);
       const auto a = speed_of_sound(U);
-      const auto vn = m * normal / rho;
+      const auto vn = m * normal * h_inverse;
 
       /* Supersonic inflow: */
       if (vn < -a) {
@@ -809,27 +766,24 @@ namespace ryujin
 
 
   template <int problem_dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline HyperbolicSystem::flux_type<problem_dim - 2,
+  DEAL_II_ALWAYS_INLINE inline HyperbolicSystem::flux_type<problem_dim - 1,
                                                            Number>
   HyperbolicSystem::flux(const dealii::Tensor<1, problem_dim, Number> &U) const
   {
-    constexpr int dim = problem_dim - 2;
+    constexpr int dim = problem_dim - 1;
     using ScalarNumber = typename get_value_type<Number>::type;
 
-    const Number rho_inverse = ScalarNumber(1.) / U[0];
+    const Number h_inverse = inverse_water_depth(U);
     const auto m = momentum(U);
     const auto p = pressure(U);
-    const Number E = U[dim + 1];
 
     flux_type<dim, Number> result;
 
     result[0] = m;
     for (unsigned int i = 0; i < dim; ++i) {
-      result[1 + i] = m * (m[i] * rho_inverse);
+      result[1 + i] = m * (m[i] * h_inverse);
       result[1 + i][i] += p;
     }
-    result[dim + 1] = m * (rho_inverse * (E + p));
-
     return result;
   }
 
@@ -838,11 +792,10 @@ namespace ryujin
   HyperbolicSystem::state_type<dim1, Number> HyperbolicSystem::expand_state(
       const dealii::Tensor<1, prob_dim2, Number> &state) const
   {
-    constexpr auto dim2 = prob_dim2 - 2;
+    constexpr auto dim2 = prob_dim2 - 1;
 
     state_type<dim1, Number> result;
     result[0] = state[0];
-    result[dim1 + 1] = state[dim2 + 1];
     for (unsigned int i = 1; i < dim2 + 1; ++i)
       result[i] = state[i];
 
@@ -855,19 +808,16 @@ namespace ryujin
   HyperbolicSystem::from_primitive_state(
       const dealii::Tensor<1, problem_dim, Number> &primitive_state) const
   {
-    constexpr auto dim = problem_dim - 2;
+    constexpr auto dim = problem_dim - 1;
 
-    const auto &rho = primitive_state[0];
+    const auto &h = primitive_state[0];
     /* extract velocity: */
     const auto u = /*SIC!*/ momentum(primitive_state);
-    const auto &p = primitive_state[dim + 1];
 
     auto state = primitive_state;
     /* Fix up momentum: */
     for (unsigned int i = 1; i < dim + 1; ++i)
-      state[i] *= rho;
-    /* Compute total energy: */
-    state[dim + 1] = p / (Number(gamma_ - 1.)) + Number(0.5) * rho * u * u;
+      state[i] *= h;
 
     return state;
   }
@@ -878,18 +828,14 @@ namespace ryujin
   HyperbolicSystem::to_primitive_state(
       const dealii::Tensor<1, problem_dim, Number> &state) const
   {
-    constexpr auto dim = problem_dim - 2;
+    constexpr auto dim = problem_dim - 1;
 
-    const auto &rho = state[0];
-    const auto rho_inverse = Number(1.) / rho;
-    const auto p = pressure(state);
+    const auto h_inverse = inverse_water_depth(state);
 
     auto primitive_state = state;
     /* Fix up velocity: */
     for (unsigned int i = 1; i < dim + 1; ++i)
-      primitive_state[i] *= rho_inverse;
-    /* Set pressure: */
-    primitive_state[dim + 1] = p;
+      primitive_state[i] *= h_inverse;
 
     return primitive_state;
   }
@@ -901,7 +847,7 @@ namespace ryujin
       const dealii::Tensor<1, problem_dim, Number> &state,
       const Lambda &lambda) const
   {
-    constexpr auto dim = problem_dim - 2;
+    constexpr auto dim = problem_dim - 1;
 
     auto result = state;
     auto M = lambda(momentum(state));

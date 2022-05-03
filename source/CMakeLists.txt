@@ -63,13 +63,7 @@ set_property(SOURCE time_loop.cc APPEND PROPERTY COMPILE_DEFINITIONS
 # Equation-specific source files:
 #
 
-if("${INSTANTIATED_EQUATIONS}" STREQUAL "")
-  set(INSTANTIATED_EQUATIONS
-    "euler"
-    )
-endif()
-
-foreach(EQUATION ${INSTANTIATED_EQUATIONS})
+macro(setup_equation EQUATION)
   # define obj_${EQUATION} object library:
   add_subdirectory(${EQUATION})
 
@@ -96,4 +90,6 @@ foreach(EQUATION ${INSTANTIATED_EQUATIONS})
 endmacro()
 
 setup_equation("euler")
-setup_equation("shallow_water")
+if(NOT "${DIM}" EQUAL "3")
+  setup_equation("shallow_water")
+endif()
