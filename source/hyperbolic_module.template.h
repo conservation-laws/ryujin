@@ -883,7 +883,7 @@ namespace ryujin
       case IDViolationStrategy::warn:
         n_warnings_++;
         if (dealii::Utilities::MPI::this_mpi_process(mpi_communicator_) == 0)
-          std::cout << "[INFO] Euler module: Insufficient CFL: Invariant "
+          std::cout << "[INFO] Hyperbolic module: Insufficient CFL: Invariant "
                        "domain violation detected"
                     << std::endl;
         break;
