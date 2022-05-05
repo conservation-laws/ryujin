@@ -126,6 +126,7 @@ namespace ryujin
         return all_below_diagonal;
       }
     }
+
   } // namespace
 
 
@@ -489,13 +490,14 @@ namespace ryujin
               thread_ready, i >= n_export_indices && i < n_internal);
 
           const auto U_i = old_U.template get_tensor<T>(i);
-          const auto f_i = hyperbolic_system_->flux(U_i);
+          const auto prec_i = hyperbolic_system_->flux_contribution(i, U_i);
 
-          std::array<HyperbolicSystem::flux_type<dim, T>, stages> f_iHs;
-          for (int s = 0; s < stages; ++s) {
-            const auto temp = stage_U[s].get().template get_tensor<T>(i);
-            f_iHs[s] = hyperbolic_system_->flux(temp);
-          }
+          // FIXME
+          // std::array<HyperbolicSystem::flux_type<dim, T>, stages> f_iHs;
+          // for (int s = 0; s < stages; ++s) {
+          //   const auto temp = stage_U[s].get().template get_tensor<T>(i);
+          //   f_iHs[s] = hyperbolic_system_->flux(temp);
+          // }
 
           auto U_i_new = U_i;
           const auto alpha_i = load_value<T>(alpha_, i);
@@ -521,22 +523,34 @@ namespace ryujin
             const auto c_ij = cij_matrix.template get_tensor<T>(i, col_idx);
             const auto d_ij_inv = Number(1.) / d_ij;
 
-            const auto f_j = hyperbolic_system_->flux(U_j);
-            for (unsigned int k = 0; k < problem_dimension; ++k) {
-              const auto temp = (f_j[k] + f_i[k]) * c_ij;
-              r_i[k] += weight * (-temp) + d_ijH * (U_j[k] - U_i[k]);
-              U_i_new[k] += tau * m_i_inv * (-temp + d_ij * (U_j[k] - U_i[k]));
+            const auto prec_j = hyperbolic_system_->flux_contribution(js, U_j);
+
+            const auto flux_ij = hyperbolic_system_->flux(prec_i, prec_j);
+            U_i_new += tau * m_i_inv * contract(flux_ij, c_ij);
+
+            if constexpr (HyperbolicSystem::have_high_order_flux) {
+              const auto high_order_flux_ij =
+                  hyperbolic_system_->high_order_flux(prec_i, prec_j);
+              r_i += weight * contract(high_order_flux_ij, c_ij);
+            } else {
+              r_i += weight * contract(flux_ij, c_ij);
             }
 
-            for (int s = 0; s < stages; ++s) {
-              for (unsigned int k = 0; k < problem_dimension; ++k) {
-                const auto U_jH = stage_U[s].get().template get_tensor<T>(js);
-                const auto f_jH = hyperbolic_system_->flux(U_jH);
-                const auto temp = (f_jH[k] + f_iHs[s][k]) * c_ij;
-                r_i[k] += stage_weights[s] * (-temp);
-              }
-            }
+            // FIXME
+            r_i += d_ijH * (U_j - U_i);
+            U_i_new += d_ij * (U_j - U_i);
 
+            // FIXME
+            // for (int s = 0; s < stages; ++s) {
+            //   for (unsigned int k = 0; k < problem_dimension;
+            //   ++k) {
+            //     const auto U_jH = stage_U[s].get().template
+            //     get_tensor<T>(js); const auto f_jH =
+            //     hyperbolic_system_->flux(U_jH); const auto temp =
+            //     (f_jH[k] + f_iHs[s][k]) * c_ij; r_i[k] +=
+            //     stage_weights[s] * (-temp);
+            //   }
+            // }
 
             const auto beta_ij =
                 betaij_matrix.template get_entry<T>(i, col_idx);
@@ -617,13 +631,16 @@ namespace ryujin
 
           const auto U_i_new = new_U.template get_tensor<T>(i);
           const auto U_i = old_U.template get_tensor<T>(i);
-          const auto f_i = hyperbolic_system_->flux(U_i);
 
-          std::array<HyperbolicSystem::flux_type<dim, T>, stages> f_iHs;
-          for (int s = 0; s < stages; ++s) {
-            const auto temp = stage_U[s].get().template get_tensor<T>(i);
-            f_iHs[s] = hyperbolic_system_->flux(temp);
-          }
+
+          const auto prec_i = hyperbolic_system_->flux_contribution(i, U_i);
+
+          // FIXME
+          // std::array<HyperbolicSystem::flux_type<dim, T>, stages> f_iHs;
+          // for (int s = 0; s < stages; ++s) {
+          //   const auto temp = stage_U[s].get().template get_tensor<T>(i);
+          //   f_iHs[s] = hyperbolic_system_->flux(temp);
+          // }
 
           const auto r_i = r_.template get_tensor<T>(i);
           const auto alpha_i = load_value<T>(alpha_, i);
@@ -653,23 +670,32 @@ namespace ryujin
 
             auto p_ij = (d_ijH - d_ij) * (U_j - U_i) + b_ij * r_j - b_ji * r_i;
 
+            const auto prec_j = hyperbolic_system_->flux_contribution(js, U_j);
+
+            if constexpr (HyperbolicSystem::have_high_order_flux ||
+                          stages != 0) {
+              const auto flux_ij = hyperbolic_system_->flux(prec_i, prec_j);
+              if constexpr (HyperbolicSystem::have_high_order_flux) {
+                const auto high_order_flux_ij =
+                    hyperbolic_system_->high_order_flux(prec_i, prec_j);
+                p_ij += weight * contract(high_order_flux_ij, c_ij) -
+                        contract(flux_ij, c_ij);
+              } else {
+                p_ij += (weight - Number(1.)) * contract(flux_ij, c_ij);
+              }
+            }
+
             if constexpr (stages != 0) {
-              /* Flux contributions: */
-
-              const auto f_j = hyperbolic_system_->flux(U_j);
-              for (unsigned int k = 0; k < problem_dimension; ++k) {
-                const auto temp = (f_j[k] + f_i[k]) * c_ij;
-                p_ij[k] += (weight - Number(1.)) * (-temp);
-              }
-
-              for (int s = 0; s < stages; ++s) {
-                const auto U_jH = stage_U[s].get().template get_tensor<T>(js);
-                const auto f_jH = hyperbolic_system_->flux(U_jH);
-                for (unsigned int k = 0; k < problem_dimension; ++k) {
-                  const auto temp = (f_jH[k] + f_iHs[s][k]) * c_ij;
-                  p_ij[k] += stage_weights[s] * (-temp);
-                }
-              }
+              // FIXME
+              // for (int s = 0; s < stages; ++s) {
+              //   const auto U_jH = stage_U[s].get().template
+              //   get_tensor<T>(js); const auto f_jH =
+              //   hyperbolic_system_->flux(U_jH); for (unsigned int k = 0; k <
+              //   problem_dimension; ++k) {
+              //     const auto temp = (f_jH[k] + f_iHs[s][k]) * c_ij;
+              //     p_ij[k] += stage_weights[s] * (-temp);
+              //   }
+              // }
             }
 
             p_ij *= factor;
@@ -810,10 +836,6 @@ namespace ryujin
               if (!success)
                 restart_needed = true;
 
-              /*
-               * FIXME: If this if statement causes too much of a performance
-               * penalty we could refactor it outside of the main loop.
-               */
               if (RYUJIN_LIKELY(limiter_iter_ == 2)) {
                 /*
                  * Shortcut: We omit updating the p_ij vector and simply

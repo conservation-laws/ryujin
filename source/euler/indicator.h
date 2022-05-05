@@ -199,7 +199,7 @@ namespace ryujin
 
     d_eta_i = hyperbolic_system.harten_entropy_derivative(U_i);
     d_eta_i[0] -= eta_i * rho_i_inverse;
-    f_i = hyperbolic_system.flux(U_i);
+    f_i = hyperbolic_system.f(U_i);
 
     left = 0.;
     right = 0.;
@@ -221,7 +221,7 @@ namespace ryujin
     const auto rho_j_inverse = Number(1.) / rho_j;
 
     const auto m_j = hyperbolic_system.momentum(U_j);
-    const auto f_j = hyperbolic_system.flux(U_j);
+    const auto f_j = hyperbolic_system.f(U_j);
 
     left += (eta_j * rho_j_inverse - eta_i * rho_i_inverse) * (m_j * c_ij);
     for (unsigned int k = 0; k < problem_dimension; ++k)
