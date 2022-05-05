@@ -306,10 +306,10 @@ namespace ryujin
      * \end{pmatrix},
      * \f]
      */
-    template <int problem_dim, typename Number>
-    flux_type<problem_dim - 2, Number>
-    f(const dealii::Tensor<1, problem_dim, Number> &U) const;
-
+    template <typename ST,
+              int dim = ST::dimension - 2,
+              typename T = typename ST::value_type>
+    flux_type<dim, T> f(const ST &U) const;
 
 
     /**
@@ -332,32 +332,32 @@ namespace ryujin
      *
      * For the Euler equations we precompute <code>f(U_i)</code>.
      */
-    template <int problem_dim, typename Number>
-    prec_type<problem_dim - 2, Number>
-    flux_contribution(const unsigned int i,
-                      const dealii::Tensor<1, problem_dim, Number> &U_i) const;
+    template <typename ST,
+              int dim = ST::dimension - 2,
+              typename T = typename ST::value_type>
+    prec_type<dim, T> flux_contribution(const unsigned int i,
+                                        const ST &U_i) const;
 
-
-    template <int problem_dim, typename Number>
-    prec_type<problem_dim - 2, Number>
-    flux_contribution(const unsigned int *js,
-                      const dealii::Tensor<1, problem_dim, Number> &U_j) const;
+    template <typename ST,
+              int dim = ST::dimension - 2,
+              typename T = typename ST::value_type>
+    prec_type<dim, T> flux_contribution(const unsigned int *js,
+                                        const ST &U_j) const;
 
     /**
      * Given precomputed flux contributions @p prec_i and @p prec_j compute
      * the flux <code>(f(U_i) + f(U_j)</code>
      */
-    template <typename FluxType>
-    FluxType flux(const FluxType &prec_i, const FluxType &prec_j) const;
+    template <typename FT, int dim = FT::dimension - 2>
+    FT flux(const FT &prec_i, const FT &prec_j) const;
 
     /**
      * The low-order and high-order fluxes are the same:
      */
     static constexpr bool have_high_order_flux = false;
 
-    template <typename FluxType>
-    FluxType high_order_flux(const FluxType &prec_i,
-                             const FluxType &prec_j) const;
+    template <typename FT, int dim = FT::dimension - 2>
+    FT high_order_flux(const FT &, const FT &) const;
 
     //@}
     /**
@@ -446,6 +446,7 @@ namespace ryujin
       result[k] = flux_ij[k] * c_ij;
     return result;
   }
+
 
   template <int problem_dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline Number
@@ -879,20 +880,18 @@ namespace ryujin
   }
 
 
-  template <int problem_dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline HyperbolicSystem::flux_type<problem_dim - 2,
-                                                           Number>
-  HyperbolicSystem::f(const dealii::Tensor<1, problem_dim, Number> &U) const
+  template <typename ST, int dim, typename T>
+  DEAL_II_ALWAYS_INLINE inline auto HyperbolicSystem::f(const ST &U) const
+      -> flux_type<dim, T>
   {
-    constexpr int dim = problem_dim - 2;
-    using ScalarNumber = typename get_value_type<Number>::type;
+    using ScalarNumber = typename get_value_type<T>::type;
 
-    const Number rho_inverse = ScalarNumber(1.) / U[0];
+    const T rho_inverse = ScalarNumber(1.) / U[0];
     const auto m = momentum(U);
     const auto p = pressure(U);
-    const Number E = U[dim + 1];
+    const T E = U[dim + 1];
 
-    flux_type<dim, Number> result;
+    flux_type<dim, T> result;
 
     result[0] = m;
     for (unsigned int i = 0; i < dim; ++i) {
@@ -905,35 +904,30 @@ namespace ryujin
   }
 
 
-  template <int problem_dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline HyperbolicSystem::prec_type<problem_dim - 2,
-                                                           Number>
-  HyperbolicSystem::flux_contribution(
-      const unsigned int /*i*/,
-      const dealii::Tensor<1, problem_dim, Number> &U_i) const
+  template <typename ST, int dim, typename T>
+  DEAL_II_ALWAYS_INLINE inline auto
+  HyperbolicSystem::flux_contribution(const unsigned int /*i*/,
+                                      const ST &U_i) const -> prec_type<dim, T>
   {
     return f(U_i);
   }
 
 
-  template <int problem_dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline HyperbolicSystem::prec_type<problem_dim - 2,
-                                                           Number>
-  HyperbolicSystem::flux_contribution(
-      const unsigned int * /*js*/,
-      const dealii::Tensor<1, problem_dim, Number> &U_j) const
+  template <typename ST, int dim, typename T>
+  DEAL_II_ALWAYS_INLINE inline auto
+  HyperbolicSystem::flux_contribution(const unsigned int * /*js*/,
+                                      const ST &U_j) const -> prec_type<dim, T>
   {
     return f(U_j);
   }
 
 
-  template <typename FluxType>
-  DEAL_II_ALWAYS_INLINE inline FluxType
-  HyperbolicSystem::flux(const FluxType &prec_i, const FluxType &prec_j) const
+  template <typename FT, int dim>
+  DEAL_II_ALWAYS_INLINE inline FT HyperbolicSystem::flux(const FT &prec_i,
+                                                         const FT &prec_j) const
   {
-    FluxType result;
-    // FIXME
-    for (unsigned int k = 0; k < DIM + 2; ++k)
+    FT result;
+    for (unsigned int k = 0; k < dim + 2; ++k)
       result[k] = prec_i[k] + prec_j[k];
     return result;
   }
