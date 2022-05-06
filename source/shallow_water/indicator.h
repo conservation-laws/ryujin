@@ -43,21 +43,7 @@ namespace ryujin
     using ScalarNumber = typename get_value_type<Number>::type;
 
     /**
-     * @name Stencil-based computation of indicators
-     *
-     * Intended usage:
-     * ```
-     * Indicator<dim, Number> indicator;
-     * for (unsigned int i = n_internal; i < n_owned; ++i) {
-     *   // ...
-     *   indicator.reset(i, U_i);
-     *   for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
-     *     // ...
-     *     indicator.add(js, U_j, c_ij);
-     *   }
-     *   indicator.alpha(hd_i);
-     * }
-     * ```
+     * @name Precomputation of indicator quantities
      */
     //@{
 
@@ -77,6 +63,26 @@ namespace ryujin
     static PrecomputedValues
     precompute_values(const HyperbolicSystem &hyperbolic_system,
                       const state_type &U);
+
+    //@}
+    /**
+     * @name Stencil-based computation of indicators
+     *
+     * Intended usage:
+     * ```
+     * Indicator<dim, Number> indicator;
+     * for (unsigned int i = n_internal; i < n_owned; ++i) {
+     *   // ...
+     *   indicator.reset(i, U_i);
+     *   for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
+     *     // ...
+     *     indicator.add(js, U_j, c_ij);
+     *   }
+     *   indicator.alpha(hd_i);
+     * }
+     * ```
+     */
+    //@{
 
     /**
      * Constructor taking a HyperbolicSystem instance as argument

@@ -36,7 +36,6 @@ namespace ryujin
      */
     static const std::string problem_name;
 
-
     /**
      * The dimension of the state space.
      */
@@ -81,7 +80,7 @@ namespace ryujin
      * The storage type used for the flux precomputations.
      */
     template <int dim, typename Number>
-    using prec_type = std::array<state_type<dim, Number>, 2>;
+    using prec_type = std::tuple<state_type<dim, Number>, Number>;
 
     /**
      * Constructor.
@@ -96,6 +95,34 @@ namespace ryujin
      */
     void parse_parameters_callback();
 
+    /**
+     * @name Precomputation of flux quantities
+     */
+    //@{
+
+    /**
+     * The number of precomputed values.
+     */
+    template <int dim>
+    static constexpr unsigned int n_precomputed_values = 1;
+
+    /**
+     * Array type used for precomputed values.
+     */
+    template<int dim, typename Number>
+    using PrecomputedValues = std::array<Number, n_precomputed_values<dim>>;
+
+    /**
+     * Precomputed values for a given state.
+     */
+    template <typename MultiComponentVector, int problem_dim, typename Number>
+    void
+    precompute_values(MultiComponentVector &precomputed_values,
+                      unsigned int i,
+                      const dealii::Tensor<1, problem_dim, Number> &U) const;
+
+
+    //@}
     /**
      * @name Computing derived physical quantities.
      */
@@ -255,28 +282,32 @@ namespace ryujin
      * Indicator<dim, Number> indicator;
      * for (unsigned int i = n_internal; i < n_owned; ++i) {
      *   // ...
-     *   const auto prec_i = flux_contribution(i, U_i);
+     *   const auto prec_i = flux_contribution(precomputed..., i, U_i);
      *   for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
      *     // ...
-     *     const auto prec_j = flux_contribution(js, U_j);
-     *     const auto flux_ij = flux(prec_i, prec_j, c_ij);
+     *     const auto prec_j = flux_contribution(precomputed..., js, U_j);
+     *     const auto flux_ij = flux(prec_i, prec_j);
      *   }
      * }
      * ```
-     *
-     * For the Euler equations we precompute <code>f(U_i)</code>.
      */
-    template <typename ST,
+    template <typename MultiComponentVector,
+              typename ST,
               int dim = ST::dimension - 1,
               typename T = typename ST::value_type>
-    prec_type<dim, T> flux_contribution(const unsigned int i,
-                                        const ST &U_i) const;
+    prec_type<dim, T>
+    flux_contribution(const MultiComponentVector &precomputed_values,
+                      const unsigned int i,
+                      const ST &U_i) const;
 
-    template <typename ST,
+    template <typename MultiComponentVector,
+              typename ST,
               int dim = ST::dimension - 1,
               typename T = typename ST::value_type>
-    prec_type<dim, T> flux_contribution(const unsigned int *js,
-                                        const ST &U_j) const;
+    prec_type<dim, T>
+    flux_contribution(const MultiComponentVector &precomputed_values,
+                      const unsigned int *js,
+                      const ST &U_j) const;
 
     /**
      * Given precomputed flux contributions @p prec_i and @p prec_j compute
@@ -285,8 +316,8 @@ namespace ryujin
     template <typename ST,
               int dim = ST::dimension - 1,
               typename T = typename ST::value_type>
-    flux_type<dim, T> flux(const std::array<ST, 2> &prec_i,
-                           const std::array<ST, 2> &prec_j) const;
+    flux_type<dim, T> flux(const std::tuple<ST, T> &prec_i,
+                           const std::tuple<ST, T> &prec_j) const;
 
     /**
      * The low-order and high-order fluxes are the same:
@@ -296,8 +327,8 @@ namespace ryujin
     template <typename ST,
               int dim = ST::dimension - 1,
               typename T = typename ST::value_type>
-    flux_type<dim, T> high_order_flux(const std::array<ST, 2> &prec_i,
-                                      const std::array<ST, 2> &prec_j) const;
+    flux_type<dim, T> high_order_flux(const std::tuple<ST, T> &prec_i,
+                                      const std::tuple<ST, T> &prec_j) const;
 
     //@}
     /**
@@ -391,7 +422,18 @@ namespace ryujin
     //@}
   };
 
+
   /* Inline definitions */
+
+
+  template <typename MCV, int problem_dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline void HyperbolicSystem::precompute_values(
+      MCV & /*precomputed_values*/,
+      unsigned int /*i*/,
+      const dealii::Tensor<1, problem_dim, Number> & /*U*/) const
+  {
+    // do nothing
+  }
 
   template <int problem_dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline Number
@@ -670,6 +712,28 @@ namespace ryujin
   }
 
 
+  template <typename MCV, typename ST, int dim, typename T>
+  DEAL_II_ALWAYS_INLINE inline auto
+  HyperbolicSystem::flux_contribution(const MCV &precomputed_values,
+                                      const unsigned int i,
+                                      const ST &U_i) const -> prec_type<dim, T>
+  {
+    const auto &Z_i = precomputed_values.template get_tensor<T>(i)[0];
+    return {U_i, Z_i};
+  }
+
+
+  template <typename MCV, typename ST, int dim, typename T>
+  DEAL_II_ALWAYS_INLINE inline auto
+  HyperbolicSystem::flux_contribution(const MCV &precomputed_values,
+                                      const unsigned int *js,
+                                      const ST &U_j) const -> prec_type<dim, T>
+  {
+    const auto &Z_j = precomputed_values.template get_tensor<T>(js)[0];
+    return {U_j, Z_j};
+  }
+
+
   template <int dim, typename ST, typename T, int dim2, typename>
   auto HyperbolicSystem::expand_state(const ST &state) const
       -> state_type<dim, T>
@@ -679,6 +743,44 @@ namespace ryujin
     for (unsigned int i = 1; i < dim2 + 1; ++i)
       result[i] = state[i];
 
+    return result;
+  }
+
+
+  template <typename ST, int dim, typename T>
+  DEAL_II_ALWAYS_INLINE inline auto
+  HyperbolicSystem::flux(const std::tuple<ST, T> &prec_i,
+                         const std::tuple<ST, T> &prec_j) const
+      -> flux_type<dim, T>
+  {
+    const auto &[U_i, Z_i] = prec_i;
+    const auto &[U_j, Z_j] = prec_j;
+
+    const auto f_i = f(U_i);
+    const auto f_j = f(U_j);
+
+    flux_type<dim, T> result;
+    for (unsigned int k = 0; k < dim + 2; ++k)
+      result[k] = f_i[k] + f_j[k];
+    return result;
+  }
+
+
+  template <typename ST, int dim, typename T>
+  DEAL_II_ALWAYS_INLINE inline auto
+  HyperbolicSystem::high_order_flux(const std::tuple<ST, T> &prec_i,
+                                    const std::tuple<ST, T> &prec_j) const
+      -> flux_type<dim, T>
+  {
+    const auto &[U_i, Z_i] = prec_i;
+    const auto &[U_j, Z_j] = prec_j;
+
+    const auto f_i = f(U_i);
+    const auto f_j = f(U_j);
+
+    flux_type<dim, T> result;
+    for (unsigned int k = 0; k < dim + 2; ++k)
+      result[k] = f_i[k] + f_j[k];
     return result;
   }
 

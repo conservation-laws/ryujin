@@ -36,6 +36,29 @@ namespace ryujin
     using ScalarNumber = typename get_value_type<Number>::type;
 
     /**
+     * @name Precomputation of indicator quantities
+     */
+    //@{
+
+    /**
+     * The number of precomputed values.
+     */
+    static constexpr unsigned int n_precomputed_values = 1;
+
+    /**
+     * Array type used for precomputed values.
+     */
+    using PrecomputedValues = std::array<Number, n_precomputed_values>;
+
+    /**
+     * Precomputed values for a given state.
+     */
+    static PrecomputedValues
+    precompute_values(const HyperbolicSystem &hyperbolic_system,
+                      const state_type &U);
+
+    //@}
+    /**
      * @name Stencil-based computation of bounds
      *
      * Intended usage:
@@ -64,23 +87,6 @@ namespace ryujin
      * Array type used to store accumulated bounds.
      */
     using Bounds = std::array<Number, n_bounds>;
-
-    /**
-     * The number of precomputed values.
-     */
-    static constexpr unsigned int n_precomputed_values = 1;
-
-    /**
-     * Array type used for precomputed values.
-     */
-    using PrecomputedValues = std::array<Number, n_precomputed_values>;
-
-    /**
-     * Precomputed values for a given state.
-     */
-    static PrecomputedValues
-    precompute_values(const HyperbolicSystem &hyperbolic_system,
-                      const state_type &U);
 
     /**
      * Constructor taking a HyperbolicSystem instance as argument

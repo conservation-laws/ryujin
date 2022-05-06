@@ -77,12 +77,13 @@ namespace ryujin
 
     const auto &scalar_partitioner = offline_data_->scalar_partitioner();
 
-    indicator_precomputed_values_.reinit_with_scalar_partitioner(
+    hyperbolic_system_prec_values_.reinit_with_scalar_partitioner(
         scalar_partitioner);
+
+    indicator_prec_values_.reinit_with_scalar_partitioner(scalar_partitioner);
     alpha_.reinit(scalar_partitioner);
 
-    limiter_precomputed_values_.reinit_with_scalar_partitioner(
-        scalar_partitioner);
+    limiter_prec_values_.reinit_with_scalar_partitioner(scalar_partitioner);
     bounds_.reinit_with_scalar_partitioner(scalar_partitioner);
 
     const auto &vector_partitioner = offline_data_->vector_partitioner();
@@ -200,8 +201,9 @@ namespace ryujin
       Scope scope(computing_timer_, "time step [E] 0 - precompute values");
 
       SynchronizationDispatch synchronization_dispatch([&]() {
-        indicator_precomputed_values_.update_ghost_values_start(channel++);
-        limiter_precomputed_values_.update_ghost_values_start(channel++);
+        hyperbolic_system_prec_values_.update_ghost_values_start(channel++);
+        indicator_prec_values_.update_ghost_values_start(channel++);
+        limiter_prec_values_.update_ghost_values_start(channel++);
       });
 
       RYUJIN_PARALLEL_REGION_BEGIN
@@ -227,13 +229,16 @@ namespace ryujin
 
           const auto U_i = old_U.template get_tensor<T>(i);
 
+          hyperbolic_system_->precompute_values(
+              hyperbolic_system_prec_values_, i, U_i);
+
           const auto ind_val_i =
               Indicator<dim, T>::precompute_values(*hyperbolic_system_, U_i);
-          indicator_precomputed_values_.template write_tensor<T>(ind_val_i, i);
+          indicator_prec_values_.template write_tensor<T>(ind_val_i, i);
 
           const auto lim_val_i =
               Limiter<dim, T>::precompute_values(*hyperbolic_system_, U_i);
-          limiter_precomputed_values_.template write_tensor<T>(lim_val_i, i);
+          limiter_prec_values_.template write_tensor<T>(lim_val_i, i);
         }
       };
 
@@ -253,8 +258,9 @@ namespace ryujin
       Scope scope(computing_timer_, "time step [E] 0 - precompute values");
 #endif
 
-      indicator_precomputed_values_.update_ghost_values_finish();
-      limiter_precomputed_values_.update_ghost_values_finish();
+      hyperbolic_system_prec_values_.update_ghost_values_finish();
+      indicator_prec_values_.update_ghost_values_finish();
+      limiter_prec_values_.update_ghost_values_finish();
     }
 
     /*
@@ -298,7 +304,7 @@ namespace ryujin
         /* Stored thread locally: */
         RiemannSolver<dim, T> riemann_solver(*hyperbolic_system_);
         Indicator<dim, T> indicator(*hyperbolic_system_,
-                                    indicator_precomputed_values_);
+                                    indicator_prec_values_);
         bool thread_ready = false;
 
         RYUJIN_OMP_FOR_NOWAIT
@@ -489,8 +495,7 @@ namespace ryujin
         unsigned int stride_size = get_stride_size<T>;
 
         /* Stored thread locally: */
-        Limiter<dim, T> limiter(*hyperbolic_system_,
-                                limiter_precomputed_values_);
+        Limiter<dim, T> limiter(*hyperbolic_system_, limiter_prec_values_);
         bool thread_ready = false;
 
         RYUJIN_OMP_FOR_NOWAIT
@@ -505,12 +510,14 @@ namespace ryujin
               thread_ready, i >= n_export_indices && i < n_internal);
 
           const auto U_i = old_U.template get_tensor<T>(i);
-          const auto prec_i = hyperbolic_system_->flux_contribution(i, U_i);
+          const auto prec_i = hyperbolic_system_->flux_contribution(
+              hyperbolic_system_prec_values_, i, U_i);
 
           std::array<HyperbolicSystem::prec_type<dim, T>, stages> prec_iHs;
           for (int s = 0; s < stages; ++s) {
             const auto temp = stage_U[s].get().template get_tensor<T>(i);
-            prec_iHs[s] = hyperbolic_system_->flux_contribution(i, temp);
+            prec_iHs[s] = hyperbolic_system_->flux_contribution(
+                hyperbolic_system_prec_values_, i, temp);
           }
 
           auto U_i_new = U_i;
@@ -537,7 +544,8 @@ namespace ryujin
             const auto c_ij = cij_matrix.template get_tensor<T>(i, col_idx);
             const auto d_ij_inv = Number(1.) / d_ij;
 
-            const auto prec_j = hyperbolic_system_->flux_contribution(js, U_j);
+            const auto prec_j = hyperbolic_system_->flux_contribution(
+                hyperbolic_system_prec_values_, js, U_j);
 
             const auto flux_ij = hyperbolic_system_->flux(prec_i, prec_j);
             U_i_new -= tau * m_i_inv * contract(flux_ij, c_ij);
@@ -556,7 +564,8 @@ namespace ryujin
 
             for (int s = 0; s < stages; ++s) {
               const auto U_jH = stage_U[s].get().template get_tensor<T>(js);
-              const auto p = hyperbolic_system_->flux_contribution(js, U_jH);
+              const auto p = hyperbolic_system_->flux_contribution(
+                  hyperbolic_system_prec_values_, js, U_jH);
               const auto flux_ij =
                   HyperbolicSystem::have_high_order_flux
                       ? hyperbolic_system_->high_order_flux(prec_iHs[s], p)
@@ -645,11 +654,13 @@ namespace ryujin
           const auto U_i = old_U.template get_tensor<T>(i);
 
 
-          const auto prec_i = hyperbolic_system_->flux_contribution(i, U_i);
+          const auto prec_i = hyperbolic_system_->flux_contribution(
+              hyperbolic_system_prec_values_, i, U_i);
           std::array<HyperbolicSystem::prec_type<dim, T>, stages> prec_iHs;
           for (int s = 0; s < stages; ++s) {
             const auto temp = stage_U[s].get().template get_tensor<T>(i);
-            prec_iHs[s] = hyperbolic_system_->flux_contribution(i, temp);
+            prec_iHs[s] = hyperbolic_system_->flux_contribution(
+                hyperbolic_system_prec_values_, i, temp);
           }
 
           const auto r_i = r_.template get_tensor<T>(i);
@@ -680,7 +691,8 @@ namespace ryujin
 
             auto p_ij = (d_ijH - d_ij) * (U_j - U_i) + b_ij * r_j - b_ji * r_i;
 
-            const auto prec_j = hyperbolic_system_->flux_contribution(js, U_j);
+            const auto prec_j = hyperbolic_system_->flux_contribution(
+                hyperbolic_system_prec_values_, js, U_j);
 
             if constexpr (HyperbolicSystem::have_high_order_flux ||
                           stages != 0) {
@@ -697,7 +709,8 @@ namespace ryujin
 
             for (int s = 0; s < stages; ++s) {
               const auto U_jH = stage_U[s].get().template get_tensor<T>(js);
-              const auto p = hyperbolic_system_->flux_contribution(js, U_jH);
+              const auto p = hyperbolic_system_->flux_contribution(
+                  hyperbolic_system_prec_values_, js, U_jH);
               const auto flux_ij =
                   HyperbolicSystem::have_high_order_flux
                       ? hyperbolic_system_->high_order_flux(prec_iHs[s], p)

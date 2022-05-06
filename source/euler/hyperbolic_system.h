@@ -97,6 +97,33 @@ namespace ryujin
     void parse_parameters_callback();
 
     /**
+     * @name Precomputation of flux quantities
+     */
+    //@{
+
+    /**
+     * The number of precomputed values.
+     */
+    template<int dim>
+    static constexpr unsigned int n_precomputed_values = 0;
+
+    /**
+     * Array type used for precomputed values.
+     */
+    template<int dim, typename Number>
+    using PrecomputedValues = std::array<Number, n_precomputed_values<dim>>;
+
+    /**
+     * Precomputed values for a given state.
+     */
+    template <typename MultiComponentVector, int problem_dim, typename Number>
+    void
+    precompute_values(MultiComponentVector &precomputed_values,
+                      unsigned int i,
+                      const dealii::Tensor<1, problem_dim, Number> &U) const;
+
+    //@}
+    /**
      * @name Computing derived physical quantities.
      */
     //@{
@@ -302,40 +329,45 @@ namespace ryujin
     flux_type<dim, T> f(const ST &U) const;
 
     /**
-     * Given a state @p U_i and an index @p i precompute flux
-     * contributions.
+     * Given a state @p U_i and an index @p i compute flux contributions.
      *
      * Intended usage:
      * ```
      * Indicator<dim, Number> indicator;
      * for (unsigned int i = n_internal; i < n_owned; ++i) {
      *   // ...
-     *   const auto prec_i = flux_contribution(i, U_i);
+     *   const auto prec_i = flux_contribution(precomputed..., i, U_i);
      *   for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
      *     // ...
-     *     const auto prec_j = flux_contribution(js, U_j);
-     *     const auto flux_ij = flux(prec_i, prec_j, c_ij);
+     *     const auto prec_j = flux_contribution(precomputed..., js, U_j);
+     *     const auto flux_ij = flux(prec_i, prec_j);
      *   }
      * }
      * ```
      *
-     * For the Euler equations we precompute <code>f(U_i)</code>.
+     * For the Euler equations we simply compute <code>f(U_i)</code>.
      */
-    template <typename ST,
+    template <typename MultiComponentVector,
+              typename ST,
               int dim = ST::dimension - 2,
               typename T = typename ST::value_type>
-    prec_type<dim, T> flux_contribution(const unsigned int i,
-                                        const ST &U_i) const;
+    prec_type<dim, T>
+    flux_contribution(const MultiComponentVector &precomputed_values,
+                      const unsigned int i,
+                      const ST &U_i) const;
 
-    template <typename ST,
+    template <typename MultiComponentVector,
+              typename ST,
               int dim = ST::dimension - 2,
               typename T = typename ST::value_type>
-    prec_type<dim, T> flux_contribution(const unsigned int *js,
-                                        const ST &U_j) const;
+    prec_type<dim, T>
+    flux_contribution(const MultiComponentVector &precomputed_values,
+                      const unsigned int *js,
+                      const ST &U_j) const;
 
     /**
-     * Given precomputed flux contributions @p prec_i and @p prec_j compute
-     * the flux <code>(f(U_i) + f(U_j)</code>
+     * Given flux contributions @p prec_i and @p prec_j compute the flux
+     * <code>(f(U_i) + f(U_j)</code>
      */
     template <typename FT, int dim = FT::dimension - 2>
     FT flux(const FT &prec_i, const FT &prec_j) const;
@@ -418,7 +450,19 @@ namespace ryujin
     //@}
   };
 
+
   /* Inline definitions */
+
+
+  template <typename MCV, int problem_dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline void HyperbolicSystem::precompute_values(
+      MCV & /*precomputed_values*/,
+      unsigned int /*i*/,
+      const dealii::Tensor<1, problem_dim, Number> & /*U*/) const
+  {
+    // do nothing
+  }
+
 
   template <int problem_dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline Number
@@ -876,18 +920,20 @@ namespace ryujin
   }
 
 
-  template <typename ST, int dim, typename T>
+  template <typename MCV, typename ST, int dim, typename T>
   DEAL_II_ALWAYS_INLINE inline auto
-  HyperbolicSystem::flux_contribution(const unsigned int /*i*/,
+  HyperbolicSystem::flux_contribution(const MCV & /*precomputed_values*/,
+                                      const unsigned int /*i*/,
                                       const ST &U_i) const -> prec_type<dim, T>
   {
     return f(U_i);
   }
 
 
-  template <typename ST, int dim, typename T>
+  template <typename MCV, typename ST, int dim, typename T>
   DEAL_II_ALWAYS_INLINE inline auto
-  HyperbolicSystem::flux_contribution(const unsigned int * /*js*/,
+  HyperbolicSystem::flux_contribution(const MCV & /*precomputed_values*/,
+                                      const unsigned int * /*js*/,
                                       const ST &U_j) const -> prec_type<dim, T>
   {
     return f(U_j);
