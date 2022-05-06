@@ -288,6 +288,7 @@ namespace ryujin
             if (t < t_ref)
               return false;
 
+            computing_timer_["time loop"].stop();
             Scope scope(computing_timer_, "(re)initialize data structures");
 
             print_info("performing global refinement");
@@ -307,6 +308,7 @@ namespace ryujin
 
             solution_transfer.interpolate(U);
 
+            computing_timer_["time loop"].start();
             return true;
           });
       t_refinements_.erase(new_end, t_refinements_.end());
