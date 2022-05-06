@@ -42,7 +42,7 @@ namespace ryujin
     /**
      * The number of precomputed values.
      */
-    static constexpr unsigned int n_precomputed_values = 1;
+    static constexpr unsigned int n_precomputed_values = 0;
 
     /**
      * Array type used for precomputed values.
@@ -171,6 +171,12 @@ namespace ryujin
 
     Bounds bounds_;
 
+    /* for relaxation */
+
+    Number h_relaxation_numerator;
+    Number kin_relaxation_numerator;
+    Number relaxation_denominator;
+
     //@}
   };
 
@@ -178,7 +184,7 @@ namespace ryujin
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline typename Limiter<dim, Number>::precomputed_type
   Limiter<dim, Number>::precompute_values(
-      const HyperbolicSystem &hyperbolic_system, const state_type &U_i)
+      const HyperbolicSystem &hyperbolic_system, const state_type & /*U_i*/)
   {
     precomputed_type result;
     return result;
@@ -186,19 +192,56 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline void Limiter<dim, Number>::reset(unsigned int i)
+  DEAL_II_ALWAYS_INLINE inline void
+  Limiter<dim, Number>::reset(unsigned int /*i*/)
   {
+    auto &[h_min, h_max, kin_max] = bounds_;
+
+    h_min = Number(std::numeric_limits<ScalarNumber>::max());
+    h_max = Number(0.);
+    kin_max = Number(0.);
+
+    h_relaxation_numerator = Number(0.);
+    kin_relaxation_numerator = Number(0.);
+    relaxation_denominator = Number(0.);
   }
 
 
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline void Limiter<dim, Number>::accumulate(
-      const unsigned int *js,
+      const unsigned int * /*js*/,
       const state_type &U_i,
       const state_type &U_j,
       const dealii::Tensor<1, dim, Number> &scaled_c_ij,
       const Number beta_ij)
   {
+    /* Bounds: */
+
+    auto &[h_min, h_max, kin_max] = bounds_;
+
+    const auto f_i = hyperbolic_system.f(U_i);
+    const auto f_j = hyperbolic_system.f(U_j);
+    const auto U_ij_bar =
+        ScalarNumber(0.5) *
+        (U_i + U_j + contract(f_i, scaled_c_ij) - contract(f_j, scaled_c_ij));
+
+    const auto h_bar_ij = hyperbolic_system.water_depth(U_ij_bar);
+    h_min = std::min(h_min, h_bar_ij);
+    h_max = std::max(h_max, h_bar_ij);
+
+    const auto kin_bar_ij = hyperbolic_system.kinetic_energy(U_ij_bar);
+    kin_max = std::max(kin_max, kin_bar_ij);
+
+    /* Relaxation: */
+
+    const auto h_i = hyperbolic_system.water_depth(U_i);
+    const auto h_j = hyperbolic_system.water_depth(U_j);
+    h_relaxation_numerator += beta_ij * (h_i + h_j);
+
+    const auto kin_i = hyperbolic_system.kinetic_energy(U_i);
+    const auto kin_j = hyperbolic_system.kinetic_energy(U_j);
+    kin_relaxation_numerator += beta_ij * (kin_i + kin_j);
+    relaxation_denominator += beta_ij;
   }
 
 
@@ -206,6 +249,27 @@ namespace ryujin
   DEAL_II_ALWAYS_INLINE inline void
   Limiter<dim, Number>::apply_relaxation(Number hd_i)
   {
+    auto &[h_min, h_max, kin_max] = bounds_;
+
+    constexpr unsigned int relaxation_order_ = 3;
+    const Number r_i =
+        Number(2.) * dealii::Utilities::fixed_power<relaxation_order_>(
+                         std::sqrt(std::sqrt(hd_i)));
+
+    constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
+
+    const Number h_relaxation =
+        std::abs(h_relaxation_numerator) /
+        (std::abs(relaxation_denominator) + Number(eps));
+
+    h_min = std::max((Number(1.) - r_i) * h_min, h_min - h_relaxation);
+    h_max = std::min((Number(1.) + r_i) * h_max, h_max + h_relaxation);
+
+    const Number kin_relaxation =
+        std::abs(kin_relaxation_numerator) /
+        (std::abs(relaxation_denominator) + Number(eps));
+
+    kin_max = std::min((Number(1.) + r_i) * kin_max, kin_max + kin_relaxation);
   }
 
 
