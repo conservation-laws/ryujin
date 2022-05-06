@@ -375,12 +375,12 @@ namespace ryujin
      *
      * @precondition dim1 has to be larger or equal than dim2.
      */
-    template <int dim1,
-              int prob_dim2,
-              typename Number,
-              typename = typename std::enable_if<(dim1 + 2 >= prob_dim2)>::type>
-    state_type<dim1, Number>
-    expand_state(const dealii::Tensor<1, prob_dim2, Number> &state) const;
+    template <int dim,
+              typename ST,
+              typename T = typename ST::value_type,
+              int dim2 = ST::dimension - 2,
+              typename = typename std::enable_if<(dim >= dim2)>::type>
+    state_type<dim, T> expand_state(const ST &state) const;
 
     /*
      * Given a primitive state [rho, u_1, ..., u_d, p] return a conserved
@@ -933,15 +933,13 @@ namespace ryujin
   }
 
 
-  template <int dim1, int prob_dim2, typename Number, typename>
-  HyperbolicSystem::state_type<dim1, Number> HyperbolicSystem::expand_state(
-      const dealii::Tensor<1, prob_dim2, Number> &state) const
+  template <int dim, typename ST, typename T, int dim2, typename>
+  auto HyperbolicSystem::expand_state(const ST &state) const
+      -> state_type<dim, T>
   {
-    constexpr auto dim2 = prob_dim2 - 2;
-
-    state_type<dim1, Number> result;
+    state_type<dim, T> result;
     result[0] = state[0];
-    result[dim1 + 1] = state[dim2 + 1];
+    result[dim + 1] = state[dim2 + 1];
     for (unsigned int i = 1; i < dim2 + 1; ++i)
       result[i] = state[i];
 
