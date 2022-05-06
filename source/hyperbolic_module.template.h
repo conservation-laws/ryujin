@@ -551,6 +551,16 @@ namespace ryujin
             const auto flux_ij = hyperbolic_system_->flux(prec_i, prec_j);
             U_i_new -= tau * m_i_inv * contract(flux_ij, c_ij);
 
+            if constexpr (HyperbolicSystem::have_equilibrated_states) {
+              const auto &[U_star_ij, U_star_ji] =
+                  hyperbolic_system_->equilibrated_states(prec_i, prec_j);
+              r_i += d_ijH * (U_star_ji - U_star_ij);
+              U_i_new += tau * m_i_inv * d_ij * (U_star_ji - U_star_ij);
+            } else {
+              r_i += d_ijH * (U_j - U_i);
+              U_i_new += tau * m_i_inv * d_ij * (U_j - U_i);
+            }
+
             if constexpr (HyperbolicSystem::have_high_order_flux) {
               const auto high_order_flux_ij =
                   hyperbolic_system_->high_order_flux(prec_i, prec_j);
@@ -558,10 +568,6 @@ namespace ryujin
             } else {
               r_i -= weight * contract(flux_ij, c_ij);
             }
-
-            // FIXME
-            r_i += d_ijH * (U_j - U_i);
-            U_i_new += tau * m_i_inv * d_ij * (U_j - U_i);
 
             for (int s = 0; s < stages; ++s) {
               const auto U_jH = stage_U[s].get().template get_tensor<T>(js);
@@ -654,7 +660,6 @@ namespace ryujin
           const auto U_i_new = new_U.template get_tensor<T>(i);
           const auto U_i = old_U.template get_tensor<T>(i);
 
-
           const auto prec_i = hyperbolic_system_->flux_contribution(
               hyperbolic_system_prec_values_, i, U_i);
           std::array<HyperbolicSystem::prec_type<dim, T>, stages> prec_iHs;
@@ -688,12 +693,22 @@ namespace ryujin
             const auto b_ij = (col_idx == 0 ? T(1.) : T(0.)) - m_ij * m_j_inv;
             const auto b_ji = (col_idx == 0 ? T(1.) : T(0.)) - m_ij * m_i_inv;
 
-            /* Contributions from graph viscosity and mass matrix correction: */
-
-            auto p_ij = (d_ijH - d_ij) * (U_j - U_i) + b_ij * r_j - b_ji * r_i;
-
             const auto prec_j = hyperbolic_system_->flux_contribution(
                 hyperbolic_system_prec_values_, js, U_j);
+
+            /* Contributions from graph viscosity and mass matrix correction: */
+
+            auto p_ij = b_ij * r_j - b_ji * r_i;
+
+            if constexpr (HyperbolicSystem::have_equilibrated_states) {
+              const auto &[U_star_ij, U_star_ji] =
+                  hyperbolic_system_->equilibrated_states(prec_i, prec_j);
+              p_ij += (d_ijH - d_ij) * (U_star_ji - U_star_ij);
+            } else {
+              p_ij += (d_ijH - d_ij) * (U_j - U_i);
+            }
+
+            /* Flux terms: */
 
             if constexpr (HyperbolicSystem::have_high_order_flux ||
                           stages != 0) {

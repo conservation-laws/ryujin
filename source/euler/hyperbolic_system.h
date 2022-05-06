@@ -372,7 +372,19 @@ namespace ryujin
     static constexpr bool have_high_order_flux = false;
 
     template <typename FT, int dim = FT::dimension - 2>
-    FT high_order_flux(const FT &, const FT &) const;
+    FT high_order_flux(const FT &, const FT &) const = delete;
+
+    /**
+     * We do not perform state equilibration
+     */
+    static constexpr bool have_equilibrated_states = false;
+
+    template <typename FT,
+              int dim = FT::dimension - 2,
+              typename TT = typename FT::value_type,
+              typename T = typename TT::value_type>
+    std::array<state_type<dim, T>, 2>
+    equilibrated_states(const FT &prec_i, const FT &prec_j) = delete;
 
     //@}
     /**

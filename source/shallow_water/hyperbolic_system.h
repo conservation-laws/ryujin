@@ -260,6 +260,18 @@ namespace ryujin
 
 
     /**
+     * For a given (1+dim dimensional) state vector <code>U</code> and
+     * left/right topography states <code>Z_left</code> and
+     * <code>Z_right</code>, return the star_state <code>U_star</code>
+     */
+    template <int problem_dim, typename Number>
+    dealii::Tensor<1, problem_dim, Number>
+    star_state(const dealii::Tensor<1, problem_dim, Number> &U,
+               const Number &Z_left,
+               const Number &Z_right) const;
+
+
+    /**
      * Given a state @p U compute the flux
      * \f[
      * \begin{pmatrix}
@@ -311,7 +323,8 @@ namespace ryujin
 
     /**
      * Given precomputed flux contributions @p prec_i and @p prec_j compute
-     * the flux <code>(f(U_i) + f(U_j)</code>
+     * the equilibrated, low-order flux \f$(f(U_i^{\ast,j}) +
+     * f(U_j^{\ast,i})\f$
      */
     template <typename ST,
               int dim = ST::dimension - 1,
@@ -319,16 +332,31 @@ namespace ryujin
     flux_type<dim, T> flux(const std::tuple<ST, T> &prec_i,
                            const std::tuple<ST, T> &prec_j) const;
 
-    /**
-     * The low-order and high-order fluxes are the same:
-     */
     static constexpr bool have_high_order_flux = true;
 
+    /**
+     * Given precomputed flux contributions @p prec_i and @p prec_j compute
+     * the high-order flux \f$(f(U_i}) + f(U_j\f$
+     */
     template <typename ST,
               int dim = ST::dimension - 1,
               typename T = typename ST::value_type>
     flux_type<dim, T> high_order_flux(const std::tuple<ST, T> &prec_i,
                                       const std::tuple<ST, T> &prec_j) const;
+
+    static constexpr bool have_equilibrated_states = true;
+
+    /**
+     * Given precomputed flux contributions @p prec_i and @p prec_j compute
+     * the equilibrated, low-order flux \f$(f(U_i^{\ast,j}) +
+     * f(U_j^{\ast,i})\f$
+     */
+    template <typename ST,
+              int dim = ST::dimension - 1,
+              typename T = typename ST::value_type>
+    std::array<ST, 2>
+    equilibrated_states(const std::tuple<ST, T> &prec_i,
+                        const std::tuple<ST, T> &prec_j) const;
 
     //@}
     /**
@@ -693,6 +721,21 @@ namespace ryujin
   }
 
 
+  template <int problem_dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, problem_dim, Number>
+  HyperbolicSystem::star_state(
+      const dealii::Tensor<1, problem_dim, Number> &U_left,
+      const Number &Z_left,
+      const Number &Z_right) const
+  {
+    const Number Z_max = std::max(Z_left, Z_right);
+    const Number h = water_depth(U_left);
+    const Number H_star = std::max(Number(0.), h + Z_left - Z_max);
+
+    return U_left * H_star * inverse_water_depth(U_left);
+  }
+
+
   template <typename ST, int dim, typename T>
   DEAL_II_ALWAYS_INLINE inline auto HyperbolicSystem::f(const ST &U) const
       -> flux_type<dim, T>
@@ -734,30 +777,16 @@ namespace ryujin
   }
 
 
-  template <int dim, typename ST, typename T, int dim2, typename>
-  auto HyperbolicSystem::expand_state(const ST &state) const
-      -> state_type<dim, T>
-  {
-    state_type<dim, T> result;
-    result[0] = state[0];
-    for (unsigned int i = 1; i < dim2 + 1; ++i)
-      result[i] = state[i];
-
-    return result;
-  }
-
-
   template <typename ST, int dim, typename T>
   DEAL_II_ALWAYS_INLINE inline auto
   HyperbolicSystem::flux(const std::tuple<ST, T> &prec_i,
                          const std::tuple<ST, T> &prec_j) const
       -> flux_type<dim, T>
   {
-    const auto &[U_i, Z_i] = prec_i;
-    const auto &[U_j, Z_j] = prec_j;
+    const auto &[U_star_ij, U_star_ji] = equilibrated_states(prec_i, prec_j);
 
-    const auto f_i = f(U_i);
-    const auto f_j = f(U_j);
+    const auto f_i = f(U_star_ij);
+    const auto f_j = f(U_star_ji);
 
     flux_type<dim, T> result;
     for (unsigned int k = 0; k < dim + 1; ++k)
@@ -781,6 +810,31 @@ namespace ryujin
     flux_type<dim, T> result;
     for (unsigned int k = 0; k < dim + 1; ++k)
       result[k] = f_i[k] + f_j[k];
+    return result;
+  }
+
+  template <typename ST, int dim, typename T>
+  DEAL_II_ALWAYS_INLINE inline std::array<ST, 2>
+  HyperbolicSystem::equilibrated_states(const std::tuple<ST, T> &prec_i,
+                                        const std::tuple<ST, T> &prec_j) const
+  {
+    const auto &[U_i, Z_i] = prec_i;
+    const auto &[U_j, Z_j] = prec_j;
+    const auto U_star_ij = star_state(U_i, Z_i, Z_j);
+    const auto U_star_ji = star_state(U_j, Z_j, Z_i);
+    return {U_star_ij, U_star_ji};
+  }
+
+
+  template <int dim, typename ST, typename T, int dim2, typename>
+  auto HyperbolicSystem::expand_state(const ST &state) const
+      -> state_type<dim, T>
+  {
+    state_type<dim, T> result;
+    result[0] = state[0];
+    for (unsigned int i = 1; i < dim2 + 1; ++i)
+      result[i] = state[i];
+
     return result;
   }
 
