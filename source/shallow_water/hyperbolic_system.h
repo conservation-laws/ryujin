@@ -790,15 +790,11 @@ namespace ryujin
   HyperbolicSystem::from_primitive_state(
       const dealii::Tensor<1, problem_dim, Number> &primitive_state) const
   {
-    constexpr auto dim = problem_dim - 1;
-
     const auto &h = primitive_state[0];
-    /* extract velocity: */
-    const auto u = /*SIC!*/ momentum(primitive_state);
 
     auto state = primitive_state;
     /* Fix up momentum: */
-    for (unsigned int i = 1; i < dim + 1; ++i)
+    for (unsigned int i = 1; i < problem_dim; ++i)
       state[i] *= h;
 
     return state;
@@ -810,13 +806,11 @@ namespace ryujin
   HyperbolicSystem::to_primitive_state(
       const dealii::Tensor<1, problem_dim, Number> &state) const
   {
-    constexpr auto dim = problem_dim - 1;
-
     const auto h_inverse = inverse_water_depth(state);
 
     auto primitive_state = state;
     /* Fix up velocity: */
-    for (unsigned int i = 1; i < dim + 1; ++i)
+    for (unsigned int i = 1; i < problem_dim; ++i)
       primitive_state[i] *= h_inverse;
 
     return primitive_state;

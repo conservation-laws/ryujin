@@ -5,8 +5,9 @@
 
 #pragma once
 
-#include <deal.II/base/tensor.h>
 #include <initial_state.h>
+
+#include <deal.II/base/tensor.h>
 
 namespace ryujin
 {
@@ -14,7 +15,7 @@ namespace ryujin
   {
     /**
      * Ritter's dam break solution. This is one-dimensional dam break without
-     * friction. See: Sec.~7.3 in Guermond et al 2018.
+     * friction. See: Sec.~7.3 in @cite GuermondEtAl2018SW.
      *
      * @ingroup InitialValues
      */
