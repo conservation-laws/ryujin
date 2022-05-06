@@ -19,7 +19,7 @@ namespace ryujin
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline Number
   RiemannSolver<dim, Number>::f(const primitive_type &riemann_data,
-                                const Number &h_Z)
+                                const Number &h_Z) const
   {
     using ScalarNumber = typename get_value_type<Number>::type;
 
@@ -40,7 +40,7 @@ namespace ryujin
   DEAL_II_ALWAYS_INLINE inline Number
   RiemannSolver<dim, Number>::phi(const primitive_type &riemann_data_i,
                                   const primitive_type &riemann_data_j,
-                                  const Number &h)
+                                  const Number &h) const
   {
     const Number &u_i = riemann_data_i[1];
     const Number &u_j = riemann_data_j[1];
@@ -52,7 +52,7 @@ namespace ryujin
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline Number
   RiemannSolver<dim, Number>::lambda1_minus(const primitive_type &riemann_data,
-                                            const Number h_star)
+                                            const Number h_star) const
   {
     using ScalarNumber = typename get_value_type<Number>::type;
 
@@ -69,7 +69,7 @@ namespace ryujin
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline Number
   RiemannSolver<dim, Number>::lambda3_plus(const primitive_type &riemann_data,
-                                           const Number h_star)
+                                           const Number h_star) const
   {
     using ScalarNumber = typename get_value_type<Number>::type;
 
@@ -88,7 +88,7 @@ namespace ryujin
   RiemannSolver<dim, Number>::compute_lambda(
       const primitive_type &riemann_data_i,
       const primitive_type &riemann_data_j,
-      const Number h_star)
+      const Number h_star) const
   {
     const Number lambda1 = lambda1_minus(riemann_data_i, h_star);
     const Number lambda3 = lambda3_plus(riemann_data_j, h_star);
@@ -101,7 +101,7 @@ namespace ryujin
   DEAL_II_ALWAYS_INLINE inline Number
   RiemannSolver<dim, Number>::h_star_two_rarefaction(
       const primitive_type &riemann_data_i,
-      const primitive_type &riemann_data_j)
+      const primitive_type &riemann_data_j) const
   {
     using ScalarNumber = typename get_value_type<Number>::type;
 
@@ -166,7 +166,7 @@ namespace ryujin
   RiemannSolver<dim, Number>::riemann_data_from_state(
       const HyperbolicSystem &hyperbolic_system,
       const state_type &U,
-      const dealii::Tensor<1, dim, Number> &n_ij) -> primitive_type
+      const dealii::Tensor<1, dim, Number> &n_ij) const -> primitive_type
   {
     const auto h = std::max(hyperbolic_system.water_depth(U), Number(h_tiny));
 
@@ -181,9 +181,9 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  inline Number
-  RiemannSolver<dim, Number>::compute(const primitive_type &riemann_data_i,
-                                      const primitive_type &riemann_data_j)
+  inline Number RiemannSolver<dim, Number>::compute(
+      const primitive_type &riemann_data_i,
+      const primitive_type &riemann_data_j) const
   {
     const Number h_star =
         h_star_two_rarefaction(riemann_data_i, riemann_data_j);
@@ -199,7 +199,7 @@ namespace ryujin
   Number RiemannSolver<dim, Number>::compute(
       const state_type &U_i,
       const state_type &U_j,
-      const dealii::Tensor<1, dim, Number> &n_ij)
+      const dealii::Tensor<1, dim, Number> &n_ij) const
   {
     const auto riemann_data_i =
         riemann_data_from_state(hyperbolic_system, U_i, n_ij);

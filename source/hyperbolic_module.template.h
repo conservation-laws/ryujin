@@ -573,11 +573,14 @@ namespace ryujin
               const auto U_jH = stage_U[s].get().template get_tensor<T>(js);
               const auto p = hyperbolic_system_->flux_contribution(
                   hyperbolic_system_prec_values_, js, U_jH);
-              const auto flux_ij =
-                  HyperbolicSystem::have_high_order_flux
-                      ? hyperbolic_system_->high_order_flux(prec_iHs[s], p)
-                      : hyperbolic_system_->flux(prec_iHs[s], p);
-              r_i -= stage_weights[s] * contract(flux_ij, c_ij);
+              if constexpr (HyperbolicSystem::have_high_order_flux) {
+                const auto high_order_flux_ij =
+                    hyperbolic_system_->high_order_flux(prec_iHs[s], p);
+                r_i -= stage_weights[s] * contract(high_order_flux_ij, c_ij);
+              } else {
+                const auto flux_ij = hyperbolic_system_->flux(prec_iHs[s], p);
+                r_i -= stage_weights[s] * contract(flux_ij, c_ij);
+              }
             }
 
             const auto beta_ij =
@@ -727,11 +730,15 @@ namespace ryujin
               const auto U_jH = stage_U[s].get().template get_tensor<T>(js);
               const auto p = hyperbolic_system_->flux_contribution(
                   hyperbolic_system_prec_values_, js, U_jH);
-              const auto flux_ij =
-                  HyperbolicSystem::have_high_order_flux
-                      ? hyperbolic_system_->high_order_flux(prec_iHs[s], p)
-                      : hyperbolic_system_->flux(prec_iHs[s], p);
-              p_ij -= stage_weights[s] * contract(flux_ij, c_ij);
+
+              if constexpr (HyperbolicSystem::have_high_order_flux) {
+                const auto high_order_flux_ij =
+                    hyperbolic_system_->high_order_flux(prec_iHs[s], p);
+                p_ij -= stage_weights[s] * contract(high_order_flux_ij, c_ij);
+              } else {
+                const auto flux_ij = hyperbolic_system_->flux(prec_iHs[s], p);
+                p_ij -= stage_weights[s] * contract(flux_ij, c_ij);
+              }
             }
 
             p_ij *= factor;

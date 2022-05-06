@@ -35,6 +35,9 @@ namespace ryujin
     static constexpr unsigned int problem_dimension =
         HyperbolicSystem::problem_dimension<dim>;
 
+    static constexpr unsigned int riemann_data_size = 4;
+    using primitive_type = std::array<Number, riemann_data_size>;
+
     /**
      * @copydoc HyperbolicSystem::state_type
      */
@@ -68,8 +71,8 @@ namespace ryujin
      * compute an estimation of an upper bound for the maximum wavespeed
      * lambda.
      */
-    Number compute(const std::array<Number, 4> &riemann_data_i,
-                   const std::array<Number, 4> &riemann_data_j);
+    Number compute(const primitive_type &riemann_data_i,
+                   const primitive_type &riemann_data_j) const;
 
     /**
      * For two given states U_i a U_j and a (normalized) "direction" n_ij
@@ -80,7 +83,7 @@ namespace ryujin
      */
     Number compute(const state_type &U_i,
                    const state_type &U_j,
-                   const dealii::Tensor<1, dim, Number> &n_ij);
+                   const dealii::Tensor<1, dim, Number> &n_ij) const;
 
     //@}
 
@@ -102,8 +105,8 @@ namespace ryujin
      *
      * Cost: 0x pow, 2x division, 2x sqrt
      */
-    Number phi_of_p_max(const std::array<Number, 4> &riemann_data_i,
-                        const std::array<Number, 4> &riemann_data_j);
+    Number phi_of_p_max(const primitive_type &riemann_data_i,
+                        const primitive_type &riemann_data_j) const;
 
 
     /**
@@ -111,8 +114,8 @@ namespace ryujin
      *
      * Cost: 0x pow, 1x division, 1x sqrt
      */
-    Number lambda1_minus(const std::array<Number, 4> &riemann_data,
-                         const Number p_star);
+    Number lambda1_minus(const primitive_type &riemann_data,
+                         const Number p_star) const;
 
 
     /**
@@ -120,8 +123,8 @@ namespace ryujin
      *
      * Cost: 0x pow, 1x division, 1x sqrt
      */
-    Number lambda3_plus(const std::array<Number, 4> &primitive_state,
-                        const Number p_star);
+    Number lambda3_plus(const primitive_type &primitive_state,
+                        const Number p_star) const;
 
 
     /**
@@ -135,9 +138,9 @@ namespace ryujin
      *
      * Cost: 0x pow, 2x division, 2x sqrt
      */
-    Number compute_lambda(const std::array<Number, 4> &riemann_data_i,
-                          const std::array<Number, 4> &riemann_data_j,
-                          const Number p_star);
+    Number compute_lambda(const primitive_type &riemann_data_i,
+                          const primitive_type &riemann_data_j,
+                          const Number p_star) const;
 
 
     /**
@@ -148,8 +151,8 @@ namespace ryujin
      *
      * Cost: 2x pow, 2x division, 0x sqrt
      */
-    Number p_star_two_rarefaction(const std::array<Number, 4> &riemann_data_i,
-                                  const std::array<Number, 4> &riemann_data_j);
+    Number p_star_two_rarefaction(const primitive_type &riemann_data_i,
+                                  const primitive_type &riemann_data_j) const;
 
 
     /**
@@ -159,10 +162,10 @@ namespace ryujin
      * compute and return the Riemann data [rho, u, p, a] (used in the
      * approximative Riemann solver).
      */
-    std::array<Number, 4>
+    primitive_type
     riemann_data_from_state(const HyperbolicSystem &hyperbolic_system,
                             const HyperbolicSystem::state_type<dim, Number> &U,
-                            const dealii::Tensor<1, dim, Number> &n_ij);
+                            const dealii::Tensor<1, dim, Number> &n_ij) const;
 
   private:
     const HyperbolicSystem &hyperbolic_system;

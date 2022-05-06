@@ -70,7 +70,7 @@ namespace ryujin
      * lambda.
      */
     Number compute(const primitive_type &riemann_data_i,
-                   const primitive_type &riemann_data_j);
+                   const primitive_type &riemann_data_j) const;
 
     /**
      * For two given states U_i a U_j and a (normalized) "direction" n_ij
@@ -81,7 +81,7 @@ namespace ryujin
      */
     Number compute(const state_type &U_i,
                    const state_type &U_j,
-                   const dealii::Tensor<1, dim, Number> &n_ij);
+                   const dealii::Tensor<1, dim, Number> &n_ij) const;
 
 
   protected:
@@ -91,29 +91,29 @@ namespace ryujin
      */
     //@{
 
-    Number f(const primitive_type &primitive_state, const Number &h_star);
+    Number f(const primitive_type &primitive_state, const Number &h_star) const;
 
     Number phi(const primitive_type &riemann_data_i,
                const primitive_type &riemann_data_j,
-               const Number &h);
+               const Number &h) const;
 
     Number lambda1_minus(const primitive_type &riemann_data,
-                         const Number h_star);
+                         const Number h_star) const;
 
     Number lambda3_plus(const primitive_type &riemann_data,
-                        const Number h_star);
+                        const Number h_star) const;
 
     Number compute_lambda(const primitive_type &riemann_data_i,
                           const primitive_type &riemann_data_j,
-                          const Number h_star);
+                          const Number h_star) const;
 
     Number h_star_two_rarefaction(const primitive_type &riemann_data_i,
-                                  const primitive_type &riemann_data_j);
+                                  const primitive_type &riemann_data_j) const;
 
     primitive_type
     riemann_data_from_state(const HyperbolicSystem &hyperbolic_system,
                             const state_type &U,
-                            const dealii::Tensor<1, dim, Number> &n_ij);
+                            const dealii::Tensor<1, dim, Number> &n_ij) const;
 
   private:
     const HyperbolicSystem &hyperbolic_system;
