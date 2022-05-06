@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2020 - 2021 by the ryujin authors
+// Copyright (C) 2020 - 2022 by the ryujin authors
 //
 
 #pragma once
@@ -32,9 +32,8 @@ namespace ryujin
     /**
      * @copydoc HyperbolicSystem::problem_dimension
      */
-    // clang-format off
-    static constexpr unsigned int problem_dimension = HyperbolicSystem::problem_dimension<dim>;
-    // clang-format on
+    static constexpr unsigned int problem_dimension =
+        HyperbolicSystem::problem_dimension<dim>;
 
     /**
      * @copydoc HyperbolicSystem::state_type

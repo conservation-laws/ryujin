@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2020 - 2021 by the ryujin authors
+// Copyright (C) 2020 - 2022 by the ryujin authors
 //
 
 #pragma once
@@ -18,7 +18,7 @@ namespace ryujin
    * The convex limiter.
    *
    * The class implements a convex limiting technique as described in
-   * @cite GuermondEtAl2018 and @cite ryujin-2021-1. Given a
+   * @cite GuermondEtAl2018 and @cite ryujin-2022-1. Given a
    * computed set of bounds and an update direction \f$\mathbf P_{ij}\f$
    * one can now determine a candidate \f$\tilde l_{ij}\f$ by computing
    *
@@ -30,7 +30,7 @@ namespace ryujin
    *   \phi_{\text{min}}\,\le\,\phi\,(\mathbf U_{i}+\tilde l_{ij}\mathbf
    * P_{ij})\Big\}, \f}
    *
-   * where \f$\psi\f$ denots the specific entropy @cite ryujin-2021-1.
+   * where \f$\psi\f$ denots the specific entropy @cite ryujin-2022-1.
    *
    * Algorithmically this is accomplished as follows: Given an initial
    * interval \f$[t_L,t_R]\f$, where \f$t_L\f$ is a good state, we first
@@ -51,9 +51,8 @@ namespace ryujin
     /**
      * @copydoc HyperbolicSystem::problem_dimension
      */
-    // clang-format off
-    static constexpr unsigned int problem_dimension = HyperbolicSystem::problem_dimension<dim>;
-    // clang-format on
+    static constexpr unsigned int problem_dimension =
+        HyperbolicSystem::problem_dimension<dim>;
 
     /**
      * @copydoc HyperbolicSystem::state_type
@@ -261,8 +260,7 @@ namespace ryujin
     const auto rho_j = hyperbolic_system.density(U_j);
     const auto m_j = hyperbolic_system.momentum(U_j);
     const auto rho_ij_bar =
-        ScalarNumber(0.5) *
-        (rho_i + rho_j + (m_i - m_j) * scaled_c_ij);
+        ScalarNumber(0.5) * (rho_i + rho_j + (m_i - m_j) * scaled_c_ij);
     rho_min = std::min(rho_min, rho_ij_bar);
     rho_max = std::max(rho_max, rho_ij_bar);
 

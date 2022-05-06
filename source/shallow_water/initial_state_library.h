@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2020 - 2021 by the ryujin authors
+// Copyright (C) 2020 - 2022 by the ryujin authors
 //
 
 #pragma once
@@ -24,10 +24,11 @@ namespace ryujin
                                      const HyperbolicSystem &hyperbolic_system,
                                      const std::string &subsection)
     {
-//       using N = Number;
-//       const auto &h = hyperbolic_system;
-//       const auto &s = subsection;
-//       initial_state_list.emplace(std::make_unique<Uniform<dim, N>>(h, s));
+      //       using N = Number;
+      //       const auto &h = hyperbolic_system;
+      //       const auto &s = subsection;
+      //       initial_state_list.emplace(std::make_unique<Uniform<dim, N>>(h,
+      //       s));
     }
 
   } // namespace InitialStateLibrary

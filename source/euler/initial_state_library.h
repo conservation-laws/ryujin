@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2020 - 2021 by the ryujin authors
+// Copyright (C) 2020 - 2022 by the ryujin authors
 //
 
 #pragma once
@@ -26,7 +26,8 @@ namespace ryujin
 
       Uniform(const HyperbolicSystem &hyperbolic_system,
               const std::string subsection)
-          : InitialState<dim, Number, HyperbolicSystem>(hyperbolic_system, "uniform", subsection)
+          : InitialState<dim, Number, HyperbolicSystem>(
+                hyperbolic_system, "uniform", subsection)
       {
         primitive_[0] = this->hyperbolic_system.gamma();
         primitive_[1] = 3.0;
@@ -65,7 +66,8 @@ namespace ryujin
 
       RampUp(const HyperbolicSystem &hyperbolic_system,
              const std::string subsection)
-          : InitialState<dim, Number, HyperbolicSystem>(hyperbolic_system, "ramp up", subsection)
+          : InitialState<dim, Number, HyperbolicSystem>(
+                hyperbolic_system, "ramp up", subsection)
       {
         primitive_initial_[0] = this->hyperbolic_system.gamma();
         primitive_initial_[1] = 0.0;
@@ -142,7 +144,8 @@ namespace ryujin
 
       Contrast(const HyperbolicSystem &hyperbolic_system,
                const std::string subsection)
-          : InitialState<dim, Number, HyperbolicSystem>(hyperbolic_system, "contrast", subsection)
+          : InitialState<dim, Number, HyperbolicSystem>(
+                hyperbolic_system, "contrast", subsection)
       {
         primitive_left_[0] = this->hyperbolic_system.gamma();
         primitive_left_[1] = 0.0;

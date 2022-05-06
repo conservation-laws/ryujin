@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2020 - 2021 by the ryujin authors
+// Copyright (C) 2020 - 2022 by the ryujin authors
 //
 
 #pragma once
@@ -20,7 +20,7 @@ namespace ryujin
 
   /**
    * Perform one step of a quadratic Newton iteration, see
-   * @cite ryujin-2021-1, Algorithm 3.
+   * @cite ryujin-2022-1, Algorithm 3.
    *
    * For this, it has to hold true that \f$p_1\le p^\ast\le p_2\f$, and
    * \f$\phi(p_1)\le 0\le \phi(p_2)\f$, or \f$\phi(p_1)\ge 0\ge

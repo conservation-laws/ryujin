@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2020 - 2021 by the ryujin authors
+// Copyright (C) 2020 - 2022 by the ryujin authors
 //
 
 #pragma once
@@ -104,13 +104,13 @@ namespace ryujin
     /**
      * The number of precomputed values.
      */
-    template<int dim>
+    template <int dim>
     static constexpr unsigned int n_precomputed_values = 0;
 
     /**
      * Array type used for precomputed values.
      */
-    template<int dim, typename Number>
+    template <int dim, typename Number>
     using PrecomputedValues = std::array<Number, n_precomputed_values<dim>>;
 
     /**
