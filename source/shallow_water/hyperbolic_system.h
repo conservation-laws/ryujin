@@ -110,7 +110,7 @@ namespace ryujin
      * Array type used for precomputed values.
      */
     template <int dim, typename Number>
-    using PrecomputedValues = std::array<Number, n_precomputed_values<dim>>;
+    using precomputed_type = std::array<Number, n_precomputed_values<dim>>;
 
     /**
      * Precomputed values for a given state.
@@ -760,7 +760,7 @@ namespace ryujin
     const auto f_j = f(U_j);
 
     flux_type<dim, T> result;
-    for (unsigned int k = 0; k < dim + 2; ++k)
+    for (unsigned int k = 0; k < dim + 1; ++k)
       result[k] = f_i[k] + f_j[k];
     return result;
   }
@@ -779,7 +779,7 @@ namespace ryujin
     const auto f_j = f(U_j);
 
     flux_type<dim, T> result;
-    for (unsigned int k = 0; k < dim + 2; ++k)
+    for (unsigned int k = 0; k < dim + 1; ++k)
       result[k] = f_i[k] + f_j[k];
     return result;
   }

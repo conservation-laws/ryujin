@@ -6,8 +6,10 @@
 #pragma once
 
 #include <hyperbolic_system.h>
-
 #include <initial_state.h>
+
+#include "initial_state_ritter_dam_break.h"
+#include "initial_state_uniform.h"
 
 namespace ryujin
 {
@@ -21,14 +23,17 @@ namespace ryujin
      */
     template <int dim, typename Number, typename T>
     void populate_initial_state_list(T &initial_state_list,
-                                     const HyperbolicSystem &hyperbolic_system,
-                                     const std::string &subsection)
+                                     const HyperbolicSystem &h,
+                                     const std::string &s)
     {
-      //       using N = Number;
-      //       const auto &h = hyperbolic_system;
-      //       const auto &s = subsection;
-      //       initial_state_list.emplace(std::make_unique<Uniform<dim, N>>(h,
-      //       s));
+      using state_type = HyperbolicSystem::state_type<dim, Number>;
+
+      auto add = [&](auto &&object) {
+        initial_state_list.emplace(std::move(object));
+      };
+
+      add(std::make_unique<Uniform<dim, Number, state_type>>(h, s));
+      add(std::make_unique<RitterDamBreak<dim, Number, state_type>>(h, s));
     }
 
   } // namespace InitialStateLibrary

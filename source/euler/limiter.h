@@ -77,12 +77,12 @@ namespace ryujin
     /**
      * Array type used for precomputed values.
      */
-    using PrecomputedValues = std::array<Number, n_precomputed_values>;
+    using precomputed_type = std::array<Number, n_precomputed_values>;
 
     /**
      * Precomputed values for a given state.
      */
-    static PrecomputedValues
+    static precomputed_type
     precompute_values(const HyperbolicSystem &hyperbolic_system,
                       const state_type &U);
 
@@ -210,11 +210,11 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline typename Limiter<dim, Number>::PrecomputedValues
+  DEAL_II_ALWAYS_INLINE inline typename Limiter<dim, Number>::precomputed_type
   Limiter<dim, Number>::precompute_values(
       const HyperbolicSystem &hyperbolic_system, const state_type &U_i)
   {
-    PrecomputedValues result;
+    precomputed_type result;
     result[0] = hyperbolic_system.specific_entropy(U_i);
     return result;
   }
@@ -231,7 +231,7 @@ namespace ryujin
     rho_max = Number(0.);
 
     const auto &[specific_entropy] =
-        precomputed_values.template get_tensor<Number, PrecomputedValues>(i);
+        precomputed_values.template get_tensor<Number, precomputed_type>(i);
 
     s_min = specific_entropy;
 
@@ -265,7 +265,7 @@ namespace ryujin
     rho_max = std::max(rho_max, rho_ij_bar);
 
     const auto &[specific_entropy_j] =
-        precomputed_values.template get_tensor<Number, PrecomputedValues>(js);
+        precomputed_values.template get_tensor<Number, precomputed_type>(js);
     s_min = std::min(s_min, specific_entropy_j);
 
     /* Relaxation: */

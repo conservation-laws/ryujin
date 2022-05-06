@@ -35,7 +35,7 @@ namespace ryujin
   class InitialState : public dealii::ParameterAcceptor
   {
   public:
-    using PrecomputedValues = std::array<Number, n_precomputed_values>;
+    using precomputed_type = std::array<Number, n_precomputed_values>;
 
     /**
      * Constructor taking geometry name @p name and a subsection @p
@@ -67,10 +67,10 @@ namespace ryujin
      * bathymetry. In case of @ref LinearTransport we precompute the
      * advection field.
      */
-    virtual PrecomputedValues
+    virtual precomputed_type
     compute_flux_contributions(const dealii::Point<dim> & /*point*/)
     {
-      return PrecomputedValues();
+      return precomputed_type();
     }
 
   private:

@@ -54,12 +54,12 @@ namespace ryujin
     /**
      * Array type used for precomputed values.
      */
-    using PrecomputedValues = std::array<Number, n_precomputed_values>;
+    using precomputed_type = std::array<Number, n_precomputed_values>;
 
     /**
      * Precomputed values for a given state.
      */
-    static PrecomputedValues
+    static precomputed_type
     precompute_values(const HyperbolicSystem &hyperbolic_system,
                       const state_type &U);
 
@@ -140,12 +140,11 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline
-      typename Indicator<dim, Number>::PrecomputedValues
-      Indicator<dim, Number>::precompute_values(
-          const HyperbolicSystem &hyperbolic_system, const state_type &U_i)
+  DEAL_II_ALWAYS_INLINE inline typename Indicator<dim, Number>::precomputed_type
+  Indicator<dim, Number>::precompute_values(
+      const HyperbolicSystem &hyperbolic_system, const state_type &U_i)
   {
-    PrecomputedValues result;
+    precomputed_type result;
     result[0] = hyperbolic_system.mathematical_entropy(U_i);
     return result;
   }
@@ -158,7 +157,7 @@ namespace ryujin
     /* entropy viscosity commutator: */
 
     const auto &[mathematical_entropy] =
-        precomputed_values.template get_tensor<Number, PrecomputedValues>(i);
+        precomputed_values.template get_tensor<Number, precomputed_type>(i);
 
     eta_i = mathematical_entropy;
 
@@ -180,7 +179,7 @@ namespace ryujin
     /* entropy viscosity commutator: */
 
     const auto &[eta_j] =
-        precomputed_values.template get_tensor<Number, PrecomputedValues>(js);
+        precomputed_values.template get_tensor<Number, precomputed_type>(js);
 
     const auto velocity_j = hyperbolic_system.momentum(U_j) *
                             hyperbolic_system.inverse_water_depth(U_j);
