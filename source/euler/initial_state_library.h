@@ -18,18 +18,16 @@ namespace ryujin
      *
      * @ingroup InitialValues
      */
-    template <int dim, typename Number>
-    class Uniform : public InitialState<dim, Number, HyperbolicSystem>
+    template <int dim, typename Number, typename state_type>
+    class Uniform : public InitialState<dim, Number, state_type>
     {
     public:
-      using typename InitialState<dim, Number, HyperbolicSystem>::state_type;
-
       Uniform(const HyperbolicSystem &hyperbolic_system,
               const std::string subsection)
-          : InitialState<dim, Number, HyperbolicSystem>(
-                hyperbolic_system, "uniform", subsection)
+          : InitialState<dim, Number, state_type>("uniform", subsection)
+          , hyperbolic_system(hyperbolic_system)
       {
-        primitive_[0] = this->hyperbolic_system.gamma();
+        primitive_[0] = hyperbolic_system.gamma();
         primitive_[1] = 3.0;
         primitive_[2] = 1.;
         this->add_parameter("primitive state",
@@ -40,12 +38,13 @@ namespace ryujin
       virtual state_type compute(const dealii::Point<dim> & /*point*/,
                                  Number /*t*/) final override
       {
-        const auto temp =
-            this->hyperbolic_system.from_primitive_state(primitive_);
-        return this->hyperbolic_system.template expand_state<dim>(temp);
+        const auto temp = hyperbolic_system.from_primitive_state(primitive_);
+        return hyperbolic_system.template expand_state<dim>(temp);
       }
 
     private:
+      const HyperbolicSystem &hyperbolic_system;
+
       dealii::Tensor<1, dim + 1, Number> primitive_;
     };
 
@@ -58,25 +57,23 @@ namespace ryujin
      *
      * @ingroup InitialValues
      */
-    template <int dim, typename Number>
-    class RampUp : public InitialState<dim, Number, HyperbolicSystem>
+    template <int dim, typename Number, typename state_type>
+    class RampUp : public InitialState<dim, Number, state_type>
     {
     public:
-      using typename InitialState<dim, Number, HyperbolicSystem>::state_type;
-
       RampUp(const HyperbolicSystem &hyperbolic_system,
              const std::string subsection)
-          : InitialState<dim, Number, HyperbolicSystem>(
-                hyperbolic_system, "ramp up", subsection)
+          : InitialState<dim, Number, state_type>("ramp up", subsection)
+          , hyperbolic_system(hyperbolic_system)
       {
-        primitive_initial_[0] = this->hyperbolic_system.gamma();
+        primitive_initial_[0] = hyperbolic_system.gamma();
         primitive_initial_[1] = 0.0;
         primitive_initial_[2] = 1.;
         this->add_parameter("primitive state initial",
                             primitive_initial_,
                             "Initial 1d primitive state (rho, u, p)");
 
-        primitive_final_[0] = this->hyperbolic_system.gamma();
+        primitive_final_[0] = hyperbolic_system.gamma();
         primitive_final_[1] = 3.0;
         primitive_final_[2] = 1.;
         this->add_parameter("primitive state final",
@@ -112,12 +109,13 @@ namespace ryujin
           primitive = alpha * primitive_initial_ + beta * primitive_final_;
         }
 
-        const auto &hyperbolic_system = this->hyperbolic_system;
         const auto temp = hyperbolic_system.from_primitive_state(primitive);
         return hyperbolic_system.template expand_state<dim>(temp);
       }
 
     private:
+      const HyperbolicSystem &hyperbolic_system;
+
       dealii::Tensor<1, 3, Number> primitive_initial_;
       dealii::Tensor<1, 3, Number> primitive_final_;
 
@@ -136,18 +134,16 @@ namespace ryujin
      *
      * @ingroup InitialValues
      */
-    template <int dim, typename Number>
-    class Contrast : public InitialState<dim, Number, HyperbolicSystem>
+    template <int dim, typename Number, typename state_type>
+    class Contrast : public InitialState<dim, Number, state_type>
     {
     public:
-      using typename InitialState<dim, Number, HyperbolicSystem>::state_type;
-
       Contrast(const HyperbolicSystem &hyperbolic_system,
                const std::string subsection)
-          : InitialState<dim, Number, HyperbolicSystem>(
-                hyperbolic_system, "contrast", subsection)
+          : InitialState<dim, Number, state_type>("contrast", subsection)
+          , hyperbolic_system(hyperbolic_system)
       {
-        primitive_left_[0] = this->hyperbolic_system.gamma();
+        primitive_left_[0] = hyperbolic_system.gamma();
         primitive_left_[1] = 0.0;
         primitive_left_[2] = 1.;
         this->add_parameter(
@@ -155,7 +151,7 @@ namespace ryujin
             primitive_left_,
             "Initial 1d primitive state (rho, u, p) on the left");
 
-        primitive_right_[0] = this->hyperbolic_system.gamma();
+        primitive_right_[0] = hyperbolic_system.gamma();
         primitive_right_[1] = 0.0;
         primitive_right_[2] = 1.;
         this->add_parameter(
@@ -167,12 +163,14 @@ namespace ryujin
       virtual state_type compute(const dealii::Point<dim> &point,
                                  Number /*t*/) final override
       {
-        const auto temp = this->hyperbolic_system.from_primitive_state(
+        const auto temp = hyperbolic_system.from_primitive_state(
             point[0] > 0. ? primitive_right_ : primitive_left_);
-        return this->hyperbolic_system.template expand_state<dim>(temp);
+        return hyperbolic_system.template expand_state<dim>(temp);
       }
 
     private:
+      const HyperbolicSystem &hyperbolic_system;
+
       dealii::Tensor<1, 3, Number> primitive_left_;
       dealii::Tensor<1, 3, Number> primitive_right_;
     };
@@ -185,21 +183,20 @@ namespace ryujin
      *
      * @ingroup InitialValues
      */
-    template <int dim, typename Number>
-    class ShockFront : public InitialState<dim, Number, HyperbolicSystem>
+    template <int dim, typename Number, typename state_type>
+    class ShockFront : public InitialState<dim, Number, state_type>
     {
     public:
-      using typename InitialState<dim, Number, HyperbolicSystem>::state_type;
-
       ShockFront(const HyperbolicSystem &hyperbolic_system,
                  const std::string subsection)
-          : InitialState<dim, Number, HyperbolicSystem>(
-                hyperbolic_system, "shockfront", subsection)
+          : InitialState<dim, Number, state_type>("shockfront", subsection)
+          , hyperbolic_system(hyperbolic_system)
       {
         dealii::ParameterAcceptor::parse_parameters_call_back.connect(std::bind(
-            &ShockFront<dim, Number>::parse_parameters_callback, this));
+            &ShockFront<dim, Number, state_type>::parse_parameters_callback,
+            this));
 
-        primitive_right_[0] = this->hyperbolic_system.gamma();
+        primitive_right_[0] = hyperbolic_system.gamma();
         primitive_right_[1] = 0.0;
         primitive_right_[2] = 1.;
         this->add_parameter("primitive state",
@@ -218,7 +215,7 @@ namespace ryujin
       {
         /* Compute post-shock state and S3: */
 
-        const auto gamma = this->hyperbolic_system.gamma();
+        const auto gamma = hyperbolic_system.gamma();
         const Number b = Number(0.); // FIXME
 
         const auto &rho_R = primitive_right_[0];
@@ -251,12 +248,14 @@ namespace ryujin
       {
         const Number position_1d = Number(point[0] - S3_ * t);
 
-        const auto temp = this->hyperbolic_system.from_primitive_state(
+        const auto temp = hyperbolic_system.from_primitive_state(
             position_1d > 0. ? primitive_right_ : primitive_left_);
-        return this->hyperbolic_system.template expand_state<dim>(temp);
+        return hyperbolic_system.template expand_state<dim>(temp);
       }
 
     private:
+      const HyperbolicSystem &hyperbolic_system;
+
       dealii::Tensor<1, 3, Number> primitive_left_;
       dealii::Tensor<1, 3, Number> primitive_right_;
       Number mach_number_;
@@ -270,16 +269,15 @@ namespace ryujin
      *
      * @ingroup InitialValues
      */
-    template <int dim, typename Number>
-    class IsentropicVortex : public InitialState<dim, Number, HyperbolicSystem>
+    template <int dim, typename Number, typename state_type>
+    class IsentropicVortex : public InitialState<dim, Number, state_type>
     {
     public:
-      using typename InitialState<dim, Number, HyperbolicSystem>::state_type;
-
       IsentropicVortex(const HyperbolicSystem &hyperbolic_system,
                        const std::string subsection)
-          : InitialState<dim, Number, HyperbolicSystem>(
-                hyperbolic_system, "isentropic vortex", subsection)
+          : InitialState<dim, Number, state_type>("isentropic vortex",
+                                                  subsection)
+          , hyperbolic_system(hyperbolic_system)
       {
         mach_number_ = 2.0;
         this->add_parameter(
@@ -292,7 +290,7 @@ namespace ryujin
       virtual state_type compute(const dealii::Point<dim> &point,
                                  Number t) final override
       {
-        const auto gamma = this->hyperbolic_system.gamma();
+        const auto gamma = hyperbolic_system.gamma();
 
 
         /* In 3D we simply project onto the 2d plane: */
@@ -328,6 +326,8 @@ namespace ryujin
       }
 
     private:
+      const HyperbolicSystem &hyperbolic_system;
+
       Number mach_number_;
       Number beta_;
     };
@@ -339,19 +339,18 @@ namespace ryujin
      *
      * @ingroup InitialValues
      */
-    template <int dim, typename Number>
-    class BeckerSolution : public InitialState<dim, Number, HyperbolicSystem>
+    template <int dim, typename Number, typename state_type>
+    class BeckerSolution : public InitialState<dim, Number, state_type>
     {
     public:
-      using typename InitialState<dim, Number, HyperbolicSystem>::state_type;
-
       BeckerSolution(const HyperbolicSystem &hyperbolic_system,
                      const std::string subsection)
-          : InitialState<dim, Number, HyperbolicSystem>(
-                hyperbolic_system, "becker solution", subsection)
+          : InitialState<dim, Number, state_type>("becker solution", subsection)
+          , hyperbolic_system(hyperbolic_system)
       {
         dealii::ParameterAcceptor::parse_parameters_call_back.connect(std::bind(
-            &BeckerSolution<dim, Number>::parse_parameters_callback, this));
+            &BeckerSolution<dim, Number, state_type>::parse_parameters_callback,
+            this));
 
         velocity_ = 0.2;
         this->add_parameter("velocity galilean frame",
@@ -377,7 +376,7 @@ namespace ryujin
 
       void parse_parameters_callback()
       {
-        const double gamma = this->hyperbolic_system.gamma();
+        const double gamma = hyperbolic_system.gamma();
 
         AssertThrow(
             velocity_left_ > velocity_right_,
@@ -474,7 +473,7 @@ namespace ryujin
                                  Number t) final override
       {
         /* (7.2) */
-        const double gamma = this->hyperbolic_system.gamma();
+        const double gamma = hyperbolic_system.gamma();
         const double R_infty = (gamma + 1) / (gamma - 1);
 
         /* (7.3) */
@@ -496,6 +495,8 @@ namespace ryujin
       }
 
     private:
+      const HyperbolicSystem &hyperbolic_system;
+
       Number velocity_;
       Number velocity_left_;
       Number velocity_right_;
@@ -514,20 +515,20 @@ namespace ryujin
      */
     template <int dim, typename Number, typename T>
     void populate_initial_state_list(T &initial_state_list,
-                                     const HyperbolicSystem &hyperbolic_system,
-                                     const std::string &subsection)
+                                     const HyperbolicSystem &h,
+                                     const std::string &s)
     {
-      using N = Number;
-      const auto &h = hyperbolic_system;
-      const auto &s = subsection;
-      initial_state_list.emplace(std::make_unique<Uniform<dim, N>>(h, s));
-      initial_state_list.emplace(std::make_unique<RampUp<dim, N>>(h, s));
-      initial_state_list.emplace(std::make_unique<Contrast<dim, N>>(h, s));
-      initial_state_list.emplace(std::make_unique<ShockFront<dim, N>>(h, s));
-      initial_state_list.emplace(
-          std::make_unique<IsentropicVortex<dim, N>>(h, s));
-      initial_state_list.emplace(
-          std::make_unique<BeckerSolution<dim, N>>(h, s));
+      using state_type = HyperbolicSystem::state_type<dim, Number>;
+
+      auto add = [&](auto &&object) {
+        initial_state_list.emplace(std::move(object));
+      };
+
+      add(std::make_unique<Uniform<dim, Number, state_type>>(h, s));
+      add(std::make_unique<Contrast<dim, Number, state_type>>(h, s));
+      add(std::make_unique<ShockFront<dim, Number, state_type>>(h, s));
+      add(std::make_unique<IsentropicVortex<dim, Number, state_type>>(h, s));
+      add(std::make_unique<BeckerSolution<dim, Number, state_type>>(h, s));
     }
 
   } // namespace InitialStateLibrary

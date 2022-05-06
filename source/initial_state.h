@@ -16,7 +16,6 @@
 
 namespace ryujin
 {
-
   /**
    * A small abstract base class to group configuration options for a
    * number of initial flow configurations.
@@ -29,26 +28,18 @@ namespace ryujin
    *
    * @ingroup InitialValues
    */
-  template <int dim, typename Number, typename HyperbolicSystem>
+  template <int dim, typename Number, typename state_type>
   class InitialState : public dealii::ParameterAcceptor
   {
   public:
-    /**
-     * @copydoc HyperbolicSystem::state_type
-     */
-    using state_type =
-        typename HyperbolicSystem::template state_type<dim, Number>;
-
     /**
      * Constructor taking geometry name @p name and a subsection @p
      * subsection as an argument. The dealii::ParameterAcceptor is
      * initialized with the subsubsection `subsection + "/" + name`.
      */
-    InitialState(const HyperbolicSystem &hyperbolic_system,
-                 const std::string &name,
+    InitialState(const std::string &name,
                  const std::string &subsection)
         : ParameterAcceptor(subsection + "/" + name)
-        , hyperbolic_system(hyperbolic_system)
         , name_(name)
     {
     }
@@ -62,9 +53,6 @@ namespace ryujin
      */
     virtual state_type compute(const dealii::Point<dim> &point, Number t) = 0;
 
-  protected:
-    const HyperbolicSystem &hyperbolic_system;
-
   private:
     const std::string name_;
 
@@ -73,6 +61,5 @@ namespace ryujin
      */
     ACCESSOR_READ_ONLY(name)
   };
-
 
 } /* namespace ryujin */

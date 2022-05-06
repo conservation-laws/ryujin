@@ -115,7 +115,7 @@ namespace ryujin
     dealii::SmartPointer<const HyperbolicSystem> hyperbolic_system_;
     dealii::SmartPointer<const OfflineData<dim, Number>> offline_data_;
 
-    std::set<std::unique_ptr<InitialState<dim, Number, HyperbolicSystem>>>
+    std::set<std::unique_ptr<InitialState<dim, Number, state_type>>>
         initial_state_list_;
 
     std::function<state_type(const dealii::Point<dim> &point, Number t)>
