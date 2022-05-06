@@ -158,7 +158,7 @@ namespace ryujin
     eta_i = mathematical_entropy;
 
     d_eta_i = hyperbolic_system.mathematical_entropy_derivative(U_i);
-    f_i = hyperbolic_system.flux(U_i);
+    f_i = hyperbolic_system.f(U_i);
     pressure_i = hyperbolic_system.pressure(U_i);
 
     left = 0.;
@@ -179,7 +179,7 @@ namespace ryujin
 
     const auto velocity_j = hyperbolic_system.momentum(U_j) *
                             hyperbolic_system.inverse_water_depth(U_j);
-    const auto f_j = hyperbolic_system.flux(U_j);
+    const auto f_j = hyperbolic_system.f(U_j);
     const auto pressure_j = hyperbolic_system.pressure(U_j);
 
     left += (eta_j + pressure_j) * (velocity_j * c_ij);

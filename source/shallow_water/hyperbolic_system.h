@@ -78,6 +78,12 @@ namespace ryujin
         Tensor<1, problem_dimension<dim>, dealii::Tensor<1, dim, Number>>;
 
     /**
+     * The storage type used for the flux precomputations.
+     */
+    template <int dim, typename Number>
+    using prec_type = std::array<state_type<dim, Number>, 2>;
+
+    /**
      * Constructor.
      */
     HyperbolicSystem(const std::string &subsection = "HyperbolicSystem");
@@ -104,14 +110,6 @@ namespace ryujin
 
     /**
      * For a given (1+dim dimensional) state vector <code>U</code>, return
-     * the momentum vector <code>[U[1], ..., U[1+dim]]</code>.
-     */
-    template <int problem_dim, typename Number>
-    static dealii::Tensor<1, problem_dim - 1, Number>
-    momentum(const dealii::Tensor<1, problem_dim, Number> &U);
-
-    /**
-     * For a given (1+dim dimensional) state vector <code>U</code>, return
      * the regularized inverse of the water depth.
      * \f[
      *   1/h -> 2 h / (h^2 + max(h, h_tiny))
@@ -120,6 +118,14 @@ namespace ryujin
     template <int problem_dim, typename Number>
     Number
     inverse_water_depth(const dealii::Tensor<1, problem_dim, Number> &U) const;
+
+    /**
+     * For a given (1+dim dimensional) state vector <code>U</code>, return
+     * the momentum vector <code>[U[1], ..., U[1+dim]]</code>.
+     */
+    template <int problem_dim, typename Number>
+    static dealii::Tensor<1, problem_dim - 1, Number>
+    momentum(const dealii::Tensor<1, problem_dim, Number> &U);
 
     /**
      * For a given (1+dim dimensional) state vector <code>U</code>, compute
@@ -131,17 +137,6 @@ namespace ryujin
     template <int problem_dim, typename Number>
     Number
     kinetic_energy(const dealii::Tensor<1, problem_dim, Number> &U) const;
-
-    /**
-     * For a given (1+dim dimensional) state vector <code>U</code> and
-     * left/right topography states <code>Z_left</code> and
-     * <code>Z_right</code>, return the star_state <code>U_star</code>
-     */
-    template <int problem_dim, typename Number>
-    dealii::Tensor<1, problem_dim, Number>
-    star_state(const dealii::Tensor<1, problem_dim, Number> &U,
-               const Number &Z_left,
-               const Number &Z_right) const;
 
     /**
      * For a given (state dimensional) state vector <code>U</code>, compute
@@ -187,59 +182,6 @@ namespace ryujin
      */
     template <int problem_dim, typename Number>
     bool is_admissible(const dealii::Tensor<1, problem_dim, Number> &U) const;
-
-    //@}
-    /**
-     * @name Functions for physical source terms
-     */
-    //@{
-
-    /**
-     * For given (1+dim dimensional) state vectors <code>U_i</code> and
-     * <code>U_j</code> and topography states <code>Z_i</code> and
-     * <code>Z_j</code> and <code>c_ij</code> vector, return the Shallow Water
-     * topography source
-     */
-    template <int problem_dim, typename Number>
-    dealii::Tensor<1, problem_dim - 1, Number> swe_topography_source(
-        const dealii::Tensor<1, problem_dim, Number> &U_i,
-        const dealii::Tensor<1, problem_dim, Number> &U_j,
-        const Number &Z_i,
-        const Number &Z_j,
-        const dealii::Tensor<1, problem_dim - 1, Number> &c_ij) const;
-
-    /**
-     * This functions returns a (1+dim dimensional) state vector for
-     * physical source terms that depend on the stencil. These functions
-     * often involve the gradient of a scalar field.
-     */
-    template <int problem_dim, typename Number>
-    dealii::Tensor<1, problem_dim, Number> compute_stencil_sources(
-        const dealii::Tensor<1, problem_dim, Number> &U_i,
-        const dealii::Tensor<1, problem_dim, Number> &U_j,
-        const Number &Z_i,
-        const Number &Z_j,
-        const dealii::Tensor<1, problem_dim - 1, Number> &c_ij) const;
-
-    /**
-     * For a given (1+dim dimensional) state vector <code>U</code> and
-     * time step <code>dt<code>, return the Glaucker-Mannings friction source
-     */
-    template <int problem_dim, typename Number>
-    dealii::Tensor<1, problem_dim - 1, Number>
-    friction_source(const dealii::Tensor<1, problem_dim, Number> &U,
-                    const Number &tau) const;
-
-    /**
-     * This function returns a (1+dim dimensional) state vector of
-     * physical source terms that are nodal based (ie do not depend on the
-     * stencil).
-     */
-    template <int problem_dim, typename Number>
-    dealii::Tensor<1, problem_dim, Number>
-    compute_nodal_sources(const dealii::Tensor<1, problem_dim, Number> &U_i,
-                          const Number &dt) const;
-
 
     //@}
     /**
@@ -299,9 +241,63 @@ namespace ryujin
      * \end{pmatrix},
      * \f]
      */
-    template <int problem_dim, typename Number>
-    flux_type<problem_dim - 1, Number>
-    flux(const dealii::Tensor<1, problem_dim, Number> &U) const;
+    template <typename ST,
+              int dim = ST::dimension - 1,
+              typename T = typename ST::value_type>
+    flux_type<dim, T> f(const ST &U) const;
+
+    /**
+     * Given a state @p U_i and an index @p i precompute flux
+     * contributions.
+     *
+     * Intended usage:
+     * ```
+     * Indicator<dim, Number> indicator;
+     * for (unsigned int i = n_internal; i < n_owned; ++i) {
+     *   // ...
+     *   const auto prec_i = flux_contribution(i, U_i);
+     *   for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
+     *     // ...
+     *     const auto prec_j = flux_contribution(js, U_j);
+     *     const auto flux_ij = flux(prec_i, prec_j, c_ij);
+     *   }
+     * }
+     * ```
+     *
+     * For the Euler equations we precompute <code>f(U_i)</code>.
+     */
+    template <typename ST,
+              int dim = ST::dimension - 1,
+              typename T = typename ST::value_type>
+    prec_type<dim, T> flux_contribution(const unsigned int i,
+                                        const ST &U_i) const;
+
+    template <typename ST,
+              int dim = ST::dimension - 1,
+              typename T = typename ST::value_type>
+    prec_type<dim, T> flux_contribution(const unsigned int *js,
+                                        const ST &U_j) const;
+
+    /**
+     * Given precomputed flux contributions @p prec_i and @p prec_j compute
+     * the flux <code>(f(U_i) + f(U_j)</code>
+     */
+    template <typename ST,
+              int dim = ST::dimension - 1,
+              typename T = typename ST::value_type>
+    flux_type<dim, T> flux(const std::array<ST, 2> &prec_i,
+                           const std::array<ST, 2> &prec_j) const;
+
+    /**
+     * The low-order and high-order fluxes are the same:
+     */
+    static constexpr bool have_high_order_flux = true;
+
+    template <typename ST,
+              int dim = ST::dimension - 1,
+              typename T = typename ST::value_type>
+    flux_type<dim, T> high_order_flux(const std::array<ST, 2> &prec_i,
+                                      const std::array<ST, 2> &prec_j) const;
 
     //@}
     /**
@@ -317,14 +313,14 @@ namespace ryujin
      * onto the first @ref dim2 unit directions of the @ref dim1
      * dimensional euclidean space.
      *
-     * @precondition dim1 has to be larger or equal than dim2.
+     * @precondition dim has to be larger or equal than dim2.
      */
-    template <int dim1,
-              int prob_dim2,
-              typename Number,
-              typename = typename std::enable_if<(dim1 + 2 >= prob_dim2)>::type>
-    state_type<dim1, Number>
-    expand_state(const dealii::Tensor<1, prob_dim2, Number> &state) const;
+    template <int dim,
+              typename ST,
+              typename T = typename ST::value_type,
+              int dim2 = ST::dimension - 1,
+              typename = typename std::enable_if<(dim >= dim2)>::type>
+    state_type<dim, T> expand_state(const ST &state) const;
 
     /*
      * Given a primitive state [rho, u_1, ..., u_d, p] return a conserved
@@ -406,6 +402,20 @@ namespace ryujin
 
 
   template <int problem_dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline Number HyperbolicSystem::inverse_water_depth(
+      const dealii::Tensor<1, problem_dim, Number> &U) const
+  {
+    using ScalarNumber = typename get_value_type<Number>::type;
+
+    const Number &h = U[0];
+    const Number h_max = std::max(h, Number(h_tiny_));
+    const Number denom = h * h + h_max * h_max;
+
+    return ScalarNumber(2.) * h / denom;
+  }
+
+
+  template <int problem_dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, problem_dim - 1, Number>
   HyperbolicSystem::momentum(const dealii::Tensor<1, problem_dim, Number> &U)
   {
@@ -418,18 +428,6 @@ namespace ryujin
     return result;
   }
 
-  template <int problem_dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline Number HyperbolicSystem::inverse_water_depth(
-      const dealii::Tensor<1, problem_dim, Number> &U) const
-  {
-    using ScalarNumber = typename get_value_type<Number>::type;
-
-    const Number &h = U[0];
-    const Number h_max = std::max(h, Number(h_tiny_));
-    const Number denom = h * h + h_max * h_max;
-
-    return ScalarNumber(2.) * h / denom;
-  }
 
   template <int problem_dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline Number HyperbolicSystem::kinetic_energy(
@@ -445,23 +443,6 @@ namespace ryujin
     return ScalarNumber(0.5) * h * vel.norm_square();
   }
 
-  template <int problem_dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, problem_dim, Number>
-  HyperbolicSystem::star_state(const dealii::Tensor<1, problem_dim, Number> &U,
-                               const Number &Z_left,
-                               const Number &Z_right) const
-  {
-
-    dealii::Tensor<1, problem_dim, Number> local_star_state;
-
-    const Number Z_max = std::max(Z_left, Z_right);
-    const Number H_star = std::max(Number(0.), U[0] + Z_left - Z_max);
-
-    local_star_state = U * H_star * inverse_water_depth(U);
-
-    return local_star_state;
-  }
-
 
   template <int problem_dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline Number HyperbolicSystem::pressure(
@@ -474,101 +455,6 @@ namespace ryujin
     const Number h_sqd = U[0] * U[0];
 
     return ScalarNumber(0.5 * gravity_) * h_sqd;
-  }
-
-  template <int problem_dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, problem_dim - 1, Number>
-  HyperbolicSystem::swe_topography_source(
-      const dealii::Tensor<1, problem_dim, Number> &U_i,
-      const dealii::Tensor<1, problem_dim, Number> &U_j,
-      const Number &Z_i,
-      const Number &Z_j,
-      const dealii::Tensor<1, problem_dim - 1, Number> &c_ij) const
-  {
-    using ScalarNumber = typename get_value_type<Number>::type;
-
-    const Number &H_i = U_i[0];
-    const Number &H_j = U_j[0];
-
-    const Number left_term = -H_i * (Z_j - Z_i);
-    const Number right_term = ScalarNumber(0.5) * (H_j - H_i) * (H_j - H_i);
-
-    const Number source = ScalarNumber(gravity_) * (left_term + right_term);
-
-    return source * c_ij;
-  }
-
-  template <int problem_dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, problem_dim, Number>
-  HyperbolicSystem::compute_stencil_sources(
-      const dealii::Tensor<1, problem_dim, Number> &U_i,
-      const dealii::Tensor<1, problem_dim, Number> &U_j,
-      const Number &Z_i,
-      const Number &Z_j,
-      const dealii::Tensor<1, problem_dim - 1, Number> &c_ij) const
-  {
-    constexpr int dim = problem_dim - 1;
-
-    dealii::Tensor<1, problem_dim, Number> stencil_sources;
-
-    /* water depth sources */
-    stencil_sources[0] = Number(0.);
-
-    /* Momentum sources */
-    const auto topography_source =
-        swe_topography_source(U_i, U_j, Z_i, Z_j, c_ij);
-
-    for (unsigned int i = 0; i < dim; ++i) {
-      stencil_sources[1 + i] = topography_source[i];
-    }
-
-    return stencil_sources;
-  }
-
-  template <int problem_dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, problem_dim - 1, Number>
-  HyperbolicSystem::friction_source(
-      const dealii::Tensor<1, problem_dim, Number> &U, const Number &tau) const
-  {
-    using ScalarNumber = typename get_value_type<Number>::type;
-
-    const Number h_max = std::max(U[0], Number(h_tiny_));
-    const Number h_star = ryujin::pow(h_max, ScalarNumber(4. / 3.));
-
-    const auto velocity = momentum(U) * inverse_water_depth(U);
-    const Number velocity_norm = velocity.norm();
-
-    const Number small_number =
-        ScalarNumber(2. * g_mannings_sqd_) * tau * velocity_norm;
-
-    const auto numerator =
-        -ScalarNumber(2. * g_mannings_sqd_) * momentum(U) * velocity_norm;
-    const Number denominator = h_star + std::max(h_star, small_number);
-
-    return numerator / denominator;
-  }
-
-  /* Inline functions for source terms */
-  template <int problem_dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, problem_dim, Number>
-  HyperbolicSystem::compute_nodal_sources(
-      const dealii::Tensor<1, problem_dim, Number> &U_i, const Number &dt) const
-  {
-    constexpr int dim = problem_dim - 1;
-
-    dealii::Tensor<1, problem_dim, Number> nodal_sources;
-
-    /* water depth sources */
-    nodal_sources[0] = Number(0.);
-
-    /* Momentum sources */
-    dealii::Tensor<1, dim, Number> friction = friction_source(U_i, dt);
-
-    for (unsigned int i = 0; i < dim; ++i) {
-      nodal_sources[1 + i] = friction[i];
-    }
-
-    return nodal_sources;
   }
 
 
@@ -765,19 +651,15 @@ namespace ryujin
   }
 
 
-  template <int problem_dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline HyperbolicSystem::flux_type<problem_dim - 1,
-                                                           Number>
-  HyperbolicSystem::flux(const dealii::Tensor<1, problem_dim, Number> &U) const
+  template <typename ST, int dim, typename T>
+  DEAL_II_ALWAYS_INLINE inline auto HyperbolicSystem::f(const ST &U) const
+      -> flux_type<dim, T>
   {
-    constexpr int dim = problem_dim - 1;
-    using ScalarNumber = typename get_value_type<Number>::type;
-
-    const Number h_inverse = inverse_water_depth(U);
+    const T h_inverse = inverse_water_depth(U);
     const auto m = momentum(U);
     const auto p = pressure(U);
 
-    flux_type<dim, Number> result;
+    flux_type<dim, T> result;
 
     result[0] = m;
     for (unsigned int i = 0; i < dim; ++i) {
@@ -788,13 +670,11 @@ namespace ryujin
   }
 
 
-  template <int dim1, int prob_dim2, typename Number, typename>
-  HyperbolicSystem::state_type<dim1, Number> HyperbolicSystem::expand_state(
-      const dealii::Tensor<1, prob_dim2, Number> &state) const
+  template <int dim, typename ST, typename T, int dim2, typename>
+  auto HyperbolicSystem::expand_state(const ST &state) const
+      -> state_type<dim, T>
   {
-    constexpr auto dim2 = prob_dim2 - 1;
-
-    state_type<dim1, Number> result;
+    state_type<dim, T> result;
     result[0] = state[0];
     for (unsigned int i = 1; i < dim2 + 1; ++i)
       result[i] = state[i];

@@ -123,7 +123,6 @@ namespace ryujin
     template <int problem_dim, typename Number>
     static Number total_energy(const dealii::Tensor<1, problem_dim, Number> &U);
 
-
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
      * and return the internal energy \f$\varepsilon = (\rho e)\f$.
@@ -131,7 +130,6 @@ namespace ryujin
     template <int problem_dim, typename Number>
     static Number
     internal_energy(const dealii::Tensor<1, problem_dim, Number> &U);
-
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
@@ -141,7 +139,6 @@ namespace ryujin
     template <int problem_dim, typename Number>
     static dealii::Tensor<1, problem_dim, Number>
     internal_energy_derivative(const dealii::Tensor<1, problem_dim, Number> &U);
-
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
@@ -159,7 +156,6 @@ namespace ryujin
     template <int problem_dim, typename Number>
     Number pressure(const dealii::Tensor<1, problem_dim, Number> &U) const;
 
-
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
      * the (physical) speed of sound:
@@ -170,7 +166,6 @@ namespace ryujin
     template <int problem_dim, typename Number>
     Number
     speed_of_sound(const dealii::Tensor<1, problem_dim, Number> &U) const;
-
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
@@ -184,7 +179,6 @@ namespace ryujin
     Number
     specific_entropy(const dealii::Tensor<1, problem_dim, Number> &U) const;
 
-
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
      * and return the Harten-type entropy
@@ -195,7 +189,6 @@ namespace ryujin
     template <int problem_dim, typename Number>
     Number
     harten_entropy(const dealii::Tensor<1, problem_dim, Number> &U) const;
-
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
@@ -208,7 +201,6 @@ namespace ryujin
     dealii::Tensor<1, problem_dim, Number> harten_entropy_derivative(
         const dealii::Tensor<1, problem_dim, Number> &U) const;
 
-
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
      * and return the entropy \f$\eta = p^{1/\gamma}\f$.
@@ -216,7 +208,6 @@ namespace ryujin
     template <int problem_dim, typename Number>
     Number
     mathematical_entropy(const dealii::Tensor<1, problem_dim, Number> U) const;
-
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
@@ -295,7 +286,6 @@ namespace ryujin
      */
     //@{
 
-
     /**
      * Given a state @p U compute the flux
      * \f[
@@ -310,7 +300,6 @@ namespace ryujin
               int dim = ST::dimension - 2,
               typename T = typename ST::value_type>
     flux_type<dim, T> f(const ST &U) const;
-
 
     /**
      * Given a state @p U_i and an index @p i precompute flux
@@ -370,10 +359,10 @@ namespace ryujin
      * Given a state vector associated with @ref dim2 spatial dimensions
      * return an "expanded" version of the state vector associated with
      * @ref dim1 spatial dimensions where the momentum vector is projected
-     * onto the first @ref dim2 unit directions of the @ref dim1
-     * dimensional euclidean space.
+     * onto the first @ref dim2 unit directions of the @ref dim dimensional
+     * euclidean space.
      *
-     * @precondition dim1 has to be larger or equal than dim2.
+     * @precondition dim has to be larger or equal than dim2.
      */
     template <int dim,
               typename ST,
@@ -430,23 +419,6 @@ namespace ryujin
   };
 
   /* Inline definitions */
-
-  /**
-   * Internally used: Contract a given flux and c_ij:
-   */
-  template <int problem_dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, problem_dim, Number> contract(
-      const dealii::Tensor<1,
-                           problem_dim,
-                           dealii::Tensor<1, problem_dim - 2, Number>> &flux_ij,
-      const dealii::Tensor<1, problem_dim - 2, Number> &c_ij)
-  {
-    dealii::Tensor<1, problem_dim, Number> result;
-    for (unsigned int k = 0; k < problem_dim; ++k)
-      result[k] = flux_ij[k] * c_ij;
-    return result;
-  }
-
 
   template <int problem_dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline Number
