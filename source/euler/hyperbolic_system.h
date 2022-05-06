@@ -108,12 +108,6 @@ namespace ryujin
     static constexpr unsigned int n_precomputed_values = 0;
 
     /**
-     * Array type used for precomputed values.
-     */
-    template <int dim, typename Number>
-    using PrecomputedValues = std::array<Number, n_precomputed_values<dim>>;
-
-    /**
      * Precomputed values for a given state.
      */
     template <typename MultiComponentVector, int problem_dim, typename Number>

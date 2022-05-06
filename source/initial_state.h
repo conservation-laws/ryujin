@@ -28,10 +28,15 @@ namespace ryujin
    *
    * @ingroup InitialValues
    */
-  template <int dim, typename Number, typename state_type>
+  template <int dim,
+            typename Number,
+            typename state_type,
+            int n_precomputed_values = 0>
   class InitialState : public dealii::ParameterAcceptor
   {
   public:
+    using PrecomputedValues = std::array<Number, n_precomputed_values>;
+
     /**
      * Constructor taking geometry name @p name and a subsection @p
      * subsection as an argument. The dealii::ParameterAcceptor is
@@ -52,6 +57,21 @@ namespace ryujin
      * current time to allow for time-dependent (in-flow) Dirichlet data.
      */
     virtual state_type compute(const dealii::Point<dim> &point, Number t) = 0;
+
+    /**
+     * Given a position @p point returns a precomputed value used for the
+     * flux computation via HyperbolicSystem::flux_contribution().
+     *
+     * The default implementation of this function simply returns a zero
+     * value. In case of the @ref ShallowWaterEquations we precompute the
+     * bathymetry. In case of @ref LinearTransport we precompute the
+     * advection field.
+     */
+    virtual PrecomputedValues
+    compute_flux_contributions(const dealii::Point<dim> & /*point*/)
+    {
+      return PrecomputedValues();
+    }
 
   private:
     const std::string name_;

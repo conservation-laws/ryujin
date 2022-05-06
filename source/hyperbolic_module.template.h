@@ -77,9 +77,6 @@ namespace ryujin
 
     const auto &scalar_partitioner = offline_data_->scalar_partitioner();
 
-    hyperbolic_system_prec_values_.reinit_with_scalar_partitioner(
-        scalar_partitioner);
-
     indicator_prec_values_.reinit_with_scalar_partitioner(scalar_partitioner);
     alpha_.reinit(scalar_partitioner);
 
@@ -96,6 +93,10 @@ namespace ryujin
     lij_matrix_.reinit(sparsity_simd);
     lij_matrix_next_.reinit(sparsity_simd);
     pij_matrix_.reinit(sparsity_simd);
+
+    /* Flux precomputations: */
+    hyperbolic_system_prec_values_ =
+        initial_values_->interpolate_flux_contributions();
   }
 
 
