@@ -567,7 +567,7 @@ namespace ryujin
 
     /* Also print out parameters to a prm file: */
 
-    std::ofstream output(base_name_ + "-parameter.prm");
+    std::ofstream output(base_name_ + "-parameters.prm");
     ParameterAcceptor::prm.print_parameters(output, ParameterHandler::Text);
   }
 
