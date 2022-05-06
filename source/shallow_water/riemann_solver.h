@@ -35,6 +35,9 @@ namespace ryujin
     static constexpr unsigned int problem_dimension =
         HyperbolicSystem::problem_dimension<dim>;
 
+    static constexpr unsigned int riemann_data_size = 3;
+    using primitive_type = std::array<Number, riemann_data_size>;
+
     /**
      * @copydoc HyperbolicSystem::state_type
      */
@@ -55,6 +58,9 @@ namespace ryujin
      */
     RiemannSolver(const HyperbolicSystem &hyperbolic_system)
         : hyperbolic_system(hyperbolic_system)
+        , gravity(hyperbolic_system.gravity())
+        , gravity_inverse(1. / gravity)
+        , h_tiny(hyperbolic_system.h_tiny())
     {
     }
 
@@ -63,8 +69,8 @@ namespace ryujin
      * compute an estimation of an upper bound for the maximum wavespeed
      * lambda.
      */
-    Number compute(const std::array<Number, 4> &riemann_data_i,
-                   const std::array<Number, 4> &riemann_data_j);
+    Number compute(const primitive_type &riemann_data_i,
+                   const primitive_type &riemann_data_j);
 
     /**
      * For two given states U_i a U_j and a (normalized) "direction" n_ij
@@ -77,14 +83,43 @@ namespace ryujin
                    const state_type &U_j,
                    const dealii::Tensor<1, dim, Number> &n_ij);
 
-    //@}
 
   protected:
-    /** @name Internal functions used in the Riemann solver */
+    //@}
+    /**
+     * @name Internal functions used in the Riemann solver
+     */
     //@{
+
+    Number f(const primitive_type &primitive_state, const Number &h_star);
+
+    Number phi(const primitive_type &riemann_data_i,
+               const primitive_type &riemann_data_j,
+               const Number &h);
+
+    Number lambda1_minus(const primitive_type &riemann_data,
+                         const Number h_star);
+
+    Number lambda3_plus(const primitive_type &riemann_data,
+                        const Number h_star);
+
+    Number compute_lambda(const primitive_type &riemann_data_i,
+                          const primitive_type &riemann_data_j,
+                          const Number h_star);
+
+    Number h_star_two_rarefaction(const primitive_type &riemann_data_i,
+                                  const primitive_type &riemann_data_j);
+
+    primitive_type
+    riemann_data_from_state(const HyperbolicSystem &hyperbolic_system,
+                            const state_type &U,
+                            const dealii::Tensor<1, dim, Number> &n_ij);
 
   private:
     const HyperbolicSystem &hyperbolic_system;
+    const ScalarNumber gravity;
+    const ScalarNumber gravity_inverse;
+    const ScalarNumber h_tiny;
 
     //@}
   };
