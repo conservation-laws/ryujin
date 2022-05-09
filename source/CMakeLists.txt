@@ -73,10 +73,6 @@ macro(setup_equation EQUATION)
     obj_common obj_${EQUATION} ${OpenMP_CXX_LIBRARIES}
     )
 
-  set_property(TARGET ${EQUATION}
-    PROPERTY RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/run
-    )
-
   if(LIKWID_PERFMON)
     target_link_libraries(${EQUATION} likwid likwid-hwloc likwid-lua)
   endif()
@@ -85,6 +81,16 @@ macro(setup_equation EQUATION)
   if(LIBSTDCPP)
     target_link_libraries(${EQUATION} stdc++fs)
   endif()
+
+  set_target_properties(${EQUATION} PROPERTIES
+    RUNTIME_OUTPUT_NAME "ryujin-${DIM}d-${EQUATION}"
+    )
+
+  add_custom_target(symlink_${EQUATION} ALL
+    DEPENDS ${EQUATION}
+    COMMAND ${CMAKE_COMMAND} -E create_symlink $<TARGET_FILE:${EQUATION}>
+      "${CMAKE_BINARY_DIR}/run/${EQUATION}/ryujin"
+    )
 
   install(TARGETS ${EQUATION} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endmacro()
