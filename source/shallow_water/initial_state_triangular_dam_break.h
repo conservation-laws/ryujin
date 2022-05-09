@@ -74,15 +74,7 @@ namespace ryujin
         else if (x > right_position)
           h = std::max(Number(0.), right_depth - bath);
 
-        /* Set water depths at the two resevoirs */
-        if (x < dam_location)
-          final_state[0] = std::max(Number(0.), left_depth - bath);
-        else if (x > 30.)
-          final_state[0] = std::max(Number(0.), right_depth - bath);
-        else
-          final_state[0] = 0.;
-
-        return final_state;
+        return state_type{{h, Number(0.), Number(0.)}};
       }
 
       virtual auto compute_flux_contributions(const dealii::Point<dim> &point)

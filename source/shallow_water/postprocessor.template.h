@@ -21,27 +21,15 @@ namespace ryujin
 {
 #ifndef DOXYGEN
   template <>
-  const std::array<std::string, 1> Postprocessor<1, double>::component_names{
+  const std::array<std::string, 1> Postprocessor<1, NUMBER>::component_names{
       {"schlieren"}};
 
   template <>
-  const std::array<std::string, 2> Postprocessor<2, double>::component_names{
+  const std::array<std::string, 2> Postprocessor<2, NUMBER>::component_names{
       {"schlieren", "vorticity"}};
 
   template <>
-  const std::array<std::string, 2> Postprocessor<3, double>::component_names{
-      {"schlieren", "vorticity"}};
-
-  template <>
-  const std::array<std::string, 1> Postprocessor<1, float>::component_names{
-      {"schlieren"}};
-
-  template <>
-  const std::array<std::string, 2> Postprocessor<2, float>::component_names{
-      {"schlieren", "vorticity"}};
-
-  template <>
-  const std::array<std::string, 2> Postprocessor<3, float>::component_names{
+  const std::array<std::string, 2> Postprocessor<3, NUMBER>::component_names{
       {"schlieren", "vorticity"}};
 #endif
 
@@ -92,7 +80,6 @@ namespace ryujin
     std::cout << "Postprocessor<dim, Number>::schedule_output()" << std::endl;
 #endif
 
-#if 0
     const auto &affine_constraints = offline_data_->affine_constraints();
 
     constexpr auto simd_length = dealii::VectorizedArray<Number>::size();
@@ -132,7 +119,7 @@ namespace ryujin
         if (row_length == 1)
           continue;
 
-        dealii::Tensor<1, dim, Number> grad_rho_i;
+        dealii::Tensor<1, dim, Number> grad_h_i;
         curl_type curl_v_i;
 
         /* Skip diagonal. */
@@ -146,14 +133,14 @@ namespace ryujin
 
           const auto c_ij = cij_matrix.get_tensor(i, col_idx);
 
-          const auto rho_j = HyperbolicSystem::density(U_j);
+          const auto h_j = HyperbolicSystem::water_depth(U_j);
 
-          grad_rho_i += c_ij * rho_j;
+          grad_h_i += c_ij * h_j;
 
           if constexpr (dim == 2) {
-            curl_v_i[0] += cross_product_2d(c_ij) * M_j / rho_j;
+            curl_v_i[0] += cross_product_2d(c_ij) * M_j / h_j;
           } else if constexpr (dim == 3) {
-            curl_v_i += cross_product_3d(c_ij, M_j / rho_j);
+            curl_v_i += cross_product_3d(c_ij, M_j / h_j);
           }
         }
 
@@ -165,9 +152,9 @@ namespace ryujin
           const auto id = std::get<3>(it->second);
           /* Remove normal components of the gradient on the boundary: */
           if (id == Boundary::slip || id == Boundary::no_slip) {
-            grad_rho_i -= 1. * (grad_rho_i * normal) * normal;
+            grad_h_i -= 1. * (grad_h_i * normal) * normal;
           } else {
-            grad_rho_i = 0.;
+            grad_h_i = 0.;
           }
           /* Only retain the normal component of the curl on the boundary: */
           if constexpr (dim == 2) {
@@ -183,7 +170,7 @@ namespace ryujin
 
         dealii::Tensor<1, n_quantities, Number> quantities;
 
-        quantities[0] = grad_rho_i.norm() / m_i;
+        quantities[0] = grad_h_i.norm() / m_i;
         if constexpr (dim == 2) {
           quantities[1] = curl_v_i[0] / m_i;
         } else if constexpr (dim == 3) {
@@ -281,7 +268,6 @@ namespace ryujin
       affine_constraints.distribute(it);
       it.update_ghost_values();
     }
-#endif
   }
 
 } // namespace ryujin
