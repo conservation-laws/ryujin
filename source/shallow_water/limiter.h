@@ -184,7 +184,8 @@ namespace ryujin
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline typename Limiter<dim, Number>::precomputed_type
   Limiter<dim, Number>::precompute_values(
-      const HyperbolicSystem &hyperbolic_system, const state_type & /*U_i*/)
+      const HyperbolicSystem & /*hyperbolic_system*/,
+      const state_type & /*U_i*/)
   {
     precomputed_type result;
     return result;
