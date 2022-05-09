@@ -529,21 +529,38 @@ namespace ryujin
             const auto c_ij = cij_matrix.template get_tensor<T>(i, col_idx);
             const auto d_ij_inv = Number(1.) / d_ij;
 
+            const auto beta_ij =
+                betaij_matrix.template get_entry<T>(i, col_idx);
+
             const auto prec_j = hyperbolic_system_->flux_contribution(
                 hyperbolic_system_prec_values_, js, U_j);
+
+            /*
+             * Compute low-order flux and limiter bounds:
+             */
 
             const auto flux_ij = hyperbolic_system_->flux(prec_i, prec_j);
             U_i_new -= tau * m_i_inv * contract(flux_ij, c_ij);
 
             if constexpr (HyperbolicSystem::have_equilibrated_states) {
+              /* Use star states for low-order update and limiter bounds: */
               const auto &[U_star_ij, U_star_ji] =
                   hyperbolic_system_->equilibrated_states(prec_i, prec_j);
               r_i += d_ijH * (U_star_ji - U_star_ij);
               U_i_new += tau * m_i_inv * d_ij * (U_star_ji - U_star_ij);
+              limiter.accumulate(
+                  js, U_star_ij, U_star_ji, d_ij_inv * c_ij, beta_ij);
+
             } else {
+              /* Regular low-order update with unmodified states: */
               r_i += d_ijH * (U_j - U_i);
               U_i_new += tau * m_i_inv * d_ij * (U_j - U_i);
+              limiter.accumulate(js, U_i, U_j, d_ij_inv * c_ij, beta_ij);
             }
+
+            /*
+             * Compute high-order fluxes:
+             */
 
             if constexpr (HyperbolicSystem::have_high_order_flux) {
               const auto high_order_flux_ij =
@@ -566,10 +583,6 @@ namespace ryujin
                 r_i -= stage_weights[s] * contract(flux_ij, c_ij);
               }
             }
-
-            const auto beta_ij =
-                betaij_matrix.template get_entry<T>(i, col_idx);
-            limiter.accumulate(js, U_i, U_j, d_ij_inv * c_ij, beta_ij);
           }
 
           new_U.template write_tensor<T>(U_i_new, i);
@@ -683,7 +696,9 @@ namespace ryujin
             const auto prec_j = hyperbolic_system_->flux_contribution(
                 hyperbolic_system_prec_values_, js, U_j);
 
-            /* Contributions from graph viscosity and mass matrix correction: */
+            /*
+             * Contributions from graph viscosity and mass matrix correction:
+             */
 
             auto p_ij = b_ij * r_j - b_ji * r_i;
 
@@ -695,7 +710,9 @@ namespace ryujin
               p_ij += (d_ijH - d_ij) * (U_j - U_i);
             }
 
-            /* Flux terms: */
+            /*
+             * The difference of high-order and low-order flux terms:
+             */
 
             if constexpr (HyperbolicSystem::have_high_order_flux ||
                           stages != 0) {
