@@ -25,12 +25,13 @@ namespace ryujin
   VTUOutput<dim, Number>::VTUOutput(
       const MPI_Comm &mpi_communicator,
       const ryujin::OfflineData<dim, Number> &offline_data,
-      const ryujin::HyperbolicModule<dim, Number> &hyperbolic_data,
+      const ryujin::HyperbolicModule<dim, Number> &hyperbolic_module,
       const ryujin::Postprocessor<dim, Number> &postprocessor,
       const std::string &subsection /*= "VTUOutput"*/)
       : ParameterAcceptor(subsection)
       , mpi_communicator_(mpi_communicator)
       , offline_data_(&offline_data)
+      , hyperbolic_module_(&hyperbolic_module)
       , postprocessor_(&postprocessor)
   {
     use_mpi_io_ = true;
@@ -77,7 +78,11 @@ namespace ryujin
     unsigned int d = 0;
     for (auto &it : quantities_) {
       it.reinit(offline_data_->scalar_partitioner());
-      U.extract_component(it, d++);
+      if (d < problem_dimension)
+        U.extract_component(it, d++);
+      else
+        hyperbolic_module_->hyperbolic_system_prec_values().extract_component(
+            it, d++ - problem_dimension);
       affine_constraints.distribute(it);
       it.update_ghost_values();
     }
