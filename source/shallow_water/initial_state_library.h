@@ -14,6 +14,7 @@
 #include "initial_state_ritter_dam_break.h"
 #include "initial_state_solitary_wave.h"
 #include "initial_state_three_bumps_dam_break.h"
+#include "initial_state_triangular_dam_break.h"
 #include "initial_state_uniform.h"
 
 namespace ryujin
@@ -42,6 +43,7 @@ namespace ryujin
       add(std::make_unique<RitterDamBreak<dim, Number, state_type>>(h, s));
       add(std::make_unique<SolitaryWave<dim, Number, state_type>>(h, s));
       add(std::make_unique<ThreeBumpsDamBreak<dim, Number, state_type>>(h, s));
+      add(std::make_unique<TriangularDamBreak<dim, Number, state_type>>(h, s));
       add(std::make_unique<Uniform<dim, Number, state_type>>(h, s));
     }
 
