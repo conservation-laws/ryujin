@@ -59,9 +59,7 @@ namespace ryujin
     geometry_list_.emplace(std::make_unique<Geometries::Step<dim>>(subsection));
     geometry_list_.emplace(std::make_unique<Geometries::Wall<dim>>(subsection));
     geometry_list_.emplace(
-        std::make_unique<Geometries::ShockTube<dim>>(subsection));
-    geometry_list_.emplace(
-        std::make_unique<Geometries::Validation<dim>>(subsection));
+        std::make_unique<Geometries::RectangularDomain<dim>>(subsection));
     geometry_list_.emplace(
         std::make_unique<Geometries::Airfoil<dim>>(subsection));
   }
