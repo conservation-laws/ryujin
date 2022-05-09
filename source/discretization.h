@@ -9,6 +9,7 @@
 
 #include "convenience_macros.h"
 #include "geometry.h"
+#include "patterns_conversion.h"
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/quadrature.h>
@@ -102,7 +103,20 @@ namespace ryujin
      */
     dynamic = 5,
   };
+} // namespace ryujin
 
+#ifndef DOXYGEN
+DECLARE_ENUM(ryujin::Boundary,
+             LIST({ryujin::Boundary::do_nothing, "do_nothing"},
+                  {ryujin::Boundary::periodic, "periodic"},
+                  {ryujin::Boundary::slip, "slip"},
+                  {ryujin::Boundary::no_slip, "no_slip"},
+                  {ryujin::Boundary::dirichlet, "dirichlet"},
+                  {ryujin::Boundary::dynamic, "dynamic"}));
+#endif
+
+namespace ryujin
+{
   /**
    * This class is as a container for data related to the discretization,
    * this includes the triangulation, finite element, mapping, and
