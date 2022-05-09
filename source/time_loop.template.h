@@ -47,8 +47,11 @@ namespace ryujin
                        hyperbolic_system_,
                        offline_data_,
                        "/I - VTUOutput/Postprocessor")
-      , vtu_output_(
-            mpi_communicator_, offline_data_, postprocessor_, "/I - VTUOutput")
+      , vtu_output_(mpi_communicator_,
+                    offline_data_,
+                    hyperbolic_module_,
+                    postprocessor_,
+                    "/I - VTUOutput")
       , quantities_(mpi_communicator_,
                     hyperbolic_system_,
                     offline_data_,

@@ -32,7 +32,7 @@ namespace ryujin
   {
   public:
     /**
-     * The name of the hyperbolic system as a string.
+     * The name of the hyperbolic system.
      */
     static const std::string problem_name;
 
@@ -49,7 +49,7 @@ namespace ryujin
     using state_type = dealii::Tensor<1, problem_dimension<dim>, Number>;
 
     /**
-     * An array holding all component names of the conserved state as a string.
+     * An array holding all component names of the conserved state.
      */
     template <int dim>
     static const std::array<std::string, problem_dimension<dim>>
@@ -63,7 +63,7 @@ namespace ryujin
         dealii::Tensor<1, problem_dimension<dim>, Number>;
 
     /**
-     * An array holding all component names of the primitive state as a string.
+     * An array holding all component names of the primitive state.
      */
     template <int dim>
     static const std::array<std::string, problem_dimension<dim>>
@@ -111,6 +111,13 @@ namespace ryujin
      */
     template <int dim, typename Number>
     using precomputed_type = std::array<Number, n_precomputed_values<dim>>;
+
+    /**
+     * An array holding all component names of the precomputed values.
+     */
+    template <int dim>
+    static const std::array<std::string, n_precomputed_values<dim>>
+        precomputed_names;
 
     /**
      * Precomputed values for a given state.

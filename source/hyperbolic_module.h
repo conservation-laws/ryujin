@@ -264,11 +264,13 @@ namespace ryujin
 
     static constexpr auto n_prec = HyperbolicSystem::n_precomputed_values<dim>;
     mutable MultiComponentVector<Number, n_prec> hyperbolic_system_prec_values_;
+    ACCESSOR_READ_ONLY(hyperbolic_system_prec_values)
 
     static constexpr auto n_ind = Indicator<dim, Number>::n_precomputed_values;
     mutable MultiComponentVector<Number, n_ind> indicator_prec_values_;
 
     mutable scalar_type alpha_;
+    ACCESSOR_READ_ONLY(alpha)
 
     static constexpr auto n_lim = Limiter<dim, Number>::n_precomputed_values;
     mutable MultiComponentVector<Number, n_lim> limiter_prec_values_;
@@ -286,4 +288,4 @@ namespace ryujin
     //@}
   };
 
-} /* namespace ryujin */
+  } /* namespace ryujin */

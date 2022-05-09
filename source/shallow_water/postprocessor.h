@@ -113,18 +113,6 @@ namespace ryujin
      */
     void compute(const vector_type &U) const;
 
-    /**
-     * Returns true if at least one background thread is active writing out
-     * the solution to disk.
-     */
-    bool is_active();
-
-    /**
-     * Wait for all background threads to finish writing out the solution
-     * to disk.
-     */
-    void wait();
-
   private:
     /**
      * @name Run time options

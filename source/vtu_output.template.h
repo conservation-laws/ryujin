@@ -25,6 +25,7 @@ namespace ryujin
   VTUOutput<dim, Number>::VTUOutput(
       const MPI_Comm &mpi_communicator,
       const ryujin::OfflineData<dim, Number> &offline_data,
+      const ryujin::HyperbolicModule<dim, Number> &hyperbolic_data,
       const ryujin::Postprocessor<dim, Number> &postprocessor,
       const std::string &subsection /*= "VTUOutput"*/)
       : ParameterAcceptor(subsection)
@@ -32,7 +33,7 @@ namespace ryujin
       , offline_data_(&offline_data)
       , postprocessor_(&postprocessor)
   {
-    use_mpi_io_ = false;
+    use_mpi_io_ = true;
     add_parameter("use mpi io",
                   use_mpi_io_,
                   "If enabled write out one vtu file via MPI IO using "
@@ -74,7 +75,7 @@ namespace ryujin
     /* Copy state vector: */
 
     unsigned int d = 0;
-    for (auto &it : state_vector_) {
+    for (auto &it : quantities_) {
       it.reinit(offline_data_->scalar_partitioner());
       U.extract_component(it, d++);
       affine_constraints.distribute(it);
@@ -90,36 +91,33 @@ namespace ryujin
     const auto &mapping = discretization.mapping();
     const auto patch_order = discretization.finite_element().degree - 1;
 
-    if (output_full) {
+    auto declare_output_vectors = [&](auto &data_out) mutable -> void {
       data_out->attach_dof_handler(offline_data_->dof_handler());
 
       for (unsigned int i = 0; i < problem_dimension; ++i)
-        data_out->add_data_vector(state_vector_[i],
+        data_out->add_data_vector(quantities_[i],
                                   HyperbolicSystem::component_names<dim>[i]);
+
+      for (unsigned int i = 0; i < n_precomputed_values; ++i)
+        data_out->add_data_vector(quantities_[problem_dimension + i],
+                                  HyperbolicSystem::precomputed_names<dim>[i]);
 
       constexpr auto n_quantities = Postprocessor<dim, Number>::n_quantities;
       for (unsigned int i = 0; i < n_quantities; ++i)
         data_out->add_data_vector(postprocessor_->quantities()[i],
                                   postprocessor_->component_names[i]);
+    };
 
+    if (output_full) {
+      declare_output_vectors(data_out);
       data_out->build_patches(mapping, patch_order);
-
       DataOutBase::VtkFlags flags(
           t, cycle, true, DataOutBase::VtkFlags::best_speed);
       data_out->set_flags(flags);
     }
 
     if (output_levelsets && manifolds_.size() != 0) {
-      data_out_levelsets->attach_dof_handler(offline_data_->dof_handler());
-
-      for (unsigned int i = 0; i < problem_dimension; ++i)
-        data_out_levelsets->add_data_vector(
-            state_vector_[i], HyperbolicSystem::component_names<dim>[i]);
-
-      constexpr auto n_quantities = Postprocessor<dim, Number>::n_quantities;
-      for (unsigned int i = 0; i < n_quantities; ++i)
-        data_out_levelsets->add_data_vector(postprocessor_->quantities()[i],
-                                            postprocessor_->component_names[i]);
+      declare_output_vectors(data_out_levelsets);
 
       /*
        * Specify an output filter that selects only cells for output that are

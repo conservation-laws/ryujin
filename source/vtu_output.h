@@ -11,6 +11,7 @@
 #include <postprocessor.h>
 
 #include "offline_data.h"
+#include "hyperbolic_module.h"
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/grid/intergrid_map.h>
@@ -39,6 +40,12 @@ namespace ryujin
         HyperbolicSystem::problem_dimension<dim>;
 
     /**
+     * @copydoc HyperbolicSystem::n_precomputed_values
+     */
+    static constexpr unsigned int n_precomputed_values =
+        HyperbolicSystem::n_precomputed_values<dim>;
+
+    /**
      * @copydoc OfflineData::scalar_type
      */
     using scalar_type = typename OfflineData<dim, Number>::scalar_type;
@@ -53,6 +60,7 @@ namespace ryujin
      */
     VTUOutput(const MPI_Comm &mpi_communicator,
               const ryujin::OfflineData<dim, Number> &offline_data,
+              const ryujin::HyperbolicModule<dim, Number> &hyperbolic_module,
               const ryujin::Postprocessor<dim, Number> &postprocessor,
               const std::string &subsection = "VTUOutput");
 
@@ -107,13 +115,13 @@ namespace ryujin
 
     const MPI_Comm &mpi_communicator_;
 
-    dealii::SmartPointer<const ryujin::OfflineData<dim, Number>> offline_data_;
-    dealii::SmartPointer<const ryujin::Postprocessor<dim, Number>>
-        postprocessor_;
+    dealii::SmartPointer<const OfflineData<dim, Number>> offline_data_;
+    dealii::SmartPointer<const HyperbolicModule<dim, Number>>
+        hyperbolic_module_;
+    dealii::SmartPointer<const Postprocessor<dim, Number>> postprocessor_;
 
-    std::future<void> background_thread_status;
-
-    std::array<scalar_type, problem_dimension> state_vector_;
+    std::array<scalar_type, problem_dimension + n_precomputed_values>
+        quantities_;
 
     //@}
   };

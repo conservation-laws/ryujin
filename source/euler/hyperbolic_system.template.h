@@ -60,6 +60,15 @@ namespace ryujin
   const std::array<std::string, 5>
       HyperbolicSystem::primitive_component_names<3>{
           {"rho", "v_1", "v_2", "v_3", "p"}};
+
+  template <>
+  const std::array<std::string, 0> HyperbolicSystem::precomputed_names<1>{{}};
+
+  template <>
+  const std::array<std::string, 0> HyperbolicSystem::precomputed_names<2>{{}};
+
+  template <>
+  const std::array<std::string, 0> HyperbolicSystem::precomputed_names<3>{{}};
 #endif
 
 } /* namespace ryujin */
