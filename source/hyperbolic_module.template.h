@@ -128,22 +128,6 @@ namespace ryujin
         return all_below_diagonal;
       }
     }
-
-    /**
-     * Internally used: Contract a given flux and c_ij:
-     */
-    template <typename FT,
-              int problem_dim = FT::dimension,
-              typename TT = typename FT::value_type,
-              typename T = typename TT::value_type>
-    DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, problem_dim, T>
-    contract(const FT &flux_ij, const TT &c_ij)
-    {
-      dealii::Tensor<1, problem_dim, T> result;
-      for (unsigned int k = 0; k < problem_dim; ++k)
-        result[k] = flux_ij[k] * c_ij;
-      return result;
-    }
   } // namespace
 
 

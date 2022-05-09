@@ -950,10 +950,7 @@ namespace ryujin
   DEAL_II_ALWAYS_INLINE inline FT HyperbolicSystem::flux(const FT &prec_i,
                                                          const FT &prec_j) const
   {
-    FT result;
-    for (unsigned int k = 0; k < dim + 2; ++k)
-      result[k] = prec_i[k] + prec_j[k];
-    return result;
+    return add(prec_i, prec_j);
   }
 
 

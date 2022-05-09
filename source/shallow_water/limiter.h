@@ -222,8 +222,7 @@ namespace ryujin
     const auto f_i = hyperbolic_system.f(U_i);
     const auto f_j = hyperbolic_system.f(U_j);
     const auto U_ij_bar =
-        ScalarNumber(0.5) *
-        (U_i + U_j + contract(f_i, scaled_c_ij) - contract(f_j, scaled_c_ij));
+        ScalarNumber(0.5) * (U_i + U_j + contract(add(f_i, -f_j), scaled_c_ij));
 
     const auto h_bar_ij = hyperbolic_system.water_depth(U_ij_bar);
     h_min = std::min(h_min, h_bar_ij);

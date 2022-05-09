@@ -788,10 +788,7 @@ namespace ryujin
     const auto f_i = f(U_star_ij);
     const auto f_j = f(U_star_ji);
 
-    flux_type<dim, T> result;
-    for (unsigned int k = 0; k < dim + 1; ++k)
-      result[k] = f_i[k] + f_j[k];
-    return result;
+    return add(f_i, f_j);
   }
 
 
@@ -807,10 +804,7 @@ namespace ryujin
     const auto f_i = f(U_i);
     const auto f_j = f(U_j);
 
-    flux_type<dim, T> result;
-    for (unsigned int k = 0; k < dim + 1; ++k)
-      result[k] = f_i[k] + f_j[k];
-    return result;
+    return add(f_i, f_j);
   }
 
   template <typename ST, int dim, typename T>

@@ -8,7 +8,7 @@
 #include <deal.II/base/function.h>
 
 /**
- * @name Various convenience macros
+ * @name Various convenience functions and macros
  */
 //@{
 
@@ -70,6 +70,39 @@ namespace ryujin
   {
     return {callable, k};
   }
+
+
+  /**
+   * Contract a given rank-2 tensor flux_ij and a rank-1 tensor c_ij:
+   */
+  template <typename FT,
+            int problem_dim = FT::dimension,
+            typename TT = typename FT::value_type,
+            typename T = typename TT::value_type>
+  DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, problem_dim, T>
+  contract(const FT &flux_ij, const TT &c_ij)
+  {
+    dealii::Tensor<1, problem_dim, T> result;
+    for (unsigned int k = 0; k < problem_dim; ++k)
+      result[k] = flux_ij[k] * c_ij;
+    return result;
+  }
+
+
+  /**
+   * Add two given rank-2 tensors flux_left_ij and flux_right_ij:
+   */
+  template <typename FT, int problem_dim = FT::dimension>
+  DEAL_II_ALWAYS_INLINE inline FT add(const FT &flux_left_ij,
+                                      const FT &flux_right_ij)
+  {
+    FT result;
+    for (unsigned int k = 0; k < problem_dim; ++k)
+      result[k] = flux_left_ij[k] + flux_right_ij[k];
+    return result;
+  }
+
+
 } // namespace ryujin
 
 
