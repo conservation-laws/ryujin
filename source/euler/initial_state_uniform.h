@@ -41,7 +41,7 @@ namespace ryujin
     private:
       const HyperbolicSystem &hyperbolic_system;
 
-      dealii::Tensor<1, dim + 1, Number> primitive_;
+      dealii::Tensor<1, 3, Number> primitive_;
     };
   } // namespace InitialStateLibrary
 } // namespace ryujin
