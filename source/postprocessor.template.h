@@ -112,7 +112,7 @@ namespace ryujin
     const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
     const auto &lumped_mass_matrix = offline_data_->lumped_mass_matrix();
     const auto &cij_matrix = offline_data_->cij_matrix();
-    // const auto &boundary_map = offline_data_->boundary_map();
+    const auto &boundary_map = offline_data_->boundary_map();
 
     const unsigned int n_internal = offline_data_->n_locally_internal();
     const unsigned int n_owned = offline_data_->n_locally_owned();
@@ -172,40 +172,56 @@ namespace ryujin
 
             k = 0;
             for (const auto &[is_primitive, index] : vorticity_indices_) {
-              grad_type<T> v_j;
+              grad_type<T> q_j;
               for (unsigned int d = 0; d < dim; ++d)
-                v_j[d] = (is_primitive ? prim_j[index + d] : U_j[index + d]);
+                q_j[d] = (is_primitive ? prim_j[index + d] : U_j[index + d]);
 
               if constexpr (dim == 2) {
-                local_vorticity_values[k++][0] += cross_product_2d(c_ij) * v_j;
+                local_vorticity_values[k++][0] += cross_product_2d(c_ij) * q_j;
               } else if constexpr (dim == 3) {
-                local_vorticity_values[k++] += cross_product_3d(c_ij, v_j);
+                local_vorticity_values[k++] += cross_product_3d(c_ij, q_j);
               }
             }
           }
 
           /* Fix up boundaries: */
 
-#if 0
-          // FIXME
-          const auto range = boundary_map.equal_range(i);
-          for (auto it = range.first; it != range.second; ++it) {
-            const auto normal = std::get<0>(it->second);
-            const auto id = std::get<3>(it->second);
-            /* Remove normal components of the gradient on the boundary: */
-            if (id == Boundary::slip || id == Boundary::no_slip) {
-              grad_rho_i -= 1. * (grad_rho_i * normal) * normal;
-            } else {
-              grad_rho_i = 0.;
-            }
-            /* Only retain the normal component of the curl on the boundary: */
-            if constexpr (dim == 2) {
-              curl_v_i = 0.;
-            } else if constexpr (dim == 3) {
-              curl_v_i = (curl_v_i * normal) * normal;
+          /* Serialize over the stride: */
+          for (unsigned int k = 0; k < stride_size; ++k) {
+            const auto range = boundary_map.equal_range(i + k);
+            for (auto it = range.first; it != range.second; ++it) {
+              const auto normal = std::get<0>(it->second);
+              const auto id = std::get<3>(it->second);
+
+              if (id == Boundary::slip || id == Boundary::no_slip) {
+                /* Remove normal component of schlieren values at slip
+                 * and no-slip boundaries: */
+                for (auto &it : local_schlieren_values) {
+                  auto grad_q_i = serialize_tensor(it, k);
+                  grad_q_i -= 1. * (grad_q_i * normal) * normal;
+                  assign_serial_tensor(it, grad_q_i, k);
+                }
+
+              } else {
+                /* Set schlieren values to zero everywhere else: */
+                for (auto &it : local_schlieren_values) {
+                  assign_serial_tensor(it, grad_type<Number>(), k);
+                }
+              }
+
+              for (auto &it : local_vorticity_values) {
+                /* Retain only the normal component of the curl on the
+                 * boundary: */
+                if constexpr (dim == 2) {
+                  assign_serial_tensor(it, curl_type<Number>(), k);
+                } else if constexpr (dim == 3) {
+                  auto curl_q_i = serialize_tensor(it, k);
+                  curl_q_i = (curl_q_i * normal) * normal;
+                  assign_serial_tensor(it, curl_q_i, k);
+                }
+              }
             }
           }
-#endif
 
           /* Populate quantities: */
 

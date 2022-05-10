@@ -225,6 +225,92 @@ namespace ryujin
     }
   }
 
+
+  /**
+   * Return the k-th serialized component of a Tensor of VectorizedArray
+   *
+   * @ingroup SIMD
+   */
+  template <int rank, int dim, std::size_t width, typename Number>
+  DEAL_II_ALWAYS_INLINE inline dealii::Tensor<rank, dim, Number>
+  serialize_tensor(
+      const dealii::Tensor<rank, dim, dealii::VectorizedArray<Number, width>>
+          &vectorized,
+      const unsigned int k)
+  {
+    Assert(k < width, ExcMessage("Index past VectorizedArray width"));
+    dealii::Tensor<rank, dim, Number> result;
+    if constexpr (rank == 1) {
+      for (unsigned int d = 0; d < dim; ++d)
+        result[d] = vectorized[d][k];
+    } else {
+      for (unsigned int d = 0; d < dim; ++d)
+        result[d] = serialize_tensor(vectorized[d], k);
+    }
+    return result;
+  }
+
+
+  /**
+   * Variant of above function for serial Tensors that simply returns the
+   * given tensor.
+   *
+   * @ingroup SIMD
+   */
+  template <int rank, int dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline dealii::Tensor<rank, dim, Number>
+  serialize_tensor(const dealii::Tensor<rank, dim, Number> &serial,
+                   const unsigned int k)
+  {
+    (void)k;
+    Assert(k == 0,
+           ExcMessage("The given index k must be zero for a serial tensor"));
+    return serial;
+  }
+
+
+  /**
+   * Update the the k-th serial component of a Tensor of VectorizedArray
+   *
+   * @ingroup SIMD
+   */
+  template <int rank, int dim, std::size_t width, typename Number>
+  DEAL_II_ALWAYS_INLINE inline void
+  assign_serial_tensor(
+      dealii::Tensor<rank, dim, dealii::VectorizedArray<Number, width>> &result,
+      const dealii::Tensor<rank, dim, Number> &serial,
+      const unsigned int k)
+  {
+    Assert(k < width, ExcMessage("Index past VectorizedArray width"));
+    if constexpr (rank == 1) {
+      for (unsigned int d = 0; d < dim; ++d)
+        result[d][k] = serial[d];
+    } else {
+      for (unsigned int d = 0; d < dim; ++d)
+        assign_serial_tensor(result[d], serial[d], k);
+    }
+  }
+
+
+  /**
+   * Variant of above function for serial Tensors that simply assigns the
+   * given tensor as is.
+   *
+   * @ingroup SIMD
+   */
+  template <int rank, int dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline void
+  assign_serial_tensor(dealii::Tensor<rank, dim, Number> &result,
+                       const dealii::Tensor<rank, dim, Number> &serial,
+                       const unsigned int k)
+  {
+    (void)k;
+    Assert(k == 0,
+           ExcMessage("The given index k must be zero for a serial tensor"));
+
+    result = serial;
+  }
+
   //@}
 
 } // namespace ryujin
