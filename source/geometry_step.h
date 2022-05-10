@@ -108,7 +108,7 @@ namespace ryujin
             for (auto f : GeometryInfo<2>::face_indices()) {
               const auto face = cell->face(f);
               if (face->at_boundary())
-                face->set_manifold_id(Boundary::slip);
+                face->set_manifold_id(1);
               cell->set_manifold_id(1); // temporarily for second loop
             }
           }

@@ -35,7 +35,7 @@ Matthias Maier <maier@math.tamu.edu> and Martin Kronbichler
 Full license text
 -----------------
 
-Copyright (c) 2020 - 2021 by the ryujin authors
+Copyright (c) 2020 - 2022 by the ryujin authors
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
