@@ -40,7 +40,7 @@ namespace ryujin
 
       const auto &h_min = std::get<0>(bounds);
       const auto &h_max = std::get<1>(bounds);
-      const auto h_tiny = hyperbolic_system.h_tiny();
+      const Number h_tiny = hyperbolic_system.h_tiny();
 
       if (!((std::max(Number(0.), U_h - relaxbig * h_max) == Number(0.)) &&
             (std::max(Number(0.), h_min - relaxbig * U_h) == Number(0.)))) {

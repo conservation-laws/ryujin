@@ -57,7 +57,7 @@ namespace ryujin
           return state_type{
               {(x <= 0. ? left_depth : right_depth), Number(0.), Number(0.)}};
 
-        const auto hv = std::sqrt(hyperbolic_system.gravity() * left_depth);
+        const Number hv = std::sqrt(hyperbolic_system.gravity() * left_depth);
         return state_type{{left_depth, hv, hv}};
       }
 

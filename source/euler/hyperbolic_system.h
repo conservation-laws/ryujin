@@ -308,11 +308,11 @@ namespace ryujin
      *    versus inflow).
      */
     template <int problem_dim, typename Number, typename Lambda>
-    dealii::Tensor<1, problem_dim, Number>
-    apply_boundary_conditions(dealii::types::boundary_id id,
-                              dealii::Tensor<1, problem_dim, Number> U,
-                              const dealii::Tensor<1, problem_dim - 2> &normal,
-                              Lambda get_dirichlet_data) const;
+    dealii::Tensor<1, problem_dim, Number> apply_boundary_conditions(
+        dealii::types::boundary_id id,
+        dealii::Tensor<1, problem_dim, Number> U,
+        const dealii::Tensor<1, problem_dim - 2, Number> &normal,
+        Lambda get_dirichlet_data) const;
 
     //@}
     /**
@@ -855,7 +855,7 @@ namespace ryujin
   HyperbolicSystem::apply_boundary_conditions(
       dealii::types::boundary_id id,
       dealii::Tensor<1, problem_dim, Number> U,
-      const dealii::Tensor<1, problem_dim - 2> &normal,
+      const dealii::Tensor<1, problem_dim - 2, Number> &normal,
       Lambda get_dirichlet_data) const
   {
     constexpr auto dim = problem_dim - 2;
