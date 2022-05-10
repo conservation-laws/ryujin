@@ -1,5 +1,5 @@
 subsection A - TimeLoop
-  set basename                  = validation-erk-33
+  set basename                  = validation-ssprk-33
 
   set enable output full        = true
   set enable compute error      = true
@@ -50,5 +50,5 @@ subsection H - TimeIntegrator
   set cfl max            = 0.2
   set cfl recovery strategy = none
 
-  set time stepping scheme  = erk 33
+  set time stepping scheme  = ssprk 33
 end
