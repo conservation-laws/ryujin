@@ -34,11 +34,6 @@ namespace ryujin
     void load_mesh(Discretization<dim> &discretization,
                    const std::string &base_name)
     {
-      if constexpr (dim == 1) {
-        AssertThrow(false, dealii::ExcNotImplemented());
-        __builting_trap();
-        return;
-      }
       discretization.refinement() = 0; /* do not refine */
       discretization.prepare();
       discretization.triangulation().load(base_name + "-checkpoint.mesh");
