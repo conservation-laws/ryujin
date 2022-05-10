@@ -5,20 +5,8 @@
 
 #pragma once
 
-#include <compile_time_options.h>
-
 #include "cubic_spline.h"
-#include "geometry.h"
 #include "transfinite_interpolation.template.h"
-
-#include <deal.II/fe/fe_system.h>
-#include <deal.II/grid/grid_generator.h>
-#include <deal.II/grid/grid_in.h>
-#include <deal.II/grid/grid_out.h>
-#include <deal.II/grid/grid_tools.h>
-#include <deal.II/grid/manifold_lib.h>
-#include <deal.II/grid/tensor_product_manifold.h>
-#include <deal.II/grid/tria.h>
 
 namespace ryujin
 {
@@ -729,12 +717,7 @@ namespace ryujin
 
   } // namespace
 
-  /**
-   * A namespace for a number of benchmark geometries and dealii::GridIn
-   * wrappers.
-   *
-   * @ingroup Mesh
-   */
+
   namespace Geometries
   {
     /**
@@ -1360,7 +1343,5 @@ namespace ryujin
       unsigned int n_anisotropic_refinements_trailing_;
       unsigned int subdivisions_z_;
     };
-
   } /* namespace Geometries */
-
 } /* namespace ryujin */

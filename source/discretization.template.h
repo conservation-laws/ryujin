@@ -8,8 +8,7 @@
 #include <compile_time_options.h>
 
 #include "discretization.h"
-#include "grid_airfoil.h"
-#include "grid_generator.h"
+#include "geometry_library.h"
 
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/fe/fe_q.h>
@@ -54,14 +53,7 @@ namespace ryujin
                   repartitioning_,
                   "try to equalize workload by repartitioning the mesh");
 
-    geometry_list_.emplace(
-        std::make_unique<Geometries::Cylinder<dim>>(subsection));
-    geometry_list_.emplace(std::make_unique<Geometries::Step<dim>>(subsection));
-    geometry_list_.emplace(std::make_unique<Geometries::Wall<dim>>(subsection));
-    geometry_list_.emplace(
-        std::make_unique<Geometries::RectangularDomain<dim>>(subsection));
-    geometry_list_.emplace(
-        std::make_unique<Geometries::Airfoil<dim>>(subsection));
+    Geometries::populate_geometry_list<dim>(geometry_list_, subsection);
   }
 
 
