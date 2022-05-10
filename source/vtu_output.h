@@ -10,8 +10,8 @@
 #include <hyperbolic_system.h>
 #include <postprocessor.h>
 
-#include "offline_data.h"
 #include "hyperbolic_module.h"
+#include "offline_data.h"
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/grid/intergrid_map.h>
@@ -38,6 +38,11 @@ namespace ryujin
      */
     static constexpr unsigned int problem_dimension =
         HyperbolicSystem::problem_dimension<dim>;
+
+    /**
+     * @copydoc HyperbolicSystem::state_type
+     */
+    using state_type = HyperbolicSystem::state_type<dim, Number>;
 
     /**
      * @copydoc HyperbolicSystem::n_precomputed_values
@@ -106,6 +111,7 @@ namespace ryujin
     bool use_mpi_io_;
 
     std::vector<std::string> manifolds_;
+    std::list<std::string> selected_quantities_;
 
     //@}
     /**
@@ -120,8 +126,12 @@ namespace ryujin
         hyperbolic_module_;
     dealii::SmartPointer<const Postprocessor<dim, Number>> postprocessor_;
 
-    std::array<scalar_type, problem_dimension + n_precomputed_values>
-        quantities_;
+    std::vector<scalar_type> quantities_;
+
+    std::vector<std::tuple<std::string /*name*/,
+                           std::function<void(scalar_type & /*result*/,
+                                              const vector_type & /*U*/)>>>
+        quantities_mapping_;
 
     //@}
   };
