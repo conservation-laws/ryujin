@@ -1,15 +1,14 @@
 subsection A - TimeLoop
-  set basename                  = validation-erk-33
+  set basename             = validation-erk-33
 
-  set enable output full        = true
-  set enable compute error      = true
-  set enable compute quantities = true
+  set enable output full   = true
+  set enable compute error = true
 
-  set final time                = 2.0
-  set output granularity        = 2.0
+  set final time           = 2.0
+  set output granularity   = 2.0
 end
 
-subsection B - HyperbolicSystem
+subsection B - Equation
   set gamma = 1.4
 end
 
@@ -38,12 +37,6 @@ subsection E - InitialValues
     set beta        = 5
   end
 end
-
-subsection F - HyperbolicModule
-  set cfl with boundary dofs = false
-  set limiter iterations     = 2
-end
-
 
 subsection H - TimeIntegrator
   set cfl min            = 0.2

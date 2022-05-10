@@ -5,7 +5,6 @@
 
 add_library(obj_euler OBJECT
   limiter.cc
-  postprocessor.cc
   hyperbolic_system.cc
   riemann_solver.cc
   )

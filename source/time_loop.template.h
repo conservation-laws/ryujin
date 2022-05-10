@@ -28,7 +28,7 @@ namespace ryujin
   TimeLoop<dim, Number>::TimeLoop(const MPI_Comm &mpi_comm)
       : ParameterAcceptor("/A - TimeLoop")
       , mpi_communicator_(mpi_comm)
-      , hyperbolic_system_("/B - HyperbolicSystem")
+      , hyperbolic_system_("/B - Equation")
       , discretization_(mpi_communicator_, "/C - Discretization")
       , offline_data_(mpi_communicator_, discretization_, "/D - OfflineData")
       , initial_values_(hyperbolic_system_, offline_data_, "/E - InitialValues")
@@ -46,7 +46,7 @@ namespace ryujin
       , postprocessor_(mpi_communicator_,
                        hyperbolic_system_,
                        offline_data_,
-                       "/I - VTUOutput/Postprocessor")
+                       "/I - VTUOutput")
       , vtu_output_(mpi_communicator_,
                     offline_data_,
                     hyperbolic_module_,
@@ -147,7 +147,7 @@ namespace ryujin
     terminal_update_interval_ = 10;
     add_parameter("terminal update interval",
                   terminal_update_interval_,
-                  "number of cycles after which output statistics are "
+                  "number of seconds after which output statistics are "
                   "recomputed and printed on the terminal");
   }
 
@@ -241,12 +241,16 @@ namespace ryujin
       }
     }
 
-    print_info("entering main loop");
-    computing_timer_["time loop"].start();
+    unsigned int cycle = 1;
+    Number last_terminal_output = (terminal_update_interval_ == Number(0.)
+                                       ? std::numeric_limits<Number>::max()
+                                       : std::numeric_limits<Number>::lowest());
 
     /* Loop: */
 
-    unsigned int cycle = 1;
+    print_info("entering main loop");
+    computing_timer_["time loop"].start();
+
     for (;; ++cycle) {
 
 #ifdef DEBUG_OUTPUT
@@ -331,9 +335,11 @@ namespace ryujin
       if (t >= output_cycle * output_granularity_)
         print_cycle_statistics(cycle, t, output_cycle, /*logfile*/ true);
 
-      if (terminal_update_interval_ != 0 &&
-          cycle % terminal_update_interval_ == 0)
+      const auto wall_time = computing_timer_["time loop"].wall_time();
+      if (wall_time >= last_terminal_output + terminal_update_interval_) {
         print_cycle_statistics(cycle, t, output_cycle);
+        last_terminal_output = wall_time;
+      }
     } /* end of loop */
 
     /* We have actually performed one cycle less. */
@@ -342,12 +348,12 @@ namespace ryujin
     computing_timer_["time loop"].stop();
 
     /* Write final timing statistics to screen and logfile: */
-    if (terminal_update_interval_ != 0) {
+    if (terminal_update_interval_ != Number(0.)) {
       print_cycle_statistics(
-          cycle, t, output_cycle, /*logfile*/ false, /*final_time=*/true);
+          cycle, t, output_cycle, /*logfile*/ false, /*final*/ true);
     }
     print_cycle_statistics(
-        cycle, t, output_cycle, /*logfile*/ true, /*final_time=*/true);
+        cycle, t, output_cycle, /*logfile*/ true, /*final*/ true);
 
     if (enable_compute_error_) {
       /* Output final error: */
@@ -898,8 +904,9 @@ namespace ryujin
     }
 
     const unsigned int minutes = eta / 60;
-    output << minutes << " min";
+    output << minutes << " min\n";
 
+    output << "\n"
     if (mpi_rank_ != 0)
       return;
 
@@ -977,7 +984,9 @@ namespace ryujin
            << n_mpi_processes_ << " ranks / " << MultithreadInfo::n_threads() //
            << " threads."                                                     //
            << "\n             Last output cycle " << output_cycle - 1         //
-           << " at t = " << output_granularity_ * (output_cycle - 1) << "\n"; //
+           << " at t = " << output_granularity_ * (output_cycle - 1)          //
+           << " (terminal update interval " << terminal_update_interval_      //
+           << "s)\n";
 
     print_memory_statistics(output);
     print_timers(output);

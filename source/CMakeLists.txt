@@ -47,6 +47,7 @@ set(DEPENDENT_SOURCE_FILES
   hyperbolic_module.cc
   initial_values.cc
   main.cc
+  postprocessor.cc
   quantities.cc
   time_integrator.cc
   time_loop.cc

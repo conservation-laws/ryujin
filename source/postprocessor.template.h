@@ -80,6 +80,8 @@ namespace ryujin
     std::cout << "Postprocessor<dim, Number>::schedule_output()" << std::endl;
 #endif
 
+#if 0
+
     const auto &affine_constraints = offline_data_->affine_constraints();
 
     constexpr auto simd_length = dealii::VectorizedArray<Number>::size();
@@ -268,6 +270,7 @@ namespace ryujin
       affine_constraints.distribute(it);
       it.update_ghost_values();
     }
+#endif
   }
 
 } // namespace ryujin

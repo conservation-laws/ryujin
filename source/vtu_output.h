@@ -8,10 +8,10 @@
 #include <compile_time_options.h>
 
 #include <hyperbolic_system.h>
-#include <postprocessor.h>
 
 #include "hyperbolic_module.h"
 #include "offline_data.h"
+#include "postprocessor.h"
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/grid/intergrid_map.h>
