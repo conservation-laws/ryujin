@@ -313,8 +313,7 @@ namespace ryujin
     clear_statistics();
 
     /* Prepare header string: */
-    const auto &names =
-        hyperbolic_system_->template primitive_component_names<dim>;
+    const auto &names = HyperbolicSystem::primitive_component_names<dim>;
     header_ =
         std::accumulate(std::begin(names),
                         std::end(names),
