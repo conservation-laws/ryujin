@@ -906,7 +906,6 @@ namespace ryujin
     const unsigned int minutes = eta / 60;
     output << minutes << " min\n";
 
-    output << "\n"
     if (mpi_rank_ != 0)
       return;
 

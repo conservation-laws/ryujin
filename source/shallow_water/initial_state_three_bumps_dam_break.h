@@ -5,10 +5,6 @@
 
 #pragma once
 
-#include "initial_state.h"
-
-#include <deal.II/base/tensor.h>
-
 namespace ryujin
 {
   namespace InitialStateLibrary

@@ -91,6 +91,7 @@ macro(setup_equation EQUATION)
     DEPENDS ${EQUATION}
     COMMAND ${CMAKE_COMMAND} -E create_symlink $<TARGET_FILE:${EQUATION}>
       "${CMAKE_BINARY_DIR}/run/${EQUATION}/ryujin"
+    COMMENT "updating ${EQUATION} symlink"
     )
 
   install(TARGETS ${EQUATION} DESTINATION ${CMAKE_INSTALL_BINDIR})
