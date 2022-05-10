@@ -4,8 +4,8 @@
 # The geometry is a 3D cylinder of diameter 0.5 positioned in a 3D channel
 # of length 4, height 2 and width 2.
 #
-# Warning, this is a fairly large computation: The default refinement 6
-# corresponds to about 32M gridpoints.
+# Warning, this is a fairly large computation:
+# The default refinement (level 6) corresponds to about 32M gridpoints.
 #
 # [1] Maier, Kronbichler: Efficient parallel 3D computation of the
 #     compressible Euler equations with an invariant-domain preserving
@@ -14,10 +14,9 @@
 #
 
 subsection A - TimeLoop
-  set basename                     = cylinder-3d
+  set basename                     = mach3-cylinder-3d
 
   set enable checkpointing         = false
-  set enable compute quantities    = false
   set enable output full           = true
   set enable output levelsets      = true
 
@@ -25,18 +24,13 @@ subsection A - TimeLoop
   set output granularity           = 0.01
 
   set output checkpoint multiplier = 1
-  set output quantities multiplier = 1
   set output full multiplier       = 100
   set output levelsets multiplier  = 1
-
-  set terminal update interval     = 10
 end
 
 
-subsection B - ProblemDescription
-  set description = Euler
-
-  set gamma       = 1.4
+subsection B - Equation
+  set gamma = 1.4
 end
 
 
@@ -69,15 +63,9 @@ subsection E - InitialValues
 end
 
 
-subsection F - EulerModule
-  set limiter iterations = 2
-end
-
-
 subsection H - TimeIntegrator
-  set cfl min            = 0.45
-  set cfl max            = 0.90
-
+  set cfl min               = 0.45
+  set cfl max               = 0.90
   set cfl recovery strategy = bang bang control
 
   set time stepping scheme  = erk 33
@@ -87,10 +75,8 @@ end
 subsection I - VTUOutput
   set manifolds      = x, y, z, x^2+y^2-0.25*0.25
 
+  set use mpi io     = true
+
   set schlieren beta = 10
   set vorticity beta = 10
-
-  set use mpi io     = true
 end
-
-
