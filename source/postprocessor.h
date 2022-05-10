@@ -109,6 +109,16 @@ namespace ryujin
     }
 
     /**
+     * Reset computed normalization bounds. Calling this function will
+     * force a recomputation of the normalization bounds during the next
+     * call to compute().
+     */
+    void reset_bounds() const
+    {
+      bounds_.clear();
+    }
+
+    /**
      * Given a state vector @p U and a file name prefix @p name, the
      * current time @p t, and the current output cycle @p cycle) schedule a
      * solution output.
@@ -128,6 +138,7 @@ namespace ryujin
      */
     //@{
 
+    bool recompute_bounds_;
     Number beta_;
 
     std::vector<std::string> schlieren_quantities_;
@@ -148,6 +159,7 @@ namespace ryujin
     std::vector<std::pair<bool /*primitive*/, unsigned int>> schlieren_indices_;
     std::vector<std::pair<bool /*primitive*/, unsigned int>> vorticity_indices_;
 
+    mutable std::vector<std::pair<Number, Number>> bounds_;
     mutable std::vector<scalar_type> quantities_;
     ACCESSOR_READ_ONLY(quantities)
 

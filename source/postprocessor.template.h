@@ -36,6 +36,13 @@ namespace ryujin
                   "Beta factor used in the exponential scale for the schlieren "
                   "and vorticity plots");
 
+    recompute_bounds_ = true;
+    add_parameter(
+        "schlieren recompute bounds",
+        recompute_bounds_,
+        "Recompute bounds for every output cycle. If set to false, bounds once "
+        "at the beginning and reused thereafter.");
+
     static_assert(HyperbolicSystem::component_names<dim>.size() > 0,
                   "Need at least one scalar quantitity");
     schlieren_quantities_.push_back(HyperbolicSystem::component_names<dim>[0]);
@@ -61,6 +68,7 @@ namespace ryujin
     std::cout << "Postprocessor<dim, Number>::prepare()" << std::endl;
 #endif
 
+    bounds_.clear();
     component_names_.clear();
     schlieren_indices_.clear();
     vorticity_indices_.clear();
@@ -250,17 +258,22 @@ namespace ryujin
       RYUJIN_PARALLEL_REGION_END
     }
 
-    std::vector<std::pair<Number, Number>> bounds(
-        n_quantities,
-        std::make_pair(Number(0.), std::numeric_limits<Number>::max()));
-
     /*
      * Step 2: Compute bounds and synchronize over MPI ranks:
      */
 
-    {
+    /* Force recomputation of bounds: */
+    if (recompute_bounds_)
+      bounds_.clear();
+
+    if (bounds_.size() != n_quantities) {
+      bounds_.clear();
+      bounds_.resize(
+          n_quantities,
+          std::make_pair(Number(0.), std::numeric_limits<Number>::max()));
+
       for (unsigned int d = 0; d < n_quantities; ++d) {
-        auto &[q_max, q_min] = bounds[d];
+        auto &[q_max, q_min] = bounds_[d];
         for (unsigned int i = 0; i < n_owned; ++i) {
           const auto q = quantities_[d].local_element(i);
           q_max = std::max(q_max, q);
@@ -268,10 +281,9 @@ namespace ryujin
         }
         q_max = dealii::Utilities::MPI::max(q_max, mpi_communicator_);
         q_min = dealii::Utilities::MPI::min(q_min, mpi_communicator_);
+        Assert(q_max >= q_min, dealii::ExcInternalError());
       }
     }
-
-    Assert(q_max >= q_min, dealii::ExcInternalError());
 
     /*
      * Step 3: Normalize quantities on exponential scale:
@@ -279,7 +291,7 @@ namespace ryujin
 
     {
       for (unsigned int d = 0; d < n_quantities; ++d) {
-        auto &[q_max, q_min] = bounds[d];
+        auto &[q_max, q_min] = bounds_[d];
         for (unsigned int i = 0; i < n_owned; ++i) {
           auto &q = quantities_[d].local_element(i);
           constexpr auto eps = std::numeric_limits<Number>::epsilon();

@@ -144,7 +144,7 @@ namespace ryujin
     resume_ = false;
     add_parameter("resume", resume_, "Resume an interrupted computation");
 
-    terminal_update_interval_ = 10;
+    terminal_update_interval_ = 5;
     add_parameter("terminal update interval",
                   terminal_update_interval_,
                   "number of seconds after which output statistics are "
@@ -512,6 +512,14 @@ namespace ryujin
       print_info("scheduling output");
 
       postprocessor_.compute(U);
+      /*
+       * Workaround: Manually reset bounds during the first output cycle
+       * (which is often just a uniform flow field) to obtain a better
+       * normailization:
+       */
+      if (cycle == 0)
+        postprocessor_.reset_bounds();
+
       vtu_output_.schedule_output(
           U, name, t, cycle, do_full_output, do_levelsets);
     }
