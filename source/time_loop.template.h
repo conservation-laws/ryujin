@@ -192,16 +192,14 @@ namespace ryujin
 
       if (resume_) {
         print_info("resuming computation: recreating mesh");
-        discretization_.refinement() = 0; /* do not refine */
-        discretization_.prepare();
-        discretization_.triangulation().load(base_name_ + "-checkpoint.mesh");
+        Checkpointing::load_mesh(discretization_, base_name_);
 
         print_info("preparing compute kernels");
         prepare_compute_kernels();
 
         print_info("resuming computation: loading state vector");
         U.reinit(offline_data_.vector_partitioner());
-        do_resume(
+        Checkpointing::load_state_vector(
             offline_data_, base_name_, U, t, output_cycle, mpi_communicator_);
         t_initial_ = t;
 
@@ -529,7 +527,8 @@ namespace ryujin
       Scope scope(computing_timer_, "time step [P] Z - checkpointing");
       print_info("scheduling checkpointing");
 
-      do_checkpoint(offline_data_, base_name_, U, t, cycle, mpi_communicator_);
+      Checkpointing::write_checkpoint(
+          offline_data_, base_name_, U, t, cycle, mpi_communicator_);
     }
   }
 
