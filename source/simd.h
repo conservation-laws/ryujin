@@ -238,7 +238,7 @@ namespace ryujin
           &vectorized,
       const unsigned int k)
   {
-    Assert(k < width, ExcMessage("Index past VectorizedArray width"));
+    Assert(k < width, dealii::ExcMessage("Index past VectorizedArray width"));
     dealii::Tensor<rank, dim, Number> result;
     if constexpr (rank == 1) {
       for (unsigned int d = 0; d < dim; ++d)
@@ -264,7 +264,8 @@ namespace ryujin
   {
     (void)k;
     Assert(k == 0,
-           ExcMessage("The given index k must be zero for a serial tensor"));
+           dealii::ExcMessage(
+               "The given index k must be zero for a serial tensor"));
     return serial;
   }
 
@@ -281,7 +282,7 @@ namespace ryujin
       const dealii::Tensor<rank, dim, Number> &serial,
       const unsigned int k)
   {
-    Assert(k < width, ExcMessage("Index past VectorizedArray width"));
+    Assert(k < width, dealii::ExcMessage("Index past VectorizedArray width"));
     if constexpr (rank == 1) {
       for (unsigned int d = 0; d < dim; ++d)
         result[d][k] = serial[d];
@@ -306,7 +307,8 @@ namespace ryujin
   {
     (void)k;
     Assert(k == 0,
-           ExcMessage("The given index k must be zero for a serial tensor"));
+           dealii::ExcMessage(
+               "The given index k must be zero for a serial tensor"));
 
     result = serial;
   }

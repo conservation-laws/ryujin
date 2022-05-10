@@ -153,9 +153,9 @@ namespace ryujin
         for (unsigned int i = left; i < right; i += stride_size) {
 
           for (auto &it : local_schlieren_values)
-            it = T(0.);
+            it = grad_type<T>();
           for (auto &it : local_vorticity_values)
-            it = T(0.);
+            it = curl_type<T>();
 
           /* Skip constrained degrees of freedom: */
           const unsigned int row_length = sparsity_simd.row_length(i);
@@ -276,8 +276,8 @@ namespace ryujin
         auto &[q_max, q_min] = bounds_[d];
         for (unsigned int i = 0; i < n_owned; ++i) {
           const auto q = quantities_[d].local_element(i);
-          q_max = std::max(q_max, q);
-          q_min = std::min(q_min, q);
+          q_max = std::max(q_max, std::abs(q));
+          q_min = std::min(q_min, std::abs(q));
         }
         q_max = dealii::Utilities::MPI::max(q_max, mpi_communicator_);
         q_min = dealii::Utilities::MPI::min(q_min, mpi_communicator_);
