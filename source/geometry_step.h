@@ -27,7 +27,7 @@ namespace ryujin
      *
      * @ingroup Mesh
      */
-    template <int dim, int spacedim, template <int, int> class Triangulation>
+    template <int dim, template <int, int> class Triangulation>
     void step(Triangulation<dim, dim> &,
               const double /*length*/,
               const double /*height*/,
@@ -35,6 +35,7 @@ namespace ryujin
               const double /*step_height*/)
     {
       AssertThrow(false, dealii::ExcNotImplemented());
+      __builtin_trap();
     }
 
 
@@ -132,16 +133,6 @@ namespace ryujin
             vertex[1] = step_height - 0.0125 * (1 - std::sqrt(1. / 2.));
         }
       }
-    }
-
-    template <template <int, int> class Triangulation>
-    void step(Triangulation<3, 3> &,
-              const double,
-              const double,
-              const double,
-              const double)
-    {
-      AssertThrow(false, dealii::ExcNotImplemented());
     }
 #endif
   } /* namespace GridGenerator */

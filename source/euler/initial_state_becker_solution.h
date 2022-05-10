@@ -163,11 +163,11 @@ namespace ryujin
                          (R_infty * velocity_left_ * velocity_right_ - v * v);
         Assert(e > 0., dealii::ExcInternalError());
 
-        return state_type(
-            {Number(rho),
-             Number(rho * (velocity_ + v)),
-             Number(0.),
-             Number(rho * (e + 0.5 * (velocity_ + v) * (velocity_ + v)))});
+        return hyperbolic_system.template expand_state<dim>(
+            HyperbolicSystem::state_type<1, Number>{
+                {Number(rho),
+                 Number(rho * (velocity_ + v)),
+                 Number(rho * (e + 0.5 * (velocity_ + v) * (velocity_ + v)))}});
       }
 
     private:

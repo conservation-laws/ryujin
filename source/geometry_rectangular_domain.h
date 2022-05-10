@@ -36,8 +36,9 @@ namespace ryujin
       RectangularDomain(const std::string subsection)
           : Geometry<dim>("rectangular domain", subsection)
       {
-        this->add_parameter(
-            "position bottom left", point_left_, "Position of bottom left corner");
+        this->add_parameter("position bottom left",
+                            point_left_,
+                            "Position of bottom left corner");
 
         for (unsigned int d = 0; d < dim; ++d)
           point_right_[d] = 20.0;
@@ -209,20 +210,26 @@ namespace ryujin
           directions.push_back(2);
         }
 
-        if (!directions.empty()) {
-          std::vector<dealii::GridTools::PeriodicFacePair<
-              typename dealii::Triangulation<dim>::cell_iterator>>
-              periodic_faces;
+        if constexpr (dim != 1) {
+          if (!directions.empty()) {
+            std::vector<dealii::GridTools::PeriodicFacePair<
+                typename dealii::Triangulation<dim>::cell_iterator>>
+                periodic_faces;
 
-          for (const auto direction : directions)
-            dealii::GridTools::collect_periodic_faces(
-                triangulation,
-                /*b_id */ Boundary::periodic,
-                /*direction*/ direction,
-                periodic_faces);
+            for (const auto direction : directions)
+              dealii::GridTools::collect_periodic_faces(
+                  triangulation,
+                  /*b_id */ Boundary::periodic,
+                  /*direction*/ direction,
+                  periodic_faces);
 
-          triangulation.add_periodicity(periodic_faces);
+            triangulation.add_periodicity(periodic_faces);
+          }
         }
+
+        AssertThrow(dim != 1 || directions.empty(),
+                    dealii::ExcMessage("One dimensional periodic boundary "
+                                       "conditions are not implemented"));
       }
 
     private:

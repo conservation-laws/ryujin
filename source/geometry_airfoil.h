@@ -1200,7 +1200,11 @@ namespace ryujin
          * Runtime parameters: width_, subdivisions_z_ (for dim == 3)
          */
 
-        if constexpr (dim == 2) {
+        if constexpr (dim == 1) {
+          AssertThrow(false, dealii::ExcNotImplemented());
+          __builtin_trap();
+
+        } else if constexpr (dim == 2) {
           /* Flatten manifold: */
           dealii::Triangulation<2> tria3;
           tria3.set_mesh_smoothing(triangulation.get_mesh_smoothing());
@@ -1238,8 +1242,11 @@ namespace ryujin
         /*
          * Reattach manifolds:
          */
+        if constexpr (dim == 1) {
+          AssertThrow(false, dealii::ExcNotImplemented());
+          __builtin_trap();
 
-        if constexpr (dim == 2) {
+        } else if constexpr (dim == 2) {
           unsigned int index = 10;
           for (const auto &manifold : manifolds)
             triangulation.set_manifold(index++, *manifold);

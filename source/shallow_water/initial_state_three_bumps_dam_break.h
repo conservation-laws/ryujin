@@ -45,20 +45,17 @@ namespace ryujin
       virtual state_type compute(const dealii::Point<dim> &point,
                                  Number t) final override
       {
-        if constexpr (dim == 1) {
-          AssertThrow(false, dealii::ExcNotImplemented());
-          return state_type();
-        }
-
         const Number x = point[0];
 
         // Return initial state for t = 0
         if (t <= 1.e-10)
-          return state_type{
-              {(x <= 0. ? left_depth : right_depth), Number(0.), Number(0.)}};
+          return hyperbolic_system.template expand_state<dim>(
+              HyperbolicSystem::state_type<1, Number>{
+                  {(x <= 0. ? left_depth : right_depth), Number(0.)}});
 
         const Number hv = std::sqrt(hyperbolic_system.gravity() * left_depth);
-        return state_type{{left_depth, hv, hv}};
+        return hyperbolic_system.template expand_state<dim>(
+            HyperbolicSystem::state_type<1, Number>{{left_depth, hv}});
       }
 
       virtual auto compute_flux_contributions(const dealii::Point<dim> &point)

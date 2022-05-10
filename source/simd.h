@@ -276,8 +276,7 @@ namespace ryujin
    * @ingroup SIMD
    */
   template <int rank, int dim, std::size_t width, typename Number>
-  DEAL_II_ALWAYS_INLINE inline void
-  assign_serial_tensor(
+  DEAL_II_ALWAYS_INLINE inline void assign_serial_tensor(
       dealii::Tensor<rank, dim, dealii::VectorizedArray<Number, width>> &result,
       const dealii::Tensor<rank, dim, Number> &serial,
       const unsigned int k)

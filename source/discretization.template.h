@@ -82,39 +82,41 @@ namespace ryujin
                      geometry_ + "\""));
     }
 
-    if (repartitioning_) {
-      /*
-       * Try to partition the mesh equilibrating the workload. The usual mesh
-       * partitioning heuristic that tries to partition the mesh such that
-       * every MPI rank has roughly the same number of locally owned degrees
-       * of freedom does not work well in our case due to the fact that
-       * boundary dofs are not SIMD parallelized. (In fact, every dof with
-       * "non-standard connectivity" is not SIMD parallelized. Those are
-       * however exceedingly rare (point irregularities in 2D, line
-       * irregularities in 3D) and we simply ignore them.)
-       *
-       * For the mesh partitioning scheme we have to supply an additional
-       * weight that gets added to the default weight of a cell which is
-       * 1000. Asymptotically we have one boundary dof per boundary cell (in
-       * any dimension). A rough benchmark reveals that the speedup due to
-       * SIMD vectorization is typically less than VectorizedArray::size() /
-       * 2. Boundary dofs are more expensive due to certain special treatment
-       * (additional symmetrization of d_ij, boundary fixup) so it should be
-       * safe to assume that the cost incurred is at least
-       * VectorizedArray::size() / 2.
-       */
-      constexpr auto speedup = dealii::VectorizedArray<NUMBER>::size() / 2u;
-      constexpr unsigned int weight = 1000u;
+    if constexpr (dim != 1) {
+      if (repartitioning_) {
+        /*
+         * Try to partition the mesh equilibrating the workload. The usual mesh
+         * partitioning heuristic that tries to partition the mesh such that
+         * every MPI rank has roughly the same number of locally owned degrees
+         * of freedom does not work well in our case due to the fact that
+         * boundary dofs are not SIMD parallelized. (In fact, every dof with
+         * "non-standard connectivity" is not SIMD parallelized. Those are
+         * however exceedingly rare (point irregularities in 2D, line
+         * irregularities in 3D) and we simply ignore them.)
+         *
+         * For the mesh partitioning scheme we have to supply an additional
+         * weight that gets added to the default weight of a cell which is
+         * 1000. Asymptotically we have one boundary dof per boundary cell (in
+         * any dimension). A rough benchmark reveals that the speedup due to
+         * SIMD vectorization is typically less than VectorizedArray::size() /
+         * 2. Boundary dofs are more expensive due to certain special treatment
+         * (additional symmetrization of d_ij, boundary fixup) so it should be
+         * safe to assume that the cost incurred is at least
+         * VectorizedArray::size() / 2.
+         */
+        constexpr auto speedup = dealii::VectorizedArray<NUMBER>::size() / 2u;
+        constexpr unsigned int weight = 1000u;
 
-      triangulation.signals.cell_weight.connect(
-          [](const auto &cell, const auto /*status*/) -> unsigned int {
-            if (cell->at_boundary())
-              return weight * (speedup == 0u ? 0u : speedup - 1u);
-            else
-              return 0u;
-          });
+        triangulation.signals.cell_weight.connect(
+            [](const auto &cell, const auto /*status*/) -> unsigned int {
+              if (cell->at_boundary())
+                return weight * (speedup == 0u ? 0u : speedup - 1u);
+              else
+                return 0u;
+            });
 
-      triangulation.repartition();
+        triangulation.repartition();
+      }
     }
 
     triangulation.refine_global(refinement_);

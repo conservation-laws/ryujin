@@ -42,8 +42,7 @@ namespace ryujin
      * subsection as an argument. The dealii::ParameterAcceptor is
      * initialized with the subsubsection `subsection + "/" + name`.
      */
-    InitialState(const std::string &name,
-                 const std::string &subsection)
+    InitialState(const std::string &name, const std::string &subsection)
         : ParameterAcceptor(subsection + "/" + name)
         , name_(name)
     {

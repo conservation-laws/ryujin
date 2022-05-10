@@ -288,4 +288,4 @@ namespace ryujin
     //@}
   };
 
-  } /* namespace ryujin */
+} /* namespace ryujin */

@@ -31,6 +31,7 @@ namespace ryujin
                   const double /*cylinder_height*/)
     {
       AssertThrow(false, dealii::ExcNotImplemented());
+      __builtin_trap();
     }
 
 

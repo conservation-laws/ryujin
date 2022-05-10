@@ -112,6 +112,7 @@ namespace ryujin
             /* rotation */ orientation[2]);
       } else {
         AssertThrow(false, dealii::ExcNotImplemented());
+        __builtin_trap();
       }
     }
 

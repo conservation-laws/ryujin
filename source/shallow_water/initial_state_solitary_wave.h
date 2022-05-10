@@ -34,11 +34,6 @@ namespace ryujin
       virtual state_type compute(const dealii::Point<dim> &point,
                                  Number t) final override
       {
-        if constexpr (dim == 1) {
-          AssertThrow(false, dealii::ExcNotImplemented());
-          return state_type();
-        }
-
         const auto g = hyperbolic_system.gravity();
         const Number x = point[0];
 
@@ -55,7 +50,9 @@ namespace ryujin
 
         const Number h = std::max(wave, Number(0.));
         const Number v = celerity * (wave - depth_) / wave;
-        return state_type{{h, h * v, Number(0.)}};
+
+        return hyperbolic_system.template expand_state<dim>(
+            HyperbolicSystem::state_type<1, Number>{{h, h * v}});
 
 #if 0
         // FIXME

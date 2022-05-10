@@ -214,30 +214,29 @@ namespace ryujin
         level_set_functions.emplace_back(
             std::make_shared<FunctionParser<dim>>(expression));
 
-      data_out->set_cell_selection(
-          [level_set_functions](const auto &cell) {
-            if (!cell->is_active() || cell->is_artificial())
-              return false;
+      data_out->set_cell_selection([level_set_functions](const auto &cell) {
+        if (!cell->is_active() || cell->is_artificial())
+          return false;
 
-            for (const auto &function : level_set_functions) {
+        for (const auto &function : level_set_functions) {
 
-              unsigned int above = 0;
-              unsigned int below = 0;
+          unsigned int above = 0;
+          unsigned int below = 0;
 
-              for (unsigned int v = 0; v < GeometryInfo<dim>::vertices_per_cell;
-                   ++v) {
-                const auto vertex = cell->vertex(v);
-                constexpr auto eps = std::numeric_limits<Number>::epsilon();
-                if (function->value(vertex) >= 0. - 100. * eps)
-                  above++;
-                if (function->value(vertex) <= 0. + 100. * eps)
-                  below++;
-                if (above > 0 && below > 0)
-                  return true;
-              }
-            }
-            return false;
-          });
+          for (unsigned int v = 0; v < GeometryInfo<dim>::vertices_per_cell;
+               ++v) {
+            const auto vertex = cell->vertex(v);
+            constexpr auto eps = std::numeric_limits<Number>::epsilon();
+            if (function->value(vertex) >= 0. - 100. * eps)
+              above++;
+            if (function->value(vertex) <= 0. + 100. * eps)
+              below++;
+            if (above > 0 && below > 0)
+              return true;
+          }
+        }
+        return false;
+      });
 
       data_out->build_patches(mapping, patch_order);
 

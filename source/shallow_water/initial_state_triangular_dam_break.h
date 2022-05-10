@@ -14,9 +14,10 @@ namespace ryujin
     class TriangularDamBreak : public InitialState<dim, Number, state_type, 1>
     {
     public:
-      TriangularDamBreak(const HyperbolicSystem & /*hyperbolic_system*/,
+      TriangularDamBreak(const HyperbolicSystem &hyperbolic_system,
                          const std::string s)
           : InitialState<dim, Number, state_type, 1>("triangular dam break", s)
+          , hyperbolic_system(hyperbolic_system)
       {
         left_depth = 0.75;
         this->add_parameter("left resevoir depth",
@@ -56,11 +57,6 @@ namespace ryujin
       virtual state_type compute(const dealii::Point<dim> &point,
                                  Number /*t*/) final override
       {
-        if constexpr (dim == 1) {
-          AssertThrow(false, dealii::ExcNotImplemented());
-          return state_type();
-        }
-
         const Number x = point[0];
         const Number bath = compute_bathymetry(point);
 
@@ -71,7 +67,8 @@ namespace ryujin
         else if (x > right_position)
           h = std::max(Number(0.), right_depth - bath);
 
-        return state_type{{h, Number(0.), Number(0.)}};
+        return hyperbolic_system.template expand_state<dim>(
+            HyperbolicSystem::state_type<1, Number>{{h, Number(0.)}});
       }
 
       virtual auto compute_flux_contributions(const dealii::Point<dim> &point)
@@ -83,6 +80,8 @@ namespace ryujin
       }
 
     private:
+      const HyperbolicSystem &hyperbolic_system;
+
       DEAL_II_ALWAYS_INLINE inline Number
       compute_bathymetry(const dealii::Point<dim> &point) const
       {

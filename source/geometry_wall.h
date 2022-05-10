@@ -28,6 +28,7 @@ namespace ryujin
               const double /*wall_position*/)
     {
       AssertThrow(false, dealii::ExcNotImplemented());
+      __builtin_trap();
     }
 
 

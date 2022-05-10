@@ -25,6 +25,7 @@ namespace ryujin
       : level_coarse(-1)
   {
     AssertThrow(dim > 1, ExcNotImplemented());
+    __builtin_trap();
   }
 
 

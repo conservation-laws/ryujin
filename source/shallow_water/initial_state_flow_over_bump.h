@@ -65,7 +65,8 @@ namespace ryujin
 
         /* Explicitly return initial state */
         if (t < 1e-12)
-          return state_type{{h_initial, q_inflow, Number(0.)}};
+          return hyperbolic_system.template expand_state<dim>(
+              HyperbolicSystem::state_type<1, Number>{{h_initial, q_inflow}});
 
         Number h_exact = 2. * std::sqrt(-Q) * cos(theta / 3.) - b / 3.;
         if (which_case_ == "transcritical") {
@@ -78,7 +79,8 @@ namespace ryujin
           }
         }
 
-        return state_type{{h_exact, q_inflow, Number(0.)}};
+        return hyperbolic_system.template expand_state<dim>(
+            HyperbolicSystem::state_type<1, Number>{{h_exact, q_inflow}});
       }
 
       virtual auto compute_flux_contributions(const dealii::Point<dim> &point)

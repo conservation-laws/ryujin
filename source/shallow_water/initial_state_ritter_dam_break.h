@@ -29,74 +29,63 @@ namespace ryujin
         this->add_parameter("time initial",
                             t_initial_,
                             "Time at which initial state is prescribed");
-        dam_location = 5.;
-        this->add_parameter(
-            "dam location",
-            dam_location,
-            "Location of pseudo-dam that separates two water depths");
+
         left_depth = 0.005;
         this->add_parameter("left water depth",
                             left_depth,
-                            "Depth of water to the left of pseudo-dam");
+                            "Depth of water to the left of pseudo-dam (x<0)");
         right_depth = 0.;
         this->add_parameter("right water depth",
                             right_depth,
-                            "Depth of water to the right of pseudo-dam");
+                            "Depth of water to the right of pseudo-dam (x>0)");
       }
 
       virtual state_type compute(const dealii::Point<dim> &point,
                                  Number t) final override
       {
-        if constexpr (dim == 1) {
-          AssertThrow(false, dealii::ExcNotImplemented());
-          return state_type();
-        }
-
         const auto g = hyperbolic_system.gravity();
         const Number x = point[0];
 
-        // Explicitly define initial left state
-        left_state[0] = left_depth;
-        left_state[1] = Number(0.);
-        left_state[2] = Number(0.);
+        /* Return initial state if t_initial_ = 0 */
 
-        // Explicitly define initial right state
-        right_state[0] = right_depth;
-        right_state[1] = Number(0.);
-        right_state[2] = Number(0.);
-
-        // Return initial state if t_initial_ = 0
         if (t_initial_ <= 1.e-10) {
-          final_state = (x <= dam_location ? left_state : right_state);
-          return final_state;
+          if (x < 0)
+            return hyperbolic_system.template expand_state<dim>(
+                HyperbolicSystem::state_type<1, Number>{
+                    {left_depth, Number(0.)}});
+          else
+            return hyperbolic_system.template expand_state<dim>(
+                HyperbolicSystem::state_type<1, Number>{
+                    {right_depth, Number(0.)}});
         }
 
         AssertThrow(t + t_initial_ > 0.,
                     dealii::ExcMessage("Expansion must be computed at a time "
                                        "greater than 0."));
 
-        // Else we compute the expansion profiles at t + t_initial
-        const Number aL = std::sqrt(g * left_depth);
-        const Number xA = dam_location - (t + t_initial_) * aL;
-        const Number xB = dam_location + Number(2.) * (t + t_initial_) * aL;
+        /* ... else we compute the expansion profiles at t + t_initial */
 
-        const Number tmp = aL - (x - dam_location) / (2. * (t + t_initial_));
+        const Number aL = std::sqrt(g * left_depth);
+        const Number xA = -(t + t_initial_) * aL;
+        const Number xB = Number(2.) * (t + t_initial_) * aL;
+
+        const Number tmp = aL - x / (2. * (t + t_initial_));
 
         const Number h_expansion = 4. / (9. * g) * tmp * tmp;
-        const Number v_expansion =
-            2. / 3. * ((x - dam_location) / (t + t_initial_) + aL);
+        const Number v_expansion = 2. / 3. * (x / (t + t_initial_) + aL);
 
-        if (x <= xA) {
-          final_state = left_state;
-        } else if (x <= xB) {
-          final_state[0] = h_expansion;
-          final_state[1] = h_expansion * v_expansion;
-          final_state[2] = Number(0.);
-        } else {
-          final_state = right_state;
-        }
-
-        return final_state;
+        if (x <= xA)
+          return hyperbolic_system.template expand_state<dim>(
+              HyperbolicSystem::state_type<1, Number>{
+                  {left_depth, Number(0.)}});
+        else if (x <= xB)
+          return hyperbolic_system.template expand_state<dim>(
+              HyperbolicSystem::state_type<1, Number>{
+                  {h_expansion, h_expansion * v_expansion}});
+        else
+          return hyperbolic_system.template expand_state<dim>(
+              HyperbolicSystem::state_type<1, Number>{
+                  {right_depth, Number(0.)}});
       }
 
       /* Default bathymetry of 0 */
@@ -106,13 +95,8 @@ namespace ryujin
 
       Number t_initial_;
 
-      Number dam_location;
       Number left_depth;
       Number right_depth;
-
-      state_type final_state;
-      state_type left_state;
-      state_type right_state;
     };
 
   } // namespace InitialStateLibrary
