@@ -153,14 +153,15 @@ end
 
 
 subsection I - VTUOutput
-  set manifolds           =
+  set manifolds             =
 
-  set use mpi io          = true
+  set use mpi io            = true
 
-  set selected quantities = rho, m_1, m_2, E
+  set vtu output quantities = rho, m_1, m_2, E
 
-  set schlieren beta      = 10
-  set vorticity beta      = 10
+  set schlieren beta        = 10
+  set schlieren quantities  = rho
+  set vorticity quantities  =
 end
 
 

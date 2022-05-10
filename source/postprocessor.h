@@ -34,11 +34,7 @@ namespace ryujin
    *       \mathbf q_i =  \frac{1}{m_i}\;\sum_{j\in \mathcal{J}(i)}
    * \mathbf{c}_{ij} \times \mathbf{m}_j / \rho_j. \f]
    *
-   * In addition, the generated VTU output also contains the full state
-   * vector, and a local estimate of the effective residual viscosity
-   * \f$\mu_{\text{res}}\f$ caused by the graph viscosity stabilization.
-   *
-   * @ingroup EulerEquations
+   * @ingroup TimeLoop
    */
   template <int dim, typename Number = double>
   class Postprocessor final : public dealii::ParameterAcceptor
@@ -56,21 +52,18 @@ namespace ryujin
     using state_type = HyperbolicSystem::state_type<dim, Number>;
 
     /**
-     * Type used to store a curl of an 2D/3D vector field. Departing from
+     * The type used to store the gradient of a scalar quantitty;
+     */
+    template <typename T>
+    using grad_type = dealii::Tensor<1, dim, T>;
+
+    /**
+     * Type used to store the curl of an 2D/3D vector field. Departing from
      * mathematical rigor, in 2D this is a number (stored as
      * `Tensor<1,1>`), in 3D this is a rank 1 tensor.
      */
-    using curl_type = dealii::Tensor<1, dim == 2 ? 1 : dim, Number>;
-
-    /**
-     * The number of postprocessed quantities:
-     */
-    static constexpr unsigned int n_quantities = (dim == 1) ? 1 : 2;
-
-    /**
-     * An array of strings for all component names.
-     */
-    const static std::array<std::string, n_quantities> component_names;
+    template <typename T>
+    using curl_type = dealii::Tensor<1, dim == 2 ? 1 : dim, T>;
 
     /**
      * @copydoc OfflineData::scalar_type
@@ -100,6 +93,22 @@ namespace ryujin
     void prepare();
 
     /**
+     * Returns the number of computed quantities.
+     */
+    unsigned int n_quantities() const
+    {
+      return quantities_.size();
+    }
+
+    /**
+     * A vector of strings for all component names.
+     */
+    const std::vector<std::string> component_names() const
+    {
+      return component_names_;
+    }
+
+    /**
      * Given a state vector @p U and a file name prefix @p name, the
      * current time @p t, and the current output cycle @p cycle) schedule a
      * solution output.
@@ -119,8 +128,10 @@ namespace ryujin
      */
     //@{
 
-    Number schlieren_beta_;
-    Number vorticity_beta_;
+    Number beta_;
+
+    std::vector<std::string> schlieren_quantities_;
+    std::vector<std::string> vorticity_quantities_;
 
     //@}
     /**
@@ -133,7 +144,11 @@ namespace ryujin
     dealii::SmartPointer<const HyperbolicSystem> hyperbolic_system_;
     dealii::SmartPointer<const ryujin::OfflineData<dim, Number>> offline_data_;
 
-    mutable std::array<scalar_type, n_quantities> quantities_;
+    std::vector<std::string> component_names_;
+    std::vector<std::pair<bool /*primitive*/, unsigned int>> schlieren_indices_;
+    std::vector<std::pair<bool /*primitive*/, unsigned int>> vorticity_indices_;
+
+    mutable std::vector<scalar_type> quantities_;
     ACCESSOR_READ_ONLY(quantities)
 
     //@}

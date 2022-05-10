@@ -111,7 +111,8 @@ namespace ryujin
     bool use_mpi_io_;
 
     std::vector<std::string> manifolds_;
-    std::list<std::string> selected_quantities_;
+
+    std::vector<std::string> vtu_output_quantities_;
 
     //@}
     /**

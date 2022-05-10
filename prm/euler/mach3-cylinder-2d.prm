@@ -66,5 +66,4 @@ subsection I - VTUOutput
   set use mpi io     = true
 
   set schlieren beta = 10
-  set vorticity beta = 10
 end

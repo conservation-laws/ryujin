@@ -48,16 +48,16 @@ namespace ryujin
 
     std::copy(std::begin(HyperbolicSystem::component_names<dim>),
               std::end(HyperbolicSystem::component_names<dim>),
-              std::back_inserter(selected_quantities_));
+              std::back_inserter(vtu_output_quantities_));
 
     std::copy(std::begin(HyperbolicSystem::precomputed_names<dim>),
               std::end(HyperbolicSystem::precomputed_names<dim>),
-              std::back_inserter(selected_quantities_));
+              std::back_inserter(vtu_output_quantities_));
 
-    add_parameter("selected quantities",
-                  selected_quantities_,
-                  "List of conserved, primitive, precomputed, or postprocessed "
-                  "quantities that will be written to the vtu files.");
+    add_parameter("vtu output quantities",
+                  vtu_output_quantities_,
+                  "List of conserved, primitive, or precomputed quantities "
+                  "that will be written to the vtu files.");
   }
 
 
@@ -72,7 +72,7 @@ namespace ryujin
 
     quantities_mapping_.clear();
 
-    for (const auto &entry : selected_quantities_) {
+    for (const auto &entry : vtu_output_quantities_) {
       {
         /* Conserved quantities: */
 
@@ -95,10 +95,7 @@ namespace ryujin
             HyperbolicSystem::primitive_component_names<dim>;
         const auto pos = std::find(std::begin(names), std::end(names), entry);
         if (pos != std::end(names)) {
-          quantities_mapping_.push_back(std::make_tuple(
-              entry, [](scalar_type &, const vector_type &) {
-                AssertThrow(false, dealii::ExcNotImplemented());
-              }));
+          AssertThrow(false, dealii::ExcNotImplemented());
           continue;
         }
       }
@@ -177,10 +174,10 @@ namespace ryujin
       data_out->add_data_vector(quantities_[d], entry);
     }
 
-    constexpr auto n_quantities = Postprocessor<dim, Number>::n_quantities;
+    const auto n_quantities = postprocessor_->n_quantities();
     for (unsigned int i = 0; i < n_quantities; ++i)
       data_out->add_data_vector(postprocessor_->quantities()[i],
-                                postprocessor_->component_names[i]);
+                                postprocessor_->component_names()[i]);
 
     DataOutBase::VtkFlags flags(
         t, cycle, true, DataOutBase::VtkFlags::best_speed);
