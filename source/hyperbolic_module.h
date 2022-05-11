@@ -233,6 +233,7 @@ namespace ryujin
     unsigned int limiter_iter_;
     Number limiter_newton_tolerance_;
     unsigned int limiter_newton_max_iter_;
+    Number limiter_relaxation_factor_;
 
     bool cfl_with_boundary_dofs_;
 

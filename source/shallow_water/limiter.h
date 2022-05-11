@@ -70,7 +70,7 @@ namespace ryujin
      *     // ...
      *     limiter.accumulate(js, U_j, scaled_c_ij, beta_ij);
      *   }
-     *   limiter.apply_relaxation(hd_i);
+     *   limiter.apply_relaxation(hd_i, limiter_relaxation_factor_);
      *   limiter.bounds();
      * }
      * ```
@@ -116,7 +116,8 @@ namespace ryujin
     /**
      * Apply relaxation.
      */
-    void apply_relaxation(const Number hd_i);
+    void apply_relaxation(const Number hd_i,
+                          const ScalarNumber factor = ScalarNumber(2.));
 
     /**
      * Return the computed bounds.
@@ -247,14 +248,18 @@ namespace ryujin
 
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline void
-  Limiter<dim, Number>::apply_relaxation(Number hd_i)
+  Limiter<dim, Number>::apply_relaxation(Number hd_i, ScalarNumber factor)
   {
     auto &[h_min, h_max, kin_max] = bounds_;
 
-    constexpr unsigned int relaxation_order_ = 3;
-    const Number r_i =
-        Number(2.) * dealii::Utilities::fixed_power<relaxation_order_>(
-                         std::sqrt(std::sqrt(hd_i)));
+    /* Use r_i = factor * (m_i / |Omega|) ^ (1.5 / d): */
+
+    Number r_i = std::sqrt(hd_i);                              // in 3D: ^ 3/6
+    if constexpr (dim == 2)                                    //
+      r_i = dealii::Utilities::fixed_power<3>(std::sqrt(r_i)); // in 2D: ^ 3/4
+    else if constexpr (dim == 1)                               //
+      r_i = dealii::Utilities::fixed_power<3>(r_i);            // in 1D: ^ 3/2
+    r_i *= factor;
 
     constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
 

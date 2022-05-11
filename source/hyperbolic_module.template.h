@@ -58,6 +58,12 @@ namespace ryujin
                   "Maximal number of quadratic newton iterations performed "
                   "during limiting");
 
+    limiter_relaxation_factor_ = Number(2.);
+    add_parameter("limiter relaxation factor",
+                  limiter_relaxation_factor_,
+                  "Additional relaxation factor for computing the relaxation "
+                  "window with r_i = factor * (m_i/|Omega|)^(1.5/d).");
+
     cfl_with_boundary_dofs_ = false;
     add_parameter("cfl with boundary dofs",
                   cfl_with_boundary_dofs_,
@@ -589,7 +595,7 @@ namespace ryujin
           r_.template write_tensor<T>(r_i, i);
 
           const auto hd_i = m_i * measure_of_omega_inverse;
-          limiter.apply_relaxation(hd_i);
+          limiter.apply_relaxation(hd_i, limiter_relaxation_factor_);
           bounds_.template write_tensor<T>(limiter.bounds(), i);
         }
       };
