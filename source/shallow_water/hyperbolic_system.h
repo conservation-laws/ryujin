@@ -441,8 +441,6 @@ namespace ryujin
     double h_tiny_;
     ACCESSOR_READ_ONLY(h_tiny)
 
-    double gravity_inverse_;
-
     double g_mannings_sqd_;
 
     double reference_speed_;
@@ -649,7 +647,7 @@ namespace ryujin
 
     const auto vn_new = 0.5 * (R_1 + R_2);
 
-    const auto h_new = gravity_inverse_ * ryujin::pow((R_2 - R_1) / 4., 2);
+    const auto h_new = ryujin::pow((R_2 - R_1) / 4., 2) / gravity_;
 
     state_type<dim, Number> U_new;
 

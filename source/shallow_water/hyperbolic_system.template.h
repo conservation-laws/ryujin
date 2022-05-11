@@ -43,7 +43,6 @@ namespace ryujin
      * Precompute some stuff:
      */
     h_tiny_ = reference_water_depth_ * dry_state_tolerance_;
-    gravity_inverse_ = 1. / gravity_;
     g_mannings_sqd_ = gravity_ * mannings_ * mannings_;
     reference_speed_ = std::sqrt(gravity_ * reference_water_depth_);
     h_kinetic_energy_tiny_ =

@@ -204,16 +204,14 @@ namespace ryujin
 
     /* FIXME: this can be refactoring into a runtime parameter... */
     const ScalarNumber evc_alpha_0_ = ScalarNumber(1.);
-    const auto regularization = hd_i * std::abs(eta_i + pressure_i);
+
+    constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
+    const auto regularization =
+        hd_i * (std::abs(eta_i) + std::abs(pressure_i) + eps);
+
     const auto quotient =
         std::abs(numerator + regularization) / (denominator + regularization);
     return std::min(Number(1.), evc_alpha_0_ * quotient);
-
-    // FIXME: This is the old regularization. Check the new one and then remove
-    // one of the two.
-    // quotient = dealii::compare_and_apply_mask<
-    //   dealii::SIMDComparison::less_than_or_equal>(
-    //   h_i, hyperbolic_system.h_tiny(), Number(1.), quotient);
 
     return quotient;
   }
