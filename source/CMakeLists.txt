@@ -101,7 +101,7 @@ macro(setup_equation EQUATION)
   install(TARGETS ${EQUATION} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endmacro()
 
-setup_equation("euler")
+#setup_equation("euler")
 if(NOT "${DIM}" EQUAL "3")
   setup_equation("shallow_water")
 endif()

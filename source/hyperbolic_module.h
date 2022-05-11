@@ -279,12 +279,16 @@ namespace ryujin
     static constexpr auto n_bounds = Limiter<dim, Number>::n_bounds;
     mutable MultiComponentVector<Number, n_bounds> bounds_;
 
+    mutable vector_type source_;
+
     mutable vector_type r_;
+    mutable vector_type source_r_;
 
     mutable SparseMatrixSIMD<Number> dij_matrix_;
     mutable SparseMatrixSIMD<Number> lij_matrix_;
     mutable SparseMatrixSIMD<Number> lij_matrix_next_;
     mutable SparseMatrixSIMD<Number, problem_dimension> pij_matrix_;
+    mutable SparseMatrixSIMD<Number, problem_dimension> source_pij_matrix_;
 
     //@}
   };

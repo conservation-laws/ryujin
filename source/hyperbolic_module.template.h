@@ -91,6 +91,10 @@ namespace ryujin
 
     const auto &vector_partitioner = offline_data_->vector_partitioner();
     r_.reinit(vector_partitioner);
+    if constexpr (HyperbolicSystem::have_source_terms) {
+      source_.reinit(vector_partitioner);
+      source_r_.reinit(vector_partitioner);
+    }
 
     /* Initialize matrices: */
 
@@ -99,6 +103,9 @@ namespace ryujin
     lij_matrix_.reinit(sparsity_simd);
     lij_matrix_next_.reinit(sparsity_simd);
     pij_matrix_.reinit(sparsity_simd);
+    if constexpr (HyperbolicSystem::have_source_terms) {
+      source_pij_matrix_.reinit(sparsity_simd);
+    }
 
     /* Flux precomputations: */
     hyperbolic_system_prec_values_ =
@@ -470,8 +477,9 @@ namespace ryujin
                   "time step [E] 3 - l.-o. update, bounds, and r_i");
 
       SynchronizationDispatch synchronization_dispatch([&]() {
-        if (limiter_iter_ != 0)
-          r_.update_ghost_values_start(channel++);
+        r_.update_ghost_values_start(channel++);
+        source_.update_ghost_values_start(channel++);
+        source_r_.update_ghost_values_start(channel++);
       });
 
       const Number weight =
@@ -512,14 +520,23 @@ namespace ryujin
           }
 
           auto U_i_new = U_i;
-          const auto alpha_i = load_value<T>(alpha_, i);
+          HyperbolicSystem::state_type<dim, T> r_i;
 
+          const auto alpha_i = load_value<T>(alpha_, i);
           const auto m_i = load_value<T>(lumped_mass_matrix, i);
           const auto m_i_inv = load_value<T>(lumped_mass_matrix_inverse, i);
 
           limiter.reset(i);
 
-          HyperbolicSystem::state_type<dim, T> r_i;
+          HyperbolicSystem::state_type<dim, T> source_i;
+          HyperbolicSystem::state_type<dim, T> source_r_i;
+          if constexpr (HyperbolicSystem::have_source_terms) {
+            /* source_i will be multiplied by tau * m_i_inv */
+            source_i = hyperbolic_system_->low_order_nodal_source(
+                hyperbolic_system_prec_values_, i, U_i);
+            source_r_i = hyperbolic_system_->high_order_nodal_source(
+                hyperbolic_system_prec_values_, i, U_i);
+          }
 
           const unsigned int *js = sparsity_simd.columns(i);
           for (unsigned int col_idx = 0; col_idx < row_length;
@@ -547,6 +564,11 @@ namespace ryujin
 
             const auto flux_ij = hyperbolic_system_->flux(prec_i, prec_j);
             U_i_new -= tau * m_i_inv * contract(flux_ij, c_ij);
+
+            if constexpr (HyperbolicSystem::have_source_terms) {
+              source_i -= hyperbolic_system_->low_order_stencil_source(
+                  prec_i, prec_j, c_ij, beta_ij);
+            }
 
             if constexpr (HyperbolicSystem::have_equilibrated_states) {
               /* Use star states for low-order update and limiter bounds: */
@@ -576,10 +598,17 @@ namespace ryujin
               r_i -= weight * contract(flux_ij, c_ij);
             }
 
+            if constexpr (HyperbolicSystem::have_source_terms) {
+              source_r_i -=
+                  weight * hyperbolic_system_->high_order_stencil_source(
+                               prec_i, prec_j, c_ij, beta_ij);
+            }
+
             for (int s = 0; s < stages; ++s) {
               const auto U_jH = stage_U[s].get().template get_tensor<T>(js);
               const auto p = hyperbolic_system_->flux_contribution(
                   hyperbolic_system_prec_values_, js, U_jH);
+
               if constexpr (HyperbolicSystem::have_high_order_flux) {
                 const auto high_order_flux_ij =
                     hyperbolic_system_->high_order_flux(prec_iHs[s], p);
@@ -588,11 +617,23 @@ namespace ryujin
                 const auto flux_ij = hyperbolic_system_->flux(prec_iHs[s], p);
                 r_i -= stage_weights[s] * contract(flux_ij, c_ij);
               }
+
+              if constexpr (HyperbolicSystem::have_source_terms) {
+                source_r_i -= stage_weights[s] *
+                              hyperbolic_system_->high_order_stencil_source(
+                                  prec_iHs[s], p, c_ij, beta_ij);
+              }
             }
           }
 
           new_U.template write_tensor<T>(U_i_new, i);
           r_.template write_tensor<T>(r_i, i);
+
+          if constexpr (HyperbolicSystem::have_source_terms) {
+            source_i *= tau * m_i_inv;
+            source_.template write_tensor<T>(source_i, i);
+            source_r_.template write_tensor<T>(source_r_i, i);
+          }
 
           const auto hd_i = m_i * measure_of_omega_inverse;
           limiter.apply_relaxation(hd_i, limiter_relaxation_factor_);
@@ -617,8 +658,9 @@ namespace ryujin
                   "time step [E] 3 - l.-o. update, bounds, and r_i");
 #endif
 
-      if (limiter_iter_ != 0)
-        r_.update_ghost_values_finish();
+      r_.update_ghost_values_finish();
+      source_.update_ghost_values_finish();
+      source_r_.update_ghost_values_finish();
     }
 
     /*

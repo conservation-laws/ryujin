@@ -128,7 +128,6 @@ namespace ryujin
                       unsigned int i,
                       const dealii::Tensor<1, problem_dim, Number> &U) const;
 
-
     //@}
     /**
      * @name Computing derived physical quantities.
@@ -265,7 +264,6 @@ namespace ryujin
      */
     //@{
 
-
     /**
      * For a given (1+dim dimensional) state vector <code>U</code> and
      * left/right topography states <code>Z_left</code> and
@@ -276,7 +274,6 @@ namespace ryujin
     star_state(const dealii::Tensor<1, problem_dim, Number> &U,
                const Number &Z_left,
                const Number &Z_right) const;
-
 
     /**
      * Given a state @p U compute the flux
@@ -364,6 +361,47 @@ namespace ryujin
     std::array<ST, 2>
     equilibrated_states(const std::tuple<ST, T> &prec_i,
                         const std::tuple<ST, T> &prec_j) const;
+
+    //@}
+    /**
+     * @name Computing stencil source terms
+     */
+    //@{
+
+    static constexpr bool have_source_terms = true;
+
+    template <typename MultiComponentVector,
+              typename ST,
+              int dim = ST::dimension - 1,
+              typename T = typename ST::value_type>
+    ST low_order_nodal_source(const MultiComponentVector &precomputed_values,
+                              const unsigned int i,
+                              const ST &U_i) const;
+
+    template <typename MultiComponentVector,
+              typename ST,
+              int dim = ST::dimension - 1,
+              typename T = typename ST::value_type>
+    ST high_order_nodal_source(const MultiComponentVector &precomputed_values,
+                               const unsigned int i,
+                               const ST &U_i) const;
+
+    template <typename ST,
+              int dim = ST::dimension - 1,
+              typename T = typename ST::value_type>
+    ST low_order_stencil_source(const std::tuple<ST, T> &prec_i,
+                                const std::tuple<ST, T> &prec_j,
+                                const dealii::Tensor<1, dim, T> &c_ij,
+                                const T beta_ij) const;
+
+    template <typename ST,
+              int dim = ST::dimension - 1,
+              typename T = typename ST::value_type>
+    ST high_order_stencil_source(const std::tuple<ST, T> &prec_i,
+                                 const std::tuple<ST, T> &prec_j,
+                                 const dealii::Tensor<1, dim, T> &c_ij,
+                                 const T beta_ij) const;
+
 
     //@}
     /**
