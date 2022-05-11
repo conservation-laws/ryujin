@@ -87,10 +87,14 @@ macro(setup_equation EQUATION)
     RUNTIME_OUTPUT_NAME "ryujin-${DIM}d-${EQUATION}"
     )
 
-  add_custom_target(symlink_${EQUATION} ALL
-    DEPENDS ${EQUATION}
+  add_custom_command(
+    OUTPUT "${CMAKE_BINARY_DIR}/run/${EQUATION}/ryujin"
     COMMAND ${CMAKE_COMMAND} -E create_symlink $<TARGET_FILE:${EQUATION}>
       "${CMAKE_BINARY_DIR}/run/${EQUATION}/ryujin"
+      )
+
+  add_custom_target(symlink_${EQUATION} ALL
+    DEPENDS ${EQUATION} "${CMAKE_BINARY_DIR}/run/${EQUATION}/ryujin"
     COMMENT "updating ${EQUATION} symlink"
     )
 
