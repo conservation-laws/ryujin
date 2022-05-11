@@ -25,12 +25,26 @@ namespace ryujin
                                       const std::string &subsection)
       : ParameterAcceptor(subsection)
       , mpi_communicator_(mpi_communicator)
-      , triangulation_(std::make_unique<Triangulation>(
-            mpi_communicator_,
-            dealii::Triangulation<dim>::limit_level_difference_at_vertices,
-            dealii::parallel::distributed::Triangulation<
-                dim>::construct_multigrid_hierarchy))
   {
+    const auto smoothing =
+        dealii::Triangulation<dim>::limit_level_difference_at_vertices;
+
+    if constexpr (have_distributed_triangulation<dim>) {
+      const auto settings =
+          Triangulation::Settings::construct_multigrid_hierarchy;
+      triangulation_ = std::make_unique<Triangulation>(
+          mpi_communicator_, smoothing, settings);
+
+    } else {
+      const auto settings = static_cast<typename Triangulation::Settings>(
+          Triangulation::partition_auto |
+          Triangulation::construct_multigrid_hierarchy);
+      /* Beware of the boolean: */
+      triangulation_ = std::make_unique<Triangulation>(
+          mpi_communicator_, smoothing, /*artificial cells*/ true, settings);
+    }
+
+
     /* Options: */
 
     geometry_ = "cylinder";
@@ -82,7 +96,7 @@ namespace ryujin
                      geometry_ + "\""));
     }
 
-    if constexpr (dim != 1) {
+    if constexpr (have_distributed_triangulation<dim>) {
       if (repartitioning_) {
         /*
          * Try to partition the mesh equilibrating the workload. The usual mesh

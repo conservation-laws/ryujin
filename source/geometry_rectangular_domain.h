@@ -121,7 +121,13 @@ namespace ryujin
         dealii::Triangulation<dim, dim> tria1;
         tria1.set_mesh_smoothing(triangulation.get_mesh_smoothing());
 
-        if constexpr (dim == 2) {
+        if constexpr (dim == 1) {
+          dealii::GridGenerator::subdivided_hyper_rectangle(
+              tria1,
+              {subdivisions_x_},
+              point_left_,
+              point_right_);
+        } else if constexpr (dim == 2) {
           dealii::GridGenerator::subdivided_hyper_rectangle(
               tria1,
               {subdivisions_x_, subdivisions_y_},

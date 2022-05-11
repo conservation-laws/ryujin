@@ -90,7 +90,7 @@ namespace ryujin
       }
 
       /* Roll second component of initial_direction onto x-axis: */
-      {
+      if constexpr (dim >= 2) {
         auto n_x = initial_direction[0];
         auto n_y = initial_direction[1];
         const auto norm = std::sqrt(n_x * n_x + n_y * n_y);
@@ -116,7 +116,7 @@ namespace ryujin
     affine_transform_vector(const dealii::Tensor<1, dim> initial_direction,
                             dealii::Tensor<1, dim, Number> direction)
     {
-      {
+      if constexpr (dim >= 2) {
         auto n_x = initial_direction[0];
         auto n_y = initial_direction[1];
         const auto norm = std::sqrt(n_x * n_x + n_y * n_y);

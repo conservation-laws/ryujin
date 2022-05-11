@@ -13,6 +13,7 @@
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/quadrature.h>
+#include <deal.II/distributed/shared_tria.h>
 #include <deal.II/distributed/tria.h>
 #include <deal.II/fe/fe.h>
 #include <deal.II/fe/mapping.h>
@@ -248,4 +249,13 @@ namespace ryujin
     //@}
   };
 
+
+  /**
+   * A templated constexpr boolean that is true if we use a parallel
+   * distributed triangulation (for the specified dimension).
+   */
+  template <int dim>
+  constexpr bool have_distributed_triangulation =
+      std::is_same<typename Discretization<dim>::Triangulation,
+                   dealii::parallel::distributed::Triangulation<dim>>::value;
 } /* namespace ryujin */
