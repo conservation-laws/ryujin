@@ -352,7 +352,7 @@ namespace ryujin
 
     /**
      * Given precomputed flux contributions @p prec_i and @p prec_j compute
-     * the equilibrated, low-order flux \f$(f(U_i^{\ast,j}) +
+     * the equilibrated, low-order flux \f$f(U_i^{\ast,j}) +
      * f(U_j^{\ast,i})\f$
      */
     template <typename ST,
@@ -370,6 +370,9 @@ namespace ryujin
 
     static constexpr bool have_source_terms = true;
 
+    /**
+     * FIXME
+     */
     template <typename MultiComponentVector,
               typename ST,
               int dim = ST::dimension - 1,
@@ -378,6 +381,9 @@ namespace ryujin
                               const unsigned int i,
                               const ST &U_i) const;
 
+    /**
+     * FIXME
+     */
     template <typename MultiComponentVector,
               typename ST,
               int dim = ST::dimension - 1,
@@ -386,6 +392,11 @@ namespace ryujin
                                const unsigned int i,
                                const ST &U_i) const;
 
+    /**
+     * Given precomputed flux contributions @p prec_i and @p prec_j compute
+     * the equilibrated, low-order source term
+     * \f$-g(H^{\ast,j}_i)^2c_ij\f$.
+     */
     template <typename ST,
               int dim = ST::dimension - 1,
               typename T = typename ST::value_type>
@@ -394,6 +405,11 @@ namespace ryujin
                                 const dealii::Tensor<1, dim, T> &c_ij,
                                 const T beta_ij) const;
 
+    /**
+     * Given precomputed flux contributions @p prec_i and @p prec_j compute
+     * the equilibrated, low-order source term
+     * \f$ g H_i Z_j c_ij\f$.
+     */
     template <typename ST,
               int dim = ST::dimension - 1,
               typename T = typename ST::value_type>
@@ -865,9 +881,9 @@ namespace ryujin
 
   template <typename MultiComponentVector, typename ST, int dim, typename T>
   ST HyperbolicSystem::low_order_nodal_source(
-      const MultiComponentVector &precomputed_values,
-      const unsigned int i,
-      const ST &U_i) const
+      const MultiComponentVector & /*precomputed_values*/,
+      const unsigned int /*i*/,
+      const ST & /*U_i*/) const
   {
     // FIXME
     return ST();
@@ -875,9 +891,9 @@ namespace ryujin
 
   template <typename MultiComponentVector, typename ST, int dim, typename T>
   ST HyperbolicSystem::high_order_nodal_source(
-      const MultiComponentVector &precomputed_values,
-      const unsigned int i,
-      const ST &U_i) const
+      const MultiComponentVector & /*precomputed_values*/,
+      const unsigned int /*i*/,
+      const ST & /*U_i*/) const
   {
     // FIXME
     return ST();

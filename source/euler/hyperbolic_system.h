@@ -387,9 +387,7 @@ namespace ryujin
     template <typename FT, int dim = FT::dimension - 2>
     FT high_order_flux(const FT &, const FT &) const = delete;
 
-    /**
-     * We do not perform state equilibration
-     */
+    /** We do not perform state equilibration */
     static constexpr bool have_equilibrated_states = false;
 
     template <typename FT,
@@ -398,6 +396,46 @@ namespace ryujin
               typename T = typename TT::value_type>
     std::array<state_type<dim, T>, 2>
     equilibrated_states(const FT &prec_i, const FT &prec_j) = delete;
+
+    //@}
+    /**
+     * @name Computing stencil source terms
+     */
+    //@{
+
+    /** We do not have source terms */
+    static constexpr bool have_source_terms = false;
+
+    template <typename MultiComponentVector, typename ST>
+    ST low_order_nodal_source(const MultiComponentVector &,
+                              const unsigned int,
+                              const ST &) const = delete;
+
+    template <typename MultiComponentVector, typename ST>
+    ST high_order_nodal_source(const MultiComponentVector &,
+                               const unsigned int i,
+                               const ST &) const = delete;
+
+    template <typename FT,
+              int dim = FT::dimension - 2,
+              typename TT = typename FT::value_type,
+              typename T = typename TT::value_type>
+    state_type<dim, T>
+    low_order_stencil_source(const FT &,
+                             const FT &,
+                             const dealii::Tensor<1, dim, T> &,
+                             const T) const = delete;
+
+    template <typename FT,
+              int dim = FT::dimension - 2,
+              typename TT = typename FT::value_type,
+              typename T = typename TT::value_type>
+    state_type<dim, T>
+    high_order_stencil_source(const FT &,
+                              const FT &,
+                              const dealii::Tensor<1, dim, T> &,
+                              const T) const = delete;
+
 
     //@}
     /**
