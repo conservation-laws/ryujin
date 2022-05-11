@@ -118,6 +118,30 @@ DECLARE_ENUM(ryujin::Boundary,
 
 namespace ryujin
 {
+  namespace
+  {
+    template <int dim>
+    struct Proxy {
+      using Triangulation = dealii::parallel::distributed::Triangulation<dim>;
+    };
+
+    template <>
+    struct Proxy<1> {
+      using Triangulation = dealii::parallel::shared::Triangulation<1>;
+    };
+
+  } // namespace
+
+  /**
+   * A templated constexpr boolean that is true if we use a parallel
+   * distributed triangulation (for the specified dimension).
+   */
+  template <int dim>
+  constexpr bool have_distributed_triangulation =
+      std::is_same<typename Discretization<dim>::Triangulation,
+                   dealii::parallel::distributed::Triangulation<dim>>::value;
+
+
   /**
    * This class is as a container for data related to the discretization,
    * this includes the triangulation, finite element, mapping, and
@@ -138,12 +162,15 @@ namespace ryujin
   {
   public:
     /**
-     * A typdef for the deal.II triangulation that is used by this class.
-     * Depending on use case possible values are
-     * dealii::parallel::distributed::Triangulation and
-     * dealii::parallel::fullydistributed::Triangulation.
+     * A type alias denoting the Triangulation we are using:
+     *
+     * In one spatial dimensions we use a
+     * dealii::parallel::shared::Triangulation and for two and three
+     * dimensions a dealii::parallel::distributed::Triangulation.
      */
-    using Triangulation = dealii::parallel::distributed::Triangulation<dim>;
+    using Triangulation = typename Proxy<dim>::Triangulation;
+
+    static_assert(dim == 1 || have_distributed_triangulation<dim>);
 
     /**
      * Constructor.
@@ -248,14 +275,4 @@ namespace ryujin
 
     //@}
   };
-
-
-  /**
-   * A templated constexpr boolean that is true if we use a parallel
-   * distributed triangulation (for the specified dimension).
-   */
-  template <int dim>
-  constexpr bool have_distributed_triangulation =
-      std::is_same<typename Discretization<dim>::Triangulation,
-                   dealii::parallel::distributed::Triangulation<dim>>::value;
 } /* namespace ryujin */
