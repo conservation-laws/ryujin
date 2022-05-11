@@ -207,7 +207,7 @@ namespace ryujin
         using T = decltype(sentinel);
         unsigned int stride_size = get_stride_size<T>;
 
-        RYUJIN_OMP_FOR_NOWAIT
+        RYUJIN_OMP_FOR
         for (unsigned int i = left; i < right; i += stride_size) {
 
           /* Skip constrained degrees of freedom: */
@@ -298,7 +298,7 @@ namespace ryujin
                                     indicator_prec_values_);
         bool thread_ready = false;
 
-        RYUJIN_OMP_FOR_NOWAIT
+        RYUJIN_OMP_FOR
         for (unsigned int i = left; i < right; i += stride_size) {
 
           /* Skip constrained degrees of freedom: */
@@ -489,7 +489,7 @@ namespace ryujin
         Limiter<dim, T> limiter(*hyperbolic_system_, limiter_prec_values_);
         bool thread_ready = false;
 
-        RYUJIN_OMP_FOR_NOWAIT
+        RYUJIN_OMP_FOR
         for (unsigned int i = left; i < right; i += stride_size) {
 
           /* Skip constrained degrees of freedom: */
@@ -647,7 +647,7 @@ namespace ryujin
         /* Stored thread locally: */
         bool thread_ready = false;
 
-        RYUJIN_OMP_FOR_NOWAIT
+        RYUJIN_OMP_FOR
         for (unsigned int i = left; i < right; i += stride_size) {
 
           /* Skip constrained degrees of freedom: */
@@ -822,7 +822,7 @@ namespace ryujin
           AlignedVector<T> lij_row;
           bool thread_ready = false;
 
-          RYUJIN_OMP_FOR_NOWAIT
+          RYUJIN_OMP_FOR
           for (unsigned int i = left; i < right; i += stride_size) {
 
             /* Skip constrained degrees of freedom: */

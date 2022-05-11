@@ -149,7 +149,7 @@ namespace ryujin
         std::vector<grad_type<T>> local_schlieren_values(n_schlieren);
         std::vector<curl_type<T>> local_vorticity_values(n_vorticities);
 
-        RYUJIN_OMP_FOR_NOWAIT
+        RYUJIN_OMP_FOR
         for (unsigned int i = left; i < right; i += stride_size) {
 
           for (auto &it : local_schlieren_values)
