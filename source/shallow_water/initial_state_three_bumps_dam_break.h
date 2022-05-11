@@ -25,8 +25,6 @@ namespace ryujin
           : InitialState<dim, Number, state_type, 1>("three bumps dam break", s)
           , hyperbolic_system(hyperbolic_system)
       {
-        // FIXME: put dam_location = 16 into config file
-
         left_depth = 1.875;
         this->add_parameter("left water depth",
                             left_depth,
@@ -47,15 +45,22 @@ namespace ryujin
       {
         const Number x = point[0];
 
-        // Return initial state for t = 0
-        if (t <= 1.e-10)
-          return hyperbolic_system.template expand_state<dim>(
-              HyperbolicSystem::state_type<1, Number>{
-                  {(x <= 0. ? left_depth : right_depth), Number(0.)}});
+        /* Initial state: */
 
-        const Number hv = std::sqrt(hyperbolic_system.gravity() * left_depth);
+        if (t <= 1.e-10) {
+          Number h = x < 0 ? left_depth : right_depth;
+          h = std::max(h - compute_bathymetry(point), Number(0.));
+          return hyperbolic_system.template expand_state<dim>(
+              HyperbolicSystem::state_type<1, Number>{{h, Number(0.)}});
+        }
+
+        /* For t > 0 prescribe constant inflow Dirichlet data on the left: */
+
+        const auto &h = left_depth;
+        const auto a = hyperbolic_system.speed_of_sound(
+            HyperbolicSystem ::state_type<1, Number>{{h, Number(0.)}});
         return hyperbolic_system.template expand_state<dim>(
-            HyperbolicSystem::state_type<1, Number>{{left_depth, hv}});
+            HyperbolicSystem::state_type<1, Number>{{h, h * a}});
       }
 
       virtual auto compute_flux_contributions(const dealii::Point<dim> &point)
@@ -92,7 +97,6 @@ namespace ryujin
 
         return std::max({z1, z2, z3, Number(0.)});
       }
-
 
       Number left_depth;
       Number right_depth;
