@@ -436,7 +436,6 @@ namespace ryujin
                               const dealii::Tensor<1, dim, T> &,
                               const T) const = delete;
 
-
     //@}
     /**
      * @name State transformations (primitive states, expanding

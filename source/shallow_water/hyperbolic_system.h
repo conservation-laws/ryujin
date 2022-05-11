@@ -866,6 +866,7 @@ namespace ryujin
     return add(f_i, f_j);
   }
 
+
   template <typename ST, int dim, typename T>
   DEAL_II_ALWAYS_INLINE inline std::array<ST, 2>
   HyperbolicSystem::equilibrated_states(const std::tuple<ST, T> &prec_i,
@@ -889,6 +890,7 @@ namespace ryujin
     return ST();
   }
 
+
   template <typename MultiComponentVector, typename ST, int dim, typename T>
   ST HyperbolicSystem::high_order_nodal_source(
       const MultiComponentVector & /*precomputed_values*/,
@@ -898,6 +900,7 @@ namespace ryujin
     // FIXME
     return ST();
   }
+
 
   template <typename ST, int dim, typename T>
   ST HyperbolicSystem::low_order_stencil_source(
@@ -917,6 +920,7 @@ namespace ryujin
       result[d] = factor * c_ij[d - 1];
     return result;
   }
+
 
   template <typename ST, int dim, typename T>
   ST HyperbolicSystem::high_order_stencil_source(

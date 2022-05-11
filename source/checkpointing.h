@@ -150,7 +150,8 @@ namespace ryujin
                      const MPI_Comm &mpi_communicator)
     {
       if constexpr (have_distributed_triangulation<dim>) {
-        const auto &triangulation = offline_data.discretization().triangulation();
+        const auto &triangulation =
+            offline_data.discretization().triangulation();
         const auto &dof_handler = offline_data.dof_handler();
 
         /* Copy state into scalar component vectors: */

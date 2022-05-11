@@ -77,5 +77,5 @@ namespace ryujin
       Number amplitude_;
     };
 
-  } // namespace InitialStates
+  } // namespace InitialStateLibrary
 } // namespace ryujin

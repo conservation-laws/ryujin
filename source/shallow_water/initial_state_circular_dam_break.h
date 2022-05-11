@@ -18,7 +18,7 @@ namespace ryujin
     class CircularDamBreak : public InitialState<dim, Number, state_type, 1>
     {
     public:
-      CircularDamBreak(const HyperbolicSystem & hyperbolic_system,
+      CircularDamBreak(const HyperbolicSystem &hyperbolic_system,
                        const std::string sub)
           : InitialState<dim, Number, state_type, 1>("circular dam break", sub)
           , hyperbolic_system(hyperbolic_system)
@@ -55,5 +55,5 @@ namespace ryujin
       Number dam_amplitude_;
     };
 
-  } // namespace InitialStates
+  } // namespace InitialStateLibrary
 } // namespace ryujin
