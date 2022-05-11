@@ -465,11 +465,6 @@ namespace ryujin
 
     /*
      * Step 3: Low-order update, also compute limiter bounds, R_i
-     *
-     *   Low-order update: += tau / m_i
-     *         \sum_j {- (f_j + f_i) c_ij + d_ij^L (U_j - U_i)}
-     *
-     *   R_i = \sum_j {- (f_j + f_i) c_ij + d_ij^H (U_j - U_i)}
      */
 
     {
@@ -599,9 +594,9 @@ namespace ryujin
             }
 
             if constexpr (HyperbolicSystem::have_source_terms) {
-              source_r_i -=
-                  weight * hyperbolic_system_->high_order_stencil_source(
-                               prec_i, prec_j, c_ij, beta_ij);
+              const auto s_ho = hyperbolic_system_->high_order_stencil_source(
+                  prec_i, prec_j, c_ij, beta_ij);
+              source_r_i -= weight * s_ho;
             }
 
             for (int s = 0; s < stages; ++s) {
@@ -619,9 +614,9 @@ namespace ryujin
               }
 
               if constexpr (HyperbolicSystem::have_source_terms) {
-                source_r_i -= stage_weights[s] *
-                              hyperbolic_system_->high_order_stencil_source(
-                                  prec_iHs[s], p, c_ij, beta_ij);
+                const auto s_ho = hyperbolic_system_->high_order_stencil_source(
+                    prec_iHs[s], p, c_ij, beta_ij);
+                source_r_i -= stage_weights[s] * s_ho;
               }
             }
           }
@@ -665,9 +660,6 @@ namespace ryujin
 
     /*
      * Step 4: Compute P_ij, and l_ij (first round):
-     *
-     *    P_ij = tau / m_i / lambda ( (d_ij^H - d_ij^L) (U_i - U_j) +
-     *                                (b_ij R_j - b_ji R_i) )
      */
 
     if (limiter_iter_ != 0) {
@@ -718,6 +710,11 @@ namespace ryujin
           }
 
           const auto r_i = r_.template get_tensor<T>(i);
+
+          HyperbolicSystem::state_type<dim, T> source_r_i;
+          if constexpr (HyperbolicSystem::have_source_terms)
+            source_r_i = source_.template get_tensor<T>(i);
+
           const auto alpha_i = load_value<T>(alpha_, i);
           const auto lambda_inv = Number(row_length - 1);
           const auto factor = tau * m_i_inv * lambda_inv;
@@ -729,7 +726,14 @@ namespace ryujin
             const auto U_j = old_U.template get_tensor<T>(js);
 
             const auto c_ij = cij_matrix.template get_tensor<T>(i, col_idx);
+            const auto beta_ij =
+                betaij_matrix.template get_entry<T>(i, col_idx);
+
             const auto r_j = r_.template get_tensor<T>(js);
+
+            HyperbolicSystem::state_type<dim, T> source_r_j;
+            if constexpr (HyperbolicSystem::have_source_terms)
+              source_r_j = source_.template get_tensor<T>(js);
 
             const auto alpha_j = load_value<T>(alpha_, js);
             const auto m_j_inv = load_value<T>(lumped_mass_matrix_inverse, js);
@@ -749,6 +753,10 @@ namespace ryujin
              */
 
             auto p_ij = b_ij * r_j - b_ji * r_i;
+
+            HyperbolicSystem::state_type<dim, T> source_p_ij;
+            if constexpr (HyperbolicSystem::have_source_terms)
+              source_p_ij = b_ij * source_r_j - b_ji * source_r_i;
 
             if constexpr (HyperbolicSystem::have_equilibrated_states) {
               const auto &[U_star_ij, U_star_ji] =
@@ -775,6 +783,14 @@ namespace ryujin
               }
             }
 
+            if constexpr (HyperbolicSystem::have_source_terms) {
+              const auto s_lo = hyperbolic_system_->low_order_stencil_source(
+                  prec_i, prec_j, c_ij, beta_ij);
+              const auto s_ho = hyperbolic_system_->high_order_stencil_source(
+                  prec_i, prec_j, c_ij, beta_ij);
+              source_r_i += s_lo - weight * s_ho;
+            }
+
             for (int s = 0; s < stages; ++s) {
               const auto U_jH = stage_U[s].get().template get_tensor<T>(js);
               const auto p = hyperbolic_system_->flux_contribution(
@@ -788,10 +804,21 @@ namespace ryujin
                 const auto flux_ij = hyperbolic_system_->flux(prec_iHs[s], p);
                 p_ij -= stage_weights[s] * contract(flux_ij, c_ij);
               }
+
+              if constexpr (HyperbolicSystem::have_source_terms) {
+                const auto s_ho = hyperbolic_system_->high_order_stencil_source(
+                    prec_iHs[s], p, c_ij, beta_ij);
+                source_r_i -= stage_weights[s] * s_ho;
+              }
             }
 
             p_ij *= factor;
             pij_matrix_.write_tensor(p_ij, i, col_idx, true);
+
+            if constexpr (HyperbolicSystem::have_source_terms) {
+              source_p_ij *= factor;
+              source_pij_matrix_.write_tensor(source_p_ij, i, col_idx, true);
+            }
 
             const auto &[l_ij, success] =
                 Limiter<dim, T>::limit(*hyperbolic_system_,
@@ -839,9 +866,9 @@ namespace ryujin
     for (unsigned int pass = 0; pass < limiter_iter_; ++pass) {
 
       std::string step_no = std::to_string(5 + pass);
-      std::string additional_step =
-          pass + 1 < limiter_iter_ ? ", next l_ij" : "";
+
       bool last_round = (pass + 1 == limiter_iter_);
+      std::string additional_step = (last_round ? "" : ", next l_ij");
 
       {
         Scope scope(computing_timer_,
@@ -877,6 +904,10 @@ namespace ryujin
 
             auto U_i_new = new_U.template get_tensor<T>(i);
 
+            HyperbolicSystem::state_type<dim, T> source_i;
+            if constexpr (HyperbolicSystem::have_source_terms)
+              source_i = source_.template get_tensor<T>(i);
+
             const Number lambda = Number(1.) / Number(row_length - 1);
             lij_row.resize_fast(row_length);
 
@@ -886,9 +917,15 @@ namespace ryujin
                   lij_matrix_.template get_entry<T>(i, col_idx),
                   lij_matrix_.template get_transposed_entry<T>(i, col_idx));
 
-              auto p_ij = pij_matrix_.template get_tensor<T>(i, col_idx);
+              const auto p_ij = pij_matrix_.template get_tensor<T>(i, col_idx);
 
               U_i_new += l_ij * lambda * p_ij;
+
+              if constexpr (HyperbolicSystem::have_source_terms) {
+                const auto source_p_ij =
+                    source_pij_matrix_.template get_tensor<T>(i, col_idx);
+                source_i += l_ij * lambda * source_p_ij;
+              }
 
               if (!last_round)
                 lij_row[col_idx] = l_ij;
@@ -901,6 +938,9 @@ namespace ryujin
 #endif
 
             new_U.template write_tensor<T>(U_i_new, i);
+
+            if constexpr (HyperbolicSystem::have_source_terms)
+              source_.template write_tensor<T>(source_i, i);
 
             /* Skip computating l_ij and updating p_ij in the last round */
             if (last_round)
@@ -928,23 +968,13 @@ namespace ryujin
               if (!success)
                 restart_needed = true;
 
-              if (RYUJIN_LIKELY(limiter_iter_ == 2)) {
-                /*
-                 * Shortcut: We omit updating the p_ij vector and simply
-                 * write (1 - l_ij^(1)) * l_ij^(2) into the l_ij matrix. This
-                 * approach only works for two limiting steps.
-                 */
-                const auto entry = (T(1.) - old_l_ij) * new_l_ij;
-                lij_matrix_next_.write_entry(entry, i, col_idx, true);
-              } else {
-                /*
-                 * @todo: This is expensive. If we ever end up using more
-                 * than two limiter passes we should implement this by
-                 * storing a scalar factor instead of writing back into p_ij.
-                 */
-                lij_matrix_next_.write_entry(new_l_ij, i, col_idx, true);
-                pij_matrix_.write_tensor(new_p_ij, i, col_idx);
-              }
+              /*
+               * Shortcut: We omit updating the p_ij vector and simply
+               * write (1 - l_ij^(1)) * l_ij^(2) into the l_ij matrix. This
+               * approach only works for at most two limiting steps.
+               */
+              const auto entry = (T(1.) - old_l_ij) * new_l_ij;
+              lij_matrix_next_.write_entry(entry, i, col_idx, true);
             }
           }
         };
@@ -976,6 +1006,10 @@ namespace ryujin
     } /* limiter_iter_ */
 
     CALLGRIND_STOP_INSTRUMENTATION
+
+    /* Update sources: */
+    if constexpr (HyperbolicSystem::have_source_terms)
+      new_U += source_;
 
     /* Do we have to restart? */
 

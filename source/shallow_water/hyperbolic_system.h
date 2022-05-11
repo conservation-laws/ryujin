@@ -863,6 +863,64 @@ namespace ryujin
   }
 
 
+  template <typename MultiComponentVector, typename ST, int dim, typename T>
+  ST HyperbolicSystem::low_order_nodal_source(
+      const MultiComponentVector &precomputed_values,
+      const unsigned int i,
+      const ST &U_i) const
+  {
+    // FIXME
+    return ST();
+  }
+
+  template <typename MultiComponentVector, typename ST, int dim, typename T>
+  ST HyperbolicSystem::high_order_nodal_source(
+      const MultiComponentVector &precomputed_values,
+      const unsigned int i,
+      const ST &U_i) const
+  {
+    // FIXME
+    return ST();
+  }
+
+  template <typename ST, int dim, typename T>
+  ST HyperbolicSystem::low_order_stencil_source(
+      const std::tuple<ST, T> &prec_i,
+      const std::tuple<ST, T> &prec_j,
+      const dealii::Tensor<1, dim, T> &c_ij,
+      const T /*beta_ij*/) const
+  {
+    const auto &[U_i, Z_i] = prec_i;
+    const auto &[U_j, Z_j] = prec_j;
+    const auto U_star_ij = star_state(U_i, Z_i, Z_j);
+    const auto H_star_ij = water_depth(U_star_ij);
+
+    const auto factor = -gravity_ * H_star_ij * H_star_ij;
+    ST result;
+    for (unsigned int d = 1; d < dim + 1; ++d)
+      result[d] = factor * c_ij[d - 1];
+    return result;
+  }
+
+  template <typename ST, int dim, typename T>
+  ST HyperbolicSystem::high_order_stencil_source(
+      const std::tuple<ST, T> &prec_i,
+      const std::tuple<ST, T> &prec_j,
+      const dealii::Tensor<1, dim, T> &c_ij,
+      const T /*beta_ij*/) const
+  {
+    const auto &[U_i, Z_i] = prec_i;
+    const auto &[U_j, Z_j] = prec_j;
+    const auto H_i = water_depth(U_i);
+
+    const auto factor = gravity_ * H_i * Z_j;
+    ST result;
+    for (unsigned int d = 1; d < dim + 1; ++d)
+      result[d] = factor * c_ij[d - 1];
+    return result;
+  }
+
+
   template <int dim, typename ST, typename T, int dim2, typename>
   auto HyperbolicSystem::expand_state(const ST &state) const
       -> state_type<dim, T>
