@@ -85,12 +85,12 @@ namespace ryujin
                               "number of subdivisions in y direction");
           this->add_parameter(
               "boundary condition bottom",
-              boundary_left_,
+              boundary_bottom_,
               "Type of boundary condition enforced on the bottom side of the "
               "domain (faces with normal in negative y direction)");
           this->add_parameter(
               "boundary condition top",
-              boundary_right_,
+              boundary_top_,
               "Type of boundary condition enforced on the top side of the "
               "domain (faces with normal in positive y direction)");
         }
@@ -101,12 +101,12 @@ namespace ryujin
                               "number of subdivisions in z direction");
           this->add_parameter(
               "boundary condition back",
-              boundary_left_,
+              boundary_back_,
               "Type of boundary condition enforced on the back side of the "
               "domain (faces with normal in negative z direction)");
           this->add_parameter(
               "boundary condition front",
-              boundary_right_,
+              boundary_front_,
               "Type of boundary condition enforced on the front side of the "
               "domain (faces with normal in positive z direction)");
         }
