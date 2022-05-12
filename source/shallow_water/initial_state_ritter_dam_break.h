@@ -21,7 +21,7 @@ namespace ryujin
     public:
       RitterDamBreak(const HyperbolicSystem &hyperbolic_system,
                      const std::string subsection)
-          : InitialState<dim, Number, state_type, 1>("ritter_dam_break",
+          : InitialState<dim, Number, state_type, 1>("ritter dam break",
                                                      subsection)
           , hyperbolic_system(hyperbolic_system)
       {

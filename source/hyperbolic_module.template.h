@@ -788,7 +788,7 @@ namespace ryujin
                   prec_i, prec_j, c_ij, beta_ij);
               const auto s_ho = hyperbolic_system_->high_order_stencil_source(
                   prec_i, prec_j, c_ij, beta_ij);
-              source_r_i += s_lo - weight * s_ho;
+              source_p_ij += s_lo - weight * s_ho;
             }
 
             for (int s = 0; s < stages; ++s) {
@@ -808,7 +808,7 @@ namespace ryujin
               if constexpr (HyperbolicSystem::have_source_terms) {
                 const auto s_ho = hyperbolic_system_->high_order_stencil_source(
                     prec_iHs[s], p, c_ij, beta_ij);
-                source_r_i -= stage_weights[s] * s_ho;
+                source_p_ij -= stage_weights[s] * s_ho;
               }
             }
 
