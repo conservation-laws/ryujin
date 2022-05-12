@@ -46,9 +46,9 @@ namespace ryujin
         const auto g = hyperbolic_system.gravity();
         const Number x = point[0];
 
-        /* Return initial state if t_initial_ = 0 */
+        /* Return initial state if t + t_initial_ = 0 */
 
-        if (t_initial_ <= 1.e-10) {
+        if (t + t_initial_ <= 1.e-10) {
           if (x < 0)
             return hyperbolic_system.template expand_state<dim>(
                 HyperbolicSystem::state_type<1, Number>{
