@@ -1,7 +1,7 @@
 //
 // SPDX-License-Identifier: LGPL-2.1+ or MIT
-// Copyright (C) 2007 - 2021 by Martin Kronbichler
-// Copyright (C) 2008 - 2021 by David Wells
+// Copyright (C) 2007 - 2022 by Martin Kronbichler
+// Copyright (C) 2008 - 2022 by David Wells
 //
 
 #pragma once
@@ -25,6 +25,7 @@ namespace ryujin
       : level_coarse(-1)
   {
     AssertThrow(dim > 1, ExcNotImplemented());
+    __builtin_trap();
   }
 
 

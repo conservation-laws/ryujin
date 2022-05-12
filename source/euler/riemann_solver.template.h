@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2020 - 2021 by the ryujin authors
+// Copyright (C) 2020 - 2022 by the ryujin authors
 //
 
 #pragma once
@@ -28,8 +28,8 @@ namespace ryujin
    */
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline Number RiemannSolver<dim, Number>::phi_of_p_max(
-      const std::array<Number, 4> &riemann_data_i,
-      const std::array<Number, 4> &riemann_data_j)
+      const primitive_type &riemann_data_i,
+      const primitive_type &riemann_data_j) const
   {
     using ScalarNumber = typename get_value_type<Number>::type;
 
@@ -67,8 +67,9 @@ namespace ryujin
    * Cost: 0x pow, 1x division, 1x sqrt
    */
   template <int dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline Number RiemannSolver<dim, Number>::lambda1_minus(
-      const std::array<Number, 4> &riemann_data, const Number p_star)
+  DEAL_II_ALWAYS_INLINE inline Number
+  RiemannSolver<dim, Number>::lambda1_minus(const primitive_type &riemann_data,
+                                            const Number p_star) const
   {
     using ScalarNumber = typename get_value_type<Number>::type;
 
@@ -89,7 +90,7 @@ namespace ryujin
    */
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline Number RiemannSolver<dim, Number>::lambda3_plus(
-      const std::array<Number, 4> &primitive_state, const Number p_star)
+      const primitive_type &primitive_state, const Number p_star) const
   {
     using ScalarNumber = typename get_value_type<Number>::type;
 
@@ -116,9 +117,9 @@ namespace ryujin
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline Number
   RiemannSolver<dim, Number>::compute_lambda(
-      const std::array<Number, 4> &riemann_data_i,
-      const std::array<Number, 4> &riemann_data_j,
-      const Number p_star)
+      const primitive_type &riemann_data_i,
+      const primitive_type &riemann_data_j,
+      const Number p_star) const
   {
     const Number nu_11 = lambda1_minus(riemann_data_i, p_star);
     const Number nu_32 = lambda3_plus(riemann_data_j, p_star);
@@ -138,8 +139,8 @@ namespace ryujin
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline Number
   RiemannSolver<dim, Number>::p_star_two_rarefaction(
-      const std::array<Number, 4> &riemann_data_i,
-      const std::array<Number, 4> &riemann_data_j)
+      const primitive_type &riemann_data_i,
+      const primitive_type &riemann_data_j) const
   {
     using ScalarNumber = typename get_value_type<Number>::type;
 
@@ -180,11 +181,11 @@ namespace ryujin
    * approximative Riemann solver).
    */
   template <int dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline std::array<Number, 4>
+  DEAL_II_ALWAYS_INLINE inline auto
   RiemannSolver<dim, Number>::riemann_data_from_state(
       const HyperbolicSystem &hyperbolic_system,
       const HyperbolicSystem::state_type<dim, Number> &U,
-      const dealii::Tensor<1, dim, Number> &n_ij)
+      const dealii::Tensor<1, dim, Number> &n_ij) const -> primitive_type
   {
     const auto rho = hyperbolic_system.density(U);
     const auto rho_inverse = Number(1.0) / rho;
@@ -207,8 +208,8 @@ namespace ryujin
 
   template <int dim, typename Number>
   Number RiemannSolver<dim, Number>::compute(
-      const std::array<Number, 4> &riemann_data_i,
-      const std::array<Number, 4> &riemann_data_j)
+      const primitive_type &riemann_data_i,
+      const primitive_type &riemann_data_j) const
   {
     /*
      * We need a good upper and lower bound, p_1 < p_star < p_2, for
@@ -264,7 +265,7 @@ namespace ryujin
   Number RiemannSolver<dim, Number>::compute(
       const state_type &U_i,
       const state_type &U_j,
-      const dealii::Tensor<1, dim, Number> &n_ij)
+      const dealii::Tensor<1, dim, Number> &n_ij) const
   {
     const auto riemann_data_i =
         riemann_data_from_state(hyperbolic_system, U_i, n_ij);

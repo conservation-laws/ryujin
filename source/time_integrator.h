@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2020 - 2021 by the ryujin authors
+// Copyright (C) 2020 - 2022 by the ryujin authors
 //
 
 #pragma once
@@ -112,9 +112,8 @@ namespace ryujin
     /**
      * @copydoc HyperbolicSystem::problem_dimension
      */
-    // clang-format off
-    static constexpr unsigned int problem_dimension = HyperbolicSystem::problem_dimension<dim>;
-    // clang-format on
+    static constexpr unsigned int problem_dimension =
+        HyperbolicSystem::problem_dimension<dim>;
 
     /**
      * Typedef for a MultiComponentVector storing the state U.
@@ -124,11 +123,12 @@ namespace ryujin
     /**
      * Constructor.
      */
-    TimeIntegrator(const MPI_Comm &mpi_communicator,
-                   std::map<std::string, dealii::Timer> &computing_timer,
-                   const ryujin::OfflineData<dim, Number> &offline_data,
-                   const ryujin::HyperbolicModule<dim, Number> &hyperbolic_module,
-                   const std::string &subsection = "TimeIntegrator");
+    TimeIntegrator(
+        const MPI_Comm &mpi_communicator,
+        std::map<std::string, dealii::Timer> &computing_timer,
+        const ryujin::OfflineData<dim, Number> &offline_data,
+        const ryujin::HyperbolicModule<dim, Number> &hyperbolic_module,
+        const std::string &subsection = "TimeIntegrator");
 
     /**
      * Prepare time integration. A call to @ref prepare() allocates

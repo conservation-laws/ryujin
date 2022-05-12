@@ -1,0 +1,174 @@
+subsection A - TimeLoop
+  set basename                     = cylinder
+
+  set enable checkpointing         = false
+  set enable output full           = false
+  set enable output levelsets      = false
+  set enable compute quantities    = false
+  set enable compute error         = false
+
+  set final time                   = 5.00
+  set output granularity           = 0.01
+
+  set output checkpoint multiplier = 1
+  set output full multiplier       = 1
+  set output levelsets multiplier  = 1
+  set output quantities multiplier = 1
+
+  set refinement timepoints        =
+
+  set terminal update interval     = 10
+
+  set resume                       = false
+end
+
+
+subsection B - Equation
+  set gamma = 1.4
+end
+
+
+subsection C - Discretization
+  set geometry            = cylinder
+
+  set mesh distortion     = 0
+  set mesh refinement     = 5
+  set mesh repartitioning = false
+
+  subsection rectangular domain
+    set position bottom left      = 0, 0
+    set position top right        = 20, 20
+
+    set subdivisions x            = 1
+    set subdivisions y            = 1
+
+    set grading pull back         = x;y
+    set grading push forward      = x;y
+
+    set boundary condition bottom = dirichlet
+    set boundary condition left   = dirichlet
+    set boundary condition right  = dirichlet
+    set boundary condition top    = dirichlet
+  end
+
+  subsection cylinder
+    set height          = 2
+    set length          = 4
+    set object diameter = 0.5
+    set object position = 0.6
+  end
+
+  subsection step
+    set height        = 1
+    set length        = 3
+    set step height   = 0.2
+    set step position = 0.6
+  end
+
+  subsection wall
+    set height        = 1
+    set length        = 3.2
+    set wall position = 0.166667
+  end
+
+  subsection airfoil
+    set airfoil center                      = -0.5, 0
+    set airfoil length                      = 2
+    set airfoil type                        = NASA SC(2) 0714
+    set anisotropic pre refinement airfoil  = 1
+    set anisotropic pre refinement trailing = 3
+    set grading epsilon                     = 0.02
+    set grading epsilon trailing            = 0.01
+    set grading exponent                    = 5.5
+    set height                              = 6
+    set psi center                          = 0.05, 0
+    set psi ratio                           = 0.3
+    set psi samples                         = 100
+    set subdivisions z                      = 2
+    set width                               = 1
+  end
+end
+
+
+subsection E - InitialValues
+  set configuration = uniform
+
+  set direction     = 1, 0
+  set position      = 1, 0
+
+  set perturbation  = 0
+
+  subsection uniform
+    set primitive state = 1.4, 3, 1
+  end
+
+  subsection ramp up
+    set primitive state initial = 1.4, 0, 1
+    set primitive state final   = 1.4, 3, 1
+    set time initial            = 0
+    set time final              = 1
+  end
+
+  subsection contrast
+    set primitive state left  = 1.4, 0, 1
+    set primitive state right = 1.4, 0, 1
+  end
+
+  subsection shockfront
+    set mach number     = 2
+    set primitive state = 1.4, 0, 1
+  end
+
+  subsection isentropic vortex
+    set beta        = 5
+    set mach number = 2
+  end
+
+  subsection becker solution
+    set density left            = 1
+    set mu                      = 0.01
+    set velocity galilean frame = 0.2
+    set velocity left           = 1
+    set velocity right          = 0.259259
+  end
+end
+
+
+subsection F - HyperbolicModule
+  set cfl with boundary dofs        = false
+
+  set limiter iterations            = 2
+  set limiter newton max iterations = 2
+  set limiter newton tolerance      = 1e-10
+end
+
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.45
+  set cfl max               = 0.9
+  set cfl recovery strategy = bang bang control
+
+  set time stepping scheme  = erk 33
+end
+
+
+subsection I - VTUOutput
+  set manifolds                  =
+  set use mpi io                 = true
+
+  set vtu output quantities      = rho, m_1, m_2, E
+
+  set schlieren quantities       = rho
+  set vorticity quantities       =
+  set schlieren beta             = 10
+  set schlieren recompute bounds = true
+end
+
+
+subsection J - Quantities
+  set boundary manifolds           =
+
+  set interior manifolds           =
+
+  set clear statistics on writeout = true
+end

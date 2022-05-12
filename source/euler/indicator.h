@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2020 - 2021 by the ryujin authors
+// Copyright (C) 2020 - 2022 by the ryujin authors
 //
 
 #pragma once
@@ -62,9 +62,8 @@ namespace ryujin
     /**
      * @copydoc HyperbolicSystem::problem_dimension
      */
-    // clang-format off
-    static constexpr unsigned int problem_dimension = HyperbolicSystem::problem_dimension<dim>;
-    // clang-format on
+    static constexpr unsigned int problem_dimension =
+        HyperbolicSystem::problem_dimension<dim>;
 
     /**
      * @copydoc HyperbolicSystem::state_type
@@ -81,6 +80,29 @@ namespace ryujin
      */
     using ScalarNumber = typename get_value_type<Number>::type;
 
+    /**
+     * @name Precomputation of indicator quantities
+     */
+    //@{
+
+    /**
+     * The number of precomputed values.
+     */
+    static constexpr unsigned int n_precomputed_values = 1;
+
+    /**
+     * Array type used for precomputed values.
+     */
+    using precomputed_type = std::array<Number, n_precomputed_values>;
+
+    /**
+     * Precomputed values for a given state.
+     */
+    static precomputed_type
+    precompute_values(const HyperbolicSystem &hyperbolic_system,
+                      const state_type &U);
+
+    //@}
     /**
      * @name Stencil-based computation of indicators
      *
@@ -99,23 +121,6 @@ namespace ryujin
      * ```
      */
     //@{
-
-    /**
-     * The number of precomputed values.
-     */
-    static constexpr unsigned int n_precomputed_values = 1;
-
-    /**
-     * Array type used for precomputed values.
-     */
-    using PrecomputedValues = std::array<Number, n_precomputed_values>;
-
-    /**
-     * Precomputed values for a given state.
-     */
-    static PrecomputedValues
-    precompute_values(const HyperbolicSystem &hyperbolic_system,
-                      const state_type &U);
 
     /**
      * Constructor taking a HyperbolicSystem instance as argument
@@ -173,12 +178,11 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline
-      typename Indicator<dim, Number>::PrecomputedValues
-      Indicator<dim, Number>::precompute_values(
-          const HyperbolicSystem &hyperbolic_system, const state_type &U_i)
+  DEAL_II_ALWAYS_INLINE inline typename Indicator<dim, Number>::precomputed_type
+  Indicator<dim, Number>::precompute_values(
+      const HyperbolicSystem &hyperbolic_system, const state_type &U_i)
   {
-    PrecomputedValues result;
+    precomputed_type result;
     result[0] = hyperbolic_system.harten_entropy(U_i);
     return result;
   }
@@ -191,7 +195,7 @@ namespace ryujin
     /* entropy viscosity commutator: */
 
     const auto &[harten_entropy] =
-        precomputed_values.template get_tensor<Number, PrecomputedValues>(i);
+        precomputed_values.template get_tensor<Number, precomputed_type>(i);
 
     const auto rho_i = hyperbolic_system.density(U_i);
     rho_i_inverse = Number(1.) / rho_i;
@@ -215,7 +219,7 @@ namespace ryujin
     /* entropy viscosity commutator: */
 
     const auto &[eta_j] =
-        precomputed_values.template get_tensor<Number, PrecomputedValues>(js);
+        precomputed_values.template get_tensor<Number, precomputed_type>(js);
 
     const auto rho_j = hyperbolic_system.density(U_j);
     const auto rho_j_inverse = Number(1.) / rho_j;

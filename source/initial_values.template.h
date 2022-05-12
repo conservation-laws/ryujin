@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2020 - 2021 by the ryujin authors
+// Copyright (C) 2020 - 2022 by the ryujin authors
 //
 
 #pragma once
@@ -90,7 +90,7 @@ namespace ryujin
       }
 
       /* Roll second component of initial_direction onto x-axis: */
-      {
+      if constexpr (dim >= 2) {
         auto n_x = initial_direction[0];
         auto n_y = initial_direction[1];
         const auto norm = std::sqrt(n_x * n_x + n_y * n_y);
@@ -116,7 +116,7 @@ namespace ryujin
     affine_transform_vector(const dealii::Tensor<1, dim> initial_direction,
                             dealii::Tensor<1, dim, Number> direction)
     {
-      {
+      if constexpr (dim >= 2) {
         auto n_x = initial_direction[0];
         auto n_y = initial_direction[1];
         const auto norm = std::sqrt(n_x * n_x + n_y * n_y);
@@ -152,8 +152,6 @@ namespace ryujin
   template <int dim, typename Number>
   void InitialValues<dim, Number>::parse_parameters_callback()
   {
-    constexpr auto problem_dimension = HyperbolicSystem::problem_dimension<dim>;
-
     /* First, let's normalize the direction: */
 
     AssertThrow(
@@ -177,6 +175,12 @@ namespace ryujin
                   return affine_transform_vector(initial_direction_, momentum);
                 });
             return state;
+          };
+
+          flux_contributions_ = [this, &it](const dealii::Point<dim> &point) {
+            const auto transformed_point =
+                affine_transform(initial_direction_, initial_position_, point);
+            return it->compute_flux_contributions(transformed_point);
           };
           initialized = true;
           break;
@@ -210,8 +214,7 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  typename InitialValues<dim, Number>::vector_type
-  InitialValues<dim, Number>::interpolate(Number t)
+  auto InitialValues<dim, Number>::interpolate(Number t) const -> vector_type
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "InitialValues<dim, Number>::interpolate(t = " << t << ")"
@@ -220,8 +223,6 @@ namespace ryujin
 
     vector_type U;
     U.reinit(offline_data_->vector_partitioner());
-
-    constexpr auto problem_dimension = HyperbolicSystem::problem_dimension<dim>;
 
     using scalar_type = typename OfflineData<dim, Number>::scalar_type;
 
@@ -238,15 +239,15 @@ namespace ryujin
       U.insert_component(temp, d);
     }
 
-    const auto &boundary_map = offline_data_->boundary_map();
-    const unsigned int n_owned = offline_data_->n_locally_owned();
-
     /*
      * Cosmetic fix up: Ensure that the initial state is compatible with
      * slip and no_slip boundary conditions. This ensures that nothing is
      * ever transported out of slip and no slip boundaries - even if
      * initial conditions happen to be set incorrectly.
      */
+
+    const auto &boundary_map = offline_data_->boundary_map();
+    const unsigned int n_owned = offline_data_->n_locally_owned();
 
     for (auto entry : boundary_map) {
       const auto i = entry.first;
@@ -266,6 +267,37 @@ namespace ryujin
 
     U.update_ghost_values();
     return U;
+  }
+
+
+  template <int dim, typename Number>
+  auto InitialValues<dim, Number>::interpolate_flux_contributions() const
+      -> MultiComponentVector<Number, n_precomputed_values>
+  {
+    const auto scalar_partitioner = offline_data_->scalar_partitioner();
+
+    MultiComponentVector<Number, n_precomputed_values> precomputed;
+    precomputed.reinit_with_scalar_partitioner(scalar_partitioner);
+
+    if constexpr (n_precomputed_values == 0)
+      return precomputed;
+
+    using scalar_type = typename OfflineData<dim, Number>::scalar_type;
+
+    const auto callable = [&](const auto &p) { return flux_contributions(p); };
+
+    scalar_type temp;
+    temp.reinit(scalar_partitioner);
+
+    for (unsigned int d = 0; d < n_precomputed_values; ++d) {
+      VectorTools::interpolate(offline_data_->dof_handler(),
+                               to_function<dim, Number>(callable, d),
+                               temp);
+      precomputed.insert_component(temp, d);
+    }
+
+    precomputed.update_ghost_values();
+    return precomputed;
   }
 
 } /* namespace ryujin */

@@ -1,24 +1,12 @@
 //
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2020 - 2021 by the ryujin authors
+// Copyright (C) 2020 - 2022 by the ryujin authors
 //
 
 #pragma once
 
-#include <compile_time_options.h>
-
 #include "cubic_spline.h"
-#include "geometry.h"
 #include "transfinite_interpolation.template.h"
-
-#include <deal.II/fe/fe_system.h>
-#include <deal.II/grid/grid_generator.h>
-#include <deal.II/grid/grid_in.h>
-#include <deal.II/grid/grid_out.h>
-#include <deal.II/grid/grid_tools.h>
-#include <deal.II/grid/manifold_lib.h>
-#include <deal.II/grid/tensor_product_manifold.h>
-#include <deal.II/grid/tria.h>
 
 namespace ryujin
 {
@@ -729,12 +717,7 @@ namespace ryujin
 
   } // namespace
 
-  /**
-   * A namespace for a number of benchmark geometries and dealii::GridIn
-   * wrappers.
-   *
-   * @ingroup Mesh
-   */
+
   namespace Geometries
   {
     /**
@@ -1217,7 +1200,11 @@ namespace ryujin
          * Runtime parameters: width_, subdivisions_z_ (for dim == 3)
          */
 
-        if constexpr (dim == 2) {
+        if constexpr (dim == 1) {
+          AssertThrow(false, dealii::ExcNotImplemented());
+          __builtin_trap();
+
+        } else if constexpr (dim == 2) {
           /* Flatten manifold: */
           dealii::Triangulation<2> tria3;
           tria3.set_mesh_smoothing(triangulation.get_mesh_smoothing());
@@ -1255,8 +1242,11 @@ namespace ryujin
         /*
          * Reattach manifolds:
          */
+        if constexpr (dim == 1) {
+          AssertThrow(false, dealii::ExcNotImplemented());
+          __builtin_trap();
 
-        if constexpr (dim == 2) {
+        } else if constexpr (dim == 2) {
           unsigned int index = 10;
           for (const auto &manifold : manifolds)
             triangulation.set_manifold(index++, *manifold);
@@ -1360,7 +1350,5 @@ namespace ryujin
       unsigned int n_anisotropic_refinements_trailing_;
       unsigned int subdivisions_z_;
     };
-
   } /* namespace Geometries */
-
 } /* namespace ryujin */

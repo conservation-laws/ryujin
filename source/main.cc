@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2020 - 2021 by the ryujin authors
+// Copyright (C) 2020 - 2022 by the ryujin authors
 //
 
 #include <compile_time_options.h>
@@ -13,6 +13,7 @@
 
 #include <omp.h>
 
+#include <filesystem>
 #include <fstream>
 
 int main(int argc, char *argv[])
@@ -50,8 +51,9 @@ int main(int argc, char *argv[])
       dealii::ExcMessage("Invalid number of parameters. At most one argument "
                          "supported which has to be a parameter file"));
 
+  const auto executable_name = std::filesystem::path(argv[0]).filename();
   dealii::ParameterAcceptor::initialize(
-      argc == 2 ? argv[1] : std::string(EXECUTABLE_NAME) + ".prm");
+      argc == 2 ? argv[1] : std::string(executable_name) + ".prm");
 
   time_loop.run();
 

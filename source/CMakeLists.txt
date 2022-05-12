@@ -1,6 +1,6 @@
 ##
 ## SPDX-License-Identifier: MIT
-## Copyright (C) 2020 - 2021 by the ryujin authors
+## Copyright (C) 2020 - 2022 by the ryujin authors
 ##
 
 configure_file(
@@ -25,7 +25,7 @@ check_cxx_source_compiles("
   )
 
 #
-# Common and dependent source files:
+# Common and equation-independent source files and target:
 #
 
 set(COMMON_SOURCE_FILES
@@ -36,10 +36,18 @@ set(COMMON_SOURCE_FILES
   sparse_matrix_simd.cc
   )
 
+add_library(obj_common OBJECT ${COMMON_SOURCE_FILES})
+deal_ii_setup_target(obj_common)
+
+#
+# Common, equation-dependent source files:
+#
+
 set(DEPENDENT_SOURCE_FILES
   hyperbolic_module.cc
   initial_values.cc
   main.cc
+  postprocessor.cc
   quantities.cc
   time_integrator.cc
   time_loop.cc
@@ -52,42 +60,18 @@ set_property(SOURCE time_loop.cc APPEND PROPERTY COMPILE_DEFINITIONS
   RYUJIN_GIT_SHORTREV="${GIT_SHORTREV}"
   )
 
-add_library(obj_common OBJECT ${COMMON_SOURCE_FILES})
-deal_ii_setup_target(obj_common)
-
 #
 # Equation-specific source files:
 #
 
-if("${INSTANTIATED_EQUATIONS}" STREQUAL "")
-  set(INSTANTIATED_EQUATIONS
-    "euler"
-    )
-endif()
-
-foreach(EQUATION ${INSTANTIATED_EQUATIONS})
+macro(setup_equation EQUATION)
   # define obj_${EQUATION} object library:
   add_subdirectory(${EQUATION})
 
-  add_library(obj_dependent_${EQUATION} OBJECT ${DEPENDENT_SOURCE_FILES})
-  target_include_directories(obj_dependent_${EQUATION} PRIVATE
-      ${CMAKE_CURRENT_SOURCE_DIR}/${EQUATION}
-    )
-  target_compile_definitions(obj_dependent_${EQUATION}
-    PRIVATE EXECUTABLE_NAME="${EQUATION}"
-    )
-  deal_ii_setup_target(obj_dependent_${EQUATION})
-
-  add_executable(${EQUATION}
-    $<TARGET_OBJECTS:obj_common>
-    $<TARGET_OBJECTS:obj_dependent_${EQUATION}>
-    $<TARGET_OBJECTS:obj_${EQUATION}>
-    )
+  add_executable(${EQUATION} ${DEPENDENT_SOURCE_FILES})
   deal_ii_setup_target(${EQUATION})
-  target_link_libraries(${EQUATION} ${OpenMP_CXX_LIBRARIES})
-
-  set_property(TARGET ${EQUATION}
-    PROPERTY RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/run
+  target_link_libraries(${EQUATION}
+    obj_common obj_${EQUATION} ${OpenMP_CXX_LIBRARIES}
     )
 
   if(LIKWID_PERFMON)
@@ -99,7 +83,25 @@ foreach(EQUATION ${INSTANTIATED_EQUATIONS})
     target_link_libraries(${EQUATION} stdc++fs)
   endif()
 
-  install(TARGETS ${EQUATION}
-    DESTINATION ${CMAKE_INSTALL_BINDIR}
+  set_target_properties(${EQUATION} PROPERTIES
+    RUNTIME_OUTPUT_NAME "ryujin-${DIM}d-${EQUATION}"
     )
-endforeach()
+
+  add_custom_command(
+    OUTPUT "${CMAKE_BINARY_DIR}/run/${EQUATION}/ryujin"
+    COMMAND ${CMAKE_COMMAND} -E create_symlink $<TARGET_FILE:${EQUATION}>
+      "${CMAKE_BINARY_DIR}/run/${EQUATION}/ryujin"
+      )
+
+  add_custom_target(symlink_${EQUATION} ALL
+    DEPENDS ${EQUATION} "${CMAKE_BINARY_DIR}/run/${EQUATION}/ryujin"
+    COMMENT "updating ${EQUATION} symlink"
+    )
+
+  install(TARGETS ${EQUATION} DESTINATION ${CMAKE_INSTALL_BINDIR})
+endmacro()
+
+setup_equation("euler")
+if(NOT "${DIM}" EQUAL "3")
+  setup_equation("shallow_water")
+endif()

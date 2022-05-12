@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2020 - 2021 by the ryujin authors
+// Copyright (C) 2020 - 2022 by the ryujin authors
 //
 
 #pragma once
@@ -42,9 +42,8 @@ namespace ryujin
     /**
      * @copydoc HyperbolicSystem::problem_dimension
      */
-    // clang-format off
-    static constexpr unsigned int problem_dimension = HyperbolicSystem::problem_dimension<dim>;
-    // clang-format on
+    static constexpr unsigned int problem_dimension =
+        HyperbolicSystem::problem_dimension<dim>;
 
     /**
      * @copydoc HyperbolicSystem::state_type
@@ -55,6 +54,17 @@ namespace ryujin
      * Typedef for a MultiComponentVector storing the state U.
      */
     using vector_type = MultiComponentVector<Number, problem_dimension>;
+
+    /**
+     * @copydoc HyperbolicSystem::n_precomputed_values
+     */
+    static constexpr unsigned int n_precomputed_values =
+        HyperbolicSystem::n_precomputed_values<dim>;
+
+    /**
+     * Array type used for precomputed values.
+     */
+    using precomputed_type = std::array<Number, n_precomputed_values>;
 
     /**
      * Constructor.
@@ -91,7 +101,29 @@ namespace ryujin
      * This routine computes and returns a state vector populated with
      * initial values for a specified time @p t.
      */
-    vector_type interpolate(Number t = 0);
+    vector_type interpolate(Number t = 0) const;
+
+
+    /**
+     * Given a position @p point returns the corresponding (conserved)
+     * initial state. The function is used to interpolate initial values
+     * and enforce Dirichlet boundary conditions. For the latter, the the
+     * function signature has an additional parameter @p t denoting the
+     * current time to allow for time-dependent (in-flow) Dirichlet data.
+     */
+    DEAL_II_ALWAYS_INLINE inline precomputed_type
+    flux_contributions(const dealii::Point<dim> &point) const
+    {
+      return flux_contributions_(point);
+    }
+
+
+    /**
+     * This routine computes and returns a state vector populated with
+     * initial values for a specified time @p t.
+     */
+    MultiComponentVector<Number, n_precomputed_values>
+    interpolate_flux_contributions() const;
 
   private:
     /**
@@ -116,11 +148,15 @@ namespace ryujin
     dealii::SmartPointer<const HyperbolicSystem> hyperbolic_system_;
     dealii::SmartPointer<const OfflineData<dim, Number>> offline_data_;
 
-    std::set<std::unique_ptr<InitialState<dim, Number, HyperbolicSystem>>>
+    std::set<std::unique_ptr<
+        InitialState<dim, Number, state_type, n_precomputed_values>>>
         initial_state_list_;
 
     std::function<state_type(const dealii::Point<dim> &point, Number t)>
         initial_state_;
+
+    std::function<precomputed_type(const dealii::Point<dim> &point)>
+        flux_contributions_;
 
     //@}
   };

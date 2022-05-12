@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2020 - 2021 by the ryujin authors
+// Copyright (C) 2020 - 2022 by the ryujin authors
 //
 
 #pragma once
@@ -18,7 +18,7 @@ namespace ryujin
    * The convex limiter.
    *
    * The class implements a convex limiting technique as described in
-   * @cite GuermondEtAl2018 and @cite ryujin-2021-1. Given a
+   * @cite GuermondEtAl2018 and @cite ryujin-2022-1. Given a
    * computed set of bounds and an update direction \f$\mathbf P_{ij}\f$
    * one can now determine a candidate \f$\tilde l_{ij}\f$ by computing
    *
@@ -30,7 +30,7 @@ namespace ryujin
    *   \phi_{\text{min}}\,\le\,\phi\,(\mathbf U_{i}+\tilde l_{ij}\mathbf
    * P_{ij})\Big\}, \f}
    *
-   * where \f$\psi\f$ denots the specific entropy @cite ryujin-2021-1.
+   * where \f$\psi\f$ denots the specific entropy @cite ryujin-2022-1.
    *
    * Algorithmically this is accomplished as follows: Given an initial
    * interval \f$[t_L,t_R]\f$, where \f$t_L\f$ is a good state, we first
@@ -51,9 +51,8 @@ namespace ryujin
     /**
      * @copydoc HyperbolicSystem::problem_dimension
      */
-    // clang-format off
-    static constexpr unsigned int problem_dimension = HyperbolicSystem::problem_dimension<dim>;
-    // clang-format on
+    static constexpr unsigned int problem_dimension =
+        HyperbolicSystem::problem_dimension<dim>;
 
     /**
      * @copydoc HyperbolicSystem::state_type
@@ -61,10 +60,38 @@ namespace ryujin
     using state_type = HyperbolicSystem::state_type<dim, Number>;
 
     /**
+     * @copydoc HyperbolicSystem::prec_type
+     */
+    using prec_type = HyperbolicSystem::prec_type<dim, Number>;
+
+    /**
      * @copydoc HyperbolicSystem::ScalarNumber
      */
     using ScalarNumber = typename get_value_type<Number>::type;
 
+    /**
+     * @name Precomputation of indicator quantities
+     */
+    //@{
+
+    /**
+     * The number of precomputed values.
+     */
+    static constexpr unsigned int n_precomputed_values = 1;
+
+    /**
+     * Array type used for precomputed values.
+     */
+    using precomputed_type = std::array<Number, n_precomputed_values>;
+
+    /**
+     * Precomputed values for a given state.
+     */
+    static precomputed_type
+    precompute_values(const HyperbolicSystem &hyperbolic_system,
+                      const state_type &U);
+
+    //@}
     /**
      * @name Stencil-based computation of bounds
      *
@@ -76,9 +103,9 @@ namespace ryujin
      *   limiter.reset(i, U_i);
      *   for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
      *     // ...
-     *     limiter.accumulate(js, U_j, U_ij_bar, beta_ij);
+     *     limiter.accumulate(js, U_i, U_j, pre_i, pre_j, scaled_c_ij, beta_ij);
      *   }
-     *   limiter.apply_relaxation(hd_i);
+     *   limiter.apply_relaxation(hd_i, limiter_relaxation_factor_);
      *   limiter.bounds();
      * }
      * ```
@@ -94,23 +121,6 @@ namespace ryujin
      * Array type used to store accumulated bounds.
      */
     using Bounds = std::array<Number, n_bounds>;
-
-    /**
-     * The number of precomputed values.
-     */
-    static constexpr unsigned int n_precomputed_values = 1;
-
-    /**
-     * Array type used for precomputed values.
-     */
-    using PrecomputedValues = std::array<Number, n_precomputed_values>;
-
-    /**
-     * Precomputed values for a given state.
-     */
-    static PrecomputedValues
-    precompute_values(const HyperbolicSystem &hyperbolic_system,
-                      const state_type &U);
 
     /**
      * Constructor taking a HyperbolicSystem instance as argument
@@ -135,13 +145,16 @@ namespace ryujin
     void accumulate(const unsigned int *js,
                     const state_type &U_i,
                     const state_type &U_j,
+                    const prec_type &prec_i,
+                    const prec_type &prec_j,
                     const dealii::Tensor<1, dim, Number> &scaled_c_ij,
                     const Number beta_ij);
 
     /**
      * Apply relaxation.
      */
-    void apply_relaxation(const Number hd_i);
+    void apply_relaxation(const Number hd_i,
+                          const ScalarNumber factor = ScalarNumber(2.));
 
     /**
      * Return the computed bounds.
@@ -205,11 +218,11 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline typename Limiter<dim, Number>::PrecomputedValues
+  DEAL_II_ALWAYS_INLINE inline typename Limiter<dim, Number>::precomputed_type
   Limiter<dim, Number>::precompute_values(
       const HyperbolicSystem &hyperbolic_system, const state_type &U_i)
   {
-    PrecomputedValues result;
+    precomputed_type result;
     result[0] = hyperbolic_system.specific_entropy(U_i);
     return result;
   }
@@ -226,7 +239,7 @@ namespace ryujin
     rho_max = Number(0.);
 
     const auto &[specific_entropy] =
-        precomputed_values.template get_tensor<Number, PrecomputedValues>(i);
+        precomputed_values.template get_tensor<Number, precomputed_type>(i);
 
     s_min = specific_entropy;
 
@@ -243,6 +256,8 @@ namespace ryujin
       const unsigned int *js,
       const state_type &U_i,
       const state_type &U_j,
+      const prec_type & /*prec_i*/,
+      const prec_type & /*prec_j*/,
       const dealii::Tensor<1, dim, Number> &scaled_c_ij,
       const Number beta_ij)
   {
@@ -255,13 +270,12 @@ namespace ryujin
     const auto rho_j = hyperbolic_system.density(U_j);
     const auto m_j = hyperbolic_system.momentum(U_j);
     const auto rho_ij_bar =
-        ScalarNumber(0.5) *
-        (rho_i + rho_j + (m_i - m_j) * scaled_c_ij);
+        ScalarNumber(0.5) * (rho_i + rho_j + (m_i - m_j) * scaled_c_ij);
     rho_min = std::min(rho_min, rho_ij_bar);
     rho_max = std::max(rho_max, rho_ij_bar);
 
     const auto &[specific_entropy_j] =
-        precomputed_values.template get_tensor<Number, PrecomputedValues>(js);
+        precomputed_values.template get_tensor<Number, precomputed_type>(js);
     s_min = std::min(s_min, specific_entropy_j);
 
     /* Relaxation: */
@@ -277,14 +291,18 @@ namespace ryujin
 
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline void
-  Limiter<dim, Number>::apply_relaxation(Number hd_i)
+  Limiter<dim, Number>::apply_relaxation(Number hd_i, ScalarNumber factor)
   {
     auto &[rho_min, rho_max, s_min] = bounds_;
 
-    constexpr unsigned int relaxation_order_ = 3;
-    const Number r_i =
-        Number(2.) * dealii::Utilities::fixed_power<relaxation_order_>(
-                         std::sqrt(std::sqrt(hd_i)));
+    /* Use r_i = factor * (m_i / |Omega|) ^ (1.5 / d): */
+
+    Number r_i = std::sqrt(hd_i);                              // in 3D: ^ 3/6
+    if constexpr (dim == 2)                                    //
+      r_i = dealii::Utilities::fixed_power<3>(std::sqrt(r_i)); // in 2D: ^ 3/4
+    else if constexpr (dim == 1)                               //
+      r_i = dealii::Utilities::fixed_power<3>(r_i);            // in 1D: ^ 3/2
+    r_i *= factor;
 
     constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
     const Number rho_relaxation =

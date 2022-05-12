@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2020 - 2021 by the ryujin authors
+// Copyright (C) 2020 - 2022 by the ryujin authors
 //
 
 #pragma once
@@ -9,9 +9,11 @@
 
 #include "convenience_macros.h"
 #include "geometry.h"
+#include "patterns_conversion.h"
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/quadrature.h>
+#include <deal.II/distributed/shared_tria.h>
 #include <deal.II/distributed/tria.h>
 #include <deal.II/fe/fe.h>
 #include <deal.II/fe/mapping.h>
@@ -102,6 +104,43 @@ namespace ryujin
      */
     dynamic = 5,
   };
+} // namespace ryujin
+
+#ifndef DOXYGEN
+DECLARE_ENUM(ryujin::Boundary,
+             LIST({ryujin::Boundary::do_nothing, "do_nothing"},
+                  {ryujin::Boundary::periodic, "periodic"},
+                  {ryujin::Boundary::slip, "slip"},
+                  {ryujin::Boundary::no_slip, "no_slip"},
+                  {ryujin::Boundary::dirichlet, "dirichlet"},
+                  {ryujin::Boundary::dynamic, "dynamic"}));
+#endif
+
+namespace ryujin
+{
+  namespace
+  {
+    template <int dim>
+    struct Proxy {
+      using Triangulation = dealii::parallel::distributed::Triangulation<dim>;
+    };
+
+    template <>
+    struct Proxy<1> {
+      using Triangulation = dealii::parallel::shared::Triangulation<1>;
+    };
+
+  } // namespace
+
+  /**
+   * A templated constexpr boolean that is true if we use a parallel
+   * distributed triangulation (for the specified dimension).
+   */
+  template <int dim>
+  constexpr bool have_distributed_triangulation =
+      std::is_same<typename Discretization<dim>::Triangulation,
+                   dealii::parallel::distributed::Triangulation<dim>>::value;
+
 
   /**
    * This class is as a container for data related to the discretization,
@@ -123,12 +162,15 @@ namespace ryujin
   {
   public:
     /**
-     * A typdef for the deal.II triangulation that is used by this class.
-     * Depending on use case possible values are
-     * dealii::parallel::distributed::Triangulation and
-     * dealii::parallel::fullydistributed::Triangulation.
+     * A type alias denoting the Triangulation we are using:
+     *
+     * In one spatial dimensions we use a
+     * dealii::parallel::shared::Triangulation and for two and three
+     * dimensions a dealii::parallel::distributed::Triangulation.
      */
-    using Triangulation = dealii::parallel::distributed::Triangulation<dim>;
+    using Triangulation = typename Proxy<dim>::Triangulation;
+
+    static_assert(dim == 1 || have_distributed_triangulation<dim>);
 
     /**
      * Constructor.
@@ -233,5 +275,4 @@ namespace ryujin
 
     //@}
   };
-
 } /* namespace ryujin */

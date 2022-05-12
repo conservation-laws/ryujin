@@ -1,0 +1,115 @@
+//
+// SPDX-License-Identifier: MIT
+// Copyright (C) 2020 - 2022 by the ryujin authors
+//
+
+#pragma once
+
+namespace ryujin
+{
+  namespace InitialStateLibrary
+  {
+    /**
+     * Flow over a bump with a hydraulic jump.
+     * See: Sec.~7.2 in @cite GuermondEtAl2018SW.
+     *
+     * @ingroup InitialValues
+     */
+    template <int dim, typename Number, typename state_type>
+    class FlowOverBump : public InitialState<dim, Number, state_type, 1>
+    {
+    public:
+      FlowOverBump(const HyperbolicSystem &hyperbolic_system,
+                   const std::string subsec)
+          : InitialState<dim, Number, state_type, 1>("flow over bump", subsec)
+          , hyperbolic_system(hyperbolic_system)
+      {
+        which_case_ = "transcritical";
+        this->add_parameter("flow type",
+                            which_case_,
+                            "Either 'transcritical' flow with shock "
+                            "or 'subsonic' flow.");
+      }
+
+      virtual state_type compute(const dealii::Point<dim> &point,
+                                 Number t) final override
+      {
+        const auto x = point[0];
+        const Number g = this->hyperbolic_system.gravity();
+
+        /* Define constants for transcritical flow */
+        const Number xM = 10.;
+        const Number xS = 11.7;
+        const Number zM = 0.2;
+        Number h_inflow = 0.28205279813802181;
+        Number q_inflow = 0.18;
+        Number cBer = zM + 1.5 * ryujin::pow(q_inflow * q_inflow / g, 1. / 3.);
+
+
+        /* Subsonic flow constants */
+        if (which_case_ == "subsonic") {
+          q_inflow = 4.42;
+          h_inflow = 2.;
+          cBer = std::pow(q_inflow / h_inflow, 2) / (2. * g) + h_inflow;
+        }
+
+        /* General values for Cardano's formula */
+        const Number d = q_inflow * q_inflow / (2. * g);
+        const Number b = compute_bathymetry(point) - cBer;
+        const Number Q = -std::pow(b, 2) / 9.;
+        const Number R = -(27. * d + 2. * std::pow(b, 3)) / 54.;
+        const Number theta = acos(ryujin::pow(-Q, -1.5) * R);
+
+        /* Define initial and exact solution */
+        const Number h_initial = h_inflow - compute_bathymetry(point);
+
+        /* Explicitly return initial state */
+        if (t < 1e-12)
+          return hyperbolic_system.template expand_state<dim>(
+              HyperbolicSystem::state_type<1, Number>{{h_initial, q_inflow}});
+
+        Number h_exact = 2. * std::sqrt(-Q) * cos(theta / 3.) - b / 3.;
+        if (which_case_ == "transcritical") {
+          if (xM <= x && x < xS) {
+            h_exact = 2. * std::sqrt(-Q) *
+                          cos((4. * dealii::numbers::PI + theta) / 3.) -
+                      b / 3.;
+          } else if (xS < x) {
+            h_exact = 0.28205279813802181;
+          }
+        }
+
+        return hyperbolic_system.template expand_state<dim>(
+            HyperbolicSystem::state_type<1, Number>{{h_exact, q_inflow}});
+      }
+
+      virtual auto compute_flux_contributions(const dealii::Point<dim> &point)
+          -> typename InitialState<dim, Number, state_type, 1>::precomputed_type
+          final override
+      {
+        /* Compute bathymetry: */
+        return {compute_bathymetry(point)};
+      }
+
+    private:
+      const HyperbolicSystem &hyperbolic_system;
+
+      DEAL_II_ALWAYS_INLINE
+      inline Number compute_bathymetry(const dealii::Point<dim> &point) const
+      {
+        const auto x = point[0];
+
+        const Number bump = Number(0.2 / 64.) * std::pow(x - Number(8.), 3) *
+                            std::pow(Number(12.) - x, 3);
+
+        Number bath = 0.;
+        if (8. <= x && x <= 12.)
+          bath = bump;
+        return bath;
+      }
+
+      std::string which_case_;
+    };
+
+  } // namespace InitialStateLibrary
+} // namespace ryujin

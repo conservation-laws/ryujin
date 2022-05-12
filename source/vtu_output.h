@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2020 - 2021 by the ryujin authors
+// Copyright (C) 2020 - 2022 by the ryujin authors
 //
 
 #pragma once
@@ -8,9 +8,10 @@
 #include <compile_time_options.h>
 
 #include <hyperbolic_system.h>
-#include <postprocessor.h>
 
+#include "hyperbolic_module.h"
 #include "offline_data.h"
+#include "postprocessor.h"
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/grid/intergrid_map.h>
@@ -35,9 +36,19 @@ namespace ryujin
     /**
      * @copydoc HyperbolicSystem::problem_dimension
      */
-    // clang-format off
-    static constexpr unsigned int problem_dimension = HyperbolicSystem::problem_dimension<dim>;
-    // clang-format on
+    static constexpr unsigned int problem_dimension =
+        HyperbolicSystem::problem_dimension<dim>;
+
+    /**
+     * @copydoc HyperbolicSystem::state_type
+     */
+    using state_type = HyperbolicSystem::state_type<dim, Number>;
+
+    /**
+     * @copydoc HyperbolicSystem::n_precomputed_values
+     */
+    static constexpr unsigned int n_precomputed_values =
+        HyperbolicSystem::n_precomputed_values<dim>;
 
     /**
      * @copydoc OfflineData::scalar_type
@@ -54,6 +65,7 @@ namespace ryujin
      */
     VTUOutput(const MPI_Comm &mpi_communicator,
               const ryujin::OfflineData<dim, Number> &offline_data,
+              const ryujin::HyperbolicModule<dim, Number> &hyperbolic_module,
               const ryujin::Postprocessor<dim, Number> &postprocessor,
               const std::string &subsection = "VTUOutput");
 
@@ -100,6 +112,8 @@ namespace ryujin
 
     std::vector<std::string> manifolds_;
 
+    std::vector<std::string> vtu_output_quantities_;
+
     //@}
     /**
      * @name Internal data
@@ -108,13 +122,17 @@ namespace ryujin
 
     const MPI_Comm &mpi_communicator_;
 
-    dealii::SmartPointer<const ryujin::OfflineData<dim, Number>> offline_data_;
-    dealii::SmartPointer<const ryujin::Postprocessor<dim, Number>>
-        postprocessor_;
+    dealii::SmartPointer<const OfflineData<dim, Number>> offline_data_;
+    dealii::SmartPointer<const HyperbolicModule<dim, Number>>
+        hyperbolic_module_;
+    dealii::SmartPointer<const Postprocessor<dim, Number>> postprocessor_;
 
-    std::future<void> background_thread_status;
+    std::vector<scalar_type> quantities_;
 
-    std::array<scalar_type, problem_dimension> state_vector_;
+    std::vector<std::tuple<std::string /*name*/,
+                           std::function<void(scalar_type & /*result*/,
+                                              const vector_type & /*U*/)>>>
+        quantities_mapping_;
 
     //@}
   };

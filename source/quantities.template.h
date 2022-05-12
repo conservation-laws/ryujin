@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2020 - 2021 by the ryujin authors
+// Copyright (C) 2020 - 2022 by the ryujin authors
 //
 
 #pragma once
@@ -313,8 +313,7 @@ namespace ryujin
     clear_statistics();
 
     /* Prepare header string: */
-    const auto &names =
-        hyperbolic_system_->template primitive_component_names<dim>;
+    const auto &names = HyperbolicSystem::primitive_component_names<dim>;
     header_ =
         std::accumulate(std::begin(names),
                         std::end(names),

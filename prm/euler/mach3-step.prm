@@ -1,0 +1,66 @@
+#
+# A 2D Mach 3 forward-facing step configuration
+#
+
+subsection A - TimeLoop
+  set basename                     = mach3-step
+
+  set enable output full           = true
+
+  set final time                   = 4.00
+  set output granularity           = 0.20
+
+  set output full multiplier       = 1
+end
+
+
+subsection B - Equation
+  set gamma = 1.4
+end
+
+
+subsection C - Discretization
+  set geometry            = step
+
+  set mesh refinement     = 3
+  set mesh repartitioning = false
+
+  subsection step
+    set height        = 1
+    set length        = 3
+    set step height   = 0.2
+    set step position = 0.6
+  end
+end
+
+
+subsection E - InitialValues
+  set configuration = uniform
+
+  set direction     = 1, 0
+  set position      = 1, 0
+
+  set perturbation  = 0
+
+  subsection uniform
+    set primitive state = 1.4, 3, 1
+  end
+end
+
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.45
+  set cfl max               = 0.90
+  set cfl recovery strategy = bang bang control
+
+  set time stepping scheme  = erk 33
+end
+
+
+subsection I - VTUOutput
+  set manifolds      =
+
+  set use mpi io     = true
+
+  set schlieren beta = 10
+end

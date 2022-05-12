@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2020 - 2021 by the ryujin authors
+// Copyright (C) 2020 - 2022 by the ryujin authors
 //
 
 #pragma once
@@ -78,6 +78,12 @@ namespace ryujin
         Tensor<1, problem_dimension<dim>, dealii::Tensor<1, dim, Number>>;
 
     /**
+     * The storage type used for the flux precomputations.
+     */
+    template <int dim, typename Number>
+    using prec_type = flux_type<dim, Number>;
+
+    /**
      * Constructor.
      */
     HyperbolicSystem(const std::string &subsection = "HyperbolicSystem");
@@ -90,6 +96,40 @@ namespace ryujin
      */
     void parse_parameters_callback();
 
+    /**
+     * @name Precomputation of flux quantities
+     */
+    //@{
+
+    /**
+     * The number of precomputed values.
+     */
+    template <int dim>
+    static constexpr unsigned int n_precomputed_values = 0;
+
+    /**
+     * Array type used for precomputed values.
+     */
+    template <int dim, typename Number>
+    using precomputed_type = std::array<Number, n_precomputed_values<dim>>;
+
+    /**
+     * An array holding all component names of the precomputed values.
+     */
+    template <int dim>
+    static const std::array<std::string, n_precomputed_values<dim>>
+        precomputed_names;
+
+    /**
+     * Precomputed values for a given state.
+     */
+    template <typename MultiComponentVector, int problem_dim, typename Number>
+    void
+    precompute_values(MultiComponentVector &precomputed_values,
+                      unsigned int i,
+                      const dealii::Tensor<1, problem_dim, Number> &U) const;
+
+    //@}
     /**
      * @name Computing derived physical quantities.
      */
@@ -117,7 +157,6 @@ namespace ryujin
     template <int problem_dim, typename Number>
     static Number total_energy(const dealii::Tensor<1, problem_dim, Number> &U);
 
-
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
      * and return the internal energy \f$\varepsilon = (\rho e)\f$.
@@ -125,7 +164,6 @@ namespace ryujin
     template <int problem_dim, typename Number>
     static Number
     internal_energy(const dealii::Tensor<1, problem_dim, Number> &U);
-
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
@@ -135,7 +173,6 @@ namespace ryujin
     template <int problem_dim, typename Number>
     static dealii::Tensor<1, problem_dim, Number>
     internal_energy_derivative(const dealii::Tensor<1, problem_dim, Number> &U);
-
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
@@ -153,7 +190,6 @@ namespace ryujin
     template <int problem_dim, typename Number>
     Number pressure(const dealii::Tensor<1, problem_dim, Number> &U) const;
 
-
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
      * the (physical) speed of sound:
@@ -164,7 +200,6 @@ namespace ryujin
     template <int problem_dim, typename Number>
     Number
     speed_of_sound(const dealii::Tensor<1, problem_dim, Number> &U) const;
-
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
@@ -178,7 +213,6 @@ namespace ryujin
     Number
     specific_entropy(const dealii::Tensor<1, problem_dim, Number> &U) const;
 
-
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
      * and return the Harten-type entropy
@@ -189,7 +223,6 @@ namespace ryujin
     template <int problem_dim, typename Number>
     Number
     harten_entropy(const dealii::Tensor<1, problem_dim, Number> &U) const;
-
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
@@ -202,7 +235,6 @@ namespace ryujin
     dealii::Tensor<1, problem_dim, Number> harten_entropy_derivative(
         const dealii::Tensor<1, problem_dim, Number> &U) const;
 
-
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
      * and return the entropy \f$\eta = p^{1/\gamma}\f$.
@@ -210,7 +242,6 @@ namespace ryujin
     template <int problem_dim, typename Number>
     Number
     mathematical_entropy(const dealii::Tensor<1, problem_dim, Number> U) const;
-
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
@@ -277,18 +308,17 @@ namespace ryujin
      *    versus inflow).
      */
     template <int problem_dim, typename Number, typename Lambda>
-    dealii::Tensor<1, problem_dim, Number>
-    apply_boundary_conditions(dealii::types::boundary_id id,
-                              dealii::Tensor<1, problem_dim, Number> U,
-                              const dealii::Tensor<1, problem_dim - 2> &normal,
-                              Lambda get_dirichlet_data) const;
+    dealii::Tensor<1, problem_dim, Number> apply_boundary_conditions(
+        dealii::types::boundary_id id,
+        dealii::Tensor<1, problem_dim, Number> U,
+        const dealii::Tensor<1, problem_dim - 2, Number> &normal,
+        Lambda get_dirichlet_data) const;
 
     //@}
     /**
      * @name Computing fluxes.
      */
     //@{
-
 
     /**
      * Given a state @p U compute the flux
@@ -300,9 +330,111 @@ namespace ryujin
      * \end{pmatrix},
      * \f]
      */
-    template <int problem_dim, typename Number>
-    flux_type<problem_dim - 2, Number>
-    f(const dealii::Tensor<1, problem_dim, Number> &U) const;
+    template <typename ST,
+              int dim = ST::dimension - 2,
+              typename T = typename ST::value_type>
+    flux_type<dim, T> f(const ST &U) const;
+
+    /**
+     * Given a state @p U_i and an index @p i compute flux contributions.
+     *
+     * Intended usage:
+     * ```
+     * Indicator<dim, Number> indicator;
+     * for (unsigned int i = n_internal; i < n_owned; ++i) {
+     *   // ...
+     *   const auto prec_i = flux_contribution(precomputed..., i, U_i);
+     *   for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
+     *     // ...
+     *     const auto prec_j = flux_contribution(precomputed..., js, U_j);
+     *     const auto flux_ij = flux(prec_i, prec_j);
+     *   }
+     * }
+     * ```
+     *
+     * For the Euler equations we simply compute <code>f(U_i)</code>.
+     */
+    template <typename MultiComponentVector,
+              typename ST,
+              int dim = ST::dimension - 2,
+              typename T = typename ST::value_type>
+    prec_type<dim, T>
+    flux_contribution(const MultiComponentVector &precomputed_values,
+                      const unsigned int i,
+                      const ST &U_i) const;
+
+    template <typename MultiComponentVector,
+              typename ST,
+              int dim = ST::dimension - 2,
+              typename T = typename ST::value_type>
+    prec_type<dim, T>
+    flux_contribution(const MultiComponentVector &precomputed_values,
+                      const unsigned int *js,
+                      const ST &U_j) const;
+
+    /**
+     * Given flux contributions @p prec_i and @p prec_j compute the flux
+     * <code>(f(U_i) + f(U_j)</code>
+     */
+    template <typename FT, int dim = FT::dimension - 2>
+    FT flux(const FT &prec_i, const FT &prec_j) const;
+
+    /**
+     * The low-order and high-order fluxes are the same:
+     */
+    static constexpr bool have_high_order_flux = false;
+
+    template <typename FT, int dim = FT::dimension - 2>
+    FT high_order_flux(const FT &, const FT &) const = delete;
+
+    /** We do not perform state equilibration */
+    static constexpr bool have_equilibrated_states = false;
+
+    template <typename FT,
+              int dim = FT::dimension - 2,
+              typename TT = typename FT::value_type,
+              typename T = typename TT::value_type>
+    std::array<state_type<dim, T>, 2>
+    equilibrated_states(const FT &prec_i, const FT &prec_j) = delete;
+
+    //@}
+    /**
+     * @name Computing stencil source terms
+     */
+    //@{
+
+    /** We do not have source terms */
+    static constexpr bool have_source_terms = false;
+
+    template <typename MultiComponentVector, typename ST>
+    ST low_order_nodal_source(const MultiComponentVector &,
+                              const unsigned int,
+                              const ST &) const = delete;
+
+    template <typename MultiComponentVector, typename ST>
+    ST high_order_nodal_source(const MultiComponentVector &,
+                               const unsigned int i,
+                               const ST &) const = delete;
+
+    template <typename FT,
+              int dim = FT::dimension - 2,
+              typename TT = typename FT::value_type,
+              typename T = typename TT::value_type>
+    state_type<dim, T>
+    low_order_stencil_source(const FT &,
+                             const FT &,
+                             const dealii::Tensor<1, dim, T> &,
+                             const T) const = delete;
+
+    template <typename FT,
+              int dim = FT::dimension - 2,
+              typename TT = typename FT::value_type,
+              typename T = typename TT::value_type>
+    state_type<dim, T>
+    high_order_stencil_source(const FT &,
+                              const FT &,
+                              const dealii::Tensor<1, dim, T> &,
+                              const T) const = delete;
 
     //@}
     /**
@@ -315,17 +447,17 @@ namespace ryujin
      * Given a state vector associated with @ref dim2 spatial dimensions
      * return an "expanded" version of the state vector associated with
      * @ref dim1 spatial dimensions where the momentum vector is projected
-     * onto the first @ref dim2 unit directions of the @ref dim1
-     * dimensional euclidean space.
+     * onto the first @ref dim2 unit directions of the @ref dim dimensional
+     * euclidean space.
      *
-     * @precondition dim1 has to be larger or equal than dim2.
+     * @precondition dim has to be larger or equal than dim2.
      */
-    template <int dim1,
-              int prob_dim2,
-              typename Number,
-              typename = typename std::enable_if<(dim1 + 2 >= prob_dim2)>::type>
-    state_type<dim1, Number>
-    expand_state(const dealii::Tensor<1, prob_dim2, Number> &state) const;
+    template <int dim,
+              typename ST,
+              typename T = typename ST::value_type,
+              int dim2 = ST::dimension - 2,
+              typename = typename std::enable_if<(dim >= dim2)>::type>
+    state_type<dim, T> expand_state(const ST &state) const;
 
     /*
      * Given a primitive state [rho, u_1, ..., u_d, p] return a conserved
@@ -374,7 +506,19 @@ namespace ryujin
     //@}
   };
 
+
   /* Inline definitions */
+
+
+  template <typename MCV, int problem_dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline void HyperbolicSystem::precompute_values(
+      MCV & /*precomputed_values*/,
+      unsigned int /*i*/,
+      const dealii::Tensor<1, problem_dim, Number> & /*U*/) const
+  {
+    // do nothing
+  }
+
 
   template <int problem_dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline Number
@@ -748,7 +892,7 @@ namespace ryujin
   HyperbolicSystem::apply_boundary_conditions(
       dealii::types::boundary_id id,
       dealii::Tensor<1, problem_dim, Number> U,
-      const dealii::Tensor<1, problem_dim - 2> &normal,
+      const dealii::Tensor<1, problem_dim - 2, Number> &normal,
       Lambda get_dirichlet_data) const
   {
     constexpr auto dim = problem_dim - 2;
@@ -808,20 +952,18 @@ namespace ryujin
   }
 
 
-  template <int problem_dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline HyperbolicSystem::flux_type<problem_dim - 2,
-                                                           Number>
-  HyperbolicSystem::f(const dealii::Tensor<1, problem_dim, Number> &U) const
+  template <typename ST, int dim, typename T>
+  DEAL_II_ALWAYS_INLINE inline auto HyperbolicSystem::f(const ST &U) const
+      -> flux_type<dim, T>
   {
-    constexpr int dim = problem_dim - 2;
-    using ScalarNumber = typename get_value_type<Number>::type;
+    using ScalarNumber = typename get_value_type<T>::type;
 
-    const Number rho_inverse = ScalarNumber(1.) / U[0];
+    const T rho_inverse = ScalarNumber(1.) / U[0];
     const auto m = momentum(U);
     const auto p = pressure(U);
-    const Number E = U[dim + 1];
+    const T E = U[dim + 1];
 
-    flux_type<dim, Number> result;
+    flux_type<dim, T> result;
 
     result[0] = m;
     for (unsigned int i = 0; i < dim; ++i) {
@@ -834,15 +976,41 @@ namespace ryujin
   }
 
 
-  template <int dim1, int prob_dim2, typename Number, typename>
-  HyperbolicSystem::state_type<dim1, Number> HyperbolicSystem::expand_state(
-      const dealii::Tensor<1, prob_dim2, Number> &state) const
+  template <typename MCV, typename ST, int dim, typename T>
+  DEAL_II_ALWAYS_INLINE inline auto
+  HyperbolicSystem::flux_contribution(const MCV & /*precomputed_values*/,
+                                      const unsigned int /*i*/,
+                                      const ST &U_i) const -> prec_type<dim, T>
   {
-    constexpr auto dim2 = prob_dim2 - 2;
+    return f(U_i);
+  }
 
-    state_type<dim1, Number> result;
+
+  template <typename MCV, typename ST, int dim, typename T>
+  DEAL_II_ALWAYS_INLINE inline auto
+  HyperbolicSystem::flux_contribution(const MCV & /*precomputed_values*/,
+                                      const unsigned int * /*js*/,
+                                      const ST &U_j) const -> prec_type<dim, T>
+  {
+    return f(U_j);
+  }
+
+
+  template <typename FT, int dim>
+  DEAL_II_ALWAYS_INLINE inline FT HyperbolicSystem::flux(const FT &prec_i,
+                                                         const FT &prec_j) const
+  {
+    return add(prec_i, prec_j);
+  }
+
+
+  template <int dim, typename ST, typename T, int dim2, typename>
+  auto HyperbolicSystem::expand_state(const ST &state) const
+      -> state_type<dim, T>
+  {
+    state_type<dim, T> result;
     result[0] = state[0];
-    result[dim1 + 1] = state[dim2 + 1];
+    result[dim + 1] = state[dim2 + 1];
     for (unsigned int i = 1; i < dim2 + 1; ++i)
       result[i] = state[i];
 

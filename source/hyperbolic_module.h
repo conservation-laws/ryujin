@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2020 - 2021 by the ryujin authors
+// Copyright (C) 2020 - 2022 by the ryujin authors
 //
 
 #pragma once
@@ -72,7 +72,7 @@ namespace ryujin
    * Explicit forward Euler time-stepping for hyperbolic systems with
    * convex limiting.
    *
-   * This module is described in detail in @cite ryujin-2021-1, Alg. 1.
+   * This module is described in detail in @cite ryujin-2022-1, Alg. 1.
    *
    * @ingroup HyperbolicModule
    */
@@ -83,9 +83,8 @@ namespace ryujin
     /**
      * @copydoc HyperbolicSystem::problem_dimension
      */
-    // clang-format off
-    static constexpr unsigned int problem_dimension = HyperbolicSystem::problem_dimension<dim>;
-    // clang-format on
+    static constexpr unsigned int problem_dimension =
+        HyperbolicSystem::problem_dimension<dim>;
 
     /**
      * @copydoc HyperbolicSystem::state_type
@@ -111,11 +110,11 @@ namespace ryujin
      * Constructor.
      */
     HyperbolicModule(const MPI_Comm &mpi_communicator,
-                std::map<std::string, dealii::Timer> &computing_timer,
-                const ryujin::OfflineData<dim, Number> &offline_data,
-                const ryujin::HyperbolicSystem &hyperbolic_system,
-                const ryujin::InitialValues<dim, Number> &initial_values,
-                const std::string &subsection = "HyperbolicModule");
+                     std::map<std::string, dealii::Timer> &computing_timer,
+                     const ryujin::OfflineData<dim, Number> &offline_data,
+                     const ryujin::HyperbolicSystem &hyperbolic_system,
+                     const ryujin::InitialValues<dim, Number> &initial_values,
+                     const std::string &subsection = "HyperbolicModule");
 
     /**
      * Prepare time stepping. A call to @ref prepare() allocates temporary
@@ -143,7 +142,7 @@ namespace ryujin
      * The function takes an optional array of states @ref stage_U together
      * with a an array of weights @ref stage_weights to construct a
      * modified high-order flux. The standard high-order flux reads
-     * (cf @cite ryujin-2021-1, Eq. 12):
+     * (cf @cite ryujin-2022-1, Eq. 12):
      * \f{align}
      *   \newcommand{\bR}{{\boldsymbol R}}
      *   \newcommand{\bU}{{\boldsymbol U}}
@@ -201,7 +200,7 @@ namespace ryujin
      * Dirichlet boundaries the appropriate state at time @ref t is
      * substituted; and on "flexible" boundaries depending on the fact
      * whether we have supersonic or subsonic inflow/outflow the
-     * appropriate Riemann invariant is prescribed. See @cite ryujin-2021-3
+     * appropriate Riemann invariant is prescribed. See @cite ryujin-2022-3
      * for details.
      *
      * @note The routine does update ghost vectors of the distributed
@@ -234,6 +233,7 @@ namespace ryujin
     unsigned int limiter_iter_;
     Number limiter_newton_tolerance_;
     unsigned int limiter_newton_max_iter_;
+    Number limiter_relaxation_factor_;
 
     bool cfl_with_boundary_dofs_;
 
@@ -263,23 +263,32 @@ namespace ryujin
     mutable unsigned int n_warnings_;
     ACCESSOR_READ_ONLY(n_warnings)
 
+    static constexpr auto n_prec = HyperbolicSystem::n_precomputed_values<dim>;
+    mutable MultiComponentVector<Number, n_prec> hyperbolic_system_prec_values_;
+    ACCESSOR_READ_ONLY(hyperbolic_system_prec_values)
+
     static constexpr auto n_ind = Indicator<dim, Number>::n_precomputed_values;
-    mutable MultiComponentVector<Number, n_ind> indicator_precomputed_values_;
+    mutable MultiComponentVector<Number, n_ind> indicator_prec_values_;
 
     mutable scalar_type alpha_;
+    ACCESSOR_READ_ONLY(alpha)
 
     static constexpr auto n_lim = Limiter<dim, Number>::n_precomputed_values;
-    mutable MultiComponentVector<Number, n_lim> limiter_precomputed_values_;
+    mutable MultiComponentVector<Number, n_lim> limiter_prec_values_;
 
     static constexpr auto n_bounds = Limiter<dim, Number>::n_bounds;
     mutable MultiComponentVector<Number, n_bounds> bounds_;
 
+    mutable vector_type source_;
+
     mutable vector_type r_;
+    mutable vector_type source_r_;
 
     mutable SparseMatrixSIMD<Number> dij_matrix_;
     mutable SparseMatrixSIMD<Number> lij_matrix_;
     mutable SparseMatrixSIMD<Number> lij_matrix_next_;
     mutable SparseMatrixSIMD<Number, problem_dimension> pij_matrix_;
+    mutable SparseMatrixSIMD<Number, problem_dimension> source_pij_matrix_;
 
     //@}
   };

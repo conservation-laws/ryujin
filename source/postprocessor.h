@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2020 - 2021 by the ryujin authors
+// Copyright (C) 2020 - 2022 by the ryujin authors
 //
 
 #pragma once
@@ -34,11 +34,7 @@ namespace ryujin
    *       \mathbf q_i =  \frac{1}{m_i}\;\sum_{j\in \mathcal{J}(i)}
    * \mathbf{c}_{ij} \times \mathbf{m}_j / \rho_j. \f]
    *
-   * In addition, the generated VTU output also contains the full state
-   * vector, and a local estimate of the effective residual viscosity
-   * \f$\mu_{\text{res}}\f$ caused by the graph viscosity stabilization.
-   *
-   * @ingroup EulerEquations
+   * @ingroup TimeLoop
    */
   template <int dim, typename Number = double>
   class Postprocessor final : public dealii::ParameterAcceptor
@@ -47,9 +43,8 @@ namespace ryujin
     /**
      * @copydoc HyperbolicSystem::problem_dimension
      */
-    // clang-format off
-    static constexpr unsigned int problem_dimension = HyperbolicSystem::problem_dimension<dim>;
-    // clang-format on
+    static constexpr unsigned int problem_dimension =
+        HyperbolicSystem::problem_dimension<dim>;
 
     /**
      * @copydoc HyperbolicSystem::state_type
@@ -57,21 +52,18 @@ namespace ryujin
     using state_type = HyperbolicSystem::state_type<dim, Number>;
 
     /**
-     * Type used to store a curl of an 2D/3D vector field. Departing from
+     * The type used to store the gradient of a scalar quantitty;
+     */
+    template <typename T>
+    using grad_type = dealii::Tensor<1, dim, T>;
+
+    /**
+     * Type used to store the curl of an 2D/3D vector field. Departing from
      * mathematical rigor, in 2D this is a number (stored as
      * `Tensor<1,1>`), in 3D this is a rank 1 tensor.
      */
-    using curl_type = dealii::Tensor<1, dim == 2 ? 1 : dim, Number>;
-
-    /**
-     * The number of postprocessed quantities:
-     */
-    static constexpr unsigned int n_quantities = (dim == 1) ? 1 : 2;
-
-    /**
-     * An array of strings for all component names.
-     */
-    const static std::array<std::string, n_quantities> component_names;
+    template <typename T>
+    using curl_type = dealii::Tensor<1, dim == 2 ? 1 : dim, T>;
 
     /**
      * @copydoc OfflineData::scalar_type
@@ -101,6 +93,32 @@ namespace ryujin
     void prepare();
 
     /**
+     * Returns the number of computed quantities.
+     */
+    unsigned int n_quantities() const
+    {
+      return quantities_.size();
+    }
+
+    /**
+     * A vector of strings for all component names.
+     */
+    const std::vector<std::string> component_names() const
+    {
+      return component_names_;
+    }
+
+    /**
+     * Reset computed normalization bounds. Calling this function will
+     * force a recomputation of the normalization bounds during the next
+     * call to compute().
+     */
+    void reset_bounds() const
+    {
+      bounds_.clear();
+    }
+
+    /**
      * Given a state vector @p U and a file name prefix @p name, the
      * current time @p t, and the current output cycle @p cycle) schedule a
      * solution output.
@@ -114,26 +132,17 @@ namespace ryujin
      */
     void compute(const vector_type &U) const;
 
-    /**
-     * Returns true if at least one background thread is active writing out
-     * the solution to disk.
-     */
-    bool is_active();
-
-    /**
-     * Wait for all background threads to finish writing out the solution
-     * to disk.
-     */
-    void wait();
-
   private:
     /**
      * @name Run time options
      */
     //@{
 
-    Number schlieren_beta_;
-    Number vorticity_beta_;
+    bool recompute_bounds_;
+    Number beta_;
+
+    std::vector<std::string> schlieren_quantities_;
+    std::vector<std::string> vorticity_quantities_;
 
     //@}
     /**
@@ -146,7 +155,12 @@ namespace ryujin
     dealii::SmartPointer<const HyperbolicSystem> hyperbolic_system_;
     dealii::SmartPointer<const ryujin::OfflineData<dim, Number>> offline_data_;
 
-    mutable std::array<scalar_type, n_quantities> quantities_;
+    std::vector<std::string> component_names_;
+    std::vector<std::pair<bool /*primitive*/, unsigned int>> schlieren_indices_;
+    std::vector<std::pair<bool /*primitive*/, unsigned int>> vorticity_indices_;
+
+    mutable std::vector<std::pair<Number, Number>> bounds_;
+    mutable std::vector<scalar_type> quantities_;
     ACCESSOR_READ_ONLY(quantities)
 
     //@}

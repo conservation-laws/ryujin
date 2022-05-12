@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2020 - 2021 by the ryujin authors
+// Copyright (C) 2020 - 2022 by the ryujin authors
 //
 
 #pragma once
@@ -28,7 +28,7 @@ namespace ryujin
   TimeLoop<dim, Number>::TimeLoop(const MPI_Comm &mpi_comm)
       : ParameterAcceptor("/A - TimeLoop")
       , mpi_communicator_(mpi_comm)
-      , hyperbolic_system_("/B - HyperbolicSystem")
+      , hyperbolic_system_("/B - Equation")
       , discretization_(mpi_communicator_, "/C - Discretization")
       , offline_data_(mpi_communicator_, discretization_, "/D - OfflineData")
       , initial_values_(hyperbolic_system_, offline_data_, "/E - InitialValues")
@@ -46,9 +46,12 @@ namespace ryujin
       , postprocessor_(mpi_communicator_,
                        hyperbolic_system_,
                        offline_data_,
-                       "/I - VTUOutput/Postprocessor")
-      , vtu_output_(
-            mpi_communicator_, offline_data_, postprocessor_, "/I - VTUOutput")
+                       "/I - VTUOutput")
+      , vtu_output_(mpi_communicator_,
+                    offline_data_,
+                    hyperbolic_module_,
+                    postprocessor_,
+                    "/I - VTUOutput")
       , quantities_(mpi_communicator_,
                     hyperbolic_system_,
                     offline_data_,
@@ -141,10 +144,10 @@ namespace ryujin
     resume_ = false;
     add_parameter("resume", resume_, "Resume an interrupted computation");
 
-    terminal_update_interval_ = 10;
+    terminal_update_interval_ = 5;
     add_parameter("terminal update interval",
                   terminal_update_interval_,
-                  "number of cycles after which output statistics are "
+                  "number of seconds after which output statistics are "
                   "recomputed and printed on the terminal");
   }
 
@@ -189,16 +192,14 @@ namespace ryujin
 
       if (resume_) {
         print_info("resuming computation: recreating mesh");
-        discretization_.refinement() = 0; /* do not refine */
-        discretization_.prepare();
-        discretization_.triangulation().load(base_name_ + "-checkpoint.mesh");
+        Checkpointing::load_mesh(discretization_, base_name_);
 
         print_info("preparing compute kernels");
         prepare_compute_kernels();
 
         print_info("resuming computation: loading state vector");
         U.reinit(offline_data_.vector_partitioner());
-        do_resume(
+        Checkpointing::load_state_vector(
             offline_data_, base_name_, U, t, output_cycle, mpi_communicator_);
         t_initial_ = t;
 
@@ -238,12 +239,16 @@ namespace ryujin
       }
     }
 
-    print_info("entering main loop");
-    computing_timer_["time loop"].start();
+    unsigned int cycle = 1;
+    Number last_terminal_output = (terminal_update_interval_ == Number(0.)
+                                       ? std::numeric_limits<Number>::max()
+                                       : std::numeric_limits<Number>::lowest());
 
     /* Loop: */
 
-    unsigned int cycle = 1;
+    print_info("entering main loop");
+    computing_timer_["time loop"].start();
+
     for (;; ++cycle) {
 
 #ifdef DEBUG_OUTPUT
@@ -288,6 +293,7 @@ namespace ryujin
             if (t < t_ref)
               return false;
 
+            computing_timer_["time loop"].stop();
             Scope scope(computing_timer_, "(re)initialize data structures");
 
             print_info("performing global refinement");
@@ -307,6 +313,7 @@ namespace ryujin
 
             solution_transfer.interpolate(U);
 
+            computing_timer_["time loop"].start();
             return true;
           });
       t_refinements_.erase(new_end, t_refinements_.end());
@@ -326,9 +333,11 @@ namespace ryujin
       if (t >= output_cycle * output_granularity_)
         print_cycle_statistics(cycle, t, output_cycle, /*logfile*/ true);
 
-      if (terminal_update_interval_ != 0 &&
-          cycle % terminal_update_interval_ == 0)
+      const auto wall_time = computing_timer_["time loop"].wall_time();
+      if (wall_time >= last_terminal_output + terminal_update_interval_) {
         print_cycle_statistics(cycle, t, output_cycle);
+        last_terminal_output = wall_time;
+      }
     } /* end of loop */
 
     /* We have actually performed one cycle less. */
@@ -337,12 +346,12 @@ namespace ryujin
     computing_timer_["time loop"].stop();
 
     /* Write final timing statistics to screen and logfile: */
-    if (terminal_update_interval_ != 0) {
+    if (terminal_update_interval_ != Number(0.)) {
       print_cycle_statistics(
-          cycle, t, output_cycle, /*logfile*/ false, /*final_time=*/true);
+          cycle, t, output_cycle, /*logfile*/ false, /*final*/ true);
     }
     print_cycle_statistics(
-        cycle, t, output_cycle, /*logfile*/ true, /*final_time=*/true);
+        cycle, t, output_cycle, /*logfile*/ true, /*final*/ true);
 
     if (enable_compute_error_) {
       /* Output final error: */
@@ -501,6 +510,14 @@ namespace ryujin
       print_info("scheduling output");
 
       postprocessor_.compute(U);
+      /*
+       * Workaround: Manually reset bounds during the first output cycle
+       * (which is often just a uniform flow field) to obtain a better
+       * normailization:
+       */
+      if (cycle == 0)
+        postprocessor_.reset_bounds();
+
       vtu_output_.schedule_output(
           U, name, t, cycle, do_full_output, do_levelsets);
     }
@@ -510,7 +527,8 @@ namespace ryujin
       Scope scope(computing_timer_, "time step [P] Z - checkpointing");
       print_info("scheduling checkpointing");
 
-      do_checkpoint(offline_data_, base_name_, U, t, cycle, mpi_communicator_);
+      Checkpointing::write_checkpoint(
+          offline_data_, base_name_, U, t, cycle, mpi_communicator_);
     }
   }
 
@@ -565,7 +583,7 @@ namespace ryujin
 
     /* Also print out parameters to a prm file: */
 
-    std::ofstream output(base_name_ + "-parameter.prm");
+    std::ofstream output(base_name_ + "-parameters.prm");
     ParameterAcceptor::prm.print_parameters(output, ParameterHandler::Text);
   }
 
@@ -893,7 +911,7 @@ namespace ryujin
     }
 
     const unsigned int minutes = eta / 60;
-    output << minutes << " min";
+    output << minutes << " min\n";
 
     if (mpi_rank_ != 0)
       return;
@@ -972,7 +990,9 @@ namespace ryujin
            << n_mpi_processes_ << " ranks / " << MultithreadInfo::n_threads() //
            << " threads."                                                     //
            << "\n             Last output cycle " << output_cycle - 1         //
-           << " at t = " << output_granularity_ * (output_cycle - 1) << "\n"; //
+           << " at t = " << output_granularity_ * (output_cycle - 1)          //
+           << " (terminal update interval " << terminal_update_interval_      //
+           << "s)\n";
 
     print_memory_statistics(output);
     print_timers(output);

@@ -3,29 +3,19 @@
 #
 
 subsection A - TimeLoop
-  set basename                     = dbmr
+  set basename                     = mach10-dbmr
 
-  set enable checkpointing         = false
-  set enable compute quantities    = false
   set enable output full           = true
-  set enable output levelsets      = false
 
   set final time                   = 0.20
   set output granularity           = 0.01
 
-  set output checkpoint multiplier = 1
-  set output quantities multiplier = 1
   set output full multiplier       = 1
-  set output levelsets multiplier  = 1
-
-  set terminal update interval     = 10
 end
 
 
-subsection B - ProblemDescription
-  set description = Euler
-
-  set gamma       = 1.4
+subsection B - Equation
+  set gamma = 1.4
 end
 
 
@@ -56,28 +46,19 @@ subsection E - InitialValues
 end
 
 
-subsection F - EulerModule
-  set limiter iterations = 2
-end
-
-
 subsection H - TimeIntegrator
-  set cfl min            = 0.90
-  set cfl max            = 0.90
+  set cfl min               = 0.45
+  set cfl max               = 0.90
+  set cfl recovery strategy = bang bang control
 
-  set cfl recovery strategy = none
-
-  set time stepping scheme  = ssprk 33
+  set time stepping scheme  = erk 33
 end
 
 
 subsection I - VTUOutput
-  set manifolds      = 
-
-  set schlieren beta = 10
-  set vorticity beta = 10
+  set manifolds      =
 
   set use mpi io     = true
+
+  set schlieren beta = 10
 end
-
-

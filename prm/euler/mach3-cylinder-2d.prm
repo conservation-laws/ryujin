@@ -1,34 +1,24 @@
 #
-# A Mach 3 2D disc configuration.
+# A 2D Mach 3 disc configuration.
 #
-# The geometry is a 2D disc of diameter 0.5 positioned in a 2D channel of
-# length 4, height 2 and width 2.
+# The geometry is a 2D disc of diameter 0.5 positioned in a channel of
+# length 4 and height 2.
 #
 
 subsection A - TimeLoop
-  set basename                     = cylinder-2d
+  set basename                     = mach3-cylinder-2d
 
-  set enable checkpointing         = false
-  set enable compute quantities    = false
   set enable output full           = true
-  set enable output levelsets      = false
 
   set final time                   = 5.00
   set output granularity           = 0.01
 
-  set output checkpoint multiplier = 1
-  set output quantities multiplier = 1
   set output full multiplier       = 1
-  set output levelsets multiplier  = 1
-
-  set terminal update interval     = 10
 end
 
 
-subsection B - ProblemDescription
-  set description = Euler
-
-  set gamma       = 1.4
+subsection B - Equation
+  set gamma = 1.4
 end
 
 
@@ -61,15 +51,9 @@ subsection E - InitialValues
 end
 
 
-subsection F - EulerModule
-  set limiter iterations = 2
-end
-
-
 subsection H - TimeIntegrator
-  set cfl min            = 0.45
-  set cfl max            = 0.90
-
+  set cfl min               = 0.45
+  set cfl max               = 0.90
   set cfl recovery strategy = bang bang control
 
   set time stepping scheme  = erk 33
@@ -77,12 +61,9 @@ end
 
 
 subsection I - VTUOutput
-  set manifolds      = 
-
-  set schlieren beta = 10
-  set vorticity beta = 10
+  set manifolds      =
 
   set use mpi io     = true
+
+  set schlieren beta = 10
 end
-
-

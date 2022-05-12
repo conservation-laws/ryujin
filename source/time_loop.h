@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2020 - 2021 by the ryujin authors
+// Copyright (C) 2020 - 2022 by the ryujin authors
 //
 
 #pragma once
@@ -8,12 +8,12 @@
 #include <compile_time_options.h>
 
 #include <hyperbolic_system.h>
-#include <postprocessor.h>
 
 #include "discretization.h"
 #include "hyperbolic_module.h"
 #include "initial_values.h"
 #include "offline_data.h"
+#include "postprocessor.h"
 #include "quantities.h"
 #include "time_integrator.h"
 #include "vtu_output.h"
@@ -40,9 +40,8 @@ namespace ryujin
     /**
      * @copydoc HyperbolicSystem::problem_dimension
      */
-    // clang-format off
-    static constexpr unsigned int problem_dimension = HyperbolicSystem::problem_dimension<dim>;
-    // clang-format on
+    static constexpr unsigned int problem_dimension =
+        HyperbolicSystem::problem_dimension<dim>;
 
     /**
      * @copydoc OfflineData::scalar_type
@@ -126,7 +125,7 @@ namespace ryujin
 
     bool resume_;
 
-    unsigned int terminal_update_interval_;
+    Number terminal_update_interval_;
 
     //@}
     /**

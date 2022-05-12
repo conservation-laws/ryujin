@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2020 - 2021 by the ryujin authors
+// Copyright (C) 2020 - 2022 by the ryujin authors
 //
 
 #pragma once
@@ -16,7 +16,6 @@
 
 namespace ryujin
 {
-
   /**
    * A small abstract base class to group configuration options for a
    * number of initial flow configurations.
@@ -29,26 +28,22 @@ namespace ryujin
    *
    * @ingroup InitialValues
    */
-  template <int dim, typename Number, typename HyperbolicSystem>
+  template <int dim,
+            typename Number,
+            typename state_type,
+            int n_precomputed_values = 0>
   class InitialState : public dealii::ParameterAcceptor
   {
   public:
-    /**
-     * @copydoc HyperbolicSystem::state_type
-     */
-    using state_type =
-        typename HyperbolicSystem::template state_type<dim, Number>;
+    using precomputed_type = std::array<Number, n_precomputed_values>;
 
     /**
      * Constructor taking geometry name @p name and a subsection @p
      * subsection as an argument. The dealii::ParameterAcceptor is
      * initialized with the subsubsection `subsection + "/" + name`.
      */
-    InitialState(const HyperbolicSystem &hyperbolic_system,
-                 const std::string &name,
-                 const std::string &subsection)
+    InitialState(const std::string &name, const std::string &subsection)
         : ParameterAcceptor(subsection + "/" + name)
-        , hyperbolic_system(hyperbolic_system)
         , name_(name)
     {
     }
@@ -62,8 +57,20 @@ namespace ryujin
      */
     virtual state_type compute(const dealii::Point<dim> &point, Number t) = 0;
 
-  protected:
-    const HyperbolicSystem &hyperbolic_system;
+    /**
+     * Given a position @p point returns a precomputed value used for the
+     * flux computation via HyperbolicSystem::flux_contribution().
+     *
+     * The default implementation of this function simply returns a zero
+     * value. In case of the @ref ShallowWaterEquations we precompute the
+     * bathymetry. In case of @ref LinearTransport we precompute the
+     * advection field.
+     */
+    virtual precomputed_type
+    compute_flux_contributions(const dealii::Point<dim> & /*point*/)
+    {
+      return precomputed_type();
+    }
 
   private:
     const std::string name_;
@@ -73,6 +80,5 @@ namespace ryujin
      */
     ACCESSOR_READ_ONLY(name)
   };
-
 
 } /* namespace ryujin */
