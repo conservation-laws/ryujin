@@ -743,6 +743,7 @@ namespace ryujin
 
             const auto m_ij = mass_matrix.template get_entry<T>(i, col_idx);
             const auto b_ij = (col_idx == 0 ? T(1.) : T(0.)) - m_ij * m_j_inv;
+            /* m_ji = m_ij  so let's simply use m_ij: */
             const auto b_ji = (col_idx == 0 ? T(1.) : T(0.)) - m_ij * m_i_inv;
 
             const auto prec_j = hyperbolic_system_->flux_contribution(
