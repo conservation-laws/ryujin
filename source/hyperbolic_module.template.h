@@ -713,7 +713,7 @@ namespace ryujin
 
           HyperbolicSystem::state_type<dim, T> source_r_i;
           if constexpr (HyperbolicSystem::have_source_terms)
-            source_r_i = source_.template get_tensor<T>(i);
+            source_r_i = source_r_.template get_tensor<T>(i);
 
           const auto alpha_i = load_value<T>(alpha_, i);
           const auto lambda_inv = Number(row_length - 1);
@@ -733,7 +733,7 @@ namespace ryujin
 
             HyperbolicSystem::state_type<dim, T> source_r_j;
             if constexpr (HyperbolicSystem::have_source_terms)
-              source_r_j = source_.template get_tensor<T>(js);
+              source_r_j = source_r_.template get_tensor<T>(js);
 
             const auto alpha_j = load_value<T>(alpha_, js);
             const auto m_j_inv = load_value<T>(lumped_mass_matrix_inverse, js);
