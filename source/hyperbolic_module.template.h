@@ -572,17 +572,15 @@ namespace ryujin
               U_i_new += tau * m_i_inv * d_ij * (U_star_ji - U_star_ij);
               p_ij += (d_ijH - d_ij) * (U_star_ji - U_star_ij);
 
-              limiter.accumulate(
-                  js, U_star_ij, U_star_ji, d_ij_inv * c_ij, beta_ij);
-
             } else {
               /* Regular low-order update with unmodified states: */
               r_i += d_ijH * (U_j - U_i);
               U_i_new += tau * m_i_inv * d_ij * (U_j - U_i);
               p_ij += (d_ijH - d_ij) * (U_j - U_i);
-
-              limiter.accumulate(js, U_i, U_j, d_ij_inv * c_ij, beta_ij);
             }
+
+            limiter.accumulate(
+                js, U_i, U_j, prec_i, prec_j, d_ij_inv * c_ij, beta_ij);
 
             /*
              * Compute high-order fluxes:

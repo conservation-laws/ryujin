@@ -30,6 +30,11 @@ namespace ryujin
     using state_type = HyperbolicSystem::state_type<dim, Number>;
 
     /**
+     * @copydoc HyperbolicSystem::prec_type
+     */
+    using prec_type = HyperbolicSystem::prec_type<dim, Number>;
+
+    /**
      * @copydoc HyperbolicSystem::ScalarNumber
      */
     using ScalarNumber = typename get_value_type<Number>::type;
@@ -68,7 +73,7 @@ namespace ryujin
      *   limiter.reset(i, U_i);
      *   for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
      *     // ...
-     *     limiter.accumulate(js, U_j, scaled_c_ij, beta_ij);
+     *     limiter.accumulate(js, U_i, U_j, pre_i, pre_j, scaled_c_ij, beta_ij);
      *   }
      *   limiter.apply_relaxation(hd_i, limiter_relaxation_factor_);
      *   limiter.bounds();
@@ -110,6 +115,8 @@ namespace ryujin
     void accumulate(const unsigned int *js,
                     const state_type &U_i,
                     const state_type &U_j,
+                    const prec_type &prec_i,
+                    const prec_type &prec_j,
                     const dealii::Tensor<1, dim, Number> &scaled_c_ij,
                     const Number beta_ij);
 
@@ -212,19 +219,31 @@ namespace ryujin
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline void Limiter<dim, Number>::accumulate(
       const unsigned int * /*js*/,
-      const state_type &U_i,
-      const state_type &U_j,
+      const state_type & /*U_i*/,
+      const state_type & /*U_j*/,
+      const prec_type &prec_i,
+      const prec_type &prec_j,
       const dealii::Tensor<1, dim, Number> &scaled_c_ij,
       const Number beta_ij)
   {
-    /* Bounds: */
+    /* The bar states: */
 
-    auto &[h_min, h_max, kin_max] = bounds_;
+    const auto &[U_i, Z_i] = prec_i;
+    const auto &[U_j, Z_j] = prec_j;
+//     const auto U_star_ij = hyperbolic_system.star_state(U_i, Z_i, Z_j);
+//     const auto U_star_ji = hyperbolic_system.star_state(U_j, Z_j, Z_i);
 
     const auto f_i = hyperbolic_system.f(U_i);
     const auto f_j = hyperbolic_system.f(U_j);
+//     const auto f_star_ij = hyperbolic_system.f(U_star_ij);
+//     const auto f_star_ji = hyperbolic_system.f(U_star_ji);
+
     const auto U_ij_bar =
-        ScalarNumber(0.5) * (U_i + U_j + contract(add(f_i, -f_j), scaled_c_ij));
+        ScalarNumber(0.5) * (U_i + U_j + contract(add(f_i, f_j), scaled_c_ij));
+
+    /* Bounds: */
+
+    auto &[h_min, h_max, kin_max] = bounds_;
 
     const auto h_bar_ij = hyperbolic_system.water_depth(U_ij_bar);
     h_min = std::min(h_min, h_bar_ij);

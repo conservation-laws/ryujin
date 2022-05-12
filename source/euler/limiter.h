@@ -60,6 +60,11 @@ namespace ryujin
     using state_type = HyperbolicSystem::state_type<dim, Number>;
 
     /**
+     * @copydoc HyperbolicSystem::prec_type
+     */
+    using prec_type = HyperbolicSystem::prec_type<dim, Number>;
+
+    /**
      * @copydoc HyperbolicSystem::ScalarNumber
      */
     using ScalarNumber = typename get_value_type<Number>::type;
@@ -98,7 +103,7 @@ namespace ryujin
      *   limiter.reset(i, U_i);
      *   for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
      *     // ...
-     *     limiter.accumulate(js, U_j, scaled_c_ij, beta_ij);
+     *     limiter.accumulate(js, U_i, U_j, pre_i, pre_j, scaled_c_ij, beta_ij);
      *   }
      *   limiter.apply_relaxation(hd_i, limiter_relaxation_factor_);
      *   limiter.bounds();
@@ -140,6 +145,8 @@ namespace ryujin
     void accumulate(const unsigned int *js,
                     const state_type &U_i,
                     const state_type &U_j,
+                    const prec_type &prec_i,
+                    const prec_type &prec_j,
                     const dealii::Tensor<1, dim, Number> &scaled_c_ij,
                     const Number beta_ij);
 
@@ -249,6 +256,8 @@ namespace ryujin
       const unsigned int *js,
       const state_type &U_i,
       const state_type &U_j,
+      const prec_type & /*prec_i*/,
+      const prec_type & /*prec_j*/,
       const dealii::Tensor<1, dim, Number> &scaled_c_ij,
       const Number beta_ij)
   {
