@@ -7,6 +7,7 @@
 
 #include "simd.h"
 
+#include <deal.II/base/mpi.h>
 #include <deal.II/base/partitioner.h>
 #include <deal.II/base/vectorization.h>
 #include <deal.II/lac/la_parallel_vector.h>
