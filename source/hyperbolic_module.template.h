@@ -247,14 +247,8 @@ namespace ryujin
 
       LIKWID_MARKER_STOP("time_step_0");
       RYUJIN_PARALLEL_REGION_END
-    }
 
-    {
-#if defined(SPLIT_SYNCHRONIZATION_TIMERS) || defined(DEBUG_OUTPUT)
-      Scope scope(computing_timer_, "time step [E] 0 - synchronization");
-#else
-      Scope scope(computing_timer_, "time step [E] 0 - precompute values");
-#endif
+      /* Synchronize MPI exchange: */
 
       hyperbolic_system_prec_values_.update_ghost_values_finish();
       indicator_prec_values_.update_ghost_values_finish();
@@ -468,8 +462,9 @@ namespace ryujin
      */
 
     {
-      Scope scope(computing_timer_,
-                  "time step [E] 3 - l.-o. update, bounds, and r_i");
+      Scope scope(
+          computing_timer_,
+          "time step [E] 3 - l.-o. update, compute bounds, r_i, and p_ij");
 
       SynchronizationDispatch synchronization_dispatch([&]() {
         r_.update_ghost_values_start(channel++);
@@ -526,7 +521,7 @@ namespace ryujin
           HyperbolicSystem::state_type<dim, T> source_i;
           HyperbolicSystem::state_type<dim, T> source_r_i;
           if constexpr (HyperbolicSystem::have_source_terms) {
-            /* source_i will be multiplied by tau * m_i_inv */
+            // FIXME
             source_i = hyperbolic_system_->low_order_nodal_source(
                 hyperbolic_system_prec_values_, i, U_i);
             source_r_i = hyperbolic_system_->high_order_nodal_source(
@@ -559,10 +554,14 @@ namespace ryujin
 
             const auto flux_ij = hyperbolic_system_->flux(prec_i, prec_j);
             U_i_new -= tau * m_i_inv * contract(flux_ij, c_ij);
+            auto p_ij = contract(flux_ij, c_ij);
 
+            HyperbolicSystem::state_type<dim, T> source_p_ij;
             if constexpr (HyperbolicSystem::have_source_terms) {
-              source_i -= hyperbolic_system_->low_order_stencil_source(
+              const auto s_lo = hyperbolic_system_->low_order_stencil_source(
                   prec_i, prec_j, c_ij, beta_ij);
+              source_i -= tau * m_i_inv * s_lo;
+              source_p_ij += s_lo;
             }
 
             if constexpr (HyperbolicSystem::have_equilibrated_states) {
@@ -571,6 +570,8 @@ namespace ryujin
                   hyperbolic_system_->equilibrated_states(prec_i, prec_j);
               r_i += d_ijH * (U_star_ji - U_star_ij);
               U_i_new += tau * m_i_inv * d_ij * (U_star_ji - U_star_ij);
+              p_ij += (d_ijH - d_ij) * (U_star_ji - U_star_ij);
+
               limiter.accumulate(
                   js, U_star_ij, U_star_ji, d_ij_inv * c_ij, beta_ij);
 
@@ -578,6 +579,8 @@ namespace ryujin
               /* Regular low-order update with unmodified states: */
               r_i += d_ijH * (U_j - U_i);
               U_i_new += tau * m_i_inv * d_ij * (U_j - U_i);
+              p_ij += (d_ijH - d_ij) * (U_j - U_i);
+
               limiter.accumulate(js, U_i, U_j, d_ij_inv * c_ij, beta_ij);
             }
 
@@ -589,14 +592,17 @@ namespace ryujin
               const auto high_order_flux_ij =
                   hyperbolic_system_->high_order_flux(prec_i, prec_j);
               r_i -= weight * contract(high_order_flux_ij, c_ij);
+              p_ij -= weight * contract(high_order_flux_ij, c_ij);
             } else {
               r_i -= weight * contract(flux_ij, c_ij);
+              p_ij -= weight * contract(flux_ij, c_ij);
             }
 
             if constexpr (HyperbolicSystem::have_source_terms) {
               const auto s_ho = hyperbolic_system_->high_order_stencil_source(
                   prec_i, prec_j, c_ij, beta_ij);
               source_r_i -= weight * s_ho;
+              source_p_ij -= weight * s_ho;
             }
 
             for (int s = 0; s < stages; ++s) {
@@ -608,24 +614,30 @@ namespace ryujin
                 const auto high_order_flux_ij =
                     hyperbolic_system_->high_order_flux(prec_iHs[s], p);
                 r_i -= stage_weights[s] * contract(high_order_flux_ij, c_ij);
+                p_ij -= stage_weights[s] * contract(high_order_flux_ij, c_ij);
               } else {
                 const auto flux_ij = hyperbolic_system_->flux(prec_iHs[s], p);
                 r_i -= stage_weights[s] * contract(flux_ij, c_ij);
+                p_ij -= stage_weights[s] * contract(flux_ij, c_ij);
               }
 
               if constexpr (HyperbolicSystem::have_source_terms) {
                 const auto s_ho = hyperbolic_system_->high_order_stencil_source(
                     prec_iHs[s], p, c_ij, beta_ij);
                 source_r_i -= stage_weights[s] * s_ho;
+                source_p_ij -= stage_weights[s] * s_ho;
               }
             }
+
+            pij_matrix_.write_tensor(p_ij, i, col_idx, true);
+            if constexpr (HyperbolicSystem::have_source_terms)
+              source_pij_matrix_.write_tensor(source_p_ij, i, col_idx, true);
           }
 
           new_U.template write_tensor<T>(U_i_new, i);
           r_.template write_tensor<T>(r_i, i);
 
           if constexpr (HyperbolicSystem::have_source_terms) {
-            source_i *= tau * m_i_inv;
             source_.template write_tensor<T>(source_i, i);
             source_r_.template write_tensor<T>(source_r_i, i);
           }
@@ -643,15 +655,8 @@ namespace ryujin
 
       LIKWID_MARKER_STOP("time_step_3");
       RYUJIN_PARALLEL_REGION_END
-    }
 
-    {
-#if defined(SPLIT_SYNCHRONIZATION_TIMERS) || defined(DEBUG_OUTPUT)
-      Scope scope(computing_timer_, "time step [E] 3 - synchronization");
-#else
-      Scope scope(computing_timer_,
-                  "time step [E] 3 - l.-o. update, bounds, and r_i");
-#endif
+      /* Synchronize MPI exchange: */
 
       r_.update_ghost_values_finish();
       source_.update_ghost_values_finish();
@@ -659,17 +664,15 @@ namespace ryujin
     }
 
     /*
-     * Step 4: Compute P_ij, and l_ij (first round):
+     * Step 4: Compute second part of P_ij, and l_ij (first round):
      */
 
     if (limiter_iter_ != 0) {
-      Scope scope(computing_timer_, "time step [E] 4 - compute p_ij, and l_ij");
+      Scope scope(computing_timer_,
+                  "time step [E] 4 - compute p_ij, and l_ij");
 
       SynchronizationDispatch synchronization_dispatch(
           [&]() { lij_matrix_.update_ghost_rows_start(channel++); });
-
-      const Number weight =
-          -std::accumulate(stage_weights.begin(), stage_weights.end(), -1.);
 
       RYUJIN_PARALLEL_REGION_BEGIN
       LIKWID_MARKER_START("time_step_4");
@@ -698,16 +701,6 @@ namespace ryujin
           const auto m_i_inv = load_value<T>(lumped_mass_matrix_inverse, i);
 
           const auto U_i_new = new_U.template get_tensor<T>(i);
-          const auto U_i = old_U.template get_tensor<T>(i);
-
-          const auto prec_i = hyperbolic_system_->flux_contribution(
-              hyperbolic_system_prec_values_, i, U_i);
-          std::array<HyperbolicSystem::prec_type<dim, T>, stages> prec_iHs;
-          for (int s = 0; s < stages; ++s) {
-            const auto temp = stage_U[s].get().template get_tensor<T>(i);
-            prec_iHs[s] = hyperbolic_system_->flux_contribution(
-                hyperbolic_system_prec_values_, i, temp);
-          }
 
           const auto r_i = r_.template get_tensor<T>(i);
 
@@ -715,7 +708,6 @@ namespace ryujin
           if constexpr (HyperbolicSystem::have_source_terms)
             source_r_i = source_r_.template get_tensor<T>(i);
 
-          const auto alpha_i = load_value<T>(alpha_, i);
           const auto lambda_inv = Number(row_length - 1);
           const auto factor = tau * m_i_inv * lambda_inv;
 
@@ -723,103 +715,35 @@ namespace ryujin
           for (unsigned int col_idx = 0; col_idx < row_length;
                ++col_idx, js += stride_size) {
 
-            const auto U_j = old_U.template get_tensor<T>(js);
+            /*
+             * Mass matrix correction:
+             */
 
-            const auto c_ij = cij_matrix.template get_tensor<T>(i, col_idx);
-            const auto beta_ij =
-                betaij_matrix.template get_entry<T>(i, col_idx);
-
-            const auto r_j = r_.template get_tensor<T>(js);
-
-            HyperbolicSystem::state_type<dim, T> source_r_j;
-            if constexpr (HyperbolicSystem::have_source_terms)
-              source_r_j = source_r_.template get_tensor<T>(js);
-
-            const auto alpha_j = load_value<T>(alpha_, js);
             const auto m_j_inv = load_value<T>(lumped_mass_matrix_inverse, js);
-
-            const auto d_ij = dij_matrix_.template get_entry<T>(i, col_idx);
-            const auto d_ijH = d_ij * (alpha_i + alpha_j) * Number(.5);
-
             const auto m_ij = mass_matrix.template get_entry<T>(i, col_idx);
+
             const auto b_ij = (col_idx == 0 ? T(1.) : T(0.)) - m_ij * m_j_inv;
             /* m_ji = m_ij  so let's simply use m_ij: */
             const auto b_ji = (col_idx == 0 ? T(1.) : T(0.)) - m_ij * m_i_inv;
 
-            const auto prec_j = hyperbolic_system_->flux_contribution(
-                hyperbolic_system_prec_values_, js, U_j);
-
-            /*
-             * Contributions from graph viscosity and mass matrix correction:
-             */
-
-            auto p_ij = b_ij * r_j - b_ji * r_i;
-
-            HyperbolicSystem::state_type<dim, T> source_p_ij;
-            if constexpr (HyperbolicSystem::have_source_terms)
-              source_p_ij = b_ij * source_r_j - b_ji * source_r_i;
-
-            if constexpr (HyperbolicSystem::have_equilibrated_states) {
-              const auto &[U_star_ij, U_star_ji] =
-                  hyperbolic_system_->equilibrated_states(prec_i, prec_j);
-              p_ij += (d_ijH - d_ij) * (U_star_ji - U_star_ij);
-            } else {
-              p_ij += (d_ijH - d_ij) * (U_j - U_i);
-            }
-
-            /*
-             * The difference of high-order and low-order flux terms:
-             */
-
-            if constexpr (HyperbolicSystem::have_high_order_flux ||
-                          stages != 0) {
-              const auto flux_ij = hyperbolic_system_->flux(prec_i, prec_j);
-              if constexpr (HyperbolicSystem::have_high_order_flux) {
-                const auto high_order_flux_ij =
-                    hyperbolic_system_->high_order_flux(prec_i, prec_j);
-                p_ij -= weight * contract(high_order_flux_ij, c_ij) -
-                        contract(flux_ij, c_ij);
-              } else {
-                p_ij -= (weight - Number(1.)) * contract(flux_ij, c_ij);
-              }
-            }
-
-            if constexpr (HyperbolicSystem::have_source_terms) {
-              const auto s_lo = hyperbolic_system_->low_order_stencil_source(
-                  prec_i, prec_j, c_ij, beta_ij);
-              const auto s_ho = hyperbolic_system_->high_order_stencil_source(
-                  prec_i, prec_j, c_ij, beta_ij);
-              source_p_ij += s_lo - weight * s_ho;
-            }
-
-            for (int s = 0; s < stages; ++s) {
-              const auto U_jH = stage_U[s].get().template get_tensor<T>(js);
-              const auto p = hyperbolic_system_->flux_contribution(
-                  hyperbolic_system_prec_values_, js, U_jH);
-
-              if constexpr (HyperbolicSystem::have_high_order_flux) {
-                const auto high_order_flux_ij =
-                    hyperbolic_system_->high_order_flux(prec_iHs[s], p);
-                p_ij -= stage_weights[s] * contract(high_order_flux_ij, c_ij);
-              } else {
-                const auto flux_ij = hyperbolic_system_->flux(prec_iHs[s], p);
-                p_ij -= stage_weights[s] * contract(flux_ij, c_ij);
-              }
-
-              if constexpr (HyperbolicSystem::have_source_terms) {
-                const auto s_ho = hyperbolic_system_->high_order_stencil_source(
-                    prec_iHs[s], p, c_ij, beta_ij);
-                source_p_ij -= stage_weights[s] * s_ho;
-              }
-            }
-
+            auto p_ij = pij_matrix_.template get_tensor<T>(i, col_idx);
+            const auto r_j = r_.template get_tensor<T>(js);
+            p_ij += b_ij * r_j - b_ji * r_i;
             p_ij *= factor;
             pij_matrix_.write_tensor(p_ij, i, col_idx, true);
 
             if constexpr (HyperbolicSystem::have_source_terms) {
+              auto source_p_ij =
+                  source_pij_matrix_.template get_tensor<T>(i, col_idx);
+              const auto source_r_j = source_r_.template get_tensor<T>(js);
+              source_p_ij = b_ij * source_r_j - b_ji * source_r_i;
               source_p_ij *= factor;
               source_pij_matrix_.write_tensor(source_p_ij, i, col_idx, true);
             }
+
+            /*
+             * Compute limiter bounds:
+             */
 
             const auto &[l_ij, success] =
                 Limiter<dim, T>::limit(*hyperbolic_system_,
@@ -844,14 +768,8 @@ namespace ryujin
 
       LIKWID_MARKER_STOP("time_step_4");
       RYUJIN_PARALLEL_REGION_END
-    }
 
-    if (limiter_iter_ != 0) {
-#if defined(SPLIT_SYNCHRONIZATION_TIMERS) || defined(DEBUG_OUTPUT)
-      Scope scope(computing_timer_, "time step [E] 4 - synchronization");
-#else
-      Scope scope(computing_timer_, "time step [E] 4 - compute p_ij, and l_ij");
-#endif
+      /* Synchronize MPI exchange: */
 
       lij_matrix_.update_ghost_rows_finish();
     }
@@ -865,152 +783,139 @@ namespace ryujin
      */
 
     for (unsigned int pass = 0; pass < limiter_iter_; ++pass) {
+      bool last_round = (pass + 1 == limiter_iter_);
 
       std::string step_no = std::to_string(5 + pass);
-
-      bool last_round = (pass + 1 == limiter_iter_);
       std::string additional_step = (last_round ? "" : ", next l_ij");
+      Scope scope(computing_timer_,
+                  "time step [E] " + step_no + " - " +
+                      "symmetrize l_ij, h.-o. update" + additional_step);
 
-      {
-        Scope scope(computing_timer_,
-                    "time step [E] " + step_no + " - " +
-                        "symmetrize l_ij, h.-o. update" + additional_step);
+      SynchronizationDispatch synchronization_dispatch([&]() {
+        if (!last_round)
+          lij_matrix_next_.update_ghost_rows_start(channel++);
+      });
 
-        SynchronizationDispatch synchronization_dispatch([&]() {
-          if (!last_round)
-            lij_matrix_next_.update_ghost_rows_start(channel++);
-        });
+      RYUJIN_PARALLEL_REGION_BEGIN
+      LIKWID_MARKER_START(("time_step_" + step_no).c_str());
 
-        RYUJIN_PARALLEL_REGION_BEGIN
-        LIKWID_MARKER_START(("time_step_" + step_no).c_str());
+      auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
+        using T = decltype(sentinel);
+        unsigned int stride_size = get_stride_size<T>;
 
-        auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
-          using T = decltype(sentinel);
-          unsigned int stride_size = get_stride_size<T>;
+        /* Stored thread locally: */
+        AlignedVector<T> lij_row;
+        bool thread_ready = false;
 
-          /* Stored thread locally: */
-          AlignedVector<T> lij_row;
-          bool thread_ready = false;
+        RYUJIN_OMP_FOR
+        for (unsigned int i = left; i < right; i += stride_size) {
 
-          RYUJIN_OMP_FOR
-          for (unsigned int i = left; i < right; i += stride_size) {
+          /* Skip constrained degrees of freedom: */
+          const unsigned int row_length = sparsity_simd.row_length(i);
+          if (row_length == 1)
+            continue;
 
-            /* Skip constrained degrees of freedom: */
-            const unsigned int row_length = sparsity_simd.row_length(i);
-            if (row_length == 1)
-              continue;
+          synchronization_dispatch.check(
+              thread_ready, i >= n_export_indices && i < n_internal);
 
-            synchronization_dispatch.check(
-                thread_ready, i >= n_export_indices && i < n_internal);
+          auto U_i_new = new_U.template get_tensor<T>(i);
 
-            auto U_i_new = new_U.template get_tensor<T>(i);
+          HyperbolicSystem::state_type<dim, T> source_i;
+          if constexpr (HyperbolicSystem::have_source_terms)
+            source_i = source_.template get_tensor<T>(i);
 
-            HyperbolicSystem::state_type<dim, T> source_i;
-            if constexpr (HyperbolicSystem::have_source_terms)
-              source_i = source_.template get_tensor<T>(i);
+          const Number lambda = Number(1.) / Number(row_length - 1);
+          lij_row.resize_fast(row_length);
 
-            const Number lambda = Number(1.) / Number(row_length - 1);
-            lij_row.resize_fast(row_length);
+          for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
 
-            for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
+            const auto l_ij = std::min(
+                lij_matrix_.template get_entry<T>(i, col_idx),
+                lij_matrix_.template get_transposed_entry<T>(i, col_idx));
 
-              const auto l_ij = std::min(
-                  lij_matrix_.template get_entry<T>(i, col_idx),
-                  lij_matrix_.template get_transposed_entry<T>(i, col_idx));
+            const auto p_ij = pij_matrix_.template get_tensor<T>(i, col_idx);
 
-              const auto p_ij = pij_matrix_.template get_tensor<T>(i, col_idx);
+            U_i_new += l_ij * lambda * p_ij;
 
-              U_i_new += l_ij * lambda * p_ij;
-
-              if constexpr (HyperbolicSystem::have_source_terms) {
-                const auto source_p_ij =
-                    source_pij_matrix_.template get_tensor<T>(i, col_idx);
-                source_i += l_ij * lambda * source_p_ij;
-              }
-
-              if (!last_round)
-                lij_row[col_idx] = l_ij;
+            if constexpr (HyperbolicSystem::have_source_terms) {
+              const auto source_p_ij =
+                  source_pij_matrix_.template get_tensor<T>(i, col_idx);
+              source_i += l_ij * lambda * source_p_ij;
             }
+
+            if (!last_round)
+              lij_row[col_idx] = l_ij;
+          }
 
 #ifdef CHECK_BOUNDS
-            if (!hyperbolic_system_->is_admissible(U_i_new)) {
-              restart_needed = true;
-            }
-#endif
-
-            new_U.template write_tensor<T>(U_i_new, i);
-
-            if constexpr (HyperbolicSystem::have_source_terms)
-              source_.template write_tensor<T>(source_i, i);
-
-            /* Skip computating l_ij and updating p_ij in the last round */
-            if (last_round)
-              continue;
-
-            const auto bounds =
-                bounds_.template get_tensor<T, std::array<T, n_bounds>>(i);
-            for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
-
-              const auto old_l_ij = lij_row[col_idx];
-
-              const auto new_p_ij =
-                  (T(1.) - old_l_ij) *
-                  pij_matrix_.template get_tensor<T>(i, col_idx);
-
-              const auto &[new_l_ij, success] =
-                  Limiter<dim, T>::limit(*hyperbolic_system_,
-                                         bounds,
-                                         U_i_new,
-                                         new_p_ij,
-                                         limiter_newton_tolerance_,
-                                         limiter_newton_max_iter_);
-
-              /* Unsuccessful with current CFL, force a restart. */
-              if (!success)
-                restart_needed = true;
-
-              /*
-               * Shortcut: We omit updating the p_ij vector and simply
-               * write (1 - l_ij^(1)) * l_ij^(2) into the l_ij matrix. This
-               * approach only works for at most two limiting steps.
-               */
-              const auto entry = (T(1.) - old_l_ij) * new_l_ij;
-              lij_matrix_next_.write_entry(entry, i, col_idx, true);
-            }
+          if (!hyperbolic_system_->is_admissible(U_i_new)) {
+            restart_needed = true;
           }
-        };
-
-        /* Parallel non-vectorized loop: */
-        loop(Number(), n_internal, n_owned);
-        /* Parallel vectorized SIMD loop: */
-        loop(VA(), 0, n_internal);
-
-        LIKWID_MARKER_STOP(("time_step_" + step_no).c_str());
-        RYUJIN_PARALLEL_REGION_END
-      }
-
-      {
-#if defined(SPLIT_SYNCHRONIZATION_TIMERS) || defined(DEBUG_OUTPUT)
-        Scope scope(computing_timer_,
-                    "time step [E] " + step_no + " - synchronization");
-#else
-        Scope scope(computing_timer_,
-                    "time step [E] " + step_no + " - " +
-                        "symmetrize l_ij, h.-o. update" + additional_step);
 #endif
 
-        if (!last_round) {
-          lij_matrix_next_.update_ghost_rows_finish();
-          std::swap(lij_matrix_, lij_matrix_next_);
+          new_U.template write_tensor<T>(U_i_new, i);
+
+          if constexpr (HyperbolicSystem::have_source_terms)
+            source_.template write_tensor<T>(source_i, i);
+
+          /* Skip computating l_ij and updating p_ij in the last round */
+          if (last_round)
+            continue;
+
+          const auto bounds =
+              bounds_.template get_tensor<T, std::array<T, n_bounds>>(i);
+          for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
+
+            const auto old_l_ij = lij_row[col_idx];
+
+            const auto new_p_ij =
+                (T(1.) - old_l_ij) *
+                pij_matrix_.template get_tensor<T>(i, col_idx);
+
+            const auto &[new_l_ij, success] =
+                Limiter<dim, T>::limit(*hyperbolic_system_,
+                                       bounds,
+                                       U_i_new,
+                                       new_p_ij,
+                                       limiter_newton_tolerance_,
+                                       limiter_newton_max_iter_);
+
+            /* Unsuccessful with current CFL, force a restart. */
+            if (!success)
+              restart_needed = true;
+
+            /*
+             * Shortcut: We omit updating the p_ij vector and simply
+             * write (1 - l_ij^(1)) * l_ij^(2) into the l_ij matrix. This
+             * approach only works for at most two limiting steps.
+             */
+            const auto entry = (T(1.) - old_l_ij) * new_l_ij;
+            lij_matrix_next_.write_entry(entry, i, col_idx, true);
+          }
         }
+      };
+
+      /* Parallel non-vectorized loop: */
+      loop(Number(), n_internal, n_owned);
+      /* Parallel vectorized SIMD loop: */
+      loop(VA(), 0, n_internal);
+
+      LIKWID_MARKER_STOP(("time_step_" + step_no).c_str());
+      RYUJIN_PARALLEL_REGION_END
+
+      /* Synchronize MPI exchange: */
+
+      if (!last_round) {
+        lij_matrix_next_.update_ghost_rows_finish();
+        std::swap(lij_matrix_, lij_matrix_next_);
       }
     } /* limiter_iter_ */
-
-    CALLGRIND_STOP_INSTRUMENTATION
 
     /* Update sources: */
     if constexpr (HyperbolicSystem::have_source_terms)
       new_U += source_;
+
+    CALLGRIND_STOP_INSTRUMENTATION
 
     /* Do we have to restart? */
 
@@ -1032,7 +937,7 @@ namespace ryujin
       }
     }
 
-    /* Update the result and return tau_max: */
+    /* Return tau_max: */
     return tau_max;
   }
 
