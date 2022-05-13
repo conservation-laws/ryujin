@@ -141,6 +141,15 @@ namespace ryujin
         "Multiplicative modifier applied to \"output granularity\" that "
         "determines the writeout granularity for quantities of interest");
 
+    std::copy(std::begin(HyperbolicSystem::component_names<dim>),
+              std::end(HyperbolicSystem::component_names<dim>),
+              std::back_inserter(error_quantities_));
+
+    add_parameter("error quantities",
+                  error_quantities_,
+                  "List of conserved quantities used in the computation of the "
+                  "normalized error norms.");
+
     resume_ = false;
     add_parameter("resume", resume_, "Resume an interrupted computation");
 
@@ -372,10 +381,6 @@ namespace ryujin
     std::cout << "TimeLoop<dim, Number>::compute_error()" << std::endl;
 #endif
 
-    constexpr auto problem_dimension = HyperbolicSystem::problem_dimension<dim>;
-
-    /* Compute L_inf norm: */
-
     Vector<float> difference_per_cell(
         discretization_.triangulation().n_active_cells());
 
@@ -390,11 +395,22 @@ namespace ryujin
     analytic_component.reinit(offline_data_.scalar_partitioner());
     error_component.reinit(offline_data_.scalar_partitioner());
 
-    for (unsigned int i = 0; i < problem_dimension; ++i) {
+    /* Loop over all selected components: */
+    for (const auto &entry : error_quantities_) {
+      const auto &names = HyperbolicSystem::component_names<dim>;
+      const auto pos = std::find(std::begin(names), std::end(names), entry);
+      if (pos == std::end(names)) {
+        AssertThrow(
+            false,
+            dealii::ExcMessage("Unknown component name »" + entry + "«"));
+        __builtin_trap();
+      }
+
+      const auto index = std::distance(std::begin(names), pos);
 
       /* Compute norms of analytic solution: */
 
-      analytic.extract_component(analytic_component, i);
+      analytic.extract_component(analytic_component, index);
 
       const Number linf_norm_analytic = Utilities::MPI::max(
           analytic_component.linfty_norm(), mpi_communicator_);
@@ -421,7 +437,7 @@ namespace ryujin
 
       /* Compute norms of error: */
 
-      U.extract_component(error_component, i);
+      U.extract_component(error_component, index);
       /* Populate constrained dofs due to periodicity: */
       offline_data_.affine_constraints().distribute(error_component);
       error_component.update_ghost_values();
@@ -450,12 +466,9 @@ namespace ryujin
       const Number l2_norm_error = Number(std::sqrt(Utilities::MPI::sum(
           std::pow(difference_per_cell.l2_norm(), 2), mpi_communicator_)));
 
-      if (linf_norm_analytic >= 1.0e-10)
-        linf_norm += linf_norm_error / linf_norm_analytic;
-      if (l1_norm_analytic >= 1.0e-10)
-        l1_norm += l1_norm_error / l1_norm_analytic;
-      if (l2_norm_analytic >= 1.0e-10)
-        l2_norm += l2_norm_error / l2_norm_analytic;
+      linf_norm += linf_norm_error / linf_norm_analytic;
+      l1_norm += l1_norm_error / l1_norm_analytic;
+      l2_norm += l2_norm_error / l2_norm_analytic;
     }
 
     if (mpi_rank_ != 0)

@@ -123,6 +123,8 @@ namespace ryujin
     unsigned int output_levelsets_multiplier_;
     unsigned int output_quantities_multiplier_;
 
+    std::vector<std::string> error_quantities_;
+
     bool resume_;
 
     Number terminal_update_interval_;
