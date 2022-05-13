@@ -63,7 +63,7 @@ namespace ryujin
           const Number v_y = eta_ * omega * std::cos(omega * t);
 
           return hyperbolic_system.template expand_state<dim>(
-              HyperbolicSystem::state_type<2, Number>{{h, v_x, v_y}});
+              HyperbolicSystem::state_type<2, Number>{{h, h * v_x, h * v_y}});
         }
       }
 
