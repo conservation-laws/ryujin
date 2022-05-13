@@ -212,8 +212,6 @@ namespace ryujin
     const auto quotient =
         std::abs(numerator + regularization) / (denominator + regularization);
     return std::min(Number(1.), evc_alpha_0_ * quotient);
-
-    return quotient;
   }
 
 } // namespace ryujin

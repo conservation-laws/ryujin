@@ -77,25 +77,28 @@ namespace ryujin
       DEAL_II_ALWAYS_INLINE inline Number
       compute_bathymetry(const dealii::Point<dim> &point) const
       {
+        if constexpr (dim == 1) {
+          AssertThrow(false, dealii::ExcNotImplemented());
+          __builtin_trap();
+          return Number(0.);
+        }
+
         const Number &x = point[0];
         const Number &y = point[1];
 
         Number z1 =
             1. -
             1. / 8. * std::sqrt(std::pow(x - 30., 2) + std::pow(y - 6., 2));
-        z1 *= cone_magnitude;
 
         Number z2 =
             1. -
             1. / 8. * std::sqrt(std::pow(x - 30., 2) + std::pow(y - 24., 2));
-        z2 *= cone_magnitude;
 
         Number z3 =
             3. -
             3. / 10. * std::sqrt(std::pow(x - 47.5, 2) + std::pow(y - 15., 2));
-        z3 *= cone_magnitude;
 
-        return std::max({z1, z2, z3, Number(0.)});
+        return cone_magnitude * std::max({z1, z2, z3, Number(0.)});
       }
 
       Number left_depth;

@@ -11,6 +11,7 @@
 
 #include "initial_state_circular_dam_break.h"
 #include "initial_state_flow_over_bump.h"
+#include "initial_state_paraboloid.h"
 #include "initial_state_ritter_dam_break.h"
 #include "initial_state_solitary_wave.h"
 #include "initial_state_three_bumps_dam_break.h"
@@ -40,6 +41,7 @@ namespace ryujin
 
       add(std::make_unique<CircularDamBreak<dim, Number, state_type>>(h, s));
       add(std::make_unique<FlowOverBump<dim, Number, state_type>>(h, s));
+      add(std::make_unique<Paraboloid<dim, Number, state_type>>(h, s));
       add(std::make_unique<RitterDamBreak<dim, Number, state_type>>(h, s));
       add(std::make_unique<SolitaryWave<dim, Number, state_type>>(h, s));
       add(std::make_unique<ThreeBumpsDamBreak<dim, Number, state_type>>(h, s));
