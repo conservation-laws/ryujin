@@ -38,14 +38,16 @@ namespace ryujin
                   "any of the subsections defined below.");
 
     initial_direction_[0] = 1.;
-    add_parameter("direction",
-                  initial_direction_,
-                  "Initial direction of shock front, contrast, or vortex");
+    add_parameter(
+        "direction",
+        initial_direction_,
+        "Initial direction of initial configuration (Galilei transform)");
 
     initial_position_[0] = 1.;
-    add_parameter("position",
-                  initial_position_,
-                  "Initial position of shock front, contrast, or vortex");
+    add_parameter(
+        "position",
+        initial_position_,
+        "Initial position of initial configuration (Galilei transform)");
 
     perturbation_ = 0.;
     add_parameter("perturbation",
@@ -154,9 +156,8 @@ namespace ryujin
   {
     /* First, let's normalize the direction: */
 
-    AssertThrow(
-        initial_direction_.norm() != 0.,
-        ExcMessage("Initial shock front direction is set to the zero vector."));
+    AssertThrow(initial_direction_.norm() != 0.,
+                ExcMessage("Initial direction is set to the zero vector."));
     initial_direction_ /= initial_direction_.norm();
 
     /* Populate std::function object: */

@@ -55,7 +55,8 @@ namespace ryujin
 
           Number h =
               eta_ * h_0_ / (a_ * a_) *
-              (2. * x * std::cos(omega * t) + 2 * y * std::sin(omega * t) - z);
+                  (2. * x * std::cos(omega * t) + 2 * y * std::sin(omega * t)) -
+              z;
           h = std::max(h, Number(0.));
 
           const Number v_x = -eta_ * omega * std::sin(omega * t);
@@ -80,7 +81,7 @@ namespace ryujin
       DEAL_II_ALWAYS_INLINE inline Number
       compute_bathymetry(const dealii::Point<dim> &point) const
       {
-        return point.norm();
+        return -h_0_ * (Number(1.) - point.norm_square() / (a_ * a_));
       }
 
       Number a_;
