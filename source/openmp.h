@@ -127,12 +127,16 @@ namespace ryujin
    *
    * @ingroup Miscellaneous
    */
-  template <typename Payload>
   class SynchronizationDispatch
   {
   public:
-    SynchronizationDispatch(const Payload &payload)
-        : payload_(payload)
+    SynchronizationDispatch(
+        const std::function<void()> &async_payload_start,
+        const std::function<void()> &async_payload_finalize,
+        const std::function<void()> &sync_payload = std::function<void()>())
+        : async_payload_start_(async_payload_start)
+        , async_payload_finalize_(async_payload_finalize)
+        , sync_payload_(sync_payload)
         , executed_payload_(false)
         , n_threads_ready_(0)
     {
@@ -140,25 +144,45 @@ namespace ryujin
 
     ~SynchronizationDispatch()
     {
+#ifndef SYNCHRONOUS_MPI_EXCHANGE
+      /* Executes in serial context: */
       if (!executed_payload_)
-        payload_();
+        async_payload_start_();
+      async_payload_finalize_();
+#else
+      if (sync_payload_) {
+        sync_payload_();
+      } else {
+        async_payload_start_();
+        async_payload_finalize_();
+      }
+#endif
     }
 
     DEAL_II_ALWAYS_INLINE inline void check(bool &thread_ready,
                                             const bool condition)
     {
+      /* Executes in concurrent, parallel context: */
+
+#ifndef SYNCHRONOUS_MPI_EXCHANGE
       if (RYUJIN_UNLIKELY(thread_ready == false && condition)) {
+#else
+      if constexpr (false) {
+        (void)condition;
+#endif
         thread_ready = true;
         if (++n_threads_ready_ == omp_get_num_threads()) {
           executed_payload_ = true;
-          payload_();
+          async_payload_start_();
         }
       }
     }
 
   private:
-    const Payload payload_;
-    bool executed_payload_;
+    const std::function<void()> async_payload_start_;
+    const std::function<void()> async_payload_finalize_;
+    const std::function<void()> sync_payload_;
+    std::atomic_bool executed_payload_;
     std::atomic_int n_threads_ready_;
   };
 } // namespace ryujin

@@ -198,11 +198,22 @@ namespace ryujin
     {
       Scope scope(computing_timer_, "time step [E] 0 - precompute values");
 
-      SynchronizationDispatch synchronization_dispatch([&]() {
-        hyperbolic_system_prec_values_.update_ghost_values_start(channel++);
-        indicator_prec_values_.update_ghost_values_start(channel++);
-        limiter_prec_values_.update_ghost_values_start(channel++);
-      });
+      SynchronizationDispatch synchronization_dispatch(
+          [&]() {
+            hyperbolic_system_prec_values_.update_ghost_values_start(channel++);
+            indicator_prec_values_.update_ghost_values_start(channel++);
+            limiter_prec_values_.update_ghost_values_start(channel++);
+          },
+          [&]() {
+            hyperbolic_system_prec_values_.update_ghost_values_finish();
+            indicator_prec_values_.update_ghost_values_finish();
+            limiter_prec_values_.update_ghost_values_finish();
+          },
+          [&]() {
+            hyperbolic_system_prec_values_.update_ghost_values();
+            indicator_prec_values_.update_ghost_values();
+            limiter_prec_values_.update_ghost_values();
+          });
 
       RYUJIN_PARALLEL_REGION_BEGIN
       LIKWID_MARKER_START("time_step_0");
@@ -210,7 +221,9 @@ namespace ryujin
       /* Stored thread locally: */
       bool thread_ready = false;
 
-      auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
+      const auto loop = [&](auto sentinel,
+                            unsigned int left,
+                            unsigned int right) {
         using T = decltype(sentinel);
         unsigned int stride_size = get_stride_size<T>;
 
@@ -247,12 +260,6 @@ namespace ryujin
 
       LIKWID_MARKER_STOP("time_step_0");
       RYUJIN_PARALLEL_REGION_END
-
-      /* Synchronize MPI exchange: */
-
-      hyperbolic_system_prec_values_.update_ghost_values_finish();
-      indicator_prec_values_.update_ghost_values_finish();
-      limiter_prec_values_.update_ghost_values_finish();
     }
 
     /*
@@ -284,7 +291,8 @@ namespace ryujin
                   "time step [E] 1 - compute d_ij, and alpha_i");
 
       SynchronizationDispatch synchronization_dispatch(
-          [&]() { alpha_.update_ghost_values_start(channel++); });
+          [&]() { alpha_.update_ghost_values_start(channel++); },
+          [&]() { alpha_.update_ghost_values_finish(); });
 
       RYUJIN_PARALLEL_REGION_BEGIN
       LIKWID_MARKER_START("time_step_1");
@@ -371,9 +379,8 @@ namespace ryujin
 
       RiemannSolver<dim, Number> riemann_solver(*hyperbolic_system_);
 
-      RYUJIN_OMP_FOR /* with barrier */
-          for (std::size_t k = 0; k < coupling_boundary_pairs.size(); ++k)
-      {
+      RYUJIN_OMP_FOR
+      for (std::size_t k = 0; k < coupling_boundary_pairs.size(); ++k) {
         const auto &entry = coupling_boundary_pairs[k];
         const auto &[i, col_idx, j] = entry;
         const auto U_i = old_U.get_tensor(i);
@@ -391,9 +398,8 @@ namespace ryujin
 
       /* Symmetrize d_ij: */
 
-      RYUJIN_OMP_FOR /* with barrier */
-          for (unsigned int i = 0; i < n_owned; ++i)
-      {
+      RYUJIN_OMP_FOR
+      for (unsigned int i = 0; i < n_owned; ++i) {
 
         /* Skip constrained degrees of freedom: */
         const unsigned int row_length = sparsity_simd.row_length(i);
@@ -439,8 +445,6 @@ namespace ryujin
       Scope scope(computing_timer_,
                   "time step [E] 2 - synchronization barrier");
 
-      alpha_.update_ghost_values_finish();
-
       /* MPI Barrier: */
       tau_max.store(Utilities::MPI::min(tau_max.load(), mpi_communicator_));
 
@@ -466,11 +470,22 @@ namespace ryujin
           computing_timer_,
           "time step [E] 3 - l.-o. update, compute bounds, r_i, and p_ij");
 
-      SynchronizationDispatch synchronization_dispatch([&]() {
-        r_.update_ghost_values_start(channel++);
-        source_.update_ghost_values_start(channel++);
-        source_r_.update_ghost_values_start(channel++);
-      });
+      SynchronizationDispatch synchronization_dispatch(
+          [&]() {
+            r_.update_ghost_values_start(channel++);
+            source_.update_ghost_values_start(channel++);
+            source_r_.update_ghost_values_start(channel++);
+          },
+          [&]() {
+            r_.update_ghost_values_finish();
+            source_.update_ghost_values_finish();
+            source_r_.update_ghost_values_finish();
+          },
+          [&]() {
+            r_.update_ghost_values();
+            source_.update_ghost_values();
+            source_r_.update_ghost_values();
+          });
 
       const Number weight =
           -std::accumulate(stage_weights.begin(), stage_weights.end(), -1.);
@@ -653,12 +668,6 @@ namespace ryujin
 
       LIKWID_MARKER_STOP("time_step_3");
       RYUJIN_PARALLEL_REGION_END
-
-      /* Synchronize MPI exchange: */
-
-      r_.update_ghost_values_finish();
-      source_.update_ghost_values_finish();
-      source_r_.update_ghost_values_finish();
     }
 
     /*
@@ -670,7 +679,8 @@ namespace ryujin
                   "time step [E] 4 - compute p_ij, and l_ij");
 
       SynchronizationDispatch synchronization_dispatch(
-          [&]() { lij_matrix_.update_ghost_rows_start(channel++); });
+          [&]() { lij_matrix_.update_ghost_rows_start(channel++); },
+          [&]() { lij_matrix_.update_ghost_rows_finish(); });
 
       RYUJIN_PARALLEL_REGION_BEGIN
       LIKWID_MARKER_START("time_step_4");
@@ -766,10 +776,6 @@ namespace ryujin
 
       LIKWID_MARKER_STOP("time_step_4");
       RYUJIN_PARALLEL_REGION_END
-
-      /* Synchronize MPI exchange: */
-
-      lij_matrix_.update_ghost_rows_finish();
     }
 
     /*
@@ -789,10 +795,15 @@ namespace ryujin
                   "time step [E] " + step_no + " - " +
                       "symmetrize l_ij, h.-o. update" + additional_step);
 
-      SynchronizationDispatch synchronization_dispatch([&]() {
-        if (!last_round)
-          lij_matrix_next_.update_ghost_rows_start(channel++);
-      });
+      SynchronizationDispatch synchronization_dispatch(
+          [&]() {
+            if (!last_round)
+              lij_matrix_next_.update_ghost_rows_start(channel++);
+          },
+          [&]() {
+            if (!last_round)
+              lij_matrix_next_.update_ghost_rows_finish();
+          });
 
       RYUJIN_PARALLEL_REGION_BEGIN
       LIKWID_MARKER_START(("time_step_" + step_no).c_str());
@@ -901,12 +912,8 @@ namespace ryujin
       LIKWID_MARKER_STOP(("time_step_" + step_no).c_str());
       RYUJIN_PARALLEL_REGION_END
 
-      /* Synchronize MPI exchange: */
-
-      if (!last_round) {
-        lij_matrix_next_.update_ghost_rows_finish();
+      if (!last_round)
         std::swap(lij_matrix_, lij_matrix_next_);
-      }
     } /* limiter_iter_ */
 
     /* Update sources: */

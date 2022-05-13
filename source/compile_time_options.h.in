@@ -16,6 +16,7 @@
 #cmakedefine FORCE_DEAL_II_SPARSE_MATRIX
 #cmakedefine LIKWID_PERFMON
 #cmakedefine USE_CUSTOM_POW
+#cmakedefine USE_SYNCHRONOUS_MPI
 #cmakedefine VALGRIND_CALLGRIND
 
 #if defined(DEBUG) && !defined(CHECK_BOUNDS)
