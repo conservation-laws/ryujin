@@ -14,6 +14,7 @@
 #include <deal.II/numerics/vector_tools.templates.h>
 
 #include <random>
+#include <random>
 
 namespace ryujin
 {
@@ -200,11 +201,16 @@ namespace ryujin
       initial_state_ = [old_state = this->initial_state_,
                         perturbation = this->perturbation_](
                            const dealii::Point<dim> &point, Number t) {
-        static std::default_random_engine generator;
-        static std::uniform_real_distribution<Number> distribution(-1., 1.);
-        auto draw = std::bind(distribution, generator);
 
         auto state = old_state(point, t);
+
+        if (t > 0.)
+          return state;
+
+        static std::default_random_engine generator =
+            std::default_random_engine(std::random_device()());
+        static std::uniform_real_distribution<Number> distribution(-1., 1.);
+        static auto draw = std::bind(distribution, generator);
         for (unsigned int i = 0; i < problem_dimension; ++i)
           state[i] *= (Number(1.) + perturbation * draw());
 

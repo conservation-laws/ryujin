@@ -15,6 +15,7 @@
 #include <deal.II/fe/mapping_q.h>
 
 #include <fstream>
+#include <random>
 
 namespace ryujin
 {
@@ -136,7 +137,8 @@ namespace ryujin
     triangulation.refine_global(refinement_);
 
     if (std::abs(mesh_distortion_) > 1.0e-10)
-      GridTools::distort_random(mesh_distortion_, triangulation);
+      GridTools::distort_random(
+          mesh_distortion_, triangulation, std::random_device()());
 
     mapping_ = std::make_unique<MappingQ<dim>>(order_mapping);
     finite_element_ = std::make_unique<FE_Q<dim>>(order_finite_element);
