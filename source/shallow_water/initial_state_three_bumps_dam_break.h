@@ -25,6 +25,15 @@ namespace ryujin
           : InitialState<dim, Number, state_type, 1>("three bumps dam break", s)
           , hyperbolic_system(hyperbolic_system)
       {
+        well_balancing_validation = false;
+        this->add_parameter(
+            "well balancing validation",
+            well_balancing_validation,
+            "If set to true then the initial profile is returned for all times "
+            "(t>0); otherwise a constant inflow is computed for t>0 suitable "
+            "for prescribing Dirichlet conditions at the inflow boundary.");
+
+
         left_depth = 1.875;
         this->add_parameter("left water depth",
                             left_depth,
@@ -47,7 +56,7 @@ namespace ryujin
 
         /* Initial state: */
 
-        if (t <= 1.e-10) {
+        if (t <= 1.e-10 || well_balancing_validation) {
           Number h = x < 0 ? left_depth : right_depth;
           h = std::max(h - compute_bathymetry(point), Number(0.));
           return hyperbolic_system.template expand_state<dim>(
@@ -101,6 +110,7 @@ namespace ryujin
         return cone_magnitude * std::max({z1, z2, z3, Number(0.)});
       }
 
+      bool well_balancing_validation;
       Number left_depth;
       Number right_depth;
       Number cone_magnitude;
