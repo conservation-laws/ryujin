@@ -230,16 +230,14 @@ namespace ryujin
 
     const auto &[U_i, Z_i] = prec_i;
     const auto &[U_j, Z_j] = prec_j;
-//     const auto U_star_ij = hyperbolic_system.star_state(U_i, Z_i, Z_j);
-//     const auto U_star_ji = hyperbolic_system.star_state(U_j, Z_j, Z_i);
-
-    const auto f_i = hyperbolic_system.f(U_i);
-    const auto f_j = hyperbolic_system.f(U_j);
-//     const auto f_star_ij = hyperbolic_system.f(U_star_ij);
-//     const auto f_star_ji = hyperbolic_system.f(U_star_ji);
+    const auto U_star_ij = hyperbolic_system.star_state(U_i, Z_i, Z_j);
+    const auto U_star_ji = hyperbolic_system.star_state(U_j, Z_j, Z_i);
+    const auto f_star_ij = hyperbolic_system.f(U_star_ij);
+    const auto f_star_ji = hyperbolic_system.f(U_star_ji);
 
     const auto U_ij_bar =
-        ScalarNumber(0.5) * (U_i + U_j + contract(add(f_i, f_j), scaled_c_ij));
+        ScalarNumber(0.5) * (U_star_ij + U_star_ji +
+                             contract(add(f_star_ij, -f_star_ji), scaled_c_ij));
 
     /* Bounds: */
 
