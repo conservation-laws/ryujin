@@ -168,7 +168,10 @@ namespace ryujin
       const state_type &U,
       const dealii::Tensor<1, dim, Number> &n_ij) const -> primitive_type
   {
-    const auto h = std::max(hyperbolic_system.water_depth(U), Number(h_tiny));
+    constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
+    const auto h_reference = hyperbolic_system.reference_water_depth();
+    const Number h_cutoff = Number(h_reference) * eps;
+    const auto h = std::max(hyperbolic_system.water_depth(U), h_cutoff);
 
     const auto vel = hyperbolic_system.momentum(U) *
                      hyperbolic_system.inverse_water_depth(U);

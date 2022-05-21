@@ -60,7 +60,6 @@ namespace ryujin
         : hyperbolic_system(hyperbolic_system)
         , gravity(hyperbolic_system.gravity())
         , gravity_inverse(1. / gravity)
-        , h_tiny(hyperbolic_system.h_tiny())
     {
     }
 
@@ -119,7 +118,6 @@ namespace ryujin
     const HyperbolicSystem &hyperbolic_system;
     const ScalarNumber gravity;
     const ScalarNumber gravity_inverse;
-    const ScalarNumber h_tiny;
 
     //@}
   };

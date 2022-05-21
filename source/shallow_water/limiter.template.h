@@ -23,61 +23,53 @@ namespace ryujin
     bool success = true;
     Number t_r = t_max;
 
+    constexpr ScalarNumber min = std::numeric_limits<ScalarNumber>::min();
     constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
-    // FIXME
-    // constexpr ScalarNumber relax = ScalarNumber(1. + 10. * eps);
-    constexpr ScalarNumber relaxbig = ScalarNumber(1. + 10000. * eps);
+    const ScalarNumber relax =
+        ScalarNumber(1. + hyperbolic_system.dry_state_relaxation() * eps);
 
     /*
      * We first limit the water_depth h.
      *
      * See [Guermond et al, 2021] (5.7).
      */
-
     {
-      const auto &U_h = hyperbolic_system.water_depth(U);
-      const auto &P_h = hyperbolic_system.water_depth(P);
-
+      auto h_U = hyperbolic_system.water_depth(U);
+      const auto &h_P = hyperbolic_system.water_depth(P);
       const auto &h_min = std::get<0>(bounds);
       const auto &h_max = std::get<1>(bounds);
-      const Number h_tiny = hyperbolic_system.h_tiny();
 
-      if (!((std::max(Number(0.), U_h - relaxbig * h_max) == Number(0.)) &&
-            (std::max(Number(0.), h_min - relaxbig * U_h) == Number(0.)))) {
+      const auto test_min = hyperbolic_system.filter_dry_water_depth(
+          std::max(Number(0.), h_U - relax * h_max));
+      const auto test_max = hyperbolic_system.filter_dry_water_depth(
+          std::max(Number(0.), h_min - relax * h_U));
+
+      if (!(test_min == Number(0.) && test_max == Number(0.))) {
 #ifdef DEBUG_OUTPUT
         std::cout << std::fixed << std::setprecision(16);
         std::cout << "Bounds violation: low-order water depth (critical)!\n";
         std::cout << "\t\th min: " << h_min << "\n";
-        std::cout << "\t\th:     " << U_h << "\n";
+        std::cout << "\t\th:     " << h_U << "\n";
         std::cout << "\t\th max: " << h_max << "\n" << std::endl;
 #endif
         success = false;
       }
 
-      const Number denominator =
-          ScalarNumber(1.) / (std::abs(P_h) + eps * h_max);
-      t_r = dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-          h_max,
-          U_h + t_r * P_h,
-          (std::abs(h_max - U_h) + eps * h_min) * denominator,
+      const Number denominator = ScalarNumber(1.) / (std::abs(h_P) + min);
+      constexpr auto lte = dealii::SIMDComparison::less_than_or_equal;
+
+      t_r = dealii::compare_and_apply_mask<lte>(
+          h_max, h_U + t_r * h_P,
+          positive_part(h_max - h_U) * denominator,
           t_r);
 
-      t_r = dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-          U_h + t_r * P_h,
+      t_r = dealii::compare_and_apply_mask<lte>(
+          h_U + t_r * h_P,
           h_min,
-          (std::abs(h_min - U_h) + eps * h_min) * denominator,
+          positive_part(h_min - h_U) * denominator,
           t_r);
 
-      /* Check if h <= h_tiny force low-order: */
-      // FIXME verify
-      t_r = dealii::compare_and_apply_mask<
-          dealii::SIMDComparison::less_than_or_equal>(
-          U_h, h_tiny, Number(0.), t_r);
-
-      /*
-       * It is always t_min <= t_r <= t_max, but just to be sure, box
-       * back into bounds:
-       */
+      /* Box back into bounds: */
       t_r = std::min(t_r, t_max);
       t_r = std::max(t_r, t_min);
 
@@ -85,15 +77,22 @@ namespace ryujin
       /*
        * Verify that the new state is within bounds:
        */
-      const auto n_h = hyperbolic_system.water_depth(U + t_r * P);
-      if (!((std::max(Number(0.), n_h - relaxbig * h_max) == Number(0.)) &&
-            (std::max(Number(0.), h_min - relaxbig * n_h) == Number(0.)))) {
+      const auto h_new = hyperbolic_system.water_depth(U + t_r * P);
+      const auto test_new_min = hyperbolic_system.filter_dry_water_depth(
+          std::max(Number(0.), h_new - relax * h_max));
+      const auto test_new_max = hyperbolic_system.filter_dry_water_depth(
+          std::max(Number(0.), h_min - relax * h_new));
+
+      if (!(test_new_min == Number(0.) && test_new_max == Number(0.))) {
 #ifdef DEBUG_OUTPUT
-        std::cout << std::fixed << std::setprecision(16);
+        std::cout << std::fixed << std::setprecision(30);
         std::cout << "Bounds violation: high-order water depth!\n";
         std::cout << "\t\th min: " << h_min << "\n";
-        std::cout << "\t\th:     " << n_h << "\n";
-        std::cout << "\t\th max: " << h_max << "\n" << std::endl;
+        std::cout << "\t\th:     " << h_new << "\n";
+        std::cout << "\t\th max: " << h_max << "\n";
+        std::cout << "\t\th_U:   " << h_U << "\n";
+        std::cout << "\t\th_P:   " << h_P << "\n";
+        std::cout << "\t\tt_r:   " << t_r << "\n" << std::endl;
 #endif
         success = false;
       }
@@ -116,6 +115,7 @@ namespace ryujin
 
     Number t_l = t_min; // good state
 
+#if 0
     {
       const auto &U_h = hyperbolic_system.water_depth(U);
       const auto &P_h = hyperbolic_system.water_depth(P);
@@ -124,7 +124,6 @@ namespace ryujin
       const auto &P_m = hyperbolic_system.momentum(P);
 
       const auto &kin_max = std::get<2>(bounds);
-      const Number h_kin_small = hyperbolic_system.h_kinetic_energy_tiny();
 
       /* We first check if t_r is a good state */
 
@@ -182,6 +181,7 @@ namespace ryujin
       t_l = std::min(t_l, t_max);
       t_l = std::max(t_l, t_min);
     }
+#endif
 
     return {t_l, success};
   }

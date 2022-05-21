@@ -88,14 +88,6 @@ namespace ryujin
     HyperbolicSystem(const std::string &subsection = "HyperbolicSystem");
 
     /**
-     * Callback for ParameterAcceptor::initialize(). After we read in
-     * configuration parameters from the parameter file we have to do some
-     * (minor) preparatory work in this class to precompute some common
-     * quantities. Do this with a callback.
-     */
-    void parse_parameters_callback();
-
-    /**
      * @name Precomputation of flux quantities
      */
     //@{
@@ -143,14 +135,22 @@ namespace ryujin
 
     /**
      * For a given (1+dim dimensional) state vector <code>U</code>, return
-     * the regularized inverse of the water depth.
-     * \f[
-     *   1/h -> 2 h / (h^2 + max(h, h_tiny))
-     * \f]
+     * a regularized inverse of the water depth. This function returns 1 /
+     * max(h, h_cutoff), where h_cutoff is the reference water depth
+     * multiplied by eps.
      */
     template <int problem_dim, typename Number>
     Number
     inverse_water_depth(const dealii::Tensor<1, problem_dim, Number> &U) const;
+
+    /**
+     * Given a water depth @ref h this function returns 0 if h is in the
+     * interval [-relaxation * h_cutoff, relaxation * h_cutoff], otherwise
+     * h is returned unmodified. Here, h_cutoff is the reference water
+     * depth multiplied by eps.
+     */
+    template <typename Number>
+    Number filter_dry_water_depth(const Number &h) const;
 
     /**
      * For a given (1+dim dimensional) state vector <code>U</code>, return
@@ -492,33 +492,14 @@ namespace ryujin
     double gravity_;
     ACCESSOR_READ_ONLY(gravity)
 
-    double reference_water_depth_;
-    ACCESSOR_READ_ONLY(reference_water_depth)
-
-    double dry_state_tolerance_;
-    ACCESSOR_READ_ONLY(dry_state_tolerance)
-
     double mannings_;
     ACCESSOR_READ_ONLY(mannings)
 
-    //@}
-    /**
-     * @name Precomputed scalar quantitites
-     */
-    //@{
-    double h_tiny_;
-    ACCESSOR_READ_ONLY(h_tiny)
+    double reference_water_depth_;
+    ACCESSOR_READ_ONLY(reference_water_depth)
 
-    double g_mannings_sqd_;
-
-    double reference_speed_;
-    ACCESSOR_READ_ONLY(reference_speed)
-
-    double h_kinetic_energy_tiny_;
-    ACCESSOR_READ_ONLY(h_kinetic_energy_tiny)
-
-    double tiny_entropy_number_;
-    ACCESSOR_READ_ONLY(tiny_entropy_number)
+    double dry_state_relaxation_;
+    ACCESSOR_READ_ONLY(dry_state_relaxation)
 
     //@}
   };
@@ -548,13 +529,28 @@ namespace ryujin
   DEAL_II_ALWAYS_INLINE inline Number HyperbolicSystem::inverse_water_depth(
       const dealii::Tensor<1, problem_dim, Number> &U) const
   {
+    /*
+     * FIXME
+     */
     using ScalarNumber = typename get_value_type<Number>::type;
+    constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
+    const Number h_cutoff = Number(reference_water_depth_) * eps;
 
-    const Number &h = U[0];
-    const Number h_max = std::max(h, Number(h_tiny_));
-    const Number denom = h * h + h_max * h_max;
+    return Number(1.) / std::max(water_depth(U), h_cutoff);
+  }
 
-    return ScalarNumber(2.) * h / denom;
+
+  template <typename Number>
+  DEAL_II_ALWAYS_INLINE inline Number
+  HyperbolicSystem::filter_dry_water_depth(const Number &h) const
+  {
+    using ScalarNumber = typename get_value_type<Number>::type;
+    constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
+    const Number h_cutoff_big =
+        Number(reference_water_depth_ * dry_state_relaxation_) * eps;
+
+    return dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+        std::abs(h), h_cutoff_big, Number(0.), h);
   }
 
 
@@ -659,26 +655,25 @@ namespace ryujin
   }
 
 
-  template <int problem_dim, typename Number>
+  template <int problem_dim, typename T>
   DEAL_II_ALWAYS_INLINE inline bool HyperbolicSystem::is_admissible(
-      const dealii::Tensor<1, problem_dim, Number> &U) const
+      const dealii::Tensor<1, problem_dim, T> &U) const
   {
-    const auto h_new = water_depth(U);
+    const auto h = filter_dry_water_depth(water_depth(U));
 
-    constexpr auto gt = dealii::SIMDComparison::greater_than;
-    using T = Number;
+    constexpr auto gte = dealii::SIMDComparison::greater_than_or_equal;
     const auto test =
-        dealii::compare_and_apply_mask<gt>(h_new, T(0.), T(0.), T(-1.));
+        dealii::compare_and_apply_mask<gte>(h, T(0.), T(0.), T(-1.));
 
 #ifdef DEBUG_OUTPUT
-    if (!(test == Number(0.))) {
+    if (!(test == T(0.))) {
       std::cout << std::fixed << std::setprecision(16);
       std::cout << "Bounds violation: Negative state [h] detected!\n";
-      std::cout << "\t\trho: " << h_new << "\n" << std::endl;
+      std::cout << "\t\trho: " << h << "\n" << std::endl;
     }
 #endif
 
-    return (test == Number(0.));
+    return (test == T(0.));
   }
 
 
