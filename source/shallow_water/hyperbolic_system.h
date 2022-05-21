@@ -402,21 +402,35 @@ namespace ryujin
               typename T = typename ST::value_type>
     ST low_order_stencil_source(const std::tuple<ST, T> &prec_i,
                                 const std::tuple<ST, T> &prec_j,
-                                const dealii::Tensor<1, dim, T> &c_ij,
-                                const T beta_ij) const;
+                                const T &d_ij,
+                                const dealii::Tensor<1, dim, T> &c_ij) const;
+
 
     /**
      * Given precomputed flux contributions @p prec_i and @p prec_j compute
-     * the equilibrated, low-order source term
-     * \f$ g H_i Z_j c_ij\f$.
+     * the high-order source term \f$ g H_i Z_j c_ij\f$.
      */
     template <typename ST,
               int dim = ST::dimension - 1,
               typename T = typename ST::value_type>
     ST high_order_stencil_source(const std::tuple<ST, T> &prec_i,
                                  const std::tuple<ST, T> &prec_j,
-                                 const dealii::Tensor<1, dim, T> &c_ij,
-                                 const T beta_ij) const;
+                                 const T &d_ij,
+                                 const dealii::Tensor<1, dim, T> &c_ij) const;
+
+
+    /**
+     * Given precomputed flux contributions @p prec_i and @p prec_j compute
+     * the equilibrated, low-order affine shift
+     * \f$ B_{ij} = -2d_ij(U^{\ast,j}_i)-2f((U^{\ast,j}_i))c_ij\f$.
+     */
+    template <typename ST,
+              int dim = ST::dimension - 1,
+              typename T = typename ST::value_type>
+    ST affine_shift_stencil_source(const std::tuple<ST, T> &prec_i,
+                                   const std::tuple<ST, T> &prec_j,
+                                   const T &d_ij,
+                                   const dealii::Tensor<1, dim, T> &c_ij) const;
 
 
     //@}
@@ -591,8 +605,9 @@ namespace ryujin
   DEAL_II_ALWAYS_INLINE inline Number HyperbolicSystem::speed_of_sound(
       const dealii::Tensor<1, problem_dim, Number> &U) const
   {
-    /* c^2 = g * h */
     using ScalarNumber = typename get_value_type<Number>::type;
+
+    /* c^2 = g * h */
     return std::sqrt(ScalarNumber(gravity_) * U[0]);
   }
 
@@ -847,7 +862,7 @@ namespace ryujin
     const auto f_i = f(U_star_ij);
     const auto f_j = f(U_star_ji);
 
-    return add(f_i, f_j);
+    return -add(f_i, f_j);
   }
 
 
@@ -863,7 +878,7 @@ namespace ryujin
     const auto f_i = f(U_i);
     const auto f_j = f(U_j);
 
-    return add(f_i, f_j);
+    return -add(f_i, f_j);
   }
 
 
@@ -906,15 +921,16 @@ namespace ryujin
   ST HyperbolicSystem::low_order_stencil_source(
       const std::tuple<ST, T> &prec_i,
       const std::tuple<ST, T> &prec_j,
-      const dealii::Tensor<1, dim, T> &c_ij,
-      const T /*beta_ij*/) const
+      const T &,
+      const dealii::Tensor<1, dim, T> &c_ij) const
   {
     const auto &[U_i, Z_i] = prec_i;
+    const auto H_i = water_depth(U_i);
     const auto &[U_j, Z_j] = prec_j;
     const auto U_star_ij = star_state(U_i, Z_i, Z_j);
     const auto H_star_ij = water_depth(U_star_ij);
 
-    const auto factor = -gravity_ * H_star_ij * H_star_ij;
+    const auto factor = gravity_ * (H_star_ij * H_star_ij - H_i * H_i);
     ST result;
     for (unsigned int d = 1; d < dim + 1; ++d)
       result[d] = factor * c_ij[d - 1];
@@ -926,18 +942,35 @@ namespace ryujin
   ST HyperbolicSystem::high_order_stencil_source(
       const std::tuple<ST, T> &prec_i,
       const std::tuple<ST, T> &prec_j,
-      const dealii::Tensor<1, dim, T> &c_ij,
-      const T /*beta_ij*/) const
+      const T &,
+      const dealii::Tensor<1, dim, T> &c_ij) const
   {
     const auto &[U_i, Z_i] = prec_i;
     const auto &[U_j, Z_j] = prec_j;
     const auto H_i = water_depth(U_i);
 
-    const auto factor = gravity_ * H_i * Z_j;
+    const auto factor = -gravity_ * H_i * (Z_j - Z_i);
     ST result;
     for (unsigned int d = 1; d < dim + 1; ++d)
       result[d] = factor * c_ij[d - 1];
     return result;
+  }
+
+
+  template <typename ST, int dim, typename T>
+  ST HyperbolicSystem::affine_shift_stencil_source(
+      const std::tuple<ST, T> &prec_i,
+      const std::tuple<ST, T> &prec_j,
+      const T &d_ij,
+      const dealii::Tensor<1, dim, T> &c_ij) const
+  {
+    using ScalarNumber = typename get_value_type<T>::type;
+
+    const auto &[U_star_ij, U_star_ji] = equilibrated_states(prec_i, prec_j);
+    const auto f_star_ij = f(U_star_ij);
+
+    return -ScalarNumber(2.) * d_ij * U_star_ij -
+           ScalarNumber(2.) * contract(f_star_ij, c_ij);
   }
 
 

@@ -288,7 +288,7 @@ namespace ryujin
     mutable SparseMatrixSIMD<Number> lij_matrix_;
     mutable SparseMatrixSIMD<Number> lij_matrix_next_;
     mutable SparseMatrixSIMD<Number, problem_dimension> pij_matrix_;
-    mutable SparseMatrixSIMD<Number, problem_dimension> source_pij_matrix_;
+    mutable SparseMatrixSIMD<Number, problem_dimension> qij_matrix_;
 
     //@}
   };

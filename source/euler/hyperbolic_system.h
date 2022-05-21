@@ -374,7 +374,7 @@ namespace ryujin
 
     /**
      * Given flux contributions @p prec_i and @p prec_j compute the flux
-     * <code>(f(U_i) + f(U_j)</code>
+     * <code>(-f(U_i) - f(U_j)</code>
      */
     template <typename FT, int dim = FT::dimension - 2>
     FT flux(const FT &prec_i, const FT &prec_j) const;
@@ -423,8 +423,8 @@ namespace ryujin
     state_type<dim, T>
     low_order_stencil_source(const FT &,
                              const FT &,
-                             const dealii::Tensor<1, dim, T> &,
-                             const T) const = delete;
+                             const T,
+                             const dealii::Tensor<1, dim, T> &) const = delete;
 
     template <typename FT,
               int dim = FT::dimension - 2,
@@ -433,8 +433,18 @@ namespace ryujin
     state_type<dim, T>
     high_order_stencil_source(const FT &,
                               const FT &,
-                              const dealii::Tensor<1, dim, T> &,
-                              const T) const = delete;
+                              const T,
+                              const dealii::Tensor<1, dim, T> &) const = delete;
+
+    template <typename FT,
+              int dim = FT::dimension - 2,
+              typename TT = typename FT::value_type,
+              typename T = typename TT::value_type>
+    state_type<dim, T> affine_shift_stencil_source(
+        const FT &,
+        const FT &,
+        const T,
+        const dealii::Tensor<1, dim, T> &) const = delete;
 
     //@}
     /**
@@ -1000,7 +1010,7 @@ namespace ryujin
   DEAL_II_ALWAYS_INLINE inline FT HyperbolicSystem::flux(const FT &prec_i,
                                                          const FT &prec_j) const
   {
-    return add(prec_i, prec_j);
+    return -add(prec_i, prec_j);
   }
 
 
