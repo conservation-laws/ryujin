@@ -534,10 +534,10 @@ namespace ryujin
           limiter.reset(i);
 
           /* Sources: */
-          HyperbolicSystem::state_type<dim, T> S_i;
+          HyperbolicSystem::state_type<dim, T> S_i_new;
           HyperbolicSystem::state_type<dim, T> S_iH;
           if constexpr (HyperbolicSystem::have_source_terms) {
-            S_i = hyperbolic_system_->low_order_nodal_source(
+            S_i_new = hyperbolic_system_->low_order_nodal_source(
                 hyperbolic_system_prec_values_, i, U_i);
             S_iH = hyperbolic_system_->high_order_nodal_source(
                 hyperbolic_system_prec_values_, i, U_i);
@@ -573,9 +573,13 @@ namespace ryujin
 
             HyperbolicSystem::state_type<dim, T> Q_ij;
             if constexpr (HyperbolicSystem::have_source_terms) {
+              const auto B_ij = hyperbolic_system_->affine_shift_stencil_source(
+                  prec_i, prec_j, d_ij, c_ij);
               const auto S_ij = hyperbolic_system_->low_order_stencil_source(
                   prec_i, prec_j, d_ij, c_ij);
-              S_i += tau * m_i_inv * S_ij;
+
+              U_i_new -= tau * m_i_inv * B_ij;
+              S_i_new += tau * m_i_inv * (B_ij + S_ij);
               Q_ij -= S_ij;
             }
 
@@ -651,7 +655,7 @@ namespace ryujin
           r_.template write_tensor<T>(F_iH, i);
 
           if constexpr (HyperbolicSystem::have_source_terms) {
-            source_.template write_tensor<T>(S_i, i);
+            source_.template write_tensor<T>(S_i_new, i);
             source_r_.template write_tensor<T>(S_iH, i);
           }
 
