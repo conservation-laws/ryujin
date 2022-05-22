@@ -143,6 +143,15 @@ namespace ryujin
     static Number density(const dealii::Tensor<1, problem_dim, Number> &U);
 
     /**
+     * Given a density @ref rho this function returns 0 if rho is in the
+     * interval [-relaxation * rho_cutoff, relaxation * rho_cutoff],
+     * otherwise rho is returned unmodified. Here, rho_cutoff is the
+     * reference density multiplied by eps.
+     */
+    template <typename Number>
+    Number filter_vacuum_density(const Number &rho) const;
+
+    /**
      * For a given (2+dim dimensional) state vector <code>U</code>, return
      * the momentum vector <code>[U[1], ..., U[1+dim]]</code>.
      */
@@ -505,6 +514,12 @@ namespace ryujin
     double gamma_;
     ACCESSOR_READ_ONLY(gamma)
 
+    double reference_density_;
+    ACCESSOR_READ_ONLY(reference_density)
+
+    double vacuum_state_relaxation_;
+    ACCESSOR_READ_ONLY(vacuum_state_relaxation)
+
     //@}
     /**
      * @name Precomputed scalar quantitites
@@ -535,6 +550,20 @@ namespace ryujin
   HyperbolicSystem::density(const dealii::Tensor<1, problem_dim, Number> &U)
   {
     return U[0];
+  }
+
+
+  template <typename Number>
+  DEAL_II_ALWAYS_INLINE inline Number
+  HyperbolicSystem::filter_vacuum_density(const Number &rho) const
+  {
+    using ScalarNumber = typename get_value_type<Number>::type;
+    constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
+    const Number rho_cutoff_big =
+        Number(reference_density_ * vacuum_state_relaxation_) * eps;
+
+    return dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+        std::abs(rho), rho_cutoff_big, Number(0.), rho);
   }
 
 

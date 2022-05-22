@@ -24,8 +24,9 @@ namespace ryujin
     Number t_r = t_max;
 
     constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
-    constexpr ScalarNumber relax = ScalarNumber(1. + 10. * eps);
-    constexpr ScalarNumber relaxbig = ScalarNumber(1. + 10000. * eps);
+    const ScalarNumber relax_small = ScalarNumber(1. + 10. * eps);
+    const ScalarNumber relax =
+        ScalarNumber(1. + hyperbolic_system.vacuum_state_relaxation() * eps);
 
     /*
      * First limit the density rho.
@@ -34,40 +35,44 @@ namespace ryujin
      */
 
     {
-      const auto &U_rho = hyperbolic_system.density(U);
-      const auto &P_rho = hyperbolic_system.density(P);
+      const auto &rho_U = hyperbolic_system.density(U);
+      const auto &rho_P = hyperbolic_system.density(P);
 
       const auto &rho_min = std::get<0>(bounds);
       const auto &rho_max = std::get<1>(bounds);
 
       /*
-       * Verify that U_rho is within bounds. This property might be
+       * Verify that rho_U is within bounds. This property might be
        * violated for relative CFL numbers larger than 1.
        */
-      if (!((std::max(Number(0.), U_rho - relaxbig * rho_max) == Number(0.)) &&
-            (std::max(Number(0.), rho_min - relaxbig * U_rho) == Number(0.)))) {
+      const auto test_min = hyperbolic_system.filter_vacuum_density(
+          std::max(Number(0.), rho_U - relax * rho_max));
+      const auto test_max = hyperbolic_system.filter_vacuum_density(
+          std::max(Number(0.), rho_min - relax * rho_U));
+      if (!(test_min == Number(0.) && test_max == Number(0.))) {
 #ifdef DEBUG_OUTPUT
         std::cout << std::fixed << std::setprecision(16);
         std::cout << "Bounds violation: low-order density (critical)!\n";
-        std::cout << "\t\trho min: " << rho_min << "\n";
-        std::cout << "\t\trho:     " << U_rho << "\n";
-        std::cout << "\t\trho max: " << rho_max << "\n" << std::endl;
+        std::cout << "\t\trho dmin: " << negative_part(rho_U - rho_min) << "\n";
+        std::cout << "\t\trho:      " << rho_U << "\n";
+        std::cout << "\t\trho dmax: " << positive_part(rho_U - rho_max) << "\n"
+                  << std::endl;
 #endif
         success = false;
       }
 
       const Number denominator =
-          ScalarNumber(1.) / (std::abs(P_rho) + eps * rho_max);
+          ScalarNumber(1.) / (std::abs(rho_P) + eps * rho_max);
       t_r = dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
           rho_max,
-          U_rho + t_r * P_rho,
-          (std::abs(rho_max - U_rho) + eps * rho_min) * denominator,
+          rho_U + t_r * rho_P,
+          (std::abs(rho_max - rho_U) + eps * rho_min) * denominator,
           t_r);
 
       t_r = dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-          U_rho + t_r * P_rho,
+          rho_U + t_r * rho_P,
           rho_min,
-          (std::abs(rho_min - U_rho) + eps * rho_min) * denominator,
+          (std::abs(rho_min - rho_U) + eps * rho_min) * denominator,
           t_r);
 
       /*
@@ -81,14 +86,17 @@ namespace ryujin
       /*
        * Verify that the new state is within bounds:
        */
-      const auto n_rho = hyperbolic_system.density(U + t_r * P);
-      if (!((std::max(Number(0.), n_rho - relaxbig * rho_max) == Number(0.)) &&
-            (std::max(Number(0.), rho_min - relaxbig * n_rho) == Number(0.)))) {
+      const auto rho_new = hyperbolic_system.density(U + t_r * P);
+      const auto test_new_min = hyperbolic_system.filter_vacuum_density(
+          std::max(Number(0.), rho_new - relax * rho_max));
+      const auto test_new_max = hyperbolic_system.filter_vacuum_density(
+          std::max(Number(0.), rho_min - relax * rho_new));
+      if (!(test_new_min == Number(0.) && test_new_max == Number(0.))) {
 #ifdef DEBUG_OUTPUT
         std::cout << std::fixed << std::setprecision(16);
         std::cout << "Bounds violation: high-order density!\n";
         std::cout << "\t\trho min: " << rho_min << "\n";
-        std::cout << "\t\trho:     " << n_rho << "\n";
+        std::cout << "\t\trho:     " << rho_new << "\n";
         std::cout << "\t\trho max: " << rho_max << "\n" << std::endl;
 #endif
         success = false;
@@ -132,10 +140,13 @@ namespace ryujin
         const auto rho_r_gamma = ryujin::pow(rho_r, gamma);
         const auto rho_e_r = hyperbolic_system.internal_energy(U_r);
 
-        auto psi_r = relax * rho_r * rho_e_r - s_min * rho_r * rho_r_gamma;
+        auto psi_r =
+            relax_small * rho_r * rho_e_r - s_min * rho_r * rho_r_gamma;
 
-        /* If psi_r > 0 the right state is fine, force returning t_r by
-         * setting t_l = t_r: */
+        /*
+         * If psi_r > 0 the right state is fine, force returning t_r by
+         * setting t_l = t_r:
+         */
         t_l = dealii::compare_and_apply_mask<
             dealii::SIMDComparison::greater_than>(psi_r, Number(0.), t_r, t_l);
 
@@ -148,14 +159,17 @@ namespace ryujin
         const auto rho_l_gamma = ryujin::pow(rho_l, gamma);
         const auto rho_e_l = hyperbolic_system.internal_energy(U_l);
 
-        auto psi_l = relax * rho_l * rho_e_l - s_min * rho_l * rho_l_gamma;
+        auto psi_l =
+            relax_small * rho_l * rho_e_l - s_min * rho_l * rho_l_gamma;
 
         /*
          * Verify that the left state is within bounds. This property might
          * be violated for relative CFL numbers larger than 1.
          */
+        const auto lower_bound =
+            (ScalarNumber(1.) - relax) * s_min * rho_r * rho_r_gamma;
         if (n == 0 &&
-            !(std::min(Number(0.), psi_l + Number(100. * eps)) == Number(0.))) {
+            !(std::min(Number(0.), psi_l - lower_bound) == Number(0.))) {
 #ifdef DEBUG_OUTPUT
           std::cout << std::fixed << std::setprecision(16);
           std::cout
@@ -203,11 +217,14 @@ namespace ryujin
         const auto rho_new = hyperbolic_system.density(U_new);
         const auto e_new = hyperbolic_system.internal_energy(U_new);
         const auto psi =
-            relax * relax * rho_new * e_new - s_min * ryujin::pow(rho_new, gp1);
+            relax_small * rho_new * e_new - s_min * ryujin::pow(rho_new, gp1);
+
+        const auto lower_bound =
+            (ScalarNumber(1.) - relax) * s_min * ryujin::pow(rho_new, gp1);
 
         const bool e_valid = std::min(Number(0.), e_new) == Number(0.);
         const bool psi_valid =
-            std::min(Number(0.), psi + ScalarNumber(100.) * eps) == Number(0.);
+            std::min(Number(0.), psi - lower_bound) == Number(0.);
         if (!e_valid || !psi_valid) {
 #ifdef DEBUG_OUTPUT
           std::cout << std::fixed << std::setprecision(16);

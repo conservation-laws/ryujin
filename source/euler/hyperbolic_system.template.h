@@ -19,6 +19,16 @@ namespace ryujin
     gamma_ = 7. / 5.;
     add_parameter("gamma", gamma_, "The ratio of specific heats");
 
+    reference_density_ = 1.;
+    add_parameter("reference density",
+                  reference_density_,
+                  "Problem specific density reference");
+
+    vacuum_state_relaxation_ = 10000.;
+    add_parameter("vacuum state relaxation",
+                  vacuum_state_relaxation_,
+                  "Problem specific vacuum relaxation parameter");
+
     parse_parameters_callback();
   }
 
