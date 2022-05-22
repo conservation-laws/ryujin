@@ -343,9 +343,10 @@ namespace ryujin
         print_cycle_statistics(cycle, t, output_cycle, /*logfile*/ true);
 
       const auto wall_time = computing_timer_["time loop"].wall_time();
-      if (wall_time >= last_terminal_output + terminal_update_interval_) {
+      const auto data = Utilities::MPI::min_max_avg(wall_time, mpi_communicator_);
+      if (data.avg >= last_terminal_output + terminal_update_interval_) {
         print_cycle_statistics(cycle, t, output_cycle);
-        last_terminal_output = wall_time;
+        last_terminal_output = data.avg;
       }
     } /* end of loop */
 
