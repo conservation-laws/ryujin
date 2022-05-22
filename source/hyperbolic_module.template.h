@@ -933,10 +933,6 @@ namespace ryujin
       switch (id_violation_strategy_) {
       case IDViolationStrategy::warn:
         n_warnings_++;
-        if (dealii::Utilities::MPI::this_mpi_process(mpi_communicator_) == 0)
-          std::cout << "[INFO] Hyperbolic module: Insufficient CFL: Invariant "
-                       "domain violation detected"
-                    << std::endl;
         break;
       case IDViolationStrategy::raise_exception:
         n_restarts_++;
