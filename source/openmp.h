@@ -10,6 +10,7 @@
 #include <deal.II/base/config.h>
 
 #include <atomic>
+#include <future>
 #include <omp.h>
 
 /**
@@ -130,39 +131,27 @@ namespace ryujin
   class SynchronizationDispatch
   {
   public:
-    SynchronizationDispatch(
-        const std::function<void()> &async_payload_start,
-        const std::function<void()> &async_payload_finalize,
-        const std::function<void()> &sync_payload = std::function<void()>())
-        : async_payload_start_(async_payload_start)
-        , async_payload_finalize_(async_payload_finalize)
-        , sync_payload_(sync_payload)
-        , executed_payload_(false)
+    SynchronizationDispatch(const std::function<void()> &async_payload)
+        : async_payload_(async_payload)
         , n_threads_ready_(0)
     {
     }
 
     ~SynchronizationDispatch()
     {
-#ifndef SYNCHRONOUS_MPI_EXCHANGE
-      /* Executes in serial context: */
-      if (!executed_payload_)
-        async_payload_start_();
-      async_payload_finalize_();
-#else
-      if (sync_payload_) {
-        sync_payload_();
+      /* Executes in serial, non thread-parallel context: */
+
+      if (payload_status_.valid()) {
+        payload_status_.wait();
       } else {
-        async_payload_start_();
-        async_payload_finalize_();
+        async_payload_();
       }
-#endif
     }
 
     DEAL_II_ALWAYS_INLINE inline void check(bool &thread_ready,
                                             const bool condition)
     {
-      /* Executes in concurrent, parallel context: */
+      /* Executes in concurrent, thread-parallel context: */
 
 #ifndef SYNCHRONOUS_MPI_EXCHANGE
       if (RYUJIN_UNLIKELY(thread_ready == false && condition)) {
@@ -172,17 +161,14 @@ namespace ryujin
 #endif
         thread_ready = true;
         if (++n_threads_ready_ == omp_get_num_threads()) {
-          executed_payload_ = true;
-          async_payload_start_();
+          payload_status_ = std::async(std::launch::async, async_payload_);
         }
       }
     }
 
   private:
-    const std::function<void()> async_payload_start_;
-    const std::function<void()> async_payload_finalize_;
-    const std::function<void()> sync_payload_;
-    std::atomic_bool executed_payload_;
+    const std::function<void()> async_payload_;
+    std::future<void> payload_status_;
     std::atomic_int n_threads_ready_;
   };
 } // namespace ryujin

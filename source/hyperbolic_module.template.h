@@ -198,22 +198,15 @@ namespace ryujin
     {
       Scope scope(computing_timer_, "time step [E] 0 - precompute values");
 
-      SynchronizationDispatch synchronization_dispatch(
-          [&]() {
-            hyperbolic_system_prec_values_.update_ghost_values_start(channel++);
-            indicator_prec_values_.update_ghost_values_start(channel++);
-            limiter_prec_values_.update_ghost_values_start(channel++);
-          },
-          [&]() {
-            hyperbolic_system_prec_values_.update_ghost_values_finish();
-            indicator_prec_values_.update_ghost_values_finish();
-            limiter_prec_values_.update_ghost_values_finish();
-          },
-          [&]() {
-            hyperbolic_system_prec_values_.update_ghost_values();
-            indicator_prec_values_.update_ghost_values();
-            limiter_prec_values_.update_ghost_values();
-          });
+      SynchronizationDispatch synchronization_dispatch([&]() {
+        hyperbolic_system_prec_values_.update_ghost_values_start(channel++);
+        indicator_prec_values_.update_ghost_values_start(channel++);
+        limiter_prec_values_.update_ghost_values_start(channel++);
+
+        hyperbolic_system_prec_values_.update_ghost_values_finish();
+        indicator_prec_values_.update_ghost_values_finish();
+        limiter_prec_values_.update_ghost_values_finish();
+      });
 
       RYUJIN_PARALLEL_REGION_BEGIN
       LIKWID_MARKER_START("time_step_0");
@@ -290,9 +283,10 @@ namespace ryujin
       Scope scope(computing_timer_,
                   "time step [E] 1 - compute d_ij, and alpha_i");
 
-      SynchronizationDispatch synchronization_dispatch(
-          [&]() { alpha_.update_ghost_values_start(channel++); },
-          [&]() { alpha_.update_ghost_values_finish(); });
+      SynchronizationDispatch synchronization_dispatch([&]() {
+        alpha_.update_ghost_values_start(channel++);
+        alpha_.update_ghost_values_finish();
+      });
 
       RYUJIN_PARALLEL_REGION_BEGIN
       LIKWID_MARKER_START("time_step_1");
@@ -470,22 +464,15 @@ namespace ryujin
           computing_timer_,
           "time step [E] 3 - l.-o. update, compute bounds, r_i, and p_ij");
 
-      SynchronizationDispatch synchronization_dispatch(
-          [&]() {
-            r_.update_ghost_values_start(channel++);
-            source_.update_ghost_values_start(channel++);
-            source_r_.update_ghost_values_start(channel++);
-          },
-          [&]() {
-            r_.update_ghost_values_finish();
-            source_.update_ghost_values_finish();
-            source_r_.update_ghost_values_finish();
-          },
-          [&]() {
-            r_.update_ghost_values();
-            source_.update_ghost_values();
-            source_r_.update_ghost_values();
-          });
+      SynchronizationDispatch synchronization_dispatch([&]() {
+        r_.update_ghost_values_start(channel++);
+        source_.update_ghost_values_start(channel++);
+        source_r_.update_ghost_values_start(channel++);
+
+        r_.update_ghost_values_finish();
+        source_.update_ghost_values_finish();
+        source_r_.update_ghost_values_finish();
+      });
 
       const Number weight =
           -std::accumulate(stage_weights.begin(), stage_weights.end(), -1.);
@@ -681,9 +668,10 @@ namespace ryujin
     if (limiter_iter_ != 0) {
       Scope scope(computing_timer_, "time step [E] 4 - compute p_ij, and l_ij");
 
-      SynchronizationDispatch synchronization_dispatch(
-          [&]() { lij_matrix_.update_ghost_rows_start(channel++); },
-          [&]() { lij_matrix_.update_ghost_rows_finish(); });
+      SynchronizationDispatch synchronization_dispatch([&]() {
+        lij_matrix_.update_ghost_rows_start(channel++);
+        lij_matrix_.update_ghost_rows_finish();
+      });
 
       RYUJIN_PARALLEL_REGION_BEGIN
       LIKWID_MARKER_START("time_step_4");
@@ -797,15 +785,12 @@ namespace ryujin
                   "time step [E] " + step_no + " - " +
                       "symmetrize l_ij, h.-o. update" + additional_step);
 
-      SynchronizationDispatch synchronization_dispatch(
-          [&]() {
-            if (!last_round)
-              lij_matrix_next_.update_ghost_rows_start(channel++);
-          },
-          [&]() {
-            if (!last_round)
-              lij_matrix_next_.update_ghost_rows_finish();
-          });
+      SynchronizationDispatch synchronization_dispatch([&]() {
+        if (!last_round) {
+          lij_matrix_next_.update_ghost_rows_start(channel++);
+          lij_matrix_next_.update_ghost_rows_finish();
+        }
+      });
 
       RYUJIN_PARALLEL_REGION_BEGIN
       LIKWID_MARKER_START(("time_step_" + step_no).c_str());
