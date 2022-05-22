@@ -998,14 +998,18 @@ namespace ryujin
 
     print_head(primary.str(), secondary.str(), output);
 
-    output << "Information: (HYP) " << hyperbolic_system_.problem_name        //
-           << "\n             [" << base_name_ << "] with "                   //
-           << offline_data_.dof_handler().n_dofs() << " Qdofs on "            //
-           << n_mpi_processes_ << " ranks / " << MultithreadInfo::n_threads() //
-           << " threads."                                                     //
-           << "\n             Last output cycle " << output_cycle - 1         //
-           << " at t = " << output_granularity_ * (output_cycle - 1)          //
-           << " (terminal update interval " << terminal_update_interval_      //
+    output << "Information: (HYP) " << hyperbolic_system_.problem_name   //
+           << "\n             [" << base_name_ << "] with "              //
+           << offline_data_.dof_handler().n_dofs() << " Qdofs on "       //
+           << n_mpi_processes_ << " ranks / "                            //
+#ifdef WITH_OPENMP
+           << MultithreadInfo::n_threads() << " threads."                //
+#else
+           << "[openmp disabled]."                                       //
+#endif
+           << "\n             Last output cycle " << output_cycle - 1    //
+           << " at t = " << output_granularity_ * (output_cycle - 1)     //
+           << " (terminal update interval " << terminal_update_interval_ //
            << "s)\n";
 
     print_memory_statistics(output);

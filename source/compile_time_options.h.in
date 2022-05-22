@@ -15,9 +15,10 @@
 #cmakedefine DENORMALS_ARE_ZERO
 #cmakedefine FORCE_DEAL_II_SPARSE_MATRIX
 #cmakedefine LIKWID_PERFMON
-#cmakedefine USE_CUSTOM_POW
 #cmakedefine SYNCHRONOUS_MPI_EXCHANGE
+#cmakedefine USE_CUSTOM_POW
 #cmakedefine VALGRIND_CALLGRIND
+#cmakedefine WITH_OPENMP
 
 #if defined(DEBUG) && !defined(CHECK_BOUNDS)
 #define CHECK_BOUNDS

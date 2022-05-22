@@ -9,9 +9,12 @@
 
 #include <deal.II/base/config.h>
 
+#ifdef WITH_OPENMP
+#include <omp.h>
+#endif
+
 #include <atomic>
 #include <future>
-#include <omp.h>
 
 /**
  * @name OpenMP parallel for macros
@@ -148,23 +151,21 @@ namespace ryujin
       }
     }
 
+#if defined(WITH_OPENMP) && !defined(SYNCHRONOUS_MPI_EXCHANGE)
     DEAL_II_ALWAYS_INLINE inline void check(bool &thread_ready,
                                             const bool condition)
     {
       /* Executes in concurrent, thread-parallel context: */
-
-#ifndef SYNCHRONOUS_MPI_EXCHANGE
       if (RYUJIN_UNLIKELY(thread_ready == false && condition)) {
-#else
-      if constexpr (false) {
-        (void)condition;
-#endif
         thread_ready = true;
         if (++n_threads_ready_ == omp_get_num_threads()) {
           payload_status_ = std::async(std::launch::async, async_payload_);
         }
       }
     }
+#else
+    DEAL_II_ALWAYS_INLINE inline void check(bool &, const bool) {}
+#endif
 
   private:
     const std::function<void()> async_payload_;

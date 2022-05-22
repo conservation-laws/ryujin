@@ -23,25 +23,59 @@ if(NOT DEAL_II_WITH_MPI OR NOT DEAL_II_WITH_P4EST)
 endif()
 
 project(ryujin CXX)
-string(APPEND DEAL_II_CXX_FLAGS " -Wfatal-errors")
+
+#
+# Options:
+#
+
+option(CALLGRIND
+  "Compile and link against the valgrind/callgrind instrumentation library" OFF
+  )
+
+option(DOCUMENTATION
+  "Build documentation with doxygen" OFF
+  )
+
+option(LIKWID_PERFMON
+  "Compile and link against the likwid instrumentation library" OFF
+  )
+
+set(DIM "2" CACHE STRING "The dimension")
+set(NUMBER "double" CACHE STRING "The principal floating point type")
+
+option(CHECK_BOUNDS "Enable debug code paths that check limiter bounds" OFF)
+option(DEBUG_OUTPUT "Enable detailed time-step output" OFF)
+option(DENORMALS_ARE_ZERO "Set the \"denormals are zero\" and \"flush to zero\" bits in the MXCSR register" ON)
+option(FORCE_DEAL_II_SPARSE_MATRIX "Always use dealii::SparseMatrix instead of TrilinosWrappers::SparseMatrix for assembly" OFF)
+option(SYNCHRONOUS_MPI_EXCHANGE "Use synchronous MPI communication" ON)
+option(USE_CUSTOM_POW "Use custom serial pow implementation" ON)
+option(WITH_OPENMP "Enable threading support via OpenMP" OFF)
+
+set(ORDER_FINITE_ELEMENT "1" CACHE STRING "Order of finite elements")
+set(ORDER_MAPPING "1" CACHE STRING "Order of mapping")
+set(ORDER_QUADRATURE "2" CACHE STRING "Order of quadrature")
 
 #
 # Set up compiler flags:
 #
 
-find_package(OpenMP REQUIRED)
-string(APPEND DEAL_II_CXX_FLAGS " ${OpenMP_CXX_FLAGS}")
-#
-# Work around a bug with brew on darwin where libomp.dylib gets silently
-# dropped from the link line even though we try to add the library with a
-# proper target_link_libraries() call...
-#
-if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
-  string(APPEND DEAL_II_LINKER_FLAGS " ${OpenMP_CXX_LIBRARIES}")
-endif()
+string(APPEND DEAL_II_CXX_FLAGS " -Wfatal-errors")
 
 if(NOT ${DEAL_II_WITH_CXX17})
   string(APPEND DEAL_II_CXX_FLAGS " -std=c++17")
+endif()
+
+if(WITH_OPENMP)
+  find_package(OpenMP REQUIRED)
+  string(APPEND DEAL_II_CXX_FLAGS " ${OpenMP_CXX_FLAGS}")
+  #
+  # Work around a bug with brew on darwin where libomp.dylib gets silently
+  # dropped from the link line even though we try to add the library with a
+  # proper target_link_libraries() call...
+  #
+  if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
+    string(APPEND DEAL_II_LINKER_FLAGS " ${OpenMP_CXX_LIBRARIES}")
+  endif()
 endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
@@ -73,40 +107,6 @@ set(CMAKE_CXX_FLAGS "")
 set(CMAKE_CXX_FLAGS_RELEASE "")
 set(CMAKE_CXX_FLAGS_DEBUG "")
 set(CMAKE_EXE_LINKER_FLAGS "")
-
-#
-# External library and feature configuration:
-#
-
-option(CALLGRIND
-  "Compile and link against the valgrind/callgrind instrumentation library" OFF
-  )
-
-option(DOCUMENTATION
-  "Build documentation with doxygen" OFF
-  )
-
-option(LIKWID_PERFMON
-  "Compile and link against the likwid instrumentation library" OFF
-  )
-
-#
-# Options:
-#
-
-set(DIM "2" CACHE STRING "The dimension")
-set(NUMBER "double" CACHE STRING "The principal floating point type")
-
-option(CHECK_BOUNDS "Enable debug code paths that check limiter bounds" OFF)
-option(DEBUG_OUTPUT "Enable detailed time-step output" OFF)
-option(DENORMALS_ARE_ZERO "Set the \"denormals are zero\" and \"flush to zero\" bits in the MXCSR register" ON)
-option(FORCE_DEAL_II_SPARSE_MATRIX "Always use dealii::SparseMatrix instead of TrilinosWrappers::SparseMatrix for assembly" OFF)
-option(SYNCHRONOUS_MPI_EXCHANGE "Use synchronous MPI communication" ON)
-option(USE_CUSTOM_POW "Use custom serial pow implementation" ON)
-
-set(ORDER_FINITE_ELEMENT "1" CACHE STRING "Order of finite elements")
-set(ORDER_MAPPING "1" CACHE STRING "Order of mapping")
-set(ORDER_QUADRATURE "2" CACHE STRING "Order of quadrature")
 
 #
 # Set up the rest:
