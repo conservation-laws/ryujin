@@ -58,7 +58,7 @@ namespace ryujin
                   "Maximal number of quadratic newton iterations performed "
                   "during limiting");
 
-    limiter_relaxation_factor_ = Number(2.);
+    limiter_relaxation_factor_ = Number(1.);
     add_parameter("limiter relaxation factor",
                   limiter_relaxation_factor_,
                   "Additional relaxation factor for computing the relaxation "
