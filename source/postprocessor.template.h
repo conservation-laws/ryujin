@@ -162,9 +162,8 @@ namespace ryujin
           if (row_length == 1)
             continue;
 
-          /* Skip diagonal. */
-          const unsigned int *js = sparsity_simd.columns(i) + stride_size;
-          for (unsigned int col_idx = 1; col_idx < row_length;
+          const unsigned int *js = sparsity_simd.columns(i);
+          for (unsigned int col_idx = 0; col_idx < row_length;
                ++col_idx, js += stride_size) {
 
             const auto U_j = U.template get_tensor<T>(js);
@@ -174,7 +173,7 @@ namespace ryujin
 
             unsigned int k = 0;
             for (const auto &[is_primitive, index] : schlieren_indices_) {
-              local_schlieren_values[k++] +=
+              local_schlieren_values[k++] -=
                   c_ij * (is_primitive ? prim_j[index] : U_j[index]);
             }
 
@@ -185,9 +184,9 @@ namespace ryujin
                 q_j[d] = (is_primitive ? prim_j[index + d] : U_j[index + d]);
 
               if constexpr (dim == 2) {
-                local_vorticity_values[k++][0] += cross_product_2d(c_ij) * q_j;
+                local_vorticity_values[k++][0] -= cross_product_2d(c_ij) * q_j;
               } else if constexpr (dim == 3) {
-                local_vorticity_values[k++] += cross_product_3d(c_ij, q_j);
+                local_vorticity_values[k++] -= cross_product_3d(c_ij, q_j);
               }
             }
           }
@@ -233,7 +232,7 @@ namespace ryujin
 
           /* Populate quantities: */
 
-          const Number m_i = lumped_mass_matrix.local_element(i);
+          const auto m_i = load_value<T>(lumped_mass_matrix, i);
 
           unsigned int k = 0;
 
