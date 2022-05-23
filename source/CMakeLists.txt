@@ -74,7 +74,7 @@ macro(setup_equation EQUATION)
     obj_common obj_${EQUATION} ${OpenMP_CXX_LIBRARIES}
     )
 
-  if(LIKWID_PERFMON)
+  if(WITH_LIKWID)
     target_link_libraries(${EQUATION} likwid likwid-hwloc likwid-lua)
   endif()
 

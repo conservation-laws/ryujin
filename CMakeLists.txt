@@ -28,18 +28,6 @@ project(ryujin CXX)
 # Options:
 #
 
-option(CALLGRIND
-  "Compile and link against the valgrind/callgrind instrumentation library" OFF
-  )
-
-option(DOCUMENTATION
-  "Build documentation with doxygen" OFF
-  )
-
-option(LIKWID_PERFMON
-  "Compile and link against the likwid instrumentation library" OFF
-  )
-
 set(DIM "2" CACHE STRING "The dimension")
 set(NUMBER "double" CACHE STRING "The principal floating point type")
 
@@ -47,8 +35,12 @@ option(CHECK_BOUNDS "Enable debug code paths that check limiter bounds" OFF)
 option(DEBUG_OUTPUT "Enable detailed time-step output" OFF)
 option(DENORMALS_ARE_ZERO "Set the \"denormals are zero\" and \"flush to zero\" bits in the MXCSR register" ON)
 option(FORCE_DEAL_II_SPARSE_MATRIX "Always use dealii::SparseMatrix instead of TrilinosWrappers::SparseMatrix for assembly" OFF)
-option(SYNCHRONOUS_MPI_EXCHANGE "Use synchronous MPI communication" ON)
-option(USE_CUSTOM_POW "Use custom serial pow implementation" ON)
+
+option(WITH_ASYNC_MPI_EXCHANGE "Use synchronous MPI communication" OFF)
+option(WITH_CALLGRIND "Compile and link against the valgrind/callgrind instrumentation library" OFF)
+option(WITH_CUSTOM_POW "Use custom serial pow implementation" ON)
+option(WITH_DOXYGEN "Build documentation with doxygen" OFF)
+option(WITH_LIKWID "Compile and link against the likwid instrumentation library" OFF)
 option(WITH_OPENMP "Enable threading support via OpenMP" OFF)
 
 set(ORDER_FINITE_ELEMENT "1" CACHE STRING "Order of finite elements")
@@ -120,6 +112,6 @@ add_subdirectory(prm)
 #enable_testing()
 #add_subdirectory(tests)
 
-IF(DOCUMENTATION)
+IF(WITH_DOXYGEN)
   add_subdirectory(doc)
 ENDIF()

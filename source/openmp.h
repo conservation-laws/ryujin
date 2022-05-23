@@ -151,16 +151,17 @@ namespace ryujin
       }
     }
 
-#if defined(WITH_OPENMP) && !defined(SYNCHRONOUS_MPI_EXCHANGE)
+#ifdef WITH_ASYNC_MPI_EXCHANGE
     DEAL_II_ALWAYS_INLINE inline void check(bool &thread_ready,
                                             const bool condition)
     {
       /* Executes in concurrent, thread-parallel context: */
       if (RYUJIN_UNLIKELY(thread_ready == false && condition)) {
         thread_ready = true;
-        if (++n_threads_ready_ == omp_get_num_threads()) {
+#ifdef WITH_OPENMP
+        if (++n_threads_ready_ == omp_get_num_threads())
+#endif
           payload_status_ = std::async(std::launch::async, async_payload_);
-        }
       }
     }
 #else

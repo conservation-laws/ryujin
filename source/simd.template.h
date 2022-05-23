@@ -33,7 +33,7 @@ namespace ryujin
   }
 
 #if DEAL_II_COMPILER_VECTORIZATION_LEVEL >= 1 && defined(__SSE2__) &&          \
-    defined(USE_CUSTOM_POW)
+    defined(WITH_CUSTOM_POW)
 
   template <>
   // DEAL_II_ALWAYS_INLINE inline
