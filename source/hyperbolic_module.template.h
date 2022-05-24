@@ -79,6 +79,10 @@ namespace ryujin
     std::cout << "HyperbolicModule<dim, Number>::prepare()" << std::endl;
 #endif
 
+    AssertThrow(limiter_iter_ <= 2,
+                dealii::ExcMessage(
+                    "The number of limiter iterations must be between [0,2]"));
+
     /* Initialize vectors: */
 
     const auto &scalar_partitioner = offline_data_->scalar_partitioner();
@@ -785,6 +789,10 @@ namespace ryujin
                   "time step [E] " + step_no + " - " +
                       "symmetrize l_ij, h.-o. update" + additional_step);
 
+      if (last_round) {
+        std::swap(lij_matrix_, lij_matrix_next_);
+      }
+
       SynchronizationDispatch synchronization_dispatch([&]() {
         if (!last_round) {
           lij_matrix_next_.update_ghost_rows_start(channel++);
@@ -898,9 +906,6 @@ namespace ryujin
 
       LIKWID_MARKER_STOP(("time_step_" + step_no).c_str());
       RYUJIN_PARALLEL_REGION_END
-
-      if (!last_round)
-        std::swap(lij_matrix_, lij_matrix_next_);
     } /* limiter_iter_ */
 
     /* Update sources: */
