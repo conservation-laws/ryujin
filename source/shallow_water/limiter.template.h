@@ -175,13 +175,11 @@ namespace ryujin
         success = false;
       }
 
-      /* Return if all psi_l values are within a prescribed tolerance: */
-      if (std::max(
-              Number(0.),
-              dealii::compare_and_apply_mask<
-                  dealii::SIMDComparison::greater_than>(
-                  psi_r, Number(0.), Number(0.), psi_l - newton_tolerance)) ==
-          Number(0.))
+      /*
+       * Return if the window between t_l and t_r is within the prescribed
+       * tolerance:
+       */
+      if (std::max(Number(0.), t_r - t_l - newton_tolerance) == Number(0.))
         return {t_l, success};
 
       /*
