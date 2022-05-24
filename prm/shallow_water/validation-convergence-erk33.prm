@@ -1,0 +1,94 @@
+subsection A - TimeLoop
+  set basename                     = validation-erk33
+
+  set enable output full           = true
+  set enable compute error         = true
+  set enable compute quantities    = true
+  set error quantities             = h
+
+  #FIXME:
+  #set final time                   = 13.45710440
+  #set output granularity           = 01.345610440
+  set final time                   = 1.3456104401
+  set output granularity           = 0.013456104401
+end
+
+
+subsection B - Equation
+  set dry state relaxation  = 10000
+  set reference water depth = 0.1
+  set gravity               = 9.81
+  set mannings              = 0
+end
+
+
+subsection C - Discretization
+  set geometry            = rectangular domain
+
+  set mesh refinement     = 7
+  set mesh distortion     = 0
+  set mesh repartitioning = false
+
+  subsection rectangular domain
+    set position bottom left      = 0, 0
+    set position top right        = 4, 4
+
+    set subdivisions x            = 1
+    set subdivisions y            = 1
+
+    set grading pull back         = x;y
+    set grading push forward      = x;y
+
+    set boundary condition bottom = do_nothing
+    set boundary condition left   = do_nothing
+    set boundary condition right  = do_nothing
+    set boundary condition top    = do_nothing
+  end
+end
+
+subsection E - InitialValues
+  set configuration = paraboloid
+
+  set position      = 2, 2
+  set direction     = 1, 0
+  set perturbation  = 0
+
+  subsection paraboloid
+    set eta                 = 0.5
+    set free surface radius = 1
+    set water height        = 0.1
+  end
+end
+
+subsection F - HyperbolicModule
+  set cfl with boundary dofs        = false
+
+  set limiter iterations            = 2
+  set limiter newton max iterations = 2
+  set limiter newton tolerance      = 1e-10
+  set limiter relaxation factor     = 20
+end
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.10
+  set cfl max               = 0.10
+  set cfl recovery strategy = none
+  set time stepping scheme  = erk 33
+end
+
+subsection I - VTUOutput
+  set manifolds                  =
+  set vtu output quantities      = h, m_1, m_2, bathymetry, alpha
+  set use mpi io                 = true
+
+  set schlieren quantities       = h
+  set vorticity quantities       =
+  set schlieren beta             = 10
+  set schlieren recompute bounds = true
+end
+
+subsection J - Quantities
+  set interior manifolds           = domain : 0 : space_averaged
+  set boundary manifolds           =
+  set clear statistics on writeout = true
+end

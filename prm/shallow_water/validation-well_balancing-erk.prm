@@ -1,0 +1,103 @@
+subsection A - TimeLoop
+  set basename                     = well-balancing
+
+  set enable compute error         = true
+  set error quantities             = h
+
+  set enable output full           = true
+
+  set final time                   = 100.0
+  set output granularity           =  10.0
+
+  set resume                       = false
+
+  set terminal update interval     = 5
+end
+
+
+subsection B - Equation
+  set gravity               = 9.81
+  set mannings              = 0
+
+  set reference water depth = 1
+  set dry state relaxation  = 10000
+end
+
+
+subsection C - Discretization
+  set geometry            = rectangular domain
+
+  set mesh distortion     = 0
+  set mesh refinement     = 8
+  set mesh repartitioning = false
+
+  subsection rectangular domain
+    set position bottom left      =  0,  0
+    set position top right        = 60, 30
+
+    set subdivisions x            = 1
+    set subdivisions y            = 1
+
+    set boundary condition left   = slip
+    set boundary condition right  = slip
+    set boundary condition bottom = slip
+    set boundary condition top    = slip
+
+    set grading pull back         = x;y
+    set grading push forward      = x;y
+  end
+end
+
+
+subsection E - InitialValues
+  set configuration = three bumps dam break
+
+  set position      = 0, 0
+  set direction     = 1, 0
+  set perturbation  = 0
+
+  subsection three bumps dam break
+    set cone magnitude    = 1
+    set left water depth  = 2
+    set right water depth = 2
+    set well balancing validation = true
+  end
+end
+
+
+subsection F - HyperbolicModule
+  set cfl with boundary dofs        = false
+
+  set limiter iterations            = 2
+  set limiter newton tolerance      = 1e-10
+  set limiter relaxation factor     = 2
+end
+
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.90
+  set cfl max               = 0.90
+  set cfl recovery strategy = none
+
+  set time stepping scheme  = erk 33
+end
+
+
+subsection I - VTUOutput
+  set manifolds                  =
+  set vtu output quantities      = h, m_1, m_2, bathymetry
+  set use mpi io                 = true
+
+  set schlieren quantities       = h
+  set vorticity quantities       =
+  set schlieren beta             = 10
+  set schlieren recompute bounds = true
+
+end
+
+
+subsection J - Quantities
+  set interior manifolds           =
+  set boundary manifolds           =
+  set clear statistics on writeout = true
+end
