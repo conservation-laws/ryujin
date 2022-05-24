@@ -21,6 +21,8 @@ namespace ryujin
                               const Number t_max /* = Number(1.) */)
   {
     bool success = true;
+
+    Number t_l = t_min;
     Number t_r = t_max;
 
     constexpr ScalarNumber min = std::numeric_limits<ScalarNumber>::min();
@@ -74,6 +76,12 @@ namespace ryujin
       t_r = std::min(t_r, t_max);
       t_r = std::max(t_r, t_min);
 
+      /*
+       * Enforce strict limiting on dry states:
+       */
+      t_r = dealii::compare_and_apply_mask<dealii::SIMDComparison::equal>(
+          hyperbolic_system.filter_dry_water_depth(h_U), Number(0.), t_l, t_r);
+
 #ifdef CHECK_BOUNDS
       /*
        * Verify that the new state is within bounds:
@@ -112,8 +120,6 @@ namespace ryujin
      *
      *   psi = h KE_i^max - 1/2 |q|^2
      */
-
-    Number t_l = t_min; // good state
 
     {
       const auto &kin_max = std::get<2>(bounds);
