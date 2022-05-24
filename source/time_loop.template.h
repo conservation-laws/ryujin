@@ -339,13 +339,15 @@ namespace ryujin
 
       /* Print and record cycle statistics: */
 
-      if (t >= output_cycle * output_granularity_)
-        print_cycle_statistics(cycle, t, output_cycle, /*logfile*/ true);
-
+      const bool write_to_log_file = (t >= output_cycle * output_granularity_);
       const auto wall_time = computing_timer_["time loop"].wall_time();
-      const auto data = Utilities::MPI::min_max_avg(wall_time, mpi_communicator_);
-      if (data.avg >= last_terminal_output + terminal_update_interval_) {
-        print_cycle_statistics(cycle, t, output_cycle);
+      const auto data =
+          Utilities::MPI::min_max_avg(wall_time, mpi_communicator_);
+      const bool update_terminal =
+          (data.avg >= last_terminal_output + terminal_update_interval_);
+      if (write_to_log_file || update_terminal) {
+        print_cycle_statistics(
+            cycle, t, output_cycle, /*logfile*/ write_to_log_file);
         last_terminal_output = data.avg;
       }
     } /* end of loop */
@@ -355,13 +357,11 @@ namespace ryujin
 
     computing_timer_["time loop"].stop();
 
-    /* Write final timing statistics to screen and logfile: */
     if (terminal_update_interval_ != Number(0.)) {
+      /* Write final timing statistics to screen and logfile: */
       print_cycle_statistics(
-          cycle, t, output_cycle, /*logfile*/ false, /*final*/ true);
+          cycle, t, output_cycle, /*logfile*/ true, /*final*/ true);
     }
-    print_cycle_statistics(
-        cycle, t, output_cycle, /*logfile*/ true, /*final*/ true);
 
     if (enable_compute_error_) {
       /* Output final error: */
@@ -790,11 +790,10 @@ namespace ryujin
   void TimeLoop<dim, Number>::print_throughput(unsigned int cycle,
                                                Number t,
                                                std::ostream &stream,
-                                               bool update,
                                                bool final_time)
   {
     /*
-     * @fixme The global state kept in this function should be refactored
+     * Fixme: The global state kept in this function should be refactored
      * into its own class object.
      */
     static struct Data {
@@ -812,8 +811,7 @@ namespace ryujin
     /* Update statistics: */
 
     {
-      if (update)
-        previous = current;
+      previous = current;
 
       current.cycle = cycle;
       current.t = t;
@@ -1014,20 +1012,16 @@ namespace ryujin
 
     print_memory_statistics(output);
     print_timers(output);
-    print_throughput(cycle,
-                     t,
-                     output,
-                     /*update*/ !write_to_logfile,
-                     /*final_time*/ final_time);
+    print_throughput(cycle, t, output, final_time);
 
     if (mpi_rank_ == 0) {
+#ifndef DEBUG_OUTPUT
+      std::cout << "\033[2J\033[H";
+#endif
+      std::cout << output.str() << std::flush;
+
       if (write_to_logfile) {
         logfile_ << "\n" << output.str() << std::flush;
-      } else {
-#ifndef DEBUG_OUTPUT
-        std::cout << "\033[2J\033[H";
-#endif
-        std::cout << output.str() << std::flush;
       }
     }
   }
