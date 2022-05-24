@@ -15,7 +15,7 @@ namespace ryujin
                               const Bounds &bounds,
                               const state_type &U,
                               const state_type &P,
-                              const ScalarNumber /* newton_tolerance */,
+                              const ScalarNumber newton_tolerance,
                               const unsigned int /* newton_max_iter */,
                               const Number t_min /* = Number(0.) */,
                               const Number t_max /* = Number(1.) */)
@@ -25,6 +25,7 @@ namespace ryujin
 
     constexpr ScalarNumber min = std::numeric_limits<ScalarNumber>::min();
     constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
+    const ScalarNumber relax_small = ScalarNumber(1. + 10. * eps);
     const ScalarNumber relax =
         ScalarNumber(1. + hyperbolic_system.dry_state_relaxation() * eps);
 
@@ -99,7 +100,6 @@ namespace ryujin
 #endif
     }
 
-
     /*
      * Then limit the (negative) kinetic energy:
      *
@@ -115,14 +115,7 @@ namespace ryujin
 
     Number t_l = t_min; // good state
 
-#if 0
     {
-      const auto &U_h = hyperbolic_system.water_depth(U);
-      const auto &P_h = hyperbolic_system.water_depth(P);
-
-      const auto &U_m = hyperbolic_system.momentum(U);
-      const auto &P_m = hyperbolic_system.momentum(P);
-
       const auto &kin_max = std::get<2>(bounds);
 
       /* We first check if t_r is a good state */
@@ -131,57 +124,104 @@ namespace ryujin
       const auto h_r = hyperbolic_system.water_depth(U_r);
       const auto q_r = hyperbolic_system.momentum(U_r);
 
-      const auto psi_r = h_r * kin_max - ScalarNumber(0.5) * q_r.norm_square();
+      const auto psi_r =
+          relax_small * h_r * kin_max - ScalarNumber(0.5) * q_r.norm_square();
 
-      /* If psi_r > -h_kin_small the right state is fine, force returning t_r by
-       * setting t_l = t_r: */
-      t_l = dealii::compare_and_apply_mask< //
-          dealii::SIMDComparison::greater_than>(psi_r, -h_kin_small, t_r, t_l);
-      // FIXME
+      /*
+       * If psi_r > 0 the right state is fine, force returning t_r by
+       * setting t_l = t_r:
+       */
+      t_l = dealii::compare_and_apply_mask<
+          dealii::SIMDComparison::greater_than>(psi_r, Number(0.), t_r, t_l);
 
       /* If we have set t_l = t_r everywhere we can return: */
       if (t_l == t_r)
         return {t_l, success};
 
+#ifdef DEBUG_OUTPUT_LIMITER
+      {
+        std::cout << std::endl;
+        std::cout << std::fixed << std::setprecision(16);
+        std::cout << "t_l: (start) " << t_l << std::endl;
+        std::cout << "t_r: (start) " << t_r << std::endl;
+      }
+#endif
+
+      const auto U_l = U + t_l * P;
+      const auto h_l = hyperbolic_system.water_depth(U_l);
+      const auto q_l = hyperbolic_system.momentum(U_l);
+
+      const auto psi_l =
+          relax_small * h_l * kin_max - ScalarNumber(0.5) * q_l.norm_square();
+
       /*
-       * If bound is not satisfied, we need to find the root of a quadratic
-       * equation:
+       * Verify that the left state is within bounds. This property might
+       * be violated for relative CFL numbers larger than 1.
        *
-       * a t^2 + b t + c = 0
+       * We use a non-scaled eps here to force the lower_bound to be
+       * negative so that we do not accidentally trigger in "perfect" dry
+       * states with h_l equal to zero.
+       */
+      const auto filtered_h_l =hyperbolic_system.filter_dry_water_depth(h_l);
+      const auto lower_bound =
+          (ScalarNumber(1.) - relax) * filtered_h_l * kin_max - eps;
+      if (!(std::min(Number(0.), psi_l - lower_bound + min) == Number(0.))) {
+#ifdef DEBUG_OUTPUT
+        std::cout << std::fixed << std::setprecision(16);
+        std::cout
+            << "Bounds violation: low-order kinetic energy (critical)!\n";
+        std::cout << "\t\tPsi left: 0 <= " << psi_l << "\n" << std::endl;
+#endif
+        success = false;
+      }
+
+      /* Return if all psi_l values are within a prescribed tolerance: */
+      if (std::max(
+              Number(0.),
+              dealii::compare_and_apply_mask<
+                  dealii::SIMDComparison::greater_than>(
+                  psi_r, Number(0.), Number(0.), psi_l - newton_tolerance)) ==
+          Number(0.))
+        return {t_l, success};
+
+      /*
+       * If the bound is not satisfied, we need to find the root of a
+       * quadratic function:
        *
-       * If root r exists, we take t_l = min(r, t_r). Else we take t_l =
-       * min(t_l, t_r). Up to round-off error, a < 0 and c >= 0 always, so
-       * we only define the negative root of the quadratic equation.
+       * psi(t)   = (h_U + t h_P) kin_max
+       *            - 1/2 (|q_U|^2 + 2(q_U * q_P) t + |q_P|^2 t^2)
+       *
+       * d_psi(t) = h_P kin_max - (q_U * q_P) - |q_P|^2 t
+       *
+       * We can compute the root of this function efficiently by using our
+       * standard quadratic_newton_step() function that will use the points
+       * [p1, p1, p2] as well as [p1, p2, p2] to construct two quadratic
+       * polynomials to compute new candiates for the bounds [t_l, t_r]. In
+       * case of a quadratic function psi(t) both polynomials will coincide
+       * so that (up to round-off error) t_l = t_r.
        */
 
-      const auto a = -ScalarNumber(0.5) * P_m.norm_square();
-      const auto a_nudged = std::min(a, -h_kin_small); // FIXME
-      const auto b = P_h * kin_max - U_m * P_m;
-      const auto c = U_h * kin_max - ScalarNumber(0.5) * U_m.norm_square();
+      const auto &h_P = hyperbolic_system.water_depth(P);
+      const auto &q_U = hyperbolic_system.momentum(U);
+      const auto &q_P = hyperbolic_system.momentum(P);
 
-      // FIXME: Check admissibility
+      const auto dpsi_l = h_P * kin_max - (q_U * q_P) - q_P * q_P * t_l;
+      const auto dpsi_r = h_P * kin_max - (q_U * q_P) - q_P * q_P * t_r;
 
-      const Number discriminant = b * b - ScalarNumber(4.) * a * c;
+      quadratic_newton_step(
+          t_l, t_r, psi_l, psi_r, dpsi_l, dpsi_r, Number(-1.));
 
-      Number root = ScalarNumber(0.5) / a_nudged *
-                    (-b - std::sqrt(std::abs(discriminant)));
-
-      /* Define final limiter */
-      t_l =
-          dealii::compare_and_apply_mask<dealii::SIMDComparison::greater_than>(
-              root, Number(0.), std::min(root, t_r), std::min(t_l, t_r));
-
-      /* If kinetic energy <= h_kin_small, then set limiter to 0 */
-      t_l = dealii::compare_and_apply_mask<
-          dealii::SIMDComparison::less_than_or_equal>(
-          U_h * kin_max, h_kin_small, Number(0.), t_l);
-      // FIXME
-
-      /* and then put it in a box for safety reasons */
-      t_l = std::min(t_l, t_max);
-      t_l = std::max(t_l, t_min);
-    }
+#ifdef DEBUG_OUTPUT_LIMITER
+      if (std::max(Number(0.), psi_r + Number(eps)) == Number(0.)) {
+        std::cout << "psi_l:       " << psi_l << std::endl;
+        std::cout << "psi_r:       " << psi_r << std::endl;
+        std::cout << "dpsi_l:      " << dpsi_l << std::endl;
+        std::cout << "dpsi_r:      " << dpsi_r << std::endl;
+        std::cout << "t_l: (end)   " << t_l << std::endl;
+        std::cout << "t_r: (end)   " << t_r << std::endl;
+      }
 #endif
+    }
 
     return {t_l, success};
   }

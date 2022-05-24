@@ -22,8 +22,8 @@ namespace ryujin
    * Perform one step of a quadratic Newton iteration, see
    * @cite ryujin-2022-1, Algorithm 3.
    *
-   * For this, it has to hold true that \f$p_1\le p^\ast\le p_2\f$, and
-   * \f$\phi(p_1)\le 0\le \phi(p_2)\f$, or \f$\phi(p_1)\ge 0\ge
+   * @note For this, it has to hold true that \f$p_1\le p^\ast\le p_2\f$,
+   * and \f$\phi(p_1)\le 0\le \phi(p_2)\f$, or \f$\phi(p_1)\ge 0\ge
    * \phi(p_2)\f$ and that \f$\phi\f$ itself is a 3-convex/concave
    * function, i.e., \f$\phi'''<0\f$, or \f$\phi'''>0\f$.
    *
