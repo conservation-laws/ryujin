@@ -608,15 +608,10 @@ namespace ryujin
       }
     }
 
-    RYUJIN_PARALLEL_REGION_BEGIN
-
-    RYUJIN_OMP_FOR
     for (std::size_t c = 0; c < n_indices; ++c)
       for (unsigned int comp = 0; comp < n_components; ++comp)
         exchange_buffer[n_components * c + comp] =
             data[n_components * sparsity->indices_to_be_sent[c] + comp];
-
-    RYUJIN_PARALLEL_REGION_END
 
     {
       const auto &targets = sparsity->send_targets;
