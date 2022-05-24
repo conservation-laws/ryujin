@@ -154,6 +154,15 @@ namespace ryujin
         if (t_l == t_r)
           break;
 
+#ifdef DEBUG_OUTPUT_LIMITER
+        if (n == 0) {
+          std::cout << std::endl;
+          std::cout << std::fixed << std::setprecision(16);
+          std::cout << "t_l: (start) " << t_l << std::endl;
+          std::cout << "t_r: (start) " << t_r << std::endl;
+        }
+#endif
+
         const auto U_l = U + t_l * P;
         const auto rho_l = hyperbolic_system.density(U_l);
         const auto rho_l_gamma = ryujin::pow(rho_l, gamma);
@@ -167,7 +176,7 @@ namespace ryujin
          * be violated for relative CFL numbers larger than 1.
          */
         const auto lower_bound =
-            (ScalarNumber(1.) - relax) * s_min * rho_r * rho_r_gamma;
+            (ScalarNumber(1.) - relax) * s_min * rho_l * rho_l_gamma;
         if (n == 0 &&
             !(std::min(Number(0.), psi_l - lower_bound) == Number(0.))) {
 #ifdef DEBUG_OUTPUT
@@ -203,9 +212,14 @@ namespace ryujin
         quadratic_newton_step(
             t_l, t_r, psi_l, psi_r, dpsi_l, dpsi_r, Number(-1.));
 
-        /* Let's error on the safe side: */
-        t_l -= ScalarNumber(0.2) * newton_tolerance;
-        t_r += ScalarNumber(0.2) * newton_tolerance;
+#ifdef DEBUG_OUTPUT_LIMITER
+          std::cout << "psi_l:       " << psi_l << std::endl;
+          std::cout << "psi_r:       " << psi_r << std::endl;
+          std::cout << "dpsi_l:      " << dpsi_l << std::endl;
+          std::cout << "dpsi_r:      " << dpsi_r << std::endl;
+          std::cout << "t_l: (  " << n << "  ) " << t_l << std::endl;
+          std::cout << "t_r: (  " << n << "  ) " << t_r << std::endl;
+#endif
       }
 
 #ifdef CHECK_BOUNDS
