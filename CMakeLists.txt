@@ -36,7 +36,7 @@ option(DEBUG_OUTPUT "Enable detailed time-step output" OFF)
 option(DENORMALS_ARE_ZERO "Set the \"denormals are zero\" and \"flush to zero\" bits in the MXCSR register" ON)
 option(FORCE_DEAL_II_SPARSE_MATRIX "Always use dealii::SparseMatrix instead of TrilinosWrappers::SparseMatrix for assembly" OFF)
 
-option(WITH_ASYNC_MPI_EXCHANGE "Use synchronous MPI communication" ON)
+option(WITH_ASYNC_MPI_EXCHANGE "Use synchronous MPI communication" OFF)
 option(WITH_CALLGRIND "Compile and link against the valgrind/callgrind instrumentation library" OFF)
 option(WITH_CUSTOM_POW "Use custom serial pow implementation" ON)
 option(WITH_DOXYGEN "Build documentation with doxygen" OFF)
