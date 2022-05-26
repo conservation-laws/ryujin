@@ -58,7 +58,8 @@ namespace ryujin
         success = false;
       }
 
-      const Number denominator = ScalarNumber(1.) / (std::abs(h_P) + min);
+      const Number denominator =
+          h_P / std::max(std::abs(h_P * h_P), Number(100. * min));
       constexpr auto lte = dealii::SIMDComparison::less_than_or_equal;
 
       t_r = dealii::compare_and_apply_mask<lte>(
@@ -168,7 +169,7 @@ namespace ryujin
        * negative so that we do not accidentally trigger in "perfect" dry
        * states with h_l equal to zero.
        */
-      const auto filtered_h_l =hyperbolic_system.filter_dry_water_depth(h_l);
+      const auto filtered_h_l = hyperbolic_system.filter_dry_water_depth(h_l);
       const auto lower_bound =
           (ScalarNumber(1.) - relax) * filtered_h_l * kin_max - eps;
       if (!(std::min(Number(0.), psi_l - lower_bound + min) == Number(0.))) {
