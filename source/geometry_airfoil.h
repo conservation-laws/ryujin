@@ -1264,7 +1264,7 @@ namespace ryujin
 
         for (auto cell : triangulation.active_cell_iterators()) {
           for (auto f : dealii::GeometryInfo<dim>::face_indices()) {
-            const auto face = cell->face(f);
+            auto face = cell->face(f);
 
             /* Handle boundary faces: */
             if (!face->at_boundary())
