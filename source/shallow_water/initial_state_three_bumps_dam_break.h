@@ -87,9 +87,9 @@ namespace ryujin
       compute_bathymetry(const dealii::Point<dim> &point) const
       {
         if constexpr (dim == 1) {
-          AssertThrow(false, dealii::ExcNotImplemented());
-          __builtin_trap();
-          return Number(0.);
+          /* When dim = 1, we only have one cone */
+          Number z3 = 3. - 3. / 10. * std::sqrt(std::pow(x - 47.5, 2));
+          return cone_magnitude * std::max({z3, Number(0.)});
         }
 
         const Number &x = point[0];
