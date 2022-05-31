@@ -88,6 +88,8 @@ namespace ryujin
       {
         if constexpr (dim == 1) {
           /* When dim = 1, we only have one cone */
+          const Number &x = point[0];
+
           Number z3 = 3. - 3. / 10. * std::sqrt(std::pow(x - 47.5, 2));
           return cone_magnitude * std::max({z3, Number(0.)});
         }
