@@ -49,7 +49,7 @@ namespace ryujin
     time_stepping_scheme_ = TimeSteppingScheme::erk_33;
     add_parameter("time stepping scheme",
                   time_stepping_scheme_,
-                  "Time stepping scheme: ssprk 33, erk 33");
+                  "Time stepping scheme: ssprk 33, erk 22, erk 33, erk 43");
   }
 
 
@@ -64,6 +64,9 @@ namespace ryujin
 
     switch (time_stepping_scheme_) {
     case TimeSteppingScheme::ssprk_33:
+      temp_U_.resize(2);
+      break;
+    case TimeSteppingScheme::erk_22:
       temp_U_.resize(2);
       break;
     case TimeSteppingScheme::erk_33:
@@ -103,6 +106,8 @@ namespace ryujin
       switch (time_stepping_scheme_) {
       case TimeSteppingScheme::ssprk_33:
         return step_ssprk_33(U, t);
+      case TimeSteppingScheme::erk_22:
+        return step_erk_22(U, t);
       case TimeSteppingScheme::erk_33:
         return step_erk_33(U, t);
       case TimeSteppingScheme::erk_43:
@@ -162,6 +167,25 @@ namespace ryujin
     return tau;
   }
 
+  template <int dim, typename Number>
+  Number TimeIntegrator<dim, Number>::step_erk_22(vector_type &U, Number t)
+  {
+#ifdef DEBUG_OUTPUT
+    std::cout << "TimeIntegrator<dim, Number>::step_erk_22()" << std::endl;
+#endif
+
+    /* Step 1: U1 <- {U, 1} at time t + tau */
+    Number tau = hyperbolic_module_->template step<0>(U, {}, {}, temp_U_[0]);
+    hyperbolic_module_->apply_boundary_conditions(temp_U_[0], t + tau);
+
+    /* Step 2: U2 <- {U1, 2} and {U, -1} at time t + 2 tau */
+    hyperbolic_module_->template step<1>(
+        temp_U_[0], {{U}}, {{Number(-1.)}}, temp_U_[1], tau);
+    hyperbolic_module_->apply_boundary_conditions(temp_U_[1], t + 2. * tau);
+
+    U.swap(temp_U_[1]);
+    return 2. * tau;
+  }
 
   template <int dim, typename Number>
   Number TimeIntegrator<dim, Number>::step_erk_33(vector_type &U, Number t)

@@ -55,6 +55,19 @@ namespace ryujin
      */
     ssprk_33,
 
+   /**
+     * The explicit Runge-Kutta method RK(2,2;1) with the butcher tableau
+     * \f{align*}
+     * \begin{array}{c|ccc}
+     *   0            & 0 \\
+     *   \tfrac{1}{2} & \tfrac{1}{2} & 0 \\
+     *   \hline
+     *   1            & 0  & 1
+     * \end{array}
+     * \f}
+     */
+    erk_22,
+
     /**
      * The explicit Runge-Kutta method RK(3,3;1) with the butcher tableau
      * \f{align*}
@@ -93,6 +106,7 @@ DECLARE_ENUM(ryujin::CFLRecoveryStrategy,
 
 DECLARE_ENUM(ryujin::TimeSteppingScheme,
              LIST({ryujin::TimeSteppingScheme::ssprk_33, "ssprk 33"},
+		  {ryujin::TimeSteppingScheme::erk_22, "erk 22"},
                   {ryujin::TimeSteppingScheme::erk_33, "erk 33"},
                   {ryujin::TimeSteppingScheme::erk_43, "erk 43"}));
 #endif
@@ -167,6 +181,13 @@ namespace ryujin
      * maximal time step size.
      */
     Number step_ssprk_33(vector_type &U, Number t, Number tau = Number(0.));
+
+  /**
+     * Given a reference to a previous state vector U performs an explicit
+     * second-order Runge-Kutta SSPRK(2,2,1) time step (and store the
+     * result in U). The function returns the chosen time step size tau.
+     */
+    Number step_erk_22(vector_type &U, Number t);
 
     /**
      * Given a reference to a previous state vector U performs an explicit
