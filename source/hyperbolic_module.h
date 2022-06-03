@@ -144,7 +144,7 @@ namespace ryujin
      * modified high-order flux. The standard high-order flux reads
      * (cf @cite ryujin-2022-1, Eq. 12):
      * \f{align}
-     *   \newcommand{\bR}{{\boldsymbol R}}
+     *   \newcommand{\bF}{{\boldsymbol F}}
      *   \newcommand{\bU}{{\boldsymbol U}}
      *   \newcommand\bUni{\bU^n_i}
      *   \newcommand\bUnj{\bU^n_j}
@@ -156,27 +156,25 @@ namespace ryujin
      *   \frac{m_{j}}{\tau_n}\big(
      *   \tilde\bU_j^{H,n+1} - \bU_j^{n}\big)
      *   \;=\;
-     *   \bR^n_i,
+     *   \bF^n_i + d_{ij}^{H,n}\big(\bUnj-\bUni\big),
      *   \qquad\text{with}\quad
-     *   \bR^n_i\;:=\;
-     *   \sum_{j\in\Ii}\Big(-\polf(\bUnj) \cdot\bc_{ij}
-     *   +d_{ij}^{H,n}\big(\bUnj-\bUni\big)\Big).
+     *   \bF^n_i\;:=\;
+     *   \sum_{j\in\Ii}\Big(-(\polf(\bUni)+\polf(\bUnj)) \cdot\bc_{ij}\Big).
      * \f}
      * Instead, the function assembles the modified high-order flux:
      * \f{align}
-     *   \newcommand{\bR}{{\boldsymbol R}}
+     *   \newcommand{\bF}{{\boldsymbol F}}
      *   \newcommand{\bU}{{\boldsymbol U}}
      *   \newcommand\bUnis{\bU^{s,n}_i}
      *   \newcommand\bUnjs{\bU^{s,n}_j}
      *   \newcommand{\polf}{{\mathbb f}}
      *   \newcommand\Ii{\mathcal{I}(i)}
      *   \newcommand{\bc}{{\boldsymbol c}}
-     *   \tilde{\bR}^n_i\;:=\;
-     *   \big(1-\sum_{s=\{1:\text{stages}\}}\omega_s\big)\bR^n_i
+     *   \tilde{\bF}^n_i\;:=\;
+     *   \big(1-\sum_{s=\{1:\text{stages}\}}\omega_s\big)\bF^n_i
      *   \;+\;
      *   \sum_{s=\{1:stages\}}\omega_s
-     *   \sum_{j\in\Ii}\Big(-\polf(\bUnis)-\polf(\bUnjs) \cdot\bc_{ij}
-     *   +d_{ij}^{H,s,n}\big(\bUnjs-\bUnis\big)\Big),
+     *   \sum_{j\in\Ii}\Big(-(\polf(\bUnis)+\polf(\bUnjs)) \cdot\bc_{ij}\Big).
      * \f}
      * where \f$\omega_s\f$ denotes the weigths for the given stages.
      *
