@@ -39,9 +39,11 @@ option(FORCE_DEAL_II_SPARSE_MATRIX "Always use dealii::SparseMatrix instead of T
 option(WITH_ASYNC_MPI_EXCHANGE "Use synchronous MPI communication" OFF)
 option(WITH_CALLGRIND "Compile and link against the valgrind/callgrind instrumentation library" OFF)
 option(WITH_CUSTOM_POW "Use custom serial pow implementation" ON)
-option(WITH_DOXYGEN "Build documentation with doxygen" OFF)
 option(WITH_LIKWID "Compile and link against the likwid instrumentation library" OFF)
-option(WITH_OPENMP "Enable threading support via OpenMP" ON)
+option(WITH_DOXYGEN "Build documentation with doxygen" OFF)
+
+find_package(OpenMP)
+option(WITH_OPENMP "Enable threading support via OpenMP" ${OpenMP_FOUND})
 
 set(ORDER_FINITE_ELEMENT "1" CACHE STRING "Order of finite elements")
 set(ORDER_MAPPING "1" CACHE STRING "Order of mapping")
