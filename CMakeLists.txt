@@ -72,6 +72,10 @@ if(WITH_OPENMP)
   endif()
 endif()
 
+if(WITH_LIKWID)
+  add_definitions(-DLIKWID_PERFMON)
+endif()
+
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
   string(APPEND DEAL_II_CXX_FLAGS " -fdiagnostics-color=always")
   string(REPLACE "-Qunused-arguments" "" DEAL_II_CXX_FLAGS "${DEAL_II_CXX_FLAGS}")
