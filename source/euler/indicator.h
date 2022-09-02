@@ -66,6 +66,17 @@ namespace ryujin
         HyperbolicSystem::problem_dimension<dim>;
 
     /**
+     * @copydoc HyperbolicSystem::precomputed_type
+     */
+    using precomputed_type = HyperbolicSystem::precomputed_type<dim, Number>;
+
+    /**
+     * @copydoc HyperbolicSystem::n_precomputed_values
+     */
+    static constexpr unsigned int n_precomputed_values =
+        HyperbolicSystem::n_precomputed_values<dim>;
+
+    /**
      * @copydoc HyperbolicSystem::state_type
      */
     using state_type = HyperbolicSystem::state_type<dim, Number>;
@@ -80,29 +91,6 @@ namespace ryujin
      */
     using ScalarNumber = typename get_value_type<Number>::type;
 
-    /**
-     * @name Precomputation of indicator quantities
-     */
-    //@{
-
-    /**
-     * The number of precomputed values.
-     */
-    static constexpr unsigned int n_precomputed_values = 1;
-
-    /**
-     * Array type used for precomputed values.
-     */
-    using precomputed_type = std::array<Number, n_precomputed_values>;
-
-    /**
-     * Precomputed values for a given state.
-     */
-    static precomputed_type
-    precompute_values(const HyperbolicSystem &hyperbolic_system,
-                      const state_type &U);
-
-    //@}
     /**
      * @name Stencil-based computation of indicators
      *
@@ -178,28 +166,17 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline typename Indicator<dim, Number>::precomputed_type
-  Indicator<dim, Number>::precompute_values(
-      const HyperbolicSystem &hyperbolic_system, const state_type &U_i)
-  {
-    precomputed_type result;
-    result[0] = hyperbolic_system.harten_entropy(U_i);
-    return result;
-  }
-
-
-  template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline void
   Indicator<dim, Number>::reset(const unsigned int i, const state_type &U_i)
   {
     /* entropy viscosity commutator: */
 
-    const auto &[harten_entropy] =
+    const auto &[new_s_i, new_eta_i] =
         precomputed_values.template get_tensor<Number, precomputed_type>(i);
 
     const auto rho_i = hyperbolic_system.density(U_i);
     rho_i_inverse = Number(1.) / rho_i;
-    eta_i = harten_entropy;
+    eta_i = new_eta_i;
 
     d_eta_i = hyperbolic_system.harten_entropy_derivative(U_i);
     d_eta_i[0] -= eta_i * rho_i_inverse;
@@ -218,7 +195,7 @@ namespace ryujin
   {
     /* entropy viscosity commutator: */
 
-    const auto &[eta_j] =
+    const auto &[s_j, eta_j] =
         precomputed_values.template get_tensor<Number, precomputed_type>(js);
 
     const auto rho_j = hyperbolic_system.density(U_j);

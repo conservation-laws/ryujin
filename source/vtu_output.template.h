@@ -110,7 +110,7 @@ namespace ryujin
           quantities_mapping_.push_back(std::make_tuple(
               entry, [this, index](scalar_type &result, const vector_type &) {
                 const auto &precomputed =
-                    hyperbolic_module_->hyperbolic_system_prec_values();
+                    hyperbolic_module_->precomputed_values();
                 precomputed.extract_component(result, index);
               }));
           continue;

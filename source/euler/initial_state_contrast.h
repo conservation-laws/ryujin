@@ -20,12 +20,12 @@ namespace ryujin
      * @ingroup InitialValues
      */
     template <int dim, typename Number, typename state_type>
-    class Contrast : public InitialState<dim, Number, state_type>
+    class Contrast : public InitialState<dim, Number, state_type, 2>
     {
     public:
       Contrast(const HyperbolicSystem &hyperbolic_system,
                const std::string subsection)
-          : InitialState<dim, Number, state_type>("contrast", subsection)
+          : InitialState<dim, Number, state_type, 2>("contrast", subsection)
           , hyperbolic_system(hyperbolic_system)
       {
         primitive_left_[0] = hyperbolic_system.gamma();

@@ -15,12 +15,12 @@ namespace ryujin
      * @ingroup InitialValues
      */
     template <int dim, typename Number, typename state_type>
-    class Uniform : public InitialState<dim, Number, state_type>
+    class Uniform : public InitialState<dim, Number, state_type, 2>
     {
     public:
       Uniform(const HyperbolicSystem &hyperbolic_system,
               const std::string subsection)
-          : InitialState<dim, Number, state_type>("uniform", subsection)
+          : InitialState<dim, Number, state_type, 2>("uniform", subsection)
           , hyperbolic_system(hyperbolic_system)
       {
         primitive_[0] = hyperbolic_system.gamma();

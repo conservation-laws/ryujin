@@ -36,7 +36,6 @@ namespace ryujin
      */
     static const std::string problem_name;
 
-
     /**
      * The dimension of the state space.
      */
@@ -78,7 +77,7 @@ namespace ryujin
         Tensor<1, problem_dimension<dim>, dealii::Tensor<1, dim, Number>>;
 
     /**
-     * The storage type used for the flux precomputations.
+     * The storage type used for flux contributions.
      */
     template <int dim, typename Number>
     using prec_type = flux_type<dim, Number>;
@@ -97,7 +96,7 @@ namespace ryujin
     void parse_parameters_callback();
 
     /**
-     * @name Precomputation of flux quantities
+     * @name Precomputed quantities
      */
     //@{
 
@@ -105,7 +104,7 @@ namespace ryujin
      * The number of precomputed values.
      */
     template <int dim>
-    static constexpr unsigned int n_precomputed_values = 0;
+    static constexpr unsigned int n_precomputed_values = 2;
 
     /**
      * Array type used for precomputed values.
@@ -131,7 +130,7 @@ namespace ryujin
 
     //@}
     /**
-     * @name Computing derived physical quantities.
+     * @name Computing derived physical quantities
      */
     //@{
 
@@ -325,7 +324,7 @@ namespace ryujin
 
     //@}
     /**
-     * @name Computing fluxes.
+     * @name Flux computations
      */
     //@{
 
@@ -495,7 +494,7 @@ namespace ryujin
 
     /*
      * Transform the current state according to a  given operator @ref
-     * momentum_transform acting on  a @p dim dimensional momentum (or
+     * momentum_transform acting on a @p dim dimensional momentum (or
      * velocity) vector.
      */
     template <int problem_dim, typename Number, typename Lambda>
@@ -537,11 +536,15 @@ namespace ryujin
 
   template <typename MCV, int problem_dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline void HyperbolicSystem::precompute_values(
-      MCV & /*precomputed_values*/,
-      unsigned int /*i*/,
-      const dealii::Tensor<1, problem_dim, Number> & /*U*/) const
+      MCV &precomputed_values,
+      unsigned int i,
+      const dealii::Tensor<1, problem_dim, Number> &U_i) const
   {
-    // do nothing
+    constexpr int dim = problem_dim - 2;
+
+    const precomputed_type<dim, Number> prec_i{specific_entropy(U_i),
+                                               harten_entropy(U_i)};
+    precomputed_values.template write_tensor<Number>(prec_i, i);
   }
 
 

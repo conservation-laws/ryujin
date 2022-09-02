@@ -72,13 +72,16 @@ namespace ryujin
           {"rho", "v_1", "v_2", "v_3", "p"}};
 
   template <>
-  const std::array<std::string, 0> HyperbolicSystem::precomputed_names<1>{{}};
+  const std::array<std::string, 2> HyperbolicSystem::precomputed_names<1>{
+      {"s", "eta"}};
 
   template <>
-  const std::array<std::string, 0> HyperbolicSystem::precomputed_names<2>{{}};
+  const std::array<std::string, 2> HyperbolicSystem::precomputed_names<2>{
+      {"s", "eta"}};
 
   template <>
-  const std::array<std::string, 0> HyperbolicSystem::precomputed_names<3>{{}};
+  const std::array<std::string, 2> HyperbolicSystem::precomputed_names<3>{
+      {"s", "eta"}};
 #endif
 
 } /* namespace ryujin */
