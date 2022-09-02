@@ -83,8 +83,8 @@ namespace ryujin
             HyperbolicSystem::state_type<1, Number>{{h_exact, q_inflow}});
       }
 
-      virtual auto initial_precomputations(const dealii::Point<dim> &point)
-          -> typename InitialState<dim, Number, state_type, 1>::precomputed_type
+      virtual auto initial_precomputations(const dealii::Point<dim> &point) ->
+          typename InitialState<dim, Number, state_type, 1>::precomputed_type
           final override
       {
         /* Compute bathymetry: */

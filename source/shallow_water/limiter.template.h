@@ -62,16 +62,17 @@ namespace ryujin
           h_P / std::max(std::abs(h_P * h_P), Number(100. * min));
       constexpr auto lte = dealii::SIMDComparison::less_than_or_equal;
 
-      t_r = dealii::compare_and_apply_mask<lte>(
-          h_max, h_U + t_r * h_P,
-          positive_part(h_max - h_U) * denominator,
-          t_r);
+      t_r = dealii::compare_and_apply_mask<lte>(h_max,
+                                                h_U + t_r * h_P,
+                                                positive_part(h_max - h_U) *
+                                                    denominator,
+                                                t_r);
 
-      t_r = dealii::compare_and_apply_mask<lte>(
-          h_U + t_r * h_P,
-          h_min,
-          positive_part(h_min - h_U) * denominator,
-          t_r);
+      t_r = dealii::compare_and_apply_mask<lte>(h_U + t_r * h_P,
+                                                h_min,
+                                                positive_part(h_min - h_U) *
+                                                    denominator,
+                                                t_r);
 
       /* Box back into bounds: */
       t_r = std::min(t_r, t_max);
@@ -138,8 +139,9 @@ namespace ryujin
        * If psi_r > 0 the right state is fine, force returning t_r by
        * setting t_l = t_r:
        */
-      t_l = dealii::compare_and_apply_mask<
-          dealii::SIMDComparison::greater_than>(psi_r, Number(0.), t_r, t_l);
+      t_l =
+          dealii::compare_and_apply_mask<dealii::SIMDComparison::greater_than>(
+              psi_r, Number(0.), t_r, t_l);
 
       /* If we have set t_l = t_r everywhere we can return: */
       if (t_l == t_r)
@@ -175,8 +177,7 @@ namespace ryujin
       if (!(std::min(Number(0.), psi_l - lower_bound + min) == Number(0.))) {
 #ifdef DEBUG_OUTPUT
         std::cout << std::fixed << std::setprecision(16);
-        std::cout
-            << "Bounds violation: low-order kinetic energy (critical)!\n";
+        std::cout << "Bounds violation: low-order kinetic energy (critical)!\n";
         std::cout << "\t\tPsi left: 0 <= " << psi_l << "\n" << std::endl;
 #endif
         success = false;

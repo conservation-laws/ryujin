@@ -14,7 +14,6 @@
 #include <deal.II/numerics/vector_tools.templates.h>
 
 #include <random>
-#include <random>
 
 namespace ryujin
 {
@@ -201,7 +200,6 @@ namespace ryujin
       initial_state_ = [old_state = this->initial_state_,
                         perturbation = this->perturbation_](
                            const dealii::Point<dim> &point, Number t) {
-
         auto state = old_state(point, t);
 
         if (t > 0.)

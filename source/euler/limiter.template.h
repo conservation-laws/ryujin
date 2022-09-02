@@ -211,12 +211,12 @@ namespace ryujin
             t_l, t_r, psi_l, psi_r, dpsi_l, dpsi_r, Number(-1.));
 
 #ifdef DEBUG_OUTPUT_LIMITER
-          std::cout << "psi_l:       " << psi_l << std::endl;
-          std::cout << "psi_r:       " << psi_r << std::endl;
-          std::cout << "dpsi_l:      " << dpsi_l << std::endl;
-          std::cout << "dpsi_r:      " << dpsi_r << std::endl;
-          std::cout << "t_l: (  " << n << "  ) " << t_l << std::endl;
-          std::cout << "t_r: (  " << n << "  ) " << t_r << std::endl;
+        std::cout << "psi_l:       " << psi_l << std::endl;
+        std::cout << "psi_r:       " << psi_r << std::endl;
+        std::cout << "dpsi_l:      " << dpsi_l << std::endl;
+        std::cout << "dpsi_r:      " << dpsi_r << std::endl;
+        std::cout << "t_l: (  " << n << "  ) " << t_l << std::endl;
+        std::cout << "t_r: (  " << n << "  ) " << t_r << std::endl;
 #endif
       }
 
