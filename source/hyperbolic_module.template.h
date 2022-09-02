@@ -492,14 +492,15 @@ namespace ryujin
               thread_ready, i >= n_export_indices && i < n_internal);
 
           const auto U_i = old_U.template get_tensor<T>(i);
-          const auto prec_i = hyperbolic_system_->flux_contribution(
+          const auto flux_i = hyperbolic_system_->flux_contribution(
               precomputed_values_, i, U_i);
 
-          std::array<HyperbolicSystem::prec_type<dim, T>, stages> prec_iHs;
+          std::array<HyperbolicSystem::flux_contribution_type<dim, T>, stages>
+              flux_iHs;
           for (int s = 0; s < stages; ++s) {
             const auto temp = stage_U[s].get().template get_tensor<T>(i);
             // FIXME high order flux
-            prec_iHs[s] = hyperbolic_system_->flux_contribution(
+            flux_iHs[s] = hyperbolic_system_->flux_contribution(
                 precomputed_values_, i, temp);
           }
 
@@ -539,23 +540,23 @@ namespace ryujin
             const auto beta_ij =
                 betaij_matrix.template get_entry<T>(i, col_idx);
 
-            const auto prec_j = hyperbolic_system_->flux_contribution(
+            const auto flux_j = hyperbolic_system_->flux_contribution(
                 precomputed_values_, js, U_j);
 
             /*
              * Compute low-order flux and limiter bounds:
              */
 
-            const auto flux_ij = hyperbolic_system_->flux(prec_i, prec_j);
+            const auto flux_ij = hyperbolic_system_->flux(flux_i, flux_j);
             U_i_new += tau * m_i_inv * contract(flux_ij, c_ij);
             auto P_ij = -contract(flux_ij, c_ij);
 
             HyperbolicSystem::state_type<dim, T> Q_ij;
             if constexpr (HyperbolicSystem::have_source_terms) {
               const auto B_ij = hyperbolic_system_->affine_shift_stencil_source(
-                  prec_i, prec_j, d_ij, c_ij);
+                  flux_i, flux_j, d_ij, c_ij);
               const auto S_ij = hyperbolic_system_->low_order_stencil_source(
-                  prec_i, prec_j, d_ij, c_ij);
+                  flux_i, flux_j, d_ij, c_ij);
 
               U_i_new -= tau * m_i_inv * B_ij;
               S_i_new += tau * m_i_inv * (B_ij + S_ij);
@@ -565,7 +566,7 @@ namespace ryujin
             if constexpr (HyperbolicSystem::have_equilibrated_states) {
               /* Use star states for low-order update: */
               const auto &[U_star_ij, U_star_ji] =
-                  hyperbolic_system_->equilibrated_states(prec_i, prec_j);
+                  hyperbolic_system_->equilibrated_states(flux_i, flux_j);
               U_i_new += tau * m_i_inv * d_ij * (U_star_ji - U_star_ij);
               F_iH += d_ijH * (U_star_ji - U_star_ij);
               P_ij += (d_ijH - d_ij) * (U_star_ji - U_star_ij);
@@ -578,7 +579,7 @@ namespace ryujin
             }
 
             limiter.accumulate(
-                js, U_i, U_j, prec_i, prec_j, d_ij_inv * c_ij, beta_ij);
+                js, U_i, U_j, flux_i, flux_j, d_ij_inv * c_ij, beta_ij);
 
             /*
              * Compute high-order fluxes:
@@ -586,7 +587,7 @@ namespace ryujin
 
             if constexpr (HyperbolicSystem::have_high_order_flux) {
               const auto high_order_flux_ij =
-                  hyperbolic_system_->high_order_flux(prec_i, prec_j);
+                  hyperbolic_system_->high_order_flux(flux_i, flux_j);
               F_iH += weight * contract(high_order_flux_ij, c_ij);
               P_ij += weight * contract(high_order_flux_ij, c_ij);
             } else {
@@ -596,7 +597,7 @@ namespace ryujin
 
             if constexpr (HyperbolicSystem::have_source_terms) {
               const auto S_ijH = hyperbolic_system_->high_order_stencil_source(
-                  prec_i, prec_j, d_ijH, c_ij);
+                  flux_i, flux_j, d_ijH, c_ij);
               S_iH += weight * S_ijH;
               Q_ij += weight * S_ijH;
             }
@@ -609,18 +610,18 @@ namespace ryujin
 
               if constexpr (HyperbolicSystem::have_high_order_flux) {
                 const auto high_order_flux_ij =
-                    hyperbolic_system_->high_order_flux(prec_iHs[s], p);
+                    hyperbolic_system_->high_order_flux(flux_iHs[s], p);
                 F_iH += stage_weights[s] * contract(high_order_flux_ij, c_ij);
                 P_ij += stage_weights[s] * contract(high_order_flux_ij, c_ij);
               } else {
-                const auto flux_ij = hyperbolic_system_->flux(prec_iHs[s], p);
+                const auto flux_ij = hyperbolic_system_->flux(flux_iHs[s], p);
                 F_iH += stage_weights[s] * contract(flux_ij, c_ij);
                 P_ij += stage_weights[s] * contract(flux_ij, c_ij);
               }
 
               if constexpr (HyperbolicSystem::have_source_terms) {
                 auto S_ijH = hyperbolic_system_->high_order_stencil_source(
-                    prec_iHs[s], p, d_ijH, c_ij);
+                    flux_iHs[s], p, d_ijH, c_ij);
                 S_iH += stage_weights[s] * S_ijH;
                 Q_ij += stage_weights[s] * S_ijH;
               }

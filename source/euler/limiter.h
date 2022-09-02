@@ -71,9 +71,10 @@ namespace ryujin
     using state_type = HyperbolicSystem::state_type<dim, Number>;
 
     /**
-     * @copydoc HyperbolicSystem::prec_type
+     * @copydoc HyperbolicSystem::flux_contribution_type
      */
-    using prec_type = HyperbolicSystem::prec_type<dim, Number>;
+    using flux_contribution_type =
+        HyperbolicSystem::flux_contribution_type<dim, Number>;
 
     /**
      * @copydoc HyperbolicSystem::ScalarNumber
@@ -133,8 +134,8 @@ namespace ryujin
     void accumulate(const unsigned int *js,
                     const state_type &U_i,
                     const state_type &U_j,
-                    const prec_type &prec_i,
-                    const prec_type &prec_j,
+                    const flux_contribution_type &flux_i,
+                    const flux_contribution_type &flux_j,
                     const dealii::Tensor<1, dim, Number> &scaled_c_ij,
                     const Number beta_ij);
 
@@ -233,8 +234,8 @@ namespace ryujin
       const unsigned int *js,
       const state_type &U_i,
       const state_type &U_j,
-      const prec_type & /*prec_i*/,
-      const prec_type & /*prec_j*/,
+      const flux_contribution_type & /*flux_i*/,
+      const flux_contribution_type & /*flux_j*/,
       const dealii::Tensor<1, dim, Number> &scaled_c_ij,
       const Number beta_ij)
   {

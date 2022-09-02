@@ -80,7 +80,7 @@ namespace ryujin
      * The storage type used for flux contributions.
      */
     template <int dim, typename Number>
-    using prec_type = flux_type<dim, Number>;
+    using flux_contribution_type = flux_type<dim, Number>;
 
     /**
      * Constructor.
@@ -351,11 +351,11 @@ namespace ryujin
      * Indicator<dim, Number> indicator;
      * for (unsigned int i = n_internal; i < n_owned; ++i) {
      *   // ...
-     *   const auto prec_i = flux_contribution(precomputed..., i, U_i);
+     *   const auto flux_i = flux_contribution(precomputed..., i, U_i);
      *   for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
      *     // ...
-     *     const auto prec_j = flux_contribution(precomputed..., js, U_j);
-     *     const auto flux_ij = flux(prec_i, prec_j);
+     *     const auto flux_j = flux_contribution(precomputed..., js, U_j);
+     *     const auto flux_ij = flux(flux_i, flux_j);
      *   }
      * }
      * ```
@@ -366,7 +366,7 @@ namespace ryujin
               typename ST,
               int dim = ST::dimension - 2,
               typename T = typename ST::value_type>
-    prec_type<dim, T>
+    flux_contribution_type<dim, T>
     flux_contribution(const MultiComponentVector &precomputed_values,
                       const unsigned int i,
                       const ST &U_i) const;
@@ -375,17 +375,17 @@ namespace ryujin
               typename ST,
               int dim = ST::dimension - 2,
               typename T = typename ST::value_type>
-    prec_type<dim, T>
+    flux_contribution_type<dim, T>
     flux_contribution(const MultiComponentVector &precomputed_values,
                       const unsigned int *js,
                       const ST &U_j) const;
 
     /**
-     * Given flux contributions @p prec_i and @p prec_j compute the flux
+     * Given flux contributions @p flux_i and @p flux_j compute the flux
      * <code>(-f(U_i) - f(U_j)</code>
      */
     template <typename FT, int dim = FT::dimension - 2>
-    FT flux(const FT &prec_i, const FT &prec_j) const;
+    FT flux(const FT &flux_i, const FT &flux_j) const;
 
     /**
      * The low-order and high-order fluxes are the same:
@@ -403,7 +403,7 @@ namespace ryujin
               typename TT = typename FT::value_type,
               typename T = typename TT::value_type>
     std::array<state_type<dim, T>, 2>
-    equilibrated_states(const FT &prec_i, const FT &prec_j) = delete;
+    equilibrated_states(const FT &flux_i, const FT &flux_j) = delete;
 
     //@}
     /**
@@ -1022,7 +1022,8 @@ namespace ryujin
   DEAL_II_ALWAYS_INLINE inline auto
   HyperbolicSystem::flux_contribution(const MCV & /*precomputed_values*/,
                                       const unsigned int /*i*/,
-                                      const ST &U_i) const -> prec_type<dim, T>
+                                      const ST &U_i) const
+      -> flux_contribution_type<dim, T>
   {
     return f(U_i);
   }
@@ -1032,17 +1033,18 @@ namespace ryujin
   DEAL_II_ALWAYS_INLINE inline auto
   HyperbolicSystem::flux_contribution(const MCV & /*precomputed_values*/,
                                       const unsigned int * /*js*/,
-                                      const ST &U_j) const -> prec_type<dim, T>
+                                      const ST &U_j) const
+      -> flux_contribution_type<dim, T>
   {
     return f(U_j);
   }
 
 
   template <typename FT, int dim>
-  DEAL_II_ALWAYS_INLINE inline FT HyperbolicSystem::flux(const FT &prec_i,
-                                                         const FT &prec_j) const
+  DEAL_II_ALWAYS_INLINE inline FT HyperbolicSystem::flux(const FT &flux_i,
+                                                         const FT &flux_j) const
   {
-    return -add(prec_i, prec_j);
+    return -add(flux_i, flux_j);
   }
 
 
