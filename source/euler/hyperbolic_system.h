@@ -124,9 +124,9 @@ namespace ryujin
      */
     template <typename MultiComponentVector, int problem_dim, typename Number>
     void
-    precompute_values(MultiComponentVector &precomputed_values,
-                      unsigned int i,
-                      const dealii::Tensor<1, problem_dim, Number> &U) const;
+    nodal_precomputation(MultiComponentVector &precomputed_values,
+                         unsigned int i,
+                         const dealii::Tensor<1, problem_dim, Number> &U) const;
 
     //@}
     /**
@@ -535,7 +535,7 @@ namespace ryujin
 
 
   template <typename MCV, int problem_dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline void HyperbolicSystem::precompute_values(
+  DEAL_II_ALWAYS_INLINE inline void HyperbolicSystem::nodal_precomputation(
       MCV &precomputed_values,
       unsigned int i,
       const dealii::Tensor<1, problem_dim, Number> &U_i) const

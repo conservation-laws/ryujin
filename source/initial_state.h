@@ -67,7 +67,7 @@ namespace ryujin
      * advection field.
      */
     virtual precomputed_type
-    compute_flux_contributions(const dealii::Point<dim> & /*point*/)
+    initial_precomputations(const dealii::Point<dim> & /*point*/)
     {
       return precomputed_type();
     }

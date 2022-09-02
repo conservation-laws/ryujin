@@ -182,7 +182,7 @@ namespace ryujin
           flux_contributions_ = [this, &it](const dealii::Point<dim> &point) {
             const auto transformed_point =
                 affine_transform(initial_direction_, initial_position_, point);
-            return it->compute_flux_contributions(transformed_point);
+            return it->initial_precomputations(transformed_point);
           };
           initialized = true;
           break;

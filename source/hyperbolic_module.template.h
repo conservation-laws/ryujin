@@ -231,7 +231,7 @@ namespace ryujin
 
           const auto U_i = old_U.template get_tensor<T>(i);
 
-          hyperbolic_system_->precompute_values(precomputed_values_, i, U_i);
+          hyperbolic_system_->nodal_precomputation(precomputed_values_, i, U_i);
 
           // FIXME: add iteration over stencil.
         }
