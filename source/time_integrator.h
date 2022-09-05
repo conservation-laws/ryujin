@@ -130,9 +130,20 @@ namespace ryujin
         HyperbolicSystem::problem_dimension<dim>;
 
     /**
+     * @copydoc HyperbolicSystem::n_precomputed_values
+     */
+    static constexpr unsigned int n_precomputed_values =
+        HyperbolicSystem::n_precomputed_values<dim>;
+
+    /**
      * Typedef for a MultiComponentVector storing the state U.
      */
     using vector_type = MultiComponentVector<Number, problem_dimension>;
+
+    /**
+     * Typedef for a MultiComponentVector storing precomputed values.
+     */
+    using precomputed_type = MultiComponentVector<Number, n_precomputed_values>;
 
     /**
      * Constructor.
@@ -234,6 +245,8 @@ namespace ryujin
         hyperbolic_module_;
 
     std::vector<vector_type> temp_U_;
+    std::vector<precomputed_type> temp_precomputed_;
+
     vector_type temp_U_strang_; // FIXME: refactor
 
     //@}

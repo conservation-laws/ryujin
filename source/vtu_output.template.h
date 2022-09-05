@@ -50,9 +50,10 @@ namespace ryujin
               std::end(HyperbolicSystem::component_names<dim>),
               std::back_inserter(vtu_output_quantities_));
 
-    std::copy(std::begin(HyperbolicSystem::precomputed_names<dim>),
-              std::end(HyperbolicSystem::precomputed_names<dim>),
-              std::back_inserter(vtu_output_quantities_));
+    // FIXME
+//     std::copy(std::begin(HyperbolicSystem::precomputed_names<dim>),
+//               std::end(HyperbolicSystem::precomputed_names<dim>),
+//               std::back_inserter(vtu_output_quantities_));
 
     add_parameter("vtu output quantities",
                   vtu_output_quantities_,
@@ -100,6 +101,8 @@ namespace ryujin
         }
       }
 
+      // FIXME
+#if 0
       {
         /* Precomputed quantities: */
 
@@ -116,6 +119,7 @@ namespace ryujin
           continue;
         }
       }
+#endif
 
       {
         /* Special indicator value: */

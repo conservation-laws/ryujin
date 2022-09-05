@@ -89,8 +89,6 @@ namespace ryujin
 
     alpha_.reinit(scalar_partitioner);
 
-    precomputed_values_.reinit_with_scalar_partitioner(scalar_partitioner);
-
     bounds_.reinit_with_scalar_partitioner(scalar_partitioner);
 
     const auto &vector_partitioner = offline_data_->vector_partitioner();
@@ -111,7 +109,8 @@ namespace ryujin
       qij_matrix_.reinit(sparsity_simd);
     }
 
-    precomputed_values_ = initial_values_->interpolate_flux_contributions();
+    // FIXME
+    // precomputed_values_ = initial_values_->interpolate_flux_contributions();
   }
 
 
@@ -151,8 +150,11 @@ namespace ryujin
   Number HyperbolicModule<dim, Number>::step(
       const vector_type &old_U,
       std::array<std::reference_wrapper<const vector_type>, stages> stage_U,
+      std::array<std::reference_wrapper<const precomputed_type>, stages>
+          stage_precomputed,
       const std::array<Number, stages> stage_weights,
       vector_type &new_U,
+      precomputed_type &new_precomputed,
       Number tau /*= 0.*/) const
   {
 #ifdef DEBUG_OUTPUT
@@ -201,9 +203,9 @@ namespace ryujin
       Scope scope(computing_timer_, "time step [E] 0 - precompute values");
 
       SynchronizationDispatch synchronization_dispatch([&]() {
-        precomputed_values_.update_ghost_values_start(channel++);
+        new_precomputed.update_ghost_values_start(channel++);
 
-        precomputed_values_.update_ghost_values_finish();
+        new_precomputed.update_ghost_values_finish();
       });
 
       RYUJIN_PARALLEL_REGION_BEGIN
@@ -231,7 +233,7 @@ namespace ryujin
 
           const auto U_i = old_U.template get_tensor<T>(i);
 
-          hyperbolic_system_->nodal_precomputation(precomputed_values_, i, U_i);
+          hyperbolic_system_->nodal_precomputation(new_precomputed, i, U_i);
 
           // FIXME: add iteration over stencil.
         }
@@ -277,6 +279,7 @@ namespace ryujin
 
       SynchronizationDispatch synchronization_dispatch([&]() {
         alpha_.update_ghost_values_start(channel++);
+
         alpha_.update_ghost_values_finish();
       });
 
@@ -289,7 +292,7 @@ namespace ryujin
 
         /* Stored thread locally: */
         RiemannSolver<dim, T> riemann_solver(*hyperbolic_system_);
-        Indicator<dim, T> indicator(*hyperbolic_system_, precomputed_values_);
+        Indicator<dim, T> indicator(*hyperbolic_system_, new_precomputed);
         bool thread_ready = false;
 
         RYUJIN_OMP_FOR
@@ -477,7 +480,7 @@ namespace ryujin
         unsigned int stride_size = get_stride_size<T>;
 
         /* Stored thread locally: */
-        Limiter<dim, T> limiter(*hyperbolic_system_, precomputed_values_);
+        Limiter<dim, T> limiter(*hyperbolic_system_, new_precomputed);
         bool thread_ready = false;
 
         RYUJIN_OMP_FOR
@@ -493,15 +496,14 @@ namespace ryujin
 
           const auto U_i = old_U.template get_tensor<T>(i);
           const auto flux_i = hyperbolic_system_->flux_contribution(
-              precomputed_values_, i, U_i);
+              new_precomputed, i, U_i);
 
           std::array<HyperbolicSystem::flux_contribution_type<dim, T>, stages>
               flux_iHs;
           for (int s = 0; s < stages; ++s) {
             const auto temp = stage_U[s].get().template get_tensor<T>(i);
-            // FIXME high order flux
             flux_iHs[s] = hyperbolic_system_->flux_contribution(
-                precomputed_values_, i, temp);
+                stage_precomputed[s], i, temp);
           }
 
           auto U_i_new = U_i;
@@ -518,9 +520,9 @@ namespace ryujin
           HyperbolicSystem::state_type<dim, T> S_iH;
           if constexpr (HyperbolicSystem::have_source_terms) {
             S_i_new = hyperbolic_system_->low_order_nodal_source(
-                precomputed_values_, i, U_i);
+                new_precomputed, i, U_i);
             S_iH = hyperbolic_system_->high_order_nodal_source(
-                precomputed_values_, i, U_i);
+                new_precomputed, i, U_i);
           }
 
           const unsigned int *js = sparsity_simd.columns(i);
@@ -540,8 +542,8 @@ namespace ryujin
             const auto beta_ij =
                 betaij_matrix.template get_entry<T>(i, col_idx);
 
-            const auto flux_j = hyperbolic_system_->flux_contribution(
-                precomputed_values_, js, U_j);
+            const auto flux_j =
+                hyperbolic_system_->flux_contribution(new_precomputed, js, U_j);
 
             /*
              * Compute low-order flux and limiter bounds:
@@ -604,9 +606,8 @@ namespace ryujin
 
             for (int s = 0; s < stages; ++s) {
               const auto U_jH = stage_U[s].get().template get_tensor<T>(js);
-              // FIXME high order flux
               const auto p = hyperbolic_system_->flux_contribution(
-                  precomputed_values_, js, U_jH);
+                  stage_precomputed[s], js, U_jH);
 
               if constexpr (HyperbolicSystem::have_high_order_flux) {
                 const auto high_order_flux_ij =
@@ -814,9 +815,9 @@ namespace ryujin
 
           auto U_i_new = new_U.template get_tensor<T>(i);
 
-          HyperbolicSystem::state_type<dim, T> source_i;
+          HyperbolicSystem::state_type<dim, T> S_i_new;
           if constexpr (HyperbolicSystem::have_source_terms)
-            source_i = source_.template get_tensor<T>(i);
+            S_i_new = source_.template get_tensor<T>(i);
 
           const Number lambda = Number(1.) / Number(row_length - 1);
           lij_row.resize_fast(row_length);
@@ -832,9 +833,8 @@ namespace ryujin
             U_i_new += l_ij * lambda * p_ij;
 
             if constexpr (HyperbolicSystem::have_source_terms) {
-              const auto source_p_ij =
-                  qij_matrix_.template get_tensor<T>(i, col_idx);
-              source_i += l_ij * lambda * source_p_ij;
+              const auto q_ij = qij_matrix_.template get_tensor<T>(i, col_idx);
+              S_i_new += l_ij * lambda * q_ij;
             }
 
             if (!last_round)
@@ -850,7 +850,7 @@ namespace ryujin
           new_U.template write_tensor<T>(U_i_new, i);
 
           if constexpr (HyperbolicSystem::have_source_terms)
-            source_.template write_tensor<T>(source_i, i);
+            source_.template write_tensor<T>(S_i_new, i);
 
           /* Skip computating l_ij and updating p_ij in the last round */
           if (last_round)
@@ -879,9 +879,10 @@ namespace ryujin
               restart_needed = true;
 
             /*
-             * Shortcut: We omit updating the p_ij vector and simply
-             * write (1 - l_ij^(1)) * l_ij^(2) into the l_ij matrix. This
-             * approach only works for at most two limiting steps.
+             * Shortcut: We omit updating the p_ij and q_ij matrices and
+             * simply write (1 - l_ij^(1)) * l_ij^(2) into the l_ij matrix.
+             *
+             * This approach only works for at most two limiting steps.
              */
             const auto entry = (T(1.) - old_l_ij) * new_l_ij;
             lij_matrix_next_.write_entry(entry, i, col_idx, true);

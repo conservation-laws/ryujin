@@ -107,6 +107,18 @@ namespace ryujin
     using vector_type = MultiComponentVector<Number, problem_dimension>;
 
     /**
+     * @copydoc HyperbolicSystem::problem_dimension
+     */
+    static constexpr unsigned int n_precomputed_values =
+        HyperbolicSystem::n_precomputed_values<dim>;
+
+    /**
+     * Typedef for a MultiComponentVector storing precomputed values.
+     */
+    using precomputed_type = MultiComponentVector<Number, n_precomputed_values>;
+
+
+    /**
      * Constructor.
      */
     HyperbolicModule(const MPI_Comm &mpi_communicator,
@@ -187,8 +199,11 @@ namespace ryujin
     Number
     step(const vector_type &old_U,
          std::array<std::reference_wrapper<const vector_type>, stages> stage_U,
+         std::array<std::reference_wrapper<const precomputed_type>, stages>
+             stage_precomputed,
          const std::array<Number, stages> stage_weights,
          vector_type &new_U,
+         precomputed_type &new_precomputed,
          Number tau = Number(0.)) const;
 
     /**
@@ -263,12 +278,6 @@ namespace ryujin
 
     mutable scalar_type alpha_;
     ACCESSOR_READ_ONLY(alpha)
-
-    static constexpr auto n_precomputed_values =
-        HyperbolicSystem::n_precomputed_values<dim>;
-    mutable MultiComponentVector<Number, n_precomputed_values>
-        precomputed_values_;
-    ACCESSOR_READ_ONLY(precomputed_values)
 
     static constexpr auto n_bounds = Limiter<dim, Number>::n_bounds;
     mutable MultiComponentVector<Number, n_bounds> bounds_;
