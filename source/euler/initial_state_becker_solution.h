@@ -16,12 +16,12 @@ namespace ryujin
      * @ingroup InitialValues
      */
     template <int dim, typename Number, typename state_type>
-    class BeckerSolution : public InitialState<dim, Number, state_type, 2>
+    class BeckerSolution : public InitialState<dim, Number, state_type>
     {
     public:
       BeckerSolution(const HyperbolicSystem &hyperbolic_system,
                      const std::string subsection)
-          : InitialState<dim, Number, state_type, 2>("becker solution",
+          : InitialState<dim, Number, state_type>("becker solution",
                                                      subsection)
           , hyperbolic_system(hyperbolic_system)
       {

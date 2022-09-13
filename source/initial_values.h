@@ -59,7 +59,7 @@ namespace ryujin
      * @copydoc HyperbolicSystem::n_precomputed_values
      */
     static constexpr unsigned int n_precomputed_values =
-        HyperbolicSystem::n_precomputed_values<dim>;
+        HyperbolicSystem::n_precomputed_initial_values<dim>;
 
     /**
      * Array type used for precomputed values.

@@ -17,12 +17,12 @@ namespace ryujin
      * @ingroup InitialValues
      */
     template <int dim, typename Number, typename state_type>
-    class ShockFront : public InitialState<dim, Number, state_type, 2>
+    class ShockFront : public InitialState<dim, Number, state_type>
     {
     public:
       ShockFront(const HyperbolicSystem &hyperbolic_system,
                  const std::string subsection)
-          : InitialState<dim, Number, state_type, 2>("shockfront", subsection)
+          : InitialState<dim, Number, state_type>("shockfront", subsection)
           , hyperbolic_system(hyperbolic_system)
       {
         dealii::ParameterAcceptor::parse_parameters_call_back.connect(std::bind(

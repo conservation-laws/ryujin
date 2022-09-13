@@ -18,12 +18,12 @@ namespace ryujin
      * @ingroup InitialValues
      */
     template <int dim, typename Number, typename state_type>
-    class RampUp : public InitialState<dim, Number, state_type, 2>
+    class RampUp : public InitialState<dim, Number, state_type>
     {
     public:
       RampUp(const HyperbolicSystem &hyperbolic_system,
              const std::string subsection)
-          : InitialState<dim, Number, state_type, 2>("ramp up", subsection)
+          : InitialState<dim, Number, state_type>("ramp up", subsection)
           , hyperbolic_system(hyperbolic_system)
       {
         primitive_initial_[0] = hyperbolic_system.gamma();

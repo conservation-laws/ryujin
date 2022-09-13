@@ -107,6 +107,12 @@ namespace ryujin
     static constexpr unsigned int n_precomputed_values = 2;
 
     /**
+     * The number of precomputed initial values.
+     */
+    template <int dim>
+    static constexpr unsigned int n_precomputed_initial_values = 0;
+
+    /**
      * Array type used for precomputed values.
      */
     template <int dim, typename Number>

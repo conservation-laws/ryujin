@@ -16,12 +16,12 @@ namespace ryujin
      * @ingroup InitialValues
      */
     template <int dim, typename Number, typename state_type>
-    class IsentropicVortex : public InitialState<dim, Number, state_type, 2>
+    class IsentropicVortex : public InitialState<dim, Number, state_type>
     {
     public:
       IsentropicVortex(const HyperbolicSystem &hyperbolic_system,
                        const std::string subsection)
-          : InitialState<dim, Number, state_type, 2>("isentropic vortex",
+          : InitialState<dim, Number, state_type>("isentropic vortex",
                                                      subsection)
           , hyperbolic_system(hyperbolic_system)
       {
