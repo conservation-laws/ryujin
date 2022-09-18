@@ -123,7 +123,7 @@ namespace ryujin
      * initial values for a specified time @p t.
      */
     MultiComponentVector<Number, n_precomputed_values>
-    interpolate_flux_contributions() const;
+    interpolate_precomputed_initial_values() const;
 
   private:
     /**

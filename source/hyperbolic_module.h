@@ -288,10 +288,11 @@ namespace ryujin
     mutable unsigned int n_warnings_;
     ACCESSOR_READ_ONLY(n_warnings)
 
+    vector_type precomputed_initial_;
+    ACCESSOR_READ_ONLY(precomputed_initial)
+
     mutable scalar_type alpha_;
     ACCESSOR_READ_ONLY(alpha)
-
-    vector_type precomputed_initial_;
 
     static constexpr auto n_bounds = Limiter<dim, Number>::n_bounds;
     mutable MultiComponentVector<Number, n_bounds> bounds_;

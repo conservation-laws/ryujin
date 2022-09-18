@@ -86,9 +86,8 @@ namespace ryujin
     /* Initialize vectors: */
 
     const auto &scalar_partitioner = offline_data_->scalar_partitioner();
-
+    precomputed_initial_.reinit_with_scalar_partitioner(scalar_partitioner);
     alpha_.reinit(scalar_partitioner);
-
     bounds_.reinit_with_scalar_partitioner(scalar_partitioner);
 
     const auto &vector_partitioner = offline_data_->vector_partitioner();
@@ -109,8 +108,8 @@ namespace ryujin
       qij_matrix_.reinit(sparsity_simd);
     }
 
-    // FIXME
-    // precomputed_values_ = initial_values_->interpolate_flux_contributions();
+    precomputed_initial_ =
+        initial_values_->interpolate_precomputed_initial_values();
   }
 
 

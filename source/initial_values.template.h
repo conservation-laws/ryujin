@@ -276,7 +276,8 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  auto InitialValues<dim, Number>::interpolate_flux_contributions() const
+  auto
+  InitialValues<dim, Number>::interpolate_precomputed_initial_values() const
       -> MultiComponentVector<Number, n_precomputed_values>
   {
     const auto scalar_partitioner = offline_data_->scalar_partitioner();
