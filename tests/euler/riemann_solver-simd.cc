@@ -1,30 +1,27 @@
-#ifndef RIEMANN_NEWTON_MAX_ITER
-#define RIEMANN_NEWTON_MAX_ITER 0
-#endif
-
-#include <problem_description.h>
+#include <hyperbolic_system.h>
 #include <riemann_solver.h>
 #include <riemann_solver.template.h>
-#include <simd.template.h>
+#include <simd.h>
 
 using namespace ryujin;
 using namespace dealii;
 
 int main()
 {
+  using Number = VectorizedArray<double>;
+
   constexpr int dim = 1;
 
-  ProblemDescription problem_description;
-  const double gamma = problem_description.gamma();
-  const double b = problem_description.b();
-  RiemannSolver<dim> riemann_solver(problem_description);
+  HyperbolicSystem hyperbolic_system;
+  const double gamma = hyperbolic_system.gamma();
+  RiemannSolver<dim, Number> riemann_solver(hyperbolic_system);
 
   const auto riemann_data = [&](const auto &state) {
-    const double rho = state[0];
-    const double u = state[1];
-    const double p = state[2];
+    const Number rho = state[0];
+    const Number u = state[1];
+    const Number p = state[2];
 
-    std::array<double, 4> result;
+    std::array<Number, 4> result;
     result[0] = rho;
     result[1] = u;
     result[2] = p;
@@ -32,26 +29,20 @@ int main()
     return result;
   };
 
-  const auto test = [&](const std::array<double, 3> &U_i,
-                        const std::array<double, 3> &U_j) {
+  const auto test = [&](const std::array<Number, 3> &U_i,
+                        const std::array<Number, 3> &U_j) {
     std::cout << U_i[0] << " " << U_i[1] << " " << U_i[2] << std::endl;
     std::cout << U_j[0] << " " << U_j[1] << " " << U_j[2] << std::endl;
     const auto rd_i = riemann_data(U_i);
     const auto rd_j = riemann_data(U_j);
-    const auto [lambda_max, p_star, n_iterations] =
-        riemann_solver.compute(rd_i, rd_j);
+    const auto lambda_max = riemann_solver.compute(rd_i, rd_j);
     std::cout << lambda_max << std::endl;
-    std::cout << p_star << std::endl;
-    std::cout << n_iterations << std::endl << std::endl;
   };
 
   std::cout << std::setprecision(16);
   std::cout << std::scientific;
 
   std::cout << "gamma: " << gamma << std::endl;
-  std::cout << "b: " << b << std::endl;
-  std::cout << "max_iter:  " << RiemannSolver<dim>::newton_max_iter_
-            << std::endl;
   std::cout << std::endl;
 
   /* Leblanc:*/
