@@ -51,11 +51,19 @@ namespace ryujin
 
   template <>
   const std::array<std::string, 1> HyperbolicSystem::precomputed_names<1>{
-      {"bathymetry"}};
+      {"eta_m"}};
 
   template <>
   const std::array<std::string, 1> HyperbolicSystem::precomputed_names<2>{
-      {"bathymetry"}};
+      {"eta_m"}};
+
+  template <>
+  const std::array<std::string, 1>
+      HyperbolicSystem::precomputed_initial_names<1>{{"bathymetry"}};
+
+  template <>
+  const std::array<std::string, 1>
+      HyperbolicSystem::precomputed_initial_names<2>{{"bathymetry"}};
 #endif
 
 } /* namespace ryujin */

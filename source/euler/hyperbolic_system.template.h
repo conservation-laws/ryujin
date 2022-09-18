@@ -85,15 +85,15 @@ namespace ryujin
 
   template <>
   const std::array<std::string, 2> HyperbolicSystem::precomputed_names<1>{
-      {"s", "eta"}};
+      {"s", "eta_h"}};
 
   template <>
   const std::array<std::string, 2> HyperbolicSystem::precomputed_names<2>{
-      {"s", "eta"}};
+      {"s", "eta_h"}};
 
   template <>
   const std::array<std::string, 2> HyperbolicSystem::precomputed_names<3>{
-      {"s", "eta"}};
+      {"s", "eta_h"}};
 #endif
 
 } /* namespace ryujin */

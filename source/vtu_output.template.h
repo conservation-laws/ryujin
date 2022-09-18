@@ -50,10 +50,9 @@ namespace ryujin
               std::end(HyperbolicSystem::component_names<dim>),
               std::back_inserter(vtu_output_quantities_));
 
-    // FIXME
-//     std::copy(std::begin(HyperbolicSystem::precomputed_names<dim>),
-//               std::end(HyperbolicSystem::precomputed_names<dim>),
-//               std::back_inserter(vtu_output_quantities_));
+    std::copy(std::begin(HyperbolicSystem::precomputed_initial_names<dim>),
+              std::end(HyperbolicSystem::precomputed_initial_names<dim>),
+              std::back_inserter(vtu_output_quantities_));
 
     add_parameter("vtu output quantities",
                   vtu_output_quantities_,
@@ -101,25 +100,22 @@ namespace ryujin
         }
       }
 
-      // FIXME
-#if 0
       {
-        /* Precomputed quantities: */
+        /* Precomputed initial quantities: */
 
-        constexpr auto &names = HyperbolicSystem::precomputed_names<dim>;
+        constexpr auto &names =
+            HyperbolicSystem::precomputed_initial_names<dim>;
         const auto pos = std::find(std::begin(names), std::end(names), entry);
         if (pos != std::end(names)) {
           const auto index = std::distance(std::begin(names), pos);
           quantities_mapping_.push_back(std::make_tuple(
               entry, [this, index](scalar_type &result, const vector_type &) {
-                const auto &precomputed =
-                    hyperbolic_module_->precomputed_values();
-                precomputed.extract_component(result, index);
+                hyperbolic_module_->precomputed_initial().extract_component(
+                    result, index);
               }));
           continue;
         }
       }
-#endif
 
       {
         /* Special indicator value: */

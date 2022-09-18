@@ -288,7 +288,7 @@ namespace ryujin
     mutable unsigned int n_warnings_;
     ACCESSOR_READ_ONLY(n_warnings)
 
-    vector_type precomputed_initial_;
+    precomputed_initial_type precomputed_initial_;
     ACCESSOR_READ_ONLY(precomputed_initial)
 
     mutable scalar_type alpha_;
