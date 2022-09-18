@@ -244,10 +244,10 @@ namespace ryujin
     dealii::SmartPointer<const ryujin::HyperbolicModule<dim, Number>>
         hyperbolic_module_;
 
-    std::vector<vector_type> temp_U_;
-    std::vector<precomputed_type> temp_precomputed_;
+    std::vector<vector_type> U_;
+    std::vector<precomputed_type> precomputed_;
 
-    vector_type temp_U_strang_; // FIXME: refactor
+    vector_type U_strang_; // FIXME: refactor
 
     //@}
   };

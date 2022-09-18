@@ -64,31 +64,31 @@ namespace ryujin
 
     switch (time_stepping_scheme_) {
     case TimeSteppingScheme::ssprk_33:
-      temp_U_.resize(2);
-      temp_precomputed_.resize(2);
+      U_.resize(2);
+      precomputed_.resize(2);
       break;
     case TimeSteppingScheme::erk_22:
-      temp_U_.resize(2);
-      temp_precomputed_.resize(2);
+      U_.resize(2);
+      precomputed_.resize(2);
       break;
     case TimeSteppingScheme::erk_33:
-      temp_U_.resize(3);
-      temp_precomputed_.resize(3);
+      U_.resize(3);
+      precomputed_.resize(3);
       break;
     case TimeSteppingScheme::erk_43:
-      temp_U_.resize(4);
-      temp_precomputed_.resize(4);
+      U_.resize(4);
+      precomputed_.resize(4);
       break;
     }
 
     /* Initialize temporary vectors and matrices: */
 
     const auto &vector_partitioner = offline_data_->vector_partitioner();
-    for (auto &it : temp_U_)
+    for (auto &it : U_)
       it.reinit(vector_partitioner);
 
     const auto &scalar_partitioner = offline_data_->scalar_partitioner();
-    for (auto &it : temp_precomputed_)
+    for (auto &it : precomputed_)
       it.reinit_with_scalar_partitioner(scalar_partitioner);
 
     /* Reset CFL to canonical starting value: */
@@ -159,22 +159,22 @@ namespace ryujin
 
     /* Step 1: U1 = U_old + tau * L(U_old) at time t + tau */
     tau = hyperbolic_module_->template step<0>(
-        U, {}, {}, {}, temp_U_[0], temp_precomputed_[0], tau);
-    hyperbolic_module_->apply_boundary_conditions(temp_U_[0], t + tau);
+        U, {}, {}, {}, U_[0], precomputed_[0], tau);
+    hyperbolic_module_->apply_boundary_conditions(U_[0], t + tau);
 
     /* Step 2: U2 = 3/4 U_old + 1/4 (U1 + tau L(U1)) at time t + tau */
     hyperbolic_module_->template step<0>(
-        temp_U_[0], {}, {}, {}, temp_U_[1], temp_precomputed_[1], tau);
-    temp_U_[1].sadd(Number(1. / 4.), Number(3. / 4.), U);
-    hyperbolic_module_->apply_boundary_conditions(temp_U_[1], t + tau);
+        U_[0], {}, {}, {}, U_[1], precomputed_[1], tau);
+    U_[1].sadd(Number(1. / 4.), Number(3. / 4.), U);
+    hyperbolic_module_->apply_boundary_conditions(U_[1], t + tau);
 
     /* Step 3: U3 = 1/3 U_old + 2/3 (U2 + tau L(U2)) at time t + 0.5 * tau */
     hyperbolic_module_->template step<0>(
-        temp_U_[1], {}, {}, {}, temp_U_[0], temp_precomputed_[0], tau);
-    temp_U_[0].sadd(Number(2. / 3.), Number(1. / 3.), U);
-    hyperbolic_module_->apply_boundary_conditions(temp_U_[0], t + 0.5 * tau);
+        U_[1], {}, {}, {}, U_[0], precomputed_[0], tau);
+    U_[0].sadd(Number(2. / 3.), Number(1. / 3.), U);
+    hyperbolic_module_->apply_boundary_conditions(U_[0], t + 0.5 * tau);
 
-    U.swap(temp_U_[0]);
+    U.swap(U_[0]);
     return tau;
   }
 
@@ -187,20 +187,20 @@ namespace ryujin
 
     /* Step 1: U1 <- {U, 1} at time t + tau */
     Number tau = hyperbolic_module_->template step<0>(
-        U, {}, {}, {}, temp_U_[0], temp_precomputed_[0]);
-    hyperbolic_module_->apply_boundary_conditions(temp_U_[0], t + tau);
+        U, {}, {}, {}, U_[0], precomputed_[0]);
+    hyperbolic_module_->apply_boundary_conditions(U_[0], t + tau);
 
     /* Step 2: U2 <- {U1, 2} and {U, -1} at time t + 2 tau */
-    hyperbolic_module_->template step<1>(temp_U_[0],
+    hyperbolic_module_->template step<1>(U_[0],
                                          {{U}},
-                                         {{temp_precomputed_[0]}},
+                                         {{precomputed_[0]}},
                                          {{Number(-1.)}},
-                                         temp_U_[1],
-                                         temp_precomputed_[1],
+                                         U_[1],
+                                         precomputed_[1],
                                          tau);
-    hyperbolic_module_->apply_boundary_conditions(temp_U_[1], t + 2. * tau);
+    hyperbolic_module_->apply_boundary_conditions(U_[1], t + 2. * tau);
 
-    U.swap(temp_U_[1]);
+    U.swap(U_[1]);
     return 2. * tau;
   }
 
@@ -213,31 +213,30 @@ namespace ryujin
 
     /* Step 1: U1 <- {U, 1} at time t + tau */
     Number tau = hyperbolic_module_->template step<0>(
-        U, {}, {}, {}, temp_U_[0], temp_precomputed_[0]);
-    hyperbolic_module_->apply_boundary_conditions(temp_U_[0], t + tau);
+        U, {}, {}, {}, U_[0], precomputed_[0]);
+    hyperbolic_module_->apply_boundary_conditions(U_[0], t + tau);
 
     /* Step 2: U2 <- {U1, 2} and {U, -1} at time t + 2 tau */
-    hyperbolic_module_->template step<1>(temp_U_[0],
+    hyperbolic_module_->template step<1>(U_[0],
                                          {{U}},
-                                         {{temp_precomputed_[0]}},
+                                         {{precomputed_[0]}},
                                          {{Number(-1.)}},
-                                         temp_U_[1],
-                                         temp_precomputed_[1],
+                                         U_[1],
+                                         precomputed_[1],
                                          tau);
-    hyperbolic_module_->apply_boundary_conditions(temp_U_[1], t + 2. * tau);
+    hyperbolic_module_->apply_boundary_conditions(U_[1], t + 2. * tau);
 
     /* Step 3: U3 <- {U2, 9/4} and {U1, -2} and {U, 3/4} at time t + 3 tau */
-    hyperbolic_module_->template step<2>(
-        temp_U_[1],
-        {{U, temp_U_[0]}},
-        {{temp_precomputed_[0], temp_precomputed_[1]}},
-        {{Number(0.75), Number(-2.)}},
-        temp_U_[2],
-        temp_precomputed_[2],
-        tau);
-    hyperbolic_module_->apply_boundary_conditions(temp_U_[2], t + 3. * tau);
+    hyperbolic_module_->template step<2>(U_[1],
+                                         {{U, U_[0]}},
+                                         {{precomputed_[0], precomputed_[1]}},
+                                         {{Number(0.75), Number(-2.)}},
+                                         U_[2],
+                                         precomputed_[2],
+                                         tau);
+    hyperbolic_module_->apply_boundary_conditions(U_[2], t + 3. * tau);
 
-    U.swap(temp_U_[2]);
+    U.swap(U_[2]);
     return 3. * tau;
   }
 
@@ -251,43 +250,42 @@ namespace ryujin
 
     /* Step 1: U1 <- {U, 1} at time t + tau */
     Number tau = hyperbolic_module_->template step<0>(
-        U, {}, {}, {}, temp_U_[0], temp_precomputed_[0]);
-    hyperbolic_module_->apply_boundary_conditions(temp_U_[0], t + tau);
+        U, {}, {}, {}, U_[0], precomputed_[0]);
+    hyperbolic_module_->apply_boundary_conditions(U_[0], t + tau);
 
 
     /* Step 2: U2 <- {U1, 2} and {U, -1} at time t + 2 tau */
-    hyperbolic_module_->template step<1>(temp_U_[0],
+    hyperbolic_module_->template step<1>(U_[0],
                                          {{U}},
-                                         {{temp_precomputed_[0]}},
+                                         {{precomputed_[0]}},
                                          {{Number(-1.)}},
-                                         temp_U_[1],
-                                         temp_precomputed_[1],
+                                         U_[1],
+                                         precomputed_[1],
                                          tau);
-    hyperbolic_module_->apply_boundary_conditions(temp_U_[1], t + 2. * tau);
+    hyperbolic_module_->apply_boundary_conditions(U_[1], t + 2. * tau);
 
 
     /* Step 3: U3 <- {U2, 2} and {U1, -1} at time t + 3 tau */
-    hyperbolic_module_->template step<1>(temp_U_[1],
-                                         {{temp_U_[0]}},
-                                         {{temp_precomputed_[1]}},
+    hyperbolic_module_->template step<1>(U_[1],
+                                         {{U_[0]}},
+                                         {{precomputed_[1]}},
                                          {{Number(-1.)}},
-                                         temp_U_[2],
-                                         temp_precomputed_[2],
+                                         U_[2],
+                                         precomputed_[2],
                                          tau);
-    hyperbolic_module_->apply_boundary_conditions(temp_U_[2], t + 3. * tau);
+    hyperbolic_module_->apply_boundary_conditions(U_[2], t + 3. * tau);
 
     /* Step 4: U4 <- {U3, 8/3} and {U2,-10/3} and {U1, 5/3} at time t + 4 tau */
-    hyperbolic_module_->template step<2>(
-        temp_U_[2],
-        {{temp_U_[0], temp_U_[1]}},
-        {{temp_precomputed_[1], temp_precomputed_[2]}},
-        {{Number(5. / 3.), Number(-10. / 3.)}},
-        temp_U_[3],
-        temp_precomputed_[3],
-        tau);
-    hyperbolic_module_->apply_boundary_conditions(temp_U_[3], t + 4. * tau);
+    hyperbolic_module_->template step<2>(U_[2],
+                                         {{U_[0], U_[1]}},
+                                         {{precomputed_[1], precomputed_[2]}},
+                                         {{Number(5. / 3.), Number(-10. / 3.)}},
+                                         U_[3],
+                                         precomputed_[3],
+                                         tau);
+    hyperbolic_module_->apply_boundary_conditions(U_[3], t + 4. * tau);
 
-    U.swap(temp_U_[3]);
+    U.swap(U_[3]);
     return 4. * tau;
   }
 } /* namespace ryujin */
