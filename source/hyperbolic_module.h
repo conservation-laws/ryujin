@@ -107,7 +107,7 @@ namespace ryujin
     using vector_type = MultiComponentVector<Number, problem_dimension>;
 
     /**
-     * @copydoc HyperbolicSystem::problem_dimension
+     * @copydoc HyperbolicSystem::n_precomputed_values
      */
     static constexpr unsigned int n_precomputed_values =
         HyperbolicSystem::n_precomputed_values<dim>;
@@ -116,6 +116,18 @@ namespace ryujin
      * Typedef for a MultiComponentVector storing precomputed values.
      */
     using precomputed_type = MultiComponentVector<Number, n_precomputed_values>;
+
+    /**
+     * @copydoc HyperbolicSystem::n_precomputed_initial_values
+     */
+    static constexpr unsigned int n_precomputed_initial_values =
+        HyperbolicSystem::n_precomputed_initial_values<dim>;
+
+    /**
+     * Typedef for a MultiComponentVector storing precomputed initial_values.
+     */
+    using precomputed_initial_type =
+        MultiComponentVector<Number, n_precomputed_initial_values>;
 
 
     /**
@@ -278,6 +290,8 @@ namespace ryujin
 
     mutable scalar_type alpha_;
     ACCESSOR_READ_ONLY(alpha)
+
+    vector_type precomputed_initial_;
 
     static constexpr auto n_bounds = Limiter<dim, Number>::n_bounds;
     mutable MultiComponentVector<Number, n_bounds> bounds_;

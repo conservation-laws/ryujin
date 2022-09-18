@@ -72,6 +72,18 @@ namespace ryujin
           {"rho", "v_1", "v_2", "v_3", "p"}};
 
   template <>
+  const std::array<std::string, 0>
+      HyperbolicSystem::precomputed_initial_names<1>{};
+
+  template <>
+  const std::array<std::string, 0>
+      HyperbolicSystem::precomputed_initial_names<2>{};
+
+  template <>
+  const std::array<std::string, 0>
+      HyperbolicSystem::precomputed_initial_names<3>{};
+
+  template <>
   const std::array<std::string, 2> HyperbolicSystem::precomputed_names<1>{
       {"s", "eta"}};
 

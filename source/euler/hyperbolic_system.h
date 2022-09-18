@@ -101,16 +101,30 @@ namespace ryujin
     //@{
 
     /**
-     * The number of precomputed values.
-     */
-    template <int dim>
-    static constexpr unsigned int n_precomputed_values = 2;
-
-    /**
      * The number of precomputed initial values.
      */
     template <int dim>
     static constexpr unsigned int n_precomputed_initial_values = 0;
+
+    /**
+     * Array type used for precomputed initial values.
+     */
+    template <int dim, typename Number>
+    using precomputed_initial_type =
+        std::array<Number, n_precomputed_initial_values<dim>>;
+
+    /**
+     * An array holding all component names of the precomputed values.
+     */
+    template <int dim>
+    static const std::array<std::string, n_precomputed_initial_values<dim>>
+        precomputed_initial_names;
+
+    /**
+     * The number of precomputed values.
+     */
+    template <int dim>
+    static constexpr unsigned int n_precomputed_values = 2;
 
     /**
      * Array type used for precomputed values.
