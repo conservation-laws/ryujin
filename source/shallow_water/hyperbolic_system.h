@@ -80,7 +80,7 @@ namespace ryujin
      * The storage type used for the flux precomputations.
      */
     template <int dim, typename Number>
-    using prec_type = std::tuple<state_type<dim, Number>, Number>;
+    using flux_contribution_type = std::tuple<state_type<dim, Number>, Number>;
 
     /**
      * Constructor.
@@ -91,6 +91,26 @@ namespace ryujin
      * @name Precomputation of flux quantities
      */
     //@{
+
+    /**
+     * The number of precomputed initial values.
+     */
+    template <int dim>
+    static constexpr unsigned int n_precomputed_initial_values = 1;
+
+    /**
+     * Array type used for precomputed initial values.
+     */
+    template <int dim, typename Number>
+    using precomputed_initial_type =
+        std::array<Number, n_precomputed_initial_values<dim>>;
+
+    /**
+     * An array holding all component names of the precomputed values.
+     */
+    template <int dim>
+    static const std::array<std::string, n_precomputed_initial_values<dim>>
+        precomputed_initial_names;
 
     /**
      * The number of precomputed values.
@@ -116,9 +136,9 @@ namespace ryujin
      */
     template <typename MultiComponentVector, int problem_dim, typename Number>
     void
-    precompute_values(MultiComponentVector &precomputed_values,
-                      unsigned int i,
-                      const dealii::Tensor<1, problem_dim, Number> &U) const;
+    nodal_precomputation(MultiComponentVector &precomputed_values,
+                         unsigned int i,
+                         const dealii::Tensor<1, problem_dim, Number> &U) const;
 
     //@}
     /**
@@ -290,38 +310,41 @@ namespace ryujin
     flux_type<dim, T> f(const ST &U) const;
 
     /**
-     * Given a state @p U_i and an index @p i precompute flux
-     * contributions.
+     * Given a state @p U_i and an index @p i compute flux contributions.
      *
      * Intended usage:
      * ```
      * Indicator<dim, Number> indicator;
      * for (unsigned int i = n_internal; i < n_owned; ++i) {
      *   // ...
-     *   const auto prec_i = flux_contribution(precomputed..., i, U_i);
+     *   const auto flux_i = flux_contribution(precomputed..., i, U_i);
      *   for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
      *     // ...
-     *     const auto prec_j = flux_contribution(precomputed..., js, U_j);
-     *     const auto flux_ij = flux(prec_i, prec_j);
+     *     const auto flux_j = flux_contribution(precomputed..., js, U_j);
+     *     const auto flux_ij = flux(flux_i, flux_j);
      *   }
      * }
      * ```
      */
     template <typename MultiComponentVector,
+              typename MultiComponentVector2,
               typename ST,
               int dim = ST::dimension - 1,
               typename T = typename ST::value_type>
-    prec_type<dim, T>
+    flux_contribution_type<dim, T>
     flux_contribution(const MultiComponentVector &precomputed_values,
+                      const MultiComponentVector2 &precomputed_initial_values,
                       const unsigned int i,
                       const ST &U_i) const;
 
     template <typename MultiComponentVector,
+              typename MultiComponentVector2,
               typename ST,
               int dim = ST::dimension - 1,
               typename T = typename ST::value_type>
-    prec_type<dim, T>
+    flux_contribution_type<dim, T>
     flux_contribution(const MultiComponentVector &precomputed_values,
+                      const MultiComponentVector2 &precomputed_initial_values,
                       const unsigned int *js,
                       const ST &U_j) const;
 
@@ -509,13 +532,17 @@ namespace ryujin
 
 
   template <typename MCV, int problem_dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline void HyperbolicSystem::precompute_values(
-      MCV & /*precomputed_values*/,
-      unsigned int /*i*/,
-      const dealii::Tensor<1, problem_dim, Number> & /*U*/) const
+  DEAL_II_ALWAYS_INLINE inline void HyperbolicSystem::nodal_precomputation(
+      MCV &precomputed_values,
+      unsigned int i,
+      const dealii::Tensor<1, problem_dim, Number> &U_i) const
   {
-    // do nothing
+    constexpr int dim = problem_dim - 1;
+
+    const precomputed_type<dim, Number> prec_i{mathematical_entropy(U_i)};
+    precomputed_values.template write_tensor<Number>(prec_i, i);
   }
+
 
   template <int problem_dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline Number
@@ -824,24 +851,28 @@ namespace ryujin
   }
 
 
-  template <typename MCV, typename ST, int dim, typename T>
+  template <typename MCV, typename MICV, typename ST, int dim, typename T>
   DEAL_II_ALWAYS_INLINE inline auto
-  HyperbolicSystem::flux_contribution(const MCV &precomputed_values,
+  HyperbolicSystem::flux_contribution(const MCV & /*precomputed_values*/,
+                                      const MICV &precomputed_initial_values,
                                       const unsigned int i,
-                                      const ST &U_i) const -> prec_type<dim, T>
+                                      const ST &U_i) const
+      -> flux_contribution_type<dim, T>
   {
-    const auto &Z_i = precomputed_values.template get_tensor<T>(i)[0];
+    const auto &Z_i = precomputed_initial_values.template get_tensor<T>(i)[0];
     return {U_i, Z_i};
   }
 
 
-  template <typename MCV, typename ST, int dim, typename T>
+  template <typename MCV, typename MICV, typename ST, int dim, typename T>
   DEAL_II_ALWAYS_INLINE inline auto
-  HyperbolicSystem::flux_contribution(const MCV &precomputed_values,
+  HyperbolicSystem::flux_contribution(const MCV & /*precomputed_values*/,
+                                      const MICV &precomputed_initial_values,
                                       const unsigned int *js,
-                                      const ST &U_j) const -> prec_type<dim, T>
+                                      const ST &U_j) const
+      -> flux_contribution_type<dim, T>
   {
-    const auto &Z_j = precomputed_values.template get_tensor<T>(js)[0];
+    const auto &Z_j = precomputed_initial_values.template get_tensor<T>(js)[0];
     return {U_j, Z_j};
   }
 

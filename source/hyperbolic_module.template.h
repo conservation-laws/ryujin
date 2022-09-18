@@ -495,14 +495,14 @@ namespace ryujin
 
           const auto U_i = old_U.template get_tensor<T>(i);
           const auto flux_i = hyperbolic_system_->flux_contribution(
-              new_precomputed, i, U_i);
+              new_precomputed, precomputed_initial_, i, U_i);
 
           std::array<HyperbolicSystem::flux_contribution_type<dim, T>, stages>
               flux_iHs;
           for (int s = 0; s < stages; ++s) {
             const auto temp = stage_U[s].get().template get_tensor<T>(i);
             flux_iHs[s] = hyperbolic_system_->flux_contribution(
-                stage_precomputed[s], i, temp);
+                stage_precomputed[s].get(), precomputed_initial_, i, temp);
           }
 
           auto U_i_new = U_i;
@@ -541,8 +541,8 @@ namespace ryujin
             const auto beta_ij =
                 betaij_matrix.template get_entry<T>(i, col_idx);
 
-            const auto flux_j =
-                hyperbolic_system_->flux_contribution(new_precomputed, js, U_j);
+            const auto flux_j = hyperbolic_system_->flux_contribution(
+                new_precomputed, precomputed_initial_, js, U_j);
 
             /*
              * Compute low-order flux and limiter bounds:
@@ -606,7 +606,7 @@ namespace ryujin
             for (int s = 0; s < stages; ++s) {
               const auto U_jH = stage_U[s].get().template get_tensor<T>(js);
               const auto p = hyperbolic_system_->flux_contribution(
-                  stage_precomputed[s], js, U_jH);
+                  stage_precomputed[s].get(), precomputed_initial_, js, U_jH);
 
               if constexpr (HyperbolicSystem::have_high_order_flux) {
                 const auto high_order_flux_ij =

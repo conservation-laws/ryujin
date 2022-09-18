@@ -32,6 +32,17 @@ namespace ryujin
     using state_type = HyperbolicSystem::state_type<dim, Number>;
 
     /**
+     * @copydoc HyperbolicSystem::n_precomputed_values
+     */
+    static constexpr unsigned int n_precomputed_values =
+        HyperbolicSystem::n_precomputed_values<dim>;
+
+    /**
+     * @copydoc HyperbolicSystem::precomputed_type
+     */
+    using precomputed_type = HyperbolicSystem::precomputed_type<dim, Number>;
+
+    /**
      * @copydoc HyperbolicSystem::flux_type
      */
     using flux_type = HyperbolicSystem::flux_type<dim, Number>;
@@ -40,28 +51,6 @@ namespace ryujin
      * @copydoc HyperbolicSystem::ScalarNumber
      */
     using ScalarNumber = typename get_value_type<Number>::type;
-
-    /**
-     * @name Precomputation of indicator quantities
-     */
-    //@{
-
-    /**
-     * The number of precomputed values.
-     */
-    static constexpr unsigned int n_precomputed_values = 1;
-
-    /**
-     * Array type used for precomputed values.
-     */
-    using precomputed_type = std::array<Number, n_precomputed_values>;
-
-    /**
-     * Precomputed values for a given state.
-     */
-    static precomputed_type
-    precompute_values(const HyperbolicSystem &hyperbolic_system,
-                      const state_type &U);
 
     //@}
     /**
@@ -137,17 +126,6 @@ namespace ryujin
 
     //@}
   };
-
-
-  template <int dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline typename Indicator<dim, Number>::precomputed_type
-  Indicator<dim, Number>::precompute_values(
-      const HyperbolicSystem &hyperbolic_system, const state_type &U_i)
-  {
-    precomputed_type result;
-    result[0] = hyperbolic_system.mathematical_entropy(U_i);
-    return result;
-  }
 
 
   template <int dim, typename Number>

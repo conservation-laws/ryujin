@@ -55,9 +55,9 @@ namespace ryujin
         HyperbolicSystem::problem_dimension<dim>;
 
     /**
-     * @copydoc HyperbolicSystem::precomputed_type
+     * @copydoc HyperbolicSystem::state_type
      */
-    using precomputed_type = HyperbolicSystem::precomputed_type<dim, Number>;
+    using state_type = HyperbolicSystem::state_type<dim, Number>;
 
     /**
      * @copydoc HyperbolicSystem::n_precomputed_values
@@ -66,9 +66,9 @@ namespace ryujin
         HyperbolicSystem::n_precomputed_values<dim>;
 
     /**
-     * @copydoc HyperbolicSystem::state_type
+     * @copydoc HyperbolicSystem::precomputed_type
      */
-    using state_type = HyperbolicSystem::state_type<dim, Number>;
+    using precomputed_type = HyperbolicSystem::precomputed_type<dim, Number>;
 
     /**
      * @copydoc HyperbolicSystem::flux_contribution_type

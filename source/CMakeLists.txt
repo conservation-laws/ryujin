@@ -103,5 +103,5 @@ endmacro()
 
 setup_equation("euler")
 if(NOT "${DIM}" EQUAL "3")
-  #setup_equation("shallow_water")
+  setup_equation("shallow_water")
 endif()

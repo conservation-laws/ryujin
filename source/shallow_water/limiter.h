@@ -30,38 +30,26 @@ namespace ryujin
     using state_type = HyperbolicSystem::state_type<dim, Number>;
 
     /**
-     * @copydoc HyperbolicSystem::prec_type
+     * @copydoc HyperbolicSystem::n_precomputed_values
      */
-    using prec_type = HyperbolicSystem::prec_type<dim, Number>;
+    static constexpr unsigned int n_precomputed_values =
+        HyperbolicSystem::n_precomputed_values<dim>;
+
+    /**
+     * @copydoc HyperbolicSystem::precomputed_type
+     */
+    using precomputed_type = HyperbolicSystem::precomputed_type<dim, Number>;
+
+    /**
+     * @copydoc HyperbolicSystem::flux_contribution_type
+     */
+    using flux_contribution_type = HyperbolicSystem::flux_contribution_type<dim, Number>;
 
     /**
      * @copydoc HyperbolicSystem::ScalarNumber
      */
     using ScalarNumber = typename get_value_type<Number>::type;
 
-    /**
-     * @name Precomputation of indicator quantities
-     */
-    //@{
-
-    /**
-     * The number of precomputed values.
-     */
-    static constexpr unsigned int n_precomputed_values = 0;
-
-    /**
-     * Array type used for precomputed values.
-     */
-    using precomputed_type = std::array<Number, n_precomputed_values>;
-
-    /**
-     * Precomputed values for a given state.
-     */
-    static precomputed_type
-    precompute_values(const HyperbolicSystem &hyperbolic_system,
-                      const state_type &U);
-
-    //@}
     /**
      * @name Stencil-based computation of bounds
      *
@@ -115,8 +103,8 @@ namespace ryujin
     void accumulate(const unsigned int *js,
                     const state_type &U_i,
                     const state_type &U_j,
-                    const prec_type &prec_i,
-                    const prec_type &prec_j,
+                    const flux_contribution_type &prec_i,
+                    const flux_contribution_type &prec_j,
                     const dealii::Tensor<1, dim, Number> &scaled_c_ij,
                     const Number beta_ij);
 
@@ -190,17 +178,6 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline typename Limiter<dim, Number>::precomputed_type
-  Limiter<dim, Number>::precompute_values(
-      const HyperbolicSystem & /*hyperbolic_system*/,
-      const state_type & /*U_i*/)
-  {
-    precomputed_type result;
-    return result;
-  }
-
-
-  template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline void
   Limiter<dim, Number>::reset(unsigned int /*i*/)
   {
@@ -221,8 +198,8 @@ namespace ryujin
       const unsigned int * /*js*/,
       const state_type & /*U_i*/,
       const state_type & /*U_j*/,
-      const prec_type &prec_i,
-      const prec_type &prec_j,
+      const flux_contribution_type &prec_i,
+      const flux_contribution_type &prec_j,
       const dealii::Tensor<1, dim, Number> &scaled_c_ij,
       const Number beta_ij)
   {
