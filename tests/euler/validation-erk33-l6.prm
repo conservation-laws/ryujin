@@ -1,5 +1,5 @@
 subsection A - TimeLoop
-  set basename                  = validation-euler-l7
+  set basename                  = validation-euler-l6
 
   set enable output full        = false
   set enable compute quantities = false
@@ -12,18 +12,22 @@ subsection A - TimeLoop
   set terminal update interval  = 0
 end
 
-subsection B - ProblemDescription
-  set description = Euler
+subsection B - Equation
   set gamma = 1.4
 end
 
 subsection C - Discretization
-  set geometry        = validation
-  set mesh refinement = 7
+  set geometry        = rectangular domain
+  set mesh refinement = 6
 
-  subsection validation
-    set length   = 10
-    set periodic = false
+  subsection rectangular domain
+    set boundary condition bottom = dirichlet
+    set boundary condition left   = dirichlet
+    set boundary condition right  = dirichlet
+    set boundary condition top    = dirichlet
+
+    set position bottom left      = -5, -5
+    set position top right        =  5,  5
   end
 end
 
@@ -38,7 +42,7 @@ subsection E - InitialValues
   end
 end
 
-subsection F - EulerModule
+subsection F - HyperbolicModule
   set cfl with boundary dofs = false
   set limiter iterations     = 2
 end

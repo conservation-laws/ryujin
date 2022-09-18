@@ -95,6 +95,21 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 #
+# Detection
+#
+
+# Detect whether we are building against GCC's libstdc++.
+include(CheckCXXSourceCompiles)
+check_cxx_source_compiles("
+  #include <iostream>
+  #ifndef __GLIBCXX__
+  #error NOT LIBSTDCPP
+  #endif
+  int main() {}"
+  LIBSTDCPP
+  )
+
+#
 # Respect user overrides performed via CMAKE_CXX_FLAGS/CMAKE_EXE_LINKER_FLAGS
 #
 
@@ -116,8 +131,8 @@ include(GNUInstallDirs)
 add_subdirectory(source)
 add_subdirectory(prm)
 
-#enable_testing()
-#add_subdirectory(tests)
+enable_testing()
+add_subdirectory(tests)
 
 IF(WITH_DOXYGEN)
   add_subdirectory(doc)

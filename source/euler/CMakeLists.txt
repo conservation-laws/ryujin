@@ -8,5 +8,6 @@ add_library(obj_euler OBJECT
   hyperbolic_system.cc
   riemann_solver.cc
   )
+target_link_libraries(obj_euler PUBLIC obj_common)
 deal_ii_setup_target(obj_euler)
 target_include_directories(obj_euler PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

@@ -345,10 +345,12 @@ namespace ryujin
           Utilities::MPI::min_max_avg(wall_time, mpi_communicator_);
       const bool update_terminal =
           (data.avg >= last_terminal_output + terminal_update_interval_);
-      if (write_to_log_file || update_terminal) {
-        print_cycle_statistics(
-            cycle, t, output_cycle, /*logfile*/ write_to_log_file);
-        last_terminal_output = data.avg;
+      if (terminal_update_interval_ != Number(0.)) {
+        if (write_to_log_file || update_terminal) {
+          print_cycle_statistics(
+              cycle, t, output_cycle, /*logfile*/ write_to_log_file);
+          last_terminal_output = data.avg;
+        }
       }
     } /* end of loop */
 

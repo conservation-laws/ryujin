@@ -8,22 +8,6 @@ configure_file(
   ${CMAKE_CURRENT_BINARY_DIR}/compile_time_options.h
   )
 
-include_directories(
-  ${CMAKE_BINARY_DIR}/source/
-  ${CMAKE_CURRENT_SOURCE_DIR}
-  )
-
-# Detect whether we are building against GCC's libstdc++.
-include(CheckCXXSourceCompiles)
-check_cxx_source_compiles("
-  #include <iostream>
-  #ifndef __GLIBCXX__
-  #error NOT LIBSTDCPP
-  #endif
-  int main() {}"
-  LIBSTDCPP
-  )
-
 #
 # Common and equation-independent source files and target:
 #
@@ -37,6 +21,10 @@ set(COMMON_SOURCE_FILES
   )
 
 add_library(obj_common OBJECT ${COMMON_SOURCE_FILES})
+target_include_directories(obj_common PUBLIC
+  ${CMAKE_BINARY_DIR}/source/
+  ${CMAKE_CURRENT_SOURCE_DIR}
+  )
 deal_ii_setup_target(obj_common)
 
 #
@@ -46,7 +34,6 @@ deal_ii_setup_target(obj_common)
 set(DEPENDENT_SOURCE_FILES
   hyperbolic_module.cc
   initial_values.cc
-  main.cc
   postprocessor.cc
   quantities.cc
   time_integrator.cc
@@ -65,23 +52,40 @@ set_property(SOURCE time_loop.cc APPEND PROPERTY COMPILE_DEFINITIONS
 #
 
 macro(setup_equation EQUATION)
-  # define obj_${EQUATION} object library:
+  #
+  # obj_${EQUATION} object library: equation specific code:
+  #
+
   add_subdirectory(${EQUATION})
 
-  add_executable(${EQUATION} ${DEPENDENT_SOURCE_FILES})
-  deal_ii_setup_target(${EQUATION})
-  target_link_libraries(${EQUATION}
-    obj_common obj_${EQUATION} ${OpenMP_CXX_LIBRARIES}
-    )
+  #
+  # obj_${EQUATION}_dependent object library: equation dependent common code:
+  #
 
+  add_library(obj_${EQUATION}_dependent OBJECT ${DEPENDENT_SOURCE_FILES})
+  deal_ii_setup_target(obj_${EQUATION}_dependent)
+
+  target_link_libraries(obj_${EQUATION}_dependent PUBLIC obj_${EQUATION})
   if(WITH_LIKWID)
-    target_link_libraries(${EQUATION} likwid likwid-hwloc likwid-lua)
+    target_link_libraries(obj_${EQUATION}_dependent PUBLIC
+      likwid likwid-hwloc likwid-lua
+      )
   endif()
-
   # For GNU libstdc++ we have to make sure to also link against libstdc++fs.
   if(LIBSTDCPP)
-    target_link_libraries(${EQUATION} stdc++fs)
+    target_link_libraries(obj_${EQUATION}_dependent PUBLIC stdc++fs)
   endif()
+
+  #
+  # The actual executable:
+  #
+
+  add_executable(${EQUATION} main.cc)
+  deal_ii_setup_target(${EQUATION})
+
+  target_link_libraries(${EQUATION}
+    obj_common obj_${EQUATION} obj_${EQUATION}_dependent
+    )
 
   set_target_properties(${EQUATION} PROPERTIES
     RUNTIME_OUTPUT_NAME "ryujin-${DIM}d-${EQUATION}"
