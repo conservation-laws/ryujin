@@ -163,6 +163,10 @@ namespace ryujin
     Number
     inverse_water_depth(const dealii::Tensor<1, problem_dim, Number> &U) const;
 
+    template <int problem_dim, typename Number>
+    Number inverse_water_depth_sharp(
+        const dealii::Tensor<1, problem_dim, Number> &U) const;
+
     /**
      * Given a water depth @ref h this function returns 0 if h is in the
      * interval [-relaxation * h_cutoff, relaxation * h_cutoff], otherwise
@@ -556,14 +560,31 @@ namespace ryujin
   DEAL_II_ALWAYS_INLINE inline Number HyperbolicSystem::inverse_water_depth(
       const dealii::Tensor<1, problem_dim, Number> &U) const
   {
-    /*
-     * FIXME
-     */
     using ScalarNumber = typename get_value_type<Number>::type;
     constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
-    const Number h_cutoff = Number(reference_water_depth_) * eps;
+    // FIXME
+    const Number h_cutoff = Number(reference_water_depth_) * 1.e6 * eps;
 
-    return Number(1.) / std::max(water_depth(U), h_cutoff);
+    const Number h = water_depth(U);
+    const Number h_max = std::max(h, h_cutoff);
+    const Number denom = h * h + h_max * h_max;
+    return ScalarNumber(2.) * h / denom;
+  }
+
+
+  template <int problem_dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline Number
+  HyperbolicSystem::inverse_water_depth_sharp(
+      const dealii::Tensor<1, problem_dim, Number> &U) const
+  {
+    using ScalarNumber = typename get_value_type<Number>::type;
+    constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
+    // FIXME
+    const Number h_cutoff = Number(reference_water_depth_) * 1.e-3 * eps;
+
+    const Number h = water_depth(U);
+    const Number h_max = std::max(h, h_cutoff);
+    return ScalarNumber(1.) / h_max;
   }
 
 

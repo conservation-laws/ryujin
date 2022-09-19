@@ -174,7 +174,7 @@ namespace ryujin
     const auto h = std::max(hyperbolic_system.water_depth(U), h_cutoff);
 
     const auto vel = hyperbolic_system.momentum(U) *
-                     hyperbolic_system.inverse_water_depth(U);
+                     hyperbolic_system.inverse_water_depth_sharp(U);
     const auto proj_vel = n_ij * vel;
 
     const auto a = std::sqrt(h * ScalarNumber(gravity));
