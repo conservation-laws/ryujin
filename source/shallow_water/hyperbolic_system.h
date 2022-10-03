@@ -155,6 +155,16 @@ namespace ryujin
 
     /**
      * For a given (1+dim dimensional) state vector <code>U</code>, return
+     * the regularized water depth <code>U[0]</code> This function returns
+     * max(h, h_cutoff), where h_cutoff is the reference water depth
+     * multiplied by eps.
+     */
+    template <int problem_dim, typename Number>
+    Number
+    water_depth_sharp(const dealii::Tensor<1, problem_dim, Number> &U) const;
+
+    /**
+     * For a given (1+dim dimensional) state vector <code>U</code>, return
      * a regularized inverse of the water depth. This function returns 1 /
      * max(h, h_cutoff), where h_cutoff is the reference water depth
      * multiplied by eps.
@@ -574,17 +584,26 @@ namespace ryujin
 
   template <int problem_dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline Number
-  HyperbolicSystem::inverse_water_depth_sharp(
+  HyperbolicSystem::water_depth_sharp(
       const dealii::Tensor<1, problem_dim, Number> &U) const
   {
     using ScalarNumber = typename get_value_type<Number>::type;
     constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
-    // FIXME
     const Number h_cutoff = Number(reference_water_depth_) * 1.e-3 * eps;
 
     const Number h = water_depth(U);
     const Number h_max = std::max(h, h_cutoff);
-    return ScalarNumber(1.) / h_max;
+    return h_max;
+  }
+
+
+  template <int problem_dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline Number
+  HyperbolicSystem::inverse_water_depth_sharp(
+      const dealii::Tensor<1, problem_dim, Number> &U) const
+  {
+    using ScalarNumber = typename get_value_type<Number>::type;
+    return ScalarNumber(1.) / water_depth_sharp(U);
   }
 
 

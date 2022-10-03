@@ -22,6 +22,7 @@ namespace ryujin
                                 const Number &h_Z) const
   {
     using ScalarNumber = typename get_value_type<Number>::type;
+    const auto gravity = hyperbolic_system.gravity();
 
     const auto &[h, u, a] = riemann_data;
 
@@ -104,6 +105,8 @@ namespace ryujin
       const primitive_type &riemann_data_j) const
   {
     using ScalarNumber = typename get_value_type<Number>::type;
+    const auto gravity = hyperbolic_system.gravity();
+    const auto gravity_inverse = ScalarNumber(1.) / gravity;
 
     const auto &[h_i, u_i, a_i] = riemann_data_i;
     const auto &[h_j, u_j, a_j] = riemann_data_j;
@@ -164,20 +167,15 @@ namespace ryujin
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline auto
   RiemannSolver<dim, Number>::riemann_data_from_state(
-      const HyperbolicSystem &hyperbolic_system,
       const state_type &U,
       const dealii::Tensor<1, dim, Number> &n_ij) const -> primitive_type
   {
-    constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
-    const auto h_reference = hyperbolic_system.reference_water_depth();
-    const Number h_cutoff = Number(h_reference) * eps;
-    const auto h = std::max(hyperbolic_system.water_depth(U), h_cutoff);
+    const auto h = hyperbolic_system.water_depth_sharp(U);
+    const auto gravity = hyperbolic_system.gravity();
 
-    const auto vel = hyperbolic_system.momentum(U) *
-                     hyperbolic_system.inverse_water_depth_sharp(U);
+    const auto vel = hyperbolic_system.momentum(U) / h;
     const auto proj_vel = n_ij * vel;
-
-    const auto a = std::sqrt(h * ScalarNumber(gravity));
+    const auto a = std::sqrt(h * gravity);
 
     return {{h, proj_vel, a}};
   }
@@ -204,10 +202,8 @@ namespace ryujin
       const state_type &U_j,
       const dealii::Tensor<1, dim, Number> &n_ij) const
   {
-    const auto riemann_data_i =
-        riemann_data_from_state(hyperbolic_system, U_i, n_ij);
-    const auto riemann_data_j =
-        riemann_data_from_state(hyperbolic_system, U_j, n_ij);
+    const auto riemann_data_i = riemann_data_from_state(U_i, n_ij);
+    const auto riemann_data_j = riemann_data_from_state(U_j, n_ij);
     return compute(riemann_data_i, riemann_data_j);
   }
 

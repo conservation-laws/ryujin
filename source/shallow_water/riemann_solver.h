@@ -58,8 +58,6 @@ namespace ryujin
      */
     RiemannSolver(const HyperbolicSystem &hyperbolic_system)
         : hyperbolic_system(hyperbolic_system)
-        , gravity(hyperbolic_system.gravity())
-        , gravity_inverse(1. / gravity)
     {
     }
 
@@ -110,14 +108,11 @@ namespace ryujin
                                   const primitive_type &riemann_data_j) const;
 
     primitive_type
-    riemann_data_from_state(const HyperbolicSystem &hyperbolic_system,
-                            const state_type &U,
+    riemann_data_from_state(const state_type &U,
                             const dealii::Tensor<1, dim, Number> &n_ij) const;
 
   private:
     const HyperbolicSystem &hyperbolic_system;
-    const ScalarNumber gravity;
-    const ScalarNumber gravity_inverse;
 
     //@}
   };
