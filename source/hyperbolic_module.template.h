@@ -728,7 +728,7 @@ namespace ryujin
             if constexpr (HyperbolicSystem::have_source_terms) {
               auto Q_ij = qij_matrix_.template get_tensor<T>(i, col_idx);
               const auto S_jH = source_r_.template get_tensor<T>(js);
-              Q_ij = b_ij * S_jH - b_ji * S_iH;
+              Q_ij += b_ij * S_jH - b_ji * S_iH;
               Q_ij *= factor;
               qij_matrix_.write_tensor(Q_ij, i, col_idx, true);
             }
