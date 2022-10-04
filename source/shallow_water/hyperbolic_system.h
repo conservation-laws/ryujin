@@ -1013,11 +1013,17 @@ namespace ryujin
       const T &,
       const dealii::Tensor<1, dim, T> &c_ij) const
   {
+    using ScalarNumber = typename get_value_type<T>::type;
+
     const auto &[U_i, Z_i] = prec_i;
     const auto &[U_j, Z_j] = prec_j;
     const auto H_i = water_depth(U_i);
+    const auto H_j = water_depth(U_j);
 
-    const auto factor = -gravity_ * H_i * (Z_j - Z_i);
+    const auto factor =
+        -gravity_ * H_i * (Z_j - Z_i) +
+        ScalarNumber(0.5) * gravity_ * (H_j - H_i) * (H_j - H_i);
+
     ST result;
     for (unsigned int d = 1; d < dim + 1; ++d)
       result[d] = factor * c_ij[d - 1];
