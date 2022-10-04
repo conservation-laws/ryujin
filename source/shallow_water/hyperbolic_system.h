@@ -170,8 +170,8 @@ namespace ryujin
      * multiplied by eps.
      */
     template <int problem_dim, typename Number>
-    Number
-    inverse_water_depth(const dealii::Tensor<1, problem_dim, Number> &U) const;
+    Number inverse_water_depth_mollified(
+        const dealii::Tensor<1, problem_dim, Number> &U) const;
 
     template <int problem_dim, typename Number>
     Number inverse_water_depth_sharp(
@@ -567,13 +567,14 @@ namespace ryujin
 
 
   template <int problem_dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline Number HyperbolicSystem::inverse_water_depth(
+  DEAL_II_ALWAYS_INLINE inline Number
+  HyperbolicSystem::inverse_water_depth_mollified(
       const dealii::Tensor<1, problem_dim, Number> &U) const
   {
     using ScalarNumber = typename get_value_type<Number>::type;
     constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
     const Number h_cutoff =
-        Number(reference_water_depth_ * dry_state_relaxation_) * 1.e3 * eps;
+        Number(reference_water_depth_ * dry_state_relaxation_) * eps;
 
     const Number h = water_depth(U);
     const Number h_max = std::max(h, h_cutoff);
@@ -590,7 +591,7 @@ namespace ryujin
     using ScalarNumber = typename get_value_type<Number>::type;
     constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
     const Number h_cutoff =
-        Number(reference_water_depth_ * dry_state_relaxation_) * 1.e-3 * eps;
+        Number(reference_water_depth_ * dry_state_relaxation_) * eps;
 
     const Number h = water_depth(U);
     const Number h_max = std::max(h, h_cutoff);
@@ -645,7 +646,7 @@ namespace ryujin
     using ScalarNumber = typename get_value_type<Number>::type;
 
     const auto h = water_depth(U);
-    const auto vel = momentum(U) * inverse_water_depth(U);
+    const auto vel = momentum(U) * inverse_water_depth_sharp(U);
 
     return ScalarNumber(0.5) * h * vel.norm_square();
   }
@@ -708,7 +709,7 @@ namespace ryujin
     dealii::Tensor<1, problem_dim, Number> result;
 
     const Number &h = U[0];
-    const auto vel = momentum(U) * inverse_water_depth(U);
+    const auto vel = momentum(U) * inverse_water_depth_sharp(U);
 
     // water depth component
     result[0] =
@@ -761,11 +762,11 @@ namespace ryujin
 
     const auto m = momentum(U);
     const auto a = speed_of_sound(U);
-    const auto vn = m * normal * inverse_water_depth(U);
+    const auto vn = m * normal * inverse_water_depth_sharp(U);
 
     const auto m_bar = momentum(U_bar);
     const auto a_bar = speed_of_sound(U_bar);
-    const auto vn_bar = m_bar * normal * inverse_water_depth(U_bar);
+    const auto vn_bar = m_bar * normal * inverse_water_depth_sharp(U_bar);
 
     /* First Riemann characteristic: v * n - 2 * a */
 
@@ -775,7 +776,7 @@ namespace ryujin
 
     const auto R_2 = component == 2 ? vn_bar + 2. * a_bar : vn + 2. * a;
 
-    const auto vperp = m * inverse_water_depth(U) - vn * normal;
+    const auto vperp = m * inverse_water_depth_sharp(U) - vn * normal;
 
     const auto vn_new = 0.5 * (R_1 + R_2);
 
@@ -830,7 +831,7 @@ namespace ryujin
        *      R_1 characteristic.
        */
       const auto m = momentum(U);
-      const auto h_inverse = inverse_water_depth(U);
+      const auto h_inverse = inverse_water_depth_sharp(U);
       const auto a = speed_of_sound(U);
       const auto vn = m * normal * h_inverse;
 
@@ -869,7 +870,7 @@ namespace ryujin
     const Number h = water_depth(U_left);
     const Number H_star = std::max(Number(0.), h + Z_left - Z_max);
 
-    return U_left * H_star * inverse_water_depth(U_left);
+    return U_left * H_star * inverse_water_depth_sharp(U_left);
   }
 
 
@@ -877,7 +878,7 @@ namespace ryujin
   DEAL_II_ALWAYS_INLINE inline auto HyperbolicSystem::f(const ST &U) const
       -> flux_type<dim, T>
   {
-    const T h_inverse = inverse_water_depth(U);
+    const T h_inverse = inverse_water_depth_sharp(U);
     const auto m = momentum(U);
     const auto p = pressure(U);
 
@@ -1075,7 +1076,7 @@ namespace ryujin
   HyperbolicSystem::to_primitive_state(
       const dealii::Tensor<1, problem_dim, Number> &state) const
   {
-    const auto h_inverse = inverse_water_depth(state);
+    const auto h_inverse = inverse_water_depth_sharp(state);
 
     auto primitive_state = state;
     /* Fix up velocity: */

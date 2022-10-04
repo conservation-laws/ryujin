@@ -160,7 +160,7 @@ namespace ryujin
         precomputed_values.template get_tensor<Number, precomputed_type>(js);
 
     const auto velocity_j = hyperbolic_system.momentum(U_j) *
-                            hyperbolic_system.inverse_water_depth(U_j);
+                            hyperbolic_system.inverse_water_depth_sharp(U_j);
     const auto f_j = hyperbolic_system.f(U_j);
     const auto pressure_j = hyperbolic_system.pressure(U_j);
 
