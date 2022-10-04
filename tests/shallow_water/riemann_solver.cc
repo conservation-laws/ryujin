@@ -49,6 +49,7 @@ int main()
   std::cout << "dry_state_relaxation:  " << hyperbolic_system.dry_state_relaxation() << std::endl;
   std::cout << std::endl;
 
+  // 10/04/2022 verified against Mathematica computation (Eric + Matthias)
   test({0.0, 0.0}, {0.0, 0.0});
   test({1.0, 1.0}, {0.0, 0.0});
   test({1.8, 0.0}, {1.0, 0.0});
