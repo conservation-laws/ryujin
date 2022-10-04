@@ -80,8 +80,6 @@ namespace ryujin
                    const state_type &U_j,
                    const dealii::Tensor<1, dim, Number> &n_ij) const;
 
-
-  protected:
     //@}
     /**
      * @name Internal functions used in the Riemann solver

@@ -572,8 +572,8 @@ namespace ryujin
   {
     using ScalarNumber = typename get_value_type<Number>::type;
     constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
-    // FIXME
-    const Number h_cutoff = Number(reference_water_depth_) * 1.e6 * eps;
+    const Number h_cutoff =
+        Number(reference_water_depth_ * dry_state_relaxation_) * 1.e1 * eps;
 
     const Number h = water_depth(U);
     const Number h_max = std::max(h, h_cutoff);
@@ -589,7 +589,8 @@ namespace ryujin
   {
     using ScalarNumber = typename get_value_type<Number>::type;
     constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
-    const Number h_cutoff = Number(reference_water_depth_) * 1.e-3 * eps;
+    const Number h_cutoff =
+        Number(reference_water_depth_ * dry_state_relaxation_) * 1.e1 * eps;
 
     const Number h = water_depth(U);
     const Number h_max = std::max(h, h_cutoff);
