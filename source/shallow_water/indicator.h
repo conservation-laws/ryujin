@@ -132,6 +132,7 @@ namespace ryujin
   DEAL_II_ALWAYS_INLINE inline void
   Indicator<dim, Number>::reset(const unsigned int i, const state_type &U_i)
   {
+    h_i = hyperbolic_system.water_depth(U_i);
     /* entropy viscosity commutator: */
 
     const auto &[mathematical_entropy] =
@@ -177,18 +178,21 @@ namespace ryujin
   {
     using ScalarNumber = typename get_value_type<Number>::type;
 
-    const auto numerator = std::abs(left - d_eta_i * right);
-    const auto denominator = std::abs(left) + std::abs(d_eta_i * right);
+    Number my_sum = 0.;
+    for (unsigned int k = 0; k < problem_dimension; ++k) {
+      my_sum += d_eta_i[k] * right[k];
+    }
+
+    Number numerator = std::abs(left - my_sum);
+    Number denominator = std::abs(left) + std::abs(my_sum);
+
+    constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
+    const auto quotient =
+        std::abs(numerator + eps) / (denominator + hd_i * std::abs(eta_i) + eps);
 
     /* FIXME: this can be refactoring into a runtime parameter... */
     const ScalarNumber evc_alpha_0_ = ScalarNumber(1.);
-
-    constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
-    const auto regularization =
-        hd_i * (std::abs(eta_i) + std::abs(pressure_i) + eps);
-
-    const auto quotient =
-        std::abs(numerator + regularization) / (denominator + regularization);
+    
     return std::min(Number(1.), evc_alpha_0_ * quotient);
   }
 

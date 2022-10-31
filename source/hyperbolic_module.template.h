@@ -632,6 +632,11 @@ namespace ryujin
               qij_matrix_.write_tensor(Q_ij, i, col_idx, true);
           }
 
+#ifdef CHECK_BOUNDS
+          AssertThrow(hyperbolic_system_->is_admissible(U_i_new),
+                      ExcMessage("Low-order state is not admissible!"));
+#endif
+
           new_U.template write_tensor<T>(U_i_new, i);
           r_.template write_tensor<T>(F_iH, i);
 

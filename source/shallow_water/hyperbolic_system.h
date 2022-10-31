@@ -738,7 +738,7 @@ namespace ryujin
     if (!(test == T(0.))) {
       std::cout << std::fixed << std::setprecision(16);
       std::cout << "Bounds violation: Negative state [h] detected!\n";
-      std::cout << "\t\trho: " << h << "\n" << std::endl;
+      std::cout << "\t\th: " << h << "\n" << std::endl;
     }
 #endif
 
