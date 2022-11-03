@@ -533,10 +533,12 @@ namespace ryujin
     ACCESSOR_READ_ONLY(mannings)
 
     double reference_water_depth_;
-    ACCESSOR_READ_ONLY(reference_water_depth)
 
-    double dry_state_relaxation_;
-    ACCESSOR_READ_ONLY(dry_state_relaxation)
+    double dry_state_relaxation_sharp_;
+    ACCESSOR_READ_ONLY(dry_state_relaxation_sharp)
+
+    double dry_state_relaxation_mollified_;
+    ACCESSOR_READ_ONLY(dry_state_relaxation_mollified)
 
     //@}
   };
@@ -573,11 +575,11 @@ namespace ryujin
   {
     using ScalarNumber = typename get_value_type<Number>::type;
     constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
-    const Number h_cutoff =
-        Number(reference_water_depth_ * dry_state_relaxation_) * eps;
+    const Number h_cutoff_mollified =
+        Number(reference_water_depth_ * dry_state_relaxation_mollified_) * eps;
 
     const Number h = water_depth(U);
-    const Number h_max = std::max(h, h_cutoff);
+    const Number h_max = std::max(h, h_cutoff_mollified);
     const Number denom = h * h + h_max * h_max;
     return ScalarNumber(2.) * h / denom;
   }
@@ -590,11 +592,11 @@ namespace ryujin
   {
     using ScalarNumber = typename get_value_type<Number>::type;
     constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
-    const Number h_cutoff =
-        Number(reference_water_depth_ * dry_state_relaxation_) * eps;
+    const Number h_cutoff_sharp =
+        Number(reference_water_depth_ * dry_state_relaxation_sharp_) * eps;
 
     const Number h = water_depth(U);
-    const Number h_max = std::max(h, h_cutoff);
+    const Number h_max = std::max(h, h_cutoff_sharp);
     return h_max;
   }
 
@@ -615,11 +617,11 @@ namespace ryujin
   {
     using ScalarNumber = typename get_value_type<Number>::type;
     constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
-    const Number h_cutoff_big =
-        Number(reference_water_depth_ * dry_state_relaxation_) * eps;
+    const Number h_cutoff_mollified =
+        Number(reference_water_depth_ * dry_state_relaxation_mollified_) * eps;
 
     return dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-        std::abs(h), h_cutoff_big, Number(0.), h);
+        std::abs(h), h_cutoff_mollified, Number(0.), h);
   }
 
 
@@ -870,7 +872,7 @@ namespace ryujin
     const Number h = water_depth(U_left);
     const Number H_star = std::max(Number(0.), h + Z_left - Z_max);
 
-    return U_left * H_star * inverse_water_depth_sharp(U_left);
+    return U_left * H_star * inverse_water_depth_mollified(U_left);
   }
 
 
@@ -878,7 +880,7 @@ namespace ryujin
   DEAL_II_ALWAYS_INLINE inline auto HyperbolicSystem::f(const ST &U) const
       -> flux_type<dim, T>
   {
-    const T h_inverse = inverse_water_depth_sharp(U);
+    const T h_inverse = inverse_water_depth_mollified(U);
     const auto m = momentum(U);
     const auto p = pressure(U);
 

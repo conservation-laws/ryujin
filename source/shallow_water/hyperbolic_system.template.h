@@ -25,9 +25,14 @@ namespace ryujin
                   reference_water_depth_,
                   "Problem specific water depth reference");
 
-    dry_state_relaxation_ = 100.;
-    add_parameter("dry state relaxation",
-                  dry_state_relaxation_,
+    dry_state_relaxation_sharp_ = 1.e2;
+    add_parameter("dry state relaxation sharp",
+                  dry_state_relaxation_sharp_,
+                  "Problem specific dry-state relaxation parameter");
+
+    dry_state_relaxation_mollified_ = 1.e5;
+    add_parameter("dry state relaxation mollified",
+                  dry_state_relaxation_mollified_,
                   "Problem specific dry-state relaxation parameter");
   }
 

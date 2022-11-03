@@ -27,9 +27,10 @@ namespace ryujin
 
     constexpr ScalarNumber min = std::numeric_limits<ScalarNumber>::min();
     constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
-    const ScalarNumber relax_small = ScalarNumber(1. + 10. * eps);
-    const ScalarNumber relax =
-        ScalarNumber(1. + hyperbolic_system.dry_state_relaxation() * eps);
+    const ScalarNumber relax_small = ScalarNumber(
+        1. + hyperbolic_system.dry_state_relaxation_sharp() * eps); // FIXME
+    const ScalarNumber relax = ScalarNumber(
+        1. + hyperbolic_system.dry_state_relaxation_mollified() * eps); // FIXME
 
     /*
      * We first limit the water_depth h.
