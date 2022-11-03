@@ -578,7 +578,7 @@ namespace ryujin
     const Number h_cutoff_mollified =
         Number(reference_water_depth_ * dry_state_relaxation_mollified_) * eps;
 
-    const Number h = water_depth(U);
+    const Number h = positive_part(water_depth(U));
     const Number h_max = std::max(h, h_cutoff_mollified);
     const Number denom = h * h + h_max * h_max;
     return ScalarNumber(2.) * h / denom;
@@ -880,7 +880,7 @@ namespace ryujin
   DEAL_II_ALWAYS_INLINE inline auto HyperbolicSystem::f(const ST &U) const
       -> flux_type<dim, T>
   {
-    const T h_inverse = inverse_water_depth_mollified(U);
+    const T h_inverse = inverse_water_depth_sharp(U);
     const auto m = momentum(U);
     const auto p = pressure(U);
 
