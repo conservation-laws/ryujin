@@ -230,11 +230,8 @@ namespace ryujin
           synchronization_dispatch.check(
               thread_ready, i >= n_export_indices && i < n_internal);
 
-          const auto U_i = old_U.template get_tensor<T>(i);
-
-          hyperbolic_system_->nodal_precomputation(new_precomputed, i, U_i);
-
-          // FIXME: add iteration over stencil.
+          hyperbolic_system_->precomputation<T>(
+              new_precomputed, old_U, sparsity_simd, i);
         }
       };
 

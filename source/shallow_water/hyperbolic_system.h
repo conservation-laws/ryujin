@@ -8,8 +8,10 @@
 #include <compile_time_options.h>
 #include <convenience_macros.h>
 #include <discretization.h>
+#include <multicomponent_vector.h>
 #include <patterns_conversion.h>
 #include <simd.h>
+
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/tensor.h>
@@ -134,11 +136,16 @@ namespace ryujin
     /**
      * Precomputed values for a given state.
      */
-    template <typename MultiComponentVector, int problem_dim, typename Number>
+    template <typename Number,
+              typename ScalarNumber = typename get_value_type<Number>::type,
+              int problem_dim,
+              typename MCV,
+              typename SPARSITY>
     void
-    nodal_precomputation(MultiComponentVector &precomputed_values,
-                         unsigned int i,
-                         const dealii::Tensor<1, problem_dim, Number> &U) const;
+    precomputation(MCV &precomputed_values,
+                   const MultiComponentVector<ScalarNumber, problem_dim> &U,
+                   const SPARSITY &sparsity_simd,
+                   unsigned int i) const;
 
     //@}
     /**
@@ -547,13 +554,20 @@ namespace ryujin
   /* Inline definitions */
 
 
-  template <typename MCV, int problem_dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline void HyperbolicSystem::nodal_precomputation(
+  template <typename Number,
+            typename ScalarNumber,
+            int problem_dim,
+            typename MCV,
+            typename SPARSITY>
+  DEAL_II_ALWAYS_INLINE inline void HyperbolicSystem::precomputation(
       MCV &precomputed_values,
-      unsigned int i,
-      const dealii::Tensor<1, problem_dim, Number> &U_i) const
+      const MultiComponentVector<ScalarNumber, problem_dim> &U,
+      const SPARSITY & /*sparsity_simd*/,
+      unsigned int i) const
   {
-    constexpr int dim = problem_dim - 1;
+    constexpr int dim = problem_dim - 2;
+
+    const auto U_i = U.template get_tensor<Number>(i);
 
     const precomputed_type<dim, Number> prec_i{mathematical_entropy(U_i)};
     precomputed_values.template write_tensor<Number>(prec_i, i);
