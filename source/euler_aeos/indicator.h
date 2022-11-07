@@ -171,7 +171,7 @@ namespace ryujin
   {
     /* entropy viscosity commutator: */
 
-    const auto &[new_s_i, new_eta_i] =
+    const auto &[new_p_i, new_gamma_min_i, new_s_i, new_eta_i] =
         precomputed_values.template get_tensor<Number, precomputed_type>(i);
 
     const auto rho_i = hyperbolic_system.density(U_i);
@@ -195,7 +195,7 @@ namespace ryujin
   {
     /* entropy viscosity commutator: */
 
-    const auto &[s_j, eta_j] =
+    const auto &[p_j, gamma_min_j, s_j, eta_j] =
         precomputed_values.template get_tensor<Number, precomputed_type>(js);
 
     const auto rho_j = hyperbolic_system.density(U_j);

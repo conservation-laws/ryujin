@@ -216,7 +216,7 @@ namespace ryujin
     rho_min = Number(std::numeric_limits<ScalarNumber>::max());
     rho_max = Number(0.);
 
-    const auto &[s_i, eta_i] =
+    const auto &[p_i, gamma_min_i, s_i, eta_i] =
         precomputed_values.template get_tensor<Number, precomputed_type>(i);
 
     s_min = s_i;
@@ -252,7 +252,7 @@ namespace ryujin
     rho_min = std::min(rho_min, rho_ij_bar);
     rho_max = std::max(rho_max, rho_ij_bar);
 
-    const auto &[s_j, eta_j] =
+    const auto &[p_j, gamma_min_j, s_j, eta_j] =
         precomputed_values.template get_tensor<Number, precomputed_type>(js);
     s_min = std::min(s_min, s_j);
 

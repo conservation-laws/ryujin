@@ -125,7 +125,7 @@ namespace ryujin
      * The number of precomputed values.
      */
     template <int dim>
-    static constexpr unsigned int n_precomputed_values = 2;
+    static constexpr unsigned int n_precomputed_values = 4;
 
     /**
      * Array type used for precomputed values.
@@ -243,9 +243,14 @@ namespace ryujin
      *   (1 - b * \rho)^(\gamma -1).
      * \f]
      */
+    // FIXME remove
     template <int problem_dim, typename Number>
     Number
     specific_entropy(const dealii::Tensor<1, problem_dim, Number> &U) const;
+
+    template <int problem_dim, typename Number>
+    Number specific_entropy(const dealii::Tensor<1, problem_dim, Number> &U,
+                            const Number gamma_min) const;
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
@@ -254,9 +259,14 @@ namespace ryujin
      *   \eta = (\rho^2 e) ^ {1 / (\gamma + 1)}.
      * \f]
      */
+    // FIXME remove
     template <int problem_dim, typename Number>
     Number
     harten_entropy(const dealii::Tensor<1, problem_dim, Number> &U) const;
+
+    template <int problem_dim, typename Number>
+    Number harten_entropy(const dealii::Tensor<1, problem_dim, Number> &U,
+                          const Number gamma_min) const;
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
@@ -268,23 +278,6 @@ namespace ryujin
     template <int problem_dim, typename Number>
     dealii::Tensor<1, problem_dim, Number> harten_entropy_derivative(
         const dealii::Tensor<1, problem_dim, Number> &U) const;
-
-    /**
-     * For a given (2+dim dimensional) state vector <code>U</code>, compute
-     * and return the entropy \f$\eta = p^{1/\gamma}\f$.
-     */
-    template <int problem_dim, typename Number>
-    Number
-    mathematical_entropy(const dealii::Tensor<1, problem_dim, Number> U) const;
-
-    /**
-     * For a given (2+dim dimensional) state vector <code>U</code>, compute
-     * and return the derivative \f$\eta'\f$ of the entropy \f$\eta =
-     * p^{1/\gamma}\f$.
-     */
-    template <int problem_dim, typename Number>
-    dealii::Tensor<1, problem_dim, Number> mathematical_entropy_derivative(
-        const dealii::Tensor<1, problem_dim, Number> U) const;
 
     /**
      * Returns whether the state @ref U is admissible. If @ref U is a
@@ -572,15 +565,34 @@ namespace ryujin
   DEAL_II_ALWAYS_INLINE inline void HyperbolicSystem::precomputation(
       MCV &precomputed_values,
       const MultiComponentVector<ScalarNumber, problem_dim> &U,
-      const SPARSITY & /*sparsity_simd*/,
+      const SPARSITY &sparsity_simd,
       unsigned int i) const
   {
+//     unsigned int stride_size = get_stride_size<Number>;
     constexpr int dim = problem_dim - 2;
 
     const auto U_i = U.template get_tensor<Number>(i);
-    const precomputed_type<dim, Number> prec_i{specific_entropy(U_i),
-                                               harten_entropy(U_i)};
+    const auto p_i = pressure(U_i);
 
+    auto gamma_min = Number(gamma_);
+#if 0
+    auto gamma_min = gamma(U_i, p_i);
+
+    const unsigned int row_length = sparsity_simd.row_length(i);
+    const unsigned int *js = sparsity_simd.columns(i) + stride_size;
+    for (unsigned int col_idx = 1; col_idx < row_length;
+         ++col_idx, js += stride_size) {
+      const auto U_j = U.template get_tensor<Number>(js);
+      const auto p_j = pressure(U_j); // FIXME
+      const auto gamma_j = gamma(U_j, p_j);
+      gamma_min = std::min(gamma_min, gamma_j);
+    }
+#endif
+
+    const auto s_i = specific_entropy(U_i, gamma_min);
+    const auto eta_i = harten_entropy(U_i, gamma_min);
+
+    const precomputed_type<dim, Number> prec_i{p_i, gamma_min, s_i, eta_i};
     precomputed_values.template write_tensor<Number>(prec_i, i);
   }
 
@@ -716,6 +728,20 @@ namespace ryujin
 
 
   template <int problem_dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline Number HyperbolicSystem::specific_entropy(
+      const dealii::Tensor<1, problem_dim, Number> &U,
+      const Number gamma_min) const
+  {
+    /* exp((gamma - 1)s) = (rho e) / rho ^ gamma */
+
+    using ScalarNumber = typename get_value_type<Number>::type;
+
+    const auto rho_inverse = ScalarNumber(1.) / U[0];
+    return internal_energy(U) * ryujin::vec_pow(rho_inverse, gamma_min);
+  }
+
+
+  template <int problem_dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline Number HyperbolicSystem::harten_entropy(
       const dealii::Tensor<1, problem_dim, Number> &U) const
   {
@@ -730,6 +756,26 @@ namespace ryujin
 
     const Number rho_rho_e = rho * E - ScalarNumber(0.5) * m.norm_square();
     return ryujin::pow(rho_rho_e, gamma_plus_one_inverse_);
+  }
+
+
+  template <int problem_dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline Number HyperbolicSystem::harten_entropy(
+      const dealii::Tensor<1, problem_dim, Number> &U,
+      const Number gamma_min) const
+  {
+    /* rho^2 e = \rho E - 1/2*m^2 */
+
+    constexpr int dim = problem_dim - 2;
+    using ScalarNumber = typename get_value_type<Number>::type;
+
+    const Number rho = U[0];
+    const auto m = momentum(U);
+    const Number E = U[dim + 1];
+
+    const Number rho_rho_e = rho * E - ScalarNumber(0.5) * m.norm_square();
+    return ryujin::vec_pow(rho_rho_e,
+                           ScalarNumber(1.) / (gamma_min + Number(1.)));
   }
 
 
@@ -768,56 +814,6 @@ namespace ryujin
       result[1 + i] = -factor * m[i];
     }
     result[dim + 1] = factor * rho;
-
-    return result;
-  }
-
-
-  template <int problem_dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline Number HyperbolicSystem::mathematical_entropy(
-      const dealii::Tensor<1, problem_dim, Number> U) const
-  {
-    const auto p = pressure(U);
-    return ryujin::pow(p, gamma_inverse_);
-  }
-
-
-  template <int problem_dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, problem_dim, Number>
-  HyperbolicSystem::mathematical_entropy_derivative(
-      const dealii::Tensor<1, problem_dim, Number> U) const
-  {
-    /*
-     * With
-     *   eta = p ^ (1/gamma)
-     *   p = (gamma - 1) * (rho e)
-     *   rho e = E - 1/2 |m|^2 / rho
-     *
-     * we get
-     *
-     *   eta' = (gamma - 1)/gamma p ^(1/gamma - 1) *
-     *
-     *     (1/2m^2/rho^2 , -m/rho , 1 )^T
-     */
-
-    constexpr int dim = problem_dim - 2;
-    using ScalarNumber = typename get_value_type<Number>::type;
-
-    const Number &rho = U[0];
-    const Number rho_inverse = ScalarNumber(1.) / rho;
-    const auto u = momentum(U) * rho_inverse;
-    const auto p = pressure(U);
-
-    const auto factor = (gamma_ - ScalarNumber(1.0)) * gamma_inverse_ *
-                        ryujin::pow(p, gamma_inverse_ - ScalarNumber(1.));
-
-    dealii::Tensor<1, problem_dim, Number> result;
-
-    result[0] = factor * ScalarNumber(0.5) * u.norm_square();
-    result[dim + 1] = factor;
-    for (unsigned int i = 0; i < dim; ++i) {
-      result[1 + i] = -factor * u[i];
-    }
 
     return result;
   }
