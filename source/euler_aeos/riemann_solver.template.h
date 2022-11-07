@@ -183,7 +183,6 @@ namespace ryujin
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline auto
   RiemannSolver<dim, Number>::riemann_data_from_state(
-      const HyperbolicSystem &hyperbolic_system,
       const HyperbolicSystem::state_type<dim, Number> &U,
       const dealii::Tensor<1, dim, Number> &n_ij) const -> primitive_type
   {
@@ -267,10 +266,8 @@ namespace ryujin
       const state_type &U_j,
       const dealii::Tensor<1, dim, Number> &n_ij) const
   {
-    const auto riemann_data_i =
-        riemann_data_from_state(hyperbolic_system, U_i, n_ij);
-    const auto riemann_data_j =
-        riemann_data_from_state(hyperbolic_system, U_j, n_ij);
+    const auto riemann_data_i = riemann_data_from_state(U_i, n_ij);
+    const auto riemann_data_j = riemann_data_from_state(U_j, n_ij);
 
     return compute(riemann_data_i, riemann_data_j);
   }

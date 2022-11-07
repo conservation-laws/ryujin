@@ -163,8 +163,7 @@ namespace ryujin
      * approximative Riemann solver).
      */
     primitive_type
-    riemann_data_from_state(const HyperbolicSystem &hyperbolic_system,
-                            const HyperbolicSystem::state_type<dim, Number> &U,
+    riemann_data_from_state(const HyperbolicSystem::state_type<dim, Number> &U,
                             const dealii::Tensor<1, dim, Number> &n_ij) const;
 
   private:
