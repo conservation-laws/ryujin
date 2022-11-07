@@ -199,8 +199,8 @@ namespace ryujin
 
     const auto state =
         HyperbolicSystem::state_type<1, Number>({rho, proj_m, E});
-    const auto p = hyperbolic_system.pressure(state);
-    const auto a = hyperbolic_system.speed_of_sound(state);
+    const auto p = hyperbolic_system.pressure_oracle(state); // FIXME
+    const auto a = hyperbolic_system.speed_of_sound(state, p);
 
     return {{rho, proj_m * rho_inverse, p, a}};
   }

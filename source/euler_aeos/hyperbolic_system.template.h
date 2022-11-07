@@ -59,17 +59,29 @@ namespace ryujin
 
   template <>
   const std::array<std::string, 3>
-      HyperbolicSystem::primitive_component_names<1>{{"rho", "u", "p"}};
+      HyperbolicSystem::primitive_component_names<1>{{"rho", "u", "e"}};
 
   template <>
   const std::array<std::string, 4>
       HyperbolicSystem::primitive_component_names<2>{
-          {"rho", "v_1", "v_2", "p"}};
+          {"rho", "v_1", "v_2", "e"}};
 
   template <>
   const std::array<std::string, 5>
       HyperbolicSystem::primitive_component_names<3>{
-          {"rho", "v_1", "v_2", "v_3", "p"}};
+          {"rho", "v_1", "v_2", "v_3", "e"}};
+
+  template <>
+  const std::array<std::string, 4> HyperbolicSystem::precomputed_names<1>{
+      {"p", "gamma", "surrogate_entropy", "eta_harten"}};
+
+  template <>
+  const std::array<std::string, 4> HyperbolicSystem::precomputed_names<2>{
+      {"p", "gamma", "surrogate_entropy", "eta_harten"}};
+
+  template <>
+  const std::array<std::string, 4> HyperbolicSystem::precomputed_names<3>{
+      {"p", "gamma", "surrogate_entropy", "eta_harten"}};
 
   template <>
   const std::array<std::string, 0>
@@ -82,18 +94,6 @@ namespace ryujin
   template <>
   const std::array<std::string, 0>
       HyperbolicSystem::precomputed_initial_names<3>{};
-
-  template <>
-  const std::array<std::string, 2> HyperbolicSystem::precomputed_names<1>{
-      {"s", "eta_h"}};
-
-  template <>
-  const std::array<std::string, 2> HyperbolicSystem::precomputed_names<2>{
-      {"s", "eta_h"}};
-
-  template <>
-  const std::array<std::string, 2> HyperbolicSystem::precomputed_names<3>{
-      {"s", "eta_h"}};
 #endif
 
 } /* namespace ryujin */

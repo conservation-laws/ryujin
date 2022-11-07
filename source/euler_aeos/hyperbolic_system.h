@@ -209,20 +209,12 @@ namespace ryujin
     internal_energy_derivative(const dealii::Tensor<1, problem_dim, Number> &U);
 
     /**
-     * For a given (2+dim dimensional) state vector <code>U</code>, compute
-     * and return the pressure \f$p\f$.
-     *
-     * We assume that the pressure is given by a polytropic equation of
-     * state, i.e.,
-     * \f[
-     *   p = \frac{\gamma - 1}{1 - b*\rho}\; (\rho e)
-     * \f]
-     *
-     * @note If you want to set the covolume paramete @ref b_ to nonzero
-     * you have to enable the @ref covolume_ compile-time option.
+     * For a given (2+dim dimensional) state vector <code>U</code>, query
+     * the pressure oracle and return \f$p\f$.
      */
     template <int problem_dim, typename Number>
-    Number pressure(const dealii::Tensor<1, problem_dim, Number> &U) const;
+    Number
+    pressure_oracle(const dealii::Tensor<1, problem_dim, Number> &U) const;
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
@@ -233,7 +225,8 @@ namespace ryujin
      */
     template <int problem_dim, typename Number>
     Number
-    speed_of_sound(const dealii::Tensor<1, problem_dim, Number> &U) const;
+    speed_of_sound(const dealii::Tensor<1, problem_dim, Number> &U,
+                   const Number &p) const;
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
@@ -348,7 +341,7 @@ namespace ryujin
     //@{
 
     /**
-     * Given a state @p U compute the flux
+     * Given a state @p U and a pressure @p p compute the flux
      * \f[
      * \begin{pmatrix}
      *   \textbf m \\
@@ -360,7 +353,7 @@ namespace ryujin
     template <typename ST,
               int dim = ST::dimension - 2,
               typename T = typename ST::value_type>
-    flux_type<dim, T> f(const ST &U) const;
+    flux_type<dim, T> f(const ST &U, const T &p) const;
 
     /**
      * Given a state @p U_i and an index @p i compute flux contributions.
@@ -572,7 +565,7 @@ namespace ryujin
     constexpr int dim = problem_dim - 2;
 
     const auto U_i = U.template get_tensor<Number>(i);
-    const auto p_i = pressure(U_i);
+    const auto p_i = pressure_oracle(U_i);
 
     auto gamma_min = Number(gamma_);
 #if 0
@@ -690,7 +683,7 @@ namespace ryujin
 
 
   template <int problem_dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline Number HyperbolicSystem::pressure(
+  DEAL_II_ALWAYS_INLINE inline Number HyperbolicSystem::pressure_oracle(
       const dealii::Tensor<1, problem_dim, Number> &U) const
   {
     /* p = (gamma - 1) / (1 - b * rho) * (rho e) */
@@ -702,14 +695,14 @@ namespace ryujin
 
   template <int problem_dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline Number HyperbolicSystem::speed_of_sound(
-      const dealii::Tensor<1, problem_dim, Number> &U) const
+      const dealii::Tensor<1, problem_dim, Number> &U,
+      const Number &p) const
   {
     /* c^2 = gamma * p / rho / (1 - b * rho) */
 
     using ScalarNumber = typename get_value_type<Number>::type;
 
     const Number rho_inverse = ScalarNumber(1.) / U[0];
-    const Number p = pressure(U);
     return std::sqrt(gamma_ * p * rho_inverse);
   }
 
@@ -905,63 +898,6 @@ namespace ryujin
   }
 
 
-  template <int component, int problem_dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, problem_dim, Number>
-  HyperbolicSystem::prescribe_riemann_characteristic(
-      const dealii::Tensor<1, problem_dim, Number> &U,
-      const dealii::Tensor<1, problem_dim, Number> &U_bar,
-      const dealii::Tensor<1, problem_dim - 2, Number> &normal) const
-  {
-    static_assert(component == 1 || component == 2,
-                  "component has to be 1 or 2");
-
-    constexpr int dim = problem_dim - 2;
-
-    const auto m = momentum(U);
-    const auto rho = density(U);
-    const auto a = speed_of_sound(U);
-    const auto vn = m * normal / rho;
-
-    const auto m_bar = momentum(U_bar);
-    const auto rho_bar = density(U_bar);
-    const auto a_bar = speed_of_sound(U_bar);
-    const auto vn_bar = m_bar * normal / rho_bar;
-
-    /* First Riemann characteristic: v* n - 2 / (gamma - 1) * a */
-
-    const auto R_1 = component == 1 ? vn_bar - 2. * a_bar / (gamma_ - 1.)
-                                    : vn - 2. * a / (gamma_ - 1.);
-
-    /* Second Riemann characteristic: v* n + 2 / (gamma - 1) * a */
-
-    const auto R_2 = component == 2 ? vn_bar + 2. * a_bar / (gamma_ - 1.)
-                                    : vn + 2. * a / (gamma_ - 1.);
-
-    const auto p = pressure(U);
-    const auto s = p / ryujin::pow(rho, gamma_);
-
-    const auto vperp = m / rho - vn * normal;
-
-    const auto vn_new = 0.5 * (R_1 + R_2);
-
-    auto rho_new =
-        1. / (gamma_ * s) * ryujin::pow((gamma_ - 1.) / 4. * (R_2 - R_1), 2);
-    rho_new = ryujin::pow(rho_new, 1. / (gamma_ - 1.));
-
-    const auto p_new = s * std::pow(rho_new, gamma_);
-
-    state_type<dim, Number> U_new;
-    U_new[0] = rho_new;
-    for (unsigned int d = 0; d < dim; ++d) {
-      U_new[1 + d] = rho_new * (vn_new * normal + vperp)[d];
-    }
-    U_new[1 + dim] = p_new / (gamma_ - 1.) +
-                     0.5 * rho_new * (vn_new * vn_new + vperp.norm_square());
-
-    return U_new;
-  }
-
-
   template <int problem_dim, typename Number, typename Lambda>
   DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, problem_dim, Number>
   HyperbolicSystem::apply_boundary_conditions(
@@ -986,6 +922,11 @@ namespace ryujin
         U[k + 1] = Number(0.);
 
     } else if (id == Boundary::dynamic) {
+      __builtin_trap();
+      // FIXME: dynamic boundary conditions require a call to
+      // speed_of_sound(), for this to happen we need to update the API to
+      // chain in precomputed values.
+#if 0
       /*
        * On dynamic boundary conditions, we distinguish four cases:
        *
@@ -1021,6 +962,7 @@ namespace ryujin
       }
 
       /* Supersonic outflow: do nothing, i.e., keep U as is */
+#endif
     }
 
     return U;
@@ -1028,14 +970,14 @@ namespace ryujin
 
 
   template <typename ST, int dim, typename T>
-  DEAL_II_ALWAYS_INLINE inline auto HyperbolicSystem::f(const ST &U) const
+  DEAL_II_ALWAYS_INLINE inline auto HyperbolicSystem::f(const ST &U,
+                                                        const T &p) const
       -> flux_type<dim, T>
   {
     using ScalarNumber = typename get_value_type<T>::type;
 
     const T rho_inverse = ScalarNumber(1.) / U[0];
     const auto m = momentum(U);
-    const auto p = pressure(U);
     const T E = U[dim + 1];
 
     flux_type<dim, T> result;
@@ -1053,23 +995,27 @@ namespace ryujin
 
   template <typename MCV, typename MICV, typename ST, int dim, typename T>
   DEAL_II_ALWAYS_INLINE inline auto HyperbolicSystem::flux_contribution(
-      const MCV & /*precomputed_values*/,
+      const MCV &precomputed_values,
       const MICV & /*precomputed_initial_values*/,
-      const unsigned int /*i*/,
+      const unsigned int i,
       const ST &U_i) const -> flux_contribution_type<dim, T>
   {
-    return f(U_i);
+    const auto &[p_i, gamma_min_i, s_i, eta_i] =
+        precomputed_values.template get_tensor<T, precomputed_type<dim, T>>(i);
+    return f(U_i, p_i);
   }
 
 
   template <typename MCV, typename MICV, typename ST, int dim, typename T>
   DEAL_II_ALWAYS_INLINE inline auto HyperbolicSystem::flux_contribution(
-      const MCV & /*precomputed_values*/,
+      const MCV &precomputed_values,
       const MICV & /*precomputed_initial_values*/,
-      const unsigned int * /*js*/,
+      const unsigned int *js,
       const ST &U_j) const -> flux_contribution_type<dim, T>
   {
-    return f(U_j);
+    const auto &[p_j, gamma_min_j, s_j, eta_j] =
+        precomputed_values.template get_tensor<T, precomputed_type<dim, T>>(js);
+    return f(U_j, p_j);
   }
 
 
@@ -1105,14 +1051,14 @@ namespace ryujin
     const auto &rho = primitive_state[0];
     /* extract velocity: */
     const auto u = /*SIC!*/ momentum(primitive_state);
-    const auto &p = primitive_state[dim + 1];
+    const auto &e = primitive_state[dim + 1];
 
     auto state = primitive_state;
     /* Fix up momentum: */
     for (unsigned int i = 1; i < dim + 1; ++i)
       state[i] *= rho;
     /* Compute total energy: */
-    state[dim + 1] = p / (Number(gamma_ - 1.)) + Number(0.5) * rho * u * u;
+    state[dim + 1] = e + Number(0.5) * rho * u * u;
 
     return state;
   }
@@ -1127,14 +1073,14 @@ namespace ryujin
 
     const auto &rho = state[0];
     const auto rho_inverse = Number(1.) / rho;
-    const auto p = pressure(state);
+    const auto e = internal_energy(state);
 
     auto primitive_state = state;
     /* Fix up velocity: */
     for (unsigned int i = 1; i < dim + 1; ++i)
       primitive_state[i] *= rho_inverse;
-    /* Set pressure: */
-    primitive_state[dim + 1] = p;
+    /* Set internal energy */
+    primitive_state[dim + 1] = e;
 
     return primitive_state;
   }
