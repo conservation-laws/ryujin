@@ -179,8 +179,14 @@ namespace ryujin
       data_out->add_data_vector(postprocessor_->quantities()[i],
                                 postprocessor_->component_names()[i]);
 
-    DataOutBase::VtkFlags flags(
-        t, cycle, true, DataOutBase::VtkFlags::best_speed);
+    DataOutBase::VtkFlags flags(t,
+                                cycle,
+                                true,
+#if DEAL_II_VERSION_GTE(9, 5, 0)
+                                DataOutBase::CompressionLevel::best_speed);
+#else
+                                DataOutBase::VtkFlags::best_speed);
+#endif
     data_out->set_flags(flags);
 
     const auto &discretization = offline_data_->discretization();
