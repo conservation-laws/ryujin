@@ -7,6 +7,6 @@
 
 namespace ryujin
 {
-  const std::string HyperbolicSystem::problem_name =
-      "Compressible Euler equations (arbitrary equation of state)";
+  std::string HyperbolicSystem::problem_name =
+      "Compressible Euler equations (arbitrary EOS)";
 } /* namespace ryujin */

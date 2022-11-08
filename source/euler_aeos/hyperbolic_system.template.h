@@ -59,6 +59,9 @@ namespace ryujin
         pressure_oracle_ = [&it](double rho, double e) {
           return it->pressure_oracle(rho, e);
         };
+
+        problem_name = "Compressible Euler equations (" + it->name() + " EOS)";
+
         initialized = true;
         break;
       }
@@ -68,6 +71,7 @@ namespace ryujin
         dealii::ExcMessage(
             "Could not find an equation of state description with name \"" +
             equation_of_state_ + "\""));
+
   }
 
 

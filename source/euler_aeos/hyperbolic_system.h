@@ -37,7 +37,7 @@ namespace ryujin
     /**
      * The name of the hyperbolic system as a string.
      */
-    static const std::string problem_name;
+    static std::string problem_name;
 
     /**
      * The dimension of the state space.
