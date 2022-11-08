@@ -273,8 +273,9 @@ namespace ryujin
      * \f]
      */
     template <int problem_dim, typename Number>
-    dealii::Tensor<1, problem_dim, Number> harten_entropy_derivative(
-        const dealii::Tensor<1, problem_dim, Number> &U) const;
+    dealii::Tensor<1, problem_dim, Number>
+    harten_entropy_derivative(const dealii::Tensor<1, problem_dim, Number> &U,
+                              const Number &gamma_min) const;
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
@@ -536,9 +537,6 @@ namespace ryujin
     std::string equation_of_state_;
     ACCESSOR_READ_ONLY(equation_of_state)
 
-    double legacy_gamma_;
-    ACCESSOR_READ_ONLY(legacy_gamma)
-
     double reference_density_;
     ACCESSOR_READ_ONLY(reference_density)
 
@@ -786,7 +784,8 @@ namespace ryujin
   template <int problem_dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, problem_dim, Number>
   HyperbolicSystem::harten_entropy_derivative(
-      const dealii::Tensor<1, problem_dim, Number> &U) const
+      const dealii::Tensor<1, problem_dim, Number> &U,
+      const Number &gamma_min) const
   {
     /*
      * With
@@ -807,10 +806,11 @@ namespace ryujin
 
     const Number rho_rho_e = rho * E - ScalarNumber(0.5) * m.norm_square();
 
-    const double gamma_plus_one_inverse = 1. / (legacy_gamma_ + 1.);
+    const auto gamma_plus_one_inverse =
+        ScalarNumber(1.) / (gamma_min + Number(1.));
     const auto factor =
         gamma_plus_one_inverse *
-        ryujin::pow(rho_rho_e, -legacy_gamma_ * gamma_plus_one_inverse);
+        ryujin::vec_pow(rho_rho_e, -gamma_min * gamma_plus_one_inverse);
 
     dealii::Tensor<1, problem_dim, Number> result;
 
@@ -844,7 +844,7 @@ namespace ryujin
   {
     const auto rho_new = density(U);
     const auto e_new = internal_energy(U);
-    const auto s_new = specific_entropy(U, Number(legacy_gamma_)); // FIXME
+    const auto s_new = specific_entropy(U, Number(7. / 5.)); // FIXME
 
     constexpr auto gt = dealii::SIMDComparison::greater_than;
     using T = Number;

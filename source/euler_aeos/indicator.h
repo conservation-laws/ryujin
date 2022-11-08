@@ -181,7 +181,7 @@ namespace ryujin
     rho_i_inverse = Number(1.) / rho_i;
     eta_i = new_eta_i;
 
-    d_eta_i = hyperbolic_system.harten_entropy_derivative(U_i);
+    d_eta_i = hyperbolic_system.harten_entropy_derivative(U_i, new_gamma_min_i);
     d_eta_i[0] -= eta_i * rho_i_inverse;
     f_i = hyperbolic_system.f(U_i, new_p_i);
 

@@ -24,9 +24,6 @@ namespace ryujin
                   "The equation of state. Valid names are given by any of the "
                   "subsections defined below.");
 
-    legacy_gamma_ = 7. / 5.;
-    add_parameter("gamma", legacy_gamma_, "The ratio of specific heats");
-
     reference_density_ = 1.;
     add_parameter("reference density",
                   reference_density_,
