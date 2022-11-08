@@ -29,7 +29,7 @@ namespace ryujin
             &ShockFront<dim, Number, state_type>::parse_parameters_callback,
             this));
 
-        primitive_right_[0] = hyperbolic_system.gamma();
+        primitive_right_[0] = hyperbolic_system.legacy_gamma();
         primitive_right_[1] = 0.0;
         primitive_right_[2] = 1.;
         this->add_parameter("primitive state",
@@ -48,7 +48,7 @@ namespace ryujin
       {
         /* Compute post-shock state and S3: */
 
-        const auto gamma = hyperbolic_system.gamma();
+        const auto gamma = hyperbolic_system.legacy_gamma();
         const Number b = Number(0.); // FIXME
 
         const auto &rho_R = primitive_right_[0];

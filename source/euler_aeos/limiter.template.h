@@ -112,7 +112,7 @@ namespace ryujin
 
     Number t_l = t_min; // good state
 
-    const ScalarNumber gamma = hyperbolic_system.gamma();
+    const ScalarNumber gamma = hyperbolic_system.legacy_gamma();
     const ScalarNumber gp1 = gamma + ScalarNumber(1.);
 
     {

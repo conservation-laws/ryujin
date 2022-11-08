@@ -28,7 +28,7 @@ namespace ryujin
           : InitialState<dim, Number, state_type>("contrast", subsection)
           , hyperbolic_system(hyperbolic_system)
       {
-        primitive_left_[0] = hyperbolic_system.gamma();
+        primitive_left_[0] = hyperbolic_system.legacy_gamma();
         primitive_left_[1] = 0.0;
         primitive_left_[2] = 1.;
         this->add_parameter(
@@ -36,7 +36,7 @@ namespace ryujin
             primitive_left_,
             "Initial 1d primitive state (rho, u, p) on the left");
 
-        primitive_right_[0] = hyperbolic_system.gamma();
+        primitive_right_[0] = hyperbolic_system.legacy_gamma();
         primitive_right_[1] = 0.0;
         primitive_right_[2] = 1.;
         this->add_parameter(

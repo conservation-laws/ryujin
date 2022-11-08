@@ -72,7 +72,7 @@ namespace ryujin
                       &precomputed_values)
         : hyperbolic_system(hyperbolic_system)
         , precomputed_values(precomputed_values)
-        , gamma(hyperbolic_system.gamma())
+        , gamma(hyperbolic_system.legacy_gamma())
         , gamma_inverse(1. / gamma)
         , gamma_minus_one_inverse(1. / (gamma - 1.))
         , gamma_minus_one_over_gamma_plus_one((gamma - 1.) / (gamma + 1.))

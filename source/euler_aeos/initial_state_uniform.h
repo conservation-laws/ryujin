@@ -23,7 +23,7 @@ namespace ryujin
           : InitialState<dim, Number, state_type>("uniform", subsection)
           , hyperbolic_system(hyperbolic_system)
       {
-        primitive_[0] = hyperbolic_system.gamma();
+        primitive_[0] = hyperbolic_system.legacy_gamma();
         primitive_[1] = 3.0;
         primitive_[2] = 1.;
         this->add_parameter("primitive state",

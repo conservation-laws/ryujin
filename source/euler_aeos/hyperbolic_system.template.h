@@ -24,8 +24,8 @@ namespace ryujin
                   "The equation of state. Valid names are given by any of the "
                   "subsections defined below.");
 
-    gamma_ = 7. / 5.;
-    add_parameter("gamma", gamma_, "The ratio of specific heats");
+    legacy_gamma_ = 7. / 5.;
+    add_parameter("gamma", legacy_gamma_, "The ratio of specific heats");
 
     reference_density_ = 1.;
     add_parameter("reference density",
@@ -50,9 +50,6 @@ namespace ryujin
 
   void HyperbolicSystem::parse_parameters_callback()
   {
-    gamma_inverse_ = 1. / gamma_;
-    gamma_plus_one_inverse_ = 1. / (gamma_ + 1.);
-
     bool initialized = false;
     for (auto &it : equation_of_state_list_)
       if (it->name() == equation_of_state_) {

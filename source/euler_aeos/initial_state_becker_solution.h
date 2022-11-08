@@ -53,7 +53,7 @@ namespace ryujin
 
       void parse_parameters_callback()
       {
-        const double gamma = hyperbolic_system.gamma();
+        const double gamma = hyperbolic_system.legacy_gamma();
 
         AssertThrow(
             velocity_left_ > velocity_right_,
@@ -150,7 +150,7 @@ namespace ryujin
                                  Number t) final override
       {
         /* (7.2) */
-        const double gamma = hyperbolic_system.gamma();
+        const double gamma = hyperbolic_system.legacy_gamma();
         const double R_infty = (gamma + 1) / (gamma - 1);
 
         /* (7.3) */

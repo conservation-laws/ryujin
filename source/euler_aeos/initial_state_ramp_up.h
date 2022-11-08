@@ -26,14 +26,14 @@ namespace ryujin
           : InitialState<dim, Number, state_type>("ramp up", subsection)
           , hyperbolic_system(hyperbolic_system)
       {
-        primitive_initial_[0] = hyperbolic_system.gamma();
+        primitive_initial_[0] = hyperbolic_system.legacy_gamma();
         primitive_initial_[1] = 0.0;
         primitive_initial_[2] = 1.;
         this->add_parameter("primitive state initial",
                             primitive_initial_,
                             "Initial 1d primitive state (rho, u, p)");
 
-        primitive_final_[0] = hyperbolic_system.gamma();
+        primitive_final_[0] = hyperbolic_system.legacy_gamma();
         primitive_final_[1] = 3.0;
         primitive_final_[2] = 1.;
         this->add_parameter("primitive state final",

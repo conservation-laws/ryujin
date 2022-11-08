@@ -281,6 +281,20 @@ namespace ryujin
         const dealii::Tensor<1, problem_dim, Number> &U) const;
 
     /**
+     * For a given (2+dim dimensional) state vector <code>U</code>, compute
+     * a surrogate gamma:
+     * \f[
+     *   \gamma(\rho, p, e) = 1 + \frac{p * (1 - b * \rho)}{\rho * e}
+     * \f]
+     *
+     * This is used in the interpolation of the pressure for computing the max
+     * wave speed in the local Riemann problem.
+     */
+    template <int problem_dim, typename Number>
+    Number surrogate_gamma(const dealii::Tensor<1, problem_dim, Number> &U,
+                           const Number &p) const;
+
+    /**
      * Returns whether the state @ref U is admissible. If @ref U is a
      * vectorized state then @ref U is admissible if all vectorized values
      * are admissible.
@@ -526,8 +540,8 @@ namespace ryujin
     std::string equation_of_state_;
     ACCESSOR_READ_ONLY(equation_of_state)
 
-    double gamma_;
-    ACCESSOR_READ_ONLY(gamma)
+    double legacy_gamma_;
+    ACCESSOR_READ_ONLY(legacy_gamma)
 
     double reference_density_;
     ACCESSOR_READ_ONLY(reference_density)
@@ -540,8 +554,6 @@ namespace ryujin
      * @name Internal data
      */
     //@{
-    double gamma_inverse_;
-    double gamma_plus_one_inverse_;
 
     std::set<std::unique_ptr<EquationOfState>> equation_of_state_list_;
 
@@ -565,16 +577,15 @@ namespace ryujin
       const SPARSITY &sparsity_simd,
       unsigned int i) const
   {
-//     unsigned int stride_size = get_stride_size<Number>;
+    unsigned int stride_size = get_stride_size<Number>;
     constexpr int dim = problem_dim - 2;
 
     const auto U_i = U.template get_tensor<Number>(i);
     const auto p_i = pressure_oracle(U_i);
 
-    auto gamma_min = Number(gamma_);
-#if 0
-    auto gamma_min = gamma(U_i, p_i);
+    auto gamma_min = surrogate_gamma(U_i, p_i);
 
+#if 0
     const unsigned int row_length = sparsity_simd.row_length(i);
     const unsigned int *js = sparsity_simd.columns(i) + stride_size;
     for (unsigned int col_idx = 1; col_idx < row_length;
@@ -721,7 +732,7 @@ namespace ryujin
     using ScalarNumber = typename get_value_type<Number>::type;
 
     const Number rho_inverse = ScalarNumber(1.) / U[0];
-    return std::sqrt(gamma_ * p * rho_inverse);
+    return std::sqrt(legacy_gamma_ * p * rho_inverse);
   }
 
 
@@ -734,7 +745,7 @@ namespace ryujin
     using ScalarNumber = typename get_value_type<Number>::type;
 
     const auto rho_inverse = ScalarNumber(1.) / U[0];
-    return internal_energy(U) * ryujin::pow(rho_inverse, gamma_);
+    return internal_energy(U) * ryujin::pow(rho_inverse, legacy_gamma_);
   }
 
 
@@ -766,7 +777,9 @@ namespace ryujin
     const Number E = U[dim + 1];
 
     const Number rho_rho_e = rho * E - ScalarNumber(0.5) * m.norm_square();
-    return ryujin::pow(rho_rho_e, gamma_plus_one_inverse_);
+
+    const double gamma_plus_one_inverse = 1. / (legacy_gamma_ + 1.);
+    return ryujin::pow(rho_rho_e, gamma_plus_one_inverse);
   }
 
 
@@ -785,6 +798,7 @@ namespace ryujin
     const Number E = U[dim + 1];
 
     const Number rho_rho_e = rho * E - ScalarNumber(0.5) * m.norm_square();
+
     return ryujin::vec_pow(rho_rho_e,
                            ScalarNumber(1.) / (gamma_min + Number(1.)));
   }
@@ -814,9 +828,10 @@ namespace ryujin
 
     const Number rho_rho_e = rho * E - ScalarNumber(0.5) * m.norm_square();
 
+    const double gamma_plus_one_inverse = 1. / (legacy_gamma_ + 1.);
     const auto factor =
-        gamma_plus_one_inverse_ *
-        ryujin::pow(rho_rho_e, -gamma_ * gamma_plus_one_inverse_);
+        gamma_plus_one_inverse *
+        ryujin::pow(rho_rho_e, -legacy_gamma_ * gamma_plus_one_inverse);
 
     dealii::Tensor<1, problem_dim, Number> result;
 
@@ -827,6 +842,21 @@ namespace ryujin
     result[dim + 1] = factor * rho;
 
     return result;
+  }
+
+
+  template <int problem_dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline Number HyperbolicSystem::surrogate_gamma(
+      const dealii::Tensor<1, problem_dim, Number> &U, const Number &p) const
+  {
+    /* \gamma(\rho, p, e) = 1 + \frac{p * (1 - b * \rho)}{\rho * e} */
+
+    using ScalarNumber = typename get_value_type<Number>::type;
+
+    const Number rho = U[0];
+    const Number rho_e = internal_energy(U);
+
+    return Number(1.) + p / rho_e;
   }
 
 

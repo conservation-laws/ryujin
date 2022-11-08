@@ -36,7 +36,7 @@ namespace ryujin
       virtual state_type compute(const dealii::Point<dim> &point,
                                  Number t) final override
       {
-        const auto gamma = hyperbolic_system.gamma();
+        const auto gamma = hyperbolic_system.legacy_gamma();
 
 
         /* In 3D we simply project onto the 2d plane: */
