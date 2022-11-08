@@ -122,7 +122,11 @@ namespace ryujin
         constexpr auto speedup = dealii::VectorizedArray<NUMBER>::size() / 2u;
         constexpr unsigned int weight = 1000u;
 
+#if DEAL_II_VERSION_GTE(9,5,0)
+        triangulation.signals.weight.connect(
+#else
         triangulation.signals.cell_weight.connect(
+#endif
             [](const auto &cell, const auto /*status*/) -> unsigned int {
               if (cell->at_boundary())
                 return weight * (speedup == 0u ? 0u : speedup - 1u);
