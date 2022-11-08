@@ -192,6 +192,14 @@ namespace ryujin
     /* A monotonically increasing "channel" variable for mpi_tags: */
     unsigned int channel = 10;
 
+    /* Lambda for creating the computing timer string: */
+    int step_no = 0;
+    const auto scoped_name = [&step_no](const auto &name,
+                                        const bool advance = true) {
+      advance || step_no--;
+      return "time step [E] " + std::to_string(step_no++) + " - " + name;
+    };
+
     /* A boolean signalling that a restart is necessary: */
     std::atomic<bool> restart_needed = false;
 
@@ -199,7 +207,7 @@ namespace ryujin
      * Step 0: Precompute values
      */
     {
-      Scope scope(computing_timer_, "time step [E] 0 - precompute values");
+      Scope scope(computing_timer_, scoped_name("precompute values"));
 
       SynchronizationDispatch synchronization_dispatch([&]() {
         new_precomputed.update_ghost_values_start(channel++);
@@ -208,7 +216,7 @@ namespace ryujin
       });
 
       RYUJIN_PARALLEL_REGION_BEGIN
-      LIKWID_MARKER_START("time_step_0");
+      LIKWID_MARKER_START(("time_step_" + std::to_string(step_no)).c_str());
 
       /* Stored thread locally: */
       bool thread_ready = false;
@@ -240,7 +248,7 @@ namespace ryujin
       /* Parallel vectorized SIMD loop: */
       loop(VA(), 0, n_internal);
 
-      LIKWID_MARKER_STOP("time_step_0");
+      LIKWID_MARKER_STOP(("time_step_" + std::to_string(step_no)).c_str());
       RYUJIN_PARALLEL_REGION_END
     }
 
@@ -270,8 +278,7 @@ namespace ryujin
      */
 
     {
-      Scope scope(computing_timer_,
-                  "time step [E] 1 - compute d_ij, and alpha_i");
+      Scope scope(computing_timer_, scoped_name("compute d_ij, and alpha_i"));
 
       SynchronizationDispatch synchronization_dispatch([&]() {
         alpha_.update_ghost_values_start(channel++);
@@ -280,7 +287,7 @@ namespace ryujin
       });
 
       RYUJIN_PARALLEL_REGION_BEGIN
-      LIKWID_MARKER_START("time_step_1");
+      LIKWID_MARKER_START(("time_step_" + std::to_string(step_no)).c_str());
 
       auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
         using T = decltype(sentinel);
@@ -342,7 +349,7 @@ namespace ryujin
       /* Parallel vectorized SIMD loop: */
       loop(VA(), 0, n_internal);
 
-      LIKWID_MARKER_STOP("time_step_1");
+      LIKWID_MARKER_STOP(("time_step_" + std::to_string(step_no)).c_str());
       RYUJIN_PARALLEL_REGION_END
     }
 
@@ -353,13 +360,12 @@ namespace ryujin
     std::atomic<Number> tau_max{std::numeric_limits<Number>::infinity()};
 
     {
-      Scope scope(
-          computing_timer_,
-          "time step [E] 2 - compute bdry d_ij, diag d_ii, and tau_max");
+      Scope scope(computing_timer_,
+                  scoped_name("compute bdry d_ij, diag d_ii, and tau_max"));
 
       /* Parallel region */
       RYUJIN_PARALLEL_REGION_BEGIN
-      LIKWID_MARKER_START("time_step_2");
+      LIKWID_MARKER_START(("time_step_" + std::to_string(step_no)).c_str());
 
       /* Complete d_ij at boundary: */
 
@@ -424,13 +430,13 @@ namespace ryujin
         }
       }
 
-      LIKWID_MARKER_STOP("time_step_2");
+      LIKWID_MARKER_STOP(("time_step_" + std::to_string(step_no)).c_str());
       RYUJIN_PARALLEL_REGION_END
     }
 
     {
       Scope scope(computing_timer_,
-                  "time step [E] 2 - synchronization barrier");
+                  scoped_name("synchronization barrier", false));
 
       /* MPI Barrier: */
       tau_max.store(Utilities::MPI::min(tau_max.load(), mpi_communicator_));
@@ -453,9 +459,8 @@ namespace ryujin
      */
 
     {
-      Scope scope(
-          computing_timer_,
-          "time step [E] 3 - l.-o. update, compute bounds, r_i, and p_ij");
+      Scope scope(computing_timer_,
+                  scoped_name("l.-o. update, compute bounds, r_i, and p_ij"));
 
       SynchronizationDispatch synchronization_dispatch([&]() {
         r_.update_ghost_values_start(channel++);
@@ -472,7 +477,7 @@ namespace ryujin
 
       /* Parallel region */
       RYUJIN_PARALLEL_REGION_BEGIN
-      LIKWID_MARKER_START("time_step_3");
+      LIKWID_MARKER_START(("time_step_" + std::to_string(step_no)).c_str());
 
       auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
         using T = decltype(sentinel);
@@ -656,7 +661,7 @@ namespace ryujin
       /* Parallel vectorized SIMD loop: */
       loop(VA(), 0, n_internal);
 
-      LIKWID_MARKER_STOP("time_step_3");
+      LIKWID_MARKER_STOP(("time_step_" + std::to_string(step_no)).c_str());
       RYUJIN_PARALLEL_REGION_END
     }
 
@@ -665,7 +670,7 @@ namespace ryujin
      */
 
     if (limiter_iter_ != 0) {
-      Scope scope(computing_timer_, "time step [E] 4 - compute p_ij, and l_ij");
+      Scope scope(computing_timer_, scoped_name("compute p_ij, and l_ij"));
 
       SynchronizationDispatch synchronization_dispatch([&]() {
         lij_matrix_.update_ghost_rows_start(channel++);
@@ -673,7 +678,7 @@ namespace ryujin
       });
 
       RYUJIN_PARALLEL_REGION_BEGIN
-      LIKWID_MARKER_START("time_step_4");
+      LIKWID_MARKER_START(("time_step_" + std::to_string(step_no)).c_str());
 
       auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
         using T = decltype(sentinel);
@@ -763,7 +768,7 @@ namespace ryujin
       /* Parallel vectorized SIMD loop: */
       loop(VA(), 0, n_internal);
 
-      LIKWID_MARKER_STOP("time_step_4");
+      LIKWID_MARKER_STOP(("time_step_" + std::to_string(step_no)).c_str());
       RYUJIN_PARALLEL_REGION_END
     }
 
@@ -778,11 +783,10 @@ namespace ryujin
     for (unsigned int pass = 0; pass < limiter_iter_; ++pass) {
       bool last_round = (pass + 1 == limiter_iter_);
 
-      std::string step_no = std::to_string(5 + pass);
       std::string additional_step = (last_round ? "" : ", next l_ij");
-      Scope scope(computing_timer_,
-                  "time step [E] " + step_no + " - " +
-                      "symmetrize l_ij, h.-o. update" + additional_step);
+      Scope scope(
+          computing_timer_,
+          scoped_name("symmetrize l_ij, h.-o. update" + additional_step));
 
       if (last_round) {
         std::swap(lij_matrix_, lij_matrix_next_);
@@ -796,7 +800,7 @@ namespace ryujin
       });
 
       RYUJIN_PARALLEL_REGION_BEGIN
-      LIKWID_MARKER_START(("time_step_" + step_no).c_str());
+      LIKWID_MARKER_START(("time_step_" + std::to_string(step_no)).c_str());
 
       auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
         using T = decltype(sentinel);
@@ -899,7 +903,7 @@ namespace ryujin
       /* Parallel vectorized SIMD loop: */
       loop(VA(), 0, n_internal);
 
-      LIKWID_MARKER_STOP(("time_step_" + step_no).c_str());
+      LIKWID_MARKER_STOP(("time_step_" + std::to_string(step_no)).c_str());
       RYUJIN_PARALLEL_REGION_END
     } /* limiter_iter_ */
 

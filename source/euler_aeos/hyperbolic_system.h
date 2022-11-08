@@ -853,7 +853,6 @@ namespace ryujin
 
     using ScalarNumber = typename get_value_type<Number>::type;
 
-    const Number rho = U[0];
     const Number rho_e = internal_energy(U);
 
     return Number(1.) + p / rho_e;
