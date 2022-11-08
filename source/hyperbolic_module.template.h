@@ -287,7 +287,8 @@ namespace ryujin
         unsigned int stride_size = get_stride_size<T>;
 
         /* Stored thread locally: */
-        RiemannSolver<dim, T> riemann_solver(*hyperbolic_system_);
+        RiemannSolver<dim, T> riemann_solver(*hyperbolic_system_,
+                                             new_precomputed);
         Indicator<dim, T> indicator(*hyperbolic_system_, new_precomputed);
         bool thread_ready = false;
 
@@ -323,7 +324,8 @@ namespace ryujin
 
             const auto norm = c_ij.norm();
             const auto n_ij = c_ij / norm;
-            const auto lambda_max = riemann_solver.compute(U_i, U_j, n_ij);
+            const auto lambda_max =
+                riemann_solver.compute(U_i, U_j, i, js, n_ij);
             const auto d = norm * lambda_max;
 
             dij_matrix_.write_entry(d, i, col_idx, true);
@@ -361,7 +363,8 @@ namespace ryujin
 
       /* Complete d_ij at boundary: */
 
-      RiemannSolver<dim, Number> riemann_solver(*hyperbolic_system_);
+      RiemannSolver<dim, Number> riemann_solver(*hyperbolic_system_,
+                                                new_precomputed);
 
       RYUJIN_OMP_FOR
       for (std::size_t k = 0; k < coupling_boundary_pairs.size(); ++k) {
@@ -373,7 +376,7 @@ namespace ryujin
         Assert(c_ji.norm() > 1.e-12, ExcInternalError());
         const auto norm = c_ji.norm();
         const auto n_ji = c_ji / norm;
-        auto lambda_max = riemann_solver.compute(U_j, U_i, n_ji);
+        auto lambda_max = riemann_solver.compute(U_j, U_i, i, &j, n_ji);
 
         auto d = dij_matrix_.get_entry(i, col_idx);
         d = std::max(d, norm * lambda_max);

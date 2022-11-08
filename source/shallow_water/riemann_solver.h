@@ -44,6 +44,17 @@ namespace ryujin
     using state_type = HyperbolicSystem::state_type<dim, Number>;
 
     /**
+     * @copydoc HyperbolicSystem::precomputed_type
+     */
+    using precomputed_type = HyperbolicSystem::precomputed_type<dim, Number>;
+
+    /**
+     * @copydoc HyperbolicSystem::n_precomputed_values
+     */
+    static constexpr unsigned int n_precomputed_values =
+        HyperbolicSystem::n_precomputed_values<dim>;
+
+    /**
      * @copydoc HyperbolicSystem::ScalarNumber
      */
     using ScalarNumber = typename get_value_type<Number>::type;
@@ -56,8 +67,11 @@ namespace ryujin
     /**
      * Constructor taking a HyperbolicSystem instance as argument
      */
-    RiemannSolver(const HyperbolicSystem &hyperbolic_system)
+    RiemannSolver(const HyperbolicSystem &hyperbolic_system,
+                  const MultiComponentVector<ScalarNumber, n_precomputed_values>
+                      &precomputed_values)
         : hyperbolic_system(hyperbolic_system)
+        , precomputed_values(precomputed_values)
     {
     }
 
@@ -78,6 +92,8 @@ namespace ryujin
      */
     Number compute(const state_type &U_i,
                    const state_type &U_j,
+                   const unsigned int i,
+                   const unsigned int *js,
                    const dealii::Tensor<1, dim, Number> &n_ij) const;
 
     //@}
@@ -112,7 +128,44 @@ namespace ryujin
   private:
     const HyperbolicSystem &hyperbolic_system;
 
+    const MultiComponentVector<ScalarNumber, n_precomputed_values>
+        &precomputed_values;
     //@}
   };
+
+
+  /* Inline definitions */
+
+
+  template <int dim, typename Number>
+  DEAL_II_ALWAYS_INLINE inline auto
+  RiemannSolver<dim, Number>::riemann_data_from_state(
+      const state_type &U,
+      const dealii::Tensor<1, dim, Number> &n_ij) const -> primitive_type
+  {
+    const auto h = hyperbolic_system.water_depth_sharp(U);
+    const auto gravity = hyperbolic_system.gravity();
+
+    const auto vel = hyperbolic_system.momentum(U) / h;
+    const auto proj_vel = n_ij * vel;
+    const auto a = std::sqrt(h * gravity);
+
+    return {{h, proj_vel, a}};
+  }
+
+
+  template <int dim, typename Number>
+  Number RiemannSolver<dim, Number>::compute(
+      const state_type &U_i,
+      const state_type &U_j,
+      const unsigned int /*i*/,
+      const unsigned int * /*js*/,
+      const dealii::Tensor<1, dim, Number> &n_ij) const
+  {
+    const auto riemann_data_i = riemann_data_from_state(U_i, n_ij);
+    const auto riemann_data_j = riemann_data_from_state(U_j, n_ij);
+    return compute(riemann_data_i, riemann_data_j);
+  }
+
 
 } /* namespace ryujin */

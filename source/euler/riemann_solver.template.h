@@ -173,38 +173,6 @@ namespace ryujin
   }
 
 
-  /**
-   * For a given (2+dim dimensional) state vector <code>U</code>, and a
-   * (normalized) "direction" n_ij, first compute the corresponding
-   * projected state in the corresponding 1D Riemann problem, and then
-   * compute and return the Riemann data [rho, u, p, a] (used in the
-   * approximative Riemann solver).
-   */
-  template <int dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline auto
-  RiemannSolver<dim, Number>::riemann_data_from_state(
-      const HyperbolicSystem::state_type<dim, Number> &U,
-      const dealii::Tensor<1, dim, Number> &n_ij) const -> primitive_type
-  {
-    const auto rho = hyperbolic_system.density(U);
-    const auto rho_inverse = Number(1.0) / rho;
-
-    const auto m = hyperbolic_system.momentum(U);
-    const auto proj_m = n_ij * m;
-    const auto perp = m - proj_m * n_ij;
-
-    const auto E = hyperbolic_system.total_energy(U) -
-                   Number(0.5) * perp.norm_square() * rho_inverse;
-
-    const auto state =
-        HyperbolicSystem::state_type<1, Number>({rho, proj_m, E});
-    const auto p = hyperbolic_system.pressure(state);
-    const auto a = hyperbolic_system.speed_of_sound(state);
-
-    return {{rho, proj_m * rho_inverse, p, a}};
-  }
-
-
   template <int dim, typename Number>
   Number RiemannSolver<dim, Number>::compute(
       const primitive_type &riemann_data_i,
@@ -257,19 +225,6 @@ namespace ryujin
             phi_p_max, Number(0.), p_star_tilde, std::min(p_max, p_star_tilde));
 
     return compute_lambda(riemann_data_i, riemann_data_j, p_2);
-  }
-
-
-  template <int dim, typename Number>
-  Number RiemannSolver<dim, Number>::compute(
-      const state_type &U_i,
-      const state_type &U_j,
-      const dealii::Tensor<1, dim, Number> &n_ij) const
-  {
-    const auto riemann_data_i = riemann_data_from_state(U_i, n_ij);
-    const auto riemann_data_j = riemann_data_from_state(U_j, n_ij);
-
-    return compute(riemann_data_i, riemann_data_j);
   }
 
 } /* namespace ryujin */

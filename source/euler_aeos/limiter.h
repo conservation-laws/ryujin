@@ -206,6 +206,9 @@ namespace ryujin
   };
 
 
+  /* Inline definitions */
+
+
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline void Limiter<dim, Number>::reset(unsigned int i)
   {

@@ -165,6 +165,9 @@ namespace ryujin
   };
 
 
+  /* Inline definitions */
+
+
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline void
   Indicator<dim, Number>::reset(const unsigned int i, const state_type &U_i)

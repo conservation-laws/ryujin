@@ -204,23 +204,6 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline auto
-  RiemannSolver<dim, Number>::riemann_data_from_state(
-      const state_type &U,
-      const dealii::Tensor<1, dim, Number> &n_ij) const -> primitive_type
-  {
-    const auto h = hyperbolic_system.water_depth_sharp(U);
-    const auto gravity = hyperbolic_system.gravity();
-
-    const auto vel = hyperbolic_system.momentum(U) / h;
-    const auto proj_vel = n_ij * vel;
-    const auto a = std::sqrt(h * gravity);
-
-    return {{h, proj_vel, a}};
-  }
-
-
-  template <int dim, typename Number>
   inline Number RiemannSolver<dim, Number>::compute(
       const primitive_type &riemann_data_i,
       const primitive_type &riemann_data_j) const
@@ -232,18 +215,6 @@ namespace ryujin
         compute_lambda(riemann_data_i, riemann_data_j, h_star);
 
     return lambda_max;
-  }
-
-
-  template <int dim, typename Number>
-  Number RiemannSolver<dim, Number>::compute(
-      const state_type &U_i,
-      const state_type &U_j,
-      const dealii::Tensor<1, dim, Number> &n_ij) const
-  {
-    const auto riemann_data_i = riemann_data_from_state(U_i, n_ij);
-    const auto riemann_data_j = riemann_data_from_state(U_j, n_ij);
-    return compute(riemann_data_i, riemann_data_j);
   }
 
 
