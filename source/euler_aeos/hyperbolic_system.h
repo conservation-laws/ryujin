@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include "equation_of_state.h"
+
 #include <compile_time_options.h>
 #include <convenience_macros.h>
 #include <discretization.h>
@@ -156,6 +158,20 @@ namespace ryujin
 
     //@}
     /**
+     * @name Equation of state
+     */
+    //@{
+
+    /**
+     * For a given (2+dim dimensional) state vector <code>U</code>, query
+     * the pressure oracle and return \f$p\f$.
+     */
+    template <int problem_dim, typename Number>
+    Number
+    pressure_oracle(const dealii::Tensor<1, problem_dim, Number> &U) const;
+
+    //@}
+    /**
      * @name Computing derived physical quantities
      */
     //@{
@@ -207,14 +223,6 @@ namespace ryujin
     template <int problem_dim, typename Number>
     static dealii::Tensor<1, problem_dim, Number>
     internal_energy_derivative(const dealii::Tensor<1, problem_dim, Number> &U);
-
-    /**
-     * For a given (2+dim dimensional) state vector <code>U</code>, query
-     * the pressure oracle and return \f$p\f$.
-     */
-    template <int problem_dim, typename Number>
-    Number
-    pressure_oracle(const dealii::Tensor<1, problem_dim, Number> &U) const;
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
@@ -285,17 +293,6 @@ namespace ryujin
      * @name Special functions for boundary states
      */
     //@{
-
-    /**
-     * For a given state @p U and normal direction @p normal returns the
-     * n-th pair of left and right eigenvectors of the linearized normal
-     * flux.
-     */
-    template <int component, int problem_dim, typename Number>
-    std::array<dealii::Tensor<1, problem_dim, Number>, 2>
-    linearized_eigenvector(
-        const dealii::Tensor<1, problem_dim, Number> &U,
-        const dealii::Tensor<1, problem_dim - 2, Number> &normal) const;
 
     /**
      * Decomposes a given state @p U into Riemann invariants and then
@@ -526,6 +523,9 @@ namespace ryujin
      */
     //@{
 
+    std::string equation_of_state_;
+    ACCESSOR_READ_ONLY(equation_of_state)
+
     double gamma_;
     ACCESSOR_READ_ONLY(gamma)
 
@@ -537,11 +537,15 @@ namespace ryujin
 
     //@}
     /**
-     * @name Precomputed scalar quantitites
+     * @name Internal data
      */
     //@{
     double gamma_inverse_;
     double gamma_plus_one_inverse_;
+
+    std::set<std::unique_ptr<EquationOfState>> equation_of_state_list_;
+
+    std::function<double(const double, const double)> pressure_oracle_;
 
     //@}
   };
@@ -686,10 +690,24 @@ namespace ryujin
   DEAL_II_ALWAYS_INLINE inline Number HyperbolicSystem::pressure_oracle(
       const dealii::Tensor<1, problem_dim, Number> &U) const
   {
-    /* p = (gamma - 1) / (1 - b * rho) * (rho e) */
-
     using ScalarNumber = typename get_value_type<Number>::type;
-    return ScalarNumber(gamma_ - 1.) * internal_energy(U);
+
+    if constexpr (std::is_same<ScalarNumber, Number>::value) {
+      const auto rho = density(U);
+      const auto e = internal_energy(U);
+      return pressure_oracle_(rho, e);
+
+    } else {
+      Number result = Number(0.);
+      const auto rho = density(U);
+      const auto e = internal_energy(U);
+
+      for (unsigned int k = 0; k < Number::size(); ++k) {
+        result[k] = pressure_oracle_(rho[k], e[k]);
+      }
+
+      return result;
+    }
   }
 
 
@@ -838,63 +856,6 @@ namespace ryujin
 #endif
 
     return (test == Number(0.));
-  }
-
-
-  template <int component, int problem_dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline std::
-      array<dealii::Tensor<1, problem_dim, Number>, 2>
-      HyperbolicSystem::linearized_eigenvector(
-          const dealii::Tensor<1, problem_dim, Number> &U,
-          const dealii::Tensor<1, problem_dim - 2, Number> &normal) const
-  {
-    static_assert(component == 1 || component == problem_dim,
-                  "Only first and last eigenvectors implemented");
-
-    constexpr int dim = problem_dim - 2;
-
-    const auto rho = density(U);
-    const auto m = momentum(U);
-    const auto v = m / rho;
-    const auto a = speed_of_sound(U);
-    const auto gamma = this->gamma();
-
-    state_type<dim, Number> b;
-    state_type<dim, Number> c;
-
-    const auto e_k = 0.5 * v.norm_square();
-
-    switch (component) {
-    case 1:
-      b[0] = (gamma - 1.) * e_k + a * v * normal;
-      for (unsigned int i = 0; i < dim; ++i)
-        b[1 + i] = (1. - gamma) * v[i] - a * normal[i];
-      b[dim + 1] = gamma - 1.;
-      b /= 2. * a * a;
-
-      c[0] = 1.;
-      for (unsigned int i = 0; i < dim; ++i)
-        c[1 + i] = v[i] - a * normal[i];
-      c[dim + 1] = a * a / (gamma - 1) + e_k - a * (v * normal);
-
-      return {b, c};
-
-    case problem_dim:
-      b[0] = (gamma - 1.) * e_k - a * v * normal;
-      for (unsigned int i = 0; i < dim; ++i)
-        b[1 + i] = (1. - gamma) * v[i] + a * normal[i];
-      b[dim + 1] = gamma - 1.;
-      b /= 2. * a * a;
-
-      c[0] = 1.;
-      for (unsigned int i = 0; i < dim; ++i)
-        c[1 + i] = v[i] + a * normal[i];
-      c[dim + 1] = a * a / (gamma - 1) + e_k + a * (v * normal);
-
-      return {b, c};
-    }
-
-    __builtin_unreachable();
   }
 
 

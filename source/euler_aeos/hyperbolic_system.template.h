@@ -7,6 +7,8 @@
 
 #include "hyperbolic_system.h"
 
+#include "equation_of_state_library.h"
+
 namespace ryujin
 {
   HyperbolicSystem::HyperbolicSystem(
@@ -15,6 +17,12 @@ namespace ryujin
   {
     ParameterAcceptor::parse_parameters_call_back.connect(
         std::bind(&HyperbolicSystem::parse_parameters_callback, this));
+
+    equation_of_state_ = "polytropic gas";
+    add_parameter("equation of state",
+                  equation_of_state_,
+                  "The equation of state. Valid names are given by any of the "
+                  "subsections defined below.");
 
     gamma_ = 7. / 5.;
     add_parameter("gamma", gamma_, "The ratio of specific heats");
@@ -29,18 +37,37 @@ namespace ryujin
                   vacuum_state_relaxation_,
                   "Problem specific vacuum relaxation parameter");
 
+    /*
+     * And finally populate the equation of state list with all equation of
+     * state configurations defined in the EquationOfState namespace:
+     */
+    EquationOfStateLibrary::populate_equation_of_state_list(
+        equation_of_state_list_, subsection);
+
     parse_parameters_callback();
   }
 
 
   void HyperbolicSystem::parse_parameters_callback()
   {
-    /*
-     * Precompute a number of derived gamma coefficients that contain
-     * divisions:
-     */
     gamma_inverse_ = 1. / gamma_;
     gamma_plus_one_inverse_ = 1. / (gamma_ + 1.);
+
+    bool initialized = false;
+    for (auto &it : equation_of_state_list_)
+      if (it->name() == equation_of_state_) {
+        pressure_oracle_ = [&it](double rho, double e) {
+          return it->pressure_oracle(rho, e);
+        };
+        initialized = true;
+        break;
+      }
+
+    AssertThrow(
+        initialized,
+        dealii::ExcMessage(
+            "Could not find an equation of state description with name \"" +
+            equation_of_state_ + "\""));
   }
 
 
