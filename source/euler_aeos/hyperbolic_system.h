@@ -585,17 +585,15 @@ namespace ryujin
 
     auto gamma_min = surrogate_gamma(U_i, p_i);
 
-#if 0
     const unsigned int row_length = sparsity_simd.row_length(i);
     const unsigned int *js = sparsity_simd.columns(i) + stride_size;
     for (unsigned int col_idx = 1; col_idx < row_length;
          ++col_idx, js += stride_size) {
       const auto U_j = U.template get_tensor<Number>(js);
-      const auto p_j = pressure(U_j); // FIXME
-      const auto gamma_j = gamma(U_j, p_j);
+      const auto p_j = pressure_oracle(U_j); // FIXME
+      const auto gamma_j = surrogate_gamma(U_j, p_j);
       gamma_min = std::min(gamma_min, gamma_j);
     }
-#endif
 
     const auto s_i = specific_entropy(U_i, gamma_min);
     const auto eta_i = harten_entropy(U_i, gamma_min);
