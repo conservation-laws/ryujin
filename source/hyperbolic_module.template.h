@@ -206,7 +206,13 @@ namespace ryujin
     /*
      * Step 0: Precompute values
      */
-    {
+
+    static_assert(HyperbolicSystem::n_precomputation_cycles <= 2,
+                  "internal_error");
+
+    if constexpr (HyperbolicSystem::n_precomputation_cycles >= 1) {
+      constexpr unsigned int cycle = 0;
+
       Scope scope(computing_timer_, scoped_name("precompute values"));
 
       SynchronizationDispatch synchronization_dispatch([&]() {
@@ -221,27 +227,27 @@ namespace ryujin
       /* Stored thread locally: */
       bool thread_ready = false;
 
-      const auto loop = [&](auto sentinel,
-                            unsigned int left,
-                            unsigned int right) {
-        using T = decltype(sentinel);
-        unsigned int stride_size = get_stride_size<T>;
+      const auto loop =
+          [&](auto sentinel, unsigned int left, unsigned int right) {
 
-        RYUJIN_OMP_FOR
-        for (unsigned int i = left; i < right; i += stride_size) {
+            using T = decltype(sentinel);
+            unsigned int stride_size = get_stride_size<T>;
 
-          /* Skip constrained degrees of freedom: */
-          const unsigned int row_length = sparsity_simd.row_length(i);
-          if (row_length == 1)
-            continue;
+            RYUJIN_OMP_FOR
+            for (unsigned int i = left; i < right; i += stride_size) {
 
-          synchronization_dispatch.check(
-              thread_ready, i >= n_export_indices && i < n_internal);
+              /* Skip constrained degrees of freedom: */
+              const unsigned int row_length = sparsity_simd.row_length(i);
+              if (row_length == 1)
+                continue;
 
-          hyperbolic_system_->precomputation<T>(
-              new_precomputed, old_U, sparsity_simd, i);
-        }
-      };
+              synchronization_dispatch.check(
+                  thread_ready, i >= n_export_indices && i < n_internal);
+
+              hyperbolic_system_->precomputation<cycle, T>(
+                  new_precomputed, old_U, sparsity_simd, i);
+            }
+          };
 
       /* Parallel non-vectorized loop: */
       loop(Number(), n_internal, n_owned);
@@ -252,6 +258,53 @@ namespace ryujin
       RYUJIN_PARALLEL_REGION_END
     }
 
+    if constexpr (HyperbolicSystem::n_precomputation_cycles >= 2) {
+      constexpr unsigned int cycle = 1;
+
+      Scope scope(computing_timer_, scoped_name("precompute values"));
+
+      SynchronizationDispatch synchronization_dispatch([&]() {
+        new_precomputed.update_ghost_values_start(channel++);
+
+        new_precomputed.update_ghost_values_finish();
+      });
+
+      RYUJIN_PARALLEL_REGION_BEGIN
+      LIKWID_MARKER_START(("time_step_" + std::to_string(step_no)).c_str());
+
+      /* Stored thread locally: */
+      bool thread_ready = false;
+
+      const auto loop =
+          [&](auto sentinel, unsigned int left, unsigned int right) {
+
+            using T = decltype(sentinel);
+            unsigned int stride_size = get_stride_size<T>;
+
+            RYUJIN_OMP_FOR
+            for (unsigned int i = left; i < right; i += stride_size) {
+
+              /* Skip constrained degrees of freedom: */
+              const unsigned int row_length = sparsity_simd.row_length(i);
+              if (row_length == 1)
+                continue;
+
+              synchronization_dispatch.check(
+                  thread_ready, i >= n_export_indices && i < n_internal);
+
+              hyperbolic_system_->precomputation<cycle, T>(
+                  new_precomputed, old_U, sparsity_simd, i);
+            }
+          };
+
+      /* Parallel non-vectorized loop: */
+      loop(Number(), n_internal, n_owned);
+      /* Parallel vectorized SIMD loop: */
+      loop(VA(), 0, n_internal);
+
+      LIKWID_MARKER_STOP(("time_step_" + std::to_string(step_no)).c_str());
+      RYUJIN_PARALLEL_REGION_END
+    };
 
     /*
      * Step 1: Compute off-diagonal d_ij, and alpha_i

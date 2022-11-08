@@ -143,9 +143,15 @@ namespace ryujin
         precomputed_names;
 
     /**
+     * The number of precomputation cycles.
+     */
+    static constexpr unsigned int n_precomputation_cycles = 2;
+
+    /**
      * Precomputed values for a given state.
      */
-    template <typename Number,
+    template <unsigned int cycle,
+              typename Number,
               typename ScalarNumber = typename get_value_type<Number>::type,
               int problem_dim,
               typename MCV,
@@ -566,7 +572,8 @@ namespace ryujin
   /* Inline definitions */
 
 
-  template <typename Number,
+  template <unsigned int cycle,
+            typename Number,
             typename ScalarNumber,
             int problem_dim,
             typename MCV,
@@ -577,29 +584,45 @@ namespace ryujin
       const SPARSITY &sparsity_simd,
       unsigned int i) const
   {
+    static_assert(cycle <= 1, "internal error");
+
     unsigned int stride_size = get_stride_size<Number>;
     constexpr int dim = problem_dim - 2;
 
     const auto U_i = U.template get_tensor<Number>(i);
-    const auto p_i = pressure_oracle(U_i);
 
-    auto gamma_min = surrogate_gamma(U_i, p_i);
-
-    const unsigned int row_length = sparsity_simd.row_length(i);
-    const unsigned int *js = sparsity_simd.columns(i) + stride_size;
-    for (unsigned int col_idx = 1; col_idx < row_length;
-         ++col_idx, js += stride_size) {
-      const auto U_j = U.template get_tensor<Number>(js);
-      const auto p_j = pressure_oracle(U_j); // FIXME
-      const auto gamma_j = surrogate_gamma(U_j, p_j);
-      gamma_min = std::min(gamma_min, gamma_j);
+    if constexpr (cycle == 0) {
+      const auto p_i = pressure_oracle(U_i);
+      const auto gamma_i = surrogate_gamma(U_i, p_i);
+      const precomputed_type<dim, Number> prec_i{
+          p_i, gamma_i, Number(0.), Number(0.)};
+      precomputed_values.template write_tensor<Number>(prec_i, i);
     }
 
-    const auto s_i = specific_entropy(U_i, gamma_min);
-    const auto eta_i = harten_entropy(U_i, gamma_min);
+    if constexpr (cycle == 1) {
+      using PT = precomputed_type<dim, Number>;
 
-    const precomputed_type<dim, Number> prec_i{p_i, gamma_min, s_i, eta_i};
-    precomputed_values.template write_tensor<Number>(prec_i, i);
+      auto prec_i = precomputed_values.template get_tensor<Number, PT>(i);
+      auto &[p_i, gamma_min_i, s_i, eta_i] = prec_i;
+
+      const unsigned int row_length = sparsity_simd.row_length(i);
+      const unsigned int *js = sparsity_simd.columns(i) + stride_size;
+      for (unsigned int col_idx = 1; col_idx < row_length;
+           ++col_idx, js += stride_size) {
+
+        const auto U_j = U.template get_tensor<Number>(js);
+        const auto prec_j =
+            precomputed_values.template get_tensor<Number, PT>(js);
+        auto &[p_j, gamma_min_j, s_j, eta_j] = prec_j;
+        const auto gamma_j = surrogate_gamma(U_j, p_j);
+        gamma_min_i = std::min(gamma_min_i, gamma_j);
+      }
+
+      s_i = specific_entropy(U_i, gamma_min_i);
+      eta_i = harten_entropy(U_i, gamma_min_i);
+
+      precomputed_values.template write_tensor<Number>(prec_i, i);
+    }
   }
 
 

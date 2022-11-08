@@ -134,9 +134,15 @@ namespace ryujin
         precomputed_names;
 
     /**
+     * The number of precomputation cycles.
+     */
+    static constexpr unsigned int n_precomputation_cycles = 1;
+
+    /**
      * Precomputed values for a given state.
      */
-    template <typename Number,
+    template <unsigned int cycle,
+              typename Number,
               typename ScalarNumber = typename get_value_type<Number>::type,
               int problem_dim,
               typename MCV,
@@ -554,7 +560,8 @@ namespace ryujin
   /* Inline definitions */
 
 
-  template <typename Number,
+  template <unsigned int cycle,
+            typename Number,
             typename ScalarNumber,
             int problem_dim,
             typename MCV,
@@ -565,6 +572,8 @@ namespace ryujin
       const SPARSITY & /*sparsity_simd*/,
       unsigned int i) const
   {
+    static_assert(cycle == 0, "internal error");
+
     constexpr int dim = problem_dim - 2;
 
     const auto U_i = U.template get_tensor<Number>(i);
