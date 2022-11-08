@@ -264,8 +264,8 @@ namespace ryujin
     rho_relaxation_numerator += beta_ij * (rho_i + rho_j);
     rho_relaxation_denominator += beta_ij;
 
-    const Number s_interp =
-        hyperbolic_system.specific_entropy((U_i + U_j) * ScalarNumber(.5));
+    const Number s_interp = hyperbolic_system.specific_entropy(
+        (U_i + U_j) * ScalarNumber(.5), gamma_min_j); // FIXME
     s_interp_max = std::max(s_interp_max, s_interp);
   }
 

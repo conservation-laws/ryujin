@@ -28,21 +28,21 @@ namespace ryujin
           : InitialState<dim, Number, state_type>("contrast", subsection)
           , hyperbolic_system(hyperbolic_system)
       {
-        primitive_left_[0] = hyperbolic_system.legacy_gamma();
-        primitive_left_[1] = 0.0;
-        primitive_left_[2] = 1.;
+        primitive_left_[0] = 7. / 5.;
+        primitive_left_[1] = 0.;
+        primitive_left_[2] = 1. / .4;
         this->add_parameter(
             "primitive state left",
             primitive_left_,
-            "Initial 1d primitive state (rho, u, p) on the left");
+            "Initial 1d primitive state (rho, u, e) on the left");
 
-        primitive_right_[0] = hyperbolic_system.legacy_gamma();
-        primitive_right_[1] = 0.0;
-        primitive_right_[2] = 1.;
+        primitive_right_[0] = 7. / 5.;
+        primitive_right_[1] = 0.;
+        primitive_right_[2] = 1. / .4;
         this->add_parameter(
             "primitive state right",
             primitive_right_,
-            "Initial 1d primitive state (rho, u, p) on the right");
+            "Initial 1d primitive state (rho, u, e) on the right");
       }
 
       virtual state_type compute(const dealii::Point<dim> &point,

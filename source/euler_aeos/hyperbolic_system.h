@@ -238,9 +238,9 @@ namespace ryujin
      * \f]
      */
     template <int problem_dim, typename Number>
-    Number
-    speed_of_sound(const dealii::Tensor<1, problem_dim, Number> &U,
-                   const Number &p) const;
+    Number speed_of_sound(const dealii::Tensor<1, problem_dim, Number> &U,
+                          const Number &gamma,
+                          const Number &p) const;
 
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, compute
@@ -250,11 +250,6 @@ namespace ryujin
      *   (1 - b * \rho)^(\gamma -1).
      * \f]
      */
-    // FIXME remove
-    template <int problem_dim, typename Number>
-    Number
-    specific_entropy(const dealii::Tensor<1, problem_dim, Number> &U) const;
-
     template <int problem_dim, typename Number>
     Number specific_entropy(const dealii::Tensor<1, problem_dim, Number> &U,
                             const Number gamma_min) const;
@@ -266,11 +261,6 @@ namespace ryujin
      *   \eta = (\rho^2 e) ^ {1 / (\gamma + 1)}.
      * \f]
      */
-    // FIXME remove
-    template <int problem_dim, typename Number>
-    Number
-    harten_entropy(const dealii::Tensor<1, problem_dim, Number> &U) const;
-
     template <int problem_dim, typename Number>
     Number harten_entropy(const dealii::Tensor<1, problem_dim, Number> &U,
                           const Number gamma_min) const;
@@ -746,6 +736,7 @@ namespace ryujin
   template <int problem_dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline Number HyperbolicSystem::speed_of_sound(
       const dealii::Tensor<1, problem_dim, Number> &U,
+      const Number &gamma,
       const Number &p) const
   {
     /* c^2 = gamma * p / rho / (1 - b * rho) */
@@ -753,20 +744,7 @@ namespace ryujin
     using ScalarNumber = typename get_value_type<Number>::type;
 
     const Number rho_inverse = ScalarNumber(1.) / U[0];
-    return std::sqrt(legacy_gamma_ * p * rho_inverse);
-  }
-
-
-  template <int problem_dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline Number HyperbolicSystem::specific_entropy(
-      const dealii::Tensor<1, problem_dim, Number> &U) const
-  {
-    /* exp((gamma - 1)s) = (rho e) / rho ^ gamma */
-
-    using ScalarNumber = typename get_value_type<Number>::type;
-
-    const auto rho_inverse = ScalarNumber(1.) / U[0];
-    return internal_energy(U) * ryujin::pow(rho_inverse, legacy_gamma_);
+    return std::sqrt(gamma * p * rho_inverse);
   }
 
 
@@ -781,26 +759,6 @@ namespace ryujin
 
     const auto rho_inverse = ScalarNumber(1.) / U[0];
     return internal_energy(U) * ryujin::vec_pow(rho_inverse, gamma_min);
-  }
-
-
-  template <int problem_dim, typename Number>
-  DEAL_II_ALWAYS_INLINE inline Number HyperbolicSystem::harten_entropy(
-      const dealii::Tensor<1, problem_dim, Number> &U) const
-  {
-    /* rho^2 e = \rho E - 1/2*m^2 */
-
-    constexpr int dim = problem_dim - 2;
-    using ScalarNumber = typename get_value_type<Number>::type;
-
-    const Number rho = U[0];
-    const auto m = momentum(U);
-    const Number E = U[dim + 1];
-
-    const Number rho_rho_e = rho * E - ScalarNumber(0.5) * m.norm_square();
-
-    const double gamma_plus_one_inverse = 1. / (legacy_gamma_ + 1.);
-    return ryujin::pow(rho_rho_e, gamma_plus_one_inverse);
   }
 
 
@@ -886,7 +844,7 @@ namespace ryujin
   {
     const auto rho_new = density(U);
     const auto e_new = internal_energy(U);
-    const auto s_new = specific_entropy(U);
+    const auto s_new = specific_entropy(U, Number(legacy_gamma_)); // FIXME
 
     constexpr auto gt = dealii::SIMDComparison::greater_than;
     using T = Number;

@@ -25,6 +25,9 @@ namespace ryujin
                                                      subsection)
           , hyperbolic_system(hyperbolic_system)
       {
+        gamma_ = 7. / 5.;
+        this->add_parameter("gamma", gamma_, "The ratio of specific heats");
+
         mach_number_ = 2.0;
         this->add_parameter(
             "mach number", mach_number_, "Mach number of isentropic vortex");
@@ -36,9 +39,6 @@ namespace ryujin
       virtual state_type compute(const dealii::Point<dim> &point,
                                  Number t) final override
       {
-        const auto gamma = hyperbolic_system.legacy_gamma();
-
-
         /* In 3D we simply project onto the 2d plane: */
         dealii::Point<2> point_bar;
         point_bar[0] = point[0] - mach_number_ * t;
@@ -49,17 +49,17 @@ namespace ryujin
         const Number factor = beta_ / Number(2. * M_PI) *
                               exp(Number(0.5) - Number(0.5) * r_square);
 
-        const Number T = Number(1.) - (gamma - Number(1.)) /
-                                          (Number(2.) * gamma) * factor *
+        const Number T = Number(1.) - (gamma_ - Number(1.)) /
+                                          (Number(2.) * gamma_) * factor *
                                           factor;
 
         const Number u = mach_number_ - factor * Number(point_bar[1]);
         const Number v = factor * Number(point_bar[0]);
 
-        const Number rho = ryujin::pow(T, Number(1.) / (gamma - Number(1.)));
-        const Number p = ryujin::pow(rho, gamma);
+        const Number rho = ryujin::pow(T, Number(1.) / (gamma_ - Number(1.)));
+        const Number p = ryujin::pow(rho, gamma_);
         const Number E =
-            p / (gamma - Number(1.)) + Number(0.5) * rho * (u * u + v * v);
+            p / (gamma_ - Number(1.)) + Number(0.5) * rho * (u * u + v * v);
 
         if constexpr (dim == 2)
           return state_type({rho, rho * u, rho * v, E});
@@ -74,6 +74,7 @@ namespace ryujin
     private:
       const HyperbolicSystem &hyperbolic_system;
 
+      Number gamma_;
       Number mach_number_;
       Number beta_;
     };

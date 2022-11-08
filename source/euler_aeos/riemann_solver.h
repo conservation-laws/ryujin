@@ -180,6 +180,7 @@ namespace ryujin
      */
     primitive_type
     riemann_data_from_state(const HyperbolicSystem::state_type<dim, Number> &U,
+                            const Number &gamma,
                             const Number &p,
                             const dealii::Tensor<1, dim, Number> &n_ij) const;
 
@@ -206,6 +207,7 @@ namespace ryujin
   DEAL_II_ALWAYS_INLINE inline auto
   RiemannSolver<dim, Number>::riemann_data_from_state(
       const HyperbolicSystem::state_type<dim, Number> &U,
+      const Number &gamma,
       const Number &p,
       const dealii::Tensor<1, dim, Number> &n_ij) const -> primitive_type
   {
@@ -221,7 +223,7 @@ namespace ryujin
 
     const auto state =
         HyperbolicSystem::state_type<1, Number>({rho, proj_m, E});
-    const auto a = hyperbolic_system.speed_of_sound(state, p);
+    const auto a = hyperbolic_system.speed_of_sound(state, gamma, p);
 
     return {{rho, proj_m * rho_inverse, p, a}};
   }
@@ -241,8 +243,10 @@ namespace ryujin
     const auto &[p_j, gamma_min_j, s_j, eta_j] =
         precomputed_values.template get_tensor<Number, precomputed_type>(js);
 
-    const auto riemann_data_i = riemann_data_from_state(U_i, p_i, n_ij);
-    const auto riemann_data_j = riemann_data_from_state(U_j, p_j, n_ij);
+    const auto riemann_data_i =
+        riemann_data_from_state(U_i, gamma_min_i, p_i, n_ij);
+    const auto riemann_data_j =
+        riemann_data_from_state(U_j, gamma_min_j, p_j, n_ij);
 
     return compute(riemann_data_i, riemann_data_j);
   }
