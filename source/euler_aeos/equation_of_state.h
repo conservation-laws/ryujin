@@ -43,7 +43,7 @@ namespace ryujin
     const std::string name_;
 
     /**
-     * Return the name of the geometry as (const reference) std::string
+     * Return the name of the EOS as (const reference) std::string
      */
     ACCESSOR_READ_ONLY(name)
   };

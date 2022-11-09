@@ -24,6 +24,12 @@ namespace ryujin
                   "The equation of state. Valid names are given by any of the "
                   "subsections defined below.");
 
+    b_interp_ = 0.;
+    add_parameter("interpolant constant b",
+                  b_interp_,
+                  "The maximum compressibility constant used to interpolate "
+                  "the co-volume EOS");
+
     reference_density_ = 1.;
     add_parameter("reference density",
                   reference_density_,
@@ -65,7 +71,6 @@ namespace ryujin
         dealii::ExcMessage(
             "Could not find an equation of state description with name \"" +
             equation_of_state_ + "\""));
-
   }
 
 

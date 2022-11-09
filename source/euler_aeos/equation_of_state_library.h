@@ -15,7 +15,7 @@ namespace ryujin
   {
     /**
      * Populate a given container with all equation of states defined in
-     * this namespace
+     * this namespace.
      *
      * @ingroup EquationOfState
      */
@@ -28,7 +28,9 @@ namespace ryujin
       };
 
       add(std::make_unique<PolytropicGas>(subsection));
+      add(std::make_unique<NobleAbleStiffenedGas>(subsection));
+      // add(std::make_unique<VanDerWaals>(subsection));
     }
 
-  } // namespace EquationOfState
+  } // namespace EquationOfStateLibrary
 } // namespace ryujin

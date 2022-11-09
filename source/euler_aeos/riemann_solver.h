@@ -21,7 +21,7 @@ namespace ryujin
    * ensures that the estimate \f$\lambda_{\text{max}}\f$ that is returned
    * for the maximal wavespeed is a strict upper bound.
    *
-   * The solver is based on @cite GuermondPopov2016b.
+   * The solver is based on @cite ClaytonGuermondPopov-2022.
    *
    * @ingroup EulerEquations
    */
@@ -72,11 +72,7 @@ namespace ryujin
                       &precomputed_values)
         : hyperbolic_system(hyperbolic_system)
         , precomputed_values(precomputed_values)
-        , gamma(7. / 5.)
-        , gamma_inverse(1. / gamma)
-        , gamma_minus_one_inverse(1. / (gamma - 1.))
-        , gamma_minus_one_over_gamma_plus_one((gamma - 1.) / (gamma + 1.))
-        , gamma_plus_one_inverse(1. / (gamma + 1.))
+        , b_interp(hyperbolic_system.b_interp())
     {
     }
 
@@ -108,21 +104,20 @@ namespace ryujin
     //@{
 
     /**
-     * See [1], page 912, (3.3).
+     * See [Tabulated paper], page ???
      *
-     * The approximate Riemann solver is based on a function phi(p) that is
-     * montone increasing in p, concave down and whose (weak) third
-     * derivative is non-negative and locally bounded [1, p. 912]. Because
-     * we actually do not perform any iteration for computing our wavespeed
-     * estimate we can get away by only implementing a specialized variant
-     * of the phi function that computes phi(p_max). It inlines the
-     * implementation of the "f" function and eliminates all unnecessary
-     * branches in "f".
-     *
-     * Cost: 0x pow, 2x division, 2x sqrt
+     * Cost: ???
      */
-    Number phi_of_p_max(const primitive_type &riemann_data_i,
-                        const primitive_type &riemann_data_j) const;
+    Number f(const primitive_type &primitive_state, const Number p_star) const;
+
+    /**
+     * See [Tabulated paper], page ???
+     *
+     * Cost: ???
+     */
+    Number phi_of_p(const primitive_type &riemann_data_i,
+                    const primitive_type &riemann_data_j,
+                    const Number p_in) const;
 
 
     /**
@@ -158,19 +153,6 @@ namespace ryujin
                           const primitive_type &riemann_data_j,
                           const Number p_star) const;
 
-
-    /**
-     * Two-rarefaction approximation to p_star computed for two primitive
-     * states <code>riemann_data_i</code> and <code>riemann_data_j</code>.
-     *
-     * See [1], page 914, (4.3)
-     *
-     * Cost: 2x pow, 2x division, 0x sqrt
-     */
-    Number p_star_two_rarefaction(const primitive_type &riemann_data_i,
-                                  const primitive_type &riemann_data_j) const;
-
-
     /**
      * For a given (2+dim dimensional) state vector <code>U</code>, and a
      * (normalized) "direction" n_ij, first compute the corresponding
@@ -180,7 +162,6 @@ namespace ryujin
      */
     primitive_type
     riemann_data_from_state(const HyperbolicSystem::state_type<dim, Number> &U,
-                            const Number &gamma,
                             const Number &p,
                             const dealii::Tensor<1, dim, Number> &n_ij) const;
 
@@ -190,24 +171,17 @@ namespace ryujin
     const MultiComponentVector<ScalarNumber, n_precomputed_values>
         &precomputed_values;
 
-    const ScalarNumber gamma;
-    const ScalarNumber gamma_inverse;
-    const ScalarNumber gamma_minus_one_inverse;
-    const ScalarNumber gamma_minus_one_over_gamma_plus_one;
-    const ScalarNumber gamma_plus_one_inverse;
-
+    const ScalarNumber b_interp;
     //@}
   };
 
 
-  /* Inline definitions */
-
+  /* Main inline definitions for RiemannSolver */
 
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline auto
   RiemannSolver<dim, Number>::riemann_data_from_state(
       const HyperbolicSystem::state_type<dim, Number> &U,
-      const Number &gamma,
       const Number &p,
       const dealii::Tensor<1, dim, Number> &n_ij) const -> primitive_type
   {
@@ -223,9 +197,24 @@ namespace ryujin
 
     const auto state =
         HyperbolicSystem::state_type<1, Number>({rho, proj_m, E});
-    const auto a = hyperbolic_system.speed_of_sound(state, gamma, p);
+    const auto gamma_ = hyperbolic_system.surrogate_gamma(state, p);
 
-    return {{rho, proj_m * rho_inverse, p, a}};
+#ifdef CHECK_BOUNDS
+    AssertThrowSIMD(Number(p),
+                    [](auto val) { return val > ScalarNumber(0.); },
+                    dealii::ExcMessage(" p <= 0."));
+
+    const Number x_ = Number(1.) - b_interp * rho;
+    AssertThrowSIMD(x_,
+                    [](auto val) { return val > ScalarNumber(0.); },
+                    dealii::ExcMessage(" 1. - b * rho <= 0."));
+
+    AssertThrowSIMD(gamma_ - Number(1.),
+                    [](auto val) { return val > ScalarNumber(0.); },
+                    dealii::ExcMessage(" gamma_ <= 1. "));
+#endif
+
+    return {{rho, proj_m * rho_inverse, p, gamma_}};
   }
 
 
@@ -237,16 +226,14 @@ namespace ryujin
       const unsigned int *js,
       const dealii::Tensor<1, dim, Number> &n_ij) const
   {
-    const auto &[p_i, gamma_min_i, s_i, eta_i] =
+    const auto &[p_i, unused_i, s_i, eta_i] =
         precomputed_values.template get_tensor<Number, precomputed_type>(i);
 
-    const auto &[p_j, gamma_min_j, s_j, eta_j] =
+    const auto &[p_j, unused_j, s_j, eta_j] =
         precomputed_values.template get_tensor<Number, precomputed_type>(js);
 
-    const auto riemann_data_i =
-        riemann_data_from_state(U_i, gamma_min_i, p_i, n_ij);
-    const auto riemann_data_j =
-        riemann_data_from_state(U_j, gamma_min_j, p_j, n_ij);
+    const auto riemann_data_i = riemann_data_from_state(U_i, p_i, n_ij);
+    const auto riemann_data_j = riemann_data_from_state(U_j, p_j, n_ij);
 
     return compute(riemann_data_i, riemann_data_j);
   }

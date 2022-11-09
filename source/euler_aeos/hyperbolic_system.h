@@ -534,9 +534,20 @@ namespace ryujin
      */
     //@{
 
+    /* For EOS */
     std::string equation_of_state_;
     ACCESSOR_READ_ONLY(equation_of_state)
 
+    double b_interp_;
+    ACCESSOR_READ_ONLY(b_interp)
+
+    double pinf_interp_;
+    ACCESSOR_READ_ONLY(pinf_interp)
+
+    double q_interp_;
+    ACCESSOR_READ_ONLY(q_interp)
+
+    /* For vacuum states */
     double reference_density_;
     ACCESSOR_READ_ONLY(reference_density)
 
@@ -832,9 +843,11 @@ namespace ryujin
 
     using ScalarNumber = typename get_value_type<Number>::type;
 
+    const Number rho = density(U);
     const Number rho_e = internal_energy(U);
+    const Number cov = Number(1.) - Number(b_interp_) * rho;
 
-    return Number(1.) + p / rho_e;
+    return Number(1.) + p * cov / rho_e;
   }
 
 
