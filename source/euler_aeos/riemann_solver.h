@@ -72,7 +72,6 @@ namespace ryujin
                       &precomputed_values)
         : hyperbolic_system(hyperbolic_system)
         , precomputed_values(precomputed_values)
-        , b_interp(hyperbolic_system.b_interp())
     {
     }
 
@@ -104,11 +103,34 @@ namespace ryujin
     //@{
 
     /**
+     * FIXME
+     */
+    Number compute_alpha(const primitive_type &riemann_data) const;
+
+    /**
+     * FIXME
+     */
+    Number compute_c(const Number gamma_Z) const;
+
+    /**
+     * FIXME
+     */
+    Number p_star_RS_aeos(const primitive_type &riemann_data_i,
+                          const primitive_type &riemann_data_j) const;
+
+    /**
+     * FIXME
+     */
+    Number p_star_SS_aeos(const primitive_type &riemann_data_i,
+                          const primitive_type &riemann_data_j) const;
+
+
+    /**
      * See [Tabulated paper], page ???
      *
      * Cost: ???
      */
-    Number f(const primitive_type &primitive_state, const Number p_star) const;
+    Number f(const primitive_type &riemann_data, const Number p_star) const;
 
     /**
      * See [Tabulated paper], page ???
@@ -170,8 +192,6 @@ namespace ryujin
 
     const MultiComponentVector<ScalarNumber, n_precomputed_values>
         &precomputed_values;
-
-    const ScalarNumber b_interp;
     //@}
   };
 
