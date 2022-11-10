@@ -24,7 +24,7 @@ namespace ryujin
    * A444-A470
    */
 
-  /* Compute \alpha_Z function */
+  /* Compute \alpha_Z / c(\gamma_Z) function */
 
   template <int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline Number RiemannSolver<dim, Number>::compute_alpha(
@@ -175,22 +175,23 @@ namespace ryujin
 
     const auto &[rho, u, p, gamma] = primitive_state;
 
-    const Number g_minus_one_ = gamma - Number(1.);
+    const Number g_minus_one = gamma - Number(1.);
+    const Number g_plus_one = gamma + Number(1.);
 
     const Number one_minus_b_rho = Number(1.) - b_interp * rho;
 
     const Number a = std::sqrt(gamma * p / (rho * one_minus_b_rho));
 
-    Number radicand_inverse =
-        ScalarNumber(0.5) * rho *
-        ((gamma + Number(1.)) * p_star + g_minus_one_ * p) / one_minus_b_rho;
+    const Number Az = ScalarNumber(2.) * one_minus_b_rho / (rho * (g_plus_one));
+    const Number Bz = g_minus_one / g_plus_one * p;
+    const Number radicand = Az / (p_star + Bz);
 
-    const Number true_value = (p_star - p) / std::sqrt(radicand_inverse);
+    const Number true_value = (p_star - p) * std::sqrt(radicand);
 
-    const auto exponent = ScalarNumber(0.5) * g_minus_one_ / gamma;
+    const auto exponent = ScalarNumber(0.5) * g_minus_one / gamma;
     const Number factor = ryujin::vec_pow(p_star / p, exponent) - Number(1.);
     const auto false_value =
-        ScalarNumber(2.) * a * one_minus_b_rho * factor / g_minus_one_;
+        ScalarNumber(2.) * a * one_minus_b_rho * factor / g_minus_one;
 
     return dealii::compare_and_apply_mask<
         dealii::SIMDComparison::greater_than_or_equal>(

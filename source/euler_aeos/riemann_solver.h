@@ -224,7 +224,7 @@ namespace ryujin
                     [](auto val) { return val > ScalarNumber(0.); },
                     dealii::ExcMessage(" p <= 0."));
 
-    const Number x_ = Number(1.) - b_interp * rho;
+    const Number x_ = Number(1.) - hyperbolic_system.b_interp() * rho;
     AssertThrowSIMD(x_,
                     [](auto val) { return val > ScalarNumber(0.); },
                     dealii::ExcMessage(" 1. - b * rho <= 0."));
