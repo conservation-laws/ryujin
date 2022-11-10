@@ -7,6 +7,8 @@
 
 #include "equation_of_state.h"
 
+#include "equation_of_state_jwl.h"
+#include "equation_of_state_nasg_gas.h"
 #include "equation_of_state_polytropic_gas.h"
 
 namespace ryujin
@@ -29,7 +31,7 @@ namespace ryujin
 
       add(std::make_unique<PolytropicGas>(subsection));
       add(std::make_unique<NobleAbleStiffenedGas>(subsection));
-      // add(std::make_unique<VanDerWaals>(subsection));
+      add(std::make_unique<JonesWilkinsLee>(subsection));
     }
 
   } // namespace EquationOfStateLibrary

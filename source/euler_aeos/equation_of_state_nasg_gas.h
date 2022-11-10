@@ -36,15 +36,30 @@ namespace ryujin
             "reference pressure", pinf_, "The reference pressure p infinity");
       }
 
+      /* Pressure oracle */
       virtual double
       pressure_oracle(const double rho,
                       const double internal_energy) final override
       {
+        /* p = (\gamma - 1) *  (\rho (e - q))/ (1 - b \rho) - \gamma p_\infty */
+
         const auto cov = 1. - b_ * rho;
 
         const auto num = internal_energy - q_ * rho;
         const auto den = cov;
         return (gamma_ - 1.) * num / den - gamma_ * pinf_;
+      }
+
+      /* Sie from rho and p */
+      virtual double sie_from_rho_p(const double rho,
+                                    const double pressure) final override
+      {
+        const auto cov = 1. - b_ * rho;
+
+        const auto num = pressure + gamma_ * pinf_;
+        const auto den = gamma_ - 1.;
+
+        return num / den * rho * cov + q_;
       }
 
     private:

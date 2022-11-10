@@ -36,8 +36,13 @@ namespace ryujin
     {
     }
 
+    /* Pressure given rho and internal energy (rho * e) */
     virtual double pressure_oracle(const double density,
                                    const double internal_energy) = 0;
+
+    /* Specific internal energy (e) given density (rho) and pressure (p) */
+    virtual double sie_from_rho_p(const double density,
+                                  const double pressure) = 0;
 
   private:
     const std::string name_;
