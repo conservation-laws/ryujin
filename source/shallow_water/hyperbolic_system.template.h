@@ -51,6 +51,11 @@ namespace ryujin
 
 
     template <>
+    const std::array<std::string, 4> HyperbolicSystem::component_names<3>{
+        {"h", "m_1", "m_2", "m_3"}};
+
+
+    template <>
     const std::array<std::string, 2>
         HyperbolicSystem::primitive_component_names<1>{{"h", "v"}};
 
@@ -58,6 +63,12 @@ namespace ryujin
     template <>
     const std::array<std::string, 3>
         HyperbolicSystem::primitive_component_names<2>{{"h", "v_1", "v_2"}};
+
+
+    template <>
+    const std::array<std::string, 4>
+        HyperbolicSystem::primitive_component_names<3>{
+            {"h", "v_1", "v_2", "v_3"}};
 
 
     template <>
@@ -71,6 +82,11 @@ namespace ryujin
 
 
     template <>
+    const std::array<std::string, 1> HyperbolicSystem::precomputed_names<3>{
+        {"eta_m"}};
+
+
+    template <>
     const std::array<std::string, 1>
         HyperbolicSystem::precomputed_initial_names<1>{{"bathymetry"}};
 
@@ -78,6 +94,11 @@ namespace ryujin
     template <>
     const std::array<std::string, 1>
         HyperbolicSystem::precomputed_initial_names<2>{{"bathymetry"}};
+
+
+    template <>
+    const std::array<std::string, 1>
+        HyperbolicSystem::precomputed_initial_names<3>{{"bathymetry"}};
 #endif
 
   } // namespace ShallowWater
