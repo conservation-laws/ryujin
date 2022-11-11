@@ -95,7 +95,7 @@ macro(setup_equation EQUATION)
     OUTPUT "${CMAKE_BINARY_DIR}/run/${EQUATION}/ryujin"
     COMMAND ${CMAKE_COMMAND} -E create_symlink $<TARGET_FILE:${EQUATION}>
       "${CMAKE_BINARY_DIR}/run/${EQUATION}/ryujin"
-      )
+    )
 
   add_custom_target(symlink_${EQUATION} ALL
     DEPENDS ${EQUATION} "${CMAKE_BINARY_DIR}/run/${EQUATION}/ryujin"
@@ -106,7 +106,7 @@ macro(setup_equation EQUATION)
 endmacro()
 
 setup_equation("euler")
-setup_equation("euler_aeos")
-if(NOT "${DIM}" EQUAL "3")
-  setup_equation("shallow_water")
-endif()
+#setup_equation("euler_aeos")
+#if(NOT "${DIM}" EQUAL "3")
+#  setup_equation("shallow_water")
+#endif()
