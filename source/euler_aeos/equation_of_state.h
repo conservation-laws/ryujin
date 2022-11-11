@@ -16,41 +16,45 @@
 
 namespace ryujin
 {
-  /**
-   * A small abstract base class to group configuration options for an
-   * equation of state.
-   *
-   * @ingroup EquationOfState
-   */
-  class EquationOfState : public dealii::ParameterAcceptor
+  namespace EulerAEOS
   {
-  public:
     /**
-     * Constructor taking EOS name @p name and a subsection @p subsection
-     * as an argument. The dealii::ParameterAcceptor is initialized with
-     * the subsubsection `subsection + "/" + name`.
+     * A small abstract base class to group configuration options for an
+     * equation of state.
+     *
+     * @ingroup EquationOfState
      */
-    EquationOfState(const std::string &name, const std::string &subsection)
-        : ParameterAcceptor(subsection + "/" + name)
-        , name_(name)
+    class EquationOfState : public dealii::ParameterAcceptor
     {
-    }
+    public:
+      /**
+       * Constructor taking EOS name @p name and a subsection @p subsection
+       * as an argument. The dealii::ParameterAcceptor is initialized with
+       * the subsubsection `subsection + "/" + name`.
+       */
+      EquationOfState(const std::string &name, const std::string &subsection)
+          : ParameterAcceptor(subsection + "/" + name)
+          , name_(name)
+      {
+      }
 
-    /* Pressure given rho and internal energy (rho * e) */
-    virtual double pressure_oracle(const double density,
-                                   const double internal_energy) = 0;
+      /* Pressure given rho and internal energy (rho * e) */
+      virtual double pressure_oracle(const double density,
+                                     const double internal_energy) = 0;
 
-    /* Specific internal energy (e) given density (rho) and pressure (p) */
-    virtual double sie_from_rho_p(const double density,
-                                  const double pressure) = 0;
+      /* Specific internal energy (e) given density (rho) and pressure (p) */
+      virtual double sie_from_rho_p(const double density,
+                                    const double pressure) = 0;
 
-  private:
-    const std::string name_;
+    private:
+      const std::string name_;
 
-    /**
-     * Return the name of the EOS as (const reference) std::string
-     */
-    ACCESSOR_READ_ONLY(name)
-  };
+      /**
+       * Return the name of the EOS as (const reference) std::string
+       */
+      ACCESSOR_READ_ONLY(name)
+    };
+  } // namespace EulerAEOS
 
+  using namespace EulerAEOS;
 } /* namespace ryujin */

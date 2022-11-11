@@ -9,9 +9,11 @@
 
 namespace ryujin
 {
-  /* instantiations */
+  namespace EulerAEOS
+  {
+    /* instantiations */
 
-  template class RiemannSolver<DIM, NUMBER>;
-  template class RiemannSolver<DIM, dealii::VectorizedArray<NUMBER>>;
-
-} /* namespace ryujin */
+    template class RiemannSolver<DIM, NUMBER>;
+    template class RiemannSolver<DIM, dealii::VectorizedArray<NUMBER>>;
+  } // namespace EulerAEOS
+} // namespace ryujin

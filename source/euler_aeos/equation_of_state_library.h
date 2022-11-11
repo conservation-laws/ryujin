@@ -13,26 +13,29 @@
 
 namespace ryujin
 {
-  namespace EquationOfStateLibrary
+  namespace EulerAEOS
   {
-    /**
-     * Populate a given container with all equation of states defined in
-     * this namespace.
-     *
-     * @ingroup EquationOfState
-     */
-    template <typename T>
-    void populate_equation_of_state_list(T &equation_of_state_list,
-                                         const std::string &subsection)
+    namespace EquationOfStateLibrary
     {
-      auto add = [&](auto &&object) {
-        equation_of_state_list.emplace(std::move(object));
-      };
+      /**
+       * Populate a given container with all equation of states defined in
+       * this namespace.
+       *
+       * @ingroup EquationOfState
+       */
+      template <typename T>
+      void populate_equation_of_state_list(T &equation_of_state_list,
+                                           const std::string &subsection)
+      {
+        auto add = [&](auto &&object) {
+          equation_of_state_list.emplace(std::move(object));
+        };
 
-      add(std::make_unique<PolytropicGas>(subsection));
-      add(std::make_unique<NobleAbleStiffenedGas>(subsection));
-      add(std::make_unique<JonesWilkinsLee>(subsection));
-    }
+        add(std::make_unique<PolytropicGas>(subsection));
+        add(std::make_unique<NobleAbleStiffenedGas>(subsection));
+        add(std::make_unique<JonesWilkinsLee>(subsection));
+      }
 
-  } // namespace EquationOfStateLibrary
+    } // namespace EquationOfStateLibrary
+  } // namespace EulerAEOS
 } // namespace ryujin
