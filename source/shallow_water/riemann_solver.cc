@@ -9,9 +9,12 @@
 
 namespace ryujin
 {
-  /* instantiations */
+  namespace ShallowWater
+  {
+    /* instantiations */
 
-  template class RiemannSolver<DIM, NUMBER>;
-  template class RiemannSolver<DIM, dealii::VectorizedArray<NUMBER>>;
+    template class RiemannSolver<DIM, NUMBER>;
+    template class RiemannSolver<DIM, dealii::VectorizedArray<NUMBER>>;
 
-} /* namespace ryujin */
+  } // namespace ShallowWater
+} // namespace ryujin
