@@ -553,6 +553,7 @@ namespace ryujin
       ACCESSOR_READ_ONLY(mannings)
 
       double reference_water_depth_;
+      ACCESSOR_READ_ONLY(reference_water_depth)
 
       double dry_state_relaxation_sharp_;
       ACCESSOR_READ_ONLY(dry_state_relaxation_sharp)

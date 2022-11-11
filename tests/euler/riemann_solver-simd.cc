@@ -1,4 +1,5 @@
 #include <hyperbolic_system.h>
+#include <multicomponent_vector.h>
 #include <riemann_solver.h>
 #include <riemann_solver.template.h>
 #include <simd.h>
@@ -14,7 +15,13 @@ int main()
 
   HyperbolicSystem hyperbolic_system;
   const double gamma = hyperbolic_system.gamma();
-  RiemannSolver<dim, Number> riemann_solver(hyperbolic_system);
+
+  static constexpr unsigned int n_precomputed_values =
+      HyperbolicSystem::n_precomputed_values<dim>;
+  using precomputed_type = MultiComponentVector<double, n_precomputed_values>;
+  precomputed_type dummy;
+
+  RiemannSolver<dim, Number> riemann_solver(hyperbolic_system, dummy);
 
   const auto riemann_data = [&](const auto &state) {
     const Number rho = state[0];
