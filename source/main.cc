@@ -40,7 +40,11 @@ int main(int argc, char *argv[])
   MPI_Comm mpi_communicator(MPI_COMM_WORLD);
 
 #ifdef WITH_OPENMP
-  omp_set_num_threads(dealii::MultithreadInfo::n_threads());
+  const unsigned int n_threads_omp = omp_get_thread_limit();
+  const unsigned int n_threads_dealii = dealii::MultithreadInfo::n_threads();
+  const unsigned int n_threads = std::min(n_threads_omp, n_threads_dealii);
+  omp_set_num_threads(n_threads);
+  dealii::MultithreadInfo::set_thread_limit(n_threads);
 #else
   if (dealii::Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
     std::cout << "[INFO] OpenMP support disabled, set thread limit to one"
