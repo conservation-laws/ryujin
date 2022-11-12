@@ -32,7 +32,7 @@ namespace ryujin
                     dry_state_relaxation_sharp_,
                     "Problem specific dry-state relaxation parameter");
 
-      dry_state_relaxation_mollified_ = 1.e5;
+      dry_state_relaxation_mollified_ = 1.e2;
       add_parameter("dry state relaxation mollified",
                     dry_state_relaxation_mollified_,
                     "Problem specific dry-state relaxation parameter");

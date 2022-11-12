@@ -51,9 +51,10 @@ int main()
   std::cout << std::setprecision(16);
   std::cout << std::scientific;
 
-  std::cout << "gravity:               " << gravity << std::endl;
-  std::cout << "reference_water_depth: " << hyperbolic_system.reference_water_depth() << std::endl;
-  std::cout << "dry_state_relaxation:  " << hyperbolic_system.dry_state_relaxation() << std::endl;
+  std::cout << "gravity:                      " << gravity << std::endl;
+  std::cout << "reference_water_depth:        " << hyperbolic_system.reference_water_depth() << std::endl;
+  std::cout << "dry_state_relaxation (sharp): " << hyperbolic_system.dry_state_relaxation_mollified() << std::endl;
+  std::cout << "dry_state_relaxation (molli): " << hyperbolic_system.dry_state_relaxation_sharp() << std::endl;
   std::cout << std::endl;
 
   // 10/04/2022 verified against Mathematica computation (Eric + Matthias)
