@@ -17,6 +17,5 @@ macro(setup_equation EQUATION)
 endmacro()
 
 setup_equation("euler")
-if(NOT "${DIM}" EQUAL "3")
-  setup_equation("shallow_water")
-endif()
+setup_equation("euler_aeos")
+setup_equation("shallow_water")

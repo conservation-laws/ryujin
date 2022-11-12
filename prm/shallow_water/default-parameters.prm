@@ -26,10 +26,12 @@ end
 
 
 subsection B - Equation
-  set gamma                   = 1.4
+  set gravity                        = 9.81
+  set mannings                       = 0
 
-  set reference density       = 1
-  set vacuum state relaxation = 10000
+  set reference water depth          = 1
+  set dry state relaxation sharp     = 100
+  set dry state relaxation mollified = 100
 end
 
 
@@ -106,39 +108,67 @@ subsection E - InitialValues
   set direction     = 1, 0
   set perturbation  = 0
 
-  subsection becker solution
-    set density left            = 1
-    set mu                      = 0.01
-    set velocity galilean frame = 0.2
-    set velocity left           = 1
-    set velocity right          = 0.259259
+  subsection circular dam break
+    set dam amplitude     = 2.5
+    set radius            = 2.5
+    set still water depth = 0.5
   end
 
-  subsection contrast
-    set primitive state left  = 1.4, 0, 1
-    set primitive state right = 1.4, 0, 1
+  subsection flow over bump
+    set flow type = transcritical
   end
 
-  subsection isentropic vortex
-    set beta        = 5
-    set mach number = 2
+  subsection paraboloid
+    set eta                 = 0.5
+    set free surface radius = 1
+    set water height        = 0.1
   end
 
-  subsection ramp up
-    set primitive state initial = 1.4, 0, 1
-    set primitive state final   = 1.4, 3, 1
-    set time initial            = 0
-    set time final              = 1
+  subsection ritter dam break
+    set left water depth = 0.005
+    set time initial     = 0.1
   end
 
-  subsection shockfront
-    set mach number     = 2
-    set primitive state = 1.4, 0, 1
+  subsection sloping ramp
+    set inflow              = false
+    set left water depth    = 1.875
+    set length of flat part = 5
+    set ramp slope          = 1
+    set right water depth   = 0
+  end
+
+  subsection solitary wave
+    set amplitude   = 0.2
+    set water depth = 0.5
+  end
+
+  subsection three bumps dam break
+    set cone magnitude            = 1
+    set left water depth          = 1.875
+    set right water depth         = 0
+    set well balancing validation = false
+  end
+
+  subsection triangular dam break
+    set left resevoir depth     = 0.75
+    set left resevoir position  = 0
+    set right resevoir depth    = 0.15
+    set right resevoir position = 14.5
+    set step height             = 0.4
+    set step position           = 13
+    set step width              = 6
   end
 
   subsection uniform
-    set primitive state = 1.4, 3, 1
+    set primitive state = 1, 5
   end
+
+  subsection unsteady vortex
+    set beta            = 0.1
+    set mach number     = 2
+    set reference depth = 1
+  end
+
 end
 
 
@@ -165,13 +195,13 @@ subsection I - VTUOutput
   set manifolds                  =
 
   set schlieren beta             = 10
-  set schlieren quantities       = rho
+  set schlieren quantities       = h
   set schlieren recompute bounds = true
 
   set use mpi io                 = true
 
   set vorticity quantities       =
-  set vtu output quantities      = rho, m_1, m_2, E
+  set vtu output quantities      = h, m_1, m_2, bathymetry
 end
 
 

@@ -26,10 +26,30 @@ end
 
 
 subsection B - Equation
-  set gamma                   = 1.4
+  set equation of state       = polytropic gas
 
   set reference density       = 1
   set vacuum state relaxation = 10000
+
+  subsection jones-wilkins-lee
+    set A     = 0
+    set B     = 0
+    set R1    = 0
+    set R2    = 0
+    set omega = 0.4
+    set rho_0 = 0
+  end
+
+  subsection noble-abel-stiffened gas
+    set co-volume                          = 0
+    set gamma                              = 1.4
+    set reference pressure                 = 0
+    set reference specific internal energy = 0
+  end
+
+  subsection polytropic gas
+    set gamma = 1.4
+  end
 end
 
 
@@ -106,21 +126,14 @@ subsection E - InitialValues
   set direction     = 1, 0
   set perturbation  = 0
 
-  subsection becker solution
-    set density left            = 1
-    set mu                      = 0.01
-    set velocity galilean frame = 0.2
-    set velocity left           = 1
-    set velocity right          = 0.259259
-  end
-
   subsection contrast
-    set primitive state left  = 1.4, 0, 1
-    set primitive state right = 1.4, 0, 1
+    set primitive state left  = 1.4, 0, 2.5
+    set primitive state right = 1.4, 0, 2.5
   end
 
   subsection isentropic vortex
     set beta        = 5
+    set gamma       = 1.4
     set mach number = 2
   end
 
@@ -131,14 +144,10 @@ subsection E - InitialValues
     set time final              = 1
   end
 
-  subsection shockfront
-    set mach number     = 2
-    set primitive state = 1.4, 0, 1
+  subsection uniform
+    set primitive state = 1.4, 3, 2.5
   end
 
-  subsection uniform
-    set primitive state = 1.4, 3, 1
-  end
 end
 
 
