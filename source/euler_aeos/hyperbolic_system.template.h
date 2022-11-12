@@ -27,6 +27,11 @@ namespace ryujin
           "The equation of state. Valid names are given by any of the "
           "subsections defined below");
 
+      //
+      // FIXME: This should not be a parameter but set in
+      // parse_parameters_callback() by querying information from the
+      // selected EOS.
+      //
       b_interp_ = 0.;
       add_parameter("interpolation co-volume",
                     b_interp_,
