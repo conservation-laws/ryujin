@@ -123,7 +123,6 @@ namespace ryujin
                 velocity_left_ * (0.5 - nu) + velocity_right_ * (nu + 0.5);
 
             auto [f, df] = psi(x, v);
-            unsigned int iter = 0;
 
             while (std::abs(f) > norm) {
               const double v_next = v - f / df;
@@ -145,7 +144,6 @@ namespace ryujin
               const auto [new_f, new_df] = psi(x, v);
               f = new_f;
               df = new_df;
-              iter++;
             }
 
             return v;
