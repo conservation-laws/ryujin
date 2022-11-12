@@ -25,13 +25,13 @@ namespace ryujin
           "equation of state",
           equation_of_state_,
           "The equation of state. Valid names are given by any of the "
-          "subsections defined below.");
+          "subsections defined below");
 
       b_interp_ = 0.;
-      add_parameter("interpolant constant b",
+      add_parameter("interpolation co-volume",
                     b_interp_,
-                    "The maximum compressibility constant used to interpolate "
-                    "the co-volume EOS");
+                    "The maximum compressibility constant used for the "
+                    "co-volume EOS interpolation");
 
       reference_density_ = 1.;
       add_parameter("reference density",

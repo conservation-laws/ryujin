@@ -237,18 +237,6 @@ namespace ryujin
 
       /**
        * For a given (2+dim dimensional) state vector <code>U</code>, compute
-       * the (physical) speed of sound:
-       * \f[
-       *   c^2 = \frac{\gamma * p}{\rho\;(1 - b * \rho)}
-       * \f]
-       */
-      template <int problem_dim, typename Number>
-      Number speed_of_sound(const dealii::Tensor<1, problem_dim, Number> &U,
-                            const Number &gamma,
-                            const Number &p) const;
-
-      /**
-       * For a given (2+dim dimensional) state vector <code>U</code>, compute
        * and return the (scaled) specific entropy
        * \f[
        *   e^{(\gamma-1)s} = \frac{\rho\,e}{\rho^\gamma}
@@ -309,18 +297,6 @@ namespace ryujin
        * @name Special functions for boundary states
        */
       //@{
-
-      /**
-       * Decomposes a given state @p U into Riemann invariants and then
-       * replaces the first or second Riemann characteristic from the one
-       * taken from @p U_bar state. Note that the @p U_bar state is just the
-       * prescribed dirichlet values.
-       */
-      template <int component, int problem_dim, typename Number>
-      dealii::Tensor<1, problem_dim, Number> prescribe_riemann_characteristic(
-          const dealii::Tensor<1, problem_dim, Number> &U,
-          const dealii::Tensor<1, problem_dim, Number> &U_bar,
-          const dealii::Tensor<1, problem_dim - 2, Number> &normal) const;
 
       /**
        * Apply boundary conditions.
@@ -749,21 +725,6 @@ namespace ryujin
 
 
     template <int problem_dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number HyperbolicSystem::speed_of_sound(
-        const dealii::Tensor<1, problem_dim, Number> &U,
-        const Number &gamma,
-        const Number &p) const
-    {
-      /* c^2 = gamma * p / rho / (1 - b * rho) */
-
-      using ScalarNumber = typename get_value_type<Number>::type;
-
-      const Number rho_inverse = ScalarNumber(1.) / U[0];
-      return std::sqrt(gamma * p * rho_inverse);
-    }
-
-
-    template <int problem_dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number HyperbolicSystem::specific_entropy(
         const dealii::Tensor<1, problem_dim, Number> &U,
         const Number gamma_min) const
@@ -908,47 +869,8 @@ namespace ryujin
           U[k + 1] = Number(0.);
 
       } else if (id == Boundary::dynamic) {
+        // Not implemented
         __builtin_trap();
-        // FIXME: dynamic boundary conditions require a call to
-        // speed_of_sound(), for this to happen we need to update the API to
-        // chain in precomputed values.
-#if 0
-      /*
-       * On dynamic boundary conditions, we distinguish four cases:
-       *
-       *  - supersonic inflow: prescribe full state
-       *  - subsonic inflow:
-       *      decompose into Riemann invariants and leave R_2
-       *      characteristic untouched.
-       *  - supersonic outflow: do nothing
-       *  - subsonic outflow:
-       *      decompose into Riemann invariants and prescribe incoming
-       *      R_1 characteristic.
-       */
-      const auto m = momentum(U);
-      const auto rho = density(U);
-      const auto a = speed_of_sound(U);
-      const auto vn = m * normal / rho;
-
-      /* Supersonic inflow: */
-      if (vn < -a) {
-        U = get_dirichlet_data();
-      }
-
-      /* Subsonic inflow: */
-      if (vn >= -a && vn <= 0.) {
-        const auto U_dirichlet = get_dirichlet_data();
-        U = prescribe_riemann_characteristic<2>(U_dirichlet, U, normal);
-      }
-
-      /* Subsonic outflow: */
-      if (vn > 0. && vn <= a) {
-        const auto U_dirichlet = get_dirichlet_data();
-        U = prescribe_riemann_characteristic<1>(U, U_dirichlet, normal);
-      }
-
-      /* Supersonic outflow: do nothing, i.e., keep U as is */
-#endif
       }
 
       return U;
