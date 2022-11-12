@@ -864,22 +864,19 @@ namespace ryujin
     {
       const auto rho_new = density(U);
       const auto e_new = internal_energy(U);
-      const auto s_new = specific_entropy(U, Number(7. / 5.)); // FIXME
 
       constexpr auto gt = dealii::SIMDComparison::greater_than;
       using T = Number;
       const auto test =
           dealii::compare_and_apply_mask<gt>(rho_new, T(0.), T(0.), T(-1.)) + //
-          dealii::compare_and_apply_mask<gt>(e_new, T(0.), T(0.), T(-1.)) +   //
-          dealii::compare_and_apply_mask<gt>(s_new, T(0.), T(0.), T(-1.));
+          dealii::compare_and_apply_mask<gt>(e_new, T(0.), T(0.), T(-1.));
 
 #ifdef DEBUG_OUTPUT
       if (!(test == Number(0.))) {
         std::cout << std::fixed << std::setprecision(16);
-        std::cout << "Bounds violation: Negative state [rho, e, s] detected!\n";
+        std::cout << "Bounds violation: Negative state [rho, e] detected!\n";
         std::cout << "\t\trho: " << rho_new << "\n";
         std::cout << "\t\tint: " << e_new << "\n";
-        std::cout << "\t\tent: " << s_new << "\n" << std::endl;
       }
 #endif
 
