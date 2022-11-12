@@ -26,19 +26,21 @@ namespace ryujin
           this->add_parameter("gamma", gamma_, "The ratio of specific heats");
         }
 
-        /* Pressure oracle */
-        virtual double
-        pressure_oracle(const double /*rho*/,
-                        const double internal_energy) final override
+
+        virtual double pressure(const double /*rho*/,
+                                const double internal_energy) final override
         {
-          /* p = (\gamma - 1) * \rho * e */
+          /*
+           * p = (\gamma - 1) * \rho * e
+           */
 
           return (gamma_ - 1.) * internal_energy;
         }
 
-        /* Sie from rho and p */
-        virtual double sie_from_rho_p(const double rho,
-                                      const double pressure) final override
+
+        virtual double
+        specific_internal_energy(const double rho,
+                                 const double pressure) final override
         {
           const double denom = rho * (gamma_ - 1.);
           return pressure / denom;
@@ -48,5 +50,5 @@ namespace ryujin
         double gamma_;
       };
     } // namespace EquationOfStateLibrary
-  } // namespace EulerAEOS
+  }   // namespace EulerAEOS
 } // namespace ryujin

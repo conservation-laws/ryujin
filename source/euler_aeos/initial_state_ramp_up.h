@@ -86,5 +86,5 @@ namespace ryujin
         Number t_final_;
       };
     } // namespace InitialStateLibrary
-  } // namespace EulerAEOS
+  }   // namespace EulerAEOS
 } // namespace ryujin

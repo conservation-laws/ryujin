@@ -59,8 +59,8 @@ namespace ryujin
       bool initialized = false;
       for (auto &it : equation_of_state_list_)
         if (it->name() == equation_of_state_) {
-          pressure_oracle_ = [&it](double rho, double e) {
-            return it->pressure_oracle(rho, e);
+          pressure_ = [&it](double rho, double e) {
+            return it->pressure(rho, e);
           };
 
           problem_name =

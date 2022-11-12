@@ -199,7 +199,8 @@ namespace ryujin
     };
 
 
-    /* Main inline definitions for RiemannSolver */
+    /* Inline definitions */
+
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto

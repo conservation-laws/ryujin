@@ -178,8 +178,7 @@ namespace ryujin
        * the pressure oracle and return \f$p\f$.
        */
       template <int problem_dim, typename Number>
-      Number
-      pressure_oracle(const dealii::Tensor<1, problem_dim, Number> &U) const;
+      Number pressure(const dealii::Tensor<1, problem_dim, Number> &U) const;
 
       //@}
       /**
@@ -569,7 +568,7 @@ namespace ryujin
 
       std::set<std::unique_ptr<EquationOfState>> equation_of_state_list_;
 
-      std::function<double(const double, const double)> pressure_oracle_;
+      std::function<double(const double, const double)> pressure_;
 
       //@}
     };
@@ -598,7 +597,7 @@ namespace ryujin
       const auto U_i = U.template get_tensor<Number>(i);
 
       if constexpr (cycle == 0) {
-        const auto p_i = pressure_oracle(U_i);
+        const auto p_i = pressure(U_i);
         const auto gamma_i = surrogate_gamma(U_i, p_i);
         const precomputed_type<dim, Number> prec_i{
             p_i, gamma_i, Number(0.), Number(0.)};
@@ -725,7 +724,7 @@ namespace ryujin
 
 
     template <int problem_dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number HyperbolicSystem::pressure_oracle(
+    DEAL_II_ALWAYS_INLINE inline Number HyperbolicSystem::pressure(
         const dealii::Tensor<1, problem_dim, Number> &U) const
     {
       using ScalarNumber = typename get_value_type<Number>::type;
@@ -733,7 +732,7 @@ namespace ryujin
       if constexpr (std::is_same<ScalarNumber, Number>::value) {
         const auto rho = density(U);
         const auto e = internal_energy(U);
-        return pressure_oracle_(rho, e);
+        return pressure_(rho, e);
 
       } else {
         Number result = Number(0.);
@@ -741,7 +740,7 @@ namespace ryujin
         const auto e = internal_energy(U);
 
         for (unsigned int k = 0; k < Number::size(); ++k) {
-          result[k] = pressure_oracle_(rho[k], e[k]);
+          result[k] = pressure_(rho[k], e[k]);
         }
 
         return result;

@@ -81,5 +81,5 @@ namespace ryujin
         Number beta_;
       };
     } // namespace InitialStateLibrary
-  } // namespace EulerAEOS
+  }   // namespace EulerAEOS
 } // namespace ryujin

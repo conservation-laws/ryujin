@@ -44,5 +44,5 @@ namespace ryujin
       }
 
     } // namespace InitialStateLibrary
-  } // namespace EulerAEOS
+  }   // namespace EulerAEOS
 } // namespace ryujin

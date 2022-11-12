@@ -41,13 +41,14 @@ namespace ryujin
           this->add_parameter("rho_0", rho0_, "The reference density");
         }
 
-        /* Pressure oracle */
-        virtual double
-        pressure_oracle(const double rho,
-                        const double internal_energy) final override
+
+        virtual double pressure(const double rho,
+                                const double internal_energy) final override
         {
-          /* p = A(1 - omega / R_1 rho / rho_0) * exp(-R_1 rho_0 / rho) + B(1
-           * - omega / R_2 rho/ rho_0) + omega rho * e */
+          /*
+           * p = A(1 - omega / R_1 rho / rho_0) * exp(-R_1 rho_0 / rho) + B(1
+           * - omega / R_2 rho/ rho_0) + omega rho * e
+           */
 
           const double ratio = rho / rho0_;
 
@@ -60,9 +61,10 @@ namespace ryujin
           return first_term + second_term + omega_ * internal_energy;
         }
 
-        /* Sie from rho and p */
-        virtual double sie_from_rho_p(const double rho,
-                                      const double pressure) final override
+
+        virtual double
+        specific_internal_energy(const double rho,
+                                 const double pressure) final override
         {
           const double ratio = rho / rho0_;
 
@@ -85,5 +87,5 @@ namespace ryujin
         double rho0_;
       };
     } // namespace EquationOfStateLibrary
-  } // namespace EulerAEOS
+  }   // namespace EulerAEOS
 } // namespace ryujin

@@ -46,5 +46,5 @@ namespace ryujin
         dealii::Tensor<1, 3, Number> primitive_;
       };
     } // namespace InitialStateLibrary
-  } // namespace EulerAEOS
+  }   // namespace EulerAEOS
 } // namespace ryujin

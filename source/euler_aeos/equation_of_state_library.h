@@ -7,8 +7,8 @@
 
 #include "equation_of_state.h"
 
-#include "equation_of_state_jwl.h"
-#include "equation_of_state_nasg_gas.h"
+#include "equation_of_state_jones_wilkins_lee.h"
+#include "equation_of_state_noble_abel_stiffened_gas.h"
 #include "equation_of_state_polytropic_gas.h"
 
 namespace ryujin
@@ -32,10 +32,10 @@ namespace ryujin
         };
 
         add(std::make_unique<PolytropicGas>(subsection));
-        add(std::make_unique<NobleAbleStiffenedGas>(subsection));
+        add(std::make_unique<NobleAbelStiffenedGas>(subsection));
         add(std::make_unique<JonesWilkinsLee>(subsection));
       }
 
     } // namespace EquationOfStateLibrary
-  } // namespace EulerAEOS
+  }   // namespace EulerAEOS
 } // namespace ryujin
