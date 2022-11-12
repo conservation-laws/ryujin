@@ -691,8 +691,9 @@ namespace ryujin
           }
 
 #ifdef CHECK_BOUNDS
-          AssertThrow(hyperbolic_system_->is_admissible(U_i_new),
-                      ExcMessage("Low-order state is not admissible!"));
+          if (!hyperbolic_system_->is_admissible(U_i_new)) {
+            restart_needed = true;
+          }
 #endif
 
           new_U.template write_tensor<T>(U_i_new, i);
