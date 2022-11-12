@@ -7,5 +7,9 @@
 
 namespace ryujin
 {
-  const std::string HyperbolicSystem::problem_name = "Shallow water equations";
-} /* namespace ryujin */
+  namespace ShallowWater
+  {
+    const std::string HyperbolicSystem::problem_name =
+        "Shallow water equations";
+  }
+} // namespace ryujin

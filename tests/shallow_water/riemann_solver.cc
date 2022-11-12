@@ -1,4 +1,5 @@
 #include <hyperbolic_system.h>
+#include <multicomponent_vector.h>
 #include <riemann_solver.h>
 #include <riemann_solver.template.h>
 #include <simd.h>
@@ -12,7 +13,13 @@ int main()
 
   HyperbolicSystem hyperbolic_system;
   const double gravity = hyperbolic_system.gravity();
-  RiemannSolver<dim> riemann_solver(hyperbolic_system);
+
+  static constexpr unsigned int n_precomputed_values =
+      HyperbolicSystem::n_precomputed_values<dim>;
+  using precomputed_type = MultiComponentVector<double, n_precomputed_values>;
+  precomputed_type dummy;
+
+  RiemannSolver<dim> riemann_solver(hyperbolic_system, dummy);
 
   const auto riemann_data = [&](const auto &state) {
     const auto h = hyperbolic_system.water_depth_sharp(
@@ -44,9 +51,10 @@ int main()
   std::cout << std::setprecision(16);
   std::cout << std::scientific;
 
-  std::cout << "gravity:               " << gravity << std::endl;
-  std::cout << "reference_water_depth: " << hyperbolic_system.reference_water_depth() << std::endl;
-  std::cout << "dry_state_relaxation:  " << hyperbolic_system.dry_state_relaxation() << std::endl;
+  std::cout << "gravity:                      " << gravity << std::endl;
+  std::cout << "reference_water_depth:        " << hyperbolic_system.reference_water_depth() << std::endl;
+  std::cout << "dry_state_relaxation (sharp): " << hyperbolic_system.dry_state_relaxation_mollified() << std::endl;
+  std::cout << "dry_state_relaxation (molli): " << hyperbolic_system.dry_state_relaxation_sharp() << std::endl;
   std::cout << std::endl;
 
   // 10/04/2022 verified against Mathematica computation (Eric + Matthias)
