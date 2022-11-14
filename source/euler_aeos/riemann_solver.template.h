@@ -277,16 +277,13 @@ namespace ryujin
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
-      /* First we get left and right states */
       const auto &[rho_i, u_i, p_i, gamma_i] = riemann_data_i;
       const auto &[rho_j, u_j, p_j, gamma_j] = riemann_data_j;
 
-      /* First get p_min, p_max */
       const Number p_min = std::min(p_i, p_j);
       const Number p_max = std::max(p_i, p_j);
 
       const Number phi_p_max = phi_of_p(riemann_data_i, riemann_data_j, p_max);
-
       const Number phi_p_min = phi_of_p(riemann_data_i, riemann_data_j, p_min);
 
       Number p_star_tilde = Number(0.);

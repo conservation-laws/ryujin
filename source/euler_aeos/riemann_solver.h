@@ -210,7 +210,7 @@ namespace ryujin
         const dealii::Tensor<1, dim, Number> &n_ij) const -> primitive_type
     {
       const auto rho = hyperbolic_system.density(U);
-      const auto rho_inverse = Number(1.0) / rho;
+      const auto rho_inverse = ScalarNumber(1.0) / rho;
 
       const auto m = hyperbolic_system.momentum(U);
       const auto proj_m = n_ij * m;
@@ -219,9 +219,7 @@ namespace ryujin
       const auto E = hyperbolic_system.total_energy(U) -
                      Number(0.5) * perp.norm_square() * rho_inverse;
 
-      const auto state =
-          HyperbolicSystem::state_type<1, Number>({rho, proj_m, E});
-      const auto gamma_ = hyperbolic_system.surrogate_gamma(state, p);
+      const auto gamma = hyperbolic_system.surrogate_gamma(U, p);
 
 #ifdef CHECK_BOUNDS
       AssertThrowSIMD(
@@ -236,12 +234,12 @@ namespace ryujin
           dealii::ExcMessage(" 1. - b * rho <= 0."));
 
       AssertThrowSIMD(
-          gamma_ - Number(1.),
+          gamma - Number(1.),
           [](auto val) { return val > ScalarNumber(0.); },
-          dealii::ExcMessage(" gamma_ <= 1. "));
+          dealii::ExcMessage(" gamma <= 1. "));
 #endif
 
-      return {{rho, proj_m * rho_inverse, p, gamma_}};
+      return {{rho, proj_m * rho_inverse, p, gamma}};
     }
 
 
