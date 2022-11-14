@@ -37,7 +37,7 @@ namespace ryujin
       static constexpr unsigned int problem_dimension =
           HyperbolicSystem::problem_dimension<dim>;
 
-      static constexpr unsigned int riemann_data_size = 4;
+      static constexpr unsigned int riemann_data_size = 5;
       using primitive_type = std::array<Number, riemann_data_size>;
 
       /**
@@ -108,12 +108,13 @@ namespace ryujin
       /**
        * FIXME
        */
-      Number compute_alpha(const primitive_type &riemann_data) const;
+      Number
+      alpha(const Number &rho, const Number &gamma, const Number &a) const;
 
       /**
        * FIXME
        */
-      Number compute_c(const Number gamma_Z) const;
+      Number c(const Number gamma_Z) const;
 
       /**
        * FIXME
@@ -214,12 +215,12 @@ namespace ryujin
 
       const auto m = hyperbolic_system.momentum(U);
       const auto proj_m = n_ij * m;
-      const auto perp = m - proj_m * n_ij;
-
-      const auto E = hyperbolic_system.total_energy(U) -
-                     Number(0.5) * perp.norm_square() * rho_inverse;
 
       const auto gamma = hyperbolic_system.surrogate_gamma(U, p);
+
+      const ScalarNumber b_interp = hyperbolic_system.b_interp();
+      const Number x = Number(1.) - b_interp * rho;
+      const Number a = std::sqrt(gamma * p / (rho * x));
 
 #ifdef CHECK_BOUNDS
       AssertThrowSIMD(
@@ -239,7 +240,7 @@ namespace ryujin
           dealii::ExcMessage(" gamma <= 1. "));
 #endif
 
-      return {{rho, proj_m * rho_inverse, p, gamma}};
+      return {{rho, proj_m * rho_inverse, p, gamma, a}};
     }
 
 
