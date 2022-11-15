@@ -40,7 +40,38 @@ namespace ryujin
      *    wavespeed.
      *
      *    If p_2 > p_min then a more pessimistic bound is computed.
+     *
+     *  - FIXME: Simplification in p_star_RS
      */
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline Number
+    RiemannSolver<dim, Number>::c(const Number gamma) const
+    {
+      using ScalarNumber = typename get_value_type<Number>::type;
+
+      /*
+       * We implement the continuous and monotonic function and continuous
+       * function:
+       *
+       *   c(gamma)^2 = 1                                  for gamma <= 5 / 3
+       *   c(gamma)^2 = (3 * gamma + 11) / (6 * gamma + 6) in between
+       *   c(gamma)^2 = 5 / 6                              for gamma > 3
+       *
+       * Due to the fact that the function is monotonic we can simply clip
+       * the values without checking the conditions:
+       */
+
+      Number radicand = (ScalarNumber(3.) * gamma + Number(11.)) /
+                        (ScalarNumber(6.) * gamma + Number(6.));
+
+      radicand = std::min(Number(1.), radicand);
+      radicand = std::max(Number(5. / 6.), radicand);
+
+      return std::sqrt(radicand);
+    }
+
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number RiemannSolver<dim, Number>::alpha(
@@ -60,32 +91,7 @@ namespace ryujin
 
 
     template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    RiemannSolver<dim, Number>::c(const Number gamma_Z) const
-    {
-      using ScalarNumber = typename get_value_type<Number>::type;
-
-      Number radicand = (ScalarNumber(3.) * gamma_Z + Number(11.)) /
-                        (ScalarNumber(6.) * (gamma_Z + Number(1.)));
-      const Number false_value = std::sqrt(radicand);
-
-      Number c_of_gamma = dealii::compare_and_apply_mask<
-          dealii::SIMDComparison::less_than_or_equal>(
-          gamma_Z, Number(5. / 3.), Number(1.), false_value);
-
-      const Number true_value = Number(0.5 * std::sqrt(2.));
-
-      c_of_gamma = dealii::compare_and_apply_mask<
-          dealii::SIMDComparison::greater_than_or_equal>(
-          gamma_Z, Number(3.), true_value, c_of_gamma);
-
-      return c_of_gamma;
-    }
-
-
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    RiemannSolver<dim, Number>::p_star_RS_aeos(
+    DEAL_II_ALWAYS_INLINE inline Number RiemannSolver<dim, Number>::p_star_RS(
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
@@ -119,11 +125,11 @@ namespace ryujin
           dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
               p_i, p_j, alpha_i, alpha_j);
 
+      const Number alpha_hat_min = c(gamma_min) * alpha_min;
+
       const Number alpha_max = dealii::compare_and_apply_mask<
           dealii::SIMDComparison::greater_than_or_equal>(
           p_i, p_j, alpha_i, alpha_j);
-
-      const Number c_gamma_min = c(gamma_min);
 
       const Number exp_min =
           ScalarNumber(2.) * gamma_min / (gamma_min - Number(1.));
@@ -135,17 +141,14 @@ namespace ryujin
           alpha_max * (Number(1.) - ryujin::vec_pow(p_min / p_max, exp_max)) -
           (u_j - u_i);
 
-      const Number denominator = c_gamma_min * alpha_min;
-
-      const Number base = numerator / denominator + Number(1.);
+      const Number base = numerator / alpha_hat_min + Number(1.);
 
       return p_min * ryujin::vec_pow(base, exp_min);
     }
 
 
     template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    RiemannSolver<dim, Number>::p_star_SS_aeos(
+    DEAL_II_ALWAYS_INLINE inline Number RiemannSolver<dim, Number>::p_star_SS(
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
@@ -260,13 +263,13 @@ namespace ryujin
       const Number p_max = std::max(p_i, p_j);
       const Number phi_p_max = phi_of_p_max(riemann_data_i, riemann_data_j);
 
-      const Number p_star_SS = p_star_SS_aeos(riemann_data_i, riemann_data_j);
+      const Number p_SS = p_star_SS(riemann_data_i, riemann_data_j);
 
-      const Number p_star_RS = p_star_RS_aeos(riemann_data_i, riemann_data_j);
+      const Number p_RS = p_star_RS(riemann_data_i, riemann_data_j);
 
       const Number p_2 =
           dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-              phi_p_max, Number(0.), p_star_SS, std::min(p_max, p_star_RS));
+              phi_p_max, Number(0.), p_SS, std::min(p_max, p_RS));
 
       return compute_lambda(riemann_data_i, riemann_data_j, p_2);
     }

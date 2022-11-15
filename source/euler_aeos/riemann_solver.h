@@ -108,25 +108,25 @@ namespace ryujin
       /**
        * FIXME
        */
+      Number c(const Number gamma_Z) const;
+
+      /**
+       * FIXME
+       */
       Number
       alpha(const Number &rho, const Number &gamma, const Number &a) const;
 
       /**
        * FIXME
        */
-      Number c(const Number gamma_Z) const;
+      Number p_star_RS(const primitive_type &riemann_data_i,
+                       const primitive_type &riemann_data_j) const;
 
       /**
        * FIXME
        */
-      Number p_star_RS_aeos(const primitive_type &riemann_data_i,
-                            const primitive_type &riemann_data_j) const;
-
-      /**
-       * FIXME
-       */
-      Number p_star_SS_aeos(const primitive_type &riemann_data_i,
-                            const primitive_type &riemann_data_j) const;
+      Number p_star_SS(const primitive_type &riemann_data_i,
+                       const primitive_type &riemann_data_j) const;
 
 
       /**
