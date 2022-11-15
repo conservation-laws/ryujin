@@ -85,7 +85,7 @@ namespace ryujin
       return c_of_gamma;
     }
 
-    /* For p_star in the Expansion/Shock case. Pessimistic approximation */
+
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
     RiemannSolver<dim, Number>::p_star_RS_aeos(
@@ -145,6 +145,7 @@ namespace ryujin
       return p_min * ryujin::vec_pow(base, exp_min);
     }
 
+
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
     RiemannSolver<dim, Number>::p_star_SS_aeos(
@@ -176,49 +177,36 @@ namespace ryujin
       return ryujin::vec_pow(base, exp_inv);
     }
 
+
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
-    RiemannSolver<dim, Number>::f(const primitive_type &primitive_state,
-                                  const Number p_star) const
+    RiemannSolver<dim, Number>::phi_of_p_max(
+        const primitive_type &riemann_data_i,
+        const primitive_type &riemann_data_j) const
     {
       using ScalarNumber = typename get_value_type<Number>::type;
       const ScalarNumber b_interp = hyperbolic_system.b_interp();
 
-      const auto &[rho, u, p, gamma, a] = primitive_state;
+      const auto &[rho_i, u_i, p_i, gamma_i, a_i] = riemann_data_i;
+      const auto &[rho_j, u_j, p_j, gamma_j, a_j] = riemann_data_j;
 
-      const Number g_minus_one = gamma - Number(1.);
-      const Number g_plus_one = gamma + Number(1.);
+      const Number p_max = std::max(p_i, p_j);
 
-      const Number one_minus_b_rho = Number(1.) - b_interp * rho;
+      const Number radicand_inverse_i =
+          ScalarNumber(0.5) * rho_i / (Number(1.) - b_interp * rho_i) *
+          ((gamma_i + Number(1.)) * p_max + (gamma_i - Number(1.)) * p_i);
 
-      const Number Az =
-          ScalarNumber(2.) * one_minus_b_rho / (rho * (g_plus_one));
-      const Number Bz = g_minus_one / g_plus_one * p;
-      const Number radicand = Az / (p_star + Bz);
+      const Number value_i = (p_max - p_i) / std::sqrt(radicand_inverse_i);
 
-      const Number true_value = (p_star - p) * std::sqrt(radicand);
+      const Number radicand_jnverse_j =
+          ScalarNumber(0.5) * rho_j / (Number(1.) - b_interp * rho_j) *
+          ((gamma_j + Number(1.)) * p_max + (gamma_j - Number(1.)) * p_j);
 
-      const auto exponent = ScalarNumber(0.5) * g_minus_one / gamma;
-      const Number factor = ryujin::vec_pow(p_star / p, exponent) - Number(1.);
-      const auto false_value =
-          ScalarNumber(2.) * a * one_minus_b_rho * factor / g_minus_one;
+      const Number value_j = (p_max - p_j) / std::sqrt(radicand_jnverse_j);
 
-      return dealii::compare_and_apply_mask<
-          dealii::SIMDComparison::greater_than_or_equal>(
-          p_star, p, true_value, false_value);
+      return value_i + value_j + u_j - u_i;
     }
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    RiemannSolver<dim, Number>::phi_of_p(const primitive_type &riemann_data_i,
-                                         const primitive_type &riemann_data_j,
-                                         const Number p_in) const
-    {
-      const Number &u_i = riemann_data_i[1];
-      const Number &u_j = riemann_data_j[1];
-
-      return f(riemann_data_i, p_in) + f(riemann_data_j, p_in) + u_j - u_i;
-    }
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
@@ -235,6 +223,7 @@ namespace ryujin
       return u - a * std::sqrt(Number(1.) + factor * tmp);
     }
 
+
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
     RiemannSolver<dim, Number>::lambda3_plus(const primitive_type &riemann_data,
@@ -250,6 +239,7 @@ namespace ryujin
       return u + a * std::sqrt(Number(1.) + factor * tmp);
     }
 
+
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
     RiemannSolver<dim, Number>::compute_lambda(
@@ -263,6 +253,7 @@ namespace ryujin
       return std::max(positive_part(nu_32), negative_part(nu_11));
     }
 
+
     template <int dim, typename Number>
     Number RiemannSolver<dim, Number>::compute(
         const primitive_type &riemann_data_i,
@@ -272,7 +263,7 @@ namespace ryujin
       const auto &[rho_j, u_j, p_j, gamma_j, a_j] = riemann_data_j;
 
       const Number p_max = std::max(p_i, p_j);
-      const Number phi_p_max = phi_of_p(riemann_data_i, riemann_data_j, p_max);
+      const Number phi_p_max = phi_of_p_max(riemann_data_i, riemann_data_j);
 
       const Number p_star_SS = p_star_SS_aeos(riemann_data_i, riemann_data_j);
 

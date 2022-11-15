@@ -134,16 +134,8 @@ namespace ryujin
        *
        * Cost: ???
        */
-      Number f(const primitive_type &riemann_data, const Number p_star) const;
-
-      /**
-       * See [Tabulated paper], page ???
-       *
-       * Cost: ???
-       */
-      Number phi_of_p(const primitive_type &riemann_data_i,
-                      const primitive_type &riemann_data_j,
-                      const Number p_in) const;
+      Number phi_of_p_max(const primitive_type &riemann_data_i,
+                          const primitive_type &riemann_data_j) const;
 
 
       /**
