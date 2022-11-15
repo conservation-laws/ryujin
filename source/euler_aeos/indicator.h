@@ -130,6 +130,12 @@ namespace ryujin
       void reset(const unsigned int i, const state_type &U_i);
 
       /**
+       * When considering arbitrary equations of state, a surrogate flux is used
+       * to compute the indicator.
+       */
+      flux_type surrogate_flux(const state_type &U, const Number &gamma_min);
+
+      /**
        * When looping over the sparsity row, add the contribution associated
        * with the neighboring state U_j.
        */
@@ -169,6 +175,38 @@ namespace ryujin
 
     /* Inline definitions */
 
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline HyperbolicSystem::flux_type<dim, Number>
+    Indicator<dim, Number>::surrogate_flux(const state_type &U,
+                                           const Number &gamma_min)
+    {
+      using ScalarNumber = typename get_value_type<Number>::type;
+
+      const Number rho = U[0];
+      const Number rho_inverse = ScalarNumber(1.) / U[0];
+
+      const auto m = hyperbolic_system.momentum(U);
+      const Number E = U[dim + 1];
+
+      /* Define "tabulated" pressure */
+      const Number numerator = hyperbolic_system.internal_energy(U);
+      const Number denominator =
+          Number(1.) - ScalarNumber(hyperbolic_system.b_interp()) * rho;
+      const Number p = (gamma_min - Number(1.)) * numerator / denominator;
+
+      /* Define surrogate flux */
+      flux_type result;
+
+      result[0] = m;
+      for (unsigned int i = 0; i < dim; ++i) {
+        result[1 + i] = m * (m[i] * rho_inverse);
+        result[1 + i][i] += p;
+      }
+      result[dim + 1] = m * (rho_inverse * (E + p));
+
+      return result;
+    }
+
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline void
@@ -186,7 +224,7 @@ namespace ryujin
       d_eta_i =
           hyperbolic_system.harten_entropy_derivative(U_i, new_gamma_min_i);
       d_eta_i[0] -= eta_i * rho_i_inverse;
-      f_i = hyperbolic_system.f(U_i, new_p_i);
+      f_i = surrogate_flux(U_i, new_gamma_min_i);
 
       left = 0.;
       right = 0.;
@@ -208,7 +246,7 @@ namespace ryujin
       const auto rho_j_inverse = Number(1.) / rho_j;
 
       const auto m_j = hyperbolic_system.momentum(U_j);
-      const auto f_j = hyperbolic_system.f(U_j, p_j);
+      const auto f_j = surrogate_flux(U_j, gamma_min_j);
 
       left += (eta_j * rho_j_inverse - eta_i * rho_i_inverse) * (m_j * c_ij);
       for (unsigned int k = 0; k < problem_dimension; ++k)

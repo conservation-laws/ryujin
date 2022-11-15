@@ -251,7 +251,7 @@ namespace ryujin
        * For a given (2+dim dimensional) state vector <code>U</code>, compute
        * and return the Harten-type entropy
        * \f[
-       *   \eta = (\rho^2 e) ^ {1 / (\gamma + 1)}.
+       *   \eta = (\rho^2 e * (1 - b_interp * \rho))^{1 / (\gamma + 1)}.
        * \f]
        */
       template <int problem_dim, typename Number>
@@ -262,7 +262,13 @@ namespace ryujin
        * For a given (2+dim dimensional) state vector <code>U</code>, compute
        * and return the derivative \f$\eta'\f$ of the Harten-type entropy
        * \f[
-       *   \eta = (\rho^2 e) ^ {1 / (\gamma + 1)}.
+       *   \eta = (\rho^2 e * (1 - b_interp * \rho))^{1 / (\gamma + 1)},
+       * \f]
+       *
+       * with
+       *
+       * \f[
+       *   \eta' = (FIXME)^T
        * \f]
        */
       template <int problem_dim, typename Number>
@@ -743,7 +749,7 @@ namespace ryujin
         const dealii::Tensor<1, problem_dim, Number> &U,
         const Number gamma_min) const
     {
-      /* rho^2 e = \rho E - 1/2*m^2 */
+      /* FIXME */
 
       constexpr int dim = problem_dim - 2;
       using ScalarNumber = typename get_value_type<Number>::type;
@@ -754,8 +760,12 @@ namespace ryujin
 
       const Number rho_rho_e = rho * E - ScalarNumber(0.5) * m.norm_square();
 
-      return ryujin::vec_pow(rho_rho_e,
-                             ScalarNumber(1.) / (gamma_min + Number(1.)));
+      const Number x = Number(1.) - Number(b_interp_) * rho;
+      const Number cov_term = ryujin::vec_pow(x, gamma_min - Number(1.));
+
+      const Number exponent = ScalarNumber(1.) / (gamma_min + Number(1.));
+
+      return ryujin::vec_pow(rho_rho_e * cov_term, exponent);
     }
 
 
@@ -767,13 +777,12 @@ namespace ryujin
     {
       /*
        * With
-       *   eta = (rho^2 e) ^ 1/(gamma+1)
-       *   rho^2 e = rho * E - 1/2 |m|^2
+       *   \eta = (\rho^2 e * (1 - b_interp * \rho)) ^ {1 / (\gamma + 1)},
+       *   rho^2 e = rho * E - 1/2 |m|^2,
        *
        * we get
        *
-       *   eta' = 1/(gamma+1) * (rho^2 e) ^ -gamma/(gamma+1) * ( E , -m , rho
-       * )^T
+       *   eta' = FIXME
        */
 
       constexpr int dim = problem_dim - 2;
@@ -782,21 +791,32 @@ namespace ryujin
       const Number rho = U[0];
       const auto m = momentum(U);
       const Number E = U[dim + 1];
-
       const Number rho_rho_e = rho * E - ScalarNumber(0.5) * m.norm_square();
 
       const auto gamma_plus_one_inverse =
           ScalarNumber(1.) / (gamma_min + Number(1.));
-      const auto factor =
-          gamma_plus_one_inverse *
-          ryujin::vec_pow(rho_rho_e, -gamma_min * gamma_plus_one_inverse);
 
+      const Number x = Number(1.) - Number(b_interp_) * rho;
+      const Number x_inverse = Number(1.) / x;
+      const Number covolume_term = ryujin::vec_pow(x, gamma_min - Number(1.));
+
+      /* Not sure if to compute directly or call harten_entropy() function? */
+      const Number eta =
+          ryujin::vec_pow(rho_rho_e * covolume_term, gamma_plus_one_inverse);
+
+      const Number factor = gamma_plus_one_inverse * covolume_term *
+                            ryujin::vec_pow(eta, -gamma_min);
+
+      /* Store eta' result */
       dealii::Tensor<1, problem_dim, Number> result;
 
-      result[0] = factor * E;
+      result[0] = factor * (E - Number(b_interp_) * (gamma_min - Number(1.)) *
+                                    rho_rho_e * x_inverse);
+
       for (unsigned int i = 0; i < dim; ++i) {
         result[1 + i] = -factor * m[i];
       }
+
       result[dim + 1] = factor * rho;
 
       return result;
