@@ -221,21 +221,17 @@ namespace ryujin
       const Number a = std::sqrt(gamma * p / (rho * x));
 
 #ifdef CHECK_BOUNDS
-      AssertThrowSIMD(
-          Number(p),
-          [](auto val) { return val > ScalarNumber(0.); },
-          dealii::ExcMessage("Internal error: p <= 0."));
+      AssertThrowSIMD(Number(p),
+                      [](auto val) { return val > ScalarNumber(0.); },
+                      dealii::ExcMessage("Internal error: p <= 0."));
 
-      const Number x = Number(1.) - hyperbolic_system.b_interp() * rho;
-      AssertThrowSIMD(
-          x,
-          [](auto val) { return val > ScalarNumber(0.); },
-          dealii::ExcMessage("Internal error: 1. - b * rho <= 0."));
+      AssertThrowSIMD(x,
+                      [](auto val) { return val > ScalarNumber(0.); },
+                      dealii::ExcMessage("Internal error: 1. - b * rho <= 0."));
 
-      AssertThrowSIMD(
-          gamma,
-          [](auto val) { return val > ScalarNumber(1.); },
-          dealii::ExcMessage("Internal error: gamma <= 1."));
+      AssertThrowSIMD(gamma,
+                      [](auto val) { return val > ScalarNumber(1.); },
+                      dealii::ExcMessage("Internal error: gamma <= 1."));
 #endif
 
       return {{rho, proj_m * rho_inverse, p, gamma, a}};
