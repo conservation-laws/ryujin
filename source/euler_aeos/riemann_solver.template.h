@@ -17,16 +17,33 @@ namespace ryujin
   namespace EulerAEOS
   {
     /*
-     * This is a modification of the RiemannSolver Class in ryujin/euler. We
-     * refer the reader to:
+     * The RiemannSolver is a guaranteed maximal wavespeed (GMS) estimate
+     * for the extended Riemann problem outlined in
+     * @cite ClaytonGuermondPopov-2022.
      *
-     * Invariant Domain-Preserving approximations for the Euler equations
-     * with tabulated equation of state, Bennett Clayton, Jean-Luc Guermond,
-     * and Bojan * Popov, SIAM Journal on Scientific Computing 2022 44:1,
-     * A444-A470
+     * In contrast to the algorithm outlined in above reference the
+     * algorithm takes a couple of shortcuts to significantly decrease the
+     * computational footprint. These simplifications still guarantee that
+     * we have an upper bound on the maximal wavespeed - but the number
+     * bound might be larger. In particular:
+     *
+     *  - We will assume that the nonvaccum condition holds true, i.e.,
+     *    phi(0) < 0.
+     *
+     *  - We do not check and treat the case phi(p_min) > 0. This
+     *    corresponds to two expansion waves, see §5.2 in the reference. In
+     *    this case we have
+     *
+     *      0 < p_star < p_min <= p_max.
+     *
+     *    And due to the fact that p_star < p_min the wavespeeds reduce to
+     *    a left wavespeed v_L - a_L and right wavespeed v_R + a_R. This
+     *    implies that it is sufficient to set p_2 to ANY value provided
+     *    that p_2 <= p_min hold true in order to compute the correct
+     *    wavespeed.
+     *
+     *    If p_2 > p_min then a more pessimistic bound is computed.
      */
-
-    /* Compute \alpha_Z / c(\gamma_Z) function */
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number RiemannSolver<dim, Number>::alpha(
@@ -44,7 +61,6 @@ namespace ryujin
       return numerator / denominator;
     }
 
-    /* Compute c(\gamma_Z) function */
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
@@ -83,13 +99,13 @@ namespace ryujin
       const auto alpha_i = alpha(rho_i, gamma_i, a_i);
       const auto alpha_j = alpha(rho_j, gamma_j, a_j);
 
-      //
-      // First get p_min, p_max.
-      //
-      // Then, we get gamma_min/max, and alpha_min/max. Note that the
-      // *_min/max values are associated with p_min/max and are not
-      // necessarily the minimum/maximum of *_i vs *_j.
-      //
+      /*
+       * First get p_min, p_max.
+       *
+       * Then, we get gamma_min/max, and alpha_min/max. Note that the
+       * *_min/max values are associated with p_min/max and are not
+       * necessarily the minimum/maximum of *_i vs *_j.
+       */
 
       const Number p_min = std::min(p_i, p_j);
       const Number p_max = std::max(p_i, p_j);
@@ -255,32 +271,16 @@ namespace ryujin
       const auto &[rho_i, u_i, p_i, gamma_i, a_i] = riemann_data_i;
       const auto &[rho_j, u_j, p_j, gamma_j, a_j] = riemann_data_j;
 
-      const Number p_min = std::min(p_i, p_j);
       const Number p_max = std::max(p_i, p_j);
-
       const Number phi_p_max = phi_of_p(riemann_data_i, riemann_data_j, p_max);
-      const Number phi_p_min = phi_of_p(riemann_data_i, riemann_data_j, p_min);
-
-      Number p_star_tilde = Number(0.);
-
-      const Number p_star_RS = p_star_RS_aeos(riemann_data_i, riemann_data_j);
 
       const Number p_star_SS = p_star_SS_aeos(riemann_data_i, riemann_data_j);
 
-      p_star_tilde = dealii::compare_and_apply_mask<
-          dealii::SIMDComparison::greater_than_or_equal>(
-          phi_p_max, Number(0.), p_star_RS, p_star_SS);
-
-      p_star_tilde = dealii::compare_and_apply_mask<
-          dealii::SIMDComparison::greater_than_or_equal>(
-          phi_p_min, Number(0.), Number(0.), p_star_tilde);
+      const Number p_star_RS = p_star_RS_aeos(riemann_data_i, riemann_data_j);
 
       const Number p_2 =
           dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-              phi_p_max,
-              Number(0.),
-              p_star_tilde,
-              std::min(p_max, p_star_tilde));
+              phi_p_max, Number(0.), p_star_SS, std::min(p_max, p_star_RS));
 
       return compute_lambda(riemann_data_i, riemann_data_j, p_2);
     }

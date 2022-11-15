@@ -183,21 +183,27 @@ namespace ryujin
         const primitive_type &riemann_data_j) const
     {
       /*
-       * We need a good upper and lower bound, p_1 < p_star < p_2, for
-       * finding phi(p_star) == 0. This implies that we have to ensure that
+       * For exactly solving the Riemann problem we need to start with a
+       * good upper and lower bound, p_1 <= p_star <= p_2, for finding
+       * phi(p_star) == 0. This implies that we have to ensure that
        * phi(p_2) >= 0 and phi(p_1) <= 0.
+       *
+       * Instead of solving the Riemann problem exactly, however we will
+       * simply use the upper bound p_2 (with p_2 >= p_star) to compute
+       * lambda_max and return the estimate.
        *
        * We will use three candidates, p_min, p_max and the two rarefaction
        * approximation p_star_tilde. We have (up to round-off errors) that
-       * phi(p_star_tilde) >= 0. So this is a safe upper bound.
+       * phi(p_star_tilde) >= 0. So this is a safe upper bound, it might
+       * just be too large.
        *
        * Depending on the sign of phi(p_max) we select the following ranges:
        *
-       * phi(p_max) <  0:
-       *   p_1  <-  p_max   and   p_2  <-  p_star_tilde
+       *   phi(p_max) <  0:
+       *     p_1  <-  p_max   and   p_2  <-  p_star_tilde
        *
-       * phi(p_max) >= 0:
-       *   p_1  <-  p_min   and   p_2  <-  min(p_max, p_star_tilde)
+       *   phi(p_max) >= 0:
+       *     p_1  <-  p_min   and   p_2  <-  min(p_max, p_star_tilde)
        *
        * Nota bene:
        *
@@ -205,16 +211,22 @@ namespace ryujin
        *    contained in the second condition.
        *
        *  - In principle, we would have to treat the case phi(p_min) > 0 as
-       *    well. This corresponds to two expansion waves and a good estimate
-       *    for the wavespeed is obtained by setting p_star = 0 and computing
-       *    lambda_max with that. However, it turns out that numerically in
-       *    this case the two-rarefaction approximation p_star_tilde is
-       *    already an excellent guess and we will have
+       *    well. This corresponds to two expansion waves and a good
+       *    estimate for the wavespeed is obtained by simply computing
+       *    lambda_max with p_2 = 0.
+       *
+       *    However, it turns out that numerically in this case we will
+       *    have
        *
        *      0 < p_star <= p_star_tilde <= p_min <= p_max.
        *
-       *    So let's simply detect this case numerically by checking for p_2 <
-       *    p_1 and setting p_1 <- 0 if necessary.
+       *    So it is sufficient to end up with p_2 = p_star_tilde (!!) to
+       *    compute the exact same wave speed as for p_2 = 0.
+       *
+       *    Note: If for some reason p_star should be computed exactly,
+       *    then p_1 has to be set to zero. This can be done efficiently by
+       *    simply checking for p_2 < p_1 and setting p_1 <- 0 if
+       *    necessary.
        */
 
       const Number p_max = std::max(riemann_data_i[2], riemann_data_j[2]);
@@ -224,7 +236,7 @@ namespace ryujin
 
       const Number phi_p_max = phi_of_p_max(riemann_data_i, riemann_data_j);
 
-      Number p_2 =
+      const Number p_2 =
           dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
               phi_p_max,
               Number(0.),
