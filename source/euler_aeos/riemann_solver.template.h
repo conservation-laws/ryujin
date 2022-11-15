@@ -117,10 +117,6 @@ namespace ryujin
           dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
               p_i, p_j, gamma_i, gamma_j);
 
-      const Number gamma_max = dealii::compare_and_apply_mask<
-          dealii::SIMDComparison::greater_than_or_equal>(
-          p_i, p_j, gamma_i, gamma_j);
-
       const Number alpha_min =
           dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
               p_i, p_j, alpha_i, alpha_j);
@@ -131,12 +127,12 @@ namespace ryujin
           dealii::SIMDComparison::greater_than_or_equal>(
           p_i, p_j, alpha_i, alpha_j);
 
+#if 0
       const Number exp_min =
           ScalarNumber(2.) * gamma_min / (gamma_min - Number(1.));
       const Number exp_max =
           (gamma_max - Number(1.)) / (ScalarNumber(2.) * gamma_max);
 
-      /* Then we can compute p_star_RS */
       const Number numerator =
           alpha_max * (Number(1.) - ryujin::vec_pow(p_min / p_max, exp_max)) -
           (u_j - u_i);
@@ -144,6 +140,28 @@ namespace ryujin
       const Number base = numerator / alpha_hat_min + Number(1.);
 
       return p_min * ryujin::vec_pow(base, exp_min);
+#endif
+
+      // FIXME: For the time being, let us just use (5.7) p1_tilde as upper
+      // bound. It indeed is a guaranteed upper bound...
+
+      const Number gamma_m = std::min(gamma_i, gamma_j);
+      const Number gamma_M = std::max(gamma_i, gamma_j);
+
+      const Number exponent =
+          (gamma_M - Number(1.)) / (ScalarNumber(2.) * gamma_M);
+      const Number exponent_inverse = Number(1.) / exponent;
+      const Number r_exponent =
+          (gamma_M - gamma_m) / (ScalarNumber(2.) * gamma_m * gamma_M);
+
+      const Number numerator =
+          positive_part(alpha_hat_min + alpha_max - (u_j - u_i));
+
+      Number denominator =
+          alpha_hat_min * ryujin::vec_pow(p_min / p_max, r_exponent - exponent);
+      denominator += alpha_max;
+
+      return p_max * ryujin::vec_pow(numerator / denominator, exponent_inverse);
     }
 
 
@@ -173,6 +191,71 @@ namespace ryujin
           alpha_hat_i * ryujin::vec_pow(p_i / p_j, -exponent) + alpha_hat_j;
 
       return p_j * ryujin::vec_pow(numerator / denominator, exponent_inverse);
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline Number
+    RiemannSolver<dim, Number>::p_star_tilde(
+        const primitive_type &riemann_data_i,
+        const primitive_type &riemann_data_j) const
+    {
+      using ScalarNumber = typename get_value_type<Number>::type;
+
+      const auto &[rho_i, u_i, p_i, gamma_i, a_i] = riemann_data_i;
+      const auto &[rho_j, u_j, p_j, gamma_j, a_j] = riemann_data_j;
+      const auto alpha_i = alpha(rho_i, gamma_i, a_i);
+      const auto alpha_j = alpha(rho_j, gamma_j, a_j);
+
+      /*
+       * First get p_min, p_max.
+       *
+       * Then, we get gamma_min/max, and alpha_min/max. Note that the
+       * *_min/max values are associated with p_min/max and are not
+       * necessarily the minimum/maximum of *_i vs *_j.
+       */
+
+      const Number p_min = std::min(p_i, p_j);
+      const Number p_max = std::max(p_i, p_j);
+
+      const Number gamma_min =
+          dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+              p_i, p_j, gamma_i, gamma_j);
+
+      const Number gamma_max = dealii::compare_and_apply_mask<
+          dealii::SIMDComparison::greater_than_or_equal>(
+          p_i, p_j, gamma_i, gamma_j);
+
+      const Number alpha_min =
+          dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+              p_i, p_j, alpha_i, alpha_j);
+
+      const Number alpha_hat_min = c(gamma_min) * alpha_min;
+
+      const Number alpha_max = dealii::compare_and_apply_mask<
+          dealii::SIMDComparison::greater_than_or_equal>(
+          p_i, p_j, alpha_i, alpha_j);
+
+      const Number alpha_hat_max = c(gamma_max) * alpha_max;
+
+      const Number gamma_m = std::min(gamma_i, gamma_j);
+      const Number gamma_M = std::max(gamma_i, gamma_j);
+
+      const Number exponent =
+          (gamma_m - Number(1.)) / (ScalarNumber(2.) * gamma_m);
+      const Number exponent_inverse = Number(1.) / exponent;
+
+      const Number r_exponent =
+          (gamma_M - gamma_m) / (ScalarNumber(2.) * gamma_m * gamma_M);
+
+      const Number numerator =
+          positive_part(alpha_hat_min + /*SIC!*/ alpha_max - (u_j - u_i));
+
+      const Number denominator =
+          alpha_hat_min * ryujin::vec_pow(p_min / p_max, -exponent) +
+          alpha_hat_max * ryujin::vec_pow(p_min / p_max, r_exponent);
+
+      return p_max * ryujin::vec_pow(numerator / denominator, exponent_inverse);
     }
 
 
@@ -263,13 +346,14 @@ namespace ryujin
       const Number p_max = std::max(p_i, p_j);
       const Number phi_p_max = phi_of_p_max(riemann_data_i, riemann_data_j);
 
-      const Number p_SS = p_star_SS(riemann_data_i, riemann_data_j);
-
-      const Number p_RS = p_star_RS(riemann_data_i, riemann_data_j);
+      const Number p_star_approx = p_star_tilde(riemann_data_i, riemann_data_j);
 
       const Number p_2 =
           dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-              phi_p_max, Number(0.), p_SS, std::min(p_max, p_RS));
+              phi_p_max,
+              Number(0.),
+              p_star_approx,
+              std::min(p_max, p_star_approx));
 
       return compute_lambda(riemann_data_i, riemann_data_j, p_2);
     }

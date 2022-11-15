@@ -128,6 +128,12 @@ namespace ryujin
       Number p_star_SS(const primitive_type &riemann_data_i,
                        const primitive_type &riemann_data_j) const;
 
+      /**
+       * FIXME
+       */
+      Number p_star_tilde(const primitive_type &riemann_data_i,
+                          const primitive_type &riemann_data_j) const;
+
 
       /**
        * See [Tabulated paper], page ???
