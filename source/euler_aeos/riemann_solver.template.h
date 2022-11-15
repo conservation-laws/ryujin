@@ -27,9 +27,6 @@ namespace ryujin
      * we have an upper bound on the maximal wavespeed - but the number
      * bound might be larger. In particular:
      *
-     *  - We will assume that the nonvaccum condition holds true, i.e.,
-     *    phi(0) < 0.
-     *
      *  - We do not check and treat the case phi(p_min) > 0. This
      *    corresponds to two expansion waves, see §5.2 in the reference. In
      *    this case we have
@@ -159,22 +156,20 @@ namespace ryujin
 
       const Number gamma_m = std::min(gamma_i, gamma_j);
 
-      /* Compute alpha_hat_left and alpha_hat_right  */
-      const Number alpha_hat_left = c(gamma_i) * alpha(rho_i, gamma_i, a_i);
-      const Number alpha_hat_right = c(gamma_j) * alpha(rho_j, gamma_j, a_j);
+      const Number alpha_hat_i = c(gamma_i) * alpha(rho_i, gamma_i, a_i);
+      const Number alpha_hat_j = c(gamma_j) * alpha(rho_j, gamma_j, a_j);
 
-      const Number exp = (gamma_m - Number(1.)) / (ScalarNumber(2.) * gamma_m);
-      const Number exp_inv = Number(1.) / exp;
+      const Number exponent =
+          (gamma_m - Number(1.)) / (ScalarNumber(2.) * gamma_m);
+      const Number exponent_inverse = Number(1.) / exponent;
 
-      /* Then we can compute p_star_SS */
-      const Number numerator = alpha_hat_left + alpha_hat_right - (u_j - u_i);
+      const Number numerator =
+          positive_part(alpha_hat_i + alpha_hat_j - (u_j - u_i));
 
-      const Number denominator = alpha_hat_left * ryujin::vec_pow(p_i, -exp) +
-                                 alpha_hat_right * ryujin::vec_pow(p_j, -exp);
+      const Number denominator =
+          alpha_hat_i * ryujin::vec_pow(p_i / p_j, -exponent) + alpha_hat_j;
 
-      const Number base = numerator / denominator;
-
-      return ryujin::vec_pow(base, exp_inv);
+      return p_j * ryujin::vec_pow(numerator / denominator, exponent_inverse);
     }
 
 
