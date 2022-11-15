@@ -140,14 +140,13 @@ namespace ryujin
       const auto &[rho_i, u_i, p_i, gamma_i, a_i] = riemann_data_i;
       const auto &[rho_j, u_j, p_j, gamma_j, a_j] = riemann_data_j;
 
-      const Number gamma_min = std::min(gamma_i, gamma_j);
+      const Number gamma_m = std::min(gamma_i, gamma_j);
 
       /* Compute alpha_hat_left and alpha_hat_right  */
       const Number alpha_hat_left = c(gamma_i) * alpha(rho_i, gamma_i, a_i);
       const Number alpha_hat_right = c(gamma_j) * alpha(rho_j, gamma_j, a_j);
 
-      const Number exp =
-          (gamma_min - Number(1.)) / (ScalarNumber(2.) * gamma_min);
+      const Number exp = (gamma_m - Number(1.)) / (ScalarNumber(2.) * gamma_m);
       const Number exp_inv = Number(1.) / exp;
 
       /* Then we can compute p_star_SS */

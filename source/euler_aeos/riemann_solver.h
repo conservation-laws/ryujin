@@ -226,18 +226,18 @@ namespace ryujin
       AssertThrowSIMD(
           Number(p),
           [](auto val) { return val > ScalarNumber(0.); },
-          dealii::ExcMessage(" p <= 0."));
+          dealii::ExcMessage("Internal error: p <= 0."));
 
-      const Number x_ = Number(1.) - hyperbolic_system.b_interp() * rho;
+      const Number x = Number(1.) - hyperbolic_system.b_interp() * rho;
       AssertThrowSIMD(
-          x_,
+          x,
           [](auto val) { return val > ScalarNumber(0.); },
-          dealii::ExcMessage(" 1. - b * rho <= 0."));
+          dealii::ExcMessage("Internal error: 1. - b * rho <= 0."));
 
       AssertThrowSIMD(
-          gamma - Number(1.),
-          [](auto val) { return val > ScalarNumber(0.); },
-          dealii::ExcMessage(" gamma <= 1. "));
+          gamma,
+          [](auto val) { return val > ScalarNumber(1.); },
+          dealii::ExcMessage("Internal error: gamma <= 1."));
 #endif
 
       return {{rho, proj_m * rho_inverse, p, gamma, a}};
