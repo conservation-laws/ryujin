@@ -277,18 +277,36 @@ namespace ryujin
                                 const Number &gamma_min) const;
 
       /**
-       * For a given (2+dim dimensional) state vector <code>U</code>, compute
-       * a surrogate gamma:
+       * For a given (2+dim dimensional) state vector <code>U</code> and
+       * pressure <code>p</code>, compute a surrogate gamma:
        * \f[
        *   \gamma(\rho, p, e) = 1 + \frac{p * (1 - b * \rho)}{\rho * e}
        * \f]
        *
-       * This is used in the interpolation of the pressure for computing the max
-       * wave speed in the local Riemann problem.
+       * This function is used in various places to interpolate of the
+       * pressure.
        */
       template <int problem_dim, typename Number>
       Number surrogate_gamma(const dealii::Tensor<1, problem_dim, Number> &U,
                              const Number &p) const;
+
+      /**
+       * For a given (2+dim dimensional) state vector <code>U</code> and
+       * gamma <code>gamma</code>, compute a surrogate pressure:
+       * \f[
+       *   p(\rho, \gamma, e) = \frac{(\gamma - 1) * \rho * e}{1 - b * \rho}
+       * \f]
+       *
+       * This function is the complementary function to surrogate_gamma(),
+       * meaning the following property holds true:
+       * ```
+       *   surrogate_gamma(U, surrogate_pressure(U, gamma)) == gamma
+       *       surrogate_pressure(U, surrogate_gamma(U, p)) == p
+       * ```
+       */
+      template <int problem_dim, typename Number>
+      Number surrogate_pressure(const dealii::Tensor<1, problem_dim, Number> &U,
+                                const Number &gamma) const;
 
       /**
        * Returns whether the state @ref U is admissible. If @ref U is a
@@ -752,10 +770,8 @@ namespace ryujin
     template <int problem_dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number HyperbolicSystem::harten_entropy(
         const dealii::Tensor<1, problem_dim, Number> &U,
-        const Number gamma_min) const
+        const Number gamma) const
     {
-      /* FIXME */
-
       constexpr int dim = problem_dim - 2;
       using ScalarNumber = typename get_value_type<Number>::type;
 
@@ -766,9 +782,9 @@ namespace ryujin
       const Number rho_rho_e = rho * E - ScalarNumber(0.5) * m.norm_square();
 
       const Number x = Number(1.) - Number(b_interp_) * rho;
-      const Number cov_term = ryujin::vec_pow(x, gamma_min - Number(1.));
+      const Number cov_term = ryujin::vec_pow(x, gamma - Number(1.));
 
-      const Number exponent = ScalarNumber(1.) / (gamma_min + Number(1.));
+      const Number exponent = ScalarNumber(1.) / (gamma + Number(1.));
 
       return ryujin::vec_pow(rho_rho_e * cov_term, exponent);
     }
@@ -832,15 +848,26 @@ namespace ryujin
     DEAL_II_ALWAYS_INLINE inline Number HyperbolicSystem::surrogate_gamma(
         const dealii::Tensor<1, problem_dim, Number> &U, const Number &p) const
     {
-      /* \gamma(\rho, p, e) = 1 + \frac{p * (1 - b * \rho)}{\rho * e} */
-
       using ScalarNumber = typename get_value_type<Number>::type;
 
       const Number rho = density(U);
       const Number rho_e = internal_energy(U);
-      const Number cov = Number(1.) - Number(b_interp_) * rho;
+      const Number covolume = Number(1.) - Number(b_interp_) * rho;
 
-      return Number(1.) + p * cov / rho_e;
+      return Number(1.) + p * covolume / rho_e;
+    }
+
+
+    template <int problem_dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline Number HyperbolicSystem::surrogate_pressure(
+        const dealii::Tensor<1, problem_dim, Number> &U,
+        const Number &gamma) const
+    {
+      const Number rho = density(U);
+      const Number rho_e = internal_energy(U);
+      const Number covolume = Number(1.) - Number(b_interp_) * rho;
+
+      return (gamma - Number(1.)) * rho_e / covolume;
     }
 
 

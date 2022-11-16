@@ -228,7 +228,7 @@ namespace ryujin
         denominator += std::abs(d_eta_i[k] * right[k]);
       }
 
-      /* FIXME: this can be refactoring into a runtime parameter... */
+      /* FIXME: this can be refactored into a runtime parameter... */
       const ScalarNumber evc_alpha_0_ = ScalarNumber(1.);
       const auto quotient =
           std::abs(numerator) / (denominator + hd_i * std::abs(eta_i));
