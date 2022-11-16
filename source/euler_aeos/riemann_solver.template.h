@@ -91,7 +91,8 @@ namespace ryujin
 
 
     template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number RiemannSolver<dim, Number>::p_star_RS(
+    DEAL_II_ALWAYS_INLINE inline Number
+    RiemannSolver<dim, Number>::p_star_RS_full(
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
@@ -127,50 +128,75 @@ namespace ryujin
           dealii::SIMDComparison::greater_than_or_equal>(
           p_i, p_j, alpha_i, alpha_j);
 
-#if 0
-      const Number exp_min =
-          ScalarNumber(2.) * gamma_min / (gamma_min - Number(1.));
-      const Number exp_max =
-          (gamma_max - Number(1.)) / (ScalarNumber(2.) * gamma_max);
-
-      const Number numerator =
-          alpha_max * (Number(1.) - ryujin::vec_pow(p_min / p_max, exp_max)) -
-          (u_j - u_i);
-
-      const Number base = numerator / alpha_hat_min + Number(1.);
-
-      return p_min * ryujin::vec_pow(base, exp_min);
-#endif
-
-      // FIXME: For the time being, let us just use (5.7) p1_tilde as upper
-      // bound. It indeed is a guaranteed upper bound...
-
       const Number gamma_m = std::min(gamma_i, gamma_j);
       const Number gamma_M = std::max(gamma_i, gamma_j);
-
-      const Number exponent =
-          (gamma_M - Number(1.)) / (ScalarNumber(2.) * gamma_M);
-      const Number exponent_inverse = Number(1.) / exponent;
-      const Number r_exponent =
-          (gamma_M - gamma_m) / (ScalarNumber(2.) * gamma_m * gamma_M);
 
       const Number numerator =
           positive_part(alpha_hat_min + alpha_max - (u_j - u_i));
 
-      Number denominator =
-          alpha_hat_min * ryujin::vec_pow(p_min / p_max, r_exponent - exponent);
-      denominator += alpha_max;
+      const Number p_ratio = p_min / p_max;
 
-      return p_max * ryujin::vec_pow(numerator / denominator, exponent_inverse);
+      /*
+       * Here, we use a trick: The r-factor only shows up in the formula
+       * for the case \gamma_min = \gamma_m, otherwise the r-factor
+       * vanishes. We can accomplish this by using the following modified
+       * exponent (where we substitute gamma_m by gamma_min):
+       */
+      const Number r_exponent =
+          (gamma_M - gamma_min) / (ScalarNumber(2.) * gamma_min * gamma_M);
+
+      /*
+       * Compute (5.7) first formula for \tilde p_1^\ast and (5.8)
+       * second formula for \tilde p_2^\ast at the same time:
+       */
+
+      const Number first_exponent =
+          (gamma_M - Number(1.)) / (ScalarNumber(2.) * gamma_M);
+      const Number first_exponent_inverse = Number(1.) / first_exponent;
+
+      const Number first_denom =
+          alpha_hat_min *
+              ryujin::vec_pow(p_ratio, r_exponent - first_exponent) +
+          alpha_max;
+
+      const Number p_1_tilde = p_max * ryujin::vec_pow(numerator / first_denom,
+                                                       first_exponent_inverse);
+#ifdef DEBUG_OUTPUT
+    std::cout << "RS p_1_tilde = " << p_1_tilde << "\n";
+#endif
+
+      /*
+       * Compute (5.7) second formula for \tilde p_2^\ast and (5.8) first
+       * formula for \tilde p_1^\ast at the same time:
+       */
+
+      const Number second_exponent =
+          (gamma_m - Number(1.)) / (ScalarNumber(2.) * gamma_m);
+      const Number second_exponent_inverse = Number(1.) / second_exponent;
+
+      Number second_denom =
+          alpha_hat_min * ryujin::vec_pow(p_ratio, -second_exponent) +
+          alpha_max * ryujin::vec_pow(p_ratio, r_exponent);
+
+      const Number p_2_tilde = p_max * ryujin::vec_pow(numerator / second_denom,
+                                                       second_exponent_inverse);
+
+#ifdef DEBUG_OUTPUT
+    std::cout << "RS p_2_tilde = " << p_2_tilde << "\n";
+#endif
+
+      return std::min(p_1_tilde, p_2_tilde);
     }
 
 
     template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number RiemannSolver<dim, Number>::p_star_SS(
+    DEAL_II_ALWAYS_INLINE inline Number
+    RiemannSolver<dim, Number>::p_star_SS_full(
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
       using ScalarNumber = typename get_value_type<Number>::type;
+      const ScalarNumber b_interp = hyperbolic_system.b_interp();
 
       const auto &[rho_i, u_i, p_i, gamma_i, a_i] = riemann_data_i;
       const auto &[rho_j, u_j, p_j, gamma_j, a_j] = riemann_data_j;
@@ -179,6 +205,10 @@ namespace ryujin
 
       const Number alpha_hat_i = c(gamma_i) * alpha(rho_i, gamma_i, a_i);
       const Number alpha_hat_j = c(gamma_j) * alpha(rho_j, gamma_j, a_j);
+
+      /*
+       * Compute (5.10) formula for \tilde p_1^\ast:
+       */
 
       const Number exponent =
           (gamma_m - Number(1.)) / (ScalarNumber(2.) * gamma_m);
@@ -190,13 +220,52 @@ namespace ryujin
       const Number denominator =
           alpha_hat_i * ryujin::vec_pow(p_i / p_j, -exponent) + alpha_hat_j;
 
-      return p_j * ryujin::vec_pow(numerator / denominator, exponent_inverse);
+      const Number p_1_tilde =
+          p_j * ryujin::vec_pow(numerator / denominator, exponent_inverse);
+
+#ifdef DEBUG_OUTPUT
+    std::cout << "SS p_1_tilde = " << p_1_tilde << "\n";
+#endif
+
+      /*
+       * Compute (5.11) formula for \tilde p_2^\ast:
+       */
+
+    const Number p_max = std::max(p_i, p_j);
+
+    Number radicand_i =
+        ScalarNumber(2.) * (Number(1.) - b_interp * rho_i) * p_max;
+    radicand_i /=
+        rho_i * ((gamma_i + Number(1.)) * p_max + (gamma_i - Number(1.)) * p_i);
+
+    const Number x_i = std::sqrt(radicand_i);
+
+    Number radicand_j =
+        ScalarNumber(2.) * (Number(1.) - b_interp * rho_j) * p_max;
+    radicand_j /=
+        rho_j * ((gamma_j + Number(1.)) * p_max + (gamma_j - Number(1.)) * p_j);
+
+    const Number x_j = std::sqrt(radicand_j);
+
+    const Number a = x_i + x_j;
+    const Number b = u_j - u_i;
+    const Number c = -p_i * x_i - p_j * x_j;
+
+    const Number base = (-b + std::sqrt(b * b - ScalarNumber(4.) * a * c)) /
+                        (ScalarNumber(2.) * a);
+    const Number p_2_tilde = base * base;
+
+#ifdef DEBUG_OUTPUT
+    std::cout << "SS p_2_tilde = " << p_2_tilde << "\n";
+#endif
+
+      return std::min(p_1_tilde, p_2_tilde);
     }
 
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
-    RiemannSolver<dim, Number>::p_star_tilde(
+    RiemannSolver<dim, Number>::p_star_interpolated(
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
@@ -346,14 +415,26 @@ namespace ryujin
       const Number p_max = std::max(p_i, p_j);
       const Number phi_p_max = phi_of_p_max(riemann_data_i, riemann_data_j);
 
-      const Number p_star_approx = p_star_tilde(riemann_data_i, riemann_data_j);
+      if (!hyperbolic_system.compute_expensive_bounds()) {
+        const Number p_star_tilde =
+            p_star_interpolated(riemann_data_i, riemann_data_j);
+
+        const Number p_2 =
+            dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+                phi_p_max,
+                Number(0.),
+                p_star_tilde,
+                std::min(p_max, p_star_tilde));
+
+        return compute_lambda(riemann_data_i, riemann_data_j, p_2);
+      }
+
+      const Number p_star_RS = p_star_RS_full(riemann_data_i, riemann_data_j);
+      const Number p_star_SS = p_star_SS_full(riemann_data_i, riemann_data_j);
 
       const Number p_2 =
           dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-              phi_p_max,
-              Number(0.),
-              p_star_approx,
-              std::min(p_max, p_star_approx));
+              phi_p_max, Number(0.), p_star_SS, std::min(p_max, p_star_RS));
 
       return compute_lambda(riemann_data_i, riemann_data_j, p_2);
     }

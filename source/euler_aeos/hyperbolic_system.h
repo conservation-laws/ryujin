@@ -523,6 +523,7 @@ namespace ryujin
       //@{
 
       /* For EOS */
+
       std::string equation_of_state_;
       ACCESSOR_READ_ONLY(equation_of_state)
 
@@ -535,7 +536,11 @@ namespace ryujin
       double q_interp_;
       ACCESSOR_READ_ONLY(q_interp)
 
+      bool compute_expensive_bounds_;
+      ACCESSOR_READ_ONLY(compute_expensive_bounds)
+
       /* For vacuum states */
+
       double reference_density_;
       ACCESSOR_READ_ONLY(reference_density)
 

@@ -117,22 +117,32 @@ namespace ryujin
       alpha(const Number &rho, const Number &gamma, const Number &a) const;
 
       /**
-       * FIXME
+       * Compute the best available, but expensive, upper bound on the
+       * expansion-shock case as described in §5.4, Eqn. (5.7) and (5.8) in
+       * @cite ClaytonGuermondPopov-2022
        */
-      Number p_star_RS(const primitive_type &riemann_data_i,
-                       const primitive_type &riemann_data_j) const;
+      Number p_star_RS_full(const primitive_type &riemann_data_i,
+                            const primitive_type &riemann_data_j) const;
+
+      /**
+       * Compute the best available, but expensive, upper bound on the
+       * shock-shock case as described in §5.5, Eqn. (5.10) and (5.12) in
+       * @cite ClaytonGuermondPopov-2022
+       */
+      Number p_star_SS_full(const primitive_type &riemann_data_i,
+                            const primitive_type &riemann_data_j) const;
 
       /**
        * FIXME
        */
-      Number p_star_SS(const primitive_type &riemann_data_i,
-                       const primitive_type &riemann_data_j) const;
+      Number p_star_quadratic(const primitive_type &riemann_data_i,
+                              const primitive_type &riemann_data_j) const;
 
       /**
        * FIXME
        */
-      Number p_star_tilde(const primitive_type &riemann_data_i,
-                          const primitive_type &riemann_data_j) const;
+      Number p_star_interpolated(const primitive_type &riemann_data_i,
+                                 const primitive_type &riemann_data_j) const;
 
 
       /**
@@ -246,6 +256,9 @@ namespace ryujin
         const unsigned int *js,
         const dealii::Tensor<1, dim, Number> &n_ij) const
     {
+#ifdef DEBUG_OUTPUT
+    std::cout << "RiemannSolver<dim, Number>::compute()" << std::endl;
+#endif
       const auto &[p_i, unused_i, s_i, eta_i] =
           precomputed_values.template get_tensor<Number, precomputed_type>(i);
 

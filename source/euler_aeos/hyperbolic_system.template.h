@@ -38,6 +38,12 @@ namespace ryujin
                     "The maximum compressibility constant used for the "
                     "co-volume EOS interpolation");
 
+      compute_expensive_bounds_ = false;
+      add_parameter("compute expensive bounds",
+                    compute_expensive_bounds_,
+                    "Compute better, but significantly more expensive upper "
+                    "bounds on the maximal wavespeed.");
+
       reference_density_ = 1.;
       add_parameter("reference density",
                     reference_density_,
