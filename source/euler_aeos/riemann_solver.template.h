@@ -210,6 +210,8 @@ namespace ryujin
 
       /*
        * Compute (5.10) formula for \tilde p_1^\ast:
+       *
+       * Cost: 2x pow, 4x division, 0x sqrt
        */
 
       const Number exponent =
@@ -231,6 +233,8 @@ namespace ryujin
 
       /*
        * Compute (5.11) formula for \tilde p_2^\ast:
+       *
+       * Cost: 0x pow, 3x division, 3x sqrt
        */
 
     const Number p_max = std::max(p_i, p_j);
@@ -353,6 +357,51 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
+    RiemannSolver<dim, Number>::f(const primitive_type &riemann_data,
+                                  const Number p_star) const
+    {
+      using ScalarNumber = typename get_value_type<Number>::type;
+      const ScalarNumber b_interp = hyperbolic_system.b_interp();
+
+      const auto &[rho, u, p, gamma, a] = riemann_data;
+
+      const Number one_minus_b_rho = Number(1.) - b_interp * rho;
+
+      const Number Az =
+          ScalarNumber(2.) * one_minus_b_rho / (rho * (gamma + Number(1.)));
+
+      const Number Bz = (gamma - Number(1.)) / (gamma + Number(1.)) * p;
+
+      const Number radicand = Az / (p_star + Bz);
+
+      const Number true_value = (p_star - p) * std::sqrt(radicand);
+
+      const auto exponent = ScalarNumber(0.5) * (gamma - Number(1.)) / gamma;
+      const Number factor = ryujin::vec_pow(p_star / p, exponent) - Number(1.);
+      const auto false_value = ScalarNumber(2.) * a * one_minus_b_rho * factor /
+                               (gamma - Number(1.));
+
+      return dealii::compare_and_apply_mask<
+          dealii::SIMDComparison::greater_than_or_equal>(
+          p_star, p, true_value, false_value);
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline Number
+    RiemannSolver<dim, Number>::phi(const primitive_type &riemann_data_i,
+                                    const primitive_type &riemann_data_j,
+                                    const Number p_in) const
+    {
+      const Number &u_i = riemann_data_i[1];
+      const Number &u_j = riemann_data_j[1];
+
+      return f(riemann_data_i, p_in) + f(riemann_data_j, p_in) + u_j - u_i;
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline Number
     RiemannSolver<dim, Number>::phi_of_p_max(
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
@@ -440,8 +489,15 @@ namespace ryujin
 
       if (!hyperbolic_system.compute_expensive_bounds()) {
 #ifdef DEBUG_RIEMANN_SOLVER
-        p_star_RS_full(riemann_data_i, riemann_data_j);
-        p_star_SS_full(riemann_data_i, riemann_data_j);
+        const Number p_star_RS = p_star_RS_full(riemann_data_i, riemann_data_j);
+        const Number p_star_SS = p_star_SS_full(riemann_data_i, riemann_data_j);
+        const Number p_debug =
+            dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+                phi_p_max, Number(0.), p_star_SS, std::min(p_max, p_star_RS));
+        std::cout << "   p^*_debug  = " << p_debug << "\n";
+        std::cout << "-> lambda_deb = "
+                  << compute_lambda(riemann_data_i, riemann_data_j, p_debug)
+                  << std::endl;
 #endif
 
         const Number p_star_tilde =
@@ -455,7 +511,9 @@ namespace ryujin
                 std::min(p_max, p_star_tilde));
 
 #ifdef DEBUG_RIEMANN_SOLVER
-      std::cout << "   p_*_tilde  = " << p_2 << "\n";
+      std::cout << "   p^*_tilde  = " << p_2 << "\n";
+      std::cout << "   phi(p_*_t) = "
+                << phi(riemann_data_i, riemann_data_j, p_2) << "\n";
       std::cout << "-> lambda_max = "
                 << compute_lambda(riemann_data_i, riemann_data_j, p_2) << "\n"
                 << std::endl;
@@ -472,9 +530,11 @@ namespace ryujin
               phi_p_max, Number(0.), p_star_SS, std::min(p_max, p_star_RS));
 
 #ifdef DEBUG_RIEMANN_SOLVER
-      std::cout << "   p_*_tilde  = " << p_2 << "\n";
+      std::cout << "   p^*_tilde  = " << p_2 << "\n";
+      std::cout << "   phi(p_*_t) = "
+                << phi(riemann_data_i, riemann_data_j, p_2) << "\n";
       std::cout << "-> lambda_max = "
-                << compute_lambda(riemann_data_i, riemann_data_j, p_2) << "\n"
+                << compute_lambda(riemann_data_i, riemann_data_j, p_2)
                 << std::endl;
 #endif
 

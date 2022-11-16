@@ -107,11 +107,15 @@ namespace ryujin
 
       /**
        * FIXME
+       *
+       * Cost: 0x pow, 1x division, 1x sqrt
        */
       Number c(const Number gamma_Z) const;
 
       /**
        * FIXME
+       *
+       * Cost: 0x pow, 1x division, 0x sqrt
        */
       Number
       alpha(const Number &rho, const Number &gamma, const Number &a) const;
@@ -120,6 +124,8 @@ namespace ryujin
        * Compute the best available, but expensive, upper bound on the
        * expansion-shock case as described in §5.4, Eqn. (5.7) and (5.8) in
        * @cite ClaytonGuermondPopov-2022
+       *
+       * Cost: 5x pow, 11x division, 1x sqrt
        */
       Number p_star_RS_full(const primitive_type &riemann_data_i,
                             const primitive_type &riemann_data_j) const;
@@ -128,34 +134,63 @@ namespace ryujin
        * Compute the best available, but expensive, upper bound on the
        * shock-shock case as described in §5.5, Eqn. (5.10) and (5.12) in
        * @cite ClaytonGuermondPopov-2022
+       *
+       * Cost: 2x pow, 9x division, 3x sqrt
        */
       Number p_star_SS_full(const primitive_type &riemann_data_i,
                             const primitive_type &riemann_data_j) const;
 
-      /**
-       * FIXME
-       */
-      Number p_star_quadratic(const primitive_type &riemann_data_i,
-                              const primitive_type &riemann_data_j) const;
 
-      /**
-       * FIXME
+      /*
+       * Compute a simultaneous upper bound on (5.7) second formula for
+       * \tilde p_2^\ast (5.8) first formula for \tilde p_1^\ast (5.11)
+       * formula for \tilde p_2^\ast in @cite ClaytonGuermondPopov-2022
+       *
+       * Cost: 3x pow, 9x division, 2x sqrt
+       *
+       * @todo improve documentation
        */
       Number p_star_interpolated(const primitive_type &riemann_data_i,
                                  const primitive_type &riemann_data_j) const;
 
+      /**
+       * FIXME
+       *
+       * Cost: 0x pow, 6x division, 1x sqrt
+       */
+      Number f(const primitive_type &riemann_data, const Number p_star) const;
+
 
       /**
-       * See [Tabulated paper], page ???
+       * FIXME
        *
-       * Cost: ???
+       * Cost: TODO
+       */
+      Number phi(const primitive_type &riemann_data_i,
+                 const primitive_type &riemann_data_j,
+                 const Number p_in) const;
+
+
+      /**
+       * See @cite ClaytonGuermondPopov-2022
+       *
+       * The approximate Riemann solver is based on a function phi(p) that is
+       * montone increasing in p, concave down and whose (weak) third
+       * derivative is non-negative and locally bounded. Because we
+       * actually do not perform any iteration for computing our wavespeed
+       * estimate we can get away by only implementing a specialized
+       * variant of the phi function that computes phi(p_max). It inlines
+       * the implementation of the "f" function and eliminates all
+       * unnecessary branches in "f".
+       *
+       * Cost: 0x pow, 2x division, 2x sqrt
        */
       Number phi_of_p_max(const primitive_type &riemann_data_i,
                           const primitive_type &riemann_data_j) const;
 
 
       /**
-       * see [1], page 912, (3.7)
+       * See @cite GuermondPopov2016 page 912, (3.7)
        *
        * Cost: 0x pow, 1x division, 1x sqrt
        */
@@ -164,7 +199,7 @@ namespace ryujin
 
 
       /**
-       * see [1], page 912, (3.8)
+       * See @cite GuermondPopov2016 page 912, (3.8)
        *
        * Cost: 0x pow, 1x division, 1x sqrt
        */
@@ -173,15 +208,13 @@ namespace ryujin
 
 
       /**
+       * See @cite GuermondPopov2016 page 912, (3.9)
+       *
        * For two given primitive states <code>riemann_data_i</code> and
        * <code>riemann_data_j</code>, and a guess p_2, compute an upper bound
        * for lambda.
        *
-       * This is the same lambda_max as computed by compute_gap. The function
-       * simply avoids a number of unnecessary computations (in case we do
-       * not need to know the gap).
-       *
-       * Cost: 0x pow, 2x division, 2x sqrt
+       * Cost: 0x pow, 2x division, 2x sqrt (inclusive)
        */
       Number compute_lambda(const primitive_type &riemann_data_i,
                             const primitive_type &riemann_data_j,

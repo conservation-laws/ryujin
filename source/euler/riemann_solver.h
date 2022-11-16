@@ -129,7 +129,7 @@ namespace ryujin
 
 
       /**
-       * see [1], page 912, (3.7)
+       * see @cite GuermondPopov2016 page 912, (3.7)
        *
        * Cost: 0x pow, 1x division, 1x sqrt
        */
@@ -138,7 +138,7 @@ namespace ryujin
 
 
       /**
-       * see [1], page 912, (3.8)
+       * see @cite GuermondPopov2016 page 912, (3.8)
        *
        * Cost: 0x pow, 1x division, 1x sqrt
        */
@@ -147,15 +147,13 @@ namespace ryujin
 
 
       /**
+       * see @cite GuermondPopov2016 page 912, (3.9)
+       *
        * For two given primitive states <code>riemann_data_i</code> and
        * <code>riemann_data_j</code>, and a guess p_2, compute an upper bound
        * for lambda.
        *
-       * This is the same lambda_max as computed by compute_gap. The function
-       * simply avoids a number of unnecessary computations (in case we do
-       * not need to know the gap).
-       *
-       * Cost: 0x pow, 2x division, 2x sqrt
+       * Cost: 0x pow, 2x division, 2x sqrt (inclusive)
        */
       Number compute_lambda(const primitive_type &riemann_data_i,
                             const primitive_type &riemann_data_j,
