@@ -293,15 +293,15 @@ namespace ryujin
           dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
               p_i, p_j, gamma_i, gamma_j);
 
-      const Number gamma_max = dealii::compare_and_apply_mask<
-          dealii::SIMDComparison::greater_than_or_equal>(
-          p_i, p_j, gamma_i, gamma_j);
-
       const Number alpha_min =
           dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
               p_i, p_j, alpha_i, alpha_j);
 
       const Number alpha_hat_min = c(gamma_min) * alpha_min;
+
+      const Number gamma_max = dealii::compare_and_apply_mask<
+          dealii::SIMDComparison::greater_than_or_equal>(
+          p_i, p_j, gamma_i, gamma_j);
 
       const Number alpha_max = dealii::compare_and_apply_mask<
           dealii::SIMDComparison::greater_than_or_equal>(
@@ -312,21 +312,42 @@ namespace ryujin
       const Number gamma_m = std::min(gamma_i, gamma_j);
       const Number gamma_M = std::max(gamma_i, gamma_j);
 
+      const Number p_ratio = p_min / p_max;
+
+      /*
+       * Here, we use a trick: The r-factor only shows up in the formula
+       * for the case \gamma_min = \gamma_m, otherwise the r-factor
+       * vanishes. We can accomplish this by using the following modified
+       * exponent (where we substitute gamma_m by gamma_min):
+       */
+      const Number r_exponent =
+          (gamma_M - gamma_min) / (ScalarNumber(2.) * gamma_min * gamma_M);
+
+      /*
+       * Compute a simultaneous upper bound on
+       *   (5.7) second formula for \tilde p_2^\ast
+       *   (5.8) first formula for \tilde p_1^\ast
+       *   (5.11) formula for \tilde p_2^\ast
+       */
+
       const Number exponent =
           (gamma_m - Number(1.)) / (ScalarNumber(2.) * gamma_m);
       const Number exponent_inverse = Number(1.) / exponent;
 
-      const Number r_exponent =
-          (gamma_M - gamma_m) / (ScalarNumber(2.) * gamma_m * gamma_M);
-
       const Number numerator =
           positive_part(alpha_hat_min + /*SIC!*/ alpha_max - (u_j - u_i));
 
-      const Number denominator =
-          alpha_hat_min * ryujin::vec_pow(p_min / p_max, -exponent) +
-          alpha_hat_max * ryujin::vec_pow(p_min / p_max, r_exponent);
+      Number denominator = alpha_hat_min * ryujin::vec_pow(p_ratio, -exponent) +
+                           alpha_hat_max * ryujin::vec_pow(p_ratio, r_exponent);
 
-      return p_max * ryujin::vec_pow(numerator / denominator, exponent_inverse);
+      const Number p_tilde =
+          p_max * ryujin::vec_pow(numerator / denominator, exponent_inverse);
+
+#ifdef DEBUG_RIEMANN_SOLVER
+      std::cout << "IN p_*_tilde  = " << p_tilde << "\n";
+#endif
+
+      return p_tilde;
     }
 
 
@@ -418,6 +439,11 @@ namespace ryujin
       const Number phi_p_max = phi_of_p_max(riemann_data_i, riemann_data_j);
 
       if (!hyperbolic_system.compute_expensive_bounds()) {
+#ifdef DEBUG_RIEMANN_SOLVER
+        p_star_RS_full(riemann_data_i, riemann_data_j);
+        p_star_SS_full(riemann_data_i, riemann_data_j);
+#endif
+
         const Number p_star_tilde =
             p_star_interpolated(riemann_data_i, riemann_data_j);
 
@@ -427,6 +453,13 @@ namespace ryujin
                 Number(0.),
                 p_star_tilde,
                 std::min(p_max, p_star_tilde));
+
+#ifdef DEBUG_RIEMANN_SOLVER
+      std::cout << "   p_*_tilde  = " << p_2 << "\n";
+      std::cout << "-> lambda_max = "
+                << compute_lambda(riemann_data_i, riemann_data_j, p_2) << "\n"
+                << std::endl;
+#endif
 
         return compute_lambda(riemann_data_i, riemann_data_j, p_2);
       }
