@@ -54,22 +54,32 @@ namespace ryujin
       using ScalarNumber = typename get_value_type<Number>::type;
 
       /*
-       * We implement the continuous and monotonic function and continuous
-       * function:
+       * FIXME: This needs a better function.
        *
-       *   c(gamma)^2 = 1                                  for gamma <= 5 / 3
-       *   c(gamma)^2 = (3 * gamma + 11) / (6 * gamma + 6) in between
-       *   c(gamma)^2 = 5 / 6                              for gamma > 3
+       * We implement the continuous and monotonic function c(gamma) as
+       * defined in (A.3) on page A469 of @cite ClaytonGuermondPopov-2022.
+       * But with a simplified quick cut-off for the case gamma > 3:
+       *
+       *   c(gamma)^2 = 1                                    for gamma <= 5 / 3
+       *   c(gamma)^2 = (3 * gamma + 11) / (6 * gamma + 6)   in between
+       *   c(gamma)^2 = max(1/2, 5 / 6 - slope (gamma - 3))  for gamma > 3
        *
        * Due to the fact that the function is monotonic we can simply clip
        * the values without checking the conditions:
        */
 
-      Number radicand = (ScalarNumber(3.) * gamma + Number(11.)) /
-                        (ScalarNumber(6.) * gamma + Number(6.));
+      constexpr ScalarNumber slope =
+          ScalarNumber(-0.34976871477801828189920753948709);
 
+      const Number first_radicand = (ScalarNumber(3.) * gamma + Number(11.)) /
+                                    (ScalarNumber(6.) * gamma + Number(6.));
+
+      const Number second_radicand =
+          Number(5. / 6.) + slope * (gamma - Number(3.));
+
+      Number radicand = std::min(first_radicand, second_radicand);
       radicand = std::min(Number(1.), radicand);
-      radicand = std::max(Number(5. / 6.), radicand);
+      radicand = std::max(Number(1. / 2.), radicand);
 
       return std::sqrt(radicand);
     }
