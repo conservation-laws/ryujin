@@ -997,8 +997,10 @@ namespace ryujin
               << std::endl;
 #endif
 
+    const auto cycle_number =
+        4 + HyperbolicSystem::n_precomputation_cycles + limiter_iter_;
     Scope scope(computing_timer_,
-                "time step [E] " + std::to_string(5 + limiter_iter_) +
+                "time step [E] " + std::to_string(cycle_number) +
                     " - apply boundary conditions");
 
     const auto &boundary_map = offline_data_->boundary_map();
