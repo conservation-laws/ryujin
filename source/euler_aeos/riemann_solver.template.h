@@ -12,6 +12,8 @@
 #include <newton.h>
 #include <simd.h>
 
+// #define DEBUG_RIEMANN_SOLVER
+
 namespace ryujin
 {
   namespace EulerAEOS
@@ -161,8 +163,8 @@ namespace ryujin
 
       const Number p_1_tilde = p_max * ryujin::vec_pow(numerator / first_denom,
                                                        first_exponent_inverse);
-#ifdef DEBUG_OUTPUT
-    std::cout << "RS p_1_tilde = " << p_1_tilde << "\n";
+#ifdef DEBUG_RIEMANN_SOLVER
+    std::cout << "RS p_1_tilde  = " << p_1_tilde << "\n";
 #endif
 
       /*
@@ -181,8 +183,8 @@ namespace ryujin
       const Number p_2_tilde = p_max * ryujin::vec_pow(numerator / second_denom,
                                                        second_exponent_inverse);
 
-#ifdef DEBUG_OUTPUT
-    std::cout << "RS p_2_tilde = " << p_2_tilde << "\n";
+#ifdef DEBUG_RIEMANN_SOLVER
+    std::cout << "RS p_2_tilde  = " << p_2_tilde << "\n";
 #endif
 
       return std::min(p_1_tilde, p_2_tilde);
@@ -223,8 +225,8 @@ namespace ryujin
       const Number p_1_tilde =
           p_j * ryujin::vec_pow(numerator / denominator, exponent_inverse);
 
-#ifdef DEBUG_OUTPUT
-    std::cout << "SS p_1_tilde = " << p_1_tilde << "\n";
+#ifdef DEBUG_RIEMANN_SOLVER
+    std::cout << "SS p_1_tilde  = " << p_1_tilde << "\n";
 #endif
 
       /*
@@ -255,8 +257,8 @@ namespace ryujin
                         (ScalarNumber(2.) * a);
     const Number p_2_tilde = base * base;
 
-#ifdef DEBUG_OUTPUT
-    std::cout << "SS p_2_tilde = " << p_2_tilde << "\n";
+#ifdef DEBUG_RIEMANN_SOLVER
+    std::cout << "SS p_2_tilde  = " << p_2_tilde << "\n";
 #endif
 
       return std::min(p_1_tilde, p_2_tilde);
@@ -435,6 +437,13 @@ namespace ryujin
       const Number p_2 =
           dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
               phi_p_max, Number(0.), p_star_SS, std::min(p_max, p_star_RS));
+
+#ifdef DEBUG_RIEMANN_SOLVER
+      std::cout << "   p_*_tilde  = " << p_2 << "\n";
+      std::cout << "-> lambda_max = "
+                << compute_lambda(riemann_data_i, riemann_data_j, p_2) << "\n"
+                << std::endl;
+#endif
 
       return compute_lambda(riemann_data_i, riemann_data_j, p_2);
     }
