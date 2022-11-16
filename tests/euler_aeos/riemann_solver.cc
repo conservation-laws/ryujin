@@ -85,6 +85,10 @@ int main()
   /* Case 10:*/
   test({1.0, 2.18, 1.e2, 7. / 5.}, {1.0, 2.18, 0.01, 7. / 5.});
 
+  /* States with crazy two-rarefaction pressure: */
+
+  test({1., 300., 1, 1.4}, {0.125, -300., 0.1, 1.4});
+
   /* States with crazy gamma values: */
 
   test({1., 0., 2. / 30., 2.99}, {1.e-3, 0., 2. / 3. * 1.e-10, 1.40});

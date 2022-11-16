@@ -54,8 +54,6 @@ namespace ryujin
       using ScalarNumber = typename get_value_type<Number>::type;
 
       /*
-       * FIXME: This needs a better function.
-       *
        * We implement the continuous and monotonic function c(gamma) as
        * defined in (A.3) on page A469 of @cite ClaytonGuermondPopov-2022.
        * But with a simplified quick cut-off for the case gamma > 3:
@@ -505,6 +503,8 @@ namespace ryujin
             dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
                 phi_p_max, Number(0.), p_star_SS, std::min(p_max, p_star_RS));
         std::cout << "   p^*_debug  = " << p_debug << "\n";
+      std::cout << "   phi(p_*_d) = "
+                << phi(riemann_data_i, riemann_data_j, p_debug) << "\n";
         std::cout << "-> lambda_deb = "
                   << compute_lambda(riemann_data_i, riemann_data_j, p_debug)
                   << std::endl;
