@@ -58,10 +58,21 @@ int main()
     std::cout << lambda_max << std::endl;
   };
 
+  const auto set_covolume = [&](const double covolume) {
+    std::stringstream parameters;
+    parameters << "subsection HyperbolicSystem\n"
+               << "set interpolation co-volume  = " << std::to_string(covolume)
+               << "\n"
+               << "end" << std::endl;
+    ParameterAcceptor::initialize(parameters);
+  };
+
   std::cout << std::setprecision(16);
   std::cout << std::scientific;
 
-  /* Test vectors for ideal gas with gamma = 1.4: */
+  /*
+   * Test vectors for ideal gas with gamma = 1.4:
+   */
 
   /* Leblanc:*/
   test({1., 0., 2. / 30., 7. / 5.}, {1.e-3, 0., 2. / 3. * 1.e-10, 7. / 5.});
@@ -85,11 +96,32 @@ int main()
   /* Case 10:*/
   test({1.0, 2.18, 1.e2, 7. / 5.}, {1.0, 2.18, 0.01, 7. / 5.});
 
-  /* States with crazy two-rarefaction pressure: */
+  /*
+   * States with non-constant gamma values:
+   */
+
+  /* Shock-shock */
+  set_covolume(0.003);
+  test({1.5, 100., 22., 2.0041781532448066}, {7., 0., 12., 5.7237635705670113});
+
+  /* Shock-expansion */
+  set_covolume(0.003);
+  test({1.5, 0., 22., 2.0041781532448066}, {7., 0., 12., 5.7237635705670113});
+
+  /* Shock-expansion Mie-Gruneisen */
+  set_covolume(0.);
+  test({3500., 20., 2.3e10, 118.01508858712090},
+       {2400., 0., 1.5e11, 2.8761770391786854});
+
+  /*
+   * States with crazy two-rarefaction pressure:
+   */
 
   test({1., 300., 1, 1.4}, {0.125, -300., 0.1, 1.4});
 
-  /* States with crazy gamma values: */
+  /*
+   * States with crazy gamma values:
+   */
 
   test({1., 0., 2. / 30., 2.99}, {1.e-3, 0., 2. / 3. * 1.e-10, 1.40});
 
