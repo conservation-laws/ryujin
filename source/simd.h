@@ -37,6 +37,7 @@ namespace ryujin
   };
   //@}
 
+
   /**
    * Return the stride size:
    *
@@ -50,6 +51,7 @@ namespace ryujin
   unsigned int get_stride_size<dealii::VectorizedArray<T, width>> = width;
   //@}
 
+
 #ifndef DOXYGEN
   namespace
   {
@@ -61,6 +63,7 @@ namespace ryujin
     }
   } /* namespace */
 #endif
+
 
   /**
    * Given a callable object f(k), this function creates a std::array with
@@ -138,12 +141,23 @@ namespace ryujin
 
 
   /**
-   * Custom implementation of a vectorized pow function.
+   * Custom serial pow function.
    *
    * @ingroup SIMD
    */
   template <typename T>
-  T pow(const T x, const typename get_value_type<T>::type b);
+  T pow(const T x, const T b);
+
+
+  /**
+   * Custom implementation of a vectorized pow function.
+   *
+   * @ingroup SIMD
+   */
+  template <typename T, std::size_t width>
+  dealii::VectorizedArray<T, width>
+  pow(const dealii::VectorizedArray<T, width> x, const T b);
+
 
   /**
    * Custom implementation of a vectorized pow function with vectorized
@@ -151,8 +165,63 @@ namespace ryujin
    *
    * @ingroup SIMD
    */
-  template <typename T>
-  T pow(const T x, const T b);
+  template <typename T, std::size_t width>
+  dealii::VectorizedArray<T, width>
+  pow(const dealii::VectorizedArray<T, width> x,
+      const dealii::VectorizedArray<T, width> b);
+
+
+  /**
+   * Controls the bias of the fast_pow() functions.
+   */
+  enum class Bias {
+    /**
+     * No specific bias.
+     */
+    none,
+
+    /**
+     * Guarantee an upper bound, i.e., fast_pow(x,b) >= pow(x,b) provided
+     * that FIXME
+     */
+    max,
+
+    /**
+     * Guarantee a lower bound, i.e., fast_pow(x,b) >= pow(x,b) provided
+     * that FIXME
+     */
+    min
+  };
+
+  /**
+   * Custom serial approximate pow function.
+   *
+   * @ingroup SIMD
+   */
+  template <Bias B = Bias::none, typename T>
+  T fast_pow(const T x, const T b);
+
+
+  /**
+   * Custom implementation of an approximate, vectorized pow function.
+   *
+   * @ingroup SIMD
+   */
+  template <Bias B = Bias::none, typename T, std::size_t width>
+  dealii::VectorizedArray<T, width>
+  fast_pow(const dealii::VectorizedArray<T, width> x, const T b);
+
+
+  /**
+   * Custom implementation of an approximate, vectorized pow function with
+   * vectorized exponent.
+   *
+   * @ingroup SIMD
+   */
+  template <Bias B = Bias::none, typename T, std::size_t width>
+  dealii::VectorizedArray<T, width>
+  fast_pow(const dealii::VectorizedArray<T, width> x,
+           const dealii::VectorizedArray<T, width> b);
 
   //@}
   /**
