@@ -763,7 +763,7 @@ namespace ryujin
       using ScalarNumber = typename get_value_type<Number>::type;
 
       const auto rho_inverse = ScalarNumber(1.) / U[0];
-      return internal_energy(U) * ryujin::vec_pow(rho_inverse, gamma_min);
+      return internal_energy(U) * ryujin::pow(rho_inverse, gamma_min);
     }
 
 
@@ -782,11 +782,11 @@ namespace ryujin
       const Number rho_rho_e = rho * E - ScalarNumber(0.5) * m.norm_square();
 
       const Number x = Number(1.) - Number(b_interp_) * rho;
-      const Number cov_term = ryujin::vec_pow(x, gamma - Number(1.));
+      const Number cov_term = ryujin::pow(x, gamma - Number(1.));
 
       const Number exponent = ScalarNumber(1.) / (gamma + Number(1.));
 
-      return ryujin::vec_pow(rho_rho_e * cov_term, exponent);
+      return ryujin::pow(rho_rho_e * cov_term, exponent);
     }
 
 
@@ -819,14 +819,14 @@ namespace ryujin
 
       const Number x = Number(1.) - Number(b_interp_) * rho;
       const Number x_inverse = Number(1.) / x;
-      const Number covolume_term = ryujin::vec_pow(x, gamma_min - Number(1.));
+      const Number covolume_term = ryujin::pow(x, gamma_min - Number(1.));
 
       /* Not sure if to compute directly or call harten_entropy() function? */
       const Number eta =
-          ryujin::vec_pow(rho_rho_e * covolume_term, gamma_plus_one_inverse);
+          ryujin::pow(rho_rho_e * covolume_term, gamma_plus_one_inverse);
 
       const Number factor = gamma_plus_one_inverse * covolume_term *
-                            ryujin::vec_pow(eta, -gamma_min);
+                            ryujin::pow(eta, -gamma_min);
 
       /* Store eta' result */
       dealii::Tensor<1, problem_dim, Number> result;

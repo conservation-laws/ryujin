@@ -26,7 +26,7 @@ namespace ryujin
                                   const Number &h) const
     {
       using ScalarNumber = typename get_value_type<Number>::type;
-      const auto gravity = hyperbolic_system.gravity();
+      const ScalarNumber gravity = hyperbolic_system.gravity();
 
       const auto &[h_Z, u_Z, a_Z] = riemann_data_Z;
 
@@ -114,7 +114,7 @@ namespace ryujin
         const primitive_type &riemann_data_j) const
     {
       using ScalarNumber = typename get_value_type<Number>::type;
-      const auto gravity = hyperbolic_system.gravity();
+      const ScalarNumber gravity = hyperbolic_system.gravity();
       const auto gravity_inverse = ScalarNumber(1.) / gravity;
 
       const auto &[h_i, u_i, a_i] = riemann_data_i;

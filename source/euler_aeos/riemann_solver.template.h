@@ -165,14 +165,13 @@ namespace ryujin
       const Number first_exponent_inverse = Number(1.) / first_exponent;
 
       const Number first_denom =
-          alpha_hat_min *
-              ryujin::vec_pow(p_ratio, r_exponent - first_exponent) +
+          alpha_hat_min * ryujin::pow(p_ratio, r_exponent - first_exponent) +
           alpha_max;
 
-      const Number p_1_tilde = p_max * ryujin::vec_pow(numerator / first_denom,
-                                                       first_exponent_inverse);
+      const Number p_1_tilde =
+          p_max * ryujin::pow(numerator / first_denom, first_exponent_inverse);
 #ifdef DEBUG_RIEMANN_SOLVER
-    std::cout << "RS p_1_tilde  = " << p_1_tilde << "\n";
+      std::cout << "RS p_1_tilde  = " << p_1_tilde << "\n";
 #endif
 
       /*
@@ -185,14 +184,14 @@ namespace ryujin
       const Number second_exponent_inverse = Number(1.) / second_exponent;
 
       Number second_denom =
-          alpha_hat_min * ryujin::vec_pow(p_ratio, -second_exponent) +
-          alpha_max * ryujin::vec_pow(p_ratio, r_exponent);
+          alpha_hat_min * ryujin::pow(p_ratio, -second_exponent) +
+          alpha_max * ryujin::pow(p_ratio, r_exponent);
 
-      const Number p_2_tilde = p_max * ryujin::vec_pow(numerator / second_denom,
-                                                       second_exponent_inverse);
+      const Number p_2_tilde = p_max * ryujin::pow(numerator / second_denom,
+                                                   second_exponent_inverse);
 
 #ifdef DEBUG_RIEMANN_SOLVER
-    std::cout << "RS p_2_tilde  = " << p_2_tilde << "\n";
+      std::cout << "RS p_2_tilde  = " << p_2_tilde << "\n";
 #endif
 
       return std::min(p_1_tilde, p_2_tilde);
@@ -230,13 +229,13 @@ namespace ryujin
           positive_part(alpha_hat_i + alpha_hat_j - (u_j - u_i));
 
       const Number denominator =
-          alpha_hat_i * ryujin::vec_pow(p_i / p_j, -exponent) + alpha_hat_j;
+          alpha_hat_i * ryujin::pow(p_i / p_j, -exponent) + alpha_hat_j;
 
       const Number p_1_tilde =
-          p_j * ryujin::vec_pow(numerator / denominator, exponent_inverse);
+          p_j * ryujin::pow(numerator / denominator, exponent_inverse);
 
 #ifdef DEBUG_RIEMANN_SOLVER
-    std::cout << "SS p_1_tilde  = " << p_1_tilde << "\n";
+      std::cout << "SS p_1_tilde  = " << p_1_tilde << "\n";
 #endif
 
       /*
@@ -245,32 +244,32 @@ namespace ryujin
        * Cost: 0x pow, 3x division, 3x sqrt
        */
 
-    const Number p_max = std::max(p_i, p_j);
+      const Number p_max = std::max(p_i, p_j);
 
-    Number radicand_i =
-        ScalarNumber(2.) * (Number(1.) - b_interp * rho_i) * p_max;
-    radicand_i /=
-        rho_i * ((gamma_i + Number(1.)) * p_max + (gamma_i - Number(1.)) * p_i);
+      Number radicand_i =
+          ScalarNumber(2.) * (Number(1.) - b_interp * rho_i) * p_max;
+      radicand_i /= rho_i * ((gamma_i + Number(1.)) * p_max +
+                             (gamma_i - Number(1.)) * p_i);
 
-    const Number x_i = std::sqrt(radicand_i);
+      const Number x_i = std::sqrt(radicand_i);
 
-    Number radicand_j =
-        ScalarNumber(2.) * (Number(1.) - b_interp * rho_j) * p_max;
-    radicand_j /=
-        rho_j * ((gamma_j + Number(1.)) * p_max + (gamma_j - Number(1.)) * p_j);
+      Number radicand_j =
+          ScalarNumber(2.) * (Number(1.) - b_interp * rho_j) * p_max;
+      radicand_j /= rho_j * ((gamma_j + Number(1.)) * p_max +
+                             (gamma_j - Number(1.)) * p_j);
 
-    const Number x_j = std::sqrt(radicand_j);
+      const Number x_j = std::sqrt(radicand_j);
 
-    const Number a = x_i + x_j;
-    const Number b = u_j - u_i;
-    const Number c = -p_i * x_i - p_j * x_j;
+      const Number a = x_i + x_j;
+      const Number b = u_j - u_i;
+      const Number c = -p_i * x_i - p_j * x_j;
 
-    const Number base = (-b + std::sqrt(b * b - ScalarNumber(4.) * a * c)) /
-                        (ScalarNumber(2.) * a);
-    const Number p_2_tilde = base * base;
+      const Number base = (-b + std::sqrt(b * b - ScalarNumber(4.) * a * c)) /
+                          (ScalarNumber(2.) * a);
+      const Number p_2_tilde = base * base;
 
 #ifdef DEBUG_RIEMANN_SOLVER
-    std::cout << "SS p_2_tilde  = " << p_2_tilde << "\n";
+      std::cout << "SS p_2_tilde  = " << p_2_tilde << "\n";
 #endif
 
       return std::min(p_1_tilde, p_2_tilde);
@@ -349,11 +348,11 @@ namespace ryujin
       const Number numerator =
           positive_part(alpha_hat_min + /*SIC!*/ alpha_max - (u_j - u_i));
 
-      Number denominator = alpha_hat_min * ryujin::vec_pow(p_ratio, -exponent) +
-                           alpha_hat_max * ryujin::vec_pow(p_ratio, r_exponent);
+      Number denominator = alpha_hat_min * ryujin::pow(p_ratio, -exponent) +
+                           alpha_hat_max * ryujin::pow(p_ratio, r_exponent);
 
       const Number p_tilde =
-          p_max * ryujin::vec_pow(numerator / denominator, exponent_inverse);
+          p_max * ryujin::pow(numerator / denominator, exponent_inverse);
 
 #ifdef DEBUG_RIEMANN_SOLVER
       std::cout << "IN p_*_tilde  = " << p_tilde << "\n";
@@ -385,7 +384,7 @@ namespace ryujin
       const Number true_value = (p_star - p) * std::sqrt(radicand);
 
       const auto exponent = ScalarNumber(0.5) * (gamma - Number(1.)) / gamma;
-      const Number factor = ryujin::vec_pow(p_star / p, exponent) - Number(1.);
+      const Number factor = ryujin::pow(p_star / p, exponent) - Number(1.);
       const auto false_value = ScalarNumber(2.) * a * one_minus_b_rho * factor /
                                (gamma - Number(1.));
 
@@ -503,8 +502,8 @@ namespace ryujin
             dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
                 phi_p_max, Number(0.), p_star_SS, std::min(p_max, p_star_RS));
         std::cout << "   p^*_debug  = " << p_debug << "\n";
-      std::cout << "   phi(p_*_d) = "
-                << phi(riemann_data_i, riemann_data_j, p_debug) << "\n";
+        std::cout << "   phi(p_*_d) = "
+                  << phi(riemann_data_i, riemann_data_j, p_debug) << "\n";
         std::cout << "-> lambda_deb = "
                   << compute_lambda(riemann_data_i, riemann_data_j, p_debug)
                   << std::endl;
@@ -521,12 +520,12 @@ namespace ryujin
                 std::min(p_max, p_star_tilde));
 
 #ifdef DEBUG_RIEMANN_SOLVER
-      std::cout << "   p^*_tilde  = " << p_2 << "\n";
-      std::cout << "   phi(p_*_t) = "
-                << phi(riemann_data_i, riemann_data_j, p_2) << "\n";
-      std::cout << "-> lambda_max = "
-                << compute_lambda(riemann_data_i, riemann_data_j, p_2) << "\n"
-                << std::endl;
+        std::cout << "   p^*_tilde  = " << p_2 << "\n";
+        std::cout << "   phi(p_*_t) = "
+                  << phi(riemann_data_i, riemann_data_j, p_2) << "\n";
+        std::cout << "-> lambda_max = "
+                  << compute_lambda(riemann_data_i, riemann_data_j, p_2) << "\n"
+                  << std::endl;
 #endif
 
         return compute_lambda(riemann_data_i, riemann_data_j, p_2);

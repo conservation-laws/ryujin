@@ -147,8 +147,8 @@ namespace ryujin
         const state_type &U, const dealii::Tensor<1, dim, Number> &n_ij) const
         -> primitive_type
     {
-      const auto h = hyperbolic_system.water_depth_sharp(U);
-      const auto gravity = hyperbolic_system.gravity();
+      const Number h = hyperbolic_system.water_depth_sharp(U);
+      const Number gravity = hyperbolic_system.gravity();
 
       const auto vel = hyperbolic_system.momentum(U) / h;
       const auto proj_vel = n_ij * vel;

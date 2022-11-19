@@ -714,7 +714,7 @@ namespace ryujin
 
       const Number rho_inverse = ScalarNumber(1.) / U[0];
       const Number p = pressure(U);
-      return std::sqrt(gamma_ * p * rho_inverse);
+      return std::sqrt(ScalarNumber(gamma_) * p * rho_inverse);
     }
 
 
@@ -727,7 +727,8 @@ namespace ryujin
       using ScalarNumber = typename get_value_type<Number>::type;
 
       const auto rho_inverse = ScalarNumber(1.) / U[0];
-      return internal_energy(U) * ryujin::pow(rho_inverse, gamma_);
+      return internal_energy(U) *
+             ryujin::pow(rho_inverse, ScalarNumber(gamma_));
     }
 
 
@@ -745,7 +746,7 @@ namespace ryujin
       const Number E = U[dim + 1];
 
       const Number rho_rho_e = rho * E - ScalarNumber(0.5) * m.norm_square();
-      return ryujin::pow(rho_rho_e, gamma_plus_one_inverse_);
+      return ryujin::pow(rho_rho_e, ScalarNumber(gamma_plus_one_inverse_));
     }
 
 
@@ -775,8 +776,9 @@ namespace ryujin
       const Number rho_rho_e = rho * E - ScalarNumber(0.5) * m.norm_square();
 
       const auto factor =
-          gamma_plus_one_inverse_ *
-          ryujin::pow(rho_rho_e, -gamma_ * gamma_plus_one_inverse_);
+          ScalarNumber(gamma_plus_one_inverse_) *
+          ryujin::pow(rho_rho_e,
+                      -ScalarNumber(gamma_ * gamma_plus_one_inverse_));
 
       dealii::Tensor<1, problem_dim, Number> result;
 
@@ -794,8 +796,9 @@ namespace ryujin
     DEAL_II_ALWAYS_INLINE inline Number HyperbolicSystem::mathematical_entropy(
         const dealii::Tensor<1, problem_dim, Number> U) const
     {
+      using ScalarNumber = typename get_value_type<Number>::type;
       const auto p = pressure(U);
-      return ryujin::pow(p, gamma_inverse_);
+      return ryujin::pow(p, ScalarNumber(gamma_inverse_));
     }
 
 
@@ -825,8 +828,9 @@ namespace ryujin
       const auto u = momentum(U) * rho_inverse;
       const auto p = pressure(U);
 
-      const auto factor = (gamma_ - ScalarNumber(1.0)) * gamma_inverse_ *
-                          ryujin::pow(p, gamma_inverse_ - ScalarNumber(1.));
+      const auto factor = (ScalarNumber(gamma_) - ScalarNumber(1.0)) *
+                          ScalarNumber(gamma_inverse_) *
+                          ryujin::pow(p, ScalarNumber(gamma_inverse_ - 1.));
 
       dealii::Tensor<1, problem_dim, Number> result;
 
@@ -936,6 +940,8 @@ namespace ryujin
       static_assert(component == 1 || component == 2,
                     "component has to be 1 or 2");
 
+      using ScalarNumber = typename get_value_type<Number>::type;
+
       constexpr int dim = problem_dim - 2;
 
       const auto m = momentum(U);
@@ -950,33 +956,36 @@ namespace ryujin
 
       /* First Riemann characteristic: v* n - 2 / (gamma - 1) * a */
 
-      const auto R_1 = component == 1 ? vn_bar - 2. * a_bar / (gamma_ - 1.)
-                                      : vn - 2. * a / (gamma_ - 1.);
+      const auto R_1 = component == 1
+                           ? vn_bar - 2. * a_bar / ScalarNumber(gamma_ - 1.)
+                           : vn - 2. * a / ScalarNumber(gamma_ - 1.);
 
       /* Second Riemann characteristic: v* n + 2 / (gamma - 1) * a */
 
-      const auto R_2 = component == 2 ? vn_bar + 2. * a_bar / (gamma_ - 1.)
-                                      : vn + 2. * a / (gamma_ - 1.);
+      const auto R_2 = component == 2
+                           ? vn_bar + 2. * a_bar / ScalarNumber(gamma_ - 1.)
+                           : vn + 2. * a / ScalarNumber(gamma_ - 1.);
 
       const auto p = pressure(U);
-      const auto s = p / ryujin::pow(rho, gamma_);
+      const auto s = p / ryujin::pow(rho, ScalarNumber(gamma_));
 
       const auto vperp = m / rho - vn * normal;
 
       const auto vn_new = 0.5 * (R_1 + R_2);
 
-      auto rho_new =
-          1. / (gamma_ * s) * ryujin::pow((gamma_ - 1.) / 4. * (R_2 - R_1), 2);
+      auto rho_new = 1. / (ScalarNumber(gamma_) * s) *
+                     ryujin::fixed_power<2>(ScalarNumber((gamma_ - 1.) / 4.) *
+                                            (R_2 - R_1));
       rho_new = ryujin::pow(rho_new, 1. / (gamma_ - 1.));
 
-      const auto p_new = s * std::pow(rho_new, gamma_);
+      const auto p_new = s * std::pow(rho_new, ScalarNumber(gamma_));
 
       state_type<dim, Number> U_new;
       U_new[0] = rho_new;
       for (unsigned int d = 0; d < dim; ++d) {
         U_new[1 + d] = rho_new * (vn_new * normal + vperp)[d];
       }
-      U_new[1 + dim] = p_new / (gamma_ - 1.) +
+      U_new[1 + dim] = p_new / ScalarNumber(gamma_ - 1.) +
                        0.5 * rho_new * (vn_new * vn_new + vperp.norm_square());
 
       return U_new;
@@ -1121,6 +1130,7 @@ namespace ryujin
     HyperbolicSystem::from_primitive_state(
         const dealii::Tensor<1, problem_dim, Number> &primitive_state) const
     {
+      using ScalarNumber = typename get_value_type<Number>::type;
       constexpr auto dim = problem_dim - 2;
 
       const auto &rho = primitive_state[0];
@@ -1133,7 +1143,8 @@ namespace ryujin
       for (unsigned int i = 1; i < dim + 1; ++i)
         state[i] *= rho;
       /* Compute total energy: */
-      state[dim + 1] = p / (Number(gamma_ - 1.)) + Number(0.5) * rho * u * u;
+      state[dim + 1] =
+          p / (ScalarNumber(gamma_ - 1.)) + Number(0.5) * rho * u * u;
 
       return state;
     }
@@ -1175,7 +1186,7 @@ namespace ryujin
         result[1 + d] = M[d];
       return result;
     }
-  } // namespace EULER
+  } // namespace Euler
 
   using namespace Euler;
 } /* namespace ryujin */

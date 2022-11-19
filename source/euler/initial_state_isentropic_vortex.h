@@ -58,8 +58,8 @@ namespace ryujin
           const Number u = mach_number_ - factor * Number(point_bar[1]);
           const Number v = factor * Number(point_bar[0]);
 
-          const Number rho = ryujin::pow(T, Number(1.) / (gamma - Number(1.)));
-          const Number p = ryujin::pow(rho, gamma);
+          const Number rho = ryujin::pow(T, Number(1.) / (Number(gamma - 1.)));
+          const Number p = ryujin::pow(rho, Number(gamma));
           const Number E =
               p / (gamma - Number(1.)) + Number(0.5) * rho * (u * u + v * v);
 

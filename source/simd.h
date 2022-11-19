@@ -146,12 +146,13 @@ namespace ryujin
   T pow(const T x, const typename get_value_type<T>::type b);
 
   /**
-   * Custom implementation of a vectorized pow function with vectorized power.
+   * Custom implementation of a vectorized pow function with vectorized
+   * exponent.
    *
    * @ingroup SIMD
    */
   template <typename T>
-  T vec_pow(const T x, const T b);
+  T pow(const T x, const T b);
 
   //@}
   /**

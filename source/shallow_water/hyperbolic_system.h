@@ -794,6 +794,8 @@ namespace ryujin
       static_assert(component == 1 || component == 2,
                     "component has to be 1 or 2");
 
+      using ScalarNumber = typename get_value_type<Number>::type;
+
       const auto m = momentum(U);
       const auto a = speed_of_sound(U);
       const auto vn = m * normal * inverse_water_depth_sharp(U);
@@ -804,17 +806,21 @@ namespace ryujin
 
       /* First Riemann characteristic: v * n - 2 * a */
 
-      const auto R_1 = component == 1 ? vn_bar - 2. * a_bar : vn - 2. * a;
+      const auto R_1 = component == 1 ? vn_bar - ScalarNumber(2.) * a_bar
+                                      : vn - ScalarNumber(2.) * a;
 
       /* Second Riemann characteristic: v * n + 2 * a */
 
-      const auto R_2 = component == 2 ? vn_bar + 2. * a_bar : vn + 2. * a;
+      const auto R_2 = component == 2 ? vn_bar + ScalarNumber(2.) * a_bar
+                                      : vn + ScalarNumber(2.) * a;
 
       const auto vperp = m * inverse_water_depth_sharp(U) - vn * normal;
 
-      const auto vn_new = 0.5 * (R_1 + R_2);
+      const auto vn_new = ScalarNumber(0.5) * (R_1 + R_2);
 
-      const auto h_new = ryujin::pow((R_2 - R_1) / 4., 2) / gravity_;
+      const auto h_new =
+          ryujin::fixed_power<2>((R_2 - R_1) / ScalarNumber(4.)) /
+          ScalarNumber(gravity_);
 
       state_type<dim, Number> U_new;
 
@@ -1027,13 +1033,16 @@ namespace ryujin
         const T &,
         const dealii::Tensor<1, dim, T> &c_ij) const
     {
+      using ScalarNumber = typename get_value_type<T>::type;
+
       const auto &[U_i, Z_i] = prec_i;
       const auto H_i = water_depth(U_i);
       const auto &[U_j, Z_j] = prec_j;
       const auto U_star_ij = star_state(U_i, Z_i, Z_j);
       const auto H_star_ij = water_depth(U_star_ij);
 
-      const auto factor = gravity_ * (H_star_ij * H_star_ij - H_i * H_i);
+      const auto factor =
+          ScalarNumber(gravity_) * (H_star_ij * H_star_ij - H_i * H_i);
       ST result;
       for (unsigned int d = 1; d < dim + 1; ++d)
         result[d] = factor * c_ij[d - 1];
@@ -1055,9 +1064,9 @@ namespace ryujin
       const auto H_i = water_depth(U_i);
       const auto H_j = water_depth(U_j);
 
-      const auto factor =
-          -gravity_ * H_i * (Z_j - Z_i) +
-          ScalarNumber(0.5) * gravity_ * (H_j - H_i) * (H_j - H_i);
+      const auto factor = -ScalarNumber(gravity_) * H_i * (Z_j - Z_i) +
+                          ScalarNumber(0.5) * ScalarNumber(gravity_) *
+                              (H_j - H_i) * (H_j - H_i);
 
       ST result;
       for (unsigned int d = 1; d < dim + 1; ++d)

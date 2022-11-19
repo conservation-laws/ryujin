@@ -46,7 +46,7 @@ namespace ryujin
           Number h_inflow = 0.28205279813802181;
           Number q_inflow = 0.18;
           Number cBer =
-              zM + 1.5 * ryujin::pow(q_inflow * q_inflow / g, 1. / 3.);
+              zM + 1.5 * ryujin::pow(q_inflow * q_inflow / g, Number(1. / 3.));
 
 
           /* Subsonic flow constants */
@@ -61,7 +61,7 @@ namespace ryujin
           const Number b = compute_bathymetry(point) - cBer;
           const Number Q = -std::pow(b, 2) / 9.;
           const Number R = -(27. * d + 2. * std::pow(b, 3)) / 54.;
-          const Number theta = acos(ryujin::pow(-Q, -1.5) * R);
+          const Number theta = acos(ryujin::pow(-Q, Number(-1.5)) * R);
 
           /* Define initial and exact solution */
           const Number h_initial = h_inflow - compute_bathymetry(point);
