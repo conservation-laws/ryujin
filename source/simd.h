@@ -198,7 +198,7 @@ namespace ryujin
    *
    * @ingroup SIMD
    */
-  template <Bias B = Bias::none, typename T>
+  template <Bias bias = Bias::none, typename T>
   T fast_pow(const T x, const T b);
 
 
@@ -207,7 +207,7 @@ namespace ryujin
    *
    * @ingroup SIMD
    */
-  template <Bias B = Bias::none, typename T, std::size_t width>
+  template <Bias bias = Bias::none, typename T, std::size_t width>
   dealii::VectorizedArray<T, width>
   fast_pow(const dealii::VectorizedArray<T, width> x, const T b);
 
@@ -218,7 +218,7 @@ namespace ryujin
    *
    * @ingroup SIMD
    */
-  template <Bias B = Bias::none, typename T, std::size_t width>
+  template <Bias bias = Bias::none, typename T, std::size_t width>
   dealii::VectorizedArray<T, width>
   fast_pow(const dealii::VectorizedArray<T, width> x,
            const dealii::VectorizedArray<T, width> b);

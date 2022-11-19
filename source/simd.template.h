@@ -207,32 +207,42 @@ namespace ryujin
    * The "fast_pow" family of approximate pow() functions
    */
 
-  template <Bias B, typename T>
+  template <Bias bias, typename T>
   // DEAL_II_ALWAYS_INLINE inline
   T fast_pow(const T x, const T b)
   {
-    return ryujin::pow(float(x), float(b));
+    if constexpr (bias == Bias::none)
+      return ryujin::pow(float(x), float(b));
+
+    __builtin_trap();
   }
 
 
-  template <Bias B, typename T, std::size_t width>
+  template <Bias bias, typename T, std::size_t width>
   // DEAL_II_ALWAYS_INLINE inline
   dealii::VectorizedArray<T, width>
   fast_pow(const dealii::VectorizedArray<T, width> x, const T b)
   {
-    return from_vcl<T, width>(FC<T, width>::to_double(
-        vcl::pow(FC<T, width>::to_float(to_vcl(x)), float(b))));
+    if constexpr (bias == Bias::none)
+      return from_vcl<T, width>(FC<T, width>::to_double(
+          vcl::pow(FC<T, width>::to_float(to_vcl(x)), float(b))));
+
+    __builtin_trap();
   }
 
 
-  template <Bias B, typename T, std::size_t width>
+  template <Bias bias, typename T, std::size_t width>
   // DEAL_II_ALWAYS_INLINE inline
   dealii::VectorizedArray<T, width>
   fast_pow(const dealii::VectorizedArray<T, width> x,
       const dealii::VectorizedArray<T, width> b)
   {
-    return from_vcl<T, width>(FC<T, width>::to_double(vcl::pow(
-        FC<T, width>::to_float(to_vcl(x)), FC<T, width>::to_float(to_vcl(b)))));
+    if constexpr (bias == Bias::none)
+      return from_vcl<T, width>(
+          FC<T, width>::to_double(vcl::pow(FC<T, width>::to_float(to_vcl(x)),
+                                           FC<T, width>::to_float(to_vcl(b)))));
+
+    __builtin_trap();
   }
 
 
