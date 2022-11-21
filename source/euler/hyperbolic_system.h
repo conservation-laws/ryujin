@@ -762,8 +762,8 @@ namespace ryujin
        *
        * we get
        *
-       *   eta' = 1/(gamma+1) * (rho^2 e) ^ -gamma/(gamma+1) * ( E , -m , rho
-       * )^T
+       *   eta' = 1/(gamma+1) * (rho^2 e) ^ -gamma/(gamma+1) * (E,-m,rho)^T
+       *
        */
 
       constexpr int dim = problem_dim - 2;
@@ -783,9 +783,8 @@ namespace ryujin
       dealii::Tensor<1, problem_dim, Number> result;
 
       result[0] = factor * E;
-      for (unsigned int i = 0; i < dim; ++i) {
+      for (unsigned int i = 0; i < dim; ++i)
         result[1 + i] = -factor * m[i];
-      }
       result[dim + 1] = factor * rho;
 
       return result;

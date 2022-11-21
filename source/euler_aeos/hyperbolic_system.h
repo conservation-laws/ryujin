@@ -265,15 +265,11 @@ namespace ryujin
        *   \eta = (\rho^2 e * (1 - b_interp * \rho))^{1 / (\gamma + 1)},
        * \f]
        *
-       * with
-       *
-       * \f[
-       *   \eta' = (FIXME)^T
-       * \f]
        */
       template <int problem_dim, typename Number>
       dealii::Tensor<1, problem_dim, Number>
       harten_entropy_derivative(const dealii::Tensor<1, problem_dim, Number> &U,
+                                const Number &eta,
                                 const Number &gamma_min) const;
 
       /**
@@ -781,12 +777,12 @@ namespace ryujin
 
       const Number rho_rho_e = rho * E - ScalarNumber(0.5) * m.norm_square();
 
-      const Number x = Number(1.) - Number(b_interp_) * rho;
-      const Number cov_term = ryujin::pow(x, gamma - Number(1.));
-
       const Number exponent = ScalarNumber(1.) / (gamma + Number(1.));
 
-      return ryujin::pow(rho_rho_e * cov_term, exponent);
+      const Number covolume = Number(1.) - Number(b_interp_) * rho;
+      const Number covolume_term = ryujin::pow(covolume, gamma - Number(1.));
+
+      return ryujin::pow(rho_rho_e * covolume_term, exponent);
     }
 
 
@@ -794,16 +790,21 @@ namespace ryujin
     DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, problem_dim, Number>
     HyperbolicSystem::harten_entropy_derivative(
         const dealii::Tensor<1, problem_dim, Number> &U,
-        const Number &gamma_min) const
+        const Number &eta,
+        const Number &gamma) const
     {
       /*
        * With
-       *   \eta = (\rho^2 e * (1 - b_interp * \rho)) ^ {1 / (\gamma + 1)},
+       *   eta = (rho^2 e * (1 - b_interp * rho)) ^ {1 / (gamma + 1)},
        *   rho^2 e = rho * E - 1/2 |m|^2,
        *
        * we get
        *
-       *   eta' = FIXME
+       *   eta' = factor * (1 - b_interp rho) * (E,-m,rho)^T +
+       *          factor * rho^2 e * (gamma - 1) * b * (1,0,0)^T
+       *
+       *   factor = 1/(gamma+1) * (eta/(1-b_interp rho)^-gamma
+       *                        / (1-b_interp rho)^2
        */
 
       constexpr int dim = problem_dim - 2;
@@ -814,31 +815,22 @@ namespace ryujin
       const Number E = U[dim + 1];
       const Number rho_rho_e = rho * E - ScalarNumber(0.5) * m.norm_square();
 
-      const auto gamma_plus_one_inverse =
-          ScalarNumber(1.) / (gamma_min + Number(1.));
+      const Number b = Number(b_interp_);
 
-      const Number x = Number(1.) - Number(b_interp_) * rho;
-      const Number x_inverse = Number(1.) / x;
-      const Number covolume_term = ryujin::pow(x, gamma_min - Number(1.));
+      const Number covolume = Number(1.) - b * rho;
+      const Number covolume_inverse = Number(1.) / covolume;
 
-      /* Not sure if to compute directly or call harten_entropy() function? */
-      const Number eta =
-          ryujin::pow(rho_rho_e * covolume_term, gamma_plus_one_inverse);
+      const Number factor = ryujin::pow(eta * covolume_inverse, -gamma) *
+                            fixed_power<2>(covolume_inverse) /
+                            (gamma + Number(1.));
 
-      const Number factor = gamma_plus_one_inverse * covolume_term *
-                            ryujin::pow(eta, -gamma_min);
-
-      /* Store eta' result */
       dealii::Tensor<1, problem_dim, Number> result;
 
-      result[0] = factor * (E - Number(b_interp_) * (gamma_min - Number(1.)) *
-                                    rho_rho_e * x_inverse);
-
-      for (unsigned int i = 0; i < dim; ++i) {
-        result[1 + i] = -factor * m[i];
-      }
-
-      result[dim + 1] = factor * rho;
+      result[0] =
+          factor * (covolume * E - (gamma - Number(1.)) * rho_rho_e * b);
+      for (unsigned int i = 0; i < dim; ++i)
+        result[1 + i] = -factor * covolume * m[i];
+      result[dim + 1] = factor * covolume * rho;
 
       return result;
     }
