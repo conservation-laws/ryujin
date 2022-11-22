@@ -56,8 +56,8 @@ namespace ryujin
 
     add_parameter("vtu output quantities",
                   vtu_output_quantities_,
-                  "List of conserved, primitive, or precomputed quantities "
-                  "that will be written to the vtu files.");
+                  "List of conserved, primitive, precomputed, or postprocessed "
+                  "quantities that will be written to the vtu files.");
   }
 
 
@@ -95,7 +95,22 @@ namespace ryujin
             HyperbolicSystem::primitive_component_names<dim>;
         const auto pos = std::find(std::begin(names), std::end(names), entry);
         if (pos != std::end(names)) {
-          AssertThrow(false, dealii::ExcNotImplemented());
+          const auto index = std::distance(std::begin(names), pos);
+          quantities_mapping_.push_back(std::make_tuple(
+              entry, [this, index](scalar_type &result, const vector_type &U) {
+                /*
+                 * FIXME: We might traverse the same vector multiple times. This
+                 * is inefficient.
+                 */
+                const unsigned int n_owned = offline_data_->n_locally_owned();
+                for (unsigned int i = 0; i < n_owned; ++i) {
+                  const auto &hyperbolic_system =
+                      hyperbolic_module_->hyperbolic_system();
+                  result.local_element(i) =
+                      hyperbolic_system.to_primitive_state(
+                          U.get_tensor(i))[index];
+                }
+              }));
           continue;
         }
       }

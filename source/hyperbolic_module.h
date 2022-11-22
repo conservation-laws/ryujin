@@ -274,6 +274,7 @@ namespace ryujin
     std::map<std::string, dealii::Timer> &computing_timer_;
 
     dealii::SmartPointer<const ryujin::OfflineData<dim, Number>> offline_data_;
+    ACCESSOR_READ_ONLY(offline_data)
     dealii::SmartPointer<const ryujin::HyperbolicSystem> hyperbolic_system_;
     ACCESSOR_READ_ONLY(hyperbolic_system)
     dealii::SmartPointer<const ryujin::InitialValues<dim, Number>>
@@ -292,7 +293,7 @@ namespace ryujin
     ACCESSOR_READ_ONLY(precomputed_initial)
 
     mutable scalar_type alpha_;
-    ACCESSOR_READ_ONLY(alpha)
+    ACCESSOR_READ_ONLY(alpha);
 
     static constexpr auto n_bounds = Limiter<dim, Number>::n_bounds;
     mutable MultiComponentVector<Number, n_bounds> bounds_;
