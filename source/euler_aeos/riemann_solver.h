@@ -289,9 +289,6 @@ namespace ryujin
         const unsigned int *js,
         const dealii::Tensor<1, dim, Number> &n_ij) const
     {
-#ifdef DEBUG_OUTPUT
-    std::cout << "RiemannSolver<dim, Number>::compute()" << std::endl;
-#endif
       const auto &[p_i, unused_i, s_i, eta_i] =
           precomputed_values.template get_tensor<Number, precomputed_type>(i);
 

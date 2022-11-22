@@ -507,8 +507,12 @@ namespace ryujin
       std::cout << "        perform time-step with tau = " << tau << std::endl;
 #endif
 
-      if (precompute_only_)
+      if (precompute_only_) {
+#ifdef DEBUG_OUTPUT
+        std::cout << "        return early" << std::endl;
+#endif
         return Number(0.);
+      }
     }
 
     /*
