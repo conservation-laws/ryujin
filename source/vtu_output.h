@@ -9,6 +9,7 @@
 
 #include <hyperbolic_system.h>
 
+#include "convenience_macros.h"
 #include "hyperbolic_module.h"
 #include "offline_data.h"
 #include "postprocessor.h"
@@ -101,6 +102,7 @@ namespace ryujin
      * The function requires MPI communication and is not reentrant.
      */
     void schedule_output(const vector_type &U,
+                         const precomputed_type &precomputed_values,
                          std::string name,
                          Number t,
                          unsigned int cycle,
@@ -133,14 +135,14 @@ namespace ryujin
     dealii::SmartPointer<const Postprocessor<dim, Number>> postprocessor_;
 
     bool need_to_prepare_step_;
+    ACCESSOR_READ_ONLY(need_to_prepare_step)
 
     std::vector<scalar_type> quantities_;
 
-    precomputed_type temp_precomputed_;
-
     std::vector<std::tuple<std::string /*name*/,
                            std::function<void(scalar_type & /*result*/,
-                                              const vector_type & /*U*/)>>>
+                                              const vector_type & /*U*/,
+                                              const precomputed_type &)>>>
         quantities_mapping_;
 
     //@}

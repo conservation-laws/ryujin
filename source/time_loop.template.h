@@ -534,8 +534,25 @@ namespace ryujin
       if (cycle == 0)
         postprocessor_.reset_bounds();
 
+      precomputed_type precomputed_values;
+
+      if (vtu_output_.need_to_prepare_step()) {
+        /*
+         * In case we output a precomputed value or alpha we have to run
+         * Steps 0 - 2 of the explicit Euler step:
+         */
+        const auto &scalar_partitioner = offline_data_.scalar_partitioner();
+        precomputed_values.reinit_with_scalar_partitioner(scalar_partitioner);
+
+        vector_type dummy;
+        hyperbolic_module_.precompute_only_ = true;
+        hyperbolic_module_.template step<0>(
+            U, {}, {}, {}, dummy, precomputed_values, Number(0.));
+        hyperbolic_module_.precompute_only_ = false;
+      }
+
       vtu_output_.schedule_output(
-          U, name, t, cycle, do_full_output, do_levelsets);
+          U, precomputed_values, name, t, cycle, do_full_output, do_levelsets);
     }
 
     /* Checkpointing: */

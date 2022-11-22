@@ -83,10 +83,13 @@ namespace ryujin
         const auto pos = std::find(std::begin(names), std::end(names), entry);
         if (pos != std::end(names)) {
           const auto index = std::distance(std::begin(names), pos);
-          quantities_mapping_.push_back(std::make_tuple(
-              entry, [index](scalar_type &result, const vector_type &U) {
-                U.extract_component(result, index);
-              }));
+          quantities_mapping_.push_back(
+              std::make_tuple(entry,
+                              [index](scalar_type &result,
+                                      const vector_type &U,
+                                      const precomputed_type &) {
+                                U.extract_component(result, index);
+                              }));
           continue;
         }
       }
@@ -100,7 +103,10 @@ namespace ryujin
         if (pos != std::end(names)) {
           const auto index = std::distance(std::begin(names), pos);
           quantities_mapping_.push_back(std::make_tuple(
-              entry, [this, index](scalar_type &result, const vector_type &U) {
+              entry,
+              [this, index](scalar_type &result,
+                            const vector_type &U,
+                            const precomputed_type &) {
                 /*
                  * FIXME: We might traverse the same vector multiple times. This
                  * is inefficient.
@@ -127,7 +133,10 @@ namespace ryujin
         if (pos != std::end(names)) {
           const auto index = std::distance(std::begin(names), pos);
           quantities_mapping_.push_back(std::make_tuple(
-              entry, [this, index](scalar_type &result, const vector_type &) {
+              entry,
+              [this, index](scalar_type &result,
+                            const vector_type &,
+                            const precomputed_type &) {
                 hyperbolic_module_->precomputed_initial().extract_component(
                     result, index);
               }));
@@ -143,8 +152,11 @@ namespace ryujin
         if (pos != std::end(names)) {
           const auto index = std::distance(std::begin(names), pos);
           quantities_mapping_.push_back(std::make_tuple(
-              entry, [this, index](scalar_type &result, const vector_type &) {
-                temp_precomputed_.extract_component(result, index);
+              entry,
+              [index](scalar_type &result,
+                      const vector_type &,
+                      const precomputed_type &precomputed_values) {
+                precomputed_values.extract_component(result, index);
               }));
           need_to_prepare_step_ = true;
           continue;
@@ -155,11 +167,14 @@ namespace ryujin
         /* Special indicator value: */
 
         if (entry == "alpha") {
-          quantities_mapping_.push_back(std::make_tuple(
-              entry, [this](scalar_type &result, const vector_type &) {
-                const auto &alpha = hyperbolic_module_->alpha();
-                result = alpha;
-              }));
+          quantities_mapping_.push_back(
+              std::make_tuple(entry,
+                              [this](scalar_type &result,
+                                     const vector_type &,
+                                     const precomputed_type &) {
+                                const auto &alpha = hyperbolic_module_->alpha();
+                                result = alpha;
+                              }));
           need_to_prepare_step_ = true;
           continue;
         }
@@ -175,27 +190,18 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  void VTUOutput<dim, Number>::schedule_output(const vector_type &U,
-                                               std::string name,
-                                               Number t,
-                                               unsigned int cycle,
-                                               bool output_full,
-                                               bool output_levelsets)
+  void VTUOutput<dim, Number>::schedule_output(
+      const vector_type &U,
+      const precomputed_type &precomputed_values,
+      std::string name,
+      Number t,
+      unsigned int cycle,
+      bool output_full,
+      bool output_levelsets)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "VTUOutput<dim, Number>::schedule_output()" << std::endl;
 #endif
-    if (need_to_prepare_step_) {
-      const auto &scalar_partitioner = offline_data_->scalar_partitioner();
-      temp_precomputed_.reinit_with_scalar_partitioner(scalar_partitioner);
-
-      vector_type dummy;
-      hyperbolic_module_->precompute_only_ = true;
-      hyperbolic_module_->template step<0>(
-          U, {}, {}, {}, dummy, temp_precomputed_, Number(0.));
-      hyperbolic_module_->precompute_only_ = false;
-    }
-
     const auto &affine_constraints = offline_data_->affine_constraints();
 
     /* Copy quantities: */
@@ -204,13 +210,10 @@ namespace ryujin
            ExcInternalError());
     for (unsigned int d = 0; d < quantities_.size(); ++d) {
       const auto &lambda = std::get<1>(quantities_mapping_[d]);
-      lambda(quantities_[d], U);
+      lambda(quantities_[d], U, precomputed_values);
       affine_constraints.distribute(quantities_[d]);
       quantities_[d].update_ghost_values();
     }
-
-    if (need_to_prepare_step_)
-      temp_precomputed_.reinit(0);
 
     /* prepare DataOut: */
 

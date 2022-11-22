@@ -44,6 +44,13 @@ namespace ryujin
         HyperbolicSystem::problem_dimension<dim>;
 
     /**
+     * @copydoc HyperbolicSystem::n_precomputed_values
+     */
+    static constexpr unsigned int n_precomputed_values =
+        HyperbolicSystem::n_precomputed_values<dim>;
+
+
+    /**
      * @copydoc OfflineData::scalar_type
      */
     using scalar_type = typename OfflineData<dim, Number>::scalar_type;
@@ -52,6 +59,11 @@ namespace ryujin
      * Typedef for a MultiComponentVector storing the state U.
      */
     using vector_type = MultiComponentVector<Number, problem_dimension>;
+
+    /**
+     * Typedef for a MultiComponentVector storing precomputed values.
+     */
+    using precomputed_type = MultiComponentVector<Number, n_precomputed_values>;
 
     /**
      * Constructor.
