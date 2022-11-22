@@ -435,7 +435,7 @@ namespace ryujin
         Assert(c_ji.norm() > 1.e-12, ExcInternalError());
         const auto norm = c_ji.norm();
         const auto n_ji = c_ji / norm;
-        auto lambda_max = riemann_solver.compute(U_j, U_i, i, &j, n_ji);
+        auto lambda_max = riemann_solver.compute(U_j, U_i, j, &i, n_ji);
 
         auto d = dij_matrix_.get_entry(i, col_idx);
         d = std::max(d, norm * lambda_max);
