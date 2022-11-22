@@ -246,6 +246,8 @@ namespace ryujin
       cfl_ = new_cfl;
     }
 
+    mutable bool precompute_only_;
+
     mutable IDViolationStrategy id_violation_strategy_;
 
   private:
@@ -293,7 +295,7 @@ namespace ryujin
     ACCESSOR_READ_ONLY(precomputed_initial)
 
     mutable scalar_type alpha_;
-    ACCESSOR_READ_ONLY(alpha);
+    ACCESSOR_READ_ONLY(alpha)
 
     static constexpr auto n_bounds = Limiter<dim, Number>::n_bounds;
     mutable MultiComponentVector<Number, n_bounds> bounds_;

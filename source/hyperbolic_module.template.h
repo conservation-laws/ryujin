@@ -30,6 +30,7 @@ namespace ryujin
       const ryujin::InitialValues<dim, Number> &initial_values,
       const std::string &subsection /*= "HyperbolicModule"*/)
       : ParameterAcceptor(subsection)
+      , precompute_only_(false)
       , id_violation_strategy_(IDViolationStrategy::warn)
       , mpi_communicator_(mpi_communicator)
       , computing_timer_(computing_timer)
@@ -157,7 +158,7 @@ namespace ryujin
       Number tau /*= 0.*/) const
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "HyperbolicModule<dim, Number>::single_step()" << std::endl;
+    std::cout << "HyperbolicModule<dim, Number>::step()" << std::endl;
 #endif
 
     CALLGRIND_START_INSTRUMENTATION
@@ -505,6 +506,9 @@ namespace ryujin
       std::cout << "        computed tau_max = " << tau_max << std::endl;
       std::cout << "        perform time-step with tau = " << tau << std::endl;
 #endif
+
+      if (precompute_only_)
+        return Number(0.);
     }
 
     /*

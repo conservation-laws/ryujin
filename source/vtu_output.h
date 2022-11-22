@@ -61,6 +61,11 @@ namespace ryujin
     using vector_type = MultiComponentVector<Number, problem_dimension>;
 
     /**
+     * Typedef for a MultiComponentVector storing precomputed values.
+     */
+    using precomputed_type = MultiComponentVector<Number, n_precomputed_values>;
+
+    /**
      * Constructor.
      */
     VTUOutput(const MPI_Comm &mpi_communicator,
@@ -127,7 +132,11 @@ namespace ryujin
         hyperbolic_module_;
     dealii::SmartPointer<const Postprocessor<dim, Number>> postprocessor_;
 
+    bool need_to_prepare_step_;
+
     std::vector<scalar_type> quantities_;
+
+    precomputed_type temp_precomputed_;
 
     std::vector<std::tuple<std::string /*name*/,
                            std::function<void(scalar_type & /*result*/,

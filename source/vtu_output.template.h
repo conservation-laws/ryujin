@@ -33,6 +33,7 @@ namespace ryujin
       , offline_data_(&offline_data)
       , hyperbolic_module_(&hyperbolic_module)
       , postprocessor_(&postprocessor)
+      , need_to_prepare_step_(false)
   {
     use_mpi_io_ = true;
     add_parameter("use mpi io",
@@ -67,6 +68,8 @@ namespace ryujin
 #ifdef DEBUG_OUTPUT
     std::cout << "VTUOutput<dim, Number>::prepare()" << std::endl;
 #endif
+
+    need_to_prepare_step_ = false;
 
     /* Populate quantities mapping: */
 
@@ -133,6 +136,22 @@ namespace ryujin
       }
 
       {
+        /* Precomputed quantities: */
+
+        constexpr auto &names = HyperbolicSystem::precomputed_names<dim>;
+        const auto pos = std::find(std::begin(names), std::end(names), entry);
+        if (pos != std::end(names)) {
+          const auto index = std::distance(std::begin(names), pos);
+          quantities_mapping_.push_back(std::make_tuple(
+              entry, [this, index](scalar_type &result, const vector_type &) {
+                temp_precomputed_.extract_component(result, index);
+              }));
+          need_to_prepare_step_ = true;
+          continue;
+        }
+      }
+
+      {
         /* Special indicator value: */
 
         if (entry == "alpha") {
@@ -141,6 +160,7 @@ namespace ryujin
                 const auto &alpha = hyperbolic_module_->alpha();
                 result = alpha;
               }));
+          need_to_prepare_step_ = true;
           continue;
         }
       }
@@ -165,6 +185,16 @@ namespace ryujin
 #ifdef DEBUG_OUTPUT
     std::cout << "VTUOutput<dim, Number>::schedule_output()" << std::endl;
 #endif
+    if (need_to_prepare_step_) {
+      const auto &scalar_partitioner = offline_data_->scalar_partitioner();
+      temp_precomputed_.reinit_with_scalar_partitioner(scalar_partitioner);
+
+      vector_type dummy;
+      hyperbolic_module_->precompute_only_ = true;
+      hyperbolic_module_->template step<0>(
+          U, {}, {}, {}, dummy, temp_precomputed_, Number(0.));
+      hyperbolic_module_->precompute_only_ = false;
+    }
 
     const auto &affine_constraints = offline_data_->affine_constraints();
 
@@ -178,6 +208,9 @@ namespace ryujin
       affine_constraints.distribute(quantities_[d]);
       quantities_[d].update_ghost_values();
     }
+
+    if (need_to_prepare_step_)
+      temp_precomputed_.reinit(0);
 
     /* prepare DataOut: */
 
