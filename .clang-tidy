@@ -1,0 +1,12 @@
+Checks: >
+  -*,
+  cppcoreguidelines-pro-type-static-cast-downcast,
+  google-readability-casting,
+  modernize-*,
+  -modernize-concat-nested-namespaces,
+  -modernize-pass-by-value,
+  -modernize-use-trailing-return-type,
+  mpi-*,
+  performance-*,
+  -performance-inefficient-string-concatenation,
+  -performance-no-automatic-move

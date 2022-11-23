@@ -1,0 +1,3 @@
+# Work around our crazy compilation setup:
+CompileFlags:
+  Add: [-I../source/euler]
