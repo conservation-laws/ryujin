@@ -153,8 +153,7 @@ namespace ryujin
           };
         }
 
-        virtual state_type compute(const dealii::Point<dim> &point,
-                                   Number t) final override
+        state_type compute(const dealii::Point<dim> &point, Number t) final
         {
           /* (7.2) */
           const double gamma = hyperbolic_system.gamma();
@@ -192,5 +191,5 @@ namespace ryujin
       };
 
     } // namespace InitialStateLibrary
-  } // namespace Euler
+  }   // namespace Euler
 } // namespace ryujin

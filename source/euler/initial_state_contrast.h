@@ -50,8 +50,7 @@ namespace ryujin
               "Initial 1d primitive state (rho, u, p) on the right");
         }
 
-        virtual state_type compute(const dealii::Point<dim> &point,
-                                   Number /*t*/) final override
+        state_type compute(const dealii::Point<dim> &point, Number /*t*/) final
         {
           const auto temp = hyperbolic_system.from_primitive_state(
               point[0] > 0. ? primitive_right_ : primitive_left_);
@@ -65,5 +64,5 @@ namespace ryujin
         dealii::Tensor<1, 3, Number> primitive_right_;
       };
     } // namespace InitialStateLibrary
-  } // namespace Euler
+  }   // namespace Euler
 } // namespace ryujin

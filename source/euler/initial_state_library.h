@@ -47,5 +47,5 @@ namespace ryujin
       }
 
     } // namespace InitialStateLibrary
-  } // namespace Euler
+  }   // namespace Euler
 } // namespace ryujin

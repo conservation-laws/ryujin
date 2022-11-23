@@ -83,8 +83,7 @@ namespace ryujin
           primitive_left_[2] = p_L;
         }
 
-        virtual state_type compute(const dealii::Point<dim> &point,
-                                   Number t) final override
+        state_type compute(const dealii::Point<dim> &point, Number t) final
         {
           const Number position_1d = Number(point[0] - S3_ * t);
 
@@ -102,5 +101,5 @@ namespace ryujin
         Number S3_;
       };
     } // namespace InitialStateLibrary
-  } // namespace Euler
+  }   // namespace Euler
 } // namespace ryujin

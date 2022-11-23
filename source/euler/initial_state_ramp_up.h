@@ -57,8 +57,7 @@ namespace ryujin
               "Time from which on the final state is attained)");
         }
 
-        virtual state_type compute(const dealii::Point<dim> & /*point*/,
-                                   Number t) final override
+        state_type compute(const dealii::Point<dim> & /*point*/, Number t) final
         {
           dealii::Tensor<1, 3, Number> primitive;
 
@@ -89,5 +88,5 @@ namespace ryujin
         Number t_final_;
       };
     } // namespace InitialStateLibrary
-  } // namespace Euler
+  }   // namespace Euler
 } // namespace ryujin

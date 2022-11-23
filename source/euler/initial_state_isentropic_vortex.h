@@ -38,8 +38,7 @@ namespace ryujin
           this->add_parameter("beta", beta_, "vortex strength beta");
         }
 
-        virtual state_type compute(const dealii::Point<dim> &point,
-                                   Number t) final override
+        state_type compute(const dealii::Point<dim> &point, Number t) final
         {
           const auto gamma = hyperbolic_system.gamma();
 
@@ -83,5 +82,5 @@ namespace ryujin
         Number beta_;
       };
     } // namespace InitialStateLibrary
-  } // namespace Euler
+  }   // namespace Euler
 } // namespace ryujin

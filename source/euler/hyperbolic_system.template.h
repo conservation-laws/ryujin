@@ -16,7 +16,7 @@ namespace ryujin
         : ParameterAcceptor(subsection)
     {
       ParameterAcceptor::parse_parameters_call_back.connect(
-          std::bind(&HyperbolicSystem::parse_parameters_callback, this));
+          [this] { parse_parameters_callback(); });
 
       gamma_ = 7. / 5.;
       add_parameter("gamma", gamma_, "The ratio of specific heats");
