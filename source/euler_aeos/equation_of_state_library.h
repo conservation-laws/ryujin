@@ -5,8 +5,6 @@
 
 #pragma once
 
-#include "equation_of_state.h"
-
 #include "equation_of_state_jones_wilkins_lee.h"
 #include "equation_of_state_noble_abel_stiffened_gas.h"
 #include "equation_of_state_polytropic_gas.h"

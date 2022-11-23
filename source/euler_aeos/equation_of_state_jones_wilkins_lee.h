@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include "equation_of_state.h"
+
 namespace ryujin
 {
   namespace EulerAEOS
