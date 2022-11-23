@@ -108,10 +108,30 @@ int main()
   set_covolume(0.003);
   test({1.5, 0., 22., 2.0041781532448066}, {7., 0., 12., 5.7237635705670113});
 
-  /* Shock-expansion Mie-Gruneisen */
+  /* Mie-Gruneisen: shock-expansion 1, gamma_min != gamma_m */
   set_covolume(0.);
   test({3500., 20., 2.3e10, 118.01508858712090},
        {2400., 0., 1.5e11, 2.8761770391786854});
+
+  /* Mie-Gruneisen: shock-expansion 2, gamma_min = gamma_m */
+  set_covolume(0.);
+  test({3500., 20., 2.3e10, 118.01508858712090},
+       {3300., 0., 2.2e10, 8.2392709087064375});
+
+  /* Mie-Gruneisen: shock-expansion 3, gamma_min = gamma_m */
+  set_covolume(0.);
+  test({3500., 20., 2.3e10, 118.01508858712090},
+       {3., 0., 2.2e6, 1.0453481734270629});
+
+  /* Mie-Gruneisen: shock-expansion 4, gamma_min = gamma_m */
+  set_covolume(0.);
+  test({350., 20., 2.3e5, 1.0000474957444776},
+       {3., 0., 2.2e6, 1.0453481734270629});
+
+  /* Mie-Gruneisen: shock-expansion 5, gamma_min != gamma_m */
+  set_covolume(0.);
+  test({15., 20., 7.3e8, 2.2145329586703819},
+       {500., 0., 2.2e9, 1.2899388697970200});
 
   /*
    * States with crazy two-rarefaction pressure:
