@@ -21,7 +21,7 @@ namespace ryujin
       class NobleAbelStiffenedGas : public EquationOfState
       {
       public:
-        NobleAbelStiffenedGas(const std::string subsection)
+        NobleAbelStiffenedGas(const std::string &subsection)
             : EquationOfState("noble-abel-stiffened gas", subsection)
         {
           gamma_ = 7. / 5.;
@@ -42,8 +42,7 @@ namespace ryujin
         }
 
 
-        virtual double pressure(const double rho,
-                                const double internal_energy) final override
+        double pressure(const double rho, const double internal_energy) final
         {
           /*
            * p = (\gamma - 1) *  (\rho (e - q))/ (1 - b \rho) - \gamma p_\infty
@@ -57,9 +56,8 @@ namespace ryujin
         }
 
 
-        virtual double
-        specific_internal_energy(const double rho,
-                                 const double pressure) final override
+        double specific_internal_energy(const double rho,
+                                        const double pressure) final
         {
           const auto cov = 1. - b_ * rho;
 

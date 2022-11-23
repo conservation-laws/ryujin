@@ -41,8 +41,7 @@ namespace ryujin
           this->add_parameter("beta", beta_, "vortex strength beta");
         }
 
-        virtual state_type compute(const dealii::Point<dim> &point,
-                                   Number t) final override
+        state_type compute(const dealii::Point<dim> &point, Number t) final
         {
           /* In 3D we simply project onto the 2d plane: */
           dealii::Point<2> point_bar;

@@ -18,7 +18,7 @@ namespace ryujin
         : ParameterAcceptor(subsection)
     {
       ParameterAcceptor::parse_parameters_call_back.connect(
-          std::bind(&HyperbolicSystem::parse_parameters_callback, this));
+          [this] { parse_parameters_callback(); });
 
       equation_of_state_ = "polytropic gas";
       add_parameter(

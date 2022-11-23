@@ -36,8 +36,8 @@ namespace ryujin
                               "Initial 1d primitive state (rho, u, e)");
         }
 
-        virtual state_type compute(const dealii::Point<dim> & /*point*/,
-                                   Number /*t*/) final override
+        state_type compute(const dealii::Point<dim> & /*point*/,
+                           Number /*t*/) final
         {
           const auto temp = hyperbolic_system.from_primitive_state(primitive_);
           return hyperbolic_system.template expand_state<dim>(temp);

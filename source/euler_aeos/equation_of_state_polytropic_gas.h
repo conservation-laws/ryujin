@@ -21,7 +21,7 @@ namespace ryujin
       class PolytropicGas : public EquationOfState
       {
       public:
-        PolytropicGas(const std::string subsection)
+        PolytropicGas(const std::string &subsection)
             : EquationOfState("polytropic gas", subsection)
         {
           gamma_ = 7. / 5.;
@@ -29,8 +29,8 @@ namespace ryujin
         }
 
 
-        virtual double pressure(const double /*rho*/,
-                                const double internal_energy) final override
+        double pressure(const double /*rho*/,
+                        const double internal_energy) final
         {
           /*
            * p = (\gamma - 1) * \rho * e
@@ -40,9 +40,8 @@ namespace ryujin
         }
 
 
-        virtual double
-        specific_internal_energy(const double rho,
-                                 const double pressure) final override
+        double specific_internal_energy(const double rho,
+                                        const double pressure) final
         {
           const double denom = rho * (gamma_ - 1.);
           return pressure / denom;

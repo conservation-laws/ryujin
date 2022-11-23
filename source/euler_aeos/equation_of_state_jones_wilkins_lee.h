@@ -21,7 +21,7 @@ namespace ryujin
       class JonesWilkinsLee : public EquationOfState
       {
       public:
-        JonesWilkinsLee(const std::string subsection)
+        JonesWilkinsLee(const std::string &subsection)
             : EquationOfState("jones-wilkins-lee", subsection)
         {
           capA_ = 0.;
@@ -44,8 +44,7 @@ namespace ryujin
         }
 
 
-        virtual double pressure(const double rho,
-                                const double internal_energy) final override
+        double pressure(const double rho, const double internal_energy) final
         {
           /*
            * p = A(1 - omega / R_1 rho / rho_0) * exp(-R_1 rho_0 / rho) + B(1
@@ -64,9 +63,8 @@ namespace ryujin
         }
 
 
-        virtual double
-        specific_internal_energy(const double rho,
-                                 const double pressure) final override
+        double specific_internal_energy(const double rho,
+                                        const double pressure) final
         {
           const double ratio = rho / rho0_;
 
