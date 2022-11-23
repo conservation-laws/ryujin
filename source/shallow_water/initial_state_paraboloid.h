@@ -5,8 +5,8 @@
 
 #pragma once
 
-#include <initial_state.h>
 #include <hyperbolic_system.h>
+#include <initial_state.h>
 
 namespace ryujin
 {
@@ -42,8 +42,7 @@ namespace ryujin
           this->add_parameter("eta", eta_, "The eta parameter");
         }
 
-        virtual state_type compute(const dealii::Point<dim> &point,
-                                   Number t) final override
+        state_type compute(const dealii::Point<dim> &point, Number t) final
         {
           if constexpr (dim == 1) {
             AssertThrow(false, dealii::ExcNotImplemented());
@@ -71,9 +70,9 @@ namespace ryujin
           }
         }
 
-        virtual auto initial_precomputations(const dealii::Point<dim> &point) ->
+        auto initial_precomputations(const dealii::Point<dim> &point) ->
             typename InitialState<dim, Number, state_type, 1>::precomputed_type
-            final override
+            final
         {
           /* Compute bathymetry: */
           return {compute_bathymetry(point)};
@@ -94,5 +93,5 @@ namespace ryujin
       };
 
     } // namespace InitialStateLibrary
-  } // namespace ShallowWater
+  }   // namespace ShallowWater
 } // namespace ryujin

@@ -36,8 +36,7 @@ namespace ryujin
                               "or 'subsonic' flow.");
         }
 
-        virtual state_type compute(const dealii::Point<dim> &point,
-                                   Number t) final override
+        state_type compute(const dealii::Point<dim> &point, Number t) final
         {
           const auto x = point[0];
           const Number g = this->hyperbolic_system.gravity();
@@ -89,9 +88,9 @@ namespace ryujin
               HyperbolicSystem::state_type<1, Number>{{h_exact, q_inflow}});
         }
 
-        virtual auto initial_precomputations(const dealii::Point<dim> &point) ->
+        auto initial_precomputations(const dealii::Point<dim> &point) ->
             typename InitialState<dim, Number, state_type, 1>::precomputed_type
-            final override
+            final
         {
           /* Compute bathymetry: */
           return {compute_bathymetry(point)};
@@ -118,5 +117,5 @@ namespace ryujin
       };
 
     } // namespace InitialStateLibrary
-  } // namespace ShallowWater
+  }   // namespace ShallowWater
 } // namespace ryujin

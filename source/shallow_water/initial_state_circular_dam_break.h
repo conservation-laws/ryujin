@@ -41,8 +41,7 @@ namespace ryujin
               "dam amplitude", dam_amplitude_, "Amplitude of circular dam");
         }
 
-        virtual state_type compute(const dealii::Point<dim> &point,
-                                   Number /*t*/) final override
+        state_type compute(const dealii::Point<dim> &point, Number /*t*/) final
         {
           const Number r = point.norm_square();
           const Number h = (r <= radius_ ? dam_amplitude_ : still_water_depth_);
@@ -62,5 +61,5 @@ namespace ryujin
       };
 
     } // namespace InitialStateLibrary
-  } // namespace ShallowWater
+  }   // namespace ShallowWater
 } // namespace ryujin

@@ -5,8 +5,8 @@
 
 #pragma once
 
-#include <initial_state.h>
 #include <hyperbolic_system.h>
+#include <initial_state.h>
 
 namespace ryujin
 {
@@ -35,8 +35,8 @@ namespace ryujin
                               "Initial 1d primitive state (h, u)");
         }
 
-        virtual state_type compute(const dealii::Point<dim> & /*point*/,
-                                   Number /*t*/) final override
+        state_type compute(const dealii::Point<dim> & /*point*/,
+                           Number /*t*/) final
         {
           const auto temp = hyperbolic_system.from_primitive_state(primitive_);
           return hyperbolic_system.template expand_state<dim>(temp);
@@ -50,5 +50,5 @@ namespace ryujin
         dealii::Tensor<1, 2, Number> primitive_;
       };
     } // namespace InitialStateLibrary
-  } // namespace ShallowWater
+  }   // namespace ShallowWater
 } // namespace ryujin

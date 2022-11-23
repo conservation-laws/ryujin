@@ -1,8 +1,8 @@
 
 #pragma once
 
-#include <initial_state.h>
 #include <hyperbolic_system.h>
+#include <initial_state.h>
 
 namespace ryujin
 {
@@ -60,8 +60,7 @@ namespace ryujin
               "step height", step_height, "Height of the triangular step");
         }
 
-        virtual state_type compute(const dealii::Point<dim> &point,
-                                   Number /*t*/) final override
+        state_type compute(const dealii::Point<dim> &point, Number /*t*/) final
         {
           const Number x = point[0];
           const Number bath = compute_bathymetry(point);
@@ -77,9 +76,9 @@ namespace ryujin
               HyperbolicSystem::state_type<1, Number>{{h, Number(0.)}});
         }
 
-        virtual auto initial_precomputations(const dealii::Point<dim> &point) ->
+        auto initial_precomputations(const dealii::Point<dim> &point) ->
             typename InitialState<dim, Number, state_type, 1>::precomputed_type
-            final override
+            final
         {
           /* Compute bathymetry: */
           return {compute_bathymetry(point)};
@@ -111,5 +110,5 @@ namespace ryujin
       };
 
     } // namespace InitialStateLibrary
-  } // namespace ShallowWater
+  }   // namespace ShallowWater
 } // namespace ryujin

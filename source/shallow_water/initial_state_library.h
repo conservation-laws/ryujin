@@ -5,8 +5,8 @@
 
 #pragma once
 
-#include <initial_state.h>
 #include <hyperbolic_system.h>
+#include <initial_state.h>
 
 #include "initial_state_circular_dam_break.h"
 #include "initial_state_flow_over_bump.h"
@@ -58,5 +58,5 @@ namespace ryujin
       }
 
     } // namespace InitialStateLibrary
-  } // namespace ShallowWater
+  }   // namespace ShallowWater
 } // namespace ryujin

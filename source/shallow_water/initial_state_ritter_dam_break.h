@@ -5,8 +5,8 @@
 
 #pragma once
 
-#include <initial_state.h>
 #include <hyperbolic_system.h>
+#include <initial_state.h>
 
 namespace ryujin
 {
@@ -51,8 +51,7 @@ namespace ryujin
                                          "initial time greater than 0."));
         }
 
-        virtual state_type compute(const dealii::Point<dim> &point,
-                                   Number t) final override
+        state_type compute(const dealii::Point<dim> &point, Number t) final
         {
           const auto g = hyperbolic_system.gravity();
           const Number x = point[0];
@@ -91,5 +90,5 @@ namespace ryujin
       };
 
     } // namespace InitialStateLibrary
-  } // namespace ShallowWater
+  }   // namespace ShallowWater
 } // namespace ryujin

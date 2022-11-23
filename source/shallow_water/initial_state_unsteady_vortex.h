@@ -5,8 +5,8 @@
 
 #pragma once
 
-#include <initial_state.h>
 #include <hyperbolic_system.h>
+#include <initial_state.h>
 
 namespace ryujin
 {
@@ -41,8 +41,7 @@ namespace ryujin
           this->add_parameter("beta", beta_, "vortex strength beta");
         }
 
-        virtual state_type compute(const dealii::Point<dim> &point,
-                                   Number t) final override
+        state_type compute(const dealii::Point<dim> &point, Number t) final
         {
           const auto gravity = hyperbolic_system.gravity();
 
@@ -80,5 +79,5 @@ namespace ryujin
         Number beta_;
       };
     } // namespace InitialStateLibrary
-  } // namespace ShallowWater
+  }   // namespace ShallowWater
 } // namespace ryujin
