@@ -6,7 +6,6 @@
 #pragma once
 
 #include <initial_state.h>
-
 #include <hyperbolic_system.h>
 
 #include "initial_state_circular_dam_break.h"

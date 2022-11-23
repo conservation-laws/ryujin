@@ -1,6 +1,9 @@
 
 #pragma once
 
+#include <initial_state.h>
+#include <hyperbolic_system.h>
+
 namespace ryujin
 {
   namespace ShallowWater

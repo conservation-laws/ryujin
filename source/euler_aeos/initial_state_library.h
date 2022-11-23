@@ -6,7 +6,6 @@
 #pragma once
 
 #include <hyperbolic_system.h>
-
 #include <initial_state.h>
 
 #include "initial_state_contrast.h"
