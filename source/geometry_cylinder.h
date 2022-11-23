@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include "geometry_common_includes.h"
+
 namespace ryujin
 {
   namespace GridGenerator

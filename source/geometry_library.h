@@ -5,39 +5,11 @@
 
 #pragma once
 
-#include <compile_time_options.h>
-
-#include "geometry.h"
-
-#include <deal.II/fe/fe_system.h>
-#include <deal.II/grid/grid_generator.h>
-#include <deal.II/grid/grid_tools.h>
-#include <deal.II/grid/manifold_lib.h>
-#include <deal.II/grid/tensor_product_manifold.h>
-#include <deal.II/grid/tria.h>
-
-
-namespace ryujin
-{
-  /**
-   * This namespace provides a collection of functions for generating
-   * triangulations for some benchmark configurations.
-   *
-   * @ingroup Mesh
-   */
-  namespace GridGenerator
-  {
-    using namespace dealii::GridGenerator;
-  } /* namespace GridGenerator */
-} /* namespace ryujin */
-
-
 #include "geometry_airfoil.h"
 #include "geometry_cylinder.h"
 #include "geometry_rectangular_domain.h"
 #include "geometry_step.h"
 #include "geometry_wall.h"
-
 
 namespace ryujin
 {

@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include "geometry_common_includes.h"
+
 #include "cubic_spline.h"
 #include "transfinite_interpolation.template.h"
 
