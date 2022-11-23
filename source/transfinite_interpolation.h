@@ -25,19 +25,19 @@ namespace ryujin
   public:
     TransfiniteInterpolationManifold();
 
-    virtual ~TransfiniteInterpolationManifold() override = default;
+    ~TransfiniteInterpolationManifold() override = default;
 
-    virtual std::unique_ptr<Manifold<dim, spacedim>> clone() const override;
+    std::unique_ptr<Manifold<dim, spacedim>> clone() const override;
 
     void initialize(
         const Triangulation<dim, spacedim> &triangulation,
         const Manifold<dim, spacedim> &chart_manifold = FlatManifold<dim>());
 
-    virtual Point<spacedim>
+    Point<spacedim>
     get_new_point(const ArrayView<const Point<spacedim>> &surrounding_points,
                   const ArrayView<const double> &weights) const override;
 
-    virtual void
+    void
     get_new_points(const ArrayView<const Point<spacedim>> &surrounding_points,
                    const Table<2, double> &weights,
                    ArrayView<Point<spacedim>> new_points) const override;

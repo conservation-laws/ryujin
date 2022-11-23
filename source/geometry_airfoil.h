@@ -64,8 +64,8 @@ namespace ryujin
                dealii::ExcInternalError());
       }
 
-      virtual dealii::Point<dim>
-      pull_back(const dealii::Point<dim> &space_point) const final override
+      dealii::Point<dim>
+      pull_back(const dealii::Point<dim> &space_point) const final
       {
         auto coordinate = dealii::Point<dim>() + (space_point - airfoil_center);
 
@@ -91,8 +91,8 @@ namespace ryujin
         return chart_point;
       }
 
-      virtual dealii::Point<dim>
-      push_forward(const dealii::Point<dim> &point) const final override
+      dealii::Point<dim>
+      push_forward(const dealii::Point<dim> &point) const final
       {
         auto chart_point = point;
 
@@ -120,7 +120,7 @@ namespace ryujin
         return dealii::Point<dim>() + (coordinate + airfoil_center);
       }
 
-      std::unique_ptr<dealii::Manifold<dim, dim>> clone() const final override
+      std::unique_ptr<dealii::Manifold<dim, dim>> clone() const final
       {
         const double psi_ratio = ratio_ * psi_front(M_PI) / psi_front(0.);
         return std::make_unique<AirfoilManifold<dim>>(airfoil_center,
@@ -163,7 +163,7 @@ namespace ryujin
       }
 
       /* FIXME: find out why weights are not normalized. */
-      virtual Point<dim>
+      Point<dim>
       get_new_point(const ArrayView<const Point<dim>> &surrounding_points,
                     const ArrayView<const double> &weights) const override
       {
@@ -177,8 +177,8 @@ namespace ryujin
                                                          weights);
       }
 
-      virtual dealii::Point<dim>
-      pull_back(const dealii::Point<dim> &space_point) const final override
+      dealii::Point<dim>
+      pull_back(const dealii::Point<dim> &space_point) const final
       {
         auto chart_point = space_point - center;
 
@@ -195,8 +195,8 @@ namespace ryujin
         return dealii::Point<dim>() + chart_point;
       }
 
-      virtual dealii::Point<dim>
-      push_forward(const dealii::Point<dim> &chart_point) const final override
+      dealii::Point<dim>
+      push_forward(const dealii::Point<dim> &chart_point) const final
       {
         auto space_point = chart_point;
 
@@ -216,7 +216,7 @@ namespace ryujin
         return center + (space_point - dealii::Point<dim>());
       }
 
-      std::unique_ptr<dealii::Manifold<dim, dim>> clone() const final override
+      std::unique_ptr<dealii::Manifold<dim, dim>> clone() const final
       {
         return std::make_unique<GradingManifold<dim>>(
             center, direction, grading, epsilon);
@@ -242,12 +242,12 @@ namespace ryujin
       {
       }
 
-      virtual std::unique_ptr<Manifold<dim>> clone() const override
+      std::unique_ptr<Manifold<dim>> clone() const override
       {
         return std::make_unique<ExtrudedManifold<dim>>(*manifold);
       }
 
-      virtual Point<dim>
+      Point<dim>
       get_new_point(const ArrayView<const Point<dim>> &surrounding_points,
                     const ArrayView<const double> &weights) const override
       {
@@ -845,8 +845,8 @@ namespace ryujin
                             "number of subdivisions in z direction");
       }
 
-      virtual void create_triangulation(
-          typename Geometry<dim>::Triangulation &triangulation) final override
+      void create_triangulation(
+          typename Geometry<dim>::Triangulation &triangulation) final
       {
         /*
          * Step 1: Create parametrization:

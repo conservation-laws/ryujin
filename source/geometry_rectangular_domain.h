@@ -115,8 +115,8 @@ namespace ryujin
       }
 
 
-      virtual void create_triangulation(
-          typename Geometry<dim>::Triangulation &triangulation) final override
+      void create_triangulation(
+          typename Geometry<dim>::Triangulation &triangulation) final
       {
         /* create mesh: */
 

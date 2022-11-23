@@ -36,7 +36,7 @@ namespace ryujin
   {
     template <typename T>
     const std::string &get_options_from_name(const T &manifolds,
-                                             std::string name)
+                                             const std::string &name)
     {
       const auto it =
           std::find_if(manifolds.begin(),
@@ -91,7 +91,8 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  void Quantities<dim, Number>::prepare(std::string name, unsigned int cycle)
+  void Quantities<dim, Number>::prepare(const std::string &name,
+                                        unsigned int cycle)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "Quantities<dim, Number>::prepare()" << std::endl;

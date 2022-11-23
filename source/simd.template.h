@@ -235,7 +235,7 @@ namespace ryujin
   // DEAL_II_ALWAYS_INLINE inline
   dealii::VectorizedArray<T, width>
   fast_pow(const dealii::VectorizedArray<T, width> x,
-      const dealii::VectorizedArray<T, width> b)
+           const dealii::VectorizedArray<T, width> b)
   {
     if constexpr (bias == Bias::none)
       return from_vcl<T, width>(

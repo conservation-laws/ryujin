@@ -5,6 +5,7 @@ Checks: >
   modernize-*,
   -modernize-concat-nested-namespaces,
   -modernize-pass-by-value,
+  -modernize-use-nodiscard,
   -modernize-use-trailing-return-type,
   mpi-*,
   performance-*,

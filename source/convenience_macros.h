@@ -143,7 +143,7 @@ namespace
     static auto test(C *) -> decltype(*std::declval<C>(), std::true_type());
 
   public:
-    typedef decltype(test<T>(nullptr)) type;
+    using type = decltype(test<T>(nullptr));
     static constexpr auto value = type::value;
   };
 

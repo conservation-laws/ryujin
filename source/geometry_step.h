@@ -160,8 +160,8 @@ namespace ryujin
         this->add_parameter("step height", step_height_, "height of step");
       }
 
-      virtual void create_triangulation(
-          typename Geometry<dim>::Triangulation &triangulation) final override
+      void create_triangulation(
+          typename Geometry<dim>::Triangulation &triangulation) final
       {
         GridGenerator::step(
             triangulation, length_, height_, step_position_, step_height_);

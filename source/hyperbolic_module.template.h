@@ -5,8 +5,6 @@
 
 #pragma once
 
-#include <riemann_solver.h>
-
 #include "hyperbolic_module.h"
 #include "introspection.h"
 #include "openmp.h"
@@ -230,7 +228,6 @@ namespace ryujin
 
       const auto loop =
           [&](auto sentinel, unsigned int left, unsigned int right) {
-
             using T = decltype(sentinel);
             unsigned int stride_size = get_stride_size<T>;
 
@@ -278,7 +275,6 @@ namespace ryujin
 
       const auto loop =
           [&](auto sentinel, unsigned int left, unsigned int right) {
-
             using T = decltype(sentinel);
             unsigned int stride_size = get_stride_size<T>;
 

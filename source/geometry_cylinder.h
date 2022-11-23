@@ -249,8 +249,8 @@ namespace ryujin
                             "diameter of immersed cylinder");
       }
 
-      virtual void create_triangulation(
-          typename Geometry<dim>::Triangulation &triangulation) final override
+      void create_triangulation(
+          typename Geometry<dim>::Triangulation &triangulation) final
       {
         GridGenerator::cylinder(triangulation,
                                 length_,

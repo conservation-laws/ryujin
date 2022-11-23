@@ -7,6 +7,7 @@
 
 #include <compile_time_options.h>
 
+#include "discretization.h"
 #include "geometry.h"
 
 #include <deal.II/fe/fe_system.h>

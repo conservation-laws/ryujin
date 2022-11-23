@@ -67,7 +67,7 @@ int main(int argc, char *argv[])
 
   const auto executable_name = std::filesystem::path(argv[0]).filename();
   dealii::ParameterAcceptor::initialize(
-      argc == 2 ? argv[1] : std::string(executable_name) + ".prm");
+      argc == 2 ? argv[1] : executable_name.string() + ".prm");
 
   time_loop.run();
 

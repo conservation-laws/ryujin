@@ -10,6 +10,7 @@
 #include <hyperbolic_system.h>
 #include <indicator.h>
 #include <limiter.h>
+#include <riemann_solver.h>
 
 #include "convenience_macros.h"
 #include "initial_values.h"

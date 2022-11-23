@@ -10,6 +10,8 @@
 
 #include <boost/container/small_vector.hpp>
 
+#include <deal.II/base/table.h>
+
 namespace ryujin
 {
 

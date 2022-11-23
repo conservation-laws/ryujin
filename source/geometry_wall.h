@@ -121,8 +121,8 @@ namespace ryujin
             "wall position", wall_position_, "x position of wall");
       }
 
-      virtual void create_triangulation(
-          typename Geometry<dim>::Triangulation &triangulation) final override
+      void create_triangulation(
+          typename Geometry<dim>::Triangulation &triangulation) final
       {
         GridGenerator::wall(triangulation, length_, height_, wall_position_);
       }

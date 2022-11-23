@@ -22,19 +22,19 @@ namespace ryujin
   pow(const dealii::VectorizedArray<float, 16>,
       const dealii::VectorizedArray<float, 16>);
 
-//   template dealii::VectorizedArray<double, 8>
-//   fast_pow<Bias::none>(const dealii::VectorizedArray<double, 8>, const double);
+  template dealii::VectorizedArray<double, 8>
+  fast_pow<Bias::none>(const dealii::VectorizedArray<double, 8>, const double);
 
-//   template dealii::VectorizedArray<double, 8>
-//   fast_pow<Bias::none>(const dealii::VectorizedArray<double, 8>,
-//                        const dealii::VectorizedArray<double, 8>);
+  template dealii::VectorizedArray<double, 8>
+  fast_pow<Bias::none>(const dealii::VectorizedArray<double, 8>,
+                       const dealii::VectorizedArray<double, 8>);
 
-//   template dealii::VectorizedArray<float, 16>
-//   fast_pow<Bias::none>(const dealii::VectorizedArray<float, 16>, const float);
+  template dealii::VectorizedArray<float, 16>
+  fast_pow<Bias::none>(const dealii::VectorizedArray<float, 16>, const float);
 
-//   template dealii::VectorizedArray<float, 16>
-//   fast_pow<Bias::none>(const dealii::VectorizedArray<float, 16>,
-//                        const dealii::VectorizedArray<float, 16>);
+  template dealii::VectorizedArray<float, 16>
+  fast_pow<Bias::none>(const dealii::VectorizedArray<float, 16>,
+                       const dealii::VectorizedArray<float, 16>);
 #endif
 
 #if DEAL_II_COMPILER_VECTORIZATION_LEVEL >= 2 && defined(__AVX__)

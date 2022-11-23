@@ -73,7 +73,7 @@ namespace ryujin
      *
      * The string parameter @ref name is used as base name for output files.
      */
-    void prepare(std::string name, unsigned int cycle);
+    void prepare(const std::string &name, unsigned int cycle);
 
     /**
      * Takes a state vector @p U at time t (obtained at the end of a full
