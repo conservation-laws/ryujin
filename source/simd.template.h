@@ -7,20 +7,24 @@
 
 #include "simd.h"
 
-DEAL_II_DISABLE_EXTRA_DIAGNOSTICS
+#include <cmath>
+
 #if DEAL_II_COMPILER_VECTORIZATION_LEVEL >= 1 && defined(__SSE2__)
+
 #define VCL_NAMESPACE vcl
+DEAL_II_DISABLE_EXTRA_DIAGNOSTICS
 #include "../simd-math/vectorclass.h"
 #include "../simd-math/vectormath_exp.h"
+DEAL_II_ENABLE_EXTRA_DIAGNOSTICS
 #undef VCL_NAMESPACE
 #endif
-DEAL_II_ENABLE_EXTRA_DIAGNOSTICS
+
 
 namespace ryujin
 {
-  /*
-   * pow implementation for scalar float and double:
-   */
+  /*****************************************************************************
+   *             pow() implementation for scalar float and double:             *
+   ****************************************************************************/
 
 #if DEAL_II_COMPILER_VECTORIZATION_LEVEL >= 1 && defined(__SSE2__) &&          \
     defined(WITH_CUSTOM_POW)
@@ -62,6 +66,9 @@ namespace ryujin
   }
 #endif
 
+  /*****************************************************************************
+   *            pow() implementation for VectorizedArray<T, width>:            *
+   ****************************************************************************/
 
   namespace
   {
@@ -133,10 +140,7 @@ namespace ryujin
   }
 
 
-  /*
-   * Specialized pow implementation for VectorizedArray:
-   */
-
+#if DEAL_II_COMPILER_VECTORIZATION_LEVEL >= 1 && defined(__SSE2__)
   template <typename T, std::size_t width>
   // DEAL_II_ALWAYS_INLINE inline
   dealii::VectorizedArray<T, width>
@@ -154,6 +158,50 @@ namespace ryujin
   {
     return from_vcl<T, width>(vcl::pow(to_vcl(x), to_vcl(b)));
   }
+#endif
+
+
+  template <>
+  // DEAL_II_ALWAYS_INLINE inline
+  dealii::VectorizedArray<double, 1>
+  pow(const dealii::VectorizedArray<double, 1> x, const double b)
+  {
+    return ryujin::pow(x, b);
+  }
+
+
+  template <>
+  // DEAL_II_ALWAYS_INLINE inline
+  dealii::VectorizedArray<double, 1>
+  pow(const dealii::VectorizedArray<double, 1> x,
+      const dealii::VectorizedArray<double, 1> b)
+  {
+    return ryujin::pow(x, b);
+  }
+
+
+  template <>
+  // DEAL_II_ALWAYS_INLINE inline
+  dealii::VectorizedArray<float, 1>
+  pow(const dealii::VectorizedArray<float, 1> x, const float b)
+  {
+    return ryujin::pow(x, b);
+  }
+
+
+  template <>
+  // DEAL_II_ALWAYS_INLINE inline
+  dealii::VectorizedArray<float, 1>
+  pow(const dealii::VectorizedArray<float, 1> x,
+      const dealii::VectorizedArray<float, 1> b)
+  {
+    return ryujin::pow(x, b);
+  }
+
+
+  /*****************************************************************************
+   *          Fast pow() implementation for VectorizedArray<T, width>:         *
+   ****************************************************************************/
 
   namespace
   {
@@ -171,18 +219,26 @@ namespace ryujin
       typename VectorClassType<float, float_width>::value_type
       to_float(typename VectorClassType<double, width>::value_type x)
       {
+#if DEAL_II_COMPILER_VECTORIZATION_LEVEL == 0
+        return x;
+#else
         return vcl::to_float(x);
+#endif
       }
       static DEAL_II_ALWAYS_INLINE inline
       typename VectorClassType<double, width>::value_type
       to_double(typename VectorClassType<float, float_width>::value_type x)
       {
+#if DEAL_II_COMPILER_VECTORIZATION_LEVEL == 0
+        return x;
+#else
         if constexpr (width == 2) {
           const vcl::Vec4d temp = vcl::to_double(x);
           return vcl::Vec2d(temp.extract(0), temp.extract(1));
         } else {
           return vcl::to_double(x);
         }
+#endif
       }
     };
 
@@ -207,17 +263,7 @@ namespace ryujin
    * The "fast_pow" family of approximate pow() functions
    */
 
-  template <Bias bias, typename T>
-  // DEAL_II_ALWAYS_INLINE inline
-  T fast_pow(const T x, const T b)
-  {
-    if constexpr (bias == Bias::none)
-      return ryujin::pow(float(x), float(b));
-
-    __builtin_trap();
-  }
-
-
+#if DEAL_II_COMPILER_VECTORIZATION_LEVEL >= 1 && defined(__SSE2__)
   template <Bias bias, typename T, std::size_t width>
   // DEAL_II_ALWAYS_INLINE inline
   dealii::VectorizedArray<T, width>
@@ -244,6 +290,16 @@ namespace ryujin
 
     __builtin_trap();
   }
+#endif
 
+  template <Bias bias, typename T>
+  // DEAL_II_ALWAYS_INLINE inline
+  T fast_pow(const T x, const T b)
+  {
+    if constexpr (bias == Bias::none)
+      return ryujin::pow(float(x), float(b));
+
+    __builtin_trap();
+  }
 
 } // namespace ryujin

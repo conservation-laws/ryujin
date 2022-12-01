@@ -97,8 +97,4 @@ namespace ryujin
                        const dealii::VectorizedArray<float, 4>);
 #endif
 
-  template double fast_pow<Bias::none>(const double, const double);
-
-  template float fast_pow<Bias::none>(const float, const float);
-
 } // namespace ryujin
