@@ -234,6 +234,35 @@ namespace ryujin
           std::cout << "t_r: (end)   " << t_r << std::endl;
         }
 #endif
+
+#ifdef CHECK_BOUNDS
+        /*
+         * Verify that the new state is within bounds:
+         */
+        {
+          const auto U_new = U + t_l * P;
+          const auto h_new = hyperbolic_system.water_depth(U_new);
+          const auto q_new = hyperbolic_system.momentum(U_new);
+
+          const auto psi_new = relax_small * h_new * kin_max -
+                               ScalarNumber(0.5) * q_new.norm_square();
+
+          const auto lower_bound =
+              (ScalarNumber(1.) - relax) * h_new * kin_max - eps;
+
+          const bool psi_valid =
+              std::min(Number(0.), psi_new - lower_bound + min) == Number(0.);
+          if (!psi_valid) {
+#ifdef DEBUG_OUTPUT
+            std::cout << std::fixed << std::setprecision(16);
+            std::cout << "High-order bounds violation!\n";
+            std::cout << "\t\tDepth   = " << h_new << "\n";
+            std::cout << "\t\tPsi: 0 <= " << psi_new << "\n" << std::endl;
+#endif
+            success = false;
+          }
+        }
+#endif
       }
 
       return {t_l, success};

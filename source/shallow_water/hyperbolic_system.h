@@ -513,7 +513,7 @@ namespace ryujin
       state_type<dim, T> expand_state(const ST &state) const;
 
       /*
-       * Given a primitive state [rho, u_1, ..., u_d, p] return a conserved
+       * Given a primitive state [h, u_1, ..., u_d] return a conserved
        * state
        */
       template <int problem_dim, typename Number>
@@ -521,8 +521,7 @@ namespace ryujin
           const dealii::Tensor<1, problem_dim, Number> &primitive_state) const;
 
       /*
-       * Given a conserved state return a primitive state [rho, u_1, ..., u_d,
-       * p]
+       * Given a conserved state return a primitive state [h, u_1, ..., u_d]
        */
       template <int problem_dim, typename Number>
       dealii::Tensor<1, problem_dim, Number> to_primitive_state(
