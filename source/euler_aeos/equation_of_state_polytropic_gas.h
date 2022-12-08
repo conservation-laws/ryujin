@@ -35,16 +35,26 @@ namespace ryujin
           /*
            * p = (\gamma - 1) * \rho * e
            */
-
           return (gamma_ - 1.) * internal_energy;
         }
 
 
-        double specific_internal_energy(const double rho,
-                                        const double pressure) final
+        double specific_internal_energy(const double rho, const double p) final
         {
+          /*
+           * e = p / (\rho (\gamma - 1) )
+           */
           const double denom = rho * (gamma_ - 1.);
-          return pressure / denom;
+          return p / denom;
+        }
+
+
+        double material_sound_speed(const double rho, const double p) final
+        {
+          /*
+           * c^2 = \gamma p / \rho
+           */
+          return std::sqrt(gamma_ * p / rho);
         }
 
       private:

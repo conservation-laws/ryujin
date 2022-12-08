@@ -22,25 +22,25 @@ namespace ryujin
       {
       public:
         JonesWilkinsLee(const std::string &subsection)
-            : EquationOfState("jones-wilkins-lee", subsection)
+            : EquationOfState("jones wilkins lee", subsection)
         {
-          capA_ = 0.;
-          this->add_parameter("A", capA_, "The A constant");
+          capA = 0.;
+          this->add_parameter("A", capA, "The A constant");
 
-          capB_ = 0.;
-          this->add_parameter("B", capB_, "The B constant");
+          capB = 0.;
+          this->add_parameter("B", capB, "The B constant");
 
-          R1_ = 0.;
-          this->add_parameter("R1", R1_, "The R1 constant");
+          R1 = 0.;
+          this->add_parameter("R1", R1, "The R1 constant");
 
-          R2_ = 0.;
-          this->add_parameter("R2", R2_, "The R2 constant");
+          R2 = 0.;
+          this->add_parameter("R2", R2, "The R2 constant");
 
-          omega_ = 0.4;
-          this->add_parameter("omega", omega_, "The Gruneisen coefficient");
+          omega = 0.4;
+          this->add_parameter("omega", omega, "The Gruneisen coefficient");
 
-          rho0_ = 0.;
-          this->add_parameter("rho_0", rho0_, "The reference density");
+          rho0 = 0.;
+          this->add_parameter("rho_0", rho0, "The reference density");
         }
 
 
@@ -51,40 +51,61 @@ namespace ryujin
            * - omega / R_2 rho/ rho_0) + omega rho * e
            */
 
-          const double ratio = rho / rho0_;
+          const auto ratio = rho / rho0;
 
-          double temp = 1. - omega_ / R1_ * ratio;
-          const double first_term = capA_ * temp * std::exp(-R1_ * 1. / ratio);
+          auto temp = 1. - omega / R1 * ratio;
+          const auto first_term = capA * temp * std::exp(-R1 * 1. / ratio);
 
-          temp = 1. - omega_ / R2_ * ratio;
-          const double second_term = capB_ * temp * std::exp(-R2_ * 1. / ratio);
+          temp = 1. - omega / R2 * ratio;
+          const auto second_term = capB * temp * std::exp(-R2 * 1. / ratio);
 
-          return first_term + second_term + omega_ * internal_energy;
+          return first_term + second_term + omega * internal_energy;
         }
 
 
-        double specific_internal_energy(const double rho,
-                                        const double pressure) final
+        double specific_internal_energy(const double rho, const double p) final
         {
-          const double ratio = rho / rho0_;
+          /*
+           * e = (p - [A(1 - omega / R_1 \rho / rho_0) * exp(-R_1 rho_0 / \rho)
+           * + B(1 - omega / R_2 \rho/ rho_0)]  / (omega \rho)
+           */
+          const auto ratio = rho / rho0;
 
-          double temp = 1. - omega_ / R1_ * ratio;
-          const double first_term = capA_ * temp * std::exp(-R1_ * 1. / ratio);
+          auto temp = 1. - omega / R1 * ratio;
+          const auto first_term = capA * temp * std::exp(-R1 * 1. / ratio);
 
-          temp = 1. - omega_ / R2_ * ratio;
-          const double second_term = capB_ * temp * std::exp(-R2_ * 1. / ratio);
+          temp = 1. - omega / R2 * ratio;
+          const auto second_term = capB * temp * std::exp(-R2 * 1. / ratio);
 
+          return (p - (first_term + second_term)) / (rho * omega);
+        }
 
-          return (pressure - (first_term + second_term)) / (rho * omega_);
+        double material_sound_speed(const double rho, const double p) final
+        {
+          /*
+          c^2 = ...
+          */
+          auto temp = omega / R1 * rho / rho0;
+          temp = omega * (1. - temp) * (1. + 1. / temp) - temp;
+          const auto first_term = capA / rho * temp * std::exp(omega / temp);
+
+          temp = omega / R2 * rho / rho0;
+          temp = omega * (1. - temp) * (1. + 1. / temp) - temp;
+          const auto second_term = capB / rho * temp * std::exp(omega / temp);
+
+          const auto e = specific_internal_energy(rho, p);
+          const auto third_term = omega * (omega + 1.) * e;
+
+          return first_term + second_term + third_term;
         }
 
       private:
-        double capA_;
-        double capB_;
-        double R1_;
-        double R2_;
-        double omega_;
-        double rho0_;
+        double capA;
+        double capB;
+        double R1;
+        double R2;
+        double omega;
+        double rho0;
       };
     } // namespace EquationOfStateLibrary
   }   // namespace EulerAEOS

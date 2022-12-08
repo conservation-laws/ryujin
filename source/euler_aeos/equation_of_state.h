@@ -39,18 +39,25 @@ namespace ryujin
       }
 
       /**
-       * Return the pressure given density (rho) and internal energy (rho *
+       * Return the pressure given density (\rho) and internal energy (rho *
        * e).
        */
       virtual double pressure(const double density,
                               const double internal_energy) = 0;
 
       /**
-       * Return the specific internal energy (e) for a given density (rho)
+       * Return the specific internal energy (e) for a given density (\rho)
        * and pressure (p).
        */
       virtual double specific_internal_energy(const double density,
                                               const double pressure) = 0;
+
+      /**
+       * Return the material sound speed (c) for a given density (\rho)
+       * and pressure (p).
+       */
+      virtual double material_sound_speed(const double density,
+                                          const double pressure) = 0;
 
     private:
       const std::string name_;
