@@ -56,9 +56,7 @@ set(ORDER_QUADRATURE "2" CACHE STRING "Order of quadrature")
 
 string(APPEND DEAL_II_CXX_FLAGS " -Wfatal-errors")
 
-if(NOT ${DEAL_II_WITH_CXX17})
-  string(APPEND DEAL_II_CXX_FLAGS " -std=c++17")
-endif()
+string(APPEND DEAL_II_CXX_FLAGS " -std=c++17")
 
 if(WITH_OPENMP)
   find_package(OpenMP REQUIRED)
