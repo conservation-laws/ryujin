@@ -166,7 +166,7 @@ namespace ryujin
   dealii::VectorizedArray<double, 1>
   pow(const dealii::VectorizedArray<double, 1> x, const double b)
   {
-    return ryujin::pow(x, b);
+    return ryujin::pow(x[0], b);
   }
 
 
@@ -176,7 +176,7 @@ namespace ryujin
   pow(const dealii::VectorizedArray<double, 1> x,
       const dealii::VectorizedArray<double, 1> b)
   {
-    return ryujin::pow(x, b);
+    return ryujin::pow(x[0], b[0]);
   }
 
 
@@ -185,7 +185,7 @@ namespace ryujin
   dealii::VectorizedArray<float, 1>
   pow(const dealii::VectorizedArray<float, 1> x, const float b)
   {
-    return ryujin::pow(x, b);
+    return ryujin::pow(x[0], b);
   }
 
 
@@ -195,7 +195,7 @@ namespace ryujin
   pow(const dealii::VectorizedArray<float, 1> x,
       const dealii::VectorizedArray<float, 1> b)
   {
-    return ryujin::pow(x, b);
+    return ryujin::pow(x[0], b[0]);
   }
 
 
