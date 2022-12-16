@@ -4,10 +4,11 @@
 //
 
 #include "hyperbolic_module.template.h"
+#include "euler/description.h"
 
 namespace ryujin
 {
   /* instantiations */
-  template class HyperbolicModule<DIM, NUMBER>;
+  template class HyperbolicModule<Euler::Description, DIM, NUMBER>;
 
 } /* namespace ryujin */

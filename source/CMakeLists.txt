@@ -33,12 +33,12 @@ deal_ii_setup_target(obj_common)
 
 set(DEPENDENT_SOURCE_FILES
   hyperbolic_module.cc
-  initial_values.cc
-  postprocessor.cc
-  quantities.cc
-  time_integrator.cc
-  time_loop.cc
-  vtu_output.cc
+#    initial_values.cc
+#    postprocessor.cc
+#    quantities.cc
+#    time_integrator.cc
+#    time_loop.cc
+#    vtu_output.cc
   )
 
 set_property(SOURCE time_loop.cc APPEND PROPERTY COMPILE_DEFINITIONS
@@ -106,5 +106,5 @@ macro(setup_equation EQUATION)
 endmacro()
 
 setup_equation("euler")
-setup_equation("euler_aeos")
-setup_equation("shallow_water")
+#setup_equation("euler_aeos")
+#setup_equation("shallow_water")

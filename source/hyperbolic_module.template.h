@@ -19,8 +19,8 @@ namespace ryujin
 {
   using namespace dealii;
 
-  template <int dim, typename Number>
-  HyperbolicModule<dim, Number>::HyperbolicModule(
+  template <typename Description, int dim, typename Number>
+  HyperbolicModule<Description, dim, Number>::HyperbolicModule(
       const MPI_Comm &mpi_communicator,
       std::map<std::string, dealii::Timer> &computing_timer,
       const ryujin::OfflineData<dim, Number> &offline_data,
@@ -71,11 +71,12 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void HyperbolicModule<dim, Number>::prepare()
+  template <typename Description, int dim, typename Number>
+  void HyperbolicModule<Description, dim, Number>::prepare()
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "HyperbolicModule<dim, Number>::prepare()" << std::endl;
+    std::cout << "HyperbolicModule<Description, dim, Number>::prepare()"
+              << std::endl;
 #endif
 
     AssertThrow(limiter_iter_ <= 2,
@@ -143,9 +144,9 @@ namespace ryujin
   } // namespace
 
 
-  template <int dim, typename Number>
+  template <typename Description, int dim, typename Number>
   template <int stages>
-  Number HyperbolicModule<dim, Number>::step(
+  Number HyperbolicModule<Description, dim, Number>::step(
       const vector_type &old_U,
       std::array<std::reference_wrapper<const vector_type>, stages> stage_U,
       std::array<std::reference_wrapper<const precomputed_type>, stages>
@@ -156,7 +157,8 @@ namespace ryujin
       Number tau /*= 0.*/) const
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "HyperbolicModule<dim, Number>::step()" << std::endl;
+    std::cout << "HyperbolicModule<Description, dim, Number>::step()"
+              << std::endl;
 #endif
 
     CALLGRIND_START_INSTRUMENTATION
@@ -344,9 +346,10 @@ namespace ryujin
         unsigned int stride_size = get_stride_size<T>;
 
         /* Stored thread locally: */
-        RiemannSolver<dim, T> riemann_solver(*hyperbolic_system_,
-                                             new_precomputed);
-        Indicator<dim, T> indicator(*hyperbolic_system_, new_precomputed);
+        typename Description::template RiemannSolver<dim, T> riemann_solver(
+            *hyperbolic_system_, new_precomputed);
+        typename Description::template Indicator<dim, T> indicator(
+            *hyperbolic_system_, new_precomputed);
         bool thread_ready = false;
 
         RYUJIN_OMP_FOR
@@ -419,8 +422,8 @@ namespace ryujin
 
       /* Complete d_ij at boundary: */
 
-      RiemannSolver<dim, Number> riemann_solver(*hyperbolic_system_,
-                                                new_precomputed);
+      typename Description::template RiemannSolver<dim, Number> riemann_solver(
+          *hyperbolic_system_, new_precomputed);
 
       RYUJIN_OMP_FOR
       for (std::size_t k = 0; k < coupling_boundary_pairs.size(); ++k) {
@@ -541,7 +544,8 @@ namespace ryujin
         unsigned int stride_size = get_stride_size<T>;
 
         /* Stored thread locally: */
-        Limiter<dim, T> limiter(*hyperbolic_system_, new_precomputed);
+        typename Description::template Limiter<dim, T> limiter(
+            *hyperbolic_system_, new_precomputed);
         bool thread_ready = false;
 
         RYUJIN_OMP_FOR
@@ -559,8 +563,10 @@ namespace ryujin
           const auto flux_i = hyperbolic_system_->flux_contribution(
               new_precomputed, precomputed_initial_, i, U_i);
 
-          std::array<HyperbolicSystem::flux_contribution_type<dim, T>, stages>
-              flux_iHs;
+          using flux_contribution_type =
+              typename HyperbolicSystem::template flux_contribution_type<dim,
+                                                                         T>;
+          std::array<flux_contribution_type, stages> flux_iHs;
           for (int s = 0; s < stages; ++s) {
             const auto temp = stage_U[s].get().template get_tensor<T>(i);
             flux_iHs[s] = hyperbolic_system_->flux_contribution(
@@ -568,7 +574,9 @@ namespace ryujin
           }
 
           auto U_i_new = U_i;
-          HyperbolicSystem::state_type<dim, T> F_iH;
+          using state_type =
+              typename HyperbolicSystem::template state_type<dim, T>;
+          state_type F_iH;
 
           const auto alpha_i = load_value<T>(alpha_, i);
           const auto m_i = load_value<T>(lumped_mass_matrix, i);
@@ -577,8 +585,8 @@ namespace ryujin
           limiter.reset(i);
 
           /* Sources: */
-          HyperbolicSystem::state_type<dim, T> S_i_new;
-          HyperbolicSystem::state_type<dim, T> S_iH;
+          state_type S_i_new;
+          state_type S_iH;
           if constexpr (HyperbolicSystem::have_source_terms) {
             S_i_new = hyperbolic_system_->low_order_nodal_source(
                 new_precomputed, i, U_i);
@@ -614,7 +622,9 @@ namespace ryujin
             U_i_new += tau * m_i_inv * contract(flux_ij, c_ij);
             auto P_ij = -contract(flux_ij, c_ij);
 
-            HyperbolicSystem::state_type<dim, T> Q_ij;
+            using state_type =
+                typename HyperbolicSystem::template state_type<dim, T>;
+            state_type Q_ij;
             if constexpr (HyperbolicSystem::have_source_terms) {
               const auto B_ij = hyperbolic_system_->affine_shift_stencil_source(
                   flux_i, flux_j, d_ij, c_ij);
@@ -765,7 +775,10 @@ namespace ryujin
 
           const auto F_iH = r_.template get_tensor<T>(i);
 
-          HyperbolicSystem::state_type<dim, T> S_iH;
+
+          using state_type =
+              typename HyperbolicSystem::template state_type<dim, T>;
+          state_type S_iH;
           if constexpr (HyperbolicSystem::have_source_terms)
             S_iH = source_r_.template get_tensor<T>(i);
 
@@ -806,12 +819,13 @@ namespace ryujin
              */
 
             const auto &[l_ij, success] =
-                Limiter<dim, T>::limit(*hyperbolic_system_,
-                                       bounds,
-                                       U_i_new,
-                                       P_ij,
-                                       limiter_newton_tolerance_,
-                                       limiter_newton_max_iter_);
+                typename Description::template Limiter<dim, T>::limit(
+                    *hyperbolic_system_,
+                    bounds,
+                    U_i_new,
+                    P_ij,
+                    limiter_newton_tolerance_,
+                    limiter_newton_max_iter_);
             lij_matrix_.template write_entry<T>(l_ij, i, col_idx, true);
 
             /* Unsuccessful with current CFL, force a restart. */
@@ -881,7 +895,9 @@ namespace ryujin
 
           auto U_i_new = new_U.template get_tensor<T>(i);
 
-          HyperbolicSystem::state_type<dim, T> S_i_new;
+          using state_type =
+              typename HyperbolicSystem::template state_type<dim, T>;
+          state_type S_i_new;
           if constexpr (HyperbolicSystem::have_source_terms)
             S_i_new = source_.template get_tensor<T>(i);
 
@@ -933,12 +949,13 @@ namespace ryujin
                 pij_matrix_.template get_tensor<T>(i, col_idx);
 
             const auto &[new_l_ij, success] =
-                Limiter<dim, T>::limit(*hyperbolic_system_,
-                                       bounds,
-                                       U_i_new,
-                                       new_p_ij,
-                                       limiter_newton_tolerance_,
-                                       limiter_newton_max_iter_);
+                typename Description::template Limiter<dim, T>::limit(
+                    *hyperbolic_system_,
+                    bounds,
+                    U_i_new,
+                    new_p_ij,
+                    limiter_newton_tolerance_,
+                    limiter_newton_max_iter_);
 
             /* Unsuccessful with current CFL, force a restart. */
             if (!success)
@@ -992,12 +1009,13 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void HyperbolicModule<dim, Number>::apply_boundary_conditions(vector_type &U,
-                                                                Number t) const
+  template <typename Description, int dim, typename Number>
+  void HyperbolicModule<Description, dim, Number>::apply_boundary_conditions(
+      vector_type &U, Number t) const
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "HyperbolicModule<dim, Number>::apply_boundary_conditions()"
+    std::cout << "HyperbolicModule<Description, dim, "
+                 "Number>::apply_boundary_conditions()"
               << std::endl;
 #endif
 

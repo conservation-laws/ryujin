@@ -54,7 +54,7 @@ set(ORDER_QUADRATURE "2" CACHE STRING "Order of quadrature")
 # Set up compiler flags:
 #
 
-string(APPEND DEAL_II_CXX_FLAGS " -Wfatal-errors")
+#string(APPEND DEAL_II_CXX_FLAGS " -Wfatal-errors")
 
 string(APPEND DEAL_II_CXX_FLAGS " -std=c++17")
 

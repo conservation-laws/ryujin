@@ -1199,4 +1199,4 @@ namespace ryujin
   } // namespace Euler
 
   using namespace Euler;
-} /* namespace ryujin */
+} // namespace ryujin

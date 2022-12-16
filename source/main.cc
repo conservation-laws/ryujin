@@ -6,7 +6,7 @@
 #include <compile_time_options.h>
 
 #include "introspection.h"
-#include "time_loop.h"
+//#include "time_loop.h"
 
 #include <deal.II/base/multithread_info.h>
 #include <deal.II/base/utilities.h>
@@ -20,6 +20,7 @@
 
 int main(int argc, char *argv[])
 {
+#if 0
 #if defined(DENORMALS_ARE_ZERO) && defined(__x86_64)
   /*
    * Change rounding mode on X86-64 architecture: Denormals are flushed to
@@ -72,6 +73,7 @@ int main(int argc, char *argv[])
   time_loop.run();
 
   LIKWID_CLOSE;
+#endif
 
   return 0;
 }
