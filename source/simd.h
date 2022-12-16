@@ -193,13 +193,14 @@ namespace ryujin
     min
   };
 
+
   /**
    * Custom serial approximate pow function.
    *
    * @ingroup SIMD
    */
-  template <Bias bias = Bias::none, typename T>
-  T fast_pow(const T x, const T b);
+  template <typename T>
+  T fast_pow(const T x, const T b, const Bias bias = Bias::none);
 
 
   /**
@@ -207,9 +208,11 @@ namespace ryujin
    *
    * @ingroup SIMD
    */
-  template <Bias bias = Bias::none, typename T, std::size_t width>
+  template <typename T, std::size_t width>
   dealii::VectorizedArray<T, width>
-  fast_pow(const dealii::VectorizedArray<T, width> x, const T b);
+  fast_pow(const dealii::VectorizedArray<T, width> x,
+           const T b,
+           const Bias bias = Bias::none);
 
 
   /**
@@ -218,10 +221,11 @@ namespace ryujin
    *
    * @ingroup SIMD
    */
-  template <Bias bias = Bias::none, typename T, std::size_t width>
+  template <typename T, std::size_t width>
   dealii::VectorizedArray<T, width>
   fast_pow(const dealii::VectorizedArray<T, width> x,
-           const dealii::VectorizedArray<T, width> b);
+           const dealii::VectorizedArray<T, width> b,
+           const Bias bias = Bias::none);
 
   //@}
   /**
