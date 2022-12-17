@@ -72,13 +72,13 @@ namespace ryujin
       return precomputed_type();
     }
 
-  private:
-    const std::string name_;
-
     /**
      * Return the name of the geometry as (const reference) std::string
      */
     ACCESSOR_READ_ONLY(name)
+
+  private:
+    const std::string name_;
   };
 
 } /* namespace ryujin */

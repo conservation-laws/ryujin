@@ -210,20 +210,14 @@ namespace ryujin
 
   public:
     /**
-     * Return a mutable reference to the triangulation.
-     */
-    Triangulation &triangulation()
-    {
-      return *triangulation_;
-    }
-
-    /**
      * Return a mutable reference to the refinement variable.
      */
-    unsigned int &refinement()
-    {
-      return refinement_;
-    }
+    ACCESSOR(refinement)
+
+    /**
+     * Return a mutable reference to the triangulation.
+     */
+    ACCESSOR(triangulation)
 
     /**
      * Return a read-only const reference to the triangulation.

@@ -546,21 +546,33 @@ namespace ryujin
           const Lambda &lambda) const;
 
       //@}
-
-    private:
       /**
        * @name Run time options
        */
       //@{
 
-      double gamma_;
+      /**
+       * Returns the gamma value.
+       */
       ACCESSOR_READ_ONLY(gamma)
 
-      double reference_density_;
+      /**
+       * Returns the reference density.
+       */
       ACCESSOR_READ_ONLY(reference_density)
 
-      double vacuum_state_relaxation_;
+      /**
+       * Return the vaccuum state relaxation constant.
+       */
       ACCESSOR_READ_ONLY(vacuum_state_relaxation)
+
+    private:
+
+      double gamma_;
+
+      double reference_density_;
+
+      double vacuum_state_relaxation_;
 
       //@}
       /**

@@ -87,91 +87,6 @@ namespace ryujin
       create_multigrid_data();
     }
 
-  private:
-    /**
-     * Set up affine constraints and sparsity pattern. Internally used in
-     * setup().
-     */
-    void create_constraints_and_sparsity_pattern();
-
-    /**
-     * Set up DoFHandler, all IndexSet objects and the SparsityPattern.
-     * Initialize matrix storage.
-     *
-     * The @ref problem_dimension parameter is used to setup up an
-     * appropriately sized vector partitioner for the MultiComponentVector.
-     */
-    void setup(const unsigned int problem_dimension);
-
-    /**
-     * Assemble all matrices.
-     */
-    void assemble();
-
-    /**
-     * Create multigrid data.
-     */
-    void create_multigrid_data();
-
-    std::unique_ptr<dealii::DoFHandler<dim>> dof_handler_;
-
-    dealii::AffineConstraints<Number> affine_constraints_;
-
-    std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
-        scalar_partitioner_;
-
-    std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
-        vector_partitioner_;
-
-    unsigned int n_export_indices_;
-    unsigned int n_locally_internal_;
-    unsigned int n_locally_owned_;
-    unsigned int n_locally_relevant_;
-
-    using boundary_map_type =
-        std::multimap<dealii::types::global_dof_index, boundary_description>;
-    using coupling_boundary_pairs_type =
-        std::vector<std::tuple<dealii::types::global_dof_index,
-                               unsigned int,
-                               dealii::types::global_dof_index>>;
-    boundary_map_type boundary_map_;
-    coupling_boundary_pairs_type coupling_boundary_pairs_;
-
-    std::vector<boundary_map_type> level_boundary_map_;
-
-    dealii::DynamicSparsityPattern sparsity_pattern_;
-
-    SparsityPatternSIMD<dealii::VectorizedArray<Number>::size()>
-        sparsity_pattern_simd_;
-
-    SparseMatrixSIMD<Number> mass_matrix_;
-
-    dealii::LinearAlgebra::distributed::Vector<Number> lumped_mass_matrix_;
-    dealii::LinearAlgebra::distributed::Vector<Number>
-        lumped_mass_matrix_inverse_;
-
-    std::vector<dealii::LinearAlgebra::distributed::Vector<float>>
-        level_lumped_mass_matrix_;
-
-    SparseMatrixSIMD<Number> betaij_matrix_;
-    SparseMatrixSIMD<Number, dim> cij_matrix_;
-
-    Number measure_of_omega_;
-
-    dealii::SmartPointer<const ryujin::Discretization<dim>> discretization_;
-
-    const MPI_Comm &mpi_communicator_;
-
-    /**
-     * Construct a boundary map for a given set of DoFHandler iterators.
-     */
-    template <typename ITERATOR1, typename ITERATOR2>
-    boundary_map_type construct_boundary_map(
-        const ITERATOR1 &begin,
-        const ITERATOR2 &end,
-        const dealii::Utilities::MPI::Partitioner &partitioner) const;
-
-  protected:
     /**
      * The DofHandler for our (scalar) CG ansatz space in (deal.II typical)
      * global numbering.
@@ -314,6 +229,90 @@ namespace ryujin
      * Returns a reference of the underlying Discretization object.
      */
     ACCESSOR_READ_ONLY(discretization)
+
+  private:
+    /**
+     * Set up affine constraints and sparsity pattern. Internally used in
+     * setup().
+     */
+    void create_constraints_and_sparsity_pattern();
+
+    /**
+     * Set up DoFHandler, all IndexSet objects and the SparsityPattern.
+     * Initialize matrix storage.
+     *
+     * The @ref problem_dimension parameter is used to setup up an
+     * appropriately sized vector partitioner for the MultiComponentVector.
+     */
+    void setup(const unsigned int problem_dimension);
+
+    /**
+     * Assemble all matrices.
+     */
+    void assemble();
+
+    /**
+     * Create multigrid data.
+     */
+    void create_multigrid_data();
+
+    std::unique_ptr<dealii::DoFHandler<dim>> dof_handler_;
+
+    dealii::AffineConstraints<Number> affine_constraints_;
+
+    std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
+        scalar_partitioner_;
+
+    std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
+        vector_partitioner_;
+
+    unsigned int n_export_indices_;
+    unsigned int n_locally_internal_;
+    unsigned int n_locally_owned_;
+    unsigned int n_locally_relevant_;
+
+    using boundary_map_type =
+        std::multimap<dealii::types::global_dof_index, boundary_description>;
+    using coupling_boundary_pairs_type =
+        std::vector<std::tuple<dealii::types::global_dof_index,
+                               unsigned int,
+                               dealii::types::global_dof_index>>;
+    boundary_map_type boundary_map_;
+    coupling_boundary_pairs_type coupling_boundary_pairs_;
+
+    std::vector<boundary_map_type> level_boundary_map_;
+
+    dealii::DynamicSparsityPattern sparsity_pattern_;
+
+    SparsityPatternSIMD<dealii::VectorizedArray<Number>::size()>
+        sparsity_pattern_simd_;
+
+    SparseMatrixSIMD<Number> mass_matrix_;
+
+    dealii::LinearAlgebra::distributed::Vector<Number> lumped_mass_matrix_;
+    dealii::LinearAlgebra::distributed::Vector<Number>
+        lumped_mass_matrix_inverse_;
+
+    std::vector<dealii::LinearAlgebra::distributed::Vector<float>>
+        level_lumped_mass_matrix_;
+
+    SparseMatrixSIMD<Number> betaij_matrix_;
+    SparseMatrixSIMD<Number, dim> cij_matrix_;
+
+    Number measure_of_omega_;
+
+    dealii::SmartPointer<const ryujin::Discretization<dim>> discretization_;
+
+    const MPI_Comm &mpi_communicator_;
+
+    /**
+     * Construct a boundary map for a given set of DoFHandler iterators.
+     */
+    template <typename ITERATOR1, typename ITERATOR2>
+    boundary_map_type construct_boundary_map(
+        const ITERATOR1 &begin,
+        const ITERATOR2 &end,
+        const dealii::Utilities::MPI::Partitioner &partitioner) const;
   };
 
 } /* namespace ryujin */

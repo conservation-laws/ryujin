@@ -59,13 +59,13 @@ namespace ryujin
       virtual double material_sound_speed(const double density,
                                           const double pressure) = 0;
 
-    private:
-      const std::string name_;
-
       /**
        * Return the name of the EOS as (const reference) std::string
        */
       ACCESSOR_READ_ONLY(name)
+
+    private:
+      const std::string name_;
     };
   } // namespace EulerAEOS
 

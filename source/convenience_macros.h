@@ -153,7 +153,7 @@ namespace
   template <
       typename T,
       typename = typename std::enable_if<!is_dereferenceable<T>::value>::type>
-  const T &dereference(T &t)
+  auto dereference(T &t) -> T&
   {
     return t;
   }
@@ -161,7 +161,7 @@ namespace
   template <
       typename T,
       typename = typename std::enable_if<is_dereferenceable<T>::value>::type>
-  auto dereference(T &t) -> const decltype(*t) &
+  auto dereference(T &t) -> decltype(*t) &
   {
     return *t;
   }
@@ -183,13 +183,23 @@ namespace
  * @ingroup Miscellaneous
  */
 #define ACCESSOR_READ_ONLY(member)                                             \
-public:                                                                        \
-  DEAL_II_ALWAYS_INLINE inline auto &member() const                            \
+  inline auto &member() const                                                  \
   {                                                                            \
     return dereference(member##_);                                             \
-  }                                                                            \
-                                                                               \
-protected:
+  }
+
+
+/**
+ * Variant of the macro above that returns a mutable reference.
+ *
+ * @ingroup Miscellaneous
+ */
+#define ACCESSOR(member)                                                       \
+  inline auto &member()                                                        \
+  {                                                                            \
+    return dereference(member##_);                                             \
+  }
+
 
 /**
  * Variant of the macro above that does not attempt to dereference the
@@ -198,13 +208,10 @@ protected:
  * @ingroup Miscellaneous
  */
 #define ACCESSOR_READ_ONLY_NO_DEREFERENCE(member)                              \
-public:                                                                        \
-  DEAL_II_ALWAYS_INLINE inline const auto &member() const                      \
+  inline const auto &member() const                                            \
   {                                                                            \
     return member##_;                                                          \
-  }                                                                            \
-                                                                               \
-protected:
+  }
 
 
 /**

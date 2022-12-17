@@ -247,8 +247,50 @@ namespace ryujin
       cfl_ = new_cfl;
     }
 
+    /**
+     * Returns the relative CFL number used for computing an appropriate
+     * time-step size.
+     */
+    ACCESSOR_READ_ONLY(cfl)
+
+    /**
+     * Return a reference to the OfflineData object
+     */
+    ACCESSOR_READ_ONLY(offline_data)
+
+    /**
+     * Return a reference to the HyperbolicSystem object
+     */
+    ACCESSOR_READ_ONLY(hyperbolic_system)
+
+    /**
+     * Return a reference to the precomputed initial data vector
+     */
+    ACCESSOR_READ_ONLY(precomputed_initial)
+
+    /**
+     * Return a reference to alpha vector storing indicator values. Note
+     * that the values stored in alpha correspond to the last step executed
+     * by this class. This value can be recomputed for a given state vector
+     * by setting precompute_only_ to true and calling the step() function.
+     */
+    ACCESSOR_READ_ONLY(alpha)
+
+    /**
+     * The number of restarts issued by the step() function.
+     */
+    ACCESSOR_READ_ONLY(n_restarts)
+
+    /**
+     * The number of ID violation warnings encounterd in the step()
+     * function.
+     */
+    ACCESSOR_READ_ONLY(n_warnings)
+
+    // FIXME: refactor to function
     mutable bool precompute_only_;
 
+    // FIXME: refactor to function
     mutable IDViolationStrategy id_violation_strategy_;
 
   private:
@@ -277,26 +319,19 @@ namespace ryujin
     std::map<std::string, dealii::Timer> &computing_timer_;
 
     dealii::SmartPointer<const ryujin::OfflineData<dim, Number>> offline_data_;
-    ACCESSOR_READ_ONLY(offline_data)
     dealii::SmartPointer<const ryujin::HyperbolicSystem> hyperbolic_system_;
-    ACCESSOR_READ_ONLY(hyperbolic_system)
     dealii::SmartPointer<const ryujin::InitialValues<dim, Number>>
         initial_values_;
 
     mutable Number cfl_;
-    ACCESSOR_READ_ONLY(cfl)
 
     mutable unsigned int n_restarts_;
-    ACCESSOR_READ_ONLY(n_restarts)
 
     mutable unsigned int n_warnings_;
-    ACCESSOR_READ_ONLY(n_warnings)
 
     precomputed_initial_type precomputed_initial_;
-    ACCESSOR_READ_ONLY(precomputed_initial)
 
     mutable scalar_type alpha_;
-    ACCESSOR_READ_ONLY(alpha)
 
     static constexpr auto n_bounds = Limiter<dim, Number>::n_bounds;
     mutable MultiComponentVector<Number, n_bounds> bounds_;

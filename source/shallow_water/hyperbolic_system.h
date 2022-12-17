@@ -538,27 +538,32 @@ namespace ryujin
           const Lambda &lambda) const;
 
       //@}
-
-    private:
       /**
        * @name Run time options
        */
       //@{
 
-      double gravity_;
       ACCESSOR_READ_ONLY(gravity)
 
-      double mannings_;
       ACCESSOR_READ_ONLY(mannings)
 
-      double reference_water_depth_;
       ACCESSOR_READ_ONLY(reference_water_depth)
 
-      double dry_state_relaxation_sharp_;
       ACCESSOR_READ_ONLY(dry_state_relaxation_sharp)
 
-      double dry_state_relaxation_mollified_;
       ACCESSOR_READ_ONLY(dry_state_relaxation_mollified)
+
+    private:
+
+      double gravity_;
+
+      double mannings_;
+
+      double reference_water_depth_;
+
+      double dry_state_relaxation_sharp_;
+
+      double dry_state_relaxation_mollified_;
 
       //@}
     };

@@ -132,6 +132,13 @@ namespace ryujin
      */
     void compute(const vector_type &U) const;
 
+    /**
+     * Returns a reference to the quantities_ vector that has been filled
+     * by the compute() function.
+     */
+    ACCESSOR_READ_ONLY(quantities)
+
+
   private:
     /**
      * @name Run time options
@@ -161,8 +168,6 @@ namespace ryujin
 
     mutable std::vector<std::pair<Number, Number>> bounds_;
     mutable std::vector<scalar_type> quantities_;
-    ACCESSOR_READ_ONLY(quantities)
-
     //@}
   };
 

@@ -529,37 +529,36 @@ namespace ryujin
           const Lambda &lambda) const;
 
       //@}
-
-    private:
       /**
        * @name Run time options
        */
       //@{
 
-      /* For EOS */
-
-      std::string equation_of_state_;
       ACCESSOR_READ_ONLY(equation_of_state)
 
-      double b_interp_;
       ACCESSOR_READ_ONLY(b_interp)
-
-      double pinf_interp_;
       ACCESSOR_READ_ONLY(pinf_interp)
-
-      double q_interp_;
       ACCESSOR_READ_ONLY(q_interp)
 
-      bool compute_expensive_bounds_;
-      ACCESSOR_READ_ONLY(compute_expensive_bounds)
-
-      /* For vacuum states */
-
-      double reference_density_;
       ACCESSOR_READ_ONLY(reference_density)
 
-      double vacuum_state_relaxation_;
       ACCESSOR_READ_ONLY(vacuum_state_relaxation)
+
+      ACCESSOR_READ_ONLY(compute_expensive_bounds)
+
+    private:
+
+      std::string equation_of_state_;
+
+      double b_interp_;
+      double pinf_interp_;
+      double q_interp_;
+
+      double reference_density_;
+
+      double vacuum_state_relaxation_;
+
+      bool compute_expensive_bounds_;
 
       //@}
       /**

@@ -54,13 +54,13 @@ namespace ryujin
      */
     virtual void create_triangulation(Triangulation &triangulation) = 0;
 
-  private:
-    const std::string name_;
-
     /**
      * Return the name of the geometry as (const reference) std::string
      */
     ACCESSOR_READ_ONLY(name)
+
+  private:
+    const std::string name_;
   };
 
 } /* namespace ryujin */
