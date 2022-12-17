@@ -58,7 +58,9 @@ struct Patterns::Tools::
         return std::get<0>(it);
     }
 
-    AssertThrow(false, dealii::ExcInternalError());
+    AssertThrow(false,
+                dealii::ExcMessage("Incomplete conversion table - unable to "
+                                   "identify matching value"));
   }
 };
 
