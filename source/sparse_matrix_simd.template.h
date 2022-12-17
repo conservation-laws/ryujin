@@ -10,12 +10,6 @@
 #include <deal.II/base/vectorization.h>
 #include <deal.II/lac/sparse_matrix.h>
 
-#if DEAL_II_VERSION_GTE(9, 3, 0)
-#define LOCAL_SIZE locally_owned_size
-#else
-#define LOCAL_SIZE local_size
-#endif
-
 namespace ryujin
 {
 
@@ -51,11 +45,11 @@ namespace ryujin
     this->mpi_communicator = partitioner->get_mpi_communicator();
 
     this->n_internal_dofs = n_internal_dofs;
-    this->n_locally_owned_dofs = partitioner->LOCAL_SIZE();
+    this->n_locally_owned_dofs = partitioner->locally_owned_size();
     this->partitioner = partitioner;
 
     const auto n_locally_relevant_dofs =
-        partitioner->LOCAL_SIZE() + partitioner->n_ghost_indices();
+        partitioner->locally_owned_size() + partitioner->n_ghost_indices();
 
     /*
      * First, create a static sparsity pattern (in local indexing( where
@@ -392,5 +386,3 @@ namespace ryujin
   }
 
 } // namespace ryujin
-
-#undef LOCAL_SIZE

@@ -28,12 +28,6 @@
 #undef DEAL_II_WITH_TRILINOS
 #endif
 
-#if DEAL_II_VERSION_GTE(9, 3, 0)
-#define LOCAL_SIZE locally_owned_size
-#else
-#define LOCAL_SIZE local_size
-#endif
-
 namespace ryujin
 {
   using namespace dealii;
@@ -557,7 +551,8 @@ namespace ryujin
       mass_matrix_tmp.vmult(local_lumped_mass_matrix, one);
       lumped_mass_matrix_.compress(VectorOperation::add);
 
-      for (unsigned int i = 0; i < scalar_partitioner_->LOCAL_SIZE(); ++i) {
+      for (unsigned int i = 0; i < scalar_partitioner_->locally_owned_size();
+           ++i) {
         lumped_mass_matrix_.local_element(i) =
             local_lumped_mass_matrix.local_element(i);
         lumped_mass_matrix_inverse_.local_element(i) =
@@ -574,7 +569,8 @@ namespace ryujin
       Vector<Number> local_lumped_mass_matrix(mass_matrix_tmp.m());
       mass_matrix_tmp.vmult(local_lumped_mass_matrix, one);
 
-      for (unsigned int i = 0; i < scalar_partitioner_->LOCAL_SIZE(); ++i) {
+      for (unsigned int i = 0; i < scalar_partitioner_->locally_owned_size();
+           ++i) {
         lumped_mass_matrix_.local_element(i) = local_lumped_mass_matrix(i);
         lumped_mass_matrix_inverse_.local_element(i) =
             1. / lumped_mass_matrix_.local_element(i);
@@ -844,5 +840,3 @@ namespace ryujin
   }
 
 } /* namespace ryujin */
-
-#undef LOCAL_SIZE

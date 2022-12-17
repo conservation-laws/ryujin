@@ -142,8 +142,8 @@ namespace ryujin
 #endif
 
       static DEAL_II_ALWAYS_INLINE inline
-      typename VectorClassType<float, float_width>::value_type
-      to_float(typename VectorClassType<double, width>::value_type x)
+          typename VectorClassType<float, float_width>::value_type
+          to_float(typename VectorClassType<double, width>::value_type x)
       {
 #if DEAL_II_COMPILER_VECTORIZATION_LEVEL >= 1 && defined(__SSE2__)
         return vcl::to_float(x);
@@ -153,8 +153,8 @@ namespace ryujin
       }
 
       static DEAL_II_ALWAYS_INLINE inline
-      typename VectorClassType<double, width>::value_type
-      to_double(typename VectorClassType<float, float_width>::value_type x)
+          typename VectorClassType<double, width>::value_type
+          to_double(typename VectorClassType<float, float_width>::value_type x)
       {
 #if DEAL_II_COMPILER_VECTORIZATION_LEVEL >= 1 && defined(__SSE2__)
         if constexpr (width == 1) {
@@ -174,14 +174,14 @@ namespace ryujin
     template <std::size_t width>
     struct FC<float, width> {
       static DEAL_II_ALWAYS_INLINE inline
-      typename VectorClassType<float, width>::value_type
-      to_float(typename VectorClassType<float, width>::value_type x)
+          typename VectorClassType<float, width>::value_type
+          to_float(typename VectorClassType<float, width>::value_type x)
       {
         return x;
       }
       static DEAL_II_ALWAYS_INLINE inline
-      typename VectorClassType<float, width>::value_type
-      to_double(typename VectorClassType<float, width>::value_type x)
+          typename VectorClassType<float, width>::value_type
+          to_double(typename VectorClassType<float, width>::value_type x)
       {
         return x;
       }

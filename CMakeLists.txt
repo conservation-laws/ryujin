@@ -8,7 +8,7 @@ set(RYUJIN_VERSION 2.1.1)
 cmake_minimum_required(VERSION 3.5)
 set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
 
-find_package(deal.II 9.2 REQUIRED HINTS ${DEAL_II_DIR} $ENV{DEAL_II_DIR})
+find_package(deal.II 9.3 REQUIRED HINTS ${DEAL_II_DIR} $ENV{DEAL_II_DIR})
 
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -ffp-contract=fast" CACHE STRING
   "Flags used by the compiler during release builds."

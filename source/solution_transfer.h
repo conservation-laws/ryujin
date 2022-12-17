@@ -120,11 +120,7 @@ namespace ryujin
       interpolated_state_.resize(problem_dimension);
       for (auto &it : interpolated_state_) {
         it.reinit(scalar_partitioner);
-#if DEAL_II_VERSION_GTE(9, 3, 0)
         it.zero_out_ghost_values();
-#else
-        it.zero_out_ghosts();
-#endif
       }
 
       std::vector<scalar_type *> ptr_interpolated_state;

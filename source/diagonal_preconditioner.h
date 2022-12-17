@@ -11,12 +11,6 @@
 
 #include <deal.II/lac/la_parallel_block_vector.h>
 
-#if DEAL_II_VERSION_GTE(9, 3, 0)
-#define LOCAL_SIZE locally_owned_size
-#else
-#define LOCAL_SIZE local_size
-#endif
-
 namespace ryujin
 {
   /**
@@ -68,9 +62,9 @@ namespace ryujin
      */
     void vmult(scalar_type &dst, const scalar_type &src) const
     {
-      const auto n_owned = diagonal_.get_partitioner()->LOCAL_SIZE();
-      AssertDimension(n_owned, src.get_partitioner()->LOCAL_SIZE());
-      AssertDimension(n_owned, dst.get_partitioner()->LOCAL_SIZE());
+      const auto n_owned = diagonal_.get_partitioner()->locally_owned_size();
+      AssertDimension(n_owned, src.get_partitioner()->locally_owned_size());
+      AssertDimension(n_owned, dst.get_partitioner()->locally_owned_size());
 
       DEAL_II_OPENMP_SIMD_PRAGMA
       for (unsigned int i = 0; i < n_owned; ++i)
@@ -86,11 +80,13 @@ namespace ryujin
       const auto n_blocks = src.n_blocks();
       AssertDimension(n_blocks, dst.n_blocks());
 
-      const auto n_owned = diagonal_.get_partitioner()->LOCAL_SIZE();
+      const auto n_owned = diagonal_.get_partitioner()->locally_owned_size();
 
       for (unsigned int d = 0; d < n_blocks; ++d) {
-        AssertDimension(n_owned, src.block(d).get_partitioner()->LOCAL_SIZE());
-        AssertDimension(n_owned, dst.block(d).get_partitioner()->LOCAL_SIZE());
+        AssertDimension(n_owned,
+                        src.block(d).get_partitioner()->locally_owned_size());
+        AssertDimension(n_owned,
+                        dst.block(d).get_partitioner()->locally_owned_size());
 
         DEAL_II_OPENMP_SIMD_PRAGMA
         for (unsigned int i = 0; i < n_owned; ++i)
@@ -104,5 +100,3 @@ namespace ryujin
   };
 
 } /* namespace ryujin */
-
-#undef LOCAL_SIZE

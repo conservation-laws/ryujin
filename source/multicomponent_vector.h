@@ -12,12 +12,6 @@
 #include <deal.II/base/vectorization.h>
 #include <deal.II/lac/la_parallel_vector.h>
 
-#if DEAL_II_VERSION_GTE(9, 3, 0)
-#define LOCAL_SIZE locally_owned_size
-#else
-#define LOCAL_SIZE local_size
-#endif
-
 namespace ryujin
 {
   /**
@@ -199,11 +193,12 @@ namespace ryujin
            dealii::ExcMessage(
                "Cannot extract from a vector with zero components."));
 
-    Assert(n_comp * scalar_vector.get_partitioner()->LOCAL_SIZE() ==
-               this->get_partitioner()->LOCAL_SIZE(),
+    Assert(n_comp * scalar_vector.get_partitioner()->locally_owned_size() ==
+               this->get_partitioner()->locally_owned_size(),
            dealii::ExcMessage("Called with a scalar_vector argument that has "
                               "incompatible local range."));
-    const auto local_size = scalar_vector.get_partitioner()->LOCAL_SIZE();
+    const auto local_size =
+        scalar_vector.get_partitioner()->locally_owned_size();
     for (unsigned int i = 0; i < local_size; ++i)
       scalar_vector.local_element(i) =
           this->local_element(i * n_comp + component);
@@ -219,11 +214,12 @@ namespace ryujin
            dealii::ExcMessage(
                "Cannot insert into a vector with zero components."));
 
-    Assert(n_comp * scalar_vector.get_partitioner()->LOCAL_SIZE() ==
-               this->get_partitioner()->LOCAL_SIZE(),
+    Assert(n_comp * scalar_vector.get_partitioner()->locally_owned_size() ==
+               this->get_partitioner()->locally_owned_size(),
            dealii::ExcMessage("Called with a scalar_vector argument that has "
                               "incompatible local range."));
-    const auto local_size = scalar_vector.get_partitioner()->LOCAL_SIZE();
+    const auto local_size =
+        scalar_vector.get_partitioner()->locally_owned_size();
     for (unsigned int i = 0; i < local_size; ++i)
       this->local_element(i * n_comp + component) =
           scalar_vector.local_element(i);
@@ -346,5 +342,3 @@ namespace ryujin
 #endif
 
 } // namespace ryujin
-
-#undef LOCAL_SIZE
