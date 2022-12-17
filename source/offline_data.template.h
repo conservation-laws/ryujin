@@ -24,9 +24,6 @@
 #include <deal.II/lac/trilinos_sparse_matrix.h>
 #endif
 
-#include <boost/range/irange.hpp>
-#include <boost/range/iterator_range.hpp>
-
 #ifdef FORCE_DEAL_II_SPARSE_MATRIX
 #undef DEAL_II_WITH_TRILINOS
 #endif
