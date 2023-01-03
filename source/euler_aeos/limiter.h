@@ -20,9 +20,10 @@ namespace ryujin
      * The convex limiter.
      *
      * The class implements a convex limiting technique as described in
-     * @cite GuermondEtAl2018 and @cite ryujin-2022-1. Given a
-     * computed set of bounds and an update direction \f$\mathbf P_{ij}\f$
-     * one can now determine a candidate \f$\tilde l_{ij}\f$ by computing
+     * @cite GuermondEtAl2018,  @cite ryujin-2022-1 and @cite
+     * aeos-second-order-2022. Given a computed set of bounds and an update
+     * direction \f$\mathbf P_{ij}\f$ one can now determine a candidate
+     * \f$\tilde l_{ij}\f$ by computing
      *
      * \f{align}
      *   \tilde l_{ij} = \max_{l\,\in\,[0,1]}
@@ -205,6 +206,7 @@ namespace ryujin
       Number rho_relaxation_denominator;
       Number s_interp_max;
 
+      Number gamma_min;
       //@}
     };
 
@@ -226,6 +228,7 @@ namespace ryujin
       const auto &[p_i, gamma_min_i, s_i, eta_i] =
           precomputed_values.template get_tensor<Number, precomputed_type>(i);
 
+      gamma_min = gamma_min_i;
       s_min = s_i;
 
       /* Relaxation: */
@@ -259,9 +262,14 @@ namespace ryujin
       rho_min = std::min(rho_min, rho_ij_bar);
       rho_max = std::max(rho_max, rho_ij_bar);
 
+      // s_j is not correct
       const auto &[p_j, gamma_min_j, s_j, eta_j] =
           precomputed_values.template get_tensor<Number, precomputed_type>(js);
+
+      //  const auto s_bar_ij =
+      //     problem_description.specific_entropy(U_ij_bar, gamma_min_i);
       s_min = std::min(s_min, s_j);
+      // s_min = std::min(s_min, s_bar_ij);
 
       /* Relaxation: */
 
@@ -296,11 +304,25 @@ namespace ryujin
 
       rho_min =
           std::max((Number(1.) - r_i) * rho_min, rho_min - rho_relaxation);
-      rho_max =
-          std::min((Number(1.) + r_i) * rho_max, rho_max + rho_relaxation);
 
       s_min = std::max((Number(1.) - r_i) * s_min,
                        Number(2.) * s_min - s_interp_max);
+
+      /**
+       * If we have a maximum compressibility constant, b, the maximum bound for
+       * rho changes. See @cite aeos-second-order-2022 for how to define
+       * rho_max.
+       **/
+
+      const auto numerator = (gamma_min + Number(1.)) * rho_max;
+      const auto denominator =
+          gamma_min - Number(1.) +
+          ScalarNumber(2. * hyperbolic_system.b_interp()) * rho_max;
+
+      const auto upper_bound = numerator / denominator;
+
+      rho_max = std::min(upper_bound, (Number(1.) + r_i) * rho_max);
+      rho_max = std::min(rho_max, rho_max + rho_relaxation);
     }
 
 
