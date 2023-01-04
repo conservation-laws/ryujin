@@ -108,7 +108,7 @@ namespace ryujin
       /**
        * The number of stored entries in the bounds array.
        */
-      static constexpr unsigned int n_bounds = 3;
+      static constexpr unsigned int n_bounds = 4;
 
       /**
        * Array type used to store accumulated bounds.
@@ -206,7 +206,6 @@ namespace ryujin
       Number rho_relaxation_denominator;
       Number s_interp_max;
 
-      Number gamma_min;
       //@}
     };
 
@@ -220,7 +219,7 @@ namespace ryujin
     {
       /* Bounds: */
 
-      auto &[rho_min, rho_max, s_min] = bounds_;
+      auto &[rho_min, rho_max, s_min, gamma_min] = bounds_;
 
       rho_min = Number(std::numeric_limits<ScalarNumber>::max());
       rho_max = Number(0.);
@@ -241,35 +240,44 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline void Limiter<dim, Number>::accumulate(
-        const unsigned int *js,
+        const unsigned int * /*js*/,
         const state_type &U_i,
         const state_type &U_j,
-        const flux_contribution_type & /*flux_i*/,
-        const flux_contribution_type & /*flux_j*/,
+        const flux_contribution_type &flux_i,
+        const flux_contribution_type &flux_j,
         const dealii::Tensor<1, dim, Number> &scaled_c_ij,
         const Number beta_ij)
     {
       /* Bounds: */
 
-      auto &[rho_min, rho_max, s_min] = bounds_;
+
+      auto &[rho_min, rho_max, s_min, gamma_min] = bounds_;
 
       const auto rho_i = hyperbolic_system.density(U_i);
-      const auto m_i = hyperbolic_system.momentum(U_i);
       const auto rho_j = hyperbolic_system.density(U_j);
-      const auto m_j = hyperbolic_system.momentum(U_j);
-      const auto rho_ij_bar =
-          ScalarNumber(0.5) * (rho_i + rho_j + (m_i - m_j) * scaled_c_ij);
+
+      const auto U_ij_bar =
+          ScalarNumber(0.5) * (U_i + U_j) -
+          ScalarNumber(0.5) * contract(add(flux_j, -flux_i), scaled_c_ij);
+
+
+      const auto rho_ij_bar = hyperbolic_system.density(U_ij_bar);
+      const auto s_bar_ij =
+          hyperbolic_system.specific_entropy(U_ij_bar, gamma_min);
+
       rho_min = std::min(rho_min, rho_ij_bar);
       rho_max = std::max(rho_max, rho_ij_bar);
 
-      // s_j is not correct
-      const auto &[p_j, gamma_min_j, s_j, eta_j] =
-          precomputed_values.template get_tensor<Number, precomputed_type>(js);
+      // this s_j is not correct
+      // const auto &[p_j, gamma_min_j, s_j, eta_j] =
+      //     precomputed_values.template get_tensor<Number,
+      //     precomputed_type>(js);
 
-      //  const auto s_bar_ij =
-      //     problem_description.specific_entropy(U_ij_bar, gamma_min_i);
+      // This is correct, but not effecient
+      const auto s_j = hyperbolic_system.specific_entropy(U_j, gamma_min);
+
       s_min = std::min(s_min, s_j);
-      // s_min = std::min(s_min, s_bar_ij);
+      s_min = std::min(s_min, s_bar_ij);
 
       /* Relaxation: */
 
@@ -277,7 +285,7 @@ namespace ryujin
       rho_relaxation_denominator += beta_ij;
 
       const Number s_interp = hyperbolic_system.specific_entropy(
-          (U_i + U_j) * ScalarNumber(.5), gamma_min_j); // FIXME
+          (U_i + U_j) * ScalarNumber(.5), gamma_min);
       s_interp_max = std::max(s_interp_max, s_interp);
     }
 
@@ -286,7 +294,7 @@ namespace ryujin
     DEAL_II_ALWAYS_INLINE inline void
     Limiter<dim, Number>::apply_relaxation(Number hd_i, ScalarNumber factor)
     {
-      auto &[rho_min, rho_max, s_min] = bounds_;
+      auto &[rho_min, rho_max, s_min, gamma_min] = bounds_;
 
       /* Use r_i = factor * (m_i / |Omega|) ^ (1.5 / d): */
 

@@ -116,8 +116,10 @@ namespace ryujin
 
       Number t_l = t_min; // good state
 
-      const ScalarNumber gamma = 7. / 5.;
-      const ScalarNumber gp1 = gamma + ScalarNumber(1.);
+      const auto &gamma = std::get<3>(bounds) /* = gamma_min*/;
+      const Number gm1 = gamma - Number(1.);
+
+      const ScalarNumber b_ = hyperbolic_system.b_interp();
 
       {
         /*
@@ -125,6 +127,8 @@ namespace ryujin
          *
          * Given initial limiter values t_l and t_r with psi(t_l) > 0 and
          * psi(t_r) < 0 we try to find t^\ast with psi(t^\ast) \approx 0.
+         *
+         * FIXME -- Need to change comment
          *
          * Here, psi is a 3-convex function obtained by scaling the specific
          * entropy s:
@@ -143,9 +147,11 @@ namespace ryujin
           const auto rho_r = hyperbolic_system.density(U_r);
           const auto rho_r_gamma = ryujin::pow(rho_r, gamma);
           const auto rho_e_r = hyperbolic_system.internal_energy(U_r);
+          const auto covolume_r = Number(1.) - b_ * rho_r;
 
           auto psi_r =
-              relax_small * rho_r * rho_e_r - s_min * rho_r * rho_r_gamma;
+              relax_small * rho_r * rho_e_r -
+              s_min * rho_r * rho_r_gamma * ryujin::pow(covolume_r, -gm1);
 
           /*
            * If psi_r > 0 the right state is fine, force returning t_r by
@@ -172,14 +178,17 @@ namespace ryujin
           const auto rho_l = hyperbolic_system.density(U_l);
           const auto rho_l_gamma = ryujin::pow(rho_l, gamma);
           const auto rho_e_l = hyperbolic_system.internal_energy(U_l);
+          const auto covolume_l = Number(1.) - b_ * rho_l;
 
           auto psi_l =
-              relax_small * rho_l * rho_e_l - s_min * rho_l * rho_l_gamma;
+              relax_small * rho_l * rho_e_l -
+              s_min * rho_l * rho_l_gamma * ryujin::pow(covolume_l, -gm1);
 
-          /*
-           * Verify that the left state is within bounds. This property might
-           * be violated for relative CFL numbers larger than 1.
-           */
+/*
+ * Verify that the left state is within bounds. This property might
+ * be violated for relative CFL numbers larger than 1.
+ */
+#if 0
           const auto lower_bound =
               (ScalarNumber(1.) - relax) * s_min * rho_l * rho_l_gamma;
           if (n == 0 &&
@@ -192,6 +201,7 @@ namespace ryujin
 #endif
             success = false;
           }
+#endif
 
           /*
            * Break if the window between t_l and t_r is within the prescribed
@@ -207,10 +217,18 @@ namespace ryujin
               hyperbolic_system.internal_energy_derivative(U_l) * P;
           const auto drho_e_r =
               hyperbolic_system.internal_energy_derivative(U_r) * P;
+
+          const auto extra_term_l = s_min *
+                                    ryujin::pow(rho_l / covolume_l, gamma) *
+                                    (covolume_l + gamma - b_ * rho_l);
+          const auto extra_term_r = s_min *
+                                    ryujin::pow(rho_r / covolume_r, gamma) *
+                                    (covolume_r + gamma - b_ * rho_r);
+
           const auto dpsi_l =
-              rho_l * drho_e_l + (rho_e_l - gp1 * s_min * rho_l_gamma) * drho;
+              rho_l * drho_e_l + (rho_e_l - extra_term_l) * drho;
           const auto dpsi_r =
-              rho_r * drho_e_r + (rho_e_r - gp1 * s_min * rho_r_gamma) * drho;
+              rho_r * drho_e_r + (rho_e_r - extra_term_r) * drho;
 
           quadratic_newton_step(
               t_l, t_r, psi_l, psi_r, dpsi_l, dpsi_r, Number(-1.));
@@ -225,28 +243,34 @@ namespace ryujin
 #endif
         }
 
-#ifdef CHECK_BOUNDS
+#ifdef CHECK_BOUNDS // FIXME
         /*
          * Verify that the new state is within bounds:
          */
         {
           const auto U_new = U + t_l * P;
+
           const auto rho_new = hyperbolic_system.density(U_new);
-          const auto e_new = hyperbolic_system.internal_energy(U_new);
+          const auto rho_e_new = hyperbolic_system.internal_energy(U_new);
+          const auto rho_gamma_new = ryujin::pow(rho_new, gamma);
+          const auto covolume_new = Number(1.) - b_ * rho_new;
+
           const auto psi =
-              relax_small * rho_new * e_new - s_min * ryujin::pow(rho_new, gp1);
+              relax_small * rho_new * rho_e_new -
+              s_min * rho_new * rho_gamma_new * ryujin::pow(covolume_new, -gm1);
 
-          const auto lower_bound =
-              (ScalarNumber(1.) - relax) * s_min * ryujin::pow(rho_new, gp1);
+          const auto lower_bound = (ScalarNumber(1.) - relax) * s_min *
+                                   rho_new * rho_gamma_new *
+                                   ryujin::pow(covolume_new, -gm1);
 
-          const bool e_valid = std::min(Number(0.), e_new) == Number(0.);
+          const bool e_valid = std::min(Number(0.), rho_e_new) == Number(0.);
           const bool psi_valid =
               std::min(Number(0.), psi - lower_bound) == Number(0.);
           if (!e_valid || !psi_valid) {
 #ifdef DEBUG_OUTPUT
             std::cout << std::fixed << std::setprecision(16);
             std::cout << "Bounds violation: high-order specific entropy!\n";
-            std::cout << "\t\tInt: 0 <= " << e_new << "\n";
+            std::cout << "\t\tInt: 0 <= " << rho_e_new << "\n";
             std::cout << "\t\tPsi: 0 <= " << psi << "\n" << std::endl;
 #endif
             success = false;
