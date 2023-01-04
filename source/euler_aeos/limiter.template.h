@@ -184,13 +184,12 @@ namespace ryujin
               relax_small * rho_l * rho_e_l -
               s_min * rho_l * rho_l_gamma * ryujin::pow(covolume_l, -gm1);
 
-/*
- * Verify that the left state is within bounds. This property might
- * be violated for relative CFL numbers larger than 1.
- */
-#if 0
-          const auto lower_bound =
-              (ScalarNumber(1.) - relax) * s_min * rho_l * rho_l_gamma;
+          /*
+           * Verify that the left state is within bounds. This property might
+           * be violated for relative CFL numbers larger than 1.
+           */
+          const auto lower_bound = (ScalarNumber(1.) - relax) * s_min * rho_l *
+                                   rho_l_gamma * ryujin::pow(covolume_l, -gm1);
           if (n == 0 &&
               !(std::min(Number(0.), psi_l - lower_bound) == Number(0.))) {
 #ifdef DEBUG_OUTPUT
@@ -201,7 +200,6 @@ namespace ryujin
 #endif
             success = false;
           }
-#endif
 
           /*
            * Break if the window between t_l and t_r is within the prescribed
@@ -243,7 +241,7 @@ namespace ryujin
 #endif
         }
 
-#ifdef CHECK_BOUNDS // FIXME
+#ifdef CHECK_BOUNDS
         /*
          * Verify that the new state is within bounds:
          */

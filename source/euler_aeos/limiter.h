@@ -260,7 +260,6 @@ namespace ryujin
           ScalarNumber(0.5) * (U_i + U_j) -
           ScalarNumber(0.5) * contract(add(flux_j, -flux_i), scaled_c_ij);
 
-
       const auto rho_ij_bar = hyperbolic_system.density(U_ij_bar);
       const auto s_bar_ij =
           hyperbolic_system.specific_entropy(U_ij_bar, gamma_min);
