@@ -1,0 +1,79 @@
+subsection A - TimeLoop
+  set basename                     = wc-blast-ideal
+  set enable output full           = true
+  set final time                   = 0.038
+  set output granularity           = 0.001
+  set terminal update interval     = 5
+end
+
+subsection B - Equation
+  set compute expensive bounds = false
+  set equation of state        = polytropic gas
+  set interpolation co-volume  = 0
+  set reference density        = 1
+  set vacuum state relaxation  = 10000
+
+  subsection polytropic gas
+    set gamma = 1.4
+  end
+
+end
+
+subsection C - Discretization
+  set geometry            = rectangular domain
+  set mesh distortion     = 0
+  set mesh refinement     = 10
+  set mesh repartitioning = false
+
+  subsection rectangular domain
+    set boundary condition left  = slip
+    set boundary condition right = slip
+    set grading pull back        = x
+    set grading push forward     = x
+    set position bottom left     = 0
+    set position top right       = 1
+    set subdivisions x           = 1
+  end
+end
+
+subsection E - InitialValues
+  set configuration = TwoContrast
+  set direction     = 1
+  set perturbation  = 0
+  set position      = 0  # 0 is the origin
+
+  subsection TwoContrast
+    set left region length     = 0.1
+    set middle region length   = 0.8
+    # (rho, u, e)
+    set primitive state left   = 1, 0, 2500
+    set primitive state middle = 1, 0, 0.025
+    set primitive state right  = 1, 0, 250
+  end
+end
+
+subsection F - HyperbolicModule
+  set cfl with boundary dofs        = false
+  set limiter iterations            = 2
+  set limiter newton max iterations = 2
+  set limiter newton tolerance      = 1e-10
+  set limiter relaxation factor     = 1
+end
+
+subsection H - TimeIntegrator
+  set cfl max               = 0.9
+  set cfl min               = 0.45
+  set cfl recovery strategy = bang bang control
+  set time stepping scheme  = erk 33
+end
+
+subsection I - VTUOutput
+  set manifolds                  = 
+  set schlieren beta             = 10
+  set schlieren quantities       = 
+  set schlieren recompute bounds = true
+  set use mpi io                 = true
+  set vtu output quantities      = rho, m, E, p
+end
+
+

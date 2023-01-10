@@ -1,0 +1,431 @@
+# Listing of Parameters
+# ---------------------
+subsection A - TimeLoop
+  # Base name for all output files
+  set basename                     = cylinder
+
+  # Write out checkpoints to resume an interrupted computation at output
+  # granularity intervals. The frequency is determined by "output granularity"
+  # times "output checkpoint multiplier"
+  set enable checkpointing         = false
+
+  # Flag to control whether we compute the Linfty Linf_norm of the difference
+  # to an analytic solution. Implemented only for certain initial state
+  # configurations.
+  set enable compute error         = false
+
+  # Flag to control whether we compute quantities of interest. The frequency
+  # how often quantities are logged is determined by "output granularity"
+  # times "output quantities multiplier"
+  set enable compute quantities    = false
+
+  # Write out full pvtu records. The frequency is determined by "output
+  # granularity" times "output full multiplier"
+  set enable output full           = false
+
+  # Write out levelsets pvtu records. The frequency is determined by "output
+  # granularity" times "output levelsets multiplier"
+  set enable output levelsets      = false
+
+  # List of conserved quantities used in the computation of the normalized
+  # error norms.
+  set error quantities             = rho, m, E
+
+  # Final time
+  set final time                   = 5
+
+  # Multiplicative modifier applied to "output granularity" that determines
+  # the checkpointing granularity
+  set output checkpoint multiplier = 1
+
+  # Multiplicative modifier applied to "output granularity" that determines
+  # the full pvtu writeout granularity
+  set output full multiplier       = 1
+
+  # The output granularity specifies the time interval after which output
+  # routines are run. Further modified by "*_multiplier" options
+  set output granularity           = 0.01
+
+  # Multiplicative modifier applied to "output granularity" that determines
+  # the levelsets pvtu writeout granularity
+  set output levelsets multiplier  = 1
+
+  # Multiplicative modifier applied to "output granularity" that determines
+  # the writeout granularity for quantities of interest
+  set output quantities multiplier = 1
+
+  # List of points in (simulation) time at which the mesh will be globally
+  # refined
+  set refinement timepoints        = 
+
+  # Resume an interrupted computation
+  set resume                       = false
+
+  # number of seconds after which output statistics are recomputed and printed
+  # on the terminal
+  set terminal update interval     = 5
+end
+
+
+subsection B - Equation
+  # Compute better, but significantly more expensive upper bounds on the
+  # maximal wavespeed.
+  set compute expensive bounds = false
+
+  # The equation of state. Valid names are given by any of the subsections
+  # defined below
+  set equation of state        = polytropic gas
+
+  # The maximum compressibility constant used for the co-volume EOS
+  # interpolation
+  set interpolation co-volume  = 0
+
+  # Problem specific density reference
+  set reference density        = 1
+
+  # Problem specific vacuum relaxation parameter
+  set vacuum state relaxation  = 10000
+
+
+  subsection jones wilkins lee
+    # The A constant
+    set A     = 0
+
+    # The B constant
+    set B     = 0
+
+    # The R1 constant
+    set R1    = 0
+
+    # The R2 constant
+    set R2    = 0
+
+    # The Gruneisen coefficient
+    set omega = 0.4
+
+    # The reference density
+    set rho_0 = 0
+  end
+
+  subsection noble abel stiffened gas
+    # The maximum compressibility constant
+    set covolume b                         = 0
+
+    # The ratio of specific heats
+    set gamma                              = 1.4
+
+    # The reference pressure p infinity
+    set reference pressure                 = 0
+
+    # The reference specific internal energy
+    set reference specific internal energy = 0
+  end
+
+  subsection polytropic gas
+    # The ratio of specific heats
+    set gamma = 1.4
+  end
+
+  subsection van der waals
+    # The maximum compressibility constant
+    set covolume b = 0
+
+    # The ratio of specific heats
+    set gamma      = 1.4
+
+    # The vdw a constant
+    set vdw a      = 0
+  end
+
+end
+
+
+subsection C - Discretization
+  # Name of the geometry used to create the mesh. Valid names are given by any
+  # of the subsections defined below.
+  set geometry            = cylinder
+
+  # Strength of mesh distortion
+  set mesh distortion     = 0
+
+  # number of refinement of global refinement steps
+  set mesh refinement     = 5
+
+  # try to equalize workload by repartitioning the mesh
+  set mesh repartitioning = false
+
+
+  subsection airfoil
+    # position of airfoil center in the mesh
+    set airfoil center                      = -0.5, 0
+
+    # length of airfoil (leading to trailing edge)
+    set airfoil length                      = 2
+
+    # airfoil type and serial number
+    set airfoil type                        = NASA SC(2) 0714
+
+    # number of anisotropic pre refinement steps for the airfoil
+    set anisotropic pre refinement airfoil  = 1
+
+    # number of anisotropic pre refinement steps for the blunt trailing edge
+    # cell
+    set anisotropic pre refinement trailing = 3
+
+    # graded mesh: regularization parameter
+    set grading epsilon                     = 0.02
+
+    # graded mesh: regularization parameter for trailing cells
+    set grading epsilon trailing            = 0.01
+
+    # graded mesh: exponent
+    set grading exponent                    = 5.5
+
+    # height of computational domain
+    set height                              = 6
+
+    # center position of airfoil for sampling psi
+    set psi center                          = 0.05, 0
+
+    # Scaling parameter for averages in curved nose region, can be adjusted by
+    # hand to equliabrate the size of faces at the nose part of the airfoil
+    set psi ratio                           = 0.3
+
+    # number of samples used for generating spline psi
+    set psi samples                         = 100
+
+    # number of subdivisions in z direction
+    set subdivisions z                      = 2
+
+    # width of computational domain
+    set width                               = 1
+  end
+
+  subsection cylinder
+    # height of computational domain
+    set height          = 2
+
+    # length of computational domain
+    set length          = 4
+
+    # diameter of immersed cylinder
+    set object diameter = 0.5
+
+    # x position of immersed cylinder center point
+    set object position = 0.6
+  end
+
+  subsection rectangular domain
+    # Type of boundary condition enforced on the left side of the domain
+    # (faces with normal in negative x direction)
+    set boundary condition left  = dirichlet
+
+    # Type of boundary condition enforced on the right side of the domain
+    # (faces with normal in positive x direction)
+    set boundary condition right = dirichlet
+
+    # pull back of grading manifold
+    set grading pull back        = x
+
+    # push forward of grading manifold
+    set grading push forward     = x
+
+    # Position of bottom left corner
+    set position bottom left     = 0
+
+    # Position of top right corner
+    set position top right       = 20
+
+    # number of subdivisions in x direction
+    set subdivisions x           = 1
+  end
+
+  subsection step
+    # height of computational domain
+    set height        = 1
+
+    # length of computational domain
+    set length        = 3
+
+    # height of step
+    set step height   = 0.2
+
+    # x position of step
+    set step position = 0.6
+  end
+
+  subsection wall
+    # height of computational domain
+    set height        = 1
+
+    # length of computational domain
+    set length        = 3.2
+
+    # x position of wall
+    set wall position = 0.166667
+  end
+
+end
+
+
+subsection D - OfflineData
+end
+
+
+subsection E - InitialValues
+  # The initial state configuration. Valid names are given by any of the
+  # subsections defined below.
+  set configuration = uniform
+
+  # Initial direction of initial configuration (Galilei transform)
+  set direction     = 1
+
+  # Add a random perturbation of the specified magnitude to the initial
+  # state.
+  set perturbation  = 0
+
+  # Initial position of initial configuration (Galilei transform)
+  set position      = 1
+
+
+  subsection TwoContrast
+    # The length of the left region
+    set left region length     = 0.1
+
+    # The length of the middle region
+    set middle region length   = 0.8
+
+    # Initial 1d primitive state (rho, u, e) on the left
+    set primitive state left   = 1, 0, 2500
+
+    # Initial 1d primitive state (rho, u, e) in the middle
+    set primitive state middle = 1, 0, 0.025
+
+    # Initial 1d primitive state (rho, u, e) on the right
+    set primitive state right  = 1, 0, 250
+  end
+
+  subsection contrast
+    # Initial 1d primitive state (rho, u, e) on the left
+    set primitive state left  = 1.4, 0, 2.5
+
+    # Initial 1d primitive state (rho, u, e) on the right
+    set primitive state right = 1.4, 0, 2.5
+  end
+
+  subsection isentropic vortex
+    # vortex strength beta
+    set beta        = 5
+
+    # The ratio of specific heats
+    set gamma       = 1.4
+
+    # Mach number of isentropic vortex
+    set mach number = 2
+  end
+
+  subsection ramp up
+    # Final 1d primitive state (rho, u, e)
+    set primitive state final   = 1.4, 3, 1
+
+    # Initial 1d primitive state (rho, u, e)
+    set primitive state initial = 1.4, 0, 1
+
+    # Time from which on the final state is attained)
+    set time final              = 1
+
+    # Time until which initial state is prescribed
+    set time initial            = 0
+  end
+
+  subsection uniform
+    # Initial 1d primitive state (rho, u, e)
+    set primitive state = 1.4, 3, 2.5
+  end
+
+end
+
+
+subsection F - HyperbolicModule
+  # Use also the local wave-speed estimate d_ij of boundary dofs when
+  # computing the maximal admissible step size
+  set cfl with boundary dofs        = false
+
+  # Number of limiter iterations
+  set limiter iterations            = 2
+
+  # Maximal number of quadratic newton iterations performed during limiting
+  set limiter newton max iterations = 2
+
+  # Tolerance for the quadratic newton stopping criterion
+  set limiter newton tolerance      = 1e-10
+
+  # Additional relaxation factor for computing the relaxation window with r_i
+  # = factor * (m_i/|Omega|)^(1.5/d).
+  set limiter relaxation factor     = 1
+end
+
+
+subsection H - TimeIntegrator
+  # Maximal admissible relative CFL constant. How this parameter is used
+  # depends on the chosen CFL recovery strategy
+  set cfl max               = 0.9
+
+  # Minimal admissible relative CFL constant. How this parameter is used
+  # depends on the chosen CFL recovery strategy
+  set cfl min               = 0.45
+
+  # CFL/invariant domain violation recovery strategy: none, bang bang control
+  set cfl recovery strategy = bang bang control
+
+  # Time stepping scheme: ssprk 33, erk 22, erk 33, erk 43
+  set time stepping scheme  = erk 33
+end
+
+
+subsection I - VTUOutput
+  # List of level set functions. The description is used to only output cells
+  # that intersect the given level set.
+  set manifolds                  = 
+
+  # Beta factor used in the exponential scale for the schlieren and vorticity
+  # plots
+  set schlieren beta             = 10
+
+  # List of conserved quantities used for the schlieren postprocessor.
+  set schlieren quantities       = rho
+
+  # Recompute bounds for every output cycle. If set to false, bounds once at
+  # the beginning and reused thereafter.
+  set schlieren recompute bounds = true
+
+  # If enabled write out one vtu file via MPI IO using write_vtu_in_parallel()
+  # instead of independent output files via write_vtu_with_pvtu_record()
+  set use mpi io                 = true
+
+  # List of conserved, primitive, precomputed, or postprocessed quantities
+  # that will be written to the vtu files.
+  set vtu output quantities      = rho, m, E
+end
+
+
+subsection J - Quantities
+  # List of level set functions describing boundary. The description is used
+  # to only output point values for boundary vertices belonging to a certain
+  # level set. Format: '<name> : <level set formula> : <options> , [...]
+  # (options: time_averaged, space_averaged, instantaneous)
+  set boundary manifolds           = 
+
+  # If set to true then all temporal statistics (for "time_averaged"
+  # quantities) accumulated so far are reset each time a writeout of
+  # quantities is performed
+  set clear statistics on writeout = true
+
+  # List of level set functions describing interior manifolds. The description
+  # is used to only output point values for vertices belonging to a certain
+  # level set. Format: '<name> : <level set formula> : <options> , [...]
+  # (options: time_averaged, space_averaged, instantaneous)
+  set interior manifolds           = 
+end
+
+
