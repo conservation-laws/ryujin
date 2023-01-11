@@ -163,6 +163,8 @@ namespace ryujin
       Number left = 0.;
       state_type right;
 
+      Number gamma_min;
+
       //@}
     };
 
@@ -179,16 +181,18 @@ namespace ryujin
       const auto &[p_i, gamma_min_i, s_i, new_eta_i] =
           precomputed_values.template get_tensor<Number, precomputed_type>(i);
 
+      gamma_min = gamma_min_i;
+
       const auto rho_i = hyperbolic_system.density(U_i);
       rho_i_inverse = Number(1.) / rho_i;
       eta_i = new_eta_i;
 
       d_eta_i =
-          hyperbolic_system.harten_entropy_derivative(U_i, eta_i, gamma_min_i);
+          hyperbolic_system.harten_entropy_derivative(U_i, eta_i, gamma_min);
       d_eta_i[0] -= eta_i * rho_i_inverse;
 
       const auto surrogate_p_i =
-          hyperbolic_system.surrogate_pressure(U_i, gamma_min_i);
+          hyperbolic_system.surrogate_pressure(U_i, gamma_min);
       f_i = hyperbolic_system.f(U_i, surrogate_p_i);
 
       left = 0.;
@@ -198,14 +202,18 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline void
-    Indicator<dim, Number>::add(const unsigned int *js,
+    Indicator<dim, Number>::add(const unsigned int * /*js*/,
                                 const state_type &U_j,
                                 const dealii::Tensor<1, dim, Number> &c_ij)
     {
       /* entropy viscosity commutator: */
 
-      const auto &[p_j, gamma_min_j, s_j, eta_j] =
-          precomputed_values.template get_tensor<Number, precomputed_type>(js);
+      // const auto &[p_j, gamma_min_j, s_j, eta_j] =
+      //     precomputed_values.template get_tensor<Number,
+      //     precomputed_type>(js);
+
+      // Compute correct eta_j. This is not effecient.
+      const auto eta_j = hyperbolic_system.harten_entropy(U_j, gamma_min);
 
       const auto rho_j = hyperbolic_system.density(U_j);
       const auto rho_j_inverse = Number(1.) / rho_j;
@@ -213,7 +221,7 @@ namespace ryujin
       const auto m_j = hyperbolic_system.momentum(U_j);
 
       const auto surrogate_p_j =
-          hyperbolic_system.surrogate_pressure(U_j, gamma_min_j);
+          hyperbolic_system.surrogate_pressure(U_j, gamma_min);
       const auto f_j = hyperbolic_system.f(U_j, surrogate_p_j);
 
       left += (eta_j * rho_j_inverse - eta_i * rho_i_inverse) * (m_j * c_ij);
