@@ -90,12 +90,12 @@ Contact
 -------
 
 For questions please contact Matthias Maier <maier@math.tamu.edu> and
-Martin Kronbichler <kronbichler@lnm.mw.tum.de>.
+Martin Kronbichler <martin.kronbichler@uni-a.de>.
 
 Authors
 -------
 
- - Martin Kronbichler ([@kronbichler](https://github.com/kronbichler)), Technical University of Munich, Germany
+ - Martin Kronbichler ([@kronbichler](https://github.com/kronbichler)), University of Augsburg, Germany
  - Matthias Maier ([@tamiko](https://github.com/tamiko)), Texas A&M University, TX, USA
  - Ignacio Tomas ([@itomasSNL](https://github.com/itomasSNL)), Texas A&M University, Sandia National Laboratories
  - Eric Tovar ([@ejtovar](https://github.com/ejtovar)), Texas A&M University, TX, USA
