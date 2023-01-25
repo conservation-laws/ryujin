@@ -98,4 +98,4 @@ Authors
  - Martin Kronbichler ([@kronbichler](https://github.com/kronbichler)), University of Augsburg, Germany
  - Matthias Maier ([@tamiko](https://github.com/tamiko)), Texas A&M University, TX, USA
  - Ignacio Tomas ([@itomasSNL](https://github.com/itomasSNL)), Texas Tech University, TX, USA
- - Eric Tovar ([@ejtovar](https://github.com/ejtovar)), Texas A&M University, TX, USA
+ - Eric Tovar ([@ejtovar](https://github.com/ejtovar)), Los Alamos National Laboratory, USA
