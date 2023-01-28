@@ -554,7 +554,6 @@ namespace ryujin
       ACCESSOR_READ_ONLY(dry_state_relaxation_mollified)
 
     private:
-
       double gravity_;
 
       double mannings_;

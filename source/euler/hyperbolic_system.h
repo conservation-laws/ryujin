@@ -567,7 +567,6 @@ namespace ryujin
       ACCESSOR_READ_ONLY(vacuum_state_relaxation)
 
     private:
-
       double gamma_;
 
       double reference_density_;

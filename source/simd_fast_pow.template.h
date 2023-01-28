@@ -26,7 +26,7 @@ namespace ryujin
   {
     return std::pow(x, b);
   }
-}
+} // namespace ryujin
 #endif
 
 
@@ -38,6 +38,7 @@ namespace ryujin
                                                    VTYPE const y,
                                                    Bias)
   {
+    /* clang-format off */
     using namespace vcl;
 
     const float ln2f_hi  =  0.693359375f;        // log(2), split in two for extended precision
@@ -157,8 +158,9 @@ namespace ryujin
     z = wm_pow_case_x0(xzero, y, z);
 
     return z;
-  }
 
+    /* clang-format on */
+  }
 } // namespace ryujin
 
 #endif

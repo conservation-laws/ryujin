@@ -547,7 +547,6 @@ namespace ryujin
       ACCESSOR_READ_ONLY(compute_expensive_bounds)
 
     private:
-
       std::string equation_of_state_;
 
       double b_interp_;

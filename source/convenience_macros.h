@@ -153,7 +153,7 @@ namespace
   template <
       typename T,
       typename = typename std::enable_if<!is_dereferenceable<T>::value>::type>
-  auto dereference(T &t) -> T&
+  auto dereference(T &t) -> T &
   {
     return t;
   }
