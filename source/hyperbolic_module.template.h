@@ -25,7 +25,7 @@ namespace ryujin
       std::map<std::string, dealii::Timer> &computing_timer,
       const ryujin::OfflineData<dim, Number> &offline_data,
       const ryujin::HyperbolicSystem &hyperbolic_system,
-      const ryujin::InitialValues<dim, Number> &initial_values,
+      const ryujin::InitialValues<Description, dim, Number> &initial_values,
       const std::string &subsection /*= "HyperbolicModule"*/)
       : ParameterAcceptor(subsection)
       , precompute_only_(false)

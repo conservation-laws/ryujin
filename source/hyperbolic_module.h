@@ -136,12 +136,13 @@ namespace ryujin
     /**
      * Constructor.
      */
-    HyperbolicModule(const MPI_Comm &mpi_communicator,
-                     std::map<std::string, dealii::Timer> &computing_timer,
-                     const ryujin::OfflineData<dim, Number> &offline_data,
-                     const ryujin::HyperbolicSystem &hyperbolic_system,
-                     const ryujin::InitialValues<dim, Number> &initial_values,
-                     const std::string &subsection = "HyperbolicModule");
+    HyperbolicModule(
+        const MPI_Comm &mpi_communicator,
+        std::map<std::string, dealii::Timer> &computing_timer,
+        const ryujin::OfflineData<dim, Number> &offline_data,
+        const ryujin::HyperbolicSystem &hyperbolic_system,
+        const ryujin::InitialValues<Description, dim, Number> &initial_values,
+        const std::string &subsection = "HyperbolicModule");
 
     /**
      * Prepare time stepping. A call to @ref prepare() allocates temporary
@@ -322,7 +323,7 @@ namespace ryujin
 
     dealii::SmartPointer<const ryujin::OfflineData<dim, Number>> offline_data_;
     dealii::SmartPointer<const ryujin::HyperbolicSystem> hyperbolic_system_;
-    dealii::SmartPointer<const ryujin::InitialValues<dim, Number>>
+    dealii::SmartPointer<const ryujin::InitialValues<Description, dim, Number>>
         initial_values_;
 
     mutable Number cfl_;

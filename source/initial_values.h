@@ -35,20 +35,26 @@ namespace ryujin
    *
    * @ingroup InitialValues
    */
-  template <int dim, typename Number = double>
+  template <typename Description, int dim, typename Number = double>
   class InitialValues : public dealii::ParameterAcceptor
   {
   public:
     /**
+     * @copydoc HyperbolicSystem
+     */
+    using HyperbolicSystem = typename Description::HyperbolicSystem;
+
+    /**
      * @copydoc HyperbolicSystem::problem_dimension
      */
     static constexpr unsigned int problem_dimension =
-        HyperbolicSystem::problem_dimension<dim>;
+        HyperbolicSystem::template problem_dimension<dim>;
 
     /**
      * @copydoc HyperbolicSystem::state_type
      */
-    using state_type = HyperbolicSystem::state_type<dim, Number>;
+    using state_type =
+        typename HyperbolicSystem::template state_type<dim, Number>;
 
     /**
      * Typedef for a MultiComponentVector storing the state U.
@@ -59,7 +65,7 @@ namespace ryujin
      * @copydoc HyperbolicSystem::n_precomputed_values
      */
     static constexpr unsigned int n_precomputed_values =
-        HyperbolicSystem::n_precomputed_initial_values<dim>;
+        HyperbolicSystem::template n_precomputed_initial_values<dim>;
 
     /**
      * Array type used for precomputed values.
