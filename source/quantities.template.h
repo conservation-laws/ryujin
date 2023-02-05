@@ -50,8 +50,8 @@ namespace ryujin
   } // namespace
 
 
-  template <int dim, typename Number>
-  Quantities<dim, Number>::Quantities(
+  template <typename Description, int dim, typename Number>
+  Quantities<Description, dim, Number>::Quantities(
       const MPI_Comm &mpi_communicator,
       const ryujin::HyperbolicSystem &hyperbolic_system,
       const ryujin::OfflineData<dim, Number> &offline_data,
@@ -90,9 +90,9 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void Quantities<dim, Number>::prepare(const std::string &name,
-                                        unsigned int cycle)
+  template <typename Description, int dim, typename Number>
+  void Quantities<Description, dim, Number>::prepare(const std::string &name,
+                                                     unsigned int cycle)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "Quantities<dim, Number>::prepare()" << std::endl;
@@ -314,7 +314,8 @@ namespace ryujin
     clear_statistics();
 
     /* Prepare header string: */
-    const auto &names = HyperbolicSystem::primitive_component_names<dim>;
+    const auto &names =
+        HyperbolicSystem::template primitive_component_names<dim>;
     header_ =
         std::accumulate(std::begin(names),
                         std::end(names),
@@ -328,8 +329,8 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void Quantities<dim, Number>::clear_statistics()
+  template <typename Description, int dim, typename Number>
+  void Quantities<Description, dim, Number>::clear_statistics()
   {
     const auto reset = [](const auto &manifold_map, auto &statistics_map) {
       for (const auto &[name, data_map] : manifold_map) {
@@ -355,9 +356,9 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
+  template <typename Description, int dim, typename Number>
   template <typename point_type, typename value_type>
-  value_type Quantities<dim, Number>::internal_accumulate(
+  value_type Quantities<Description, dim, Number>::internal_accumulate(
       const vector_type &U,
       const std::vector<point_type> &points_vector,
       std::vector<value_type> &val_new)
@@ -413,9 +414,9 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
+  template <typename Description, int dim, typename Number>
   template <typename value_type>
-  void Quantities<dim, Number>::internal_write_out(
+  void Quantities<Description, dim, Number>::internal_write_out(
       std::ostream &output,
       const std::vector<value_type> &values,
       const Number scale)
@@ -446,9 +447,9 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
+  template <typename Description, int dim, typename Number>
   template <typename value_type>
-  void Quantities<dim, Number>::internal_write_out_time_series(
+  void Quantities<Description, dim, Number>::internal_write_out_time_series(
       std::ostream &output,
       const std::vector<std::tuple<Number, value_type>> &values,
       bool append)
@@ -470,8 +471,9 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void Quantities<dim, Number>::accumulate(const vector_type &U, const Number t)
+  template <typename Description, int dim, typename Number>
+  void Quantities<Description, dim, Number>::accumulate(const vector_type &U,
+                                                        const Number t)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "Quantities<dim, Number>::accumulate()" << std::endl;
@@ -539,10 +541,10 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void Quantities<dim, Number>::write_out(const vector_type &U,
-                                          const Number t,
-                                          unsigned int cycle)
+  template <typename Description, int dim, typename Number>
+  void Quantities<Description, dim, Number>::write_out(const vector_type &U,
+                                                       const Number t,
+                                                       unsigned int cycle)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "Quantities<dim, Number>::write_out()" << std::endl;

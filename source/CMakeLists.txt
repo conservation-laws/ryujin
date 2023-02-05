@@ -35,7 +35,7 @@ set(DEPENDENT_SOURCE_FILES
   hyperbolic_module.cc
 #    initial_values.cc
   postprocessor.cc
-#    quantities.cc
+  quantities.cc
 #    time_integrator.cc
 #    time_loop.cc
 #    vtu_output.cc
