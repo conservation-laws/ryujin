@@ -819,7 +819,7 @@ namespace ryujin
              */
 
             const auto &[l_ij, success] =
-                typename Description::template Limiter<dim, T>::limit(
+                Description::template Limiter<dim, T>::limit(
                     *hyperbolic_system_,
                     bounds,
                     U_i_new,
@@ -949,7 +949,7 @@ namespace ryujin
                 pij_matrix_.template get_tensor<T>(i, col_idx);
 
             const auto &[new_l_ij, success] =
-                typename Description::template Limiter<dim, T>::limit(
+                Description::template Limiter<dim, T>::limit(
                     *hyperbolic_system_,
                     bounds,
                     U_i_new,

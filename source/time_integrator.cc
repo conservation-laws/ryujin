@@ -4,10 +4,11 @@
 //
 
 #include "time_integrator.template.h"
+#include "euler/description.h" // FIXME refactoring
 
 namespace ryujin
 {
   /* instantiations */
-  template class TimeIntegrator<DIM, NUMBER>;
+  template class TimeIntegrator<Euler::Description, DIM, NUMBER>;
 
 } /* namespace ryujin */
