@@ -4,10 +4,11 @@
 //
 
 #include "vtu_output.template.h"
+#include "euler/description.h" // FIXME refactoring
 
 namespace ryujin
 {
   /* instantiations */
-  template class VTUOutput<DIM, NUMBER>;
+  template class VTUOutput<Euler::Description, DIM, NUMBER>;
 
 } /* namespace ryujin */

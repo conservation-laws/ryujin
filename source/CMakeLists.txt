@@ -38,7 +38,7 @@ set(DEPENDENT_SOURCE_FILES
   quantities.cc
 #    time_integrator.cc
 #    time_loop.cc
-#    vtu_output.cc
+  vtu_output.cc
   )
 
 set_property(SOURCE time_loop.cc APPEND PROPERTY COMPILE_DEFINITIONS

@@ -30,26 +30,32 @@ namespace ryujin
    *
    * @ingroup TimeLoop
    */
-  template <int dim, typename Number = double>
+  template <typename Description, int dim, typename Number = double>
   class VTUOutput final : public dealii::ParameterAcceptor
   {
+    /**
+     * @copydoc HyperbolicSystem
+     */
+    using HyperbolicSystem = typename Description::HyperbolicSystem;
+
   public:
     /**
      * @copydoc HyperbolicSystem::problem_dimension
      */
     static constexpr unsigned int problem_dimension =
-        HyperbolicSystem::problem_dimension<dim>;
+        HyperbolicSystem::template problem_dimension<dim>;
 
     /**
      * @copydoc HyperbolicSystem::state_type
      */
-    using state_type = HyperbolicSystem::state_type<dim, Number>;
+    using state_type =
+        typename HyperbolicSystem::template state_type<dim, Number>;
 
     /**
      * @copydoc HyperbolicSystem::n_precomputed_values
      */
     static constexpr unsigned int n_precomputed_values =
-        HyperbolicSystem::n_precomputed_values<dim>;
+        HyperbolicSystem::template n_precomputed_values<dim>;
 
     /**
      * @copydoc OfflineData::scalar_type
@@ -69,11 +75,13 @@ namespace ryujin
     /**
      * Constructor.
      */
-    VTUOutput(const MPI_Comm &mpi_communicator,
-              const ryujin::OfflineData<dim, Number> &offline_data,
-              const ryujin::HyperbolicModule<dim, Number> &hyperbolic_module,
-              const ryujin::Postprocessor<dim, Number> &postprocessor,
-              const std::string &subsection = "VTUOutput");
+    VTUOutput(
+        const MPI_Comm &mpi_communicator,
+        const ryujin::OfflineData<dim, Number> &offline_data,
+        const ryujin::HyperbolicModule<Description, dim, Number>
+            &hyperbolic_module,
+        const ryujin::Postprocessor<Description, dim, Number> &postprocessor,
+        const std::string &subsection = "VTUOutput");
 
     /**
      * Prepare VTU output. A call to @ref prepare() allocates temporary
@@ -138,9 +146,10 @@ namespace ryujin
     const MPI_Comm &mpi_communicator_;
 
     dealii::SmartPointer<const OfflineData<dim, Number>> offline_data_;
-    dealii::SmartPointer<const HyperbolicModule<dim, Number>>
+    dealii::SmartPointer<const HyperbolicModule<Description, dim, Number>>
         hyperbolic_module_;
-    dealii::SmartPointer<const Postprocessor<dim, Number>> postprocessor_;
+    dealii::SmartPointer<const Postprocessor<Description, dim, Number>>
+        postprocessor_;
 
     bool need_to_prepare_step_;
 
