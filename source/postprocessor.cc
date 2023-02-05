@@ -4,10 +4,11 @@
 //
 
 #include "postprocessor.template.h"
+#include "euler/description.h" // FIXME refactoring
 
 namespace ryujin
 {
   /* instantiations */
-  template class Postprocessor<DIM, NUMBER>;
+  template class Postprocessor<Euler::Description, DIM, NUMBER>;
 
 } /* namespace ryujin */

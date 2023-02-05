@@ -19,8 +19,8 @@
 
 namespace ryujin
 {
-  template <int dim, typename Number>
-  Postprocessor<dim, Number>::Postprocessor(
+  template <typename Description, int dim, typename Number>
+  Postprocessor<Description, dim, Number>::Postprocessor(
       const MPI_Comm &mpi_communicator,
       const ryujin::HyperbolicSystem &hyperbolic_system,
       const ryujin::OfflineData<dim, Number> &offline_data,
@@ -43,9 +43,10 @@ namespace ryujin
         "Recompute bounds for every output cycle. If set to false, bounds once "
         "at the beginning and reused thereafter.");
 
-    static_assert(HyperbolicSystem::component_names<dim>.size() > 0,
+    static_assert(HyperbolicSystem::template component_names<dim>.size() > 0,
                   "Need at least one scalar quantitity");
-    schlieren_quantities_.push_back(HyperbolicSystem::component_names<dim>[0]);
+    schlieren_quantities_.push_back(
+        HyperbolicSystem::template component_names<dim>[0]);
 
     add_parameter(
         "schlieren quantities",
@@ -61,8 +62,8 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void Postprocessor<dim, Number>::prepare()
+  template <typename Description, int dim, typename Number>
+  void Postprocessor<Description, dim, Number>::prepare()
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "Postprocessor<dim, Number>::prepare()" << std::endl;
@@ -76,8 +77,9 @@ namespace ryujin
     const auto populate = [&](const auto &strings,
                               auto &indices,
                               const auto &pre) {
-      const auto &cons = HyperbolicSystem::component_names<dim>;
-      const auto &prim = HyperbolicSystem::primitive_component_names<dim>;
+      const auto &cons = HyperbolicSystem::template component_names<dim>;
+      const auto &prim =
+          HyperbolicSystem::template primitive_component_names<dim>;
       for (const auto &entry : strings) {
         bool found = false;
         for (const auto &[is_primitive, names] :
@@ -106,8 +108,9 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void Postprocessor<dim, Number>::compute(const vector_type &U) const
+  template <typename Description, int dim, typename Number>
+  void
+  Postprocessor<Description, dim, Number>::compute(const vector_type &U) const
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "Postprocessor<dim, Number>::compute()" << std::endl;

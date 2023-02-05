@@ -36,20 +36,26 @@ namespace ryujin
    *
    * @ingroup TimeLoop
    */
-  template <int dim, typename Number = double>
+  template <typename Description, int dim, typename Number = double>
   class Postprocessor final : public dealii::ParameterAcceptor
   {
   public:
     /**
+     * @copydoc HyperbolicSystem
+     */
+    using HyperbolicSystem = typename Description::HyperbolicSystem;
+
+    /**
      * @copydoc HyperbolicSystem::problem_dimension
      */
     static constexpr unsigned int problem_dimension =
-        HyperbolicSystem::problem_dimension<dim>;
+        HyperbolicSystem::template problem_dimension<dim>;
 
     /**
      * @copydoc HyperbolicSystem::state_type
      */
-    using state_type = HyperbolicSystem::state_type<dim, Number>;
+    using state_type =
+        typename HyperbolicSystem::template state_type<dim, Number>;
 
     /**
      * The type used to store the gradient of a scalar quantitty;

@@ -4,7 +4,7 @@
 //
 
 #include "hyperbolic_module.template.h"
-#include "euler/description.h"
+#include "euler/description.h" // FIXME refactoring
 
 namespace ryujin
 {
