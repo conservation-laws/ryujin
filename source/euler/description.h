@@ -15,7 +15,15 @@ namespace ryujin
   namespace Euler
   {
     /**
-     * FIXME
+     * A struct that contains all equation specific classes describing the
+     * chosen hyperbolic system, the indicator, the limiter and
+     * (approximate) Riemann solver.
+     *
+     * We group all of these templates together in this struct so that we
+     * only need to add a single template parameter to the all the
+     * algorithm classes, such as HyperbolicModule.
+     *
+     * @ingroup EulerEquations
      */
     struct Description {
       using HyperbolicSystem = Euler::HyperbolicSystem;
