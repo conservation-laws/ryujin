@@ -37,7 +37,7 @@ set(DEPENDENT_SOURCE_FILES
   postprocessor.cc
   quantities.cc
   time_integrator.cc
-#    time_loop.cc
+  time_loop.cc
   vtu_output.cc
   )
 
