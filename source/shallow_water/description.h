@@ -7,6 +7,7 @@
 
 #include "hyperbolic_system.h"
 #include "indicator.h"
+#include "initial_state_library.h"
 #include "limiter.h"
 #include "riemann_solver.h"
 
@@ -31,11 +32,15 @@ namespace ryujin
       template <int dim, typename Number = double>
       using Indicator = ShallowWater::Indicator<dim, Number>;
 
+      using InitialStateLibrary = ShallowWater::InitialStateLibrary;
+
       template <int dim, typename Number = double>
       using Limiter = ShallowWater::Limiter<dim, Number>;
 
       template <int dim, typename Number = double>
       using RiemannSolver = ShallowWater::RiemannSolver<dim, Number>;
     };
-  } // namespace Euler
+  } // namespace ShallowWater
+
+  using ShallowWater::Description;
 } // namespace ryujin

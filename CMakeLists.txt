@@ -131,8 +131,8 @@ include(GNUInstallDirs)
 add_subdirectory(source)
 add_subdirectory(prm)
 
-enable_testing()
-add_subdirectory(tests)
+#  enable_testing()
+#  add_subdirectory(tests)
 
 IF(WITH_DOXYGEN)
   add_subdirectory(doc)

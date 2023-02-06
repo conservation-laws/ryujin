@@ -1156,6 +1156,4 @@ namespace ryujin
     }
 
   } // namespace ShallowWater
-
-  using namespace ShallowWater;
 } // namespace ryujin

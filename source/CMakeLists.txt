@@ -79,4 +79,4 @@ endmacro()
 
 setup_equation("euler")
 setup_equation("euler_aeos")
-#  setup_equation("shallow_water")
+setup_equation("shallow_water")
