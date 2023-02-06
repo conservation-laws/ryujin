@@ -7,12 +7,13 @@
 
 #include "hyperbolic_system.h"
 #include "indicator.h"
+#include "initial_state_library.h"
 #include "limiter.h"
 #include "riemann_solver.h"
 
 namespace ryujin
 {
-  namespace Euler
+  namespace EulerAEOS
   {
     /**
      * A struct that contains all equation specific classes describing the
@@ -26,16 +27,20 @@ namespace ryujin
      * @ingroup EulerEquations
      */
     struct Description {
-      using HyperbolicSystem = Euler::HyperbolicSystem;
+      using HyperbolicSystem = EulerAEOS::HyperbolicSystem;
 
       template <int dim, typename Number = double>
-      using Indicator = Euler::Indicator<dim, Number>;
+      using Indicator = EulerAEOS::Indicator<dim, Number>;
+
+      using InitialStateLibrary = EulerAEOS::InitialStateLibrary;
 
       template <int dim, typename Number = double>
-      using Limiter = Euler::Limiter<dim, Number>;
+      using Limiter = EulerAEOS::Limiter<dim, Number>;
 
       template <int dim, typename Number = double>
-      using RiemannSolver = Euler::RiemannSolver<dim, Number>;
+      using RiemannSolver = EulerAEOS::RiemannSolver<dim, Number>;
     };
-  } // namespace Euler
+  } // namespace EulerAEOS
+
+  using EulerAEOS::Description;
 } // namespace ryujin
