@@ -4,11 +4,11 @@
 //
 
 #include "initial_values.template.h"
-#include "euler/description.h" // FIXME refactoring
+#include <description.h>
 
 namespace ryujin
 {
   /* instantiations */
-  template class InitialValues<Euler::Description, DIM, NUMBER>;
+  template class InitialValues<Description, DIM, NUMBER>;
 
 } /* namespace ryujin */

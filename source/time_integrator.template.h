@@ -18,8 +18,8 @@ namespace ryujin
   TimeIntegrator<Description, dim, Number>::TimeIntegrator(
       const MPI_Comm &mpi_communicator,
       std::map<std::string, dealii::Timer> &computing_timer,
-      const ryujin::OfflineData<dim, Number> &offline_data,
-      const ryujin::HyperbolicModule<Description, dim, Number>
+      const OfflineData<dim, Number> &offline_data,
+      const HyperbolicModule<Description, dim, Number>
           &hyperbolic_module,
       const std::string &subsection /*= "TimeIntegrator"*/)
       : ParameterAcceptor(subsection)
@@ -136,7 +136,7 @@ namespace ryujin
     try {
       return single_step();
 
-    } catch (ryujin::Restart) {
+    } catch (Restart) {
 
       AssertThrow(cfl_recovery_strategy_ != CFLRecoveryStrategy::none,
                   dealii::ExcInternalError());

@@ -155,8 +155,8 @@ namespace ryujin
      */
     TimeIntegrator(const MPI_Comm &mpi_communicator,
                    std::map<std::string, dealii::Timer> &computing_timer,
-                   const ryujin::OfflineData<dim, Number> &offline_data,
-                   const ryujin::HyperbolicModule<Description, dim, Number>
+                   const OfflineData<dim, Number> &offline_data,
+                   const HyperbolicModule<Description, dim, Number>
                        &hyperbolic_module,
                    const std::string &subsection = "TimeIntegrator");
 
@@ -245,9 +245,9 @@ namespace ryujin
     const MPI_Comm &mpi_communicator_;
     std::map<std::string, dealii::Timer> &computing_timer_;
 
-    dealii::SmartPointer<const ryujin::OfflineData<dim, Number>> offline_data_;
+    dealii::SmartPointer<const OfflineData<dim, Number>> offline_data_;
     dealii::SmartPointer<
-        const ryujin::HyperbolicModule<Description, dim, Number>>
+        const HyperbolicModule<Description, dim, Number>>
         hyperbolic_module_;
 
     std::vector<vector_type> U_;

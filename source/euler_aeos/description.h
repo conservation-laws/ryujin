@@ -7,7 +7,6 @@
 
 #include "hyperbolic_system.h"
 #include "indicator.h"
-#include "initial_state_library.h"
 #include "limiter.h"
 #include "riemann_solver.h"
 
@@ -32,8 +31,6 @@ namespace ryujin
       template <int dim, typename Number = double>
       using Indicator = Euler::Indicator<dim, Number>;
 
-      using InitialStateLibrary = Euler::InitialStateLibrary;
-
       template <int dim, typename Number = double>
       using Limiter = Euler::Limiter<dim, Number>;
 
@@ -41,6 +38,4 @@ namespace ryujin
       using RiemannSolver = Euler::RiemannSolver<dim, Number>;
     };
   } // namespace Euler
-
-  using Euler::Description;
 } // namespace ryujin

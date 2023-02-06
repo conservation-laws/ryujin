@@ -48,7 +48,7 @@ set_property(SOURCE time_loop.cc APPEND PROPERTY COMPILE_DEFINITIONS
   )
 
 #
-# Equation-specific source files:
+# Equation-specific source files and compilation targets:
 #
 
 macro(setup_equation EQUATION)
@@ -65,46 +65,18 @@ macro(setup_equation EQUATION)
   add_library(obj_${EQUATION}_dependent OBJECT ${DEPENDENT_SOURCE_FILES})
   deal_ii_setup_target(obj_${EQUATION}_dependent)
 
-  target_link_libraries(obj_${EQUATION}_dependent PUBLIC obj_${EQUATION})
+  # Include the obj_${EQUATION} objects with PRIVATE visibility
+  target_link_libraries(obj_${EQUATION}_dependent PRIVATE obj_${EQUATION})
+
   if(WITH_LIKWID)
-    target_link_libraries(obj_${EQUATION}_dependent PUBLIC
-      likwid likwid-hwloc likwid-lua
-      )
+    target_link_libraries(obj_${EQUATION}_dependent PUBLIC likwid likwid-hwloc likwid-lua)
   endif()
   # For GNU libstdc++ we have to make sure to also link against libstdc++fs.
   if(LIBSTDCPP)
     target_link_libraries(obj_${EQUATION}_dependent PUBLIC stdc++fs)
   endif()
-
-  #
-  # The actual executable:
-  #
-
-  add_executable(${EQUATION} main.cc)
-  deal_ii_setup_target(${EQUATION})
-
-  target_link_libraries(${EQUATION}
-    obj_common obj_${EQUATION} obj_${EQUATION}_dependent
-    )
-
-  set_target_properties(${EQUATION} PROPERTIES
-    RUNTIME_OUTPUT_NAME "ryujin-${DIM}d-${EQUATION}"
-    )
-
-  add_custom_command(
-    OUTPUT "${CMAKE_BINARY_DIR}/run/${EQUATION}/ryujin"
-    COMMAND ${CMAKE_COMMAND} -E create_symlink $<TARGET_FILE:${EQUATION}>
-      "${CMAKE_BINARY_DIR}/run/${EQUATION}/ryujin"
-    )
-
-  add_custom_target(symlink_${EQUATION} ALL
-    DEPENDS ${EQUATION} "${CMAKE_BINARY_DIR}/run/${EQUATION}/ryujin"
-    COMMENT "updating ${EQUATION} symlink"
-    )
-
-  install(TARGETS ${EQUATION} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endmacro()
 
 setup_equation("euler")
-#setup_equation("euler_aeos")
-#setup_equation("shallow_water")
+#  setup_equation("euler_aeos")
+#  setup_equation("shallow_water")

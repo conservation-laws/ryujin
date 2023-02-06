@@ -25,20 +25,26 @@ namespace ryujin
    *
    * @ingroup TimeLoop
    */
-  template <int dim, typename Number = double>
+  template <typename Description, int dim, typename Number = double>
   class SolutionTransfer final
   {
   public:
     /**
+     * @copydoc HyperbolicSystem
+     */
+    using HyperbolicSystem = typename Description::HyperbolicSystem;
+
+    /**
      * @copydoc HyperbolicSystem::problem_dimension
      */
     static constexpr unsigned int problem_dimension =
-        HyperbolicSystem::problem_dimension<dim>;
+        HyperbolicSystem::template problem_dimension<dim>;
 
     /**
      * @copydoc HyperbolicSystem::state_type
      */
-    using state_type = HyperbolicSystem::state_type<dim, Number>;
+    using state_type =
+        typename HyperbolicSystem::template state_type<dim, Number>;
 
     /**
      * @copydoc OfflineData::scalar_type
@@ -53,8 +59,8 @@ namespace ryujin
     /**
      * Constructor.
      */
-    SolutionTransfer(const ryujin::OfflineData<dim, Number> &offline_data,
-                     const ryujin::HyperbolicSystem &hyperbolic_system)
+    SolutionTransfer(const OfflineData<dim, Number> &offline_data,
+                     const HyperbolicSystem &hyperbolic_system)
         : offline_data_(&offline_data)
         , hyperbolic_system_(&hyperbolic_system)
         , solution_transfer_(offline_data.dof_handler())
@@ -152,8 +158,8 @@ namespace ryujin
      * @name Internal data
      */
     //@{
-    dealii::SmartPointer<const ryujin::OfflineData<dim, Number>> offline_data_;
-    dealii::SmartPointer<const ryujin::HyperbolicSystem> hyperbolic_system_;
+    dealii::SmartPointer<const OfflineData<dim, Number>> offline_data_;
+    dealii::SmartPointer<const HyperbolicSystem> hyperbolic_system_;
 
     dealii::parallel::distributed::SolutionTransfer<dim, scalar_type>
         solution_transfer_;

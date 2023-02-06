@@ -1196,7 +1196,6 @@ namespace ryujin
         result[1 + d] = M[d];
       return result;
     }
-  } // namespace Euler
 
-  using namespace Euler;
+  } // namespace Euler
 } // namespace ryujin

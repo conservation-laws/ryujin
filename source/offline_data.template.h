@@ -36,7 +36,7 @@ namespace ryujin
   template <int dim, typename Number>
   OfflineData<dim, Number>::OfflineData(
       const MPI_Comm &mpi_communicator,
-      const ryujin::Discretization<dim> &discretization,
+      const Discretization<dim> &discretization,
       const std::string &subsection /*= "OfflineData"*/)
       : ParameterAcceptor(subsection)
       , discretization_(&discretization)

@@ -44,10 +44,9 @@ namespace ryujin
     warn,
 
     /**
-     * Raise a ryujin::Restart exception on domain violation. This
-     * exception can be caught in TimeIntegrator and various different
-     * actions (adapt CFL and retry) can be taken depending on chosen
-     * strategy.
+     * Raise a Restart exception on domain violation. This exception can be
+     * caught in TimeIntegrator and various different actions (adapt CFL
+     * and retry) can be taken depending on chosen strategy.
      */
     raise_exception,
   };
@@ -139,9 +138,9 @@ namespace ryujin
     HyperbolicModule(
         const MPI_Comm &mpi_communicator,
         std::map<std::string, dealii::Timer> &computing_timer,
-        const ryujin::OfflineData<dim, Number> &offline_data,
-        const ryujin::HyperbolicSystem &hyperbolic_system,
-        const ryujin::InitialValues<Description, dim, Number> &initial_values,
+        const OfflineData<dim, Number> &offline_data,
+        const HyperbolicSystem &hyperbolic_system,
+        const InitialValues<Description, dim, Number> &initial_values,
         const std::string &subsection = "HyperbolicModule");
 
     /**
@@ -321,9 +320,9 @@ namespace ryujin
     const MPI_Comm &mpi_communicator_;
     std::map<std::string, dealii::Timer> &computing_timer_;
 
-    dealii::SmartPointer<const ryujin::OfflineData<dim, Number>> offline_data_;
-    dealii::SmartPointer<const ryujin::HyperbolicSystem> hyperbolic_system_;
-    dealii::SmartPointer<const ryujin::InitialValues<Description, dim, Number>>
+    dealii::SmartPointer<const OfflineData<dim, Number>> offline_data_;
+    dealii::SmartPointer<const HyperbolicSystem> hyperbolic_system_;
+    dealii::SmartPointer<const InitialValues<Description, dim, Number>>
         initial_values_;
 
     mutable Number cfl_;

@@ -7,13 +7,12 @@
 
 #include "hyperbolic_system.h"
 #include "indicator.h"
-#include "initial_state_library.h"
 #include "limiter.h"
 #include "riemann_solver.h"
 
 namespace ryujin
 {
-  namespace Euler
+  namespace ShallowWater
   {
     /**
      * A struct that contains all equation specific classes describing the
@@ -27,20 +26,16 @@ namespace ryujin
      * @ingroup EulerEquations
      */
     struct Description {
-      using HyperbolicSystem = Euler::HyperbolicSystem;
+      using HyperbolicSystem = ShallowWater::HyperbolicSystem;
 
       template <int dim, typename Number = double>
-      using Indicator = Euler::Indicator<dim, Number>;
-
-      using InitialStateLibrary = Euler::InitialStateLibrary;
+      using Indicator = ShallowWater::Indicator<dim, Number>;
 
       template <int dim, typename Number = double>
-      using Limiter = Euler::Limiter<dim, Number>;
+      using Limiter = ShallowWater::Limiter<dim, Number>;
 
       template <int dim, typename Number = double>
-      using RiemannSolver = Euler::RiemannSolver<dim, Number>;
+      using RiemannSolver = ShallowWater::RiemannSolver<dim, Number>;
     };
   } // namespace Euler
-
-  using Euler::Description;
 } // namespace ryujin

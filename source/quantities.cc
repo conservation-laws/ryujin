@@ -4,11 +4,11 @@
 //
 
 #include "quantities.template.h"
-#include "euler/description.h" // FIXME refactoring
+#include <description.h>
 
 namespace ryujin
 {
   /* instantiations */
-  template class Quantities<Euler::Description, DIM, NUMBER>;
+  template class Quantities<Description, DIM, NUMBER>;
 
 } /* namespace ryujin */

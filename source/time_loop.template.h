@@ -307,8 +307,8 @@ namespace ryujin
 
             print_info("performing global refinement");
 
-            SolutionTransfer<dim, Number> solution_transfer(offline_data_,
-                                                            hyperbolic_system_);
+            SolutionTransfer<Description, dim, Number> solution_transfer(
+                offline_data_, hyperbolic_system_);
 
             auto &triangulation = discretization_.triangulation();
             for (auto &cell : triangulation.active_cell_iterators())

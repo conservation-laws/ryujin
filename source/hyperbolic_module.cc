@@ -4,11 +4,11 @@
 //
 
 #include "hyperbolic_module.template.h"
-#include "euler/description.h" // FIXME refactoring
+#include <description.h>
 
 namespace ryujin
 {
   /* instantiations */
-  template class HyperbolicModule<Euler::Description, DIM, NUMBER>;
+  template class HyperbolicModule<Description, DIM, NUMBER>;
 
 } /* namespace ryujin */

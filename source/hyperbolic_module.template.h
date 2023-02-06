@@ -23,9 +23,9 @@ namespace ryujin
   HyperbolicModule<Description, dim, Number>::HyperbolicModule(
       const MPI_Comm &mpi_communicator,
       std::map<std::string, dealii::Timer> &computing_timer,
-      const ryujin::OfflineData<dim, Number> &offline_data,
-      const ryujin::HyperbolicSystem &hyperbolic_system,
-      const ryujin::InitialValues<Description, dim, Number> &initial_values,
+      const OfflineData<dim, Number> &offline_data,
+      const HyperbolicSystem &hyperbolic_system,
+      const InitialValues<Description, dim, Number> &initial_values,
       const std::string &subsection /*= "HyperbolicModule"*/)
       : ParameterAcceptor(subsection)
       , precompute_only_(false)
@@ -244,7 +244,7 @@ namespace ryujin
               synchronization_dispatch.check(
                   thread_ready, i >= n_export_indices && i < n_internal);
 
-              hyperbolic_system_->precomputation<cycle, T>(
+              hyperbolic_system_->template precomputation<cycle, T>(
                   new_precomputed, old_U, sparsity_simd, i);
             }
           };
@@ -291,7 +291,7 @@ namespace ryujin
               synchronization_dispatch.check(
                   thread_ready, i >= n_export_indices && i < n_internal);
 
-              hyperbolic_system_->precomputation<cycle, T>(
+              hyperbolic_system_->template precomputation<cycle, T>(
                   new_precomputed, old_U, sparsity_simd, i);
             }
           };

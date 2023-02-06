@@ -85,8 +85,8 @@ namespace ryujin
      * Constructor.
      */
     Postprocessor(const MPI_Comm &mpi_communicator,
-                  const ryujin::HyperbolicSystem &hyperbolic_system,
-                  const ryujin::OfflineData<dim, Number> &offline_data,
+                  const HyperbolicSystem &hyperbolic_system,
+                  const OfflineData<dim, Number> &offline_data,
                   const std::string &subsection = "Postprocessor");
 
     /**
@@ -166,7 +166,7 @@ namespace ryujin
     const MPI_Comm &mpi_communicator_;
 
     dealii::SmartPointer<const HyperbolicSystem> hyperbolic_system_;
-    dealii::SmartPointer<const ryujin::OfflineData<dim, Number>> offline_data_;
+    dealii::SmartPointer<const OfflineData<dim, Number>> offline_data_;
 
     std::vector<std::string> component_names_;
     std::vector<std::pair<bool /*primitive*/, unsigned int>> schlieren_indices_;

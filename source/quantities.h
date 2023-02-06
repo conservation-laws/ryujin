@@ -64,8 +64,8 @@ namespace ryujin
      * Constructor.
      */
     Quantities(const MPI_Comm &mpi_communicator,
-               const ryujin::HyperbolicSystem &hyperbolic_system,
-               const ryujin::OfflineData<dim, Number> &offline_data,
+               const HyperbolicSystem &hyperbolic_system,
+               const OfflineData<dim, Number> &offline_data,
                const std::string &subsection = "Quantities");
 
     /**

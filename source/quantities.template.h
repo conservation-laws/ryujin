@@ -53,8 +53,8 @@ namespace ryujin
   template <typename Description, int dim, typename Number>
   Quantities<Description, dim, Number>::Quantities(
       const MPI_Comm &mpi_communicator,
-      const ryujin::HyperbolicSystem &hyperbolic_system,
-      const ryujin::OfflineData<dim, Number> &offline_data,
+      const HyperbolicSystem &hyperbolic_system,
+      const OfflineData<dim, Number> &offline_data,
       const std::string &subsection /*= "Quantities"*/)
       : ParameterAcceptor(subsection)
       , mpi_communicator_(mpi_communicator)

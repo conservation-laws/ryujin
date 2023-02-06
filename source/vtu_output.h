@@ -77,10 +77,10 @@ namespace ryujin
      */
     VTUOutput(
         const MPI_Comm &mpi_communicator,
-        const ryujin::OfflineData<dim, Number> &offline_data,
-        const ryujin::HyperbolicModule<Description, dim, Number>
+        const OfflineData<dim, Number> &offline_data,
+        const HyperbolicModule<Description, dim, Number>
             &hyperbolic_module,
-        const ryujin::Postprocessor<Description, dim, Number> &postprocessor,
+        const Postprocessor<Description, dim, Number> &postprocessor,
         const std::string &subsection = "VTUOutput");
 
     /**

@@ -70,7 +70,7 @@ namespace ryujin
      * Constructor
      */
     OfflineData(const MPI_Comm &mpi_communicator,
-                const ryujin::Discretization<dim> &discretization,
+                const Discretization<dim> &discretization,
                 const std::string &subsection = "OfflineData");
 
     /**
@@ -301,7 +301,7 @@ namespace ryujin
 
     Number measure_of_omega_;
 
-    dealii::SmartPointer<const ryujin::Discretization<dim>> discretization_;
+    dealii::SmartPointer<const Discretization<dim>> discretization_;
 
     const MPI_Comm &mpi_communicator_;
 

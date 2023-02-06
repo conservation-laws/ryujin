@@ -4,11 +4,11 @@
 //
 
 #include "time_loop.template.h"
-#include "euler/description.h" // FIXME refactoring
+#include <description.h>
 
 namespace ryujin
 {
   /* instantiations */
-  template class TimeLoop<Euler::Description, DIM, NUMBER>;
+  template class TimeLoop<Description, DIM, NUMBER>;
 
 } // namespace ryujin

@@ -60,8 +60,9 @@ namespace ryujin
      * And finally populate the initial state list with all initial state
      * configurations defined in the InitialStateLibrary namespace:
      */
-    InitialStateLibrary::populate_initial_state_list<dim, Number>(
-        initial_state_list_, *hyperbolic_system_, subsection);
+    Description::InitialStateLibrary::
+        template populate_initial_state_list<dim, Number>(
+            initial_state_list_, *hyperbolic_system_, subsection);
   }
 
   namespace
