@@ -67,7 +67,6 @@ namespace ryujin
     private:
       const std::string name_;
     };
-  } // namespace EulerAEOS
 
-  using namespace EulerAEOS;
+  } // namespace EulerAEOS
 } /* namespace ryujin */

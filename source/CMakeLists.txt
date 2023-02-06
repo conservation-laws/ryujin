@@ -48,7 +48,7 @@ set_property(SOURCE time_loop.cc APPEND PROPERTY COMPILE_DEFINITIONS
   )
 
 #
-# Equation-specific source files:
+# Equation-specific source files and compilation targets:
 #
 
 macro(setup_equation EQUATION)
@@ -65,11 +65,10 @@ macro(setup_equation EQUATION)
   add_library(obj_${EQUATION}_dependent OBJECT ${DEPENDENT_SOURCE_FILES})
   deal_ii_setup_target(obj_${EQUATION}_dependent)
 
-  target_link_libraries(obj_${EQUATION}_dependent PUBLIC obj_${EQUATION})
+  # Include the obj_${EQUATION} objects with PRIVATE visibility
+  target_link_libraries(obj_${EQUATION}_dependent PRIVATE obj_${EQUATION})
   if(WITH_LIKWID)
-    target_link_libraries(obj_${EQUATION}_dependent PUBLIC
-      likwid likwid-hwloc likwid-lua
-      )
+    target_link_libraries(obj_${EQUATION}_dependent PUBLIC likwid likwid-hwloc likwid-lua)
   endif()
   # For GNU libstdc++ we have to make sure to also link against libstdc++fs.
   if(LIBSTDCPP)

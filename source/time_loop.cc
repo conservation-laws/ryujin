@@ -4,10 +4,11 @@
 //
 
 #include "time_loop.template.h"
+#include <description.h>
 
 namespace ryujin
 {
   /* instantiations */
-  template class TimeLoop<DIM, NUMBER>;
+  template class TimeLoop<Description, DIM, NUMBER>;
 
 } // namespace ryujin

@@ -248,12 +248,12 @@ namespace ryujin
       std::string grading_push_forward_;
       std::string grading_pull_back_;
 
-      ryujin::Boundary boundary_back_;
-      ryujin::Boundary boundary_bottom_;
-      ryujin::Boundary boundary_front_;
-      ryujin::Boundary boundary_left_;
-      ryujin::Boundary boundary_right_;
-      ryujin::Boundary boundary_top_;
+      Boundary boundary_back_;
+      Boundary boundary_bottom_;
+      Boundary boundary_front_;
+      Boundary boundary_left_;
+      Boundary boundary_right_;
+      Boundary boundary_top_;
     };
   } /* namespace Geometries */
 } /* namespace ryujin */

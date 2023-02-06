@@ -10,4 +10,5 @@ add_library(obj_euler OBJECT
   )
 target_link_libraries(obj_euler PUBLIC obj_common)
 deal_ii_setup_target(obj_euler)
+# Propagate the current source directory with PUBLIC visibility
 target_include_directories(obj_euler PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

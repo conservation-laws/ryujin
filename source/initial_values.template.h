@@ -19,8 +19,8 @@ namespace ryujin
 {
   using namespace dealii;
 
-  template <int dim, typename Number>
-  InitialValues<dim, Number>::InitialValues(
+  template <typename Description, int dim, typename Number>
+  InitialValues<Description, dim, Number>::InitialValues(
       const HyperbolicSystem &hyperbolic_system,
       const OfflineData<dim, Number> &offline_data,
       const std::string &subsection)
@@ -29,7 +29,8 @@ namespace ryujin
       , offline_data_(&offline_data)
   {
     ParameterAcceptor::parse_parameters_call_back.connect(std::bind(
-        &InitialValues<dim, Number>::parse_parameters_callback, this));
+        &InitialValues<Description, dim, Number>::parse_parameters_callback,
+        this));
 
     configuration_ = "uniform";
     add_parameter("configuration",
@@ -59,8 +60,9 @@ namespace ryujin
      * And finally populate the initial state list with all initial state
      * configurations defined in the InitialStateLibrary namespace:
      */
-    InitialStateLibrary::populate_initial_state_list<dim, Number>(
-        initial_state_list_, *hyperbolic_system_, subsection);
+    Description::InitialStateLibrary::
+        template populate_initial_state_list<dim, Number>(
+            initial_state_list_, *hyperbolic_system_, subsection);
   }
 
   namespace
@@ -151,8 +153,8 @@ namespace ryujin
   } /* namespace */
 
 
-  template <int dim, typename Number>
-  void InitialValues<dim, Number>::parse_parameters_callback()
+  template <typename Description, int dim, typename Number>
+  void InitialValues<Description, dim, Number>::parse_parameters_callback()
   {
     /* First, let's normalize the direction: */
 
@@ -218,8 +220,9 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  auto InitialValues<dim, Number>::interpolate(Number t) const -> vector_type
+  template <typename Description, int dim, typename Number>
+  auto InitialValues<Description, dim, Number>::interpolate(Number t) const
+      -> vector_type
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "InitialValues<dim, Number>::interpolate(t = " << t << ")"
@@ -275,9 +278,9 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  auto
-  InitialValues<dim, Number>::interpolate_precomputed_initial_values() const
+  template <typename Description, int dim, typename Number>
+  auto InitialValues<Description, dim, Number>::
+      interpolate_precomputed_initial_values() const
       -> MultiComponentVector<Number, n_precomputed_values>
   {
     const auto scalar_partitioner = offline_data_->scalar_partitioner();

@@ -20,8 +20,7 @@ namespace ryujin
 {
   namespace Euler
   {
-    namespace InitialStateLibrary
-    {
+    struct InitialStateLibrary {
       /**
        * Populate a given container with all initial state defined in this
        * namespace
@@ -29,9 +28,9 @@ namespace ryujin
        * @ingroup InitialValues
        */
       template <int dim, typename Number, typename T>
-      void populate_initial_state_list(T &initial_state_list,
-                                       const HyperbolicSystem &h,
-                                       const std::string &s)
+      static void populate_initial_state_list(T &initial_state_list,
+                                              const HyperbolicSystem &h,
+                                              const std::string &s)
       {
         using state_type = HyperbolicSystem::state_type<dim, Number>;
 
@@ -47,7 +46,6 @@ namespace ryujin
         add(std::make_unique<ShockFront<dim, Number, state_type>>(h, s));
         add(std::make_unique<Uniform<dim, Number, state_type>>(h, s));
       }
-
-    } // namespace InitialStateLibrary
-  }   // namespace Euler
+    };
+  } // namespace Euler
 } // namespace ryujin

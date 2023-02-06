@@ -4,10 +4,11 @@
 //
 
 #include "vtu_output.template.h"
+#include <description.h>
 
 namespace ryujin
 {
   /* instantiations */
-  template class VTUOutput<DIM, NUMBER>;
+  template class VTUOutput<Description, DIM, NUMBER>;
 
 } /* namespace ryujin */

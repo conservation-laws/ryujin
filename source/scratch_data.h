@@ -27,7 +27,7 @@ namespace ryujin
     }
 
 
-    AssemblyScratchData(const ryujin::Discretization<dim> &discretization)
+    AssemblyScratchData(const Discretization<dim> &discretization)
         : discretization_(discretization)
         , fe_values_(discretization_.mapping(),
                      discretization_.finite_element(),
@@ -38,7 +38,7 @@ namespace ryujin
     {
     }
 
-    const ryujin::Discretization<dim> &discretization_;
+    const Discretization<dim> &discretization_;
     dealii::FEValues<dim> fe_values_;
   };
 

@@ -7,18 +7,19 @@
 
 #include "time_integrator.h"
 
+// We need to instantiate the HyperbolicModule::step() function:
 #include "hyperbolic_module.template.h"
 
 namespace ryujin
 {
   using namespace dealii;
 
-  template <int dim, typename Number>
-  TimeIntegrator<dim, Number>::TimeIntegrator(
+  template <typename Description, int dim, typename Number>
+  TimeIntegrator<Description, dim, Number>::TimeIntegrator(
       const MPI_Comm &mpi_communicator,
       std::map<std::string, dealii::Timer> &computing_timer,
-      const ryujin::OfflineData<dim, Number> &offline_data,
-      const ryujin::HyperbolicModule<dim, Number> &hyperbolic_module,
+      const OfflineData<dim, Number> &offline_data,
+      const HyperbolicModule<Description, dim, Number> &hyperbolic_module,
       const std::string &subsection /*= "TimeIntegrator"*/)
       : ParameterAcceptor(subsection)
       , mpi_communicator_(mpi_communicator)
@@ -53,8 +54,8 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void TimeIntegrator<dim, Number>::prepare()
+  template <typename Description, int dim, typename Number>
+  void TimeIntegrator<Description, dim, Number>::prepare()
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeIntegrator<dim, Number>::prepare()" << std::endl;
@@ -101,10 +102,10 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  Number TimeIntegrator<dim, Number>::step(vector_type &U,
-                                           Number t,
-                                           unsigned int /*cycle*/)
+  template <typename Description, int dim, typename Number>
+  Number TimeIntegrator<Description, dim, Number>::step(vector_type &U,
+                                                        Number t,
+                                                        unsigned int /*cycle*/)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeIntegrator<dim, Number>::step()" << std::endl;
@@ -134,7 +135,7 @@ namespace ryujin
     try {
       return single_step();
 
-    } catch (ryujin::Restart) {
+    } catch (Restart) {
 
       AssertThrow(cfl_recovery_strategy_ != CFLRecoveryStrategy::none,
                   dealii::ExcInternalError());
@@ -150,10 +151,9 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  Number TimeIntegrator<dim, Number>::step_ssprk_33(vector_type &U,
-                                                    Number t,
-                                                    Number tau /*=Number(0.)*/)
+  template <typename Description, int dim, typename Number>
+  Number TimeIntegrator<Description, dim, Number>::step_ssprk_33(
+      vector_type &U, Number t, Number tau /*=Number(0.)*/)
   {
     /* SSP-RK3, see @cite Shu1988, Eq. 2.18. */
 
@@ -178,8 +178,9 @@ namespace ryujin
     return tau;
   }
 
-  template <int dim, typename Number>
-  Number TimeIntegrator<dim, Number>::step_erk_22(vector_type &U, Number t)
+  template <typename Description, int dim, typename Number>
+  Number TimeIntegrator<Description, dim, Number>::step_erk_22(vector_type &U,
+                                                               Number t)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeIntegrator<dim, Number>::step_erk_22()" << std::endl;
@@ -204,8 +205,9 @@ namespace ryujin
     return 2. * tau;
   }
 
-  template <int dim, typename Number>
-  Number TimeIntegrator<dim, Number>::step_erk_33(vector_type &U, Number t)
+  template <typename Description, int dim, typename Number>
+  Number TimeIntegrator<Description, dim, Number>::step_erk_33(vector_type &U,
+                                                               Number t)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeIntegrator<dim, Number>::step_erk_33()" << std::endl;
@@ -241,8 +243,9 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  Number TimeIntegrator<dim, Number>::step_erk_43(vector_type &U, Number t)
+  template <typename Description, int dim, typename Number>
+  Number TimeIntegrator<Description, dim, Number>::step_erk_43(vector_type &U,
+                                                               Number t)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeIntegrator<dim, Number>::step_erk_43()" << std::endl;

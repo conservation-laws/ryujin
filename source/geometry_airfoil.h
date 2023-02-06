@@ -1098,7 +1098,7 @@ namespace ryujin
               i == 5 ? grading_epsilon_trailing_ : grading_epsilon_};
 
           auto transfinite =
-              std::make_unique<ryujin::TransfiniteInterpolationManifold<2>>();
+              std::make_unique<TransfiniteInterpolationManifold<2>>();
           transfinite->initialize(coarse_triangulation, grading);
 
           coarse_triangulation.set_manifold(index, *transfinite);

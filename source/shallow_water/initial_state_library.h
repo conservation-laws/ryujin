@@ -23,8 +23,7 @@ namespace ryujin
 {
   namespace ShallowWater
   {
-    namespace InitialStateLibrary
-    {
+    struct InitialStateLibrary {
       /**
        * Populate a given container with all initial state defined in this
        * namespace
@@ -32,9 +31,9 @@ namespace ryujin
        * @ingroup InitialValues
        */
       template <int dim, typename Number, typename T>
-      void populate_initial_state_list(T &initial_state_list,
-                                       const HyperbolicSystem &h,
-                                       const std::string &s)
+      static void populate_initial_state_list(T &initial_state_list,
+                                              const HyperbolicSystem &h,
+                                              const std::string &s)
       {
         using state_type = HyperbolicSystem::state_type<dim, Number>;
 
@@ -56,7 +55,6 @@ namespace ryujin
                                                                            s));
         add(std::make_unique<UnsteadyVortex<dim, Number, state_type>>(h, s));
       }
-
-    } // namespace InitialStateLibrary
-  }   // namespace ShallowWater
+    };
+  } // namespace ShallowWater
 } // namespace ryujin

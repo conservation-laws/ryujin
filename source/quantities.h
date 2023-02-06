@@ -28,26 +28,32 @@ namespace ryujin
    *
    * @ingroup TimeLoop
    */
-  template <int dim, typename Number = double>
+  template <typename Description, int dim, typename Number = double>
   class Quantities final : public dealii::ParameterAcceptor
   {
   public:
     /**
+     * @copydoc HyperbolicSystem
+     */
+    using HyperbolicSystem = typename Description::HyperbolicSystem;
+
+    /**
      * @copydoc HyperbolicSystem::problem_dimension
      */
     static constexpr unsigned int problem_dimension =
-        HyperbolicSystem::problem_dimension<dim>;
+        HyperbolicSystem::template problem_dimension<dim>;
 
     /**
      * @copydoc HyperbolicSystem::state_type
      */
-    using state_type = HyperbolicSystem::state_type<dim, Number>;
+    using state_type =
+        typename HyperbolicSystem::template state_type<dim, Number>;
 
     /**
      * @copydoc HyperbolicSystem::primitive_state_type
      */
     using primitive_state_type =
-        HyperbolicSystem::primitive_state_type<dim, Number>;
+        typename HyperbolicSystem::template primitive_state_type<dim, Number>;
 
     /**
      * Typedef for a MultiComponentVector storing the state U.
@@ -58,8 +64,8 @@ namespace ryujin
      * Constructor.
      */
     Quantities(const MPI_Comm &mpi_communicator,
-               const ryujin::HyperbolicSystem &hyperbolic_system,
-               const ryujin::OfflineData<dim, Number> &offline_data,
+               const HyperbolicSystem &hyperbolic_system,
+               const OfflineData<dim, Number> &offline_data,
                const std::string &subsection = "Quantities");
 
     /**

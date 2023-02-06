@@ -10,4 +10,5 @@ add_library(obj_shallow_water OBJECT
   )
 target_link_libraries(obj_shallow_water PUBLIC obj_common)
 deal_ii_setup_target(obj_shallow_water)
+# Propagate the current source directory with PUBLIC visibility
 target_include_directories(obj_shallow_water PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

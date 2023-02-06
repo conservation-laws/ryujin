@@ -4,10 +4,11 @@
 //
 
 #include "time_integrator.template.h"
+#include <description.h>
 
 namespace ryujin
 {
   /* instantiations */
-  template class TimeIntegrator<DIM, NUMBER>;
+  template class TimeIntegrator<Description, DIM, NUMBER>;
 
 } /* namespace ryujin */

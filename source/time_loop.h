@@ -33,21 +33,26 @@ namespace ryujin
    *
    * @ingroup TimeLoop
    */
-  template <int dim, typename Number = double>
+  template <typename Description, int dim, typename Number = double>
   class TimeLoop final : public dealii::ParameterAcceptor
   {
   public:
     /**
+     * @copydoc HyperbolicSystem
+     */
+    using HyperbolicSystem = typename Description::HyperbolicSystem;
+
+    /**
      * @copydoc HyperbolicSystem::problem_dimension
      */
     static constexpr unsigned int problem_dimension =
-        HyperbolicSystem::problem_dimension<dim>;
+        HyperbolicSystem::template problem_dimension<dim>;
 
     /**
      * @copydoc HyperbolicSystem::n_precomputed_values
      */
     static constexpr unsigned int n_precomputed_values =
-        HyperbolicSystem::n_precomputed_values<dim>;
+        HyperbolicSystem::template n_precomputed_values<dim>;
 
 
     /**
@@ -153,12 +158,12 @@ namespace ryujin
     HyperbolicSystem hyperbolic_system_;
     Discretization<dim> discretization_;
     OfflineData<dim, Number> offline_data_;
-    InitialValues<dim, Number> initial_values_;
-    HyperbolicModule<dim, Number> hyperbolic_module_;
-    TimeIntegrator<dim, Number> time_integrator_;
-    Postprocessor<dim, Number> postprocessor_;
-    VTUOutput<dim, Number> vtu_output_;
-    Quantities<dim, Number> quantities_;
+    InitialValues<Description, dim, Number> initial_values_;
+    HyperbolicModule<Description, dim, Number> hyperbolic_module_;
+    TimeIntegrator<Description, dim, Number> time_integrator_;
+    Postprocessor<Description, dim, Number> postprocessor_;
+    VTUOutput<Description, dim, Number> vtu_output_;
+    Quantities<Description, dim, Number> quantities_;
 
     const unsigned int mpi_rank_;
     const unsigned int n_mpi_processes_;

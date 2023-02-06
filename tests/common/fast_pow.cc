@@ -14,7 +14,7 @@ int main()
     std::cout << "a:        " << a << "\n";
     std::cout << "b:        " << b << "\n";
     std::cout << "pow:      " << ryujin::pow(a, b) << "\n";
-    std::cout << "fast_pow: " << ryujin::fast_pow<ryujin::Bias::none>(a, b)
+    std::cout << "fast_pow: " << ryujin::fast_pow(a, b, ryujin::Bias::none)
               << "\n"
               << std::endl;
   };

@@ -4,10 +4,11 @@
 //
 
 #include "initial_values.template.h"
+#include <description.h>
 
 namespace ryujin
 {
   /* instantiations */
-  template class InitialValues<DIM, NUMBER>;
+  template class InitialValues<Description, DIM, NUMBER>;
 
 } /* namespace ryujin */

@@ -24,8 +24,8 @@ using namespace dealii;
 
 namespace ryujin
 {
-  template <int dim, typename Number>
-  TimeLoop<dim, Number>::TimeLoop(const MPI_Comm &mpi_comm)
+  template <typename Description, int dim, typename Number>
+  TimeLoop<Description, dim, Number>::TimeLoop(const MPI_Comm &mpi_comm)
       : ParameterAcceptor("/A - TimeLoop")
       , mpi_communicator_(mpi_comm)
       , hyperbolic_system_("/B - Equation")
@@ -141,8 +141,8 @@ namespace ryujin
         "Multiplicative modifier applied to \"output granularity\" that "
         "determines the writeout granularity for quantities of interest");
 
-    std::copy(std::begin(HyperbolicSystem::component_names<dim>),
-              std::end(HyperbolicSystem::component_names<dim>),
+    std::copy(std::begin(HyperbolicSystem::template component_names<dim>),
+              std::end(HyperbolicSystem::template component_names<dim>),
               std::back_inserter(error_quantities_));
 
     add_parameter("error quantities",
@@ -161,8 +161,8 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void TimeLoop<dim, Number>::run()
+  template <typename Description, int dim, typename Number>
+  void TimeLoop<Description, dim, Number>::run()
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeLoop<dim, Number>::run()" << std::endl;
@@ -185,7 +185,7 @@ namespace ryujin
     /* Prepare data structures: */
 
     const auto prepare_compute_kernels = [&]() {
-      offline_data_.prepare(HyperbolicSystem::problem_dimension<dim>);
+      offline_data_.prepare(HyperbolicSystem::template problem_dimension<dim>);
       hyperbolic_module_.prepare();
       time_integrator_.prepare();
       postprocessor_.prepare();
@@ -307,8 +307,8 @@ namespace ryujin
 
             print_info("performing global refinement");
 
-            SolutionTransfer<dim, Number> solution_transfer(offline_data_,
-                                                            hyperbolic_system_);
+            SolutionTransfer<Description, dim, Number> solution_transfer(
+                offline_data_, hyperbolic_system_);
 
             auto &triangulation = discretization_.triangulation();
             for (auto &cell : triangulation.active_cell_iterators())
@@ -376,9 +376,10 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void TimeLoop<dim, Number>::compute_error(
-      const typename TimeLoop<dim, Number>::vector_type &U, const Number t)
+  template <typename Description, int dim, typename Number>
+  void TimeLoop<Description, dim, Number>::compute_error(
+      const typename TimeLoop<Description, dim, Number>::vector_type &U,
+      const Number t)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeLoop<dim, Number>::compute_error()" << std::endl;
@@ -400,7 +401,7 @@ namespace ryujin
 
     /* Loop over all selected components: */
     for (const auto &entry : error_quantities_) {
-      const auto &names = HyperbolicSystem::component_names<dim>;
+      const auto &names = HyperbolicSystem::template component_names<dim>;
       const auto pos = std::find(std::begin(names), std::end(names), entry);
       if (pos == std::end(names)) {
         AssertThrow(
@@ -498,9 +499,9 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void TimeLoop<dim, Number>::output(
-      const typename TimeLoop<dim, Number>::vector_type &U,
+  template <typename Description, int dim, typename Number>
+  void TimeLoop<Description, dim, Number>::output(
+      const typename TimeLoop<Description, dim, Number>::vector_type &U,
       const std::string &name,
       Number t,
       unsigned int cycle)
@@ -571,8 +572,9 @@ namespace ryujin
    */
 
 
-  template <int dim, typename Number>
-  void TimeLoop<dim, Number>::print_parameters(std::ostream &stream)
+  template <typename Description, int dim, typename Number>
+  void
+  TimeLoop<Description, dim, Number>::print_parameters(std::ostream &stream)
   {
     if (mpi_rank_ != 0)
       return;
@@ -621,8 +623,9 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void TimeLoop<dim, Number>::print_mpi_partition(std::ostream &stream)
+  template <typename Description, int dim, typename Number>
+  void
+  TimeLoop<Description, dim, Number>::print_mpi_partition(std::ostream &stream)
   {
     /*
      * Fixme: this conversion to double is really not elegant. We should
@@ -693,8 +696,9 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void TimeLoop<dim, Number>::print_memory_statistics(std::ostream &stream)
+  template <typename Description, int dim, typename Number>
+  void TimeLoop<Description, dim, Number>::print_memory_statistics(
+      std::ostream &stream)
   {
     Utilities::System::MemoryStats stats;
     Utilities::System::get_memory_stats(stats);
@@ -720,8 +724,8 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void TimeLoop<dim, Number>::print_timers(std::ostream &stream)
+  template <typename Description, int dim, typename Number>
+  void TimeLoop<Description, dim, Number>::print_timers(std::ostream &stream)
   {
     std::vector<std::ostringstream> output(computing_timer_.size());
 
@@ -805,11 +809,9 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void TimeLoop<dim, Number>::print_throughput(unsigned int cycle,
-                                               Number t,
-                                               std::ostream &stream,
-                                               bool final_time)
+  template <typename Description, int dim, typename Number>
+  void TimeLoop<Description, dim, Number>::print_throughput(
+      unsigned int cycle, Number t, std::ostream &stream, bool final_time)
   {
     /*
      * Fixme: The global state kept in this function should be refactored
@@ -950,8 +952,8 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void TimeLoop<dim, Number>::print_info(const std::string &header)
+  template <typename Description, int dim, typename Number>
+  void TimeLoop<Description, dim, Number>::print_info(const std::string &header)
   {
     if (mpi_rank_ != 0)
       return;
@@ -960,10 +962,11 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void TimeLoop<dim, Number>::print_head(const std::string &header,
-                                         const std::string &secondary,
-                                         std::ostream &stream)
+  template <typename Description, int dim, typename Number>
+  void
+  TimeLoop<Description, dim, Number>::print_head(const std::string &header,
+                                                 const std::string &secondary,
+                                                 std::ostream &stream)
   {
     if (mpi_rank_ != 0)
       return;
@@ -991,12 +994,13 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void TimeLoop<dim, Number>::print_cycle_statistics(unsigned int cycle,
-                                                     Number t,
-                                                     unsigned int output_cycle,
-                                                     bool write_to_logfile,
-                                                     bool final_time)
+  template <typename Description, int dim, typename Number>
+  void TimeLoop<Description, dim, Number>::print_cycle_statistics(
+      unsigned int cycle,
+      Number t,
+      unsigned int output_cycle,
+      bool write_to_logfile,
+      bool final_time)
   {
     std::ostringstream output;
 

@@ -4,10 +4,11 @@
 //
 
 #include "quantities.template.h"
+#include <description.h>
 
 namespace ryujin
 {
   /* instantiations */
-  template class Quantities<DIM, NUMBER>;
+  template class Quantities<Description, DIM, NUMBER>;
 
 } /* namespace ryujin */

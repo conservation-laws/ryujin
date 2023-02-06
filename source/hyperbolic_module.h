@@ -7,11 +7,6 @@
 
 #include <compile_time_options.h>
 
-#include <hyperbolic_system.h>
-#include <indicator.h>
-#include <limiter.h>
-#include <riemann_solver.h>
-
 #include "convenience_macros.h"
 #include "initial_values.h"
 #include "offline_data.h"
@@ -49,10 +44,9 @@ namespace ryujin
     warn,
 
     /**
-     * Raise a ryujin::Restart exception on domain violation. This
-     * exception can be caught in TimeIntegrator and various different
-     * actions (adapt CFL and retry) can be taken depending on chosen
-     * strategy.
+     * Raise a Restart exception on domain violation. This exception can be
+     * caught in TimeIntegrator and various different actions (adapt CFL
+     * and retry) can be taken depending on chosen strategy.
      */
     raise_exception,
   };
@@ -77,25 +71,32 @@ namespace ryujin
    *
    * @ingroup HyperbolicModule
    */
-  template <int dim, typename Number = double>
+  template <typename Description, int dim, typename Number = double>
   class HyperbolicModule final : public dealii::ParameterAcceptor
   {
   public:
     /**
+     * @copydoc HyperbolicSystem
+     */
+    using HyperbolicSystem = typename Description::HyperbolicSystem;
+
+    /**
      * @copydoc HyperbolicSystem::problem_dimension
      */
     static constexpr unsigned int problem_dimension =
-        HyperbolicSystem::problem_dimension<dim>;
+        HyperbolicSystem::template problem_dimension<dim>;
 
     /**
      * @copydoc HyperbolicSystem::state_type
      */
-    using state_type = HyperbolicSystem::state_type<dim, Number>;
+    using state_type =
+        typename HyperbolicSystem::template state_type<dim, Number>;
 
     /**
      * @copydoc HyperbolicSystem::flux_type
      */
-    using flux_type = HyperbolicSystem::flux_type<dim, Number>;
+    using flux_type =
+        typename HyperbolicSystem::template flux_type<dim, Number>;
 
     /**
      * @copydoc OfflineData::scalar_type
@@ -111,7 +112,7 @@ namespace ryujin
      * @copydoc HyperbolicSystem::n_precomputed_values
      */
     static constexpr unsigned int n_precomputed_values =
-        HyperbolicSystem::n_precomputed_values<dim>;
+        HyperbolicSystem::template n_precomputed_values<dim>;
 
     /**
      * Typedef for a MultiComponentVector storing precomputed values.
@@ -122,7 +123,7 @@ namespace ryujin
      * @copydoc HyperbolicSystem::n_precomputed_initial_values
      */
     static constexpr unsigned int n_precomputed_initial_values =
-        HyperbolicSystem::n_precomputed_initial_values<dim>;
+        HyperbolicSystem::template n_precomputed_initial_values<dim>;
 
     /**
      * Typedef for a MultiComponentVector storing precomputed initial_values.
@@ -134,12 +135,13 @@ namespace ryujin
     /**
      * Constructor.
      */
-    HyperbolicModule(const MPI_Comm &mpi_communicator,
-                     std::map<std::string, dealii::Timer> &computing_timer,
-                     const ryujin::OfflineData<dim, Number> &offline_data,
-                     const ryujin::HyperbolicSystem &hyperbolic_system,
-                     const ryujin::InitialValues<dim, Number> &initial_values,
-                     const std::string &subsection = "HyperbolicModule");
+    HyperbolicModule(
+        const MPI_Comm &mpi_communicator,
+        std::map<std::string, dealii::Timer> &computing_timer,
+        const OfflineData<dim, Number> &offline_data,
+        const HyperbolicSystem &hyperbolic_system,
+        const InitialValues<Description, dim, Number> &initial_values,
+        const std::string &subsection = "HyperbolicModule");
 
     /**
      * Prepare time stepping. A call to @ref prepare() allocates temporary
@@ -318,9 +320,9 @@ namespace ryujin
     const MPI_Comm &mpi_communicator_;
     std::map<std::string, dealii::Timer> &computing_timer_;
 
-    dealii::SmartPointer<const ryujin::OfflineData<dim, Number>> offline_data_;
-    dealii::SmartPointer<const ryujin::HyperbolicSystem> hyperbolic_system_;
-    dealii::SmartPointer<const ryujin::InitialValues<dim, Number>>
+    dealii::SmartPointer<const OfflineData<dim, Number>> offline_data_;
+    dealii::SmartPointer<const HyperbolicSystem> hyperbolic_system_;
+    dealii::SmartPointer<const InitialValues<Description, dim, Number>>
         initial_values_;
 
     mutable Number cfl_;
@@ -333,7 +335,8 @@ namespace ryujin
 
     mutable scalar_type alpha_;
 
-    static constexpr auto n_bounds = Limiter<dim, Number>::n_bounds;
+    static constexpr auto n_bounds =
+        Description::template Limiter<dim, Number>::n_bounds;
     mutable MultiComponentVector<Number, n_bounds> bounds_;
 
     mutable vector_type source_;

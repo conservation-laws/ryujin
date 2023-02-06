@@ -21,12 +21,12 @@ namespace ryujin
   using namespace dealii;
 
 
-  template <int dim, typename Number>
-  VTUOutput<dim, Number>::VTUOutput(
+  template <typename Description, int dim, typename Number>
+  VTUOutput<Description, dim, Number>::VTUOutput(
       const MPI_Comm &mpi_communicator,
-      const ryujin::OfflineData<dim, Number> &offline_data,
-      const ryujin::HyperbolicModule<dim, Number> &hyperbolic_module,
-      const ryujin::Postprocessor<dim, Number> &postprocessor,
+      const OfflineData<dim, Number> &offline_data,
+      const HyperbolicModule<Description, dim, Number> &hyperbolic_module,
+      const Postprocessor<Description, dim, Number> &postprocessor,
       const std::string &subsection /*= "VTUOutput"*/)
       : ParameterAcceptor(subsection)
       , mpi_communicator_(mpi_communicator)
@@ -47,13 +47,14 @@ namespace ryujin
                   "List of level set functions. The description is used to "
                   "only output cells that intersect the given level set.");
 
-    std::copy(std::begin(HyperbolicSystem::component_names<dim>),
-              std::end(HyperbolicSystem::component_names<dim>),
+    std::copy(std::begin(HyperbolicSystem::template component_names<dim>),
+              std::end(HyperbolicSystem::template component_names<dim>),
               std::back_inserter(vtu_output_quantities_));
 
-    std::copy(std::begin(HyperbolicSystem::precomputed_initial_names<dim>),
-              std::end(HyperbolicSystem::precomputed_initial_names<dim>),
-              std::back_inserter(vtu_output_quantities_));
+    std::copy(
+        std::begin(HyperbolicSystem::template precomputed_initial_names<dim>),
+        std::end(HyperbolicSystem::template precomputed_initial_names<dim>),
+        std::back_inserter(vtu_output_quantities_));
 
     add_parameter("vtu output quantities",
                   vtu_output_quantities_,
@@ -62,8 +63,8 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void VTUOutput<dim, Number>::prepare()
+  template <typename Description, int dim, typename Number>
+  void VTUOutput<Description, dim, Number>::prepare()
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "VTUOutput<dim, Number>::prepare()" << std::endl;
@@ -79,7 +80,7 @@ namespace ryujin
       {
         /* Conserved quantities: */
 
-        constexpr auto &names = HyperbolicSystem::component_names<dim>;
+        constexpr auto &names = HyperbolicSystem::template component_names<dim>;
         const auto pos = std::find(std::begin(names), std::end(names), entry);
         if (pos != std::end(names)) {
           const auto index = std::distance(std::begin(names), pos);
@@ -98,7 +99,7 @@ namespace ryujin
         /* Primitive quantities: */
 
         constexpr auto &names =
-            HyperbolicSystem::primitive_component_names<dim>;
+            HyperbolicSystem::template primitive_component_names<dim>;
         const auto pos = std::find(std::begin(names), std::end(names), entry);
         if (pos != std::end(names)) {
           const auto index = std::distance(std::begin(names), pos);
@@ -128,7 +129,7 @@ namespace ryujin
         /* Precomputed initial quantities: */
 
         constexpr auto &names =
-            HyperbolicSystem::precomputed_initial_names<dim>;
+            HyperbolicSystem::template precomputed_initial_names<dim>;
         const auto pos = std::find(std::begin(names), std::end(names), entry);
         if (pos != std::end(names)) {
           const auto index = std::distance(std::begin(names), pos);
@@ -147,7 +148,8 @@ namespace ryujin
       {
         /* Precomputed quantities: */
 
-        constexpr auto &names = HyperbolicSystem::precomputed_names<dim>;
+        constexpr auto &names =
+            HyperbolicSystem::template precomputed_names<dim>;
         const auto pos = std::find(std::begin(names), std::end(names), entry);
         if (pos != std::end(names)) {
           const auto index = std::distance(std::begin(names), pos);
@@ -189,8 +191,8 @@ namespace ryujin
   }
 
 
-  template <int dim, typename Number>
-  void VTUOutput<dim, Number>::schedule_output(
+  template <typename Description, int dim, typename Number>
+  void VTUOutput<Description, dim, Number>::schedule_output(
       const vector_type &U,
       const precomputed_type &precomputed_values,
       std::string name,
