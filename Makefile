@@ -44,6 +44,10 @@ run_clean:
 
 ##########################################################################
 
+cleanup_insource:
+	@rm -f $(SOURCEDIR)/CMakeCache.txt
+	@rm -rf $(SOURCEDIR)/CMakeFiles
+
 rebuild_cache:
 	@mkdir -p $(BUILDDIR)
 	@cd $(BUILDDIR) && cmake -G$(GENERATOR) $(SOURCEDIR)
@@ -69,7 +73,7 @@ debug:
 Makefile:
 	
 
-%: $(BUILDDIR)/$(MAKE_FILE)
+%: cleanup_insource $(BUILDDIR)/$(MAKE_FILE)
 	@cd $(BUILDDIR) && $(MAKE_COMMAND) $@
 
-.PHONY: rebuild_cache edit_cache release debug
+.PHONY: cleanup_insource rebuild_cache edit_cache release debug

@@ -3,9 +3,21 @@
 ## Copyright (C) 2020 - 2022 by the ryujin authors
 ##
 
+get_filename_component(_source "${CMAKE_SOURCE_DIR}" REALPATH)
+get_filename_component(_build  "${CMAKE_BINARY_DIR}" REALPATH)
+if("${_source}" STREQUAL "${_build}")
+  message(FATAL_ERROR
+    "\nRefusing to configure the project in the source directory. This "
+    "operation would globber important files. You need to configure in a "
+    "separate build directory. It is easiest to simply invoke $ make, which "
+    "will configure ryujin in the directory ./build.\n"
+    "You will need to clean up ./CMakeCache.txt and ./CMakeFiles by hand."
+    )
+endif()
+
 set(RYUJIN_VERSION 2.1.1)
 
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.11)
 set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
 
 find_package(deal.II 9.3 REQUIRED HINTS ${DEAL_II_DIR} $ENV{DEAL_II_DIR})
