@@ -74,6 +74,34 @@ macro(setup_equation EQUATION)
   if(LIBSTDCPP)
     target_link_libraries(obj_${EQUATION}_dependent PUBLIC stdc++fs)
   endif()
+
+  #
+  # The actual executable:
+  #
+
+  add_executable(${EQUATION} main.cc)
+  deal_ii_setup_target(${EQUATION})
+
+  target_link_libraries(${EQUATION}
+    obj_common obj_${EQUATION} obj_${EQUATION}_dependent
+    )
+
+  set_target_properties(${EQUATION} PROPERTIES
+    RUNTIME_OUTPUT_NAME "ryujin-${DIM}d-${EQUATION}"
+    )
+
+  add_custom_command(
+    OUTPUT "${CMAKE_BINARY_DIR}/run/${EQUATION}/ryujin"
+    COMMAND ${CMAKE_COMMAND} -E create_symlink $<TARGET_FILE:${EQUATION}>
+      "${CMAKE_BINARY_DIR}/run/${EQUATION}/ryujin"
+    )
+
+  add_custom_target(symlink_${EQUATION} ALL
+    DEPENDS ${EQUATION} "${CMAKE_BINARY_DIR}/run/${EQUATION}/ryujin"
+    COMMENT "updating ${EQUATION} symlink"
+    )
+
+  install(TARGETS ${EQUATION} DESTINATION ${CMAKE_INSTALL_BINDIR})
 endmacro()
 
 setup_equation("euler")

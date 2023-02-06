@@ -6,6 +6,7 @@
 #include <iomanip>
 #include <iostream>
 
+using namespace ryujin::Euler;
 using namespace ryujin;
 using namespace dealii;
 

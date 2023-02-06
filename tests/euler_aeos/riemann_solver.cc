@@ -6,6 +6,7 @@
 #include <riemann_solver.template.h>
 #include <simd.h>
 
+using namespace ryujin::EulerAEOS;
 using namespace ryujin;
 using namespace dealii;
 

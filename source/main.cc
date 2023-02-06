@@ -5,9 +5,10 @@
 
 #include <compile_time_options.h>
 
-#include "euler/description.h" // FIXME refactoring
 #include "introspection.h"
 #include "time_loop.h"
+
+#include <description.h>
 
 #include <deal.II/base/multithread_info.h>
 #include <deal.II/base/utilities.h>
@@ -56,7 +57,7 @@ int main(int argc, char *argv[])
   LSAN_ENABLE
   LIKWID_INIT
 
-  ryujin::TimeLoop<ryujin::Euler::Description, DIM, NUMBER> time_loop(
+  ryujin::TimeLoop<ryujin::Description, DIM, NUMBER> time_loop(
       mpi_communicator);
 
   if (dealii::Utilities::MPI::this_mpi_process(mpi_communicator) == 0)
