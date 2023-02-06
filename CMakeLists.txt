@@ -92,6 +92,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   string(APPEND DEAL_II_LINKER_FLAGS_DEBUG
     " -fsanitize=address -fsanitize-address-use-after-scope"
     )
+  string(APPEND DEAL_II_CXX_FLAGS " -Wno-undefined-var-template")
 endif()
 
 #
