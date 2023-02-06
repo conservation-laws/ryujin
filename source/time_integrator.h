@@ -153,12 +153,12 @@ namespace ryujin
     /**
      * Constructor.
      */
-    TimeIntegrator(const MPI_Comm &mpi_communicator,
-                   std::map<std::string, dealii::Timer> &computing_timer,
-                   const OfflineData<dim, Number> &offline_data,
-                   const HyperbolicModule<Description, dim, Number>
-                       &hyperbolic_module,
-                   const std::string &subsection = "TimeIntegrator");
+    TimeIntegrator(
+        const MPI_Comm &mpi_communicator,
+        std::map<std::string, dealii::Timer> &computing_timer,
+        const OfflineData<dim, Number> &offline_data,
+        const HyperbolicModule<Description, dim, Number> &hyperbolic_module,
+        const std::string &subsection = "TimeIntegrator");
 
     /**
      * Prepare time integration. A call to @ref prepare() allocates
@@ -246,8 +246,7 @@ namespace ryujin
     std::map<std::string, dealii::Timer> &computing_timer_;
 
     dealii::SmartPointer<const OfflineData<dim, Number>> offline_data_;
-    dealii::SmartPointer<
-        const HyperbolicModule<Description, dim, Number>>
+    dealii::SmartPointer<const HyperbolicModule<Description, dim, Number>>
         hyperbolic_module_;
 
     std::vector<vector_type> U_;

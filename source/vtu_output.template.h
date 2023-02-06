@@ -25,8 +25,7 @@ namespace ryujin
   VTUOutput<Description, dim, Number>::VTUOutput(
       const MPI_Comm &mpi_communicator,
       const OfflineData<dim, Number> &offline_data,
-      const HyperbolicModule<Description, dim, Number>
-          &hyperbolic_module,
+      const HyperbolicModule<Description, dim, Number> &hyperbolic_module,
       const Postprocessor<Description, dim, Number> &postprocessor,
       const std::string &subsection /*= "VTUOutput"*/)
       : ParameterAcceptor(subsection)

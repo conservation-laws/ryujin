@@ -67,7 +67,6 @@ macro(setup_equation EQUATION)
 
   # Include the obj_${EQUATION} objects with PRIVATE visibility
   target_link_libraries(obj_${EQUATION}_dependent PRIVATE obj_${EQUATION})
-
   if(WITH_LIKWID)
     target_link_libraries(obj_${EQUATION}_dependent PUBLIC likwid likwid-hwloc likwid-lua)
   endif()

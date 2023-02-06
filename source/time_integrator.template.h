@@ -19,8 +19,7 @@ namespace ryujin
       const MPI_Comm &mpi_communicator,
       std::map<std::string, dealii::Timer> &computing_timer,
       const OfflineData<dim, Number> &offline_data,
-      const HyperbolicModule<Description, dim, Number>
-          &hyperbolic_module,
+      const HyperbolicModule<Description, dim, Number> &hyperbolic_module,
       const std::string &subsection /*= "TimeIntegrator"*/)
       : ParameterAcceptor(subsection)
       , mpi_communicator_(mpi_communicator)
@@ -105,8 +104,8 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   Number TimeIntegrator<Description, dim, Number>::step(vector_type &U,
-                                           Number t,
-                                           unsigned int /*cycle*/)
+                                                        Number t,
+                                                        unsigned int /*cycle*/)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeIntegrator<dim, Number>::step()" << std::endl;
