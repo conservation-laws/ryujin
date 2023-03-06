@@ -132,6 +132,12 @@ namespace ryujin
 
   } // namespace
 
+#ifndef DOXYGEN
+  /* forward declaration */
+  template <int dim>
+  class Discretization;
+#endif
+
   /**
    * A templated constexpr boolean that is true if we use a parallel
    * distributed triangulation (for the specified dimension).
