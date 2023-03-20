@@ -11,8 +11,10 @@
 #include "initial_state_becker_solution.h"
 #include "initial_state_contrast.h"
 #include "initial_state_isentropic_vortex.h"
+#include "initial_state_leblanc.h"
 #include "initial_state_noh.h"
 #include "initial_state_ramp_up.h"
+#include "initial_state_rarefaction.h"
 #include "initial_state_shock_front.h"
 #include "initial_state_uniform.h"
 
@@ -41,8 +43,10 @@ namespace ryujin
         add(std::make_unique<BeckerSolution<dim, Number, state_type>>(h, s));
         add(std::make_unique<Contrast<dim, Number, state_type>>(h, s));
         add(std::make_unique<IsentropicVortex<dim, Number, state_type>>(h, s));
+        add(std::make_unique<LeBlanc<dim, Number, state_type>>(h, s));
         add(std::make_unique<Noh<dim, Number, state_type>>(h, s));
         add(std::make_unique<RampUp<dim, Number, state_type>>(h, s));
+        add(std::make_unique<Rarefaction<dim, Number, state_type>>(h, s));
         add(std::make_unique<ShockFront<dim, Number, state_type>>(h, s));
         add(std::make_unique<Uniform<dim, Number, state_type>>(h, s));
       }

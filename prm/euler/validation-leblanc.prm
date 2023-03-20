@@ -1,0 +1,66 @@
+#
+# A 2D Mach 3 disc configuration.
+#
+# The geometry is a 2D disc of diameter 0.5 positioned in a channel of
+# length 4 and height 2.
+#
+
+subsection A - TimeLoop
+  set basename             = leblanc
+
+  set enable output full   = true
+  set enable compute error = true
+  set error quantities             = rho, m_1, E
+
+  set final time           = 2.0
+  set output granularity   = 2.0
+end
+
+
+subsection B - Equation
+  set gamma = 1.66666666666667
+end
+
+
+subsection C - Discretization
+  set geometry        = rectangular domain
+  set mesh refinement = 5
+
+  subsection rectangular domain
+    set boundary condition bottom = periodic
+    set boundary condition left   = dirichlet
+    set boundary condition right  = dirichlet
+    set boundary condition top    = periodic
+
+    set position bottom left      = -1, -0.1
+    set position top right        =  2,  0.1
+
+    set subdivisions x            = 10
+    set subdivisions y            = 3
+  end
+end
+
+
+subsection E - InitialValues
+  set configuration = leblanc
+
+  set direction     = 1, 0
+  set position      = 0, 0
+
+  set perturbation  = 0
+end
+
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.10
+  set cfl max               = 0.10
+  set cfl recovery strategy = none
+  set time stepping scheme  = erk 33
+end
+
+
+subsection I - VTUOutput
+  set manifolds      =
+  set use mpi io     = true
+  set schlieren beta = 10
+end
