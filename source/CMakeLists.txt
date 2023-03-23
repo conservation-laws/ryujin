@@ -82,7 +82,7 @@ macro(setup_equation EQUATION)
   add_executable(${EQUATION} main.cc)
   deal_ii_setup_target(${EQUATION})
 
-  target_link_libraries(${EQUATION}
+  target_link_libraries(${EQUATION} PUBLIC
     obj_common obj_${EQUATION} obj_${EQUATION}_dependent
     )
 
