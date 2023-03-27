@@ -64,7 +64,7 @@ namespace ryujin
 
     template <>
     const std::array<std::string, 3>
-        HyperbolicSystem::primitive_component_names<1>{{"rho", "u", "p"}};
+        HyperbolicSystem::primitive_component_names<1>{{"rho", "v", "p"}};
 
 
     template <>

@@ -22,12 +22,6 @@ namespace ryujin
      * Physics, Volume 72, Issue 1, 1987,
      * https://doi.org/10.1016/0021-9991(87)90074-X.
      *
-     * We recommend Sect. 6.7 of the following article for more details:
-     *
-     * Guermond, JL., Popov, B. & Saavedra, L. Second-Order Invariant Domain
-     * Preserving ALE Approximation of Euler Equations. Commun. Appl. Math.
-     * Comput. (2021). https://doi.org/10.1007/s42967-021-00165-y
-     *
      * @ingroup InitialValues
      */
     template <int dim, typename Number, typename state_type>
@@ -39,51 +33,72 @@ namespace ryujin
           : InitialState<dim, Number, state_type>("noh", subsection)
           , hyperbolic_system(hyperbolic_system)
       {
-        // no customization at this point
+        /* no customization at this point */
       }
 
       state_type compute(const dealii::Point<dim> &point, Number t) final
       {
+        // initialize some values
+        auto rho = 1.;
+        auto u = 0., v = 0.;
+        auto E = 0.;
+
         const auto gamma = hyperbolic_system.gamma();
-
-        // initialize some things
-        auto rho = 1.0;
-        auto u = 0.0;
-        auto v = 0.0;
-        auto E = 0.0;
-
         const auto norm = point.norm();
 
-        if (t < 1.e-16) {
-          if (norm > 1.e-16) {
-            u = -point[0] / norm;
-            v = -point[1] / norm;
-          }
-          // Get E from ideal EOS
-          E = 1.e-12 / (gamma - Number(1.)) +
-              Number(0.5) * rho * (u * u + v * v);
-        } else if (t / 3. < point.norm()) {
-          rho = 1.0 + t / norm;
-          u = 0.0;
-          v = 0.0;
-          E = 0.5 * rho;
-        } else {
-          rho = 16.0;
-          if (norm > 1.e-16) {
-            u = -point[0] / norm;
-            v = -point[1] / norm;
-          }
-          E = 8.0;
-        }
+        // initial/exact solution for each dimension
+        switch (dim) {
+        case 1:
 
+          // initial condition
+          if (t < 1.e-16) {
+            if (norm > 1.e-16)
+              u = -point[0] / norm;
+            E = 1.e-12 / (gamma - Number(1.)) + Number(0.5) * rho * u * u;
+          }
+
+          // exact solution
+          else if (t / 3. < norm) {
+            rho = 1.0;
+            u = -1;
+            E = 0.5 * rho + 1.e-12 / (gamma - Number(1.));
+          } else if (t / 3. >= norm) {
+            rho = 4.0;
+            u = 0.0;
+            E = 2.0 + 1.e-12 / (gamma - Number(1.));
+          }
+
+          break;
+        case 2:
+
+          // initial condition
+          if (t < 1.e-16) {
+            if (norm > 1.e-16) {
+              u = -point[0] / norm, v = -point[1] / norm;
+            }
+            E = 1.e-12 / (gamma - Number(1.)) +
+                Number(0.5) * rho * (u * u + v * v);
+          }
+
+          // exact solution
+          else if (t / 3. < norm) {
+            rho = 1.0 + t / norm;
+            u = -point[0] / norm, v = -point[1] / norm;
+            E = 0.5 * rho + 1.e-12 / (gamma - Number(1.));
+          } else if (t / 3. >= norm) {
+            rho = 16.0;
+            u = 0.0, v = 0.0;
+            E = 8.0 + 1.e-12 / (gamma - Number(1.));
+          }
+
+          break;
+        }
 
         // Set final state
         if constexpr (dim == 1)
           return state_type({rho, rho * u, E});
         else if constexpr (dim == 2)
           return state_type({rho, rho * u, rho * v, E});
-        else if constexpr (dim == 3)
-          return state_type({rho, rho * u, rho * v, Number(0.), E});
         else {
           AssertThrow(false, dealii::ExcNotImplemented());
           __builtin_trap();
@@ -93,5 +108,6 @@ namespace ryujin
     private:
       const HyperbolicSystem &hyperbolic_system;
     };
+
   } // namespace Euler
 } // namespace ryujin
