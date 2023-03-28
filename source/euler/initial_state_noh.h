@@ -33,34 +33,34 @@ namespace ryujin
           : InitialState<dim, Number, state_type>("noh", subsection)
           , hyperbolic_system(hyperbolic_system)
       {
-        /* no customization at this point */
+        /* No customization at this point */
       }
 
+      /* Initial and exact solution for each dimension */
       state_type compute(const dealii::Point<dim> &point, Number t) final
       {
-        // initialize some values
-        auto rho = 1.;
-        auto u = 0., v = 0.;
-        auto E = 0.;
-
-        const auto gamma = hyperbolic_system.gamma();
+        // Initialize some quantities
+        double rho = 1.;
+        double u = 0., v = 0.;
+        double E = 0.;
+        const double gamma = hyperbolic_system.gamma();
         const auto norm = point.norm();
 
-        // initial/exact solution for each dimension
+        // Define profiles for each dim here
         switch (dim) {
         case 1:
 
-          // initial condition
+          /* Initial condition */
           if (t < 1.e-16) {
             if (norm > 1.e-16)
               u = -point[0] / norm;
             E = 1.e-12 / (gamma - Number(1.)) + Number(0.5) * rho * u * u;
           }
 
-          // exact solution
+          /* Exact solution */
           else if (t / 3. < norm) {
             rho = 1.0;
-            u = -1;
+            u = -point[0] / norm;
             E = 0.5 * rho + 1.e-12 / (gamma - Number(1.));
           } else if (t / 3. >= norm) {
             rho = 4.0;
@@ -71,7 +71,7 @@ namespace ryujin
           break;
         case 2:
 
-          // initial condition
+          /* Initial condition */
           if (t < 1.e-16) {
             if (norm > 1.e-16) {
               u = -point[0] / norm, v = -point[1] / norm;
@@ -80,7 +80,7 @@ namespace ryujin
                 Number(0.5) * rho * (u * u + v * v);
           }
 
-          // exact solution
+          /* Exact solution */
           else if (t / 3. < norm) {
             rho = 1.0 + t / norm;
             u = -point[0] / norm, v = -point[1] / norm;
@@ -94,7 +94,7 @@ namespace ryujin
           break;
         }
 
-        // Set final state
+        /* Set final state */
         if constexpr (dim == 1)
           return state_type({rho, rho * u, E});
         else if constexpr (dim == 2)
