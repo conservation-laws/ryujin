@@ -228,7 +228,21 @@ namespace ryujin
        * happen that we end up with an inconsistent local range.
        */
       create_constraints_and_sparsity_pattern();
-      if (consistent_stride_range() != n_locally_internal_) {
+      bool locally_inconsistent =
+          consistent_stride_range() != n_locally_internal_;
+
+      /*
+       * TODO: complain that I cannot feed the lambda directly into the
+       * all_reduce function.
+       */
+      std::function<bool(const bool &, const bool &)> comparator =
+          [](const bool &left, const bool &right) -> bool {
+        return left || right;
+      };
+      locally_inconsistent = Utilities::MPI::all_reduce(
+          locally_inconsistent, mpi_communicator_, comparator);
+
+      if (locally_inconsistent) {
         /*
          * In this case we try to fix up the numbering by pushing affected
          * strides to the end and slightly lowering the n_locally_internal_
