@@ -66,13 +66,13 @@ macro(setup_equation EQUATION)
   deal_ii_setup_target(obj_${EQUATION}_dependent)
 
   # Include the obj_${EQUATION} objects with PRIVATE visibility
-  target_link_libraries(obj_${EQUATION}_dependent PRIVATE obj_${EQUATION})
+  target_link_libraries(obj_${EQUATION}_dependent obj_${EQUATION})
   if(WITH_LIKWID)
-    target_link_libraries(obj_${EQUATION}_dependent PUBLIC likwid likwid-hwloc likwid-lua)
+    target_link_libraries(obj_${EQUATION}_dependent likwid likwid-hwloc likwid-lua)
   endif()
   # For GNU libstdc++ we have to make sure to also link against libstdc++fs.
   if(LIBSTDCPP)
-    target_link_libraries(obj_${EQUATION}_dependent PUBLIC stdc++fs)
+    target_link_libraries(obj_${EQUATION}_dependent stdc++fs)
   endif()
 
   #
@@ -82,7 +82,7 @@ macro(setup_equation EQUATION)
   add_executable(${EQUATION} main.cc)
   deal_ii_setup_target(${EQUATION})
 
-  target_link_libraries(${EQUATION} PUBLIC
+  target_link_libraries(${EQUATION}
     obj_common obj_${EQUATION} obj_${EQUATION}_dependent
     )
 
