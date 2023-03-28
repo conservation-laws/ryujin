@@ -28,8 +28,8 @@ namespace ryujin
       {
       }
 
-      virtual Number value(const dealii::Point<dim> &point,
-                           unsigned int /*component*/) const
+      Number value(const dealii::Point<dim> &point,
+                   unsigned int /*component*/) const override
       {
         return callable_(point)[k_];
       }
