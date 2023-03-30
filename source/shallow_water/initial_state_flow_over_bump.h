@@ -27,11 +27,21 @@ namespace ryujin
           : InitialState<dim, Number, state_type, 1>("flow over bump", subsec)
           , hyperbolic_system(hyperbolic_system)
       {
+        dealii::ParameterAcceptor::parse_parameters_call_back.connect(
+            std::bind(&FlowOverBump::parse_parameters_callback, this));
+
         which_case_ = "transcritical";
         this->add_parameter("flow type",
                             which_case_,
                             "Either 'transcritical' flow with shock "
                             "or 'subsonic' flow.");
+      }
+
+      void parse_parameters_callback()
+      {
+        AssertThrow(which_case_ == "subsonic" || which_case_ == "transcritical",
+                    dealii::ExcMessage("Flow type must be 'transcritical' "
+                                       "or 'subsonic'. "));
       }
 
       state_type compute(const dealii::Point<dim> &point, Number t) final
