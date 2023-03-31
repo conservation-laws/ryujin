@@ -845,7 +845,7 @@ namespace ryujin
     }
 
     /*
-     * Step 5, 6, ..., 4 + limiter_iter_: Perform high-order update:
+     * Step 5, 6: Perform high-order update:
      *
      *   Symmetrize l_ij
      *   High-order update: += l_ij * lambda * P_ij
@@ -860,7 +860,7 @@ namespace ryujin
           computing_timer_,
           scoped_name("symmetrize l_ij, h.-o. update" + additional_step));
 
-      if (last_round) {
+      if ((limiter_iter_ == 2) && last_round) {
         std::swap(lij_matrix_, lij_matrix_next_);
       }
 
