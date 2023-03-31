@@ -385,7 +385,7 @@ namespace ryujin
     std::cout << "TimeLoop<dim, Number>::compute_error()" << std::endl;
 #endif
 
-    Vector<float> difference_per_cell(
+    Vector<Number> difference_per_cell(
         discretization_.triangulation().n_active_cells());
 
     Number linf_norm = 0.;
@@ -479,6 +479,7 @@ namespace ryujin
       return;
 
     logfile_ << std::endl << "Computed errors:" << std::endl << std::endl;
+    logfile_ << std::setprecision(16);
 
     logfile_ << "Normalized consolidated Linf, L1, and L2 errors at "
              << "final time" << std::endl;
@@ -490,6 +491,7 @@ namespace ryujin
 
     std::cout << "Normalized consolidated Linf, L1, and L2 errors at "
               << "final time" << std::endl;
+    std::cout << std::setprecision(16);
     std::cout << "#dofs = " << offline_data_.dof_handler().n_dofs()
               << std::endl;
     std::cout << "t     = " << t << std::endl;
