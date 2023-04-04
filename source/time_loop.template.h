@@ -148,7 +148,13 @@ namespace ryujin
     add_parameter("error quantities",
                   error_quantities_,
                   "List of conserved quantities used in the computation of the "
-                  "normalized error norms.");
+                  "error norms.");
+
+    error_normalize_ = true;
+    add_parameter("error normalize",
+                  error_normalize_,
+                  "Flag to control whether the error should be normalized by "
+                  "the corresponding norm of the analytic solution.");
 
     resume_ = false;
     add_parameter("resume", resume_, "Resume an interrupted computation");
@@ -412,32 +418,38 @@ namespace ryujin
 
       const auto index = std::distance(std::begin(names), pos);
 
-      /* Compute norms of analytic solution: */
-
       analytic.extract_component(analytic_component, index);
 
-      const Number linf_norm_analytic = Utilities::MPI::max(
-          analytic_component.linfty_norm(), mpi_communicator_);
+      /* Compute norms of analytic solution: */
 
-      VectorTools::integrate_difference(offline_data_.dof_handler(),
-                                        analytic_component,
-                                        Functions::ZeroFunction<dim, Number>(),
-                                        difference_per_cell,
-                                        QGauss<dim>(3),
-                                        VectorTools::L1_norm);
+      Number linf_norm_analytic;
+      Number l1_norm_analytic;
+      Number l2_norm_analytic;
 
-      const Number l1_norm_analytic =
-          Utilities::MPI::sum(difference_per_cell.l1_norm(), mpi_communicator_);
+      if (error_normalize_) {
+        linf_norm_analytic = Utilities::MPI::max(analytic_component.linfty_norm(),
+                                                 mpi_communicator_);
 
-      VectorTools::integrate_difference(offline_data_.dof_handler(),
-                                        analytic_component,
-                                        Functions::ZeroFunction<dim, Number>(),
-                                        difference_per_cell,
-                                        QGauss<dim>(3),
-                                        VectorTools::L2_norm);
+        VectorTools::integrate_difference(offline_data_.dof_handler(),
+                                          analytic_component,
+                                          Functions::ZeroFunction<dim, Number>(),
+                                          difference_per_cell,
+                                          QGauss<dim>(3),
+                                          VectorTools::L1_norm);
 
-      const Number l2_norm_analytic = Number(std::sqrt(Utilities::MPI::sum(
-          std::pow(difference_per_cell.l2_norm(), 2), mpi_communicator_)));
+        l1_norm_analytic =
+            Utilities::MPI::sum(difference_per_cell.l1_norm(), mpi_communicator_);
+
+        VectorTools::integrate_difference(offline_data_.dof_handler(),
+                                          analytic_component,
+                                          Functions::ZeroFunction<dim, Number>(),
+                                          difference_per_cell,
+                                          QGauss<dim>(3),
+                                          VectorTools::L2_norm);
+
+        l2_norm_analytic = Number(std::sqrt(Utilities::MPI::sum(
+            std::pow(difference_per_cell.l2_norm(), 2), mpi_communicator_)));
+      }
 
       /* Compute norms of error: */
 
@@ -470,9 +482,15 @@ namespace ryujin
       const Number l2_norm_error = Number(std::sqrt(Utilities::MPI::sum(
           std::pow(difference_per_cell.l2_norm(), 2), mpi_communicator_)));
 
-      linf_norm += linf_norm_error / linf_norm_analytic;
-      l1_norm += l1_norm_error / l1_norm_analytic;
-      l2_norm += l2_norm_error / l2_norm_analytic;
+      if(error_normalize_) {
+        linf_norm += linf_norm_error / linf_norm_analytic;
+        l1_norm += l1_norm_error / l1_norm_analytic;
+        l2_norm += l2_norm_error / l2_norm_analytic;
+      } else {
+        linf_norm += linf_norm_error;
+        l1_norm += l1_norm_error;
+        l2_norm += l2_norm_error;
+      }
     }
 
     if (mpi_rank_ != 0)
@@ -481,16 +499,18 @@ namespace ryujin
     logfile_ << std::endl << "Computed errors:" << std::endl << std::endl;
     logfile_ << std::setprecision(16);
 
-    logfile_ << "Normalized consolidated Linf, L1, and L2 errors at "
-             << "final time" << std::endl;
+    std::string description =
+        error_normalize_ ? "Normalized consolidated" : "Consolidated";
+
+    logfile_ << description + " Linf, L1, and L2 errors at final time \n";
+    logfile_ << std::setprecision(16);
     logfile_ << "#dofs = " << offline_data_.dof_handler().n_dofs() << std::endl;
     logfile_ << "t     = " << t << std::endl;
     logfile_ << "Linf  = " << linf_norm << std::endl;
     logfile_ << "L1    = " << l1_norm << std::endl;
     logfile_ << "L2    = " << l2_norm << std::endl;
 
-    std::cout << "Normalized consolidated Linf, L1, and L2 errors at "
-              << "final time" << std::endl;
+    std::cout << description + " Linf, L1, and L2 errors at final time \n";
     std::cout << std::setprecision(16);
     std::cout << "#dofs = " << offline_data_.dof_handler().n_dofs()
               << std::endl;

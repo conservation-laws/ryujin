@@ -8,6 +8,7 @@ subsection A - TimeLoop
   set enable output levelsets      = false
 
   set error quantities             = rho, m_1, m_2, E
+  set error normalize              = true
 
   set final time                   = 5
   set output granularity           = 0.01

@@ -140,6 +140,7 @@ namespace ryujin
     unsigned int output_quantities_multiplier_;
 
     std::vector<std::string> error_quantities_;
+    bool error_normalize_;
 
     bool resume_;
 
