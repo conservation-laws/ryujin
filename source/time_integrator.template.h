@@ -48,10 +48,10 @@ namespace ryujin
                   "bang bang control");
 
     time_stepping_scheme_ = TimeSteppingScheme::erk_33;
-    add_parameter(
-        "time stepping scheme",
-        time_stepping_scheme_,
-        "Time stepping scheme: ssprk 33, erk 22, erk 33, erk 43, erk54");
+    add_parameter("time stepping scheme",
+                  time_stepping_scheme_,
+                  "Time stepping scheme: ssprk 33, erk 11, erk 22, erk 33, erk "
+                  "43, erk 54");
   }
 
 
@@ -68,6 +68,10 @@ namespace ryujin
     case TimeSteppingScheme::ssprk_33:
       U_.resize(2);
       precomputed_.resize(2);
+      break;
+    case TimeSteppingScheme::erk_11:
+      U_.resize(1);
+      precomputed_.resize(1);
       break;
     case TimeSteppingScheme::erk_22:
       U_.resize(2);
@@ -120,6 +124,8 @@ namespace ryujin
       switch (time_stepping_scheme_) {
       case TimeSteppingScheme::ssprk_33:
         return step_ssprk_33(U, t);
+      case TimeSteppingScheme::erk_11:
+        return step_erk_11(U, t);
       case TimeSteppingScheme::erk_22:
         return step_erk_22(U, t);
       case TimeSteppingScheme::erk_33:
@@ -185,6 +191,25 @@ namespace ryujin
     return tau;
   }
 
+
+  template <typename Description, int dim, typename Number>
+  Number TimeIntegrator<Description, dim, Number>::step_erk_11(vector_type &U,
+                                                               Number t)
+  {
+#ifdef DEBUG_OUTPUT
+    std::cout << "TimeIntegrator<dim, Number>::step_erk_11()" << std::endl;
+#endif
+
+    /* Step 1: U1 <- {U, 1} at time t + tau */
+    Number tau = hyperbolic_module_->template step<0>(
+        U, {}, {}, {}, U_[0], precomputed_[0]);
+    hyperbolic_module_->apply_boundary_conditions(U_[0], t + tau);
+
+    U.swap(U_[0]);
+    return tau;
+  }
+
+
   template <typename Description, int dim, typename Number>
   Number TimeIntegrator<Description, dim, Number>::step_erk_22(vector_type &U,
                                                                Number t)
@@ -211,6 +236,7 @@ namespace ryujin
     U.swap(U_[1]);
     return 2. * tau;
   }
+
 
   template <typename Description, int dim, typename Number>
   Number TimeIntegrator<Description, dim, Number>::step_erk_33(vector_type &U,
