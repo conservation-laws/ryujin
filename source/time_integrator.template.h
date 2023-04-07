@@ -48,9 +48,10 @@ namespace ryujin
                   "bang bang control");
 
     time_stepping_scheme_ = TimeSteppingScheme::erk_33;
-    add_parameter("time stepping scheme",
-                  time_stepping_scheme_,
-                  "Time stepping scheme: ssprk 33, erk 22, erk 33, erk 43");
+    add_parameter(
+        "time stepping scheme",
+        time_stepping_scheme_,
+        "Time stepping scheme: ssprk 33, erk 22, erk 33, erk 43, erk54");
   }
 
 
@@ -79,6 +80,10 @@ namespace ryujin
     case TimeSteppingScheme::erk_43:
       U_.resize(4);
       precomputed_.resize(4);
+      break;
+    case TimeSteppingScheme::erk_54:
+      U_.resize(5);
+      precomputed_.resize(5);
       break;
     }
 
@@ -121,6 +126,8 @@ namespace ryujin
         return step_erk_33(U, t);
       case TimeSteppingScheme::erk_43:
         return step_erk_43(U, t);
+      case TimeSteppingScheme::erk_54:
+        return step_erk_54(U, t);
       default:
         __builtin_unreachable();
       }
@@ -290,5 +297,86 @@ namespace ryujin
 
     U.swap(U_[3]);
     return 4. * tau;
+  }
+
+
+  template <typename Description, int dim, typename Number>
+  Number TimeIntegrator<Description, dim, Number>::step_erk_54(vector_type &U,
+                                                               Number t)
+  {
+#ifdef DEBUG_OUTPUT
+    std::cout << "TimeIntegrator<dim, Number>::step_erk_54()" << std::endl;
+#endif
+
+    constexpr Number c = 0.2; /* equidistant c_i */
+    constexpr Number a_21 = +0.2;
+    constexpr Number a_31 = +0.26075582269554909;
+    constexpr Number a_32 = +0.13924417730445096;
+    constexpr Number a_41 = -0.25856517872570289;
+    constexpr Number a_42 = +0.91136274166280729;
+    constexpr Number a_43 = -0.05279756293710430;
+    constexpr Number a_51 = +0.21623276431503774;
+    constexpr Number a_52 = +0.51534223099602405;
+    constexpr Number a_53 = -0.81662794199265554;
+    constexpr Number a_54 = +0.88505294668159373;
+    constexpr Number a_61 = -0.10511678454691901; /* aka b_1 */
+    constexpr Number a_62 = +0.87880047152100838; /* aka b_2 */
+    constexpr Number a_63 = -0.58903404061484477; /* aka b_3 */
+    constexpr Number a_64 = +0.46213380485434047; /* aka b_4 */
+    // constexpr Number a_65 = +0.35321654878641495; /* aka b_5 */
+
+    /* Step 1: */
+    Number tau = hyperbolic_module_->template step<0>(
+        U, {}, {}, {}, U_[0], precomputed_[0]);
+    hyperbolic_module_->apply_boundary_conditions(U_[0], t + tau);
+
+    /* Step 2: */
+    hyperbolic_module_->template step<1>(U_[0],
+                                         {{U}},
+                                         {{precomputed_[0]}},
+                                         {{(a_31 - a_21) / c}},
+                                         U_[1],
+                                         precomputed_[1],
+                                         tau);
+    hyperbolic_module_->apply_boundary_conditions(U_[1], t + 2. * tau);
+
+    /* Step 3: */
+    hyperbolic_module_->template step<2>(
+        U_[1],
+        {{U, U_[0]}},
+        {{precomputed_[0], precomputed_[1]}},
+        {{(a_41 - a_31) / c, (a_42 - a_32) / c}},
+        U_[2],
+        precomputed_[2],
+        tau);
+    hyperbolic_module_->apply_boundary_conditions(U_[2], t + 3. * tau);
+
+    /* Step 4: */
+    hyperbolic_module_->template step<3>(
+        U_[2],
+        {{U, U_[0], U_[1]}},
+        {{precomputed_[0], precomputed_[1], precomputed_[2]}},
+        {{(a_51 - a_41) / c, (a_52 - a_42) / c, (a_53 - a_43) / c}},
+        U_[3],
+        precomputed_[3],
+        tau);
+    hyperbolic_module_->apply_boundary_conditions(U_[3], t + 4. * tau);
+
+    /* Step 5: */
+    hyperbolic_module_->template step<4>(
+        U_[3],
+        {{U, U_[0], U_[1], U_[2]}},
+        {{precomputed_[0], precomputed_[1], precomputed_[2], precomputed_[3]}},
+        {{(a_61 - a_51) / c,
+          (a_62 - a_52) / c,
+          (a_63 - a_53) / c,
+          (a_64 - a_54) / c}},
+        U_[4],
+        precomputed_[4],
+        tau);
+    hyperbolic_module_->apply_boundary_conditions(U_[4], t + 5. * tau);
+
+    U.swap(U_[4]);
+    return 5. * tau;
   }
 } /* namespace ryujin */

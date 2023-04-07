@@ -91,10 +91,16 @@ namespace ryujin
      *   \tfrac{1}{2} & 0            & \tfrac{1}{2} & 0 \\
      *   \tfrac{3}{4} & 0            & \tfrac{1}{4} & \tfrac{1}{2}  & 0 \\
      *   \hline
-     *   1            & 0            & \tfrac{2}{3} & -\tfrac{1}{3} &
-     * \tfrac{2}{3} \end{array} \f}
+     *   1            & 0            & \tfrac{2}{3} & -\tfrac{1}{3} & \tfrac{2}{3}
+     * \end{array} \f}
      */
     erk_43,
+
+    /**
+     * The explicit Runge-Kutta method RK(5,4;1) with the butcher tableau
+     * TODO
+     */
+    erk_54,
   };
 } // namespace ryujin
 
@@ -108,7 +114,8 @@ DECLARE_ENUM(ryujin::TimeSteppingScheme,
              LIST({ryujin::TimeSteppingScheme::ssprk_33, "ssprk 33"},
                   {ryujin::TimeSteppingScheme::erk_22, "erk 22"},
                   {ryujin::TimeSteppingScheme::erk_33, "erk 33"},
-                  {ryujin::TimeSteppingScheme::erk_43, "erk 43"}));
+                  {ryujin::TimeSteppingScheme::erk_43, "erk 43"},
+                  {ryujin::TimeSteppingScheme::erk_54, "erk 54"}));
 #endif
 
 namespace ryujin
@@ -200,25 +207,32 @@ namespace ryujin
 
     /**
      * Given a reference to a previous state vector U performs an explicit
-     * second-order Runge-Kutta SSPRK(2,2,1) time step (and store the
-     * result in U). The function returns the chosen time step size tau.
+     * second-order Runge-Kutta ERK(2,2,1) time step (and store the result
+     * in U). The function returns the chosen time step size tau.
      */
     Number step_erk_22(vector_type &U, Number t);
 
     /**
      * Given a reference to a previous state vector U performs an explicit
-     * third-order Runge-Kutta SSPRK(3,3,1) time step (and store the
-     * result in U). The function returns the chosen time step size tau.
+     * third-order Runge-Kutta ERK(3,3,1) time step (and store the result
+     * in U). The function returns the chosen time step size tau.
      */
     Number step_erk_33(vector_type &U, Number t);
 
     /**
      * Given a reference to a previous state vector U performs an explicit
-     * 4 stage third-order Runge-Kutta SSPRK(4,3,1) time step (and store
+     * 4 stage third-order Runge-Kutta ERK(4,3,1) time step (and store the
+     * result in U). The function returns the chosen time step size tau.
+     */
+    Number step_erk_43(vector_type &U, Number t);
+
+    /**
+     * Given a reference to a previous state vector U performs an explicit
+     * 4 stage fourth-order Runge-Kutta ERK(4,4,3/4) time step (and store
      * the result in U). The function returns the chosen time step size
      * tau.
      */
-    Number step_erk_43(vector_type &U, Number t);
+    Number step_erk_54(vector_type &U, Number t);
 
   private:
     //@}
