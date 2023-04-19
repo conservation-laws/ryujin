@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include <hyperbolic_system.h>
+#include "hyperbolic_system.h"
 #include <initial_state.h>
 
 #include "initial_state_becker_solution.h"
