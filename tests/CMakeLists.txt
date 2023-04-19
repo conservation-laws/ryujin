@@ -5,8 +5,7 @@ find_program(NUMDIFF_EXECUTABLE
   )
 mark_as_advanced(NUMDIFF_EXECUTABLE)
 
-if(NOT ${CMAKE_VERSION} VERSION_LESS 3.15
-   AND NOT "${NUMDIFF_EXECUTABLE}" MATCHES "NUMDIFF_EXECUTABLE-NOTFOUND")
+if(NOT "${NUMDIFF_EXECUTABLE}" MATCHES "NUMDIFF_EXECUTABLE-NOTFOUND")
   add_subdirectory("common")
   add_subdirectory("euler")
   add_subdirectory("euler_aeos")
