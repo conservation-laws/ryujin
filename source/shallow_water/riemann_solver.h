@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include <hyperbolic_system.h>
+#include "hyperbolic_system.h"
 
 #include <simd.h>
 

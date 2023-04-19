@@ -24,7 +24,7 @@ namespace ryujin
      * only need to add a single template parameter to the all the
      * algorithm classes, such as HyperbolicModule.
      *
-     * @ingroup EulerEquations
+     * @ingroup ShallowWaterEquations
      */
     struct Description {
       using HyperbolicSystem = ShallowWater::HyperbolicSystem;
@@ -41,6 +41,4 @@ namespace ryujin
       using RiemannSolver = ShallowWater::RiemannSolver<dim, Number>;
     };
   } // namespace ShallowWater
-
-  using ShallowWater::Description;
 } // namespace ryujin
