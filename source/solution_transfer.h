@@ -7,8 +7,6 @@
 
 #include <compile_time_options.h>
 
-#include <hyperbolic_system.h>
-
 #include "offline_data.h"
 
 #include <deal.II/distributed/solution_transfer.h>

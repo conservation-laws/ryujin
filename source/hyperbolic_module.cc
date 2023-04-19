@@ -4,7 +4,7 @@
 //
 
 #include "hyperbolic_module.template.h"
-#include <description.h>
+#include <instantiate.h>
 
 namespace ryujin
 {

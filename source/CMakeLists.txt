@@ -51,6 +51,7 @@ set_property(SOURCE time_loop.cc APPEND PROPERTY COMPILE_DEFINITIONS
 # Equation-specific source files and compilation targets:
 #
 
+set(OBJECT_TARGETS)
 macro(setup_equation EQUATION)
   #
   # obj_${EQUATION} object library: equation specific code:
@@ -65,45 +66,35 @@ macro(setup_equation EQUATION)
   add_library(obj_${EQUATION}_dependent OBJECT ${DEPENDENT_SOURCE_FILES})
   deal_ii_setup_target(obj_${EQUATION}_dependent)
 
-  # Include the obj_${EQUATION} objects with PRIVATE visibility
   target_link_libraries(obj_${EQUATION}_dependent obj_${EQUATION})
   if(WITH_LIKWID)
     target_link_libraries(obj_${EQUATION}_dependent likwid likwid-hwloc likwid-lua)
   endif()
-  # For GNU libstdc++ we have to make sure to also link against libstdc++fs.
   if(LIBSTDCPP)
+    # For GNU libstdc++ we have to make sure to also link against libstdc++fs.
     target_link_libraries(obj_${EQUATION}_dependent stdc++fs)
   endif()
 
-  #
-  # The actual executable:
-  #
-
-  add_executable(${EQUATION} main.cc)
-  deal_ii_setup_target(${EQUATION})
-
-  target_link_libraries(${EQUATION}
-    obj_common obj_${EQUATION} obj_${EQUATION}_dependent
-    )
-
-  set_target_properties(${EQUATION} PROPERTIES
-    RUNTIME_OUTPUT_NAME "ryujin-${DIM}d-${EQUATION}"
-    )
-
-  add_custom_command(
-    OUTPUT "${CMAKE_BINARY_DIR}/run/${EQUATION}/ryujin"
-    COMMAND ${CMAKE_COMMAND} -E create_symlink $<TARGET_FILE:${EQUATION}>
-      "${CMAKE_BINARY_DIR}/run/${EQUATION}/ryujin"
-    )
-
-  add_custom_target(symlink_${EQUATION} ALL
-    DEPENDS ${EQUATION} "${CMAKE_BINARY_DIR}/run/${EQUATION}/ryujin"
-    COMMENT "updating ${EQUATION} symlink"
-    )
-
-  install(TARGETS ${EQUATION} DESTINATION ${CMAKE_INSTALL_BINDIR})
+  list(APPEND OBJECT_TARGETS obj_${EQUATION} obj_${EQUATION}_dependent)
 endmacro()
 
-setup_equation("euler")
-setup_equation("euler_aeos")
-setup_equation("shallow_water")
+file(GLOB _directories RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *)
+foreach(_directory ${_directories})
+  if(IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/${_directory}")
+    setup_equation("${_directory}")
+  endif()
+endforeach()
+
+#
+# The executable
+#
+
+add_executable(ryujin main.cc)
+deal_ii_setup_target(ryujin)
+target_link_libraries(ryujin obj_common ${OBJECT_TARGETS})
+
+set_target_properties(ryujin PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/run"
+  )
+
+install(TARGETS ryujin DESTINATION ${CMAKE_INSTALL_BINDIR})
