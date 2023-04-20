@@ -1,21 +1,11 @@
-macro(setup_equation EQUATION)
-  file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/run/${EQUATION}")
+file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/run/")
 
-  add_custom_command(
-    OUTPUT "${CMAKE_BINARY_DIR}/run/${EQUATION}/prm"
-    COMMAND ${CMAKE_COMMAND} -E create_symlink
-      "${CMAKE_CURRENT_SOURCE_DIR}/${EQUATION}"
-      "${CMAKE_BINARY_DIR}/run/${EQUATION}/prm"
+file(GLOB _directories CONFIGURE_DEPENDS *)
+foreach(_directory ${_directories})
+  if(IS_DIRECTORY "${_directory}")
+    get_filename_component(_equation "${_directory}" NAME)
+    file(CREATE_LINK
+      "${_directory}" "${CMAKE_BINARY_DIR}/run/${_equation}" SYMBOLIC
       )
-
-  add_custom_target(symlink_${EQUATION}_prm ALL
-    DEPENDS ${EQUATION} "${CMAKE_BINARY_DIR}/run/${EQUATION}/prm"
-    COMMENT "updating ${EQUATION} prm symlink"
-    )
-
-  install(DIRECTORY ${EQUATION} DESTINATION ${CMAKE_INSTALL_DOCDIR}/prm/)
-endmacro()
-
-setup_equation("euler")
-setup_equation("euler_aeos")
-setup_equation("shallow_water")
+  endif()
+endforeach()

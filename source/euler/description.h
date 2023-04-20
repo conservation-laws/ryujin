@@ -41,6 +41,4 @@ namespace ryujin
       using RiemannSolver = Euler::RiemannSolver<dim, Number>;
     };
   } // namespace Euler
-
-  using Euler::Description;
 } // namespace ryujin

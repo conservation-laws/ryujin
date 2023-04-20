@@ -17,7 +17,7 @@ endif()
 
 set(RYUJIN_VERSION 2.1.1)
 
-cmake_minimum_required(VERSION 3.11)
+cmake_minimum_required(VERSION 3.15)
 set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
 
 find_package(deal.II 9.3 REQUIRED HINTS ${DEAL_II_DIR} $ENV{DEAL_II_DIR})

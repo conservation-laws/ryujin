@@ -4,7 +4,7 @@
 //
 
 #include "vtu_output.template.h"
-#include <description.h>
+#include <instantiate.h>
 
 namespace ryujin
 {

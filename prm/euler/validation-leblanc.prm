@@ -18,7 +18,8 @@ end
 
 
 subsection B - Equation
-  set gamma = 1.66666666666667
+  set equation = euler
+  set gamma    = 1.66666666666667
 end
 
 

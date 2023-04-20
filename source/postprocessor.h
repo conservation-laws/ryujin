@@ -5,8 +5,6 @@
 
 #pragma once
 
-#include <hyperbolic_system.h>
-
 #include <compile_time_options.h>
 #include <offline_data.h>
 

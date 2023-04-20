@@ -4,7 +4,7 @@
 //
 
 #include "postprocessor.template.h"
-#include <description.h>
+#include <instantiate.h>
 
 namespace ryujin
 {

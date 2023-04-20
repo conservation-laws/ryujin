@@ -7,8 +7,6 @@
 
 #include <compile_time_options.h>
 
-#include <hyperbolic_system.h>
-
 #include "discretization.h"
 #include "hyperbolic_module.h"
 #include "initial_values.h"

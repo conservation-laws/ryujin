@@ -7,8 +7,6 @@
 
 #include <compile_time_options.h>
 
-#include <hyperbolic_system.h>
-
 #include "convenience_macros.h"
 #include "initial_values.h"
 #include "offline_data.h"

@@ -7,16 +7,17 @@ subsection A - TimeLoop
 end
 
 subsection B - Equation
-  set compute expensive bounds = false
+  set equation                 = euler aeos
   set equation of state        = polytropic gas
-  set interpolation co-volume  = 0
-  set reference density        = 1
-  set vacuum state relaxation  = 10000
 
   subsection polytropic gas
     set gamma = 1.4
   end
 
+  set interpolation co-volume  = 0
+  set reference density        = 1
+  set vacuum state relaxation  = 10000
+  set compute expensive bounds = false
 end
 
 subsection C - Discretization
