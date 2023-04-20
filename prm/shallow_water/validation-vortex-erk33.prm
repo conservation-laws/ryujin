@@ -14,9 +14,12 @@ end
 
 
 subsection B - Equation
-  set dry state relaxation  = 100
-  set gravity               = 9.81
-  set reference water depth = 1
+  set equation                       = shallow water
+
+  set gravity                        = 9.81
+  set mannings                       = 0
+
+  set reference water depth          = 1.0
 end
 
 

@@ -8,6 +8,11 @@ subsection A - TimeLoop
   set output granularity   = 2.0
 end
 
+subsection B - Equation
+  set equation = euler
+  set gamma    = 1.4
+end
+
 subsection C - Discretization
   set geometry        = rectangular domain
   set mesh refinement = 7

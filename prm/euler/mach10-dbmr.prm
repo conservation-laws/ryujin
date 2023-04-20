@@ -15,7 +15,8 @@ end
 
 
 subsection B - Equation
-  set gamma = 1.4
+  set equation = euler
+  set gamma    = 1.4
 end
 
 

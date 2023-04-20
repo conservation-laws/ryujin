@@ -2,22 +2,23 @@ subsection A - TimeLoop
   set basename                     = cylinder
 
   set enable checkpointing         = false
-  set enable compute error         = false
   set enable compute quantities    = false
   set enable output full           = false
   set enable output levelsets      = false
 
+  set enable compute error         = false
+  set error normalize              = true
   set error quantities             = rho, m_1, m_2, E
 
-  set final time                   = 5
   set output granularity           = 0.01
-
-  set output checkpoint multiplier = 1
-  set output quantities multiplier = 1
-  set output full multiplier       = 1
-  set output levelsets multiplier  = 1
+  set final time                   = 5
 
   set refinement timepoints        =
+
+  set output checkpoint multiplier = 1
+  set output levelsets multiplier  = 1
+  set output quantities multiplier = 1
+  set output full multiplier       = 1
 
   set resume                       = false
 
@@ -26,12 +27,17 @@ end
 
 
 subsection B - Equation
-  set equation of state       = polytropic gas
+  set equation                 = euler aeos
 
-  set reference density       = 1
-  set vacuum state relaxation = 10000
+  set interpolation co-volume  = 0
+  set reference density        = 1
+  set vacuum state relaxation  = 10000
 
-  subsection jones-wilkins-lee
+  set compute expensive bounds = false
+
+  set equation of state        = polytropic gas
+
+  subsection jones wilkins lee
     set A     = 0
     set B     = 0
     set R1    = 0
@@ -40,9 +46,10 @@ subsection B - Equation
     set rho_0 = 0
   end
 
-  subsection noble-abel-stiffened gas
-    set co-volume                          = 0
+  subsection noble abel stiffened gas
     set gamma                              = 1.4
+
+    set covolume b                         = 0
     set reference pressure                 = 0
     set reference specific internal energy = 0
   end
@@ -50,63 +57,71 @@ subsection B - Equation
   subsection polytropic gas
     set gamma = 1.4
   end
+
+  subsection van der waals
+    set gamma      = 1.4
+
+    set covolume b = 0
+    set vdw a      = -1.83255e-06
+  end
 end
 
 
 subsection C - Discretization
   set geometry            = cylinder
 
-  set mesh distortion     = 0
   set mesh refinement     = 5
+  set mesh distortion     = 0
   set mesh repartitioning = false
 
   subsection airfoil
-    set airfoil center                      = -0.5, 0
-    set airfoil length                      = 2
+    set height                              = 6
+
     set airfoil type                        = NASA SC(2) 0714
 
+    set airfoil center                      = -0.5, 0
+    set airfoil length                      = 2
     set anisotropic pre refinement airfoil  = 1
     set anisotropic pre refinement trailing = 3
-
     set grading epsilon                     = 0.02
     set grading epsilon trailing            = 0.01
     set grading exponent                    = 5.5
-    set height                              = 6
     set psi center                          = 0.05, 0
     set psi ratio                           = 0.3
     set psi samples                         = 100
 
-    set subdivisions z                      = 2
-
     set width                               = 1
+    set subdivisions z                      = 2
   end
 
   subsection cylinder
     set height          = 2
     set length          = 4
+
     set object diameter = 0.5
     set object position = 0.6
   end
 
   subsection rectangular domain
-    set boundary condition bottom = dirichlet
-    set boundary condition left   = dirichlet
-    set boundary condition right  = dirichlet
-    set boundary condition top    = dirichlet
-
-    set grading pull back         = x;y
-    set grading push forward      = x;y
-
     set position bottom left      = 0, 0
     set position top right        = 20, 20
 
     set subdivisions x            = 1
     set subdivisions y            = 1
+
+    set grading pull back         = x;y
+    set grading push forward      = x;y
+
+    set boundary condition left   = dirichlet
+    set boundary condition right  = dirichlet
+    set boundary condition bottom = dirichlet
+    set boundary condition top    = dirichlet
   end
 
   subsection step
     set height        = 1
     set length        = 3
+
     set step height   = 0.2
     set step position = 0.6
   end
@@ -126,15 +141,23 @@ subsection E - InitialValues
   set direction     = 1, 0
   set perturbation  = 0
 
+  subsection TwoContrast
+    set left region length     = 0.1
+    set middle region length   = 0.8
+    set primitive state left   = 1, 0, 2500
+    set primitive state middle = 1, 0, 0.025
+    set primitive state right  = 1, 0, 250
+  end
+
   subsection contrast
     set primitive state left  = 1.4, 0, 2.5
     set primitive state right = 1.4, 0, 2.5
   end
 
   subsection isentropic vortex
-    set beta        = 5
     set gamma       = 1.4
     set mach number = 2
+    set beta        = 5
   end
 
   subsection ramp up
@@ -145,6 +168,7 @@ subsection E - InitialValues
   end
 
   subsection uniform
+    # Initial 1d primitive state (rho, u, e)
     set primitive state = 1.4, 3, 2.5
   end
 
@@ -164,8 +188,11 @@ end
 subsection H - TimeIntegrator
   set cfl min               = 0.45
   set cfl max               = 0.9
+
+  # CFL/invariant domain violation recovery strategy: none, bang bang control
   set cfl recovery strategy = bang bang control
 
+  # Time stepping scheme: ssprk 33, erk 11, erk 22, erk 33, erk 43, erk 54
   set time stepping scheme  = erk 33
 end
 
@@ -173,20 +200,19 @@ end
 subsection I - VTUOutput
   set manifolds                  =
 
-  set schlieren beta             = 10
-  set schlieren quantities       = rho
-  set schlieren recompute bounds = true
-
+  set vtu output quantities      = rho, m_1, m_2, E
   set use mpi io                 = true
 
+  set schlieren quantities       = rho
   set vorticity quantities       =
-  set vtu output quantities      = rho, m_1, m_2, E
+  set schlieren beta             = 10
+  set schlieren recompute bounds = true
 end
 
 
 subsection J - Quantities
-  set boundary manifolds           =
   set interior manifolds           =
+  set boundary manifolds           =
 
   set clear statistics on writeout = true
 end
