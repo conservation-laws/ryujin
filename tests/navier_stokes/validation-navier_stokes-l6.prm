@@ -13,14 +13,14 @@ subsection A - TimeLoop
 end
 
 subsection B - ProblemDescription
-  set description = Navier Stokes
+  set equation = navier stokes
 
-  set gamma = 1.4
+  set gamma    = 1.4
 
-  set lambda      = 0
-  set mu          = 0.01
+  set lambda   = 0
+  set mu       = 0.01
 
-  set kappa       = 1.866666666666666e-2
+  set kappa    = 1.866666666666666e-2
 end
 
 subsection C - Discretization
