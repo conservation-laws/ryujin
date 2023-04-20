@@ -3,7 +3,7 @@
 
 int main()
 {
-  using VA = dealii::VectorizedArray<double>;
+  using VA = dealii::VectorizedArray<double, 4>;
 
   dealii::DynamicSparsityPattern spars(14, 14);
   spars.add(0, 0);
