@@ -72,8 +72,7 @@ namespace ryujin
         const auto c_right = speed_of_sound(rho_right, primitive_right[2]);
 
         /* 1-Riemann invariant: uR + 2 cR/(gamma -1) = uL + 2 cL/(gamma -1) */
-        primitive_right[1] =
-            u_left + 2.0 * (c_left - c_right) / (gamma - 1.0);
+        primitive_right[1] = u_left + 2.0 * (c_left - c_right) / (gamma - 1.0);
 
         return primitive_right;
       };

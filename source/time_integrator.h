@@ -95,8 +95,8 @@ namespace ryujin
      *   \tfrac{1}{2} & 0            & \tfrac{1}{2} & 0 \\
      *   \tfrac{3}{4} & 0            & \tfrac{1}{4} & \tfrac{1}{2}  & 0 \\
      *   \hline
-     *   1            & 0            & \tfrac{2}{3} & -\tfrac{1}{3} & \tfrac{2}{3}
-     * \end{array} \f}
+     *   1            & 0            & \tfrac{2}{3} & -\tfrac{1}{3} &
+     * \tfrac{2}{3} \end{array} \f}
      */
     erk_43,
 

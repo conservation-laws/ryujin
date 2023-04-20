@@ -1,7 +1,7 @@
 #include <simd.h>
 
-#include <iostream>
 #include <iomanip>
+#include <iostream>
 
 int main()
 {

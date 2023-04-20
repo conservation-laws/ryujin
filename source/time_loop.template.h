@@ -427,25 +427,27 @@ namespace ryujin
       Number l2_norm_analytic;
 
       if (error_normalize_) {
-        linf_norm_analytic = Utilities::MPI::max(analytic_component.linfty_norm(),
-                                                 mpi_communicator_);
+        linf_norm_analytic = Utilities::MPI::max(
+            analytic_component.linfty_norm(), mpi_communicator_);
 
-        VectorTools::integrate_difference(offline_data_.dof_handler(),
-                                          analytic_component,
-                                          Functions::ZeroFunction<dim, Number>(),
-                                          difference_per_cell,
-                                          QGauss<dim>(3),
-                                          VectorTools::L1_norm);
+        VectorTools::integrate_difference(
+            offline_data_.dof_handler(),
+            analytic_component,
+            Functions::ZeroFunction<dim, Number>(),
+            difference_per_cell,
+            QGauss<dim>(3),
+            VectorTools::L1_norm);
 
-        l1_norm_analytic =
-            Utilities::MPI::sum(difference_per_cell.l1_norm(), mpi_communicator_);
+        l1_norm_analytic = Utilities::MPI::sum(difference_per_cell.l1_norm(),
+                                               mpi_communicator_);
 
-        VectorTools::integrate_difference(offline_data_.dof_handler(),
-                                          analytic_component,
-                                          Functions::ZeroFunction<dim, Number>(),
-                                          difference_per_cell,
-                                          QGauss<dim>(3),
-                                          VectorTools::L2_norm);
+        VectorTools::integrate_difference(
+            offline_data_.dof_handler(),
+            analytic_component,
+            Functions::ZeroFunction<dim, Number>(),
+            difference_per_cell,
+            QGauss<dim>(3),
+            VectorTools::L2_norm);
 
         l2_norm_analytic = Number(std::sqrt(Utilities::MPI::sum(
             std::pow(difference_per_cell.l2_norm(), 2), mpi_communicator_)));
@@ -482,7 +484,7 @@ namespace ryujin
       const Number l2_norm_error = Number(std::sqrt(Utilities::MPI::sum(
           std::pow(difference_per_cell.l2_norm(), 2), mpi_communicator_)));
 
-      if(error_normalize_) {
+      if (error_normalize_) {
         linf_norm += linf_norm_error / linf_norm_analytic;
         l1_norm += l1_norm_error / l1_norm_analytic;
         l2_norm += l2_norm_error / l2_norm_analytic;
