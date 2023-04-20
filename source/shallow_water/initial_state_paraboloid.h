@@ -91,7 +91,7 @@ namespace ryujin
               HyperbolicSystem::state_type<1, Number>{{h, h * v_x}});
         else if constexpr (dim == 2)
           return hyperbolic_system.template expand_state<dim>(
-              HyperbolicSystem::state_type<1, Number>{{h, h * v_x, h * v_y}});
+              HyperbolicSystem::state_type<2, Number>{{h, h * v_x, h * v_y}});
         else {
           AssertThrow(false, dealii::ExcNotImplemented());
           __builtin_trap();

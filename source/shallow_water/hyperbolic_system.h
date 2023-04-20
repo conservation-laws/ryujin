@@ -585,7 +585,7 @@ namespace ryujin
     {
       static_assert(cycle == 0, "internal error");
 
-      constexpr int dim = problem_dim - 2;
+      constexpr int dim = problem_dim - 1;
 
       const auto U_i = U.template get_tensor<Number>(i);
 
@@ -944,7 +944,7 @@ namespace ryujin
                                         const ST &U_i) const
         -> flux_contribution_type<dim, T>
     {
-      const auto &Z_i = precomputed_initial_values.template get_tensor<T>(i)[0];
+      const auto Z_i = precomputed_initial_values.template get_tensor<T>(i)[0];
       return {U_i, Z_i};
     }
 
@@ -957,8 +957,7 @@ namespace ryujin
                                         const ST &U_j) const
         -> flux_contribution_type<dim, T>
     {
-      const auto &Z_j =
-          precomputed_initial_values.template get_tensor<T>(js)[0];
+      const auto Z_j = precomputed_initial_values.template get_tensor<T>(js)[0];
       return {U_j, Z_j};
     }
 
