@@ -1,0 +1,67 @@
+subsection A - TimeLoop
+  set basename                     = output-paraboloid
+  set enable output full           = true
+  set error quantities             = h
+  set final time                   = 4
+  set output granularity           = 0.1
+end
+
+subsection B - Equation
+  set equation                       = shallow water 
+
+  set dry state relaxation mollified = 1.e4
+  set dry state relaxation sharp     = 1.e4
+  set gravity                        = 9.81
+  set reference water depth          = 1.0
+end
+
+subsection C - Discretization
+  set geometry            = rectangular domain
+  set mesh refinement     = 11
+
+  subsection rectangular domain
+    set boundary condition left   = slip
+    set boundary condition right  = slip
+    set position bottom left      = 0
+    set position top right        = 4
+    set subdivisions x            = 1
+  end
+
+end
+
+subsection E - InitialValues
+  set configuration = paraboloid
+  set direction     = 1
+  set position      = 2
+
+   subsection paraboloid
+    set eta                 = 0.5
+    set free surface radius = 1
+    set water height        = 0.1
+  end
+end
+
+subsection F - HyperbolicModule
+  set cfl with boundary dofs        = true
+  set limiter iterations            = 0
+  set limiter newton max iterations = 2
+  set limiter newton tolerance      = 1e-10
+  set limiter relaxation factor     = 2
+end
+
+subsection H - TimeIntegrator
+  set cfl max               = 0.9
+  set cfl min               = 0.45
+  set cfl recovery strategy = none
+  set time stepping scheme  = erk 33
+end
+
+subsection I - VTUOutput
+  set schlieren beta             = 10
+  set schlieren quantities       = h
+  set schlieren recompute bounds = true
+  set use mpi io                 = true
+  set vtu output quantities      = h, m, bathymetry, alpha, v
+end
+
+
