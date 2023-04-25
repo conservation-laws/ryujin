@@ -69,9 +69,20 @@ namespace ryujin
     {
       bool initialized = false;
       for (auto &it : equation_of_state_list_)
+
+        /* Populate EOS-specific quantities and functions */
         if (it->name() == equation_of_state_) {
+
           pressure_ = [&it](double rho, double e) {
             return it->pressure(rho, e);
+          };
+
+          specific_internal_energy_ = [&it](double rho, double p) {
+            return it->specific_internal_energy(rho, p);
+          };
+
+          material_sound_speed_ = [&it](double rho, double p) {
+            return it->material_sound_speed(rho, p);
           };
 
           problem_name =

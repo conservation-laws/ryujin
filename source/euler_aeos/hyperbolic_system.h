@@ -528,6 +528,15 @@ namespace ryujin
           const dealii::Tensor<1, problem_dim, Number> &state,
           const Lambda &lambda) const;
 
+      /*
+       * Functions from the user-defined equation of state.
+       */
+      std::function<double(const double, const double)> pressure_;
+      std::function<double(const double, const double)>
+          specific_internal_energy_;
+      std::function<double(const double, const double)> material_sound_speed_;
+
+
       //@}
       /**
        * @name Run time options
@@ -566,8 +575,6 @@ namespace ryujin
       //@{
 
       std::set<std::unique_ptr<EquationOfState>> equation_of_state_list_;
-
-      std::function<double(const double, const double)> pressure_;
 
       //@}
     };
@@ -752,12 +759,16 @@ namespace ryujin
         const dealii::Tensor<1, problem_dim, Number> &U,
         const Number gamma_min) const
     {
-      /* exp((gamma - 1)s) = (rho e) / rho ^ gamma */
+      /* FIXME: exp((gamma - 1)s) = (rho e) / rho ^ gamma */
 
       using ScalarNumber = typename get_value_type<Number>::type;
 
-      const auto rho_inverse = ScalarNumber(1.) / U[0];
-      return internal_energy(U) * ryujin::pow(rho_inverse, gamma_min);
+      const auto &rho = U[0];
+
+      const auto rho_inverse = ScalarNumber(1.) / rho;
+      const auto covolume = Number(1.) - Number(b_interp_) * U[0];
+      return internal_energy(U) *
+             ryujin::pow(rho_inverse - Number(b_interp_), gamma_min) / covolume;
     }
 
 
@@ -911,7 +922,7 @@ namespace ryujin
           U[k + 1] = Number(0.);
 
       } else if (id == Boundary::dynamic) {
-        // Not implemented
+        AssertThrow(false, dealii::ExcNotImplemented());
         __builtin_trap();
       }
 
@@ -1001,16 +1012,21 @@ namespace ryujin
       constexpr auto dim = problem_dim - 2;
 
       const auto &rho = primitive_state[0];
-      /* extract velocity: */
+
+      /* extract velocity */
       const auto u = /*SIC!*/ momentum(primitive_state);
+
+      /* get specific internal energy: */
       const auto &e = primitive_state[dim + 1];
 
       auto state = primitive_state;
+
       /* Fix up momentum: */
       for (unsigned int i = 1; i < dim + 1; ++i)
         state[i] *= rho;
+
       /* Compute total energy: */
-      state[dim + 1] = e + Number(0.5) * rho * u * u;
+      state[dim + 1] = rho * e + Number(0.5) * rho * u * u;
 
       return state;
     }
@@ -1025,14 +1041,16 @@ namespace ryujin
 
       const auto &rho = state[0];
       const auto rho_inverse = Number(1.) / rho;
-      const auto e = internal_energy(state);
+      const auto rho_e = internal_energy(state);
 
       auto primitive_state = state;
+
       /* Fix up velocity: */
       for (unsigned int i = 1; i < dim + 1; ++i)
         primitive_state[i] *= rho_inverse;
-      /* Set internal energy */
-      primitive_state[dim + 1] = e;
+
+      /* Set specific internal energy */
+      primitive_state[dim + 1] = rho_e * rho_inverse;
 
       return primitive_state;
     }
