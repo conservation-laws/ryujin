@@ -27,17 +27,6 @@ namespace ryujin
           "The equation of state. Valid names are given by any of the "
           "subsections defined below");
 
-      //
-      // FIXME: This should not be a parameter but set in
-      // parse_parameters_callback() by querying information from the
-      // selected EOS.
-      //
-      b_interp_ = 0.;
-      add_parameter("interpolation co-volume",
-                    b_interp_,
-                    "The maximum compressibility constant used for the "
-                    "co-volume EOS interpolation");
-
       compute_expensive_bounds_ = false;
       add_parameter("compute expensive bounds",
                     compute_expensive_bounds_,
@@ -84,6 +73,8 @@ namespace ryujin
           material_sound_speed_ = [&it](double rho, double p) {
             return it->material_sound_speed(rho, p);
           };
+
+          b_interp_ = it->interpolation_b;
 
           problem_name =
               "Compressible Euler equations (" + it->name() + " EOS)";

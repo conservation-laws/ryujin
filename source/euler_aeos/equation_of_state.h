@@ -36,6 +36,12 @@ namespace ryujin
           : ParameterAcceptor(subsection + "/" + name)
           , name_(name)
       {
+        /* Every EOS needs to define the interpolation co-volume constant (b) */
+        interpolation_b = 0;
+        add_parameter("interpolation co-volume",
+                      interpolation_b,
+                      "The maximum compressibility constant used for the "
+                      "co-volume EOS interpolation");
       }
 
       /**
@@ -58,6 +64,12 @@ namespace ryujin
        */
       virtual double material_sound_speed(const double density,
                                           const double pressure) = 0;
+
+      /**
+       * The interpolation co-volume constant (b).
+       */
+      double interpolation_b;
+
 
       /**
        * Return the name of the EOS as (const reference) std::string

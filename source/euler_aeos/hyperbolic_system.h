@@ -558,8 +558,6 @@ namespace ryujin
       ACCESSOR_READ_ONLY(equation_of_state)
 
       ACCESSOR_READ_ONLY(b_interp)
-      ACCESSOR_READ_ONLY(pinf_interp)
-      ACCESSOR_READ_ONLY(q_interp)
 
       ACCESSOR_READ_ONLY(reference_density)
 
