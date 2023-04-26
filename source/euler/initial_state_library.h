@@ -16,6 +16,7 @@
 #include "initial_state_ramp_up.h"
 #include "initial_state_rarefaction.h"
 #include "initial_state_shock_front.h"
+#include "initial_state_twoD_contrast.h"
 #include "initial_state_uniform.h"
 
 namespace ryujin
@@ -48,6 +49,7 @@ namespace ryujin
         add(std::make_unique<RampUp<dim, Number, state_type>>(h, s));
         add(std::make_unique<Rarefaction<dim, Number, state_type>>(h, s));
         add(std::make_unique<ShockFront<dim, Number, state_type>>(h, s));
+        add(std::make_unique<TwoDContrast<dim, Number, state_type>>(h, s));
         add(std::make_unique<Uniform<dim, Number, state_type>>(h, s));
       }
     };

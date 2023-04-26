@@ -319,6 +319,18 @@ namespace ryujin
       //@{
 
       /**
+       * Decomposes a given state @p U into Riemann invariants and then
+       * replaces the first or second Riemann characteristic from the one
+       * taken from @p U_bar state. Note that the @p U_bar state is just the
+       * prescribed dirichlet values.
+       */
+      template <int component, int problem_dim, typename Number>
+      dealii::Tensor<1, problem_dim, Number> prescribe_riemann_characteristic(
+          const dealii::Tensor<1, problem_dim, Number> &U,
+          const dealii::Tensor<1, problem_dim, Number> &U_bar,
+          const dealii::Tensor<1, problem_dim - 2, Number> &normal) const;
+
+      /**
        * Apply boundary conditions.
        *
        * For the compressible Euler equations we have:
@@ -529,7 +541,7 @@ namespace ryujin
           const Lambda &lambda) const;
 
       /*
-       * Functions from the user-defined equation of state.
+       * Functions and quantities from the user-defined equation of state.
        */
       std::function<double(const double, const double)> pressure_;
       std::function<double(const double, const double)>
@@ -559,8 +571,6 @@ namespace ryujin
       std::string equation_of_state_;
 
       double b_interp_;
-      double pinf_interp_;
-      double q_interp_;
 
       double reference_density_;
 
@@ -897,6 +907,77 @@ namespace ryujin
       return (test == Number(0.));
     }
 
+    template <int component, int problem_dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, problem_dim, Number>
+    HyperbolicSystem::prescribe_riemann_characteristic(
+        const dealii::Tensor<1, problem_dim, Number> &U,
+        const dealii::Tensor<1, problem_dim, Number> &U_bar,
+        const dealii::Tensor<1, problem_dim - 2, Number> &normal) const
+    {
+      static_assert(component == 1 || component == 2,
+                    "component has to be 1 or 2");
+
+      using ScalarNumber = typename get_value_type<Number>::type;
+
+      constexpr int dim = problem_dim - 2;
+
+      const auto m = momentum(U);
+      const auto rho = density(U);
+      const auto vn = m * normal / rho;
+
+      const auto p = pressure(U);
+      const auto gamma = surrogate_gamma(U, p);
+      const auto x = Number(1.) - b_interp_ * rho;
+      const auto a = std::sqrt(gamma * p / (rho * x)); // local speed of sound
+
+
+      const auto m_bar = momentum(U_bar);
+      const auto rho_bar = density(U_bar);
+      const auto vn_bar = m_bar * normal / rho_bar;
+
+      const auto p_bar = pressure(U_bar);
+      const auto gamma_bar = surrogate_gamma(U_bar, p_bar);
+      const auto x_bar = Number(1.) - b_interp_ * rho_bar;
+      const auto a_bar = std::sqrt(gamma_bar * p_bar / (rho_bar * x_bar));
+
+      /* First Riemann characteristic: v* n - 2 / (gamma - 1) * a */
+
+      const auto R_1 = component == 1
+                           ? vn_bar - 2. * a_bar / (gamma_bar - 1.) * x_bar
+                           : vn - 2. * a / (gamma - 1.) * x;
+
+      /* Second Riemann characteristic: v* n + 2 / (gamma - 1) * a */
+
+      const auto R_2 = component == 2
+                           ? vn_bar + 2. * a_bar / (gamma_bar - 1.) * x_bar
+                           : vn + 2. * a / (gamma - 1.) * x;
+
+      const auto s = p / ryujin::pow(rho, gamma) * ryujin::pow(x, gamma);
+
+      const auto vperp = m / rho - vn * normal;
+
+      const auto vn_new = 0.5 * (R_1 + R_2);
+
+      auto rho_new =
+          1. / (gamma * s) * ryujin::pow((gamma - 1.) / 4. * (R_2 - R_1), 2.);
+      rho_new = 1. / (ryujin::pow(rho_new, 1. / (1. - gamma)) + b_interp_);
+
+      const auto x_new = 1. - b_interp_ * rho_new;
+
+      const auto p_new =
+          s * std::pow(rho_new, gamma) / ryujin::pow(x_new, gamma);
+
+      state_type<dim, Number> U_new;
+      U_new[0] = rho_new;
+      for (unsigned int d = 0; d < dim; ++d) {
+        U_new[1 + d] = rho_new * (vn_new * normal + vperp)[d];
+      }
+      U_new[1 + dim] = p_new / (gamma - 1.) +
+                       0.5 * rho_new * (vn_new * vn_new + vperp.norm_square());
+
+      return U_new;
+    }
+
 
     template <int problem_dim, typename Number, typename Lambda>
     DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, problem_dim, Number>
@@ -922,8 +1003,50 @@ namespace ryujin
           U[k + 1] = Number(0.);
 
       } else if (id == Boundary::dynamic) {
+        /* FIXME: Currently does not work */
+
         AssertThrow(false, dealii::ExcNotImplemented());
         __builtin_trap();
+        /*
+         * On dynamic boundary conditions, we distinguish four cases:
+         *
+         *  - supersonic inflow: prescribe full state
+         *  - subsonic inflow:
+         *      decompose into Riemann invariants and leave R_2
+         *      characteristic untouched.
+         *  - supersonic outflow: do nothing
+         *  - subsonic outflow:
+         *      decompose into Riemann invariants and prescribe incoming
+         *      R_1 characteristic.
+         */
+        const auto m = momentum(U);
+        const auto rho = density(U);
+        const auto vn = m * normal / rho;
+
+        const auto p = pressure(U);
+        const auto gamma = surrogate_gamma(U, p);
+
+        const auto x = Number(1.) - b_interp_ * rho;
+        const auto a = std::sqrt(gamma * p / (rho * x)); // local speed of sound
+
+        /* Supersonic inflow: */
+        if (vn < -a) {
+          U = get_dirichlet_data();
+        }
+
+        /* Subsonic inflow: */
+        if (vn >= -a && vn <= 0.) {
+          const auto U_dirichlet = get_dirichlet_data();
+          U = prescribe_riemann_characteristic<2>(U_dirichlet, U, normal);
+        }
+
+        /* Subsonic outflow: */
+        if (vn > 0. && vn <= a) {
+          const auto U_dirichlet = get_dirichlet_data();
+          U = prescribe_riemann_characteristic<1>(U, U_dirichlet, normal);
+        }
+
+        /* Supersonic outflow: do nothing, i.e., keep U as is */
       }
 
       return U;

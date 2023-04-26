@@ -10,7 +10,7 @@
 
 namespace ryujin
 {
-  namespace EulerAEOS
+  namespace Euler
   {
     /**
      * A 2D extension of the "contrast" initial state consisting of 4 different
@@ -83,13 +83,6 @@ namespace ryujin
         auto temp_bottom =
             point[0] >= 0. ? primitive_bottom_right_ : primitive_bottom_left_;
 
-        /* Convert (dim+1) entries from pressure to specific internal energy */
-        temp_top[dim + 1] = hyperbolic_system.specific_internal_energy_(
-            temp_top[0], temp_top[dim + 1]);
-
-        temp_bottom[dim + 1] = hyperbolic_system.specific_internal_energy_(
-            temp_bottom[0], temp_bottom[dim + 1]);
-
         /* Convert to regular states */
         temp_top = hyperbolic_system.from_primitive_state(temp_top);
         temp_bottom = hyperbolic_system.from_primitive_state(temp_bottom);
@@ -111,5 +104,5 @@ namespace ryujin
       dealii::Tensor<1, 4, Number> primitive_top_right_;
       dealii::Tensor<1, 4, Number> primitive_bottom_right_;
     };
-  } // namespace EulerAEOS
+  } // namespace Euler
 } // namespace ryujin
