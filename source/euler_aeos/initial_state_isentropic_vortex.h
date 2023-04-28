@@ -16,7 +16,7 @@ namespace ryujin
      * The isentropic vortex
      * @todo Documentation
      *
-     * @ingroup InitialValues
+     * @ingroup EulerEquations
      */
     template <int dim, typename Number, typename state_type>
     class IsentropicVortex : public InitialState<dim, Number, state_type>

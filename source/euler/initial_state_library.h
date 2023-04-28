@@ -28,7 +28,7 @@ namespace ryujin
        * Populate a given container with all initial state defined in this
        * namespace
        *
-       * @ingroup InitialValues
+       * @ingroup EulerEquations
        */
       template <int dim, typename Number, typename T>
       static void populate_initial_state_list(T &initial_state_list,

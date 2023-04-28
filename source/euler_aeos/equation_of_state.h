@@ -22,7 +22,7 @@ namespace ryujin
      * A small abstract base class to group configuration options for an
      * equation of state.
      *
-     * @ingroup EquationOfState
+     * @ingroup EulerEquations
      */
     class EquationOfState : public dealii::ParameterAcceptor
     {

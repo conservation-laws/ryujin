@@ -15,7 +15,7 @@ namespace ryujin
     /**
      * Dam break with flat portion followed by a sloping ramp.
      *
-     * @ingroup InitialValues
+     * @ingroup ShallowWaterEquations
      */
     template <int dim, typename Number, typename state_type>
     class SlopingRampDamBreak : public InitialState<dim, Number, state_type, 1>

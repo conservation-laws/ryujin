@@ -18,7 +18,7 @@ namespace ryujin
      * primite_right_ valid for \f$ t \ge t_{\text{right}} \f$. In between,
      * a smooth interpolation is performed.
      *
-     * @ingroup InitialValues
+     * @ingroup EulerEquations
      */
     template <int dim, typename Number, typename state_type>
     class RampUp : public InitialState<dim, Number, state_type>

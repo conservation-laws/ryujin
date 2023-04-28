@@ -17,7 +17,7 @@ namespace ryujin
      *
      * @todo Documentation
      *
-     * @ingroup InitialValues
+     * @ingroup EulerEquations
      */
     template <int dim, typename Number, typename state_type>
     class ShockFront : public InitialState<dim, Number, state_type>

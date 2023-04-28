@@ -20,7 +20,7 @@ namespace ryujin
      * you need correct time-dependent Dirichlet data use @ref ShockFront
      * instead.
      *
-     * @ingroup InitialValues
+     * @ingroup EulerEquations
      */
     template <int dim, typename Number, typename state_type>
     class Contrast : public InitialState<dim, Number, state_type>

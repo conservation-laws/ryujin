@@ -16,7 +16,7 @@ namespace ryujin
      * An initial state formed by a contrast of a given "left" and "right"
      * primitive state.
      *
-     * @ingroup InitialValues
+     * @ingroup ShallowWaterEquations
      */
     template <int dim, typename Number, typename state_type>
     class Contrast : public InitialState<dim, Number, state_type, 1>

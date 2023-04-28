@@ -18,7 +18,7 @@ namespace ryujin
      * W. C. Thacker, Some exact solution to the nonlinear shallo-water wave
      * equations, J. Fluid. Mech., 107:499-508, 1981.
      *
-     * @ingroup InitialValues
+     * @ingroup ShallowWaterEquations
      */
     template <int dim, typename Number, typename state_type>
     class Paraboloid : public InitialState<dim, Number, state_type, 1>

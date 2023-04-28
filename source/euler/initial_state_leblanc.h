@@ -16,7 +16,7 @@ namespace ryujin
      * The rarefaction
      * @todo Documentation
      *
-     * @ingroup InitialValues
+     * @ingroup EulerEquations
      */
 
     template <int dim, typename Number, typename state_type>

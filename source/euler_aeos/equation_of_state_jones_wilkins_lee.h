@@ -16,7 +16,7 @@ namespace ryujin
       /**
        * The Jones-Wilkins-Lee equation of state
        *
-       * @ingroup EquationOfState
+       * @ingroup EulerEquations
        */
       class JonesWilkinsLee : public EquationOfState
       {

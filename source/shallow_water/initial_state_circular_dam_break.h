@@ -15,7 +15,7 @@ namespace ryujin
     /**
      * Circular dam break problem.
      *
-     * @ingroup InitialValues
+     * @ingroup ShallowWaterEquations
      */
     template <int dim, typename Number, typename state_type>
     class CircularDamBreak : public InitialState<dim, Number, state_type, 1>

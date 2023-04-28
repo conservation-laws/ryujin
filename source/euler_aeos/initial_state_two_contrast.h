@@ -25,7 +25,7 @@ namespace ryujin
      * Two-Dimensional Fluid Flow with Strong Shocks", J. Computational
      * Physics, 54, 115-173 (1984).
      *
-     * @ingroup InitialValues
+     * @ingroup EulerEquations
      */
     template <int dim, typename Number, typename state_type>
     class TwoContrast : public InitialState<dim, Number, state_type>
