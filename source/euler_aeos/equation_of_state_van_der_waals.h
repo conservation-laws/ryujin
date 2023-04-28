@@ -28,7 +28,7 @@ namespace ryujin
           this->add_parameter("gamma", gamma_, "The ratio of specific heats");
 
           a_ = 0.;
-          this->add_parameter("vdw a", b_, "The vdw a constant");
+          this->add_parameter("vdw a", a_, "The vdw a constant");
 
           b_ = 0.;
           this->add_parameter(
