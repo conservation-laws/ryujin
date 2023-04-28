@@ -20,8 +20,12 @@
   mesh  [label="Discretization", URL="\ref Mesh"];
   hyperbolic [label="Hyperbolic Module", URL="\ref HyperbolicModule"];
   parabolic [label="Parabolic Module", URL="\ref ParabolicModule"];
-  loop  [label="Time loop", URL="\ref TimeLoop"];
+  loop  [label="Time Integration and Postprocessing", URL="\ref TimeLoop"];
+
+  formulation [label="PDE formulation", URL="\ref Description"];
+
   euler [label="Euler Equations", URL="\ref EulerEquations"];
+  shallow [label="Shallow Water Equations", URL="\ref ShallowWaterEquations"];
   navier [label="Navier Stokes Equations", URL="\ref NavierStokesEquations"];
 
   fe   -> mesh  [color="black",style="solid"];
@@ -36,12 +40,27 @@
   misc -> loop  [color="black",style="solid"];
   hyperbolic -> loop [color="black",style="solid"];
   parabolic -> loop [color="black",style="solid"];
-  euler -> hyperbolic [color="black",style="solid"];
-  navier -> hyperbolic [color="black",style="solid"];
-  navier -> parabolic [color="black",style="solid"];
+  euler -> formulation [color="blak",style="solid"];
+  shallow -> formulation [color="black",style="solid"];
+  navier -> formulation [color="black",style="solid"];
+  formulation -> hyperbolic [color="black",style="solid"];
+  formulation -> parabolic [color="black",style="solid"];
 }
  * @enddot
  *
- * In addition, the doxygen documentation contains information about
+ * In addition, the doxygen documentation contains information on
  * \ref Installation and \ref Usage.
+ *
+ * ryujin is based on discretization approaches and algorithms that have
+ * been developed in a number of publications
+ * \cite GuermondPopov2016
+ * \cite GuermondPopov2016b
+ * \cite GuermondEtAl2018
+ * \cite GuermondEtAl2018SW
+ * \cite ryujin-2021-1
+ * \cite ryujin-2021-2
+ * \cite ryujin-2021-3
+ * \cite ClaytonGuermondPopov-2022
+ * \cite ryujin-2023-4.
+ * A complete list of references can be found in the \ref citelist.
  */

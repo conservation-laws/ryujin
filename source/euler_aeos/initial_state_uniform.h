@@ -15,7 +15,7 @@ namespace ryujin
     /**
      * Uniform initial state defined by a given primitive state.
      *
-     * @ingroup InitialValues
+     * @ingroup EulerEquations
      */
     template <int dim, typename Number, typename state_type>
     class Uniform : public InitialState<dim, Number, state_type>

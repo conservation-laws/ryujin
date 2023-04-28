@@ -16,7 +16,7 @@ namespace ryujin
      * Flow over a bump with a hydraulic jump.
      * See: Sec.~7.2 in @cite GuermondEtAl2018SW.
      *
-     * @ingroup InitialValues
+     * @ingroup ShallowWaterEquations
      */
     template <int dim, typename Number, typename state_type>
     class FlowOverBump : public InitialState<dim, Number, state_type, 1>

@@ -16,7 +16,7 @@ namespace ryujin
      * An analytic solution of the compressible Navier Stokes system
      * @todo Documentation
      *
-     * @ingroup InitialValues
+     * @ingroup EulerEquations
      */
     template <int dim, typename Number, typename state_type>
     class BeckerSolution : public InitialState<dim, Number, state_type>

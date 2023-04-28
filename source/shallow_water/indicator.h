@@ -18,6 +18,11 @@ namespace ryujin
 {
   namespace ShallowWater
   {
+    /**
+     * @todo documentation
+     *
+     * @ingroup ShallowWaterEquations
+     */
     template <int dim, typename Number = double>
     class Indicator
     {

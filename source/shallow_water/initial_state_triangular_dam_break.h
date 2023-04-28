@@ -11,7 +11,7 @@ namespace ryujin
     /**
      * Dam break over a triangular step.
      *
-     * @ingroup InitialValues
+     * @ingroup ShallowWaterEquations
      */
     template <int dim, typename Number, typename state_type>
     class TriangularDamBreak : public InitialState<dim, Number, state_type, 1>

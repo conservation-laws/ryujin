@@ -15,7 +15,7 @@ namespace ryujin
     /**
      * Solitary wave over flat bottom. See TODO
      *
-     * @ingroup InitialValues
+     * @ingroup ShallowWaterEquations
      */
     template <int dim, typename Number, typename state_type>
     class SolitaryWave : public InitialState<dim, Number, state_type, 1>

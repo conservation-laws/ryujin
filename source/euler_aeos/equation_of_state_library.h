@@ -20,7 +20,7 @@ namespace ryujin
        * Populate a given container with all equation of states defined in
        * this namespace.
        *
-       * @ingroup EquationOfState
+       * @ingroup EulerEquations
        */
       template <typename T>
       void populate_equation_of_state_list(T &equation_of_state_list,

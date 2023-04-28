@@ -19,7 +19,8 @@ message(STATUS "Using MathJax path: »${MATHJAX_PATH}«")
 list(APPEND DOXYGEN_INPUT
   ${CMAKE_SOURCE_DIR}/source/
   ${CMAKE_SOURCE_DIR}/source/euler
-  ${CMAKE_SOURCE_DIR}/source/navier_stokes
+  ${CMAKE_SOURCE_DIR}/source/euler_aeos
+  ${CMAKE_SOURCE_DIR}/source/shallow_water
   ${CMAKE_SOURCE_DIR}/doc/headers
   )
 string(REPLACE ";" " " DOXYGEN_INPUT "${DOXYGEN_INPUT}")
@@ -30,8 +31,10 @@ file(GLOB DOXYGEN_DEPEND
   ${CMAKE_SOURCE_DIR}/source/*.cc
   ${CMAKE_SOURCE_DIR}/source/euler/*.h
   ${CMAKE_SOURCE_DIR}/source/euler/*.cc
-  ${CMAKE_SOURCE_DIR}/source/navier_stokes/*.h
-  ${CMAKE_SOURCE_DIR}/source/navier_stokes/*.cc
+  ${CMAKE_SOURCE_DIR}/source/euler_aeos/*.h
+  ${CMAKE_SOURCE_DIR}/source/euler_aeos/*.cc
+  ${CMAKE_SOURCE_DIR}/source/shallow_water/*.h
+  ${CMAKE_SOURCE_DIR}/source/shallow_water/*.cc
   ${CMAKE_SOURCE_DIR}/doc/headers/*.h
   )
 

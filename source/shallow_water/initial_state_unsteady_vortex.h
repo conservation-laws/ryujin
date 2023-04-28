@@ -15,7 +15,7 @@ namespace ryujin
     /**
      * Eric derived this. Will publish somewhere sometime.
      *
-     * @ingroup InitialValues
+     * @ingroup ShallowWaterEquations
      */
     template <int dim, typename Number, typename state_type>
     class UnsteadyVortex : public InitialState<dim, Number, state_type, 1>

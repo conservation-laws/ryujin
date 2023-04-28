@@ -16,7 +16,7 @@ namespace ryujin
      * Ritter's dam break solution. This is one-dimensional dam break without
      * friction. See: Sec.~7.3 in @cite GuermondEtAl2018SW.
      *
-     * @ingroup InitialValues
+     * @ingroup ShallowWaterEquations
      */
     template <int dim, typename Number, typename state_type>
     class RitterDamBreak : public InitialState<dim, Number, state_type, 1>

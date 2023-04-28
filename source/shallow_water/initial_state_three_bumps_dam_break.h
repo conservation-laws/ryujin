@@ -16,7 +16,7 @@ namespace ryujin
      * Dam break with three conical islands as obstacles. See Sec.~7.8 in
      * @cite GuermondEtAl2018SW with \f$D = [0,75m]x[0,30m]\f$.
      *
-     * @ingroup InitialValues
+     * @ingroup ShallowWaterEquations
      */
     template <int dim, typename Number, typename state_type>
     class ThreeBumpsDamBreak : public InitialState<dim, Number, state_type, 1>

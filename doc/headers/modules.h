@@ -8,57 +8,10 @@
 
 
 /**
- * @defgroup InitialValues Initial values and manufactured solutions
- *
- * Several classes and helper functions for initial value configuration.
- */
-
-
-/**
  * @defgroup FiniteElement Finite element formulation
  *
  * Some helper functions for local index handling, dof renumbering,
- * sparsity pattern and matrix assembly.
- */
-
-
-/**
- * @defgroup DissipationModule Dissipation Module
- *
- * This module contains classes and functions used during different stages
- * of the implicit diffusion update performed in DissipationModule::step().
- */
-
-
-/**
- * @defgroup HyperbolicModule Hyperbolic Module
- *
- * This module contains classes and functions used during different stages
- * of the explicit hyperbolic update performed in HyperbolicModule::step().
- */
-
-
-/**
- * @defgroup ParabolicModule Parabolic Module
- *
- * This module contains classes and functions used during different stages
- * of the implicit parabolic update performed in ParabolicModule::step().
- */
-
-
-/**
- * @defgroup EulerEquations The Compressible Euler Equations
- *
- * This module contains classes and functions related to solving the
- * compressible Euler equations of gas dynamics.
- */
-
-
-/**
- * @defgroup NavierStokesEquations The Compressible Navier Stokes Equations
- *
- * This module contains classes and functions related to solving the
- * compressible Navier Stokes equations.
+ * sparsity pattern creation and matrix assembly.
  */
 
 
@@ -77,7 +30,52 @@
 
 
 /**
- * @defgroup TimeLoop Time loop
+ * @defgroup EulerEquations The Compressible Euler Equations
  *
- * This module contains classes and functions used in TimeLoop::run().
+ * This module contains classes and functions related to solving the
+ * compressible Euler equations of gas dynamics.
+ */
+
+
+/**
+ * @defgroup ShallowWaterEquations The Shallow Water Equations
+ *
+ * This module contains classes and functions related to solving the
+ * shallow water equations.
+ */
+
+
+/**
+ * @defgroup HyperbolicModule Hyperbolic Module
+ *
+ * This module contains classes and functions used during different stages
+ * of the explicit hyperbolic update performed in HyperbolicModule::step().
+ */
+
+
+/**
+ * @defgroup ParabolicModule Parabolic Module
+ *
+ * This module contains classes and functions used during different stages
+ * of the implicit parabolic update performed in ParabolicModule::step().
+ */
+
+/**
+ * @def
+ */
+
+
+/**
+ * @defgroup NavierStokesEquations The Compressible Navier Stokes Equations
+ *
+ * This module contains classes and functions related to solving the
+ * compressible Navier Stokes equations.
+ */
+
+
+/**
+ * @defgroup TimeLoop Time Integration and Postprocessing
+ *
+ * This module contains classes and functions used for timestepping and
+ * running the program.
  */

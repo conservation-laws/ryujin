@@ -18,7 +18,7 @@ namespace ryujin
      *
      * @todo The set up is as follows:
      *
-     * @ingroup InitialValues
+     * @ingroup EulerEquations
      */
     template <int dim, typename Number, typename state_type>
     class SmoothWave : public InitialState<dim, Number, state_type>

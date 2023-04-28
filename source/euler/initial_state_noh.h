@@ -22,7 +22,7 @@ namespace ryujin
      * Physics, Volume 72, Issue 1, 1987,
      * https://doi.org/10.1016/0021-9991(87)90074-X.
      *
-     * @ingroup InitialValues
+     * @ingroup EulerEquations
      */
     template <int dim, typename Number, typename state_type>
     class Noh : public InitialState<dim, Number, state_type>
