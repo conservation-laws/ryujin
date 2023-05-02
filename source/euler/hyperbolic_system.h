@@ -35,6 +35,11 @@ namespace ryujin
     {
     public:
       /**
+       * @name Types and compile time constants
+       */
+      //@{
+
+      /**
        * The name of the hyperbolic system as a string.
        */
       static const std::string problem_name;
@@ -88,6 +93,12 @@ namespace ryujin
       template <int dim, typename Number>
       using flux_contribution_type = flux_type<dim, Number>;
 
+      //@}
+      /**
+       * @name Constructor and setup
+       */
+      //@{
+
       /**
        * Constructor.
        */
@@ -101,6 +112,7 @@ namespace ryujin
        */
       void parse_parameters_callback();
 
+      //@}
       /**
        * @name Precomputed quantities
        */
@@ -498,8 +510,7 @@ namespace ryujin
 
       //@}
       /**
-       * @name State transformations (primitive states, expanding
-       * dimensionality, Galilei transform, etc.)
+       * @name State transformations
        */
       //@{
 
