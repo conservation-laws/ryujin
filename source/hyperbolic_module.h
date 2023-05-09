@@ -183,7 +183,7 @@ namespace ryujin
      *   \frac{m_{j}}{\tau_n}\big(
      *   \tilde\bU_j^{H,n+1} - \bU_j^{n}\big)
      *   \;=\;
-     *   \bF^n_i + d_{ij}^{H,n}\big(\bUnj-\bUni\big),
+     *   \bF^n_i + \sum_{j\in\Ii}d_{ij}^{H,n}\big(\bUnj-\bUni\big),
      *   \qquad\text{with}\quad
      *   \bF^n_i\;:=\;
      *   \sum_{j\in\Ii}\Big(-(\polf(\bUni)+\polf(\bUnj)) \cdot\bc_{ij}\Big).
@@ -200,10 +200,13 @@ namespace ryujin
      *   \tilde{\bF}^n_i\;:=\;
      *   \big(1-\sum_{s=\{1:\text{stages}\}}\omega_s\big)\bF^n_i
      *   \;+\;
-     *   \sum_{s=\{1:stages\}}\omega_s
+     *   \sum_{s=\{1:stages\}}\omega_s \bF^{s,n}_i
+     *   \qquad\text{with}\quad
+     *   \bF^{s,n}_i\;:=\;
      *   \sum_{j\in\Ii}\Big(-(\polf(\bUnis)+\polf(\bUnjs)) \cdot\bc_{ij}\Big).
      * \f}
-     * where \f$\omega_s\f$ denotes the weigths for the given stages.
+     * where \f$\omega_s\f$ denotes the weigths for the given stages
+     * \f$\bU^{s,n}\f$.
      *
      * @note The routine does not automatically update ghost vectors of the
      * distributed vector @ref new_U. It is best to simply call

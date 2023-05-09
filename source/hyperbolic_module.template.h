@@ -386,9 +386,9 @@ namespace ryujin
             const auto n_ij = c_ij / norm;
             const auto lambda_max =
                 riemann_solver.compute(U_i, U_j, i, js, n_ij);
-            const auto d = norm * lambda_max;
+            const auto d_ij = norm * lambda_max;
 
-            dij_matrix_.write_entry(d, i, col_idx, true);
+            dij_matrix_.write_entry(d_ij, i, col_idx, true);
           }
 
           const auto mass = load_value<T>(lumped_mass_matrix, i);
