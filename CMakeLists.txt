@@ -22,10 +22,6 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
 
 find_package(deal.II 9.3 REQUIRED HINTS ${DEAL_II_DIR} $ENV{DEAL_II_DIR})
 
-set(CMAKE_CXX_FLAGS_RELEASE "-O3 -ffp-contract=fast" CACHE STRING
-  "Flags used by the compiler during release builds."
-  )
-
 deal_ii_initialize_cached_variables()
 deal_ii_query_git_information()
 
