@@ -10,6 +10,7 @@
 
 #include "initial_state_contrast.h"
 #include "initial_state_isentropic_vortex.h"
+#include "initial_state_radial_contrast.h"
 #include "initial_state_ramp_up.h"
 #include "initial_state_smooth_wave.h"
 #include "initial_state_twoD_contrast.h"
@@ -40,6 +41,7 @@ namespace ryujin
 
         add(std::make_unique<Contrast<dim, Number, state_type>>(h, s));
         add(std::make_unique<IsentropicVortex<dim, Number, state_type>>(h, s));
+        add(std::make_unique<RadialContrast<dim, Number, state_type>>(h, s));
         add(std::make_unique<RampUp<dim, Number, state_type>>(h, s));
         add(std::make_unique<SmoothWave<dim, Number, state_type>>(h, s));
         add(std::make_unique<TwoDContrast<dim, Number, state_type>>(h, s));

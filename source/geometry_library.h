@@ -6,6 +6,7 @@
 #pragma once
 
 #include "geometry_airfoil.h"
+#include "geometry_annulus.h"
 #include "geometry_cylinder.h"
 #include "geometry_rectangular_domain.h"
 #include "geometry_step.h"
@@ -39,6 +40,7 @@ namespace ryujin
       add(std::make_unique<Wall<dim>>(subsection));
       add(std::make_unique<RectangularDomain<dim>>(subsection));
       add(std::make_unique<Airfoil<dim>>(subsection));
+      add(std::make_unique<Annulus<dim>>(subsection));
     }
   } /* namespace Geometries */
 } /* namespace ryujin */
