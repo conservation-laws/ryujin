@@ -39,7 +39,6 @@ namespace ryujin
     template <template <int, int> class Triangulation>
     void annulus(Triangulation<2, 2> &triangulation,
                  const double length,
-                 const double height,
                  const double inner_radius,
                  const double outer_radius,
                  const double angle)
@@ -136,7 +135,7 @@ namespace ryujin
           bool partial_annulus =
               std::abs(position[1]) -
                   std::abs(position[0]) *
-                      std::sin(dealii::numbers::PI / 180. * angle * 2.) <
+                      std::tan(dealii::numbers::PI / 180. * angle) <
               1.e-8;
 
           if (in_anulus && partial_annulus) {
@@ -172,7 +171,6 @@ namespace ryujin
     template <template <int, int> class Triangulation>
     void annulus(Triangulation<3, 3> /* &triangulation */,
                  const double /* length */,
-                 const double /* height */,
                  const double /* inner_radius */,
                  const double /* outer_radius */,
                  const double /* angle */)
@@ -213,24 +211,20 @@ namespace ryujin
             "outer radius", outer_radius_, "outer radius of partial annulus");
 
         angle_ = 45.;
-        this->add_parameter(
-            "coverage angle", angle_, "Half angle coverage of partial annulus");
+        this->add_parameter("coverage angle",
+                            angle_,
+                            "angle coverage of partial annulus above y-axis");
       }
 
       void create_triangulation(
           typename Geometry<dim>::Triangulation &triangulation) final
       {
-        GridGenerator::annulus(triangulation,
-                               length_,
-                               height_,
-                               inner_radius_,
-                               outer_radius_,
-                               angle_);
+        GridGenerator::annulus(
+            triangulation, length_, inner_radius_, outer_radius_, angle_);
       }
 
     private:
       double length_;
-      double height_;
       double inner_radius_;
       double outer_radius_;
       double angle_;
