@@ -25,7 +25,6 @@ namespace ryujin
     template <int dim, int spacedim, template <int, int> class Triangulation>
     void annulus(Triangulation<dim, spacedim> &,
                  const double /*length*/,
-                 const double /*height*/,
                  const double /*inner_radius*/,
                  const double /*outer_radius*/,
                  const double /*angle*/)
