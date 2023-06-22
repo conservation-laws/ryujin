@@ -130,7 +130,7 @@ namespace ryujin
           const auto outer_value = outer_radius;
 
           bool in_anulus =
-              radius - inner_value > 1.e-12 && outer_value - radius > 1.e-12;
+              radius - inner_value > 1.e-8 && outer_value - radius > 1.e-3;
 
           bool partial_annulus =
               std::abs(position[1]) -
