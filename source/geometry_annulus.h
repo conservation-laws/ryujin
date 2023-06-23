@@ -17,9 +17,6 @@ namespace ryujin
      *
      * We set slip boundary conditions on all boundaries.
      *
-     * The 3D mesh is created by extruding the 2D mesh with a width equal
-     * to the "height".
-     *
      * @ingroup Mesh
      */
     template <int dim, int spacedim, template <int, int> class Triangulation>
@@ -73,14 +70,15 @@ namespace ryujin
           /*
            * Separately, mark all faces that touch the annulus.
            */
-          for(const unsigned int f : cell->face_indices()) {
+          for (const unsigned int f : cell->face_indices()) {
             const auto face = cell->face(f);
 
             bool face_on_annulus = true;
             for (unsigned int v : face->vertex_indices()) {
               const auto vertex = face->vertex(v);
               const auto distance = vertex.norm();
-              if (!(inner_radius - eps <= distance && distance <= outer_radius)) {
+              if (!(inner_radius - eps <= distance &&
+                    distance <= outer_radius)) {
                 face_on_annulus = false;
                 break;
               }
@@ -125,10 +123,10 @@ namespace ryujin
           static_assert(dim == 2, "not implemented");
           for (unsigned int i = 0; i < 4; ++i) {
             auto &vertex = cell->vertex(i);
-            if (std::abs(vertex[0]) < eps && std::abs(vertex[1]) > 1.0)
-              vertex[1] = std::copysign(1.0, vertex[1]);
-            if (std::abs(vertex[1]) < eps && std::abs(vertex[0]) > 1.0)
-              vertex[0] = std::copysign(1.0, vertex[0]);
+            if (std::abs(vertex[0]) < eps && std::abs(vertex[1]) > length / 2.)
+              vertex[1] = std::copysign(length / 2., vertex[1]);
+            if (std::abs(vertex[1]) < eps && std::abs(vertex[0]) > length / 2.)
+              vertex[0] = std::copysign(length / 2., vertex[0]);
           }
         }
         assign_manifolds(temp);
@@ -248,7 +246,7 @@ namespace ryujin
       {
         length_ = 2.;
         this->add_parameter(
-            "length", length_, "length of computational domain [-L,L]x[-L,L]");
+            "length", length_, "length of computational domain [-L/2,L/2]^d");
 
         inner_radius_ = 0.6;
         this->add_parameter(
