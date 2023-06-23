@@ -100,8 +100,9 @@ namespace ryujin
       dealii::Triangulation<dim> tria_inner;
       {
         dealii::Triangulation<dim> temp;
-        GridGenerator::hyper_ball(temp, dealii::Point<dim>(), inner_radius);
-        temp.refine_global(3);
+        GridGenerator::hyper_ball_balanced(
+            temp, dealii::Point<dim>(), inner_radius);
+        temp.refine_global(2);
         GridGenerator::flatten_triangulation(temp, tria_inner);
       }
 
