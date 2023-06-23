@@ -46,16 +46,15 @@ namespace ryujin
 
       using namespace dealii;
 
-      /* Create inner ball with radius=inner_radius and rotate */
+      /* Create inner ball with radius=inner_radius: */
       dealii::Triangulation<dim> tria_inner;
       GridGenerator::hyper_ball(tria_inner, dealii::Point<dim>(), inner_radius);
       GridTools::rotate(dealii::numbers::PI / 4., tria_inner);
 
-      /* Create outer annulus. Note part of this will be removed */
+      /* Create outer annulus. Note part of this will be removed. */
       dealii::Triangulation<dim> annulus;
       GridGenerator::hyper_shell(
           annulus, dealii::Point<dim>(), inner_radius, outer_radius, 4);
-      GridTools::rotate(dealii::numbers::PI / 4., annulus);
 
       /* Create outside shell */
       dealii::Triangulation<dim> tria_outer;
@@ -65,62 +64,60 @@ namespace ryujin
                                  length / 2. * std::sqrt(2),
                                  4);
 
-      /* Create triangulation to merge */
-      dealii::Triangulation<dim, dim> final;
-      final.set_mesh_smoothing(triangulation.get_mesh_smoothing());
+      /* Create triangulation to merge: */
+      dealii::Triangulation<dim, dim> coarse_triangulation;
+      coarse_triangulation.set_mesh_smoothing(
+          triangulation.get_mesh_smoothing());
       GridGenerator::merge_triangulations(
-          {&tria_inner, &annulus, &tria_outer}, final, 1.e-12);
+          {&tria_inner, &annulus, &tria_outer}, coarse_triangulation, 1.e-12);
+      GridTools::rotate(dealii::numbers::PI / 4., coarse_triangulation);
 
-      /* Then, do magic to make mesh better */
-      triangulation.copy_triangulation(final);
+      /*
+       * Set manifold IDs:
+       */
 
-      triangulation.reset_all_manifolds();
-      triangulation.set_all_manifold_ids(0);
+      coarse_triangulation.reset_all_manifolds();
+      coarse_triangulation.set_all_manifold_ids(0);
 
-      const auto radius_1 = inner_radius;
-      const auto radius_2 = outer_radius;
-
-      for (const auto &cell : triangulation.cell_iterators()) {
-        for (const auto &face : cell->face_iterators()) {
-          bool face_at_inner_sphere_boundary = true;
-          bool face_at_outer_sphere_boundary = true;
-          for (const auto v : face->vertex_indices()) {
-            if (std::abs(face->vertex(v).norm() - radius_1) > 1.e-12)
-              face_at_inner_sphere_boundary = false;
-            if (std::abs(face->vertex(v).norm() - radius_2) > 1.e-12)
-              face_at_outer_sphere_boundary = false;
+      const auto assign_manifold_ids = [&](auto &tria) {
+        for (const auto &cell : tria.cell_iterators()) {
+          /*
+           * Select all cells that will comprise the annulus. That is, all
+           * cells whose vertices lie betwenn the two radii.
+           */
+          bool cell_on_annulus = true;
+          static_assert(dim == 2, "not implemented");
+          for (unsigned int i = 0; i < 4; ++i) {
+            const auto vertex = cell->vertex(i);
+            const auto distance = vertex.norm();
+            constexpr double eps = 1.0e-10;
+            if (!(inner_radius - eps <= distance && distance <= outer_radius)) {
+              cell_on_annulus = false;
+              break;
+            }
           }
-          if (face_at_inner_sphere_boundary)
-            face->set_all_manifold_ids(1);
-          if (face_at_outer_sphere_boundary)
-            face->set_all_manifold_ids(2);
+          if (!cell_on_annulus)
+            continue;
+
+          cell->set_all_manifold_ids(1);
         }
 
-        const auto position = cell->center();
-        if (position.norm() < radius_1)
-          cell->set_material_id(1);
-        else if (position.norm() > radius_1 && position.norm() < radius_2)
-          cell->set_material_id(2);
-        else
-          cell->set_material_id(0);
-      }
+        tria.set_manifold(1, SphericalManifold<dim>());
+        dealii::TransfiniteInterpolationManifold<dim> transfinite_manifold;
+        transfinite_manifold.initialize(tria);
+        tria.set_manifold(0, transfinite_manifold);
+      };
 
-      triangulation.set_manifold(1, SphericalManifold<dim>());
-      triangulation.set_manifold(2, SphericalManifold<dim>());
-
-      dealii::TransfiniteInterpolationManifold<dim> transfinite_manifold;
-      transfinite_manifold.initialize(triangulation);
-      triangulation.set_manifold(0, transfinite_manifold);
-
-      triangulation.refine_global(5);
-      GridTools::rotate(dealii::numbers::PI / 4., triangulation);
+      assign_manifold_ids(coarse_triangulation);
+      coarse_triangulation.refine_global(5);
+//       coarse_triangulation.reset_all_manifolds();
 
       /* Remove mesh cells in the annulus */
 
       std::set<typename dealii::Triangulation<dim>::active_cell_iterator>
           cells_to_remove;
 
-      for (const auto &cell : triangulation.active_cell_iterators()) {
+      for (const auto &cell : coarse_triangulation.active_cell_iterators()) {
         for (auto f : dealii::GeometryInfo<dim>::face_indices()) {
           auto face = cell->face(f);
           const auto position = face->center();
@@ -144,7 +141,18 @@ namespace ryujin
       }
 
       GridGenerator::create_triangulation_with_removed_cells(
-          triangulation, cells_to_remove, triangulation);
+          coarse_triangulation, cells_to_remove, coarse_triangulation);
+
+      /*
+       * Flatten triangulation and copy over to distributed triangulation:
+       */
+      dealii::Triangulation<dim> flattened_triangulation;
+      flattened_triangulation.set_mesh_smoothing(
+          triangulation.get_mesh_smoothing());
+      GridGenerator::flatten_triangulation(coarse_triangulation,
+                                           flattened_triangulation);
+      triangulation.copy_triangulation(flattened_triangulation);
+      assign_manifold_ids(triangulation);
 
 
       /*
@@ -152,7 +160,7 @@ namespace ryujin
        */
 
       for (auto cell : triangulation.active_cell_iterators()) {
-        for (auto f : GeometryInfo<2>::face_indices()) {
+        for (auto f : GeometryInfo<dim>::face_indices()) {
           const auto face = cell->face(f);
 
           if (!face->at_boundary())
@@ -186,7 +194,7 @@ namespace ryujin
   {
     /**
      * A 2D/3D cylinder configuration constructed with
-     * GridGenerator::cylinder().
+     * GridGenerator::annulus().
      *
      * @ingroup Mesh
      */
