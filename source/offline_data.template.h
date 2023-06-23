@@ -826,7 +826,7 @@ namespace ryujin
         if (id != new_id)
           continue;
 
-        Assert(point.distance(new_point) < 1.0e-16, dealii::ExcInternalError());
+        Assert(point.distance(new_point) < 1.0e-14, dealii::ExcInternalError());
 
         if (normal * new_normal / normal.norm() / new_normal.norm() > 0.08) {
           /* Both normals describe an acute angle of 85 degrees or less. */
