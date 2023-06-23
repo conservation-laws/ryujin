@@ -43,63 +43,51 @@ namespace ryujin
                  const double angle)
     {
       constexpr int dim = 2;
+      constexpr double eps = 1.0e-10;
 
       using namespace dealii;
 
-      /* Create inner ball with radius=inner_radius: */
-      dealii::Triangulation<dim> tria_inner;
-      GridGenerator::hyper_ball(tria_inner, dealii::Point<dim>(), inner_radius);
-      GridTools::rotate(dealii::numbers::PI / 4., tria_inner);
-
-      /* Create outer annulus. Note part of this will be removed. */
-      dealii::Triangulation<dim> annulus;
-      GridGenerator::hyper_shell(
-          annulus, dealii::Point<dim>(), inner_radius, outer_radius, 4);
-
-      /* Create outside shell */
-      dealii::Triangulation<dim> tria_outer;
-      GridGenerator::hyper_shell(tria_outer,
-                                 dealii::Point<dim>(),
-                                 outer_radius,
-                                 length / 2. * std::sqrt(2),
-                                 4);
-
-      /* Create triangulation to merge: */
-      dealii::Triangulation<dim, dim> coarse_triangulation;
-      coarse_triangulation.set_mesh_smoothing(
-          triangulation.get_mesh_smoothing());
-      GridGenerator::merge_triangulations(
-          {&tria_inner, &annulus, &tria_outer}, coarse_triangulation, 1.e-12);
-      GridTools::rotate(dealii::numbers::PI / 4., coarse_triangulation);
-
       /*
-       * Set manifold IDs:
+       * A lambda that conveniently sets and assigns manifold IDs and that
+       * we need a couple of times during the construction process of the
+       * triangulation:
        */
-
-      coarse_triangulation.reset_all_manifolds();
-      coarse_triangulation.set_all_manifold_ids(0);
-
-      const auto assign_manifold_ids = [&](auto &tria) {
+      const auto assign_manifolds = [&](auto &tria) {
         for (const auto &cell : tria.cell_iterators()) {
           /*
-           * Select all cells that will comprise the annulus. That is, all
+           * Mark all cells that will comprise the annulus. That is, all
            * cells whose vertices lie betwenn the two radii.
            */
           bool cell_on_annulus = true;
-          static_assert(dim == 2, "not implemented");
-          for (unsigned int i = 0; i < 4; ++i) {
-            const auto vertex = cell->vertex(i);
+          for (unsigned int v : cell->vertex_indices()) {
+            const auto vertex = cell->vertex(v);
             const auto distance = vertex.norm();
-            constexpr double eps = 1.0e-10;
             if (!(inner_radius - eps <= distance && distance <= outer_radius)) {
               cell_on_annulus = false;
               break;
             }
           }
-          if (!cell_on_annulus)
-            continue;
+          if (cell_on_annulus)
+            cell->set_all_manifold_ids(1);
 
-          cell->set_all_manifold_ids(1);
+          /*
+           * Separately, mark all faces that touch the annulus.
+           */
+          for(const unsigned int f : cell->face_indices()) {
+            const auto face = cell->face(f);
+
+            bool face_on_annulus = true;
+            for (unsigned int v : face->vertex_indices()) {
+              const auto vertex = face->vertex(v);
+              const auto distance = vertex.norm();
+              if (!(inner_radius - eps <= distance && distance <= outer_radius)) {
+                face_on_annulus = false;
+                break;
+              }
+            }
+            if (face_on_annulus)
+              face->set_all_manifold_ids(1);
+          }
         }
 
         tria.set_manifold(1, SphericalManifold<dim>());
@@ -108,9 +96,61 @@ namespace ryujin
         tria.set_manifold(0, transfinite_manifold);
       };
 
-      assign_manifold_ids(coarse_triangulation);
-      coarse_triangulation.refine_global(5);
-//       coarse_triangulation.reset_all_manifolds();
+      /* Create inner ball with radius=inner_radius: */
+      dealii::Triangulation<dim> tria_inner;
+      {
+        dealii::Triangulation<dim> temp;
+        GridGenerator::hyper_ball(temp, dealii::Point<dim>(), inner_radius);
+        temp.refine_global(3);
+        GridGenerator::flatten_triangulation(temp, tria_inner);
+      }
+
+      /* Create outer annulus. Note part of this will be removed. */
+      dealii::Triangulation<dim> annulus;
+      GridGenerator::hyper_shell(
+          annulus, dealii::Point<dim>(), inner_radius, outer_radius, 32);
+
+      /* Create outside shell */
+      dealii::Triangulation<dim> tria_outer;
+      {
+        dealii::Triangulation<dim> temp;
+        GridGenerator::hyper_shell(temp,
+                                   dealii::Point<dim>(),
+                                   outer_radius,
+                                   length / 2. * std::sqrt(2),
+                                   8);
+        /* Fix up vertices so that we get back a unit square: */
+        for (const auto &cell : temp.cell_iterators()) {
+          static_assert(dim == 2, "not implemented");
+          for (unsigned int i = 0; i < 4; ++i) {
+            auto &vertex = cell->vertex(i);
+            if (std::abs(vertex[0]) < eps && std::abs(vertex[1]) > 1.0)
+              vertex[1] = std::copysign(1.0, vertex[1]);
+            if (std::abs(vertex[1]) < eps && std::abs(vertex[0]) > 1.0)
+              vertex[0] = std::copysign(1.0, vertex[0]);
+          }
+        }
+        assign_manifolds(temp);
+        temp.refine_global(2);
+        GridGenerator::flatten_triangulation(temp, tria_outer);
+      }
+
+      /* Create triangulation to merge: */
+      dealii::Triangulation<dim, dim> coarse_triangulation;
+      coarse_triangulation.set_mesh_smoothing(
+          triangulation.get_mesh_smoothing());
+      GridGenerator::merge_triangulations(
+          {&tria_inner, &annulus, &tria_outer}, coarse_triangulation, 1.e-12);
+
+      /*
+       * Set manifold IDs:
+       */
+
+      coarse_triangulation.reset_all_manifolds();
+      coarse_triangulation.set_all_manifold_ids(0);
+
+      assign_manifolds(coarse_triangulation);
+      coarse_triangulation.refine_global(2);
 
       /* Remove mesh cells in the annulus */
 
@@ -152,7 +192,7 @@ namespace ryujin
       GridGenerator::flatten_triangulation(coarse_triangulation,
                                            flattened_triangulation);
       triangulation.copy_triangulation(flattened_triangulation);
-      assign_manifold_ids(triangulation);
+      assign_manifolds(triangulation);
 
 
       /*
