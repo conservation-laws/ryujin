@@ -58,12 +58,10 @@ namespace ryujin
         auto temp = hyperbolic_system.from_primitive_state(
             point.norm() > radius_ ? primitive_right_ : primitive_left_);
 
-        /*  Convert (dim+1) entry from pressure to specific internal energy
+        /*  Convert last entry from pressure to specific internal energy
          *  Note that: e = e(rho, p).
          */
-        temp[dim + 1] =
-            hyperbolic_system.specific_internal_energy_(temp[0], temp[dim + 1]);
-
+        temp[2] = hyperbolic_system.specific_internal_energy_(temp[0], temp[2]);
         return hyperbolic_system.template expand_state<dim>(temp);
       }
 
