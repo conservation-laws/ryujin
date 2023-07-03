@@ -116,7 +116,7 @@ DECLARE_ENUM(ryujin::CFLRecoveryStrategy,
 
 DECLARE_ENUM(ryujin::TimeSteppingScheme,
              LIST({ryujin::TimeSteppingScheme::ssprk_33, "ssprk 33"},
-                  {ryujin::TimeSteppingScheme::erk_22, "erk 11"},
+                  {ryujin::TimeSteppingScheme::erk_11, "erk 11"},
                   {ryujin::TimeSteppingScheme::erk_22, "erk 22"},
                   {ryujin::TimeSteppingScheme::erk_33, "erk 33"},
                   {ryujin::TimeSteppingScheme::erk_43, "erk 43"},
