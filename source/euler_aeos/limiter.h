@@ -324,7 +324,7 @@ namespace ryujin
       const auto numerator = (gamma_min + Number(1.)) * rho_max;
       const auto denominator =
           gamma_min - Number(1.) +
-          ScalarNumber(2. * hyperbolic_system.b_interp()) * rho_max;
+          ScalarNumber(2. * hyperbolic_system.interpolation_b()) * rho_max;
 
       const auto upper_bound = numerator / denominator;
 

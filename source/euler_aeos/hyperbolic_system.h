@@ -251,7 +251,7 @@ namespace ryujin
        * For a given (2+dim dimensional) state vector <code>U</code>, compute
        * and return the Harten-type entropy
        * \f[
-       *   \eta = (\rho^2 e * (1 - b_interp * \rho))^{1 / (\gamma + 1)}.
+       *   \eta = (\rho^2 e * (1 - interpolation_b * \rho))^{1 / (\gamma + 1)}.
        * \f]
        */
       template <int problem_dim, typename Number>
@@ -262,7 +262,7 @@ namespace ryujin
        * For a given (2+dim dimensional) state vector <code>U</code>, compute
        * and return the derivative \f$\eta'\f$ of the Harten-type entropy
        * \f[
-       *   \eta = (\rho^2 e * (1 - b_interp * \rho))^{1 / (\gamma + 1)},
+       *   \eta = (\rho^2 e * (1 - interpolation_b * \rho))^{1 / (\gamma + 1)},
        * \f]
        *
        */
@@ -557,7 +557,7 @@ namespace ryujin
 
       ACCESSOR_READ_ONLY(equation_of_state)
 
-      ACCESSOR_READ_ONLY(b_interp)
+      ACCESSOR_READ_ONLY(interpolation_b)
 
       ACCESSOR_READ_ONLY(reference_density)
 
@@ -568,7 +568,7 @@ namespace ryujin
     private:
       std::string equation_of_state_;
 
-      double b_interp_;
+      double interpolation_b_;
 
       double reference_density_;
 
@@ -774,9 +774,10 @@ namespace ryujin
       const auto &rho = U[0];
 
       const auto rho_inverse = ScalarNumber(1.) / rho;
-      const auto covolume = Number(1.) - Number(b_interp_) * U[0];
+      const auto covolume = Number(1.) - Number(interpolation_b_) * U[0];
       return internal_energy(U) *
-             ryujin::pow(rho_inverse - Number(b_interp_), gamma_min) / covolume;
+             ryujin::pow(rho_inverse - Number(interpolation_b_), gamma_min) /
+             covolume;
     }
 
 
@@ -796,7 +797,7 @@ namespace ryujin
 
       const Number exponent = ScalarNumber(1.) / (gamma + Number(1.));
 
-      const Number covolume = Number(1.) - Number(b_interp_) * rho;
+      const Number covolume = Number(1.) - Number(interpolation_b_) * rho;
       const Number covolume_term = ryujin::pow(covolume, gamma - Number(1.));
 
       return ryujin::pow(rho_rho_e * covolume_term, exponent);
@@ -812,16 +813,16 @@ namespace ryujin
     {
       /*
        * With
-       *   eta = (rho^2 e * (1 - b_interp * rho)) ^ {1 / (gamma + 1)},
+       *   eta = (rho^2 e * (1 - interpolation_b * rho)) ^ {1 / (gamma + 1)},
        *   rho^2 e = rho * E - 1/2 |m|^2,
        *
        * we get
        *
-       *   eta' = factor * (1 - b_interp rho) * (E,-m,rho)^T +
+       *   eta' = factor * (1 - interpolation_b rho) * (E,-m,rho)^T +
        *          factor * rho^2 e * (gamma - 1) * b * (1,0,0)^T
        *
-       *   factor = 1/(gamma+1) * (eta/(1-b_interp rho)^-gamma
-       *                        / (1-b_interp rho)^2
+       *   factor = 1/(gamma+1) * (eta/(1-interpolation_b rho)^-gamma
+       *                        / (1-interpolation_b rho)^2
        */
 
       constexpr int dim = problem_dim - 2;
@@ -832,7 +833,7 @@ namespace ryujin
       const Number E = U[dim + 1];
       const Number rho_rho_e = rho * E - ScalarNumber(0.5) * m.norm_square();
 
-      const Number b = Number(b_interp_);
+      const Number b = Number(interpolation_b_);
 
       const Number covolume = Number(1.) - b * rho;
       const Number covolume_inverse = Number(1.) / covolume;
@@ -861,7 +862,7 @@ namespace ryujin
 
       const Number rho = density(U);
       const Number rho_e = internal_energy(U);
-      const Number covolume = Number(1.) - Number(b_interp_) * rho;
+      const Number covolume = Number(1.) - Number(interpolation_b_) * rho;
 
       return Number(1.) + p * covolume / rho_e;
     }
@@ -874,7 +875,7 @@ namespace ryujin
     {
       const Number rho = density(U);
       const Number rho_e = internal_energy(U);
-      const Number covolume = Number(1.) - Number(b_interp_) * rho;
+      const Number covolume = Number(1.) - Number(interpolation_b_) * rho;
 
       return (gamma - Number(1.)) * rho_e / covolume;
     }
@@ -925,7 +926,7 @@ namespace ryujin
 
       const auto p = pressure(U);
       const auto gamma = surrogate_gamma(U, p);
-      const auto x = Number(1.) - b_interp_ * rho;
+      const auto x = Number(1.) - interpolation_b_ * rho;
       const auto a = std::sqrt(gamma * p / (rho * x)); // local speed of sound
 
 
@@ -935,7 +936,7 @@ namespace ryujin
 
       const auto p_bar = pressure(U_bar);
       const auto gamma_bar = surrogate_gamma(U_bar, p_bar);
-      const auto x_bar = Number(1.) - b_interp_ * rho_bar;
+      const auto x_bar = Number(1.) - interpolation_b_ * rho_bar;
       const auto a_bar = std::sqrt(gamma_bar * p_bar / (rho_bar * x_bar));
 
       /* First Riemann characteristic: v* n - 2 / (gamma - 1) * a */
@@ -958,9 +959,10 @@ namespace ryujin
 
       auto rho_new =
           1. / (gamma * s) * ryujin::pow((gamma - 1.) / 4. * (R_2 - R_1), 2.);
-      rho_new = 1. / (ryujin::pow(rho_new, 1. / (1. - gamma)) + b_interp_);
+      rho_new =
+          1. / (ryujin::pow(rho_new, 1. / (1. - gamma)) + interpolation_b_);
 
-      const auto x_new = 1. - b_interp_ * rho_new;
+      const auto x_new = 1. - interpolation_b_ * rho_new;
 
       const auto p_new =
           s * std::pow(rho_new, gamma) / ryujin::pow(x_new, gamma);
@@ -1024,7 +1026,7 @@ namespace ryujin
         const auto p = pressure(U);
         const auto gamma = surrogate_gamma(U, p);
 
-        const auto x = Number(1.) - b_interp_ * rho;
+        const auto x = Number(1.) - interpolation_b_ * rho;
         const auto a = std::sqrt(gamma * p / (rho * x)); // local speed of sound
 
         /* Supersonic inflow: */

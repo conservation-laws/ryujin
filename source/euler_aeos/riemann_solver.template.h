@@ -89,10 +89,10 @@ namespace ryujin
     {
       using ScalarNumber = typename get_value_type<Number>::type;
 
-      const ScalarNumber b_interp = hyperbolic_system.b_interp();
+      const ScalarNumber interpolation_b = hyperbolic_system.interpolation_b();
 
       const Number numerator =
-          ScalarNumber(2.) * a * (Number(1.) - b_interp * rho);
+          ScalarNumber(2.) * a * (Number(1.) - interpolation_b * rho);
 
       const Number denominator = gamma - Number(1.);
 
@@ -205,7 +205,7 @@ namespace ryujin
         const primitive_type &riemann_data_j) const
     {
       using ScalarNumber = typename get_value_type<Number>::type;
-      const ScalarNumber b_interp = hyperbolic_system.b_interp();
+      const ScalarNumber interpolation_b = hyperbolic_system.interpolation_b();
 
       const auto &[rho_i, u_i, p_i, gamma_i, a_i] = riemann_data_i;
       const auto &[rho_j, u_j, p_j, gamma_j, a_j] = riemann_data_j;
@@ -247,14 +247,14 @@ namespace ryujin
       const Number p_max = std::max(p_i, p_j);
 
       Number radicand_i =
-          ScalarNumber(2.) * (Number(1.) - b_interp * rho_i) * p_max;
+          ScalarNumber(2.) * (Number(1.) - interpolation_b * rho_i) * p_max;
       radicand_i /= rho_i * ((gamma_i + Number(1.)) * p_max +
                              (gamma_i - Number(1.)) * p_i);
 
       const Number x_i = std::sqrt(radicand_i);
 
       Number radicand_j =
-          ScalarNumber(2.) * (Number(1.) - b_interp * rho_j) * p_max;
+          ScalarNumber(2.) * (Number(1.) - interpolation_b * rho_j) * p_max;
       radicand_j /= rho_j * ((gamma_j + Number(1.)) * p_max +
                              (gamma_j - Number(1.)) * p_j);
 
@@ -368,11 +368,11 @@ namespace ryujin
                                   const Number p_star) const
     {
       using ScalarNumber = typename get_value_type<Number>::type;
-      const ScalarNumber b_interp = hyperbolic_system.b_interp();
+      const ScalarNumber interpolation_b = hyperbolic_system.interpolation_b();
 
       const auto &[rho, u, p, gamma, a] = riemann_data;
 
-      const Number one_minus_b_rho = Number(1.) - b_interp * rho;
+      const Number one_minus_b_rho = Number(1.) - interpolation_b * rho;
 
       const Number Az =
           ScalarNumber(2.) * one_minus_b_rho / (rho * (gamma + Number(1.)));
@@ -414,7 +414,7 @@ namespace ryujin
         const primitive_type &riemann_data_j) const
     {
       using ScalarNumber = typename get_value_type<Number>::type;
-      const ScalarNumber b_interp = hyperbolic_system.b_interp();
+      const ScalarNumber interpolation_b = hyperbolic_system.interpolation_b();
 
       const auto &[rho_i, u_i, p_i, gamma_i, a_i] = riemann_data_i;
       const auto &[rho_j, u_j, p_j, gamma_j, a_j] = riemann_data_j;
@@ -422,13 +422,13 @@ namespace ryujin
       const Number p_max = std::max(p_i, p_j);
 
       const Number radicand_inverse_i =
-          ScalarNumber(0.5) * rho_i / (Number(1.) - b_interp * rho_i) *
+          ScalarNumber(0.5) * rho_i / (Number(1.) - interpolation_b * rho_i) *
           ((gamma_i + Number(1.)) * p_max + (gamma_i - Number(1.)) * p_i);
 
       const Number value_i = (p_max - p_i) / std::sqrt(radicand_inverse_i);
 
       const Number radicand_jnverse_j =
-          ScalarNumber(0.5) * rho_j / (Number(1.) - b_interp * rho_j) *
+          ScalarNumber(0.5) * rho_j / (Number(1.) - interpolation_b * rho_j) *
           ((gamma_j + Number(1.)) * p_max + (gamma_j - Number(1.)) * p_j);
 
       const Number value_j = (p_max - p_j) / std::sqrt(radicand_jnverse_j);
