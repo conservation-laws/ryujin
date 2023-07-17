@@ -29,7 +29,6 @@ end
 subsection B - Equation
   set equation                 = euler aeos
 
-  set interpolation co-volume  = 0
   set reference density        = 1
   set vacuum state relaxation  = 10000
 

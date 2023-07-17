@@ -39,6 +39,10 @@ namespace ryujin
           pinf_ = 0.;
           this->add_parameter(
               "reference pressure", pinf_, "The reference pressure p infinity");
+
+          /* Update the interpolation_b_ parameter on parameter read in: */
+          ParameterAcceptor::parse_parameters_call_back.connect(
+              [this] { this->interpolation_b_ = b_; });
         }
 
 
