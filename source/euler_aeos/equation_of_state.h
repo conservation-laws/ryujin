@@ -36,12 +36,11 @@ namespace ryujin
           : ParameterAcceptor(subsection + "/" + name)
           , name_(name)
       {
-        /* Every EOS needs to define the interpolation co-volume constant (b) */
-        interpolation_b = 0;
-        add_parameter("interpolation co-volume",
-                      interpolation_b,
-                      "The maximum compressibility constant used for the "
-                      "co-volume EOS interpolation");
+        /*
+         * If necessary derived EOS can override the inerpolation co-volume
+         * b that is used in the approximate Riemann solver.
+         */
+        interpolation_b_ = 0.;
       }
 
       /**
@@ -66,15 +65,17 @@ namespace ryujin
                                           const double pressure) = 0;
 
       /**
-       * The interpolation co-volume constant (b).
+       * Return the interpolation co-volume constant (b).
        */
-      double interpolation_b;
-
+      ACCESSOR_READ_ONLY(interpolation_b)
 
       /**
        * Return the name of the EOS as (const reference) std::string
        */
       ACCESSOR_READ_ONLY(name)
+
+    protected:
+      double interpolation_b_;
 
     private:
       const std::string name_;
