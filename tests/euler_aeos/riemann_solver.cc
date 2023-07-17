@@ -40,8 +40,8 @@ int main()
     result[1] = u;
     result[2] = p;
     result[3] = gamma;
-    const double b_interp = hyperbolic_system.b_interp();
-    const double x = 1. - b_interp * rho;
+    const double interpolation_b = hyperbolic_system.interpolation_b();
+    const double x = 1. - interpolation_b * rho;
     result[4] = std::sqrt(gamma * p / (rho * x));
     return result;
   };
@@ -60,10 +60,16 @@ int main()
   };
 
   const auto set_covolume = [&](const double covolume) {
+    /*
+     * Set the interpolatory covolume by selecting an equation of state
+     * with a covolume.
+     */
     std::stringstream parameters;
     parameters << "subsection HyperbolicSystem\n"
-               << "set interpolation co-volume  = " << std::to_string(covolume)
-               << "\n"
+               << "set equation of state = polytropic gas\n"
+               << "subsection van der waals\n"
+               << "set covolume b = " << std::to_string(covolume) << "\n"
+               << "end"
                << "end" << std::endl;
     ParameterAcceptor::initialize(parameters);
   };
