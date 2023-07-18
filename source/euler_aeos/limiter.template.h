@@ -119,7 +119,7 @@ namespace ryujin
       const auto &gamma = std::get<3>(bounds) /* = gamma_min*/;
       const Number gm1 = gamma - Number(1.);
 
-      const ScalarNumber b_ = hyperbolic_system.interpolation_b();
+      const ScalarNumber b_ = hyperbolic_system.interpolation_b_();
 
       {
         /*

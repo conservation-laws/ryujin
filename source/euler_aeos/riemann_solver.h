@@ -259,7 +259,7 @@ namespace ryujin
 
       const auto gamma = hyperbolic_system.surrogate_gamma(U, p);
 
-      const ScalarNumber interpolation_b = hyperbolic_system.interpolation_b();
+      const ScalarNumber interpolation_b = hyperbolic_system.interpolation_b_();
       const Number x = Number(1.) - interpolation_b * rho;
       const Number a = std::sqrt(gamma * p / (rho * x));
 

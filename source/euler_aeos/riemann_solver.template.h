@@ -89,7 +89,7 @@ namespace ryujin
     {
       using ScalarNumber = typename get_value_type<Number>::type;
 
-      const ScalarNumber interpolation_b = hyperbolic_system.interpolation_b();
+      const ScalarNumber interpolation_b = hyperbolic_system.interpolation_b_();
 
       const Number numerator =
           ScalarNumber(2.) * a * (Number(1.) - interpolation_b * rho);
@@ -205,7 +205,7 @@ namespace ryujin
         const primitive_type &riemann_data_j) const
     {
       using ScalarNumber = typename get_value_type<Number>::type;
-      const ScalarNumber interpolation_b = hyperbolic_system.interpolation_b();
+      const ScalarNumber interpolation_b = hyperbolic_system.interpolation_b_();
 
       const auto &[rho_i, u_i, p_i, gamma_i, a_i] = riemann_data_i;
       const auto &[rho_j, u_j, p_j, gamma_j, a_j] = riemann_data_j;
@@ -368,7 +368,7 @@ namespace ryujin
                                   const Number p_star) const
     {
       using ScalarNumber = typename get_value_type<Number>::type;
-      const ScalarNumber interpolation_b = hyperbolic_system.interpolation_b();
+      const ScalarNumber interpolation_b = hyperbolic_system.interpolation_b_();
 
       const auto &[rho, u, p, gamma, a] = riemann_data;
 
@@ -414,7 +414,7 @@ namespace ryujin
         const primitive_type &riemann_data_j) const
     {
       using ScalarNumber = typename get_value_type<Number>::type;
-      const ScalarNumber interpolation_b = hyperbolic_system.interpolation_b();
+      const ScalarNumber interpolation_b = hyperbolic_system.interpolation_b_();
 
       const auto &[rho_i, u_i, p_i, gamma_i, a_i] = riemann_data_i;
       const auto &[rho_j, u_j, p_j, gamma_j, a_j] = riemann_data_j;

@@ -74,7 +74,9 @@ namespace ryujin
             return it->material_sound_speed(rho, p);
           };
 
-          interpolation_b_ = it->interpolation_b();
+          interpolation_b_ = [&it]() {
+            return it->interpolation_b();
+          };
 
           problem_name =
               "Compressible Euler equations (" + it->name() + " EOS)";
