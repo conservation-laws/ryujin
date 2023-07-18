@@ -40,7 +40,7 @@ int main()
     result[1] = u;
     result[2] = p;
     result[3] = gamma;
-    const double interpolation_b = hyperbolic_system.interpolation_b();
+    const double interpolation_b = hyperbolic_system.interpolation_b_();
     const double x = 1. - interpolation_b * rho;
     result[4] = std::sqrt(gamma * p / (rho * x));
     return result;
@@ -66,11 +66,12 @@ int main()
      */
     std::stringstream parameters;
     parameters << "subsection HyperbolicSystem\n"
-               << "set equation of state = polytropic gas\n"
+               << "set equation of state = van der waals\n"
                << "subsection van der waals\n"
                << "set covolume b = " << std::to_string(covolume) << "\n"
-               << "end"
-               << "end" << std::endl;
+               << "end\n"
+               << "end\n"
+               << std::endl;
     ParameterAcceptor::initialize(parameters);
   };
 
