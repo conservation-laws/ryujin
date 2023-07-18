@@ -91,7 +91,7 @@ namespace ryujin
       /**
        * Constructor.
        */
-      HyperbolicSystem(const std::string &subsection = "HyperbolicSystem");
+      HyperbolicSystem(const std::string &subsection = "/HyperbolicSystem");
 
       /**
        * @name Precomputation of flux quantities

@@ -141,7 +141,7 @@ namespace ryujin
         const OfflineData<dim, Number> &offline_data,
         const HyperbolicSystem &hyperbolic_system,
         const InitialValues<Description, dim, Number> &initial_values,
-        const std::string &subsection = "HyperbolicModule");
+        const std::string &subsection = "/HyperbolicModule");
 
     /**
      * Prepare time stepping. A call to @ref prepare() allocates temporary

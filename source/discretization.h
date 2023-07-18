@@ -182,7 +182,7 @@ namespace ryujin
      * Constructor.
      */
     Discretization(const MPI_Comm &mpi_communicator,
-                   const std::string &subsection = "Discretization");
+                   const std::string &subsection = "/Discretization");
 
     /**
      * Create the triangulation and set up the finite element, mapping and

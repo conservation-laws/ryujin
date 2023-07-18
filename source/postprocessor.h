@@ -85,7 +85,7 @@ namespace ryujin
     Postprocessor(const MPI_Comm &mpi_communicator,
                   const HyperbolicSystem &hyperbolic_system,
                   const OfflineData<dim, Number> &offline_data,
-                  const std::string &subsection = "Postprocessor");
+                  const std::string &subsection = "/Postprocessor");
 
     /**
      * Prepare Postprocessor. A call to @ref prepare() allocates temporary

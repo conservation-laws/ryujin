@@ -64,7 +64,7 @@ namespace ryujin
     Quantities(const MPI_Comm &mpi_communicator,
                const HyperbolicSystem &hyperbolic_system,
                const OfflineData<dim, Number> &offline_data,
-               const std::string &subsection = "Quantities");
+               const std::string &subsection = "/Quantities");
 
     /**
      * Prepare evaluation. A call to @ref prepare() allocates temporary

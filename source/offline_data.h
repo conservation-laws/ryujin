@@ -71,7 +71,7 @@ namespace ryujin
      */
     OfflineData(const MPI_Comm &mpi_communicator,
                 const Discretization<dim> &discretization,
-                const std::string &subsection = "OfflineData");
+                const std::string &subsection = "/OfflineData");
 
     /**
      * Prepare offline data. A call to @ref prepare() internally calls

@@ -170,7 +170,7 @@ namespace ryujin
         std::map<std::string, dealii::Timer> &computing_timer,
         const OfflineData<dim, Number> &offline_data,
         const HyperbolicModule<Description, dim, Number> &hyperbolic_module,
-        const std::string &subsection = "TimeIntegrator");
+        const std::string &subsection = "/TimeIntegrator");
 
     /**
      * Prepare time integration. A call to @ref prepare() allocates

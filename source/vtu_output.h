@@ -78,7 +78,7 @@ namespace ryujin
         const OfflineData<dim, Number> &offline_data,
         const HyperbolicModule<Description, dim, Number> &hyperbolic_module,
         const Postprocessor<Description, dim, Number> &postprocessor,
-        const std::string &subsection = "VTUOutput");
+        const std::string &subsection = "/VTUOutput");
 
     /**
      * Prepare VTU output. A call to @ref prepare() allocates temporary

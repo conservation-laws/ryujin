@@ -75,7 +75,7 @@ namespace ryujin
      */
     InitialValues(const HyperbolicSystem &hyperbolic_system,
                   const OfflineData<dim, Number> &offline_data,
-                  const std::string &subsection = "InitialValues");
+                  const std::string &subsection = "/InitialValues");
 
 
     /**
