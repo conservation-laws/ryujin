@@ -12,6 +12,8 @@ namespace ryujin
 {
   namespace Euler
   {
+    struct Description;
+
     /**
      * The rarefaction
      * @todo Documentation
@@ -19,15 +21,16 @@ namespace ryujin
      * @ingroup EulerEquations
      */
 
-    template <int dim, typename Number, typename state_type>
-    class Rarefaction : public InitialState<dim, Number, state_type>
+    template <int dim, typename Number>
+    class Rarefaction : public InitialState<Description, dim, Number>
     {
     public:
       using HyperbolicSystemView = HyperbolicSystem::View<dim, Number>;
+      using state_type = typename HyperbolicSystemView::state_type;
 
       Rarefaction(const HyperbolicSystemView &hyperbolic_system,
                   const std::string subsection)
-          : InitialState<dim, Number, state_type>("rarefaction", subsection)
+          : InitialState<Description, dim, Number>("rarefaction", subsection)
           , hyperbolic_system(hyperbolic_system)
       {
       } /* Constructor */
@@ -35,7 +38,7 @@ namespace ryujin
       state_type compute(const dealii::Point<dim> &point, Number t) final;
 
     private:
-      const HyperbolicSystemView &hyperbolic_system;
+      const HyperbolicSystemView hyperbolic_system;
     }; // Rarefaction
 
 #if 0
@@ -44,9 +47,9 @@ namespace ryujin
 //       Number k1, k2, dens_pow, k3, p_pow;
 #endif
 
-    template <int dim, typename Number, typename state_type>
-    state_type Rarefaction<dim, Number, state_type>::compute(
-        const dealii::Point<dim> &point, Number t)
+    template <int dim, typename Number>
+    auto Rarefaction<dim, Number>::compute(const dealii::Point<dim> &point,
+                                           Number t) -> state_type
     {
       const Number gamma = hyperbolic_system.gamma();
 

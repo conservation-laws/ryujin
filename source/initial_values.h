@@ -38,7 +38,7 @@ namespace ryujin
   {
   public:
     /**
-     * @copydoc HyperbolicSystem::View
+     * @copydoc HyperbolicSystem
      */
     using HyperbolicSystem = typename Description::HyperbolicSystem;
 
@@ -73,7 +73,7 @@ namespace ryujin
     /**
      * Array type used for precomputed values.
      */
-    using precomputed_type = std::array<Number, n_precomputed_values>;
+    using precomputed_type = typename HyperbolicSystemView::precomputed_type;
 
     /**
      * Constructor.
@@ -157,8 +157,7 @@ namespace ryujin
     const HyperbolicSystemView hyperbolic_system_;
     dealii::SmartPointer<const OfflineData<dim, Number>> offline_data_;
 
-    std::set<std::unique_ptr<
-        InitialState<dim, Number, state_type, n_precomputed_values>>>
+    std::set<std::unique_ptr<InitialState<Description, dim, Number>>>
         initial_state_list_;
 
     std::function<state_type(const dealii::Point<dim> &point, Number t)>

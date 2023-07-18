@@ -12,6 +12,8 @@ namespace ryujin
 {
   namespace Euler
   {
+    struct Description;
+
     /**
      *
      * This initial state reproduces the classical Noh problem introduced
@@ -24,22 +26,24 @@ namespace ryujin
      *
      * @ingroup EulerEquations
      */
-    template <int dim, typename Number, typename state_type>
-    class Noh : public InitialState<dim, Number, state_type>
+    template <int dim, typename Number>
+    class Noh : public InitialState<Description, dim, Number>
     {
     public:
       using HyperbolicSystemView = HyperbolicSystem::View<dim, Number>;
+      using state_type = typename HyperbolicSystemView::state_type;
 
       Noh(const HyperbolicSystemView &hyperbolic_system,
-          const std::string subsection)
-          : InitialState<dim, Number, state_type>("noh", subsection)
+          const std::string &subsection)
+          : InitialState<Description, dim, Number>("noh", subsection)
           , hyperbolic_system(hyperbolic_system)
       {
         /* No customization at this point */
       }
 
       /* Initial and exact solution for each dimension */
-      state_type compute(const dealii::Point<dim> &point, Number t) final
+      auto compute(const dealii::Point<dim> &point, Number t)
+          -> state_type final
       {
         // Initialize some quantities
         double rho = 1.;
@@ -108,7 +112,7 @@ namespace ryujin
       }
 
     private:
-      const HyperbolicSystemView &hyperbolic_system;
+      const HyperbolicSystemView hyperbolic_system;
     };
 
   } // namespace Euler

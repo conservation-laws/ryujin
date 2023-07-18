@@ -12,6 +12,8 @@ namespace ryujin
 {
   namespace Euler
   {
+    struct Description;
+
     /**
      * A slight modification of the "contrast" initial state. Now, we have
      * an initial state formed by a contrast of a given "left" and "right"
@@ -24,15 +26,17 @@ namespace ryujin
      *
      * @ingroup EulerEquations
      */
-    template <int dim, typename Number, typename state_type>
-    class RadialContrast : public InitialState<dim, Number, state_type>
+    template <int dim, typename Number>
+    class RadialContrast : public InitialState<Description, dim, Number>
     {
     public:
       using HyperbolicSystemView = HyperbolicSystem::View<dim, Number>;
+      using state_type = typename HyperbolicSystemView::state_type;
 
       RadialContrast(const HyperbolicSystemView &hyperbolic_system,
-                     const std::string subsection)
-          : InitialState<dim, Number, state_type>("radial contrast", subsection)
+                     const std::string &subsection)
+          : InitialState<Description, dim, Number>("radial contrast",
+                                                   subsection)
           , hyperbolic_system(hyperbolic_system)
       {
         primitive_left_[0] = hyperbolic_system.gamma();
@@ -55,7 +59,8 @@ namespace ryujin
         this->add_parameter("radius", radius_, "Radius of radial area");
       }
 
-      state_type compute(const dealii::Point<dim> &point, Number /*t*/) final
+      auto compute(const dealii::Point<dim> &point, Number /*t*/)
+          -> state_type final
       {
         return hyperbolic_system.from_primitive_state(
             hyperbolic_system.expand_state(
@@ -63,7 +68,7 @@ namespace ryujin
       }
 
     private:
-      const HyperbolicSystemView &hyperbolic_system;
+      const HyperbolicSystemView hyperbolic_system;
 
       dealii::Tensor<1, 3, Number> primitive_left_;
       dealii::Tensor<1, 3, Number> primitive_right_;

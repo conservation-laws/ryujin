@@ -12,6 +12,8 @@ namespace ryujin
 {
   namespace Euler
   {
+    struct Description;
+
     /**
      * The rarefaction
      * @todo Documentation
@@ -19,15 +21,16 @@ namespace ryujin
      * @ingroup EulerEquations
      */
 
-    template <int dim, typename Number, typename state_type>
-    class LeBlanc : public InitialState<dim, Number, state_type>
+    template <int dim, typename Number>
+    class LeBlanc : public InitialState<Description, dim, Number>
     {
     public:
       using HyperbolicSystemView = HyperbolicSystem::View<dim, Number>;
+      using state_type = typename HyperbolicSystemView::state_type;
 
       LeBlanc(const HyperbolicSystemView &hyperbolic_system,
               const std::string subsection)
-          : InitialState<dim, Number, state_type>("leblanc", subsection)
+          : InitialState<Description, dim, Number>("leblanc", subsection)
           , hyperbolic_system(hyperbolic_system)
       {
       } /* Constructor */
@@ -35,14 +38,13 @@ namespace ryujin
       state_type compute(const dealii::Point<dim> &point, Number t) final;
 
     private:
-      const HyperbolicSystemView &hyperbolic_system;
+      const HyperbolicSystemView hyperbolic_system;
     };
 
 
-    template <int dim, typename Number, typename state_type>
-    state_type
-    LeBlanc<dim, Number, state_type>::compute(const dealii::Point<dim> &point,
-                                              Number t)
+    template <int dim, typename Number>
+    auto LeBlanc<dim, Number>::compute(const dealii::Point<dim> &point,
+                                       Number t) -> state_type
     {
       /*
        * The LeBlanc shock tube:

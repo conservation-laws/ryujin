@@ -37,24 +37,21 @@ namespace ryujin
                                   const HyperbolicSystem::View<dim, Number> &h,
                                   const std::string &s)
       {
-        using state_type =
-            typename HyperbolicSystem::View<dim, Number>::state_type;
-
         auto add = [&](auto &&object) {
           initial_state_list.emplace(std::move(object));
         };
 
-        add(std::make_unique<BeckerSolution<dim, Number, state_type>>(h, s));
-        add(std::make_unique<Contrast<dim, Number, state_type>>(h, s));
-        add(std::make_unique<IsentropicVortex<dim, Number, state_type>>(h, s));
-        add(std::make_unique<LeBlanc<dim, Number, state_type>>(h, s));
-        add(std::make_unique<Noh<dim, Number, state_type>>(h, s));
-        add(std::make_unique<RadialContrast<dim, Number, state_type>>(h, s));
-        add(std::make_unique<RampUp<dim, Number, state_type>>(h, s));
-        add(std::make_unique<Rarefaction<dim, Number, state_type>>(h, s));
-        add(std::make_unique<ShockFront<dim, Number, state_type>>(h, s));
-        add(std::make_unique<TwoDContrast<dim, Number, state_type>>(h, s));
-        add(std::make_unique<Uniform<dim, Number, state_type>>(h, s));
+        add(std::make_unique<BeckerSolution<dim, Number>>(h, s));
+        add(std::make_unique<Contrast<dim, Number>>(h, s));
+        add(std::make_unique<IsentropicVortex<dim, Number>>(h, s));
+        add(std::make_unique<LeBlanc<dim, Number>>(h, s));
+        add(std::make_unique<Noh<dim, Number>>(h, s));
+        add(std::make_unique<RadialContrast<dim, Number>>(h, s));
+        add(std::make_unique<RampUp<dim, Number>>(h, s));
+        add(std::make_unique<Rarefaction<dim, Number>>(h, s));
+        add(std::make_unique<ShockFront<dim, Number>>(h, s));
+        add(std::make_unique<TwoDContrast<dim, Number>>(h, s));
+        add(std::make_unique<Uniform<dim, Number>>(h, s));
       }
     };
   } // namespace Euler

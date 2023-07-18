@@ -12,6 +12,8 @@ namespace ryujin
 {
   namespace Euler
   {
+    struct Description;
+
     /**
      * An initial state formed by a contrast of a given "left" and "right"
      * primitive state.
@@ -22,15 +24,16 @@ namespace ryujin
      *
      * @ingroup EulerEquations
      */
-    template <int dim, typename Number, typename state_type>
-    class Contrast : public InitialState<dim, Number, state_type>
+    template <int dim, typename Number>
+    class Contrast : public InitialState<Description, dim, Number>
     {
     public:
       using HyperbolicSystemView = HyperbolicSystem::View<dim, Number>;
+      using state_type = typename HyperbolicSystemView::state_type;
 
       Contrast(const HyperbolicSystemView &hyperbolic_system,
                const std::string subsection)
-          : InitialState<dim, Number, state_type>("contrast", subsection)
+          : InitialState<Description, dim, Number>("contrast", subsection)
           , hyperbolic_system(hyperbolic_system)
       {
         primitive_left_[0] = hyperbolic_system.gamma();
@@ -58,7 +61,7 @@ namespace ryujin
       }
 
     private:
-      const HyperbolicSystemView &hyperbolic_system;
+      const HyperbolicSystemView hyperbolic_system;
 
       dealii::Tensor<1, 3, Number> primitive_left_;
       dealii::Tensor<1, 3, Number> primitive_right_;

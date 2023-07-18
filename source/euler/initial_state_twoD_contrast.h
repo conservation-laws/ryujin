@@ -12,6 +12,8 @@ namespace ryujin
 {
   namespace Euler
   {
+    struct Description;
+
     /**
      * A 2D extension of the "contrast" initial state consisting of 4 different
      * states separated at x = 0 and y = 0. Visually, this looks like:
@@ -26,15 +28,16 @@ namespace ryujin
      *
      * @ingroup EulerEquations
      */
-    template <int dim, typename Number, typename state_type>
-    class TwoDContrast : public InitialState<dim, Number, state_type>
+    template <int dim, typename Number>
+    class TwoDContrast : public InitialState<Description, dim, Number>
     {
     public:
       using HyperbolicSystemView = HyperbolicSystem::View<dim, Number>;
+      using state_type = typename HyperbolicSystemView::state_type;
 
       TwoDContrast(const HyperbolicSystemView &hyperbolic_system,
-                   const std::string subsection)
-          : InitialState<dim, Number, state_type>("2d contrast", subsection)
+                   const std::string &subsection)
+          : InitialState<Description, dim, Number>("2d contrast", subsection)
           , hyperbolic_system(hyperbolic_system)
       {
 
@@ -95,7 +98,7 @@ namespace ryujin
       }
 
     private:
-      const HyperbolicSystemView &hyperbolic_system;
+      const HyperbolicSystemView hyperbolic_system;
 
       state_type primitive_top_left_;
       state_type primitive_bottom_left_;

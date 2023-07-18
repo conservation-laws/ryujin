@@ -12,6 +12,8 @@ namespace ryujin
 {
   namespace Euler
   {
+    struct Description;
+
     /**
      * A time-dependent state given by an initial state @p primite_left_
      * valid for \f$ t \le t_{\text{left}} \f$ and a final state @p
@@ -20,15 +22,16 @@ namespace ryujin
      *
      * @ingroup EulerEquations
      */
-    template <int dim, typename Number, typename state_type>
-    class RampUp : public InitialState<dim, Number, state_type>
+    template <int dim, typename Number>
+    class RampUp : public InitialState<Description, dim, Number>
     {
     public:
       using HyperbolicSystemView = HyperbolicSystem::View<dim, Number>;
+      using state_type = typename HyperbolicSystemView::state_type;
 
       RampUp(const HyperbolicSystemView &hyperbolic_system,
              const std::string subsection)
-          : InitialState<dim, Number, state_type>("ramp up", subsection)
+          : InitialState<Description, dim, Number>("ramp up", subsection)
           , hyperbolic_system(hyperbolic_system)
       {
         primitive_initial_[0] = hyperbolic_system.gamma();
@@ -56,7 +59,8 @@ namespace ryujin
                             "Time from which on the final state is attained)");
       }
 
-      state_type compute(const dealii::Point<dim> & /*point*/, Number t) final
+      auto compute(const dealii::Point<dim> & /*point*/, Number t)
+          -> state_type final
       {
         typename HyperbolicSystem::View<1, Number>::primitive_state_type
             primitive;
@@ -79,7 +83,7 @@ namespace ryujin
       }
 
     private:
-      const HyperbolicSystemView &hyperbolic_system;
+      const HyperbolicSystemView hyperbolic_system;
 
       dealii::Tensor<1, 3, Number> primitive_initial_;
       dealii::Tensor<1, 3, Number> primitive_final_;

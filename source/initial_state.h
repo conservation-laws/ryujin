@@ -28,14 +28,18 @@ namespace ryujin
    *
    * @ingroup InitialValues
    */
-  template <int dim,
-            typename Number,
-            typename state_type,
-            int n_precomputed_values = 0>
+  template <typename Description, int dim, typename Number = double>
   class InitialState : public dealii::ParameterAcceptor
   {
   public:
-    using precomputed_type = std::array<Number, n_precomputed_values>;
+    /**
+     * @copydoc HyperbolicSystem::View
+     */
+    using HyperbolicSystemView =
+        typename Description::HyperbolicSystem::template View<dim, Number>;
+
+    using state_type = typename HyperbolicSystemView::state_type;
+    using precomputed_type = typename HyperbolicSystemView::precomputed_type;
 
     /**
      * Constructor taking geometry name @p name and a subsection @p

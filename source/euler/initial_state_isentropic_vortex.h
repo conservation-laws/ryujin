@@ -12,22 +12,25 @@ namespace ryujin
 {
   namespace Euler
   {
+    struct Description;
+
     /**
      * The isentropic vortex
      * @todo Documentation
      *
      * @ingroup EulerEquations
      */
-    template <int dim, typename Number, typename state_type>
-    class IsentropicVortex : public InitialState<dim, Number, state_type>
+    template <int dim, typename Number>
+    class IsentropicVortex : public InitialState<Description, dim, Number>
     {
     public:
       using HyperbolicSystemView = HyperbolicSystem::View<dim, Number>;
+      using state_type = typename HyperbolicSystemView::state_type;
 
       IsentropicVortex(const HyperbolicSystemView &hyperbolic_system,
                        const std::string subsection)
-          : InitialState<dim, Number, state_type>("isentropic vortex",
-                                                  subsection)
+          : InitialState<Description, dim, Number>("isentropic vortex",
+                                                   subsection)
           , hyperbolic_system(hyperbolic_system)
       {
         mach_number_ = 2.0;
@@ -76,7 +79,7 @@ namespace ryujin
       }
 
     private:
-      const HyperbolicSystemView &hyperbolic_system;
+      const HyperbolicSystemView hyperbolic_system;
 
       Number mach_number_;
       Number beta_;
