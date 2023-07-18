@@ -5,7 +5,6 @@
 
 add_library(obj_euler OBJECT
   limiter.cc
-  hyperbolic_system.cc
   riemann_solver.cc
   )
 target_link_libraries(obj_euler obj_common)

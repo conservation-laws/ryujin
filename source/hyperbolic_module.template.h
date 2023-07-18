@@ -92,7 +92,8 @@ namespace ryujin
 
     const auto &vector_partitioner = offline_data_->vector_partitioner();
     r_.reinit(vector_partitioner);
-    if constexpr (HyperbolicSystem::have_source_terms) {
+    using View = typename HyperbolicSystem::template View<dim, Number>;
+    if constexpr (View::have_source_terms) {
       source_.reinit(vector_partitioner);
       source_r_.reinit(vector_partitioner);
     }
@@ -104,7 +105,7 @@ namespace ryujin
     lij_matrix_.reinit(sparsity_simd);
     lij_matrix_next_.reinit(sparsity_simd);
     pij_matrix_.reinit(sparsity_simd);
-    if constexpr (HyperbolicSystem::have_source_terms) {
+    if constexpr (View::have_source_terms) {
       qij_matrix_.reinit(sparsity_simd);
     }
 
@@ -208,10 +209,9 @@ namespace ryujin
      * Step 0: Precompute values
      */
 
-    static_assert(HyperbolicSystem::n_precomputation_cycles <= 2,
-                  "internal_error");
+    static_assert(n_precomputation_cycles <= 2, "internal_error");
 
-    if constexpr (HyperbolicSystem::n_precomputation_cycles >= 1) {
+    if constexpr (n_precomputation_cycles >= 1) {
       constexpr unsigned int cycle = 0;
 
       Scope scope(computing_timer_, scoped_name("precompute values"));
@@ -244,7 +244,8 @@ namespace ryujin
               synchronization_dispatch.check(
                   thread_ready, i >= n_export_indices && i < n_internal);
 
-              hyperbolic_system_->template precomputation<cycle, T>(
+              const auto view = hyperbolic_system_->template view<dim, T>();
+              view.template precomputation<cycle>(
                   new_precomputed, old_U, sparsity_simd, i);
             }
           };
@@ -258,7 +259,7 @@ namespace ryujin
       RYUJIN_PARALLEL_REGION_END
     }
 
-    if constexpr (HyperbolicSystem::n_precomputation_cycles >= 2) {
+    if constexpr (n_precomputation_cycles >= 2) {
       constexpr unsigned int cycle = 1;
 
       Scope scope(computing_timer_, scoped_name("precompute values"));
@@ -291,7 +292,8 @@ namespace ryujin
               synchronization_dispatch.check(
                   thread_ready, i >= n_export_indices && i < n_internal);
 
-              hyperbolic_system_->template precomputation<cycle, T>(
+              const auto view = hyperbolic_system_->template view<dim, T>();
+              view.template precomputation<cycle>(
                   new_precomputed, old_U, sparsity_simd, i);
             }
           };
@@ -543,9 +545,12 @@ namespace ryujin
         using T = decltype(sentinel);
         unsigned int stride_size = get_stride_size<T>;
 
+        const auto view = hyperbolic_system_->template view<dim, T>();
+        using View = typename HyperbolicSystem::template View<dim, T>;
+
         /* Stored thread locally: */
-        typename Description::template Limiter<dim, T> limiter(
-            *hyperbolic_system_, new_precomputed);
+        using Limiter = typename Description::template Limiter<dim, T>;
+        Limiter limiter(*hyperbolic_system_, new_precomputed);
         bool thread_ready = false;
 
         RYUJIN_OMP_FOR
@@ -560,22 +565,19 @@ namespace ryujin
               thread_ready, i >= n_export_indices && i < n_internal);
 
           const auto U_i = old_U.template get_tensor<T>(i);
-          const auto flux_i = hyperbolic_system_->flux_contribution(
+          const auto flux_i = view.flux_contribution(
               new_precomputed, precomputed_initial_, i, U_i);
 
-          using flux_contribution_type =
-              typename HyperbolicSystem::template flux_contribution_type<dim,
-                                                                         T>;
+          using flux_contribution_type = typename View::flux_contribution_type;
           std::array<flux_contribution_type, stages> flux_iHs;
           for (int s = 0; s < stages; ++s) {
             const auto temp = stage_U[s].get().template get_tensor<T>(i);
-            flux_iHs[s] = hyperbolic_system_->flux_contribution(
+            flux_iHs[s] = view.flux_contribution(
                 stage_precomputed[s].get(), precomputed_initial_, i, temp);
           }
 
           auto U_i_new = U_i;
-          using state_type =
-              typename HyperbolicSystem::template state_type<dim, T>;
+          using state_type = typename View::state_type;
           state_type F_iH;
 
           const auto alpha_i = load_value<T>(alpha_, i);
@@ -587,11 +589,9 @@ namespace ryujin
           /* Sources: */
           state_type S_i_new;
           state_type S_iH;
-          if constexpr (HyperbolicSystem::have_source_terms) {
-            S_i_new = hyperbolic_system_->low_order_nodal_source(
-                new_precomputed, i, U_i);
-            S_iH = hyperbolic_system_->high_order_nodal_source(
-                new_precomputed, i, U_i);
+          if constexpr (View::have_source_terms) {
+            S_i_new = view.low_order_nodal_source(new_precomputed, i, U_i);
+            S_iH = view.high_order_nodal_source(new_precomputed, i, U_i);
           }
 
           const unsigned int *js = sparsity_simd.columns(i);
@@ -611,35 +611,34 @@ namespace ryujin
             const auto beta_ij =
                 betaij_matrix.template get_entry<T>(i, col_idx);
 
-            const auto flux_j = hyperbolic_system_->flux_contribution(
+            const auto flux_j = view.flux_contribution(
                 new_precomputed, precomputed_initial_, js, U_j);
 
             /*
              * Compute low-order flux and limiter bounds:
              */
 
-            const auto flux_ij = hyperbolic_system_->flux(flux_i, flux_j);
+            const auto flux_ij = view.flux(flux_i, flux_j);
             U_i_new += tau * m_i_inv * contract(flux_ij, c_ij);
             auto P_ij = -contract(flux_ij, c_ij);
 
-            using state_type =
-                typename HyperbolicSystem::template state_type<dim, T>;
+            using state_type = typename View::state_type;
             state_type Q_ij;
-            if constexpr (HyperbolicSystem::have_source_terms) {
-              const auto B_ij = hyperbolic_system_->affine_shift_stencil_source(
-                  flux_i, flux_j, d_ij, c_ij);
-              const auto S_ij = hyperbolic_system_->low_order_stencil_source(
-                  flux_i, flux_j, d_ij, c_ij);
+            if constexpr (View::have_source_terms) {
+              const auto B_ij =
+                  view.affine_shift_stencil_source(flux_i, flux_j, d_ij, c_ij);
+              const auto S_ij =
+                  view.low_order_stencil_source(flux_i, flux_j, d_ij, c_ij);
 
               U_i_new -= tau * m_i_inv * B_ij;
               S_i_new += tau * m_i_inv * (B_ij + S_ij);
               Q_ij -= S_ij;
             }
 
-            if constexpr (HyperbolicSystem::have_equilibrated_states) {
+            if constexpr (View::have_equilibrated_states) {
               /* Use star states for low-order update: */
               const auto &[U_star_ij, U_star_ji] =
-                  hyperbolic_system_->equilibrated_states(flux_i, flux_j);
+                  view.equilibrated_states(flux_i, flux_j);
               U_i_new += tau * m_i_inv * d_ij * (U_star_ji - U_star_ij);
               F_iH += d_ijH * (U_star_ji - U_star_ij);
               P_ij += (d_ijH - d_ij) * (U_star_ji - U_star_ij);
@@ -658,9 +657,9 @@ namespace ryujin
              * Compute high-order fluxes:
              */
 
-            if constexpr (HyperbolicSystem::have_high_order_flux) {
+            if constexpr (View::have_high_order_flux) {
               const auto high_order_flux_ij =
-                  hyperbolic_system_->high_order_flux(flux_i, flux_j);
+                  view.high_order_flux(flux_i, flux_j);
               F_iH += weight * contract(high_order_flux_ij, c_ij);
               P_ij += weight * contract(high_order_flux_ij, c_ij);
             } else {
@@ -668,44 +667,44 @@ namespace ryujin
               P_ij += weight * contract(flux_ij, c_ij);
             }
 
-            if constexpr (HyperbolicSystem::have_source_terms) {
-              const auto S_ijH = hyperbolic_system_->high_order_stencil_source(
-                  flux_i, flux_j, d_ijH, c_ij);
+            if constexpr (View::have_source_terms) {
+              const auto S_ijH =
+                  view.high_order_stencil_source(flux_i, flux_j, d_ijH, c_ij);
               S_iH += weight * S_ijH;
               Q_ij += weight * S_ijH;
             }
 
             for (int s = 0; s < stages; ++s) {
               const auto U_jH = stage_U[s].get().template get_tensor<T>(js);
-              const auto p = hyperbolic_system_->flux_contribution(
+              const auto p = view.flux_contribution(
                   stage_precomputed[s].get(), precomputed_initial_, js, U_jH);
 
-              if constexpr (HyperbolicSystem::have_high_order_flux) {
+              if constexpr (View::have_high_order_flux) {
                 const auto high_order_flux_ij =
-                    hyperbolic_system_->high_order_flux(flux_iHs[s], p);
+                    view.high_order_flux(flux_iHs[s], p);
                 F_iH += stage_weights[s] * contract(high_order_flux_ij, c_ij);
                 P_ij += stage_weights[s] * contract(high_order_flux_ij, c_ij);
               } else {
-                const auto flux_ij = hyperbolic_system_->flux(flux_iHs[s], p);
+                const auto flux_ij = view.flux(flux_iHs[s], p);
                 F_iH += stage_weights[s] * contract(flux_ij, c_ij);
                 P_ij += stage_weights[s] * contract(flux_ij, c_ij);
               }
 
-              if constexpr (HyperbolicSystem::have_source_terms) {
-                auto S_ijH = hyperbolic_system_->high_order_stencil_source(
-                    flux_iHs[s], p, d_ijH, c_ij);
+              if constexpr (View::have_source_terms) {
+                auto S_ijH =
+                    view.high_order_stencil_source(flux_iHs[s], p, d_ijH, c_ij);
                 S_iH += stage_weights[s] * S_ijH;
                 Q_ij += stage_weights[s] * S_ijH;
               }
             }
 
             pij_matrix_.write_tensor(P_ij, i, col_idx, true);
-            if constexpr (HyperbolicSystem::have_source_terms)
+            if constexpr (View::have_source_terms)
               qij_matrix_.write_tensor(Q_ij, i, col_idx, true);
           }
 
 #ifdef CHECK_BOUNDS
-          if (!hyperbolic_system_->is_admissible(U_i_new)) {
+          if (!view.is_admissible(U_i_new)) {
             restart_needed = true;
           }
 #endif
@@ -713,7 +712,7 @@ namespace ryujin
           new_U.template write_tensor<T>(U_i_new, i);
           r_.template write_tensor<T>(F_iH, i);
 
-          if constexpr (HyperbolicSystem::have_source_terms) {
+          if constexpr (View::have_source_terms) {
             source_.template write_tensor<T>(S_i_new, i);
             source_r_.template write_tensor<T>(S_iH, i);
           }
@@ -752,6 +751,8 @@ namespace ryujin
         using T = decltype(sentinel);
         unsigned int stride_size = get_stride_size<T>;
 
+        using View = typename HyperbolicSystem::template View<dim, T>;
+
         /* Stored thread locally: */
         bool thread_ready = false;
 
@@ -776,10 +777,9 @@ namespace ryujin
           const auto F_iH = r_.template get_tensor<T>(i);
 
 
-          using state_type =
-              typename HyperbolicSystem::template state_type<dim, T>;
+          using state_type = typename View::state_type;
           state_type S_iH;
-          if constexpr (HyperbolicSystem::have_source_terms)
+          if constexpr (View::have_source_terms)
             S_iH = source_r_.template get_tensor<T>(i);
 
           const auto lambda_inv = Number(row_length - 1);
@@ -806,7 +806,7 @@ namespace ryujin
             P_ij *= factor;
             pij_matrix_.write_tensor(P_ij, i, col_idx);
 
-            if constexpr (HyperbolicSystem::have_source_terms) {
+            if constexpr (View::have_source_terms) {
               auto Q_ij = qij_matrix_.template get_tensor<T>(i, col_idx);
               const auto S_jH = source_r_.template get_tensor<T>(js);
               Q_ij += b_ij * S_jH - b_ji * S_iH;
@@ -878,6 +878,8 @@ namespace ryujin
         using T = decltype(sentinel);
         unsigned int stride_size = get_stride_size<T>;
 
+        using View = typename HyperbolicSystem::template View<dim, T>;
+
         /* Stored thread locally: */
         AlignedVector<T> lij_row;
         bool thread_ready = false;
@@ -895,10 +897,9 @@ namespace ryujin
 
           auto U_i_new = new_U.template get_tensor<T>(i);
 
-          using state_type =
-              typename HyperbolicSystem::template state_type<dim, T>;
+          using state_type = typename View::state_type;
           state_type S_i_new;
-          if constexpr (HyperbolicSystem::have_source_terms)
+          if constexpr (View::have_source_terms)
             S_i_new = source_.template get_tensor<T>(i);
 
           const Number lambda = Number(1.) / Number(row_length - 1);
@@ -914,7 +915,7 @@ namespace ryujin
 
             U_i_new += l_ij * lambda * p_ij;
 
-            if constexpr (HyperbolicSystem::have_source_terms) {
+            if constexpr (View::have_source_terms) {
               const auto q_ij = qij_matrix_.template get_tensor<T>(i, col_idx);
               S_i_new += l_ij * lambda * q_ij;
             }
@@ -924,14 +925,14 @@ namespace ryujin
           }
 
 #ifdef CHECK_BOUNDS
-          if (!hyperbolic_system_->is_admissible(U_i_new)) {
+          if (!view.is_admissible(U_i_new)) {
             restart_needed = true;
           }
 #endif
 
           new_U.template write_tensor<T>(U_i_new, i);
 
-          if constexpr (HyperbolicSystem::have_source_terms)
+          if constexpr (View::have_source_terms)
             source_.template write_tensor<T>(S_i_new, i);
 
           /* Skip computating l_ij and updating p_ij in the last round */
@@ -983,7 +984,8 @@ namespace ryujin
     } /* limiter_iter_ */
 
     /* Update sources: */
-    if constexpr (HyperbolicSystem::have_source_terms)
+    using View = typename HyperbolicSystem::template View<dim, Number>;
+    if constexpr (View::have_source_terms)
       new_U += source_;
 
     CALLGRIND_STOP_INSTRUMENTATION
@@ -1019,8 +1021,7 @@ namespace ryujin
               << std::endl;
 #endif
 
-    const auto cycle_number =
-        4 + HyperbolicSystem::n_precomputation_cycles + limiter_iter_;
+    const auto cycle_number = 4 + n_precomputation_cycles + limiter_iter_;
     Scope scope(computing_timer_,
                 "time step [E] " + std::to_string(cycle_number) +
                     " - apply boundary conditions");
@@ -1048,8 +1049,8 @@ namespace ryujin
         return initial_values_->initial_state(position, t);
       };
 
-      U_i = hyperbolic_system_->apply_boundary_conditions(
-          id, U_i, normal, get_dirichlet_data);
+      const auto view = hyperbolic_system_->template view<dim, Number>();
+      U_i = view.apply_boundary_conditions(id, U_i, normal, get_dirichlet_data);
       U.write_tensor(U_i, i);
     }
 

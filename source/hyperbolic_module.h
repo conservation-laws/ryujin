@@ -119,6 +119,12 @@ namespace ryujin
         HyperbolicSystemView::n_precomputed_values;
 
     /**
+     * @copydoc HyperbolicSystemView::n_precomputation_cycles
+     */
+    static constexpr unsigned int n_precomputation_cycles =
+        HyperbolicSystemView::n_precomputation_cycles;
+
+    /**
      * Typedef for a MultiComponentVector storing precomputed values.
      */
     using precomputed_type = MultiComponentVector<Number, n_precomputed_values>;
