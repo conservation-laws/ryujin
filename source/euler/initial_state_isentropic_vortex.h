@@ -22,7 +22,9 @@ namespace ryujin
     class IsentropicVortex : public InitialState<dim, Number, state_type>
     {
     public:
-      IsentropicVortex(const HyperbolicSystem &hyperbolic_system,
+      using HyperbolicSystemView = HyperbolicSystem::View<dim, Number>;
+
+      IsentropicVortex(const HyperbolicSystemView &hyperbolic_system,
                        const std::string subsection)
           : InitialState<dim, Number, state_type>("isentropic vortex",
                                                   subsection)
@@ -74,7 +76,7 @@ namespace ryujin
       }
 
     private:
-      const HyperbolicSystem &hyperbolic_system;
+      const HyperbolicSystemView &hyperbolic_system;
 
       Number mach_number_;
       Number beta_;

@@ -23,7 +23,9 @@ namespace ryujin
     class Rarefaction : public InitialState<dim, Number, state_type>
     {
     public:
-      Rarefaction(const HyperbolicSystem &hyperbolic_system,
+      using HyperbolicSystemView = HyperbolicSystem::View<dim, Number>;
+
+      Rarefaction(const HyperbolicSystemView &hyperbolic_system,
                   const std::string subsection)
           : InitialState<dim, Number, state_type>("rarefaction", subsection)
           , hyperbolic_system(hyperbolic_system)
@@ -33,7 +35,7 @@ namespace ryujin
       state_type compute(const dealii::Point<dim> &point, Number t) final;
 
     private:
-      const HyperbolicSystem &hyperbolic_system;
+      const HyperbolicSystemView &hyperbolic_system;
     }; // Rarefaction
 
 #if 0
@@ -120,8 +122,8 @@ namespace ryujin
         primitive = primitive_right;
       }
 
-      return hyperbolic_system.template expand_state<dim>(
-          hyperbolic_system.from_primitive_state(dealii::Tensor<1, 3, Number>{
+      return hyperbolic_system.from_primitive_state(
+          hyperbolic_system.expand_state(dealii::Tensor<1, 3, Number>{
               {primitive[0], primitive[1], primitive[2]}}));
     }
 

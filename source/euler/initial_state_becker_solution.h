@@ -22,7 +22,9 @@ namespace ryujin
     class BeckerSolution : public InitialState<dim, Number, state_type>
     {
     public:
-      BeckerSolution(const HyperbolicSystem &hyperbolic_system,
+      using HyperbolicSystemView = HyperbolicSystem::View<dim, Number>;
+
+      BeckerSolution(const HyperbolicSystemView &hyperbolic_system,
                      const std::string subsection)
           : InitialState<dim, Number, state_type>("becker solution", subsection)
           , hyperbolic_system(hyperbolic_system)
@@ -163,15 +165,17 @@ namespace ryujin
                          (R_infty * velocity_left_ * velocity_right_ - v * v);
         Assert(e > 0., dealii::ExcInternalError());
 
-        return hyperbolic_system.template expand_state<dim>(
-            HyperbolicSystem::state_type<1, Number>{
+        const auto state_1d =
+            typename HyperbolicSystem::View<1, Number>::state_type{
                 {Number(rho),
                  Number(rho * (velocity_ + v)),
-                 Number(rho * (e + 0.5 * (velocity_ + v) * (velocity_ + v)))}});
+                 Number(rho * (e + 0.5 * (velocity_ + v) * (velocity_ + v)))}};
+
+        return hyperbolic_system.expand_state(state_1d);
       }
 
     private:
-      const HyperbolicSystem &hyperbolic_system;
+      const HyperbolicSystemView &hyperbolic_system;
 
       Number velocity_;
       Number velocity_left_;

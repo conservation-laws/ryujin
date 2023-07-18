@@ -52,6 +52,8 @@ namespace ryujin
       double vacuum_state_relaxation_;
 
       double gamma_inverse_;
+      double gamma_minus_one_inverse_;
+      double gamma_minus_one_over_gamma_plus_one_;
       double gamma_plus_one_inverse_;
 
     public:
@@ -74,9 +76,23 @@ namespace ryujin
         }
 
         /**
+         * Create a modified view from the current one:
+         */
+        template <int dim2, typename Number2>
+        auto view() const
+        {
+          return View<dim2, Number2>{hyperbolic_system_};
+        }
+
+        /**
          * The underlying scalar number type.
          */
         using ScalarNumber = typename get_value_type<Number>::type;
+
+        /**
+         * @name Access to runtime parameters
+         */
+        //@{
 
         DEAL_II_ALWAYS_INLINE inline ScalarNumber gamma() const
         {
@@ -94,6 +110,16 @@ namespace ryujin
           return ScalarNumber(hyperbolic_system_.vacuum_state_relaxation_);
         }
 
+        //@}
+        /**
+         * @name Access to cached inverses
+         *
+         * A collection of commonly used expressions with gamma that would
+         * otherwise need to be recomputed many times putting unnecessary
+         * pressure on the div/sqrt ALU unit.
+         */
+        //@{
+
         DEAL_II_ALWAYS_INLINE inline ScalarNumber gamma_inverse() const
         {
           return ScalarNumber(hyperbolic_system_.gamma_inverse_);
@@ -104,11 +130,25 @@ namespace ryujin
           return ScalarNumber(hyperbolic_system_.gamma_plus_one_inverse_);
         }
 
+        DEAL_II_ALWAYS_INLINE inline ScalarNumber
+        gamma_minus_one_inverse() const
+        {
+          return ScalarNumber(hyperbolic_system_.gamma_minus_one_inverse_);
+        }
+
+        DEAL_II_ALWAYS_INLINE inline ScalarNumber
+        gamma_minus_one_over_gamma_plus_one() const
+        {
+          return ScalarNumber(
+              hyperbolic_system_.gamma_minus_one_over_gamma_plus_one_);
+        }
+
       private:
         const HyperbolicSystem &hyperbolic_system_;
 
 
       public:
+        //@}
         /**
          * @name Types and compile time constants
          */
@@ -479,15 +519,15 @@ namespace ryujin
         /** We do not have source terms */
         static constexpr bool have_source_terms = false;
 
-        template <typename MultiComponentVector, typename ST>
-        ST low_order_nodal_source(const MultiComponentVector &,
-                                  const unsigned int,
-                                  const ST &) const = delete;
+        template <typename MultiComponentVector>
+        state_type low_order_nodal_source(const MultiComponentVector &,
+                                          const unsigned int,
+                                          const state_type &) const = delete;
 
-        template <typename MultiComponentVector, typename ST>
-        ST high_order_nodal_source(const MultiComponentVector &,
-                                   const unsigned int i,
-                                   const ST &) const = delete;
+        template <typename MultiComponentVector>
+        state_type high_order_nodal_source(const MultiComponentVector &,
+                                           const unsigned int i,
+                                           const state_type &) const = delete;
 
         state_type low_order_stencil_source(
             const flux_contribution_type &,
@@ -577,6 +617,7 @@ namespace ryujin
      * -------------------------------------------------------------------------
      */
 
+
     inline HyperbolicSystem::HyperbolicSystem(const std::string &subsection)
         : ParameterAcceptor(subsection)
     {
@@ -600,6 +641,8 @@ namespace ryujin
       const auto compute_inverses = [this] {
         gamma_inverse_ = 1. / gamma_;
         gamma_plus_one_inverse_ = 1. / (gamma_ + 1.);
+        gamma_minus_one_inverse_ = 1. / (gamma_ - 1.);
+        gamma_minus_one_over_gamma_plus_one_ = (gamma_ - 1.) / (gamma_ + 1.);
       };
 
       compute_inverses();
@@ -969,7 +1012,7 @@ namespace ryujin
                                             (R_2 - R_1));
       rho_new = ryujin::pow(rho_new, 1. / (gamma() - 1.));
 
-      const auto p_new = s * std::pow(rho_new, ScalarNumber(gamma));
+      const auto p_new = s * std::pow(rho_new, gamma());
 
       state_type U_new;
       U_new[0] = rho_new;
@@ -992,18 +1035,20 @@ namespace ryujin
         const dealii::Tensor<1, dim, Number> &normal,
         const Lambda &get_dirichlet_data) const -> state_type
     {
+      state_type result = U;
+
       if (id == Boundary::dirichlet) {
-        U = get_dirichlet_data();
+        result = get_dirichlet_data();
 
       } else if (id == Boundary::slip) {
         auto m = momentum(U);
         m -= 1. * (m * normal) * normal;
         for (unsigned int k = 0; k < dim; ++k)
-          U[k + 1] = m[k];
+          result[k + 1] = m[k];
 
       } else if (id == Boundary::no_slip) {
         for (unsigned int k = 0; k < dim; ++k)
-          U[k + 1] = Number(0.);
+          result[k + 1] = Number(0.);
 
       } else if (id == Boundary::dynamic) {
         /*
@@ -1025,25 +1070,25 @@ namespace ryujin
 
         /* Supersonic inflow: */
         if (vn < -a) {
-          U = get_dirichlet_data();
+          result = get_dirichlet_data();
         }
 
         /* Subsonic inflow: */
         if (vn >= -a && vn <= 0.) {
           const auto U_dirichlet = get_dirichlet_data();
-          U = prescribe_riemann_characteristic<2>(U_dirichlet, U, normal);
+          result = prescribe_riemann_characteristic<2>(U_dirichlet, U, normal);
         }
 
         /* Subsonic outflow: */
         if (vn > 0. && vn <= a) {
           const auto U_dirichlet = get_dirichlet_data();
-          U = prescribe_riemann_characteristic<1>(U, U_dirichlet, normal);
+          result = prescribe_riemann_characteristic<1>(U, U_dirichlet, normal);
         }
 
         /* Supersonic outflow: do nothing, i.e., keep U as is */
       }
 
-      return U;
+      return result;
     }
 
 

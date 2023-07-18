@@ -23,7 +23,9 @@ namespace ryujin
     class ShockFront : public InitialState<dim, Number, state_type>
     {
     public:
-      ShockFront(const HyperbolicSystem &hyperbolic_system,
+      using HyperbolicSystemView = HyperbolicSystem::View<dim, Number>;
+
+      ShockFront(const HyperbolicSystemView &hyperbolic_system,
                  const std::string subsection)
           : InitialState<dim, Number, state_type>("shockfront", subsection)
           , hyperbolic_system(hyperbolic_system)
@@ -83,13 +85,13 @@ namespace ryujin
       {
         const Number position_1d = Number(point[0] - S3_ * t);
 
-        const auto temp = hyperbolic_system.from_primitive_state(
-            position_1d > 0. ? primitive_right_ : primitive_left_);
-        return hyperbolic_system.template expand_state<dim>(temp);
+        return hyperbolic_system.from_primitive_state(
+            hyperbolic_system.expand_state(position_1d > 0. ? primitive_right_
+                                                            : primitive_left_));
       }
 
     private:
-      const HyperbolicSystem &hyperbolic_system;
+      const HyperbolicSystemView &hyperbolic_system;
 
       dealii::Tensor<1, 3, Number> primitive_left_;
       dealii::Tensor<1, 3, Number> primitive_right_;

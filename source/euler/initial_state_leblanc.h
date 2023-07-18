@@ -23,7 +23,9 @@ namespace ryujin
     class LeBlanc : public InitialState<dim, Number, state_type>
     {
     public:
-      LeBlanc(const HyperbolicSystem &hyperbolic_system,
+      using HyperbolicSystemView = HyperbolicSystem::View<dim, Number>;
+
+      LeBlanc(const HyperbolicSystemView &hyperbolic_system,
               const std::string subsection)
           : InitialState<dim, Number, state_type>("leblanc", subsection)
           , hyperbolic_system(hyperbolic_system)
@@ -33,7 +35,7 @@ namespace ryujin
       state_type compute(const dealii::Point<dim> &point, Number t) final;
 
     private:
-      const HyperbolicSystem &hyperbolic_system;
+      const HyperbolicSystemView &hyperbolic_system;
     };
 
 
@@ -95,8 +97,8 @@ namespace ryujin
         primitive = primitive_right;
       }
 
-      return hyperbolic_system.template expand_state<dim>(
-          hyperbolic_system.from_primitive_state(primitive));
+      return hyperbolic_system.from_primitive_state(
+          hyperbolic_system.expand_state(primitive));
     }
 
   } // namespace Euler

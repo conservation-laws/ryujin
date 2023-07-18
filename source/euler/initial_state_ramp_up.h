@@ -24,7 +24,9 @@ namespace ryujin
     class RampUp : public InitialState<dim, Number, state_type>
     {
     public:
-      RampUp(const HyperbolicSystem &hyperbolic_system,
+      using HyperbolicSystemView = HyperbolicSystem::View<dim, Number>;
+
+      RampUp(const HyperbolicSystemView &hyperbolic_system,
              const std::string subsection)
           : InitialState<dim, Number, state_type>("ramp up", subsection)
           , hyperbolic_system(hyperbolic_system)
@@ -56,7 +58,8 @@ namespace ryujin
 
       state_type compute(const dealii::Point<dim> & /*point*/, Number t) final
       {
-        dealii::Tensor<1, 3, Number> primitive;
+        typename HyperbolicSystem::View<1, Number>::primitive_state_type
+            primitive;
 
         if (t <= t_initial_) {
           primitive = primitive_initial_;
@@ -71,12 +74,12 @@ namespace ryujin
           primitive = alpha * primitive_initial_ + beta * primitive_final_;
         }
 
-        const auto temp = hyperbolic_system.from_primitive_state(primitive);
-        return hyperbolic_system.template expand_state<dim>(temp);
+        return hyperbolic_system.from_primitive_state(
+            hyperbolic_system.expand_state(primitive));
       }
 
     private:
-      const HyperbolicSystem &hyperbolic_system;
+      const HyperbolicSystemView &hyperbolic_system;
 
       dealii::Tensor<1, 3, Number> primitive_initial_;
       dealii::Tensor<1, 3, Number> primitive_final_;

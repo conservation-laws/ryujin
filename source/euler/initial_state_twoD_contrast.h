@@ -30,11 +30,14 @@ namespace ryujin
     class TwoDContrast : public InitialState<dim, Number, state_type>
     {
     public:
-      TwoDContrast(const HyperbolicSystem &hyperbolic_system,
+      using HyperbolicSystemView = HyperbolicSystem::View<dim, Number>;
+
+      TwoDContrast(const HyperbolicSystemView &hyperbolic_system,
                    const std::string subsection)
           : InitialState<dim, Number, state_type>("2d contrast", subsection)
           , hyperbolic_system(hyperbolic_system)
       {
+
         /* Set default values and get primitive states from user */
         primitive_top_left_[0] = 1.0;
         primitive_top_left_[1] = 0.0;
@@ -76,33 +79,28 @@ namespace ryujin
 
       state_type compute(const dealii::Point<dim> &point, Number /*t*/) final
       {
-        /* Set temporary states depending on location */
-        auto temp_top =
-            point[0] >= 0. ? primitive_top_right_ : primitive_top_left_;
-
-        auto temp_bottom =
-            point[0] >= 0. ? primitive_bottom_right_ : primitive_bottom_left_;
-
-        /* Convert to regular states */
-        temp_top = hyperbolic_system.from_primitive_state(temp_top);
-        temp_bottom = hyperbolic_system.from_primitive_state(temp_bottom);
-
-        /* Return final state if dim = 2 */
         if constexpr (dim != 2) {
           AssertThrow(false, dealii::ExcNotImplemented());
           __builtin_trap();
-        } else
-          return hyperbolic_system.template expand_state<dim>(
-              point[1] >= 0. ? temp_top : temp_bottom);
+        }
+
+        /* Set temporary states depending on location */
+        const auto temp_top =
+            point[0] >= 0. ? primitive_top_right_ : primitive_top_left_;
+        const auto temp_bottom =
+            point[0] >= 0. ? primitive_bottom_right_ : primitive_bottom_left_;
+
+        return hyperbolic_system.from_primitive_state(
+            point[1] >= 0. ? temp_top : temp_bottom);
       }
 
     private:
-      const HyperbolicSystem &hyperbolic_system;
+      const HyperbolicSystemView &hyperbolic_system;
 
-      dealii::Tensor<1, 4, Number> primitive_top_left_;
-      dealii::Tensor<1, 4, Number> primitive_bottom_left_;
-      dealii::Tensor<1, 4, Number> primitive_top_right_;
-      dealii::Tensor<1, 4, Number> primitive_bottom_right_;
+      state_type primitive_top_left_;
+      state_type primitive_bottom_left_;
+      state_type primitive_top_right_;
+      state_type primitive_bottom_right_;
     };
   } // namespace Euler
 } // namespace ryujin

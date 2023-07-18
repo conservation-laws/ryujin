@@ -13,7 +13,7 @@ namespace ryujin
   {
     template <int dim, typename Number>
     std::tuple<Number, bool>
-    Limiter<dim, Number>::limit(const HyperbolicSystem &hyperbolic_system,
+    Limiter<dim, Number>::limit(const HyperbolicSystemView &hyperbolic_system,
                                 const Bounds &bounds,
                                 const state_type &U,
                                 const state_type &P,

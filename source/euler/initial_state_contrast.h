@@ -26,7 +26,9 @@ namespace ryujin
     class Contrast : public InitialState<dim, Number, state_type>
     {
     public:
-      Contrast(const HyperbolicSystem &hyperbolic_system,
+      using HyperbolicSystemView = HyperbolicSystem::View<dim, Number>;
+
+      Contrast(const HyperbolicSystemView &hyperbolic_system,
                const std::string subsection)
           : InitialState<dim, Number, state_type>("contrast", subsection)
           , hyperbolic_system(hyperbolic_system)
@@ -50,13 +52,13 @@ namespace ryujin
 
       state_type compute(const dealii::Point<dim> &point, Number /*t*/) final
       {
-        const auto temp = hyperbolic_system.from_primitive_state(
-            point[0] > 0. ? primitive_right_ : primitive_left_);
-        return hyperbolic_system.template expand_state<dim>(temp);
+        return hyperbolic_system.from_primitive_state(
+            hyperbolic_system.expand_state(point[0] > 0. ? primitive_right_
+                                                         : primitive_left_));
       }
 
     private:
-      const HyperbolicSystem &hyperbolic_system;
+      const HyperbolicSystemView &hyperbolic_system;
 
       dealii::Tensor<1, 3, Number> primitive_left_;
       dealii::Tensor<1, 3, Number> primitive_right_;

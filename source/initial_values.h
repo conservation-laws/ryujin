@@ -38,21 +38,26 @@ namespace ryujin
   {
   public:
     /**
-     * @copydoc HyperbolicSystem
+     * @copydoc HyperbolicSystem::View
      */
     using HyperbolicSystem = typename Description::HyperbolicSystem;
+
+    /**
+     * @copydoc HyperbolicSystem::View
+     */
+    using HyperbolicSystemView =
+        typename Description::HyperbolicSystem::template View<dim, Number>;
 
     /**
      * @copydoc HyperbolicSystem::problem_dimension
      */
     static constexpr unsigned int problem_dimension =
-        HyperbolicSystem::template problem_dimension<dim>;
+        HyperbolicSystemView::problem_dimension;
 
     /**
      * @copydoc HyperbolicSystem::state_type
      */
-    using state_type =
-        typename HyperbolicSystem::template state_type<dim, Number>;
+    using state_type = typename HyperbolicSystemView::state_type;
 
     /**
      * Typedef for a MultiComponentVector storing the state U.
@@ -63,7 +68,7 @@ namespace ryujin
      * @copydoc HyperbolicSystem::n_precomputed_values
      */
     static constexpr unsigned int n_precomputed_values =
-        HyperbolicSystem::template n_precomputed_initial_values<dim>;
+        HyperbolicSystemView::n_precomputed_initial_values;
 
     /**
      * Array type used for precomputed values.
@@ -149,7 +154,7 @@ namespace ryujin
      */
     //@{
 
-    dealii::SmartPointer<const HyperbolicSystem> hyperbolic_system_;
+    const HyperbolicSystemView hyperbolic_system_;
     dealii::SmartPointer<const OfflineData<dim, Number>> offline_data_;
 
     std::set<std::unique_ptr<

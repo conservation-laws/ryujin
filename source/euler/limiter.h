@@ -51,35 +51,40 @@ namespace ryujin
     {
     public:
       /**
-       * @copydoc HyperbolicSystem::problem_dimension
+       * @copydoc HyperbolicSystem::View
+       */
+      using HyperbolicSystemView = HyperbolicSystem::View<dim, Number>;
+
+      /**
+       * @copydoc HyperbolicSystem::View::problem_dimension
        */
       static constexpr unsigned int problem_dimension =
-          HyperbolicSystem::problem_dimension<dim>;
+          HyperbolicSystemView::problem_dimension;
 
       /**
-       * @copydoc HyperbolicSystem::state_type
+       * @copydoc HyperbolicSystem::View::state_type
        */
-      using state_type = HyperbolicSystem::state_type<dim, Number>;
+      using state_type = typename HyperbolicSystemView::state_type;
 
       /**
-       * @copydoc HyperbolicSystem::n_precomputed_values
+       * @copydoc HyperbolicSystem::View::n_precomputed_values
        */
       static constexpr unsigned int n_precomputed_values =
-          HyperbolicSystem::n_precomputed_values<dim>;
+          HyperbolicSystemView::n_precomputed_values;
 
       /**
-       * @copydoc HyperbolicSystem::precomputed_type
+       * @copydoc HyperbolicSystem::View::precomputed_type
        */
-      using precomputed_type = HyperbolicSystem::precomputed_type<dim, Number>;
+      using precomputed_type = typename HyperbolicSystemView::precomputed_type;
 
       /**
-       * @copydoc HyperbolicSystem::flux_contribution_type
+       * @copydoc HyperbolicSystem::View::flux_contribution_type
        */
       using flux_contribution_type =
-          HyperbolicSystem::flux_contribution_type<dim, Number>;
+          typename HyperbolicSystemView::flux_contribution_type;
 
       /**
-       * @copydoc HyperbolicSystem::ScalarNumber
+       * @copydoc HyperbolicSystem::View::ScalarNumber
        */
       using ScalarNumber = typename get_value_type<Number>::type;
 
@@ -115,7 +120,7 @@ namespace ryujin
       using Bounds = std::array<Number, n_bounds>;
 
       /**
-       * Constructor taking a HyperbolicSystem instance as argument
+       * Constructor taking a HyperbolicSystem::View instance as argument
        */
       Limiter(const HyperbolicSystem &hyperbolic_system,
               const MultiComponentVector<ScalarNumber, n_precomputed_values>
@@ -164,7 +169,7 @@ namespace ryujin
        * selected local minimum principles are obeyed.
        */
       static std::tuple<Number, bool>
-      limit(const HyperbolicSystem &hyperbolic_system,
+      limit(const HyperbolicSystemView &hyperbolic_system,
             const Bounds &bounds,
             const state_type &U,
             const state_type &P,
@@ -185,7 +190,7 @@ namespace ryujin
        * invariant domain.
        */
       static bool
-      is_in_invariant_domain(const HyperbolicSystem &hyperbolic_system,
+      is_in_invariant_domain(const HyperbolicSystemView &hyperbolic_system,
                              const Bounds &bounds,
                              const state_type &U);
 
@@ -194,7 +199,7 @@ namespace ryujin
       /** @name */
       //@{
 
-      const HyperbolicSystem &hyperbolic_system;
+      const HyperbolicSystemView hyperbolic_system;
 
       const MultiComponentVector<ScalarNumber, n_precomputed_values>
           &precomputed_values;
@@ -315,7 +320,7 @@ namespace ryujin
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline bool
     Limiter<dim, Number>::is_in_invariant_domain(
-        const HyperbolicSystem & /*hyperbolic_system*/,
+        const HyperbolicSystemView & /*hyperbolic_system*/,
         const Bounds & /*bounds*/,
         const state_type & /*U*/)
     {

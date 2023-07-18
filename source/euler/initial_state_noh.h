@@ -28,7 +28,9 @@ namespace ryujin
     class Noh : public InitialState<dim, Number, state_type>
     {
     public:
-      Noh(const HyperbolicSystem &hyperbolic_system,
+      using HyperbolicSystemView = HyperbolicSystem::View<dim, Number>;
+
+      Noh(const HyperbolicSystemView &hyperbolic_system,
           const std::string subsection)
           : InitialState<dim, Number, state_type>("noh", subsection)
           , hyperbolic_system(hyperbolic_system)
@@ -106,7 +108,7 @@ namespace ryujin
       }
 
     private:
-      const HyperbolicSystem &hyperbolic_system;
+      const HyperbolicSystemView &hyperbolic_system;
     };
 
   } // namespace Euler

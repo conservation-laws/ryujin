@@ -62,31 +62,36 @@ namespace ryujin
     {
     public:
       /**
+       * @copydoc HyperbolicSystem::View
+       */
+      using HyperbolicSystemView = HyperbolicSystem::View<dim, Number>;
+
+      /**
        * @copydoc HyperbolicSystem::problem_dimension
        */
       static constexpr unsigned int problem_dimension =
-          HyperbolicSystem::problem_dimension<dim>;
+          HyperbolicSystemView::problem_dimension;
 
       /**
        * @copydoc HyperbolicSystem::precomputed_type
        */
-      using precomputed_type = HyperbolicSystem::precomputed_type<dim, Number>;
+      using precomputed_type = typename HyperbolicSystemView::precomputed_type;
 
       /**
        * @copydoc HyperbolicSystem::n_precomputed_values
        */
       static constexpr unsigned int n_precomputed_values =
-          HyperbolicSystem::n_precomputed_values<dim>;
+          HyperbolicSystemView::n_precomputed_values;
 
       /**
        * @copydoc HyperbolicSystem::state_type
        */
-      using state_type = HyperbolicSystem::state_type<dim, Number>;
+      using state_type = typename HyperbolicSystemView::state_type;
 
       /**
        * @copydoc HyperbolicSystem::flux_type
        */
-      using flux_type = HyperbolicSystem::flux_type<dim, Number>;
+      using flux_type = typename HyperbolicSystemView::flux_type;
 
       /**
        * @copydoc HyperbolicSystem::ScalarNumber
@@ -150,7 +155,7 @@ namespace ryujin
        */
       //@{
 
-      const HyperbolicSystem &hyperbolic_system;
+      const HyperbolicSystemView hyperbolic_system;
 
       const MultiComponentVector<ScalarNumber, n_precomputed_values>
           &precomputed_values;
@@ -167,7 +172,11 @@ namespace ryujin
     };
 
 
-    /* Inline definitions */
+    /*
+     * -------------------------------------------------------------------------
+     * Inline definitions
+     * -------------------------------------------------------------------------
+     */
 
 
     template <int dim, typename Number>

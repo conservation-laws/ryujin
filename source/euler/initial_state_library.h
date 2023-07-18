@@ -32,11 +32,13 @@ namespace ryujin
        * @ingroup EulerEquations
        */
       template <int dim, typename Number, typename T>
-      static void populate_initial_state_list(T &initial_state_list,
-                                              const HyperbolicSystem &h,
-                                              const std::string &s)
+      static void
+      populate_initial_state_list(T &initial_state_list,
+                                  const HyperbolicSystem::View<dim, Number> &h,
+                                  const std::string &s)
       {
-        using state_type = HyperbolicSystem::state_type<dim, Number>;
+        using state_type =
+            typename HyperbolicSystem::View<dim, Number>::state_type;
 
         auto add = [&](auto &&object) {
           initial_state_list.emplace(std::move(object));
