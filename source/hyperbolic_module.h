@@ -81,22 +81,26 @@ namespace ryujin
     using HyperbolicSystem = typename Description::HyperbolicSystem;
 
     /**
+     * @copydoc HyperbolicSystem::View
+     */
+    using HyperbolicSystemView =
+        typename Description::HyperbolicSystem::template View<dim, Number>;
+
+    /**
      * @copydoc HyperbolicSystem::problem_dimension
      */
     static constexpr unsigned int problem_dimension =
-        HyperbolicSystem::template problem_dimension<dim>;
+        HyperbolicSystemView::problem_dimension;
 
     /**
      * @copydoc HyperbolicSystem::state_type
      */
-    using state_type =
-        typename HyperbolicSystem::template state_type<dim, Number>;
+    using state_type = typename HyperbolicSystemView::state_type;
 
     /**
      * @copydoc HyperbolicSystem::flux_type
      */
-    using flux_type =
-        typename HyperbolicSystem::template flux_type<dim, Number>;
+    using flux_type = typename HyperbolicSystemView::flux_type;
 
     /**
      * @copydoc OfflineData::scalar_type
@@ -112,7 +116,7 @@ namespace ryujin
      * @copydoc HyperbolicSystem::n_precomputed_values
      */
     static constexpr unsigned int n_precomputed_values =
-        HyperbolicSystem::template n_precomputed_values<dim>;
+        HyperbolicSystemView::n_precomputed_values;
 
     /**
      * Typedef for a MultiComponentVector storing precomputed values.
@@ -123,7 +127,7 @@ namespace ryujin
      * @copydoc HyperbolicSystem::n_precomputed_initial_values
      */
     static constexpr unsigned int n_precomputed_initial_values =
-        HyperbolicSystem::template n_precomputed_initial_values<dim>;
+        HyperbolicSystemView::n_precomputed_initial_values;
 
     /**
      * Typedef for a MultiComponentVector storing precomputed initial_values.
