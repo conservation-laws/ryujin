@@ -925,6 +925,7 @@ namespace ryujin
           }
 
 #ifdef CHECK_BOUNDS
+          const auto view = hyperbolic_system_->template view<dim, T>();
           if (!view.is_admissible(U_i_new)) {
             restart_needed = true;
           }
