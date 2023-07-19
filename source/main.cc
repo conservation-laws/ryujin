@@ -61,10 +61,9 @@ int main(int argc, char *argv[])
 {
   flush_denormals_to_zero();
 
-  set_thread_limit();
-
   LSAN_DISABLE;
   dealii::Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv);
+  set_thread_limit();
   MPI_Comm mpi_communicator(MPI_COMM_WORLD);
   LSAN_ENABLE
 
