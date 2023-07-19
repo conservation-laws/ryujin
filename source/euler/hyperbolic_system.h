@@ -236,7 +236,7 @@ namespace ryujin
         /**
          * Array type used for precomputed initial values.
          */
-        using precomputed_initial_type =
+        using precomputed_initial_state_type =
             std::array<Number, n_precomputed_initial_values>;
 
         /**
