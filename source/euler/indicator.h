@@ -73,9 +73,10 @@ namespace ryujin
           HyperbolicSystemView::problem_dimension;
 
       /**
-       * @copydoc HyperbolicSystem::precomputed_type
+       * @copydoc HyperbolicSystem::precomputed_state_type
        */
-      using precomputed_type = typename HyperbolicSystemView::precomputed_type;
+      using precomputed_state_type =
+          typename HyperbolicSystemView::precomputed_state_type;
 
       /**
        * @copydoc HyperbolicSystem::n_precomputed_values
@@ -96,7 +97,7 @@ namespace ryujin
       /**
        * @copydoc HyperbolicSystem::ScalarNumber
        */
-      using ScalarNumber = typename get_value_type<Number>::type;
+      using ScalarNumber = typename HyperbolicSystemView::ScalarNumber;
 
       /**
        * @name Stencil-based computation of indicators
@@ -186,7 +187,8 @@ namespace ryujin
       /* entropy viscosity commutator: */
 
       const auto &[new_s_i, new_eta_i] =
-          precomputed_values.template get_tensor<Number, precomputed_type>(i);
+          precomputed_values
+              .template get_tensor<Number, precomputed_state_type>(i);
 
       const auto rho_i = hyperbolic_system.density(U_i);
       rho_i_inverse = Number(1.) / rho_i;
@@ -210,7 +212,8 @@ namespace ryujin
       /* entropy viscosity commutator: */
 
       const auto &[s_j, eta_j] =
-          precomputed_values.template get_tensor<Number, precomputed_type>(js);
+          precomputed_values
+              .template get_tensor<Number, precomputed_state_type>(js);
 
       const auto rho_j = hyperbolic_system.density(U_j);
       const auto rho_j_inverse = Number(1.) / rho_j;

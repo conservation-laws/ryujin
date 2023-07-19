@@ -73,9 +73,10 @@ namespace ryujin
           HyperbolicSystemView::n_precomputed_values;
 
       /**
-       * @copydoc HyperbolicSystem::View::precomputed_type
+       * @copydoc HyperbolicSystem::View::precomputed_state_type
        */
-      using precomputed_type = typename HyperbolicSystemView::precomputed_type;
+      using precomputed_state_type =
+          typename HyperbolicSystemView::precomputed_state_type;
 
       /**
        * @copydoc HyperbolicSystem::View::flux_contribution_type
@@ -86,7 +87,7 @@ namespace ryujin
       /**
        * @copydoc HyperbolicSystem::View::ScalarNumber
        */
-      using ScalarNumber = typename get_value_type<Number>::type;
+      using ScalarNumber = typename HyperbolicSystemView::ScalarNumber;
 
       /**
        * @name Stencil-based computation of bounds
@@ -229,7 +230,8 @@ namespace ryujin
       rho_max = Number(0.);
 
       const auto &[s_i, eta_i] =
-          precomputed_values.template get_tensor<Number, precomputed_type>(i);
+          precomputed_values
+              .template get_tensor<Number, precomputed_state_type>(i);
 
       s_min = s_i;
 
@@ -265,7 +267,8 @@ namespace ryujin
       rho_max = std::max(rho_max, rho_ij_bar);
 
       const auto &[s_j, eta_j] =
-          precomputed_values.template get_tensor<Number, precomputed_type>(js);
+          precomputed_values
+              .template get_tensor<Number, precomputed_state_type>(js);
       s_min = std::min(s_min, s_j);
 
       /* Relaxation: */

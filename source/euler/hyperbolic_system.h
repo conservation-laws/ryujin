@@ -57,9 +57,20 @@ namespace ryujin
 
     public:
       /**
-       * A view on the HyperbolicSystem for a given dimension @p dim and
-       * choice of number type @p Number (which can be a scalar float, or
-       * double, as well as a VectorizedArray holding packed scalars.
+       * A view of the HyperbolicSystem that makes methods available for a
+       * given dimension @p dim and choice of number type @p Number (which
+       * can be a scalar float, or double, as well as a VectorizedArray
+       * holding packed scalars.
+       *
+       * Intended usage:
+       * ```
+       * HyperbolicSystem hyperbolic_system;
+       * const auto view = hyperbolic_system.template view<dim, Number>();
+       * const auto flux_i = view.flux_contribution(...);
+       * const auto flux_j = view.flux_contribution(...);
+       * const auto flux_ij = view.flux(flux_i, flux_j);
+       * // etc.
+       * ```
        */
       template <int dim, typename Number>
       class View
@@ -242,7 +253,7 @@ namespace ryujin
         /**
          * Array type used for precomputed values.
          */
-        using precomputed_type = std::array<Number, n_precomputed_values>;
+        using precomputed_state_type = std::array<Number, n_precomputed_values>;
 
         /**
          * An array holding all component names of the precomputed values.
@@ -655,7 +666,8 @@ namespace ryujin
       static_assert(cycle == 0, "internal error");
 
       const auto U_i = U.template get_tensor<Number>(i);
-      const precomputed_type prec_i{specific_entropy(U_i), harten_entropy(U_i)};
+      const precomputed_state_type prec_i{specific_entropy(U_i),
+                                          harten_entropy(U_i)};
       precomputed_values.template write_tensor<Number>(prec_i, i);
     }
 

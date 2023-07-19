@@ -39,7 +39,8 @@ namespace ryujin
         typename Description::HyperbolicSystem::template View<dim, Number>;
 
     using state_type = typename HyperbolicSystemView::state_type;
-    using precomputed_type = typename HyperbolicSystemView::precomputed_type;
+    using precomputed_state_type =
+        typename HyperbolicSystemView::precomputed_state_type;
 
     /**
      * Constructor taking geometry name @p name and a subsection @p
@@ -70,10 +71,10 @@ namespace ryujin
      * bathymetry. In case of @ref LinearTransport we precompute the
      * advection field.
      */
-    virtual precomputed_type
+    virtual precomputed_state_type
     initial_precomputations(const dealii::Point<dim> & /*point*/)
     {
-      return precomputed_type();
+      return precomputed_state_type();
     }
 
     /**

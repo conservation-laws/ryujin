@@ -42,18 +42,22 @@ namespace ryujin
       static constexpr unsigned int problem_dimension =
           HyperbolicSystemView::problem_dimension;
 
+      /**
+       * Number of components in a primitive state, we store \f$[\rho, v,
+       * p, a]\f$, thus, 4.
+       */
       static constexpr unsigned int riemann_data_size = 4;
+
+      /**
+       * The array type to store the expanded primitive state for the
+       * Riemann solver \f$[\rho, v, p, a]\f$
+       */
       using primitive_type = std::array<Number, riemann_data_size>;
 
       /**
        * @copydoc HyperbolicSystem::View::state_type
        */
       using state_type = typename HyperbolicSystemView::state_type;
-
-      /**
-       * @copydoc HyperbolicSystem::View::precomputed_type
-       */
-      using precomputed_type = typename HyperbolicSystemView::precomputed_type;
 
       /**
        * @copydoc HyperbolicSystem::View::n_precomputed_values
@@ -64,7 +68,7 @@ namespace ryujin
       /**
        * @copydoc HyperbolicSystem::View::ScalarNumber
        */
-      using ScalarNumber = typename get_value_type<Number>::type;
+      using ScalarNumber = typename HyperbolicSystemView::ScalarNumber;
 
       /**
        * @name Compute wavespeed estimates

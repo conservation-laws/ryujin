@@ -168,7 +168,7 @@ namespace ryujin
         /**
          * Array type used for precomputed values.
          */
-        using precomputed_type = std::array<Number, n_precomputed_values>;
+        using precomputed_state_type = std::array<Number, n_precomputed_values>;
 
         /**
          * An array holding all component names of the precomputed values.

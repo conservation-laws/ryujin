@@ -73,7 +73,8 @@ namespace ryujin
     /**
      * Array type used for precomputed values.
      */
-    using precomputed_type = typename HyperbolicSystemView::precomputed_type;
+    using precomputed_state_type =
+        typename HyperbolicSystemView::precomputed_state_type;
 
     /**
      * Constructor.
@@ -120,7 +121,7 @@ namespace ryujin
      * function signature has an additional parameter @p t denoting the
      * current time to allow for time-dependent (in-flow) Dirichlet data.
      */
-    DEAL_II_ALWAYS_INLINE inline precomputed_type
+    DEAL_II_ALWAYS_INLINE inline precomputed_state_type
     flux_contributions(const dealii::Point<dim> &point) const
     {
       return flux_contributions_(point);
@@ -163,7 +164,7 @@ namespace ryujin
     std::function<state_type(const dealii::Point<dim> &point, Number t)>
         initial_state_;
 
-    std::function<precomputed_type(const dealii::Point<dim> &point)>
+    std::function<precomputed_state_type(const dealii::Point<dim> &point)>
         flux_contributions_;
 
     //@}
