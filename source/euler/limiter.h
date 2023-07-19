@@ -266,7 +266,7 @@ namespace ryujin
       /* Relaxation: */
 
       rho_relaxation_numerator += beta_ij * (rho_i + rho_j);
-      rho_relaxation_denominator += beta_ij;
+      rho_relaxation_denominator += std::abs(beta_ij);
 
       const Number s_interp =
           hyperbolic_system.specific_entropy((U_i + U_j) * ScalarNumber(.5));
@@ -294,10 +294,10 @@ namespace ryujin
           std::abs(rho_relaxation_numerator) /
           (std::abs(rho_relaxation_denominator) + Number(eps));
 
-      rho_min =
-          std::max((Number(1.) - r_i) * rho_min, rho_min - rho_relaxation);
-      rho_max =
-          std::min((Number(1.) + r_i) * rho_max, rho_max + rho_relaxation);
+      rho_min = std::max((Number(1.) - r_i) * rho_min,
+                         rho_min - ScalarNumber(2.) * rho_relaxation);
+      rho_max = std::min((Number(1.) + r_i) * rho_max,
+                         rho_max + ScalarNumber(2.) * rho_relaxation);
 
       s_min = std::max((Number(1.) - r_i) * s_min,
                        Number(2.) * s_min - s_interp_max);
