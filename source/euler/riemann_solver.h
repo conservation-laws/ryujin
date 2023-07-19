@@ -72,7 +72,7 @@ namespace ryujin
       //@{
 
       /**
-       * Constructor taking a HyperbolicSystem::View instance as argument
+       * Constructor taking a HyperbolicSystem instance as argument
        */
       RiemannSolver(
           const HyperbolicSystem &hyperbolic_system,

@@ -5,7 +5,6 @@
 
 #pragma once
 
-#include <Epetra_DataAccess.h>
 #include <compile_time_options.h>
 #include <convenience_macros.h>
 #include <discretization.h>
@@ -562,14 +561,8 @@ namespace ryujin
          *
          * @precondition dim has to be larger or equal than dim2.
          */
-        template <typename ST,
-                  typename T = typename ST::value_type,
-                  int dim2 = ST::dimension - 2>
+        template <typename ST>
         state_type expand_state(const ST &state) const;
-        // refactor to static_assert with error message
-        //             typename = typename std::enable_if<(dim >= dim2)>::type,
-        //             typename = typename std::enable_if<std::is_same_v<Number,
-        //             T>>::type>
 
         /*
          * Given a primitive state [rho, u_1, ..., u_d, p] return a conserved
@@ -1151,11 +1144,19 @@ namespace ryujin
 
 
     template <int dim, typename Number>
-    template <typename ST, typename T, int dim2>
+    template <typename ST>
     auto
     HyperbolicSystem::View<dim, Number>::expand_state(const ST &state) const
         -> state_type
     {
+      using T = typename ST::value_type;
+      static_assert(std::is_same_v<Number, T>, "template mismatch");
+
+      constexpr auto dim2 = ST::dimension - 2;
+      static_assert(dim >= dim2,
+                    "the space dimension of the argument state must not be "
+                    "larger than the one of the target state");
+
       state_type result;
       result[0] = state[0];
       result[dim + 1] = state[dim2 + 1];

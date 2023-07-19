@@ -120,7 +120,7 @@ namespace ryujin
       using Bounds = std::array<Number, n_bounds>;
 
       /**
-       * Constructor taking a HyperbolicSystem::View instance as argument
+       * Constructor taking a HyperbolicSystem instance as argument
        */
       Limiter(const HyperbolicSystem &hyperbolic_system,
               const MultiComponentVector<ScalarNumber, n_precomputed_values>
