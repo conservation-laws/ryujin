@@ -99,6 +99,12 @@ namespace ryujin
         using state_type = dealii::Tensor<1, problem_dimension, Number>;
 
         /**
+         * MulticomponentVector for storing a vector of conserved states:
+         */
+        using vector_type =
+            MultiComponentVector<ScalarNumber, problem_dimension>;
+
+        /**
          * An array holding all component names of the conserved state as a
          * string.
          */
@@ -155,6 +161,13 @@ namespace ryujin
             std::array<Number, n_precomputed_initial_values>;
 
         /**
+         * MulticomponentVector for storing a vector of precomputed initial
+         * states:
+         */
+        using precomputed_initial_vector_type =
+            MultiComponentVector<ScalarNumber, n_precomputed_initial_values>;
+
+        /**
          * An array holding all component names of the precomputed values.
          */
         static inline const auto precomputed_initial_names =
@@ -171,6 +184,12 @@ namespace ryujin
         using precomputed_state_type = std::array<Number, n_precomputed_values>;
 
         /**
+         * MulticomponentVector for storing a vector of precomputed states:
+         */
+        using precomputed_vector_type =
+            MultiComponentVector<ScalarNumber, n_precomputed_values>;
+
+        /**
          * An array holding all component names of the precomputed values.
          */
         static inline const auto precomputed_names =
@@ -184,12 +203,11 @@ namespace ryujin
         /**
          * Precomputed values for a given state.
          */
-        template <unsigned int cycle, typename MCV, typename SPARSITY>
-        void precomputation(
-            MCV &precomputed_values,
-            const MultiComponentVector<ScalarNumber, problem_dimension> &U,
-            const SPARSITY &sparsity_simd,
-            unsigned int i) const = delete;
+        template <unsigned int cycle, typename SPARSITY>
+        void precomputation(precomputed_vector_type &precomputed_values,
+                            const vector_type &U,
+                            const SPARSITY &sparsity_simd,
+                            unsigned int i) const = delete;
 
         //@}
         /**
@@ -251,20 +269,18 @@ namespace ryujin
          *
          * For the Euler equations we simply compute <code>f(U_i)</code>.
          */
-        template <typename MCV1, typename MCV2>
         flux_contribution_type
-        flux_contribution(const MCV1 & /*precomputed_values*/,
-                          const MCV2 & /*precomputed_initial_values*/,
+        flux_contribution(const precomputed_vector_type & /*pv*/,
+                          const precomputed_initial_vector_type & /*piv*/,
                           const unsigned int /*i*/,
                           const state_type & /*U_i*/) const
         {
           return flux_contribution_type{};
         }
 
-        template <typename MCV1, typename MCV2>
         flux_contribution_type
-        flux_contribution(const MCV1 & /*precomputed_values*/,
-                          const MCV2 & /*precomputed_initial_values*/,
+        flux_contribution(const precomputed_vector_type & /*pv*/,
+                          const precomputed_initial_vector_type & /*piv*/,
                           const unsigned int * /*js*/,
                           const state_type & /*U_j*/) const
         {
@@ -306,14 +322,12 @@ namespace ryujin
         /** We do not have source terms */
         static constexpr bool have_source_terms = false;
 
-        template <typename MultiComponentVector>
-        state_type low_order_nodal_source(const MultiComponentVector &,
+        state_type low_order_nodal_source(const precomputed_vector_type &,
                                           const unsigned int,
                                           const state_type &) const = delete;
 
-        template <typename MultiComponentVector>
-        state_type high_order_nodal_source(const MultiComponentVector &,
-                                           const unsigned int i,
+        state_type high_order_nodal_source(const precomputed_vector_type &,
+                                           const unsigned int,
                                            const state_type &) const = delete;
 
         state_type low_order_stencil_source(

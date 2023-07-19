@@ -150,11 +150,11 @@ namespace ryujin
   Number HyperbolicModule<Description, dim, Number>::step(
       const vector_type &old_U,
       std::array<std::reference_wrapper<const vector_type>, stages> stage_U,
-      std::array<std::reference_wrapper<const precomputed_type>, stages>
+      std::array<std::reference_wrapper<const precomputed_vector_type>, stages>
           stage_precomputed,
       const std::array<Number, stages> stage_weights,
       vector_type &new_U,
-      precomputed_type &new_precomputed,
+      precomputed_vector_type &new_precomputed,
       Number tau /*= 0.*/) const
   {
 #ifdef DEBUG_OUTPUT
