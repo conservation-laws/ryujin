@@ -93,8 +93,7 @@ namespace ryujin
 
       for (unsigned int i = 0; i < n_owned; ++i) {
         const auto U_i = U.get_tensor(i);
-        const auto primitive_state =
-            hyperbolic_system_.to_primitive_state(U_i);
+        const auto primitive_state = hyperbolic_system_.to_primitive_state(U_i);
 
         for (unsigned int k = 0; k < problem_dimension; ++k)
           state_[k].local_element(i) = primitive_state[k];

@@ -754,7 +754,7 @@ namespace ryujin
     HyperbolicSystem::View<dim, Number>::pressure(const state_type &U) const
     {
       /* p = (gamma - 1) / (1 - b * rho) * (rho e) */
-      return gamma() * internal_energy(U);
+      return (gamma() - ScalarNumber(1.)) * internal_energy(U);
     }
 
 
