@@ -29,15 +29,16 @@ namespace ryujin
      * @ingroup EulerEquations
      */
     template <int dim, typename Number>
-    class TwoDContrast : public InitialState<Description, dim, Number>
+    class FourStateContrast : public InitialState<Description, dim, Number>
     {
     public:
       using HyperbolicSystemView = HyperbolicSystem::View<dim, Number>;
       using state_type = typename HyperbolicSystemView::state_type;
 
-      TwoDContrast(const HyperbolicSystemView &hyperbolic_system,
-                   const std::string &subsection)
-          : InitialState<Description, dim, Number>("2d contrast", subsection)
+      FourStateContrast(const HyperbolicSystemView &hyperbolic_system,
+                        const std::string &subsection)
+          : InitialState<Description, dim, Number>("four state contrast",
+                                                   subsection)
           , hyperbolic_system(hyperbolic_system)
       {
 
