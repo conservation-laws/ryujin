@@ -23,7 +23,8 @@ namespace ryujin
   namespace Euler
   {
     /**
-     * Description of a @p dim dimensional hyperbolic conservation law.
+     * The compressible Euler equations of gas dynamics. Specialized
+     * implementation for a polytropic gas equation.
      *
      * We have a (2 + dim) dimensional state space \f$[\rho, \textbf m,
      * E]\f$, where \f$\rho\f$ denotes the density, \f$\textbf m\f$ is the
@@ -46,6 +47,10 @@ namespace ryujin
       HyperbolicSystem(const std::string &subsection = "/HyperbolicSystem");
 
     private:
+      /**
+       * @name Runtime parameters, internal fields and methods
+       */
+      //@{
       double gamma_;
       double reference_density_;
       double vacuum_state_relaxation_;
@@ -54,6 +59,7 @@ namespace ryujin
       double gamma_minus_one_inverse_;
       double gamma_minus_one_over_gamma_plus_one_;
       double gamma_plus_one_inverse_;
+      //@}
 
     public:
       /**
@@ -152,13 +158,16 @@ namespace ryujin
           return ScalarNumber(
               hyperbolic_system_.gamma_minus_one_over_gamma_plus_one_);
         }
+        //@}
+        /**
+         * @name Internal data
+         */
+        //@{
 
       private:
         const HyperbolicSystem &hyperbolic_system_;
 
-
       public:
-        //@}
         /**
          * @name Types and compile time constants
          */
@@ -170,8 +179,7 @@ namespace ryujin
         static constexpr unsigned int problem_dimension = 2 + dim;
 
         /**
-         * The storage type used for a (conserved) state vector \f$\boldsymbol
-         * U\f$.
+         * The storage type used for a (conserved) state \f$\boldsymbol U\f$.
          */
         using state_type = dealii::Tensor<1, problem_dimension, Number>;
 
@@ -610,6 +618,7 @@ namespace ryujin
         template <typename Lambda>
         state_type apply_galilei_transform(const state_type &state,
                                            const Lambda &lambda) const;
+        //@}
       }; /* HyperbolicSystem::View */
 
       template <int dim, typename Number>
@@ -734,9 +743,9 @@ namespace ryujin
       /*
        * rho e = (E - 1/2*m^2/rho)
        */
-      const Number rho_inverse = ScalarNumber(1.) / U[0];
+      const Number rho_inverse = ScalarNumber(1.) / density(U);
       const auto m = momentum(U);
-      const Number E = U[dim + 1];
+      const Number E = total_energy(U);
       return E - ScalarNumber(0.5) * m.norm_square() * rho_inverse;
     }
 
@@ -753,7 +762,7 @@ namespace ryujin
        *   (rho e)' = (1/2m^2/rho^2, -m/rho , 1 )^T
        */
 
-      const Number rho_inverse = ScalarNumber(1.) / U[0];
+      const Number rho_inverse = ScalarNumber(1.) / density(U);
       const auto u = momentum(U) * rho_inverse;
 
       state_type result;
@@ -783,7 +792,7 @@ namespace ryujin
         const state_type &U) const
     {
       /* c^2 = gamma * p / rho / (1 - b * rho) */
-      const Number rho_inverse = ScalarNumber(1.) / U[0];
+      const Number rho_inverse = ScalarNumber(1.) / density(U);
       const Number p = pressure(U);
       return std::sqrt(gamma() * p * rho_inverse);
     }
@@ -795,7 +804,7 @@ namespace ryujin
         const state_type &U) const
     {
       /* exp((gamma - 1)s) = (rho e) / rho ^ gamma */
-      const auto rho_inverse = ScalarNumber(1.) / U[0];
+      const auto rho_inverse = ScalarNumber(1.) / density(U);
       return internal_energy(U) * ryujin::pow(rho_inverse, gamma());
     }
 
@@ -807,9 +816,9 @@ namespace ryujin
     {
       /* rho^2 e = \rho E - 1/2*m^2 */
 
-      const Number rho = U[0];
+      const Number rho = density(U);
       const auto m = momentum(U);
-      const Number E = U[dim + 1];
+      const Number E = total_energy(U);
 
       const Number rho_rho_e = rho * E - ScalarNumber(0.5) * m.norm_square();
       return ryujin::pow(rho_rho_e, gamma_plus_one_inverse());
@@ -832,9 +841,9 @@ namespace ryujin
        *
        */
 
-      const Number rho = U[0];
+      const Number rho = density(U);
       const auto m = momentum(U);
-      const Number E = U[dim + 1];
+      const Number E = total_energy(U);
 
       const Number rho_rho_e = rho * E - ScalarNumber(0.5) * m.norm_square();
 
@@ -881,7 +890,7 @@ namespace ryujin
        *
        *     (1/2m^2/rho^2 , -m/rho , 1 )^T
        */
-      const Number &rho = U[0];
+      const Number rho = density(U);
       const Number rho_inverse = ScalarNumber(1.) / rho;
       const auto u = momentum(U) * rho_inverse;
       const auto p = pressure(U);
@@ -1116,10 +1125,10 @@ namespace ryujin
     HyperbolicSystem::View<dim, Number>::f(const state_type &U) const
         -> flux_type
     {
-      const auto rho_inverse = ScalarNumber(1.) / U[0];
+      const auto rho_inverse = ScalarNumber(1.) / density(U);
       const auto m = momentum(U);
       const auto p = pressure(U);
-      const auto E = U[dim + 1];
+      const auto E = total_energy(U);
 
       flux_type result;
 
