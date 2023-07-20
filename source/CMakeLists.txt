@@ -78,11 +78,10 @@ macro(setup_equation EQUATION)
   list(APPEND OBJECT_TARGETS obj_${EQUATION} obj_${EQUATION}_dependent)
 endmacro()
 
-file(GLOB _directories RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *)
-foreach(_directory ${_directories})
-  if(IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/${_directory}")
-    setup_equation("${_directory}")
-  endif()
+file(GLOB _files RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS */CMakeLists.txt)
+foreach(_file ${_files})
+  get_filename_component(_directory "${_file}" DIRECTORY)
+  setup_equation("${_directory}")
 endforeach()
 
 #

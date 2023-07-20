@@ -3,8 +3,6 @@
 // Copyright (C) 2020 - 2023 by the ryujin authors
 //
 
-#pragma once
-
 #include "equation_of_state_library.h"
 
 #include "equation_of_state_jones_wilkins_lee.h"

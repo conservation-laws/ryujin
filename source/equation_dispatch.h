@@ -11,7 +11,7 @@
 
 #include "euler/description.h"
 #include "euler_aeos/description.h"
-#include "shallow_water/description.h"
+// #include "shallow_water/description.h"
 
 #include <deal.II/base/mpi.h>
 
@@ -38,7 +38,7 @@ namespace ryujin
     /**
      * The shallow water equations
      */
-    shallow_water
+    //shallow_water
   };
 } // namespace ryujin
 
@@ -46,7 +46,8 @@ namespace ryujin
 DECLARE_ENUM(ryujin::Equation,
              LIST({ryujin::Equation::euler, "euler"},
                   {ryujin::Equation::euler_aeos, "euler aeos"},
-                  {ryujin::Equation::shallow_water, "shallow water"}));
+                  // {ryujin::Equation::shallow_water, "shallow water"},
+                  ));
 #endif
 
 namespace ryujin
@@ -71,11 +72,11 @@ namespace ryujin
     return Equation::euler_aeos;
   }
 
-  template <>
-  constexpr Equation get_equation<ShallowWater::Description>()
-  {
-    return Equation::shallow_water;
-  }
+//   template <>
+//   constexpr Equation get_equation<ShallowWater::Description>()
+//   {
+//     return Equation::shallow_water;
+//   }
 #endif
 
 
@@ -119,12 +120,12 @@ namespace ryujin
         ParameterAcceptor::initialize(parameter_file);
         time_loop.run();
       }; break;
-      case Equation::shallow_water: {
-        ryujin::TimeLoop<ryujin::ShallowWater::Description, DIM, NUMBER>
-            time_loop(mpi_communicator);
-        ParameterAcceptor::initialize(parameter_file);
-        time_loop.run();
-      }; break;
+//       case Equation::shallow_water: {
+//         ryujin::TimeLoop<ryujin::ShallowWater::Description, DIM, NUMBER>
+//             time_loop(mpi_communicator);
+//         ParameterAcceptor::initialize(parameter_file);
+//         time_loop.run();
+//       }; break;
       }
     }
 
@@ -185,7 +186,7 @@ namespace ryujin
     internal::create_parameter_template<EulerAEOS::Description>(
         parameter_file, mpi_communicator);
 
-    internal::create_parameter_template<ShallowWater::Description>(
-        parameter_file, mpi_communicator);
+//     internal::create_parameter_template<ShallowWater::Description>(
+//         parameter_file, mpi_communicator);
   }
 } // namespace ryujin
