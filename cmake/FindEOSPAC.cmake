@@ -8,7 +8,6 @@
 
 set(EOSPAC_LIBRARY "")
 foreach(_prefix ${CMAKE_PREFIX_PATH})
-  message(STATUS "${_prefix}")
   file(GLOB_RECURSE _candidates ${_prefix}/*/libeospac6.a)
   if(NOT "${_candidates}" STREQUAL "")
     list(GET _candidates 0 EOSPAC_LIBRARY)
@@ -21,7 +20,6 @@ endif()
 
 set(EOSPAC_INCLUDE_DIR "")
 foreach(_prefix ${CMAKE_PREFIX_PATH})
-  message(STATUS "${_prefix}")
   file(GLOB_RECURSE _candidates ${_prefix}/*/eos_Interface.h)
   if(NOT "${_candidates}" STREQUAL "")
     list(GET _candidates 0 EOSPAC_INCLUDE_DIR)

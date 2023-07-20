@@ -8,6 +8,7 @@
 #include "equation_of_state_jones_wilkins_lee.h"
 #include "equation_of_state_noble_abel_stiffened_gas.h"
 #include "equation_of_state_polytropic_gas.h"
+#include "equation_of_state_sesame.h"
 #include "equation_of_state_van_der_waals.h"
 
 namespace ryujin
@@ -30,10 +31,11 @@ namespace ryujin
           equation_of_state_list.emplace(std::move(object));
         };
 
-        add(std::make_unique<PolytropicGas>(subsection));
-        add(std::make_unique<VanDerWaals>(subsection));
-        add(std::make_unique<NobleAbelStiffenedGas>(subsection));
         add(std::make_unique<JonesWilkinsLee>(subsection));
+        add(std::make_unique<NobleAbelStiffenedGas>(subsection));
+        add(std::make_unique<PolytropicGas>(subsection));
+        add(std::make_unique<Sesame>(subsection));
+        add(std::make_unique<VanDerWaals>(subsection));
       }
 
     } // namespace EquationOfStateLibrary
