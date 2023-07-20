@@ -207,6 +207,7 @@ namespace ryujin
         Sesame(const std::string &subsection)
             : EquationOfState("sesame", subsection)
         {
+          material_id_ = 5030;
           this->add_parameter(
               "material id", material_id_, "The Sesame Material ID");
 
