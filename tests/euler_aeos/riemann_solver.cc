@@ -17,7 +17,7 @@ int main()
   HyperbolicSystem hyperbolic_system;
 
   static constexpr unsigned int n_precomputed_values =
-      HyperbolicSystem::n_precomputed_values<dim>;
+      HyperbolicSystem::View<dim, double>::n_precomputed_values;
   using precomputed_type = MultiComponentVector<double, n_precomputed_values>;
   precomputed_type dummy;
 
@@ -40,7 +40,8 @@ int main()
     result[1] = u;
     result[2] = p;
     result[3] = gamma;
-    const double interpolation_b = hyperbolic_system.interpolation_b_();
+    const double interpolation_b =
+        hyperbolic_system.view<dim, double>().eos_interpolation_b();
     const double x = 1. - interpolation_b * rho;
     result[4] = std::sqrt(gamma * p / (rho * x));
     return result;

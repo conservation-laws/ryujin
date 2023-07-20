@@ -51,8 +51,6 @@ namespace ryujin
     DEAL_II_ALWAYS_INLINE inline Number
     RiemannSolver<dim, Number>::c(const Number gamma) const
     {
-      using ScalarNumber = typename get_value_type<Number>::type;
-
       /*
        * We implement the continuous and monotonic function c(gamma) as
        * defined in (A.3) on page A469 of @cite ClaytonGuermondPopov-2022.
@@ -87,9 +85,7 @@ namespace ryujin
     DEAL_II_ALWAYS_INLINE inline Number RiemannSolver<dim, Number>::alpha(
         const Number &rho, const Number &gamma, const Number &a) const
     {
-      using ScalarNumber = typename get_value_type<Number>::type;
-
-      const ScalarNumber interpolation_b = hyperbolic_system.interpolation_b_();
+      const auto interpolation_b = hyperbolic_system.eos_interpolation_b();
 
       const Number numerator =
           ScalarNumber(2.) * a * (Number(1.) - interpolation_b * rho);
@@ -106,8 +102,6 @@ namespace ryujin
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
-      using ScalarNumber = typename get_value_type<Number>::type;
-
       const auto &[rho_i, u_i, p_i, gamma_i, a_i] = riemann_data_i;
       const auto &[rho_j, u_j, p_j, gamma_j, a_j] = riemann_data_j;
       const auto alpha_i = alpha(rho_i, gamma_i, a_i);
@@ -204,8 +198,7 @@ namespace ryujin
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
-      using ScalarNumber = typename get_value_type<Number>::type;
-      const ScalarNumber interpolation_b = hyperbolic_system.interpolation_b_();
+      const auto interpolation_b = hyperbolic_system.eos_interpolation_b();
 
       const auto &[rho_i, u_i, p_i, gamma_i, a_i] = riemann_data_i;
       const auto &[rho_j, u_j, p_j, gamma_j, a_j] = riemann_data_j;
@@ -282,8 +275,6 @@ namespace ryujin
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
-      using ScalarNumber = typename get_value_type<Number>::type;
-
       const auto &[rho_i, u_i, p_i, gamma_i, a_i] = riemann_data_i;
       const auto &[rho_j, u_j, p_j, gamma_j, a_j] = riemann_data_j;
       const auto alpha_i = alpha(rho_i, gamma_i, a_i);
@@ -367,8 +358,7 @@ namespace ryujin
     RiemannSolver<dim, Number>::f(const primitive_type &riemann_data,
                                   const Number p_star) const
     {
-      using ScalarNumber = typename get_value_type<Number>::type;
-      const ScalarNumber interpolation_b = hyperbolic_system.interpolation_b_();
+      const auto interpolation_b = hyperbolic_system.eos_interpolation_b();
 
       const auto &[rho, u, p, gamma, a] = riemann_data;
 
@@ -413,8 +403,7 @@ namespace ryujin
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
-      using ScalarNumber = typename get_value_type<Number>::type;
-      const ScalarNumber interpolation_b = hyperbolic_system.interpolation_b_();
+      const auto interpolation_b = hyperbolic_system.eos_interpolation_b();
 
       const auto &[rho_i, u_i, p_i, gamma_i, a_i] = riemann_data_i;
       const auto &[rho_j, u_j, p_j, gamma_j, a_j] = riemann_data_j;

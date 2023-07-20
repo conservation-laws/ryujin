@@ -14,7 +14,7 @@ namespace ryujin
     /* instantiations */
 
     template std::tuple<NUMBER, bool>
-    Limiter<DIM, NUMBER>::limit(const HyperbolicSystem &,
+    Limiter<DIM, NUMBER>::limit(const HyperbolicSystemView &,
                                 const std::array<NUMBER, 4> &,
                                 const state_type &,
                                 const state_type &,
@@ -25,7 +25,7 @@ namespace ryujin
 
     template std::tuple<VectorizedArray<NUMBER>, bool>
     Limiter<DIM, VectorizedArray<NUMBER>>::limit(
-        const HyperbolicSystem &,
+        const HyperbolicSystemView &,
         const std::array<VectorizedArray<NUMBER>, 4> &,
         const state_type &,
         const state_type &,

@@ -62,36 +62,49 @@ namespace ryujin
     {
     public:
       /**
-       * @copydoc HyperbolicSystem::problem_dimension
+       * @copydoc HyperbolicSystem::View
+       */
+      using HyperbolicSystemView = HyperbolicSystem::View<dim, Number>;
+
+      /**
+       * @copydoc HyperbolicSystem::View::problem_dimension
        */
       static constexpr unsigned int problem_dimension =
-          HyperbolicSystem::problem_dimension<dim>;
+          HyperbolicSystemView::problem_dimension;
 
       /**
-       * @copydoc HyperbolicSystem::precomputed_type
+       * @copydoc HyperbolicSystem::View::state_type
        */
-      using precomputed_type = HyperbolicSystem::precomputed_type<dim, Number>;
+      using state_type = typename HyperbolicSystemView::state_type;
 
       /**
-       * @copydoc HyperbolicSystem::n_precomputed_values
+       * @copydoc HyperbolicSystem::View::n_precomputed_values
        */
       static constexpr unsigned int n_precomputed_values =
-          HyperbolicSystem::n_precomputed_values<dim>;
+          HyperbolicSystemView::n_precomputed_values;
 
       /**
-       * @copydoc HyperbolicSystem::state_type
+       * @copydoc HyperbolicSystem::View::precomputed_state_type
        */
-      using state_type = HyperbolicSystem::state_type<dim, Number>;
+      using precomputed_state_type =
+          typename HyperbolicSystemView::precomputed_state_type;
 
       /**
-       * @copydoc HyperbolicSystem::flux_type
+       * @copydoc HyperbolicSystem::View::flux_type
        */
-      using flux_type = HyperbolicSystem::flux_type<dim, Number>;
+      using flux_type =
+          typename HyperbolicSystemView::flux_type;
 
       /**
-       * @copydoc HyperbolicSystem::ScalarNumber
+       * @copydoc HyperbolicSystem::View::flux_type
        */
-      using ScalarNumber = typename get_value_type<Number>::type;
+      using flux_contribution_type =
+          typename HyperbolicSystemView::flux_contribution_type;
+
+      /**
+       * @copydoc HyperbolicSystem::View::ScalarNumber
+       */
+      using ScalarNumber = typename HyperbolicSystemView::ScalarNumber;
 
       /**
        * @name Stencil-based computation of indicators
@@ -150,7 +163,7 @@ namespace ryujin
        */
       //@{
 
-      const HyperbolicSystem &hyperbolic_system;
+      const HyperbolicSystem::View<dim, Number> hyperbolic_system;
 
       const MultiComponentVector<ScalarNumber, n_precomputed_values>
           &precomputed_values;
@@ -179,7 +192,8 @@ namespace ryujin
       /* entropy viscosity commutator: */
 
       const auto &[p_i, gamma_min_i, s_i, new_eta_i] =
-          precomputed_values.template get_tensor<Number, precomputed_type>(i);
+          precomputed_values
+              .template get_tensor<Number, precomputed_state_type>(i);
 
       gamma_min = gamma_min_i;
 

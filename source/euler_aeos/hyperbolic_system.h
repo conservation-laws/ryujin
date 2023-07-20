@@ -573,6 +573,40 @@ namespace ryujin
         equilibrated_states(const flux_contribution_type &flux_i,
                             const flux_contribution_type &flux_j) = delete;
 
+        /**
+         * @name Computing stencil source terms
+         */
+        //@{
+
+        /** We do not have source terms */
+        static constexpr bool have_source_terms = false;
+
+        state_type low_order_nodal_source(const precomputed_vector_type &,
+                                          const unsigned int,
+                                          const state_type &) const = delete;
+
+        state_type high_order_nodal_source(const precomputed_vector_type &,
+                                           const unsigned int,
+                                           const state_type &) const = delete;
+
+        state_type low_order_stencil_source(
+            const flux_contribution_type &,
+            const flux_contribution_type &,
+            const Number,
+            const dealii::Tensor<1, dim, Number> &) const = delete;
+
+        state_type high_order_stencil_source(
+            const flux_contribution_type &,
+            const flux_contribution_type &,
+            const Number,
+            const dealii::Tensor<1, dim, Number> &) const = delete;
+
+        state_type affine_shift_stencil_source(
+            const flux_contribution_type &,
+            const flux_contribution_type &,
+            const Number,
+            const dealii::Tensor<1, dim, Number> &) const = delete;
+
         //@}
         /**
          * @name State transformations
@@ -639,7 +673,7 @@ namespace ryujin
      */
 
 
-    HyperbolicSystem::HyperbolicSystem(
+    inline HyperbolicSystem::HyperbolicSystem(
         const std::string &subsection /*= "HyperbolicSystem"*/)
         : ParameterAcceptor(subsection)
     {
@@ -1086,7 +1120,7 @@ namespace ryujin
       state_type result = U;
 
       if (id == Boundary::dirichlet) {
-        U = get_dirichlet_data();
+        result = get_dirichlet_data();
 
       } else if (id == Boundary::slip) {
         auto m = momentum(U);
@@ -1099,10 +1133,7 @@ namespace ryujin
           result[k + 1] = Number(0.);
 
       } else if (id == Boundary::dynamic) {
-        /* FIXME: Currently does not work */
-        AssertThrow(false, dealii::ExcNotImplemented());
-        __builtin_trap();
-
+#if 0
         /*
          * On dynamic boundary conditions, we distinguish four cases:
          *
@@ -1117,36 +1148,32 @@ namespace ryujin
          */
         const auto m = momentum(U);
         const auto rho = density(U);
+        const auto a = speed_of_sound(U);
         const auto vn = m * normal / rho;
-
-        const auto p = surrogate_pressure(U); // FIXME: discuss
-        const auto gamma = surrogate_gamma(U, p);
-
-        const auto interpolation_b = ScalarNumber(eos_interpolation_b());
-        const auto x = Number(1.) - interpolation_b * rho;
-        const auto a = std::sqrt(gamma * p / (rho * x)); // local speed of sound
 
         /* Supersonic inflow: */
         if (vn < -a) {
-          U = get_dirichlet_data();
+          result = get_dirichlet_data();
         }
 
         /* Subsonic inflow: */
         if (vn >= -a && vn <= 0.) {
           const auto U_dirichlet = get_dirichlet_data();
-          U = prescribe_riemann_characteristic<2>(U_dirichlet, U, normal);
+          result = prescribe_riemann_characteristic<2>(U_dirichlet, U, normal);
         }
 
         /* Subsonic outflow: */
         if (vn > 0. && vn <= a) {
           const auto U_dirichlet = get_dirichlet_data();
-          U = prescribe_riemann_characteristic<1>(U, U_dirichlet, normal);
+          result = prescribe_riemann_characteristic<1>(U, U_dirichlet, normal);
         }
 
         /* Supersonic outflow: do nothing, i.e., keep U as is */
+#endif
+        __builtin_trap();
       }
 
-      return U;
+      return result;
     }
 
 
