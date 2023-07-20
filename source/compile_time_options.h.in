@@ -23,6 +23,7 @@
 
 #cmakedefine WITH_ASYNC_MPI_EXCHANGE
 #cmakedefine WITH_CUSTOM_POW
+#cmakedefine WITH_EOSPAC
 #cmakedefine WITH_LIKWID
 #cmakedefine WITH_OPENMP
 #cmakedefine WITH_VALGRIND
