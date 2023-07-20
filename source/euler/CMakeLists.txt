@@ -4,6 +4,7 @@
 ##
 
 add_library(obj_euler OBJECT
+  initial_state_library.cc
   limiter.cc
   riemann_solver.cc
   )
