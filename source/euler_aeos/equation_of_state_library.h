@@ -5,10 +5,7 @@
 
 #pragma once
 
-#include "equation_of_state_jones_wilkins_lee.h"
-#include "equation_of_state_noble_abel_stiffened_gas.h"
-#include "equation_of_state_polytropic_gas.h"
-#include "equation_of_state_van_der_waals.h"
+#include "equation_of_state.h"
 
 namespace ryujin
 {
@@ -22,19 +19,13 @@ namespace ryujin
        *
        * @ingroup EulerEquations
        */
-      template <typename T>
-      void populate_equation_of_state_list(T &equation_of_state_list,
-                                           const std::string &subsection)
-      {
-        auto add = [&](auto &&object) {
-          equation_of_state_list.emplace(std::move(object));
-        };
 
-        add(std::make_unique<PolytropicGas>(subsection));
-        add(std::make_unique<VanDerWaals>(subsection));
-        add(std::make_unique<NobleAbelStiffenedGas>(subsection));
-        add(std::make_unique<JonesWilkinsLee>(subsection));
-      }
+      using equation_of_state_list_type =
+          std::set<std::unique_ptr<EquationOfState>>;
+
+      void populate_equation_of_state_list(
+          equation_of_state_list_type &equation_of_state_list,
+          const std::string &subsection);
 
     } // namespace EquationOfStateLibrary
   }   // namespace EulerAEOS
