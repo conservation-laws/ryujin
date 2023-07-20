@@ -5,15 +5,12 @@
 
 #pragma once
 
-#include "hyperbolic_system.h"
-#include <initial_state.h>
+#include <initial_state_library.h>
 
 namespace ryujin
 {
-  namespace Euler
+  namespace EulerInitialStates
   {
-    struct Description;
-
     /**
      * An initial state formed by a contrast of a given "left" and "right"
      * primitive state.
@@ -24,11 +21,13 @@ namespace ryujin
      *
      * @ingroup EulerEquations
      */
-    template <int dim, typename Number>
+    template <typename Description, int dim, typename Number>
     class Contrast : public InitialState<Description, dim, Number>
     {
     public:
-      using HyperbolicSystemView = HyperbolicSystem::View<dim, Number>;
+      using HyperbolicSystem = typename Description::HyperbolicSystem;
+      using HyperbolicSystemView =
+          typename HyperbolicSystem::template View<dim, Number>;
       using state_type = typename HyperbolicSystemView::state_type;
 
       Contrast(const HyperbolicSystemView &hyperbolic_system,

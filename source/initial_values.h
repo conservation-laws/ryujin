@@ -7,7 +7,7 @@
 
 #include <compile_time_options.h>
 
-#include "initial_state.h"
+#include "initial_state_library.h"
 #include "offline_data.h"
 
 #include <deal.II/base/parameter_acceptor.h>
@@ -46,7 +46,7 @@ namespace ryujin
      * @copydoc HyperbolicSystem::View
      */
     using HyperbolicSystemView =
-        typename Description::HyperbolicSystem::template View<dim, Number>;
+        typename HyperbolicSystem::template View<dim, Number>;
 
     /**
      * @copydoc HyperbolicSystem::problem_dimension
@@ -158,8 +158,8 @@ namespace ryujin
     dealii::SmartPointer<const HyperbolicSystem> hyperbolic_system_;
     dealii::SmartPointer<const OfflineData<dim, Number>> offline_data_;
 
-    std::set<std::unique_ptr<InitialState<Description, dim, Number>>>
-        initial_state_list_;
+    typename InitialStateLibrary<Description, dim, Number>::
+        initial_state_list_type initial_state_list_;
 
     std::function<state_type(const dealii::Point<dim> &point, Number t)>
         initial_state_;

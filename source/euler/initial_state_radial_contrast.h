@@ -5,20 +5,17 @@
 
 #pragma once
 
-#include "hyperbolic_system.h"
-#include <initial_state.h>
+#include <initial_state_library.h>
 
 namespace ryujin
 {
-  namespace Euler
+  namespace EulerInitialStates
   {
-    struct Description;
-
     /**
-     * A slight modification of the "contrast" initial state. Now, we have
-     * an initial state formed by a contrast of a given "left" and "right"
-     * primitive state where the "left" state is "inside" the radius, R, and the
-     * "right" state is outside.
+     * A modification of the "contrast" initial state. Now, we have an
+     * initial state formed by a contrast of a given "left" and "right"
+     * primitive state where the "left" state is "inside" the radius, R,
+     * and the "right" state is outside.
      *
      * @note This class does not evolve a possible shock front in time. If
      * you need correct time-dependent Dirichlet data use @ref ShockFront
@@ -26,11 +23,13 @@ namespace ryujin
      *
      * @ingroup EulerEquations
      */
-    template <int dim, typename Number>
+    template <typename Description, int dim, typename Number>
     class RadialContrast : public InitialState<Description, dim, Number>
     {
     public:
-      using HyperbolicSystemView = HyperbolicSystem::View<dim, Number>;
+      using HyperbolicSystem = typename Description::HyperbolicSystem;
+      using HyperbolicSystemView =
+          typename HyperbolicSystem::template View<dim, Number>;
       using state_type = typename HyperbolicSystemView::state_type;
 
       RadialContrast(const HyperbolicSystemView &hyperbolic_system,

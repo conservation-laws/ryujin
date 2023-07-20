@@ -5,15 +5,12 @@
 
 #pragma once
 
-#include "hyperbolic_system.h"
-#include <initial_state.h>
+#include <initial_state_library.h>
 
 namespace ryujin
 {
-  namespace Euler
+  namespace EulerInitialStates
   {
-    struct Description;
-
     /**
      * The rarefaction
      * @todo Documentation
@@ -21,11 +18,13 @@ namespace ryujin
      * @ingroup EulerEquations
      */
 
-    template <int dim, typename Number>
+    template <typename Description, int dim, typename Number>
     class Rarefaction : public InitialState<Description, dim, Number>
     {
     public:
-      using HyperbolicSystemView = HyperbolicSystem::View<dim, Number>;
+      using HyperbolicSystem = typename Description::HyperbolicSystem;
+      using HyperbolicSystemView =
+          typename HyperbolicSystem::template View<dim, Number>;
       using state_type = typename HyperbolicSystemView::state_type;
 
       Rarefaction(const HyperbolicSystemView &hyperbolic_system,
@@ -35,100 +34,97 @@ namespace ryujin
       {
       } /* Constructor */
 
-      state_type compute(const dealii::Point<dim> &point, Number t) final;
-
-    private:
-      const HyperbolicSystemView hyperbolic_system;
-    }; // Rarefaction
-
 #if 0
 //       Number cL, rhoL, uL, pL;
 //       Number rhoR, uR, pR, cR;
 //       Number k1, k2, dens_pow, k3, p_pow;
 #endif
 
-    template <int dim, typename Number>
-    auto Rarefaction<dim, Number>::compute(const dealii::Point<dim> &point,
-                                           Number t) -> state_type
-    {
-      const Number gamma = hyperbolic_system.gamma();
+      state_type compute(const dealii::Point<dim> &point, Number t) final
+      {
+        const Number gamma = hyperbolic_system.gamma();
 
-      using state_type_1d = std::array<Number, 3>;
+        using state_type_1d = std::array<Number, 3>;
 
-      /*
-       * Compute the speed of sound:
-       */
-      const auto speed_of_sound = [&](const auto rho, const auto p) {
-        return std::sqrt(gamma * p / rho);
-      };
+        /*
+         * Compute the speed of sound:
+         */
+        const auto speed_of_sound = [&](const auto rho, const auto p) {
+          return std::sqrt(gamma * p / rho);
+        };
 
-      /*
-       * Compute the rarefaction right side:
-       */
-      const auto rarefaction_right_state = [&](const auto primitive_left,
-                                               const auto rho_right) {
+        /*
+         * Compute the rarefaction right side:
+         */
+        const auto rarefaction_right_state = [&](const auto primitive_left,
+                                                 const auto rho_right) {
+          const auto &[rho_left, u_left, p_left] = primitive_left;
+          state_type_1d primitive_right{{rho_right, 0., 0.}};
+
+          /* Isentropic condition: pR = (rhoR/rhoL)^{gamma} * pL */
+          primitive_right[2] = std::pow(rho_right / rho_left, gamma) * p_left;
+
+          const auto c_left = speed_of_sound(rho_left, p_left);
+          const auto c_right = speed_of_sound(rho_right, primitive_right[2]);
+
+          /* 1-Riemann invariant: uR + 2 cR/(gamma -1) = uL + 2 cL/(gamma -1) */
+          primitive_right[1] =
+              u_left + 2.0 * (c_left - c_right) / (gamma - 1.0);
+
+          return primitive_right;
+        };
+
+        /* Initial left and right states (rho, u, p): */
+        const state_type_1d primitive_left{
+            {3.0, speed_of_sound(3.0, 1.0), 1.0}};
+        const state_type_1d primitive_right =
+            rarefaction_right_state(primitive_left, /*rho_right*/ 0.5);
+
+        /*
+         * Compute rarefaction solution:
+         */
+
         const auto &[rho_left, u_left, p_left] = primitive_left;
-        state_type_1d primitive_right{{rho_right, 0., 0.}};
-
-        /* Isentropic condition: pR = (rhoR/rhoL)^{gamma} * pL */
-        primitive_right[2] = std::pow(rho_right / rho_left, gamma) * p_left;
-
         const auto c_left = speed_of_sound(rho_left, p_left);
-        const auto c_right = speed_of_sound(rho_right, primitive_right[2]);
+        const auto &[rho_right, u_right, p_right] = primitive_right;
+        const auto c_right = speed_of_sound(rho_right, p_right);
 
-        /* 1-Riemann invariant: uR + 2 cR/(gamma -1) = uL + 2 cL/(gamma -1) */
-        primitive_right[1] = u_left + 2.0 * (c_left - c_right) / (gamma - 1.0);
+        /* Constants: */
+        const Number k1 = 2.0 / (gamma + 1.0);
+        const Number k2 = ((gamma - 1.0) / ((gamma + 1.0) * c_left));
+        const Number density_exponent = 2.0 / (gamma - 1.0);
+        const Number k3 = c_left + ((gamma - 1.0) / 2.0) * u_left;
+        const Number pressure_exponent = 2.0 * gamma / (gamma - 1.0);
 
-        return primitive_right;
-      };
+        const double &x = point[0];
 
-      /* Initial left and right states (rho, u, p): */
-      const state_type_1d primitive_left{{3.0, speed_of_sound(3.0, 1.0), 1.0}};
-      const state_type_1d primitive_right =
-          rarefaction_right_state(primitive_left, /*rho_right*/ 0.5);
+        state_type_1d primitive;
 
-      /*
-       * Compute rarefaction solution:
-       */
+        if (x <= t * (u_left - c_left)) {
+          primitive = primitive_left;
 
-      const auto &[rho_left, u_left, p_left] = primitive_left;
-      const auto c_left = speed_of_sound(rho_left, p_left);
-      const auto &[rho_right, u_right, p_right] = primitive_right;
-      const auto c_right = speed_of_sound(rho_right, p_right);
+        } else if (x <= t * (u_right - c_right)) {
 
-      /* Constants: */
-      const Number k1 = 2.0 / (gamma + 1.0);
-      const Number k2 = ((gamma - 1.0) / ((gamma + 1.0) * c_left));
-      const Number density_exponent = 2.0 / (gamma - 1.0);
-      const Number k3 = c_left + ((gamma - 1.0) / 2.0) * u_left;
-      const Number pressure_exponent = 2.0 * gamma / (gamma - 1.0);
+          /* Self-similar variable: */
+          const double chi = x / t;
 
-      const double &x = point[0];
+          primitive[0] =
+              rho_left * std::pow(k1 + k2 * (u_left - chi), density_exponent);
+          primitive[1] = k1 * (k3 + chi);
+          primitive[2] =
+              p_left * std::pow(k1 + k2 * (u_left - chi), pressure_exponent);
 
-      state_type_1d primitive;
+        } else {
+          primitive = primitive_right;
+        }
 
-      if (x <= t * (u_left - c_left)) {
-        primitive = primitive_left;
-
-      } else if (x <= t * (u_right - c_right)) {
-
-        /* Self-similar variable: */
-        const double chi = x / t;
-
-        primitive[0] =
-            rho_left * std::pow(k1 + k2 * (u_left - chi), density_exponent);
-        primitive[1] = k1 * (k3 + chi);
-        primitive[2] =
-            p_left * std::pow(k1 + k2 * (u_left - chi), pressure_exponent);
-
-      } else {
-        primitive = primitive_right;
+        return hyperbolic_system.from_primitive_state(
+            hyperbolic_system.expand_state(dealii::Tensor<1, 3, Number>{
+                {primitive[0], primitive[1], primitive[2]}}));
       }
 
-      return hyperbolic_system.from_primitive_state(
-          hyperbolic_system.expand_state(dealii::Tensor<1, 3, Number>{
-              {primitive[0], primitive[1], primitive[2]}}));
-    }
-
-  } // namespace Euler
+    private:
+      const HyperbolicSystemView hyperbolic_system;
+    }; // Rarefaction
+  }    // namespace Euler
 } // namespace ryujin

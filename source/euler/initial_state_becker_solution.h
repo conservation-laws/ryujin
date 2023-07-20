@@ -5,26 +5,25 @@
 
 #pragma once
 
-#include "hyperbolic_system.h"
-#include <initial_state.h>
+#include <initial_state_library.h>
 
 namespace ryujin
 {
-  namespace Euler
+  namespace EulerInitialStates
   {
-    struct Description;
-
     /**
      * An analytic solution of the compressible Navier Stokes system
      * @todo Documentation
      *
      * @ingroup EulerEquations
      */
-    template <int dim, typename Number>
+    template <typename Description, int dim, typename Number>
     class BeckerSolution : public InitialState<Description, dim, Number>
     {
     public:
-      using HyperbolicSystemView = HyperbolicSystem::View<dim, Number>;
+      using HyperbolicSystem = typename Description::HyperbolicSystem;
+      using HyperbolicSystemView =
+          typename HyperbolicSystem::template View<dim, Number>;
       using state_type = typename HyperbolicSystemView::state_type;
 
       BeckerSolution(const HyperbolicSystemView &hyperbolic_system,
@@ -170,11 +169,10 @@ namespace ryujin
                          (R_infty * velocity_left_ * velocity_right_ - v * v);
         Assert(e > 0., dealii::ExcInternalError());
 
-        const auto state_1d =
-            typename HyperbolicSystem::View<1, Number>::state_type{
-                {Number(rho),
-                 Number(rho * (velocity_ + v)),
-                 Number(rho * (e + 0.5 * (velocity_ + v) * (velocity_ + v)))}};
+        const auto state_1d = state_type{
+            {Number(rho),
+             Number(rho * (velocity_ + v)),
+             Number(rho * (e + 0.5 * (velocity_ + v) * (velocity_ + v)))}};
 
         return hyperbolic_system.expand_state(state_1d);
       }

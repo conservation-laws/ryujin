@@ -26,7 +26,7 @@ namespace ryujin
      * @ingroup EulerEquations
      */
     template <typename Description, int dim, typename Number>
-    class FourStateContrast : public InitialState<Description, dim, Number>
+    class TwoDContrast : public InitialState<Description, dim, Number>
     {
     public:
       using HyperbolicSystem = typename Description::HyperbolicSystem;
@@ -34,13 +34,11 @@ namespace ryujin
           typename HyperbolicSystem::template View<dim, Number>;
       using state_type = typename HyperbolicSystemView::state_type;
 
-      FourStateContrast(const HyperbolicSystemView &hyperbolic_system,
-                        const std::string &subsection)
-          : InitialState<Description, dim, Number>("four state contrast",
-                                                   subsection)
+      TwoDContrast(const HyperbolicSystemView &hyperbolic_system,
+                   const std::string subsection)
+          : InitialState<Description, dim, Number>("2d contrast", subsection)
           , hyperbolic_system(hyperbolic_system)
       {
-
         /* Set default values and get primitive states from user */
         primitive_top_left_[0] = 1.0;
         primitive_top_left_[1] = 0.0;
@@ -82,28 +80,40 @@ namespace ryujin
 
       state_type compute(const dealii::Point<dim> &point, Number /*t*/) final
       {
+        /* Set temporary states depending on location */
+        auto temp_top =
+            point[0] >= 0. ? primitive_top_right_ : primitive_top_left_;
+
+        auto temp_bottom =
+            point[0] >= 0. ? primitive_bottom_right_ : primitive_bottom_left_;
+
+        /* Convert (dim+1) entries from pressure to specific internal energy */
+        temp_top[dim + 1] = hyperbolic_system.specific_internal_energy_(
+            temp_top[0], temp_top[dim + 1]);
+
+        temp_bottom[dim + 1] = hyperbolic_system.specific_internal_energy_(
+            temp_bottom[0], temp_bottom[dim + 1]);
+
+        /* Convert to regular states */
+        temp_top = hyperbolic_system.from_primitive_state(temp_top);
+        temp_bottom = hyperbolic_system.from_primitive_state(temp_bottom);
+
+        /* Return final state if dim = 2 */
         if constexpr (dim != 2) {
           AssertThrow(false, dealii::ExcNotImplemented());
           __builtin_trap();
-        }
-
-        /* Set temporary states depending on location */
-        const auto temp_top =
-            point[0] >= 0. ? primitive_top_right_ : primitive_top_left_;
-        const auto temp_bottom =
-            point[0] >= 0. ? primitive_bottom_right_ : primitive_bottom_left_;
-
-        return hyperbolic_system.from_primitive_state(
-            point[1] >= 0. ? temp_top : temp_bottom);
+        } else
+          return hyperbolic_system.template expand_state<dim>(
+              point[1] >= 0. ? temp_top : temp_bottom);
       }
 
     private:
-      const HyperbolicSystemView hyperbolic_system;
+      const HyperbolicSystem &hyperbolic_system;
 
-      state_type primitive_top_left_;
-      state_type primitive_bottom_left_;
-      state_type primitive_top_right_;
-      state_type primitive_bottom_right_;
+      dealii::Tensor<1, 4, Number> primitive_top_left_;
+      dealii::Tensor<1, 4, Number> primitive_bottom_left_;
+      dealii::Tensor<1, 4, Number> primitive_top_right_;
+      dealii::Tensor<1, 4, Number> primitive_bottom_right_;
     };
-  } // namespace Euler
+  } // namespace EulerAEOS
 } // namespace ryujin

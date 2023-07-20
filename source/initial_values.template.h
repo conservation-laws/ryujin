@@ -5,8 +5,6 @@
 
 #pragma once
 
-#include <initial_state_library.h>
-
 #include "initial_values.h"
 #include "simd.h"
 
@@ -60,9 +58,8 @@ namespace ryujin
      * And finally populate the initial state list with all initial state
      * configurations defined in the InitialStateLibrary namespace:
      */
-    Description::InitialStateLibrary::
-        template populate_initial_state_list<dim, Number>(
-            initial_state_list_, *hyperbolic_system_, subsection);
+    InitialStateLibrary<Description, dim, Number>::populate_initial_state_list(
+        initial_state_list_, *hyperbolic_system_, subsection);
   }
 
   namespace

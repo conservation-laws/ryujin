@@ -5,15 +5,12 @@
 
 #pragma once
 
-#include "hyperbolic_system.h"
-#include <initial_state.h>
+#include <initial_state_library.h>
 
 namespace ryujin
 {
-  namespace Euler
+  namespace EulerInitialStates
   {
-    struct Description;
-
     /**
      * An S1/S3 shock front
      *
@@ -21,11 +18,13 @@ namespace ryujin
      *
      * @ingroup EulerEquations
      */
-    template <int dim, typename Number>
+    template <typename Description, int dim, typename Number>
     class ShockFront : public InitialState<Description, dim, Number>
     {
     public:
-      using HyperbolicSystemView = HyperbolicSystem::View<dim, Number>;
+      using HyperbolicSystem = typename Description::HyperbolicSystem;
+      using HyperbolicSystemView =
+          typename HyperbolicSystem::template View<dim, Number>;
       using state_type = typename HyperbolicSystemView::state_type;
 
       ShockFront(const HyperbolicSystemView &hyperbolic_system,

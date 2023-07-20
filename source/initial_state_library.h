@@ -12,6 +12,7 @@
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/tensor.h>
 
+#include <set>
 #include <string>
 
 namespace ryujin
@@ -86,4 +87,46 @@ namespace ryujin
     const std::string name_;
   };
 
-} /* namespace ryujin */
+
+  /**
+   * A "factory" class that is used to populate a list of all possible
+   * initial states for a given equation desribed by @p Description.
+   *
+   * This works by specializing the static member function
+   * populate_initial_state_list for all possible equation @p Description.
+   *
+   * @ingroup InitialValues
+   */
+  template <typename Description, int dim, typename Number>
+  class InitialStateLibrary
+  {
+  public:
+    /**
+     * @copydoc HyperbolicSystem
+     */
+    using HyperbolicSystem = typename Description::HyperbolicSystem;
+
+    /**
+     * @copydoc HyperbolicSystem::View
+     */
+    using HyperbolicSystemView =
+        typename HyperbolicSystem::template View<dim, Number>;
+
+    /**
+     * The type of the initial state list
+     */
+    using initial_state_list_type =
+        std::set<std::unique_ptr<InitialState<Description, dim, Number>>>;
+
+    /**
+     * Populate a given container with all initial states defined for the
+     * given equation @p Description and dimension @p dim.
+     *
+     * @ingroup InitialValues
+     */
+    static void
+    populate_initial_state_list(initial_state_list_type &initial_state_list,
+                                const HyperbolicSystemView &h,
+                                const std::string &s);
+  };
+} // namespace ryujin

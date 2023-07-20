@@ -5,26 +5,25 @@
 
 #pragma once
 
-#include "hyperbolic_system.h"
-#include <initial_state.h>
+#include <initial_state_library.h>
 
 namespace ryujin
 {
-  namespace Euler
+  namespace EulerInitialStates
   {
-    struct Description;
-
     /**
      * The isentropic vortex
      * @todo Documentation
      *
      * @ingroup EulerEquations
      */
-    template <int dim, typename Number>
+    template <typename Description, int dim, typename Number>
     class IsentropicVortex : public InitialState<Description, dim, Number>
     {
     public:
-      using HyperbolicSystemView = HyperbolicSystem::View<dim, Number>;
+      using HyperbolicSystem = typename Description::HyperbolicSystem;
+      using HyperbolicSystemView =
+          typename HyperbolicSystem::template View<dim, Number>;
       using state_type = typename HyperbolicSystemView::state_type;
 
       IsentropicVortex(const HyperbolicSystemView &hyperbolic_system,

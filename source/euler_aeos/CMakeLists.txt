@@ -5,6 +5,7 @@
 
 add_library(obj_euler_aeos OBJECT
   equation_of_state_library.cc
+  initial_state_library.cc
   limiter.cc
   riemann_solver.cc
   )

@@ -7,7 +7,6 @@
 
 #include "hyperbolic_system.h"
 #include "indicator.h"
-#include "initial_state_library.h"
 #include "limiter.h"
 #include "riemann_solver.h"
 
@@ -31,8 +30,6 @@ namespace ryujin
 
       template <int dim, typename Number = double>
       using Indicator = Skeleton::Indicator<dim, Number>;
-
-      using InitialStateLibrary = Skeleton::InitialStateLibrary;
 
       template <int dim, typename Number = double>
       using Limiter = Skeleton::Limiter<dim, Number>;

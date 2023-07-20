@@ -5,15 +5,12 @@
 
 #pragma once
 
-#include "hyperbolic_system.h"
-#include <initial_state.h>
+#include <initial_state_library.h>
 
 namespace ryujin
 {
-  namespace Euler
+  namespace EulerInitialStates
   {
-    struct Description;
-
     /**
      * A time-dependent state given by an initial state @p primite_left_
      * valid for \f$ t \le t_{\text{left}} \f$ and a final state @p
@@ -22,11 +19,13 @@ namespace ryujin
      *
      * @ingroup EulerEquations
      */
-    template <int dim, typename Number>
+    template <typename Description, int dim, typename Number>
     class RampUp : public InitialState<Description, dim, Number>
     {
     public:
-      using HyperbolicSystemView = HyperbolicSystem::View<dim, Number>;
+      using HyperbolicSystem = typename Description::HyperbolicSystem;
+      using HyperbolicSystemView =
+          typename HyperbolicSystem::template View<dim, Number>;
       using state_type = typename HyperbolicSystemView::state_type;
 
       RampUp(const HyperbolicSystemView &hyperbolic_system,
@@ -62,8 +61,8 @@ namespace ryujin
       auto compute(const dealii::Point<dim> & /*point*/, Number t)
           -> state_type final
       {
-        typename HyperbolicSystem::View<1, Number>::primitive_state_type
-            primitive;
+        using HSV1 = typename HyperbolicSystem::template View<1, Number>;
+        typename HSV1::primitive_state_type primitive;
 
         if (t <= t_initial_) {
           primitive = primitive_initial_;
