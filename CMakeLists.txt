@@ -48,11 +48,15 @@ option(FORCE_DEAL_II_SPARSE_MATRIX "Always use dealii::SparseMatrix instead of T
 option(WITH_ASYNC_MPI_EXCHANGE "Use synchronous MPI communication" OFF)
 option(WITH_CALLGRIND "Compile and link against the valgrind/callgrind instrumentation library" OFF)
 option(WITH_CUSTOM_POW "Use custom serial pow implementation" ON)
-option(WITH_LIKWID "Compile and link against the likwid instrumentation library" OFF)
 option(WITH_DOXYGEN "Build documentation with doxygen" OFF)
+option(WITH_LIKWID "Compile and link against the likwid instrumentation library" OFF)
 
 find_package(OpenMP)
 option(WITH_OPENMP "Enable threading support via OpenMP" ${OpenMP_FOUND})
+
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
+find_package(EOSPAC)
+option(WITH_EOSPAC "Add support for the EOSPAC suite" ${EOSPAC_FOUND})
 
 set(ORDER_FINITE_ELEMENT "1" CACHE STRING "Order of finite elements")
 set(ORDER_MAPPING "1" CACHE STRING "Order of mapping")
@@ -78,6 +82,10 @@ if(WITH_OPENMP)
   if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
     string(APPEND DEAL_II_LINKER_FLAGS " ${OpenMP_CXX_LIBRARIES}")
   endif()
+endif()
+
+if(WITH_EOSPAC)
+  find_package(EOSPAC REQUIRED)
 endif()
 
 if(WITH_LIKWID)
