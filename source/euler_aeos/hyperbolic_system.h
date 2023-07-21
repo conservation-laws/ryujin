@@ -384,12 +384,6 @@ namespace ryujin
         static state_type internal_energy_derivative(const state_type &U);
 
         /**
-         * For a given (2+dim dimensional) state vector <code>U</code>,
-         * query the pressure oracle and return \f$p\f$.
-         */
-        Number pressure(const state_type &U) const;
-
-        /**
          * For a given (2+dim dimensional) state vector <code>U</code>, compute
          * and return the (scaled) specific entropy
          * \f[
@@ -780,7 +774,19 @@ namespace ryujin
           dispatch_check(i);
 
           const auto U_i = U.template get_tensor<Number>(i);
-          const auto p_i = pressure(U_i);
+
+          const auto rho_i = density(U_i);
+          const auto e_i = internal_energy(U_i) / rho_i;
+          Number p_i;
+
+          if constexpr (std::is_same<ScalarNumber, Number>::value) {
+            p_i = eos_pressure(rho_i, e_i);
+          } else {
+            for (unsigned int k = 0; k < Number::size(); ++k) {
+              p_i[k] = eos_pressure(rho_i[k], e_i[k]);
+            }
+          }
+
           const auto gamma_i = surrogate_gamma(U_i, p_i);
           const PT prec_i{p_i, gamma_i, Number(0.), Number(0.)};
           precomputed_values.template write_tensor<Number>(prec_i, i);
@@ -902,27 +908,6 @@ namespace ryujin
       result[dim + 1] = ScalarNumber(1.);
 
       return result;
-    }
-
-
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    HyperbolicSystem::View<dim, Number>::pressure(const state_type &U) const
-    {
-      const auto rho = density(U);
-      const auto e = internal_energy(U) / rho;
-
-      if constexpr (std::is_same<ScalarNumber, Number>::value) {
-        return eos_pressure(rho, e);
-
-      } else {
-
-        Number result = Number(0.);
-        for (unsigned int k = 0; k < Number::size(); ++k) {
-          result[k] = eos_pressure(rho[k], e[k]);
-        }
-        return result;
-      }
     }
 
 
