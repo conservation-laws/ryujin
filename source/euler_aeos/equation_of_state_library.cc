@@ -13,31 +13,28 @@
 
 namespace ryujin
 {
-  namespace EulerAEOS
+  namespace EquationOfStateLibrary
   {
-    namespace EquationOfStateLibrary
+    /**
+     * Populate a given container with all equation of states defined in
+     * this namespace.
+     *
+     * @ingroup EulerEquations
+     */
+
+    void populate_equation_of_state_list(
+        equation_of_state_list_type &equation_of_state_list,
+        const std::string &subsection)
     {
-      /**
-       * Populate a given container with all equation of states defined in
-       * this namespace.
-       *
-       * @ingroup EulerEquations
-       */
+      auto add = [&](auto &&object) {
+        equation_of_state_list.emplace(std::move(object));
+      };
 
-      void populate_equation_of_state_list(
-          equation_of_state_list_type &equation_of_state_list,
-          const std::string &subsection)
-      {
-        auto add = [&](auto &&object) {
-          equation_of_state_list.emplace(std::move(object));
-        };
-
-        add(std::make_unique<JonesWilkinsLee>(subsection));
-        add(std::make_unique<NobleAbelStiffenedGas>(subsection));
-        add(std::make_unique<PolytropicGas>(subsection));
-        add(std::make_unique<Sesame>(subsection));
-        add(std::make_unique<VanDerWaals>(subsection));
-      }
-    } // namespace EquationOfStateLibrary
-  }   // namespace EulerAEOS
+      add(std::make_unique<JonesWilkinsLee>(subsection));
+      add(std::make_unique<NobleAbelStiffenedGas>(subsection));
+      add(std::make_unique<PolytropicGas>(subsection));
+      add(std::make_unique<Sesame>(subsection));
+      add(std::make_unique<VanDerWaals>(subsection));
+    }
+  } // namespace EquationOfStateLibrary
 } // namespace ryujin

@@ -9,6 +9,8 @@
 
 #include "convenience_macros.h"
 
+#include <deal.II/base/array_view.h>
+#include <deal.II/base/exceptions.h>
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/tensor.h>
 
@@ -16,7 +18,7 @@
 
 namespace ryujin
 {
-  namespace EulerAEOS
+  namespace EquationOfStateLibrary
   {
     /**
      * A small abstract base class to group configuration options for an
@@ -47,20 +49,95 @@ namespace ryujin
        * Return the pressure given density @p rho and specific internal
        * energy @p e.
        */
-      virtual double pressure(const double &rho, const double &e) = 0;
+      virtual double pressure(double rho, double e) = 0;
+
+      /**
+       * Variant of above function operating on a contiguous range of
+       * values. The result is stored in the first argument @p p,
+       * overriding previous contents.
+       *
+       * @note The second and third arguments are writable as well. We need
+       * to perform some unit transformations for certain tabulated
+       * equation of state libraries, such as the sesame database. Rather
+       * than creating temporaries we override values in place.
+       */
+      virtual void pressure(const dealii::ArrayView<double> &p,
+                            const dealii::ArrayView<double> &rho,
+                            const dealii::ArrayView<double> &e)
+      {
+        Assert(p.size() == rho.size() && rho.size() == e.size(),
+               dealii::ExcMessage("vectors have different size"));
+
+        std::transform(std::begin(rho),
+                       std::end(rho),
+                       std::begin(e),
+                       std::begin(p),
+                       [&](double rho, double e) { return pressure(rho, e); });
+      }
 
       /**
        * Return the specific internal energy @p e for a given density @p
        * rho and pressure @p p.
        */
-      virtual double specific_internal_energy(const double &rho,
-                                              const double &p) = 0;
+      virtual double specific_internal_energy(double rho, double p) = 0;
+
+      /**
+       * Variant of above function operating on a contiguous range of
+       * values. The result is stored in the first argument @p p,
+       * overriding previous contents.
+       *
+       * @note The second and third arguments are writable as well. We need
+       * to perform some unit transformations for certain tabulated
+       * equation of state libraries, such as the sesame database. Rather
+       * than creating temporaries we override values in place.
+       */
+      virtual void
+      specific_internal_energy(const dealii::ArrayView<double> &e,
+                               const dealii::ArrayView<double> &rho,
+                               const dealii::ArrayView<double> &p)
+      {
+        Assert(p.size() == rho.size() && rho.size() == e.size(),
+               dealii::ExcMessage("vectors have different size"));
+
+        std::transform(std::begin(rho),
+                       std::end(rho),
+                       std::begin(p),
+                       std::begin(e),
+                       [&](double rho, double p) {
+                         return specific_internal_energy(rho, p);
+                       });
+      }
 
       /**
        * Return the sound speed @p c for a given density @p rho and
        * specific internal energy  @p e.
        */
-      virtual double sound_speed(const double &rho, const double &e) = 0;
+      virtual double sound_speed(double rho, double e) = 0;
+
+      /**
+       * Variant of above function operating on a contiguous range of
+       * values. The result is stored in the first argument @p p,
+       * overriding previous contents.
+       *
+       * @note The second and third arguments are writable as well. We need
+       * to perform some unit transformations for certain tabulated
+       * equation of state libraries, such as the sesame database. Rather
+       * than creating temporaries we override values in place.
+       */
+      virtual void sound_speed(const dealii::ArrayView<double> &c,
+                               const dealii::ArrayView<double> &rho,
+                               const dealii::ArrayView<double> &e)
+      {
+        Assert(c.size() == rho.size() && rho.size() == e.size(),
+               dealii::ExcMessage("vectors have different size"));
+
+        std::transform(
+            std::begin(rho),
+            std::end(rho),
+            std::begin(e),
+            std::begin(c),
+            [&](double rho, double e) { return sound_speed(rho, e); });
+      }
 
       /**
        * Return the interpolation co-volume constant (b).

@@ -9,23 +9,20 @@
 
 namespace ryujin
 {
-  namespace EulerAEOS
+  namespace EquationOfStateLibrary
   {
-    namespace EquationOfStateLibrary
-    {
-      using equation_of_state_list_type =
-          std::set<std::unique_ptr<EquationOfState>>;
+    using equation_of_state_list_type =
+        std::set<std::unique_ptr<EquationOfState>>;
 
-      /**
-       * Populate a given container with all equation of states defined in
-       * this namespace.
-       *
-       * @ingroup EulerEquations
-       */
-      void populate_equation_of_state_list(
-          equation_of_state_list_type &equation_of_state_list,
-          const std::string &subsection);
+    /**
+     * Populate a given container with all equation of states defined in
+     * this namespace.
+     *
+     * @ingroup EulerEquations
+     */
+    void populate_equation_of_state_list(
+        equation_of_state_list_type &equation_of_state_list,
+        const std::string &subsection);
 
-    } // namespace EquationOfStateLibrary
-  }   // namespace EulerAEOS
+  } // namespace EquationOfStateLibrary
 } // namespace ryujin

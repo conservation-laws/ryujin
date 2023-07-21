@@ -60,6 +60,7 @@ namespace ryujin
       double vacuum_state_relaxation_;
       bool compute_expensive_bounds_;
 
+      using EquationOfState = EquationOfStateLibrary::EquationOfState;
       std::set<std::unique_ptr<EquationOfState>> equation_of_state_list_;
 
       std::function<double(const double, const double)> eos_pressure_;

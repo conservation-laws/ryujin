@@ -191,108 +191,99 @@ namespace ryujin
   } // namespace eospac
 #endif
 
-  namespace EulerAEOS
+  namespace EquationOfStateLibrary
   {
-    namespace EquationOfStateLibrary
+    /**
+     * A tabulated equation of state based on the EOSPAC6/Sesame
+     * database.
+     *
+     * Units are:
+     *        [rho] = kg / m^3
+     *          [p] = Pa = Kg / m / s^2
+     *          [e] = J / Kg = N m / Kg = m^2 / s^2
+     *
+     * @ingroup EulerEquations
+     */
+    class Sesame : public EquationOfState
     {
-      /**
-       * A tabulated equation of state based on the EOSPAC6/Sesame
-       * database.
-       *
-       * Units are:
-       *        [rho] = kg / m^3
-       *          [p] = Pa = Kg / m / s^2
-       *          [e] = J / Kg = N m / Kg = m^2 / s^2
-       *
-       * @ingroup EulerEquations
-       */
-      class Sesame : public EquationOfState
-      {
-      public:
+    public:
 #ifdef WITH_EOSPAC
-        Sesame(const std::string &subsection)
-            : EquationOfState("sesame", subsection)
-        {
-          material_id_ = 5030;
-          this->add_parameter(
-              "material id", material_id_, "The Sesame Material ID");
+      Sesame(const std::string &subsection)
+          : EquationOfState("sesame", subsection)
+      {
+        material_id_ = 5030;
+        this->add_parameter(
+            "material id", material_id_, "The Sesame Material ID");
 
-          const auto set_up_database = [&]() {
-            const std::vector<std::tuple<EOS_INTEGER, eospac::TableType>>
-                tables{
-                    {material_id_, eospac::TableType::p_rho_e},
-                    {material_id_, eospac::TableType::e_rho_p},
-                };
-
-            eospac_interface_ = std::make_unique<eospac::Interface>(tables);
+        const auto set_up_database = [&]() {
+          const std::vector<std::tuple<EOS_INTEGER, eospac::TableType>> tables{
+              {material_id_, eospac::TableType::p_rho_e},
+              {material_id_, eospac::TableType::e_rho_p},
           };
 
-          this->parse_parameters_call_back.connect(set_up_database);
-        }
+          eospac_interface_ = std::make_unique<eospac::Interface>(tables);
+        };
 
-        double pressure(const double &rho, const double &e) final
-        {
-          EOS_INTEGER index = 0;
-          const auto &[p, p_drho, p_de] =
-              eospac_interface_->interpolate_values<1>(
-                  index, {rho / 1.e3}, {e / 1.e6});
-          return 1.e9 * p[0];
-        }
+        this->parse_parameters_call_back.connect(set_up_database);
+      }
 
-        double specific_internal_energy(const double &rho,
-                                        const double &p) final
-        {
-          EOS_INTEGER index = 1;
-          const auto &[e, e_drho, e_dp] =
-              eospac_interface_->interpolate_values<1>(
-                  index, {rho / 1.e3}, {p / 1.e9});
-          return 1.e6 * e[0];
-        }
+      double pressure(double rho, double e) final
+      {
+        EOS_INTEGER index = 0;
+        const auto &[p, p_drho, p_de] =
+            eospac_interface_->interpolate_values<1>(
+                index, {rho / 1.e3}, {e / 1.e6});
+        return 1.e9 * p[0];
+      }
 
-        double material_sound_speed(const double &/*rho*/,
-                                    const double &/*p*/) final
-        {
-          __builtin_trap();
-        }
+      double specific_internal_energy(double rho, double p) final
+      {
+        EOS_INTEGER index = 1;
+        const auto &[e, e_drho, e_dp] =
+            eospac_interface_->interpolate_values<1>(
+                index, {rho / 1.e3}, {p / 1.e9});
+        return 1.e6 * e[0];
+      }
 
-      private:
-        EOS_INTEGER material_id_;
-        std::unique_ptr<eospac::Interface> eospac_interface_;
+      double sound_speed(double /*rho*/, double /*p*/) final
+      {
+        __builtin_trap();
+      }
+
+    private:
+      EOS_INTEGER material_id_;
+      std::unique_ptr<eospac::Interface> eospac_interface_;
 
 #else /* WITH_EOSPAC */
 
-        /* We do not have eospac support */
-        Sesame(const std::string &subsection)
-            : EquationOfState("Sesame", subsection)
-        {
-        }
+      /* We do not have eospac support */
+      Sesame(const std::string &subsection)
+          : EquationOfState("Sesame", subsection)
+      {
+      }
 
-        static constexpr auto message =
-            "ryujin has to be configured with eospac support in order to use "
-            "the Sesame EOS database";
+      static constexpr auto message =
+          "ryujin has to be configured with eospac support in order to use "
+          "the Sesame EOS database";
 
-        double pressure(const double &/*rho*/,
-                        const double &/*internal_energy*/) final
-        {
-          AssertThrow(false, dealii::ExcMessage(message));
-          __builtin_trap();
-        }
+      double pressure(double /*rho*/, double /*internal_energy*/) final
+      {
+        AssertThrow(false, dealii::ExcMessage(message));
+        __builtin_trap();
+      }
 
-        double specific_internal_energy(const double &/*rho*/,
-                                        const double &/*p*/) final
-        {
-          AssertThrow(false, dealii::ExcMessage(message));
-          __builtin_trap();
-        }
+      double specific_internal_energy(double /*rho*/, double /*p*/) final
+      {
+        AssertThrow(false, dealii::ExcMessage(message));
+        __builtin_trap();
+      }
 
-        double sound_speed(const double & /*rho*/, const double & /*e*/) final
-        {
-          AssertThrow(false, dealii::ExcMessage(message));
-          __builtin_trap();
-        }
+      double sound_speed(double /*rho*/, double /*e*/) final
+      {
+        AssertThrow(false, dealii::ExcMessage(message));
+        __builtin_trap();
+      }
 #endif
-      };
-    } // namespace EquationOfStateLibrary
-  }   // namespace EulerAEOS
-
+    };
+  } // namespace EquationOfStateLibrary
 } // namespace ryujin
