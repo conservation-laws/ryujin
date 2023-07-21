@@ -12,21 +12,21 @@ namespace ryujin
   namespace EulerInitialStates
   {
     /**
-     * A 2D extension of the "contrast" initial state consisting of 4 different
-     * states separated at x = 0 and y = 0. Visually, this looks like:
+     * An initial state formed by two contrasts of given "left", "middle"
+     * and "right" primitive states. The user defines the lengths of the left
+     * and middle regions. The rest of the domain is populated with the right
+     * region. This initial state (default values) can be used to replicate
+     * the classical Woodward-Colella colliding blast wave problem described
+     * in:
      *
-     *        state 1  | state 2
-     *        ---------|-----------
-     *        state 3  | state 4
-     *
-     * @note This class does not evolve a possible shock front in time. If
-     * you need correct time-dependent Dirichlet data use @ref ShockFront
-     * instead.
+     * Woodward, P. and Colella, P., "The Numerical Simulation of
+     * Two-Dimensional Fluid Flow with Strong Shocks", J. Computational
+     * Physics, 54, 115-173 (1984).
      *
      * @ingroup EulerEquations
      */
     template <typename Description, int dim, typename Number>
-    class TwoDContrast : public InitialState<Description, dim, Number>
+    class ThreeStateContrast : public InitialState<Description, dim, Number>
     {
     public:
       using HyperbolicSystem = typename Description::HyperbolicSystem;
@@ -34,86 +34,71 @@ namespace ryujin
           typename HyperbolicSystem::template View<dim, Number>;
       using state_type = typename HyperbolicSystemView::state_type;
 
-      TwoDContrast(const HyperbolicSystemView &hyperbolic_system,
-                   const std::string subsection)
-          : InitialState<Description, dim, Number>("2d contrast", subsection)
+      ThreeStateContrast(const HyperbolicSystemView &hyperbolic_system,
+                         const std::string &subsection)
+          : InitialState<Description, dim, Number>("three state contrast",
+                                                   subsection)
           , hyperbolic_system(hyperbolic_system)
       {
-        /* Set default values and get primitive states from user */
-        primitive_top_left_[0] = 1.0;
-        primitive_top_left_[1] = 0.0;
-        primitive_top_left_[2] = 0.0;
-        primitive_top_left_[3] = 1.;
 
+        primitive_left_[0] = 1.4;
+        primitive_left_[1] = 0.;
+        primitive_left_[2] = 1.;
         this->add_parameter(
-            "primitive state top left",
-            primitive_top_left_,
-            "Initial primitive state (rho, u, v, p) on top left");
+            "primitive state left",
+            primitive_left_,
+            "Initial 1d primitive state (rho, u, p) on the left");
 
-        primitive_top_right_[0] = 0.125;
-        primitive_top_right_[1] = 0.0;
-        primitive_top_right_[2] = 0.0;
-        primitive_top_right_[3] = 0.1;
-        this->add_parameter(
-            "primitive state top right",
-            primitive_top_right_,
-            "Initial primitive state (rho, u, v, p) on top right");
+        left_length_ = 0.1;
+        this->add_parameter("left region length",
+                            left_length_,
+                            "The length of the left region");
 
-        primitive_bottom_right_[0] = 1.0;
-        primitive_bottom_right_[1] = 0.0;
-        primitive_bottom_right_[2] = 0.0;
-        primitive_bottom_right_[3] = 0.1;
+        primitive_middle_[0] = 1.4;
+        primitive_middle_[1] = 0.;
+        primitive_middle_[2] = 1.;
         this->add_parameter(
-            "primitive state bottom right",
-            primitive_bottom_right_,
-            "Initial primitive state (rho, u, v, p) on bottom right");
+            "primitive state middle",
+            primitive_middle_,
+            "Initial 1d primitive state (rho, u, p) in the middle");
 
-        primitive_bottom_left_[0] = 1.0;
-        primitive_bottom_left_[1] = 0.0;
-        primitive_bottom_left_[2] = 0.0;
-        primitive_bottom_left_[3] = 1.;
+        middle_length_ = 0.8;
+        this->add_parameter("middle region length",
+                            middle_length_,
+                            "The length of the middle region");
+
+        primitive_right_[0] = 1.4;
+        primitive_right_[1] = 0.;
+        primitive_right_[2] = 1.;
         this->add_parameter(
-            "primitive state bottom left",
-            primitive_bottom_left_,
-            "Initial primitive state (rho, u, v, p) on bottom left");
+            "primitive state right",
+            primitive_right_,
+            "Initial 1d primitive state (rho, u, p) on the right");
+
+        // FIXME: update primitive
       }
 
       state_type compute(const dealii::Point<dim> &point, Number /*t*/) final
       {
-        /* Set temporary states depending on location */
-        auto temp_top =
-            point[0] >= 0. ? primitive_top_right_ : primitive_top_left_;
 
-        auto temp_bottom =
-            point[0] >= 0. ? primitive_bottom_right_ : primitive_bottom_left_;
+        const auto result = //
+            point[0] >= left_length_ + middle_length_ ? primitive_right_
+            : point[0] >= left_length_                ? primitive_middle_
+                                                      : primitive_left_;
 
-        /* Convert (dim+1) entries from pressure to specific internal energy */
-        temp_top[dim + 1] = hyperbolic_system.specific_internal_energy_(
-            temp_top[0], temp_top[dim + 1]);
-
-        temp_bottom[dim + 1] = hyperbolic_system.specific_internal_energy_(
-            temp_bottom[0], temp_bottom[dim + 1]);
-
-        /* Convert to regular states */
-        temp_top = hyperbolic_system.from_primitive_state(temp_top);
-        temp_bottom = hyperbolic_system.from_primitive_state(temp_bottom);
-
-        /* Return final state if dim = 2 */
-        if constexpr (dim != 2) {
-          AssertThrow(false, dealii::ExcNotImplemented());
-          __builtin_trap();
-        } else
-          return hyperbolic_system.template expand_state<dim>(
-              point[1] >= 0. ? temp_top : temp_bottom);
+        return hyperbolic_system.from_primitive_state(
+            hyperbolic_system.expand_state(result));
       }
 
     private:
-      const HyperbolicSystem &hyperbolic_system;
+      const HyperbolicSystemView &hyperbolic_system;
 
-      dealii::Tensor<1, 4, Number> primitive_top_left_;
-      dealii::Tensor<1, 4, Number> primitive_bottom_left_;
-      dealii::Tensor<1, 4, Number> primitive_top_right_;
-      dealii::Tensor<1, 4, Number> primitive_bottom_right_;
+      Number left_length_;
+      Number middle_length_;
+
+      dealii::Tensor<1, 3, Number> primitive_left_;
+      dealii::Tensor<1, 3, Number> primitive_middle_;
+      dealii::Tensor<1, 3, Number> primitive_right_;
     };
-  } // namespace EulerAEOS
+  } // namespace EulerInitialStates
 } // namespace ryujin

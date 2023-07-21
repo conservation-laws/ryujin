@@ -33,14 +33,14 @@ namespace ryujin
           : InitialState<Description, dim, Number>("ramp up", subsection)
           , hyperbolic_system(hyperbolic_system)
       {
-        primitive_initial_[0] = hyperbolic_system.gamma();
+        primitive_initial_[0] = 1.4;
         primitive_initial_[1] = 0.0;
         primitive_initial_[2] = 1.;
         this->add_parameter("primitive state initial",
                             primitive_initial_,
                             "Initial 1d primitive state (rho, u, p)");
 
-        primitive_final_[0] = hyperbolic_system.gamma();
+        primitive_final_[0] = 1.4;
         primitive_final_[1] = 3.0;
         primitive_final_[2] = 1.;
         this->add_parameter("primitive state final",
@@ -56,13 +56,14 @@ namespace ryujin
         this->add_parameter("time final",
                             t_final_,
                             "Time from which on the final state is attained)");
+
+        // FIXME: update primitive
       }
 
       auto compute(const dealii::Point<dim> & /*point*/, Number t)
           -> state_type final
       {
-        using HSV1 = typename HyperbolicSystem::template View<1, Number>;
-        typename HSV1::primitive_state_type primitive;
+        dealii::Tensor<1, 3, Number> primitive;
 
         if (t <= t_initial_) {
           primitive = primitive_initial_;

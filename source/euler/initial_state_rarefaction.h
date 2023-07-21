@@ -9,6 +9,11 @@
 
 namespace ryujin
 {
+  namespace Euler
+  {
+    struct Description;
+  }
+
   namespace EulerInitialStates
   {
     /**
@@ -32,25 +37,27 @@ namespace ryujin
           : InitialState<Description, dim, Number>("rarefaction", subsection)
           , hyperbolic_system(hyperbolic_system)
       {
-      } /* Constructor */
+        gamma_ = 1.4;
+        if constexpr (!std::is_same_v<Description, Euler::Description>) {
+          this->add_parameter("gamma", gamma_, "The ratio of specific heats");
+        }
 
-#if 0
-//       Number cL, rhoL, uL, pL;
-//       Number rhoR, uR, pR, cR;
-//       Number k1, k2, dens_pow, k3, p_pow;
-#endif
+        this->parse_parameters_call_back.connect([&]() {
+          if constexpr (std::is_same_v<Description, Euler::Description>) {
+            gamma_ = this->hyperbolic_system.gamma();
+          }
+        });
+      } /* Constructor */
 
       state_type compute(const dealii::Point<dim> &point, Number t) final
       {
-        const Number gamma = hyperbolic_system.gamma();
-
         using state_type_1d = std::array<Number, 3>;
 
         /*
          * Compute the speed of sound:
          */
         const auto speed_of_sound = [&](const auto rho, const auto p) {
-          return std::sqrt(gamma * p / rho);
+          return std::sqrt(gamma_ * p / rho);
         };
 
         /*
@@ -62,14 +69,14 @@ namespace ryujin
           state_type_1d primitive_right{{rho_right, 0., 0.}};
 
           /* Isentropic condition: pR = (rhoR/rhoL)^{gamma} * pL */
-          primitive_right[2] = std::pow(rho_right / rho_left, gamma) * p_left;
+          primitive_right[2] = std::pow(rho_right / rho_left, gamma_) * p_left;
 
           const auto c_left = speed_of_sound(rho_left, p_left);
           const auto c_right = speed_of_sound(rho_right, primitive_right[2]);
 
           /* 1-Riemann invariant: uR + 2 cR/(gamma -1) = uL + 2 cL/(gamma -1) */
           primitive_right[1] =
-              u_left + 2.0 * (c_left - c_right) / (gamma - 1.0);
+              u_left + 2.0 * (c_left - c_right) / (gamma_ - 1.0);
 
           return primitive_right;
         };
@@ -90,11 +97,11 @@ namespace ryujin
         const auto c_right = speed_of_sound(rho_right, p_right);
 
         /* Constants: */
-        const Number k1 = 2.0 / (gamma + 1.0);
-        const Number k2 = ((gamma - 1.0) / ((gamma + 1.0) * c_left));
-        const Number density_exponent = 2.0 / (gamma - 1.0);
-        const Number k3 = c_left + ((gamma - 1.0) / 2.0) * u_left;
-        const Number pressure_exponent = 2.0 * gamma / (gamma - 1.0);
+        const Number k1 = 2.0 / (gamma_ + 1.0);
+        const Number k2 = ((gamma_ - 1.0) / ((gamma_ + 1.0) * c_left));
+        const Number density_exponent = 2.0 / (gamma_ - 1.0);
+        const Number k3 = c_left + ((gamma_ - 1.0) / 2.0) * u_left;
+        const Number pressure_exponent = 2.0 * gamma_ / (gamma_ - 1.0);
 
         const double &x = point[0];
 
@@ -118,13 +125,18 @@ namespace ryujin
           primitive = primitive_right;
         }
 
+        const dealii::Tensor<1, 3, Number> result{
+            {primitive[0], primitive[1], primitive[2]}};
+
+        // FIXME: update primitive
+
         return hyperbolic_system.from_primitive_state(
-            hyperbolic_system.expand_state(dealii::Tensor<1, 3, Number>{
-                {primitive[0], primitive[1], primitive[2]}}));
+            hyperbolic_system.expand_state(result));
       }
 
     private:
       const HyperbolicSystemView hyperbolic_system;
-    }; // Rarefaction
-  }    // namespace Euler
+      Number gamma_;
+    };
+  } // namespace EulerInitialStates
 } // namespace ryujin

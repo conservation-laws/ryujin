@@ -38,39 +38,43 @@ namespace ryujin
                                                    subsection)
           , hyperbolic_system(hyperbolic_system)
       {
-        primitive_left_[0] = hyperbolic_system.gamma();
-        primitive_left_[1] = 0.0;
-        primitive_left_[2] = 1.;
+        primitive_inner_[0] = 1.4;
+        primitive_inner_[1] = 0.0;
+        primitive_inner_[2] = 1.;
         this->add_parameter(
-            "primitive state left",
-            primitive_left_,
-            "Initial 1d primitive state (rho, u, p) on the left");
+            "primitive state inner",
+            primitive_inner_,
+            "Initial 1d primitive state (rho, u, p) on the inner disk");
 
-        primitive_right_[0] = hyperbolic_system.gamma();
-        primitive_right_[1] = 0.0;
-        primitive_right_[2] = 1.;
+        primitive_outer_[0] = 1.4;
+        primitive_outer_[1] = 0.0;
+        primitive_outer_[2] = 1.;
         this->add_parameter(
-            "primitive state right",
-            primitive_right_,
-            "Initial 1d primitive state (rho, u, p) on the right");
+            "primitive state outer",
+            primitive_outer_,
+            "Initial 1d primitive state (rho, u, p) on the outer annulus");
 
         radius_ = 0.5;
         this->add_parameter("radius", radius_, "Radius of radial area");
+
+        // FIXME: update primitive
       }
 
       auto compute(const dealii::Point<dim> &point, Number /*t*/)
           -> state_type final
       {
+        const auto result =
+            point.norm() > radius_ ? primitive_outer_ : primitive_inner_;
+
         return hyperbolic_system.from_primitive_state(
-            hyperbolic_system.expand_state(
-                point.norm() > radius_ ? primitive_right_ : primitive_left_));
+            hyperbolic_system.expand_state(result));
       }
 
     private:
       const HyperbolicSystemView hyperbolic_system;
 
-      dealii::Tensor<1, 3, Number> primitive_left_;
-      dealii::Tensor<1, 3, Number> primitive_right_;
+      dealii::Tensor<1, 3, Number> primitive_inner_;
+      dealii::Tensor<1, 3, Number> primitive_outer_;
       double radius_;
     };
   } // namespace Euler

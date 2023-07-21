@@ -35,28 +35,30 @@ namespace ryujin
           : InitialState<Description, dim, Number>("contrast", subsection)
           , hyperbolic_system(hyperbolic_system)
       {
-        primitive_left_[0] = hyperbolic_system.gamma();
-        primitive_left_[1] = 0.0;
+        primitive_left_[0] = 1.4;
+        primitive_left_[1] = 0.;
         primitive_left_[2] = 1.;
         this->add_parameter(
             "primitive state left",
             primitive_left_,
             "Initial 1d primitive state (rho, u, p) on the left");
 
-        primitive_right_[0] = hyperbolic_system.gamma();
-        primitive_right_[1] = 0.0;
+        primitive_right_[0] = 1.4;
+        primitive_right_[1] = 0.;
         primitive_right_[2] = 1.;
         this->add_parameter(
             "primitive state right",
             primitive_right_,
             "Initial 1d primitive state (rho, u, p) on the right");
+
+        // FIXME: update primitive
       }
 
       state_type compute(const dealii::Point<dim> &point, Number /*t*/) final
       {
+        const auto &result = point[0] > 0. ? primitive_right_ : primitive_left_;
         return hyperbolic_system.from_primitive_state(
-            hyperbolic_system.expand_state(point[0] > 0. ? primitive_right_
-                                                         : primitive_left_));
+            hyperbolic_system.expand_state(result));
       }
 
     private:

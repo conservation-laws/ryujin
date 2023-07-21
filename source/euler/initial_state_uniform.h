@@ -30,12 +30,14 @@ namespace ryujin
           : InitialState<Description, dim, Number>("uniform", subsection)
           , hyperbolic_system(hyperbolic_system)
       {
-        primitive_[0] = hyperbolic_system.gamma();
-        primitive_[1] = 3.0;
+        primitive_[0] = 1.4;
+        primitive_[1] = 3.;
         primitive_[2] = 1.;
         this->add_parameter("primitive state",
                             primitive_,
                             "Initial 1d primitive state (rho, u, p)");
+
+        // FIXME: update primitive
       }
 
       state_type compute(const dealii::Point<dim> & /*point*/,

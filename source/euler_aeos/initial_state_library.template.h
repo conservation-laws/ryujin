@@ -32,10 +32,8 @@ namespace ryujin
                                 const HyperbolicSystemView &h [[maybe_unused]],
                                 const std::string &s [[maybe_unused]])
     {
-#if 0
       EulerInitialStates::populate_initial_state_list<Description, dim, Number>(
           initial_state_list, h, s);
-#endif
     }
   };
 } // namespace ryujin

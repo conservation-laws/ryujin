@@ -9,6 +9,11 @@
 
 namespace ryujin
 {
+  namespace Euler
+  {
+    struct Description;
+  }
+
   namespace EulerInitialStates
   {
     /**
@@ -32,6 +37,11 @@ namespace ryujin
                                                    subsection)
           , hyperbolic_system(hyperbolic_system)
       {
+        gamma_ = 1.4;
+        if constexpr (!std::is_same_v<Description, Euler::Description>) {
+          this->add_parameter("gamma", gamma_, "The ratio of specific heats");
+        }
+
         velocity_ = 0.2;
         this->add_parameter("velocity galilean frame",
                             velocity_,
@@ -53,20 +63,25 @@ namespace ryujin
         mu_ = 0.01;
         this->add_parameter("mu", mu_, "Shear viscosity");
 
-        dealii::ParameterAcceptor::parse_parameters_call_back.connect([this]() {
-          /*
-           * Set up all helper functions:
-           */
+        /* Callback: */
 
-          const double gamma = this->hyperbolic_system.gamma();
+        dealii::ParameterAcceptor::parse_parameters_call_back.connect([this]() {
+          if constexpr (std::is_same_v<Description, Euler::Description>) {
+            gamma_ = this->hyperbolic_system.gamma();
+          }
 
           AssertThrow(
               velocity_left_ > velocity_right_,
               dealii::ExcMessage("The left limiting velocity must be greater "
                                  "than the right limiting velocity"));
+
           AssertThrow(velocity_left_ > 0.,
                       dealii::ExcMessage(
                           "The left limiting velocity must be positive"));
+
+          /*
+           * Set up all helper functions and quantities:
+           */
 
           const double velocity_origin =
               std::sqrt(velocity_left_ * velocity_right_);
@@ -74,7 +89,7 @@ namespace ryujin
           /* Prefactor as given in: (7.1) */
 
           const double Pr = 0.75;
-          const double factor = 2. * gamma / (gamma + 1.) //
+          const double factor = 2. * gamma_ / (gamma_ + 1.) //
                                 * mu_ / (density_left_ * velocity_left_ * Pr);
 
           psi = [=](double x, double v) {
@@ -155,8 +170,7 @@ namespace ryujin
       state_type compute(const dealii::Point<dim> &point, Number t) final
       {
         /* (7.2) */
-        const double gamma = hyperbolic_system.gamma();
-        const double R_infty = (gamma + 1) / (gamma - 1);
+        const double R_infty = (gamma_ + 1) / (gamma_ - 1);
 
         /* (7.3) */
         const double x = point[0] - velocity_ * t;
@@ -165,7 +179,7 @@ namespace ryujin
         Assert(v <= velocity_left_, dealii::ExcInternalError());
         const double rho = density_left_ * velocity_left_ / v;
         Assert(rho > 0., dealii::ExcInternalError());
-        const double e = 1. / (2. * gamma) *
+        const double e = 1. / (2. * gamma_) *
                          (R_infty * velocity_left_ * velocity_right_ - v * v);
         Assert(e > 0., dealii::ExcInternalError());
 
@@ -179,6 +193,7 @@ namespace ryujin
 
     private:
       const HyperbolicSystemView hyperbolic_system;
+      Number gamma_;
 
       Number velocity_;
       Number velocity_left_;

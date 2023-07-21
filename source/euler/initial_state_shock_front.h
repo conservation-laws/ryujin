@@ -9,6 +9,11 @@
 
 namespace ryujin
 {
+  namespace Euler
+  {
+    struct Description;
+  }
+
   namespace EulerInitialStates
   {
     /**
@@ -32,7 +37,12 @@ namespace ryujin
           : InitialState<Description, dim, Number>("shockfront", subsection)
           , hyperbolic_system(hyperbolic_system)
       {
-        primitive_right_[0] = hyperbolic_system.gamma();
+        gamma_ = 1.4;
+        if constexpr (!std::is_same_v<Description, Euler::Description>) {
+          this->add_parameter("gamma", gamma_, "The ratio of specific heats");
+        }
+
+        primitive_right_[0] = 1.4;
         primitive_right_[1] = 0.0;
         primitive_right_[2] = 1.;
         this->add_parameter("primitive state",
@@ -47,35 +57,40 @@ namespace ryujin
             "Mach number of shock front (S1, S3 = mach * a_L/R)");
 
         dealii::ParameterAcceptor::parse_parameters_call_back.connect([this]() {
+          if constexpr (std::is_same_v<Description, Euler::Description>) {
+            gamma_ = this->hyperbolic_system.gamma();
+          }
+
           /* Compute post-shock state and S3: */
 
-          const auto gamma = this->hyperbolic_system.gamma();
           const Number b = Number(0.); // FIXME
 
           const auto &rho_R = primitive_right_[0];
           const auto &u_R = primitive_right_[1];
           const auto &p_R = primitive_right_[2];
           /* a_R^2 = gamma * p / rho / (1 - b * rho) */
-          const Number a_R = std::sqrt(gamma * p_R / rho_R / (1 - b * rho_R));
+          const Number a_R = std::sqrt(gamma_ * p_R / rho_R / (1 - b * rho_R));
           const Number mach_R = u_R / a_R;
 
           S3_ = mach_number_ * a_R;
           const Number delta_mach = mach_R - mach_number_;
 
           const Number rho_L =
-              rho_R * (gamma + Number(1.)) * delta_mach * delta_mach /
-              ((gamma - Number(1.)) * delta_mach * delta_mach + Number(2.));
+              rho_R * (gamma_ + Number(1.)) * delta_mach * delta_mach /
+              ((gamma_ - Number(1.)) * delta_mach * delta_mach + Number(2.));
           const Number u_L =
               (Number(1.) - rho_R / rho_L) * S3_ + rho_R / rho_L * u_R;
           const Number p_L = p_R *
-                             (Number(2.) * gamma * delta_mach * delta_mach -
-                              (gamma - Number(1.))) /
-                             (gamma + Number(1.));
+                             (Number(2.) * gamma_ * delta_mach * delta_mach -
+                              (gamma_ - Number(1.))) /
+                             (gamma_ + Number(1.));
 
           primitive_left_[0] = rho_L;
           primitive_left_[1] = u_L;
           primitive_left_[2] = p_L;
         });
+
+        // FIXME: update primitive
       }
 
 
@@ -90,6 +105,8 @@ namespace ryujin
 
     private:
       const HyperbolicSystemView hyperbolic_system;
+
+      Number gamma_;
 
       dealii::Tensor<1, 3, Number> primitive_left_;
       dealii::Tensor<1, 3, Number> primitive_right_;

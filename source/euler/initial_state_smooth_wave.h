@@ -70,24 +70,19 @@ namespace ryujin
         if (left_ <= point_bar[0] && point_bar[0] <= right_)
           rho = density_ref_ + polynomial;
 
-        /* Define specific internal energy from rho and p */
-        const Number sie =
-            hyperbolic_system.specific_internal_energy_(rho, pressure_ref_);
+        dealii::Tensor<1, 3, Number> result;
+        result[0] = rho;
+        result[1] = mach_number_;
+        result[2] = pressure_ref_;
 
-        dealii::Tensor<1, 3, Number> primitive_temp;
-        primitive_temp[0] = rho;
-        primitive_temp[1] = mach_number_;
-        primitive_temp[2] = sie;
+        // FIXME: update primitive
 
-        /* convert to full state */
-        const auto full_temp =
-            hyperbolic_system.from_primitive_state(primitive_temp);
-
-        return hyperbolic_system.template expand_state<dim>(full_temp);
+        return hyperbolic_system.from_primitive_state(
+            hyperbolic_system.expand_state(result));
       }
 
     private:
-      const HyperbolicSystem &hyperbolic_system;
+      const HyperbolicSystemView &hyperbolic_system;
 
       Number density_ref_;
       Number pressure_ref_;

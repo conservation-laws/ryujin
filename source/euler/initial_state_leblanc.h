@@ -59,38 +59,40 @@ namespace ryujin
         constexpr Number post_contact_density = 3.9999980604299963e-03;
         constexpr Number contact_pressure = 0.51557792765096996e-03;
 
-        state_type_1d primitive;
+        state_type_1d result;
         const double &x = point[0];
 
         if (x <= -1.0 / 3.0 * t) {
           /* Left state: */
-          primitive = primitive_left;
+          result = primitive_left;
 
         } else if (x < rarefaction_speed * t) {
           /* Expansion data (with self-similar variable chi): */
           const double chi = x / t;
-          primitive[0] = std::pow(0.75 - 0.75 * chi, 3.0);
-          primitive[1] = 0.75 * (1.0 / 3.0 + chi);
-          primitive[2] = (1.0 / 15.0) * std::pow(0.75 - 0.75 * chi, 5.0);
+          result[0] = std::pow(0.75 - 0.75 * chi, 3.0);
+          result[1] = 0.75 * (1.0 / 3.0 + chi);
+          result[2] = (1.0 / 15.0) * std::pow(0.75 - 0.75 * chi, 5.0);
 
         } else if (x < contact_velocity * t) {
-          primitive[0] = pre_contact_density;
-          primitive[1] = contact_velocity;
-          primitive[2] = contact_pressure;
+          result[0] = pre_contact_density;
+          result[1] = contact_velocity;
+          result[2] = contact_pressure;
 
         } else if (x < right_shock_speed * t) {
           /* Contact-wave data (velocity and pressure are continuous): */
-          primitive[0] = post_contact_density;
-          primitive[1] = contact_velocity;
-          primitive[2] = contact_pressure;
+          result[0] = post_contact_density;
+          result[1] = contact_velocity;
+          result[2] = contact_pressure;
 
         } else {
           /* Right state: */
-          primitive = primitive_right;
+          result = primitive_right;
         }
 
+        // FIXME: update primitive
+
         return hyperbolic_system.from_primitive_state(
-            hyperbolic_system.expand_state(primitive));
+            hyperbolic_system.expand_state(result));
       }
 
     private:
