@@ -5,25 +5,14 @@
 
 #pragma once
 
-#include <initial_state_library.h>
-
 #include "description.h"
-#include "initial_state_becker_solution.h"
-#include "initial_state_contrast.h"
-#include "initial_state_four_state_contrast.h"
-#include "initial_state_isentropic_vortex.h"
-#include "initial_state_leblanc.h"
-#include "initial_state_noh.h"
-#include "initial_state_radial_contrast.h"
-#include "initial_state_ramp_up.h"
-#include "initial_state_rarefaction.h"
-#include "initial_state_shock_front.h"
-#include "initial_state_uniform.h"
+
+#include <initial_state_library.h>
+#include "initial_state_library_euler.h"
 
 namespace ryujin
 {
-  using namespace Euler; // FIXME
-  using namespace EulerInitialStates;
+  using Description = Euler::Description;
 
   template <int dim, typename Number>
   class InitialStateLibrary<Description, dim, Number>
@@ -42,21 +31,8 @@ namespace ryujin
                                 const HyperbolicSystemView &h,
                                 const std::string &s)
     {
-      auto add = [&](auto &&object) {
-        initial_state_list.emplace(std::move(object));
-      };
-
-      add(std::make_unique<BeckerSolution<Description, dim, Number>>(h, s));
-      add(std::make_unique<Contrast<Description, dim, Number>>(h, s));
-      add(std::make_unique<IsentropicVortex<Description, dim, Number>>(h, s));
-      add(std::make_unique<LeBlanc<Description, dim, Number>>(h, s));
-      add(std::make_unique<Noh<Description, dim, Number>>(h, s));
-      add(std::make_unique<RadialContrast<Description, dim, Number>>(h, s));
-      add(std::make_unique<RampUp<Description, dim, Number>>(h, s));
-      add(std::make_unique<Rarefaction<Description, dim, Number>>(h, s));
-      add(std::make_unique<ShockFront<Description, dim, Number>>(h, s));
-      add(std::make_unique<FourStateContrast<Description, dim, Number>>(h, s));
-      add(std::make_unique<Uniform<Description, dim, Number>>(h, s));
+      EulerInitialStates::populate_initial_state_list<Description, dim, Number>(
+          initial_state_list, h, s);
     }
   };
 } // namespace ryujin

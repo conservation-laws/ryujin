@@ -146,15 +146,14 @@ namespace ryujin
         //@{
 
         /**
-         * For a given density \f$\rho\f$ and internal energy \f$rho * e\f$
-         * return the pressure \f$p\f$.
+         * For a given density \f$\rho\f$ and specific internal energy
+         * \f$e\f$ return the pressure \f$p\f$.
          */
         DEAL_II_ALWAYS_INLINE inline ScalarNumber
-        eos_pressure(const ScalarNumber &density,
-                     const ScalarNumber &internal_energy) const
+        eos_pressure(const ScalarNumber &rho,
+                     const ScalarNumber &e) const
         {
-          return ScalarNumber(
-              hyperbolic_system_.eos_pressure_(density, internal_energy));
+          return ScalarNumber(hyperbolic_system_.eos_pressure_(rho, e));
         }
 
         /**
@@ -162,23 +161,23 @@ namespace ryujin
          * specific internal energy \f$e\f$.
          */
         DEAL_II_ALWAYS_INLINE inline ScalarNumber
-        eos_specific_internal_energy(const ScalarNumber &density,
-                                     const ScalarNumber &pressure) const
+        eos_specific_internal_energy(const ScalarNumber &rho,
+                                     const ScalarNumber &p) const
         {
-          return ScalarNumber(hyperbolic_system_.eos_specific_internal_energy_(
-              density, pressure));
+          return ScalarNumber(
+              hyperbolic_system_.eos_specific_internal_energy_(rho, p));
         }
 
         /**
-         * For a given density \f$\rho\f$ and pressure \f$p\f$ return the
-         * material sound speed \f$a\f$.
+         * For a given density \f$\rho\f$ and specific internal energy
+         * \f$e\f$ return the material sound speed \f$a\f$.
          */
         DEAL_II_ALWAYS_INLINE inline ScalarNumber
-        eos_material_sound_speed(const ScalarNumber &density,
-                                 const ScalarNumber &pressure) const
+        eos_material_sound_speed(const ScalarNumber &rho,
+                                 const ScalarNumber &e) const
         {
           return ScalarNumber(
-              hyperbolic_system_.eos_material_sound_speed_(density, pressure));
+              hyperbolic_system_.eos_material_sound_speed_(rho, e));
         }
 
         /**

@@ -5,13 +5,14 @@
 
 #pragma once
 
-#include <initial_state_library.h>
-
 #include "description.h"
+
+#include <initial_state_library.h>
+#include "../euler/initial_state_library_euler.h"
 
 namespace ryujin
 {
-  using namespace EulerAEOS; // FIXME
+  using Description = EulerAEOS::Description;
 
   template <int dim, typename Number>
   class InitialStateLibrary<Description, dim, Number>
@@ -26,10 +27,15 @@ namespace ryujin
         std::set<std::unique_ptr<InitialState<Description, dim, Number>>>;
 
     static void
-    populate_initial_state_list(initial_state_list_type &,
-                                const HyperbolicSystemView &,
-                                const std::string &)
+    populate_initial_state_list(initial_state_list_type &initial_state_list
+                                [[maybe_unused]],
+                                const HyperbolicSystemView &h [[maybe_unused]],
+                                const std::string &s [[maybe_unused]])
     {
+#if 0
+      EulerInitialStates::populate_initial_state_list<Description, dim, Number>(
+          initial_state_list, h, s);
+#endif
     }
   };
 } // namespace ryujin
