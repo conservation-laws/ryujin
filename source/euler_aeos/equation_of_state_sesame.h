@@ -198,6 +198,11 @@ namespace ryujin
        * A tabulated equation of state based on the EOSPAC6/Sesame
        * database.
        *
+       * Units are:
+       *        [rho] = kg / m^3
+       *          [p] = Pa = Kg / m / s^2
+       *          [e] = J / Kg = N m / Kg = m^2 / s^2
+       *
        * @ingroup EulerEquations
        */
       class Sesame : public EquationOfState
@@ -224,21 +229,22 @@ namespace ryujin
           this->parse_parameters_call_back.connect(set_up_database);
         }
 
-        double pressure(const double rho,
-                        const double e) final
+        double pressure(const double rho, const double e) final
         {
           EOS_INTEGER index = 0;
           const auto &[p, p_drho, p_de] =
-              eospac_interface_->interpolate_values<1>(index, {rho}, {e});
-          return p[0];
+              eospac_interface_->interpolate_values<1>(
+                  index, {rho / 1.e3}, {e / 1.e6});
+          return 1.e9 * p[0];
         }
 
         double specific_internal_energy(const double rho, const double p) final
         {
           EOS_INTEGER index = 1;
           const auto &[e, e_drho, e_dp] =
-              eospac_interface_->interpolate_values<1>(index, {rho}, {p});
-          return e[0];
+              eospac_interface_->interpolate_values<1>(
+                  index, {rho / 1.e3}, {p / 1.e9});
+          return 1.e6 * e[0];
         }
 
         double material_sound_speed(const double /*rho*/,
