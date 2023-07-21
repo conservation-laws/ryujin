@@ -314,8 +314,7 @@ namespace ryujin
     clear_statistics();
 
     /* Prepare header string: */
-    const auto &names =
-        HyperbolicSystem::template primitive_component_names<dim>;
+    const auto &names = HyperbolicSystemView::primitive_component_names;
     header_ =
         std::accumulate(std::begin(names),
                         std::end(names),
@@ -381,8 +380,8 @@ namespace ryujin
           const auto mass_i = std::get<index>(point);
 
           const auto U_i = U.get_tensor(i);
-          const auto primitive_state =
-              hyperbolic_system_->to_primitive_state(U_i);
+          const auto view = hyperbolic_system_->template view<dim, Number>();
+          const auto primitive_state = view.to_primitive_state(U_i);
 
           value_type result;
           std::get<0>(result) = primitive_state;

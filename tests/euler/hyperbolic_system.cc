@@ -17,13 +17,13 @@ void test()
   std::cout << std::setprecision(10);
 
   HyperbolicSystem hyperbolic_system;
-  hyperbolic_system.parse_parameters_callback();
+  const auto view = hyperbolic_system.view<dim, Number>();
 
-  using state_type = typename HyperbolicSystem::state_type<dim, Number>;
+  using HyperbolicSystemView = typename HyperbolicSystem::View<dim, Number>;
+  using state_type = typename HyperbolicSystemView::state_type;
 
   const auto from_1d_state =
-      [&hyperbolic_system](
-          const dealii::Tensor<1, 3, Number> &state_1d) -> state_type {
+      [&view](const dealii::Tensor<1, 3, Number> &state_1d) -> state_type {
     const auto &rho = state_1d[0];
     const auto &u = state_1d[1];
     const auto &p = state_1d[2];
@@ -32,48 +32,48 @@ void test()
 
     state[0] = rho;
     state[1] = rho * u;
-    state[dim + 1] = p / (hyperbolic_system.gamma() - 1.) + 0.5 * rho * u * u;
+    state[dim + 1] = p / (view.gamma() - 1.) + 0.5 * rho * u * u;
 
     return state;
   };
 
   dealii::Tensor<1, 3, Number> state_1d;
-  state_1d[0] = hyperbolic_system.gamma();
+  state_1d[0] = view.gamma();
   state_1d[1] = 3.;
   state_1d[2] = 1.;
   const auto U = from_1d_state(state_1d);
 
   std::cout << "dim = " << dim << std::endl;
-  std::cout << "momentum = "                                        //
-            << hyperbolic_system.momentum(U)                        //
-            << std::endl;                                           //
-  std::cout << "internal_energy = "                                 //
-            << hyperbolic_system.internal_energy(U)                 //
-            << std::endl;                                           //
-  std::cout << "internal_energy_derivative = "                      //
-            << hyperbolic_system.internal_energy_derivative(U)      //
-            << std::endl;                                           //
-  std::cout << "pressure = "                                        //
-            << hyperbolic_system.pressure(U)                        //
-            << std::endl;                                           //
-  std::cout << "specific_entropy = "                                //
-            << hyperbolic_system.specific_entropy(U)                //
-            << std::endl;                                           //
-  std::cout << "harten entropy = "                                  //
-            << hyperbolic_system.harten_entropy(U)                  //
-            << std::endl;                                           //
-  std::cout << "harten_entropy_derivative = "                       //
-            << hyperbolic_system.harten_entropy_derivative(U)       //
-            << std::endl;                                           //
-  std::cout << "mathematical entropy = "                            //
-            << hyperbolic_system.mathematical_entropy(U)            //
-            << std::endl;                                           //
-  std::cout << "mathematical_entropy_derivative = "                 //
-            << hyperbolic_system.mathematical_entropy_derivative(U) //
-            << std::endl;                                           //
-  std::cout << "f = "                                               //
-            << hyperbolic_system.f(U)                               //
-            << std::endl;                                           //
+  std::cout << "momentum = "                           //
+            << view.momentum(U)                        //
+            << std::endl;                              //
+  std::cout << "internal_energy = "                    //
+            << view.internal_energy(U)                 //
+            << std::endl;                              //
+  std::cout << "internal_energy_derivative = "         //
+            << view.internal_energy_derivative(U)      //
+            << std::endl;                              //
+  std::cout << "pressure = "                           //
+            << view.pressure(U)                        //
+            << std::endl;                              //
+  std::cout << "specific_entropy = "                   //
+            << view.specific_entropy(U)                //
+            << std::endl;                              //
+  std::cout << "harten entropy = "                     //
+            << view.harten_entropy(U)                  //
+            << std::endl;                              //
+  std::cout << "harten_entropy_derivative = "          //
+            << view.harten_entropy_derivative(U)       //
+            << std::endl;                              //
+  std::cout << "mathematical entropy = "               //
+            << view.mathematical_entropy(U)            //
+            << std::endl;                              //
+  std::cout << "mathematical_entropy_derivative = "    //
+            << view.mathematical_entropy_derivative(U) //
+            << std::endl;                              //
+  std::cout << "f = "                                  //
+            << view.f(U)                               //
+            << std::endl;                              //
 }
 
 int main()

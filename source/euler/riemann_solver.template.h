@@ -34,12 +34,12 @@ namespace ryujin
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
-      using ScalarNumber = typename get_value_type<Number>::type;
-
       const auto &[rho_i, u_i, p_i, a_i] = riemann_data_i;
       const auto &[rho_j, u_j, p_j, a_j] = riemann_data_j;
 
       const Number p_max = std::max(p_i, p_j);
+
+      const auto gamma = hyperbolic_system.gamma();
 
       const Number radicand_inverse_i = ScalarNumber(0.5) * rho_i *
                                         ((gamma + ScalarNumber(1.)) * p_max +
@@ -74,10 +74,10 @@ namespace ryujin
     RiemannSolver<dim, Number>::lambda1_minus(
         const primitive_type &riemann_data, const Number p_star) const
     {
-      using ScalarNumber = typename get_value_type<Number>::type;
-
       const auto &[rho, u, p, a] = riemann_data;
 
+      const auto gamma = hyperbolic_system.gamma();
+      const auto gamma_inverse = hyperbolic_system.gamma_inverse();
       const auto factor =
           (gamma + ScalarNumber(1.0)) * ScalarNumber(0.5) * gamma_inverse;
       const Number tmp = positive_part((p_star - p) / p);
@@ -96,10 +96,10 @@ namespace ryujin
     RiemannSolver<dim, Number>::lambda3_plus(
         const primitive_type &primitive_state, const Number p_star) const
     {
-      using ScalarNumber = typename get_value_type<Number>::type;
-
       const auto &[rho, u, p, a] = primitive_state;
 
+      const auto gamma = hyperbolic_system.gamma();
+      const auto gamma_inverse = hyperbolic_system.gamma_inverse();
       const Number factor =
           (gamma + ScalarNumber(1.0)) * ScalarNumber(0.5) * gamma_inverse;
       const Number tmp = positive_part((p_star - p) / p);
@@ -146,8 +146,6 @@ namespace ryujin
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
-      using ScalarNumber = typename get_value_type<Number>::type;
-
       const auto &[rho_i, u_i, p_i, a_i] = riemann_data_i;
       const auto &[rho_j, u_j, p_j, a_j] = riemann_data_j;
 
@@ -158,6 +156,7 @@ namespace ryujin
        * identity below:
        */
 
+      const auto &gamma = hyperbolic_system.gamma();
       const auto factor = (gamma - ScalarNumber(1.)) * ScalarNumber(0.5);
 
       /*
@@ -167,11 +166,14 @@ namespace ryujin
        * Therefore, all we have to do is to take the positive part of the
        * expression:
        */
+      const auto &gamma_inverse = hyperbolic_system.gamma_inverse();
+      const auto &gm1_inverse = hyperbolic_system.gamma_minus_one_inverse();
+
       const Number numerator = positive_part(a_i + a_j - factor * (u_j - u_i));
       const Number denominator =
           a_i * ryujin::pow(p_i / p_j, -factor * gamma_inverse) + a_j;
 
-      const auto exponent = ScalarNumber(2.0) * gamma * gamma_minus_one_inverse;
+      const auto exponent = ScalarNumber(2.0) * gamma * gm1_inverse;
 
       return p_j * ryujin::pow(numerator / denominator, exponent);
     }

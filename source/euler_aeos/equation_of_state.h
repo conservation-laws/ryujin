@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2020 - 2022 by the ryujin authors
+// Copyright (C) 2020 - 2023 by the ryujin authors
 //
 
 #pragma once
@@ -44,25 +44,23 @@ namespace ryujin
       }
 
       /**
-       * Return the pressure given density (\rho) and internal energy (rho *
-       * e).
+       * Return the pressure given density @p rho and specific internal
+       * energy @p e.
        */
-      virtual double pressure(const double density,
-                              const double internal_energy) = 0;
+      virtual double pressure(const double &rho, const double &e) = 0;
 
       /**
-       * Return the specific internal energy (e) for a given density (\rho)
-       * and pressure (p).
+       * Return the specific internal energy @p e for a given density @p
+       * rho and pressure @p p.
        */
-      virtual double specific_internal_energy(const double density,
-                                              const double pressure) = 0;
+      virtual double specific_internal_energy(const double &rho,
+                                              const double &p) = 0;
 
       /**
-       * Return the material sound speed (c) for a given density (\rho)
-       * and pressure (p).
+       * Return the sound speed @p c for a given density @p rho and
+       * specific internal energy  @p e.
        */
-      virtual double material_sound_speed(const double density,
-                                          const double pressure) = 0;
+      virtual double sound_speed(const double &rho, const double &e) = 0;
 
       /**
        * Return the interpolation co-volume constant (b).

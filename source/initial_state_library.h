@@ -12,6 +12,7 @@
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/tensor.h>
 
+#include <set>
 #include <string>
 
 namespace ryujin
@@ -28,14 +29,19 @@ namespace ryujin
    *
    * @ingroup InitialValues
    */
-  template <int dim,
-            typename Number,
-            typename state_type,
-            int n_precomputed_values = 0>
+  template <typename Description, int dim, typename Number = double>
   class InitialState : public dealii::ParameterAcceptor
   {
   public:
-    using precomputed_type = std::array<Number, n_precomputed_values>;
+    /**
+     * @copydoc HyperbolicSystem::View
+     */
+    using HyperbolicSystemView =
+        typename Description::HyperbolicSystem::template View<dim, Number>;
+
+    using state_type = typename HyperbolicSystemView::state_type;
+    using precomputed_state_type =
+        typename HyperbolicSystemView::precomputed_state_type;
 
     /**
      * Constructor taking geometry name @p name and a subsection @p
@@ -66,10 +72,10 @@ namespace ryujin
      * bathymetry. In case of @ref LinearTransport we precompute the
      * advection field.
      */
-    virtual precomputed_type
+    virtual precomputed_state_type
     initial_precomputations(const dealii::Point<dim> & /*point*/)
     {
-      return precomputed_type();
+      return precomputed_state_type();
     }
 
     /**
@@ -81,4 +87,46 @@ namespace ryujin
     const std::string name_;
   };
 
-} /* namespace ryujin */
+
+  /**
+   * A "factory" class that is used to populate a list of all possible
+   * initial states for a given equation desribed by @p Description.
+   *
+   * This works by specializing the static member function
+   * populate_initial_state_list for all possible equation @p Description.
+   *
+   * @ingroup InitialValues
+   */
+  template <typename Description, int dim, typename Number>
+  class InitialStateLibrary
+  {
+  public:
+    /**
+     * @copydoc HyperbolicSystem
+     */
+    using HyperbolicSystem = typename Description::HyperbolicSystem;
+
+    /**
+     * @copydoc HyperbolicSystem::View
+     */
+    using HyperbolicSystemView =
+        typename HyperbolicSystem::template View<dim, Number>;
+
+    /**
+     * The type of the initial state list
+     */
+    using initial_state_list_type =
+        std::set<std::unique_ptr<InitialState<Description, dim, Number>>>;
+
+    /**
+     * Populate a given container with all initial states defined for the
+     * given equation @p Description and dimension @p dim.
+     *
+     * @ingroup InitialValues
+     */
+    static void
+    populate_initial_state_list(initial_state_list_type &initial_state_list,
+                                const HyperbolicSystemView &h,
+                                const std::string &s);
+  };
+} // namespace ryujin

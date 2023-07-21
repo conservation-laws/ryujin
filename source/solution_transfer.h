@@ -33,16 +33,21 @@ namespace ryujin
     using HyperbolicSystem = typename Description::HyperbolicSystem;
 
     /**
+     * @copydoc HyperbolicSystem::View
+     */
+    using HyperbolicSystemView =
+        typename Description::HyperbolicSystem::template View<dim, Number>;
+
+    /**
      * @copydoc HyperbolicSystem::problem_dimension
      */
     static constexpr unsigned int problem_dimension =
-        HyperbolicSystem::template problem_dimension<dim>;
+        HyperbolicSystemView::problem_dimension;
 
     /**
      * @copydoc HyperbolicSystem::state_type
      */
-    using state_type =
-        typename HyperbolicSystem::template state_type<dim, Number>;
+    using state_type = typename HyperbolicSystemView::state_type;
 
     /**
      * @copydoc OfflineData::scalar_type
@@ -60,7 +65,7 @@ namespace ryujin
     SolutionTransfer(const OfflineData<dim, Number> &offline_data,
                      const HyperbolicSystem &hyperbolic_system)
         : offline_data_(&offline_data)
-        , hyperbolic_system_(&hyperbolic_system)
+        , hyperbolic_system_(hyperbolic_system)
         , solution_transfer_(offline_data.dof_handler())
     {
     }
@@ -88,8 +93,7 @@ namespace ryujin
 
       for (unsigned int i = 0; i < n_owned; ++i) {
         const auto U_i = U.get_tensor(i);
-        const auto primitive_state =
-            hyperbolic_system_->to_primitive_state(U_i);
+        const auto primitive_state = hyperbolic_system_.to_primitive_state(U_i);
 
         for (unsigned int k = 0; k < problem_dimension; ++k)
           state_[k].local_element(i) = primitive_state[k];
@@ -142,7 +146,7 @@ namespace ryujin
         state_type U_i;
         for (unsigned int k = 0; k < problem_dimension; ++k)
           U_i[k] = interpolated_state_[k].local_element(i);
-        U_i = hyperbolic_system_->from_primitive_state(U_i);
+        U_i = hyperbolic_system_.from_primitive_state(U_i);
 
         U.write_tensor(U_i, i);
       }
@@ -157,7 +161,7 @@ namespace ryujin
      */
     //@{
     dealii::SmartPointer<const OfflineData<dim, Number>> offline_data_;
-    dealii::SmartPointer<const HyperbolicSystem> hyperbolic_system_;
+    const HyperbolicSystemView hyperbolic_system_;
 
     dealii::parallel::distributed::SolutionTransfer<dim, scalar_type>
         solution_transfer_;

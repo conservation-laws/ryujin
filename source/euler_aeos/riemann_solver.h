@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2020 - 2022 by the ryujin authors
+// Copyright (C) 2020 - 2023 by the ryujin authors
 //
 
 #pragma once
@@ -32,34 +32,49 @@ namespace ryujin
     {
     public:
       /**
-       * @copydoc HyperbolicSystem::problem_dimension
+       * @copydoc HyperbolicSystem::View
+       */
+      using HyperbolicSystemView = HyperbolicSystem::View<dim, Number>;
+
+      /**
+       * @copydoc HyperbolicSystem::View::problem_dimension
        */
       static constexpr unsigned int problem_dimension =
-          HyperbolicSystem::problem_dimension<dim>;
+          HyperbolicSystemView::problem_dimension;
 
+      /**
+       * Number of components in a primitive state, we store \f$[\rho, v,
+       * p, a, gamma]\f$, thus, 5.
+       */
       static constexpr unsigned int riemann_data_size = 5;
+
+      /**
+       * The array type to store the expanded primitive state for the
+       * Riemann solver \f$[\rho, v, p, a]\f$
+       */
       using primitive_type = std::array<Number, riemann_data_size>;
 
       /**
-       * @copydoc HyperbolicSystem::state_type
+       * @copydoc HyperbolicSystem::View::state_type
        */
-      using state_type = HyperbolicSystem::state_type<dim, Number>;
+      using state_type = typename HyperbolicSystemView::state_type;
 
       /**
-       * @copydoc HyperbolicSystem::precomputed_type
-       */
-      using precomputed_type = HyperbolicSystem::precomputed_type<dim, Number>;
-
-      /**
-       * @copydoc HyperbolicSystem::n_precomputed_values
+       * @copydoc HyperbolicSystem::View::n_precomputed_values
        */
       static constexpr unsigned int n_precomputed_values =
-          HyperbolicSystem::n_precomputed_values<dim>;
+          HyperbolicSystemView::n_precomputed_values;
 
       /**
-       * @copydoc HyperbolicSystem::ScalarNumber
+       * @copydoc HyperbolicSystem::View::precomputed_state_type
        */
-      using ScalarNumber = typename get_value_type<Number>::type;
+      using precomputed_state_type =
+          typename HyperbolicSystemView::precomputed_state_type;
+
+      /**
+       * @copydoc HyperbolicSystem::View::ScalarNumber
+       */
+      using ScalarNumber = typename HyperbolicSystemView::ScalarNumber;
 
       /**
        * @name Compute wavespeed estimates
@@ -227,13 +242,13 @@ namespace ryujin
        * compute and return the Riemann data [rho, u, p, a] (used in the
        * approximative Riemann solver).
        */
-      primitive_type riemann_data_from_state(
-          const HyperbolicSystem::state_type<dim, Number> &U,
-          const Number &p,
-          const dealii::Tensor<1, dim, Number> &n_ij) const;
+      primitive_type
+      riemann_data_from_state(const state_type &U,
+                              const Number &p,
+                              const dealii::Tensor<1, dim, Number> &n_ij) const;
 
     private:
-      const HyperbolicSystem &hyperbolic_system;
+      const HyperbolicSystemView hyperbolic_system;
 
       const MultiComponentVector<ScalarNumber, n_precomputed_values>
           &precomputed_values;
@@ -247,7 +262,7 @@ namespace ryujin
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
     RiemannSolver<dim, Number>::riemann_data_from_state(
-        const HyperbolicSystem::state_type<dim, Number> &U,
+        const state_type &U,
         const Number &p,
         const dealii::Tensor<1, dim, Number> &n_ij) const -> primitive_type
     {
@@ -259,9 +274,9 @@ namespace ryujin
 
       const auto gamma = hyperbolic_system.surrogate_gamma(U, p);
 
-      const ScalarNumber interpolation_b = hyperbolic_system.interpolation_b_();
-      const Number x = Number(1.) - interpolation_b * rho;
-      const Number a = std::sqrt(gamma * p / (rho * x));
+      const auto interpolation_b = hyperbolic_system.eos_interpolation_b();
+      const auto x = Number(1.) - interpolation_b * rho;
+      const auto a = std::sqrt(gamma * p / (rho * x));
 
 #ifdef CHECK_BOUNDS
       AssertThrowSIMD(
@@ -293,10 +308,12 @@ namespace ryujin
         const dealii::Tensor<1, dim, Number> &n_ij) const
     {
       const auto &[p_i, unused_i, s_i, eta_i] =
-          precomputed_values.template get_tensor<Number, precomputed_type>(i);
+          precomputed_values
+              .template get_tensor<Number, precomputed_state_type>(i);
 
       const auto &[p_j, unused_j, s_j, eta_j] =
-          precomputed_values.template get_tensor<Number, precomputed_type>(js);
+          precomputed_values
+              .template get_tensor<Number, precomputed_state_type>(js);
 
       const auto riemann_data_i = riemann_data_from_state(U_i, p_i, n_ij);
       const auto riemann_data_j = riemann_data_from_state(U_j, p_j, n_ij);

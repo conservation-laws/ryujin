@@ -32,34 +32,43 @@ namespace ryujin
     {
     public:
       /**
-       * @copydoc HyperbolicSystem::problem_dimension
+       * @copydoc HyperbolicSystem::View
+       */
+      using HyperbolicSystemView = HyperbolicSystem::View<dim, Number>;
+
+      /**
+       * @copydoc HyperbolicSystem::View::problem_dimension
        */
       static constexpr unsigned int problem_dimension =
-          HyperbolicSystem::problem_dimension<dim>;
+          HyperbolicSystemView::problem_dimension;
 
+      /**
+       * Number of components in a primitive state, we store \f$[\rho, v,
+       * p, a]\f$, thus, 4.
+       */
       static constexpr unsigned int riemann_data_size = 4;
+
+      /**
+       * The array type to store the expanded primitive state for the
+       * Riemann solver \f$[\rho, v, p, a]\f$
+       */
       using primitive_type = std::array<Number, riemann_data_size>;
 
       /**
-       * @copydoc HyperbolicSystem::state_type
+       * @copydoc HyperbolicSystem::View::state_type
        */
-      using state_type = HyperbolicSystem::state_type<dim, Number>;
+      using state_type = typename HyperbolicSystemView::state_type;
 
       /**
-       * @copydoc HyperbolicSystem::precomputed_type
-       */
-      using precomputed_type = HyperbolicSystem::precomputed_type<dim, Number>;
-
-      /**
-       * @copydoc HyperbolicSystem::n_precomputed_values
+       * @copydoc HyperbolicSystem::View::n_precomputed_values
        */
       static constexpr unsigned int n_precomputed_values =
-          HyperbolicSystem::n_precomputed_values<dim>;
+          HyperbolicSystemView::n_precomputed_values;
 
       /**
-       * @copydoc HyperbolicSystem::ScalarNumber
+       * @copydoc HyperbolicSystem::View::ScalarNumber
        */
-      using ScalarNumber = typename get_value_type<Number>::type;
+      using ScalarNumber = typename HyperbolicSystemView::ScalarNumber;
 
       /**
        * @name Compute wavespeed estimates
@@ -75,11 +84,6 @@ namespace ryujin
               &precomputed_values)
           : hyperbolic_system(hyperbolic_system)
           , precomputed_values(precomputed_values)
-          , gamma(hyperbolic_system.gamma())
-          , gamma_inverse(1. / gamma)
-          , gamma_minus_one_inverse(1. / (gamma - 1.))
-          , gamma_minus_one_over_gamma_plus_one((gamma - 1.) / (gamma + 1.))
-          , gamma_plus_one_inverse(1. / (gamma + 1.))
       {
       }
 
@@ -179,22 +183,15 @@ namespace ryujin
        * compute and return the Riemann data [rho, u, p, a] (used in the
        * approximative Riemann solver).
        */
-      primitive_type riemann_data_from_state(
-          const HyperbolicSystem::state_type<dim, Number> &U,
-          const dealii::Tensor<1, dim, Number> &n_ij) const;
+      primitive_type
+      riemann_data_from_state(const state_type &U,
+                              const dealii::Tensor<1, dim, Number> &n_ij) const;
 
     private:
-      const HyperbolicSystem &hyperbolic_system;
+      const HyperbolicSystemView hyperbolic_system;
 
       const MultiComponentVector<ScalarNumber, n_precomputed_values>
           &precomputed_values;
-
-      const ScalarNumber gamma;
-      const ScalarNumber gamma_inverse;
-      const ScalarNumber gamma_minus_one_inverse;
-      const ScalarNumber gamma_minus_one_over_gamma_plus_one;
-      const ScalarNumber gamma_plus_one_inverse;
-
       //@}
     };
 
@@ -205,8 +202,8 @@ namespace ryujin
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
     RiemannSolver<dim, Number>::riemann_data_from_state(
-        const HyperbolicSystem::state_type<dim, Number> &U,
-        const dealii::Tensor<1, dim, Number> &n_ij) const -> primitive_type
+        const state_type &U, const dealii::Tensor<1, dim, Number> &n_ij) const
+        -> primitive_type
     {
       const auto rho = hyperbolic_system.density(U);
       const auto rho_inverse = Number(1.0) / rho;
@@ -218,11 +215,14 @@ namespace ryujin
       const auto E = hyperbolic_system.total_energy(U) -
                      Number(0.5) * perp.norm_square() * rho_inverse;
 
-      const auto state =
-          HyperbolicSystem::state_type<1, Number>({rho, proj_m, E});
-      const auto p = hyperbolic_system.pressure(state);
-      const auto a = hyperbolic_system.speed_of_sound(state);
+      using state_type_1d =
+          typename HyperbolicSystem::View<1, Number>::state_type;
+      const auto hyperbolic_system_1d =
+          hyperbolic_system.template view<1, Number>();
 
+      const auto state = state_type_1d{{rho, proj_m, E}};
+      const auto p = hyperbolic_system_1d.pressure(state);
+      const auto a = hyperbolic_system_1d.speed_of_sound(state);
       return {{rho, proj_m * rho_inverse, p, a}};
     }
 

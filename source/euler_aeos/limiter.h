@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2020 - 2022 by the ryujin authors
+// Copyright (C) 2020 - 2023 by the ryujin authors
 //
 
 #pragma once
@@ -52,37 +52,43 @@ namespace ryujin
     {
     public:
       /**
-       * @copydoc HyperbolicSystem::problem_dimension
+       * @copydoc HyperbolicSystem::View
+       */
+      using HyperbolicSystemView = HyperbolicSystem::View<dim, Number>;
+
+      /**
+       * @copydoc HyperbolicSystem::View::problem_dimension
        */
       static constexpr unsigned int problem_dimension =
-          HyperbolicSystem::problem_dimension<dim>;
+          HyperbolicSystemView::problem_dimension;
 
       /**
-       * @copydoc HyperbolicSystem::state_type
+       * @copydoc HyperbolicSystem::View::state_type
        */
-      using state_type = HyperbolicSystem::state_type<dim, Number>;
+      using state_type = typename HyperbolicSystemView::state_type;
 
       /**
-       * @copydoc HyperbolicSystem::n_precomputed_values
+       * @copydoc HyperbolicSystem::View::n_precomputed_values
        */
       static constexpr unsigned int n_precomputed_values =
-          HyperbolicSystem::n_precomputed_values<dim>;
+          HyperbolicSystemView::n_precomputed_values;
 
       /**
-       * @copydoc HyperbolicSystem::precomputed_type
+       * @copydoc HyperbolicSystem::View::precomputed_state_type
        */
-      using precomputed_type = HyperbolicSystem::precomputed_type<dim, Number>;
+      using precomputed_state_type =
+          typename HyperbolicSystemView::precomputed_state_type;
 
       /**
-       * @copydoc HyperbolicSystem::flux_contribution_type
+       * @copydoc HyperbolicSystem::View::flux_contribution_type
        */
       using flux_contribution_type =
-          HyperbolicSystem::flux_contribution_type<dim, Number>;
+          typename HyperbolicSystemView::flux_contribution_type;
 
       /**
-       * @copydoc HyperbolicSystem::ScalarNumber
+       * @copydoc HyperbolicSystem::View::ScalarNumber
        */
-      using ScalarNumber = typename get_value_type<Number>::type;
+      using ScalarNumber = typename HyperbolicSystemView::ScalarNumber;
 
       /**
        * @name Stencil-based computation of bounds
@@ -165,7 +171,7 @@ namespace ryujin
        * selected local minimum principles are obeyed.
        */
       static std::tuple<Number, bool>
-      limit(const HyperbolicSystem &hyperbolic_system,
+      limit(const HyperbolicSystemView &hyperbolic_system,
             const Bounds &bounds,
             const state_type &U,
             const state_type &P,
@@ -186,7 +192,7 @@ namespace ryujin
        * invariant domain.
        */
       static bool
-      is_in_invariant_domain(const HyperbolicSystem &hyperbolic_system,
+      is_in_invariant_domain(const HyperbolicSystemView &hyperbolic_system,
                              const Bounds &bounds,
                              const state_type &U);
 
@@ -195,7 +201,7 @@ namespace ryujin
       /** @name */
       //@{
 
-      const HyperbolicSystem &hyperbolic_system;
+      const HyperbolicSystemView hyperbolic_system;
 
       const MultiComponentVector<ScalarNumber, n_precomputed_values>
           &precomputed_values;
@@ -225,7 +231,8 @@ namespace ryujin
       rho_max = Number(0.);
 
       const auto &[p_i, gamma_min_i, s_i, eta_i] =
-          precomputed_values.template get_tensor<Number, precomputed_type>(i);
+          precomputed_values
+              .template get_tensor<Number, precomputed_state_type>(i);
 
       gamma_min = gamma_min_i;
       s_min = s_i;
@@ -322,9 +329,9 @@ namespace ryujin
        **/
 
       const auto numerator = (gamma_min + Number(1.)) * rho_max;
+      const auto interpolation_b = hyperbolic_system.eos_interpolation_b();
       const auto denominator =
-          gamma_min - Number(1.) +
-          ScalarNumber(2. * hyperbolic_system.interpolation_b_()) * rho_max;
+          gamma_min - Number(1.) + ScalarNumber(2.) * interpolation_b * rho_max;
 
       const auto upper_bound = numerator / denominator;
 
@@ -344,7 +351,7 @@ namespace ryujin
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline bool
     Limiter<dim, Number>::is_in_invariant_domain(
-        const HyperbolicSystem & /*hyperbolic_system*/,
+        const HyperbolicSystemView & /*hyperbolic_system*/,
         const Bounds & /*bounds*/,
         const state_type & /*U*/)
     {

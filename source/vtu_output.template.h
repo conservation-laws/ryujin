@@ -47,14 +47,13 @@ namespace ryujin
                   "List of level set functions. The description is used to "
                   "only output cells that intersect the given level set.");
 
-    std::copy(std::begin(HyperbolicSystem::template component_names<dim>),
-              std::end(HyperbolicSystem::template component_names<dim>),
+    std::copy(std::begin(HyperbolicSystemView::component_names),
+              std::end(HyperbolicSystemView::component_names),
               std::back_inserter(vtu_output_quantities_));
 
-    std::copy(
-        std::begin(HyperbolicSystem::template precomputed_initial_names<dim>),
-        std::end(HyperbolicSystem::template precomputed_initial_names<dim>),
-        std::back_inserter(vtu_output_quantities_));
+    std::copy(std::begin(HyperbolicSystemView::precomputed_initial_names),
+              std::end(HyperbolicSystemView::precomputed_initial_names),
+              std::back_inserter(vtu_output_quantities_));
 
     add_parameter("vtu output quantities",
                   vtu_output_quantities_,
@@ -80,7 +79,7 @@ namespace ryujin
       {
         /* Conserved quantities: */
 
-        constexpr auto &names = HyperbolicSystem::template component_names<dim>;
+        constexpr auto &names = HyperbolicSystemView::component_names;
         const auto pos = std::find(std::begin(names), std::end(names), entry);
         if (pos != std::end(names)) {
           const auto index = std::distance(std::begin(names), pos);
@@ -98,8 +97,7 @@ namespace ryujin
       {
         /* Primitive quantities: */
 
-        constexpr auto &names =
-            HyperbolicSystem::template primitive_component_names<dim>;
+        constexpr auto &names = HyperbolicSystemView::primitive_component_names;
         const auto pos = std::find(std::begin(names), std::end(names), entry);
         if (pos != std::end(names)) {
           const auto index = std::distance(std::begin(names), pos);
@@ -114,11 +112,10 @@ namespace ryujin
                  */
                 const unsigned int n_owned = offline_data_->n_locally_owned();
                 for (unsigned int i = 0; i < n_owned; ++i) {
-                  const auto &hyperbolic_system =
-                      hyperbolic_module_->hyperbolic_system();
+                  const auto view = hyperbolic_module_->hyperbolic_system()
+                                        .template view<dim, Number>();
                   result.local_element(i) =
-                      hyperbolic_system.to_primitive_state(
-                          U.get_tensor(i))[index];
+                      view.to_primitive_state(U.get_tensor(i))[index];
                 }
               }));
           continue;
@@ -128,8 +125,7 @@ namespace ryujin
       {
         /* Precomputed initial quantities: */
 
-        constexpr auto &names =
-            HyperbolicSystem::template precomputed_initial_names<dim>;
+        constexpr auto &names = HyperbolicSystemView::precomputed_initial_names;
         const auto pos = std::find(std::begin(names), std::end(names), entry);
         if (pos != std::end(names)) {
           const auto index = std::distance(std::begin(names), pos);
@@ -148,8 +144,7 @@ namespace ryujin
       {
         /* Precomputed quantities: */
 
-        constexpr auto &names =
-            HyperbolicSystem::template precomputed_names<dim>;
+        constexpr auto &names = HyperbolicSystemView::precomputed_names;
         const auto pos = std::find(std::begin(names), std::end(names), entry);
         if (pos != std::end(names)) {
           const auto index = std::distance(std::begin(names), pos);

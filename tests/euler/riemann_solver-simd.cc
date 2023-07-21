@@ -15,10 +15,10 @@ int main()
   constexpr int dim = 1;
 
   HyperbolicSystem hyperbolic_system;
-  const double gamma = hyperbolic_system.gamma();
+  const double gamma = hyperbolic_system.view<dim, double>().gamma();
 
   static constexpr unsigned int n_precomputed_values =
-      HyperbolicSystem::n_precomputed_values<dim>;
+      HyperbolicSystem::View<dim, double>::n_precomputed_values;
   using precomputed_type = MultiComponentVector<double, n_precomputed_values>;
   precomputed_type dummy;
 

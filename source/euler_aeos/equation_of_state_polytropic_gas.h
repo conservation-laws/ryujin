@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2020 - 2022 by the ryujin authors
+// Copyright (C) 2020 - 2023 by the ryujin authors
 //
 
 #pragma once
@@ -28,33 +28,38 @@ namespace ryujin
           this->add_parameter("gamma", gamma_, "The ratio of specific heats");
         }
 
-
-        double pressure(const double /*rho*/,
-                        const double internal_energy) final
+        /**
+         * The pressure is given by
+         * \f{align}
+         *   p = (\gamma - 1) \rho e
+         * \f}
+         */
+        double pressure(const double &rho, const double &e) final
         {
-          /*
-           * p = (\gamma - 1) * \rho * e
-           */
-          return (gamma_ - 1.) * internal_energy;
+          return (gamma_ - 1.) * rho * e;
         }
 
-
-        double specific_internal_energy(const double rho, const double p) final
+        /**
+         * The specific internal energy is given by
+         * \f{align}
+         *   e = p / (\rho (\gamma - 1))
+         * \f}
+         */
+        double specific_internal_energy(const double &rho,
+                                        const double &p) final
         {
-          /*
-           * e = p / (\rho (\gamma - 1) )
-           */
-          const double denom = rho * (gamma_ - 1.);
-          return p / denom;
+          return p / (rho * (gamma_ - 1.));
         }
 
-
-        double material_sound_speed(const double rho, const double p) final
+        /**
+         * The speed of sound is given by
+         * \f{align}
+         *   c^2 = \gamma * (\gamma - 1) e
+         * \f}
+         */
+        double sound_speed(const double & /*rho*/, const double &e) final
         {
-          /*
-           * c^2 = \gamma p / \rho
-           */
-          return std::sqrt(gamma_ * p / rho);
+          return std::sqrt(gamma_ * (gamma_ - 1.) * e);
         }
 
       private:

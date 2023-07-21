@@ -7,7 +7,7 @@
 
 #include <compile_time_options.h>
 
-#include "initial_state.h"
+#include "initial_state_library.h"
 #include "offline_data.h"
 
 #include <deal.II/base/parameter_acceptor.h>
@@ -43,16 +43,21 @@ namespace ryujin
     using HyperbolicSystem = typename Description::HyperbolicSystem;
 
     /**
+     * @copydoc HyperbolicSystem::View
+     */
+    using HyperbolicSystemView =
+        typename HyperbolicSystem::template View<dim, Number>;
+
+    /**
      * @copydoc HyperbolicSystem::problem_dimension
      */
     static constexpr unsigned int problem_dimension =
-        HyperbolicSystem::template problem_dimension<dim>;
+        HyperbolicSystemView::problem_dimension;
 
     /**
      * @copydoc HyperbolicSystem::state_type
      */
-    using state_type =
-        typename HyperbolicSystem::template state_type<dim, Number>;
+    using state_type = typename HyperbolicSystemView::state_type;
 
     /**
      * Typedef for a MultiComponentVector storing the state U.
@@ -63,12 +68,13 @@ namespace ryujin
      * @copydoc HyperbolicSystem::n_precomputed_values
      */
     static constexpr unsigned int n_precomputed_values =
-        HyperbolicSystem::template n_precomputed_initial_values<dim>;
+        HyperbolicSystemView::n_precomputed_initial_values;
 
     /**
      * Array type used for precomputed values.
      */
-    using precomputed_type = std::array<Number, n_precomputed_values>;
+    using precomputed_state_type =
+        typename HyperbolicSystemView::precomputed_state_type;
 
     /**
      * Constructor.
@@ -115,7 +121,7 @@ namespace ryujin
      * function signature has an additional parameter @p t denoting the
      * current time to allow for time-dependent (in-flow) Dirichlet data.
      */
-    DEAL_II_ALWAYS_INLINE inline precomputed_type
+    DEAL_II_ALWAYS_INLINE inline precomputed_state_type
     flux_contributions(const dealii::Point<dim> &point) const
     {
       return flux_contributions_(point);
@@ -152,14 +158,13 @@ namespace ryujin
     dealii::SmartPointer<const HyperbolicSystem> hyperbolic_system_;
     dealii::SmartPointer<const OfflineData<dim, Number>> offline_data_;
 
-    std::set<std::unique_ptr<
-        InitialState<dim, Number, state_type, n_precomputed_values>>>
-        initial_state_list_;
+    typename InitialStateLibrary<Description, dim, Number>::
+        initial_state_list_type initial_state_list_;
 
     std::function<state_type(const dealii::Point<dim> &point, Number t)>
         initial_state_;
 
-    std::function<precomputed_type(const dealii::Point<dim> &point)>
+    std::function<precomputed_state_type(const dealii::Point<dim> &point)>
         flux_contributions_;
 
     //@}

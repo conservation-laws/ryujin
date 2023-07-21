@@ -36,22 +36,27 @@ namespace ryujin
     using HyperbolicSystem = typename Description::HyperbolicSystem;
 
     /**
-     * @copydoc HyperbolicSystem::problem_dimension
+     * @copydoc HyperbolicSystem::View
+     */
+    using HyperbolicSystemView =
+        typename Description::HyperbolicSystem::template View<dim, Number>;
+
+    /**
+     * @copydoc HyperbolicSystem::View::problem_dimension
      */
     static constexpr unsigned int problem_dimension =
-        HyperbolicSystem::template problem_dimension<dim>;
+        HyperbolicSystemView::problem_dimension;
 
     /**
-     * @copydoc HyperbolicSystem::state_type
+     * @copydoc HyperbolicSystem::View::state_type
      */
-    using state_type =
-        typename HyperbolicSystem::template state_type<dim, Number>;
+    using state_type = typename HyperbolicSystemView::state_type;
 
     /**
-     * @copydoc HyperbolicSystem::primitive_state_type
+     * @copydoc HyperbolicSystem::View::primitive_state_type
      */
     using primitive_state_type =
-        typename HyperbolicSystem::template primitive_state_type<dim, Number>;
+        typename HyperbolicSystemView::primitive_state_type;
 
     /**
      * Typedef for a MultiComponentVector storing the state U.

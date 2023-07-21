@@ -4,10 +4,12 @@
 ##
 
 add_library(obj_euler_aeos OBJECT
+  equation_of_state_library.cc
+  initial_state_library.cc
   limiter.cc
-  hyperbolic_system.cc
   riemann_solver.cc
   )
+set_target_properties(obj_euler_aeos PROPERTIES LINKER_LANGUAGE CXX)
 target_link_libraries(obj_euler_aeos obj_common)
 deal_ii_setup_target(obj_euler_aeos)
 # Propagate the current source directory with PUBLIC visibility

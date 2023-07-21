@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2020 - 2022 by the ryujin authors
+// Copyright (C) 2020 - 2023 by the ryujin authors
 //
 
 #pragma once
@@ -45,39 +45,52 @@ namespace ryujin
               [this] { this->interpolation_b_ = b_; });
         }
 
-
-        double pressure(const double rho, const double internal_energy) final
+        /**
+         * The pressure is given by
+         * \f{align}
+         *   p = (\gamma - 1) \rho (e - q) / (1 - b \rho) - \gamma p_\infty
+         * \f}
+         */
+        double pressure(const double &rho, const double &e) final
         {
-          /*
-           * p = (\gamma - 1) *  (\rho (e - q))/ (1 - b \rho) - \gamma p_\infty
-           */
-          const auto num = internal_energy - q_ * rho;
-          const auto den = 1. - b_ * rho;
-          return (gamma_ - 1.) * num / den - gamma_ * pinf_;
+          return (gamma_ - 1.) * rho * (e - q_) / (1. - b_ * rho) -
+                 gamma_ * pinf_;
         }
 
 
-        double specific_internal_energy(const double rho,
-                                        const double pressure) final
+        /*
+         * The specific internal energy is given by
+         * \f{align}
+         *   e - q = (p + \gamma p_\infty) * (1 - b \rho) / (\rho (\gamma - 1))
+         * \f}
+         * \f}
+         */
+        double specific_internal_energy(const double &rho,
+                                        const double &p) final
         {
-          /*
-           * e = q + (p + \gamma p_\infty) * (1 - b \rho) / (\rho (\gamma -1 ))
-           */
-          const auto cov = 1. - b_ * rho;
-          const auto num = (pressure + gamma_ * pinf_) * cov;
-          const auto den = rho * (gamma_ - 1.);
-          return num / den + q_;
+          const auto numerator = (p + gamma_ * pinf_) * (1. - b_ * rho);
+          const auto denominator = rho * (gamma_ - 1.);
+          return q_ + numerator / denominator;
         }
 
-        double material_sound_speed(const double rho, const double p) final
+        /**
+         * The speed of sound is given by
+         */
+        double sound_speed(const double &rho, const double &e) final
         {
+          __builtin_trap();
+          // FIXME: refactor to new interface
+#if 0
           /*
-           * c^2 = \gamma (p + p_\infty) / (\rho (1 - b \rho))
+           * \f{align}
+           *   c^2 = \gamma (p + p_\infty) / (\rho (1 - b \rho))
+           * \f}
            */
           const auto cov = 1. - b_ * rho;
           const auto num = gamma_ * (p + pinf_);
           const auto den = rho * cov;
           return std::sqrt(num / den);
+#endif
         }
 
       private:

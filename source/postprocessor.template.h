@@ -43,10 +43,9 @@ namespace ryujin
         "Recompute bounds for every output cycle. If set to false, bounds once "
         "at the beginning and reused thereafter.");
 
-    static_assert(HyperbolicSystem::template component_names<dim>.size() > 0,
+    static_assert(HyperbolicSystemView::component_names.size() > 0,
                   "Need at least one scalar quantitity");
-    schlieren_quantities_.push_back(
-        HyperbolicSystem::template component_names<dim>[0]);
+    schlieren_quantities_.push_back(HyperbolicSystemView::component_names[0]);
 
     add_parameter(
         "schlieren quantities",
@@ -77,9 +76,8 @@ namespace ryujin
     const auto populate = [&](const auto &strings,
                               auto &indices,
                               const auto &pre) {
-      const auto &cons = HyperbolicSystem::template component_names<dim>;
-      const auto &prim =
-          HyperbolicSystem::template primitive_component_names<dim>;
+      const auto &cons = HyperbolicSystemView::component_names;
+      const auto &prim = HyperbolicSystemView::primitive_component_names;
       for (const auto &entry : strings) {
         bool found = false;
         for (const auto &[is_primitive, names] :
@@ -170,7 +168,8 @@ namespace ryujin
                ++col_idx, js += stride_size) {
 
             const auto U_j = U.template get_tensor<T>(js);
-            const auto prim_j = hyperbolic_system_->to_primitive_state(U_j);
+            const auto view = hyperbolic_system_->template view<dim, T>();
+            const auto prim_j = view.to_primitive_state(U_j);
 
             const auto c_ij = cij_matrix.template get_tensor<T>(i, col_idx);
 

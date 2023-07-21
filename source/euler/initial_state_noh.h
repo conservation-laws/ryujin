@@ -5,12 +5,16 @@
 
 #pragma once
 
-#include "hyperbolic_system.h"
-#include <initial_state.h>
+#include <initial_state_library.h>
 
 namespace ryujin
 {
   namespace Euler
+  {
+    struct Description;
+  }
+
+  namespace EulerInitialStates
   {
     /**
      *
@@ -24,26 +28,42 @@ namespace ryujin
      *
      * @ingroup EulerEquations
      */
-    template <int dim, typename Number, typename state_type>
-    class Noh : public InitialState<dim, Number, state_type>
+    template <typename Description, int dim, typename Number>
+    class Noh : public InitialState<Description, dim, Number>
     {
     public:
-      Noh(const HyperbolicSystem &hyperbolic_system,
-          const std::string subsection)
-          : InitialState<dim, Number, state_type>("noh", subsection)
+      using HyperbolicSystem = typename Description::HyperbolicSystem;
+      using HyperbolicSystemView =
+          typename HyperbolicSystem::template View<dim, Number>;
+      using state_type = typename HyperbolicSystemView::state_type;
+
+      Noh(const HyperbolicSystemView &hyperbolic_system,
+          const std::string &subsection)
+          : InitialState<Description, dim, Number>("noh", subsection)
           , hyperbolic_system(hyperbolic_system)
       {
-        /* No customization at this point */
+        gamma_ = 1.4;
+        if constexpr (!std::is_same_v<Description, Euler::Description>) {
+          this->add_parameter("gamma", gamma_, "The ratio of specific heats");
+        }
+
+        this->parse_parameters_call_back.connect([&]() {
+          if constexpr (std::is_same_v<Description, Euler::Description>) {
+            gamma_ = this->hyperbolic_system.gamma();
+          }
+        });
       }
 
       /* Initial and exact solution for each dimension */
-      state_type compute(const dealii::Point<dim> &point, Number t) final
+      auto compute(const dealii::Point<dim> &point, Number t)
+          -> state_type final
       {
         // Initialize some quantities
         double rho = 1.;
-        double u = 0., v = 0.;
+        double u = 0.;
+        double v = 0.;
         double E = 0.;
-        const double gamma = hyperbolic_system.gamma();
+
         const auto norm = point.norm();
 
         // Define profiles for each dim here
@@ -54,18 +74,18 @@ namespace ryujin
           if (t < 1.e-16) {
             if (norm > 1.e-16)
               u = -point[0] / norm;
-            E = 1.e-12 / (gamma - Number(1.)) + Number(0.5) * rho * u * u;
+            E = 1.e-12 / (gamma_ - Number(1.)) + Number(0.5) * rho * u * u;
           }
 
           /* Exact solution */
           else if (t / 3. < norm) {
             rho = 1.0;
             u = -point[0] / norm;
-            E = 0.5 * rho + 1.e-12 / (gamma - Number(1.));
+            E = 0.5 * rho + 1.e-12 / (gamma_ - Number(1.));
           } else if (t / 3. >= norm) {
             rho = 4.0;
             u = 0.0;
-            E = 2.0 + 1.e-12 / (gamma - Number(1.));
+            E = 2.0 + 1.e-12 / (gamma_ - Number(1.));
           }
 
           break;
@@ -76,7 +96,7 @@ namespace ryujin
             if (norm > 1.e-16) {
               u = -point[0] / norm, v = -point[1] / norm;
             }
-            E = 1.e-12 / (gamma - Number(1.)) +
+            E = 1.e-12 / (gamma_ - Number(1.)) +
                 Number(0.5) * rho * (u * u + v * v);
           }
 
@@ -84,11 +104,11 @@ namespace ryujin
           else if (t / 3. < norm) {
             rho = 1.0 + t / norm;
             u = -point[0] / norm, v = -point[1] / norm;
-            E = 0.5 * rho + 1.e-12 / (gamma - Number(1.));
+            E = 0.5 * rho + 1.e-12 / (gamma_ - Number(1.));
           } else if (t / 3. >= norm) {
             rho = 16.0;
             u = 0.0, v = 0.0;
-            E = 8.0 + 1.e-12 / (gamma - Number(1.));
+            E = 8.0 + 1.e-12 / (gamma_ - Number(1.));
           }
 
           break;
@@ -106,8 +126,8 @@ namespace ryujin
       }
 
     private:
-      const HyperbolicSystem &hyperbolic_system;
+      const HyperbolicSystemView hyperbolic_system;
+      Number gamma_;
     };
-
   } // namespace Euler
 } // namespace ryujin

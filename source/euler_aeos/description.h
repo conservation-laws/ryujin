@@ -1,13 +1,12 @@
 //
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2020 - 2022 by the ryujin authors
+// Copyright (C) 2020 - 2023 by the ryujin authors
 //
 
 #pragma once
 
 #include "hyperbolic_system.h"
 #include "indicator.h"
-#include "initial_state_library.h"
 #include "limiter.h"
 #include "riemann_solver.h"
 
@@ -31,8 +30,6 @@ namespace ryujin
 
       template <int dim, typename Number = double>
       using Indicator = EulerAEOS::Indicator<dim, Number>;
-
-      using InitialStateLibrary = EulerAEOS::InitialStateLibrary;
 
       template <int dim, typename Number = double>
       using Limiter = EulerAEOS::Limiter<dim, Number>;

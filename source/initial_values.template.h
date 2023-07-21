@@ -5,8 +5,6 @@
 
 #pragma once
 
-#include <initial_state_library.h>
-
 #include "initial_values.h"
 #include "simd.h"
 
@@ -60,9 +58,8 @@ namespace ryujin
      * And finally populate the initial state list with all initial state
      * configurations defined in the InitialStateLibrary namespace:
      */
-    Description::InitialStateLibrary::
-        template populate_initial_state_list<dim, Number>(
-            initial_state_list_, *hyperbolic_system_, subsection);
+    InitialStateLibrary<Description, dim, Number>::populate_initial_state_list(
+        initial_state_list_, *hyperbolic_system_, subsection);
   }
 
   namespace
@@ -173,8 +170,9 @@ namespace ryujin
             const auto transformed_point =
                 affine_transform(initial_direction_, initial_position_, point);
             auto state = it->compute(transformed_point, t);
-            state = hyperbolic_system_->apply_galilei_transform(
-                state, [&](const auto &momentum) {
+            const auto view = hyperbolic_system_->template view<dim, Number>();
+            state =
+                view.apply_galilei_transform(state, [&](const auto &momentum) {
                   return affine_transform_vector(initial_direction_, momentum);
                 });
             return state;
@@ -267,7 +265,8 @@ namespace ryujin
 
       if (id == Boundary::slip || id == Boundary::no_slip) {
         auto U_i = U.get_tensor(i);
-        U_i = hyperbolic_system_->apply_boundary_conditions(
+        const auto view = hyperbolic_system_->template view<dim, Number>();
+        U_i = view.apply_boundary_conditions(
             id, U_i, normal, [&]() { return U_i; });
         U.write_tensor(U_i, i);
       }

@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2020 - 2022 by the ryujin authors
+// Copyright (C) 2020 - 2023 by the ryujin authors
 //
 
 #pragma once
@@ -13,7 +13,7 @@ namespace ryujin
   {
     template <int dim, typename Number>
     std::tuple<Number, bool>
-    Limiter<dim, Number>::limit(const HyperbolicSystem &hyperbolic_system,
+    Limiter<dim, Number>::limit(const HyperbolicSystemView &hyperbolic_system,
                                 const Bounds &bounds,
                                 const state_type &U,
                                 const state_type &P,
@@ -119,7 +119,7 @@ namespace ryujin
       const auto &gamma = std::get<3>(bounds) /* = gamma_min*/;
       const Number gm1 = gamma - Number(1.);
 
-      const ScalarNumber b_ = hyperbolic_system.interpolation_b_();
+      const auto interpolation_b = hyperbolic_system.eos_interpolation_b();
 
       {
         /*
@@ -147,7 +147,7 @@ namespace ryujin
           const auto rho_r = hyperbolic_system.density(U_r);
           const auto rho_r_gamma = ryujin::pow(rho_r, gamma);
           const auto rho_e_r = hyperbolic_system.internal_energy(U_r);
-          const auto covolume_r = Number(1.) - b_ * rho_r;
+          const auto covolume_r = Number(1.) - interpolation_b * rho_r;
 
           auto psi_r =
               relax_small * rho_r * rho_e_r -
@@ -178,7 +178,7 @@ namespace ryujin
           const auto rho_l = hyperbolic_system.density(U_l);
           const auto rho_l_gamma = ryujin::pow(rho_l, gamma);
           const auto rho_e_l = hyperbolic_system.internal_energy(U_l);
-          const auto covolume_l = Number(1.) - b_ * rho_l;
+          const auto covolume_l = Number(1.) - interpolation_b * rho_l;
 
           auto psi_l =
               relax_small * rho_l * rho_e_l -
@@ -216,12 +216,12 @@ namespace ryujin
           const auto drho_e_r =
               hyperbolic_system.internal_energy_derivative(U_r) * P;
 
-          const auto extra_term_l = s_min *
-                                    ryujin::pow(rho_l / covolume_l, gamma) *
-                                    (covolume_l + gamma - b_ * rho_l);
-          const auto extra_term_r = s_min *
-                                    ryujin::pow(rho_r / covolume_r, gamma) *
-                                    (covolume_r + gamma - b_ * rho_r);
+          const auto extra_term_l =
+              s_min * ryujin::pow(rho_l / covolume_l, gamma) *
+              (covolume_l + gamma - interpolation_b * rho_l);
+          const auto extra_term_r =
+              s_min * ryujin::pow(rho_r / covolume_r, gamma) *
+              (covolume_r + gamma - interpolation_b * rho_r);
 
           const auto dpsi_l =
               rho_l * drho_e_l + (rho_e_l - extra_term_l) * drho;
@@ -251,7 +251,7 @@ namespace ryujin
           const auto rho_new = hyperbolic_system.density(U_new);
           const auto rho_e_new = hyperbolic_system.internal_energy(U_new);
           const auto rho_gamma_new = ryujin::pow(rho_new, gamma);
-          const auto covolume_new = Number(1.) - b_ * rho_new;
+          const auto covolume_new = Number(1.) - interpolation_b * rho_new;
 
           const auto psi =
               relax_small * rho_new * rho_e_new -

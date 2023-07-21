@@ -81,22 +81,26 @@ namespace ryujin
     using HyperbolicSystem = typename Description::HyperbolicSystem;
 
     /**
+     * @copydoc HyperbolicSystem::View
+     */
+    using HyperbolicSystemView =
+        typename HyperbolicSystem::template View<dim, Number>;
+
+    /**
      * @copydoc HyperbolicSystem::problem_dimension
      */
     static constexpr unsigned int problem_dimension =
-        HyperbolicSystem::template problem_dimension<dim>;
+        HyperbolicSystemView::problem_dimension;
 
     /**
      * @copydoc HyperbolicSystem::state_type
      */
-    using state_type =
-        typename HyperbolicSystem::template state_type<dim, Number>;
+    using state_type = typename HyperbolicSystemView::state_type;
 
     /**
      * @copydoc HyperbolicSystem::flux_type
      */
-    using flux_type =
-        typename HyperbolicSystem::template flux_type<dim, Number>;
+    using flux_type = typename HyperbolicSystemView::flux_type;
 
     /**
      * @copydoc OfflineData::scalar_type
@@ -104,32 +108,39 @@ namespace ryujin
     using scalar_type = typename OfflineData<dim, Number>::scalar_type;
 
     /**
-     * Typedef for a MultiComponentVector storing the state U.
+     * @copydoc HyperbolicSystem::View::vector_type
      */
-    using vector_type = MultiComponentVector<Number, problem_dimension>;
+    using vector_type = typename HyperbolicSystemView::vector_type;
 
     /**
      * @copydoc HyperbolicSystem::n_precomputed_values
      */
     static constexpr unsigned int n_precomputed_values =
-        HyperbolicSystem::template n_precomputed_values<dim>;
+        HyperbolicSystemView::n_precomputed_values;
+
+    /**
+     * @copydoc HyperbolicSystemView::n_precomputation_cycles
+     */
+    static constexpr unsigned int n_precomputation_cycles =
+        HyperbolicSystemView::n_precomputation_cycles;
 
     /**
      * Typedef for a MultiComponentVector storing precomputed values.
      */
-    using precomputed_type = MultiComponentVector<Number, n_precomputed_values>;
+    using precomputed_vector_type =
+        typename HyperbolicSystemView::precomputed_vector_type;
 
     /**
      * @copydoc HyperbolicSystem::n_precomputed_initial_values
      */
     static constexpr unsigned int n_precomputed_initial_values =
-        HyperbolicSystem::template n_precomputed_initial_values<dim>;
+        HyperbolicSystemView::n_precomputed_initial_values;
 
     /**
      * Typedef for a MultiComponentVector storing precomputed initial_values.
      */
-    using precomputed_initial_type =
-        MultiComponentVector<Number, n_precomputed_initial_values>;
+    using precomputed_initial_vector_type =
+        typename HyperbolicSystemView::precomputed_initial_vector_type;
 
 
     /**
@@ -217,11 +228,11 @@ namespace ryujin
     Number
     step(const vector_type &old_U,
          std::array<std::reference_wrapper<const vector_type>, stages> stage_U,
-         std::array<std::reference_wrapper<const precomputed_type>, stages>
-             stage_precomputed,
+         std::array<std::reference_wrapper<const precomputed_vector_type>,
+                    stages> stage_precomputed,
          const std::array<Number, stages> stage_weights,
          vector_type &new_U,
-         precomputed_type &new_precomputed,
+         precomputed_vector_type &new_precomputed,
          Number tau = Number(0.)) const;
 
     /**
@@ -334,7 +345,7 @@ namespace ryujin
 
     mutable unsigned int n_warnings_;
 
-    precomputed_initial_type precomputed_initial_;
+    precomputed_initial_vector_type precomputed_initial_;
 
     mutable scalar_type alpha_;
 

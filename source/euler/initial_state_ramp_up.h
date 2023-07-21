@@ -5,12 +5,11 @@
 
 #pragma once
 
-#include "hyperbolic_system.h"
-#include <initial_state.h>
+#include <initial_state_library.h>
 
 namespace ryujin
 {
-  namespace Euler
+  namespace EulerInitialStates
   {
     /**
      * A time-dependent state given by an initial state @p primite_left_
@@ -20,23 +19,28 @@ namespace ryujin
      *
      * @ingroup EulerEquations
      */
-    template <int dim, typename Number, typename state_type>
-    class RampUp : public InitialState<dim, Number, state_type>
+    template <typename Description, int dim, typename Number>
+    class RampUp : public InitialState<Description, dim, Number>
     {
     public:
-      RampUp(const HyperbolicSystem &hyperbolic_system,
+      using HyperbolicSystem = typename Description::HyperbolicSystem;
+      using HyperbolicSystemView =
+          typename HyperbolicSystem::template View<dim, Number>;
+      using state_type = typename HyperbolicSystemView::state_type;
+
+      RampUp(const HyperbolicSystemView &hyperbolic_system,
              const std::string subsection)
-          : InitialState<dim, Number, state_type>("ramp up", subsection)
+          : InitialState<Description, dim, Number>("ramp up", subsection)
           , hyperbolic_system(hyperbolic_system)
       {
-        primitive_initial_[0] = hyperbolic_system.gamma();
+        primitive_initial_[0] = 1.4;
         primitive_initial_[1] = 0.0;
         primitive_initial_[2] = 1.;
         this->add_parameter("primitive state initial",
                             primitive_initial_,
                             "Initial 1d primitive state (rho, u, p)");
 
-        primitive_final_[0] = hyperbolic_system.gamma();
+        primitive_final_[0] = 1.4;
         primitive_final_[1] = 3.0;
         primitive_final_[2] = 1.;
         this->add_parameter("primitive state final",
@@ -52,9 +56,12 @@ namespace ryujin
         this->add_parameter("time final",
                             t_final_,
                             "Time from which on the final state is attained)");
+
+        // FIXME: update primitive
       }
 
-      state_type compute(const dealii::Point<dim> & /*point*/, Number t) final
+      auto compute(const dealii::Point<dim> & /*point*/, Number t)
+          -> state_type final
       {
         dealii::Tensor<1, 3, Number> primitive;
 
@@ -71,12 +78,12 @@ namespace ryujin
           primitive = alpha * primitive_initial_ + beta * primitive_final_;
         }
 
-        const auto temp = hyperbolic_system.from_primitive_state(primitive);
-        return hyperbolic_system.template expand_state<dim>(temp);
+        return hyperbolic_system.from_primitive_state(
+            hyperbolic_system.expand_state(primitive));
       }
 
     private:
-      const HyperbolicSystem &hyperbolic_system;
+      const HyperbolicSystemView hyperbolic_system;
 
       dealii::Tensor<1, 3, Number> primitive_initial_;
       dealii::Tensor<1, 3, Number> primitive_final_;
