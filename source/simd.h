@@ -343,9 +343,8 @@ namespace ryujin
   template <int rank, int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline dealii::Tensor<rank, dim, Number>
   serialize_tensor(const dealii::Tensor<rank, dim, Number> &serial,
-                   const unsigned int k)
+                   const unsigned int k [[maybe_unused]])
   {
-    (void)k;
     Assert(k == 0,
            dealii::ExcMessage(
                "The given index k must be zero for a serial tensor"));
@@ -385,9 +384,8 @@ namespace ryujin
   DEAL_II_ALWAYS_INLINE inline void
   assign_serial_tensor(dealii::Tensor<rank, dim, Number> &result,
                        const dealii::Tensor<rank, dim, Number> &serial,
-                       const unsigned int k)
+                       const unsigned int k [[maybe_unused]])
   {
-    (void)k;
     Assert(k == 0,
            dealii::ExcMessage(
                "The given index k must be zero for a serial tensor"));
