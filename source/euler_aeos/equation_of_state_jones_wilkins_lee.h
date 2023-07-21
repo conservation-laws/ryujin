@@ -43,48 +43,56 @@ namespace ryujin
           this->add_parameter("rho_0", rho0, "The reference density");
         }
 
-
-        double pressure(const double rho, const double internal_energy) final
+        /**
+         * The pressure is given by
+         * \f{align}
+         *   p = A(1 - \omega / R_1 \rho / \rho_0) e^{(-R_1 \rho_0 / \rho)}
+         *     + B(1 - \omega / R_2 \rho/ \rho_0) e^{(-R_2 \rho_0 / \rho)}
+         *     + \omega \rho e
+         * \f}
+         */
+        double pressure(const double &rho, const double &e) final
         {
-          /*
-           * p = A(1 - omega / R_1 rho / rho_0) * exp(-R_1 rho_0 / rho) + B(1
-           * - omega / R_2 rho/ rho_0) + omega rho * e
-           */
 
           const auto ratio = rho / rho0;
 
-          auto temp = 1. - omega / R1 * ratio;
-          const auto first_term = capA * temp * std::exp(-R1 * 1. / ratio);
+          const auto first_term =
+              capA * (1. - omega / R1 * ratio) * std::exp(-R1 * 1. / ratio);
+          const auto second_term =
+              capB * (1. - omega / R2 * ratio) * std::exp(-R2 * 1. / ratio);
 
-          temp = 1. - omega / R2 * ratio;
-          const auto second_term = capB * temp * std::exp(-R2 * 1. / ratio);
-
-          return first_term + second_term + omega * internal_energy;
+          return first_term + second_term + omega * rho * e;
         }
 
-
-        double specific_internal_energy(const double rho, const double p) final
+        /*
+         * The specific internal energy is given by
+         * \f{align}
+         *   \omega \rho e = p
+         *   - A(1 - \omega / R_1 \rho / \rho_0) e^{(-R_1 \rho_0 / \rho)}
+         *   - B(1 - \omega / R_2 \rho/ \rho_0) e^{(-R_2 \rho_0 / \rho)}
+         * \f}
+         */
+        double specific_internal_energy(const double &rho,
+                                        const double &p) final
         {
-          /*
-           * e = (p - [A(1 - omega / R_1 \rho / rho_0) * exp(-R_1 rho_0 / \rho)
-           * + B(1 - omega / R_2 \rho/ rho_0)]  / (omega \rho)
-           */
           const auto ratio = rho / rho0;
 
-          auto temp = 1. - omega / R1 * ratio;
-          const auto first_term = capA * temp * std::exp(-R1 * 1. / ratio);
+          const auto first_term =
+              capA * (1. - omega / R1 * ratio) * std::exp(-R1 * 1. / ratio);
+          const auto second_term =
+              capB * (1. - omega / R2 * ratio) * std::exp(-R2 * 1. / ratio);
 
-          temp = 1. - omega / R2 * ratio;
-          const auto second_term = capB * temp * std::exp(-R2 * 1. / ratio);
-
-          return (p - (first_term + second_term)) / (rho * omega);
+          return (p - first_term - second_term) / (rho * omega);
         }
 
-        double material_sound_speed(const double rho, const double p) final
+        /**
+         * The speed of sound is given by
+         */
+        double sound_speed(const double &rho, const double &e) final
         {
-          /*
-          c^2 = ...
-          */
+          __builtin_trap();
+          // FIXME: refactor to new interface
+#if 0
           auto temp = omega / R1 * rho / rho0;
           temp = omega * (1. - temp) * (1. + 1. / temp) - temp;
           const auto first_term = capA / rho * temp * std::exp(omega / temp);
@@ -97,6 +105,7 @@ namespace ryujin
           const auto third_term = omega * (omega + 1.) * e;
 
           return first_term + second_term + third_term;
+#endif
         }
 
       private:

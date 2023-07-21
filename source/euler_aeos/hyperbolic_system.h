@@ -64,8 +64,7 @@ namespace ryujin
       std::function<double(const double, const double)> eos_pressure_;
       std::function<double(const double, const double)>
           eos_specific_internal_energy_;
-      std::function<double(const double, const double)>
-          eos_material_sound_speed_;
+      std::function<double(const double, const double)> eos_sound_speed_;
       std::function<double()> eos_interpolation_b_;
 
     public:
@@ -146,8 +145,8 @@ namespace ryujin
         //@{
 
         /**
-         * For a given density \f$\rho\f$ and specific internal energy
-         * \f$e\f$ return the pressure \f$p\f$.
+         * For a given density \f$\rho\f$ and <i>specific</i> internal
+         * energy \f$e\f$ return the pressure \f$p\f$.
          */
         DEAL_II_ALWAYS_INLINE inline ScalarNumber
         eos_pressure(const ScalarNumber &rho,
@@ -158,7 +157,7 @@ namespace ryujin
 
         /**
          * For a given density \f$\rho\f$ and pressure \f$p\f$ return the
-         * specific internal energy \f$e\f$.
+         * <i>specific</i> internal energy \f$e\f$.
          */
         DEAL_II_ALWAYS_INLINE inline ScalarNumber
         eos_specific_internal_energy(const ScalarNumber &rho,
@@ -169,15 +168,13 @@ namespace ryujin
         }
 
         /**
-         * For a given density \f$\rho\f$ and specific internal energy
-         * \f$e\f$ return the material sound speed \f$a\f$.
+         * For a given density \f$\rho\f$ and <i>specific</i> internal
+         * energy \f$e\f$ return the sound speed \f$a\f$.
          */
         DEAL_II_ALWAYS_INLINE inline ScalarNumber
-        eos_material_sound_speed(const ScalarNumber &rho,
-                                 const ScalarNumber &e) const
+        eos_sound_speed(const ScalarNumber &rho, const ScalarNumber &e) const
         {
-          return ScalarNumber(
-              hyperbolic_system_.eos_material_sound_speed_(rho, e));
+          return ScalarNumber(hyperbolic_system_.eos_sound_speed_(rho, e));
         }
 
         /**
@@ -242,8 +239,10 @@ namespace ryujin
             dealii::Tensor<1, problem_dimension, Number>;
 
         /**
-         * An array holding all component names of the primitive state as a
-         * string.
+         * An array holding all component names of the primitive state
+         * \f$[\rho,\vec v, e]\f$ as a string.
+         *
+         * @note The last component ist the <b>specific</b> internal energy
          */
         static inline const auto primitive_component_names =
             []() -> std::array<std::string, problem_dimension> {
@@ -721,8 +720,8 @@ namespace ryujin
               return it->specific_internal_energy(rho, p);
             };
 
-            eos_material_sound_speed_ = [&it](double rho, double p) {
-              return it->material_sound_speed(rho, p);
+            eos_sound_speed_ = [&it](double rho, double e) {
+              return it->sound_speed(rho, e);
             };
 
             eos_interpolation_b_ = [&it]() { return it->interpolation_b(); };
@@ -883,7 +882,7 @@ namespace ryujin
     HyperbolicSystem::View<dim, Number>::pressure(const state_type &U) const
     {
       const auto rho = density(U);
-      const auto e = internal_energy(U);
+      const auto e = internal_energy(U) / rho;
 
       if constexpr (std::is_same<ScalarNumber, Number>::value) {
         return eos_pressure(rho, e);
@@ -1044,6 +1043,8 @@ namespace ryujin
         const state_type &U_bar,
         const dealii::Tensor<1, dim, Number> &normal) const -> state_type
     {
+      __builtin_trap(); // untested and likely needs to be refactored
+
       static_assert(component == 1 || component == 2,
                     "component has to be 1 or 2");
 
@@ -1132,6 +1133,7 @@ namespace ryujin
           result[k + 1] = Number(0.);
 
       } else if (id == Boundary::dynamic) {
+        __builtin_trap(); // untested and likely needs to be refactored
 #if 0
         /*
          * On dynamic boundary conditions, we distinguish four cases:
@@ -1169,7 +1171,6 @@ namespace ryujin
 
         /* Supersonic outflow: do nothing, i.e., keep U as is */
 #endif
-        __builtin_trap();
       }
 
       return result;

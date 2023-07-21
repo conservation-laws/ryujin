@@ -39,33 +39,42 @@ namespace ryujin
               [this] { this->interpolation_b_ = b_; });
         }
 
-
-        double pressure(const double rho, const double internal_energy) final
+        /**
+         * The pressure is given by
+         * \f{align}
+         *   p = (\gamma - 1) * (\rho * e + a \rho^2)/(1 - b \rho) - a \rho^2
+         * \f}
+         */
+        double pressure(const double &rho, const double &e) final
         {
-          /*
-           * p = (\gamma - 1) * (\rho * e + a \rho^2)/(1 - b \rho) - a \rho^2
-           */
-          const auto num = internal_energy + a_ * rho * rho;
-          const auto den = 1. - b_ * rho;
-          return (gamma_ - 1.) * num / den - a_ * rho * rho;
+          const auto numerator = rho * e + a_ * rho * rho;
+          const auto denominator = 1. - b_ * rho;
+          return (gamma_ - 1.) * numerator / denominator - a_ * rho * rho;
         }
 
-
-        double specific_internal_energy(const double rho,
-                                        const double pressure) final
+        /**
+         * The specific internal energy is given by
+         * \f{align}
+         *   \rho e = (p + a \rho^2) * (1 - b \rho) / (\rho (\gamma -1))
+         *   - a \rho^2
+         * \f}
+         */
+        double specific_internal_energy(const double &rho,
+                                        const double &p) final
         {
-          /*
-           * rho e = (p + a \rho^2) * (1 - b \rho) / (\rho (\gamma -1))
-           * - a \rho^2
-           */
-          const auto cov = 1. - b_ * rho;
-          const auto num = (pressure + a_ * rho * rho) * cov;
-          const auto den = rho * (gamma_ - 1.);
-          return num / den - a_ * rho;
+          const auto numerator = (p + a_ * rho * rho) * (1. - b_ * rho);
+          const auto denominator = rho * (gamma_ - 1.);
+          return numerator / denominator - a_ * rho;
         }
 
-        double material_sound_speed(const double rho, const double p) final
+        /**
+         * The speed of sound is given by
+         */
+        double sound_speed(const double &rho, const double &e) final
         {
+          __builtin_trap();
+          // FIXME: refactor to new interface
+#if 0
           /*
            * c^2 = \gamma (p + a \rho^2) / (\rho (1 - b \rho)) - 2 a \rho
            */
@@ -73,6 +82,7 @@ namespace ryujin
           const auto num = gamma_ * (p + a_ * rho * rho);
           const auto den = rho * cov;
           return std::sqrt(num / den - 2. * a_ * rho * rho);
+#endif
         }
 
       private:
