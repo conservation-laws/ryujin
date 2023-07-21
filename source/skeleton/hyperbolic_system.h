@@ -201,13 +201,18 @@ namespace ryujin
         static constexpr unsigned int n_precomputation_cycles = 0;
 
         /**
-         * Precomputed values for a given state.
+         * Step 0: precompute values for hyperbolic update. This routine is
+         * called within our usual loop() idiom in HyperbolicModule
          */
-        template <unsigned int cycle, typename SPARSITY>
-        void precomputation(precomputed_vector_type &precomputed_values,
-                            const vector_type &U,
-                            const SPARSITY &sparsity_simd,
-                            unsigned int i) const = delete;
+        template <typename DISPATCH, typename SPARSITY>
+        void
+        precomputation_loop(unsigned int /*cycle*/,
+                            const DISPATCH &dispatch_check,
+                            precomputed_vector_type & /*precomputed_values*/,
+                            const SPARSITY & /*sparsity_simd*/,
+                            const vector_type & /*U*/,
+                            unsigned int /*left*/,
+                            unsigned int /*right*/) const = delete;
 
         //@}
         /**

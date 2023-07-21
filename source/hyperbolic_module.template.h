@@ -206,108 +206,56 @@ namespace ryujin
     std::atomic<bool> restart_needed = false;
 
     /*
+     * -------------------------------------------------------------------------
      * Step 0: Precompute values
+     * -------------------------------------------------------------------------
      */
 
-    static_assert(n_precomputation_cycles <= 2, "internal_error");
-
-    if constexpr (n_precomputation_cycles >= 1) {
-      constexpr unsigned int cycle = 0;
-
+    if constexpr (n_precomputation_cycles != 0) {
       Scope scope(computing_timer_, scoped_name("precompute values"));
 
-      SynchronizationDispatch synchronization_dispatch([&]() {
-        new_precomputed.update_ghost_values_start(channel++);
+      for (unsigned int cycle = 0; cycle < n_precomputation_cycles; ++cycle) {
 
-        new_precomputed.update_ghost_values_finish();
-      });
+        SynchronizationDispatch synchronization_dispatch([&]() {
+          new_precomputed.update_ghost_values_start(channel++);
+          new_precomputed.update_ghost_values_finish();
+        });
 
-      RYUJIN_PARALLEL_REGION_BEGIN
-      LIKWID_MARKER_START(("time_step_" + std::to_string(step_no)).c_str());
+        RYUJIN_PARALLEL_REGION_BEGIN
+        LIKWID_MARKER_START(("time_step_" + std::to_string(step_no)).c_str());
 
-      /* Stored thread locally: */
-      bool thread_ready = false;
+        auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
+          using T = decltype(sentinel);
 
-      const auto loop =
-          [&](auto sentinel, unsigned int left, unsigned int right) {
-            using T = decltype(sentinel);
-            unsigned int stride_size = get_stride_size<T>;
+          /* Stored thread locally: */
+          bool thread_ready = false;
 
-            RYUJIN_OMP_FOR
-            for (unsigned int i = left; i < right; i += stride_size) {
+          const auto view = hyperbolic_system_->template view<dim, T>();
+          view.precomputation_loop(
+              cycle,
+              [&](const unsigned int i) {
+                synchronization_dispatch.check(
+                    thread_ready, i >= n_export_indices && i < n_internal);
+              },
+              new_precomputed,
+              sparsity_simd,
+              old_U,
+              left,
+              right);
+        };
 
-              /* Skip constrained degrees of freedom: */
-              const unsigned int row_length = sparsity_simd.row_length(i);
-              if (row_length == 1)
-                continue;
+        /* Parallel non-vectorized loop: */
+        loop(Number(), n_internal, n_owned);
+        /* Parallel vectorized SIMD loop: */
+        loop(VA(), 0, n_internal);
 
-              synchronization_dispatch.check(
-                  thread_ready, i >= n_export_indices && i < n_internal);
-
-              const auto view = hyperbolic_system_->template view<dim, T>();
-              view.template precomputation<cycle>(
-                  new_precomputed, old_U, sparsity_simd, i);
-            }
-          };
-
-      /* Parallel non-vectorized loop: */
-      loop(Number(), n_internal, n_owned);
-      /* Parallel vectorized SIMD loop: */
-      loop(VA(), 0, n_internal);
-
-      LIKWID_MARKER_STOP(("time_step_" + std::to_string(step_no)).c_str());
-      RYUJIN_PARALLEL_REGION_END
+        LIKWID_MARKER_STOP(("time_step_" + std::to_string(step_no)).c_str());
+        RYUJIN_PARALLEL_REGION_END
+      }
     }
 
-    if constexpr (n_precomputation_cycles >= 2) {
-      constexpr unsigned int cycle = 1;
-
-      Scope scope(computing_timer_, scoped_name("precompute values"));
-
-      SynchronizationDispatch synchronization_dispatch([&]() {
-        new_precomputed.update_ghost_values_start(channel++);
-
-        new_precomputed.update_ghost_values_finish();
-      });
-
-      RYUJIN_PARALLEL_REGION_BEGIN
-      LIKWID_MARKER_START(("time_step_" + std::to_string(step_no)).c_str());
-
-      /* Stored thread locally: */
-      bool thread_ready = false;
-
-      const auto loop =
-          [&](auto sentinel, unsigned int left, unsigned int right) {
-            using T = decltype(sentinel);
-            unsigned int stride_size = get_stride_size<T>;
-
-            RYUJIN_OMP_FOR
-            for (unsigned int i = left; i < right; i += stride_size) {
-
-              /* Skip constrained degrees of freedom: */
-              const unsigned int row_length = sparsity_simd.row_length(i);
-              if (row_length == 1)
-                continue;
-
-              synchronization_dispatch.check(
-                  thread_ready, i >= n_export_indices && i < n_internal);
-
-              const auto view = hyperbolic_system_->template view<dim, T>();
-              view.template precomputation<cycle>(
-                  new_precomputed, old_U, sparsity_simd, i);
-            }
-          };
-
-      /* Parallel non-vectorized loop: */
-      loop(Number(), n_internal, n_owned);
-      /* Parallel vectorized SIMD loop: */
-      loop(VA(), 0, n_internal);
-
-      LIKWID_MARKER_STOP(("time_step_" + std::to_string(step_no)).c_str());
-      RYUJIN_PARALLEL_REGION_END
-    };
-
     /*
+     * -------------------------------------------------------------------------
      * Step 1: Compute off-diagonal d_ij, and alpha_i
      *
      * The computation of the d_ij is quite costly. So we do a trick to
@@ -329,6 +277,7 @@ namespace ryujin
      *  computing entries for which *IN A GLOBAL* enumeration j > i. But
      *  the index translation, subsequent symmetrization, and exchange
      *  sounds a bit too expensive...
+     * -------------------------------------------------------------------------
      */
 
     {
@@ -336,7 +285,6 @@ namespace ryujin
 
       SynchronizationDispatch synchronization_dispatch([&]() {
         alpha_.update_ghost_values_start(channel++);
-
         alpha_.update_ghost_values_finish();
       });
 
@@ -409,7 +357,9 @@ namespace ryujin
     }
 
     /*
+     * -------------------------------------------------------------------------
      * Step 2: Compute diagonal of d_ij, and maximal time-step size.
+     * -------------------------------------------------------------------------
      */
 
     std::atomic<Number> tau_max{std::numeric_limits<Number>::infinity()};
@@ -517,7 +467,9 @@ namespace ryujin
     }
 
     /*
+     * -------------------------------------------------------------------------
      * Step 3: Low-order update, also compute limiter bounds, R_i
+     * -------------------------------------------------------------------------
      */
 
     {
@@ -528,7 +480,6 @@ namespace ryujin
         r_.update_ghost_values_start(channel++);
         source_.update_ghost_values_start(channel++);
         source_r_.update_ghost_values_start(channel++);
-
         r_.update_ghost_values_finish();
         source_.update_ghost_values_finish();
         source_r_.update_ghost_values_finish();
@@ -733,7 +684,9 @@ namespace ryujin
     }
 
     /*
+     * -------------------------------------------------------------------------
      * Step 4: Compute second part of P_ij, and l_ij (first round):
+     * -------------------------------------------------------------------------
      */
 
     if (limiter_iter_ != 0) {
@@ -845,11 +798,13 @@ namespace ryujin
     }
 
     /*
+     * -------------------------------------------------------------------------
      * Step 5, 6: Perform high-order update:
      *
      *   Symmetrize l_ij
      *   High-order update: += l_ij * lambda * P_ij
      *   Compute next l_ij
+     * -------------------------------------------------------------------------
      */
 
     for (unsigned int pass = 0; pass < limiter_iter_; ++pass) {
@@ -1022,7 +977,8 @@ namespace ryujin
               << std::endl;
 #endif
 
-    const auto cycle_number = 4 + n_precomputation_cycles + limiter_iter_;
+    const auto cycle_number =
+        4 + (n_precomputation_cycles > 0 ? 1 : 0) + limiter_iter_;
     Scope scope(computing_timer_,
                 "time step [E] " + std::to_string(cycle_number) +
                     " - apply boundary conditions");

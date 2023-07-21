@@ -9,6 +9,7 @@
 #include <convenience_macros.h>
 #include <discretization.h>
 #include <multicomponent_vector.h>
+#include <openmp.h>
 #include <patterns_conversion.h>
 #include <simd.h>
 
@@ -294,13 +295,17 @@ namespace ryujin
         static constexpr unsigned int n_precomputation_cycles = 1;
 
         /**
-         * Precomputed values for a given state.
+         * Step 0: precompute values for hyperbolic update. This routine is
+         * called within our usual loop() idiom in HyperbolicModule
          */
-        template <unsigned int cycle, typename SPARSITY>
-        void precomputation(precomputed_vector_type &precomputed_values,
-                            const vector_type &U,
-                            const SPARSITY &sparsity_simd,
-                            unsigned int i) const;
+        template <typename DISPATCH, typename SPARSITY>
+        void precomputation_loop(unsigned int cycle,
+                                 const DISPATCH &dispatch_check,
+                                 precomputed_vector_type &precomputed_values,
+                                 const SPARSITY &sparsity_simd,
+                                 const vector_type &U,
+                                 unsigned int left,
+                                 unsigned int right) const;
 
         //@}
         /**
@@ -678,20 +683,36 @@ namespace ryujin
 
 
     template <int dim, typename Number>
-    template <unsigned int cycle, typename SPARSITY>
+    template <typename DISPATCH, typename SPARSITY>
     DEAL_II_ALWAYS_INLINE inline void
-    HyperbolicSystem::View<dim, Number>::precomputation(
+    HyperbolicSystem::View<dim, Number>::precomputation_loop(
+        unsigned int cycle [[maybe_unused]],
+        const DISPATCH &dispatch_check,
         precomputed_vector_type &precomputed_values,
+        const SPARSITY &sparsity_simd,
         const vector_type &U,
-        const SPARSITY & /*sparsity_simd*/,
-        unsigned int i) const
+        unsigned int left,
+        unsigned int right) const
     {
-      static_assert(cycle == 0, "internal error");
+      Assert(cycle == 0, dealii::ExcInternalError());
 
-      const auto U_i = U.template get_tensor<Number>(i);
-      const precomputed_state_type prec_i{specific_entropy(U_i),
-                                          harten_entropy(U_i)};
-      precomputed_values.template write_tensor<Number>(prec_i, i);
+      unsigned int stride_size = get_stride_size<Number>;
+
+      RYUJIN_OMP_FOR
+      for (unsigned int i = left; i < right; i += stride_size) {
+
+        /* Skip constrained degrees of freedom: */
+        const unsigned int row_length = sparsity_simd.row_length(i);
+        if (row_length == 1)
+          continue;
+
+        dispatch_check(i);
+
+        const auto U_i = U.template get_tensor<Number>(i);
+        const precomputed_state_type prec_i{specific_entropy(U_i),
+                                            harten_entropy(U_i)};
+        precomputed_values.template write_tensor<Number>(prec_i, i);
+      }
     }
 
 

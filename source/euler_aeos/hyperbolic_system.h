@@ -11,6 +11,7 @@
 #include <convenience_macros.h>
 #include <discretization.h>
 #include <multicomponent_vector.h>
+#include <openmp.h>
 #include <patterns_conversion.h>
 #include <simd.h>
 
@@ -325,13 +326,17 @@ namespace ryujin
         static constexpr unsigned int n_precomputation_cycles = 2;
 
         /**
-         * Precomputed values for a given state.
+         * Step 0: precompute values for hyperbolic update. This routine is
+         * called within our usual loop() idiom in HyperbolicModule
          */
-        template <unsigned int cycle, typename SPARSITY>
-        void precomputation(precomputed_vector_type &precomputed_values,
-                            const vector_type &U,
-                            const SPARSITY &sparsity_simd,
-                            unsigned int i) const;
+        template <typename DISPATCH, typename SPARSITY>
+        void precomputation_loop(unsigned int cycle,
+                                 const DISPATCH &dispatch_check,
+                                 precomputed_vector_type &precomputed_values,
+                                 const SPARSITY &sparsity_simd,
+                                 const vector_type &U,
+                                 unsigned int left,
+                                 unsigned int right) const;
 
         //@}
         /**
@@ -747,50 +752,73 @@ namespace ryujin
 
 
     template <int dim, typename Number>
-    template <unsigned int cycle, typename SPARSITY>
+    template <typename DISPATCH, typename SPARSITY>
     DEAL_II_ALWAYS_INLINE inline void
-    HyperbolicSystem::View<dim, Number>::precomputation(
+    HyperbolicSystem::View<dim, Number>::precomputation_loop(
+        unsigned int cycle [[maybe_unused]],
+        const DISPATCH &dispatch_check,
         precomputed_vector_type &precomputed_values,
-        const vector_type &U,
         const SPARSITY &sparsity_simd,
-        unsigned int i) const
+        const vector_type &U,
+        unsigned int left,
+        unsigned int right) const
     {
-      static_assert(cycle <= 1, "internal error");
+      Assert(cycle == 0 || cycle == 1, dealii::ExcInternalError());
 
       unsigned int stride_size = get_stride_size<Number>;
 
-      const auto U_i = U.template get_tensor<Number>(i);
+      if (cycle == 0) {
+        RYUJIN_OMP_FOR
+        for (unsigned int i = left; i < right; i += stride_size) {
+          using PT = precomputed_state_type;
 
-      using PT = precomputed_state_type;
+          /* Skip constrained degrees of freedom: */
+          const unsigned int row_length = sparsity_simd.row_length(i);
+          if (row_length == 1)
+            continue;
 
-      if constexpr (cycle == 0) {
-        const auto p_i = pressure(U_i);
-        const auto gamma_i = surrogate_gamma(U_i, p_i);
-        const PT prec_i{p_i, gamma_i, Number(0.), Number(0.)};
-        precomputed_values.template write_tensor<Number>(prec_i, i);
+          dispatch_check(i);
+
+          const auto U_i = U.template get_tensor<Number>(i);
+          const auto p_i = pressure(U_i);
+          const auto gamma_i = surrogate_gamma(U_i, p_i);
+          const PT prec_i{p_i, gamma_i, Number(0.), Number(0.)};
+          precomputed_values.template write_tensor<Number>(prec_i, i);
+        }
       }
 
-      if constexpr (cycle == 1) {
-        auto prec_i = precomputed_values.template get_tensor<Number, PT>(i);
-        auto &[p_i, gamma_min_i, s_i, eta_i] = prec_i;
+      if (cycle == 1) {
+        RYUJIN_OMP_FOR
+        for (unsigned int i = left; i < right; i += stride_size) {
+          using PT = precomputed_state_type;
 
-        const unsigned int row_length = sparsity_simd.row_length(i);
-        const unsigned int *js = sparsity_simd.columns(i) + stride_size;
-        for (unsigned int col_idx = 1; col_idx < row_length;
-             ++col_idx, js += stride_size) {
+          /* Skip constrained degrees of freedom: */
+          const unsigned int row_length = sparsity_simd.row_length(i);
+          if (row_length == 1)
+            continue;
 
-          const auto U_j = U.template get_tensor<Number>(js);
-          const auto prec_j =
-              precomputed_values.template get_tensor<Number, PT>(js);
-          auto &[p_j, gamma_min_j, s_j, eta_j] = prec_j;
-          const auto gamma_j = surrogate_gamma(U_j, p_j);
-          gamma_min_i = std::min(gamma_min_i, gamma_j);
+          dispatch_check(i);
+
+          const auto U_i = U.template get_tensor<Number>(i);
+          auto prec_i = precomputed_values.template get_tensor<Number, PT>(i);
+          auto &[p_i, gamma_min_i, s_i, eta_i] = prec_i;
+
+          const unsigned int *js = sparsity_simd.columns(i) + stride_size;
+          for (unsigned int col_idx = 1; col_idx < row_length;
+               ++col_idx, js += stride_size) {
+
+            const auto U_j = U.template get_tensor<Number>(js);
+            const auto prec_j =
+                precomputed_values.template get_tensor<Number, PT>(js);
+            auto &[p_j, gamma_min_j, s_j, eta_j] = prec_j;
+            const auto gamma_j = surrogate_gamma(U_j, p_j);
+            gamma_min_i = std::min(gamma_min_i, gamma_j);
+          }
+
+          s_i = specific_entropy(U_i, gamma_min_i);
+          eta_i = harten_entropy(U_i, gamma_min_i);
+          precomputed_values.template write_tensor<Number>(prec_i, i);
         }
-
-        s_i = specific_entropy(U_i, gamma_min_i);
-        eta_i = harten_entropy(U_i, gamma_min_i);
-
-        precomputed_values.template write_tensor<Number>(prec_i, i);
       }
     }
 
