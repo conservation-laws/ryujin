@@ -1369,7 +1369,7 @@ namespace ryujin
       /* Fix up velocity: */
       for (unsigned int i = 1; i < dim + 1; ++i)
         primitive_state[i] *= rho_inverse;
-      /* Set pressure: */
+      /* Set specific internal energy: */
       primitive_state[dim + 1] = rho_e * rho_inverse;
 
       return primitive_state;
