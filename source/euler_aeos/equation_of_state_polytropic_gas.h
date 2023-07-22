@@ -54,7 +54,7 @@ namespace ryujin
        *   c^2 = \gamma * (\gamma - 1) e
        * \f}
        */
-      double sound_speed(double /*rho*/, double e) const final
+      double speed_of_sound(double /*rho*/, double e) const final
       {
         return std::sqrt(gamma_ * (gamma_ - 1.) * e);
       }

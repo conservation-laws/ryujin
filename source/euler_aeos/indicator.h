@@ -92,8 +92,7 @@ namespace ryujin
       /**
        * @copydoc HyperbolicSystem::View::flux_type
        */
-      using flux_type =
-          typename HyperbolicSystemView::flux_type;
+      using flux_type = typename HyperbolicSystemView::flux_type;
 
       /**
        * @copydoc HyperbolicSystem::View::flux_type

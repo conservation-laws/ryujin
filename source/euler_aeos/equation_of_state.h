@@ -119,7 +119,7 @@ namespace ryujin
        * Return the sound speed @p c for a given density @p rho and
        * specific internal energy  @p e.
        */
-      virtual double sound_speed(double rho, double e) const = 0;
+      virtual double speed_of_sound(double rho, double e) const = 0;
 
       /**
        * Variant of above function operating on a contiguous range of
@@ -131,9 +131,9 @@ namespace ryujin
        * equation of state libraries, such as the sesame database. Rather
        * than creating temporaries we override values in place.
        */
-      virtual void sound_speed(const dealii::ArrayView<double> &c,
-                               const dealii::ArrayView<double> &rho,
-                               const dealii::ArrayView<double> &e) const
+      virtual void speed_of_sound(const dealii::ArrayView<double> &c,
+                                  const dealii::ArrayView<double> &rho,
+                                  const dealii::ArrayView<double> &e) const
       {
         Assert(c.size() == rho.size() && rho.size() == e.size(),
                dealii::ExcMessage("vectors have different size"));
@@ -143,7 +143,7 @@ namespace ryujin
             std::end(rho),
             std::begin(e),
             std::begin(c),
-            [&](double rho, double e) { return sound_speed(rho, e); });
+            [&](double rho, double e) { return speed_of_sound(rho, e); });
       }
 
       /**
@@ -154,7 +154,7 @@ namespace ryujin
       /**
        * Return a boolean indicating whether the dealii::ArrayView<double>
        * variants for the pressure(), specific_internal_energy(), and
-       * sound_speed() functions should be preferred.
+       * speed_of_sound() functions should be preferred.
        *
        * Ordinarily we use the single-valued signatures for pre-computation
        * because this leads to slightly better throughput (due to better
@@ -177,5 +177,5 @@ namespace ryujin
       const std::string name_;
     };
 
-  } // namespace EulerAEOS
+  } // namespace EquationOfStateLibrary
 } /* namespace ryujin */

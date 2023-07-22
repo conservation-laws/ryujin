@@ -85,7 +85,7 @@ namespace ryujin
       /**
        * The speed of sound is given by
        */
-      double sound_speed(double rho, double e) const final
+      double speed_of_sound(double rho, double e) const final
       {
         __builtin_trap();
         // FIXME: refactor to new interface
