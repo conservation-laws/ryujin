@@ -232,7 +232,7 @@ namespace ryujin
       }
 
 
-      double pressure(double rho, double e) final
+      double pressure(double rho, double e) const final
       {
         EOS_INTEGER index = 0;
 
@@ -254,7 +254,7 @@ namespace ryujin
 
       void pressure(const dealii::ArrayView<double> &p,
                     const dealii::ArrayView<double> &rho,
-                    const dealii::ArrayView<double> &e) final
+                    const dealii::ArrayView<double> &e) const final
       {
         Assert(p.size() == rho.size() && rho.size() == e.size(),
                dealii::ExcMessage("vectors have different size"));
@@ -294,7 +294,7 @@ namespace ryujin
       }
 
 
-      double specific_internal_energy(double rho, double p) final
+      double specific_internal_energy(double rho, double p) const final
       {
         EOS_INTEGER index = 1;
 
@@ -314,9 +314,10 @@ namespace ryujin
       }
 
 
-      void specific_internal_energy(const dealii::ArrayView<double> &e,
-                                    const dealii::ArrayView<double> &rho,
-                                    const dealii::ArrayView<double> &p) final
+      void
+      specific_internal_energy(const dealii::ArrayView<double> &e,
+                               const dealii::ArrayView<double> &rho,
+                               const dealii::ArrayView<double> &p) const final
       {
         Assert(e.size() == rho.size() && rho.size() == p.size(),
                dealii::ExcMessage("vectors have different size"));
@@ -356,7 +357,7 @@ namespace ryujin
       }
 
 
-      double sound_speed(double /*rho*/, double /*p*/) final
+      double sound_speed(double /*rho*/, double /*p*/) const final
       {
         __builtin_trap();
       }
@@ -364,7 +365,7 @@ namespace ryujin
 
       void sound_speed(const dealii::ArrayView<double> & /*c*/,
                        const dealii::ArrayView<double> & /*rho*/,
-                       const dealii::ArrayView<double> & /*e*/) final
+                       const dealii::ArrayView<double> & /*e*/) const final
       {
         __builtin_trap();
       }
@@ -385,19 +386,19 @@ namespace ryujin
           "ryujin has to be configured with eospac support in order to use "
           "the Sesame EOS database";
 
-      double pressure(double /*rho*/, double /*internal_energy*/) final
+      double pressure(double /*rho*/, double /*internal_energy*/) const final
       {
         AssertThrow(false, dealii::ExcMessage(message));
         __builtin_trap();
       }
 
-      double specific_internal_energy(double /*rho*/, double /*p*/) final
+      double specific_internal_energy(double /*rho*/, double /*p*/) const final
       {
         AssertThrow(false, dealii::ExcMessage(message));
         __builtin_trap();
       }
 
-      double sound_speed(double /*rho*/, double /*e*/) final
+      double sound_speed(double /*rho*/, double /*e*/) const final
       {
         AssertThrow(false, dealii::ExcMessage(message));
         __builtin_trap();

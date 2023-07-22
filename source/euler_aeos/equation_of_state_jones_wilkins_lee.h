@@ -49,7 +49,7 @@ namespace ryujin
        *     + \omega \rho e
        * \f}
        */
-      double pressure(double rho, double e) final
+      double pressure(double rho, double e) const final
       {
 
         const auto ratio = rho / rho0;
@@ -70,7 +70,7 @@ namespace ryujin
        *   - B(1 - \omega / R_2 \rho/ \rho_0) e^{(-R_2 \rho_0 / \rho)}
        * \f}
        */
-      double specific_internal_energy(double rho, double p) final
+      double specific_internal_energy(double rho, double p) const final
       {
         const auto ratio = rho / rho0;
 
@@ -85,7 +85,7 @@ namespace ryujin
       /**
        * The speed of sound is given by
        */
-      double sound_speed(double rho, double e) final
+      double sound_speed(double rho, double e) const final
       {
         __builtin_trap();
         // FIXME: refactor to new interface

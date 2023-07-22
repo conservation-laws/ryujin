@@ -56,7 +56,7 @@ namespace ryujin
        * Return the pressure given density @p rho and specific internal
        * energy @p e.
        */
-      virtual double pressure(double rho, double e) = 0;
+      virtual double pressure(double rho, double e) const = 0;
 
       /**
        * Variant of above function operating on a contiguous range of
@@ -70,7 +70,7 @@ namespace ryujin
        */
       virtual void pressure(const dealii::ArrayView<double> &p,
                             const dealii::ArrayView<double> &rho,
-                            const dealii::ArrayView<double> &e)
+                            const dealii::ArrayView<double> &e) const
       {
         Assert(p.size() == rho.size() && rho.size() == e.size(),
                dealii::ExcMessage("vectors have different size"));
@@ -86,7 +86,7 @@ namespace ryujin
        * Return the specific internal energy @p e for a given density @p
        * rho and pressure @p p.
        */
-      virtual double specific_internal_energy(double rho, double p) = 0;
+      virtual double specific_internal_energy(double rho, double p) const = 0;
 
       /**
        * Variant of above function operating on a contiguous range of
@@ -101,7 +101,7 @@ namespace ryujin
       virtual void
       specific_internal_energy(const dealii::ArrayView<double> &e,
                                const dealii::ArrayView<double> &rho,
-                               const dealii::ArrayView<double> &p)
+                               const dealii::ArrayView<double> &p) const
       {
         Assert(p.size() == rho.size() && rho.size() == e.size(),
                dealii::ExcMessage("vectors have different size"));
@@ -119,7 +119,7 @@ namespace ryujin
        * Return the sound speed @p c for a given density @p rho and
        * specific internal energy  @p e.
        */
-      virtual double sound_speed(double rho, double e) = 0;
+      virtual double sound_speed(double rho, double e) const = 0;
 
       /**
        * Variant of above function operating on a contiguous range of
@@ -133,7 +133,7 @@ namespace ryujin
        */
       virtual void sound_speed(const dealii::ArrayView<double> &c,
                                const dealii::ArrayView<double> &rho,
-                               const dealii::ArrayView<double> &e)
+                               const dealii::ArrayView<double> &e) const
       {
         Assert(c.size() == rho.size() && rho.size() == e.size(),
                dealii::ExcMessage("vectors have different size"));
