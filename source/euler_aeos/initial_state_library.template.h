@@ -7,8 +7,8 @@
 
 #include "description.h"
 
-#include <initial_state_library.h>
 #include "../euler/initial_state_library_euler.h"
+#include <initial_state_library.h>
 
 namespace ryujin
 {
@@ -37,4 +37,3 @@ namespace ryujin
     }
   };
 } // namespace ryujin
-

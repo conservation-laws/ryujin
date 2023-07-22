@@ -32,7 +32,7 @@ namespace ryujin
        *   p = (\gamma - 1) \rho e
        * \f}
        */
-      double pressure(double rho, double e) final
+      double pressure(double rho, double e) const final
       {
         return (gamma_ - 1.) * rho * e;
       }
@@ -43,7 +43,7 @@ namespace ryujin
        *   e = p / (\rho (\gamma - 1))
        * \f}
        */
-      double specific_internal_energy(double rho, double p) final
+      double specific_internal_energy(double rho, double p) const final
       {
         return p / (rho * (gamma_ - 1.));
       }
@@ -54,7 +54,7 @@ namespace ryujin
        *   c^2 = \gamma * (\gamma - 1) e
        * \f}
        */
-      double sound_speed(double /*rho*/, double e) final
+      double speed_of_sound(double /*rho*/, double e) const final
       {
         return std::sqrt(gamma_ * (gamma_ - 1.) * e);
       }

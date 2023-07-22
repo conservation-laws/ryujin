@@ -41,53 +41,46 @@ namespace ryujin
         /* Update the interpolation_b_ parameter on parameter read in: */
         ParameterAcceptor::parse_parameters_call_back.connect(
             [this] { this->interpolation_b_ = b_; });
+        this->interpolation_b_ = b_;
       }
 
       /**
        * The pressure is given by
        * \f{align}
-       *   p = (\gamma - 1) \rho (e - q) / (1 - b \rho) - \gamma p_\infty
+       *   p + p_\infty = (\gamma - 1) \rho (e - q) / (1 - b \rho)
        * \f}
        */
-      double pressure(double rho, double e) final
+      double pressure(double rho, double e) const final
       {
-        return (gamma_ - 1.) * rho * (e - q_) / (1. - b_ * rho) -
-               gamma_ * pinf_;
+        return (gamma_ - 1.) * rho * (e - q_) / (1. - b_ * rho) - pinf_;
       }
 
 
       /*
        * The specific internal energy is given by
        * \f{align}
-       *   e - q = (p + \gamma p_\infty) * (1 - b \rho) / (\rho (\gamma - 1))
-       * \f}
+       *   e - q = (p + p_\infty) * (1 - b \rho) / (\rho (\gamma - 1))
        * \f}
        */
-      double specific_internal_energy(double rho, double p) final
+      double specific_internal_energy(double rho, double p) const final
       {
-        const auto numerator = (p + gamma_ * pinf_) * (1. - b_ * rho);
+        const auto numerator = (p + pinf_) * (1. - b_ * rho);
         const auto denominator = rho * (gamma_ - 1.);
         return q_ + numerator / denominator;
       }
 
       /**
        * The speed of sound is given by
+       * \f{align}
+       *   c^2 = \frac{\gamma (p + p_\infty)}{\rho (1 - b \rho)}
+       *       = \frac{\gamma (\gamma -1) (e - q)}{(1 - b\rho)^2}.
+       * \f}
        */
-      double sound_speed(double rho, double e) final
+      double speed_of_sound(double rho, double e) const final
       {
-        __builtin_trap();
-        // FIXME: refactor to new interface
-#if 0
-          /*
-           * \f{align}
-           *   c^2 = \gamma (p + p_\infty) / (\rho (1 - b \rho))
-           * \f}
-           */
-          const auto cov = 1. - b_ * rho;
-          const auto num = gamma_ * (p + pinf_);
-          const auto den = rho * cov;
-          return std::sqrt(num / den);
-#endif
+        const auto covolume = 1. - b_ * rho;
+        const auto numerator = gamma_ * (gamma_ - 1.) * (e - q_);
+        return std::sqrt(numerator) / covolume;
       }
 
     private:

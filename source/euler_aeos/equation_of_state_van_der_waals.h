@@ -43,11 +43,12 @@ namespace ryujin
        *   p = (\gamma - 1) * (\rho * e + a \rho^2)/(1 - b \rho) - a \rho^2
        * \f}
        */
-      double pressure(double rho, double e) final
+      double pressure(double rho, double e) const final
       {
-        const auto numerator = rho * e + a_ * rho * rho;
-        const auto denominator = 1. - b_ * rho;
-        return (gamma_ - 1.) * numerator / denominator - a_ * rho * rho;
+        const auto intermolecular = a_ * rho * rho;
+        const auto numerator = rho * e + intermolecular;
+        const auto covolume = 1. - b_ * rho;
+        return (gamma_ - 1.) * numerator / covolume - intermolecular;
       }
 
       /**
@@ -57,29 +58,27 @@ namespace ryujin
        *   - a \rho^2
        * \f}
        */
-      double specific_internal_energy(double rho, double p) final
+      double specific_internal_energy(double rho, double p) const final
       {
-        const auto numerator = (p + a_ * rho * rho) * (1. - b_ * rho);
+        const auto intermolecular = a_ * rho * rho;
+        const auto covolume = 1. - b_ * rho;
+        const auto numerator = (p + intermolecular) * covolume;
         const auto denominator = rho * (gamma_ - 1.);
         return numerator / denominator - a_ * rho;
       }
 
       /**
        * The speed of sound is given by
+       * \f{align}
+       *   c^2 = \frac{\gamma (\gamma -1) (e + a \rho)}{(1 - b\rho)^2}
+       *   - 2a\rho.
+       * \f}
        */
-      double sound_speed(double rho, double e) final
+      double speed_of_sound(double rho, double e) const final
       {
-        __builtin_trap();
-        // FIXME: refactor to new interface
-#if 0
-          /*
-           * c^2 = \gamma (p + a \rho^2) / (\rho (1 - b \rho)) - 2 a \rho
-           */
-          const auto cov = 1. - b_ * rho;
-          const auto num = gamma_ * (p + a_ * rho * rho);
-          const auto den = rho * cov;
-          return std::sqrt(num / den - 2. * a_ * rho * rho);
-#endif
+        const auto covolume = 1. - b_ * rho;
+        const auto numerator = gamma_ * (gamma_ - 1.) * (e + a_ * rho);
+        return std::sqrt(numerator / (covolume * covolume) - 2. * a_ * rho);
       }
 
     private:

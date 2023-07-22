@@ -15,6 +15,7 @@ template <int dim, typename Number>
 void test()
 {
   std::cout << std::setprecision(10);
+  std::cout << std::scientific;
 
   HyperbolicSystem hyperbolic_system;
   const auto view = hyperbolic_system.view<dim, Number>();

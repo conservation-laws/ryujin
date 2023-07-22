@@ -22,22 +22,22 @@ namespace ryujin
       JonesWilkinsLee(const std::string &subsection)
           : EquationOfState("jones wilkins lee", subsection)
       {
-        capA = 0.;
+        capA = 0.0;
         this->add_parameter("A", capA, "The A constant");
 
-        capB = 0.;
+        capB = 0.0;
         this->add_parameter("B", capB, "The B constant");
 
-        R1 = 0.;
+        R1 = 1.0;
         this->add_parameter("R1", R1, "The R1 constant");
 
-        R2 = 0.;
+        R2 = 1.0;
         this->add_parameter("R2", R2, "The R2 constant");
 
         omega = 0.4;
         this->add_parameter("omega", omega, "The Gruneisen coefficient");
 
-        rho0 = 0.;
+        rho0 = 1.0;
         this->add_parameter("rho_0", rho0, "The reference density");
       }
 
@@ -49,7 +49,7 @@ namespace ryujin
        *     + \omega \rho e
        * \f}
        */
-      double pressure(double rho, double e) final
+      double pressure(double rho, double e) const final
       {
 
         const auto ratio = rho / rho0;
@@ -70,7 +70,7 @@ namespace ryujin
        *   - B(1 - \omega / R_2 \rho/ \rho_0) e^{(-R_2 \rho_0 / \rho)}
        * \f}
        */
-      double specific_internal_energy(double rho, double p) final
+      double specific_internal_energy(double rho, double p) const final
       {
         const auto ratio = rho / rho0;
 
@@ -85,24 +85,23 @@ namespace ryujin
       /**
        * The speed of sound is given by
        */
-      double sound_speed(double rho, double e) final
+      double speed_of_sound(double rho, double e) const final
       {
-        __builtin_trap();
-        // FIXME: refactor to new interface
-#if 0
-          auto temp = omega / R1 * rho / rho0;
-          temp = omega * (1. - temp) * (1. + 1. / temp) - temp;
-          const auto first_term = capA / rho * temp * std::exp(omega / temp);
+        // FIXME: This needs to be verified...
 
-          temp = omega / R2 * rho / rho0;
-          temp = omega * (1. - temp) * (1. + 1. / temp) - temp;
-          const auto second_term = capB / rho * temp * std::exp(omega / temp);
+        const auto t1 = omega * rho / (R1 * rho0);
+        const auto factor1 = omega * (1. - t1) * (1. + 1. / t1) - t1;
+        const auto first_term =
+            capA / rho * factor1 * std::exp(omega / factor1);
 
-          const auto e = specific_internal_energy(rho, p);
-          const auto third_term = omega * (omega + 1.) * e;
+        const auto t2 = omega * rho / (R2 * rho0);
+        const auto factor2 = omega * (1. - t2) * (1. + 1. / t2) - t2;
+        const auto second_term =
+            capB / rho * factor2 * std::exp(omega / factor2);
 
-          return first_term + second_term + third_term;
-#endif
+        const auto third_term = omega * (omega + 1.) * e;
+
+        return std::sqrt(first_term + second_term + third_term);
       }
 
     private:

@@ -148,8 +148,7 @@ namespace ryujin
          * energy \f$e\f$ return the pressure \f$p\f$.
          */
         DEAL_II_ALWAYS_INLINE inline ScalarNumber
-        eos_pressure(const ScalarNumber &rho,
-                     const ScalarNumber &e) const
+        eos_pressure(const ScalarNumber &rho, const ScalarNumber &e) const
         {
           const auto &eos = hyperbolic_system_.selected_equation_of_state_;
           return ScalarNumber(eos->pressure(rho, e));
@@ -172,10 +171,10 @@ namespace ryujin
          * energy \f$e\f$ return the sound speed \f$a\f$.
          */
         DEAL_II_ALWAYS_INLINE inline ScalarNumber
-        eos_sound_speed(const ScalarNumber &rho, const ScalarNumber &e) const
+        eos_speed_of_sound(const ScalarNumber &rho, const ScalarNumber &e) const
         {
           const auto &eos = hyperbolic_system_.selected_equation_of_state_;
-          return ScalarNumber(eos->sound_speed(rho, e));
+          return ScalarNumber(eos->speed_of_sound(rho, e));
         }
 
         /**

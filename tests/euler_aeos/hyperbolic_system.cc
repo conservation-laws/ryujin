@@ -22,6 +22,7 @@ template <int dim, typename Number>
 void test(const Number gamma)
 {
   std::cout << std::setprecision(10);
+  std::cout << std::scientific;
 
   std::cout << "interpolatory covolume: "
             << hyperbolic_system.view<dim, Number>().eos_interpolation_b()
