@@ -93,6 +93,13 @@
 #define RYUJIN_OMP_CRITICAL RYUJIN_PRAGMA(omp critical)
 
 /**
+ * Annotate a section that has to be executed on one thread only.
+ *
+ * @ingroup Miscellaneous
+ */
+#define RYUJIN_OMP_SINGLE RYUJIN_PRAGMA(omp single)
+
+/**
  * Compiler hint annotating a boolean to be likely true.
  *
  * Intended use:

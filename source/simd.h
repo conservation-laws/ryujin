@@ -242,17 +242,41 @@ namespace ryujin
   template <typename T, typename V>
   DEAL_II_ALWAYS_INLINE inline T load_value(const V &vector, unsigned int i)
   {
-    static_assert(std::is_same<typename get_value_type<T>::type,
-                               typename V::value_type>::value,
-                  "dummy type mismatch");
+    static_assert(std::is_same_v<typename get_value_type<T>::type,
+                                 typename V::value_type>,
+                  "type mismatch");
     T result;
 
-    if constexpr (std::is_same<T, typename get_value_type<T>::type>::value) {
+    if constexpr (std::is_same_v<T, typename get_value_type<T>::type>) {
       /* Non-vectorized sequential access. */
       result = vector.local_element(i);
     } else {
       /* Vectorized fast access. index must be divisible by simd_length */
       result.load(vector.get_values() + i);
+    }
+
+    return result;
+  }
+
+
+  /**
+   * Variant of above function specialized for std::vector.
+   * @ingroup SIMD
+   */
+  template <typename T, typename T2>
+  DEAL_II_ALWAYS_INLINE inline T load_value(const std::vector<T2> &vector,
+                                            unsigned int i)
+  {
+    static_assert(std::is_same_v<typename get_value_type<T>::type, T2>,
+                  "type mismatch");
+    T result;
+
+    if constexpr (std::is_same_v<T, typename get_value_type<T>::type>) {
+      /* Non-vectorized sequential access. */
+      result = vector[i];
+    } else {
+      /* Vectorized fast access. index must be divisible by simd_length */
+      result.load(vector.data() + i);
     }
 
     return result;
@@ -269,17 +293,41 @@ namespace ryujin
   DEAL_II_ALWAYS_INLINE inline T load_value(const V &vector,
                                             const unsigned int *js)
   {
-    static_assert(std::is_same<typename get_value_type<T>::type,
-                               typename V::value_type>::value,
-                  "dummy type mismatch");
+    static_assert(std::is_same_v<typename get_value_type<T>::type,
+                                 typename V::value_type>,
+                  "type mismatch");
     T result;
 
-    if constexpr (std::is_same<T, typename get_value_type<T>::type>::value) {
+    if constexpr (std::is_same_v<T, typename get_value_type<T>::type>) {
       /* Non-vectorized sequential access. */
       result = vector.local_element(js[0]);
     } else {
       /* Vectorized fast access. index must be divisible by simd_length */
       result.gather(vector.get_values(), js);
+    }
+
+    return result;
+  }
+
+
+  /**
+   * Variant of above function specialized for std::vector.
+   * @ingroup SIMD
+   */
+  template <typename T, typename T2>
+  DEAL_II_ALWAYS_INLINE inline T load_value(const std::vector<T2> &vector,
+                                            const unsigned int *js)
+  {
+    static_assert(std::is_same_v<typename get_value_type<T>::type, T2>,
+                  "type mismatch");
+    T result;
+
+    if constexpr (std::is_same_v<T, typename get_value_type<T>::type>) {
+      /* Non-vectorized sequential access. */
+      result = vector[js[0]];
+    } else {
+      /* Vectorized fast access. index must be divisible by simd_length */
+      result.load(vector.data(), js);
     }
 
     return result;
@@ -295,16 +343,37 @@ namespace ryujin
   DEAL_II_ALWAYS_INLINE inline void
   store_value(V &vector, const T &values, unsigned int i)
   {
-    static_assert(std::is_same<typename get_value_type<T>::type,
-                               typename V::value_type>::value,
-                  "dummy type mismatch");
+    static_assert(std::is_same_v<typename get_value_type<T>::type,
+                                 typename V::value_type>,
+                  "type mismatch");
 
-    if constexpr (std::is_same<T, typename get_value_type<T>::type>::value) {
+    if constexpr (std::is_same_v<T, typename get_value_type<T>::type>) {
       /* Non-vectorized sequential access. */
       vector.local_element(i) = values;
     } else {
       /* Vectorized fast access. index must be divisible by simd_length */
       values.store(vector.get_values() + i);
+    }
+  }
+
+
+  /**
+   * Variant of above function specialized for std::vector.
+   * @ingroup SIMD
+   */
+  template <typename T, typename T2>
+  DEAL_II_ALWAYS_INLINE inline void
+  store_value(std::vector<T2> &vector, const T &values, unsigned int i)
+  {
+    static_assert(std::is_same_v<typename get_value_type<T>::type, T2>,
+                  "type mismatch");
+
+    if constexpr (std::is_same_v<T, typename get_value_type<T>::type>) {
+      /* Non-vectorized sequential access. */
+      vector[i] = values;
+    } else {
+      /* Vectorized fast access. index must be divisible by simd_length */
+      values.store(vector.data() + i);
     }
   }
 
@@ -343,9 +412,8 @@ namespace ryujin
   template <int rank, int dim, typename Number>
   DEAL_II_ALWAYS_INLINE inline dealii::Tensor<rank, dim, Number>
   serialize_tensor(const dealii::Tensor<rank, dim, Number> &serial,
-                   const unsigned int k)
+                   const unsigned int k [[maybe_unused]])
   {
-    (void)k;
     Assert(k == 0,
            dealii::ExcMessage(
                "The given index k must be zero for a serial tensor"));
@@ -385,9 +453,8 @@ namespace ryujin
   DEAL_II_ALWAYS_INLINE inline void
   assign_serial_tensor(dealii::Tensor<rank, dim, Number> &result,
                        const dealii::Tensor<rank, dim, Number> &serial,
-                       const unsigned int k)
+                       const unsigned int k [[maybe_unused]])
   {
-    (void)k;
     Assert(k == 0,
            dealii::ExcMessage(
                "The given index k must be zero for a serial tensor"));

@@ -11,6 +11,7 @@
 #include <convenience_macros.h>
 #include <discretization.h>
 #include <multicomponent_vector.h>
+#include <openmp.h>
 #include <patterns_conversion.h>
 #include <simd.h>
 
@@ -59,13 +60,11 @@ namespace ryujin
       double vacuum_state_relaxation_;
       bool compute_expensive_bounds_;
 
-      std::set<std::unique_ptr<EquationOfState>> equation_of_state_list_;
+      EquationOfStateLibrary::equation_of_state_list_type
+          equation_of_state_list_;
 
-      std::function<double(const double, const double)> eos_pressure_;
-      std::function<double(const double, const double)>
-          eos_specific_internal_energy_;
-      std::function<double(const double, const double)> eos_sound_speed_;
-      std::function<double()> eos_interpolation_b_;
+      using EquationOfState = EquationOfStateLibrary::EquationOfState;
+      std::shared_ptr<EquationOfState> selected_equation_of_state_;
 
     public:
       /**
@@ -152,7 +151,8 @@ namespace ryujin
         eos_pressure(const ScalarNumber &rho,
                      const ScalarNumber &e) const
         {
-          return ScalarNumber(hyperbolic_system_.eos_pressure_(rho, e));
+          const auto &eos = hyperbolic_system_.selected_equation_of_state_;
+          return ScalarNumber(eos->pressure(rho, e));
         }
 
         /**
@@ -163,8 +163,8 @@ namespace ryujin
         eos_specific_internal_energy(const ScalarNumber &rho,
                                      const ScalarNumber &p) const
         {
-          return ScalarNumber(
-              hyperbolic_system_.eos_specific_internal_energy_(rho, p));
+          const auto &eos = hyperbolic_system_.selected_equation_of_state_;
+          return ScalarNumber(eos->specific_internal_energy(rho, p));
         }
 
         /**
@@ -174,7 +174,8 @@ namespace ryujin
         DEAL_II_ALWAYS_INLINE inline ScalarNumber
         eos_sound_speed(const ScalarNumber &rho, const ScalarNumber &e) const
         {
-          return ScalarNumber(hyperbolic_system_.eos_sound_speed_(rho, e));
+          const auto &eos = hyperbolic_system_.selected_equation_of_state_;
+          return ScalarNumber(eos->sound_speed(rho, e));
         }
 
         /**
@@ -182,7 +183,8 @@ namespace ryujin
          */
         DEAL_II_ALWAYS_INLINE inline ScalarNumber eos_interpolation_b() const
         {
-          return ScalarNumber(hyperbolic_system_.eos_interpolation_b_());
+          const auto &eos = hyperbolic_system_.selected_equation_of_state_;
+          return ScalarNumber(eos->interpolation_b());
         }
 
         //@}
@@ -325,13 +327,17 @@ namespace ryujin
         static constexpr unsigned int n_precomputation_cycles = 2;
 
         /**
-         * Precomputed values for a given state.
+         * Step 0: precompute values for hyperbolic update. This routine is
+         * called within our usual loop() idiom in HyperbolicModule
          */
-        template <unsigned int cycle, typename SPARSITY>
-        void precomputation(precomputed_vector_type &precomputed_values,
-                            const vector_type &U,
-                            const SPARSITY &sparsity_simd,
-                            unsigned int i) const;
+        template <typename DISPATCH, typename SPARSITY>
+        void precomputation_loop(unsigned int cycle,
+                                 const DISPATCH &dispatch_check,
+                                 precomputed_vector_type &precomputed_values,
+                                 const SPARSITY &sparsity_simd,
+                                 const vector_type &U,
+                                 unsigned int left,
+                                 unsigned int right) const;
 
         //@}
         /**
@@ -377,12 +383,6 @@ namespace ryujin
          * \f$\varepsilon = (\rho e)\f$.
          */
         static state_type internal_energy_derivative(const state_type &U);
-
-        /**
-         * For a given (2+dim dimensional) state vector <code>U</code>,
-         * query the pressure oracle and return \f$p\f$.
-         */
-        Number pressure(const state_type &U) const;
 
         /**
          * For a given (2+dim dimensional) state vector <code>U</code>, compute
@@ -711,24 +711,9 @@ namespace ryujin
 
           /* Populate EOS-specific quantities and functions */
           if (it->name() == equation_of_state_) {
-
-            eos_pressure_ = [&it](double rho, double e) {
-              return it->pressure(rho, e);
-            };
-
-            eos_specific_internal_energy_ = [&it](double rho, double p) {
-              return it->specific_internal_energy(rho, p);
-            };
-
-            eos_sound_speed_ = [&it](double rho, double e) {
-              return it->sound_speed(rho, e);
-            };
-
-            eos_interpolation_b_ = [&it]() { return it->interpolation_b(); };
-
+            selected_equation_of_state_ = it;
             problem_name =
                 "Compressible Euler equations (" + it->name() + " EOS)";
-
             initialized = true;
             break;
           }
@@ -747,50 +732,148 @@ namespace ryujin
 
 
     template <int dim, typename Number>
-    template <unsigned int cycle, typename SPARSITY>
+    template <typename DISPATCH, typename SPARSITY>
     DEAL_II_ALWAYS_INLINE inline void
-    HyperbolicSystem::View<dim, Number>::precomputation(
+    HyperbolicSystem::View<dim, Number>::precomputation_loop(
+        unsigned int cycle [[maybe_unused]],
+        const DISPATCH &dispatch_check,
         precomputed_vector_type &precomputed_values,
-        const vector_type &U,
         const SPARSITY &sparsity_simd,
-        unsigned int i) const
+        const vector_type &U,
+        unsigned int left,
+        unsigned int right) const
     {
-      static_assert(cycle <= 1, "internal error");
+      Assert(cycle == 0 || cycle == 1, dealii::ExcInternalError());
 
+      /* We are inside a thread parallel context */
+
+      const auto &eos = hyperbolic_system_.selected_equation_of_state_;
       unsigned int stride_size = get_stride_size<Number>;
 
-      const auto U_i = U.template get_tensor<Number>(i);
+      if (cycle == 0) {
+        if (eos->prefer_vector_interface()) {
+          /*
+           * Set up temporary storage for p, rho, e and make two calls into
+           * the eos library.
+           */
+          const auto offset = left;
+          const auto size = right - left;
 
-      using PT = precomputed_state_type;
+          static /* shared */ std::vector<double> p;
+          static /* shared */ std::vector<double> rho;
+          static /* shared */ std::vector<double> e;
+          RYUJIN_OMP_SINGLE
+          {
+            p.resize(size);
+            rho.resize(size);
+            e.resize(size);
+          }
 
-      if constexpr (cycle == 0) {
-        const auto p_i = pressure(U_i);
-        const auto gamma_i = surrogate_gamma(U_i, p_i);
-        const PT prec_i{p_i, gamma_i, Number(0.), Number(0.)};
-        precomputed_values.template write_tensor<Number>(prec_i, i);
-      }
+          RYUJIN_OMP_FOR
+          for (unsigned int i = 0; i < size; i += stride_size) {
+            const auto U_i = U.template get_tensor<Number>(offset + i);
+            const auto rho_i = density(U_i);
+            const auto e_i = internal_energy(U_i) / rho_i;
+            /*
+             * Populate rho and e also for interpolated values from
+             * constrainted degrees of freedom so that the vectors contain
+             * physically admissible entries throughout.
+             */
+            store_value<Number>(rho, rho_i, i);
+            store_value<Number>(e, e_i, i);
+          }
 
-      if constexpr (cycle == 1) {
-        auto prec_i = precomputed_values.template get_tensor<Number, PT>(i);
-        auto &[p_i, gamma_min_i, s_i, eta_i] = prec_i;
+          /* Make sure the call into eospac (and others) is single threaded. */
+          RYUJIN_OMP_SINGLE
+          {
+            eos->pressure(p, rho, e);
+          }
 
-        const unsigned int row_length = sparsity_simd.row_length(i);
-        const unsigned int *js = sparsity_simd.columns(i) + stride_size;
-        for (unsigned int col_idx = 1; col_idx < row_length;
-             ++col_idx, js += stride_size) {
+          RYUJIN_OMP_FOR
+          for (unsigned int i = 0; i < size; i += stride_size) {
+            /* Skip constrained degrees of freedom: */
+            const unsigned int row_length = sparsity_simd.row_length(i);
+            if (row_length == 1)
+              continue;
 
-          const auto U_j = U.template get_tensor<Number>(js);
-          const auto prec_j =
-              precomputed_values.template get_tensor<Number, PT>(js);
-          auto &[p_j, gamma_min_j, s_j, eta_j] = prec_j;
-          const auto gamma_j = surrogate_gamma(U_j, p_j);
-          gamma_min_i = std::min(gamma_min_i, gamma_j);
+            dispatch_check(i);
+
+            using PT = precomputed_state_type;
+            const auto U_i = U.template get_tensor<Number>(offset + i);
+            const auto p_i = load_value<Number>(p, i);
+            const auto gamma_i = surrogate_gamma(U_i, p_i);
+            const PT prec_i{p_i, gamma_i, Number(0.), Number(0.)};
+            precomputed_values.template write_tensor<Number>(prec_i,
+                                                             offset + i);
+          }
+        } else {
+          /*
+           * This is the variant with slightly better performance provided
+           * that a call to the eos is not too expensive. This variant
+           * calls into the eos library for ever single degree of freedom.
+           */
+          RYUJIN_OMP_FOR
+          for (unsigned int i = left; i < right; i += stride_size) {
+            /* Skip constrained degrees of freedom: */
+            const unsigned int row_length = sparsity_simd.row_length(i);
+            if (row_length == 1)
+              continue;
+
+            dispatch_check(i);
+
+            const auto U_i = U.template get_tensor<Number>(i);
+            const auto rho_i = density(U_i);
+            const auto e_i = internal_energy(U_i) / rho_i;
+            Number p_i;
+
+            if constexpr (std::is_same<ScalarNumber, Number>::value) {
+              p_i = eos_pressure(rho_i, e_i);
+            } else {
+              for (unsigned int k = 0; k < Number::size(); ++k) {
+                p_i[k] = eos_pressure(rho_i[k], e_i[k]);
+              }
+            }
+
+            const auto gamma_i = surrogate_gamma(U_i, p_i);
+            using PT = precomputed_state_type;
+            const PT prec_i{p_i, gamma_i, Number(0.), Number(0.)};
+            precomputed_values.template write_tensor<Number>(prec_i, i);
+          }
+        } /* prefer_vector_interface */
+      }   /* cycle == 0 */
+
+      if (cycle == 1) {
+        RYUJIN_OMP_FOR
+        for (unsigned int i = left; i < right; i += stride_size) {
+          using PT = precomputed_state_type;
+
+          /* Skip constrained degrees of freedom: */
+          const unsigned int row_length = sparsity_simd.row_length(i);
+          if (row_length == 1)
+            continue;
+
+          dispatch_check(i);
+
+          const auto U_i = U.template get_tensor<Number>(i);
+          auto prec_i = precomputed_values.template get_tensor<Number, PT>(i);
+          auto &[p_i, gamma_min_i, s_i, eta_i] = prec_i;
+
+          const unsigned int *js = sparsity_simd.columns(i) + stride_size;
+          for (unsigned int col_idx = 1; col_idx < row_length;
+               ++col_idx, js += stride_size) {
+
+            const auto U_j = U.template get_tensor<Number>(js);
+            const auto prec_j =
+                precomputed_values.template get_tensor<Number, PT>(js);
+            auto &[p_j, gamma_min_j, s_j, eta_j] = prec_j;
+            const auto gamma_j = surrogate_gamma(U_j, p_j);
+            gamma_min_i = std::min(gamma_min_i, gamma_j);
+          }
+
+          s_i = specific_entropy(U_i, gamma_min_i);
+          eta_i = harten_entropy(U_i, gamma_min_i);
+          precomputed_values.template write_tensor<Number>(prec_i, i);
         }
-
-        s_i = specific_entropy(U_i, gamma_min_i);
-        eta_i = harten_entropy(U_i, gamma_min_i);
-
-        precomputed_values.template write_tensor<Number>(prec_i, i);
       }
     }
 
@@ -874,27 +957,6 @@ namespace ryujin
       result[dim + 1] = ScalarNumber(1.);
 
       return result;
-    }
-
-
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    HyperbolicSystem::View<dim, Number>::pressure(const state_type &U) const
-    {
-      const auto rho = density(U);
-      const auto e = internal_energy(U) / rho;
-
-      if constexpr (std::is_same<ScalarNumber, Number>::value) {
-        return eos_pressure(rho, e);
-
-      } else {
-
-        Number result = Number(0.);
-        for (unsigned int k = 0; k < Number::size(); ++k) {
-          result[k] = eos_pressure(rho[k], e[k]);
-        }
-        return result;
-      }
     }
 
 

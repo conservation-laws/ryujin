@@ -9,6 +9,7 @@
 
 #include "equation_of_state.h"
 
+#include <deal.II/base/array_view.h>
 #include <deal.II/base/config.h>
 #include <deal.II/base/exceptions.h>
 #include <deal.II/base/parameter_acceptor.h>
@@ -109,20 +110,22 @@ namespace ryujin
        * Query the table with index @p index. The interpolation works on @p
        * n tuples in parallel.
        */
-      template <std::size_t n>
-      inline DEAL_II_ALWAYS_INLINE std::array<std::array<EOS_REAL, n>, 3>
+      inline DEAL_II_ALWAYS_INLINE void
       interpolate_values(const EOS_INTEGER &index,
-                         const std::array<EOS_REAL, n> &X,
-                         const std::array<EOS_REAL, n> &Y)
+                         const dealii::ArrayView<EOS_REAL> &F,
+                         const dealii::ArrayView<EOS_REAL> &dFx,
+                         const dealii::ArrayView<EOS_REAL> &dFy,
+                         const dealii::ArrayView<const EOS_REAL> &X,
+                         const dealii::ArrayView<const EOS_REAL> &Y)
       {
         Assert(index >= 0 && index < n_tables_,
                dealii::ExcMessage("Table index out of range"));
 
-        EOS_INTEGER n_queries = n;
+        EOS_INTEGER n_queries = F.size();
 
-        std::array<EOS_REAL, n> F;
-        std::array<EOS_REAL, n> dFx;
-        std::array<EOS_REAL, n> dFy;
+        Assert(dFx.size() == n_queries && dFy.size() == n_queries &&
+                   X.size() == n_queries && Y.size() == n_queries,
+               dealii::ExcMessage("vector sizes do not match"));
 
         EOS_INTEGER error_code;
         eos_Interpolate(&table_handles_[index],
@@ -133,7 +136,6 @@ namespace ryujin
                         dFx.data(),
                         dFy.data(),
                         &error_code);
-        return {F, dFx, dFy};
       }
 
     private:
@@ -191,108 +193,216 @@ namespace ryujin
   } // namespace eospac
 #endif
 
-  namespace EulerAEOS
+  namespace EquationOfStateLibrary
   {
-    namespace EquationOfStateLibrary
+    /**
+     * A tabulated equation of state based on the EOSPAC6/Sesame
+     * database.
+     *
+     * Units are:
+     *        [rho] = kg / m^3
+     *          [p] = Pa = Kg / m / s^2
+     *          [e] = J / Kg = N m / Kg = m^2 / s^2
+     *
+     * @ingroup EulerEquations
+     */
+    class Sesame : public EquationOfState
     {
-      /**
-       * A tabulated equation of state based on the EOSPAC6/Sesame
-       * database.
-       *
-       * Units are:
-       *        [rho] = kg / m^3
-       *          [p] = Pa = Kg / m / s^2
-       *          [e] = J / Kg = N m / Kg = m^2 / s^2
-       *
-       * @ingroup EulerEquations
-       */
-      class Sesame : public EquationOfState
-      {
-      public:
+    public:
 #ifdef WITH_EOSPAC
-        Sesame(const std::string &subsection)
-            : EquationOfState("sesame", subsection)
-        {
-          material_id_ = 5030;
-          this->add_parameter(
-              "material id", material_id_, "The Sesame Material ID");
+      Sesame(const std::string &subsection)
+          : EquationOfState("sesame", subsection)
+      {
+        material_id_ = 5030;
+        this->add_parameter(
+            "material id", material_id_, "The Sesame Material ID");
 
-          const auto set_up_database = [&]() {
-            const std::vector<std::tuple<EOS_INTEGER, eospac::TableType>>
-                tables{
-                    {material_id_, eospac::TableType::p_rho_e},
-                    {material_id_, eospac::TableType::e_rho_p},
-                };
+        this->prefer_vector_interface_ = true;
 
-            eospac_interface_ = std::make_unique<eospac::Interface>(tables);
+        const auto set_up_database = [&]() {
+          const std::vector<std::tuple<EOS_INTEGER, eospac::TableType>> tables{
+              {material_id_, eospac::TableType::p_rho_e},
+              {material_id_, eospac::TableType::e_rho_p},
           };
 
-          this->parse_parameters_call_back.connect(set_up_database);
-        }
+          eospac_interface_ = std::make_unique<eospac::Interface>(tables);
+        };
 
-        double pressure(const double &rho, const double &e) final
-        {
-          EOS_INTEGER index = 0;
-          const auto &[p, p_drho, p_de] =
-              eospac_interface_->interpolate_values<1>(
-                  index, {rho / 1.e3}, {e / 1.e6});
-          return 1.e9 * p[0];
-        }
+        this->parse_parameters_call_back.connect(set_up_database);
+      }
 
-        double specific_internal_energy(const double &rho,
-                                        const double &p) final
-        {
-          EOS_INTEGER index = 1;
-          const auto &[e, e_drho, e_dp] =
-              eospac_interface_->interpolate_values<1>(
-                  index, {rho / 1.e3}, {p / 1.e9});
-          return 1.e6 * e[0];
-        }
 
-        double material_sound_speed(const double &/*rho*/,
-                                    const double &/*p*/) final
-        {
-          __builtin_trap();
-        }
+      double pressure(double rho, double e) final
+      {
+        EOS_INTEGER index = 0;
 
-      private:
-        EOS_INTEGER material_id_;
-        std::unique_ptr<eospac::Interface> eospac_interface_;
+        double p, p_drho, p_de;
+        const double rho_scaled = rho / 1.0e3; // convert from Kg/m^3 to Mg/m^3
+        const double e_scaled = e / 1.0e6;     // convert from J/kg to MJ/kg
+
+        eospac_interface_->interpolate_values(
+            index,
+            dealii::ArrayView<double>(&p, 1),
+            dealii::ArrayView<double>(&p_drho, 1),
+            dealii::ArrayView<double>(&p_de, 1),
+            dealii::ArrayView<const double>(&rho_scaled, 1),
+            dealii::ArrayView<const double>(&e_scaled, 1));
+
+        return 1.0e9 * p; // convert from GPa to Pa
+      }
+
+
+      void pressure(const dealii::ArrayView<double> &p,
+                    const dealii::ArrayView<double> &rho,
+                    const dealii::ArrayView<double> &e) final
+      {
+        Assert(p.size() == rho.size() && rho.size() == e.size(),
+               dealii::ExcMessage("vectors have different size"));
+
+        EOS_INTEGER index = 0;
+
+        /* FIXME: this is not reentrant... */
+        thread_local static std::vector<double> p_drho;
+        thread_local static std::vector<double> p_de;
+        p_drho.resize(p.size());
+        p_de.resize(p.size());
+
+        // convert from Kg/m^3 to Mg/m^3
+        std::transform(std::begin(rho),
+                       std::end(rho),
+                       std::begin(rho),
+                       [](double rho) { return rho / 1.0e3; });
+
+        // convert from J/kg to MJ/kg
+        std::transform(std::begin(e), //
+                       std::end(e),
+                       std::begin(e),
+                       [](auto e) { return e / 1.0e6; });
+
+        eospac_interface_->interpolate_values(index,
+                                              p,
+                                              dealii::ArrayView<double>(p_drho),
+                                              dealii::ArrayView<double>(p_de),
+                                              rho,
+                                              e);
+
+        // convert from GPa to Pa
+        std::transform(std::begin(p), //
+                       std::end(p),
+                       std::begin(p),
+                       [](auto it) { return it * 1.0e9; });
+      }
+
+
+      double specific_internal_energy(double rho, double p) final
+      {
+        EOS_INTEGER index = 1;
+
+        double e, e_drho, e_dp;
+        const double rho_scaled = rho / 1.0e3; // convert from Kg/M^3 to Mg/M^3
+        const double p_scaled = p / 1.0e9;     // convert from Pa to GPa
+
+        eospac_interface_->interpolate_values(
+            index,
+            dealii::ArrayView<double>(&e, 1),
+            dealii::ArrayView<double>(&e_drho, 1),
+            dealii::ArrayView<double>(&e_dp, 1),
+            dealii::ArrayView<const double>(&rho_scaled, 1),
+            dealii::ArrayView<const double>(&p_scaled, 1));
+
+        return 1.0e6 * e; // convert from MJ/kg to J/kg
+      }
+
+
+      void specific_internal_energy(const dealii::ArrayView<double> &e,
+                                    const dealii::ArrayView<double> &rho,
+                                    const dealii::ArrayView<double> &p) final
+      {
+        Assert(e.size() == rho.size() && rho.size() == p.size(),
+               dealii::ExcMessage("vectors have different size"));
+
+        EOS_INTEGER index = 1;
+
+        /* FIXME: this is not reentrant... */
+        thread_local static std::vector<double> e_drho;
+        thread_local static std::vector<double> e_dp;
+        e_drho.resize(e.size());
+        e_dp.resize(e.size());
+
+        // convert from Kg/m^3 to Mg/m^3
+        std::transform(std::begin(rho),
+                       std::end(rho),
+                       std::begin(rho),
+                       [](double rho) { return rho / 1.0e3; });
+
+        // convert from Pa to GPa
+        std::transform(std::begin(p), //
+                       std::end(p),
+                       std::begin(p),
+                       [](auto it) { return it / 1.0e9; });
+
+        eospac_interface_->interpolate_values(index,
+                                              e,
+                                              dealii::ArrayView<double>(e_drho),
+                                              dealii::ArrayView<double>(e_dp),
+                                              rho,
+                                              p);
+
+        // convert from MJ/kg to J/kg
+        std::transform(std::begin(e), //
+                       std::end(e),
+                       std::begin(e),
+                       [](auto e) { return e * 1.0e6; });
+      }
+
+
+      double sound_speed(double /*rho*/, double /*p*/) final
+      {
+        __builtin_trap();
+      }
+
+
+      void sound_speed(const dealii::ArrayView<double> & /*c*/,
+                       const dealii::ArrayView<double> & /*rho*/,
+                       const dealii::ArrayView<double> & /*e*/) final
+      {
+        __builtin_trap();
+      }
+
+    private:
+      EOS_INTEGER material_id_;
+      std::unique_ptr<eospac::Interface> eospac_interface_;
 
 #else /* WITH_EOSPAC */
 
-        /* We do not have eospac support */
-        Sesame(const std::string &subsection)
-            : EquationOfState("Sesame", subsection)
-        {
-        }
+      /* We do not have eospac support */
+      Sesame(const std::string &subsection)
+          : EquationOfState("Sesame", subsection)
+      {
+      }
 
-        static constexpr auto message =
-            "ryujin has to be configured with eospac support in order to use "
-            "the Sesame EOS database";
+      static constexpr auto message =
+          "ryujin has to be configured with eospac support in order to use "
+          "the Sesame EOS database";
 
-        double pressure(const double &/*rho*/,
-                        const double &/*internal_energy*/) final
-        {
-          AssertThrow(false, dealii::ExcMessage(message));
-          __builtin_trap();
-        }
+      double pressure(double /*rho*/, double /*internal_energy*/) final
+      {
+        AssertThrow(false, dealii::ExcMessage(message));
+        __builtin_trap();
+      }
 
-        double specific_internal_energy(const double &/*rho*/,
-                                        const double &/*p*/) final
-        {
-          AssertThrow(false, dealii::ExcMessage(message));
-          __builtin_trap();
-        }
+      double specific_internal_energy(double /*rho*/, double /*p*/) final
+      {
+        AssertThrow(false, dealii::ExcMessage(message));
+        __builtin_trap();
+      }
 
-        double sound_speed(const double & /*rho*/, const double & /*e*/) final
-        {
-          AssertThrow(false, dealii::ExcMessage(message));
-          __builtin_trap();
-        }
+      double sound_speed(double /*rho*/, double /*e*/) final
+      {
+        AssertThrow(false, dealii::ExcMessage(message));
+        __builtin_trap();
+      }
 #endif
-      };
-    } // namespace EquationOfStateLibrary
-  }   // namespace EulerAEOS
-
+    };
+  } // namespace EquationOfStateLibrary
 } // namespace ryujin
