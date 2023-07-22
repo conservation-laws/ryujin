@@ -217,6 +217,8 @@ namespace ryujin
         this->add_parameter(
             "material id", material_id_, "The Sesame Material ID");
 
+        this->prefer_vector_interface_ = true;
+
         const auto set_up_database = [&]() {
           const std::vector<std::tuple<EOS_INTEGER, eospac::TableType>> tables{
               {material_id_, eospac::TableType::p_rho_e},

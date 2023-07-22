@@ -39,10 +39,17 @@ namespace ryujin
           , name_(name)
       {
         /*
-         * If necessary derived EOS can override the inerpolation co-volume
-         * b that is used in the approximate Riemann solver.
+         * If necessary derived EOS can override the interpolation
+         * co-volume b that is used in the approximate Riemann solver.
          */
         interpolation_b_ = 0.;
+
+        /*
+         * If necessary derived EOS can override this boolean to indicate
+         * that the dealii::ArrayView<double> variants of the pressure()
+         * function (etc.) should be preferred.
+         */
+        prefer_vector_interface_ = false;
       }
 
       /**
@@ -145,12 +152,26 @@ namespace ryujin
       ACCESSOR_READ_ONLY(interpolation_b)
 
       /**
+       * Return a boolean indicating whether the dealii::ArrayView<double>
+       * variants for the pressure(), specific_internal_energy(), and
+       * sound_speed() functions should be preferred.
+       *
+       * Ordinarily we use the single-valued signatures for pre-computation
+       * because this leads to slightly better throughput (due to better
+       * memory locality with how we store precomputed values) and less
+       * memory consumption. On the other hand, some tabulated equation of
+       * state libraries work best with a single call and a large dataset.
+       */
+      ACCESSOR_READ_ONLY(prefer_vector_interface)
+
+      /**
        * Return the name of the EOS as (const reference) std::string
        */
       ACCESSOR_READ_ONLY(name)
 
     protected:
       double interpolation_b_;
+      bool prefer_vector_interface_;
 
     private:
       const std::string name_;
