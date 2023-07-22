@@ -201,8 +201,8 @@ namespace ryujin
       rho_i_inverse = Number(1.) / rho_i;
       eta_i = new_eta_i;
 
-      d_eta_i =
-          hyperbolic_system.harten_entropy_derivative(U_i, eta_i, gamma_min);
+      d_eta_i = hyperbolic_system.surrogate_harten_entropy_derivative(
+          U_i, eta_i, gamma_min);
       d_eta_i[0] -= eta_i * rho_i_inverse;
 
       const auto surrogate_p_i =
@@ -227,7 +227,8 @@ namespace ryujin
       //     precomputed_type>(js);
 
       // Compute correct eta_j. This is not effecient.
-      const auto eta_j = hyperbolic_system.harten_entropy(U_j, gamma_min);
+      const auto eta_j =
+          hyperbolic_system.surrogate_harten_entropy(U_j, gamma_min);
 
       const auto rho_j = hyperbolic_system.density(U_j);
       const auto rho_j_inverse = Number(1.) / rho_j;

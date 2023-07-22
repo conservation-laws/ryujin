@@ -384,39 +384,49 @@ namespace ryujin
          */
         static state_type internal_energy_derivative(const state_type &U);
 
+        //@}
+        /**
+         * @name Surrogate functions for computing various interpolatory
+         * physical quantities that are needed for Riemann solver,
+         * indicator and limiter.
+         */
+        //@{
+
         /**
          * For a given (2+dim dimensional) state vector <code>U</code>, compute
-         * and return the (scaled) specific entropy
+         * and return a (scaled) surrogate specific entropy
          * \f[
          *   e^{(\gamma_{\text{min} - 1)s} =
          *   \frac{\rho\,e}{\rho^\gamma_{\text{min}}
          *   (1 - b * \rho)^(\gamma_{\text{min}} -1).
          * \f]
          */
-        Number specific_entropy(const state_type &U,
-                                const Number &gamma_min) const;
+        Number surrogate_specific_entropy(const state_type &U,
+                                          const Number &gamma_min) const;
 
         /**
          * For a given (2+dim dimensional) state vector <code>U</code>, compute
-         * and return the Harten-type entropy
+         * and return a surrogate Harten-type entropy
          * \f[
-         *   \eta = (\rho^2 e * (1 - interpolation_b * \rho))^{1 /
-         *   (\gamma_{\text{min}} + 1)}.
+         *   \eta = (\rho^2 e \cdot (1 - interpolation_b \rho)
+         *   ^{\gamma_{text}min} - 1})^{1 / (\gamma_{\text{min}} + 1)}.
          * \f]
          */
-        Number harten_entropy(const state_type &U,
-                              const Number &gamma_min) const;
+        Number surrogate_harten_entropy(const state_type &U,
+                                        const Number &gamma_min) const;
 
         /**
          * For a given (2+dim dimensional) state vector <code>U</code>, compute
          * and return the derivative \f$\eta'\f$ of the Harten-type entropy
          * \f[
-         *   \eta = (\rho^2 e) ^ {1 / (\gamma_{\text{min}} + 1)}.
+         *   \eta = (\rho^2 e \cdot (1 - interpolation_b \rho)
+         *   ^{\gamma_{text}min} - 1})^{1 / (\gamma_{\text{min}} + 1)}.
          * \f]
          */
-        state_type harten_entropy_derivative(const state_type &U,
-                                             const Number &eta,
-                                             const Number &gamma_min) const;
+        state_type
+        surrogate_harten_entropy_derivative(const state_type &U,
+                                            const Number &eta,
+                                            const Number &gamma_min) const;
 
         /**
          * For a given (2+dim dimensional) state vector <code>U</code> and
@@ -870,8 +880,8 @@ namespace ryujin
             gamma_min_i = std::min(gamma_min_i, gamma_j);
           }
 
-          s_i = specific_entropy(U_i, gamma_min_i);
-          eta_i = harten_entropy(U_i, gamma_min_i);
+          s_i = surrogate_specific_entropy(U_i, gamma_min_i);
+          eta_i = surrogate_harten_entropy(U_i, gamma_min_i);
           precomputed_values.template write_tensor<Number>(prec_i, i);
         }
       }
@@ -962,7 +972,7 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
-    HyperbolicSystem::View<dim, Number>::specific_entropy(
+    HyperbolicSystem::View<dim, Number>::surrogate_specific_entropy(
         const state_type &U, const Number &gamma_min) const
     {
       using ScalarNumber = typename get_value_type<Number>::type;
@@ -979,7 +989,7 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
-    HyperbolicSystem::View<dim, Number>::harten_entropy(
+    HyperbolicSystem::View<dim, Number>::surrogate_harten_entropy(
         const state_type &U, const Number &gamma_min) const
     {
       const auto rho = density(U);
@@ -999,7 +1009,7 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystem::View<dim, Number>::harten_entropy_derivative(
+    HyperbolicSystem::View<dim, Number>::surrogate_harten_entropy_derivative(
         const state_type &U, const Number &eta, const Number &gamma_min) const
         -> state_type
     {

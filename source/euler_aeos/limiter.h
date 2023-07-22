@@ -269,7 +269,7 @@ namespace ryujin
 
       const auto rho_ij_bar = hyperbolic_system.density(U_ij_bar);
       const auto s_bar_ij =
-          hyperbolic_system.specific_entropy(U_ij_bar, gamma_min);
+          hyperbolic_system.surrogate_specific_entropy(U_ij_bar, gamma_min);
 
       rho_min = std::min(rho_min, rho_ij_bar);
       rho_max = std::max(rho_max, rho_ij_bar);
@@ -280,7 +280,8 @@ namespace ryujin
       //     precomputed_type>(js);
 
       // This is correct, but not effecient
-      const auto s_j = hyperbolic_system.specific_entropy(U_j, gamma_min);
+      const auto s_j =
+          hyperbolic_system.surrogate_specific_entropy(U_j, gamma_min);
 
       s_min = std::min(s_min, s_j);
       s_min = std::min(s_min, s_bar_ij);
@@ -290,7 +291,7 @@ namespace ryujin
       rho_relaxation_numerator += beta_ij * (rho_i + rho_j);
       rho_relaxation_denominator += beta_ij;
 
-      const Number s_interp = hyperbolic_system.specific_entropy(
+      const Number s_interp = hyperbolic_system.surrogate_specific_entropy(
           (U_i + U_j) * ScalarNumber(.5), gamma_min);
       s_interp_max = std::max(s_interp_max, s_interp);
     }
