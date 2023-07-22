@@ -745,38 +745,102 @@ namespace ryujin
     {
       Assert(cycle == 0 || cycle == 1, dealii::ExcInternalError());
 
+      /* We are inside a thread parallel context */
+
+      const auto &eos = hyperbolic_system_.selected_equation_of_state_;
       unsigned int stride_size = get_stride_size<Number>;
 
       if (cycle == 0) {
-        RYUJIN_OMP_FOR
-        for (unsigned int i = left; i < right; i += stride_size) {
-          using PT = precomputed_state_type;
+        if (eos->prefer_vector_interface()) {
+          /*
+           * Set up temporary storage for p, rho, e and make two calls into
+           * the eos library.
+           */
+          const auto offset = left;
+          const auto size = right - left;
 
-          /* Skip constrained degrees of freedom: */
-          const unsigned int row_length = sparsity_simd.row_length(i);
-          if (row_length == 1)
-            continue;
-
-          dispatch_check(i);
-
-          const auto U_i = U.template get_tensor<Number>(i);
-          const auto rho_i = density(U_i);
-          const auto e_i = internal_energy(U_i) / rho_i;
-          Number p_i;
-
-          if constexpr (std::is_same<ScalarNumber, Number>::value) {
-            p_i = eos_pressure(rho_i, e_i);
-          } else {
-            for (unsigned int k = 0; k < Number::size(); ++k) {
-              p_i[k] = eos_pressure(rho_i[k], e_i[k]);
-            }
+          static /* shared */ std::vector<double> p;
+          static /* shared */ std::vector<double> rho;
+          static /* shared */ std::vector<double> e;
+          RYUJIN_OMP_SINGLE
+          {
+            p.resize(size);
+            rho.resize(size);
+            e.resize(size);
           }
 
-          const auto gamma_i = surrogate_gamma(U_i, p_i);
-          const PT prec_i{p_i, gamma_i, Number(0.), Number(0.)};
-          precomputed_values.template write_tensor<Number>(prec_i, i);
-        }
-      }
+          RYUJIN_OMP_FOR
+          for (unsigned int i = 0; i < size; i += stride_size) {
+            const auto U_i = U.template get_tensor<Number>(offset + i);
+            const auto rho_i = density(U_i);
+            const auto e_i = internal_energy(U_i) / rho_i;
+            /*
+             * Populate rho and e also for interpolated values from
+             * constrainted degrees of freedom so that the vectors contain
+             * physically admissible entries throughout.
+             */
+            store_value<Number>(rho, rho_i, i);
+            store_value<Number>(e, e_i, i);
+          }
+
+          /* Make sure the call into eospac (and others) is single threaded. */
+          RYUJIN_OMP_SINGLE
+          {
+            eos->pressure(p, rho, e);
+          }
+
+          RYUJIN_OMP_FOR
+          for (unsigned int i = 0; i < size; i += stride_size) {
+            /* Skip constrained degrees of freedom: */
+            const unsigned int row_length = sparsity_simd.row_length(i);
+            if (row_length == 1)
+              continue;
+
+            dispatch_check(i);
+
+            using PT = precomputed_state_type;
+            const auto U_i = U.template get_tensor<Number>(offset + i);
+            const auto p_i = load_value<Number>(p, i);
+            const auto gamma_i = surrogate_gamma(U_i, p_i);
+            const PT prec_i{p_i, gamma_i, Number(0.), Number(0.)};
+            precomputed_values.template write_tensor<Number>(prec_i,
+                                                             offset + i);
+          }
+        } else {
+          /*
+           * This is the variant with slightly better performance provided
+           * that a call to the eos is not too expensive. This variant
+           * calls into the eos library for ever single degree of freedom.
+           */
+          RYUJIN_OMP_FOR
+          for (unsigned int i = left; i < right; i += stride_size) {
+            /* Skip constrained degrees of freedom: */
+            const unsigned int row_length = sparsity_simd.row_length(i);
+            if (row_length == 1)
+              continue;
+
+            dispatch_check(i);
+
+            const auto U_i = U.template get_tensor<Number>(i);
+            const auto rho_i = density(U_i);
+            const auto e_i = internal_energy(U_i) / rho_i;
+            Number p_i;
+
+            if constexpr (std::is_same<ScalarNumber, Number>::value) {
+              p_i = eos_pressure(rho_i, e_i);
+            } else {
+              for (unsigned int k = 0; k < Number::size(); ++k) {
+                p_i[k] = eos_pressure(rho_i[k], e_i[k]);
+              }
+            }
+
+            const auto gamma_i = surrogate_gamma(U_i, p_i);
+            using PT = precomputed_state_type;
+            const PT prec_i{p_i, gamma_i, Number(0.), Number(0.)};
+            precomputed_values.template write_tensor<Number>(prec_i, i);
+          }
+        } /* prefer_vector_interface */
+      }   /* cycle == 0 */
 
       if (cycle == 1) {
         RYUJIN_OMP_FOR

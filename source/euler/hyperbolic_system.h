@@ -696,6 +696,8 @@ namespace ryujin
     {
       Assert(cycle == 0, dealii::ExcInternalError());
 
+      /* We are inside a thread parallel context */
+
       unsigned int stride_size = get_stride_size<Number>;
 
       RYUJIN_OMP_FOR
