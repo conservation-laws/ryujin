@@ -319,7 +319,10 @@ namespace ryujin
          */
         static inline const auto precomputed_names =
             std::array<std::string, n_precomputed_values>{
-                {"p", "gamma", "surrogate_entropy", "eta_harten"}};
+                {"p",
+                 "surrogate_gamma",
+                 "surrogate_specific_entropy",
+                 "surrogate_harten_entropy"}};
 
         /**
          * The number of precomputation cycles.
