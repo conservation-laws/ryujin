@@ -30,11 +30,11 @@ namespace ryujin
         equation_of_state_list.emplace(std::move(object));
       };
 
-      add(std::make_unique<JonesWilkinsLee>(subsection));
-      add(std::make_unique<NobleAbelStiffenedGas>(subsection));
-      add(std::make_unique<PolytropicGas>(subsection));
-      add(std::make_unique<Sesame>(subsection));
-      add(std::make_unique<VanDerWaals>(subsection));
+      add(std::make_shared<JonesWilkinsLee>(subsection));
+      add(std::make_shared<NobleAbelStiffenedGas>(subsection));
+      add(std::make_shared<PolytropicGas>(subsection));
+      add(std::make_shared<Sesame>(subsection));
+      add(std::make_shared<VanDerWaals>(subsection));
     }
   } // namespace EquationOfStateLibrary
 } // namespace ryujin

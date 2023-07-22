@@ -60,14 +60,11 @@ namespace ryujin
       double vacuum_state_relaxation_;
       bool compute_expensive_bounds_;
 
-      using EquationOfState = EquationOfStateLibrary::EquationOfState;
-      std::set<std::unique_ptr<EquationOfState>> equation_of_state_list_;
+      EquationOfStateLibrary::equation_of_state_list_type
+          equation_of_state_list_;
 
-      std::function<double(const double, const double)> eos_pressure_;
-      std::function<double(const double, const double)>
-          eos_specific_internal_energy_;
-      std::function<double(const double, const double)> eos_sound_speed_;
-      std::function<double()> eos_interpolation_b_;
+      using EquationOfState = EquationOfStateLibrary::EquationOfState;
+      std::shared_ptr<EquationOfState> selected_equation_of_state_;
 
     public:
       /**
@@ -154,7 +151,8 @@ namespace ryujin
         eos_pressure(const ScalarNumber &rho,
                      const ScalarNumber &e) const
         {
-          return ScalarNumber(hyperbolic_system_.eos_pressure_(rho, e));
+          const auto &eos = hyperbolic_system_.selected_equation_of_state_;
+          return ScalarNumber(eos->pressure(rho, e));
         }
 
         /**
@@ -165,8 +163,8 @@ namespace ryujin
         eos_specific_internal_energy(const ScalarNumber &rho,
                                      const ScalarNumber &p) const
         {
-          return ScalarNumber(
-              hyperbolic_system_.eos_specific_internal_energy_(rho, p));
+          const auto &eos = hyperbolic_system_.selected_equation_of_state_;
+          return ScalarNumber(eos->specific_internal_energy(rho, p));
         }
 
         /**
@@ -176,7 +174,8 @@ namespace ryujin
         DEAL_II_ALWAYS_INLINE inline ScalarNumber
         eos_sound_speed(const ScalarNumber &rho, const ScalarNumber &e) const
         {
-          return ScalarNumber(hyperbolic_system_.eos_sound_speed_(rho, e));
+          const auto &eos = hyperbolic_system_.selected_equation_of_state_;
+          return ScalarNumber(eos->sound_speed(rho, e));
         }
 
         /**
@@ -184,7 +183,8 @@ namespace ryujin
          */
         DEAL_II_ALWAYS_INLINE inline ScalarNumber eos_interpolation_b() const
         {
-          return ScalarNumber(hyperbolic_system_.eos_interpolation_b_());
+          const auto &eos = hyperbolic_system_.selected_equation_of_state_;
+          return ScalarNumber(eos->interpolation_b());
         }
 
         //@}
@@ -711,24 +711,9 @@ namespace ryujin
 
           /* Populate EOS-specific quantities and functions */
           if (it->name() == equation_of_state_) {
-
-            eos_pressure_ = [&it](double rho, double e) {
-              return it->pressure(rho, e);
-            };
-
-            eos_specific_internal_energy_ = [&it](double rho, double p) {
-              return it->specific_internal_energy(rho, p);
-            };
-
-            eos_sound_speed_ = [&it](double rho, double e) {
-              return it->sound_speed(rho, e);
-            };
-
-            eos_interpolation_b_ = [&it]() { return it->interpolation_b(); };
-
+            selected_equation_of_state_ = it;
             problem_name =
                 "Compressible Euler equations (" + it->name() + " EOS)";
-
             initialized = true;
             break;
           }
@@ -775,7 +760,6 @@ namespace ryujin
           dispatch_check(i);
 
           const auto U_i = U.template get_tensor<Number>(i);
-
           const auto rho_i = density(U_i);
           const auto e_i = internal_energy(U_i) / rho_i;
           Number p_i;

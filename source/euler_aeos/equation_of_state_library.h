@@ -12,7 +12,7 @@ namespace ryujin
   namespace EquationOfStateLibrary
   {
     using equation_of_state_list_type =
-        std::set<std::unique_ptr<EquationOfState>>;
+        std::set<std::shared_ptr<EquationOfState>>;
 
     /**
      * Populate a given container with all equation of states defined in
