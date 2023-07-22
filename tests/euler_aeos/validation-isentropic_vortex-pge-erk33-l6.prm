@@ -1,0 +1,59 @@
+subsection A - TimeLoop
+  set basename                  = validation-euler-l6
+
+  set enable output full        = false
+  set enable compute quantities = false
+
+  set enable compute error      = true
+
+  set final time                = 2.0
+
+  set output granularity        = 2.0
+  set terminal update interval  = 0
+end
+
+subsection B - Equation
+  set equation                 = euler aeos
+  set equation of state        = polytropic gas
+  subsection polytropic gas
+    set gamma = 1.4
+  end
+end
+
+subsection C - Discretization
+  set geometry        = rectangular domain
+  set mesh refinement = 6
+
+  subsection rectangular domain
+    set boundary condition bottom = dirichlet
+    set boundary condition left   = dirichlet
+    set boundary condition right  = dirichlet
+    set boundary condition top    = dirichlet
+
+    set position bottom left      = -5, -5
+    set position top right        =  5,  5
+  end
+end
+
+subsection E - InitialValues
+  set configuration = isentropic vortex
+  set direction     =  1,  1
+  set position      = -1, -1
+
+  subsection isentropic vortex
+    set mach number = 1
+    set beta        = 5
+  end
+end
+
+subsection F - HyperbolicModule
+  set cfl with boundary dofs = false
+  set limiter iterations     = 2
+end
+
+subsection H - TimeIntegrator
+  set cfl min            = 0.2
+  set cfl max            = 0.2
+  set cfl recovery strategy = none
+  set time stepping scheme  = erk 33
+end
