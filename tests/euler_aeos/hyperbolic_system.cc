@@ -119,6 +119,16 @@ int main()
   test<2, float>(/* surrogate gamma */ 1.4);
   test<3, float>(/* surrogate gamma */ 1.4);
 
+  std::cout << "\ndouble:\n" << std::endl;
+  test<1, double>(/* surrogate gamma */ 1.9);
+  test<2, double>(/* surrogate gamma */ 1.9);
+  test<3, double>(/* surrogate gamma */ 1.9);
+  std::cout << "\nfloat:\n" << std::endl;
+  test<1, float>(/* surrogate gamma */ 1.9);
+  test<2, float>(/* surrogate gamma */ 1.9);
+  test<3, float>(/* surrogate gamma */ 1.9);
+
+
   set_covolume(0.1);
   std::cout << "\ndouble:\n" << std::endl;
   test<1, double>(/* surrogate gamma */ 1.4);
@@ -128,6 +138,15 @@ int main()
   test<1, float>(/* surrogate gamma */ 1.4);
   test<2, float>(/* surrogate gamma */ 1.4);
   test<3, float>(/* surrogate gamma */ 1.4);
+
+  std::cout << "\ndouble:\n" << std::endl;
+  test<1, double>(/* surrogate gamma */ 1.9);
+  test<2, double>(/* surrogate gamma */ 1.9);
+  test<3, double>(/* surrogate gamma */ 1.9);
+  std::cout << "\nfloat:\n" << std::endl;
+  test<1, float>(/* surrogate gamma */ 1.9);
+  test<2, float>(/* surrogate gamma */ 1.9);
+  test<3, float>(/* surrogate gamma */ 1.9);
 
   set_covolume(0.5);
   std::cout << "\ndouble:\n" << std::endl;
@@ -139,15 +158,14 @@ int main()
   test<2, float>(/* surrogate gamma */ 1.4);
   test<3, float>(/* surrogate gamma */ 1.4);
 
-  set_covolume(0.9);
   std::cout << "\ndouble:\n" << std::endl;
-  test<1, double>(/* surrogate gamma */ 1.4);
-  test<2, double>(/* surrogate gamma */ 1.4);
-  test<3, double>(/* surrogate gamma */ 1.4);
+  test<1, double>(/* surrogate gamma */ 1.9);
+  test<2, double>(/* surrogate gamma */ 1.9);
+  test<3, double>(/* surrogate gamma */ 1.9);
   std::cout << "\nfloat:\n" << std::endl;
-  test<1, float>(/* surrogate gamma */ 1.4);
-  test<2, float>(/* surrogate gamma */ 1.4);
-  test<3, float>(/* surrogate gamma */ 1.4);
+  test<1, float>(/* surrogate gamma */ 1.9);
+  test<2, float>(/* surrogate gamma */ 1.9);
+  test<3, float>(/* surrogate gamma */ 1.9);
 
   return 0;
 }

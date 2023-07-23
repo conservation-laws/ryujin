@@ -1,336 +1,504 @@
 
 double:
 
-interpolatory covolume: 0
+interpolatory covolume: 0.0000000000e+00
 dim = 1
-density = 1.4
-momentum = 4.2
-total_energy = 8.8
-internal_energy = 2.5
-internal_energy_derivative = 4.5 -3 1
-specific_entropy = 1.560848526
-harten entropy = 1.685369066
-harten_entropy_derivative = 1.765624736 -0.8426845331 0.2808948444
-surrogate_pressure = 1
-surrogate_gamma = 1.4
-f = 4.2 13.6 29.4
-interpolatory covolume: 0
+density = 1.4000000000e+00
+momentum = 4.2000000000e+00
+total_energy = 8.8000000000e+00
+internal_energy = 2.5000000000e+00
+internal_energy_derivative = 4.5000000000e+00 -3.0000000000e+00 1.0000000000e+00
+specific_entropy = 1.5608485265e+00
+harten entropy = 1.6853690662e+00
+harten_entropy_derivative = 1.7656247360e+00 -8.4268453310e-01 2.8089484437e-01
+surrogate_pressure = 1.0000000000e+00
+surrogate_gamma = 1.4000000000e+00
+f = 4.2000000000e+00 1.3600000000e+01 2.9400000000e+01
+interpolatory covolume: 0.0000000000e+00
 dim = 2
-density = 1.4
-momentum = 4.2 0
-total_energy = 8.8
-internal_energy = 2.5
-internal_energy_derivative = 4.5 -3 -0 1
-specific_entropy = 1.560848526
-harten entropy = 1.685369066
-harten_entropy_derivative = 1.765624736 -0.8426845331 -0 0.2808948444
-surrogate_pressure = 1
-surrogate_gamma = 1.4
-f = 4.2 0 13.6 0 0 1 29.4 0
-interpolatory covolume: 0
+density = 1.4000000000e+00
+momentum = 4.2000000000e+00 0.0000000000e+00
+total_energy = 8.8000000000e+00
+internal_energy = 2.5000000000e+00
+internal_energy_derivative = 4.5000000000e+00 -3.0000000000e+00 0.0000000000e+00 1.0000000000e+00
+specific_entropy = 1.5608485265e+00
+harten entropy = 1.6853690662e+00
+harten_entropy_derivative = 1.7656247360e+00 -8.4268453310e-01 0.0000000000e+00 2.8089484437e-01
+surrogate_pressure = 1.0000000000e+00
+surrogate_gamma = 1.4000000000e+00
+f = 4.2000000000e+00 0.0000000000e+00 1.3600000000e+01 0.0000000000e+00 0.0000000000e+00 1.0000000000e+00 2.9400000000e+01 0.0000000000e+00
+interpolatory covolume: 0.0000000000e+00
 dim = 3
-density = 1.4
-momentum = 4.2 0 0
-total_energy = 8.8
-internal_energy = 2.5
-internal_energy_derivative = 4.5 -3 -0 -0 1
-specific_entropy = 1.560848526
-harten entropy = 1.685369066
-harten_entropy_derivative = 1.765624736 -0.8426845331 -0 -0 0.2808948444
-surrogate_pressure = 1
-surrogate_gamma = 1.4
-f = 4.2 0 0 13.6 0 0 0 1 0 0 0 1 29.4 0 0
+density = 1.4000000000e+00
+momentum = 4.2000000000e+00 0.0000000000e+00 0.0000000000e+00
+total_energy = 8.8000000000e+00
+internal_energy = 2.5000000000e+00
+internal_energy_derivative = 4.5000000000e+00 -3.0000000000e+00 0.0000000000e+00 0.0000000000e+00 1.0000000000e+00
+specific_entropy = 1.5608485265e+00
+harten entropy = 1.6853690662e+00
+harten_entropy_derivative = 1.7656247360e+00 -8.4268453310e-01 0.0000000000e+00 0.0000000000e+00 2.8089484437e-01
+surrogate_pressure = 1.0000000000e+00
+surrogate_gamma = 1.4000000000e+00
+f = 4.2000000000e+00 0.0000000000e+00 0.0000000000e+00 1.3600000000e+01 0.0000000000e+00 0.0000000000e+00 0.0000000000e+00 1.0000000000e+00 0.0000000000e+00 0.0000000000e+00 0.0000000000e+00 1.0000000000e+00 2.9400000000e+01 0.0000000000e+00 0.0000000000e+00
 
 float:
 
-interpolatory covolume: 0
+interpolatory covolume: 0.0000000000e+00
 dim = 1
-density = 1.399999976
-momentum = 4.199999809
-total_energy = 8.800000191
-internal_energy = 2.500000954
-internal_energy_derivative = 4.5 -3 1
-specific_entropy = 1.56084919
-harten entropy = 1.685369253
-harten_entropy_derivative = 1.765624404 -0.8426843286 0.2808947861
-surrogate_pressure = 1.000000358
-surrogate_gamma = 1.399999976
-f = 4.199999809 13.59999943 29.40000153
-interpolatory covolume: 0
+density = 1.3999999762e+00
+momentum = 4.1999998093e+00
+total_energy = 8.8000001907e+00
+internal_energy = 2.5000009537e+00
+internal_energy_derivative = 4.5000000000e+00 -3.0000000000e+00 1.0000000000e+00
+specific_entropy = 1.5608491898e+00
+harten entropy = 1.6853692532e+00
+harten_entropy_derivative = 1.7656244040e+00 -8.4268432856e-01 2.8089478612e-01
+surrogate_pressure = 1.0000003576e+00
+surrogate_gamma = 1.3999999762e+00
+f = 4.1999998093e+00 1.3599999428e+01 2.9400001526e+01
+interpolatory covolume: 0.0000000000e+00
 dim = 2
-density = 1.399999976
-momentum = 4.199999809 0
-total_energy = 8.800000191
-internal_energy = 2.500000954
-internal_energy_derivative = 4.5 -3 -0 1
-specific_entropy = 1.56084919
-harten entropy = 1.685369253
-harten_entropy_derivative = 1.765624404 -0.8426843286 -0 0.2808947861
-surrogate_pressure = 1.000000358
-surrogate_gamma = 1.399999976
-f = 4.199999809 0 13.59999943 0 0 1.000000358 29.40000153 0
-interpolatory covolume: 0
+density = 1.3999999762e+00
+momentum = 4.1999998093e+00 0.0000000000e+00
+total_energy = 8.8000001907e+00
+internal_energy = 2.5000009537e+00
+internal_energy_derivative = 4.5000000000e+00 -3.0000000000e+00 0.0000000000e+00 1.0000000000e+00
+specific_entropy = 1.5608491898e+00
+harten entropy = 1.6853692532e+00
+harten_entropy_derivative = 1.7656244040e+00 -8.4268432856e-01 0.0000000000e+00 2.8089478612e-01
+surrogate_pressure = 1.0000003576e+00
+surrogate_gamma = 1.3999999762e+00
+f = 4.1999998093e+00 0.0000000000e+00 1.3599999428e+01 0.0000000000e+00 0.0000000000e+00 1.0000003576e+00 2.9400001526e+01 0.0000000000e+00
+interpolatory covolume: 0.0000000000e+00
 dim = 3
-density = 1.399999976
-momentum = 4.199999809 0 0
-total_energy = 8.800000191
-internal_energy = 2.500000954
-internal_energy_derivative = 4.5 -3 -0 -0 1
-specific_entropy = 1.56084919
-harten entropy = 1.685369253
-harten_entropy_derivative = 1.765624404 -0.8426843286 -0 -0 0.2808947861
-surrogate_pressure = 1.000000358
-surrogate_gamma = 1.399999976
-f = 4.199999809 0 0 13.59999943 0 0 0 1.000000358 0 0 0 1.000000358 29.40000153 0 0
+density = 1.3999999762e+00
+momentum = 4.1999998093e+00 0.0000000000e+00 0.0000000000e+00
+total_energy = 8.8000001907e+00
+internal_energy = 2.5000009537e+00
+internal_energy_derivative = 4.5000000000e+00 -3.0000000000e+00 0.0000000000e+00 0.0000000000e+00 1.0000000000e+00
+specific_entropy = 1.5608491898e+00
+harten entropy = 1.6853692532e+00
+harten_entropy_derivative = 1.7656244040e+00 -8.4268432856e-01 0.0000000000e+00 0.0000000000e+00 2.8089478612e-01
+surrogate_pressure = 1.0000003576e+00
+surrogate_gamma = 1.3999999762e+00
+f = 4.1999998093e+00 0.0000000000e+00 0.0000000000e+00 1.3599999428e+01 0.0000000000e+00 0.0000000000e+00 0.0000000000e+00 1.0000003576e+00 0.0000000000e+00 0.0000000000e+00 0.0000000000e+00 1.0000003576e+00 2.9400001526e+01 0.0000000000e+00 0.0000000000e+00
 
 double:
 
-interpolatory covolume: 0.1
+interpolatory covolume: 0.0000000000e+00
 dim = 1
-density = 1.4
-momentum = 4.2
-total_energy = 8.8
-internal_energy = 2.5
-internal_energy_derivative = 4.5 -3 1
-specific_entropy = 1.469468021
-harten entropy = 1.643531733
-harten_entropy_derivative = 1.689943758 -0.8217658663 0.2739219554
-surrogate_pressure = 1.162790698
-surrogate_gamma = 1.4
-f = 4.2 13.7627907 29.88837209
-interpolatory covolume: 0.1
+density = 1.9000000000e+00
+momentum = 5.7000000000e+00
+total_energy = 9.6611111111e+00
+internal_energy = 1.1111111111e+00
+internal_energy_derivative = 4.5000000000e+00 -3.0000000000e+00 1.0000000000e+00
+specific_entropy = 3.2819023037e-01
+harten entropy = 1.2938989975e+00
+harten_entropy_derivative = 2.0418242801e+00 -1.2046645839e+00 4.0155486130e-01
+surrogate_pressure = 1.0000000000e+00
+surrogate_gamma = 1.9000000000e+00
+f = 5.7000000000e+00 1.8100000000e+01 3.1983333333e+01
+interpolatory covolume: 0.0000000000e+00
 dim = 2
-density = 1.4
-momentum = 4.2 0
-total_energy = 8.8
-internal_energy = 2.5
-internal_energy_derivative = 4.5 -3 -0 1
-specific_entropy = 1.469468021
-harten entropy = 1.643531733
-harten_entropy_derivative = 1.689943758 -0.8217658663 -0 0.2739219554
-surrogate_pressure = 1.162790698
-surrogate_gamma = 1.4
-f = 4.2 0 13.7627907 0 0 1.162790698 29.88837209 0
-interpolatory covolume: 0.1
+density = 1.9000000000e+00
+momentum = 5.7000000000e+00 0.0000000000e+00
+total_energy = 9.6611111111e+00
+internal_energy = 1.1111111111e+00
+internal_energy_derivative = 4.5000000000e+00 -3.0000000000e+00 0.0000000000e+00 1.0000000000e+00
+specific_entropy = 3.2819023037e-01
+harten entropy = 1.2938989975e+00
+harten_entropy_derivative = 2.0418242801e+00 -1.2046645839e+00 0.0000000000e+00 4.0155486130e-01
+surrogate_pressure = 1.0000000000e+00
+surrogate_gamma = 1.9000000000e+00
+f = 5.7000000000e+00 0.0000000000e+00 1.8100000000e+01 0.0000000000e+00 0.0000000000e+00 1.0000000000e+00 3.1983333333e+01 0.0000000000e+00
+interpolatory covolume: 0.0000000000e+00
 dim = 3
-density = 1.4
-momentum = 4.2 0 0
-total_energy = 8.8
-internal_energy = 2.5
-internal_energy_derivative = 4.5 -3 -0 -0 1
-specific_entropy = 1.469468021
-harten entropy = 1.643531733
-harten_entropy_derivative = 1.689943758 -0.8217658663 -0 -0 0.2739219554
-surrogate_pressure = 1.162790698
-surrogate_gamma = 1.4
-f = 4.2 0 0 13.7627907 0 0 0 1.162790698 0 0 0 1.162790698 29.88837209 0 0
+density = 1.9000000000e+00
+momentum = 5.7000000000e+00 0.0000000000e+00 0.0000000000e+00
+total_energy = 9.6611111111e+00
+internal_energy = 1.1111111111e+00
+internal_energy_derivative = 4.5000000000e+00 -3.0000000000e+00 0.0000000000e+00 0.0000000000e+00 1.0000000000e+00
+specific_entropy = 3.2819023037e-01
+harten entropy = 1.2938989975e+00
+harten_entropy_derivative = 2.0418242801e+00 -1.2046645839e+00 0.0000000000e+00 0.0000000000e+00 4.0155486130e-01
+surrogate_pressure = 1.0000000000e+00
+surrogate_gamma = 1.9000000000e+00
+f = 5.7000000000e+00 0.0000000000e+00 0.0000000000e+00 1.8100000000e+01 0.0000000000e+00 0.0000000000e+00 0.0000000000e+00 1.0000000000e+00 0.0000000000e+00 0.0000000000e+00 0.0000000000e+00 1.0000000000e+00 3.1983333333e+01 0.0000000000e+00 0.0000000000e+00
 
 float:
 
-interpolatory covolume: 0.1000000015
+interpolatory covolume: 0.0000000000e+00
 dim = 1
-density = 1.399999976
-momentum = 4.199999809
-total_energy = 8.800000191
-internal_energy = 2.500000954
-internal_energy_derivative = 4.5 -3 1
-specific_entropy = 1.469468594
-harten entropy = 1.643532038
-harten_entropy_derivative = 1.689943433 -0.8217656016 0.2739218771
-surrogate_pressure = 1.162791133
-surrogate_gamma = 1.399999976
-f = 4.199999809 13.76279068 29.88837242
-interpolatory covolume: 0.1000000015
+density = 1.8999999762e+00
+momentum = 5.6999998093e+00
+total_energy = 9.6611108780e+00
+internal_energy = 1.1111106873e+00
+internal_energy_derivative = 4.5000000000e+00 -3.0000000000e+00 1.0000000000e+00
+specific_entropy = 3.2819014788e-01
+harten entropy = 1.2938989401e+00
+harten_entropy_derivative = 2.0418245792e+00 -1.2046647072e+00 4.0155491233e-01
+surrogate_pressure = 9.9999958277e-01
+surrogate_gamma = 1.8999999762e+00
+f = 5.6999998093e+00 1.8099998474e+01 3.1983331680e+01
+interpolatory covolume: 0.0000000000e+00
 dim = 2
-density = 1.399999976
-momentum = 4.199999809 0
-total_energy = 8.800000191
-internal_energy = 2.500000954
-internal_energy_derivative = 4.5 -3 -0 1
-specific_entropy = 1.469468594
-harten entropy = 1.643532038
-harten_entropy_derivative = 1.689943433 -0.8217656016 -0 0.2739218771
-surrogate_pressure = 1.162791133
-surrogate_gamma = 1.399999976
-f = 4.199999809 0 13.76279068 0 0 1.162791133 29.88837242 0
-interpolatory covolume: 0.1000000015
+density = 1.8999999762e+00
+momentum = 5.6999998093e+00 0.0000000000e+00
+total_energy = 9.6611108780e+00
+internal_energy = 1.1111106873e+00
+internal_energy_derivative = 4.5000000000e+00 -3.0000000000e+00 0.0000000000e+00 1.0000000000e+00
+specific_entropy = 3.2819014788e-01
+harten entropy = 1.2938989401e+00
+harten_entropy_derivative = 2.0418245792e+00 -1.2046647072e+00 0.0000000000e+00 4.0155491233e-01
+surrogate_pressure = 9.9999958277e-01
+surrogate_gamma = 1.8999999762e+00
+f = 5.6999998093e+00 0.0000000000e+00 1.8099998474e+01 0.0000000000e+00 0.0000000000e+00 9.9999958277e-01 3.1983331680e+01 0.0000000000e+00
+interpolatory covolume: 0.0000000000e+00
 dim = 3
-density = 1.399999976
-momentum = 4.199999809 0 0
-total_energy = 8.800000191
-internal_energy = 2.500000954
-internal_energy_derivative = 4.5 -3 -0 -0 1
-specific_entropy = 1.469468594
-harten entropy = 1.643532038
-harten_entropy_derivative = 1.689943433 -0.8217656016 -0 -0 0.2739218771
-surrogate_pressure = 1.162791133
-surrogate_gamma = 1.399999976
-f = 4.199999809 0 0 13.76279068 0 0 0 1.162791133 0 0 0 1.162791133 29.88837242 0 0
+density = 1.8999999762e+00
+momentum = 5.6999998093e+00 0.0000000000e+00 0.0000000000e+00
+total_energy = 9.6611108780e+00
+internal_energy = 1.1111106873e+00
+internal_energy_derivative = 4.5000000000e+00 -3.0000000000e+00 0.0000000000e+00 0.0000000000e+00 1.0000000000e+00
+specific_entropy = 3.2819014788e-01
+harten entropy = 1.2938989401e+00
+harten_entropy_derivative = 2.0418245792e+00 -1.2046647072e+00 0.0000000000e+00 0.0000000000e+00 4.0155491233e-01
+surrogate_pressure = 9.9999958277e-01
+surrogate_gamma = 1.8999999762e+00
+f = 5.6999998093e+00 0.0000000000e+00 0.0000000000e+00 1.8099998474e+01 0.0000000000e+00 0.0000000000e+00 0.0000000000e+00 9.9999958277e-01 0.0000000000e+00 0.0000000000e+00 0.0000000000e+00 9.9999958277e-01 3.1983331680e+01 0.0000000000e+00 0.0000000000e+00
 
 double:
 
-interpolatory covolume: 0.5
+interpolatory covolume: 1.0000000000e-01
 dim = 1
-density = 1.4
-momentum = 4.2
-total_energy = 8.8
-internal_energy = 2.5
-internal_energy_derivative = 4.5 -3 1
-specific_entropy = 0.9642935473
-harten entropy = 1.378950133
-harten_entropy_derivative = 1.061572721 -0.6894750663 0.2298250221
-surrogate_pressure = 3.333333333
-surrogate_gamma = 1.4
-f = 4.2 15.93333333 36.4
-interpolatory covolume: 0.5
+density = 1.4000000000e+00
+momentum = 4.2000000000e+00
+total_energy = 8.8000000000e+00
+internal_energy = 2.5000000000e+00
+internal_energy_derivative = 4.5000000000e+00 -3.0000000000e+00 1.0000000000e+00
+specific_entropy = 1.4694680208e+00
+harten entropy = 1.6435317327e+00
+harten_entropy_derivative = 1.6899437583e+00 -8.2176586633e-01 2.7392195544e-01
+surrogate_pressure = 1.1627906977e+00
+surrogate_gamma = 1.4000000000e+00
+f = 4.2000000000e+00 1.3762790698e+01 2.9888372093e+01
+interpolatory covolume: 1.0000000000e-01
 dim = 2
-density = 1.4
-momentum = 4.2 0
-total_energy = 8.8
-internal_energy = 2.5
-internal_energy_derivative = 4.5 -3 -0 1
-specific_entropy = 0.9642935473
-harten entropy = 1.378950133
-harten_entropy_derivative = 1.061572721 -0.6894750663 -0 0.2298250221
-surrogate_pressure = 3.333333333
-surrogate_gamma = 1.4
-f = 4.2 0 15.93333333 0 0 3.333333333 36.4 0
-interpolatory covolume: 0.5
+density = 1.4000000000e+00
+momentum = 4.2000000000e+00 0.0000000000e+00
+total_energy = 8.8000000000e+00
+internal_energy = 2.5000000000e+00
+internal_energy_derivative = 4.5000000000e+00 -3.0000000000e+00 0.0000000000e+00 1.0000000000e+00
+specific_entropy = 1.4694680208e+00
+harten entropy = 1.6435317327e+00
+harten_entropy_derivative = 1.6899437583e+00 -8.2176586633e-01 0.0000000000e+00 2.7392195544e-01
+surrogate_pressure = 1.1627906977e+00
+surrogate_gamma = 1.4000000000e+00
+f = 4.2000000000e+00 0.0000000000e+00 1.3762790698e+01 0.0000000000e+00 0.0000000000e+00 1.1627906977e+00 2.9888372093e+01 0.0000000000e+00
+interpolatory covolume: 1.0000000000e-01
 dim = 3
-density = 1.4
-momentum = 4.2 0 0
-total_energy = 8.8
-internal_energy = 2.5
-internal_energy_derivative = 4.5 -3 -0 -0 1
-specific_entropy = 0.9642935473
-harten entropy = 1.378950133
-harten_entropy_derivative = 1.061572721 -0.6894750663 -0 -0 0.2298250221
-surrogate_pressure = 3.333333333
-surrogate_gamma = 1.4
-f = 4.2 0 0 15.93333333 0 0 0 3.333333333 0 0 0 3.333333333 36.4 0 0
+density = 1.4000000000e+00
+momentum = 4.2000000000e+00 0.0000000000e+00 0.0000000000e+00
+total_energy = 8.8000000000e+00
+internal_energy = 2.5000000000e+00
+internal_energy_derivative = 4.5000000000e+00 -3.0000000000e+00 0.0000000000e+00 0.0000000000e+00 1.0000000000e+00
+specific_entropy = 1.4694680208e+00
+harten entropy = 1.6435317327e+00
+harten_entropy_derivative = 1.6899437583e+00 -8.2176586633e-01 0.0000000000e+00 0.0000000000e+00 2.7392195544e-01
+surrogate_pressure = 1.1627906977e+00
+surrogate_gamma = 1.4000000000e+00
+f = 4.2000000000e+00 0.0000000000e+00 0.0000000000e+00 1.3762790698e+01 0.0000000000e+00 0.0000000000e+00 0.0000000000e+00 1.1627906977e+00 0.0000000000e+00 0.0000000000e+00 0.0000000000e+00 1.1627906977e+00 2.9888372093e+01 0.0000000000e+00 0.0000000000e+00
 
 float:
 
-interpolatory covolume: 0.5
+interpolatory covolume: 1.0000000149e-01
 dim = 1
-density = 1.399999976
-momentum = 4.199999809
-total_energy = 8.800000191
-internal_energy = 2.500000954
-internal_energy_derivative = 4.5 -3 1
-specific_entropy = 0.9642940164
-harten entropy = 1.378950357
-harten_entropy_derivative = 1.061572433 -0.6894748807 0.2298249751
-surrogate_pressure = 3.333334446
-surrogate_gamma = 1.399999976
-f = 4.199999809 15.93333435 36.40000534
-interpolatory covolume: 0.5
+density = 1.3999999762e+00
+momentum = 4.1999998093e+00
+total_energy = 8.8000001907e+00
+internal_energy = 2.5000009537e+00
+internal_energy_derivative = 4.5000000000e+00 -3.0000000000e+00 1.0000000000e+00
+specific_entropy = 1.4694684744e+00
+harten entropy = 1.6435319185e+00
+harten_entropy_derivative = 1.6899434328e+00 -8.2176560163e-01 2.7392187715e-01
+surrogate_pressure = 1.1627911329e+00
+surrogate_gamma = 1.3999999762e+00
+f = 4.1999998093e+00 1.3762790680e+01 2.9888372421e+01
+interpolatory covolume: 1.0000000149e-01
 dim = 2
-density = 1.399999976
-momentum = 4.199999809 0
-total_energy = 8.800000191
-internal_energy = 2.500000954
-internal_energy_derivative = 4.5 -3 -0 1
-specific_entropy = 0.9642940164
-harten entropy = 1.378950357
-harten_entropy_derivative = 1.061572433 -0.6894748807 -0 0.2298249751
-surrogate_pressure = 3.333334446
-surrogate_gamma = 1.399999976
-f = 4.199999809 0 15.93333435 0 0 3.333334446 36.40000534 0
-interpolatory covolume: 0.5
+density = 1.3999999762e+00
+momentum = 4.1999998093e+00 0.0000000000e+00
+total_energy = 8.8000001907e+00
+internal_energy = 2.5000009537e+00
+internal_energy_derivative = 4.5000000000e+00 -3.0000000000e+00 0.0000000000e+00 1.0000000000e+00
+specific_entropy = 1.4694684744e+00
+harten entropy = 1.6435319185e+00
+harten_entropy_derivative = 1.6899434328e+00 -8.2176560163e-01 0.0000000000e+00 2.7392187715e-01
+surrogate_pressure = 1.1627911329e+00
+surrogate_gamma = 1.3999999762e+00
+f = 4.1999998093e+00 0.0000000000e+00 1.3762790680e+01 0.0000000000e+00 0.0000000000e+00 1.1627911329e+00 2.9888372421e+01 0.0000000000e+00
+interpolatory covolume: 1.0000000149e-01
 dim = 3
-density = 1.399999976
-momentum = 4.199999809 0 0
-total_energy = 8.800000191
-internal_energy = 2.500000954
-internal_energy_derivative = 4.5 -3 -0 -0 1
-specific_entropy = 0.9642940164
-harten entropy = 1.378950357
-harten_entropy_derivative = 1.061572433 -0.6894748807 -0 -0 0.2298249751
-surrogate_pressure = 3.333334446
-surrogate_gamma = 1.399999976
-f = 4.199999809 0 0 15.93333435 0 0 0 3.333334446 0 0 0 3.333334446 36.40000534 0 0
+density = 1.3999999762e+00
+momentum = 4.1999998093e+00 0.0000000000e+00 0.0000000000e+00
+total_energy = 8.8000001907e+00
+internal_energy = 2.5000009537e+00
+internal_energy_derivative = 4.5000000000e+00 -3.0000000000e+00 0.0000000000e+00 0.0000000000e+00 1.0000000000e+00
+specific_entropy = 1.4694684744e+00
+harten entropy = 1.6435319185e+00
+harten_entropy_derivative = 1.6899434328e+00 -8.2176560163e-01 0.0000000000e+00 0.0000000000e+00 2.7392187715e-01
+surrogate_pressure = 1.1627911329e+00
+surrogate_gamma = 1.3999999762e+00
+f = 4.1999998093e+00 0.0000000000e+00 0.0000000000e+00 1.3762790680e+01 0.0000000000e+00 0.0000000000e+00 0.0000000000e+00 1.1627911329e+00 0.0000000000e+00 0.0000000000e+00 0.0000000000e+00 1.1627911329e+00 2.9888372421e+01 0.0000000000e+00 0.0000000000e+00
 
 double:
 
-interpolatory covolume: 0.9
+interpolatory covolume: 1.0000000000e-01
 dim = 1
-density = 1.4
-momentum = 4.2
-total_energy = 8.8
-internal_energy = 2.5
-internal_energy_derivative = 4.5 -3 1
-specific_entropy = nan
-harten entropy = nan
-harten_entropy_derivative = nan -nan nan
-surrogate_pressure = -3.846153846
-surrogate_gamma = 1.4
-f = 4.2 8.753846154 14.86153846
-interpolatory covolume: 0.9
+density = 1.9000000000e+00
+momentum = 5.7000000000e+00
+total_energy = 9.6611111111e+00
+internal_energy = 1.1111111111e+00
+internal_energy_derivative = 4.5000000000e+00 -3.0000000000e+00 1.0000000000e+00
+specific_entropy = 2.7149520626e-01
+harten entropy = 1.2119903874e+00
+harten_entropy_derivative = 1.8661328096e+00 -1.1284048434e+00 3.7613494781e-01
+surrogate_pressure = 1.2345679012e+00
+surrogate_gamma = 1.9000000000e+00
+f = 5.7000000000e+00 1.8334567901e+01 3.2687037037e+01
+interpolatory covolume: 1.0000000000e-01
 dim = 2
-density = 1.4
-momentum = 4.2 0
-total_energy = 8.8
-internal_energy = 2.5
-internal_energy_derivative = 4.5 -3 -0 1
-specific_entropy = nan
-harten entropy = nan
-harten_entropy_derivative = nan -nan -nan nan
-surrogate_pressure = -3.846153846
-surrogate_gamma = 1.4
-f = 4.2 0 8.753846154 0 0 -3.846153846 14.86153846 0
-interpolatory covolume: 0.9
+density = 1.9000000000e+00
+momentum = 5.7000000000e+00 0.0000000000e+00
+total_energy = 9.6611111111e+00
+internal_energy = 1.1111111111e+00
+internal_energy_derivative = 4.5000000000e+00 -3.0000000000e+00 0.0000000000e+00 1.0000000000e+00
+specific_entropy = 2.7149520626e-01
+harten entropy = 1.2119903874e+00
+harten_entropy_derivative = 1.8661328096e+00 -1.1284048434e+00 0.0000000000e+00 3.7613494781e-01
+surrogate_pressure = 1.2345679012e+00
+surrogate_gamma = 1.9000000000e+00
+f = 5.7000000000e+00 0.0000000000e+00 1.8334567901e+01 0.0000000000e+00 0.0000000000e+00 1.2345679012e+00 3.2687037037e+01 0.0000000000e+00
+interpolatory covolume: 1.0000000000e-01
 dim = 3
-density = 1.4
-momentum = 4.2 0 0
-total_energy = 8.8
-internal_energy = 2.5
-internal_energy_derivative = 4.5 -3 -0 -0 1
-specific_entropy = nan
-harten entropy = nan
-harten_entropy_derivative = nan -nan -nan -nan nan
-surrogate_pressure = -3.846153846
-surrogate_gamma = 1.4
-f = 4.2 0 0 8.753846154 0 0 0 -3.846153846 0 0 0 -3.846153846 14.86153846 0 0
+density = 1.9000000000e+00
+momentum = 5.7000000000e+00 0.0000000000e+00 0.0000000000e+00
+total_energy = 9.6611111111e+00
+internal_energy = 1.1111111111e+00
+internal_energy_derivative = 4.5000000000e+00 -3.0000000000e+00 0.0000000000e+00 0.0000000000e+00 1.0000000000e+00
+specific_entropy = 2.7149520626e-01
+harten entropy = 1.2119903874e+00
+harten_entropy_derivative = 1.8661328096e+00 -1.1284048434e+00 0.0000000000e+00 0.0000000000e+00 3.7613494781e-01
+surrogate_pressure = 1.2345679012e+00
+surrogate_gamma = 1.9000000000e+00
+f = 5.7000000000e+00 0.0000000000e+00 0.0000000000e+00 1.8334567901e+01 0.0000000000e+00 0.0000000000e+00 0.0000000000e+00 1.2345679012e+00 0.0000000000e+00 0.0000000000e+00 0.0000000000e+00 1.2345679012e+00 3.2687037037e+01 0.0000000000e+00 0.0000000000e+00
 
 float:
 
-interpolatory covolume: 0.8999999762
+interpolatory covolume: 1.0000000149e-01
 dim = 1
-density = 1.399999976
-momentum = 4.199999809
-total_energy = 8.800000191
-internal_energy = 2.500000954
-internal_energy_derivative = 4.5 -3 1
-specific_entropy = nan
-harten entropy = nan
-harten_entropy_derivative = nan -nan nan
-surrogate_pressure = -3.846156359
-surrogate_gamma = 1.399999976
-f = 4.199999809 8.753843307 14.86153126
-interpolatory covolume: 0.8999999762
+density = 1.8999999762e+00
+momentum = 5.6999998093e+00
+total_energy = 9.6611108780e+00
+internal_energy = 1.1111106873e+00
+internal_energy_derivative = 4.5000000000e+00 -3.0000000000e+00 1.0000000000e+00
+specific_entropy = 2.7149513364e-01
+harten entropy = 1.2119903564e+00
+harten_entropy_derivative = 1.8661328554e+00 -1.1284048557e+00 3.7613496184e-01
+surrogate_pressure = 1.2345674038e+00
+surrogate_gamma = 1.8999999762e+00
+f = 5.6999998093e+00 1.8334566116e+01 3.2687034607e+01
+interpolatory covolume: 1.0000000149e-01
 dim = 2
-density = 1.399999976
-momentum = 4.199999809 0
-total_energy = 8.800000191
-internal_energy = 2.500000954
-internal_energy_derivative = 4.5 -3 -0 1
-specific_entropy = nan
-harten entropy = nan
-harten_entropy_derivative = nan -nan -nan nan
-surrogate_pressure = -3.846156359
-surrogate_gamma = 1.399999976
-f = 4.199999809 0 8.753843307 0 0 -3.846156359 14.86153126 0
-interpolatory covolume: 0.8999999762
+density = 1.8999999762e+00
+momentum = 5.6999998093e+00 0.0000000000e+00
+total_energy = 9.6611108780e+00
+internal_energy = 1.1111106873e+00
+internal_energy_derivative = 4.5000000000e+00 -3.0000000000e+00 0.0000000000e+00 1.0000000000e+00
+specific_entropy = 2.7149513364e-01
+harten entropy = 1.2119903564e+00
+harten_entropy_derivative = 1.8661328554e+00 -1.1284048557e+00 0.0000000000e+00 3.7613496184e-01
+surrogate_pressure = 1.2345674038e+00
+surrogate_gamma = 1.8999999762e+00
+f = 5.6999998093e+00 0.0000000000e+00 1.8334566116e+01 0.0000000000e+00 0.0000000000e+00 1.2345674038e+00 3.2687034607e+01 0.0000000000e+00
+interpolatory covolume: 1.0000000149e-01
 dim = 3
-density = 1.399999976
-momentum = 4.199999809 0 0
-total_energy = 8.800000191
-internal_energy = 2.500000954
-internal_energy_derivative = 4.5 -3 -0 -0 1
-specific_entropy = nan
-harten entropy = nan
-harten_entropy_derivative = nan -nan -nan -nan nan
-surrogate_pressure = -3.846156359
-surrogate_gamma = 1.399999976
-f = 4.199999809 0 0 8.753843307 0 0 0 -3.846156359 0 0 0 -3.846156359 14.86153126 0 0
+density = 1.8999999762e+00
+momentum = 5.6999998093e+00 0.0000000000e+00 0.0000000000e+00
+total_energy = 9.6611108780e+00
+internal_energy = 1.1111106873e+00
+internal_energy_derivative = 4.5000000000e+00 -3.0000000000e+00 0.0000000000e+00 0.0000000000e+00 1.0000000000e+00
+specific_entropy = 2.7149513364e-01
+harten entropy = 1.2119903564e+00
+harten_entropy_derivative = 1.8661328554e+00 -1.1284048557e+00 0.0000000000e+00 0.0000000000e+00 3.7613496184e-01
+surrogate_pressure = 1.2345674038e+00
+surrogate_gamma = 1.8999999762e+00
+f = 5.6999998093e+00 0.0000000000e+00 0.0000000000e+00 1.8334566116e+01 0.0000000000e+00 0.0000000000e+00 0.0000000000e+00 1.2345674038e+00 0.0000000000e+00 0.0000000000e+00 0.0000000000e+00 1.2345674038e+00 3.2687034607e+01 0.0000000000e+00 0.0000000000e+00
+
+double:
+
+interpolatory covolume: 5.0000000000e-01
+dim = 1
+density = 1.4000000000e+00
+momentum = 4.2000000000e+00
+total_energy = 8.8000000000e+00
+internal_energy = 2.5000000000e+00
+internal_energy_derivative = 4.5000000000e+00 -3.0000000000e+00 1.0000000000e+00
+specific_entropy = 9.6429354725e-01
+harten entropy = 1.3789501326e+00
+harten_entropy_derivative = 1.0615727211e+00 -6.8947506630e-01 2.2982502210e-01
+surrogate_pressure = 3.3333333333e+00
+surrogate_gamma = 1.4000000000e+00
+f = 4.2000000000e+00 1.5933333333e+01 3.6400000000e+01
+interpolatory covolume: 5.0000000000e-01
+dim = 2
+density = 1.4000000000e+00
+momentum = 4.2000000000e+00 0.0000000000e+00
+total_energy = 8.8000000000e+00
+internal_energy = 2.5000000000e+00
+internal_energy_derivative = 4.5000000000e+00 -3.0000000000e+00 0.0000000000e+00 1.0000000000e+00
+specific_entropy = 9.6429354725e-01
+harten entropy = 1.3789501326e+00
+harten_entropy_derivative = 1.0615727211e+00 -6.8947506630e-01 0.0000000000e+00 2.2982502210e-01
+surrogate_pressure = 3.3333333333e+00
+surrogate_gamma = 1.4000000000e+00
+f = 4.2000000000e+00 0.0000000000e+00 1.5933333333e+01 0.0000000000e+00 0.0000000000e+00 3.3333333333e+00 3.6400000000e+01 0.0000000000e+00
+interpolatory covolume: 5.0000000000e-01
+dim = 3
+density = 1.4000000000e+00
+momentum = 4.2000000000e+00 0.0000000000e+00 0.0000000000e+00
+total_energy = 8.8000000000e+00
+internal_energy = 2.5000000000e+00
+internal_energy_derivative = 4.5000000000e+00 -3.0000000000e+00 0.0000000000e+00 0.0000000000e+00 1.0000000000e+00
+specific_entropy = 9.6429354725e-01
+harten entropy = 1.3789501326e+00
+harten_entropy_derivative = 1.0615727211e+00 -6.8947506630e-01 0.0000000000e+00 0.0000000000e+00 2.2982502210e-01
+surrogate_pressure = 3.3333333333e+00
+surrogate_gamma = 1.4000000000e+00
+f = 4.2000000000e+00 0.0000000000e+00 0.0000000000e+00 1.5933333333e+01 0.0000000000e+00 0.0000000000e+00 0.0000000000e+00 3.3333333333e+00 0.0000000000e+00 0.0000000000e+00 0.0000000000e+00 3.3333333333e+00 3.6400000000e+01 0.0000000000e+00 0.0000000000e+00
+
+float:
+
+interpolatory covolume: 5.0000000000e-01
+dim = 1
+density = 1.3999999762e+00
+momentum = 4.1999998093e+00
+total_energy = 8.8000001907e+00
+internal_energy = 2.5000009537e+00
+internal_energy_derivative = 4.5000000000e+00 -3.0000000000e+00 1.0000000000e+00
+specific_entropy = 9.6429401636e-01
+harten entropy = 1.3789503574e+00
+harten_entropy_derivative = 1.0615724325e+00 -6.8947488070e-01 2.2982497513e-01
+surrogate_pressure = 3.3333344460e+00
+surrogate_gamma = 1.3999999762e+00
+f = 4.1999998093e+00 1.5933334351e+01 3.6400005341e+01
+interpolatory covolume: 5.0000000000e-01
+dim = 2
+density = 1.3999999762e+00
+momentum = 4.1999998093e+00 0.0000000000e+00
+total_energy = 8.8000001907e+00
+internal_energy = 2.5000009537e+00
+internal_energy_derivative = 4.5000000000e+00 -3.0000000000e+00 0.0000000000e+00 1.0000000000e+00
+specific_entropy = 9.6429401636e-01
+harten entropy = 1.3789503574e+00
+harten_entropy_derivative = 1.0615724325e+00 -6.8947488070e-01 0.0000000000e+00 2.2982497513e-01
+surrogate_pressure = 3.3333344460e+00
+surrogate_gamma = 1.3999999762e+00
+f = 4.1999998093e+00 0.0000000000e+00 1.5933334351e+01 0.0000000000e+00 0.0000000000e+00 3.3333344460e+00 3.6400005341e+01 0.0000000000e+00
+interpolatory covolume: 5.0000000000e-01
+dim = 3
+density = 1.3999999762e+00
+momentum = 4.1999998093e+00 0.0000000000e+00 0.0000000000e+00
+total_energy = 8.8000001907e+00
+internal_energy = 2.5000009537e+00
+internal_energy_derivative = 4.5000000000e+00 -3.0000000000e+00 0.0000000000e+00 0.0000000000e+00 1.0000000000e+00
+specific_entropy = 9.6429401636e-01
+harten entropy = 1.3789503574e+00
+harten_entropy_derivative = 1.0615724325e+00 -6.8947488070e-01 0.0000000000e+00 0.0000000000e+00 2.2982497513e-01
+surrogate_pressure = 3.3333344460e+00
+surrogate_gamma = 1.3999999762e+00
+f = 4.1999998093e+00 0.0000000000e+00 0.0000000000e+00 1.5933334351e+01 0.0000000000e+00 0.0000000000e+00 0.0000000000e+00 3.3333344460e+00 0.0000000000e+00 0.0000000000e+00 0.0000000000e+00 3.3333344460e+00 3.6400005341e+01 0.0000000000e+00 0.0000000000e+00
+
+double:
+
+interpolatory covolume: 5.0000000000e-01
+dim = 1
+density = 1.9000000000e+00
+momentum = 5.7000000000e+00
+total_energy = 9.6611111111e+00
+internal_energy = 1.1111111111e+00
+internal_energy_derivative = 4.5000000000e+00 -3.0000000000e+00 1.0000000000e+00
+specific_entropy = 2.2141072431e-02
+harten entropy = 5.1066071232e-01
+harten_entropy_derivative = -7.7896611380e-01 -4.7544273216e-01 1.5848091072e-01
+surrogate_pressure = 2.0000000000e+01
+surrogate_gamma = 1.9000000000e+00
+f = 5.7000000000e+00 3.7100000000e+01 8.8983333333e+01
+interpolatory covolume: 5.0000000000e-01
+dim = 2
+density = 1.9000000000e+00
+momentum = 5.7000000000e+00 0.0000000000e+00
+total_energy = 9.6611111111e+00
+internal_energy = 1.1111111111e+00
+internal_energy_derivative = 4.5000000000e+00 -3.0000000000e+00 0.0000000000e+00 1.0000000000e+00
+specific_entropy = 2.2141072431e-02
+harten entropy = 5.1066071232e-01
+harten_entropy_derivative = -7.7896611380e-01 -4.7544273216e-01 0.0000000000e+00 1.5848091072e-01
+surrogate_pressure = 2.0000000000e+01
+surrogate_gamma = 1.9000000000e+00
+f = 5.7000000000e+00 0.0000000000e+00 3.7100000000e+01 0.0000000000e+00 0.0000000000e+00 2.0000000000e+01 8.8983333333e+01 0.0000000000e+00
+interpolatory covolume: 5.0000000000e-01
+dim = 3
+density = 1.9000000000e+00
+momentum = 5.7000000000e+00 0.0000000000e+00 0.0000000000e+00
+total_energy = 9.6611111111e+00
+internal_energy = 1.1111111111e+00
+internal_energy_derivative = 4.5000000000e+00 -3.0000000000e+00 0.0000000000e+00 0.0000000000e+00 1.0000000000e+00
+specific_entropy = 2.2141072431e-02
+harten entropy = 5.1066071232e-01
+harten_entropy_derivative = -7.7896611380e-01 -4.7544273216e-01 0.0000000000e+00 0.0000000000e+00 1.5848091072e-01
+surrogate_pressure = 2.0000000000e+01
+surrogate_gamma = 1.9000000000e+00
+f = 5.7000000000e+00 0.0000000000e+00 0.0000000000e+00 3.7100000000e+01 0.0000000000e+00 0.0000000000e+00 0.0000000000e+00 2.0000000000e+01 0.0000000000e+00 0.0000000000e+00 0.0000000000e+00 2.0000000000e+01 8.8983333333e+01 0.0000000000e+00 0.0000000000e+00
+
+float:
+
+interpolatory covolume: 5.0000000000e-01
+dim = 1
+density = 1.8999999762e+00
+momentum = 5.6999998093e+00
+total_energy = 9.6611108780e+00
+internal_energy = 1.1111106873e+00
+internal_energy_derivative = 4.5000000000e+00 -3.0000000000e+00 1.0000000000e+00
+specific_entropy = 2.2141091526e-02
+harten entropy = 5.1066076756e-01
+harten_entropy_derivative = -7.7896547318e-01 -4.7544273734e-01 1.5848091245e-01
+surrogate_pressure = 1.9999986649e+01
+surrogate_gamma = 1.8999999762e+00
+f = 5.6999998093e+00 3.7099983215e+01 8.8983291626e+01
+interpolatory covolume: 5.0000000000e-01
+dim = 2
+density = 1.8999999762e+00
+momentum = 5.6999998093e+00 0.0000000000e+00
+total_energy = 9.6611108780e+00
+internal_energy = 1.1111106873e+00
+internal_energy_derivative = 4.5000000000e+00 -3.0000000000e+00 0.0000000000e+00 1.0000000000e+00
+specific_entropy = 2.2141091526e-02
+harten entropy = 5.1066076756e-01
+harten_entropy_derivative = -7.7896547318e-01 -4.7544273734e-01 0.0000000000e+00 1.5848091245e-01
+surrogate_pressure = 1.9999986649e+01
+surrogate_gamma = 1.8999999762e+00
+f = 5.6999998093e+00 0.0000000000e+00 3.7099983215e+01 0.0000000000e+00 0.0000000000e+00 1.9999986649e+01 8.8983291626e+01 0.0000000000e+00
+interpolatory covolume: 5.0000000000e-01
+dim = 3
+density = 1.8999999762e+00
+momentum = 5.6999998093e+00 0.0000000000e+00 0.0000000000e+00
+total_energy = 9.6611108780e+00
+internal_energy = 1.1111106873e+00
+internal_energy_derivative = 4.5000000000e+00 -3.0000000000e+00 0.0000000000e+00 0.0000000000e+00 1.0000000000e+00
+specific_entropy = 2.2141091526e-02
+harten entropy = 5.1066076756e-01
+harten_entropy_derivative = -7.7896547318e-01 -4.7544273734e-01 0.0000000000e+00 0.0000000000e+00 1.5848091245e-01
+surrogate_pressure = 1.9999986649e+01
+surrogate_gamma = 1.8999999762e+00
+f = 5.6999998093e+00 0.0000000000e+00 0.0000000000e+00 3.7099983215e+01 0.0000000000e+00 0.0000000000e+00 0.0000000000e+00 1.9999986649e+01 0.0000000000e+00 0.0000000000e+00 0.0000000000e+00 1.9999986649e+01 8.8983291626e+01 0.0000000000e+00 0.0000000000e+00
