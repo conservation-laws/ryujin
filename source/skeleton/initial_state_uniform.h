@@ -28,7 +28,7 @@ namespace ryujin
       using primitive_state_type =
           typename HyperbolicSystemView::primitive_state_type;
 
-      Uniform(const HyperbolicSystemView &hyperbolic_system,
+      Uniform(const HyperbolicSystem &hyperbolic_system,
               const std::string subsection)
           : InitialState<Description, dim, Number>("uniform", subsection)
           , hyperbolic_system(hyperbolic_system)

@@ -27,7 +27,7 @@ namespace ryujin
           typename HyperbolicSystem::template View<dim, Number>;
       using state_type = typename HyperbolicSystemView::state_type;
 
-      LeBlanc(const HyperbolicSystemView &hyperbolic_system,
+      LeBlanc(const HyperbolicSystem &hyperbolic_system,
               const std::string subsection)
           : InitialState<Description, dim, Number>("leblanc", subsection)
           , hyperbolic_system_(hyperbolic_system)

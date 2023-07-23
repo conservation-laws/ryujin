@@ -32,7 +32,7 @@ namespace ryujin
           typename HyperbolicSystem::template View<dim, Number>;
       using state_type = typename HyperbolicSystemView::state_type;
 
-      ShockFront(const HyperbolicSystemView &hyperbolic_system,
+      ShockFront(const HyperbolicSystem &hyperbolic_system,
                  const std::string subsection)
           : InitialState<Description, dim, Number>("shockfront", subsection)
           , hyperbolic_system_(hyperbolic_system)

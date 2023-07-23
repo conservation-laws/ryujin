@@ -28,7 +28,7 @@ namespace ryujin
           typename HyperbolicSystem::template View<dim, Number>;
       using state_type = typename HyperbolicSystemView::state_type;
 
-      RampUp(const HyperbolicSystemView &hyperbolic_system,
+      RampUp(const HyperbolicSystem &hyperbolic_system,
              const std::string subsection)
           : InitialState<Description, dim, Number>("ramp up", subsection)
           , hyperbolic_system_(hyperbolic_system)

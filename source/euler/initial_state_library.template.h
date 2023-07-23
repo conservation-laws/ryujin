@@ -28,7 +28,7 @@ namespace ryujin
 
     static void
     populate_initial_state_list(initial_state_list_type &initial_state_list,
-                                const HyperbolicSystemView &h,
+                                const HyperbolicSystem &h,
                                 const std::string &s)
     {
       EulerInitialStates::populate_initial_state_list<Description, dim, Number>(

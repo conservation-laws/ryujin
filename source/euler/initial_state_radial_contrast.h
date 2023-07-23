@@ -32,7 +32,7 @@ namespace ryujin
           typename HyperbolicSystem::template View<dim, Number>;
       using state_type = typename HyperbolicSystemView::state_type;
 
-      RadialContrast(const HyperbolicSystemView &hyperbolic_system,
+      RadialContrast(const HyperbolicSystem &hyperbolic_system,
                      const std::string &subsection)
           : InitialState<Description, dim, Number>("radial contrast",
                                                    subsection)

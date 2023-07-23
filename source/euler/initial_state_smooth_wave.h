@@ -29,7 +29,7 @@ namespace ryujin
           typename HyperbolicSystem::template View<dim, Number>;
       using state_type = typename HyperbolicSystemView::state_type;
 
-      SmoothWave(const HyperbolicSystemView &hyperbolic_system,
+      SmoothWave(const HyperbolicSystem &hyperbolic_system,
                  const std::string subsection)
           : InitialState<Description, dim, Number>("smooth wave", subsection)
           , hyperbolic_system_(hyperbolic_system)
@@ -82,7 +82,7 @@ namespace ryujin
       }
 
     private:
-      const HyperbolicSystemView &hyperbolic_system_;
+      const HyperbolicSystemView hyperbolic_system_;
 
       Number density_ref_;
       Number pressure_ref_;

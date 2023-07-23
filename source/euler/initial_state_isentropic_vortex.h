@@ -32,7 +32,7 @@ namespace ryujin
           typename HyperbolicSystem::template View<dim, Number>;
       using state_type = typename HyperbolicSystemView::state_type;
 
-      IsentropicVortex(const HyperbolicSystemView &hyperbolic_system,
+      IsentropicVortex(const HyperbolicSystem &hyperbolic_system,
                        const std::string subsection)
           : InitialState<Description, dim, Number>("isentropic vortex",
                                                    subsection)

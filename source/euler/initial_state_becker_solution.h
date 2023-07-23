@@ -50,7 +50,7 @@ namespace ryujin
           typename HyperbolicSystem::template View<dim, Number>;
       using state_type = typename HyperbolicSystemView::state_type;
 
-      BeckerSolution(const HyperbolicSystemView &hyperbolic_system,
+      BeckerSolution(const HyperbolicSystem &hyperbolic_system,
                      const std::string &subsection)
           : InitialState<Description, dim, Number>("becker solution",
                                                    subsection)

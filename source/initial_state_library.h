@@ -107,12 +107,6 @@ namespace ryujin
     using HyperbolicSystem = typename Description::HyperbolicSystem;
 
     /**
-     * @copydoc HyperbolicSystem::View
-     */
-    using HyperbolicSystemView =
-        typename HyperbolicSystem::template View<dim, Number>;
-
-    /**
      * The type of the initial state list
      */
     using initial_state_list_type =
@@ -126,7 +120,7 @@ namespace ryujin
      */
     static void
     populate_initial_state_list(initial_state_list_type &initial_state_list,
-                                const HyperbolicSystemView &h,
+                                const HyperbolicSystem &h,
                                 const std::string &s);
   };
 } // namespace ryujin

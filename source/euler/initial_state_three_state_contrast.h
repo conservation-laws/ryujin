@@ -34,7 +34,7 @@ namespace ryujin
           typename HyperbolicSystem::template View<dim, Number>;
       using state_type = typename HyperbolicSystemView::state_type;
 
-      ThreeStateContrast(const HyperbolicSystemView &hyperbolic_system,
+      ThreeStateContrast(const HyperbolicSystem &hyperbolic_system,
                          const std::string &subsection)
           : InitialState<Description, dim, Number>("three state contrast",
                                                    subsection)
@@ -94,7 +94,7 @@ namespace ryujin
       }
 
     private:
-      const HyperbolicSystemView &hyperbolic_system_;
+      const HyperbolicSystemView hyperbolic_system_;
 
       Number left_length_;
       Number middle_length_;
