@@ -31,7 +31,7 @@ namespace ryujin
       RampUp(const HyperbolicSystemView &hyperbolic_system,
              const std::string subsection)
           : InitialState<Description, dim, Number>("ramp up", subsection)
-          , hyperbolic_system(hyperbolic_system)
+          , hyperbolic_system_(hyperbolic_system)
       {
         primitive_initial_[0] = 1.4;
         primitive_initial_[1] = 0.0;
@@ -59,8 +59,9 @@ namespace ryujin
 
         const auto convert_states = [&]() {
           state_initial_ =
-              hyperbolic_system.from_initial_state(primitive_initial_);
-          state_final_ = hyperbolic_system.from_initial_state(primitive_final_);
+              hyperbolic_system_.from_initial_state(primitive_initial_);
+          state_final_ =
+              hyperbolic_system_.from_initial_state(primitive_final_);
         };
         this->parse_parameters_call_back.connect(convert_states);
         convert_states();
@@ -88,7 +89,7 @@ namespace ryujin
       }
 
     private:
-      const HyperbolicSystemView hyperbolic_system;
+      const HyperbolicSystemView hyperbolic_system_;
 
       dealii::Tensor<1, 3, Number> primitive_initial_;
       dealii::Tensor<1, 3, Number> primitive_final_;
@@ -98,5 +99,5 @@ namespace ryujin
       state_type state_initial_;
       state_type state_final_;
     };
-  } // namespace Euler
+  } // namespace EulerInitialStates
 } // namespace ryujin

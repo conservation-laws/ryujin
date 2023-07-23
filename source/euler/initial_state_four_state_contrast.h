@@ -38,7 +38,7 @@ namespace ryujin
                         const std::string &subsection)
           : InitialState<Description, dim, Number>("four state contrast",
                                                    subsection)
-          , hyperbolic_system(hyperbolic_system)
+          , hyperbolic_system_(hyperbolic_system)
       {
         primitive_bottom_left_[0] = 1.4;
         primitive_bottom_left_[1] = 0.;
@@ -79,13 +79,13 @@ namespace ryujin
 
         const auto convert_states = [&]() {
           state_bottom_left_ =
-              hyperbolic_system.from_initial_state(primitive_bottom_left_);
+              hyperbolic_system_.from_initial_state(primitive_bottom_left_);
           state_bottom_right_ =
-              hyperbolic_system.from_initial_state(primitive_bottom_right_);
+              hyperbolic_system_.from_initial_state(primitive_bottom_right_);
           state_top_left_ =
-              hyperbolic_system.from_initial_state(primitive_top_left_);
+              hyperbolic_system_.from_initial_state(primitive_top_left_);
           state_top_right_ =
-              hyperbolic_system.from_initial_state(primitive_top_right_);
+              hyperbolic_system_.from_initial_state(primitive_top_right_);
         };
         this->parse_parameters_call_back.connect(convert_states);
         convert_states();
@@ -99,8 +99,7 @@ namespace ryujin
 
         } else {
 
-          const auto top =
-              point[0] >= 0. ? state_top_right_ : state_top_left_;
+          const auto top = point[0] >= 0. ? state_top_right_ : state_top_left_;
           const auto bottom =
               point[0] >= 0. ? state_bottom_right_ : state_bottom_left_;
           return (point[1] >= 0. ? top : bottom);
@@ -108,7 +107,7 @@ namespace ryujin
       }
 
     private:
-      const HyperbolicSystemView hyperbolic_system;
+      const HyperbolicSystemView hyperbolic_system_;
 
       dealii::Tensor<1, 4, Number> primitive_bottom_left_;
       dealii::Tensor<1, 4, Number> primitive_bottom_right_;
@@ -120,5 +119,5 @@ namespace ryujin
       state_type state_top_left_;
       state_type state_top_right_;
     };
-  } // namespace Euler
+  } // namespace EulerInitialStates
 } // namespace ryujin

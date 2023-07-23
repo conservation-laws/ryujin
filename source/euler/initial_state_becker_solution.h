@@ -54,7 +54,7 @@ namespace ryujin
                      const std::string &subsection)
           : InitialState<Description, dim, Number>("becker solution",
                                                    subsection)
-          , hyperbolic_system(hyperbolic_system)
+          , hyperbolic_system_(hyperbolic_system)
       {
         gamma_ = 1.4;
         if constexpr (!std::is_same_v<Description, Euler::Description>) {
@@ -86,7 +86,7 @@ namespace ryujin
 
         dealii::ParameterAcceptor::parse_parameters_call_back.connect([this]() {
           if constexpr (std::is_same_v<Description, Euler::Description>) {
-            gamma_ = this->hyperbolic_system.gamma();
+            gamma_ = hyperbolic_system_.gamma();
           }
 
           AssertThrow(
@@ -207,11 +207,11 @@ namespace ryujin
              Number(rho * (velocity_ + v)),
              Number(rho * (e + 0.5 * (velocity_ + v) * (velocity_ + v)))}};
 
-        return hyperbolic_system.expand_state(state_1d);
+        return hyperbolic_system_.expand_state(state_1d);
       }
 
     private:
-      const HyperbolicSystemView hyperbolic_system;
+      const HyperbolicSystemView hyperbolic_system_;
       Number gamma_;
 
       Number velocity_;
@@ -223,5 +223,5 @@ namespace ryujin
       std::function<double(double)> find_velocity;
     };
 
-  } // namespace Euler
+  } // namespace EulerInitialStates
 } // namespace ryujin

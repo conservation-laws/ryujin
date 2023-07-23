@@ -28,7 +28,7 @@ namespace ryujin
       Uniform(const HyperbolicSystemView &hyperbolic_system,
               const std::string subsection)
           : InitialState<Description, dim, Number>("uniform", subsection)
-          , hyperbolic_system(hyperbolic_system)
+          , hyperbolic_system_(hyperbolic_system)
       {
         primitive_[0] = 1.4;
         primitive_[1] = 3.;
@@ -38,7 +38,7 @@ namespace ryujin
                             "Initial 1d primitive state (rho, u, p)");
 
         const auto convert_states = [&]() {
-          state_ = hyperbolic_system.from_initial_state(primitive_);
+          state_ = hyperbolic_system_.from_initial_state(primitive_);
         };
         this->parse_parameters_call_back.connect(convert_states);
         convert_states();
@@ -51,11 +51,11 @@ namespace ryujin
       }
 
     private:
-      const HyperbolicSystemView hyperbolic_system;
+      const HyperbolicSystemView hyperbolic_system_;
 
       dealii::Tensor<1, 3, Number> primitive_;
 
       state_type state_;
     };
-  } // namespace Euler
+  } // namespace EulerInitialStates
 } // namespace ryujin

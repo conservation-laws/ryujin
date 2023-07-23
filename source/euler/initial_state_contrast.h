@@ -33,7 +33,7 @@ namespace ryujin
       Contrast(const HyperbolicSystemView &hyperbolic_system,
                const std::string subsection)
           : InitialState<Description, dim, Number>("contrast", subsection)
-          , hyperbolic_system(hyperbolic_system)
+          , hyperbolic_system_(hyperbolic_system)
       {
         primitive_left_[0] = 1.4;
         primitive_left_[1] = 0.;
@@ -52,8 +52,9 @@ namespace ryujin
             "Initial 1d primitive state (rho, u, p) on the right");
 
         const auto convert_states = [&]() {
-          state_left_ = hyperbolic_system.from_initial_state(primitive_left_);
-          state_right_ = hyperbolic_system.from_initial_state(primitive_right_);
+          state_left_ = hyperbolic_system_.from_initial_state(primitive_left_);
+          state_right_ =
+              hyperbolic_system_.from_initial_state(primitive_right_);
         };
         this->parse_parameters_call_back.connect(convert_states);
         convert_states();
@@ -65,7 +66,7 @@ namespace ryujin
       }
 
     private:
-      const HyperbolicSystemView hyperbolic_system;
+      const HyperbolicSystemView hyperbolic_system_;
 
       dealii::Tensor<1, 3, Number> primitive_left_;
       dealii::Tensor<1, 3, Number> primitive_right_;
@@ -73,5 +74,5 @@ namespace ryujin
       state_type state_left_;
       state_type state_right_;
     };
-  } // namespace Euler
+  } // namespace EulerInitialStates
 } // namespace ryujin

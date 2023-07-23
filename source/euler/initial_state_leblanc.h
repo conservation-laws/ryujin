@@ -30,7 +30,7 @@ namespace ryujin
       LeBlanc(const HyperbolicSystemView &hyperbolic_system,
               const std::string subsection)
           : InitialState<Description, dim, Number>("leblanc", subsection)
-          , hyperbolic_system(hyperbolic_system)
+          , hyperbolic_system_(hyperbolic_system)
       {
       } /* Constructor */
 
@@ -91,12 +91,12 @@ namespace ryujin
 
         // FIXME: update primitive
 
-        return hyperbolic_system.from_primitive_state(
-            hyperbolic_system.expand_state(result));
+        return hyperbolic_system_.from_primitive_state(
+            hyperbolic_system_.expand_state(result));
       }
 
     private:
-      const HyperbolicSystemView hyperbolic_system;
+      const HyperbolicSystemView hyperbolic_system_;
     };
-  } // namespace Euler
+  } // namespace EulerInitialStates
 } // namespace ryujin

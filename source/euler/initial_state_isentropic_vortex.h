@@ -36,7 +36,7 @@ namespace ryujin
                        const std::string subsection)
           : InitialState<Description, dim, Number>("isentropic vortex",
                                                    subsection)
-          , hyperbolic_system(hyperbolic_system)
+          , hyperbolic_system_(hyperbolic_system)
       {
         gamma_ = 1.4;
         if constexpr (!std::is_same_v<Description, Euler::Description>) {
@@ -54,7 +54,7 @@ namespace ryujin
       state_type compute(const dealii::Point<dim> &point, Number t) final
       {
         if constexpr (std::is_same_v<Description, Euler::Description>) {
-          gamma_ = this->hyperbolic_system.gamma();
+          gamma_ = hyperbolic_system_.gamma();
         }
 
         /* In 3D we simply project onto the 2d plane: */
@@ -90,11 +90,11 @@ namespace ryujin
       }
 
     private:
-      const HyperbolicSystemView hyperbolic_system;
+      const HyperbolicSystemView hyperbolic_system_;
 
       Number gamma_;
       Number mach_number_;
       Number beta_;
     };
-  } // namespace Euler
+  } // namespace EulerInitialStates
 } // namespace ryujin

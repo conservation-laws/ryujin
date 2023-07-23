@@ -38,7 +38,7 @@ namespace ryujin
                          const std::string &subsection)
           : InitialState<Description, dim, Number>("three state contrast",
                                                    subsection)
-          , hyperbolic_system(hyperbolic_system)
+          , hyperbolic_system_(hyperbolic_system)
       {
 
         primitive_left_[0] = 1.4;
@@ -76,10 +76,11 @@ namespace ryujin
             "Initial 1d primitive state (rho, u, p) on the right");
 
         const auto convert_states = [&]() {
-          state_left_ = hyperbolic_system.from_initial_state(primitive_left_);
+          state_left_ = hyperbolic_system_.from_initial_state(primitive_left_);
           state_middle_ =
-              hyperbolic_system.from_initial_state(primitive_middle_);
-          state_right_ = hyperbolic_system.from_initial_state(primitive_right_);
+              hyperbolic_system_.from_initial_state(primitive_middle_);
+          state_right_ =
+              hyperbolic_system_.from_initial_state(primitive_right_);
         };
         this->parse_parameters_call_back.connect(convert_states);
         convert_states();
@@ -93,7 +94,7 @@ namespace ryujin
       }
 
     private:
-      const HyperbolicSystemView &hyperbolic_system;
+      const HyperbolicSystemView &hyperbolic_system_;
 
       Number left_length_;
       Number middle_length_;

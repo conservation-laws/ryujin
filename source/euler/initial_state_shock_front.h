@@ -35,7 +35,7 @@ namespace ryujin
       ShockFront(const HyperbolicSystemView &hyperbolic_system,
                  const std::string subsection)
           : InitialState<Description, dim, Number>("shockfront", subsection)
-          , hyperbolic_system(hyperbolic_system)
+          , hyperbolic_system_(hyperbolic_system)
       {
         gamma_ = 1.4;
         if constexpr (!std::is_same_v<Description, Euler::Description>) {
@@ -58,7 +58,7 @@ namespace ryujin
 
         const auto compute_and_convert_states = [&]() {
           if constexpr (std::is_same_v<Description, Euler::Description>) {
-            gamma_ = this->hyperbolic_system.gamma();
+            gamma_ = hyperbolic_system_.gamma();
           }
 
           /* Compute post-shock state and S3: */
@@ -89,8 +89,9 @@ namespace ryujin
           primitive_left_[1] = u_L;
           primitive_left_[2] = p_L;
 
-          state_left_ = hyperbolic_system.from_initial_state(primitive_left_);
-          state_right_ = hyperbolic_system.from_initial_state(primitive_right_);
+          state_left_ = hyperbolic_system_.from_initial_state(primitive_left_);
+          state_right_ =
+              hyperbolic_system_.from_initial_state(primitive_right_);
         };
 
         this->parse_parameters_call_back.connect(compute_and_convert_states);
@@ -105,7 +106,7 @@ namespace ryujin
       }
 
     private:
-      const HyperbolicSystemView hyperbolic_system;
+      const HyperbolicSystemView hyperbolic_system_;
 
       Number gamma_;
 
@@ -117,5 +118,5 @@ namespace ryujin
       state_type state_left_;
       state_type state_right_;
     };
-  } // namespace Euler
+  } // namespace EulerInitialStates
 } // namespace ryujin

@@ -17,9 +17,9 @@
 #include "initial_state_ramp_up.h"
 #include "initial_state_rarefaction.h"
 #include "initial_state_shock_front.h"
-#include "initial_state_uniform.h"
 #include "initial_state_smooth_wave.h"
 #include "initial_state_three_state_contrast.h"
+#include "initial_state_uniform.h"
 
 namespace ryujin
 {

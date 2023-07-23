@@ -36,7 +36,7 @@ namespace ryujin
                      const std::string &subsection)
           : InitialState<Description, dim, Number>("radial contrast",
                                                    subsection)
-          , hyperbolic_system(hyperbolic_system)
+          , hyperbolic_system_(hyperbolic_system)
       {
         primitive_inner_[0] = 1.4;
         primitive_inner_[1] = 0.0;
@@ -58,8 +58,10 @@ namespace ryujin
         this->add_parameter("radius", radius_, "Radius of radial area");
 
         const auto convert_states = [&]() {
-          state_inner_ = hyperbolic_system.from_initial_state(primitive_inner_);
-          state_outer_ = hyperbolic_system.from_initial_state(primitive_outer_);
+          state_inner_ =
+              hyperbolic_system_.from_initial_state(primitive_inner_);
+          state_outer_ =
+              hyperbolic_system_.from_initial_state(primitive_outer_);
         };
         this->parse_parameters_call_back.connect(convert_states);
         convert_states();
@@ -72,7 +74,7 @@ namespace ryujin
       }
 
     private:
-      const HyperbolicSystemView hyperbolic_system;
+      const HyperbolicSystemView hyperbolic_system_;
 
       dealii::Tensor<1, 3, Number> primitive_inner_;
       dealii::Tensor<1, 3, Number> primitive_outer_;
@@ -81,5 +83,5 @@ namespace ryujin
       state_type state_inner_;
       state_type state_outer_;
     };
-  } // namespace Euler
+  } // namespace EulerInitialStates
 } // namespace ryujin

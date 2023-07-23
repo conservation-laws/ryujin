@@ -40,7 +40,7 @@ namespace ryujin
       Noh(const HyperbolicSystemView &hyperbolic_system,
           const std::string &subsection)
           : InitialState<Description, dim, Number>("noh", subsection)
-          , hyperbolic_system(hyperbolic_system)
+          , hyperbolic_system_(hyperbolic_system)
       {
         gamma_ = 1.4;
         if constexpr (!std::is_same_v<Description, Euler::Description>) {
@@ -49,7 +49,7 @@ namespace ryujin
 
         this->parse_parameters_call_back.connect([&]() {
           if constexpr (std::is_same_v<Description, Euler::Description>) {
-            gamma_ = this->hyperbolic_system.gamma();
+            gamma_ = hyperbolic_system_.gamma();
           }
         });
       }
@@ -126,8 +126,8 @@ namespace ryujin
       }
 
     private:
-      const HyperbolicSystemView hyperbolic_system;
+      const HyperbolicSystemView hyperbolic_system_;
       Number gamma_;
     };
-  } // namespace Euler
+  } // namespace EulerInitialStates
 } // namespace ryujin
