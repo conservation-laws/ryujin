@@ -147,34 +147,61 @@ namespace ryujin
          * For a given density \f$\rho\f$ and <i>specific</i> internal
          * energy \f$e\f$ return the pressure \f$p\f$.
          */
-        DEAL_II_ALWAYS_INLINE inline ScalarNumber
-        eos_pressure(const ScalarNumber &rho, const ScalarNumber &e) const
+        DEAL_II_ALWAYS_INLINE inline Number
+        eos_pressure(const Number &rho, const Number &e) const
         {
           const auto &eos = hyperbolic_system_.selected_equation_of_state_;
-          return ScalarNumber(eos->pressure(rho, e));
+
+          if constexpr (std::is_same_v<ScalarNumber, Number>) {
+            return ScalarNumber(eos->pressure(rho, e));
+          } else {
+            Number p;
+            for (unsigned int k = 0; k < Number::size(); ++k) {
+              p[k] = ScalarNumber(eos->pressure(rho[k], e[k]));
+            }
+            return p;
+          }
         }
 
         /**
          * For a given density \f$\rho\f$ and pressure \f$p\f$ return the
          * <i>specific</i> internal energy \f$e\f$.
          */
-        DEAL_II_ALWAYS_INLINE inline ScalarNumber
-        eos_specific_internal_energy(const ScalarNumber &rho,
-                                     const ScalarNumber &p) const
+        DEAL_II_ALWAYS_INLINE inline Number
+        eos_specific_internal_energy(const Number &rho,
+                                     const Number &p) const
         {
           const auto &eos = hyperbolic_system_.selected_equation_of_state_;
-          return ScalarNumber(eos->specific_internal_energy(rho, p));
+
+          if constexpr (std::is_same_v<ScalarNumber, Number>) {
+            return ScalarNumber(eos->specific_internal_energy(rho, p));
+          } else {
+            Number e;
+            for (unsigned int k = 0; k < Number::size(); ++k) {
+              e[k] = ScalarNumber(eos->specific_internal_energy(rho[k], p[k]));
+            }
+            return e;
+          }
         }
 
         /**
          * For a given density \f$\rho\f$ and <i>specific</i> internal
          * energy \f$e\f$ return the sound speed \f$a\f$.
          */
-        DEAL_II_ALWAYS_INLINE inline ScalarNumber
-        eos_speed_of_sound(const ScalarNumber &rho, const ScalarNumber &e) const
+        DEAL_II_ALWAYS_INLINE inline Number
+        eos_speed_of_sound(const Number &rho, const Number &e) const
         {
           const auto &eos = hyperbolic_system_.selected_equation_of_state_;
-          return ScalarNumber(eos->speed_of_sound(rho, e));
+
+          if constexpr (std::is_same_v<ScalarNumber, Number>) {
+            return ScalarNumber(eos->speed_of_sound(rho, e));
+          } else {
+            Number c;
+            for (unsigned int k = 0; k < Number::size(); ++k) {
+              c[k] = ScalarNumber(eos->speed_of_sound(rho[k], e[k]));
+            }
+            return c;
+          }
         }
 
         /**
@@ -836,15 +863,7 @@ namespace ryujin
             const auto U_i = U.template get_tensor<Number>(i);
             const auto rho_i = density(U_i);
             const auto e_i = internal_energy(U_i) / rho_i;
-            Number p_i;
-
-            if constexpr (std::is_same<ScalarNumber, Number>::value) {
-              p_i = eos_pressure(rho_i, e_i);
-            } else {
-              for (unsigned int k = 0; k < Number::size(); ++k) {
-                p_i[k] = eos_pressure(rho_i[k], e_i[k]);
-              }
-            }
+            const auto p_i = eos_pressure(rho_i, e_i);
 
             const auto gamma_i = surrogate_gamma(U_i, p_i);
             using PT = precomputed_state_type;
@@ -1339,10 +1358,11 @@ namespace ryujin
     HyperbolicSystem::View<dim, Number>::from_primitive_state(
         const primitive_state_type &primitive_state) const -> state_type
     {
-      const auto &rho = primitive_state[0];
+      const auto rho = density(primitive_state);
       /* extract velocity: */
       const auto u = /*SIC!*/ momentum(primitive_state);
-      const auto &e = primitive_state[dim + 1];
+      /* extract specific internal energy: */
+      const auto &e = /*SIC!*/ total_energy(primitive_state);
 
       auto state = primitive_state;
       /* Fix up momentum: */
@@ -1361,7 +1381,7 @@ namespace ryujin
     HyperbolicSystem::View<dim, Number>::to_primitive_state(
         const state_type &state) const -> primitive_state_type
     {
-      const auto &rho = state[0];
+      const auto rho = density(state);
       const auto rho_inverse = Number(1.) / rho;
       const auto rho_e = internal_energy(state);
 
