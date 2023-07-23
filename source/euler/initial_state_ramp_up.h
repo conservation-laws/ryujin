@@ -57,29 +57,34 @@ namespace ryujin
                             t_final_,
                             "Time from which on the final state is attained)");
 
-        // FIXME: update primitive
+        const auto convert_states = [&]() {
+          state_initial_ =
+              hyperbolic_system.from_initial_state(primitive_initial_);
+          state_final_ = hyperbolic_system.from_initial_state(primitive_final_);
+        };
+        this->parse_parameters_call_back.connect(convert_states);
+        convert_states();
       }
 
       auto compute(const dealii::Point<dim> & /*point*/, Number t)
           -> state_type final
       {
-        dealii::Tensor<1, 3, Number> primitive;
+        state_type result;
 
         if (t <= t_initial_) {
-          primitive = primitive_initial_;
+          result = state_initial_;
         } else if (t >= t_final_) {
-          primitive = primitive_final_;
+          result = state_final_;
         } else {
           const Number factor =
               std::cos(0.5 * M_PI * (t - t_initial_) / (t_final_ - t_initial_));
 
           const Number alpha = factor * factor;
           const Number beta = Number(1.) - alpha;
-          primitive = alpha * primitive_initial_ + beta * primitive_final_;
+          result = alpha * state_initial_ + beta * state_final_;
         }
 
-        return hyperbolic_system.from_primitive_state(
-            hyperbolic_system.expand_state(primitive));
+        return result;
       }
 
     private:
@@ -87,9 +92,11 @@ namespace ryujin
 
       dealii::Tensor<1, 3, Number> primitive_initial_;
       dealii::Tensor<1, 3, Number> primitive_final_;
-
       Number t_initial_;
       Number t_final_;
+
+      state_type state_initial_;
+      state_type state_final_;
     };
   } // namespace Euler
 } // namespace ryujin

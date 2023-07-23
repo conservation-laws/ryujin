@@ -51,14 +51,17 @@ namespace ryujin
             primitive_right_,
             "Initial 1d primitive state (rho, u, p) on the right");
 
-        // FIXME: update primitive
+        const auto convert_states = [&]() {
+          state_left_ = hyperbolic_system.from_initial_state(primitive_left_);
+          state_right_ = hyperbolic_system.from_initial_state(primitive_right_);
+        };
+        this->parse_parameters_call_back.connect(convert_states);
+        convert_states();
       }
 
       state_type compute(const dealii::Point<dim> &point, Number /*t*/) final
       {
-        const auto &result = point[0] > 0. ? primitive_right_ : primitive_left_;
-        return hyperbolic_system.from_primitive_state(
-            hyperbolic_system.expand_state(result));
+        return (point[0] > 0. ? state_right_ : state_left_);
       }
 
     private:
@@ -66,6 +69,9 @@ namespace ryujin
 
       dealii::Tensor<1, 3, Number> primitive_left_;
       dealii::Tensor<1, 3, Number> primitive_right_;
+
+      state_type state_left_;
+      state_type state_right_;
     };
   } // namespace Euler
 } // namespace ryujin
