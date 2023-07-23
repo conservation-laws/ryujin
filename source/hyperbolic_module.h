@@ -180,7 +180,7 @@ namespace ryujin
      * The function takes an optional array of states @ref stage_U together
      * with a an array of weights @ref stage_weights to construct a
      * modified high-order flux. The standard high-order flux reads
-     * (cf @cite ryujin-2022-1, Eq. 12):
+     * (cf @cite ryujin-2021-1, Eq. 12):
      * \f{align}
      *   \newcommand{\bF}{{\boldsymbol F}}
      *   \newcommand{\bU}{{\boldsymbol U}}

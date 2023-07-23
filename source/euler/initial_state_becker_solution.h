@@ -28,7 +28,7 @@ namespace ryujin
      *    \Big\{\frac{v_0}{v_0-v_1}\log\Big(\frac{v_0-v(x)}{v_0-v_{01}}\Big)
      *    - \frac{v_1}{v_0-v_1}\log\Big(\frac{v(x)-v_1}{v_{01}-v_1}\Big)\Big\}.
      *  \f}
-     *  to high accuracy to recover the function @f$v(x)@f. This
+     *  to high accuracy to recover the function @f$v(x)@f$. This
      *  information is then used to compute density and internal energy as
      *  follows:
      *  \f{equation}
