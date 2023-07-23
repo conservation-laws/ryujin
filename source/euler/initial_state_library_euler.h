@@ -17,9 +17,9 @@
 #include "initial_state_ramp_up.h"
 #include "initial_state_rarefaction.h"
 #include "initial_state_shock_front.h"
-#include "initial_state_uniform.h"
 #include "initial_state_smooth_wave.h"
 #include "initial_state_three_state_contrast.h"
+#include "initial_state_uniform.h"
 
 namespace ryujin
 {
@@ -29,8 +29,7 @@ namespace ryujin
     void populate_initial_state_list(
         typename ryujin::InitialStateLibrary<Description, dim, Number>::
             initial_state_list_type &initial_state_list,
-        const typename Description::HyperbolicSystem::template View<dim, Number>
-            &h,
+        const typename Description::HyperbolicSystem &h,
         const std::string &s)
     {
       auto add = [&](auto &&object) {

@@ -17,8 +17,27 @@ namespace ryujin
   namespace EulerInitialStates
   {
     /**
-     * An analytic solution of the compressible Navier Stokes system
-     * @todo Documentation
+     * An analytic solution of the compressible Navier-Stokes system
+     * as described in @cite Becker1922.
+     *
+     * The initial state is a 1D stationary, viscous shock that is expanded
+     * to 2D/3D if necessary with an additional Galilei transform to add a
+     * velocity. Internally, the routine solves the equation
+     *  \f{equation}
+     *    x = \frac{2}{\gamma+1} \frac{\kappa}{m_0 c_v}
+     *    \Big\{\frac{v_0}{v_0-v_1}\log\Big(\frac{v_0-v(x)}{v_0-v_{01}}\Big)
+     *    - \frac{v_1}{v_0-v_1}\log\Big(\frac{v(x)-v_1}{v_{01}-v_1}\Big)\Big\}.
+     *  \f}
+     *  to high accuracy to recover the function @f$v(x)@f$. This
+     *  information is then used to compute density and internal energy as
+     *  follows:
+     *  \f{equation}
+     *    \rho(x) = \frac{m_0}{v(x)},
+     *    \qquad
+     *    e(x) = \frac{1}{2\gamma}\Big(\frac{\gamma+1}{\gamma-1}v_{01}^2 -
+     *    v^2(x)\Big).
+     *  \f}
+     *  For details see the dicussion in @cite ryujin-2021-2 Section 7.2.
      *
      * @ingroup EulerEquations
      */
@@ -31,11 +50,11 @@ namespace ryujin
           typename HyperbolicSystem::template View<dim, Number>;
       using state_type = typename HyperbolicSystemView::state_type;
 
-      BeckerSolution(const HyperbolicSystemView &hyperbolic_system,
+      BeckerSolution(const HyperbolicSystem &hyperbolic_system,
                      const std::string &subsection)
           : InitialState<Description, dim, Number>("becker solution",
                                                    subsection)
-          , hyperbolic_system(hyperbolic_system)
+          , hyperbolic_system_(hyperbolic_system)
       {
         gamma_ = 1.4;
         if constexpr (!std::is_same_v<Description, Euler::Description>) {
@@ -67,7 +86,7 @@ namespace ryujin
 
         dealii::ParameterAcceptor::parse_parameters_call_back.connect([this]() {
           if constexpr (std::is_same_v<Description, Euler::Description>) {
-            gamma_ = this->hyperbolic_system.gamma();
+            gamma_ = hyperbolic_system_.gamma();
           }
 
           AssertThrow(
@@ -188,11 +207,11 @@ namespace ryujin
              Number(rho * (velocity_ + v)),
              Number(rho * (e + 0.5 * (velocity_ + v) * (velocity_ + v)))}};
 
-        return hyperbolic_system.expand_state(state_1d);
+        return hyperbolic_system_.expand_state(state_1d);
       }
 
     private:
-      const HyperbolicSystemView hyperbolic_system;
+      const HyperbolicSystemView hyperbolic_system_;
       Number gamma_;
 
       Number velocity_;
@@ -204,5 +223,5 @@ namespace ryujin
       std::function<double(double)> find_velocity;
     };
 
-  } // namespace Euler
+  } // namespace EulerInitialStates
 } // namespace ryujin

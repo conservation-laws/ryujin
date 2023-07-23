@@ -32,10 +32,10 @@ namespace ryujin
           typename HyperbolicSystem::template View<dim, Number>;
       using state_type = typename HyperbolicSystemView::state_type;
 
-      ShockFront(const HyperbolicSystemView &hyperbolic_system,
+      ShockFront(const HyperbolicSystem &hyperbolic_system,
                  const std::string subsection)
           : InitialState<Description, dim, Number>("shockfront", subsection)
-          , hyperbolic_system(hyperbolic_system)
+          , hyperbolic_system_(hyperbolic_system)
       {
         gamma_ = 1.4;
         if constexpr (!std::is_same_v<Description, Euler::Description>) {
@@ -56,9 +56,9 @@ namespace ryujin
             mach_number_,
             "Mach number of shock front (S1, S3 = mach * a_L/R)");
 
-        dealii::ParameterAcceptor::parse_parameters_call_back.connect([this]() {
+        const auto compute_and_convert_states = [&]() {
           if constexpr (std::is_same_v<Description, Euler::Description>) {
-            gamma_ = this->hyperbolic_system.gamma();
+            gamma_ = hyperbolic_system_.gamma();
           }
 
           /* Compute post-shock state and S3: */
@@ -88,23 +88,25 @@ namespace ryujin
           primitive_left_[0] = rho_L;
           primitive_left_[1] = u_L;
           primitive_left_[2] = p_L;
-        });
 
-        // FIXME: update primitive
+          state_left_ = hyperbolic_system_.from_initial_state(primitive_left_);
+          state_right_ =
+              hyperbolic_system_.from_initial_state(primitive_right_);
+        };
+
+        this->parse_parameters_call_back.connect(compute_and_convert_states);
+        compute_and_convert_states();
       }
 
 
       state_type compute(const dealii::Point<dim> &point, Number t) final
       {
         const Number position_1d = Number(point[0] - S3_ * t);
-
-        return hyperbolic_system.from_primitive_state(
-            hyperbolic_system.expand_state(position_1d > 0. ? primitive_right_
-                                                            : primitive_left_));
+        return (position_1d > 0. ? state_right_ : state_left_);
       }
 
     private:
-      const HyperbolicSystemView hyperbolic_system;
+      const HyperbolicSystemView hyperbolic_system_;
 
       Number gamma_;
 
@@ -112,6 +114,9 @@ namespace ryujin
       dealii::Tensor<1, 3, Number> primitive_right_;
       Number mach_number_;
       Number S3_;
+
+      state_type state_left_;
+      state_type state_right_;
     };
-  } // namespace Euler
+  } // namespace EulerInitialStates
 } // namespace ryujin

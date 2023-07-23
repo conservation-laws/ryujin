@@ -32,11 +32,11 @@ namespace ryujin
           typename HyperbolicSystem::template View<dim, Number>;
       using state_type = typename HyperbolicSystemView::state_type;
 
-      RadialContrast(const HyperbolicSystemView &hyperbolic_system,
+      RadialContrast(const HyperbolicSystem &hyperbolic_system,
                      const std::string &subsection)
           : InitialState<Description, dim, Number>("radial contrast",
                                                    subsection)
-          , hyperbolic_system(hyperbolic_system)
+          , hyperbolic_system_(hyperbolic_system)
       {
         primitive_inner_[0] = 1.4;
         primitive_inner_[1] = 0.0;
@@ -57,25 +57,31 @@ namespace ryujin
         radius_ = 0.5;
         this->add_parameter("radius", radius_, "Radius of radial area");
 
-        // FIXME: update primitive
+        const auto convert_states = [&]() {
+          state_inner_ =
+              hyperbolic_system_.from_initial_state(primitive_inner_);
+          state_outer_ =
+              hyperbolic_system_.from_initial_state(primitive_outer_);
+        };
+        this->parse_parameters_call_back.connect(convert_states);
+        convert_states();
       }
 
       auto compute(const dealii::Point<dim> &point, Number /*t*/)
           -> state_type final
       {
-        const auto result =
-            point.norm() > radius_ ? primitive_outer_ : primitive_inner_;
-
-        return hyperbolic_system.from_primitive_state(
-            hyperbolic_system.expand_state(result));
+        return (point.norm() > radius_ ? state_outer_ : state_inner_);
       }
 
     private:
-      const HyperbolicSystemView hyperbolic_system;
+      const HyperbolicSystemView hyperbolic_system_;
 
       dealii::Tensor<1, 3, Number> primitive_inner_;
       dealii::Tensor<1, 3, Number> primitive_outer_;
       double radius_;
+
+      state_type state_inner_;
+      state_type state_outer_;
     };
-  } // namespace Euler
+  } // namespace EulerInitialStates
 } // namespace ryujin

@@ -62,7 +62,7 @@ namespace ryujin
         return first_term + second_term + omega * rho * e;
       }
 
-      /*
+      /**
        * The specific internal energy is given by
        * \f{align}
        *   \omega \rho e = p

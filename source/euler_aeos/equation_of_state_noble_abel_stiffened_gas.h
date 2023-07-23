@@ -56,7 +56,7 @@ namespace ryujin
       }
 
 
-      /*
+      /**
        * The specific internal energy is given by
        * \f{align}
        *   e - q = (p + p_\infty) * (1 - b \rho) / (\rho (\gamma - 1))

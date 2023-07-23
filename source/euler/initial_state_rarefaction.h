@@ -32,10 +32,10 @@ namespace ryujin
           typename HyperbolicSystem::template View<dim, Number>;
       using state_type = typename HyperbolicSystemView::state_type;
 
-      Rarefaction(const HyperbolicSystemView &hyperbolic_system,
+      Rarefaction(const HyperbolicSystem &hyperbolic_system,
                   const std::string subsection)
           : InitialState<Description, dim, Number>("rarefaction", subsection)
-          , hyperbolic_system(hyperbolic_system)
+          , hyperbolic_system_(hyperbolic_system)
       {
         gamma_ = 1.4;
         if constexpr (!std::is_same_v<Description, Euler::Description>) {
@@ -44,7 +44,7 @@ namespace ryujin
 
         this->parse_parameters_call_back.connect([&]() {
           if constexpr (std::is_same_v<Description, Euler::Description>) {
-            gamma_ = this->hyperbolic_system.gamma();
+            gamma_ = hyperbolic_system_.gamma();
           }
         });
       } /* Constructor */
@@ -130,12 +130,12 @@ namespace ryujin
 
         // FIXME: update primitive
 
-        return hyperbolic_system.from_primitive_state(
-            hyperbolic_system.expand_state(result));
+        return hyperbolic_system_.from_primitive_state(
+            hyperbolic_system_.expand_state(result));
       }
 
     private:
-      const HyperbolicSystemView hyperbolic_system;
+      const HyperbolicSystemView hyperbolic_system_;
       Number gamma_;
     };
   } // namespace EulerInitialStates

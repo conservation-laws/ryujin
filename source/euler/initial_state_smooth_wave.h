@@ -5,8 +5,8 @@
 
 #pragma once
 
-#include <simd.h>
 #include <initial_state_library.h>
+#include <simd.h>
 
 namespace ryujin
 {
@@ -29,10 +29,10 @@ namespace ryujin
           typename HyperbolicSystem::template View<dim, Number>;
       using state_type = typename HyperbolicSystemView::state_type;
 
-      SmoothWave(const HyperbolicSystemView &hyperbolic_system,
+      SmoothWave(const HyperbolicSystem &hyperbolic_system,
                  const std::string subsection)
           : InitialState<Description, dim, Number>("smooth wave", subsection)
-          , hyperbolic_system(hyperbolic_system)
+          , hyperbolic_system_(hyperbolic_system)
       {
         density_ref_ = 1.;
         this->add_parameter("reference density",
@@ -77,12 +77,12 @@ namespace ryujin
 
         // FIXME: update primitive
 
-        return hyperbolic_system.from_primitive_state(
-            hyperbolic_system.expand_state(result));
+        return hyperbolic_system_.from_primitive_state(
+            hyperbolic_system_.expand_state(result));
       }
 
     private:
-      const HyperbolicSystemView &hyperbolic_system;
+      const HyperbolicSystemView hyperbolic_system_;
 
       Number density_ref_;
       Number pressure_ref_;
@@ -90,5 +90,5 @@ namespace ryujin
       Number left_;
       Number right_;
     };
-  } // namespace EulerAEOS
+  } // namespace EulerInitialStates
 } // namespace ryujin

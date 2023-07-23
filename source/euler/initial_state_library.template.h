@@ -7,8 +7,8 @@
 
 #include "description.h"
 
-#include <initial_state_library.h>
 #include "initial_state_library_euler.h"
+#include <initial_state_library.h>
 
 namespace ryujin
 {
@@ -28,7 +28,7 @@ namespace ryujin
 
     static void
     populate_initial_state_list(initial_state_list_type &initial_state_list,
-                                const HyperbolicSystemView &h,
+                                const HyperbolicSystem &h,
                                 const std::string &s)
     {
       EulerInitialStates::populate_initial_state_list<Description, dim, Number>(
@@ -36,4 +36,3 @@ namespace ryujin
     }
   };
 } // namespace ryujin
-

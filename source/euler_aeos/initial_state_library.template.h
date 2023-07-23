@@ -27,10 +27,9 @@ namespace ryujin
         std::set<std::unique_ptr<InitialState<Description, dim, Number>>>;
 
     static void
-    populate_initial_state_list(initial_state_list_type &initial_state_list
-                                [[maybe_unused]],
-                                const HyperbolicSystemView &h [[maybe_unused]],
-                                const std::string &s [[maybe_unused]])
+    populate_initial_state_list(initial_state_list_type &initial_state_list,
+                                const HyperbolicSystem &h,
+                                const std::string &s)
     {
       EulerInitialStates::populate_initial_state_list<Description, dim, Number>(
           initial_state_list, h, s);
