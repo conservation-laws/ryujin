@@ -590,7 +590,7 @@ namespace ryujin
          */
         //@{
 
-        /*
+        /**
          * Given a state vector associated with @ref dim2 spatial dimensions
          * return an "expanded" version of the state vector associated with
          * @ref dim1 spatial dimensions where the momentum vector is projected
@@ -602,20 +602,36 @@ namespace ryujin
         template <typename ST>
         state_type expand_state(const ST &state) const;
 
-        /*
+        /**
+         * Given an initial state [rho, u_1, ..., u_?, p] return a
+         * conserved state [rho, m_1, ..., m_d, E].
+         *
+         * This function simply calls from_primitive_state() and
+         * expand_state().
+         *
+         * @note This function is used to conveniently convert (user
+         * provided) primitive initial states with pressure values to a
+         * conserved state in the EulerInitialStateLibrary. As such, this
+         * function is implemented in the Euler::HyperbolicSystem and
+         * EulerAEOS::HyperbolicSystem classes.
+         */
+        template <typename ST>
+        state_type from_initial_state(const ST &initial_state) const;
+
+        /**
          * Given a primitive state [rho, u_1, ..., u_d, p] return a conserved
          * state
          */
         state_type
         from_primitive_state(const primitive_state_type &primitive_state) const;
 
-        /*
+        /**
          * Given a conserved state return a primitive state [rho, u_1, ..., u_d,
          * p]
          */
         primitive_state_type to_primitive_state(const state_type &state) const;
 
-        /*
+        /**
          * Transform the current state according to a  given operator @ref
          * momentum_transform acting on a @p dim dimensional momentum (or
          * velocity) vector.
@@ -1220,6 +1236,17 @@ namespace ryujin
         result[i] = state[i];
 
       return result;
+    }
+
+
+    template <int dim, typename Number>
+    template <typename ST>
+    DEAL_II_ALWAYS_INLINE inline auto
+    HyperbolicSystem::View<dim, Number>::from_initial_state(
+        const ST &initial_state) const -> state_type
+    {
+      const auto primitive_state = expand_state(initial_state);
+      return from_primitive_state(primitive_state);
     }
 
 
