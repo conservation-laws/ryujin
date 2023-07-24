@@ -124,7 +124,7 @@ namespace ryujin
      * Return a dealii::Tensor populated with the @p n_comp component
      * vector stored at index @p i.
      *
-     * If the template parameter @tref Number2 is a VectorizedArray then
+     * If the template parameter @a Number2 is a VectorizedArray then
      * the function returns a SIMD vectorized dealii::Tensor populated with
      * entries from the @p n_comp component vectors stored at indices i,
      * i+1, ..., i+simd_length-1.
@@ -149,7 +149,7 @@ namespace ryujin
      * Update the values of the @p n_comp component vector at index @p i
      * with the values supplied by @p tensor.
      *
-     * If the template parameter @tref Number2 is a VectorizedArray then
+     * If the template parameter @a Number2 is a VectorizedArray then
      * the function takes a SIMD vectorized @p tensor as argument instead
      * and updates the values of the @p n_comp component vectors at indices
      * i, i+1, ..., i+simd_length_1. with the values supplied by @p tensor.

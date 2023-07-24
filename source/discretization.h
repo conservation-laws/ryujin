@@ -79,7 +79,7 @@ namespace ryujin
      * component of the momentum in the Euler module. This is done by
      * explicitly removing the normal component of the momentum for the
      * degree of freedom at the end of TimeStep::euler_step(). In the
-     * dissipation module a vanishing velocity \f$v=0f$ is enforced
+     * dissipation module a vanishing velocity \f$v=0\f$ is enforced
      * strongly.
      */
     no_slip = 3,

@@ -27,11 +27,10 @@ namespace ryujin
    * A class to store all data that can be precomputed offline.
    *
    * This class takes a reference to a Discretization object (that itself
-   * holds a @ref Triangulation, @ref FiniteElement, @ref Mapping, and @ref
-   * Quadrature object).
+   * holds a Triangulation, FiniteElement, Mapping, and Quadrature object).
    *
-   * Most notably this class sets up a @ref DoFHandler, the
-   * @ref SparsityPattern, various @ref IndexSet objects to hold locally
+   * Most notably this class sets up a DoFHandler, the
+   * SparsityPattern, various IndexSet objects to hold locally
    * owned and locally relevant indices, and precomputes all matrices (mass
    * matrix, lumped mass matrix, $c_{ij}$ matrices, and $n_{ij}$ matrices).
    *
@@ -74,10 +73,10 @@ namespace ryujin
                 const std::string &subsection = "/OfflineData");
 
     /**
-     * Prepare offline data. A call to @ref prepare() internally calls
-     * @ref setup() and @ref assemble().
+     * Prepare offline data. A call to prepare() internally calls setup()
+     * and assemble().
      *
-     * The @ref problem_dimension parameter is used to setup up an
+     * The problem_dimension parameter is used to setup up an
      * appropriately sized vector partitioner for the MultiComponentVector.
      */
     void prepare(const unsigned int problem_dimension)
@@ -155,7 +154,7 @@ namespace ryujin
      * we record the global degree of freedom index along with a weighted
      * boundary normal, the associated boundary id, and position.
      *
-     * This map is later used in @ref OfflineData to handle boundary
+     * This map is later used in OfflineData to handle boundary
      * degrees of freedom after every time step (for example to implement
      * reflective boundary conditions).
      */
@@ -241,8 +240,8 @@ namespace ryujin
      * Set up DoFHandler, all IndexSet objects and the SparsityPattern.
      * Initialize matrix storage.
      *
-     * The @ref problem_dimension parameter is used to setup up an
-     * appropriately sized vector partitioner for the MultiComponentVector.
+     * The problem_dimension parameter is used to setup up an appropriately
+     * sized vector partitioner for the MultiComponentVector.
      */
     void setup(const unsigned int problem_dimension);
 

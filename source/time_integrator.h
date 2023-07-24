@@ -179,9 +179,9 @@ namespace ryujin
         const std::string &subsection = "/TimeIntegrator");
 
     /**
-     * Prepare time integration. A call to @ref prepare() allocates
-     * temporary storage and is necessary before any of the following
-     * time-stepping functions can be called.
+     * Prepare time integration. A call to prepare() allocates temporary
+     * storage and is necessary before any of the following time-stepping
+     * functions can be called.
      */
     void prepare();
 
@@ -210,7 +210,7 @@ namespace ryujin
      * time step (and store the result in U). The function returns the
      * chosen time step size tau.
      *
-     * If the parameter @ref tau is set to a nonzero value then the
+     * If the parameter @p tau is set to a nonzero value then the
      * supplied value is used for time stepping instead of the computed
      * maximal time step size.
      */

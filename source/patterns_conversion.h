@@ -9,6 +9,8 @@
 
 #include <numeric>
 
+#ifndef DOXYGEN
+
 DEAL_II_NAMESPACE_OPEN
 
 
@@ -77,3 +79,5 @@ DEAL_II_NAMESPACE_CLOSE
     };                                                                         \
   }                                                                            \
   static_assert(true, "")
+
+#endif

@@ -67,7 +67,7 @@ namespace ryujin
    * Explicit forward Euler time-stepping for hyperbolic systems with
    * convex limiting.
    *
-   * This module is described in detail in @cite ryujin-2022-1, Alg. 1.
+   * This module is described in detail in @cite ryujin-2021-1, Alg. 1.
    *
    * @ingroup HyperbolicModule
    */
@@ -155,7 +155,7 @@ namespace ryujin
         const std::string &subsection = "/HyperbolicModule");
 
     /**
-     * Prepare time stepping. A call to @ref prepare() allocates temporary
+     * Prepare time stepping. A call to @p prepare() allocates temporary
      * storage and is necessary before any of the following time-stepping
      * functions can be called.
      */
@@ -167,18 +167,18 @@ namespace ryujin
     //@{
 
     /**
-     * Given a reference to a previous state vector @ref old_U perform an
-     * explicit euler step (and store the result in @ref new_U). The
+     * Given a reference to a previous state vector @p old_U perform an
+     * explicit euler step (and store the result in @p new_U). The
      * function returns the computed maximal time step size tau_max
      * according to the CFL condition.
      *
-     * The time step is performed with either tau_max (if @ref tau is set
-     * to 0), or tau (if @ref tau is nonzero). Here, tau_max is the
-     * computed maximal time step size and @ref tau is the last parameter
+     * The time step is performed with either tau_max (if @p tau is set
+     * to 0), or tau (if @p tau is nonzero). Here, tau_max is the
+     * computed maximal time step size and @p tau is the last parameter
      * of the function.
      *
-     * The function takes an optional array of states @ref stage_U together
-     * with a an array of weights @ref stage_weights to construct a
+     * The function takes an optional array of states @p stage_U together
+     * with a an array of weights @p stage_weights to construct a
      * modified high-order flux. The standard high-order flux reads
      * (cf @cite ryujin-2021-1, Eq. 12):
      * \f{align}
@@ -220,7 +220,7 @@ namespace ryujin
      * \f$\bU^{s,n}\f$.
      *
      * @note The routine does not automatically update ghost vectors of the
-     * distributed vector @ref new_U. It is best to simply call
+     * distributed vector @p new_U. It is best to simply call
      * HyperbolicModule::apply_boundary_conditions() on the appropriate vector
      * immediately after performing a time step.
      */
@@ -236,17 +236,17 @@ namespace ryujin
          Number tau = Number(0.)) const;
 
     /**
-     * This function postprocesses a given state @ref U to conform with all
-     * prescribed boundary conditions at time @ref t. This implies that on
+     * This function postprocesses a given state @p U to conform with all
+     * prescribed boundary conditions at time @p t. This implies that on
      * slip (and no-slip) boundaries the normal momentum is set to zero; on
-     * Dirichlet boundaries the appropriate state at time @ref t is
+     * Dirichlet boundaries the appropriate state at time @p t is
      * substituted; and on "flexible" boundaries depending on the fact
      * whether we have supersonic or subsonic inflow/outflow the
-     * appropriate Riemann invariant is prescribed. See @cite ryujin-2022-3
+     * appropriate Riemann invariant is prescribed. See @cite ryujin-2021-3
      * for details.
      *
      * @note The routine does update ghost vectors of the distributed
-     * vector @ref U
+     * vector @p U
      */
     void apply_boundary_conditions(vector_type &U, Number t) const;
 
