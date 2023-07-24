@@ -80,7 +80,7 @@ namespace ryujin
      * and interior maps. The storage requirement varies according to the
      * supplied manifold descriptions.
      *
-     * The string parameter @ref name is used as base name for output files.
+     * The string parameter @p name is used as base name for output files.
      */
     void prepare(const std::string &name, unsigned int cycle);
 

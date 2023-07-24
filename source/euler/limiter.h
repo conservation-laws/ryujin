@@ -20,7 +20,7 @@ namespace ryujin
      * The convex limiter.
      *
      * The class implements a convex limiting technique as described in
-     * @cite GuermondEtAl2018 and @cite ryujin-2022-1. Given a
+     * @cite GuermondEtAl2018 and @cite ryujin-2021-1. Given a
      * computed set of bounds and an update direction \f$\mathbf P_{ij}\f$
      * one can now determine a candidate \f$\tilde l_{ij}\f$ by computing
      *
@@ -32,7 +32,7 @@ namespace ryujin
      *   \phi_{\text{min}}\,\le\,\phi\,(\mathbf U_{i}+\tilde l_{ij}\mathbf
      * P_{ij})\Big\}, \f}
      *
-     * where \f$\psi\f$ denots the specific entropy @cite ryujin-2022-1.
+     * where \f$\psi\f$ denots the specific entropy @cite ryujin-2021-1.
      *
      * Algorithmically this is accomplished as follows: Given an initial
      * interval \f$[t_L,t_R]\f$, where \f$t_L\f$ is a good state, we first
@@ -185,8 +185,8 @@ namespace ryujin
       //@{
 
       /**
-       * Returns whether the state @ref U is located in the invariant domain
-       * described by @ref bounds. If @ref U is a vectorized state then the
+       * Returns whether the state @p U is located in the invariant domain
+       * described by @p bounds. If @p U is a vectorized state then the
        * function returns true if all vectorized values are located in the
        * invariant domain.
        */

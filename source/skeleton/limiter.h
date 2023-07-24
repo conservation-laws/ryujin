@@ -164,8 +164,8 @@ namespace ryujin
       //@{
 
       /**
-       * Returns whether the state @ref U is located in the invariant domain
-       * described by @ref bounds. If @ref U is a vectorized state then the
+       * Returns whether the state @p U is located in the invariant domain
+       * described by @p bounds. If @p U is a vectorized state then the
        * function returns true if all vectorized values are located in the
        * invariant domain.
        */

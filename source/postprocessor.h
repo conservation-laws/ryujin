@@ -80,7 +80,7 @@ namespace ryujin
     using scalar_type = typename OfflineData<dim, Number>::scalar_type;
 
     /**
-     * @copydoc OfflineData::vector_type
+     * @copydoc HyperbolicSystem::View::vector_type
      */
     using vector_type = MultiComponentVector<Number, problem_dimension>;
 

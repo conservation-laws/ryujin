@@ -320,7 +320,7 @@ namespace ryujin
         static Number density(const state_type &U);
 
         /**
-         * Given a density @ref rho this function returns 0 if rho is in the
+         * Given a density @p rho this function returns 0 if rho is in the
          * interval [-relaxation * rho_cutoff, relaxation * rho_cutoff],
          * otherwise rho is returned unmodified. Here, rho_cutoff is the
          * reference density multiplied by eps.
@@ -359,11 +359,8 @@ namespace ryujin
          * We assume that the pressure is given by a polytropic equation of
          * state, i.e.,
          * \f[
-         *   p = \frac{\gamma - 1}{1 - b*\rho}\; (\rho e)
+         *   p = (\gamma - 1)\;(\rho e)
          * \f]
-         *
-         * @note If you want to set the covolume paramete @ref b_ to nonzero
-         * you have to enable the @ref covolume_ compile-time option.
          */
         Number pressure(const state_type &U) const;
 
@@ -371,7 +368,7 @@ namespace ryujin
          * For a given (2+dim dimensional) state vector <code>U</code>, compute
          * the (physical) speed of sound:
          * \f[
-         *   c^2 = \frac{\gamma * p}{\rho\;(1 - b * \rho)}
+         *   c^2 = \frac{\gamma\,p}{\rho}
          * \f]
          */
         Number speed_of_sound(const state_type &U) const;
@@ -380,8 +377,7 @@ namespace ryujin
          * For a given (2+dim dimensional) state vector <code>U</code>, compute
          * and return the (scaled) specific entropy
          * \f[
-         *   e^{(\gamma-1)s} = \frac{\rho\,e}{\rho^\gamma}
-         *   (1 - b * \rho)^(\gamma -1).
+         *   e^{(\gamma-1)s} = \frac{\rho\,e}{\rho^\gamma}.
          * \f]
          */
         Number specific_entropy(const state_type &U) const;
@@ -418,8 +414,8 @@ namespace ryujin
         state_type mathematical_entropy_derivative(const state_type &U) const;
 
         /**
-         * Returns whether the state @ref U is admissible. If @ref U is a
-         * vectorized state then @ref U is admissible if all vectorized values
+         * Returns whether the state @p U is admissible. If @p U is a
+         * vectorized state then @p U is admissible if all vectorized values
          * are admissible.
          */
         bool is_admissible(const state_type &U) const;
@@ -591,13 +587,14 @@ namespace ryujin
         //@{
 
         /**
-         * Given a state vector associated with @ref dim2 spatial dimensions
-         * return an "expanded" version of the state vector associated with
-         * @ref dim1 spatial dimensions where the momentum vector is projected
-         * onto the first @ref dim2 unit directions of the @ref dim dimensional
-         * euclidean space.
+         * Given a state vector associated with a different spatial
+         * dimensions than the current one, return an "expanded" version of
+         * the state vector associated with @a dim spatial dimensions where
+         * the momentum vector of the conserved state @p state is expaned
+         * with zeros to a total length of @a dim entries.
          *
-         * @precondition dim has to be larger or equal than dim2.
+         * @note @a dim has to be larger or equal than the dimension of the
+         * @a ST vector.
          */
         template <typename ST>
         state_type expand_state(const ST &state) const;
@@ -632,9 +629,9 @@ namespace ryujin
         primitive_state_type to_primitive_state(const state_type &state) const;
 
         /**
-         * Transform the current state according to a  given operator @ref
-         * momentum_transform acting on a @p dim dimensional momentum (or
-         * velocity) vector.
+         * Transform the current state according to a  given operator
+         * @p lambda acting on a @a dim dimensional momentum (or velocity)
+         * vector.
          */
         template <typename Lambda>
         state_type apply_galilei_transform(const state_type &state,
@@ -820,7 +817,7 @@ namespace ryujin
     DEAL_II_ALWAYS_INLINE inline Number
     HyperbolicSystem::View<dim, Number>::pressure(const state_type &U) const
     {
-      /* p = (gamma - 1) / (1 - b * rho) * (rho e) */
+      /* p = (gamma - 1) * (rho e) */
       return (gamma() - ScalarNumber(1.)) * internal_energy(U);
     }
 
@@ -830,7 +827,7 @@ namespace ryujin
     HyperbolicSystem::View<dim, Number>::speed_of_sound(
         const state_type &U) const
     {
-      /* c^2 = gamma * p / rho / (1 - b * rho) */
+      /* c^2 = gamma * p / rho */
       const Number rho_inverse = ScalarNumber(1.) / density(U);
       const Number p = pressure(U);
       return std::sqrt(gamma() * p * rho_inverse);

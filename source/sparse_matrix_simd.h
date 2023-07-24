@@ -138,12 +138,12 @@ namespace ryujin
     /* Get scalar or tensor-valued entry: */
 
     /**
-     * return the (scalar) entry indexed by @ref row and
-     * @ref position_within_column.
+     * return the (scalar) entry indexed by @p row and
+     * @p position_within_column.
      *
-     * @note If the template argument @ref Number2
+     * @note If the template argument @a Number2
      * is a vetorized array a specialized, faster access will be performed.
-     * In this case the index @ref row must be within the interval
+     * In this case the index @p row must be within the interval
      * [0, n_internal_dofs) and must be divisible by simd_length.
      */
     template <typename Number2 = Number>
@@ -151,12 +151,12 @@ namespace ryujin
                       const unsigned int position_within_column) const;
 
     /**
-     * return the tensor-valued entry indexed by @ref row and
-     * @ref position_within_column.
+     * return the tensor-valued entry indexed by @p row and
+     * @p position_within_column.
      *
-     * @note If the template argument @ref Number2
+     * @note If the template argument @a Number2
      * is a vetorized array a specialized, faster access will be performed.
-     * In this case the index @ref row must be within the interval
+     * In this case the index @p row must be within the interval
      * [0, n_internal_dofs) and must be divisible by simd_length.
      */
     template <typename Number2 = Number>
@@ -167,12 +167,12 @@ namespace ryujin
     /* Get transposed scalar or tensor-valued entry: */
 
     /**
-     * return the transposed (scalar) entry indexed by @ref row and
-     * @ref position_within_column.
+     * return the transposed (scalar) entry indexed by @p row and
+     * @p position_within_column.
      *
-     * @note If the template argument @ref Number2
+     * @note If the template argument @a Number2
      * is a vetorized array a specialized, faster access will be performed.
-     * In this case the index @ref row must be within the interval
+     * In this case the index @p row must be within the interval
      * [0, n_internal_dofs) and must be divisible by simd_length.
      */
     template <typename Number2 = Number>
@@ -181,12 +181,12 @@ namespace ryujin
                          const unsigned int position_within_column) const;
 
     /**
-     * return the transposed tensor-valued entry indexed by @ref row and
-     * @ref position_within_column.
+     * return the transposed tensor-valued entry indexed by @p row and
+     * @a position_within_column.
      *
-     * @note If the template argument @ref Number2
+     * @note If the template argument @a Number2
      * is a vetorized array a specialized, faster access will be performed.
-     * In this case the index @ref row must be within the interval
+     * In this case the index @p row must be within the interval
      * [0, n_internal_dofs) and must be divisible by simd_length.
      */
     template <typename Number2 = Number>
@@ -197,12 +197,12 @@ namespace ryujin
     /* Write scalar or tensor entry: */
 
     /**
-     * Write a (scalar valued) @ref entry to the matrix indexed by @ref row
-     * and @ref position_within_column.
+     * Write a (scalar valued) @p entry to the matrix indexed by @p row
+     * and @p position_within_column.
      *
-     * @note If the template argument @ref Number2
+     * @note If the template argument @a Number2
      * is a vetorized array a specialized, faster access will be performed.
-     * In this case the index @ref row must be within the interval
+     * In this case the index @p row must be within the interval
      * [0, n_internal_dofs) and must be divisible by simd_length.
      */
     template <typename Number2 = Number>
@@ -212,12 +212,12 @@ namespace ryujin
                      const bool do_streaming_store = false);
 
     /**
-     * Write a tensor-valued @ref entry to the matrix indexed by @ref row
-     * and @ref position_within_column.
+     * Write a tensor-valued @p entry to the matrix indexed by @p row
+     * and @p position_within_column.
      *
-     * @note If the template argument @ref Number2
+     * @note If the template argument @a Number2
      * is a vetorized array a specialized, faster access will be performed.
-     * In this case the index @ref row must be within the interval
+     * In this case the index @p row must be within the interval
      * [0, n_internal_dofs) and must be divisible by simd_length.
      */
     template <typename Number2 = Number>

@@ -381,7 +381,7 @@ namespace ryujin
         static Number density(const state_type &U);
 
         /**
-         * Given a density @ref rho this function returns 0 if rho is in the
+         * Given a density @p rho this function returns 0 if rho is in the
          * interval [-relaxation * rho_cutoff, relaxation * rho_cutoff],
          * otherwise rho is returned unmodified. Here, rho_cutoff is the
          * reference density multiplied by eps.
@@ -487,8 +487,8 @@ namespace ryujin
                                   const Number &gamma) const;
 
         /**
-         * Returns whether the state @ref U is admissible. If @ref U is a
-         * vectorized state then @ref U is admissible if all vectorized values
+         * Returns whether the state @p U is admissible. If @p U is a
+         * vectorized state then @p U is admissible if all vectorized values
          * are admissible.
          */
         bool is_admissible(const state_type &U) const;
@@ -651,13 +651,14 @@ namespace ryujin
         //@{
 
         /**
-         * Given a state vector associated with @ref dim2 spatial dimensions
-         * return an "expanded" version of the state vector associated with
-         * @ref dim1 spatial dimensions where the momentum vector is projected
-         * onto the first @ref dim2 unit directions of the @ref dim dimensional
-         * euclidean space.
+         * Given a state vector associated with a different spatial
+         * dimensions than the current one, return an "expanded" version of
+         * the state vector associated with @a dim spatial dimensions where
+         * the momentum vector of the conserved state @p state is expaned
+         * with zeros to a total length of @a dim entries.
          *
-         * @precondition dim has to be larger or equal than dim2.
+         * @note @a dim has to be larger or equal than the dimension of the
+         * @a ST vector.
          */
         template <typename ST>
         state_type expand_state(const ST &state) const;
@@ -691,9 +692,9 @@ namespace ryujin
         primitive_state_type to_primitive_state(const state_type &state) const;
 
         /**
-         * Transform the current state according to a  given operator @ref
-         * momentum_transform acting on a @p dim dimensional momentum (or
-         * velocity) vector.
+         * Transform the current state according to a  given operator
+         * @p lambda acting on a @a dim dimensional momentum (or velocity)
+         * vector.
          */
         template <typename Lambda>
         state_type apply_galilei_transform(const state_type &state,
