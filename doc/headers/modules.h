@@ -30,6 +30,38 @@
 
 
 /**
+ * @defgroup HyperbolicModule Hyperbolic Module
+ *
+ * This module contains classes and functions used during different stages
+ * of the explicit hyperbolic update performed in HyperbolicModule::step().
+ */
+
+
+/**
+ * @defgroup ParabolicModule Parabolic Module
+ *
+ * This module contains classes and functions used during different stages
+ * of the implicit parabolic update performed in ParabolicModule::step().
+ */
+
+
+/**
+ * @defgroup TimeLoop Time Integration and Postprocessing
+ *
+ * This module contains classes and functions used for timestepping and
+ * running the program.
+ */
+
+
+/**
+ * @defgroup SkeletonEquations Minimal equation interface
+ *
+ * This module contains the minimal necessary interface for defining a
+ * hyperbolic system.
+ */
+
+
+/**
  * @defgroup EulerEquations The Compressible Euler Equations
  *
  * This module contains classes and functions related to solving the
@@ -46,36 +78,8 @@
 
 
 /**
- * @defgroup HyperbolicModule Hyperbolic Module
- *
- * This module contains classes and functions used during different stages
- * of the explicit hyperbolic update performed in HyperbolicModule::step().
- */
-
-
-/**
- * @defgroup ParabolicModule Parabolic Module
- *
- * This module contains classes and functions used during different stages
- * of the implicit parabolic update performed in ParabolicModule::step().
- */
-
-/**
- * @def
- */
-
-
-/**
  * @defgroup NavierStokesEquations The Compressible Navier Stokes Equations
  *
  * This module contains classes and functions related to solving the
  * compressible Navier Stokes equations.
- */
-
-
-/**
- * @defgroup TimeLoop Time Integration and Postprocessing
- *
- * This module contains classes and functions used for timestepping and
- * running the program.
  */
