@@ -16,14 +16,14 @@
  *
  * <h4>For Debian stable:</h4>
  *
- * In order to enable buster-backports https://backports.debian.org and
+ * In order to enable bookworm-backports https://backports.debian.org and
  * install all necessary packages run as root user:
  * @code
  *   mkdir -p /etc/apt/sources.list.d/
- *   echo deb http://deb.debian.org/debian buster-backports main > /etc/apt/sources.list.d/buster-backports.conf
+ *   echo deb http://deb.debian.org/debian bookworm-backports main > /etc/apt/sources.list.d/bookworm-backports.conf
  *   apt update
  *
- *   apt install libdeal.ii-dev/buster-backports libp4est-dev/buster-backports
+ *   apt install libdeal.ii-dev/bookworm-backports libp4est-dev/bookworm-backports
  * @endcode
  *
  * Also make sure to have numdiff, cmake, g++, ninja and git installed:
@@ -32,12 +32,12 @@
  *   apt install cmake make g++ ninja-build git ca-certificates
  * @endcode
  *
- * <h4>For Ubuntu LTS 20.04:</h4>
+ * <h4>For Ubuntu LTS 22.04:</h4>
  *
- * In order to add the backports <a href="https://launchpad.net/~ginggs/+archive/ubuntu/deal.ii-9.3.0-backports">PPA</a>
+ * In order to add the backports <a href="https://launchpad.net/~ginggs/+archive/ubuntu/deal.ii-9.4.0-backports">PPA</a>
  * issue the following commands:
  * @code
- *   sudo add-apt-repository ppa:ginggs/deal.ii-9.3.0-backports
+ *   sudo add-apt-repository ppa:ginggs/deal.ii-9.4.0-backports
  *   sudo apt update
  *   sudo apt install libdeal.ii-dev
  * @endcode
