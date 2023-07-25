@@ -940,12 +940,19 @@ namespace ryujin
            << std::setprecision(2) << std::fixed << cycles_per_second
            << " cycles/s)" << std::endl;
 
-    output << "        [ CFL = "
+    const auto &scheme = time_integrator_.time_stepping_scheme();
+    output << "        [ "
+           << Patterns::Tools::Convert<TimeSteppingScheme>::to_string(scheme)
+           << " with CFL = "
            << std::setprecision(2) << std::fixed << hyperbolic_module_.cfl()
            << " ("
            << std::setprecision(0) << std::fixed << hyperbolic_module_.n_restarts()
+           << "/"
+           << std::setprecision(0) << std::fixed << parabolic_module_.n_restarts()
            << " rsts) ("
            << std::setprecision(0) << std::fixed << hyperbolic_module_.n_warnings()
+           << "/"
+           << std::setprecision(0) << std::fixed << parabolic_module_.n_warnings()
            << " warn) ]" << std::endl;
 
     output << "        [ dt = "

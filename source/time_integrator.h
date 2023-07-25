@@ -254,6 +254,11 @@ namespace ryujin
      */
     Number step_erk_54(vector_type &U, Number t);
 
+    /**
+     * The selected time-stepping scheme.
+     */
+    ACCESSOR_READ_ONLY(time_stepping_scheme);
+
   private:
     //@}
     /**
