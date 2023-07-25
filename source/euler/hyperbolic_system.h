@@ -40,7 +40,7 @@ namespace ryujin
        * The name of the hyperbolic system as a string.
        */
       static inline const std::string problem_name =
-          "Compressible Euler equations (polytropic gas EOS)";
+          "Compressible Euler equations (polytropic gas EOS, optimized)";
 
       /**
        * Constructor.
