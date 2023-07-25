@@ -34,6 +34,7 @@ deal_ii_setup_target(obj_common)
 set(DEPENDENT_SOURCE_FILES
   hyperbolic_module.cc
   initial_values.cc
+  parabolic_module.cc
   postprocessor.cc
   quantities.cc
   time_integrator.cc

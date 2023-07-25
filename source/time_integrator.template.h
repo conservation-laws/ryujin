@@ -7,8 +7,10 @@
 
 #include "time_integrator.h"
 
-// We need to instantiate the HyperbolicModule::step() function:
+// We need to instantiate the HyperbolicModule::step() and
+// ParabolicModule::step() functions:
 #include "hyperbolic_module.template.h"
+#include "parabolic_module.template.h"
 
 namespace ryujin
 {
@@ -20,12 +22,14 @@ namespace ryujin
       std::map<std::string, dealii::Timer> &computing_timer,
       const OfflineData<dim, Number> &offline_data,
       const HyperbolicModule<Description, dim, Number> &hyperbolic_module,
+      const ParabolicModule<Description, dim, Number> &parabolic_module,
       const std::string &subsection /*= "TimeIntegrator"*/)
       : ParameterAcceptor(subsection)
       , mpi_communicator_(mpi_communicator)
       , computing_timer_(computing_timer)
       , offline_data_(&offline_data)
       , hyperbolic_module_(&hyperbolic_module)
+      , parabolic_module_(&parabolic_module)
   {
     cfl_min_ = Number(0.45);
     add_parameter(

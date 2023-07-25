@@ -10,6 +10,7 @@
 #include "convenience_macros.h"
 #include "hyperbolic_module.h"
 #include "offline_data.h"
+#include "parabolic_module.h"
 #include "patterns_conversion.h"
 
 namespace ryujin
@@ -176,6 +177,7 @@ namespace ryujin
         std::map<std::string, dealii::Timer> &computing_timer,
         const OfflineData<dim, Number> &offline_data,
         const HyperbolicModule<Description, dim, Number> &hyperbolic_module,
+        const ParabolicModule<Description, dim, Number> &parabolic_module,
         const std::string &subsection = "/TimeIntegrator");
 
     /**
@@ -280,6 +282,8 @@ namespace ryujin
     dealii::SmartPointer<const OfflineData<dim, Number>> offline_data_;
     dealii::SmartPointer<const HyperbolicModule<Description, dim, Number>>
         hyperbolic_module_;
+    dealii::SmartPointer<const ParabolicModule<Description, dim, Number>>
+        parabolic_module_;
 
     std::vector<vector_type> U_;
     std::vector<precomputed_type> precomputed_;

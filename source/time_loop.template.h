@@ -38,10 +38,17 @@ namespace ryujin
                            hyperbolic_system_,
                            initial_values_,
                            "/F - HyperbolicModule")
+      , parabolic_module_(mpi_communicator_,
+                          computing_timer_,
+                          offline_data_,
+                          hyperbolic_system_,
+                          initial_values_,
+                          "/G - ParabolicModule")
       , time_integrator_(mpi_communicator_,
                          computing_timer_,
                          offline_data_,
                          hyperbolic_module_,
+                         parabolic_module_,
                          "/H - TimeIntegrator")
       , postprocessor_(mpi_communicator_,
                        hyperbolic_system_,
@@ -1043,10 +1050,11 @@ namespace ryujin
 
     print_head(primary.str(), secondary.str(), output);
 
-    output << "Information: (HYP) " << hyperbolic_system_.problem_name //
-           << "\n             [" << base_name_ << "] with "            //
-           << offline_data_.dof_handler().n_dofs() << " Qdofs on "     //
-           << n_mpi_processes_ << " ranks / "                          //
+    output << "Information: (HYP) " << hyperbolic_system_.problem_name  //
+           << "\n             (PAR) " << parabolic_module_.problem_name //
+           << "\n             [" << base_name_ << "] with "             //
+           << offline_data_.dof_handler().n_dofs() << " Qdofs on "      //
+           << n_mpi_processes_ << " ranks / "                           //
 #ifdef WITH_OPENMP
            << MultithreadInfo::n_threads() << " threads." //
 #else
