@@ -19,9 +19,11 @@ namespace ryujin
      * chosen hyperbolic system, the indicator, the limiter and
      * (approximate) Riemann solver.
      *
-     * We group all of these templates together in this struct so that we
-     * only need to add a single template parameter to the all the
-     * algorithm classes, such as HyperbolicModule.
+     * The compressible Euler equations of gas dynamics. Generalized
+     * implementation with a modified approximative Riemann solver,
+     * indicator, and limiter suitable for arbitrary equations of state.
+     *
+     * The parabolic subsystem is chosen to be the identity.
      *
      * @ingroup EulerEquations
      */
