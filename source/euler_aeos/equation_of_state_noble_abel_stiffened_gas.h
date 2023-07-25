@@ -47,39 +47,41 @@ namespace ryujin
       /**
        * The pressure is given by
        * \f{align}
-       *   p + p_\infty = (\gamma - 1) \rho (e - q) / (1 - b \rho)
+       *   p = (\gamma - 1) \rho (e - q) / (1 - b \rho) - \gamma p_\infty
        * \f}
        */
       double pressure(double rho, double e) const final
       {
-        return (gamma_ - 1.) * rho * (e - q_) / (1. - b_ * rho) - pinf_;
+        return (gamma_ - 1.) * rho * (e - q_) / (1. - b_ * rho) -
+               gamma_ * pinf_;
       }
 
 
       /**
        * The specific internal energy is given by
        * \f{align}
-       *   e - q = (p + p_\infty) * (1 - b \rho) / (\rho (\gamma - 1))
+       *   e - q = (p + \gamma p_\infty) * (1 - b \rho) / (\rho (\gamma - 1))
        * \f}
        */
       double specific_internal_energy(double rho, double p) const final
       {
-        const auto numerator = (p + pinf_) * (1. - b_ * rho);
+        const auto numerator = (p + gamma_ * pinf_) * (1. - b_ * rho);
         const auto denominator = rho * (gamma_ - 1.);
         return q_ + numerator / denominator;
       }
 
       /**
-       * The speed of sound is given by
+       * Let \f$X = (1 - b \rho)\f$. The speed of sound is given by
        * \f{align}
-       *   c^2 = \frac{\gamma (p + p_\infty)}{\rho (1 - b \rho)}
-       *       = \frac{\gamma (\gamma -1) (e - q)}{(1 - b\rho)^2}.
+       *   c^2 = \frac{\gamma (p + p_\infty)}{\rho X}
+       *       = \frac{\gamma (\gamma -1)[\rho (e - q) - p_\infty X]}{\rho X^2}
        * \f}
        */
       double speed_of_sound(double rho, double e) const final
       {
         const auto covolume = 1. - b_ * rho;
-        const auto numerator = gamma_ * (gamma_ - 1.) * (e - q_);
+        auto numerator = (rho * (e - q_) - pinf_ * covolume) / rho;
+        numerator *= gamma_ * (gamma_ - 1.);
         return std::sqrt(numerator) / covolume;
       }
 

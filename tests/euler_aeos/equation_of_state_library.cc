@@ -88,15 +88,15 @@ int main()
   NobleAbelStiffenedGas noble_abel_stiffened_gas("");
   test(noble_abel_stiffened_gas);
 
-  std::cout << "\nNobleAbelStiffenedGas with gamma=1.4, b=0.2, q=0.0125, pinf=0.3"
+  std::cout << "\nNobleAbelStiffenedGas with gamma=1.4, b=0.2, q=0.00125, pinf=0.005"
             << std::endl;
   {
     std::stringstream parameters;
     parameters << "subsection noble abel stiffened gas\n"
-               << "set gamma = 1.40\n"
+               << "set gamma = 1.4\n"
                << "set covolume b = 0.2\n"
-               << "set reference specific internal energy = 0.0125\n"
-               << "set reference pressure = 0.30\n"
+               << "set reference specific internal energy = 0.00125\n"
+               << "set reference pressure = 0.005\n"
                << "end\n"
                << std::endl;
     ParameterAcceptor::initialize(parameters);
