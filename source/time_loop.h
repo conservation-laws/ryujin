@@ -42,6 +42,11 @@ namespace ryujin
     using HyperbolicSystem = typename Description::HyperbolicSystem;
 
     /**
+     * @copydoc ParabolicSystem
+     */
+    using ParabolicSystem = typename Description::ParabolicSystem;
+
+    /**
      * @copydoc HyperbolicSystem::View
      */
     using HyperbolicSystemView =
@@ -162,6 +167,7 @@ namespace ryujin
     std::map<std::string, dealii::Timer> computing_timer_;
 
     HyperbolicSystem hyperbolic_system_;
+    ParabolicSystem parabolic_system_;
     Discretization<dim> discretization_;
     OfflineData<dim, Number> offline_data_;
     InitialValues<Description, dim, Number> initial_values_;

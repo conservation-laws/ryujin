@@ -16,14 +16,14 @@ namespace ryujin
       const MPI_Comm &mpi_communicator,
       std::map<std::string, dealii::Timer> &computing_timer,
       const OfflineData<dim, Number> &offline_data,
-      const HyperbolicSystem &hyperbolic_system,
+      const ParabolicSystem &parabolic_system,
       const InitialValues<Description, dim, Number> &initial_values,
       const std::string &subsection /*= "ParabolicModule"*/)
       : ParameterAcceptor(subsection)
       , mpi_communicator_(mpi_communicator)
       , computing_timer_(computing_timer)
       , offline_data_(&offline_data)
-      , hyperbolic_system_(&hyperbolic_system)
+      , parabolic_system_(&parabolic_system)
       , initial_values_(&initial_values)
       , n_restarts_(0)
       , n_warnings_(0)
@@ -52,7 +52,17 @@ namespace ryujin
       vector_type &,
       Number) const
   {
-    // do nothing
+    if constexpr (ParabolicSystem::is_identity) {
+      AssertThrow(
+          false,
+          dealii::ExcMessage("The parabolic system is the identity. This "
+                             "function should have never been called."));
+      __builtin_trap();
+
+    } else {
+
+      // fixme
+    }
   }
 
 
@@ -63,7 +73,17 @@ namespace ryujin
       vector_type &,
       Number) const
   {
-    // do nothing
+    if constexpr (ParabolicSystem::is_identity) {
+      AssertThrow(
+          false,
+          dealii::ExcMessage("The parabolic system is the identity. This "
+                             "function should have never been called."));
+      __builtin_trap();
+
+    } else {
+
+      // fixme
+    }
   }
 
 } /* namespace ryujin */

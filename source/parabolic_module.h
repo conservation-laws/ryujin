@@ -33,16 +33,14 @@ namespace ryujin
   {
   public:
     /**
-     * The name of the parabolic system as a string.
-     *
-     * @todo Refactor into ParabolicSystem class
-     */
-    static inline const std::string problem_name = "Identity";
-
-    /**
      * @copydoc HyperbolicSystem
      */
     using HyperbolicSystem = typename Description::HyperbolicSystem;
+
+    /**
+     * @copydoc ParabolicSystem
+     */
+    using ParabolicSystem = typename Description::ParabolicSystem;
 
     /**
      * @copydoc HyperbolicSystem::View
@@ -69,7 +67,7 @@ namespace ryujin
         const MPI_Comm &mpi_communicator,
         std::map<std::string, dealii::Timer> &computing_timer,
         const OfflineData<dim, Number> &offline_data,
-        const HyperbolicSystem &hyperbolic_system,
+        const ParabolicSystem &parabolic_system,
         const InitialValues<Description, dim, Number> &initial_values,
         const std::string &subsection = "/ParabolicModule");
 
@@ -115,6 +113,12 @@ namespace ryujin
                              vector_type &new_U,
                              Number tau) const;
 
+    //@}
+    /**
+     * @name Accessors
+     */
+    //@{
+
     /**
      * Return a reference to the OfflineData object
      */
@@ -123,7 +127,7 @@ namespace ryujin
     /**
      * Return a reference to the HyperbolicSystem object
      */
-    ACCESSOR_READ_ONLY(hyperbolic_system)
+    ACCESSOR_READ_ONLY(parabolic_system)
 
     /**
      * The number of restarts issued by the step() function.
@@ -137,11 +141,6 @@ namespace ryujin
     ACCESSOR_READ_ONLY(n_warnings)
 
   private:
-    //@}
-    /**
-     * @name Run time options
-     */
-    //@{
 
     //@}
     /**
@@ -153,7 +152,7 @@ namespace ryujin
     std::map<std::string, dealii::Timer> &computing_timer_;
 
     dealii::SmartPointer<const OfflineData<dim, Number>> offline_data_;
-    dealii::SmartPointer<const HyperbolicSystem> hyperbolic_system_;
+    dealii::SmartPointer<const ParabolicSystem> parabolic_system_;
     dealii::SmartPointer<const InitialValues<Description, dim, Number>>
         initial_values_;
 

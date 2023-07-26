@@ -9,6 +9,7 @@
 #include "../euler/indicator.h"
 #include "../euler/limiter.h"
 #include "../euler/riemann_solver.h"
+#include "parabolic_system.h"
 
 namespace ryujin
 {
@@ -27,6 +28,7 @@ namespace ryujin
      */
     struct Description {
       using HyperbolicSystem = Euler::HyperbolicSystem;
+      using ParabolicSystem = NavierStokes::ParabolicSystem;
 
       template <int dim, typename Number = double>
       using Indicator = Euler::Indicator<dim, Number>;

@@ -29,6 +29,7 @@ namespace ryujin
       : ParameterAcceptor("/A - TimeLoop")
       , mpi_communicator_(mpi_comm)
       , hyperbolic_system_("/B - Equation")
+      , parabolic_system_("/B - Equation")
       , discretization_(mpi_communicator_, "/C - Discretization")
       , offline_data_(mpi_communicator_, discretization_, "/D - OfflineData")
       , initial_values_(hyperbolic_system_, offline_data_, "/E - InitialValues")
@@ -41,7 +42,7 @@ namespace ryujin
       , parabolic_module_(mpi_communicator_,
                           computing_timer_,
                           offline_data_,
-                          hyperbolic_system_,
+                          parabolic_system_,
                           initial_values_,
                           "/G - ParabolicModule")
       , time_integrator_(mpi_communicator_,
@@ -955,6 +956,9 @@ namespace ryujin
            << std::setprecision(0) << std::fixed << parabolic_module_.n_warnings()
            << " warn) ]" << std::endl;
 
+    if constexpr (!ParabolicSystem::is_identity)
+      parabolic_system_.print_solver_statistics(output);
+
     output << "        [ dt = "
            << std::scientific << std::setprecision(2) << delta_time
            << " ( "
@@ -1057,11 +1061,12 @@ namespace ryujin
 
     print_head(primary.str(), secondary.str(), output);
 
-    output << "Information: (HYP) " << hyperbolic_system_.problem_name  //
-           << "\n             (PAR) " << parabolic_module_.problem_name //
-           << "\n             [" << base_name_ << "] with "             //
-           << offline_data_.dof_handler().n_dofs() << " Qdofs on "      //
-           << n_mpi_processes_ << " ranks / "                           //
+    output << "Information: (HYP) " << hyperbolic_system_.problem_name;
+    if constexpr (!ParabolicSystem::is_identity)
+      output << "\n             (PAR) " << parabolic_system_.problem_name;
+    output << "\n             [" << base_name_ << "] with "        //
+           << offline_data_.dof_handler().n_dofs() << " Qdofs on " //
+           << n_mpi_processes_ << " ranks / "                      //
 #ifdef WITH_OPENMP
            << MultithreadInfo::n_threads() << " threads." //
 #else

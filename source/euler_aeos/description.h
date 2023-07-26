@@ -6,6 +6,7 @@
 #pragma once
 
 #include "hyperbolic_system.h"
+#include "parabolic_system.h"
 #include "indicator.h"
 #include "limiter.h"
 #include "riemann_solver.h"
@@ -29,6 +30,7 @@ namespace ryujin
      */
     struct Description {
       using HyperbolicSystem = EulerAEOS::HyperbolicSystem;
+      using ParabolicSystem = EulerAEOS::ParabolicSystem;
 
       template <int dim, typename Number = double>
       using Indicator = EulerAEOS::Indicator<dim, Number>;
