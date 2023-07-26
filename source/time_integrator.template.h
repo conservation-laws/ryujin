@@ -93,6 +93,14 @@ namespace ryujin
       U_.resize(5);
       precomputed_.resize(5);
       break;
+    case TimeSteppingScheme::strang_ssprk_33_cn:
+      U_.resize(2);
+      precomputed_.resize(2);
+      break;
+    case TimeSteppingScheme::strang_erk_33_cn:
+      U_.resize(3);
+      precomputed_.resize(3);
+      break;
     }
 
     /* Initialize temporary vectors and matrices: */
@@ -112,6 +120,46 @@ namespace ryujin
                 ExcMessage("cfl max must be greater than or equal to cfl min"));
 
     hyperbolic_module_->cfl(cfl_max_);
+
+    const auto check_whether_timestepping_makes_sense = [&]() {
+      /*
+       * Make sure the user selects an appropriate time-stepping scheme.
+       */
+
+      switch (time_stepping_scheme_) {
+      case TimeSteppingScheme::ssprk_33:
+        [[fallthrough]];
+      case TimeSteppingScheme::erk_11:
+        [[fallthrough]];
+      case TimeSteppingScheme::erk_22:
+        [[fallthrough]];
+      case TimeSteppingScheme::erk_33:
+        [[fallthrough]];
+      case TimeSteppingScheme::erk_43:
+        [[fallthrough]];
+      case TimeSteppingScheme::erk_54: {
+        AssertThrow(
+            ParabolicSystem::is_identity,
+            dealii::ExcMessage(
+                "The selected equation consists of a hyperbolic and nontrivial "
+                "parabolic subsystem and requires an IMEX timestepping "
+                "scheme such as »strang erk 33 cn«."));
+      }
+      case TimeSteppingScheme::strang_ssprk_33_cn:
+        [[fallthrough]];
+      case TimeSteppingScheme::strang_erk_33_cn: {
+        AssertThrow(
+            !ParabolicSystem::is_identity,
+            dealii::ExcMessage(
+                "The selected equation has a trivial parabolic subsystem and "
+                "should not be run with an IMEX timestepping scheme."));
+      }
+      }
+    };
+
+    check_whether_timestepping_makes_sense();
+    this->parse_parameters_call_back.connect(
+        check_whether_timestepping_makes_sense);
   }
 
 
@@ -138,6 +186,10 @@ namespace ryujin
         return step_erk_43(U, t);
       case TimeSteppingScheme::erk_54:
         return step_erk_54(U, t);
+      case TimeSteppingScheme::strang_ssprk_33_cn:
+        return step_strang_ssprk_33_cn(U, t);
+      case TimeSteppingScheme::strang_erk_33_cn:
+        return step_strang_erk_33_cn(U, t);
       default:
         __builtin_unreachable();
       }
@@ -145,6 +197,8 @@ namespace ryujin
 
     if (cfl_recovery_strategy_ == CFLRecoveryStrategy::bang_bang_control) {
       hyperbolic_module_->id_violation_strategy_ =
+          IDViolationStrategy::raise_exception;
+      parabolic_module_->id_violation_strategy_ =
           IDViolationStrategy::raise_exception;
       hyperbolic_module_->cfl(cfl_max_);
     }
@@ -159,6 +213,7 @@ namespace ryujin
 
       if (cfl_recovery_strategy_ == CFLRecoveryStrategy::bang_bang_control) {
         hyperbolic_module_->id_violation_strategy_ = IDViolationStrategy::warn;
+        parabolic_module_->id_violation_strategy_ = IDViolationStrategy::warn;
         hyperbolic_module_->cfl(cfl_min_);
         return single_step();
       }
@@ -409,4 +464,22 @@ namespace ryujin
     U.swap(U_[4]);
     return 5. * tau;
   }
+
+
+  template <typename Description, int dim, typename Number>
+  Number TimeIntegrator<Description, dim, Number>::step_strang_ssprk_33_cn(
+      vector_type &U, Number t)
+  {
+    //FIXME
+  }
+
+
+  template <typename Description, int dim, typename Number>
+  Number TimeIntegrator<Description, dim, Number>::step_strang_erk_33_cn(
+      vector_type &U, Number t)
+  {
+    //FIXME
+  }
+
+
 } /* namespace ryujin */

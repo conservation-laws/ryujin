@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include "hyperbolic_module.h"
+
 #include <compile_time_options.h>
 
 #include "convenience_macros.h"
@@ -54,13 +56,6 @@ namespace ryujin
     using vector_type = typename HyperbolicSystemView::vector_type;
 
     /**
-     * Typedef for a MultiComponentVector storing precomputed values.
-     */
-    using precomputed_vector_type =
-        typename HyperbolicSystemView::precomputed_vector_type;
-
-
-    /**
      * Constructor.
      */
     ParabolicModule(
@@ -95,10 +90,7 @@ namespace ryujin
     template <int stages>
     void
     step(const vector_type &old_U,
-         const precomputed_vector_type &old_precomputed,
          std::array<std::reference_wrapper<const vector_type>, stages> stage_U,
-         std::array<std::reference_wrapper<const precomputed_vector_type>,
-                    stages> stage_precomputed,
          const std::array<Number, stages> stage_weights,
          vector_type &new_U,
          Number tau) const;
@@ -109,7 +101,6 @@ namespace ryujin
      * store the result in @p new_U).
      */
     void crank_nicolson_step(const vector_type &old_U,
-                             const precomputed_vector_type &old_precomputed,
                              vector_type &new_U,
                              Number tau) const;
 
@@ -140,8 +131,10 @@ namespace ryujin
      */
     ACCESSOR_READ_ONLY(n_warnings)
 
-  private:
+    // FIXME: refactor to function
+    mutable IDViolationStrategy id_violation_strategy_;
 
+  private:
     //@}
     /**
      * @name Internal data

@@ -20,6 +20,7 @@ namespace ryujin
       const InitialValues<Description, dim, Number> &initial_values,
       const std::string &subsection /*= "ParabolicModule"*/)
       : ParameterAcceptor(subsection)
+      , id_violation_strategy_(IDViolationStrategy::warn)
       , mpi_communicator_(mpi_communicator)
       , computing_timer_(computing_timer)
       , offline_data_(&offline_data)
@@ -45,9 +46,7 @@ namespace ryujin
   template <int stages>
   void ParabolicModule<Description, dim, Number>::step(
       const vector_type &,
-      const precomputed_vector_type &,
       std::array<std::reference_wrapper<const vector_type>, stages>,
-      std::array<std::reference_wrapper<const precomputed_vector_type>, stages>,
       const std::array<Number, stages>,
       vector_type &,
       Number) const
@@ -68,10 +67,7 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   void ParabolicModule<Description, dim, Number>::crank_nicolson_step(
-      const vector_type &,
-      const precomputed_vector_type &,
-      vector_type &,
-      Number) const
+      const vector_type &old_U, vector_type &new_U, Number) const
   {
     if constexpr (ParabolicSystem::is_identity) {
       AssertThrow(
