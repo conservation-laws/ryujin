@@ -148,7 +148,9 @@ set(CMAKE_EXE_LINKER_FLAGS "")
 include(GNUInstallDirs)
 
 add_subdirectory(source)
-add_subdirectory(prm)
+
+file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/run/")
+file(CREATE_LINK "${CMAKE_SOURCE_DIR}/prm" "${CMAKE_BINARY_DIR}/run/prm" SYMBOLIC)
 
 enable_testing()
 add_subdirectory(tests)
