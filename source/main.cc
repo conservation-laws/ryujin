@@ -80,7 +80,7 @@ int main(int argc, char *argv[])
   if (argc > 2) {
     if (dealii::Utilities::MPI::this_mpi_process(mpi_communicator) == 0) {
       std::cout << "[ERROR] Invalid number of parameters. At most one argument "
-                << "supported which has to be a parameter file" << std::endl;
+                << "supported which has to be a parameter file." << std::endl;
     }
 
     LIKWID_CLOSE;
@@ -89,8 +89,22 @@ int main(int argc, char *argv[])
   }
 
   const auto executable_name = std::filesystem::path(argv[0]).filename();
-  const std::string parameter_file =
-      argc == 2 ? argv[1] : executable_name.string() + ".prm";
+  std::string parameter_file = executable_name.string() + ".prm";
+
+  if (argc == 2) {
+    parameter_file = argv[1];
+
+    if (!std::filesystem::exists(parameter_file)) {
+      if (dealii::Utilities::MPI::this_mpi_process(mpi_communicator) == 0) {
+        std::cout << "[ERROR] The specified parameter file »" << parameter_file
+                  << "« does not exist." << std::endl;
+      }
+
+      LIKWID_CLOSE;
+      LSAN_DISABLE;
+      return 1;
+    }
+  }
 
   if (!std::filesystem::exists(parameter_file)) {
     if (dealii::Utilities::MPI::this_mpi_process(mpi_communicator) == 0) {
