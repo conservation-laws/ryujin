@@ -236,7 +236,7 @@ namespace ryujin
      * supplied value is used for time stepping instead of the computed
      * maximal time step size.
      */
-    Number step_ssprk_33(vector_type &U, Number t, Number tau = Number(0.));
+    Number step_ssprk_33(vector_type &U, Number t);
 
     /**
      * Given a reference to a previous state vector U performs an explicit
