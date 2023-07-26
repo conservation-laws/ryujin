@@ -78,14 +78,16 @@ namespace ryujin
             "Initial primitive state (rho, u, v, p) on top right");
 
         const auto convert_states = [&]() {
-          state_bottom_left_ =
-              hyperbolic_system_.from_initial_state(primitive_bottom_left_);
-          state_bottom_right_ =
-              hyperbolic_system_.from_initial_state(primitive_bottom_right_);
-          state_top_left_ =
-              hyperbolic_system_.from_initial_state(primitive_top_left_);
-          state_top_right_ =
-              hyperbolic_system_.from_initial_state(primitive_top_right_);
+          if constexpr (dim != 1) {
+            state_bottom_left_ =
+                hyperbolic_system_.from_initial_state(primitive_bottom_left_);
+            state_bottom_right_ =
+                hyperbolic_system_.from_initial_state(primitive_bottom_right_);
+            state_top_left_ =
+                hyperbolic_system_.from_initial_state(primitive_top_left_);
+            state_top_right_ =
+                hyperbolic_system_.from_initial_state(primitive_top_right_);
+          }
         };
         this->parse_parameters_call_back.connect(convert_states);
         convert_states();
