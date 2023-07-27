@@ -9,7 +9,7 @@
 #include <openmp.h>
 #include <simd.h>
 
-#include "description.h"
+#include "../euler/hyperbolic_system.h"
 #include "parabolic_system.h"
 
 #include <deal.II/base/vectorization.h>
@@ -20,7 +20,7 @@
 
 /*
  * FIXME: generalize and make these operators equation independent and
- * refactor into ../parabolic_gmg_operators.h
+ * refactor into ../parabolic_module_gmg_operators.h
  */
 
 namespace ryujin

@@ -6,6 +6,7 @@
 #pragma once
 
 #include "parabolic_solver.h"
+#include "description.h"
 
 #include <introspection.h>
 #include <openmp.h>
@@ -30,8 +31,8 @@ namespace ryujin
   {
     using namespace dealii;
 
-    template <int dim, typename Number>
-    ParabolicSolver<dim, Number>::ParabolicSolver(
+    template <typename Description, int dim, typename Number>
+    ParabolicSolver<Description, dim, Number>::ParabolicSolver(
         const MPI_Comm &mpi_communicator,
         std::map<std::string, dealii::Timer> &computing_timer,
         const HyperbolicSystem &hyperbolic_system,
@@ -120,8 +121,8 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    void ParabolicSolver<dim, Number>::prepare()
+    template <typename Description, int dim, typename Number>
+    void ParabolicSolver<Description, dim, Number>::prepare()
     {
 #ifdef DEBUG_OUTPUT
       std::cout << "ParabolicSolver<dim, Number>::prepare()" << std::endl;
@@ -206,12 +207,13 @@ namespace ryujin
                                 level_matrix_free_);
     }
 
-
-    template <int dim, typename Number>
-    Number ParabolicSolver<dim, Number>::step(vector_type &U,
-                                              Number t,
-                                              Number tau,
-                                              unsigned int cycle) const
+    template <typename Description, int dim, typename Number>
+    void ParabolicSolver<Description, dim, Number>::crank_nicolson_step(
+        const vector_type &old_U,
+        const Number t,
+        vector_type &new_U,
+        Number tau,
+        unsigned int cycle) const
     {
 #ifdef DEBUG_OUTPUT
       std::cout << "ParabolicSolver<dim, Number>::step()" << std::endl;
@@ -260,7 +262,7 @@ namespace ryujin
 
         RYUJIN_OMP_FOR
         for (unsigned int i = 0; i < size_regular; i += simd_length) {
-          const auto U_i = U.template get_tensor<VA>(i);
+          const auto U_i = old_U.template get_tensor<VA>(i);
           const auto view = hyperbolic_system_->template view<dim, VA>();
           const auto rho_i = view.density(U_i);
           const auto M_i = view.momentum(U_i);
@@ -279,7 +281,7 @@ namespace ryujin
         RYUJIN_PARALLEL_REGION_END
 
         for (unsigned int i = size_regular; i < n_owned; ++i) {
-          const auto U_i = U.get_tensor(i);
+          const auto U_i = old_U.get_tensor(i);
           const auto view = hyperbolic_system_->template view<dim, Number>();
           const auto rho_i = view.density(U_i);
           const auto M_i = view.momentum(U_i);
@@ -789,7 +791,7 @@ namespace ryujin
 
         RYUJIN_OMP_FOR
         for (unsigned int i = 0; i < size_regular; i += simd_length) {
-          auto U_i = U.template get_tensor<VA>(i);
+          auto U_i = old_U.template get_tensor<VA>(i);
           const auto view = hyperbolic_system_->template view<dim, VA>();
           const auto rho_i = view.density(U_i);
 
@@ -810,13 +812,13 @@ namespace ryujin
             U_i[1 + d] = m_i_new[d];
           U_i[1 + dim] = E_i_new;
 
-          U.template write_tensor<VA>(U_i, i);
+          new_U.template write_tensor<VA>(U_i, i);
         }
 
         RYUJIN_PARALLEL_REGION_END
 
         for (unsigned int i = size_regular; i < n_owned; ++i) {
-          auto U_i = U.get_tensor(i);
+          auto U_i = old_U.get_tensor(i);
           const auto view = hyperbolic_system_->template view<dim, Number>();
           const auto rho_i = view.density(U_i);
 
@@ -837,17 +839,15 @@ namespace ryujin
             U_i[1 + d] = m_i_new[d];
           U_i[1 + dim] = E_i_new;
 
-          U.write_tensor(U_i, i);
+          new_U.write_tensor(U_i, i);
         }
 
-        U.update_ghost_values();
+        new_U.update_ghost_values();
 
         LIKWID_MARKER_STOP("time_step_n_4");
       }
 
       CALLGRIND_STOP_INSTRUMENTATION
-
-      return tau;
     }
 
   } // namespace NavierStokes

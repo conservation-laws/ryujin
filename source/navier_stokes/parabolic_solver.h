@@ -13,7 +13,6 @@
 #include <simd.h>
 #include <sparse_matrix_simd.h>
 
-#include "description.h"
 #include "parabolic_solver_gmg_operators.h"
 
 #include <deal.II/base/mg_level_object.h>
@@ -94,9 +93,9 @@ namespace ryujin
      *
      * @todo Provide more details about boundary conditions.
      *
-     * @ingroup ParabolicSolver
+     * @ingroup ParabolicModule
      */
-    template <int dim, typename Number = double>
+    template <typename Description, int dim, typename Number = double>
     class ParabolicSolver final : public dealii::ParameterAcceptor
     {
     public:
@@ -162,8 +161,6 @@ namespace ryujin
        * old_t and a time-step size @p tau perform an implicit Crank-Nicolson
        * step (and store the result in @p new_U).
        */
-      Number
-      step(vector_type &U, Number t, Number tau, unsigned int cycle) const;
       void crank_nicolson_step(const vector_type &old_U,
                                const Number old_t,
                                vector_type &new_U,

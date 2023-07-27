@@ -10,6 +10,7 @@
 #include "indicator.h"
 #include "limiter.h"
 #include "riemann_solver.h"
+#include "../stub_solver.h"
 
 namespace ryujin
 {
@@ -30,7 +31,11 @@ namespace ryujin
      */
     struct Description {
       using HyperbolicSystem = EulerAEOS::HyperbolicSystem;
+
       using ParabolicSystem = EulerAEOS::ParabolicSystem;
+
+      template <int dim, typename Number = double>
+      using ParabolicSolver = ryujin::StubSolver<Description, dim, Number>;
 
       template <int dim, typename Number = double>
       using Indicator = EulerAEOS::Indicator<dim, Number>;
