@@ -42,6 +42,7 @@ namespace ryujin
       , parabolic_module_(mpi_communicator_,
                           computing_timer_,
                           offline_data_,
+                          hyperbolic_system_,
                           parabolic_system_,
                           initial_values_,
                           "/G - ParabolicModule")
@@ -201,6 +202,7 @@ namespace ryujin
     const auto prepare_compute_kernels = [&]() {
       offline_data_.prepare(problem_dimension);
       hyperbolic_module_.prepare();
+      parabolic_module_.prepare();
       time_integrator_.prepare();
       postprocessor_.prepare();
       vtu_output_.prepare();

@@ -45,6 +45,12 @@ namespace ryujin
     using ParabolicSystem = typename Description::ParabolicSystem;
 
     /**
+     * The ParabolicSolver
+     */
+    using ParabolicSolver =
+        typename Description::template ParabolicSolver<dim, Number>;
+
+    /**
      * @copydoc HyperbolicSystem::View
      */
     using HyperbolicSystemView =
@@ -62,6 +68,7 @@ namespace ryujin
         const MPI_Comm &mpi_communicator,
         std::map<std::string, dealii::Timer> &computing_timer,
         const OfflineData<dim, Number> &offline_data,
+        const HyperbolicSystem &hyperbolic_system,
         const ParabolicSystem &parabolic_system,
         const InitialValues<Description, dim, Number> &initial_values,
         const std::string &subsection = "/ParabolicModule");
@@ -111,17 +118,6 @@ namespace ryujin
      * @name Accessors
      */
     //@{
-
-    /**
-     * Return a reference to the OfflineData object
-     */
-    ACCESSOR_READ_ONLY(offline_data)
-
-    /**
-     * Return a reference to the HyperbolicSystem object
-     */
-    ACCESSOR_READ_ONLY(parabolic_system)
-
     /**
      * The number of restarts issued by the step() function.
      */
@@ -143,13 +139,9 @@ namespace ryujin
      */
     //@{
 
-    const MPI_Comm &mpi_communicator_;
-    std::map<std::string, dealii::Timer> &computing_timer_;
-
-    dealii::SmartPointer<const OfflineData<dim, Number>> offline_data_;
-    dealii::SmartPointer<const ParabolicSystem> parabolic_system_;
-    dealii::SmartPointer<const InitialValues<Description, dim, Number>>
-        initial_values_;
+    // FIXME: refactor contents into this class.
+    ParabolicSolver parabolic_solver_;
+    unsigned int cycle_;
 
     mutable unsigned int n_restarts_;
     mutable unsigned int n_warnings_;

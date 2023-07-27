@@ -16,16 +16,19 @@ namespace ryujin
       const MPI_Comm &mpi_communicator,
       std::map<std::string, dealii::Timer> &computing_timer,
       const OfflineData<dim, Number> &offline_data,
+      const HyperbolicSystem &hyperbolic_system,
       const ParabolicSystem &parabolic_system,
       const InitialValues<Description, dim, Number> &initial_values,
       const std::string &subsection /*= "ParabolicModule"*/)
       : ParameterAcceptor(subsection)
       , id_violation_strategy_(IDViolationStrategy::warn)
-      , mpi_communicator_(mpi_communicator)
-      , computing_timer_(computing_timer)
-      , offline_data_(&offline_data)
-      , parabolic_system_(&parabolic_system)
-      , initial_values_(&initial_values)
+      , parabolic_solver_(mpi_communicator,
+                          computing_timer,
+                          hyperbolic_system,
+                          parabolic_system,
+                          offline_data,
+                          initial_values,
+                          subsection)
       , n_restarts_(0)
       , n_warnings_(0)
   {
@@ -39,6 +42,10 @@ namespace ryujin
     std::cout << "ParabolicModule<Description, dim, Number>::prepare()"
               << std::endl;
 #endif
+    if constexpr (!ParabolicSystem::is_identity)
+      parabolic_solver_.prepare();
+
+    cycle_ = 0;
   }
 
 
@@ -61,7 +68,8 @@ namespace ryujin
 
     } else {
 
-      // fixme
+      AssertThrow(false, dealii::ExcNotImplemented());
+      __builtin_trap();
     }
   }
 
@@ -69,9 +77,9 @@ namespace ryujin
   template <typename Description, int dim, typename Number>
   void ParabolicModule<Description, dim, Number>::crank_nicolson_step(
       const vector_type &old_U,
-      const Number,
+      const Number t,
       vector_type &new_U,
-      const Number) const
+      const Number tau) const
   {
     if constexpr (ParabolicSystem::is_identity) {
       AssertThrow(
@@ -82,7 +90,7 @@ namespace ryujin
 
     } else {
 
-      // fixme
+      parabolic_solver_.crank_nicolson_step(old_U, t, new_U, tau, cycle_);
     }
   }
 
