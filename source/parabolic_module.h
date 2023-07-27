@@ -79,9 +79,9 @@ namespace ryujin
     //@{
 
     /**
-     * Given a reference to a previous state vector @p old_U and a
-     * time-step size @p tau perform an implicit backward euler step (and
-     * store the result in @p new_U).
+     * Given a reference to a previous state vector @p old_U at time
+     * @p old_t and a time-step size @p tau perform an implicit backward
+     * euler step (and store the result in @p new_U).
      *
      * The function takes an optional array of states @p stage_U together
      * with a an array of weights @p stage_weights to construct a modified
@@ -90,19 +90,21 @@ namespace ryujin
     template <int stages>
     void
     step(const vector_type &old_U,
+         const Number old_t,
          std::array<std::reference_wrapper<const vector_type>, stages> stage_U,
          const std::array<Number, stages> stage_weights,
          vector_type &new_U,
-         Number tau) const;
+         const Number tau) const;
 
     /**
-     * Given a reference to a previous state vector @p old_U and a
-     * time-step size @p tau perform an implicit Crank-Nicolson step (and
-     * store the result in @p new_U).
+     * Given a reference to a previous state vector @p old_U at time @p
+     * old_t and a time-step size @p tau perform an implicit Crank-Nicolson
+     * step (and store the result in @p new_U).
      */
     void crank_nicolson_step(const vector_type &old_U,
+                             const Number old_t,
                              vector_type &new_U,
-                             Number tau) const;
+                             const Number tau) const;
 
     //@}
     /**

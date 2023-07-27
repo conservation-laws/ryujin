@@ -46,10 +46,11 @@ namespace ryujin
   template <int stages>
   void ParabolicModule<Description, dim, Number>::step(
       const vector_type &,
+      const Number,
       std::array<std::reference_wrapper<const vector_type>, stages>,
       const std::array<Number, stages>,
       vector_type &,
-      Number) const
+      const Number) const
   {
     if constexpr (ParabolicSystem::is_identity) {
       AssertThrow(
@@ -67,7 +68,10 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   void ParabolicModule<Description, dim, Number>::crank_nicolson_step(
-      const vector_type &old_U, vector_type &new_U, Number) const
+      const vector_type &old_U,
+      const Number,
+      vector_type &new_U,
+      const Number) const
   {
     if constexpr (ParabolicSystem::is_identity) {
       AssertThrow(

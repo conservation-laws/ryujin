@@ -497,7 +497,7 @@ namespace ryujin
 
     /* Implicit Crank-Nicolson step with final result in U_[2]: */
 
-    parabolic_module_->crank_nicolson_step(U_[0], U_[2], 2.0 * tau);
+    parabolic_module_->crank_nicolson_step(U_[0], t, U_[2], 2.0 * tau);
 
     /* Second SSPRK 3 step with final result in U_[0]: */
 
@@ -557,7 +557,7 @@ namespace ryujin
 
     /* Implicit Crank-Nicolson step with final result in U_[3]: */
 
-    parabolic_module_->crank_nicolson_step(U_[2], U_[3], 6.0 * tau);
+    parabolic_module_->crank_nicolson_step(U_[2], t, U_[3], 6.0 * tau);
 
     /* First explicit SSPRK 3 step with final result in U_[0]: */
 
