@@ -202,7 +202,9 @@ namespace ryujin
                          (R_infty * velocity_left_ * velocity_right_ - v * v);
         Assert(e > 0., dealii::ExcInternalError());
 
-        const auto state_1d = state_type{
+        using state_type_1d =
+            typename HyperbolicSystem::template View<1, Number>::state_type;
+        const auto state_1d = state_type_1d{
             {Number(rho),
              Number(rho * (velocity_ + v)),
              Number(rho * (e + 0.5 * (velocity_ + v) * (velocity_ + v)))}};
