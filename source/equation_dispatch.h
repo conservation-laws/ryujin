@@ -11,6 +11,7 @@
 
 #include "euler/description.h"
 #include "euler_aeos/description.h"
+#include "navier_stokes/description.h"
 // #include "shallow_water/description.h"
 
 #include <deal.II/base/mpi.h>
@@ -36,9 +37,11 @@ namespace ryujin
     euler_aeos,
 
     /**
-     * The shallow water equations
+     * The compressible Navier-Stokes equations of gas dynamics with a
+     * polytropic gas equation of state, Newtonian fluid viscosity model,
+     * and a heat flux governed by  Fourier's law.
      */
-    //shallow_water
+    navier_stokes,
   };
 } // namespace ryujin
 
@@ -46,40 +49,13 @@ namespace ryujin
 DECLARE_ENUM(ryujin::Equation,
              LIST({ryujin::Equation::euler, "euler"},
                   {ryujin::Equation::euler_aeos, "euler aeos"},
+                  {ryujin::Equation::navier_stokes, "navier stokes"},
                   // {ryujin::Equation::shallow_water, "shallow water"},
                   ));
 #endif
 
 namespace ryujin
 {
-#ifndef DOXYGEN
-  /*
-   * FIXME: This typetrait feels redundant...
-   */
-
-  template <typename description>
-  constexpr Equation get_equation() = delete;
-
-  template <>
-  constexpr Equation get_equation<Euler::Description>()
-  {
-    return Equation::euler;
-  }
-
-  template <>
-  constexpr Equation get_equation<EulerAEOS::Description>()
-  {
-    return Equation::euler_aeos;
-  }
-
-//   template <>
-//   constexpr Equation get_equation<ShallowWater::Description>()
-//   {
-//     return Equation::shallow_water;
-//   }
-#endif
-
-
   /**
    * Dispatcher class that calls into the right TimeLoop depending on
    * what equation has been selected.
@@ -109,23 +85,22 @@ namespace ryujin
 
       switch (equation_) {
       case Equation::euler: {
-        ryujin::TimeLoop<ryujin::Euler::Description, DIM, NUMBER> time_loop(
-            mpi_communicator);
+        TimeLoop<Euler::Description, DIM, NUMBER> time_loop(mpi_communicator);
         ParameterAcceptor::initialize(parameter_file);
         time_loop.run();
       }; break;
       case Equation::euler_aeos: {
-        ryujin::TimeLoop<ryujin::EulerAEOS::Description, DIM, NUMBER> time_loop(
+        TimeLoop<EulerAEOS::Description, DIM, NUMBER> time_loop(
             mpi_communicator);
         ParameterAcceptor::initialize(parameter_file);
         time_loop.run();
       }; break;
-//       case Equation::shallow_water: {
-//         ryujin::TimeLoop<ryujin::ShallowWater::Description, DIM, NUMBER>
-//             time_loop(mpi_communicator);
-//         ParameterAcceptor::initialize(parameter_file);
-//         time_loop.run();
-//       }; break;
+      case Equation::navier_stokes: {
+        TimeLoop<NavierStokes::Description, DIM, NUMBER> time_loop(
+            mpi_communicator);
+        ParameterAcceptor::initialize(parameter_file);
+        time_loop.run();
+      }; break;
       }
     }
 
@@ -137,16 +112,9 @@ namespace ryujin
   namespace internal
   {
     template <typename description>
-    void create_parameter_template(const std::string &parameter_file,
+    void create_parameter_template(const std::string &name,
                                    const MPI_Comm &mpi_communicator)
     {
-      constexpr auto equation = get_equation<description>();
-      const std::string name =
-          dealii::Patterns::Tools::Convert<Equation>::to_string(equation);
-
-      std::string suffix = "." + name;
-      std::replace(suffix.begin(), suffix.end(), ' ', '_');
-
       {
         /*
          * Create temporary objects for the sole purpose of populating the
@@ -161,17 +129,23 @@ namespace ryujin
         prm.set("equation", name);
         prm.leave_subsection();
 
-        if (dealii::Utilities::MPI::this_mpi_process(mpi_communicator) == 0) {
-          const auto template_file = parameter_file + suffix;
+        std::string base_name = name;
+        std::replace(base_name.begin(), base_name.end(), ' ', '_');
 
-          if (!std::filesystem::exists(template_file))
-            prm.print_parameters(template_file,
+        if (dealii::Utilities::MPI::this_mpi_process(mpi_communicator) == 0) {
+          const auto full_name = base_name + "-default_parameters.prm";
+          if (!std::filesystem::exists(full_name))
+            prm.print_parameters(full_name,
                                  dealii::ParameterHandler::OutputStyle::PRM);
+
+          const auto short_name = base_name + "-brief.prm";
+          if (!std::filesystem::exists(short_name))
+            prm.print_parameters(short_name,
+                                 dealii::ParameterHandler::OutputStyle::Short);
         }
         // all objects have to go out of scope, see
         // https://github.com/dealii/dealii/issues/15111
       }
-
       dealii::ParameterAcceptor::clear();
     }
   } // namespace internal
@@ -180,13 +154,13 @@ namespace ryujin
   void create_parameter_templates(const std::string &parameter_file,
                                   const MPI_Comm &mpi_communicator)
   {
-    internal::create_parameter_template<Euler::Description>(parameter_file,
+    internal::create_parameter_template<Euler::Description>("euler",
                                                             mpi_communicator);
+    std::filesystem::copy("euler-brief.prm", parameter_file);
 
     internal::create_parameter_template<EulerAEOS::Description>(
-        parameter_file, mpi_communicator);
-
-//     internal::create_parameter_template<ShallowWater::Description>(
-//         parameter_file, mpi_communicator);
+        "euler aeos", mpi_communicator);
+    internal::create_parameter_template<NavierStokes::Description>(
+        "navier stokes", mpi_communicator);
   }
 } // namespace ryujin

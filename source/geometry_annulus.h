@@ -215,7 +215,7 @@ namespace ryujin
 
 
     template <template <int, int> class Triangulation>
-    void annulus(Triangulation<3, 3> /* &triangulation */,
+    void annulus(Triangulation<3, 3> & /* triangulation */,
                  const double /* length */,
                  const double /* inner_radius */,
                  const double /* outer_radius */,

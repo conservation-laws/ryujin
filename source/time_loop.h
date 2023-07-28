@@ -11,6 +11,7 @@
 #include "hyperbolic_module.h"
 #include "initial_values.h"
 #include "offline_data.h"
+#include "parabolic_module.h"
 #include "postprocessor.h"
 #include "quantities.h"
 #include "time_integrator.h"
@@ -39,6 +40,11 @@ namespace ryujin
      * @copydoc HyperbolicSystem
      */
     using HyperbolicSystem = typename Description::HyperbolicSystem;
+
+    /**
+     * @copydoc ParabolicSystem
+     */
+    using ParabolicSystem = typename Description::ParabolicSystem;
 
     /**
      * @copydoc HyperbolicSystem::View
@@ -161,10 +167,12 @@ namespace ryujin
     std::map<std::string, dealii::Timer> computing_timer_;
 
     HyperbolicSystem hyperbolic_system_;
+    ParabolicSystem parabolic_system_;
     Discretization<dim> discretization_;
     OfflineData<dim, Number> offline_data_;
     InitialValues<Description, dim, Number> initial_values_;
     HyperbolicModule<Description, dim, Number> hyperbolic_module_;
+    ParabolicModule<Description, dim, Number> parabolic_module_;
     TimeIntegrator<Description, dim, Number> time_integrator_;
     Postprocessor<Description, dim, Number> postprocessor_;
     VTUOutput<Description, dim, Number> vtu_output_;

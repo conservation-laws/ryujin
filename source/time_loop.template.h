@@ -29,6 +29,7 @@ namespace ryujin
       : ParameterAcceptor("/A - TimeLoop")
       , mpi_communicator_(mpi_comm)
       , hyperbolic_system_("/B - Equation")
+      , parabolic_system_("/B - Equation")
       , discretization_(mpi_communicator_, "/C - Discretization")
       , offline_data_(mpi_communicator_, discretization_, "/D - OfflineData")
       , initial_values_(hyperbolic_system_, offline_data_, "/E - InitialValues")
@@ -38,10 +39,18 @@ namespace ryujin
                            hyperbolic_system_,
                            initial_values_,
                            "/F - HyperbolicModule")
+      , parabolic_module_(mpi_communicator_,
+                          computing_timer_,
+                          offline_data_,
+                          hyperbolic_system_,
+                          parabolic_system_,
+                          initial_values_,
+                          "/G - ParabolicModule")
       , time_integrator_(mpi_communicator_,
                          computing_timer_,
                          offline_data_,
                          hyperbolic_module_,
+                         parabolic_module_,
                          "/H - TimeIntegrator")
       , postprocessor_(mpi_communicator_,
                        hyperbolic_system_,
@@ -193,6 +202,7 @@ namespace ryujin
     const auto prepare_compute_kernels = [&]() {
       offline_data_.prepare(problem_dimension);
       hyperbolic_module_.prepare();
+      parabolic_module_.prepare();
       time_integrator_.prepare();
       postprocessor_.prepare();
       vtu_output_.prepare();
@@ -274,7 +284,7 @@ namespace ryujin
 
       if (enable_compute_quantities_) {
         Scope scope(computing_timer_,
-                    "time step [P] X - accumulate quantities");
+                    "time step [X] 1 - accumulate quantities");
         quantities_.accumulate(U, t);
       }
 
@@ -293,7 +303,7 @@ namespace ryujin
             (output_cycle % output_quantities_multiplier_ == 0) &&
             (output_cycle > 0)) {
           Scope scope(computing_timer_,
-                      "time step [P] X - write out quantities");
+                      "time step [X] 2 - write out quantities");
           quantities_.write_out(U, t, output_cycle);
         }
         ++output_cycle;
@@ -547,7 +557,7 @@ namespace ryujin
 
     /* Data output: */
     if (do_full_output || do_levelsets) {
-      Scope scope(computing_timer_, "time step [P] Y - output vtu");
+      Scope scope(computing_timer_, "time step [X] 3 - output vtu");
       print_info("scheduling output");
 
       postprocessor_.compute(U);
@@ -582,7 +592,7 @@ namespace ryujin
 
     /* Checkpointing: */
     if (do_checkpointing) {
-      Scope scope(computing_timer_, "time step [P] Z - checkpointing");
+      Scope scope(computing_timer_, "time step [X] 4 - checkpointing");
       print_info("scheduling checkpointing");
 
       Checkpointing::write_checkpoint(
@@ -933,13 +943,23 @@ namespace ryujin
            << std::setprecision(2) << std::fixed << cycles_per_second
            << " cycles/s)" << std::endl;
 
-    output << "        [ CFL = "
+    const auto &scheme = time_integrator_.time_stepping_scheme();
+    output << "        [ "
+           << Patterns::Tools::Convert<TimeSteppingScheme>::to_string(scheme)
+           << " with CFL = "
            << std::setprecision(2) << std::fixed << hyperbolic_module_.cfl()
            << " ("
            << std::setprecision(0) << std::fixed << hyperbolic_module_.n_restarts()
+           << "/"
+           << std::setprecision(0) << std::fixed << parabolic_module_.n_restarts()
            << " rsts) ("
            << std::setprecision(0) << std::fixed << hyperbolic_module_.n_warnings()
+           << "/"
+           << std::setprecision(0) << std::fixed << parabolic_module_.n_warnings()
            << " warn) ]" << std::endl;
+
+    if constexpr (!ParabolicSystem::is_identity)
+      parabolic_module_.print_solver_statistics(output);
 
     output << "        [ dt = "
            << std::scientific << std::setprecision(2) << delta_time
@@ -950,7 +970,7 @@ namespace ryujin
 
     /* and print an ETA */
     time_per_second_exp = 0.8 * time_per_second_exp + 0.2 * time_per_second;
-    auto eta = static_cast<unsigned int>(std::max(t_final_ - t, 0.) /
+    auto eta = static_cast<unsigned int>(std::max(t_final_ - t, Number(0.)) /
                                          time_per_second_exp);
 
     output << "\n  ETA : ";
@@ -968,7 +988,7 @@ namespace ryujin
     }
 
     const unsigned int minutes = eta / 60;
-    output << minutes << " min\n";
+    output << minutes << " min";
 
     if (mpi_rank_ != 0)
       return;
@@ -1009,10 +1029,8 @@ namespace ryujin
     /* clang-format off */
     stream << "\n";
     stream << "    ####################################################\n";
-    stream << "    #########                                  #########\n";
     stream << "    #########"     <<  padded_header   <<     "#########\n";
     stream << "    #########"     << padded_secondary <<     "#########\n";
-    stream << "    #########                                  #########\n";
     stream << "    ####################################################\n";
     stream << std::endl;
     /* clang-format on */
@@ -1043,10 +1061,12 @@ namespace ryujin
 
     print_head(primary.str(), secondary.str(), output);
 
-    output << "Information: (HYP) " << hyperbolic_system_.problem_name //
-           << "\n             [" << base_name_ << "] with "            //
-           << offline_data_.dof_handler().n_dofs() << " Qdofs on "     //
-           << n_mpi_processes_ << " ranks / "                          //
+    output << "Information: (HYP) " << hyperbolic_system_.problem_name;
+    if constexpr (!ParabolicSystem::is_identity)
+      output << "\n             (PAR) " << parabolic_system_.problem_name;
+    output << "\n             [" << base_name_ << "] with "        //
+           << offline_data_.dof_handler().n_dofs() << " Qdofs on " //
+           << n_mpi_processes_ << " ranks / "                      //
 #ifdef WITH_OPENMP
            << MultithreadInfo::n_threads() << " threads." //
 #else

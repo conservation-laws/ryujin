@@ -10,6 +10,7 @@
 #include "convenience_macros.h"
 #include "hyperbolic_module.h"
 #include "offline_data.h"
+#include "parabolic_module.h"
 #include "patterns_conversion.h"
 
 namespace ryujin
@@ -105,6 +106,18 @@ namespace ryujin
      * TODO
      */
     erk_54,
+
+    /**
+     * A Strang split using ssprk 33 for the hyperbolic subproblem and
+     * Crank-Nicolson for the parabolic subproblem
+     */
+    strang_ssprk_33_cn,
+
+    /**
+     * A Strang split using erk 33 for the hyperbolic subproblem and
+     * Crank-Nicolson for the parabolic subproblem
+     */
+    strang_erk_33_cn,
   };
 } // namespace ryujin
 
@@ -114,13 +127,16 @@ DECLARE_ENUM(ryujin::CFLRecoveryStrategy,
                   {ryujin::CFLRecoveryStrategy::bang_bang_control,
                    "bang bang control"}));
 
-DECLARE_ENUM(ryujin::TimeSteppingScheme,
-             LIST({ryujin::TimeSteppingScheme::ssprk_33, "ssprk 33"},
-                  {ryujin::TimeSteppingScheme::erk_11, "erk 11"},
-                  {ryujin::TimeSteppingScheme::erk_22, "erk 22"},
-                  {ryujin::TimeSteppingScheme::erk_33, "erk 33"},
-                  {ryujin::TimeSteppingScheme::erk_43, "erk 43"},
-                  {ryujin::TimeSteppingScheme::erk_54, "erk 54"}));
+DECLARE_ENUM(
+    ryujin::TimeSteppingScheme,
+    LIST({ryujin::TimeSteppingScheme::ssprk_33, "ssprk 33"},
+         {ryujin::TimeSteppingScheme::erk_11, "erk 11"},
+         {ryujin::TimeSteppingScheme::erk_22, "erk 22"},
+         {ryujin::TimeSteppingScheme::erk_33, "erk 33"},
+         {ryujin::TimeSteppingScheme::erk_43, "erk 43"},
+         {ryujin::TimeSteppingScheme::erk_54, "erk 54"},
+         {ryujin::TimeSteppingScheme::strang_ssprk_33_cn, "strang ssprk 33 cn"},
+         {ryujin::TimeSteppingScheme::strang_erk_33_cn, "strang erk 33 cn"}, ));
 #endif
 
 namespace ryujin
@@ -139,6 +155,11 @@ namespace ryujin
      * @copydoc HyperbolicSystem
      */
     using HyperbolicSystem = typename Description::HyperbolicSystem;
+
+    /**
+     * @copydoc ParabolicSystem
+     */
+    using ParabolicSystem = typename Description::ParabolicSystem;
 
     /**
      * @copydoc HyperbolicSystem::View
@@ -176,6 +197,7 @@ namespace ryujin
         std::map<std::string, dealii::Timer> &computing_timer,
         const OfflineData<dim, Number> &offline_data,
         const HyperbolicModule<Description, dim, Number> &hyperbolic_module,
+        const ParabolicModule<Description, dim, Number> &parabolic_module,
         const std::string &subsection = "/TimeIntegrator");
 
     /**
@@ -214,7 +236,7 @@ namespace ryujin
      * supplied value is used for time stepping instead of the computed
      * maximal time step size.
      */
-    Number step_ssprk_33(vector_type &U, Number t, Number tau = Number(0.));
+    Number step_ssprk_33(vector_type &U, Number t);
 
     /**
      * Given a reference to a previous state vector U performs an explicit
@@ -252,6 +274,29 @@ namespace ryujin
      */
     Number step_erk_54(vector_type &U, Number t);
 
+    /**
+     * Given a reference to a previous state vector U performs a combined
+     * explicit implicit Strang split using a third-order Runge-Kutta
+     * ERK(3,3,1/3) time step and an implicit Crank-Nicolson step (and
+     * store the result in U). The function returns the chosen time step
+     * size tau.
+     */
+    Number step_strang_ssprk_33_cn(vector_type &U, Number t);
+
+    /**
+     * Given a reference to a previous state vector U performs a combined
+     * explicit implicit Strang split using a third-order Runge-Kutta
+     * ERK(3,3,1) time step and an implicit Crank-Nicolson step (and store
+     * the result in U). The function returns the chosen time step size
+     * tau.
+     */
+    Number step_strang_erk_33_cn(vector_type &U, Number t);
+
+    /**
+     * The selected time-stepping scheme.
+     */
+    ACCESSOR_READ_ONLY(time_stepping_scheme);
+
   private:
     //@}
     /**
@@ -280,6 +325,8 @@ namespace ryujin
     dealii::SmartPointer<const OfflineData<dim, Number>> offline_data_;
     dealii::SmartPointer<const HyperbolicModule<Description, dim, Number>>
         hyperbolic_module_;
+    dealii::SmartPointer<const ParabolicModule<Description, dim, Number>>
+        parabolic_module_;
 
     std::vector<vector_type> U_;
     std::vector<precomputed_type> precomputed_;

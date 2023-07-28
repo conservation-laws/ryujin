@@ -5,9 +5,11 @@
 
 #pragma once
 
+#include "../stub_solver.h"
 #include "hyperbolic_system.h"
 #include "indicator.h"
 #include "limiter.h"
+#include "parabolic_system.h"
 #include "riemann_solver.h"
 
 namespace ryujin
@@ -27,6 +29,11 @@ namespace ryujin
      */
     struct Description {
       using HyperbolicSystem = Skeleton::HyperbolicSystem;
+
+      using ParabolicSystem = Skeleton::ParabolicSystem;
+
+      template <int dim, typename Number = double>
+      using ParabolicSolver = ryujin::StubSolver<Description, dim, Number>;
 
       template <int dim, typename Number = double>
       using Indicator = Skeleton::Indicator<dim, Number>;

@@ -59,26 +59,23 @@ namespace ryujin
           -> state_type final
       {
         // Initialize some quantities
-        double rho = 1.;
-        double u = 0.;
-        double v = 0.;
-        double E = 0.;
+        Number rho = 1.;
+        Number u = 0.;
+        Number v = 0.;
+        Number E = 0.;
 
         const auto norm = point.norm();
 
         // Define profiles for each dim here
         switch (dim) {
         case 1:
-
-          /* Initial condition */
           if (t < 1.e-16) {
+            /* Initial condition */
             if (norm > 1.e-16)
               u = -point[0] / norm;
             E = 1.e-12 / (gamma_ - Number(1.)) + Number(0.5) * rho * u * u;
-          }
-
-          /* Exact solution */
-          else if (t / 3. < norm) {
+          } else if (t / 3. < norm) {
+            /* Exact solution */
             rho = 1.0;
             u = -point[0] / norm;
             E = 0.5 * rho + 1.e-12 / (gamma_ - Number(1.));
@@ -87,31 +84,33 @@ namespace ryujin
             u = 0.0;
             E = 2.0 + 1.e-12 / (gamma_ - Number(1.));
           }
-
           break;
-        case 2:
 
-          /* Initial condition */
+        case 2:
           if (t < 1.e-16) {
+            /* Initial condition */
             if (norm > 1.e-16) {
               u = -point[0] / norm, v = -point[1] / norm;
             }
             E = 1.e-12 / (gamma_ - Number(1.)) +
                 Number(0.5) * rho * (u * u + v * v);
-          }
 
-          /* Exact solution */
-          else if (t / 3. < norm) {
+          } else if (t / 3. < norm) {
+            /* Exact solution */
             rho = 1.0 + t / norm;
             u = -point[0] / norm, v = -point[1] / norm;
             E = 0.5 * rho + 1.e-12 / (gamma_ - Number(1.));
+
           } else if (t / 3. >= norm) {
             rho = 16.0;
             u = 0.0, v = 0.0;
             E = 8.0 + 1.e-12 / (gamma_ - Number(1.));
           }
-
           break;
+
+        case 3:
+          AssertThrow(false, dealii::ExcNotImplemented());
+          __builtin_trap();
         }
 
         /* Set final state */
@@ -123,6 +122,7 @@ namespace ryujin
           AssertThrow(false, dealii::ExcNotImplemented());
           __builtin_trap();
         }
+
       }
 
     private:

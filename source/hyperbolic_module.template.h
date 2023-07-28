@@ -199,7 +199,7 @@ namespace ryujin
     const auto scoped_name = [&step_no](const auto &name,
                                         const bool advance = true) {
       advance || step_no--;
-      return "time step [E] " + std::to_string(step_no++) + " - " + name;
+      return "time step [H] " + std::to_string(step_no++) + " - " + name;
     };
 
     /* A boolean signalling that a restart is necessary: */
@@ -980,7 +980,7 @@ namespace ryujin
     const auto cycle_number =
         4 + (n_precomputation_cycles > 0 ? 1 : 0) + limiter_iter_;
     Scope scope(computing_timer_,
-                "time step [E] " + std::to_string(cycle_number) +
+                "time step [H] " + std::to_string(cycle_number) +
                     " - apply boundary conditions");
 
     const auto &boundary_map = offline_data_->boundary_map();

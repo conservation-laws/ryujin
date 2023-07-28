@@ -1,34 +1,36 @@
 subsection A - TimeLoop
-  set basename                  = validation-navier-stokes
+  set basename             = validation-ssprk33
 
-  set enable output full        = true
-  set enable compute error      = true
-  set enable compute quantities = true
+  set enable output full   = true
+  set enable compute error = true
+  set error quantities     = rho, m_1, E
 
-  set final time                = 2.0
-  set output granularity        = 2.0
+  set final time           = 2.0
+  set output granularity   = 2.0
 end
 
 
-subsection B - ProblemDescription
-  set description = Navier Stokes
-
-  set gamma = 1.4
-
-  set lambda      = 0
+subsection B - Equation
+  set equation = navier stokes
+  set gamma       = 1.4
   set mu          = 0.01
-
+  set lambda      = 0
   set kappa       = 1.866666666666666e-2
 end
 
 
 subsection C - Discretization
-  set geometry        = validation
+  set geometry        = rectangular domain
   set mesh refinement = 7
 
-  subsection validation
-    set length   = 0.5
-    set periodic = true
+  subsection rectangular domain
+    set boundary condition bottom = periodic
+    set boundary condition left   = dirichlet
+    set boundary condition right  = dirichlet
+    set boundary condition top    = periodic
+
+    set position bottom left      = -0.25, -0.25
+    set position top right        =  0.25,  0.25
   end
 end
 
@@ -52,14 +54,13 @@ subsection E - InitialValues
 end
 
 
-subsection F - EulerModule
+subsection F - HyperbolicModule
   set cfl with boundary dofs = false
-
   set limiter iterations     = 2
 end
 
 
-subsection G - DissipationModule
+subsection G - ParabolicModule
   set tolerance             = 1e-16
   set tolerance linfty norm = false
 
@@ -69,8 +70,8 @@ end
 
 
 subsection H - TimeIntegrator
-  set cfl min                = 0.30
-  set cfl max                = 0.30
+  set cfl min               = 0.30
+  set cfl max               = 0.30
   set cfl recovery strategy = none
-  set time stepping scheme  = ssprk 33
+  set time stepping scheme  = strang erk 33 cn
 end

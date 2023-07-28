@@ -267,19 +267,31 @@ namespace ryujin
   DEAL_II_ALWAYS_INLINE inline T load_value(const std::vector<T2> &vector,
                                             unsigned int i)
   {
-    static_assert(std::is_same_v<typename get_value_type<T>::type, T2>,
-                  "type mismatch");
-    T result;
+    if constexpr (std::is_same_v<typename get_value_type<T>::type, T2>) {
+      /* Optimized default for source and destination with same type: */
 
-    if constexpr (std::is_same_v<T, typename get_value_type<T>::type>) {
-      /* Non-vectorized sequential access. */
-      result = vector[i];
+      T result;
+      if constexpr (std::is_same_v<T, typename get_value_type<T>::type>) {
+        /* Non-vectorized sequential access. */
+        result = vector[i];
+      } else {
+        /* Vectorized fast access. index must be divisible by simd_length */
+        result.load(vector.data() + i);
+      }
+      return result;
+
     } else {
-      /* Vectorized fast access. index must be divisible by simd_length */
-      result.load(vector.data() + i);
+      /* Fallback for mismatched types (float vs double): */
+      T result;
+      if constexpr (std::is_same_v<T, typename get_value_type<T>::type>) {
+        result = vector[i];
+      } else {
+        // FIXME: suboptimal
+        for (unsigned int k = 0; k < T::size(); ++k)
+          result[k] = vector[i + k];
+      }
+      return result;
     }
-
-    return result;
   }
 
 
@@ -365,15 +377,26 @@ namespace ryujin
   DEAL_II_ALWAYS_INLINE inline void
   store_value(std::vector<T2> &vector, const T &values, unsigned int i)
   {
-    static_assert(std::is_same_v<typename get_value_type<T>::type, T2>,
-                  "type mismatch");
+    if constexpr (std::is_same_v<typename get_value_type<T>::type, T2>) {
+      /* Optimized default for source and destination with same type: */
 
-    if constexpr (std::is_same_v<T, typename get_value_type<T>::type>) {
-      /* Non-vectorized sequential access. */
-      vector[i] = values;
+      if constexpr (std::is_same_v<T, typename get_value_type<T>::type>) {
+        /* Non-vectorized sequential access. */
+        vector[i] = values;
+      } else {
+        /* Vectorized fast access. index must be divisible by simd_length */
+        values.store(vector.data() + i);
+      }
+
     } else {
-      /* Vectorized fast access. index must be divisible by simd_length */
-      values.store(vector.data() + i);
+      /* Fallback for mismatched types (float vs double): */
+      if constexpr (std::is_same_v<T, typename get_value_type<T>::type>) {
+        vector[i] = values;
+      } else {
+        // FIXME: suboptimal
+        for (unsigned int k = 0; k < T::size(); ++k)
+          vector[i + k] = values[k];
+      }
     }
   }
 

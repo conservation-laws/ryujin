@@ -6,9 +6,11 @@
 #pragma once
 
 #include "hyperbolic_system.h"
+#include "parabolic_system.h"
 #include "indicator.h"
 #include "limiter.h"
 #include "riemann_solver.h"
+#include "../stub_solver.h"
 
 namespace ryujin
 {
@@ -19,14 +21,21 @@ namespace ryujin
      * chosen hyperbolic system, the indicator, the limiter and
      * (approximate) Riemann solver.
      *
-     * We group all of these templates together in this struct so that we
-     * only need to add a single template parameter to the all the
-     * algorithm classes, such as HyperbolicModule.
+     * The compressible Euler equations of gas dynamics. Generalized
+     * implementation with a modified approximative Riemann solver,
+     * indicator, and limiter suitable for arbitrary equations of state.
+     *
+     * The parabolic subsystem is chosen to be the identity.
      *
      * @ingroup EulerEquations
      */
     struct Description {
       using HyperbolicSystem = EulerAEOS::HyperbolicSystem;
+
+      using ParabolicSystem = EulerAEOS::ParabolicSystem;
+
+      template <int dim, typename Number = double>
+      using ParabolicSolver = ryujin::StubSolver<Description, dim, Number>;
 
       template <int dim, typename Number = double>
       using Indicator = EulerAEOS::Indicator<dim, Number>;

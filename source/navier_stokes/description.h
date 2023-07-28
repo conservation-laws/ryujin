@@ -1,40 +1,40 @@
 //
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2020 - 2022 by the ryujin authors
+// Copyright (C) 2020 - 2023 by the ryujin authors
 //
 
 #pragma once
 
-#include "hyperbolic_system.h"
+#include "../euler/hyperbolic_system.h"
+#include "../euler/indicator.h"
+#include "../euler/limiter.h"
+#include "../euler/riemann_solver.h"
+#include "parabolic_solver.h"
 #include "parabolic_system.h"
-#include "indicator.h"
-#include "limiter.h"
-#include "riemann_solver.h"
-#include "../stub_solver.h"
 
 namespace ryujin
 {
-  namespace Euler
+  namespace NavierStokes
   {
     /**
      * A struct that contains all equation specific classes describing the
      * chosen hyperbolic system, the indicator, the limiter and
      * (approximate) Riemann solver.
      *
-     * The compressible Euler equations of gas dynamics. Specialized
-     * implementation for a polytropic gas equation.
+     * We group all of these templates together in this struct so that we
+     * only need to add a single template parameter to the all the
+     * algorithm classes, such as HyperbolicModule.
      *
-     * The parabolic subsystem is chosen to be the identity.
-     *
-     * @ingroup EulerEquations
+     * @ingroup NavierStokesEquations
      */
     struct Description {
       using HyperbolicSystem = Euler::HyperbolicSystem;
 
-      using ParabolicSystem = Euler::ParabolicSystem;
+      using ParabolicSystem = NavierStokes::ParabolicSystem;
 
       template <int dim, typename Number = double>
-      using ParabolicSolver = ryujin::StubSolver<Description, dim, Number>;
+      using ParabolicSolver =
+          NavierStokes::ParabolicSolver<Description, dim, Number>;
 
       template <int dim, typename Number = double>
       using Indicator = Euler::Indicator<dim, Number>;
@@ -45,5 +45,5 @@ namespace ryujin
       template <int dim, typename Number = double>
       using RiemannSolver = Euler::RiemannSolver<dim, Number>;
     };
-  } // namespace Euler
+  } // namespace NavierStokes
 } // namespace ryujin

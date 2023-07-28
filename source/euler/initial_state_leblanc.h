@@ -43,8 +43,7 @@ namespace ryujin
         /* Initial left and right states (rho, u, p): */
         using state_type_1d = dealii::Tensor<1, 3, Number>;
         const state_type_1d primitive_left{{1.0, 0.0, 1.0 / 15.0}};
-        const state_type_1d primitive_right{
-            {0.001, 0.0, 2.0 / 3.0 * std::pow(10.0, -10.0)}};
+        const state_type_1d primitive_right{{0.001, 0.0, 2.0 / 3.0 * 1.e-10}};
 
         /* The intermediate wave-speeds appearing on the Riemann fan: */
         constexpr Number rarefaction_speed = 0.49578489518897934;
