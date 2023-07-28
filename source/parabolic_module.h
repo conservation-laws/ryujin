@@ -113,6 +113,13 @@ namespace ryujin
                              vector_type &new_U,
                              const Number tau) const;
 
+    /**
+     * Print a status line with solver statistics. This function is used
+     * for constructing the status message displayed periodically in the
+     * TimeLoop.
+     */
+    void print_solver_statistics(std::ostream &output) const;
+
     //@}
     /**
      * @name Accessors

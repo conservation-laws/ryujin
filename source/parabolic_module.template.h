@@ -91,6 +91,17 @@ namespace ryujin
     } else {
 
       parabolic_solver_.crank_nicolson_step(old_U, t, new_U, tau, cycle_);
+      n_restarts_ = parabolic_solver_.n_restarts();
+      n_warnings_ = parabolic_solver_.n_warnings();
+    }
+  }
+
+  template <typename Description, int dim, typename Number>
+  void ParabolicModule<Description, dim, Number>::print_solver_statistics(
+      std::ostream &output) const
+  {
+    if constexpr (!ParabolicSystem::is_identity) {
+      parabolic_solver_.print_solver_statistics(output);
     }
   }
 

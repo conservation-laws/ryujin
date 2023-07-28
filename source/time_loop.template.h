@@ -284,7 +284,7 @@ namespace ryujin
 
       if (enable_compute_quantities_) {
         Scope scope(computing_timer_,
-                    "time step [P] X - accumulate quantities");
+                    "time step [X] 1 - accumulate quantities");
         quantities_.accumulate(U, t);
       }
 
@@ -303,7 +303,7 @@ namespace ryujin
             (output_cycle % output_quantities_multiplier_ == 0) &&
             (output_cycle > 0)) {
           Scope scope(computing_timer_,
-                      "time step [P] X - write out quantities");
+                      "time step [X] 2 - write out quantities");
           quantities_.write_out(U, t, output_cycle);
         }
         ++output_cycle;
@@ -557,7 +557,7 @@ namespace ryujin
 
     /* Data output: */
     if (do_full_output || do_levelsets) {
-      Scope scope(computing_timer_, "time step [P] Y - output vtu");
+      Scope scope(computing_timer_, "time step [X] 3 - output vtu");
       print_info("scheduling output");
 
       postprocessor_.compute(U);
@@ -592,7 +592,7 @@ namespace ryujin
 
     /* Checkpointing: */
     if (do_checkpointing) {
-      Scope scope(computing_timer_, "time step [P] Z - checkpointing");
+      Scope scope(computing_timer_, "time step [X] 4 - checkpointing");
       print_info("scheduling checkpointing");
 
       Checkpointing::write_checkpoint(
@@ -959,7 +959,7 @@ namespace ryujin
            << " warn) ]" << std::endl;
 
     if constexpr (!ParabolicSystem::is_identity)
-      parabolic_system_.print_solver_statistics(output);
+      parabolic_module_.print_solver_statistics(output);
 
     output << "        [ dt = "
            << std::scientific << std::setprecision(2) << delta_time
@@ -988,7 +988,7 @@ namespace ryujin
     }
 
     const unsigned int minutes = eta / 60;
-    output << minutes << " min\n";
+    output << minutes << " min";
 
     if (mpi_rank_ != 0)
       return;
@@ -1029,10 +1029,8 @@ namespace ryujin
     /* clang-format off */
     stream << "\n";
     stream << "    ####################################################\n";
-    stream << "    #########                                  #########\n";
     stream << "    #########"     <<  padded_header   <<     "#########\n";
     stream << "    #########"     << padded_secondary <<     "#########\n";
-    stream << "    #########                                  #########\n";
     stream << "    ####################################################\n";
     stream << std::endl;
     /* clang-format on */

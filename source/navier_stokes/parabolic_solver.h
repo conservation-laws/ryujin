@@ -166,6 +166,14 @@ namespace ryujin
                                vector_type &new_U,
                                Number tau,
                                unsigned int cycle) const;
+
+      /**
+       * Print a status line with solver statistics. This function is used
+       * for constructing the status message displayed periodically in the
+       * TimeLoop.
+       */
+      void print_solver_statistics(std::ostream &output) const;
+
       //@}
       /**
        * @name Accessors
@@ -174,8 +182,6 @@ namespace ryujin
 
       ACCESSOR_READ_ONLY(n_restarts)
       ACCESSOR_READ_ONLY(n_warnings)
-      ACCESSOR_READ_ONLY(n_iterations_velocity)
-      ACCESSOR_READ_ONLY(n_iterations_internal_energy)
 
       //@}
 

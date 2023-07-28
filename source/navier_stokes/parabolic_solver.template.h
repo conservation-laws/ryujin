@@ -5,8 +5,8 @@
 
 #pragma once
 
-#include "parabolic_solver.h"
 #include "description.h"
+#include "parabolic_solver.h"
 
 #include <introspection.h>
 #include <openmp.h>
@@ -47,6 +47,7 @@ namespace ryujin
         , parabolic_system_(&parabolic_system)
         , offline_data_(&offline_data)
         , initial_values_(&initial_values)
+        , n_restarts_(0)
         , n_warnings_(0)
         , n_iterations_velocity_(0.)
         , n_iterations_internal_energy_(0.)
@@ -249,16 +250,16 @@ namespace ryujin
 #endif
 
       /*
-       * Step 0:
+       * Step 1:
        *
        * Build right hand side for the velocity update.
        * Also initialize solution vectors for internal energy and velocity
        * update.
        */
       {
-        Scope scope(computing_timer_, "time step [N] 0 - build velocities rhs");
+        Scope scope(computing_timer_, "time step [P] 1 - update velocities");
         RYUJIN_PARALLEL_REGION_BEGIN
-        LIKWID_MARKER_START("time_step_n_0");
+        LIKWID_MARKER_START("time_step_parabolic_1");
 
         RYUJIN_OMP_FOR
         for (unsigned int i = 0; i < size_regular; i += simd_length) {
@@ -423,7 +424,7 @@ namespace ryujin
                                            smoother_data);
         }
 
-        LIKWID_MARKER_STOP("time_step_n_0");
+        LIKWID_MARKER_STOP("time_step_parabolic_1");
       }
 
       /* Compute the global minimum of the internal energy: */
@@ -437,9 +438,9 @@ namespace ryujin
        * Step 1: Solve velocity update:
        */
       {
-        Scope scope(computing_timer_, "time step [N] 1 - update velocities");
+        Scope scope(computing_timer_, "time step [P] 1 - update velocities");
 
-        LIKWID_MARKER_START("time_step_n_1");
+        LIKWID_MARKER_START("time_step_parabolic_1");
 
         VelocityMatrix<dim, Number, Number> velocity_operator;
         velocity_operator.initialize(*parabolic_system_,
@@ -504,7 +505,7 @@ namespace ryujin
               0.1 * solver_control.last_step();
         }
 
-        LIKWID_MARKER_STOP("time_step_n_1");
+        LIKWID_MARKER_STOP("time_step_parabolic_1");
       }
 
       /*
@@ -512,9 +513,9 @@ namespace ryujin
        */
       {
         Scope scope(computing_timer_,
-                    "time step [N] 2 - build internal energy rhs");
+                    "time step [P] 2 - update internal energy");
 
-        LIKWID_MARKER_START("time_step_n_2");
+        LIKWID_MARKER_START("time_step_parabolic_2");
 
         /* Compute m_i K_i^{n+1/2}:  (5.5) */
         matrix_free_.template cell_loop<scalar_type, block_vector_type>(
@@ -678,24 +679,24 @@ namespace ryujin
           mg_smoother_energy_.initialize(level_energy_matrices_, smoother_data);
         }
 
-        LIKWID_MARKER_STOP("time_step_n_2");
+        LIKWID_MARKER_STOP("time_step_parabolic_2");
       }
 
       /*
-       * Step 3: Solve internal energy update:
+       * Step 2: Solve internal energy update:
        */
       {
         Scope scope(computing_timer_,
-                    "time step [N] 3 - update internal energy");
+                    "time step [P] 2 - update internal energy");
 
-        LIKWID_MARKER_START("time_step_n_3");
+        LIKWID_MARKER_START("time_step_parabolic_2");
 
         EnergyMatrix<dim, Number, Number> energy_operator;
-        energy_operator.initialize(
-            *offline_data_,
-            matrix_free_,
-            density_,
-            theta_ * tau_ * parabolic_system_->cv_inverse_kappa());
+        energy_operator.initialize(*offline_data_,
+                                   matrix_free_,
+                                   density_,
+                                   theta_ * tau_ *
+                                       parabolic_system_->cv_inverse_kappa());
 
         const auto tolerance_internal_energy =
             (tolerance_linfty_norm_ ? internal_energy_rhs_.linfty_norm()
@@ -771,21 +772,21 @@ namespace ryujin
           }
         }
 
-        LIKWID_MARKER_STOP("time_step_n_3");
+        LIKWID_MARKER_STOP("time_step_parabolic_2");
       }
 
       /*
-       * Step 4: Copy vectors
+       * Step 3: Copy vectors
        *
        * FIXME: Memory access is suboptimal...
        */
       {
         const auto alpha = Number(1.) / theta_;
 
-        Scope scope(computing_timer_, "time step [N] 4 - write back vectors");
+        Scope scope(computing_timer_, "time step [P] 3 - write back vectors");
 
         RYUJIN_PARALLEL_REGION_BEGIN
-        LIKWID_MARKER_START("time_step_n_4");
+        LIKWID_MARKER_START("time_step_parabolic_3");
 
         const unsigned int size_regular = n_owned / simd_length * simd_length;
 
@@ -844,10 +845,23 @@ namespace ryujin
 
         new_U.update_ghost_values();
 
-        LIKWID_MARKER_STOP("time_step_n_4");
+        LIKWID_MARKER_STOP("time_step_parabolic_3");
       }
 
       CALLGRIND_STOP_INSTRUMENTATION
+    }
+
+
+    template <typename Description, int dim, typename Number>
+    void ParabolicSolver<Description, dim, Number>::print_solver_statistics(
+        std::ostream &output) const
+    {
+      output << "        [ " << std::setprecision(2) << std::fixed
+             << n_iterations_velocity_
+             << (use_gmg_velocity_ ? " GMG vel -- " : " CG vel -- ")
+             << n_iterations_internal_energy_
+             << (use_gmg_internal_energy_ ? " GMG int ]" : " CG int ]")
+             << std::endl;
     }
 
   } // namespace NavierStokes

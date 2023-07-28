@@ -49,22 +49,6 @@ namespace ryujin
       ACCESSOR_READ_ONLY(lambda)
       ACCESSOR_READ_ONLY(cv_inverse_kappa)
 
-      void print_solver_statistics(std::ostream &output) const
-      {
-        // FIXME remove
-        bool use_gmg_velocity_ = true;
-        bool use_gmg_internal_energy_ = true;
-        unsigned int n_iterations_velocity_ = 42;
-        unsigned int n_iterations_internal_energy_ = 42;
-
-        output << "        [ " << std::setprecision(2) << std::fixed
-               << n_iterations_velocity_
-               << (use_gmg_velocity_ ? " GMG vel -- " : " CG vel -- ")
-               << n_iterations_internal_energy_
-               << (use_gmg_internal_energy_ ? " GMG int ]" : " CG int ]")
-               << std::endl;
-      }
-
     private:
       /**
        * @name Runtime parameters, internal fields and methods
