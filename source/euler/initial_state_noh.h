@@ -59,10 +59,10 @@ namespace ryujin
           -> state_type final
       {
         // Initialize some quantities
-        double rho = 1.;
-        double u = 0.;
-        double v = 0.;
-        double E = 0.;
+        Number rho = 1.;
+        Number u = 0.;
+        Number v = 0.;
+        Number E = 0.;
 
         const auto norm = point.norm();
 

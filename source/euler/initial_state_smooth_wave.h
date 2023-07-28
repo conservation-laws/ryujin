@@ -59,11 +59,12 @@ namespace ryujin
       {
         auto point_bar = point;
         point_bar[0] = point_bar[0] - mach_number_ * t;
+        const auto x = Number(point_bar[0]);
 
-        const Number polynomial = ryujin::pow(2., 6.) *
-                                  ryujin::pow(right_ - left_, -6.) *
-                                  ryujin::pow(point_bar[0] - left_, 3.) *
-                                  ryujin::pow(right_ - point_bar[0], 3.);
+        const Number polynomial = Number(64) *
+                                  ryujin::fixed_power<3>(x - left_) *
+                                  ryujin::fixed_power<3>(right_ - x) /
+                                  ryujin::fixed_power<6>(right_ - left_);
 
         /* Define density profile */
         Number rho = density_ref_;

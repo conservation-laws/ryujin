@@ -970,7 +970,7 @@ namespace ryujin
 
     /* and print an ETA */
     time_per_second_exp = 0.8 * time_per_second_exp + 0.2 * time_per_second;
-    auto eta = static_cast<unsigned int>(std::max(t_final_ - t, 0.) /
+    auto eta = static_cast<unsigned int>(std::max(t_final_ - t, Number(0.)) /
                                          time_per_second_exp);
 
     output << "\n  ETA : ";

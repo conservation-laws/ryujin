@@ -56,7 +56,7 @@ namespace ryujin
         /*
          * Compute the speed of sound:
          */
-        const auto speed_of_sound = [&](const auto rho, const auto p) {
+        const auto speed_of_sound = [&](const Number rho, const Number p) {
           return std::sqrt(gamma_ * p / rho);
         };
 
@@ -64,7 +64,7 @@ namespace ryujin
          * Compute the rarefaction right side:
          */
         const auto rarefaction_right_state = [&](const auto primitive_left,
-                                                 const auto rho_right) {
+                                                 const Number rho_right) {
           const auto &[rho_left, u_left, p_left] = primitive_left;
           state_type_1d primitive_right{{rho_right, 0., 0.}};
 
