@@ -5,12 +5,12 @@
 
 #pragma once
 
+#include "../stub_solver.h"
 #include "hyperbolic_system.h"
-#include "parabolic_system.h"
 #include "indicator.h"
 #include "limiter.h"
+#include "parabolic_system.h"
 #include "riemann_solver.h"
-#include "../stub_solver.h"
 
 namespace ryujin
 {

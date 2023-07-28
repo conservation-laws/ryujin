@@ -58,7 +58,7 @@ namespace ryujin
       std::string equation_of_state_;
       double reference_density_;
       double vacuum_state_relaxation_;
-      bool compute_expensive_bounds_;
+      bool compute_strict_bounds_;
 
       EquationOfStateLibrary::equation_of_state_list_type
           equation_of_state_list_;
@@ -132,9 +132,9 @@ namespace ryujin
           return ScalarNumber(hyperbolic_system_.vacuum_state_relaxation_);
         }
 
-        DEAL_II_ALWAYS_INLINE inline bool compute_expensive_bounds() const
+        DEAL_II_ALWAYS_INLINE inline bool compute_strict_bounds() const
         {
-          return hyperbolic_system_.compute_expensive_bounds_;
+          return hyperbolic_system_.compute_strict_bounds_;
         }
 
         //@}
@@ -147,8 +147,8 @@ namespace ryujin
          * For a given density \f$\rho\f$ and <i>specific</i> internal
          * energy \f$e\f$ return the pressure \f$p\f$.
          */
-        DEAL_II_ALWAYS_INLINE inline Number
-        eos_pressure(const Number &rho, const Number &e) const
+        DEAL_II_ALWAYS_INLINE inline Number eos_pressure(const Number &rho,
+                                                         const Number &e) const
         {
           const auto &eos = hyperbolic_system_.selected_equation_of_state_;
 
@@ -168,8 +168,7 @@ namespace ryujin
          * <i>specific</i> internal energy \f$e\f$.
          */
         DEAL_II_ALWAYS_INLINE inline Number
-        eos_specific_internal_energy(const Number &rho,
-                                     const Number &p) const
+        eos_specific_internal_energy(const Number &rho, const Number &p) const
         {
           const auto &eos = hyperbolic_system_.selected_equation_of_state_;
 
@@ -737,11 +736,16 @@ namespace ryujin
           "The equation of state. Valid names are given by any of the "
           "subsections defined below");
 
-      compute_expensive_bounds_ = false;
-      add_parameter("compute expensive bounds",
-                    compute_expensive_bounds_,
-                    "Compute better, but significantly more expensive upper "
-                    "bounds on the maximal wavespeed.");
+      compute_strict_bounds_ = false;
+      add_parameter(
+          "compute strict bounds",
+          compute_strict_bounds_,
+          "Compute strict, but significantly more expensive bounds at various "
+          "places: (a) an expensive, but better upper wavespeed estimate in "
+          "the approximate RiemannSolver; (b) entropy viscosity-commutator "
+          "with correct gamma_min over the stencil; (c) mathematically correct "
+          "surrogate specific entropy minimum with gamma_min over the "
+          "stencil.");
 
       reference_density_ = 1.;
       add_parameter("reference density",
