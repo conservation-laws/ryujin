@@ -168,12 +168,8 @@ namespace ryujin
       for (unsigned int level = 0; level < n_levels; ++level)
         dealii::DoFTools::extract_locally_relevant_level_dofs(
             offline_data_->dof_handler(), level, relevant_sets[level]);
-#if DEAL_II_VERSION_GTE(9, 3, 0)
       mg_constrained_dofs_.initialize(offline_data_->dof_handler(),
                                       relevant_sets);
-#else
-      mg_constrained_dofs_.initialize(offline_data_->dof_handler());
-#endif
       std::set<types::boundary_id> boundary_ids;
       boundary_ids.insert(Boundary::dirichlet);
       boundary_ids.insert(Boundary::no_slip);
@@ -538,30 +534,27 @@ namespace ryujin
                    ++cell) {
                 velocity.reinit(cell);
                 energy.reinit(cell);
-#if DEAL_II_VERSION_GTE(9, 3, 0)
                 velocity.gather_evaluate(src, EvaluationFlags::gradients);
-#else
-                velocity.read_dof_values(src);
-                velocity.evaluate(false, true);
-#endif
 
                 for (unsigned int q = 0; q < velocity.n_q_points; ++q) {
+                  if constexpr (dim == 1) {
+                    /* Workaround: no symmetric gradient for dim == 1: */
+                    const auto gradient = velocity.get_gradient(q);
+                    auto S = (4. / 3. * mu + lambda) * gradient;
+                    energy.submit_value(gradient * S, q);
 
-                  const auto symmetric_gradient =
-                      velocity.get_symmetric_gradient(q);
-                  const auto divergence = trace(symmetric_gradient);
+                  } else {
 
-                  auto S = 2. * mu * symmetric_gradient;
-                  for (unsigned int d = 0; d < dim; ++d)
-                    S[d][d] += (lambda - 2. / 3. * mu) * divergence;
-
-                  energy.submit_value(symmetric_gradient * S, q);
+                    const auto symmetric_gradient =
+                        velocity.get_symmetric_gradient(q);
+                    const auto divergence = trace(symmetric_gradient);
+                    auto S = 2. * mu * symmetric_gradient;
+                    for (unsigned int d = 0; d < dim; ++d)
+                      S[d][d] += (lambda - 2. / 3. * mu) * divergence;
+                    energy.submit_value(symmetric_gradient * S, q);
+                  }
                 }
-#if DEAL_II_VERSION_GTE(9, 3, 0)
                 energy.integrate_scatter(EvaluationFlags::values, dst);
-#else
-                energy.integrate_scatter(true, false, dst);
-#endif
               }
             },
             internal_energy_rhs_,

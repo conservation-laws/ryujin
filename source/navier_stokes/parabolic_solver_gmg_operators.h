@@ -408,30 +408,28 @@ namespace ryujin
         const Number mu = parabolic_system_->mu();
         const Number lambda = parabolic_system_->lambda();
 
-#if DEAL_II_VERSION_GTE(9, 3, 0)
         velocity.evaluate(dealii::EvaluationFlags::gradients);
-#else
-        velocity.evaluate(false, true);
-#endif
 
         for (unsigned int q = 0; q < velocity.n_q_points; ++q) {
+          if constexpr (dim == 1) {
+            /* Workaround: no symmetric gradient for dim == 1: */
+            const auto gradient = velocity.get_gradient(q);
+            auto S = (4. / 3. * mu + lambda) * gradient;
+            velocity.submit_gradient(theta_x_tau_ * S, q);
 
-          const auto symmetric_gradient = velocity.get_symmetric_gradient(q);
-          const auto divergence = trace(symmetric_gradient);
+          } else {
 
-          // S = (2 mu nabla^S(v) + (lambda - 2/3*mu) div(v) Id) : nabla phi
-          auto S = 2. * mu * symmetric_gradient;
-          for (unsigned int d = 0; d < dim; ++d)
-            S[d][d] += (lambda - 2. / 3. * mu) * divergence;
-
-          velocity.submit_symmetric_gradient(theta_x_tau_ * S, q);
+            const auto symmetric_gradient = velocity.get_symmetric_gradient(q);
+            const auto divergence = trace(symmetric_gradient);
+            // S = (2 mu nabla^S(v) + (lambda - 2/3*mu) div(v) Id) : nabla phi
+            auto S = 2. * mu * symmetric_gradient;
+            for (unsigned int d = 0; d < dim; ++d)
+              S[d][d] += (lambda - 2. / 3. * mu) * divergence;
+            velocity.submit_symmetric_gradient(theta_x_tau_ * S, q);
+          }
         }
 
-#if DEAL_II_VERSION_GTE(9, 3, 0)
         velocity.integrate(dealii::EvaluationFlags::gradients);
-#else
-        velocity.integrate(false, true);
-#endif
       }
     };
 
@@ -753,19 +751,11 @@ namespace ryujin
       template <typename Evaluator>
       void apply_local_operator(Evaluator &energy) const
       {
-#if DEAL_II_VERSION_GTE(9, 3, 0)
         energy.evaluate(dealii::EvaluationFlags::gradients);
-#else
-        energy.evaluate(false, true);
-#endif
         for (unsigned int q = 0; q < energy.n_q_points; ++q) {
           energy.submit_gradient(factor_ * energy.get_gradient(q), q);
         }
-#if DEAL_II_VERSION_GTE(9, 3, 0)
         energy.integrate(dealii::EvaluationFlags::gradients);
-#else
-        energy.integrate(false, true);
-#endif
       }
     };
 
