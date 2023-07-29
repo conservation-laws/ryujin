@@ -577,6 +577,53 @@ namespace ryujin
       }
     }
 
+    /**
+     * (nlr1t-il) NLR-1T AIRFOIL
+     *
+     * Bell/NASA/NLR NLR-1T rotorcraft airfoil
+     * Max thickness 8.7% at 38.3% chord.
+     * Max camber 1.3% at 22.3% chord
+     *
+     * Input by Taylor Boylan
+     */
+    std::array<std::vector<double>, 4> bell(const std::string &serial_number)
+    {
+      if (serial_number == "NLR-1T") {
+        std::vector<double> x_upper{
+            .0,     .00259, .00974, .02185, .03796, .05675, .07753,
+            .09845, .12341, .15412, .18767, .22313, .26054, .29979,
+            .34064, .38269, .42528, .46849, .51162, .55383, .59596,
+            .63728, .67732, .71079, .73905, .76946, .80263, .84055,
+            .87846, .90845, .93589, .96199, 1.};
+
+        std::vector<double> y_upper{
+            .0,     .00704, .01524, .02296, .02972, .03588, .04098,
+            .04469, .04741, .04986, .05188, .05345, .05459, .05531,
+            .05565, .0556,  .05518, .05438, .05323, .05175, .04992,
+            .04774, .04524, .04291, .04017, .03644, .0314,  .02533,
+            .01901, .01421, .0102,  .00651, .00104};
+
+        std::vector<double> x_lower{
+            .0,     .00259, .00974, .02185, .03796, .05675, .07753,
+            .09845, .12341, .15412, .18767, .22313, .26054, .29979,
+            .34064, .38269, .42528, .46849, .51162, .55383, .59596,
+            .63728, .67732, .71079, .73905, .76946, .80263, .84055,
+            .87846, .90845, .93589, .96199, 1.};
+        std::vector<double> y_lower{
+            .0,      -.00512, -.00867, -.0118,  -.01465, -.01713, -.01929,
+            -.02112, -.02299, -.02494, -.02671, -.02821, -.02944, -.0304,
+            -.03104, -.03142, -.0315,  -.03132, -.0308,  -.02992, -.02867,
+            -.02734, -.0258,  -.02432, -.02305, -.02164, -.01996, -.01794,
+            -.01571, -.01364, -.01087, -.00711, -.00104};
+
+        return {{x_upper, y_upper, x_lower, y_lower}};
+
+      } else {
+
+        AssertThrow(false, dealii::ExcMessage("Invalid BELL serial number"));
+      }
+    }
+
 
     /**
      * @todo Documentation
@@ -862,6 +909,8 @@ namespace ryujin
             return nasa_sc2(airfoil_type_.substr(11));
           } else if (airfoil_type_.rfind("ONERA ", 0) == 0) {
             return onera(airfoil_type_.substr(6));
+          } else if (airfoil_type_.rfind("BELL ", 0) == 0) {
+            return bell(airfoil_type_.substr(5));
           }
           AssertThrow(false, ExcMessage("Unknown airfoil type"));
         }();
