@@ -865,7 +865,7 @@ namespace ryujin
           /*
            * This is the variant with slightly better performance provided
            * that a call to the eos is not too expensive. This variant
-           * calls into the eos library for ever single degree of freedom.
+           * calls into the eos library for every single degree of freedom.
            */
           RYUJIN_OMP_FOR
           for (unsigned int i = left; i < right; i += stride_size) {
