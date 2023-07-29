@@ -90,7 +90,7 @@ namespace ryujin
 
     } else {
 
-      parabolic_solver_.crank_nicolson_step(old_U, t, new_U, tau, cycle_);
+      parabolic_solver_.crank_nicolson_step(old_U, t, new_U, tau, cycle_++);
       n_restarts_ = parabolic_solver_.n_restarts();
       n_warnings_ = parabolic_solver_.n_warnings();
     }

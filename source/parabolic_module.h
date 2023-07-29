@@ -148,7 +148,7 @@ namespace ryujin
 
     // FIXME: refactor contents into this class.
     ParabolicSolver parabolic_solver_;
-    unsigned int cycle_;
+    mutable unsigned int cycle_;
 
     mutable unsigned int n_restarts_;
     mutable unsigned int n_warnings_;
