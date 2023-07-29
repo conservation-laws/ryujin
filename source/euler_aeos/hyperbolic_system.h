@@ -736,7 +736,7 @@ namespace ryujin
           "The equation of state. Valid names are given by any of the "
           "subsections defined below");
 
-      compute_strict_bounds_ = false;
+      compute_strict_bounds_ = true;
       add_parameter(
           "compute strict bounds",
           compute_strict_bounds_,
