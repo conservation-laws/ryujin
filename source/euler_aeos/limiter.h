@@ -248,7 +248,7 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline void Limiter<dim, Number>::accumulate(
-        const unsigned int * /*js*/,
+        const unsigned int *js,
         const state_type &U_i,
         const state_type &U_j,
         const flux_contribution_type &flux_i,
@@ -275,14 +275,18 @@ namespace ryujin
       rho_min = std::min(rho_min, rho_ij_bar);
       rho_max = std::max(rho_max, rho_ij_bar);
 
-      // this s_j is not correct
-      // const auto &[p_j, gamma_min_j, s_j, eta_j] =
-      //     precomputed_values.template get_tensor<Number,
-      //     precomputed_type>(js);
+      auto [p_j, gamma_min_j, s_j, eta_j] =
+          precomputed_values
+              .template get_tensor<Number, precomputed_state_type>(js);
 
-      // This is correct, but not effecient
-      const auto s_j =
-          hyperbolic_system.surrogate_specific_entropy(U_j, gamma_min);
+      if (hyperbolic_system.compute_strict_bounds()) {
+        /*
+         * Use expensive but formally correct surrogate harten entropy with
+         * appropriate gamma_min computed over the stencil.
+         */
+        s_j = hyperbolic_system.surrogate_specific_entropy(U_j, gamma_min);
+      }
+
 
       s_min = std::min(s_min, s_j);
       s_min = std::min(s_min, s_bar_ij);
