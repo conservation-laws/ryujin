@@ -25,7 +25,7 @@ int main()
 
   std::stringstream parameters;
   parameters << "subsection HyperbolicSystem\n"
-             << "set compute strict bounds = false\n"
+             << "set compute strict bounds = true\n"
              << "end" << std::endl;
   ParameterAcceptor::initialize(parameters);
 

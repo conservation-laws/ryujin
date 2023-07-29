@@ -188,6 +188,9 @@ namespace ryujin
     DEAL_II_ALWAYS_INLINE inline void
     Indicator<dim, Number>::reset(const unsigned int i, const state_type &U_i)
     {
+      if (!hyperbolic_system.compute_strict_bounds())
+        return;
+
       /* entropy viscosity commutator: */
 
       const auto &[p_i, gamma_min_i, s_i, new_eta_i] =
@@ -219,13 +222,11 @@ namespace ryujin
                                 const state_type &U_j,
                                 const dealii::Tensor<1, dim, Number> &c_ij)
     {
+      if (!hyperbolic_system.compute_strict_bounds())
+        return;
+
       /* entropy viscosity commutator: */
 
-      // const auto &[p_j, gamma_min_j, s_j, eta_j] =
-      //     precomputed_values.template get_tensor<Number,
-      //     precomputed_type>(js);
-
-      // Compute correct eta_j. This is not effecient.
       const auto eta_j =
           hyperbolic_system.surrogate_harten_entropy(U_j, gamma_min);
 
@@ -248,7 +249,8 @@ namespace ryujin
     DEAL_II_ALWAYS_INLINE inline Number
     Indicator<dim, Number>::alpha(const Number hd_i)
     {
-      using ScalarNumber = typename get_value_type<Number>::type;
+      if (!hyperbolic_system.compute_strict_bounds())
+        return Number(0.);
 
       Number numerator = left;
       Number denominator = std::abs(left);

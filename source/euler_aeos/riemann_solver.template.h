@@ -483,7 +483,7 @@ namespace ryujin
       const Number p_max = std::max(p_i, p_j);
       const Number phi_p_max = phi_of_p_max(riemann_data_i, riemann_data_j);
 
-      if (!hyperbolic_system.compute_expensive_bounds()) {
+      if (!hyperbolic_system.compute_strict_bounds()) {
 #ifdef DEBUG_RIEMANN_SOLVER
         const Number p_star_RS = p_star_RS_full(riemann_data_i, riemann_data_j);
         const Number p_star_SS = p_star_SS_full(riemann_data_i, riemann_data_j);

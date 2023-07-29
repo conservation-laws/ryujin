@@ -14,6 +14,7 @@ end
 
 subsection B - Equation
   set equation                 = euler aeos
+  set compute strict bounds    = true
   set equation of state        = polytropic gas
   subsection polytropic gas
     set gamma = 1.4
