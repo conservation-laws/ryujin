@@ -75,14 +75,15 @@ namespace ryujin
         const primitive_type &riemann_data, const Number p_star) const
     {
       const auto &[rho, u, p, a] = riemann_data;
+      const auto inv_p = ScalarNumber(1.0) / p;
 
       const auto gamma = hyperbolic_system.gamma();
       const auto gamma_inverse = hyperbolic_system.gamma_inverse();
       const auto factor =
           (gamma + ScalarNumber(1.0)) * ScalarNumber(0.5) * gamma_inverse;
-      const Number tmp = positive_part((p_star - p) / p);
+      const Number tmp = positive_part((p_star - p) * inv_p);
 
-      return u - a * std::sqrt(Number(1.0) + factor * tmp);
+      return u - a * std::sqrt(ScalarNumber(1.0) + factor * tmp);
     }
 
 
@@ -97,12 +98,13 @@ namespace ryujin
         const primitive_type &primitive_state, const Number p_star) const
     {
       const auto &[rho, u, p, a] = primitive_state;
+      const auto inv_p = ScalarNumber(1.0) / p;
 
       const auto gamma = hyperbolic_system.gamma();
       const auto gamma_inverse = hyperbolic_system.gamma_inverse();
       const Number factor =
           (gamma + ScalarNumber(1.0)) * ScalarNumber(0.5) * gamma_inverse;
-      const Number tmp = positive_part((p_star - p) / p);
+      const Number tmp = positive_part((p_star - p) * inv_p);
       return u + a * std::sqrt(Number(1.0) + factor * tmp);
     }
 
@@ -148,6 +150,7 @@ namespace ryujin
     {
       const auto &[rho_i, u_i, p_i, a_i] = riemann_data_i;
       const auto &[rho_j, u_j, p_j, a_j] = riemann_data_j;
+      const auto inv_p_j = ScalarNumber(1.) / p_j;
 
       /*
        * Nota bene (cf. [1, (4.3)]):
@@ -171,7 +174,7 @@ namespace ryujin
 
       const Number numerator = positive_part(a_i + a_j - factor * (u_j - u_i));
       const Number denominator =
-          a_i * ryujin::pow(p_i / p_j, -factor * gamma_inverse) + a_j;
+          a_i * ryujin::pow(p_i * inv_p_j, -factor * gamma_inverse) + a_j;
 
       const auto exponent = ScalarNumber(2.0) * gamma * gm1_inverse;
 
