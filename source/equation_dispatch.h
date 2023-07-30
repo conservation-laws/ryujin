@@ -133,12 +133,13 @@ namespace ryujin
         std::replace(base_name.begin(), base_name.end(), ' ', '_');
 
         if (dealii::Utilities::MPI::this_mpi_process(mpi_communicator) == 0) {
-          const auto full_name = base_name + "-default_parameters.prm";
+          const auto full_name =
+              "default_parameters-" + base_name + "-description.prm";
           if (!std::filesystem::exists(full_name))
             prm.print_parameters(full_name,
                                  dealii::ParameterHandler::OutputStyle::PRM);
 
-          const auto short_name = base_name + "-brief.prm";
+          const auto short_name = "default_parameters-" + base_name + ".prm";
           if (!std::filesystem::exists(short_name))
             prm.print_parameters(short_name,
                                  dealii::ParameterHandler::OutputStyle::Short);
@@ -156,7 +157,7 @@ namespace ryujin
   {
     internal::create_parameter_template<Euler::Description>("euler",
                                                             mpi_communicator);
-    std::filesystem::copy("euler-brief.prm", parameter_file);
+    std::filesystem::copy("default_parameters-euler.prm", parameter_file);
 
     internal::create_parameter_template<EulerAEOS::Description>(
         "euler aeos", mpi_communicator);
