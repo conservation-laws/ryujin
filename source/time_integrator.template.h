@@ -51,7 +51,10 @@ namespace ryujin
                   "CFL/invariant domain violation recovery strategy: none, "
                   "bang bang control");
 
-    time_stepping_scheme_ = TimeSteppingScheme::erk_33;
+    if(ParabolicSystem::is_identity)
+      time_stepping_scheme_ = TimeSteppingScheme::erk_33;
+    else
+      time_stepping_scheme_ = TimeSteppingScheme::strang_erk_33_cn;
     add_parameter("time stepping scheme",
                   time_stepping_scheme_,
                   "Time stepping scheme: ssprk 33, erk 11, erk 22, erk 33, erk "
