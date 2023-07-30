@@ -122,7 +122,6 @@ namespace ryujin
           AssertThrow(false, dealii::ExcNotImplemented());
           __builtin_trap();
         }
-
       }
 
     private:

@@ -51,5 +51,5 @@ namespace ryujin
     {
     }
 
-  } // namespace NavierStokes
+  } // namespace Skeleton
 } // namespace ryujin

@@ -51,7 +51,7 @@ namespace ryujin
                   "CFL/invariant domain violation recovery strategy: none, "
                   "bang bang control");
 
-    if(ParabolicSystem::is_identity)
+    if (ParabolicSystem::is_identity)
       time_stepping_scheme_ = TimeSteppingScheme::erk_33;
     else
       time_stepping_scheme_ = TimeSteppingScheme::strang_erk_33_cn;
@@ -229,8 +229,8 @@ namespace ryujin
 
 
   template <typename Description, int dim, typename Number>
-  Number TimeIntegrator<Description, dim, Number>::step_ssprk_33(
-      vector_type &U, Number t)
+  Number TimeIntegrator<Description, dim, Number>::step_ssprk_33(vector_type &U,
+                                                                 Number t)
   {
     /* SSP-RK3, see @cite Shu1988, Eq. 2.18. */
 
@@ -303,8 +303,8 @@ namespace ryujin
 
 
   template <typename Description, int dim, typename Number>
-  Number TimeIntegrator<Description, dim, Number>::step_erk_33(
-      vector_type &U, Number t)
+  Number TimeIntegrator<Description, dim, Number>::step_erk_33(vector_type &U,
+                                                               Number t)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeIntegrator<dim, Number>::step_erk_33()" << std::endl;

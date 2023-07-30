@@ -85,5 +85,5 @@ namespace ryujin
                     "Scaled thermal conductivity constant: c_v^{-1} kappa");
     }
 
-  } // namespace Euler
+  } // namespace NavierStokes
 } // namespace ryujin

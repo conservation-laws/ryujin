@@ -225,7 +225,7 @@ namespace ryujin
          * vectorized state then @p U is admissible if all vectorized
          * values are admissible.
          */
-        bool is_admissible(const state_type &/*U*/) const
+        bool is_admissible(const state_type & /*U*/) const
         {
           return true;
         }
@@ -423,5 +423,5 @@ namespace ryujin
         return View<dim, Number>{*this};
       }
     }; /* HyperbolicSystem */
-  } // namespace Skeleton
+  }    // namespace Skeleton
 } // namespace ryujin
