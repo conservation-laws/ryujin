@@ -93,7 +93,7 @@ namespace ryujin
      *
      * @todo Provide more details about boundary conditions.
      *
-     * @ingroup ParabolicModule
+     * @ingroup NavierStokesEquations
      */
     template <typename Description, int dim, typename Number = double>
     class ParabolicSolver final : public dealii::ParameterAcceptor
