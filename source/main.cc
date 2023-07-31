@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2020 - 2022 by the ryujin authors
+// Copyright (C) 2020 - 2023 by the ryujin authors
 //
 
 #include <compile_time_options.h>
@@ -108,9 +108,9 @@ int main(int argc, char *argv[])
 
   if (!std::filesystem::exists(parameter_file)) {
     if (dealii::Utilities::MPI::this_mpi_process(mpi_communicator) == 0) {
-      std::cout //
-          << "[INFO] Parameter file »" << parameter_file << "« not found.\n"
-          << "[INFO] Creating templates..." << std::endl;
+      std::cout << "[INFO] Default parameter file »" << parameter_file
+                << "« not found.\n[INFO] Creating template parameter files..."
+                << std::endl;
     }
 
     ryujin::create_parameter_templates(parameter_file, mpi_communicator);

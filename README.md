@@ -3,35 +3,64 @@
 ryujin
 ======
 
-Ryujin is a high-performance second-order collocation-type finite-element
-scheme for solving the compressible Navier-Stokes and Euler equations of
-gas dynamics on unstructured meshes. The solver is based on the convex
-limiting technique introduced by [Guermond et
-al.](https://doi.org/10.1137/17M1149961) and uses the finite element
-library [deal.II](https://github.com/dealii/dealii)
-([website](https://www.dealii.org)).
-
-As such it is <i>invariant-domain preserving</i>, the solver maintains
-important physical invariants and is guaranteed to be stable without the
-use of ad-hoc tuning parameters.
+Ryujin is a high-performance high-order collocation-type finite-element
+solver for conservation equations such as the compressible Navier-Stokes
+and Euler equations of gas dynamics. The solver is based on the [convex
+limiting technique](https://doi.org/10.1137/17M1149961) to ensure
+[invariant domain preservation](https://doi.org/10.1137/16M1074291) and
+uses the finite element library [deal.II](https://github.com/dealii/dealii)
+([website](https://www.dealii.org)) and the [vector class SIMD
+library](https://github.com/vectorclass/version2). As such the solver
+maintains important physical invariants and is guaranteed to be stable
+without the use of ad-hoc tuning parameters.
 
 Ryujin is freely available under the terms of the [MIT license](COPYING.md).
+
+Modules
+-------
+
+Ryujin features the following equation modules selectable by the following
+parameter flags:
+ - `equation = euler`, an optimized solver module for the
+   [compressible Euler
+   equations](https://en.wikipedia.org/wiki/Euler_equations_(fluid_dynamics))
+   with polytropic equation of state.
+ - `equation = euler aeos`, a generalized solver module for the
+   compressible Euler equation with an [arbitrary or tabulated equation of
+   state](https://en.wikipedia.org/wiki/Equation_of_state).
+ - `equation = navier stokes`, an optimized solver module for the
+   [compressible Navier-Stokes
+   equations](https://en.wikipedia.org/wiki/Navier%E2%80%93Stokes_equations)
+   with polytropic equation of state,
+   Newtonian fluid model, and Fourier's law for the heat flux.
+ - `equation = shallow water`, a module for the [shallow-water
+   equations](https://en.wikipedia.org/wiki/Shallow_water_equations).
+ - `equation = scalar conservation`, a module for scalar conservation
+   equations with user-supplied flux. The module features a greedy
+   wave-speed estimate to maintain an invariant domain, a generic indicator
+   based on the entropy-viscosity commutator technique with a general,
+   entropy-like function, and a customizable FCT-style limiter.
 
 Resources
 ---------
 
+ - [Website](https://conservation-laws.org/)
  - [Installation instructions](https://conservation-laws.org/ryujin/doxygen/Installation.html)
  - [Usage instructions](https://conservation-laws.org/ryujin/doxygen/Usage.html)
  - [Doxygen documentation](https://conservation-laws.org/ryujin/doxygen)
- - [Website](https://conservation-laws.org/)
 
 Videos
 ------
 
-<h4>Compressible Euler flow (Mach 3) past a cylinder: (click on image)</h4>
+A number of simulation results can be found on [this youtube
+channel](https://www.youtube.com/@matthiasmaier8956).
 
+[<img src="https://img.youtube.com/vi/ig7R3yA7CtE/maxresdefault.jpg" width="400"/>](https://www.youtube.com/watch?v=ig7R3yA7CtE)
+[<img src="https://img.youtube.com/vi/yM2rT3teakE/maxresdefault.jpg" width="400"/>](https://www.youtube.com/watch?v=yM2rT3teakE)
+[<img src="https://img.youtube.com/vi/xIwJZlsXpZ4/0.jpg" width="400"/>](https://www.youtube.com/watch?v=xIwJZlsXpZ4)
 [<img src="https://img.youtube.com/vi/pPP26zelb0M/0.jpg" width="400"/>](https://www.youtube.com/watch?v=pPP26zelb0M)
 [<img src="https://img.youtube.com/vi/vBCRAF_c8m8/0.jpg" width="400"/>](https://www.youtube.com/watch?v=vBCRAF_c8m8)
+[<img src="https://img.youtube.com/vi/xecIZylotSE/0.jpg" width="400"/>](https://www.youtube.com/watch?v=xecIZylotSE)
 
 References
 ----------
@@ -89,13 +118,14 @@ some of the following references
 Contact
 -------
 
-For questions please contact Matthias Maier <maier@math.tamu.edu> and
-Martin Kronbichler <martin.kronbichler@uni-a.de>.
+For questions either open an
+[issue](https://github.com/conservation-laws/ryujin/issues), or contact
+Matthias Maier (maier@tamu.edu).
 
-Authors
--------
+Developers
+----------
 
  - Martin Kronbichler ([@kronbichler](https://github.com/kronbichler)), University of Augsburg, Germany
  - Matthias Maier ([@tamiko](https://github.com/tamiko)), Texas A&M University, TX, USA
- - Ignacio Tomas ([@itomasSNL](https://github.com/itomasSNL)), Texas Tech University, TX, USA
+ - Ignacio Tomas ([@nachosaurus](https://github.com/nachosaurus)), Texas Tech University, TX, USA
  - Eric Tovar ([@ejtovar](https://github.com/ejtovar)), Los Alamos National Laboratory, USA

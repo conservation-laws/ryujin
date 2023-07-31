@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2020 - 2021 by the ryujin authors
+// Copyright (C) 2020 - 2023 by the ryujin authors
 //
 
 #pragma once
@@ -93,7 +93,7 @@ namespace ryujin
      *
      * @todo Provide more details about boundary conditions.
      *
-     * @ingroup ParabolicModule
+     * @ingroup NavierStokesEquations
      */
     template <typename Description, int dim, typename Number = double>
     class ParabolicSolver final : public dealii::ParameterAcceptor

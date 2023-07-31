@@ -1,0 +1,90 @@
+##
+#
+# Euler (optimized polytropic gas EOS) benchmark:
+#
+# The rarefaction wave is an analytic solution of the compressible Euler
+# equations (with polytropic gas equation of state). See Section 5.3 of
+# @cite GuermondEtAl2018 and Section 4.4 in @cite Toro2009. The problem is
+# challenging to solve for methods enforcing a minimum priniciple on the
+# specific entropy. With strict limiting the convergence rate reduces to 1.
+# The best-approximation error for the problem in the L1-norm is 2.
+#
+# We report the final, normalized L1, L2, L\infty error norms summed up
+# over the rho, m_1, and E components.
+#
+# This configuration uses an explicit ERK(3, 3, 1) timestepping.
+# Expected results are reported in euler-rarefaction-erk33.baseline
+#
+# We expect a convergence rate of around 1.5 in the L1 norm for our choice
+# of limiting and bounds relaxation.
+#
+# Compile time options: dim = 1, Number = double
+#
+##
+
+subsection A - TimeLoop
+  set basename             = rarefaction-erk33
+
+  set enable output full   = true
+
+  set enable compute error = true
+  set error normalize      = true
+  set error quantities     = rho, m, E
+
+  set final time           = 0.30558
+  set output granularity   = 0.30558
+end
+
+
+subsection B - Equation
+  set equation = euler
+  set gamma    = 1.4
+end
+
+
+subsection C - Discretization
+  set geometry        = rectangular domain
+  set mesh refinement = 6
+
+  subsection rectangular domain
+    set boundary condition left   = dirichlet
+    set boundary condition right  = dirichlet
+
+    set position bottom left      = 0
+    set position top right        = 1
+    set subdivisions x            = 25
+  end
+end
+
+
+subsection E - InitialValues
+  set configuration = rarefaction
+
+  set direction     = 1
+  set position      = 0.2
+end
+
+
+subsection F - HyperbolicModule
+  set cfl with boundary dofs        = true
+
+  set limiter iterations            = 2
+  set limiter newton max iterations = 2
+  set limiter newton tolerance      = 1e-10
+  set limiter relaxation factor     = 8
+end
+
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.10
+  set cfl max               = 0.10
+  set cfl recovery strategy = none
+  set time stepping scheme  = erk 33
+end
+
+
+subsection I - VTUOutput
+  set manifolds      =
+  set use mpi io     = true
+  set schlieren beta = 10
+end

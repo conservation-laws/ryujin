@@ -13,4 +13,3 @@ namespace ryujin
     template class ParabolicSolver<Description, DIM, NUMBER>;
   }
 } // namespace ryujin
-

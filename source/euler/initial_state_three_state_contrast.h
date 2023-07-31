@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2020 - 2022 by the ryujin authors
+// Copyright (C) 2020 - 2023 by the ryujin authors
 //
 
 #pragma once
@@ -17,11 +17,10 @@ namespace ryujin
      * and middle regions. The rest of the domain is populated with the right
      * region. This initial state (default values) can be used to replicate
      * the classical Woodward-Colella colliding blast wave problem described
-     * in:
+     * in @cite Woodward1984
      *
-     * Woodward, P. and Colella, P., "The Numerical Simulation of
-     * Two-Dimensional Fluid Flow with Strong Shocks", J. Computational
-     * Physics, 54, 115-173 (1984).
+     * @note The @p t argument is ignored. This class always returns the
+     * initial configuration.
      *
      * @ingroup EulerEquations
      */

@@ -12,10 +12,10 @@ end
 
 subsection B - Equation
   set equation = navier stokes
-  set gamma       = 1.4
-  set mu          = 0.01
-  set lambda      = 0
-  set kappa       = 1.866666666666666e-2
+  set gamma    = 1.4
+  set mu       = 0.01
+  set lambda   = 0
+  set kappa    = 1.866666666666666e-2
 end
 
 

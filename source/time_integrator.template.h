@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2020 - 2022 by the ryujin authors
+// Copyright (C) 2020 - 2023 by the ryujin authors
 //
 
 #pragma once
@@ -51,7 +51,10 @@ namespace ryujin
                   "CFL/invariant domain violation recovery strategy: none, "
                   "bang bang control");
 
-    time_stepping_scheme_ = TimeSteppingScheme::erk_33;
+    if (ParabolicSystem::is_identity)
+      time_stepping_scheme_ = TimeSteppingScheme::erk_33;
+    else
+      time_stepping_scheme_ = TimeSteppingScheme::strang_erk_33_cn;
     add_parameter("time stepping scheme",
                   time_stepping_scheme_,
                   "Time stepping scheme: ssprk 33, erk 11, erk 22, erk 33, erk "
@@ -226,8 +229,8 @@ namespace ryujin
 
 
   template <typename Description, int dim, typename Number>
-  Number TimeIntegrator<Description, dim, Number>::step_ssprk_33(
-      vector_type &U, Number t)
+  Number TimeIntegrator<Description, dim, Number>::step_ssprk_33(vector_type &U,
+                                                                 Number t)
   {
     /* SSP-RK3, see @cite Shu1988, Eq. 2.18. */
 
@@ -300,8 +303,8 @@ namespace ryujin
 
 
   template <typename Description, int dim, typename Number>
-  Number TimeIntegrator<Description, dim, Number>::step_erk_33(
-      vector_type &U, Number t)
+  Number TimeIntegrator<Description, dim, Number>::step_erk_33(vector_type &U,
+                                                               Number t)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeIntegrator<dim, Number>::step_erk_33()" << std::endl;

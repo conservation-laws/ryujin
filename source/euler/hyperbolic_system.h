@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2020 - 2022 by the ryujin authors
+// Copyright (C) 2020 - 2023 by the ryujin authors
 //
 
 #pragma once
@@ -159,6 +159,17 @@ namespace ryujin
           return ScalarNumber(
               hyperbolic_system_.gamma_minus_one_over_gamma_plus_one_);
         }
+
+        /**
+         * constexpr boolean used in the EulerInitialStates namespace
+         */
+        static constexpr bool have_gamma = true;
+
+        /**
+         * constexpr boolean used in the EulerInitialStates namespace
+         */
+        static constexpr bool have_eos_interpolation_b = false;
+
         //@}
         /**
          * @name Internal data

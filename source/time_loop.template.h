@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2020 - 2022 by the ryujin authors
+// Copyright (C) 2020 - 2023 by the ryujin authors
 //
 
 #pragma once
@@ -647,13 +647,13 @@ namespace ryujin
     stream << std::endl;
     stream << std::endl << "Run time parameters:" << std::endl << std::endl;
     ParameterAcceptor::prm.print_parameters(
-        stream, ParameterHandler::OutputStyle::ShortText);
+        stream, ParameterHandler::OutputStyle::ShortPRM);
     stream << std::endl;
 
     /* Also print out parameters to a prm file: */
 
     std::ofstream output(base_name_ + "-parameters.prm");
-    ParameterAcceptor::prm.print_parameters(output, ParameterHandler::Text);
+    ParameterAcceptor::prm.print_parameters(output, ParameterHandler::ShortPRM);
   }
 
 

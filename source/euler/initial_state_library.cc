@@ -9,4 +9,3 @@ namespace ryujin
 {
   template class InitialStateLibrary<Description, DIM, NUMBER>;
 } // namespace ryujin
-

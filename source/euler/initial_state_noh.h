@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2020 - 2022 by the ryujin authors
+// Copyright (C) 2020 - 2023 by the ryujin authors
 //
 
 #pragma once
@@ -9,22 +9,16 @@
 
 namespace ryujin
 {
-  namespace Euler
-  {
-    struct Description;
-  }
-
   namespace EulerInitialStates
   {
     /**
+     * The Noh problem
      *
-     * This initial state reproduces the classical Noh problem introduced
-     * in:
+     * This initial state sets up the classical Noh problem introduced in
+     * @cite Noh1987
      *
-     * W.F Noh, Errors for calculations of strong shocks using an artificial
-     * viscosity and an artificial heat flux, Journal of Computational
-     * Physics, Volume 72, Issue 1, 1987,
-     * https://doi.org/10.1016/0021-9991(87)90074-X.
+     * @note This class returns the analytic solution as a function of time
+     * @p t and position @p x.
      *
      * @ingroup EulerEquations
      */
@@ -43,12 +37,12 @@ namespace ryujin
           , hyperbolic_system_(hyperbolic_system)
       {
         gamma_ = 1.4;
-        if constexpr (!std::is_same_v<Description, Euler::Description>) {
+        if constexpr (!HyperbolicSystemView::have_gamma) {
           this->add_parameter("gamma", gamma_, "The ratio of specific heats");
         }
 
         this->parse_parameters_call_back.connect([&]() {
-          if constexpr (std::is_same_v<Description, Euler::Description>) {
+          if constexpr (HyperbolicSystemView::have_gamma) {
             gamma_ = hyperbolic_system_.gamma();
           }
         });
@@ -122,7 +116,6 @@ namespace ryujin
           AssertThrow(false, dealii::ExcNotImplemented());
           __builtin_trap();
         }
-
       }
 
     private:

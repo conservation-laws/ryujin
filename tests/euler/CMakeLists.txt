@@ -1,3 +1,8 @@
+##
+## SPDX-License-Identifier: MIT
+## Copyright (C) 2020 - 2023 by the ryujin authors
+##
+
 set(EQUATION euler)
 
 include_directories(

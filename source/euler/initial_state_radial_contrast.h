@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2020 - 2022 by the ryujin authors
+// Copyright (C) 2020 - 2023 by the ryujin authors
 //
 
 #pragma once
@@ -17,9 +17,11 @@ namespace ryujin
      * primitive state where the "left" state is "inside" the radius, R,
      * and the "right" state is outside.
      *
-     * @note This class does not evolve a possible shock front in time. If
-     * you need correct time-dependent Dirichlet data use @ref ShockFront
-     * instead.
+     * @note The @p t argument is ignored. This class always returns the
+     * initial configuration.
+     *
+     * @todo Transform a nonzero initial velocity into a radial momentum
+     * scaling with 1 / r^(dim -1).
      *
      * @ingroup EulerEquations
      */

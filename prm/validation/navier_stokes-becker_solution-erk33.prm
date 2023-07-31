@@ -1,0 +1,100 @@
+##
+#
+# Navier Stokes (optimized polytropic gas EOS) benchmark:
+#
+# An analytic solution of the compressible Navier-Stokes system as
+# described in @cite Becker1922. We report the final, normalized L1, L2,
+# L\infty error norms summed up over the rho, m, and E components.
+#
+# This configuration uses an explicit ERK(3, 3, 1) timestepping.
+# Expected results are reported in euler-becker_solution-erk33.baseline
+#
+# Compile time options: dim = 1, Number = double
+#
+##
+
+subsection A - TimeLoop
+  set basename             = becker_solution-erk33
+
+  set enable output full   = true
+
+  set enable compute error = true
+  set error normalize      = true
+  set error quantities     = rho, m, E
+
+  set final time           = 2.00
+  set output granularity   = 2.00
+end
+
+
+subsection B - Equation
+  set equation = navier stokes
+  set gamma    = 1.4
+  set mu       = 0.01
+  set lambda   = 0
+  set kappa    = 1.866666666666666e-2
+end
+
+
+subsection C - Discretization
+  set geometry        = rectangular domain
+  set mesh refinement = 6
+
+  subsection rectangular domain
+    set boundary condition left   = dirichlet
+    set boundary condition right  = dirichlet
+
+    set position bottom left      = -0.25
+    set position top right        =  0.25
+    set subdivisions x            = 25
+  end
+end
+
+
+subsection E - InitialValues
+  set configuration = becker solution
+  set direction     = 1
+  set position      = -0.125
+
+  subsection becker solution
+    set mu                      = 0.01
+    set velocity galilean frame = 0.125
+    set density left            = 1
+    set velocity left           = 1
+    set velocity right          = 0.259259259259
+  end
+end
+
+
+subsection F - HyperbolicModule
+  set cfl with boundary dofs        = true
+
+  set limiter iterations            = 2
+  set limiter newton max iterations = 2
+  set limiter newton tolerance      = 1e-10
+  set limiter relaxation factor     = 1
+end
+
+
+subsection G - ParabolicModule
+  set tolerance             = 1e-14
+  set tolerance linfty norm = false
+
+  set multigrid velocity    = false
+  set multigrid energy      = false
+end
+
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.10
+  set cfl max               = 0.10
+  set cfl recovery strategy = none
+  set time stepping scheme  = strang erk 33 cn
+end
+
+
+subsection I - VTUOutput
+  set manifolds      =
+  set use mpi io     = true
+  set schlieren beta = 10
+end

@@ -35,7 +35,7 @@ namespace ryujin
      * \f$d_i=1/(\rho_i m_i)\f$ for a given lumped mass matrix \f$ m_i \f$,
      * and a density field \f$ \rho_i \f$.
      *
-     * @ingroup ParabolicModule
+     * @ingroup NavierStokesEquations
      */
     template <int dim, typename Number>
     class DiagonalMatrix
@@ -150,7 +150,7 @@ namespace ryujin
      * An operator describing the velocity-velocity subblock of the
      * parabolic system.
      *
-     * @ingroup ParabolicModule
+     * @ingroup NavierStokesEquations
      */
     template <int dim, typename Number, typename Number2>
     class VelocityMatrix : public dealii::Subscriptor
@@ -435,7 +435,7 @@ namespace ryujin
 
 
     /**
-     * @ingroup ParabolicModule
+     * @ingroup NavierStokesEquations
      */
     template <int dim, typename Number>
     class MGTransferVelocity
@@ -542,7 +542,7 @@ namespace ryujin
 
 
     /**
-     * @ingroup ParabolicModule
+     * @ingroup NavierStokesEquations
      */
     template <int dim, typename Number, typename Number2>
     class EnergyMatrix : public dealii::Subscriptor
@@ -761,7 +761,7 @@ namespace ryujin
 
 
     /**
-     * @ingroup ParabolicModule
+     * @ingroup NavierStokesEquations
      */
     template <int dim, typename Number>
     class MGTransferEnergy : public dealii::MGTransferMatrixFree<dim, Number>

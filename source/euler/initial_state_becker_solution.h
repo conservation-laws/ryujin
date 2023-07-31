@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2020 - 2022 by the ryujin authors
+// Copyright (C) 2020 - 2023 by the ryujin authors
 //
 
 #pragma once
@@ -9,14 +9,11 @@
 
 namespace ryujin
 {
-  namespace Euler
-  {
-    struct Description;
-  }
-
   namespace EulerInitialStates
   {
     /**
+     * The Becker solution.
+     *
      * An analytic solution of the compressible Navier-Stokes system
      * as described in @cite Becker1922.
      *
@@ -39,6 +36,9 @@ namespace ryujin
      *  \f}
      *  For details see the dicussion in @cite ryujin-2021-2 Section 7.2.
      *
+     * @note This class returns the analytic solution as a function of time
+     * @p t and position @p x.
+     *
      * @ingroup EulerEquations
      */
     template <typename Description, int dim, typename Number>
@@ -57,7 +57,7 @@ namespace ryujin
           , hyperbolic_system_(hyperbolic_system)
       {
         gamma_ = 1.4;
-        if constexpr (!std::is_same_v<Description, Euler::Description>) {
+        if constexpr (!HyperbolicSystemView::have_gamma) {
           this->add_parameter("gamma", gamma_, "The ratio of specific heats");
         }
 
@@ -85,7 +85,7 @@ namespace ryujin
         /* Callback: */
 
         dealii::ParameterAcceptor::parse_parameters_call_back.connect([this]() {
-          if constexpr (std::is_same_v<Description, Euler::Description>) {
+          if constexpr (HyperbolicSystemView::have_gamma) {
             gamma_ = hyperbolic_system_.gamma();
           }
 

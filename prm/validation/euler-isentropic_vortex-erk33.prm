@@ -1,8 +1,29 @@
+##
+#
+# Euler (optimized polytropic gas EOS) benchmark:
+#
+# The isentropic vortex is an analytic solution of the compressible Euler
+# equations (with polytropic gas equation of state). We compute the vortex
+# on the square [-5, 5]^2 initially centered at (-1,-1) with a strength of
+# beta=5, and moving in diagonal (1,1) direction with mach number 1. At
+# final time t=2 the vortex is located at (1, 1). We report the final,
+# normalized L1, L2, L\infty error norms summed up over all components.
+#
+# This configuration uses an explicit ERK(3, 3, 1) timestepping.
+# Expected results are reported in euler-isentropic_vortex-erk33.baseline
+#
+# Compile time options: dim = 2, Number = double
+#
+##
+
 subsection A - TimeLoop
-  set basename             = validation-erk33
+  set basename             = isentropic_vortex-erk33
 
   set enable output full   = true
+
   set enable compute error = true
+  set error normalize      = true
+  set error quantities     = rho, m_1, m_2, E
 
   set final time           = 2.0
   set output granularity   = 2.0
