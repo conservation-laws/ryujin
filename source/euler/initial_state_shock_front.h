@@ -12,9 +12,14 @@ namespace ryujin
   namespace EulerInitialStates
   {
     /**
-     * An S1/S3 shock front
+     * The S1/S3 shock front.
      *
-     * @todo Documentation
+     * An Analytic solution for the compressible Euler equations with
+     * polytropic gas equation of state consisting of a shock front
+     * evolving in time.
+     *
+     * @note This class returns the analytic solution as a function of time
+     * @p t and position @p x.
      *
      * @ingroup EulerEquations
      */

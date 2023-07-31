@@ -12,8 +12,12 @@ namespace ryujin
   namespace EulerInitialStates
   {
     /**
-     * The rarefaction
-     * @todo Documentation
+     * An Analytic solution for the compressible Euler equations with
+     * polytropic gas equation of state consisting of a smooth rarefaction
+     * wave.
+     *
+     * @note This class returns the analytic solution as a function of time
+     * @p t and position @p x.
      *
      * @ingroup EulerEquations
      */
@@ -26,6 +30,8 @@ namespace ryujin
       using HyperbolicSystemView =
           typename HyperbolicSystem::template View<dim, Number>;
       using state_type = typename HyperbolicSystemView::state_type;
+
+      using ScalarNumber = typename HyperbolicSystemView::ScalarNumber;
 
       Rarefaction(const HyperbolicSystem &hyperbolic_system,
                   const std::string subsection)
@@ -120,13 +126,15 @@ namespace ryujin
           primitive = primitive_right;
         }
 
-        const dealii::Tensor<1, 3, Number> result{
-            {primitive[0], primitive[1], primitive[2]}};
-
-        // FIXME: update primitive
-
-        return hyperbolic_system_.from_primitive_state(
-            hyperbolic_system_.expand_state(result));
+        state_type conserved_state;
+        {
+          const auto &[rho, u, p] = primitive;
+          conserved_state[0] = rho;
+          conserved_state[1] = rho * u;
+          conserved_state[dim + 1] =
+              p / ScalarNumber(gamma_ - 1.) + ScalarNumber(0.5) * rho * u * u;
+        }
+        return conserved_state;
       }
 
     private:

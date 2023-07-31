@@ -13,8 +13,13 @@ namespace ryujin
   namespace EulerInitialStates
   {
     /**
-     * Initial configuration for the LeBlanc shock tube
-     * @todo Documentation
+     * The Le Blanc shocktube.
+     *
+     * An Analytic solution for the compressible Euler equations with
+     * polytropic gas equation of state and \f$\gamma = 5./3\f$.
+     *
+     * @note This class returns the analytic solution as a function of time
+     * @p t and position @p x.
      *
      * @ingroup EulerEquations
      */
@@ -40,7 +45,7 @@ namespace ryujin
       state_type compute(const dealii::Point<dim> &point, Number t) final
       {
         /*
-         * The LeBlanc shock tube:
+         * The Le Blanc shock tube:
          */
 
         /* Initial left and right states (rho, u, p): */
@@ -99,6 +104,7 @@ namespace ryujin
           conserved_state[dim + 1] =
               p / ScalarNumber(5. / 3. - 1.) + ScalarNumber(0.5) * rho * u * u;
         }
+
         return conserved_state;
       }
 

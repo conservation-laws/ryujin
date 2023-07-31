@@ -19,9 +19,8 @@ namespace ryujin
      *        ---------|-----------
      *        state 3  | state 4
      *
-     * @note This class does not evolve a possible shock front in time. If
-     * you need correct time-dependent Dirichlet data use @ref ShockFront
-     * instead.
+     * @note The @p t argument is ignored. This class always returns the
+     * initial configuration.
      *
      * @ingroup EulerEquations
      */

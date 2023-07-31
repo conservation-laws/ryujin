@@ -12,7 +12,11 @@ namespace ryujin
   namespace EulerInitialStates
   {
     /**
-     * Uniform initial state defined by a given primitive state.
+     * Returns a uniform initial state defined by a given primitive
+     * (initial) state.
+     *
+     * @note The @p t argument is ignored. This class always returns the
+     * initial configuration.
      *
      * @ingroup EulerEquations
      */

@@ -14,9 +14,13 @@ namespace ryujin
   {
     /**
      * This is a generalization of the "Smooth traveling wave" problem first
-     * proposed in Section 5.2 of [Guermond, Nazarov, Popov, Thomas].
+     * proposed in Section 5.2 of @cite GuermondEtAl2018
      *
-     * @todo The set up is as follows:
+     * An Analytic solution for the compressible Euler equations with
+     * polytropic gas equation of state and \f$\gamma = 7./5\f$.
+     *
+     * @note This class returns the analytic solution as a function of time
+     * @p t and position @p x.
      *
      * @ingroup EulerEquations
      */
@@ -28,6 +32,8 @@ namespace ryujin
       using HyperbolicSystemView =
           typename HyperbolicSystem::template View<dim, Number>;
       using state_type = typename HyperbolicSystemView::state_type;
+
+      using ScalarNumber = typename HyperbolicSystemView::ScalarNumber;
 
       SmoothWave(const HyperbolicSystem &hyperbolic_system,
                  const std::string subsection)
@@ -71,15 +77,15 @@ namespace ryujin
         if (left_ <= point_bar[0] && point_bar[0] <= right_)
           rho = density_ref_ + polynomial;
 
-        dealii::Tensor<1, 3, Number> result;
-        result[0] = rho;
-        result[1] = mach_number_;
-        result[2] = pressure_ref_;
-
-        // FIXME: update primitive
-
-        return hyperbolic_system_.from_primitive_state(
-            hyperbolic_system_.expand_state(result));
+        state_type conserved_state;
+        {
+          conserved_state[0] = rho;
+          conserved_state[1] = rho * mach_number_;
+          conserved_state[dim + 1] =
+              pressure_ref_ / ScalarNumber(7. / 5. - 1.) +
+              ScalarNumber(0.5) * rho * mach_number_ * mach_number_;
+        }
+        return conserved_state;
       }
 
     private:

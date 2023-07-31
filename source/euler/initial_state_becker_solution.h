@@ -12,6 +12,8 @@ namespace ryujin
   namespace EulerInitialStates
   {
     /**
+     * The Becker solution.
+     *
      * An analytic solution of the compressible Navier-Stokes system
      * as described in @cite Becker1922.
      *
@@ -33,6 +35,9 @@ namespace ryujin
      *    v^2(x)\Big).
      *  \f}
      *  For details see the dicussion in @cite ryujin-2021-2 Section 7.2.
+     *
+     * @note This class returns the analytic solution as a function of time
+     * @p t and position @p x.
      *
      * @ingroup EulerEquations
      */

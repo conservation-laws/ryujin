@@ -13,11 +13,11 @@ namespace ryujin
   {
     /**
      * An initial state formed by a contrast of a given "left" and "right"
-     * primitive state.
+     * primitive (initial) state.
      *
-     * @note This class does not evolve a possible shock front in time. If
-     * you need correct time-dependent Dirichlet data use @ref ShockFront
-     * instead.
+     * @note The @p t argument is ignored. This class does not evolve a
+     * possible shock front in time. If you need correct time-dependent
+     * Dirichlet data use @ref ShockFront instead.
      *
      * @ingroup EulerEquations
      */

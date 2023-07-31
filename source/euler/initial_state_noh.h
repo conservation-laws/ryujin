@@ -12,14 +12,13 @@ namespace ryujin
   namespace EulerInitialStates
   {
     /**
+     * The Noh problem
      *
-     * This initial state reproduces the classical Noh problem introduced
-     * in:
+     * This initial state sets up the classical Noh problem introduced in
+     * @cite Noh1987
      *
-     * W.F Noh, Errors for calculations of strong shocks using an artificial
-     * viscosity and an artificial heat flux, Journal of Computational
-     * Physics, Volume 72, Issue 1, 1987,
-     * https://doi.org/10.1016/0021-9991(87)90074-X.
+     * @note This class returns the analytic solution as a function of time
+     * @p t and position @p x.
      *
      * @ingroup EulerEquations
      */

@@ -13,8 +13,12 @@ namespace ryujin
   namespace EulerInitialStates
   {
     /**
-     * The isentropic vortex
-     * @todo Documentation
+     * The isentropic vortex.
+     *
+     * An analytic solution for the compressible Euler equations.
+     *
+     * @note This class returns the analytic solution as a function of time
+     * @p t and position @p x.
      *
      * @ingroup EulerEquations
      */
