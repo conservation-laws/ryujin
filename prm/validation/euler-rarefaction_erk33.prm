@@ -2,22 +2,28 @@
 #
 # Euler (optimized polytropic gas EOS) benchmark:
 #
-# The Leblanc shocktube is an analytic solution of the compressible Euler
-# equations (with polytropic gas equation of state). We report the final,
-# normalized L1, L2, L\infty error norms summed up the rho, m_1, and E
-# components.
+# The rarefaction wave is an analytic solution of the compressible Euler
+# equations (with polytropic gas equation of state). See Section 5.3 of
+# @cite GuermondEtAl2018 and Section 4.4 in @cite Toro2009. The problem is
+# challenging to solve for methods enforcing a minimum priniciple on the
+# specific entropy. With strict limiting the convergence rate reduces to 1.
+# The best-approximation error for the problem in the L1-norm is 2.
+#
+# We report the final, normalized L1, L2, L\infty error norms summed up
+# over the rho, m_1, and E components.
 #
 # This configuration uses an explicit ERK(3, 3, 1) timestepping.
-# Expected results are reported in euler-leblanc-erk33.baseline
+# Expected results are reported in euler-rarefaction-erk33.baseline
 #
-# The expected optimal rate of this test case is 1 in the L1 norm.
+# We expect a convergence rate of around 1.5 in the L1 norm for our choice
+# of limiting and bounds relaxation.
 #
 # Compile time options: dim = 1, Number = double
 #
 ##
 
 subsection A - TimeLoop
-  set basename             = leblanc-erk33
+  set basename             = rarefaction-erk33
 
   set enable output full   = true
 
@@ -25,14 +31,14 @@ subsection A - TimeLoop
   set error normalize      = true
   set error quantities     = rho, m, E
 
-  set final time           = 0.66666666666667
-  set output granularity   = 0.66666666666667
+  set final time           = 0.30558
+  set output granularity   = 0.30558
 end
 
 
 subsection B - Equation
   set equation = euler
-  set gamma    = 1.66666666666667
+  set gamma    = 1.4
 end
 
 
@@ -52,11 +58,10 @@ end
 
 
 subsection E - InitialValues
-  set configuration = leblanc
+  set configuration = rarefaction
 
   set direction     = 1
-  # for cG put the discontinuity right in the center of a cell
-  set position      = 0.326732673267
+  set position      = 0.2
 end
 
 

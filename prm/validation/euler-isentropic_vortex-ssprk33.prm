@@ -10,7 +10,7 @@
 # normalized L1, L2, L\infty error norms summed up over all components.
 #
 # This configuration uses an explicit ERK(2, 2, 1) timestepping.
-# Expected results are reported in euler-isentropic_vortex-erk22.baseline
+# Expected results are reported in euler-isentropic_vortex-ssprk33.baseline
 #
 # Compile time options: dim = 2, Number = double
 #
