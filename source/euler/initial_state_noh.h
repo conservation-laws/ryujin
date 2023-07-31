@@ -9,11 +9,6 @@
 
 namespace ryujin
 {
-  namespace Euler
-  {
-    struct Description;
-  }
-
   namespace EulerInitialStates
   {
     /**
@@ -43,12 +38,12 @@ namespace ryujin
           , hyperbolic_system_(hyperbolic_system)
       {
         gamma_ = 1.4;
-        if constexpr (!std::is_same_v<Description, Euler::Description>) {
+        if constexpr (!HyperbolicSystemView::have_gamma) {
           this->add_parameter("gamma", gamma_, "The ratio of specific heats");
         }
 
         this->parse_parameters_call_back.connect([&]() {
-          if constexpr (std::is_same_v<Description, Euler::Description>) {
+          if constexpr (HyperbolicSystemView::have_gamma) {
             gamma_ = hyperbolic_system_.gamma();
           }
         });

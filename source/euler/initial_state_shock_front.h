@@ -9,11 +9,6 @@
 
 namespace ryujin
 {
-  namespace Euler
-  {
-    struct Description;
-  }
-
   namespace EulerInitialStates
   {
     /**
@@ -38,7 +33,7 @@ namespace ryujin
           , hyperbolic_system_(hyperbolic_system)
       {
         gamma_ = 1.4;
-        if constexpr (!std::is_same_v<Description, Euler::Description>) {
+        if constexpr (!HyperbolicSystemView::have_gamma) {
           this->add_parameter("gamma", gamma_, "The ratio of specific heats");
         }
 
@@ -57,13 +52,15 @@ namespace ryujin
             "Mach number of shock front (S1, S3 = mach * a_L/R)");
 
         const auto compute_and_convert_states = [&]() {
-          if constexpr (std::is_same_v<Description, Euler::Description>) {
+          if constexpr (HyperbolicSystemView::have_gamma) {
             gamma_ = hyperbolic_system_.gamma();
           }
 
           /* Compute post-shock state and S3: */
 
-          const Number b = Number(0.); // FIXME
+          auto b = Number(0.);
+          if constexpr (HyperbolicSystemView::have_eos_interpolation_b)
+            b = hyperbolic_system_.eos_interpolation_b();
 
           const auto &rho_R = primitive_right_[0];
           const auto &u_R = primitive_right_[1];

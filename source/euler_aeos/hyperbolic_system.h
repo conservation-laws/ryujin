@@ -212,6 +212,16 @@ namespace ryujin
           return ScalarNumber(eos->interpolation_b());
         }
 
+        /**
+         * constexpr boolean used in the EulerInitialStates namespace
+         */
+        static constexpr bool have_gamma = false;
+
+        /**
+         * constexpr boolean used in the EulerInitialStates namespace
+         */
+        static constexpr bool have_eos_interpolation_b = true;
+
         //@}
         /**
          * @name Internal data
