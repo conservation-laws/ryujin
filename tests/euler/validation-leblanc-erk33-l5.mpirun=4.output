@@ -1,0 +1,12 @@
+[INFO] initiating flux capacitor
+[INFO] initializing data structures
+[INFO] creating mesh
+[INFO] preparing compute kernels
+[INFO] interpolating initial values
+[INFO] entering main loop
+Normalized consolidated Linf, L1, and L2 errors at final time 
+#dofs = 14409
+t     = 0.6668356890251758
+Linf  = 0.2365625337561636
+L1    = 0.0129022954207507
+L2    = 0.0320396743061396
