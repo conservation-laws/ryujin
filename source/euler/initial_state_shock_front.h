@@ -34,7 +34,7 @@ namespace ryujin
 
       ShockFront(const HyperbolicSystem &hyperbolic_system,
                  const std::string subsection)
-          : InitialState<Description, dim, Number>("shockfront", subsection)
+          : InitialState<Description, dim, Number>("shock front", subsection)
           , hyperbolic_system_(hyperbolic_system)
       {
         gamma_ = 1.4;

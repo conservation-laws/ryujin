@@ -4,8 +4,8 @@ subsection A - TimeLoop
   set enable compute error = true
   set error quantities     = rho, m_1, E
 
-  set final time           = 0.66666666666667
-  set output granularity   = 0.66666666666667
+  set final time           = 0.30558
+  set output granularity   = 0.30558
 
   set terminal update interval  = 0
 end
@@ -13,7 +13,7 @@ end
 
 subsection B - Equation
   set equation = euler
-  set gamma    = 1.66666666666667
+  set gamma    = 1.4
 end
 
 
@@ -36,11 +36,10 @@ end
 
 
 subsection E - InitialValues
-  set configuration = leblanc
+  set configuration = rarefaction
 
   set direction     = 1, 0
-  # for cG put the discontinuity right in the center of a cell
-  set position      = 0.326732673267, 0
+  set position      = 0.2, 0
 end
 
 
@@ -55,8 +54,8 @@ end
 
 
 subsection H - TimeIntegrator
-  set cfl min               = 0.75
-  set cfl max               = 0.75
+  set cfl min               = 0.50
+  set cfl max               = 0.50
   set cfl recovery strategy = none
   set time stepping scheme  = erk 33
 end

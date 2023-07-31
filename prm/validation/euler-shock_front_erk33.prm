@@ -2,20 +2,21 @@
 #
 # Euler (optimized polytropic gas EOS) benchmark:
 #
-# The Smooth traveling wave is an analytic solution of the compressible
-# Euler equations (with polytropic gas equation of state). We report the
-# final, normalized L1, L2, L\infty error norms summed up over the rho,
-# m_1, and E components.
+# The S1/S3 shock front is discontinuous, analytic solution of the
+# compressible Euler equations (with polytropic gas equation of state).
+#
+# We report the final, normalized L1, L2, L\infty error norms summed up
+# over the rho, m_1, and E components.
 #
 # This configuration uses an explicit ERK(3, 3, 1) timestepping.
-# Expected results are reported in euler-smooth_wave-erk33.baseline
+# Expected results are reported in euler-shock_front-erk33.baseline
 #
 # Compile time options: dim = 1, Number = double
 #
 ##
 
 subsection A - TimeLoop
-  set basename             = smooth_wave-erk33
+  set basename             = shock_front-erk33
 
   set enable output full   = true
 
@@ -23,8 +24,8 @@ subsection A - TimeLoop
   set error normalize      = true
   set error quantities     = rho, m, E
 
-  set final time           = 0.60
-  set output granularity   = 0.60
+  set final time           = 0.25
+  set output granularity   = 0.25
 end
 
 
@@ -50,10 +51,10 @@ end
 
 
 subsection E - InitialValues
-  set configuration = smooth wave
+  set configuration = shock front
 
   set direction     = 1
-  set position      = 0.1
+  set position      = 0.25
 end
 
 
@@ -63,7 +64,7 @@ subsection F - HyperbolicModule
   set limiter iterations            = 2
   set limiter newton max iterations = 2
   set limiter newton tolerance      = 1e-10
-  set limiter relaxation factor     = 8
+  set limiter relaxation factor     = 1
 end
 
 

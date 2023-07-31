@@ -30,11 +30,11 @@ end
 
 
 subsection B - Equation
-  set equation = euler aeos
-  set compute strict bounds    = false
-  set equation of state = polytropic gas
+  set equation              = euler aeos
+  set compute strict bounds = false
+  set equation of state     = polytropic gas
   subsection polytropic gas
-    set gamma    = 1.66666666666667
+    set gamma = 1.66666666666667
   end
 end
 
