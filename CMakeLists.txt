@@ -57,7 +57,7 @@ option(CHECK_BOUNDS "Enable debug code paths that check limiter bounds" OFF)
 option(DEBUG_OUTPUT "Enable detailed time-step output" OFF)
 option(DENORMALS_ARE_ZERO "Set the \"denormals are zero\" and \"flush to zero\" bits in the MXCSR register" ON)
 option(FORCE_DEAL_II_SPARSE_MATRIX "Always use dealii::SparseMatrix instead of TrilinosWrappers::SparseMatrix for assembly" OFF)
-option(SANITIZER "Enable address and UBSAN sanitizers" OFF)
+option(SANITIZER "Enable address and UBSAN sanitizers for DEBUG build" OFF)
 
 set(ORDER_FINITE_ELEMENT "1" CACHE STRING "Order of finite elements")
 set(ORDER_MAPPING "1" CACHE STRING "Order of mapping")
@@ -96,15 +96,17 @@ endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   string(APPEND DEAL_II_CXX_FLAGS
-    " -Xclang -fcolor-diagnostics -Qunused-arguments"
+    " -Xclang -fcolor-diagnostics"
     )
+endif()
+
+if(SANITIZER)
   string(APPEND DEAL_II_CXX_FLAGS_DEBUG
     " -fsanitize=address,undefined,leak -fsanitize-address-use-after-return=always -fsanitize-address-use-after-scope"
     )
   string(APPEND DEAL_II_LINKER_FLAGS_DEBUG
     " -fsanitize=address,undefined,leak -fsanitize-address-use-after-return=always -fsanitize-address-use-after-scope"
     )
-  string(APPEND DEAL_II_CXX_FLAGS " -Wno-undefined-var-template")
 endif()
 
 # Respect user overrides performed via CMAKE_CXX_FLAGS/CMAKE_EXE_LINKER_FLAGS
