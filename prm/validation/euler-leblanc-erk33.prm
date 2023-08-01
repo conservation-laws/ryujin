@@ -12,8 +12,6 @@
 #
 # The expected optimal rate of this test case is 1 in the L1 norm.
 #
-# Compile time options: dim = 1, Number = double
-#
 ##
 
 subsection A - TimeLoop
@@ -31,8 +29,10 @@ end
 
 
 subsection B - Equation
-  set equation = euler
-  set gamma    = 1.66666666666667
+  set dimension = 1
+  set equation  = euler
+
+  set gamma     = 1.66666666666667
 end
 
 

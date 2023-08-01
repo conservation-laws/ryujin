@@ -9,8 +9,6 @@
 # This configuration uses an explicit ERK(3, 3, 1) timestepping.
 # Expected results are reported in euler-becker_solution-erk33.baseline
 #
-# Compile time options: dim = 1, Number = double
-#
 ##
 
 subsection A - TimeLoop
@@ -28,11 +26,13 @@ end
 
 
 subsection B - Equation
-  set equation = navier stokes
-  set gamma    = 1.4
-  set mu       = 0.01
-  set lambda   = 0
-  set kappa    = 1.866666666666666e-2
+  set dimension = 1
+  set equation  = navier stokes
+
+  set gamma     = 1.4
+  set mu        = 0.01
+  set lambda    = 0
+  set kappa     = 1.866666666666666e-2
 end
 
 

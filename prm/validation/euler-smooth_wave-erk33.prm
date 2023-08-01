@@ -10,8 +10,6 @@
 # This configuration uses an explicit ERK(3, 3, 1) timestepping.
 # Expected results are reported in euler-smooth_wave-erk33.baseline
 #
-# Compile time options: dim = 1, Number = double
-#
 ##
 
 subsection A - TimeLoop
@@ -29,8 +27,10 @@ end
 
 
 subsection B - Equation
-  set equation = euler
-  set gamma    = 1.4
+  set dimension = 1
+  set equation  = euler
+
+  set gamma     = 1.4
 end
 
 
