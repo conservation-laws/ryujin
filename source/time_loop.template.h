@@ -613,7 +613,7 @@ namespace ryujin
     if (mpi_rank_ != 0)
       return;
 
-    /* Output commit and library informations: */
+    /* Output commit and library information: */
 
     /* clang-format off */
     stream << std::endl;
@@ -631,9 +631,7 @@ namespace ryujin
     stream << std::endl
            << std::endl << "Compile time parameters:" << std::endl << std::endl;
 
-    stream << "DIM == " << dim << std::endl;
     stream << "NUMBER == " << typeid(Number).name() << std::endl;
-
     stream << "SIMD width == " << VectorizedArray<Number>::size() << std::endl;
 
     /* clang-format on */

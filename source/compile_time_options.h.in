@@ -7,7 +7,6 @@
 
 /* Compile-time options: */
 
-#define DIM @DIM@
 #define NUMBER @NUMBER@
 
 #cmakedefine CHECK_BOUNDS

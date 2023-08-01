@@ -49,7 +49,6 @@ project(ryujin CXX)
 # Compile-time options:
 #
 
-set(DIM "2" CACHE STRING "The dimension")
 set(NUMBER "double" CACHE STRING "The principal floating point type")
 
 option(ASYNC_MPI_EXCHANGE "Use synchronous MPI communication" OFF)
