@@ -25,12 +25,16 @@
  * CALLGRIND_STOP_INSTRUMENTATION
  * @endcode
  */
-#define CALLGRIND_START_INSTRUMENTATION
+#define CALLGRIND_START_INSTRUMENTATION                                        \
+  do {                                                                         \
+  } while (false)
 
 /**
  * @copydoc CALLGRIND_START_INSTRUMENTATION
  */
-#define CALLGRIND_STOP_INSTRUMENTATION
+#define CALLGRIND_STOP_INSTRUMENTATION                                         \
+  do {                                                                         \
+  } while (false)
 
 #ifdef WITH_VALGRIND
 #undef CALLGRIND_START_INSTRUMENTATION

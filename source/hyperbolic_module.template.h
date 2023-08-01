@@ -162,7 +162,7 @@ namespace ryujin
               << std::endl;
 #endif
 
-    CALLGRIND_START_INSTRUMENTATION
+    CALLGRIND_START_INSTRUMENTATION;
 
     using VA = VectorizedArray<Number>;
 
@@ -944,7 +944,7 @@ namespace ryujin
     if constexpr (View::have_source_terms)
       new_U += source_;
 
-    CALLGRIND_STOP_INSTRUMENTATION
+    CALLGRIND_STOP_INSTRUMENTATION;
 
     /* Do we have to restart? */
 

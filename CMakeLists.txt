@@ -67,9 +67,9 @@ set(ORDER_QUADRATURE "2" CACHE STRING "Order of quadrature")
 # External packages:
 #
 
-option(WITH_CALLGRIND "Compile and link against the valgrind/callgrind instrumentation library" OFF)
 option(WITH_DOXYGEN "Build documentation with doxygen" OFF)
 option(WITH_LIKWID "Compile and link against the likwid instrumentation library" OFF)
+option(WITH_VALGRIND "Compile and link against the valgrind/callgrind instrumentation library" OFF)
 
 if("${WITH_OPENMP}" STREQUAL "")
   find_package(OpenMP QUIET)
@@ -138,6 +138,11 @@ endif()
 if(WITH_LIKWID)
   find_package(LIKWID REQUIRED)
   list(APPEND EXTERNAL_TARGETS "Likwid::Likwid")
+endif()
+
+if(WITH_VALGRIND)
+  find_package(VALGRIND REQUIRED)
+  list(APPEND EXTERNAL_TARGETS "Valgrind::Valgrind")
 endif()
 
 #
