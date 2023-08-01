@@ -31,6 +31,9 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 
 find_package(deal.II 9.3 REQUIRED HINTS ${DEAL_II_DIR} $ENV{DEAL_II_DIR})
 
+set(CMAKE_BUILD_TYPE "Release" CACHE STRING
+  "Choose the type of build, options are: Debug, Release"
+  )
 deal_ii_initialize_cached_variables()
 deal_ii_query_git_information()
 
@@ -143,8 +146,13 @@ include(GNUInstallDirs)
 
 add_subdirectory(source)
 
+install(FILES COPYING.md README.md
+  DESTINATION ${CMAKE_INSTALL_DOCDIR}
+  )
+
 file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/run/")
 file(CREATE_LINK "${CMAKE_SOURCE_DIR}/prm" "${CMAKE_BINARY_DIR}/run/prm" SYMBOLIC)
+install(DIRECTORY prm DESTINATION ${CMAKE_INSTALL_DOCDIR})
 
 enable_testing()
 add_subdirectory(tests)
