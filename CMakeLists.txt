@@ -3,6 +3,10 @@
 ## Copyright (C) 2020 - 2023 by the ryujin authors
 ##
 
+#
+# Sanity check:
+#
+
 get_filename_component(_source "${CMAKE_SOURCE_DIR}" REALPATH)
 get_filename_component(_build  "${CMAKE_BINARY_DIR}" REALPATH)
 if("${_source}" STREQUAL "${_build}")
@@ -15,13 +19,21 @@ if("${_source}" STREQUAL "${_build}")
     )
 endif()
 
+#
+# Set up deal.II
+#
+
 set(RYUJIN_VERSION 2.1.1)
 
 cmake_minimum_required(VERSION 3.15)
 set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 
 find_package(deal.II 9.3 REQUIRED HINTS ${DEAL_II_DIR} $ENV{DEAL_II_DIR})
 
+set(CMAKE_BUILD_TYPE "Release" CACHE STRING
+  "Choose the type of build, options are: Debug, Release"
+  )
 deal_ii_initialize_cached_variables()
 deal_ii_query_git_information()
 
@@ -34,65 +46,46 @@ endif()
 project(ryujin CXX)
 
 #
-# Options:
+# Compile-time options:
 #
 
-set(DIM "2" CACHE STRING "The dimension")
 set(NUMBER "double" CACHE STRING "The principal floating point type")
 
+option(ASYNC_MPI_EXCHANGE "Use synchronous MPI communication" OFF)
 option(CHECK_BOUNDS "Enable debug code paths that check limiter bounds" OFF)
 option(DEBUG_OUTPUT "Enable detailed time-step output" OFF)
 option(DENORMALS_ARE_ZERO "Set the \"denormals are zero\" and \"flush to zero\" bits in the MXCSR register" ON)
 option(FORCE_DEAL_II_SPARSE_MATRIX "Always use dealii::SparseMatrix instead of TrilinosWrappers::SparseMatrix for assembly" OFF)
-
-option(WITH_ASYNC_MPI_EXCHANGE "Use synchronous MPI communication" OFF)
-option(WITH_CALLGRIND "Compile and link against the valgrind/callgrind instrumentation library" OFF)
-option(WITH_CUSTOM_POW "Use custom serial pow implementation" ON)
-option(WITH_DOXYGEN "Build documentation with doxygen" OFF)
-option(WITH_LIKWID "Compile and link against the likwid instrumentation library" OFF)
-
-find_package(OpenMP)
-option(WITH_OPENMP "Enable threading support via OpenMP" ${OpenMP_FOUND})
-
-list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
-find_package(EOSPAC)
-option(WITH_EOSPAC "Add support for the EOSPAC suite" ${EOSPAC_FOUND})
+option(SANITIZER "Enable address and UBSAN sanitizers for DEBUG build" OFF)
 
 set(ORDER_FINITE_ELEMENT "1" CACHE STRING "Order of finite elements")
 set(ORDER_MAPPING "1" CACHE STRING "Order of mapping")
 set(ORDER_QUADRATURE "2" CACHE STRING "Order of quadrature")
 
 #
+# External packages:
+#
+
+option(WITH_DOXYGEN "Build documentation with doxygen" OFF)
+option(WITH_LIKWID "Compile and link against the likwid instrumentation library" OFF)
+option(WITH_VALGRIND "Compile and link against the valgrind/callgrind instrumentation library" OFF)
+
+if("${WITH_OPENMP}" STREQUAL "")
+  find_package(OpenMP QUIET)
+endif()
+option(WITH_OPENMP "Enable threading support via OpenMP" ${OpenMP_FOUND})
+
+if("${WITH_EOSPAC}" STREQUAL "")
+  find_package(EOSPAC QUIET)
+endif()
+option(WITH_EOSPAC "Add support for the EOSPAC suite" ${EOSPAC_FOUND})
+
+#
 # Set up compiler flags:
 #
 
 #string(APPEND DEAL_II_CXX_FLAGS " -Wfatal-errors")
-
 string(APPEND DEAL_II_CXX_FLAGS " -std=c++17")
-
-if(WITH_OPENMP)
-  find_package(OpenMP REQUIRED)
-  string(APPEND DEAL_II_CXX_FLAGS " ${OpenMP_CXX_FLAGS}")
-  string(APPEND DEAL_II_LINKER_FLAGS " ${OpenMP_CXX_FLAGS}")
-  list(APPEND DEAL_II_INCLUDE_DIRS "${OpenMP_CXX_INCLUDE_DIRS}")
-
-  #
-  # Work around a bug with brew on darwin where libomp.dylib gets silently
-  # dropped from the link line even though we try to add the library with a
-  # proper target_link_libraries() call...
-  #
-  if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
-    string(APPEND DEAL_II_LINKER_FLAGS " ${OpenMP_CXX_LIBRARIES}")
-  endif()
-endif()
-
-if(WITH_EOSPAC)
-  find_package(EOSPAC REQUIRED)
-endif()
-
-if(WITH_LIKWID)
-  add_definitions(-DLIKWID_PERFMON)
-endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
   string(APPEND DEAL_II_CXX_FLAGS " -fdiagnostics-color=always")
@@ -102,36 +95,20 @@ endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   string(APPEND DEAL_II_CXX_FLAGS
-    " -Xclang -fcolor-diagnostics -Qunused-arguments"
+    " -Xclang -fcolor-diagnostics"
     )
+endif()
+
+if(SANITIZER)
   string(APPEND DEAL_II_CXX_FLAGS_DEBUG
     " -fsanitize=address,undefined,leak -fsanitize-address-use-after-return=always -fsanitize-address-use-after-scope"
     )
   string(APPEND DEAL_II_LINKER_FLAGS_DEBUG
     " -fsanitize=address,undefined,leak -fsanitize-address-use-after-return=always -fsanitize-address-use-after-scope"
     )
-  string(APPEND DEAL_II_CXX_FLAGS " -Wno-undefined-var-template")
 endif()
 
-#
-# Detection
-#
-
-# Detect whether we are building against GCC's libstdc++.
-include(CheckCXXSourceCompiles)
-check_cxx_source_compiles("
-  #include <iostream>
-  #ifndef __GLIBCXX__
-  #error NOT LIBSTDCPP
-  #endif
-  int main() {}"
-  LIBSTDCPP
-  )
-
-#
 # Respect user overrides performed via CMAKE_CXX_FLAGS/CMAKE_EXE_LINKER_FLAGS
-#
-
 string(APPEND DEAL_II_CXX_FLAGS " $ENV{CXXFLAGS} ${CMAKE_CXX_FLAGS}")
 string(APPEND DEAL_II_CXX_FLAGS_DEBUG " ${CMAKE_CXX_FLAGS_DEBUG}")
 string(APPEND DEAL_II_CXX_FLAGS_RELEASE " ${CMAKE_CXX_FLAGS_RELEASE}")
@@ -142,6 +119,32 @@ set(CMAKE_CXX_FLAGS_DEBUG "")
 set(CMAKE_EXE_LINKER_FLAGS "")
 
 #
+# Feature configuration:
+#
+
+set(EXTERNAL_TARGETS)
+
+if(WITH_OPENMP)
+  find_package(OpenMP REQUIRED)
+  list(APPEND EXTERNAL_TARGETS "OpenMP::OpenMP_CXX")
+endif()
+
+if(WITH_EOSPAC)
+  find_package(EOSPAC REQUIRED)
+  list(APPEND EXTERNAL_TARGETS "Eospac::Eospac6")
+endif()
+
+if(WITH_LIKWID)
+  find_package(LIKWID REQUIRED)
+  list(APPEND EXTERNAL_TARGETS "Likwid::Likwid")
+endif()
+
+if(WITH_VALGRIND)
+  find_package(VALGRIND REQUIRED)
+  list(APPEND EXTERNAL_TARGETS "Valgrind::Valgrind")
+endif()
+
+#
 # Set up the rest:
 #
 
@@ -149,8 +152,13 @@ include(GNUInstallDirs)
 
 add_subdirectory(source)
 
+install(FILES COPYING.md README.md
+  DESTINATION ${CMAKE_INSTALL_DOCDIR}
+  )
+
 file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/run/")
 file(CREATE_LINK "${CMAKE_SOURCE_DIR}/prm" "${CMAKE_BINARY_DIR}/run/prm" SYMBOLIC)
+install(DIRECTORY prm DESTINATION ${CMAKE_INSTALL_DOCDIR})
 
 enable_testing()
 add_subdirectory(tests)

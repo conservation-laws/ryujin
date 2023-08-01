@@ -18,8 +18,6 @@
 # We expect a convergence rate of around 1.5 in the L1 norm for our choice
 # of limiting and bounds relaxation.
 #
-# Compile time options: dim = 1, Number = double
-#
 ##
 
 subsection A - TimeLoop
@@ -37,8 +35,10 @@ end
 
 
 subsection B - Equation
-  set equation = euler
-  set gamma    = 1.4
+  set dimension = 1
+  set equation  = euler
+
+  set gamma     = 1.4
 end
 
 

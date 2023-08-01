@@ -9,6 +9,8 @@
 namespace ryujin
 {
   /* instantiations */
-  template class ParabolicModule<Description, DIM, NUMBER>;
+  template class ParabolicModule<Description, 1, NUMBER>;
+  template class ParabolicModule<Description, 2, NUMBER>;
+  template class ParabolicModule<Description, 3, NUMBER>;
 
 } /* namespace ryujin */

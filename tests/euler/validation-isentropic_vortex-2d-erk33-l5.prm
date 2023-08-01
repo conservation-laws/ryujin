@@ -13,8 +13,9 @@ subsection A - TimeLoop
 end
 
 subsection B - Equation
-  set equation = euler
-  set gamma    = 1.4
+  set dimension = 2
+  set equation  = euler
+  set gamma     = 1.4
 end
 
 subsection C - Discretization

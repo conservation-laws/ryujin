@@ -12,8 +12,6 @@
 # This configuration uses an explicit ERK(2, 2, 1) timestepping.
 # Expected results are reported in euler-isentropic_vortex-ssprk33.baseline
 #
-# Compile time options: dim = 2, Number = double
-#
 ##
 
 subsection A - TimeLoop
@@ -30,8 +28,10 @@ subsection A - TimeLoop
 end
 
 subsection B - Equation
-  set equation = euler
-  set gamma    = 1.4
+  set dimension = 2
+  set equation  = euler
+
+  set gamma     = 1.4
 end
 
 subsection C - Discretization

@@ -9,6 +9,8 @@
 namespace ryujin
 {
   /* instantiations */
-  template class InitialValues<Description, DIM, NUMBER>;
+  template class InitialValues<Description, 1, NUMBER>;
+  template class InitialValues<Description, 2, NUMBER>;
+  template class InitialValues<Description, 3, NUMBER>;
 
 } /* namespace ryujin */

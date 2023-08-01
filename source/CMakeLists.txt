@@ -67,17 +67,9 @@ macro(setup_equation EQUATION)
   add_library(obj_${EQUATION}_dependent OBJECT ${DEPENDENT_SOURCE_FILES})
   deal_ii_setup_target(obj_${EQUATION}_dependent)
 
-  target_link_libraries(obj_${EQUATION}_dependent obj_${EQUATION})
-  if(WITH_LIKWID)
-    target_link_libraries(obj_${EQUATION}_dependent likwid likwid-hwloc likwid-lua)
-  endif()
-  if(WITH_EOSPAC)
-    target_link_libraries(obj_${EQUATION}_dependent eospac6)
-  endif()
-  if(LIBSTDCPP)
-    # For GNU libstdc++ we have to make sure to also link against libstdc++fs.
-    target_link_libraries(obj_${EQUATION}_dependent stdc++fs)
-  endif()
+  target_link_libraries(obj_${EQUATION}_dependent
+    obj_${EQUATION} ${EXTERNAL_TARGETS}
+    )
 
   list(APPEND OBJECT_TARGETS obj_${EQUATION} obj_${EQUATION}_dependent)
 endmacro()
@@ -94,7 +86,7 @@ endforeach()
 
 add_executable(ryujin main.cc)
 deal_ii_setup_target(ryujin)
-target_link_libraries(ryujin obj_common ${OBJECT_TARGETS})
+target_link_libraries(ryujin obj_common ${OBJECT_TARGETS} ${EXTERNAL_TARGETS})
 
 set_target_properties(ryujin PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/run"

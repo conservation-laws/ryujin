@@ -9,6 +9,8 @@
 namespace ryujin
 {
   /* instantiations */
-  template class HyperbolicModule<Description, DIM, NUMBER>;
+  template class HyperbolicModule<Description, 1, NUMBER>;
+  template class HyperbolicModule<Description, 2, NUMBER>;
+  template class HyperbolicModule<Description, 3, NUMBER>;
 
 } /* namespace ryujin */

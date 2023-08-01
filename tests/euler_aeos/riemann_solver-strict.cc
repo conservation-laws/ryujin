@@ -1,8 +1,10 @@
+// force distinct symbols in test
+#define EulerAEOS EulerAEOSTest
 
 #include <hyperbolic_system.h>
 #include <multicomponent_vector.h>
-#include <riemann_solver.h>
 #define DEBUG_RIEMANN_SOLVER
+#include <riemann_solver.h>
 #include <riemann_solver.template.h>
 #include <simd.h>
 

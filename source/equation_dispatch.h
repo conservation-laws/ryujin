@@ -66,54 +66,89 @@ namespace ryujin
     EquationDispatch()
         : ParameterAcceptor("B - Equation")
     {
+      dimension_ = 2;
+      add_parameter("dimension", dimension_, "The spatial dimension");
+
       equation_ = Equation::euler;
       add_parameter("equation", equation_, "The PDE system");
     }
 
-    void run(const std::string &parameter_file,
-             const MPI_Comm &mpi_communicator)
+    void run(const std::string &parameter_file, const MPI_Comm &mpi_comm)
     {
-      std::string name =
-          dealii::Patterns::Tools::Convert<Equation>::to_string(equation_);
-
       ParameterAcceptor::prm.parse_input(parameter_file,
                                          "",
                                          /* skip undefined */ true,
                                          /* assert entries present */ false);
 
-      name = dealii::Patterns::Tools::Convert<Equation>::to_string(equation_);
+      AssertThrow(
+          dimension_ >= 1 && dimension_ <= 3,
+          dealii::ExcMessage("Dave, this conversation can serve no purpose "
+                             "anymore. Goodbye.\nThe dimension parameter needs "
+                             "to be either 1, 2, or 3."));
 
       switch (equation_) {
-      case Equation::euler: {
-        TimeLoop<Euler::Description, DIM, NUMBER> time_loop(mpi_communicator);
-        ParameterAcceptor::initialize(parameter_file);
-        time_loop.run();
-      }; break;
-      case Equation::euler_aeos: {
-        TimeLoop<EulerAEOS::Description, DIM, NUMBER> time_loop(
-            mpi_communicator);
-        ParameterAcceptor::initialize(parameter_file);
-        time_loop.run();
-      }; break;
-      case Equation::navier_stokes: {
-        TimeLoop<NavierStokes::Description, DIM, NUMBER> time_loop(
-            mpi_communicator);
-        ParameterAcceptor::initialize(parameter_file);
-        time_loop.run();
-      }; break;
+      case Equation::euler:
+        if (dimension_ == 1) {
+          TimeLoop<Euler::Description, 1, NUMBER> time_loop(mpi_comm);
+          ParameterAcceptor::initialize(parameter_file);
+          time_loop.run();
+        } else if (dimension_ == 2) {
+          TimeLoop<Euler::Description, 2, NUMBER> time_loop(mpi_comm);
+          ParameterAcceptor::initialize(parameter_file);
+          time_loop.run();
+        } else if (dimension_ == 3) {
+          TimeLoop<Euler::Description, 3, NUMBER> time_loop(mpi_comm);
+          ParameterAcceptor::initialize(parameter_file);
+          time_loop.run();
+        } else
+          __builtin_unreachable();
+        break;
+      case Equation::euler_aeos:
+        if (dimension_ == 1) {
+          TimeLoop<EulerAEOS::Description, 1, NUMBER> time_loop(mpi_comm);
+          ParameterAcceptor::initialize(parameter_file);
+          time_loop.run();
+        } else if (dimension_ == 2) {
+          TimeLoop<EulerAEOS::Description, 2, NUMBER> time_loop(mpi_comm);
+          ParameterAcceptor::initialize(parameter_file);
+          time_loop.run();
+        } else if (dimension_ == 3) {
+          TimeLoop<EulerAEOS::Description, 3, NUMBER> time_loop(mpi_comm);
+          ParameterAcceptor::initialize(parameter_file);
+          time_loop.run();
+        } else
+          __builtin_unreachable();
+        break;
+      case Equation::navier_stokes:
+        if (dimension_ == 1) {
+          TimeLoop<NavierStokes::Description, 1, NUMBER> time_loop(mpi_comm);
+          ParameterAcceptor::initialize(parameter_file);
+          time_loop.run();
+        } else if (dimension_ == 2) {
+          TimeLoop<NavierStokes::Description, 2, NUMBER> time_loop(mpi_comm);
+          ParameterAcceptor::initialize(parameter_file);
+          time_loop.run();
+        } else if (dimension_ == 3) {
+          TimeLoop<NavierStokes::Description, 3, NUMBER> time_loop(mpi_comm);
+          ParameterAcceptor::initialize(parameter_file);
+          time_loop.run();
+        } else
+          __builtin_unreachable();
+        break;
       }
     }
 
-  private:
+  private : int dimension_;
     Equation equation_;
   };
 
 
   namespace internal
   {
-    template <typename description>
-    void create_parameter_template(const std::string &name,
-                                   const MPI_Comm &mpi_communicator)
+    template <int dim, typename description>
+    void create_prm_files(const std::string &name,
+                          const MPI_Comm &mpi_communicator,
+                          bool write_detailed_description)
     {
       {
         /*
@@ -121,28 +156,29 @@ namespace ryujin
          * ParameterAcceptor::prm object.
          */
         ryujin::EquationDispatch equation_dispatch;
-        ryujin::TimeLoop<description, DIM, NUMBER> time_loop(mpi_communicator);
+        ryujin::TimeLoop<description, dim, NUMBER> time_loop(mpi_communicator);
 
         /* Fix up "equation" entry: */
         auto &prm = dealii::ParameterAcceptor::prm;
         prm.enter_subsection("B - Equation");
+        prm.set("dimension", std::to_string(dim));
         prm.set("equation", name);
         prm.leave_subsection();
 
         std::string base_name = name;
         std::replace(base_name.begin(), base_name.end(), ' ', '_');
+        base_name += "-" + std::to_string(dim) + "d";
 
         if (dealii::Utilities::MPI::this_mpi_process(mpi_communicator) == 0) {
           const auto full_name =
               "default_parameters-" + base_name + "-description.prm";
-          if (!std::filesystem::exists(full_name))
+          if (write_detailed_description)
             prm.print_parameters(full_name,
                                  dealii::ParameterHandler::OutputStyle::PRM);
 
           const auto short_name = "default_parameters-" + base_name + ".prm";
-          if (!std::filesystem::exists(short_name))
-            prm.print_parameters(short_name,
-                                 dealii::ParameterHandler::OutputStyle::Short);
+          prm.print_parameters(short_name,
+                               dealii::ParameterHandler::OutputStyle::Short);
         }
         // all objects have to go out of scope, see
         // https://github.com/dealii/dealii/issues/15111
@@ -155,13 +191,26 @@ namespace ryujin
   void create_parameter_templates(const std::string &parameter_file,
                                   const MPI_Comm &mpi_communicator)
   {
-    internal::create_parameter_template<Euler::Description>("euler",
-                                                            mpi_communicator);
-    std::filesystem::copy("default_parameters-euler.prm", parameter_file);
+    internal::create_prm_files<1, Euler::Description>(
+        "euler", mpi_communicator, false);
+    internal::create_prm_files<2, Euler::Description>(
+        "euler", mpi_communicator, true);
+    internal::create_prm_files<3, Euler::Description>(
+        "euler", mpi_communicator, false);
+    std::filesystem::copy("default_parameters-euler-2d.prm", parameter_file);
 
-    internal::create_parameter_template<EulerAEOS::Description>(
-        "euler aeos", mpi_communicator);
-    internal::create_parameter_template<NavierStokes::Description>(
-        "navier stokes", mpi_communicator);
+    internal::create_prm_files<1, EulerAEOS::Description>(
+        "euler aeos", mpi_communicator, false);
+    internal::create_prm_files<2, EulerAEOS::Description>(
+        "euler aeos", mpi_communicator, true);
+    internal::create_prm_files<3, EulerAEOS::Description>(
+        "euler aeos", mpi_communicator, false);
+
+    internal::create_prm_files<1, NavierStokes::Description>(
+        "navier stokes", mpi_communicator, false);
+    internal::create_prm_files<2, NavierStokes::Description>(
+        "navier stokes", mpi_communicator, true);
+    internal::create_prm_files<3, NavierStokes::Description>(
+        "navier stokes", mpi_communicator, false);
   }
 } // namespace ryujin

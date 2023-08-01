@@ -13,9 +13,7 @@ namespace ryujin
 
   template class SparsityPatternSIMD<dealii::VectorizedArray<NUMBER>::size()>;
 
-  template class SparseMatrixSIMD<NUMBER>;
-
-#if DIM != 1
-  template class SparseMatrixSIMD<NUMBER, DIM>;
-#endif
+  template class SparseMatrixSIMD<NUMBER, 1>;
+  template class SparseMatrixSIMD<NUMBER, 2>;
+  template class SparseMatrixSIMD<NUMBER, 3>;
 } /* namespace ryujin */

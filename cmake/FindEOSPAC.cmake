@@ -35,8 +35,8 @@ find_package_handle_standard_args(EOSPAC DEFAULT_MSG
   EOSPAC_LIBRARY EOSPAC_INCLUDE_DIR
   )
 
-if(EOSPAC_FOUND AND NOT TARGET eospac6)
-  add_library(eospac6 INTERFACE)
-  target_link_libraries(eospac6 INTERFACE ${EOSPAC_LIBRARY})
-  target_include_directories(eospac6 SYSTEM INTERFACE ${EOSPAC_INCLUDE_DIR})
+if(EOSPAC_FOUND AND NOT TARGET Eospac::Eospac6)
+  add_library(Eospac::Eospac6 INTERFACE IMPORTED)
+  target_link_libraries(Eospac::Eospac6 INTERFACE ${EOSPAC_LIBRARY})
+  target_include_directories(Eospac::Eospac6 SYSTEM INTERFACE ${EOSPAC_INCLUDE_DIR})
 endif()

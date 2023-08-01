@@ -216,7 +216,7 @@ namespace ryujin
       std::cout << "ParabolicSolver<dim, Number>::step()" << std::endl;
 #endif
 
-      CALLGRIND_START_INSTRUMENTATION
+      CALLGRIND_START_INSTRUMENTATION;
 
       using VA = VectorizedArray<Number>;
 
@@ -841,7 +841,7 @@ namespace ryujin
         LIKWID_MARKER_STOP("time_step_parabolic_3");
       }
 
-      CALLGRIND_STOP_INSTRUMENTATION
+      CALLGRIND_STOP_INSTRUMENTATION;
     }
 
 

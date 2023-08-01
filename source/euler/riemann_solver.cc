@@ -13,8 +13,13 @@ namespace ryujin
   {
     /* instantiations */
 
-    template class RiemannSolver<DIM, NUMBER>;
-    template class RiemannSolver<DIM, dealii::VectorizedArray<NUMBER>>;
+    template class RiemannSolver<1, NUMBER>;
+    template class RiemannSolver<2, NUMBER>;
+    template class RiemannSolver<3, NUMBER>;
+
+    template class RiemannSolver<1, dealii::VectorizedArray<NUMBER>>;
+    template class RiemannSolver<2, dealii::VectorizedArray<NUMBER>>;
+    template class RiemannSolver<3, dealii::VectorizedArray<NUMBER>>;
 
   } // namespace Euler
 } // namespace ryujin

@@ -1,8 +1,11 @@
 /**
  * @mainpage
  *
- * This is the main starting page for the ryujin class and function
- * documentation. The program is organized into the following modules:
+ * This is the main starting page for the technical ryujin class and
+ * function documentation. A full usage guide can be found at
+ * https://conservation-laws.org
+ *
+ * The program is organized into the following modules:
  *
  * @dot
  digraph G
@@ -47,9 +50,6 @@
   formulation -> parabolic [color="black",style="solid"];
 }
  * @enddot
- *
- * In addition, the doxygen documentation contains information on
- * \ref Installation and \ref Usage.
  *
  * ryujin is based on discretization approaches and algorithms that have
  * been developed in a number of publications
