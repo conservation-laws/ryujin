@@ -2,44 +2,43 @@ subsection A - TimeLoop
   set basename             = leblanc-erk33
 
   set enable compute error = true
-  set error quantities     = rho, m_1, E
+  set error quantities     = rho, m, E
 
-  set final time           = 0.30558
-  set output granularity   = 0.30558
+  set final time           = 0.66666666666667
+  set output granularity   = 0.66666666666667
 
   set terminal update interval  = 0
 end
 
 
 subsection B - Equation
-  set equation = euler
-  set gamma    = 1.4
+  set dimension = 1
+  set equation  = euler
+  set gamma     = 1.66666666666667
 end
 
 
 subsection C - Discretization
   set geometry        = rectangular domain
-  set mesh refinement = 3
+  set mesh refinement = 6
 
   subsection rectangular domain
-    set boundary condition top    = periodic
     set boundary condition left   = dirichlet
     set boundary condition right  = dirichlet
-    set boundary condition bottom = periodic
 
-    set position bottom left      = 0, 0
-    set position top right        = 1, 0.005
-    set subdivisions x            = 200
-    set subdivisions y            = 1
+    set position bottom left      = 0
+    set position top right        = 1
+    set subdivisions x            = 25
   end
 end
 
 
 subsection E - InitialValues
-  set configuration = rarefaction
+  set configuration = leblanc
 
-  set direction     = 1, 0
-  set position      = 0.2, 0
+  set direction     = 1
+  # for cG put the discontinuity right in the center of a cell
+  set position      = 0.326732673267
 end
 
 
@@ -54,8 +53,8 @@ end
 
 
 subsection H - TimeIntegrator
-  set cfl min               = 0.50
-  set cfl max               = 0.50
+  set cfl min               = 0.10
+  set cfl max               = 0.10
   set cfl recovery strategy = none
   set time stepping scheme  = erk 33
 end

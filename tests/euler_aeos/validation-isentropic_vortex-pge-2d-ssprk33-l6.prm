@@ -1,5 +1,5 @@
 subsection A - TimeLoop
-  set basename                  = validation-euler-l7
+  set basename                  = validation-euler-l6
 
   set enable output full        = false
   set enable compute quantities = false
@@ -13,13 +13,18 @@ subsection A - TimeLoop
 end
 
 subsection B - Equation
-  set equation = euler
-  set gamma    = 1.4
+  set dimension                = 2
+  set equation                 = euler aeos
+  set compute strict bounds    = true
+  set equation of state        = polytropic gas
+  subsection polytropic gas
+    set gamma = 1.4
+  end
 end
 
 subsection C - Discretization
   set geometry        = rectangular domain
-  set mesh refinement = 7
+  set mesh refinement = 6
 
   subsection rectangular domain
     set boundary condition bottom = dirichlet

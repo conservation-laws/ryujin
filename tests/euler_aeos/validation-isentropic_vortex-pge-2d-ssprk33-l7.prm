@@ -13,8 +13,13 @@ subsection A - TimeLoop
 end
 
 subsection B - Equation
-  set equation = euler
-  set gamma    = 1.4
+  set dimension                = 2
+  set equation                 = euler aeos
+  set compute strict bounds    = true
+  set equation of state        = polytropic gas
+  subsection polytropic gas
+    set gamma = 1.4
+  end
 end
 
 subsection C - Discretization
@@ -52,5 +57,5 @@ subsection H - TimeIntegrator
   set cfl min            = 0.2
   set cfl max            = 0.2
   set cfl recovery strategy = none
-  set time stepping scheme  = erk 33
+  set time stepping scheme  = ssprk 33
 end
