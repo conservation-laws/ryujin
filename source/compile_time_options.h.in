@@ -16,7 +16,6 @@
 #endif
 
 #cmakedefine ASYNC_MPI_EXCHANGE
-#cmakedefine CUSTOM_POW
 #cmakedefine DEBUG_OUTPUT
 #cmakedefine DENORMALS_ARE_ZERO
 #cmakedefine FORCE_DEAL_II_SPARSE_MATRIX
