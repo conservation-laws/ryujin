@@ -14,17 +14,55 @@ namespace ryujin
     /* instantiations */
 
     template std::tuple<NUMBER, bool>
-    Limiter<DIM, NUMBER>::limit(const HyperbolicSystemView &,
-                                const std::array<NUMBER, 3> &,
-                                const state_type &,
-                                const state_type &,
-                                const NUMBER,
-                                const unsigned int,
-                                const NUMBER,
-                                const NUMBER);
+    Limiter<1, NUMBER>::limit(const HyperbolicSystemView &,
+                              const std::array<NUMBER, 3> &,
+                              const state_type &,
+                              const state_type &,
+                              const NUMBER,
+                              const unsigned int,
+                              const NUMBER,
+                              const NUMBER);
+    template std::tuple<NUMBER, bool>
+    Limiter<2, NUMBER>::limit(const HyperbolicSystemView &,
+                              const std::array<NUMBER, 3> &,
+                              const state_type &,
+                              const state_type &,
+                              const NUMBER,
+                              const unsigned int,
+                              const NUMBER,
+                              const NUMBER);
+    template std::tuple<NUMBER, bool>
+    Limiter<3, NUMBER>::limit(const HyperbolicSystemView &,
+                              const std::array<NUMBER, 3> &,
+                              const state_type &,
+                              const state_type &,
+                              const NUMBER,
+                              const unsigned int,
+                              const NUMBER,
+                              const NUMBER);
 
     template std::tuple<VectorizedArray<NUMBER>, bool>
-    Limiter<DIM, VectorizedArray<NUMBER>>::limit(
+    Limiter<1, VectorizedArray<NUMBER>>::limit(
+        const HyperbolicSystemView &,
+        const std::array<VectorizedArray<NUMBER>, 3> &,
+        const state_type &,
+        const state_type &,
+        const NUMBER,
+        const unsigned int,
+        const VectorizedArray<NUMBER>,
+        const VectorizedArray<NUMBER>);
+    template std::tuple<VectorizedArray<NUMBER>, bool>
+    Limiter<2, VectorizedArray<NUMBER>>::limit(
+        const HyperbolicSystemView &,
+        const std::array<VectorizedArray<NUMBER>, 3> &,
+        const state_type &,
+        const state_type &,
+        const NUMBER,
+        const unsigned int,
+        const VectorizedArray<NUMBER>,
+        const VectorizedArray<NUMBER>);
+    template std::tuple<VectorizedArray<NUMBER>, bool>
+    Limiter<3, VectorizedArray<NUMBER>>::limit(
         const HyperbolicSystemView &,
         const std::array<VectorizedArray<NUMBER>, 3> &,
         const state_type &,

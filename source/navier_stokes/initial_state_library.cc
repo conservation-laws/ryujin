@@ -7,5 +7,7 @@
 
 namespace ryujin
 {
-  template class InitialStateLibrary<Description, DIM, NUMBER>;
+  template class InitialStateLibrary<Description, 1, NUMBER>;
+  template class InitialStateLibrary<Description, 2, NUMBER>;
+  template class InitialStateLibrary<Description, 3, NUMBER>;
 } // namespace ryujin
