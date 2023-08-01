@@ -9,9 +9,10 @@
 #include "patterns_conversion.h"
 #include "time_loop.h"
 
-#include "euler/description.h"
 #include "euler_aeos/description.h"
+#include "euler/description.h"
 #include "navier_stokes/description.h"
+#include "scalar_conservation/description.h"
 // #include "shallow_water/description.h"
 
 #include <deal.II/base/mpi.h>
@@ -42,6 +43,12 @@ namespace ryujin
      * and a heat flux governed by  Fourier's law.
      */
     navier_stokes,
+
+    /**
+     * A scalar conservation equation with a user-specified flux depending
+     * on the state.
+     */
+    scalar_conservation,
   };
 } // namespace ryujin
 
@@ -50,6 +57,7 @@ DECLARE_ENUM(ryujin::Equation,
              LIST({ryujin::Equation::euler, "euler"},
                   {ryujin::Equation::euler_aeos, "euler aeos"},
                   {ryujin::Equation::navier_stokes, "navier stokes"},
+                  {ryujin::Equation::scalar_conservation, "scalar conservation"},
                   // {ryujin::Equation::shallow_water, "shallow water"},
                   ));
 #endif
@@ -135,6 +143,27 @@ namespace ryujin
         } else
           __builtin_unreachable();
         break;
+      case Equation::scalar_conservation:
+        if (dimension_ == 1) {
+          TimeLoop<ScalarConservation::Description, 1, NUMBER> time_loop(
+              mpi_comm);
+          ParameterAcceptor::initialize(parameter_file);
+          time_loop.run();
+        } else if (dimension_ == 2) {
+          TimeLoop<ScalarConservation::Description, 2, NUMBER> time_loop(
+              mpi_comm);
+          ParameterAcceptor::initialize(parameter_file);
+          time_loop.run();
+        } else if (dimension_ == 3) {
+          TimeLoop<ScalarConservation::Description, 3, NUMBER> time_loop(
+              mpi_comm);
+          ParameterAcceptor::initialize(parameter_file);
+          time_loop.run();
+        } else
+          __builtin_unreachable();
+        break;
+      default:
+        __builtin_trap();
       }
     }
 
@@ -213,5 +242,12 @@ namespace ryujin
         "navier stokes", mpi_communicator, true);
     internal::create_prm_files<3, NavierStokes::Description>(
         "navier stokes", mpi_communicator, false);
+
+    internal::create_prm_files<1, ScalarConservation::Description>(
+        "scalar conservation", mpi_communicator, false);
+    internal::create_prm_files<2, ScalarConservation::Description>(
+        "scalar conservation", mpi_communicator, true);
+    internal::create_prm_files<3, ScalarConservation::Description>(
+        "scalar conservation", mpi_communicator, false);
   }
 } // namespace ryujin
