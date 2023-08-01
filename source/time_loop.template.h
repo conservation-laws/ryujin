@@ -636,7 +636,7 @@ namespace ryujin
 
     stream << "SIMD width == " << VectorizedArray<Number>::size() << std::endl;
 
-#ifdef WITH_CUSTOM_POW
+#ifdef CUSTOM_POW
     stream << "serial pow == broadcasted pow(Vec4f)/pow(Vec2d)" << std::endl;
 #else
     stream << "serial pow == std::pow"<< std::endl;

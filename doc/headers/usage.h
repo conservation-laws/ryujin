@@ -71,18 +71,18 @@
  * DIM                          - the spatial dimension, default to 2
  * NUMBER                       - select "double" for double precision or "float" for single precision
  *
+ * ASYNC_MPI_EXCHANGE           - enable asynchronous "communication hiding" MPI exchange (defaults to OFF)
  * CHECK_BOUNDS                 - enable additional bounds checking (defaults to OFF)
+ * CUSTOM_POW                   - use a custom SIMD implementation also for serial pow (default to ON)
  * DEBUG_OUTPUT                 - enable debug output (defaults to OFF)
  * DENORMALS_ARE_ZERO           - disable floating point denormals (defaults to ON)
  * FORCE_DEAL_II_SPARSE_MATRIX  - always use deal.II sparse matrix for preliminary assembly instead of Trilinos
- * WITH_ASYNC_MPI_EXCHANGE      - enable asynchronous "communication hiding" MPI exchange (defaults to OFF)
- * WITH_CUSTOM_POW              - use a custom SIMD implementation also for serial pow (default to ON)
- * WITH_DOXYGEN                 - enable support for doxygen and build documentation
- * WITH_EOSPAC                  - enable support for the EOSPAC6/Sesame tabulated equation of state database (autodetection)
- * WITH_OPENMP                  - enable support for multithreading via OpenMP (autodetection)
  *
  * WITH_CALLGRIND               - enable Valgrind/Callgrind stetoscope mode (default to OFF)
+ * WITH_DOXYGEN                 - enable support for doxygen and build documentation
+ * WITH_EOSPAC                  - enable support for the EOSPAC6/Sesame tabulated equation of state database (autodetection)
  * WITH_LIKWID                  - enable support for Likwid stetoscope mode (library for Intel performance counters, defaults to OFF)
+ * WITH_OPENMP                  - enable support for multithreading via OpenMP (autodetection)
  * @endcode
  *
  * Most of the other compile-time options are marked as advanced and only

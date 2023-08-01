@@ -10,7 +10,11 @@ find_program(NUMDIFF_EXECUTABLE
   )
 mark_as_advanced(NUMDIFF_EXECUTABLE)
 
-if(NOT "${NUMDIFF_EXECUTABLE}" MATCHES "NUMDIFF_EXECUTABLE-NOTFOUND")
+if("${NUMDIFF_EXECUTABLE}" MATCHES "NUMDIFF_EXECUTABLE-NOTFOUND")
+  message(STATUS "Could not find numdiff executable. Disabling tests.")
+
+else()
+
   file(GLOB _files RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS */CMakeLists.txt)
   foreach(_file ${_files})
     get_filename_component(_directory "${_file}" DIRECTORY)

@@ -5,7 +5,7 @@
 
 #pragma once
 
-/* General compile-time options: */
+/* Compile-time options: */
 
 #define DIM @DIM@
 #define NUMBER @NUMBER@
@@ -15,14 +15,14 @@
 #define CHECK_BOUNDS
 #endif
 
+#cmakedefine ASYNC_MPI_EXCHANGE
+#cmakedefine CUSTOM_POW
 #cmakedefine DEBUG_OUTPUT
 #cmakedefine DENORMALS_ARE_ZERO
 #cmakedefine FORCE_DEAL_II_SPARSE_MATRIX
 
-/* Options: */
+/* External packages: */
 
-#cmakedefine WITH_ASYNC_MPI_EXCHANGE
-#cmakedefine WITH_CUSTOM_POW
 #cmakedefine WITH_EOSPAC
 #cmakedefine WITH_LIKWID
 #cmakedefine WITH_OPENMP

@@ -158,7 +158,7 @@ namespace ryujin
       }
     }
 
-#ifdef WITH_ASYNC_MPI_EXCHANGE
+#ifdef ASYNC_MPI_EXCHANGE
     DEAL_II_ALWAYS_INLINE inline void check(bool &thread_ready,
                                             const bool condition)
     {
