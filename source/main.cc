@@ -40,7 +40,7 @@ void flush_denormals_to_zero()
 /**
  * Set up thread pools and obey thread limits:
  */
-void set_thread_limit()
+void set_thread_limit(const MPI_Comm &mpi_communicator [[maybe_unused]])
 {
 #ifdef WITH_OPENMP
   const unsigned int n_threads_omp = omp_get_thread_limit();
@@ -67,8 +67,8 @@ int main(int argc, char *argv[])
 
   LSAN_DISABLE;
   dealii::Utilities::MPI::MPI_InitFinalize mpi_initialization(argc, argv);
-  set_thread_limit();
   MPI_Comm mpi_communicator(MPI_COMM_WORLD);
+  set_thread_limit(mpi_communicator);
   LSAN_ENABLE
 
   LIKWID_INIT;
