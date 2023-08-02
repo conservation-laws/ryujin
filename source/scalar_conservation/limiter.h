@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2020 - 2022 by the ryujin authors
+// Copyright (C) 2020 - 2023 by the ryujin authors
 //
 
 #pragma once
@@ -151,10 +151,10 @@ namespace ryujin
             const state_type & /*P*/,
             const ScalarNumber /*newton_tolerance*/,
             const unsigned int /*newton_max_iter*/,
-            const Number /*t_min*/ = Number(0.),
-            const Number t_max = Number(1.))
+            const Number t_min = Number(0.),
+            const Number /*t_max*/ = Number(1.))
       {
-        return {t_max, true};
+        return {t_min, true};
       }
 
       //*}

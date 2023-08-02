@@ -17,12 +17,14 @@ namespace ryujin
   namespace ScalarConservation
   {
     /**
+     * This struct contains all equation specific classes describing the
+     * chosen hyperbolic system, the indicator, the limiter and
+     * (approximate) Riemann solver.
+     *
      * A scalar conservation equation for a scalar unknown u with a
      * user-specified flux depending on the state u.
      *
-     * A struct that contains all equation specific classes describing the
-     * chosen hyperbolic system, the indicator, the limiter and
-     * (approximate) Riemann solver.
+     * The parabolic subsystem is chosen to be the identity.
      *
      * @note We group all of these templates together in this struct so
      * that we only need to add a single template parameter to the all the

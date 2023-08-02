@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2020 - 2022 by the ryujin authors
+// Copyright (C) 2020 - 2023 by the ryujin authors
 //
 
 #pragma once
@@ -8,6 +8,7 @@
 #include <initial_state_library.h>
 
 #include "description.h"
+#include "initial_state_function.h"
 #include "initial_state_uniform.h"
 
 namespace ryujin
@@ -32,6 +33,7 @@ namespace ryujin
         initial_state_list.emplace(std::move(object));
       };
 
+      add(std::make_unique<Function<dim, Number>>(h, s));
       add(std::make_unique<Uniform<dim, Number>>(h, s));
     }
   };

@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2020 - 2022 by the ryujin authors
+// Copyright (C) 2020 - 2023 by the ryujin authors
 //
 
 #pragma once
@@ -108,7 +108,7 @@ namespace ryujin
        */
       Number alpha(const Number /*h_i*/)
       {
-        return Number(0.);
+        return Number(1.);
       }
 
       //@}

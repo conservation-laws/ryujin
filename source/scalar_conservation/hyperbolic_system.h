@@ -6,11 +6,14 @@
 #pragma once
 
 #include <convenience_macros.h>
+#include <deal.II/base/config.h>
 #include <discretization.h>
 #include <multicomponent_vector.h>
+#include <openmp.h>
 #include <patterns_conversion.h>
 #include <simd.h>
 
+#include <deal.II/base/function_parser.h>
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/tensor.h>
 
@@ -22,7 +25,8 @@ namespace ryujin
   namespace ScalarConservation
   {
     /**
-     * Description of a hyperbolic conservation law.
+     * A scalar conservation equation for a state \f$u\f$ with a user
+     * specified flux \f$f(u)\f$.
      *
      * @ingroup ScalarConservationEquations
      */
@@ -32,16 +36,23 @@ namespace ryujin
       /**
        * The name of the hyperbolic system as a string.
        */
-      static inline const std::string problem_name =
-          "Skeleton Hyperbolic System";
+      static inline std::string problem_name = "Scalar conservation equation";
 
       /**
        * Constructor.
        */
-      HyperbolicSystem(const std::string &subsection = "/HyperbolicSystem")
-          : ParameterAcceptor(subsection)
-      {
-      }
+      HyperbolicSystem(const std::string &subsection = "/HyperbolicSystem");
+
+    private:
+      /**
+       * @name Runtime parameters, internal fields and methods
+       */
+      //@{
+      std::vector<std::string> flux_description_;
+      std::unique_ptr<dealii::FunctionParser<1>> flux_function_;
+      double derivative_approximation_delta_;
+      //@}
+
 
     public:
       /**
@@ -109,15 +120,7 @@ namespace ryujin
          * string.
          */
         static inline const auto component_names =
-            []() -> std::array<std::string, problem_dimension> {
-          if constexpr (dim == 1)
-            return {"u"};
-          else if constexpr (dim == 2)
-            return {"u"};
-          else if constexpr (dim == 3)
-            return {"u"};
-          __builtin_trap();
-        }();
+            std::array<std::string, problem_dimension>{"u"};
 
         /**
          * The storage type used for a primitive state vector.
@@ -176,7 +179,7 @@ namespace ryujin
         /**
          * The number of precomputed values.
          */
-        static constexpr unsigned int n_precomputed_values = 0;
+        static constexpr unsigned int n_precomputed_values = 2. * dim;
 
         /**
          * Array type used for precomputed values.
@@ -193,12 +196,20 @@ namespace ryujin
          * An array holding all component names of the precomputed values.
          */
         static inline const auto precomputed_names =
-            std::array<std::string, n_precomputed_values>{};
+            []() -> std::array<std::string, n_precomputed_values> {
+          if constexpr (dim == 1)
+            return {"f", "df"};
+          else if constexpr (dim == 2)
+            return {"f_1", "f_2", "df_1", "df_2"};
+          else if constexpr (dim == 3)
+            return {"f_1", "f_2", "f_3", "df_1", "df_2", "df_3"};
+          __builtin_trap();
+        }();
 
         /**
          * The number of precomputation cycles.
          */
-        static constexpr unsigned int n_precomputation_cycles = 0;
+        static constexpr unsigned int n_precomputation_cycles = 1;
 
         /**
          * Step 0: precompute values for hyperbolic update. This routine is
@@ -212,7 +223,7 @@ namespace ryujin
                             const SPARSITY & /*sparsity_simd*/,
                             const vector_type & /*U*/,
                             unsigned int /*left*/,
-                            unsigned int /*right*/) const = delete;
+                            unsigned int /*right*/) const;
 
         //@}
         /**
@@ -221,11 +232,19 @@ namespace ryujin
         //@{
 
         /**
+         * Return the scalar value stored in the state "vector". Given the
+         * fact that a scalar conservation equation is indeed scalar this
+         * simply unwraps the Tensor from the state_type and returns the
+         * one and only entry.
+         */
+        static Number state(const state_type &U);
+
+        /**
          * Returns whether the state @p U is admissible. If @p U is a
          * vectorized state then @p U is admissible if all vectorized
          * values are admissible.
          */
-        bool is_admissible(const state_type &/*U*/) const
+        bool is_admissible(const state_type & /*U*/) const
         {
           return true;
         }
@@ -244,10 +263,7 @@ namespace ryujin
             const dealii::types::boundary_id /*id*/,
             const state_type &U,
             const dealii::Tensor<1, dim, Number> & /*normal*/,
-            const Lambda & /*get_dirichlet_data*/) const
-        {
-          return U;
-        }
+            const Lambda & /*get_dirichlet_data*/) const;
 
         //@}
         /**
@@ -275,31 +291,81 @@ namespace ryujin
          * For the Euler equations we simply compute <code>f(U_i)</code>.
          */
         flux_contribution_type
-        flux_contribution(const precomputed_vector_type & /*pv*/,
+        flux_contribution(const precomputed_vector_type &pv,
                           const precomputed_initial_vector_type & /*piv*/,
-                          const unsigned int /*i*/,
+                          const unsigned int i,
                           const state_type & /*U_i*/) const
         {
-          return flux_contribution_type{};
+          if constexpr (dim == 1) {
+            const auto &[f, df] =
+                pv.template get_tensor<Number, precomputed_state_type>(i);
+            flux_contribution_type result;
+            result[0][0] = f;
+            return result;
+
+          } else if constexpr (dim == 2) {
+            const auto &[f_1, f_2, df_1, df_2] =
+                pv.template get_tensor<Number, precomputed_state_type>(i);
+            flux_contribution_type result;
+            result[0][0] = f_1;
+            result[0][1] = f_2;
+            return result;
+
+          } else if constexpr (dim == 3) {
+            const auto &[f_1, f_2, f_3, df_1, df_2, df_3] =
+                pv.template get_tensor<Number, precomputed_state_type>(i);
+            flux_contribution_type result;
+            result[0][0] = f_1;
+            result[0][1] = f_2;
+            result[0][2] = f_3;
+            return result;
+          }
+
+          __builtin_unreachable();
         }
 
         flux_contribution_type
-        flux_contribution(const precomputed_vector_type & /*pv*/,
+        flux_contribution(const precomputed_vector_type &pv,
                           const precomputed_initial_vector_type & /*piv*/,
-                          const unsigned int * /*js*/,
+                          const unsigned int *js,
                           const state_type & /*U_j*/) const
         {
-          return flux_contribution_type{};
+          if constexpr (dim == 1) {
+            const auto &[f, df] =
+                pv.template get_tensor<Number, precomputed_state_type>(js);
+            flux_contribution_type result;
+            result[0][0] = f;
+            return result;
+
+          } else if constexpr (dim == 2) {
+            const auto &[f_1, f_2, df_1, df_2] =
+                pv.template get_tensor<Number, precomputed_state_type>(js);
+            flux_contribution_type result;
+            result[0][0] = f_1;
+            result[0][1] = f_2;
+            return result;
+
+          } else if constexpr (dim == 3) {
+            const auto &[f_1, f_2, f_3, df_1, df_2, df_3] =
+                pv.template get_tensor<Number, precomputed_state_type>(js);
+            flux_contribution_type result;
+            result[0][0] = f_1;
+            result[0][1] = f_2;
+            result[0][2] = f_3;
+            return result;
+          }
+
+          __builtin_unreachable();
         }
 
         /**
          * Given flux contributions @p flux_i and @p flux_j compute the flux
          * <code>(-f(U_i) - f(U_j)</code>
          */
-        flux_type flux(const flux_contribution_type & /*flux_i*/,
-                       const flux_contribution_type & /*flux_j*/) const
+        flux_type flux(const flux_contribution_type &flux_i,
+                       const flux_contribution_type &flux_j) const
         {
-          return flux_type{};
+          return -add(flux_i, flux_j);
         }
 
         /**
@@ -423,5 +489,169 @@ namespace ryujin
         return View<dim, Number>{*this};
       }
     }; /* HyperbolicSystem */
+
+
+    /*
+     * -------------------------------------------------------------------------
+     * Inline definitions
+     * -------------------------------------------------------------------------
+     */
+
+
+    inline HyperbolicSystem::HyperbolicSystem(const std::string &subsection)
+        : ParameterAcceptor(subsection)
+    {
+      flux_description_ = {"0.5 * u * u"};
+      add_parameter(
+          "flux",
+          flux_description_,
+          "A mathematical description of the flux as a function of state used "
+          "to create a muparser object to evaluate the flux. For two, or three "
+          "dimensional fluxes, components are separated with a comma (,).");
+
+      derivative_approximation_delta_ = 1.0e-10;
+      add_parameter("derivative approximation delta",
+                    derivative_approximation_delta_,
+                    "step size of the central difference quotient to compute "
+                    "an approximation of the flux derivative");
+
+      /*
+       * Set up the muparser object with the final flux description from
+       * the parameter file:
+       */
+      const auto set_up_muparser = [this] {
+        const auto size = flux_description_.size();
+        Assert(0 < size && size <= 3,
+               dealii::ExcMessage(
+                   "user specified flux description must be either one, two, "
+                   "or three strings separated by a comma"));
+        flux_function_ = std::make_unique<dealii::FunctionParser<1>>(
+            size, 0.0, derivative_approximation_delta_);
+        flux_function_->initialize({"u"}, flux_description_, {});
+
+        problem_name =
+            "Scalar conservation equation (f(u)={" +
+            std::accumulate(std::begin(flux_description_),
+                            std::end(flux_description_),
+                            std::string(),
+                            [](std::string &result, std::string &element) {
+                              return result.empty() ? element
+                                                    : result + "," + element;
+                            }) +
+            "})";
+      };
+
+      set_up_muparser();
+      ParameterAcceptor::parse_parameters_call_back.connect(set_up_muparser);
+    }
+
+
+    template <int dim, typename Number>
+    template <typename DISPATCH, typename SPARSITY>
+    DEAL_II_ALWAYS_INLINE inline void
+    HyperbolicSystem::View<dim, Number>::precomputation_loop(
+        unsigned int cycle [[maybe_unused]],
+        const DISPATCH &dispatch_check,
+        precomputed_vector_type &precomputed_values,
+        const SPARSITY &sparsity_simd,
+        const vector_type &U,
+        unsigned int left,
+        unsigned int right) const
+    {
+      Assert(cycle == 0, dealii::ExcInternalError());
+
+      /* We are inside a thread parallel context */
+
+      unsigned int stride_size = get_stride_size<Number>;
+
+      RYUJIN_OMP_FOR
+      for (unsigned int i = left; i < right; i += stride_size) {
+
+        /* Skip constrained degrees of freedom: */
+        const unsigned int row_length = sparsity_simd.row_length(i);
+        if (row_length == 1)
+          continue;
+
+        dispatch_check(i);
+
+        const auto U_i = U.template get_tensor<Number>(i);
+        const auto u_i = state(U_i);
+
+        precomputed_state_type prec_i;
+        for (unsigned int k = 0; k < n_precomputed_values / 2; ++k) {
+          if constexpr (std::is_same_v<ScalarNumber, Number>) {
+            prec_i[k] = hyperbolic_system_.flux_function_->value(
+                dealii::Point<1>{u_i}, k);
+            prec_i[dim + k] = hyperbolic_system_.flux_function_->gradient(
+                dealii::Point<1>{u_i}, k)[0];
+          } else {
+            for (unsigned int s = 0; s < Number::size(); ++s) {
+              prec_i[k][s] = hyperbolic_system_.flux_function_->value(
+                  dealii::Point<1>{u_i[s]}, k);
+              prec_i[dim + k][s] = hyperbolic_system_.flux_function_->gradient(
+                  dealii::Point<1>{u_i[s]}, k)[0];
+            }
+          }
+        }
+
+        precomputed_values.template write_tensor<Number>(prec_i, i);
+      }
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline Number
+    HyperbolicSystem::View<dim, Number>::state(const state_type &U)
+    {
+      return U[0];
+    }
+
+
+    template <int dim, typename Number>
+    template <typename Lambda>
+    DEAL_II_ALWAYS_INLINE inline auto
+    HyperbolicSystem::View<dim, Number>::apply_boundary_conditions(
+        dealii::types::boundary_id id,
+        const state_type &U,
+        const dealii::Tensor<1, dim, Number> & /*normal*/,
+        const Lambda &get_dirichlet_data) const -> state_type
+    {
+      state_type result = U;
+
+      if (id == Boundary::dirichlet) {
+        result = get_dirichlet_data();
+
+      } else if (id == Boundary::slip) {
+        AssertThrow(
+            false,
+            dealii::ExcMessage("Invalid boundary ID »Boundary::slip«, slip "
+                               "boundary conditions are unavailable for scalar "
+                               "conservation equations."));
+        __builtin_trap();
+
+      } else if (id == Boundary::no_slip) {
+        AssertThrow(
+            false,
+            dealii::ExcMessage("Invalid boundary ID »Boundary::no_slip«, "
+                               "no-slip boundary conditions are unavailable "
+                               "for scalar conservation equations."));
+        __builtin_trap();
+
+      } else if (id == Boundary::dynamic) {
+        AssertThrow(
+            false,
+            dealii::ExcMessage("Invalid boundary ID »Boundary::dynamic«, "
+                               "dynamic boundary conditions are unavailable "
+                               "for scalar conservation equations."));
+        __builtin_trap();
+      }
+
+      return result;
+    }
+
+
+    // FIXME
+
+
   } // namespace ScalarConservation
 } // namespace ryujin

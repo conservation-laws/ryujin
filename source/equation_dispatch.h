@@ -9,8 +9,8 @@
 #include "patterns_conversion.h"
 #include "time_loop.h"
 
-#include "euler_aeos/description.h"
 #include "euler/description.h"
+#include "euler_aeos/description.h"
 #include "navier_stokes/description.h"
 #include "scalar_conservation/description.h"
 // #include "shallow_water/description.h"
@@ -57,7 +57,8 @@ DECLARE_ENUM(ryujin::Equation,
              LIST({ryujin::Equation::euler, "euler"},
                   {ryujin::Equation::euler_aeos, "euler aeos"},
                   {ryujin::Equation::navier_stokes, "navier stokes"},
-                  {ryujin::Equation::scalar_conservation, "scalar conservation"},
+                  {ryujin::Equation::scalar_conservation,
+                   "scalar conservation"},
                   // {ryujin::Equation::shallow_water, "shallow water"},
                   ));
 #endif
