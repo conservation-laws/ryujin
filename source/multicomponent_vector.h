@@ -250,12 +250,12 @@ namespace ryujin
     } else if constexpr (std::is_same<VectorizedArray, Number2>::value) {
 
       /* Vectorized fast access. index must be divisible by simd_length */
-      unsigned int indices[VectorizedArray::size()];
+      std::array<unsigned int, VectorizedArray::size()> indices;
       for (unsigned int k = 0; k < VectorizedArray::size(); ++k)
         indices[k] = k * n_comp;
 
       dealii::vectorized_load_and_transpose(
-          n_comp, this->begin() + i * n_comp, indices, &tensor[0]);
+          n_comp, this->begin() + i * n_comp, indices.data(), &tensor[0]);
 
     } else {
       /* not implemented */
@@ -289,12 +289,12 @@ namespace ryujin
     } else if constexpr (std::is_same<VectorizedArray, Number2>::value) {
       /* Vectorized fast access. index must be divisible by simd_length */
 
-      unsigned int indices[VectorizedArray::size()];
+      std::array<unsigned int, VectorizedArray::size()> indices;
       for (unsigned int k = 0; k < VectorizedArray::size(); ++k)
         indices[k] = js[k] * n_comp;
 
       dealii::vectorized_load_and_transpose(
-          n_comp, this->begin(), indices, &tensor[0]);
+          n_comp, this->begin(), indices.data(), &tensor[0]);
 
     } else {
       /* not implemented */
@@ -327,12 +327,15 @@ namespace ryujin
     } else if constexpr (std::is_same<VectorizedArray, Number2>::value) {
       /* Vectorized fast access. index must be divisible by simd_length */
 
-      unsigned int indices[VectorizedArray::size()];
+      std::array<unsigned int, VectorizedArray::size()> indices;
       for (unsigned int k = 0; k < VectorizedArray::size(); ++k)
         indices[k] = k * n_comp;
 
-      dealii::vectorized_transpose_and_store(
-          false, n_comp, &tensor[0], indices, this->begin() + i * n_comp);
+      dealii::vectorized_transpose_and_store(false,
+                                             n_comp,
+                                             &tensor[0],
+                                             indices.data(),
+                                             this->begin() + i * n_comp);
 
     } else {
       /* not implemented */
