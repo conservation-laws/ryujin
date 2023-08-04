@@ -199,7 +199,7 @@ namespace ryujin
     const auto scoped_name = [&step_no](const auto &name,
                                         const bool advance = true) {
       advance || step_no--;
-      return "time step [H] " + std::to_string(step_no++) + " - " + name;
+      return "time step [H] " + std::to_string(++step_no) + " - " + name;
     };
 
     /* A boolean signalling that a restart is necessary: */
@@ -978,10 +978,12 @@ namespace ryujin
 #endif
 
     const auto cycle_number =
-        4 + (n_precomputation_cycles > 0 ? 1 : 0) + limiter_iter_;
+        5 + (n_precomputation_cycles > 0 ? 1 : 0) + limiter_iter_;
     Scope scope(computing_timer_,
                 "time step [H] " + std::to_string(cycle_number) +
                     " - apply boundary conditions");
+
+    LIKWID_MARKER_START(("time_step_" + std::to_string(cycle_number)).c_str());
 
     const auto &boundary_map = offline_data_->boundary_map();
 
@@ -1010,6 +1012,8 @@ namespace ryujin
       U_i = view.apply_boundary_conditions(id, U_i, normal, get_dirichlet_data);
       U.write_tensor(U_i, i);
     }
+
+    LIKWID_MARKER_STOP(("time_step_" + std::to_string(cycle_number)).c_str());
 
     U.update_ghost_values();
   }
