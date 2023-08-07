@@ -432,9 +432,9 @@ namespace ryujin
 
       /* Compute norms of analytic solution: */
 
-      Number linf_norm_analytic;
-      Number l1_norm_analytic;
-      Number l2_norm_analytic;
+      Number linf_norm_analytic = 0.;
+      Number l1_norm_analytic = 0.;
+      Number l2_norm_analytic = 0.;
 
       if (error_normalize_) {
         linf_norm_analytic = Utilities::MPI::max(
