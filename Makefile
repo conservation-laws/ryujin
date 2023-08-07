@@ -6,6 +6,8 @@
 SHELL:=bash
 default: all
 
+.PHONY: default
+
 SOURCEDIR:=$(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
 BUILDDIR:=build
 
@@ -18,29 +20,6 @@ else
   MAKE_COMMAND:=ninja
   MAKE_FILE:=build.ninja
 endif
-
-NP:=2
-MPIRUN:=mpirun --bind-to none --oversubscribe -np $(NP)
-EXECUTABLE:=ryujin
-PARAMETER_FILE:=$(EXECUTABLE).prm
-
-EDITOR ?= vi
-
-edit: all
-	@if [ \! -f $(BUILDDIR)/run/$(PARAMETER_FILE) ]; then cd $(BUILDDIR)/run; $(MPIRUN) ./$(EXECUTABLE); fi
-	@$(EDITOR) $(BUILDDIR)/run/$(PARAMETER_FILE)
-
-run: all
-	@cd $(BUILDDIR)/run && time ASAN_OPTIONS=detect_leaks=0 $(MPIRUN) ./$(EXECUTABLE)
-
-rum:
-	@echo "... and a bottle of rum"
-
-run_clean:
-	@rm -f $(BUILDDIR)/run/*.(vtk|vtu|log|txt|gnuplot)
-	@rm -f $(BUILDDIR)/run/*-*.*
-
-.PHONY: default edit run run_clean
 
 ##########################################################################
 
@@ -60,14 +39,14 @@ $(BUILDDIR)/$(MAKE_FILE):
 	@mkdir -p $(BUILDDIR)
 	@cd $(BUILDDIR) && cmake -G$(GENERATOR) $(SOURCEDIR)
 
-release:
-	@mkdir -p $(BUILDDIR)
-	@cd $(BUILDDIR) && cmake -DCMAKE_BUILD_TYPE=Release -G$(GENERATOR) $(SOURCEDIR)
-	@cd $(BUILDDIR) && $(MAKE_COMMAND)
-
 debug:
 	@mkdir -p $(BUILDDIR)
 	@cd $(BUILDDIR) && cmake -DCMAKE_BUILD_TYPE=Debug -G$(GENERATOR) $(SOURCEDIR)
+	@cd $(BUILDDIR) && $(MAKE_COMMAND)
+
+release:
+	@mkdir -p $(BUILDDIR)
+	@cd $(BUILDDIR) && cmake -DCMAKE_BUILD_TYPE=Release -G$(GENERATOR) $(SOURCEDIR)
 	@cd $(BUILDDIR) && $(MAKE_COMMAND)
 
 Makefile:
@@ -76,4 +55,13 @@ Makefile:
 %: cleanup_insource $(BUILDDIR)/$(MAKE_FILE)
 	@cd $(BUILDDIR) && $(MAKE_COMMAND) $@
 
-.PHONY: cleanup_insource rebuild_cache edit_cache release debug
+.PHONY: cleanup_insource rebuild_cache edit_cache debug release
+
+##########################################################################
+
+indent:
+	@clang-format -i source/**/*.h source/**/*.cc
+
+.PHONY: indent
+
+##########################################################################
