@@ -378,9 +378,6 @@ namespace ryujin
       std::unique_ptr<eospac::Interface> eospac_interface_;
 
 #else /* WITHOUT_EOSPAC */
-      std::cout << " We are here " << std::endl;
-      __builtin_trap();
-      q
 
       /* We do not have eospac support */
       Sesame(const std::string &subsection)
