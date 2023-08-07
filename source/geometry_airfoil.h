@@ -629,13 +629,13 @@ namespace ryujin
      * @todo Documentation
      */
     std::array<std::function<double(const double)>, 3>
-    create_psi(const std::vector<double> &x_upper,
-               const std::vector<double> &y_upper,
-               const std::vector<double> &x_lower,
-               const std::vector<double> &y_lower,
-               const double x_center,
-               const double y_center,
-               const double scaling = 1.)
+    create_psi(const std::vector<double> &x_upper [[maybe_unused]],
+               const std::vector<double> &y_upper [[maybe_unused]],
+               const std::vector<double> &x_lower [[maybe_unused]],
+               const std::vector<double> &y_lower [[maybe_unused]],
+               const double x_center [[maybe_unused]],
+               const double y_center [[maybe_unused]],
+               const double scaling [[maybe_unused]] = 1.)
     {
       Assert(x_upper.size() >= 2, dealii::ExcInternalError());
       Assert(x_upper.front() == 0. && x_upper.back() == 1.,
