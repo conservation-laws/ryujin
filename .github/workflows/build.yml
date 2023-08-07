@@ -57,6 +57,57 @@ jobs:
         cd build-debug
         make VERBOSE=1 -j2
 
+  ################################################
+  # ubuntu-lts-22.04 with clang, deal.II master #
+  ################################################
+
+  ubuntu-lts-2204-dealii-clang:
+    name: Build ubuntu lts 22.04 deal.II master with clang 15
+    runs-on: [ubuntu-22.04]
+
+    container:
+      options: --user root
+      image: dealii/dealii:master-jammy
+
+    steps:
+    - name: install clang-15
+      run: |
+        echo "deb http://archive.ubuntu.com/ubuntu/ jammy-backports main" | sudo tee /etc/apt/sources.list.d/backports.list
+        sudo apt update
+        sudo apt install -y clang-15 libomp-15-dev
+    - uses: actions/checkout@v3
+      with:
+        submodules: 'true'
+    - name: info
+      run: |
+        g++ -v
+        cmake --version
+    - name: configure release
+      run: |
+        mkdir build-release
+        cd build-release
+        cmake \
+          -DCMAKE_CXX_COMPILER=clang++-15 -DCMAKE_CXX_FLAGS="-Wno-unknown-warning-option -Wno-ignored-optimization-argument" \
+          -DFORCE_DEAL_II_SPARSE_MATRIX=yes \
+          -DWITH_OPENMP=on ..
+    - name: build release
+      run: |
+        cd build-release
+        make VERBOSE=1 -j2
+    - name: configure debug
+      run: |
+        mkdir build-debug
+        cd build-debug
+        cmake \
+          -DCMAKE_CXX_COMPILER=clang++-15 -DCMAKE_CXX_FLAGS="-Wno-unknown-warning-option -Wno-ignored-optimization-argument" \
+          -DFORCE_DEAL_II_SPARSE_MATRIX=yes \
+          -DWITH_OPENMP=on -DCMAKE_BUILD_TYPE=Debug ..
+    - name: build debug
+      run: |
+        cd build-debug
+        make VERBOSE=1 -j2
+
+
   ###############################################
   # ubuntu-lts-22.04 with gcc-11, deal.II 9.5.0 #
   ###############################################
