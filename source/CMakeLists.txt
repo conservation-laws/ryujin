@@ -26,6 +26,7 @@ target_include_directories(obj_common PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}
   )
 deal_ii_setup_target(obj_common)
+target_link_libraries(obj_common ${EXTERNAL_TARGETS})
 
 #
 # Common, equation-dependent source files:
