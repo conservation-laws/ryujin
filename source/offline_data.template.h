@@ -228,8 +228,10 @@ namespace ryujin
        * happen that we end up with an inconsistent local range.
        */
       create_constraints_and_sparsity_pattern();
-      bool locally_inconsistent =
-          consistent_stride_range() != n_locally_internal_;
+      bool locally_inconsistent = false;
+
+#if DEAL_II_VERSION_GTE(9, 5, 0)
+      locally_inconsistent = consistent_stride_range() != n_locally_internal_;
 
       /*
        * TODO: complain that I cannot feed the lambda directly into the
@@ -241,6 +243,7 @@ namespace ryujin
       };
       locally_inconsistent = Utilities::MPI::all_reduce(
           locally_inconsistent, mpi_communicator_, comparator);
+#endif
 
       if (locally_inconsistent) {
         /*
