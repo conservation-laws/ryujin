@@ -23,7 +23,10 @@ namespace ryujin
 {
 #ifdef WITH_EOSPAC
   /**
-   * A namespace with wrappers for the eospac6 library and sesame database.
+   * A namespace with wrappers for the eospac6 library and sesame database. The
+   * eospac6 wrapper needs the SESAMEPATH variable to be defined in your
+   * environment. The SESAMEPATH should be the directory containing the sesame
+   * database.
    */
   namespace eospac
   {
@@ -374,7 +377,10 @@ namespace ryujin
       EOS_INTEGER material_id_;
       std::unique_ptr<eospac::Interface> eospac_interface_;
 
-#else /* WITH_EOSPAC */
+#else /* WITHOUT_EOSPAC */
+      std::cout << " We are here " << std::endl;
+      __builtin_trap();
+      q
 
       /* We do not have eospac support */
       Sesame(const std::string &subsection)
