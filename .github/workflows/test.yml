@@ -52,4 +52,6 @@ jobs:
         export OMPI_ALLOW_RUN_AS_ROOT=1
         export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
         cd build-release
-        ctest --output-on-failure -j2 -VV
+        # skip a number of expensive validation tests:
+        ctest --output-on-failure -j2 -VV -E \
+          "(validation-isentropic_vortex.*l7|validation-becker_solution.*l7)"
