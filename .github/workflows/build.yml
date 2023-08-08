@@ -1,4 +1,4 @@
-name: ubuntu-lts-22.04
+name: build
 
 on:
   push:
@@ -23,7 +23,7 @@ jobs:
   ################################################
 
   ubuntu-lts-2204-dealii-master:
-    name: build-deal.II-master
+    name: lts-2204-deal.II-master
     runs-on: [ubuntu-22.04]
 
     container:
@@ -62,7 +62,7 @@ jobs:
   ################################################
 
   ubuntu-lts-2204-dealii-clang:
-    name: build-deal.II-master-clang-15
+    name: lts-2204-deal.II-master-clang-15
     runs-on: [ubuntu-22.04]
 
     container:
@@ -113,7 +113,7 @@ jobs:
   ###############################################
 
   ubuntu-lts-2204-dealii-950:
-    name: build-deal.II-9.5.0
+    name: lts-2204-deal.II-9.5.0
     runs-on: [ubuntu-22.04]
 
     container:
@@ -148,7 +148,7 @@ jobs:
   ###############################################
 
   ubuntu-lts-2204-dealii-942:
-    name: build-deal.II-9.4.2
+    name: lts-2204-deal.II-9.4.2
     runs-on: [ubuntu-22.04]
 
     container:
@@ -187,7 +187,7 @@ jobs:
   ###########################################
 
   ubuntu-lts-2204-dealii-no_openmp:
-    name: build-deal.II-9.5.0-noopenmp
+    name: lts-2204-deal.II-9.5.0-noopenmp
     runs-on: [ubuntu-22.04]
 
     container:
