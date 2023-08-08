@@ -1,0 +1,214 @@
+name: ubuntu-lts-22.04
+
+on:
+  push:
+  pull_request:
+    types:
+    - opened
+    - reopened
+    - synchronize
+    - ready_for_review
+
+concurrency:
+  group: ${ {github.event_name }}-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{github.event_name == 'pull_request'}}
+
+permissions:
+  contents: read
+
+jobs:
+
+  ################################################
+  # ubuntu-lts-22.04 with gcc-11, deal.II master #
+  ################################################
+
+  ubuntu-lts-2204-dealii-master:
+    name: build-deal.II-master
+    runs-on: [ubuntu-22.04]
+
+    container:
+      options: --user root
+      image: dealii/dealii:master-jammy
+
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: 'true'
+    - name: info
+      run: |
+        g++ -v
+        cmake --version
+    - name: configure release
+      run: |
+        mkdir build-release
+        cd build-release
+        cmake -DWITH_OPENMP=on ..
+    - name: build release
+      run: |
+        cd build-release
+        make VERBOSE=1 -j2
+    - name: configure debug
+      run: |
+        mkdir build-debug
+        cd build-debug
+        cmake -DWITH_OPENMP=on -DCMAKE_BUILD_TYPE=Debug ..
+    - name: build debug
+      run: |
+        cd build-debug
+        make VERBOSE=1 -j2
+
+  ################################################
+  # ubuntu-lts-22.04 with clang, deal.II master #
+  ################################################
+
+  ubuntu-lts-2204-dealii-clang:
+    name: build-deal.II-master-clang-15
+    runs-on: [ubuntu-22.04]
+
+    container:
+      options: --user root
+      image: dealii/dealii:master-jammy
+
+    steps:
+    - name: install clang-15
+      run: |
+        echo "deb http://archive.ubuntu.com/ubuntu/ jammy-backports main" | sudo tee /etc/apt/sources.list.d/backports.list
+        sudo apt update
+        sudo apt install -y clang-15 libomp-15-dev
+    - uses: actions/checkout@v3
+      with:
+        submodules: 'true'
+    - name: info
+      run: |
+        g++ -v
+        cmake --version
+    - name: configure release
+      run: |
+        mkdir build-release
+        cd build-release
+        cmake \
+          -DCMAKE_CXX_COMPILER=clang++-15 -DCMAKE_CXX_FLAGS="-Wno-unknown-warning-option -Wno-ignored-optimization-argument" \
+          -DFORCE_DEAL_II_SPARSE_MATRIX=yes \
+          -DWITH_OPENMP=on ..
+    - name: build release
+      run: |
+        cd build-release
+        make VERBOSE=1 -j2
+    - name: configure debug
+      run: |
+        mkdir build-debug
+        cd build-debug
+        cmake \
+          -DCMAKE_CXX_COMPILER=clang++-15 -DCMAKE_CXX_FLAGS="-Wno-unknown-warning-option -Wno-ignored-optimization-argument" \
+          -DFORCE_DEAL_II_SPARSE_MATRIX=yes \
+          -DWITH_OPENMP=on -DCMAKE_BUILD_TYPE=Debug ..
+    - name: build debug
+      run: |
+        cd build-debug
+        make VERBOSE=1 -j2
+
+
+  ###############################################
+  # ubuntu-lts-22.04 with gcc-11, deal.II 9.5.0 #
+  ###############################################
+
+  ubuntu-lts-2204-dealii-950:
+    name: build-deal.II-9.5.0
+    runs-on: [ubuntu-22.04]
+
+    container:
+      options: --user root
+      image: dealii/dealii:v9.5.0-jammy
+
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: 'true'
+    - name: info
+      run: |
+        g++ -v
+        cmake --version
+    - name: configure release
+      run: |
+        mkdir build-release
+        cd build-release
+        cmake -DWITH_OPENMP=on ..
+    - name: build release
+      run: |
+        cd build-release
+        make VERBOSE=1 -j2
+    - name: configure debug
+      run: |
+        mkdir build-debug
+        cd build-debug
+        cmake -DWITH_OPENMP=on -DCMAKE_BUILD_TYPE=Debug ..
+
+  ###############################################
+  # ubuntu-lts-22.04 with gcc-11, deal.II 9.4.2 #
+  ###############################################
+
+  ubuntu-lts-2204-dealii-942:
+    name: build-deal.II-9.4.2
+    runs-on: [ubuntu-22.04]
+
+    container:
+      options: --user root
+      image: dealii/dealii:v9.4.2-jammy
+
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: 'true'
+    - name: info
+      run: |
+        g++ -v
+        cmake --version
+    - name: configure release
+      run: |
+        mkdir build-release
+        cd build-release
+        cmake -DWITH_OPENMP=on ..
+    - name: build release
+      run: |
+        cd build-release
+        make VERBOSE=1 -j2
+    - name: configure debug
+      run: |
+        mkdir build-debug
+        cd build-debug
+        cmake -DWITH_OPENMP=on -DCMAKE_BUILD_TYPE=Debug ..
+    - name: build debug
+      run: |
+        cd build-debug
+        make VERBOSE=1 -j2
+
+  ###########################################
+  # ubuntu-lts-22.04 with gcc-11, no openmp #
+  ###########################################
+
+  ubuntu-lts-2204-dealii-no_openmp:
+    name: build-deal.II-9.5.0-noopenmp
+    runs-on: [ubuntu-22.04]
+
+    container:
+      options: --user root
+      image: dealii/dealii:v9.5.0-jammy
+
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: 'true'
+    - name: info
+      run: |
+        g++ -v
+        cmake --version
+    - name: configure no_openmp
+      run: |
+        mkdir build-no_openmp
+        cd build-no_openmp
+        cmake -DWITH_OPENMP=off ..
+    - name: build no_openmp
+
+      run: |
+        cd build-no_openmp
+        make VERBOSE=1 -j2

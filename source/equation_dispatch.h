@@ -138,7 +138,8 @@ namespace ryujin
       }
     }
 
-  private : int dimension_;
+  private:
+    int dimension_;
     Equation equation_;
   };
 

@@ -13,5 +13,5 @@ namespace ryujin
     template class ParabolicSolver<Description, 1, NUMBER>;
     template class ParabolicSolver<Description, 2, NUMBER>;
     template class ParabolicSolver<Description, 3, NUMBER>;
-  }
+  } // namespace NavierStokes
 } // namespace ryujin

@@ -73,37 +73,36 @@ namespace ryujin
           return primitive_right;
         };
 
-        const auto compute_constants = [this,
-                                        speed_of_sound,
-                                        rarefaction_right_state]() {
-          if constexpr (HyperbolicSystemView::have_gamma) {
-            gamma_ = hyperbolic_system_.gamma();
-          }
+        const auto compute_constants =
+            [this, speed_of_sound, rarefaction_right_state]() {
+              if constexpr (HyperbolicSystemView::have_gamma) {
+                gamma_ = hyperbolic_system_.gamma();
+              }
 
-          /*
-           * Initial left and right states (rho, u, p, c):
-           */
+              /*
+               * Initial left and right states (rho, u, p, c):
+               */
 
-          const Number rho_left = 3.0;
-          const Number p_left = 1.0;
-          const Number c_left = speed_of_sound(rho_left, p_left);
-          const Number u_left = c_left; /* verify */
-          const Number rho_right = 0.5;
+              const Number rho_left = 3.0;
+              const Number p_left = 1.0;
+              const Number c_left = speed_of_sound(rho_left, p_left);
+              const Number u_left = c_left; /* verify */
+              const Number rho_right = 0.5;
 
-          primitive_left_ = {rho_left, c_left, p_left, c_left};
-          primitive_right_ =
-              rarefaction_right_state(primitive_left_, rho_right);
+              primitive_left_ = {rho_left, c_left, p_left, c_left};
+              primitive_right_ =
+                  rarefaction_right_state(primitive_left_, rho_right);
 
-          /*
-           * Populate constants:
-           */
+              /*
+               * Populate constants:
+               */
 
-          k1 = 2.0 / (gamma_ + 1.0);
-          k2 = ((gamma_ - 1.0) / ((gamma_ + 1.0) * c_left));
-          density_exponent = 2.0 / (gamma_ - 1.0);
-          k3 = c_left + ((gamma_ - 1.0) / 2.0) * u_left;
-          pressure_exponent = 2.0 * gamma_ / (gamma_ - 1.0);
-        };
+              k1 = 2.0 / (gamma_ + 1.0);
+              k2 = ((gamma_ - 1.0) / ((gamma_ + 1.0) * c_left));
+              density_exponent = 2.0 / (gamma_ - 1.0);
+              k3 = c_left + ((gamma_ - 1.0) / 2.0) * u_left;
+              pressure_exponent = 2.0 * gamma_ / (gamma_ - 1.0);
+            };
 
         this->parse_parameters_call_back.connect(compute_constants);
         compute_constants();

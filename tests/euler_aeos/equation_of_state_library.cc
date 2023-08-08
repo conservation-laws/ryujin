@@ -88,8 +88,9 @@ int main()
   NobleAbelStiffenedGas noble_abel_stiffened_gas("");
   test(noble_abel_stiffened_gas);
 
-  std::cout << "\nNobleAbelStiffenedGas with gamma=1.4, b=0.2, q=0.00125, pinf=0.005"
-            << std::endl;
+  std::cout
+      << "\nNobleAbelStiffenedGas with gamma=1.4, b=0.2, q=0.00125, pinf=0.005"
+      << std::endl;
   {
     std::stringstream parameters;
     parameters << "subsection noble abel stiffened gas\n"
@@ -105,13 +106,11 @@ int main()
 
   /* van der Waals */
 
-  std::cout << "\nVanDerWaals with gamma=1.4, a=0, b=0"
-            << std::endl;
+  std::cout << "\nVanDerWaals with gamma=1.4, a=0, b=0" << std::endl;
   VanDerWaals van_der_waals("");
   test(van_der_waals);
 
-  std::cout << "\nVanDerWaals with gamma=1.4, a=0.015, b=0.2"
-            << std::endl;
+  std::cout << "\nVanDerWaals with gamma=1.4, a=0.015, b=0.2" << std::endl;
   {
     std::stringstream parameters;
     parameters << "subsection van der waals\n"
@@ -124,12 +123,12 @@ int main()
   }
   test(van_der_waals);
 
-  std::cout << "\nJonesWilkinsLee with omega=1.4, A=0, B=0"
-            << std::endl;
+  std::cout << "\nJonesWilkinsLee with omega=1.4, A=0, B=0" << std::endl;
   JonesWilkinsLee jones_wilkins_lee("");
   test(jones_wilkins_lee);
 
-  std::cout << "\nJonesWilkinsLee with omega=0.8938, A=6.321e3, B=-4.472, R1=11.3, R2=1.13, rho_0=1.0"
+  std::cout << "\nJonesWilkinsLee with omega=0.8938, A=6.321e3, B=-4.472, "
+               "R1=11.3, R2=1.13, rho_0=1.0"
             << std::endl;
   {
     std::stringstream parameters;

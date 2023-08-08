@@ -5,8 +5,8 @@
 
 #pragma once
 
-#include <initial_state_library.h>
 #include <cmath>
+#include <initial_state_library.h>
 
 namespace ryujin
 {
