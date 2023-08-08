@@ -3,7 +3,8 @@
 
 int main()
 {
-  using VA = dealii::VectorizedArray<double, 4>;
+  using VA = dealii::VectorizedArray<double>;
+  constexpr auto simd_width = VA::size();
 
   dealii::DynamicSparsityPattern spars(14, 14);
   spars.add(0, 0);
@@ -26,8 +27,9 @@ int main()
   auto partitioner = std::make_shared<dealii::Utilities::MPI::Partitioner>(
       locally_owned, locally_relevant, MPI_COMM_SELF);
 
-  ryujin::SparsityPatternSIMD<4> my_sparsity(12, spars, partitioner);
-  ryujin::SparseMatrixSIMD<double, 1, 4> my_sparse(my_sparsity);
+  ryujin::SparsityPatternSIMD<simd_width> my_sparsity(
+      (12 / simd_width) * simd_width, spars, partitioner);
+  ryujin::SparseMatrixSIMD<double, 1, simd_width> my_sparse(my_sparsity);
   for (unsigned i = 0; i < 12; ++i)
     for (unsigned j = 0; j < 3; ++j)
       my_sparse.write_entry(double(i * 3 + j), i, j);
@@ -44,16 +46,18 @@ int main()
     std::cout << std::endl;
   }
   std::cout << "Matrix entries by SIMD rows" << std::endl;
-  for (unsigned int i = 0; i < 12; i += 4) {
+  unsigned int i = 0;
+  for (; i < (12 / simd_width) * simd_width; i += simd_width) {
     for (unsigned int j = 0; j < 3; ++j) {
       const auto a = my_sparse.template get_entry<VA>(i, j);
       std::cout << a << "   ";
     }
     std::cout << std::endl;
   }
-  std::cout << my_sparse.get_entry(12, 0) << " " << my_sparse.get_entry(12, 1)
-            << " " << my_sparse.get_entry(13, 0) << " "
-            << my_sparse.get_entry(13, 1) << std::endl;
+  for (; i < 14; i++)
+    std::cout << my_sparse.get_entry(i, 0) << " " << my_sparse.get_entry(i, 1)
+              << " ";
+  std::cout << std::endl;
 
   std::cout << "Matrix entries transposed row by row" << std::endl;
   for (unsigned int i = 0; i < my_sparsity.n_rows(); ++i) {
@@ -65,15 +69,16 @@ int main()
   }
 
   std::cout << "Matrix entries transposed by SIMD row" << std::endl;
-  for (unsigned int i = 0; i < 12; i += 4) {
+  i = 0;
+  for (; i < (12 / simd_width) * simd_width; i += simd_width) {
     for (unsigned int j = 0; j < 3; ++j) {
       const auto a = my_sparse.template get_transposed_entry<VA>(i, j);
       std::cout << a << "   ";
     }
     std::cout << std::endl;
   }
-  std::cout << my_sparse.get_transposed_entry(12, 0) << " "
-            << my_sparse.get_transposed_entry(12, 1) << " "
-            << my_sparse.get_transposed_entry(13, 0) << " "
-            << my_sparse.get_transposed_entry(13, 1) << std::endl;
+  for (; i < 14; i++)
+    std::cout << my_sparse.get_transposed_entry(i, 0) << " "
+              << my_sparse.get_transposed_entry(i, 1) << " ";
+  std::cout << std::endl;
 }
