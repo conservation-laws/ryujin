@@ -16,7 +16,7 @@ jobs:
   ################
 
   clang-format:
-    name: Run clang-format
+    name: clang-format
     runs-on: ubuntu-latest
 
     steps:
