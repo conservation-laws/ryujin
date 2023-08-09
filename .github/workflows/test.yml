@@ -1,0 +1,57 @@
+name: verification
+
+on:
+  push:
+  pull_request:
+    types:
+    - opened
+    - reopened
+    - synchronize
+    - ready_for_review
+
+concurrency:
+  group: ${ {github.event_name }}-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{github.event_name == 'pull_request'}}
+
+permissions:
+  contents: read
+
+jobs:
+
+  ################################################
+  # ubuntu-lts-22.04 with gcc-11, deal.II master #
+  ################################################
+
+  ubuntu-lts-2204-dealii-master:
+    name: tests-deal.II-master
+    runs-on: [ubuntu-22.04]
+
+    container:
+      options: --user root
+      image: dealii/dealii:master-jammy
+
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: 'true'
+    - name: info
+      run: |
+        g++ -v
+        cmake --version
+    - name: configure release
+      run: |
+        mkdir build-release
+        cd build-release
+        cmake -DWITH_OPENMP=on ..
+    - name: build release
+      run: |
+        cd build-release
+        make VERBOSE=1 -j2
+    - name: test release
+      run: |
+        export OMPI_ALLOW_RUN_AS_ROOT=1
+        export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
+        cd build-release
+        # skip a number of expensive verification tests:
+        ctest --output-on-failure -j2 -VV -E \
+          "(verification-isentropic_vortex.*l7|verification-becker_solution.*l7)"
