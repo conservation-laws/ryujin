@@ -207,7 +207,7 @@ namespace ryujin
 
     /*
      * -------------------------------------------------------------------------
-     * Step 0: Precompute values
+     * Step 1: Precompute values
      * -------------------------------------------------------------------------
      */
 
@@ -256,7 +256,7 @@ namespace ryujin
 
     /*
      * -------------------------------------------------------------------------
-     * Step 1: Compute off-diagonal d_ij, and alpha_i
+     * Step 2: Compute off-diagonal d_ij, and alpha_i
      *
      * The computation of the d_ij is quite costly. So we do a trick to
      * save a bit of computational resources. Instead of computing all d_ij
@@ -358,7 +358,7 @@ namespace ryujin
 
     /*
      * -------------------------------------------------------------------------
-     * Step 2: Compute diagonal of d_ij, and maximal time-step size.
+     * Step 3: Compute diagonal of d_ij, and maximal time-step size.
      * -------------------------------------------------------------------------
      */
 
@@ -468,7 +468,7 @@ namespace ryujin
 
     /*
      * -------------------------------------------------------------------------
-     * Step 3: Low-order update, also compute limiter bounds, R_i
+     * Step 4: Low-order update, also compute limiter bounds, R_i
      * -------------------------------------------------------------------------
      */
 
@@ -685,7 +685,7 @@ namespace ryujin
 
     /*
      * -------------------------------------------------------------------------
-     * Step 4: Compute second part of P_ij, and l_ij (first round):
+     * Step 5: Compute second part of P_ij, and l_ij (first round):
      * -------------------------------------------------------------------------
      */
 
@@ -799,7 +799,7 @@ namespace ryujin
 
     /*
      * -------------------------------------------------------------------------
-     * Step 5, 6: Perform high-order update:
+     * Step 6, 7: Perform high-order update:
      *
      *   Symmetrize l_ij
      *   High-order update: += l_ij * lambda * P_ij
@@ -966,6 +966,11 @@ namespace ryujin
     return tau_max;
   }
 
+  /*
+   * -------------------------------------------------------------------------
+   * Step 8: Apply boundary conditions
+   * -------------------------------------------------------------------------
+   */
 
   template <typename Description, int dim, typename Number>
   void HyperbolicModule<Description, dim, Number>::apply_boundary_conditions(
