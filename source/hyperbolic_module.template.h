@@ -362,7 +362,7 @@ namespace ryujin
      * -------------------------------------------------------------------------
      */
 
-    std::atomic<Number> tau_max{std::numeric_limits<Number>::infinity()};
+    std::atomic<Number> tau_max{std::numeric_limits<Number>::max()};
 
     {
       Scope scope(computing_timer_,
@@ -376,6 +376,8 @@ namespace ryujin
 
       typename Description::template RiemannSolver<dim, Number> riemann_solver(
           *hyperbolic_system_, new_precomputed);
+
+      Number local_tau_max = std::numeric_limits<Number>::max();
 
       RYUJIN_OMP_FOR
       for (std::size_t k = 0; k < coupling_boundary_pairs.size(); ++k) {
@@ -426,14 +428,16 @@ namespace ryujin
 
         const Number mass = lumped_mass_matrix.local_element(i);
         const Number tau = cfl_ * mass / (Number(-2.) * d_sum);
-
         if (boundary_map.count(i) == 0 || cfl_with_boundary_dofs_) {
-          Number current_tau_max = tau_max.load();
-          while (current_tau_max > tau &&
-                 !tau_max.compare_exchange_weak(current_tau_max, tau))
-            ;
+          local_tau_max = std::min(local_tau_max, tau);
         }
       }
+
+      /* Synchronize tau max over all threads: */
+      Number current_tau_max = tau_max.load();
+      while (current_tau_max > local_tau_max &&
+             !tau_max.compare_exchange_weak(current_tau_max, local_tau_max))
+        ;
 
       LIKWID_MARKER_STOP(("time_step_" + std::to_string(step_no)).c_str());
       RYUJIN_PARALLEL_REGION_END
