@@ -198,8 +198,6 @@ namespace ryujin
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
-      const auto interpolation_b = hyperbolic_system.eos_interpolation_b();
-
       const auto &[rho_i, u_i, p_i, gamma_i, a_i] = riemann_data_i;
       const auto &[rho_j, u_j, p_j, gamma_j, a_j] = riemann_data_j;
 
@@ -230,6 +228,23 @@ namespace ryujin
 #ifdef DEBUG_RIEMANN_SOLVER
       std::cout << "SS p_1_tilde  = " << p_1_tilde << "\n";
 #endif
+
+      const auto p_2_tilde = p_star_failsafe(riemann_data_i, riemann_data_j);
+
+      return std::min(p_1_tilde, p_2_tilde);
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline Number
+    RiemannSolver<dim, Number>::p_star_failsafe(
+        const primitive_type &riemann_data_i,
+        const primitive_type &riemann_data_j) const
+    {
+      const auto interpolation_b = hyperbolic_system.eos_interpolation_b();
+
+      const auto &[rho_i, u_i, p_i, gamma_i, a_i] = riemann_data_i;
+      const auto &[rho_j, u_j, p_j, gamma_j, a_j] = riemann_data_j;
 
       /*
        * Compute (5.11) formula for \tilde p_2^\ast:
@@ -264,8 +279,7 @@ namespace ryujin
 #ifdef DEBUG_RIEMANN_SOLVER
       std::cout << "SS p_2_tilde  = " << p_2_tilde << "\n";
 #endif
-
-      return std::min(p_1_tilde, p_2_tilde);
+      return p_2_tilde;
     }
 
 
@@ -513,12 +527,14 @@ namespace ryujin
 
         const Number p_star_tilde =
             p_star_interpolated(riemann_data_i, riemann_data_j);
+        const Number p_star_backup =
+            p_star_failsafe(riemann_data_i, riemann_data_j);
 
         const Number p_2 =
             dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
                 phi_p_max,
                 Number(0.),
-                p_star_tilde,
+                std::min(p_star_tilde, p_star_backup),
                 std::min(p_max, p_star_tilde));
 
 #ifdef DEBUG_RIEMANN_SOLVER
