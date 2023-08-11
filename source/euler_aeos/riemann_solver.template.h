@@ -480,6 +480,19 @@ namespace ryujin
       const auto &[rho_i, u_i, p_i, gamma_i, a_i] = riemann_data_i;
       const auto &[rho_j, u_j, p_j, gamma_j, a_j] = riemann_data_j;
 
+#ifdef DEBUG_RIEMANN_SOLVER
+      std::cout << "rho_left: " << rho_i << std::endl;
+      std::cout << "u_left: " << u_i << std::endl;
+      std::cout << "p_left: " << p_i << std::endl;
+      std::cout << "gamma_left: " << gamma_i << std::endl;
+      std::cout << "a_left: " << a_i << std::endl;
+      std::cout << "rho_right: " << rho_j << std::endl;
+      std::cout << "u_right: " << u_j << std::endl;
+      std::cout << "p_right: " << p_j << std::endl;
+      std::cout << "gamma_right: " << gamma_j << std::endl;
+      std::cout << "a_right: " << a_j << std::endl;
+#endif
+
       const Number p_max = std::max(p_i, p_j);
       const Number phi_p_max = phi_of_p_max(riemann_data_i, riemann_data_j);
 
