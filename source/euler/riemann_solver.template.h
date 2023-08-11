@@ -182,6 +182,57 @@ namespace ryujin
     }
 
 
+    /**
+     * Failsafe approximation to p_star computed for two primitive
+     * states <code>riemann_data_i</code> and <code>riemann_data_j</code>.
+     *
+     * See [1], page 914, (4.3)
+     *
+     * Cost: 2x pow, 2x division, 0x sqrt
+     */
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline Number
+    RiemannSolver<dim, Number>::p_star_failsafe(
+        const primitive_type &riemann_data_i,
+        const primitive_type &riemann_data_j) const
+    {
+      const auto &[rho_i, u_i, p_i, a_i] = riemann_data_i;
+      const auto &[rho_j, u_j, p_j, a_j] = riemann_data_j;
+
+      const auto &gamma = hyperbolic_system.gamma();
+
+      /*
+       * Compute (5.11) formula for \tilde p_2^\ast:
+       *
+       * Cost: 0x pow, 3x division, 3x sqrt
+       */
+
+      const Number p_max = std::max(p_i, p_j);
+
+      Number radicand_i = ScalarNumber(2.) * p_max;
+      radicand_i /=
+          rho_i * ((gamma + Number(1.)) * p_max + (gamma - Number(1.)) * p_i);
+
+      const Number x_i = std::sqrt(radicand_i);
+
+      Number radicand_j = ScalarNumber(2.) * p_max;
+      radicand_j /=
+          rho_j * ((gamma + Number(1.)) * p_max + (gamma - Number(1.)) * p_j);
+
+      const Number x_j = std::sqrt(radicand_j);
+
+      const Number a = x_i + x_j;
+      const Number b = u_j - u_i;
+      const Number c = -p_i * x_i - p_j * x_j;
+
+      const Number base = (-b + std::sqrt(b * b - ScalarNumber(4.) * a * c)) /
+                          (ScalarNumber(2.) * a);
+      const Number p_2_tilde = base * base;
+
+      return p_2_tilde;
+    }
+
+
     template <int dim, typename Number>
     Number RiemannSolver<dim, Number>::compute(
         const primitive_type &riemann_data_i,
@@ -237,7 +288,8 @@ namespace ryujin
       const Number p_max = std::max(riemann_data_i[2], riemann_data_j[2]);
 
       const Number p_star_tilde =
-          p_star_two_rarefaction(riemann_data_i, riemann_data_j);
+          std::min(p_star_two_rarefaction(riemann_data_i, riemann_data_j),
+                   p_star_failsafe(riemann_data_i, riemann_data_j));
 
       const Number phi_p_max = phi_of_p_max(riemann_data_i, riemann_data_j);
 
