@@ -114,8 +114,24 @@ namespace ryujin
       /** @name Internal functions used in the Riemann solver */
       //@{
 
+#ifndef DOXYGEN
       /**
-       * See [1], page 912, (3.3).
+       * FIXME
+       */
+      Number f(const primitive_type &riemann_data, const Number p_star) const;
+
+
+      /**
+       * FIXME
+       */
+      Number phi(const primitive_type &riemann_data_i,
+                 const primitive_type &riemann_data_j,
+                 const Number p_in) const;
+#endif
+
+
+      /**
+       * See @cite GuermondPopov2016b, page 912, (3.3).
        *
        * The approximate Riemann solver is based on a function phi(p) that is
        * montone increasing in p, concave down and whose (weak) third
@@ -168,12 +184,23 @@ namespace ryujin
        * Two-rarefaction approximation to p_star computed for two primitive
        * states <code>riemann_data_i</code> and <code>riemann_data_j</code>.
        *
-       * See [1], page 914, (4.3)
+       * See @cite GuermondPopov2016b, page 914, (4.3)
        *
        * Cost: 2x pow, 2x division, 0x sqrt
        */
       Number p_star_two_rarefaction(const primitive_type &riemann_data_i,
                                     const primitive_type &riemann_data_j) const;
+
+      /**
+       * Failsafe approximation to p_star computed for two primitive states
+       * <code>riemann_data_i</code> and <code>riemann_data_j</code>.
+       *
+       * See @cite ClaytonGuermondPopov-2022, (5.11):
+       *
+       * Cost: 0x pow, 3x division, 3x sqrt
+       */
+      Number p_star_failsafe(const primitive_type &riemann_data_i,
+                             const primitive_type &riemann_data_j) const;
 
 
       /**

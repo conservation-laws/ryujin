@@ -155,6 +155,14 @@ namespace ryujin
       Number p_star_SS_full(const primitive_type &riemann_data_i,
                             const primitive_type &riemann_data_j) const;
 
+      /*
+       * Compute only the failsafe the failsafe bound for \f$\tilde
+       * p_2^\ast\f$ (5.11) in @cite ClaytonGuermondPopov-2022
+       *
+       * Cost: 0x pow, 3x division, 3x sqrt
+       */
+      Number p_star_failsafe(const primitive_type &riemann_data_i,
+                             const primitive_type &riemann_data_j) const;
 
       /*
        * Compute a simultaneous upper bound on (5.7) second formula for
@@ -168,22 +176,21 @@ namespace ryujin
       Number p_star_interpolated(const primitive_type &riemann_data_i,
                                  const primitive_type &riemann_data_j) const;
 
-      /**
+
+#ifndef DOXYGEN
+      /*
        * FIXME
-       *
-       * Cost: 0x pow, 6x division, 1x sqrt
        */
       Number f(const primitive_type &riemann_data, const Number p_star) const;
 
 
-      /**
+      /*
        * FIXME
-       *
-       * Cost: TODO
        */
       Number phi(const primitive_type &riemann_data_i,
                  const primitive_type &riemann_data_j,
                  const Number p_in) const;
+#endif
 
 
       /**

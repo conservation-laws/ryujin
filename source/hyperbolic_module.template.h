@@ -207,7 +207,7 @@ namespace ryujin
 
     /*
      * -------------------------------------------------------------------------
-     * Step 0: Precompute values
+     * Step 1: Precompute values
      * -------------------------------------------------------------------------
      */
 
@@ -256,7 +256,7 @@ namespace ryujin
 
     /*
      * -------------------------------------------------------------------------
-     * Step 1: Compute off-diagonal d_ij, and alpha_i
+     * Step 2: Compute off-diagonal d_ij, and alpha_i
      *
      * The computation of the d_ij is quite costly. So we do a trick to
      * save a bit of computational resources. Instead of computing all d_ij
@@ -358,11 +358,11 @@ namespace ryujin
 
     /*
      * -------------------------------------------------------------------------
-     * Step 2: Compute diagonal of d_ij, and maximal time-step size.
+     * Step 3: Compute diagonal of d_ij, and maximal time-step size.
      * -------------------------------------------------------------------------
      */
 
-    std::atomic<Number> tau_max{std::numeric_limits<Number>::infinity()};
+    std::atomic<Number> tau_max{std::numeric_limits<Number>::max()};
 
     {
       Scope scope(computing_timer_,
@@ -376,6 +376,8 @@ namespace ryujin
 
       typename Description::template RiemannSolver<dim, Number> riemann_solver(
           *hyperbolic_system_, new_precomputed);
+
+      Number local_tau_max = std::numeric_limits<Number>::max();
 
       RYUJIN_OMP_FOR
       for (std::size_t k = 0; k < coupling_boundary_pairs.size(); ++k) {
@@ -426,14 +428,16 @@ namespace ryujin
 
         const Number mass = lumped_mass_matrix.local_element(i);
         const Number tau = cfl_ * mass / (Number(-2.) * d_sum);
-
         if (boundary_map.count(i) == 0 || cfl_with_boundary_dofs_) {
-          Number current_tau_max = tau_max.load();
-          while (current_tau_max > tau &&
-                 !tau_max.compare_exchange_weak(current_tau_max, tau))
-            ;
+          local_tau_max = std::min(local_tau_max, tau);
         }
       }
+
+      /* Synchronize tau max over all threads: */
+      Number current_tau_max = tau_max.load();
+      while (current_tau_max > local_tau_max &&
+             !tau_max.compare_exchange_weak(current_tau_max, local_tau_max))
+        ;
 
       LIKWID_MARKER_STOP(("time_step_" + std::to_string(step_no)).c_str());
       RYUJIN_PARALLEL_REGION_END
@@ -468,7 +472,7 @@ namespace ryujin
 
     /*
      * -------------------------------------------------------------------------
-     * Step 3: Low-order update, also compute limiter bounds, R_i
+     * Step 4: Low-order update, also compute limiter bounds, R_i
      * -------------------------------------------------------------------------
      */
 
@@ -685,7 +689,7 @@ namespace ryujin
 
     /*
      * -------------------------------------------------------------------------
-     * Step 4: Compute second part of P_ij, and l_ij (first round):
+     * Step 5: Compute second part of P_ij, and l_ij (first round):
      * -------------------------------------------------------------------------
      */
 
@@ -799,7 +803,7 @@ namespace ryujin
 
     /*
      * -------------------------------------------------------------------------
-     * Step 5, 6: Perform high-order update:
+     * Step 6, 7: Perform high-order update:
      *
      *   Symmetrize l_ij
      *   High-order update: += l_ij * lambda * P_ij
@@ -966,6 +970,11 @@ namespace ryujin
     return tau_max;
   }
 
+  /*
+   * -------------------------------------------------------------------------
+   * Step 8: Apply boundary conditions
+   * -------------------------------------------------------------------------
+   */
 
   template <typename Description, int dim, typename Number>
   void HyperbolicModule<Description, dim, Number>::apply_boundary_conditions(
