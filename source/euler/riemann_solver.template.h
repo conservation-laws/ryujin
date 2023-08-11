@@ -12,10 +12,51 @@
 #include <newton.h>
 #include <simd.h>
 
+// #define DEBUG_RIEMANN_SOLVER
+
 namespace ryujin
 {
   namespace Euler
   {
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline Number
+    RiemannSolver<dim, Number>::f(const primitive_type &riemann_data,
+                                  const Number p_star) const
+    {
+      const auto &[rho, u, p, a] = riemann_data;
+      const auto gamma = hyperbolic_system.gamma();
+
+      const Number Az = ScalarNumber(2.) / (rho * (gamma + Number(1.)));
+      const Number Bz =
+          (gamma - ScalarNumber(1.)) / (gamma + ScalarNumber(1.)) * p;
+      const Number radicand = Az / (p_star + Bz);
+      const Number true_value = (p_star - p) * std::sqrt(radicand);
+
+      const auto exponent =
+          ScalarNumber(0.5) * (gamma - ScalarNumber(1.)) / gamma;
+      const Number factor = ryujin::pow(p_star / p, exponent) - Number(1.);
+      const auto false_value =
+          ScalarNumber(2.) * a * factor / (gamma - ScalarNumber(1.));
+
+      return dealii::compare_and_apply_mask<
+          dealii::SIMDComparison::greater_than_or_equal>(
+          p_star, p, true_value, false_value);
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline Number
+    RiemannSolver<dim, Number>::phi(const primitive_type &riemann_data_i,
+                                    const primitive_type &riemann_data_j,
+                                    const Number p_in) const
+    {
+      const Number &u_i = riemann_data_i[1];
+      const Number &u_j = riemann_data_j[1];
+
+      return f(riemann_data_i, p_in) + f(riemann_data_j, p_in) + u_j - u_i;
+    }
+
+
     /*
      * The approximate Riemann solver is based on a function phi(p) that is
      * montone increasing in p, concave down and whose (weak) third
@@ -64,7 +105,7 @@ namespace ryujin
      */
 
 
-    /**
+    /*
      * see [1], page 912, (3.7)
      *
      * Cost: 0x pow, 1x division, 1x sqrt
@@ -87,7 +128,7 @@ namespace ryujin
     }
 
 
-    /**
+    /*
      * see [1], page 912, (3.8)
      *
      * Cost: 0x pow, 1x division, 1x sqrt
@@ -109,7 +150,7 @@ namespace ryujin
     }
 
 
-    /**
+    /*
      * For two given primitive states <code>riemann_data_i</code> and
      * <code>riemann_data_j</code>, and a guess p_2, compute an upper bound
      * for lambda.
@@ -134,7 +175,7 @@ namespace ryujin
     }
 
 
-    /**
+    /*
      * Two-rarefaction approximation to p_star computed for two primitive
      * states <code>riemann_data_i</code> and <code>riemann_data_j</code>.
      *
@@ -178,11 +219,17 @@ namespace ryujin
 
       const auto exponent = ScalarNumber(2.0) * gamma * gm1_inverse;
 
-      return p_j * ryujin::pow(numerator / denominator, exponent);
+      const auto p_1_tilde =
+          p_j * ryujin::pow(numerator / denominator, exponent);
+
+#ifdef DEBUG_RIEMANN_SOLVER
+      std::cout << "p_star_two_rarefaction = " << p_1_tilde << std::endl;
+#endif
+      return p_1_tilde;
     }
 
 
-    /**
+    /*
      * Failsafe approximation to p_star computed for two primitive
      * states <code>riemann_data_i</code> and <code>riemann_data_j</code>.
      *
@@ -229,6 +276,9 @@ namespace ryujin
                           (ScalarNumber(2.) * a);
       const Number p_2_tilde = base * base;
 
+#ifdef DEBUG_RIEMANN_SOLVER
+      std::cout << "p_star_failsafe = " << p_2_tilde << std::endl;
+#endif
       return p_2_tilde;
     }
 
@@ -285,7 +335,21 @@ namespace ryujin
        *    necessary.
        */
 
-      const Number p_max = std::max(riemann_data_i[2], riemann_data_j[2]);
+      const auto &[rho_i, u_i, p_i, a_i] = riemann_data_i;
+      const auto &[rho_j, u_j, p_j, a_j] = riemann_data_j;
+
+#ifdef DEBUG_RIEMANN_SOLVER
+      std::cout << "rho_left: " << rho_i << std::endl;
+      std::cout << "u_left: " << u_i << std::endl;
+      std::cout << "p_left: " << p_i << std::endl;
+      std::cout << "a_left: " << a_i << std::endl;
+      std::cout << "rho_right: " << rho_j << std::endl;
+      std::cout << "u_right: " << u_j << std::endl;
+      std::cout << "p_right: " << p_j << std::endl;
+      std::cout << "a_right: " << a_j << std::endl;
+#endif
+
+      const Number p_max = std::max(p_i, p_j);
 
       const Number p_star_tilde =
           std::min(p_star_two_rarefaction(riemann_data_i, riemann_data_j),
@@ -299,6 +363,15 @@ namespace ryujin
               Number(0.),
               p_star_tilde,
               std::min(p_max, p_star_tilde));
+
+#ifdef DEBUG_RIEMANN_SOLVER
+      std::cout << "   p^*_tilde  = " << p_2 << "\n";
+      std::cout << "   phi(p_*_t) = "
+                << phi(riemann_data_i, riemann_data_j, p_2) << "\n";
+      std::cout << "-> lambda_max = "
+                << compute_lambda(riemann_data_i, riemann_data_j, p_2)
+                << std::endl;
+#endif
 
       return compute_lambda(riemann_data_i, riemann_data_j, p_2);
     }

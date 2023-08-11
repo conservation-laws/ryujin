@@ -114,6 +114,22 @@ namespace ryujin
       /** @name Internal functions used in the Riemann solver */
       //@{
 
+#ifndef DOXYGEN
+      /**
+       * FIXME
+       */
+      Number f(const primitive_type &riemann_data, const Number p_star) const;
+
+
+      /**
+       * FIXME
+       */
+      Number phi(const primitive_type &riemann_data_i,
+                 const primitive_type &riemann_data_j,
+                 const Number p_in) const;
+#endif
+
+
       /**
        * See @cite GuermondPopov2016b, page 912, (3.3).
        *
