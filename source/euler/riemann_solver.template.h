@@ -351,9 +351,10 @@ namespace ryujin
 
       const Number p_max = std::max(p_i, p_j);
 
-      const Number p_star_tilde =
-          std::min(p_star_two_rarefaction(riemann_data_i, riemann_data_j),
-                   p_star_failsafe(riemann_data_i, riemann_data_j));
+      const Number rarefaction =
+          p_star_two_rarefaction(riemann_data_i, riemann_data_j);
+      const Number failsafe = p_star_failsafe(riemann_data_i, riemann_data_j);
+      const Number p_star_tilde = std::min(rarefaction, failsafe);
 
       const Number phi_p_max = phi_of_p_max(riemann_data_i, riemann_data_j);
 
