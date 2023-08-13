@@ -210,7 +210,7 @@ namespace ryujin
         const Number t,
         vector_type &new_U,
         Number tau,
-        unsigned int cycle) const
+        const bool reinitialize_gmg) const
     {
 #ifdef DEBUG_OUTPUT
       std::cout << "ParabolicSolver<dim, Number>::step()" << std::endl;
@@ -378,7 +378,7 @@ namespace ryujin
          * refreshes will render the approximation better, at some additional
          * cost.
          */
-        if (use_gmg_velocity_ && (cycle % 4 == 1)) {
+        if (use_gmg_velocity_ && reinitialize_gmg) {
           MGLevelObject<typename PreconditionChebyshev<
               VelocityMatrix<dim, float, Number>,
               LinearAlgebra::distributed::BlockVector<float>,
@@ -429,6 +429,11 @@ namespace ryujin
       auto e_min_old =
           *std::min_element(internal_energy_.begin(), internal_energy_.end());
       e_min_old = Utilities::MPI::min(e_min_old, mpi_communicator_);
+
+      // FIXME: create a meaningful relaxation based on global mesh size
+      // minimum.
+      constexpr Number eps = std::numeric_limits<Number>::epsilon();
+      e_min_old *= (1. - 1000. * eps);
 
       /*
        * Step 1: Solve velocity update:
@@ -635,7 +640,7 @@ namespace ryujin
          * refreshes will render the approximation better, at some additional
          * cost.
          */
-        if (use_gmg_internal_energy_ && (cycle % 4 == 1)) {
+        if (use_gmg_internal_energy_ && reinitialize_gmg) {
           MGLevelObject<typename PreconditionChebyshev<
               EnergyMatrix<dim, float, Number>,
               LinearAlgebra::distributed::Vector<float>>::AdditionalData>
@@ -754,14 +759,17 @@ namespace ryujin
                                              internal_energy_.end());
           e_min_new = Utilities::MPI::min(e_min_new, mpi_communicator_);
 
-          constexpr Number eps = std::numeric_limits<Number>::epsilon();
-          if (e_min_new < e_min_old * (1. - 1000. * eps)) {
+          if (e_min_new < e_min_old) {
             n_warnings_++;
-            if (dealii::Utilities::MPI::this_mpi_process(mpi_communicator_) ==
-                0)
-              std::cout << "[INFO] Dissipation module: Insufficient CFL: "
-                           "Invariant domain violation detected"
-                        << std::endl;
+#ifdef DEBUG_OUTPUT
+            std::cout << std::fixed << std::setprecision(16);
+            std::cout << "Bounds violation: internal energy (critical)!\n"
+                      << "\t\te_min_old:         " << e_min_old << "\n"
+                      << "\t\te_min_old (delta): "
+                      << negative_part(e_min_new - e_min_old) << "\n"
+                      << "\t\te_min_new:         " << e_min_new << "\n"
+                      << std::endl;
+#endif
           }
         }
 

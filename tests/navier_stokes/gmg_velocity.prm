@@ -1,0 +1,76 @@
+subsection A - TimeLoop
+  set basename                  = test
+
+  set enable compute error      = true
+  set error quantities          = rho, m, E
+
+  set final time                = 2.0
+  set output granularity        = 2.0
+  set terminal update interval  = 0
+end
+
+
+subsection B - Equation
+  set dimension = 1
+  set equation  = navier stokes
+  set gamma     = 1.4
+  set mu        = 0.01
+  set lambda    = 0
+  set kappa     = 1.866666666666666e-2
+end
+
+
+subsection C - Discretization
+  set geometry        = rectangular domain
+  set mesh refinement = 5
+
+  subsection rectangular domain
+    set boundary condition left   = dirichlet
+    set boundary condition right  = dirichlet
+
+    set position bottom left      = -0.25
+    set position top right        =  0.25
+  end
+end
+
+
+subsection D - OfflineData
+end
+
+
+subsection E - InitialValues
+  set configuration = becker solution
+  set direction     = 1
+  set position      = -0.125
+
+  subsection becker solution
+    set mu                      = 0.01
+    set velocity galilean frame = 0.125
+    set density left            = 1
+    set velocity left           = 1
+    set velocity right          = 0.259259259259
+  end
+end
+
+
+subsection F - HyperbolicModule
+  set cfl with boundary dofs = false
+  set limiter iterations     = 2
+end
+
+
+subsection G - ParabolicModule
+  set tolerance             = 1e-16
+  set tolerance linfty norm = false
+
+  set multigrid velocity    = true
+  set multigrid energy      = true
+end
+
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.30
+  set cfl max               = 0.30
+  set cfl recovery strategy = none
+  set time stepping scheme  = strang erk 33 cn
+end
