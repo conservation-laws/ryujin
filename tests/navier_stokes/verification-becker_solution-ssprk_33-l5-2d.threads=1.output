@@ -5,8 +5,8 @@
 [INFO] interpolating initial values
 [INFO] entering main loop
 Normalized consolidated Linf, L1, and L2 errors at final time 
-#dofs = 129
-t     = 2.000186146673883
-Linf  = 0.002861102644966179
-L1    = 0.0004061066752773352
-L2    = 0.0009444462751166424
+#dofs = 1089
+t     = 2.002241258960642
+Linf  = 0.03638141310811963
+L1    = 0.01687569794341988
+L2    = 0.01895603426299336
