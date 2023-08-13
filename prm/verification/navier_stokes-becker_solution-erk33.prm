@@ -38,7 +38,7 @@ end
 
 subsection C - Discretization
   set geometry        = rectangular domain
-  set mesh refinement = 6
+  set mesh refinement = 5
 
   subsection rectangular domain
     set boundary condition left   = dirichlet

@@ -87,8 +87,9 @@ namespace ryujin
     /* Enforce bounds: */
 
     t_1 = std::max(p_1, t_1);
-    t_2 = std::max(p_1, t_2);
     t_1 = std::min(p_2, t_1);
+
+    t_2 = std::max(p_1, t_2);
     t_2 = std::min(p_2, t_2);
 
     /* Ensure that always p_1 <= p_2: */

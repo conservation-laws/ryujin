@@ -785,7 +785,15 @@ namespace ryujin
                     limiter_newton_max_iter_);
             lij_matrix_.template write_entry<T>(l_ij, i, col_idx, true);
 
-            /* Unsuccessful with current CFL, force a restart. */
+            /*
+             * If the success is set to false then the low-order update
+             * resulted in a state outside of the limiter bounds. This can
+             * happen if we compute with an aggressive CFL number. We
+             * signal this condition by setting the restart_needed boolean
+             * to true and defer further action to the chosen
+             * IDViolationStrategy and the policy set in the
+             * TimeIntegrator.
+             */
             if (!success)
               restart_needed = true;
           }
@@ -918,9 +926,20 @@ namespace ryujin
                     limiter_newton_tolerance_,
                     limiter_newton_max_iter_);
 
-            /* Unsuccessful with current CFL, force a restart. */
+            /*
+             * This is the second pass of the limiter. Under rare
+             * circumstances the previous high-order update might be
+             * slightly out of bounds due to roundoff errors. This happens
+             * for example in flat regions or in stagnation points at a
+             * (slip boundary) point. The limiter should ensure that we do
+             * not further manipulate the state in this case. We thus only
+             * signal a restart condition if the `CHECK_BOUNDS` debug
+             * macro is defined.
+             */
+#ifdef CHECK_BOUNDS
             if (!success)
               restart_needed = true;
+#endif
 
             /*
              * Shortcut: We omit updating the p_ij and q_ij matrices and

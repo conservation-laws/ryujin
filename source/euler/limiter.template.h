@@ -54,12 +54,14 @@ namespace ryujin
         if (!(test_min == Number(0.) && test_max == Number(0.))) {
 #ifdef DEBUG_OUTPUT
           std::cout << std::fixed << std::setprecision(16);
-          std::cout << "Bounds violation: low-order density (critical)!\n";
-          std::cout << "\t\trho dmin: " << negative_part(rho_U - rho_min)
-                    << "\n";
-          std::cout << "\t\trho:      " << rho_U << "\n";
-          std::cout << "\t\trho dmax: " << positive_part(rho_U - rho_max)
-                    << "\n"
+          std::cout << "Bounds violation: low-order density (critical)!"
+                    << "\n\t\trho min:         " << rho_min
+                    << "\n\t\trho min (delta): "
+                    << negative_part(rho_U - rho_min)
+                    << "\n\t\trho:             " << rho_U
+                    << "\n\t\trho max (delta): "
+                    << positive_part(rho_U - rho_max)
+                    << "\n\t\trho max:         " << rho_max << "\n"
                     << std::endl;
 #endif
           success = false;
@@ -67,21 +69,37 @@ namespace ryujin
 
         const Number denominator =
             ScalarNumber(1.) / (std::abs(rho_P) + eps * rho_max);
+
         t_r = dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
             rho_max,
             rho_U + t_r * rho_P,
-            (std::abs(rho_max - rho_U) + eps * rho_min) * denominator,
+            /*
+             * rho_P is positive.
+             *
+             * Note: Do not take an absolute value here. If we are out of
+             * bounds we have to ensure that t_r is set to t_min.
+             */
+            (rho_max - rho_U) * denominator,
             t_r);
 
         t_r = dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
             rho_U + t_r * rho_P,
             rho_min,
-            (std::abs(rho_min - rho_U) + eps * rho_min) * denominator,
+            /*
+             * rho_P is negative.
+             *
+             * Note: Do not take an absolute value here. If we are out of
+             * bounds we have to ensure that t_r is set to t_min.
+             */
+            (rho_U - rho_min) * denominator,
             t_r);
 
         /*
-         * It is always t_min <= t <= t_max, but just to be sure, box
-         * back into bounds:
+         * Ensure that t_min <= t <= t_max. This might not be the case if
+         * rho_U is outside the interval [rho_min, rho_max]. Furthermore,
+         * the quotient we take above is prone to numerical cancellation in
+         * particular in the second pass of the limiter when rho_P might be
+         * small.
          */
         t_r = std::min(t_r, t_max);
         t_r = std::max(t_r, t_min);
@@ -98,10 +116,15 @@ namespace ryujin
         if (!(test_new_min == Number(0.) && test_new_max == Number(0.))) {
 #ifdef DEBUG_OUTPUT
           std::cout << std::fixed << std::setprecision(16);
-          std::cout << "Bounds violation: high-order density!\n";
-          std::cout << "\t\trho min: " << rho_min << "\n";
-          std::cout << "\t\trho:     " << rho_new << "\n";
-          std::cout << "\t\trho max: " << rho_max << "\n" << std::endl;
+          std::cout << "Bounds violation: high-order density!"
+                    << "\n\t\trho min:         " << rho_min
+                    << "\n\t\trho min (delta): "
+                    << negative_part(rho_new - rho_min)
+                    << "\n\t\trho:             " << rho_new
+                    << "\n\t\trho max (delta): "
+                    << positive_part(rho_new - rho_max)
+                    << "\n\t\trho max:         " << rho_max << "\n"
+                    << std::endl;
 #endif
           success = false;
         }
@@ -147,6 +170,7 @@ namespace ryujin
           auto psi_r =
               relax_small * rho_r * rho_e_r - s_min * rho_r * rho_r_gamma;
 
+#ifndef CHECK_BOUNDS
           /*
            * If psi_r > 0 the right state is fine, force returning t_r by
            * setting t_l = t_r:
@@ -155,9 +179,24 @@ namespace ryujin
               dealii::SIMDComparison::greater_than>(
               psi_r, Number(0.), t_r, t_l);
 
-          /* If we have set t_l = t_r everywhere we can break: */
+          /*
+           * If we have set t_l = t_r everywhere then all states state U_r
+           * with t_r obey the specific entropy inequality and we can
+           * break.
+           *
+           * This is a very important optimization: Only for 1 in (25 to
+           * 50) cases do we actually need to limit on the specific entropy
+           * because one of the right states failed. So we can skip
+           * constructing the left state U_l, which is expensive.
+           *
+           * This implies unfortunately that we might not accurately report
+           * whether the low_order update U itself obeyed bounds because
+           * U_r = U + t_r * P pushed us back into bounds. We thus skip
+           * this shortcut if `CHECK_BOUNDS` is set.
+           */
           if (t_l == t_r)
             break;
+#endif
 
 #ifdef DEBUG_OUTPUT_LIMITER
           if (n == 0) {
@@ -192,6 +231,16 @@ namespace ryujin
 #endif
             success = false;
           }
+
+#ifdef CHECK_BOUNDS
+          /*
+           * If psi_r > 0 the right state is fine, force returning t_r by
+           * setting t_l = t_r:
+           */
+          t_l = dealii::compare_and_apply_mask<
+              dealii::SIMDComparison::greater_than>(
+              psi_r, Number(0.), t_r, t_l);
+#endif
 
           /*
            * Break if the window between t_l and t_r is within the prescribed
@@ -232,22 +281,25 @@ namespace ryujin
         {
           const auto U_new = U + t_l * P;
           const auto rho_new = hyperbolic_system.density(U_new);
-          const auto e_new = hyperbolic_system.internal_energy(U_new);
-          const auto psi =
-              relax_small * rho_new * e_new - s_min * ryujin::pow(rho_new, gp1);
+          const auto rho_new_gamma = ryujin::pow(rho_new, gamma);
+          const auto rho_e_new = hyperbolic_system.internal_energy(U_new);
+
+          auto psi_new = relax_small * rho_new * rho_e_new -
+                         s_min * rho_new * rho_new_gamma;
 
           const auto lower_bound =
-              (ScalarNumber(1.) - relax) * s_min * ryujin::pow(rho_new, gp1);
+              (ScalarNumber(1.) - relax) * s_min * rho_new * rho_new_gamma;
 
-          const bool e_valid = std::min(Number(0.), e_new) == Number(0.);
+          const bool e_valid = std::min(Number(0.), rho_e_new) == Number(0.);
           const bool psi_valid =
-              std::min(Number(0.), psi - lower_bound) == Number(0.);
+              std::min(Number(0.), psi_new - lower_bound) == Number(0.);
+
           if (!e_valid || !psi_valid) {
 #ifdef DEBUG_OUTPUT
             std::cout << std::fixed << std::setprecision(16);
             std::cout << "Bounds violation: high-order specific entropy!\n";
-            std::cout << "\t\tInt: 0 <= " << e_new << "\n";
-            std::cout << "\t\tPsi: 0 <= " << psi << "\n" << std::endl;
+            std::cout << "\t\trho e: 0 <= " << rho_e_new << "\n";
+            std::cout << "\t\tPsi:   0 <= " << psi_new << "\n" << std::endl;
 #endif
             success = false;
           }

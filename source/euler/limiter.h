@@ -168,6 +168,14 @@ namespace ryujin
        * function computes and returns the maximal coefficient \f$t\f$,
        * obeying \f$t_{\text{min}} < t < t_{\text{max}}\f$, such that the
        * selected local minimum principles are obeyed.
+       *
+       * The returned boolean is set to true if the original low-order
+       * update was within bounds.
+       *
+       * If the debug option `CHECK_BOUNDS` is set to true, then the
+       * boolean is set to true if the low-order and the resulting
+       * high-order update are within bounds. The latter might be violated
+       * due to round-off errors when computing the limiter bounds.
        */
       static std::tuple<Number, bool>
       limit(const HyperbolicSystemView &hyperbolic_system,
