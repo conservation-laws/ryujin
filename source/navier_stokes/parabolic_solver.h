@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include "hyperbolic_module.h"
+
 #include <compile_time_options.h>
 
 #include <convenience_macros.h>
@@ -165,6 +167,7 @@ namespace ryujin
                                const Number old_t,
                                vector_type &new_U,
                                Number tau,
+                               const IDViolationStrategy id_violation_strategy,
                                const bool reinitialize_gmg) const;
 
       /**

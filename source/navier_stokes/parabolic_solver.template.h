@@ -210,6 +210,7 @@ namespace ryujin
         const Number t,
         vector_type &new_U,
         Number tau,
+        const IDViolationStrategy id_violation_strategy,
         const bool reinitialize_gmg) const
     {
 #ifdef DEBUG_OUTPUT
@@ -244,6 +245,9 @@ namespace ryujin
 #ifdef DEBUG_OUTPUT
       std::cout << "        perform time-step with tau = " << tau << std::endl;
 #endif
+
+      /* A boolean signalling that a restart is necessary: */
+      std::atomic<bool> restart_needed = false;
 
       /*
        * Step 1:
@@ -760,7 +764,6 @@ namespace ryujin
           e_min_new = Utilities::MPI::min(e_min_new, mpi_communicator_);
 
           if (e_min_new < e_min_old) {
-            n_warnings_++;
 #ifdef DEBUG_OUTPUT
             std::cout << std::fixed << std::setprecision(16);
             std::cout << "Bounds violation: internal energy (critical)!\n"
@@ -770,6 +773,7 @@ namespace ryujin
                       << "\t\te_min_new:         " << e_min_new << "\n"
                       << std::endl;
 #endif
+            restart_needed = true;
           }
         }
 
@@ -850,6 +854,17 @@ namespace ryujin
       }
 
       CALLGRIND_STOP_INSTRUMENTATION;
+
+      if (restart_needed) {
+        switch (id_violation_strategy) {
+        case IDViolationStrategy::warn:
+          n_warnings_++;
+          break;
+        case IDViolationStrategy::raise_exception:
+          n_restarts_++;
+          throw Restart();
+        }
+      }
     }
 
 

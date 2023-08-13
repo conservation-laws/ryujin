@@ -42,7 +42,8 @@ namespace ryujin
         const ParabolicSystem & /*parabolic_system*/,
         const OfflineData<dim, Number> & /*offline_data*/,
         const InitialValues<Description, dim, Number> & /*initial_values*/,
-        const std::string & /*subsection*/ = "StubSolver")
+        const std::string &subsection = "StubSolver")
+        : ParameterAcceptor(subsection)
     {
     }
   };
