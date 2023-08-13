@@ -75,34 +75,42 @@ namespace ryujin
     case TimeSteppingScheme::ssprk_33:
       U_.resize(2);
       precomputed_.resize(1);
+      efficiency_ = 1.;
       break;
     case TimeSteppingScheme::erk_11:
       U_.resize(1);
       precomputed_.resize(1);
+      efficiency_ = 1.;
       break;
     case TimeSteppingScheme::erk_22:
       U_.resize(2);
       precomputed_.resize(2);
+      efficiency_ = 2.;
       break;
     case TimeSteppingScheme::erk_33:
       U_.resize(3);
       precomputed_.resize(3);
+      efficiency_ = 3.;
       break;
     case TimeSteppingScheme::erk_43:
       U_.resize(4);
       precomputed_.resize(4);
+      efficiency_ = 4.;
       break;
     case TimeSteppingScheme::erk_54:
       U_.resize(5);
       precomputed_.resize(5);
+      efficiency_ = 5.;
       break;
     case TimeSteppingScheme::strang_ssprk_33_cn:
       U_.resize(3);
       precomputed_.resize(1);
+      efficiency_ = 2.;
       break;
     case TimeSteppingScheme::strang_erk_33_cn:
       U_.resize(4);
       precomputed_.resize(3);
+      efficiency_ = 6.;
       break;
     }
 
