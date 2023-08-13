@@ -176,6 +176,7 @@ namespace ryujin
               relax_small * rho_r * rho_e_r -
               s_min * rho_r * rho_r_gamma * ryujin::pow(covolume_r, -gm1);
 
+#ifndef CHECK_BOUNDS
           /*
            * If psi_r > 0 the right state is fine, force returning t_r by
            * setting t_l = t_r:
@@ -184,9 +185,24 @@ namespace ryujin
               dealii::SIMDComparison::greater_than>(
               psi_r, Number(0.), t_r, t_l);
 
-          /* If we have set t_l = t_r everywhere we can break: */
+          /*
+           * If we have set t_l = t_r everywhere then all states state U_r
+           * with t_r obey the specific entropy inequality and we can
+           * break.
+           *
+           * This is a very important optimization: Only for 1 in (25 to
+           * 50) cases do we actually need to limit on the specific entropy
+           * because one of the right states failed. So we can skip
+           * constructing the left state U_l, which is expensive.
+           *
+           * This implies unfortunately that we might not accurately report
+           * whether the low_order update U itself obeyed bounds because
+           * U_r = U + t_r * P pushed us back into bounds. We thus skip
+           * this shortcut if `CHECK_BOUNDS` is set.
+           */
           if (t_l == t_r)
             break;
+#endif
 
 #ifdef DEBUG_OUTPUT_LIMITER
           if (n == 0) {
@@ -223,6 +239,16 @@ namespace ryujin
 #endif
             success = false;
           }
+
+#ifdef CHECK_BOUNDS
+          /*
+           * If psi_r > 0 the right state is fine, force returning t_r by
+           * setting t_l = t_r:
+           */
+          t_l = dealii::compare_and_apply_mask<
+              dealii::SIMDComparison::greater_than>(
+              psi_r, Number(0.), t_r, t_l);
+#endif
 
           /*
            * Break if the window between t_l and t_r is within the prescribed
