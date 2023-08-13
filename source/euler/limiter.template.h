@@ -255,22 +255,25 @@ namespace ryujin
         {
           const auto U_new = U + t_l * P;
           const auto rho_new = hyperbolic_system.density(U_new);
-          const auto e_new = hyperbolic_system.internal_energy(U_new);
-          const auto psi =
-              relax_small * rho_new * e_new - s_min * ryujin::pow(rho_new, gp1);
+          const auto rho_new_gamma = ryujin::pow(rho_new, gamma);
+          const auto rho_e_new = hyperbolic_system.internal_energy(U_new);
+
+          auto psi_new = relax_small * rho_new * rho_e_new -
+                         s_min * rho_new * rho_new_gamma;
 
           const auto lower_bound =
-              (ScalarNumber(1.) - relax) * s_min * ryujin::pow(rho_new, gp1);
+              (ScalarNumber(1.) - relax) * s_min * rho_new * rho_new_gamma;
 
-          const bool e_valid = std::min(Number(0.), e_new) == Number(0.);
+          const bool e_valid = std::min(Number(0.), rho_e_new) == Number(0.);
           const bool psi_valid =
-              std::min(Number(0.), psi - lower_bound) == Number(0.);
+              std::min(Number(0.), psi_new - lower_bound) == Number(0.);
+
           if (!e_valid || !psi_valid) {
 #ifdef DEBUG_OUTPUT
             std::cout << std::fixed << std::setprecision(16);
             std::cout << "Bounds violation: high-order specific entropy!\n";
-            std::cout << "\t\tInt: 0 <= " << e_new << "\n";
-            std::cout << "\t\tPsi: 0 <= " << psi << "\n" << std::endl;
+            std::cout << "\t\trho e: 0 <= " << rho_e_new << "\n";
+            std::cout << "\t\tPsi:   0 <= " << psi_new << "\n" << std::endl;
 #endif
             success = false;
           }
