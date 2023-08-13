@@ -430,6 +430,11 @@ namespace ryujin
           *std::min_element(internal_energy_.begin(), internal_energy_.end());
       e_min_old = Utilities::MPI::min(e_min_old, mpi_communicator_);
 
+      // FIXME: create a meaningful relaxation based on global mesh size
+      // minimum.
+      constexpr Number eps = std::numeric_limits<Number>::epsilon();
+      e_min_old *= (1. - 1000. * eps);
+
       /*
        * Step 1: Solve velocity update:
        */
@@ -754,14 +759,17 @@ namespace ryujin
                                              internal_energy_.end());
           e_min_new = Utilities::MPI::min(e_min_new, mpi_communicator_);
 
-          constexpr Number eps = std::numeric_limits<Number>::epsilon();
-          if (e_min_new < e_min_old * (1. - 1000. * eps)) {
+          if (e_min_new < e_min_old) {
             n_warnings_++;
-            if (dealii::Utilities::MPI::this_mpi_process(mpi_communicator_) ==
-                0)
-              std::cout << "[INFO] Dissipation module: Insufficient CFL: "
-                           "Invariant domain violation detected"
-                        << std::endl;
+#ifdef DEBUG_OUTPUT
+            std::cout << std::fixed << std::setprecision(16);
+            std::cout << "Bounds violation: internal energy (critical)!\n"
+                      << "\t\te_min_old:         " << e_min_old << "\n"
+                      << "\t\te_min_old (delta): "
+                      << negative_part(e_min_new - e_min_old) << "\n"
+                      << "\t\te_min_new:         " << e_min_new << "\n"
+                      << std::endl;
+#endif
           }
         }
 
