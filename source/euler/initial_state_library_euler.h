@@ -7,6 +7,7 @@
 
 #include <initial_state_library.h>
 
+#include "initial_state_astro_jet.h"
 #include "initial_state_becker_solution.h"
 #include "initial_state_contrast.h"
 #include "initial_state_four_state_contrast.h"
@@ -36,6 +37,7 @@ namespace ryujin
         initial_state_list.emplace(std::move(object));
       };
 
+      add(std::make_unique<AstroJet<Description, dim, Number>>(h, s));
       add(std::make_unique<BeckerSolution<Description, dim, Number>>(h, s));
       add(std::make_unique<Contrast<Description, dim, Number>>(h, s));
       add(std::make_unique<IsentropicVortex<Description, dim, Number>>(h, s));
