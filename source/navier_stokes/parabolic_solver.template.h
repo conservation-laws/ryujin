@@ -210,7 +210,7 @@ namespace ryujin
         const Number t,
         vector_type &new_U,
         Number tau,
-        unsigned int cycle) const
+        const bool reinitialize_gmg) const
     {
 #ifdef DEBUG_OUTPUT
       std::cout << "ParabolicSolver<dim, Number>::step()" << std::endl;
@@ -378,7 +378,7 @@ namespace ryujin
          * refreshes will render the approximation better, at some additional
          * cost.
          */
-        if (use_gmg_velocity_ && (cycle % 4 == 1)) {
+        if (use_gmg_velocity_ && reinitialize_gmg) {
           MGLevelObject<typename PreconditionChebyshev<
               VelocityMatrix<dim, float, Number>,
               LinearAlgebra::distributed::BlockVector<float>,
@@ -635,7 +635,7 @@ namespace ryujin
          * refreshes will render the approximation better, at some additional
          * cost.
          */
-        if (use_gmg_internal_energy_ && (cycle % 4 == 1)) {
+        if (use_gmg_internal_energy_ && reinitialize_gmg) {
           MGLevelObject<typename PreconditionChebyshev<
               EnergyMatrix<dim, float, Number>,
               LinearAlgebra::distributed::Vector<float>>::AdditionalData>

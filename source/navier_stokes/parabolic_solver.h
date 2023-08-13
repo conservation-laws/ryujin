@@ -165,7 +165,7 @@ namespace ryujin
                                const Number old_t,
                                vector_type &new_U,
                                Number tau,
-                               unsigned int cycle) const;
+                               const bool reinitialize_gmg) const;
 
       /**
        * Print a status line with solver statistics. This function is used
