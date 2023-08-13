@@ -71,7 +71,7 @@ namespace ryujin
         convert_states();
       }
 
-      state_type compute(const dealii::Point<dim> &point, Number t) final
+      state_type compute(const dealii::Point<dim> &point, Number /*t*/) final
       {
         return (point[0] < 1.e-12 && std::abs(point[1]) <= jet_width_
                     ? state_left_
