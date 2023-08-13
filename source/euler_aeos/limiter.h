@@ -266,7 +266,6 @@ namespace ryujin
     {
       /* Bounds: */
 
-
       auto &[rho_min, rho_max, s_min, gamma_min] = bounds_;
 
       const auto rho_i = hyperbolic_system.density(U_i);
@@ -277,36 +276,61 @@ namespace ryujin
           ScalarNumber(0.5) * contract(add(flux_j, -flux_i), scaled_c_ij);
 
       const auto rho_ij_bar = hyperbolic_system.density(U_ij_bar);
-      const auto s_bar_ij =
-          hyperbolic_system.surrogate_specific_entropy(U_ij_bar, gamma_min);
+
+      /* Density bounds: */
 
       rho_min = std::min(rho_min, rho_ij_bar);
       rho_max = std::max(rho_max, rho_ij_bar);
 
-      auto [p_j, gamma_min_j, s_j, eta_j] =
-          precomputed_values
-              .template get_tensor<Number, precomputed_state_type>(js);
-
-      if (hyperbolic_system.compute_strict_bounds()) {
-        /*
-         * Use expensive but formally correct surrogate harten entropy with
-         * appropriate gamma_min computed over the stencil.
-         */
-        s_j = hyperbolic_system.surrogate_specific_entropy(U_j, gamma_min);
-      }
-
-
-      s_min = std::min(s_min, s_j);
-      s_min = std::min(s_min, s_bar_ij);
-
-      /* Relaxation: */
+      /* Density relaxation: */
 
       rho_relaxation_numerator += beta_ij * (rho_i + rho_j);
       rho_relaxation_denominator += std::abs(beta_ij);
 
-      const Number s_interp = hyperbolic_system.surrogate_specific_entropy(
-          (U_i + U_j) * ScalarNumber(.5), gamma_min);
-      s_interp_max = std::max(s_interp_max, s_interp);
+      /* Surrogate entropy bounds and relaxation: */
+
+      if (hyperbolic_system.compute_strict_bounds()) {
+        /*
+         * Compute strict bounds precisely as outlined in @cite ryujin-2023-4
+         *
+         * This means, we compute
+         *  - the surrogate entropy at dof j with the gamma_min of index i,
+         *  - the currogate entropy of the bar state U_ij_bar
+         *  - an interpolated surrogate entropy at (U_i + U_j) / 2 for
+         *    bounds relaxation:
+         */
+
+        const auto s_j =
+            hyperbolic_system.surrogate_specific_entropy(U_j, gamma_min);
+
+        const auto s_ij_bar =
+            hyperbolic_system.surrogate_specific_entropy(U_ij_bar, gamma_min);
+
+        const Number s_interp = hyperbolic_system.surrogate_specific_entropy(
+            (U_i + U_j) * ScalarNumber(.5), gamma_min);
+
+        s_min = std::min(s_min, s_j);
+        s_min = std::min(s_min, s_ij_bar);
+        s_interp_max = std::max(s_interp_max, s_interp);
+
+      } else {
+        /*
+         * Compute a cheaper bound solely relying on the diagonal s_j
+         * (computed with gamma_min_j) and the surrogate entropy s_ij_bar
+         * of the bar state. We use the s_ij_bar for computing the bounds
+         * relaxation as well.
+         */
+        const auto [p_j, gamma_min_j, s_j, eta_j] =
+            precomputed_values
+                .template get_tensor<Number, precomputed_state_type>(js);
+
+        const auto s_ij_bar =
+            hyperbolic_system.surrogate_specific_entropy(U_ij_bar, gamma_min);
+
+        s_min = std::min(s_min, s_j);
+        s_min = std::min(s_min, s_ij_bar);
+        s_interp_max = std::max(s_interp_max, s_ij_bar);
+      }
     }
 
 
