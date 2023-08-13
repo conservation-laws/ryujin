@@ -224,7 +224,7 @@ namespace ryujin
      * adaptation and recovery strategies for invariant domain violations
      * are used.
      */
-    Number step(vector_type &U, Number t, unsigned int cycle);
+    Number step(vector_type &U, Number t);
 
     /**
      * Given a reference to a previous state vector U performs an explicit
