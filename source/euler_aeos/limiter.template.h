@@ -54,12 +54,14 @@ namespace ryujin
         if (!(test_min == Number(0.) && test_max == Number(0.))) {
 #ifdef DEBUG_OUTPUT
           std::cout << std::fixed << std::setprecision(16);
-          std::cout << "Bounds violation: low-order density (critical)!\n";
-          std::cout << "\t\trho dmin: " << negative_part(rho_U - rho_min)
-                    << "\n";
-          std::cout << "\t\trho:      " << rho_U << "\n";
-          std::cout << "\t\trho dmax: " << positive_part(rho_U - rho_max)
-                    << "\n"
+          std::cout << "Bounds violation: low-order density (critical)!"
+                    << "\n\t\trho min:         " << rho_min
+                    << "\n\t\trho min (delta): "
+                    << negative_part(rho_U - rho_min)
+                    << "\n\t\trho:             " << rho_U
+                    << "\n\t\trho max (delta): "
+                    << positive_part(rho_U - rho_max)
+                    << "\n\t\trho max:         " << rho_max << "\n"
                     << std::endl;
 #endif
           success = false;
@@ -98,10 +100,15 @@ namespace ryujin
         if (!(test_new_min == Number(0.) && test_new_max == Number(0.))) {
 #ifdef DEBUG_OUTPUT
           std::cout << std::fixed << std::setprecision(16);
-          std::cout << "Bounds violation: high-order density!\n";
-          std::cout << "\t\trho min: " << rho_min << "\n";
-          std::cout << "\t\trho:     " << rho_new << "\n";
-          std::cout << "\t\trho max: " << rho_max << "\n" << std::endl;
+          std::cout << "Bounds violation: high-order density!"
+                    << "\n\t\trho min:         " << rho_min
+                    << "\n\t\trho min (delta): "
+                    << negative_part(rho_new - rho_min)
+                    << "\n\t\trho:             " << rho_new
+                    << "\n\t\trho max (delta): "
+                    << positive_part(rho_new - rho_max)
+                    << "\n\t\trho max:         " << rho_max << "\n"
+                    << std::endl;
 #endif
           success = false;
         }
