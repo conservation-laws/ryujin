@@ -69,21 +69,37 @@ namespace ryujin
 
         const Number denominator =
             ScalarNumber(1.) / (std::abs(rho_P) + eps * rho_max);
+
         t_r = dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
             rho_max,
             rho_U + t_r * rho_P,
-            (std::abs(rho_max - rho_U) + eps * rho_min) * denominator,
+            /*
+             * rho_P is positive.
+             *
+             * Note: Do not take an absolute value here. If we are out of
+             * bounds we have to ensure that t_r is set to t_min.
+             */
+            (rho_max - rho_U) * denominator,
             t_r);
 
         t_r = dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
             rho_U + t_r * rho_P,
             rho_min,
-            (std::abs(rho_min - rho_U) + eps * rho_min) * denominator,
+            /*
+             * rho_P is negative.
+             *
+             * Note: Do not take an absolute value here. If we are out of
+             * bounds we have to ensure that t_r is set to t_min.
+             */
+            (rho_U - rho_min) * denominator,
             t_r);
 
         /*
-         * It is always t_min <= t <= t_max, but just to be sure, box
-         * back into bounds:
+         * Ensure that t_min <= t <= t_max. This might not be the case if
+         * rho_U is outside the interval [rho_min, rho_max]. Furthermore,
+         * the quotient we take above is prone to numerical cancellation in
+         * particular in the second pass of the limiter when rho_P might be
+         * small.
          */
         t_r = std::min(t_r, t_max);
         t_r = std::max(t_r, t_min);
