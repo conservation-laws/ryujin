@@ -42,7 +42,7 @@ jobs:
       run: |
         mkdir build-release
         cd build-release
-        cmake -DWITH_OPENMP=on ..
+        cmake -DCMAKE_CXX_FLAGS="-Werror" -DWITH_OPENMP=on ..
     - name: build release
       run: |
         cd build-release
@@ -51,7 +51,7 @@ jobs:
       run: |
         mkdir build-debug
         cd build-debug
-        cmake -DWITH_OPENMP=on -DCMAKE_BUILD_TYPE=Debug ..
+        cmake -DCMAKE_CXX_FLAGS="-Werror" -DWITH_OPENMP=on -DCMAKE_BUILD_TYPE=Debug ..
     - name: build debug
       run: |
         cd build-debug
@@ -87,7 +87,7 @@ jobs:
         mkdir build-release
         cd build-release
         cmake \
-          -DCMAKE_CXX_COMPILER=clang++-15 -DCMAKE_CXX_FLAGS="-Wno-unknown-warning-option -Wno-ignored-optimization-argument" \
+          -DCMAKE_CXX_COMPILER=clang++-15 -DCMAKE_CXX_FLAGS="-Werror -Wno-unknown-warning-option -Wno-ignored-optimization-argument" \
           -DFORCE_DEAL_II_SPARSE_MATRIX=yes \
           -DWITH_OPENMP=on ..
     - name: build release
@@ -99,7 +99,7 @@ jobs:
         mkdir build-debug
         cd build-debug
         cmake \
-          -DCMAKE_CXX_COMPILER=clang++-15 -DCMAKE_CXX_FLAGS="-Wno-unknown-warning-option -Wno-ignored-optimization-argument" \
+          -DCMAKE_CXX_COMPILER=clang++-15 -DCMAKE_CXX_FLAGS="-Werror -Wno-unknown-warning-option -Wno-ignored-optimization-argument" \
           -DFORCE_DEAL_II_SPARSE_MATRIX=yes \
           -DWITH_OPENMP=on -DCMAKE_BUILD_TYPE=Debug ..
     - name: build debug
@@ -132,7 +132,7 @@ jobs:
       run: |
         mkdir build-release
         cd build-release
-        cmake -DWITH_OPENMP=on ..
+        cmake -DCMAKE_CXX_FLAGS="-Werror" -DWITH_OPENMP=on ..
     - name: build release
       run: |
         cd build-release
@@ -141,7 +141,7 @@ jobs:
       run: |
         mkdir build-debug
         cd build-debug
-        cmake -DWITH_OPENMP=on -DCMAKE_BUILD_TYPE=Debug ..
+        cmake -DCMAKE_CXX_FLAGS="-Werror" -DWITH_OPENMP=on -DCMAKE_BUILD_TYPE=Debug ..
 
   ###############################################
   # ubuntu-lts-22.04 with gcc-11, deal.II 9.4.2 #
@@ -167,7 +167,7 @@ jobs:
       run: |
         mkdir build-release
         cd build-release
-        cmake -DWITH_OPENMP=on ..
+        cmake -DCMAKE_CXX_FLAGS="-Werror" -DWITH_OPENMP=on ..
     - name: build release
       run: |
         cd build-release
@@ -176,7 +176,7 @@ jobs:
       run: |
         mkdir build-debug
         cd build-debug
-        cmake -DWITH_OPENMP=on -DCMAKE_BUILD_TYPE=Debug ..
+        cmake -DCMAKE_CXX_FLAGS="-Werror" -DWITH_OPENMP=on -DCMAKE_BUILD_TYPE=Debug ..
     - name: build debug
       run: |
         cd build-debug
@@ -206,7 +206,7 @@ jobs:
       run: |
         mkdir build-no_openmp
         cd build-no_openmp
-        cmake -DWITH_OPENMP=off ..
+        cmake -DCMAKE_CXX_FLAGS="-Werror" -DWITH_OPENMP=off ..
     - name: build no_openmp
 
       run: |
