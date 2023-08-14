@@ -884,13 +884,17 @@ namespace ryujin
     const double cycles_per_second =
         delta_cycles / (current.wall_time - previous.wall_time);
 
+    const auto efficiency = time_integrator_.efficiency();
+    const auto n_dofs =
+        static_cast<double>(offline_data_.dof_handler().n_dofs());
+
     const double wall_m_dofs_per_sec =
-        delta_cycles * ((double)offline_data_.dof_handler().n_dofs()) / 1.e6 /
-        (current.wall_time - previous.wall_time);
+        delta_cycles * n_dofs / 1.e6 /
+        (current.wall_time - previous.wall_time) * efficiency;
 
     const double cpu_m_dofs_per_sec =
-        delta_cycles * ((double)offline_data_.dof_handler().n_dofs()) / 1.e6 /
-        (current.cpu_time_sum - previous.cpu_time_sum);
+        delta_cycles * n_dofs / 1.e6 /
+        (current.cpu_time_sum - previous.cpu_time_sum) * efficiency;
 
     double cpu_time_skew = (current.cpu_time_max - current.cpu_time_min - //
                             previous.cpu_time_max + previous.cpu_time_min) /
@@ -918,7 +922,7 @@ namespace ryujin
            << std::setprecision(4) << std::fixed << cpu_m_dofs_per_sec
            << " MQ/s  ("
            << std::scientific << 1. / cpu_m_dofs_per_sec * 1.e-6
-           << " s/Qdof/cycle)" << std::endl;
+           << " s/Qdof/substep)" << std::endl;
 
     output << "        [cpu time skew: "
            << std::setprecision(2) << std::scientific << cpu_time_skew
@@ -931,7 +935,7 @@ namespace ryujin
            << std::setprecision(4) << std::fixed << wall_m_dofs_per_sec
            << " MQ/s  ("
            << std::scientific << 1. / wall_m_dofs_per_sec * 1.e-6
-           << " s/Qdof/cycle)  ("
+           << " s/Qdof/substep)  ("
            << std::setprecision(2) << std::fixed << cycles_per_second
            << " cycles/s)" << std::endl;
 
