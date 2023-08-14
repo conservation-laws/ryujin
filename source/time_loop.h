@@ -155,6 +155,7 @@ namespace ryujin
     bool resume_;
 
     Number terminal_update_interval_;
+    bool terminal_show_rank_throughput_;
 
     //@}
     /**

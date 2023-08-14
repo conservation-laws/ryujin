@@ -224,8 +224,22 @@ namespace ryujin
      * adaptation and recovery strategies for invariant domain violations
      * are used.
      */
-    Number step(vector_type &U, Number t, unsigned int cycle);
+    Number step(vector_type &U, Number t);
 
+    /**
+     * The selected time-stepping scheme.
+     */
+    ACCESSOR_READ_ONLY(time_stepping_scheme);
+
+    /**
+     * The eficiency of the selected time-stepping scheme expressed as the
+     * ratio of step size of the combined method to step size of an
+     * elementary forward Euler step. For example, SSPRK33 has an
+     * efficiency ratio of 1 whereas ERK33 has an efficiency ratio of 3.
+     */
+    ACCESSOR_READ_ONLY(efficiency);
+
+  protected:
     /**
      * Given a reference to a previous state vector U performs an explicit
      * third-order strong-stability preserving Runge-Kutta SSPRK(3,3,1/3)
@@ -268,7 +282,7 @@ namespace ryujin
 
     /**
      * Given a reference to a previous state vector U performs an explicit
-     * 4 stage fourth-order Runge-Kutta ERK(4,4,3/4) time step (and store
+     * 4 stage fourth-order Runge-Kutta ERK(5,4,1) time step (and store
      * the result in U). The function returns the chosen time step size
      * tau.
      */
@@ -292,11 +306,6 @@ namespace ryujin
      */
     Number step_strang_erk_33_cn(vector_type &U, Number t);
 
-    /**
-     * The selected time-stepping scheme.
-     */
-    ACCESSOR_READ_ONLY(time_stepping_scheme);
-
   private:
     //@}
     /**
@@ -310,6 +319,7 @@ namespace ryujin
     CFLRecoveryStrategy cfl_recovery_strategy_;
 
     TimeSteppingScheme time_stepping_scheme_;
+    double efficiency_;
 
     //@}
 

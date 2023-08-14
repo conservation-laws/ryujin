@@ -171,8 +171,17 @@ namespace ryujin
     terminal_update_interval_ = 5;
     add_parameter("terminal update interval",
                   terminal_update_interval_,
-                  "number of seconds after which output statistics are "
+                  "Number of seconds after which output statistics are "
                   "recomputed and printed on the terminal");
+
+    terminal_show_rank_throughput_ = true;
+    add_parameter("terminal show rank throughput",
+                  terminal_show_rank_throughput_,
+                  "If set to true an average per rank throughput is computed "
+                  "by dividing the total consumed CPU time (per rank) by the "
+                  "number of threads (per rank). If set to false then a plain "
+                  "average per thread \"CPU\" throughput value is computed by "
+                  "using the umodified total accumulated CPU time.");
   }
 
 
@@ -350,7 +359,7 @@ namespace ryujin
 
       /* Do a time step: */
 
-      const auto tau = time_integrator_.step(U, t, cycle);
+      const auto tau = time_integrator_.step(U, t);
       t += tau;
 
       /* Print and record cycle statistics: */
@@ -884,13 +893,21 @@ namespace ryujin
     const double cycles_per_second =
         delta_cycles / (current.wall_time - previous.wall_time);
 
-    const double wall_m_dofs_per_sec =
-        delta_cycles * ((double)offline_data_.dof_handler().n_dofs()) / 1.e6 /
-        (current.wall_time - previous.wall_time);
+    const auto efficiency = time_integrator_.efficiency();
+    const auto n_dofs =
+        static_cast<double>(offline_data_.dof_handler().n_dofs());
 
-    const double cpu_m_dofs_per_sec =
-        delta_cycles * ((double)offline_data_.dof_handler().n_dofs()) / 1.e6 /
-        (current.cpu_time_sum - previous.cpu_time_sum);
+    const double wall_m_dofs_per_sec =
+        delta_cycles * n_dofs / 1.e6 /
+        (current.wall_time - previous.wall_time) * efficiency;
+
+    double cpu_m_dofs_per_sec = delta_cycles * n_dofs / 1.e6 /
+                                (current.cpu_time_sum - previous.cpu_time_sum) *
+                                efficiency;
+#ifdef WITH_OPENMP
+    if (terminal_show_rank_throughput_)
+      cpu_m_dofs_per_sec *= MultithreadInfo::n_threads();
+#endif
 
     double cpu_time_skew = (current.cpu_time_max - current.cpu_time_min - //
                             previous.cpu_time_max + previous.cpu_time_min) /
@@ -914,11 +931,12 @@ namespace ryujin
     /* clang-format off */
     output << std::endl;
 
-    output << "Throughput:\n  CPU : "
+    output << "Throughput:\n  "
+           << (terminal_show_rank_throughput_? "RANK: " : "CPU : ")
            << std::setprecision(4) << std::fixed << cpu_m_dofs_per_sec
            << " MQ/s  ("
            << std::scientific << 1. / cpu_m_dofs_per_sec * 1.e-6
-           << " s/Qdof/cycle)" << std::endl;
+           << " s/Qdof/substep)" << std::endl;
 
     output << "        [cpu time skew: "
            << std::setprecision(2) << std::scientific << cpu_time_skew
@@ -931,7 +949,7 @@ namespace ryujin
            << std::setprecision(4) << std::fixed << wall_m_dofs_per_sec
            << " MQ/s  ("
            << std::scientific << 1. / wall_m_dofs_per_sec * 1.e-6
-           << " s/Qdof/cycle)  ("
+           << " s/Qdof/substep)  ("
            << std::setprecision(2) << std::fixed << cycles_per_second
            << " cycles/s)" << std::endl;
 
