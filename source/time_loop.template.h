@@ -171,8 +171,17 @@ namespace ryujin
     terminal_update_interval_ = 5;
     add_parameter("terminal update interval",
                   terminal_update_interval_,
-                  "number of seconds after which output statistics are "
+                  "Number of seconds after which output statistics are "
                   "recomputed and printed on the terminal");
+
+    terminal_show_rank_throughput_ = true;
+    add_parameter("terminal show rank throughput",
+                  terminal_show_rank_throughput_,
+                  "If set to true an average per rank throughput is computed "
+                  "by dividing the total consumed CPU time (per rank) by the "
+                  "number of threads (per rank). If set to false then a plain "
+                  "average per thread \"CPU\" throughput value is computed by "
+                  "using the umodified total accumulated CPU time.");
   }
 
 
@@ -892,9 +901,13 @@ namespace ryujin
         delta_cycles * n_dofs / 1.e6 /
         (current.wall_time - previous.wall_time) * efficiency;
 
-    const double cpu_m_dofs_per_sec =
-        delta_cycles * n_dofs / 1.e6 /
-        (current.cpu_time_sum - previous.cpu_time_sum) * efficiency;
+    double cpu_m_dofs_per_sec = delta_cycles * n_dofs / 1.e6 /
+                                (current.cpu_time_sum - previous.cpu_time_sum) *
+                                efficiency;
+#ifdef WITH_OPENMP
+    if (terminal_show_rank_throughput_)
+      cpu_m_dofs_per_sec *= MultithreadInfo::n_threads();
+#endif
 
     double cpu_time_skew = (current.cpu_time_max - current.cpu_time_min - //
                             previous.cpu_time_max + previous.cpu_time_min) /
@@ -918,7 +931,8 @@ namespace ryujin
     /* clang-format off */
     output << std::endl;
 
-    output << "Throughput:\n  CPU : "
+    output << "Throughput:\n  "
+           << (terminal_show_rank_throughput_? "RANK: " : "CPU : ")
            << std::setprecision(4) << std::fixed << cpu_m_dofs_per_sec
            << " MQ/s  ("
            << std::scientific << 1. / cpu_m_dofs_per_sec * 1.e-6
