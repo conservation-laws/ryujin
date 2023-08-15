@@ -5,6 +5,7 @@
 
 add_library(obj_scalar_conservation OBJECT
   initial_state_library.cc
+  riemann_solver.cc
   )
 set_target_properties(obj_scalar_conservation PROPERTIES LINKER_LANGUAGE CXX)
 target_link_libraries(obj_scalar_conservation obj_common)

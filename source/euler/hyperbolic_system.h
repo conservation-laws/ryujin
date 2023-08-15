@@ -180,6 +180,7 @@ namespace ryujin
         const HyperbolicSystem &hyperbolic_system_;
 
       public:
+        //@}
         /**
          * @name Types and compile time constants
          */

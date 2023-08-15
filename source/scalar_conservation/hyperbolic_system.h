@@ -48,9 +48,15 @@ namespace ryujin
        * @name Runtime parameters, internal fields and methods
        */
       //@{
+      double derivative_approximation_delta_;
+
+      bool riemann_solver_convex_flux_;
+      bool riemann_solver_greedy_wavespeed_;
+      bool riemann_solver_random_entropy_;
+
       std::vector<std::string> flux_description_;
       std::unique_ptr<dealii::FunctionParser<1>> flux_function_;
-      double derivative_approximation_delta_;
+
       //@}
 
 
@@ -87,12 +93,65 @@ namespace ryujin
          */
         using ScalarNumber = typename get_value_type<Number>::type;
 
+        /**
+         * @name Access to runtime parameters
+         */
+        //@{
+
+        DEAL_II_ALWAYS_INLINE inline ScalarNumber
+        derivative_approximation_delta() const
+        {
+          return ScalarNumber(
+              hyperbolic_system_.derivative_approximation_delta_);
+        }
+
+        DEAL_II_ALWAYS_INLINE inline bool
+        riemann_solver_convex_flux() const
+        {
+          return hyperbolic_system_.riemann_solver_convex_flux_;
+        }
+
+        DEAL_II_ALWAYS_INLINE inline bool
+        riemann_solver_greedy_wavespeed() const
+        {
+          return hyperbolic_system_.riemann_solver_greedy_wavespeed_;
+        }
+
+        DEAL_II_ALWAYS_INLINE inline bool
+        riemann_solver_random_entropy() const
+        {
+          return hyperbolic_system_.riemann_solver_random_entropy_;
+        }
+
+        //@}
+        /**
+         * @name Low-level access to the flux function parser:
+         */
+        //@{
+
+        /**
+         * For a given state \f$u\f$ compute the flux \f$f(u)\f$.
+         */
+        DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, dim, Number>
+        flux_function(const Number &u) const;
+
+        /**
+         * For a given state \f$u\f$ compute the flux gradient \f$f'(u)\f$.
+         */
+        DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, dim, Number>
+        flux_gradient_function(const Number &u) const;
+
+        //@}
+        /**
+         * @name Internal data
+         */
+        //@{
 
       private:
         const HyperbolicSystem &hyperbolic_system_;
 
-
       public:
+        //@}
         /**
          * @name Types and compile time constants
          */
@@ -272,6 +331,21 @@ namespace ryujin
         //@{
 
         /**
+         * Helper function that given a @p precomputed_state constructs a
+         * dealii::Tensor with the flux @f$f(u)@f$.
+         */
+        dealii::Tensor<1, dim, Number> construct_flux_tensor(
+            const precomputed_state_type &precomputed_state) const;
+
+        /**
+         * Helper function that given a @p precomputed_state constructs a
+         * dealii::Tensor with the gradient of the flux @f$f(u)@f$ with
+         * respect to the state @f$u@f$.
+         */
+        dealii::Tensor<1, dim, Number> construct_flux_gradient_tensor(
+            const precomputed_state_type &precomputed_state) const;
+
+        /**
          * Given a state @p U_i and an index @p i compute flux contributions.
          *
          * Intended usage:
@@ -294,79 +368,20 @@ namespace ryujin
         flux_contribution(const precomputed_vector_type &pv,
                           const precomputed_initial_vector_type & /*piv*/,
                           const unsigned int i,
-                          const state_type & /*U_i*/) const
-        {
-          if constexpr (dim == 1) {
-            const auto &[f, df] =
-                pv.template get_tensor<Number, precomputed_state_type>(i);
-            flux_contribution_type result;
-            result[0][0] = f;
-            return result;
-
-          } else if constexpr (dim == 2) {
-            const auto &[f_1, f_2, df_1, df_2] =
-                pv.template get_tensor<Number, precomputed_state_type>(i);
-            flux_contribution_type result;
-            result[0][0] = f_1;
-            result[0][1] = f_2;
-            return result;
-
-          } else if constexpr (dim == 3) {
-            const auto &[f_1, f_2, f_3, df_1, df_2, df_3] =
-                pv.template get_tensor<Number, precomputed_state_type>(i);
-            flux_contribution_type result;
-            result[0][0] = f_1;
-            result[0][1] = f_2;
-            result[0][2] = f_3;
-            return result;
-          }
-
-          __builtin_unreachable();
-        }
+                          const state_type & /*U_i*/) const;
 
         flux_contribution_type
         flux_contribution(const precomputed_vector_type &pv,
                           const precomputed_initial_vector_type & /*piv*/,
                           const unsigned int *js,
-                          const state_type & /*U_j*/) const
-        {
-          if constexpr (dim == 1) {
-            const auto &[f, df] =
-                pv.template get_tensor<Number, precomputed_state_type>(js);
-            flux_contribution_type result;
-            result[0][0] = f;
-            return result;
-
-          } else if constexpr (dim == 2) {
-            const auto &[f_1, f_2, df_1, df_2] =
-                pv.template get_tensor<Number, precomputed_state_type>(js);
-            flux_contribution_type result;
-            result[0][0] = f_1;
-            result[0][1] = f_2;
-            return result;
-
-          } else if constexpr (dim == 3) {
-            const auto &[f_1, f_2, f_3, df_1, df_2, df_3] =
-                pv.template get_tensor<Number, precomputed_state_type>(js);
-            flux_contribution_type result;
-            result[0][0] = f_1;
-            result[0][1] = f_2;
-            result[0][2] = f_3;
-            return result;
-          }
-
-          __builtin_unreachable();
-        }
+                          const state_type & /*U_j*/) const;
 
         /**
          * Given flux contributions @p flux_i and @p flux_j compute the flux
          * <code>(-f(U_i) - f(U_j)</code>
          */
         flux_type flux(const flux_contribution_type &flux_i,
-                       const flux_contribution_type &flux_j) const
-        {
-          return -add(flux_i, flux_j);
-        }
+                       const flux_contribution_type &flux_j) const;
 
         /**
          * The low-order and high-order fluxes are the same:
@@ -512,8 +527,30 @@ namespace ryujin
       derivative_approximation_delta_ = 1.0e-10;
       add_parameter("derivative approximation delta",
                     derivative_approximation_delta_,
-                    "step size of the central difference quotient to compute "
+                    "Step size of the central difference quotient to compute "
                     "an approximation of the flux derivative");
+
+      riemann_solver_convex_flux_ = true;
+      add_parameter(
+          "riemann solver convex flux",
+          riemann_solver_convex_flux_,
+          "Set to true if the user provided flux function is a convex flux. In "
+          "this case we can skip enforcing an expensive entropy inequality for "
+          "the non-greedy estimate.");
+
+      riemann_solver_greedy_wavespeed_ = false;
+      add_parameter(
+          "riemann solver greedy wavespeed",
+          riemann_solver_greedy_wavespeed_,
+          "Use a greedy wavespeed estimate instead of a guaranteed upper bound "
+          "on the maximal wavespeed (for convex fluxes).");
+
+      riemann_solver_random_entropy_ = false;
+      add_parameter("riemann solver random entropy",
+                    riemann_solver_random_entropy_,
+                    "Use a random Krŭzkov entropy for computing an greedy "
+                    "wavespeed estimate. If set to false then the parameter k "
+                    "is set to the average of the left and right state.");
 
       /*
        * Set up the muparser object with the final flux description from
@@ -543,6 +580,55 @@ namespace ryujin
 
       set_up_muparser();
       ParameterAcceptor::parse_parameters_call_back.connect(set_up_muparser);
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, dim, Number>
+    HyperbolicSystem::View<dim, Number>::flux_function(const Number &u) const
+    {
+      dealii::Tensor<1, dim, Number> result;
+
+      /* This access is terrible: */
+
+      for (unsigned int k = 0; k < dim; ++k) {
+        if constexpr (std::is_same_v<ScalarNumber, Number>) {
+          result[k] =
+              hyperbolic_system_.flux_function_->value(dealii::Point<1>{u}, k);
+        } else {
+          for (unsigned int s = 0; s < Number::size(); ++s) {
+            result[k][s] = hyperbolic_system_.flux_function_->value(
+                dealii::Point<1>{u[s]}, k);
+          }
+        }
+      }
+
+      return result;
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, dim, Number>
+    HyperbolicSystem::View<dim, Number>::flux_gradient_function(
+        const Number &u) const
+    {
+      dealii::Tensor<1, dim, Number> result;
+
+      /* This access is terrible: */
+
+      for (unsigned int k = 0; k < dim; ++k) {
+        if constexpr (std::is_same_v<ScalarNumber, Number>) {
+          result[k] = hyperbolic_system_.flux_function_->gradient(
+              dealii::Point<1>{u}, k)[0];
+        } else {
+          for (unsigned int s = 0; s < Number::size(); ++s) {
+            result[k][s] = hyperbolic_system_.flux_function_->gradient(
+                dealii::Point<1>{u[s]}, k)[0];
+          }
+        }
+      }
+
+      return result;
     }
 
 
@@ -577,21 +663,14 @@ namespace ryujin
         const auto U_i = U.template get_tensor<Number>(i);
         const auto u_i = state(U_i);
 
+        const auto f_i = flux_function(u_i);
+        const auto df_i = flux_gradient_function(u_i);
+
         precomputed_state_type prec_i;
+
         for (unsigned int k = 0; k < n_precomputed_values / 2; ++k) {
-          if constexpr (std::is_same_v<ScalarNumber, Number>) {
-            prec_i[k] = hyperbolic_system_.flux_function_->value(
-                dealii::Point<1>{u_i}, k);
-            prec_i[dim + k] = hyperbolic_system_.flux_function_->gradient(
-                dealii::Point<1>{u_i}, k)[0];
-          } else {
-            for (unsigned int s = 0; s < Number::size(); ++s) {
-              prec_i[k][s] = hyperbolic_system_.flux_function_->value(
-                  dealii::Point<1>{u_i[s]}, k);
-              prec_i[dim + k][s] = hyperbolic_system_.flux_function_->gradient(
-                  dealii::Point<1>{u_i[s]}, k)[0];
-            }
-          }
+          prec_i[k] = f_i[k];
+          prec_i[dim + k] = df_i[k];
         }
 
         precomputed_values.template write_tensor<Number>(prec_i, i);
@@ -650,8 +729,101 @@ namespace ryujin
     }
 
 
-    // FIXME
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, dim, Number>
+    HyperbolicSystem::View<dim, Number>::construct_flux_tensor(
+        const precomputed_state_type &precomputed_state) const
+    {
+      dealii::Tensor<1, dim, Number> result;
 
+      if constexpr (dim == 1) {
+        const auto &[f, df] = precomputed_state;
+        result[0] = f;
+
+      } else if constexpr (dim == 2) {
+        const auto &[f_1, f_2, df_1, df_2] = precomputed_state;
+        result[0] = f_1;
+        result[1] = f_2;
+
+      } else if constexpr (dim == 3) {
+        const auto &[f_1, f_2, f_3, df_1, df_2, df_3] =
+            precomputed_state;
+        result[0] = f_1;
+        result[1] = f_2;
+        result[2] = f_3;
+      }
+
+      return result;
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, dim, Number>
+    HyperbolicSystem::View<dim, Number>::construct_flux_gradient_tensor(
+        const precomputed_state_type &precomputed_state) const
+    {
+      dealii::Tensor<1, dim, Number> result;
+
+      if constexpr (dim == 1) {
+        const auto &[f, df] = precomputed_state;
+        result[0] = df;
+
+      } else if constexpr (dim == 2) {
+        const auto &[f_1, f_2, df_1, df_2] = precomputed_state;
+        result[0] = df_1;
+        result[1] = df_2;
+
+      } else if constexpr (dim == 3) {
+        const auto &[f_1, f_2, f_3, df_1, df_2, df_3] =
+            precomputed_state;
+        result[0] = df_1;
+        result[1] = df_2;
+        result[2] = df_3;
+      }
+
+      return result;
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline auto
+    HyperbolicSystem::View<dim, Number>::flux_contribution(
+        const precomputed_vector_type &pv,
+        const precomputed_initial_vector_type & /*piv*/,
+        const unsigned int i,
+        const state_type & /*U_i*/) const -> flux_contribution_type
+    {
+      /* The flux contribution is a rank 2 tensor, thus a little dance: */
+      flux_contribution_type result;
+      result[0] = construct_flux_tensor(
+          pv.template get_tensor<Number, precomputed_state_type>(i));
+      return result;
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline auto
+    HyperbolicSystem::View<dim, Number>::flux_contribution(
+        const precomputed_vector_type &pv,
+        const precomputed_initial_vector_type & /*piv*/,
+        const unsigned int *js,
+        const state_type & /*U_j*/) const -> flux_contribution_type
+    {
+      /* The flux contribution is a rank 2 tensor, thus a little dance: */
+      flux_contribution_type result;
+      result[0] = construct_flux_tensor(
+          pv.template get_tensor<Number, precomputed_state_type>(js));
+      return result;
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline auto HyperbolicSystem::View<dim, Number>::flux(
+        const flux_contribution_type &flux_i,
+        const flux_contribution_type &flux_j) const -> flux_type
+    {
+      return -add(flux_i, flux_j);
+    }
 
   } // namespace ScalarConservation
 } // namespace ryujin

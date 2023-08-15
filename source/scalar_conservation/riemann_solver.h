@@ -19,10 +19,12 @@ namespace ryujin
   namespace ScalarConservation
   {
     /**
-     * A fast approximative solver for the associated 1D Riemann problem.
-     * The solver has to ensure that the estimate
-     * \f$\lambda_{\text{max}}\f$ that is returned for the maximal
-     * wavespeed is a strict upper bound.
+     * A fast estimate for a sufficient maximal wavespeed of the 1D Riemann
+     * problem. The wavespeed estimate is based on a guaranteed upper bound
+     * on the maximal wavespeed for convex fluxes, see Example 79.17 on
+     * page 333 of @cite GuermondErn2021. As well as an augmented "Roe
+     * average" based on an entropy inequality of a suitable Krŭzkov
+     * entropy, see @cite ryujin-2023-5 Section 4.
      *
      * @ingroup ScalarConservationEquations
      */
@@ -70,16 +72,14 @@ namespace ryujin
 
       /**
        * For two given states U_i a U_j and a (normalized) "direction" n_ij
-       * compute an estimation of an upper bound for lambda.
+       * compute an estimate for an upper bound of lambda.
        */
-      Number compute(const state_type & /*U_i*/,
-                     const state_type & /*U_j*/,
-                     const unsigned int /*i*/,
-                     const unsigned int * /*js*/,
-                     const dealii::Tensor<1, dim, Number> & /*n_ij*/) const
-      {
-        return Number(1.);
-      }
+      Number compute(const state_type &U_i,
+                     const state_type &U_j,
+                     const unsigned int i,
+                     const unsigned int *js,
+                     const dealii::Tensor<1, dim, Number> &n_ij) const;
+
       //@}
       //
     private:
