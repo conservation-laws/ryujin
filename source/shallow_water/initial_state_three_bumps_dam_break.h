@@ -1,6 +1,8 @@
 //
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT or BSD-3-Clause
+// [LANL Copyright Statement]
 // Copyright (C) 2020 - 2023 by the ryujin authors
+// Copyright (C) 2023 - 2023 by Triad National Security, LLC
 //
 
 #pragma once
