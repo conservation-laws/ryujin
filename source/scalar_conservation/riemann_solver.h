@@ -49,6 +49,12 @@ namespace ryujin
           HyperbolicSystemView::n_precomputed_values;
 
       /**
+       * @copydoc HyperbolicSystem::View::precomputed_state_type
+       */
+      using precomputed_state_type =
+          typename HyperbolicSystemView::precomputed_state_type;
+
+      /**
        * @copydoc HyperbolicSystem::View::ScalarNumber
        */
       using ScalarNumber = typename get_value_type<Number>::type;
@@ -71,6 +77,17 @@ namespace ryujin
       }
 
       /**
+       * For two states @p u_i, @p u_j, precomputed values @p prec_i,
+       * @p prec_j, and a (normalized) "direction" n_ij
+       * compute an upper bound estimate for the wavespeed.
+       */
+      Number compute(const Number &u_i,
+                     const Number &u_j,
+                     const precomputed_state_type &prec_i,
+                     const precomputed_state_type &prec_j,
+                     const dealii::Tensor<1, dim, Number> &n_ij) const;
+
+      /**
        * For two given states U_i a U_j and a (normalized) "direction" n_ij
        * compute an estimate for an upper bound of lambda.
        */
@@ -87,5 +104,36 @@ namespace ryujin
       const MultiComponentVector<ScalarNumber, n_precomputed_values>
           &precomputed_values;
     };
+
+
+    /*
+     * -------------------------------------------------------------------------
+     * Inline definitions
+     * -------------------------------------------------------------------------
+     */
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline Number RiemannSolver<dim, Number>::compute(
+        const state_type &U_i,
+        const state_type &U_j,
+        const unsigned int i,
+        const unsigned int *js,
+        const dealii::Tensor<1, dim, Number> &n_ij) const
+    {
+      using pst =
+          typename HyperbolicSystem::View<dim, Number>::precomputed_state_type;
+
+      const auto &view = hyperbolic_system; // FIXME
+      const auto u_i = view.state(U_i);
+      const auto u_j = view.state(U_j);
+
+      const auto &pv = precomputed_values;
+      const auto prec_i = pv.template get_tensor<Number, pst>(i);
+      const auto prec_j = pv.template get_tensor<Number, pst>(js);
+
+      return compute(u_i, u_j, prec_i, prec_j, n_ij);
+    }
+
+
   } // namespace ScalarConservation
 } // namespace ryujin

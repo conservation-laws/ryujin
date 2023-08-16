@@ -94,19 +94,17 @@ namespace ryujin
       }
 
       /**
-       * For two given 1D primitive states riemann_data_i and riemann_data_j,
-       * compute an estimation of an upper bound for the maximum wavespeed
-       * lambda.
+       * For two given 1D primitive states riemann_data_i and
+       * riemann_data_j, compute an estimate for an upper bound of the
+       * maximum wavespeed lambda.
        */
       Number compute(const primitive_type &riemann_data_i,
                      const primitive_type &riemann_data_j) const;
 
       /**
        * For two given states U_i a U_j and a (normalized) "direction" n_ij
-       * compute an estimation of an upper bound for lambda.
-       *
-       * Returns a tuple consisting of lambda max and the number of Newton
-       * iterations used in the solver to find it.
+       * compute an estimate for an upper bound of the maximum wavespeed
+       * lambda.
        */
       Number compute(const state_type &U_i,
                      const state_type &U_j,
@@ -263,7 +261,11 @@ namespace ryujin
     };
 
 
-    /* Inline definitions */
+    /*
+     * -------------------------------------------------------------------------
+     * Inline definitions
+     * -------------------------------------------------------------------------
+     */
 
 
     template <int dim, typename Number>

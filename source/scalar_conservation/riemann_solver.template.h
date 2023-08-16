@@ -21,23 +21,13 @@ namespace ryujin
   {
     template <int dim, typename Number>
     Number RiemannSolver<dim, Number>::compute(
-        const state_type &U_i,
-        const state_type &U_j,
-        const unsigned int i,
-        const unsigned int *js,
+        const Number &u_i,
+        const Number &u_j,
+        const precomputed_state_type &prec_i,
+        const precomputed_state_type &prec_j,
         const dealii::Tensor<1, dim, Number> &n_ij) const
     {
-      using pst =
-          typename HyperbolicSystem::View<dim, Number>::precomputed_state_type;
-
-      const auto view = hyperbolic_system.template view<dim, Number>();
-
-      const auto u_i = hyperbolic_system.state(U_i);
-      const auto u_j = hyperbolic_system.state(U_j);
-
-      const auto &pv = precomputed_values;
-      const auto prec_i = pv.template get_tensor<Number, pst>(i);
-      const auto prec_j = pv.template get_tensor<Number, pst>(js);
+      const auto &view = hyperbolic_system; // FIXME
 
       /* Project all fluxes to 1D: */
       const Number f_i = view.construct_flux_tensor(prec_i) * n_ij;
@@ -164,8 +154,17 @@ namespace ryujin
         const Number c = eta_i + eta_j;
         const Number d = q_j - q_i;
 
-        const Number lambda_left = (d + b) / (std::abs(c + a) + h2);
-        const Number lambda_right = (d - b) / (std::abs(c - a) + h2);
+        /*
+         * FIXME: Ordinarily, lambda_left and lambda_right would be
+         * computed without taking the absolute value of the numerator.
+         * (The denominator is - in the absence of rounding errors - always
+         * nonnegative. The numerator has a sign.)
+         * But empirically it turns out that taking the absolute value and
+         * letting both estimates participate in the maximal wavespeed
+         * estimate helps a lot.
+         */
+        const Number lambda_left = std::abs(d + b) / (std::abs(c + a) + h2);
+        const Number lambda_right = std::abs(d - b) / (std::abs(c - a) + h2);
 
 #ifdef DEBUG_RIEMANN_SOLVER
         std::cout << "   left  wavespeed   = " << lambda_left << std::endl;
