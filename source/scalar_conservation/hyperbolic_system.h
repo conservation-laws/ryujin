@@ -50,9 +50,9 @@ namespace ryujin
       //@{
       double derivative_approximation_delta_;
 
-      bool riemann_solver_convex_flux_;
       bool riemann_solver_greedy_wavespeed_;
-      bool riemann_solver_random_entropy_;
+      bool riemann_solver_averaged_entropy_;
+      unsigned int riemann_solver_random_entropies_;
 
       std::vector<std::string> flux_description_;
       std::unique_ptr<dealii::FunctionParser<1>> flux_function_;
@@ -106,21 +106,21 @@ namespace ryujin
         }
 
         DEAL_II_ALWAYS_INLINE inline bool
-        riemann_solver_convex_flux() const
-        {
-          return hyperbolic_system_.riemann_solver_convex_flux_;
-        }
-
-        DEAL_II_ALWAYS_INLINE inline bool
         riemann_solver_greedy_wavespeed() const
         {
           return hyperbolic_system_.riemann_solver_greedy_wavespeed_;
         }
 
         DEAL_II_ALWAYS_INLINE inline bool
-        riemann_solver_random_entropy() const
+        riemann_solver_averaged_entropy() const
         {
-          return hyperbolic_system_.riemann_solver_random_entropy_;
+          return hyperbolic_system_.riemann_solver_averaged_entropy_;
+        }
+
+        DEAL_II_ALWAYS_INLINE inline unsigned int
+        riemann_solver_random_entropies() const
+        {
+          return hyperbolic_system_.riemann_solver_random_entropies_;
         }
 
         //@}
@@ -530,14 +530,6 @@ namespace ryujin
                     "Step size of the central difference quotient to compute "
                     "an approximation of the flux derivative");
 
-      riemann_solver_convex_flux_ = true;
-      add_parameter(
-          "riemann solver convex flux",
-          riemann_solver_convex_flux_,
-          "Set to true if the user provided flux function is a convex flux. In "
-          "this case we can skip enforcing an expensive entropy inequality for "
-          "the non-greedy estimate.");
-
       riemann_solver_greedy_wavespeed_ = false;
       add_parameter(
           "riemann solver greedy wavespeed",
@@ -545,12 +537,21 @@ namespace ryujin
           "Use a greedy wavespeed estimate instead of a guaranteed upper bound "
           "on the maximal wavespeed (for convex fluxes).");
 
-      riemann_solver_random_entropy_ = false;
-      add_parameter("riemann solver random entropy",
-                    riemann_solver_random_entropy_,
-                    "Use a random Krŭzkov entropy for computing an greedy "
-                    "wavespeed estimate. If set to false then the parameter k "
-                    "is set to the average of the left and right state.");
+      riemann_solver_averaged_entropy_ = false;
+      add_parameter(
+          "riemann solver averaged entropy",
+          riemann_solver_averaged_entropy_,
+          "In addition to the wavespeed estimate based on the Roe average and "
+          "flux gradients of the left and right state also enforce an entropy "
+          "inequality on the averaged Krŭzkov entropy.");
+
+      riemann_solver_random_entropies_ = 0;
+      add_parameter(
+          "riemann solver random entropies",
+          riemann_solver_random_entropies_,
+          "In addition to the wavespeed estimate based on the Roe average and "
+          "flux gradients of the left and right state also enforce an entropy "
+          "inequality on the prescribed number of random Krŭzkov entropies.");
 
       /*
        * Set up the muparser object with the final flux description from

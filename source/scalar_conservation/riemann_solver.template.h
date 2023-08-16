@@ -11,6 +11,8 @@
 
 #include <simd.h>
 
+#include <random>
+
 // #define DEBUG_RIEMANN_SOLVER
 
 namespace ryujin
@@ -109,20 +111,37 @@ namespace ryujin
 #endif
       }
 
-      if (view.riemann_solver_greedy_wavespeed() ||
-          !view.riemann_solver_convex_flux()) {
-        /*
-         * If we are approximating with a greedy wavespeed or if we have a
-         * general, not necessarily convex flux we compute
-         */
+      /*
+       * Thread-local helper lambda to generate a random number in [0,1]:
+       */
 
-        Number k = ScalarNumber(0.5) * (u_i + u_j);
+      thread_local static const auto draw = []() {
+        static std::random_device random_device;
+        static auto generator = std::default_random_engine(random_device());
+        static std::uniform_real_distribution<ScalarNumber> dist(0., 1.);
 
-        if (view.riemann_solver_random_entropy()) {
-          // FIXME
-          __builtin_trap();
+        if constexpr (std::is_same_v<ScalarNumber, Number>) {
+          /*
+           * Scalar quantity:
+           */
+          return dist(generator);
+
+        } else {
+          /*
+           * Populate a vectorized array:
+           */
+          Number result;
+          for (unsigned int s = 0; s < Number::size(); ++s)
+            result[s] = dist(generator);
+          return result;
         }
+      };
 
+      /*
+       * Helper functions for enforcing entropy inequalities:
+       */
+
+      const auto enforce_entropy = [&](const Number &k) {
         const Number f_k = view.flux_function(k) * n_ij;
 
 #ifdef DEBUG_RIEMANN_SOLVER
@@ -145,8 +164,28 @@ namespace ryujin
         const Number c = eta_i + eta_j;
         const Number d = q_j - q_i;
 
-        lambda_max = std::max(lambda_max, (d + b) / (std::abs(c + a) + h2));
-        lambda_max = std::max(lambda_max, (d - b) / (std::abs(c - a) + h2));
+        const Number lambda_left = (d + b) / (std::abs(c + a) + h2);
+        const Number lambda_right = (d - b) / (std::abs(c - a) + h2);
+
+#ifdef DEBUG_RIEMANN_SOLVER
+        std::cout << "   left  wavespeed   = " << lambda_left << std::endl;
+        std::cout << "   right wavespeed   = " << lambda_right << std::endl;
+#endif
+        lambda_max = std::max(lambda_max, lambda_left);
+        lambda_max = std::max(lambda_max, lambda_right);
+      };
+
+
+      if (view.riemann_solver_averaged_entropy()) {
+        const Number k = ScalarNumber(0.5) * (u_i + u_j);
+        enforce_entropy(k);
+      }
+
+      const unsigned int n_entropies = view.riemann_solver_random_entropies();
+      for (unsigned int i = 0; i < n_entropies; ++i) {
+        const Number factor = draw();
+        const Number k = factor * u_i + (Number(1.) - factor) * u_j;
+        enforce_entropy(k);
       }
 
 #ifdef DEBUG_RIEMANN_SOLVER
