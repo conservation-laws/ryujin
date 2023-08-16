@@ -20,6 +20,10 @@ code is dual licensed under the MIT and the
 [BSD 3-clause license](https://spdx.org/licenses/BSD-3-Clause.html).
 Third-party dependencies and header libraries are covered by different open
 source licenses. For details consult [COPYING.md](COPYING.md).
+Contributions to the ryujin source code are governed by the [Developer
+Certificate of Origin version 1.1](https://developercertificate.org/); see
+[CONTRIBUTING.md](CONTRIBUTING.md) for details.
+
 
 Modules
 -------
