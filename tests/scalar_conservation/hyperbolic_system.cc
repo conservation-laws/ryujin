@@ -45,6 +45,9 @@ void test(const std::vector<std::string> &flux_description)
 
   const auto u = view.state(U);
   std::cout << "state = " << u << std::endl;
+  std::cout << "square_entropy = " << view.square_entropy(U) << std::endl;
+  std::cout << "square_entropy_derivative = "
+            << view.square_entropy_derivative(U) << std::endl;
   std::cout << "flux = " << view.flux_function(u) << std::endl;
   std::cout << "flux_gradient = " << view.flux_gradient_function(u)
             << std::endl;

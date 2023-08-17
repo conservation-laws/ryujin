@@ -299,6 +299,23 @@ namespace ryujin
         static Number state(const state_type &U);
 
         /**
+         * For a given state <code>U</code>, compute the square entropy
+         * \f[
+         *   \eta = 1/2 u^2.
+         * \f]
+         */
+        Number square_entropy(const state_type &U) const;
+
+        /**
+         * For a given state <code>U</code>, compute the derivative of the
+         * square entropy
+         * \f[
+         *   \eta = u.
+         * \f]
+         */
+        Number square_entropy_derivative(const state_type &U) const;
+
+        /**
          * Returns whether the state @p U is admissible. If @p U is a
          * vectorized state then @p U is admissible if all vectorized
          * values are admissible.
@@ -684,6 +701,26 @@ namespace ryujin
     HyperbolicSystem::View<dim, Number>::state(const state_type &U)
     {
       return U[0];
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline Number
+    HyperbolicSystem::View<dim, Number>::square_entropy(
+        const state_type &U) const
+    {
+      const Number u = state(U);
+      return ScalarNumber(0.5) * u * u;
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline Number
+    HyperbolicSystem::View<dim, Number>::square_entropy_derivative(
+        const state_type &U) const
+    {
+      const Number u = state(U);
+      return u;
     }
 
 
