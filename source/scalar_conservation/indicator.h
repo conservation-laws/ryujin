@@ -108,7 +108,7 @@ namespace ryujin
        */
       Number alpha(const Number /*h_i*/)
       {
-        return Number(1.);
+        return Number(0.);
       }
 
       //@}
