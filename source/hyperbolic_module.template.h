@@ -326,7 +326,7 @@ namespace ryujin
 
             const auto c_ij = cij_matrix.template get_tensor<T>(i, col_idx);
 
-            indicator.add(js, U_j, c_ij);
+            indicator.accumulate(js, U_j, c_ij);
 
             /* Only iterate over the upper triangular portion of d_ij */
             if (all_below_diagonal<T>(i, js))

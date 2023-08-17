@@ -44,10 +44,10 @@ void test(const std::vector<std::string> &flux_description)
   std::cout << "f(u)={" + expression + "}" << std::endl;
 
   const auto u = view.state(U);
-    std::cout << "state = " << u << std::endl;
-    std::cout << "flux = " << view.flux_function(u) << std::endl;
-    std::cout << "flux_gradient = " << view.flux_gradient_function(u)
-              << std::endl;
+  std::cout << "state = " << u << std::endl;
+  std::cout << "flux = " << view.flux_function(u) << std::endl;
+  std::cout << "flux_gradient = " << view.flux_gradient_function(u)
+            << std::endl;
 }
 
 int main()

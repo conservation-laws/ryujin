@@ -747,8 +747,7 @@ namespace ryujin
         result[1] = f_2;
 
       } else if constexpr (dim == 3) {
-        const auto &[f_1, f_2, f_3, df_1, df_2, df_3] =
-            precomputed_state;
+        const auto &[f_1, f_2, f_3, df_1, df_2, df_3] = precomputed_state;
         result[0] = f_1;
         result[1] = f_2;
         result[2] = f_3;
@@ -775,8 +774,7 @@ namespace ryujin
         result[1] = df_2;
 
       } else if constexpr (dim == 3) {
-        const auto &[f_1, f_2, f_3, df_1, df_2, df_3] =
-            precomputed_state;
+        const auto &[f_1, f_2, f_3, df_1, df_2, df_3] = precomputed_state;
         result[0] = df_1;
         result[1] = df_2;
         result[2] = df_3;

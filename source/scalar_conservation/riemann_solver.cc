@@ -21,5 +21,5 @@ namespace ryujin
     template class RiemannSolver<2, dealii::VectorizedArray<NUMBER>>;
     template class RiemannSolver<3, dealii::VectorizedArray<NUMBER>>;
 
-  } // namespace Euler
+  } // namespace ScalarConservation
 } // namespace ryujin
