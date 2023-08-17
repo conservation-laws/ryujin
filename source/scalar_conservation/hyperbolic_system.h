@@ -304,16 +304,34 @@ namespace ryujin
          *   \eta = 1/2 u^2.
          * \f]
          */
-        Number square_entropy(const state_type &U) const;
+        Number square_entropy(const Number &u) const;
 
         /**
          * For a given state <code>U</code>, compute the derivative of the
          * square entropy
          * \f[
-         *   \eta = u.
+         *   \eta' = u.
          * \f]
          */
-        Number square_entropy_derivative(const state_type &U) const;
+        Number square_entropy_derivative(const Number &u) const;
+
+        /**
+         * For a given state <code>U</code>, compute the Krŭzkov entropy
+         * \f[
+         *   \eta = |u-k|.
+         * \f]
+         */
+        Number kruzkov_entropy(const Number &k, const Number &u) const;
+
+        /**
+         * For a given state <code>U</code>, compute the derivative of the
+         * Krŭzkov entropy:
+         * \f[
+         *   \eta' = \text{sgn}(u-k).
+         * \f]
+         */
+        Number kruzkov_entropy_derivative(const Number &k,
+                                          const Number &u) const;
 
         /**
          * Returns whether the state @p U is admissible. If @p U is a
@@ -706,10 +724,8 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
-    HyperbolicSystem::View<dim, Number>::square_entropy(
-        const state_type &U) const
+    HyperbolicSystem::View<dim, Number>::square_entropy(const Number &u) const
     {
-      const Number u = state(U);
       return ScalarNumber(0.5) * u * u;
     }
 
@@ -717,10 +733,29 @@ namespace ryujin
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
     HyperbolicSystem::View<dim, Number>::square_entropy_derivative(
-        const state_type &U) const
+        const Number &u) const
     {
-      const Number u = state(U);
       return u;
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline Number
+    HyperbolicSystem::View<dim, Number>::kruzkov_entropy(const Number &k,
+                                                         const Number &u) const
+    {
+      return std::abs(k - u);
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline Number
+    HyperbolicSystem::View<dim, Number>::kruzkov_entropy_derivative(
+        const Number &k, const Number &u) const
+    {
+      constexpr auto gte = dealii::SIMDComparison::greater_than_or_equal;
+      // return sgn(u-k):
+      return dealii::compare_and_apply_mask<gte>(u, k, Number(1.), Number(-1.));
     }
 
 

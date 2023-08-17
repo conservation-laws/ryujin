@@ -39,14 +39,15 @@ namespace ryujin
           HyperbolicSystemView::n_precomputed_values;
 
       /**
+       * @copydoc HyperbolicSystem::View::precomputed_state_type
+       */
+      using precomputed_state_type =
+          typename HyperbolicSystemView::precomputed_state_type;
+
+      /**
        * @copydoc HyperbolicSystem::state_type
        */
       using state_type = typename HyperbolicSystemView::state_type;
-
-      /**
-       * @copydoc HyperbolicSystem::flux_type
-       */
-      using flux_type = typename HyperbolicSystemView::flux_type;
 
       /**
        * @copydoc HyperbolicSystem::ScalarNumber
@@ -87,29 +88,20 @@ namespace ryujin
        * Reset temporary storage and initialize for a new row corresponding
        * to state vector U_i.
        */
-      void reset(const unsigned int /*i*/, const state_type & /*U_i*/)
-      {
-        // empty
-      }
+      void reset(const unsigned int i, const state_type &U_i);
 
       /**
        * When looping over the sparsity row, add the contribution associated
        * with the neighboring state U_j.
        */
-      void accumulate(const unsigned int * /*js*/,
-                      const state_type & /*U_j*/,
-                      const dealii::Tensor<1, dim, Number> & /*c_ij*/)
-      {
-        // empty
-      }
+      void accumulate(const unsigned int *js,
+                      const state_type &U_j,
+                      const dealii::Tensor<1, dim, Number> &c_ij);
 
       /**
        * Return the computed alpha_i value.
        */
-      Number alpha(const Number /*h_i*/)
-      {
-        return Number(0.);
-      }
+      Number alpha(const Number h_i);
 
       //@}
 
@@ -122,7 +114,79 @@ namespace ryujin
 
       const MultiComponentVector<ScalarNumber, n_precomputed_values>
           &precomputed_values;
+
+      Number u_i;
+      Number u_abs_max;
+      dealii::Tensor<1, dim, Number> f_i;
+      Number left;
+      Number right;
       //@}
     };
+
+
+    /*
+     * -------------------------------------------------------------------------
+     * Inline definitions
+     * -------------------------------------------------------------------------
+     */
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline void
+    Indicator<dim, Number>::reset(const unsigned int i, const state_type &U_i)
+    {
+      const auto prec_i =
+          precomputed_values
+              .template get_tensor<Number, precomputed_state_type>(i);
+
+      /* entropy viscosity commutator: */
+
+      u_i = hyperbolic_system.state(U_i);
+      u_abs_max = std::abs(u_i);
+      f_i = hyperbolic_system.construct_flux_tensor(prec_i);
+      left = 0.;
+      right = 0.;
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline void Indicator<dim, Number>::accumulate(
+        const unsigned int *js,
+        const state_type &U_j,
+        const dealii::Tensor<1, dim, Number> &c_ij)
+    {
+      const auto prec_j =
+          precomputed_values
+              .template get_tensor<Number, precomputed_state_type>(js);
+
+      /* entropy viscosity commutator: */
+
+      const auto u_j = hyperbolic_system.state(U_j);
+      u_abs_max = std::max(u_abs_max, std::abs(u_j));
+      const auto d_eta_j =
+          hyperbolic_system.kruzkov_entropy_derivative(u_i, u_j);
+      const auto f_j = hyperbolic_system.construct_flux_tensor(prec_j);
+
+      left += d_eta_j * (f_j * c_ij);
+      right += d_eta_j * (f_i * c_ij);
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline Number
+    Indicator<dim, Number>::alpha(const Number hd_i)
+    {
+      Number numerator = left - right;
+      Number denominator = std::abs(left) + std::abs(right);
+
+      /* FIXME: this can be refactored into a runtime parameter... */
+      const ScalarNumber evc_alpha_0_ = ScalarNumber(1.);
+      const auto quotient =
+          std::abs(numerator) /
+          (denominator + std::max(hd_i * std::abs(u_abs_max),
+                                  Number(std::numeric_limits<double>::min())));
+      return std::min(Number(1.), evc_alpha_0_ * quotient);
+    }
+
   } // namespace ScalarConservation
 } // namespace ryujin

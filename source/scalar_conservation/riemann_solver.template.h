@@ -139,15 +139,13 @@ namespace ryujin
         std::cout << "f_k  = " << f_k << std::endl;
 #endif
 
-        const Number eta_i = std::abs(u_i - k);
-        /* We should implement and use a "copysign" intrinsic for deal.II: */
-        const Number q_i = /* sign(u_i - k) * (f_i - f_k) */
-            dealii::compare_and_apply_mask<gte>(u_i, k, f_i - f_k, f_k - f_i);
+        const Number eta_i = hyperbolic_system.kruzkov_entropy(k, u_i);
+        const Number q_i =
+            hyperbolic_system.kruzkov_entropy_derivative(k, u_i) * (f_i - f_k);
 
-        const Number eta_j = std::abs(u_j - k);
-        /* We should implement and use a "copysign" intrinsic for deal.II: */
-        const Number q_j = /* sign(u_j - k) * (f_j - f_k) */
-            dealii::compare_and_apply_mask<gte>(u_j, k, f_j - f_k, f_k - f_j);
+        const Number eta_j = hyperbolic_system.kruzkov_entropy(k, u_j);
+        const Number q_j =
+            hyperbolic_system.kruzkov_entropy_derivative(k, u_j) * (f_j - f_k);
 
         const Number a = u_i + u_j - ScalarNumber(2.) * k;
         const Number b = f_j - f_i;
