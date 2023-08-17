@@ -539,7 +539,7 @@ namespace ryujin
           const auto m_i = load_value<T>(lumped_mass_matrix, i);
           const auto m_i_inv = load_value<T>(lumped_mass_matrix_inverse, i);
 
-          limiter.reset(i);
+          limiter.reset(i, U_i);
 
           /* Sources: */
           state_type S_i_new;

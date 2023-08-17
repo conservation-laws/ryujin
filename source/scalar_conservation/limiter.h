@@ -97,7 +97,7 @@ namespace ryujin
       /**
        * Reset temporary storage
        */
-      void reset(const unsigned int /*i*/)
+      void reset(const unsigned int /*i*/, const state_type & /*U_i*/)
       {
         // empty
       }
