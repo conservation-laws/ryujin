@@ -423,6 +423,13 @@ namespace ryujin
           d_sum -= dij_matrix_.get_entry(i, col_idx);
         }
 
+        /*
+         * Make sure that we do not accidentally divide by zero. (Yes, this
+         * can happen for some (admittedly, rather esoteric) scalar
+         * conservation equations...).
+         */
+        d_sum = std::min(d_sum, -1.e6 * std::numeric_limits<double>::min());
+
         /* write diagonal element */
         dij_matrix_.write_entry(d_sum, i, 0);
 
