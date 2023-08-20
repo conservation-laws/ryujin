@@ -43,7 +43,7 @@ namespace ryujin
       if (!(test_min == Number(0.) && test_max == Number(0.))) {
 #ifdef DEBUG_OUTPUT
         std::cout << std::fixed << std::setprecision(16);
-        std::cout << "Bounds violation: low-order density (critical)!"
+        std::cout << "Bounds violation: low-order state (critical)!"
                   << "\n\t\tu min:         " << u_min
                   << "\n\t\tu min (delta): " << negative_part(u_U - u_min)
                   << "\n\t\tu:             " << u_U
@@ -95,15 +95,13 @@ namespace ryujin
       /*
        * Verify that the new state is within bounds:
        */
-      const auto u_new = hyperbolic_system.density(U + t_r * P);
-      const auto test_new_min = hyperbolic_system.filter_vacuum_density(
-          std::max(Number(0.), u_new - relax * u_max));
-      const auto test_new_max = hyperbolic_system.filter_vacuum_density(
-          std::max(Number(0.), u_min - relax * u_new));
+      const auto u_new = hyperbolic_system.state(U + t_r * P);
+      const auto test_new_min = std::max(Number(0.), u_new - relax * u_max);
+      const auto test_new_max = std::max(Number(0.), u_min - relax * u_new);
       if (!(test_new_min == Number(0.) && test_new_max == Number(0.))) {
 #ifdef DEBUG_OUTPUT
         std::cout << std::fixed << std::setprecision(16);
-        std::cout << "Bounds violation: high-order density!"
+        std::cout << "Bounds violation: high-order state!"
                   << "\n\t\tu min:         " << u_min
                   << "\n\t\tu min (delta): " << negative_part(u_new - u_min)
                   << "\n\t\tu:             " << u_new
