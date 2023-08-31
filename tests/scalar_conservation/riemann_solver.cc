@@ -16,21 +16,13 @@ using namespace dealii;
 
 
 template <int dim, typename Number>
-void test(const std::vector<std::string> &flux_description)
+void test(const std::string &expression)
 {
   std::cout << std::setprecision(10);
   std::cout << std::scientific;
 
   HyperbolicSystem hyperbolic_system;
   const auto view = hyperbolic_system.view<dim, Number>();
-
-  const std::string expression = std::accumulate(
-      std::begin(flux_description),
-      std::end(flux_description),
-      std::string(),
-      [](std::string &result, const std::string &element) {
-        return result.empty() ? element : result + "," + element;
-      });
 
   {
     std::stringstream parameters;
@@ -103,10 +95,10 @@ void test(const std::vector<std::string> &flux_description)
 
 int main()
 {
-  test<1, double>({"0.5*u*u"});
-  test<2, double>({"0.5*u*u", "0.5*u*u"});
+  test<1, double>("burgers");
+  test<2, double>("burgers");
 
-  test<2, double>({"sin(u)", "cos(u)"});
+  test<2, double>("kpp");
 
   return 0;
 }
