@@ -22,6 +22,7 @@ namespace ryujin
       KPP(const std::string &subsection)
           : Flux("kpp", subsection)
       {
+        flux_formula_ = "f(u)={sin(u),cos(u)}";
       }
 
 

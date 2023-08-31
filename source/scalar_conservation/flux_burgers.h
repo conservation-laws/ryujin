@@ -22,6 +22,7 @@ namespace ryujin
       Burgers(const std::string &subsection)
           : Flux("burgers", subsection)
       {
+        flux_formula_ = "f(u)={0.5u^2}";
       }
 
 
