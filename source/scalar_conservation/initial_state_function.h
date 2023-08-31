@@ -38,7 +38,7 @@ namespace ryujin
         expression_ = "0.25 * x";
         this->add_parameter("expression",
                             expression_,
-                            "A mathematical description of the initial state");
+                            "A function expression for the initial state");
 
         /*
          * Set up the muparser object with the final flux description from

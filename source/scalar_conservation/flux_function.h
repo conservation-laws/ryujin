@@ -29,9 +29,9 @@ namespace ryujin
       Function(const std::string &subsection)
           : Flux("function", subsection)
       {
-        description_ = "0.5*u*u";
-        add_parameter("description",
-                      description_,
+        expression_ = "0.5*u*u";
+        add_parameter("expression",
+                      expression_,
                       "A mathematical description of the flux as a function of "
                       "state used to create a muparser object to evaluate the "
                       "flux. For two, or three dimensional fluxes, components "
@@ -48,11 +48,10 @@ namespace ryujin
          * the parameter file:
          */
         const auto set_up_muparser = [this] {
+          std::vector<std::string> split_expressions;
+          boost::split(split_expressions, expression_, boost::is_any_of(";"));
 
-          std::vector<std::string> expression;
-          boost::split(expression, description_, boost::is_any_of(";"));
-
-          const auto size = expression.size();
+          const auto size = split_expressions.size();
 
           Assert(0 < size && size <= 3,
                  dealii::ExcMessage(
@@ -60,9 +59,9 @@ namespace ryujin
                      "or three strings separated by a comma"));
           flux_function_ = std::make_unique<dealii::FunctionParser<1>>(
               size, 0.0, derivative_approximation_delta_);
-          flux_function_->initialize({"u"}, expression, {});
+          flux_function_->initialize({"u"}, split_expressions, {});
 
-          flux_formula_ = "f(u)={" + description_ + "}";
+          flux_formula_ = "f(u)={" + expression_ + "}";
         };
 
         set_up_muparser();
@@ -85,10 +84,10 @@ namespace ryujin
 
 
     private:
-      std::string description_;
+      std::string expression_;
       double derivative_approximation_delta_;
 
       std::unique_ptr<dealii::FunctionParser<1>> flux_function_;
     };
-  } // namespace EquationOfStateLibrary
+  } // namespace FluxLibrary
 } // namespace ryujin
