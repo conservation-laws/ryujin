@@ -32,7 +32,7 @@ namespace ryujin
         expression_ = "0.5*u*u";
         add_parameter("expression",
                       expression_,
-                      "A mathematical description of the flux as a function of "
+                      "A function expression of the flux as a function of "
                       "state used to create a muparser object to evaluate the "
                       "flux. For two, or three dimensional fluxes, components "
                       "are separated with a semicolon (;).");

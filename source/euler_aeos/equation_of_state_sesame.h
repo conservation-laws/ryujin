@@ -360,7 +360,7 @@ namespace ryujin
       }
 
 
-      double speed_of_sound(double /*rho*/, double /*p*/) const final
+      double speed_of_sound(double /*rho*/, double /*e*/) const final
       {
         __builtin_trap();
       }

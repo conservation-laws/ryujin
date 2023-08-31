@@ -45,6 +45,11 @@ namespace ryujin
          * the parameter file:
          */
         const auto set_up_muparser = [this] {
+          /*
+           * This variant of the constructor initializes the function
+           * parser with support for a time-dependent description involving
+           * a variable »t«:
+           */
           function_ =
               std::make_unique<dealii::FunctionParser<dim>>(expression_);
         };
