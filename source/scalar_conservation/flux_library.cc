@@ -20,17 +20,14 @@ namespace ryujin
      * @ingroup EulerEquations
      */
 
-    void populate_flux_list(
-        flux_list_type &flux_list,
-        const std::string &subsection)
+    void populate_flux_list(flux_list_type &flux_list,
+                            const std::string &subsection)
     {
-      auto add = [&](auto &&object) {
-        flux_list.emplace(std::move(object));
-      };
+      auto add = [&](auto &&object) { flux_list.emplace(std::move(object)); };
 
       add(std::make_shared<Burgers>(subsection));
       add(std::make_shared<Function>(subsection));
       add(std::make_shared<KPP>(subsection));
     }
-  } // namespace EquationOfStateLibrary
+  } // namespace FluxLibrary
 } // namespace ryujin

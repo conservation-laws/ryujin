@@ -59,5 +59,5 @@ namespace ryujin
         }
       }
     };
-  } // namespace EquationOfStateLibrary
+  } // namespace FluxLibrary
 } // namespace ryujin
