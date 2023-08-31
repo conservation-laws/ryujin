@@ -795,7 +795,6 @@ namespace ryujin
       };
 
       ParameterAcceptor::parse_parameters_call_back.connect(populate_functions);
-
       populate_functions();
     }
 

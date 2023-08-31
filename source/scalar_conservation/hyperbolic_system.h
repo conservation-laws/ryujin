@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include "flux_library.h"
+
 #include <convenience_macros.h>
 #include <deal.II/base/config.h>
 #include <discretization.h>
@@ -13,12 +15,10 @@
 #include <patterns_conversion.h>
 #include <simd.h>
 
-#include <deal.II/base/function_parser.h>
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/tensor.h>
 
 #include <array>
-#include <functional>
 
 namespace ryujin
 {
@@ -48,14 +48,16 @@ namespace ryujin
        * @name Runtime parameters, internal fields and methods
        */
       //@{
-      double derivative_approximation_delta_;
+      std::string flux_;
 
       bool riemann_solver_greedy_wavespeed_;
       bool riemann_solver_averaged_entropy_;
       unsigned int riemann_solver_random_entropies_;
+      double riemann_solver_approximation_delta_;
 
-      std::vector<std::string> flux_description_;
-      std::unique_ptr<dealii::FunctionParser<1>> flux_function_;
+      FluxLibrary::flux_list_type flux_list_;
+      using Flux = FluxLibrary::Flux;
+      std::shared_ptr<Flux> selected_flux_;
 
       //@}
 
@@ -98,11 +100,9 @@ namespace ryujin
          */
         //@{
 
-        DEAL_II_ALWAYS_INLINE inline ScalarNumber
-        derivative_approximation_delta() const
+        DEAL_II_ALWAYS_INLINE inline const std::string &flux() const
         {
-          return ScalarNumber(
-              hyperbolic_system_.derivative_approximation_delta_);
+          return hyperbolic_system_.flux_;
         }
 
         DEAL_II_ALWAYS_INLINE inline bool
@@ -121,6 +121,13 @@ namespace ryujin
         riemann_solver_random_entropies() const
         {
           return hyperbolic_system_.riemann_solver_random_entropies_;
+        }
+
+        DEAL_II_ALWAYS_INLINE inline ScalarNumber
+        riemann_solver_approximation_delta() const
+        {
+          return ScalarNumber(
+              hyperbolic_system_.riemann_solver_approximation_delta_);
         }
 
         //@}
@@ -551,19 +558,11 @@ namespace ryujin
     inline HyperbolicSystem::HyperbolicSystem(const std::string &subsection)
         : ParameterAcceptor(subsection)
     {
-      flux_description_ = {"0.5 * u * u"};
-      add_parameter(
-          "flux",
-          flux_description_,
-          "A mathematical description of the flux as a function of state used "
-          "to create a muparser object to evaluate the flux. For two, or three "
-          "dimensional fluxes, components are separated with a comma (,).");
-
-      derivative_approximation_delta_ = 1.0e-10;
-      add_parameter("derivative approximation delta",
-                    derivative_approximation_delta_,
-                    "Step size of the central difference quotient to compute "
-                    "an approximation of the flux derivative");
+      flux_ = "burgers";
+      add_parameter("flux",
+                    flux_,
+                    "The scalar flux. Valid names are given by any of the "
+                    "subsections defined below");
 
       riemann_solver_greedy_wavespeed_ = false;
       add_parameter(
@@ -588,34 +587,40 @@ namespace ryujin
           "flux gradients of the left and right state also enforce an entropy "
           "inequality on the prescribed number of random Krŭzkov entropies.");
 
-      /*
-       * Set up the muparser object with the final flux description from
-       * the parameter file:
-       */
-      const auto set_up_muparser = [this] {
-        const auto size = flux_description_.size();
-        Assert(0 < size && size <= 3,
-               dealii::ExcMessage(
-                   "user specified flux description must be either one, two, "
-                   "or three strings separated by a comma"));
-        flux_function_ = std::make_unique<dealii::FunctionParser<1>>(
-            size, 0.0, derivative_approximation_delta_);
-        flux_function_->initialize({"u"}, flux_description_, {});
+      riemann_solver_approximation_delta_ = 1.0e-10;
+      add_parameter("riemann solver approximation delta",
+                    riemann_solver_approximation_delta_,
+                    "Cutoff used for switching between difference quotient and "
+                    "derivative in the greedy wavespeed estimate");
 
-        problem_name =
-            "Scalar conservation equation (f(u)={" +
-            std::accumulate(std::begin(flux_description_),
-                            std::end(flux_description_),
-                            std::string(),
-                            [](std::string &result, std::string &element) {
-                              return result.empty() ? element
-                                                    : result + "," + element;
-                            }) +
-            "})";
+      /*
+       * And finally populate the flux list with all flux configurations
+       * defined in the FluxLibrary namespace:
+       */
+      FluxLibrary::populate_flux_list(flux_list_, subsection);
+
+      const auto populate_functions = [this]() {
+        bool initialized = false;
+        for (auto &it : flux_list_)
+
+          /* Populate EOS-specific quantities and functions */
+          if (it->name() == flux_) {
+            selected_flux_ = it;
+            problem_name = "Scalar conservation equation (" + it->name() +
+                           ": " + it->flux_formula() + ")";
+            initialized = true;
+            break;
+          }
+
+        AssertThrow(
+            initialized,
+            dealii::ExcMessage(
+                "Could not find an equation of state description with name \"" +
+                flux_ + "\""));
       };
 
-      set_up_muparser();
-      ParameterAcceptor::parse_parameters_call_back.connect(set_up_muparser);
+      ParameterAcceptor::parse_parameters_call_back.connect(populate_functions);
+      populate_functions();
     }
 
 
@@ -623,18 +628,16 @@ namespace ryujin
     DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, dim, Number>
     HyperbolicSystem::View<dim, Number>::flux_function(const Number &u) const
     {
+      const auto &flux = hyperbolic_system_.selected_flux_;
       dealii::Tensor<1, dim, Number> result;
 
-      /* This access is terrible: */
-
+      /* This access by calling into value() repeatedly is terrible: */
       for (unsigned int k = 0; k < dim; ++k) {
         if constexpr (std::is_same_v<ScalarNumber, Number>) {
-          result[k] =
-              hyperbolic_system_.flux_function_->value(dealii::Point<1>{u}, k);
+          result[k] = flux->value(u, k);
         } else {
           for (unsigned int s = 0; s < Number::size(); ++s) {
-            result[k][s] = hyperbolic_system_.flux_function_->value(
-                dealii::Point<1>{u[s]}, k);
+            result[k][s] = flux->value(u[s], k);
           }
         }
       }
@@ -648,18 +651,16 @@ namespace ryujin
     HyperbolicSystem::View<dim, Number>::flux_gradient_function(
         const Number &u) const
     {
+      const auto &flux = hyperbolic_system_.selected_flux_;
       dealii::Tensor<1, dim, Number> result;
 
-      /* This access is terrible: */
-
+      /* This access by calling into value() repeatedly is terrible: */
       for (unsigned int k = 0; k < dim; ++k) {
         if constexpr (std::is_same_v<ScalarNumber, Number>) {
-          result[k] = hyperbolic_system_.flux_function_->gradient(
-              dealii::Point<1>{u}, k)[0];
+          result[k] = flux->gradient(u, k);
         } else {
           for (unsigned int s = 0; s < Number::size(); ++s) {
-            result[k][s] = hyperbolic_system_.flux_function_->gradient(
-                dealii::Point<1>{u[s]}, k)[0];
+            result[k][s] = flux->gradient(u[s], k);
           }
         }
       }

@@ -27,7 +27,7 @@ namespace ryujin
         const precomputed_state_type &prec_j,
         const dealii::Tensor<1, dim, Number> &n_ij) const
     {
-      const auto &view = hyperbolic_system; // FIXME
+      const auto &view = hyperbolic_system;
 
       /* Project all fluxes to 1D: */
       const Number f_i = view.construct_flux_tensor(prec_i) * n_ij;
@@ -35,7 +35,7 @@ namespace ryujin
       const Number df_i = view.construct_flux_gradient_tensor(prec_i) * n_ij;
       const Number df_j = view.construct_flux_gradient_tensor(prec_j) * n_ij;
 
-      const auto h2 = Number(2. * view.derivative_approximation_delta());
+      const auto h2 = Number(2. * view.riemann_solver_approximation_delta());
 
 #ifdef DEBUG_RIEMANN_SOLVER
       std::cout << "\nu_i  = " << u_i << std::endl;

@@ -8,6 +8,8 @@
 #include "hyperbolic_system.h"
 #include <initial_state_library.h>
 
+#include <deal.II/base/function_parser.h>
+
 namespace ryujin
 {
   namespace ScalarConservation

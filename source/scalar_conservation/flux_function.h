@@ -34,6 +34,12 @@ namespace ryujin
                       "flux. For two, or three dimensional fluxes, components "
                       "are separated with a comma (,).");
 
+        derivative_approximation_delta_ = 1.0e-10;
+        add_parameter("derivative approximation delta",
+                      derivative_approximation_delta_,
+                      "Step size of the central difference quotient to compute "
+                      "an approximation of the flux derivative");
+
         /*
          * Set up the muparser object with the final flux description from
          * the parameter file:
