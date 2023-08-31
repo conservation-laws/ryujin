@@ -14,7 +14,7 @@ namespace ryujin
   namespace EulerInitialStates
   {
     /**
-     * Returns a initial state defined by a set of user specified function.
+     * Returns an initial state defined by a set of user specified function.
      *
      * @ingroup EulerEquations
      */

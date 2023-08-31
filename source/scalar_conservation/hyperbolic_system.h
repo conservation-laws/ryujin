@@ -603,7 +603,7 @@ namespace ryujin
         bool initialized = false;
         for (auto &it : flux_list_)
 
-          /* Populate EOS-specific quantities and functions */
+          /* Populate flux functions: */
           if (it->name() == flux_) {
             selected_flux_ = it;
             problem_name = "Scalar conservation equation (" + it->name() +
@@ -612,11 +612,10 @@ namespace ryujin
             break;
           }
 
-        AssertThrow(
-            initialized,
-            dealii::ExcMessage(
-                "Could not find an equation of state description with name \"" +
-                flux_ + "\""));
+        AssertThrow(initialized,
+                    dealii::ExcMessage(
+                        "Could not find a flux description with name \"" +
+                        flux_ + "\""));
       };
 
       ParameterAcceptor::parse_parameters_call_back.connect(populate_functions);
