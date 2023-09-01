@@ -116,7 +116,7 @@ namespace ryujin
        *   indicator.reset(i, U_i);
        *   for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
        *     // ...
-       *     indicator.add(js, U_j, c_ij);
+       *     indicator.accumulate(js, U_j, c_ij);
        *   }
        *   indicator.alpha(hd_i);
        * }
@@ -145,9 +145,9 @@ namespace ryujin
        * When looping over the sparsity row, add the contribution associated
        * with the neighboring state U_j.
        */
-      void add(const unsigned int *js,
-               const state_type &U_j,
-               const dealii::Tensor<1, dim, Number> &c_ij);
+      void accumulate(const unsigned int *js,
+                      const state_type &U_j,
+                      const dealii::Tensor<1, dim, Number> &c_ij);
 
       /**
        * Return the computed alpha_i value.
@@ -181,7 +181,11 @@ namespace ryujin
     };
 
 
-    /* Inline definitions */
+    /*
+     * -------------------------------------------------------------------------
+     * Inline definitions
+     * -------------------------------------------------------------------------
+     */
 
 
     template <int dim, typename Number>
@@ -217,10 +221,10 @@ namespace ryujin
 
 
     template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline void
-    Indicator<dim, Number>::add(const unsigned int * /*js*/,
-                                const state_type &U_j,
-                                const dealii::Tensor<1, dim, Number> &c_ij)
+    DEAL_II_ALWAYS_INLINE inline void Indicator<dim, Number>::accumulate(
+        const unsigned int * /*js*/,
+        const state_type &U_j,
+        const dealii::Tensor<1, dim, Number> &c_ij)
     {
       if (!hyperbolic_system.compute_strict_bounds())
         return;

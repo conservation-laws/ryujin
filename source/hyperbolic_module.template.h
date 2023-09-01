@@ -326,7 +326,7 @@ namespace ryujin
 
             const auto c_ij = cij_matrix.template get_tensor<T>(i, col_idx);
 
-            indicator.add(js, U_j, c_ij);
+            indicator.accumulate(js, U_j, c_ij);
 
             /* Only iterate over the upper triangular portion of d_ij */
             if (all_below_diagonal<T>(i, js))
@@ -422,6 +422,13 @@ namespace ryujin
 
           d_sum -= dij_matrix_.get_entry(i, col_idx);
         }
+
+        /*
+         * Make sure that we do not accidentally divide by zero. (Yes, this
+         * can happen for some (admittedly, rather esoteric) scalar
+         * conservation equations...).
+         */
+        d_sum = std::min(d_sum, -1.e6 * std::numeric_limits<double>::min());
 
         /* write diagonal element */
         dij_matrix_.write_entry(d_sum, i, 0);
@@ -539,7 +546,7 @@ namespace ryujin
           const auto m_i = load_value<T>(lumped_mass_matrix, i);
           const auto m_i_inv = load_value<T>(lumped_mass_matrix_inverse, i);
 
-          limiter.reset(i);
+          limiter.reset(i, U_i);
 
           /* Sources: */
           state_type S_i_new;

@@ -134,7 +134,7 @@ namespace ryujin
       /**
        * Reset temporary storage
        */
-      void reset(const unsigned int i);
+      void reset(const unsigned int i, const state_type &U_i);
 
       /**
        * When looping over the sparsity row, add the contribution associated
@@ -228,7 +228,8 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline void
-    Limiter<dim, Number>::reset(unsigned int i)
+    Limiter<dim, Number>::reset(const unsigned int /*i*/,
+                                const state_type & /*U_i*/)
     {
       /* Bounds: */
 
@@ -236,12 +237,7 @@ namespace ryujin
 
       rho_min = Number(std::numeric_limits<ScalarNumber>::max());
       rho_max = Number(0.);
-
-      const auto &[s_i, eta_i] =
-          precomputed_values
-              .template get_tensor<Number, precomputed_state_type>(i);
-
-      s_min = s_i;
+      s_min = Number(std::numeric_limits<ScalarNumber>::max());
 
       /* Relaxation: */
 

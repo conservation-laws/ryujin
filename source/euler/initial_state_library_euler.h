@@ -11,6 +11,7 @@
 #include "initial_state_becker_solution.h"
 #include "initial_state_contrast.h"
 #include "initial_state_four_state_contrast.h"
+#include "initial_state_function.h"
 #include "initial_state_isentropic_vortex.h"
 #include "initial_state_leblanc.h"
 #include "initial_state_noh.h"
@@ -40,6 +41,8 @@ namespace ryujin
       add(std::make_unique<AstroJet<Description, dim, Number>>(h, s));
       add(std::make_unique<BeckerSolution<Description, dim, Number>>(h, s));
       add(std::make_unique<Contrast<Description, dim, Number>>(h, s));
+      add(std::make_unique<FourStateContrast<Description, dim, Number>>(h, s));
+      add(std::make_unique<Function<Description, dim, Number>>(h, s));
       add(std::make_unique<IsentropicVortex<Description, dim, Number>>(h, s));
       add(std::make_unique<LeBlanc<Description, dim, Number>>(h, s));
       add(std::make_unique<Noh<Description, dim, Number>>(h, s));
@@ -47,10 +50,9 @@ namespace ryujin
       add(std::make_unique<RampUp<Description, dim, Number>>(h, s));
       add(std::make_unique<Rarefaction<Description, dim, Number>>(h, s));
       add(std::make_unique<ShockFront<Description, dim, Number>>(h, s));
-      add(std::make_unique<FourStateContrast<Description, dim, Number>>(h, s));
-      add(std::make_unique<Uniform<Description, dim, Number>>(h, s));
       add(std::make_unique<SmoothWave<Description, dim, Number>>(h, s));
       add(std::make_unique<ThreeStateContrast<Description, dim, Number>>(h, s));
+      add(std::make_unique<Uniform<Description, dim, Number>>(h, s));
     }
   } // namespace EulerInitialStates
 } // namespace ryujin

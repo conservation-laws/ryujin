@@ -5,6 +5,7 @@
 
 #include "equation_of_state_library.h"
 
+#include "equation_of_state_function.h"
 #include "equation_of_state_jones_wilkins_lee.h"
 #include "equation_of_state_noble_abel_stiffened_gas.h"
 #include "equation_of_state_polytropic_gas.h"
@@ -30,6 +31,7 @@ namespace ryujin
         equation_of_state_list.emplace(std::move(object));
       };
 
+      add(std::make_shared<Function>(subsection));
       add(std::make_shared<JonesWilkinsLee>(subsection));
       add(std::make_shared<NobleAbelStiffenedGas>(subsection));
       add(std::make_shared<PolytropicGas>(subsection));
