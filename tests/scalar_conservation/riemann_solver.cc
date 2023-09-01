@@ -96,7 +96,9 @@ void test(const std::string &expression)
 int main()
 {
   test<1, double>("burgers");
+  dealii::ParameterAcceptor::clear();
   test<2, double>("burgers");
+  dealii::ParameterAcceptor::clear();
 
   test<2, double>("kpp");
 

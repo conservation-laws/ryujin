@@ -48,11 +48,16 @@ void test(const std::string &expression)
 int main()
 {
   test<1, double>("burgers");
+  dealii::ParameterAcceptor::clear();
   test<1, float>("burgers");
+  dealii::ParameterAcceptor::clear();
   test<2, double>("burgers");
+  dealii::ParameterAcceptor::clear();
   test<2, float>("burgers");
+  dealii::ParameterAcceptor::clear();
 
   test<2, double>("kpp");
+  dealii::ParameterAcceptor::clear();
   test<2, float>({"kpp"});
 
   return 0;
