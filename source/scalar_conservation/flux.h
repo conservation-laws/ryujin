@@ -40,6 +40,8 @@ namespace ryujin
           : ParameterAcceptor(subsection + "/" + name)
           , name_(name)
       {
+        derivative_approximation_delta_ =
+            1.e4 * std::numeric_limits<double>::epsilon();
       }
 
 
@@ -62,12 +64,26 @@ namespace ryujin
       ACCESSOR_READ_ONLY(name);
 
       /**
+       * Return an appropriate step size for approximating a differential
+       * with a central difference quotient. This value is used internally
+       * in the Riemann solver to switch between a central difference
+       * formula and the "true" gradient() for computing the Roe average.
+       *
+       * The value should be set to be of the same order than any
+       * discretization used for computing the gradient(). The default
+       * value is 1e4 times the machine epsilon and is appropriate if
+       * gradient() is known and therefore implemented exactly.
+       */
+      ACCESSOR_READ_ONLY(derivative_approximation_delta)
+
+      /**
        * A string showing a detailed formula of the chosen flux function
        * (such as "f(u)=0.5*u*u").
        */
       ACCESSOR_READ_ONLY(flux_formula);
 
     protected:
+      double derivative_approximation_delta_;
       std::string flux_formula_;
 
     private:

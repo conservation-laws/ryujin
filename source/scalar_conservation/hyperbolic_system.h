@@ -53,7 +53,6 @@ namespace ryujin
       bool riemann_solver_greedy_wavespeed_;
       bool riemann_solver_averaged_entropy_;
       unsigned int riemann_solver_random_entropies_;
-      double riemann_solver_approximation_delta_;
 
       FluxLibrary::flux_list_type flux_list_;
       using Flux = FluxLibrary::Flux;
@@ -126,8 +125,8 @@ namespace ryujin
         DEAL_II_ALWAYS_INLINE inline ScalarNumber
         riemann_solver_approximation_delta() const
         {
-          return ScalarNumber(
-              hyperbolic_system_.riemann_solver_approximation_delta_);
+          const auto &flux = hyperbolic_system_.selected_flux_;
+          return ScalarNumber(flux->derivative_approximation_delta());
         }
 
         //@}
@@ -586,12 +585,6 @@ namespace ryujin
           "In addition to the wavespeed estimate based on the Roe average and "
           "flux gradients of the left and right state also enforce an entropy "
           "inequality on the prescribed number of random Krŭzkov entropies.");
-
-      riemann_solver_approximation_delta_ = 1.0e-10;
-      add_parameter("riemann solver approximation delta",
-                    riemann_solver_approximation_delta_,
-                    "Cutoff used for switching between difference quotient and "
-                    "derivative in the greedy wavespeed estimate");
 
       /*
        * And finally populate the flux list with all flux configurations

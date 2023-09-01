@@ -37,9 +37,9 @@ namespace ryujin
                       "flux. For two, or three dimensional fluxes, components "
                       "are separated with a semicolon (;).");
 
-        derivative_approximation_delta_ = 1.0e-10;
+        this->derivative_approximation_delta_ = 1.0e-10;
         add_parameter("derivative approximation delta",
-                      derivative_approximation_delta_,
+                      this->derivative_approximation_delta_,
                       "Step size of the central difference quotient to compute "
                       "an approximation of the flux derivative");
 
@@ -58,7 +58,7 @@ namespace ryujin
                      "user specified flux description must be either one, two, "
                      "or three strings separated by a comma"));
           flux_function_ = std::make_unique<dealii::FunctionParser<1>>(
-              size, 0.0, derivative_approximation_delta_);
+              size, 0.0, this->derivative_approximation_delta_);
           flux_function_->initialize({"u"}, split_expressions, {});
 
           flux_formula_ = "f(u)={" + expression_ + "}";
@@ -85,7 +85,6 @@ namespace ryujin
 
     private:
       std::string expression_;
-      double derivative_approximation_delta_;
 
       std::unique_ptr<dealii::FunctionParser<1>> flux_function_;
     };
