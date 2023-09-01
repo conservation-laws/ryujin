@@ -599,6 +599,7 @@ namespace ryujin
           /* Populate flux functions: */
           if (it->name() == flux_) {
             selected_flux_ = it;
+            it->parse_parameters_call_back();
             problem_name = "Scalar conservation equation (" + it->name() +
                            ": " + it->flux_formula() + ")";
             initialized = true;
