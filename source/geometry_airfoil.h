@@ -354,7 +354,13 @@ namespace ryujin
 
 
     /**
-     * @todo Documentation
+     * The NASA SC(2)-0714 airfoil as described in the technical report
+     *   NASA Technical Paper 2969, 1990
+     *   NASA Supercritical Airfoils, A Matrix of Family-Related Airfoils
+     *   Charles D. Harris
+     *
+     * Table XXI. page 36 (pdf page 38), found here
+     * https://ntrs.nasa.gov/api/citations/19890008197/downloads/19890008197.pdf
      */
     std::array<std::vector<double>, 4>
     nasa_sc2(const std::string &serial_number)
@@ -400,7 +406,12 @@ namespace ryujin
 
 
     /**
-     * @todo Documentation
+     * Datapoints for the Onera OAT15a airfoil.
+     *
+     * This data is annoyingly hard to get, see the discussion here
+     * https://www.cfd-online.com/Forums/main/114894-oat15a-geometry.html
+     * that mentions the following thesis (Appendix page 152) as a
+     * reference https://lume.ufrgs.br/handle/10183/28925
      */
     std::array<std::vector<double>, 4> onera(const std::string &serial_number)
     {
