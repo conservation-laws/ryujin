@@ -20,7 +20,7 @@
 #
 # [1] Maier, Kronbichler: Efficient parallel 3D computation of the
 #     compressible Euler equations with an invariant-domain preserving
-#     second-order finite-element scheme. ACM TOPC 2021, vol 8,
+#     second-order finite-element scheme. ACM TOPC 2021, vol 8.
 #     DOI 10.1145/3470637, https://arxiv.org/abs/2007.00094
 #
 ##
