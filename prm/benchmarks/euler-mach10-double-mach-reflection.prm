@@ -1,6 +1,22 @@
+##
 #
-# A Mach 10 double mach reflection configuration
+# The Mach 10 double mach reflection benchmark as described in [1].
 #
+# The chosen refinement level 7 corresponds to around 1.87M gridpoints
+# (7.48M degrees of freedom), which requires around 3k time steps and runs
+# for about (4h / #n_cores) on a modern system.
+#
+# The final time is set to t = 0.20 and we output a vtk every δt = 0.01.
+# For postprocessing the simulation into a nice video set the output
+# frequency to δt = = 0.0005 which will result in a 20 seconds long video
+# at 20 fps.
+#
+# [1] Woodward, Colella: The numerical simulation of two-dimensional fluid
+#     flow with strong shocks. Journal of Computational Physics 1984, vol 54
+#     DOI rm10.1016/0021-9991(84)90142-6
+#
+##
+
 
 subsection A - TimeLoop
   set basename                     = mach10-dbmr
@@ -9,8 +25,6 @@ subsection A - TimeLoop
 
   set final time                   = 0.20
   set output granularity           = 0.01
-
-  set output full multiplier       = 1
 end
 
 
@@ -35,12 +49,12 @@ end
 
 
 subsection E - InitialValues
-  set configuration = shockfront
+  set configuration = shock front
 
   set direction     = 0.8660254, -0.5
   set position      = 0.166667, 0
 
-  subsection shockfront
+  subsection shock front
     set mach number     = 10
     set primitive state = 1.4, 0, 1
   end
@@ -48,18 +62,15 @@ end
 
 
 subsection H - TimeIntegrator
-  set cfl min               = 0.45
+  set cfl min               = 0.90
   set cfl max               = 0.90
-  set cfl recovery strategy = bang bang control
+  set cfl recovery strategy = none
 
   set time stepping scheme  = erk 33
 end
 
 
 subsection I - VTUOutput
-  set manifolds      =
-
   set use mpi io     = true
-
   set schlieren beta = 10
 end

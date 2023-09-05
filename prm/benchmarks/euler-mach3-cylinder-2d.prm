@@ -1,0 +1,80 @@
+##
+#
+# Supersonic channel flow past a cylinder in 2D at Mach 3.
+#
+# The geometry is a disc of diameter 0.5 positioned at coordinates {0.6,0}
+# in a channel [0,4] x [-1,1]. On the left inflow boundary Dirichlet
+# boundary conditions and on the right outflow boundary "do nothing"
+# conditions are enforced. On all other boundaries (top and bottom boundary
+# of the channel and the cylinder boundary) slip boundary conditions are
+# enforced.
+#
+# The chosen refinement level 8 corresponds to around 2.36M gridpoints
+# (9.44M degrees of freedom), which requires around 25k time steps and runs
+# for about (50h / #n_cores) on a modern system.
+#
+# The final time is set to t = 5.0 and we output a vtk every δt = 0.1. For
+# postprocessing the simulation into a nice video set the output frequency
+# to δt = = 0.01 which will result in a 25 seconds long video at 20 fps.
+#
+##
+
+subsection A - TimeLoop
+  set basename                     = mach3-cylinder-2d
+
+  set enable output full           = true
+
+  set final time                   = 5.00
+  set output granularity           = 0.10
+end
+
+
+subsection B - Equation
+  set dimension = 2
+  set equation  = euler
+  set gamma     = 1.4
+end
+
+
+subsection C - Discretization
+  set geometry            = cylinder
+
+  set mesh refinement     = 8
+  set mesh repartitioning = false
+
+  subsection cylinder
+    set height          = 2
+    set length          = 4
+    set object diameter = 0.5
+    set object position = 0.6
+  end
+end
+
+
+subsection E - InitialValues
+  set configuration = uniform
+
+  set direction     = 1, 0
+  set position      = 1, 0
+
+  set perturbation  = 0
+
+  subsection uniform
+    set primitive state = 1.4, 3, 1
+  end
+end
+
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.90
+  set cfl max               = 0.90
+  set cfl recovery strategy = none
+
+  set time stepping scheme  = erk 33
+end
+
+
+subsection I - VTUOutput
+  set use mpi io     = true
+  set schlieren beta = 10
+end
