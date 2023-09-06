@@ -55,10 +55,11 @@ namespace ryujin
       time_stepping_scheme_ = TimeSteppingScheme::erk_33;
     else
       time_stepping_scheme_ = TimeSteppingScheme::strang_erk_33_cn;
-    add_parameter("time stepping scheme",
-                  time_stepping_scheme_,
-                  "Time stepping scheme: ssprk 33, erk 11, erk 22, erk 33, erk "
-                  "43, erk 54");
+    add_parameter(
+        "time stepping scheme",
+        time_stepping_scheme_,
+        "Time stepping scheme: ssprk 33, erk 11, erk 22, erk 33, erk 43, erk "
+        "54, strang ssprk 33 cn, strang erk 33 cn, strang erk 43 cn");
   }
 
 
@@ -112,6 +113,11 @@ namespace ryujin
       precomputed_.resize(3);
       efficiency_ = 6.;
       break;
+    case TimeSteppingScheme::strang_erk_43_cn:
+      U_.resize(4); // FIXME
+      precomputed_.resize(4);
+      efficiency_ = 8.;
+      break;
     }
 
     /* Initialize temporary vectors and matrices: */
@@ -159,7 +165,9 @@ namespace ryujin
       }
       case TimeSteppingScheme::strang_ssprk_33_cn:
         [[fallthrough]];
-      case TimeSteppingScheme::strang_erk_33_cn: {
+      case TimeSteppingScheme::strang_erk_33_cn:
+        [[fallthrough]];
+      case TimeSteppingScheme::strang_erk_43_cn: {
         AssertThrow(
             !ParabolicSystem::is_identity,
             dealii::ExcMessage(
@@ -202,6 +210,8 @@ namespace ryujin
         return step_strang_ssprk_33_cn(U, t);
       case TimeSteppingScheme::strang_erk_33_cn:
         return step_strang_erk_33_cn(U, t);
+      case TimeSteppingScheme::strang_erk_43_cn:
+        return step_strang_erk_43_cn(U, t);
       default:
         __builtin_unreachable();
       }
@@ -360,7 +370,6 @@ namespace ryujin
         U, {}, {}, {}, U_[0], precomputed_[0]);
     hyperbolic_module_->apply_boundary_conditions(U_[0], t + tau);
 
-
     /* Step 2: U2 <- {U1, 2} and {U, -1} at time t + 2 tau */
     hyperbolic_module_->template step<1>(U_[0],
                                          {{U}},
@@ -370,7 +379,6 @@ namespace ryujin
                                          precomputed_[1],
                                          tau);
     hyperbolic_module_->apply_boundary_conditions(U_[1], t + 2. * tau);
-
 
     /* Step 3: U3 <- {U2, 2} and {U1, -1} at time t + 3 tau */
     hyperbolic_module_->template step<1>(U_[1],
@@ -541,7 +549,7 @@ namespace ryujin
               << std::endl;
 #endif
 
-    /* First explicit SSPRK 3 step with final result in U_[0]: */
+    /* First explicit ERK(3,3,1) step with final result in U_[2]: */
 
     Number tau = hyperbolic_module_->template step<0>(
         /*input*/ U, {}, {}, {}, U_[0], precomputed_[0]);
@@ -569,7 +577,7 @@ namespace ryujin
 
     parabolic_module_->crank_nicolson_step(U_[2], t, U_[3], 6.0 * tau);
 
-    /* First explicit SSPRK 3 step with final result in U_[0]: */
+    /* First explicit SSPRK 3 step with final result in U_[2]: */
 
     hyperbolic_module_->template step<0>(
         /*intermediate*/ U_[3], {}, {}, {}, U_[0], precomputed_[0], tau);
@@ -595,6 +603,100 @@ namespace ryujin
 
     U.swap(U_[2]);
     return 6. * tau;
+  }
+
+
+  template <typename Description, int dim, typename Number>
+  Number TimeIntegrator<Description, dim, Number>::step_strang_erk_43_cn(
+      vector_type &U, Number t)
+  {
+    // FIXME: refactor to avoid code duplication with step_erk_43
+
+#ifdef DEBUG_OUTPUT
+    std::cout << "TimeIntegrator<dim, Number>::step_strang_erk_43_cn()"
+              << std::endl;
+#endif
+
+    /* First explicit ERK(4,3,1) step with final result in U_[3]: */
+
+    /* Step 1: U1 <- {U, 1} at time t + tau */
+    Number tau = hyperbolic_module_->template step<0>(
+        /*input*/ U, {}, {}, {}, U_[0], precomputed_[0]);
+    hyperbolic_module_->apply_boundary_conditions(U_[0], t + tau);
+
+    /* Step 2: U2 <- {U1, 2} and {U, -1} at time t + 2 tau */
+    hyperbolic_module_->template step<1>(U_[0],
+                                         {{/*input*/ U}},
+                                         {{precomputed_[0]}},
+                                         {{Number(-1.)}},
+                                         U_[1],
+                                         precomputed_[1],
+                                         tau);
+    hyperbolic_module_->apply_boundary_conditions(U_[1], t + 2. * tau);
+
+    /* Step 3: U3 <- {U2, 2} and {U1, -1} at time t + 3 tau */
+    hyperbolic_module_->template step<1>(U_[1],
+                                         {{U_[0]}},
+                                         {{precomputed_[1]}},
+                                         {{Number(-1.)}},
+                                         U_[2],
+                                         precomputed_[2],
+                                         tau);
+    hyperbolic_module_->apply_boundary_conditions(U_[2], t + 3. * tau);
+
+    /* Step 4: U4 <- {U3, 8/3} and {U2,-10/3} and {U1, 5/3} at time t + 4 tau */
+    hyperbolic_module_->template step<2>(U_[2],
+                                         {{U_[0], U_[1]}},
+                                         {{precomputed_[1], precomputed_[2]}},
+                                         {{Number(5. / 3.), Number(-10. / 3.)}},
+                                         U_[3],
+                                         precomputed_[3],
+                                         tau);
+    hyperbolic_module_->apply_boundary_conditions(U_[3], t + 4. * tau);
+
+    /* Implicit Crank-Nicolson step with final result in U_[2]: */
+
+    parabolic_module_->crank_nicolson_step(U_[3], t, U_[2], 8.0 * tau);
+
+    /* First explicit SSPRK 3 step with final result in U_[3]: */
+
+    /* Step 1: U1 <- {U, 1} at time t + tau */
+    hyperbolic_module_->template step<0>(
+        /*intermediate*/ U_[2], {}, {}, {}, U_[0], precomputed_[0], tau);
+    hyperbolic_module_->apply_boundary_conditions(U_[0], t + 5. * tau);
+
+    /* Step 2: U2 <- {U1, 2} and {U, -1} at time t + 2 tau */
+    hyperbolic_module_->template step<1>(U_[0],
+                                         {{/*intermediate*/ U_[2]}},
+                                         {{precomputed_[0]}},
+                                         {{Number(-1.)}},
+                                         U_[1],
+                                         precomputed_[1],
+                                         tau);
+    hyperbolic_module_->apply_boundary_conditions(U_[1], t + 6. * tau);
+
+    /* Step 3: U3 <- {U2, 2} and {U1, -1} at time t + 3 tau */
+    hyperbolic_module_->template step<1>(U_[1],
+                                         {{U_[0]}},
+                                         {{precomputed_[1]}},
+                                         {{Number(-1.)}},
+                                         U_[2],
+                                         precomputed_[2],
+                                         tau);
+    hyperbolic_module_->apply_boundary_conditions(U_[2], t + 7. * tau);
+
+    /* Step 4: U4 <- {U3, 8/3} and {U2,-10/3} and {U1, 5/3} at time t + 4 tau */
+    hyperbolic_module_->template step<2>(U_[2],
+                                         {{U_[0], U_[1]}},
+                                         {{precomputed_[1], precomputed_[2]}},
+                                         {{Number(5. / 3.), Number(-10. / 3.)}},
+                                         U_[3],
+                                         precomputed_[3],
+                                         tau);
+    hyperbolic_module_->apply_boundary_conditions(U_[3], t + 8. * tau);
+
+    U.swap(U_[3]);
+    return 8. * tau;
   }
 
 } /* namespace ryujin */

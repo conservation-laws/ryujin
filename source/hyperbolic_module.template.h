@@ -428,7 +428,8 @@ namespace ryujin
          * can happen for some (admittedly, rather esoteric) scalar
          * conservation equations...).
          */
-        d_sum = std::min(d_sum, -1.e6 * std::numeric_limits<double>::min());
+        d_sum =
+            std::min(d_sum, Number(-1.e6) * std::numeric_limits<Number>::min());
 
         /* write diagonal element */
         dij_matrix_.write_entry(d_sum, i, 0);
