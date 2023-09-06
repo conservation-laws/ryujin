@@ -1,0 +1,83 @@
+##
+#
+# Supersonic flow past a forward facing step at Mach 3.
+#
+# The geometry is a channel with bottom left corner {0,0} and top right
+# corner {3,1} but with a step inscribed at position x = 0.6 of height 0.2:
+#
+#   [0,0.6] x [0,0.2] \cup [0,3] x [0.2,1.0]
+#
+# On the left inflow boundary Dirichlet boundary conditions and on the
+# right outflow boundary "do nothing" conditions are enforced. On all other
+# boundaries (top and bottom boundary of the channel includin step) slip
+# boundary conditions are enforced.
+#
+# The chosen refinement level 3 corresponds to around 1.04M gridpoints
+# (4.16M degrees of freedom), which requires around 14k time steps and runs
+# for about (15h / #n_cores) on a modern system.
+#
+# The final time is set to t = 4.0 and we output a vtk every δt = 0.1. For
+# postprocessing the simulation into a nice video set the output frequency
+# to δt = = 0.01 which will result in a 20 seconds long video at 20 fps.
+#
+##
+
+subsection A - TimeLoop
+  set basename                     = mach3-step
+
+  set enable output full           = true
+
+  set final time                   = 4.00
+  set output granularity           = 0.10
+end
+
+
+subsection B - Equation
+  set dimension = 2
+  set equation  = euler
+  set gamma     = 1.4
+end
+
+
+subsection C - Discretization
+  set geometry            = step
+
+  set mesh refinement     = 3
+  set mesh repartitioning = false
+
+  subsection step
+    set height        = 1
+    set length        = 3
+    set step height   = 0.2
+    set step position = 0.6
+  end
+end
+
+
+subsection E - InitialValues
+  set configuration = uniform
+
+  set direction     = 1, 0
+  set position      = 1, 0
+
+  set perturbation  = 0
+
+  subsection uniform
+    set primitive state = 1.4, 3, 1
+  end
+end
+
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.90
+  set cfl max               = 0.90
+  set cfl recovery strategy = none
+
+  set time stepping scheme  = erk 33
+end
+
+
+subsection I - VTUOutput
+  set use mpi io     = true
+  set schlieren beta = 10
+end

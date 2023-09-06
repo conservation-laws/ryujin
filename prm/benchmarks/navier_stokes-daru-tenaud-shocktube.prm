@@ -1,3 +1,4 @@
+##
 #
 # Navier-Stokes Shocktube Benchmark
 #
@@ -11,6 +12,9 @@
 # We use the ideal gas equation of state p = (gamma - 1) rho e with
 # gamma=1.4. The bulk viscosity is set to 0. The Prandtl number is Pr=0.73.
 #
+# The chosen refinement level 10 corresponds to around 2.10M gridpoints
+# (8.40M degrees of freedom), which requires around 5k time steps and runs
+# for about (60h / #n_cores) on a modern system.
 #
 # [1] V.~Daru and C.~Tenaud. Evaluation of TVD high resolution schemes for
 #     unsteady viscous shocked flows. Computers & Fluids, 30(1):89-113, 2001
@@ -19,9 +23,10 @@
 #     problem by using a high resolution monotonicity-preserving scheme.
 #      Computers & Fluids, 38(3):664-676, 2009.
 #
+##
 
 subsection A - TimeLoop
-  set basename                     = graded-enforced-L10
+  set basename                     = shocktube-graded
 
   set enable compute quantities    = true
   set enable output full           = true
@@ -33,35 +38,41 @@ subsection A - TimeLoop
   set output quantities multiplier = 1
 end
 
-subsection B - ProblemDescription
-  set description = Navier Stokes
+subsection B - Equation
+  set dimension = 2
+  set equation  = navier stokes
 
-  set mu          = 1.0e-3
-  set lambda      = 0
+  set mu        = 1.0e-3
+  set lambda    = 0
 
   # Scaled thermal conductivity c_v^{-1} kappa  =  mu * gamma / Pr
-  set kappa       = 1.91780821918e-3
+  set kappa     = 1.91780821918e-3
 end
 
 subsection C - Discretization
-  set geometry            = shocktube
+  set geometry            = rectangular domain
   set mesh refinement     = 10
   set mesh repartitioning = true
 
-  subsection shocktube
-    set height               = 0.5
-    set length               = 1
+  subsection rectangular domain
+    set boundary condition bottom = no_slip
+    set boundary condition left   = no_slip
+    set boundary condition right  = no_slip
+    set boundary condition top    = slip
 
-    set grading pull back    = x;(1-y)^5.
-    set grading push forward = x;1-y^(1./5.)
-    set subdivisions x       = 2
-    set subdivisions y       = 1
+    set position bottom left      =  0, 0
+    set position top right        =  1, 0.5
+
+    set grading pull back         = x;(1-y)^2.
+    set grading push forward      = x;1-y^(1./2.)
+    set subdivisions x            = 2
+    set subdivisions y            = 1
   end
 end
 
 subsection E - InitialValues
   set configuration = contrast
-  set direction     = 1, 0
+  set direction     = 1,   0
   set position      = 0.5, 0
 
   subsection contrast
@@ -70,13 +81,13 @@ subsection E - InitialValues
   end
 end
 
-subsection F - EulerModule
+subsection F - HyperbolicModule
   set cfl with boundary dofs = true
 
   set limiter iterations = 2
 end
 
-subsection G - DissipationModule
+subsection G - ParabolicModule
   set tolerance                              = 1e-10
   set tolerance linfty norm                  = false
 
@@ -92,22 +103,18 @@ subsection G - DissipationModule
   set multigrid velocity - chebyshev max eig = 2.0
   set multigrid velocity - chebyshev range   = 8.0
   set multigrid velocity - max iter          = 12
-
-  set shift                                  = 0
 end
 
 subsection H - TimeIntegrator
   set cfl min                = 0.80
   set cfl max                = 0.80
   set cfl recovery strategy = none
-  set time stepping scheme  = erk 33
+  set time stepping scheme  = strang erk 33 cn
 end
 
 subsection I - VTUOutput
-  set use mpi io     = false
-
   set schlieren beta = 10
-  set vorticity beta = 10
+  set use mpi io     = true
 end
 
 
