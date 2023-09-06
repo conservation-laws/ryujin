@@ -118,6 +118,12 @@ namespace ryujin
      * Crank-Nicolson for the parabolic subproblem
      */
     strang_erk_33_cn,
+
+    /**
+     * A Strang split using erk 43 for the hyperbolic subproblem and
+     * Crank-Nicolson for the parabolic subproblem
+     */
+    strang_erk_43_cn,
   };
 } // namespace ryujin
 
@@ -136,7 +142,8 @@ DECLARE_ENUM(
          {ryujin::TimeSteppingScheme::erk_43, "erk 43"},
          {ryujin::TimeSteppingScheme::erk_54, "erk 54"},
          {ryujin::TimeSteppingScheme::strang_ssprk_33_cn, "strang ssprk 33 cn"},
-         {ryujin::TimeSteppingScheme::strang_erk_33_cn, "strang erk 33 cn"}, ));
+         {ryujin::TimeSteppingScheme::strang_erk_33_cn, "strang erk 33 cn"},
+         {ryujin::TimeSteppingScheme::strang_erk_43_cn, "strang erk 43 cn"}, ));
 #endif
 
 namespace ryujin
@@ -305,6 +312,15 @@ namespace ryujin
      * tau.
      */
     Number step_strang_erk_33_cn(vector_type &U, Number t);
+
+    /**
+     * Given a reference to a previous state vector U performs a combined
+     * explicit implicit Strang split using a third-order Runge-Kutta
+     * ERK(4,3,1) time step and an implicit Crank-Nicolson step (and store
+     * the result in U). The function returns the chosen time step size
+     * tau.
+     */
+    Number step_strang_erk_43_cn(vector_type &U, Number t);
 
   private:
     //@}
