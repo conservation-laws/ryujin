@@ -49,10 +49,6 @@ void set_thread_limit(const MPI_Comm &mpi_communicator [[maybe_unused]])
   omp_set_num_threads(n_threads);
   dealii::MultithreadInfo::set_thread_limit(n_threads);
 #else
-  if (dealii::Utilities::MPI::this_mpi_process(mpi_communicator) == 0) {
-    std::cout << "[INFO] OpenMP support disabled, set thread limit to one"
-              << std::endl;
-  }
   dealii::MultithreadInfo::set_thread_limit(1);
 #endif
 }
