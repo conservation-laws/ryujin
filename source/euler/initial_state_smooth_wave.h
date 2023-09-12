@@ -75,13 +75,13 @@ namespace ryujin
         if (left_ <= point_bar[0] && point_bar[0] <= right_)
           rho = density_ref_ + polynomial;
 
-        state_type conserved_state;
+        state_type initial_state;
         {
-          conserved_state[0] = rho;
-          conserved_state[1] = mach_number_;
-          conserved_state[dim + 1] = pressure_ref_;
+          initial_state[0] = rho;
+          initial_state[1] = mach_number_;
+          initial_state[dim + 1] = pressure_ref_;
         }
-        return hyperbolic_system_.from_initial_state(conserved_state);
+        return hyperbolic_system_.from_initial_state(initial_state);
       }
 
     private:
