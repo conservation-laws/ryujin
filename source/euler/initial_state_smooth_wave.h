@@ -14,10 +14,9 @@ namespace ryujin
   {
     /**
      * This is a generalization of the "Smooth traveling wave" problem first
-     * proposed in Section 5.2 of @cite GuermondEtAl2018
-     *
-     * An Analytic solution for the compressible Euler equations with
-     * polytropic gas equation of state and \f$\gamma = 7./5\f$.
+     * proposed in Section 5.2 of @cite GuermondEtAl2018 for ideal gas EOS.
+     * The details for extending to arbitrary equations of state are seen in
+     * Section 5.3.1 of @cite ryujin-2023-4.
      *
      * @note This class returns the analytic solution as a function of time
      * @p t and position @p x.
@@ -55,10 +54,9 @@ namespace ryujin
                             mach_number_,
                             "Mach number of traveling smooth wave");
 
+        /* These are the x_0 and x_1 parameters from references above. */
         left_ = 0.1;
-        this->add_parameter("left number", left_, "fixme left ");
         right_ = 0.3;
-        this->add_parameter("right number", right_, "fixme right ");
       }
 
       state_type compute(const dealii::Point<dim> &point, Number t) final
@@ -77,15 +75,13 @@ namespace ryujin
         if (left_ <= point_bar[0] && point_bar[0] <= right_)
           rho = density_ref_ + polynomial;
 
-        state_type conserved_state;
+        state_type initial_state;
         {
-          conserved_state[0] = rho;
-          conserved_state[1] = rho * mach_number_;
-          conserved_state[dim + 1] =
-              pressure_ref_ / ScalarNumber(7. / 5. - 1.) +
-              ScalarNumber(0.5) * rho * mach_number_ * mach_number_;
+          initial_state[0] = rho;
+          initial_state[1] = mach_number_;
+          initial_state[dim + 1] = pressure_ref_;
         }
-        return conserved_state;
+        return hyperbolic_system_.from_initial_state(initial_state);
       }
 
     private:
