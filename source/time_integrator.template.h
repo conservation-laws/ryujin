@@ -7,11 +7,6 @@
 
 #include "time_integrator.h"
 
-// We need to instantiate the HyperbolicModule::step() and
-// ParabolicModule::step() functions:
-#include "hyperbolic_module.template.h"
-#include "parabolic_module.template.h"
-
 namespace ryujin
 {
   using namespace dealii;
