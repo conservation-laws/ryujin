@@ -54,18 +54,26 @@
 
 
 /**
- * @defgroup SkeletonEquations Minimal equation interface
- *
- * This module contains the minimal necessary interface for defining a
- * hyperbolic system.
- */
-
-
-/**
  * @defgroup EulerEquations The Compressible Euler Equations
  *
  * This module contains classes and functions related to solving the
  * compressible Euler equations of gas dynamics.
+ */
+
+
+/**
+ * @defgroup NavierStokesEquations The Compressible Navier Stokes Equations
+ *
+ * This module contains classes and functions related to solving the
+ * compressible Navier Stokes equations.
+ */
+
+
+/**
+ * @defgroup ScalarConservationEquations The Scalar Conservation Equations
+ *
+ * This module contains classes and functions related to solving various
+ * scalar conservation equations.
  */
 
 
@@ -78,8 +86,8 @@
 
 
 /**
- * @defgroup NavierStokesEquations The Compressible Navier Stokes Equations
+ * @defgroup SkeletonEquations Minimal equation interface
  *
- * This module contains classes and functions related to solving the
- * compressible Navier Stokes equations.
+ * This module contains the minimal necessary interface for defining a
+ * hyperbolic system.
  */
