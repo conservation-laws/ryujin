@@ -750,8 +750,9 @@ namespace ryujin
           const auto lambda_inv = Number(row_length - 1);
           const auto factor = tau * m_i_inv * lambda_inv;
 
-          const unsigned int *js = sparsity_simd.columns(i);
-          for (unsigned int col_idx = 0; col_idx < row_length;
+          /* Skip diagonal. */
+          const unsigned int *js = sparsity_simd.columns(i) + stride_size;
+          for (unsigned int col_idx = 1; col_idx < row_length;
                ++col_idx, js += stride_size) {
 
             /*
@@ -880,7 +881,8 @@ namespace ryujin
           const Number lambda = Number(1.) / Number(row_length - 1);
           lij_row.resize_fast(row_length);
 
-          for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
+          /* Skip diagonal. */
+          for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
 
             const auto l_ij = std::min(
                 lij_matrix_.template get_entry<T>(i, col_idx),
@@ -917,7 +919,8 @@ namespace ryujin
 
           const auto bounds =
               bounds_.template get_tensor<T, std::array<T, n_bounds>>(i);
-          for (unsigned int col_idx = 0; col_idx < row_length; ++col_idx) {
+          /* Skip diagonal. */
+          for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
 
             const auto old_l_ij = lij_row[col_idx];
 
