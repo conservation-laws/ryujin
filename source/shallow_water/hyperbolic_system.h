@@ -6,8 +6,10 @@
 #pragma once
 
 #include <convenience_macros.h>
+#include <deal.II/base/config.h>
 #include <discretization.h>
 #include <multicomponent_vector.h>
+#include <openmp.h>
 #include <patterns_conversion.h>
 #include <simd.h>
 
@@ -277,17 +279,13 @@ namespace ryujin
          * called within our usual loop() idiom in HyperbolicModule
          */
         template <typename DISPATCH, typename SPARSITY>
-        void
-        precomputation_loop(unsigned int /*cycle*/,
-                            const DISPATCH &/*dispatch_check*/,
-                            precomputed_vector_type & /*precomputed_values*/,
-                            const SPARSITY & /*sparsity_simd*/,
-                            const vector_type & /*U*/,
-                            unsigned int /*left*/,
-                            unsigned int /*right*/) const
-        {
-          // FIXME
-        }
+        void precomputation_loop(unsigned int cycle,
+                                 const DISPATCH &dispatch_check,
+                                 precomputed_vector_type &precomputed_values,
+                                 const SPARSITY &sparsity_simd,
+                                 const vector_type &U,
+                                 unsigned int left,
+                                 unsigned int right) const;
 
         //@}
         /**
@@ -631,5 +629,695 @@ namespace ryujin
         return View<dim, Number>{*this};
       }
     }; /* HyperbolicSystem */
-  }    // namespace ShallowWater
+
+
+    /*
+     * -------------------------------------------------------------------------
+     * Inline definitions
+     * -------------------------------------------------------------------------
+     */
+
+    template <int dim, typename Number>
+    template <typename DISPATCH, typename SPARSITY>
+    DEAL_II_ALWAYS_INLINE inline void
+    HyperbolicSystem::View<dim, Number>::precomputation_loop(
+        unsigned int cycle [[maybe_unused]],
+        const DISPATCH &dispatch_check,
+        precomputed_vector_type &precomputed_values,
+        const SPARSITY &sparsity_simd,
+        const vector_type &U,
+        unsigned int left,
+        unsigned int right) const
+    {
+      Assert(cycle == 0, dealii::ExcInternalError());
+
+      /* We are inside a thread parallel context */
+
+      unsigned int stride_size = get_stride_size<Number>;
+
+      RYUJIN_OMP_FOR
+      for (unsigned int i = left; i < right; i += stride_size) {
+
+        /* Skip constrained degrees of freedom: */
+        const unsigned int row_length = sparsity_simd.row_length(i);
+        if (row_length == 1)
+          continue;
+
+        dispatch_check(i);
+
+        const auto U_i = U.template get_tensor<Number>(i);
+        const precomputed_state_type prec_i{mathematical_entropy(U_i)};
+        precomputed_values.template write_tensor<Number>(prec_i, i);
+      }
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline Number
+    HyperbolicSystem::View<dim, Number>::water_depth(const state_type &U)
+    {
+      return U[0];
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline Number
+    HyperbolicSystem::View<dim, Number>::inverse_water_depth_mollified(
+        const state_type &U) const
+    {
+      constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
+
+      const Number h_cutoff_mollified = reference_water_depth() *
+                                        dry_state_relaxation_mollified() *
+                                        Number(eps);
+
+      const Number h = water_depth(U);
+      const Number h_pos = positive_part(water_depth(U));
+      const Number h_max = std::max(h, h_cutoff_mollified);
+      const Number denom = h * h + h_max * h_max;
+      return ScalarNumber(2.) * h_pos / denom;
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline Number
+    HyperbolicSystem::View<dim, Number>::water_depth_sharp(
+        const state_type &U) const
+    {
+      constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
+
+      const Number h_cutoff_sharp =
+          reference_water_depth() * dry_state_relaxation_sharp() * Number(eps);
+
+      const Number h = water_depth(U);
+      const Number h_max = std::max(h, h_cutoff_sharp);
+      return h_max;
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline Number
+    HyperbolicSystem::View<dim, Number>::inverse_water_depth_sharp(
+        const state_type &U) const
+    {
+      return ScalarNumber(1.) / water_depth_sharp(U);
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline Number
+    HyperbolicSystem::View<dim, Number>::filter_dry_water_depth(
+        const Number &h) const
+    {
+      using ScalarNumber = typename get_value_type<Number>::type;
+      constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
+
+      const Number h_cutoff_mollified = reference_water_depth() *
+                                        dry_state_relaxation_mollified() *
+                                        Number(eps);
+
+      return dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+          std::abs(h), h_cutoff_mollified, Number(0.), h);
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, dim, Number>
+    HyperbolicSystem::View<dim, Number>::momentum(const state_type &U)
+    {
+      dealii::Tensor<1, dim, Number> result;
+
+      for (unsigned int i = 0; i < dim; ++i)
+        result[i] = U[1 + i];
+      return result;
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline Number
+    HyperbolicSystem::View<dim, Number>::kinetic_energy(
+        const state_type &U) const
+    {
+      const auto h = water_depth(U);
+      const auto vel = momentum(U) * inverse_water_depth_sharp(U);
+
+      /* KE = 1/2 h |v|^2 */
+      return ScalarNumber(0.5) * h * vel.norm_square();
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline Number
+    HyperbolicSystem::View<dim, Number>::pressure(const state_type &U) const
+    {
+      const Number h_sqd = U[0] * U[0];
+
+      /* p = 1/2 g h^2 */
+      return ScalarNumber(0.5) * gravity() * h_sqd;
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline Number
+    HyperbolicSystem::View<dim, Number>::speed_of_sound(
+        const state_type &U) const
+    {
+      /* c^2 = g * h */
+      return std::sqrt(gravity() * U[0]);
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline Number
+    HyperbolicSystem::View<dim, Number>::mathematical_entropy(
+        const state_type &U) const
+    {
+      const auto p = pressure(U);
+      const auto k_e = kinetic_energy(U);
+      return p + k_e;
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline auto
+    HyperbolicSystem::View<dim, Number>::mathematical_entropy_derivative(
+        const state_type &U) const -> state_type
+    {
+      /*
+       * With
+       *   eta = 1/2 g h^2 + 1/2 |m|^2 / h
+       *
+       * we get
+       *
+       *   eta' = (g h - 1/2 |vel|^2, vel)
+       *
+       * where vel = m / h
+       */
+
+      state_type result;
+
+      const Number &h = U[0];
+      const auto vel = momentum(U) * inverse_water_depth_sharp(U);
+
+      // water depth component
+      result[0] = gravity() * h - ScalarNumber(0.5) * vel.norm_square();
+
+      // momentum components
+      for (unsigned int i = 0; i < dim; ++i) {
+        result[1 + i] = vel[i];
+      }
+
+      return result;
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline bool
+    HyperbolicSystem::View<dim, Number>::is_admissible(
+        const state_type &U) const
+    {
+      const auto h = filter_dry_water_depth(water_depth(U));
+
+      constexpr auto gte = dealii::SIMDComparison::greater_than_or_equal;
+      const auto test = dealii::compare_and_apply_mask<gte>(
+          h, Number(0.), Number(0.), Number(-1.));
+
+#ifdef DEBUG_OUTPUT
+      if (!(test == Number(0.))) {
+        std::cout << std::fixed << std::setprecision(16);
+        std::cout << "Bounds violation: Negative state [h] detected!\n";
+        std::cout << "\t\th: " << h << "\n" << std::endl;
+        __builtin_trap();
+      }
+#endif
+
+      return (test == Number(0.));
+    }
+
+
+    template <int dim, typename Number>
+    template <int component>
+    DEAL_II_ALWAYS_INLINE inline auto
+    HyperbolicSystem::View<dim, Number>::prescribe_riemann_characteristic(
+        const state_type &U,
+        const state_type &U_bar,
+        const dealii::Tensor<1, dim, Number> &normal) const -> state_type
+    {
+      /* Note that U_bar are the dirichlet values that are prescribed */
+      static_assert(component == 1 || component == 2,
+                    "component has to be 1 or 2");
+
+      using ScalarNumber = typename get_value_type<Number>::type;
+
+      const auto m = momentum(U);
+      const auto a = speed_of_sound(U);
+      const auto vn = m * normal * inverse_water_depth_sharp(U);
+
+      const auto m_bar = momentum(U_bar);
+      const auto a_bar = speed_of_sound(U_bar);
+      const auto vn_bar = m_bar * normal * inverse_water_depth_sharp(U_bar);
+
+      /* First Riemann characteristic: v * n - 2 * a */
+
+      const auto R_1 = component == 1 ? vn_bar - ScalarNumber(2.) * a_bar
+                                      : vn - ScalarNumber(2.) * a;
+
+      /* Second Riemann characteristic: v * n + 2 * a */
+
+      const auto R_2 = component == 2 ? vn_bar + ScalarNumber(2.) * a_bar
+                                      : vn + ScalarNumber(2.) * a;
+
+      const auto vperp = m * inverse_water_depth_sharp(U) - vn * normal;
+
+      const auto vn_new = ScalarNumber(0.5) * (R_1 + R_2);
+
+      const auto h_new =
+          ryujin::fixed_power<2>((R_2 - R_1) / ScalarNumber(4.)) / gravity();
+
+      state_type U_new;
+      U_new[0] = h_new;
+      for (unsigned int d = 0; d < dim; ++d) {
+        U_new[1 + d] = h_new * (vn_new * normal + vperp)[d];
+      }
+
+      return U_new;
+    }
+
+
+    template <int dim, typename Number>
+    template <typename Lambda>
+    DEAL_II_ALWAYS_INLINE inline auto
+    HyperbolicSystem::View<dim, Number>::apply_boundary_conditions(
+        const dealii::types::boundary_id id,
+        const state_type &U,
+        const dealii::Tensor<1, dim, Number> &normal,
+        const Lambda &get_dirichlet_data) const -> state_type
+    {
+      if (id == Boundary::dirichlet) {
+        U = get_dirichlet_data();
+
+      } else if (id == Boundary::slip) {
+        auto m = momentum(U);
+        m -= 1. * (m * normal) * normal;
+        for (unsigned int k = 0; k < dim; ++k)
+          U[k + 1] = m[k];
+
+      } else if (id == Boundary::no_slip) {
+        for (unsigned int k = 0; k < dim; ++k)
+          U[k + 1] = Number(0.);
+
+      } else if (id == Boundary::dynamic) {
+        /*
+         * On dynamic boundary conditions, we distinguish four cases:
+         *
+         *  - supersonic inflow: prescribe full state
+         *  - subsonic inflow:
+         *      decompose into Riemann invariants and leave R_2
+         *      characteristic untouched.
+         *  - supersonic outflow: do nothing
+         *  - subsonic outflow:
+         *      decompose into Riemann invariants and prescribe incoming
+         *      R_1 characteristic.
+         */
+        const auto m = momentum(U);
+        const auto h_inverse = inverse_water_depth_sharp(U);
+        const auto a = speed_of_sound(U);
+        const auto vn = m * normal * h_inverse;
+
+        /* Supersonic inflow: */
+        if (vn < -a) {
+          U = get_dirichlet_data();
+        }
+
+        /* Subsonic inflow: */
+        if (vn >= -a && vn <= 0.) {
+          const auto U_dirichlet = get_dirichlet_data();
+          U = prescribe_riemann_characteristic<2>(U_dirichlet, U, normal);
+        }
+
+        /* Subsonic outflow: */
+        if (vn > 0. && vn <= a) {
+          const auto U_dirichlet = get_dirichlet_data();
+          U = prescribe_riemann_characteristic<1>(U, U_dirichlet, normal);
+        }
+
+        /* Supersonic outflow: do nothing, i.e., keep U as is */
+      }
+
+      return U;
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline auto
+    HyperbolicSystem::View<dim, Number>::star_state(const state_type &U,
+                                                    const Number &Z_left,
+                                                    const Number &Z_right) const
+        -> state_type
+    {
+      const Number Z_max = std::max(Z_left, Z_right);
+      const Number h = water_depth(U);
+      const Number H_star = std::max(Number(0.), h + Z_left - Z_max);
+
+      return U * H_star * inverse_water_depth_mollified(U);
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline auto
+    HyperbolicSystem::View<dim, Number>::f(const state_type &U) const
+        -> flux_type
+    {
+      const auto h_inverse = inverse_water_depth_sharp(U);
+      const auto m = momentum(U);
+      const auto p = pressure(U);
+
+      flux_type result;
+
+      result[0] = (m * h_inverse) * U[0];
+      for (unsigned int i = 0; i < dim; ++i) {
+        result[1 + i] = (m * h_inverse) * m[i];
+        result[1 + i][i] += p;
+      }
+      return result;
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline auto
+    HyperbolicSystem::View<dim, Number>::g(const state_type &U) const
+        -> flux_type
+    {
+      const auto h_inverse = inverse_water_depth_sharp(U);
+      const auto m = momentum(U);
+
+      flux_type result;
+
+      result[0] = (m * h_inverse) * U[0];
+      for (unsigned int i = 0; i < dim; ++i) {
+        result[1 + i] = (m * h_inverse) * m[i];
+      }
+      return result;
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline auto
+    HyperbolicSystem::View<dim, Number>::flux_contribution(
+        const precomputed_vector_type & /*pv*/,
+        const precomputed_initial_vector_type &piv,
+        const unsigned int i,
+        const state_type &U_i) const -> flux_contribution_type
+    {
+      const auto Z_i = piv.template get_tensor<Number>(i)[0];
+      return {U_i, Z_i};
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline auto
+    HyperbolicSystem::View<dim, Number>::flux_contribution(
+        const precomputed_vector_type & /*pv*/,
+        const precomputed_initial_vector_type &piv,
+        const unsigned int *js,
+        const state_type &U_j) const -> flux_contribution_type
+    {
+      const auto Z_j = piv.template get_tensor<Number>(js)[0];
+      return {U_j, Z_j};
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline auto HyperbolicSystem::View<dim, Number>::flux(
+        const flux_contribution_type &flux_i,
+        const flux_contribution_type &flux_j) const -> flux_type
+    {
+      const auto &[U_i, Z_i] = flux_i;
+      const auto &[U_j, Z_j] = flux_j;
+      const auto &[U_star_ij, U_star_ji] = equilibrated_states(flux_i, flux_j);
+
+      const auto H_i = water_depth(U_i);
+      const auto H_j = water_depth(U_j);
+
+      const auto g_i = g(U_star_ij);
+      const auto g_j = g(U_star_ji);
+
+      flux_type result = -add(g_i, g_j);
+      for (unsigned int i = 0; i < dim; ++i) {
+        result[1 + i][i] -= gravity() * H_i * H_j;
+      }
+
+      return result;
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline auto
+    HyperbolicSystem::View<dim, Number>::high_order_flux(
+        const flux_contribution_type &flux_i,
+        const flux_contribution_type &flux_j) const -> flux_type
+    {
+      const auto &[U_i, Z_i] = flux_i;
+      const auto &[U_j, Z_j] = flux_j;
+
+      const auto H_i = water_depth(U_i);
+      const auto H_j = water_depth(U_j);
+
+      const auto g_i = g(U_i);
+      const auto g_j = g(U_j);
+
+      flux_type result = -add(g_i, g_j);
+      for (unsigned int i = 0; i < dim; ++i) {
+        result[1 + i][i] -= gravity() * H_i * H_j;
+      }
+
+      return result;
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline auto
+    HyperbolicSystem::View<dim, Number>::equilibrated_states(
+        const flux_contribution_type &flux_i,
+        const flux_contribution_type &flux_j) const -> std::array<state_type, 2>
+    {
+      const auto &[U_i, Z_i] = flux_i;
+      const auto &[U_j, Z_j] = flux_j;
+
+      const auto U_star_ij = star_state(U_i, Z_i, Z_j);
+      const auto U_star_ji = star_state(U_j, Z_j, Z_i);
+
+      return {U_star_ij, U_star_ji};
+    }
+
+
+#if 0
+    template <typename MultiComponentVector, typename ST, int dim, typename T>
+    ST HyperbolicSystem::low_order_nodal_source(
+        const MultiComponentVector & /*precomputed_values*/,
+        const unsigned int /*i*/,
+        const ST &U,
+        const T &m_i,
+        const T &tau) const
+    {
+      // TODO: Move sources to a "source library"
+      using ScalarNumber = typename get_value_type<T>::type;
+
+      const auto h_sharp = water_depth_sharp(U);
+      const auto h_star = ryujin::pow(h_sharp, ScalarNumber(4. / 3.));
+
+      const auto mom = momentum(U);
+      const auto vel_norm = (mom * inverse_water_depth_mollified(U)).norm();
+
+      auto factor = vel_norm;
+      factor *= ScalarNumber(2. * gravity_ * mannings_ * mannings_);
+
+      const auto small_number = factor * tau;
+
+      const auto numerator = -factor * mom;
+      const auto denominator = h_star + std::max(h_star, small_number);
+      const auto momentum_source = numerator / denominator;
+
+      ST result;
+      for (unsigned int d = 0; d < dim; ++d)
+        result[d + 1] = m_i * momentum_source[d];
+      return result;
+    }
+
+
+    template <typename MultiComponentVector, typename ST, int dim, typename T>
+    ST HyperbolicSystem::high_order_nodal_source(
+        const MultiComponentVector & /*precomputed_values*/,
+        const unsigned int /*i*/,
+        const ST &U,
+        const T &m_i,
+        const T &tau) const
+    {
+      // TODO: Move sources to a "source library"
+      using ScalarNumber = typename get_value_type<T>::type;
+
+      const auto h_sharp = water_depth_sharp(U);
+      const auto h_star = ryujin::pow(h_sharp, ScalarNumber(4. / 3.));
+
+      const auto mom = momentum(U);
+      const auto vel_norm = (mom * inverse_water_depth_mollified(U)).norm();
+
+      auto factor = vel_norm;
+      factor *= ScalarNumber(2. * gravity_ * mannings_ * mannings_);
+
+      const auto small_number = factor * tau;
+
+      const auto numerator = -factor * mom;
+      const auto denominator = h_star + std::max(h_star, small_number);
+      const auto momentum_source = numerator / denominator;
+
+      ST result;
+      for (unsigned int d = 0; d < dim; ++d)
+        result[d + 1] = m_i * momentum_source[d];
+      return result;
+    }
+
+
+    template <typename ST, int dim, typename T>
+    ST HyperbolicSystem::low_order_stencil_source(
+        const std::tuple<ST, T> &prec_i,
+        const std::tuple<ST, T> &prec_j,
+        const T &,
+        const dealii::Tensor<1, dim, T> &c_ij) const
+    {
+      using ScalarNumber = typename get_value_type<T>::type;
+
+      const auto &[U_i, Z_i] = prec_i;
+      const auto &[U_j, Z_j] = prec_j;
+
+      const auto H_i = water_depth(U_i);
+      const auto H_j = water_depth(U_j);
+
+      const auto U_star_ij = star_state(U_i, Z_i, Z_j);
+      const auto U_star_ji = star_state(U_j, Z_j, Z_i);
+
+      const auto H_star_ij = water_depth(U_star_ij);
+      const auto H_star_ji = water_depth(U_star_ji);
+
+      auto factor = H_star_ji * H_star_ji - H_star_ij * H_star_ij;
+      factor -= ScalarNumber(2.0) * H_i * H_j;
+      factor *= ScalarNumber(0.5 * gravity_);
+
+      ST result;
+      for (unsigned int d = 1; d < dim + 1; ++d)
+        result[d] = -factor * c_ij[d - 1];
+      return result;
+    }
+
+
+    template <typename ST, int dim, typename T>
+    ST HyperbolicSystem::high_order_stencil_source(
+        const std::tuple<ST, T> &prec_i,
+        const std::tuple<ST, T> &prec_j,
+        const T &,
+        const dealii::Tensor<1, dim, T> &c_ij) const
+    {
+      using ScalarNumber = typename get_value_type<T>::type;
+
+      const auto &[U_i, Z_i] = prec_i;
+      const auto &[U_j, Z_j] = prec_j;
+      const auto H_i = water_depth(U_i);
+      // const auto H_j = water_depth(U_j);
+
+      const auto factor = ScalarNumber(gravity_) * H_i * (Z_j - Z_i);
+
+      ST result;
+      for (unsigned int d = 1; d < dim + 1; ++d)
+        result[d] = -factor * c_ij[d - 1];
+      return result;
+    }
+
+
+    template <typename ST, int dim, typename T>
+    ST HyperbolicSystem::affine_shift_stencil_source(
+        const std::tuple<ST, T> &prec_i,
+        const std::tuple<ST, T> &prec_j,
+        const T &d_ij,
+        const dealii::Tensor<1, dim, T> &c_ij) const
+    {
+      using ScalarNumber = typename get_value_type<T>::type;
+
+      const auto &[U_star_ij, U_star_ji] = equilibrated_states(prec_i, prec_j);
+      const auto g_star_ij = gas(U_star_ij);
+
+      return -ScalarNumber(2.) * d_ij * U_star_ij -
+             ScalarNumber(2.) * contract(g_star_ij, c_ij);
+    }
+#endif
+
+
+    template <int dim, typename Number>
+    template <typename ST>
+    DEAL_II_ALWAYS_INLINE inline auto
+    HyperbolicSystem::View<dim, Number>::expand_state(const ST &state) const
+        -> state_type
+    {
+      using T = typename ST::value_type;
+      static_assert(std::is_same_v<Number, T>, "template mismatch");
+
+      constexpr auto dim2 = ST::dimension - 2;
+      static_assert(dim >= dim2,
+                    "the space dimension of the argument state must not be "
+                    "larger than the one of the target state");
+
+      state_type result;
+      result[0] = state[0];
+      for (unsigned int i = 1; i < dim2 + 1; ++i)
+        result[i] = state[i];
+
+      return result;
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline auto
+    HyperbolicSystem::View<dim, Number>::from_primitive_state(
+        const primitive_state_type &primitive_state) const -> state_type
+    {
+      const auto &h = primitive_state[0];
+
+      auto state = primitive_state;
+      /* Fix up momentum: */
+      for (unsigned int i = 1; i < dim + 1; ++i)
+        state[i] *= h;
+
+      return state;
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline auto
+    HyperbolicSystem::View<dim, Number>::to_primitive_state(
+        const state_type &state) const -> primitive_state_type
+    {
+      const auto h_inverse = inverse_water_depth_sharp(state);
+
+      auto primitive_state = state;
+      /* Fix up velocity: */
+      for (unsigned int i = 1; i < dim + 1; ++i)
+        primitive_state[i] *= h_inverse;
+
+      return primitive_state;
+    }
+
+
+    template <int dim, typename Number>
+    template <typename Lambda>
+    DEAL_II_ALWAYS_INLINE inline auto
+    HyperbolicSystem::View<dim, Number>::apply_galilei_transform(
+        const state_type &state, const Lambda &lambda) const -> state_type
+    {
+      auto result = state;
+      auto M = lambda(momentum(state));
+      for (unsigned int d = 0; d < dim; ++d)
+        result[1 + d] = M[d];
+      return result;
+    }
+
+  } // namespace ShallowWater
 } // namespace ryujin
