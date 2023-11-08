@@ -913,18 +913,20 @@ namespace ryujin
         const dealii::Tensor<1, dim, Number> &normal,
         const Lambda &get_dirichlet_data) const -> state_type
     {
+      state_type result = U;
+
       if (id == Boundary::dirichlet) {
-        U = get_dirichlet_data();
+        result = get_dirichlet_data();
 
       } else if (id == Boundary::slip) {
         auto m = momentum(U);
         m -= 1. * (m * normal) * normal;
         for (unsigned int k = 0; k < dim; ++k)
-          U[k + 1] = m[k];
+          result[k + 1] = m[k];
 
       } else if (id == Boundary::no_slip) {
         for (unsigned int k = 0; k < dim; ++k)
-          U[k + 1] = Number(0.);
+          result[k + 1] = Number(0.);
 
       } else if (id == Boundary::dynamic) {
         /*
@@ -946,25 +948,25 @@ namespace ryujin
 
         /* Supersonic inflow: */
         if (vn < -a) {
-          U = get_dirichlet_data();
+          result = get_dirichlet_data();
         }
 
         /* Subsonic inflow: */
         if (vn >= -a && vn <= 0.) {
           const auto U_dirichlet = get_dirichlet_data();
-          U = prescribe_riemann_characteristic<2>(U_dirichlet, U, normal);
+          result = prescribe_riemann_characteristic<2>(U_dirichlet, U, normal);
         }
 
         /* Subsonic outflow: */
         if (vn > 0. && vn <= a) {
           const auto U_dirichlet = get_dirichlet_data();
-          U = prescribe_riemann_characteristic<1>(U, U_dirichlet, normal);
+          result = prescribe_riemann_characteristic<1>(U, U_dirichlet, normal);
         }
 
         /* Supersonic outflow: do nothing, i.e., keep U as is */
       }
 
-      return U;
+      return result;
     }
 
 
