@@ -4,9 +4,8 @@
 ##
 
 add_library(obj_shallow_water OBJECT
-  dummy.cc
+  initial_state_library.cc
   )
-  #initial_state_library.cc
   #limiter.cc
   #riemann_solver.cc
 set_target_properties(obj_shallow_water PROPERTIES LINKER_LANGUAGE CXX)
