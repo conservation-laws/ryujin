@@ -1113,18 +1113,15 @@ namespace ryujin
     }
 
 
+    template <int dim, typename Number>
+    auto HyperbolicSystem::View<dim, Number>::low_order_nodal_source(
+        const precomputed_vector_type &pv,
+        const unsigned int i,
+        const state_type &U_i) const -> state_type
+    {
+      // TODO FIXME
+
 #if 0
-    template <typename MultiComponentVector, typename ST, int dim, typename T>
-    ST HyperbolicSystem::low_order_nodal_source(
-        const MultiComponentVector & /*precomputed_values*/,
-        const unsigned int /*i*/,
-        const ST &U,
-        const T &m_i,
-        const T &tau) const
-    {
-      // TODO: Move sources to a "source library"
-      using ScalarNumber = typename get_value_type<T>::type;
-
       const auto h_sharp = water_depth_sharp(U);
       const auto h_star = ryujin::pow(h_sharp, ScalarNumber(4. / 3.));
 
@@ -1144,20 +1141,19 @@ namespace ryujin
       for (unsigned int d = 0; d < dim; ++d)
         result[d + 1] = m_i * momentum_source[d];
       return result;
+#endif
     }
 
 
-    template <typename MultiComponentVector, typename ST, int dim, typename T>
-    ST HyperbolicSystem::high_order_nodal_source(
-        const MultiComponentVector & /*precomputed_values*/,
-        const unsigned int /*i*/,
-        const ST &U,
-        const T &m_i,
-        const T &tau) const
+    template <int dim, typename Number>
+    auto HyperbolicSystem::View<dim, Number>::high_order_nodal_source(
+        const precomputed_vector_type &pv,
+        const unsigned int i,
+        const state_type &U_i) const -> state_type
     {
-      // TODO: Move sources to a "source library"
-      using ScalarNumber = typename get_value_type<T>::type;
+      // TODO FIXME
 
+#if 0
       const auto h_sharp = water_depth_sharp(U);
       const auto h_star = ryujin::pow(h_sharp, ScalarNumber(4. / 3.));
 
@@ -1177,18 +1173,17 @@ namespace ryujin
       for (unsigned int d = 0; d < dim; ++d)
         result[d + 1] = m_i * momentum_source[d];
       return result;
+#endif
     }
 
 
-    template <typename ST, int dim, typename T>
-    ST HyperbolicSystem::low_order_stencil_source(
-        const std::tuple<ST, T> &prec_i,
-        const std::tuple<ST, T> &prec_j,
-        const T &,
-        const dealii::Tensor<1, dim, T> &c_ij) const
+    template <int dim, typename Number>
+    auto HyperbolicSystem::View<dim, Number>::low_order_stencil_source(
+        const flux_contribution_type &prec_i,
+        const flux_contribution_type &prec_j,
+        const Number & /*d_ij*/,
+        const dealii::Tensor<1, dim, Number> &c_ij) const -> state_type
     {
-      using ScalarNumber = typename get_value_type<T>::type;
-
       const auto &[U_i, Z_i] = prec_i;
       const auto &[U_j, Z_j] = prec_j;
 
@@ -1203,54 +1198,49 @@ namespace ryujin
 
       auto factor = H_star_ji * H_star_ji - H_star_ij * H_star_ij;
       factor -= ScalarNumber(2.0) * H_i * H_j;
-      factor *= ScalarNumber(0.5 * gravity_);
+      factor *= ScalarNumber(0.5) * gravity();
 
-      ST result;
+      state_type result;
       for (unsigned int d = 1; d < dim + 1; ++d)
         result[d] = -factor * c_ij[d - 1];
       return result;
     }
 
 
-    template <typename ST, int dim, typename T>
-    ST HyperbolicSystem::high_order_stencil_source(
-        const std::tuple<ST, T> &prec_i,
-        const std::tuple<ST, T> &prec_j,
-        const T &,
-        const dealii::Tensor<1, dim, T> &c_ij) const
+    template <int dim, typename Number>
+    auto HyperbolicSystem::View<dim, Number>::high_order_stencil_source(
+        const flux_contribution_type &prec_i,
+        const flux_contribution_type &prec_j,
+        const Number & /*d_ij*/,
+        const dealii::Tensor<1, dim, Number> &c_ij) const -> state_type
     {
-      using ScalarNumber = typename get_value_type<T>::type;
-
       const auto &[U_i, Z_i] = prec_i;
       const auto &[U_j, Z_j] = prec_j;
       const auto H_i = water_depth(U_i);
       // const auto H_j = water_depth(U_j);
 
-      const auto factor = ScalarNumber(gravity_) * H_i * (Z_j - Z_i);
+      const auto factor = gravity() * H_i * (Z_j - Z_i);
 
-      ST result;
+      state_type result;
       for (unsigned int d = 1; d < dim + 1; ++d)
         result[d] = -factor * c_ij[d - 1];
       return result;
     }
 
 
-    template <typename ST, int dim, typename T>
-    ST HyperbolicSystem::affine_shift_stencil_source(
-        const std::tuple<ST, T> &prec_i,
-        const std::tuple<ST, T> &prec_j,
-        const T &d_ij,
-        const dealii::Tensor<1, dim, T> &c_ij) const
+    template <int dim, typename Number>
+    auto HyperbolicSystem::View<dim, Number>::affine_shift_stencil_source(
+        const flux_contribution_type &prec_i,
+        const flux_contribution_type &prec_j,
+        const Number &d_ij,
+        const dealii::Tensor<1, dim, Number> &c_ij) const -> state_type
     {
-      using ScalarNumber = typename get_value_type<T>::type;
-
       const auto &[U_star_ij, U_star_ji] = equilibrated_states(prec_i, prec_j);
-      const auto g_star_ij = gas(U_star_ij);
+      const auto g_star_ij = g(U_star_ij);
 
       return -ScalarNumber(2.) * d_ij * U_star_ij -
              ScalarNumber(2.) * contract(g_star_ij, c_ij);
     }
-#endif
 
 
     template <int dim, typename Number>
