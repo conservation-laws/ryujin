@@ -5,9 +5,9 @@
 
 add_library(obj_shallow_water OBJECT
   initial_state_library.cc
+  limiter.cc
   riemann_solver.cc
   )
-  #limiter.cc
 set_target_properties(obj_shallow_water PROPERTIES LINKER_LANGUAGE CXX)
 deal_ii_setup_target(obj_shallow_water)
 target_link_libraries(obj_shallow_water obj_common ${EXTERNAL_TARGETS})

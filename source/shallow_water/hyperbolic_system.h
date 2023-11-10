@@ -1114,7 +1114,8 @@ namespace ryujin
 
 
     template <int dim, typename Number>
-    auto HyperbolicSystem::View<dim, Number>::low_order_nodal_source(
+    DEAL_II_ALWAYS_INLINE inline auto
+    HyperbolicSystem::View<dim, Number>::low_order_nodal_source(
         const precomputed_vector_type &pv,
         const unsigned int i,
         const state_type &U_i) const -> state_type
@@ -1146,7 +1147,8 @@ namespace ryujin
 
 
     template <int dim, typename Number>
-    auto HyperbolicSystem::View<dim, Number>::high_order_nodal_source(
+    DEAL_II_ALWAYS_INLINE inline auto
+    HyperbolicSystem::View<dim, Number>::high_order_nodal_source(
         const precomputed_vector_type &pv,
         const unsigned int i,
         const state_type &U_i) const -> state_type
@@ -1178,7 +1180,8 @@ namespace ryujin
 
 
     template <int dim, typename Number>
-    auto HyperbolicSystem::View<dim, Number>::low_order_stencil_source(
+    DEAL_II_ALWAYS_INLINE inline auto
+    HyperbolicSystem::View<dim, Number>::low_order_stencil_source(
         const flux_contribution_type &prec_i,
         const flux_contribution_type &prec_j,
         const Number & /*d_ij*/,
@@ -1208,7 +1211,8 @@ namespace ryujin
 
 
     template <int dim, typename Number>
-    auto HyperbolicSystem::View<dim, Number>::high_order_stencil_source(
+    DEAL_II_ALWAYS_INLINE inline auto
+    HyperbolicSystem::View<dim, Number>::high_order_stencil_source(
         const flux_contribution_type &prec_i,
         const flux_contribution_type &prec_j,
         const Number & /*d_ij*/,
@@ -1229,7 +1233,8 @@ namespace ryujin
 
 
     template <int dim, typename Number>
-    auto HyperbolicSystem::View<dim, Number>::affine_shift_stencil_source(
+    DEAL_II_ALWAYS_INLINE inline auto
+    HyperbolicSystem::View<dim, Number>::affine_shift_stencil_source(
         const flux_contribution_type &prec_i,
         const flux_contribution_type &prec_j,
         const Number &d_ij,
