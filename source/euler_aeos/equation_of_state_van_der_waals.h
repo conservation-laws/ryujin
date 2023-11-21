@@ -32,6 +32,10 @@ namespace ryujin
         this->add_parameter(
             "covolume b", b_, "The maximum compressibility constant");
 
+        R_ = 0.4;
+        this->add_parameter(
+            "gas constant R", R_, "The specific gas constant R");
+
         /* Update the interpolation_b_ parameter on parameter read in: */
         ParameterAcceptor::parse_parameters_call_back.connect(
             [this] { this->interpolation_b_ = b_; });
@@ -68,6 +72,17 @@ namespace ryujin
       }
 
       /**
+       * The temperature is given by
+       * \f{align}
+       *   T = (\gamma - 1) / R (e + a \rho)
+       * \f}
+       */
+      double temperature(double rho, double e) const final
+      {
+        return (gamma_ - 1.) / R_ * (e + a_ * rho);
+      }
+
+      /**
        * The speed of sound is given by
        * \f{align}
        *   c^2 = \frac{\gamma (\gamma -1) (e + a \rho)}{(1 - b\rho)^2}
@@ -85,6 +100,7 @@ namespace ryujin
       double gamma_;
       double b_;
       double a_;
+      double R_;
     };
   } // namespace EquationOfStateLibrary
 } /* namespace ryujin */
