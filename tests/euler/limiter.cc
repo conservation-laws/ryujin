@@ -46,7 +46,7 @@ int main()
               << "\nBounds: " << bounds[0] << " " << bounds[1] << " "
               << bounds[2] << std::endl;
 
-    const auto &[l, success] = Limiter<dim, double>::limit(
+    const auto &[l, success] = limiter.limit(
         hyperbolic_system, bounds, U, P, newton_tolerance, newton_max_iter);
 
     std::cout << "l: " << l;

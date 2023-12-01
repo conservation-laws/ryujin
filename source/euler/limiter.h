@@ -176,7 +176,7 @@ namespace ryujin
        * high-order update are within bounds. The latter might be violated
        * due to round-off errors when computing the limiter bounds.
        */
-      static std::tuple<Number, bool>
+      std::tuple<Number, bool>
       limit(const HyperbolicSystemView &hyperbolic_system,
             const Bounds &bounds,
             const state_type &U,

@@ -718,6 +718,8 @@ namespace ryujin
         using View = typename HyperbolicSystem::template View<dim, T>;
 
         /* Stored thread locally: */
+        using Limiter = typename Description::template Limiter<dim, T>;
+        Limiter limiter(*hyperbolic_system_, new_precomputed);
         bool thread_ready = false;
 
         RYUJIN_OMP_FOR
@@ -784,13 +786,12 @@ namespace ryujin
              */
 
             const auto &[l_ij, success] =
-                Description::template Limiter<dim, T>::limit(
-                    *hyperbolic_system_,
-                    bounds,
-                    U_i_new,
-                    P_ij,
-                    limiter_newton_tolerance_,
-                    limiter_newton_max_iter_);
+                limiter.limit(*hyperbolic_system_,
+                              bounds,
+                              U_i_new,
+                              P_ij,
+                              limiter_newton_tolerance_,
+                              limiter_newton_max_iter_);
             lij_matrix_.template write_entry<T>(l_ij, i, col_idx, true);
 
             /*
@@ -857,6 +858,8 @@ namespace ryujin
 
         /* Stored thread locally: */
         AlignedVector<T> lij_row;
+        using Limiter = typename Description::template Limiter<dim, T>;
+        Limiter limiter(*hyperbolic_system_, new_precomputed);
         bool thread_ready = false;
 
         RYUJIN_OMP_FOR
@@ -928,13 +931,12 @@ namespace ryujin
                 pij_matrix_.template get_tensor<T>(i, col_idx);
 
             const auto &[new_l_ij, success] =
-                Description::template Limiter<dim, T>::limit(
-                    *hyperbolic_system_,
-                    bounds,
-                    U_i_new,
-                    new_p_ij,
-                    limiter_newton_tolerance_,
-                    limiter_newton_max_iter_);
+                limiter.limit(*hyperbolic_system_,
+                              bounds,
+                              U_i_new,
+                              new_p_ij,
+                              limiter_newton_tolerance_,
+                              limiter_newton_max_iter_);
 
             /*
              * This is the second pass of the limiter. Under rare

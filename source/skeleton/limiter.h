@@ -143,7 +143,7 @@ namespace ryujin
        * obeying \f$t_{\text{min}} < t < t_{\text{max}}\f$, such that the
        * selected local minimum principles are obeyed.
        */
-      static std::tuple<Number, bool>
+      std::tuple<Number, bool>
       limit(const HyperbolicSystemView & /*hyperbolic_system*/,
             const Bounds & /*bounds*/,
             const state_type & /*U*/,
