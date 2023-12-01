@@ -65,8 +65,7 @@ namespace ryujin
        *     // ...
        *     limiter.accumulate(js, U_j, flux_j, scaled_c_ij, beta_ij);
        *   }
-       *   limiter.apply_relaxation(hd_i);
-       *   limiter.bounds();
+       *   limiter.bounds(hd_i);
        * }
        * ```
        */
@@ -88,9 +87,9 @@ namespace ryujin
       Limiter(const HyperbolicSystem &hyperbolic_system,
               const MultiComponentVector<ScalarNumber, n_precomputed_values>
                   &precomputed_values,
-            const ScalarNumber relaxation_factor,
-            const ScalarNumber newton_tolerance,
-            const unsigned int newton_max_iter)
+              const ScalarNumber relaxation_factor,
+              const ScalarNumber newton_tolerance,
+              const unsigned int newton_max_iter)
           : hyperbolic_system(hyperbolic_system)
           , precomputed_values(precomputed_values)
           , relaxation_factor(relaxation_factor)
@@ -123,19 +122,13 @@ namespace ryujin
       }
 
       /**
-       * Apply relaxation.
+       * Return the computed bounds (with relaxation applied).
        */
-      void apply_relaxation(const Number /*hd_i*/)
+      Bounds bounds(const Number /*hd_i*/) const
       {
-        // empty
-      }
+        auto relaxed_bounds = bounds_;
 
-      /**
-       * Return the computed bounds.
-       */
-      const Bounds &bounds() const
-      {
-        return bounds_;
+        return relaxed_bounds;
       }
 
       //*}
@@ -148,12 +141,11 @@ namespace ryujin
        * obeying \f$t_{\text{min}} < t < t_{\text{max}}\f$, such that the
        * selected local minimum principles are obeyed.
        */
-      std::tuple<Number, bool>
-      limit(const Bounds & /*bounds*/,
-            const state_type & /*U*/,
-            const state_type & /*P*/,
-            const Number /*t_min*/ = Number(0.),
-            const Number t_max = Number(1.))
+      std::tuple<Number, bool> limit(const Bounds & /*bounds*/,
+                                     const state_type & /*U*/,
+                                     const state_type & /*P*/,
+                                     const Number /*t_min*/ = Number(0.),
+                                     const Number t_max = Number(1.))
       {
         return {t_max, true};
       }

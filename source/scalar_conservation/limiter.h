@@ -65,8 +65,7 @@ namespace ryujin
        *     // ...
        *     limiter.accumulate(js, U_j, flux_j, scaled_c_ij, beta_ij);
        *   }
-       *   limiter.apply_relaxation(hd_i);
-       *   limiter.bounds();
+       *   limiter.bounds(hd_i);
        * }
        * ```
        */
@@ -88,9 +87,9 @@ namespace ryujin
       Limiter(const HyperbolicSystem &hyperbolic_system,
               const MultiComponentVector<ScalarNumber, n_precomputed_values>
                   &precomputed_values,
-            const ScalarNumber relaxation_factor,
-            const ScalarNumber newton_tolerance,
-            const unsigned int newton_max_iter)
+              const ScalarNumber relaxation_factor,
+              const ScalarNumber newton_tolerance,
+              const unsigned int newton_max_iter)
           : hyperbolic_system(hyperbolic_system)
           , precomputed_values(precomputed_values)
           , relaxation_factor(relaxation_factor)
@@ -117,14 +116,9 @@ namespace ryujin
                       const Number beta_ij);
 
       /**
-       * Apply relaxation.
+       * Return the computed bounds (with relaxation applied).
        */
-      void apply_relaxation(const Number hd_i);
-
-      /**
-       * Return the computed bounds.
-       */
-      const Bounds &bounds() const;
+      Bounds bounds(const Number hd_i) const;
 
       //*}
       /** @name Convex limiter */
@@ -136,12 +130,11 @@ namespace ryujin
        * obeying \f$t_{\text{min}} < t < t_{\text{max}}\f$, such that the
        * selected local minimum principles are obeyed.
        */
-      std::tuple<Number, bool>
-      limit(const Bounds &bounds,
-            const state_type &U,
-            const state_type &P,
-            const Number t_min = Number(0.),
-            const Number t_max = Number(1.));
+      std::tuple<Number, bool> limit(const Bounds &bounds,
+                                     const state_type &U,
+                                     const state_type &P,
+                                     const Number t_min = Number(0.),
+                                     const Number t_max = Number(1.));
 
       //*}
       /**
@@ -248,10 +241,11 @@ namespace ryujin
 
 
     template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline void
-    Limiter<dim, Number>::apply_relaxation(Number hd_i)
+    DEAL_II_ALWAYS_INLINE inline auto
+    Limiter<dim, Number>::bounds(const Number hd_i) const -> Bounds
     {
-      auto &[u_min, u_max] = bounds_;
+      auto relaxed_bounds = bounds_;
+      auto &[u_min, u_max] = relaxed_bounds;
 
       /* Use r_i = factor * (m_i / |Omega|) ^ (1.5 / d): */
 
@@ -272,14 +266,8 @@ namespace ryujin
 
       u_max = std::min((Number(1.) + r_i) * u_max,
                        u_max + ScalarNumber(2.) * u_relaxation);
-    }
 
-
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline const typename Limiter<dim, Number>::Bounds &
-    Limiter<dim, Number>::bounds() const
-    {
-      return bounds_;
+      return relaxed_bounds;
     }
 
 

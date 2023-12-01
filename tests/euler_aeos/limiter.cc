@@ -62,23 +62,22 @@ int main()
 
   constexpr double gamma = 1.4;
 
-  const auto test = [&](const state_type &U,
-                        const state_type &P,
-                        const bounds_type &bounds) {
-    std::cout << "State: " << U << "\nSpecific entropy: "
-              << view.surrogate_specific_entropy(U, gamma)
-              << "\nBounds: " << bounds[0] << " " << bounds[1] << " "
-              << bounds[2] << std::endl;
+  const auto test =
+      [&](const state_type &U, const state_type &P, const bounds_type &bounds) {
+        std::cout << "State: " << U << "\nSpecific entropy: "
+                  << view.surrogate_specific_entropy(U, gamma)
+                  << "\nBounds: " << bounds[0] << " " << bounds[1] << " "
+                  << bounds[2] << std::endl;
 
-    const auto &[l, success] = limiter.limit(bounds, U, P);
+        const auto &[l, success] = limiter.limit(bounds, U, P);
 
-    std::cout << "l: " << l;
-    if (success)
-      std::cout << "\nSuccess!";
-    else
-      std::cout << "\nFailure!";
-    std::cout << std::endl;
-  };
+        std::cout << "l: " << l;
+        if (success)
+          std::cout << "\nSuccess!";
+        else
+          std::cout << "\nFailure!";
+        std::cout << std::endl;
+      };
 
   std::cout << std::setprecision(16);
   std::cout << std::scientific;

@@ -684,8 +684,8 @@ namespace ryujin
           }
 
           const auto hd_i = m_i * measure_of_omega_inverse;
-          limiter.apply_relaxation(hd_i);
-          bounds_.template write_tensor<T>(limiter.bounds(), i);
+          const auto relaxed_bounds = limiter.bounds(hd_i);
+          bounds_.template write_tensor<T>(relaxed_bounds, i);
         }
       };
 
