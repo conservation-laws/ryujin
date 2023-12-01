@@ -60,11 +60,10 @@ namespace ryujin
        * Limiter<dim, Number> limiter;
        * for (unsigned int i = n_internal; i < n_owned; ++i) {
        *   // ...
-       *   limiter.reset(i, U_i);
+       *   limiter.reset(i, U_i, flux_i);
        *   for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
        *     // ...
-       *     limiter.accumulate(js, U_i, U_j, pre_i, pre_j, scaled_c_ij,
-       * beta_ij);
+       *     limiter.accumulate(js, U_j, flux_j, scaled_c_ij, beta_ij);
        *   }
        *   limiter.apply_relaxation(hd_i, limiter_relaxation_factor_);
        *   limiter.bounds();
@@ -97,7 +96,9 @@ namespace ryujin
       /**
        * Reset temporary storage
        */
-      void reset(const unsigned int /*i*/, const state_type & /*U_i*/)
+      void reset(const unsigned int /*i*/,
+                 const state_type & /*new_U_i*/,
+                 const flux_contribution_type & /*new_flux_i*/)
       {
         // empty
       }
@@ -107,9 +108,7 @@ namespace ryujin
        * with the neighboring state U_j.
        */
       void accumulate(const unsigned int * /*js*/,
-                      const state_type & /*U_i*/,
                       const state_type & /*U_j*/,
-                      const flux_contribution_type & /*flux_i*/,
                       const flux_contribution_type & /*flux_j*/,
                       const dealii::Tensor<1, dim, Number> & /*scaled_c_ij*/,
                       const Number & /*beta_ij*/)

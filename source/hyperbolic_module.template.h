@@ -547,7 +547,7 @@ namespace ryujin
           const auto m_i = load_value<T>(lumped_mass_matrix, i);
           const auto m_i_inv = load_value<T>(lumped_mass_matrix_inverse, i);
 
-          limiter.reset(i, U_i);
+          limiter.reset(i, U_i, flux_i);
 
           /* Sources: */
           state_type S_i_new;
@@ -613,8 +613,7 @@ namespace ryujin
               P_ij += (d_ijH - d_ij) * (U_j - U_i);
             }
 
-            limiter.accumulate(
-                js, U_i, U_j, flux_i, flux_j, d_ij_inv * c_ij, beta_ij);
+            limiter.accumulate(js, U_j, flux_j, d_ij_inv * c_ij, beta_ij);
 
             /*
              * Compute high-order fluxes:
@@ -781,7 +780,7 @@ namespace ryujin
             }
 
             /*
-             * Compute limiter bounds:
+             * Compute limiter coefficients:
              */
 
             const auto &[l_ij, success] =
