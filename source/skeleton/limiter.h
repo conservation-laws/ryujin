@@ -65,7 +65,7 @@ namespace ryujin
        *     // ...
        *     limiter.accumulate(js, U_j, flux_j, scaled_c_ij, beta_ij);
        *   }
-       *   limiter.apply_relaxation(hd_i, limiter_relaxation_factor_);
+       *   limiter.apply_relaxation(hd_i);
        *   limiter.bounds();
        * }
        * ```
@@ -87,9 +87,15 @@ namespace ryujin
        */
       Limiter(const HyperbolicSystem &hyperbolic_system,
               const MultiComponentVector<ScalarNumber, n_precomputed_values>
-                  &precomputed_values)
+                  &precomputed_values,
+            const ScalarNumber relaxation_factor,
+            const ScalarNumber newton_tolerance,
+            const unsigned int newton_max_iter)
           : hyperbolic_system(hyperbolic_system)
           , precomputed_values(precomputed_values)
+          , relaxation_factor(relaxation_factor)
+          , newton_tolerance(newton_tolerance)
+          , newton_max_iter(newton_max_iter)
       {
       }
 
@@ -119,8 +125,7 @@ namespace ryujin
       /**
        * Apply relaxation.
        */
-      void apply_relaxation(const Number /*hd_i*/,
-                            const ScalarNumber /*factor*/)
+      void apply_relaxation(const Number /*hd_i*/)
       {
         // empty
       }
@@ -144,12 +149,9 @@ namespace ryujin
        * selected local minimum principles are obeyed.
        */
       std::tuple<Number, bool>
-      limit(const HyperbolicSystemView & /*hyperbolic_system*/,
-            const Bounds & /*bounds*/,
+      limit(const Bounds & /*bounds*/,
             const state_type & /*U*/,
             const state_type & /*P*/,
-            const ScalarNumber /*newton_tolerance*/,
-            const unsigned int /*newton_max_iter*/,
             const Number /*t_min*/ = Number(0.),
             const Number t_max = Number(1.))
       {
@@ -177,13 +179,17 @@ namespace ryujin
       }
 
     private:
-      //*}
-      /** @name */
+      //@}
+      /** @name Arguments and internal fields */
       //@{
       const HyperbolicSystemView hyperbolic_system;
 
       const MultiComponentVector<ScalarNumber, n_precomputed_values>
           &precomputed_values;
+
+      ScalarNumber relaxation_factor;
+      ScalarNumber newton_tolerance;
+      unsigned int newton_max_iter;
 
       Bounds bounds_;
       //@}

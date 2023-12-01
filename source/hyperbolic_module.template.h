@@ -513,7 +513,11 @@ namespace ryujin
 
         /* Stored thread locally: */
         using Limiter = typename Description::template Limiter<dim, T>;
-        Limiter limiter(*hyperbolic_system_, new_precomputed);
+        Limiter limiter(*hyperbolic_system_,
+                        new_precomputed,
+                        limiter_relaxation_factor_,
+                        limiter_newton_tolerance_,
+                        limiter_newton_max_iter_);
         bool thread_ready = false;
 
         RYUJIN_OMP_FOR
@@ -680,7 +684,7 @@ namespace ryujin
           }
 
           const auto hd_i = m_i * measure_of_omega_inverse;
-          limiter.apply_relaxation(hd_i, limiter_relaxation_factor_);
+          limiter.apply_relaxation(hd_i);
           bounds_.template write_tensor<T>(limiter.bounds(), i);
         }
       };
@@ -719,7 +723,11 @@ namespace ryujin
 
         /* Stored thread locally: */
         using Limiter = typename Description::template Limiter<dim, T>;
-        Limiter limiter(*hyperbolic_system_, new_precomputed);
+        Limiter limiter(*hyperbolic_system_,
+                        new_precomputed,
+                        limiter_relaxation_factor_,
+                        limiter_newton_tolerance_,
+                        limiter_newton_max_iter_);
         bool thread_ready = false;
 
         RYUJIN_OMP_FOR
@@ -785,13 +793,7 @@ namespace ryujin
              * Compute limiter coefficients:
              */
 
-            const auto &[l_ij, success] =
-                limiter.limit(*hyperbolic_system_,
-                              bounds,
-                              U_i_new,
-                              P_ij,
-                              limiter_newton_tolerance_,
-                              limiter_newton_max_iter_);
+            const auto &[l_ij, success] = limiter.limit(bounds, U_i_new, P_ij);
             lij_matrix_.template write_entry<T>(l_ij, i, col_idx, true);
 
             /*
@@ -859,7 +861,11 @@ namespace ryujin
         /* Stored thread locally: */
         AlignedVector<T> lij_row;
         using Limiter = typename Description::template Limiter<dim, T>;
-        Limiter limiter(*hyperbolic_system_, new_precomputed);
+        Limiter limiter(*hyperbolic_system_,
+                        new_precomputed,
+                        limiter_relaxation_factor_,
+                        limiter_newton_tolerance_,
+                        limiter_newton_max_iter_);
         bool thread_ready = false;
 
         RYUJIN_OMP_FOR
@@ -931,12 +937,7 @@ namespace ryujin
                 pij_matrix_.template get_tensor<T>(i, col_idx);
 
             const auto &[new_l_ij, success] =
-                limiter.limit(*hyperbolic_system_,
-                              bounds,
-                              U_i_new,
-                              new_p_ij,
-                              limiter_newton_tolerance_,
-                              limiter_newton_max_iter_);
+                limiter.limit(bounds, U_i_new, new_p_ij);
 
             /*
              * This is the second pass of the limiter. Under rare

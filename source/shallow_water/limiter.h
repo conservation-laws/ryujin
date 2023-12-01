@@ -72,7 +72,7 @@ namespace ryujin
        *     limiter.accumulate(js, U_i, U_j, pre_i, pre_j, scaled_c_ij,
        * beta_ij);
        *   }
-       *   limiter.apply_relaxation(hd_i, limiter_relaxation_factor_);
+       *   limiter.apply_relaxation(hd_i);
        *   limiter.bounds();
        * }
        * ```
@@ -94,9 +94,15 @@ namespace ryujin
        */
       Limiter(const HyperbolicSystem &hyperbolic_system,
               const MultiComponentVector<ScalarNumber, n_precomputed_values>
-                  &precomputed_values)
+                  &precomputed_values,
+            const ScalarNumber relaxation_factor,
+            const ScalarNumber newton_tolerance,
+            const unsigned int newton_max_iter)
           : hyperbolic_system(hyperbolic_system)
           , precomputed_values(precomputed_values)
+          , relaxation_factor(relaxation_factor)
+          , newton_tolerance(newton_tolerance)
+          , newton_max_iter(newton_max_iter)
       {
       }
 
@@ -120,8 +126,7 @@ namespace ryujin
       /**
        * Apply relaxation.
        */
-      void apply_relaxation(const Number hd_i,
-                            const ScalarNumber factor = ScalarNumber(2.));
+      void apply_relaxation(const Number hd_i);
 
       /**
        * Return the computed bounds.
@@ -139,12 +144,9 @@ namespace ryujin
        * selected local minimum principles are obeyed.
        */
       std::tuple<Number, bool>
-      limit(const HyperbolicSystem &hyperbolic_system,
-            const Bounds &bounds,
+      limit(const Bounds &bounds,
             const state_type &U,
             const state_type &P,
-            const ScalarNumber newton_tolerance,
-            const unsigned int newton_max_iter,
             const Number t_min = Number(0.),
             const Number t_max = Number(1.));
       //*}
@@ -165,14 +167,17 @@ namespace ryujin
                              const state_type &U);
 
     private:
-      //*}
-      /** @name */
+      //@}
+      /** @name Arguments and internal fields */
       //@{
-
       const HyperbolicSystem &hyperbolic_system;
 
       const MultiComponentVector<ScalarNumber, n_precomputed_values>
           &precomputed_values;
+
+      ScalarNumber relaxation_factor;
+      ScalarNumber newton_tolerance;
+      unsigned int newton_max_iter;
 
       Bounds bounds_;
 
@@ -254,7 +259,7 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline void
-    Limiter<dim, Number>::apply_relaxation(Number hd_i, ScalarNumber factor)
+    Limiter<dim, Number>::apply_relaxation(Number hd_i)
     {
       auto &[h_min, h_max, kin_max] = bounds_;
 
@@ -265,7 +270,7 @@ namespace ryujin
         r_i = dealii::Utilities::fixed_power<3>(std::sqrt(r_i)); // in 2D: ^ 3/4
       else if constexpr (dim == 1)                               //
         r_i = dealii::Utilities::fixed_power<3>(r_i);            // in 1D: ^ 3/2
-      r_i *= factor;
+      r_i *= relaxation_factor;
 
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
 
