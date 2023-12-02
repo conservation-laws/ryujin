@@ -573,24 +573,6 @@ namespace ryujin
                                            const unsigned int,
                                            const state_type &) const = delete;
 
-        state_type low_order_stencil_source(
-            const flux_contribution_type &,
-            const flux_contribution_type &,
-            const Number,
-            const dealii::Tensor<1, dim, Number> &) const = delete;
-
-        state_type high_order_stencil_source(
-            const flux_contribution_type &,
-            const flux_contribution_type &,
-            const Number,
-            const dealii::Tensor<1, dim, Number> &) const = delete;
-
-        state_type affine_shift_stencil_source(
-            const flux_contribution_type &,
-            const flux_contribution_type &,
-            const Number,
-            const dealii::Tensor<1, dim, Number> &) const = delete;
-
         //@}
         /**
          * @name State transformations

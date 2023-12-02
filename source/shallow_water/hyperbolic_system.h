@@ -519,7 +519,7 @@ namespace ryujin
         /**
          * We do have source terms
          */
-        static constexpr bool have_source_terms = false;
+        static constexpr bool have_source_terms = true;
 
         /**
          * FIXME
@@ -534,38 +534,6 @@ namespace ryujin
         state_type high_order_nodal_source(const precomputed_vector_type &pv,
                                            const unsigned int i,
                                            const state_type &U_i) const;
-
-        /**
-         * Given precomputed flux contributions @p prec_i and @p prec_j compute
-         * the equilibrated, low-order source term
-         * \f$-g(H^{\ast,j}_i)^2c_ij\f$.
-         */
-        state_type low_order_stencil_source(
-            const flux_contribution_type &prec_i,
-            const flux_contribution_type &prec_j,
-            const Number &d_ij,
-            const dealii::Tensor<1, dim, Number> &c_ij) const;
-
-        /**
-         * Given precomputed flux contributions @p prec_i and @p prec_j compute
-         * the high-order source term \f$ g H_i Z_j c_ij\f$.
-         */
-        state_type high_order_stencil_source(
-            const flux_contribution_type &prec_i,
-            const flux_contribution_type &prec_j,
-            const Number &d_ij,
-            const dealii::Tensor<1, dim, Number> &c_ij) const;
-
-        /**
-         * Given precomputed flux contributions @p prec_i and @p prec_j compute
-         * the equilibrated, low-order affine shift
-         * \f$ B_{ij} = -2d_ij(U^{\ast,j}_i)-2f((U^{\ast,j}_i))c_ij\f$.
-         */
-        state_type affine_shift_stencil_source(
-            const flux_contribution_type &prec_i,
-            const flux_contribution_type &prec_j,
-            const Number &d_ij,
-            const dealii::Tensor<1, dim, Number> &c_ij) const;
 
         //@}
         /**
@@ -1141,135 +1109,24 @@ namespace ryujin
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
     HyperbolicSystem::View<dim, Number>::low_order_nodal_source(
-        const precomputed_vector_type &pv,
-        const unsigned int i,
-        const state_type &U_i) const -> state_type
+        const precomputed_vector_type & /*pv*/,
+        const unsigned int /*i*/,
+        const state_type & /*U_i*/) const -> state_type
     {
-      // TODO FIXME
-
-#if 0
-      const auto h_sharp = water_depth_sharp(U);
-      const auto h_star = ryujin::pow(h_sharp, ScalarNumber(4. / 3.));
-
-      const auto mom = momentum(U);
-      const auto vel_norm = (mom * inverse_water_depth_mollified(U)).norm();
-
-      auto factor = vel_norm;
-      factor *= ScalarNumber(2. * gravity_ * mannings_ * mannings_);
-
-      const auto small_number = factor * tau;
-
-      const auto numerator = -factor * mom;
-      const auto denominator = h_star + std::max(h_star, small_number);
-      const auto momentum_source = numerator / denominator;
-
-      ST result;
-      for (unsigned int d = 0; d < dim; ++d)
-        result[d + 1] = m_i * momentum_source[d];
+      state_type result;
       return result;
-#endif
     }
 
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
     HyperbolicSystem::View<dim, Number>::high_order_nodal_source(
-        const precomputed_vector_type &pv,
-        const unsigned int i,
-        const state_type &U_i) const -> state_type
+        const precomputed_vector_type & /*pv*/,
+        const unsigned int /*i*/,
+        const state_type & /*U_i*/) const -> state_type
     {
-      // TODO FIXME
-
-#if 0
-      const auto h_sharp = water_depth_sharp(U);
-      const auto h_star = ryujin::pow(h_sharp, ScalarNumber(4. / 3.));
-
-      const auto mom = momentum(U);
-      const auto vel_norm = (mom * inverse_water_depth_mollified(U)).norm();
-
-      auto factor = vel_norm;
-      factor *= ScalarNumber(2. * gravity_ * mannings_ * mannings_);
-
-      const auto small_number = factor * tau;
-
-      const auto numerator = -factor * mom;
-      const auto denominator = h_star + std::max(h_star, small_number);
-      const auto momentum_source = numerator / denominator;
-
-      ST result;
-      for (unsigned int d = 0; d < dim; ++d)
-        result[d + 1] = m_i * momentum_source[d];
-      return result;
-#endif
-    }
-
-
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystem::View<dim, Number>::low_order_stencil_source(
-        const flux_contribution_type &prec_i,
-        const flux_contribution_type &prec_j,
-        const Number & /*d_ij*/,
-        const dealii::Tensor<1, dim, Number> &c_ij) const -> state_type
-    {
-      const auto &[U_i, Z_i] = prec_i;
-      const auto &[U_j, Z_j] = prec_j;
-
-      const auto H_i = water_depth(U_i);
-      const auto H_j = water_depth(U_j);
-
-      const auto U_star_ij = star_state(U_i, Z_i, Z_j);
-      const auto U_star_ji = star_state(U_j, Z_j, Z_i);
-
-      const auto H_star_ij = water_depth(U_star_ij);
-      const auto H_star_ji = water_depth(U_star_ji);
-
-      auto factor = H_star_ji * H_star_ji - H_star_ij * H_star_ij;
-      factor -= ScalarNumber(2.0) * H_i * H_j;
-      factor *= ScalarNumber(0.5) * gravity();
-
       state_type result;
-      for (unsigned int d = 1; d < dim + 1; ++d)
-        result[d] = -factor * c_ij[d - 1];
       return result;
-    }
-
-
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystem::View<dim, Number>::high_order_stencil_source(
-        const flux_contribution_type &prec_i,
-        const flux_contribution_type &prec_j,
-        const Number & /*d_ij*/,
-        const dealii::Tensor<1, dim, Number> &c_ij) const -> state_type
-    {
-      const auto &[U_i, Z_i] = prec_i;
-      const auto &[U_j, Z_j] = prec_j;
-      const auto H_i = water_depth(U_i);
-      // const auto H_j = water_depth(U_j);
-
-      const auto factor = gravity() * H_i * (Z_j - Z_i);
-
-      state_type result;
-      for (unsigned int d = 1; d < dim + 1; ++d)
-        result[d] = -factor * c_ij[d - 1];
-      return result;
-    }
-
-
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystem::View<dim, Number>::affine_shift_stencil_source(
-        const flux_contribution_type &prec_i,
-        const flux_contribution_type &prec_j,
-        const Number &d_ij,
-        const dealii::Tensor<1, dim, Number> &c_ij) const -> state_type
-    {
-      const auto &[U_star_ij, U_star_ji] = equilibrated_states(prec_i, prec_j);
-      const auto g_star_ij = g(U_star_ij);
-
-      return -ScalarNumber(2.) * d_ij * U_star_ij -
-             ScalarNumber(2.) * contract(g_star_ij, c_ij);
     }
 
 

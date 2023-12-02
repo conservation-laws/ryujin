@@ -93,10 +93,6 @@ namespace ryujin
     const auto &vector_partitioner = offline_data_->vector_partitioner();
     r_.reinit(vector_partitioner);
     using View = typename HyperbolicSystem::template View<dim, Number>;
-    if constexpr (View::have_source_terms) {
-      source_.reinit(vector_partitioner);
-      source_r_.reinit(vector_partitioner);
-    }
 
     /* Initialize matrices: */
 
@@ -105,9 +101,6 @@ namespace ryujin
     lij_matrix_.reinit(sparsity_simd);
     lij_matrix_next_.reinit(sparsity_simd);
     pij_matrix_.reinit(sparsity_simd);
-    if constexpr (View::have_source_terms) {
-      qij_matrix_.reinit(sparsity_simd);
-    }
 
     precomputed_initial_ =
         initial_values_->interpolate_precomputed_initial_values();
@@ -123,7 +116,7 @@ namespace ryujin
     template <typename T>
     bool all_below_diagonal(unsigned int i, const unsigned int *js)
     {
-      if constexpr (std::is_same<T, typename get_value_type<T>::type>::value) {
+      if constexpr (std::is_same_v<T, typename get_value_type<T>::type>) {
         /* Non-vectorized sequential access. */
         const auto j = *js;
         return j < i;
@@ -490,11 +483,7 @@ namespace ryujin
 
       SynchronizationDispatch synchronization_dispatch([&]() {
         r_.update_ghost_values_start(channel++);
-        source_.update_ghost_values_start(channel++);
-        source_r_.update_ghost_values_start(channel++);
         r_.update_ghost_values_finish();
-        source_.update_ghost_values_finish();
-        source_r_.update_ghost_values_finish();
       });
 
       const Number weight =
@@ -553,14 +542,6 @@ namespace ryujin
 
           limiter.reset(i, U_i, flux_i);
 
-          /* Sources: */
-          state_type S_i_new;
-          state_type S_iH;
-          if constexpr (View::have_source_terms) {
-            S_i_new = view.low_order_nodal_source(new_precomputed, i, U_i);
-            S_iH = view.high_order_nodal_source(new_precomputed, i, U_i);
-          }
-
           const unsigned int *js = sparsity_simd.columns(i);
           for (unsigned int col_idx = 0; col_idx < row_length;
                ++col_idx, js += stride_size) {
@@ -588,19 +569,6 @@ namespace ryujin
             const auto flux_ij = view.flux(flux_i, flux_j);
             U_i_new += tau * m_i_inv * contract(flux_ij, c_ij);
             auto P_ij = -contract(flux_ij, c_ij);
-
-            using state_type = typename View::state_type;
-            state_type Q_ij;
-            if constexpr (View::have_source_terms) {
-              const auto B_ij =
-                  view.affine_shift_stencil_source(flux_i, flux_j, d_ij, c_ij);
-              const auto S_ij =
-                  view.low_order_stencil_source(flux_i, flux_j, d_ij, c_ij);
-
-              U_i_new -= tau * m_i_inv * B_ij;
-              S_i_new += tau * m_i_inv * (B_ij + S_ij);
-              Q_ij -= S_ij;
-            }
 
             if constexpr (View::have_equilibrated_states) {
               /* Use star states for low-order update: */
@@ -633,13 +601,6 @@ namespace ryujin
               P_ij += weight * contract(flux_ij, c_ij);
             }
 
-            if constexpr (View::have_source_terms) {
-              const auto S_ijH =
-                  view.high_order_stencil_source(flux_i, flux_j, d_ijH, c_ij);
-              S_iH += weight * S_ijH;
-              Q_ij += weight * S_ijH;
-            }
-
             for (int s = 0; s < stages; ++s) {
               const auto U_jH = stage_U[s].get().template get_tensor<T>(js);
               const auto p = view.flux_contribution(
@@ -655,18 +616,9 @@ namespace ryujin
                 F_iH += stage_weights[s] * contract(flux_ij, c_ij);
                 P_ij += stage_weights[s] * contract(flux_ij, c_ij);
               }
-
-              if constexpr (View::have_source_terms) {
-                auto S_ijH =
-                    view.high_order_stencil_source(flux_iHs[s], p, d_ijH, c_ij);
-                S_iH += stage_weights[s] * S_ijH;
-                Q_ij += stage_weights[s] * S_ijH;
-              }
             }
 
             pij_matrix_.write_tensor(P_ij, i, col_idx, true);
-            if constexpr (View::have_source_terms)
-              qij_matrix_.write_tensor(Q_ij, i, col_idx, true);
           }
 
 #ifdef CHECK_BOUNDS
@@ -677,11 +629,6 @@ namespace ryujin
 
           new_U.template write_tensor<T>(U_i_new, i);
           r_.template write_tensor<T>(F_iH, i);
-
-          if constexpr (View::have_source_terms) {
-            source_.template write_tensor<T>(S_i_new, i);
-            source_r_.template write_tensor<T>(S_iH, i);
-          }
 
           const auto hd_i = m_i * measure_of_omega_inverse;
           const auto relaxed_bounds = limiter.bounds(hd_i);
@@ -750,12 +697,6 @@ namespace ryujin
 
           const auto F_iH = r_.template get_tensor<T>(i);
 
-
-          using state_type = typename View::state_type;
-          state_type S_iH;
-          if constexpr (View::have_source_terms)
-            S_iH = source_r_.template get_tensor<T>(i);
-
           const auto lambda_inv = Number(row_length - 1);
           const auto factor = tau * m_i_inv * lambda_inv;
 
@@ -780,14 +721,6 @@ namespace ryujin
             P_ij += b_ij * F_jH - b_ji * F_iH;
             P_ij *= factor;
             pij_matrix_.write_tensor(P_ij, i, col_idx);
-
-            if constexpr (View::have_source_terms) {
-              auto Q_ij = qij_matrix_.template get_tensor<T>(i, col_idx);
-              const auto S_jH = source_r_.template get_tensor<T>(js);
-              Q_ij += b_ij * S_jH - b_ji * S_iH;
-              Q_ij *= factor;
-              qij_matrix_.write_tensor(Q_ij, i, col_idx);
-            }
 
             /*
              * Compute limiter coefficients:
@@ -881,11 +814,6 @@ namespace ryujin
 
           auto U_i_new = new_U.template get_tensor<T>(i);
 
-          using state_type = typename View::state_type;
-          state_type S_i_new;
-          if constexpr (View::have_source_terms)
-            S_i_new = source_.template get_tensor<T>(i);
-
           const Number lambda = Number(1.) / Number(row_length - 1);
           lij_row.resize_fast(row_length);
 
@@ -900,11 +828,6 @@ namespace ryujin
 
             U_i_new += l_ij * lambda * p_ij;
 
-            if constexpr (View::have_source_terms) {
-              const auto q_ij = qij_matrix_.template get_tensor<T>(i, col_idx);
-              S_i_new += l_ij * lambda * q_ij;
-            }
-
             if (!last_round)
               lij_row[col_idx] = l_ij;
           }
@@ -917,9 +840,6 @@ namespace ryujin
 #endif
 
           new_U.template write_tensor<T>(U_i_new, i);
-
-          if constexpr (View::have_source_terms)
-            source_.template write_tensor<T>(S_i_new, i);
 
           /* Skip computating l_ij and updating p_ij in the last round */
           if (last_round)
@@ -977,8 +897,6 @@ namespace ryujin
 
     /* Update sources: */
     using View = typename HyperbolicSystem::template View<dim, Number>;
-    if constexpr (View::have_source_terms)
-      new_U += source_;
 
     CALLGRIND_STOP_INSTRUMENTATION;
 
