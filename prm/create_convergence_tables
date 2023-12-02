@@ -1,0 +1,296 @@
+#!/usr/bin/env python
+
+##
+## SPDX-License-Identifier: MIT or BSD-3-Clause
+## Copyright (C) 2020 - 2023 by the ryujin authors
+##
+
+help_description = """
+
+This python script performs a convergence analsyis by running a number of
+simulations. It reads the output of each simulation to find the errors and
+then creates a convergence rate table.
+
+This file reads in 3 required command line arguments:
+
+    initial -- initial mesh refinement level;
+    final   -- final mesh refinement level;
+
+and 1 optional command line argument:
+
+    file -- name of prm file used for simulation
+
+Example:
+
+> python ryujin_errors.py --file ryujin.prm --initial 3 --final 7
+
+NOTE: You might have to:
+    1. change the location for the ryujin executable
+"""
+
+import os, sys
+import numpy as np
+from tabulate import tabulate
+import argparse, textwrap, re, time
+
+parser = argparse.ArgumentParser(
+    prog="error_table",
+    formatter_class=argparse.RawDescriptionHelpFormatter,
+    description=textwrap.dedent(help_description),
+)
+
+parser.add_argument(
+    "--file",
+    type=str,
+    default="ryujin.prm",
+    help="prm file name",
+    required=False,
+)
+
+parser.add_argument(
+    "--initial",
+    type=int,
+    default=3,
+    help="initial mesh refinement level",
+    required=True,
+)
+
+parser.add_argument(
+    "--final",
+    type=int,
+    default=7,
+    help="final mesh refinement level",
+    required=True,
+)
+
+args = parser.parse_args()
+
+# To save in outputted text file
+script_name = sys.argv[0]  # The script name is at index 0
+arguments = sys.argv[1:]  # The actual arguments are from index 1 onwards
+
+# Convert the command-line arguments to a string
+arguments_string = " ".join(arguments)
+
+# Create a formatted string
+script_args = f"\nScript: {script_name}\nArguments: {arguments_string}\n"
+
+## Get arguments from parser
+prm_file = str(args.file)
+initial_ref = args.initial
+final_ref = args.final
+
+# set bash profile, executable location and prm file
+executable_location = "./ryujin"
+
+# now we define the main function to be called at the end
+def main():
+    run_simulations()
+    compute_errors()
+    compute_rates()
+
+
+def run_simulations():
+    # define file list
+    files_lst = ["ref_" + str(i) + ".out" for i in range(initial_ref, final_ref + 1)]
+
+    # save for access later
+    run_simulations.files_lst = files_lst
+
+    # Get mesh refinement line number in prm file
+    file_path = "example.txt"
+    target_string = "set mesh refinement     = "
+    result = find_string_in_file(prm_file, target_string)
+
+    if result:
+        line_number, line = result
+        # print(f"The string '{target_string}' was found on line {line_number}: {line}")
+    else:
+        print(f"The string '{target_string}' was not found in the file.")
+        quit()
+
+    # Run program for each refinement
+    for i in range(len(files_lst)):
+        # Updates prm file with new mesh refinement
+        os.system(
+            'sed -i "'
+            + str(line_number)
+            + "s/.*/  set mesh refinement     = "
+            + str(i + initial_ref)
+            + '/g" '
+            + prm_file
+        )
+        # Run simulation
+        os.system(executable_location + " " + prm_file + " > " + files_lst[i])
+        # Prepend output file names with refinement
+        print("---- refinement " + str(i + initial_ref) + " done----")
+
+
+def compute_errors():
+    # initialize list for dofs and errrors
+    dofs = []
+    L1error = []
+    L2error = []
+    Linf_error = []
+
+    # define strings to be found in files
+    dofs_string = "#dofs = "
+    L1_string = "L1    = "
+    L2_string = "L2    = "
+    Linf_string = "Linf  = "
+
+    # loop through files
+    for input_filepath in run_simulations.files_lst:
+        with open(input_filepath) as fp:
+            for cnt, ln in enumerate(fp):
+                if ln.strip().startswith(dofs_string):
+                    match_number = re.compile(
+                        "\s-?\ *[0-9]+\.?[0-9]*(?:[Ee]\ *-?\ *[0-9]+)?"
+                    )
+                    temp = [int(x) for x in re.findall(match_number, ln)]
+                    dofs.append(temp[0])
+                if ln.strip().startswith(L1_string):
+                    match_number = re.compile(
+                        "\s-?\ *[0-9]+\.?[0-9]*(?:[Ee]\ *-?\ *[0-9]+)?"
+                    )
+                    final_list = [float(x) for x in re.findall(match_number, ln)]
+                    L1error.append(final_list[0])
+                if ln.strip().startswith(L2_string):
+                    match_number = re.compile(
+                        "\s-?\ *[0-9]+\.?[0-9]*(?:[Ee]\ *-?\ *[0-9]+)?"
+                    )
+                    final_list = [float(x) for x in re.findall(match_number, ln)]
+                    L2error.append(final_list[0])
+                if ln.strip().startswith(Linf_string):
+                    match_number = re.compile(
+                        "\s?\ *[0-9]+\.?[0-9]*(?:[Ee]\ *-?\ *[0-9]+)?"
+                    )
+                    final_list = [float(x) for x in re.findall(match_number, ln)]
+                    Linf_error.append(final_list[0])
+    # then save for other function calls
+    compute_rates.dofs = dofs
+    compute_rates.L1error = L1error
+    compute_rates.L2error = L2error
+    compute_rates.Linf_error = Linf_error
+
+
+def compute_rates():
+    # get dof list from compute_errors() function
+    dofs = compute_rates.dofs
+
+    # get errors from compute_errors() function
+    L1error = compute_rates.L1error
+    L2error = compute_rates.L2error
+    Linf_error = compute_rates.Linf_error
+
+    # initialize rates
+    L1_rates = []
+    L2_rates = []
+    Linf_rates = []
+
+    for i, error in enumerate(L1error):
+        if i > 0:
+            L1_rates.append(np.log(L1error[i - 1] / L1error[i]) / np.log(2))
+            L2_rates.append(np.log(L2error[i - 1] / L2error[i]) / np.log(2))
+            Linf_rates.append(np.log(Linf_error[i - 1] / Linf_error[i]) / np.log(2))
+
+    # Use tabulate to create a formatted table
+    table = []
+    for i in range(len(dofs)):
+        if i == 0:
+            table.append(
+                [dofs[i], L1error[i], "---", L2error[i], "---", Linf_error[i], "---"]
+            )
+        else:
+            table.append(
+                [
+                    dofs[i],
+                    L1error[i],
+                    round(L1_rates[i - 1], 2),
+                    L2error[i],
+                    round(L2_rates[i - 1], 2),
+                    Linf_error[i],
+                    round(Linf_rates[i - 1], 2),
+                ]
+            )
+
+    text_table = tabulate(
+        table,
+        headers=[
+            "# dof",
+            "L1 Error",
+            "Rate",
+            "L2 Error",
+            "Rate",
+            "L-Inf Error",
+            "Rate",
+        ],
+    )
+
+    # Output table to console
+    print("             ")
+    print(text_table)
+
+    # Output table to txt file
+    f = open("convergence_rates.txt", "w+")
+    f.write(script_args)
+    f.write("\n")
+    f.write(text_table)
+    f.close()
+
+    latex_options = {
+        "colalign": (
+            "c",
+            "c",
+            "c",
+        ),  # Column alignment: "c" (center), "r" (right), "l" (left)
+        "colsep": ("|",),  # Column separator as a vertical line ("|")
+    }
+
+    # column_alignment = "ccccccc"
+
+    tex_table = tabulate(
+        table,
+        headers=[
+            "$I$",
+            "$\delta^1(T)$",
+            "Rate",
+            "$\delta^2(T)$",
+            "Rate",
+            "$\delta^\infty(T)$",
+            "Rate",
+        ],
+        tablefmt="latex_raw",
+    )
+
+    # Output table to console
+    # print("             ")
+    # print(tex_table)
+
+    # Output table to txt file
+    f = open("convergence_rates.tex", "w+")
+    f.write(tex_table)
+    f.close()
+
+
+def find_string_in_file(file_path, target_string):
+    with open(file_path, "r") as file:
+        for line_number, line in enumerate(file, 1):
+            if target_string in line:
+                return line_number, line
+
+    # If the string is not found, return None
+    return None
+
+
+def tsn(number, precision=4):
+    """
+    Convert a number to scientific notation with the specified precision.
+    """
+    return f"{number:.{precision}e}"
+
+
+# then we put main at the bottom to run everything
+start_time = time.time()
+main()
+print("\n Total run time:\n\t  %s seconds " % (time.time() - start_time))
