@@ -359,6 +359,19 @@ namespace ryujin
                        [](auto e) { return e * 1.0e6; });
       }
 
+      /* FIXME: Implement table look up for temperature. Need to think about
+       * whether it should be T(rho, e) or T(rho, p). */
+      double temperature(double /*rho*/, double /*e*/) const final
+      {
+        __builtin_trap();
+      }
+
+      void temperature(const dealii::ArrayView<double> & /*temp*/,
+                       const dealii::ArrayView<double> & /*rho*/,
+                       const dealii::ArrayView<double> & /*e*/) const final
+      {
+        __builtin_trap();
+      }
 
       double speed_of_sound(double /*rho*/, double /*e*/) const final
       {
@@ -396,6 +409,12 @@ namespace ryujin
       }
 
       double specific_internal_energy(double /*rho*/, double /*p*/) const final
+      {
+        AssertThrow(false, dealii::ExcMessage(message));
+        __builtin_trap();
+      }
+
+      double temperature(double /*rho*/, double /*e*/) const final
       {
         AssertThrow(false, dealii::ExcMessage(message));
         __builtin_trap();

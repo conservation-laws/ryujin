@@ -12,7 +12,9 @@ namespace ryujin
   namespace EquationOfStateLibrary
   {
     /**
-     * The Jones-Wilkins-Lee equation of state
+     * The Jones-Wilkins-Lee equation of state. See (16a) in:
+     * "JWL Equation of State" by Ralph Menikoff (LA-UR-15-29536). We are
+     * assuming that the reference temperature T_r is chosen such that E_r = 0.
      *
      * @ingroup EulerEquations
      */
@@ -37,8 +39,15 @@ namespace ryujin
         omega = 0.4;
         this->add_parameter("omega", omega, "The Gruneisen coefficient");
 
-        rho0 = 1.0;
-        this->add_parameter("rho_0", rho0, "The reference density");
+        rho_0 = 1.0;
+        this->add_parameter("rho_0", rho_0, "The reference density");
+
+        q_0 = 0.0;
+        this->add_parameter("q_0", q_0, "The specific internal energy offset");
+
+        cv_ = 718.;
+        this->add_parameter(
+            "c_v", cv_, "The specific heat capacity at constant volume");
       }
 
       /**
@@ -46,20 +55,20 @@ namespace ryujin
        * \f{align}
        *   p = A(1 - \omega / R_1 \rho / \rho_0) e^{(-R_1 \rho_0 / \rho)}
        *     + B(1 - \omega / R_2 \rho/ \rho_0) e^{(-R_2 \rho_0 / \rho)}
-       *     + \omega \rho e
+       *     + \omega \rho (e + q_0)
        * \f}
        */
       double pressure(double rho, double e) const final
       {
 
-        const auto ratio = rho / rho0;
+        const auto ratio = rho / rho_0;
 
         const auto first_term =
             capA * (1. - omega / R1 * ratio) * std::exp(-R1 * 1. / ratio);
         const auto second_term =
             capB * (1. - omega / R2 * ratio) * std::exp(-R2 * 1. / ratio);
 
-        return first_term + second_term + omega * rho * e;
+        return first_term + second_term + omega * rho * (e + q_0);
       }
 
       /**
@@ -72,7 +81,7 @@ namespace ryujin
        */
       double specific_internal_energy(double rho, double p) const final
       {
-        const auto ratio = rho / rho0;
+        const auto ratio = rho / rho_0;
 
         const auto first_term =
             capA * (1. - omega / R1 * ratio) * std::exp(-R1 * 1. / ratio);
@@ -83,21 +92,39 @@ namespace ryujin
       }
 
       /**
+       * The temperature is given by
+       * \f{align}
+       *   c_v T = e + q_0 - 1 / \rho_0 * (A / R_1 * e^{(-R_1 \rho_0 / \rho)}
+       *         + B / R_2 * e^{(-R_2 \rho_0 / \rho)})
+       * \f}
+       */
+      double temperature(double rho, double e) const final
+      {
+        /* Using (16a) of LA-UR-15-29536 */
+        const auto ratio = rho / rho_0;
+
+        const auto first_term = capA / R1 * std::exp(-R1 * 1. / ratio);
+        const auto second_term = capB / R2 * std::exp(-R2 * 1. / ratio);
+
+        return (e + q_0 - 1. / rho_0 * (first_term + second_term)) / cv_;
+      }
+
+      /**
        * The speed of sound is given by
        */
       double speed_of_sound(double rho, double e) const final
       {
-        // FIXME: This needs to be verified...
+        /* FIXME: Need to cross reference with literature */
 
-        const auto t1 = omega * rho / (R1 * rho0);
+        const auto t1 = omega * rho / (R1 * rho_0);
         const auto factor1 = omega * (1. - t1) * (1. + 1. / t1) - t1;
         const auto first_term =
-            capA / rho * factor1 * std::exp(omega / factor1);
+            capA / rho * factor1 * std::exp(-1. / t1 / omega);
 
-        const auto t2 = omega * rho / (R2 * rho0);
+        const auto t2 = omega * rho / (R2 * rho_0);
         const auto factor2 = omega * (1. - t2) * (1. + 1. / t2) - t2;
         const auto second_term =
-            capB / rho * factor2 * std::exp(omega / factor2);
+            capB / rho * factor2 * std::exp(-1. / t2 / omega);
 
         const auto third_term = omega * (omega + 1.) * e;
 
@@ -110,7 +137,9 @@ namespace ryujin
       double R1;
       double R2;
       double omega;
-      double rho0;
+      double rho_0;
+      double q_0;
+      double cv_;
     };
   } // namespace EquationOfStateLibrary
 } // namespace ryujin

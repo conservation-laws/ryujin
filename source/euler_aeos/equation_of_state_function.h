@@ -38,6 +38,13 @@ namespace ryujin
             "A function expression for the specific internal energy as a "
             "function of density, rho, and pressure, p: e(rho, p)");
 
+        temperature_expression_ = "e / 718.";
+        add_parameter("temperature",
+                      temperature_expression_,
+                      "A function expression for the temperature as a "
+                      "function of density, rho, and specific internal energy, "
+                      "e: T(rho, e)");
+
         sos_expression_ = "sqrt(1.4 * (1.4 - 1.0) * e)";
         add_parameter(
             "speed of sound",
@@ -55,6 +62,10 @@ namespace ryujin
 
           sie_function_ = std::make_unique<dealii::FunctionParser<2>>();
           sie_function_->initialize("rho,p", sie_expression_, {});
+
+          temperature_function_ = std::make_unique<dealii::FunctionParser<2>>();
+          temperature_function_->initialize(
+              "rho,e", temperature_expression_, {});
 
           sos_function_ = std::make_unique<dealii::FunctionParser<2>>();
           sos_function_->initialize("rho,e", sos_expression_, {});
@@ -74,6 +85,11 @@ namespace ryujin
         return sie_function_->value(dealii::Point<2>(rho, p));
       }
 
+      double temperature(double rho, double e) const final
+      {
+        return temperature_function_->value(dealii::Point<2>(rho, e));
+      }
+
       double speed_of_sound(double rho, double e) const final
       {
         return sos_function_->value(dealii::Point<2>(rho, e));
@@ -83,10 +99,12 @@ namespace ryujin
       std::string p_expression_;
       std::string sie_expression_;
       std::string sos_expression_;
+      std::string temperature_expression_;
 
       std::unique_ptr<dealii::FunctionParser<2>> p_function_;
       std::unique_ptr<dealii::FunctionParser<2>> sie_function_;
       std::unique_ptr<dealii::FunctionParser<2>> sos_function_;
+      std::unique_ptr<dealii::FunctionParser<2>> temperature_function_;
     };
   } // namespace EquationOfStateLibrary
 } // namespace ryujin

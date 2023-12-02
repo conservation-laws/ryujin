@@ -116,6 +116,37 @@ namespace ryujin
       }
 
       /**
+       * Return the temperature @p T for a given density @p
+       * rho and specific internal energy @p e.
+       */
+      virtual double temperature(double rho, double e) const = 0;
+
+      /**
+       * Variant of above function operating on a contiguous range of
+       * values. The result is stored in the first argument @p T,
+       * overriding previous contents.
+       *
+       * @note The second and third arguments are writable as well. We need
+       * to perform some unit transformations for certain tabulated
+       * equation of state libraries, such as the sesame database. Rather
+       * than creating temporaries we override values in place.
+       */
+      virtual void temperature(const dealii::ArrayView<double> &T,
+                               const dealii::ArrayView<double> &rho,
+                               const dealii::ArrayView<double> &e) const
+      {
+        Assert(T.size() == rho.size() && rho.size() == e.size(),
+               dealii::ExcMessage("vectors have different size"));
+
+        std::transform(
+            std::begin(rho),
+            std::end(rho),
+            std::begin(e),
+            std::begin(T),
+            [&](double rho, double e) { return temperature(rho, e); });
+      }
+
+      /**
        * Return the sound speed @p c for a given density @p rho and
        * specific internal energy  @p e.
        */

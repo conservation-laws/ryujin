@@ -184,6 +184,26 @@ namespace ryujin
         }
 
         /**
+         * For a given density \f$\rho\f$ and specific internal energy \f$e\f$
+         * return the temperature \f$T\f$.
+         */
+        DEAL_II_ALWAYS_INLINE inline Number
+        eos_temperature(const Number &rho, const Number &e) const
+        {
+          const auto &eos = hyperbolic_system_.selected_equation_of_state_;
+
+          if constexpr (std::is_same_v<ScalarNumber, Number>) {
+            return ScalarNumber(eos->temperature(rho, e));
+          } else {
+            Number temp;
+            for (unsigned int k = 0; k < Number::size(); ++k) {
+              temp[k] = ScalarNumber(eos->temperature(rho[k], e[k]));
+            }
+            return temp;
+          }
+        }
+
+        /**
          * For a given density \f$\rho\f$ and <i>specific</i> internal
          * energy \f$e\f$ return the sound speed \f$a\f$.
          */
