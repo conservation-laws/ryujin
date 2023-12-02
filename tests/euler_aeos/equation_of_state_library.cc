@@ -38,12 +38,14 @@ void test(const ryujin::EquationOfStateLibrary::EquationOfState &eos)
     const auto p = eos.pressure(rho, e);
     const auto e_back = eos.specific_internal_energy(rho, p);
     const auto c = eos.speed_of_sound(rho, e);
+    const auto T = eos.temperature(rho, e);
 
-    std::cout << "input rho = " << rho << std::endl       //
-              << "input e = " << e << std::endl           //
-              << "outpu p = " << p << std::endl           //
-              << "check e_back = " << e_back << std::endl //
-              << "check c = " << c << std::endl;
+    std::cout << "input rho      = " << rho << std::endl    //
+              << "input e        = " << e << std::endl      //
+              << "output p       = " << p << std::endl      //
+              << "check e_back   = " << e_back << std::endl //
+              << "check c        = " << c << std::endl      //
+              << "check T        = " << T << std::endl;
   }
 
   {
@@ -52,6 +54,7 @@ void test(const ryujin::EquationOfStateLibrary::EquationOfState &eos)
     std::array<double, 5> p;
     std::array<double, 5> e_back;
     std::array<double, 5> c;
+    std::array<double, 5> T;
 
     eos.pressure(dealii::ArrayView<double>(p),
                  dealii::ArrayView<double>(rho),
@@ -65,11 +68,16 @@ void test(const ryujin::EquationOfStateLibrary::EquationOfState &eos)
                        dealii::ArrayView<double>(rho),
                        dealii::ArrayView<double>(e));
 
-    print_array("input rho", rho, std::cout);
-    print_array("input e", e, std::cout);
-    print_array("outpu p", p, std::cout);
-    print_array("check e_back", e_back, std::cout);
-    print_array("check c", c, std::cout);
+    eos.temperature(dealii::ArrayView<double>(T),
+                    dealii::ArrayView<double>(rho),
+                    dealii::ArrayView<double>(e));
+
+    print_array("input rho     ", rho, std::cout);
+    print_array("input e       ", e, std::cout);
+    print_array("output p      ", p, std::cout);
+    print_array("check e_back  ", e_back, std::cout);
+    print_array("check c       ", c, std::cout);
+    print_array("check T       ", T, std::cout);
   }
 }
 
@@ -128,7 +136,7 @@ int main()
   test(jones_wilkins_lee);
 
   std::cout << "\nJonesWilkinsLee with omega=0.8938, A=6.321e3, B=-4.472, "
-               "R1=11.3, R2=1.13, rho_0=1.0"
+               "R1=11.3, R2=1.13, rho_0=1.0, q_0=0.0"
             << std::endl;
   {
     std::stringstream parameters;
@@ -139,6 +147,7 @@ int main()
                << "set R2 = 1.13\n"
                << "set omega = 0.8938\n"
                << "set rho_0 = 1.0\n"
+               << "set q_0 = 0.0\n"
                << "end\n"
                << std::endl;
     ParameterAcceptor::initialize(parameters);

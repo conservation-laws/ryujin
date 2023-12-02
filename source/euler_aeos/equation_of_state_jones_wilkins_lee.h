@@ -12,8 +12,9 @@ namespace ryujin
   namespace EquationOfStateLibrary
   {
     /**
-     * The Jones-Wilkins-Lee equation of state. See "JWL Equation of State" by
-     * Ralph Menikoff (LA-UR-15-29536)
+     * The Jones-Wilkins-Lee equation of state. See (16a) in:
+     * "JWL Equation of State" by Ralph Menikoff (LA-UR-15-29536). We are
+     * assuming that the reference temperature T_r is chosen such that E_r = 0.
      *
      * @ingroup EulerEquations
      */
@@ -99,7 +100,7 @@ namespace ryujin
        */
       double temperature(double rho, double e) const final
       {
-        /* Using (16a) of LA-UR-15-29536 (need to verify if valid)*/
+        /* Using (16a) of LA-UR-15-29536 */
         const auto ratio = rho / rho_0;
 
         const auto first_term = capA / R1 * std::exp(-R1 * 1. / ratio);
@@ -113,17 +114,17 @@ namespace ryujin
        */
       double speed_of_sound(double rho, double e) const final
       {
-        // FIXME: This needs to be verified...
+        /* FIXME: Need to cross reference with literature */
 
         const auto t1 = omega * rho / (R1 * rho_0);
         const auto factor1 = omega * (1. - t1) * (1. + 1. / t1) - t1;
         const auto first_term =
-            capA / rho * factor1 * std::exp(omega / factor1);
+            capA / rho * factor1 * std::exp(-1. / t1 / omega);
 
         const auto t2 = omega * rho / (R2 * rho_0);
         const auto factor2 = omega * (1. - t2) * (1. + 1. / t2) - t2;
         const auto second_term =
-            capB / rho * factor2 * std::exp(omega / factor2);
+            capB / rho * factor2 * std::exp(-1. / t2 / omega);
 
         const auto third_term = omega * (omega + 1.) * e;
 

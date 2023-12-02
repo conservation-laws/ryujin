@@ -139,10 +139,10 @@ namespace ryujin
                dealii::ExcMessage("vectors have different size"));
 
         std::transform(
-            std::begin(T),
-            std::end(T),
             std::begin(rho),
+            std::end(rho),
             std::begin(e),
+            std::begin(T),
             [&](double rho, double e) { return temperature(rho, e); });
       }
 
