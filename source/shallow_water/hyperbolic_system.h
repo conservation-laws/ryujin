@@ -1048,18 +1048,24 @@ namespace ryujin
         const flux_contribution_type &flux_j) const -> flux_type
     {
       const auto &[U_i, Z_i] = flux_i;
-      const auto &[U_j, Z_j] = flux_j;
       const auto &[U_star_ij, U_star_ji] = equilibrated_states(flux_i, flux_j);
 
       const auto H_i = water_depth(U_i);
-      const auto H_j = water_depth(U_j);
+      const auto H_star_ij = water_depth(U_star_ij);
+      const auto H_star_ji = water_depth(U_star_ji);
 
       const auto g_i = g(U_star_ij);
       const auto g_j = g(U_star_ji);
 
       flux_type result = -add(g_i, g_j);
+
+      const auto factor =
+          (ScalarNumber(0.5) * (H_star_ji * H_star_ji - H_star_ij * H_star_ij) +
+           H_i * H_i) *
+          gravity();
+
       for (unsigned int i = 0; i < dim; ++i) {
-        result[1 + i][i] -= gravity() * H_i * H_j;
+        result[1 + i][i] -= factor;
       }
 
       return result;
@@ -1082,8 +1088,10 @@ namespace ryujin
       const auto g_j = g(U_j);
 
       flux_type result = -add(g_i, g_j);
+
+      const auto factor = gravity() * H_i * (H_j + Z_j - Z_i);
       for (unsigned int i = 0; i < dim; ++i) {
-        result[1 + i][i] -= gravity() * H_i * H_j;
+        result[1 + i][i] -= factor;
       }
 
       return result;
