@@ -106,7 +106,7 @@ namespace ryujin
       /**
        * Return the computed alpha_i value.
        */
-      Number alpha(const Number /*h_i*/)
+      Number alpha(const Number /*h_i*/) const
       {
         return Number(0.);
       }

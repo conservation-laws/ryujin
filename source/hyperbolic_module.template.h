@@ -513,7 +513,11 @@ namespace ryujin
 
         /* Stored thread locally: */
         using Limiter = typename Description::template Limiter<dim, T>;
-        Limiter limiter(*hyperbolic_system_, new_precomputed);
+        Limiter limiter(*hyperbolic_system_,
+                        new_precomputed,
+                        limiter_relaxation_factor_,
+                        limiter_newton_tolerance_,
+                        limiter_newton_max_iter_);
         bool thread_ready = false;
 
         RYUJIN_OMP_FOR
@@ -547,7 +551,7 @@ namespace ryujin
           const auto m_i = load_value<T>(lumped_mass_matrix, i);
           const auto m_i_inv = load_value<T>(lumped_mass_matrix_inverse, i);
 
-          limiter.reset(i, U_i);
+          limiter.reset(i, U_i, flux_i);
 
           /* Sources: */
           state_type S_i_new;
@@ -613,8 +617,7 @@ namespace ryujin
               P_ij += (d_ijH - d_ij) * (U_j - U_i);
             }
 
-            limiter.accumulate(
-                js, U_i, U_j, flux_i, flux_j, d_ij_inv * c_ij, beta_ij);
+            limiter.accumulate(js, U_j, flux_j, d_ij_inv * c_ij, beta_ij);
 
             /*
              * Compute high-order fluxes:
@@ -681,8 +684,8 @@ namespace ryujin
           }
 
           const auto hd_i = m_i * measure_of_omega_inverse;
-          limiter.apply_relaxation(hd_i, limiter_relaxation_factor_);
-          bounds_.template write_tensor<T>(limiter.bounds(), i);
+          const auto relaxed_bounds = limiter.bounds(hd_i);
+          bounds_.template write_tensor<T>(relaxed_bounds, i);
         }
       };
 
@@ -719,6 +722,12 @@ namespace ryujin
         using View = typename HyperbolicSystem::template View<dim, T>;
 
         /* Stored thread locally: */
+        using Limiter = typename Description::template Limiter<dim, T>;
+        Limiter limiter(*hyperbolic_system_,
+                        new_precomputed,
+                        limiter_relaxation_factor_,
+                        limiter_newton_tolerance_,
+                        limiter_newton_max_iter_);
         bool thread_ready = false;
 
         RYUJIN_OMP_FOR
@@ -781,17 +790,10 @@ namespace ryujin
             }
 
             /*
-             * Compute limiter bounds:
+             * Compute limiter coefficients:
              */
 
-            const auto &[l_ij, success] =
-                Description::template Limiter<dim, T>::limit(
-                    *hyperbolic_system_,
-                    bounds,
-                    U_i_new,
-                    P_ij,
-                    limiter_newton_tolerance_,
-                    limiter_newton_max_iter_);
+            const auto &[l_ij, success] = limiter.limit(bounds, U_i_new, P_ij);
             lij_matrix_.template write_entry<T>(l_ij, i, col_idx, true);
 
             /*
@@ -858,6 +860,12 @@ namespace ryujin
 
         /* Stored thread locally: */
         AlignedVector<T> lij_row;
+        using Limiter = typename Description::template Limiter<dim, T>;
+        Limiter limiter(*hyperbolic_system_,
+                        new_precomputed,
+                        limiter_relaxation_factor_,
+                        limiter_newton_tolerance_,
+                        limiter_newton_max_iter_);
         bool thread_ready = false;
 
         RYUJIN_OMP_FOR
@@ -929,13 +937,7 @@ namespace ryujin
                 pij_matrix_.template get_tensor<T>(i, col_idx);
 
             const auto &[new_l_ij, success] =
-                Description::template Limiter<dim, T>::limit(
-                    *hyperbolic_system_,
-                    bounds,
-                    U_i_new,
-                    new_p_ij,
-                    limiter_newton_tolerance_,
-                    limiter_newton_max_iter_);
+                limiter.limit(bounds, U_i_new, new_p_ij);
 
             /*
              * This is the second pass of the limiter. Under rare

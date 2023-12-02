@@ -60,14 +60,12 @@ namespace ryujin
        * Limiter<dim, Number> limiter;
        * for (unsigned int i = n_internal; i < n_owned; ++i) {
        *   // ...
-       *   limiter.reset(i, U_i);
+       *   limiter.reset(i, U_i, flux_i);
        *   for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
        *     // ...
-       *     limiter.accumulate(js, U_i, U_j, pre_i, pre_j, scaled_c_ij,
-       * beta_ij);
+       *     limiter.accumulate(js, U_j, flux_j, scaled_c_ij, beta_ij);
        *   }
-       *   limiter.apply_relaxation(hd_i, limiter_relaxation_factor_);
-       *   limiter.bounds();
+       *   limiter.bounds(hd_i);
        * }
        * ```
        */
@@ -88,39 +86,39 @@ namespace ryujin
        */
       Limiter(const HyperbolicSystem &hyperbolic_system,
               const MultiComponentVector<ScalarNumber, n_precomputed_values>
-                  &precomputed_values)
+                  &precomputed_values,
+              const ScalarNumber relaxation_factor,
+              const ScalarNumber newton_tolerance,
+              const unsigned int newton_max_iter)
           : hyperbolic_system(hyperbolic_system)
           , precomputed_values(precomputed_values)
+          , relaxation_factor(relaxation_factor)
+          , newton_tolerance(newton_tolerance)
+          , newton_max_iter(newton_max_iter)
       {
       }
 
       /**
        * Reset temporary storage
        */
-      void reset(const unsigned int /*i*/, const state_type & /*U_i*/);
+      void reset(const unsigned int i,
+                 const state_type &U_i,
+                 const flux_contribution_type &flux_i);
 
       /**
        * When looping over the sparsity row, add the contribution associated
        * with the neighboring state U_j.
        */
       void accumulate(const unsigned int *js,
-                      const state_type &U_i,
                       const state_type &U_j,
-                      const flux_contribution_type &flux_i,
                       const flux_contribution_type &flux_j,
                       const dealii::Tensor<1, dim, Number> &scaled_c_ij,
                       const Number beta_ij);
 
       /**
-       * Apply relaxation.
+       * Return the computed bounds (with relaxation applied).
        */
-      void apply_relaxation(const Number hd_i,
-                            const ScalarNumber factor = ScalarNumber(2.));
-
-      /**
-       * Return the computed bounds.
-       */
-      const Bounds &bounds() const;
+      Bounds bounds(const Number hd_i) const;
 
       //*}
       /** @name Convex limiter */
@@ -132,15 +130,11 @@ namespace ryujin
        * obeying \f$t_{\text{min}} < t < t_{\text{max}}\f$, such that the
        * selected local minimum principles are obeyed.
        */
-      static std::tuple<Number, bool>
-      limit(const HyperbolicSystemView &hyperbolic_system,
-            const Bounds &bounds,
-            const state_type &U,
-            const state_type &P,
-            const ScalarNumber newton_tolerance,
-            const unsigned int newton_max_iter,
-            const Number t_min = Number(0.),
-            const Number t_max = Number(1.));
+      std::tuple<Number, bool> limit(const Bounds &bounds,
+                                     const state_type &U,
+                                     const state_type &P,
+                                     const Number t_min = Number(0.),
+                                     const Number t_max = Number(1.));
 
       //*}
       /**
@@ -160,13 +154,20 @@ namespace ryujin
                              const state_type & /*U*/);
 
     private:
-      //*}
-      /** @name */
+      //@}
+      /** @name Arguments and internal fields */
       //@{
       const HyperbolicSystemView hyperbolic_system;
 
       const MultiComponentVector<ScalarNumber, n_precomputed_values>
           &precomputed_values;
+
+      ScalarNumber relaxation_factor;
+      ScalarNumber newton_tolerance;
+      unsigned int newton_max_iter;
+
+      state_type U_i;
+      flux_contribution_type flux_i;
 
       Bounds bounds_;
 
@@ -186,8 +187,12 @@ namespace ryujin
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline void
     Limiter<dim, Number>::reset(const unsigned int /*i*/,
-                                const state_type & /*U_i*/)
+                                const state_type &new_U_i,
+                                const flux_contribution_type &new_flux_i)
     {
+      U_i = new_U_i;
+      flux_i = new_flux_i;
+
       /* Bounds: */
 
       auto &[u_min, u_max] = bounds_;
@@ -205,9 +210,7 @@ namespace ryujin
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline void Limiter<dim, Number>::accumulate(
         const unsigned int * /*js*/,
-        const state_type &U_i,
         const state_type &U_j,
-        const flux_contribution_type &flux_i,
         const flux_contribution_type &flux_j,
         const dealii::Tensor<1, dim, Number> &scaled_c_ij,
         const Number beta_ij)
@@ -238,10 +241,11 @@ namespace ryujin
 
 
     template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline void
-    Limiter<dim, Number>::apply_relaxation(Number hd_i, ScalarNumber factor)
+    DEAL_II_ALWAYS_INLINE inline auto
+    Limiter<dim, Number>::bounds(const Number hd_i) const -> Bounds
     {
-      auto &[u_min, u_max] = bounds_;
+      auto relaxed_bounds = bounds_;
+      auto &[u_min, u_max] = relaxed_bounds;
 
       /* Use r_i = factor * (m_i / |Omega|) ^ (1.5 / d): */
 
@@ -250,7 +254,7 @@ namespace ryujin
         r_i = dealii::Utilities::fixed_power<3>(std::sqrt(r_i)); // in 2D: ^ 3/4
       else if constexpr (dim == 1)                               //
         r_i = dealii::Utilities::fixed_power<3>(r_i);            // in 1D: ^ 3/2
-      r_i *= factor;
+      r_i *= relaxation_factor;
 
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
       const Number u_relaxation =
@@ -262,14 +266,8 @@ namespace ryujin
 
       u_max = std::min((Number(1.) + r_i) * u_max,
                        u_max + ScalarNumber(2.) * u_relaxation);
-    }
 
-
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline const typename Limiter<dim, Number>::Bounds &
-    Limiter<dim, Number>::bounds() const
-    {
-      return bounds_;
+      return relaxed_bounds;
     }
 
 

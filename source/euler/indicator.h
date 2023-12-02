@@ -146,7 +146,7 @@ namespace ryujin
       /**
        * Return the computed alpha_i value.
        */
-      Number alpha(const Number h_i);
+      Number alpha(const Number h_i) const;
 
       //@}
 
@@ -229,7 +229,7 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
-    Indicator<dim, Number>::alpha(const Number hd_i)
+    Indicator<dim, Number>::alpha(const Number hd_i) const
     {
       using ScalarNumber = typename get_value_type<Number>::type;
 
