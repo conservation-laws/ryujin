@@ -42,10 +42,7 @@ namespace ryujin
       /**
        * Constructor.
        */
-      HyperbolicSystem(const std::string &subsection = "/HyperbolicSystem")
-          : ParameterAcceptor(subsection)
-      {
-      }
+      HyperbolicSystem(const std::string &subsection = "/HyperbolicSystem");
 
     private:
       /**
@@ -522,7 +519,7 @@ namespace ryujin
         /**
          * We do have source terms
          */
-        static constexpr bool have_source_terms = true;
+        static constexpr bool have_source_terms = false;
 
         /**
          * FIXME
@@ -636,6 +633,34 @@ namespace ryujin
      * Inline definitions
      * -------------------------------------------------------------------------
      */
+
+
+    inline HyperbolicSystem::HyperbolicSystem(const std::string &subsection)
+        : ParameterAcceptor(subsection)
+    {
+      gravity_ = 9.81;
+      add_parameter("gravity", gravity_, "Gravitational constant [m/s^2]");
+
+      mannings_ = 0.;
+      add_parameter(
+          "mannings", mannings_, "Roughness coefficient for friction source");
+
+      reference_water_depth_ = 1.;
+      add_parameter("reference water depth",
+                    reference_water_depth_,
+                    "Problem specific water depth reference");
+
+      dry_state_relaxation_sharp_ = 1.e2;
+      add_parameter("dry state relaxation sharp",
+                    dry_state_relaxation_sharp_,
+                    "Problem specific dry-state relaxation parameter");
+
+      dry_state_relaxation_mollified_ = 1.e2;
+      add_parameter("dry state relaxation mollified",
+                    dry_state_relaxation_mollified_,
+                    "Problem specific dry-state relaxation parameter");
+      }
+
 
     template <int dim, typename Number>
     template <typename DISPATCH, typename SPARSITY>
