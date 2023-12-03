@@ -23,9 +23,10 @@ namespace ryujin
       Number t_r = t_max;
 
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
-      const ScalarNumber relax_small = ScalarNumber(1. + 10. * eps);
-      const ScalarNumber relax =
-          ScalarNumber(1. + hyperbolic_system.vacuum_state_relaxation() * eps);
+      const auto sharp = 10.;
+      const auto mollified = hyperbolic_system.vacuum_state_relaxation();
+      const ScalarNumber relax_small = ScalarNumber(1. + sharp * eps);
+      const ScalarNumber relax = ScalarNumber(1. + mollified * eps);
 
       /*
        * First limit the density rho.

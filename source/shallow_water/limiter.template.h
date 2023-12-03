@@ -50,16 +50,19 @@ namespace ryujin
         if (!(test_min == Number(0.) && test_max == Number(0.))) {
 #ifdef DEBUG_OUTPUT
           std::cout << std::fixed << std::setprecision(16);
-          std::cout << "Bounds violation: low-order water depth (critical)!\n";
-          std::cout << "\t\th min: " << h_min << "\n";
-          std::cout << "\t\th:     " << h_U << "\n";
-          std::cout << "\t\th max: " << h_max << "\n" << std::endl;
+          std::cout << "Bounds violation: low-order water depth (critical)!\n"
+                    << "\n\t\th min:         " << h_min
+                    << "\n\t\th min (delta): " << negative_part(h_U - h_min)
+                    << "\n\t\th:             " << h_U
+                    << "\n\t\th max (delta): " << positive_part(h_U - h_max)
+                    << "\n\t\th max:         " << h_max << "\n"
+                    << std::endl;
 #endif
           success = false;
         }
 
         const Number denominator =
-            ScalarNumber(1.) / (std::abs(h_P) + Number(100. * min));
+            ScalarNumber(1.) / (std::abs(h_P) + eps * std::max(h_max, h_tiny));
 
         constexpr auto lt = dealii::SIMDComparison::less_than;
 
@@ -117,13 +120,13 @@ namespace ryujin
         if (!(test_new_min == Number(0.) && test_new_max == Number(0.))) {
 #ifdef DEBUG_OUTPUT
           std::cout << std::fixed << std::setprecision(30);
-          std::cout << "Bounds violation: high-order water depth!\n";
-          std::cout << "\t\th min: " << h_min << "\n";
-          std::cout << "\t\th:     " << h_new << "\n";
-          std::cout << "\t\th max: " << h_max << "\n";
-          std::cout << "\t\th_U:   " << h_U << "\n";
-          std::cout << "\t\th_P:   " << h_P << "\n";
-          std::cout << "\t\tt_r:   " << t_r << "\n" << std::endl;
+          std::cout << "Bounds violation: high-order water depth!\n"
+                    << "\n\t\th min:         " << h_min
+                    << "\n\t\th min (delta): " << negative_part(h_new - h_min)
+                    << "\n\t\th:             " << h_new
+                    << "\n\t\th max (delta): " << positive_part(h_new - h_max)
+                    << "\n\t\th max:         " << h_max << "\n"
+                    << std::endl;
 #endif
           success = false;
         }
@@ -184,7 +187,7 @@ namespace ryujin
          * Verify that the left state is within bounds. This property might
          * be violated for relative CFL numbers larger than 1.
          *
-         * We use a non-scaled eps here to force the lower_bound to be
+         * We use a non-scaled "+min" here to force the lower_bound to be
          * negative so that we do not accidentally trigger in "perfect" dry
          * states with h_l equal to zero.
          */
