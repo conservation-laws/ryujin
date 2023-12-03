@@ -63,8 +63,7 @@ DECLARE_ENUM(ryujin::Equation,
                   {ryujin::Equation::navier_stokes, "navier stokes"},
                   {ryujin::Equation::scalar_conservation,
                    "scalar conservation"},
-                  {ryujin::Equation::shallow_water, "shallow water"},
-                  ));
+                  {ryujin::Equation::shallow_water, "shallow water"}, ));
 #endif
 
 namespace ryujin
@@ -169,18 +168,15 @@ namespace ryujin
         break;
       case Equation::shallow_water:
         if (dimension_ == 1) {
-          TimeLoop<ShallowWater::Description, 1, NUMBER> time_loop(
-              mpi_comm);
+          TimeLoop<ShallowWater::Description, 1, NUMBER> time_loop(mpi_comm);
           ParameterAcceptor::initialize(parameter_file);
           time_loop.run();
         } else if (dimension_ == 2) {
-          TimeLoop<ShallowWater::Description, 2, NUMBER> time_loop(
-              mpi_comm);
+          TimeLoop<ShallowWater::Description, 2, NUMBER> time_loop(mpi_comm);
           ParameterAcceptor::initialize(parameter_file);
           time_loop.run();
         } else if (dimension_ == 3) {
-          TimeLoop<ShallowWater::Description, 3, NUMBER> time_loop(
-              mpi_comm);
+          TimeLoop<ShallowWater::Description, 3, NUMBER> time_loop(mpi_comm);
           ParameterAcceptor::initialize(parameter_file);
           time_loop.run();
         } else

@@ -414,15 +414,6 @@ namespace ryujin
         //@{
 
         /**
-         * For a given (1+dim dimensional) state vector <code>U</code> and
-         * left/right topography states <code>Z_left</code> and
-         * <code>Z_right</code>, return the star_state <code>U_star</code>
-         */
-        state_type star_state(const state_type &U,
-                              const Number &Z_left,
-                              const Number &Z_right) const;
-
-        /**
          * Given a state @p U compute the flux
          * \f[
          * \begin{pmatrix}
@@ -443,6 +434,24 @@ namespace ryujin
          * \f]
          */
         flux_type g(const state_type &U) const;
+
+        /**
+         * For a given (1+dim dimensional) state vector <code>U</code> and
+         * left/right topography states <code>Z_left</code> and
+         * <code>Z_right</code>, return the star_state <code>U_star</code>
+         */
+        state_type star_state(const state_type &U,
+                              const Number &Z_left,
+                              const Number &Z_right) const;
+
+        /**
+         * Given precomputed flux contributions @p prec_i and @p prec_j
+         * compute the equilibrated states \f$U_i^{\ast,j}\f$ and
+         * \f$U_j^{\ast,i}\f$.
+         */
+        std::array<state_type, 2>
+        equilibrated_states(const flux_contribution_type &,
+                            const flux_contribution_type &) const;
 
         /**
          * Given a state @p U_i and an index @p i compute flux contributions.
@@ -498,27 +507,22 @@ namespace ryujin
                                   const flux_contribution_type &flux_j) const;
 
         /**
-         * We need to perform state equilibration: */
-        static constexpr bool have_equilibrated_states = true;
-
-        /**
-         * Given precomputed flux contributions @p prec_i and @p prec_j
-         * compute the equilibrated states \f$U_i^{\ast,j}\f$ and
-         * \f$U_j^{\ast,i}\f$.
+         * Given precomputed flux contributions @p prec_i and @p prec_j compute
+         * the equilibrated, low-order affine shift
+         * \f$ B_{ij} = -2d_ij(U^{\ast,j}_i)-2f((U^{\ast,j}_i))c_ij\f$.
          */
-        std::array<state_type, 2>
-        equilibrated_states(const flux_contribution_type &,
-                            const flux_contribution_type &) const;
+        state_type affine_shift(const flux_contribution_type &flux_i,
+                                const flux_contribution_type &flux_j,
+                                const dealii::Tensor<1, dim, Number> &c_ij,
+                                const Number &d_ij) const;
 
         //@}
         /**
-         * @name Computing stencil source terms
+         * @name Computing source terms
          */
         //@{
 
-        /**
-         * We do have source terms
-         */
+        /** We do have source terms */
         static constexpr bool have_source_terms = true;
 
         /**
@@ -627,7 +631,7 @@ namespace ryujin
       add_parameter("dry state relaxation mollified",
                     dry_state_relaxation_mollified_,
                     "Problem specific dry-state relaxation parameter");
-      }
+    }
 
 
     template <int dim, typename Number>
@@ -965,21 +969,6 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystem::View<dim, Number>::star_state(const state_type &U,
-                                                    const Number &Z_left,
-                                                    const Number &Z_right) const
-        -> state_type
-    {
-      const Number Z_max = std::max(Z_left, Z_right);
-      const Number h = water_depth(U);
-      const Number H_star = std::max(Number(0.), h + Z_left - Z_max);
-
-      return U * H_star * inverse_water_depth_mollified(U);
-    }
-
-
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline auto
     HyperbolicSystem::View<dim, Number>::f(const state_type &U) const
         -> flux_type
     {
@@ -1013,6 +1002,37 @@ namespace ryujin
         result[1 + i] = (m * h_inverse) * m[i];
       }
       return result;
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline auto
+    HyperbolicSystem::View<dim, Number>::star_state(const state_type &U,
+                                                    const Number &Z_left,
+                                                    const Number &Z_right) const
+        -> state_type
+    {
+      const Number Z_max = std::max(Z_left, Z_right);
+      const Number h = water_depth(U);
+      const Number H_star = std::max(Number(0.), h + Z_left - Z_max);
+
+      return U * H_star * inverse_water_depth_mollified(U);
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline auto
+    HyperbolicSystem::View<dim, Number>::equilibrated_states(
+        const flux_contribution_type &flux_i,
+        const flux_contribution_type &flux_j) const -> std::array<state_type, 2>
+    {
+      const auto &[U_i, Z_i] = flux_i;
+      const auto &[U_j, Z_j] = flux_j;
+
+      const auto U_star_ij = star_state(U_i, Z_i, Z_j);
+      const auto U_star_ji = star_state(U_j, Z_j, Z_i);
+
+      return {U_star_ij, U_star_ji};
     }
 
 
@@ -1100,17 +1120,16 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystem::View<dim, Number>::equilibrated_states(
+    HyperbolicSystem::View<dim, Number>::affine_shift(
         const flux_contribution_type &flux_i,
-        const flux_contribution_type &flux_j) const -> std::array<state_type, 2>
+        const flux_contribution_type &flux_j,
+        const dealii::Tensor<1, dim, Number> &c_ij,
+        const Number &d_ij) const -> state_type
     {
-      const auto &[U_i, Z_i] = flux_i;
-      const auto &[U_j, Z_j] = flux_j;
+      const auto &[U_star_ij, U_star_ji] = equilibrated_states(flux_i, flux_j);
+      const auto g_star_ij = g(U_star_ij);
 
-      const auto U_star_ij = star_state(U_i, Z_i, Z_j);
-      const auto U_star_ji = star_state(U_j, Z_j, Z_i);
-
-      return {U_star_ij, U_star_ji};
+      return -ScalarNumber(2.) * (d_ij * U_star_ij + contract(g_star_ij, c_ij));
     }
 
 

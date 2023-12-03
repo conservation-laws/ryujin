@@ -631,15 +631,6 @@ namespace ryujin
                         const flux_contribution_type &flux_j) const = delete;
 
         /**
-         * We do not perform state equilibration
-         */
-        static constexpr bool have_equilibrated_states = false;
-
-        std::array<state_type, 2>
-        equilibrated_states(const flux_contribution_type &flux_i,
-                            const flux_contribution_type &flux_j) = delete;
-
-        /**
          * @name Computing stencil source terms
          */
         //@{

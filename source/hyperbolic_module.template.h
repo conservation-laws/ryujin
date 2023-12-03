@@ -17,6 +17,11 @@
 
 namespace ryujin
 {
+  namespace ShallowWater
+  {
+    struct Description;
+  }
+
   using namespace dealii;
 
   template <typename Description, int dim, typename Number>
@@ -156,6 +161,23 @@ namespace ryujin
 #endif
 
     CALLGRIND_START_INSTRUMENTATION;
+
+    /*
+     * Workaround: A constexpr boolean storing the fact whether we
+     * instantiate the HyperbolicModule for the shallow water equations.
+     *
+     * Rationale: Currently, the shallow water equations is the only
+     * hyperbolic system for which we have to (a) form equilibrated states
+     * for the low-order update, and (b) apply an affine shift for
+     * computing limiter bounds. It's not so easy to come up with a
+     * meaningful abstraction layer for this (in particular because we only
+     * have one PDE). Thus, for the time being we simply special case a
+     * small amount of code in this routine.
+     *
+     * FIXME: Refactor into a proper abstraction layer / interface.
+     */
+    constexpr bool shallow_water =
+        std::is_same_v<Description, ShallowWater::Description>;
 
     using VA = VectorizedArray<Number>;
 
@@ -543,6 +565,30 @@ namespace ryujin
           limiter.reset(i, U_i, flux_i);
 
           const unsigned int *js = sparsity_simd.columns(i);
+
+          /*
+           * Workaround: For shallow water we need to accumulate an affine
+           * shift over the stencil first before we can compute limiter
+           * bounds.
+           */
+          [[maybe_unused]] state_type affine_shift;
+          if constexpr (shallow_water) {
+            for (unsigned int col_idx = 0; col_idx < row_length;
+                 ++col_idx, js += stride_size) {
+
+              const auto U_j = old_U.template get_tensor<T>(js);
+              const auto flux_j = view.flux_contribution(
+                  new_precomputed, precomputed_initial_, js, U_j);
+
+              const auto d_ij = dij_matrix_.template get_entry<T>(i, col_idx);
+              const auto c_ij = cij_matrix.template get_tensor<T>(i, col_idx);
+
+              const auto B_ij = view.affine_shift(flux_i, flux_j, c_ij, d_ij);
+              affine_shift += B_ij;
+            }
+          }
+
+          js = sparsity_simd.columns(i);
           for (unsigned int col_idx = 0; col_idx < row_length;
                ++col_idx, js += stride_size) {
 
@@ -570,22 +616,28 @@ namespace ryujin
             U_i_new += tau * m_i_inv * contract(flux_ij, c_ij);
             auto P_ij = -contract(flux_ij, c_ij);
 
-            if constexpr (View::have_equilibrated_states) {
-              /* Use star states for low-order update: */
+            if constexpr (shallow_water) {
+              /*
+               * Workaround: Shallow water (and related) are special:
+               */
+
               const auto &[U_star_ij, U_star_ji] =
                   view.equilibrated_states(flux_i, flux_j);
               U_i_new += tau * m_i_inv * d_ij * (U_star_ji - U_star_ij);
               F_iH += d_ijH * (U_star_ji - U_star_ij);
               P_ij += (d_ijH - d_ij) * (U_star_ji - U_star_ij);
 
+              limiter.accumulate(
+                  js, U_j, flux_j, d_ij_inv * c_ij, beta_ij, affine_shift);
+
             } else {
-              /* Regular low-order update with unmodified states: */
+
               U_i_new += tau * m_i_inv * d_ij * (U_j - U_i);
               F_iH += d_ijH * (U_j - U_i);
               P_ij += (d_ijH - d_ij) * (U_j - U_i);
-            }
 
-            limiter.accumulate(js, U_j, flux_j, d_ij_inv * c_ij, beta_ij);
+              limiter.accumulate(js, U_j, flux_j, d_ij_inv * c_ij, beta_ij);
+            }
 
             /*
              * Compute high-order fluxes:

@@ -540,21 +540,12 @@ namespace ryujin
         flux_type flux(const flux_contribution_type &flux_i,
                        const flux_contribution_type &flux_j) const;
 
-        /**
-         * The low-order and high-order fluxes are the same:
-         */
+        /** The low-order and high-order fluxes are the same */
         static constexpr bool have_high_order_flux = false;
 
         flux_type
         high_order_flux(const flux_contribution_type &flux_i,
                         const flux_contribution_type &flux_j) const = delete;
-
-        /** We do not perform state equilibration */
-        static constexpr bool have_equilibrated_states = false;
-
-        std::array<state_type, 2>
-        equilibrated_states(const flux_contribution_type &flux_i,
-                            const flux_contribution_type &flux_j) = delete;
 
         //@}
         /**
@@ -562,7 +553,7 @@ namespace ryujin
          */
         //@{
 
-        /** We do not have source terms */
+        /** We do not have source terms: */
         static constexpr bool have_source_terms = false;
 
         state_type low_order_nodal_source(const precomputed_vector_type &,

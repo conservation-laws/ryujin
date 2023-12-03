@@ -311,13 +311,6 @@ namespace ryujin
         high_order_flux(const flux_contribution_type &,
                         const flux_contribution_type &) const = delete;
 
-        /** We do not perform state equilibration */
-        static constexpr bool have_equilibrated_states = false;
-
-        std::array<state_type, 2>
-        equilibrated_states(const flux_contribution_type &,
-                            const flux_contribution_type &) const = delete;
-
         //@}
         /**
          * @name Computing stencil source terms
