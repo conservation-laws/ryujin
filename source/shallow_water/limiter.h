@@ -177,7 +177,6 @@ namespace ryujin
       Number h_relaxation_numerator;
       Number kin_relaxation_numerator;
       Number relaxation_denominator;
-      Number v2_relaxation_numerator;
 
       //@}
     };
@@ -199,16 +198,15 @@ namespace ryujin
       U_i = new_U_i;
       flux_i = new_flux_i;
 
-      auto &[h_min, h_max, kin_max, v2_max] = bounds_;
+      auto &[h_min, h_max, h_tiny, kin_max] = bounds_;
 
       h_min = Number(std::numeric_limits<ScalarNumber>::max());
       h_max = Number(0.);
+      h_tiny = Number(0.);
       kin_max = Number(0.);
-      v2_max = Number(0.);
 
       h_relaxation_numerator = Number(0.);
       kin_relaxation_numerator = Number(0.);
-      v2_relaxation_numerator = Number(0.);
       relaxation_denominator = Number(0.);
     }
 
@@ -220,7 +218,7 @@ namespace ryujin
         const flux_contribution_type &flux_j,
         const dealii::Tensor<1, dim, Number> &scaled_c_ij,
         const Number &beta_ij,
-        [[maybe_unused]] const state_type &affine_shift)
+        const state_type &affine_shift)
     {
       /* The bar states: */
 
@@ -235,9 +233,11 @@ namespace ryujin
                       (U_star_ij + U_star_ji +
                        contract(add(f_star_ij, -f_star_ji), scaled_c_ij));
 
+      U_ij_bar += affine_shift;
+
       /* Bounds: */
 
-      auto &[h_min, h_max, kin_max, v2_max] = bounds_;
+      auto &[h_min, h_max, h_tiny, kin_max] = bounds_;
 
       const auto h_bar_ij = hyperbolic_system.water_depth(U_ij_bar);
       h_min = std::min(h_min, h_bar_ij);
@@ -246,31 +246,17 @@ namespace ryujin
       const auto kin_bar_ij = hyperbolic_system.kinetic_energy(U_ij_bar);
       kin_max = std::max(kin_max, kin_bar_ij);
 
-      const auto vel =
-          hyperbolic_system.momentum(U_ij_bar) *
-          hyperbolic_system.inverse_water_depth_mollified(U_ij_bar);
-      const auto v2_bar_ij = vel.norm_square();
-      v2_max = std::max(v2_max, v2_bar_ij);
-
       /* Relaxation: */
 
       relaxation_denominator += std::abs(beta_ij);
 
       const auto h_i = hyperbolic_system.water_depth(U_i);
       const auto h_j = hyperbolic_system.water_depth(U_j);
-      h_relaxation_numerator += beta_ij * (-h_i + h_j);
+      h_relaxation_numerator += beta_ij * (h_i + h_j);
 
       const auto kin_i = hyperbolic_system.kinetic_energy(U_i);
       const auto kin_j = hyperbolic_system.kinetic_energy(U_j);
-      kin_relaxation_numerator += beta_ij * (-kin_i + kin_j);
-
-      const auto vel_i = hyperbolic_system.momentum(U_i) *
-                         hyperbolic_system.inverse_water_depth_mollified(U_i);
-      const auto vel_j = hyperbolic_system.momentum(U_j) *
-                         hyperbolic_system.inverse_water_depth_mollified(U_j);
-
-      v2_relaxation_numerator +=
-          beta_ij * (-vel_i.norm_square() + vel_j.norm_square());
+      kin_relaxation_numerator += beta_ij * (kin_i + kin_j);
     }
 
 
@@ -279,7 +265,7 @@ namespace ryujin
     Limiter<dim, Number>::bounds(const Number hd_i) const -> Bounds
     {
       auto relaxed_bounds = bounds_;
-      auto &[h_min, h_max, kin_max, v2_max] = relaxed_bounds;
+      auto &[h_min, h_max, h_tiny, kin_max] = relaxed_bounds;
 
       /* Use r_i = factor * (m_i / |Omega|) ^ (1.5 / d): */
 
@@ -292,25 +278,27 @@ namespace ryujin
 
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
 
-      const Number h_relaxation = ScalarNumber(2.) *
-                                  std::abs(h_relaxation_numerator) /
-                                  (relaxation_denominator + Number(eps));
+      const Number h_relaxed = ScalarNumber(2.) *
+                               std::abs(h_relaxation_numerator) /
+                               (relaxation_denominator + Number(eps));
 
-      h_min = std::max((Number(1.) - r_i) * h_min, h_min - h_relaxation);
-      h_max = std::min((Number(1.) + r_i) * h_max, h_max + h_relaxation);
+      h_min = std::max((Number(1.) - r_i) * h_min, h_min - h_relaxed);
+      h_max = std::min((Number(1.) + r_i) * h_max, h_max + h_relaxed);
 
-      const Number kin_relaxation = ScalarNumber(2.) *
-                                    std::abs(kin_relaxation_numerator) /
-                                    (relaxation_denominator + Number(eps));
+      const Number kin_relaxed = ScalarNumber(2.) *
+                                 std::abs(kin_relaxation_numerator) /
+                                 (relaxation_denominator + Number(eps));
 
-      kin_max =
-          std::min((Number(1.) + r_i) * kin_max, kin_max + kin_relaxation);
+      kin_max = std::min((Number(1.) + r_i) * kin_max, kin_max + kin_relaxed);
 
-      const Number v2_relaxation = ScalarNumber(2.) *
-                                   std::abs(v2_relaxation_numerator) /
-                                   (relaxation_denominator + Number(eps));
+      /* Use r_i = 0.2 * (m_i / |Omega|) ^ (1 / d): */
 
-      v2_max = std::min((Number(1.) + r_i) * v2_max, v2_max + v2_relaxation);
+      r_i = hd_i;
+      if constexpr (dim == 2)
+        r_i = std::sqrt(hd_i);
+      r_i *= ScalarNumber(0.2);
+
+      h_tiny = hyperbolic_system.reference_water_depth() * r_i;
 
       return relaxed_bounds;
     }

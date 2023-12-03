@@ -564,14 +564,15 @@ namespace ryujin
 
           limiter.reset(i, U_i, flux_i);
 
-          const unsigned int *js = sparsity_simd.columns(i);
-
           /*
            * Workaround: For shallow water we need to accumulate an affine
            * shift over the stencil first before we can compute limiter
            * bounds.
            */
+
           [[maybe_unused]] state_type affine_shift;
+
+          const unsigned int *js = sparsity_simd.columns(i);
           if constexpr (shallow_water) {
             for (unsigned int col_idx = 0; col_idx < row_length;
                  ++col_idx, js += stride_size) {
@@ -586,6 +587,8 @@ namespace ryujin
               const auto B_ij = view.affine_shift(flux_i, flux_j, c_ij, d_ij);
               affine_shift += B_ij;
             }
+
+            affine_shift *= tau * m_i_inv;
           }
 
           js = sparsity_simd.columns(i);
