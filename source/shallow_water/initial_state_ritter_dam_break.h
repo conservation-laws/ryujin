@@ -5,35 +5,32 @@
 
 #pragma once
 
-#include "hyperbolic_system.h"
 #include <initial_state_library.h>
 
 namespace ryujin
 {
-  namespace ShallowWater
+  namespace ShallowWaterInitialStates
   {
-    struct Description;
-
     /**
      * Ritter's dam break solution. This is one-dimensional dam break without
-     * friction. See: Sec.~7.3 in @cite GuermondEtAl2018SW.
+     * friction. See Section 7.3 in @cite GuermondEtAl2018SW for details.
      *
      * @ingroup ShallowWaterEquations
      */
-    template <int dim, typename Number>
+    template <typename Description, int dim, typename Number>
     class RitterDamBreak : public InitialState<Description, dim, Number>
     {
     public:
-      using HyperbolicSystemView = HyperbolicSystem::View<dim, Number>;
+      using HyperbolicSystem = typename Description::HyperbolicSystem;
+      using HyperbolicSystemView =
+          typename HyperbolicSystem::template View<dim, Number>;
       using state_type = typename HyperbolicSystemView::state_type;
-      using primitive_state_type =
-          typename HyperbolicSystemView::primitive_state_type;
 
       RitterDamBreak(const HyperbolicSystem &hyperbolic_system,
                      const std::string subsection)
           : InitialState<Description, dim, Number>("ritter dam break",
                                                    subsection)
-          , hyperbolic_system(hyperbolic_system)
+          , hyperbolic_system_(hyperbolic_system)
       {
         dealii::ParameterAcceptor::parse_parameters_call_back.connect(
             std::bind(&RitterDamBreak::parse_parameters_callback, this));
@@ -58,8 +55,9 @@ namespace ryujin
 
       state_type compute(const dealii::Point<dim> &point, Number t) final
       {
-        const auto g = hyperbolic_system.gravity();
-        const Number x = point[0];
+        const auto g = hyperbolic_system_.gravity();
+
+        const auto x = point[0];
 
         const Number aL = std::sqrt(g * left_depth);
         const Number xA = -(t + t_initial_) * aL;
@@ -81,12 +79,11 @@ namespace ryujin
       /* Default bathymetry of 0 */
 
     private:
-      const HyperbolicSystemView hyperbolic_system;
+      const HyperbolicSystemView hyperbolic_system_;
 
       Number t_initial_;
-
       Number left_depth;
     };
 
-  } // namespace ShallowWater
+  } // namespace ShallowWaterInitialStates
 } // namespace ryujin

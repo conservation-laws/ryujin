@@ -5,34 +5,33 @@
 
 #pragma once
 
-#include "hyperbolic_system.h"
 #include <initial_state_library.h>
 
 namespace ryujin
 {
-  namespace ShallowWater
+  namespace ShallowWaterInitialStates
   {
-    struct Description;
-
     /**
-     * Eric derived this. Will publish somewhere sometime.
+     * Smooth vortex problem with and without topography. Without topography,
+     * the smooth vortex moves through space. With topography, it is a steady
+     * vortex in space. See Section 2.3 in @cite Ricchiuto_Bollermann_2009
+     * for details.
      *
      * @ingroup ShallowWaterEquations
      */
-    template <int dim, typename Number>
-    class UnsteadyVortex : public InitialState<Description, dim, Number>
+    template <typename Description, int dim, typename Number>
+    class SmoothVortex : public InitialState<Description, dim, Number>
     {
     public:
-      using HyperbolicSystemView = HyperbolicSystem::View<dim, Number>;
+      using HyperbolicSystem = typename Description::HyperbolicSystem;
+      using HyperbolicSystemView =
+          typename HyperbolicSystem::template View<dim, Number>;
       using state_type = typename HyperbolicSystemView::state_type;
-      using primitive_state_type =
-          typename HyperbolicSystemView::primitive_state_type;
 
-      UnsteadyVortex(const HyperbolicSystem &hyperbolic_system,
-                     const std::string subsection)
-          : InitialState<Description, dim, Number>("unsteady vortex",
-                                                   subsection)
-          , hyperbolic_system(hyperbolic_system)
+      SmoothVortex(const HyperbolicSystem &hyperbolic_system,
+                   const std::string subsection)
+          : InitialState<Description, dim, Number>("smooth vortex", subsection)
+          , hyperbolic_system_(hyperbolic_system)
       {
         with_bathymetry = false;
         this->add_parameter("with bathymetry",
@@ -53,7 +52,7 @@ namespace ryujin
 
       state_type compute(const dealii::Point<dim> &point, Number t) final
       {
-        const auto gravity = hyperbolic_system.gravity();
+        const auto gravity = hyperbolic_system_.gravity();
 
         dealii::Point<2> point_bar;
         point_bar[0] = point[0] - mach_number_ * t;
@@ -93,7 +92,7 @@ namespace ryujin
       }
 
     private:
-      const HyperbolicSystemView hyperbolic_system;
+      const HyperbolicSystemView hyperbolic_system_;
 
       DEAL_II_ALWAYS_INLINE inline Number
       compute_bathymetry(const dealii::Point<dim> &point) const
@@ -118,5 +117,5 @@ namespace ryujin
       Number beta_;
     };
 
-  } // namespace ShallowWater
+  } // namespace ShallowWaterInitialStates
 } // namespace ryujin

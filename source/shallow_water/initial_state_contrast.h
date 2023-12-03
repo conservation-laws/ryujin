@@ -5,34 +5,31 @@
 
 #pragma once
 
-#include "hyperbolic_system.h"
 #include <initial_state_library.h>
 
 namespace ryujin
 {
-  namespace ShallowWater
+  namespace ShallowWaterInitialStates
   {
-    struct Description;
-
     /**
      * An initial state formed by a contrast of a given "left" and "right"
      * primitive state.
      *
      * @ingroup ShallowWaterEquations
      */
-    template <int dim, typename Number>
+    template <typename Description, int dim, typename Number>
     class Contrast : public InitialState<Description, dim, Number>
     {
     public:
-      using HyperbolicSystemView = HyperbolicSystem::View<dim, Number>;
+      using HyperbolicSystem = typename Description::HyperbolicSystem;
+      using HyperbolicSystemView =
+          typename HyperbolicSystem::template View<dim, Number>;
       using state_type = typename HyperbolicSystemView::state_type;
-      using primitive_state_type =
-          typename HyperbolicSystemView::primitive_state_type;
 
       Contrast(const HyperbolicSystem &hyperbolic_system,
                const std::string subsection)
           : InitialState<Description, dim, Number>("contrast", subsection)
-          , hyperbolic_system(hyperbolic_system)
+          , hyperbolic_system_(hyperbolic_system)
       {
         primitive_left_[0] = 1.;
         primitive_left_[1] = 0.0;
@@ -50,15 +47,14 @@ namespace ryujin
       state_type compute(const dealii::Point<dim> &point, Number /*t*/) final
       {
         const auto temp = point[0] > 0. ? primitive_right_ : primitive_left_;
-        return hyperbolic_system.from_primitive_state(
-            hyperbolic_system.expand_state(temp));
+        return hyperbolic_system_.from_initial_state(temp);
       }
 
     private:
-      const HyperbolicSystemView hyperbolic_system;
+      const HyperbolicSystemView hyperbolic_system_;
 
       dealii::Tensor<1, 2, Number> primitive_left_;
       dealii::Tensor<1, 2, Number> primitive_right_;
     };
-  } // namespace ShallowWater
+  } // namespace ShallowWaterInitialStates
 } // namespace ryujin

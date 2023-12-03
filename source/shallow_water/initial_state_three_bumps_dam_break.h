@@ -10,29 +10,28 @@
 
 namespace ryujin
 {
-  namespace ShallowWater
+  namespace ShallowWaterInitialStates
   {
-    struct Description;
-
     /**
-     * Dam break with three conical islands as obstacles. See Sec.~7.8 in
-     * @cite GuermondEtAl2018SW with \f$D = [0,75m]x[0,30m]\f$.
+     * Dam break with three conical islands as obstacles.
+     * See Section 7.8 in @cite GuermondEtAl2018SW for details.
      *
      * @ingroup ShallowWaterEquations
      */
-    template <int dim, typename Number>
+    template <typename Description, int dim, typename Number>
     class ThreeBumpsDamBreak : public InitialState<Description, dim, Number>
     {
     public:
-      using HyperbolicSystemView = HyperbolicSystem::View<dim, Number>;
+      using HyperbolicSystem = typename Description::HyperbolicSystem;
+      using HyperbolicSystemView =
+          typename HyperbolicSystem::template View<dim, Number>;
       using state_type = typename HyperbolicSystemView::state_type;
-      using primitive_state_type =
-          typename HyperbolicSystemView::primitive_state_type;
 
       ThreeBumpsDamBreak(const HyperbolicSystem &hyperbolic_system,
-                         const std::string s)
-          : InitialState<Description, dim, Number>("three bumps dam break", s)
-          , hyperbolic_system(hyperbolic_system)
+                         const std::string subsection)
+          : InitialState<Description, dim, Number>("three bumps dam break",
+                                                   subsection)
+          , hyperbolic_system_(hyperbolic_system)
       {
         well_balancing_validation = false;
         this->add_parameter(
@@ -75,7 +74,7 @@ namespace ryujin
 
         const auto &h = left_depth;
         const auto a =
-            hyperbolic_system.speed_of_sound(state_type{{h, Number(0.)}});
+            hyperbolic_system_.speed_of_sound(state_type{{h, Number(0.)}});
         return state_type{{h, h * a}};
       }
 
@@ -88,7 +87,7 @@ namespace ryujin
       }
 
     private:
-      const HyperbolicSystemView hyperbolic_system;
+      const HyperbolicSystemView hyperbolic_system_;
 
       DEAL_II_ALWAYS_INLINE inline Number
       compute_bathymetry(const dealii::Point<dim> &point) const
@@ -125,5 +124,5 @@ namespace ryujin
       Number cone_magnitude;
     };
 
-  } // namespace ShallowWater
+  } // namespace ShallowWaterInitialStates
 } // namespace ryujin

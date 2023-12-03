@@ -5,36 +5,34 @@
 
 #pragma once
 
-#include "hyperbolic_system.h"
 #include <initial_state_library.h>
 
 namespace ryujin
 {
-  namespace ShallowWater
+  namespace ShallowWaterInitialStates
   {
-    struct Description;
-
     /**
-     * A 1D/2D Paraboloid configuration. See following reference:
+     * A 1D/2D configuration for planar surface flow in a radially-symmetric
+     * paraboloid basin without friction. See Section 4.2.2 of
+     * @cite swashes_2013 for details.
      *
-     * W. C. Thacker, Some exact solution to the nonlinear shallo-water wave
-     * equations, J. Fluid. Mech., 107:499-508, 1981.
+     * @todo Add variation with friction.
      *
      * @ingroup ShallowWaterEquations
      */
-    template <int dim, typename Number>
+    template <typename Description, int dim, typename Number>
     class Paraboloid : public InitialState<Description, dim, Number>
     {
     public:
-      using HyperbolicSystemView = HyperbolicSystem::View<dim, Number>;
+      using HyperbolicSystem = typename Description::HyperbolicSystem;
+      using HyperbolicSystemView =
+          typename HyperbolicSystem::template View<dim, Number>;
       using state_type = typename HyperbolicSystemView::state_type;
-      using primitive_state_type =
-          typename HyperbolicSystemView::primitive_state_type;
 
       Paraboloid(const HyperbolicSystem &hyperbolic_system,
                  const std::string subsection)
           : InitialState<Description, dim, Number>("paraboloid", subsection)
-          , hyperbolic_system(hyperbolic_system)
+          , hyperbolic_system_(hyperbolic_system)
       {
         a_ = 1.;
         this->add_parameter(
@@ -50,62 +48,45 @@ namespace ryujin
 
       state_type compute(const dealii::Point<dim> &point, Number t) final
       {
-        /* Initialize primitive variables */
-        Number h = 0.;   // water depth
-        Number v_x = 0.; // velocity in x-direction
-        Number v_y = 0.; // velocity in y-direction (if in 2D)
-
         /* Common quantities */
         const auto z = compute_bathymetry(point);
-        const auto g = hyperbolic_system.gravity();
+        const auto g = hyperbolic_system_.gravity();
         const Number omega = std::sqrt(2. * g * h_0_) / a_;
+        const Number &x = point[0];
+
+        /* Initialize primitive variables */
+        Number h, v_x, v_y = 0.;
 
         /* Define profiles for each dimension */
-        switch (dim) {
-        case 1:
-          /* Fake 1D configuration */
-          {
-            const Number &x = point[0];
+        if constexpr (dim == 1) {
 
-            h = eta_ * h_0_ / (a_ * a_) * (2. * x * std::cos(omega * t)) - z;
-            h = std::max(h, Number(0.));
+          const auto elevation =
+              eta_ * h_0_ / (a_ * a_) * (2. * x * std::cos(omega * t));
 
-            v_x = -eta_ * omega * std::sin(omega * t);
-          }
-          break;
+          h = std::max(elevation - z, Number(0.));
+          v_x = -eta_ * omega * std::sin(omega * t);
 
-        case 2:
-          /* 2D configuration as described in reference above */
-          {
-            const Number &x = point[0];
-            const Number &y = point[1];
-
-            h = eta_ * h_0_ / (a_ * a_) *
-                    (2. * x * std::cos(omega * t) +
-                     2 * y * std::sin(omega * t)) -
-                z;
-            h = std::max(h, Number(0.));
-
-            v_x = -eta_ * omega * std::sin(omega * t);
-            v_y = eta_ * omega * std::cos(omega * t);
-          }
-          break;
-
-        default:
-          AssertThrow(false, dealii::ExcNotImplemented());
-          __builtin_trap();
-        }
-
-        /* Set final state */
-        if constexpr (dim == 1)
           return state_type{{h, h * v_x}};
-        else if constexpr (dim == 2)
+        } else if constexpr (dim == 2) {
+
+          const Number &y = point[1];
+
+          const auto elevation =
+              eta_ * h_0_ / (a_ * a_) *
+              (2. * x * std::cos(omega * t) + 2. * y * std::sin(omega * t));
+
+          h = std::max(elevation - z, Number(0.));
+          v_x = -eta_ * omega * std::sin(omega * t);
+          v_y = eta_ * omega * std::cos(omega * t);
+
           return state_type{{h, h * v_x, h * v_y}};
-        else {
+
+        } else {
           AssertThrow(false, dealii::ExcNotImplemented());
           __builtin_trap();
         }
       }
+
 
       auto initial_precomputations(const dealii::Point<dim> &point) ->
           typename InitialState<Description, dim, Number>::
@@ -116,7 +97,7 @@ namespace ryujin
       }
 
     private:
-      const HyperbolicSystemView hyperbolic_system;
+      const HyperbolicSystemView hyperbolic_system_;
 
       DEAL_II_ALWAYS_INLINE inline Number
       compute_bathymetry(const dealii::Point<dim> &point) const
@@ -129,5 +110,5 @@ namespace ryujin
       Number eta_;
     };
 
-  } // namespace ShallowWater
+  } // namespace ShallowWaterInitialStates
 } // namespace ryujin

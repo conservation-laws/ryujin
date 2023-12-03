@@ -584,15 +584,28 @@ namespace ryujin
         state_type expand_state(const ST &state) const;
 
         /**
-         * Given a primitive state [rho, u_1, ..., u_d, p] return a conserved
+         * Given an initial state [h, u_1, ..., u_d] return a
+         * conserved state [h, m_1, ..., m_d].
+         *
+         * This function simply calls from_primitive_state() and
+         * expand_state().
+         *
+         * @note This function is used to conveniently convert (user
+         * provided) primitive initial states to a conserved state in the
+         * ShallowWaterInitialStateLibrary.
+         */
+        template <typename ST>
+        state_type from_initial_state(const ST &initial_state) const;
+
+        /**
+         * Given a primitive state [h, u_1, ..., u_d] return a conserved
          * state
          */
         state_type
         from_primitive_state(const primitive_state_type &primitive_state) const;
 
         /**
-         * Given a conserved state return a primitive state [rho, u_1, ..., u_d,
-         * p]
+         * Given a conserved state return a primitive state [h, u_1, ..., u_d]
          */
         primitive_state_type to_primitive_state(const state_type &state) const;
 
@@ -1249,7 +1262,7 @@ namespace ryujin
       using T = typename ST::value_type;
       static_assert(std::is_same_v<Number, T>, "template mismatch");
 
-      constexpr auto dim2 = ST::dimension - 2;
+      constexpr auto dim2 = ST::dimension - 1;
       static_assert(dim >= dim2,
                     "the space dimension of the argument state must not be "
                     "larger than the one of the target state");
@@ -1260,6 +1273,16 @@ namespace ryujin
         result[i] = state[i];
 
       return result;
+    }
+
+    template <int dim, typename Number>
+    template <typename ST>
+    DEAL_II_ALWAYS_INLINE inline auto
+    HyperbolicSystem::View<dim, Number>::from_initial_state(
+        const ST &initial_state) const -> state_type
+    {
+      const auto primitive_state = expand_state(initial_state);
+      return from_primitive_state(primitive_state);
     }
 
 

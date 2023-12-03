@@ -5,34 +5,31 @@
 
 #pragma once
 
-#include "hyperbolic_system.h"
 #include <initial_state_library.h>
 
 namespace ryujin
 {
-  namespace ShallowWater
+  namespace ShallowWaterInitialStates
   {
-    struct Description;
-
     /**
      * Flow over a bump with a hydraulic jump.
-     * See: Sec.~7.2 in @cite GuermondEtAl2018SW.
+     * See Section 7.2 in @cite GuermondEtAl2018SW for details.
      *
      * @ingroup ShallowWaterEquations
      */
-    template <int dim, typename Number>
+    template <typename Description, int dim, typename Number>
     class FlowOverBump : public InitialState<Description, dim, Number>
     {
     public:
-      using HyperbolicSystemView = HyperbolicSystem::View<dim, Number>;
+      using HyperbolicSystem = typename Description::HyperbolicSystem;
+      using HyperbolicSystemView =
+          typename HyperbolicSystem::template View<dim, Number>;
       using state_type = typename HyperbolicSystemView::state_type;
-      using primitive_state_type =
-          typename HyperbolicSystemView::primitive_state_type;
 
       FlowOverBump(const HyperbolicSystem &hyperbolic_system,
-                   const std::string subsec)
-          : InitialState<Description, dim, Number>("flow over bump", subsec)
-          , hyperbolic_system(hyperbolic_system)
+                   const std::string subsection)
+          : InitialState<Description, dim, Number>("flow over bump", subsection)
+          , hyperbolic_system_(hyperbolic_system)
       {
         dealii::ParameterAcceptor::parse_parameters_call_back.connect(
             std::bind(&FlowOverBump::parse_parameters_callback, this));
@@ -53,8 +50,9 @@ namespace ryujin
 
       state_type compute(const dealii::Point<dim> &point, Number t) final
       {
+        const auto g = hyperbolic_system_.gravity();
+
         const auto x = point[0];
-        const Number g = this->hyperbolic_system.gravity();
 
         /* Define constants for transcritical flow */
         const Number xM = 10.;
@@ -111,7 +109,7 @@ namespace ryujin
       }
 
     private:
-      const HyperbolicSystemView hyperbolic_system;
+      const HyperbolicSystemView hyperbolic_system_;
 
       DEAL_II_ALWAYS_INLINE
       inline Number compute_bathymetry(const dealii::Point<dim> &point) const
@@ -130,5 +128,5 @@ namespace ryujin
       std::string which_case_;
     };
 
-  } // namespace ShallowWater
+  } // namespace ShallowWaterInitialStates
 } // namespace ryujin

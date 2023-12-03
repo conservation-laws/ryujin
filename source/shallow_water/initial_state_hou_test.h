@@ -5,31 +5,27 @@
 
 #pragma once
 
-#include "hyperbolic_system.h"
 #include <initial_state_library.h>
+
+#include <deal.II/base/function_parser.h>
 
 namespace ryujin
 {
-  namespace ShallowWater
+  namespace ShallowWaterInitialStates
   {
-    struct Description;
-
     /**
-     * Test proposed in Section 3.8 of
-     *
-     * "A robust well-balanced model on unstructured grids for shallow water
-     * flows with wetting and drying over complex topography"
+     * Wetting/drying test proposed in Section 3.8 of @hou2013.
      *
      * @ingroup ShallowWaterEquations
      */
-    template <int dim, typename Number>
+    template <typename Description, int dim, typename Number>
     class HouTest : public InitialState<Description, dim, Number>
     {
     public:
-      using HyperbolicSystemView = HyperbolicSystem::View<dim, Number>;
+      using HyperbolicSystem = typename Description::HyperbolicSystem;
+      using HyperbolicSystemView =
+          typename HyperbolicSystem::template View<dim, Number>;
       using state_type = typename HyperbolicSystemView::state_type;
-      using primitive_state_type =
-          typename HyperbolicSystemView::primitive_state_type;
 
       HouTest(const HyperbolicSystem &hyperbolic_system, const std::string s)
           : InitialState<Description, dim, Number>("hou test", s)
@@ -43,16 +39,22 @@ namespace ryujin
 
       state_type compute(const dealii::Point<dim> &point, Number /*t*/) final
       {
-        const Number x = point[0];
+        if constexpr (dim == 1) {
+          AssertThrow(false, dealii::ExcNotImplemented());
+          __builtin_trap();
 
-        const Number bath = compute_bathymetry(point);
+        } else {
+          const Number x = point[0];
 
-        /* Set water depth behind resevoir */
-        Number h = 0.;
-        if (x < -100.)
-          h = std::max(depth_ - bath, 0.);
+          const Number bath = compute_bathymetry(point);
 
-        return state_type{{h, 0.}};
+          /* Set water depth behind resevoir */
+          Number h = 0.;
+          if (x < -100.)
+            h = std::max(depth_ - bath, 0.);
+
+          return state_type{{h, 0.}};
+        }
       }
 
       auto initial_precomputations(const dealii::Point<dim> &point) ->
@@ -103,5 +105,5 @@ namespace ryujin
       }
     };
 
-  } // namespace ShallowWater
+  } // namespace ShallowWaterInitialStates
 } // namespace ryujin
