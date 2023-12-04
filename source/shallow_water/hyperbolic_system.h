@@ -532,18 +532,24 @@ namespace ryujin
         static constexpr bool have_source_terms = true;
 
         /**
-         * FIXME
+         * Implement a regularized Manning friction coefficient
+         *
+         * TODO: explain
          */
-        state_type low_order_nodal_source(const precomputed_vector_type &pv,
-                                          const unsigned int i,
-                                          const state_type &U_i) const;
+        state_type low_order_source(const precomputed_vector_type &pv,
+                                    const unsigned int i,
+                                    const state_type &U_i,
+                                    const ScalarNumber t,
+                                    const ScalarNumber tau) const;
 
         /**
-         * FIXME
+         * Same as the low-order source above
          */
-        state_type high_order_nodal_source(const precomputed_vector_type &pv,
-                                           const unsigned int i,
-                                           const state_type &U_i) const;
+        state_type high_order_source(const precomputed_vector_type &pv,
+                                     const unsigned int i,
+                                     const state_type &U_i,
+                                     const ScalarNumber t,
+                                     const ScalarNumber tau) const;
 
         //@}
         /**
@@ -1144,25 +1150,46 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystem::View<dim, Number>::low_order_nodal_source(
+    HyperbolicSystem::View<dim, Number>::low_order_source(
         const precomputed_vector_type & /*pv*/,
         const unsigned int /*i*/,
-        const state_type & /*U_i*/) const -> state_type
+        const state_type &U_i,
+        const ScalarNumber /*t*/,
+        const ScalarNumber tau) const -> state_type
     {
       state_type result;
+
+      const auto g = gravity();
+      const auto n = mannings();
+
+      const auto h_sharp = water_depth_sharp(U_i);
+      const auto h_inverse = inverse_water_depth_mollified(U_i);
+      const auto h_star = ryujin::pow(h_sharp, ScalarNumber(4. / 3.));
+
+      const auto m = momentum(U_i);
+      const auto v_norm = (m * h_inverse).norm();
+      const auto factor = ScalarNumber(2.) * g * n * n * v_norm;
+
+      const auto denominator = h_star + std::max(h_star, tau * factor);
+      const auto denominator_inverse = ScalarNumber(1.) / denominator;
+
+      for (unsigned int d = 0; d < dim; ++d)
+        result[d + 1] = factor * denominator_inverse * m[d];
+
       return result;
     }
 
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystem::View<dim, Number>::high_order_nodal_source(
-        const precomputed_vector_type & /*pv*/,
-        const unsigned int /*i*/,
-        const state_type & /*U_i*/) const -> state_type
+    HyperbolicSystem::View<dim, Number>::high_order_source(
+        const precomputed_vector_type &pv,
+        const unsigned int i,
+        const state_type &U_i,
+        const ScalarNumber /*t*/,
+        const ScalarNumber tau) const -> state_type
     {
-      state_type result;
-      return result;
+      return low_order_source(pv, i, U_i, tau);
     }
 
 
