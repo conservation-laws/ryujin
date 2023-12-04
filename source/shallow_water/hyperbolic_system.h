@@ -53,6 +53,7 @@ namespace ryujin
       double mannings_;
 
       double reference_water_depth_;
+      double dry_state_relaxation_factor_;
       double dry_state_relaxation_small_;
       double dry_state_relaxation_large_;
       //@}
@@ -119,6 +120,12 @@ namespace ryujin
         DEAL_II_ALWAYS_INLINE inline ScalarNumber reference_water_depth() const
         {
           return hyperbolic_system_.reference_water_depth_;
+        }
+
+        DEAL_II_ALWAYS_INLINE inline ScalarNumber
+        dry_state_relaxation_factor() const
+        {
+          return hyperbolic_system_.dry_state_relaxation_factor_;
         }
 
         DEAL_II_ALWAYS_INLINE inline ScalarNumber
@@ -620,6 +627,11 @@ namespace ryujin
       add_parameter("reference water depth",
                     reference_water_depth_,
                     "Problem specific water depth reference");
+
+      dry_state_relaxation_factor_ = 2.e-1;
+      add_parameter("dry state relaxation factor",
+                    dry_state_relaxation_factor_,
+                    "Problem specific dry-state relaxation parameter");
 
       dry_state_relaxation_small_ = 1.e2;
       add_parameter("dry state relaxation small",

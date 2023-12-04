@@ -296,7 +296,7 @@ namespace ryujin
       r_i = hd_i;
       if constexpr (dim == 2)
         r_i = std::sqrt(hd_i);
-      r_i *= ScalarNumber(0.2);
+      r_i *= hyperbolic_system.dry_state_relaxation_factor();
 
       h_tiny = hyperbolic_system.reference_water_depth() * r_i;
 
