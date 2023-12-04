@@ -78,9 +78,11 @@ namespace ryujin
        */
       Indicator(const HyperbolicSystem &hyperbolic_system,
                 const MultiComponentVector<ScalarNumber, n_precomputed_values>
-                    &precomputed_values)
+                    &precomputed_values,
+                const ScalarNumber evc_factor)
           : hyperbolic_system(hyperbolic_system)
           , precomputed_values(precomputed_values)
+          , evc_factor(evc_factor)
       {
       }
 
@@ -114,6 +116,8 @@ namespace ryujin
 
       const MultiComponentVector<ScalarNumber, n_precomputed_values>
           &precomputed_values;
+
+      const ScalarNumber evc_factor;
 
       Number u_i;
       Number u_abs_max;
@@ -179,13 +183,12 @@ namespace ryujin
       Number numerator = left - right;
       Number denominator = std::abs(left) + std::abs(right);
 
-      /* FIXME: this can be refactored into a runtime parameter... */
-      const ScalarNumber evc_alpha_0_ = ScalarNumber(1.);
       const auto quotient =
           std::abs(numerator) /
           (denominator + std::max(hd_i * std::abs(u_abs_max),
                                   Number(std::numeric_limits<double>::min())));
-      return std::min(Number(1.), evc_alpha_0_ * quotient);
+
+      return std::min(Number(1.), evc_factor * quotient);
     }
 
   } // namespace ScalarConservation

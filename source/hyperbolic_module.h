@@ -315,6 +315,7 @@ namespace ryujin
      * @name Run time options
      */
     //@{
+    Number indicator_evc_factor_;
 
     unsigned int limiter_iter_;
     Number limiter_newton_tolerance_;

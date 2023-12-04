@@ -207,9 +207,9 @@ namespace ryujin
       const MultiComponentVector<ScalarNumber, n_precomputed_values>
           &precomputed_values;
 
-      ScalarNumber relaxation_factor;
-      ScalarNumber newton_tolerance;
-      unsigned int newton_max_iter;
+      const ScalarNumber relaxation_factor;
+      const ScalarNumber newton_tolerance;
+      const unsigned int newton_max_iter;
 
       state_type U_i;
 
