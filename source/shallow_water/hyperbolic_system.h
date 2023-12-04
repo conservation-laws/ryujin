@@ -53,8 +53,8 @@ namespace ryujin
       double mannings_;
 
       double reference_water_depth_;
-      double dry_state_relaxation_sharp_;
-      double dry_state_relaxation_mollified_;
+      double dry_state_relaxation_small_;
+      double dry_state_relaxation_large_;
       //@}
 
     public:
@@ -108,30 +108,29 @@ namespace ryujin
 
         DEAL_II_ALWAYS_INLINE inline ScalarNumber gravity() const
         {
-          return ScalarNumber(hyperbolic_system_.gravity_);
+          return hyperbolic_system_.gravity_;
         }
 
         DEAL_II_ALWAYS_INLINE inline ScalarNumber mannings() const
         {
-          return ScalarNumber(hyperbolic_system_.mannings_);
+          return hyperbolic_system_.mannings_;
         }
 
         DEAL_II_ALWAYS_INLINE inline ScalarNumber reference_water_depth() const
         {
-          return ScalarNumber(hyperbolic_system_.reference_water_depth_);
+          return hyperbolic_system_.reference_water_depth_;
         }
 
         DEAL_II_ALWAYS_INLINE inline ScalarNumber
-        dry_state_relaxation_sharp() const
+        dry_state_relaxation_small() const
         {
-          return ScalarNumber(hyperbolic_system_.dry_state_relaxation_sharp_);
+          return hyperbolic_system_.dry_state_relaxation_small_;
         }
 
         DEAL_II_ALWAYS_INLINE inline ScalarNumber
-        dry_state_relaxation_mollified() const
+        dry_state_relaxation_large() const
         {
-          return ScalarNumber(
-              hyperbolic_system_.dry_state_relaxation_mollified_);
+          return hyperbolic_system_.dry_state_relaxation_large_;
         }
 
         //@}
@@ -622,14 +621,14 @@ namespace ryujin
                     reference_water_depth_,
                     "Problem specific water depth reference");
 
-      dry_state_relaxation_sharp_ = 1.e2;
-      add_parameter("dry state relaxation sharp",
-                    dry_state_relaxation_sharp_,
+      dry_state_relaxation_small_ = 1.e2;
+      add_parameter("dry state relaxation small",
+                    dry_state_relaxation_small_,
                     "Problem specific dry-state relaxation parameter");
 
-      dry_state_relaxation_mollified_ = 1.e2;
-      add_parameter("dry state relaxation mollified",
-                    dry_state_relaxation_mollified_,
+      dry_state_relaxation_large_ = 1.e4;
+      add_parameter("dry state relaxation large",
+                    dry_state_relaxation_large_,
                     "Problem specific dry-state relaxation parameter");
     }
 
@@ -684,9 +683,8 @@ namespace ryujin
     {
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
 
-      const Number h_cutoff_mollified = reference_water_depth() *
-                                        dry_state_relaxation_mollified() *
-                                        Number(eps);
+      const Number h_cutoff_mollified =
+          reference_water_depth() * dry_state_relaxation_large() * Number(eps);
 
       const Number h = water_depth(U);
       const Number h_pos = positive_part(water_depth(U));
@@ -703,11 +701,11 @@ namespace ryujin
     {
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
 
-      const Number h_cutoff_sharp =
-          reference_water_depth() * dry_state_relaxation_sharp() * Number(eps);
+      const Number h_cutoff_small =
+          reference_water_depth() * dry_state_relaxation_small() * Number(eps);
 
       const Number h = water_depth(U);
-      const Number h_max = std::max(h, h_cutoff_sharp);
+      const Number h_max = std::max(h, h_cutoff_small);
       return h_max;
     }
 
@@ -729,12 +727,11 @@ namespace ryujin
       using ScalarNumber = typename get_value_type<Number>::type;
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
 
-      const Number h_cutoff_mollified = reference_water_depth() *
-                                        dry_state_relaxation_mollified() *
-                                        Number(eps);
+      const Number h_cutoff_large =
+          reference_water_depth() * dry_state_relaxation_large() * Number(eps);
 
       return dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-          std::abs(h), h_cutoff_mollified, Number(0.), h);
+          std::abs(h), h_cutoff_large, Number(0.), h);
     }
 
 

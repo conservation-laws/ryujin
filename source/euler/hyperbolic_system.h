@@ -52,8 +52,10 @@ namespace ryujin
        */
       //@{
       double gamma_;
+
       double reference_density_;
-      double vacuum_state_relaxation_;
+      double vacuum_state_relaxation_small_;
+      double vacuum_state_relaxation_large_;
 
       double gamma_inverse_;
       double gamma_minus_one_inverse_;
@@ -112,18 +114,24 @@ namespace ryujin
 
         DEAL_II_ALWAYS_INLINE inline ScalarNumber gamma() const
         {
-          return ScalarNumber(hyperbolic_system_.gamma_);
+          return hyperbolic_system_.gamma_;
         }
 
         DEAL_II_ALWAYS_INLINE inline ScalarNumber reference_density() const
         {
-          return ScalarNumber(hyperbolic_system_.reference_density_);
+          return hyperbolic_system_.reference_density_;
         }
 
         DEAL_II_ALWAYS_INLINE inline ScalarNumber
-        vacuum_state_relaxation() const
+        vacuum_state_relaxation_small() const
         {
-          return ScalarNumber(hyperbolic_system_.vacuum_state_relaxation_);
+          return hyperbolic_system_.vacuum_state_relaxation_small_;
+        }
+
+        DEAL_II_ALWAYS_INLINE inline ScalarNumber
+        vacuum_state_relaxation_large() const
+        {
+          return hyperbolic_system_.vacuum_state_relaxation_large_;
         }
 
         //@}
@@ -331,9 +339,9 @@ namespace ryujin
         static Number density(const state_type &U);
 
         /**
-         * Given a density @p rho this function returns 0 if rho is in the
-         * interval [-relaxation * rho_cutoff, relaxation * rho_cutoff],
-         * otherwise rho is returned unmodified. Here, rho_cutoff is the
+         * Given a density @p rho this function returns 0 if the magniatude
+         * of rho is smaller or equal than relaxation_large * rho_cutoff.
+         * Otherwise rho is returned unmodified. Here, rho_cutoff is the
          * reference density multiplied by eps.
          */
         Number filter_vacuum_density(const Number &rho) const;
@@ -658,9 +666,14 @@ namespace ryujin
                     reference_density_,
                     "Problem specific density reference");
 
-      vacuum_state_relaxation_ = 10000.;
-      add_parameter("vacuum state relaxation",
-                    vacuum_state_relaxation_,
+      vacuum_state_relaxation_small_ = 1.e2;
+      add_parameter("vacuum state relaxation small",
+                    vacuum_state_relaxation_small_,
+                    "Problem specific vacuum relaxation parameter");
+
+      vacuum_state_relaxation_large_ = 1.e4;
+      add_parameter("vacuum state relaxation large",
+                    vacuum_state_relaxation_large_,
                     "Problem specific vacuum relaxation parameter");
 
       /*
@@ -729,11 +742,11 @@ namespace ryujin
         const Number &rho) const
     {
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
-      const Number rho_cutoff_big =
-          reference_density() * vacuum_state_relaxation() * eps;
+      const Number rho_cutoff_large =
+          reference_density() * vacuum_state_relaxation_large() * eps;
 
       return dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-          std::abs(rho), rho_cutoff_big, Number(0.), rho);
+          std::abs(rho), rho_cutoff_large, Number(0.), rho);
     }
 
 
