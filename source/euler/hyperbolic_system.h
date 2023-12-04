@@ -570,9 +570,21 @@ namespace ryujin
                                     const ScalarNumber t,
                                     const ScalarNumber tau) const = delete;
 
+        state_type low_order_source(const precomputed_vector_type &pv,
+                                    const unsigned int *js,
+                                    const state_type &U_j,
+                                    const ScalarNumber t,
+                                    const ScalarNumber tau) const = delete;
+
         state_type high_order_source(const precomputed_vector_type &pv,
                                      const unsigned int i,
                                      const state_type &U_i,
+                                     const ScalarNumber t,
+                                     const ScalarNumber tau) const = delete;
+
+        state_type high_order_source(const precomputed_vector_type &pv,
+                                     const unsigned int *js,
+                                     const state_type &U_j,
                                      const ScalarNumber t,
                                      const ScalarNumber tau) const = delete;
 

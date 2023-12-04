@@ -532,22 +532,34 @@ namespace ryujin
         static constexpr bool have_source_terms = true;
 
         /**
-         * Implement a regularized Manning friction coefficient
+         * A regularized Gauckler-Manning friction coefficient.
          *
-         * TODO: explain
+         * FIXME: details
          */
+        state_type manning_friction(const state_type &U,
+                                    const ScalarNumber tau) const;
+
         state_type low_order_source(const precomputed_vector_type &pv,
                                     const unsigned int i,
                                     const state_type &U_i,
                                     const ScalarNumber t,
                                     const ScalarNumber tau) const;
 
-        /**
-         * Same as the low-order source above
-         */
+        state_type low_order_source(const precomputed_vector_type &pv,
+                                    const unsigned int *js,
+                                    const state_type &U_j,
+                                    const ScalarNumber t,
+                                    const ScalarNumber tau) const;
+
         state_type high_order_source(const precomputed_vector_type &pv,
                                      const unsigned int i,
                                      const state_type &U_i,
+                                     const ScalarNumber t,
+                                     const ScalarNumber tau) const;
+
+        state_type high_order_source(const precomputed_vector_type &pv,
+                                     const unsigned int *js,
+                                     const state_type &U_j,
                                      const ScalarNumber t,
                                      const ScalarNumber tau) const;
 
@@ -1150,23 +1162,19 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystem::View<dim, Number>::low_order_source(
-        const precomputed_vector_type & /*pv*/,
-        const unsigned int /*i*/,
-        const state_type &U_i,
-        const ScalarNumber /*t*/,
-        const ScalarNumber tau) const -> state_type
+    HyperbolicSystem::View<dim, Number>::manning_friction(
+        const state_type &U, const ScalarNumber tau) const -> state_type
     {
       state_type result;
 
       const auto g = gravity();
       const auto n = mannings();
 
-      const auto h_sharp = water_depth_sharp(U_i);
-      const auto h_inverse = inverse_water_depth_mollified(U_i);
+      const auto h_sharp = water_depth_sharp(U);
+      const auto h_inverse = inverse_water_depth_mollified(U);
       const auto h_star = ryujin::pow(h_sharp, ScalarNumber(4. / 3.));
 
-      const auto m = momentum(U_i);
+      const auto m = momentum(U);
       const auto v_norm = (m * h_inverse).norm();
       const auto factor = ScalarNumber(2.) * g * n * n * v_norm;
 
@@ -1174,7 +1182,7 @@ namespace ryujin
       const auto denominator_inverse = ScalarNumber(1.) / denominator;
 
       for (unsigned int d = 0; d < dim; ++d)
-        result[d + 1] = factor * denominator_inverse * m[d];
+        result[d + 1] = -factor * denominator_inverse * m[d];
 
       return result;
     }
@@ -1182,14 +1190,53 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystem::View<dim, Number>::high_order_source(
-        const precomputed_vector_type &pv,
-        const unsigned int i,
+    HyperbolicSystem::View<dim, Number>::low_order_source(
+        const precomputed_vector_type & /*pv*/,
+        const unsigned int /*i*/,
         const state_type &U_i,
         const ScalarNumber /*t*/,
         const ScalarNumber tau) const -> state_type
     {
-      return low_order_source(pv, i, U_i, tau);
+      return manning_friction(U_i, tau);
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline auto
+    HyperbolicSystem::View<dim, Number>::low_order_source(
+        const precomputed_vector_type & /*pv*/,
+        const unsigned int * /*js*/,
+        const state_type &U_j,
+        const ScalarNumber /*t*/,
+        const ScalarNumber tau) const -> state_type
+    {
+      return manning_friction(U_j, tau);
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline auto
+    HyperbolicSystem::View<dim, Number>::high_order_source(
+        const precomputed_vector_type & /*pv*/,
+        const unsigned int /*i*/,
+        const state_type &U_i,
+        const ScalarNumber /*t*/,
+        const ScalarNumber tau) const -> state_type
+    {
+      return manning_friction(U_i, tau);
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline auto
+    HyperbolicSystem::View<dim, Number>::high_order_source(
+        const precomputed_vector_type & /*pv*/,
+        const unsigned int * /*js*/,
+        const state_type &U_j,
+        const ScalarNumber /*t*/,
+        const ScalarNumber tau) const -> state_type
+    {
+      return manning_friction(U_j, tau);
     }
 
 

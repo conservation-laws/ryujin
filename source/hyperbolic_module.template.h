@@ -522,13 +522,16 @@ namespace ryujin
 
       auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
         using T = decltype(sentinel);
+        using View = typename HyperbolicSystem::template View<dim, T>;
+        using Limiter = typename Description::template Limiter<dim, T>;
+        using flux_contribution_type = typename View::flux_contribution_type;
+        using state_type = typename View::state_type;
+
         unsigned int stride_size = get_stride_size<T>;
 
         const auto view = hyperbolic_system_->template view<dim, T>();
-        using View = typename HyperbolicSystem::template View<dim, T>;
 
         /* Stored thread locally: */
-        using Limiter = typename Description::template Limiter<dim, T>;
         Limiter limiter(*hyperbolic_system_,
                         new_precomputed,
                         limiter_relaxation_factor_,
@@ -548,24 +551,45 @@ namespace ryujin
               thread_ready, i >= n_export_indices && i < n_internal);
 
           const auto U_i = old_U.template get_tensor<T>(i);
-          const auto flux_i = view.flux_contribution(
-              new_precomputed, precomputed_initial_, i, U_i);
-
-          using flux_contribution_type = typename View::flux_contribution_type;
-          std::array<flux_contribution_type, stages> flux_iHs;
-          for (int s = 0; s < stages; ++s) {
-            const auto temp = stage_U[s].get().template get_tensor<T>(i);
-            flux_iHs[s] = view.flux_contribution(
-                stage_precomputed[s].get(), precomputed_initial_, i, temp);
-          }
-
           auto U_i_new = U_i;
-          using state_type = typename View::state_type;
-          state_type F_iH;
 
           const auto alpha_i = load_value<T>(alpha_, i);
           const auto m_i = load_value<T>(lumped_mass_matrix, i);
           const auto m_i_inv = load_value<T>(lumped_mass_matrix_inverse, i);
+
+          const auto flux_i = view.flux_contribution(
+              new_precomputed, precomputed_initial_, i, U_i);
+
+          std::array<flux_contribution_type, stages> flux_iHs;
+          [[maybe_unused]] state_type S_iH;
+
+          for (int s = 0; s < stages; ++s) {
+            const auto temp = stage_U[s].get().template get_tensor<T>(i);
+            flux_iHs[s] = view.flux_contribution(
+                stage_precomputed[s].get(), precomputed_initial_, i, temp);
+
+            if constexpr (View::have_source_terms) {
+              // FIXME: Chain through correct time
+              constexpr Number t = 0.;
+              S_iH += stage_weights[s] *
+                      view.high_order_source(new_precomputed, i, temp, t, tau);
+            }
+          }
+
+          state_type F_iH;
+          [[maybe_unused]] state_type S_i;
+
+          if constexpr (View::have_source_terms) {
+            // FIXME: Chain through correct time
+            constexpr Number t = 0.;
+
+            S_i = view.low_order_source(new_precomputed, i, U_i, t, tau);
+            U_i_new += tau * /* m_i_inv * m_i */ S_i;
+
+            S_iH += weight *
+                    view.high_order_source(new_precomputed, i, U_i, t, tau);
+            F_iH += m_i * S_iH;
+          }
 
           limiter.reset(i, U_i, flux_i);
 
@@ -616,6 +640,8 @@ namespace ryujin
             const auto flux_j = view.flux_contribution(
                 new_precomputed, precomputed_initial_, js, U_j);
 
+            const auto m_ij = mass_matrix.template get_entry<T>(i, col_idx);
+
             /*
              * Compute low-order flux and limiter bounds:
              */
@@ -647,8 +673,13 @@ namespace ryujin
               limiter.accumulate(js, U_j, flux_j, d_ij_inv * c_ij, beta_ij);
             }
 
+            if constexpr (View::have_source_terms) {
+              F_iH -= m_ij * S_iH;
+              P_ij -= m_ij * /*sic!*/ S_i;
+            }
+
             /*
-             * Compute high-order fluxes:
+             * Compute high-order fluxes and source terms:
              */
 
             if constexpr (View::have_high_order_flux) {
@@ -659,6 +690,15 @@ namespace ryujin
             } else {
               F_iH += weight * contract(flux_ij, c_ij);
               P_ij += weight * contract(flux_ij, c_ij);
+            }
+
+            if constexpr (View::have_source_terms) {
+              // FIXME: Chain through correct time
+              constexpr Number t = 0.;
+              const auto contribution =
+                  view.high_order_source(new_precomputed, js, U_j, t, tau);
+              F_iH += weight * m_ij * contribution;
+              P_ij += weight * m_ij * contribution;
             }
 
             for (int s = 0; s < stages; ++s) {
@@ -675,6 +715,15 @@ namespace ryujin
                 const auto flux_ij = view.flux(flux_iHs[s], p);
                 F_iH += stage_weights[s] * contract(flux_ij, c_ij);
                 P_ij += stage_weights[s] * contract(flux_ij, c_ij);
+              }
+
+              if constexpr (View::have_source_terms) {
+                // FIXME: Chain through correct time
+                constexpr Number t = 0.;
+                const auto contribution = view.high_order_source(
+                    stage_precomputed[s].get(), js, U_jH, t, tau);
+                F_iH += stage_weights[s] * m_ij * contribution;
+                P_ij += stage_weights[s] * m_ij * contribution;
               }
             }
 
@@ -724,12 +773,12 @@ namespace ryujin
 
       auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
         using T = decltype(sentinel);
+        using View = typename HyperbolicSystem::template View<dim, T>;
+        using Limiter = typename Description::template Limiter<dim, T>;
+
         unsigned int stride_size = get_stride_size<T>;
 
-        using View = typename HyperbolicSystem::template View<dim, T>;
-
         /* Stored thread locally: */
-        using Limiter = typename Description::template Limiter<dim, T>;
         Limiter limiter(*hyperbolic_system_,
                         new_precomputed,
                         limiter_relaxation_factor_,
@@ -847,13 +896,13 @@ namespace ryujin
 
       auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
         using T = decltype(sentinel);
-        unsigned int stride_size = get_stride_size<T>;
-
         using View = typename HyperbolicSystem::template View<dim, T>;
+        using Limiter = typename Description::template Limiter<dim, T>;
+
+        unsigned int stride_size = get_stride_size<T>;
 
         /* Stored thread locally: */
         AlignedVector<T> lij_row;
-        using Limiter = typename Description::template Limiter<dim, T>;
         Limiter limiter(*hyperbolic_system_,
                         new_precomputed,
                         limiter_relaxation_factor_,
