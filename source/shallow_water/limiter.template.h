@@ -134,7 +134,6 @@ namespace ryujin
 #endif
       }
 
-#if 0
       /*
        * Limit the (negative) kinetic energy:
        *
@@ -148,7 +147,8 @@ namespace ryujin
        *   psi = h KE_i^max - 1/2 |q|^2
        */
 
-      {
+      if (hyperbolic_system.limiter_kinetic_energy()) {
+
         /* We first check if t_r is a good state */
 
         const auto U_r = U + t_r * P;
@@ -166,7 +166,7 @@ namespace ryujin
             dealii::SIMDComparison::greater_than>(psi_r, Number(0.), t_r, t_l);
 
         /* If we have set t_l = t_r everywhere we can return: */
-        if (t_l == t_r)
+        if (!hyperbolic_system.limiter_square_velocity() && t_l == t_r)
           return {t_l, success};
 
 #ifdef DEBUG_OUTPUT_LIMITER
@@ -196,7 +196,7 @@ namespace ryujin
         const auto filtered_h_l = hyperbolic_system.filter_dry_water_depth(h_l);
         const auto lower_bound =
             (ScalarNumber(1.) - relax) * filtered_h_l * kin_max - eps;
-        if (!(std::min(Number(0.), psi_l - lower_bound + min) == Number(0.))) {
+        if (!(std::min(Number(0.), psi_l - lower_bound) == Number(0.))) {
 #ifdef DEBUG_OUTPUT
           std::cout << std::fixed << std::setprecision(16);
           std::cout
@@ -207,49 +207,48 @@ namespace ryujin
         }
 
         /*
-         * Return if the window between t_l and t_r is within the prescribed
-         * tolerance:
+         * Skip the quadratic Newton step if the window between t_l and t_r
+         * is within the prescribed tolerance:
          */
-        if (std::max(Number(0.), t_r - t_l - newton_tolerance) == Number(0.))
-          return {t_l, success};
+        if (!(std::max(Number(0.), t_r - t_l - newton_tol) == Number(0.))) {
+          /*
+           * If the bound is not satisfied, we need to find the root of a
+           * quadratic function:
+           *
+           * psi(t)   = (h_U + t h_P) kin_max
+           *            - 1/2 (|q_U|^2 + 2(q_U * q_P) t + |q_P|^2 t^2)
+           *
+           * d_psi(t) = h_P kin_max - (q_U * q_P) - |q_P|^2 t
+           *
+           * We can compute the root of this function efficiently by using our
+           * standard quadratic_newton_step() function that will use the points
+           * [p1, p1, p2] as well as [p1, p2, p2] to construct two quadratic
+           * polynomials to compute new candiates for the bounds [t_l, t_r]. In
+           * case of a quadratic function psi(t) both polynomials will coincide
+           * so that (up to round-off error) t_l = t_r.
+           */
 
-        /*
-         * If the bound is not satisfied, we need to find the root of a
-         * quadratic function:
-         *
-         * psi(t)   = (h_U + t h_P) kin_max
-         *            - 1/2 (|q_U|^2 + 2(q_U * q_P) t + |q_P|^2 t^2)
-         *
-         * d_psi(t) = h_P kin_max - (q_U * q_P) - |q_P|^2 t
-         *
-         * We can compute the root of this function efficiently by using our
-         * standard quadratic_newton_step() function that will use the points
-         * [p1, p1, p2] as well as [p1, p2, p2] to construct two quadratic
-         * polynomials to compute new candiates for the bounds [t_l, t_r]. In
-         * case of a quadratic function psi(t) both polynomials will coincide
-         * so that (up to round-off error) t_l = t_r.
-         */
+          const auto &h_P = hyperbolic_system.water_depth(P);
+          const auto &q_U = hyperbolic_system.momentum(U);
+          const auto &q_P = hyperbolic_system.momentum(P);
 
-        const auto &h_P = hyperbolic_system.water_depth(P);
-        const auto &q_U = hyperbolic_system.momentum(U);
-        const auto &q_P = hyperbolic_system.momentum(P);
+          const auto dpsi_l = h_P * kin_max - (q_U * q_P) - q_P * q_P * t_l;
+          const auto dpsi_r = h_P * kin_max - (q_U * q_P) - q_P * q_P * t_r;
 
-        const auto dpsi_l = h_P * kin_max - (q_U * q_P) - q_P * q_P * t_l;
-        const auto dpsi_r = h_P * kin_max - (q_U * q_P) - q_P * q_P * t_r;
-
-        quadratic_newton_step(
-            t_l, t_r, psi_l, psi_r, dpsi_l, dpsi_r, Number(-1.));
+          quadratic_newton_step(
+              t_l, t_r, psi_l, psi_r, dpsi_l, dpsi_r, Number(-1.));
 
 #ifdef DEBUG_OUTPUT_LIMITER
-        if (std::max(Number(0.), psi_r + Number(eps)) == Number(0.)) {
-          std::cout << "psi_l:       " << psi_l << std::endl;
-          std::cout << "psi_r:       " << psi_r << std::endl;
-          std::cout << "dpsi_l:      " << dpsi_l << std::endl;
-          std::cout << "dpsi_r:      " << dpsi_r << std::endl;
-          std::cout << "t_l: (end)   " << t_l << std::endl;
-          std::cout << "t_r: (end)   " << t_r << std::endl;
-        }
+          if (std::max(Number(0.), psi_r + Number(eps)) == Number(0.)) {
+            std::cout << "psi_l:       " << psi_l << std::endl;
+            std::cout << "psi_r:       " << psi_r << std::endl;
+            std::cout << "dpsi_l:      " << dpsi_l << std::endl;
+            std::cout << "dpsi_r:      " << dpsi_r << std::endl;
+            std::cout << "t_l: (end)   " << t_l << std::endl;
+            std::cout << "t_r: (end)   " << t_r << std::endl;
+          }
 #endif
+        }
 
 #ifdef CHECK_BOUNDS
         /*
@@ -267,7 +266,7 @@ namespace ryujin
               (ScalarNumber(1.) - relax) * h_new * kin_max - eps;
 
           const bool psi_valid =
-              std::min(Number(0.), psi_new - lower_bound + min) == Number(0.);
+              std::min(Number(0.), psi_new - lower_bound) == Number(0.);
           if (!psi_valid) {
 #ifdef DEBUG_OUTPUT
             std::cout << std::fixed << std::setprecision(16);
@@ -278,8 +277,13 @@ namespace ryujin
           }
         }
 #endif
+
+        /* Flip bounds for the square velocity limiter: */
+        if (hyperbolic_system.limiter_square_velocity()) {
+          t_r = t_l;
+          t_l = t_min;
+        }
       }
-#endif
 
       /*
        * Limit the (negative) |v|^2:
@@ -292,7 +296,7 @@ namespace ryujin
        *   psi = h^2 (|v|^2)^max - |q|^2
        */
 
-      {
+      if (hyperbolic_system.limiter_square_velocity()) {
         /* We first check if t_r is a good state */
 
         const auto U_r = U + t_r * P;
@@ -338,64 +342,65 @@ namespace ryujin
         const auto filtered_h_l = hyperbolic_system.filter_dry_water_depth(h_l);
         const auto lower_bound =
             (ScalarNumber(1.) - relax) * filtered_h_l * filtered_h_l * v2_max -
-            eps;
-        if (!(std::min(Number(0.), psi_l - lower_bound + min) == Number(0.))) {
+            100. * eps;
+        if (!(std::min(Number(0.), psi_l - lower_bound) == Number(0.))) {
 #ifdef DEBUG_OUTPUT
           std::cout << std::fixed << std::setprecision(16);
           std::cout
-              << "Bounds violation: low-order velocity squared (critical)!\n";
+              << "Bounds violation: low-order square velocity (critical)!\n";
           std::cout << "\t\tPsi left: 0 <= " << psi_l << "\n" << std::endl;
 #endif
           success = false;
         }
 
         /*
-         * Return if the window between t_l and t_r is within the prescribed
-         * tolerance:
+         * Skip the quadratic Newton step if the window between t_l and t_r
+         * is within the prescribed tolerance:
          */
-        if (std::max(Number(0.), t_r - t_l - newton_tolerance) == Number(0.))
-          return {t_l, success};
+        if (!(std::max(Number(0.), t_r - t_l - newton_tol) == Number(0.))) {
+          /*
+           * If the bound is not satisfied, we need to find the root of a
+           * quadratic function:
+           *
+           * psi(t)   = (h_U + t h_P)^2 v2_max
+           *            - (|q_U|^2 + 2(q_U * q_P) t + |q_P|^2 t^2)
+           *
+           * d_psi(t) = 2 (h_U + t * h_P) * h_P v2_max
+           *            - 2 (q_U * q_P) - |q_P|^2 t
+           *
+           * We can compute the root of this function efficiently by using our
+           * standard quadratic_newton_step() function that will use the points
+           * [p1, p1, p2] as well as [p1, p2, p2] to construct two quadratic
+           * polynomials to compute new candiates for the bounds [t_l, t_r]. In
+           * case of a quadratic function psi(t) both polynomials will coincide
+           * so that (up to round-off error) t_l = t_r.
+           */
+          const auto &h_U = hyperbolic_system.water_depth(U);
+          const auto &h_P = hyperbolic_system.water_depth(P);
+          const auto &q_U = hyperbolic_system.momentum(U);
+          const auto &q_P = hyperbolic_system.momentum(P);
 
-        /*
-         * If the bound is not satisfied, we need to find the root of a
-         * quadratic function:
-         *
-         * psi(t)   = (h_U + t h_P)^2 v2_max
-         *            - (|q_U|^2 + 2(q_U * q_P) t + |q_P|^2 t^2)
-         *
-         * d_psi(t) = 2 (h_U + t * h_P) * h_P v2_max - 2 (q_U * q_P) - |q_P|^2 t
-         *
-         * We can compute the root of this function efficiently by using our
-         * standard quadratic_newton_step() function that will use the points
-         * [p1, p1, p2] as well as [p1, p2, p2] to construct two quadratic
-         * polynomials to compute new candiates for the bounds [t_l, t_r]. In
-         * case of a quadratic function psi(t) both polynomials will coincide
-         * so that (up to round-off error) t_l = t_r.
-         */
+          const auto dpsi_l =
+              (h_U + t_l * h_P) * h_P * v2_max -
+              ScalarNumber(2.) * ((q_U * q_P) - q_P * q_P * t_l);
+          const auto dpsi_r =
+              (h_U + t_r * h_P) * h_P * v2_max -
+              ScalarNumber(2.) * ((q_U * q_P) - q_P * q_P * t_r);
 
-        const auto &h_U = hyperbolic_system.water_depth(U);
-        const auto &h_P = hyperbolic_system.water_depth(P);
-        const auto &q_U = hyperbolic_system.momentum(U);
-        const auto &q_P = hyperbolic_system.momentum(P);
-
-        const auto dpsi_l = (h_U + t_l * h_P) * h_P * v2_max -
-                            ScalarNumber(2.) * ((q_U * q_P) - q_P * q_P * t_l);
-        const auto dpsi_r = (h_U + t_r * h_P) * h_P * v2_max -
-                            ScalarNumber(2.) * ((q_U * q_P) - q_P * q_P * t_r);
-
-        quadratic_newton_step(
-            t_l, t_r, psi_l, psi_r, dpsi_l, dpsi_r, Number(-1.));
+          quadratic_newton_step(
+              t_l, t_r, psi_l, psi_r, dpsi_l, dpsi_r, Number(-1.));
 
 #ifdef DEBUG_OUTPUT_LIMITER
-        if (std::max(Number(0.), psi_r + Number(eps)) == Number(0.)) {
-          std::cout << "psi_l:       " << psi_l << std::endl;
-          std::cout << "psi_r:       " << psi_r << std::endl;
-          std::cout << "dpsi_l:      " << dpsi_l << std::endl;
-          std::cout << "dpsi_r:      " << dpsi_r << std::endl;
-          std::cout << "t_l: (end)   " << t_l << std::endl;
-          std::cout << "t_r: (end)   " << t_r << std::endl;
-        }
+          if (std::max(Number(0.), psi_r + Number(eps)) == Number(0.)) {
+            std::cout << "psi_l:       " << psi_l << std::endl;
+            std::cout << "psi_r:       " << psi_r << std::endl;
+            std::cout << "dpsi_l:      " << dpsi_l << std::endl;
+            std::cout << "dpsi_r:      " << dpsi_r << std::endl;
+            std::cout << "t_l: (end)   " << t_l << std::endl;
+            std::cout << "t_r: (end)   " << t_r << std::endl;
+          }
 #endif
+        }
 
 #ifdef CHECK_BOUNDS
         /*
@@ -410,14 +415,15 @@ namespace ryujin
               relax_small * h_new * h_new * v2_max - q_new.norm_square();
 
           const auto lower_bound =
-              (ScalarNumber(1.) - relax) * h_new * h_new * v2_max - eps;
+              (ScalarNumber(1.) - relax) * h_new * h_new * v2_max -
+              ScalarNumber(100.) * eps;
 
           const bool psi_valid =
-              std::min(Number(0.), psi_new - lower_bound + min) == Number(0.);
+              std::min(Number(0.), psi_new - lower_bound) == Number(0.);
           if (!psi_valid) {
 #ifdef DEBUG_OUTPUT
             std::cout << std::fixed << std::setprecision(16);
-            std::cout << "Bounds violation: high-order velocity squared!\n";
+            std::cout << "Bounds violation: high-order square velocity!\n";
             std::cout << "\t\tPsi: 0 <= " << psi_new << "\n" << std::endl;
 #endif
             success = false;

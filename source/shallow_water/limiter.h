@@ -88,12 +88,12 @@ namespace ryujin
               const MultiComponentVector<ScalarNumber, n_precomputed_values>
                   &precomputed_values,
               const ScalarNumber relaxation_factor,
-              const ScalarNumber newton_tolerance,
+              const ScalarNumber newton_tol,
               const unsigned int newton_max_iter)
           : hyperbolic_system(hyperbolic_system)
           , precomputed_values(precomputed_values)
           , relaxation_factor(relaxation_factor)
-          , newton_tolerance(newton_tolerance)
+          , newton_tol(newton_tol)
           , newton_max_iter(newton_max_iter)
       {
       }
@@ -164,7 +164,7 @@ namespace ryujin
           &precomputed_values;
 
       ScalarNumber relaxation_factor;
-      ScalarNumber newton_tolerance;
+      ScalarNumber newton_tol;
       unsigned int newton_max_iter;
 
       state_type U_i;
