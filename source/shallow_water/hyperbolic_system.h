@@ -50,7 +50,7 @@ namespace ryujin
        */
       //@{
       double gravity_;
-      double mannings_;
+      double manning_friction_coefficient_;
 
       double reference_water_depth_;
       double dry_state_relaxation_factor_;
@@ -112,9 +112,10 @@ namespace ryujin
           return hyperbolic_system_.gravity_;
         }
 
-        DEAL_II_ALWAYS_INLINE inline ScalarNumber mannings() const
+        DEAL_II_ALWAYS_INLINE inline ScalarNumber
+        manning_friction_coefficient() const
         {
-          return hyperbolic_system_.mannings_;
+          return hyperbolic_system_.manning_friction_coefficient_;
         }
 
         DEAL_II_ALWAYS_INLINE inline ScalarNumber reference_water_depth() const
@@ -253,7 +254,7 @@ namespace ryujin
         /**
          * The number of precomputed values.
          */
-        static constexpr unsigned int n_precomputed_values = 1;
+        static constexpr unsigned int n_precomputed_values = 2;
 
         /**
          * Array type used for precomputed values.
@@ -270,7 +271,7 @@ namespace ryujin
          * An array holding all component names of the precomputed values.
          */
         static inline const auto precomputed_names =
-            std::array<std::string, n_precomputed_values>{"eta_m"};
+            std::array<std::string, n_precomputed_values>{"eta_m", "h_star"};
 
         /**
          * The number of precomputation cycles.
@@ -537,6 +538,7 @@ namespace ryujin
          * FIXME: details
          */
         state_type manning_friction(const state_type &U,
+                                    const Number &h_star,
                                     const ScalarNumber tau) const;
 
         state_type low_order_source(const precomputed_vector_type &pv,
@@ -650,9 +652,10 @@ namespace ryujin
       gravity_ = 9.81;
       add_parameter("gravity", gravity_, "Gravitational constant [m/s^2]");
 
-      mannings_ = 0.;
-      add_parameter(
-          "mannings", mannings_, "Roughness coefficient for friction source");
+      manning_friction_coefficient_ = 0.;
+      add_parameter("manning friction coefficient",
+                    manning_friction_coefficient_,
+                    "Roughness coefficient for friction source");
 
       reference_water_depth_ = 1.;
       add_parameter("reference water depth",
@@ -705,7 +708,13 @@ namespace ryujin
         dispatch_check(i);
 
         const auto U_i = U.template get_tensor<Number>(i);
-        const precomputed_state_type prec_i{mathematical_entropy(U_i)};
+
+        const auto eta_m = mathematical_entropy(U_i);
+
+        const auto h_sharp = water_depth_sharp(U_i);
+        const auto h_star = ryujin::pow(h_sharp, ScalarNumber(4. / 3.));
+
+        const precomputed_state_type prec_i{eta_m, h_star};
         precomputed_values.template write_tensor<Number>(prec_i, i);
       }
     }
@@ -1176,16 +1185,15 @@ namespace ryujin
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
     HyperbolicSystem::View<dim, Number>::manning_friction(
-        const state_type &U, const ScalarNumber tau) const -> state_type
+        const state_type &U, const Number &h_star, const ScalarNumber tau) const
+        -> state_type
     {
       state_type result;
 
       const auto g = gravity();
-      const auto n = mannings();
+      const auto n = manning_friction_coefficient();
 
-      const auto h_sharp = water_depth_sharp(U);
       const auto h_inverse = inverse_water_depth_mollified(U);
-      const auto h_star = ryujin::pow(h_sharp, ScalarNumber(4. / 3.));
 
       const auto m = momentum(U);
       const auto v_norm = (m * h_inverse).norm();
@@ -1204,52 +1212,64 @@ namespace ryujin
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
     HyperbolicSystem::View<dim, Number>::low_order_source(
-        const precomputed_vector_type & /*pv*/,
-        const unsigned int /*i*/,
+        const precomputed_vector_type &pv,
+        const unsigned int i,
         const state_type &U_i,
         const ScalarNumber /*t*/,
         const ScalarNumber tau) const -> state_type
     {
-      return manning_friction(U_i, tau);
+      const auto &[eta_m, h_star] =
+          pv.template get_tensor<Number, precomputed_state_type>(i);
+
+      return manning_friction(U_i, h_star, tau);
     }
 
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
     HyperbolicSystem::View<dim, Number>::low_order_source(
-        const precomputed_vector_type & /*pv*/,
-        const unsigned int * /*js*/,
+        const precomputed_vector_type &pv,
+        const unsigned int *js,
         const state_type &U_j,
         const ScalarNumber /*t*/,
         const ScalarNumber tau) const -> state_type
     {
-      return manning_friction(U_j, tau);
+      const auto &[eta_m, h_star] =
+          pv.template get_tensor<Number, precomputed_state_type>(js);
+
+      return manning_friction(U_j, h_star, tau);
     }
 
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
     HyperbolicSystem::View<dim, Number>::high_order_source(
-        const precomputed_vector_type & /*pv*/,
-        const unsigned int /*i*/,
+        const precomputed_vector_type &pv,
+        const unsigned int i,
         const state_type &U_i,
         const ScalarNumber /*t*/,
         const ScalarNumber tau) const -> state_type
     {
-      return manning_friction(U_i, tau);
+      const auto &[eta_m, h_star] =
+          pv.template get_tensor<Number, precomputed_state_type>(i);
+
+      return manning_friction(U_i, h_star, tau);
     }
 
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
     HyperbolicSystem::View<dim, Number>::high_order_source(
-        const precomputed_vector_type & /*pv*/,
-        const unsigned int * /*js*/,
+        const precomputed_vector_type &pv,
+        const unsigned int *js,
         const state_type &U_j,
         const ScalarNumber /*t*/,
         const ScalarNumber tau) const -> state_type
     {
-      return manning_friction(U_j, tau);
+      const auto &[eta_m, h_star] =
+          pv.template get_tensor<Number, precomputed_state_type>(js);
+
+      return manning_friction(U_j, h_star, tau);
     }
 
 

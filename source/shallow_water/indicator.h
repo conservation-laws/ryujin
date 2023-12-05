@@ -155,11 +155,11 @@ namespace ryujin
       h_i = hyperbolic_system.water_depth(U_i);
       /* entropy viscosity commutator: */
 
-      const auto &[mathematical_entropy] =
+      const auto &[eta_m, h_star] =
           precomputed_values
               .template get_tensor<Number, precomputed_state_type>(i);
 
-      eta_i = mathematical_entropy;
+      eta_i = eta_m;
 
       d_eta_i = hyperbolic_system.mathematical_entropy_derivative(U_i);
       f_i = hyperbolic_system.f(U_i);
@@ -178,7 +178,7 @@ namespace ryujin
     {
       /* entropy viscosity commutator: */
 
-      const auto &[eta_j] =
+      const auto &[eta_j, h_star_j] =
           precomputed_values
               .template get_tensor<Number, precomputed_state_type>(js);
 
