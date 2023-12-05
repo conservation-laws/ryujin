@@ -1175,10 +1175,15 @@ namespace ryujin
         const dealii::Tensor<1, dim, Number> &c_ij,
         const Number &d_ij) const -> state_type
     {
-      const auto &[U_star_ij, U_star_ji] = equilibrated_states(flux_i, flux_j);
-      const auto g_star_ij = g(U_star_ij);
+      const auto &[U_i, Z_i] = flux_i;
+      const auto &[U_j, Z_j] = flux_j;
+      const auto U_star_ij = star_state(U_i, Z_i, Z_j);
 
-      return -ScalarNumber(2.) * (d_ij * U_star_ij + contract(g_star_ij, c_ij));
+      const auto h_inverse = inverse_water_depth_sharp(U_i);
+      const auto m = momentum(U_i);
+      const auto factor = ScalarNumber(2.) * (d_ij + h_inverse * (m * c_ij));
+
+      return -factor * (U_star_ij - U_i);
     }
 
 
