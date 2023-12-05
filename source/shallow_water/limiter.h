@@ -109,9 +109,9 @@ namespace ryujin
        * When looping over the sparsity row, add the contribution associated
        * with the neighboring state U_j.
        */
-      void accumulate(const unsigned int *js,
-                      const state_type &U_j,
-                      const flux_contribution_type &flux_j,
+      void accumulate(const state_type &U_j,
+                      const state_type &U_star_ij,
+                      const state_type &U_star_ji,
                       const dealii::Tensor<1, dim, Number> &scaled_c_ij,
                       const Number &beta_ij,
                       const state_type &affine_shift);
@@ -168,7 +168,6 @@ namespace ryujin
       unsigned int newton_max_iter;
 
       state_type U_i;
-      flux_contribution_type flux_i;
 
       Bounds bounds_;
 
@@ -193,10 +192,9 @@ namespace ryujin
     DEAL_II_ALWAYS_INLINE inline void
     Limiter<dim, Number>::reset(unsigned int /*i*/,
                                 const state_type &new_U_i,
-                                const flux_contribution_type &new_flux_i)
+                                const flux_contribution_type & /*new_flux_i*/)
     {
       U_i = new_U_i;
-      flux_i = new_flux_i;
 
       auto &[h_min, h_max, h_tiny, kin_max] = bounds_;
 
@@ -213,19 +211,15 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline void Limiter<dim, Number>::accumulate(
-        const unsigned int * /*js*/,
         const state_type &U_j,
-        const flux_contribution_type &flux_j,
+        const state_type &U_star_ij,
+        const state_type &U_star_ji,
         const dealii::Tensor<1, dim, Number> &scaled_c_ij,
         const Number &beta_ij,
         const state_type &affine_shift)
     {
       /* The bar states: */
 
-      const auto &[U_i_, Z_i] = flux_i;
-      const auto &[U_j_, Z_j] = flux_j;
-      const auto U_star_ij = hyperbolic_system.star_state(U_i, Z_i, Z_j);
-      const auto U_star_ji = hyperbolic_system.star_state(U_j, Z_j, Z_i);
       const auto f_star_ij = hyperbolic_system.f(U_star_ij);
       const auto f_star_ji = hyperbolic_system.f(U_star_ji);
 

@@ -657,12 +657,17 @@ namespace ryujin
 
               const auto &[U_star_ij, U_star_ji] =
                   view.equilibrated_states(flux_i, flux_j);
+
               U_i_new += tau * m_i_inv * d_ij * (U_star_ji - U_star_ij);
               F_iH += d_ijH * (U_star_ji - U_star_ij);
               P_ij += (d_ijH - d_ij) * (U_star_ji - U_star_ij);
 
-              limiter.accumulate(
-                  js, U_j, flux_j, d_ij_inv * c_ij, beta_ij, affine_shift);
+              limiter.accumulate(U_j,
+                                 U_star_ij,
+                                 U_star_ji,
+                                 d_ij_inv * c_ij,
+                                 beta_ij,
+                                 affine_shift);
 
             } else {
 
