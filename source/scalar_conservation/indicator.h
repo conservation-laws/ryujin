@@ -185,8 +185,9 @@ namespace ryujin
 
       const auto quotient =
           std::abs(numerator) /
-          (denominator + std::max(hd_i * std::abs(u_abs_max),
-                                  Number(std::numeric_limits<double>::min())));
+          (denominator +
+           std::max(hd_i * std::abs(u_abs_max),
+                    Number(100. * std::numeric_limits<ScalarNumber>::min())));
 
       return std::min(Number(1.), evc_factor * quotient);
     }
