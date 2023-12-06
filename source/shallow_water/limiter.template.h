@@ -342,7 +342,7 @@ namespace ryujin
         const auto filtered_h_l = hyperbolic_system.filter_dry_water_depth(h_l);
         const auto lower_bound =
             (ScalarNumber(1.) - relax) * filtered_h_l * filtered_h_l * v2_max -
-            100. * eps;
+            ScalarNumber(100.) * eps;
         if (!(std::min(Number(0.), psi_l - lower_bound) == Number(0.))) {
 #ifdef DEBUG_OUTPUT
           std::cout << std::fixed << std::setprecision(16);

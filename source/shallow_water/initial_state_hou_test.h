@@ -51,7 +51,7 @@ namespace ryujin
           /* Set water depth behind resevoir */
           Number h = 0.;
           if (x < -100.)
-            h = std::max(depth_ - bath, 0.);
+            h = std::max(depth_ - bath, Number(0.));
 
           return state_type{{h, 0.}};
         }

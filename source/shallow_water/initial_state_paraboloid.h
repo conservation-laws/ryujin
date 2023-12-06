@@ -93,7 +93,7 @@ namespace ryujin
           auto htilde = h_0_ - compute_bathymetry(point);
           htilde += term1 + term2 + term3;
 
-          h = std::max(htilde, 0.);
+          h = std::max(htilde, Number(0.));
           v_x = B_ * std::exp(-1. / 2. * k * t) * std::sin(s * t);
 
           return state_type{{h, h * v_x}};
@@ -101,7 +101,7 @@ namespace ryujin
 
           const Number &y = point[1];
 
-          const auto elevation =
+          const Number elevation =
               eta_ * h_0_ / (a_ * a_) *
               (2. * x * std::cos(omega * t) + 2. * y * std::sin(omega * t));
 
