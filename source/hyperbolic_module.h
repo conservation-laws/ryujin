@@ -315,6 +315,7 @@ namespace ryujin
      * @name Run time options
      */
     //@{
+    Number indicator_evc_factor_;
 
     unsigned int limiter_iter_;
     Number limiter_newton_tolerance_;
@@ -353,16 +354,12 @@ namespace ryujin
         Description::template Limiter<dim, Number>::n_bounds;
     mutable MultiComponentVector<Number, n_bounds> bounds_;
 
-    mutable vector_type source_;
-
     mutable vector_type r_;
-    mutable vector_type source_r_;
 
     mutable SparseMatrixSIMD<Number> dij_matrix_;
     mutable SparseMatrixSIMD<Number> lij_matrix_;
     mutable SparseMatrixSIMD<Number> lij_matrix_next_;
     mutable SparseMatrixSIMD<Number, problem_dimension> pij_matrix_;
-    mutable SparseMatrixSIMD<Number, problem_dimension> qij_matrix_;
 
     //@}
   };

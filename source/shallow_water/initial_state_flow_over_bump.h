@@ -1,31 +1,37 @@
 //
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT or BSD-3-Clause
+// [LANL Copyright Statement]
 // Copyright (C) 2020 - 2023 by the ryujin authors
+// Copyright (C) 2023 - 2023 by Triad National Security, LLC
 //
 
 #pragma once
 
-#include "hyperbolic_system.h"
-#include <initial_state.h>
+#include <initial_state_library.h>
 
 namespace ryujin
 {
-  namespace ShallowWater
+  namespace ShallowWaterInitialStates
   {
     /**
      * Flow over a bump with a hydraulic jump.
-     * See: Sec.~7.2 in @cite GuermondEtAl2018SW.
+     * See Section 7.2 in @cite GuermondEtAl2018SW for details.
      *
      * @ingroup ShallowWaterEquations
      */
-    template <int dim, typename Number, typename state_type>
-    class FlowOverBump : public InitialState<dim, Number, state_type, 1>
+    template <typename Description, int dim, typename Number>
+    class FlowOverBump : public InitialState<Description, dim, Number>
     {
     public:
+      using HyperbolicSystem = typename Description::HyperbolicSystem;
+      using HyperbolicSystemView =
+          typename HyperbolicSystem::template View<dim, Number>;
+      using state_type = typename HyperbolicSystemView::state_type;
+
       FlowOverBump(const HyperbolicSystem &hyperbolic_system,
-                   const std::string subsec)
-          : InitialState<dim, Number, state_type, 1>("flow over bump", subsec)
-          , hyperbolic_system(hyperbolic_system)
+                   const std::string subsection)
+          : InitialState<Description, dim, Number>("flow over bump", subsection)
+          , hyperbolic_system_(hyperbolic_system)
       {
         dealii::ParameterAcceptor::parse_parameters_call_back.connect(
             std::bind(&FlowOverBump::parse_parameters_callback, this));
@@ -46,8 +52,9 @@ namespace ryujin
 
       state_type compute(const dealii::Point<dim> &point, Number t) final
       {
+        const auto g = hyperbolic_system_.gravity();
+
         const auto x = point[0];
-        const Number g = this->hyperbolic_system.gravity();
 
         /* Define constants for transcritical flow */
         const Number xM = 10.;
@@ -77,9 +84,9 @@ namespace ryujin
         const Number h_initial = h_inflow - compute_bathymetry(point);
 
         /* Explicitly return initial state */
-        if (t < 1e-12)
-          return hyperbolic_system.template expand_state<dim>(
-              HyperbolicSystem::state_type<1, Number>{{h_initial, q_inflow}});
+        if (t < 1e-12) {
+          return state_type{{h_initial, q_inflow}};
+        }
 
         Number h_exact = 2. * std::sqrt(-Q) * cos(theta / 3.) - b / 3.;
         if (which_case_ == "transcritical") {
@@ -92,20 +99,19 @@ namespace ryujin
           }
         }
 
-        return hyperbolic_system.template expand_state<dim>(
-            HyperbolicSystem::state_type<1, Number>{{h_exact, q_inflow}});
+        return state_type{{h_exact, q_inflow}};
       }
 
       auto initial_precomputations(const dealii::Point<dim> &point) ->
-          typename InitialState<dim, Number, state_type, 1>::precomputed_type
-          final
+          typename InitialState<Description, dim, Number>::
+              precomputed_state_type final
       {
         /* Compute bathymetry: */
         return {compute_bathymetry(point)};
       }
 
     private:
-      const HyperbolicSystem &hyperbolic_system;
+      const HyperbolicSystemView hyperbolic_system_;
 
       DEAL_II_ALWAYS_INLINE
       inline Number compute_bathymetry(const dealii::Point<dim> &point) const
@@ -124,5 +130,5 @@ namespace ryujin
       std::string which_case_;
     };
 
-  } // namespace ShallowWater
+  } // namespace ShallowWaterInitialStates
 } // namespace ryujin

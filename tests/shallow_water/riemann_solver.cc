@@ -1,5 +1,9 @@
+// force distinct symbols in test
+#define ShallowWater ShallowWaterTest
+
 #include <hyperbolic_system.h>
 #include <multicomponent_vector.h>
+#define DEBUG_RIEMANN_SOLVER
 #include <riemann_solver.h>
 #include <riemann_solver.template.h>
 #include <simd.h>
@@ -13,17 +17,17 @@ int main()
   constexpr int dim = 1;
 
   HyperbolicSystem hyperbolic_system;
-  const double gravity = hyperbolic_system.gravity();
+  const double gravity = hyperbolic_system.view<dim, double>().gravity();
 
   static constexpr unsigned int n_precomputed_values =
-      HyperbolicSystem::n_precomputed_values<dim>;
+      HyperbolicSystem::View<dim, double>::n_precomputed_values;
   using precomputed_type = MultiComponentVector<double, n_precomputed_values>;
   precomputed_type dummy;
 
   RiemannSolver<dim> riemann_solver(hyperbolic_system, dummy);
 
   const auto riemann_data = [&](const auto &state) {
-    const auto h = hyperbolic_system.water_depth_sharp(
+    const auto h = hyperbolic_system.view<dim, double>().water_depth_sharp(
         dealii::Tensor<1, 2, double>{{state[0], state[1]}});
     const double u = state[1] / h;
 
@@ -42,7 +46,7 @@ int main()
     const auto rd_j = riemann_data(U_j);
     std::cout << "relaxation: " << rd_i[0] << " " << rd_i[1] << std::endl;
     std::cout << "relaxation: " << rd_j[0] << " " << rd_j[1] << std::endl;
-    const auto h_star = riemann_solver.h_star_two_rarefaction(rd_i, rd_j);
+    const auto h_star = riemann_solver.compute_h_star(rd_i, rd_j);
     const auto lambda_max = riemann_solver.compute(rd_i, rd_j);
     std::cout << "lambda_max: " << lambda_max << std::endl;
     std::cout << "h_star: " << h_star << std::endl;
@@ -52,13 +56,15 @@ int main()
   std::cout << std::setprecision(16);
   std::cout << std::scientific;
 
+  const auto view = hyperbolic_system.view<dim, double>();
+
   std::cout << "gravity:                      " << gravity << std::endl;
-  std::cout << "reference_water_depth:        "
-            << hyperbolic_system.reference_water_depth() << std::endl;
-  std::cout << "dry_state_relaxation (sharp): "
-            << hyperbolic_system.dry_state_relaxation_mollified() << std::endl;
-  std::cout << "dry_state_relaxation (molli): "
-            << hyperbolic_system.dry_state_relaxation_sharp() << std::endl;
+  std::cout << "reference_water_depth:        " << view.reference_water_depth()
+            << std::endl;
+  std::cout << "dry_state_relaxation (small): "
+            << view.dry_state_relaxation_small() << std::endl;
+  std::cout << "dry_state_relaxation (large): "
+            << view.dry_state_relaxation_large() << std::endl;
   std::cout << std::endl;
 
   // 10/04/2022 verified against Mathematica computation (Eric + Matthias)

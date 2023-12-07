@@ -1,6 +1,8 @@
 //
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT or BSD-3-Clause
+// [LANL Copyright Statement]
 // Copyright (C) 2020 - 2023 by the ryujin authors
+// Copyright (C) 2023 - 2023 by Triad National Security, LLC
 //
 
 #pragma once
@@ -10,14 +12,13 @@
 #include <compile_time_options.h>
 #include <multicomponent_vector.h>
 #include <newton.h>
-#include <simd.h>
 
 namespace ryujin
 {
   namespace ShallowWater
   {
     /**
-     * @todo documentation
+     * The convex limiter.
      *
      * @ingroup ShallowWaterEquations
      */
@@ -26,35 +27,29 @@ namespace ryujin
     {
     public:
       /**
-       * @copydoc HyperbolicSystem::problem_dimension
+       * @copydoc HyperbolicSystem::View
        */
-      static constexpr unsigned int problem_dimension =
-          HyperbolicSystem::problem_dimension<dim>;
+      using HyperbolicSystemView = HyperbolicSystem::View<dim, Number>;
 
       /**
-       * @copydoc HyperbolicSystem::state_type
+       * @copydoc HyperbolicSystem::View::state_type
        */
-      using state_type = HyperbolicSystem::state_type<dim, Number>;
+      using state_type = typename HyperbolicSystemView::state_type;
 
       /**
-       * @copydoc HyperbolicSystem::n_precomputed_values
+       * @copydoc HyperbolicSystem::View::n_precomputed_values
        */
       static constexpr unsigned int n_precomputed_values =
-          HyperbolicSystem::n_precomputed_values<dim>;
+          HyperbolicSystemView::n_precomputed_values;
 
       /**
-       * @copydoc HyperbolicSystem::precomputed_type
-       */
-      using precomputed_type = HyperbolicSystem::precomputed_type<dim, Number>;
-
-      /**
-       * @copydoc HyperbolicSystem::flux_contribution_type
+       * @copydoc HyperbolicSystem::View::flux_contribution_type
        */
       using flux_contribution_type =
-          HyperbolicSystem::flux_contribution_type<dim, Number>;
+          typename HyperbolicSystemView::flux_contribution_type;
 
       /**
-       * @copydoc HyperbolicSystem::ScalarNumber
+       * @copydoc HyperbolicSystem::View::ScalarNumber
        */
       using ScalarNumber = typename get_value_type<Number>::type;
 
@@ -66,11 +61,11 @@ namespace ryujin
        * Limiter<dim, Number> limiter;
        * for (unsigned int i = n_internal; i < n_owned; ++i) {
        *   // ...
-       *   limiter.reset(i, U_i);
+       *   limiter.reset(i, U_i, flux_i);
        *   for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
        *     // ...
-       *     limiter.accumulate(js, U_i, U_j, pre_i, pre_j, scaled_c_ij,
-       * beta_ij);
+       *     limiter.accumulate(
+       *       js, U_j, flux_j, scaled_c_ij, beta_ij, affine_shift);
        *   }
        *   limiter.bounds(hd_i);
        * }
@@ -81,7 +76,7 @@ namespace ryujin
       /**
        * The number of stored entries in the bounds array.
        */
-      static constexpr unsigned int n_bounds = 3;
+      static constexpr unsigned int n_bounds = 5;
 
       /**
        * Array type used to store accumulated bounds.
@@ -95,12 +90,12 @@ namespace ryujin
               const MultiComponentVector<ScalarNumber, n_precomputed_values>
                   &precomputed_values,
               const ScalarNumber relaxation_factor,
-              const ScalarNumber newton_tolerance,
+              const ScalarNumber newton_tol,
               const unsigned int newton_max_iter)
           : hyperbolic_system(hyperbolic_system)
           , precomputed_values(precomputed_values)
           , relaxation_factor(relaxation_factor)
-          , newton_tolerance(newton_tolerance)
+          , newton_tol(newton_tol)
           , newton_max_iter(newton_max_iter)
       {
       }
@@ -108,29 +103,25 @@ namespace ryujin
       /**
        * Reset temporary storage
        */
-      void reset(const unsigned int i);
+      void reset(const unsigned int i,
+                 const state_type &U_i,
+                 const flux_contribution_type &flux_i);
 
       /**
        * When looping over the sparsity row, add the contribution associated
        * with the neighboring state U_j.
        */
-      void accumulate(const unsigned int *js,
-                      const state_type &U_i,
-                      const state_type &U_j,
-                      const flux_contribution_type &prec_i,
-                      const flux_contribution_type &prec_j,
+      void accumulate(const state_type &U_j,
+                      const state_type &U_star_ij,
+                      const state_type &U_star_ji,
                       const dealii::Tensor<1, dim, Number> &scaled_c_ij,
-                      const Number beta_ij);
-
-      /**
-       * Apply relaxation.
-       */
-      void apply_relaxation(const Number hd_i);
+                      const Number &beta_ij,
+                      const state_type &affine_shift);
 
       /**
        * Return the computed bounds (with relaxation applied).
        */
-      const Bounds bounds(const Number hd_i) const;
+      Bounds bounds(const Number hd_i) const;
 
       //*}
       /** @name Convex limiter */
@@ -147,6 +138,7 @@ namespace ryujin
                                      const state_type &P,
                                      const Number t_min = Number(0.),
                                      const Number t_max = Number(1.));
+
       //*}
       /**
        * @name Verify invariant domain property
@@ -154,28 +146,30 @@ namespace ryujin
       //@{
 
       /**
-       * Returns whether the state @ref U is located in the invariant domain
-       * described by @ref bounds. If @ref U is a vectorized state then the
+       * Returns whether the state @p U is located in the invariant domain
+       * described by @p bounds. If @p U is a vectorized state then the
        * function returns true if all vectorized values are located in the
        * invariant domain.
        */
       static bool
-      is_in_invariant_domain(const HyperbolicSystem &hyperbolic_system,
-                             const Bounds &bounds,
-                             const state_type &U);
+      is_in_invariant_domain(const HyperbolicSystemView & /*hyperbolic_system*/,
+                             const Bounds & /*bounds*/,
+                             const state_type & /*U*/);
 
     private:
       //@}
       /** @name Arguments and internal fields */
       //@{
-      const HyperbolicSystem &hyperbolic_system;
+      const HyperbolicSystemView hyperbolic_system;
 
       const MultiComponentVector<ScalarNumber, n_precomputed_values>
           &precomputed_values;
 
       ScalarNumber relaxation_factor;
-      ScalarNumber newton_tolerance;
+      ScalarNumber newton_tol;
       unsigned int newton_max_iter;
+
+      state_type U_i;
 
       Bounds bounds_;
 
@@ -183,57 +177,66 @@ namespace ryujin
 
       Number h_relaxation_numerator;
       Number kin_relaxation_numerator;
+      Number v2_relaxation_numerator;
       Number relaxation_denominator;
 
       //@}
     };
 
 
-    /* Inline definitions */
+    /*
+     * -------------------------------------------------------------------------
+     * Inline definitions
+     * -------------------------------------------------------------------------
+     */
 
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline void
-    Limiter<dim, Number>::reset(unsigned int /*i*/)
+    Limiter<dim, Number>::reset(unsigned int /*i*/,
+                                const state_type &new_U_i,
+                                const flux_contribution_type & /*new_flux_i*/)
     {
-      auto &[h_min, h_max, kin_max] = bounds_;
+      U_i = new_U_i;
+
+      auto &[h_min, h_max, h_small, kin_max, v2_max] = bounds_;
 
       h_min = Number(std::numeric_limits<ScalarNumber>::max());
       h_max = Number(0.);
+      h_small = Number(0.);
       kin_max = Number(0.);
+      v2_max = Number(0.);
 
       h_relaxation_numerator = Number(0.);
       kin_relaxation_numerator = Number(0.);
+      v2_relaxation_numerator = Number(0.);
       relaxation_denominator = Number(0.);
     }
 
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline void Limiter<dim, Number>::accumulate(
-        const unsigned int * /*js*/,
-        const state_type & /*U_i*/,
-        const state_type & /*U_j*/,
-        const flux_contribution_type &prec_i,
-        const flux_contribution_type &prec_j,
+        const state_type &U_j,
+        const state_type &U_star_ij,
+        const state_type &U_star_ji,
         const dealii::Tensor<1, dim, Number> &scaled_c_ij,
-        const Number beta_ij)
+        const Number &beta_ij,
+        const state_type &affine_shift)
     {
       /* The bar states: */
 
-      const auto &[U_i, Z_i] = prec_i;
-      const auto &[U_j, Z_j] = prec_j;
-      const auto U_star_ij = hyperbolic_system.star_state(U_i, Z_i, Z_j);
-      const auto U_star_ji = hyperbolic_system.star_state(U_j, Z_j, Z_i);
       const auto f_star_ij = hyperbolic_system.f(U_star_ij);
       const auto f_star_ji = hyperbolic_system.f(U_star_ji);
 
-      const auto U_ij_bar = ScalarNumber(0.5) *
-                            (U_star_ij + U_star_ji +
-                             contract(add(f_star_ij, -f_star_ji), scaled_c_ij));
+      auto U_ij_bar = ScalarNumber(0.5) *
+                      (U_star_ij + U_star_ji +
+                       contract(add(f_star_ij, -f_star_ji), scaled_c_ij));
+
+      U_ij_bar += affine_shift;
 
       /* Bounds: */
 
-      auto &[h_min, h_max, kin_max] = bounds_;
+      auto &[h_min, h_max, h_small, kin_max, v2_max] = bounds_;
 
       const auto h_bar_ij = hyperbolic_system.water_depth(U_ij_bar);
       h_min = std::min(h_min, h_bar_ij);
@@ -242,7 +245,15 @@ namespace ryujin
       const auto kin_bar_ij = hyperbolic_system.kinetic_energy(U_ij_bar);
       kin_max = std::max(kin_max, kin_bar_ij);
 
+      const auto v_bar_ij =
+          hyperbolic_system.momentum(U_ij_bar) *
+          hyperbolic_system.inverse_water_depth_mollified(U_ij_bar);
+      const auto v2_bar_ij = v_bar_ij.norm_square();
+      v2_max = std::max(v2_max, v2_bar_ij);
+
       /* Relaxation: */
+
+      relaxation_denominator += std::abs(beta_ij);
 
       const auto h_i = hyperbolic_system.water_depth(U_i);
       const auto h_j = hyperbolic_system.water_depth(U_j);
@@ -251,15 +262,22 @@ namespace ryujin
       const auto kin_i = hyperbolic_system.kinetic_energy(U_i);
       const auto kin_j = hyperbolic_system.kinetic_energy(U_j);
       kin_relaxation_numerator += beta_ij * (kin_i + kin_j);
-      relaxation_denominator += beta_ij;
+
+      const auto vel_i = hyperbolic_system.momentum(U_i) *
+                         hyperbolic_system.inverse_water_depth_mollified(U_i);
+      const auto vel_j = hyperbolic_system.momentum(U_j) *
+                         hyperbolic_system.inverse_water_depth_mollified(U_j);
+      v2_relaxation_numerator +=
+          beta_ij * (-vel_i.norm_square() + vel_j.norm_square());
     }
 
 
     template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline void
-    Limiter<dim, Number>::apply_relaxation(Number hd_i)
+    DEAL_II_ALWAYS_INLINE inline auto
+    Limiter<dim, Number>::bounds(const Number hd_i) const -> Bounds
     {
-      auto &[h_min, h_max, kin_max] = bounds_;
+      auto relaxed_bounds = bounds_;
+      auto &[h_min, h_max, h_small, kin_max, v2_max] = relaxed_bounds;
 
       /* Use r_i = factor * (m_i / |Omega|) ^ (1.5 / d): */
 
@@ -272,34 +290,42 @@ namespace ryujin
 
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
 
-      const Number h_relaxation =
-          std::abs(h_relaxation_numerator) /
-          (std::abs(relaxation_denominator) + Number(eps));
+      const Number h_relaxed = ScalarNumber(2.) *
+                               std::abs(h_relaxation_numerator) /
+                               (relaxation_denominator + Number(eps));
 
-      h_min = std::max((Number(1.) - r_i) * h_min, h_min - h_relaxation);
-      h_max = std::min((Number(1.) + r_i) * h_max, h_max + h_relaxation);
+      h_min = std::max((Number(1.) - r_i) * h_min, h_min - h_relaxed);
+      h_max = std::min((Number(1.) + r_i) * h_max, h_max + h_relaxed);
 
-      const Number kin_relaxation =
-          std::abs(kin_relaxation_numerator) /
-          (std::abs(relaxation_denominator) + Number(eps));
+      const Number kin_relaxed = ScalarNumber(2.) *
+                                 std::abs(kin_relaxation_numerator) /
+                                 (relaxation_denominator + Number(eps));
 
-      kin_max =
-          std::min((Number(1.) + r_i) * kin_max, kin_max + kin_relaxation);
-    }
+      kin_max = std::min((Number(1.) + r_i) * kin_max, kin_max + kin_relaxed);
 
+      const Number v2_relaxed = ScalarNumber(2.) *
+                                std::abs(v2_relaxation_numerator) /
+                                (relaxation_denominator + Number(eps));
 
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline const typename Limiter<dim, Number>::Bounds &
-    Limiter<dim, Number>::bounds() const
-    {
-      return bounds_;
+      v2_max = std::min((Number(1.) + r_i) * v2_max, v2_max + v2_relaxed);
+
+      /* Use r_i = 0.2 * (m_i / |Omega|) ^ (1 / d): */
+
+      r_i = hd_i;
+      if constexpr (dim == 2)
+        r_i = std::sqrt(hd_i);
+      r_i *= hyperbolic_system.dry_state_relaxation_factor();
+
+      h_small = hyperbolic_system.reference_water_depth() * r_i;
+
+      return relaxed_bounds;
     }
 
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline bool
     Limiter<dim, Number>::is_in_invariant_domain(
-        const HyperbolicSystem & /*hyperbolic_system*/,
+        const HyperbolicSystemView & /*hyperbolic_system*/,
         const Bounds & /*bounds*/,
         const state_type & /*U*/)
     {
@@ -307,6 +333,7 @@ namespace ryujin
       __builtin_trap();
       return true;
     }
+
 
   } // namespace ShallowWater
 } // namespace ryujin

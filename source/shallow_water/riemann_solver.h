@@ -1,29 +1,23 @@
 //
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT or BSD-3-Clause
+// [LANL Copyright Statement]
 // Copyright (C) 2020 - 2023 by the ryujin authors
+// Copyright (C) 2023 - 2023 by Triad National Security, LLC
 //
 
 #pragma once
 
 #include "hyperbolic_system.h"
 
-#include <simd.h>
-
-#include <deal.II/base/point.h>
-#include <deal.II/base/tensor.h>
-
-#include <functional>
-
 namespace ryujin
 {
   namespace ShallowWater
   {
     /**
-     * A fast approximative solver for the 1D Riemann problem. The solver
-     * ensures that the estimate \f$\lambda_{\text{max}}\f$ that is returned
-     * for the maximal wavespeed is a strict upper bound.
-     *
-     * The solver is based on @cite GuermondPopov2016b.
+     * A fast approximative solver for the associated 1D Riemann problem.
+     * The solver has to ensure that the estimate
+     * \f$\lambda_{\text{max}}\f$ that is returned for the maximal
+     * wavespeed is a strict upper bound.
      *
      * @ingroup ShallowWaterEquations
      */
@@ -32,34 +26,43 @@ namespace ryujin
     {
     public:
       /**
-       * @copydoc HyperbolicSystem::problem_dimension
+       * @copydoc HyperbolicSystem::View
+       */
+      using HyperbolicSystemView = HyperbolicSystem::View<dim, Number>;
+
+      /**
+       * @copydoc HyperbolicSystem::View::problem_dimension
        */
       static constexpr unsigned int problem_dimension =
-          HyperbolicSystem::problem_dimension<dim>;
+          HyperbolicSystemView::problem_dimension;
 
+      /**
+       * Number of components in a primitive state, we store \f$[\rho, v,
+       * p, a]\f$, thus, 4.
+       */
       static constexpr unsigned int riemann_data_size = 3;
+
+      /**
+       * The array type to store the expanded primitive state for the
+       * Riemann solver \f$[\rho, v, p, a]\f$
+       */
       using primitive_type = std::array<Number, riemann_data_size>;
 
       /**
-       * @copydoc HyperbolicSystem::state_type
+       * @copydoc HyperbolicSystem::View::state_type
        */
-      using state_type = HyperbolicSystem::state_type<dim, Number>;
+      using state_type = typename HyperbolicSystemView::state_type;
 
       /**
-       * @copydoc HyperbolicSystem::precomputed_type
-       */
-      using precomputed_type = HyperbolicSystem::precomputed_type<dim, Number>;
-
-      /**
-       * @copydoc HyperbolicSystem::n_precomputed_values
+       * @copydoc HyperbolicSystem::View::n_precomputed_values
        */
       static constexpr unsigned int n_precomputed_values =
-          HyperbolicSystem::n_precomputed_values<dim>;
+          HyperbolicSystemView::n_precomputed_values;
 
       /**
-       * @copydoc HyperbolicSystem::ScalarNumber
+       * @copydoc HyperbolicSystem::View::ScalarNumber
        */
-      using ScalarNumber = typename get_value_type<Number>::type;
+      using ScalarNumber = typename HyperbolicSystemView::ScalarNumber;
 
       /**
        * @name Compute wavespeed estimates
@@ -78,6 +81,7 @@ namespace ryujin
       {
       }
 
+
       /**
        * For two given 1D primitive states riemann_data_i and riemann_data_j,
        * compute an estimation of an upper bound for the maximum wavespeed
@@ -86,12 +90,10 @@ namespace ryujin
       Number compute(const primitive_type &riemann_data_i,
                      const primitive_type &riemann_data_j) const;
 
+
       /**
        * For two given states U_i a U_j and a (normalized) "direction" n_ij
        * compute an estimation of an upper bound for lambda.
-       *
-       * Returns a tuple consisting of lambda max and the number of Newton
-       * iterations used in the solver to find it.
        */
       Number compute(const state_type &U_i,
                      const state_type &U_j,
@@ -99,6 +101,7 @@ namespace ryujin
                      const unsigned int *js,
                      const dealii::Tensor<1, dim, Number> &n_ij) const;
 
+    protected:
       //@}
       /**
        * @name Internal functions used in the Riemann solver
@@ -122,23 +125,35 @@ namespace ryujin
                             const primitive_type &riemann_data_j,
                             const Number h_star) const;
 
-      Number h_star_two_rarefaction(const primitive_type &riemann_data_i,
-                                    const primitive_type &riemann_data_j) const;
+    public:
+      Number compute_h_star(const primitive_type &riemann_data_i,
+                            const primitive_type &riemann_data_j) const;
 
+    protected:
       primitive_type
       riemann_data_from_state(const state_type &U,
                               const dealii::Tensor<1, dim, Number> &n_ij) const;
 
     private:
-      const HyperbolicSystem &hyperbolic_system;
+      //@}
+      /**
+       * @name Internal functions used in the Riemann solver
+       */
+      //@{
 
+      const HyperbolicSystemView hyperbolic_system;
       const MultiComponentVector<ScalarNumber, n_precomputed_values>
           &precomputed_values;
+
       //@}
     };
 
 
-    /* Inline definitions */
+    /*
+     * -------------------------------------------------------------------------
+     * Inline definitions
+     * -------------------------------------------------------------------------
+     */
 
 
     template <int dim, typename Number>
@@ -170,7 +185,5 @@ namespace ryujin
       const auto riemann_data_j = riemann_data_from_state(U_j, n_ij);
       return compute(riemann_data_i, riemann_data_j);
     }
-
-
   } // namespace ShallowWater
 } // namespace ryujin

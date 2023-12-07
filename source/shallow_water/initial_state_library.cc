@@ -5,15 +5,11 @@
 // Copyright (C) 2023 - 2023 by Triad National Security, LLC
 //
 
-#ifndef RYUJIN_INCLUDE_INSTANTIATION_ONCE
-#define RYUJIN_INCLUDE_INSTANTIATION_ONCE
-#else
-#error Instantiation files can only be included once.
-#endif
-
-#include "description.h"
+#include "initial_state_library.template.h"
 
 namespace ryujin
 {
-  using ShallowWater::Description;
+  template class InitialStateLibrary<Description, 1, NUMBER>;
+  template class InitialStateLibrary<Description, 2, NUMBER>;
+  template class InitialStateLibrary<Description, 3, NUMBER>;
 } // namespace ryujin

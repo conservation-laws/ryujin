@@ -1,6 +1,8 @@
 //
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT or BSD-3-Clause
+// [LANL Copyright Statement]
 // Copyright (C) 2020 - 2023 by the ryujin authors
+// Copyright (C) 2023 - 2023 by Triad National Security, LLC
 //
 
 #include "limiter.template.h"
@@ -13,26 +15,12 @@ namespace ryujin
   {
     /* instantiations */
 
-    template std::tuple<NUMBER, bool>
-    Limiter<DIM, NUMBER>::limit(const HyperbolicSystem &,
-                                const std::array<NUMBER, 3> &,
-                                const state_type &,
-                                const state_type &,
-                                const NUMBER,
-                                const unsigned int,
-                                const NUMBER,
-                                const NUMBER);
+    template class Limiter<1, NUMBER>;
+    template class Limiter<2, NUMBER>;
+    template class Limiter<3, NUMBER>;
 
-    template std::tuple<VectorizedArray<NUMBER>, bool>
-    Limiter<DIM, VectorizedArray<NUMBER>>::limit(
-        const HyperbolicSystem &,
-        const std::array<VectorizedArray<NUMBER>, 3> &,
-        const state_type &,
-        const state_type &,
-        const NUMBER,
-        const unsigned int,
-        const VectorizedArray<NUMBER>,
-        const VectorizedArray<NUMBER>);
-
+    template class Limiter<1, dealii::VectorizedArray<NUMBER>>;
+    template class Limiter<2, dealii::VectorizedArray<NUMBER>>;
+    template class Limiter<3, dealii::VectorizedArray<NUMBER>>;
   } // namespace ShallowWater
 } // namespace ryujin

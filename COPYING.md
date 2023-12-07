@@ -4,7 +4,7 @@ ryujin copyright and license
 This project is licensed under the
 [MIT license](https://spdx.org/licenses/MIT.html).
 Part of the source code is dual licensed under the MIT and the
-[3-clause BSD license](https://spdx.org/licenses/BSD-3-Clause.html).
+[BSD 3-clause license](https://spdx.org/licenses/BSD-3-Clause.html).
 
 
 Third party software
@@ -41,7 +41,9 @@ Full license texts
 ==================
 
 The open source license that applies to a source file is annotated in the
-header with an [SPDX identifier](https://spdx.dev/ids/).
+header with an [SPDX identifier](https://spdx.dev/ids/). In addition, part
+of the source code (identified in the header file) is subject to the LANL
+Copyright Statement outlined below.
 
 
 MIT License
@@ -66,6 +68,27 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
+
+
+LANL Copyright Statement
+------------------------
+
+Copyright (c) 2023 - 2023 by Triad National Security, LLC
+
+All rights reserved.
+
+This program was produced under U.S. Government contract 89233218CNA000001
+for Los Alamos National Laboratory (LANL), which is operated by Triad
+National Security, LLC for the U.S. Department of Energy/National Nuclear
+Security Administration. All rights in the program are. reserved by Triad
+National Security, LLC, and the U.S. Department of Energy/National Nuclear
+Security Administration. The Government is granted for itself and others
+acting on its behalf a nonexclusive, paid-up, irrevocable worldwide license
+in this material to reproduce, prepare. derivative works, distribute copies
+to the public, perform publicly and display publicly, and to permit. others
+to do so.
+
+This program is Open-Source under the BSD 3-clause License.
 
 
 BSD 3-clause License

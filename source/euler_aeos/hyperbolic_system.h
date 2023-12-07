@@ -19,7 +19,6 @@
 #include <deal.II/base/tensor.h>
 
 #include <array>
-#include <functional>
 
 namespace ryujin
 {
@@ -57,7 +56,8 @@ namespace ryujin
 
       std::string equation_of_state_;
       double reference_density_;
-      double vacuum_state_relaxation_;
+      double vacuum_state_relaxation_small_;
+      double vacuum_state_relaxation_large_;
       bool compute_strict_bounds_;
 
       EquationOfStateLibrary::equation_of_state_list_type
@@ -123,13 +123,19 @@ namespace ryujin
 
         DEAL_II_ALWAYS_INLINE inline ScalarNumber reference_density() const
         {
-          return ScalarNumber(hyperbolic_system_.reference_density_);
+          return hyperbolic_system_.reference_density_;
         }
 
         DEAL_II_ALWAYS_INLINE inline ScalarNumber
-        vacuum_state_relaxation() const
+        vacuum_state_relaxation_small() const
         {
-          return ScalarNumber(hyperbolic_system_.vacuum_state_relaxation_);
+          return hyperbolic_system_.vacuum_state_relaxation_small_;
+        }
+
+        DEAL_II_ALWAYS_INLINE inline ScalarNumber
+        vacuum_state_relaxation_large() const
+        {
+          return hyperbolic_system_.vacuum_state_relaxation_large_;
         }
 
         DEAL_II_ALWAYS_INLINE inline bool compute_strict_bounds() const
@@ -410,9 +416,9 @@ namespace ryujin
         static Number density(const state_type &U);
 
         /**
-         * Given a density @p rho this function returns 0 if rho is in the
-         * interval [-relaxation * rho_cutoff, relaxation * rho_cutoff],
-         * otherwise rho is returned unmodified. Here, rho_cutoff is the
+         * Given a density @p rho this function returns 0 if the magniatude
+         * of rho is smaller or equal than relaxation_large * rho_cutoff.
+         * Otherwise rho is returned unmodified. Here, rho_cutoff is the
          * reference density multiplied by eps.
          */
         Number filter_vacuum_density(const Number &rho) const;
@@ -631,15 +637,6 @@ namespace ryujin
                         const flux_contribution_type &flux_j) const = delete;
 
         /**
-         * We do not perform state equilibration
-         */
-        static constexpr bool have_equilibrated_states = false;
-
-        std::array<state_type, 2>
-        equilibrated_states(const flux_contribution_type &flux_i,
-                            const flux_contribution_type &flux_j) = delete;
-
-        /**
          * @name Computing stencil source terms
          */
         //@{
@@ -647,31 +644,29 @@ namespace ryujin
         /** We do not have source terms */
         static constexpr bool have_source_terms = false;
 
-        state_type low_order_nodal_source(const precomputed_vector_type &,
-                                          const unsigned int,
-                                          const state_type &) const = delete;
+        state_type low_order_source(const precomputed_vector_type &pv,
+                                    const unsigned int i,
+                                    const state_type &U_i,
+                                    const ScalarNumber t,
+                                    const ScalarNumber tau) const = delete;
 
-        state_type high_order_nodal_source(const precomputed_vector_type &,
-                                           const unsigned int,
-                                           const state_type &) const = delete;
+        state_type low_order_source(const precomputed_vector_type &pv,
+                                    const unsigned int *js,
+                                    const state_type &U_j,
+                                    const ScalarNumber t,
+                                    const ScalarNumber tau) const = delete;
 
-        state_type low_order_stencil_source(
-            const flux_contribution_type &,
-            const flux_contribution_type &,
-            const Number,
-            const dealii::Tensor<1, dim, Number> &) const = delete;
+        state_type high_order_source(const precomputed_vector_type &pv,
+                                     const unsigned int i,
+                                     const state_type &U_i,
+                                     const ScalarNumber t,
+                                     const ScalarNumber tau) const = delete;
 
-        state_type high_order_stencil_source(
-            const flux_contribution_type &,
-            const flux_contribution_type &,
-            const Number,
-            const dealii::Tensor<1, dim, Number> &) const = delete;
-
-        state_type affine_shift_stencil_source(
-            const flux_contribution_type &,
-            const flux_contribution_type &,
-            const Number,
-            const dealii::Tensor<1, dim, Number> &) const = delete;
+        state_type high_order_source(const precomputed_vector_type &pv,
+                                     const unsigned int *js,
+                                     const state_type &U_j,
+                                     const ScalarNumber t,
+                                     const ScalarNumber tau) const = delete;
 
         //@}
         /**
@@ -782,9 +777,14 @@ namespace ryujin
                     reference_density_,
                     "Problem specific density reference");
 
-      vacuum_state_relaxation_ = 10000.;
-      add_parameter("vacuum state relaxation",
-                    vacuum_state_relaxation_,
+      vacuum_state_relaxation_small_ = 1.e2;
+      add_parameter("vacuum state relaxation small",
+                    vacuum_state_relaxation_small_,
+                    "Problem specific vacuum relaxation parameter");
+
+      vacuum_state_relaxation_large_ = 1.e4;
+      add_parameter("vacuum state relaxation large",
+                    vacuum_state_relaxation_large_,
                     "Problem specific vacuum relaxation parameter");
 
       /*
@@ -972,11 +972,11 @@ namespace ryujin
         const Number &rho) const
     {
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
-      const Number rho_cutoff_big =
-          reference_density() * vacuum_state_relaxation() * eps;
+      const Number rho_cutoff_large =
+          reference_density() * vacuum_state_relaxation_large() * eps;
 
       return dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
-          std::abs(rho), rho_cutoff_big, Number(0.), rho);
+          std::abs(rho), rho_cutoff_large, Number(0.), rho);
     }
 
 

@@ -1,15 +1,15 @@
 //
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT or BSD-3-Clause
+// [LANL Copyright Statement]
 // Copyright (C) 2020 - 2023 by the ryujin authors
+// Copyright (C) 2023 - 2023 by Triad National Security, LLC
 //
 
 #pragma once
 
 #include "hyperbolic_system.h"
 
-#include <compile_time_options.h>
 #include <multicomponent_vector.h>
-#include <simd.h>
 
 #include <deal.II/base/vectorization.h>
 
@@ -19,7 +19,8 @@ namespace ryujin
   namespace ShallowWater
   {
     /**
-     * @todo documentation
+     * An suitable indicator strategy that is used to form the preliminary
+     * high-order update.
      *
      * @ingroup ShallowWaterEquations
      */
@@ -28,38 +29,43 @@ namespace ryujin
     {
     public:
       /**
+       * @copydoc HyperbolicSystem::View
+       */
+      using HyperbolicSystemView = HyperbolicSystem::View<dim, Number>;
+
+      /**
        * @copydoc HyperbolicSystem::problem_dimension
        */
       static constexpr unsigned int problem_dimension =
-          HyperbolicSystem::problem_dimension<dim>;
+          HyperbolicSystemView::problem_dimension;
 
       /**
-       * @copydoc HyperbolicSystem::state_type
+       * @copydoc HyperbolicSystem::precomputed_state_type
        */
-      using state_type = HyperbolicSystem::state_type<dim, Number>;
+      using precomputed_state_type =
+          typename HyperbolicSystemView::precomputed_state_type;
 
       /**
        * @copydoc HyperbolicSystem::n_precomputed_values
        */
       static constexpr unsigned int n_precomputed_values =
-          HyperbolicSystem::n_precomputed_values<dim>;
+          HyperbolicSystemView::n_precomputed_values;
 
       /**
-       * @copydoc HyperbolicSystem::precomputed_type
+       * @copydoc HyperbolicSystem::state_type
        */
-      using precomputed_type = HyperbolicSystem::precomputed_type<dim, Number>;
+      using state_type = typename HyperbolicSystemView::state_type;
 
       /**
        * @copydoc HyperbolicSystem::flux_type
        */
-      using flux_type = HyperbolicSystem::flux_type<dim, Number>;
+      using flux_type = typename HyperbolicSystemView::flux_type;
 
       /**
        * @copydoc HyperbolicSystem::ScalarNumber
        */
       using ScalarNumber = typename get_value_type<Number>::type;
 
-      //@}
       /**
        * @name Stencil-based computation of indicators
        *
@@ -71,7 +77,7 @@ namespace ryujin
        *   indicator.reset(i, U_i);
        *   for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
        *     // ...
-       *     indicator.add(js, U_j, c_ij);
+       *     indicator.accumulate(js, U_j, c_ij);
        *   }
        *   indicator.alpha(hd_i);
        * }
@@ -84,9 +90,11 @@ namespace ryujin
        */
       Indicator(const HyperbolicSystem &hyperbolic_system,
                 const MultiComponentVector<ScalarNumber, n_precomputed_values>
-                    &precomputed_values)
+                    &precomputed_values,
+                const ScalarNumber evc_factor)
           : hyperbolic_system(hyperbolic_system)
           , precomputed_values(precomputed_values)
+          , evc_factor(evc_factor)
       {
       }
 
@@ -94,20 +102,20 @@ namespace ryujin
        * Reset temporary storage and initialize for a new row corresponding
        * to state vector U_i.
        */
-      void reset(const unsigned int i, const state_type &U_i);
+      void reset(const unsigned int /*i*/, const state_type &U_i);
 
       /**
        * When looping over the sparsity row, add the contribution associated
        * with the neighboring state U_j.
        */
-      void add(const unsigned int *js,
-               const state_type &U_j,
-               const dealii::Tensor<1, dim, Number> &c_ij);
+      void accumulate(const unsigned int *js,
+                      const state_type &U_j,
+                      const dealii::Tensor<1, dim, Number> &c_ij);
 
       /**
        * Return the computed alpha_i value.
        */
-      Number alpha(const Number h_i) const;
+      Number alpha(const Number h_i);
 
       //@}
 
@@ -116,11 +124,12 @@ namespace ryujin
        * @name
        */
       //@{
-
-      const HyperbolicSystem &hyperbolic_system;
+      const HyperbolicSystemView hyperbolic_system;
 
       const MultiComponentVector<ScalarNumber, n_precomputed_values>
           &precomputed_values;
+
+      const ScalarNumber evc_factor;
 
       Number h_i = 0.;
       Number eta_i = 0.;
@@ -130,12 +139,15 @@ namespace ryujin
 
       Number left = 0.;
       state_type right;
-
       //@}
     };
 
 
-    /* Inline definitions */
+    /*
+     * -------------------------------------------------------------------------
+     * Inline definitions
+     * -------------------------------------------------------------------------
+     */
 
 
     template <int dim, typename Number>
@@ -145,10 +157,11 @@ namespace ryujin
       h_i = hyperbolic_system.water_depth(U_i);
       /* entropy viscosity commutator: */
 
-      const auto &[mathematical_entropy] =
-          precomputed_values.template get_tensor<Number, precomputed_type>(i);
+      const auto &[eta_m, h_star] =
+          precomputed_values
+              .template get_tensor<Number, precomputed_state_type>(i);
 
-      eta_i = mathematical_entropy;
+      eta_i = eta_m;
 
       d_eta_i = hyperbolic_system.mathematical_entropy_derivative(U_i);
       f_i = hyperbolic_system.f(U_i);
@@ -160,15 +173,16 @@ namespace ryujin
 
 
     template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline void
-    Indicator<dim, Number>::add(const unsigned int *js,
-                                const state_type &U_j,
-                                const dealii::Tensor<1, dim, Number> &c_ij)
+    DEAL_II_ALWAYS_INLINE inline void Indicator<dim, Number>::accumulate(
+        const unsigned int *js,
+        const state_type &U_j,
+        const dealii::Tensor<1, dim, Number> &c_ij)
     {
       /* entropy viscosity commutator: */
 
-      const auto &[eta_j] =
-          precomputed_values.template get_tensor<Number, precomputed_type>(js);
+      const auto &[eta_j, h_star_j] =
+          precomputed_values
+              .template get_tensor<Number, precomputed_state_type>(js);
 
       const auto velocity_j = hyperbolic_system.momentum(U_j) *
                               hyperbolic_system.inverse_water_depth_sharp(U_j);
@@ -184,10 +198,8 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
-    Indicator<dim, Number>::alpha(const Number hd_i) const
+    Indicator<dim, Number>::alpha(const Number hd_i)
     {
-      using ScalarNumber = typename get_value_type<Number>::type;
-
       Number my_sum = 0.;
       for (unsigned int k = 0; k < problem_dimension; ++k) {
         my_sum += d_eta_i[k] * right[k];
@@ -196,15 +208,15 @@ namespace ryujin
       Number numerator = std::abs(left - my_sum);
       Number denominator = std::abs(left) + std::abs(my_sum);
 
-      constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
-      const auto quotient = std::abs(numerator + eps) /
-                            (denominator + hd_i * std::abs(eta_i) + eps);
+      const auto quotient =
+          std::abs(numerator) /
+          (denominator +
+           std::max(hd_i * std::abs(eta_i),
+                    Number(100. * std::numeric_limits<ScalarNumber>::min())));
 
-      /* FIXME: this can be refactoring into a runtime parameter... */
-      const ScalarNumber evc_alpha_0_ = ScalarNumber(1.);
-
-      return std::min(Number(1.), evc_alpha_0_ * quotient);
+      return std::min(Number(1.), evc_factor * quotient);
     }
+
 
   } // namespace ShallowWater
 } // namespace ryujin

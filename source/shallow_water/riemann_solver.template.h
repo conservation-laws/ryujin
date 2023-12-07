@@ -1,6 +1,8 @@
 //
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT or BSD-3-Clause
+// [LANL Copyright Statement]
 // Copyright (C) 2020 - 2023 by the ryujin authors
+// Copyright (C) 2023 - 2023 by Triad National Security, LLC
 //
 
 #pragma once
@@ -25,7 +27,6 @@ namespace ryujin
     RiemannSolver<dim, Number>::f(const primitive_type &riemann_data_Z,
                                   const Number &h) const
     {
-      using ScalarNumber = typename get_value_type<Number>::type;
       const ScalarNumber gravity = hyperbolic_system.gravity();
 
       const auto &[h_Z, u_Z, a_Z] = riemann_data_Z;
@@ -64,8 +65,6 @@ namespace ryujin
     RiemannSolver<dim, Number>::lambda1_minus(
         const primitive_type &riemann_data, const Number h_star) const
     {
-      using ScalarNumber = typename get_value_type<Number>::type;
-
       const auto &[h, u, a] = riemann_data;
 
       const Number factor = positive_part((h_star - h) / h);
@@ -81,8 +80,6 @@ namespace ryujin
     RiemannSolver<dim, Number>::lambda3_plus(const primitive_type &riemann_data,
                                              const Number h_star) const
     {
-      using ScalarNumber = typename get_value_type<Number>::type;
-
       const auto &[h, u, a] = riemann_data;
 
       const Number factor = positive_part((h_star - h) / h);
@@ -109,11 +106,10 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
-    RiemannSolver<dim, Number>::h_star_two_rarefaction(
+    RiemannSolver<dim, Number>::compute_h_star(
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
-      using ScalarNumber = typename get_value_type<Number>::type;
       const ScalarNumber gravity = hyperbolic_system.gravity();
       const auto gravity_inverse = ScalarNumber(1.) / gravity;
 
@@ -124,14 +120,14 @@ namespace ryujin
       const Number h_max = std::max(h_i, h_j);
 
 #ifdef DEBUG_RIEMANN_SOLVER
-      std::cout << h_min << "<- h_min/max ->" << h_max << std::endl;
+      std::cout << h_min << "  <- h_min/max ->  " << h_max << std::endl;
 #endif
 
       const Number a_min = std::sqrt(gravity * h_min);
       const Number a_max = std::sqrt(gravity * h_max);
 
 #ifdef DEBUG_RIEMANN_SOLVER
-      std::cout << a_min << "<- a_min/max ->" << a_max << std::endl;
+      std::cout << a_min << "  <- a_min/max ->  " << a_max << std::endl;
 #endif
 
       const Number sqrt_two = std::sqrt(ScalarNumber(2.));
@@ -151,12 +147,11 @@ namespace ryujin
       std::cout << "phi_value_max ->" << phi_value_max << std::endl;
 #endif
 
-
       /* We compute the three h_star quantities */
 
       Number tmp;
 
-      // h_star_left
+      /* Double rarefaction case (h_star left): */
 
       tmp = positive_part(u_i - u_j + ScalarNumber(2.) * (a_i + a_j));
       const Number h_star_left =
@@ -166,7 +161,7 @@ namespace ryujin
       std::cout << "left: " << h_star_left << std::endl;
 #endif
 
-      // h_star_middle
+      /* Double modified shock (h_star middle): */
 
       tmp = Number(1.) + sqrt_two * (u_i - u_j) / (a_min + a_max);
       const Number h_star_middle = std::sqrt(h_min * h_max) * tmp;
@@ -175,7 +170,7 @@ namespace ryujin
       std::cout << "middle: " << h_star_middle << std::endl;
 #endif
 
-      // h_star_right
+      /* Expansion and modified shock (h_star right): */
 
       const auto left_radicand =
           ScalarNumber(3.) * h_min +
@@ -212,8 +207,7 @@ namespace ryujin
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
-      const Number h_star =
-          h_star_two_rarefaction(riemann_data_i, riemann_data_j);
+      const Number h_star = compute_h_star(riemann_data_i, riemann_data_j);
 
       const Number lambda_max =
           compute_lambda(riemann_data_i, riemann_data_j, h_star);

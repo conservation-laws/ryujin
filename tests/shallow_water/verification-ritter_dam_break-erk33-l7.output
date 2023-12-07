@@ -4,9 +4,13 @@
 [INFO] preparing compute kernels
 [INFO] interpolating initial values
 [INFO] entering main loop
+[INFO] scheduling output
+[INFO] scheduling output
+[INFO] scheduling output
+[INFO] scheduling output
 Normalized consolidated Linf, L1, and L2 errors at final time 
-#dofs = 1601
-t     = 0.6672313404558621
-Linf  = 0.2573904344036638
-L1    = 0.01175316810657698
-L2    = 0.0303466667075718
+#dofs = 3201
+t     = 6.002065094435731
+Linf  = 0.001137042397958594
+L1    = 2.035435119886289e-05
+L2    = 6.232415634990906e-05

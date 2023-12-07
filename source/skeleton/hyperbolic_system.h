@@ -311,13 +311,6 @@ namespace ryujin
         high_order_flux(const flux_contribution_type &,
                         const flux_contribution_type &) const = delete;
 
-        /** We do not perform state equilibration */
-        static constexpr bool have_equilibrated_states = false;
-
-        std::array<state_type, 2>
-        equilibrated_states(const flux_contribution_type &,
-                            const flux_contribution_type &) const = delete;
-
         //@}
         /**
          * @name Computing stencil source terms
@@ -327,31 +320,17 @@ namespace ryujin
         /** We do not have source terms */
         static constexpr bool have_source_terms = false;
 
-        state_type low_order_nodal_source(const precomputed_vector_type &,
-                                          const unsigned int,
-                                          const state_type &) const = delete;
+        state_type low_order_source(const precomputed_vector_type &pv,
+                                    const unsigned int i,
+                                    const state_type &U_i,
+                                    const ScalarNumber t,
+                                    const ScalarNumber tau) const = delete;
 
-        state_type high_order_nodal_source(const precomputed_vector_type &,
-                                           const unsigned int,
-                                           const state_type &) const = delete;
-
-        state_type low_order_stencil_source(
-            const flux_contribution_type &,
-            const flux_contribution_type &,
-            const Number,
-            const dealii::Tensor<1, dim, Number> &) const = delete;
-
-        state_type high_order_stencil_source(
-            const flux_contribution_type &,
-            const flux_contribution_type &,
-            const Number,
-            const dealii::Tensor<1, dim, Number> &) const = delete;
-
-        state_type affine_shift_stencil_source(
-            const flux_contribution_type &,
-            const flux_contribution_type &,
-            const Number,
-            const dealii::Tensor<1, dim, Number> &) const = delete;
+        state_type high_order_source(const precomputed_vector_type &pv,
+                                     const unsigned int i,
+                                     const state_type &U_i,
+                                     const ScalarNumber t,
+                                     const ScalarNumber tau) const = delete;
 
         //@}
         /**

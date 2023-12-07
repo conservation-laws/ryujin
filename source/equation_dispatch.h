@@ -5,7 +5,6 @@
 
 #pragma once
 
-#include "convenience_macros.h"
 #include "patterns_conversion.h"
 #include "time_loop.h"
 
@@ -13,7 +12,7 @@
 #include "euler_aeos/description.h"
 #include "navier_stokes/description.h"
 #include "scalar_conservation/description.h"
-// #include "shallow_water/description.h"
+#include "shallow_water/description.h"
 
 #include <deal.II/base/mpi.h>
 
@@ -49,6 +48,11 @@ namespace ryujin
      * on the state.
      */
     scalar_conservation,
+
+    /**
+     * The shallow water equations
+     */
+    shallow_water,
   };
 } // namespace ryujin
 
@@ -59,8 +63,7 @@ DECLARE_ENUM(ryujin::Equation,
                   {ryujin::Equation::navier_stokes, "navier stokes"},
                   {ryujin::Equation::scalar_conservation,
                    "scalar conservation"},
-                  // {ryujin::Equation::shallow_water, "shallow water"},
-                  ));
+                  {ryujin::Equation::shallow_water, "shallow water"}, ));
 #endif
 
 namespace ryujin
@@ -163,6 +166,22 @@ namespace ryujin
         } else
           __builtin_unreachable();
         break;
+      case Equation::shallow_water:
+        if (dimension_ == 1) {
+          TimeLoop<ShallowWater::Description, 1, NUMBER> time_loop(mpi_comm);
+          ParameterAcceptor::initialize(parameter_file);
+          time_loop.run();
+        } else if (dimension_ == 2) {
+          TimeLoop<ShallowWater::Description, 2, NUMBER> time_loop(mpi_comm);
+          ParameterAcceptor::initialize(parameter_file);
+          time_loop.run();
+        } else if (dimension_ == 3) {
+          TimeLoop<ShallowWater::Description, 3, NUMBER> time_loop(mpi_comm);
+          ParameterAcceptor::initialize(parameter_file);
+          time_loop.run();
+        } else
+          __builtin_unreachable();
+        break;
       default:
         __builtin_trap();
       }
@@ -250,5 +269,12 @@ namespace ryujin
         "scalar conservation", mpi_communicator, true);
     internal::create_prm_files<3, ScalarConservation::Description>(
         "scalar conservation", mpi_communicator, false);
+
+    internal::create_prm_files<1, ShallowWater::Description>(
+        "shallow water", mpi_communicator, false);
+    internal::create_prm_files<2, ShallowWater::Description>(
+        "shallow water", mpi_communicator, true);
+    internal::create_prm_files<3, ShallowWater::Description>(
+        "shallow water", mpi_communicator, false);
   }
 } // namespace ryujin

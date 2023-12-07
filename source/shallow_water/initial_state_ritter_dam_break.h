@@ -1,32 +1,38 @@
 //
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT or BSD-3-Clause
+// [LANL Copyright Statement]
 // Copyright (C) 2020 - 2023 by the ryujin authors
+// Copyright (C) 2023 - 2023 by Triad National Security, LLC
 //
 
 #pragma once
 
-#include "hyperbolic_system.h"
-#include <initial_state.h>
+#include <initial_state_library.h>
 
 namespace ryujin
 {
-  namespace ShallowWater
+  namespace ShallowWaterInitialStates
   {
     /**
      * Ritter's dam break solution. This is one-dimensional dam break without
-     * friction. See: Sec.~7.3 in @cite GuermondEtAl2018SW.
+     * friction. See Section 7.3 in @cite GuermondEtAl2018SW for details.
      *
      * @ingroup ShallowWaterEquations
      */
-    template <int dim, typename Number, typename state_type>
-    class RitterDamBreak : public InitialState<dim, Number, state_type, 1>
+    template <typename Description, int dim, typename Number>
+    class RitterDamBreak : public InitialState<Description, dim, Number>
     {
     public:
+      using HyperbolicSystem = typename Description::HyperbolicSystem;
+      using HyperbolicSystemView =
+          typename HyperbolicSystem::template View<dim, Number>;
+      using state_type = typename HyperbolicSystemView::state_type;
+
       RitterDamBreak(const HyperbolicSystem &hyperbolic_system,
                      const std::string subsection)
-          : InitialState<dim, Number, state_type, 1>("ritter dam break",
-                                                     subsection)
-          , hyperbolic_system(hyperbolic_system)
+          : InitialState<Description, dim, Number>("ritter dam break",
+                                                   subsection)
+          , hyperbolic_system_(hyperbolic_system)
       {
         dealii::ParameterAcceptor::parse_parameters_call_back.connect(
             std::bind(&RitterDamBreak::parse_parameters_callback, this));
@@ -51,8 +57,9 @@ namespace ryujin
 
       state_type compute(const dealii::Point<dim> &point, Number t) final
       {
-        const auto g = hyperbolic_system.gravity();
-        const Number x = point[0];
+        const auto g = hyperbolic_system_.gravity();
+
+        const auto x = point[0];
 
         const Number aL = std::sqrt(g * left_depth);
         const Number xA = -(t + t_initial_) * aL;
@@ -64,28 +71,21 @@ namespace ryujin
         const Number v_expansion = 2. / 3. * (x / (t + t_initial_) + aL);
 
         if (x <= xA)
-          return hyperbolic_system.template expand_state<dim>(
-              HyperbolicSystem::state_type<1, Number>{
-                  {left_depth, Number(0.)}});
+          return state_type{{left_depth, Number(0.)}};
         else if (x <= xB)
-          return hyperbolic_system.template expand_state<dim>(
-              HyperbolicSystem::state_type<1, Number>{
-                  {h_expansion, h_expansion * v_expansion}});
+          return state_type{{h_expansion, h_expansion * v_expansion}};
         else
-          return hyperbolic_system.template expand_state<dim>(
-              HyperbolicSystem::state_type<1, Number>{
-                  {Number(0.), Number(0.)}});
+          return state_type{{Number(0.), Number(0.)}};
       }
 
       /* Default bathymetry of 0 */
 
     private:
-      const HyperbolicSystem &hyperbolic_system;
+      const HyperbolicSystemView hyperbolic_system_;
 
       Number t_initial_;
-
       Number left_depth;
     };
 
-  } // namespace ShallowWater
+  } // namespace ShallowWaterInitialStates
 } // namespace ryujin

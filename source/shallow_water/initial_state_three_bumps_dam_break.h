@@ -1,31 +1,39 @@
 //
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT or BSD-3-Clause
+// [LANL Copyright Statement]
 // Copyright (C) 2020 - 2023 by the ryujin authors
+// Copyright (C) 2023 - 2023 by Triad National Security, LLC
 //
 
 #pragma once
 
 #include "hyperbolic_system.h"
-#include <initial_state.h>
+#include <initial_state_library.h>
 
 namespace ryujin
 {
-  namespace ShallowWater
+  namespace ShallowWaterInitialStates
   {
     /**
-     * Dam break with three conical islands as obstacles. See Sec.~7.8 in
-     * @cite GuermondEtAl2018SW with \f$D = [0,75m]x[0,30m]\f$.
+     * Dam break with three conical islands as obstacles.
+     * See Section 7.8 in @cite GuermondEtAl2018SW for details.
      *
      * @ingroup ShallowWaterEquations
      */
-    template <int dim, typename Number, typename state_type>
-    class ThreeBumpsDamBreak : public InitialState<dim, Number, state_type, 1>
+    template <typename Description, int dim, typename Number>
+    class ThreeBumpsDamBreak : public InitialState<Description, dim, Number>
     {
     public:
+      using HyperbolicSystem = typename Description::HyperbolicSystem;
+      using HyperbolicSystemView =
+          typename HyperbolicSystem::template View<dim, Number>;
+      using state_type = typename HyperbolicSystemView::state_type;
+
       ThreeBumpsDamBreak(const HyperbolicSystem &hyperbolic_system,
-                         const std::string s)
-          : InitialState<dim, Number, state_type, 1>("three bumps dam break", s)
-          , hyperbolic_system(hyperbolic_system)
+                         const std::string subsection)
+          : InitialState<Description, dim, Number>("three bumps dam break",
+                                                   subsection)
+          , hyperbolic_system_(hyperbolic_system)
       {
         well_balancing_validation = false;
         this->add_parameter(
@@ -59,31 +67,29 @@ namespace ryujin
         /* Initial state: */
 
         if (t <= 1.e-10 || well_balancing_validation) {
-          Number h = x < 0 ? left_depth : right_depth;
+          Number h = x < 16. ? left_depth : right_depth;
           h = std::max(h - compute_bathymetry(point), Number(0.));
-          return hyperbolic_system.template expand_state<dim>(
-              HyperbolicSystem::state_type<1, Number>{{h, Number(0.)}});
+          return state_type{{h, 0.}};
         }
 
         /* For t > 0 prescribe constant inflow Dirichlet data on the left: */
 
         const auto &h = left_depth;
-        const auto a = hyperbolic_system.speed_of_sound(
-            HyperbolicSystem ::state_type<1, Number>{{h, Number(0.)}});
-        return hyperbolic_system.template expand_state<dim>(
-            HyperbolicSystem::state_type<1, Number>{{h, h * a}});
+        const auto a =
+            hyperbolic_system_.speed_of_sound(state_type{{h, Number(0.)}});
+        return state_type{{h, h * a}};
       }
 
       auto initial_precomputations(const dealii::Point<dim> &point) ->
-          typename InitialState<dim, Number, state_type, 1>::precomputed_type
-          final
+          typename InitialState<Description, dim, Number>::
+              precomputed_state_type final
       {
         /* Compute bathymetry: */
         return {compute_bathymetry(point)};
       }
 
     private:
-      const HyperbolicSystem &hyperbolic_system;
+      const HyperbolicSystemView hyperbolic_system_;
 
       DEAL_II_ALWAYS_INLINE inline Number
       compute_bathymetry(const dealii::Point<dim> &point) const
@@ -120,5 +126,5 @@ namespace ryujin
       Number cone_magnitude;
     };
 
-  } // namespace ShallowWater
+  } // namespace ShallowWaterInitialStates
 } // namespace ryujin
