@@ -126,8 +126,8 @@ namespace ryujin
                             const Number h_star) const;
 
     public:
-      Number h_star_two_rarefaction(const primitive_type &riemann_data_i,
-                                    const primitive_type &riemann_data_j) const;
+      Number compute_h_star(const primitive_type &riemann_data_i,
+                            const primitive_type &riemann_data_j) const;
 
     protected:
       primitive_type

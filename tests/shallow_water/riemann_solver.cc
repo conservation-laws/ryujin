@@ -46,7 +46,7 @@ int main()
     const auto rd_j = riemann_data(U_j);
     std::cout << "relaxation: " << rd_i[0] << " " << rd_i[1] << std::endl;
     std::cout << "relaxation: " << rd_j[0] << " " << rd_j[1] << std::endl;
-    const auto h_star = riemann_solver.h_star_two_rarefaction(rd_i, rd_j);
+    const auto h_star = riemann_solver.compute_h_star(rd_i, rd_j);
     const auto lambda_max = riemann_solver.compute(rd_i, rd_j);
     std::cout << "lambda_max: " << lambda_max << std::endl;
     std::cout << "h_star: " << h_star << std::endl;

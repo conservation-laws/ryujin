@@ -137,6 +137,14 @@ namespace ryujin
       }
 
       /*
+       * Return early if we neither limit on kinetic energy or on square
+       * velocity.
+       */
+      if (RYUJIN_UNLIKELY(!hyperbolic_system.limiter_square_velocity() &&
+                          !hyperbolic_system.limiter_kinetic_energy()))
+        return {t_l, success};
+
+      /*
        * Limit the (negative) kinetic energy:
        *
        * See [Guermond et al, 2021] (5.10).

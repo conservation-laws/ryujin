@@ -106,7 +106,7 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
-    RiemannSolver<dim, Number>::h_star_two_rarefaction(
+    RiemannSolver<dim, Number>::compute_h_star(
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
@@ -147,12 +147,11 @@ namespace ryujin
       std::cout << "phi_value_max ->" << phi_value_max << std::endl;
 #endif
 
-
       /* We compute the three h_star quantities */
 
       Number tmp;
 
-      // h_star_left
+      /* Double rarefaction case (h_star left): */
 
       tmp = positive_part(u_i - u_j + ScalarNumber(2.) * (a_i + a_j));
       const Number h_star_left =
@@ -162,7 +161,7 @@ namespace ryujin
       std::cout << "left: " << h_star_left << std::endl;
 #endif
 
-      // h_star_middle
+      /* Double modified shock (h_star middle): */
 
       tmp = Number(1.) + sqrt_two * (u_i - u_j) / (a_min + a_max);
       const Number h_star_middle = std::sqrt(h_min * h_max) * tmp;
@@ -171,7 +170,7 @@ namespace ryujin
       std::cout << "middle: " << h_star_middle << std::endl;
 #endif
 
-      // h_star_right
+      /* Expansion and modified shock (h_star right): */
 
       const auto left_radicand =
           ScalarNumber(3.) * h_min +
@@ -208,8 +207,7 @@ namespace ryujin
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
-      const Number h_star =
-          h_star_two_rarefaction(riemann_data_i, riemann_data_j);
+      const Number h_star = compute_h_star(riemann_data_i, riemann_data_j);
 
       const Number lambda_max =
           compute_lambda(riemann_data_i, riemann_data_j, h_star);
