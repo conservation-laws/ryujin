@@ -270,9 +270,9 @@ namespace ryujin
         U = initial_values_.interpolate();
 #ifdef DEBUG
         /* Poison constrained degrees of freedom: */
-        const unsigned int n_relevant = offline_data_.n_locally_relevant();
+        const unsigned int n_owned = offline_data_.n_locally_owned();
         const auto &partitioner = offline_data_.scalar_partitioner();
-        for (unsigned int i = 0; i < n_relevant; ++i) {
+        for (unsigned int i = 0; i < n_owned; ++i) {
           if (offline_data_.affine_constraints().is_constrained(
                   partitioner->local_to_global(i)))
             U.write_tensor(dealii::Tensor<1, dim + 2, Number>() *
