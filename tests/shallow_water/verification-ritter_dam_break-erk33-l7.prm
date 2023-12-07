@@ -1,0 +1,78 @@
+##
+#
+# Shallow water benchmark:
+#
+# Ritter's 1D dam break solution without friciton is a one-dimensional
+# analytical solution. See Section 7.3 in [1]
+#
+# This configuration uses an explicit ERK(3, 3, 1) timestepping. Expected
+# results are reported in shallow_water_ritter_dam_break-erk33.baseline
+#
+# [1] Well-Balanced Second-Order Finite Element Approximation of the
+#     Shallow Water Equations with Friction, Jean-Luc Guermond et al., Vol.
+#     40(6), 2018
+#
+##
+
+subsection A - TimeLoop
+  set basename             = ritter_dam_break-erk33
+
+  set enable output full   = true
+
+  set enable compute error = true
+  set error normalize      = true
+  set error quantities     = h
+
+  set final time           = 6.0
+  set output granularity   = 6.0
+
+  set terminal update interval  = 0
+end
+
+subsection B - Equation
+  set dimension                    = 1
+  set equation                     = shallow water
+
+  set gravity                      = 9.81
+  set manning friction coefficient = 0
+
+  set limiter kinetic energy       = true
+  set limiter square velocity      = false
+
+  set reference water depth        = 0.005
+  set dry state relaxation factor  = 1.0e-3
+  set dry state relaxation small   = 1e2
+  set dry state relaxation large   = 1e4
+end
+
+subsection C - Discretization
+  set geometry            = rectangular domain
+  set mesh refinement     = 7
+
+  subsection rectangular domain
+    set boundary condition left   = dirichlet
+    set boundary condition right  = dirichlet
+
+    set position bottom left      = 0
+    set position top right        = 10
+    set subdivisions x            = 25
+  end
+end
+
+subsection E - InitialValues
+  set configuration = ritter dam break
+  set direction     = 1
+  set position      = 5
+
+  subsection ritter dam break
+    set time initial = 1
+    set left water depth = 0.005
+  end
+end
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.5
+  set cfl max               = 0.5
+  set cfl recovery strategy = none
+  set time stepping scheme  = erk 33
+end

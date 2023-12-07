@@ -120,14 +120,14 @@ namespace ryujin
       const Number h_max = std::max(h_i, h_j);
 
 #ifdef DEBUG_RIEMANN_SOLVER
-      std::cout << h_min << "<- h_min/max ->" << h_max << std::endl;
+      std::cout << h_min << "  <- h_min/max ->  " << h_max << std::endl;
 #endif
 
       const Number a_min = std::sqrt(gravity * h_min);
       const Number a_max = std::sqrt(gravity * h_max);
 
 #ifdef DEBUG_RIEMANN_SOLVER
-      std::cout << a_min << "<- a_min/max ->" << a_max << std::endl;
+      std::cout << a_min << "  <- a_min/max ->  " << a_max << std::endl;
 #endif
 
       const Number sqrt_two = std::sqrt(ScalarNumber(2.));

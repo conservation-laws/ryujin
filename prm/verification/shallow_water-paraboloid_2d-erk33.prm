@@ -1,0 +1,79 @@
+##
+#
+# Shallow water benchmark:
+#
+# A 2D benchmark configuration consisting of a planar surface flow in a
+# radially-symmetric paraboloid basin without friction. See Section 4.2.2
+# of [1] for details.
+#
+# This configuration uses an explicit ERK(3, 3, 1) timestepping. Expected
+# results are reported in shallow_water-paraboloid_2d-erk33.baseline
+#
+# [1] SWASHES: a compilation of shallow water analytic solutions for
+#     hydraulic and environmental studies, Olivier Delestre, et al.,
+#     International Journal for Numerical Methods in Fluids, Vol. 72(3), 2013
+#
+##
+
+subsection A - TimeLoop
+  set basename             = paraboloid_2d-erk33
+
+  set enable output full   = true
+
+  set enable compute error = true
+  set error normalize      = true
+  set error quantities     = h
+
+  set final time           = 13.45710440
+  set output granularity   = 13.45710440
+end
+
+subsection B - Equation
+  set dimension                    = 2
+  set equation                     = shallow water
+
+  set gravity                      = 9.81
+  set manning friction coefficient = 0
+
+  set limiter kinetic energy       = false
+  set limiter square velocity      = true
+
+  set reference water depth        = 0.1
+  set dry state relaxation factor  = 0
+  set dry state relaxation small   = 1e2
+  set dry state relaxation large   = 1e4
+end
+
+subsection C - Discretization
+  set geometry            = rectangular domain
+  set mesh refinement     = 8
+
+  subsection rectangular domain
+    set boundary condition bottom = do_nothing
+    set boundary condition left   = do_nothing
+    set boundary condition right  = do_nothing
+    set boundary condition top    = do_nothing
+
+    set position bottom left      = 0, 0
+    set position top right        = 4, 4
+  end
+end
+
+subsection E - InitialValues
+  set configuration = paraboloid
+  set position      = 2, 2
+  set direction     = 1, 0
+
+  subsection paraboloid
+    set eta                 = 0.5
+    set free surface radius = 1
+    set water height        = 0.1
+  end
+end
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.50
+  set cfl max               = 0.50
+  set cfl recovery strategy = none
+  set time stepping scheme  = erk 33
+end

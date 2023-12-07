@@ -125,9 +125,11 @@ namespace ryujin
                             const primitive_type &riemann_data_j,
                             const Number h_star) const;
 
+    public:
       Number h_star_two_rarefaction(const primitive_type &riemann_data_i,
                                     const primitive_type &riemann_data_j) const;
 
+    protected:
       primitive_type
       riemann_data_from_state(const state_type &U,
                               const dealii::Tensor<1, dim, Number> &n_ij) const;

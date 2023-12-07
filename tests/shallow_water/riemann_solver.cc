@@ -1,5 +1,9 @@
+// force distinct symbols in test
+#define ShallowWater ShallowWaterTest
+
 #include <hyperbolic_system.h>
 #include <multicomponent_vector.h>
+#define DEBUG_RIEMANN_SOLVER
 #include <riemann_solver.h>
 #include <riemann_solver.template.h>
 #include <simd.h>
@@ -13,17 +17,17 @@ int main()
   constexpr int dim = 1;
 
   HyperbolicSystem hyperbolic_system;
-  const double gravity = hyperbolic_system.gravity();
+  const double gravity = hyperbolic_system.view<dim, double>().gravity();
 
   static constexpr unsigned int n_precomputed_values =
-      HyperbolicSystem::n_precomputed_values<dim>;
+      HyperbolicSystem::View<dim, double>::n_precomputed_values;
   using precomputed_type = MultiComponentVector<double, n_precomputed_values>;
   precomputed_type dummy;
 
   RiemannSolver<dim> riemann_solver(hyperbolic_system, dummy);
 
   const auto riemann_data = [&](const auto &state) {
-    const auto h = hyperbolic_system.water_depth_sharp(
+    const auto h = hyperbolic_system.view<dim, double>().water_depth_sharp(
         dealii::Tensor<1, 2, double>{{state[0], state[1]}});
     const double u = state[1] / h;
 
@@ -52,13 +56,15 @@ int main()
   std::cout << std::setprecision(16);
   std::cout << std::scientific;
 
+  const auto view = hyperbolic_system.view<dim, double>();
+
   std::cout << "gravity:                      " << gravity << std::endl;
-  std::cout << "reference_water_depth:        "
-            << hyperbolic_system.reference_water_depth() << std::endl;
-  std::cout << "dry_state_relaxation (sharp): "
-            << hyperbolic_system.dry_state_relaxation_mollified() << std::endl;
-  std::cout << "dry_state_relaxation (molli): "
-            << hyperbolic_system.dry_state_relaxation_sharp() << std::endl;
+  std::cout << "reference_water_depth:        " << view.reference_water_depth()
+            << std::endl;
+  std::cout << "dry_state_relaxation (small): "
+            << view.dry_state_relaxation_small() << std::endl;
+  std::cout << "dry_state_relaxation (large): "
+            << view.dry_state_relaxation_large() << std::endl;
   std::cout << std::endl;
 
   // 10/04/2022 verified against Mathematica computation (Eric + Matthias)

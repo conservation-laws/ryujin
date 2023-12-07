@@ -1,0 +1,78 @@
+##
+#
+# Shallow water benchmark:
+#
+# The smooth vortex is an analytic solution of the shallow water equations.
+# We compute the vortex on the square [-5, 5]^2 initially centered at
+# (-1,-1) with a strength of beta=5, and moving in diagonal (1,1) direction
+# with mach number 1. At final time t=2 the vortex is located at (1, 1). We
+# report the final, normalized L1, L2, L\infty error norms summed up over
+# all components.
+#
+# This configuration uses an explicit ERK(3, 3, 1) timestepping.
+# Expected results are reported in euler-isentropic_vortex-erk33.baseline
+#
+##
+
+subsection A - TimeLoop
+  set basename             = smooth_vortex-erk33
+
+  set enable output full   = true
+
+  set enable compute error = true
+  set error normalize      = true
+  set error quantities     = h, m_1, m_2
+
+  set final time           = 2.0
+  set output granularity   = 2.0
+end
+
+subsection B - Equation
+  set dimension                    = 2
+  set equation                     = shallow water
+
+  set gravity                      = 9.81
+  set manning friction coefficient = 0
+
+  set limiter kinetic energy       = false
+  set limiter square velocity      = true
+
+  set reference water depth        = 2
+  set dry state relaxation factor  = 0
+  set dry state relaxation small   = 1e2
+  set dry state relaxation large   = 1e4
+end
+
+subsection C - Discretization
+  set geometry            = rectangular domain
+  set mesh refinement     = 8
+
+  subsection rectangular domain
+    set boundary condition bottom = dirichlet
+    set boundary condition left   = dirichlet
+    set boundary condition right  = dirichlet
+    set boundary condition top    = dirichlet
+
+    set position bottom left      = -6, -6
+    set position top right        =  6,  6
+  end
+end
+
+subsection E - InitialValues
+  set configuration = smooth vortex
+  set direction     =  1,  1
+  set position      = -1, -1
+
+  subsection smooth vortex
+    set beta            = 2
+    set mach number     = 1
+    set reference depth = 2
+  end
+end
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.25
+  set cfl max               = 0.25
+  set cfl recovery strategy = none
+  set time stepping scheme  = erk 33
+end
