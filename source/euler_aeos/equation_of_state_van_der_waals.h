@@ -32,9 +32,16 @@ namespace ryujin
         this->add_parameter(
             "covolume b", b_, "The maximum compressibility constant");
 
+        /*
+         * R is the specific gas constant with units [J / (Kg K)]. More details
+         * can be found at:
+         * https://en.wikipedia.org/wiki/Gas_constant#Specific_gas_constant
+         */
         R_ = 0.4;
         this->add_parameter(
             "gas constant R", R_, "The specific gas constant R");
+
+        cv_ = R_ / (gamma_ - 1.);
 
         /* Update the interpolation_b_ parameter on parameter read in: */
         ParameterAcceptor::parse_parameters_call_back.connect(
@@ -79,7 +86,7 @@ namespace ryujin
        */
       double temperature(double rho, double e) const final
       {
-        return (gamma_ - 1.) / R_ * (e + a_ * rho);
+        return (e + a_ * rho) / cv_;
       }
 
       /**
@@ -101,6 +108,7 @@ namespace ryujin
       double b_;
       double a_;
       double R_;
+      double cv_;
     };
   } // namespace EquationOfStateLibrary
 } /* namespace ryujin */

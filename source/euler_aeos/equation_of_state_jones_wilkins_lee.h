@@ -15,6 +15,7 @@ namespace ryujin
      * The Jones-Wilkins-Lee equation of state. See (16a) in:
      * "JWL Equation of State" by Ralph Menikoff (LA-UR-15-29536). We are
      * assuming that the reference temperature T_r is chosen such that E_r = 0.
+     * Default parameters taken from Table 1 in reference.
      *
      * @ingroup EulerEquations
      */
@@ -24,28 +25,28 @@ namespace ryujin
       JonesWilkinsLee(const std::string &subsection)
           : EquationOfState("jones wilkins lee", subsection)
       {
-        capA = 0.0;
+        capA = 6.3207e13; // [Pa]
         this->add_parameter("A", capA, "The A constant");
 
-        capB = 0.0;
+        capB = -4.472e9; // [Pa]
         this->add_parameter("B", capB, "The B constant");
 
-        R1 = 1.0;
+        R1 = 11.3; // [unitless]
         this->add_parameter("R1", R1, "The R1 constant");
 
-        R2 = 1.0;
+        R2 = 1.13; // [unitless]
         this->add_parameter("R2", R2, "The R2 constant");
 
-        omega = 0.4;
+        omega = 0.8938; // [unitless]
         this->add_parameter("omega", omega, "The Gruneisen coefficient");
 
-        rho_0 = 1.0;
+        rho_0 = 1895; // [Kg / m^3]
         this->add_parameter("rho_0", rho_0, "The reference density");
 
-        q_0 = 0.0;
+        q_0 = 0.0; // [J / Kg]
         this->add_parameter("q_0", q_0, "The specific internal energy offset");
 
-        cv_ = 718.;
+        cv_ = 2487. / rho_0; // [J / (Kg * K)]
         this->add_parameter(
             "c_v", cv_, "The specific heat capacity at constant volume");
       }
