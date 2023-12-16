@@ -131,23 +131,26 @@ int main()
   }
   test(van_der_waals);
 
-  std::cout << "\nJonesWilkinsLee with omega=1.4, A=0, B=0" << std::endl;
+  std::cout << "\nJonesWilkinsLee with omega=0.8938, A=6.3207e13, B=-4.472e9, "
+               "R1=11.3, R2=1.13, rho_0=1895, q_0=0"
+            << std::endl;
   JonesWilkinsLee jones_wilkins_lee("");
   test(jones_wilkins_lee);
 
-  std::cout << "\nJonesWilkinsLee with omega=0.8938, A=6.321e3, B=-4.472, "
-               "R1=11.3, R2=1.13, rho_0=1.0, q_0=0.0"
+  std::cout << "\nJonesWilkinsLee with omega=0.4, A=0, B=0, "
+               "R1=1, R2=1, rho_0=1, q_0=0, c_v=1"
             << std::endl;
   {
     std::stringstream parameters;
     parameters << "subsection jones wilkins lee\n"
-               << "set A = 6.321e3\n"
-               << "set B = -4.472\n"
-               << "set R1 = 11.3\n"
-               << "set R2 = 1.13\n"
-               << "set omega = 0.8938\n"
-               << "set rho_0 = 1.0\n"
-               << "set q_0 = 0.0\n"
+               << "set A     = 0\n"
+               << "set B     = 0\n"
+               << "set R1    = 1\n"
+               << "set R2    = 1\n"
+               << "set omega = 0.4\n"
+               << "set rho_0 = 1\n"
+               << "set q_0   = 0\n"
+               << "set c_v   = 1\n"
                << "end\n"
                << std::endl;
     ParameterAcceptor::initialize(parameters);

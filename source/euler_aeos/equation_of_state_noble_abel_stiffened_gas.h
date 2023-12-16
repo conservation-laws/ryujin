@@ -25,9 +25,16 @@ namespace ryujin
         gamma_ = 7. / 5.;
         this->add_parameter("gamma", gamma_, "The ratio of specific heats");
 
-        cv_ = 718.;
+        /*
+         * R is the specific gas constant with units [J / (Kg K)]. More details
+         * can be found at:
+         * https://en.wikipedia.org/wiki/Gas_constant#Specific_gas_constant
+         */
+        R_ = 287.052874;
         this->add_parameter(
-            "c_v", cv_, "The specific heat capacity at constant volume");
+            "gas constant R", R_, "The specific gas constant R");
+
+        cv_ = R_ / (gamma_ - 1.);
 
         b_ = 0.;
         this->add_parameter(
@@ -102,6 +109,7 @@ namespace ryujin
 
     private:
       double gamma_;
+      double R_;
       double cv_;
       double b_;
       double q_;
