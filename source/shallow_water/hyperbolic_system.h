@@ -989,6 +989,16 @@ namespace ryujin
       if (id == Boundary::dirichlet) {
         result = get_dirichlet_data();
 
+      } else if (id == Boundary::discharge_only) {
+        /*
+         * For some benchmarks for the Shallow Water Equations, only the
+         * discharge (i.e., momentum) is enforced. We "do nothing" for the water
+         * depth.
+         */
+        auto m_dir = momentum(get_dirichlet_data());
+        for (unsigned int k = 0; k < dim; ++k)
+          result[k + 1] = m_dir[k];
+
       } else if (id == Boundary::slip) {
         auto m = momentum(U);
         m -= 1. * (m * normal) * normal;

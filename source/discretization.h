@@ -90,7 +90,7 @@ namespace ryujin
      * InitialData::initial_state(). Such Dirichlet conditions can only be
      * meaningfully enforced as inflow conditions, i.e., the velocity
      * vector associated with a Dirichlet boundary degree of freedom has to
-     * point into the computational domain, and no "backward travelling"
+     * point into the computational domain, and no "backward traveling"
      * shock front or other flow feature must reach a Dirichlet boundary
      * degree of freedom during the computation.
      */
@@ -103,6 +103,14 @@ namespace ryujin
      * is inflow. Otherwise we do nothing.
      */
     dynamic = 5,
+
+    /**
+     * For the Shallow Water Equations: On degrees of freedom marked as
+     * "discharge only" boundary, we reset only the momentum of the degree of
+     * freedom to the value of InitialData::initial_state(). Such
+     * conditions are used in many steady state problems with inflow conditions.
+     */
+    discharge_only = 6
   };
 } // namespace ryujin
 
@@ -113,7 +121,8 @@ DECLARE_ENUM(ryujin::Boundary,
                   {ryujin::Boundary::slip, "slip"},
                   {ryujin::Boundary::no_slip, "no_slip"},
                   {ryujin::Boundary::dirichlet, "dirichlet"},
-                  {ryujin::Boundary::dynamic, "dynamic"}));
+                  {ryujin::Boundary::dynamic, "dynamic"},
+                  {ryujin::Boundary::discharge_only, "discharge only"}));
 #endif
 
 namespace ryujin
