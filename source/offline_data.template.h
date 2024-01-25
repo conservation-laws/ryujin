@@ -205,7 +205,7 @@ namespace ryujin
      * A small lambda to check for stride-level consistency of the internal
      * index range:
      */
-    const auto consistent_stride_range = [&]() {
+    const auto consistent_stride_range [[maybe_unused]] = [&]() {
       constexpr auto group_size = VectorizedArray<Number>::size();
       const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
       const auto offset = n_locally_owned_ != 0 ? *locally_owned.begin() : 0;
@@ -230,6 +230,16 @@ namespace ryujin
 
     create_constraints_and_sparsity_pattern();
 
+    const auto mpi_allreduce_logical_or = [&](const bool local_value) {
+      std::function<bool(const bool &, const bool &)> comparator =
+          [](const bool &left, const bool &right) -> bool {
+        return left || right;
+      };
+
+      return Utilities::MPI::all_reduce(
+          local_value, mpi_communicator_, comparator);
+    };
+
     /*
      * We have to ensure that the locally internal numbering range is still
      * consistent, meaning that all strides have the same stencil size.
@@ -238,25 +248,11 @@ namespace ryujin
      * node constraints). Therefore, the following little dance:
      */
 
-    if (affine_constraints_.n_constraints() > 0) {
-      bool locally_inconsistent = false;
+    if (mpi_allreduce_logical_or(affine_constraints_.n_constraints() > 0)) {
 
 #if DEAL_II_VERSION_GTE(9, 5, 0)
-      locally_inconsistent = consistent_stride_range() != n_locally_internal_;
-
-      /*
-       * TODO: complain that I cannot feed the lambda directly into the
-       * all_reduce function.
-       */
-      std::function<bool(const bool &, const bool &)> comparator =
-          [](const bool &left, const bool &right) -> bool {
-        return left || right;
-      };
-      locally_inconsistent = Utilities::MPI::all_reduce(
-          locally_inconsistent, mpi_communicator_, comparator);
-#endif
-
-      if (locally_inconsistent) {
+      if (mpi_allreduce_logical_or( //
+              consistent_stride_range() != n_locally_internal_)) {
         /*
          * In this case we try to fix up the numbering by pushing affected
          * strides to the end and slightly lowering the n_locally_internal_
@@ -270,6 +266,7 @@ namespace ryujin
         create_constraints_and_sparsity_pattern();
         n_locally_internal_ = consistent_stride_range();
       }
+#endif
     }
 
     /*
