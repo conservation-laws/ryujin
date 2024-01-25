@@ -50,8 +50,9 @@ namespace ryujin
 
         /* Initial left and right states (rho, u, p): */
         using state_type_1d = std::array<Number, 3>;
-        constexpr state_type_1d primitive_left{1., 0., 2. / 3. * 1.e-1};
-        constexpr state_type_1d primitive_right{1.e-3, 0., 2. / 3. * 1.e-10};
+        constexpr state_type_1d primitive_left{1., 0., Number(2. / 3. * 1.e-1)};
+        constexpr state_type_1d primitive_right{
+            1.e-3, 0., Number(2. / 3. * 1.e-10)};
 
         /* The intermediate wave-speeds appearing on the Riemann fan: */
         constexpr Number rarefaction_speed = 0.49578489518897934;
