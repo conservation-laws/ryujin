@@ -103,6 +103,7 @@ namespace ryujin
     first_cycle_ = true;
 
     const unsigned int n_owned = offline_data_->n_locally_owned();
+    const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
 
     /*
      * Create interior maps and allocate statistics.
@@ -115,7 +116,7 @@ namespace ryujin
         interior_manifolds_.begin(),
         interior_manifolds_.end(),
         std::inserter(interior_maps_, interior_maps_.end()),
-        [this, n_owned](auto it) {
+        [this, n_owned, &sparsity_simd](auto it) {
           const auto &[name, expression, option] = it;
           FunctionParser<dim> level_set_function(expression);
 
@@ -161,6 +162,11 @@ namespace ryujin
                   offline_data_->scalar_partitioner()->global_to_local(
                       global_index);
 
+              /* Skip constrained degrees of freedom: */
+              const unsigned int row_length = sparsity_simd.row_length(index);
+              if (row_length == 1)
+                continue;
+
               if (index >= n_owned)
                 continue;
 
@@ -183,7 +189,6 @@ namespace ryujin
         });
 
     /* Output interior maps: */
-
 
     for (const auto &[name, interior_map] : interior_maps_) {
       /* Skip outputting the boundary map for spatial averages. */

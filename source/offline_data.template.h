@@ -163,8 +163,12 @@ namespace ryujin
     DoFRenumbering::Cuthill_McKee(dof_handler);
 
     /*
-     * Reorder all export indices at the beginning of the locally_internal index
-     * range to achieve a better packging:
+     * Reorder all (individual) export indices at the beginning of the
+     * locally_internal index range to achieve a better packing:
+     *
+     * Note: This function might miss export indices that come from
+     * eliminating hanging node and periodicity constraints (which we do
+     * not know at this point because they depend on the renumbering...).
      */
     DoFRenumbering::export_indices_first(
         dof_handler, mpi_communicator_, n_locally_owned_, 1);
@@ -185,6 +189,11 @@ namespace ryujin
      * export indices to the start of the index range. This reordering
      * preserves the binning introduced by
      * DoFRenumbering::internal_range().
+     *
+     * Note: This function might miss export indices that come from
+     * eliminating hanging node and periodicity constraints (which we do
+     * not know at this point because they depend on the renumbering...).
+     * We therefore have to update n_export_indices_ later again.
      */
     n_export_indices_ =
         DoFRenumbering::export_indices_first(dof_handler,
@@ -196,7 +205,7 @@ namespace ryujin
      * A small lambda to check for stride-level consistency of the internal
      * index range:
      */
-    const auto consistent_stride_range = [&]() {
+    const auto consistent_stride_range [[maybe_unused]] = [&]() {
       constexpr auto group_size = VectorizedArray<Number>::size();
       const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
       const auto offset = n_locally_owned_ != 0 ? *locally_owned.begin() : 0;
@@ -219,33 +228,31 @@ namespace ryujin
      * Create final sparsity pattern:
      */
 
-    const auto &periodic_faces =
-        discretization_->triangulation().get_periodic_face_map();
-    if (periodic_faces.size() > 0) {
-      /*
-       * Workaround: The elimination procedure for periodically constrained
-       * degrees of freedom is unfortunately not terribly stable. It might
-       * happen that we end up with an inconsistent local range.
-       */
-      create_constraints_and_sparsity_pattern();
-      bool locally_inconsistent = false;
+    create_constraints_and_sparsity_pattern();
 
-#if DEAL_II_VERSION_GTE(9, 5, 0)
-      locally_inconsistent = consistent_stride_range() != n_locally_internal_;
-
-      /*
-       * TODO: complain that I cannot feed the lambda directly into the
-       * all_reduce function.
-       */
+    const auto mpi_allreduce_logical_or = [&](const bool local_value) {
       std::function<bool(const bool &, const bool &)> comparator =
           [](const bool &left, const bool &right) -> bool {
         return left || right;
       };
-      locally_inconsistent = Utilities::MPI::all_reduce(
-          locally_inconsistent, mpi_communicator_, comparator);
-#endif
 
-      if (locally_inconsistent) {
+      return Utilities::MPI::all_reduce(
+          local_value, mpi_communicator_, comparator);
+    };
+
+    /*
+     * We have to ensure that the locally internal numbering range is still
+     * consistent, meaning that all strides have the same stencil size.
+     * This property might not hold any more after the elimination
+     * procedure of constrained degrees of freedom (periodicity, or hanging
+     * node constraints). Therefore, the following little dance:
+     */
+
+    if (mpi_allreduce_logical_or(affine_constraints_.n_constraints() > 0)) {
+
+#if DEAL_II_VERSION_GTE(9, 5, 0)
+      if (mpi_allreduce_logical_or( //
+              consistent_stride_range() != n_locally_internal_)) {
         /*
          * In this case we try to fix up the numbering by pushing affected
          * strides to the end and slightly lowering the n_locally_internal_
@@ -259,20 +266,16 @@ namespace ryujin
         create_constraints_and_sparsity_pattern();
         n_locally_internal_ = consistent_stride_range();
       }
-
-    } else {
-
-      create_constraints_and_sparsity_pattern();
-#ifdef DEBUG
-      /*
-       * Check that after all the dof manipulation and setup we still end up
-       * with indices in [0, locally_internal) that have uniform stencil size
-       * within a stride.
-       */
-      Assert(consistent_stride_range() == n_locally_internal_,
-             dealii::ExcInternalError());
 #endif
     }
+
+    /*
+     * Check that after all the dof manipulation and setup we still end up
+     * with indices in [0, locally_internal) that have uniform stencil size
+     * within a stride.
+     */
+    Assert(consistent_stride_range() == n_locally_internal_,
+           dealii::ExcInternalError());
 
     /*
      * Set up partitioner:
@@ -305,11 +308,15 @@ namespace ryujin
     vector_partitioner_ =
         create_vector_partitioner(scalar_partitioner_, problem_dimension);
 
-
-    if (periodic_faces.size() > 0) {
+    /*
+     * After elminiating periodicity and hanging node constraints we need
+     * to update n_export_indices_ again. This happens because we need to
+     * call export_indices_first() with incomplete information (missing
+     * eliminated degrees of freedom).
+     */
+    if (affine_constraints_.n_constraints() > 0) {
       /*
-       * In case of periodic boundary conditions we might need to update
-       * n_export_indices_ again - just do it unconiditionally
+       * Recalculate n_export_indices_:
        */
       n_export_indices_ = 0;
       for (const auto &it : scalar_partitioner_->import_indices())
@@ -319,19 +326,18 @@ namespace ryujin
       constexpr auto simd_length = VectorizedArray<Number>::size();
       n_export_indices_ =
           (n_export_indices_ + simd_length - 1) / simd_length * simd_length;
-      Assert(n_export_indices_ <= n_locally_internal_, ExcInternalError());
-#ifdef DEBUG
-    } else {
-      /* Check that n_export_indices_ is valid: */
-      unsigned int control = 0;
-      for (const auto &it : scalar_partitioner_->import_indices())
-        if (it.second <= n_locally_internal_)
-          control = std::max(control, it.second);
-
-      Assert(control <= n_export_indices_, ExcInternalError());
-      Assert(n_export_indices_ <= n_locally_internal_, ExcInternalError());
-#endif
     }
+
+#ifdef DEBUG
+    /* Check that n_export_indices_ is valid: */
+    unsigned int control = 0;
+    for (const auto &it : scalar_partitioner_->import_indices())
+      if (it.second <= n_locally_internal_)
+        control = std::max(control, it.second);
+
+    Assert(control <= n_export_indices_, ExcInternalError());
+    Assert(n_export_indices_ <= n_locally_internal_, ExcInternalError());
+#endif
 
     /*
      * Set up SIMD sparsity pattern in local numbering. Nota bene: The
