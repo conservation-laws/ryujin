@@ -106,11 +106,11 @@ namespace ryujin
 
     /**
      * For the Shallow Water Equations: On degrees of freedom marked as
-     * "discharge only" boundary, we reset only the momentum of the degree of
-     * freedom to the value of InitialData::initial_state(). Such
-     * conditions are used in many steady state problems with inflow conditions.
+     * "dirichlet momentum" boundary, we reset only the momentum of the degree
+     * of freedom to the value of InitialData::initial_state(). Such conditions
+     * are used in many steady state problems with inflow conditions.
      */
-    discharge_only = 6
+    dirichlet_momentum = 6
   };
 } // namespace ryujin
 
@@ -122,7 +122,8 @@ DECLARE_ENUM(ryujin::Boundary,
                   {ryujin::Boundary::no_slip, "no_slip"},
                   {ryujin::Boundary::dirichlet, "dirichlet"},
                   {ryujin::Boundary::dynamic, "dynamic"},
-                  {ryujin::Boundary::discharge_only, "discharge only"}));
+                  {ryujin::Boundary::dirichlet_momentum,
+                   "dirichlet momentum"}));
 #endif
 
 namespace ryujin

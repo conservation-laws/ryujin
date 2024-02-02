@@ -4,7 +4,7 @@
 #
 # The geometry is the rectangle [0, 6.0078m] x [-0.12,0.12m] which are the 
 # direct measurements of the wave flume from the experiment. 
-# On the left, "discharge only" inflow conditions are encforced
+# On the left, "dirichlet moment" inflow conditions are encforced
 # and on the right outflow boundary, we enforce "dynamic" conditions.
 # On all other boundaries (top and bottom boundary of the flume) slip boundary 
 # conditions are enforced.
@@ -62,7 +62,7 @@ subsection C - Discretization
   # Used for steady inflow configurations
   subsection rectangular domain
     set boundary condition bottom = slip
-    set boundary condition left   = discharge only
+    set boundary condition left   = dirichlet momentum
     set boundary condition right  = dynamic
     set boundary condition top    = slip
     set position bottom left      = 0,      -0.12
