@@ -10,6 +10,7 @@
 #include "geometry_cylinder.h"
 #include "geometry_rectangular_domain.h"
 #include "geometry_step.h"
+#include "geometry_tank.h"
 #include "geometry_wall.h"
 
 namespace ryujin
@@ -41,6 +42,7 @@ namespace ryujin
       add(std::make_unique<RectangularDomain<dim>>(subsection));
       add(std::make_unique<Airfoil<dim>>(subsection));
       add(std::make_unique<Annulus<dim>>(subsection));
+      add(std::make_unique<WaveTank<dim>>(subsection));
     }
   } /* namespace Geometries */
 } /* namespace ryujin */

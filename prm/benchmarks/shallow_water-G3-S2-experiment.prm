@@ -1,0 +1,121 @@
+##
+#
+# "G2-S2" experiment reproduced from [1]
+#
+# The geometry is the rectangle [0, 6.0078m] x [-0.12,0.12m] which are the 
+# direct measurements of the wave flume from the experiment. 
+# On the left, "dirichlet moment" inflow conditions are encforced
+# and on the right outflow boundary, we enforce "dynamic" conditions.
+# On all other boundaries (top and bottom boundary of the flume) slip boundary 
+# conditions are enforced.
+#
+# The chosen refinement level 3 corresponds to around 928,137 degrees of 
+# freedom, which requires around 39k time steps and runs
+# for about 0.5h with 128 ranks / 2 threads on a modern system.
+#
+# The final time is set to t = 50.0 and we output a vtk every δt = 10s. For
+# postprocessing the simulation into a nice video set the output frequency
+# to δt = = 0.1.
+#
+# [1] Martínez-Aranda, S., et al. "Towards transient experimental water 
+# surfaces: A new benchmark dataset for 2D shallow water solvers." 
+# Advances in water resources 121 (2018): 130-149.
+#
+##
+
+subsection A - TimeLoop
+  set basename                      = output-G2-S2
+  set final time                    = 50
+
+  set enable output full            = true
+  set output granularity            = 0.1
+  set output full multiplier        = 100 # Change to 1 for nice movie
+
+  set enable compute quantities     = true
+  set output quantities multiplier  = 100 
+
+  set terminal show rank throughput = true
+  set terminal update interval      = 5
+end
+
+subsection B - Equation
+  set dimension                    = 2
+  set equation                     = shallow water
+  set limiter square velocity      = true
+
+  set reference water depth        = 1
+  set dry state relaxation large   = 1e4
+  set dry state relaxation small   = 1e4
+
+  set gravity                      = 9.81
+  set manning friction coefficient = 0.01
+end
+
+subsection C - Discretization
+  set geometry            = rectangular domain
+  # refinement 0 -  15050 DOFs
+  # refinement 1 -  58947 DOFs
+  # refinement 2 - 233285 DOFs
+  # refinement 3 - 928137 DOFs
+  set mesh refinement     = 3
+
+  # Used for steady inflow configurations
+  subsection rectangular domain
+    set boundary condition bottom = slip
+    set boundary condition left   = dirichlet momentum
+    set boundary condition right  = dynamic
+    set boundary condition top    = slip
+    set position bottom left      = 0,      -0.12
+    set position top right        = 6.0078, 0.12
+    set subdivisions x            = 601
+    set subdivisions y            = 24
+  end
+end
+
+subsection E - InitialValues
+  set configuration = transient experiments
+  set direction     = 1, 0
+  set position      = 0, 0
+
+  subsection transient experiments 
+  # Need to divide Q by .24m which is width of chanel and convert h->s
+  # G2 test cases -- S.1, Q = 5.05 m^3 / h -> q = 0.00585 m^2 / s
+  #               -- S.2, Q = 9.01 m^3 / h -> q = 0.0104 m^2 / s
+  #               -- D.1, h0 = 0.13m
+  set experimental configuration  = G2
+    # note that the depth value does not matter
+    set flow state left           = 0.1, 0.0104  
+    set flow state right          = 0,     0
+  end 
+end
+
+subsection F - HyperbolicModule
+  set cfl with boundary dofs        = false
+  set indicator evc factor          = 1
+  set limiter iterations            = 2
+  set limiter newton max iterations = 2
+  set limiter newton tolerance      = 1e-10
+  set limiter relaxation factor     = 2
+end
+
+subsection H - TimeIntegrator
+  set cfl max               = 0.9
+  set cfl min               = 0.45
+  set cfl recovery strategy = bang bang control
+  set time stepping scheme  = erk 43
+end
+
+subsection I - VTUOutput
+  set manifolds                  = 
+  set schlieren beta             = 10
+  set schlieren quantities       = h
+  set schlieren recompute bounds = true
+  set use mpi io                 = true
+  set vtu output quantities      = h, m_1, m_2, bathymetry, alpha, v_1
+end
+
+subsection J - Quantities
+  set clear statistics on writeout = true
+  set interior manifolds = lineout-x : x - 2.40 : instantaneous, \
+                           lineout-y : y - 0.   : instantaneous  
+end
