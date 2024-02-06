@@ -50,11 +50,11 @@ namespace ryujin
       time_stepping_scheme_ = TimeSteppingScheme::erk_33;
     else
       time_stepping_scheme_ = TimeSteppingScheme::strang_erk_33_cn;
-    add_parameter(
-        "time stepping scheme",
-        time_stepping_scheme_,
-        "Time stepping scheme: ssprk 33, erk 11, erk 22, erk 33, erk 43, erk "
-        "54, strang ssprk 33 cn, strang erk 33 cn, strang erk 43 cn");
+    add_parameter("time stepping scheme",
+                  time_stepping_scheme_,
+                  "Time stepping scheme: ssprk 22, ssprk 33, erk 11, erk 22, "
+                  "erk 33, erk 43, erk "
+                  "54, strang ssprk 33 cn, strang erk 33 cn, strang erk 43 cn");
   }
 
 
@@ -68,6 +68,11 @@ namespace ryujin
     /* Resize temporary storage to appropriate sizes: */
 
     switch (time_stepping_scheme_) {
+    case TimeSteppingScheme::ssprk_22:
+      U_.resize(2);
+      precomputed_.resize(1);
+      efficiency_ = 1.;
+      break;
     case TimeSteppingScheme::ssprk_33:
       U_.resize(2);
       precomputed_.resize(1);
@@ -139,6 +144,8 @@ namespace ryujin
        */
 
       switch (time_stepping_scheme_) {
+      case TimeSteppingScheme::ssprk_22:
+        [[fallthrough]];
       case TimeSteppingScheme::ssprk_33:
         [[fallthrough]];
       case TimeSteppingScheme::erk_11:
@@ -189,6 +196,8 @@ namespace ryujin
 
     const auto single_step = [&]() {
       switch (time_stepping_scheme_) {
+      case TimeSteppingScheme::ssprk_22:
+        return step_ssprk_22(U, t);
       case TimeSteppingScheme::ssprk_33:
         return step_ssprk_33(U, t);
       case TimeSteppingScheme::erk_11:
@@ -237,6 +246,27 @@ namespace ryujin
 
       __builtin_unreachable();
     }
+  }
+
+  template <typename Description, int dim, typename Number>
+  Number TimeIntegrator<Description, dim, Number>::step_ssprk_22(vector_type &U,
+                                                                 Number t)
+  {
+    /* SSP-RK3, see @cite Shu1988, Eq. 2.15. */
+
+    /* Step 1: U1 = U_old + tau * L(U_old) at time t + tau */
+    Number tau = hyperbolic_module_->template step<0>(
+        U, {}, {}, {}, U_[0], precomputed_[0]);
+    hyperbolic_module_->apply_boundary_conditions(U_[0], t + tau);
+
+    /* Step 2: U2 = 1/2 U_old + 1/2 (U1 + tau L(U1)) at time t + tau */
+    hyperbolic_module_->template step<0>(
+        U_[0], {}, {}, {}, U_[1], precomputed_[0], tau);
+    U_[1].sadd(Number(1. / 2.), Number(1. / 2.), U);
+    hyperbolic_module_->apply_boundary_conditions(U_[1], t + tau);
+
+    U.swap(U_[1]);
+    return tau;
   }
 
 
