@@ -194,22 +194,51 @@ namespace ryujin
       send_targets.resize(partitioner->import_targets().size());
       auto idx = import_indices_part.begin();
 
+      /*
+       * Index p iterates over import_targets() and index p_match iterates
+       * over ghost_ranges. such that
+       *   import_targets()[p].first == ghost_rangs[p_match].first
+       */
+      unsigned int p_match = 0;
       for (unsigned int p = 0; p < partitioner->import_targets().size(); ++p) {
+
+        /*
+         * Match up processor index between receive and import targets. If
+         * we do not find a match, which can happen for locally refined
+         * meshes - then set p_match equal to receive_targests.size().
+         */
+        while (p_match < receive_targets.size() &&
+               receive_targets[p_match].first !=
+                   partitioner->import_targets()[p].first)
+          p_match++;
+
         for (unsigned int c = 0; c < partitioner->import_targets()[p].second;
              ++c, ++idx) {
+
+          /*
+           * Continue if we do not have a match. Note that we need to enter
+           * and continue this loop till the end in order to advance idx
+           * correctly.
+           */
+          if (p_match == receive_targets.size())
+            continue;
+
           const unsigned int row = *idx;
           indices_to_be_sent.push_back(row < n_internal_dofs
                                            ? row_starts[row / simd_length] +
                                                  row % simd_length
                                            : row_starts[row]);
-          for (auto jt = ++sparsity.begin(row); jt != sparsity.end(row); ++jt)
-            if (jt->column() >= ghost_ranges[p] &&
-                jt->column() < ghost_ranges[p + 1])
+
+          for (auto jt = ++sparsity.begin(row); jt != sparsity.end(row); ++jt) {
+            if (jt->column() >= ghost_ranges[p_match] &&
+                jt->column() < ghost_ranges[p_match + 1]) {
               indices_to_be_sent.push_back(
                   row < n_internal_dofs
                       ? row_starts[row / simd_length] + row % simd_length +
                             (jt - sparsity.begin(row)) * simd_length
                       : row_starts[row] + (jt - sparsity.begin(row)));
+            }
+          }
         }
 
         send_targets[p].first = partitioner->import_targets()[p].first;
