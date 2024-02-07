@@ -498,6 +498,11 @@ namespace ryujin
       }
     }
 
+#ifdef DEBUG
+    /*  Exchange d_ij so that we can check for symmetry: */
+    dij_matrix_.update_ghost_rows();
+#endif
+
     /*
      * -------------------------------------------------------------------------
      * Step 4: Low-order update, also compute limiter bounds, R_i
@@ -630,6 +635,19 @@ namespace ryujin
 
             const auto d_ij = dij_matrix_.template get_entry<T>(i, col_idx);
             const auto d_ijH = d_ij * (alpha_i + alpha_j) * Number(.5);
+
+#ifdef DEBUG
+            /*
+             * Verify that all local chunks of the d_ij matrix have been
+             * computed consistently over all MPI ranks. For that we
+             * imported all ghost rows from neighboring MPI ranks and
+             * simply check that the (local) values of d_ij and d_ji match.
+             */
+            const auto d_ji =
+                dij_matrix_.template get_transposed_entry<T>(i, col_idx);
+            Assert(std::max(std::abs(d_ij - d_ji), T(1.0e-12)) == T(1.0e-12),
+                   dealii::ExcMessage("d_ij not symmetric"));
+#endif
 
             const auto c_ij = cij_matrix.template get_tensor<T>(i, col_idx);
             const auto d_ij_inv = Number(1.) / d_ij;
