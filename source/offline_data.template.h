@@ -616,32 +616,13 @@ namespace ryujin
     mass_matrix_.update_ghost_rows();
     cij_matrix_.update_ghost_rows();
 
-    /* Populate boundary map: */
+    /* Populate boundary map and collect coupling boundary pairs: */
 
     boundary_map_ = construct_boundary_map(
         dof_handler.begin_active(), dof_handler.end(), *scalar_partitioner_);
 
-    /* Extract coupling boundary pairs: */
-
-    coupling_boundary_pairs_.clear();
-    for (auto entry : boundary_map_) {
-      const auto i = entry.first;
-      Assert(i <= n_locally_owned_, dealii::ExcInternalError());
-
-      const unsigned int row_length = sparsity_pattern_simd_.row_length(i);
-      Assert(row_length > 1, dealii::ExcInternalError());
-
-      const unsigned int *js = sparsity_pattern_simd_.columns(i);
-      constexpr auto simd_length = VectorizedArray<Number>::size();
-      /* skip diagonal: */
-      for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
-        const auto j = *(i < n_locally_internal_ ? js + col_idx * simd_length
-                                                 : js + col_idx);
-        if (boundary_map_.count(j) != 0) {
-          coupling_boundary_pairs_.push_back({i, col_idx, j});
-        }
-      }
-    }
+    coupling_boundary_pairs_ = collect_coupling_boundary_pairs(
+        dof_handler.begin_active(), dof_handler.end(), *scalar_partitioner_);
   }
 
 
@@ -860,6 +841,104 @@ namespace ryujin
     }
 
     return filtered_map;
+  }
+
+
+  template <int dim, typename Number>
+  template <typename ITERATOR1, typename ITERATOR2>
+  typename OfflineData<dim, Number>::coupling_boundary_pairs_type
+  OfflineData<dim, Number>::collect_coupling_boundary_pairs(
+      const ITERATOR1 &begin,
+      const ITERATOR2 &end,
+      const Utilities::MPI::Partitioner &partitioner) const
+  {
+#ifdef DEBUG_OUTPUT
+    std::cout << "OfflineData<dim, Number>::collect_coupling_boundary_pairs()"
+              << std::endl;
+#endif
+
+    /*
+     * First, collect *all* locally relevant degrees of freedom that are
+     * located on a (non periodic) boundary. We also collect constrained
+     * degrees of freedom for the time being (and filter afterwards).
+     */
+
+    std::set<unsigned int> locally_relevant_boundary_indices;
+
+    std::vector<dealii::types::global_dof_index> local_dof_indices;
+
+    const unsigned int dofs_per_cell =
+        discretization_->finite_element().dofs_per_cell;
+
+    for (auto cell = begin; cell != end; ++cell) {
+
+      /* Make sure to iterate over the entire locally relevant set: */
+      if (cell->is_artificial())
+        continue;
+
+      local_dof_indices.resize(dofs_per_cell);
+      cell->get_active_or_mg_dof_indices(local_dof_indices);
+
+      for (auto f : GeometryInfo<dim>::face_indices()) {
+        const auto face = cell->face(f);
+        const auto id = face->boundary_id();
+
+        if (!face->at_boundary())
+          continue;
+
+        /* Skip periodic boundary faces; see above. */
+        if (id == Boundary::periodic)
+          continue;
+
+        for (unsigned int j = 0; j < dofs_per_cell; ++j) {
+
+          if (!discretization_->finite_element().has_support_on_face(j, f))
+            continue;
+
+          const auto global_index = local_dof_indices[j];
+          const auto index = partitioner.global_to_local(global_index);
+
+          /* Skip irrelevant degrees of freedom: */
+          if (index >= n_locally_relevant_)
+            continue;
+
+          locally_relevant_boundary_indices.insert(index);
+        } /* j */
+      }   /* f */
+    }     /* cell */
+
+    /*
+     * Now, collect all coupling boundary pairs:
+     */
+
+    coupling_boundary_pairs_type result;
+
+    for (const auto i : locally_relevant_boundary_indices) {
+
+      /* Only record pairs with a left index that is locally owned: */
+      if (i >= n_locally_owned_)
+        continue;
+
+      const unsigned int row_length = sparsity_pattern_simd_.row_length(i);
+
+      /* Skip all constrained degrees of freedom: */
+      if (row_length == 1)
+        continue;
+
+      const unsigned int *js = sparsity_pattern_simd_.columns(i);
+      constexpr auto simd_length = VectorizedArray<Number>::size();
+      /* skip diagonal: */
+      for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
+        const auto j = *(i < n_locally_internal_ ? js + col_idx * simd_length
+                                                 : js + col_idx);
+
+        if (locally_relevant_boundary_indices.count(j) != 0) {
+          result.push_back({i, col_idx, j});
+        }
+      }
+    }
+
+    return result;
   }
 
 } /* namespace ryujin */
