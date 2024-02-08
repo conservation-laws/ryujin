@@ -312,6 +312,16 @@ namespace ryujin
         const ITERATOR1 &begin,
         const ITERATOR2 &end,
         const dealii::Utilities::MPI::Partitioner &partitioner) const;
+
+    /**
+     * Collect coupling pairs of locally owned (and locally relevant)
+     * boundary degrees of freedom.
+     */
+    template <typename ITERATOR1, typename ITERATOR2>
+    coupling_boundary_pairs_type collect_coupling_boundary_pairs(
+        const ITERATOR1 &begin,
+        const ITERATOR2 &end,
+        const dealii::Utilities::MPI::Partitioner &partitioner) const;
   };
 
 } /* namespace ryujin */
