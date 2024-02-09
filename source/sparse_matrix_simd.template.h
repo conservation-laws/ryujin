@@ -247,7 +247,7 @@ namespace ryujin
 
       /*
        * Count how many dofs to receive and the various buffers to set up
-       * the MPI communication.
+       * for the MPI communication.
        */
 
       std::size_t receive_counter = 0;

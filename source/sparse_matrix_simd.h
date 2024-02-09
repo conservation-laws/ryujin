@@ -96,9 +96,27 @@ namespace ryujin
     dealii::AlignedVector<unsigned int> column_indices;
     dealii::AlignedVector<unsigned int> indices_transposed;
 
+    /**
+     * Array listing all (locally owned) indices, potentially duplicated,
+     * and arranged consecutively by send targets.
+     */
+
     dealii::AlignedVector<std::size_t> indices_to_be_sent;
+    /**
+     * All send targets stored as a pair consisting of an MPI rank (first
+     * entry) and a corresponding index range into indices_to_be_sent given
+     * by the half open range [send_targets[p-1].second, send_targets[p])
+     */
     std::vector<std::pair<unsigned int, unsigned int>> send_targets;
+
+    /**
+     * All receive targets stored as a pair consisting of an MPI rank (first
+     * entry) and a corresponding index range into the (serial) data()
+     * array given by the half open range [receive_targets[p-1].second,
+     * receive_targets[p])
+     */
     std::vector<std::pair<unsigned int, unsigned int>> receive_targets;
+
     MPI_Comm mpi_communicator;
 
     template <typename, int, int>
@@ -589,6 +607,13 @@ namespace ryujin
 
     requests.resize(sparsity->receive_targets.size() +
                     sparsity->send_targets.size());
+
+    /*
+     * Set up MPI receive requests. We will always receive data for indices
+     * in the range [n_locally_owned_, n_locally_relevant_), thus the DATA
+     * is stored in non-vectorized CSR format.
+     */
+
     {
       const auto &targets = sparsity->receive_targets;
       for (unsigned int p = 0; p < targets.size(); ++p) {
