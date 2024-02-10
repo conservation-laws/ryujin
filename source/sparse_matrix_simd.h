@@ -96,9 +96,28 @@ namespace ryujin
     dealii::AlignedVector<unsigned int> column_indices;
     dealii::AlignedVector<unsigned int> indices_transposed;
 
-    dealii::AlignedVector<std::size_t> indices_to_be_sent;
+    /**
+     * Array listing all (locally owned) entries as a pair {row,
+     * position_within_column}, potentially duplicated, and arranged
+     * consecutively by send targets.
+     */
+    std::vector<std::pair<unsigned int, unsigned int>> entries_to_be_sent;
+
+    /**
+     * All send targets stored as a pair consisting of an MPI rank (first
+     * entry) and a corresponding index range into entries_to_be_sent given
+     * by the half open range [send_targets[p-1].second, send_targets[p])
+     */
     std::vector<std::pair<unsigned int, unsigned int>> send_targets;
+
+    /**
+     * All receive targets stored as a pair consisting of an MPI rank (first
+     * entry) and a corresponding index range into the (serial) data()
+     * array given by the half open range [receive_targets[p-1].second,
+     * receive_targets[p])
+     */
     std::vector<std::pair<unsigned int, unsigned int>> receive_targets;
+
     MPI_Comm mpi_communicator;
 
     template <typename, int, int>
@@ -584,11 +603,18 @@ namespace ryujin
                dealii::Utilities::MPI::internal::Tags::partitioner_export_end,
            dealii::ExcInternalError());
 
-    const std::size_t n_indices = sparsity->indices_to_be_sent.size();
+    const std::size_t n_indices = sparsity->entries_to_be_sent.size();
     exchange_buffer.resize_fast(n_components * n_indices);
 
     requests.resize(sparsity->receive_targets.size() +
                     sparsity->send_targets.size());
+
+    /*
+     * Set up MPI receive requests. We will always receive data for indices
+     * in the range [n_locally_owned_, n_locally_relevant_), thus the DATA
+     * is stored in non-vectorized CSR format.
+     */
+
     {
       const auto &targets = sparsity->receive_targets;
       for (unsigned int p = 0; p < targets.size(); ++p) {
@@ -608,10 +634,44 @@ namespace ryujin
       }
     }
 
-    for (std::size_t c = 0; c < n_indices; ++c)
-      for (unsigned int comp = 0; comp < n_components; ++comp)
-        exchange_buffer[n_components * c + comp] =
-            data[n_components * sparsity->indices_to_be_sent[c] + comp];
+    /*
+     * Copy all entries that we plan to send over to the exchange buffer.
+     * Here, we have to be careful with indices falling into the "locally
+     * internal" range that are stored in an array-of-struct-of-array type.
+     */
+
+    for (std::size_t c = 0; c < n_indices; ++c) {
+
+      const auto &[row, position_within_column] =
+          sparsity->entries_to_be_sent[c];
+
+      Assert(row < sparsity->n_locally_owned_dofs, dealii::ExcInternalError());
+
+      if (row < sparsity->n_internal_dofs) {
+        // go through vectorized part
+        const unsigned int simd_row = row / simd_length;
+        const unsigned int simd_offset = row % simd_length;
+        for (unsigned int d = 0; d < n_components; ++d)
+          exchange_buffer[n_components * c + d] =
+              data[(sparsity->row_starts[simd_row] +
+                    position_within_column * simd_length) *
+                       n_components +
+                   d * simd_length + simd_offset];
+      } else {
+        // go through standard part
+        for (unsigned int d = 0; d < n_components; ++d)
+          exchange_buffer[n_components * c + d] =
+              data[(sparsity->row_starts[row] + position_within_column) *
+                       n_components +
+                   d];
+      }
+    }
+
+    /*
+     * Set up MPI send requests. We have copied everything we intend to
+     * send to the exchange_buffer compatible with the CSR storage format
+     * of the receiving MPI rank.
+     */
 
     {
       const auto &targets = sparsity->send_targets;

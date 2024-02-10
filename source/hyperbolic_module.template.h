@@ -400,20 +400,21 @@ namespace ryujin
       Number local_tau_max = std::numeric_limits<Number>::max();
 
       RYUJIN_OMP_FOR
-      for (std::size_t k = 0; k < coupling_boundary_pairs.size(); ++k) {
-        const auto &entry = coupling_boundary_pairs[k];
-        const auto &[i, col_idx, j] = entry;
+      for (const auto &[i, col_idx, j] : coupling_boundary_pairs) {
         const auto U_i = old_U.get_tensor(i);
         const auto U_j = old_U.get_tensor(j);
+
         const auto c_ji = cij_matrix.get_transposed_tensor(i, col_idx);
         Assert(c_ji.norm() > 1.e-12, ExcInternalError());
-        const auto norm = c_ji.norm();
-        const auto n_ji = c_ji / norm;
-        auto lambda_max = riemann_solver.compute(U_j, U_i, j, &i, n_ji);
+        const auto norm_ji = c_ji.norm();
+        const auto n_ji = c_ji / norm_ji;
 
-        auto d = dij_matrix_.get_entry(i, col_idx);
-        d = std::max(d, norm * lambda_max);
-        dij_matrix_.write_entry(d, i, col_idx);
+        const auto d_ij = dij_matrix_.get_entry(i, col_idx);
+
+        const auto lambda_max = riemann_solver.compute(U_j, U_i, j, &i, n_ji);
+        const auto d_ji = norm_ji * lambda_max;
+
+        dij_matrix_.write_entry(std::max(d_ij, d_ji), i, col_idx);
       }
 
       /* Symmetrize d_ij: */

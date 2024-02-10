@@ -190,7 +190,7 @@ namespace ryujin
       AssertDimension(import_indices_part.size(),
                       partitioner->n_import_indices());
 
-      indices_to_be_sent.clear();
+      entries_to_be_sent.clear();
       send_targets.resize(partitioner->import_targets().size());
       auto idx = import_indices_part.begin();
 
@@ -224,30 +224,26 @@ namespace ryujin
             continue;
 
           const unsigned int row = *idx;
-          indices_to_be_sent.push_back(row < n_internal_dofs
-                                           ? row_starts[row / simd_length] +
-                                                 row % simd_length
-                                           : row_starts[row]);
+
+          entries_to_be_sent.push_back({row, 0});
 
           for (auto jt = ++sparsity.begin(row); jt != sparsity.end(row); ++jt) {
             if (jt->column() >= ghost_ranges[p_match] &&
                 jt->column() < ghost_ranges[p_match + 1]) {
-              indices_to_be_sent.push_back(
-                  row < n_internal_dofs
-                      ? row_starts[row / simd_length] + row % simd_length +
-                            (jt - sparsity.begin(row)) * simd_length
-                      : row_starts[row] + (jt - sparsity.begin(row)));
+              const unsigned int position_within_column =
+                  jt - sparsity.begin(row);
+              entries_to_be_sent.push_back({row, position_within_column});
             }
           }
         }
 
         send_targets[p].first = partitioner->import_targets()[p].first;
-        send_targets[p].second = indices_to_be_sent.size();
+        send_targets[p].second = entries_to_be_sent.size();
       }
 
       /*
        * Count how many dofs to receive and the various buffers to set up
-       * the MPI communication.
+       * for the MPI communication.
        */
 
       std::size_t receive_counter = 0;
