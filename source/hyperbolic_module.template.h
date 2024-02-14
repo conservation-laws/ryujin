@@ -399,8 +399,15 @@ namespace ryujin
 
       Number local_tau_max = std::numeric_limits<Number>::max();
 
+      /*
+       * Note: we need this dance of iterating over an integer and then
+       * accessing the element to make Apple's OpenMP implementation
+       * happy.
+       */
       RYUJIN_OMP_FOR
-      for (const auto &[i, col_idx, j] : coupling_boundary_pairs) {
+      for (std::size_t k = 0; k < coupling_boundary_pairs.size(); ++k) {
+        const auto &[i, col_idx, j] = coupling_boundary_pairs[k];
+
         const auto U_i = old_U.get_tensor(i);
         const auto U_j = old_U.get_tensor(j);
 
