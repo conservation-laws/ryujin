@@ -8,9 +8,9 @@
 [INFO] scheduling output
 [INFO] scheduling output
 [INFO] scheduling output
-Normalized consolidated Linf, L1, and L2 errors at final time 
-#dofs = 4225
-t     = 2.002751001291742
-Linf  = 0.03574448813100288
-L1    = 0.0006330576515184822
-L2    = 0.003423352366914714
+Normalized consolidated Linf, L1, and L2 errors at final time
+#dofs = 513
+t     = 1.000593578808362
+Linf  = 2.073541977120867e-14
+L1    = 3.827527652098191e-15
+L2    = 4.904868710241667e-15

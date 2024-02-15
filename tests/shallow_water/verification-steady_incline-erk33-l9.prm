@@ -1,0 +1,94 @@
+##
+#
+# Shallow water benchmark
+#
+# A 1D benchmark configuration consisting of a steady flow over an inclined 
+# plane with Manning's friction. See section 4.1 of [1] for details.
+#
+# This configuration uses an explicit ERK(3, 3, 1) timestepping. Expected
+# results are reported in shallow_water-steady_incline_1d-erk33-l9.baseline
+#
+# [1] Chertock, Alina, et al. "Well‐balanced positivity preserving 
+#     central‐upwind scheme for the shallow water system with friction terms." 
+#     International Journal for numerical methods in fluids 
+#     78.6 (2015): 355-383.
+##
+
+subsection A - TimeLoop
+  set basename                      = steady_incline_1d-erk33-l9
+
+  set final time                    = 1
+  set enable output full            = true
+  set output granularity            = 1
+
+  set enable compute error          = true
+  set error quantities              = h, m
+  set error normalize               = true
+
+  set terminal update interval      = 0
+
+end
+
+subsection B - Equation
+  set dimension                    = 1
+  set equation                     = shallow water
+
+  set gravity                      = 9.81
+  set manning friction coefficient = 1.e-2
+
+  set limiter kinetic energy       = false
+  set limiter square velocity      = true
+  
+  set reference water depth        = 1
+  set dry state relaxation large   = 1e4
+  set dry state relaxation small   = 1e4
+end
+
+subsection C - Discretization
+  set geometry            = rectangular domain
+  set mesh refinement     = 9
+
+  subsection rectangular domain
+    set boundary condition left   = dynamic
+    set boundary condition right  = dynamic
+    set position bottom left      = 0
+    set position top right        = 20
+  end
+end
+
+subsection E - InitialValues
+
+  set configuration = sloping friction
+  set position      = 0
+
+  subsection sloping friction
+   set ramp slope        = 1.e-2
+   set initial discharge = 1.e-1
+  end
+
+end
+
+subsection F - HyperbolicModule
+  set cfl with boundary dofs        = false
+  set indicator evc factor          = 1
+  set limiter iterations            = 2
+  set limiter newton max iterations = 2
+  set limiter newton tolerance      = 1e-10
+  set limiter relaxation factor     = 2
+end
+
+subsection H - TimeIntegrator
+  set cfl max               = 0.50
+  set cfl min               = 0.50
+  set cfl recovery strategy = none
+  set time stepping scheme  = erk 33
+end
+
+subsection I - VTUOutput
+  set manifolds                  = 
+  set schlieren beta             = 10
+  set schlieren quantities       = h
+  set schlieren recompute bounds = true
+  set use mpi io                 = true
+  set vtu output quantities      = h, m, bathymetry, alpha, eta_m
+end

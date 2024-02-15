@@ -337,9 +337,8 @@ namespace ryujin
 
           indicator.reset(i, U_i);
 
-          /* Skip diagonal. */
-          const unsigned int *js = sparsity_simd.columns(i) + stride_size;
-          for (unsigned int col_idx = 1; col_idx < row_length;
+          const unsigned int *js = sparsity_simd.columns(i);
+          for (unsigned int col_idx = 0; col_idx < row_length;
                ++col_idx, js += stride_size) {
 
             const auto U_j = old_U.template get_tensor<T>(js);
@@ -347,6 +346,10 @@ namespace ryujin
             const auto c_ij = cij_matrix.template get_tensor<T>(i, col_idx);
 
             indicator.accumulate(js, U_j, c_ij);
+
+            /* Skip diagonal. */
+            if (col_idx == 0)
+              continue;
 
             /* Only iterate over the upper triangular portion of d_ij */
             if (all_below_diagonal<T>(i, js))
