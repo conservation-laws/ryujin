@@ -337,7 +337,6 @@ namespace ryujin
 
           indicator.reset(i, U_i);
 
-          /* Don't skip diagonal for indicator */
           const unsigned int *js = sparsity_simd.columns(i);
           for (unsigned int col_idx = 0; col_idx < row_length;
                ++col_idx, js += stride_size) {
@@ -348,7 +347,10 @@ namespace ryujin
 
             indicator.accumulate(js, U_j, c_ij);
 
-            /* Then skip diagonal. If col_idx == 0, we continue. */
+            /* Skip diagonal. */
+            if (col_idx == 0)
+              continue;
+
             /* Only iterate over the upper triangular portion of d_ij */
             if (all_below_diagonal<T>(i, js))
               continue;
