@@ -40,9 +40,9 @@ namespace ryujin
           , hyperbolic_system_(hyperbolic_system)
       {
 
-        primitive_left_[0] = 1.4;
+        primitive_left_[0] = 1.;
         primitive_left_[1] = 0.;
-        primitive_left_[2] = 1.;
+        primitive_left_[2] = 1.e3;
         this->add_parameter(
             "primitive state left",
             primitive_left_,
@@ -53,9 +53,9 @@ namespace ryujin
                             left_length_,
                             "The length of the left region");
 
-        primitive_middle_[0] = 1.4;
+        primitive_middle_[0] = 1.;
         primitive_middle_[1] = 0.;
-        primitive_middle_[2] = 1.;
+        primitive_middle_[2] = 1.e-2;
         this->add_parameter(
             "primitive state middle",
             primitive_middle_,
@@ -66,9 +66,9 @@ namespace ryujin
                             middle_length_,
                             "The length of the middle region");
 
-        primitive_right_[0] = 1.4;
+        primitive_right_[0] = 1.;
         primitive_right_[1] = 0.;
-        primitive_right_[2] = 1.;
+        primitive_right_[2] = 1.e2;
         this->add_parameter(
             "primitive state right",
             primitive_right_,
