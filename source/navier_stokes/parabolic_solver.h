@@ -114,7 +114,7 @@ namespace ryujin
       /**
        * @copydoc HyperbolicSystemView
        */
-      using HyperbolicSystemView =
+      using View =
           typename Description::template HyperbolicSystemView<dim, Number>;
 
       /**
@@ -125,7 +125,7 @@ namespace ryujin
       /**
        * @copydoc HyperbolicSystemView::vector_type
        */
-      using vector_type = typename HyperbolicSystemView::vector_type;
+      using vector_type = typename View::vector_type;
 
       /**
        * A distributed block vector used for temporary storage of the

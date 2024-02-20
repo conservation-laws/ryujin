@@ -26,9 +26,9 @@ namespace ryujin
     {
     public:
       using HyperbolicSystem = typename Description::HyperbolicSystem;
-      using HyperbolicSystemView =
+      using View =
           typename Description::template HyperbolicSystemView<dim, Number>;
-      using state_type = typename HyperbolicSystemView::state_type;
+      using state_type = typename View::state_type;
 
       SmoothVortex(const HyperbolicSystem &hyperbolic_system,
                    const std::string subsection)

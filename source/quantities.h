@@ -38,25 +38,23 @@ namespace ryujin
     /**
      * @copydoc HyperbolicSystemView
      */
-    using HyperbolicSystemView =
+    using View =
         typename Description::template HyperbolicSystemView<dim, Number>;
 
     /**
      * @copydoc HyperbolicSystemView::problem_dimension
      */
-    static constexpr unsigned int problem_dimension =
-        HyperbolicSystemView::problem_dimension;
+    static constexpr unsigned int problem_dimension = View::problem_dimension;
 
     /**
      * @copydoc HyperbolicSystemView::state_type
      */
-    using state_type = typename HyperbolicSystemView::state_type;
+    using state_type = typename View::state_type;
 
     /**
      * @copydoc HyperbolicSystemView::primitive_state_type
      */
-    using primitive_state_type =
-        typename HyperbolicSystemView::primitive_state_type;
+    using primitive_state_type = typename View::primitive_state_type;
 
     /**
      * Typedef for a MultiComponentVector storing the state U.

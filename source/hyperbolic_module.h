@@ -83,24 +83,23 @@ namespace ryujin
     /**
      * @copydoc HyperbolicSystemView
      */
-    using HyperbolicSystemView =
+    using View =
         typename Description::template HyperbolicSystemView<dim, Number>;
 
     /**
      * @copydoc HyperbolicSystem::problem_dimension
      */
-    static constexpr unsigned int problem_dimension =
-        HyperbolicSystemView::problem_dimension;
+    static constexpr unsigned int problem_dimension = View::problem_dimension;
 
     /**
      * @copydoc HyperbolicSystem::state_type
      */
-    using state_type = typename HyperbolicSystemView::state_type;
+    using state_type = typename View::state_type;
 
     /**
      * @copydoc HyperbolicSystem::flux_type
      */
-    using flux_type = typename HyperbolicSystemView::flux_type;
+    using flux_type = typename View::flux_type;
 
     /**
      * @copydoc OfflineData::scalar_type
@@ -110,37 +109,36 @@ namespace ryujin
     /**
      * @copydoc HyperbolicSystemView::vector_type
      */
-    using vector_type = typename HyperbolicSystemView::vector_type;
+    using vector_type = typename View::vector_type;
 
     /**
      * @copydoc HyperbolicSystem::n_precomputed_values
      */
     static constexpr unsigned int n_precomputed_values =
-        HyperbolicSystemView::n_precomputed_values;
+        View::n_precomputed_values;
 
     /**
      * @copydoc HyperbolicSystemView::n_precomputation_cycles
      */
     static constexpr unsigned int n_precomputation_cycles =
-        HyperbolicSystemView::n_precomputation_cycles;
+        View::n_precomputation_cycles;
 
     /**
      * Typedef for a MultiComponentVector storing precomputed values.
      */
-    using precomputed_vector_type =
-        typename HyperbolicSystemView::precomputed_vector_type;
+    using precomputed_vector_type = typename View::precomputed_vector_type;
 
     /**
      * @copydoc HyperbolicSystem::n_precomputed_initial_values
      */
     static constexpr unsigned int n_precomputed_initial_values =
-        HyperbolicSystemView::n_precomputed_initial_values;
+        View::n_precomputed_initial_values;
 
     /**
      * Typedef for a MultiComponentVector storing precomputed initial_values.
      */
     using precomputed_initial_vector_type =
-        typename HyperbolicSystemView::precomputed_initial_vector_type;
+        typename View::precomputed_initial_vector_type;
 
 
     /**

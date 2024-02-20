@@ -78,24 +78,23 @@ namespace ryujin
       /**
        * @copydoc HyperbolicSystemView
        */
-      using HyperbolicSystemView = HyperbolicSystemView<dim, Number>;
+      using View = HyperbolicSystemView<dim, Number>;
 
       /**
        * @copydoc HyperbolicSystemView::state_type
        */
-      using state_type = typename HyperbolicSystemView::state_type;
+      using state_type = typename View::state_type;
 
       /**
        * @copydoc HyperbolicSystemView::n_precomputed_values
        */
       static constexpr unsigned int n_precomputed_values =
-          HyperbolicSystemView::n_precomputed_values;
+          View::n_precomputed_values;
 
       /**
        * @copydoc HyperbolicSystemView::precomputed_state_type
        */
-      using precomputed_state_type =
-          typename HyperbolicSystemView::precomputed_state_type;
+      using precomputed_state_type = typename View::precomputed_state_type;
 
       /**
        * @copydoc HyperbolicSystemView::ScalarNumber
@@ -173,7 +172,7 @@ namespace ryujin
     {
       const auto view = hyperbolic_system.view<dim, Number>();
 
-      using pst = typename HyperbolicSystemView::precomputed_state_type;
+      using pst = typename View::precomputed_state_type;
 
       const auto u_i = view.state(U_i);
       const auto u_j = view.state(U_j);

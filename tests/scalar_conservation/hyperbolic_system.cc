@@ -27,8 +27,8 @@ void test(const std::string &expression)
     ParameterAcceptor::initialize(parameters);
   }
 
-  using HyperbolicSystemView = HyperbolicSystemView<dim, Number>;
-  using state_type = typename HyperbolicSystemView::state_type;
+  using View = HyperbolicSystemView<dim, Number>;
+  using state_type = typename View::state_type;
 
   state_type U{{1.4}};
 

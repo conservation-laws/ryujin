@@ -319,7 +319,7 @@ namespace ryujin
     clear_statistics();
 
     /* Prepare header string: */
-    const auto &names = HyperbolicSystemView::primitive_component_names;
+    const auto &names = View::primitive_component_names;
     header_ =
         std::accumulate(std::begin(names),
                         std::end(names),

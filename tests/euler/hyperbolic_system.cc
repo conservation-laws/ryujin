@@ -20,8 +20,8 @@ void test()
   HyperbolicSystem hyperbolic_system;
   const auto view = hyperbolic_system.view<dim, Number>();
 
-  using HyperbolicSystemView = HyperbolicSystemView<dim, Number>;
-  using state_type = typename HyperbolicSystemView::state_type;
+  using View = HyperbolicSystemView<dim, Number>;
+  using state_type = typename View::state_type;
 
   const auto from_1d_state =
       [&view](const dealii::Tensor<1, 3, Number> &state_1d) -> state_type {

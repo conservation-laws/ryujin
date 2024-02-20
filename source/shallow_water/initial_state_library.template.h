@@ -22,7 +22,7 @@ namespace ryujin
   public:
     using HyperbolicSystem = typename Description::HyperbolicSystem;
 
-    using HyperbolicSystemView =
+    using View =
         typename Description::template HyperbolicSystemView<dim, Number>;
 
     using initial_state_list_type =

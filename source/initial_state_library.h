@@ -36,12 +36,11 @@ namespace ryujin
     /**
      * @copydoc HyperbolicSystemView
      */
-    using HyperbolicSystemView =
+    using View =
         typename Description::template HyperbolicSystemView<dim, Number>;
 
-    using state_type = typename HyperbolicSystemView::state_type;
-    using precomputed_state_type =
-        typename HyperbolicSystemView::precomputed_state_type;
+    using state_type = typename View::state_type;
+    using precomputed_state_type = typename View::precomputed_state_type;
 
     /**
      * Constructor taking geometry name @p name and a subsection @p

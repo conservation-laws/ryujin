@@ -53,13 +53,13 @@ namespace ryujin
     /**
      * @copydoc HyperbolicSystemView
      */
-    using HyperbolicSystemView =
+    using View =
         typename Description::template HyperbolicSystemView<dim, Number>;
 
     /**
      * @copydoc HyperbolicSystemView::vector_type
      */
-    using vector_type = typename HyperbolicSystemView::vector_type;
+    using vector_type = typename View::vector_type;
 
     /**
      * Constructor.

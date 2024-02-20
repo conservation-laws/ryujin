@@ -148,8 +148,8 @@ namespace ryujin
         "Multiplicative modifier applied to \"output granularity\" that "
         "determines the writeout granularity for quantities of interest");
 
-    std::copy(std::begin(HyperbolicSystemView::component_names),
-              std::end(HyperbolicSystemView::component_names),
+    std::copy(std::begin(View::component_names),
+              std::end(View::component_names),
               std::back_inserter(error_quantities_));
 
     add_parameter("error quantities",
@@ -436,7 +436,7 @@ namespace ryujin
 
     /* Loop over all selected components: */
     for (const auto &entry : error_quantities_) {
-      const auto &names = HyperbolicSystemView::component_names;
+      const auto &names = View::component_names;
       const auto pos = std::find(std::begin(names), std::end(names), entry);
       if (pos == std::end(names)) {
         AssertThrow(
