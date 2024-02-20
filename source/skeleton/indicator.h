@@ -137,7 +137,8 @@ namespace ryujin
        * @name
        */
       //@{
-      const HyperbolicSystemView hyperbolic_system;
+
+      const HyperbolicSystem &hyperbolic_system;
       const Parameters &parameters;
 
       const MultiComponentVector<ScalarNumber, n_precomputed_values>

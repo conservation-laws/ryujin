@@ -184,7 +184,7 @@ namespace ryujin
        */
       //@{
 
-      const HyperbolicSystemView hyperbolic_system;
+      const HyperbolicSystem &hyperbolic_system;
       const Parameters &parameters;
 
       const MultiComponentVector<ScalarNumber, n_precomputed_values>
@@ -215,17 +215,19 @@ namespace ryujin
     {
       /* entropy viscosity commutator: */
 
+      const auto view = hyperbolic_system.view<dim, Number>();
+
       const auto &[new_s_i, new_eta_i] =
           precomputed_values
               .template get_tensor<Number, precomputed_state_type>(i);
 
-      const auto rho_i = hyperbolic_system.density(U_i);
+      const auto rho_i = view.density(U_i);
       rho_i_inverse = Number(1.) / rho_i;
       eta_i = new_eta_i;
 
-      d_eta_i = hyperbolic_system.harten_entropy_derivative(U_i);
+      d_eta_i = view.harten_entropy_derivative(U_i);
       d_eta_i[0] -= eta_i * rho_i_inverse;
-      f_i = hyperbolic_system.f(U_i);
+      f_i = view.f(U_i);
 
       left = 0.;
       right = 0.;
@@ -240,15 +242,17 @@ namespace ryujin
     {
       /* entropy viscosity commutator: */
 
+      const auto view = hyperbolic_system.view<dim, Number>();
+
       const auto &[s_j, eta_j] =
           precomputed_values
               .template get_tensor<Number, precomputed_state_type>(js);
 
-      const auto rho_j = hyperbolic_system.density(U_j);
+      const auto rho_j = view.density(U_j);
       const auto rho_j_inverse = Number(1.) / rho_j;
 
-      const auto m_j = hyperbolic_system.momentum(U_j);
-      const auto f_j = hyperbolic_system.f(U_j);
+      const auto m_j = view.momentum(U_j);
+      const auto f_j = view.f(U_j);
 
       left += (eta_j * rho_j_inverse - eta_i * rho_i_inverse) * (m_j * c_ij);
       for (unsigned int k = 0; k < problem_dimension; ++k)

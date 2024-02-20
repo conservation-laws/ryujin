@@ -190,7 +190,7 @@ namespace ryujin
        */
       //@{
 
-      const HyperbolicSystem::View<dim, Number> hyperbolic_system;
+      const HyperbolicSystem &hyperbolic_system;
       const Parameters &parameters;
 
       const MultiComponentVector<ScalarNumber, n_precomputed_values>
@@ -222,7 +222,9 @@ namespace ryujin
     DEAL_II_ALWAYS_INLINE inline void
     Indicator<dim, Number>::reset(const unsigned int i, const state_type &U_i)
     {
-      if (!hyperbolic_system.compute_strict_bounds())
+      const auto view = hyperbolic_system.view<dim, Number>();
+
+      if (!view.compute_strict_bounds())
         return;
 
       /* entropy viscosity commutator: */
@@ -233,17 +235,15 @@ namespace ryujin
 
       gamma_min = gamma_min_i;
 
-      const auto rho_i = hyperbolic_system.density(U_i);
+      const auto rho_i = view.density(U_i);
       rho_i_inverse = Number(1.) / rho_i;
       eta_i = new_eta_i;
 
-      d_eta_i = hyperbolic_system.surrogate_harten_entropy_derivative(
-          U_i, eta_i, gamma_min);
+      d_eta_i = view.surrogate_harten_entropy_derivative(U_i, eta_i, gamma_min);
       d_eta_i[0] -= eta_i * rho_i_inverse;
 
-      const auto surrogate_p_i =
-          hyperbolic_system.surrogate_pressure(U_i, gamma_min);
-      f_i = hyperbolic_system.f(U_i, surrogate_p_i);
+      const auto surrogate_p_i = view.surrogate_pressure(U_i, gamma_min);
+      f_i = view.f(U_i, surrogate_p_i);
 
       left = 0.;
       right = 0.;
@@ -256,22 +256,22 @@ namespace ryujin
         const state_type &U_j,
         const dealii::Tensor<1, dim, Number> &c_ij)
     {
-      if (!hyperbolic_system.compute_strict_bounds())
+      const auto view = hyperbolic_system.view<dim, Number>();
+
+      if (!view.compute_strict_bounds())
         return;
 
       /* entropy viscosity commutator: */
 
-      const auto eta_j =
-          hyperbolic_system.surrogate_harten_entropy(U_j, gamma_min);
+      const auto eta_j = view.surrogate_harten_entropy(U_j, gamma_min);
 
-      const auto rho_j = hyperbolic_system.density(U_j);
+      const auto rho_j = view.density(U_j);
       const auto rho_j_inverse = Number(1.) / rho_j;
 
-      const auto m_j = hyperbolic_system.momentum(U_j);
+      const auto m_j = view.momentum(U_j);
 
-      const auto surrogate_p_j =
-          hyperbolic_system.surrogate_pressure(U_j, gamma_min);
-      const auto f_j = hyperbolic_system.f(U_j, surrogate_p_j);
+      const auto surrogate_p_j = view.surrogate_pressure(U_j, gamma_min);
+      const auto f_j = view.f(U_j, surrogate_p_j);
 
       left += (eta_j * rho_j_inverse - eta_i * rho_i_inverse) * (m_j * c_ij);
       for (unsigned int k = 0; k < problem_dimension; ++k)
@@ -283,7 +283,9 @@ namespace ryujin
     DEAL_II_ALWAYS_INLINE inline Number
     Indicator<dim, Number>::alpha(const Number hd_i) const
     {
-      if (!hyperbolic_system.compute_strict_bounds())
+      const auto view = hyperbolic_system.view<dim, Number>();
+
+      if (!view.compute_strict_bounds())
         return Number(0.);
 
       Number numerator = left;
