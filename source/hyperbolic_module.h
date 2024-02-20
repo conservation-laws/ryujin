@@ -318,10 +318,8 @@ namespace ryujin
     typename Description::template Indicator<dim, Number>::Parameters
         indicator_parameters_;
 
-    unsigned int limiter_iter_;
-    Number limiter_newton_tolerance_;
-    unsigned int limiter_newton_max_iter_;
-    Number limiter_relaxation_factor_;
+    typename Description::template Limiter<dim, Number>::Parameters
+        limiter_parameters_;
 
     bool cfl_with_boundary_dofs_;
 

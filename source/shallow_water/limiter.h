@@ -17,6 +17,51 @@ namespace ryujin
 {
   namespace ShallowWater
   {
+    template <typename ScalarNumber = double>
+    class LimiterParameters : public dealii::ParameterAcceptor
+    {
+    public:
+      LimiterParameters(const std::string &subsection)
+          : ParameterAcceptor(subsection)
+      {
+        iterations_ = 2;
+        add_parameter(
+            "iterations", iterations_, "Number of limiter iterations");
+
+        if constexpr (std::is_same<ScalarNumber, double>::value)
+          newton_tolerance_ = 1.e-10;
+        else
+          newton_tolerance_ = 1.e-4;
+        add_parameter("newton tolerance",
+                      newton_tolerance_,
+                      "Tolerance for the quadratic newton stopping criterion");
+
+        newton_max_iterations_ = 2;
+        add_parameter("newton max iterations",
+                      newton_max_iterations_,
+                      "Maximal number of quadratic newton iterations performed "
+                      "during limiting");
+
+        relaxation_factor_ = ScalarNumber(1.);
+        add_parameter("relaxation factor",
+                      relaxation_factor_,
+                      "Factor for scaling the relaxation window with r_i = "
+                      "factor * (m_i/|Omega|)^(1.5/d).");
+      }
+
+      ACCESSOR_READ_ONLY(iterations);
+      ACCESSOR_READ_ONLY(newton_tolerance);
+      ACCESSOR_READ_ONLY(newton_max_iterations);
+      ACCESSOR_READ_ONLY(relaxation_factor);
+
+    private:
+      unsigned int iterations_;
+      ScalarNumber newton_tolerance_;
+      unsigned int newton_max_iterations_;
+      ScalarNumber relaxation_factor_;
+    };
+
+
     /**
      * The convex limiter.
      *
@@ -54,6 +99,11 @@ namespace ryujin
       using ScalarNumber = typename get_value_type<Number>::type;
 
       /**
+       * @copydoc LimiterParameters
+       */
+      using Parameters = LimiterParameters<ScalarNumber>;
+
+      /**
        * @name Stencil-based computation of bounds
        *
        * Intended usage:
@@ -87,16 +137,12 @@ namespace ryujin
        * Constructor taking a HyperbolicSystem instance as argument
        */
       Limiter(const HyperbolicSystem &hyperbolic_system,
+              const Parameters &parameters,
               const MultiComponentVector<ScalarNumber, n_precomputed_values>
-                  &precomputed_values,
-              const ScalarNumber relaxation_factor,
-              const ScalarNumber newton_tol,
-              const unsigned int newton_max_iter)
+                  &precomputed_values)
           : hyperbolic_system(hyperbolic_system)
+          , parameters(parameters)
           , precomputed_values(precomputed_values)
-          , relaxation_factor(relaxation_factor)
-          , newton_tol(newton_tol)
-          , newton_max_iter(newton_max_iter)
       {
       }
 
@@ -161,13 +207,10 @@ namespace ryujin
       /** @name Arguments and internal fields */
       //@{
       const HyperbolicSystemView hyperbolic_system;
+      const Parameters &parameters;
 
       const MultiComponentVector<ScalarNumber, n_precomputed_values>
           &precomputed_values;
-
-      ScalarNumber relaxation_factor;
-      ScalarNumber newton_tol;
-      unsigned int newton_max_iter;
 
       state_type U_i;
 
@@ -286,7 +329,7 @@ namespace ryujin
         r_i = dealii::Utilities::fixed_power<3>(std::sqrt(r_i)); // in 2D: ^ 3/4
       else if constexpr (dim == 1)                               //
         r_i = dealii::Utilities::fixed_power<3>(r_i);            // in 1D: ^ 3/2
-      r_i *= relaxation_factor;
+      r_i *= parameters.relaxation_factor();
 
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
 

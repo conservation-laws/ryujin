@@ -36,6 +36,7 @@ namespace ryujin
       , precompute_only_(false)
       , id_violation_strategy_(IDViolationStrategy::warn)
       , indicator_parameters_(subsection + "/Indicator")
+      , limiter_parameters_(subsection + "/Limiter")
       , mpi_communicator_(mpi_communicator)
       , computing_timer_(computing_timer)
       , offline_data_(&offline_data)
@@ -45,30 +46,6 @@ namespace ryujin
       , n_restarts_(0)
       , n_warnings_(0)
   {
-    limiter_iter_ = 2;
-    add_parameter(
-        "limiter iterations", limiter_iter_, "Number of limiter iterations");
-
-    if constexpr (std::is_same<Number, double>::value)
-      limiter_newton_tolerance_ = 1.e-10;
-    else
-      limiter_newton_tolerance_ = 1.e-4;
-    add_parameter("limiter newton tolerance",
-                  limiter_newton_tolerance_,
-                  "Tolerance for the quadratic newton stopping criterion");
-
-    limiter_newton_max_iter_ = 2;
-    add_parameter("limiter newton max iterations",
-                  limiter_newton_max_iter_,
-                  "Maximal number of quadratic newton iterations performed "
-                  "during limiting");
-
-    limiter_relaxation_factor_ = Number(1.);
-    add_parameter("limiter relaxation factor",
-                  limiter_relaxation_factor_,
-                  "Factor for scaling the relaxation window with r_i = "
-                  "factor * (m_i/|Omega|)^(1.5/d).");
-
     cfl_with_boundary_dofs_ = false;
     add_parameter("cfl with boundary dofs",
                   cfl_with_boundary_dofs_,
@@ -85,7 +62,7 @@ namespace ryujin
               << std::endl;
 #endif
 
-    AssertThrow(limiter_iter_ <= 2,
+    AssertThrow(limiter_parameters_.iterations() <= 2,
                 dealii::ExcMessage(
                     "The number of limiter iterations must be between [0,2]"));
 
@@ -544,11 +521,8 @@ namespace ryujin
         const auto view = hyperbolic_system_->template view<dim, T>();
 
         /* Stored thread locally: */
-        Limiter limiter(*hyperbolic_system_,
-                        new_precomputed,
-                        limiter_relaxation_factor_,
-                        limiter_newton_tolerance_,
-                        limiter_newton_max_iter_);
+        Limiter limiter(
+            *hyperbolic_system_, limiter_parameters_, new_precomputed);
         bool thread_ready = false;
 
         RYUJIN_OMP_FOR
@@ -790,7 +764,7 @@ namespace ryujin
      * -------------------------------------------------------------------------
      */
 
-    if (limiter_iter_ != 0) {
+    if (limiter_parameters_.iterations() != 0) {
       Scope scope(computing_timer_, scoped_name("compute p_ij, and l_ij"));
 
       SynchronizationDispatch synchronization_dispatch([&]() {
@@ -809,11 +783,8 @@ namespace ryujin
         unsigned int stride_size = get_stride_size<T>;
 
         /* Stored thread locally: */
-        Limiter limiter(*hyperbolic_system_,
-                        new_precomputed,
-                        limiter_relaxation_factor_,
-                        limiter_newton_tolerance_,
-                        limiter_newton_max_iter_);
+        Limiter limiter(
+            *hyperbolic_system_, limiter_parameters_, new_precomputed);
         bool thread_ready = false;
 
         RYUJIN_OMP_FOR
@@ -902,15 +873,16 @@ namespace ryujin
      * -------------------------------------------------------------------------
      */
 
-    for (unsigned int pass = 0; pass < limiter_iter_; ++pass) {
-      bool last_round = (pass + 1 == limiter_iter_);
+    const auto n_iterations = limiter_parameters_.iterations();
+    for (unsigned int pass = 0; pass < n_iterations; ++pass) {
+      bool last_round = (pass + 1 == n_iterations);
 
       std::string additional_step = (last_round ? "" : ", next l_ij");
       Scope scope(
           computing_timer_,
           scoped_name("symmetrize l_ij, h.-o. update" + additional_step));
 
-      if ((limiter_iter_ == 2) && last_round) {
+      if ((n_iterations == 2) && last_round) {
         std::swap(lij_matrix_, lij_matrix_next_);
       }
 
@@ -933,11 +905,8 @@ namespace ryujin
 
         /* Stored thread locally: */
         AlignedVector<T> lij_row;
-        Limiter limiter(*hyperbolic_system_,
-                        new_precomputed,
-                        limiter_relaxation_factor_,
-                        limiter_newton_tolerance_,
-                        limiter_newton_max_iter_);
+        Limiter limiter(
+            *hyperbolic_system_, limiter_parameters_, new_precomputed);
         bool thread_ready = false;
 
         RYUJIN_OMP_FOR
@@ -1075,8 +1044,8 @@ namespace ryujin
               << std::endl;
 #endif
 
-    const auto cycle_number =
-        5 + (n_precomputation_cycles > 0 ? 1 : 0) + limiter_iter_;
+    const auto cycle_number = 5 + (n_precomputation_cycles > 0 ? 1 : 0) +
+                              limiter_parameters_.iterations();
     Scope scope(computing_timer_,
                 "time step [H] " + std::to_string(cycle_number) +
                     " - apply boundary conditions");

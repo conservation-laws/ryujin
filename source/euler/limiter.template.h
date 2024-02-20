@@ -160,7 +160,7 @@ namespace ryujin
 
         const auto &s_min = std::get<2>(bounds);
 
-        for (unsigned int n = 0; n < newton_max_iter; ++n) {
+        for (unsigned int n = 0; n < parameters.newton_max_iterations(); ++n) {
 
           const auto U_r = U + t_r * P;
           const auto rho_r = hyperbolic_system.density(U_r);
@@ -246,7 +246,8 @@ namespace ryujin
            * Break if the window between t_l and t_r is within the prescribed
            * tolerance:
            */
-          if (std::max(Number(0.), t_r - t_l - newton_tolerance) == Number(0.))
+          const Number tolerance(parameters.newton_tolerance());
+          if (std::max(Number(0.), t_r - t_l - tolerance) == Number(0.))
             break;
 
           /* We got unlucky and have to perform a Newton step: */
