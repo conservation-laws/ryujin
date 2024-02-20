@@ -19,8 +19,7 @@ int main()
   HyperbolicSystem hyperbolic_system;
   const double gravity = hyperbolic_system.view<dim, double>().gravity();
 
-  RiemannSolver<dim, double>::Parameters riemann_solver_parameters(
-      "/riemann_solver");
+  RiemannSolver<dim, double>::Parameters riemann_solver_parameters;
 
   static constexpr unsigned int n_precomputed_values =
       HyperbolicSystem::View<dim, double>::n_precomputed_values;

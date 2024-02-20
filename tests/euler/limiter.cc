@@ -21,7 +21,7 @@ int main()
   constexpr int dim = 1;
 
   HyperbolicSystem hyperbolic_system;
-  Limiter<dim, double>::Parameters limiter_parameters("/limiter");
+  Limiter<dim, double>::Parameters limiter_parameters;
 
   using state_type = HyperbolicSystem::View<dim, double>::state_type;
 

@@ -22,8 +22,7 @@ void test(const std::string &expression)
   std::cout << std::scientific;
 
   HyperbolicSystem hyperbolic_system;
-  typename RiemannSolver<dim, Number>::Parameters riemann_solver_parameters(
-      "/RiemannSolver");
+  typename RiemannSolver<dim, Number>::Parameters riemann_solver_parameters;
 
   const auto view = hyperbolic_system.view<dim, Number>();
 

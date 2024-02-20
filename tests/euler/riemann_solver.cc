@@ -17,8 +17,7 @@ int main()
   constexpr int dim = 1;
 
   HyperbolicSystem hyperbolic_system;
-  RiemannSolver<dim, double>::Parameters riemann_solver_parameters(
-      "/riemann_solver");
+  RiemannSolver<dim, double>::Parameters riemann_solver_parameters;
 
   const double gamma = hyperbolic_system.view<dim, double>().gamma();
 

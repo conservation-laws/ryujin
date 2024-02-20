@@ -22,7 +22,7 @@ namespace ryujin
     class RiemannSolverParameters : public dealii::ParameterAcceptor
     {
     public:
-      RiemannSolverParameters(const std::string &subsection)
+      RiemannSolverParameters(const std::string &subsection = "/RiemannSolver")
           : ParameterAcceptor(subsection)
       {
       }

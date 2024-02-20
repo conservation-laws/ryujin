@@ -22,7 +22,7 @@ namespace ryujin
     class IndicatorParameters : public dealii::ParameterAcceptor
     {
     public:
-      IndicatorParameters(const std::string &subsection)
+      IndicatorParameters(const std::string &subsection = "/Indicator")
           : ParameterAcceptor(subsection)
       {
       }

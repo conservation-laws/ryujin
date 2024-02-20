@@ -20,7 +20,7 @@ namespace ryujin
     class LimiterParameters : public dealii::ParameterAcceptor
     {
     public:
-      LimiterParameters(const std::string &subsection)
+      LimiterParameters(const std::string &subsection = "/Limiter")
           : ParameterAcceptor(subsection)
       {
         iterations_ = 2;
