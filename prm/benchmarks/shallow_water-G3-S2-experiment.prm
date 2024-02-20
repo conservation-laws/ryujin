@@ -41,7 +41,6 @@ end
 subsection B - Equation
   set dimension                    = 2
   set equation                     = shallow water
-  set limiter square velocity      = true
 
   set reference water depth        = 1
   set dry state relaxation large   = 1e4
@@ -91,11 +90,20 @@ end
 
 subsection F - HyperbolicModule
   set cfl with boundary dofs        = false
-  set indicator evc factor          = 1
-  set limiter iterations            = 2
-  set limiter newton max iterations = 2
-  set limiter newton tolerance      = 1e-10
-  set limiter relaxation factor     = 2
+
+  subsection indicator
+    set evc factor = 1
+  end
+
+  subsection limiter
+    set iterations               = 2
+    set newton max iterations    = 2
+    set newton tolerance         = 1e-10
+    set relaxation factor        = 2
+
+    set limit on kinetic energy  = false
+    set limit on square velocity = true
+  end
 end
 
 subsection H - TimeIntegrator

@@ -50,10 +50,6 @@ namespace ryujin
       //@{
       std::string flux_;
 
-      bool riemann_solver_greedy_wavespeed_;
-      bool riemann_solver_averaged_entropy_;
-      unsigned int riemann_solver_random_entropies_;
-
       FluxLibrary::flux_list_type flux_list_;
       using Flux = FluxLibrary::Flux;
       std::shared_ptr<Flux> selected_flux_;
@@ -104,26 +100,8 @@ namespace ryujin
           return hyperbolic_system_.flux_;
         }
 
-        DEAL_II_ALWAYS_INLINE inline bool
-        riemann_solver_greedy_wavespeed() const
-        {
-          return hyperbolic_system_.riemann_solver_greedy_wavespeed_;
-        }
-
-        DEAL_II_ALWAYS_INLINE inline bool
-        riemann_solver_averaged_entropy() const
-        {
-          return hyperbolic_system_.riemann_solver_averaged_entropy_;
-        }
-
-        DEAL_II_ALWAYS_INLINE inline unsigned int
-        riemann_solver_random_entropies() const
-        {
-          return hyperbolic_system_.riemann_solver_random_entropies_;
-        }
-
         DEAL_II_ALWAYS_INLINE inline ScalarNumber
-        riemann_solver_approximation_delta() const
+        derivative_approximation_delta() const
         {
           const auto &flux = hyperbolic_system_.selected_flux_;
           return ScalarNumber(flux->derivative_approximation_delta());
@@ -551,29 +529,6 @@ namespace ryujin
                     flux_,
                     "The scalar flux. Valid names are given by any of the "
                     "subsections defined below");
-
-      riemann_solver_greedy_wavespeed_ = false;
-      add_parameter(
-          "riemann solver greedy wavespeed",
-          riemann_solver_greedy_wavespeed_,
-          "Use a greedy wavespeed estimate instead of a guaranteed upper bound "
-          "on the maximal wavespeed (for convex fluxes).");
-
-      riemann_solver_averaged_entropy_ = false;
-      add_parameter(
-          "riemann solver averaged entropy",
-          riemann_solver_averaged_entropy_,
-          "In addition to the wavespeed estimate based on the Roe average and "
-          "flux gradients of the left and right state also enforce an entropy "
-          "inequality on the averaged Krŭzkov entropy.");
-
-      riemann_solver_random_entropies_ = 0;
-      add_parameter(
-          "riemann solver random entropies",
-          riemann_solver_random_entropies_,
-          "In addition to the wavespeed estimate based on the Roe average and "
-          "flux gradients of the left and right state also enforce an entropy "
-          "inequality on the prescribed number of random Krŭzkov entropies.");
 
       /*
        * And finally populate the flux list with all flux configurations

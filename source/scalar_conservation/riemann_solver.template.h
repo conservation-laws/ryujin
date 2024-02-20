@@ -35,7 +35,7 @@ namespace ryujin
       const Number df_i = view.construct_flux_gradient_tensor(prec_i) * n_ij;
       const Number df_j = view.construct_flux_gradient_tensor(prec_j) * n_ij;
 
-      const auto h2 = Number(2. * view.riemann_solver_approximation_delta());
+      const auto h2 = Number(2. * view.derivative_approximation_delta());
 
 #ifdef DEBUG_RIEMANN_SOLVER
       std::cout << "\nu_i  = " << u_i << std::endl;
@@ -68,7 +68,7 @@ namespace ryujin
 
       constexpr auto gte = dealii::SIMDComparison::greater_than_or_equal;
 
-      if (view.riemann_solver_greedy_wavespeed()) {
+      if (parameters.use_greedy_wavespeed()) {
         /*
          * In case of a greedy estimate we make sure that we always use the
          * Roe average and only fall back to the derivative approximation
@@ -173,12 +173,12 @@ namespace ryujin
       };
 
 
-      if (view.riemann_solver_averaged_entropy()) {
+      if (parameters.use_averaged_entropy()) {
         const Number k = ScalarNumber(0.5) * (u_i + u_j);
         enforce_entropy(k);
       }
 
-      const unsigned int n_entropies = view.riemann_solver_random_entropies();
+      const unsigned int n_entropies = parameters.random_entropies();
       for (unsigned int i = 0; i < n_entropies; ++i) {
         const Number factor = draw();
         const Number k = factor * u_i + (Number(1.) - factor) * u_j;

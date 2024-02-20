@@ -11,6 +11,7 @@
 #include <multicomponent_vector.h>
 #include <simd.h>
 
+#include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/vectorization.h>
 
 
@@ -18,6 +19,26 @@ namespace ryujin
 {
   namespace Euler
   {
+    template <typename ScalarNumber = double>
+    class IndicatorParameters : public dealii::ParameterAcceptor
+    {
+    public:
+      IndicatorParameters(const std::string &subsection = "/Indicator")
+          : ParameterAcceptor(subsection)
+      {
+        evc_factor_ = ScalarNumber(1.);
+        add_parameter("evc factor",
+                      evc_factor_,
+                      "Factor for scaling the entropy viscocity commuator");
+      }
+
+      ACCESSOR_READ_ONLY(evc_factor);
+
+    private:
+      ScalarNumber evc_factor_;
+    };
+
+
     /**
      * This class implements an indicator strategy used to form the
      * preliminary high-order update.
@@ -100,6 +121,11 @@ namespace ryujin
       using ScalarNumber = typename HyperbolicSystemView::ScalarNumber;
 
       /**
+       * @copydoc IndicatorParameters
+       */
+      using Parameters = IndicatorParameters<ScalarNumber>;
+
+      /**
        * @name Stencil-based computation of indicators
        *
        * Intended usage:
@@ -122,12 +148,12 @@ namespace ryujin
        * Constructor taking a HyperbolicSystem instance as argument
        */
       Indicator(const HyperbolicSystem &hyperbolic_system,
+                const Parameters &parameters,
                 const MultiComponentVector<ScalarNumber, n_precomputed_values>
-                    &precomputed_values,
-                const ScalarNumber evc_factor)
+                    &precomputed_values)
           : hyperbolic_system(hyperbolic_system)
+          , parameters(parameters)
           , precomputed_values(precomputed_values)
-          , evc_factor(evc_factor)
       {
       }
 
@@ -159,11 +185,10 @@ namespace ryujin
       //@{
 
       const HyperbolicSystemView hyperbolic_system;
+      const Parameters &parameters;
 
       const MultiComponentVector<ScalarNumber, n_precomputed_values>
           &precomputed_values;
-
-      const ScalarNumber evc_factor;
 
       Number rho_i_inverse = 0.;
       Number eta_i = 0.;
@@ -247,7 +272,7 @@ namespace ryujin
       const auto quotient =
           std::abs(numerator) / (denominator + hd_i * std::abs(eta_i));
 
-      return std::min(Number(1.), evc_factor * quotient);
+      return std::min(Number(1.), parameters.evc_factor() * quotient);
     }
   } // namespace Euler
 } // namespace ryujin

@@ -34,9 +34,6 @@ subsection B - Equation
   set gravity                      = 9.81
   set manning friction coefficient = 0
 
-  set limiter kinetic energy       = true
-  set limiter square velocity      = false
-
   set reference water depth        = 0.005
   set dry state relaxation factor  = 1.0e-3
   set dry state relaxation small   = 1e2
@@ -65,6 +62,13 @@ subsection E - InitialValues
   subsection ritter dam break
     set time initial = 1
     set left water depth = 0.005
+  end
+end
+
+subsection F - HyperbolicModule
+  subsection limiter
+    set limit on kinetic energy  = true
+    set limit on square velocity = false
   end
 end
 

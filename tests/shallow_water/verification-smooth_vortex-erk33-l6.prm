@@ -36,9 +36,6 @@ subsection B - Equation
   set gravity                      = 9.81
   set manning friction coefficient = 0
 
-  set limiter kinetic energy       = false
-  set limiter square velocity      = true
-
   set reference water depth        = 2
   set dry state relaxation factor  = 0
   set dry state relaxation small   = 1e2
@@ -69,6 +66,13 @@ subsection E - InitialValues
     set beta            = 2
     set mach number     = 1
     set reference depth = 2
+  end
+end
+
+subsection F - HyperbolicModule
+  subsection limiter
+    set limit on kinetic energy  = false
+    set limit on square velocity = true
   end
 end
 

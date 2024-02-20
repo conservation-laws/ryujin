@@ -12,12 +12,55 @@
 #include <deal.II/base/point.h>
 #include <deal.II/base/tensor.h>
 
-#include <functional>
-
 namespace ryujin
 {
   namespace ScalarConservation
   {
+    template <typename ScalarNumber = double>
+    class RiemannSolverParameters : public dealii::ParameterAcceptor
+    {
+    public:
+      RiemannSolverParameters(const std::string &subsection = "/RiemannSolver")
+          : ParameterAcceptor(subsection)
+      {
+        use_greedy_wavespeed_ = false;
+        add_parameter("use greedy wavespeed",
+                      use_greedy_wavespeed_,
+                      "Use a greedy wavespeed estimate instead of a guaranteed "
+                      "upper bound "
+                      "on the maximal wavespeed (for convex fluxes).");
+
+        use_averaged_entropy_ = false;
+        add_parameter("use averaged entropy",
+                      use_averaged_entropy_,
+                      "In addition to the wavespeed estimate based on the Roe "
+                      "average and "
+                      "flux gradients of the left and right state also enforce "
+                      "an entropy "
+                      "inequality on the averaged Krŭzkov entropy.");
+
+        random_entropies_ = 0;
+        add_parameter(
+            "random entropies",
+            random_entropies_,
+            "In addition to the wavespeed estimate based on the Roe average "
+            "and "
+            "flux gradients of the left and right state also enforce an "
+            "entropy "
+            "inequality on the prescribed number of random Krŭzkov entropies.");
+      }
+
+      ACCESSOR_READ_ONLY(use_greedy_wavespeed);
+      ACCESSOR_READ_ONLY(use_averaged_entropy);
+      ACCESSOR_READ_ONLY(random_entropies);
+
+    private:
+      bool use_greedy_wavespeed_;
+      bool use_averaged_entropy_;
+      unsigned int random_entropies_;
+    };
+
+
     /**
      * A fast estimate for a sufficient maximal wavespeed of the 1D Riemann
      * problem. The wavespeed estimate is based on a guaranteed upper bound
@@ -60,6 +103,11 @@ namespace ryujin
       using ScalarNumber = typename get_value_type<Number>::type;
 
       /**
+       * @copydoc RiemannSolverParameters
+       */
+      using Parameters = RiemannSolverParameters<ScalarNumber>;
+
+      /**
        * @name Compute wavespeed estimates
        */
       //@{
@@ -69,9 +117,11 @@ namespace ryujin
        */
       RiemannSolver(
           const HyperbolicSystem &hyperbolic_system,
+          const Parameters &parameters,
           const MultiComponentVector<ScalarNumber, n_precomputed_values>
               &precomputed_values)
           : hyperbolic_system(hyperbolic_system)
+          , parameters(parameters)
           , precomputed_values(precomputed_values)
       {
       }
@@ -97,12 +147,13 @@ namespace ryujin
                      const unsigned int *js,
                      const dealii::Tensor<1, dim, Number> &n_ij) const;
 
-      //@}
-      //
     private:
       const HyperbolicSystemView hyperbolic_system;
+      const Parameters &parameters;
+
       const MultiComponentVector<ScalarNumber, n_precomputed_values>
           &precomputed_values;
+      //@}
     };
 
 

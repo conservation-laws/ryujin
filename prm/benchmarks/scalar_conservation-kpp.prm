@@ -29,10 +29,6 @@ subsection B - Equation
   set dimension                       = 2
   set equation                        = scalar conservation
   set flux                            = kpp
-
-  set riemann solver averaged entropy = true
-  set riemann solver greedy wavespeed = true
-  set riemann solver random entropies = 0
 end
 
 
@@ -66,10 +62,11 @@ end
 
 
 subsection F - HyperbolicModule
-  set cfl with boundary dofs        = false
-
-  set limiter iterations            = 2
-  set limiter relaxation factor     = 1
+  subsection riemann solver
+    set use averaged entropy = true
+    set use greedy wavespeed = true
+    set random entropies = 0
+  end
 end
 
 

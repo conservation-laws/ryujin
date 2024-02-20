@@ -16,6 +16,25 @@ namespace ryujin
 {
   namespace Skeleton
   {
+    template <typename ScalarNumber = double>
+    class LimiterParameters : public dealii::ParameterAcceptor
+    {
+    public:
+      LimiterParameters(const std::string &subsection = "/Limiter")
+          : ParameterAcceptor(subsection)
+      {
+        iterations_ = 2;
+        add_parameter(
+            "iterations", iterations_, "Number of limiter iterations");
+      }
+
+      ACCESSOR_READ_ONLY(iterations);
+
+    private:
+      unsigned int iterations_;
+    };
+
+
     /**
      * The convex limiter.
      *
@@ -53,6 +72,11 @@ namespace ryujin
       using ScalarNumber = typename get_value_type<Number>::type;
 
       /**
+       * @copydoc LimiterParameters
+       */
+      using Parameters = LimiterParameters<ScalarNumber>;
+
+      /**
        * @name Stencil-based computation of bounds
        *
        * Intended usage:
@@ -85,16 +109,12 @@ namespace ryujin
        * Constructor taking a HyperbolicSystem instance as argument
        */
       Limiter(const HyperbolicSystem &hyperbolic_system,
+              const Parameters &parameters,
               const MultiComponentVector<ScalarNumber, n_precomputed_values>
-                  &precomputed_values,
-              const ScalarNumber relaxation_factor,
-              const ScalarNumber newton_tolerance,
-              const unsigned int newton_max_iter)
+                  &precomputed_values)
           : hyperbolic_system(hyperbolic_system)
+          , parameters(parameters)
           , precomputed_values(precomputed_values)
-          , relaxation_factor(relaxation_factor)
-          , newton_tolerance(newton_tolerance)
-          , newton_max_iter(newton_max_iter)
       {
       }
 
@@ -175,13 +195,10 @@ namespace ryujin
       /** @name Arguments and internal fields */
       //@{
       const HyperbolicSystemView hyperbolic_system;
+      const Parameters &parameters;
 
       const MultiComponentVector<ScalarNumber, n_precomputed_values>
           &precomputed_values;
-
-      ScalarNumber relaxation_factor;
-      ScalarNumber newton_tolerance;
-      unsigned int newton_max_iter;
 
       Bounds bounds_;
       //@}

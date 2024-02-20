@@ -19,12 +19,15 @@ int main()
   HyperbolicSystem hyperbolic_system;
   const double gravity = hyperbolic_system.view<dim, double>().gravity();
 
+  RiemannSolver<dim, double>::Parameters riemann_solver_parameters;
+
   static constexpr unsigned int n_precomputed_values =
       HyperbolicSystem::View<dim, double>::n_precomputed_values;
   using precomputed_type = MultiComponentVector<double, n_precomputed_values>;
   precomputed_type dummy;
 
-  RiemannSolver<dim> riemann_solver(hyperbolic_system, dummy);
+  RiemannSolver<dim> riemann_solver(
+      hyperbolic_system, riemann_solver_parameters, dummy);
 
   const auto riemann_data = [&](const auto &state) {
     const auto h = hyperbolic_system.view<dim, double>().water_depth_sharp(

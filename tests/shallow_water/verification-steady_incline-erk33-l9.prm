@@ -36,9 +36,6 @@ subsection B - Equation
   set gravity                      = 9.81
   set manning friction coefficient = 1.e-2
 
-  set limiter kinetic energy       = false
-  set limiter square velocity      = true
-  
   set reference water depth        = 1
   set dry state relaxation large   = 1e4
   set dry state relaxation small   = 1e4
@@ -57,7 +54,6 @@ subsection C - Discretization
 end
 
 subsection E - InitialValues
-
   set configuration = sloping friction
   set position      = 0
 
@@ -65,16 +61,13 @@ subsection E - InitialValues
    set ramp slope        = 1.e-2
    set initial discharge = 1.e-1
   end
-
 end
 
 subsection F - HyperbolicModule
-  set cfl with boundary dofs        = false
-  set indicator evc factor          = 1
-  set limiter iterations            = 2
-  set limiter newton max iterations = 2
-  set limiter newton tolerance      = 1e-10
-  set limiter relaxation factor     = 2
+  subsection limiter
+    set limit on kinetic energy  = false
+    set limit on square velocity = true
+  end
 end
 
 subsection H - TimeIntegrator

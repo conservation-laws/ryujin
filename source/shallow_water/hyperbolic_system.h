@@ -54,9 +54,6 @@ namespace ryujin
       double gravity_;
       double manning_friction_coefficient_;
 
-      bool limiter_kinetic_energy_;
-      bool limiter_square_velocity_;
-
       double reference_water_depth_;
       double dry_state_relaxation_factor_;
       double dry_state_relaxation_small_;
@@ -121,16 +118,6 @@ namespace ryujin
         manning_friction_coefficient() const
         {
           return hyperbolic_system_.manning_friction_coefficient_;
-        }
-
-        DEAL_II_ALWAYS_INLINE inline bool limiter_kinetic_energy() const
-        {
-          return hyperbolic_system_.limiter_kinetic_energy_;
-        }
-
-        DEAL_II_ALWAYS_INLINE inline bool limiter_square_velocity() const
-        {
-          return hyperbolic_system_.limiter_square_velocity_;
         }
 
         DEAL_II_ALWAYS_INLINE inline ScalarNumber reference_water_depth() const
@@ -676,16 +663,6 @@ namespace ryujin
       add_parameter("reference water depth",
                     reference_water_depth_,
                     "Problem specific water depth reference");
-
-      limiter_kinetic_energy_ = false;
-      add_parameter("limiter kinetic energy",
-                    limiter_kinetic_energy_,
-                    "Limit on the kinetic energy");
-
-      limiter_square_velocity_ = true;
-      add_parameter("limiter square velocity",
-                    limiter_square_velocity_,
-                    "Limit on the square velocity");
 
       dry_state_relaxation_factor_ = 2.e-1;
       add_parameter("dry state relaxation factor",

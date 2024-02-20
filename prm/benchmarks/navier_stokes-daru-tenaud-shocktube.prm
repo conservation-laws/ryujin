@@ -81,12 +81,6 @@ subsection E - InitialValues
   end
 end
 
-subsection F - HyperbolicModule
-  set cfl with boundary dofs = true
-
-  set limiter iterations = 2
-end
-
 subsection G - ParabolicModule
   set tolerance                              = 1e-10
   set tolerance linfty norm                  = false
