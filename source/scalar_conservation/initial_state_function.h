@@ -25,7 +25,7 @@ namespace ryujin
     class Function : public InitialState<Description, dim, Number>
     {
     public:
-      using HyperbolicSystemView = HyperbolicSystem::View<dim, Number>;
+      using HyperbolicSystemView = HyperbolicSystemView<dim, Number>;
       using state_type = typename HyperbolicSystemView::state_type;
       using primitive_state_type =
           typename HyperbolicSystemView::primitive_state_type;

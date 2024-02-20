@@ -112,7 +112,7 @@ namespace ryujin
       using ParabolicSystem = typename Description::ParabolicSystem;
 
       /**
-       * @copydoc HyperbolicSystem::View
+       * @copydoc HyperbolicSystemView
        */
       using HyperbolicSystemView =
           typename HyperbolicSystem::template View<dim, Number>;
@@ -123,7 +123,7 @@ namespace ryujin
       using scalar_type = typename OfflineData<dim, Number>::scalar_type;
 
       /**
-       * @copydoc HyperbolicSystem::View::vector_type
+       * @copydoc HyperbolicSystemView::vector_type
        */
       using vector_type = typename HyperbolicSystemView::vector_type;
 

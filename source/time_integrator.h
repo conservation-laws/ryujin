@@ -183,7 +183,7 @@ namespace ryujin
     using ParabolicSystem = typename Description::ParabolicSystem;
 
     /**
-     * @copydoc HyperbolicSystem::View
+     * @copydoc HyperbolicSystemView
      */
     using HyperbolicSystemView =
         typename Description::HyperbolicSystem::template View<dim, Number>;

@@ -83,9 +83,9 @@ namespace ryujin
     {
     public:
       /**
-       * @copydoc HyperbolicSystem::View
+       * @copydoc HyperbolicSystemView
        */
-      using HyperbolicSystemView = HyperbolicSystem::View<dim, Number>;
+      using HyperbolicSystemView = HyperbolicSystemView<dim, Number>;
 
       /**
        * @copydoc HyperbolicSystem::problem_dimension

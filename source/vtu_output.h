@@ -37,7 +37,7 @@ namespace ryujin
     using HyperbolicSystem = typename Description::HyperbolicSystem;
 
     /**
-     * @copydoc HyperbolicSystem::View
+     * @copydoc HyperbolicSystemView
      */
     using HyperbolicSystemView =
         typename Description::HyperbolicSystem::template View<dim, Number>;
