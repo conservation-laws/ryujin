@@ -140,8 +140,8 @@ namespace ryujin
        * Return early if we neither limit on kinetic energy or on square
        * velocity.
        */
-      if (RYUJIN_UNLIKELY(!hyperbolic_system.limiter_square_velocity() &&
-                          !hyperbolic_system.limiter_kinetic_energy()))
+      if (RYUJIN_UNLIKELY(!parameters.limit_on_square_velocity() &&
+                          !parameters.limit_on_kinetic_energy()))
         return {t_l, success};
 
       /*
@@ -157,7 +157,7 @@ namespace ryujin
        *   psi = h KE_i^max - 1/2 |q|^2
        */
 
-      if (hyperbolic_system.limiter_kinetic_energy()) {
+      if (parameters.limit_on_kinetic_energy()) {
 
         /* We first check if t_r is a good state */
 
@@ -176,7 +176,7 @@ namespace ryujin
             dealii::SIMDComparison::greater_than>(psi_r, Number(0.), t_r, t_l);
 
         /* If we have set t_l = t_r everywhere we can return: */
-        if (!hyperbolic_system.limiter_square_velocity() && t_l == t_r)
+        if (!parameters.limit_on_square_velocity() && t_l == t_r)
           return {t_l, success};
 
 #ifdef DEBUG_OUTPUT_LIMITER
@@ -290,7 +290,7 @@ namespace ryujin
 #endif
 
         /* Flip bounds for the square velocity limiter: */
-        if (hyperbolic_system.limiter_square_velocity()) {
+        if (parameters.limit_on_square_velocity()) {
           t_r = t_l;
           t_l = t_min;
         }
@@ -307,7 +307,7 @@ namespace ryujin
        *   psi = h^2 (|v|^2)^max - |q|^2
        */
 
-      if (hyperbolic_system.limiter_square_velocity()) {
+      if (parameters.limit_on_square_velocity()) {
         /* We first check if t_r is a good state */
 
         const auto U_r = U + t_r * P;

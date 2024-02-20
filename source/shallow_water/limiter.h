@@ -47,6 +47,16 @@ namespace ryujin
                       relaxation_factor_,
                       "Factor for scaling the relaxation window with r_i = "
                       "factor * (m_i/|Omega|)^(1.5/d).");
+
+        limit_on_kinetic_energy_ = false;
+        add_parameter("limit on kinetic energy",
+                      limit_on_kinetic_energy_,
+                      "Limit on kinetic energy");
+
+        limit_on_square_velocity_ = true;
+        add_parameter("limit on square velocity",
+                      limit_on_square_velocity_,
+                      "Limit on square velocity");
       }
 
       ACCESSOR_READ_ONLY(iterations);
@@ -54,11 +64,17 @@ namespace ryujin
       ACCESSOR_READ_ONLY(newton_max_iterations);
       ACCESSOR_READ_ONLY(relaxation_factor);
 
+      ACCESSOR_READ_ONLY(limit_on_kinetic_energy);
+      ACCESSOR_READ_ONLY(limit_on_square_velocity);
+
     private:
       unsigned int iterations_;
       ScalarNumber newton_tolerance_;
       unsigned int newton_max_iterations_;
       ScalarNumber relaxation_factor_;
+
+      bool limit_on_kinetic_energy_;
+      bool limit_on_square_velocity_;
     };
 
 
