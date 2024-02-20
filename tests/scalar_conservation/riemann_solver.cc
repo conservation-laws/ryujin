@@ -23,7 +23,7 @@ void test(const std::string &expression)
 
   HyperbolicSystem hyperbolic_system;
   typename RiemannSolver<dim, Number>::Parameters riemann_solver_parameters(
-      "/riemann_solver");
+      "/RiemannSolver");
 
   const auto view = hyperbolic_system.view<dim, Number>();
 
@@ -31,8 +31,10 @@ void test(const std::string &expression)
     std::stringstream parameters;
     parameters << "subsection HyperbolicSystem\n"
                << "set flux = " << expression << "\n"
-               << "set riemann solver greedy wavespeed = true\n"
-               << "set riemann solver averaged entropy = true\n"
+               << "end\n"
+               << "subsection RiemannSolver\n"
+               << "set use greedy wavespeed = true\n"
+               << "set use averaged entropy = true\n"
                << "end\n"
                << std::endl;
     ParameterAcceptor::initialize(parameters);

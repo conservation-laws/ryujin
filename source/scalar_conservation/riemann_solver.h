@@ -23,7 +23,41 @@ namespace ryujin
       RiemannSolverParameters(const std::string &subsection)
           : ParameterAcceptor(subsection)
       {
+        use_greedy_wavespeed_ = false;
+        add_parameter("use greedy wavespeed",
+                      use_greedy_wavespeed_,
+                      "Use a greedy wavespeed estimate instead of a guaranteed "
+                      "upper bound "
+                      "on the maximal wavespeed (for convex fluxes).");
+
+        use_averaged_entropy_ = false;
+        add_parameter("use averaged entropy",
+                      use_averaged_entropy_,
+                      "In addition to the wavespeed estimate based on the Roe "
+                      "average and "
+                      "flux gradients of the left and right state also enforce "
+                      "an entropy "
+                      "inequality on the averaged Krŭzkov entropy.");
+
+        random_entropies_ = 0;
+        add_parameter(
+            "random entropies",
+            random_entropies_,
+            "In addition to the wavespeed estimate based on the Roe average "
+            "and "
+            "flux gradients of the left and right state also enforce an "
+            "entropy "
+            "inequality on the prescribed number of random Krŭzkov entropies.");
       }
+
+      ACCESSOR_READ_ONLY(use_greedy_wavespeed);
+      ACCESSOR_READ_ONLY(use_averaged_entropy);
+      ACCESSOR_READ_ONLY(random_entropies);
+
+    private:
+      bool use_greedy_wavespeed_;
+      bool use_averaged_entropy_;
+      unsigned int random_entropies_;
     };
 
 
