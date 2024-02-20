@@ -156,7 +156,7 @@ namespace ryujin
                               const dealii::Tensor<1, dim, Number> &n_ij) const;
 
     private:
-      const HyperbolicSystemView hyperbolic_system;
+      const HyperbolicSystem &hyperbolic_system;
       const Parameters &parameters;
 
       const MultiComponentVector<ScalarNumber, n_precomputed_values>
@@ -178,14 +178,16 @@ namespace ryujin
         const state_type &U, const dealii::Tensor<1, dim, Number> &n_ij) const
         -> primitive_type
     {
-      const Number h = hyperbolic_system.water_depth_sharp(U);
-      const Number gravity = hyperbolic_system.gravity();
+      const auto view = hyperbolic_system.view<dim, Number>();
 
-      const auto vel = hyperbolic_system.momentum(U) / h;
-      const auto proj_vel = n_ij * vel;
+      const Number h = view.water_depth_sharp(U);
+      const Number gravity = view.gravity();
+
+      const auto velocity = view.momentum(U) / h;
+      const auto projected_velocity = n_ij * velocity;
       const auto a = std::sqrt(h * gravity);
 
-      return {{h, proj_vel, a}};
+      return {{h, projected_velocity, a}};
     }
 
 

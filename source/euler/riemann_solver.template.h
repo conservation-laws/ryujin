@@ -23,8 +23,10 @@ namespace ryujin
     RiemannSolver<dim, Number>::f(const primitive_type &riemann_data,
                                   const Number p_star) const
     {
+      const auto view = hyperbolic_system.view<dim, Number>();
+
       const auto &[rho, u, p, a] = riemann_data;
-      const auto gamma = hyperbolic_system.gamma();
+      const auto gamma = view.gamma();
 
       const Number Az = ScalarNumber(2.) / (rho * (gamma + Number(1.)));
       const Number Bz =
@@ -75,12 +77,14 @@ namespace ryujin
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
+      const auto view = hyperbolic_system.view<dim, Number>();
+
       const auto &[rho_i, u_i, p_i, a_i] = riemann_data_i;
       const auto &[rho_j, u_j, p_j, a_j] = riemann_data_j;
 
       const Number p_max = std::max(p_i, p_j);
 
-      const auto gamma = hyperbolic_system.gamma();
+      const auto gamma = view.gamma();
 
       const Number radicand_inverse_i = ScalarNumber(0.5) * rho_i *
                                         ((gamma + ScalarNumber(1.)) * p_max +
@@ -115,11 +119,13 @@ namespace ryujin
     RiemannSolver<dim, Number>::lambda1_minus(
         const primitive_type &riemann_data, const Number p_star) const
     {
+      const auto view = hyperbolic_system.view<dim, Number>();
+
       const auto &[rho, u, p, a] = riemann_data;
       const auto inv_p = ScalarNumber(1.0) / p;
 
-      const auto gamma = hyperbolic_system.gamma();
-      const auto gamma_inverse = hyperbolic_system.gamma_inverse();
+      const auto gamma = view.gamma();
+      const auto gamma_inverse = view.gamma_inverse();
       const auto factor =
           (gamma + ScalarNumber(1.0)) * ScalarNumber(0.5) * gamma_inverse;
       const Number tmp = positive_part((p_star - p) * inv_p);
@@ -138,11 +144,13 @@ namespace ryujin
     RiemannSolver<dim, Number>::lambda3_plus(
         const primitive_type &primitive_state, const Number p_star) const
     {
+      const auto view = hyperbolic_system.view<dim, Number>();
+
       const auto &[rho, u, p, a] = primitive_state;
       const auto inv_p = ScalarNumber(1.0) / p;
 
-      const auto gamma = hyperbolic_system.gamma();
-      const auto gamma_inverse = hyperbolic_system.gamma_inverse();
+      const auto gamma = view.gamma();
+      const auto gamma_inverse = view.gamma_inverse();
       const Number factor =
           (gamma + ScalarNumber(1.0)) * ScalarNumber(0.5) * gamma_inverse;
       const Number tmp = positive_part((p_star - p) * inv_p);
@@ -189,6 +197,8 @@ namespace ryujin
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
+      const auto view = hyperbolic_system.view<dim, Number>();
+
       const auto &[rho_i, u_i, p_i, a_i] = riemann_data_i;
       const auto &[rho_j, u_j, p_j, a_j] = riemann_data_j;
       const auto inv_p_j = ScalarNumber(1.) / p_j;
@@ -200,7 +210,7 @@ namespace ryujin
        * identity below:
        */
 
-      const auto &gamma = hyperbolic_system.gamma();
+      const auto &gamma = view.gamma();
       const auto factor = (gamma - ScalarNumber(1.)) * ScalarNumber(0.5);
 
       /*
@@ -210,8 +220,8 @@ namespace ryujin
        * Therefore, all we have to do is to take the positive part of the
        * expression:
        */
-      const auto &gamma_inverse = hyperbolic_system.gamma_inverse();
-      const auto &gm1_inverse = hyperbolic_system.gamma_minus_one_inverse();
+      const auto &gamma_inverse = view.gamma_inverse();
+      const auto &gm1_inverse = view.gamma_minus_one_inverse();
 
       const Number numerator = positive_part(a_i + a_j - factor * (u_j - u_i));
       const Number denominator =
@@ -243,10 +253,12 @@ namespace ryujin
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
+      const auto view = hyperbolic_system.view<dim, Number>();
+
       const auto &[rho_i, u_i, p_i, a_i] = riemann_data_i;
       const auto &[rho_j, u_j, p_j, a_j] = riemann_data_j;
 
-      const auto &gamma = hyperbolic_system.gamma();
+      const auto &gamma = view.gamma();
 
       /*
        * Compute (5.11) formula for \tilde p_2^\ast:

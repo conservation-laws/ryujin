@@ -148,7 +148,7 @@ namespace ryujin
                      const dealii::Tensor<1, dim, Number> &n_ij) const;
 
     private:
-      const HyperbolicSystemView hyperbolic_system;
+      const HyperbolicSystem &hyperbolic_system;
       const Parameters &parameters;
 
       const MultiComponentVector<ScalarNumber, n_precomputed_values>
@@ -171,10 +171,11 @@ namespace ryujin
         const unsigned int *js,
         const dealii::Tensor<1, dim, Number> &n_ij) const
     {
+      const auto view = hyperbolic_system.view<dim, Number>();
+
       using pst =
           typename HyperbolicSystem::View<dim, Number>::precomputed_state_type;
 
-      const auto &view = hyperbolic_system; // FIXME
       const auto u_i = view.state(U_i);
       const auto u_j = view.state(U_j);
 

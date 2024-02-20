@@ -85,7 +85,8 @@ namespace ryujin
     DEAL_II_ALWAYS_INLINE inline Number RiemannSolver<dim, Number>::alpha(
         const Number &rho, const Number &gamma, const Number &a) const
     {
-      const auto interpolation_b = hyperbolic_system.eos_interpolation_b();
+      const auto view = hyperbolic_system.view<dim, Number>();
+      const auto interpolation_b = view.eos_interpolation_b();
 
       const Number numerator =
           ScalarNumber(2.) * a * (Number(1.) - interpolation_b * rho);
@@ -241,7 +242,8 @@ namespace ryujin
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
-      const auto interpolation_b = hyperbolic_system.eos_interpolation_b();
+      const auto view = hyperbolic_system.view<dim, Number>();
+      const auto interpolation_b = view.eos_interpolation_b();
 
       const auto &[rho_i, u_i, p_i, gamma_i, a_i] = riemann_data_i;
       const auto &[rho_j, u_j, p_j, gamma_j, a_j] = riemann_data_j;
@@ -372,7 +374,8 @@ namespace ryujin
     RiemannSolver<dim, Number>::f(const primitive_type &riemann_data,
                                   const Number p_star) const
     {
-      const auto interpolation_b = hyperbolic_system.eos_interpolation_b();
+      const auto view = hyperbolic_system.view<dim, Number>();
+      const auto interpolation_b = view.eos_interpolation_b();
 
       const auto &[rho, u, p, gamma, a] = riemann_data;
 
@@ -417,7 +420,8 @@ namespace ryujin
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
-      const auto interpolation_b = hyperbolic_system.eos_interpolation_b();
+      const auto view = hyperbolic_system.view<dim, Number>();
+      const auto interpolation_b = view.eos_interpolation_b();
 
       const auto &[rho_i, u_i, p_i, gamma_i, a_i] = riemann_data_i;
       const auto &[rho_j, u_j, p_j, gamma_j, a_j] = riemann_data_j;
@@ -491,6 +495,8 @@ namespace ryujin
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
+      const auto view = hyperbolic_system.view<dim, Number>();
+
       const auto &[rho_i, u_i, p_i, gamma_i, a_i] = riemann_data_i;
       const auto &[rho_j, u_j, p_j, gamma_j, a_j] = riemann_data_j;
 
@@ -510,7 +516,7 @@ namespace ryujin
       const Number p_max = std::max(p_i, p_j);
       const Number phi_p_max = phi_of_p_max(riemann_data_i, riemann_data_j);
 
-      if (!hyperbolic_system.compute_strict_bounds()) {
+      if (!view.compute_strict_bounds()) {
 #ifdef DEBUG_RIEMANN_SOLVER
         const Number p_star_RS = p_star_RS_full(riemann_data_i, riemann_data_j);
         const Number p_star_SS = p_star_SS_full(riemann_data_i, riemann_data_j);
