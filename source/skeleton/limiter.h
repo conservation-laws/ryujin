@@ -183,7 +183,7 @@ namespace ryujin
        * invariant domain.
        */
       static bool
-      is_in_invariant_domain(const HyperbolicSystemView & /*hyperbolic_system*/,
+      is_in_invariant_domain(const HyperbolicSystem & /*hyperbolic_system*/,
                              const Bounds & /*bounds*/,
                              const state_type & /*U*/)
       {
@@ -194,7 +194,8 @@ namespace ryujin
       //@}
       /** @name Arguments and internal fields */
       //@{
-      const HyperbolicSystemView hyperbolic_system;
+
+      const HyperbolicSystem &hyperbolic_system;
       const Parameters &parameters;
 
       const MultiComponentVector<ScalarNumber, n_precomputed_values>

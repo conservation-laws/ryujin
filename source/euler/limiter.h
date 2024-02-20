@@ -239,7 +239,7 @@ namespace ryujin
        * invariant domain.
        */
       static bool
-      is_in_invariant_domain(const HyperbolicSystemView &hyperbolic_system,
+      is_in_invariant_domain(const HyperbolicSystem &hyperbolic_system,
                              const Bounds &bounds,
                              const state_type &U);
 
@@ -248,7 +248,7 @@ namespace ryujin
       /** @name Arguments and internal fields */
       //@{
 
-      const HyperbolicSystemView hyperbolic_system;
+      const HyperbolicSystem &hyperbolic_system;
       const Parameters &parameters;
 
       const MultiComponentVector<ScalarNumber, n_precomputed_values>
@@ -301,14 +301,15 @@ namespace ryujin
         const dealii::Tensor<1, dim, Number> &scaled_c_ij,
         const Number beta_ij)
     {
-      /* Bounds: */
+      const auto view = hyperbolic_system.view<dim, Number>();
 
+      /* Bounds: */
       auto &[rho_min, rho_max, s_min] = bounds_;
 
-      const auto rho_i = hyperbolic_system.density(U_i);
-      const auto m_i = hyperbolic_system.momentum(U_i);
-      const auto rho_j = hyperbolic_system.density(U_j);
-      const auto m_j = hyperbolic_system.momentum(U_j);
+      const auto rho_i = view.density(U_i);
+      const auto m_i = view.momentum(U_i);
+      const auto rho_j = view.density(U_j);
+      const auto m_j = view.momentum(U_j);
       const auto rho_ij_bar =
           ScalarNumber(0.5) * (rho_i + rho_j + (m_i - m_j) * scaled_c_ij);
       rho_min = std::min(rho_min, rho_ij_bar);
@@ -325,7 +326,7 @@ namespace ryujin
       rho_relaxation_denominator += std::abs(beta_ij);
 
       const Number s_interp =
-          hyperbolic_system.specific_entropy((U_i + U_j) * ScalarNumber(.5));
+          view.specific_entropy((U_i + U_j) * ScalarNumber(.5));
       s_interp_max = std::max(s_interp_max, s_interp);
     }
 
@@ -366,7 +367,7 @@ namespace ryujin
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline bool
     Limiter<dim, Number>::is_in_invariant_domain(
-        const HyperbolicSystemView & /*hyperbolic_system*/,
+        const HyperbolicSystem & /*hyperbolic_system*/,
         const Bounds & /*bounds*/,
         const state_type & /*U*/)
     {
