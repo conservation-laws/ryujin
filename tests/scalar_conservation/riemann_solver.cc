@@ -39,12 +39,12 @@ void test(const std::string &expression)
     ParameterAcceptor::initialize(parameters);
   }
 
-  using HyperbolicSystemView = typename HyperbolicSystem::View<dim, Number>;
+  using HyperbolicSystemView = HyperbolicSystemView<dim, Number>;
   using state_type = typename HyperbolicSystemView::state_type;
   using precomputed_state_type =
       typename HyperbolicSystemView::precomputed_state_type;
   static constexpr unsigned int n_precomputed_values =
-      HyperbolicSystem::View<dim, Number>::n_precomputed_values;
+      HyperbolicSystemView::n_precomputed_values;
   using precomputed_type = MultiComponentVector<Number, n_precomputed_values>;
 
   precomputed_type dummy;

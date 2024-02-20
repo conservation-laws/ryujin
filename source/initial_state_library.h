@@ -37,7 +37,7 @@ namespace ryujin
      * @copydoc HyperbolicSystemView
      */
     using HyperbolicSystemView =
-        typename Description::HyperbolicSystem::template View<dim, Number>;
+        typename Description::template HyperbolicSystemView<dim, Number>;
 
     using state_type = typename HyperbolicSystemView::state_type;
     using precomputed_state_type =

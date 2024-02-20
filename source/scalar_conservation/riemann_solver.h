@@ -173,8 +173,7 @@ namespace ryujin
     {
       const auto view = hyperbolic_system.view<dim, Number>();
 
-      using pst =
-          typename HyperbolicSystemView<dim, Number>::precomputed_state_type;
+      using pst = typename HyperbolicSystemView::precomputed_state_type;
 
       const auto u_i = view.state(U_i);
       const auto u_j = view.state(U_j);

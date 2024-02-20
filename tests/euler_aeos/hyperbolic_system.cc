@@ -30,7 +30,7 @@ void test(const Number gamma)
 
   const auto view = hyperbolic_system.view<dim, Number>();
 
-  using HyperbolicSystemView = typename HyperbolicSystem::View<dim, Number>;
+  using HyperbolicSystemView = HyperbolicSystemView<dim, Number>;
   using state_type = typename HyperbolicSystemView::state_type;
 
   const auto from_1d_state =

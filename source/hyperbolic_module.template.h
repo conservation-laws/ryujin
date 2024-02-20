@@ -76,7 +76,8 @@ namespace ryujin
 
     const auto &vector_partitioner = offline_data_->vector_partitioner();
     r_.reinit(vector_partitioner);
-    using View = typename HyperbolicSystem::template View<dim, Number>;
+    using View =
+        typename Description::template HyperbolicSystemView<dim, Number>;
 
     /* Initialize matrices: */
 
@@ -512,7 +513,8 @@ namespace ryujin
 
       auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
         using T = decltype(sentinel);
-        using View = typename HyperbolicSystem::template View<dim, T>;
+        using View =
+            typename Description::template HyperbolicSystemView<dim, T>;
         using Limiter = typename Description::template Limiter<dim, T>;
         using flux_contribution_type = typename View::flux_contribution_type;
         using state_type = typename View::state_type;
@@ -778,7 +780,8 @@ namespace ryujin
 
       auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
         using T = decltype(sentinel);
-        using View = typename HyperbolicSystem::template View<dim, T>;
+        using View =
+            typename Description::template HyperbolicSystemView<dim, T>;
         using Limiter = typename Description::template Limiter<dim, T>;
 
         unsigned int stride_size = get_stride_size<T>;
@@ -899,7 +902,8 @@ namespace ryujin
 
       auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
         using T = decltype(sentinel);
-        using View = typename HyperbolicSystem::template View<dim, T>;
+        using View =
+            typename Description::template HyperbolicSystemView<dim, T>;
         using Limiter = typename Description::template Limiter<dim, T>;
 
         unsigned int stride_size = get_stride_size<T>;
@@ -1005,7 +1009,8 @@ namespace ryujin
     } /* limiter_iter_ */
 
     /* Update sources: */
-    using View = typename HyperbolicSystem::template View<dim, Number>;
+    using View =
+        typename Description::template HyperbolicSystemView<dim, Number>;
 
     CALLGRIND_STOP_INSTRUMENTATION;
 

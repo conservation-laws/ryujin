@@ -262,7 +262,7 @@ namespace ryujin
           view.total_energy(U) - Number(0.5) * perp.norm_square() * rho_inverse;
 
       using state_type_1d =
-          typename HyperbolicSystemView<1, Number>::state_type;
+          typename Euler::HyperbolicSystemView<1, Number>::state_type;
       const auto view_1d = hyperbolic_system.view<1, Number>();
 
       const auto state = state_type_1d{{rho, proj_m, E}};

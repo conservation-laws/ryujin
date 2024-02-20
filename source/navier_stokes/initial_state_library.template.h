@@ -21,7 +21,7 @@ namespace ryujin
     using HyperbolicSystem = typename Description::HyperbolicSystem;
 
     using HyperbolicSystemView =
-        typename HyperbolicSystem::template View<dim, Number>;
+        typename Description::template HyperbolicSystemView<dim, Number>;
 
     using initial_state_list_type =
         std::set<std::unique_ptr<InitialState<Description, dim, Number>>>;
