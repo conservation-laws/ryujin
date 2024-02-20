@@ -27,7 +27,7 @@ namespace ryujin
           : ParameterAcceptor(subsection)
       {
         evc_factor_ = ScalarNumber(1.);
-        add_parameter("indicator evc factor",
+        add_parameter("evc factor",
                       evc_factor_,
                       "Factor for scaling the entropy viscocity commuator");
       }

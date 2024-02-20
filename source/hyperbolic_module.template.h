@@ -37,7 +37,7 @@ namespace ryujin
       , id_violation_strategy_(IDViolationStrategy::warn)
       , indicator_parameters_(subsection + "/indicator")
       , limiter_parameters_(subsection + "/limiter")
-      , riemann_solver_parameters_(subsection + "/riemann_solver")
+      , riemann_solver_parameters_(subsection + "/riemann solver")
       , mpi_communicator_(mpi_communicator)
       , computing_timer_(computing_timer)
       , offline_data_(&offline_data)
