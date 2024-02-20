@@ -112,10 +112,10 @@ namespace ryujin
       using ParabolicSystem = typename Description::ParabolicSystem;
 
       /**
-       * @copydoc HyperbolicSystem::View
+       * @copydoc HyperbolicSystemView
        */
-      using HyperbolicSystemView =
-          typename HyperbolicSystem::template View<dim, Number>;
+      using View =
+          typename Description::template HyperbolicSystemView<dim, Number>;
 
       /**
        * @copydoc OfflineData::scalar_type
@@ -123,9 +123,9 @@ namespace ryujin
       using scalar_type = typename OfflineData<dim, Number>::scalar_type;
 
       /**
-       * @copydoc HyperbolicSystem::View::vector_type
+       * @copydoc HyperbolicSystemView::vector_type
        */
-      using vector_type = typename HyperbolicSystemView::vector_type;
+      using vector_type = typename View::vector_type;
 
       /**
        * A distributed block vector used for temporary storage of the

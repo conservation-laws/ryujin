@@ -30,6 +30,9 @@ namespace ryujin
     struct Description {
       using HyperbolicSystem = Skeleton::HyperbolicSystem;
 
+      template <int dim, typename Number = double>
+      using HyperbolicSystemView = Skeleton::HyperbolicSystemView<dim, Number>;
+
       using ParabolicSystem = Skeleton::ParabolicSystem;
 
       template <int dim, typename Number = double>

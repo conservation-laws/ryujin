@@ -43,21 +43,20 @@ namespace ryujin
     using HyperbolicSystem = typename Description::HyperbolicSystem;
 
     /**
-     * @copydoc HyperbolicSystem::View
+     * @copydoc HyperbolicSystemView
      */
-    using HyperbolicSystemView =
-        typename HyperbolicSystem::template View<dim, Number>;
+    using View =
+        typename Description::template HyperbolicSystemView<dim, Number>;
 
     /**
      * @copydoc HyperbolicSystem::problem_dimension
      */
-    static constexpr unsigned int problem_dimension =
-        HyperbolicSystemView::problem_dimension;
+    static constexpr unsigned int problem_dimension = View::problem_dimension;
 
     /**
      * @copydoc HyperbolicSystem::state_type
      */
-    using state_type = typename HyperbolicSystemView::state_type;
+    using state_type = typename View::state_type;
 
     /**
      * Typedef for a MultiComponentVector storing the state U.
@@ -68,13 +67,12 @@ namespace ryujin
      * @copydoc HyperbolicSystem::n_precomputed_values
      */
     static constexpr unsigned int n_precomputed_values =
-        HyperbolicSystemView::n_precomputed_initial_values;
+        View::n_precomputed_initial_values;
 
     /**
      * Array type used for precomputed values.
      */
-    using precomputed_state_type =
-        typename HyperbolicSystemView::precomputed_state_type;
+    using precomputed_state_type = typename View::precomputed_state_type;
 
     /**
      * Constructor.

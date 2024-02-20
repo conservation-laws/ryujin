@@ -43,9 +43,9 @@ namespace ryujin
         "Recompute bounds for every output cycle. If set to false, bounds once "
         "at the beginning and reused thereafter.");
 
-    static_assert(HyperbolicSystemView::component_names.size() > 0,
+    static_assert(View::component_names.size() > 0,
                   "Need at least one scalar quantitity");
-    schlieren_quantities_.push_back(HyperbolicSystemView::component_names[0]);
+    schlieren_quantities_.push_back(View::component_names[0]);
 
     add_parameter(
         "schlieren quantities",
@@ -76,8 +76,8 @@ namespace ryujin
     const auto populate = [&](const auto &strings,
                               auto &indices,
                               const auto &pre) {
-      const auto &cons = HyperbolicSystemView::component_names;
-      const auto &prim = HyperbolicSystemView::primitive_component_names;
+      const auto &cons = View::component_names;
+      const auto &prim = View::primitive_component_names;
       for (const auto &entry : strings) {
         bool found = false;
         for (const auto &[is_primitive, names] :

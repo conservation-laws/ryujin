@@ -39,12 +39,12 @@ int main()
     ParameterAcceptor::initialize(parameters);
   };
 
-  using state_type = HyperbolicSystem::View<dim, double>::state_type;
+  using state_type = HyperbolicSystemView<dim, double>::state_type;
 
   using bounds_type = Limiter<dim, double>::Bounds;
 
   static constexpr unsigned int n_precomputed_values =
-      HyperbolicSystem::View<dim, double>::n_precomputed_values;
+      HyperbolicSystemView<dim, double>::n_precomputed_values;
 
   using precomputed_type = MultiComponentVector<double, n_precomputed_values>;
   precomputed_type dummy;

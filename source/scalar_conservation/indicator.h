@@ -49,26 +49,25 @@ namespace ryujin
     {
     public:
       /**
-       * @copydoc HyperbolicSystem::View
+       * @copydoc HyperbolicSystemView
        */
-      using HyperbolicSystemView = HyperbolicSystem::View<dim, Number>;
+      using View = HyperbolicSystemView<dim, Number>;
 
       /**
        * @copydoc HyperbolicSystem::n_precomputed_values
        */
       static constexpr unsigned int n_precomputed_values =
-          HyperbolicSystemView::n_precomputed_values;
+          View::n_precomputed_values;
 
       /**
-       * @copydoc HyperbolicSystem::View::precomputed_state_type
+       * @copydoc HyperbolicSystemView::precomputed_state_type
        */
-      using precomputed_state_type =
-          typename HyperbolicSystemView::precomputed_state_type;
+      using precomputed_state_type = typename View::precomputed_state_type;
 
       /**
        * @copydoc HyperbolicSystem::state_type
        */
-      using state_type = typename HyperbolicSystemView::state_type;
+      using state_type = typename View::state_type;
 
       /**
        * @copydoc HyperbolicSystem::ScalarNumber

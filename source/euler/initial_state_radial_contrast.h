@@ -30,9 +30,9 @@ namespace ryujin
     {
     public:
       using HyperbolicSystem = typename Description::HyperbolicSystem;
-      using HyperbolicSystemView =
-          typename HyperbolicSystem::template View<dim, Number>;
-      using state_type = typename HyperbolicSystemView::state_type;
+      using View =
+          typename Description::template HyperbolicSystemView<dim, Number>;
+      using state_type = typename View::state_type;
 
       RadialContrast(const HyperbolicSystem &hyperbolic_system,
                      const std::string &subsection)

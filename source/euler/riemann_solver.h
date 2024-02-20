@@ -41,15 +41,14 @@ namespace ryujin
     {
     public:
       /**
-       * @copydoc HyperbolicSystem::View
+       * @copydoc HyperbolicSystemView
        */
-      using HyperbolicSystemView = HyperbolicSystem::View<dim, Number>;
+      using View = HyperbolicSystemView<dim, Number>;
 
       /**
-       * @copydoc HyperbolicSystem::View::problem_dimension
+       * @copydoc HyperbolicSystemView::problem_dimension
        */
-      static constexpr unsigned int problem_dimension =
-          HyperbolicSystemView::problem_dimension;
+      static constexpr unsigned int problem_dimension = View::problem_dimension;
 
       /**
        * Number of components in a primitive state, we store \f$[\rho, v,
@@ -64,20 +63,20 @@ namespace ryujin
       using primitive_type = std::array<Number, riemann_data_size>;
 
       /**
-       * @copydoc HyperbolicSystem::View::state_type
+       * @copydoc HyperbolicSystemView::state_type
        */
-      using state_type = typename HyperbolicSystemView::state_type;
+      using state_type = typename View::state_type;
 
       /**
-       * @copydoc HyperbolicSystem::View::n_precomputed_values
+       * @copydoc HyperbolicSystemView::n_precomputed_values
        */
       static constexpr unsigned int n_precomputed_values =
-          HyperbolicSystemView::n_precomputed_values;
+          View::n_precomputed_values;
 
       /**
-       * @copydoc HyperbolicSystem::View::ScalarNumber
+       * @copydoc HyperbolicSystemView::ScalarNumber
        */
-      using ScalarNumber = typename HyperbolicSystemView::ScalarNumber;
+      using ScalarNumber = typename View::ScalarNumber;
 
       /**
        * @copydoc RiemannSolverParameters
@@ -262,7 +261,7 @@ namespace ryujin
           view.total_energy(U) - Number(0.5) * perp.norm_square() * rho_inverse;
 
       using state_type_1d =
-          typename HyperbolicSystem::View<1, Number>::state_type;
+          typename HyperbolicSystemView<1, Number>::state_type;
       const auto view_1d = hyperbolic_system.view<1, Number>();
 
       const auto state = state_type_1d{{rho, proj_m, E}};

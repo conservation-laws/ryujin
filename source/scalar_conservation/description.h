@@ -35,6 +35,10 @@ namespace ryujin
     struct Description {
       using HyperbolicSystem = ScalarConservation::HyperbolicSystem;
 
+      template <int dim, typename Number = double>
+      using HyperbolicSystemView =
+          ScalarConservation::HyperbolicSystemView<dim, Number>;
+
       using ParabolicSystem = ScalarConservation::ParabolicSystem;
 
       template <int dim, typename Number = double>

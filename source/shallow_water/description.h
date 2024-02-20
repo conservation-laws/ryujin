@@ -32,6 +32,10 @@ namespace ryujin
     struct Description {
       using HyperbolicSystem = ShallowWater::HyperbolicSystem;
 
+      template <int dim, typename Number = double>
+      using HyperbolicSystemView =
+          ShallowWater::HyperbolicSystemView<dim, Number>;
+
       using ParabolicSystem = ShallowWater::ParabolicSystem;
 
       template <int dim, typename Number = double>

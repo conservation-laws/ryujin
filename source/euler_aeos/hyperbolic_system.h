@@ -24,6 +24,9 @@ namespace ryujin
 {
   namespace EulerAEOS
   {
+    template <int dim, typename Number>
+    class HyperbolicSystemView;
+
     /**
      * The compressible Euler equations of gas dynamics. Generalized
      * implementation with a modified approximative Riemann solver,
@@ -49,10 +52,23 @@ namespace ryujin
        */
       HyperbolicSystem(const std::string &subsection = "/HyperbolicSystem");
 
+      /**
+       * Return a view on the Hyperbolic System for a given dimension @p
+       * dim and choice of number type @p Number (which can be a scalar
+       * float, or double, as well as a VectorizedArray holding packed
+       * scalars.
+       */
+      template <int dim, typename Number>
+      auto view() const
+      {
+        return HyperbolicSystemView<dim, Number>{*this};
+      }
+
     private:
       /**
-       * @name Runtime parameters, internal fields and methods
+       * @name Runtime parameters, internal fields, methods, and friends
        */
+      //@{
 
       std::string equation_of_state_;
       double reference_density_;
@@ -66,681 +82,666 @@ namespace ryujin
       using EquationOfState = EquationOfStateLibrary::EquationOfState;
       std::shared_ptr<EquationOfState> selected_equation_of_state_;
 
+      template <int dim, typename Number>
+      friend class HyperbolicSystemView;
+      //@}
+    }; /* HyperbolicSystem */
+
+
+    /**
+     * A view of the HyperbolicSystem that makes methods available for a
+     * given dimension @p dim and choice of number type @p Number (which
+     * can be a scalar float, or double, as well as a VectorizedArray
+     * holding packed scalars.
+     *
+     * Intended usage:
+     * ```
+     * HyperbolicSystem hyperbolic_system;
+     * const auto view = hyperbolic_system.template view<dim, Number>();
+     * const auto flux_i = view.flux_contribution(...);
+     * const auto flux_j = view.flux_contribution(...);
+     * const auto flux_ij = view.flux(flux_i, flux_j);
+     * // etc.
+     * ```
+     */
+    template <int dim, typename Number>
+    class HyperbolicSystemView
+    {
     public:
       /**
-       * A view of the HyperbolicSystem that makes methods available for a
-       * given dimension @p dim and choice of number type @p Number (which
-       * can be a scalar float, or double, as well as a VectorizedArray
-       * holding packed scalars.
+       * Constructor taking a reference to the underlying
+       * HyperbolicSystem
+       */
+      HyperbolicSystemView(const HyperbolicSystem &hyperbolic_system)
+          : hyperbolic_system_(hyperbolic_system)
+      {
+      }
+
+      /**
+       * Create a modified view from the current one:
+       */
+      template <int dim2, typename Number2>
+      auto view() const
+      {
+        return HyperbolicSystemView<dim2, Number2>{hyperbolic_system_};
+      }
+
+      /**
+       * The underlying scalar number type.
+       */
+      using ScalarNumber = typename get_value_type<Number>::type;
+
+      /**
+       * @name Access to runtime parameters
+       */
+      //@{
+
+      DEAL_II_ALWAYS_INLINE inline const std::string &equation_of_state() const
+      {
+        return hyperbolic_system_.equation_of_state_;
+      }
+
+      DEAL_II_ALWAYS_INLINE inline ScalarNumber reference_density() const
+      {
+        return hyperbolic_system_.reference_density_;
+      }
+
+      DEAL_II_ALWAYS_INLINE inline ScalarNumber
+      vacuum_state_relaxation_small() const
+      {
+        return hyperbolic_system_.vacuum_state_relaxation_small_;
+      }
+
+      DEAL_II_ALWAYS_INLINE inline ScalarNumber
+      vacuum_state_relaxation_large() const
+      {
+        return hyperbolic_system_.vacuum_state_relaxation_large_;
+      }
+
+      DEAL_II_ALWAYS_INLINE inline bool compute_strict_bounds() const
+      {
+        return hyperbolic_system_.compute_strict_bounds_;
+      }
+
+      //@}
+      /**
+       * @name Low-level access to the selected equation of state.
+       */
+      //@{
+
+      /**
+       * For a given density \f$\rho\f$ and <i>specific</i> internal
+       * energy \f$e\f$ return the pressure \f$p\f$.
+       */
+      DEAL_II_ALWAYS_INLINE inline Number eos_pressure(const Number &rho,
+                                                       const Number &e) const
+      {
+        const auto &eos = hyperbolic_system_.selected_equation_of_state_;
+
+        if constexpr (std::is_same_v<ScalarNumber, Number>) {
+          return ScalarNumber(eos->pressure(rho, e));
+        } else {
+          Number p;
+          for (unsigned int k = 0; k < Number::size(); ++k) {
+            p[k] = ScalarNumber(eos->pressure(rho[k], e[k]));
+          }
+          return p;
+        }
+      }
+
+      /**
+       * For a given density \f$\rho\f$ and pressure \f$p\f$ return the
+       * <i>specific</i> internal energy \f$e\f$.
+       */
+      DEAL_II_ALWAYS_INLINE inline Number
+      eos_specific_internal_energy(const Number &rho, const Number &p) const
+      {
+        const auto &eos = hyperbolic_system_.selected_equation_of_state_;
+
+        if constexpr (std::is_same_v<ScalarNumber, Number>) {
+          return ScalarNumber(eos->specific_internal_energy(rho, p));
+        } else {
+          Number e;
+          for (unsigned int k = 0; k < Number::size(); ++k) {
+            e[k] = ScalarNumber(eos->specific_internal_energy(rho[k], p[k]));
+          }
+          return e;
+        }
+      }
+
+      /**
+       * For a given density \f$\rho\f$ and specific internal energy \f$e\f$
+       * return the temperature \f$T\f$.
+       */
+      DEAL_II_ALWAYS_INLINE inline Number eos_temperature(const Number &rho,
+                                                          const Number &e) const
+      {
+        const auto &eos = hyperbolic_system_.selected_equation_of_state_;
+
+        if constexpr (std::is_same_v<ScalarNumber, Number>) {
+          return ScalarNumber(eos->temperature(rho, e));
+        } else {
+          Number temp;
+          for (unsigned int k = 0; k < Number::size(); ++k) {
+            temp[k] = ScalarNumber(eos->temperature(rho[k], e[k]));
+          }
+          return temp;
+        }
+      }
+
+      /**
+       * For a given density \f$\rho\f$ and <i>specific</i> internal
+       * energy \f$e\f$ return the sound speed \f$a\f$.
+       */
+      DEAL_II_ALWAYS_INLINE inline Number
+      eos_speed_of_sound(const Number &rho, const Number &e) const
+      {
+        const auto &eos = hyperbolic_system_.selected_equation_of_state_;
+
+        if constexpr (std::is_same_v<ScalarNumber, Number>) {
+          return ScalarNumber(eos->speed_of_sound(rho, e));
+        } else {
+          Number c;
+          for (unsigned int k = 0; k < Number::size(); ++k) {
+            c[k] = ScalarNumber(eos->speed_of_sound(rho[k], e[k]));
+          }
+          return c;
+        }
+      }
+
+      /**
+       * Return the interpolatory co-volume \f$b_{\text{interp}}\f$.
+       */
+      DEAL_II_ALWAYS_INLINE inline ScalarNumber eos_interpolation_b() const
+      {
+        const auto &eos = hyperbolic_system_.selected_equation_of_state_;
+        return ScalarNumber(eos->interpolation_b());
+      }
+
+      /**
+       * constexpr boolean used in the EulerInitialStates namespace
+       */
+      static constexpr bool have_gamma = false;
+
+      /**
+       * constexpr boolean used in the EulerInitialStates namespace
+       */
+      static constexpr bool have_eos_interpolation_b = true;
+
+      //@}
+      /**
+       * @name Internal data
+       */
+      //@{
+
+    private:
+      const HyperbolicSystem &hyperbolic_system_;
+
+    public:
+      //@}
+      /**
+       * @name Types and compile time constants
+       */
+      //@{
+
+      /**
+       * The dimension of the state space.
+       */
+      static constexpr unsigned int problem_dimension = 2 + dim;
+
+      /**
+       * The storage type used for a (conserved) state \f$\boldsymbol U\f$.
+       */
+      using state_type = dealii::Tensor<1, problem_dimension, Number>;
+
+      /**
+       * MulticomponentVector for storing a vector of conserved states:
+       */
+      using vector_type = MultiComponentVector<ScalarNumber, problem_dimension>;
+
+      /**
+       * An array holding all component names of the conserved state as a
+       * string.
+       */
+      static inline const auto component_names =
+          []() -> std::array<std::string, problem_dimension> {
+        if constexpr (dim == 1)
+          return {"rho", "m", "E"};
+        else if constexpr (dim == 2)
+          return {"rho", "m_1", "m_2", "E"};
+        else if constexpr (dim == 3)
+          return {"rho", "m_1", "m_2", "m_3", "E"};
+        __builtin_trap();
+      }();
+
+      /**
+       * The storage type used for a primitive state vector.
+       */
+      using primitive_state_type = dealii::Tensor<1, problem_dimension, Number>;
+
+      /**
+       * An array holding all component names of the primitive state
+       * \f$[\rho,\vec v, e]\f$ as a string.
+       *
+       * @note The last component ist the <b>specific</b> internal energy
+       */
+      static inline const auto primitive_component_names =
+          []() -> std::array<std::string, problem_dimension> {
+        if constexpr (dim == 1)
+          return {"rho", "v", "e"};
+        else if constexpr (dim == 2)
+          return {"rho", "v_1", "v_2", "e"};
+        else if constexpr (dim == 3)
+          return {"rho", "v_1", "v_2", "v_3", "e"};
+        __builtin_trap();
+      }();
+
+      /**
+       * The storage type used for the flux \f$\mathbf{f}\f$.
+       */
+      using flux_type =
+          dealii::Tensor<1, problem_dimension, dealii::Tensor<1, dim, Number>>;
+
+      /**
+       * The storage type used for flux contributions.
+       */
+      using flux_contribution_type = flux_type;
+
+      //@}
+      /**
+       * @name Precomputed quantities
+       */
+      //@{
+
+      /**
+       * The number of precomputed initial values.
+       */
+      static constexpr unsigned int n_precomputed_initial_values = 0;
+
+      /**
+       * Array type used for precomputed initial values.
+       */
+      using precomputed_initial_state_type =
+          std::array<Number, n_precomputed_initial_values>;
+
+      /**
+       * MulticomponentVector for storing a vector of precomputed initial
+       * states:
+       */
+      using precomputed_initial_vector_type =
+          MultiComponentVector<ScalarNumber, n_precomputed_initial_values>;
+
+      /**
+       * An array holding all component names of the precomputed values.
+       */
+      static inline const auto precomputed_initial_names =
+          std::array<std::string, n_precomputed_initial_values>{};
+
+      /**
+       * The number of precomputed values.
+       */
+      static constexpr unsigned int n_precomputed_values = 4;
+
+      /**
+       * Array type used for precomputed values.
+       */
+      using precomputed_state_type = std::array<Number, n_precomputed_values>;
+
+      /**
+       * MulticomponentVector for storing a vector of precomputed states:
+       */
+      using precomputed_vector_type =
+          MultiComponentVector<ScalarNumber, n_precomputed_values>;
+
+      /**
+       * An array holding all component names of the precomputed values.
+       */
+      static inline const auto precomputed_names =
+          std::array<std::string, n_precomputed_values>{
+              {"p",
+               "surrogate_gamma",
+               "surrogate_specific_entropy",
+               "surrogate_harten_entropy"}};
+
+      /**
+       * The number of precomputation cycles.
+       */
+      static constexpr unsigned int n_precomputation_cycles = 2;
+
+      /**
+       * Step 0: precompute values for hyperbolic update. This routine is
+       * called within our usual loop() idiom in HyperbolicModule
+       */
+      template <typename DISPATCH, typename SPARSITY>
+      void precomputation_loop(unsigned int cycle,
+                               const DISPATCH &dispatch_check,
+                               precomputed_vector_type &precomputed_values,
+                               const SPARSITY &sparsity_simd,
+                               const vector_type &U,
+                               unsigned int left,
+                               unsigned int right) const;
+
+      //@}
+      /**
+       * @name Computing derived physical quantities
+       */
+      //@{
+
+      /**
+       * For a given (2+dim dimensional) state vector <code>U</code>, return
+       * the density <code>U[0]</code>
+       */
+      static Number density(const state_type &U);
+
+      /**
+       * Given a density @p rho this function returns 0 if the magniatude
+       * of rho is smaller or equal than relaxation_large * rho_cutoff.
+       * Otherwise rho is returned unmodified. Here, rho_cutoff is the
+       * reference density multiplied by eps.
+       */
+      Number filter_vacuum_density(const Number &rho) const;
+
+      /**
+       * For a given (2+dim dimensional) state vector <code>U</code>, return
+       * the momentum vector <code>[U[1], ..., U[1+dim]]</code>.
+       */
+      static dealii::Tensor<1, dim, Number> momentum(const state_type &U);
+
+      /**
+       * For a given (2+dim dimensional) state vector <code>U</code>, return
+       * the total energy <code>U[1+dim]</code>
+       */
+      static Number total_energy(const state_type &U);
+
+      /**
+       * For a given (2+dim dimensional) state vector <code>U</code>, compute
+       * and return the internal energy \f$\varepsilon = (\rho e)\f$.
+       */
+      static Number internal_energy(const state_type &U);
+
+      /**
+       * For a given (2+dim dimensional) state vector <code>U</code>, compute
+       * and return the derivative of the internal energy
+       * \f$\varepsilon = (\rho e)\f$.
+       */
+      static state_type internal_energy_derivative(const state_type &U);
+
+      //@}
+      /**
+       * @name Surrogate functions for computing various interpolatory
+       * physical quantities that are needed for Riemann solver,
+       * indicator and limiter.
+       */
+      //@{
+
+      /**
+       * For a given (2+dim dimensional) state vector <code>U</code>, compute
+       * and return a (scaled) surrogate specific entropy
+       * \f[
+       *   e^{(\gamma_{\text{min} - 1)s} =
+       *   \frac{\rho\,e}{\rho^\gamma_{\text{min}}
+       *   (1 - b * \rho)^(\gamma_{\text{min}} -1).
+       * \f]
+       */
+      Number surrogate_specific_entropy(const state_type &U,
+                                        const Number &gamma_min) const;
+
+      /**
+       * For a given (2+dim dimensional) state vector <code>U</code>, compute
+       * and return a surrogate Harten-type entropy
+       * \f[
+       *   \eta = (\rho^2 e \cdot (1 - interpolation_b \rho)
+       *   ^{\gamma_{text}min} - 1})^{1 / (\gamma_{\text{min}} + 1)}.
+       * \f]
+       */
+      Number surrogate_harten_entropy(const state_type &U,
+                                      const Number &gamma_min) const;
+
+      /**
+       * For a given (2+dim dimensional) state vector <code>U</code>, compute
+       * and return the derivative \f$\eta'\f$ of the Harten-type entropy
+       * \f[
+       *   \eta = (\rho^2 e \cdot (1 - interpolation_b \rho)
+       *   ^{\gamma_{text}min} - 1})^{1 / (\gamma_{\text{min}} + 1)}.
+       * \f]
+       */
+      state_type
+      surrogate_harten_entropy_derivative(const state_type &U,
+                                          const Number &eta,
+                                          const Number &gamma_min) const;
+
+      /**
+       * For a given (2+dim dimensional) state vector <code>U</code> and
+       * pressure <code>p</code>, compute a surrogate gamma:
+       * \f[
+       *   \gamma(\rho, p, e) = 1 + \frac{p * (1 - b * \rho)}{\rho * e}
+       * \f]
+       *
+       * This function is used in various places to create interpolations
+       * of the pressure.
+       */
+      Number surrogate_gamma(const state_type &U, const Number &p) const;
+
+      /**
+       * For a given (2+dim dimensional) state vector <code>U</code> and
+       * gamma <code>gamma</code>, compute a surrogate pressure:
+       * \f[
+       *   p(\rho, \gamma, e) = \frac{(\gamma - 1) * \rho * e}{1 - b * \rho}
+       * \f]
+       *
+       * This function is the complementary function to surrogate_gamma(),
+       * meaning the following property holds true:
+       * ```
+       *   surrogate_gamma(U, surrogate_pressure(U, gamma)) == gamma
+       *       surrogate_pressure(U, surrogate_gamma(U, p)) == p
+       * ```
+       */
+      Number surrogate_pressure(const state_type &U, const Number &gamma) const;
+
+      /**
+       * Returns whether the state @p U is admissible. If @p U is a
+       * vectorized state then @p U is admissible if all vectorized values
+       * are admissible.
+       */
+      bool is_admissible(const state_type &U) const;
+
+      //@}
+      /**
+       * @name Special functions for boundary states
+       */
+      //@{
+
+      /**
+       * Decomposes a given state @p U into Riemann invariants and then
+       * replaces the first or second Riemann characteristic from the one
+       * taken from @p U_bar state. Note that the @p U_bar state is just the
+       * prescribed dirichlet values.
+       */
+      template <int component>
+      state_type prescribe_riemann_characteristic(
+          const state_type &U,
+          const state_type &U_bar,
+          const dealii::Tensor<1, dim, Number> &normal) const;
+
+      /**
+       * Apply boundary conditions.
+       *
+       * For the compressible Euler equations we have:
+       *
+       *  - Dirichlet boundary conditions by prescribing the return value of
+       *    get_dirichlet_data() as is.
+       *
+       *  - Slip boundary conditions where we remove the normal component of
+       *    the momentum.
+       *
+       *  - No slip boundary conditions where we set the momentum to 0.
+       *
+       *  - "Dynamic boundary" conditions that prescribe different Riemann
+       *    invariants from the return value of get_dirichlet_data()
+       *    depending on the flow state (supersonic versus subsonic, outflow
+       *    versus inflow).
+       */
+      template <typename Lambda>
+      state_type
+      apply_boundary_conditions(const dealii::types::boundary_id id,
+                                const state_type &U,
+                                const dealii::Tensor<1, dim, Number> &normal,
+                                const Lambda &get_dirichlet_data) const;
+
+      //@}
+      /**
+       * @name Flux computations
+       */
+      //@{
+
+      /**
+       * Given a state @p U and a pressure @p p compute the flux
+       * \f[
+       * \begin{pmatrix}
+       *   \textbf m \\
+       *   \textbf v\otimes \textbf m + p\mathbb{I}_d \\
+       *   \textbf v(E+p)
+       * \end{pmatrix},
+       * \f]
+       */
+      flux_type f(const state_type &U, const Number &p) const;
+
+      /**
+       * Given a state @p U_i and an index @p i compute flux contributions.
        *
        * Intended usage:
        * ```
-       * HyperbolicSystem hyperbolic_system;
-       * const auto view = hyperbolic_system.template view<dim, Number>();
-       * const auto flux_i = view.flux_contribution(...);
-       * const auto flux_j = view.flux_contribution(...);
-       * const auto flux_ij = view.flux(flux_i, flux_j);
-       * // etc.
+       * Indicator<dim, Number> indicator;
+       * for (unsigned int i = n_internal; i < n_owned; ++i) {
+       *   // ...
+       *   const auto flux_i = flux_contribution(precomputed..., i, U_i);
+       *   for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
+       *     // ...
+       *     const auto flux_j = flux_contribution(precomputed..., js, U_j);
+       *     const auto flux_ij = flux(flux_i, flux_j);
+       *   }
+       * }
        * ```
+       *
+       * For the Euler equations we simply compute <code>f(U_i)</code>.
        */
-      template <int dim, typename Number>
-      class View
-      {
-      public:
-        /**
-         * Constructor taking a reference to the underlying
-         * HyperbolicSystem
-         */
-        View(const HyperbolicSystem &hyperbolic_system)
-            : hyperbolic_system_(hyperbolic_system)
-        {
-        }
-
-        /**
-         * Create a modified view from the current one:
-         */
-        template <int dim2, typename Number2>
-        auto view() const
-        {
-          return View<dim2, Number2>{hyperbolic_system_};
-        }
-
-        /**
-         * The underlying scalar number type.
-         */
-        using ScalarNumber = typename get_value_type<Number>::type;
-
-        /**
-         * @name Access to runtime parameters
-         */
-        //@{
-
-        DEAL_II_ALWAYS_INLINE inline const std::string &
-        equation_of_state() const
-        {
-          return hyperbolic_system_.equation_of_state_;
-        }
-
-        DEAL_II_ALWAYS_INLINE inline ScalarNumber reference_density() const
-        {
-          return hyperbolic_system_.reference_density_;
-        }
-
-        DEAL_II_ALWAYS_INLINE inline ScalarNumber
-        vacuum_state_relaxation_small() const
-        {
-          return hyperbolic_system_.vacuum_state_relaxation_small_;
-        }
-
-        DEAL_II_ALWAYS_INLINE inline ScalarNumber
-        vacuum_state_relaxation_large() const
-        {
-          return hyperbolic_system_.vacuum_state_relaxation_large_;
-        }
-
-        DEAL_II_ALWAYS_INLINE inline bool compute_strict_bounds() const
-        {
-          return hyperbolic_system_.compute_strict_bounds_;
-        }
-
-        //@}
-        /**
-         * @name Low-level access to the selected equation of state.
-         */
-        //@{
-
-        /**
-         * For a given density \f$\rho\f$ and <i>specific</i> internal
-         * energy \f$e\f$ return the pressure \f$p\f$.
-         */
-        DEAL_II_ALWAYS_INLINE inline Number eos_pressure(const Number &rho,
-                                                         const Number &e) const
-        {
-          const auto &eos = hyperbolic_system_.selected_equation_of_state_;
-
-          if constexpr (std::is_same_v<ScalarNumber, Number>) {
-            return ScalarNumber(eos->pressure(rho, e));
-          } else {
-            Number p;
-            for (unsigned int k = 0; k < Number::size(); ++k) {
-              p[k] = ScalarNumber(eos->pressure(rho[k], e[k]));
-            }
-            return p;
-          }
-        }
-
-        /**
-         * For a given density \f$\rho\f$ and pressure \f$p\f$ return the
-         * <i>specific</i> internal energy \f$e\f$.
-         */
-        DEAL_II_ALWAYS_INLINE inline Number
-        eos_specific_internal_energy(const Number &rho, const Number &p) const
-        {
-          const auto &eos = hyperbolic_system_.selected_equation_of_state_;
-
-          if constexpr (std::is_same_v<ScalarNumber, Number>) {
-            return ScalarNumber(eos->specific_internal_energy(rho, p));
-          } else {
-            Number e;
-            for (unsigned int k = 0; k < Number::size(); ++k) {
-              e[k] = ScalarNumber(eos->specific_internal_energy(rho[k], p[k]));
-            }
-            return e;
-          }
-        }
-
-        /**
-         * For a given density \f$\rho\f$ and specific internal energy \f$e\f$
-         * return the temperature \f$T\f$.
-         */
-        DEAL_II_ALWAYS_INLINE inline Number
-        eos_temperature(const Number &rho, const Number &e) const
-        {
-          const auto &eos = hyperbolic_system_.selected_equation_of_state_;
-
-          if constexpr (std::is_same_v<ScalarNumber, Number>) {
-            return ScalarNumber(eos->temperature(rho, e));
-          } else {
-            Number temp;
-            for (unsigned int k = 0; k < Number::size(); ++k) {
-              temp[k] = ScalarNumber(eos->temperature(rho[k], e[k]));
-            }
-            return temp;
-          }
-        }
-
-        /**
-         * For a given density \f$\rho\f$ and <i>specific</i> internal
-         * energy \f$e\f$ return the sound speed \f$a\f$.
-         */
-        DEAL_II_ALWAYS_INLINE inline Number
-        eos_speed_of_sound(const Number &rho, const Number &e) const
-        {
-          const auto &eos = hyperbolic_system_.selected_equation_of_state_;
-
-          if constexpr (std::is_same_v<ScalarNumber, Number>) {
-            return ScalarNumber(eos->speed_of_sound(rho, e));
-          } else {
-            Number c;
-            for (unsigned int k = 0; k < Number::size(); ++k) {
-              c[k] = ScalarNumber(eos->speed_of_sound(rho[k], e[k]));
-            }
-            return c;
-          }
-        }
-
-        /**
-         * Return the interpolatory co-volume \f$b_{\text{interp}}\f$.
-         */
-        DEAL_II_ALWAYS_INLINE inline ScalarNumber eos_interpolation_b() const
-        {
-          const auto &eos = hyperbolic_system_.selected_equation_of_state_;
-          return ScalarNumber(eos->interpolation_b());
-        }
-
-        /**
-         * constexpr boolean used in the EulerInitialStates namespace
-         */
-        static constexpr bool have_gamma = false;
-
-        /**
-         * constexpr boolean used in the EulerInitialStates namespace
-         */
-        static constexpr bool have_eos_interpolation_b = true;
-
-        //@}
-        /**
-         * @name Internal data
-         */
-        //@{
-
-      private:
-        const HyperbolicSystem &hyperbolic_system_;
-
-      public:
-        //@}
-        /**
-         * @name Types and compile time constants
-         */
-        //@{
-
-        /**
-         * The dimension of the state space.
-         */
-        static constexpr unsigned int problem_dimension = 2 + dim;
-
-        /**
-         * The storage type used for a (conserved) state \f$\boldsymbol U\f$.
-         */
-        using state_type = dealii::Tensor<1, problem_dimension, Number>;
-
-        /**
-         * MulticomponentVector for storing a vector of conserved states:
-         */
-        using vector_type =
-            MultiComponentVector<ScalarNumber, problem_dimension>;
-
-        /**
-         * An array holding all component names of the conserved state as a
-         * string.
-         */
-        static inline const auto component_names =
-            []() -> std::array<std::string, problem_dimension> {
-          if constexpr (dim == 1)
-            return {"rho", "m", "E"};
-          else if constexpr (dim == 2)
-            return {"rho", "m_1", "m_2", "E"};
-          else if constexpr (dim == 3)
-            return {"rho", "m_1", "m_2", "m_3", "E"};
-          __builtin_trap();
-        }();
-
-        /**
-         * The storage type used for a primitive state vector.
-         */
-        using primitive_state_type =
-            dealii::Tensor<1, problem_dimension, Number>;
-
-        /**
-         * An array holding all component names of the primitive state
-         * \f$[\rho,\vec v, e]\f$ as a string.
-         *
-         * @note The last component ist the <b>specific</b> internal energy
-         */
-        static inline const auto primitive_component_names =
-            []() -> std::array<std::string, problem_dimension> {
-          if constexpr (dim == 1)
-            return {"rho", "v", "e"};
-          else if constexpr (dim == 2)
-            return {"rho", "v_1", "v_2", "e"};
-          else if constexpr (dim == 3)
-            return {"rho", "v_1", "v_2", "v_3", "e"};
-          __builtin_trap();
-        }();
-
-        /**
-         * The storage type used for the flux \f$\mathbf{f}\f$.
-         */
-        using flux_type = dealii::
-            Tensor<1, problem_dimension, dealii::Tensor<1, dim, Number>>;
-
-        /**
-         * The storage type used for flux contributions.
-         */
-        using flux_contribution_type = flux_type;
-
-        //@}
-        /**
-         * @name Precomputed quantities
-         */
-        //@{
-
-        /**
-         * The number of precomputed initial values.
-         */
-        static constexpr unsigned int n_precomputed_initial_values = 0;
-
-        /**
-         * Array type used for precomputed initial values.
-         */
-        using precomputed_initial_state_type =
-            std::array<Number, n_precomputed_initial_values>;
-
-        /**
-         * MulticomponentVector for storing a vector of precomputed initial
-         * states:
-         */
-        using precomputed_initial_vector_type =
-            MultiComponentVector<ScalarNumber, n_precomputed_initial_values>;
-
-        /**
-         * An array holding all component names of the precomputed values.
-         */
-        static inline const auto precomputed_initial_names =
-            std::array<std::string, n_precomputed_initial_values>{};
-
-        /**
-         * The number of precomputed values.
-         */
-        static constexpr unsigned int n_precomputed_values = 4;
-
-        /**
-         * Array type used for precomputed values.
-         */
-        using precomputed_state_type = std::array<Number, n_precomputed_values>;
-
-        /**
-         * MulticomponentVector for storing a vector of precomputed states:
-         */
-        using precomputed_vector_type =
-            MultiComponentVector<ScalarNumber, n_precomputed_values>;
-
-        /**
-         * An array holding all component names of the precomputed values.
-         */
-        static inline const auto precomputed_names =
-            std::array<std::string, n_precomputed_values>{
-                {"p",
-                 "surrogate_gamma",
-                 "surrogate_specific_entropy",
-                 "surrogate_harten_entropy"}};
-
-        /**
-         * The number of precomputation cycles.
-         */
-        static constexpr unsigned int n_precomputation_cycles = 2;
-
-        /**
-         * Step 0: precompute values for hyperbolic update. This routine is
-         * called within our usual loop() idiom in HyperbolicModule
-         */
-        template <typename DISPATCH, typename SPARSITY>
-        void precomputation_loop(unsigned int cycle,
-                                 const DISPATCH &dispatch_check,
-                                 precomputed_vector_type &precomputed_values,
-                                 const SPARSITY &sparsity_simd,
-                                 const vector_type &U,
-                                 unsigned int left,
-                                 unsigned int right) const;
-
-        //@}
-        /**
-         * @name Computing derived physical quantities
-         */
-        //@{
-
-        /**
-         * For a given (2+dim dimensional) state vector <code>U</code>, return
-         * the density <code>U[0]</code>
-         */
-        static Number density(const state_type &U);
-
-        /**
-         * Given a density @p rho this function returns 0 if the magniatude
-         * of rho is smaller or equal than relaxation_large * rho_cutoff.
-         * Otherwise rho is returned unmodified. Here, rho_cutoff is the
-         * reference density multiplied by eps.
-         */
-        Number filter_vacuum_density(const Number &rho) const;
-
-        /**
-         * For a given (2+dim dimensional) state vector <code>U</code>, return
-         * the momentum vector <code>[U[1], ..., U[1+dim]]</code>.
-         */
-        static dealii::Tensor<1, dim, Number> momentum(const state_type &U);
-
-        /**
-         * For a given (2+dim dimensional) state vector <code>U</code>, return
-         * the total energy <code>U[1+dim]</code>
-         */
-        static Number total_energy(const state_type &U);
-
-        /**
-         * For a given (2+dim dimensional) state vector <code>U</code>, compute
-         * and return the internal energy \f$\varepsilon = (\rho e)\f$.
-         */
-        static Number internal_energy(const state_type &U);
-
-        /**
-         * For a given (2+dim dimensional) state vector <code>U</code>, compute
-         * and return the derivative of the internal energy
-         * \f$\varepsilon = (\rho e)\f$.
-         */
-        static state_type internal_energy_derivative(const state_type &U);
-
-        //@}
-        /**
-         * @name Surrogate functions for computing various interpolatory
-         * physical quantities that are needed for Riemann solver,
-         * indicator and limiter.
-         */
-        //@{
-
-        /**
-         * For a given (2+dim dimensional) state vector <code>U</code>, compute
-         * and return a (scaled) surrogate specific entropy
-         * \f[
-         *   e^{(\gamma_{\text{min} - 1)s} =
-         *   \frac{\rho\,e}{\rho^\gamma_{\text{min}}
-         *   (1 - b * \rho)^(\gamma_{\text{min}} -1).
-         * \f]
-         */
-        Number surrogate_specific_entropy(const state_type &U,
-                                          const Number &gamma_min) const;
-
-        /**
-         * For a given (2+dim dimensional) state vector <code>U</code>, compute
-         * and return a surrogate Harten-type entropy
-         * \f[
-         *   \eta = (\rho^2 e \cdot (1 - interpolation_b \rho)
-         *   ^{\gamma_{text}min} - 1})^{1 / (\gamma_{\text{min}} + 1)}.
-         * \f]
-         */
-        Number surrogate_harten_entropy(const state_type &U,
-                                        const Number &gamma_min) const;
-
-        /**
-         * For a given (2+dim dimensional) state vector <code>U</code>, compute
-         * and return the derivative \f$\eta'\f$ of the Harten-type entropy
-         * \f[
-         *   \eta = (\rho^2 e \cdot (1 - interpolation_b \rho)
-         *   ^{\gamma_{text}min} - 1})^{1 / (\gamma_{\text{min}} + 1)}.
-         * \f]
-         */
-        state_type
-        surrogate_harten_entropy_derivative(const state_type &U,
-                                            const Number &eta,
-                                            const Number &gamma_min) const;
-
-        /**
-         * For a given (2+dim dimensional) state vector <code>U</code> and
-         * pressure <code>p</code>, compute a surrogate gamma:
-         * \f[
-         *   \gamma(\rho, p, e) = 1 + \frac{p * (1 - b * \rho)}{\rho * e}
-         * \f]
-         *
-         * This function is used in various places to create interpolations
-         * of the pressure.
-         */
-        Number surrogate_gamma(const state_type &U, const Number &p) const;
-
-        /**
-         * For a given (2+dim dimensional) state vector <code>U</code> and
-         * gamma <code>gamma</code>, compute a surrogate pressure:
-         * \f[
-         *   p(\rho, \gamma, e) = \frac{(\gamma - 1) * \rho * e}{1 - b * \rho}
-         * \f]
-         *
-         * This function is the complementary function to surrogate_gamma(),
-         * meaning the following property holds true:
-         * ```
-         *   surrogate_gamma(U, surrogate_pressure(U, gamma)) == gamma
-         *       surrogate_pressure(U, surrogate_gamma(U, p)) == p
-         * ```
-         */
-        Number surrogate_pressure(const state_type &U,
-                                  const Number &gamma) const;
-
-        /**
-         * Returns whether the state @p U is admissible. If @p U is a
-         * vectorized state then @p U is admissible if all vectorized values
-         * are admissible.
-         */
-        bool is_admissible(const state_type &U) const;
-
-        //@}
-        /**
-         * @name Special functions for boundary states
-         */
-        //@{
-
-        /**
-         * Decomposes a given state @p U into Riemann invariants and then
-         * replaces the first or second Riemann characteristic from the one
-         * taken from @p U_bar state. Note that the @p U_bar state is just the
-         * prescribed dirichlet values.
-         */
-        template <int component>
-        state_type prescribe_riemann_characteristic(
-            const state_type &U,
-            const state_type &U_bar,
-            const dealii::Tensor<1, dim, Number> &normal) const;
-
-        /**
-         * Apply boundary conditions.
-         *
-         * For the compressible Euler equations we have:
-         *
-         *  - Dirichlet boundary conditions by prescribing the return value of
-         *    get_dirichlet_data() as is.
-         *
-         *  - Slip boundary conditions where we remove the normal component of
-         *    the momentum.
-         *
-         *  - No slip boundary conditions where we set the momentum to 0.
-         *
-         *  - "Dynamic boundary" conditions that prescribe different Riemann
-         *    invariants from the return value of get_dirichlet_data()
-         *    depending on the flow state (supersonic versus subsonic, outflow
-         *    versus inflow).
-         */
-        template <typename Lambda>
-        state_type
-        apply_boundary_conditions(const dealii::types::boundary_id id,
-                                  const state_type &U,
-                                  const dealii::Tensor<1, dim, Number> &normal,
-                                  const Lambda &get_dirichlet_data) const;
-
-        //@}
-        /**
-         * @name Flux computations
-         */
-        //@{
-
-        /**
-         * Given a state @p U and a pressure @p p compute the flux
-         * \f[
-         * \begin{pmatrix}
-         *   \textbf m \\
-         *   \textbf v\otimes \textbf m + p\mathbb{I}_d \\
-         *   \textbf v(E+p)
-         * \end{pmatrix},
-         * \f]
-         */
-        flux_type f(const state_type &U, const Number &p) const;
-
-        /**
-         * Given a state @p U_i and an index @p i compute flux contributions.
-         *
-         * Intended usage:
-         * ```
-         * Indicator<dim, Number> indicator;
-         * for (unsigned int i = n_internal; i < n_owned; ++i) {
-         *   // ...
-         *   const auto flux_i = flux_contribution(precomputed..., i, U_i);
-         *   for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
-         *     // ...
-         *     const auto flux_j = flux_contribution(precomputed..., js, U_j);
-         *     const auto flux_ij = flux(flux_i, flux_j);
-         *   }
-         * }
-         * ```
-         *
-         * For the Euler equations we simply compute <code>f(U_i)</code>.
-         */
-        flux_contribution_type
-        flux_contribution(const precomputed_vector_type &pv,
-                          const precomputed_initial_vector_type &piv,
-                          const unsigned int i,
-                          const state_type &U_i) const;
-
-        flux_contribution_type
-        flux_contribution(const precomputed_vector_type &pv,
-                          const precomputed_initial_vector_type &piv,
-                          const unsigned int *js,
-                          const state_type &U_j) const;
-
-        /**
-         * Given flux contributions @p flux_i and @p flux_j compute the flux
-         * <code>(-f(U_i) - f(U_j)</code>
-         */
-        flux_type flux(const flux_contribution_type &flux_i,
-                       const flux_contribution_type &flux_j) const;
-
-        /**
-         * The low-order and high-order fluxes are the same:
-         */
-        static constexpr bool have_high_order_flux = false;
-
-        flux_type
-        high_order_flux(const flux_contribution_type &flux_i,
-                        const flux_contribution_type &flux_j) const = delete;
-
-        /**
-         * @name Computing stencil source terms
-         */
-        //@{
-
-        /** We do not have source terms */
-        static constexpr bool have_source_terms = false;
-
-        state_type low_order_source(const precomputed_vector_type &pv,
-                                    const unsigned int i,
-                                    const state_type &U_i,
-                                    const ScalarNumber t,
-                                    const ScalarNumber tau) const = delete;
-
-        state_type low_order_source(const precomputed_vector_type &pv,
-                                    const unsigned int *js,
-                                    const state_type &U_j,
-                                    const ScalarNumber t,
-                                    const ScalarNumber tau) const = delete;
-
-        state_type high_order_source(const precomputed_vector_type &pv,
-                                     const unsigned int i,
-                                     const state_type &U_i,
-                                     const ScalarNumber t,
-                                     const ScalarNumber tau) const = delete;
-
-        state_type high_order_source(const precomputed_vector_type &pv,
-                                     const unsigned int *js,
-                                     const state_type &U_j,
-                                     const ScalarNumber t,
-                                     const ScalarNumber tau) const = delete;
-
-        //@}
-        /**
-         * @name State transformations
-         */
-        //@{
-
-        /**
-         * Given a state vector associated with a different spatial
-         * dimensions than the current one, return an "expanded" version of
-         * the state vector associated with @a dim spatial dimensions where
-         * the momentum vector of the conserved state @p state is expaned
-         * with zeros to a total length of @a dim entries.
-         *
-         * @note @a dim has to be larger or equal than the dimension of the
-         * @a ST vector.
-         */
-        template <typename ST>
-        state_type expand_state(const ST &state) const;
-
-        /**
-         * Given an initial state [rho, u_1, ..., u_?, p] return a
-         * conserved state [rho, m_1, ..., m_d, E]. Most notably, the
-         * specific equation of state oracle is queried to convert the
-         * pressure value into a specific internal energy.
-         *
-         * @note This function is used to conveniently convert (user
-         * provided) primitive initial states with pressure values to a
-         * conserved state in the EulerInitialStateLibrary. As such, this
-         * function is implemented in the Euler::HyperbolicSystem and
-         * EulerAEOS::HyperbolicSystem classes.
-         */
-        template <typename ST>
-        state_type from_initial_state(const ST &initial_state) const;
-
-        /**
-         * Given a primitive state [rho, u_1, ..., u_d, e] return a conserved
-         * state.
-         */
-        state_type
-        from_primitive_state(const primitive_state_type &primitive_state) const;
-
-        /**
-         * Given a conserved state return a primitive state [rho, u_1, ..., u_d,
-         * e]
-         */
-        primitive_state_type to_primitive_state(const state_type &state) const;
-
-        /**
-         * Transform the current state according to a  given operator
-         * @p lambda acting on a @a dim dimensional momentum (or velocity)
-         * vector.
-         */
-        template <typename Lambda>
-        state_type apply_galilei_transform(const state_type &state,
-                                           const Lambda &lambda) const;
-        //@}
-      }; /* HyperbolicSystem::View */
-
-      template <int dim, typename Number>
-      friend class View;
+      flux_contribution_type
+      flux_contribution(const precomputed_vector_type &pv,
+                        const precomputed_initial_vector_type &piv,
+                        const unsigned int i,
+                        const state_type &U_i) const;
+
+      flux_contribution_type
+      flux_contribution(const precomputed_vector_type &pv,
+                        const precomputed_initial_vector_type &piv,
+                        const unsigned int *js,
+                        const state_type &U_j) const;
 
       /**
-       * Return a view on the Hyperbolic System for a given dimension @p
-       * dim and choice of number type @p Number (which can be a scalar
-       * float, or double, as well as a VectorizedArray holding packed
-       * scalars.
+       * Given flux contributions @p flux_i and @p flux_j compute the flux
+       * <code>(-f(U_i) - f(U_j)</code>
        */
-      template <int dim, typename Number>
-      auto view() const
-      {
-        return View<dim, Number>{*this};
-      }
-    }; /* HyperbolicSystem */
+      flux_type flux(const flux_contribution_type &flux_i,
+                     const flux_contribution_type &flux_j) const;
+
+      /**
+       * The low-order and high-order fluxes are the same:
+       */
+      static constexpr bool have_high_order_flux = false;
+
+      flux_type
+      high_order_flux(const flux_contribution_type &flux_i,
+                      const flux_contribution_type &flux_j) const = delete;
+
+      /**
+       * @name Computing stencil source terms
+       */
+      //@{
+
+      /** We do not have source terms */
+      static constexpr bool have_source_terms = false;
+
+      state_type low_order_source(const precomputed_vector_type &pv,
+                                  const unsigned int i,
+                                  const state_type &U_i,
+                                  const ScalarNumber t,
+                                  const ScalarNumber tau) const = delete;
+
+      state_type low_order_source(const precomputed_vector_type &pv,
+                                  const unsigned int *js,
+                                  const state_type &U_j,
+                                  const ScalarNumber t,
+                                  const ScalarNumber tau) const = delete;
+
+      state_type high_order_source(const precomputed_vector_type &pv,
+                                   const unsigned int i,
+                                   const state_type &U_i,
+                                   const ScalarNumber t,
+                                   const ScalarNumber tau) const = delete;
+
+      state_type high_order_source(const precomputed_vector_type &pv,
+                                   const unsigned int *js,
+                                   const state_type &U_j,
+                                   const ScalarNumber t,
+                                   const ScalarNumber tau) const = delete;
+
+      //@}
+      /**
+       * @name State transformations
+       */
+      //@{
+
+      /**
+       * Given a state vector associated with a different spatial
+       * dimensions than the current one, return an "expanded" version of
+       * the state vector associated with @a dim spatial dimensions where
+       * the momentum vector of the conserved state @p state is expaned
+       * with zeros to a total length of @a dim entries.
+       *
+       * @note @a dim has to be larger or equal than the dimension of the
+       * @a ST vector.
+       */
+      template <typename ST>
+      state_type expand_state(const ST &state) const;
+
+      /**
+       * Given an initial state [rho, u_1, ..., u_?, p] return a
+       * conserved state [rho, m_1, ..., m_d, E]. Most notably, the
+       * specific equation of state oracle is queried to convert the
+       * pressure value into a specific internal energy.
+       *
+       * @note This function is used to conveniently convert (user
+       * provided) primitive initial states with pressure values to a
+       * conserved state in the EulerInitialStateLibrary. As such, this
+       * function is implemented in the Euler::HyperbolicSystem and
+       * EulerAEOS::HyperbolicSystem classes.
+       */
+      template <typename ST>
+      state_type from_initial_state(const ST &initial_state) const;
+
+      /**
+       * Given a primitive state [rho, u_1, ..., u_d, e] return a conserved
+       * state.
+       */
+      state_type
+      from_primitive_state(const primitive_state_type &primitive_state) const;
+
+      /**
+       * Given a conserved state return a primitive state [rho, u_1, ..., u_d,
+       * e]
+       */
+      primitive_state_type to_primitive_state(const state_type &state) const;
+
+      /**
+       * Transform the current state according to a  given operator
+       * @p lambda acting on a @a dim dimensional momentum (or velocity)
+       * vector.
+       */
+      template <typename Lambda>
+      state_type apply_galilei_transform(const state_type &state,
+                                         const Lambda &lambda) const;
+      //@}
+    }; /* HyperbolicSystemView */
 
 
     /*
@@ -822,7 +823,7 @@ namespace ryujin
     template <int dim, typename Number>
     template <typename DISPATCH, typename SPARSITY>
     DEAL_II_ALWAYS_INLINE inline void
-    HyperbolicSystem::View<dim, Number>::precomputation_loop(
+    HyperbolicSystemView<dim, Number>::precomputation_loop(
         unsigned int cycle [[maybe_unused]],
         const DISPATCH &dispatch_check,
         precomputed_vector_type &precomputed_values,
@@ -960,7 +961,7 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
-    HyperbolicSystem::View<dim, Number>::density(const state_type &U)
+    HyperbolicSystemView<dim, Number>::density(const state_type &U)
     {
       return U[0];
     }
@@ -968,7 +969,7 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
-    HyperbolicSystem::View<dim, Number>::filter_vacuum_density(
+    HyperbolicSystemView<dim, Number>::filter_vacuum_density(
         const Number &rho) const
     {
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
@@ -982,7 +983,7 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, dim, Number>
-    HyperbolicSystem::View<dim, Number>::momentum(const state_type &U)
+    HyperbolicSystemView<dim, Number>::momentum(const state_type &U)
     {
       dealii::Tensor<1, dim, Number> result;
       for (unsigned int i = 0; i < dim; ++i)
@@ -993,7 +994,7 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
-    HyperbolicSystem::View<dim, Number>::total_energy(const state_type &U)
+    HyperbolicSystemView<dim, Number>::total_energy(const state_type &U)
     {
       return U[1 + dim];
     }
@@ -1001,7 +1002,7 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
-    HyperbolicSystem::View<dim, Number>::internal_energy(const state_type &U)
+    HyperbolicSystemView<dim, Number>::internal_energy(const state_type &U)
     {
       /*
        * rho e = (E - 1/2*m^2/rho)
@@ -1015,7 +1016,7 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystem::View<dim, Number>::internal_energy_derivative(
+    HyperbolicSystemView<dim, Number>::internal_energy_derivative(
         const state_type &U) -> state_type
     {
       /*
@@ -1042,7 +1043,7 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
-    HyperbolicSystem::View<dim, Number>::surrogate_specific_entropy(
+    HyperbolicSystemView<dim, Number>::surrogate_specific_entropy(
         const state_type &U, const Number &gamma_min) const
     {
       using ScalarNumber = typename get_value_type<Number>::type;
@@ -1059,7 +1060,7 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
-    HyperbolicSystem::View<dim, Number>::surrogate_harten_entropy(
+    HyperbolicSystemView<dim, Number>::surrogate_harten_entropy(
         const state_type &U, const Number &gamma_min) const
     {
       const auto rho = density(U);
@@ -1079,7 +1080,7 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystem::View<dim, Number>::surrogate_harten_entropy_derivative(
+    HyperbolicSystemView<dim, Number>::surrogate_harten_entropy_derivative(
         const state_type &U, const Number &eta, const Number &gamma_min) const
         -> state_type
     {
@@ -1124,8 +1125,8 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
-    HyperbolicSystem::View<dim, Number>::surrogate_gamma(const state_type &U,
-                                                         const Number &p) const
+    HyperbolicSystemView<dim, Number>::surrogate_gamma(const state_type &U,
+                                                       const Number &p) const
     {
       const auto rho = density(U);
       const auto rho_e = internal_energy(U);
@@ -1138,7 +1139,7 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
-    HyperbolicSystem::View<dim, Number>::surrogate_pressure(
+    HyperbolicSystemView<dim, Number>::surrogate_pressure(
         const state_type &U, const Number &gamma) const
     {
       const auto rho = density(U);
@@ -1152,8 +1153,7 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline bool
-    HyperbolicSystem::View<dim, Number>::is_admissible(
-        const state_type &U) const
+    HyperbolicSystemView<dim, Number>::is_admissible(const state_type &U) const
     {
       const auto rho = density(U);
       const auto e = internal_energy(U);
@@ -1180,7 +1180,7 @@ namespace ryujin
     template <int dim, typename Number>
     template <int component>
     DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystem::View<dim, Number>::prescribe_riemann_characteristic(
+    HyperbolicSystemView<dim, Number>::prescribe_riemann_characteristic(
         const state_type &U,
         const state_type &U_bar,
         const dealii::Tensor<1, dim, Number> &normal) const -> state_type
@@ -1253,7 +1253,7 @@ namespace ryujin
     template <int dim, typename Number>
     template <typename Lambda>
     DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystem::View<dim, Number>::apply_boundary_conditions(
+    HyperbolicSystemView<dim, Number>::apply_boundary_conditions(
         dealii::types::boundary_id id,
         const state_type &U,
         const dealii::Tensor<1, dim, Number> &normal,
@@ -1321,8 +1321,8 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystem::View<dim, Number>::f(const state_type &U,
-                                           const Number &p) const -> flux_type
+    HyperbolicSystemView<dim, Number>::f(const state_type &U,
+                                         const Number &p) const -> flux_type
     {
       const auto rho_inverse = ScalarNumber(1.) / density(U);
       const auto m = momentum(U);
@@ -1343,7 +1343,7 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystem::View<dim, Number>::flux_contribution(
+    HyperbolicSystemView<dim, Number>::flux_contribution(
         const precomputed_vector_type &pv,
         const precomputed_initial_vector_type & /*piv*/,
         const unsigned int i,
@@ -1357,7 +1357,7 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystem::View<dim, Number>::flux_contribution(
+    HyperbolicSystemView<dim, Number>::flux_contribution(
         const precomputed_vector_type &pv,
         const precomputed_initial_vector_type & /*piv*/,
         const unsigned int *js,
@@ -1370,7 +1370,7 @@ namespace ryujin
 
 
     template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline auto HyperbolicSystem::View<dim, Number>::flux(
+    DEAL_II_ALWAYS_INLINE inline auto HyperbolicSystemView<dim, Number>::flux(
         const flux_contribution_type &flux_i,
         const flux_contribution_type &flux_j) const -> flux_type
     {
@@ -1380,8 +1380,7 @@ namespace ryujin
 
     template <int dim, typename Number>
     template <typename ST>
-    auto
-    HyperbolicSystem::View<dim, Number>::expand_state(const ST &state) const
+    auto HyperbolicSystemView<dim, Number>::expand_state(const ST &state) const
         -> state_type
     {
       using T = typename ST::value_type;
@@ -1405,7 +1404,7 @@ namespace ryujin
     template <int dim, typename Number>
     template <typename ST>
     DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystem::View<dim, Number>::from_initial_state(
+    HyperbolicSystemView<dim, Number>::from_initial_state(
         const ST &initial_state) const -> state_type
     {
       auto primitive_state = expand_state(initial_state);
@@ -1422,7 +1421,7 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystem::View<dim, Number>::from_primitive_state(
+    HyperbolicSystemView<dim, Number>::from_primitive_state(
         const primitive_state_type &primitive_state) const -> state_type
     {
       const auto rho = density(primitive_state);
@@ -1445,7 +1444,7 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystem::View<dim, Number>::to_primitive_state(
+    HyperbolicSystemView<dim, Number>::to_primitive_state(
         const state_type &state) const -> primitive_state_type
     {
       const auto rho = density(state);
@@ -1465,7 +1464,7 @@ namespace ryujin
 
     template <int dim, typename Number>
     template <typename Lambda>
-    auto HyperbolicSystem::View<dim, Number>::apply_galilei_transform(
+    auto HyperbolicSystemView<dim, Number>::apply_galilei_transform(
         const state_type &state, const Lambda &lambda) const -> state_type
     {
       auto result = state;

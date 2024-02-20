@@ -23,10 +23,9 @@ namespace ryujin
     class Uniform : public InitialState<Description, dim, Number>
     {
     public:
-      using HyperbolicSystemView = HyperbolicSystem::View<dim, Number>;
-      using state_type = typename HyperbolicSystemView::state_type;
-      using primitive_state_type =
-          typename HyperbolicSystemView::primitive_state_type;
+      using View = HyperbolicSystemView<dim, Number>;
+      using state_type = typename View::state_type;
+      using primitive_state_type = typename View::primitive_state_type;
 
       Uniform(const HyperbolicSystem &hyperbolic_system,
               const std::string subsection)

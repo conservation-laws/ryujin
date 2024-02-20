@@ -28,9 +28,9 @@ namespace ryujin
     {
     public:
       using HyperbolicSystem = typename Description::HyperbolicSystem;
-      using HyperbolicSystemView =
-          typename HyperbolicSystem::template View<dim, Number>;
-      using state_type = typename HyperbolicSystemView::state_type;
+      using View =
+          typename Description::template HyperbolicSystemView<dim, Number>;
+      using state_type = typename View::state_type;
 
       using state_type_1d = std::array<Number, 4>;
 
@@ -40,7 +40,7 @@ namespace ryujin
           , hyperbolic_system_(hyperbolic_system)
       {
         gamma_ = 1.4;
-        if constexpr (!HyperbolicSystemView::have_gamma) {
+        if constexpr (!View::have_gamma) {
           this->add_parameter("gamma", gamma_, "The ratio of specific heats");
         }
 
@@ -76,7 +76,7 @@ namespace ryujin
         const auto compute_constants =
             [this, speed_of_sound, rarefaction_right_state]() {
               const auto view = hyperbolic_system_.template view<dim, Number>();
-              if constexpr (HyperbolicSystemView::have_gamma) {
+              if constexpr (View::have_gamma) {
                 gamma_ = view.gamma();
               }
 

@@ -83,48 +83,45 @@ namespace ryujin
     {
     public:
       /**
-       * @copydoc HyperbolicSystem::View
+       * @copydoc HyperbolicSystemView
        */
-      using HyperbolicSystemView = HyperbolicSystem::View<dim, Number>;
+      using View = HyperbolicSystemView<dim, Number>;
 
       /**
-       * @copydoc HyperbolicSystem::View::problem_dimension
+       * @copydoc HyperbolicSystemView::problem_dimension
        */
-      static constexpr unsigned int problem_dimension =
-          HyperbolicSystemView::problem_dimension;
+      static constexpr unsigned int problem_dimension = View::problem_dimension;
 
       /**
-       * @copydoc HyperbolicSystem::View::state_type
+       * @copydoc HyperbolicSystemView::state_type
        */
-      using state_type = typename HyperbolicSystemView::state_type;
+      using state_type = typename View::state_type;
 
       /**
-       * @copydoc HyperbolicSystem::View::n_precomputed_values
+       * @copydoc HyperbolicSystemView::n_precomputed_values
        */
       static constexpr unsigned int n_precomputed_values =
-          HyperbolicSystemView::n_precomputed_values;
+          View::n_precomputed_values;
 
       /**
-       * @copydoc HyperbolicSystem::View::precomputed_state_type
+       * @copydoc HyperbolicSystemView::precomputed_state_type
        */
-      using precomputed_state_type =
-          typename HyperbolicSystemView::precomputed_state_type;
+      using precomputed_state_type = typename View::precomputed_state_type;
 
       /**
-       * @copydoc HyperbolicSystem::View::flux_type
+       * @copydoc HyperbolicSystemView::flux_type
        */
-      using flux_type = typename HyperbolicSystemView::flux_type;
+      using flux_type = typename View::flux_type;
 
       /**
-       * @copydoc HyperbolicSystem::View::flux_type
+       * @copydoc HyperbolicSystemView::flux_type
        */
-      using flux_contribution_type =
-          typename HyperbolicSystemView::flux_contribution_type;
+      using flux_contribution_type = typename View::flux_contribution_type;
 
       /**
-       * @copydoc HyperbolicSystem::View::ScalarNumber
+       * @copydoc HyperbolicSystemView::ScalarNumber
        */
-      using ScalarNumber = typename HyperbolicSystemView::ScalarNumber;
+      using ScalarNumber = typename View::ScalarNumber;
 
       /**
        * @copydoc IndicatorParameters

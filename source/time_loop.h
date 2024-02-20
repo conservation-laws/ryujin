@@ -47,22 +47,21 @@ namespace ryujin
     using ParabolicSystem = typename Description::ParabolicSystem;
 
     /**
-     * @copydoc HyperbolicSystem::View
+     * @copydoc HyperbolicSystemView
      */
-    using HyperbolicSystemView =
-        typename Description::HyperbolicSystem::template View<dim, Number>;
+    using View =
+        typename Description::template HyperbolicSystemView<dim, Number>;
 
     /**
      * @copydoc HyperbolicSystem::problem_dimension
      */
-    static constexpr unsigned int problem_dimension =
-        HyperbolicSystemView::problem_dimension;
+    static constexpr unsigned int problem_dimension = View::problem_dimension;
 
     /**
      * @copydoc HyperbolicSystem::n_precomputed_values
      */
     static constexpr unsigned int n_precomputed_values =
-        HyperbolicSystemView::n_precomputed_values;
+        View::n_precomputed_values;
 
 
     /**

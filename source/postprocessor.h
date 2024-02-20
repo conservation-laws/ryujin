@@ -44,21 +44,20 @@ namespace ryujin
     using HyperbolicSystem = typename Description::HyperbolicSystem;
 
     /**
-     * @copydoc HyperbolicSystem::View
+     * @copydoc HyperbolicSystemView
      */
-    using HyperbolicSystemView =
-        typename Description::HyperbolicSystem::template View<dim, Number>;
+    using View =
+        typename Description::template HyperbolicSystemView<dim, Number>;
 
     /**
      * @copydoc HyperbolicSystem::problem_dimension
      */
-    static constexpr unsigned int problem_dimension =
-        HyperbolicSystemView::problem_dimension;
+    static constexpr unsigned int problem_dimension = View::problem_dimension;
 
     /**
      * @copydoc HyperbolicSystem::state_type
      */
-    using state_type = typename HyperbolicSystemView::state_type;
+    using state_type = typename View::state_type;
 
     /**
      * The type used to store the gradient of a scalar quantitty;
@@ -80,7 +79,7 @@ namespace ryujin
     using scalar_type = typename OfflineData<dim, Number>::scalar_type;
 
     /**
-     * @copydoc HyperbolicSystem::View::vector_type
+     * @copydoc HyperbolicSystemView::vector_type
      */
     using vector_type = MultiComponentVector<Number, problem_dimension>;
 

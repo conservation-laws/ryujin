@@ -47,12 +47,12 @@ namespace ryujin
                   "List of level set functions. The description is used to "
                   "only output cells that intersect the given level set.");
 
-    std::copy(std::begin(HyperbolicSystemView::component_names),
-              std::end(HyperbolicSystemView::component_names),
+    std::copy(std::begin(View::component_names),
+              std::end(View::component_names),
               std::back_inserter(vtu_output_quantities_));
 
-    std::copy(std::begin(HyperbolicSystemView::precomputed_initial_names),
-              std::end(HyperbolicSystemView::precomputed_initial_names),
+    std::copy(std::begin(View::precomputed_initial_names),
+              std::end(View::precomputed_initial_names),
               std::back_inserter(vtu_output_quantities_));
 
     add_parameter("vtu output quantities",
@@ -79,7 +79,7 @@ namespace ryujin
       {
         /* Conserved quantities: */
 
-        constexpr auto &names = HyperbolicSystemView::component_names;
+        constexpr auto &names = View::component_names;
         const auto pos = std::find(std::begin(names), std::end(names), entry);
         if (pos != std::end(names)) {
           const auto index = std::distance(std::begin(names), pos);
@@ -97,7 +97,7 @@ namespace ryujin
       {
         /* Primitive quantities: */
 
-        constexpr auto &names = HyperbolicSystemView::primitive_component_names;
+        constexpr auto &names = View::primitive_component_names;
         const auto pos = std::find(std::begin(names), std::end(names), entry);
         if (pos != std::end(names)) {
           const auto index = std::distance(std::begin(names), pos);
@@ -125,7 +125,7 @@ namespace ryujin
       {
         /* Precomputed initial quantities: */
 
-        constexpr auto &names = HyperbolicSystemView::precomputed_initial_names;
+        constexpr auto &names = View::precomputed_initial_names;
         const auto pos = std::find(std::begin(names), std::end(names), entry);
         if (pos != std::end(names)) {
           const auto index = std::distance(std::begin(names), pos);
@@ -144,7 +144,7 @@ namespace ryujin
       {
         /* Precomputed quantities: */
 
-        constexpr auto &names = HyperbolicSystemView::precomputed_names;
+        constexpr auto &names = View::precomputed_names;
         const auto pos = std::find(std::begin(names), std::end(names), entry);
         if (pos != std::end(names)) {
           const auto index = std::distance(std::begin(names), pos);
