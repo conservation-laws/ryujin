@@ -33,9 +33,7 @@ int main()
   using precomputed_type = MultiComponentVector<double, n_precomputed_values>;
   precomputed_type dummy;
 
-  Limiter<dim, double> limiter(hyperbolic_system,
-                               limiter_parameters,
-                               dummy);
+  Limiter<dim, double> limiter(hyperbolic_system, limiter_parameters, dummy);
 
   const auto view = hyperbolic_system.template view<dim, double>();
 

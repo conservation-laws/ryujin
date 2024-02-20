@@ -48,7 +48,7 @@ end
 subsection F - HyperbolicModule
   set cfl with boundary dofs        = true
 
-  subsection Limiter
+  subsection limiter
     set iterations            = 2
     set newton max iterations = 2
     set newton tolerance      = 1e-10

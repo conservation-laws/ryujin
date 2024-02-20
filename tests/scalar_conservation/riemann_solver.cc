@@ -22,6 +22,9 @@ void test(const std::string &expression)
   std::cout << std::scientific;
 
   HyperbolicSystem hyperbolic_system;
+  typename RiemannSolver<dim, Number>::Parameters riemann_solver_parameters(
+      "/riemann_solver");
+
   const auto view = hyperbolic_system.view<dim, Number>();
 
   {
@@ -45,7 +48,8 @@ void test(const std::string &expression)
 
   precomputed_type dummy;
 
-  RiemannSolver<dim, Number> riemann_solver(hyperbolic_system, dummy);
+  RiemannSolver<dim> riemann_solver(
+      hyperbolic_system, riemann_solver_parameters, dummy);
 
   std::cout << "\n\ndim = " << dim << std::endl;
   std::cout << "f(u)={" + expression + "}" << std::endl;

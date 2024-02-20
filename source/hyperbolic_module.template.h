@@ -35,8 +35,9 @@ namespace ryujin
       : ParameterAcceptor(subsection)
       , precompute_only_(false)
       , id_violation_strategy_(IDViolationStrategy::warn)
-      , indicator_parameters_(subsection + "/Indicator")
-      , limiter_parameters_(subsection + "/Limiter")
+      , indicator_parameters_(subsection + "/indicator")
+      , limiter_parameters_(subsection + "/limiter")
+      , riemann_solver_parameters_(subsection + "/riemann_solver")
       , mpi_communicator_(mpi_communicator)
       , computing_timer_(computing_timer)
       , offline_data_(&offline_data)
@@ -290,7 +291,7 @@ namespace ryujin
 
         /* Stored thread locally: */
         typename Description::template RiemannSolver<dim, T> riemann_solver(
-            *hyperbolic_system_, new_precomputed);
+            *hyperbolic_system_, riemann_solver_parameters_, new_precomputed);
         typename Description::template Indicator<dim, T> indicator(
             *hyperbolic_system_, indicator_parameters_, new_precomputed);
         bool thread_ready = false;
@@ -371,7 +372,7 @@ namespace ryujin
       /* Complete d_ij at boundary: */
 
       typename Description::template RiemannSolver<dim, Number> riemann_solver(
-          *hyperbolic_system_, new_precomputed);
+          *hyperbolic_system_, riemann_solver_parameters_, new_precomputed);
 
       Number local_tau_max = std::numeric_limits<Number>::max();
 

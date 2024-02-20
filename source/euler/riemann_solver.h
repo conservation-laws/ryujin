@@ -12,12 +12,21 @@
 #include <deal.II/base/point.h>
 #include <deal.II/base/tensor.h>
 
-#include <functional>
-
 namespace ryujin
 {
   namespace Euler
   {
+    template <typename ScalarNumber = double>
+    class RiemannSolverParameters : public dealii::ParameterAcceptor
+    {
+    public:
+      RiemannSolverParameters(const std::string &subsection)
+          : ParameterAcceptor(subsection)
+      {
+      }
+    };
+
+
     /**
      * A fast approximative solver for the 1D Riemann problem. The solver
      * ensures that the estimate \f$\lambda_{\text{max}}\f$ that is returned
@@ -71,6 +80,11 @@ namespace ryujin
       using ScalarNumber = typename HyperbolicSystemView::ScalarNumber;
 
       /**
+       * @copydoc RiemannSolverParameters
+       */
+      using Parameters = RiemannSolverParameters<ScalarNumber>;
+
+      /**
        * @name Compute wavespeed estimates
        */
       //@{
@@ -80,9 +94,11 @@ namespace ryujin
        */
       RiemannSolver(
           const HyperbolicSystem &hyperbolic_system,
+          const Parameters &parameters,
           const MultiComponentVector<ScalarNumber, n_precomputed_values>
               &precomputed_values)
           : hyperbolic_system(hyperbolic_system)
+          , parameters(parameters)
           , precomputed_values(precomputed_values)
       {
       }
@@ -216,6 +232,7 @@ namespace ryujin
 
     private:
       const HyperbolicSystemView hyperbolic_system;
+      const Parameters &parameters;
 
       const MultiComponentVector<ScalarNumber, n_precomputed_values>
           &precomputed_values;

@@ -17,6 +17,8 @@ int main()
   constexpr int dim = 1;
 
   HyperbolicSystem hyperbolic_system;
+  RiemannSolver<dim, double>::Parameters riemann_solver_parameters(
+      "/riemann_solver");
 
   const double gamma = hyperbolic_system.view<dim, double>().gamma();
 
@@ -25,7 +27,8 @@ int main()
   using precomputed_type = MultiComponentVector<double, n_precomputed_values>;
   precomputed_type dummy;
 
-  RiemannSolver<dim> riemann_solver(hyperbolic_system, dummy);
+  RiemannSolver<dim> riemann_solver(
+      hyperbolic_system, riemann_solver_parameters, dummy);
 
   const auto riemann_data = [&](const auto &state) {
     const double rho = state[0];

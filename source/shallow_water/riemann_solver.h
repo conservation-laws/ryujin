@@ -9,10 +9,26 @@
 
 #include "hyperbolic_system.h"
 
+#include <simd.h>
+
+#include <deal.II/base/point.h>
+#include <deal.II/base/tensor.h>
+
 namespace ryujin
 {
   namespace ShallowWater
   {
+    template <typename ScalarNumber = double>
+    class RiemannSolverParameters : public dealii::ParameterAcceptor
+    {
+    public:
+      RiemannSolverParameters(const std::string &subsection)
+          : ParameterAcceptor(subsection)
+      {
+      }
+    };
+
+
     /**
      * A fast approximative solver for the associated 1D Riemann problem.
      * The solver has to ensure that the estimate
@@ -65,6 +81,11 @@ namespace ryujin
       using ScalarNumber = typename HyperbolicSystemView::ScalarNumber;
 
       /**
+       * @copydoc RiemannSolverParameters
+       */
+      using Parameters = RiemannSolverParameters<ScalarNumber>;
+
+      /**
        * @name Compute wavespeed estimates
        */
       //@{
@@ -74,13 +95,14 @@ namespace ryujin
        */
       RiemannSolver(
           const HyperbolicSystem &hyperbolic_system,
+          const Parameters &parameters,
           const MultiComponentVector<ScalarNumber, n_precomputed_values>
               &precomputed_values)
           : hyperbolic_system(hyperbolic_system)
+          , parameters(parameters)
           , precomputed_values(precomputed_values)
       {
       }
-
 
       /**
        * For two given 1D primitive states riemann_data_i and riemann_data_j,
@@ -89,7 +111,6 @@ namespace ryujin
        */
       Number compute(const primitive_type &riemann_data_i,
                      const primitive_type &riemann_data_j) const;
-
 
       /**
        * For two given states U_i a U_j and a (normalized) "direction" n_ij
@@ -135,16 +156,11 @@ namespace ryujin
                               const dealii::Tensor<1, dim, Number> &n_ij) const;
 
     private:
-      //@}
-      /**
-       * @name Internal functions used in the Riemann solver
-       */
-      //@{
-
       const HyperbolicSystemView hyperbolic_system;
+      const Parameters &parameters;
+
       const MultiComponentVector<ScalarNumber, n_precomputed_values>
           &precomputed_values;
-
       //@}
     };
 
