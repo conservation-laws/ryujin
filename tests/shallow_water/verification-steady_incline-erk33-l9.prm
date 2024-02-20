@@ -68,15 +68,6 @@ subsection E - InitialValues
 
 end
 
-subsection F - HyperbolicModule
-  set cfl with boundary dofs        = false
-  set indicator evc factor          = 1
-  set limiter iterations            = 2
-  set limiter newton max iterations = 2
-  set limiter newton tolerance      = 1e-10
-  set limiter relaxation factor     = 2
-end
-
 subsection H - TimeIntegrator
   set cfl max               = 0.50
   set cfl min               = 0.50
