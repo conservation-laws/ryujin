@@ -220,7 +220,7 @@ namespace ryujin
         const std::array<Number, 4> &riemann_data_i,
         const std::array<Number, 4> &riemann_data_j,
         const Number p_1,
-        const Number p_2)
+        const Number p_2) const
     {
       const Number nu_11 = lambda1_minus(riemann_data_i, p_2 /*SIC!*/);
       const Number nu_12 = lambda1_minus(riemann_data_i, p_1 /*SIC!*/);
@@ -478,7 +478,7 @@ namespace ryujin
 
       const Number phi_p_max = phi_of_p_max(riemann_data_i, riemann_data_j);
 
-      const Number p_2 =
+      Number p_2 =
           dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
               phi_p_max,
               Number(0.),
@@ -488,13 +488,93 @@ namespace ryujin
 #ifdef DEBUG_RIEMANN_SOLVER
       std::cout << "   p^*_tilde  = " << p_2 << "\n";
       std::cout << "   phi(p_*_t) = "
-                << phi(riemann_data_i, riemann_data_j, p_2) << "\n";
-      std::cout << "-> lambda_max = "
-                << compute_lambda(riemann_data_i, riemann_data_j, p_2)
-                << std::endl;
+                << phi(riemann_data_i, riemann_data_j, p_2) << std::endl;
 #endif
 
-      return compute_lambda(riemann_data_i, riemann_data_j, p_2);
+      /*
+       * If we do no Newton iteration, cut it short:
+       */
+
+      if (parameters.newton_max_iterations() == 0) {
+        const auto lambda_max =
+            compute_lambda(riemann_data_i, riemann_data_j, p_2);
+
+#ifdef DEBUG_RIEMANN_SOLVER
+        std::cout << "-> lambda_max = " << lambda_max << std::endl;
+#endif
+        return lambda_max;
+      }
+
+      /*
+       * Compute p_1 and ensure that p_1 < p_2. If we hit a case with two
+       * expansions we might indeed have that p_star_tilde < p_1. Set p_1 =
+       * p_2 in this case.
+       */
+
+      const Number p_min = std::min(riemann_data_i[2], riemann_data_j[2]);
+
+      Number p_1 =
+          dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
+              phi_p_max, Number(0.), p_max, p_min);
+
+      p_1 = dealii::compare_and_apply_mask<
+          dealii::SIMDComparison::less_than_or_equal>(p_1, p_2, p_1, p_2);
+
+      /*
+       * Step 2: Perform quadratic Newton iteration.
+       *
+       * See [1], p. 915f (4.8) and (4.9)
+       */
+
+      auto [gap, lambda_max] =
+          compute_gap(riemann_data_i, riemann_data_j, p_1, p_2);
+
+#ifdef DEBUG_RIEMANN_SOLVER
+      std::cout << std::fixed << std::setprecision(16);
+      std::cout << "p_1: (start) " << p_1 << std::endl;
+      std::cout << "p_2: (start) " << p_2 << std::endl;
+      std::cout << "gap: (start) " << gap << std::endl;
+      std::cout << "l_m: (start) " << lambda_max << std::endl;
+#endif
+
+      for (unsigned int i = 0; i < parameters.newton_max_iterations(); ++i) {
+
+        /* We accept our current guess if we reach the tolerance... */
+        const Number tolerance(parameters.newton_tolerance());
+        if (std::max(Number(0.), gap - tolerance) == Number(0.))
+          break;
+
+        // FIXME: Fuse these computations:
+        const Number phi_p_1 = phi(riemann_data_i, riemann_data_j, p_1);
+        const Number phi_p_2 = phi(riemann_data_i, riemann_data_j, p_2);
+        const Number dphi_p_1 = dphi(riemann_data_i, riemann_data_j, p_1);
+        const Number dphi_p_2 = dphi(riemann_data_i, riemann_data_j, p_2);
+
+        quadratic_newton_step(p_1, p_2, phi_p_1, phi_p_2, dphi_p_1, dphi_p_2);
+
+        /* Update  lambda_max and gap: */
+        auto [gap_new, lambda_max_new] =
+            compute_gap(riemann_data_i, riemann_data_j, p_1, p_2);
+        gap = gap_new;
+        lambda_max = lambda_max_new;
+
+#ifdef DEBUG_OUTPUT_LIMITER
+        std::cout << "phi_p_1:     " << psi_l << std::endl;
+        std::cout << "phi_p_2:     " << psi_r << std::endl;
+        std::cout << "dphi_p_1:    " << dpsi_l << std::endl;
+        std::cout << "dphi_p_2:    " << dpsi_r << std::endl;
+        std::cout << "p_1: (  " << n << "  ) " << p_1 << std::endl;
+        std::cout << "p_2: (  " << n << "  ) " << p_2 << std::endl;
+        std::cout << "gap:         " << gap << std::endl;
+        std::cout << "l_m:         " << lambda_max << std::endl;
+#endif
+      }
+
+#ifdef DEBUG_RIEMANN_SOLVER
+      std::cout << "-> lambda_max = " << lambda_max << std::endl;
+#endif
+
+      return lambda_max;
     }
 
 

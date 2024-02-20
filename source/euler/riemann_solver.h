@@ -23,7 +23,27 @@ namespace ryujin
       RiemannSolverParameters(const std::string &subsection = "/RiemannSolver")
           : ParameterAcceptor(subsection)
       {
+        if constexpr (std::is_same<ScalarNumber, double>::value)
+          newton_tolerance_ = 1.e-10;
+        else
+          newton_tolerance_ = 1.e-4;
+        add_parameter("newton tolerance",
+                      newton_tolerance_,
+                      "Tolerance for the quadratic newton stopping criterion");
+
+        newton_max_iterations_ = 0;
+        add_parameter("newton max iterations",
+                      newton_max_iterations_,
+                      "Maximal number of quadratic newton iterations performed "
+                      "during limiting");
       }
+
+      ACCESSOR_READ_ONLY(newton_tolerance);
+      ACCESSOR_READ_ONLY(newton_max_iterations);
+
+    private:
+      ScalarNumber newton_tolerance_;
+      unsigned int newton_max_iterations_;
     };
 
 
@@ -214,7 +234,7 @@ namespace ryujin
       std::array<Number, 2> compute_gap(const primitive_type &riemann_data_i,
                                         const primitive_type &riemann_data_j,
                                         const Number p_1,
-                                        const Number p_2);
+                                        const Number p_2) const;
 
 
       /**
