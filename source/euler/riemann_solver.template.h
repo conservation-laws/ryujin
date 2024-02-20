@@ -541,8 +541,12 @@ namespace ryujin
 
         /* We accept our current guess if we reach the tolerance... */
         const Number tolerance(parameters.newton_tolerance());
-        if (std::max(Number(0.), gap - tolerance) == Number(0.))
+        if (std::max(Number(0.), gap - tolerance) == Number(0.)) {
+#ifdef DEBUG_RIEMANN_SOLVER
+          std::cout << "converged after " << i << " iterations." << std::endl;
+#endif
           break;
+        }
 
         // FIXME: Fuse these computations:
         const Number phi_p_1 = phi(riemann_data_i, riemann_data_j, p_1);
@@ -558,13 +562,13 @@ namespace ryujin
         gap = gap_new;
         lambda_max = lambda_max_new;
 
-#ifdef DEBUG_OUTPUT_LIMITER
-        std::cout << "phi_p_1:     " << psi_l << std::endl;
-        std::cout << "phi_p_2:     " << psi_r << std::endl;
-        std::cout << "dphi_p_1:    " << dpsi_l << std::endl;
-        std::cout << "dphi_p_2:    " << dpsi_r << std::endl;
-        std::cout << "p_1: (  " << n << "  ) " << p_1 << std::endl;
-        std::cout << "p_2: (  " << n << "  ) " << p_2 << std::endl;
+#ifdef DEBUG_RIEMANN_SOLVER
+        std::cout << "phi_p_1:     " << phi_p_1 << std::endl;
+        std::cout << "phi_p_2:     " << phi_p_2 << std::endl;
+        std::cout << "dphi_p_1:    " << dphi_p_1 << std::endl;
+        std::cout << "dphi_p_2:    " << dphi_p_2 << std::endl;
+        std::cout << "p_1: (  " << i << "  ) " << p_1 << std::endl;
+        std::cout << "p_2: (  " << i << "  ) " << p_2 << std::endl;
         std::cout << "gap:         " << gap << std::endl;
         std::cout << "l_m:         " << lambda_max << std::endl;
 #endif

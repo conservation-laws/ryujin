@@ -8,6 +8,14 @@
 #include <riemann_solver.template.h>
 #include <simd.h>
 
+#ifndef NEWTON_ITERATIONS
+#define NEWTON_ITERATIONS "0"
+#endif
+
+#ifndef NUMBER
+#define NUMBER double
+#endif
+
 using namespace ryujin::Euler;
 using namespace ryujin;
 using namespace dealii;
@@ -15,26 +23,33 @@ using namespace dealii;
 int main()
 {
   constexpr int dim = 1;
+  using Number = NUMBER;
 
   HyperbolicSystem hyperbolic_system;
-  RiemannSolver<dim, double>::Parameters riemann_solver_parameters;
+  RiemannSolver<dim, Number>::Parameters riemann_solver_parameters;
 
-  const double gamma = hyperbolic_system.view<dim, double>().gamma();
+  const auto gamma = hyperbolic_system.view<dim, Number>().gamma();
 
   static constexpr unsigned int n_precomputed_values =
-      HyperbolicSystemView<dim, double>::n_precomputed_values;
-  using precomputed_type = MultiComponentVector<double, n_precomputed_values>;
+      HyperbolicSystemView<dim, Number>::n_precomputed_values;
+  using precomputed_type = MultiComponentVector<Number, n_precomputed_values>;
   precomputed_type dummy;
 
   RiemannSolver<dim> riemann_solver(
       hyperbolic_system, riemann_solver_parameters, dummy);
 
-  const auto riemann_data = [&](const auto &state) {
-    const double rho = state[0];
-    const double u = state[1];
-    const double p = state[2];
+  std::stringstream parameters;
+  parameters << "subsection RiemannSolver\n"
+             << "set newton max iterations = " NEWTON_ITERATIONS "\n"
+             << "end" << std::endl;
+  ParameterAcceptor::initialize(parameters);
 
-    std::array<double, 4> result;
+  const auto riemann_data = [&](const auto &state) {
+    const Number rho = state[0];
+    const Number u = state[1];
+    const Number p = state[2];
+
+    std::array<Number, 4> result;
     result[0] = rho;
     result[1] = u;
     result[2] = p;
@@ -42,14 +57,16 @@ int main()
     return result;
   };
 
-  const auto test = [&](const std::array<double, 3> &U_i,
-                        const std::array<double, 3> &U_j) {
+  const auto test = [&](const std::array<Number, 3> &U_i,
+                        const std::array<Number, 3> &U_j) {
     std::cout << U_i[0] << " " << U_i[1] << " " << U_i[2] << std::endl;
     std::cout << U_j[0] << " " << U_j[1] << " " << U_j[2] << std::endl;
     const auto rd_i = riemann_data(U_i);
     const auto rd_j = riemann_data(U_j);
     const auto lambda_max = riemann_solver.compute(rd_i, rd_j);
     std::cout << lambda_max << std::endl;
+    std::cout << std::endl;
+    std::cout << std::endl;
   };
 
   std::cout << std::setprecision(16);
