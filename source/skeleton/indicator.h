@@ -10,6 +10,7 @@
 #include <multicomponent_vector.h>
 #include <simd.h>
 
+#include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/vectorization.h>
 
 
@@ -17,6 +18,17 @@ namespace ryujin
 {
   namespace Skeleton
   {
+    template <typename ScalarNumber = double>
+    class IndicatorParameters : public dealii::ParameterAcceptor
+    {
+    public:
+      IndicatorParameters(const std::string &subsection)
+          : ParameterAcceptor(subsection)
+      {
+      }
+    };
+
+
     /**
      * An suitable indicator strategy that is used to form the preliminary
      * high-order update.
@@ -54,6 +66,11 @@ namespace ryujin
       using ScalarNumber = typename get_value_type<Number>::type;
 
       /**
+       * @copydoc IndicatorParameters
+       */
+      using Parameters = IndicatorParameters<ScalarNumber>;
+
+      /**
        * @name Stencil-based computation of indicators
        *
        * Intended usage:
@@ -76,12 +93,12 @@ namespace ryujin
        * Constructor taking a HyperbolicSystem instance as argument
        */
       Indicator(const HyperbolicSystem &hyperbolic_system,
+                const Parameters &parameters,
                 const MultiComponentVector<ScalarNumber, n_precomputed_values>
-                    &precomputed_values,
-                const ScalarNumber evc_factor)
+                    &precomputed_values)
           : hyperbolic_system(hyperbolic_system)
+          , parameters(parameters)
           , precomputed_values(precomputed_values)
-          , evc_factor(evc_factor)
       {
       }
 
@@ -121,11 +138,10 @@ namespace ryujin
        */
       //@{
       const HyperbolicSystemView hyperbolic_system;
+      const Parameters &parameters;
 
       const MultiComponentVector<ScalarNumber, n_precomputed_values>
           &precomputed_values;
-
-      const ScalarNumber evc_factor;
       //@}
     };
   } // namespace Skeleton

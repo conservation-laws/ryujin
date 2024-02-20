@@ -315,7 +315,8 @@ namespace ryujin
      * @name Run time options
      */
     //@{
-    Number indicator_evc_factor_;
+    typename Description::template Indicator<dim, Number>::Parameters
+        indicator_parameters_;
 
     unsigned int limiter_iter_;
     Number limiter_newton_tolerance_;

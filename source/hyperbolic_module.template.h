@@ -35,6 +35,7 @@ namespace ryujin
       : ParameterAcceptor(subsection)
       , precompute_only_(false)
       , id_violation_strategy_(IDViolationStrategy::warn)
+      , indicator_parameters_(subsection + "/Indicator")
       , mpi_communicator_(mpi_communicator)
       , computing_timer_(computing_timer)
       , offline_data_(&offline_data)
@@ -44,11 +45,6 @@ namespace ryujin
       , n_restarts_(0)
       , n_warnings_(0)
   {
-    indicator_evc_factor_ = Number(1.);
-    add_parameter("indicator evc factor",
-                  indicator_evc_factor_,
-                  "Factor for scaling the entropy viscocity commuator");
-
     limiter_iter_ = 2;
     add_parameter(
         "limiter iterations", limiter_iter_, "Number of limiter iterations");
@@ -319,7 +315,7 @@ namespace ryujin
         typename Description::template RiemannSolver<dim, T> riemann_solver(
             *hyperbolic_system_, new_precomputed);
         typename Description::template Indicator<dim, T> indicator(
-            *hyperbolic_system_, new_precomputed, indicator_evc_factor_);
+            *hyperbolic_system_, indicator_parameters_, new_precomputed);
         bool thread_ready = false;
 
         RYUJIN_OMP_FOR
