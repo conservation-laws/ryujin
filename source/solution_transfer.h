@@ -82,6 +82,7 @@ namespace ryujin
     {
       const auto &scalar_partitioner = offline_data_->scalar_partitioner();
       const auto &affine_constraints = offline_data_->affine_constraints();
+      const auto view = hyperbolic_system_.template view<dim, Number>();
 
       state_.resize(problem_dimension);
       for (auto &it : state_)
@@ -93,7 +94,7 @@ namespace ryujin
 
       for (unsigned int i = 0; i < n_owned; ++i) {
         const auto U_i = U.get_tensor(i);
-        const auto primitive_state = hyperbolic_system_.to_primitive_state(U_i);
+        const auto primitive_state = view.to_primitive_state(U_i);
 
         for (unsigned int k = 0; k < problem_dimension; ++k)
           state_[k].local_element(i) = primitive_state[k];
@@ -122,6 +123,7 @@ namespace ryujin
     void interpolate(vector_type &U)
     {
       const auto &scalar_partitioner = offline_data_->scalar_partitioner();
+      const auto view = hyperbolic_system_.template view<dim, Number>();
 
       U.reinit(offline_data_->vector_partitioner());
 
@@ -146,7 +148,7 @@ namespace ryujin
         state_type U_i;
         for (unsigned int k = 0; k < problem_dimension; ++k)
           U_i[k] = interpolated_state_[k].local_element(i);
-        U_i = hyperbolic_system_.from_primitive_state(U_i);
+        U_i = view.from_primitive_state(U_i);
 
         U.write_tensor(U_i, i);
       }
@@ -161,7 +163,7 @@ namespace ryujin
      */
     //@{
     dealii::SmartPointer<const OfflineData<dim, Number>> offline_data_;
-    const HyperbolicSystemView hyperbolic_system_;
+    const HyperbolicSystem &hyperbolic_system_;
 
     dealii::parallel::distributed::SolutionTransfer<dim, scalar_type>
         solution_transfer_;
