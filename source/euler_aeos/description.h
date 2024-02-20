@@ -32,6 +32,9 @@ namespace ryujin
     struct Description {
       using HyperbolicSystem = EulerAEOS::HyperbolicSystem;
 
+      template <int dim, typename Number = double>
+      using HyperbolicSystemView = EulerAEOS::HyperbolicSystemView<dim, Number>;
+
       using ParabolicSystem = EulerAEOS::ParabolicSystem;
 
       template <int dim, typename Number = double>

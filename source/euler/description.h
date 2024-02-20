@@ -31,6 +31,9 @@ namespace ryujin
     struct Description {
       using HyperbolicSystem = Euler::HyperbolicSystem;
 
+      template <int dim, typename Number = double>
+      using HyperbolicSystemView = Euler::HyperbolicSystemView<dim, Number>;
+
       using ParabolicSystem = Euler::ParabolicSystem;
 
       template <int dim, typename Number = double>
