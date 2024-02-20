@@ -44,11 +44,6 @@ subsection E - InitialValues
   end
 end
 
-subsection F - HyperbolicModule
-  set cfl with boundary dofs = false
-  set limiter iterations     = 2
-end
-
 subsection H - TimeIntegrator
   set cfl min            = 0.2
   set cfl max            = 0.2
