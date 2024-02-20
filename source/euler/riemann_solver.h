@@ -231,7 +231,7 @@ namespace ryujin
                               const dealii::Tensor<1, dim, Number> &n_ij) const;
 
     private:
-      const HyperbolicSystemView hyperbolic_system;
+      const HyperbolicSystem &hyperbolic_system;
       const Parameters &parameters;
 
       const MultiComponentVector<ScalarNumber, n_precomputed_values>
@@ -249,24 +249,25 @@ namespace ryujin
         const state_type &U, const dealii::Tensor<1, dim, Number> &n_ij) const
         -> primitive_type
     {
-      const auto rho = hyperbolic_system.density(U);
+      const auto view = hyperbolic_system.view<dim, Number>();
+
+      const auto rho = view.density(U);
       const auto rho_inverse = Number(1.0) / rho;
 
-      const auto m = hyperbolic_system.momentum(U);
+      const auto m = view.momentum(U);
       const auto proj_m = n_ij * m;
       const auto perp = m - proj_m * n_ij;
 
-      const auto E = hyperbolic_system.total_energy(U) -
-                     Number(0.5) * perp.norm_square() * rho_inverse;
+      const auto E =
+          view.total_energy(U) - Number(0.5) * perp.norm_square() * rho_inverse;
 
       using state_type_1d =
           typename HyperbolicSystem::View<1, Number>::state_type;
-      const auto hyperbolic_system_1d =
-          hyperbolic_system.template view<1, Number>();
+      const auto view_1d = hyperbolic_system.view<1, Number>();
 
       const auto state = state_type_1d{{rho, proj_m, E}};
-      const auto p = hyperbolic_system_1d.pressure(state);
-      const auto a = hyperbolic_system_1d.speed_of_sound(state);
+      const auto p = view_1d.pressure(state);
+      const auto a = view_1d.speed_of_sound(state);
       return {{rho, proj_m * rho_inverse, p, a}};
     }
 

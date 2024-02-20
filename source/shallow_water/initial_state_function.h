@@ -67,6 +67,8 @@ namespace ryujin
 
       state_type compute(const dealii::Point<dim> &point, Number t) final
       {
+        const auto view = hyperbolic_system_.template view<dim, Number>();
+
         dealii::Tensor<1, 2, Number> primitive;
 
         depth_function_->set_time(t);
@@ -74,11 +76,11 @@ namespace ryujin
         velocity_function_->set_time(t);
         primitive[1] = velocity_function_->value(point);
 
-        return hyperbolic_system_.from_initial_state(primitive);
+        return view.from_initial_state(primitive);
       }
 
     private:
-      const HyperbolicSystemView hyperbolic_system_;
+      const HyperbolicSystem &hyperbolic_system_;
 
       bool use_primitive_state_functions_;
 

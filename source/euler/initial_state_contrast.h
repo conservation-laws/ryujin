@@ -52,9 +52,9 @@ namespace ryujin
             "Initial 1d primitive state (rho, u, p) on the right");
 
         const auto convert_states = [&]() {
-          state_left_ = hyperbolic_system_.from_initial_state(primitive_left_);
-          state_right_ =
-              hyperbolic_system_.from_initial_state(primitive_right_);
+          const auto view = hyperbolic_system_.template view<dim, Number>();
+          state_left_ = view.from_initial_state(primitive_left_);
+          state_right_ = view.from_initial_state(primitive_right_);
         };
         this->parse_parameters_call_back.connect(convert_states);
         convert_states();
@@ -66,7 +66,7 @@ namespace ryujin
       }
 
     private:
-      const HyperbolicSystemView hyperbolic_system_;
+      const HyperbolicSystem &hyperbolic_system_;
 
       dealii::Tensor<1, 3, Number> primitive_left_;
       dealii::Tensor<1, 3, Number> primitive_right_;

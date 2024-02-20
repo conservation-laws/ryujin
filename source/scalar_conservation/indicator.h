@@ -138,7 +138,8 @@ namespace ryujin
        * @name
        */
       //@{
-      const HyperbolicSystemView hyperbolic_system;
+
+      const HyperbolicSystem &hyperbolic_system;
       const Parameters &parameters;
 
       const MultiComponentVector<ScalarNumber, n_precomputed_values>
@@ -164,15 +165,17 @@ namespace ryujin
     DEAL_II_ALWAYS_INLINE inline void
     Indicator<dim, Number>::reset(const unsigned int i, const state_type &U_i)
     {
+      /* entropy viscosity commutator: */
+
+      const auto view = hyperbolic_system.view<dim, Number>();
+
       const auto prec_i =
           precomputed_values
               .template get_tensor<Number, precomputed_state_type>(i);
 
-      /* entropy viscosity commutator: */
-
-      u_i = hyperbolic_system.state(U_i);
+      u_i = view.state(U_i);
       u_abs_max = std::abs(u_i);
-      f_i = hyperbolic_system.construct_flux_tensor(prec_i);
+      f_i = view.construct_flux_tensor(prec_i);
       left = 0.;
       right = 0.;
     }
@@ -184,17 +187,18 @@ namespace ryujin
         const state_type &U_j,
         const dealii::Tensor<1, dim, Number> &c_ij)
     {
+      /* entropy viscosity commutator: */
+
+      const auto view = hyperbolic_system.view<dim, Number>();
+
       const auto prec_j =
           precomputed_values
               .template get_tensor<Number, precomputed_state_type>(js);
 
-      /* entropy viscosity commutator: */
-
-      const auto u_j = hyperbolic_system.state(U_j);
+      const auto u_j = view.state(U_j);
       u_abs_max = std::max(u_abs_max, std::abs(u_j));
-      const auto d_eta_j =
-          hyperbolic_system.kruzkov_entropy_derivative(u_i, u_j);
-      const auto f_j = hyperbolic_system.construct_flux_tensor(prec_j);
+      const auto d_eta_j = view.kruzkov_entropy_derivative(u_i, u_j);
+      const auto f_j = view.construct_flux_tensor(prec_j);
 
       left += d_eta_j * (f_j * c_ij);
       right += d_eta_j * (f_i * c_ij);

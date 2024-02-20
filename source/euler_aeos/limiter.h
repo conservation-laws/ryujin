@@ -241,7 +241,7 @@ namespace ryujin
        * invariant domain.
        */
       static bool
-      is_in_invariant_domain(const HyperbolicSystemView &hyperbolic_system,
+      is_in_invariant_domain(const HyperbolicSystem &hyperbolic_system,
                              const Bounds &bounds,
                              const state_type &U);
 
@@ -250,7 +250,7 @@ namespace ryujin
       /** @name Arguments and internal fields */
       //@{
 
-      const HyperbolicSystemView hyperbolic_system;
+      const HyperbolicSystem &hyperbolic_system;
       const Parameters &parameters;
 
       const MultiComponentVector<ScalarNumber, n_precomputed_values>
@@ -315,18 +315,19 @@ namespace ryujin
         const dealii::Tensor<1, dim, Number> &scaled_c_ij,
         const Number beta_ij)
     {
-      /* Bounds: */
+      const auto view = hyperbolic_system.view<dim, Number>();
 
+      /* Bounds: */
       auto &[rho_min, rho_max, s_min, gamma_min] = bounds_;
 
-      const auto rho_i = hyperbolic_system.density(U_i);
-      const auto rho_j = hyperbolic_system.density(U_j);
+      const auto rho_i = view.density(U_i);
+      const auto rho_j = view.density(U_j);
 
       const auto U_ij_bar =
           ScalarNumber(0.5) * (U_i + U_j) -
           ScalarNumber(0.5) * contract(add(flux_j, -flux_i), scaled_c_ij);
 
-      const auto rho_ij_bar = hyperbolic_system.density(U_ij_bar);
+      const auto rho_ij_bar = view.density(U_ij_bar);
 
       /* Density bounds: */
 
@@ -340,7 +341,7 @@ namespace ryujin
 
       /* Surrogate entropy bounds and relaxation: */
 
-      if (hyperbolic_system.compute_strict_bounds()) {
+      if (view.compute_strict_bounds()) {
         /*
          * Compute strict bounds precisely as outlined in @cite ryujin-2023-4
          *
@@ -351,13 +352,12 @@ namespace ryujin
          *    bounds relaxation:
          */
 
-        const auto s_j =
-            hyperbolic_system.surrogate_specific_entropy(U_j, gamma_min);
+        const auto s_j = view.surrogate_specific_entropy(U_j, gamma_min);
 
         const auto s_ij_bar =
-            hyperbolic_system.surrogate_specific_entropy(U_ij_bar, gamma_min);
+            view.surrogate_specific_entropy(U_ij_bar, gamma_min);
 
-        const Number s_interp = hyperbolic_system.surrogate_specific_entropy(
+        const Number s_interp = view.surrogate_specific_entropy(
             (U_i + U_j) * ScalarNumber(.5), gamma_min);
 
         s_min = std::min(s_min, s_j);
@@ -376,7 +376,7 @@ namespace ryujin
                 .template get_tensor<Number, precomputed_state_type>(js);
 
         const auto s_ij_bar =
-            hyperbolic_system.surrogate_specific_entropy(U_ij_bar, gamma_min);
+            view.surrogate_specific_entropy(U_ij_bar, gamma_min);
 
         s_min = std::min(s_min, s_j);
         s_min = std::min(s_min, s_ij_bar);
@@ -389,6 +389,8 @@ namespace ryujin
     DEAL_II_ALWAYS_INLINE inline auto
     Limiter<dim, Number>::bounds(const Number hd_i) const -> Bounds
     {
+      const auto view = hyperbolic_system.view<dim, Number>();
+
       auto relaxed_bounds = bounds_;
       auto &[rho_min, rho_max, s_min, gamma_min] = relaxed_bounds;
 
@@ -422,7 +424,7 @@ namespace ryujin
        */
 
       const auto numerator = (gamma_min + Number(1.)) * rho_max;
-      const auto interpolation_b = hyperbolic_system.eos_interpolation_b();
+      const auto interpolation_b = view.eos_interpolation_b();
       const auto denominator =
           gamma_min - Number(1.) + ScalarNumber(2.) * interpolation_b * rho_max;
       const auto upper_bound = numerator / denominator;
@@ -436,7 +438,7 @@ namespace ryujin
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline bool
     Limiter<dim, Number>::is_in_invariant_domain(
-        const HyperbolicSystemView & /*hyperbolic_system*/,
+        const HyperbolicSystem & /*hyperbolic_system*/,
         const Bounds & /*bounds*/,
         const state_type & /*U*/)
     {

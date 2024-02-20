@@ -57,7 +57,8 @@ namespace ryujin
 
       state_type compute(const dealii::Point<dim> &point, Number t) final
       {
-        const auto g = hyperbolic_system_.gravity();
+        const auto view = hyperbolic_system_.template view<dim, Number>();
+        const auto g = view.gravity();
 
         const auto x = point[0];
 
@@ -81,7 +82,7 @@ namespace ryujin
       /* Default bathymetry of 0 */
 
     private:
-      const HyperbolicSystemView hyperbolic_system_;
+      const HyperbolicSystem &hyperbolic_system_;
 
       Number t_initial_;
       Number left_depth;

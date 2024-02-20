@@ -176,7 +176,7 @@ namespace ryujin
        * invariant domain.
        */
       static bool
-      is_in_invariant_domain(const HyperbolicSystemView & /*hyperbolic_system*/,
+      is_in_invariant_domain(const HyperbolicSystem & /*hyperbolic_system*/,
                              const Bounds & /*bounds*/,
                              const state_type & /*U*/);
 
@@ -184,7 +184,8 @@ namespace ryujin
       //@}
       /** @name Arguments and internal fields */
       //@{
-      const HyperbolicSystemView hyperbolic_system;
+
+      const HyperbolicSystem &hyperbolic_system;
       const Parameters &parameters;
 
       const MultiComponentVector<ScalarNumber, n_precomputed_values>
@@ -239,18 +240,19 @@ namespace ryujin
         const dealii::Tensor<1, dim, Number> &scaled_c_ij,
         const Number beta_ij)
     {
-      /* Bounds: */
+      const auto view = hyperbolic_system.view<dim, Number>();
 
+      /* Bounds: */
       auto &[u_min, u_max] = bounds_;
 
-      const auto u_i = hyperbolic_system.state(U_i);
-      const auto u_j = hyperbolic_system.state(U_j);
+      const auto u_i = view.state(U_i);
+      const auto u_j = view.state(U_j);
 
       const auto U_ij_bar =
           ScalarNumber(0.5) * (U_i + U_j) -
           ScalarNumber(0.5) * contract(add(flux_j, -flux_i), scaled_c_ij);
 
-      const auto u_ij_bar = hyperbolic_system.state(U_ij_bar);
+      const auto u_ij_bar = view.state(U_ij_bar);
 
       /* Bounds: */
 
@@ -298,7 +300,7 @@ namespace ryujin
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline bool
     Limiter<dim, Number>::is_in_invariant_domain(
-        const HyperbolicSystemView & /*hyperbolic_system*/,
+        const HyperbolicSystem & /*hyperbolic_system*/,
         const Bounds & /*bounds*/,
         const state_type & /*U*/)
     {

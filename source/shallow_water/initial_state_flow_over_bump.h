@@ -9,6 +9,8 @@
 
 #include <initial_state_library.h>
 
+#include <simd.h>
+
 namespace ryujin
 {
   namespace ShallowWaterInitialStates
@@ -52,7 +54,8 @@ namespace ryujin
 
       state_type compute(const dealii::Point<dim> &point, Number t) final
       {
-        const auto g = hyperbolic_system_.gravity();
+        const auto view = hyperbolic_system_.template view<dim, Number>();
+        const auto g = view.gravity();
 
         const auto x = point[0];
 
@@ -111,7 +114,7 @@ namespace ryujin
       }
 
     private:
-      const HyperbolicSystemView hyperbolic_system_;
+      const HyperbolicSystem &hyperbolic_system_;
 
       DEAL_II_ALWAYS_INLINE
       inline Number compute_bathymetry(const dealii::Point<dim> &point) const

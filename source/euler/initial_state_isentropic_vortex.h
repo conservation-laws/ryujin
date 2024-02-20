@@ -52,8 +52,10 @@ namespace ryujin
 
       state_type compute(const dealii::Point<dim> &point, Number t) final
       {
+        const auto view = hyperbolic_system_.template view<dim, Number>();
+
         if constexpr (HyperbolicSystemView::have_gamma) {
-          gamma_ = hyperbolic_system_.gamma();
+          gamma_ = view.gamma();
         }
 
         /* In 3D we simply project onto the 2d plane: */
@@ -89,7 +91,7 @@ namespace ryujin
       }
 
     private:
-      const HyperbolicSystemView hyperbolic_system_;
+      const HyperbolicSystem &hyperbolic_system_;
 
       Number gamma_;
       Number mach_number_;

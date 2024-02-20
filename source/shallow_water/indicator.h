@@ -150,7 +150,8 @@ namespace ryujin
        * @name
        */
       //@{
-      const HyperbolicSystemView hyperbolic_system;
+
+      const HyperbolicSystem &hyperbolic_system;
       const Parameters &parameters;
 
       const MultiComponentVector<ScalarNumber, n_precomputed_values>
@@ -179,18 +180,19 @@ namespace ryujin
     DEAL_II_ALWAYS_INLINE inline void
     Indicator<dim, Number>::reset(const unsigned int i, const state_type &U_i)
     {
-      h_i = hyperbolic_system.water_depth(U_i);
       /* entropy viscosity commutator: */
+
+      const auto view = hyperbolic_system.view<dim, Number>();
 
       const auto &[eta_m, h_star] =
           precomputed_values
               .template get_tensor<Number, precomputed_state_type>(i);
 
+      h_i = view.water_depth(U_i);
       eta_i = eta_m;
-
-      d_eta_i = hyperbolic_system.mathematical_entropy_derivative(U_i);
-      f_i = hyperbolic_system.f(U_i);
-      pressure_i = hyperbolic_system.pressure(U_i);
+      d_eta_i = view.mathematical_entropy_derivative(U_i);
+      f_i = view.f(U_i);
+      pressure_i = view.pressure(U_i);
 
       left = 0.;
       right = 0.;
@@ -205,14 +207,16 @@ namespace ryujin
     {
       /* entropy viscosity commutator: */
 
+      const auto view = hyperbolic_system.view<dim, Number>();
+
       const auto &[eta_j, h_star_j] =
           precomputed_values
               .template get_tensor<Number, precomputed_state_type>(js);
 
-      const auto velocity_j = hyperbolic_system.momentum(U_j) *
-                              hyperbolic_system.inverse_water_depth_sharp(U_j);
-      const auto f_j = hyperbolic_system.f(U_j);
-      const auto pressure_j = hyperbolic_system.pressure(U_j);
+      const auto velocity_j =
+          view.momentum(U_j) * view.inverse_water_depth_sharp(U_j);
+      const auto f_j = view.f(U_j);
+      const auto pressure_j = view.pressure(U_j);
 
       left += (eta_j + pressure_j) * (velocity_j * c_ij);
 

@@ -45,13 +45,14 @@ namespace ryujin
       state_type compute(const dealii::Point<dim> & /*point*/,
                          Number /*t*/) final
       {
-        return hyperbolic_system_.from_initial_state(primitive_);
+        const auto view = hyperbolic_system_.template view<dim, Number>();
+        return view.from_initial_state(primitive_);
       }
 
       /* Default bathymetry of 0 */
 
     private:
-      const HyperbolicSystemView hyperbolic_system_;
+      const HyperbolicSystem &hyperbolic_system_;
 
       dealii::Tensor<1, 2, Number> primitive_;
     };

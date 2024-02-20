@@ -64,8 +64,9 @@ namespace ryujin
             "Initial primitive state (rho, u, p) for ambient state");
 
         const auto convert_states = [&]() {
-          state_left_ = hyperbolic_system_.from_initial_state(jet_state_);
-          state_right_ = hyperbolic_system_.from_initial_state(ambient_state_);
+          const auto view = hyperbolic_system_.template view<dim, Number>();
+          state_left_ = view.from_initial_state(jet_state_);
+          state_right_ = view.from_initial_state(ambient_state_);
         };
         this->parse_parameters_call_back.connect(convert_states);
         convert_states();
@@ -79,7 +80,7 @@ namespace ryujin
       }
 
     private:
-      const HyperbolicSystemView hyperbolic_system_;
+      const HyperbolicSystem &hyperbolic_system_;
 
       Number gamma_;
       Number jet_width_;

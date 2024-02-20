@@ -62,6 +62,8 @@ namespace ryujin
 
       state_type compute(const dealii::Point<dim> &point, Number t) final
       {
+        const auto view = hyperbolic_system_.template view<dim, Number>();
+
         const Number x = point[0];
 
         /* Initial state: */
@@ -75,8 +77,7 @@ namespace ryujin
         /* For t > 0 prescribe constant inflow Dirichlet data on the left: */
 
         const auto &h = left_depth;
-        const auto a =
-            hyperbolic_system_.speed_of_sound(state_type{{h, Number(0.)}});
+        const auto a = view.speed_of_sound(state_type{{h, Number(0.)}});
         return state_type{{h, h * a}};
       }
 
@@ -89,7 +90,7 @@ namespace ryujin
       }
 
     private:
-      const HyperbolicSystemView hyperbolic_system_;
+      const HyperbolicSystem &hyperbolic_system_;
 
       DEAL_II_ALWAYS_INLINE inline Number
       compute_bathymetry(const dealii::Point<dim> &point) const

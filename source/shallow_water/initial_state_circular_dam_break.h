@@ -58,7 +58,7 @@ namespace ryujin
       /* Default bathymetry of 0 */
 
     private:
-      const HyperbolicSystemView hyperbolic_system;
+      const HyperbolicSystem &hyperbolic_system;
 
       Number still_water_depth_;
       Number radius_;

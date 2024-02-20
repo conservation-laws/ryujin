@@ -21,17 +21,18 @@ namespace ryujin
                                 const Number t_min /* = Number(0.) */,
                                 const Number t_max /* = Number(1.) */)
     {
-      const auto &[h_min, h_max, h_small, kin_max, v2_max] = bounds;
+      const auto view = hyperbolic_system.view<dim, Number>();
 
       bool success = true;
-
       Number t_l = t_min;
       Number t_r = t_max;
 
+      const auto &[h_min, h_max, h_small, kin_max, v2_max] = bounds;
+
       constexpr ScalarNumber min = std::numeric_limits<ScalarNumber>::min();
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
-      const auto small = hyperbolic_system.dry_state_relaxation_small();
-      const auto large = hyperbolic_system.dry_state_relaxation_large();
+      const auto small = view.dry_state_relaxation_small();
+      const auto large = view.dry_state_relaxation_large();
       const auto relax_small = ScalarNumber(1. + small * eps);
       const auto relax = ScalarNumber(1. + large * eps);
 
@@ -42,12 +43,12 @@ namespace ryujin
        */
 
       {
-        auto h_U = hyperbolic_system.water_depth(U);
-        const auto &h_P = hyperbolic_system.water_depth(P);
+        auto h_U = view.water_depth(U);
+        const auto &h_P = view.water_depth(P);
 
-        const auto test_min = hyperbolic_system.filter_dry_water_depth(
+        const auto test_min = view.filter_dry_water_depth(
             std::max(Number(0.), h_U - relax * h_max));
-        const auto test_max = hyperbolic_system.filter_dry_water_depth(
+        const auto test_max = view.filter_dry_water_depth(
             std::max(Number(0.), h_min - relax * h_U));
 
         if (!(test_min == Number(0.) && test_max == Number(0.))) {
@@ -114,10 +115,10 @@ namespace ryujin
         /*
          * Verify that the new state is within bounds:
          */
-        const auto h_new = hyperbolic_system.water_depth(U + t_r * P);
-        const auto test_new_min = hyperbolic_system.filter_dry_water_depth(
+        const auto h_new = view.water_depth(U + t_r * P);
+        const auto test_new_min = view.filter_dry_water_depth(
             std::max(Number(0.), h_new - relax * h_max));
-        const auto test_new_max = hyperbolic_system.filter_dry_water_depth(
+        const auto test_new_max = view.filter_dry_water_depth(
             std::max(Number(0.), h_min - relax * h_new));
 
         if (!(test_new_min == Number(0.) && test_new_max == Number(0.))) {
@@ -162,8 +163,8 @@ namespace ryujin
         /* We first check if t_r is a good state */
 
         const auto U_r = U + t_r * P;
-        const auto h_r = hyperbolic_system.water_depth(U_r);
-        const auto q_r = hyperbolic_system.momentum(U_r);
+        const auto h_r = view.water_depth(U_r);
+        const auto q_r = view.momentum(U_r);
 
         const auto psi_r =
             relax_small * h_r * kin_max - ScalarNumber(0.5) * q_r.norm_square();
@@ -189,8 +190,8 @@ namespace ryujin
 #endif
 
         const auto U_l = U + t_l * P;
-        const auto h_l = hyperbolic_system.water_depth(U_l);
-        const auto q_l = hyperbolic_system.momentum(U_l);
+        const auto h_l = view.water_depth(U_l);
+        const auto q_l = view.momentum(U_l);
 
         const auto psi_l =
             relax_small * h_l * kin_max - ScalarNumber(0.5) * q_l.norm_square();
@@ -203,7 +204,7 @@ namespace ryujin
          * negative so that we do not accidentally trigger in "perfect" dry
          * states with h_l equal to zero.
          */
-        const auto filtered_h_l = hyperbolic_system.filter_dry_water_depth(h_l);
+        const auto filtered_h_l = view.filter_dry_water_depth(h_l);
         const auto lower_bound =
             (ScalarNumber(1.) - relax) * filtered_h_l * kin_max - eps;
         if (!(std::min(Number(0.), psi_l - lower_bound) == Number(0.))) {
@@ -239,9 +240,9 @@ namespace ryujin
            * so that (up to round-off error) t_l = t_r.
            */
 
-          const auto &h_P = hyperbolic_system.water_depth(P);
-          const auto &q_U = hyperbolic_system.momentum(U);
-          const auto &q_P = hyperbolic_system.momentum(P);
+          const auto &h_P = view.water_depth(P);
+          const auto &q_U = view.momentum(U);
+          const auto &q_P = view.momentum(P);
 
           const auto dpsi_l = h_P * kin_max - (q_U * q_P) - q_P * q_P * t_l;
           const auto dpsi_r = h_P * kin_max - (q_U * q_P) - q_P * q_P * t_r;
@@ -267,8 +268,8 @@ namespace ryujin
          */
         {
           const auto U_new = U + t_l * P;
-          const auto h_new = hyperbolic_system.water_depth(U_new);
-          const auto q_new = hyperbolic_system.momentum(U_new);
+          const auto h_new = view.water_depth(U_new);
+          const auto q_new = view.momentum(U_new);
 
           const auto psi_new = relax_small * h_new * kin_max -
                                ScalarNumber(0.5) * q_new.norm_square();
@@ -311,8 +312,8 @@ namespace ryujin
         /* We first check if t_r is a good state */
 
         const auto U_r = U + t_r * P;
-        const auto h_r = hyperbolic_system.water_depth(U_r);
-        const auto q_r = hyperbolic_system.momentum(U_r);
+        const auto h_r = view.water_depth(U_r);
+        const auto q_r = view.momentum(U_r);
 
         const auto psi_r = relax_small * h_r * h_r * v2_max - q_r.norm_square();
 
@@ -337,8 +338,8 @@ namespace ryujin
 #endif
 
         const auto U_l = U + t_l * P;
-        const auto h_l = hyperbolic_system.water_depth(U_l);
-        const auto q_l = hyperbolic_system.momentum(U_l);
+        const auto h_l = view.water_depth(U_l);
+        const auto q_l = view.momentum(U_l);
 
         const auto psi_l = relax_small * h_l * h_l * v2_max - q_l.norm_square();
 
@@ -350,7 +351,7 @@ namespace ryujin
          * negative so that we do not accidentally trigger in "perfect" dry
          * states with h_l equal to zero.
          */
-        const auto filtered_h_l = hyperbolic_system.filter_dry_water_depth(h_l);
+        const auto filtered_h_l = view.filter_dry_water_depth(h_l);
         const auto lower_bound =
             (ScalarNumber(1.) - relax) * filtered_h_l * filtered_h_l * v2_max -
             ScalarNumber(100.) * eps;
@@ -387,10 +388,10 @@ namespace ryujin
            * case of a quadratic function psi(t) both polynomials will coincide
            * so that (up to round-off error) t_l = t_r.
            */
-          const auto &h_U = hyperbolic_system.water_depth(U);
-          const auto &h_P = hyperbolic_system.water_depth(P);
-          const auto &q_U = hyperbolic_system.momentum(U);
-          const auto &q_P = hyperbolic_system.momentum(P);
+          const auto &h_U = view.water_depth(U);
+          const auto &h_P = view.water_depth(P);
+          const auto &q_U = view.momentum(U);
+          const auto &q_P = view.momentum(P);
 
           const auto dpsi_l =
               (h_U + t_l * h_P) * h_P * v2_max -
@@ -420,8 +421,8 @@ namespace ryujin
          */
         {
           const auto U_new = U + t_l * P;
-          const auto h_new = hyperbolic_system.water_depth(U_new);
-          const auto q_new = hyperbolic_system.momentum(U_new);
+          const auto h_new = view.water_depth(U_new);
+          const auto q_new = view.momentum(U_new);
 
           const auto psi_new =
               relax_small * h_new * h_new * v2_max - q_new.norm_square();

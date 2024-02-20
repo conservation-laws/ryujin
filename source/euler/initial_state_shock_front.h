@@ -57,15 +57,17 @@ namespace ryujin
             "Mach number of shock front (S1, S3 = mach * a_L/R)");
 
         const auto compute_and_convert_states = [&]() {
+          const auto view = hyperbolic_system_.template view<dim, Number>();
+
           if constexpr (HyperbolicSystemView::have_gamma) {
-            gamma_ = hyperbolic_system_.gamma();
+            gamma_ = view.gamma();
           }
 
           /* Compute post-shock state and S3: */
 
           auto b = Number(0.);
           if constexpr (HyperbolicSystemView::have_eos_interpolation_b)
-            b = hyperbolic_system_.eos_interpolation_b();
+            b = view.eos_interpolation_b();
 
           const auto &rho_R = primitive_right_[0];
           const auto &u_R = primitive_right_[1];
@@ -91,9 +93,8 @@ namespace ryujin
           primitive_left_[1] = u_L;
           primitive_left_[2] = p_L;
 
-          state_left_ = hyperbolic_system_.from_initial_state(primitive_left_);
-          state_right_ =
-              hyperbolic_system_.from_initial_state(primitive_right_);
+          state_left_ = view.from_initial_state(primitive_left_);
+          state_right_ = view.from_initial_state(primitive_right_);
         };
 
         this->parse_parameters_call_back.connect(compute_and_convert_states);
@@ -108,7 +109,7 @@ namespace ryujin
       }
 
     private:
-      const HyperbolicSystemView hyperbolic_system_;
+      const HyperbolicSystem &hyperbolic_system_;
 
       Number gamma_;
 

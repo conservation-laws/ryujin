@@ -42,7 +42,8 @@ namespace ryujin
                             "Initial 1d primitive state (rho, u, p)");
 
         const auto convert_states = [&]() {
-          state_ = hyperbolic_system_.from_initial_state(primitive_);
+          const auto view = hyperbolic_system_.template view<dim, Number>();
+          state_ = view.from_initial_state(primitive_);
         };
         this->parse_parameters_call_back.connect(convert_states);
         convert_states();
@@ -55,7 +56,7 @@ namespace ryujin
       }
 
     private:
-      const HyperbolicSystemView hyperbolic_system_;
+      const HyperbolicSystem &hyperbolic_system_;
 
       dealii::Tensor<1, 3, Number> primitive_;
 

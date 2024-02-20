@@ -110,7 +110,7 @@ namespace ryujin
       }
 
     private:
-      const HyperbolicSystemView hyperbolic_system_;
+      const HyperbolicSystem &hyperbolic_system_;
     };
   } // namespace EulerInitialStates
 } // namespace ryujin

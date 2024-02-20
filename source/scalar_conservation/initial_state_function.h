@@ -67,7 +67,7 @@ namespace ryujin
       }
 
     private:
-      const HyperbolicSystemView hyperbolic_system;
+      const HyperbolicSystem &hyperbolic_system;
 
       std::string expression_;
       std::unique_ptr<dealii::FunctionParser<dim>> function_;

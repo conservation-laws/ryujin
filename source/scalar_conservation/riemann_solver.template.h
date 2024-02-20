@@ -27,7 +27,7 @@ namespace ryujin
         const precomputed_state_type &prec_j,
         const dealii::Tensor<1, dim, Number> &n_ij) const
     {
-      const auto &view = hyperbolic_system;
+      const auto &view = hyperbolic_system.view<dim, Number>();
 
       /* Project all fluxes to 1D: */
       const Number f_i = view.construct_flux_tensor(prec_i) * n_ij;
@@ -139,13 +139,13 @@ namespace ryujin
         std::cout << "f_k  = " << f_k << std::endl;
 #endif
 
-        const Number eta_i = hyperbolic_system.kruzkov_entropy(k, u_i);
+        const Number eta_i = view.kruzkov_entropy(k, u_i);
         const Number q_i =
-            hyperbolic_system.kruzkov_entropy_derivative(k, u_i) * (f_i - f_k);
+            view.kruzkov_entropy_derivative(k, u_i) * (f_i - f_k);
 
-        const Number eta_j = hyperbolic_system.kruzkov_entropy(k, u_j);
+        const Number eta_j = view.kruzkov_entropy(k, u_j);
         const Number q_j =
-            hyperbolic_system.kruzkov_entropy_derivative(k, u_j) * (f_j - f_k);
+            view.kruzkov_entropy_derivative(k, u_j) * (f_j - f_k);
 
         const Number a = u_i + u_j - ScalarNumber(2.) * k;
         const Number b = f_j - f_i;

@@ -269,7 +269,7 @@ namespace ryujin
                               const dealii::Tensor<1, dim, Number> &n_ij) const;
 
     private:
-      const HyperbolicSystemView hyperbolic_system;
+      const HyperbolicSystem &hyperbolic_system;
       const Parameters &parameters;
 
       const MultiComponentVector<ScalarNumber, n_precomputed_values>
@@ -292,15 +292,17 @@ namespace ryujin
         const Number &p,
         const dealii::Tensor<1, dim, Number> &n_ij) const -> primitive_type
     {
-      const auto rho = hyperbolic_system.density(U);
+      const auto view = hyperbolic_system.view<dim, Number>();
+
+      const auto rho = view.density(U);
       const auto rho_inverse = ScalarNumber(1.0) / rho;
 
-      const auto m = hyperbolic_system.momentum(U);
+      const auto m = view.momentum(U);
       const auto proj_m = n_ij * m;
 
-      const auto gamma = hyperbolic_system.surrogate_gamma(U, p);
+      const auto gamma = view.surrogate_gamma(U, p);
 
-      const auto interpolation_b = hyperbolic_system.eos_interpolation_b();
+      const auto interpolation_b = view.eos_interpolation_b();
       const auto x = Number(1.) - interpolation_b * rho;
       const auto a = std::sqrt(gamma * p / (rho * x));
 

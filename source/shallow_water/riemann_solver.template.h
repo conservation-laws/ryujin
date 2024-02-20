@@ -27,7 +27,8 @@ namespace ryujin
     RiemannSolver<dim, Number>::f(const primitive_type &riemann_data_Z,
                                   const Number &h) const
     {
-      const ScalarNumber gravity = hyperbolic_system.gravity();
+      const auto view = hyperbolic_system.view<dim, Number>();
+      const ScalarNumber gravity = view.gravity();
 
       const auto &[h_Z, u_Z, a_Z] = riemann_data_Z;
 
@@ -110,7 +111,8 @@ namespace ryujin
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
     {
-      const ScalarNumber gravity = hyperbolic_system.gravity();
+      const auto view = hyperbolic_system.view<dim, Number>();
+      const ScalarNumber gravity = view.gravity();
       const auto gravity_inverse = ScalarNumber(1.) / gravity;
 
       const auto &[h_i, u_i, a_i] = riemann_data_i;
