@@ -64,9 +64,11 @@ namespace ryujin
 
       state_type compute(const dealii::Point<dim> &point, Number t) final
       {
+        const auto view = hyperbolic_system_.template view<dim, Number>();
+
         /* Common quantities */
         const auto z = compute_bathymetry(point);
-        const auto g = hyperbolic_system_.gravity();
+        const auto g = view.gravity();
         const Number omega = std::sqrt(2. * g * h_0_) / a_;
         const Number &x = point[0];
 
@@ -77,7 +79,7 @@ namespace ryujin
 
         if constexpr (dim == 1) {
 
-          const Number k = hyperbolic_system_.manning_friction_coefficient();
+          const Number k = view.manning_friction_coefficient();
           const Number p = std::sqrt(8. * g * h_0_) / a_;
           const Number s = std::sqrt(p * p - k * k) / 2.;
 
@@ -129,7 +131,7 @@ namespace ryujin
       }
 
     private:
-      const HyperbolicSystemView hyperbolic_system_;
+      const HyperbolicSystem &hyperbolic_system_;
 
       DEAL_II_ALWAYS_INLINE inline Number
       compute_bathymetry(const dealii::Point<dim> &point) const

@@ -41,12 +41,12 @@ namespace ryujin
       state_type compute(const dealii::Point<dim> & /*point*/,
                          Number /*t*/) final
       {
-        return hyperbolic_system.from_primitive_state(
-            hyperbolic_system.expand_state(primitive_));
+        const auto view = hyperbolic_system.view<dim, Number>();
+        return view.from_primitive_state(view.expand_state(primitive_));
       }
 
     private:
-      const HyperbolicSystemView hyperbolic_system;
+      const HyperbolicSystem &hyperbolic_system;
 
       primitive_state_type primitive_;
     };

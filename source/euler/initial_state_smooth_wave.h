@@ -61,6 +61,8 @@ namespace ryujin
 
       state_type compute(const dealii::Point<dim> &point, Number t) final
       {
+        const auto view = hyperbolic_system_.template view<dim, Number>();
+
         auto point_bar = point;
         point_bar[0] = point_bar[0] - mach_number_ * t;
         const auto x = Number(point_bar[0]);
@@ -81,11 +83,11 @@ namespace ryujin
           initial_state[1] = mach_number_;
           initial_state[dim + 1] = pressure_ref_;
         }
-        return hyperbolic_system_.from_initial_state(initial_state);
+        return view.from_initial_state(initial_state);
       }
 
     private:
-      const HyperbolicSystemView hyperbolic_system_;
+      const HyperbolicSystem &hyperbolic_system_;
 
       Number density_ref_;
       Number pressure_ref_;

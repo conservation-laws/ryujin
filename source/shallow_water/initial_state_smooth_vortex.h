@@ -54,7 +54,8 @@ namespace ryujin
 
       state_type compute(const dealii::Point<dim> &point, Number t) final
       {
-        const auto gravity = hyperbolic_system_.gravity();
+        const auto view = hyperbolic_system_.template view<dim, Number>();
+        const auto gravity = view.gravity();
 
         dealii::Point<2> point_bar;
         point_bar[0] = point[0] - mach_number_ * t;
@@ -94,7 +95,7 @@ namespace ryujin
       }
 
     private:
-      const HyperbolicSystemView hyperbolic_system_;
+      const HyperbolicSystem &hyperbolic_system_;
 
       DEAL_II_ALWAYS_INLINE inline Number
       compute_bathymetry(const dealii::Point<dim> &point) const

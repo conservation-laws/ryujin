@@ -68,7 +68,7 @@ namespace ryujin
       }
 
     private:
-      const HyperbolicSystemView hyperbolic_system;
+      const HyperbolicSystem &hyperbolic_system;
       Number depth_;
 
       DEAL_II_ALWAYS_INLINE inline Number

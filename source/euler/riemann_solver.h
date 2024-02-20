@@ -258,8 +258,8 @@ namespace ryujin
       const auto proj_m = n_ij * m;
       const auto perp = m - proj_m * n_ij;
 
-      const auto E = view.total_energy(U) -
-                     Number(0.5) * perp.norm_square() * rho_inverse;
+      const auto E =
+          view.total_energy(U) - Number(0.5) * perp.norm_square() * rho_inverse;
 
       using state_type_1d =
           typename HyperbolicSystem::View<1, Number>::state_type;

@@ -60,10 +60,9 @@ namespace ryujin
         this->add_parameter("radius", radius_, "Radius of radial area");
 
         const auto convert_states = [&]() {
-          state_inner_ =
-              hyperbolic_system_.from_initial_state(primitive_inner_);
-          state_outer_ =
-              hyperbolic_system_.from_initial_state(primitive_outer_);
+          const auto view = hyperbolic_system_.template view<dim, Number>();
+          state_inner_ = view.from_initial_state(primitive_inner_);
+          state_outer_ = view.from_initial_state(primitive_outer_);
         };
         this->parse_parameters_call_back.connect(convert_states);
         convert_states();
@@ -76,7 +75,7 @@ namespace ryujin
       }
 
     private:
-      const HyperbolicSystemView hyperbolic_system_;
+      const HyperbolicSystem &hyperbolic_system_;
 
       dealii::Tensor<1, 3, Number> primitive_inner_;
       dealii::Tensor<1, 3, Number> primitive_outer_;

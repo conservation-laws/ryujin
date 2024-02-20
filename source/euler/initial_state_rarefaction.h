@@ -75,8 +75,9 @@ namespace ryujin
 
         const auto compute_constants =
             [this, speed_of_sound, rarefaction_right_state]() {
+              const auto view = hyperbolic_system_.template view<dim, Number>();
               if constexpr (HyperbolicSystemView::have_gamma) {
-                gamma_ = hyperbolic_system_.gamma();
+                gamma_ = view.gamma();
               }
 
               /*
@@ -153,7 +154,7 @@ namespace ryujin
       }
 
     private:
-      const HyperbolicSystemView hyperbolic_system_;
+      const HyperbolicSystem &hyperbolic_system_;
       Number gamma_;
 
       state_type_1d primitive_left_;

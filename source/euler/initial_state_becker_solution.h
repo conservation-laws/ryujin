@@ -85,8 +85,10 @@ namespace ryujin
         /* Callback: */
 
         dealii::ParameterAcceptor::parse_parameters_call_back.connect([this]() {
+          const auto view = hyperbolic_system_.template view<dim, Number>();
+
           if constexpr (HyperbolicSystemView::have_gamma) {
-            gamma_ = hyperbolic_system_.gamma();
+            gamma_ = view.gamma();
           }
 
           AssertThrow(
@@ -188,6 +190,8 @@ namespace ryujin
 
       state_type compute(const dealii::Point<dim> &point, Number t) final
       {
+        const auto view = hyperbolic_system_.template view<dim, Number>();
+
         /* (7.2) */
         const double R_infty = (gamma_ + 1) / (gamma_ - 1);
 
@@ -209,11 +213,11 @@ namespace ryujin
              Number(rho * (velocity_ + v)),
              Number(rho * (e + 0.5 * (velocity_ + v) * (velocity_ + v)))}};
 
-        return hyperbolic_system_.expand_state(state_1d);
+        return view.expand_state(state_1d);
       }
 
     private:
-      const HyperbolicSystemView hyperbolic_system_;
+      const HyperbolicSystem &hyperbolic_system_;
       Number gamma_;
 
       Number velocity_;

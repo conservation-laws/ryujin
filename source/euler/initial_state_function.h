@@ -89,6 +89,8 @@ namespace ryujin
 
       state_type compute(const dealii::Point<dim> &point, Number t) final
       {
+        const auto view = hyperbolic_system_.template view<dim, Number>();
+
         if (use_primitive_state_functions_) {
           dealii::Tensor<1, 3, Number> primitive;
 
@@ -99,7 +101,7 @@ namespace ryujin
           pressure_function_->set_time(t);
           primitive[2] = pressure_function_->value(point);
 
-          return hyperbolic_system_.from_initial_state(primitive);
+          return view.from_initial_state(primitive);
 
         } else {
           dealii::Tensor<1, 3, Number> state;
@@ -111,12 +113,12 @@ namespace ryujin
           energy_function_->set_time(t);
           state[2] = energy_function_->value(point);
 
-          return hyperbolic_system_.expand_state(state);
+          return view.expand_state(state);
         }
       }
 
     private:
-      const HyperbolicSystemView hyperbolic_system_;
+      const HyperbolicSystem &hyperbolic_system_;
 
       bool use_primitive_state_functions_;
 

@@ -255,10 +255,8 @@ namespace ryujin
           /* We got unlucky and have to perform a Newton step: */
 
           const auto drho = view.density(P);
-          const auto drho_e_l =
-              view.internal_energy_derivative(U_l) * P;
-          const auto drho_e_r =
-              view.internal_energy_derivative(U_r) * P;
+          const auto drho_e_l = view.internal_energy_derivative(U_l) * P;
+          const auto drho_e_r = view.internal_energy_derivative(U_r) * P;
           const auto dpsi_l =
               rho_l * drho_e_l + (rho_e_l - gp1 * s_min * rho_l_gamma) * drho;
           const auto dpsi_r =

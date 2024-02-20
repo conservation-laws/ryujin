@@ -65,13 +65,15 @@ namespace ryujin
 
       state_type compute(const dealii::Point<dim> &point, Number /* t */) final
       {
+        const auto view = hyperbolic_system_.template view<dim, Number>();
+
         if constexpr (dim == 1) {
           AssertThrow(false, dealii::ExcNotImplemented());
           __builtin_trap();
         }
 
         const auto temp = point[0] > 1.e-8 ? state_right_ : state_left_;
-        return hyperbolic_system_.expand_state(temp);
+        return view.expand_state(temp);
       }
 
       auto initial_precomputations(const dealii::Point<dim> &point) ->
@@ -83,7 +85,7 @@ namespace ryujin
       }
 
     private:
-      const HyperbolicSystemView hyperbolic_system_;
+      const HyperbolicSystem &hyperbolic_system_;
 
       DEAL_II_ALWAYS_INLINE
       inline Number compute_bathymetry(const dealii::Point<dim> &point) const

@@ -48,12 +48,13 @@ namespace ryujin
 
       state_type compute(const dealii::Point<dim> &point, Number /*t*/) final
       {
+        const auto view = hyperbolic_system_.template view<dim, Number>();
         const auto temp = point[0] > 0. ? primitive_right_ : primitive_left_;
-        return hyperbolic_system_.from_initial_state(temp);
+        return view.from_initial_state(temp);
       }
 
     private:
-      const HyperbolicSystemView hyperbolic_system_;
+      const HyperbolicSystem &hyperbolic_system_;
 
       dealii::Tensor<1, 2, Number> primitive_left_;
       dealii::Tensor<1, 2, Number> primitive_right_;

@@ -43,7 +43,8 @@ namespace ryujin
 
         this->parse_parameters_call_back.connect([&]() {
           if constexpr (HyperbolicSystemView::have_gamma) {
-            gamma_ = hyperbolic_system_.gamma();
+            const auto view = hyperbolic_system_.template view<dim, Number>();
+            gamma_ = view.gamma();
           }
         });
       }
@@ -119,7 +120,7 @@ namespace ryujin
       }
 
     private:
-      const HyperbolicSystemView hyperbolic_system_;
+      const HyperbolicSystem &hyperbolic_system_;
       Number gamma_;
     };
   } // namespace EulerInitialStates
