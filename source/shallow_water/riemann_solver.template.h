@@ -205,6 +205,25 @@ namespace ryujin
 
 
     template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline auto
+    RiemannSolver<dim, Number>::riemann_data_from_state(
+        const state_type &U, const dealii::Tensor<1, dim, Number> &n_ij) const
+        -> primitive_type
+    {
+      const auto view = hyperbolic_system.view<dim, Number>();
+
+      const Number h = view.water_depth_sharp(U);
+      const Number gravity = view.gravity();
+
+      const auto velocity = view.momentum(U) / h;
+      const auto projected_velocity = n_ij * velocity;
+      const auto a = std::sqrt(h * gravity);
+
+      return {{h, projected_velocity, a}};
+    }
+
+
+    template <int dim, typename Number>
     inline Number RiemannSolver<dim, Number>::compute(
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
@@ -215,6 +234,20 @@ namespace ryujin
           compute_lambda(riemann_data_i, riemann_data_j, h_star);
 
       return lambda_max;
+    }
+
+
+    template <int dim, typename Number>
+    Number RiemannSolver<dim, Number>::compute(
+        const state_type &U_i,
+        const state_type &U_j,
+        const unsigned int /*i*/,
+        const unsigned int * /*js*/,
+        const dealii::Tensor<1, dim, Number> &n_ij) const
+    {
+      const auto riemann_data_i = riemann_data_from_state(U_i, n_ij);
+      const auto riemann_data_j = riemann_data_from_state(U_j, n_ij);
+      return compute(riemann_data_i, riemann_data_j);
     }
 
   } // namespace ShallowWater

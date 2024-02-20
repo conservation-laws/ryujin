@@ -23,7 +23,27 @@ namespace ryujin
       RiemannSolverParameters(const std::string &subsection = "/RiemannSolver")
           : ParameterAcceptor(subsection)
       {
+        if constexpr (std::is_same<ScalarNumber, double>::value)
+          newton_tolerance_ = 1.e-10;
+        else
+          newton_tolerance_ = 1.e-4;
+        add_parameter("newton tolerance",
+                      newton_tolerance_,
+                      "Tolerance for the quadratic newton stopping criterion");
+
+        newton_max_iterations_ = 0;
+        add_parameter("newton max iterations",
+                      newton_max_iterations_,
+                      "Maximal number of quadratic newton iterations performed "
+                      "during limiting");
       }
+
+      ACCESSOR_READ_ONLY(newton_tolerance);
+      ACCESSOR_READ_ONLY(newton_max_iterations);
+
+    private:
+      ScalarNumber newton_tolerance_;
+      unsigned int newton_max_iterations_;
     };
 
 
@@ -129,20 +149,40 @@ namespace ryujin
       /** @name Internal functions used in the Riemann solver */
       //@{
 
-#ifndef DOXYGEN
       /**
-       * FIXME
+       * See @cite GuermondPopov2016b, page 912, (3.4).
+       *
+       * Cost: 1x pow, 1x division, 2x sqrt
        */
       Number f(const primitive_type &riemann_data, const Number p_star) const;
 
 
       /**
-       * FIXME
+       * See @cite GuermondPopov2016b, page 912, (3.4).
+       *
+       * Cost: 1x pow, 3x division, 1x sqrt
+       */
+      Number df(const primitive_type &riemann_data, const Number &p_star) const;
+
+
+      /**
+       * See @cite GuermondPopov2016b, page 912, (3.3).
+       *
+       * Cost: 2x pow, 6x division, 2x sqrt
        */
       Number phi(const primitive_type &riemann_data_i,
                  const primitive_type &riemann_data_j,
                  const Number p_in) const;
-#endif
+
+
+      /**
+       * See @cite GuermondPopov2016b, page 912, (3.3).
+       *
+       * Cost: 2x pow, 6x division, 2x sqrt
+       */
+      Number dphi(const primitive_type &riemann_data_i,
+                  const primitive_type &riemann_data_j,
+                  const Number &p) const;
 
 
       /**
@@ -164,7 +204,7 @@ namespace ryujin
 
 
       /**
-       * see @cite GuermondPopov2016 page 912, (3.7)
+       * see @cite GuermondPopov2016b, page 912, (3.7)
        *
        * Cost: 0x pow, 1x division, 1x sqrt
        */
@@ -173,7 +213,7 @@ namespace ryujin
 
 
       /**
-       * see @cite GuermondPopov2016 page 912, (3.8)
+       * see @cite GuermondPopov2016b, page 912, (3.8)
        *
        * Cost: 0x pow, 1x division, 1x sqrt
        */
@@ -182,7 +222,23 @@ namespace ryujin
 
 
       /**
-       * see @cite GuermondPopov2016 page 912, (3.9)
+       * For two given primitive states <code>riemann_data_i</code> and
+       * <code>riemann_data_j</code>, and two guesses p_1 <= p* <= p_2,
+       * compute the gap in lambda between both guesses.
+       *
+       * See @cite GuermondPopov2016b, page 914, (4.4a), (4.4b), (4.5), and
+       * (4.6)
+       *
+       * Cost: 0x pow, 4x division, 4x sqrt
+       */
+      std::array<Number, 2> compute_gap(const primitive_type &riemann_data_i,
+                                        const primitive_type &riemann_data_j,
+                                        const Number p_1,
+                                        const Number p_2) const;
+
+
+      /**
+       * see @cite GuermondPopov2016b, page 912, (3.9)
        *
        * For two given primitive states <code>riemann_data_i</code> and
        * <code>riemann_data_j</code>, and a guess p_2, compute an upper bound
@@ -237,52 +293,5 @@ namespace ryujin
           &precomputed_values;
       //@}
     };
-
-
-    /* Inline definitions */
-
-
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline auto
-    RiemannSolver<dim, Number>::riemann_data_from_state(
-        const state_type &U, const dealii::Tensor<1, dim, Number> &n_ij) const
-        -> primitive_type
-    {
-      const auto view = hyperbolic_system.view<dim, Number>();
-
-      const auto rho = view.density(U);
-      const auto rho_inverse = Number(1.0) / rho;
-
-      const auto m = view.momentum(U);
-      const auto proj_m = n_ij * m;
-      const auto perp = m - proj_m * n_ij;
-
-      const auto E =
-          view.total_energy(U) - Number(0.5) * perp.norm_square() * rho_inverse;
-
-      using state_type_1d =
-          typename HyperbolicSystemView<1, Number>::state_type;
-      const auto view_1d = hyperbolic_system.view<1, Number>();
-
-      const auto state = state_type_1d{{rho, proj_m, E}};
-      const auto p = view_1d.pressure(state);
-      const auto a = view_1d.speed_of_sound(state);
-      return {{rho, proj_m * rho_inverse, p, a}};
-    }
-
-
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number RiemannSolver<dim, Number>::compute(
-        const state_type &U_i,
-        const state_type &U_j,
-        const unsigned int /*i*/,
-        const unsigned int * /*js*/,
-        const dealii::Tensor<1, dim, Number> &n_ij) const
-    {
-      const auto riemann_data_i = riemann_data_from_state(U_i, n_ij);
-      const auto riemann_data_j = riemann_data_from_state(U_j, n_ij);
-
-      return compute(riemann_data_i, riemann_data_j);
-    }
   } // namespace Euler
 } // namespace ryujin
