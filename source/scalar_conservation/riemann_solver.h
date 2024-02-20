@@ -154,36 +154,5 @@ namespace ryujin
           &precomputed_values;
       //@}
     };
-
-
-    /*
-     * -------------------------------------------------------------------------
-     * Inline definitions
-     * -------------------------------------------------------------------------
-     */
-
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number RiemannSolver<dim, Number>::compute(
-        const state_type &U_i,
-        const state_type &U_j,
-        const unsigned int i,
-        const unsigned int *js,
-        const dealii::Tensor<1, dim, Number> &n_ij) const
-    {
-      const auto view = hyperbolic_system.view<dim, Number>();
-
-      using pst = typename View::precomputed_state_type;
-
-      const auto u_i = view.state(U_i);
-      const auto u_j = view.state(U_j);
-
-      const auto &pv = precomputed_values;
-      const auto prec_i = pv.template get_tensor<Number, pst>(i);
-      const auto prec_j = pv.template get_tensor<Number, pst>(js);
-
-      return compute(u_i, u_j, prec_i, prec_j, n_ij);
-    }
-
-
   } // namespace ScalarConservation
 } // namespace ryujin

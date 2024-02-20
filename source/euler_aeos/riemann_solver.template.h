@@ -491,6 +491,48 @@ namespace ryujin
 
 
     template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline auto
+    RiemannSolver<dim, Number>::riemann_data_from_state(
+        const state_type &U,
+        const Number &p,
+        const dealii::Tensor<1, dim, Number> &n_ij) const -> primitive_type
+    {
+      const auto view = hyperbolic_system.view<dim, Number>();
+
+      const auto rho = view.density(U);
+      const auto rho_inverse = ScalarNumber(1.0) / rho;
+
+      const auto m = view.momentum(U);
+      const auto proj_m = n_ij * m;
+
+      const auto gamma = view.surrogate_gamma(U, p);
+
+      const auto interpolation_b = view.eos_interpolation_b();
+      const auto x = Number(1.) - interpolation_b * rho;
+      const auto a = std::sqrt(gamma * p / (rho * x));
+
+#ifdef CHECK_BOUNDS
+      AssertThrowSIMD(
+          Number(p),
+          [](auto val) { return val > ScalarNumber(0.); },
+          dealii::ExcMessage("Internal error: p <= 0."));
+
+      AssertThrowSIMD(
+          x,
+          [](auto val) { return val > ScalarNumber(0.); },
+          dealii::ExcMessage("Internal error: 1. - b * rho <= 0."));
+
+      AssertThrowSIMD(
+          gamma,
+          [](auto val) { return val > ScalarNumber(1.); },
+          dealii::ExcMessage("Internal error: gamma <= 1."));
+#endif
+
+      return {{rho, proj_m * rho_inverse, p, gamma, a}};
+    }
+
+
+    template <int dim, typename Number>
     Number RiemannSolver<dim, Number>::compute(
         const primitive_type &riemann_data_i,
         const primitive_type &riemann_data_j) const
@@ -573,6 +615,30 @@ namespace ryujin
 
       return compute_lambda(riemann_data_i, riemann_data_j, p_2);
     }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline Number RiemannSolver<dim, Number>::compute(
+        const state_type &U_i,
+        const state_type &U_j,
+        const unsigned int i,
+        const unsigned int *js,
+        const dealii::Tensor<1, dim, Number> &n_ij) const
+    {
+      const auto &[p_i, unused_i, s_i, eta_i] =
+          precomputed_values
+              .template get_tensor<Number, precomputed_state_type>(i);
+
+      const auto &[p_j, unused_j, s_j, eta_j] =
+          precomputed_values
+              .template get_tensor<Number, precomputed_state_type>(js);
+
+      const auto riemann_data_i = riemann_data_from_state(U_i, p_i, n_ij);
+      const auto riemann_data_j = riemann_data_from_state(U_j, p_j, n_ij);
+
+      return compute(riemann_data_i, riemann_data_j);
+    }
+
 
   } // namespace EulerAEOS
 } // namespace ryujin
