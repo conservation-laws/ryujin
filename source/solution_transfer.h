@@ -81,27 +81,20 @@ namespace ryujin
     {
       const auto &scalar_partitioner = offline_data_->scalar_partitioner();
       const auto &affine_constraints = offline_data_->affine_constraints();
-      const auto view = hyperbolic_system_.template view<dim, Number>();
 
       state_.resize(problem_dimension);
       for (auto &it : state_)
         it.reinit(scalar_partitioner);
 
-      const unsigned int n_owned = offline_data_->n_locally_owned();
+      /*
+       * FIXME: we need to copy over to an auxiliary  state_ vector because
+       * dealii::SolutionTransfer cannot work on our MultiComponentVector
+       */
 
-      /* copy over the primitive state: */
-
-      for (unsigned int i = 0; i < n_owned; ++i) {
-        const auto U_i = U.get_tensor(i);
-        const auto primitive_state = view.to_primitive_state(U_i);
-
-        for (unsigned int k = 0; k < problem_dimension; ++k)
-          state_[k].local_element(i) = primitive_state[k];
-      }
-
-      for (auto &it : state_) {
-        affine_constraints.distribute(it);
-        it.update_ghost_values();
+      for (unsigned int k = 0; k < problem_dimension; ++k) {
+        U.extract_component(state_[k], k);
+        affine_constraints.distribute(state_[k]);
+        state_[k].update_ghost_values();
       }
 
       std::vector<const scalar_type *> ptr_state;
@@ -122,7 +115,6 @@ namespace ryujin
     void interpolate(vector_type &U)
     {
       const auto &scalar_partitioner = offline_data_->scalar_partitioner();
-      const auto view = hyperbolic_system_.template view<dim, Number>();
 
       U.reinit(offline_data_->vector_partitioner());
 
@@ -139,19 +131,13 @@ namespace ryujin
                      [](auto &it) { return &it; });
       solution_transfer_.interpolate(ptr_interpolated_state);
 
-      const unsigned int n_owned = offline_data_->n_locally_owned();
+      /*
+       * Read back from interpolated_state_ vector:
+       */
 
-      /* copy over primitive_state: */
-
-      for (unsigned int i = 0; i < n_owned; ++i) {
-        state_type U_i;
-        for (unsigned int k = 0; k < problem_dimension; ++k)
-          U_i[k] = interpolated_state_[k].local_element(i);
-        U_i = view.from_primitive_state(U_i);
-
-        U.write_tensor(U_i, i);
+      for (unsigned int k = 0; k < problem_dimension; ++k) {
+        U.insert_component(interpolated_state_[k], k);
       }
-
       U.update_ghost_values();
     }
 
