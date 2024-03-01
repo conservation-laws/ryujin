@@ -1,7 +1,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2014 - 2022 by Agner Fog
-// Copyright (C) 2020 - 2023 by the ryujin authors
+// Copyright (C) 2020 - 2024 by the ryujin authors
 //
 
 #pragma once

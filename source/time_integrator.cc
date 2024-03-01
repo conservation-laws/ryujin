@@ -1,6 +1,6 @@
 //
-// SPDX-License-Identifier: MIT
-// Copyright (C) 2020 - 2023 by the ryujin authors
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// Copyright (C) 2020 - 2024 by the ryujin authors
 //
 
 #include "time_integrator.template.h"
