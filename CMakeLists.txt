@@ -15,7 +15,9 @@ if("${_source}" STREQUAL "${_build}")
     "operation would globber important files. You need to configure in a "
     "separate build directory. It is easiest to simply invoke $ make, which "
     "will configure ryujin in the directory ./build.\n"
-    "You will need to clean up ./CMakeCache.txt and ./CMakeFiles by hand."
+    "You will need to clean up ./CMakeCache.txt and ./CMakeFiles by hand, "
+    "or by running $ make cleanup_insource which will delete these files "
+    "and directories for you"
     )
 endif()
 
