@@ -1,0 +1,275 @@
+#!/usr/bin/env python
+##
+## SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+## Copyright (C) 2020 - 2024 by the ryujin authors
+##
+
+help_description = """
+This script performs a convergence analysis by running a number of
+simulations with increasing refinement. It reads the output of each
+simulation to find the errors and then creates a convergence rate table.
+
+Example usage:
+
+> ./create_convergence_tables --file ryujin.prm --initial 3 --final 7
+
+Runs the ./ryujin executable with configuration file ryujin.prm from
+initial refinement 3 up to 7
+
+> ./create_convergence_tables --command "mpirun ryujin" [...]
+
+Runs the ./ryujin executable via mpirun
+"""
+
+import os, sys
+import numpy as np
+from tabulate import tabulate
+import argparse, textwrap, re, time
+
+#
+# Command line arguments:
+#
+
+parser = argparse.ArgumentParser(
+    prog="error_table",
+    formatter_class=argparse.RawDescriptionHelpFormatter,
+    description=textwrap.dedent(help_description),
+)
+
+parser.add_argument(
+    "--command",
+    type=str,
+    default="./ryujin",
+    help="command to execute (default: ./ryujin)",
+    required=False,
+)
+
+parser.add_argument(
+    "--file",
+    type=str,
+    default="ryujin.prm",
+    help="configuration file supplied as first argument (default: ryujin.prm)",
+    required=False,
+)
+
+parser.add_argument(
+    "--initial",
+    type=int,
+    default=3,
+    help="initial mesh refinement level (default: 3)",
+    required=False,
+)
+
+parser.add_argument(
+    "--final",
+    type=int,
+    default=7,
+    help="final mesh refinement level (default: 7)",
+    required=False,
+)
+
+args = parser.parse_args()
+
+command = str(args.command)
+prm_file = str(args.file)
+initial_refinement = args.initial
+final_refinement = args.final
+
+#
+# Collect script name and arguments for output:
+#
+
+script_name = sys.argv[0] # The script name is at index 0
+arguments = sys.argv[1:]  # The actual arguments are from index 1 onwards
+arguments_string = " ".join(arguments)
+script_args = f"\nScript: {script_name}\nArguments: {arguments_string}\n"
+
+
+def main():
+    run_simulations()
+    compute_errors()
+    compute_rates()
+
+
+output_files = ["refinement_" + str(i) + ".out" for i in range(initial_refinement, final_refinement + 1)]
+
+
+def run_simulations():
+    # Get mesh refinement line number in prm file
+    target_string = "set mesh refinement "
+    result = find_string_in_file(prm_file, target_string)
+
+    if result:
+        line_number, line = result
+    else:
+        print(f"The string '{target_string}' was not found in the file.")
+        quit()
+
+    # Run program for each refinement
+    for i in range(len(output_files)):
+        print("-- refinement " + str(i + initial_refinement) + " ...", end="")
+
+        # Updates prm file with new mesh refinement
+        os.system(
+            'sed -i "'
+            + str(line_number)
+            + "s/.*/  set mesh refinement     = "
+            + str(i + initial_refinement)
+            + '/g" '
+            + prm_file
+        )
+
+        # Run simulation
+        os.system(command + " " + prm_file + " > " + output_files[i])
+
+        print(" done")
+
+
+def compute_errors():
+    # initialize list for dofs and errors
+    global dofs
+    global L1error
+    global L2error
+    global Linf_error
+
+    dofs = []
+    L1error = []
+    L2error = []
+    Linf_error = []
+
+    # define strings to be found in files
+    dofs_string = "#dofs = "
+    L1_string = "L1    = "
+    L2_string = "L2    = "
+    Linf_string = "Linf  = "
+
+    # loop through files
+    for input_filepath in output_files:
+        with open(input_filepath) as fp:
+            for cnt, ln in enumerate(fp):
+                if ln.strip().startswith(dofs_string):
+                    match_number = re.compile(
+                        "\s-?\ *[0-9]+\.?[0-9]*(?:[Ee]\ *-?\ *[0-9]+)?"
+                    )
+                    temp = [int(x) for x in re.findall(match_number, ln)]
+                    dofs.append(temp[0])
+                if ln.strip().startswith(L1_string):
+                    match_number = re.compile(
+                        "\s-?\ *[0-9]+\.?[0-9]*(?:[Ee]\ *-?\ *[0-9]+)?"
+                    )
+                    final_list = [float(x) for x in re.findall(match_number, ln)]
+                    L1error.append(final_list[0])
+                if ln.strip().startswith(L2_string):
+                    match_number = re.compile(
+                        "\s-?\ *[0-9]+\.?[0-9]*(?:[Ee]\ *-?\ *[0-9]+)?"
+                    )
+                    final_list = [float(x) for x in re.findall(match_number, ln)]
+                    L2error.append(final_list[0])
+                if ln.strip().startswith(Linf_string):
+                    match_number = re.compile(
+                        "\s?\ *[0-9]+\.?[0-9]*(?:[Ee]\ *-?\ *[0-9]+)?"
+                    )
+                    final_list = [float(x) for x in re.findall(match_number, ln)]
+                    Linf_error.append(final_list[0])
+
+
+def compute_rates():
+    L1_rates = []
+    L2_rates = []
+    Linf_rates = []
+
+    for i, error in enumerate(L1error):
+        if i > 0:
+            L1_rates.append(np.log(L1error[i - 1] / L1error[i]) / np.log(2))
+            L2_rates.append(np.log(L2error[i - 1] / L2error[i]) / np.log(2))
+            Linf_rates.append(np.log(Linf_error[i - 1] / Linf_error[i]) / np.log(2))
+
+    #
+    # Create a formatted table with tabulate:
+    #
+
+    table = []
+    for i in range(len(dofs)):
+        if i == 0:
+            table.append(
+                [dofs[i], L1error[i], "", L2error[i], "", Linf_error[i], ""]
+            )
+        else:
+            table.append(
+                [
+                    dofs[i],
+                    L1error[i],
+                    round(L1_rates[i - 1], 2),
+                    L2error[i],
+                    round(L2_rates[i - 1], 2),
+                    Linf_error[i],
+                    round(Linf_rates[i - 1], 2),
+                ]
+            )
+
+    text_table = tabulate(
+        table,
+        headers=[
+            "#dofs",
+            "L1 error",
+            "",
+            "L2 error",
+            "",
+            "Linf error",
+            "",
+        ],
+    )
+
+    # Output table to console
+    print(" ")
+    print(text_table)
+
+    # Output table to txt file
+    f = open("convergence_rates.txt", "w+")
+    f.write(script_args)
+    f.write("\n")
+    f.write(text_table)
+    f.close()
+
+    latex_options = {
+        # column alignment: "c" (center), "r" (right), "l" (left)
+        "colalign": ( "c", "c", "c",),
+        # column separator as a vertical line ("|")
+        "colsep": ("|",),
+    }
+
+    tex_table = tabulate(
+        table,
+        headers=[
+            "$I$",
+            "$\delta^1(T)$",
+            "",
+            "$\delta^2(T)$",
+            "",
+            "$\delta^\infty(T)$",
+            "",
+        ],
+        tablefmt="latex_raw",
+    )
+
+    f = open("convergence_rates.tex", "w+")
+    f.write(tex_table)
+    f.close()
+
+
+def find_string_in_file(file_path, target_string):
+    with open(file_path, "r") as file:
+        for line_number, line in enumerate(file, 1):
+            if target_string in line:
+                return line_number, line
+
+    # If the string is not found, return None
+    return None
+
+#
+# Call main and record total runtime:
+#
+
+start_time = time.time()
+main()
+print("\nTotal run time: %.2f seconds " % (time.time() - start_time))
