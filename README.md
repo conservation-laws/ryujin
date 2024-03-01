@@ -15,13 +15,13 @@ maintains important physical invariants and is guaranteed to be stable
 without the use of ad-hoc tuning parameters.
 
 Ryujin is freely available under the terms of the
-[MIT license](https://spdx.org/licenses/MIT.html). Part of the source
-code is dual licensed under the MIT and the
-[BSD 3-clause license](https://spdx.org/licenses/BSD-3-Clause.html).
-Third-party dependencies and header libraries are covered by different open
-source licenses. For details consult [COPYING.md](COPYING.md).
-Contributions to the ryujin source code are governed by the [Developer
-Certificate of Origin version 1.1](https://developercertificate.org/); see
+[Apache License 2.0](https://spdx.org/licenses/Apache-2.0.html)
+with [LLVM Exception](https://spdx.org/licenses/LLVM-exception.html).
+Part of the contributed source code, third-party dependencies and header
+libraries are covered by different open source licenses. For details
+consult [COPYING.md](COPYING.md). Contributions to the ryujin source code
+are governed by the [Developer Certificate of Origin version
+1.1](https://developercertificate.org/); see
 [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 
