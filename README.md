@@ -54,7 +54,7 @@ Resources
 ---------
 
  - [Website](https://conservation-laws.org/)
- - [Installation instructions](https://conservation-laws.org/ryujin/doxygen/Installation.html)
+ - [Installation instructions](./INSTALLATION.md)
  - [Usage instructions](https://conservation-laws.org/ryujin/doxygen/Usage.html)
  - [Doxygen documentation](https://conservation-laws.org/ryujin/doxygen)
 
