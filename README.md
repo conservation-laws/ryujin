@@ -121,6 +121,15 @@ Developers
 
  - Martin Kronbichler ([@kronbichler](https://github.com/kronbichler)), University of Augsburg, Germany
  - Matthias Maier ([@tamiko](https://github.com/tamiko)), Texas A&M University, TX, USA
- - David Pecoraro ([@ChrisPec27](https://github.com/ChrisPec27)), Texas A&M University, TX, USA
  - Ignacio Tomas ([@nachosaurus](https://github.com/nachosaurus)), Texas Tech University, TX, USA
  - Eric Tovar ([@ejtovar](https://github.com/ejtovar)), Los Alamos National Laboratory, USA
+
+Contributors
+------------
+
+ - Taylor Boylan ([@tmboylan](https://github.com/tmboylan))
+ - Bennett Clayton ([@bgclayto](https://github.com/bgclayto))
+ - Seth Gerberding ([@Gerbeset](https://github.com/Gerbeset)), Texas A&M University, TX, USA
+ - David Pecoraro ([@ChrisPec27](https://github.com/ChrisPec27)), Texas A&M University, TX, USA
+ - Madison Sheridan ([@Helblindi](https://github.com/Helblindi)), Texas A&M University, TX, USA
+
