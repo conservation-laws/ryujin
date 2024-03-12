@@ -1,5 +1,5 @@
 //
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: Apache-2.0
 // [LANL Copyright Statement]
 // Copyright (C) 2023 - 2024 by the ryujin authors
 // Copyright (C) 2023 - 2024 by Triad National Security, LLC
