@@ -12,6 +12,7 @@
 #include "initial_state_contrast.h"
 #include "initial_state_flow_over_bump.h"
 #include "initial_state_function.h"
+#include "initial_state_geotiff.h"
 #include "initial_state_hou_test.h"
 #include "initial_state_paraboloid.h"
 #include "initial_state_ritter_dam_break.h"
@@ -40,6 +41,7 @@ namespace ryujin
       add(std::make_unique<Contrast<Description, dim, Number>>(h, s));
       add(std::make_unique<FlowOverBump<Description, dim, Number>>(h, s));
       add(std::make_unique<Function<Description, dim, Number>>(h, s));
+      add(std::make_unique<GeoTIFF<Description, dim, Number>>(h, s));
       add(std::make_unique<HouTest<Description, dim, Number>>(h, s));
       add(std::make_unique<Paraboloid<Description, dim, Number>>(h, s));
       add(std::make_unique<RitterDamBreak<Description, dim, Number>>(h, s));
