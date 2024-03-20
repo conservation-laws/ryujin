@@ -22,8 +22,9 @@ namespace ryujin
   namespace ShallowWaterInitialStates
   {
     /**
-     * Returns an initial state defined by a set of user specified functions
-     * based on the primitive variables.
+     * Returns an initial state by reading a bathymetry from a geotiff
+     * file. For this we link against GDAL, see https://gdal.org/index.html
+     * for details on GDAL and what image formats it supports.
      *
      * @ingroup ShallowWaterEquations
      */
