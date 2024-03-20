@@ -43,7 +43,7 @@ namespace ryujin
     using precomputed_state_type = typename View::precomputed_state_type;
 
     /**
-     * Constructor taking geometry name @p name and a subsection @p
+     * Constructor taking initial state name @p name and a subsection @p
      * subsection as an argument. The dealii::ParameterAcceptor is
      * initialized with the subsubsection `subsection + "/" + name`.
      */
@@ -78,7 +78,7 @@ namespace ryujin
     }
 
     /**
-     * Return the name of the geometry as (const reference) std::string
+     * Return the name of the initial state as (const reference) std::string
      */
     ACCESSOR_READ_ONLY(name)
 
