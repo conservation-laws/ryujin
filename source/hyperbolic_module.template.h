@@ -561,22 +561,21 @@ namespace ryujin
               // FIXME: Chain through correct time
               constexpr Number t = 0.;
               S_iH += stage_weights[s] *
-                      view.high_order_source(new_precomputed, i, temp, t, tau);
+                      view.nodal_source(new_precomputed, i, temp, t, tau);
             }
           }
 
-          state_type F_iH;
           [[maybe_unused]] state_type S_i;
+          state_type F_iH;
 
           if constexpr (View::have_source_terms) {
             // FIXME: Chain through correct time
             constexpr Number t = 0.;
 
-            S_i = view.low_order_source(new_precomputed, i, U_i, t, tau);
-            U_i_new += tau * /* m_i_inv * m_i */ S_i;
+            S_i = view.nodal_source(new_precomputed, i, U_i, t, tau);
+            S_iH += weight * S_i;
 
-            S_iH += weight *
-                    view.high_order_source(new_precomputed, i, U_i, t, tau);
+            U_i_new += tau * /* m_i_inv * m_i */ S_i;
             F_iH += m_i * S_iH;
           }
 
@@ -703,7 +702,7 @@ namespace ryujin
               // FIXME: Chain through correct time
               constexpr Number t = 0.;
               const auto contribution =
-                  view.high_order_source(new_precomputed, js, U_j, t, tau);
+                  view.nodal_source(new_precomputed, js, U_j, t, tau);
               F_iH += weight * m_ij * contribution;
               P_ij += weight * m_ij * contribution;
             }
@@ -727,7 +726,7 @@ namespace ryujin
               if constexpr (View::have_source_terms) {
                 // FIXME: Chain through correct time
                 constexpr Number t = 0.;
-                const auto contribution = view.high_order_source(
+                const auto contribution = view.nodal_source(
                     stage_precomputed[s].get(), js, U_jH, t, tau);
                 F_iH += stage_weights[s] * m_ij * contribution;
                 P_ij += stage_weights[s] * m_ij * contribution;

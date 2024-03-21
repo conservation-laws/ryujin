@@ -560,29 +560,17 @@ namespace ryujin
                                   const Number &h_star,
                                   const ScalarNumber tau) const;
 
-      state_type low_order_source(const precomputed_vector_type &pv,
-                                  const unsigned int i,
-                                  const state_type &U_i,
-                                  const ScalarNumber t,
-                                  const ScalarNumber tau) const;
+      state_type nodal_source(const precomputed_vector_type &pv,
+                              const unsigned int i,
+                              const state_type &U_i,
+                              const ScalarNumber t,
+                              const ScalarNumber tau) const;
 
-      state_type low_order_source(const precomputed_vector_type &pv,
-                                  const unsigned int *js,
-                                  const state_type &U_j,
-                                  const ScalarNumber t,
-                                  const ScalarNumber tau) const;
-
-      state_type high_order_source(const precomputed_vector_type &pv,
-                                   const unsigned int i,
-                                   const state_type &U_i,
-                                   const ScalarNumber t,
-                                   const ScalarNumber tau) const;
-
-      state_type high_order_source(const precomputed_vector_type &pv,
-                                   const unsigned int *js,
-                                   const state_type &U_j,
-                                   const ScalarNumber t,
-                                   const ScalarNumber tau) const;
+      state_type nodal_source(const precomputed_vector_type &pv,
+                              const unsigned int *js,
+                              const state_type &U_j,
+                              const ScalarNumber t,
+                              const ScalarNumber tau) const;
 
       //@}
       /**
@@ -1224,7 +1212,7 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::low_order_source(
+    HyperbolicSystemView<dim, Number>::nodal_source(
         const precomputed_vector_type &pv,
         const unsigned int i,
         const state_type &U_i,
@@ -1240,39 +1228,7 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::low_order_source(
-        const precomputed_vector_type &pv,
-        const unsigned int *js,
-        const state_type &U_j,
-        const ScalarNumber /*t*/,
-        const ScalarNumber tau) const -> state_type
-    {
-      const auto &[eta_m, h_star] =
-          pv.template get_tensor<Number, precomputed_state_type>(js);
-
-      return manning_friction(U_j, h_star, tau);
-    }
-
-
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::high_order_source(
-        const precomputed_vector_type &pv,
-        const unsigned int i,
-        const state_type &U_i,
-        const ScalarNumber /*t*/,
-        const ScalarNumber tau) const -> state_type
-    {
-      const auto &[eta_m, h_star] =
-          pv.template get_tensor<Number, precomputed_state_type>(i);
-
-      return manning_friction(U_i, h_star, tau);
-    }
-
-
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::high_order_source(
+    HyperbolicSystemView<dim, Number>::nodal_source(
         const precomputed_vector_type &pv,
         const unsigned int *js,
         const state_type &U_j,
