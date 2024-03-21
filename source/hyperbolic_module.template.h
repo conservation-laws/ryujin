@@ -558,10 +558,8 @@ namespace ryujin
                 stage_precomputed[s].get(), precomputed_initial_, i, temp);
 
             if constexpr (View::have_source_terms) {
-              // FIXME: Chain through correct time
-              constexpr Number t = 0.;
               S_iH += stage_weights[s] *
-                      view.nodal_source(new_precomputed, i, temp, t, tau);
+                      view.nodal_source(new_precomputed, i, temp, tau);
             }
           }
 
@@ -569,12 +567,8 @@ namespace ryujin
           state_type F_iH;
 
           if constexpr (View::have_source_terms) {
-            // FIXME: Chain through correct time
-            constexpr Number t = 0.;
-
-            S_i = view.nodal_source(new_precomputed, i, U_i, t, tau);
+            S_i = view.nodal_source(new_precomputed, i, U_i, tau);
             S_iH += weight * S_i;
-
             U_i_new += tau * /* m_i_inv * m_i */ S_i;
             F_iH += m_i * S_iH;
           }
@@ -699,10 +693,7 @@ namespace ryujin
             }
 
             if constexpr (View::have_source_terms) {
-              // FIXME: Chain through correct time
-              constexpr Number t = 0.;
-              const auto S_j =
-                  view.nodal_source(new_precomputed, js, U_j, t, tau);
+              const auto S_j = view.nodal_source(new_precomputed, js, U_j, tau);
               F_iH += weight * m_ij * S_j;
               P_ij += weight * m_ij * S_j;
             }
@@ -724,10 +715,8 @@ namespace ryujin
               }
 
               if constexpr (View::have_source_terms) {
-                // FIXME: Chain through correct time
-                constexpr Number t = 0.;
                 const auto S_js = view.nodal_source(
-                    stage_precomputed[s].get(), js, U_jH, t, tau);
+                    stage_precomputed[s].get(), js, U_jH, tau);
                 F_iH += stage_weights[s] * m_ij * S_js;
                 P_ij += stage_weights[s] * m_ij * S_js;
               }

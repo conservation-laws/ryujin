@@ -563,13 +563,11 @@ namespace ryujin
       state_type nodal_source(const precomputed_vector_type &pv,
                               const unsigned int i,
                               const state_type &U_i,
-                              const ScalarNumber t,
                               const ScalarNumber tau) const;
 
       state_type nodal_source(const precomputed_vector_type &pv,
                               const unsigned int *js,
                               const state_type &U_j,
-                              const ScalarNumber t,
                               const ScalarNumber tau) const;
 
       //@}
@@ -1216,7 +1214,6 @@ namespace ryujin
         const precomputed_vector_type &pv,
         const unsigned int i,
         const state_type &U_i,
-        const ScalarNumber /*t*/,
         const ScalarNumber tau) const -> state_type
     {
       const auto &[eta_m, h_star] =
@@ -1232,7 +1229,6 @@ namespace ryujin
         const precomputed_vector_type &pv,
         const unsigned int *js,
         const state_type &U_j,
-        const ScalarNumber /*t*/,
         const ScalarNumber tau) const -> state_type
     {
       const auto &[eta_m, h_star] =
