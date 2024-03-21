@@ -701,24 +701,24 @@ namespace ryujin
             if constexpr (View::have_source_terms) {
               // FIXME: Chain through correct time
               constexpr Number t = 0.;
-              const auto contribution =
+              const auto S_j =
                   view.nodal_source(new_precomputed, js, U_j, t, tau);
-              F_iH += weight * m_ij * contribution;
-              P_ij += weight * m_ij * contribution;
+              F_iH += weight * m_ij * S_j;
+              P_ij += weight * m_ij * S_j;
             }
 
             for (int s = 0; s < stages; ++s) {
               const auto U_jH = stage_U[s].get().template get_tensor<T>(js);
-              const auto p = view.flux_contribution(
+              const auto flux_jHs = view.flux_contribution(
                   stage_precomputed[s].get(), precomputed_initial_, js, U_jH);
 
               if constexpr (View::have_high_order_flux) {
                 const auto high_order_flux_ij =
-                    view.high_order_flux(flux_iHs[s], p);
+                    view.high_order_flux(flux_iHs[s], flux_jHs);
                 F_iH += stage_weights[s] * contract(high_order_flux_ij, c_ij);
                 P_ij += stage_weights[s] * contract(high_order_flux_ij, c_ij);
               } else {
-                const auto flux_ij = view.flux(flux_iHs[s], p);
+                const auto flux_ij = view.flux(flux_iHs[s], flux_jHs);
                 F_iH += stage_weights[s] * contract(flux_ij, c_ij);
                 P_ij += stage_weights[s] * contract(flux_ij, c_ij);
               }
@@ -726,10 +726,10 @@ namespace ryujin
               if constexpr (View::have_source_terms) {
                 // FIXME: Chain through correct time
                 constexpr Number t = 0.;
-                const auto contribution = view.nodal_source(
+                const auto S_js = view.nodal_source(
                     stage_precomputed[s].get(), js, U_jH, t, tau);
-                F_iH += stage_weights[s] * m_ij * contribution;
-                P_ij += stage_weights[s] * m_ij * contribution;
+                F_iH += stage_weights[s] * m_ij * S_js;
+                P_ij += stage_weights[s] * m_ij * S_js;
               }
             }
 
