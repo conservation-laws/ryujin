@@ -229,20 +229,22 @@ namespace ryujin
     };
 
     /*
-     * Create final sparsity pattern:
+     * A small lambda that performs a logical or over all MPI ranks:
      */
-
-    create_constraints_and_sparsity_pattern();
-
     const auto mpi_allreduce_logical_or = [&](const bool local_value) {
       std::function<bool(const bool &, const bool &)> comparator =
           [](const bool &left, const bool &right) -> bool {
         return left || right;
       };
-
       return Utilities::MPI::all_reduce(
           local_value, mpi_communicator_, comparator);
     };
+
+    /*
+     * Create final sparsity pattern:
+     */
+
+    create_constraints_and_sparsity_pattern();
 
     /*
      * We have to ensure that the locally internal numbering range is still
@@ -252,9 +254,8 @@ namespace ryujin
      * node constraints). Therefore, the following little dance:
      */
 
-    if (mpi_allreduce_logical_or(affine_constraints_.n_constraints() > 0)) {
-
 #if DEAL_II_VERSION_GTE(9, 5, 0)
+    if (mpi_allreduce_logical_or(affine_constraints_.n_constraints() > 0)) {
       if (mpi_allreduce_logical_or( //
               consistent_stride_range() != n_locally_internal_)) {
         /*
@@ -270,8 +271,8 @@ namespace ryujin
         create_constraints_and_sparsity_pattern();
         n_locally_internal_ = consistent_stride_range();
       }
-#endif
     }
+#endif
 
     /*
      * Check that after all the dof manipulation and setup we still end up
@@ -318,7 +319,7 @@ namespace ryujin
      * call export_indices_first() with incomplete information (missing
      * eliminated degrees of freedom).
      */
-    if (affine_constraints_.n_constraints() > 0) {
+    if (mpi_allreduce_logical_or(affine_constraints_.n_constraints() > 0)) {
       /*
        * Recalculate n_export_indices_:
        */
