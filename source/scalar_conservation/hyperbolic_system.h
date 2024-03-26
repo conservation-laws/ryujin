@@ -430,29 +430,15 @@ namespace ryujin
       /** We do not have source terms */
       static constexpr bool have_source_terms = false;
 
-      state_type low_order_source(const precomputed_vector_type &pv,
-                                  const unsigned int i,
-                                  const state_type &U_i,
-                                  const ScalarNumber t,
-                                  const ScalarNumber tau) const = delete;
+      state_type nodal_source(const precomputed_vector_type &pv,
+                              const unsigned int i,
+                              const state_type &U_i,
+                              const ScalarNumber tau) const = delete;
 
-      state_type low_order_source(const precomputed_vector_type &pv,
-                                  const unsigned int *js,
-                                  const state_type &U_j,
-                                  const ScalarNumber t,
-                                  const ScalarNumber tau) const = delete;
-
-      state_type high_order_source(const precomputed_vector_type &pv,
-                                   const unsigned int i,
-                                   const state_type &U_i,
-                                   const ScalarNumber t,
-                                   const ScalarNumber tau) const = delete;
-
-      state_type high_order_source(const precomputed_vector_type &pv,
-                                   const unsigned int *js,
-                                   const state_type &U_j,
-                                   const ScalarNumber t,
-                                   const ScalarNumber tau) const = delete;
+      state_type nodal_source(const precomputed_vector_type &pv,
+                              const unsigned int *js,
+                              const state_type &U_j,
+                              const ScalarNumber tau) const = delete;
 
       //@}
       /**
