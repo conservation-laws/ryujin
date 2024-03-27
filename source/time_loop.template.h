@@ -6,13 +6,12 @@
 #pragma once
 
 #include "checkpointing.h"
-#include "introspection.h"
 #include "scope.h"
 #include "solution_transfer.h"
 #include "time_loop.h"
+#include "version_info.h"
 
 #include <deal.II/base/logstream.h>
-#include <deal.II/base/revision.h>
 #include <deal.II/base/work_stream.h>
 #include <deal.II/numerics/vector_tools.h>
 #include <deal.II/numerics/vector_tools.templates.h>
@@ -634,28 +633,14 @@ namespace ryujin
 
     /* Output commit and library information: */
 
-    /* clang-format off */
-    stream << std::endl;
-    stream << "###" << std::endl;
-    stream << "#" << std::endl;
-    stream << "# deal.II version " << std::setw(8) << DEAL_II_PACKAGE_VERSION
-            << "  -  " << DEAL_II_GIT_REVISION << std::endl;
-    stream << "# ryujin  version " << std::setw(8) << RYUJIN_VERSION
-            << "  -  " << RYUJIN_GIT_REVISION << std::endl;
-    stream << "#" << std::endl;
-    stream << "###" << std::endl;
+    print_revision_and_version(stream);
 
     /* Print compile time parameters: */
 
-    stream << std::endl
-           << std::endl << "Compile time parameters:" << std::endl << std::endl;
+    print_compile_time_parameters(stream);
 
-    stream << "NUMBER == " << typeid(Number).name() << std::endl;
-    stream << "SIMD width == " << VectorizedArray<Number>::size() << std::endl;
+    /* Print run time parameters: */
 
-    /* clang-format on */
-
-    stream << std::endl;
     stream << std::endl << "Run time parameters:" << std::endl << std::endl;
     ParameterAcceptor::prm.print_parameters(
         stream, ParameterHandler::OutputStyle::ShortPRM);
