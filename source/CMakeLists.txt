@@ -18,6 +18,13 @@ set(COMMON_SOURCE_FILES
   offline_data.cc
   simd.cc
   sparse_matrix_simd.cc
+  version_info.cc
+  )
+
+set_property(SOURCE version_info.cc APPEND PROPERTY COMPILE_DEFINITIONS
+  RYUJIN_VERSION="${RYUJIN_VERSION}"
+  RYUJIN_GIT_REVISION="${GIT_REVISION}"
+  RYUJIN_GIT_SHORTREV="${GIT_SHORTREV}"
   )
 
 add_library(obj_common OBJECT ${COMMON_SOURCE_FILES})
@@ -41,12 +48,6 @@ set(DEPENDENT_SOURCE_FILES
   time_integrator.cc
   time_loop.cc
   vtu_output.cc
-  )
-
-set_property(SOURCE time_loop.cc APPEND PROPERTY COMPILE_DEFINITIONS
-  RYUJIN_VERSION="${RYUJIN_VERSION}"
-  RYUJIN_GIT_REVISION="${GIT_REVISION}"
-  RYUJIN_GIT_SHORTREV="${GIT_SHORTREV}"
   )
 
 #
