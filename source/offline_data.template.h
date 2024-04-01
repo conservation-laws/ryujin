@@ -98,9 +98,13 @@ namespace ryujin
             dof_cell_right->face(right.second),
             affine_constraints_,
             ComponentMask(),
+#if DEAL_II_VERSION_GTE(9, 6, 0)
+            orientation);
+#else
             /* orientation */ orientation[0],
             /* flip */ orientation[1],
             /* rotation */ orientation[2]);
+#endif
       } else {
         AssertThrow(false, dealii::ExcNotImplemented());
         __builtin_trap();
