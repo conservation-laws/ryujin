@@ -641,9 +641,9 @@ namespace ryujin
              * Compute low-order flux and limiter bounds:
              */
 
-            const auto flux_ij = view.flux(flux_i, flux_j);
-            U_i_new += tau * m_i_inv * contract(flux_ij, c_ij);
-            auto P_ij = -contract(flux_ij, c_ij);
+            const auto flux_ij = view.flux(flux_i, flux_j, c_ij);
+            U_i_new += tau * m_i_inv * flux_ij;
+            auto P_ij = -flux_ij;
 
             if constexpr (shallow_water) {
               /*
@@ -684,12 +684,12 @@ namespace ryujin
 
             if constexpr (View::have_high_order_flux) {
               const auto high_order_flux_ij =
-                  view.high_order_flux(flux_i, flux_j);
-              F_iH += weight * contract(high_order_flux_ij, c_ij);
-              P_ij += weight * contract(high_order_flux_ij, c_ij);
+                  view.high_order_flux(flux_i, flux_j, c_ij);
+              F_iH += weight * high_order_flux_ij;
+              P_ij += weight * high_order_flux_ij;
             } else {
-              F_iH += weight * contract(flux_ij, c_ij);
-              P_ij += weight * contract(flux_ij, c_ij);
+              F_iH += weight * flux_ij;
+              P_ij += weight * flux_ij;
             }
 
             if constexpr (View::have_source_terms) {
@@ -705,13 +705,13 @@ namespace ryujin
 
               if constexpr (View::have_high_order_flux) {
                 const auto high_order_flux_ij =
-                    view.high_order_flux(flux_iHs[s], flux_jHs);
-                F_iH += stage_weights[s] * contract(high_order_flux_ij, c_ij);
-                P_ij += stage_weights[s] * contract(high_order_flux_ij, c_ij);
+                    view.high_order_flux(flux_iHs[s], flux_jHs, c_ij);
+                F_iH += stage_weights[s] * high_order_flux_ij;
+                P_ij += stage_weights[s] * high_order_flux_ij;
               } else {
-                const auto flux_ij = view.flux(flux_iHs[s], flux_jHs);
-                F_iH += stage_weights[s] * contract(flux_ij, c_ij);
-                P_ij += stage_weights[s] * contract(flux_ij, c_ij);
+                const auto flux_ij = view.flux(flux_iHs[s], flux_jHs, c_ij);
+                F_iH += stage_weights[s] * flux_ij;
+                P_ij += stage_weights[s] * flux_ij;
               }
 
               if constexpr (View::have_source_terms) {
