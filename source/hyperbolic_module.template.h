@@ -723,7 +723,7 @@ namespace ryujin
               }
             }
 
-            pij_matrix_.write_tensor(P_ij, i, col_idx, true);
+            pij_matrix_.write_entry(P_ij, i, col_idx, true);
           }
 
 #ifdef CHECK_BOUNDS
@@ -823,7 +823,7 @@ namespace ryujin
             const auto F_jH = r_.template get_tensor<T>(js);
             P_ij += b_ij * F_jH - b_ji * F_iH;
             P_ij *= factor;
-            pij_matrix_.write_tensor(P_ij, i, col_idx);
+            pij_matrix_.write_entry(P_ij, i, col_idx);
 
             /*
              * Compute limiter coefficients:

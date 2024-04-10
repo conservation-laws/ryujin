@@ -324,7 +324,7 @@ namespace ryujin
                   sparsity->partitioner->local_to_global(i + k),
                   sparsity->partitioner->local_to_global(js[k]));
 
-        write_tensor(temp, i, col_idx, true);
+        write_entry(temp, i, col_idx, true);
       }
     }
 
@@ -344,7 +344,7 @@ namespace ryujin
             temp[d] = sparse_matrix[d].el(
                 sparsity->partitioner->local_to_global(i),
                 sparsity->partitioner->local_to_global(js[0]));
-        write_tensor(temp, i, col_idx);
+        write_entry(temp, i, col_idx);
       }
     }
 
