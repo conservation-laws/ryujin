@@ -268,15 +268,15 @@ namespace ryujin
           const auto rho_i = view.density(U_i);
           const auto M_i = view.momentum(U_i);
           const auto rho_e_i = view.internal_energy(U_i);
-          const auto m_i = load_value<VA>(lumped_mass_matrix, i);
+          const auto m_i = get_entry<VA>(lumped_mass_matrix, i);
 
-          store_value<VA>(density_, rho_i, i);
+          write_entry<VA>(density_, rho_i, i);
           /* (5.4a) */
           for (unsigned int d = 0; d < dim; ++d) {
-            store_value<VA>(velocity_.block(d), M_i[d] / rho_i, i);
-            store_value<VA>(velocity_rhs_.block(d), m_i * (M_i[d]), i);
+            write_entry<VA>(velocity_.block(d), M_i[d] / rho_i, i);
+            write_entry<VA>(velocity_rhs_.block(d), m_i * (M_i[d]), i);
           }
-          store_value<VA>(internal_energy_, rho_e_i / rho_i, i);
+          write_entry<VA>(internal_energy_, rho_e_i / rho_i, i);
         }
 
         RYUJIN_PARALLEL_REGION_END
@@ -581,12 +581,12 @@ namespace ryujin
 
         RYUJIN_OMP_FOR
         for (unsigned int i = 0; i < size_regular; i += simd_length) {
-          const auto rhs_i = load_value<VA>(internal_energy_rhs_, i);
-          const auto m_i = load_value<VA>(lumped_mass_matrix, i);
-          const auto rho_i = load_value<VA>(density_, i);
-          const auto e_i = load_value<VA>(internal_energy_, i);
+          const auto rhs_i = get_entry<VA>(internal_energy_rhs_, i);
+          const auto m_i = get_entry<VA>(lumped_mass_matrix, i);
+          const auto rho_i = get_entry<VA>(density_, i);
+          const auto e_i = get_entry<VA>(internal_energy_, i);
           /* rhs_i already contains m_i K_i^{n+1/2} */
-          store_value<VA>(internal_energy_rhs_,
+          write_entry<VA>(internal_energy_rhs_,
                           m_i * rho_i * e_i + theta_ * tau_ * rhs_i,
                           i);
         }
@@ -804,12 +804,12 @@ namespace ryujin
           /* (5.4b) */
           auto m_i_new = (Number(1.) - alpha) * view.momentum(U_i);
           for (unsigned int d = 0; d < dim; ++d) {
-            m_i_new[d] += alpha * rho_i * load_value<VA>(velocity_.block(d), i);
+            m_i_new[d] += alpha * rho_i * get_entry<VA>(velocity_.block(d), i);
           }
 
           /* (5.12)f */
           auto rho_e_i_new = (Number(1.0) - alpha) * view.internal_energy(U_i);
-          rho_e_i_new += alpha * rho_i * load_value<VA>(internal_energy_, i);
+          rho_e_i_new += alpha * rho_i * get_entry<VA>(internal_energy_, i);
 
           /* (5.18) */
           const auto E_i_new = rho_e_i_new + 0.5 * m_i_new * m_i_new / rho_i;

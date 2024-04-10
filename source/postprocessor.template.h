@@ -234,19 +234,19 @@ namespace ryujin
 
           /* Populate quantities: */
 
-          const auto m_i = load_value<T>(lumped_mass_matrix, i);
+          const auto m_i = get_entry<T>(lumped_mass_matrix, i);
 
           unsigned int k = 0;
 
           for (const auto &schlieren : local_schlieren_values) {
             const auto value_i = schlieren.norm() / m_i;
-            store_value<T>(quantities_[k++], value_i, i);
+            write_entry<T>(quantities_[k++], value_i, i);
           }
 
           for (const auto &vorticity : local_vorticity_values) {
             auto value_i =
                 (dim == 2 ? vorticity[0] / m_i : vorticity.norm() / m_i);
-            store_value<T>(quantities_[k++], value_i, i);
+            write_entry<T>(quantities_[k++], value_i, i);
           }
         } /* i */
       };

@@ -857,8 +857,8 @@ namespace ryujin
              * constrainted degrees of freedom so that the vectors contain
              * physically admissible entries throughout.
              */
-            store_value<Number>(rho, rho_i, i);
-            store_value<Number>(e, e_i, i);
+            write_entry<Number>(rho, rho_i, i);
+            write_entry<Number>(e, e_i, i);
           }
 
           /* Make sure the call into eospac (and others) is single threaded. */
@@ -878,7 +878,7 @@ namespace ryujin
 
             using PT = precomputed_state_type;
             const auto U_i = U.template get_tensor<Number>(offset + i);
-            const auto p_i = load_value<Number>(p, i);
+            const auto p_i = get_entry<Number>(p, i);
             const auto gamma_i = surrogate_gamma(U_i, p_i);
             const PT prec_i{p_i, gamma_i, Number(0.), Number(0.)};
             precomputed_values.template write_tensor<Number>(prec_i,

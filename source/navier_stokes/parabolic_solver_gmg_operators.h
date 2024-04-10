@@ -215,11 +215,11 @@ namespace ryujin
 
         RYUJIN_OMP_FOR
         for (unsigned int i = 0; i < size_regular; i += simd_length) {
-          const auto m_i = load_value<VA>(*lumped_mass_matrix, i);
-          const auto rho_i = load_value<VA>(*density_, i);
+          const auto m_i = get_entry<VA>(*lumped_mass_matrix, i);
+          const auto rho_i = get_entry<VA>(*density_, i);
           for (unsigned int d = 0; d < dim; ++d) {
-            const auto temp = load_value<VA>(src.block(d), i);
-            store_value<VA>(dst.block(d), m_i * rho_i * temp, i);
+            const auto temp = get_entry<VA>(src.block(d), i);
+            write_entry<VA>(dst.block(d), m_i * rho_i * temp, i);
           }
         }
 
@@ -614,10 +614,10 @@ namespace ryujin
 
         RYUJIN_OMP_FOR
         for (unsigned int i = 0; i < size_regular; i += simd_length) {
-          const auto m_i = load_value<VA>(*lumped_mass_matrix, i);
-          const auto rho_i = load_value<VA>(*density_, i);
-          const auto e_i = load_value<VA>(src, i);
-          store_value<VA>(dst, m_i * rho_i * e_i, i);
+          const auto m_i = get_entry<VA>(*lumped_mass_matrix, i);
+          const auto rho_i = get_entry<VA>(*density_, i);
+          const auto e_i = get_entry<VA>(src, i);
+          write_entry<VA>(dst, m_i * rho_i * e_i, i);
         }
 
         RYUJIN_PARALLEL_REGION_END

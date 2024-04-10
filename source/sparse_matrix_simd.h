@@ -367,8 +367,8 @@ namespace ryujin
   template <typename Number2>
   DEAL_II_ALWAYS_INLINE inline auto
   SparseMatrixSIMD<Number, n_components, simd_length>::get_entry(
-      const unsigned int row,
-      const unsigned int position_within_column) const -> EntryType<Number2>
+      const unsigned int row, const unsigned int position_within_column) const
+      -> EntryType<Number2>
   {
     const auto result = get_tensor<Number2>(row, position_within_column);
     if constexpr (n_components == 1)
@@ -447,8 +447,8 @@ namespace ryujin
   template <typename Number2>
   DEAL_II_ALWAYS_INLINE inline auto
   SparseMatrixSIMD<Number, n_components, simd_length>::get_transposed_entry(
-      const unsigned int row,
-      const unsigned int position_within_column) const -> EntryType<Number2>
+      const unsigned int row, const unsigned int position_within_column) const
+      -> EntryType<Number2>
   {
     const auto result =
         get_transposed_tensor<Number2>(row, position_within_column);

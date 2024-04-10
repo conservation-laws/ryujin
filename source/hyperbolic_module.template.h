@@ -339,9 +339,9 @@ namespace ryujin
             dij_matrix_.write_entry(d_ij, i, col_idx, true);
           }
 
-          const auto mass = load_value<T>(lumped_mass_matrix, i);
+          const auto mass = get_entry<T>(lumped_mass_matrix, i);
           const auto hd_i = mass * measure_of_omega_inverse;
-          store_value<T>(alpha_, indicator.alpha(hd_i), i);
+          write_entry<T>(alpha_, indicator.alpha(hd_i), i);
         }
       };
 
@@ -542,9 +542,9 @@ namespace ryujin
           const auto U_i = old_U.template get_tensor<T>(i);
           auto U_i_new = U_i;
 
-          const auto alpha_i = load_value<T>(alpha_, i);
-          const auto m_i = load_value<T>(lumped_mass_matrix, i);
-          const auto m_i_inv = load_value<T>(lumped_mass_matrix_inverse, i);
+          const auto alpha_i = get_entry<T>(alpha_, i);
+          const auto m_i = get_entry<T>(lumped_mass_matrix, i);
+          const auto m_i_inv = get_entry<T>(lumped_mass_matrix_inverse, i);
 
           const auto flux_i = view.flux_contribution(
               new_precomputed, precomputed_initial_, i, U_i);
@@ -608,7 +608,7 @@ namespace ryujin
 
             const auto U_j = old_U.template get_tensor<T>(js);
 
-            const auto alpha_j = load_value<T>(alpha_, js);
+            const auto alpha_j = get_entry<T>(alpha_, js);
 
             const auto d_ij = dij_matrix_.template get_entry<T>(i, col_idx);
             const auto d_ijH = d_ij * (alpha_i + alpha_j) * Number(.5);
@@ -794,7 +794,7 @@ namespace ryujin
           const auto bounds =
               bounds_.template get_tensor<T, std::array<T, n_bounds>>(i);
 
-          const auto m_i_inv = load_value<T>(lumped_mass_matrix_inverse, i);
+          const auto m_i_inv = get_entry<T>(lumped_mass_matrix_inverse, i);
 
           const auto U_i_new = new_U.template get_tensor<T>(i);
 
@@ -812,7 +812,7 @@ namespace ryujin
              * Mass matrix correction:
              */
 
-            const auto m_j_inv = load_value<T>(lumped_mass_matrix_inverse, js);
+            const auto m_j_inv = get_entry<T>(lumped_mass_matrix_inverse, js);
             const auto m_ij = mass_matrix.template get_entry<T>(i, col_idx);
 
             const auto b_ij = (col_idx == 0 ? T(1.) : T(0.)) - m_ij * m_j_inv;
