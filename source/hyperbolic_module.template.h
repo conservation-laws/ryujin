@@ -641,7 +641,7 @@ namespace ryujin
              * Compute low-order flux and limiter bounds:
              */
 
-            const auto flux_ij = view.flux(flux_i, flux_j, c_ij);
+            const auto flux_ij = view.flux_divergence(flux_i, flux_j, c_ij);
             U_i_new += tau * m_i_inv * flux_ij;
             auto P_ij = -flux_ij;
 
@@ -684,7 +684,7 @@ namespace ryujin
 
             if constexpr (View::have_high_order_flux) {
               const auto high_order_flux_ij =
-                  view.high_order_flux(flux_i, flux_j, c_ij);
+                  view.high_order_flux_divergence(flux_i, flux_j, c_ij);
               F_iH += weight * high_order_flux_ij;
               P_ij += weight * high_order_flux_ij;
             } else {
@@ -704,12 +704,13 @@ namespace ryujin
                   stage_precomputed[s].get(), precomputed_initial_, js, U_jH);
 
               if constexpr (View::have_high_order_flux) {
-                const auto high_order_flux_ij =
-                    view.high_order_flux(flux_iHs[s], flux_jHs, c_ij);
+                const auto high_order_flux_ij = view.high_order_flux_divergence(
+                    flux_iHs[s], flux_jHs, c_ij);
                 F_iH += stage_weights[s] * high_order_flux_ij;
                 P_ij += stage_weights[s] * high_order_flux_ij;
               } else {
-                const auto flux_ij = view.flux(flux_iHs[s], flux_jHs, c_ij);
+                const auto flux_ij =
+                    view.flux_divergence(flux_iHs[s], flux_jHs, c_ij);
                 F_iH += stage_weights[s] * flux_ij;
                 P_ij += stage_weights[s] * flux_ij;
               }

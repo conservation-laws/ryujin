@@ -389,7 +389,7 @@ namespace ryujin
        *   for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
        *     // ...
        *     const auto flux_j = flux_contribution(precomputed..., js, U_j);
-       *     const auto flux_ij = flux(flux_i, flux_j, c_ij);
+       *     const auto flux_ij = flux_divergence(flux_i, flux_j, c_ij);
        *   }
        * }
        * ```
@@ -412,14 +412,15 @@ namespace ryujin
        * Given flux contributions @p flux_i and @p flux_j compute the flux
        * <code>(-f(U_i) - f(U_j)</code>
        */
-      state_type flux(const flux_contribution_type &flux_i,
+      state_type
+      flux_divergence(const flux_contribution_type &flux_i,
                       const flux_contribution_type &flux_j,
                       const dealii::Tensor<1, dim, Number> &c_ij) const;
 
       /** The low-order and high-order fluxes are the same */
       static constexpr bool have_high_order_flux = false;
 
-      state_type high_order_flux(
+      state_type high_order_flux_divergence(
           const flux_contribution_type &,
           const flux_contribution_type &,
           const dealii::Tensor<1, dim, Number> &c_ij) const = delete;
@@ -812,7 +813,8 @@ namespace ryujin
 
 
     template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline auto HyperbolicSystemView<dim, Number>::flux(
+    DEAL_II_ALWAYS_INLINE inline auto
+    HyperbolicSystemView<dim, Number>::flux_divergence(
         const flux_contribution_type &flux_i,
         const flux_contribution_type &flux_j,
         const dealii::Tensor<1, dim, Number> &c_ij) const -> state_type
