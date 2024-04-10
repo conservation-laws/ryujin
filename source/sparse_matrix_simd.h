@@ -14,6 +14,24 @@
 
 namespace ryujin
 {
+  namespace
+  {
+    /**
+     * Internally used: A small helper to determine the appropriate type
+     * for
+     */
+    template <typename Number, int n_components>
+    struct EntryType {
+      using type = dealii::Tensor<1, n_components, Number>;
+    };
+
+    template <typename Number>
+    struct EntryType<Number, 1> {
+      using type = Number;
+    };
+  } // namespace
+
+
   template <typename Number,
             int n_components = 1,
             int simd_length = dealii::VectorizedArray<Number>::size()>
@@ -154,6 +172,15 @@ namespace ryujin
 
     using VectorizedArray = dealii::VectorizedArray<Number, simd_length>;
 
+    /**
+     * The return type of get_entry and get_transposed_entry: If
+     * `n_components` is equal to one then `EntryType` reduces to `Number2`,
+     * otherwise the type is set to
+     * `dealii::tensor<1, n_components, Number2>`
+     */
+    template <typename Number2>
+    using EntryType = typename ryujin::EntryType<Number2, n_components>::type;
+
     /* Get scalar or tensor-valued entry: */
 
     /**
@@ -166,8 +193,9 @@ namespace ryujin
      * [0, n_internal_dofs) and must be divisible by simd_length.
      */
     template <typename Number2 = Number>
-    Number2 get_entry(const unsigned int row,
-                      const unsigned int position_within_column) const;
+    EntryType<Number2>
+    get_entry(const unsigned int row,
+              const unsigned int position_within_column) const;
 
     /**
      * return the tensor-valued entry indexed by @p row and
@@ -195,7 +223,7 @@ namespace ryujin
      * [0, n_internal_dofs) and must be divisible by simd_length.
      */
     template <typename Number2 = Number>
-    Number2
+    EntryType<Number2>
     get_transposed_entry(const unsigned int row,
                          const unsigned int position_within_column) const;
 
@@ -327,11 +355,16 @@ namespace ryujin
 
   template <typename Number, int n_components, int simd_length>
   template <typename Number2>
-  DEAL_II_ALWAYS_INLINE inline Number2
+  DEAL_II_ALWAYS_INLINE inline auto
   SparseMatrixSIMD<Number, n_components, simd_length>::get_entry(
-      const unsigned int row, const unsigned int position_within_column) const
+      const unsigned int row,
+      const unsigned int position_within_column) const -> EntryType<Number2>
   {
-    return get_tensor<Number2>(row, position_within_column)[0];
+    const auto result = get_tensor<Number2>(row, position_within_column);
+    if constexpr (n_components == 1)
+      return result[0];
+    else
+      return result;
   }
 
 
@@ -402,11 +435,17 @@ namespace ryujin
 
   template <typename Number, int n_components, int simd_length>
   template <typename Number2>
-  DEAL_II_ALWAYS_INLINE inline Number2
+  DEAL_II_ALWAYS_INLINE inline auto
   SparseMatrixSIMD<Number, n_components, simd_length>::get_transposed_entry(
-      const unsigned int row, const unsigned int position_within_column) const
+      const unsigned int row,
+      const unsigned int position_within_column) const -> EntryType<Number2>
   {
-    return get_transposed_tensor<Number2>(row, position_within_column)[0];
+    const auto result =
+        get_transposed_tensor<Number2>(row, position_within_column);
+    if constexpr (n_components == 1)
+      return result[0];
+    else
+      return result;
   }
 
 
