@@ -92,7 +92,7 @@ namespace ryujin
      * const auto view = hyperbolic_system.template view<dim, Number>();
      * const auto flux_i = view.flux_contribution(...);
      * const auto flux_j = view.flux_contribution(...);
-     * const auto flux_ij = view.flux(flux_i, flux_j);
+     * const auto flux_ij = view.flux_divergence(flux_i, flux_j, c_ij);
      * // etc.
      * ```
      */
@@ -491,7 +491,7 @@ namespace ryujin
        *   for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
        *     // ...
        *     const auto flux_j = flux_contribution(precomputed..., js, U_j);
-       *     const auto flux_ij = flux(flux_i, flux_j);
+       *     const auto flux_ij = flux_divergence(flux_i, flux_j, c_ij);
        *   }
        * }
        * ```
@@ -516,8 +516,10 @@ namespace ryujin
        * compute the equilibrated, low-order flux \f$(f(U_i^{\ast,j}) +
        * f(U_j^{\ast,i})\f$
        */
-      flux_type flux(const flux_contribution_type &flux_i,
-                     const flux_contribution_type &flux_j) const;
+      state_type
+      flux_divergence(const flux_contribution_type &flux_i,
+                      const flux_contribution_type &flux_j,
+                      const dealii::Tensor<1, dim, Number> &c_ij) const;
 
       /**
        * The low-order and high-order fluxes differ:
@@ -529,8 +531,10 @@ namespace ryujin
        * compute the high-order flux \f$(f(U_i^{\ast,j}) +
        * f(U_j^{\ast,i})\f$
        */
-      flux_type high_order_flux(const flux_contribution_type &flux_i,
-                                const flux_contribution_type &flux_j) const;
+      state_type high_order_flux_divergence(
+          const flux_contribution_type &flux_i,
+          const flux_contribution_type &flux_j,
+          const dealii::Tensor<1, dim, Number> &c_ij) const;
 
       /**
        * Given precomputed flux contributions @p prec_i and @p prec_j compute
@@ -1106,9 +1110,11 @@ namespace ryujin
 
 
     template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline auto HyperbolicSystemView<dim, Number>::flux(
+    DEAL_II_ALWAYS_INLINE inline auto
+    HyperbolicSystemView<dim, Number>::flux_divergence(
         const flux_contribution_type &flux_i,
-        const flux_contribution_type &flux_j) const -> flux_type
+        const flux_contribution_type &flux_j,
+        const dealii::Tensor<1, dim, Number> &c_ij) const -> state_type
     {
       const auto &[U_i, Z_i] = flux_i;
       const auto &[U_star_ij, U_star_ji] = equilibrated_states(flux_i, flux_j);
@@ -1120,7 +1126,7 @@ namespace ryujin
       const auto g_i = g(U_star_ij);
       const auto g_j = g(U_star_ji);
 
-      flux_type result = -add(g_i, g_j);
+      auto result = -add(g_i, g_j);
 
       const auto factor =
           (ScalarNumber(0.5) * (H_star_ji * H_star_ji - H_star_ij * H_star_ij) +
@@ -1131,15 +1137,16 @@ namespace ryujin
         result[1 + i][i] -= factor;
       }
 
-      return result;
+      return contract(result, c_ij);
     }
 
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::high_order_flux(
+    HyperbolicSystemView<dim, Number>::high_order_flux_divergence(
         const flux_contribution_type &flux_i,
-        const flux_contribution_type &flux_j) const -> flux_type
+        const flux_contribution_type &flux_j,
+        const dealii::Tensor<1, dim, Number> &c_ij) const -> state_type
     {
       const auto &[U_i, Z_i] = flux_i;
       const auto &[U_j, Z_j] = flux_j;
@@ -1150,14 +1157,14 @@ namespace ryujin
       const auto g_i = g(U_i);
       const auto g_j = g(U_j);
 
-      flux_type result = -add(g_i, g_j);
+      auto result = -add(g_i, g_j);
 
       const auto factor = gravity() * H_i * (H_j + Z_j - Z_i);
       for (unsigned int i = 0; i < dim; ++i) {
         result[1 + i][i] -= factor;
       }
 
-      return result;
+      return contract(result, c_ij);
     }
 
 
