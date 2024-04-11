@@ -97,11 +97,6 @@ namespace ryujin
     using state_type = typename View::state_type;
 
     /**
-     * @copydoc HyperbolicSystem::flux_type
-     */
-    using flux_type = typename View::flux_type;
-
-    /**
      * @copydoc OfflineData::scalar_type
      */
     using scalar_type = typename OfflineData<dim, Number>::scalar_type;
