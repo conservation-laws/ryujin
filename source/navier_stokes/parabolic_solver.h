@@ -37,8 +37,8 @@ namespace ryujin
     class DiagonalMatrix;
 
     /**
-     * Decond-order time stepping for the parabolic limiting equation @cite
-     * ryujin-2021-2, Eq. 3.3:
+     * Implicit backward-Euler time stepping for the parabolic limiting
+     * equation @cite ryujin-2021-2, Eq. 3.3:
      * \f{align}
      *   \newcommand{\bbm}{{\boldsymbol m}}
      *   \newcommand{\bef}{{\boldsymbol f}}
@@ -59,7 +59,7 @@ namespace ryujin
      * D}=0 . \f}
      *
      * Internally, the module first performs an implicit backward Euler
-     * step updating the velocity @cite ryujin-2021-2, Eq. 5.5:
+     * step updating the velocity (see @cite ryujin-2021-2, Eq. 5.5):
      * \f{align}
      *   \begin{cases}
      *     \newcommand\bsfV{{\textbf V}}
@@ -71,28 +71,40 @@ namespace ryujin
      *     \newcommand{\upbnd}{^\partial}
      *     \newcommand{\dt}{{\tau}}
      *     \newcommand{\calV}{{\mathcal V}}
-     *     \varrho^{n}_i m_i \bsfV^{n+\frac{1}{2}} +
-     *     \tfrac12 \dt\sum_{j\in\calI(i)} \polB_{ij} \bsfV^{n+\frac{1}{2}} =
-     *     m_i \bsfM_i^{n} + \tfrac12 \dt m_i \bsfF_i^{n+\frac12},
+     *     \varrho^{n}_i m_i \bsfV^{n+1} +
+     *     \dt\sum_{j\in\calI(i)} \polB_{ij} \bsfV^{n+1} =
+     *     m_i \bsfM_i^{n} + \dt m_i \bsfF_i^{n+1},
      *     & \forall i\in \calV\upint
      *     \\[0.3em]
-     *     \bsfV_i^{n+\frac{1}{2}} = \boldsymbol 0, &  \forall i\in \calV\upbnd,
+     *     \bsfV_i^{n+1} = \boldsymbol 0, &  \forall i\in \calV\upbnd,
      *   \end{cases}
      * \f}
-     * We then postprocess and compute an internal energy update with a
-     * backward Euler step, @cite ryujin-2021-2, Eq. 5.13:
+     * We then postprocess and compute an internal energy update with an
+     * additional backward Euler step, (cf. @cite ryujin-2021-2, Eq. 5.13)
      * \f{align}
+     *     \newcommand\bsfV{{\textbf V}}
      *     \newcommand\sfe{{\mathsf e}}
-     *     \newcommand{\upHnph}{^{\text{H},n+\frac{1}{2}}}
+     *     \newcommand{\upHnph}{^{\text{H},n+1}}
      *     \newcommand{\calI}{{\mathcal I}}
      *     \newcommand\sfK{{\mathsf K}}
      *     \newcommand{\calV}{{\mathcal V}}
-     *     m_i \varrho_i^{n}(\sfe_i{\upHnph} - \sfe_i^{n})+\tfrac12\dt
+     *     m_i \varrho_i^{n}(\sfe_i{\upHnph} - \sfe_i^{n})+\dt
      *     \sum_{j\in\calI(i)} \beta_{ij}\sfe_i{\upHnph}
-     *     = \tfrac12 \dt m_i\sfK_i^{n+\frac{1}{2}}, \qquad \forall i\in \calV.
+     *     = \tfrac12 m_i\|\bsfV^{n+1}-\bsfV^{n}\|^2
+     *     + \dt m_i\sfK_i^{n+1}, \qquad \forall i\in \calV.
      * \f}
+     * The result is then transformed back into conserved quantities and
+     * written to the output vector.
      *
-     * @todo Fix above description
+     * @note The backward Euler scheme is a fundamental building block for
+     * higher-order time stepping, including the well-known Crank-Nicolson
+     * scheme. The latter can be expressed algebraically as a backward
+     * Euler step (from time \f$t\f$ to \f$t+\tau\f$ followed by an
+     * extrapolation step \f$U^{n+2}=2U^{n+1}-U^{n}\f$ from time
+     * \f$t+\tau\f$ to \f$t+2\tau\f$). This approach differs from the
+     * Crank-Nicolson scheme discussed in @cite ryujin-2021-2 where the
+     * extrapolation step is performed on the primitive quantities
+     * (velocity and internal energy) instead of the conserved quantities.
      *
      * @ingroup NavierStokesEquations
      */
