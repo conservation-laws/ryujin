@@ -13,7 +13,7 @@
       std::array<std::reference_wrapper<const vector_type>, stages>,           \
       const std::array<NUMBER, stages>,                                        \
       vector_type &,                                                           \
-      const NUMBER) const
+      NUMBER) const
 
 namespace ryujin
 {
