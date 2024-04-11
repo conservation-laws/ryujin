@@ -52,34 +52,12 @@ namespace ryujin
   template <typename Description, int dim, typename Number>
   template <int stages>
   void ParabolicModule<Description, dim, Number>::step(
-      const vector_type &,
-      const Number,
-      std::array<std::reference_wrapper<const vector_type>, stages>,
-      const std::array<Number, stages>,
-      vector_type &,
-      const Number) const
-  {
-    if constexpr (ParabolicSystem::is_identity) {
-      AssertThrow(
-          false,
-          dealii::ExcMessage("The parabolic system is the identity. This "
-                             "function should have never been called."));
-      __builtin_trap();
-
-    } else {
-
-      AssertThrow(false, dealii::ExcNotImplemented());
-      __builtin_trap();
-    }
-  }
-
-
-  template <typename Description, int dim, typename Number>
-  void ParabolicModule<Description, dim, Number>::crank_nicolson_step(
       const vector_type &old_U,
-      const Number t,
+      const Number old_t,
+      std::array<std::reference_wrapper<const vector_type>, stages> /*stage_U*/,
+      const std::array<Number, stages> /*stage_weights*/,
       vector_type &new_U,
-      const Number tau) const
+      Number tau) const
   {
     if constexpr (ParabolicSystem::is_identity) {
       AssertThrow(
@@ -89,14 +67,19 @@ namespace ryujin
       __builtin_trap();
 
     } else {
+
+      static_assert(stages == 0, "high order fluxes are not implemented");
+
+      /* FIXME: This needs to be refactored really really badly. */
 
       const bool reinit_gmg = cycle_++ % 4 == 0;
-      parabolic_solver_.crank_nicolson_step(
-          old_U, t, new_U, tau, id_violation_strategy_, reinit_gmg);
+      parabolic_solver_.backward_euler_step(
+          old_U, old_t, new_U, tau, id_violation_strategy_, reinit_gmg);
       n_restarts_ = parabolic_solver_.n_restarts();
       n_warnings_ = parabolic_solver_.n_warnings();
     }
   }
+
 
   template <typename Description, int dim, typename Number>
   void ParabolicModule<Description, dim, Number>::print_solver_statistics(

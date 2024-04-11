@@ -101,17 +101,7 @@ namespace ryujin
          std::array<std::reference_wrapper<const vector_type>, stages> stage_U,
          const std::array<Number, stages> stage_weights,
          vector_type &new_U,
-         const Number tau) const;
-
-    /**
-     * Given a reference to a previous state vector @p old_U at time @p
-     * old_t and a time-step size @p tau perform an implicit Crank-Nicolson
-     * step (and store the result in @p new_U).
-     */
-    void crank_nicolson_step(const vector_type &old_U,
-                             const Number old_t,
-                             vector_type &new_U,
-                             const Number tau) const;
+         Number tau) const;
 
     /**
      * Print a status line with solver statistics. This function is used

@@ -539,8 +539,8 @@ namespace ryujin
     hyperbolic_module_->apply_boundary_conditions(U_[0], t + tau);
 
     /* Implicit Crank-Nicolson step with final result in U_[2]: */
-
-    parabolic_module_->crank_nicolson_step(U_[0], t, U_[2], 2.0 * tau);
+    parabolic_module_->template step<0>(U_[0], t, {}, {}, U_[2], tau);
+    U_[2].sadd(Number(2.), Number(-1.), U_[0]);
 
     /* Second SSPRK 3 step with final result in U_[0]: */
 
@@ -599,8 +599,8 @@ namespace ryujin
     hyperbolic_module_->apply_boundary_conditions(U_[2], t + 3. * tau);
 
     /* Implicit Crank-Nicolson step with final result in U_[3]: */
-
-    parabolic_module_->crank_nicolson_step(U_[2], t, U_[3], 6.0 * tau);
+    parabolic_module_->template step<0>(U_[2], t, {}, {}, U_[3], 3.0 * tau);
+    U_[3].sadd(Number(2.), Number(-1.), U_[2]);
 
     /* First explicit SSPRK 3 step with final result in U_[2]: */
 
@@ -680,8 +680,8 @@ namespace ryujin
     hyperbolic_module_->apply_boundary_conditions(U_[3], t + 4. * tau);
 
     /* Implicit Crank-Nicolson step with final result in U_[2]: */
-
-    parabolic_module_->crank_nicolson_step(U_[3], t, U_[2], 8.0 * tau);
+    parabolic_module_->template step<0>(U_[3], t, {}, {}, U_[2], 4.0 * tau);
+    U_[2].sadd(Number(2.), Number(-1.), U_[3]);
 
     /* First explicit SSPRK 3 step with final result in U_[3]: */
 
