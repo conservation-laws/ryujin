@@ -37,8 +37,8 @@ namespace ryujin
     class DiagonalMatrix;
 
     /**
-     * Minimum entropy guaranteeing second-order time stepping for the
-     * parabolic limiting equation @cite ryujin-2021-2, Eq. 3.3:
+     * Decond-order time stepping for the parabolic limiting equation @cite
+     * ryujin-2021-2, Eq. 3.3:
      * \f{align}
      *   \newcommand{\bbm}{{\boldsymbol m}}
      *   \newcommand{\bef}{{\boldsymbol f}}
@@ -58,9 +58,8 @@ namespace ryujin
      *   &\bv_{|\partial D}=\boldsymbol 0, \qquad \Hflux(\bu)\cdot\bn_{|\partial
      * D}=0 . \f}
      *
-     * Internally, the module first performs an explicit second order
-     * Crank-Nicolson step updating the velocity @cite ryujin-2021-2, Eq.
-     * 5.5:
+     * Internally, the module first performs an implicit backward Euler
+     * step updating the velocity @cite ryujin-2021-2, Eq. 5.5:
      * \f{align}
      *   \begin{cases}
      *     \newcommand\bsfV{{\textbf V}}
@@ -81,7 +80,7 @@ namespace ryujin
      *   \end{cases}
      * \f}
      * We then postprocess and compute an internal energy update with a
-     * second Crank-Nicolson step, @cite ryujin-2021-2, Eq. 5.13:
+     * backward Euler step, @cite ryujin-2021-2, Eq. 5.13:
      * \f{align}
      *     \newcommand\sfe{{\mathsf e}}
      *     \newcommand{\upHnph}{^{\text{H},n+\frac{1}{2}}}
@@ -93,7 +92,7 @@ namespace ryujin
      *     = \tfrac12 \dt m_i\sfK_i^{n+\frac{1}{2}}, \qquad \forall i\in \calV.
      * \f}
      *
-     * @todo Provide more details about boundary conditions.
+     * @todo Fix above description
      *
      * @ingroup NavierStokesEquations
      */
@@ -160,10 +159,10 @@ namespace ryujin
 
       /**
        * Given a reference to a previous state vector @p old_U at time @p
-       * old_t and a time-step size @p tau perform an implicit Crank-Nicolson
-       * step (and store the result in @p new_U).
+       * old_t and a time-step size @p tau perform an implicit backward
+       * Euler step (and store the result in @p new_U).
        */
-      void crank_nicolson_step(const vector_type &old_U,
+      void backward_euler_step(const vector_type &old_U,
                                const Number old_t,
                                vector_type &new_U,
                                Number tau,
@@ -244,7 +243,6 @@ namespace ryujin
       mutable scalar_type density_;
 
       mutable Number tau_;
-      mutable Number theta_;
 
       mutable dealii::MGLevelObject<dealii::MatrixFree<dim, float>>
           level_matrix_free_;
