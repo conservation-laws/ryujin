@@ -627,7 +627,7 @@ namespace ryujin
 #endif
 
             const auto c_ij = cij_matrix.template get_tensor<T>(i, col_idx);
-            const auto d_ij_inv = Number(1.) / d_ij;
+            const auto scaled_c_ij = c_ij / d_ij;
 
             const auto beta_ij =
                 betaij_matrix.template get_entry<T>(i, col_idx);
@@ -660,7 +660,7 @@ namespace ryujin
               limiter.accumulate(U_j,
                                  U_star_ij,
                                  U_star_ji,
-                                 d_ij_inv * c_ij,
+                                 scaled_c_ij,
                                  beta_ij,
                                  affine_shift);
 
@@ -670,7 +670,7 @@ namespace ryujin
               F_iH += d_ijH * (U_j - U_i);
               P_ij += (d_ijH - d_ij) * (U_j - U_i);
 
-              limiter.accumulate(js, U_j, flux_j, d_ij_inv * c_ij, beta_ij);
+              limiter.accumulate(js, U_j, flux_j, scaled_c_ij, beta_ij);
             }
 
             if constexpr (View::have_source_terms) {
