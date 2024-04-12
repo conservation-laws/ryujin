@@ -232,15 +232,6 @@ namespace ryujin
 
       DiagonalMatrix<dim, Number> diagonal_matrix;
 
-      /*
-       * Set time step size and record the time t_{n+1/2} for the computed
-       * velocity.
-       *
-       * This is a bit ugly: tau_ is internally used in velocity_vmult() and
-       * internal_energy_vmult().
-       */
-
-      tau_ = tau;
 #ifdef DEBUG_OUTPUT
       std::cout << "        perform time-step with tau = " << tau << std::endl;
 #endif
@@ -335,7 +326,7 @@ namespace ryujin
           } else if (id == Boundary::dirichlet) {
 
             /* Prescribe velocity: */
-            const auto U_i = initial_values_->initial_state(position, t + tau_);
+            const auto U_i = initial_values_->initial_state(position, t + tau);
             const auto view = hyperbolic_system_->template view<dim, Number>();
             const auto rho_i = view.density(U_i);
             const auto V_i = view.momentum(U_i) / rho_i;
@@ -395,7 +386,7 @@ namespace ryujin
                 *offline_data_,
                 level_matrix_free_[level],
                 level_density_[level],
-                tau_,
+                tau,
                 level);
             level_velocity_matrices_[level].compute_diagonal(
                 smoother_data[level].preconditioner);
@@ -440,7 +431,7 @@ namespace ryujin
 
         VelocityMatrix<dim, Number, Number> velocity_operator;
         velocity_operator.initialize(
-            *parabolic_system_, *offline_data_, matrix_free_, density_, tau_);
+            *parabolic_system_, *offline_data_, matrix_free_, density_, tau);
 
         const auto tolerance_velocity =
             (tolerance_linfty_norm_ ? velocity_rhs_.linfty_norm()
@@ -590,7 +581,7 @@ namespace ryujin
             const auto correction = Number(0.5) * (V_i - V_i_new).norm_square();
 
             /* rhs_i contains already m_i K_i^{n+1/2} */
-            const auto result = m_i * rho_i * (e_i + correction) + tau_ * rhs_i;
+            const auto result = m_i * rho_i * (e_i + correction) + tau * rhs_i;
             write_entry<T>(internal_energy_rhs_, result, i);
           }
         };
@@ -621,7 +612,7 @@ namespace ryujin
 
           if (id == Boundary::dirichlet) {
             /* Prescribe internal energy: */
-            const auto U_i = initial_values_->initial_state(position, t + tau_);
+            const auto U_i = initial_values_->initial_state(position, t + tau);
             const auto view = hyperbolic_system_->template view<dim, Number>();
             const auto rho_i = view.density(U_i);
             const auto e_i = view.internal_energy(U_i) / rho_i;
@@ -659,7 +650,7 @@ namespace ryujin
                 *offline_data_,
                 level_matrix_free_[level],
                 level_density_[level],
-                tau_ * parabolic_system_->cv_inverse_kappa(),
+                tau * parabolic_system_->cv_inverse_kappa(),
                 level);
             level_energy_matrices_[level].compute_diagonal(
                 smoother_data[level].preconditioner);
@@ -694,7 +685,7 @@ namespace ryujin
         EnergyMatrix<dim, Number, Number> energy_operator;
         const auto &kappa = parabolic_system_->cv_inverse_kappa();
         energy_operator.initialize(
-            *offline_data_, matrix_free_, density_, tau_ * kappa);
+            *offline_data_, matrix_free_, density_, tau * kappa);
 
         const auto tolerance_internal_energy =
             (tolerance_linfty_norm_ ? internal_energy_rhs_.linfty_norm()

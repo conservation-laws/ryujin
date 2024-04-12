@@ -254,8 +254,6 @@ namespace ryujin
       mutable scalar_type internal_energy_rhs_;
       mutable scalar_type density_;
 
-      mutable Number tau_;
-
       mutable dealii::MGLevelObject<dealii::MatrixFree<dim, float>>
           level_matrix_free_;
       mutable dealii::MGConstrainedDoFs mg_constrained_dofs_;
