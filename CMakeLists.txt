@@ -92,7 +92,7 @@ option(WITH_GDAL "Compile and link against the gdal library" ${GDAL_FOUND})
 #
 
 # We require at least C++17.
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 
 #string(APPEND DEAL_II_CXX_FLAGS " -Wfatal-errors")
 
@@ -109,9 +109,15 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
 endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  string(APPEND DEAL_II_CXX_FLAGS
-    " -Xclang -fcolor-diagnostics"
-    )
+  string(APPEND DEAL_II_CXX_FLAGS " -Xclang -fcolor-diagnostics")
+
+  #
+  # This is finally fixed in clang-16 (by updating the C++20 support to the
+  # latest defect correction). For earlier versions, silence the warning.
+  #
+  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS "16.0.0")
+    string(APPEND DEAL_II_CXX_FLAGS " -Wno-ambiguous-reversed-operator")
+  endif()
 endif()
 
 if(SANITIZER)
