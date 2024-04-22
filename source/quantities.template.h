@@ -320,16 +320,16 @@ namespace ryujin
 
     /* Prepare header string: */
     const auto &names = View::primitive_component_names;
-    header_ =
-        std::accumulate(std::begin(names),
-                        std::end(names),
-                        std::string(),
-                        [](std::string &description, auto name) {
-                          return description.empty()
-                                     ? std::string("primitive state (") + name
-                                     : description + ", " + name;
-                        }) +
-        ")\t and 2nd moments\n";
+    header_ = std::accumulate(
+                  std::begin(names),
+                  std::end(names),
+                  std::string(),
+                  [](const std::string &description, const std::string &name) {
+                    return description.empty()
+                               ? (std::string("primitive state (") + name)
+                               : (description + ", " + name);
+                  }) +
+              ")\t and 2nd moments\n";
   }
 
 
