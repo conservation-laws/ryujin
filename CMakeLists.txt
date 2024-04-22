@@ -31,7 +31,7 @@ cmake_minimum_required(VERSION 3.15)
 set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 
-find_package(deal.II 9.3 REQUIRED HINTS ${DEAL_II_DIR} $ENV{DEAL_II_DIR})
+find_package(deal.II 9.4 REQUIRED HINTS ${DEAL_II_DIR} $ENV{DEAL_II_DIR})
 
 set(CMAKE_BUILD_TYPE "Release" CACHE STRING
   "Choose the type of build, options are: Debug, Release"
@@ -91,8 +91,10 @@ option(WITH_GDAL "Compile and link against the gdal library" ${GDAL_FOUND})
 # Set up compiler flags:
 #
 
+# We require at least C++17.
+set(CMAKE_CXX_STANDARD 17)
+
 #string(APPEND DEAL_II_CXX_FLAGS " -Wfatal-errors")
-string(APPEND DEAL_II_CXX_FLAGS " -std=c++17")
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
   string(APPEND DEAL_II_CXX_FLAGS " -fdiagnostics-color=always")
