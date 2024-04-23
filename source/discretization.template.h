@@ -45,8 +45,13 @@ namespace ryujin
           mpi_communicator_, smoothing, /*artificial cells*/ true, settings);
     }
 
-
     /* Options: */
+
+    ansatz_ = Ansatz::cg_q1;
+    add_parameter("finite element ansatz",
+                  ansatz_,
+                  "The finite element ansatz used for discretization. valid "
+                  "choices are cG Q1, cG Q2, cG Q3.");
 
     geometry_ = "cylinder";
     add_parameter("geometry",
@@ -144,10 +149,26 @@ namespace ryujin
       GridTools::distort_random(
           mesh_distortion_, triangulation, std::random_device()());
 
-    mapping_ = std::make_unique<MappingQ<dim>>(order_mapping);
-    finite_element_ = std::make_unique<FE_Q<dim>>(order_finite_element);
-    quadrature_ = std::make_unique<QGauss<dim>>(order_quadrature);
-    quadrature_1d_ = std::make_unique<QGauss<1>>(order_quadrature);
+    switch (ansatz_) {
+    case Ansatz::cg_q1:
+      mapping_ = std::make_unique<MappingQ<dim>>(1);
+      finite_element_ = std::make_unique<FE_Q<dim>>(1);
+      quadrature_ = std::make_unique<QGauss<dim>>(2);
+      quadrature_1d_ = std::make_unique<QGauss<1>>(2);
+      break;
+    case Ansatz::cg_q2:
+      mapping_ = std::make_unique<MappingQ<dim>>(2);
+      finite_element_ = std::make_unique<FE_Q<dim>>(2);
+      quadrature_ = std::make_unique<QGauss<dim>>(3);
+      quadrature_1d_ = std::make_unique<QGauss<1>>(3);
+      break;
+    case Ansatz::cg_q3:
+      mapping_ = std::make_unique<MappingQ<dim>>(3);
+      finite_element_ = std::make_unique<FE_Q<dim>>(3);
+      quadrature_ = std::make_unique<QGauss<dim>>(4);
+      quadrature_1d_ = std::make_unique<QGauss<1>>(4);
+      break;
+    }
   }
 
 } /* namespace ryujin */

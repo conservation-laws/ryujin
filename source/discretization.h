@@ -112,6 +112,23 @@ namespace ryujin
      */
     dirichlet_momentum = 6
   };
+
+
+  /**
+   * An enum class for setting the finite element ansatz.
+   *
+   * @ingroup Mesh
+   */
+  enum class Ansatz {
+    /** cG Q1: continuous bi- (tri-) linear Lagrange elements */
+    cg_q1,
+
+    /** cG Q2: continuous bi- (tri-) quadratic Lagrange elements */
+    cg_q2,
+
+    /** cG Q3: continuous bi- (tri-) cubic Lagrange elements */
+    cg_q3
+  };
 } // namespace ryujin
 
 #ifndef DOXYGEN
@@ -124,6 +141,11 @@ DECLARE_ENUM(ryujin::Boundary,
                   {ryujin::Boundary::dynamic, "dynamic"},
                   {ryujin::Boundary::dirichlet_momentum,
                    "dirichlet momentum"}));
+
+DECLARE_ENUM(ryujin::Ansatz,
+             LIST({ryujin::Ansatz::cg_q1, "cG Q1"},
+                  {ryujin::Ansatz::cg_q2, "cG Q2"},
+                  {ryujin::Ansatz::cg_q3, "cG Q3"}));
 #endif
 
 namespace ryujin
@@ -201,30 +223,15 @@ namespace ryujin
     void prepare();
 
     /**
-     * @name Discretization compile time options
+     * @name Accessors to data structures managed by this class.
      */
     //@{
 
-    static constexpr unsigned int order_finite_element = ORDER_FINITE_ELEMENT;
-    static constexpr unsigned int order_mapping = ORDER_MAPPING;
-    static constexpr unsigned int order_quadrature = ORDER_QUADRATURE;
-
-    //@}
     /**
-     * @name
+     * Return a read-only const reference to the finite element ansatz.
      */
-    //@{
+    ACCESSOR_READ_ONLY(ansatz)
 
-  protected:
-    const MPI_Comm &mpi_communicator_;
-
-    std::unique_ptr<Triangulation> triangulation_;
-    std::unique_ptr<const dealii::Mapping<dim>> mapping_;
-    std::unique_ptr<const dealii::FiniteElement<dim>> finite_element_;
-    std::unique_ptr<const dealii::Quadrature<dim>> quadrature_;
-    std::unique_ptr<const dealii::Quadrature<1>> quadrature_1d_;
-
-  public:
     /**
      * Return a mutable reference to the refinement variable.
      */
@@ -260,12 +267,23 @@ namespace ryujin
      */
     ACCESSOR_READ_ONLY(quadrature_1d)
 
+  protected:
+    const MPI_Comm &mpi_communicator_;
+
+    std::unique_ptr<Triangulation> triangulation_;
+    std::unique_ptr<const dealii::Mapping<dim>> mapping_;
+    std::unique_ptr<const dealii::FiniteElement<dim>> finite_element_;
+    std::unique_ptr<const dealii::Quadrature<dim>> quadrature_;
+    std::unique_ptr<const dealii::Quadrature<1>> quadrature_1d_;
+
   private:
     //@}
     /**
      * @name Run time options
      */
     //@{
+
+    Ansatz ansatz_;
 
     std::string geometry_;
 
