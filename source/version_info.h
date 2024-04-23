@@ -13,9 +13,4 @@ namespace ryujin
    * Print git revision and version info.
    */
   void print_revision_and_version(std::ostream &stream);
-
-  /**
-   * Print compile time parameters.
-   */
-  void print_compile_time_parameters(std::ostream &stream);
 } // namespace ryujin

@@ -635,10 +635,6 @@ namespace ryujin
 
     print_revision_and_version(stream);
 
-    /* Print compile time parameters: */
-
-    print_compile_time_parameters(stream);
-
     /* Print run time parameters: */
 
     stream << std::endl << "Run time parameters:" << std::endl << std::endl;
