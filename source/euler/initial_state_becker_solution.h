@@ -113,7 +113,7 @@ namespace ryujin
           const double factor = 2. * gamma_ / (gamma_ + 1.) //
                                 * mu_ / (density_left_ * velocity_left_ * Pr);
 
-          psi = [=](double x, double v) {
+          psi = [=, this](double x, double v) {
             const double c_l =
                 velocity_left_ / (velocity_left_ - velocity_right_);
             const double c_r =
@@ -145,7 +145,7 @@ namespace ryujin
 
           /* Root finding algorithm: */
 
-          find_velocity = [=](double x) {
+          find_velocity = [=, this](double x) {
             /* Return extremal cases: */
             if (x <= x_left)
               return double(velocity_left_);
