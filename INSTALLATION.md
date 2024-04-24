@@ -4,7 +4,7 @@ Installation instructions
 Necessary tools and library dependencies
 ----------------------------------------
 
-ryujin requires [deal.II](https://dealii.org) version 9.3.0 or newer
+ryujin requires [deal.II](https://dealii.org) version 9.4.0 or newer
 compiled with support enabled for MPI and P4est.
 
 On Debian and Ubuntu you can conveniently install all necessary libraries
@@ -14,12 +14,16 @@ and tools with `apt`.
     ```
     apt install libdeal.ii-dev cmake cmake-curses-gui numdiff make g++ ninja-build git
     ```
+  - On <b>Ubuntu LTS 24.04</b> you can run the following command to install
+    deal.II, all development libraries and necessary tools:
+    ```
+    sudo apt install libdeal.ii-dev cmake cmake-curses-gui numdiff make g++ ninja-build git
+    ```
   - On <b>Ubuntu LTS 22.04</b> you can install the current deal.II version
     from a <a href="https://launchpad.net/~ginggs/+archive/ubuntu/deal.ii-9.5.1-backports">PPA</a>
     ```
     sudo add-apt-repository ppa:ginggs/deal.ii-9.5.1-backports
     sudo apt update
-    sudo apt install libdeal.ii-dev
     sudo apt install libdeal.ii-dev cmake cmake-curses-gui numdiff make g++ ninja-build git
     ```
 
@@ -30,9 +34,9 @@ page](https://github.com/dealii/dealii/releases/tag/v9.5.2).
 If you are on Windows we strongly recommend to set up the [<b>Windows
 Subsystem for Linux v2</b>
 (WSL)](https://learn.microsoft.com/en-us/windows/wsl/about) and install
-<b>Ubuntu LTS 22.04</b> from the Microsoft store. Then, simply launch the
+<b>Ubuntu LTS 24.04</b> from the Microsoft store. Then, simply launch the
 Ubuntu App which starts a Bash shell. You can then proceed with the
-installation instructions for Ubuntu LTS 22.04 summarized above. You can
+installation instructions for Ubuntu LTS 24.04 summarized above. You can
 find a helpful tutorial on how to use the linux command line
 [here](https://ubuntu.com/tutorials/command-line-for-beginners#1-overview).
 
@@ -48,7 +52,7 @@ make.
 Retrieving and compiling ryujin
 -------------------------------
 
-At this point you should have deal.II an all necessary command line tools
+At this point you should have deal.II and all necessary command line tools
 installed. You then simply check out the ryujin repository and run `make`
 to compile ryujin:
 ```
@@ -59,12 +63,12 @@ git submodule update
 make release
 ```
 
-Note that ryujin uses the [CMake](https://cmake.org/) buildsystem. The
+Note that ryujin uses the [CMake](https://cmake.org/) build system. The
 `Makefile` found in the repository only contains a number of convenience
 targets and its use is entirely optional. If invoked it will create a
-subdirectory `build` and run cmake to configure the project. The executable
-will be located in <code>build/run</code>. The convenience Makefile
-contains the following additional targets:
+subdirectory `build`, run cmake to configure the project, and make to build
+it. The executable will be located in <code>build/run</code>. The
+convenience Makefile contains the following additional targets:
   - `make debug`:  switch to debug build and compile program
   - `make release`:  switch to release build and compile program
   - `make edit_cache`:  runs ccmake in the build directory
