@@ -1048,18 +1048,17 @@ namespace ryujin
       bool final_time)
   {
     static const std::string vectorization_name = [] {
-      using T = NUMBER;
-      constexpr auto width = VectorizedArray<NUMBER>::size();
+      constexpr auto width = VectorizedArray<Number>::size();
 
       std::string result;
       if (width == 1)
         result = "scalar ";
       else
-        result = std::to_string(width * 8 * sizeof(T)) + " bit packed ";
+        result = std::to_string(width * 8 * sizeof(Number)) + " bit packed ";
 
-      if constexpr (std::is_same_v<T, double>)
+      if constexpr (std::is_same_v<Number, double>)
         return result + "double";
-      else if constexpr (std::is_same_v<T, float>)
+      else if constexpr (std::is_same_v<Number, float>)
         return result + "float";
       else
         __builtin_trap();

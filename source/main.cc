@@ -106,9 +106,11 @@ int main(int argc, char *argv[])
       std::cout << "[INFO] Default parameter file »" << parameter_file
                 << "« not found.\n[INFO] Creating template parameter files..."
                 << std::endl;
+      ryujin::EquationDispatch::create_parameter_files();
+      std::filesystem::copy("default_parameters-euler-2d.prm", parameter_file);
     }
 
-    ryujin::create_parameter_templates(parameter_file, mpi_communicator);
+    MPI_Barrier(mpi_communicator);
 
     LIKWID_CLOSE;
     LSAN_DISABLE;
@@ -117,7 +119,7 @@ int main(int argc, char *argv[])
 
   {
     ryujin::EquationDispatch equation_dispatch;
-    equation_dispatch.run(parameter_file, mpi_communicator);
+    equation_dispatch.dispatch(parameter_file, mpi_communicator);
   }
 
   LIKWID_CLOSE;

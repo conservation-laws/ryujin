@@ -4,6 +4,7 @@
 ##
 
 add_library(obj_navier_stokes OBJECT
+  equation_dispatch.cc
   initial_state_library.cc
   parabolic_solver.cc
   )
