@@ -7,7 +7,6 @@
 
 #include <compile_time_options.h>
 
-#include "convenience_macros.h"
 #include "time_loop.h"
 
 #include <deal.II/base/mpi.h>
@@ -232,6 +231,11 @@ namespace ryujin
                  bool &time_loop_executed) {
             if (equation != name)
               return;
+
+            if (dealii::Utilities::MPI::this_mpi_process(mpi_comm) == 0) {
+              std::cout << "[INFO] dispatching to driver »" << equation
+                        << "« with dim=" << dimension << std::endl;
+            }
 
             AssertThrow(time_loop_executed == false,
                         dealii::ExcMessage(
