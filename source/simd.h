@@ -18,6 +18,7 @@ namespace ryujin
    */
   //@{
 
+
   /**
    * Small helper class to extract the underlying scalar type of a
    * VectorizedArray, or return T directly.

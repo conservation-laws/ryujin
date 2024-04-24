@@ -26,9 +26,3 @@
 #cmakedefine WITH_LIKWID
 #cmakedefine WITH_OPENMP
 #cmakedefine WITH_VALGRIND
-
-/* Discretization: */
-
-#define ORDER_FINITE_ELEMENT @ORDER_FINITE_ELEMENT@
-#define ORDER_MAPPING @ORDER_MAPPING@
-#define ORDER_QUADRATURE @ORDER_QUADRATURE@

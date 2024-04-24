@@ -230,6 +230,10 @@ namespace ryujin
        */
       //@{
 
+      // FIXME: refactor
+      static constexpr unsigned int order_fe = 1;
+      static constexpr unsigned int order_quad = 2;
+
       const MPI_Comm &mpi_communicator_;
       std::map<std::string, dealii::Timer> &computing_timer_;
 

@@ -28,18 +28,4 @@ namespace ryujin
     stream << "###" << std::endl;
     /* clang-format on */
   }
-
-  void print_compile_time_parameters(std::ostream &stream)
-  {
-    /* clang-format off */
-    stream << std::endl;
-    stream << "Compile time parameters:" << std::endl;
-    stream << "NUMBER == " << typeid(NUMBER).name() << std::endl;
-    stream << "SIMD width == " << dealii::VectorizedArray<NUMBER>::size() << std::endl;
-    stream << "ORDER_FINITE_ELEMENT == " << ORDER_FINITE_ELEMENT << std::endl;
-    stream << "ORDER_MAPPING  == " << ORDER_MAPPING << std::endl;
-    stream << "ORDER_QUADRATURE == " << ORDER_QUADRATURE << std::endl;
-    stream << std::endl;
-    /* clang-format on */
-  }
 } // namespace ryujin
