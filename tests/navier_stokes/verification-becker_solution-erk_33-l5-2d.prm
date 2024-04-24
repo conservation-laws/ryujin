@@ -11,6 +11,7 @@ end
 
 
 subsection B - Equation
+  set dimension = 2
   set equation = navier stokes
   set gamma    = 1.4
   set mu       = 0.01
