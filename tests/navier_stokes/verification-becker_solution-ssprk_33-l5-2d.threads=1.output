@@ -1,4 +1,5 @@
 [INFO] initiating flux capacitor
+[INFO] dispatching to driver »navier stokes« with dim=2
 [INFO] initializing data structures
 [INFO] creating mesh
 [INFO] preparing compute kernels
