@@ -5,16 +5,12 @@
 
 #pragma once
 
-#include "simd.h"
 #include "vtu_output.h"
 
 #include <deal.II/base/function_parser.h>
 #include <deal.II/numerics/data_out.h>
 #include <deal.II/numerics/vector_tools.h>
 
-#include <atomic>
-#include <chrono>
-#include <fstream>
 
 namespace ryujin
 {
