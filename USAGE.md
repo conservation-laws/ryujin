@@ -114,7 +114,7 @@ make edit_cache
 
 The most important compile-time option is `CMAKE_BUILD_TYPE` that is used
 to switch between a debug build configuration (`Debug`) and a release build
-configuration (`Release`). This is done most efficiently by using the
+configuration (`Release`). This option can also be set quickly with the
 convenience `Makefile` and typing `make debug`, or `make release` from the
 top level directory of ryujin.
 
@@ -122,15 +122,12 @@ Changing other compile-time options is rarely needed. And if in doubt they
 are best kept at their default values. For completeness we list all
 configuration options here:
   - `CMAKE_BUILD_TYPE`: build ryujin in "Release" or "Debug" mode
-  - `NUMBER`: select "double" for double precision or "float" for single precision
+  - `NUMBER`: select "double" for double precision or "float" for single precision (defaults to double)
   - `CHECK_BOUNDS`: enable additional bounds checking (defaults to OFF)
   - `DEBUG_OUTPUT`: enable debug output (defaults to OFF)
   - `ASYNC_MPI_EXCHANGE`: enable asynchronous "communication hiding" MPI exchange (defaults to OFF)
   - `DENORMALS_ARE_ZERO`: disable floating point denormals (defaults to ON)
-  - `FORCE_DEAL_II_SPARSE_MATRIX`: always use deal.II sparse matrix for preliminary assembly instead of Trilinos
-  - `ORDER_FINITE_ELEMENT`: polynomial order of finite element space (defaults to 1)
-  - `ORDER_MAPPING`: polynomial order of mapping (defaults to 1)
-  - `ORDER_QUADRATURE`: order of the Gaussian quadrature rule (defaults to 2)
+  - `FORCE_DEAL_II_SPARSE_MATRIX`: prefer deal.II sparse matrix for preliminary assembly instead of Trilinos
   - `SANITIZER`: enable address and UBSAN sanitizers for DEBUG build
   - `WITH_CALLGRIND`: enable Valgrind/Callgrind stetoscope mode (default to OFF)
   - `WITH_DOXYGEN`: enable support for doxygen and build documentation
