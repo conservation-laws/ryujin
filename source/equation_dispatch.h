@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <compile_time_options.h>
+
 #include "time_loop.h"
 
 #include <deal.II/base/mpi.h>
@@ -16,6 +18,12 @@
 
 namespace ryujin
 {
+  /**
+   * The Dave error message
+   */
+  inline const std::string dave =
+      "\nDave, this conversation can serve no purpose anymore. Goodbye.\n\n";
+
   /**
    * Dispatcher class that calls into the right TimeLoop for a configured
    * equation depending on what has been set in the parameter file.
@@ -29,6 +37,8 @@ namespace ryujin
       dimension_ = 0;
       add_parameter("dimension", dimension_, "The spatial dimension");
       add_parameter("equation", equation_, "The PDE system");
+
+      time_loop_executed_ = false;
     }
 
 
@@ -38,7 +48,9 @@ namespace ryujin
     static void create_parameter_files()
     {
       AssertThrow(signals != nullptr,
-                  dealii::ExcMessage("No equation has been registered"));
+                  dealii::ExcMessage(
+                      dave + "No equation has been registered. Consequently, "
+                             "there is nothing for us to do.\n"));
 
       signals->create_parameter_files();
     }
@@ -67,16 +79,25 @@ namespace ryujin
                                          /* skip undefined */ true,
                                          /* assert entries present */ false);
 
-      AssertThrow(
-          dimension_ >= 1 && dimension_ <= 3,
-          dealii::ExcMessage("Dave, this conversation can serve no purpose "
-                             "anymore. Goodbye.\nThe dimension parameter needs "
-                             "to be either 1, 2, or 3."));
+      AssertThrow(dimension_ >= 1 && dimension_ <= 3,
+                  dealii::ExcMessage(dave +
+                                     "The dimension parameter needs to be "
+                                     "either 1, 2, or 3, but we encountered »" +
+                                     std::to_string(dimension_) + "«\n"));
 
       AssertThrow(signals != nullptr,
-                  dealii::ExcMessage("No equation has been registered"));
+                  dealii::ExcMessage(
+                      dave + "No equation has been registered. Consequently, "
+                             "there is nothing for us to do.\n"));
 
-      signals->dispatch(dimension_, equation_, parameter_file, mpi_comm);
+      signals->dispatch(
+          dimension_, equation_, parameter_file, mpi_comm, time_loop_executed_);
+
+      AssertThrow(time_loop_executed_ == true,
+                  dealii::ExcMessage(dave +
+                                     "No equation was dispatched "
+                                     "with the chosen equation parameter »" +
+                                     equation_ + "«.\n"));
     }
 
 
@@ -91,7 +112,6 @@ namespace ryujin
 
       signals->dispatch.connect(callable);
     }
-
 
   protected:
     /**
@@ -110,7 +130,8 @@ namespace ryujin
       boost::signals2::signal<void(int /*dimension*/,
                                    const std::string & /*equation*/,
                                    const std::string & /*parameter file*/,
-                                   const MPI_Comm & /*MPI communicator*/)>
+                                   const MPI_Comm & /*MPI communicator*/,
+                                   bool & /*time loop executed*/)>
           dispatch;
     };
 
@@ -131,6 +152,8 @@ namespace ryujin
     std::string equation_;
 
     //@}
+
+    bool time_loop_executed_;
   };
 
 
@@ -189,6 +212,11 @@ namespace ryujin
   struct Dispatch {
     Dispatch(const std::string &name)
     {
+#ifdef DEBUG_OUTPUT
+      std::cout << "Dispatch<Description, Number>::Dispatch() for »" << name
+                << "«" << std::endl;
+#endif
+
       EquationDispatch::register_create_parameter_files([name]() {
         create_prm_files<Description, 1, Number>(name, false);
         create_prm_files<Description, 2, Number>(name, true);
@@ -199,24 +227,39 @@ namespace ryujin
           [name](const int dimension,
                  const std::string &equation,
                  const std::string &parameter_file,
-                 const MPI_Comm &mpi_comm) {
+                 const MPI_Comm &mpi_comm,
+                 bool &time_loop_executed) {
             if (equation != name)
               return;
+
+            if (dealii::Utilities::MPI::this_mpi_process(mpi_comm) == 0) {
+              std::cout << "[INFO] dispatching to driver »" << equation
+                        << "« with dim=" << dimension << std::endl;
+            }
+
+            AssertThrow(time_loop_executed == false,
+                        dealii::ExcMessage(
+                            dave +
+                            "Trying to execute more than one TimeLoop object "
+                            "with the given equation parameter »" +
+                            equation + "«"));
 
             if (dimension == 1) {
               TimeLoop<Description, 1, Number> time_loop(mpi_comm);
               dealii::ParameterAcceptor::initialize(parameter_file);
               time_loop.run();
+              time_loop_executed = true;
             } else if (dimension == 2) {
               TimeLoop<Description, 2, Number> time_loop(mpi_comm);
               dealii::ParameterAcceptor::initialize(parameter_file);
               time_loop.run();
+              time_loop_executed = true;
             } else if (dimension == 3) {
               TimeLoop<Description, 3, Number> time_loop(mpi_comm);
               dealii::ParameterAcceptor::initialize(parameter_file);
               time_loop.run();
-            } else
-              __builtin_unreachable();
+              time_loop_executed = true;
+            }
           });
     }
   };
