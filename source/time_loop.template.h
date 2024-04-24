@@ -7,6 +7,7 @@
 
 #include "checkpointing.h"
 #include "scope.h"
+#include "simd.h"
 #include "solution_transfer.h"
 #include "time_loop.h"
 #include "version_info.h"
@@ -1046,6 +1047,24 @@ namespace ryujin
       bool write_to_logfile,
       bool final_time)
   {
+    static const std::string vectorization_name = [] {
+      using T = NUMBER;
+      constexpr auto width = VectorizedArray<NUMBER>::size();
+
+      std::string result;
+      if (width == 1)
+        result = "scalar ";
+      else
+        result = std::to_string(width * 8 * sizeof(T)) + " bit packed ";
+
+      if constexpr (std::is_same_v<T, double>)
+        return result + "double";
+      else if constexpr (std::is_same_v<T, float>)
+        return result + "float";
+      else
+        __builtin_trap();
+    }();
+
     std::ostringstream output;
 
     std::ostringstream primary;
@@ -1063,17 +1082,20 @@ namespace ryujin
     print_head(primary.str(), secondary.str(), output);
 
     output << "Information: (HYP) " << hyperbolic_system_.problem_name;
-    if constexpr (!ParabolicSystem::is_identity)
+    if constexpr (!ParabolicSystem::is_identity) {
       output << "\n             (PAR) " << parabolic_system_.problem_name;
+    }
     output << "\n             [" << base_name_ << "] with "        //
            << offline_data_.dof_handler().n_dofs() << " Qdofs on " //
            << n_mpi_processes_ << " ranks / "                      //
 #ifdef WITH_OPENMP
-           << MultithreadInfo::n_threads() << " threads." //
+           << MultithreadInfo::n_threads() << " threads <" //
 #else
-           << "[openmp disabled]." //
+           << "[openmp disabled] <" //
 #endif
-           << "\n             Last output cycle " << output_cycle - 1    //
+           << vectorization_name                                         //
+           << ">\n             Last output cycle "                       //
+           << output_cycle - 1                                           //
            << " at t = " << output_granularity_ * (output_cycle - 1)     //
            << " (terminal update interval " << terminal_update_interval_ //
            << "s)\n";
