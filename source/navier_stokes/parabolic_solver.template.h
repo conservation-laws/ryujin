@@ -128,16 +128,21 @@ namespace ryujin
       std::cout << "ParabolicSolver<dim, Number>::prepare()" << std::endl;
 #endif
 
+      const auto &discretization = offline_data_->discretization();
+      AssertThrow(discretization.ansatz() == Ansatz::cg_q1,
+                  dealii::ExcMessage("The NavierStokes module currently only "
+                                     "supports cG Q1 finite elements."));
+
       /* Initialize vectors: */
 
       typename MatrixFree<dim, Number>::AdditionalData additional_data;
       additional_data.tasks_parallel_scheme =
           MatrixFree<dim, Number>::AdditionalData::none;
 
-      matrix_free_.reinit(offline_data_->discretization().mapping(),
+      matrix_free_.reinit(discretization.mapping(),
                           offline_data_->dof_handler(),
                           offline_data_->affine_constraints(),
-                          offline_data_->discretization().quadrature_1d(),
+                          discretization.quadrature_1d(),
                           additional_data);
 
       const auto &scalar_partitioner =
@@ -187,12 +192,11 @@ namespace ryujin
         // constraints.add_lines(mg_constrained_dofs_.get_boundary_indices(level));
         // constraints.merge(mg_constrained_dofs_.get_level_constraints(level));
         constraints.close();
-        level_matrix_free_[level].reinit(
-            offline_data_->discretization().mapping(),
-            offline_data_->dof_handler(),
-            constraints,
-            offline_data_->discretization().quadrature_1d(),
-            additional_data_level);
+        level_matrix_free_[level].reinit(discretization.mapping(),
+                                         offline_data_->dof_handler(),
+                                         constraints,
+                                         discretization.quadrature_1d(),
+                                         additional_data_level);
         level_matrix_free_[level].initialize_dof_vector(level_density_[level]);
       }
 
@@ -203,8 +207,8 @@ namespace ryujin
                                 level_matrix_free_);
     }
 
-    template <typename Description, int dim, typename Number>
 
+    template <typename Description, int dim, typename Number>
     void ParabolicSolver<Description, dim, Number>::backward_euler_step(
         const vector_type &old_U,
         const Number t,
@@ -507,9 +511,6 @@ namespace ryujin
                    auto &dst,
                    const auto &src,
                    const auto cell_range) {
-              constexpr auto order_fe =
-                  Discretization<dim>::order_finite_element;
-              constexpr auto order_quad = Discretization<dim>::order_quadrature;
               FEEvaluation<dim, order_fe, order_quad, dim, Number> velocity(
                   data);
               FEEvaluation<dim, order_fe, order_quad, 1, Number> energy(data);

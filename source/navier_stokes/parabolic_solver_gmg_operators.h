@@ -156,6 +156,10 @@ namespace ryujin
     class VelocityMatrix : public dealii::Subscriptor
     {
     public:
+      // FIXME: refactor
+      static constexpr unsigned int order_fe = 1;
+      static constexpr unsigned int order_quad = 2;
+
       using vector_type = dealii::LinearAlgebra::distributed::Vector<Number>;
       using block_vector_type =
           dealii::LinearAlgebra::distributed::BlockVector<Number>;
@@ -241,8 +245,6 @@ namespace ryujin
                                        auto &dst,
                                        const auto &src,
                                        const auto range) {
-          constexpr auto order_fe = Discretization<dim>::order_finite_element;
-          constexpr auto order_quad = Discretization<dim>::order_quadrature;
           dealii::FEEvaluation<dim, order_fe, order_quad, dim, Number> velocity(
               data);
 
@@ -316,9 +318,6 @@ namespace ryujin
         matrix_free_->template cell_loop<block_vector_type, unsigned int>(
             [this](
                 const auto &data, auto &dst, const auto &, const auto range) {
-              constexpr auto order_fe =
-                  Discretization<dim>::order_finite_element;
-              constexpr auto order_quad = Discretization<dim>::order_quadrature;
               dealii::FEEvaluation<dim, order_fe, order_quad, dim, Number>
                   velocity(data);
               dealii::FEEvaluation<dim, order_fe, order_quad, dim, Number>
@@ -548,6 +547,10 @@ namespace ryujin
     class EnergyMatrix : public dealii::Subscriptor
     {
     public:
+      // FIXME: refactor
+      static constexpr unsigned int order_fe = 1;
+      static constexpr unsigned int order_quad = 2;
+
       using vector_type = dealii::LinearAlgebra::distributed::Vector<Number>;
 
       EnergyMatrix() = default;
@@ -635,8 +638,6 @@ namespace ryujin
                                        auto &dst,
                                        const auto &src,
                                        const auto range) {
-          constexpr auto order_fe = Discretization<dim>::order_finite_element;
-          constexpr auto order_quad = Discretization<dim>::order_quadrature;
           dealii::FEEvaluation<dim, order_fe, order_quad, 1, Number> energy(
               data);
 
@@ -685,9 +686,6 @@ namespace ryujin
         matrix_free_->template cell_loop<vector_type, unsigned int>(
             [this](
                 const auto &data, auto &dst, const auto &, const auto range) {
-              constexpr auto order_fe =
-                  Discretization<dim>::order_finite_element;
-              constexpr auto order_quad = Discretization<dim>::order_quadrature;
               dealii::FEEvaluation<dim, order_fe, order_quad, 1, Number> energy(
                   data);
               dealii::FEEvaluation<dim, order_fe, order_quad, 1, Number> writer(
