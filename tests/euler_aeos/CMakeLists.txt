@@ -12,7 +12,8 @@ include_directories(
   )
 
 set(TEST_LIBRARIES obj_common obj_${EQUATION} obj_${EQUATION}_dependent)
-
 set(TEST_TARGET ryujin)
 
-deal_ii_pickup_tests()
+if(TARGET obj_${EQUATION})
+  deal_ii_pickup_tests()
+endif()
