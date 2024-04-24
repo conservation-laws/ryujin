@@ -7,9 +7,6 @@
 
 #include "openmp.h"
 #include "quantities.h"
-#include "scope.h"
-#include "scratch_data.h"
-#include "simd.h"
 
 #include <deal.II/base/function_parser.h>
 #include <deal.II/base/mpi.templates.h>

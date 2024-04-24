@@ -14,7 +14,6 @@
 #include <deal.II/fe/fe_q.h>
 #include <deal.II/fe/mapping_q.h>
 
-#include <fstream>
 #include <random>
 
 namespace ryujin

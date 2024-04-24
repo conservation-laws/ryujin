@@ -17,7 +17,6 @@
 #endif
 
 #include <filesystem>
-#include <fstream>
 
 /**
  * Change rounding mode on X86-64 architecture: Denormals are flushed to

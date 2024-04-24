@@ -13,10 +13,6 @@
 #include <deal.II/numerics/data_out.h>
 #include <deal.II/numerics/vector_tools.h>
 
-#include <atomic>
-#include <chrono>
-#include <fstream>
-
 namespace ryujin
 {
   template <typename Description, int dim, typename Number>
