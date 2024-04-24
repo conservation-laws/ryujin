@@ -4,6 +4,7 @@
 ##
 
 add_library(obj_scalar_conservation OBJECT
+  equation_dispatch.cc
   flux_library.cc
   initial_state_library.cc
   limiter.cc

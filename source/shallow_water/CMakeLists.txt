@@ -4,6 +4,7 @@
 ##
 
 add_library(obj_shallow_water OBJECT
+  equation_dispatch.cc
   initial_state_library.cc
   limiter.cc
   riemann_solver.cc

@@ -4,6 +4,7 @@
 ##
 
 add_library(obj_skeleton OBJECT
+  equation_dispatch.cc
   initial_state_library.cc
   )
 set_target_properties(obj_skeleton PROPERTIES LINKER_LANGUAGE CXX)
