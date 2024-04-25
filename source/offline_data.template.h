@@ -731,11 +731,10 @@ namespace ryujin
 
     {
 #ifdef DEAL_II_WITH_TRILINOS
-      using scalar_type = dealii::LinearAlgebra::distributed::Vector<double>;
-      scalar_type one(scalar_partitioner_);
+      ScalarVector one(scalar_partitioner_);
       one = 1.;
 
-      scalar_type local_lumped_mass_matrix(scalar_partitioner_);
+      ScalarVector local_lumped_mass_matrix(scalar_partitioner_);
       mass_matrix_tmp.vmult(local_lumped_mass_matrix, one);
       lumped_mass_matrix_.compress(VectorOperation::add);
 
@@ -751,10 +750,10 @@ namespace ryujin
 
 #else
 
-      Vector<Number> one(mass_matrix_tmp.m());
+      dealii::Vector<Number> one(mass_matrix_tmp.m());
       one = 1.;
 
-      Vector<Number> local_lumped_mass_matrix(mass_matrix_tmp.m());
+      dealii::Vector<Number> local_lumped_mass_matrix(mass_matrix_tmp.m());
       mass_matrix_tmp.vmult(local_lumped_mass_matrix, one);
 
       for (unsigned int i = 0; i < scalar_partitioner_->locally_owned_size();
@@ -824,7 +823,7 @@ namespace ryujin
       level_lumped_mass_matrix_[level].reinit(partitioner);
       std::vector<types::global_dof_index> dof_indices(
           dof_handler.get_fe().dofs_per_cell);
-      Vector<Number> mass_values(dof_handler.get_fe().dofs_per_cell);
+      dealii::Vector<Number> mass_values(dof_handler.get_fe().dofs_per_cell);
       FEValues<dim> fe_values(discretization_->mapping(),
                               discretization_->finite_element(),
                               discretization_->quadrature(),
@@ -856,11 +855,10 @@ namespace ryujin
 
   template <int dim, typename Number>
   template <typename ITERATOR1, typename ITERATOR2>
-  typename OfflineData<dim, Number>::boundary_map_type
-  OfflineData<dim, Number>::construct_boundary_map(
+  auto OfflineData<dim, Number>::construct_boundary_map(
       const ITERATOR1 &begin,
       const ITERATOR2 &end,
-      const Utilities::MPI::Partitioner &partitioner) const
+      const Utilities::MPI::Partitioner &partitioner) const -> BoundaryMap
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "OfflineData<dim, Number>::construct_boundary_map()"
@@ -1011,11 +1009,11 @@ namespace ryujin
 
   template <int dim, typename Number>
   template <typename ITERATOR1, typename ITERATOR2>
-  typename OfflineData<dim, Number>::coupling_boundary_pairs_type
-  OfflineData<dim, Number>::collect_coupling_boundary_pairs(
+  auto OfflineData<dim, Number>::collect_coupling_boundary_pairs(
       const ITERATOR1 &begin,
       const ITERATOR2 &end,
       const Utilities::MPI::Partitioner &partitioner) const
+      -> CouplingBoundaryPairs
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "OfflineData<dim, Number>::collect_coupling_boundary_pairs()"
@@ -1076,7 +1074,7 @@ namespace ryujin
      * Now, collect all coupling boundary pairs:
      */
 
-    coupling_boundary_pairs_type result;
+    CouplingBoundaryPairs result;
 
     for (const auto i : locally_relevant_boundary_indices) {
 

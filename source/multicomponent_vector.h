@@ -69,13 +69,13 @@ namespace ryujin
      * dealii::LinearAlgebra::distributed::Vector<Number> used to insert
      * and extract a single component of the MultiComponentVector.
      */
-    using scalar_type = dealii::LinearAlgebra::distributed::Vector<Number>;
+    using ScalarVector = dealii::LinearAlgebra::distributed::Vector<Number>;
 
     /**
      * We want to use the assignment operator of the virtual base class, so
      * specify that here.
      */
-    using scalar_type::operator=;
+    using ScalarVector::operator=;
 
     /**
      * Reinitializes the MultiComponentVector with a scalar MPI
@@ -101,7 +101,7 @@ namespace ryujin
      * call deal.II specific functions (that can only operate on scalar
      * vectors).
      */
-    void extract_component(scalar_type &scalar_vector,
+    void extract_component(ScalarVector &scalar_vector,
                            unsigned int component) const;
 
     /**
@@ -117,7 +117,7 @@ namespace ryujin
      * components of the initial state that are returned component wise as
      * single scalar vectors by deal.II interpolation functions.
      */
-    void insert_component(const scalar_type &scalar_vector,
+    void insert_component(const ScalarVector &scalar_vector,
                           unsigned int component);
 
     /**
@@ -187,7 +187,7 @@ namespace ryujin
 
   template <typename Number, int n_comp, int simd_length>
   void MultiComponentVector<Number, n_comp, simd_length>::extract_component(
-      scalar_type &scalar_vector, unsigned int component) const
+      ScalarVector &scalar_vector, unsigned int component) const
   {
     Assert(n_comp > 0,
            dealii::ExcMessage(
@@ -208,7 +208,7 @@ namespace ryujin
 
   template <typename Number, int n_comp, int simd_length>
   void MultiComponentVector<Number, n_comp, simd_length>::insert_component(
-      const scalar_type &scalar_vector, unsigned int component)
+      const ScalarVector &scalar_vector, unsigned int component)
   {
     Assert(n_comp > 0,
            dealii::ExcMessage(

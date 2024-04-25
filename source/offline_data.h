@@ -9,8 +9,8 @@
 
 #include "convenience_macros.h"
 #include "discretization.h"
-#include "multicomponent_vector.h"
 #include "sparse_matrix_simd.h"
+#include "state_vector.h"
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/partitioner.h>
@@ -48,10 +48,14 @@ namespace ryujin
   {
   public:
     /**
-     * Shorthand typedef for
-     * dealii::LinearAlgebra::distributed::Vector<Number>.
+     * @copydoc ryujin::ScalarVector
      */
-    using scalar_type = dealii::LinearAlgebra::distributed::Vector<Number>;
+    using ScalarVector = ryujin::ScalarVector<Number>;
+
+    /**
+     * Scalar vector storing single-precision floats
+     */
+    using ScalarVectorFloat = ryujin::ScalarVector<float>;
 
     /**
      * A tuple describing global dof index, boundary normal, normal mass,
@@ -99,15 +103,14 @@ namespace ryujin
     ACCESSOR_READ_ONLY(affine_constraints)
 
     /**
-     * An MPI partitioner for all parallel distributed vectors storing a
-     * scalar quantity.
+     * An MPI partitioner for the (scalar) Vector storing a scalar-valued
+     * quantity.
      */
     ACCESSOR_READ_ONLY_NO_DEREFERENCE(scalar_partitioner)
 
     /**
-     * An MPI partitioner for all parallel distributed vectors storing a
-     * vector-valued quantity of size
-     * HyperbolicSystem::problem_dimension.
+     * An MPI partitioner for the MultiComponentVector storing a
+     * vector-valued quantity of size HyperbolicSystem::problem_dimension.
      */
     ACCESSOR_READ_ONLY_NO_DEREFERENCE(vector_partitioner)
 
@@ -270,16 +273,16 @@ namespace ryujin
     unsigned int n_locally_owned_;
     unsigned int n_locally_relevant_;
 
-    using boundary_map_type =
+    using BoundaryMap =
         std::multimap<dealii::types::global_dof_index, boundary_description>;
-    using coupling_boundary_pairs_type =
+    using CouplingBoundaryPairs =
         std::vector<std::tuple<dealii::types::global_dof_index,
                                unsigned int,
                                dealii::types::global_dof_index>>;
-    boundary_map_type boundary_map_;
-    coupling_boundary_pairs_type coupling_boundary_pairs_;
+    BoundaryMap boundary_map_;
+    CouplingBoundaryPairs coupling_boundary_pairs_;
 
-    std::vector<boundary_map_type> level_boundary_map_;
+    std::vector<BoundaryMap> level_boundary_map_;
 
     dealii::DynamicSparsityPattern sparsity_pattern_;
 
@@ -288,12 +291,10 @@ namespace ryujin
 
     SparseMatrixSIMD<Number> mass_matrix_;
 
-    dealii::LinearAlgebra::distributed::Vector<Number> lumped_mass_matrix_;
-    dealii::LinearAlgebra::distributed::Vector<Number>
-        lumped_mass_matrix_inverse_;
+    ScalarVector lumped_mass_matrix_;
+    ScalarVector lumped_mass_matrix_inverse_;
 
-    std::vector<dealii::LinearAlgebra::distributed::Vector<float>>
-        level_lumped_mass_matrix_;
+    std::vector<ScalarVectorFloat> level_lumped_mass_matrix_;
 
     SparseMatrixSIMD<Number> betaij_matrix_;
     SparseMatrixSIMD<Number, dim> cij_matrix_;
@@ -308,7 +309,7 @@ namespace ryujin
      * Construct a boundary map for a given set of DoFHandler iterators.
      */
     template <typename ITERATOR1, typename ITERATOR2>
-    boundary_map_type construct_boundary_map(
+    BoundaryMap construct_boundary_map(
         const ITERATOR1 &begin,
         const ITERATOR2 &end,
         const dealii::Utilities::MPI::Partitioner &partitioner) const;
@@ -318,7 +319,7 @@ namespace ryujin
      * boundary degrees of freedom.
      */
     template <typename ITERATOR1, typename ITERATOR2>
-    coupling_boundary_pairs_type collect_coupling_boundary_pairs(
+    CouplingBoundaryPairs collect_coupling_boundary_pairs(
         const ITERATOR1 &begin,
         const ITERATOR2 &end,
         const dealii::Utilities::MPI::Partitioner &partitioner) const;
