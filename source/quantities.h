@@ -52,11 +52,6 @@ namespace ryujin
     using state_type = typename View::state_type;
 
     /**
-     * @copydoc HyperbolicSystemView::primitive_state_type
-     */
-    using primitive_state_type = typename View::primitive_state_type;
-
-    /**
      * Typedef for a MultiComponentVector storing the state U.
      */
     using vector_type = MultiComponentVector<Number, problem_dimension>;
@@ -148,8 +143,8 @@ namespace ryujin
      * pressure force.
      */
     using boundary_value =
-        std::tuple<primitive_state_type /* primitive state */,
-                   primitive_state_type /* primitive state second moment */>;
+        std::tuple<state_type /* primitive state */,
+                   state_type /* primitive state second moment */>;
 
     /**
      * Temporal statistics we store for each boundary manifold.
@@ -188,8 +183,8 @@ namespace ryujin
      * primitive state and its second moment.
      */
     using interior_value =
-        std::tuple<primitive_state_type /* primitive state */,
-                   primitive_state_type /* primitive state second moment */>;
+        std::tuple<state_type /* primitive state */,
+                   state_type /* primitive state second moment */>;
 
     /**
      * Temporal statistics we store for each interior manifold.

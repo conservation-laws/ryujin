@@ -25,7 +25,6 @@ namespace ryujin
     public:
       using View = HyperbolicSystemView<dim, Number>;
       using state_type = typename View::state_type;
-      using primitive_state_type = typename View::primitive_state_type;
 
       Uniform(const HyperbolicSystem &hyperbolic_system,
               const std::string subsection)
@@ -47,7 +46,7 @@ namespace ryujin
     private:
       const HyperbolicSystem &hyperbolic_system;
 
-      primitive_state_type primitive_;
+      state_type primitive_;
     };
   } // namespace Skeleton
 } // namespace ryujin

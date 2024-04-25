@@ -27,7 +27,6 @@ namespace ryujin
     public:
       using View = HyperbolicSystemView<dim, Number>;
       using state_type = typename View::state_type;
-      using primitive_state_type = typename View::primitive_state_type;
 
       CircularDamBreak(const HyperbolicSystem &hyperbolic_system,
                        const std::string sub)
