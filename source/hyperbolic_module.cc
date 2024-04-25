@@ -8,13 +8,10 @@
 
 #define INSTANTIATE(dim, stages)                                               \
   template NUMBER HyperbolicModule<Description, dim, NUMBER>::step<stages>(    \
-      const vector_type &,                                                     \
-      std::array<std::reference_wrapper<const vector_type>, stages>,           \
-      std::array<std::reference_wrapper<const precomputed_vector_type>,        \
-                 stages>,                                                      \
+      StateVector &,                                                           \
+      std::array<std::reference_wrapper<const StateVector>, stages>,           \
       const std::array<NUMBER, stages>,                                        \
-      vector_type &,                                                           \
-      precomputed_vector_type &,                                               \
+      StateVector &,                                                           \
       NUMBER) const
 
 namespace ryujin

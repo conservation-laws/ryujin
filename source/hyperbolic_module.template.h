@@ -70,7 +70,7 @@ namespace ryujin
     /* Initialize vectors: */
 
     const auto &scalar_partitioner = offline_data_->scalar_partitioner();
-    precomputed_initial_.reinit_with_scalar_partitioner(scalar_partitioner);
+    initial_precomputed_.reinit_with_scalar_partitioner(scalar_partitioner);
     alpha_.reinit(scalar_partitioner);
     bounds_.reinit_with_scalar_partitioner(scalar_partitioner);
 
@@ -87,8 +87,8 @@ namespace ryujin
     lij_matrix_next_.reinit(sparsity_simd);
     pij_matrix_.reinit(sparsity_simd);
 
-    precomputed_initial_ =
-        initial_values_->interpolate_precomputed_initial_vector();
+    initial_precomputed_ =
+        initial_values_->interpolate_initial_precomputed_vector();
   }
 
 
@@ -126,19 +126,21 @@ namespace ryujin
   template <typename Description, int dim, typename Number>
   template <int stages>
   Number HyperbolicModule<Description, dim, Number>::step(
-      const vector_type &old_U,
-      std::array<std::reference_wrapper<const vector_type>, stages> stage_U,
-      std::array<std::reference_wrapper<const precomputed_vector_type>, stages>
-          stage_precomputed,
+      StateVector &old_state_vector,
+      std::array<std::reference_wrapper<const StateVector>, stages>
+          stage_state_vectors,
       const std::array<Number, stages> stage_weights,
-      vector_type &new_U,
-      precomputed_vector_type &new_precomputed,
+      StateVector &new_state_vector,
       Number tau /*= 0.*/) const
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "HyperbolicModule<Description, dim, Number>::step()"
               << std::endl;
 #endif
+
+    auto &old_U = std::get<0>(old_state_vector);
+    auto &old_precomputed = std::get<1>(old_state_vector);
+    auto &new_U = std::get<0>(new_state_vector);
 
     CALLGRIND_START_INSTRUMENTATION;
 
@@ -212,8 +214,8 @@ namespace ryujin
       for (unsigned int cycle = 0; cycle < n_precomputation_cycles; ++cycle) {
 
         SynchronizationDispatch synchronization_dispatch([&]() {
-          new_precomputed.update_ghost_values_start(channel++);
-          new_precomputed.update_ghost_values_finish();
+          old_precomputed.update_ghost_values_start(channel++);
+          old_precomputed.update_ghost_values_finish();
         });
 
         RYUJIN_PARALLEL_REGION_BEGIN
@@ -232,9 +234,8 @@ namespace ryujin
                 synchronization_dispatch.check(
                     thread_ready, i >= n_export_indices && i < n_internal);
               },
-              new_precomputed,
               sparsity_simd,
-              old_U,
+              old_state_vector,
               left,
               right);
         };
@@ -291,10 +292,15 @@ namespace ryujin
         unsigned int stride_size = get_stride_size<T>;
 
         /* Stored thread locally: */
-        typename Description::template RiemannSolver<dim, T> riemann_solver(
-            *hyperbolic_system_, riemann_solver_parameters_, new_precomputed);
-        typename Description::template Indicator<dim, T> indicator(
-            *hyperbolic_system_, indicator_parameters_, new_precomputed);
+
+        using RiemannSolver = Description::template RiemannSolver<dim, T>;
+        RiemannSolver riemann_solver(
+            *hyperbolic_system_, riemann_solver_parameters_, old_precomputed);
+
+        using Indicator = Description::template Indicator<dim, T>;
+        Indicator indicator(
+            *hyperbolic_system_, indicator_parameters_, old_precomputed);
+
         bool thread_ready = false;
 
         RYUJIN_OMP_FOR
@@ -372,8 +378,9 @@ namespace ryujin
 
       /* Complete d_ij at boundary: */
 
-      typename Description::template RiemannSolver<dim, Number> riemann_solver(
-          *hyperbolic_system_, riemann_solver_parameters_, new_precomputed);
+      using RiemannSolver = Description::template RiemannSolver<dim, Number>;
+      RiemannSolver riemann_solver(
+          *hyperbolic_system_, riemann_solver_parameters_, old_precomputed);
 
       Number local_tau_max = std::numeric_limits<Number>::max();
 
@@ -513,11 +520,10 @@ namespace ryujin
 
       auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
         using T = decltype(sentinel);
-        using View =
-            typename Description::template HyperbolicSystemView<dim, T>;
-        using Limiter = typename Description::template Limiter<dim, T>;
-        using flux_contribution_type = typename View::flux_contribution_type;
-        using state_type = typename View::state_type;
+        using View = Description::template HyperbolicSystemView<dim, T>;
+        using Limiter = Description::template Limiter<dim, T>;
+        using flux_contribution_type = View::flux_contribution_type;
+        using state_type = View::state_type;
 
         unsigned int stride_size = get_stride_size<T>;
 
@@ -525,7 +531,7 @@ namespace ryujin
 
         /* Stored thread locally: */
         Limiter limiter(
-            *hyperbolic_system_, limiter_parameters_, new_precomputed);
+            *hyperbolic_system_, limiter_parameters_, old_precomputed);
         bool thread_ready = false;
 
         RYUJIN_OMP_FOR
@@ -547,19 +553,21 @@ namespace ryujin
           const auto m_i_inv = get_entry<T>(lumped_mass_matrix_inverse, i);
 
           const auto flux_i = view.flux_contribution(
-              new_precomputed, precomputed_initial_, i, U_i);
+              old_precomputed, initial_precomputed_, i, U_i);
 
           std::array<flux_contribution_type, stages> flux_iHs;
           [[maybe_unused]] state_type S_iH;
 
           for (int s = 0; s < stages; ++s) {
-            const auto temp = stage_U[s].get().template get_tensor<T>(i);
-            flux_iHs[s] = view.flux_contribution(
-                stage_precomputed[s].get(), precomputed_initial_, i, temp);
+            const auto &[U_s, prec_s, V_s] = stage_state_vectors[s].get();
+
+            const auto U_iHs = U_s.template get_tensor<T>(i);
+            flux_iHs[s] =
+                view.flux_contribution(prec_s, initial_precomputed_, i, U_iHs);
 
             if constexpr (View::have_source_terms) {
-              S_iH += stage_weights[s] *
-                      view.nodal_source(new_precomputed, i, temp, tau);
+              S_iH +=
+                  stage_weights[s] * view.nodal_source(prec_s, i, U_iHs, tau);
             }
           }
 
@@ -567,7 +575,7 @@ namespace ryujin
           state_type F_iH;
 
           if constexpr (View::have_source_terms) {
-            S_i = view.nodal_source(new_precomputed, i, U_i, tau);
+            S_i = view.nodal_source(old_precomputed, i, U_i, tau);
             S_iH += weight * S_i;
             U_i_new += tau * /* m_i_inv * m_i */ S_i;
             F_iH += m_i * S_iH;
@@ -590,7 +598,7 @@ namespace ryujin
 
               const auto U_j = old_U.template get_tensor<T>(js);
               const auto flux_j = view.flux_contribution(
-                  new_precomputed, precomputed_initial_, js, U_j);
+                  old_precomputed, initial_precomputed_, js, U_j);
 
               const auto d_ij = dij_matrix_.template get_entry<T>(i, col_idx);
               const auto c_ij = cij_matrix.template get_tensor<T>(i, col_idx);
@@ -633,7 +641,7 @@ namespace ryujin
                 betaij_matrix.template get_entry<T>(i, col_idx);
 
             const auto flux_j = view.flux_contribution(
-                new_precomputed, precomputed_initial_, js, U_j);
+                old_precomputed, initial_precomputed_, js, U_j);
 
             const auto m_ij = mass_matrix.template get_entry<T>(i, col_idx);
 
@@ -693,15 +701,17 @@ namespace ryujin
             }
 
             if constexpr (View::have_source_terms) {
-              const auto S_j = view.nodal_source(new_precomputed, js, U_j, tau);
+              const auto S_j = view.nodal_source(old_precomputed, js, U_j, tau);
               F_iH += weight * m_ij * S_j;
               P_ij += weight * m_ij * S_j;
             }
 
             for (int s = 0; s < stages; ++s) {
-              const auto U_jH = stage_U[s].get().template get_tensor<T>(js);
+              const auto &[U_s, prec_s, V_s] = stage_state_vectors[s].get();
+
+              const auto U_jHs = U_s.template get_tensor<T>(js);
               const auto flux_jHs = view.flux_contribution(
-                  stage_precomputed[s].get(), precomputed_initial_, js, U_jH);
+                  prec_s, initial_precomputed_, js, U_jHs);
 
               if constexpr (View::have_high_order_flux) {
                 const auto high_order_flux_ij = view.high_order_flux_divergence(
@@ -716,8 +726,7 @@ namespace ryujin
               }
 
               if constexpr (View::have_source_terms) {
-                const auto S_js = view.nodal_source(
-                    stage_precomputed[s].get(), js, U_jH, tau);
+                const auto S_js = view.nodal_source(prec_s, js, U_jHs, tau);
                 F_iH += stage_weights[s] * m_ij * S_js;
                 P_ij += stage_weights[s] * m_ij * S_js;
               }
@@ -777,7 +786,7 @@ namespace ryujin
 
         /* Stored thread locally: */
         Limiter limiter(
-            *hyperbolic_system_, limiter_parameters_, new_precomputed);
+            *hyperbolic_system_, limiter_parameters_, old_precomputed);
         bool thread_ready = false;
 
         RYUJIN_OMP_FOR
@@ -900,7 +909,7 @@ namespace ryujin
         /* Stored thread locally: */
         AlignedVector<T> lij_row;
         Limiter limiter(
-            *hyperbolic_system_, limiter_parameters_, new_precomputed);
+            *hyperbolic_system_, limiter_parameters_, old_precomputed);
         bool thread_ready = false;
 
         RYUJIN_OMP_FOR
@@ -1031,13 +1040,15 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   void HyperbolicModule<Description, dim, Number>::apply_boundary_conditions(
-      vector_type &U, Number t) const
+      StateVector &state_vector, Number t) const
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "HyperbolicModule<Description, dim, "
                  "Number>::apply_boundary_conditions()"
               << std::endl;
 #endif
+
+    auto &[U, precomputed, V] = state_vector;
 
     const auto cycle_number = 5 + (n_precomputation_cycles > 0 ? 1 : 0) +
                               limiter_parameters_.iterations();
