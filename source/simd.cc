@@ -7,7 +7,7 @@
 
 namespace ryujin
 {
-#if DEAL_II_COMPILER_VECTORIZATION_LEVEL >= 3 && defined(__AVX512F__)
+#if DEAL_II_COMPILER_VECTORIZATION_LEVEL >= 3
   template dealii::VectorizedArray<double, 8>
   pow(const dealii::VectorizedArray<double, 8>, const double);
 
@@ -39,7 +39,7 @@ namespace ryujin
            const Bias);
 #endif
 
-#if DEAL_II_COMPILER_VECTORIZATION_LEVEL >= 2 && defined(__AVX__)
+#if DEAL_II_COMPILER_VECTORIZATION_LEVEL >= 2
   template dealii::VectorizedArray<double, 4>
   pow(const dealii::VectorizedArray<double, 4>, const double);
 
@@ -71,7 +71,7 @@ namespace ryujin
            const Bias);
 #endif
 
-#if DEAL_II_COMPILER_VECTORIZATION_LEVEL >= 1 && defined(__SSE2__)
+#if DEAL_II_COMPILER_VECTORIZATION_LEVEL >= 1
   template dealii::VectorizedArray<double, 2>
   pow(const dealii::VectorizedArray<double, 2>, const double);
 
