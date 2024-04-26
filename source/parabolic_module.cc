@@ -8,11 +8,11 @@
 
 #define INSTANTIATE(dim, stages)                                               \
   template void ParabolicModule<Description, dim, NUMBER>::step<stages>(       \
-      const vector_type &,                                                     \
+      const StateVector &,                                                     \
       const NUMBER,                                                            \
-      std::array<std::reference_wrapper<const vector_type>, stages>,           \
+      std::array<std::reference_wrapper<const StateVector>, stages>,           \
       const std::array<NUMBER, stages>,                                        \
-      vector_type &,                                                           \
+      StateVector &,                                                           \
       NUMBER) const
 
 namespace ryujin
