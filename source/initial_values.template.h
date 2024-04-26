@@ -178,11 +178,12 @@ namespace ryujin
             return state;
           };
 
-          flux_contributions_ = [this, &it](const dealii::Point<dim> &point) {
+          initial_precomputed_ = [this, &it](const dealii::Point<dim> &point) {
             const auto transformed_point =
                 affine_transform(initial_direction_, initial_position_, point);
             return it->initial_precomputations(transformed_point);
           };
+
           initialized = true;
           break;
         }
@@ -219,22 +220,23 @@ namespace ryujin
 
 
   template <typename Description, int dim, typename Number>
-  auto InitialValues<Description, dim, Number>::interpolate(Number t) const
-      -> vector_type
+  auto InitialValues<Description, dim, Number>::interpolate_state_vector(
+      Number t) const -> StateVector
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "InitialValues<dim, Number>::interpolate(t = " << t << ")"
-              << std::endl;
+    std::cout << "InitialValues<dim, Number>::interpolate_state_vector(t = "
+              << t << ")" << std::endl;
 #endif
 
-    vector_type U;
+    StateVector state;
+    auto &[U, precomputed, V] = state;
     U.reinit(offline_data_->vector_partitioner());
 
-    using scalar_type = typename OfflineData<dim, Number>::scalar_type;
+    using ScalarVector = typename OfflineData<dim, Number>::ScalarVector;
 
     const auto callable = [&](const auto &p) { return initial_state(p, t); };
 
-    scalar_type temp;
+    ScalarVector temp;
     const auto scalar_partitioner = offline_data_->scalar_partitioner();
     temp.reinit(scalar_partitioner);
 
@@ -273,31 +275,35 @@ namespace ryujin
     }
 
     U.update_ghost_values();
-    return U;
+    return state;
   }
 
 
   template <typename Description, int dim, typename Number>
   auto InitialValues<Description, dim, Number>::
-      interpolate_precomputed_initial_values() const
-      -> MultiComponentVector<Number, n_precomputed_values>
+      interpolate_initial_precomputed_vector() const -> InitialPrecomputedVector
   {
+#ifdef DEBUG_OUTPUT
+    std::cout << "InitialValues<dim, Number>::"
+              << "interpolate_initial_precomputed_vector()" << std::endl;
+#endif
+
     const auto scalar_partitioner = offline_data_->scalar_partitioner();
 
-    MultiComponentVector<Number, n_precomputed_values> precomputed;
+    InitialPrecomputedVector precomputed;
     precomputed.reinit_with_scalar_partitioner(scalar_partitioner);
 
-    if constexpr (n_precomputed_values == 0)
+    if constexpr (n_initial_precomputed_values == 0)
       return precomputed;
 
-    using scalar_type = typename OfflineData<dim, Number>::scalar_type;
+    using ScalarVector = typename OfflineData<dim, Number>::ScalarVector;
 
-    const auto callable = [&](const auto &p) { return flux_contributions(p); };
+    const auto callable = [&](const auto &p) { return initial_precomputed(p); };
 
-    scalar_type temp;
+    ScalarVector temp;
     temp.reinit(scalar_partitioner);
 
-    for (unsigned int d = 0; d < n_precomputed_values; ++d) {
+    for (unsigned int d = 0; d < n_initial_precomputed_values; ++d) {
       VectorTools::interpolate(offline_data_->dof_handler(),
                                to_function<dim, Number>(callable, d),
                                temp);

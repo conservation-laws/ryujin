@@ -46,7 +46,7 @@ namespace ryujin
    * Convenience wrapper that creates a (scalar) dealii::Function object
    * out of a (fairly general) callable object returning array-like values.
    * An example usage is given by the interpolation of initial values
-   * performed in InitialValues::interpolate();
+   * performed in InitialValues::interpolate_state_vector();
    * ```
    * for(unsigned int i = 0; i < problem_dimension; ++i)
    *   dealii::VectorTools::interpolate(

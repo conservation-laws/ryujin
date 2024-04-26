@@ -88,7 +88,7 @@ namespace ryujin
     pij_matrix_.reinit(sparsity_simd);
 
     precomputed_initial_ =
-        initial_values_->interpolate_precomputed_initial_values();
+        initial_values_->interpolate_precomputed_initial_vector();
   }
 
 

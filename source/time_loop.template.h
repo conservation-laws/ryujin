@@ -267,7 +267,7 @@ namespace ryujin
 
         print_info("interpolating initial values");
         U.reinit(offline_data_.vector_partitioner());
-        U = initial_values_.interpolate();
+        U = initial_values_.interpolate_state_vector();
 #ifdef DEBUG
         /* Poison constrained degrees of freedom: */
         const unsigned int n_owned = offline_data_.n_locally_owned();
@@ -313,7 +313,7 @@ namespace ryujin
         if (write_output_files) {
           output(U, base_name_ + "-solution", t, output_cycle);
           if (enable_compute_error_) {
-            const auto analytic = initial_values_.interpolate(t);
+            const auto analytic = initial_values_.interpolate_state_vector(t);
             output(
                 analytic, base_name_ + "-analytic_solution", t, output_cycle);
           }
@@ -427,7 +427,7 @@ namespace ryujin
     Number l1_norm = 0;
     Number l2_norm = 0;
 
-    const auto analytic = initial_values_.interpolate(t);
+    const auto analytic = initial_values_.interpolate_state_vector(t);
 
     scalar_type analytic_component;
     scalar_type error_component;
