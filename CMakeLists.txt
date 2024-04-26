@@ -110,7 +110,9 @@ set(CMAKE_CXX_STANDARD 20)
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
   string(APPEND DEAL_II_CXX_FLAGS " -fdiagnostics-color=always")
   string(REPLACE "-Qunused-arguments" "" DEAL_II_CXX_FLAGS "${DEAL_II_CXX_FLAGS}")
-  string(APPEND DEAL_II_CXX_FLAGS " -Wno-missing-braces -Wno-unknown-pragmas")
+  string(APPEND DEAL_II_CXX_FLAGS
+    " -Wno-changes-meaning -Wno-missing-braces -Wno-unknown-pragmas"
+    )
 
   if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 12.0)
     string(APPEND DEAL_II_CXX_FLAGS " -Wno-overloaded-virtual")
