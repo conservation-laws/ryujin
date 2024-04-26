@@ -39,6 +39,21 @@ set(CMAKE_BUILD_TYPE "Release" CACHE STRING
 deal_ii_initialize_cached_variables()
 deal_ii_query_git_information()
 
+# Work around a typo in the deal.II CMake configuration:
+if(EXISTS ${DEAL_II_GIT_CONFIG})
+  include(${DEAL_II_GIT_CONFIG})
+else()
+  string(REPLACE
+    "Git.cmake" "ConfigGit.cmake" DEAL_II_GIT_CONFIG "${DEAL_II_GIT_CONFIG}"
+    )
+  if(EXISTS ${DEAL_II_GIT_CONFIG})
+    include(${DEAL_II_GIT_CONFIG})
+  endif()
+endif()
+
+message(STATUS "  dealii: ${DEAL_II_GIT_REVISION}")
+message(STATUS "  ryujin: ${GIT_REVISION}")
+
 if(NOT DEAL_II_WITH_MPI OR NOT DEAL_II_WITH_P4EST)
   message(FATAL_ERROR
     "Need a deal.II library with mpi and p4est support enabled."
