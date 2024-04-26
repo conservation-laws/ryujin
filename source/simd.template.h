@@ -212,26 +212,6 @@ namespace ryujin
   }
 
 
-#else
-  template <>
-  // DEAL_II_ALWAYS_INLINE inline
-  float pow(const float x, const float b)
-  {
-    // Call generic std::pow() implementation
-    return std::pow(x, b);
-  }
-
-
-  template <>
-  // DEAL_II_ALWAYS_INLINE inline
-  double pow(const double x, const double b)
-  {
-    // Call generic std::pow() implementation
-    return std::pow(x, b);
-  }
-#endif
-
-
   template <typename T, std::size_t width>
   // DEAL_II_ALWAYS_INLINE inline
   dealii::VectorizedArray<T, width>
@@ -249,6 +229,47 @@ namespace ryujin
   {
     return from_vcl<T, width>(vcl::pow(to_vcl(x), to_vcl(b)));
   }
+
+#else
+
+  template <>
+  // DEAL_II_ALWAYS_INLINE inline
+  float pow(const float x, const float b)
+  {
+    // Call generic std::pow() implementation
+    return std::pow(x, b);
+  }
+
+
+  template <>
+  // DEAL_II_ALWAYS_INLINE inline
+  double pow(const double x, const double b)
+  {
+    // Call generic std::pow() implementation
+    return std::pow(x, b);
+  }
+
+
+  template <typename T, std::size_t width>
+  // DEAL_II_ALWAYS_INLINE inline
+  dealii::VectorizedArray<T, width>
+  pow(const dealii::VectorizedArray<T, width> x, const T b)
+  {
+    // Call generic deal.II implementation
+    return std::pow(x, b);
+  }
+
+
+  template <typename T, std::size_t width>
+  // DEAL_II_ALWAYS_INLINE inline
+  dealii::VectorizedArray<T, width>
+  pow(const dealii::VectorizedArray<T, width> x,
+      const dealii::VectorizedArray<T, width> b)
+  {
+    // Call generic deal.II implementation
+    return std::pow(x, b);
+  }
+#endif
 
 
   /*****************************************************************************
@@ -274,26 +295,6 @@ namespace ryujin
   }
 
 
-#else
-  template <>
-  // DEAL_II_ALWAYS_INLINE inline
-  float fast_pow(const float x, const float b, const Bias)
-  {
-    // Call generic std::pow() implementation
-    return std::pow(x, b);
-  }
-
-
-  template <>
-  // DEAL_II_ALWAYS_INLINE inline
-  double fast_pow(const double x, const double b, const Bias)
-  {
-    // Call generic std::pow() implementation
-    return std::pow(static_cast<float>(x), static_cast<float>(b));
-  }
-#endif
-
-
   template <typename T, std::size_t width>
   // DEAL_II_ALWAYS_INLINE inline
   dealii::VectorizedArray<T, width> fast_pow(
@@ -317,5 +318,48 @@ namespace ryujin
                                               FC<T, width>::to_float(to_vcl(b)),
                                               bias)));
   }
+
+#else
+
+  template <>
+  // DEAL_II_ALWAYS_INLINE inline
+  float fast_pow(const float x, const float b, const Bias)
+  {
+    // Call generic std::pow() implementation
+    return std::pow(x, b);
+  }
+
+
+  template <>
+  // DEAL_II_ALWAYS_INLINE inline
+  double fast_pow(const double x, const double b, const Bias)
+  {
+    // Call generic std::pow() implementation
+    return std::pow(static_cast<float>(x), static_cast<float>(b));
+  }
+
+
+  template <typename T, std::size_t width>
+  // DEAL_II_ALWAYS_INLINE inline
+  dealii::VectorizedArray<T, width>
+  fast_pow(const dealii::VectorizedArray<T, width> x, const T b, const Bias)
+  {
+    // Call generic deal.II implementation
+    return std::pow(x, b);
+  }
+
+
+  template <typename T, std::size_t width>
+  // DEAL_II_ALWAYS_INLINE inline
+  dealii::VectorizedArray<T, width>
+  fast_pow(const dealii::VectorizedArray<T, width> x,
+           const dealii::VectorizedArray<T, width> b,
+           const Bias)
+  {
+    // Call generic deal.II implementation
+    return std::pow(x, b);
+  }
+#endif
+
 
 } // namespace ryujin
