@@ -182,11 +182,6 @@ namespace ryujin
           std::array<std::string, problem_dimension>{"u"};
 
       /**
-       * The storage type used for a primitive state vector.
-       */
-      using primitive_state_type = dealii::Tensor<1, problem_dimension, Number>;
-
-      /**
        * An array holding all component names of the primitive state as a
        * string.
        */
@@ -470,8 +465,7 @@ namespace ryujin
        * Given a primitive state [rho, u_1, ..., u_d, p] return a conserved
        * state
        */
-      state_type
-      from_primitive_state(const primitive_state_type &primitive_state) const
+      state_type from_primitive_state(const state_type &primitive_state) const
       {
         return primitive_state;
       }
@@ -480,7 +474,7 @@ namespace ryujin
        * Given a conserved state return a primitive state [rho, u_1, ..., u_d,
        * p]
        */
-      primitive_state_type to_primitive_state(const state_type &state) const
+      state_type to_primitive_state(const state_type &state) const
       {
         return state;
       }

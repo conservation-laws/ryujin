@@ -210,11 +210,6 @@ namespace ryujin
       }();
 
       /**
-       * The storage type used for a primitive state vector.
-       */
-      using primitive_state_type = dealii::Tensor<1, problem_dimension, Number>;
-
-      /**
        * An array holding all component names of the primitive state as a
        * string.
        */
@@ -612,13 +607,12 @@ namespace ryujin
        * Given a primitive state [h, u_1, ..., u_d] return a conserved
        * state
        */
-      state_type
-      from_primitive_state(const primitive_state_type &primitive_state) const;
+      state_type from_primitive_state(const state_type &primitive_state) const;
 
       /**
        * Given a conserved state return a primitive state [h, u_1, ..., u_d]
        */
-      primitive_state_type to_primitive_state(const state_type &state) const;
+      state_type to_primitive_state(const state_type &state) const;
 
       /**
        * Transform the current state according to a  given operator
@@ -1281,7 +1275,7 @@ namespace ryujin
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
     HyperbolicSystemView<dim, Number>::from_primitive_state(
-        const primitive_state_type &primitive_state) const -> state_type
+        const state_type &primitive_state) const -> state_type
     {
       const auto &h = primitive_state[0];
 
@@ -1297,7 +1291,7 @@ namespace ryujin
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
     HyperbolicSystemView<dim, Number>::to_primitive_state(
-        const state_type &state) const -> primitive_state_type
+        const state_type &state) const -> state_type
     {
       const auto h_inverse = inverse_water_depth_sharp(state);
 
