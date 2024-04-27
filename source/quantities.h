@@ -7,11 +7,7 @@
 
 #include <compile_time_options.h>
 
-#include "convenience_macros.h"
-#include "initial_values.h"
 #include "offline_data.h"
-#include "simd.h"
-#include "sparse_matrix_simd.h"
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/timer.h>
@@ -31,30 +27,22 @@ namespace ryujin
   {
   public:
     /**
-     * @copydoc HyperbolicSystem
+     * @name Typedefs and constexpr constants
      */
-    using HyperbolicSystem = typename Description::HyperbolicSystem;
+    //@{
 
-    /**
-     * @copydoc HyperbolicSystemView
-     */
-    using View =
-        typename Description::template HyperbolicSystemView<dim, Number>;
+    using HyperbolicSystem = Description::HyperbolicSystem;
 
-    /**
-     * @copydoc HyperbolicSystemView::problem_dimension
-     */
-    static constexpr unsigned int problem_dimension = View::problem_dimension;
+    using View = Description::template HyperbolicSystemView<dim, Number>;
 
-    /**
-     * @copydoc HyperbolicSystemView::state_type
-     */
-    using state_type = typename View::state_type;
+    using state_type = View::state_type;
 
+    using StateVector = View::StateVector;
+
+    //@}
     /**
-     * Typedef for a MultiComponentVector storing the state U.
+     * @name Constructor and setup
      */
-    using vector_type = MultiComponentVector<Number, problem_dimension>;
 
     /**
      * Constructor.
@@ -82,12 +70,14 @@ namespace ryujin
      * Strang step) and accumulates statistics for quantities of interests
      * for all defined manifolds.
      */
-    void accumulate(const vector_type &U, const Number t);
+    void accumulate(const StateVector &state_vector, const Number t);
 
     /**
      * Write quantities of interest to designated output files.
      */
-    void write_out(const vector_type &U, const Number t, unsigned int cycle);
+    void write_out(const StateVector &state_vector,
+                   const Number t,
+                   unsigned int cycle);
 
     //@}
 
@@ -219,7 +209,7 @@ namespace ryujin
     std::string header_;
 
     template <typename point_type, typename value_type>
-    value_type internal_accumulate(const vector_type &U,
+    value_type internal_accumulate(const StateVector &state_vector,
                                    const std::vector<point_type> &interior_map,
                                    std::vector<value_type> &new_val);
 
