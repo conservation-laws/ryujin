@@ -130,8 +130,9 @@ namespace ryujin
         return view.from_initial_state(primitive);
       }
 
-      typename InitialState<Description, dim, Number>::precomputed_state_type
-      initial_precomputations(const dealii::Point<dim> &point) final
+      auto initial_precomputations(const dealii::Point<dim> &point) ->
+          typename InitialState<Description, dim, Number>::
+              initial_precomputed_type final
       {
         /* Compute bathymetry: */
         return {compute_bathymetry(point)};

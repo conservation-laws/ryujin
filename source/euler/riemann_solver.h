@@ -92,7 +92,6 @@ namespace ryujin
       using Parameters = RiemannSolverParameters<ScalarNumber>;
 
       //@}
-
       /**
        * @name Compute wavespeed estimates
        */
