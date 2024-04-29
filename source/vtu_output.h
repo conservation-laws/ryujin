@@ -16,8 +16,6 @@
 #include <deal.II/grid/intergrid_map.h>
 #include <deal.II/multigrid/mg_transfer_matrix_free.h>
 
-#include <future>
-
 namespace ryujin
 {
 
@@ -31,48 +29,33 @@ namespace ryujin
   template <typename Description, int dim, typename Number = double>
   class VTUOutput final : public dealii::ParameterAcceptor
   {
-    /**
-     * @copydoc HyperbolicSystem
-     */
-    using HyperbolicSystem = typename Description::HyperbolicSystem;
-
-    /**
-     * @copydoc HyperbolicSystemView
-     */
-    using View =
-        typename Description::template HyperbolicSystemView<dim, Number>;
-
   public:
     /**
-     * @copydoc HyperbolicSystem::problem_dimension
+     * @name Typedefs and constexpr constants
      */
-    static constexpr unsigned int problem_dimension = View::problem_dimension;
+    //@{
 
-    /**
-     * @copydoc HyperbolicSystem::state_type
-     */
-    using state_type = typename View::state_type;
+    using HyperbolicSystem = Description::HyperbolicSystem;
 
-    /**
-     * @copydoc HyperbolicSystem::n_precomputed_values
-     */
-    static constexpr unsigned int n_precomputed_values =
-        View::n_precomputed_values;
+    using View = Description::template HyperbolicSystemView<dim, Number>;
 
-    /**
-     * @copydoc OfflineData::scalar_type
-     */
-    using scalar_type = typename OfflineData<dim, Number>::scalar_type;
+    static constexpr auto problem_dimension = View::problem_dimension;
 
-    /**
-     * Typedef for a MultiComponentVector storing the state U.
-     */
-    using vector_type = MultiComponentVector<Number, problem_dimension>;
+    using state_type = View::state_type;
 
+    static constexpr auto n_precomputed_values = View::n_precomputed_values;
+
+    using precomputed_type = View::precomputed_type;
+
+    using StateVector = View::StateVector;
+
+    using ScalarVector = ScalarVector<Number>;
+
+    //@}
     /**
-     * Typedef for a MultiComponentVector storing precomputed values.
+     * @name Constructor and setup
      */
-    using precomputed_type = MultiComponentVector<Number, n_precomputed_values>;
+    //@{
 
     /**
      * Constructor.
@@ -110,8 +93,7 @@ namespace ryujin
      *
      * The function requires MPI communication and is not reentrant.
      */
-    void schedule_output(const vector_type &U,
-                         const precomputed_type &precomputed_values,
+    void schedule_output(const StateVector &state_vector,
                          std::string name,
                          Number t,
                          unsigned int cycle,
@@ -154,12 +136,12 @@ namespace ryujin
 
     bool need_to_prepare_step_;
 
-    std::vector<scalar_type> quantities_;
+    std::vector<ScalarVector> quantities_;
 
-    std::vector<std::tuple<std::string /*name*/,
-                           std::function<void(scalar_type & /*result*/,
-                                              const vector_type & /*U*/,
-                                              const precomputed_type &)>>>
+    std::vector<
+        std::tuple<std::string /*name*/,
+                   std::function<void(ScalarVector & /*result*/,
+                                      const StateVector & /*state_vector*/)>>>
         quantities_mapping_;
 
     //@}
