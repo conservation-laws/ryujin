@@ -193,7 +193,7 @@ namespace ryujin
    *                           pow() implementation:                           *
    ****************************************************************************/
 
-#if 0
+#if DEAL_II_COMPILER_VECTORIZATION_LEVEL >= 1 && defined(__SSE2__)
   template <>
   // DEAL_II_ALWAYS_INLINE inline
   float pow(const float x, const float b)
@@ -276,7 +276,7 @@ namespace ryujin
    *                         Fast pow() implementation:                        *
    ****************************************************************************/
 
-#if 0
+#if DEAL_II_COMPILER_VECTORIZATION_LEVEL >= 1 && defined(__SSE2__)
   template <>
   // DEAL_II_ALWAYS_INLINE inline
   float fast_pow(const float x, const float b, const Bias bias)
