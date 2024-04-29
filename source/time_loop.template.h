@@ -7,7 +7,6 @@
 
 #include "checkpointing.h"
 #include "scope.h"
-#include "simd.h"
 #include "solution_transfer.h"
 #include "time_loop.h"
 #include "version_info.h"
@@ -207,7 +206,7 @@ namespace ryujin
 
     Number t = 0.;
     unsigned int output_cycle = 0;
-    vector_type U;
+    StateVector state_vector;
 
     /* Prepare data structures: */
 
@@ -235,7 +234,12 @@ namespace ryujin
         prepare_compute_kernels();
 
         print_info("resuming computation: loading state vector");
+        auto &U = std::get<0>(state_vector);
+        auto &precomputed = std::get<1>(state_vector);
         U.reinit(offline_data_.vector_partitioner());
+        precomputed.reinit_with_scalar_partitioner(
+            offline_data_.scalar_partitioner());
+
         Checkpointing::load_state_vector(
             offline_data_, base_name_, U, t, output_cycle, mpi_communicator_);
 
@@ -266,20 +270,26 @@ namespace ryujin
         prepare_compute_kernels();
 
         print_info("interpolating initial values");
-        U.reinit(offline_data_.vector_partitioner());
-        U = initial_values_.interpolate_state_vector();
+        state_vector = initial_values_.interpolate_state_vector();
 #ifdef DEBUG
         /* Poison constrained degrees of freedom: */
-        const unsigned int n_owned = offline_data_.n_locally_owned();
-        const auto &partitioner = offline_data_.scalar_partitioner();
-        for (unsigned int i = 0; i < n_owned; ++i) {
-          if (offline_data_.affine_constraints().is_constrained(
-                  partitioner->local_to_global(i)))
-            U.write_tensor(dealii::Tensor<1, dim + 2, Number>() *
-                               std::numeric_limits<Number>::signaling_NaN(),
-                           i);
+        {
+          const unsigned int n_owned = offline_data_.n_locally_owned();
+          const auto &partitioner = offline_data_.scalar_partitioner();
+          auto &U = std::get<0>(state_vector);
+          for (unsigned int i = 0; i < n_owned; ++i) {
+            if (offline_data_.affine_constraints().is_constrained(
+                    partitioner->local_to_global(i)))
+              U.write_tensor(dealii::Tensor<1, dim + 2, Number>() *
+                                 std::numeric_limits<Number>::signaling_NaN(),
+                             i);
+          }
         }
 #endif
+
+        auto &precomputed = std::get<1>(state_vector);
+        precomputed.reinit_with_scalar_partitioner(
+            offline_data_.scalar_partitioner());
       }
     }
 
@@ -304,16 +314,19 @@ namespace ryujin
       if (enable_compute_quantities_) {
         Scope scope(computing_timer_,
                     "time step [X] 1 - accumulate quantities");
-        quantities_.accumulate(U, t);
+        quantities_.accumulate(state_vector, t);
       }
 
       /* Perform output: */
 
       if (t >= output_cycle * output_granularity_) {
         if (write_output_files) {
-          output(U, base_name_ + "-solution", t, output_cycle);
+          output(state_vector, base_name_ + "-solution", t, output_cycle);
           if (enable_compute_error_) {
-            const auto analytic = initial_values_.interpolate_state_vector(t);
+            auto analytic = initial_values_.interpolate_state_vector(t);
+            auto &precomputed = std::get<1>(analytic);
+            precomputed.reinit_with_scalar_partitioner(
+                offline_data_.scalar_partitioner());
             output(
                 analytic, base_name_ + "-analytic_solution", t, output_cycle);
           }
@@ -323,7 +336,7 @@ namespace ryujin
             (output_cycle > 0)) {
           Scope scope(computing_timer_,
                       "time step [X] 2 - write out quantities");
-          quantities_.write_out(U, t, output_cycle);
+          quantities_.write_out(state_vector, t, output_cycle);
         }
         ++output_cycle;
       }
@@ -350,12 +363,12 @@ namespace ryujin
               cell->set_refine_flag();
             triangulation.prepare_coarsening_and_refinement();
 
-            solution_transfer.prepare_for_interpolation(U);
+            solution_transfer.prepare_for_interpolation(state_vector);
 
             triangulation.execute_coarsening_and_refinement();
             prepare_compute_kernels();
 
-            solution_transfer.interpolate(U);
+            solution_transfer.interpolate(state_vector);
 
             computing_timer_["time loop"].start();
             return true;
@@ -369,7 +382,7 @@ namespace ryujin
 
       /* Do a time step: */
 
-      const auto tau = time_integrator_.step(U, t);
+      const auto tau = time_integrator_.step(state_vector, t);
       t += tau;
 
       /* Print and record cycle statistics: */
@@ -402,7 +415,7 @@ namespace ryujin
 
     if (enable_compute_error_) {
       /* Output final error: */
-      compute_error(U, t);
+      compute_error(state_vector, t);
     }
 
 #ifdef WITH_VALGRIND
@@ -413,8 +426,7 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   void TimeLoop<Description, dim, Number>::compute_error(
-      const typename TimeLoop<Description, dim, Number>::vector_type &U,
-      const Number t)
+      const StateVector &state_vector, const Number t)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeLoop<dim, Number>::compute_error()" << std::endl;
@@ -429,8 +441,11 @@ namespace ryujin
 
     const auto analytic = initial_values_.interpolate_state_vector(t);
 
-    scalar_type analytic_component;
-    scalar_type error_component;
+    const auto &U = std::get<0>(state_vector);
+    const auto &analytic_U = std::get<0>(analytic);
+
+    ScalarVector analytic_component;
+    ScalarVector error_component;
     analytic_component.reinit(offline_data_.scalar_partitioner());
     error_component.reinit(offline_data_.scalar_partitioner());
 
@@ -447,7 +462,7 @@ namespace ryujin
 
       const auto index = std::distance(std::begin(names), pos);
 
-      analytic.extract_component(analytic_component, index);
+      analytic_U.extract_component(analytic_component, index);
 
       /* Compute norms of analytic solution: */
 
@@ -553,11 +568,10 @@ namespace ryujin
 
 
   template <typename Description, int dim, typename Number>
-  void TimeLoop<Description, dim, Number>::output(
-      const typename TimeLoop<Description, dim, Number>::vector_type &U,
-      const std::string &name,
-      Number t,
-      unsigned int cycle)
+  void TimeLoop<Description, dim, Number>::output(StateVector &state_vector,
+                                                  const std::string &name,
+                                                  Number t,
+                                                  unsigned int cycle)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeLoop<dim, Number>::output(t = " << t << ")" << std::endl;
@@ -579,7 +593,7 @@ namespace ryujin
       Scope scope(computing_timer_, "time step [X] 3 - output vtu");
       print_info("scheduling output");
 
-      postprocessor_.compute(U);
+      postprocessor_.compute(state_vector);
       /*
        * Workaround: Manually reset bounds during the first output cycle
        * (which is often just a uniform flow field) to obtain a better
@@ -588,25 +602,16 @@ namespace ryujin
       if (cycle == 0)
         postprocessor_.reset_bounds();
 
-      precomputed_type precomputed_values;
-
       if (vtu_output_.need_to_prepare_step()) {
-        /*
-         * In case we output a precomputed value or alpha we have to run
-         * Steps 0 - 2 of the explicit Euler step:
-         */
-        const auto &scalar_partitioner = offline_data_.scalar_partitioner();
-        precomputed_values.reinit_with_scalar_partitioner(scalar_partitioner);
-
-        vector_type dummy;
+        StateVector dummy;
         hyperbolic_module_.precompute_only_ = true;
         hyperbolic_module_.template step<0>(
-            U, {}, {}, {}, dummy, precomputed_values, Number(0.));
+            state_vector, {}, {}, dummy, Number(0.));
         hyperbolic_module_.precompute_only_ = false;
       }
 
       vtu_output_.schedule_output(
-          U, precomputed_values, name, t, cycle, do_full_output, do_levelsets);
+          state_vector, name, t, cycle, do_full_output, do_levelsets);
     }
 
     /* Checkpointing: */
@@ -614,6 +619,7 @@ namespace ryujin
       Scope scope(computing_timer_, "time step [X] 4 - checkpointing");
       print_info("scheduling checkpointing");
 
+      const auto &U = std::get<0>(state_vector);
       Checkpointing::write_checkpoint(
           offline_data_, base_name_, U, t, cycle, mpi_communicator_);
     }

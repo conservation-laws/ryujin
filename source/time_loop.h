@@ -21,8 +21,6 @@
 #include <deal.II/base/timer.h>
 
 #include <fstream>
-#include <future>
-#include <sstream>
 
 namespace ryujin
 {
@@ -37,47 +35,33 @@ namespace ryujin
   {
   public:
     /**
-     * @copydoc HyperbolicSystem
+     * @name Typedefs and constexpr constants
      */
-    using HyperbolicSystem = typename Description::HyperbolicSystem;
+    //@{
 
+    using HyperbolicSystem = Description::HyperbolicSystem;
+
+    using View = Description::template HyperbolicSystemView<dim, Number>;
+
+    using ParabolicSystem = Description::ParabolicSystem;
+
+    using ParabolicSolver = Description::template ParabolicSolver<dim, Number>;
+
+    using ScalarNumber = View::ScalarNumber;
+
+    static constexpr auto problem_dimension = View::problem_dimension;
+
+    static constexpr auto n_precomputed_values = View::n_precomputed_values;
+
+    using StateVector = View::StateVector;
+
+    using ScalarVector = ryujin::ScalarVector<Number>;
+
+    //@}
     /**
-     * @copydoc ParabolicSystem
+     * @name Constructor and setup
      */
-    using ParabolicSystem = typename Description::ParabolicSystem;
-
-    /**
-     * @copydoc HyperbolicSystemView
-     */
-    using View =
-        typename Description::template HyperbolicSystemView<dim, Number>;
-
-    /**
-     * @copydoc HyperbolicSystem::problem_dimension
-     */
-    static constexpr unsigned int problem_dimension = View::problem_dimension;
-
-    /**
-     * @copydoc HyperbolicSystem::n_precomputed_values
-     */
-    static constexpr unsigned int n_precomputed_values =
-        View::n_precomputed_values;
-
-
-    /**
-     * @copydoc OfflineData::scalar_type
-     */
-    using scalar_type = typename OfflineData<dim, Number>::scalar_type;
-
-    /**
-     * Typedef for a MultiComponentVector storing the state U.
-     */
-    using vector_type = MultiComponentVector<Number, problem_dimension>;
-
-    /**
-     * Typedef for a MultiComponentVector storing precomputed values.
-     */
-    using precomputed_type = MultiComponentVector<Number, n_precomputed_values>;
+    //@{
 
     /**
      * Constructor.
@@ -95,9 +79,9 @@ namespace ryujin
      */
     //@{
 
-    void compute_error(const vector_type &U, Number t);
+    void compute_error(const StateVector &state_vector, Number t);
 
-    void output(const vector_type &U,
+    void output(StateVector &state_vector,
                 const std::string &name,
                 Number t,
                 unsigned int cycle);

@@ -72,8 +72,8 @@ namespace ryujin
 
         const auto &scalar_partitioner = offline_data.scalar_partitioner();
 
-        using scalar_type = typename OfflineData<dim, Number>::scalar_type;
-        std::array<scalar_type, n_comp> state_vector;
+        using ScalarVector = ryujin::ScalarVector<Number>;
+        std::array<ScalarVector, n_comp> state_vector;
         for (auto &it : state_vector) {
           it.reinit(scalar_partitioner);
         }
@@ -81,10 +81,10 @@ namespace ryujin
         /* Create SolutionTransfer object, attach state vector and deserialize:
          */
 
-        dealii::parallel::distributed::SolutionTransfer<dim, scalar_type>
+        dealii::parallel::distributed::SolutionTransfer<dim, ScalarVector>
             solution_transfer(dof_handler);
 
-        std::vector<scalar_type *> ptr_state;
+        std::vector<ScalarVector *> ptr_state;
         std::transform(state_vector.begin(),
                        state_vector.end(),
                        std::back_inserter(ptr_state),
@@ -158,8 +158,8 @@ namespace ryujin
 
         const auto &scalar_partitioner = offline_data.scalar_partitioner();
 
-        using scalar_type = typename OfflineData<dim, Number>::scalar_type;
-        std::array<scalar_type, n_comp> state_vector;
+        using ScalarVector = ryujin::ScalarVector<Number>;
+        std::array<ScalarVector, n_comp> state_vector;
         unsigned int d = 0;
         for (auto &it : state_vector) {
           it.reinit(scalar_partitioner);
@@ -168,10 +168,10 @@ namespace ryujin
 
         /* Create SolutionTransfer object, attach state vector and write out: */
 
-        dealii::parallel::distributed::SolutionTransfer<dim, scalar_type>
+        dealii::parallel::distributed::SolutionTransfer<dim, ScalarVector>
             solution_transfer(dof_handler);
 
-        std::vector<const scalar_type *> ptr_state;
+        std::vector<const ScalarVector *> ptr_state;
         std::transform(state_vector.begin(),
                        state_vector.end(),
                        std::back_inserter(ptr_state),
