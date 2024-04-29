@@ -96,46 +96,27 @@ namespace ryujin
     {
     public:
       /**
-       * @copydoc HyperbolicSystemView
+       * @name Typedefs and constexpr constants
        */
+      //@{
+
       using View = HyperbolicSystemView<dim, Number>;
 
-      /**
-       * @copydoc HyperbolicSystemView::problem_dimension
-       */
-      static constexpr unsigned int problem_dimension = View::problem_dimension;
+      using ScalarNumber = View::ScalarNumber;
 
-      /**
-       * @copydoc HyperbolicSystemView::state_type
-       */
-      using state_type = typename View::state_type;
+      static constexpr auto problem_dimension = View::problem_dimension;
 
-      /**
-       * @copydoc HyperbolicSystemView::n_precomputed_values
-       */
-      static constexpr unsigned int n_precomputed_values =
-          View::n_precomputed_values;
+      using state_type = View::state_type;
 
-      /**
-       * @copydoc HyperbolicSystemView::precomputed_state_type
-       */
-      using precomputed_state_type = typename View::precomputed_state_type;
+      using flux_contribution_type = View::flux_contribution_type;
 
-      /**
-       * @copydoc HyperbolicSystemView::flux_contribution_type
-       */
-      using flux_contribution_type = typename View::flux_contribution_type;
+      using precomputed_type = View::precomputed_type;
 
-      /**
-       * @copydoc HyperbolicSystemView::ScalarNumber
-       */
-      using ScalarNumber = typename View::ScalarNumber;
+      using PrecomputedVector = View::PrecomputedVector;
 
-      /**
-       * @copydoc LimiterParameters
-       */
       using Parameters = LimiterParameters<ScalarNumber>;
 
+      //@}
       /**
        * @name Stencil-based computation of bounds
        *
@@ -170,8 +151,7 @@ namespace ryujin
        */
       Limiter(const HyperbolicSystem &hyperbolic_system,
               const Parameters &parameters,
-              const MultiComponentVector<ScalarNumber, n_precomputed_values>
-                  &precomputed_values)
+              const PrecomputedVector &precomputed_values)
           : hyperbolic_system(hyperbolic_system)
           , parameters(parameters)
           , precomputed_values(precomputed_values)
@@ -247,9 +227,7 @@ namespace ryujin
 
       const HyperbolicSystem &hyperbolic_system;
       const Parameters &parameters;
-
-      const MultiComponentVector<ScalarNumber, n_precomputed_values>
-          &precomputed_values;
+      const PrecomputedVector &precomputed_values;
 
       state_type U_i;
 
@@ -313,8 +291,7 @@ namespace ryujin
       rho_max = std::max(rho_max, rho_ij_bar);
 
       const auto &[s_j, eta_j] =
-          precomputed_values
-              .template get_tensor<Number, precomputed_state_type>(js);
+          precomputed_values.template get_tensor<Number, precomputed_type>(js);
       s_min = std::min(s_min, s_j);
 
       /* Relaxation: */
