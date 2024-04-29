@@ -71,13 +71,13 @@ namespace ryujin
 
       static_assert(stages == 0, "high order fluxes are not implemented");
 
-      /* FIXME: This needs to be refactored really really badly. */
-      const auto &[old_U, old_precomputed, old_V] = old_state_vector;
-      auto &[new_U, new_precomputed, new_V] = new_state_vector;
-
       const bool reinit_gmg = cycle_++ % 4 == 0;
-      parabolic_solver_.backward_euler_step(
-          old_U, old_t, new_U, tau, id_violation_strategy_, reinit_gmg);
+      parabolic_solver_.backward_euler_step(old_state_vector,
+                                            old_t,
+                                            new_state_vector,
+                                            tau,
+                                            id_violation_strategy_,
+                                            reinit_gmg);
       n_restarts_ = parabolic_solver_.n_restarts();
       n_warnings_ = parabolic_solver_.n_warnings();
     }

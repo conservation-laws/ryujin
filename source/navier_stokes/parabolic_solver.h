@@ -113,37 +113,33 @@ namespace ryujin
     {
     public:
       /**
-       * @copydoc HyperbolicSystem
+       * @name Typedefs and constexpr constants
        */
-      using HyperbolicSystem = typename Description::HyperbolicSystem;
+      //@{
 
-      /**
-       * @copydoc ParabolicSystem
-       */
-      using ParabolicSystem = typename Description::ParabolicSystem;
+      using HyperbolicSystem = Description::HyperbolicSystem;
 
-      /**
-       * @copydoc HyperbolicSystemView
-       */
-      using View =
-          typename Description::template HyperbolicSystemView<dim, Number>;
+      using View = Description::template HyperbolicSystemView<dim, Number>;
 
-      /**
-       * @copydoc OfflineData::scalar_type
-       */
-      using scalar_type = typename OfflineData<dim, Number>::scalar_type;
+      using ParabolicSystem = Description::ParabolicSystem;
 
-      /**
-       * @copydoc HyperbolicSystemView::vector_type
-       */
-      using vector_type = typename View::vector_type;
+      using ScalarNumber = View::ScalarNumber;
 
+      static constexpr auto problem_dimension = View::problem_dimension;
+
+      using state_type = View::state_type;
+
+      using StateVector = View::StateVector;
+
+      using ScalarVector = ScalarVector<Number>;
+
+      using BlockVector = BlockVector<Number>;
+
+      //@}
       /**
-       * A distributed block vector used for temporary storage of the
-       * velocity field.
+       * @name Constructor and setup
        */
-      using block_vector_type =
-          dealii::LinearAlgebra::distributed::BlockVector<Number>;
+      //@{
 
       /**
        * Constructor.
@@ -164,19 +160,20 @@ namespace ryujin
        */
       void prepare();
 
+      //@}
       /**
        * @name Functions for performing implicit time steps
        */
       //@{
 
       /**
-       * Given a reference to a previous state vector @p old_U at time @p
-       * old_t and a time-step size @p tau perform an implicit backward
-       * Euler step (and store the result in @p new_U).
+       * Given a reference to a previous state vector @p old_state_vector
+       * at time @p old_t and a time-step size @p tau perform an implicit
+       * backward Euler step (and store the result in @p new_state_vector).
        */
-      void backward_euler_step(const vector_type &old_U,
+      void backward_euler_step(const StateVector &old_state_vector,
                                const Number old_t,
-                               vector_type &new_U,
+                               StateVector &new_state_vector,
                                Number tau,
                                const IDViolationStrategy id_violation_strategy,
                                const bool reinitialize_gmg) const;
@@ -252,11 +249,11 @@ namespace ryujin
 
       mutable dealii::MatrixFree<dim, Number> matrix_free_;
 
-      mutable block_vector_type velocity_;
-      mutable block_vector_type velocity_rhs_;
-      mutable scalar_type internal_energy_;
-      mutable scalar_type internal_energy_rhs_;
-      mutable scalar_type density_;
+      mutable BlockVector velocity_;
+      mutable BlockVector velocity_rhs_;
+      mutable ScalarVector internal_energy_;
+      mutable ScalarVector internal_energy_rhs_;
+      mutable ScalarVector density_;
 
       mutable dealii::MGLevelObject<dealii::MatrixFree<dim, float>>
           level_matrix_free_;
