@@ -83,51 +83,27 @@ namespace ryujin
     {
     public:
       /**
-       * @copydoc HyperbolicSystemView
+       * @name Typedefs and constexpr constants
        */
+      //@{
+
       using View = HyperbolicSystemView<dim, Number>;
 
-      /**
-       * @copydoc HyperbolicSystemView::problem_dimension
-       */
-      static constexpr unsigned int problem_dimension = View::problem_dimension;
+      using ScalarNumber = View::ScalarNumber;
 
-      /**
-       * @copydoc HyperbolicSystemView::state_type
-       */
-      using state_type = typename View::state_type;
+      static constexpr auto problem_dimension = View::problem_dimension;
 
-      /**
-       * @copydoc HyperbolicSystemView::n_precomputed_values
-       */
-      static constexpr unsigned int n_precomputed_values =
-          View::n_precomputed_values;
+      using state_type = View::state_type;
 
-      /**
-       * @copydoc HyperbolicSystemView::precomputed_state_type
-       */
-      using precomputed_state_type = typename View::precomputed_state_type;
+      using flux_type = View::flux_type;
 
-      /**
-       * @copydoc HyperbolicSystemView::flux_type
-       */
-      using flux_type = typename View::flux_type;
+      using precomputed_type = View::precomputed_type;
 
-      /**
-       * @copydoc HyperbolicSystemView::flux_type
-       */
-      using flux_contribution_type = typename View::flux_contribution_type;
+      using PrecomputedVector = View::PrecomputedVector;
 
-      /**
-       * @copydoc HyperbolicSystemView::ScalarNumber
-       */
-      using ScalarNumber = typename View::ScalarNumber;
-
-      /**
-       * @copydoc IndicatorParameters
-       */
       using Parameters = IndicatorParameters<ScalarNumber>;
 
+      //@}
       /**
        * @name Stencil-based computation of indicators
        *
@@ -152,8 +128,7 @@ namespace ryujin
        */
       Indicator(const HyperbolicSystem &hyperbolic_system,
                 const Parameters &parameters,
-                const MultiComponentVector<ScalarNumber, n_precomputed_values>
-                    &precomputed_values)
+                const PrecomputedVector &precomputed_values)
           : hyperbolic_system(hyperbolic_system)
           , parameters(parameters)
           , precomputed_values(precomputed_values)
@@ -189,9 +164,7 @@ namespace ryujin
 
       const HyperbolicSystem &hyperbolic_system;
       const Parameters &parameters;
-
-      const MultiComponentVector<ScalarNumber, n_precomputed_values>
-          &precomputed_values;
+      const PrecomputedVector &precomputed_values;
 
 
       Number rho_i_inverse = 0.;
@@ -227,8 +200,7 @@ namespace ryujin
       /* entropy viscosity commutator: */
 
       const auto &[p_i, gamma_min_i, s_i, new_eta_i] =
-          precomputed_values
-              .template get_tensor<Number, precomputed_state_type>(i);
+          precomputed_values.template get_tensor<Number, precomputed_type>(i);
 
       gamma_min = gamma_min_i;
 

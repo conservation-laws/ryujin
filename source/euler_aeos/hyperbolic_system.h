@@ -14,6 +14,7 @@
 #include <openmp.h>
 #include <patterns_conversion.h>
 #include <simd.h>
+#include <state_vector.h>
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/tensor.h>
@@ -280,7 +281,7 @@ namespace ryujin
     public:
       //@}
       /**
-       * @name Types and compile time constants
+       * @name Types and constexpr constants
        */
       //@{
 
@@ -290,14 +291,20 @@ namespace ryujin
       static constexpr unsigned int problem_dimension = 2 + dim;
 
       /**
-       * The storage type used for a (conserved) state \f$\boldsymbol U\f$.
+       * Storage type for a (conserved) state vector \f$\boldsymbol U\f$.
        */
       using state_type = dealii::Tensor<1, problem_dimension, Number>;
 
       /**
-       * MulticomponentVector for storing a vector of conserved states:
+       * Storage type for the flux \f$\mathbf{f}\f$.
        */
-      using vector_type = MultiComponentVector<ScalarNumber, problem_dimension>;
+      using flux_type =
+          dealii::Tensor<1, problem_dimension, dealii::Tensor<1, dim, Number>>;
+
+      /**
+       * The storage type used for flux contributions.
+       */
+      using flux_contribution_type = flux_type;
 
       /**
        * An array holding all component names of the conserved state as a
@@ -315,10 +322,8 @@ namespace ryujin
       }();
 
       /**
-       * An array holding all component names of the primitive state
-       * \f$[\rho,\vec v, e]\f$ as a string.
-       *
-       * @note The last component ist the <b>specific</b> internal energy
+       * An array holding all component names of the primitive state as a
+       * string.
        */
       static inline const auto primitive_component_names =
           []() -> std::array<std::string, problem_dimension> {
@@ -332,47 +337,6 @@ namespace ryujin
       }();
 
       /**
-       * The storage type used for the flux \f$\mathbf{f}\f$.
-       */
-      using flux_type =
-          dealii::Tensor<1, problem_dimension, dealii::Tensor<1, dim, Number>>;
-
-      /**
-       * The storage type used for flux contributions.
-       */
-      using flux_contribution_type = flux_type;
-
-      //@}
-      /**
-       * @name Precomputed quantities
-       */
-      //@{
-
-      /**
-       * The number of precomputed initial values.
-       */
-      static constexpr unsigned int n_precomputed_initial_values = 0;
-
-      /**
-       * Array type used for precomputed initial values.
-       */
-      using precomputed_initial_state_type =
-          std::array<Number, n_precomputed_initial_values>;
-
-      /**
-       * MulticomponentVector for storing a vector of precomputed initial
-       * states:
-       */
-      using precomputed_initial_vector_type =
-          MultiComponentVector<ScalarNumber, n_precomputed_initial_values>;
-
-      /**
-       * An array holding all component names of the precomputed values.
-       */
-      static inline const auto precomputed_initial_names =
-          std::array<std::string, n_precomputed_initial_values>{};
-
-      /**
        * The number of precomputed values.
        */
       static constexpr unsigned int n_precomputed_values = 4;
@@ -380,13 +344,7 @@ namespace ryujin
       /**
        * Array type used for precomputed values.
        */
-      using precomputed_state_type = std::array<Number, n_precomputed_values>;
-
-      /**
-       * MulticomponentVector for storing a vector of precomputed states:
-       */
-      using precomputed_vector_type =
-          MultiComponentVector<ScalarNumber, n_precomputed_values>;
+      using precomputed_type = std::array<Number, n_precomputed_values>;
 
       /**
        * An array holding all component names of the precomputed values.
@@ -397,6 +355,48 @@ namespace ryujin
                "surrogate_gamma",
                "surrogate_specific_entropy",
                "surrogate_harten_entropy"}};
+
+      /**
+       * The number of precomputed initial values.
+       */
+      static constexpr unsigned int n_initial_precomputed_values = 0;
+
+      /**
+       * Array type used for precomputed initial values.
+       */
+      using initial_precomputed_type =
+          std::array<Number, n_initial_precomputed_values>;
+
+      /**
+       * An array holding all component names of the precomputed values.
+       */
+      static inline const auto initial_precomputed_names =
+          std::array<std::string, n_initial_precomputed_values>{};
+
+      /**
+       * A compound state vector.
+       */
+      using StateVector =
+          StateVector<ScalarNumber, problem_dimension, n_precomputed_values>;
+
+      /**
+       * MulticomponentVector for storing a vector of precomputed states:
+       */
+      using PrecomputedVector =
+          MultiComponentVector<ScalarNumber, n_precomputed_values>;
+
+      /**
+       * MulticomponentVector for storing a vector of precomputed initial
+       * states:
+       */
+      using InitialPrecomputedVector =
+          MultiComponentVector<ScalarNumber, n_initial_precomputed_values>;
+
+      //@}
+      /**
+       * @name Computing precomputed quantities
+       */
+      //@{
 
       /**
        * The number of precomputation cycles.
@@ -410,9 +410,8 @@ namespace ryujin
       template <typename DISPATCH, typename SPARSITY>
       void precomputation_loop(unsigned int cycle,
                                const DISPATCH &dispatch_check,
-                               precomputed_vector_type &precomputed_values,
                                const SPARSITY &sparsity_simd,
-                               const vector_type &U,
+                               StateVector &state_vector,
                                unsigned int left,
                                unsigned int right) const;
 
@@ -621,14 +620,14 @@ namespace ryujin
        * For the Euler equations we simply compute <code>f(U_i)</code>.
        */
       flux_contribution_type
-      flux_contribution(const precomputed_vector_type &pv,
-                        const precomputed_initial_vector_type &piv,
+      flux_contribution(const PrecomputedVector &pv,
+                        const InitialPrecomputedVector &piv,
                         const unsigned int i,
                         const state_type &U_i) const;
 
       flux_contribution_type
-      flux_contribution(const precomputed_vector_type &pv,
-                        const precomputed_initial_vector_type &piv,
+      flux_contribution(const PrecomputedVector &pv,
+                        const InitialPrecomputedVector &piv,
                         const unsigned int *js,
                         const state_type &U_j) const;
 
@@ -659,12 +658,12 @@ namespace ryujin
       /** We do not have source terms */
       static constexpr bool have_source_terms = false;
 
-      state_type nodal_source(const precomputed_vector_type &pv,
+      state_type nodal_source(const PrecomputedVector &pv,
                               const unsigned int i,
                               const state_type &U_i,
                               const ScalarNumber tau) const = delete;
 
-      state_type nodal_source(const precomputed_vector_type &pv,
+      state_type nodal_source(const PrecomputedVector &pv,
                               const unsigned int *js,
                               const state_type &U_j,
                               const ScalarNumber tau) const = delete;
@@ -809,13 +808,15 @@ namespace ryujin
     HyperbolicSystemView<dim, Number>::precomputation_loop(
         unsigned int cycle [[maybe_unused]],
         const DISPATCH &dispatch_check,
-        precomputed_vector_type &precomputed_values,
         const SPARSITY &sparsity_simd,
-        const vector_type &U,
+        StateVector &state_vector,
         unsigned int left,
         unsigned int right) const
     {
       Assert(cycle == 0 || cycle == 1, dealii::ExcInternalError());
+
+      const auto &U = std::get<0>(state_vector);
+      auto &precomputed = std::get<1>(state_vector);
 
       /* We are inside a thread parallel context */
 
@@ -870,13 +871,12 @@ namespace ryujin
 
             dispatch_check(i);
 
-            using PT = precomputed_state_type;
+            using PT = precomputed_type;
             const auto U_i = U.template get_tensor<Number>(offset + i);
             const auto p_i = get_entry<Number>(p, i);
             const auto gamma_i = surrogate_gamma(U_i, p_i);
             const PT prec_i{p_i, gamma_i, Number(0.), Number(0.)};
-            precomputed_values.template write_tensor<Number>(prec_i,
-                                                             offset + i);
+            precomputed.template write_tensor<Number>(prec_i, offset + i);
           }
         } else {
           /*
@@ -899,9 +899,9 @@ namespace ryujin
             const auto p_i = eos_pressure(rho_i, e_i);
 
             const auto gamma_i = surrogate_gamma(U_i, p_i);
-            using PT = precomputed_state_type;
+            using PT = precomputed_type;
             const PT prec_i{p_i, gamma_i, Number(0.), Number(0.)};
-            precomputed_values.template write_tensor<Number>(prec_i, i);
+            precomputed.template write_tensor<Number>(prec_i, i);
           }
         } /* prefer_vector_interface */
       }   /* cycle == 0 */
@@ -909,7 +909,7 @@ namespace ryujin
       if (cycle == 1) {
         RYUJIN_OMP_FOR
         for (unsigned int i = left; i < right; i += stride_size) {
-          using PT = precomputed_state_type;
+          using PT = precomputed_type;
 
           /* Skip constrained degrees of freedom: */
           const unsigned int row_length = sparsity_simd.row_length(i);
@@ -919,7 +919,7 @@ namespace ryujin
           dispatch_check(i);
 
           const auto U_i = U.template get_tensor<Number>(i);
-          auto prec_i = precomputed_values.template get_tensor<Number, PT>(i);
+          auto prec_i = precomputed.template get_tensor<Number, PT>(i);
           auto &[p_i, gamma_min_i, s_i, eta_i] = prec_i;
 
           const unsigned int *js = sparsity_simd.columns(i) + stride_size;
@@ -927,8 +927,7 @@ namespace ryujin
                ++col_idx, js += stride_size) {
 
             const auto U_j = U.template get_tensor<Number>(js);
-            const auto prec_j =
-                precomputed_values.template get_tensor<Number, PT>(js);
+            const auto prec_j = precomputed.template get_tensor<Number, PT>(js);
             auto &[p_j, gamma_min_j, s_j, eta_j] = prec_j;
             const auto gamma_j = surrogate_gamma(U_j, p_j);
             gamma_min_i = std::min(gamma_min_i, gamma_j);
@@ -936,7 +935,7 @@ namespace ryujin
 
           s_i = surrogate_specific_entropy(U_i, gamma_min_i);
           eta_i = surrogate_harten_entropy(U_i, gamma_min_i);
-          precomputed_values.template write_tensor<Number>(prec_i, i);
+          precomputed.template write_tensor<Number>(prec_i, i);
         }
       }
     }
@@ -1327,13 +1326,13 @@ namespace ryujin
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
     HyperbolicSystemView<dim, Number>::flux_contribution(
-        const precomputed_vector_type &pv,
-        const precomputed_initial_vector_type & /*piv*/,
+        const PrecomputedVector &pv,
+        const InitialPrecomputedVector & /*piv*/,
         const unsigned int i,
         const state_type &U_i) const -> flux_contribution_type
     {
       const auto &[p_i, gamma_min_i, s_i, eta_i] =
-          pv.template get_tensor<Number, precomputed_state_type>(i);
+          pv.template get_tensor<Number, precomputed_type>(i);
       return f(U_i, p_i);
     }
 
@@ -1341,13 +1340,13 @@ namespace ryujin
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
     HyperbolicSystemView<dim, Number>::flux_contribution(
-        const precomputed_vector_type &pv,
-        const precomputed_initial_vector_type & /*piv*/,
+        const PrecomputedVector &pv,
+        const InitialPrecomputedVector & /*piv*/,
         const unsigned int *js,
         const state_type &U_j) const -> flux_contribution_type
     {
       const auto &[p_j, gamma_min_j, s_j, eta_j] =
-          pv.template get_tensor<Number, precomputed_state_type>(js);
+          pv.template get_tensor<Number, precomputed_type>(js);
       return f(U_j, p_j);
     }
 
