@@ -40,13 +40,12 @@ void test(const std::string &expression)
   }
 
   using View = HyperbolicSystemView<dim, Number>;
-  using state_type = typename View::state_type;
-  using precomputed_state_type = typename View::precomputed_state_type;
-  static constexpr unsigned int n_precomputed_values =
-      View::n_precomputed_values;
-  using precomputed_type = MultiComponentVector<Number, n_precomputed_values>;
+  using state_type = View::state_type;
+  using precomputed_type = View::precomputed_type;
+  static constexpr auto n_precomputed_values = View::n_precomputed_values;
+  using PrecomputedVector = View::PrecomputedVector;
 
-  precomputed_type dummy;
+  PrecomputedVector dummy;
 
   RiemannSolver<dim> riemann_solver(
       hyperbolic_system, riemann_solver_parameters, dummy);
@@ -62,8 +61,8 @@ void test(const std::string &expression)
   const auto f_j = view.flux_function(u_j);
   const auto df_j = view.flux_gradient_function(u_j);
 
-  precomputed_state_type prec_i;
-  precomputed_state_type prec_j;
+  precomputed_type prec_i;
+  precomputed_type prec_j;
 
   for (unsigned int k = 0; k < n_precomputed_values / 2; ++k) {
     prec_i[k] = f_i[k];

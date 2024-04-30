@@ -49,36 +49,27 @@ namespace ryujin
     {
     public:
       /**
-       * @copydoc HyperbolicSystemView
+       * @name Typedefs and constexpr constants
        */
+      //@{
+
       using View = HyperbolicSystemView<dim, Number>;
 
-      /**
-       * @copydoc HyperbolicSystem::n_precomputed_values
-       */
-      static constexpr unsigned int n_precomputed_values =
-          View::n_precomputed_values;
+      using ScalarNumber = View::ScalarNumber;
 
-      /**
-       * @copydoc HyperbolicSystemView::precomputed_state_type
-       */
-      using precomputed_state_type = typename View::precomputed_state_type;
+      static constexpr auto problem_dimension = View::problem_dimension;
 
-      /**
-       * @copydoc HyperbolicSystem::state_type
-       */
-      using state_type = typename View::state_type;
+      using state_type = View::state_type;
 
-      /**
-       * @copydoc HyperbolicSystem::ScalarNumber
-       */
-      using ScalarNumber = typename get_value_type<Number>::type;
+      using flux_type = View::flux_type;
 
-      /**
-       * @copydoc IndicatorParameters
-       */
+      using precomputed_type = View::precomputed_type;
+
+      using PrecomputedVector = View::PrecomputedVector;
+
       using Parameters = IndicatorParameters<ScalarNumber>;
 
+      //@}
       /**
        * @name Stencil-based computation of indicators
        *
@@ -103,8 +94,7 @@ namespace ryujin
        */
       Indicator(const HyperbolicSystem &hyperbolic_system,
                 const Parameters &parameters,
-                const MultiComponentVector<ScalarNumber, n_precomputed_values>
-                    &precomputed_values)
+                const PrecomputedVector &precomputed_values)
           : hyperbolic_system(hyperbolic_system)
           , parameters(parameters)
           , precomputed_values(precomputed_values)
@@ -140,9 +130,7 @@ namespace ryujin
 
       const HyperbolicSystem &hyperbolic_system;
       const Parameters &parameters;
-
-      const MultiComponentVector<ScalarNumber, n_precomputed_values>
-          &precomputed_values;
+      const PrecomputedVector &precomputed_values;
 
       Number u_i;
       Number u_abs_max;
@@ -169,8 +157,7 @@ namespace ryujin
       const auto view = hyperbolic_system.view<dim, Number>();
 
       const auto prec_i =
-          precomputed_values
-              .template get_tensor<Number, precomputed_state_type>(i);
+          precomputed_values.template get_tensor<Number, precomputed_type>(i);
 
       u_i = view.state(U_i);
       u_abs_max = std::abs(u_i);
@@ -191,8 +178,7 @@ namespace ryujin
       const auto view = hyperbolic_system.view<dim, Number>();
 
       const auto prec_j =
-          precomputed_values
-              .template get_tensor<Number, precomputed_state_type>(js);
+          precomputed_values.template get_tensor<Number, precomputed_type>(js);
 
       const auto u_j = view.state(U_j);
       u_abs_max = std::max(u_abs_max, std::abs(u_j));

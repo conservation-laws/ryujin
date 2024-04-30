@@ -288,7 +288,6 @@ namespace ryujin
        */
       //@{
 
-
       /**
        * The number of precomputation cycles.
        */

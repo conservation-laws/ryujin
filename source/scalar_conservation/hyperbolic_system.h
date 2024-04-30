@@ -14,6 +14,7 @@
 #include <openmp.h>
 #include <patterns_conversion.h>
 #include <simd.h>
+#include <state_vector.h>
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/tensor.h>
@@ -154,7 +155,7 @@ namespace ryujin
     public:
       //@}
       /**
-       * @name Types and compile time constants
+       * @name Types and constexpr constants
        */
       //@{
 
@@ -164,15 +165,20 @@ namespace ryujin
       static constexpr unsigned int problem_dimension = 1;
 
       /**
-       * The storage type used for a (conserved) state vector \f$\boldsymbol
-       * U\f$.
+       * Storage type for a (conserved) state vector \f$\boldsymbol U\f$.
        */
       using state_type = dealii::Tensor<1, problem_dimension, Number>;
 
       /**
-       * MulticomponentVector for storing a vector of conserved states:
+       * Storage type for the flux \f$\mathbf{f}\f$.
        */
-      using vector_type = MultiComponentVector<ScalarNumber, problem_dimension>;
+      using flux_type =
+          dealii::Tensor<1, problem_dimension, dealii::Tensor<1, dim, Number>>;
+
+      /**
+       * The storage type used for flux contributions.
+       */
+      using flux_contribution_type = flux_type;
 
       /**
        * An array holding all component names of the conserved state as a
@@ -189,61 +195,14 @@ namespace ryujin
           std::array<std::string, problem_dimension>{"u"};
 
       /**
-       * The storage type used for the flux \f$\mathbf{f}\f$.
-       */
-      using flux_type =
-          dealii::Tensor<1, problem_dimension, dealii::Tensor<1, dim, Number>>;
-
-      /**
-       * The storage type used for flux contributions.
-       */
-      using flux_contribution_type = flux_type;
-
-      //@}
-      /**
-       * @name Precomputed quantities
-       */
-      //@{
-
-      /**
-       * The number of precomputed initial values.
-       */
-      static constexpr unsigned int n_precomputed_initial_values = 0;
-
-      /**
-       * Array type used for precomputed initial values.
-       */
-      using precomputed_initial_state_type =
-          std::array<Number, n_precomputed_initial_values>;
-
-      /**
-       * MulticomponentVector for storing a vector of precomputed initial
-       * states:
-       */
-      using precomputed_initial_vector_type =
-          MultiComponentVector<ScalarNumber, n_precomputed_initial_values>;
-
-      /**
-       * An array holding all component names of the precomputed values.
-       */
-      static inline const auto precomputed_initial_names =
-          std::array<std::string, n_precomputed_initial_values>{};
-
-      /**
        * The number of precomputed values.
        */
-      static constexpr unsigned int n_precomputed_values = 2. * dim;
+      static constexpr unsigned int n_precomputed_values = 2 * dim;
 
       /**
        * Array type used for precomputed values.
        */
-      using precomputed_state_type = std::array<Number, n_precomputed_values>;
-
-      /**
-       * MulticomponentVector for storing a vector of precomputed states:
-       */
-      using precomputed_vector_type =
-          MultiComponentVector<ScalarNumber, n_precomputed_values>;
+      using precomputed_type = std::array<Number, n_precomputed_values>;
 
       /**
        * An array holding all component names of the precomputed values.
@@ -260,6 +219,49 @@ namespace ryujin
       }();
 
       /**
+       * The number of precomputed initial values.
+       */
+      static constexpr unsigned int n_initial_precomputed_values = 0;
+
+      /**
+       * Array type used for precomputed initial values.
+       */
+      using initial_precomputed_type =
+          std::array<Number, n_initial_precomputed_values>;
+
+      /**
+       * An array holding all component names of the precomputed values.
+       */
+      static inline const auto initial_precomputed_names =
+          std::array<std::string, n_initial_precomputed_values>{};
+
+      /**
+       * A compound state vector.
+       */
+      using StateVector =
+          StateVector<ScalarNumber, problem_dimension, n_precomputed_values>;
+
+      /**
+       * MulticomponentVector for storing a vector of precomputed states:
+       */
+      using PrecomputedVector =
+          MultiComponentVector<ScalarNumber, n_precomputed_values>;
+
+      /**
+       * MulticomponentVector for storing a vector of precomputed initial
+       * states:
+       */
+      using InitialPrecomputedVector =
+          MultiComponentVector<ScalarNumber, n_initial_precomputed_values>;
+
+      //@}
+      /**
+       * @name Computing precomputed quantities
+       */
+      //@{
+
+
+      /**
        * The number of precomputation cycles.
        */
       static constexpr unsigned int n_precomputation_cycles = 1;
@@ -269,13 +271,12 @@ namespace ryujin
        * called within our usual loop() idiom in HyperbolicModule
        */
       template <typename DISPATCH, typename SPARSITY>
-      void precomputation_loop(unsigned int /*cycle*/,
+      void precomputation_loop(unsigned int cycle,
                                const DISPATCH &dispatch_check,
-                               precomputed_vector_type & /*precomputed_values*/,
-                               const SPARSITY & /*sparsity_simd*/,
-                               const vector_type & /*U*/,
-                               unsigned int /*left*/,
-                               unsigned int /*right*/) const;
+                               const SPARSITY &sparsity_simd,
+                               StateVector &state_vector,
+                               unsigned int left,
+                               unsigned int right) const;
 
       //@}
       /**
@@ -361,8 +362,8 @@ namespace ryujin
        * Helper function that given a @p precomputed_state constructs a
        * dealii::Tensor with the flux @f$f(u)@f$.
        */
-      dealii::Tensor<1, dim, Number> construct_flux_tensor(
-          const precomputed_state_type &precomputed_state) const;
+      dealii::Tensor<1, dim, Number>
+      construct_flux_tensor(const precomputed_type &precomputed_state) const;
 
       /**
        * Helper function that given a @p precomputed_state constructs a
@@ -370,7 +371,7 @@ namespace ryujin
        * respect to the state @f$u@f$.
        */
       dealii::Tensor<1, dim, Number> construct_flux_gradient_tensor(
-          const precomputed_state_type &precomputed_state) const;
+          const precomputed_type &precomputed_state) const;
 
       /**
        * Given a state @p U_i and an index @p i compute flux contributions.
@@ -392,14 +393,14 @@ namespace ryujin
        * For the Euler equations we simply compute <code>f(U_i)</code>.
        */
       flux_contribution_type
-      flux_contribution(const precomputed_vector_type &pv,
-                        const precomputed_initial_vector_type & /*piv*/,
+      flux_contribution(const PrecomputedVector &pv,
+                        const InitialPrecomputedVector & /*piv*/,
                         const unsigned int i,
                         const state_type & /*U_i*/) const;
 
       flux_contribution_type
-      flux_contribution(const precomputed_vector_type &pv,
-                        const precomputed_initial_vector_type & /*piv*/,
+      flux_contribution(const PrecomputedVector &pv,
+                        const InitialPrecomputedVector & /*piv*/,
                         const unsigned int *js,
                         const state_type & /*U_j*/) const;
 
@@ -429,12 +430,12 @@ namespace ryujin
       /** We do not have source terms */
       static constexpr bool have_source_terms = false;
 
-      state_type nodal_source(const precomputed_vector_type &pv,
+      state_type nodal_source(const PrecomputedVector &pv,
                               const unsigned int i,
                               const state_type &U_i,
                               const ScalarNumber tau) const = delete;
 
-      state_type nodal_source(const precomputed_vector_type &pv,
+      state_type nodal_source(const PrecomputedVector &pv,
                               const unsigned int *js,
                               const state_type &U_j,
                               const ScalarNumber tau) const = delete;
@@ -592,13 +593,15 @@ namespace ryujin
     HyperbolicSystemView<dim, Number>::precomputation_loop(
         unsigned int cycle [[maybe_unused]],
         const DISPATCH &dispatch_check,
-        precomputed_vector_type &precomputed_values,
         const SPARSITY &sparsity_simd,
-        const vector_type &U,
+        StateVector &state_vector,
         unsigned int left,
         unsigned int right) const
     {
       Assert(cycle == 0, dealii::ExcInternalError());
+
+      const auto &U = std::get<0>(state_vector);
+      auto &precomputed = std::get<1>(state_vector);
 
       /* We are inside a thread parallel context */
 
@@ -620,14 +623,14 @@ namespace ryujin
         const auto f_i = flux_function(u_i);
         const auto df_i = flux_gradient_function(u_i);
 
-        precomputed_state_type prec_i;
+        precomputed_type prec_i;
 
         for (unsigned int k = 0; k < n_precomputed_values / 2; ++k) {
           prec_i[k] = f_i[k];
           prec_i[dim + k] = df_i[k];
         }
 
-        precomputed_values.template write_tensor<Number>(prec_i, i);
+        precomputed.template write_tensor<Number>(prec_i, i);
       }
     }
 
@@ -723,21 +726,21 @@ namespace ryujin
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, dim, Number>
     HyperbolicSystemView<dim, Number>::construct_flux_tensor(
-        const precomputed_state_type &precomputed_state) const
+        const precomputed_type &precomputed) const
     {
       dealii::Tensor<1, dim, Number> result;
 
       if constexpr (dim == 1) {
-        const auto &[f, df] = precomputed_state;
+        const auto &[f, df] = precomputed;
         result[0] = f;
 
       } else if constexpr (dim == 2) {
-        const auto &[f_1, f_2, df_1, df_2] = precomputed_state;
+        const auto &[f_1, f_2, df_1, df_2] = precomputed;
         result[0] = f_1;
         result[1] = f_2;
 
       } else if constexpr (dim == 3) {
-        const auto &[f_1, f_2, f_3, df_1, df_2, df_3] = precomputed_state;
+        const auto &[f_1, f_2, f_3, df_1, df_2, df_3] = precomputed;
         result[0] = f_1;
         result[1] = f_2;
         result[2] = f_3;
@@ -750,21 +753,21 @@ namespace ryujin
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, dim, Number>
     HyperbolicSystemView<dim, Number>::construct_flux_gradient_tensor(
-        const precomputed_state_type &precomputed_state) const
+        const precomputed_type &precomputed) const
     {
       dealii::Tensor<1, dim, Number> result;
 
       if constexpr (dim == 1) {
-        const auto &[f, df] = precomputed_state;
+        const auto &[f, df] = precomputed;
         result[0] = df;
 
       } else if constexpr (dim == 2) {
-        const auto &[f_1, f_2, df_1, df_2] = precomputed_state;
+        const auto &[f_1, f_2, df_1, df_2] = precomputed;
         result[0] = df_1;
         result[1] = df_2;
 
       } else if constexpr (dim == 3) {
-        const auto &[f_1, f_2, f_3, df_1, df_2, df_3] = precomputed_state;
+        const auto &[f_1, f_2, f_3, df_1, df_2, df_3] = precomputed;
         result[0] = df_1;
         result[1] = df_2;
         result[2] = df_3;
@@ -777,15 +780,15 @@ namespace ryujin
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
     HyperbolicSystemView<dim, Number>::flux_contribution(
-        const precomputed_vector_type &pv,
-        const precomputed_initial_vector_type & /*piv*/,
+        const PrecomputedVector &pv,
+        const InitialPrecomputedVector & /*piv*/,
         const unsigned int i,
         const state_type & /*U_i*/) const -> flux_contribution_type
     {
       /* The flux contribution is a rank 2 tensor, thus a little dance: */
       flux_contribution_type result;
       result[0] = construct_flux_tensor(
-          pv.template get_tensor<Number, precomputed_state_type>(i));
+          pv.template get_tensor<Number, precomputed_type>(i));
       return result;
     }
 
@@ -793,15 +796,15 @@ namespace ryujin
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
     HyperbolicSystemView<dim, Number>::flux_contribution(
-        const precomputed_vector_type &pv,
-        const precomputed_initial_vector_type & /*piv*/,
+        const PrecomputedVector &pv,
+        const InitialPrecomputedVector & /*piv*/,
         const unsigned int *js,
         const state_type & /*U_j*/) const -> flux_contribution_type
     {
       /* The flux contribution is a rank 2 tensor, thus a little dance: */
       flux_contribution_type result;
       result[0] = construct_flux_tensor(
-          pv.template get_tensor<Number, precomputed_state_type>(js));
+          pv.template get_tensor<Number, precomputed_type>(js));
       return result;
     }
 
