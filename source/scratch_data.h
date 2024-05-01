@@ -17,6 +17,8 @@ namespace ryujin
   /**
    * Internal scratch data for thread parallelized assembly. See the
    * deal.II Workstream documentation for details.
+   *
+   * @ingroup Mesh
    */
   template <int dim>
   class AssemblyScratchData

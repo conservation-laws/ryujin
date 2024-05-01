@@ -17,6 +17,8 @@ namespace ryujin
 {
   /**
    * Controls the chosen invariant domain / CFL recovery strategy.
+   *
+   * @ingroup TimeLoop
    */
   enum class CFLRecoveryStrategy {
     /**
@@ -37,6 +39,8 @@ namespace ryujin
 
   /**
    * Controls the chosen time-stepping scheme.
+   *
+   * @ingroup TimeLoop
    */
   enum class TimeSteppingScheme {
     /**

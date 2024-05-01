@@ -19,6 +19,8 @@ namespace ryujin
    * deal.II. In contrast to the deal.II version it copies the coarse grid
    * and all relevant Manifold information. That way it can be initialized
    * with one Triangulation and be used with another Triangulation.
+   *
+   * @ingroup Mesh
    */
   template <int dim, int spacedim = dim>
   class TransfiniteInterpolationManifold : public Manifold<dim, spacedim>

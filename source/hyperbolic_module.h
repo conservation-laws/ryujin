@@ -34,7 +34,7 @@ namespace ryujin
    * step size tau_max and the prescribed step size tau are within an
    * acceptable tolerance of about 10%.
    *
-   * @ingroup TimeLoop
+   * @ingroup HyperbolicModule
    */
   enum class IDViolationStrategy {
     /**

@@ -41,7 +41,7 @@ namespace ryujin
    * independent, it only depends on the chosen geometry and ansatz stored
    * in the Discretization class.
    *
-   * @ingroup TimeLoop
+   * @ingroup Mesh
    */
   template <int dim, typename Number = double>
   class OfflineData : public dealii::ParameterAcceptor
