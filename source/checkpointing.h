@@ -58,12 +58,13 @@ namespace ryujin
      * @ingroup Miscellaneous
      */
     template <int dim, typename Number, int n_comp, int simd_length>
-    void load_state_vector(const OfflineData<dim, Number> &offline_data,
-                           const std::string &base_name,
-                           MultiComponentVector<Number, n_comp, simd_length> &U,
-                           Number &t,
-                           unsigned int &output_cycle,
-                           const MPI_Comm &mpi_communicator)
+    void load_state_vector(
+        const OfflineData<dim, Number> &offline_data,
+        const std::string &base_name,
+        Vectors::MultiComponentVector<Number, n_comp, simd_length> &U,
+        Number &t,
+        unsigned int &output_cycle,
+        const MPI_Comm &mpi_communicator)
     {
       if constexpr (have_distributed_triangulation<dim>) {
         const auto &dof_handler = offline_data.dof_handler();
@@ -72,7 +73,7 @@ namespace ryujin
 
         const auto &scalar_partitioner = offline_data.scalar_partitioner();
 
-        using ScalarVector = ryujin::ScalarVector<Number>;
+        using ScalarVector = Vectors::ScalarVector<Number>;
         std::array<ScalarVector, n_comp> state_vector;
         for (auto &it : state_vector) {
           it.reinit(scalar_partitioner);
@@ -141,13 +142,13 @@ namespace ryujin
      * @ingroup Miscellaneous
      */
     template <int dim, typename Number, int n_comp, int simd_length>
-    void
-    write_checkpoint(const OfflineData<dim, Number> &offline_data,
-                     const std::string &base_name,
-                     const MultiComponentVector<Number, n_comp, simd_length> &U,
-                     const Number t,
-                     const unsigned int output_cycle,
-                     const MPI_Comm &mpi_communicator)
+    void write_checkpoint(
+        const OfflineData<dim, Number> &offline_data,
+        const std::string &base_name,
+        const Vectors::MultiComponentVector<Number, n_comp, simd_length> &U,
+        const Number t,
+        const unsigned int output_cycle,
+        const MPI_Comm &mpi_communicator)
     {
       if constexpr (have_distributed_triangulation<dim>) {
         const auto &triangulation =
@@ -158,7 +159,7 @@ namespace ryujin
 
         const auto &scalar_partitioner = offline_data.scalar_partitioner();
 
-        using ScalarVector = ryujin::ScalarVector<Number>;
+        using ScalarVector = Vectors::ScalarVector<Number>;
         std::array<ScalarVector, n_comp> state_vector;
         unsigned int d = 0;
         for (auto &it : state_vector) {

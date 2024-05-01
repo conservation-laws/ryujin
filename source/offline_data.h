@@ -50,12 +50,12 @@ namespace ryujin
     /**
      * @copydoc ryujin::ScalarVector
      */
-    using ScalarVector = ryujin::ScalarVector<Number>;
+    using ScalarVector = Vectors::ScalarVector<Number>;
 
     /**
      * Scalar vector storing single-precision floats
      */
-    using ScalarVectorFloat = ryujin::ScalarVector<float>;
+    using ScalarVectorFloat = Vectors::ScalarVector<float>;
 
     /**
      * A tuple describing global dof index, boundary normal, normal mass,
@@ -80,8 +80,8 @@ namespace ryujin
      * Prepare offline data. A call to prepare() internally calls setup()
      * and assemble().
      *
-     * The problem_dimension parameter is used to setup up an
-     * appropriately sized vector partitioner for the MultiComponentVector.
+     * The problem_dimension parameter is used to setup up an appropriately
+     * sized vector partitioner for the MultiComponentVector.
      */
     void prepare(const unsigned int problem_dimension)
     {

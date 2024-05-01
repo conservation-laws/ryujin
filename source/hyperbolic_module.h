@@ -310,14 +310,15 @@ namespace ryujin
 
     InitialPrecomputedVector initial_precomputed_;
 
-    using ScalarVector = ScalarVector<Number>;
+    using ScalarVector = Vectors::ScalarVector<Number>;
     mutable ScalarVector alpha_;
 
     static constexpr auto n_bounds =
         Description::template Limiter<dim, Number>::n_bounds;
-    mutable MultiComponentVector<Number, n_bounds> bounds_;
+    mutable Vectors::MultiComponentVector<Number, n_bounds> bounds_;
 
-    using HyperbolicVector = MultiComponentVector<Number, problem_dimension>;
+    using HyperbolicVector =
+        Vectors::MultiComponentVector<Number, problem_dimension>;
     mutable HyperbolicVector r_;
 
     mutable SparseMatrixSIMD<Number> dij_matrix_;

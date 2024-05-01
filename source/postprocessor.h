@@ -59,7 +59,7 @@ namespace ryujin
 
     using StateVector = View::StateVector;
 
-    using ScalarVector = ScalarVector<Number>;
+    using ScalarVector = Vectors::ScalarVector<Number>;
 
     //@}
     /**

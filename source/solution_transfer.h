@@ -40,7 +40,7 @@ namespace ryujin
 
     using StateVector = View::StateVector;
 
-    using ScalarVector = ScalarVector<Number>;
+    using ScalarVector = Vectors::ScalarVector<Number>;
 
     //@}
     /**
@@ -79,8 +79,9 @@ namespace ryujin
         it.reinit(scalar_partitioner);
 
       /*
-       * FIXME: we need to copy over to an auxiliary  state_ vector because
-       * dealii::SolutionTransfer cannot work on our MultiComponentVector
+       * We need to copy over to an auxiliary state vector formed by a
+       * ScalarVector for each component because dealii::SolutionTransfer
+       * cannot work on our StateVector or MultiComponentVector
        */
 
       for (unsigned int k = 0; k < problem_dimension; ++k) {

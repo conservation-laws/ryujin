@@ -336,8 +336,8 @@ namespace ryujin
     scalar_partitioner_ = std::make_shared<dealii::Utilities::MPI::Partitioner>(
         locally_owned, locally_relevant, mpi_communicator_);
 
-    vector_partitioner_ =
-        create_vector_partitioner(scalar_partitioner_, problem_dimension);
+    vector_partitioner_ = Vectors::create_vector_partitioner(
+        scalar_partitioner_, problem_dimension);
 
     /*
      * After elminiating periodicity and hanging node constraints we need

@@ -131,9 +131,9 @@ namespace ryujin
 
       using StateVector = View::StateVector;
 
-      using ScalarVector = ScalarVector<Number>;
+      using ScalarVector = Vectors::ScalarVector<Number>;
 
-      using BlockVector = BlockVector<Number>;
+      using BlockVector = Vectors::BlockVector<Number>;
 
       //@}
       /**

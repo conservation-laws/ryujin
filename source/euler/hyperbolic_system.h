@@ -299,21 +299,22 @@ namespace ryujin
       /**
        * A compound state vector.
        */
-      using StateVector =
+      using StateVector = Vectors::
           StateVector<ScalarNumber, problem_dimension, n_precomputed_values>;
 
       /**
        * MulticomponentVector for storing a vector of precomputed states:
        */
       using PrecomputedVector =
-          MultiComponentVector<ScalarNumber, n_precomputed_values>;
+          Vectors::MultiComponentVector<ScalarNumber, n_precomputed_values>;
 
       /**
        * MulticomponentVector for storing a vector of precomputed initial
        * states:
        */
       using InitialPrecomputedVector =
-          MultiComponentVector<ScalarNumber, n_initial_precomputed_values>;
+          Vectors::MultiComponentVector<ScalarNumber,
+                                        n_initial_precomputed_values>;
 
       //@}
       /**
