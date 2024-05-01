@@ -30,7 +30,8 @@ int main()
   static constexpr unsigned int n_precomputed_values =
       HyperbolicSystemView<dim, double>::n_precomputed_values;
 
-  using precomputed_type = MultiComponentVector<double, n_precomputed_values>;
+  using precomputed_type =
+      Vectors::MultiComponentVector<double, n_precomputed_values>;
   precomputed_type dummy;
 
   Limiter<dim, double> limiter(hyperbolic_system, limiter_parameters, dummy);

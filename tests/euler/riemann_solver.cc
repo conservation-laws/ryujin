@@ -32,7 +32,8 @@ int main()
 
   static constexpr unsigned int n_precomputed_values =
       HyperbolicSystemView<dim, Number>::n_precomputed_values;
-  using precomputed_type = MultiComponentVector<Number, n_precomputed_values>;
+  using precomputed_type =
+      Vectors::MultiComponentVector<double, n_precomputed_values>;
   precomputed_type dummy;
 
   RiemannSolver<dim> riemann_solver(
