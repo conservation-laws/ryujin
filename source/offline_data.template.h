@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "discretization.h"
 #include "local_index_handling.h"
 #include "multicomponent_vector.h"
 #include "offline_data.h"
@@ -401,6 +402,7 @@ namespace ryujin
     /* Variant using TrilinosWrappers::SparseMatrix with global numbering */
 
     AffineConstraints<double> affine_constraints_assembly;
+    /* This small dance is necessary to translate from Number to double: */
     affine_constraints_assembly.reinit(affine_constraints_.get_local_lines());
     for (auto line : affine_constraints_.get_lines()) {
       affine_constraints_assembly.add_line(line.index);
@@ -458,6 +460,23 @@ namespace ryujin
         discretization_->finite_element().dofs_per_cell;
 
     const unsigned int n_q_points = discretization_->quadrature().size();
+    const unsigned int n_face_q_points =
+        discretization_->face_quadrature().size();
+
+    bool assemble_dg_interface_terms = false;
+    switch (discretization_->ansatz()) {
+    case Ansatz::cg_q1:
+    case Ansatz::cg_q2: /* fallthrough */
+    case Ansatz::cg_q3: /* fallthrough */
+      assemble_dg_interface_terms = false;
+      break;
+    case Ansatz::dg_q0:
+    case Ansatz::dg_q1: /* fallthrough */
+    case Ansatz::dg_q2: /* fallthrough */
+    case Ansatz::dg_q3: /* fallthrough */
+      assemble_dg_interface_terms = true;
+      break;
+    }
 
     /*
      * Now, assemble all matrices:
@@ -471,13 +490,17 @@ namespace ryujin
 
           auto &is_locally_owned = copy.is_locally_owned_;
           auto &local_dof_indices = copy.local_dof_indices_;
+          auto &neighbor_local_dof_indices = copy.neighbor_local_dof_indices_;
 
           auto &cell_mass_matrix = copy.cell_mass_matrix_;
           auto &cell_betaij_matrix = copy.cell_betaij_matrix_;
           auto &cell_cij_matrix = copy.cell_cij_matrix_;
+          auto &interface_cij_matrix = copy.interface_cij_matrix_;
           auto &cell_measure = copy.cell_measure_;
 
           auto &fe_values = scratch.fe_values_;
+          auto &fe_face_values = scratch.fe_face_values_;
+          auto &fe_neighbor_face_values = scratch.fe_neighbor_face_values_;
 
 #ifdef DEAL_II_WITH_TRILINOS
           is_locally_owned = cell->is_locally_owned();
@@ -497,6 +520,10 @@ namespace ryujin
           cell_betaij_matrix.reinit(dofs_per_cell, dofs_per_cell);
           for (auto &matrix : cell_cij_matrix)
             matrix.reinit(dofs_per_cell, dofs_per_cell);
+          if (assemble_dg_interface_terms)
+            for (auto &it : interface_cij_matrix)
+              for (auto &matrix : it)
+                matrix.reinit(dofs_per_cell, dofs_per_cell);
 
           fe_values.reinit(cell);
 
@@ -508,6 +535,10 @@ namespace ryujin
           cell_betaij_matrix = 0.;
           for (auto &matrix : cell_cij_matrix)
             matrix = 0.;
+          if (assemble_dg_interface_terms)
+            for (auto &it : interface_cij_matrix)
+              for (auto &matrix : it)
+                matrix = 0.;
           cell_measure = 0.;
 
           for (unsigned int q_point = 0; q_point < n_q_points; ++q_point) {
@@ -533,13 +564,105 @@ namespace ryujin
               } /* for i */
             }   /* for j */
           }     /* for q */
+
+          /*
+           * Assemble dG face terms:
+           */
+
+          if (!assemble_dg_interface_terms)
+            return;
+
+          for (const auto f_index : cell->face_indices()) {
+            const auto &face = cell->face(f_index);
+
+            fe_face_values.reinit(cell, f_index);
+
+            /* Skip faces without neighbors... */
+            const bool has_neighbor =
+                !face->at_boundary() || cell->has_periodic_neighbor(f_index);
+            if (!has_neighbor) {
+              // set the vector of local dof indices to 0 to indicate that
+              // there is nothing to do for this face:
+              neighbor_local_dof_indices[f_index].resize(0);
+              continue;
+            }
+
+            /* Avoid artificial cells: */
+            const auto neighbor_cell = cell->neighbor(f_index);
+            if (neighbor_cell->is_artificial()) {
+              // set the vector of local dof indices to 0 to indicate that
+              // there is nothing to do for this face:
+              neighbor_local_dof_indices[f_index].resize(0);
+              continue;
+            }
+
+            /* Face contribution: */
+
+            for (unsigned int q = 0; q < n_face_q_points; ++q) {
+              const auto JxW = fe_face_values.JxW(q);
+              const auto &normal = fe_face_values.get_normal_vectors()[q];
+
+              for (unsigned int j = 0; j < dofs_per_cell; ++j) {
+                const auto value_JxW = fe_face_values.shape_value(j, q) * JxW;
+
+                for (unsigned int i = 0; i < dofs_per_cell; ++i) {
+                  const auto value = fe_face_values.shape_value(i, q);
+
+                  for (unsigned int d = 0; d < dim; ++d)
+                    cell_cij_matrix[d](i, j) -=
+                        Number(0.5 * normal[d] * value * value_JxW);
+                } /* for i */
+              }   /* for j */
+            }     /* for q */
+
+            /* Coupling part: */
+
+            const unsigned int f_index_neighbor =
+                cell->neighbor_of_neighbor(f_index);
+
+            neighbor_local_dof_indices[f_index].resize(dofs_per_cell);
+            neighbor_cell->get_dof_indices(neighbor_local_dof_indices[f_index]);
+
+            fe_neighbor_face_values.reinit(neighbor_cell, f_index_neighbor);
+
+            for (unsigned int q = 0; q < n_face_q_points; ++q) {
+              const auto JxW = fe_face_values.JxW(q);
+              const auto &normal = fe_face_values.get_normal_vectors()[q];
+
+              /* index j for neighbor, index i for current cell: */
+              for (unsigned int j = 0; j < dofs_per_cell; ++j) {
+                const auto value_JxW =
+                    fe_neighbor_face_values.shape_value(j, q) * JxW;
+
+                for (unsigned int i = 0; i < dofs_per_cell; ++i) {
+                  const auto value = fe_face_values.shape_value(i, q);
+
+                  for (unsigned int d = 0; d < dim; ++d)
+                    interface_cij_matrix[f_index][d](i, j) +=
+                        Number(0.5 * normal[d] * value * value_JxW);
+                } /* for i */
+              }   /* for j */
+            }     /* for q */
+          }
         };
 
     const auto copy_local_to_global = [&](const auto &copy) {
       const auto &is_locally_owned = copy.is_locally_owned_;
-      auto local_dof_indices = copy.local_dof_indices_; /* make a copy */
+#ifdef DEAL_II_WITH_TRILINOS
+      const auto &local_dof_indices = copy.local_dof_indices_;
+      const auto &neighbor_local_dof_indices = copy.neighbor_local_dof_indices_;
+#else
+      /*
+       * We have to transform indices to the local index range
+       * [0, n_locally_relevant_) when using the dealii::SparseMatrix.
+       * Thus, copy all index vectors:
+       */
+      auto local_dof_indices = copy.local_dof_indices_;
+      auto neighbor_local_dof_indices = copy.neighbor_local_dof_indices_;
+#endif
       const auto &cell_mass_matrix = copy.cell_mass_matrix_;
       const auto &cell_cij_matrix = copy.cell_cij_matrix_;
+      const auto &interface_cij_matrix = copy.interface_cij_matrix_;
       const auto &cell_betaij_matrix = copy.cell_betaij_matrix_;
       const auto &cell_measure = copy.cell_measure_;
 
@@ -548,6 +671,8 @@ namespace ryujin
 
 #ifndef DEAL_II_WITH_TRILINOS
       transform_to_local_range(*scalar_partitioner_, local_dof_indices);
+      for (auto &indices : neighbor_local_dof_indices)
+        transform_to_local_range(*scalar_partitioner_, indices);
 #endif
 
       affine_constraints_assembly.distribute_local_to_global(
@@ -556,6 +681,16 @@ namespace ryujin
       for (int k = 0; k < dim; ++k) {
         affine_constraints_assembly.distribute_local_to_global(
             cell_cij_matrix[k], local_dof_indices, cij_matrix_tmp[k]);
+
+        for (unsigned int f_index = 0; f_index < copy.n_faces; ++f_index) {
+          if (neighbor_local_dof_indices[f_index].size() != 0) {
+            affine_constraints_assembly.distribute_local_to_global(
+                interface_cij_matrix[f_index][k],
+                local_dof_indices,
+                neighbor_local_dof_indices[f_index],
+                cij_matrix_tmp[k]);
+          }
+        }
       }
 
       affine_constraints_assembly.distribute_local_to_global(
