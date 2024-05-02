@@ -235,7 +235,8 @@ namespace ryujin
 
     const auto &discretization = offline_data_->discretization();
     const auto &mapping = discretization.mapping();
-    const auto patch_order = discretization.finite_element().degree - 1;
+    const auto patch_order =
+        std::max(1u, discretization.finite_element().degree) - 1u;
 
     /* Perform output: */
 
