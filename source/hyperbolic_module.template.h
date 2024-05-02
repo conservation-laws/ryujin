@@ -293,11 +293,12 @@ namespace ryujin
 
         /* Stored thread locally: */
 
-        using RiemannSolver = Description::template RiemannSolver<dim, T>;
+        using RiemannSolver =
+            typename Description::template RiemannSolver<dim, T>;
         RiemannSolver riemann_solver(
             *hyperbolic_system_, riemann_solver_parameters_, old_precomputed);
 
-        using Indicator = Description::template Indicator<dim, T>;
+        using Indicator = typename Description::template Indicator<dim, T>;
         Indicator indicator(
             *hyperbolic_system_, indicator_parameters_, old_precomputed);
 
@@ -378,7 +379,8 @@ namespace ryujin
 
       /* Complete d_ij at boundary: */
 
-      using RiemannSolver = Description::template RiemannSolver<dim, Number>;
+      using RiemannSolver =
+          typename Description::template RiemannSolver<dim, Number>;
       RiemannSolver riemann_solver(
           *hyperbolic_system_, riemann_solver_parameters_, old_precomputed);
 
@@ -520,10 +522,11 @@ namespace ryujin
 
       auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
         using T = decltype(sentinel);
-        using View = Description::template HyperbolicSystemView<dim, T>;
-        using Limiter = Description::template Limiter<dim, T>;
-        using flux_contribution_type = View::flux_contribution_type;
-        using state_type = View::state_type;
+        using View =
+            typename Description::template HyperbolicSystemView<dim, T>;
+        using Limiter = typename Description::template Limiter<dim, T>;
+        using flux_contribution_type = typename View::flux_contribution_type;
+        using state_type = typename View::state_type;
 
         unsigned int stride_size = get_stride_size<T>;
 

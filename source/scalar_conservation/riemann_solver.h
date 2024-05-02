@@ -82,15 +82,15 @@ namespace ryujin
 
       using View = HyperbolicSystemView<dim, Number>;
 
-      using ScalarNumber = View::ScalarNumber;
+      using ScalarNumber = typename View::ScalarNumber;
 
       static constexpr auto problem_dimension = View::problem_dimension;
 
-      using state_type = View::state_type;
+      using state_type = typename View::state_type;
 
-      using precomputed_type = View::precomputed_type;
+      using precomputed_type = typename View::precomputed_type;
 
-      using PrecomputedVector = View::PrecomputedVector;
+      using PrecomputedVector = typename View::PrecomputedVector;
 
       using Parameters = RiemannSolverParameters<ScalarNumber>;
 

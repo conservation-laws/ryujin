@@ -31,13 +31,14 @@ namespace ryujin
      */
     //@{
 
-    using HyperbolicSystem = Description::HyperbolicSystem;
+    using HyperbolicSystem = typename Description::HyperbolicSystem;
 
-    using View = Description::template HyperbolicSystemView<dim, Number>;
+    using View =
+        typename Description::template HyperbolicSystemView<dim, Number>;
 
-    using state_type = View::state_type;
+    using state_type = typename View::state_type;
 
-    using StateVector = View::StateVector;
+    using StateVector = typename View::StateVector;
 
     //@}
     /**

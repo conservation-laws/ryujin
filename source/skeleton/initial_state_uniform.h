@@ -24,7 +24,7 @@ namespace ryujin
     {
     public:
       using View = HyperbolicSystemView<dim, Number>;
-      using state_type = View::state_type;
+      using state_type = typename View::state_type;
 
       Uniform(const HyperbolicSystem &hyperbolic_system,
               const std::string subsection)

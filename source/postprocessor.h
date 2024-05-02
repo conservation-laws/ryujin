@@ -43,13 +43,14 @@ namespace ryujin
      */
     //@{
 
-    using HyperbolicSystem = Description::HyperbolicSystem;
+    using HyperbolicSystem = typename Description::HyperbolicSystem;
 
-    using View = Description::template HyperbolicSystemView<dim, Number>;
+    using View =
+        typename Description::template HyperbolicSystemView<dim, Number>;
 
     static constexpr auto problem_dimension = View::problem_dimension;
 
-    using state_type = View::state_type;
+    using state_type = typename View::state_type;
 
     template <typename T>
     using grad_type = dealii::Tensor<1, dim, T>;
@@ -57,7 +58,7 @@ namespace ryujin
     template <typename T>
     using curl_type = dealii::Tensor<1, dim == 2 ? 1 : dim, T>;
 
-    using StateVector = View::StateVector;
+    using StateVector = typename View::StateVector;
 
     using ScalarVector = Vectors::ScalarVector<Number>;
 

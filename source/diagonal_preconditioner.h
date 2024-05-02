@@ -5,9 +5,6 @@
 
 #pragma once
 
-#include "offline_data.h"
-#include "openmp.h"
-#include "simd.h"
 #include "state_vector.h"
 
 #include <deal.II/lac/la_parallel_block_vector.h>
@@ -27,12 +24,12 @@ namespace ryujin
     /**
      * @copydoc ryujin::ScalarVector
      */
-    using ScalarVector = ryujin::ScalarVector<Number>;
+    using ScalarVector = typename Vectors::ScalarVector<Number>;
 
     /**
      * @copydoc ryujin::BlockVector
      */
-    using BlockVector = ryujin::BlockVector<Number>;
+    using BlockVector = typename Vectors::BlockVector<Number>;
 
     /**
      * Constructor

@@ -73,7 +73,7 @@ namespace ryujin
 
         const auto &scalar_partitioner = offline_data.scalar_partitioner();
 
-        using ScalarVector = Vectors::ScalarVector<Number>;
+        using ScalarVector = typename Vectors::ScalarVector<Number>;
         std::array<ScalarVector, n_comp> state_vector;
         for (auto &it : state_vector) {
           it.reinit(scalar_partitioner);
@@ -159,7 +159,7 @@ namespace ryujin
 
         const auto &scalar_partitioner = offline_data.scalar_partitioner();
 
-        using ScalarVector = Vectors::ScalarVector<Number>;
+        using ScalarVector = typename Vectors::ScalarVector<Number>;
         std::array<ScalarVector, n_comp> state_vector;
         unsigned int d = 0;
         for (auto &it : state_vector) {

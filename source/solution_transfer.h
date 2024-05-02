@@ -32,13 +32,14 @@ namespace ryujin
      */
     //@{
 
-    using HyperbolicSystem = Description::HyperbolicSystem;
+    using HyperbolicSystem = typename Description::HyperbolicSystem;
 
-    using View = Description::template HyperbolicSystemView<dim, Number>;
+    using View =
+        typename Description::template HyperbolicSystemView<dim, Number>;
 
     static constexpr auto problem_dimension = View::problem_dimension;
 
-    using StateVector = View::StateVector;
+    using StateVector = typename View::StateVector;
 
     using ScalarVector = Vectors::ScalarVector<Number>;
 

@@ -41,22 +41,23 @@ namespace ryujin
      * @name Typedefs and constexpr constants
      */
     //@{
-    using HyperbolicSystem = Description::HyperbolicSystem;
+    using HyperbolicSystem = typename Description::HyperbolicSystem;
 
-    using View = Description::template HyperbolicSystemView<dim, Number>;
+    using View =
+        typename Description::template HyperbolicSystemView<dim, Number>;
 
     static constexpr auto problem_dimension = View::problem_dimension;
 
-    using state_type = View::state_type;
+    using state_type = typename View::state_type;
 
     static constexpr auto n_initial_precomputed_values =
         View::n_initial_precomputed_values;
 
-    using initial_precomputed_type = View::initial_precomputed_type;
+    using initial_precomputed_type = typename View::initial_precomputed_type;
 
-    using StateVector = View::StateVector;
+    using StateVector = typename View::StateVector;
 
-    using InitialPrecomputedVector = View::InitialPrecomputedVector;
+    using InitialPrecomputedVector = typename View::InitialPrecomputedVector;
 
     //@}
     /**
@@ -146,8 +147,8 @@ namespace ryujin
     dealii::SmartPointer<const HyperbolicSystem> hyperbolic_system_;
     dealii::SmartPointer<const OfflineData<dim, Number>> offline_data_;
 
-    InitialStateLibrary<Description, dim, Number>::initial_state_list_type
-        initial_state_list_;
+    typename InitialStateLibrary<Description, dim, Number>::
+        initial_state_list_type initial_state_list_;
 
     std::function<state_type(const dealii::Point<dim> &, Number)>
         initial_state_;

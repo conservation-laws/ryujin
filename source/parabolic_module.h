@@ -37,15 +37,17 @@ namespace ryujin
      */
     //@{
 
-    using HyperbolicSystem = Description::HyperbolicSystem;
+    using HyperbolicSystem = typename Description::HyperbolicSystem;
 
-    using View = Description::template HyperbolicSystemView<dim, Number>;
+    using View =
+        typename Description::template HyperbolicSystemView<dim, Number>;
 
-    using ParabolicSystem = Description::ParabolicSystem;
+    using ParabolicSystem = typename Description::ParabolicSystem;
 
-    using ParabolicSolver = Description::template ParabolicSolver<dim, Number>;
+    using ParabolicSolver =
+        typename Description::template ParabolicSolver<dim, Number>;
 
-    using StateVector = View::StateVector;
+    using StateVector = typename View::StateVector;
 
     //@}
     /**

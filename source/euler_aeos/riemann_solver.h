@@ -47,11 +47,11 @@ namespace ryujin
 
       using View = HyperbolicSystemView<dim, Number>;
 
-      using ScalarNumber = View::ScalarNumber;
+      using ScalarNumber = typename View::ScalarNumber;
 
       static constexpr auto problem_dimension = View::problem_dimension;
 
-      using state_type = View::state_type;
+      using state_type = typename View::state_type;
 
       /**
        * Number of components in a primitive state, we store \f$[\rho, v,
@@ -63,11 +63,11 @@ namespace ryujin
        * The array type to store the expanded primitive state for the
        * Riemann solver \f$[\rho, v, p, a]\f$
        */
-      using primitive_type = std::array<Number, riemann_data_size>;
+      using primitive_type = typename std::array<Number, riemann_data_size>;
 
-      using precomputed_type = View::precomputed_type;
+      using precomputed_type = typename View::precomputed_type;
 
-      using PrecomputedVector = View::PrecomputedVector;
+      using PrecomputedVector = typename View::PrecomputedVector;
 
       using Parameters = RiemannSolverParameters<ScalarNumber>;
 

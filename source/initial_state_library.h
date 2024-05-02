@@ -33,11 +33,12 @@ namespace ryujin
   class InitialState : public dealii::ParameterAcceptor
   {
   public:
-    using View = Description::template HyperbolicSystemView<dim, Number>;
+    using View =
+        typename Description::template HyperbolicSystemView<dim, Number>;
 
-    using state_type = View::state_type;
+    using state_type = typename View::state_type;
 
-    using initial_precomputed_type = View::initial_precomputed_type;
+    using initial_precomputed_type = typename View::initial_precomputed_type;
 
     /**
      * Constructor taking initial state name @p name and a subsection @p
@@ -100,7 +101,7 @@ namespace ryujin
     /**
      * @copydoc HyperbolicSystem
      */
-    using HyperbolicSystem = Description::HyperbolicSystem;
+    using HyperbolicSystem = typename Description::HyperbolicSystem;
 
     /**
      * The type of the initial state list
