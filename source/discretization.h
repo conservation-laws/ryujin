@@ -127,7 +127,19 @@ namespace ryujin
     cg_q2,
 
     /** cG Q3: continuous bi- (tri-) cubic Lagrange elements */
-    cg_q3
+    cg_q3,
+
+    /** dG Q0: discontinuous piecewise constant elements */
+    dg_q0,
+
+    /** dG Q1: discontinuous bi- (tri-) linear Lagrange elements */
+    dg_q1,
+
+    /** dG Q2: discontinuous bi- (tri-) quadratic Lagrange elements */
+    dg_q2,
+
+    /** dG Q3: discontinuous bi- (tri-) cubic Lagrange elements */
+    dg_q3
   };
 } // namespace ryujin
 
@@ -145,7 +157,11 @@ DECLARE_ENUM(ryujin::Boundary,
 DECLARE_ENUM(ryujin::Ansatz,
              LIST({ryujin::Ansatz::cg_q1, "cG Q1"},
                   {ryujin::Ansatz::cg_q2, "cG Q2"},
-                  {ryujin::Ansatz::cg_q3, "cG Q3"}));
+                  {ryujin::Ansatz::cg_q3, "cG Q3"},
+                  {ryujin::Ansatz::dg_q0, "dG Q0"},
+                  {ryujin::Ansatz::dg_q1, "dG Q1"},
+                  {ryujin::Ansatz::dg_q2, "dG Q2"},
+                  {ryujin::Ansatz::dg_q3, "dG Q3"}));
 #endif
 
 namespace ryujin
@@ -267,6 +283,11 @@ namespace ryujin
      */
     ACCESSOR_READ_ONLY(quadrature_1d)
 
+    /**
+     * Return a read-only const reference to the face quadrature rule.
+     */
+    ACCESSOR_READ_ONLY(face_quadrature)
+
   protected:
     const MPI_Comm &mpi_communicator_;
 
@@ -275,6 +296,7 @@ namespace ryujin
     std::unique_ptr<const dealii::FiniteElement<dim>> finite_element_;
     std::unique_ptr<const dealii::Quadrature<dim>> quadrature_;
     std::unique_ptr<const dealii::Quadrature<1>> quadrature_1d_;
+    std::unique_ptr<const dealii::Quadrature<dim - 1>> face_quadrature_;
 
   private:
     //@}
