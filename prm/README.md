@@ -3,7 +3,7 @@
 Parameter files
 ===============
 
-This directory contains a collecting of parameter files ranging from
+This directory contains a collection of parameter files ranging from
 airfoils, to various published benchmark configurations to validation
 configurations with test vectors.
 

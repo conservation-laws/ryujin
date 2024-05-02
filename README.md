@@ -42,7 +42,7 @@ parameter flags:
    equations](https://en.wikipedia.org/wiki/Navier%E2%80%93Stokes_equations)
    with polytropic equation of state,
    Newtonian fluid model, and Fourier's law for the heat flux.
- - `equation = shallow water`, a module for the [shallow-water
+ - `equation = shallow water`, a module for the [shallow water
    equations](https://en.wikipedia.org/wiki/Shallow_water_equations).
  - `equation = scalar conservation`, a module for scalar conservation
    equations with user-supplied flux. The module features a greedy
