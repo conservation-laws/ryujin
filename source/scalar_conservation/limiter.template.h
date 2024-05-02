@@ -53,8 +53,12 @@ namespace ryujin
         success = false;
       }
 
+      const auto regularization =
+          Number(100. * std::numeric_limits<ScalarNumber>::min());
+
       const Number denominator =
-          ScalarNumber(1.) / (std::abs(u_P) + eps * u_max);
+          ScalarNumber(1.) /
+          std::max(regularization, std::abs(u_P) + eps * u_max);
 
       t_r = dealii::compare_and_apply_mask<dealii::SIMDComparison::less_than>(
           u_max,

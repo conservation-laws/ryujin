@@ -197,11 +197,12 @@ namespace ryujin
       Number numerator = left - right;
       Number denominator = std::abs(left) + std::abs(right);
 
+      const auto regularization =
+          Number(100. * std::numeric_limits<ScalarNumber>::min());
+
       const auto quotient =
           std::abs(numerator) /
-          (denominator +
-           std::max(hd_i * std::abs(u_abs_max),
-                    Number(100. * std::numeric_limits<ScalarNumber>::min())));
+          (denominator + std::max(hd_i * std::abs(u_abs_max), regularization));
 
       return std::min(Number(1.), parameters.evc_factor() * quotient);
     }
