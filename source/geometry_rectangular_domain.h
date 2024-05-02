@@ -231,10 +231,6 @@ namespace ryujin
             triangulation.add_periodicity(periodic_faces);
           }
         }
-
-        AssertThrow(dim != 1 || directions.empty(),
-                    dealii::ExcMessage("One dimensional periodic boundary "
-                                       "conditions are not implemented"));
       }
 
     private:
