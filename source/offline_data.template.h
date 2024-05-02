@@ -122,8 +122,10 @@ namespace ryujin
        * Create cG sparsity pattern:
        */
     case Ansatz::cg_q1:
-    case Ansatz::cg_q2: /* fallthrough */
-    case Ansatz::cg_q3: /* fallthrough */
+      [[fallthrough]];
+    case Ansatz::cg_q2:
+      [[fallthrough]];
+    case Ansatz::cg_q3:
 #ifdef DEAL_II_WITH_TRILINOS
       DoFTools::make_sparsity_pattern(
           dof_handler, sparsity_pattern_, affine_constraints_, false);
@@ -142,9 +144,12 @@ namespace ryujin
        * Create dG sparsity pattern:
        */
     case Ansatz::dg_q0:
-    case Ansatz::dg_q1: /* fallthrough */
-    case Ansatz::dg_q2: /* fallthrough */
-    case Ansatz::dg_q3: /* fallthrough */
+      [[fallthrough]];
+    case Ansatz::dg_q1:
+      [[fallthrough]];
+    case Ansatz::dg_q2:
+      [[fallthrough]];
+    case Ansatz::dg_q3:
       DoFTools::make_extended_sparsity_pattern_dg(
           dof_handler, sparsity_pattern_, affine_constraints_, false);
       break;

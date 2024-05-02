@@ -179,7 +179,9 @@ namespace ryujin
       quadrature_ = std::make_unique<QGauss<dim>>(1);
       quadrature_1d_ = std::make_unique<QGauss<1>>(1);
       face_quadrature_ = std::make_unique<QGauss<dim - 1>>(1);
+      break;
     case Ansatz::cg_q1:
+      [[fallthrough]];
     case Ansatz::dg_q1:
       mapping_ = std::make_unique<MappingQ<dim>>(1);
       quadrature_ = std::make_unique<QGauss<dim>>(2);
@@ -187,6 +189,7 @@ namespace ryujin
       face_quadrature_ = std::make_unique<QGauss<dim - 1>>(2);
       break;
     case Ansatz::cg_q2:
+      [[fallthrough]];
     case Ansatz::dg_q2:
       mapping_ = std::make_unique<MappingQ<dim>>(2);
       quadrature_ = std::make_unique<QGauss<dim>>(3);
@@ -194,6 +197,7 @@ namespace ryujin
       face_quadrature_ = std::make_unique<QGauss<dim - 1>>(3);
       break;
     case Ansatz::cg_q3:
+      [[fallthrough]];
     case Ansatz::dg_q3:
       mapping_ = std::make_unique<MappingQ<dim>>(3);
       quadrature_ = std::make_unique<QGauss<dim>>(4);
