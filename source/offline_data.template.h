@@ -115,19 +115,39 @@ namespace ryujin
 
     sparsity_pattern_.reinit(
         dof_handler.n_dofs(), dof_handler.n_dofs(), locally_relevant);
+
+    switch (discretization_->ansatz()) {
+      /*
+       * Create cG sparsity pattern:
+       */
+    case Ansatz::cg_q1:
+    case Ansatz::cg_q2: /* fallthrough */
+    case Ansatz::cg_q3: /* fallthrough */
 #ifdef DEAL_II_WITH_TRILINOS
-    DoFTools::make_sparsity_pattern(
-        dof_handler, sparsity_pattern_, affine_constraints_, false);
+      DoFTools::make_sparsity_pattern(
+          dof_handler, sparsity_pattern_, affine_constraints_, false);
 #else
-    /*
-     * In case we use dealii::SparseMatrix<Number> for assembly we need a
-     * sparsity pattern that also includes the full locally relevant -
-     * locally relevant coupling block. This gets thrown out again later,
-     * but nevertheless we have to add it.
-     */
-    DoFTools::make_extended_sparsity_pattern(
-        dof_handler, sparsity_pattern_, affine_constraints_, false);
+      /*
+       * In case we use dealii::SparseMatrix<Number> for assembly we need a
+       * sparsity pattern that also includes the full locally relevant -
+       * locally relevant coupling block. This gets thrown out again later,
+       * but nevertheless we have to add it.
+       */
+      DoFTools::make_extended_sparsity_pattern(
+          dof_handler, sparsity_pattern_, affine_constraints_, false);
 #endif
+      break;
+      /*
+       * Create dG sparsity pattern:
+       */
+    case Ansatz::dg_q0:
+    case Ansatz::dg_q1: /* fallthrough */
+    case Ansatz::dg_q2: /* fallthrough */
+    case Ansatz::dg_q3: /* fallthrough */
+      DoFTools::make_extended_sparsity_pattern_dg(
+          dof_handler, sparsity_pattern_, affine_constraints_, false);
+      break;
+    }
 
     /*
      * We have to complete the local stencil to have consistent size over

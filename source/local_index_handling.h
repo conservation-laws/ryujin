@@ -392,6 +392,7 @@ namespace ryujin
     /** Import a function from deal.II into the current namespace. */
     using dealii::DoFTools::make_sparsity_pattern;
 
+
     /**
      * Given a @p dof_handler, and constraints @p affine_constraints this
      * function creates an extended sparsity pattern that also includes
@@ -414,13 +415,84 @@ namespace ryujin
         if (cell->is_artificial())
           continue;
 
-        /* translate into local index ranges: */
         cell->get_dof_indices(dof_indices);
-
         affine_constraints.add_entries_local_to_global(
             dof_indices, dsp, keep_constrained);
       }
     }
+
+
+    /**
+     * Given a @p dof_handler, and constraints @p affine_constraints this
+     * function creates an extended sparsity pattern for the discontinuous
+     * Galerkin formulation that also includes locally relevant to locally
+     * relevant couplings.
+     *
+     * @ingroup FiniteElement
+     */
+    template <int dim, typename Number, typename SPARSITY>
+    void make_extended_sparsity_pattern_dg(
+        const dealii::DoFHandler<dim> &dof_handler,
+        SPARSITY &dsp,
+        const dealii::AffineConstraints<Number> &affine_constraints,
+        bool keep_constrained)
+    {
+      Assert(affine_constraints.n_constraints() == 0,
+             dealii::ExcMessage("I don't think constraints make sense for dG"));
+
+      const auto &fe = dof_handler.get_fe();
+      const unsigned int dofs_per_cell = fe.dofs_per_cell;
+      std::vector<dealii::types::global_dof_index> dof_indices(dofs_per_cell);
+      std::vector<dealii::types::global_dof_index> neighbor_dof_indices(
+          dofs_per_cell);
+
+      /* we iterate over locally owned cells and the ghost layer */
+      for (auto cell : dof_handler.active_cell_iterators()) {
+        if (cell->is_artificial())
+          continue;
+
+        cell->get_dof_indices(dof_indices);
+
+        affine_constraints.add_entries_local_to_global(
+            dof_indices, dsp, keep_constrained);
+
+        for (const auto f_index : cell->face_indices()) {
+          const auto &face = cell->face(f_index);
+
+          /* Skip faces without neighbors... */
+          const bool has_neighbor =
+              !face->at_boundary() || cell->has_periodic_neighbor(f_index);
+          if (!has_neighbor)
+            continue;
+
+          /* Avoid artificial cells: */
+          const auto neighbor_cell = cell->neighbor(f_index);
+          if (neighbor_cell->is_artificial())
+            continue;
+
+          const unsigned int f_index_neighbor =
+              cell->neighbor_of_neighbor(f_index);
+
+          neighbor_cell->get_dof_indices(neighbor_dof_indices);
+
+          /*
+           * Construct all couplings between current and neighbor cell with
+           * DoFs located at the boundary:
+           */
+          for (unsigned int i = 0; i < dofs_per_cell; ++i) {
+            if (!fe.has_support_on_face(i, f_index))
+              continue;
+            for (unsigned int j = 0; j < dofs_per_cell; ++j) {
+              if (!fe.has_support_on_face(j, f_index_neighbor))
+                continue;
+              dsp.add(dof_indices[i], neighbor_dof_indices[j]);
+            }
+          }
+        }
+      }
+    }
+
+
   } // namespace DoFTools
 
 } // namespace ryujin
