@@ -211,11 +211,12 @@ namespace ryujin
       Number numerator = std::abs(left - my_sum);
       Number denominator = std::abs(left) + std::abs(my_sum);
 
+      const auto regularization =
+          Number(100. * std::numeric_limits<ScalarNumber>::min());
+
       const auto quotient =
           std::abs(numerator) /
-          (denominator +
-           std::max(hd_i * std::abs(eta_i),
-                    Number(100. * std::numeric_limits<ScalarNumber>::min())));
+          (denominator + std::max(hd_i * std::abs(eta_i), regularization));
 
       return std::min(Number(1.), parameters.evc_factor() * quotient);
     }

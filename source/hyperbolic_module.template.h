@@ -638,7 +638,9 @@ namespace ryujin
 #endif
 
             const auto c_ij = cij_matrix.template get_tensor<T>(i, col_idx);
-            const auto scaled_c_ij = c_ij / d_ij;
+            const auto regularization =
+                T(100. * std::numeric_limits<Number>::min());
+            const auto scaled_c_ij = c_ij / std::max(d_ij, regularization);
 
             const auto beta_ij =
                 betaij_matrix.template get_entry<T>(i, col_idx);
