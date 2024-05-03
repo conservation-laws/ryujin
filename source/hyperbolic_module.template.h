@@ -180,6 +180,7 @@ namespace ryujin
     const auto &mass_matrix = offline_data_->mass_matrix();
     const auto &betaij_matrix = offline_data_->betaij_matrix();
     const auto &cij_matrix = offline_data_->cij_matrix();
+    const auto &incidence_matrix = offline_data_->incidence_matrix();
 
     const auto &boundary_map = offline_data_->boundary_map();
     const auto &coupling_boundary_pairs =
@@ -520,7 +521,10 @@ namespace ryujin
       RYUJIN_PARALLEL_REGION_BEGIN
       LIKWID_MARKER_START(("time_step_" + std::to_string(step_no)).c_str());
 
-      auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
+      auto loop = [&](auto sentinel,
+                      auto have_discontinuous_ansatz,
+                      unsigned int left,
+                      unsigned int right) {
         using T = decltype(sentinel);
         using View =
             typename Description::template HyperbolicSystemView<dim, T>;
@@ -622,7 +626,15 @@ namespace ryujin
             const auto alpha_j = get_entry<T>(alpha_, js);
 
             const auto d_ij = dij_matrix_.template get_entry<T>(i, col_idx);
-            const auto d_ijH = d_ij * (alpha_i + alpha_j) * Number(.5);
+            auto factor = (alpha_i + alpha_j) * Number(.5);
+
+            if constexpr (have_discontinuous_ansatz) {
+              const auto incidence_ij =
+                  incidence_matrix.template get_entry<T>(i, col_idx);
+              factor = std::max(factor, incidence_ij);
+            }
+
+            const auto d_ijH = d_ij * factor;
 
 #ifdef DEBUG
             /*
@@ -755,10 +767,21 @@ namespace ryujin
         }
       };
 
-      /* Parallel non-vectorized loop: */
-      loop(Number(), n_internal, n_owned);
-      /* Parallel vectorized SIMD loop: */
-      loop(VA(), 0, n_internal);
+      /*
+       * Chain through a compile time integral constant std::true_type for
+       * a discontinuous ansatz and std::false_type otherwise. We use the
+       * (constexpr) integral constant later on to avoid branching when
+       * computing d_ijH.
+       */
+      if (offline_data_->discretization().have_discontinuous_ansatz()) {
+        /* Parallel non-vectorized loop and vectorized SIMD loop: */
+        loop(Number(), std::true_type{}, n_internal, n_owned);
+        loop(VA(), std::true_type{}, 0, n_internal);
+      } else {
+        /* Parallel non-vectorized loop and vectorized SIMD loop: */
+        loop(Number(), std::false_type{}, n_internal, n_owned);
+        loop(VA(), std::false_type{}, 0, n_internal);
+      }
 
       LIKWID_MARKER_STOP(("time_step_" + std::to_string(step_no)).c_str());
       RYUJIN_PARALLEL_REGION_END
