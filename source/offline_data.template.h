@@ -117,15 +117,16 @@ namespace ryujin
     sparsity_pattern_.reinit(
         dof_handler.n_dofs(), dof_handler.n_dofs(), locally_relevant);
 
-    switch (discretization_->ansatz()) {
+    if (discretization_->have_discontinuous_ansatz()) {
+      /*
+       * Create dG sparsity pattern:
+       */
+      DoFTools::make_extended_sparsity_pattern_dg(
+          dof_handler, sparsity_pattern_, affine_constraints_, false);
+    } else {
       /*
        * Create cG sparsity pattern:
        */
-    case Ansatz::cg_q1:
-      [[fallthrough]];
-    case Ansatz::cg_q2:
-      [[fallthrough]];
-    case Ansatz::cg_q3:
 #ifdef DEAL_II_WITH_TRILINOS
       DoFTools::make_sparsity_pattern(
           dof_handler, sparsity_pattern_, affine_constraints_, false);
@@ -139,20 +140,6 @@ namespace ryujin
       DoFTools::make_extended_sparsity_pattern(
           dof_handler, sparsity_pattern_, affine_constraints_, false);
 #endif
-      break;
-      /*
-       * Create dG sparsity pattern:
-       */
-    case Ansatz::dg_q0:
-      [[fallthrough]];
-    case Ansatz::dg_q1:
-      [[fallthrough]];
-    case Ansatz::dg_q2:
-      [[fallthrough]];
-    case Ansatz::dg_q3:
-      DoFTools::make_extended_sparsity_pattern_dg(
-          dof_handler, sparsity_pattern_, affine_constraints_, false);
-      break;
     }
 
     /*
@@ -468,21 +455,6 @@ namespace ryujin
     const unsigned int n_face_q_points =
         discretization_->face_quadrature().size();
 
-    bool assemble_dg_interface_terms = false;
-    switch (discretization_->ansatz()) {
-    case Ansatz::cg_q1:
-    case Ansatz::cg_q2: /* fallthrough */
-    case Ansatz::cg_q3: /* fallthrough */
-      assemble_dg_interface_terms = false;
-      break;
-    case Ansatz::dg_q0:
-    case Ansatz::dg_q1: /* fallthrough */
-    case Ansatz::dg_q2: /* fallthrough */
-    case Ansatz::dg_q3: /* fallthrough */
-      assemble_dg_interface_terms = true;
-      break;
-    }
-
     /*
      * Now, assemble all matrices:
      */
@@ -525,7 +497,7 @@ namespace ryujin
           cell_betaij_matrix.reinit(dofs_per_cell, dofs_per_cell);
           for (auto &matrix : cell_cij_matrix)
             matrix.reinit(dofs_per_cell, dofs_per_cell);
-          if (assemble_dg_interface_terms)
+          if (discretization_->have_discontinuous_ansatz())
             for (auto &it : interface_cij_matrix)
               for (auto &matrix : it)
                 matrix.reinit(dofs_per_cell, dofs_per_cell);
@@ -540,7 +512,7 @@ namespace ryujin
           cell_betaij_matrix = 0.;
           for (auto &matrix : cell_cij_matrix)
             matrix = 0.;
-          if (assemble_dg_interface_terms)
+          if (discretization_->have_discontinuous_ansatz())
             for (auto &it : interface_cij_matrix)
               for (auto &matrix : it)
                 matrix = 0.;
@@ -574,7 +546,7 @@ namespace ryujin
            * Assemble dG face terms:
            */
 
-          if (!assemble_dg_interface_terms)
+          if (!discretization_->have_discontinuous_ansatz())
             return;
 
           for (const auto f_index : cell->face_indices()) {
