@@ -27,6 +27,8 @@ namespace ryujin
   /**
    * Dispatcher class that calls into the right TimeLoop for a configured
    * equation depending on what has been set in the parameter file.
+   *
+   * @ingroup TimeLoop
    */
   class EquationDispatch : dealii::ParameterAcceptor
   {

@@ -210,9 +210,9 @@ namespace ryujin
 
     template <typename Description, int dim, typename Number>
     void ParabolicSolver<Description, dim, Number>::backward_euler_step(
-        const vector_type &old_U,
+        const StateVector &old_state_vector,
         const Number t,
-        vector_type &new_U,
+        StateVector &new_state_vector,
         Number tau,
         const IDViolationStrategy id_violation_strategy,
         const bool reinitialize_gmg) const
@@ -220,6 +220,9 @@ namespace ryujin
 #ifdef DEBUG_OUTPUT
       std::cout << "ParabolicSolver<dim, Number>::step()" << std::endl;
 #endif
+
+      const auto &old_U = std::get<0>(old_state_vector);
+      auto &new_U = std::get<0>(new_state_vector);
 
       CALLGRIND_START_INSTRUMENTATION;
 
@@ -471,7 +474,7 @@ namespace ryujin
               preconditioner(dof_handler, mg, mg_transfer_velocity_);
 
           SolverControl solver_control(gmg_max_iter_vel_, tolerance_velocity);
-          SolverCG<block_vector_type> solver(solver_control);
+          SolverCG<BlockVector> solver(solver_control);
           solver.solve(
               velocity_operator, velocity_, velocity_rhs_, preconditioner);
 
@@ -482,7 +485,7 @@ namespace ryujin
         } catch (SolverControl::NoConvergence &) {
 
           SolverControl solver_control(1000, tolerance_velocity);
-          SolverCG<block_vector_type> solver(solver_control);
+          SolverCG<BlockVector> solver(solver_control);
           solver.solve(
               velocity_operator, velocity_, velocity_rhs_, diagonal_matrix);
 
@@ -506,7 +509,7 @@ namespace ryujin
         LIKWID_MARKER_START("time_step_parabolic_2");
 
         /* Compute m_i K_i^{n+1/2}:  (5.5) */
-        matrix_free_.template cell_loop<scalar_type, block_vector_type>(
+        matrix_free_.template cell_loop<ScalarVector, BlockVector>(
             [this](const auto &data,
                    auto &dst,
                    const auto &src,
@@ -716,7 +719,7 @@ namespace ryujin
 
           SolverControl solver_control(gmg_max_iter_en_,
                                        tolerance_internal_energy);
-          SolverCG<scalar_type> solver(solver_control);
+          SolverCG<ScalarVector> solver(solver_control);
           solver.solve(energy_operator,
                        internal_energy_,
                        internal_energy_rhs_,
@@ -729,7 +732,7 @@ namespace ryujin
         } catch (SolverControl::NoConvergence &) {
 
           SolverControl solver_control(1000, tolerance_internal_energy);
-          SolverCG<scalar_type> solver(solver_control);
+          SolverCG<ScalarVector> solver(solver_control);
           solver.solve(energy_operator,
                        internal_energy_,
                        internal_energy_rhs_,

@@ -33,14 +33,12 @@ namespace ryujin
   class InitialState : public dealii::ParameterAcceptor
   {
   public:
-    /**
-     * @copydoc HyperbolicSystemView
-     */
     using View =
         typename Description::template HyperbolicSystemView<dim, Number>;
 
     using state_type = typename View::state_type;
-    using precomputed_state_type = typename View::precomputed_state_type;
+
+    using initial_precomputed_type = typename View::initial_precomputed_type;
 
     /**
      * Constructor taking initial state name @p name and a subsection @p
@@ -67,14 +65,14 @@ namespace ryujin
      * flux computation via HyperbolicSystem::flux_contribution().
      *
      * The default implementation of this function simply returns a zero
-     * value. In case of the @ref ShallowWaterEquations we precompute the
+     * value. In case of the @ref ShallowWaterEquations we pre-compute the
      * bathymetry. In case of @ref LinearTransport we precompute the
      * advection field.
      */
-    virtual precomputed_state_type
+    virtual initial_precomputed_type
     initial_precomputations(const dealii::Point<dim> & /*point*/)
     {
-      return precomputed_state_type();
+      return initial_precomputed_type{};
     }
 
     /**

@@ -17,6 +17,8 @@ namespace ryujin
 {
   /**
    * Controls the chosen invariant domain / CFL recovery strategy.
+   *
+   * @ingroup TimeLoop
    */
   enum class CFLRecoveryStrategy {
     /**
@@ -37,6 +39,8 @@ namespace ryujin
 
   /**
    * Controls the chosen time-stepping scheme.
+   *
+   * @ingroup TimeLoop
    */
   enum class TimeSteppingScheme {
     /**
@@ -173,41 +177,24 @@ namespace ryujin
   {
   public:
     /**
-     * @copydoc HyperbolicSystem
+     * @name Typedefs and constexpr constants
      */
+    //@{
+
     using HyperbolicSystem = typename Description::HyperbolicSystem;
 
-    /**
-     * @copydoc ParabolicSystem
-     */
-    using ParabolicSystem = typename Description::ParabolicSystem;
-
-    /**
-     * @copydoc HyperbolicSystemView
-     */
     using View =
         typename Description::template HyperbolicSystemView<dim, Number>;
 
-    /**
-     * @copydoc HyperbolicSystem::problem_dimension
-     */
-    static constexpr unsigned int problem_dimension = View::problem_dimension;
+    using ParabolicSystem = typename Description::ParabolicSystem;
 
-    /**
-     * @copydoc HyperbolicSystem::n_precomputed_values
-     */
-    static constexpr unsigned int n_precomputed_values =
-        View::n_precomputed_values;
+    using StateVector = typename View::StateVector;
 
+    //@}
     /**
-     * Typedef for a MultiComponentVector storing the state U.
+     * @name Constructor and setup
      */
-    using vector_type = MultiComponentVector<Number, problem_dimension>;
-
-    /**
-     * Typedef for a MultiComponentVector storing precomputed values.
-     */
-    using precomputed_type = MultiComponentVector<Number, n_precomputed_values>;
+    //@{
 
     /**
      * Constructor.
@@ -227,6 +214,7 @@ namespace ryujin
      */
     void prepare();
 
+    //@}
     /**
      * @name Functions for performing explicit time steps
      */
@@ -244,7 +232,7 @@ namespace ryujin
      * adaptation and recovery strategies for invariant domain violations
      * are used.
      */
-    Number step(vector_type &U, Number t);
+    Number step(StateVector &state_vector, Number t);
 
     /**
      * The selected time-stepping scheme.
@@ -270,7 +258,7 @@ namespace ryujin
      * supplied value is used for time stepping instead of the computed
      * maximal time step size.
      */
-    Number step_ssprk_22(vector_type &U, Number t);
+    Number step_ssprk_22(StateVector &state_vector, Number t);
 
     /**
      * Given a reference to a previous state vector U performs an explicit
@@ -282,35 +270,35 @@ namespace ryujin
      * supplied value is used for time stepping instead of the computed
      * maximal time step size.
      */
-    Number step_ssprk_33(vector_type &U, Number t);
+    Number step_ssprk_33(StateVector &state_vector, Number t);
 
     /**
      * Given a reference to a previous state vector U performs an explicit
      * first-order Euler step ERK(1,1;1) time step (and store the result
      * in U). The function returns the chosen time step size tau.
      */
-    Number step_erk_11(vector_type &U, Number t);
+    Number step_erk_11(StateVector &state_vector, Number t);
 
     /**
      * Given a reference to a previous state vector U performs an explicit
      * second-order Runge-Kutta ERK(2,2;1) time step (and store the result
      * in U). The function returns the chosen time step size tau.
      */
-    Number step_erk_22(vector_type &U, Number t);
+    Number step_erk_22(StateVector &state_vector, Number t);
 
     /**
      * Given a reference to a previous state vector U performs an explicit
      * third-order Runge-Kutta ERK(3,3;1) time step (and store the result
      * in U). The function returns the chosen time step size tau.
      */
-    Number step_erk_33(vector_type &U, Number t);
+    Number step_erk_33(StateVector &state_vector, Number t);
 
     /**
      * Given a reference to a previous state vector U performs an explicit
      * 4 stage third-order Runge-Kutta ERK(4,3;1) time step (and store the
      * result in U). The function returns the chosen time step size tau.
      */
-    Number step_erk_43(vector_type &U, Number t);
+    Number step_erk_43(StateVector &state_vector, Number t);
 
     /**
      * Given a reference to a previous state vector U performs an explicit
@@ -318,7 +306,7 @@ namespace ryujin
      * the result in U). The function returns the chosen time step size
      * tau.
      */
-    Number step_erk_54(vector_type &U, Number t);
+    Number step_erk_54(StateVector &state_vector, Number t);
 
     /**
      * Given a reference to a previous state vector U performs a combined
@@ -327,7 +315,7 @@ namespace ryujin
      * store the result in U). The function returns the chosen time step
      * size tau.
      */
-    Number step_strang_ssprk_33_cn(vector_type &U, Number t);
+    Number step_strang_ssprk_33_cn(StateVector &state_vector, Number t);
 
     /**
      * Given a reference to a previous state vector U performs a combined
@@ -336,7 +324,7 @@ namespace ryujin
      * the result in U). The function returns the chosen time step size
      * tau.
      */
-    Number step_strang_erk_33_cn(vector_type &U, Number t);
+    Number step_strang_erk_33_cn(StateVector &state_vector, Number t);
 
     /**
      * Given a reference to a previous state vector U performs a combined
@@ -345,7 +333,7 @@ namespace ryujin
      * the result in U). The function returns the chosen time step size
      * tau.
      */
-    Number step_strang_erk_43_cn(vector_type &U, Number t);
+    Number step_strang_erk_43_cn(StateVector &state_vector, Number t);
 
   private:
     //@}
@@ -379,8 +367,7 @@ namespace ryujin
     dealii::SmartPointer<const ParabolicModule<Description, dim, Number>>
         parabolic_module_;
 
-    std::vector<vector_type> U_;
-    std::vector<precomputed_type> precomputed_;
+    std::vector<StateVector> temporary_;
 
     //@}
   };

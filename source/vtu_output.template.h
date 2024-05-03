@@ -47,8 +47,8 @@ namespace ryujin
               std::end(View::component_names),
               std::back_inserter(vtu_output_quantities_));
 
-    std::copy(std::begin(View::precomputed_initial_names),
-              std::end(View::precomputed_initial_names),
+    std::copy(std::begin(View::initial_precomputed_names),
+              std::end(View::initial_precomputed_names),
               std::back_inserter(vtu_output_quantities_));
 
     add_parameter("vtu output quantities",
@@ -79,13 +79,12 @@ namespace ryujin
         const auto pos = std::find(std::begin(names), std::end(names), entry);
         if (pos != std::end(names)) {
           const auto index = std::distance(std::begin(names), pos);
-          quantities_mapping_.push_back(
-              std::make_tuple(entry,
-                              [index](scalar_type &result,
-                                      const vector_type &U,
-                                      const precomputed_type &) {
-                                U.extract_component(result, index);
-                              }));
+          quantities_mapping_.push_back(std::make_tuple(
+              entry,
+              [index](ScalarVector &result, const StateVector &state_vector) {
+                const auto &U = std::get<0>(state_vector);
+                U.extract_component(result, index);
+              }));
           continue;
         }
       }
@@ -99,9 +98,9 @@ namespace ryujin
           const auto index = std::distance(std::begin(names), pos);
           quantities_mapping_.push_back(std::make_tuple(
               entry,
-              [this, index](scalar_type &result,
-                            const vector_type &U,
-                            const precomputed_type &) {
+              [this, index](ScalarVector &result,
+                            const StateVector &state_vector) {
+                const auto &U = std::get<0>(state_vector);
                 /*
                  * FIXME: We might traverse the same vector multiple times. This
                  * is inefficient.
@@ -121,16 +120,13 @@ namespace ryujin
       {
         /* Precomputed initial quantities: */
 
-        constexpr auto &names = View::precomputed_initial_names;
+        constexpr auto &names = View::initial_precomputed_names;
         const auto pos = std::find(std::begin(names), std::end(names), entry);
         if (pos != std::end(names)) {
           const auto index = std::distance(std::begin(names), pos);
           quantities_mapping_.push_back(std::make_tuple(
-              entry,
-              [this, index](scalar_type &result,
-                            const vector_type &,
-                            const precomputed_type &) {
-                hyperbolic_module_->precomputed_initial().extract_component(
+              entry, [this, index](ScalarVector &result, const StateVector &) {
+                hyperbolic_module_->initial_precomputed().extract_component(
                     result, index);
               }));
           continue;
@@ -146,10 +142,9 @@ namespace ryujin
           const auto index = std::distance(std::begin(names), pos);
           quantities_mapping_.push_back(std::make_tuple(
               entry,
-              [index](scalar_type &result,
-                      const vector_type &,
-                      const precomputed_type &precomputed_values) {
-                precomputed_values.extract_component(result, index);
+              [index](ScalarVector &result, const StateVector &state_vector) {
+                const auto &precomputed = std::get<1>(state_vector);
+                precomputed.extract_component(result, index);
               }));
           need_to_prepare_step_ = true;
           continue;
@@ -160,14 +155,11 @@ namespace ryujin
         /* Special indicator value: */
 
         if (entry == "alpha") {
-          quantities_mapping_.push_back(
-              std::make_tuple(entry,
-                              [this](scalar_type &result,
-                                     const vector_type &,
-                                     const precomputed_type &) {
-                                const auto &alpha = hyperbolic_module_->alpha();
-                                result = alpha;
-                              }));
+          quantities_mapping_.push_back(std::make_tuple(
+              entry, [this](ScalarVector &result, const StateVector &) {
+                const auto &alpha = hyperbolic_module_->alpha();
+                result = alpha;
+              }));
           need_to_prepare_step_ = true;
           continue;
         }
@@ -184,8 +176,7 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   void VTUOutput<Description, dim, Number>::schedule_output(
-      const vector_type &U,
-      const precomputed_type &precomputed_values,
+      const StateVector &state_vector,
       std::string name,
       Number t,
       unsigned int cycle,
@@ -203,7 +194,7 @@ namespace ryujin
            ExcInternalError());
     for (unsigned int d = 0; d < quantities_.size(); ++d) {
       const auto &lambda = std::get<1>(quantities_mapping_[d]);
-      lambda(quantities_[d], U, precomputed_values);
+      lambda(quantities_[d], state_vector);
       affine_constraints.distribute(quantities_[d]);
       quantities_[d].update_ghost_values();
     }

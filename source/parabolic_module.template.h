@@ -52,11 +52,12 @@ namespace ryujin
   template <typename Description, int dim, typename Number>
   template <int stages>
   void ParabolicModule<Description, dim, Number>::step(
-      const vector_type &old_U,
+      const StateVector &old_state_vector,
       const Number old_t,
-      std::array<std::reference_wrapper<const vector_type>, stages> /*stage_U*/,
+      std::array<std::reference_wrapper<const StateVector>,
+                 stages> /*stage_state_vectors*/,
       const std::array<Number, stages> /*stage_weights*/,
-      vector_type &new_U,
+      StateVector &new_state_vector,
       Number tau) const
   {
     if constexpr (ParabolicSystem::is_identity) {
@@ -70,11 +71,13 @@ namespace ryujin
 
       static_assert(stages == 0, "high order fluxes are not implemented");
 
-      /* FIXME: This needs to be refactored really really badly. */
-
       const bool reinit_gmg = cycle_++ % 4 == 0;
-      parabolic_solver_.backward_euler_step(
-          old_U, old_t, new_U, tau, id_violation_strategy_, reinit_gmg);
+      parabolic_solver_.backward_euler_step(old_state_vector,
+                                            old_t,
+                                            new_state_vector,
+                                            tau,
+                                            id_violation_strategy_,
+                                            reinit_gmg);
       n_restarts_ = parabolic_solver_.n_restarts();
       n_warnings_ = parabolic_solver_.n_warnings();
     }

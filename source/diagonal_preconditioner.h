@@ -5,9 +5,7 @@
 
 #pragma once
 
-#include "offline_data.h"
-#include "openmp.h"
-#include "simd.h"
+#include "state_vector.h"
 
 #include <deal.II/lac/la_parallel_block_vector.h>
 
@@ -17,23 +15,21 @@ namespace ryujin
    * A preconditioner implementing a diagonal scaling used for the
    * non-multigrid CG iteration.
    *
-   * @ingroup DissipationModule
+   * @ingroup ParabolicModule
    */
-  template <int dim, typename Number>
+  template <typename Number>
   class DiagonalPreconditioner
   {
   public:
     /**
-     * @copydoc OfflineData::scalar_type
+     * @copydoc ryujin::ScalarVector
      */
-    using scalar_type = typename OfflineData<dim, Number>::scalar_type;
+    using ScalarVector = typename Vectors::ScalarVector<Number>;
 
     /**
-     * A distributed block vector used for temporary storage of the
-     * velocity field.
+     * @copydoc ryujin::BlockVector
      */
-    using block_vector_type =
-        dealii::LinearAlgebra::distributed::BlockVector<Number>;
+    using BlockVector = typename Vectors::BlockVector<Number>;
 
     /**
      * Constructor
@@ -43,8 +39,8 @@ namespace ryujin
     /**
      * Reinit with a scalar partitioner
      */
-    void reinit(std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
-                    scalar_partitioner)
+    void reinit(const std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
+                    &scalar_partitioner)
     {
       diagonal_.reinit(scalar_partitioner);
     }
@@ -52,7 +48,7 @@ namespace ryujin
     /**
      * Get access to the internal vector to be externally filled.
      */
-    scalar_type &scaling_vector()
+    ScalarVector &scaling_vector()
     {
       return diagonal_;
     }
@@ -60,7 +56,7 @@ namespace ryujin
     /**
      * Apply on a scalar vector.
      */
-    void vmult(scalar_type &dst, const scalar_type &src) const
+    void vmult(ScalarVector &dst, const ScalarVector &src) const
     {
       const auto n_owned = diagonal_.get_partitioner()->locally_owned_size();
       AssertDimension(n_owned, src.get_partitioner()->locally_owned_size());
@@ -75,7 +71,7 @@ namespace ryujin
     /**
      * Apply on a block vector.
      */
-    void vmult(block_vector_type &dst, const block_vector_type &src) const
+    void vmult(BlockVector &dst, const BlockVector &src) const
     {
       const auto n_blocks = src.n_blocks();
       AssertDimension(n_blocks, dst.n_blocks());
@@ -96,7 +92,7 @@ namespace ryujin
     }
 
   private:
-    scalar_type diagonal_;
+    ScalarVector diagonal_;
   };
 
 } /* namespace ryujin */

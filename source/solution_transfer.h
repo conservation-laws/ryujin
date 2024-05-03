@@ -28,35 +28,26 @@ namespace ryujin
   {
   public:
     /**
-     * @copydoc HyperbolicSystem
+     * @name Typedefs and constexpr constants
      */
+    //@{
+
     using HyperbolicSystem = typename Description::HyperbolicSystem;
 
-    /**
-     * @copydoc HyperbolicSystemView
-     */
     using View =
         typename Description::template HyperbolicSystemView<dim, Number>;
 
-    /**
-     * @copydoc HyperbolicSystem::problem_dimension
-     */
-    static constexpr unsigned int problem_dimension = View::problem_dimension;
+    static constexpr auto problem_dimension = View::problem_dimension;
 
-    /**
-     * @copydoc HyperbolicSystem::state_type
-     */
-    using state_type = typename View::state_type;
+    using StateVector = typename View::StateVector;
 
-    /**
-     * @copydoc OfflineData::scalar_type
-     */
-    using scalar_type = typename OfflineData<dim, Number>::scalar_type;
+    using ScalarVector = Vectors::ScalarVector<Number>;
 
+    //@}
     /**
-     * Typedef for a MultiComponentVector storing the state U.
+     * @name Constructor and setup
      */
-    using vector_type = MultiComponentVector<Number, problem_dimension>;
+    //@{
 
     /**
      * Constructor.
@@ -77,8 +68,10 @@ namespace ryujin
      *
      * This function has to be called before the actual grid refinement.
      */
-    void prepare_for_interpolation(const vector_type &U)
+    void prepare_for_interpolation(const StateVector &state_vector)
     {
+      const auto &U = std::get<0>(state_vector);
+
       const auto &scalar_partitioner = offline_data_->scalar_partitioner();
       const auto &affine_constraints = offline_data_->affine_constraints();
 
@@ -87,8 +80,9 @@ namespace ryujin
         it.reinit(scalar_partitioner);
 
       /*
-       * FIXME: we need to copy over to an auxiliary  state_ vector because
-       * dealii::SolutionTransfer cannot work on our MultiComponentVector
+       * We need to copy over to an auxiliary state vector formed by a
+       * ScalarVector for each component because dealii::SolutionTransfer
+       * cannot work on our StateVector or MultiComponentVector
        */
 
       for (unsigned int k = 0; k < problem_dimension; ++k) {
@@ -97,7 +91,7 @@ namespace ryujin
         state_[k].update_ghost_values();
       }
 
-      std::vector<const scalar_type *> ptr_state;
+      std::vector<const ScalarVector *> ptr_state;
       std::transform(state_.begin(),
                      state_.end(),
                      std::back_inserter(ptr_state),
@@ -112,8 +106,10 @@ namespace ryujin
      *
      * This function has to be called after the actual grid refinement.
      */
-    void interpolate(vector_type &U)
+    void interpolate(StateVector &state_vector)
     {
+      auto &U = std::get<0>(state_vector);
+
       const auto &scalar_partitioner = offline_data_->scalar_partitioner();
 
       U.reinit(offline_data_->vector_partitioner());
@@ -124,7 +120,7 @@ namespace ryujin
         it.zero_out_ghost_values();
       }
 
-      std::vector<scalar_type *> ptr_interpolated_state;
+      std::vector<ScalarVector *> ptr_interpolated_state;
       std::transform(interpolated_state_.begin(),
                      interpolated_state_.end(),
                      std::back_inserter(ptr_interpolated_state),
@@ -150,11 +146,11 @@ namespace ryujin
     dealii::SmartPointer<const OfflineData<dim, Number>> offline_data_;
     const HyperbolicSystem &hyperbolic_system_;
 
-    dealii::parallel::distributed::SolutionTransfer<dim, scalar_type>
+    dealii::parallel::distributed::SolutionTransfer<dim, ScalarVector>
         solution_transfer_;
 
-    std::vector<scalar_type> state_;
-    std::vector<scalar_type> interpolated_state_;
+    std::vector<ScalarVector> state_;
+    std::vector<ScalarVector> interpolated_state_;
     //@}
   };
 

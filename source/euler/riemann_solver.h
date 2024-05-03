@@ -61,14 +61,17 @@ namespace ryujin
     {
     public:
       /**
-       * @copydoc HyperbolicSystemView
+       * @name Typedefs and constexpr constants
        */
+      //@{
+
       using View = HyperbolicSystemView<dim, Number>;
 
-      /**
-       * @copydoc HyperbolicSystemView::problem_dimension
-       */
-      static constexpr unsigned int problem_dimension = View::problem_dimension;
+      using ScalarNumber = typename View::ScalarNumber;
+
+      static constexpr auto problem_dimension = View::problem_dimension;
+
+      using state_type = typename View::state_type;
 
       /**
        * Number of components in a primitive state, we store \f$[\rho, v,
@@ -82,27 +85,13 @@ namespace ryujin
        */
       using primitive_type = std::array<Number, riemann_data_size>;
 
-      /**
-       * @copydoc HyperbolicSystemView::state_type
-       */
-      using state_type = typename View::state_type;
+      using precomputed_type = typename View::precomputed_type;
 
-      /**
-       * @copydoc HyperbolicSystemView::n_precomputed_values
-       */
-      static constexpr unsigned int n_precomputed_values =
-          View::n_precomputed_values;
+      using PrecomputedVector = typename View::PrecomputedVector;
 
-      /**
-       * @copydoc HyperbolicSystemView::ScalarNumber
-       */
-      using ScalarNumber = typename View::ScalarNumber;
-
-      /**
-       * @copydoc RiemannSolverParameters
-       */
       using Parameters = RiemannSolverParameters<ScalarNumber>;
 
+      //@}
       /**
        * @name Compute wavespeed estimates
        */
@@ -111,11 +100,9 @@ namespace ryujin
       /**
        * Constructor taking a HyperbolicSystem instance as argument
        */
-      RiemannSolver(
-          const HyperbolicSystem &hyperbolic_system,
-          const Parameters &parameters,
-          const MultiComponentVector<ScalarNumber, n_precomputed_values>
-              &precomputed_values)
+      RiemannSolver(const HyperbolicSystem &hyperbolic_system,
+                    const Parameters &parameters,
+                    const PrecomputedVector &precomputed_values)
           : hyperbolic_system(hyperbolic_system)
           , parameters(parameters)
           , precomputed_values(precomputed_values)
@@ -288,9 +275,7 @@ namespace ryujin
     private:
       const HyperbolicSystem &hyperbolic_system;
       const Parameters &parameters;
-
-      const MultiComponentVector<ScalarNumber, n_precomputed_values>
-          &precomputed_values;
+      const PrecomputedVector &precomputed_values;
       //@}
     };
   } // namespace Euler

@@ -10,6 +10,7 @@
 #include <multicomponent_vector.h>
 #include <patterns_conversion.h>
 #include <simd.h>
+#include <state_vector.h>
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/tensor.h>
@@ -91,11 +92,6 @@ namespace ryujin
         return HyperbolicSystemView<dim2, Number2>{hyperbolic_system_};
       }
 
-      /**
-       * The underlying scalar number type.
-       */
-      using ScalarNumber = typename get_value_type<Number>::type;
-
 
     private:
       const HyperbolicSystem &hyperbolic_system_;
@@ -103,9 +99,14 @@ namespace ryujin
 
     public:
       /**
-       * @name Types and compile time constants
+       * @name Types and constexpr constants
        */
       //@{
+
+      /**
+       * The underlying scalar number type.
+       */
+      using ScalarNumber = typename get_value_type<Number>::type;
 
       /**
        * The dimension of the state space.
@@ -113,15 +114,20 @@ namespace ryujin
       static constexpr unsigned int problem_dimension = 1;
 
       /**
-       * The storage type used for a (conserved) state vector \f$\boldsymbol
-       * U\f$.
+       * Storage type for a (conserved) state vector \f$\boldsymbol U\f$.
        */
       using state_type = dealii::Tensor<1, problem_dimension, Number>;
 
       /**
-       * MulticomponentVector for storing a vector of conserved states:
+       * Storage type for the flux \f$\mathbf{f}\f$.
        */
-      using vector_type = MultiComponentVector<ScalarNumber, problem_dimension>;
+      using flux_type =
+          dealii::Tensor<1, problem_dimension, dealii::Tensor<1, dim, Number>>;
+
+      /**
+       * The storage type used for flux contributions.
+       */
+      using flux_contribution_type = flux_type;
 
       /**
        * An array holding all component names of the conserved state as a
@@ -143,48 +149,15 @@ namespace ryujin
        * string.
        */
       static inline const auto primitive_component_names =
-          std::array<std::string, problem_dimension>{"u"};
-
-      /**
-       * The storage type used for the flux \f$\mathbf{f}\f$.
-       */
-      using flux_type =
-          dealii::Tensor<1, problem_dimension, dealii::Tensor<1, dim, Number>>;
-
-      /**
-       * The storage type used for flux contributions.
-       */
-      using flux_contribution_type = flux_type;
-
-      //@}
-      /**
-       * @name Precomputed quantities
-       */
-      //@{
-
-      /**
-       * The number of precomputed initial values.
-       */
-      static constexpr unsigned int n_precomputed_initial_values = 0;
-
-      /**
-       * Array type used for precomputed initial values.
-       */
-      using precomputed_initial_state_type =
-          std::array<Number, n_precomputed_initial_values>;
-
-      /**
-       * MulticomponentVector for storing a vector of precomputed initial
-       * states:
-       */
-      using precomputed_initial_vector_type =
-          MultiComponentVector<ScalarNumber, n_precomputed_initial_values>;
-
-      /**
-       * An array holding all component names of the precomputed values.
-       */
-      static inline const auto precomputed_initial_names =
-          std::array<std::string, n_precomputed_initial_values>{};
+          []() -> std::array<std::string, problem_dimension> {
+        if constexpr (dim == 1)
+          return {"u"};
+        else if constexpr (dim == 2)
+          return {"u"};
+        else if constexpr (dim == 3)
+          return {"u"};
+        __builtin_trap();
+      }();
 
       /**
        * The number of precomputed values.
@@ -194,13 +167,7 @@ namespace ryujin
       /**
        * Array type used for precomputed values.
        */
-      using precomputed_state_type = std::array<Number, n_precomputed_values>;
-
-      /**
-       * MulticomponentVector for storing a vector of precomputed states:
-       */
-      using precomputed_vector_type =
-          MultiComponentVector<ScalarNumber, n_precomputed_values>;
+      using precomputed_type = std::array<Number, n_precomputed_values>;
 
       /**
        * An array holding all component names of the precomputed values.
@@ -209,20 +176,62 @@ namespace ryujin
           std::array<std::string, n_precomputed_values>{};
 
       /**
+       * The number of precomputed initial values.
+       */
+      static constexpr unsigned int n_initial_precomputed_values = 0;
+
+      /**
+       * Array type used for precomputed initial values.
+       */
+      using initial_precomputed_type =
+          std::array<Number, n_initial_precomputed_values>;
+
+      /**
+       * An array holding all component names of the precomputed values.
+       */
+      static inline const auto initial_precomputed_names =
+          std::array<std::string, n_initial_precomputed_values>{};
+
+      /**
+       * A compound state vector.
+       */
+      using StateVector = Vectors::
+          StateVector<ScalarNumber, problem_dimension, n_precomputed_values>;
+
+      /**
+       * MulticomponentVector for storing a vector of precomputed states:
+       */
+      using PrecomputedVector =
+          Vectors::MultiComponentVector<ScalarNumber, n_precomputed_values>;
+
+      /**
+       * MulticomponentVector for storing a vector of precomputed initial
+       * states:
+       */
+      using InitialPrecomputedVector =
+          Vectors::MultiComponentVector<ScalarNumber,
+                                        n_initial_precomputed_values>;
+
+      //@}
+      /**
+       * @name Computing precomputed quantities
+       */
+      //@{
+
+      /**
        * The number of precomputation cycles.
        */
       static constexpr unsigned int n_precomputation_cycles = 0;
 
       /**
-       * Step 0: precompute values for hyperbolic update. This routine is
-       * called within our usual loop() idiom in HyperbolicModule
+       * Precompute values for hyperbolic update. This routine is called
+       * within our usual loop() idiom in HyperbolicModule
        */
       template <typename DISPATCH, typename SPARSITY>
       void precomputation_loop(unsigned int /*cycle*/,
                                const DISPATCH &dispatch_check,
-                               precomputed_vector_type & /*precomputed_values*/,
                                const SPARSITY & /*sparsity_simd*/,
-                               const vector_type & /*U*/,
+                               StateVector & /*state_vector*/,
                                unsigned int /*left*/,
                                unsigned int /*right*/) const = delete;
 
@@ -287,8 +296,8 @@ namespace ryujin
        * For the Euler equations we simply compute <code>f(U_i)</code>.
        */
       flux_contribution_type
-      flux_contribution(const precomputed_vector_type & /*pv*/,
-                        const precomputed_initial_vector_type & /*piv*/,
+      flux_contribution(const PrecomputedVector & /*pv*/,
+                        const InitialPrecomputedVector & /*piv*/,
                         const unsigned int /*i*/,
                         const state_type & /*U_i*/) const
       {
@@ -296,8 +305,8 @@ namespace ryujin
       }
 
       flux_contribution_type
-      flux_contribution(const precomputed_vector_type & /*pv*/,
-                        const precomputed_initial_vector_type & /*piv*/,
+      flux_contribution(const PrecomputedVector & /*pv*/,
+                        const InitialPrecomputedVector & /*piv*/,
                         const unsigned int * /*js*/,
                         const state_type & /*U_j*/) const
       {
@@ -335,15 +344,15 @@ namespace ryujin
       /** We do not have source terms */
       static constexpr bool have_source_terms = false;
 
-      state_type nodal_source(const precomputed_vector_type &pv,
-                              const unsigned int i,
-                              const state_type &U_i,
-                              const ScalarNumber tau) const = delete;
+      state_type nodal_source(const PrecomputedVector & /*pv*/,
+                              const unsigned int /*i*/,
+                              const state_type & /*U_i*/,
+                              const ScalarNumber /*tau*/) const = delete;
 
-      state_type nodal_source(const precomputed_vector_type &pv,
-                              const unsigned int *js,
-                              const state_type &U_j,
-                              const ScalarNumber tau) const = delete;
+      state_type nodal_source(const PrecomputedVector & /*pv*/,
+                              const unsigned int * /*js*/,
+                              const state_type & /*U_j*/,
+                              const ScalarNumber /*tau*/) const = delete;
 
       //@}
       /**

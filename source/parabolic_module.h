@@ -12,8 +12,6 @@
 #include "convenience_macros.h"
 #include "initial_values.h"
 #include "offline_data.h"
-#include "simd.h"
-#include "sparse_matrix_simd.h"
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/timer.h>
@@ -35,31 +33,27 @@ namespace ryujin
   {
   public:
     /**
-     * @copydoc HyperbolicSystem
+     * @name Typedefs and constexpr constants
      */
+    //@{
+
     using HyperbolicSystem = typename Description::HyperbolicSystem;
 
-    /**
-     * @copydoc ParabolicSystem
-     */
-    using ParabolicSystem = typename Description::ParabolicSystem;
-
-    /**
-     * The ParabolicSolver
-     */
-    using ParabolicSolver =
-        typename Description::template ParabolicSolver<dim, Number>;
-
-    /**
-     * @copydoc HyperbolicSystemView
-     */
     using View =
         typename Description::template HyperbolicSystemView<dim, Number>;
 
+    using ParabolicSystem = typename Description::ParabolicSystem;
+
+    using ParabolicSolver =
+        typename Description::template ParabolicSolver<dim, Number>;
+
+    using StateVector = typename View::StateVector;
+
+    //@}
     /**
-     * @copydoc HyperbolicSystemView::vector_type
+     * @name Constructor and setup
      */
-    using vector_type = typename View::vector_type;
+    //@{
 
     /**
      * Constructor.
@@ -80,6 +74,7 @@ namespace ryujin
      */
     void prepare();
 
+    //@}
     /**
      * @name Functons for performing explicit time steps
      */
@@ -95,13 +90,13 @@ namespace ryujin
      * high-order right-hand side / flux.
      */
     template <int stages>
-    void
-    step(const vector_type &old_U,
-         const Number old_t,
-         std::array<std::reference_wrapper<const vector_type>, stages> stage_U,
-         const std::array<Number, stages> stage_weights,
-         vector_type &new_U,
-         Number tau) const;
+    void step(const StateVector &old_state_vector,
+              const Number old_t,
+              std::array<std::reference_wrapper<const StateVector>, stages>
+                  stage_state_vectors,
+              const std::array<Number, stages> stage_weights,
+              StateVector &new_state_vector,
+              Number tau) const;
 
     /**
      * Print a status line with solver statistics. This function is used

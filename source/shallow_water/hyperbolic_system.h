@@ -14,6 +14,7 @@
 #include <openmp.h>
 #include <patterns_conversion.h>
 #include <simd.h>
+#include <state_vector.h>
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/tensor.h>
@@ -174,25 +175,30 @@ namespace ryujin
     public:
       //@}
       /**
-       * @name Types and compile time constants
+       * @name Types and constexpr constants
        */
       //@{
 
       /**
        * The dimension of the state space.
        */
-      static constexpr unsigned int problem_dimension = dim + 1;
+      static constexpr unsigned int problem_dimension = 1 + dim;
 
       /**
-       * The storage type used for a (conserved) state vector \f$\boldsymbol
-       * U\f$.
+       * Storage type for a (conserved) state vector \f$\boldsymbol U\f$.
        */
       using state_type = dealii::Tensor<1, problem_dimension, Number>;
 
       /**
-       * MulticomponentVector for storing a vector of conserved states:
+       * Storage type for the flux \f$\mathbf{f}\f$.
        */
-      using vector_type = MultiComponentVector<ScalarNumber, problem_dimension>;
+      using flux_type =
+          dealii::Tensor<1, problem_dimension, dealii::Tensor<1, dim, Number>>;
+
+      /**
+       * The storage type used for flux contributions.
+       */
+      using flux_contribution_type = std::tuple<state_type, Number>;
 
       /**
        * An array holding all component names of the conserved state as a
@@ -225,47 +231,6 @@ namespace ryujin
       }();
 
       /**
-       * The storage type used for the flux \f$\mathbf{f}\f$.
-       */
-      using flux_type =
-          dealii::Tensor<1, problem_dimension, dealii::Tensor<1, dim, Number>>;
-
-      /**
-       * The storage type used for flux contributions.
-       */
-      using flux_contribution_type = std::tuple<state_type, Number>;
-
-      //@}
-      /**
-       * @name Precomputed quantities
-       */
-      //@{
-
-      /**
-       * The number of precomputed initial values.
-       */
-      static constexpr unsigned int n_precomputed_initial_values = 1;
-
-      /**
-       * Array type used for precomputed initial values.
-       */
-      using precomputed_initial_state_type =
-          std::array<Number, n_precomputed_initial_values>;
-
-      /**
-       * MulticomponentVector for storing a vector of precomputed initial
-       * states:
-       */
-      using precomputed_initial_vector_type =
-          MultiComponentVector<ScalarNumber, n_precomputed_initial_values>;
-
-      /**
-       * An array holding all component names of the precomputed values.
-       */
-      static inline const auto precomputed_initial_names =
-          std::array<std::string, n_precomputed_initial_values>{"bathymetry"};
-
-      /**
        * The number of precomputed values.
        */
       static constexpr unsigned int n_precomputed_values = 2;
@@ -273,19 +238,56 @@ namespace ryujin
       /**
        * Array type used for precomputed values.
        */
-      using precomputed_state_type = std::array<Number, n_precomputed_values>;
-
-      /**
-       * MulticomponentVector for storing a vector of precomputed states:
-       */
-      using precomputed_vector_type =
-          MultiComponentVector<ScalarNumber, n_precomputed_values>;
+      using precomputed_type = std::array<Number, n_precomputed_values>;
 
       /**
        * An array holding all component names of the precomputed values.
        */
       static inline const auto precomputed_names =
           std::array<std::string, n_precomputed_values>{"eta_m", "h_star"};
+
+      /**
+       * The number of precomputed initial values.
+       */
+      static constexpr unsigned int n_initial_precomputed_values = 1;
+
+      /**
+       * Array type used for precomputed initial values.
+       */
+      using initial_precomputed_type =
+          std::array<Number, n_initial_precomputed_values>;
+
+      /**
+       * An array holding all component names of the precomputed values.
+       */
+      static inline const auto initial_precomputed_names =
+          std::array<std::string, n_initial_precomputed_values>{"bathymetry"};
+
+      /**
+       * A compound state vector.
+       */
+      using StateVector = Vectors::
+          StateVector<ScalarNumber, problem_dimension, n_precomputed_values>;
+
+      /**
+       * MulticomponentVector for storing a vector of precomputed states:
+       */
+      using PrecomputedVector =
+          Vectors::MultiComponentVector<ScalarNumber, n_precomputed_values>;
+
+      /**
+       * MulticomponentVector for storing a vector of precomputed initial
+       * states:
+       */
+      using InitialPrecomputedVector =
+          Vectors::MultiComponentVector<ScalarNumber,
+                                        n_initial_precomputed_values>;
+
+      //@}
+      /**
+       * @name Computing precomputed quantities
+       */
+      //@{
 
       /**
        * The number of precomputation cycles.
@@ -299,9 +301,8 @@ namespace ryujin
       template <typename DISPATCH, typename SPARSITY>
       void precomputation_loop(unsigned int cycle,
                                const DISPATCH &dispatch_check,
-                               precomputed_vector_type &precomputed_values,
                                const SPARSITY &sparsity_simd,
-                               const vector_type &U,
+                               StateVector &state_vector,
                                unsigned int left,
                                unsigned int right) const;
 
@@ -495,14 +496,14 @@ namespace ryujin
        * bathymetry and return, both, state and bathymetry.
        */
       flux_contribution_type
-      flux_contribution(const precomputed_vector_type &pv,
-                        const precomputed_initial_vector_type &piv,
+      flux_contribution(const PrecomputedVector &pv,
+                        const InitialPrecomputedVector &piv,
                         const unsigned int i,
                         const state_type &U_i) const;
 
       flux_contribution_type
-      flux_contribution(const precomputed_vector_type &pv,
-                        const precomputed_initial_vector_type &piv,
+      flux_contribution(const PrecomputedVector &pv,
+                        const InitialPrecomputedVector &piv,
                         const unsigned int *js,
                         const state_type &U_j) const;
 
@@ -559,12 +560,12 @@ namespace ryujin
                                   const Number &h_star,
                                   const ScalarNumber tau) const;
 
-      state_type nodal_source(const precomputed_vector_type &pv,
+      state_type nodal_source(const PrecomputedVector &pv,
                               const unsigned int i,
                               const state_type &U_i,
                               const ScalarNumber tau) const;
 
-      state_type nodal_source(const precomputed_vector_type &pv,
+      state_type nodal_source(const PrecomputedVector &pv,
                               const unsigned int *js,
                               const state_type &U_j,
                               const ScalarNumber tau) const;
@@ -672,13 +673,15 @@ namespace ryujin
     HyperbolicSystemView<dim, Number>::precomputation_loop(
         unsigned int cycle [[maybe_unused]],
         const DISPATCH &dispatch_check,
-        precomputed_vector_type &precomputed_values,
         const SPARSITY &sparsity_simd,
-        const vector_type &U,
+        StateVector &state_vector,
         unsigned int left,
         unsigned int right) const
     {
       Assert(cycle == 0, dealii::ExcInternalError());
+
+      const auto &U = std::get<0>(state_vector);
+      auto &precomputed = std::get<1>(state_vector);
 
       /* We are inside a thread parallel context */
 
@@ -701,8 +704,8 @@ namespace ryujin
         const auto h_sharp = water_depth_sharp(U_i);
         const auto h_star = ryujin::pow(h_sharp, ScalarNumber(4. / 3.));
 
-        const precomputed_state_type prec_i{eta_m, h_star};
-        precomputed_values.template write_tensor<Number>(prec_i, i);
+        const precomputed_type prec_i{eta_m, h_star};
+        precomputed.template write_tensor<Number>(prec_i, i);
       }
     }
 
@@ -1080,8 +1083,8 @@ namespace ryujin
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
     HyperbolicSystemView<dim, Number>::flux_contribution(
-        const precomputed_vector_type & /*pv*/,
-        const precomputed_initial_vector_type &piv,
+        const PrecomputedVector & /*pv*/,
+        const InitialPrecomputedVector &piv,
         const unsigned int i,
         const state_type &U_i) const -> flux_contribution_type
     {
@@ -1093,8 +1096,8 @@ namespace ryujin
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
     HyperbolicSystemView<dim, Number>::flux_contribution(
-        const precomputed_vector_type & /*pv*/,
-        const precomputed_initial_vector_type &piv,
+        const PrecomputedVector & /*pv*/,
+        const InitialPrecomputedVector &piv,
         const unsigned int *js,
         const state_type &U_j) const -> flux_contribution_type
     {
@@ -1212,13 +1215,13 @@ namespace ryujin
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
     HyperbolicSystemView<dim, Number>::nodal_source(
-        const precomputed_vector_type &pv,
+        const PrecomputedVector &pv,
         const unsigned int i,
         const state_type &U_i,
         const ScalarNumber tau) const -> state_type
     {
       const auto &[eta_m, h_star] =
-          pv.template get_tensor<Number, precomputed_state_type>(i);
+          pv.template get_tensor<Number, precomputed_type>(i);
 
       return manning_friction(U_i, h_star, tau);
     }
@@ -1227,13 +1230,13 @@ namespace ryujin
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
     HyperbolicSystemView<dim, Number>::nodal_source(
-        const precomputed_vector_type &pv,
+        const PrecomputedVector &pv,
         const unsigned int *js,
         const state_type &U_j,
         const ScalarNumber tau) const -> state_type
     {
       const auto &[eta_m, h_star] =
-          pv.template get_tensor<Number, precomputed_state_type>(js);
+          pv.template get_tensor<Number, precomputed_type>(js);
 
       return manning_friction(U_j, h_star, tau);
     }

@@ -23,8 +23,8 @@ namespace ryujin
     Number RiemannSolver<dim, Number>::compute(
         const Number &u_i,
         const Number &u_j,
-        const precomputed_state_type &prec_i,
-        const precomputed_state_type &prec_j,
+        const precomputed_type &prec_i,
+        const precomputed_type &prec_j,
         const dealii::Tensor<1, dim, Number> &n_ij) const
     {
       const auto &view = hyperbolic_system.view<dim, Number>();
@@ -202,7 +202,7 @@ namespace ryujin
     {
       const auto view = hyperbolic_system.view<dim, Number>();
 
-      using pst = typename View::precomputed_state_type;
+      using pst = typename View::precomputed_type;
 
       const auto u_i = view.state(U_i);
       const auto u_j = view.state(U_j);

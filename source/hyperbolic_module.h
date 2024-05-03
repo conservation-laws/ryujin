@@ -10,8 +10,8 @@
 #include "convenience_macros.h"
 #include "initial_values.h"
 #include "offline_data.h"
-#include "simd.h"
 #include "sparse_matrix_simd.h"
+#include "state_vector.h"
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/timer.h>
@@ -34,7 +34,7 @@ namespace ryujin
    * step size tau_max and the prescribed step size tau are within an
    * acceptable tolerance of about 10%.
    *
-   * @ingroup TimeLoop
+   * @ingroup HyperbolicModule
    */
   enum class IDViolationStrategy {
     /**
@@ -76,68 +76,38 @@ namespace ryujin
   {
   public:
     /**
-     * @copydoc HyperbolicSystem
+     * @name Typedefs and constexpr constants
      */
+    //@{
+
     using HyperbolicSystem = typename Description::HyperbolicSystem;
 
-    /**
-     * @copydoc HyperbolicSystemView
-     */
     using View =
         typename Description::template HyperbolicSystemView<dim, Number>;
 
-    /**
-     * @copydoc HyperbolicSystem::problem_dimension
-     */
-    static constexpr unsigned int problem_dimension = View::problem_dimension;
+    static constexpr auto problem_dimension = View::problem_dimension;
 
-    /**
-     * @copydoc HyperbolicSystem::state_type
-     */
     using state_type = typename View::state_type;
 
-    /**
-     * @copydoc OfflineData::scalar_type
-     */
-    using scalar_type = typename OfflineData<dim, Number>::scalar_type;
+    using precomputed_type = typename View::precomputed_type;
 
-    /**
-     * @copydoc HyperbolicSystemView::vector_type
-     */
-    using vector_type = typename View::vector_type;
+    using initial_precomputed_type = typename View::initial_precomputed_type;
 
-    /**
-     * @copydoc HyperbolicSystem::n_precomputed_values
-     */
-    static constexpr unsigned int n_precomputed_values =
-        View::n_precomputed_values;
+    using StateVector = typename View::StateVector;
 
-    /**
-     * @copydoc HyperbolicSystemView::n_precomputation_cycles
-     */
-    static constexpr unsigned int n_precomputation_cycles =
+    using InitialPrecomputedVector = typename View::InitialPrecomputedVector;
+
+    static constexpr auto n_precomputation_cycles =
         View::n_precomputation_cycles;
 
+    //@}
     /**
-     * Typedef for a MultiComponentVector storing precomputed values.
+     * @name Constructor and setup
      */
-    using precomputed_vector_type = typename View::precomputed_vector_type;
+    //@{
 
     /**
-     * @copydoc HyperbolicSystem::n_precomputed_initial_values
-     */
-    static constexpr unsigned int n_precomputed_initial_values =
-        View::n_precomputed_initial_values;
-
-    /**
-     * Typedef for a MultiComponentVector storing precomputed initial_values.
-     */
-    using precomputed_initial_vector_type =
-        typename View::precomputed_initial_vector_type;
-
-
-    /**
-     * Constructor.
+     * Constructor
      */
     HyperbolicModule(
         const MPI_Comm &mpi_communicator,
@@ -154,6 +124,7 @@ namespace ryujin
      */
     void prepare();
 
+    //@}
     /**
      * @name Functons for performing explicit time steps
      */
@@ -218,15 +189,12 @@ namespace ryujin
      * immediately after performing a time step.
      */
     template <int stages>
-    Number
-    step(const vector_type &old_U,
-         std::array<std::reference_wrapper<const vector_type>, stages> stage_U,
-         std::array<std::reference_wrapper<const precomputed_vector_type>,
-                    stages> stage_precomputed,
-         const std::array<Number, stages> stage_weights,
-         vector_type &new_U,
-         precomputed_vector_type &new_precomputed,
-         Number tau = Number(0.)) const;
+    Number step(StateVector &old_state_vector,
+                std::array<std::reference_wrapper<const StateVector>, stages>
+                    stage_state_vectors,
+                const std::array<Number, stages> stage_weights,
+                StateVector &new_state_vector,
+                Number tau = Number(0.)) const;
 
     /**
      * This function postprocesses a given state @p U to conform with all
@@ -241,7 +209,7 @@ namespace ryujin
      * @note The routine does update ghost vectors of the distributed
      * vector @p U
      */
-    void apply_boundary_conditions(vector_type &U, Number t) const;
+    void apply_boundary_conditions(StateVector &state_vector, Number t) const;
 
     /**
      * Sets the relative CFL number used for computing an appropriate
@@ -275,7 +243,7 @@ namespace ryujin
     /**
      * Return a reference to the precomputed initial data vector
      */
-    ACCESSOR_READ_ONLY(precomputed_initial)
+    ACCESSOR_READ_ONLY(initial_precomputed)
 
     /**
      * Return a reference to alpha vector storing indicator values. Note
@@ -341,15 +309,18 @@ namespace ryujin
 
     mutable unsigned int n_warnings_;
 
-    precomputed_initial_vector_type precomputed_initial_;
+    InitialPrecomputedVector initial_precomputed_;
 
-    mutable scalar_type alpha_;
+    using ScalarVector = typename Vectors::ScalarVector<Number>;
+    mutable ScalarVector alpha_;
 
     static constexpr auto n_bounds =
         Description::template Limiter<dim, Number>::n_bounds;
-    mutable MultiComponentVector<Number, n_bounds> bounds_;
+    mutable Vectors::MultiComponentVector<Number, n_bounds> bounds_;
 
-    mutable vector_type r_;
+    using HyperbolicVector =
+        Vectors::MultiComponentVector<Number, problem_dimension>;
+    mutable HyperbolicVector r_;
 
     mutable SparseMatrixSIMD<Number> dij_matrix_;
     mutable SparseMatrixSIMD<Number> lij_matrix_;

@@ -40,31 +40,21 @@ namespace ryujin
     {
     public:
       /**
-       * @copydoc HyperbolicSystemView
+       * @name Typedefs and constexpr constants
        */
+      //@{
+
       using View = HyperbolicSystemView<dim, Number>;
 
-      /**
-       * @copydoc HyperbolicSystemView::state_type
-       */
+      using ScalarNumber = typename View::ScalarNumber;
+
       using state_type = typename View::state_type;
 
-      /**
-       * @copydoc HyperbolicSystemView::n_precomputed_values
-       */
-      static constexpr unsigned int n_precomputed_values =
-          View::n_precomputed_values;
+      using PrecomputedVector = typename View::PrecomputedVector;
 
-      /**
-       * @copydoc HyperbolicSystemView::ScalarNumber
-       */
-      using ScalarNumber = typename get_value_type<Number>::type;
-
-      /**
-       * @copydoc RiemannSolverParameters
-       */
       using Parameters = RiemannSolverParameters<ScalarNumber>;
 
+      //@}
       /**
        * @name Compute wavespeed estimates
        */
@@ -73,11 +63,9 @@ namespace ryujin
       /**
        * Constructor taking a HyperbolicSystem instance as argument
        */
-      RiemannSolver(
-          const HyperbolicSystem &hyperbolic_system,
-          const Parameters &parameters,
-          const MultiComponentVector<ScalarNumber, n_precomputed_values>
-              &precomputed_values)
+      RiemannSolver(const HyperbolicSystem &hyperbolic_system,
+                    const Parameters &parameters,
+                    const PrecomputedVector &precomputed_values)
           : hyperbolic_system(hyperbolic_system)
           , parameters(parameters)
           , precomputed_values(precomputed_values)
@@ -94,15 +82,13 @@ namespace ryujin
                      const unsigned int * /*js*/,
                      const dealii::Tensor<1, dim, Number> & /*n_ij*/) const
       {
-        return Number(0.);
+        return Number(1.);
       }
 
     private:
       const HyperbolicSystem &hyperbolic_system;
       const Parameters &parameters;
-
-      const MultiComponentVector<ScalarNumber, n_precomputed_values>
-          &precomputed_values;
+      const PrecomputedVector &precomputed_values;
       //@}
     };
   } // namespace Skeleton

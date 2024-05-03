@@ -38,41 +38,32 @@ namespace ryujin
   {
   public:
     /**
-     * @copydoc HyperbolicSystem
+     * @name Typedefs and constexpr constants
      */
+    //@{
     using HyperbolicSystem = typename Description::HyperbolicSystem;
 
-    /**
-     * @copydoc HyperbolicSystemView
-     */
     using View =
         typename Description::template HyperbolicSystemView<dim, Number>;
 
-    /**
-     * @copydoc HyperbolicSystem::problem_dimension
-     */
-    static constexpr unsigned int problem_dimension = View::problem_dimension;
+    static constexpr auto problem_dimension = View::problem_dimension;
 
-    /**
-     * @copydoc HyperbolicSystem::state_type
-     */
     using state_type = typename View::state_type;
 
-    /**
-     * Typedef for a MultiComponentVector storing the state U.
-     */
-    using vector_type = MultiComponentVector<Number, problem_dimension>;
+    static constexpr auto n_initial_precomputed_values =
+        View::n_initial_precomputed_values;
 
-    /**
-     * @copydoc HyperbolicSystem::n_precomputed_values
-     */
-    static constexpr unsigned int n_precomputed_values =
-        View::n_precomputed_initial_values;
+    using initial_precomputed_type = typename View::initial_precomputed_type;
 
+    using StateVector = typename View::StateVector;
+
+    using InitialPrecomputedVector = typename View::InitialPrecomputedVector;
+
+    //@}
     /**
-     * Array type used for precomputed values.
+     * @name Interpolate initial states
      */
-    using precomputed_state_type = typename View::precomputed_state_type;
+    //@{
 
     /**
      * Constructor.
@@ -106,23 +97,16 @@ namespace ryujin
 
 
     /**
-     * This routine computes and returns a state vector populated with
-     * initial values for a specified time @p t.
-     */
-    vector_type interpolate(Number t = 0) const;
-
-
-    /**
      * Given a position @p point returns the corresponding (conserved)
      * initial state. The function is used to interpolate initial values
      * and enforce Dirichlet boundary conditions. For the latter, the the
      * function signature has an additional parameter @p t denoting the
      * current time to allow for time-dependent (in-flow) Dirichlet data.
      */
-    DEAL_II_ALWAYS_INLINE inline precomputed_state_type
-    flux_contributions(const dealii::Point<dim> &point) const
+    DEAL_II_ALWAYS_INLINE inline initial_precomputed_type
+    initial_precomputed(const dealii::Point<dim> &point) const
     {
-      return flux_contributions_(point);
+      return initial_precomputed_(point);
     }
 
 
@@ -130,10 +114,17 @@ namespace ryujin
      * This routine computes and returns a state vector populated with
      * initial values for a specified time @p t.
      */
-    MultiComponentVector<Number, n_precomputed_values>
-    interpolate_precomputed_initial_values() const;
+    StateVector interpolate_state_vector(Number t = 0) const;
+
+
+    /**
+     * This routine computes and returns a state vector populated with
+     * initial values for a specified time @p t.
+     */
+    InitialPrecomputedVector interpolate_initial_precomputed_vector() const;
 
   private:
+    //@}
     /**
      * @name Run time options
      */
@@ -159,11 +150,11 @@ namespace ryujin
     typename InitialStateLibrary<Description, dim, Number>::
         initial_state_list_type initial_state_list_;
 
-    std::function<state_type(const dealii::Point<dim> &point, Number t)>
+    std::function<state_type(const dealii::Point<dim> &, Number)>
         initial_state_;
 
-    std::function<precomputed_state_type(const dealii::Point<dim> &point)>
-        flux_contributions_;
+    std::function<initial_precomputed_type(const dealii::Point<dim> &)>
+        initial_precomputed_;
 
     //@}
   };

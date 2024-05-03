@@ -39,49 +39,34 @@ namespace ryujin
   {
   public:
     /**
-     * @copydoc HyperbolicSystem
+     * @name Typedefs and constexpr constants
      */
+    //@{
+
     using HyperbolicSystem = typename Description::HyperbolicSystem;
 
-    /**
-     * @copydoc HyperbolicSystemView
-     */
     using View =
         typename Description::template HyperbolicSystemView<dim, Number>;
 
-    /**
-     * @copydoc HyperbolicSystem::problem_dimension
-     */
-    static constexpr unsigned int problem_dimension = View::problem_dimension;
+    static constexpr auto problem_dimension = View::problem_dimension;
 
-    /**
-     * @copydoc HyperbolicSystem::state_type
-     */
     using state_type = typename View::state_type;
 
-    /**
-     * The type used to store the gradient of a scalar quantitty;
-     */
     template <typename T>
     using grad_type = dealii::Tensor<1, dim, T>;
 
-    /**
-     * Type used to store the curl of an 2D/3D vector field. Departing from
-     * mathematical rigor, in 2D this is a number (stored as
-     * `Tensor<1,1>`), in 3D this is a rank 1 tensor.
-     */
     template <typename T>
     using curl_type = dealii::Tensor<1, dim == 2 ? 1 : dim, T>;
 
-    /**
-     * @copydoc OfflineData::scalar_type
-     */
-    using scalar_type = typename OfflineData<dim, Number>::scalar_type;
+    using StateVector = typename View::StateVector;
 
+    using ScalarVector = Vectors::ScalarVector<Number>;
+
+    //@}
     /**
-     * @copydoc HyperbolicSystemView::vector_type
+     * @name Constructor and setup
      */
-    using vector_type = MultiComponentVector<Number, problem_dimension>;
+    //@{
 
     /**
      * Constructor.
@@ -138,7 +123,7 @@ namespace ryujin
      *
      * The function requires MPI communication and is not reentrant.
      */
-    void compute(const vector_type &U) const;
+    void compute(const StateVector &state_vector) const;
 
     /**
      * Returns a reference to the quantities_ vector that has been filled
@@ -175,7 +160,7 @@ namespace ryujin
     std::vector<std::pair<bool /*primitive*/, unsigned int>> vorticity_indices_;
 
     mutable std::vector<std::pair<Number, Number>> bounds_;
-    mutable std::vector<scalar_type> quantities_;
+    mutable std::vector<ScalarVector> quantities_;
     //@}
   };
 

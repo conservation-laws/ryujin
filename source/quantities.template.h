@@ -360,10 +360,12 @@ namespace ryujin
   template <typename Description, int dim, typename Number>
   template <typename point_type, typename value_type>
   value_type Quantities<Description, dim, Number>::internal_accumulate(
-      const vector_type &U,
+      const StateVector &state_vector,
       const std::vector<point_type> &points_vector,
       std::vector<value_type> &val_new)
   {
+    const auto &U = std::get<0>(state_vector);
+
     value_type spatial_average;
     Number mass_sum = Number(0.);
 
@@ -473,8 +475,8 @@ namespace ryujin
 
 
   template <typename Description, int dim, typename Number>
-  void Quantities<Description, dim, Number>::accumulate(const vector_type &U,
-                                                        const Number t)
+  void Quantities<Description, dim, Number>::accumulate(
+      const StateVector &state_vector, const Number t)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "Quantities<dim, Number>::accumulate()" << std::endl;
@@ -502,7 +504,8 @@ namespace ryujin
 
         /* accumulate new values */
 
-        const auto spatial_average = internal_accumulate(U, point_map, val_new);
+        const auto spatial_average =
+            internal_accumulate(state_vector, point_map, val_new);
 
         /* Average in time with trapezoidal rule: */
 
@@ -543,9 +546,8 @@ namespace ryujin
 
 
   template <typename Description, int dim, typename Number>
-  void Quantities<Description, dim, Number>::write_out(const vector_type &U,
-                                                       const Number t,
-                                                       unsigned int cycle)
+  void Quantities<Description, dim, Number>::write_out(
+      const StateVector &state_vector, const Number t, unsigned int cycle)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "Quantities<dim, Number>::write_out()" << std::endl;
@@ -576,7 +578,7 @@ namespace ryujin
 
           if (options.find("time_averaged") == std::string::npos &&
               options.find("space_averaged") == std::string::npos)
-            internal_accumulate(U, point_map, val_new);
+            internal_accumulate(state_vector, point_map, val_new);
           else
             AssertThrow(t_new == t, dealii::ExcInternalError());
 
