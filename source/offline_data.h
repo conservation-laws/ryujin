@@ -223,6 +223,17 @@ namespace ryujin
     ACCESSOR_READ_ONLY(cij_matrix)
 
     /**
+     * The incidence matrix \f$(beta_{ij})\f$: 1 for coupling face degrees
+     * of freedom that share the same support point coordinate, 0 otherwise.
+     *
+     * (SIMD storage, local numbering)
+     *
+     * This matrix is only available for a discontinuous finite Element
+     * ansatz.
+     */
+    ACCESSOR_READ_ONLY(incidence_matrix)
+
+    /**
      * Size of computational domain.
      */
     ACCESSOR_READ_ONLY(measure_of_omega)
@@ -298,6 +309,7 @@ namespace ryujin
 
     SparseMatrixSIMD<Number> betaij_matrix_;
     SparseMatrixSIMD<Number, dim> cij_matrix_;
+    SparseMatrixSIMD<Number> incidence_matrix_;
 
     Number measure_of_omega_;
 

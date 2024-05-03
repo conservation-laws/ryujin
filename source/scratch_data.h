@@ -44,17 +44,29 @@ namespace ryujin
               discretization_.face_quadrature(),
               dealii::update_values | dealii::update_quadrature_points |
                   dealii::update_JxW_values | dealii::update_normal_vectors)
+        , fe_face_values_nodal_(discretization_.mapping(),
+                                discretization_.finite_element(),
+                                discretization_.face_nodal_quadrature(),
+                                dealii::update_values |
+                                    dealii::update_quadrature_points)
         , fe_neighbor_face_values_(discretization_.mapping(),
                                    discretization_.finite_element(),
                                    discretization_.face_quadrature(),
                                    dealii::update_values)
+        , fe_neighbor_face_values_nodal_(
+              discretization_.mapping(),
+              discretization_.finite_element(),
+              discretization_.face_nodal_quadrature(),
+              dealii::update_values)
     {
     }
 
     const Discretization<dim> &discretization_;
     dealii::FEValues<dim> fe_values_;
     dealii::FEFaceValues<dim> fe_face_values_;
+    dealii::FEFaceValues<dim> fe_face_values_nodal_;
     dealii::FEFaceValues<dim> fe_neighbor_face_values_;
+    dealii::FEFaceValues<dim> fe_neighbor_face_values_nodal_;
   };
 
   /**
@@ -77,6 +89,7 @@ namespace ryujin
         neighbor_local_dof_indices_;
     std::array<std::array<dealii::FullMatrix<Number>, dim>, n_faces>
         interface_cij_matrix_;
+    std::array<dealii::FullMatrix<Number>, n_faces> interface_incidence_matrix_;
   };
 
 } // namespace ryujin

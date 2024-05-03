@@ -179,6 +179,8 @@ namespace ryujin
       quadrature_ = std::make_unique<QGauss<dim>>(1);
       quadrature_1d_ = std::make_unique<QGauss<1>>(1);
       face_quadrature_ = std::make_unique<QGauss<dim - 1>>(1);
+      face_nodal_quadrature_ =
+          std::make_unique<dealii::QGaussLobatto<dim - 1>>(2);
       break;
     case Ansatz::cg_q1:
       [[fallthrough]];
@@ -187,6 +189,8 @@ namespace ryujin
       quadrature_ = std::make_unique<QGauss<dim>>(2);
       quadrature_1d_ = std::make_unique<QGauss<1>>(2);
       face_quadrature_ = std::make_unique<QGauss<dim - 1>>(2);
+      face_nodal_quadrature_ =
+          std::make_unique<dealii::QGaussLobatto<dim - 1>>(2);
       break;
     case Ansatz::cg_q2:
       [[fallthrough]];
@@ -195,6 +199,8 @@ namespace ryujin
       quadrature_ = std::make_unique<QGauss<dim>>(3);
       quadrature_1d_ = std::make_unique<QGauss<1>>(3);
       face_quadrature_ = std::make_unique<QGauss<dim - 1>>(3);
+      face_nodal_quadrature_ =
+          std::make_unique<dealii::QGaussLobatto<dim - 1>>(3);
       break;
     case Ansatz::cg_q3:
       [[fallthrough]];
@@ -203,6 +209,8 @@ namespace ryujin
       quadrature_ = std::make_unique<QGauss<dim>>(4);
       quadrature_1d_ = std::make_unique<QGauss<1>>(4);
       face_quadrature_ = std::make_unique<QGauss<dim - 1>>(4);
+      face_nodal_quadrature_ =
+          std::make_unique<dealii::QGaussLobatto<dim - 1>>(4);
       break;
     }
   }
