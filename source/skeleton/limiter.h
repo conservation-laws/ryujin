@@ -73,7 +73,8 @@ namespace ryujin
        *   limiter.reset(i, U_i, flux_i);
        *   for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
        *     // ...
-       *     limiter.accumulate(js, U_j, flux_j, scaled_c_ij, beta_ij);
+       *     limiter.accumulate(
+       *       js, U_j, flux_j, scaled_c_ij, beta_ij, affine_shift);
        *   }
        *   limiter.bounds(hd_i);
        * }
@@ -121,7 +122,8 @@ namespace ryujin
                       const state_type & /*U_j*/,
                       const flux_contribution_type & /*flux_j*/,
                       const dealii::Tensor<1, dim, Number> & /*scaled_c_ij*/,
-                      const Number & /*beta_ij*/)
+                      const Number & /*beta_ij*/,
+                      const state_type & /*affine_shift*/)
       {
         // empty
       }

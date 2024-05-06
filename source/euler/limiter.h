@@ -128,7 +128,8 @@ namespace ryujin
        *   limiter.reset(i, U_i, flux_i);
        *   for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
        *     // ...
-       *     limiter.accumulate(js, U_j, pre_j, scaled_c_ij, beta_ij);
+       *     limiter.accumulate(
+       *       js, U_j, flux_j, scaled_c_ij, beta_ij, affine_shift);
        *   }
        *   limiter.bounds(hd_i);
        * }
@@ -173,7 +174,8 @@ namespace ryujin
                       const state_type &U_j,
                       const flux_contribution_type &flux_j,
                       const dealii::Tensor<1, dim, Number> &scaled_c_ij,
-                      const Number beta_ij);
+                      const Number beta_ij,
+                      const state_type &affine_shift);
 
       /**
        * Return the computed bounds (with relaxation applied).
@@ -274,8 +276,16 @@ namespace ryujin
         const state_type &U_j,
         const flux_contribution_type & /*flux_j*/,
         const dealii::Tensor<1, dim, Number> &scaled_c_ij,
-        const Number beta_ij)
+        const Number beta_ij,
+        const state_type &affine_shift)
     {
+      // TODO: Currently we only apply the affine_shift to U_ij_bar (which
+      // then enters all bounds), but we do not modify s_interp and
+      // rho_relaxation. When actually adding a source term to the Euler
+      // equations verify that this does the right thing.
+      Assert(std::max(affine_shift.norm(), Number(0.)) == Number(0.),
+             dealii::ExcNotImplemented());
+
       const auto view = hyperbolic_system.view<dim, Number>();
 
       /* Bounds: */
@@ -285,8 +295,13 @@ namespace ryujin
       const auto m_i = view.momentum(U_i);
       const auto rho_j = view.density(U_j);
       const auto m_j = view.momentum(U_j);
+      const auto rho_affine_shift = view.density(affine_shift);
+
+      /* bar state shifted by an affine shift: */
       const auto rho_ij_bar =
-          ScalarNumber(0.5) * (rho_i + rho_j + (m_i - m_j) * scaled_c_ij);
+          ScalarNumber(0.5) * (rho_i + rho_j + (m_i - m_j) * scaled_c_ij) +
+          rho_affine_shift;
+
       rho_min = std::min(rho_min, rho_ij_bar);
       rho_max = std::max(rho_max, rho_ij_bar);
 

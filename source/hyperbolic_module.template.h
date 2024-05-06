@@ -699,7 +699,8 @@ namespace ryujin
               F_iH += d_ijH * (U_j - U_i);
               P_ij += (d_ijH - d_ij) * (U_j - U_i);
 
-              limiter.accumulate(js, U_j, flux_j, scaled_c_ij, beta_ij);
+              limiter.accumulate(
+                  js, U_j, flux_j, scaled_c_ij, beta_ij, affine_shift);
             }
 
             if constexpr (View::have_source_terms) {
