@@ -277,11 +277,12 @@ namespace ryujin
       const auto f_star_ij = view.f(U_star_ij);
       const auto f_star_ji = view.f(U_star_ji);
 
-      auto U_ij_bar = ScalarNumber(0.5) *
-                      (U_star_ij + U_star_ji +
-                       contract(add(f_star_ij, -f_star_ji), scaled_c_ij));
-
-      U_ij_bar += affine_shift;
+      /* bar state shifted by an affine shift: */
+      const auto U_ij_bar =
+          ScalarNumber(0.5) *
+              (U_star_ij + U_star_ji +
+               contract(add(f_star_ij, -f_star_ji), scaled_c_ij)) +
+          affine_shift;
 
       /* Bounds: */
 
