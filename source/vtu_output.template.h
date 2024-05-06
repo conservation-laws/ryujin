@@ -206,13 +206,15 @@ namespace ryujin
 
     for (unsigned int d = 0; d < quantities_.size(); ++d) {
       const auto &entry = std::get<0>(quantities_mapping_[d]);
-      data_out->add_data_vector(quantities_[d], entry);
+      data_out->add_data_vector(
+          quantities_[d], entry, DataOut<dim>::type_dof_data);
     }
 
     const auto n_quantities = postprocessor_->n_quantities();
     for (unsigned int i = 0; i < n_quantities; ++i)
       data_out->add_data_vector(postprocessor_->quantities()[i],
-                                postprocessor_->component_names()[i]);
+                                postprocessor_->component_names()[i],
+                                DataOut<dim>::type_dof_data);
 
     DataOutBase::VtkFlags flags(t,
                                 cycle,

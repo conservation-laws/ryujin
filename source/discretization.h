@@ -249,6 +249,35 @@ namespace ryujin
     ACCESSOR_READ_ONLY(ansatz)
 
     /**
+     * Return a boolean indicating  whether the chosen Ansatz space is
+     * discontinuous.
+     */
+    bool have_discontinuous_ansatz() const
+    {
+      switch (ansatz_) {
+        /* Continous Ansatz: */
+      case Ansatz::cg_q1:
+        [[fallthrough]];
+      case Ansatz::cg_q2:
+        [[fallthrough]];
+      case Ansatz::cg_q3:
+        return false;
+
+        /* Discontinuous Ansatz: */
+      case Ansatz::dg_q0:
+        [[fallthrough]];
+      case Ansatz::dg_q1:
+        [[fallthrough]];
+      case Ansatz::dg_q2:
+        [[fallthrough]];
+      case Ansatz::dg_q3:
+        return true;
+      }
+      __builtin_unreachable();
+      return false;
+    }
+
+    /**
      * Return a mutable reference to the refinement variable.
      */
     ACCESSOR(refinement)
@@ -288,6 +317,12 @@ namespace ryujin
      */
     ACCESSOR_READ_ONLY(face_quadrature)
 
+    /**
+     * Return a read-only const reference to the nodal face quadrature rule
+     * (GaußLobatto).
+     */
+    ACCESSOR_READ_ONLY(face_nodal_quadrature)
+
   protected:
     const MPI_Comm &mpi_communicator_;
 
@@ -297,6 +332,7 @@ namespace ryujin
     std::unique_ptr<const dealii::Quadrature<dim>> quadrature_;
     std::unique_ptr<const dealii::Quadrature<1>> quadrature_1d_;
     std::unique_ptr<const dealii::Quadrature<dim - 1>> face_quadrature_;
+    std::unique_ptr<const dealii::Quadrature<dim - 1>> face_nodal_quadrature_;
 
   private:
     //@}
