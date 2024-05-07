@@ -18,6 +18,7 @@
 #include "initial_state_ritter_dam_break.h"
 #include "initial_state_sloping_friction.h"
 #include "initial_state_smooth_vortex.h"
+#include "initial_state_soliton.h"
 #include "initial_state_three_bumps_dam_break.h"
 #include "initial_state_transient.h"
 #include "initial_state_uniform.h"
@@ -50,6 +51,7 @@ namespace ryujin
       add(std::make_unique<ThreeBumpsDamBreak<Description, dim, Number>>(h, s));
       add(std::make_unique<Uniform<Description, dim, Number>>(h, s));
       add(std::make_unique<TankExperiments<Description, dim, Number>>(h, s));
+      add(std::make_unique<Soliton<Description, dim, Number>>(h, s));
     }
   } // namespace ShallowWaterInitialStates
 } // namespace ryujin
