@@ -215,22 +215,22 @@ namespace ryujin
           directions.push_back(2);
         }
 
-        if constexpr (dim != 1) {
-          if (!directions.empty()) {
-            std::vector<dealii::GridTools::PeriodicFacePair<
-                typename dealii::Triangulation<dim>::cell_iterator>>
-                periodic_faces;
+#if DEAL_II_VERSION_GTE(9, 5, 0)
+        if (!directions.empty()) {
+          std::vector<dealii::GridTools::PeriodicFacePair<
+              typename dealii::Triangulation<dim>::cell_iterator>>
+              periodic_faces;
 
-            for (const auto direction : directions)
-              dealii::GridTools::collect_periodic_faces(
-                  triangulation,
-                  /*b_id */ Boundary::periodic,
-                  /*direction*/ direction,
-                  periodic_faces);
+          for (const auto direction : directions)
+            dealii::GridTools::collect_periodic_faces(
+                triangulation,
+                /*b_id */ Boundary::periodic,
+                /*direction*/ direction,
+                periodic_faces);
 
-            triangulation.add_periodicity(periodic_faces);
-          }
+          triangulation.add_periodicity(periodic_faces);
         }
+#endif
       }
 
     private:
