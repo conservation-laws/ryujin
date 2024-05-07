@@ -32,11 +32,11 @@ namespace ryujin
           : InitialState<Description, dim, Number>("soliton", subsection)
           , hyperbolic_system_(hyperbolic_system)
       {
-        depth_ = 10;
+        depth_ = 1;
         this->add_parameter(
             "still water depth", depth_, "Depth of still water");
 
-        amplitude_ = 1;
+        amplitude_ = 0.1;
         this->add_parameter("amplitude", amplitude_, "Amplitude of soliton");
       }
 
