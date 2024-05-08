@@ -138,6 +138,14 @@ namespace ryujin
        */
       Bounds bounds(const Number hd_i) const;
 
+      /**
+       * Given two bounds bounds_left, bounds_right, this function computes
+       * a larger, combined Bounds set that this is a (convex) superset of
+       * the two.
+       */
+      static Bounds combine_bounds(const Bounds &bounds_left,
+                                   const Bounds &bounds_right);
+
       //*}
       /** @name Convex limiter */
       //@{
@@ -285,6 +293,18 @@ namespace ryujin
                        u_max + ScalarNumber(2.) * u_relaxation);
 
       return relaxed_bounds;
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline auto
+    Limiter<dim, Number>::combine_bounds(const Bounds &bounds_left,
+                                         const Bounds &bounds_right) -> Bounds
+    {
+      const auto &[u_min_l, u_max_l] = bounds_left;
+      const auto &[u_min_r, u_max_r] = bounds_right;
+
+      return {std::min(u_min_l, u_min_r), std::max(u_max_l, u_max_r)};
     }
 
 

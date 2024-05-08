@@ -138,6 +138,17 @@ namespace ryujin
         return relaxed_bounds;
       }
 
+      /**
+       * Given two bounds bounds_left, bounds_right, this function computes
+       * a larger, combined Bounds set that this is a (convex) superset of
+       * the two.
+       */
+      static Bounds combine_bounds(const Bounds & /*bounds_left*/,
+                                   const Bounds & /*bounds_right*/)
+      {
+        return Bounds{};
+      }
+
       //*}
       /** @name Convex limiter */
       //@{

@@ -174,6 +174,14 @@ namespace ryujin
        */
       Bounds bounds(const Number hd_i) const;
 
+      /**
+       * Given two bounds bounds_left, bounds_right, this function computes
+       * a larger, combined Bounds set that this is a (convex) superset of
+       * the two.
+       */
+      static Bounds combine_bounds(const Bounds &bounds_left,
+                                   const Bounds &bounds_right);
+
       //*}
       /** @name Convex limiter */
       //@{
@@ -370,6 +378,22 @@ namespace ryujin
       h_small = view.reference_water_depth() * r_i;
 
       return relaxed_bounds;
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline auto
+    Limiter<dim, Number>::combine_bounds(const Bounds &bounds_l,
+                                         const Bounds &bounds_r) -> Bounds
+    {
+      const auto &[h_min_l, h_max_l, h_small_l, k_max_l, v2_max_l] = bounds_l;
+      const auto &[h_min_r, h_max_r, h_small_r, k_max_r, v2_max_r] = bounds_r;
+
+      return {std::min(h_min_l, h_min_r),
+              std::max(h_max_l, h_max_r),
+              std::min(h_small_l, h_small_r),
+              std::max(k_max_l, h_max_r),
+              std::max(v2_max_l, v2_max_r)};
     }
 
 
