@@ -67,7 +67,7 @@ subsection F - HyperbolicModule
     set iterations            = 2
     set newton max iterations = 2
     set newton tolerance      = 1e-10
-    set relaxation factor     = 8
+    set relaxation factor     = 4
   end
 end
 
