@@ -374,7 +374,6 @@ namespace ryujin
     lumped_mass_matrix_inverse_.reinit(scalar_partitioner_);
 
     mass_matrix_.reinit(sparsity_pattern_simd_);
-    betaij_matrix_.reinit(sparsity_pattern_simd_);
     cij_matrix_.reinit(sparsity_pattern_simd_);
     if (discretization_->have_discontinuous_ansatz())
       incidence_matrix_.reinit(sparsity_pattern_simd_);
@@ -414,11 +413,9 @@ namespace ryujin
         locally_owned, sparsity_pattern_, mpi_communicator_);
 
     TrilinosWrappers::SparseMatrix mass_matrix_tmp;
-    TrilinosWrappers::SparseMatrix betaij_matrix_tmp;
     std::array<TrilinosWrappers::SparseMatrix, dim> cij_matrix_tmp;
 
     mass_matrix_tmp.reinit(trilinos_sparsity_pattern);
-    betaij_matrix_tmp.reinit(trilinos_sparsity_pattern);
     for (auto &matrix : cij_matrix_tmp)
       matrix.reinit(trilinos_sparsity_pattern);
 
@@ -441,11 +438,9 @@ namespace ryujin
     }
 
     dealii::SparseMatrix<Number> mass_matrix_tmp;
-    dealii::SparseMatrix<Number> betaij_matrix_tmp;
     std::array<dealii::SparseMatrix<Number>, dim> cij_matrix_tmp;
 
     mass_matrix_tmp.reinit(sparsity_pattern_assembly);
-    betaij_matrix_tmp.reinit(sparsity_pattern_assembly);
     for (auto &matrix : cij_matrix_tmp)
       matrix.reinit(sparsity_pattern_assembly);
 #endif
@@ -474,7 +469,6 @@ namespace ryujin
       auto &neighbor_local_dof_indices = copy.neighbor_local_dof_indices_;
 
       auto &cell_mass_matrix = copy.cell_mass_matrix_;
-      auto &cell_betaij_matrix = copy.cell_betaij_matrix_;
       auto &cell_cij_matrix = copy.cell_cij_matrix_;
       auto &interface_cij_matrix = copy.interface_cij_matrix_;
       auto &cell_measure = copy.cell_measure_;
@@ -498,7 +492,6 @@ namespace ryujin
         return;
 
       cell_mass_matrix.reinit(dofs_per_cell, dofs_per_cell);
-      cell_betaij_matrix.reinit(dofs_per_cell, dofs_per_cell);
       for (auto &matrix : cell_cij_matrix)
         matrix.reinit(dofs_per_cell, dofs_per_cell);
       if (discretization_->have_discontinuous_ansatz()) {
@@ -514,7 +507,6 @@ namespace ryujin
 
       /* clear out copy data: */
       cell_mass_matrix = 0.;
-      cell_betaij_matrix = 0.;
       for (auto &matrix : cell_cij_matrix)
         matrix = 0.;
       if (discretization_->have_discontinuous_ansatz()) {
@@ -537,10 +529,8 @@ namespace ryujin
           for (unsigned int i = 0; i < dofs_per_cell; ++i) {
 
             const auto value = fe_values.shape_value(i, q_point);
-            const auto grad = fe_values.shape_grad(i, q_point);
 
             cell_mass_matrix(i, j) += Number(value * value_JxW);
-            cell_betaij_matrix(i, j) += Number(grad * grad_JxW);
             for (unsigned int d = 0; d < dim; ++d)
               cell_cij_matrix[d](i, j) += Number((value * grad_JxW)[d]);
 
@@ -649,7 +639,6 @@ namespace ryujin
       const auto &cell_mass_matrix = copy.cell_mass_matrix_;
       const auto &cell_cij_matrix = copy.cell_cij_matrix_;
       const auto &interface_cij_matrix = copy.interface_cij_matrix_;
-      const auto &cell_betaij_matrix = copy.cell_betaij_matrix_;
       const auto &cell_measure = copy.cell_measure_;
 
       if (!is_locally_owned)
@@ -679,9 +668,6 @@ namespace ryujin
         }
       }
 
-      affine_constraints_assembly.distribute_local_to_global(
-          cell_betaij_matrix, local_dof_indices, betaij_matrix_tmp);
-
       measure_of_omega_ += cell_measure;
     };
 
@@ -697,21 +683,17 @@ namespace ryujin
 #endif
 
 #ifdef DEAL_II_WITH_TRILINOS
-    betaij_matrix_tmp.compress(VectorOperation::add);
     mass_matrix_tmp.compress(VectorOperation::add);
     for (auto &it : cij_matrix_tmp)
       it.compress(VectorOperation::add);
 
-    betaij_matrix_.read_in(betaij_matrix_tmp, /*locally_indexed*/ false);
     mass_matrix_.read_in(mass_matrix_tmp, /*locally_indexed*/ false);
     cij_matrix_.read_in(cij_matrix_tmp, /*locally_indexed*/ false);
 #else
-    betaij_matrix_.read_in(betaij_matrix_tmp, /*locally_indexed*/ true);
     mass_matrix_.read_in(mass_matrix_tmp, /*locally_indexed*/ true);
     cij_matrix_.read_in(cij_matrix_tmp, /*locally_indexed*/ true);
 #endif
 
-    betaij_matrix_.update_ghost_rows();
     mass_matrix_.update_ghost_rows();
     cij_matrix_.update_ghost_rows();
 

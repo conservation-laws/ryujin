@@ -211,13 +211,6 @@ namespace ryujin
     ACCESSOR_READ_ONLY(level_lumped_mass_matrix)
 
     /**
-     * The stiffness matrix \f$(beta_{ij})\f$:
-     *   \f$\beta_{ij} = \nabla\varphi_{j}\cdot\nabla\varphi_{i}\f$
-     * (SIMD storage, local numbering)
-     */
-    ACCESSOR_READ_ONLY(betaij_matrix)
-
-    /**
      * The \f$(c_{ij})\f$ matrix. (SIMD storage, local numbering)
      */
     ACCESSOR_READ_ONLY(cij_matrix)
@@ -307,7 +300,6 @@ namespace ryujin
 
     std::vector<ScalarVectorFloat> level_lumped_mass_matrix_;
 
-    SparseMatrixSIMD<Number> betaij_matrix_;
     SparseMatrixSIMD<Number, dim> cij_matrix_;
     SparseMatrixSIMD<Number> incidence_matrix_;
 
