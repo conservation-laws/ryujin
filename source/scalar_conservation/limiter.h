@@ -26,12 +26,6 @@ namespace ryujin
         add_parameter(
             "iterations", iterations_, "Number of limiter iterations");
 
-        extend_bounds_ = false;
-        add_parameter(
-            "extend bounds",
-            extend_bounds_,
-            "Extend limiter bounds by taking the minimum over the stencil");
-
         relaxation_factor_ = ScalarNumber(1.);
         add_parameter("relaxation factor",
                       relaxation_factor_,
@@ -40,12 +34,10 @@ namespace ryujin
       }
 
       ACCESSOR_READ_ONLY(iterations);
-      ACCESSOR_READ_ONLY(extend_bounds);
       ACCESSOR_READ_ONLY(relaxation_factor);
 
     private:
       unsigned int iterations_;
-      bool extend_bounds_;
       ScalarNumber relaxation_factor_;
     };
 
