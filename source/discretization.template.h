@@ -179,8 +179,10 @@ namespace ryujin
       quadrature_ = std::make_unique<QGauss<dim>>(1);
       quadrature_1d_ = std::make_unique<QGauss<1>>(1);
       face_quadrature_ = std::make_unique<QGauss<dim - 1>>(1);
-      face_nodal_quadrature_ =
-          std::make_unique<dealii::QGaussLobatto<dim - 1>>(2);
+      if (dim > 1)
+        face_nodal_quadrature_ = std::make_unique<dealii::QMidpoint<dim - 1>>();
+      else
+        face_nodal_quadrature_ = std::make_unique<QGauss<dim - 1>>(1);
       break;
     case Ansatz::cg_q1:
       [[fallthrough]];

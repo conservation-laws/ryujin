@@ -28,6 +28,12 @@ namespace ryujin
         add_parameter(
             "iterations", iterations_, "Number of limiter iterations");
 
+        extend_bounds_ = false;
+        add_parameter(
+            "extend bounds",
+            extend_bounds_,
+            "Extend limiter bounds by taking the minimum over the stencil");
+
         if constexpr (std::is_same<ScalarNumber, double>::value)
           newton_tolerance_ = 1.e-10;
         else
@@ -60,6 +66,7 @@ namespace ryujin
       }
 
       ACCESSOR_READ_ONLY(iterations);
+      ACCESSOR_READ_ONLY(extend_bounds);
       ACCESSOR_READ_ONLY(newton_tolerance);
       ACCESSOR_READ_ONLY(newton_max_iterations);
       ACCESSOR_READ_ONLY(relaxation_factor);
@@ -69,6 +76,7 @@ namespace ryujin
 
     private:
       unsigned int iterations_;
+      bool extend_bounds_;
       ScalarNumber newton_tolerance_;
       unsigned int newton_max_iterations_;
       ScalarNumber relaxation_factor_;
@@ -173,6 +181,14 @@ namespace ryujin
        * Return the computed bounds (with relaxation applied).
        */
       Bounds bounds(const Number hd_i) const;
+
+      /**
+       * Given two bounds bounds_left, bounds_right, this function computes
+       * a larger, combined Bounds set that this is a (convex) superset of
+       * the two.
+       */
+      static Bounds combine_bounds(const Bounds &bounds_left,
+                                   const Bounds &bounds_right);
 
       //*}
       /** @name Convex limiter */
@@ -370,6 +386,22 @@ namespace ryujin
       h_small = view.reference_water_depth() * r_i;
 
       return relaxed_bounds;
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline auto
+    Limiter<dim, Number>::combine_bounds(const Bounds &bounds_l,
+                                         const Bounds &bounds_r) -> Bounds
+    {
+      const auto &[h_min_l, h_max_l, h_small_l, k_max_l, v2_max_l] = bounds_l;
+      const auto &[h_min_r, h_max_r, h_small_r, k_max_r, v2_max_r] = bounds_r;
+
+      return {std::min(h_min_l, h_min_r),
+              std::max(h_max_l, h_max_r),
+              std::min(h_small_l, h_small_r),
+              std::max(k_max_l, h_max_r),
+              std::max(v2_max_l, v2_max_r)};
     }
 
 

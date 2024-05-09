@@ -26,6 +26,12 @@ namespace ryujin
         add_parameter(
             "iterations", iterations_, "Number of limiter iterations");
 
+        extend_bounds_ = false;
+        add_parameter(
+            "extend bounds",
+            extend_bounds_,
+            "Extend limiter bounds by taking the minimum over the stencil");
+
         relaxation_factor_ = ScalarNumber(1.);
         add_parameter("relaxation factor",
                       relaxation_factor_,
@@ -34,10 +40,12 @@ namespace ryujin
       }
 
       ACCESSOR_READ_ONLY(iterations);
+      ACCESSOR_READ_ONLY(extend_bounds);
       ACCESSOR_READ_ONLY(relaxation_factor);
 
     private:
       unsigned int iterations_;
+      bool extend_bounds_;
       ScalarNumber relaxation_factor_;
     };
 
@@ -137,6 +145,14 @@ namespace ryujin
        * Return the computed bounds (with relaxation applied).
        */
       Bounds bounds(const Number hd_i) const;
+
+      /**
+       * Given two bounds bounds_left, bounds_right, this function computes
+       * a larger, combined Bounds set that this is a (convex) superset of
+       * the two.
+       */
+      static Bounds combine_bounds(const Bounds &bounds_left,
+                                   const Bounds &bounds_right);
 
       //*}
       /** @name Convex limiter */
@@ -285,6 +301,18 @@ namespace ryujin
                        u_max + ScalarNumber(2.) * u_relaxation);
 
       return relaxed_bounds;
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline auto
+    Limiter<dim, Number>::combine_bounds(const Bounds &bounds_left,
+                                         const Bounds &bounds_right) -> Bounds
+    {
+      const auto &[u_min_l, u_max_l] = bounds_left;
+      const auto &[u_min_r, u_max_r] = bounds_right;
+
+      return {std::min(u_min_l, u_min_r), std::max(u_max_l, u_max_r)};
     }
 
 

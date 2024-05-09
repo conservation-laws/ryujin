@@ -512,6 +512,15 @@ namespace ryujin
       SynchronizationDispatch synchronization_dispatch([&]() {
         r_.update_ghost_values_start(channel++);
         r_.update_ghost_values_finish();
+        if (limiter_parameters_.extend_bounds()) {
+          /*
+           * In case we extend bounds over the stencil, we have to ensure
+           * that ghost ranges are properly communicated over all MPI
+           * ranks.
+           */
+          bounds_.update_ghost_values_start(channel++);
+          bounds_.update_ghost_values_finish();
+        }
       });
 
       const Number weight =
@@ -809,7 +818,10 @@ namespace ryujin
       RYUJIN_PARALLEL_REGION_BEGIN
       LIKWID_MARKER_START(("time_step_" + std::to_string(step_no)).c_str());
 
-      auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
+      auto loop = [&](auto sentinel,
+                      auto extend_bounds,
+                      unsigned int left,
+                      unsigned int right) {
         using T = decltype(sentinel);
         using View =
             typename Description::template HyperbolicSystemView<dim, T>;
@@ -833,8 +845,24 @@ namespace ryujin
           synchronization_dispatch.check(
               thread_ready, i >= n_export_indices && i < n_internal);
 
-          const auto bounds =
+          auto bounds =
               bounds_.template get_tensor<T, std::array<T, n_bounds>>(i);
+
+          /*
+           * In case we are tasked with extending bounds over the stencil
+           * ansatz we need to loop over the stencil once and take the
+           * minimum:
+           */
+          if constexpr (extend_bounds) {
+            /* Skip diagonal. */
+            const unsigned int *js = sparsity_simd.columns(i) + stride_size;
+            for (unsigned int col_idx = 1; col_idx < row_length;
+                 ++col_idx, js += stride_size) {
+              bounds = Limiter::combine_bounds(
+                  bounds,
+                  bounds_.template get_tensor<T, std::array<T, n_bounds>>(js));
+            }
+          }
 
           const auto m_i_inv = get_entry<T>(lumped_mass_matrix_inverse, i);
 
@@ -889,10 +917,21 @@ namespace ryujin
         }
       };
 
-      /* Parallel non-vectorized loop: */
-      loop(Number(), n_internal, n_owned);
-      /* Parallel vectorized SIMD loop: */
-      loop(VA(), 0, n_internal);
+      /*
+       * Chain through a compile time integral constant std::true_type when
+       * we extend bounds over the stencil, and std::false_type otherwise.
+       * We use the (constexpr) integral constant later on to avoid
+       * branching when fetching bounds.
+       */
+      if (limiter_parameters_.extend_bounds()) {
+        /* Parallel non-vectorized loop and vectorized SIMD loop: */
+        loop(Number(), std::true_type{}, n_internal, n_owned);
+        loop(VA(), std::true_type{}, 0, n_internal);
+      } else {
+        /* Parallel non-vectorized loop and vectorized SIMD loop: */
+        loop(Number(), std::false_type{}, n_internal, n_owned);
+        loop(VA(), std::false_type{}, 0, n_internal);
+      }
 
       LIKWID_MARKER_STOP(("time_step_" + std::to_string(step_no)).c_str());
       RYUJIN_PARALLEL_REGION_END

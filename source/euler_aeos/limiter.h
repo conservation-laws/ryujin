@@ -27,6 +27,12 @@ namespace ryujin
         add_parameter(
             "iterations", iterations_, "Number of limiter iterations");
 
+        extend_bounds_ = false;
+        add_parameter(
+            "extend bounds",
+            extend_bounds_,
+            "Extend limiter bounds by taking the minimum over the stencil");
+
         if constexpr (std::is_same<ScalarNumber, double>::value)
           newton_tolerance_ = 1.e-10;
         else
@@ -49,12 +55,14 @@ namespace ryujin
       }
 
       ACCESSOR_READ_ONLY(iterations);
+      ACCESSOR_READ_ONLY(extend_bounds);
       ACCESSOR_READ_ONLY(newton_tolerance);
       ACCESSOR_READ_ONLY(newton_max_iterations);
       ACCESSOR_READ_ONLY(relaxation_factor);
 
     private:
       unsigned int iterations_;
+      bool extend_bounds_;
       ScalarNumber newton_tolerance_;
       unsigned int newton_max_iterations_;
       ScalarNumber relaxation_factor_;
@@ -183,6 +191,14 @@ namespace ryujin
        * Return the computed bounds (with relaxation applied).
        */
       Bounds bounds(const Number hd_i) const;
+
+      /**
+       * Given two bounds bounds_left, bounds_right, this function computes
+       * a larger, combined Bounds set that this is a (convex) superset of
+       * the two.
+       */
+      static Bounds combine_bounds(const Bounds &bounds_left,
+                                   const Bounds &bounds_right);
 
       //*}
       /** @name Convex limiter */
@@ -418,6 +434,21 @@ namespace ryujin
       rho_max = std::min(upper_bound, rho_max);
 
       return relaxed_bounds;
+    }
+
+
+    template <int dim, typename Number>
+    DEAL_II_ALWAYS_INLINE inline auto
+    Limiter<dim, Number>::combine_bounds(const Bounds &bounds_left,
+                                         const Bounds &bounds_right) -> Bounds
+    {
+      const auto &[rho_min_l, rho_max_l, s_min_l, gamma_min_l] = bounds_left;
+      const auto &[rho_min_r, rho_max_r, s_min_r, gamma_min_r] = bounds_right;
+
+      return {std::min(rho_min_l, rho_min_r),
+              std::max(rho_max_l, rho_max_r),
+              std::min(s_min_l, s_min_r),
+              std::min(gamma_min_l, gamma_min_r)};
     }
 
 
