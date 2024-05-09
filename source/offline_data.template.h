@@ -370,10 +370,13 @@ namespace ryujin
      * Next we can (re)initialize all local matrices:
      */
 
+    mass_matrix_.reinit(sparsity_pattern_simd_);
+    if (discretization_->have_discontinuous_ansatz())
+      mass_matrix_inverse_.reinit(sparsity_pattern_simd_);
+
     lumped_mass_matrix_.reinit(scalar_partitioner_);
     lumped_mass_matrix_inverse_.reinit(scalar_partitioner_);
 
-    mass_matrix_.reinit(sparsity_pattern_simd_);
     cij_matrix_.reinit(sparsity_pattern_simd_);
     if (discretization_->have_discontinuous_ansatz())
       incidence_matrix_.reinit(sparsity_pattern_simd_);
@@ -413,6 +416,10 @@ namespace ryujin
         locally_owned, sparsity_pattern_, mpi_communicator_);
 
     TrilinosWrappers::SparseMatrix mass_matrix_tmp;
+    TrilinosWrappers::SparseMatrix mass_matrix_inverse_tmp;
+    if (discretization_->have_discontinuous_ansatz())
+      mass_matrix_inverse_tmp.reinit(trilinos_sparsity_pattern);
+
     std::array<TrilinosWrappers::SparseMatrix, dim> cij_matrix_tmp;
 
     mass_matrix_tmp.reinit(trilinos_sparsity_pattern);
@@ -438,6 +445,10 @@ namespace ryujin
     }
 
     dealii::SparseMatrix<Number> mass_matrix_tmp;
+    dealii::SparseMatrix<Number> mass_matrix_inverse_tmp;
+    if (discretization_->have_discontinuous_ansatz())
+      mass_matrix_inverse_tmp.reinit(sparsity_pattern_assembly);
+
     std::array<dealii::SparseMatrix<Number>, dim> cij_matrix_tmp;
 
     mass_matrix_tmp.reinit(sparsity_pattern_assembly);
@@ -469,6 +480,7 @@ namespace ryujin
       auto &neighbor_local_dof_indices = copy.neighbor_local_dof_indices_;
 
       auto &cell_mass_matrix = copy.cell_mass_matrix_;
+      auto &cell_mass_matrix_inverse = copy.cell_mass_matrix_inverse_;
       auto &cell_cij_matrix = copy.cell_cij_matrix_;
       auto &interface_cij_matrix = copy.interface_cij_matrix_;
       auto &cell_measure = copy.cell_measure_;
@@ -495,6 +507,7 @@ namespace ryujin
       for (auto &matrix : cell_cij_matrix)
         matrix.reinit(dofs_per_cell, dofs_per_cell);
       if (discretization_->have_discontinuous_ansatz()) {
+        cell_mass_matrix_inverse.reinit(dofs_per_cell, dofs_per_cell);
         for (auto &it : interface_cij_matrix)
           for (auto &matrix : it)
             matrix.reinit(dofs_per_cell, dofs_per_cell);
@@ -510,6 +523,7 @@ namespace ryujin
       for (auto &matrix : cell_cij_matrix)
         matrix = 0.;
       if (discretization_->have_discontinuous_ansatz()) {
+        cell_mass_matrix_inverse = 0.;
         for (auto &it : interface_cij_matrix)
           for (auto &matrix : it)
             matrix = 0.;
@@ -620,6 +634,13 @@ namespace ryujin
           }   /* for j */
         }     /* for q */
       }
+
+      /*
+       * Compute block inverse of mass matrix:
+       */
+
+      // FIXME: rewrite with CellwiseInverseMassMatrix
+      cell_mass_matrix_inverse.invert(cell_mass_matrix);
     };
 
     const auto copy_local_to_global = [&](const auto &copy) {
@@ -637,6 +658,7 @@ namespace ryujin
       auto neighbor_local_dof_indices = copy.neighbor_local_dof_indices_;
 #endif
       const auto &cell_mass_matrix = copy.cell_mass_matrix_;
+      const auto &cell_mass_matrix_inverse = copy.cell_mass_matrix_inverse_;
       const auto &cell_cij_matrix = copy.cell_cij_matrix_;
       const auto &interface_cij_matrix = copy.interface_cij_matrix_;
       const auto &cell_measure = copy.cell_measure_;
@@ -668,6 +690,12 @@ namespace ryujin
         }
       }
 
+      if (discretization_->have_discontinuous_ansatz())
+        affine_constraints_assembly.distribute_local_to_global(
+            cell_mass_matrix_inverse,
+            local_dof_indices,
+            mass_matrix_inverse_tmp);
+
       measure_of_omega_ += cell_measure;
     };
 
@@ -688,13 +716,19 @@ namespace ryujin
       it.compress(VectorOperation::add);
 
     mass_matrix_.read_in(mass_matrix_tmp, /*locally_indexed*/ false);
+    if (discretization_->have_discontinuous_ansatz())
+      mass_matrix_inverse_.read_in(mass_matrix_inverse_tmp, /*loc_ind*/ false);
     cij_matrix_.read_in(cij_matrix_tmp, /*locally_indexed*/ false);
 #else
     mass_matrix_.read_in(mass_matrix_tmp, /*locally_indexed*/ true);
+    if (discretization_->have_discontinuous_ansatz())
+      mass_matrix_inverse_.read_in(mass_matrix_inverse_tmp, /*loc_ind*/ true);
     cij_matrix_.read_in(cij_matrix_tmp, /*locally_indexed*/ true);
 #endif
 
     mass_matrix_.update_ghost_rows();
+    if (discretization_->have_discontinuous_ansatz())
+      mass_matrix_inverse_.update_ghost_rows();
     cij_matrix_.update_ghost_rows();
 
     measure_of_omega_ =
