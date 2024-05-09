@@ -128,8 +128,7 @@ namespace ryujin
        *   limiter.reset(i, U_i, flux_i);
        *   for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
        *     // ...
-       *     limiter.accumulate(
-       *       js, U_j, flux_j, scaled_c_ij, beta_ij, affine_shift);
+       *     limiter.accumulate(js, U_j, flux_j, scaled_c_ij, affine_shift);
        *   }
        *   limiter.bounds(hd_i);
        * }
@@ -174,7 +173,6 @@ namespace ryujin
                       const state_type &U_star_ij,
                       const state_type &U_star_ji,
                       const dealii::Tensor<1, dim, Number> &scaled_c_ij,
-                      const Number &beta_ij,
                       const state_type &affine_shift);
 
       /**
@@ -283,7 +281,6 @@ namespace ryujin
         const state_type &U_star_ij,
         const state_type &U_star_ji,
         const dealii::Tensor<1, dim, Number> &scaled_c_ij,
-        const Number &beta_ij,
         const state_type &affine_shift)
     {
       const auto view = hyperbolic_system.view<dim, Number>();
@@ -317,6 +314,9 @@ namespace ryujin
       v2_max = std::max(v2_max, v2_bar_ij);
 
       /* Relaxation: */
+
+      /* Use a uniform weight. */
+      const auto beta_ij = Number(1.);
 
       relaxation_denominator += std::abs(beta_ij);
 
