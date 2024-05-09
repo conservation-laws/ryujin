@@ -446,6 +446,13 @@ namespace ryujin
       std::vector<dealii::types::global_dof_index> neighbor_dof_indices(
           dofs_per_cell);
 
+      /*
+       * We collect all coupling dof indices on a face and store the result
+       * in a vector.
+       */
+      std::vector<dealii::types::global_dof_index> coupling_indices;
+      std::vector<dealii::types::global_dof_index> neighbor_coupling_indices;
+
       /* we iterate over locally owned cells and the ghost layer */
       for (auto cell : dof_handler.active_cell_iterators()) {
         if (cell->is_artificial())
@@ -466,12 +473,15 @@ namespace ryujin
             continue;
 
           /* Avoid artificial cells: */
-          const auto neighbor_cell = cell->neighbor(f_index);
+          const auto neighbor_cell =
+              cell->neighbor_or_periodic_neighbor(f_index);
           if (neighbor_cell->is_artificial())
             continue;
 
           const unsigned int f_index_neighbor =
-              cell->neighbor_of_neighbor(f_index);
+              cell->has_periodic_neighbor(f_index)
+                  ? cell->periodic_neighbor_of_periodic_neighbor(f_index)
+                  : cell->neighbor_of_neighbor(f_index);
 
           neighbor_cell->get_dof_indices(neighbor_dof_indices);
 
@@ -479,15 +489,22 @@ namespace ryujin
            * Construct all couplings between current and neighbor cell with
            * DoFs located at the boundary:
            */
-          for (unsigned int i = 0; i < dofs_per_cell; ++i) {
-            if (!fe.has_support_on_face(i, f_index))
-              continue;
-            for (unsigned int j = 0; j < dofs_per_cell; ++j) {
-              if (!fe.has_support_on_face(j, f_index_neighbor))
-                continue;
-              dsp.add(dof_indices[i], neighbor_dof_indices[j]);
-            }
-          }
+
+          coupling_indices.resize(0);
+          for (unsigned int i = 0; i < dofs_per_cell; ++i)
+            if (fe.has_support_on_face(i, f_index))
+              coupling_indices.push_back(dof_indices[i]);
+
+          neighbor_coupling_indices.resize(0);
+          for (unsigned int j = 0; j < dofs_per_cell; ++j)
+            if (fe.has_support_on_face(j, f_index_neighbor))
+              neighbor_coupling_indices.push_back(neighbor_dof_indices[j]);
+
+          affine_constraints.add_entries_local_to_global(
+              coupling_indices,
+              neighbor_coupling_indices,
+              dsp,
+              keep_constrained);
         }
       }
     }
