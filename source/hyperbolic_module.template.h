@@ -174,10 +174,12 @@ namespace ryujin
 
     const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
 
+    const auto &mass_matrix = offline_data_->mass_matrix();
+    const auto &mass_matrix_inverse = offline_data_->mass_matrix_inverse();
     const auto &lumped_mass_matrix = offline_data_->lumped_mass_matrix();
     const auto &lumped_mass_matrix_inverse =
         offline_data_->lumped_mass_matrix_inverse();
-    const auto &mass_matrix = offline_data_->mass_matrix();
+
     const auto &cij_matrix = offline_data_->cij_matrix();
     const auto &incidence_matrix = offline_data_->incidence_matrix();
 
@@ -511,7 +513,7 @@ namespace ryujin
       SynchronizationDispatch synchronization_dispatch([&]() {
         r_.update_ghost_values_start(channel++);
         r_.update_ghost_values_finish();
-        if (limiter_parameters_.extend_bounds()) {
+        if (offline_data_->discretization().have_discontinuous_ansatz()) {
           /*
            * In case we extend bounds over the stencil, we have to ensure
            * that ghost ranges are properly communicated over all MPI
@@ -810,7 +812,7 @@ namespace ryujin
       LIKWID_MARKER_START(("time_step_" + std::to_string(step_no)).c_str());
 
       auto loop = [&](auto sentinel,
-                      auto extend_bounds,
+                      auto have_discontinuous_ansatz,
                       unsigned int left,
                       unsigned int right) {
         using T = decltype(sentinel);
@@ -840,11 +842,11 @@ namespace ryujin
               bounds_.template get_tensor<T, std::array<T, n_bounds>>(i);
 
           /*
-           * In case we are tasked with extending bounds over the stencil
-           * ansatz we need to loop over the stencil once and take the
-           * minimum:
+           * In case of a discontinuous finite element ansatz we need to
+           * extend bounds over the stencil. We do this by looping over the
+           * stencil once and taking the minimum/maximum:
            */
-          if constexpr (extend_bounds) {
+          if constexpr (have_discontinuous_ansatz) {
             /* Skip diagonal. */
             const unsigned int *js = sparsity_simd.columns(i) + stride_size;
             for (unsigned int col_idx = 1; col_idx < row_length;
@@ -855,6 +857,9 @@ namespace ryujin
             }
           }
 
+          [[maybe_unused]] T m_i;
+          if constexpr (have_discontinuous_ansatz)
+            m_i = get_entry<T>(lumped_mass_matrix, i);
           const auto m_i_inv = get_entry<T>(lumped_mass_matrix_inverse, i);
 
           const auto U_i_new = new_U.template get_tensor<T>(i);
@@ -869,20 +874,37 @@ namespace ryujin
           for (unsigned int col_idx = 1; col_idx < row_length;
                ++col_idx, js += stride_size) {
 
+            auto P_ij = pij_matrix_.template get_tensor<T>(i, col_idx);
+            const auto F_jH = r_.template get_tensor<T>(js);
+
             /*
              * Mass matrix correction:
              */
 
-            const auto m_j_inv = get_entry<T>(lumped_mass_matrix_inverse, js);
-            const auto m_ij = mass_matrix.template get_entry<T>(i, col_idx);
+            const auto kronecker_ij = col_idx == 0 ? T(1.) : T(0.);
 
-            const auto b_ij = (col_idx == 0 ? T(1.) : T(0.)) - m_ij * m_j_inv;
-            /* m_ji = m_ij  so let's simply use m_ij: */
-            const auto b_ji = (col_idx == 0 ? T(1.) : T(0.)) - m_ij * m_i_inv;
+            if constexpr (have_discontinuous_ansatz) {
+              /* Use full consistent mass matrix inverse: */
 
-            auto P_ij = pij_matrix_.template get_tensor<T>(i, col_idx);
-            const auto F_jH = r_.template get_tensor<T>(js);
-            P_ij += b_ij * F_jH - b_ji * F_iH;
+              const auto m_j = get_entry<T>(lumped_mass_matrix, js);
+              const auto m_ij_inv =
+                  mass_matrix_inverse.template get_entry<T>(i, col_idx);
+              const auto b_ij = m_i * m_ij_inv - kronecker_ij;
+              const auto b_ji = m_j * m_ij_inv - kronecker_ij;
+
+              P_ij += b_ij * F_jH - b_ji * F_iH;
+
+            } else {
+              /* Use Neumann series expansion: */
+
+              const auto m_j_inv = get_entry<T>(lumped_mass_matrix_inverse, js);
+              const auto m_ij = mass_matrix.template get_entry<T>(i, col_idx);
+              const auto b_ij = kronecker_ij - m_ij * m_j_inv;
+              const auto b_ji = kronecker_ij - m_ij * m_i_inv;
+
+              P_ij += b_ij * F_jH - b_ji * F_iH;
+            }
+
             P_ij *= factor;
             pij_matrix_.write_entry(P_ij, i, col_idx);
 
@@ -909,12 +931,12 @@ namespace ryujin
       };
 
       /*
-       * Chain through a compile time integral constant std::true_type when
-       * we extend bounds over the stencil, and std::false_type otherwise.
-       * We use the (constexpr) integral constant later on to avoid
-       * branching when fetching bounds.
+       * Chain through a compile time integral constant std::true_type for
+       * a discontinuous ansatz and std::false_type otherwise. We use the
+       * (constexpr) integral constant later on to avoid branching when
+       * computing d_ijH.
        */
-      if (limiter_parameters_.extend_bounds()) {
+      if (offline_data_->discretization().have_discontinuous_ansatz()) {
         /* Parallel non-vectorized loop and vectorized SIMD loop: */
         loop(Number(), std::true_type{}, n_internal, n_owned);
         loop(VA(), std::true_type{}, 0, n_internal);

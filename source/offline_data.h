@@ -195,12 +195,21 @@ namespace ryujin
     ACCESSOR_READ_ONLY(mass_matrix)
 
     /**
-     * The lumped mass matrix.
+     * The inverse mass matrix. (SIMD storage, local numbering)
+     *
+     * This matrix is only available for a discontinuous finite Element
+     * ansatz.
+     */
+    ACCESSOR_READ_ONLY(mass_matrix_inverse)
+
+    /**
+     * The lumped mass matrix. (stored as vector, local numbering)
      */
     ACCESSOR_READ_ONLY(lumped_mass_matrix)
 
     /**
-     * The inverse of the lumped mass matrix.
+     * The inverse of the lumped mass matrix. (stored as vector, local
+     * numbering)
      */
     ACCESSOR_READ_ONLY(lumped_mass_matrix_inverse)
 
@@ -294,6 +303,7 @@ namespace ryujin
         sparsity_pattern_simd_;
 
     SparseMatrixSIMD<Number> mass_matrix_;
+    SparseMatrixSIMD<Number> mass_matrix_inverse_;
 
     ScalarVector lumped_mass_matrix_;
     ScalarVector lumped_mass_matrix_inverse_;
