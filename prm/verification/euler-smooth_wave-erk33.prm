@@ -64,14 +64,14 @@ subsection F - HyperbolicModule
     set iterations            = 2
     set newton max iterations = 2
     set newton tolerance      = 1e-10
-    set relaxation factor     = 8
+    set relaxation factor     = 1
   end
 end
 
 
 subsection H - TimeIntegrator
-  set cfl min               = 0.10
-  set cfl max               = 0.10
+  set cfl min               = 0.30
+  set cfl max               = 0.30
   set cfl recovery strategy = none
   set time stepping scheme  = erk 33
 end
