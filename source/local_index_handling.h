@@ -473,12 +473,15 @@ namespace ryujin
             continue;
 
           /* Avoid artificial cells: */
-          const auto neighbor_cell = cell->neighbor(f_index);
+          const auto neighbor_cell =
+              cell->neighbor_or_periodic_neighbor(f_index);
           if (neighbor_cell->is_artificial())
             continue;
 
           const unsigned int f_index_neighbor =
-              cell->neighbor_of_neighbor(f_index);
+              cell->has_periodic_neighbor(f_index)
+                  ? cell->periodic_neighbor_of_periodic_neighbor(f_index)
+                  : cell->neighbor_of_neighbor(f_index);
 
           neighbor_cell->get_dof_indices(neighbor_dof_indices);
 

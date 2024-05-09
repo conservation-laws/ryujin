@@ -569,7 +569,8 @@ namespace ryujin
             }
 
             /* Avoid artificial cells: */
-            const auto neighbor_cell = cell->neighbor(f_index);
+            const auto neighbor_cell =
+                cell->neighbor_or_periodic_neighbor(f_index);
             if (neighbor_cell->is_artificial()) {
               // set the vector of local dof indices to 0 to indicate that
               // there is nothing to do for this face:
@@ -601,7 +602,9 @@ namespace ryujin
             /* Coupling part: */
 
             const unsigned int f_index_neighbor =
-                cell->neighbor_of_neighbor(f_index);
+                cell->has_periodic_neighbor(f_index)
+                    ? cell->periodic_neighbor_of_periodic_neighbor(f_index)
+                    : cell->neighbor_of_neighbor(f_index);
 
             neighbor_local_dof_indices[f_index].resize(dofs_per_cell);
             neighbor_cell->get_dof_indices(neighbor_local_dof_indices[f_index]);
@@ -816,7 +819,8 @@ namespace ryujin
           }
 
           /* Avoid artificial cells: */
-          const auto neighbor_cell = cell->neighbor(f_index);
+          const auto neighbor_cell =
+              cell->neighbor_or_periodic_neighbor(f_index);
           if (neighbor_cell->is_artificial()) {
             // set the vector of local dof indices to 0 to indicate that
             // there is nothing to do for this face:
@@ -825,7 +829,9 @@ namespace ryujin
           }
 
           const unsigned int f_index_neighbor =
-              cell->neighbor_of_neighbor(f_index);
+              cell->has_periodic_neighbor(f_index)
+                  ? cell->periodic_neighbor_of_periodic_neighbor(f_index)
+                  : cell->neighbor_of_neighbor(f_index);
 
           neighbor_local_dof_indices[f_index].resize(dofs_per_cell);
           neighbor_cell->get_dof_indices(neighbor_local_dof_indices[f_index]);
