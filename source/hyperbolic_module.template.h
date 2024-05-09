@@ -178,7 +178,6 @@ namespace ryujin
     const auto &lumped_mass_matrix_inverse =
         offline_data_->lumped_mass_matrix_inverse();
     const auto &mass_matrix = offline_data_->mass_matrix();
-    const auto &betaij_matrix = offline_data_->betaij_matrix();
     const auto &cij_matrix = offline_data_->cij_matrix();
     const auto &incidence_matrix = offline_data_->incidence_matrix();
 
@@ -667,9 +666,6 @@ namespace ryujin
                 T(100. * std::numeric_limits<Number>::min());
             const auto scaled_c_ij = c_ij / std::max(d_ij, regularization);
 
-            const auto beta_ij =
-                betaij_matrix.template get_entry<T>(i, col_idx);
-
             const auto flux_j = view.flux_contribution(
                 old_precomputed, initial_precomputed_, js, U_j);
 
@@ -695,12 +691,8 @@ namespace ryujin
               F_iH += d_ijH * (U_star_ji - U_star_ij);
               P_ij += (d_ijH - d_ij) * (U_star_ji - U_star_ij);
 
-              limiter.accumulate(U_j,
-                                 U_star_ij,
-                                 U_star_ji,
-                                 scaled_c_ij,
-                                 beta_ij,
-                                 affine_shift);
+              limiter.accumulate(
+                  U_j, U_star_ij, U_star_ji, scaled_c_ij, affine_shift);
 
             } else {
 
@@ -708,8 +700,7 @@ namespace ryujin
               F_iH += d_ijH * (U_j - U_i);
               P_ij += (d_ijH - d_ij) * (U_j - U_i);
 
-              limiter.accumulate(
-                  js, U_j, flux_j, scaled_c_ij, beta_ij, affine_shift);
+              limiter.accumulate(js, U_j, flux_j, scaled_c_ij, affine_shift);
             }
 
             if constexpr (View::have_source_terms) {
