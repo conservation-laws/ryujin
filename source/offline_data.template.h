@@ -464,173 +464,173 @@ namespace ryujin
      */
 
     /* The local, per-cell assembly routine: */
-    const auto local_assemble_system =
-        [&](const auto &cell, auto &scratch, auto &copy) {
-          /* iterate over locally owned cells and the ghost layer */
+    const auto local_assemble_system = [&](const auto &cell,
+                                           auto &scratch,
+                                           auto &copy) {
+      /* iterate over locally owned cells and the ghost layer */
 
-          auto &is_locally_owned = copy.is_locally_owned_;
-          auto &local_dof_indices = copy.local_dof_indices_;
-          auto &neighbor_local_dof_indices = copy.neighbor_local_dof_indices_;
+      auto &is_locally_owned = copy.is_locally_owned_;
+      auto &local_dof_indices = copy.local_dof_indices_;
+      auto &neighbor_local_dof_indices = copy.neighbor_local_dof_indices_;
 
-          auto &cell_mass_matrix = copy.cell_mass_matrix_;
-          auto &cell_betaij_matrix = copy.cell_betaij_matrix_;
-          auto &cell_cij_matrix = copy.cell_cij_matrix_;
-          auto &interface_cij_matrix = copy.interface_cij_matrix_;
-          auto &cell_measure = copy.cell_measure_;
+      auto &cell_mass_matrix = copy.cell_mass_matrix_;
+      auto &cell_betaij_matrix = copy.cell_betaij_matrix_;
+      auto &cell_cij_matrix = copy.cell_cij_matrix_;
+      auto &interface_cij_matrix = copy.interface_cij_matrix_;
+      auto &cell_measure = copy.cell_measure_;
 
-          auto &fe_values = scratch.fe_values_;
-          auto &fe_face_values = scratch.fe_face_values_;
-          auto &fe_neighbor_face_values = scratch.fe_neighbor_face_values_;
+      auto &fe_values = scratch.fe_values_;
+      auto &fe_face_values = scratch.fe_face_values_;
+      auto &fe_neighbor_face_values = scratch.fe_neighbor_face_values_;
 
 #ifdef DEAL_II_WITH_TRILINOS
-          is_locally_owned = cell->is_locally_owned();
+      is_locally_owned = cell->is_locally_owned();
 #else
-          /*
-           * When using a local dealii::SparseMatrix<Number> we don not
-           * have a compress(VectorOperation::add) available. In this case
-           * we assemble contributions over all locally relevant (non
-           * artificial) cells.
-           */
-          is_locally_owned = !cell->is_artificial();
+      /*
+       * When using a local dealii::SparseMatrix<Number> we don not
+       * have a compress(VectorOperation::add) available. In this case
+       * we assemble contributions over all locally relevant (non
+       * artificial) cells.
+       */
+      is_locally_owned = !cell->is_artificial();
 #endif
-          if (!is_locally_owned)
-            return;
+      if (!is_locally_owned)
+        return;
 
-          cell_mass_matrix.reinit(dofs_per_cell, dofs_per_cell);
-          cell_betaij_matrix.reinit(dofs_per_cell, dofs_per_cell);
-          for (auto &matrix : cell_cij_matrix)
+      cell_mass_matrix.reinit(dofs_per_cell, dofs_per_cell);
+      cell_betaij_matrix.reinit(dofs_per_cell, dofs_per_cell);
+      for (auto &matrix : cell_cij_matrix)
+        matrix.reinit(dofs_per_cell, dofs_per_cell);
+      if (discretization_->have_discontinuous_ansatz()) {
+        for (auto &it : interface_cij_matrix)
+          for (auto &matrix : it)
             matrix.reinit(dofs_per_cell, dofs_per_cell);
-          if (discretization_->have_discontinuous_ansatz()) {
-            for (auto &it : interface_cij_matrix)
-              for (auto &matrix : it)
-                matrix.reinit(dofs_per_cell, dofs_per_cell);
-          }
+      }
 
-          fe_values.reinit(cell);
+      fe_values.reinit(cell);
 
-          local_dof_indices.resize(dofs_per_cell);
-          cell->get_dof_indices(local_dof_indices);
+      local_dof_indices.resize(dofs_per_cell);
+      cell->get_dof_indices(local_dof_indices);
 
-          /* clear out copy data: */
-          cell_mass_matrix = 0.;
-          cell_betaij_matrix = 0.;
-          for (auto &matrix : cell_cij_matrix)
+      /* clear out copy data: */
+      cell_mass_matrix = 0.;
+      cell_betaij_matrix = 0.;
+      for (auto &matrix : cell_cij_matrix)
+        matrix = 0.;
+      if (discretization_->have_discontinuous_ansatz()) {
+        for (auto &it : interface_cij_matrix)
+          for (auto &matrix : it)
             matrix = 0.;
-          if (discretization_->have_discontinuous_ansatz()) {
-            for (auto &it : interface_cij_matrix)
-              for (auto &matrix : it)
-                matrix = 0.;
-          }
-          cell_measure = 0.;
+      }
+      cell_measure = 0.;
 
-          for (unsigned int q_point = 0; q_point < n_q_points; ++q_point) {
-            const auto JxW = fe_values.JxW(q_point);
+      for (unsigned int q_point = 0; q_point < n_q_points; ++q_point) {
+        const auto JxW = fe_values.JxW(q_point);
 
-            if (cell->is_locally_owned())
-              cell_measure += Number(JxW);
+        if (cell->is_locally_owned())
+          cell_measure += Number(JxW);
 
-            for (unsigned int j = 0; j < dofs_per_cell; ++j) {
-              const auto value_JxW = fe_values.shape_value(j, q_point) * JxW;
-              const auto grad_JxW = fe_values.shape_grad(j, q_point) * JxW;
+        for (unsigned int j = 0; j < dofs_per_cell; ++j) {
+          const auto value_JxW = fe_values.shape_value(j, q_point) * JxW;
+          const auto grad_JxW = fe_values.shape_grad(j, q_point) * JxW;
 
-              for (unsigned int i = 0; i < dofs_per_cell; ++i) {
+          for (unsigned int i = 0; i < dofs_per_cell; ++i) {
 
-                const auto value = fe_values.shape_value(i, q_point);
-                const auto grad = fe_values.shape_grad(i, q_point);
+            const auto value = fe_values.shape_value(i, q_point);
+            const auto grad = fe_values.shape_grad(i, q_point);
 
-                cell_mass_matrix(i, j) += Number(value * value_JxW);
-                cell_betaij_matrix(i, j) += Number(grad * grad_JxW);
-                for (unsigned int d = 0; d < dim; ++d)
-                  cell_cij_matrix[d](i, j) += Number((value * grad_JxW)[d]);
+            cell_mass_matrix(i, j) += Number(value * value_JxW);
+            cell_betaij_matrix(i, j) += Number(grad * grad_JxW);
+            for (unsigned int d = 0; d < dim; ++d)
+              cell_cij_matrix[d](i, j) += Number((value * grad_JxW)[d]);
 
-              } /* for i */
-            }   /* for j */
-          }     /* for q */
+          } /* for i */
+        }   /* for j */
+      }     /* for q */
 
-          /*
-           * For a discontinuous finite element ansatz we need to assemble
-           * additional face contributions:
-           */
+      /*
+       * For a discontinuous finite element ansatz we need to assemble
+       * additional face contributions:
+       */
 
-          if (!discretization_->have_discontinuous_ansatz())
-            return;
+      if (!discretization_->have_discontinuous_ansatz())
+        return;
 
-          for (const auto f_index : cell->face_indices()) {
-            const auto &face = cell->face(f_index);
+      for (const auto f_index : cell->face_indices()) {
+        const auto &face = cell->face(f_index);
 
-            /* Skip faces without neighbors... */
-            const bool has_neighbor =
-                !face->at_boundary() || cell->has_periodic_neighbor(f_index);
-            if (!has_neighbor) {
-              // set the vector of local dof indices to 0 to indicate that
-              // there is nothing to do for this face:
-              neighbor_local_dof_indices[f_index].resize(0);
-              continue;
-            }
+        /* Skip faces without neighbors... */
+        const bool has_neighbor =
+            !face->at_boundary() || cell->has_periodic_neighbor(f_index);
+        if (!has_neighbor) {
+          // set the vector of local dof indices to 0 to indicate that
+          // there is nothing to do for this face:
+          neighbor_local_dof_indices[f_index].resize(0);
+          continue;
+        }
 
-            /* Avoid artificial cells: */
-            const auto neighbor_cell =
-                cell->neighbor_or_periodic_neighbor(f_index);
-            if (neighbor_cell->is_artificial()) {
-              // set the vector of local dof indices to 0 to indicate that
-              // there is nothing to do for this face:
-              neighbor_local_dof_indices[f_index].resize(0);
-              continue;
-            }
+        /* Avoid artificial cells: */
+        const auto neighbor_cell = cell->neighbor_or_periodic_neighbor(f_index);
+        if (neighbor_cell->is_artificial()) {
+          // set the vector of local dof indices to 0 to indicate that
+          // there is nothing to do for this face:
+          neighbor_local_dof_indices[f_index].resize(0);
+          continue;
+        }
 
-            fe_face_values.reinit(cell, f_index);
+        fe_face_values.reinit(cell, f_index);
 
-            /* Face contribution: */
+        /* Face contribution: */
 
-            for (unsigned int q = 0; q < n_face_q_points; ++q) {
-              const auto JxW = fe_face_values.JxW(q);
-              const auto &normal = fe_face_values.get_normal_vectors()[q];
+        for (unsigned int q = 0; q < n_face_q_points; ++q) {
+          const auto JxW = fe_face_values.JxW(q);
+          const auto &normal = fe_face_values.get_normal_vectors()[q];
 
-              for (unsigned int j = 0; j < dofs_per_cell; ++j) {
-                const auto value_JxW = fe_face_values.shape_value(j, q) * JxW;
+          for (unsigned int j = 0; j < dofs_per_cell; ++j) {
+            const auto value_JxW = fe_face_values.shape_value(j, q) * JxW;
 
-                for (unsigned int i = 0; i < dofs_per_cell; ++i) {
-                  const auto value = fe_face_values.shape_value(i, q);
+            for (unsigned int i = 0; i < dofs_per_cell; ++i) {
+              const auto value = fe_face_values.shape_value(i, q);
 
-                  for (unsigned int d = 0; d < dim; ++d)
-                    cell_cij_matrix[d](i, j) -=
-                        Number(0.5 * normal[d] * value * value_JxW);
-                } /* for i */
-              }   /* for j */
-            }     /* for q */
+              for (unsigned int d = 0; d < dim; ++d)
+                cell_cij_matrix[d](i, j) -=
+                    Number(0.5 * normal[d] * value * value_JxW);
+            } /* for i */
+          }   /* for j */
+        }     /* for q */
 
-            /* Coupling part: */
+        /* Coupling part: */
 
-            const unsigned int f_index_neighbor =
-                cell->has_periodic_neighbor(f_index)
-                    ? cell->periodic_neighbor_of_periodic_neighbor(f_index)
-                    : cell->neighbor_of_neighbor(f_index);
+        const unsigned int f_index_neighbor =
+            cell->has_periodic_neighbor(f_index)
+                ? cell->periodic_neighbor_of_periodic_neighbor(f_index)
+                : cell->neighbor_of_neighbor(f_index);
 
-            neighbor_local_dof_indices[f_index].resize(dofs_per_cell);
-            neighbor_cell->get_dof_indices(neighbor_local_dof_indices[f_index]);
+        neighbor_local_dof_indices[f_index].resize(dofs_per_cell);
+        neighbor_cell->get_dof_indices(neighbor_local_dof_indices[f_index]);
 
-            fe_neighbor_face_values.reinit(neighbor_cell, f_index_neighbor);
+        fe_neighbor_face_values.reinit(neighbor_cell, f_index_neighbor);
 
-            for (unsigned int q = 0; q < n_face_q_points; ++q) {
-              const auto JxW = fe_face_values.JxW(q);
-              const auto &normal = fe_face_values.get_normal_vectors()[q];
+        for (unsigned int q = 0; q < n_face_q_points; ++q) {
+          const auto JxW = fe_face_values.JxW(q);
+          const auto &normal = fe_face_values.get_normal_vectors()[q];
 
-              /* index j for neighbor, index i for current cell: */
-              for (unsigned int j = 0; j < dofs_per_cell; ++j) {
-                const auto value_JxW =
-                    fe_neighbor_face_values.shape_value(j, q) * JxW;
+          /* index j for neighbor, index i for current cell: */
+          for (unsigned int j = 0; j < dofs_per_cell; ++j) {
+            const auto value_JxW =
+                fe_neighbor_face_values.shape_value(j, q) * JxW;
 
-                for (unsigned int i = 0; i < dofs_per_cell; ++i) {
-                  const auto value = fe_face_values.shape_value(i, q);
+            for (unsigned int i = 0; i < dofs_per_cell; ++i) {
+              const auto value = fe_face_values.shape_value(i, q);
 
-                  for (unsigned int d = 0; d < dim; ++d)
-                    interface_cij_matrix[f_index][d](i, j) +=
-                        Number(0.5 * normal[d] * value * value_JxW);
-                } /* for i */
-              }   /* for j */
-            }     /* for q */
-          }
-        };
+              for (unsigned int d = 0; d < dim; ++d)
+                interface_cij_matrix[f_index][d](i, j) +=
+                    Number(0.5 * normal[d] * value * value_JxW);
+            } /* for i */
+          }   /* for j */
+        }     /* for q */
+      }
+    };
 
     const auto copy_local_to_global = [&](const auto &copy) {
       const auto &is_locally_owned = copy.is_locally_owned_;
