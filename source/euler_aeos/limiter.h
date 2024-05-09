@@ -27,6 +27,12 @@ namespace ryujin
         add_parameter(
             "iterations", iterations_, "Number of limiter iterations");
 
+        extend_bounds_ = false;
+        add_parameter(
+            "extend bounds",
+            extend_bounds_,
+            "Extend limiter bounds by taking the minimum over the stencil");
+
         if constexpr (std::is_same<ScalarNumber, double>::value)
           newton_tolerance_ = 1.e-10;
         else
@@ -49,12 +55,14 @@ namespace ryujin
       }
 
       ACCESSOR_READ_ONLY(iterations);
+      ACCESSOR_READ_ONLY(extend_bounds);
       ACCESSOR_READ_ONLY(newton_tolerance);
       ACCESSOR_READ_ONLY(newton_max_iterations);
       ACCESSOR_READ_ONLY(relaxation_factor);
 
     private:
       unsigned int iterations_;
+      bool extend_bounds_;
       ScalarNumber newton_tolerance_;
       unsigned int newton_max_iterations_;
       ScalarNumber relaxation_factor_;

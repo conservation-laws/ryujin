@@ -26,12 +26,20 @@ namespace ryujin
         iterations_ = 2;
         add_parameter(
             "iterations", iterations_, "Number of limiter iterations");
+
+        extend_bounds_ = false;
+        add_parameter(
+            "extend bounds",
+            extend_bounds_,
+            "Extend limiter bounds by taking the minimum over the stencil");
       }
 
       ACCESSOR_READ_ONLY(iterations);
+      ACCESSOR_READ_ONLY(extend_bounds);
 
     private:
       unsigned int iterations_;
+      bool extend_bounds_;
     };
 
 
