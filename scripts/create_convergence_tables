@@ -149,25 +149,25 @@ def compute_errors():
             for cnt, ln in enumerate(fp):
                 if ln.strip().startswith(dofs_string):
                     match_number = re.compile(
-                        "\s-?\ *[0-9]+\.?[0-9]*(?:[Ee]\ *-?\ *[0-9]+)?"
+                        r"\s-?\ *[0-9]+\.?[0-9]*(?:[Ee]\ *-?\ *[0-9]+)?"
                     )
                     temp = [int(x) for x in re.findall(match_number, ln)]
                     dofs.append(temp[0])
                 if ln.strip().startswith(L1_string):
                     match_number = re.compile(
-                        "\s-?\ *[0-9]+\.?[0-9]*(?:[Ee]\ *-?\ *[0-9]+)?"
+                        r"\s-?\ *[0-9]+\.?[0-9]*(?:[Ee]\ *-?\ *[0-9]+)?"
                     )
                     final_list = [float(x) for x in re.findall(match_number, ln)]
                     L1error.append(final_list[0])
                 if ln.strip().startswith(L2_string):
                     match_number = re.compile(
-                        "\s-?\ *[0-9]+\.?[0-9]*(?:[Ee]\ *-?\ *[0-9]+)?"
+                        r"\s-?\ *[0-9]+\.?[0-9]*(?:[Ee]\ *-?\ *[0-9]+)?"
                     )
                     final_list = [float(x) for x in re.findall(match_number, ln)]
                     L2error.append(final_list[0])
                 if ln.strip().startswith(Linf_string):
                     match_number = re.compile(
-                        "\s?\ *[0-9]+\.?[0-9]*(?:[Ee]\ *-?\ *[0-9]+)?"
+                        r"\s?\ *[0-9]+\.?[0-9]*(?:[Ee]\ *-?\ *[0-9]+)?"
                     )
                     final_list = [float(x) for x in re.findall(match_number, ln)]
                     Linf_error.append(final_list[0])
@@ -242,11 +242,11 @@ def compute_rates():
         table,
         headers=[
             "$I$",
-            "$\delta^1(T)$",
+            r"$\delta^1(T)$",
             "",
-            "$\delta^2(T)$",
+            r"$\delta^2(T)$",
             "",
-            "$\delta^\infty(T)$",
+            r"$\delta^\infty(T)$",
             "",
         ],
         tablefmt="latex_raw",
