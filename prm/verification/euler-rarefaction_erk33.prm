@@ -15,8 +15,8 @@
 # This configuration uses an explicit ERK(3, 3, 1) timestepping.
 # Expected results are reported in euler-rarefaction-erk33.baseline
 #
-# We expect a convergence rate of around 1.5 in the L1 norm for our choice
-# of limiting and bounds relaxation.
+# For cG Q1 elements we expect a convergence rate of around ~1.75 in the L1
+# norm for our choice of limiting and bounds relaxation.
 #
 ##
 
@@ -78,8 +78,8 @@ end
 
 
 subsection H - TimeIntegrator
-  set cfl min               = 0.10
-  set cfl max               = 0.10
+  set cfl min               = 0.50
+  set cfl max               = 0.50
   set cfl recovery strategy = none
   set time stepping scheme  = erk 33
 end
