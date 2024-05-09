@@ -513,7 +513,7 @@ namespace ryujin
       SynchronizationDispatch synchronization_dispatch([&]() {
         r_.update_ghost_values_start(channel++);
         r_.update_ghost_values_finish();
-        if (limiter_parameters_.extend_bounds()) {
+        if (offline_data_->discretization().have_discontinuous_ansatz()) {
           /*
            * In case we extend bounds over the stencil, we have to ensure
            * that ghost ranges are properly communicated over all MPI
@@ -813,7 +813,6 @@ namespace ryujin
 
       auto loop = [&](auto sentinel,
                       auto have_discontinuous_ansatz,
-                      auto extend_bounds,
                       unsigned int left,
                       unsigned int right) {
         using T = decltype(sentinel);
@@ -843,11 +842,11 @@ namespace ryujin
               bounds_.template get_tensor<T, std::array<T, n_bounds>>(i);
 
           /*
-           * In case we are tasked with extending bounds over the stencil
-           * ansatz we need to loop over the stencil once and take the
-           * minimum:
+           * In case of a discontinuous finite element ansatz we need to
+           * extend bounds over the stencil. We do this by looping over the
+           * stencil once and taking the minimum/maximum:
            */
-          if constexpr (extend_bounds) {
+          if constexpr (have_discontinuous_ansatz) {
             /* Skip diagonal. */
             const unsigned int *js = sparsity_simd.columns(i) + stride_size;
             for (unsigned int col_idx = 1; col_idx < row_length;
@@ -932,34 +931,19 @@ namespace ryujin
       };
 
       /*
-       * Chain through two compile time integral constants:
-       *  - first argument: std::true_type for a discontinuous ansatz and
-       *    std::false_type otherwise. We use the (constexpr) integral
-       *    constant later on to avoid branching when computing the mass
-       *    matrix correction.
-       *  - second argument: std::true_type when we extend bounds over the
-       *    stencil, and std::false_type otherwise. We use the (constexpr)
-       *    integral constant later on to avoid branching when fetching
-       *    bounds.
+       * Chain through a compile time integral constant std::true_type for
+       * a discontinuous ansatz and std::false_type otherwise. We use the
+       * (constexpr) integral constant later on to avoid branching when
+       * computing d_ijH.
        */
-      const auto yes = std::true_type{};
-      const auto no = std::false_type{};
       if (offline_data_->discretization().have_discontinuous_ansatz()) {
-        if (limiter_parameters_.extend_bounds()) {
-          loop(Number(), /*dG*/ yes, /*extend*/ yes, n_internal, n_owned);
-          loop(VA(), /*dG*/ yes, /*extend*/ yes, 0, n_internal);
-        } else {
-          loop(Number(), /*dG*/ yes, /*extend*/ no, n_internal, n_owned);
-          loop(VA(), /*dG*/ yes, /*extend*/ no, 0, n_internal);
-        }
+        /* Parallel non-vectorized loop and vectorized SIMD loop: */
+        loop(Number(), std::true_type{}, n_internal, n_owned);
+        loop(VA(), std::true_type{}, 0, n_internal);
       } else {
-        if (limiter_parameters_.extend_bounds()) {
-          loop(Number(), /*dG*/ no, /*extend*/ yes, n_internal, n_owned);
-          loop(VA(), /*dG*/ no, /*extend*/ yes, 0, n_internal);
-        } else {
-          loop(Number(), /*dG*/ no, /*extend*/ no, n_internal, n_owned);
-          loop(VA(), /*dG*/ no, /*extend*/ no, 0, n_internal);
-        }
+        /* Parallel non-vectorized loop and vectorized SIMD loop: */
+        loop(Number(), std::false_type{}, n_internal, n_owned);
+        loop(VA(), std::false_type{}, 0, n_internal);
       }
 
       LIKWID_MARKER_STOP(("time_step_" + std::to_string(step_no)).c_str());
