@@ -341,10 +341,11 @@ namespace ryujin
           std::abs(rho_relaxation_numerator) /
           (std::abs(rho_relaxation_denominator) + Number(eps));
 
-      rho_min = std::max((Number(1.) - r_i) * rho_min,
-                         rho_min - ScalarNumber(2.) * rho_relaxation);
-      rho_max = std::min((Number(1.) + r_i) * rho_max,
-                         rho_max + ScalarNumber(2.) * rho_relaxation);
+      const auto relaxation =
+          ScalarNumber(2. * parameters.relaxation_factor()) * rho_relaxation;
+
+      rho_min = std::max((Number(1.) - r_i) * rho_min, rho_min - relaxation);
+      rho_max = std::min((Number(1.) + r_i) * rho_max, rho_max + relaxation);
 
       s_min = std::max((Number(1.) - r_i) * s_min,
                        Number(2.) * s_min - s_interp_max);
