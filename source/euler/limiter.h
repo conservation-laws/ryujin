@@ -354,8 +354,10 @@ namespace ryujin
       rho_min = std::max((Number(1.) - r_i) * rho_min, rho_min - relaxation);
       rho_max = std::min((Number(1.) + r_i) * rho_max, rho_max + relaxation);
 
-      s_min = std::max((Number(1.) - r_i) * s_min,
-                       Number(2.) * s_min - s_interp_max);
+      const auto entropy_relaxation =
+          parameters.relaxation_factor() * (s_interp_max - s_min);
+
+      s_min = std::max((Number(1.) - r_i) * s_min, s_min - entropy_relaxation);
 
       return relaxed_bounds;
     }
