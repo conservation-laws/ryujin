@@ -1,0 +1,76 @@
+subsection A - TimeLoop
+  set basename             = verification
+
+  set enable output full   = false
+
+  set enable compute error = true
+  set error normalize      = true
+
+  set final time           = 2.00
+  set output granularity   = 2.00
+
+  set terminal update interval  = 0
+end
+
+
+subsection B - Equation
+  set dimension = 1
+  set equation  = scalar conservation
+  set flux      = function
+  subsection function
+    set derivative approximation delta = 1e-10
+    set expression                     = u
+  end
+end
+
+
+subsection C - Discretization
+  set finite element ansatz = cG Q1
+
+  set geometry            = rectangular domain
+
+  set mesh refinement     = 9
+  set mesh repartitioning = false
+
+  subsection rectangular domain
+    set boundary condition left   = periodic
+    set boundary condition right  = periodic
+    set position bottom left      = 0
+    set position top right        = 6.28318530718
+  end
+end
+
+
+subsection E - InitialValues
+  set configuration = function
+  set direction     = 1
+  set position      = 1
+
+  subsection function
+    set expression = sin(x-t)
+  end
+end
+
+
+subsection F - HyperbolicModule
+  subsection indicator
+    set evc factor = 0
+  end
+  subsection limiter
+    set iterations        = 2
+    set relaxation factor = 1
+  end
+  subsection riemann solver
+    set use averaged entropy = false
+    set use greedy wavespeed = false
+    set random entropies = 0
+  end
+end
+
+
+subsection H - TimeIntegrator
+  set cfl max               = 0.80
+  set cfl min               = 0.80
+  set time stepping scheme  = erk 43
+  set cfl recovery strategy = none
+end
