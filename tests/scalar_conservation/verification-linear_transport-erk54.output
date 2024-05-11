@@ -1,0 +1,13 @@
+[INFO] initiating flux capacitor
+[INFO] dispatching to driver »scalar conservation« with dim=1
+[INFO] initializing data structures
+[INFO] creating mesh
+[INFO] preparing compute kernels
+[INFO] interpolating initial values
+[INFO] entering main loop
+Normalized consolidated Linf, L1, and L2 errors at final time 
+#dofs = 513
+t     = 2.012582627184197
+Linf  = 7.943007435700865e-09
+L1    = 7.942987312724608e-09
+L2    = 7.942961632744394e-09
