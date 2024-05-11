@@ -887,9 +887,7 @@ namespace ryujin
                     const auto hd_ij =
                         Number(0.5) * (m_i + m_j) / measure_of_omega_;
 
-                    const Number r_ij =
-                        (ansatz == Ansatz::dg_q2 ? std::pow(hd_ij, 0.5 / dim)
-                                                 : std::pow(hd_ij, 1.5 / dim));
+                    const Number r_ij = std::pow(hd_ij, 0.5 / dim);
 
                     coupling = r_ij;
                   }
