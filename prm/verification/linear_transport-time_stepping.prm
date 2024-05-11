@@ -1,0 +1,109 @@
+##
+#
+# Smooth linear transport problem in 1D.
+#
+# This configuration is used to verify our various time stepping schemes by
+# checking whether we observe the correct convergence order. We currently
+# support the following schemes:
+#
+#  - optimal explicit Runge Kutta (with recombined high-order fluxes):
+#     * "erk 11": one stage, first order
+#     * "erk 22": two stages, second order
+#     * "erk 33": three stages, third order
+#     * "erk 43": four stages, third order (fourth order for linear problems)
+#     * "erk 54": five stages, fourth order
+#
+#  - strong stability preserving Runge Kutta schemes:
+#     * "ssprk 22": two stages, second order
+#     * "ssprk 33": three stages, third order
+#
+##
+
+
+subsection A - TimeLoop
+  set basename             = linear_transport-time_stepping
+
+  set enable output full   = false
+
+  set enable compute error = true
+  set error normalize      = true
+
+  set final time           = 2.00
+  set output granularity   = 2.00
+end
+
+
+subsection B - Equation
+  set dimension = 1
+  set equation  = scalar conservation
+  set flux      = function
+  subsection function
+    set derivative approximation delta = 1e-10
+    set expression                     = u
+  end
+end
+
+
+subsection C - Discretization
+  set finite element ansatz = cG Q1
+
+  set geometry            = rectangular domain
+
+  set mesh refinement     = 11
+  set mesh repartitioning = false
+
+  subsection rectangular domain
+    set boundary condition left   = periodic
+    set boundary condition right  = periodic
+    set position bottom left      = 0
+    set position top right        = 6.28318530718
+  end
+end
+
+
+subsection E - InitialValues
+  set configuration = function
+  set direction     = 1
+  set position      = 1
+
+  subsection function
+    set expression = sin(x-t)
+  end
+end
+
+
+subsection F - HyperbolicModule
+  subsection indicator
+    set evc factor = 0
+  end
+  subsection limiter
+    set iterations        = 2
+    set relaxation factor = 1
+  end
+  subsection riemann solver
+    set use averaged entropy = false
+    set use greedy wavespeed = false
+    set random entropies = 0
+  end
+end
+
+
+subsection H - TimeIntegrator
+# set cfl max               = 0.05 # for erk 11
+# set cfl min               = 0.05 # for erk 11
+# set time stepping scheme  = erk 11
+
+# set cfl max               = 0.20 # for erk 22
+# set cfl min               = 0.20 # for erk 22
+# set time stepping scheme  = erk 22
+
+  set cfl max               = 0.80 # all others
+  set cfl min               = 0.80 # all others
+  set time stepping scheme  = erk 33
+# set time stepping scheme  = erk 43
+# set time stepping scheme  = erk 54
+# set time stepping scheme  = ssprk 22
+# set time stepping scheme  = ssprk 33
+
+  set cfl recovery strategy = none
+end
