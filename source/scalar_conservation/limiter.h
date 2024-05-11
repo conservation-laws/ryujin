@@ -218,7 +218,7 @@ namespace ryujin
       auto &[u_min, u_max] = bounds_;
 
       u_min = Number(std::numeric_limits<ScalarNumber>::max());
-      u_max = Number(0.);
+      u_max = Number(std::numeric_limits<ScalarNumber>::lowest());
 
       /* Relaxation: */
 
@@ -285,11 +285,13 @@ namespace ryujin
           std::abs(u_relaxation_numerator) /
           (std::abs(u_relaxation_denominator) + Number(eps));
 
-      u_min = std::max((Number(1.) - r_i) * u_min,
-                       u_min - ScalarNumber(2.) * u_relaxation);
+      u_min = std::max(
+          std::min((Number(1.) - r_i) * u_min, (Number(1.) + r_i) * u_min),
+          u_min - ScalarNumber(2.) * u_relaxation);
 
-      u_max = std::min((Number(1.) + r_i) * u_max,
-                       u_max + ScalarNumber(2.) * u_relaxation);
+      u_max = std::min(
+          std::max((Number(1.) + r_i) * u_max, (Number(1.) - r_i) * u_max),
+          u_max + ScalarNumber(2.) * u_relaxation);
 
       return relaxed_bounds;
     }

@@ -36,10 +36,14 @@ namespace ryujin
       /*
        * Verify that u_U is within bounds. This property might be
        * violated for relative CFL numbers larger than 1.
+       *
+       * u_min, u_U, u_max might be negative, thus relax in both directions.
        */
-      const auto test_min = std::max(Number(0.), u_U - relax * u_max);
-      const auto test_max = std::max(Number(0.), u_min - relax * u_U);
-      if (!(test_min == Number(0.) && test_max == Number(0.))) {
+      const auto test_max = std::max(
+          Number(0.), std::min(u_U - relax * u_max, relax * u_U - u_max));
+      const auto test_min = std::max(
+          Number(0.), std::min(u_min - relax * u_U, relax * u_min - u_U));
+      if (!(test_max == Number(0.) && test_min == Number(0.))) {
 #ifdef DEBUG_OUTPUT
         std::cout << std::fixed << std::setprecision(16);
         std::cout << "Bounds violation: low-order state (critical)!"
@@ -97,11 +101,15 @@ namespace ryujin
 #ifdef CHECK_BOUNDS
       /*
        * Verify that the new state is within bounds:
+       *
+       * u_min, u_U, u_max might be negative, thus relax in both directions.
        */
       const auto u_new = view.state(U + t_r * P);
-      const auto test_new_min = std::max(Number(0.), u_new - relax * u_max);
-      const auto test_new_max = std::max(Number(0.), u_min - relax * u_new);
-      if (!(test_new_min == Number(0.) && test_new_max == Number(0.))) {
+      const auto test_new_max = std::max(
+          Number(0.), std::min(u_new - relax * u_max, relax * u_new - u_max));
+      const auto test_new_min = std::max(
+          Number(0.), std::min(u_min - relax * u_new, relax * u_min - u_new));
+      if (!(test_new_max == Number(0.) && test_new_min == Number(0.))) {
 #ifdef DEBUG_OUTPUT
         std::cout << std::fixed << std::setprecision(16);
         std::cout << "Bounds violation: high-order state!"
