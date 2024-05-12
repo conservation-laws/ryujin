@@ -379,7 +379,14 @@ namespace ryujin
       RYUJIN_PARALLEL_REGION_BEGIN
       LIKWID_MARKER_START(("time_step_" + std::to_string(step_no)).c_str());
 
-      /* Complete d_ij at boundary: */
+      /*
+       * Complete d_ij at boundary:
+       *
+       * Here, for continuous finite elements the assumption c_ij = -c_ji
+       * no longer holds true. This implies that d_ij != d_ji. We thus need
+       * to compute the lower-triangular part of d_ij, where i and j are
+       * boundary degrees of freedom as well.
+       */
 
       using RiemannSolver =
           typename Description::template RiemannSolver<dim, Number>;
@@ -396,6 +403,17 @@ namespace ryujin
       RYUJIN_OMP_FOR
       for (std::size_t k = 0; k < coupling_boundary_pairs.size(); ++k) {
         const auto &[i, col_idx, j] = coupling_boundary_pairs[k];
+
+        /*
+         * Only work on index pairs "i < j" that point to the upper
+         * triangular portion of the d_ij matrix. For all of these index
+         * pairs we compute the corresponding d_ji entry and fix up the
+         * d_ij entry (from step 2) by taking the maximum. Note that we
+         * actually do not store anything in the d_ji entry itself because
+         * we symmetrize the matrix later on anyway.
+         */
+        if (j < i)
+          continue;
 
         const auto U_i = old_U.get_tensor(i);
         const auto U_j = old_U.get_tensor(j);
