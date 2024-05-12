@@ -290,7 +290,7 @@ namespace ryujin
       dof_handler.renumber_dofs(new_order);
 
       Assert(n_consistent_range % group_size == 0, dealii::ExcInternalError());
-      Assert(n_consistent_range < n_locally_internal,
+      Assert(n_consistent_range <= n_locally_internal,
              dealii::ExcInternalError());
       return n_consistent_range;
     }
