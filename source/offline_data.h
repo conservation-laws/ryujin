@@ -247,6 +247,11 @@ namespace ryujin
 
   private:
     /**
+     * Private methods used in prepare()
+     */
+    //@{
+
+    /**
      * Set up affine constraints and sparsity pattern. Internally used in
      * setup().
      */
@@ -337,6 +342,17 @@ namespace ryujin
         const ITERATOR1 &begin,
         const ITERATOR2 &end,
         const dealii::Utilities::MPI::Partitioner &partitioner) const;
+
+    //@}
+    /**
+     * @name Run time options
+     */
+    //@{
+
+    double incidence_relaxation_even_;
+    double incidence_relaxation_odd_;
+
+    //@}
   };
 
 } /* namespace ryujin */

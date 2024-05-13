@@ -43,6 +43,19 @@ namespace ryujin
       , discretization_(&discretization)
       , mpi_communicator_(mpi_communicator)
   {
+    incidence_relaxation_even_ = 0.5;
+    add_parameter("incidence matrix relaxation even degree",
+                  incidence_relaxation_even_,
+                  "Scaling exponent for incidence matrix used for "
+                  "discontinuous finite lements with even degree. The default "
+                  "value 0.5 scales the jump penalization with (h_i+h_j)^0.5.");
+
+    incidence_relaxation_odd_ = 0.0;
+    add_parameter("incidence matrix relaxation odd degree",
+                  incidence_relaxation_odd_,
+                  "Scaling exponent for incidence matrix used for "
+                  "discontinuous finite lements with even degree. The default "
+                  "value of 0.0 sets the jump penalization to a constant 1.");
   }
 
 
@@ -865,34 +878,35 @@ namespace ryujin
                 const auto v_i = fe_face_values_nodal.shape_value(i, q);
                 constexpr auto eps = std::numeric_limits<Number>::epsilon();
                 if (std::abs(v_i * v_j) > 100. * eps) {
-                  /*
-                   * For odd polynomial degree we normalize the incidence
-                   * matrix to 1. Note, that we will visit every coupling
-                   * pair of degrees of freedom (i, j) precisely once.
-                   */
-                  Number coupling = 1.0;
-
-                  /*
-                   * For even polynomial degree we normalize the incidence
-                   * matrix to (0.5 (m_i + m_j) / |Omega|) ^ (1.5 / d).
-                   * Note, that we will visit every coupling
-                   * pair of degrees of freedom (i, j) precisely once.
-                   */
                   const auto &ansatz = discretization_->ansatz();
+
+                  const auto glob_i = local_dof_indices[i];
+                  const auto glob_j = neighbor_local_dof_indices[f_index][j];
+                  const auto m_i = lumped_mass_matrix_[glob_i];
+                  const auto m_j = lumped_mass_matrix_[glob_j];
+                  const auto hd_ij =
+                      Number(0.5) * (m_i + m_j) / measure_of_omega_;
+
+                  Number r_ij = 1.0;
+
                   if (ansatz == Ansatz::dg_q0 || ansatz == Ansatz::dg_q2) {
-                    const auto glob_i = local_dof_indices[i];
-                    const auto glob_j = neighbor_local_dof_indices[f_index][j];
-                    const auto m_i = lumped_mass_matrix_[glob_i];
-                    const auto m_j = lumped_mass_matrix_[glob_j];
-                    const auto hd_ij =
-                        Number(0.5) * (m_i + m_j) / measure_of_omega_;
-
-                    const Number r_ij = std::pow(hd_ij, 0.5 / dim);
-
-                    coupling = r_ij;
+                    /*
+                     * For even polynomial degree we normalize the incidence
+                     * matrix to (0.5 (m_i + m_j) / |Omega|) ^ (1.5 / d).
+                     * Note, that we will visit every coupling
+                     * pair of degrees of freedom (i, j) precisely once.
+                     */
+                    r_ij = std::pow(hd_ij, incidence_relaxation_even_ / dim);
+                  } else {
+                    /*
+                     * For odd polynomial degree we normalize the incidence
+                     * matrix to 1. Note, that we will visit every coupling
+                     * pair of degrees of freedom (i, j) precisely once.
+                     */
+                    r_ij = std::pow(hd_ij, incidence_relaxation_odd_ / dim);
                   }
 
-                  interface_incidence_matrix[f_index](i, j) += coupling;
+                  interface_incidence_matrix[f_index](i, j) += r_ij;
                 }
               } /* for i */
             }   /* for j */
