@@ -225,6 +225,9 @@ namespace ryujin
     DEAL_II_ALWAYS_INLINE inline void
     Indicator<dim, Number>::reset(const unsigned int i, const state_type &U_i)
     {
+      if (parameters.indicator_strategy() == IndicatorStrategy::galerkin)
+        return;
+
       /* entropy viscosity commutator: */
 
       const auto view = hyperbolic_system.view<dim, Number>();
@@ -275,6 +278,7 @@ namespace ryujin
           (eta_j * rho_j_inverse - eta_i * rho_i_inverse) * (m_j * c_ij);
 
       if (parameters.indicator_strategy() == IndicatorStrategy::evc_fullsplit) {
+        /* Entropy viscosity commutator with aggressive denominator split: */
 
         left_absolute += std::abs(entropy_flux);
         for (unsigned int k = 0; k < problem_dimension; ++k) {
@@ -299,7 +303,8 @@ namespace ryujin
     DEAL_II_ALWAYS_INLINE inline Number
     Indicator<dim, Number>::alpha(const Number hd_i) const
     {
-      using ScalarNumber = typename get_value_type<Number>::type;
+      if (parameters.indicator_strategy() == IndicatorStrategy::galerkin)
+        return Number(0.);
 
       if (parameters.indicator_strategy() == IndicatorStrategy::evc_fullsplit) {
         /* Entropy viscosity commutator with aggressive denominator split: */

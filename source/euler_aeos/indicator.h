@@ -19,6 +19,31 @@ namespace ryujin
 {
   namespace EulerAEOS
   {
+    enum class IndicatorStrategy {
+      /** Indicator returns constant 0 */
+      galerkin,
+      /** The classical entropy viscosity commutator */
+      evc,
+      /** Entropy viscosity with more aggressive denominator split */
+      evc_fullsplit,
+    };
+  }
+} // namespace ryujin
+
+#ifndef DOXYGEN
+DECLARE_ENUM(ryujin::EulerAEOS::IndicatorStrategy,
+             LIST({ryujin::EulerAEOS::IndicatorStrategy::galerkin, "galerkin"},
+                  {ryujin::EulerAEOS::IndicatorStrategy::evc,
+                   "entropy viscosity"},
+                  {ryujin::EulerAEOS::IndicatorStrategy::evc_fullsplit,
+                   "aggressive entropy viscosity"}));
+#endif
+
+
+namespace ryujin
+{
+  namespace EulerAEOS
+  {
     template <typename ScalarNumber = double>
     class IndicatorParameters : public dealii::ParameterAcceptor
     {
@@ -26,15 +51,25 @@ namespace ryujin
       IndicatorParameters(const std::string &subsection = "/Indicator")
           : ParameterAcceptor(subsection)
       {
+        indicator_strategy_ = IndicatorStrategy::evc;
+        add_parameter(
+            "indicator strategy",
+            indicator_strategy_,
+            "The chosen indicator strategy. Possible values are: galerkin, "
+            "entropy viscosity, aggressive entropy viscosity");
+
         evc_factor_ = ScalarNumber(1.);
         add_parameter("evc factor",
                       evc_factor_,
                       "Factor for scaling the entropy viscocity commuator");
       }
 
+      ACCESSOR_READ_ONLY(indicator_strategy);
+
       ACCESSOR_READ_ONLY(evc_factor);
 
     private:
+      IndicatorStrategy indicator_strategy_;
       ScalarNumber evc_factor_;
     };
 
@@ -166,17 +201,18 @@ namespace ryujin
       const Parameters &parameters;
       const PrecomputedVector &precomputed_values;
 
-
       Number rho_i_inverse = 0.;
       Number eta_i = 0.;
       flux_type f_i;
       state_type d_eta_i;
+      Number gamma_min;
 
       Number left = 0.;
       state_type right;
 
-      Number gamma_min;
-
+      Number left_absolute = 0.;
+      Number right_value = 0.;
+      Number right_absolute = 0.;
       //@}
     };
 
@@ -192,12 +228,12 @@ namespace ryujin
     DEAL_II_ALWAYS_INLINE inline void
     Indicator<dim, Number>::reset(const unsigned int i, const state_type &U_i)
     {
-      const auto view = hyperbolic_system.view<dim, Number>();
-
-      if (!view.compute_strict_bounds())
+      if (parameters.indicator_strategy() == IndicatorStrategy::galerkin)
         return;
 
       /* entropy viscosity commutator: */
+
+      const auto view = hyperbolic_system.view<dim, Number>();
 
       const auto &[p_i, gamma_min_i, s_i, new_eta_i] =
           precomputed_values.template get_tensor<Number, precomputed_type>(i);
@@ -216,6 +252,10 @@ namespace ryujin
 
       left = 0.;
       right = 0.;
+
+      left_absolute = 0.;
+      right_value = 0.;
+      right_absolute = 0.;
     }
 
 
@@ -225,12 +265,12 @@ namespace ryujin
         const state_type &U_j,
         const dealii::Tensor<1, dim, Number> &c_ij)
     {
-      const auto view = hyperbolic_system.view<dim, Number>();
-
-      if (!view.compute_strict_bounds())
+      if (parameters.indicator_strategy() == IndicatorStrategy::galerkin)
         return;
 
       /* entropy viscosity commutator: */
+
+      const auto view = hyperbolic_system.view<dim, Number>();
 
       const auto eta_j = view.surrogate_harten_entropy(U_j, gamma_min);
 
@@ -242,9 +282,28 @@ namespace ryujin
       const auto surrogate_p_j = view.surrogate_pressure(U_j, gamma_min);
       const auto f_j = view.f(U_j, surrogate_p_j);
 
-      left += (eta_j * rho_j_inverse - eta_i * rho_i_inverse) * (m_j * c_ij);
-      for (unsigned int k = 0; k < problem_dimension; ++k)
-        right[k] += (f_j[k] - f_i[k]) * c_ij;
+      const auto entropy_flux =
+          (eta_j * rho_j_inverse - eta_i * rho_i_inverse) * (m_j * c_ij);
+
+      if (parameters.indicator_strategy() == IndicatorStrategy::evc_fullsplit) {
+        /* Entropy viscosity commutator with aggressive denominator split: */
+
+        left_absolute += std::abs(entropy_flux);
+        for (unsigned int k = 0; k < problem_dimension; ++k) {
+          const auto component = d_eta_i[k] * (f_j[k] - f_i[k]) * c_ij;
+          right_value += component;
+          right_absolute += std::abs(component);
+        }
+
+      } else {
+        /* Entropy viscosity commutator with conservative denominator split: */
+
+        left += entropy_flux;
+        for (unsigned int k = 0; k < problem_dimension; ++k) {
+          const auto component = (f_j[k] - f_i[k]) * c_ij;
+          right[k] += component;
+        }
+      }
     }
 
 
@@ -252,22 +311,35 @@ namespace ryujin
     DEAL_II_ALWAYS_INLINE inline Number
     Indicator<dim, Number>::alpha(const Number hd_i) const
     {
-      const auto view = hyperbolic_system.view<dim, Number>();
-
-      if (!view.compute_strict_bounds())
+      if (parameters.indicator_strategy() == IndicatorStrategy::galerkin)
         return Number(0.);
 
-      Number numerator = left;
-      Number denominator = std::abs(left);
-      for (unsigned int k = 0; k < problem_dimension; ++k) {
-        numerator -= d_eta_i[k] * right[k];
-        denominator += std::abs(d_eta_i[k] * right[k]);
+      if (parameters.indicator_strategy() == IndicatorStrategy::evc_fullsplit) {
+        /* Entropy viscosity commutator with aggressive denominator split: */
+
+        Number numerator = left - right_value;
+        Number denominator = left_absolute + right_absolute;
+
+        const auto quotient =
+            std::abs(numerator) / (denominator + hd_i * std::abs(eta_i));
+
+        return std::min(Number(1.), parameters.evc_factor() * quotient);
+
+      } else {
+        /* Entropy viscosity commutator with conservative denominator split: */
+
+        Number numerator = left;
+        Number denominator = std::abs(left);
+        for (unsigned int k = 0; k < problem_dimension; ++k) {
+          numerator -= d_eta_i[k] * right[k];
+          denominator += std::abs(d_eta_i[k] * right[k]);
+        }
+
+        const auto quotient =
+            std::abs(numerator) / (denominator + hd_i * std::abs(eta_i));
+
+        return std::min(Number(1.), parameters.evc_factor() * quotient);
       }
-
-      const auto quotient =
-          std::abs(numerator) / (denominator + hd_i * std::abs(eta_i));
-
-      return std::min(Number(1.), parameters.evc_factor() * quotient);
     }
 
   } // namespace EulerAEOS
