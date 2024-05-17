@@ -49,6 +49,10 @@ end
 subsection F - HyperbolicModule
   set cfl with boundary dofs        = true
 
+  subsection indicator
+    set indicator strategy = galerkin
+  end
+
   subsection limiter
     set iterations            = 2
     set newton max iterations = 2
