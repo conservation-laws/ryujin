@@ -33,7 +33,6 @@ namespace ryujin
       const InitialValues<Description, dim, Number> &initial_values,
       const std::string &subsection /*= "HyperbolicModule"*/)
       : ParameterAcceptor(subsection)
-      , precompute_only_(false)
       , id_violation_strategy_(IDViolationStrategy::warn)
       , indicator_parameters_(subsection + "/indicator")
       , limiter_parameters_(subsection + "/limiter")
@@ -572,13 +571,6 @@ namespace ryujin
       std::cout << "        computed tau_max = " << tau_max << std::endl;
       std::cout << "        perform time-step with tau = " << tau << std::endl;
 #endif
-
-      if (precompute_only_) {
-#ifdef DEBUG_OUTPUT
-        std::cout << "        return early" << std::endl;
-#endif
-        return Number(0.);
-      }
     }
 
 #ifdef DEBUG

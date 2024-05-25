@@ -258,8 +258,7 @@ namespace ryujin
     /**
      * Return a reference to alpha vector storing indicator values. Note
      * that the values stored in alpha correspond to the last step executed
-     * by this class. This value can be recomputed for a given state vector
-     * by setting precompute_only_ to true and calling the step() function.
+     * by this class.
      */
     ACCESSOR_READ_ONLY(alpha)
 
@@ -273,9 +272,6 @@ namespace ryujin
      * function.
      */
     ACCESSOR_READ_ONLY(n_warnings)
-
-    // FIXME: refactor to function
-    mutable bool precompute_only_;
 
     // FIXME: refactor to function
     mutable IDViolationStrategy id_violation_strategy_;
