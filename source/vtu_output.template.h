@@ -29,7 +29,6 @@ namespace ryujin
       , offline_data_(&offline_data)
       , hyperbolic_module_(&hyperbolic_module)
       , postprocessor_(&postprocessor)
-      , need_to_prepare_step_(false)
   {
     use_mpi_io_ = true;
     add_parameter("use mpi io",
@@ -64,8 +63,6 @@ namespace ryujin
 #ifdef DEBUG_OUTPUT
     std::cout << "VTUOutput<dim, Number>::prepare()" << std::endl;
 #endif
-
-    need_to_prepare_step_ = false;
 
     /* Populate quantities mapping: */
 
@@ -146,7 +143,6 @@ namespace ryujin
                 const auto &precomputed = std::get<1>(state_vector);
                 precomputed.extract_component(result, index);
               }));
-          need_to_prepare_step_ = true;
           continue;
         }
       }
@@ -160,7 +156,6 @@ namespace ryujin
                 const auto &alpha = hyperbolic_module_->alpha();
                 result = alpha;
               }));
-          need_to_prepare_step_ = true;
           continue;
         }
       }

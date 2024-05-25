@@ -101,14 +101,6 @@ namespace ryujin
                          bool output_full = true,
                          bool output_cutplanes = true);
 
-    /**
-     * Return a boolean indicating whether Steps 0 to 2 of an explicit
-     * Euler step have to be prepared prior to scheduling output. This is
-     * the case if a precomputed value or alpha is used in the output
-     * process.
-     */
-    ACCESSOR_READ_ONLY(need_to_prepare_step)
-
   private:
     /**
      * @name Run time options
@@ -134,8 +126,6 @@ namespace ryujin
         hyperbolic_module_;
     dealii::SmartPointer<const Postprocessor<Description, dim, Number>>
         postprocessor_;
-
-    bool need_to_prepare_step_;
 
     std::vector<ScalarVector> quantities_;
 
