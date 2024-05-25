@@ -131,6 +131,28 @@ namespace ryujin
     //@{
 
     /**
+     * This function preprocesses a given state vector @p U in preparation
+     * for an explicit euler step performed by the step() function. The
+     * function performs the following tasks:
+     *
+     *  - For a continuous finite element ansatz the method updates the @p U
+     *    component of the state vector by enforcing boundary conditions
+     *    for the supplied time time @p t. It then updates ghost ranges on
+     *    @p U so that the state vector is consistent across MPI ranks.
+     *  - For a discontinuous finite element ansatz it populates a local
+     *    boundary state vector that is used for computing the boundary
+     *    jump terms in the step() function when performing a dG update. It
+     *    then updates ghost ranges on @p U so that the state vector is
+     *    consistent across MPI ranks.
+     *
+     *  - The function then runs the precomputation loop that populates the
+     *    "precomputed values" component of the state vector and
+     *    distributes the result over all MPI ranks by updating ghost
+     *    ranges of the precomputed values vector.
+     */
+    void prepare_state_vector(StateVector &state_vector, Number t) const;
+
+    /**
      * Given a reference to a previous state vector @p old_U perform an
      * explicit euler step (and store the result in @p new_U). The
      * function returns the computed maximal time step size tau_max
@@ -183,33 +205,21 @@ namespace ryujin
      * where \f$\omega_s\f$ denotes the weigths for the given stages
      * \f$\bU^{s,n}\f$.
      *
-     * @note The routine does not automatically update ghost vectors of the
-     * distributed vector @p new_U. It is best to simply call
-     * HyperbolicModule::apply_boundary_conditions() on the appropriate vector
-     * immediately after performing a time step.
+     * @note The routine only performs an explicit update step on the
+     * locally owned dof index range. It neither updates the precomputed
+     * block of the state vector, sets boundary conditions (prior) to the
+     * update step, nor automatically updates the ghost range of the
+     * vector. It is thus necessary to call
+     * HyperbolicModule::prepare_state_vector() on @p old_state_vector
+     * prior to calling the step function.
      */
     template <int stages>
-    Number step(StateVector &old_state_vector,
+    Number step(const StateVector &old_state_vector,
                 std::array<std::reference_wrapper<const StateVector>, stages>
                     stage_state_vectors,
                 const std::array<Number, stages> stage_weights,
                 StateVector &new_state_vector,
                 Number tau = Number(0.)) const;
-
-    /**
-     * This function postprocesses a given state @p U to conform with all
-     * prescribed boundary conditions at time @p t. This implies that on
-     * slip (and no-slip) boundaries the normal momentum is set to zero; on
-     * Dirichlet boundaries the appropriate state at time @p t is
-     * substituted; and on "flexible" boundaries depending on the fact
-     * whether we have supersonic or subsonic inflow/outflow the
-     * appropriate Riemann invariant is prescribed. See @cite ryujin-2021-3
-     * for details.
-     *
-     * @note The routine does update ghost vectors of the distributed
-     * vector @p U
-     */
-    void apply_boundary_conditions(StateVector &state_vector, Number t) const;
 
     /**
      * Sets the relative CFL number used for computing an appropriate
