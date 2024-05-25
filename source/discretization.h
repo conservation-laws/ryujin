@@ -97,18 +97,27 @@ namespace ryujin
     dirichlet = 4,
 
     /**
-     * On degrees of freedom marked as a "dynamic" Dirichlet boundary we
-     * reset the state of the degree of freedom to the value of
-     * InitialData::initial_state() if the state of the degree of freedom
-     * is inflow. Otherwise we do nothing.
+     * On degrees of freedom marked as a "dynamic" boundary we distinguish
+     * four cases (for the compressible Euler equations or related PDEs):
+     *  - supersonic inflow, where we reset the state of a boundary degree
+     *    of freedom to the value returned by InitialData::initial_state().
+     *    This is equivalent to "dirichlet" boundary conditions.
+     *  - supersonic outflow, where we do nothing, similarly to the "do
+     *    nothing" boundary conditions.
+     *  - in case of subsonic in-, or outflow the state of a boundary
+     *    degree of freedom is translated into "Riemann characteristics"
+     *    and the values of all incoming characteristics are replaced by
+     *    the corresponding value of the state returned by
+     *    InitialData::initial_state().
      */
     dynamic = 5,
 
     /**
      * For the Shallow Water Equations: On degrees of freedom marked as
-     * "dirichlet momentum" boundary, we reset only the momentum of the degree
-     * of freedom to the value of InitialData::initial_state(). Such conditions
-     * are used in many steady state problems with inflow conditions.
+     * "dirichlet momentum" boundary, we reset only the momentum of the
+     * degree of freedom to the value of InitialData::initial_state(). Such
+     * conditions are used in many steady state problems with inflow
+     * conditions.
      */
     dirichlet_momentum = 6
   };
