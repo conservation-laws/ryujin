@@ -230,7 +230,7 @@ namespace ryujin
 
     StateVector state;
     auto &[U, precomputed, V] = state;
-    U.reinit(offline_data_->vector_partitioner());
+    U.reinit(offline_data_->state_vector_partitioner());
 
     using ScalarVector = typename OfflineData<dim, Number>::ScalarVector;
 

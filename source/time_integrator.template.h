@@ -126,13 +126,10 @@ namespace ryujin
 
     /* Initialize temporary vectors: */
 
-    const auto &scalar_partitioner = offline_data_->scalar_partitioner();
-    const auto &vector_partitioner = offline_data_->vector_partitioner();
-
     for (auto &it : temp_) {
       auto &[U, precomputed, V] = it;
-      U.reinit(vector_partitioner);
-      precomputed.reinit_with_scalar_partitioner(scalar_partitioner);
+      U.reinit(offline_data_->state_vector_partitioner());
+      precomputed.reinit(offline_data_->precomputed_vector_partitioner());
     }
 
     /* Reset CFL to canonical starting value: */

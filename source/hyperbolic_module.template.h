@@ -69,12 +69,10 @@ namespace ryujin
     /* Initialize vectors: */
 
     const auto &scalar_partitioner = offline_data_->scalar_partitioner();
-    initial_precomputed_.reinit_with_scalar_partitioner(scalar_partitioner);
     alpha_.reinit(scalar_partitioner);
     bounds_.reinit_with_scalar_partitioner(scalar_partitioner);
 
-    const auto &vector_partitioner = offline_data_->vector_partitioner();
-    r_.reinit(vector_partitioner);
+    r_.reinit(offline_data_->state_vector_partitioner());
     using View =
         typename Description::template HyperbolicSystemView<dim, Number>;
 
@@ -85,6 +83,8 @@ namespace ryujin
     lij_matrix_.reinit(sparsity_simd);
     lij_matrix_next_.reinit(sparsity_simd);
     pij_matrix_.reinit(sparsity_simd);
+
+    /* Set up initial precomputed vector: */
 
     initial_precomputed_ =
         initial_values_->interpolate_initial_precomputed_vector();
