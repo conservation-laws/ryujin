@@ -55,9 +55,9 @@ subsection C - Discretization
   set mesh repartitioning = true
 
   subsection rectangular domain
-    set boundary condition bottom = no_slip
-    set boundary condition left   = no_slip
-    set boundary condition right  = no_slip
+    set boundary condition bottom = no slip
+    set boundary condition left   = no slip
+    set boundary condition right  = no slip
     set boundary condition top    = slip
 
     set position bottom left      =  0, 0

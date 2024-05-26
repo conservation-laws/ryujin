@@ -46,10 +46,10 @@ subsection C - Discretization
   set mesh refinement     = 8
 
   subsection rectangular domain
-    set boundary condition bottom = do_nothing
-    set boundary condition left   = do_nothing
-    set boundary condition right  = do_nothing
-    set boundary condition top    = do_nothing
+    set boundary condition bottom = do nothing
+    set boundary condition left   = do nothing
+    set boundary condition right  = do nothing
+    set boundary condition top    = do nothing
 
     set position bottom left      = 0, 0
     set position top right        = 4, 4
