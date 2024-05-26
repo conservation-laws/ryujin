@@ -415,6 +415,7 @@ namespace ryujin
 
     if (enable_compute_error_) {
       /* Output final error: */
+      hyperbolic_module_.prepare_state_vector(state_vector, t);
       compute_error(state_vector, t);
     }
 
@@ -602,14 +603,7 @@ namespace ryujin
       if (cycle == 0)
         postprocessor_.reset_bounds();
 
-      if (vtu_output_.need_to_prepare_step()) {
-        StateVector dummy;
-        hyperbolic_module_.precompute_only_ = true;
-        hyperbolic_module_.template step<0>(
-            state_vector, {}, {}, dummy, Number(0.));
-        hyperbolic_module_.precompute_only_ = false;
-      }
-
+      hyperbolic_module_.prepare_state_vector(state_vector, t);
       vtu_output_.schedule_output(
           state_vector, name, t, cycle, do_full_output, do_levelsets);
     }

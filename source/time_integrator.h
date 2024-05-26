@@ -367,7 +367,7 @@ namespace ryujin
     dealii::SmartPointer<const ParabolicModule<Description, dim, Number>>
         parabolic_module_;
 
-    std::vector<StateVector> temporary_;
+    std::vector<StateVector> temp_;
 
     //@}
   };

@@ -33,7 +33,6 @@ namespace ryujin
       const InitialValues<Description, dim, Number> &initial_values,
       const std::string &subsection /*= "HyperbolicModule"*/)
       : ParameterAcceptor(subsection)
-      , precompute_only_(false)
       , id_violation_strategy_(IDViolationStrategy::warn)
       , indicator_parameters_(subsection + "/indicator")
       , limiter_parameters_(subsection + "/limiter")
@@ -92,6 +91,122 @@ namespace ryujin
   }
 
 
+  /*
+   * -------------------------------------------------------------------------
+   * Step 1: Apply boundary conditions and precompute values
+   * -------------------------------------------------------------------------
+   */
+
+
+  template <typename Description, int dim, typename Number>
+  void HyperbolicModule<Description, dim, Number>::prepare_state_vector(
+      StateVector &state_vector, Number t) const
+  {
+#ifdef DEBUG_OUTPUT
+    std::cout << "HyperbolicModule<Description, dim, "
+                 "Number>::apply_boundary_conditions()"
+              << std::endl;
+#endif
+
+    auto &U = std::get<0>(state_vector);
+    auto &precomputed = std::get<1>(state_vector);
+
+    const unsigned int n_export_indices = offline_data_->n_export_indices();
+    const unsigned int n_internal = offline_data_->n_locally_internal();
+    const unsigned int n_owned = offline_data_->n_locally_owned();
+    const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
+    const auto &boundary_map = offline_data_->boundary_map();
+    unsigned int channel = 10;
+    using VA = VectorizedArray<Number>;
+
+    Scope scope(computing_timer_,
+                "time step [H] 1 - update boundary values, precompute values");
+
+    LIKWID_MARKER_START("time_step_1a");
+
+    for (auto entry : boundary_map) {
+      const auto i = entry.first;
+
+      const auto &[normal, normal_mass, boundary_mass, id, position] =
+          entry.second;
+
+      /*
+       * Relay the task of applying appropriate boundary conditions to the
+       * Problem Description.
+       */
+
+      if (id == Boundary::do_nothing)
+        continue;
+
+      auto U_i = U.get_tensor(i);
+
+      /* Use a lambda to avoid computing unnecessary state values */
+      auto get_dirichlet_data = [position = position, t = t, this]() {
+        return initial_values_->initial_state(position, t);
+      };
+
+      const auto view = hyperbolic_system_->template view<dim, Number>();
+      U_i = view.apply_boundary_conditions(id, U_i, normal, get_dirichlet_data);
+      U.write_tensor(U_i, i);
+    }
+
+    LIKWID_MARKER_STOP("time_step_1a");
+
+    U.update_ghost_values();
+
+    /*
+     * Precompute values
+     */
+
+    if constexpr (n_precomputation_cycles != 0) {
+      for (unsigned int cycle = 0; cycle < n_precomputation_cycles; ++cycle) {
+
+        SynchronizationDispatch synchronization_dispatch([&]() {
+          precomputed.update_ghost_values_start(channel++);
+          precomputed.update_ghost_values_finish();
+        });
+
+        RYUJIN_PARALLEL_REGION_BEGIN
+        LIKWID_MARKER_START(("time_step_1b"));
+
+        auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
+          using T = decltype(sentinel);
+
+          /* Stored thread locally: */
+          bool thread_ready = false;
+
+          const auto view = hyperbolic_system_->template view<dim, T>();
+          view.precomputation_loop(
+              cycle,
+              [&](const unsigned int i) {
+                synchronization_dispatch.check(
+                    thread_ready, i >= n_export_indices && i < n_internal);
+              },
+              sparsity_simd,
+              state_vector,
+              left,
+              right);
+        };
+
+        /* Parallel non-vectorized loop: */
+        loop(Number(), n_internal, n_owned);
+        /* Parallel vectorized SIMD loop: */
+        loop(VA(), 0, n_internal);
+
+        LIKWID_MARKER_STOP("time_step_1b");
+        RYUJIN_PARALLEL_REGION_END
+      }
+    }
+  }
+
+
+  /*
+   * -------------------------------------------------------------------------
+   * Step 2 - 7: Perform an explicit Euler step
+   * -------------------------------------------------------------------------
+   */
+
+
   namespace
   {
     /**
@@ -126,7 +241,7 @@ namespace ryujin
   template <typename Description, int dim, typename Number>
   template <int stages>
   Number HyperbolicModule<Description, dim, Number>::step(
-      StateVector &old_state_vector,
+      const StateVector &old_state_vector,
       std::array<std::reference_wrapper<const StateVector>, stages>
           stage_state_vectors,
       const std::array<Number, stages> stage_weights,
@@ -194,7 +309,7 @@ namespace ryujin
     unsigned int channel = 10;
 
     /* Lambda for creating the computing timer string: */
-    int step_no = 0;
+    int step_no = 1;
     const auto scoped_name = [&step_no](const auto &name,
                                         const bool advance = true) {
       advance || step_no--;
@@ -203,54 +318,6 @@ namespace ryujin
 
     /* A boolean signalling that a restart is necessary: */
     std::atomic<bool> restart_needed = false;
-
-    /*
-     * -------------------------------------------------------------------------
-     * Step 1: Precompute values
-     * -------------------------------------------------------------------------
-     */
-
-    if constexpr (n_precomputation_cycles != 0) {
-      Scope scope(computing_timer_, scoped_name("precompute values"));
-
-      for (unsigned int cycle = 0; cycle < n_precomputation_cycles; ++cycle) {
-
-        SynchronizationDispatch synchronization_dispatch([&]() {
-          old_precomputed.update_ghost_values_start(channel++);
-          old_precomputed.update_ghost_values_finish();
-        });
-
-        RYUJIN_PARALLEL_REGION_BEGIN
-        LIKWID_MARKER_START(("time_step_" + std::to_string(step_no)).c_str());
-
-        auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
-          using T = decltype(sentinel);
-
-          /* Stored thread locally: */
-          bool thread_ready = false;
-
-          const auto view = hyperbolic_system_->template view<dim, T>();
-          view.precomputation_loop(
-              cycle,
-              [&](const unsigned int i) {
-                synchronization_dispatch.check(
-                    thread_ready, i >= n_export_indices && i < n_internal);
-              },
-              sparsity_simd,
-              old_state_vector,
-              left,
-              right);
-        };
-
-        /* Parallel non-vectorized loop: */
-        loop(Number(), n_internal, n_owned);
-        /* Parallel vectorized SIMD loop: */
-        loop(VA(), 0, n_internal);
-
-        LIKWID_MARKER_STOP(("time_step_" + std::to_string(step_no)).c_str());
-        RYUJIN_PARALLEL_REGION_END
-      }
-    }
 
     /*
      * -------------------------------------------------------------------------
@@ -504,13 +571,6 @@ namespace ryujin
       std::cout << "        computed tau_max = " << tau_max << std::endl;
       std::cout << "        perform time-step with tau = " << tau << std::endl;
 #endif
-
-      if (precompute_only_) {
-#ifdef DEBUG_OUTPUT
-        std::cout << "        return early" << std::endl;
-#endif
-        return Number(0.);
-      }
     }
 
 #ifdef DEBUG
@@ -1133,65 +1193,6 @@ namespace ryujin
 
     /* Return tau_max: */
     return tau_max;
-  }
-
-  /*
-   * -------------------------------------------------------------------------
-   * Step 8: Apply boundary conditions
-   * -------------------------------------------------------------------------
-   */
-
-  template <typename Description, int dim, typename Number>
-  void HyperbolicModule<Description, dim, Number>::apply_boundary_conditions(
-      StateVector &state_vector, Number t) const
-  {
-#ifdef DEBUG_OUTPUT
-    std::cout << "HyperbolicModule<Description, dim, "
-                 "Number>::apply_boundary_conditions()"
-              << std::endl;
-#endif
-
-    auto &[U, precomputed, V] = state_vector;
-
-    const auto cycle_number = 5 + (n_precomputation_cycles > 0 ? 1 : 0) +
-                              limiter_parameters_.iterations();
-    Scope scope(computing_timer_,
-                "time step [H] " + std::to_string(cycle_number) +
-                    " - apply boundary conditions");
-
-    LIKWID_MARKER_START(("time_step_" + std::to_string(cycle_number)).c_str());
-
-    const auto &boundary_map = offline_data_->boundary_map();
-
-    for (auto entry : boundary_map) {
-      const auto i = entry.first;
-
-      const auto &[normal, normal_mass, boundary_mass, id, position] =
-          entry.second;
-
-      /*
-       * Relay the task of applying appropriate boundary conditions to the
-       * Problem Description.
-       */
-
-      if (id == Boundary::do_nothing)
-        continue;
-
-      auto U_i = U.get_tensor(i);
-
-      /* Use a lambda to avoid computing unnecessary state values */
-      auto get_dirichlet_data = [position = position, t = t, this]() {
-        return initial_values_->initial_state(position, t);
-      };
-
-      const auto view = hyperbolic_system_->template view<dim, Number>();
-      U_i = view.apply_boundary_conditions(id, U_i, normal, get_dirichlet_data);
-      U.write_tensor(U_i, i);
-    }
-
-    LIKWID_MARKER_STOP(("time_step_" + std::to_string(cycle_number)).c_str());
-
-    U.update_ghost_values();
   }
 
 } /* namespace ryujin */
