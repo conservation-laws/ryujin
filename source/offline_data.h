@@ -80,12 +80,14 @@ namespace ryujin
      * Prepare offline data. A call to prepare() internally calls setup()
      * and assemble().
      *
-     * The problem_dimension parameter is used to setup up an appropriately
-     * sized vector partitioner for the MultiComponentVector.
+     * The problem_dimension and n_precomputed_values parameters is used to
+     * set up appropriately sized vector partitioners for the state and
+     * precomputed MultiComponentVector.
      */
-    void prepare(const unsigned int problem_dimension)
+    void prepare(const unsigned int problem_dimension,
+                 const unsigned int n_precomputed_values)
     {
-      setup(problem_dimension);
+      setup(problem_dimension, n_precomputed_values);
       assemble();
       create_multigrid_data();
     }
@@ -112,7 +114,13 @@ namespace ryujin
      * An MPI partitioner for the MultiComponentVector storing a
      * vector-valued quantity of size HyperbolicSystem::problem_dimension.
      */
-    ACCESSOR_READ_ONLY_NO_DEREFERENCE(vector_partitioner)
+    ACCESSOR_READ_ONLY_NO_DEREFERENCE(state_vector_partitioner)
+
+    /**
+     * An MPI partitioner for the MultiComponentVector storing a
+     * vector-valued quantity of size HyperbolicSystem::problem_dimension.
+     */
+    ACCESSOR_READ_ONLY_NO_DEREFERENCE(precomputed_vector_partitioner)
 
     /**
      * The subinterval \f$[0,\texttt{n_export_indices()})\f$ contains all
@@ -264,7 +272,8 @@ namespace ryujin
      * The problem_dimension parameter is used to setup up an appropriately
      * sized vector partitioner for the MultiComponentVector.
      */
-    void setup(const unsigned int problem_dimension);
+    void setup(const unsigned int problem_dimension,
+               const unsigned int n_precomputed_values);
 
     /**
      * Assemble all matrices.
@@ -284,7 +293,10 @@ namespace ryujin
         scalar_partitioner_;
 
     std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
-        vector_partitioner_;
+        state_vector_partitioner_;
+
+    std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
+        precomputed_vector_partitioner_;
 
     unsigned int n_export_indices_;
     unsigned int n_locally_internal_;

@@ -211,7 +211,7 @@ namespace ryujin
     /* Prepare data structures: */
 
     const auto prepare_compute_kernels = [&]() {
-      offline_data_.prepare(problem_dimension);
+      offline_data_.prepare(problem_dimension, n_precomputed_values);
       hyperbolic_module_.prepare();
       parabolic_module_.prepare();
       time_integrator_.prepare();
@@ -236,9 +236,8 @@ namespace ryujin
         print_info("resuming computation: loading state vector");
         auto &U = std::get<0>(state_vector);
         auto &precomputed = std::get<1>(state_vector);
-        U.reinit(offline_data_.vector_partitioner());
-        precomputed.reinit_with_scalar_partitioner(
-            offline_data_.scalar_partitioner());
+        U.reinit(offline_data_.state_vector_partitioner());
+        precomputed.reinit(offline_data_.precomputed_vector_partitioner());
 
         Checkpointing::load_state_vector(
             offline_data_, base_name_, U, t, output_cycle, mpi_communicator_);
@@ -288,8 +287,7 @@ namespace ryujin
 #endif
 
         auto &precomputed = std::get<1>(state_vector);
-        precomputed.reinit_with_scalar_partitioner(
-            offline_data_.scalar_partitioner());
+        precomputed.reinit(offline_data_.precomputed_vector_partitioner());
       }
     }
 
@@ -325,8 +323,7 @@ namespace ryujin
           if (enable_compute_error_) {
             auto analytic = initial_values_.interpolate_state_vector(t);
             auto &precomputed = std::get<1>(analytic);
-            precomputed.reinit_with_scalar_partitioner(
-                offline_data_.scalar_partitioner());
+            precomputed.reinit(offline_data_.precomputed_vector_partitioner());
             output(
                 analytic, base_name_ + "-analytic_solution", t, output_cycle);
           }
