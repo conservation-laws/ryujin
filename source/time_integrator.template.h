@@ -128,7 +128,7 @@ namespace ryujin
 
     for (auto &it : temp_) {
       auto &[U, precomputed, V] = it;
-      U.reinit(offline_data_->state_vector_partitioner());
+      U.reinit(offline_data_->hyperbolic_vector_partitioner());
       precomputed.reinit(offline_data_->precomputed_vector_partitioner());
     }
 

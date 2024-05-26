@@ -112,7 +112,7 @@ namespace ryujin
 
       const auto &scalar_partitioner = offline_data_->scalar_partitioner();
 
-      U.reinit(offline_data_->state_vector_partitioner());
+      U.reinit(offline_data_->hyperbolic_vector_partitioner());
 
       interpolated_state_.resize(problem_dimension);
       for (auto &it : interpolated_state_) {

@@ -114,7 +114,7 @@ namespace ryujin
      * An MPI partitioner for the MultiComponentVector storing a
      * vector-valued quantity of size HyperbolicSystem::problem_dimension.
      */
-    ACCESSOR_READ_ONLY_NO_DEREFERENCE(state_vector_partitioner)
+    ACCESSOR_READ_ONLY_NO_DEREFERENCE(hyperbolic_vector_partitioner)
 
     /**
      * An MPI partitioner for the MultiComponentVector storing a
@@ -293,7 +293,7 @@ namespace ryujin
         scalar_partitioner_;
 
     std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
-        state_vector_partitioner_;
+        hyperbolic_vector_partitioner_;
 
     std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
         precomputed_vector_partitioner_;

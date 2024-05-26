@@ -236,7 +236,7 @@ namespace ryujin
         print_info("resuming computation: loading state vector");
         auto &U = std::get<0>(state_vector);
         auto &precomputed = std::get<1>(state_vector);
-        U.reinit(offline_data_.state_vector_partitioner());
+        U.reinit(offline_data_.hyperbolic_vector_partitioner());
         precomputed.reinit(offline_data_.precomputed_vector_partitioner());
 
         Checkpointing::load_state_vector(

@@ -72,7 +72,7 @@ namespace ryujin
     alpha_.reinit(scalar_partitioner);
     bounds_.reinit_with_scalar_partitioner(scalar_partitioner);
 
-    r_.reinit(offline_data_->state_vector_partitioner());
+    r_.reinit(offline_data_->hyperbolic_vector_partitioner());
     using View =
         typename Description::template HyperbolicSystemView<dim, Number>;
 
