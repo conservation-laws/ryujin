@@ -47,14 +47,14 @@ namespace ryujin
     add_parameter("incidence matrix relaxation even degree",
                   incidence_relaxation_even_,
                   "Scaling exponent for incidence matrix used for "
-                  "discontinuous finite lements with even degree. The default "
+                  "discontinuous finite elements with even degree. The default "
                   "value 0.5 scales the jump penalization with (h_i+h_j)^0.5.");
 
     incidence_relaxation_odd_ = 0.0;
     add_parameter("incidence matrix relaxation odd degree",
                   incidence_relaxation_odd_,
                   "Scaling exponent for incidence matrix used for "
-                  "discontinuous finite lements with even degree. The default "
+                  "discontinuous finite elements with even degree. The default "
                   "value of 0.0 sets the jump penalization to a constant 1.");
   }
 
@@ -566,8 +566,8 @@ namespace ryujin
               cell_cij_matrix[d](i, j) += Number((value * grad_JxW)[d]);
 
           } /* for i */
-        }   /* for j */
-      }     /* for q */
+        } /* for j */
+      } /* for q */
 
       /*
        * For a discontinuous finite element ansatz we need to assemble
@@ -617,8 +617,8 @@ namespace ryujin
                 cell_cij_matrix[d](i, j) -=
                     Number(0.5 * normal[d] * value * value_JxW);
             } /* for i */
-          }   /* for j */
-        }     /* for q */
+          } /* for j */
+        } /* for q */
 
         /* Coupling part: */
 
@@ -648,8 +648,8 @@ namespace ryujin
                 interface_cij_matrix[f_index][d](i, j) +=
                     Number(0.5 * normal[d] * value * value_JxW);
             } /* for i */
-          }   /* for j */
-        }     /* for q */
+          } /* for j */
+        } /* for q */
       }
 
       /*
@@ -913,8 +913,8 @@ namespace ryujin
                   interface_incidence_matrix[f_index](i, j) += r_ij;
                 }
               } /* for i */
-            }   /* for j */
-          }     /* for q */
+            } /* for j */
+          } /* for q */
         }
       };
 
@@ -1147,8 +1147,8 @@ namespace ryujin
           preliminary_map.insert(
               {index, {normal, boundary_mass, boundary_mass, id, position}});
         } /* j */
-      }   /* f */
-    }     /* cell */
+      } /* f */
+    } /* cell */
 
     /*
      * Filter boundary map:
@@ -1265,8 +1265,8 @@ namespace ryujin
 
           locally_relevant_boundary_indices.insert(index);
         } /* j */
-      }   /* f */
-    }     /* cell */
+      } /* f */
+    } /* cell */
 
     /*
      * Now, collect all coupling boundary pairs:

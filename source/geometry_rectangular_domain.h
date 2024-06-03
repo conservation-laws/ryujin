@@ -98,8 +98,8 @@ namespace ryujin
         }
 
         if constexpr (dim == 3) {
-          this->add_parameter("subdivisions y",
-                              subdivisions_y_,
+          this->add_parameter("subdivisions z",
+                              subdivisions_z_,
                               "number of subdivisions in z direction");
           this->add_parameter(
               "boundary condition back",
@@ -181,7 +181,7 @@ namespace ryujin
                 face->set_boundary_id(boundary_front_);
             }
           } /*for*/
-        }   /*for*/
+        } /*for*/
 
         std::vector<int> directions;
 
