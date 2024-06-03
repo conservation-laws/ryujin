@@ -181,7 +181,7 @@ namespace ryujin
                 face->set_boundary_id(boundary_front_);
             }
           } /*for*/
-        } /*for*/
+        }   /*for*/
 
         std::vector<int> directions;
 
