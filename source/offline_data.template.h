@@ -47,14 +47,14 @@ namespace ryujin
     add_parameter("incidence matrix relaxation even degree",
                   incidence_relaxation_even_,
                   "Scaling exponent for incidence matrix used for "
-                  "discontinuous finite lements with even degree. The default "
+                  "discontinuous finite elements with even degree. The default "
                   "value 0.5 scales the jump penalization with (h_i+h_j)^0.5.");
 
     incidence_relaxation_odd_ = 0.0;
     add_parameter("incidence matrix relaxation odd degree",
                   incidence_relaxation_odd_,
                   "Scaling exponent for incidence matrix used for "
-                  "discontinuous finite lements with even degree. The default "
+                  "discontinuous finite elements with even degree. The default "
                   "value of 0.0 sets the jump penalization to a constant 1.");
   }
 
