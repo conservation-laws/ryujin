@@ -36,7 +36,7 @@ DECLARE_ENUM(ryujin::EulerAEOS::IndicatorStrategy,
                   {ryujin::EulerAEOS::IndicatorStrategy::evc,
                    "entropy viscosity"},
                   {ryujin::EulerAEOS::IndicatorStrategy::evc_fullsplit,
-                   "aggressive entropy viscosity"}));
+                   "entropy viscosity full split"}));
 #endif
 
 
@@ -56,7 +56,7 @@ namespace ryujin
             "indicator strategy",
             indicator_strategy_,
             "The chosen indicator strategy. Possible values are: galerkin, "
-            "entropy viscosity, aggressive entropy viscosity");
+            "entropy viscosity, entropy viscosity full split");
 
         evc_factor_ = ScalarNumber(1.);
         add_parameter("evc factor",
