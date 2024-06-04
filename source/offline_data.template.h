@@ -656,8 +656,10 @@ namespace ryujin
        * Compute block inverse of mass matrix:
        */
 
-      // FIXME: rewrite with CellwiseInverseMassMatrix
-      cell_mass_matrix_inverse.invert(cell_mass_matrix);
+      if (discretization_->have_discontinuous_ansatz()) {
+        // FIXME: rewrite with CellwiseInverseMassMatrix
+        cell_mass_matrix_inverse.invert(cell_mass_matrix);
+      }
     };
 
     const auto copy_local_to_global = [&](const auto &copy) {
