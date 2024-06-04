@@ -34,7 +34,7 @@ namespace ryujin
    * OfflineData::prepare() when constructing the
    * OfflineData::boundary_map_ object.
    *
-   * @note OfflineData::boundary_map_ is a std::multimap that stores all
+   * @note OfflineData::boundary_map_ is a std::vector that stores all
    * encountered boundary conditions for an individual degree of freedom.
    * The individual algebraic constraint is applied in no particular order.
    * It is thus important to ensure that neighboring boundary conditions,
