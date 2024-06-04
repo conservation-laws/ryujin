@@ -288,6 +288,7 @@ namespace ryujin
       if (parameters.indicator_strategy() == IndicatorStrategy::evc_fullsplit) {
         /* Entropy viscosity commutator with aggressive denominator split: */
 
+        left += entropy_flux;
         left_absolute += std::abs(entropy_flux);
         for (unsigned int k = 0; k < problem_dimension; ++k) {
           const auto component = d_eta_i[k] * (f_j[k] - f_i[k]) * c_ij;
