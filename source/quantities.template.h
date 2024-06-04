@@ -246,25 +246,21 @@ namespace ryujin
           std::vector<boundary_point> map;
 
           for (const auto &entry : offline_data_->boundary_map()) {
+            // [i, normal, normal_mass, boundary_mass, id, position] = entry
+            const auto &i = std::get<0>(entry);
+
             /* skip nonlocal */
-            if (entry.first >= n_owned)
+            if (i >= n_owned)
               continue;
 
             /* skip constrained */
             if (offline_data_->affine_constraints().is_constrained(
-                    offline_data_->scalar_partitioner()->local_to_global(
-                        entry.first)))
+                    offline_data_->scalar_partitioner()->local_to_global(i)))
               continue;
 
-            const auto &[normal, normal_mass, boundary_mass, id, position] =
-                entry.second;
+            const auto &position = std::get<5>(entry);
             if (std::abs(level_set_function.value(position)) < 1.e-12)
-              map.push_back({entry.first,
-                             normal,
-                             normal_mass,
-                             boundary_mass,
-                             id,
-                             position});
+              map.push_back(entry);
           }
           return std::make_pair(name, map);
         });
