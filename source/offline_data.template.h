@@ -337,7 +337,7 @@ namespace ryujin
     scalar_partitioner_ = std::make_shared<dealii::Utilities::MPI::Partitioner>(
         locally_owned, locally_relevant, mpi_communicator_);
 
-    state_vector_partitioner_ = Vectors::create_vector_partitioner(
+    hyperbolic_vector_partitioner_ = Vectors::create_vector_partitioner(
         scalar_partitioner_, problem_dimension);
 
     precomputed_vector_partitioner_ = Vectors::create_vector_partitioner(

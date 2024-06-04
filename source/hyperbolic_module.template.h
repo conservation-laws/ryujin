@@ -72,7 +72,7 @@ namespace ryujin
     alpha_.reinit(scalar_partitioner);
     bounds_.reinit_with_scalar_partitioner(scalar_partitioner);
 
-    r_.reinit(offline_data_->state_vector_partitioner());
+    r_.reinit(offline_data_->hyperbolic_vector_partitioner());
     using View =
         typename Description::template HyperbolicSystemView<dim, Number>;
 
@@ -519,6 +519,27 @@ namespace ryujin
           // fill lower triangular part of dij_matrix missing from step 1
           if (j < i) {
             const auto d_ji = dij_matrix_.get_transposed_entry(i, col_idx);
+
+#ifdef DEBUG
+            /* Verify that d_ji == std::max(d_ij, d_ji): */
+
+            const auto U_i = old_U.get_tensor(i);
+            const auto U_j = old_U.get_tensor(j);
+
+            const auto c_ij = cij_matrix.get_tensor(i, col_idx);
+            Assert(c_ij.norm() > 1.e-12, ExcInternalError());
+            const auto norm_ij = c_ij.norm();
+            const auto n_ij = c_ij / norm_ij;
+
+            const auto lambda_max =
+                riemann_solver.compute(U_i, U_j, i, &j, n_ij);
+            const auto d_ij = norm_ij * lambda_max;
+
+            Assert(d_ij <= d_ji + 1.0e-12,
+                   dealii::ExcMessage("d_ij not symmetrized correctly on "
+                                      "boundary degrees of freedom."));
+#endif
+
             dij_matrix_.write_entry(d_ji, i, col_idx);
           }
 
@@ -731,14 +752,15 @@ namespace ryujin
 #ifdef DEBUG
             /*
              * Verify that all local chunks of the d_ij matrix have been
-             * computed consistently over all MPI ranks. For that we
-             * imported all ghost rows from neighboring MPI ranks and
-             * simply check that the (local) values of d_ij and d_ji match.
+             * computed consistently over all MPI ranks. For that we import
+             * all ghost rows from neighboring MPI ranks and simply check
+             * that the (local) values of d_ij and d_ji match.
              */
             const auto d_ji =
                 dij_matrix_.template get_transposed_entry<T>(i, col_idx);
             Assert(std::max(std::abs(d_ij - d_ji), T(1.0e-12)) == T(1.0e-12),
-                   dealii::ExcMessage("d_ij not symmetric"));
+                   dealii::ExcMessage(
+                       "d_ij not symmetric correctly over MPI ranks"));
 #endif
 
             const auto c_ij = cij_matrix.template get_tensor<T>(i, col_idx);
