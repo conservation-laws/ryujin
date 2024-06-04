@@ -299,13 +299,14 @@ namespace ryujin
         const auto &boundary_map = offline_data_->boundary_map();
 
         for (auto entry : boundary_map) {
-          const auto i = entry.first;
+          // [i, normal, normal_mass, boundary_mass, id, position] = entry
+          const auto i = std::get<0>(entry);
           if (i >= n_owned)
             continue;
 
-          const auto normal = std::get<0>(entry.second);
-          const auto id = std::get<3>(entry.second);
-          const auto position = std::get<4>(entry.second);
+          const auto normal = std::get<1>(entry);
+          const auto id = std::get<4>(entry);
+          const auto position = std::get<5>(entry);
 
           if (id == Boundary::slip) {
             /* Remove normal component of velocity: */
@@ -607,12 +608,13 @@ namespace ryujin
         const auto &boundary_map = offline_data_->boundary_map();
 
         for (auto entry : boundary_map) {
-          const auto i = entry.first;
+          // [i, normal, normal_mass, boundary_mass, id, position] = entry
+          const auto i = std::get<0>(entry);
           if (i >= n_owned)
             continue;
 
-          const auto id = std::get<3>(entry.second);
-          const auto position = std::get<4>(entry.second);
+          const auto id = std::get<4>(entry);
+          const auto position = std::get<5>(entry);
 
           if (id == Boundary::dirichlet) {
             /* Prescribe internal energy: */
