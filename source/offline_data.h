@@ -303,12 +303,11 @@ namespace ryujin
     unsigned int n_locally_owned_;
     unsigned int n_locally_relevant_;
 
-    using BoundaryMap =
-        std::multimap<dealii::types::global_dof_index, boundary_description>;
+    using BoundaryMap = std::multimap<unsigned int, boundary_description>;
     using CouplingBoundaryPairs =
-        std::vector<std::tuple<dealii::types::global_dof_index,
-                               unsigned int,
-                               dealii::types::global_dof_index>>;
+        std::vector<std::tuple<unsigned int /*i*/,
+                               unsigned int /*col_idx*/,
+                               unsigned int /*j*/>>;
     BoundaryMap boundary_map_;
     CouplingBoundaryPairs coupling_boundary_pairs_;
 
