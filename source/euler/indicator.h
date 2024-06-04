@@ -35,7 +35,7 @@ DECLARE_ENUM(ryujin::Euler::IndicatorStrategy,
              LIST({ryujin::Euler::IndicatorStrategy::galerkin, "galerkin"},
                   {ryujin::Euler::IndicatorStrategy::evc, "entropy viscosity"},
                   {ryujin::Euler::IndicatorStrategy::evc_fullsplit,
-                   "aggressive entropy viscosity"}));
+                   "entropy viscosity full split"}));
 #endif
 
 namespace ryujin
@@ -54,7 +54,7 @@ namespace ryujin
             "indicator strategy",
             indicator_strategy_,
             "The chosen indicator strategy. Possible values are: galerkin, "
-            "entropy viscosity, aggressive entropy viscosity");
+            "entropy viscosity, entropy viscosity full split");
 
         evc_factor_ = ScalarNumber(1.);
         add_parameter("evc factor",
@@ -280,6 +280,7 @@ namespace ryujin
       if (parameters.indicator_strategy() == IndicatorStrategy::evc_fullsplit) {
         /* Entropy viscosity commutator with aggressive denominator split: */
 
+        left += entropy_flux;
         left_absolute += std::abs(entropy_flux);
         for (unsigned int k = 0; k < problem_dimension; ++k) {
           const auto component = d_eta_i[k] * (f_j[k] - f_i[k]) * c_ij;
