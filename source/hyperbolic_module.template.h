@@ -119,11 +119,9 @@ namespace ryujin
 
     LIKWID_MARKER_START("time_step_1a");
 
-    for (auto entry : boundary_map) {
-      const auto i = entry.first;
-
-      const auto &[normal, normal_mass, boundary_mass, id, position] =
-          entry.second;
+    /* FIXME: not thread parallel... */
+    for (const auto &entry : boundary_map) {
+      const auto &[i, normal, normal_mass, boundary_mass, id, position] = entry;
 
       /*
        * Relay the task of applying appropriate boundary conditions to the
