@@ -7,7 +7,6 @@
 
 #include "checkpointing.h"
 #include "scope.h"
-#include "solution_transfer.h"
 #include "time_loop.h"
 #include "version_info.h"
 
@@ -73,11 +72,6 @@ namespace ryujin
 
     t_final_ = Number(5.);
     add_parameter("final time", t_final_, "Final time");
-
-    add_parameter("refinement timepoints",
-                  t_refinements_,
-                  "List of points in (simulation) time at which the mesh will "
-                  "be globally refined");
 
     output_granularity_ = Number(0.01);
     add_parameter(
@@ -251,13 +245,6 @@ namespace ryujin
         /* Workaround: Reinitialize Quantities with correct output cycle: */
         quantities_.prepare(base_name_, output_cycle);
 
-        /* Remove outdated refinement timestamps: */
-        const auto new_end =
-            std::remove_if(t_refinements_.begin(),
-                           t_refinements_.end(),
-                           [&](const Number &t_ref) { return (t >= t_ref); });
-        t_refinements_.erase(new_end, t_refinements_.end());
-
       } else {
 
         print_info("creating mesh");
@@ -340,41 +327,6 @@ namespace ryujin
 
         ++output_cycle;
       }
-
-      /* Perform global refinement: */
-
-      const auto new_end = std::remove_if(
-          t_refinements_.begin(),
-          t_refinements_.end(),
-          [&](const Number &t_ref) {
-            if (t < t_ref)
-              return false;
-
-            computing_timer_["time loop"].stop();
-            Scope scope(computing_timer_, "(re)initialize data structures");
-
-            print_info("performing global refinement");
-
-            SolutionTransfer<Description, dim, Number> solution_transfer(
-                offline_data_, hyperbolic_system_);
-
-            auto &triangulation = discretization_.triangulation();
-            for (auto &cell : triangulation.active_cell_iterators())
-              cell->set_refine_flag();
-            triangulation.prepare_coarsening_and_refinement();
-
-            solution_transfer.prepare_for_interpolation(state_vector);
-
-            triangulation.execute_coarsening_and_refinement();
-            prepare_compute_kernels();
-
-            solution_transfer.interpolate(state_vector);
-
-            computing_timer_["time loop"].start();
-            return true;
-          });
-      t_refinements_.erase(new_end, t_refinements_.end());
-
       /* Break if we have reached the final time: */
 
       if (t >= t_final_)

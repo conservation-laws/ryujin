@@ -118,7 +118,6 @@ namespace ryujin
     std::string base_name_;
 
     Number t_final_;
-    std::vector<Number> t_refinements_;
 
     Number output_granularity_;
 
