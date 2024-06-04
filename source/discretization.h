@@ -154,10 +154,10 @@ namespace ryujin
 
 #ifndef DOXYGEN
 DECLARE_ENUM(ryujin::Boundary,
-             LIST({ryujin::Boundary::do_nothing, "do_nothing"},
+             LIST({ryujin::Boundary::do_nothing, "do nothing"},
                   {ryujin::Boundary::periodic, "periodic"},
                   {ryujin::Boundary::slip, "slip"},
-                  {ryujin::Boundary::no_slip, "no_slip"},
+                  {ryujin::Boundary::no_slip, "no slip"},
                   {ryujin::Boundary::dirichlet, "dirichlet"},
                   {ryujin::Boundary::dynamic, "dynamic"},
                   {ryujin::Boundary::dirichlet_momentum,
