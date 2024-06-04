@@ -249,14 +249,18 @@ namespace ryujin
      */
 
     {
+      constexpr Number eps = std::numeric_limits<Number>::epsilon();
+      constexpr Number floor = std::max(Number(1.0e-10), eps);
+
       for (unsigned int d = 0; d < n_quantities; ++d) {
         auto &[q_max, q_min] = bounds_[d];
         for (unsigned int i = 0; i < n_owned; ++i) {
           auto &q = quantities_[d].local_element(i);
-          constexpr auto eps = std::numeric_limits<Number>::epsilon();
-          const auto magnitude =
-              Number(1.) -
-              std::exp(-beta_ * (std::abs(q) - q_min) / (q_max - q_min + eps));
+          /* clip off everything that is below the noise "floor": */
+          const auto ratio = std::max(Number(0.), std::abs(q) - q_min - floor) /
+                             std::max(q_max - q_min, eps);
+
+          const auto magnitude = Number(1.) - std::exp(-beta_ * ratio);
           q = std::copysign(magnitude, q);
         }
       }
