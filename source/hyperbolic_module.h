@@ -291,8 +291,6 @@ namespace ryujin
     typename Description::template RiemannSolver<dim, Number>::Parameters
         riemann_solver_parameters_;
 
-    bool cfl_with_boundary_dofs_;
-
     //@}
 
     //@}

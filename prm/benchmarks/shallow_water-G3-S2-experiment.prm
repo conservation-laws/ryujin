@@ -89,8 +89,6 @@ subsection E - InitialValues
 end
 
 subsection F - HyperbolicModule
-  set cfl with boundary dofs        = false
-
   subsection indicator
     set evc factor = 1
   end

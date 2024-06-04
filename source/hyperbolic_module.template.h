@@ -46,11 +46,6 @@ namespace ryujin
       , n_restarts_(0)
       , n_warnings_(0)
   {
-    cfl_with_boundary_dofs_ = false;
-    add_parameter("cfl with boundary dofs",
-                  cfl_with_boundary_dofs_,
-                  "Use also the local wave-speed estimate d_ij of boundary "
-                  "dofs when computing the maximal admissible step size");
   }
 
 
@@ -298,7 +293,6 @@ namespace ryujin
     const auto &cij_matrix = offline_data_->cij_matrix();
     const auto &incidence_matrix = offline_data_->incidence_matrix();
 
-    const auto &boundary_map = offline_data_->boundary_map();
     const auto &coupling_boundary_pairs =
         offline_data_->coupling_boundary_pairs();
 
@@ -559,9 +553,7 @@ namespace ryujin
 
         const Number mass = lumped_mass_matrix.local_element(i);
         const Number tau = cfl_ * mass / (Number(-2.) * d_sum);
-        if (boundary_map.count(i) == 0 || cfl_with_boundary_dofs_) {
-          local_tau_max = std::min(local_tau_max, tau);
-        }
+        local_tau_max = std::min(local_tau_max, tau);
       }
 
       /* Synchronize tau max over all threads: */
