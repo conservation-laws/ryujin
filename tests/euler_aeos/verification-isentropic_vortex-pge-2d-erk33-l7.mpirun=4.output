@@ -5,9 +5,9 @@
 [INFO] preparing compute kernels
 [INFO] interpolating initial values
 [INFO] entering main loop
-Normalized consolidated Linf, L1, and L2 errors at final time
+Normalized consolidated Linf, L1, and L2 errors at final time 
 #dofs = 16641
-t     = 2.00063
-Linf  = 0.000640962
-L1    = 4.95127e-05
-L2    = 0.000116091
+t     = 2.005478363783097
+Linf  = 0.0006421458507517179
+L1    = 4.963810197315999e-05
+L2    = 0.0001163746113900111
