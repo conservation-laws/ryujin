@@ -108,12 +108,10 @@ namespace ryujin
      */
     void interpolate(StateVector &state_vector)
     {
+      reinit_state_vector<Description>(state_vector, *offline_data_);
       auto &U = std::get<0>(state_vector);
 
       const auto &scalar_partitioner = offline_data_->scalar_partitioner();
-
-      U.reinit(offline_data_->hyperbolic_vector_partitioner());
-
       interpolated_state_.resize(problem_dimension);
       for (auto &it : interpolated_state_) {
         it.reinit(scalar_partitioner);

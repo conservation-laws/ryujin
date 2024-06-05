@@ -750,7 +750,7 @@ namespace ryujin
                 dij_matrix_.template get_transposed_entry<T>(i, col_idx);
             Assert(std::max(std::abs(d_ij - d_ji), T(1.0e-12)) == T(1.0e-12),
                    dealii::ExcMessage(
-                       "d_ij not symmetric correctly over MPI ranks"));
+                       "d_ij not symmetrized correctly over MPI ranks"));
 #endif
 
             const auto c_ij = cij_matrix.template get_tensor<T>(i, col_idx);
