@@ -11,6 +11,12 @@
 
 namespace ryujin
 {
+#ifndef DOXYGEN
+  /* Forward declaration */
+  template <int dim, typename Number>
+  class OfflineData;
+#endif
+
   /**
    * A namespace for various vector type aliases.
    *
@@ -43,6 +49,28 @@ namespace ryujin
         MultiComponentVector<Number, problem_dim> /*U*/,
         MultiComponentVector<Number, prec_dim> /*precomputed values*/,
         BlockVector<Number> /*parabolic state vector*/>;
+
+
+    /**
+     * Helper function that (re)initializes all components of a StateVector
+     * to proper sizes.
+     */
+    template <
+        typename Description,
+        int dim,
+        typename Number,
+        typename View =
+            typename Description::template HyperbolicSystemView<dim, Number>,
+        int problem_dim = View::problem_dimension,
+        int prec_dim = View::n_precomputed_values>
+    void reinit_state_vector(
+        StateVector<Number, problem_dim, prec_dim> &state_vector,
+        const OfflineData<dim, Number> &offline_data)
+    {
+      auto &[U, precomputed, V] = state_vector;
+      U.reinit(offline_data.hyperbolic_vector_partitioner());
+      precomputed.reinit(offline_data.precomputed_vector_partitioner());
+    }
   } // namespace Vectors
 
 } // namespace ryujin

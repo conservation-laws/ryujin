@@ -83,10 +83,10 @@ namespace ryujin
 
     void compute_error(const StateVector &state_vector, Number t);
 
-    void output(StateVector &state_vector,
+    void output(const StateVector &state_vector,
                 const std::string &name,
-                Number t,
-                unsigned int cycle);
+                const Number t,
+                const unsigned int cycle);
 
     void print_parameters(std::ostream &stream);
     void print_mpi_partition(std::ostream &stream);

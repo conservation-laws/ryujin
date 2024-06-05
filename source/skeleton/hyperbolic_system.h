@@ -199,6 +199,12 @@ namespace ryujin
           StateVector<ScalarNumber, problem_dimension, n_precomputed_values>;
 
       /**
+       * MulticomponentVector for storing the hyperbolic state vector:
+       */
+      using HyperbolicVector =
+          Vectors::MultiComponentVector<ScalarNumber, problem_dimension>;
+
+      /**
        * MulticomponentVector for storing a vector of precomputed states:
        */
       using PrecomputedVector =

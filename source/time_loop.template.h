@@ -234,11 +234,9 @@ namespace ryujin
         prepare_compute_kernels();
 
         print_info("resuming computation: loading state vector");
-        auto &U = std::get<0>(state_vector);
-        auto &precomputed = std::get<1>(state_vector);
-        U.reinit(offline_data_.hyperbolic_vector_partitioner());
-        precomputed.reinit(offline_data_.precomputed_vector_partitioner());
 
+        reinit_state_vector<Description>(state_vector, offline_data_);
+        auto &U = std::get<0>(state_vector);
         Checkpointing::load_state_vector(
             offline_data_, base_name_, U, t, output_cycle, mpi_communicator_);
 
@@ -269,7 +267,9 @@ namespace ryujin
         prepare_compute_kernels();
 
         print_info("interpolating initial values");
-        state_vector = initial_values_.interpolate_state_vector();
+        reinit_state_vector<Description>(state_vector, offline_data_);
+        std::get<0>(state_vector) =
+            initial_values_.interpolate_hyperbolic_vector();
 #ifdef DEBUG
         /* Poison constrained degrees of freedom: */
         {
@@ -285,9 +285,6 @@ namespace ryujin
           }
         }
 #endif
-
-        auto &precomputed = std::get<1>(state_vector);
-        precomputed.reinit(offline_data_.precomputed_vector_partitioner());
       }
     }
 
@@ -319,15 +316,20 @@ namespace ryujin
 
       if (t >= output_cycle * output_granularity_) {
         if (write_output_files) {
+          hyperbolic_module_.prepare_state_vector(state_vector, t);
           output(state_vector, base_name_ + "-solution", t, output_cycle);
+
           if (enable_compute_error_) {
-            auto analytic = initial_values_.interpolate_state_vector(t);
-            auto &precomputed = std::get<1>(analytic);
-            precomputed.reinit(offline_data_.precomputed_vector_partitioner());
+            StateVector analytic;
+            reinit_state_vector<Description>(analytic, offline_data_);
+            std::get<0>(analytic) =
+                initial_values_.interpolate_hyperbolic_vector(t);
+            hyperbolic_module_.prepare_state_vector(analytic, t);
             output(
                 analytic, base_name_ + "-analytic_solution", t, output_cycle);
           }
         }
+
         if (enable_compute_quantities_ &&
             (output_cycle % output_quantities_multiplier_ == 0) &&
             (output_cycle > 0)) {
@@ -335,6 +337,7 @@ namespace ryujin
                       "time step [X] 2 - write out quantities");
           quantities_.write_out(state_vector, t, output_cycle);
         }
+
         ++output_cycle;
       }
 
@@ -437,10 +440,8 @@ namespace ryujin
     Number l1_norm = 0;
     Number l2_norm = 0;
 
-    const auto analytic = initial_values_.interpolate_state_vector(t);
-
+    const auto analytic_U = initial_values_.interpolate_hyperbolic_vector(t);
     const auto &U = std::get<0>(state_vector);
-    const auto &analytic_U = std::get<0>(analytic);
 
     ScalarVector analytic_component;
     ScalarVector error_component;
@@ -566,10 +567,11 @@ namespace ryujin
 
 
   template <typename Description, int dim, typename Number>
-  void TimeLoop<Description, dim, Number>::output(StateVector &state_vector,
-                                                  const std::string &name,
-                                                  Number t,
-                                                  unsigned int cycle)
+  void
+  TimeLoop<Description, dim, Number>::output(const StateVector &state_vector,
+                                             const std::string &name,
+                                             const Number t,
+                                             const unsigned int cycle)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeLoop<dim, Number>::output(t = " << t << ")" << std::endl;
@@ -600,7 +602,6 @@ namespace ryujin
       if (cycle == 0)
         postprocessor_.reset_bounds();
 
-      hyperbolic_module_.prepare_state_vector(state_vector, t);
       vtu_output_.schedule_output(
           state_vector, name, t, cycle, do_full_output, do_levelsets);
     }
