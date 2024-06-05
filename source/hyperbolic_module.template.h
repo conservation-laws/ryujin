@@ -99,7 +99,7 @@ namespace ryujin
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "HyperbolicModule<Description, dim, "
-                 "Number>::apply_boundary_conditions()"
+                 "Number>::prepare_state_vector()"
               << std::endl;
 #endif
 
