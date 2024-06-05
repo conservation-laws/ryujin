@@ -1065,7 +1065,16 @@ namespace ryujin
               << std::endl;
 #endif
 
-    decltype(boundary_map_) preliminary_map;
+    /*
+     * Create a temporary multimap with the (local) dof index as key:
+     */
+
+    using BoundaryData = std::tuple<dealii::Tensor<1, dim, Number> /*normal*/,
+                                    Number /*normal mass*/,
+                                    Number /*boundary mass*/,
+                                    dealii::types::boundary_id /*id*/,
+                                    dealii::Point<dim>> /*position*/;
+    std::multimap<unsigned int, BoundaryData> preliminary_map;
 
     std::vector<dealii::types::global_dof_index> local_dof_indices;
 
@@ -1163,7 +1172,7 @@ namespace ryujin
      * FIXME: is this robust in 3D?
      */
 
-    decltype(boundary_map_) filtered_map;
+    std::multimap<unsigned int, BoundaryData> filtered_map;
     std::set<dealii::types::global_dof_index> boundary_dofs;
     for (auto entry : preliminary_map) {
       bool inserted = false;
@@ -1192,18 +1201,28 @@ namespace ryujin
         filtered_map.insert(entry);
     }
 
-    /* Normalize all normal vectors: */
+    /*
+     * Normalize all normal vectors and create final boundary_map:
+     */
 
-    for (auto &it : filtered_map) {
-      auto &[normal, normal_mass, boundary_mass, id, point] = it.second;
-      const auto new_normal_mass =
-          normal.norm() + std::numeric_limits<Number>::epsilon();
-      /* Replace boundary mass with new definition: */
-      normal_mass = new_normal_mass;
-      normal /= new_normal_mass;
-    }
+    BoundaryMap boundary_map;
+    std::transform(
+        std::begin(filtered_map),
+        std::end(filtered_map),
+        std::back_inserter(boundary_map),
+        [&](const auto &it) -> BoundaryDescription { //
+          auto index = it.first;
+          const auto &[normal, normal_mass, boundary_mass, id, point] =
+              it.second;
 
-    return filtered_map;
+          const auto new_normal_mass =
+              normal.norm() + std::numeric_limits<Number>::epsilon();
+          const auto new_normal = normal / new_normal_mass;
+
+          return {index, new_normal, new_normal_mass, boundary_mass, id, point};
+        });
+
+    return boundary_map;
   }
 
 

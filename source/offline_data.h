@@ -58,16 +58,25 @@ namespace ryujin
     using ScalarVectorFloat = Vectors::ScalarVector<float>;
 
     /**
-     * A tuple describing global dof index, boundary normal, normal mass,
+     * A tuple describing (local) dof index, boundary normal, normal mass,
      * boundary mass, boundary id, and position of the boundary degree of
      * freedom.
      */
-    using boundary_description =
-        std::tuple<dealii::Tensor<1, dim, Number> /*normal*/,
+    using BoundaryDescription =
+        std::tuple<unsigned int /*i*/,
+                   dealii::Tensor<1, dim, Number> /*normal*/,
                    Number /*normal mass*/,
                    Number /*boundary mass*/,
                    dealii::types::boundary_id /*id*/,
                    dealii::Point<dim>> /*position*/;
+
+    /**
+     * A tuple describing coupling boundary degrees of freedom on directly
+     * enforced boundaries for which we have to symmetrize the d_ij matrix.
+     */
+    using CouplingDescription = std::tuple<unsigned int /*i*/, //
+                                           unsigned int /*col_idx*/,
+                                           unsigned int /*j*/>;
 
     /**
      * Constructor
@@ -303,15 +312,12 @@ namespace ryujin
     unsigned int n_locally_owned_;
     unsigned int n_locally_relevant_;
 
-    using BoundaryMap = std::multimap<unsigned int, boundary_description>;
-    using CouplingBoundaryPairs =
-        std::vector<std::tuple<unsigned int /*i*/,
-                               unsigned int /*col_idx*/,
-                               unsigned int /*j*/>>;
+    using BoundaryMap = std::vector<BoundaryDescription>;
     BoundaryMap boundary_map_;
-    CouplingBoundaryPairs coupling_boundary_pairs_;
-
     std::vector<BoundaryMap> level_boundary_map_;
+
+    using CouplingBoundaryPairs = std::vector<CouplingDescription>;
+    CouplingBoundaryPairs coupling_boundary_pairs_;
 
     dealii::DynamicSparsityPattern sparsity_pattern_;
 

@@ -247,33 +247,6 @@ namespace ryujin
       U.insert_component(temp, d);
     }
 
-    /*
-     * Cosmetic fix up: Ensure that the initial state is compatible with
-     * slip and no_slip boundary conditions. This ensures that nothing is
-     * ever transported out of slip and no slip boundaries - even if
-     * initial conditions happen to be set incorrectly.
-     */
-
-    const auto &boundary_map = offline_data_->boundary_map();
-    const unsigned int n_owned = offline_data_->n_locally_owned();
-
-    for (auto entry : boundary_map) {
-      const auto i = entry.first;
-      if (i >= n_owned)
-        continue;
-
-      const auto normal = std::get<0>(entry.second);
-      const auto id = std::get<3>(entry.second);
-
-      if (id == Boundary::slip || id == Boundary::no_slip) {
-        auto U_i = U.get_tensor(i);
-        const auto view = hyperbolic_system_->template view<dim, Number>();
-        U_i = view.apply_boundary_conditions(
-            id, U_i, normal, [&]() { return U_i; });
-        U.write_tensor(U_i, i);
-      }
-    }
-
     U.update_ghost_values();
     return state;
   }

@@ -267,13 +267,13 @@ namespace ryujin
                 : offline_data_->level_boundary_map()[level_];
 
         for (auto entry : boundary_map) {
-          const auto i = entry.first;
+          // [i, normal, normal_mass, boundary_mass, id, position] = entry
+          const auto i = std::get<0>(entry);
           if (i >= n_owned)
             continue;
 
-          const dealii::Tensor<1, dim, Number> normal =
-              std::get<0>(entry.second);
-          const auto id = std::get<3>(entry.second);
+          const dealii::Tensor<1, dim, Number> normal = std::get<1>(entry);
+          const auto id = std::get<4>(entry);
 
           if (id == Boundary::slip) {
             dealii::Tensor<1, dim, Number> V_i;
@@ -362,13 +362,13 @@ namespace ryujin
         const auto &boundary_map = offline_data_->level_boundary_map()[level_];
 
         for (auto entry : boundary_map) {
-          const auto i = entry.first;
+          // [i, normal, normal_mass, boundary_mass, id, position] = entry
+          const auto i = std::get<0>(entry);
           if (i >= n_owned)
             continue;
 
-          const dealii::Tensor<1, dim, Number> normal =
-              std::get<0>(entry.second);
-          const auto id = std::get<3>(entry.second);
+          const dealii::Tensor<1, dim, Number> normal = std::get<1>(entry);
+          const auto id = std::get<4>(entry);
 
           if (id == Boundary::slip) {
             dealii::Tensor<1, dim, Number> V_i;
@@ -660,11 +660,11 @@ namespace ryujin
                 : offline_data_->level_boundary_map()[level_];
 
         for (auto entry : boundary_map) {
-          const auto i = entry.first;
+          const auto i = std::get<0>(entry);
           if (i >= n_owned)
             continue;
 
-          const auto id = std::get<3>(entry.second);
+          const auto id = std::get<4>(entry);
           if (id == Boundary::dirichlet)
             dst.local_element(i) = src.local_element(i);
         }
@@ -729,11 +729,11 @@ namespace ryujin
         const auto &boundary_map = offline_data_->level_boundary_map()[level_];
 
         for (auto entry : boundary_map) {
-          const auto i = entry.first;
+          const auto i = std::get<0>(entry);
           if (i >= n_owned)
             continue;
 
-          const auto id = std::get<3>(entry.second);
+          const auto id = std::get<4>(entry);
           if (id == Boundary::dirichlet)
             vector.local_element(i) = 1.;
         }
