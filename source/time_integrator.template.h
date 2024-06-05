@@ -127,9 +127,7 @@ namespace ryujin
     /* Initialize temporary vectors: */
 
     for (auto &it : temp_) {
-      auto &[U, precomputed, V] = it;
-      U.reinit(offline_data_->hyperbolic_vector_partitioner());
-      precomputed.reinit(offline_data_->precomputed_vector_partitioner());
+      reinit_state_vector<Description>(it, *offline_data_);
     }
 
     /* Reset CFL to canonical starting value: */
