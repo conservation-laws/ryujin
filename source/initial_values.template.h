@@ -220,16 +220,15 @@ namespace ryujin
 
 
   template <typename Description, int dim, typename Number>
-  auto InitialValues<Description, dim, Number>::interpolate_state_vector(
-      Number t) const -> StateVector
+  auto InitialValues<Description, dim, Number>::interpolate_hyperbolic_vector(
+      Number t) const -> HyperbolicVector
   {
 #ifdef DEBUG_OUTPUT
-    std::cout << "InitialValues<dim, Number>::interpolate_state_vector(t = "
-              << t << ")" << std::endl;
+    std::cout << "InitialValues<dim, Number>::"
+              << "interpolate_hyperbolic_vector(t = " << t << ")" << std::endl;
 #endif
 
-    StateVector state;
-    auto &[U, precomputed, V] = state;
+    HyperbolicVector U;
     U.reinit(offline_data_->hyperbolic_vector_partitioner());
 
     using ScalarVector = typename OfflineData<dim, Number>::ScalarVector;
@@ -248,7 +247,7 @@ namespace ryujin
     }
 
     U.update_ghost_values();
-    return state;
+    return U;
   }
 
 

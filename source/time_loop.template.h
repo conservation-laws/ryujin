@@ -269,7 +269,8 @@ namespace ryujin
         prepare_compute_kernels();
 
         print_info("interpolating initial values");
-        state_vector = initial_values_.interpolate_state_vector();
+        std::get<0>(state_vector) =
+            initial_values_.interpolate_hyperbolic_vector();
 #ifdef DEBUG
         /* Poison constrained degrees of freedom: */
         {
@@ -321,8 +322,9 @@ namespace ryujin
         if (write_output_files) {
           output(state_vector, base_name_ + "-solution", t, output_cycle);
           if (enable_compute_error_) {
-            auto analytic = initial_values_.interpolate_state_vector(t);
-            auto &precomputed = std::get<1>(analytic);
+            StateVector analytic;
+            auto &[U, precomputed, V] = analytic;
+            U = initial_values_.interpolate_hyperbolic_vector(t);
             precomputed.reinit(offline_data_.precomputed_vector_partitioner());
             output(
                 analytic, base_name_ + "-analytic_solution", t, output_cycle);
@@ -437,10 +439,8 @@ namespace ryujin
     Number l1_norm = 0;
     Number l2_norm = 0;
 
-    const auto analytic = initial_values_.interpolate_state_vector(t);
-
+    const auto analytic_U = initial_values_.interpolate_hyperbolic_vector(t);
     const auto &U = std::get<0>(state_vector);
-    const auto &analytic_U = std::get<0>(analytic);
 
     ScalarVector analytic_component;
     ScalarVector error_component;
