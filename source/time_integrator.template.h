@@ -127,7 +127,7 @@ namespace ryujin
     /* Initialize temporary vectors: */
 
     for (auto &it : temp_) {
-      reinit_state_vector<Description>(it, *offline_data_);
+      Vectors::reinit_state_vector<Description>(it, *offline_data_);
     }
 
     /* Reset CFL to canonical starting value: */

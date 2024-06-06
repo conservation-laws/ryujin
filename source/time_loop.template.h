@@ -235,7 +235,7 @@ namespace ryujin
 
         print_info("resuming computation: loading state vector");
 
-        reinit_state_vector<Description>(state_vector, offline_data_);
+        Vectors::reinit_state_vector<Description>(state_vector, offline_data_);
         auto &U = std::get<0>(state_vector);
         Checkpointing::load_state_vector(
             offline_data_, base_name_, U, t, output_cycle, mpi_communicator_);
@@ -267,7 +267,7 @@ namespace ryujin
         prepare_compute_kernels();
 
         print_info("interpolating initial values");
-        reinit_state_vector<Description>(state_vector, offline_data_);
+        Vectors::reinit_state_vector<Description>(state_vector, offline_data_);
         std::get<0>(state_vector) =
             initial_values_.interpolate_hyperbolic_vector();
 #ifdef DEBUG
@@ -321,7 +321,7 @@ namespace ryujin
 
           if (enable_compute_error_) {
             StateVector analytic;
-            reinit_state_vector<Description>(analytic, offline_data_);
+            Vectors::reinit_state_vector<Description>(analytic, offline_data_);
             std::get<0>(analytic) =
                 initial_values_.interpolate_hyperbolic_vector(t);
             hyperbolic_module_.prepare_state_vector(analytic, t);
