@@ -1094,7 +1094,13 @@ namespace ryujin
 
     for (auto cell = begin; cell != end; ++cell) {
 
-      if (!cell->is_locally_owned_on_level())
+      /*
+       * Workaround: Make sure to iterate over the entire locally relevant
+       * set so that we compute normals between cells with differing owners
+       * correctly. This strategy works for 2D but will fail in 3D with
+       * locally refined meshes and hanging nodes situated at the boundary.
+       */
+      if (cell->is_artificial_on_level())
         continue;
 
       local_dof_indices.resize(dofs_per_cell);
