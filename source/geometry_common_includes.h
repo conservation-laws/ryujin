@@ -16,7 +16,7 @@
 #include <deal.II/grid/manifold_lib.h>
 #include <deal.II/grid/tensor_product_manifold.h>
 #include <deal.II/grid/tria.h>
-
+#include <deal.II/grid/grid_in.h>
 namespace ryujin
 {
   /**
@@ -29,4 +29,8 @@ namespace ryujin
   {
     using namespace dealii::GridGenerator;
   } /* namespace GridGenerator */
+  namespace GridIn
+  {
+    using namespace dealii;
+  }
 } /* namespace ryujin */

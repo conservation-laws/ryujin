@@ -22,6 +22,7 @@
 #include "initial_state_smooth_wave.h"
 #include "initial_state_three_state_contrast.h"
 #include "initial_state_uniform.h"
+#include "initial_state_nozzle.h"
 
 namespace ryujin
 {
@@ -53,6 +54,7 @@ namespace ryujin
       add(std::make_unique<SmoothWave<Description, dim, Number>>(h, s));
       add(std::make_unique<ThreeStateContrast<Description, dim, Number>>(h, s));
       add(std::make_unique<Uniform<Description, dim, Number>>(h, s));
+      add(std::make_unique<Nozzle<Description, dim, Number>>(h, s));
     }
   } // namespace EulerInitialStates
 } // namespace ryujin
