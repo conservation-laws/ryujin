@@ -68,8 +68,8 @@ namespace ryujin
       }
 
       /* Compute solution */
-      auto compute(const dealii::Point<dim> &point,
-                   Number t) -> state_type final
+      auto compute(const dealii::Point<dim> &point, Number t)
+          -> state_type final
       {
         const auto view = hyperbolic_system_.template view<dim, Number>();
 
