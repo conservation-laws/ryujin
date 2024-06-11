@@ -26,16 +26,16 @@
 ##
 
 subsection A - TimeLoop
-  set basename                     = shocktube-graded
+  set basename                            = shocktube-graded
 
-  set enable compute quantities    = true
-  set enable output full           = true
+  set enable compute quantities           = true
+  set enable output full                  = true
 
-  set final time                   = 1.00
-  set output granularity           = 0.01
+  set final time                          = 1.00
+  set timer granularity                   = 0.01
 
-  set output full multiplier       = 100
-  set output quantities multiplier = 1
+  set timer output full multiplier        = 100
+  set timer compute quantities multiplier = 1
 end
 
 subsection B - Equation

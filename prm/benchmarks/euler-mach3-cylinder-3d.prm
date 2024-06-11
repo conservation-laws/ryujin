@@ -26,24 +26,24 @@
 ##
 
 subsection A - TimeLoop
-  set basename                     = mach3-cylinder-3d
+  set basename                          = mach3-cylinder-3d
 
-  set enable checkpointing         = false
-  set enable output full           = false
+  set enable checkpointing              = false
+  set enable output full                = false
 
   #
   # Output reduced vtks only containing hexahedra that intersect with the
   # cutplanes x, y, z, and x^2+y^2-0.25*0.25 (as configured down below in
   # the "subsection I - VTUOutput").
   #
-  set enable output levelsets      = true
+  set enable output levelsets           = true
 
-  set final time                   = 5.00
-  set output granularity           = 0.10
+  set final time                        = 5.00
+  set timer granularity                 = 0.10
 
-  set output checkpoint multiplier = 1
-  set output full multiplier       = 10
-  set output levelsets multiplier  = 1
+  set timer checkpoint multiplier       = 1
+  set timer output full multiplier      = 10
+  set timer output levelsets multiplier = 1
 end
 
 

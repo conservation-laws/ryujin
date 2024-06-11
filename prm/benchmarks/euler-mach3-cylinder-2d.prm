@@ -20,12 +20,12 @@
 ##
 
 subsection A - TimeLoop
-  set basename                     = mach3-cylinder-2d
+  set basename           = mach3-cylinder-2d
 
-  set enable output full           = true
+  set enable output full = true
 
-  set final time                   = 5.00
-  set output granularity           = 0.10
+  set final time         = 5.00
+  set timer granularity  = 0.10
 end
 
 

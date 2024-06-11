@@ -17,14 +17,14 @@
 subsection A - TimeLoop
   set basename             = isentropic_vortex-erk22
 
-  set enable output full   = true
-
   set enable compute error = true
   set error normalize      = true
   set error quantities     = rho, m_1, m_2, E
 
+  set enable output full   = true
+
   set final time           = 2.0
-  set output granularity   = 2.0
+  set timer granularity    = 2.0
 end
 
 subsection B - Equation
