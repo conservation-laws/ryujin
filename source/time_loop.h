@@ -81,9 +81,9 @@ namespace ryujin
      */
     //@{
 
-    void compute_error(const StateVector &state_vector, Number t);
+    void compute_error(StateVector &state_vector, Number t);
 
-    void output(const StateVector &state_vector,
+    void output(StateVector &state_vector,
                 const std::string &name,
                 const Number t,
                 const unsigned int cycle);
