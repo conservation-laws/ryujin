@@ -41,6 +41,24 @@ namespace ryujin
           this->add_parameter("gamma", gamma_, "The ratio of specific heats");
         }
 
+        rho0_ = 1.0;
+        this->add_parameter(
+            "reference density", rho0_, "The reference density");
+
+        /*
+         * Exact solution assumes this value is negative, but we are just
+         * switching u0 to -u0 by hand in the formulas.
+         */
+        u0_ = 1.0;
+        this->add_parameter("reference velocity magnitude",
+                            u0_,
+                            "The reference velocity magnitude");
+
+
+        p0_ = 1.e-12;
+        this->add_parameter(
+            "reference pressure", p0_, "The reference pressure");
+
         this->parse_parameters_call_back.connect([&]() {
           if constexpr (View::have_gamma) {
             const auto view = hyperbolic_system_.template view<dim, Number>();
@@ -49,79 +67,49 @@ namespace ryujin
         });
       }
 
-      /* Initial and exact solution for each dimension */
+      /* Compute solution */
       auto compute(const dealii::Point<dim> &point, Number t)
           -> state_type final
       {
-        // Initialize some quantities
-        Number rho = 1.;
-        Number u = 0.;
-        Number v = 0.;
-        Number E = 0.;
+        const auto view = hyperbolic_system_.template view<dim, Number>();
 
         const auto norm = point.norm();
+        const auto min = 10. * std::numeric_limits<Number>::min();
 
-        // Define profiles for each dim here
-        switch (dim) {
-        case 1:
-          if (t < 1.e-16) {
-            /* Initial condition */
-            if (norm > 1.e-16)
-              u = -point[0] / norm;
-            E = 1.e-12 / (gamma_ - Number(1.)) + Number(0.5) * rho * u * u;
-          } else if (t / 3. < norm) {
-            /* Exact solution */
-            rho = 1.0;
-            u = -point[0] / norm;
-            E = 0.5 * rho + 1.e-12 / (gamma_ - Number(1.));
-          } else if (t / 3. >= norm) {
-            rho = 4.0;
-            u = 0.0;
-            E = 2.0 + 1.e-12 / (gamma_ - Number(1.));
-          }
-          break;
+        /* Initialize primitive variables */
+        Number rho = rho0_;
+        auto vel = -u0_ * point / (norm + min);
+        Number p = p0_;
 
-        case 2:
-          if (t < 1.e-16) {
-            /* Initial condition */
-            if (norm > 1.e-16) {
-              u = -point[0] / norm, v = -point[1] / norm;
-            }
-            E = 1.e-12 / (gamma_ - Number(1.)) +
-                Number(0.5) * rho * (u * u + v * v);
+        /* Define exact solutions */
+        const auto D = u0_ * (gamma_ - 1.) / 2.;
+        const bool in_interior = t == Number(0.) ? false : norm / t < D;
 
-          } else if (t / 3. < norm) {
-            /* Exact solution */
-            rho = 1.0 + t / norm;
-            u = -point[0] / norm, v = -point[1] / norm;
-            E = 0.5 * rho + 1.e-12 / (gamma_ - Number(1.));
-
-          } else if (t / 3. >= norm) {
-            rho = 16.0;
-            u = 0.0, v = 0.0;
-            E = 8.0 + 1.e-12 / (gamma_ - Number(1.));
-          }
-          break;
-
-        case 3:
-          AssertThrow(false, dealii::ExcNotImplemented());
-          __builtin_trap();
+        if (in_interior) {
+          rho = rho0_ * std::pow((gamma_ + 1.) / (gamma_ - 1.), dim);
+          vel = 0. * point;
+          p = 0.5 * rho0_ * u0_ * u0_;
+          p *= std::pow(gamma_ + 1., dim) / std::pow(gamma_ - 1., dim - 1);
+        } else {
+          rho = rho0_ * std::pow(1. + t / (norm + min), dim - 1);
         }
 
         /* Set final state */
         if constexpr (dim == 1)
-          return state_type({rho, rho * u, E});
+          return view.from_initial_state(state_type{{rho, vel[0], p}});
         else if constexpr (dim == 2)
-          return state_type({rho, rho * u, rho * v, E});
-        else {
-          AssertThrow(false, dealii::ExcNotImplemented());
-          __builtin_trap();
-        }
+          return view.from_initial_state(state_type{{rho, vel[0], vel[1], p}});
+        else
+          return view.from_initial_state(
+              state_type{{rho, vel[0], vel[1], vel[2], p}});
       }
 
     private:
       const HyperbolicSystem &hyperbolic_system_;
       Number gamma_;
+      Number rho0_;
+      Number u0_;
+      Number p0_;
     };
   } // namespace EulerInitialStates
 } // namespace ryujin
