@@ -17,14 +17,12 @@
 subsection A - TimeLoop
   set basename             = ritter_dam_break-erk33
 
-  set enable output full   = true
-
   set enable compute error = true
   set error normalize      = true
   set error quantities     = h
 
   set final time           = 6.0
-  set output granularity   = 6.0
+  set timer granularity    = 6.0
 
   set terminal update interval  = 0
 end

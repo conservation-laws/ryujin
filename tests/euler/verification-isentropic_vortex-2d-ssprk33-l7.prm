@@ -1,14 +1,11 @@
 subsection A - TimeLoop
   set basename                  = validation-euler-l7
 
-  set enable output full        = false
-  set enable compute quantities = false
-
   set enable compute error      = true
 
   set final time                = 2.0
 
-  set output granularity        = 2.0
+  set timer granularity         = 2.0
   set terminal update interval  = 0
 end
 

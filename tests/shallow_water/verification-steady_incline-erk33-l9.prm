@@ -17,13 +17,12 @@
 subsection A - TimeLoop
   set basename                      = steady_incline_1d-erk33-l9
 
-  set final time                    = 1
-  set enable output full            = true
-  set output granularity            = 1
-
   set enable compute error          = true
   set error quantities              = h, m
   set error normalize               = true
+
+  set final time                    = 1.0
+  set timer granularity             = 1.0
 
   set terminal update interval      = 0
 

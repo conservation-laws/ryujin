@@ -5,7 +5,8 @@ subsection A - TimeLoop
   set error quantities          = rho, m_1, E
 
   set final time                = 2.0
-  set output granularity        = 2.0
+  set timer granularity         = 2.0
+
   set terminal update interval  = 0
 end
 
