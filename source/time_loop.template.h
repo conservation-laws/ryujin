@@ -7,7 +7,6 @@
 
 #include "checkpointing.h"
 #include "scope.h"
-#include "solution_transfer.h"
 #include "time_loop.h"
 #include "version_info.h"
 
@@ -74,38 +73,34 @@ namespace ryujin
     t_final_ = Number(5.);
     add_parameter("final time", t_final_, "Final time");
 
-    add_parameter("refinement timepoints",
-                  t_refinements_,
-                  "List of points in (simulation) time at which the mesh will "
-                  "be globally refined");
-
-    output_granularity_ = Number(0.01);
-    add_parameter(
-        "output granularity",
-        output_granularity_,
-        "The output granularity specifies the time interval after which output "
-        "routines are run. Further modified by \"*_multiplier\" options");
+    timer_granularity_ = Number(0.01);
+    add_parameter("timer granularity",
+                  timer_granularity_,
+                  "The timer granularity specifies the time interval after "
+                  "which compute, output, postprocessing, and mesh adaptation "
+                  "routines are run. This \"baseline tick\" is further "
+                  "modified by the corresponding \"*_multiplier\" options");
 
     enable_checkpointing_ = false;
     add_parameter(
         "enable checkpointing",
         enable_checkpointing_,
-        "Write out checkpoints to resume an interrupted computation "
-        "at output granularity intervals. The frequency is determined by "
-        "\"output granularity\" times \"output checkpoint multiplier\"");
+        "Write out checkpoints to resume an interrupted computation at timer "
+        "granularity intervals. The frequency is determined by \"timer "
+        "granularity\" and \"timer checkpoint multiplier\"");
 
     enable_output_full_ = false;
     add_parameter("enable output full",
                   enable_output_full_,
                   "Write out full pvtu records. The frequency is determined by "
-                  "\"output granularity\" times \"output full multiplier\"");
+                  "\"timer granularity\" and \"timer output full multiplier\"");
 
     enable_output_levelsets_ = false;
     add_parameter(
         "enable output levelsets",
         enable_output_levelsets_,
         "Write out levelsets pvtu records. The frequency is determined by "
-        "\"output granularity\" times \"output levelsets multiplier\"");
+        "\"timer granularity\" and \"timer output levelsets multiplier\"");
 
     enable_compute_error_ = false;
     add_parameter("enable compute error",
@@ -119,32 +114,47 @@ namespace ryujin
         "enable compute quantities",
         enable_compute_quantities_,
         "Flag to control whether we compute quantities of interest. The "
-        "frequency how often quantities are logged is determined by \"output "
-        "granularity\" times \"output quantities multiplier\"");
+        "frequency how often quantities are logged is determined by \"timer "
+        "granularity\" and \"timer compute quantities multiplier\"");
 
-    output_checkpoint_multiplier_ = 1;
-    add_parameter("output checkpoint multiplier",
-                  output_checkpoint_multiplier_,
-                  "Multiplicative modifier applied to \"output granularity\" "
+    enable_mesh_adaptivity_ = false;
+    add_parameter(
+        "enable mesh adaptivity",
+        enable_mesh_adaptivity_,
+        "Flag to control whether we use an adaptive mesh refinement strategy. "
+        "The frequency how we adapt the mesh is determined by \"timer "
+        "granularity\" and \"timer mesh refinement multiplier\"");
+
+    timer_checkpoint_multiplier_ = 1;
+    add_parameter("timer checkpoint multiplier",
+                  timer_checkpoint_multiplier_,
+                  "Multiplicative modifier applied to \"timer granularity\" "
                   "that determines the checkpointing granularity");
 
-    output_full_multiplier_ = 1;
-    add_parameter("output full multiplier",
-                  output_full_multiplier_,
-                  "Multiplicative modifier applied to \"output granularity\" "
+    timer_output_full_multiplier_ = 1;
+    add_parameter("timer output full multiplier",
+                  timer_output_full_multiplier_,
+                  "Multiplicative modifier applied to \"timer granularity\" "
                   "that determines the full pvtu writeout granularity");
 
-    output_levelsets_multiplier_ = 1;
-    add_parameter("output levelsets multiplier",
-                  output_levelsets_multiplier_,
-                  "Multiplicative modifier applied to \"output granularity\" "
+    timer_output_levelsets_multiplier_ = 1;
+    add_parameter("timer output levelsets multiplier",
+                  timer_output_levelsets_multiplier_,
+                  "Multiplicative modifier applied to \"timer granularity\" "
                   "that determines the levelsets pvtu writeout granularity");
 
-    output_quantities_multiplier_ = 1;
+    timer_compute_quantities_multiplier_ = 1;
     add_parameter(
-        "output quantities multiplier",
-        output_quantities_multiplier_,
-        "Multiplicative modifier applied to \"output granularity\" that "
+        "timer compute quantities multiplier",
+        timer_compute_quantities_multiplier_,
+        "Multiplicative modifier applied to \"timer granularity\" that "
+        "determines the writeout granularity for quantities of interest");
+
+    timer_mesh_adaptivity_multiplier_ = 1;
+    add_parameter(
+        "timer mesh adaptivity multiplier",
+        timer_compute_quantities_multiplier_,
+        "Multiplicative modifier applied to \"timer granularity\" that "
         "determines the writeout granularity for quantities of interest");
 
     std::copy(std::begin(View::component_names),
@@ -194,22 +204,24 @@ namespace ryujin
     std::cout << "TimeLoop<dim, Number>::run()" << std::endl;
 #endif
 
-    const bool write_output_files = enable_checkpointing_ ||
-                                    enable_output_full_ ||
-                                    enable_output_levelsets_;
+    /*
+     * Attach log file and record runtime parameters:
+     */
 
-    /* Attach log file: */
     if (mpi_rank_ == 0)
       logfile_.open(base_name_ + ".log");
 
     print_parameters(logfile_);
 
+    /*
+     * Prepare data structures:
+     */
+
     Number t = 0.;
     unsigned int output_cycle = 0;
     StateVector state_vector;
 
-    /* Prepare data structures: */
-
+    /* Create a small lambda for preparing compute kernels: */
     const auto prepare_compute_kernels = [&]() {
       offline_data_.prepare(problem_dimension, n_precomputed_values);
       hyperbolic_module_.prepare();
@@ -241,22 +253,13 @@ namespace ryujin
             offline_data_, base_name_, U, t, output_cycle, mpi_communicator_);
 
         if (resume_at_time_zero_) {
-          /*
-           * Reset the current time t and the output cycle count to zero:
-           */
+          /* Reset the current time t and the output cycle count to zero: */
           t = 0.;
           output_cycle = 0;
         }
 
-        /* Workaround: Reinitialize Quantities with correct output cycle: */
+        /* Workaround: Reinitialize quantities with correct output cycle: */
         quantities_.prepare(base_name_, output_cycle);
-
-        /* Remove outdated refinement timestamps: */
-        const auto new_end =
-            std::remove_if(t_refinements_.begin(),
-                           t_refinements_.end(),
-                           [&](const Number &t_ref) { return (t >= t_ref); });
-        t_refinements_.erase(new_end, t_refinements_.end());
 
       } else {
 
@@ -270,21 +273,6 @@ namespace ryujin
         Vectors::reinit_state_vector<Description>(state_vector, offline_data_);
         std::get<0>(state_vector) =
             initial_values_.interpolate_hyperbolic_vector();
-#ifdef DEBUG
-        /* Poison constrained degrees of freedom: */
-        {
-          const unsigned int n_owned = offline_data_.n_locally_owned();
-          const auto &partitioner = offline_data_.scalar_partitioner();
-          auto &U = std::get<0>(state_vector);
-          for (unsigned int i = 0; i < n_owned; ++i) {
-            if (offline_data_.affine_constraints().is_constrained(
-                    partitioner->local_to_global(i)))
-              U.write_tensor(dealii::Tensor<1, dim + 2, Number>() *
-                                 std::numeric_limits<Number>::signaling_NaN(),
-                             i);
-          }
-        }
-#endif
       }
     }
 
@@ -293,7 +281,9 @@ namespace ryujin
                                        ? std::numeric_limits<Number>::max()
                                        : std::numeric_limits<Number>::lowest());
 
-    /* Loop: */
+    /*
+     * The honorable main loop:
+     */
 
     print_info("entering main loop");
     computing_timer_["time loop"].start();
@@ -314,24 +304,28 @@ namespace ryujin
 
       /* Perform output: */
 
-      if (t >= output_cycle * output_granularity_) {
-        if (write_output_files) {
-          hyperbolic_module_.prepare_state_vector(state_vector, t);
-          output(state_vector, base_name_ + "-solution", t, output_cycle);
+      if (t >= output_cycle * timer_granularity_) {
+        output(state_vector, base_name_ + "-solution", t, output_cycle);
 
-          if (enable_compute_error_) {
-            StateVector analytic;
+        if (enable_compute_error_) {
+          StateVector analytic;
+          {
+            /*
+             * FIXME: We interpolate the analytic solution at every timer
+             * tick. If we happen to actually not output anything then this
+             * is terribly inefficient...
+             */
+            Scope scope(computing_timer_,
+                        "time step [X] 0 - interpolate analytic solution");
             Vectors::reinit_state_vector<Description>(analytic, offline_data_);
             std::get<0>(analytic) =
                 initial_values_.interpolate_hyperbolic_vector(t);
-            hyperbolic_module_.prepare_state_vector(analytic, t);
-            output(
-                analytic, base_name_ + "-analytic_solution", t, output_cycle);
           }
+          output(analytic, base_name_ + "-analytic_solution", t, output_cycle);
         }
 
         if (enable_compute_quantities_ &&
-            (output_cycle % output_quantities_multiplier_ == 0) &&
+            (output_cycle % timer_compute_quantities_multiplier_ == 0) &&
             (output_cycle > 0)) {
           Scope scope(computing_timer_,
                       "time step [X] 2 - write out quantities");
@@ -341,63 +335,38 @@ namespace ryujin
         ++output_cycle;
       }
 
-      /* Perform global refinement: */
-
-      const auto new_end = std::remove_if(
-          t_refinements_.begin(),
-          t_refinements_.end(),
-          [&](const Number &t_ref) {
-            if (t < t_ref)
-              return false;
-
-            computing_timer_["time loop"].stop();
-            Scope scope(computing_timer_, "(re)initialize data structures");
-
-            print_info("performing global refinement");
-
-            SolutionTransfer<Description, dim, Number> solution_transfer(
-                offline_data_, hyperbolic_system_);
-
-            auto &triangulation = discretization_.triangulation();
-            for (auto &cell : triangulation.active_cell_iterators())
-              cell->set_refine_flag();
-            triangulation.prepare_coarsening_and_refinement();
-
-            solution_transfer.prepare_for_interpolation(state_vector);
-
-            triangulation.execute_coarsening_and_refinement();
-            prepare_compute_kernels();
-
-            solution_transfer.interpolate(state_vector);
-
-            computing_timer_["time loop"].start();
-            return true;
-          });
-      t_refinements_.erase(new_end, t_refinements_.end());
-
-      /* Break if we have reached the final time: */
+      /*
+       * Break if we have reached the final time:
+       */
 
       if (t >= t_final_)
         break;
 
-      /* Do a time step: */
+      /*
+       * Do a time step:
+       */
 
       const auto tau = time_integrator_.step(state_vector, t);
       t += tau;
 
-      /* Print and record cycle statistics: */
+      /*
+       * Print and record cycle statistics:
+       */
 
-      const bool write_to_log_file = (t >= output_cycle * output_granularity_);
+      const bool write_to_log_file = (t >= output_cycle * timer_granularity_);
+
+      /* Synchronize average Wall time over all MPI ranks: */
       const auto wall_time = computing_timer_["time loop"].wall_time();
-      const auto data =
-          Utilities::MPI::min_max_avg(wall_time, mpi_communicator_);
+      const auto average =
+          Utilities::MPI::min_max_avg(wall_time, mpi_communicator_).avg;
       const bool update_terminal =
-          (data.avg >= last_terminal_output + terminal_update_interval_);
+          (average >= last_terminal_output + terminal_update_interval_);
+
       if (terminal_update_interval_ != Number(0.)) {
         if (write_to_log_file || update_terminal) {
           print_cycle_statistics(
               cycle, t, output_cycle, /*logfile*/ write_to_log_file);
-          last_terminal_output = data.avg;
+          last_terminal_output = average;
         }
       }
     } /* end of loop */
@@ -415,7 +384,6 @@ namespace ryujin
 
     if (enable_compute_error_) {
       /* Output final error: */
-      hyperbolic_module_.prepare_state_vector(state_vector, t);
       compute_error(state_vector, t);
     }
 
@@ -426,12 +394,15 @@ namespace ryujin
 
 
   template <typename Description, int dim, typename Number>
-  void TimeLoop<Description, dim, Number>::compute_error(
-      const StateVector &state_vector, const Number t)
+  void
+  TimeLoop<Description, dim, Number>::compute_error(StateVector &state_vector,
+                                                    const Number t)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeLoop<dim, Number>::compute_error()" << std::endl;
 #endif
+
+    hyperbolic_module_.prepare_state_vector(state_vector, t);
 
     Vector<Number> difference_per_cell(
         discretization_.triangulation().n_active_cells());
@@ -567,26 +538,28 @@ namespace ryujin
 
 
   template <typename Description, int dim, typename Number>
-  void
-  TimeLoop<Description, dim, Number>::output(const StateVector &state_vector,
-                                             const std::string &name,
-                                             const Number t,
-                                             const unsigned int cycle)
+  void TimeLoop<Description, dim, Number>::output(StateVector &state_vector,
+                                                  const std::string &name,
+                                                  const Number t,
+                                                  const unsigned int cycle)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeLoop<dim, Number>::output(t = " << t << ")" << std::endl;
 #endif
 
     const bool do_full_output =
-        (cycle % output_full_multiplier_ == 0) && enable_output_full_;
+        (cycle % timer_output_full_multiplier_ == 0) && enable_output_full_;
     const bool do_levelsets =
-        (cycle % output_levelsets_multiplier_ == 0) && enable_output_levelsets_;
+        (cycle % timer_output_levelsets_multiplier_ == 0) &&
+        enable_output_levelsets_;
     const bool do_checkpointing =
-        (cycle % output_checkpoint_multiplier_ == 0) && enable_checkpointing_;
+        (cycle % timer_checkpoint_multiplier_ == 0) && enable_checkpointing_;
 
     /* There is nothing to do: */
     if (!(do_full_output || do_levelsets || do_checkpointing))
       return;
+
+    hyperbolic_module_.prepare_state_vector(state_vector, t);
 
     /* Data output: */
     if (do_full_output || do_levelsets) {
@@ -1093,7 +1066,7 @@ namespace ryujin
            << vectorization_name                                         //
            << ">\n             Last output cycle "                       //
            << output_cycle - 1                                           //
-           << " at t = " << output_granularity_ * (output_cycle - 1)     //
+           << " at t = " << timer_granularity_ * (output_cycle - 1)      //
            << " (terminal update interval " << terminal_update_interval_ //
            << "s)\n";
 

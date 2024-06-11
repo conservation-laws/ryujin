@@ -15,14 +15,14 @@
 subsection A - TimeLoop
   set basename             = smooth_wave-erk33
 
-  set enable output full   = true
-
   set enable compute error = true
   set error normalize      = true
   set error quantities     = rho, m, E
 
+  set enable output full   = true
+
   set final time           = 0.60
-  set output granularity   = 0.60
+  set timer granularity    = 0.60
 end
 
 

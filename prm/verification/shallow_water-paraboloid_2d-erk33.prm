@@ -18,14 +18,14 @@
 subsection A - TimeLoop
   set basename             = paraboloid_2d-erk33
 
-  set enable output full   = true
-
   set enable compute error = true
   set error normalize      = true
   set error quantities     = h
 
+  set enable output full   = true
+
   set final time           = 13.45710440
-  set output granularity   = 13.45710440
+  set timer granularity    = 13.45710440
 end
 
 subsection B - Equation

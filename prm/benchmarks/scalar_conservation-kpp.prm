@@ -16,12 +16,12 @@
 
 
 subsection A - TimeLoop
-  set basename                      = kpp
+  set basename                        = kpp
 
-  set enable output full            = true
+  set enable output full              = true
 
-  set final time                    = 1.00
-  set output granularity            = 1.00
+  set final time                      = 1.00
+  set timer granularity               = 1.00
 end
 
 

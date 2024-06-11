@@ -1,9 +1,10 @@
 subsection A - TimeLoop
-  set basename                     = wc-blast-ideal
-  set enable output full           = true
-  set final time                   = 0.038
-  set output granularity           = 0.001
-  set terminal update interval     = 5
+  set basename           = wc-blast-ideal
+
+  set enable output full = true
+
+  set final time         = 0.038
+  set timer granularity  = 0.001
 end
 
 subsection B - Equation

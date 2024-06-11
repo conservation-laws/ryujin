@@ -124,7 +124,7 @@ namespace ryujin
     /**
      * A structure that holds two Signals for equations:
      *  - one for creating and running the appropriate timeloop
-     *  - the other signal is used to create default parameter files.
+     *  - the other signal is used for creating default parameter files.
      */
     struct Signals {
       boost::signals2::signal<void()> create_parameter_files;
@@ -161,7 +161,7 @@ namespace ryujin
 
   /**
    * Create default parameter files for the specified equation Description,
-   * dimension and number type. This function is called form the respective
+   * dimension and number type. This function is called from the respective
    * equation driver.
    */
   template <typename Description, int dim, typename Number>
@@ -207,8 +207,8 @@ namespace ryujin
 
 
   /**
-   * A small Dispatch struct templated by an equation descriptions that
-   * registers the call backs.
+   * A small Dispatch struct templated in Description that registers the
+   * call backs.
    */
   template <typename Description, typename Number>
   struct Dispatch {

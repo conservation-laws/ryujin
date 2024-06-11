@@ -19,12 +19,12 @@
 
 
 subsection A - TimeLoop
-  set basename                     = mach10-dbmr
+  set basename           = mach10-dbmr
 
-  set enable output full           = true
+  set enable output full = true
 
-  set final time                   = 0.20
-  set output granularity           = 0.01
+  set final time         = 0.20
+  set timer granularity  = 0.01
 end
 
 

@@ -23,13 +23,13 @@
 subsection A - TimeLoop
   set basename             = linear_transport-time_stepping
 
-  set enable output full   = false
-
   set enable compute error = true
   set error normalize      = true
 
+  set enable output full   = false
+
   set final time           = 2.00
-  set output granularity   = 2.00
+  set timer granularity    = 2.00
 end
 
 

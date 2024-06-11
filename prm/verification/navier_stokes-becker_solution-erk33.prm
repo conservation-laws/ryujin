@@ -14,14 +14,14 @@
 subsection A - TimeLoop
   set basename             = becker_solution-erk33
 
-  set enable output full   = true
-
   set enable compute error = true
   set error normalize      = true
   set error quantities     = rho, m, E
 
+  set enable output full   = true
+
   set final time           = 2.00
-  set output granularity   = 2.00
+  set timer granularity    = 2.00
 end
 
 

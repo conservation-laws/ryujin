@@ -104,10 +104,10 @@ int main(int argc, char *argv[])
   if (!std::filesystem::exists(parameter_file)) {
     if (dealii::Utilities::MPI::this_mpi_process(mpi_communicator) == 0) {
       std::cout << "[INFO] Default parameter file »" << parameter_file
-                << "« not found.\n[INFO] Creating template parameter files..."
-                << std::endl;
+                << "« not found.\n[INFO] Creating template parameter files for "
+                << "you. Please modify and rename one of the templates to »"
+                << parameter_file << "«." << std::endl;
       ryujin::EquationDispatch::create_parameter_files();
-      std::filesystem::copy("default_parameters-euler-2d.prm", parameter_file);
     }
 
     MPI_Barrier(mpi_communicator);
