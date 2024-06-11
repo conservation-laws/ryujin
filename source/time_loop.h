@@ -118,19 +118,20 @@ namespace ryujin
     std::string base_name_;
 
     Number t_final_;
-
-    Number output_granularity_;
+    Number timer_granularity_;
 
     bool enable_checkpointing_;
     bool enable_output_full_;
     bool enable_output_levelsets_;
     bool enable_compute_error_;
     bool enable_compute_quantities_;
+    bool enable_mesh_adaptivity_;
 
-    unsigned int output_checkpoint_multiplier_;
-    unsigned int output_full_multiplier_;
-    unsigned int output_levelsets_multiplier_;
-    unsigned int output_quantities_multiplier_;
+    unsigned int timer_checkpoint_multiplier_;
+    unsigned int timer_output_full_multiplier_;
+    unsigned int timer_output_levelsets_multiplier_;
+    unsigned int timer_compute_quantities_multiplier_;
+    unsigned int timer_mesh_adaptivity_multiplier_;
 
     std::vector<std::string> error_quantities_;
     bool error_normalize_;

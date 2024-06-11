@@ -73,33 +73,34 @@ namespace ryujin
     t_final_ = Number(5.);
     add_parameter("final time", t_final_, "Final time");
 
-    output_granularity_ = Number(0.01);
-    add_parameter(
-        "output granularity",
-        output_granularity_,
-        "The output granularity specifies the time interval after which output "
-        "routines are run. Further modified by \"*_multiplier\" options");
+    timer_granularity_ = Number(0.01);
+    add_parameter("timer granularity",
+                  timer_granularity_,
+                  "The timer granularity specifies the time interval after "
+                  "which compute, output, postprocessing, and mesh adaptation "
+                  "routines are run. This \"baseline tick\" is further "
+                  "modified by the corresponding \"*_multiplier\" options");
 
     enable_checkpointing_ = false;
     add_parameter(
         "enable checkpointing",
         enable_checkpointing_,
-        "Write out checkpoints to resume an interrupted computation "
-        "at output granularity intervals. The frequency is determined by "
-        "\"output granularity\" times \"output checkpoint multiplier\"");
+        "Write out checkpoints to resume an interrupted computation at timer "
+        "granularity intervals. The frequency is determined by \"timer "
+        "granularity\" and \"timer checkpoint multiplier\"");
 
     enable_output_full_ = false;
     add_parameter("enable output full",
                   enable_output_full_,
                   "Write out full pvtu records. The frequency is determined by "
-                  "\"output granularity\" times \"output full multiplier\"");
+                  "\"timer granularity\" and \"timer output full multiplier\"");
 
     enable_output_levelsets_ = false;
     add_parameter(
         "enable output levelsets",
         enable_output_levelsets_,
         "Write out levelsets pvtu records. The frequency is determined by "
-        "\"output granularity\" times \"output levelsets multiplier\"");
+        "\"timer granularity\" and \"timer output levelsets multiplier\"");
 
     enable_compute_error_ = false;
     add_parameter("enable compute error",
@@ -113,32 +114,47 @@ namespace ryujin
         "enable compute quantities",
         enable_compute_quantities_,
         "Flag to control whether we compute quantities of interest. The "
-        "frequency how often quantities are logged is determined by \"output "
-        "granularity\" times \"output quantities multiplier\"");
+        "frequency how often quantities are logged is determined by \"timer "
+        "granularity\" and \"timer compute quantities multiplier\"");
 
-    output_checkpoint_multiplier_ = 1;
-    add_parameter("output checkpoint multiplier",
-                  output_checkpoint_multiplier_,
-                  "Multiplicative modifier applied to \"output granularity\" "
+    enable_mesh_adaptivity_ = false;
+    add_parameter(
+        "enable mesh adaptivity",
+        enable_mesh_adaptivity_,
+        "Flag to control whether we use an adaptive mesh refinement strategy. "
+        "The frequency how we adapt the mesh is determined by \"timer "
+        "granularity\" and \"timer mesh refinement multiplier\"");
+
+    timer_checkpoint_multiplier_ = 1;
+    add_parameter("timer checkpoint multiplier",
+                  timer_checkpoint_multiplier_,
+                  "Multiplicative modifier applied to \"timer granularity\" "
                   "that determines the checkpointing granularity");
 
-    output_full_multiplier_ = 1;
-    add_parameter("output full multiplier",
-                  output_full_multiplier_,
-                  "Multiplicative modifier applied to \"output granularity\" "
+    timer_output_full_multiplier_ = 1;
+    add_parameter("timer output full multiplier",
+                  timer_output_full_multiplier_,
+                  "Multiplicative modifier applied to \"timer granularity\" "
                   "that determines the full pvtu writeout granularity");
 
-    output_levelsets_multiplier_ = 1;
-    add_parameter("output levelsets multiplier",
-                  output_levelsets_multiplier_,
-                  "Multiplicative modifier applied to \"output granularity\" "
+    timer_output_levelsets_multiplier_ = 1;
+    add_parameter("timer output levelsets multiplier",
+                  timer_output_levelsets_multiplier_,
+                  "Multiplicative modifier applied to \"timer granularity\" "
                   "that determines the levelsets pvtu writeout granularity");
 
-    output_quantities_multiplier_ = 1;
+    timer_compute_quantities_multiplier_ = 1;
     add_parameter(
-        "output quantities multiplier",
-        output_quantities_multiplier_,
-        "Multiplicative modifier applied to \"output granularity\" that "
+        "timer compute quantities multiplier",
+        timer_compute_quantities_multiplier_,
+        "Multiplicative modifier applied to \"timer granularity\" that "
+        "determines the writeout granularity for quantities of interest");
+
+    timer_mesh_adaptivity_multiplier_ = 1;
+    add_parameter(
+        "timer mesh adaptivity multiplier",
+        timer_compute_quantities_multiplier_,
+        "Multiplicative modifier applied to \"timer granularity\" that "
         "determines the writeout granularity for quantities of interest");
 
     std::copy(std::begin(View::component_names),
@@ -301,8 +317,8 @@ namespace ryujin
 
       /* Perform output: */
 
-      if (t >= output_cycle * output_granularity_) {
-        if (write_output_files) {
+      if (t >= output_cycle * timer_granularity_) {
+        if (write_output_files) { // WTF
           hyperbolic_module_.prepare_state_vector(state_vector, t);
           output(state_vector, base_name_ + "-solution", t, output_cycle);
 
@@ -318,7 +334,7 @@ namespace ryujin
         }
 
         if (enable_compute_quantities_ &&
-            (output_cycle % output_quantities_multiplier_ == 0) &&
+            (output_cycle % timer_compute_quantities_multiplier_ == 0) &&
             (output_cycle > 0)) {
           Scope scope(computing_timer_,
                       "time step [X] 2 - write out quantities");
@@ -339,7 +355,7 @@ namespace ryujin
 
       /* Print and record cycle statistics: */
 
-      const bool write_to_log_file = (t >= output_cycle * output_granularity_);
+      const bool write_to_log_file = (t >= output_cycle * timer_granularity_);
       const auto wall_time = computing_timer_["time loop"].wall_time();
       const auto data =
           Utilities::MPI::min_max_avg(wall_time, mpi_communicator_);
@@ -530,11 +546,12 @@ namespace ryujin
 #endif
 
     const bool do_full_output =
-        (cycle % output_full_multiplier_ == 0) && enable_output_full_;
+        (cycle % timer_output_full_multiplier_ == 0) && enable_output_full_;
     const bool do_levelsets =
-        (cycle % output_levelsets_multiplier_ == 0) && enable_output_levelsets_;
+        (cycle % timer_output_levelsets_multiplier_ == 0) &&
+        enable_output_levelsets_;
     const bool do_checkpointing =
-        (cycle % output_checkpoint_multiplier_ == 0) && enable_checkpointing_;
+        (cycle % timer_checkpoint_multiplier_ == 0) && enable_checkpointing_;
 
     /* There is nothing to do: */
     if (!(do_full_output || do_levelsets || do_checkpointing))
@@ -1045,7 +1062,7 @@ namespace ryujin
            << vectorization_name                                         //
            << ">\n             Last output cycle "                       //
            << output_cycle - 1                                           //
-           << " at t = " << output_granularity_ * (output_cycle - 1)     //
+           << " at t = " << timer_granularity_ * (output_cycle - 1)      //
            << " (terminal update interval " << terminal_update_interval_ //
            << "s)\n";
 
