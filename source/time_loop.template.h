@@ -217,7 +217,7 @@ namespace ryujin
      */
 
     Number t = 0.;
-    unsigned int output_cycle = 0;
+    unsigned int timer_cycle = 0;
     StateVector state_vector;
 
     /* Create a small lambda for preparing compute kernels: */
@@ -229,7 +229,7 @@ namespace ryujin
       postprocessor_.prepare();
       vtu_output_.prepare();
       /* We skip the first output cycle for quantities: */
-      quantities_.prepare(base_name_, output_cycle == 0 ? 1 : output_cycle);
+      quantities_.prepare(base_name_, timer_cycle == 0 ? 1 : timer_cycle);
       print_mpi_partition(logfile_);
     };
 
@@ -249,16 +249,16 @@ namespace ryujin
         Vectors::reinit_state_vector<Description>(state_vector, offline_data_);
         auto &U = std::get<0>(state_vector);
         Checkpointing::load_state_vector(
-            offline_data_, base_name_, U, t, output_cycle, mpi_communicator_);
+            offline_data_, base_name_, U, t, timer_cycle, mpi_communicator_);
 
         if (resume_at_time_zero_) {
           /* Reset the current time t and the output cycle count to zero: */
           t = 0.;
-          output_cycle = 0;
+          timer_cycle = 0;
         }
 
         /* Workaround: Reinitialize quantities with correct output cycle: */
-        quantities_.prepare(base_name_, output_cycle);
+        quantities_.prepare(base_name_, timer_cycle);
 
       } else {
 
@@ -303,8 +303,8 @@ namespace ryujin
 
       /* Perform output: */
 
-      if (t >= output_cycle * timer_granularity_) {
-        output(state_vector, base_name_ + "-solution", t, output_cycle);
+      if (t >= timer_cycle * timer_granularity_) {
+        output(state_vector, base_name_ + "-solution", t, timer_cycle);
 
         if (enable_compute_error_) {
           StateVector analytic;
@@ -320,18 +320,18 @@ namespace ryujin
             std::get<0>(analytic) =
                 initial_values_.interpolate_hyperbolic_vector(t);
           }
-          output(analytic, base_name_ + "-analytic_solution", t, output_cycle);
+          output(analytic, base_name_ + "-analytic_solution", t, timer_cycle);
         }
 
         if (enable_compute_quantities_ &&
-            (output_cycle % timer_compute_quantities_multiplier_ == 0) &&
-            (output_cycle > 0)) {
+            (timer_cycle % timer_compute_quantities_multiplier_ == 0) &&
+            (timer_cycle > 0)) {
           Scope scope(computing_timer_,
                       "time step [X] 2 - write out quantities");
-          quantities_.write_out(state_vector, t, output_cycle);
+          quantities_.write_out(state_vector, t, timer_cycle);
         }
 
-        ++output_cycle;
+        ++timer_cycle;
       }
 
       /*
@@ -352,7 +352,7 @@ namespace ryujin
        * Print and record cycle statistics:
        */
 
-      const bool write_to_log_file = (t >= output_cycle * timer_granularity_);
+      const bool write_to_log_file = (t >= timer_cycle * timer_granularity_);
 
       /* Synchronize average Wall time over all MPI ranks: */
       const auto wall_time = computing_timer_["time loop"].wall_time();
@@ -364,7 +364,7 @@ namespace ryujin
       if (terminal_update_interval_ != Number(0.)) {
         if (write_to_log_file || update_terminal) {
           print_cycle_statistics(
-              cycle, t, output_cycle, /*logfile*/ write_to_log_file);
+              cycle, t, timer_cycle, /*logfile*/ write_to_log_file);
           last_terminal_output = average;
         }
       }
@@ -378,7 +378,7 @@ namespace ryujin
     if (terminal_update_interval_ != Number(0.)) {
       /* Write final timing statistics to screen and logfile: */
       print_cycle_statistics(
-          cycle, t, output_cycle, /*logfile*/ true, /*final*/ true);
+          cycle, t, timer_cycle, /*logfile*/ true, /*final*/ true);
     }
 
     if (enable_compute_error_) {
@@ -1013,7 +1013,7 @@ namespace ryujin
   void TimeLoop<Description, dim, Number>::print_cycle_statistics(
       unsigned int cycle,
       Number t,
-      unsigned int output_cycle,
+      unsigned int timer_cycle,
       bool write_to_logfile,
       bool final_time)
   {
@@ -1064,8 +1064,8 @@ namespace ryujin
 #endif
            << vectorization_name                                         //
            << ">\n             Last output cycle "                       //
-           << output_cycle - 1                                           //
-           << " at t = " << timer_granularity_ * (output_cycle - 1)      //
+           << timer_cycle - 1                                            //
+           << " at t = " << timer_granularity_ * (timer_cycle - 1)       //
            << " (terminal update interval " << terminal_update_interval_ //
            << "s)\n";
 
