@@ -566,7 +566,7 @@ namespace ryujin
 
     {
       Scope scope(computing_timer_,
-                  scoped_name("synchronization barrier", false));
+                  "time step [H] _ - synchronization barriers");
 
       /* MPI Barrier: */
       tau_max.store(Utilities::MPI::min(tau_max.load(), mpi_communicator_));
@@ -1181,16 +1181,19 @@ namespace ryujin
       RYUJIN_PARALLEL_REGION_END
     } /* limiter_iter_ */
 
-    /* Update sources: */
-    using View =
-        typename Description::template HyperbolicSystemView<dim, Number>;
-
     CALLGRIND_STOP_INSTRUMENTATION;
 
-    /* Do we have to restart? */
+    /*
+     * Do we have to restart?
+     */
 
-    restart_needed.store(
-        Utilities::MPI::logical_or(restart_needed.load(), mpi_communicator_));
+    {
+      Scope scope(computing_timer_,
+                  "time step [H] _ - synchronization barriers");
+
+      restart_needed.store(
+          Utilities::MPI::logical_or(restart_needed.load(), mpi_communicator_));
+    }
 
     if (restart_needed) {
       switch (id_violation_strategy_) {

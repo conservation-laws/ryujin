@@ -418,16 +418,23 @@ namespace ryujin
         LIKWID_MARKER_STOP("time_step_parabolic_1");
       }
 
-      /* Compute the global minimum of the internal energy: */
+      Number e_min_old;
 
-      // .begin() and .end() denote the locally owned index range:
-      auto e_min_old =
-          *std::min_element(internal_energy_.begin(), internal_energy_.end());
-      e_min_old = Utilities::MPI::min(e_min_old, mpi_communicator_);
+      {
+        Scope scope(computing_timer_,
+                    "time step [P] _ - synchronization barriers");
 
-      // FIXME: create a meaningful relaxation based on global mesh size min.
-      constexpr Number eps = std::numeric_limits<Number>::epsilon();
-      e_min_old *= (1. - 1000. * eps);
+        /* Compute the global minimum of the internal energy: */
+
+        // .begin() and .end() denote the locally owned index range:
+        e_min_old =
+            *std::min_element(internal_energy_.begin(), internal_energy_.end());
+        e_min_old = Utilities::MPI::min(e_min_old, mpi_communicator_);
+
+        // FIXME: create a meaningful relaxation based on global mesh size min.
+        constexpr Number eps = std::numeric_limits<Number>::epsilon();
+        e_min_old *= (1. - 1000. * eps);
+      }
 
       /*
        * Step 1: Solve velocity update:
@@ -751,6 +758,9 @@ namespace ryujin
          * Check for local minimum principle on internal energy:
          */
         {
+          Scope scope(computing_timer_,
+                      "time step [P] _ - synchronization barriers");
+
           // .begin() and .end() denote the locally owned index range:
           auto e_min_new = *std::min_element(internal_energy_.begin(),
                                              internal_energy_.end());
