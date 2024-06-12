@@ -190,6 +190,12 @@ namespace ryujin
        * Fix up "equation" entry:
        */
       prm.enter_subsection("B - Equation");
+      prm.declare_entry("dimension",
+                        std::to_string(dim),
+                        dealii::Patterns::Integer(),
+                        "The spatial dimension");
+      prm.declare_entry(
+          "equation", name, dealii::Patterns::Anything(), "The PDE system");
       prm.set("dimension", std::to_string(dim));
       prm.set("equation", name);
       prm.leave_subsection();
