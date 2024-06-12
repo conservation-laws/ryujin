@@ -44,6 +44,7 @@ namespace ryujin
     //@{
 
     using HyperbolicSystem = typename Description::HyperbolicSystem;
+    using ParabolicSystem = typename Description::ParabolicSystem;
 
     using View =
         typename Description::template HyperbolicSystemView<dim, Number>;
@@ -72,8 +73,9 @@ namespace ryujin
      * Constructor.
      */
     Postprocessor(const MPI_Comm &mpi_communicator,
-                  const HyperbolicSystem &hyperbolic_system,
                   const OfflineData<dim, Number> &offline_data,
+                  const HyperbolicSystem &hyperbolic_system,
+                  const ParabolicSystem &parabolic_system,
                   const std::string &subsection = "/Postprocessor");
 
     /**
@@ -152,8 +154,9 @@ namespace ryujin
 
     const MPI_Comm &mpi_communicator_;
 
-    dealii::SmartPointer<const HyperbolicSystem> hyperbolic_system_;
     dealii::SmartPointer<const OfflineData<dim, Number>> offline_data_;
+    dealii::SmartPointer<const HyperbolicSystem> hyperbolic_system_;
+    dealii::SmartPointer<const ParabolicSystem> parabolic_system_;
 
     std::vector<std::string> component_names_;
     std::vector<std::pair<bool /*primitive*/, unsigned int>> schlieren_indices_;

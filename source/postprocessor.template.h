@@ -18,13 +18,15 @@ namespace ryujin
   template <typename Description, int dim, typename Number>
   Postprocessor<Description, dim, Number>::Postprocessor(
       const MPI_Comm &mpi_communicator,
-      const HyperbolicSystem &hyperbolic_system,
       const OfflineData<dim, Number> &offline_data,
+      const HyperbolicSystem &hyperbolic_system,
+      const ParabolicSystem &parabolic_system,
       const std::string &subsection /*= "Postprocessor"*/)
       : ParameterAcceptor(subsection)
       , mpi_communicator_(mpi_communicator)
-      , hyperbolic_system_(&hyperbolic_system)
       , offline_data_(&offline_data)
+      , hyperbolic_system_(&hyperbolic_system)
+      , parabolic_system_(&parabolic_system)
   {
     beta_ = 10.;
     add_parameter("schlieren beta",

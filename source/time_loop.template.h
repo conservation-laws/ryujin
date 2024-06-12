@@ -50,8 +50,9 @@ namespace ryujin
                          parabolic_module_,
                          "/H - TimeIntegrator")
       , postprocessor_(mpi_communicator_,
-                       hyperbolic_system_,
                        offline_data_,
+                       hyperbolic_system_,
+                       parabolic_system_,
                        "/I - VTUOutput")
       , vtu_output_(mpi_communicator_,
                     offline_data_,
@@ -59,8 +60,9 @@ namespace ryujin
                     postprocessor_,
                     "/I - VTUOutput")
       , quantities_(mpi_communicator_,
-                    hyperbolic_system_,
                     offline_data_,
+                    hyperbolic_system_,
+                    parabolic_system_,
                     "/J - Quantities")
       , mpi_rank_(dealii::Utilities::MPI::this_mpi_process(mpi_communicator_))
       , n_mpi_processes_(
