@@ -132,4 +132,5 @@ Contributors
  - Seth Gerberding ([@Gerbeset](https://github.com/Gerbeset)), Texas A&M University, TX, USA
  - David Pecoraro ([@ChrisPec27](https://github.com/ChrisPec27)), Texas A&M University, TX, USA
  - Madison Sheridan ([@Helblindi](https://github.com/Helblindi)), Texas A&M University, TX, USA
+ - Gregory Christian ([@gregorychristian](https://github.com/gregorychristian), Imperial College London, UK
 
