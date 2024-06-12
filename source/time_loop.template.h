@@ -49,6 +49,11 @@ namespace ryujin
                          hyperbolic_module_,
                          parabolic_module_,
                          "/H - TimeIntegrator")
+      , mesh_adaptor_(mpi_communicator_,
+                      offline_data_,
+                      hyperbolic_system_,
+                      parabolic_system_,
+                      "/I - VTUOutput")
       , postprocessor_(mpi_communicator_,
                        offline_data_,
                        hyperbolic_system_,
@@ -123,8 +128,9 @@ namespace ryujin
         "enable mesh adaptivity",
         enable_mesh_adaptivity_,
         "Flag to control whether we use an adaptive mesh refinement strategy. "
-        "The frequency how we adapt the mesh is determined by \"timer "
-        "granularity\" and \"timer mesh refinement multiplier\"");
+        "The frequency how often we query MeshAdaptor::analyze() for deciding "
+        "on adapting the mesh is determined by \"timer granularity\" and "
+        "\"timer mesh refinement multiplier\"");
 
     timer_checkpoint_multiplier_ = 1;
     add_parameter("timer checkpoint multiplier",
@@ -156,7 +162,7 @@ namespace ryujin
         "timer mesh adaptivity multiplier",
         timer_compute_quantities_multiplier_,
         "Multiplicative modifier applied to \"timer granularity\" that "
-        "determines the writeout granularity for quantities of interest");
+        "determines the call granularity to MeshAdaptor::analyze()");
 
     std::copy(std::begin(View::component_names),
               std::end(View::component_names),
@@ -228,6 +234,7 @@ namespace ryujin
       hyperbolic_module_.prepare();
       parabolic_module_.prepare();
       time_integrator_.prepare();
+      mesh_adaptor_.prepare();
       postprocessor_.prepare();
       vtu_output_.prepare();
       /* We skip the first output cycle for quantities: */
@@ -303,7 +310,9 @@ namespace ryujin
         quantities_.accumulate(state_vector, t);
       }
 
-      /* Perform output: */
+      /*
+       * Perform various tasks whenever we reach a timer tick:
+       */
 
       if (t >= timer_cycle * timer_granularity_) {
         output(state_vector, base_name_ + "-solution", t, timer_cycle);
@@ -333,19 +342,19 @@ namespace ryujin
           quantities_.write_out(state_vector, t, timer_cycle);
         }
 
+        if (enable_mesh_adaptivity_) {
+          mesh_adaptor_.analyze(state_vector, t, timer_cycle);
+        }
+
         ++timer_cycle;
       }
 
       /*
-       * Break if we have reached the final time:
+       * Break if we have reached the final time, otherwise do a time step:
        */
 
       if (t >= t_final_)
         break;
-
-      /*
-       * Do a time step:
-       */
 
       const auto tau = time_integrator_.step(state_vector, t);
       t += tau;
@@ -353,21 +362,22 @@ namespace ryujin
       /*
        * Print and record cycle statistics:
        */
+      {
+        const bool write_to_log_file = (t >= timer_cycle * timer_granularity_);
 
-      const bool write_to_log_file = (t >= timer_cycle * timer_granularity_);
+        /* Synchronize average Wall time over all MPI ranks: */
+        const auto wall_time = computing_timer_["time loop"].wall_time();
+        const auto average =
+            Utilities::MPI::min_max_avg(wall_time, mpi_communicator_).avg;
+        const bool update_terminal =
+            (average >= last_terminal_output + terminal_update_interval_);
 
-      /* Synchronize average Wall time over all MPI ranks: */
-      const auto wall_time = computing_timer_["time loop"].wall_time();
-      const auto average =
-          Utilities::MPI::min_max_avg(wall_time, mpi_communicator_).avg;
-      const bool update_terminal =
-          (average >= last_terminal_output + terminal_update_interval_);
-
-      if (terminal_update_interval_ != Number(0.)) {
-        if (write_to_log_file || update_terminal) {
-          print_cycle_statistics(
-              cycle, t, timer_cycle, /*logfile*/ write_to_log_file);
-          last_terminal_output = average;
+        if (terminal_update_interval_ != Number(0.)) {
+          if (write_to_log_file || update_terminal) {
+            print_cycle_statistics(
+                cycle, t, timer_cycle, /*logfile*/ write_to_log_file);
+            last_terminal_output = average;
+          }
         }
       }
     } /* end of loop */

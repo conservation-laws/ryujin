@@ -43,6 +43,7 @@ target_link_libraries(obj_common ${EXTERNAL_TARGETS})
 set(DEPENDENT_SOURCE_FILES
   hyperbolic_module.cc
   initial_values.cc
+  mesh_adaptor.cc
   parabolic_module.cc
   postprocessor.cc
   quantities.cc
