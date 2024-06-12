@@ -45,7 +45,6 @@ namespace ryujin
                           initial_values_,
                           "/G - ParabolicModule")
       , time_integrator_(mpi_communicator_,
-                         computing_timer_,
                          offline_data_,
                          hyperbolic_module_,
                          parabolic_module_,
