@@ -67,7 +67,7 @@ namespace ryujin
       , n_mpi_processes_(
             dealii::Utilities::MPI::n_mpi_processes(mpi_communicator_))
   {
-    base_name_ = "cylinder";
+    base_name_ = "test";
     add_parameter("basename", base_name_, "Base name for all output files");
 
     t_final_ = Number(5.);

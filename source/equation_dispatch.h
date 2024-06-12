@@ -170,14 +170,25 @@ namespace ryujin
   {
     {
       /*
+       * Workaround: Add an entry to the "A - TimeLoop" section so that is
+       * shows up first.
+       */
+      auto &prm = dealii::ParameterAcceptor::prm;
+      prm.enter_subsection("A - TimeLoop");
+      prm.declare_entry("basename", "test");
+      prm.leave_subsection();
+
+      /*
        * Create temporary objects for the sole purpose of populating the
        * ParameterAcceptor::prm object.
        */
+
       ryujin::EquationDispatch equation_dispatch;
       ryujin::TimeLoop<Description, dim, Number> time_loop(MPI_COMM_SELF);
 
-      /* Fix up "equation" entry: */
-      auto &prm = dealii::ParameterAcceptor::prm;
+      /*
+       * Fix up "equation" entry:
+       */
       prm.enter_subsection("B - Equation");
       prm.set("dimension", std::to_string(dim));
       prm.set("equation", name);
