@@ -53,7 +53,7 @@ namespace ryujin
                       offline_data_,
                       hyperbolic_system_,
                       parabolic_system_,
-                      "/I - VTUOutput")
+                      "/I - MeshAdaptor")
       , postprocessor_(mpi_communicator_,
                        offline_data_,
                        hyperbolic_system_,
@@ -234,7 +234,7 @@ namespace ryujin
       hyperbolic_module_.prepare();
       parabolic_module_.prepare();
       time_integrator_.prepare();
-      mesh_adaptor_.prepare();
+      mesh_adaptor_.prepare(/*needs current timepoint*/ t);
       postprocessor_.prepare();
       vtu_output_.prepare();
       /* We skip the first output cycle for quantities: */

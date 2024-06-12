@@ -13,7 +13,29 @@
 namespace ryujin
 {
   /**
-   * The MeshAdaptor class is responsible for
+   * Controls the adaptation strategy used in MeshAdaptor.
+   *
+   * @ingroup Mesh
+   */
+  enum class AdaptationStrategy {
+    /**
+     * Performs a simply global refinement at specified timepoints.
+     */
+    global_refinement,
+  };
+} // namespace ryujin
+
+#ifndef DOXYGEN
+DECLARE_ENUM(ryujin::AdaptationStrategy,
+             LIST({ryujin::AdaptationStrategy::global_refinement,
+                   "global refinement"}, ));
+#endif
+
+namespace ryujin
+{
+  /**
+   * The MeshAdaptor class is responsible for performing global or local
+   * mesh adaptation.
    *
    * @ingroup Mesh
    */
@@ -54,10 +76,9 @@ namespace ryujin
                 const std::string &subsection = "/MeshAdaptor");
 
     /**
-     * Prepare MeshAdaptor. A call to @ref prepare() allocates temporary
-     * storage and is necessary before schedule_output() can be called.
+     * Prepare temporary storage and clean up internal data for MeshAdaptor.
      */
-    void prepare();
+    void prepare(const Number t);
 
     /**
      * Analyze the given StateVector and decide - depending on adaptation
@@ -80,6 +101,9 @@ namespace ryujin
      * @name Run time options
      */
     //@{
+
+    AdaptationStrategy adaptation_strategy_;
+    std::vector<Number> t_global_refinements_;
 
     //@}
     /**
