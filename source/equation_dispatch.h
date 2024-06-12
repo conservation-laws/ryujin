@@ -191,12 +191,17 @@ namespace ryujin
         const auto full_name =
             "default_parameters-" + base_name + "-description.prm";
         if (write_detailed_description)
-          prm.print_parameters(full_name,
-                               dealii::ParameterHandler::OutputStyle::PRM);
+          prm.print_parameters(
+              full_name,
+              dealii::ParameterHandler::OutputStyle::KeepDeclarationOrder);
 
         const auto short_name = "default_parameters-" + base_name + ".prm";
-        prm.print_parameters(short_name,
-                             dealii::ParameterHandler::OutputStyle::Short);
+        prm.print_parameters(
+            short_name,
+            dealii::ParameterHandler::OutputStyle::Short |
+                dealii::ParameterHandler::OutputStyle::KeepDeclarationOrder
+
+        );
       }
       // all objects have to go out of scope, see
       // https://github.com/dealii/dealii/issues/15111
