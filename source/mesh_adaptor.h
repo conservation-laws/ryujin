@@ -9,6 +9,7 @@
 #include <offline_data.h>
 
 #include <deal.II/base/parameter_acceptor.h>
+#include <deal.II/distributed/solution_transfer.h>
 
 namespace ryujin
 {
@@ -76,7 +77,12 @@ namespace ryujin
                 const std::string &subsection = "/MeshAdaptor");
 
     /**
-     * Prepare temporary storage and clean up internal data for MeshAdaptor.
+     * Prepare temporary storage and clean up internal data for the
+     * analyze() facility.
+     *
+     * @note this function does not reset the internal state_ and
+     * solution_transfer_ objects as those are needed to finalize the
+     * solution transfer to a new mesh.
      */
     void prepare(const Number t);
 
@@ -87,6 +93,32 @@ namespace ryujin
     void analyze(const StateVector &state_vector,
                  const Number t,
                  unsigned int cycle);
+
+    /**
+     * Perform mesh adaptation with the configured adaptation strategy. The
+     * function will modify the supplied @p triangulation and
+     * @p state_vector objects. The prepare_compute_kernels argument must
+     * be a lambda that reinitializes all data structures after mesh
+     * refinement.
+     */
+    template <typename Callable>
+    void adapt_mesh_and_transfer_state_vector(
+        dealii::Triangulation<dim> &triangulation,
+        StateVector &state_vector,
+        const Callable &prepare_compute_kernels) const
+    {
+      mark_cells_for_coarsening_and_refinement(triangulation);
+
+      triangulation.prepare_coarsening_and_refinement();
+      prepare_for_interpolation(state_vector);
+
+      triangulation.execute_coarsening_and_refinement();
+      prepare_compute_kernels();
+
+      interpolate(state_vector);
+
+      need_mesh_adaptation_ = false;
+    }
 
     /**
      * A boolean indicating whether we should perform a mesh adapation step
@@ -113,11 +145,54 @@ namespace ryujin
 
     const MPI_Comm &mpi_communicator_;
 
+    dealii::SmartPointer<const OfflineData<dim, Number>> offline_data_;
     dealii::SmartPointer<const HyperbolicSystem> hyperbolic_system_;
     dealii::SmartPointer<const ParabolicSystem> parabolic_system_;
-    dealii::SmartPointer<const OfflineData<dim, Number>> offline_data_;
 
-    bool need_mesh_adaptation_;
+    mutable bool need_mesh_adaptation_;
+
+    mutable std::unique_ptr<
+        dealii::parallel::distributed::SolutionTransfer<dim, ScalarVector>>
+        solution_transfer_;
+
+    mutable std::vector<ScalarVector> state_;
+
+    //@}
+    /**
+     * @name Private methods for adapt_mesh_and_transfer_state_vector()
+     */
+    //@{
+
+    /**
+     * Mark cells for coarsening and refinement with the configured marking
+     * strategy.
+     */
+    void mark_cells_for_coarsening_and_refinement(
+        dealii::Triangulation<dim> &triangulation) const;
+
+    /**
+     * Read in a state vector (in conserved quantities). The function
+     * populates auxiliary distributed vectors that store the given
+     * conserved state and then calls the underlying deal.II
+     * SolutionTransfer::prepare_for_coarsening_and_refinement();
+     *
+     * @note This function has to be called before the actual grid refinement.
+     *
+     * @note This function initializes the internal state_ and
+     * solution_transfer_ objects.
+     */
+    void prepare_for_interpolation(const StateVector &state_vector) const;
+
+    /**
+     * Finalize the state vector transfer by calling
+     * SolutionTransfer::interpolate() and repopulating the state vector.
+     *
+     * @note This function has to be called after the actual grid refinement.
+     *
+     * @note After successful state vector transfer this function frees the
+     * internal state_ and solution_transfer_ objects.
+     */
+    void interpolate(StateVector &state_vector) const;
 
     //@}
   };

@@ -228,8 +228,12 @@ namespace ryujin
     unsigned int timer_cycle = 0;
     StateVector state_vector;
 
-    /* Create a small lambda for preparing compute kernels: */
+    /*
+     * Create a small lambda for preparing compute kernels:
+     */
     const auto prepare_compute_kernels = [&]() {
+      print_info("preparing compute kernels");
+
       offline_data_.prepare(problem_dimension, n_precomputed_values);
       hyperbolic_module_.prepare();
       parabolic_module_.prepare();
@@ -250,7 +254,6 @@ namespace ryujin
         print_info("resuming computation: recreating mesh");
         Checkpointing::load_mesh(discretization_, base_name_);
 
-        print_info("preparing compute kernels");
         prepare_compute_kernels();
 
         print_info("resuming computation: loading state vector");
@@ -274,7 +277,6 @@ namespace ryujin
         print_info("creating mesh");
         discretization_.prepare();
 
-        print_info("preparing compute kernels");
         prepare_compute_kernels();
 
         print_info("interpolating initial values");
@@ -306,7 +308,7 @@ namespace ryujin
 
       if (enable_compute_quantities_) {
         Scope scope(computing_timer_,
-                    "time step [X] 1 - accumulate quantities");
+                    "time step [X]   - accumulate quantities");
         quantities_.accumulate(state_vector, t);
       }
 
@@ -326,7 +328,7 @@ namespace ryujin
              * is terribly inefficient...
              */
             Scope scope(computing_timer_,
-                        "time step [X] 0 - interpolate analytic solution");
+                        "time step [X]   - interpolate analytic solution");
             Vectors::reinit_state_vector<Description>(analytic, offline_data_);
             std::get<0>(analytic) =
                 initial_values_.interpolate_hyperbolic_vector(t);
@@ -338,15 +340,27 @@ namespace ryujin
             (timer_cycle % timer_compute_quantities_multiplier_ == 0) &&
             (timer_cycle > 0)) {
           Scope scope(computing_timer_,
-                      "time step [X] 2 - write out quantities");
+                      "time step [X]   - write out quantities");
           quantities_.write_out(state_vector, t, timer_cycle);
         }
 
         if (enable_mesh_adaptivity_) {
+          Scope scope(computing_timer_,
+                      "time step [X]   - analyze for mesh adaptation");
           mesh_adaptor_.analyze(state_vector, t, timer_cycle);
         }
 
         ++timer_cycle;
+      }
+
+      if (enable_mesh_adaptivity_ && mesh_adaptor_.need_mesh_adaptation()) {
+        Scope scope(computing_timer_, "(re)initialize data structures");
+        print_info("performing mesh adaptation");
+
+        mesh_adaptor_.adapt_mesh_and_transfer_state_vector(
+            discretization_.triangulation(),
+            state_vector,
+            prepare_compute_kernels);
       }
 
       /*
@@ -574,7 +588,7 @@ namespace ryujin
 
     /* Data output: */
     if (do_full_output || do_levelsets) {
-      Scope scope(computing_timer_, "time step [X] 3 - output vtu");
+      Scope scope(computing_timer_, "time step [X]   - perform vtu output");
       print_info("scheduling output");
 
       postprocessor_.compute(state_vector);
@@ -592,7 +606,7 @@ namespace ryujin
 
     /* Checkpointing: */
     if (do_checkpointing) {
-      Scope scope(computing_timer_, "time step [X] 4 - checkpointing");
+      Scope scope(computing_timer_, "time step [X]   - perform checkpointing");
       print_info("scheduling checkpointing");
 
       const auto &U = std::get<0>(state_vector);
