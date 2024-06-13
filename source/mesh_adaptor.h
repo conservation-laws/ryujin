@@ -20,7 +20,7 @@ namespace ryujin
    */
   enum class AdaptationStrategy {
     /**
-     * Performs a simply global refinement at specified timepoints.
+     * Performs a simple global refinement at specified timepoints.
      */
     global_refinement,
   };
@@ -117,7 +117,8 @@ namespace ryujin
 
       interpolate(state_vector);
 
-      need_mesh_adaptation_ = false;
+      // need_mesh_adaptation_ is already set to false due to the call to
+      // prepare_compute_kernels()
     }
 
     /**
@@ -149,7 +150,7 @@ namespace ryujin
     dealii::SmartPointer<const HyperbolicSystem> hyperbolic_system_;
     dealii::SmartPointer<const ParabolicSystem> parabolic_system_;
 
-    mutable bool need_mesh_adaptation_;
+    bool need_mesh_adaptation_;
 
     mutable std::unique_ptr<
         dealii::parallel::distributed::SolutionTransfer<dim, ScalarVector>>
