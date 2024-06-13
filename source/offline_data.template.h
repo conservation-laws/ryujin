@@ -1004,12 +1004,61 @@ namespace ryujin
           dof_handler.begin_active(), dof_handler.end(), *scalar_partitioner_);
     }
 
+#ifdef DEBUG
     /*
-     * Expensive consistency checks:
+     * Verify that we have consistent mass:
      */
 
-#ifdef DEBUG
-    /* Verify that the cij_matrix_ object is consistent: */
+    double total_mass = 0.;
+    for (unsigned int i = 0; i < n_locally_owned_; ++i)
+      total_mass += lumped_mass_matrix_.local_element(i);
+    total_mass = Utilities::MPI::sum(total_mass, mpi_communicator_);
+
+    Assert(std::abs(measure_of_omega_ - total_mass) < 1.e-12,
+           dealii::ExcMessage(
+               "Total mass differs from the measure of the domain."));
+
+    /*
+     * Verify that the mij_matrix_ object is consistent:
+     */
+
+    for (unsigned int i = 0; i < n_locally_owned_; ++i) {
+      /* Skip constrained degrees of freedom: */
+      const unsigned int row_length = sparsity_pattern_simd_.row_length(i);
+      if (row_length == 1)
+        continue;
+
+      auto sum =
+          mass_matrix_.get_entry(i, 0) - lumped_mass_matrix_.local_element(i);
+
+      /* skip diagonal */
+      constexpr auto simd_length = VectorizedArray<Number>::size();
+      const unsigned int *js = sparsity_pattern_simd_.columns(i);
+      for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
+        const auto j = *(i < n_locally_internal_ ? js + col_idx * simd_length
+                                                 : js + col_idx);
+        Assert(j < n_locally_relevant_, dealii::ExcInternalError());
+
+        const auto m_ij = mass_matrix_.get_entry(i, col_idx);
+        Assert(std::abs(m_ij) > 1.e-12, dealii::ExcInternalError());
+        sum += m_ij;
+
+        const auto m_ji = mass_matrix_.get_transposed_entry(i, col_idx);
+        if (std::abs(m_ij - m_ji) >= 1.e-12) {
+          // The m_ij matrix is not symmetric
+          std::stringstream ss;
+          ss << "m_ij matrix is not symmetric: " << m_ij << " <-> " << m_ji;
+          Assert(false, dealii::ExcMessage(ss.str()));
+        }
+      }
+
+      Assert(std::abs(sum) < 1.e-12, dealii::ExcInternalError());
+    }
+
+    /*
+     * Verify that the cij_matrix_ object is consistent:
+     */
+
     for (unsigned int i = 0; i < n_locally_owned_; ++i) {
       /* Skip constrained degrees of freedom: */
       const unsigned int row_length = sparsity_pattern_simd_.row_length(i);
