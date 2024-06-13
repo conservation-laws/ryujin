@@ -769,29 +769,6 @@ namespace ryujin
     measure_of_omega_ =
         Utilities::MPI::sum(measure_of_omega_, mpi_communicator_);
 
-#ifdef DEBUG
-    /*
-     * Verify that the cij_matrix_ is consistent
-     */
-    for (unsigned int i = 0; i < n_locally_owned_; ++i) {
-      /* Skip constrained degrees of freedom: */
-      const unsigned int row_length = sparsity_pattern_simd_.row_length(i);
-      if (row_length == 1)
-        continue;
-
-      auto sum = cij_matrix_.get_tensor(i, 0);
-
-      /* skip diagonal */
-      for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
-        const auto c_ij = cij_matrix_.get_tensor(i, col_idx);
-        Assert(c_ij.norm() > 1.e-12, dealii::ExcInternalError());
-        sum += c_ij;
-      }
-
-      Assert(sum.norm() < 1.e-12, dealii::ExcInternalError());
-    }
-#endif
-
     /*
      * Create lumped mass matrix:
      */
@@ -1026,6 +1003,54 @@ namespace ryujin
       coupling_boundary_pairs_ = collect_coupling_boundary_pairs(
           dof_handler.begin_active(), dof_handler.end(), *scalar_partitioner_);
     }
+
+    /*
+     * Expensive consistency checks:
+     */
+
+#ifdef DEBUG
+    /* Verify that the cij_matrix_ object is consistent: */
+    for (unsigned int i = 0; i < n_locally_owned_; ++i) {
+      /* Skip constrained degrees of freedom: */
+      const unsigned int row_length = sparsity_pattern_simd_.row_length(i);
+      if (row_length == 1)
+        continue;
+
+      auto sum = cij_matrix_.get_tensor(i, 0);
+
+      /* skip diagonal */
+      constexpr auto simd_length = VectorizedArray<Number>::size();
+      const unsigned int *js = sparsity_pattern_simd_.columns(i);
+      for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
+        const auto j = *(i < n_locally_internal_ ? js + col_idx * simd_length
+                                                 : js + col_idx);
+        Assert(j < n_locally_relevant_, dealii::ExcInternalError());
+
+        const auto c_ij = cij_matrix_.get_tensor(i, col_idx);
+        Assert(c_ij.norm() > 1.e-12, dealii::ExcInternalError());
+        sum += c_ij;
+
+        const auto c_ji = cij_matrix_.get_transposed_tensor(i, col_idx);
+        if ((c_ij + c_ji).norm() >= 1.e-12) {
+          // The c_ij matrix is not symmetric, this can only happen if i
+          // and j are both located on the boundary.
+
+          CouplingDescription coupling{i, col_idx, j};
+          const auto it = std::find(coupling_boundary_pairs_.begin(),
+                                    coupling_boundary_pairs_.end(),
+                                    coupling);
+          if (it == coupling_boundary_pairs_.end()) {
+            std::stringstream ss;
+            ss << "c_ij matrix is not anti-symmetric: " << c_ij << " <-> "
+               << c_ji;
+            Assert(false, dealii::ExcMessage(ss.str()));
+          }
+        }
+      }
+
+      Assert(sum.norm() < 1.e-12, dealii::ExcInternalError());
+    }
+#endif
   }
 
 
