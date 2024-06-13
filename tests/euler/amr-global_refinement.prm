@@ -1,0 +1,55 @@
+subsection A - TimeLoop
+  set basename                  = check_global_refinement
+
+  set enable compute error      = true
+  set enable mesh adaptivity    = true
+
+  set final time                = 2.0
+  set timer granularity         = 0.5
+
+  set terminal update interval  = 0
+end
+
+subsection B - Equation
+  set dimension = 2
+  set equation  = euler
+  set gamma     = 1.4
+end
+
+subsection C - Discretization
+  set geometry        = rectangular domain
+  set mesh refinement = 4
+
+  subsection rectangular domain
+    set boundary condition bottom = dirichlet
+    set boundary condition left   = dirichlet
+    set boundary condition right  = dirichlet
+    set boundary condition top    = dirichlet
+
+    set position bottom left      = -5, -5
+    set position top right        =  5,  5
+  end
+end
+
+subsection E - InitialValues
+  set configuration = isentropic vortex
+  set direction     =  1,  1
+  set position      = -1, -1
+
+  subsection isentropic vortex
+    set mach number = 1
+    set beta        = 5
+  end
+end
+
+subsection H - TimeIntegrator
+  set cfl min            = 0.2
+  set cfl max            = 0.2
+  set cfl recovery strategy = none
+  set time stepping scheme  = erk 33
+end
+
+subsection I - MeshAdaptor
+  set adaptation strategy          = global refinement
+  set global refinement timepoints = 1.0, 1.5
+end
