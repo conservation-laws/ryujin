@@ -1100,7 +1100,8 @@ namespace ryujin
        * correctly. This strategy works for 2D but will fail in 3D with
        * locally refined meshes and hanging nodes situated at the boundary.
        */
-      if (cell->is_artificial_on_level())
+      if ((cell->is_active() && cell->is_artificial()) ||
+          (!cell->is_active() && cell->is_artificial_on_level()))
         continue;
 
       local_dof_indices.resize(dofs_per_cell);
