@@ -753,6 +753,29 @@ namespace ryujin
     measure_of_omega_ =
         Utilities::MPI::sum(measure_of_omega_, mpi_communicator_);
 
+#ifdef DEBUG
+    /*
+     * Verify that the cij_matrix_ is consistent
+     */
+    for (unsigned int i = 0; i < n_locally_owned_; ++i) {
+      /* Skip constrained degrees of freedom: */
+      const unsigned int row_length = sparsity_pattern_simd_.row_length(i);
+      if (row_length == 1)
+        continue;
+
+      auto sum = cij_matrix_.get_tensor(i, 0);
+
+      /* skip diagonal */
+      for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
+        const auto c_ij = cij_matrix_.get_tensor(i, col_idx);
+        Assert(c_ij.norm() > 1.e-12, dealii::ExcInternalError());
+        sum += c_ij;
+      }
+
+      Assert(sum.norm() < 1.e-12, dealii::ExcInternalError());
+    }
+#endif
+
     /*
      * Create lumped mass matrix:
      */
