@@ -127,6 +127,22 @@ namespace ryujin
 
     affine_constraints_.close();
 
+#ifdef DEBUG
+    {
+      /* Check that constraints are consistent in parallel: */
+      const std::vector<IndexSet> &locally_owned_dofs =
+          Utilities::MPI::all_gather(mpi_communicator_,
+                                     dof_handler.locally_owned_dofs());
+      const IndexSet locally_active =
+          dealii::DoFTools::extract_locally_active_dofs(dof_handler);
+      Assert(affine_constraints_.is_consistent_in_parallel(locally_owned_dofs,
+                                                           locally_active,
+                                                           mpi_communicator_,
+                                                           /*verbose*/ true),
+             ExcInternalError());
+    }
+#endif
+
     sparsity_pattern_.reinit(
         dof_handler.n_dofs(), dof_handler.n_dofs(), locally_relevant);
 
