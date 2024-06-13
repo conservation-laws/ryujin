@@ -350,17 +350,17 @@ namespace ryujin
           mesh_adaptor_.analyze(state_vector, t, timer_cycle);
         }
 
+        if (mesh_adaptor_.need_mesh_adaptation() && t < t_final_) {
+          Scope scope(computing_timer_, "(re)initialize data structures");
+          print_info("performing mesh adaptation");
+
+          mesh_adaptor_.adapt_mesh_and_transfer_state_vector(
+              discretization_.triangulation(),
+              state_vector,
+              prepare_compute_kernels);
+        }
+
         ++timer_cycle;
-      }
-
-      if (enable_mesh_adaptivity_ && mesh_adaptor_.need_mesh_adaptation()) {
-        Scope scope(computing_timer_, "(re)initialize data structures");
-        print_info("performing mesh adaptation");
-
-        mesh_adaptor_.adapt_mesh_and_transfer_state_vector(
-            discretization_.triangulation(),
-            state_vector,
-            prepare_compute_kernels);
       }
 
       /*
