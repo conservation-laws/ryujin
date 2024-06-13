@@ -777,10 +777,11 @@ namespace ryujin
 #ifdef DEAL_II_WITH_TRILINOS
       ScalarVector one(scalar_partitioner_);
       one = 1.;
+      affine_constraints_assembly.set_zero(one);
 
       ScalarVector local_lumped_mass_matrix(scalar_partitioner_);
       mass_matrix_tmp.vmult(local_lumped_mass_matrix, one);
-      lumped_mass_matrix_.compress(VectorOperation::add);
+      local_lumped_mass_matrix.compress(VectorOperation::add);
 
       for (unsigned int i = 0; i < scalar_partitioner_->locally_owned_size();
            ++i) {
@@ -796,6 +797,7 @@ namespace ryujin
 
       dealii::Vector<Number> one(mass_matrix_tmp.m());
       one = 1.;
+      affine_constraints_assembly.set_zero(one);
 
       dealii::Vector<Number> local_lumped_mass_matrix(mass_matrix_tmp.m());
       mass_matrix_tmp.vmult(local_lumped_mass_matrix, one);
