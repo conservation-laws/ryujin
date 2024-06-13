@@ -28,14 +28,12 @@ namespace ryujin
   template <typename Description, int dim, typename Number>
   TimeIntegrator<Description, dim, Number>::TimeIntegrator(
       const MPI_Comm &mpi_communicator,
-      std::map<std::string, dealii::Timer> &computing_timer,
       const OfflineData<dim, Number> &offline_data,
       const HyperbolicModule<Description, dim, Number> &hyperbolic_module,
       const ParabolicModule<Description, dim, Number> &parabolic_module,
       const std::string &subsection /*= "TimeIntegrator"*/)
       : ParameterAcceptor(subsection)
       , mpi_communicator_(mpi_communicator)
-      , computing_timer_(computing_timer)
       , offline_data_(&offline_data)
       , hyperbolic_module_(&hyperbolic_module)
       , parabolic_module_(&parabolic_module)

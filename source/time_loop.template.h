@@ -45,14 +45,19 @@ namespace ryujin
                           initial_values_,
                           "/G - ParabolicModule")
       , time_integrator_(mpi_communicator_,
-                         computing_timer_,
                          offline_data_,
                          hyperbolic_module_,
                          parabolic_module_,
                          "/H - TimeIntegrator")
+      , mesh_adaptor_(mpi_communicator_,
+                      offline_data_,
+                      hyperbolic_system_,
+                      parabolic_system_,
+                      "/I - MeshAdaptor")
       , postprocessor_(mpi_communicator_,
-                       hyperbolic_system_,
                        offline_data_,
+                       hyperbolic_system_,
+                       parabolic_system_,
                        "/I - VTUOutput")
       , vtu_output_(mpi_communicator_,
                     offline_data_,
@@ -60,8 +65,9 @@ namespace ryujin
                     postprocessor_,
                     "/I - VTUOutput")
       , quantities_(mpi_communicator_,
-                    hyperbolic_system_,
                     offline_data_,
+                    hyperbolic_system_,
+                    parabolic_system_,
                     "/J - Quantities")
       , mpi_rank_(dealii::Utilities::MPI::this_mpi_process(mpi_communicator_))
       , n_mpi_processes_(
@@ -122,8 +128,9 @@ namespace ryujin
         "enable mesh adaptivity",
         enable_mesh_adaptivity_,
         "Flag to control whether we use an adaptive mesh refinement strategy. "
-        "The frequency how we adapt the mesh is determined by \"timer "
-        "granularity\" and \"timer mesh refinement multiplier\"");
+        "The frequency how often we query MeshAdaptor::analyze() for deciding "
+        "on adapting the mesh is determined by \"timer granularity\" and "
+        "\"timer mesh refinement multiplier\"");
 
     timer_checkpoint_multiplier_ = 1;
     add_parameter("timer checkpoint multiplier",
@@ -155,7 +162,7 @@ namespace ryujin
         "timer mesh adaptivity multiplier",
         timer_compute_quantities_multiplier_,
         "Multiplicative modifier applied to \"timer granularity\" that "
-        "determines the writeout granularity for quantities of interest");
+        "determines the call granularity to MeshAdaptor::analyze()");
 
     std::copy(std::begin(View::component_names),
               std::end(View::component_names),
@@ -218,19 +225,24 @@ namespace ryujin
      */
 
     Number t = 0.;
-    unsigned int output_cycle = 0;
+    unsigned int timer_cycle = 0;
     StateVector state_vector;
 
-    /* Create a small lambda for preparing compute kernels: */
+    /*
+     * Create a small lambda for preparing compute kernels:
+     */
     const auto prepare_compute_kernels = [&]() {
+      print_info("preparing compute kernels");
+
       offline_data_.prepare(problem_dimension, n_precomputed_values);
       hyperbolic_module_.prepare();
       parabolic_module_.prepare();
       time_integrator_.prepare();
+      mesh_adaptor_.prepare(/*needs current timepoint*/ t);
       postprocessor_.prepare();
       vtu_output_.prepare();
       /* We skip the first output cycle for quantities: */
-      quantities_.prepare(base_name_, output_cycle == 0 ? 1 : output_cycle);
+      quantities_.prepare(base_name_, timer_cycle == 0 ? 1 : timer_cycle);
       print_mpi_partition(logfile_);
     };
 
@@ -242,7 +254,6 @@ namespace ryujin
         print_info("resuming computation: recreating mesh");
         Checkpointing::load_mesh(discretization_, base_name_);
 
-        print_info("preparing compute kernels");
         prepare_compute_kernels();
 
         print_info("resuming computation: loading state vector");
@@ -250,23 +261,22 @@ namespace ryujin
         Vectors::reinit_state_vector<Description>(state_vector, offline_data_);
         auto &U = std::get<0>(state_vector);
         Checkpointing::load_state_vector(
-            offline_data_, base_name_, U, t, output_cycle, mpi_communicator_);
+            offline_data_, base_name_, U, t, timer_cycle, mpi_communicator_);
 
         if (resume_at_time_zero_) {
           /* Reset the current time t and the output cycle count to zero: */
           t = 0.;
-          output_cycle = 0;
+          timer_cycle = 0;
         }
 
         /* Workaround: Reinitialize quantities with correct output cycle: */
-        quantities_.prepare(base_name_, output_cycle);
+        quantities_.prepare(base_name_, timer_cycle);
 
       } else {
 
         print_info("creating mesh");
         discretization_.prepare();
 
-        print_info("preparing compute kernels");
         prepare_compute_kernels();
 
         print_info("interpolating initial values");
@@ -298,14 +308,16 @@ namespace ryujin
 
       if (enable_compute_quantities_) {
         Scope scope(computing_timer_,
-                    "time step [X] 1 - accumulate quantities");
+                    "time step [X]   - accumulate quantities");
         quantities_.accumulate(state_vector, t);
       }
 
-      /* Perform output: */
+      /*
+       * Perform various tasks whenever we reach a timer tick:
+       */
 
-      if (t >= output_cycle * timer_granularity_) {
-        output(state_vector, base_name_ + "-solution", t, output_cycle);
+      if (t >= timer_cycle * timer_granularity_) {
+        output(state_vector, base_name_ + "-solution", t, timer_cycle);
 
         if (enable_compute_error_) {
           StateVector analytic;
@@ -316,35 +328,47 @@ namespace ryujin
              * is terribly inefficient...
              */
             Scope scope(computing_timer_,
-                        "time step [X] 0 - interpolate analytic solution");
+                        "time step [X]   - interpolate analytic solution");
             Vectors::reinit_state_vector<Description>(analytic, offline_data_);
             std::get<0>(analytic) =
                 initial_values_.interpolate_hyperbolic_vector(t);
           }
-          output(analytic, base_name_ + "-analytic_solution", t, output_cycle);
+          output(analytic, base_name_ + "-analytic_solution", t, timer_cycle);
         }
 
         if (enable_compute_quantities_ &&
-            (output_cycle % timer_compute_quantities_multiplier_ == 0) &&
-            (output_cycle > 0)) {
+            (timer_cycle % timer_compute_quantities_multiplier_ == 0) &&
+            (timer_cycle > 0)) {
           Scope scope(computing_timer_,
-                      "time step [X] 2 - write out quantities");
-          quantities_.write_out(state_vector, t, output_cycle);
+                      "time step [X]   - write out quantities");
+          quantities_.write_out(state_vector, t, timer_cycle);
         }
 
-        ++output_cycle;
+        if (enable_mesh_adaptivity_) {
+          Scope scope(computing_timer_,
+                      "time step [X]   - analyze for mesh adaptation");
+          mesh_adaptor_.analyze(state_vector, t, timer_cycle);
+        }
+
+        if (mesh_adaptor_.need_mesh_adaptation() && t < t_final_) {
+          Scope scope(computing_timer_, "(re)initialize data structures");
+          print_info("performing mesh adaptation");
+
+          mesh_adaptor_.adapt_mesh_and_transfer_state_vector(
+              discretization_.triangulation(),
+              state_vector,
+              prepare_compute_kernels);
+        }
+
+        ++timer_cycle;
       }
 
       /*
-       * Break if we have reached the final time:
+       * Break if we have reached the final time, otherwise do a time step:
        */
 
       if (t >= t_final_)
         break;
-
-      /*
-       * Do a time step:
-       */
 
       const auto tau = time_integrator_.step(state_vector, t);
       t += tau;
@@ -352,21 +376,22 @@ namespace ryujin
       /*
        * Print and record cycle statistics:
        */
+      {
+        const bool write_to_log_file = (t >= timer_cycle * timer_granularity_);
 
-      const bool write_to_log_file = (t >= output_cycle * timer_granularity_);
+        /* Synchronize average Wall time over all MPI ranks: */
+        const auto wall_time = computing_timer_["time loop"].wall_time();
+        const auto average =
+            Utilities::MPI::min_max_avg(wall_time, mpi_communicator_).avg;
+        const bool update_terminal =
+            (average >= last_terminal_output + terminal_update_interval_);
 
-      /* Synchronize average Wall time over all MPI ranks: */
-      const auto wall_time = computing_timer_["time loop"].wall_time();
-      const auto average =
-          Utilities::MPI::min_max_avg(wall_time, mpi_communicator_).avg;
-      const bool update_terminal =
-          (average >= last_terminal_output + terminal_update_interval_);
-
-      if (terminal_update_interval_ != Number(0.)) {
-        if (write_to_log_file || update_terminal) {
-          print_cycle_statistics(
-              cycle, t, output_cycle, /*logfile*/ write_to_log_file);
-          last_terminal_output = average;
+        if (terminal_update_interval_ != Number(0.)) {
+          if (write_to_log_file || update_terminal) {
+            print_cycle_statistics(
+                cycle, t, timer_cycle, /*logfile*/ write_to_log_file);
+            last_terminal_output = average;
+          }
         }
       }
     } /* end of loop */
@@ -379,7 +404,7 @@ namespace ryujin
     if (terminal_update_interval_ != Number(0.)) {
       /* Write final timing statistics to screen and logfile: */
       print_cycle_statistics(
-          cycle, t, output_cycle, /*logfile*/ true, /*final*/ true);
+          cycle, t, timer_cycle, /*logfile*/ true, /*final*/ true);
     }
 
     if (enable_compute_error_) {
@@ -563,7 +588,7 @@ namespace ryujin
 
     /* Data output: */
     if (do_full_output || do_levelsets) {
-      Scope scope(computing_timer_, "time step [X] 3 - output vtu");
+      Scope scope(computing_timer_, "time step [X]   - perform vtu output");
       print_info("scheduling output");
 
       postprocessor_.compute(state_vector);
@@ -581,7 +606,7 @@ namespace ryujin
 
     /* Checkpointing: */
     if (do_checkpointing) {
-      Scope scope(computing_timer_, "time step [X] 4 - checkpointing");
+      Scope scope(computing_timer_, "time step [X]   - perform checkpointing");
       print_info("scheduling checkpointing");
 
       const auto &U = std::get<0>(state_vector);
@@ -1014,7 +1039,7 @@ namespace ryujin
   void TimeLoop<Description, dim, Number>::print_cycle_statistics(
       unsigned int cycle,
       Number t,
-      unsigned int output_cycle,
+      unsigned int timer_cycle,
       bool write_to_logfile,
       bool final_time)
   {
@@ -1065,8 +1090,8 @@ namespace ryujin
 #endif
            << vectorization_name                                         //
            << ">\n             Last output cycle "                       //
-           << output_cycle - 1                                           //
-           << " at t = " << timer_granularity_ * (output_cycle - 1)      //
+           << timer_cycle - 1                                            //
+           << " at t = " << timer_granularity_ * (timer_cycle - 1)       //
            << " (terminal update interval " << terminal_update_interval_ //
            << "s)\n";
 

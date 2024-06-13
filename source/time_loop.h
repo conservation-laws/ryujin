@@ -10,6 +10,7 @@
 #include "discretization.h"
 #include "hyperbolic_module.h"
 #include "initial_values.h"
+#include "mesh_adaptor.h"
 #include "offline_data.h"
 #include "parabolic_module.h"
 #include "postprocessor.h"
@@ -160,6 +161,7 @@ namespace ryujin
     HyperbolicModule<Description, dim, Number> hyperbolic_module_;
     ParabolicModule<Description, dim, Number> parabolic_module_;
     TimeIntegrator<Description, dim, Number> time_integrator_;
+    MeshAdaptor<Description, dim, Number> mesh_adaptor_;
     Postprocessor<Description, dim, Number> postprocessor_;
     VTUOutput<Description, dim, Number> vtu_output_;
     Quantities<Description, dim, Number> quantities_;
