@@ -52,8 +52,8 @@ namespace ryujin
         partitioner->locally_owned_size() + partitioner->n_ghost_indices();
 
     /*
-     * First, create a static sparsity pattern (in local indexing( where
-     * the only off-processor rows are the one for which locally owned rows
+     * First, create a static sparsity pattern (in local indexing), where
+     * the only off-processor rows are the ones for which locally owned rows
      * request the transpose entries. This will be the one we finally
      * compute on.
      */
@@ -152,25 +152,54 @@ namespace ryujin
     if (sparsity.n_rows() > n_locally_owned_dofs) {
 
       /*
-       * Step 1: The processors that are owning the ghosts are the same as
-       * in the partitioner of the index range:
+       * Set up receive targets.
+       *
+       * We receive our (reduced) ghost rows from MPI ranks in the ghost
+       * range of the (scalar) partitioner. We receive the entire (reduced)
+       * ghost row from that MPI rank; we can thus simply query the
+       * sparsity pattern how many data points we receive from each MPI
+       * rank.
        */
 
       const auto &ghost_targets = partitioner->ghost_targets();
 
-      auto vec_gt = ghost_targets.begin();
       receive_targets.resize(ghost_targets.size());
 
+      for (unsigned int p = 0; p < receive_targets.size(); ++p) {
+        receive_targets[p].first = ghost_targets[p].first;
+      }
+
+      const auto gt_begin = ghost_targets.begin();
+      auto gt_ptr = ghost_targets.begin();
+      std::size_t index = 0; /* index into ghost range of sparsity pattern */
+      unsigned int row_count = 0;
+
+      for (unsigned int i = n_locally_owned_dofs; i < sparsity.n_rows(); ++i) {
+        index += sparsity.row_length(i);
+        ++row_count;
+        if (row_count == gt_ptr->second) {
+          receive_targets[gt_ptr - gt_begin].second = index;
+          row_count = 0; /* reset row count and move on to new rank */
+          ++gt_ptr;
+        }
+      }
+
+      Assert(gt_ptr == partitioner->ghost_targets().end(),
+             dealii::ExcInternalError());
+
       /*
-       * Step 2: remember which range of indices belongs to which
-       * processor:
+       * Collect indices to be sent.
+       *
+       * These consist of the diagonal, as well as the part of columns of
+       * the given range. Note that this assumes that the sparsity pattern
+       * only contains those entries in ghosted rows which have a
+       * corresponding transpose entry in the owned rows; which is the case
+       * for our minimized sparsity pattern.
        */
 
       std::vector<unsigned int> ghost_ranges(ghost_targets.size() + 1);
-
       ghost_ranges[0] = n_locally_owned_dofs;
       for (unsigned int p = 0; p < receive_targets.size(); ++p) {
-        receive_targets[p].first = ghost_targets[p].first;
         ghost_ranges[p + 1] = ghost_ranges[p] + ghost_targets[p].second;
       }
 
@@ -179,19 +208,12 @@ namespace ryujin
         for (unsigned int j = i.first; j < i.second; ++j)
           import_indices_part.push_back(j);
 
-      /*
-       * Step 3: Collect indices to be sent. these consist of the diagonal,
-       * as well as the part of columns of the given range. Note that this
-       * assumes that the sparsity pattern only contains those entries in
-       * ghosted rows which have a corresponding transpose entry in the
-       * owned rows; which is the case for our minimized sparsity pattern.
-       */
-
       AssertDimension(import_indices_part.size(),
                       partitioner->n_import_indices());
 
+      const auto &import_targets = partitioner->import_targets();
       entries_to_be_sent.clear();
-      send_targets.resize(partitioner->import_targets().size());
+      send_targets.resize(import_targets.size());
       auto idx = import_indices_part.begin();
 
       /*
@@ -200,12 +222,12 @@ namespace ryujin
        *   import_targets()[p].first == ghost_rangs[p_match].first
        */
       unsigned int p_match = 0;
-      for (unsigned int p = 0; p < partitioner->import_targets().size(); ++p) {
+      for (unsigned int p = 0; p < import_targets.size(); ++p) {
 
         /*
          * Match up the rank index between receive and import targets. If
          * we do not find a match, which can happen for locally refined
-         * meshes, then we set p_match equal to receive_targests.size().
+         * meshes, then we set p_match equal to receive_targets.size().
          *
          * When trying to match the next processor index we consequently
          * have to reset p_match to 0 again. This assumes that processor
@@ -214,13 +236,10 @@ namespace ryujin
          */
         p_match = (p_match == receive_targets.size() ? 0 : p_match);
         while (p_match < receive_targets.size() &&
-               receive_targets[p_match].first !=
-                   partitioner->import_targets()[p].first)
+               receive_targets[p_match].first != import_targets[p].first)
           p_match++;
 
-        for (unsigned int c = 0; c < partitioner->import_targets()[p].second;
-             ++c, ++idx) {
-
+        for (unsigned int c = 0; c < import_targets[p].second; ++c, ++idx) {
           /*
            * Continue if we do not have a match. Note that we need to enter
            * and continue this loop till the end in order to advance idx
@@ -231,14 +250,13 @@ namespace ryujin
 
           const unsigned int row = *idx;
 
-          entries_to_be_sent.push_back({row, 0});
-
+          entries_to_be_sent.emplace_back(row, 0);
           for (auto jt = ++sparsity.begin(row); jt != sparsity.end(row); ++jt) {
             if (jt->column() >= ghost_ranges[p_match] &&
                 jt->column() < ghost_ranges[p_match + 1]) {
               const unsigned int position_within_column =
                   jt - sparsity.begin(row);
-              entries_to_be_sent.push_back({row, position_within_column});
+              entries_to_be_sent.emplace_back(row, position_within_column);
             }
           }
         }
@@ -246,27 +264,6 @@ namespace ryujin
         send_targets[p].first = partitioner->import_targets()[p].first;
         send_targets[p].second = entries_to_be_sent.size();
       }
-
-      /*
-       * Count how many dofs to receive and the various buffers to set up
-       * for the MPI communication.
-       */
-
-      std::size_t receive_counter = 0;
-      unsigned int loc_count = 0;
-      for (unsigned int i = n_locally_owned_dofs; i < sparsity.n_rows(); ++i) {
-        receive_counter += sparsity.row_length(i);
-        ++loc_count;
-        if (loc_count == vec_gt->second) {
-          receive_targets[vec_gt - partitioner->ghost_targets().begin()]
-              .second = receive_counter;
-          loc_count = 0;
-          ++vec_gt;
-        }
-      }
-
-      Assert(vec_gt == partitioner->ghost_targets().end(),
-             dealii::ExcInternalError());
     }
   }
 
