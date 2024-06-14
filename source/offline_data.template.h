@@ -127,6 +127,22 @@ namespace ryujin
 
     affine_constraints_.close();
 
+#ifdef DEBUG
+    {
+      /* Check that constraints are consistent in parallel: */
+      const std::vector<IndexSet> &locally_owned_dofs =
+          Utilities::MPI::all_gather(mpi_communicator_,
+                                     dof_handler.locally_owned_dofs());
+      const IndexSet locally_active =
+          dealii::DoFTools::extract_locally_active_dofs(dof_handler);
+      Assert(affine_constraints_.is_consistent_in_parallel(locally_owned_dofs,
+                                                           locally_active,
+                                                           mpi_communicator_,
+                                                           /*verbose*/ true),
+             ExcInternalError());
+    }
+#endif
+
     sparsity_pattern_.reinit(
         dof_handler.n_dofs(), dof_handler.n_dofs(), locally_relevant);
 
@@ -761,10 +777,11 @@ namespace ryujin
 #ifdef DEAL_II_WITH_TRILINOS
       ScalarVector one(scalar_partitioner_);
       one = 1.;
+      affine_constraints_assembly.set_zero(one);
 
       ScalarVector local_lumped_mass_matrix(scalar_partitioner_);
       mass_matrix_tmp.vmult(local_lumped_mass_matrix, one);
-      lumped_mass_matrix_.compress(VectorOperation::add);
+      local_lumped_mass_matrix.compress(VectorOperation::add);
 
       for (unsigned int i = 0; i < scalar_partitioner_->locally_owned_size();
            ++i) {
@@ -780,6 +797,7 @@ namespace ryujin
 
       dealii::Vector<Number> one(mass_matrix_tmp.m());
       one = 1.;
+      affine_constraints_assembly.set_zero(one);
 
       dealii::Vector<Number> local_lumped_mass_matrix(mass_matrix_tmp.m());
       mass_matrix_tmp.vmult(local_lumped_mass_matrix, one);
@@ -987,6 +1005,103 @@ namespace ryujin
       coupling_boundary_pairs_ = collect_coupling_boundary_pairs(
           dof_handler.begin_active(), dof_handler.end(), *scalar_partitioner_);
     }
+
+#ifdef DEBUG
+    /*
+     * Verify that we have consistent mass:
+     */
+
+    double total_mass = 0.;
+    for (unsigned int i = 0; i < n_locally_owned_; ++i)
+      total_mass += lumped_mass_matrix_.local_element(i);
+    total_mass = Utilities::MPI::sum(total_mass, mpi_communicator_);
+
+    Assert(std::abs(measure_of_omega_ - total_mass) < 1.e-12,
+           dealii::ExcMessage(
+               "Total mass differs from the measure of the domain."));
+
+    /*
+     * Verify that the mij_matrix_ object is consistent:
+     */
+
+    for (unsigned int i = 0; i < n_locally_owned_; ++i) {
+      /* Skip constrained degrees of freedom: */
+      const unsigned int row_length = sparsity_pattern_simd_.row_length(i);
+      if (row_length == 1)
+        continue;
+
+      auto sum =
+          mass_matrix_.get_entry(i, 0) - lumped_mass_matrix_.local_element(i);
+
+      /* skip diagonal */
+      constexpr auto simd_length = VectorizedArray<Number>::size();
+      const unsigned int *js = sparsity_pattern_simd_.columns(i);
+      for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
+        const auto j = *(i < n_locally_internal_ ? js + col_idx * simd_length
+                                                 : js + col_idx);
+        Assert(j < n_locally_relevant_, dealii::ExcInternalError());
+
+        const auto m_ij = mass_matrix_.get_entry(i, col_idx);
+        Assert(std::abs(m_ij) > 1.e-12, dealii::ExcInternalError());
+        sum += m_ij;
+
+        const auto m_ji = mass_matrix_.get_transposed_entry(i, col_idx);
+        if (std::abs(m_ij - m_ji) >= 1.e-12) {
+          // The m_ij matrix is not symmetric
+          std::stringstream ss;
+          ss << "m_ij matrix is not symmetric: " << m_ij << " <-> " << m_ji;
+          Assert(false, dealii::ExcMessage(ss.str()));
+        }
+      }
+
+      Assert(std::abs(sum) < 1.e-12, dealii::ExcInternalError());
+    }
+
+    /*
+     * Verify that the cij_matrix_ object is consistent:
+     */
+
+    for (unsigned int i = 0; i < n_locally_owned_; ++i) {
+      /* Skip constrained degrees of freedom: */
+      const unsigned int row_length = sparsity_pattern_simd_.row_length(i);
+      if (row_length == 1)
+        continue;
+
+      auto sum = cij_matrix_.get_tensor(i, 0);
+
+      /* skip diagonal */
+      constexpr auto simd_length = VectorizedArray<Number>::size();
+      const unsigned int *js = sparsity_pattern_simd_.columns(i);
+      for (unsigned int col_idx = 1; col_idx < row_length; ++col_idx) {
+        const auto j = *(i < n_locally_internal_ ? js + col_idx * simd_length
+                                                 : js + col_idx);
+        Assert(j < n_locally_relevant_, dealii::ExcInternalError());
+
+        const auto c_ij = cij_matrix_.get_tensor(i, col_idx);
+        Assert(c_ij.norm() > 1.e-12, dealii::ExcInternalError());
+        sum += c_ij;
+
+        const auto c_ji = cij_matrix_.get_transposed_tensor(i, col_idx);
+        if ((c_ij + c_ji).norm() >= 1.e-12) {
+          // The c_ij matrix is not symmetric, this can only happen if i
+          // and j are both located on the boundary.
+
+          CouplingDescription coupling{i, col_idx, j};
+          const auto it = std::find(coupling_boundary_pairs_.begin(),
+                                    coupling_boundary_pairs_.end(),
+                                    coupling);
+          if (it == coupling_boundary_pairs_.end()) {
+            std::stringstream ss;
+            ss << "c_ij matrix is not anti-symmetric: " << c_ij << " <-> "
+               << c_ji;
+            Assert(false, dealii::ExcMessage(ss.str()));
+          }
+        }
+      }
+
+      Assert(sum.norm() < 1.e-12, dealii::ExcInternalError());
+    }
+#endif
   }
 
 
