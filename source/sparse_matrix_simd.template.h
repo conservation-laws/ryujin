@@ -203,10 +203,16 @@ namespace ryujin
       for (unsigned int p = 0; p < partitioner->import_targets().size(); ++p) {
 
         /*
-         * Match up processor index between receive and import targets. If
+         * Match up the rank index between receive and import targets. If
          * we do not find a match, which can happen for locally refined
-         * meshes - then set p_match equal to receive_targests.size().
+         * meshes, then we set p_match equal to receive_targests.size().
+         *
+         * When trying to match the next processor index we consequently
+         * have to reset p_match to 0 again. This assumes that processor
+         * indices are sorted in the receive_targets and ghost_targets
+         * vectors.
          */
+        p_match = (p_match == receive_targets.size() ? 0 : p_match);
         while (p_match < receive_targets.size() &&
                receive_targets[p_match].first !=
                    partitioner->import_targets()[p].first)
