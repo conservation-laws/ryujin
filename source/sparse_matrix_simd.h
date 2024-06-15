@@ -129,10 +129,15 @@ namespace ryujin
     std::vector<std::pair<unsigned int, unsigned int>> send_targets;
 
     /**
-     * All receive targets stored as a pair consisting of an MPI rank (first
-     * entry) and a corresponding index range into the (serial) data()
-     * array given by the half open range [receive_targets[p-1].second,
-     * receive_targets[p])
+     * All receive targets are stored as a pair consisting of an MPI rank
+     * (first entry) and a corresponding index range into the (serial)
+     * data array given by the half open range
+     * [receive_targets[p-1].second, receive_targets[p].second).
+     *
+     * Note, that indices into the data array start with the "locally
+     * relevant", or "ghost range" offset by n_locally_owned_dofs and
+     * multiplied by the number of components stored by the (vector valued)
+     * matrix.
      */
     std::vector<std::pair<unsigned int, unsigned int>> receive_targets;
 
