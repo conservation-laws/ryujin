@@ -105,7 +105,7 @@ namespace ryujin
 
     std::size_t n_nonzero_elements() const;
 
-  private:
+  protected:
     unsigned int n_internal_dofs;
     unsigned int n_locally_owned_dofs;
     std::shared_ptr<const dealii::Utilities::MPI::Partitioner> partitioner;
@@ -296,7 +296,7 @@ namespace ryujin
 
     void update_ghost_rows();
 
-  private:
+  protected:
     const SparsityPatternSIMD<simd_length> *sparsity;
     dealii::AlignedVector<Number> data;
     dealii::AlignedVector<Number> exchange_buffer;
