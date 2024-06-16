@@ -1,0 +1,42 @@
+subsection A - TimeLoop
+  set basename                  = test
+
+  set enable compute quantities = true
+  set enable output full        = false
+
+  set final time                = 0.50
+  set timer granularity         = 0.50
+
+  set terminal update interval  = 0
+
+  set debug filename            = test-interior-R0001-space_averaged_time_series.dat
+end
+
+subsection B - Equation
+  set dimension = 2
+  set equation  = euler
+  set gamma     = 1.4
+end
+
+subsection C - Discretization
+  set geometry        = annulus
+  set mesh refinement = 0
+end
+
+subsection E - InitialValues
+  set configuration = uniform
+  set direction     =  1,  0
+  set position      =  0,  0
+
+end
+
+subsection H - TimeIntegrator
+  set cfl min            = 0.9
+  set cfl max            = 0.9
+  set cfl recovery strategy = none
+  set time stepping scheme  = ssprk 33
+end
+
+subsection J - Quantities
+  set interior manifolds           = interior : 0. : space_averaged
+end
