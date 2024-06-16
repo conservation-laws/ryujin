@@ -1289,7 +1289,7 @@ namespace ryujin
      * At this point we have collected multiple cell contributions for each
      * boundary degree of freedom. We now merge all entries that have the
      * same boundary id and whose normals describe an acute angle of about
-     * 85 degrees or less.
+     * 60 degrees or less.
      *
      * FIXME: is this robust in 3D?
      */
@@ -1300,11 +1300,11 @@ namespace ryujin
       bool inserted = false;
       const auto range = filtered_map.equal_range(entry.first);
       for (auto it = range.first; it != range.second; ++it) {
-        const auto &[new_normal,
-                     new_normal_mass,
-                     new_boundary_mass,
-                     new_id,
-                     new_point] = entry.second;
+        auto &[new_normal,
+               new_normal_mass,
+               new_boundary_mass,
+               new_id,
+               new_point] = entry.second;
         auto &[normal, normal_mass, boundary_mass, id, point] = it->second;
 
         if (id != new_id)
@@ -1312,11 +1312,29 @@ namespace ryujin
 
         Assert(point.distance(new_point) < 1.0e-14, dealii::ExcInternalError());
 
-        if (normal * new_normal / normal.norm() / new_normal.norm() > 0.08) {
-          /* Both normals describe an acute angle of 85 degrees or less. */
+        if (normal * new_normal / normal.norm() / new_normal.norm() > 0.50) {
+          /*
+           * Both normals describe an acute angle of 85 degrees or less.
+           * Merge the entries and continue.
+           */
           normal += new_normal;
           boundary_mass += new_boundary_mass;
           inserted = true;
+          continue;
+
+        } else if constexpr (dim == 2) {
+          /*
+           * Workaround for 2D: When enforcing slip boundary conditions
+           * with two noncollinear vectors the resulting momentum must be
+           * 0. But the normals don't necessarily describe an orthonormal
+           * basis and we cannot use orthogonal projection. Therefore,
+           * simply set the boundary type to no slip:
+           */
+          if (new_id == Boundary::slip) {
+            Assert(id == Boundary::slip, dealii::ExcInternalError());
+            new_id = Boundary::no_slip;
+            id = Boundary::no_slip;
+          }
         }
       }
       if (!inserted)
