@@ -118,6 +118,8 @@ namespace ryujin
 
     std::string base_name_;
 
+    std::string debug_filename_;
+
     Number t_final_;
     Number timer_granularity_;
 
