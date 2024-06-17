@@ -21,6 +21,11 @@ namespace ryujin
     class Function : public EquationOfState
     {
     public:
+      using EquationOfState::pressure;
+      using EquationOfState::specific_internal_energy;
+      using EquationOfState::speed_of_sound;
+      using EquationOfState::temperature;
+
       Function(const std::string &subsection)
           : EquationOfState("function", subsection)
       {

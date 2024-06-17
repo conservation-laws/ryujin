@@ -212,6 +212,11 @@ namespace ryujin
     class Sesame : public EquationOfState
     {
     public:
+      using EquationOfState::pressure;
+      using EquationOfState::specific_internal_energy;
+      using EquationOfState::speed_of_sound;
+      using EquationOfState::temperature;
+
 #ifdef WITH_EOSPAC
       Sesame(const std::string &subsection)
           : EquationOfState("sesame", subsection)

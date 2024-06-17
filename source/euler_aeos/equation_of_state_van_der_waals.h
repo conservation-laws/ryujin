@@ -19,6 +19,11 @@ namespace ryujin
     class VanDerWaals : public EquationOfState
     {
     public:
+      using EquationOfState::pressure;
+      using EquationOfState::specific_internal_energy;
+      using EquationOfState::speed_of_sound;
+      using EquationOfState::temperature;
+
       VanDerWaals(const std::string &subsection)
           : EquationOfState("van der waals", subsection)
       {
