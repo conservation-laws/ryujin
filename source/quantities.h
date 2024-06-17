@@ -219,13 +219,14 @@ namespace ryujin
                                    std::vector<value_type> &new_val);
 
     template <typename value_type>
-    void internal_write_out(std::ostream &output,
+    void internal_write_out(const std::string &file_name,
+                            const std::string &time_stamp,
                             const std::vector<value_type> &values,
                             const Number scale);
 
     template <typename value_type>
     void internal_write_out_time_series(
-        std::ostream &output,
+        const std::string &file_name,
         const std::vector<std::tuple<Number, value_type>> &values,
         bool append);
 
