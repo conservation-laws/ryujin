@@ -60,7 +60,6 @@ namespace ryujin
       , hyperbolic_system_(&hyperbolic_system)
       , parabolic_system_(&parabolic_system)
       , base_name_("")
-      , time_series_cycle_(1)
       , first_cycle_(true)
   {
 
@@ -90,15 +89,17 @@ namespace ryujin
 
 
   template <typename Description, int dim, typename Number>
-  void Quantities<Description, dim, Number>::prepare(const std::string &name,
-                                                     unsigned int cycle)
+  void
+  Quantities<Description, dim, Number>::prepare(const std::string &name,
+                                                unsigned int cycle,
+                                                unsigned int output_granularity)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "Quantities<dim, Number>::prepare()" << std::endl;
 #endif
 
     base_name_ = name;
-    time_series_cycle_ = cycle;
+
     first_cycle_ = true;
 
     const unsigned int n_owned = offline_data_->n_locally_owned();
@@ -207,8 +208,10 @@ namespace ryujin
 
       if (Utilities::MPI::this_mpi_process(mpi_communicator_) == 0) {
 
-        std::ofstream output(base_name_ + "-" + name + "-R" +
-                             Utilities::to_string(cycle, 4) + "-points.dat");
+        std::ofstream output(
+            base_name_ + "-" + name + "-R" +
+            Utilities::to_string(cycle + output_granularity, 4) +
+            "-points.dat");
 
         output << std::scientific << std::setprecision(14);
 
@@ -289,8 +292,10 @@ namespace ryujin
 
       if (Utilities::MPI::this_mpi_process(mpi_communicator_) == 0) {
 
-        std::ofstream output(base_name_ + "-" + name + "-R" +
-                             Utilities::to_string(cycle, 4) + "-points.dat");
+        std::ofstream output(
+            base_name_ + "-" + name + "-R" +
+            Utilities::to_string(cycle + output_granularity, 4) +
+            "-points.dat");
 
         output << std::scientific << std::setprecision(14);
 
@@ -616,7 +621,7 @@ namespace ryujin
 
           std::ofstream output;
           const auto file_name = base_name_ + "-" + name + "-R" +
-                                 Utilities::to_string(time_series_cycle_, 4) +
+                                 Utilities::to_string(cycle, 4) +
                                  "-space_averaged_time_series.dat";
 
           output << std::scientific << std::setprecision(14);

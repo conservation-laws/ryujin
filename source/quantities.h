@@ -66,7 +66,9 @@ namespace ryujin
      *
      * The string parameter @p name is used as base name for output files.
      */
-    void prepare(const std::string &name, unsigned int cycle);
+    void prepare(const std::string &name,
+                 unsigned int cycle,
+                 unsigned int output_granularity);
 
     /**
      * Takes a state vector @p U at time t (obtained at the end of a full
@@ -199,7 +201,6 @@ namespace ryujin
         interior_time_series_;
 
     std::string base_name_;
-    unsigned int time_series_cycle_;
     bool first_cycle_;
 
     //@}
