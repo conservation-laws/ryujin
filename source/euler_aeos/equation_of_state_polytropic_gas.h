@@ -19,6 +19,11 @@ namespace ryujin
     class PolytropicGas : public EquationOfState
     {
     public:
+      using EquationOfState::pressure;
+      using EquationOfState::specific_internal_energy;
+      using EquationOfState::speed_of_sound;
+      using EquationOfState::temperature;
+
       PolytropicGas(const std::string &subsection)
           : EquationOfState("polytropic gas", subsection)
       {

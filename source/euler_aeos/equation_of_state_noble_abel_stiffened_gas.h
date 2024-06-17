@@ -19,6 +19,11 @@ namespace ryujin
     class NobleAbelStiffenedGas : public EquationOfState
     {
     public:
+      using EquationOfState::pressure;
+      using EquationOfState::specific_internal_energy;
+      using EquationOfState::speed_of_sound;
+      using EquationOfState::temperature;
+
       NobleAbelStiffenedGas(const std::string &subsection)
           : EquationOfState("noble abel stiffened gas", subsection)
       {
