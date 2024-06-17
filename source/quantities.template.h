@@ -423,7 +423,8 @@ namespace ryujin
   template <typename Description, int dim, typename Number>
   template <typename value_type>
   void Quantities<Description, dim, Number>::internal_write_out(
-      std::ostream &output,
+      const std::string &file_name,
+      const std::string &time_stamp,
       const std::vector<value_type> &values,
       const Number scale)
   {
@@ -437,7 +438,9 @@ namespace ryujin
 
     if (Utilities::MPI::this_mpi_process(mpi_communicator_) == 0) {
 
-      output << "# " << header_;
+      std::ofstream output(file_name);
+      output << std::scientific << std::setprecision(14);
+      output << time_stamp << "# " << header_;
 
       unsigned int rank = 0;
       for (const auto &entries : received) {
@@ -456,14 +459,20 @@ namespace ryujin
   template <typename Description, int dim, typename Number>
   template <typename value_type>
   void Quantities<Description, dim, Number>::internal_write_out_time_series(
-      std::ostream &output,
+      const std::string &file_name,
       const std::vector<std::tuple<Number, value_type>> &values,
       bool append)
   {
     if (Utilities::MPI::this_mpi_process(mpi_communicator_) == 0) {
+      std::ofstream output;
+      output << std::scientific << std::setprecision(14);
 
-      if (!append)
+      if (append) {
+        output.open(file_name, std::ofstream::out | std::ofstream::app);
+      } else {
+        output.open(file_name, std::ofstream::out | std::ofstream::trunc);
         output << "# time t\t" << header_;
+      }
 
       for (const auto &entry : values) {
         const auto t = std::get<0>(entry);
@@ -473,6 +482,7 @@ namespace ryujin
       }
 
       output << std::flush;
+      output.close();
     }
   }
 
@@ -574,8 +584,14 @@ namespace ryujin
 
         if (options.find("instantaneous") != std::string::npos) {
 
+          const std::string file_name = prefix + "-instantaneous.dat";
+
           auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
               statistics[name];
+
+          std::stringstream time_stamp;
+          time_stamp << std::scientific << std::setprecision(14);
+          time_stamp << "# at t = " << t << std::endl;
 
           /* We have not computed any updated statistics yet: */
 
@@ -585,12 +601,7 @@ namespace ryujin
           else
             AssertThrow(t_new == t, dealii::ExcInternalError());
 
-          std::ofstream output(prefix + "-instantaneous.dat");
-
-          output << std::scientific << std::setprecision(14);
-          output << "# at t = " << t << std::endl;
-
-          internal_write_out(output, val_new, Number(1.));
+          internal_write_out(file_name, time_stamp.str(), val_new, Number(1.));
         }
 
         /*
@@ -599,16 +610,18 @@ namespace ryujin
 
         if (options.find("time_averaged") != std::string::npos) {
 
-          std::ofstream output(prefix + "-time_averaged.dat");
+          const std::string file_name = prefix + "-time_averaged.dat";
 
           auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
               statistics[name];
 
-          output << std::scientific << std::setprecision(14);
-          output << "# averaged from t = " << t_new - t_sum
-                 << " to t = " << t_new << std::endl;
+          std::stringstream time_stamp;
+          time_stamp << std::scientific << std::setprecision(14);
+          time_stamp << "# averaged from t = " << t_new - t_sum
+                     << " to t = " << t_new << std::endl;
 
-          internal_write_out(output, val_sum, Number(1.) / t_sum);
+          internal_write_out(
+              file_name, time_stamp.str(), val_sum, Number(1.) / t_sum);
         }
 
         /*
@@ -619,22 +632,15 @@ namespace ryujin
 
           auto &series = time_series[name];
 
-          std::ofstream output;
           const auto file_name = base_name_ + "-" + name + "-R" +
                                  Utilities::to_string(cycle, 4) +
                                  "-space_averaged_time_series.dat";
 
-          output << std::scientific << std::setprecision(14);
-
           if (first_cycle_) {
             first_cycle_ = false;
-            output.open(file_name, std::ofstream::out | std::ofstream::trunc);
-            internal_write_out_time_series(output, series, /*append*/ false);
-
+            internal_write_out_time_series(file_name, series, /*append*/ false);
           } else {
-
-            output.open(file_name, std::ofstream::out | std::ofstream::app);
-            internal_write_out_time_series(output, series, /*append*/ true);
+            internal_write_out_time_series(file_name, series, /*append*/ true);
           }
 
           series.clear();

@@ -201,6 +201,13 @@ namespace ryujin
                   "number of threads (per rank). If set to false then a plain "
                   "average per thread \"CPU\" throughput value is computed by "
                   "using the umodified total accumulated CPU time.");
+
+    debug_filename_ = "";
+    add_parameter("debug filename",
+                  debug_filename_,
+                  "If set to a nonempty string then we output the contents of "
+                  "this file at the end. This is mainly useful in the "
+                  "testsuite to output files we wish to compare");
   }
 
 
@@ -411,6 +418,12 @@ namespace ryujin
     if (enable_compute_error_) {
       /* Output final error: */
       compute_error(state_vector, t);
+    }
+
+    if (debug_filename_ != "") {
+      std::ifstream f(debug_filename_);
+      if (f.is_open())
+        std::cout << f.rdbuf();
     }
 
 #ifdef WITH_VALGRIND
