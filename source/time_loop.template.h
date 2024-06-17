@@ -275,7 +275,7 @@ namespace ryujin
       } else {
 
         print_info("creating mesh");
-        discretization_.prepare();
+        discretization_.prepare(base_name_);
 
         prepare_compute_kernels();
 

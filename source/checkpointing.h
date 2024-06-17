@@ -41,7 +41,7 @@ namespace ryujin
     {
       if constexpr (have_distributed_triangulation<dim>) {
         discretization.refinement() = 0; /* do not refine */
-        discretization.prepare();
+        discretization.prepare(base_name);
         discretization.triangulation().load(base_name + "-checkpoint.mesh");
       } else {
         AssertThrow(false, dealii::ExcNotImplemented());

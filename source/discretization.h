@@ -245,7 +245,7 @@ namespace ryujin
      * Create the triangulation and set up the finite element, mapping and
      * quadrature objects.
      */
-    void prepare();
+    void prepare(const std::string &base_name);
 
     /**
      * @name Accessors to data structures managed by this class.
@@ -354,11 +354,11 @@ namespace ryujin
 
     std::string geometry_;
 
-    double mesh_distortion_;
-
     unsigned int refinement_;
 
-    bool repartitioning_;
+    bool mesh_writeout_;
+    double mesh_distortion_;
+    bool mesh_repartitioning_;
 
     //@}
     /**
