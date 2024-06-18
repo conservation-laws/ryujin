@@ -115,7 +115,6 @@ namespace ryujin
       grid_out.write_msh(triangulation, base_name + "-coarse_grid.msh");
 #else
       GridOut grid_out;
-      grid_out.write_msh(triangulation, base_name + "-coarse_grid.msh");
       GridOutFlags::Msh flags(/* write faces */ true, /* write lines */ true);
       grid_out.set_flags(flags);
       std::ofstream file(base_name + "-coarse_grid.msh");
