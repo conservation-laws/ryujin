@@ -54,7 +54,6 @@ subsection E - InitialValues
 end
 
 subsection F - HyperbolicModule
-  set cfl with boundary dofs        = false
   set limiter iterations            = 2
   set limiter newton max iterations = 2
   set limiter newton tolerance      = 1e-10
