@@ -40,7 +40,6 @@ subsection C - Discretization
   set geometry            = cylinder
 
   set mesh refinement     = 8
-  set mesh repartitioning = false
 
   subsection cylinder
     set height          = 2
