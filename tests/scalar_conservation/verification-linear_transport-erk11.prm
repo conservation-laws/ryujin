@@ -28,7 +28,6 @@ subsection C - Discretization
   set geometry            = rectangular domain
 
   set mesh refinement     = 9
-  set mesh repartitioning = false
 
   subsection rectangular domain
     set boundary condition left   = periodic

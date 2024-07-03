@@ -39,7 +39,6 @@ subsection C - Discretization
   set geometry            = wall
 
   set mesh refinement     = 7
-  set mesh repartitioning = false
 
   subsection wall
     set height        = 1

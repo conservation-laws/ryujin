@@ -358,7 +358,6 @@ namespace ryujin
 
     bool mesh_writeout_;
     double mesh_distortion_;
-    bool mesh_repartitioning_;
 
     //@}
     /**

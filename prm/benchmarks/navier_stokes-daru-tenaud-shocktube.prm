@@ -52,7 +52,6 @@ end
 subsection C - Discretization
   set geometry            = rectangular domain
   set mesh refinement     = 10
-  set mesh repartitioning = true
 
   subsection rectangular domain
     set boundary condition bottom = no slip

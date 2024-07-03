@@ -43,7 +43,6 @@ subsection C - Discretization
   set geometry            = step
 
   set mesh refinement     = 3
-  set mesh repartitioning = false
 
   subsection step
     set height        = 1
