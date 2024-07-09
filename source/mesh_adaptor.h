@@ -87,8 +87,8 @@ namespace ryujin
     void prepare(const Number t);
 
     /**
-     * Analyze the given StateVector and decide - depending on adaptation
-     * strategy - whether a mesh adaptation cycle should be performed.
+     * Analyze the given StateVector with the configured adaptation strategy
+     * and decide whether a mesh adaptation cycle should be performed.
      */
     void analyze(const StateVector &state_vector,
                  const Number t,

@@ -157,13 +157,6 @@ namespace ryujin
         "Multiplicative modifier applied to \"timer granularity\" that "
         "determines the writeout granularity for quantities of interest");
 
-    timer_mesh_adaptivity_multiplier_ = 1;
-    add_parameter(
-        "timer mesh adaptivity multiplier",
-        timer_compute_quantities_multiplier_,
-        "Multiplicative modifier applied to \"timer granularity\" that "
-        "determines the call granularity to MeshAdaptor::analyze()");
-
     std::copy(std::begin(View::component_names),
               std::end(View::component_names),
               std::back_inserter(error_quantities_));
@@ -320,6 +313,27 @@ namespace ryujin
         quantities_.accumulate(state_vector, t);
       }
 
+      /* Peform a adaptation: */
+
+      if (enable_mesh_adaptivity_) {
+        {
+          Scope scope(computing_timer_,
+                      "time step [X]   - analyze for mesh adaptation");
+
+          mesh_adaptor_.analyze(state_vector, t, cycle);
+        }
+
+        if (mesh_adaptor_.need_mesh_adaptation() && t < t_final_) {
+          Scope scope(computing_timer_, "(re)initialize data structures");
+          print_info("performing mesh adaptation");
+
+          mesh_adaptor_.adapt_mesh_and_transfer_state_vector(
+              discretization_.triangulation(),
+              state_vector,
+              prepare_compute_kernels);
+        }
+      }
+
       /*
        * Perform various tasks whenever we reach a timer tick:
        */
@@ -350,22 +364,6 @@ namespace ryujin
           Scope scope(computing_timer_,
                       "time step [X]   - write out quantities");
           quantities_.write_out(state_vector, t, timer_cycle);
-        }
-
-        if (enable_mesh_adaptivity_) {
-          Scope scope(computing_timer_,
-                      "time step [X]   - analyze for mesh adaptation");
-          mesh_adaptor_.analyze(state_vector, t, timer_cycle);
-        }
-
-        if (mesh_adaptor_.need_mesh_adaptation() && t < t_final_) {
-          Scope scope(computing_timer_, "(re)initialize data structures");
-          print_info("performing mesh adaptation");
-
-          mesh_adaptor_.adapt_mesh_and_transfer_state_vector(
-              discretization_.triangulation(),
-              state_vector,
-              prepare_compute_kernels);
         }
 
         ++timer_cycle;
