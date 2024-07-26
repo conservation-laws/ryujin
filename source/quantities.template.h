@@ -60,7 +60,6 @@ namespace ryujin
       , hyperbolic_system_(&hyperbolic_system)
       , parabolic_system_(&parabolic_system)
       , base_name_("")
-      , first_cycle_(true)
   {
 
     add_parameter("interior manifolds",
@@ -100,7 +99,8 @@ namespace ryujin
 
     base_name_ = name;
 
-    first_cycle_ = true;
+    /* Force to write to a new time series file: */
+    time_series_cycle_.reset();
 
     const unsigned int n_owned = offline_data_->n_locally_owned();
     const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
@@ -629,20 +629,19 @@ namespace ryujin
          */
 
         if (options.find("space_averaged") != std::string::npos) {
-
-          auto &series = time_series[name];
-
-          const auto file_name = base_name_ + "-" + name + "-R" +
-                                 Utilities::to_string(cycle, 4) +
-                                 "-space_averaged_time_series.dat";
-
-          if (first_cycle_) {
-            first_cycle_ = false;
-            internal_write_out_time_series(file_name, series, /*append*/ false);
-          } else {
-            internal_write_out_time_series(file_name, series, /*append*/ true);
+          bool append = true;
+          if (!time_series_cycle_.has_value()) {
+            time_series_cycle_ = cycle;
+            append = false;
           }
 
+          const auto file_name =
+              base_name_ + "-" + name + "-R" +
+              Utilities::to_string(time_series_cycle_.value(), 4) +
+              "-space_averaged_time_series.dat";
+
+          auto &series = time_series[name];
+          internal_write_out_time_series(file_name, series, /*append*/ append);
           series.clear();
         }
       }

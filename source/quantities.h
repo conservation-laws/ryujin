@@ -15,6 +15,8 @@
 #include <deal.II/lac/sparse_matrix.templates.h>
 #include <deal.II/lac/vector.h>
 
+#include <optional>
+
 namespace ryujin
 {
   /**
@@ -202,6 +204,7 @@ namespace ryujin
 
     std::string base_name_;
     bool first_cycle_;
+    std::optional<unsigned int> time_series_cycle_;
 
     //@}
     /**
