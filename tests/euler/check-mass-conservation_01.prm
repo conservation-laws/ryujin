@@ -9,7 +9,7 @@ subsection A - TimeLoop
 
   set terminal update interval  = 0
 
-  set debug filename            = test-interior-R0001-space_averaged_time_series.dat
+  set debug filename            = test-interior-R0000-space_averaged_time_series.dat
 end
 
 subsection B - Equation
