@@ -615,13 +615,16 @@ namespace ryujin
           auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
               statistics[name];
 
-          std::stringstream time_stamp;
-          time_stamp << std::scientific << std::setprecision(14);
-          time_stamp << "# averaged from t = " << t_new - t_sum
-                     << " to t = " << t_new << std::endl;
+          /* Check whether we have accumulated any statistics yet: */
+          if (t_sum != Number(0.)) {
+            std::stringstream time_stamp;
+            time_stamp << std::scientific << std::setprecision(14);
+            time_stamp << "# averaged from t = " << t_new - t_sum
+                       << " to t = " << t_new << std::endl;
 
-          internal_write_out(
-              file_name, time_stamp.str(), val_sum, Number(1.) / t_sum);
+            internal_write_out(
+                file_name, time_stamp.str(), val_sum, Number(1.) / t_sum);
+          }
         }
 
         /*
