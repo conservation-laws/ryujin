@@ -301,29 +301,7 @@ namespace ryujin
         quantities_.accumulate(state_vector, t);
       }
 
-      /* Peform a mesh adaptation cycle: */
-
-      if (enable_mesh_adaptivity_) {
-        {
-          Scope scope(computing_timer_,
-                      "time step [X]   - analyze for mesh adaptation");
-
-          mesh_adaptor_.analyze(state_vector, t, cycle);
-        }
-
-        if (mesh_adaptor_.need_mesh_adaptation() && t < t_final_) {
-          Scope scope(computing_timer_, "(re)initialize data structures");
-          print_info("performing mesh adaptation");
-
-          hyperbolic_module_.prepare_state_vector(state_vector, t);
-          adapt_mesh_and_transfer_state_vector(state_vector,
-                                               prepare_compute_kernels);
-        }
-      }
-
-      /*
-       * Perform various tasks whenever we reach a timer tick:
-       */
+      /* Perform various tasks whenever we reach a timer tick: */
 
       if (t >= timer_cycle * timer_granularity_) {
         output(state_vector, base_name_ + "-solution", t, timer_cycle);
@@ -355,19 +333,37 @@ namespace ryujin
         ++timer_cycle;
       }
 
-      /*
-       * Break if we have reached the final time, otherwise do a time step:
-       */
+      /* Break if we have reached the final time. */
 
       if (t >= t_final_)
         break;
 
+      /* Peform a mesh adaptation cycle: */
+
+      if (enable_mesh_adaptivity_) {
+        {
+          Scope scope(computing_timer_,
+                      "time step [X]   - analyze for mesh adaptation");
+
+          mesh_adaptor_.analyze(state_vector, t, cycle);
+        }
+
+        if (mesh_adaptor_.need_mesh_adaptation()) {
+          Scope scope(computing_timer_, "(re)initialize data structures");
+          print_info("performing mesh adaptation");
+
+          hyperbolic_module_.prepare_state_vector(state_vector, t);
+          adapt_mesh_and_transfer_state_vector(state_vector,
+                                               prepare_compute_kernels);
+        }
+      }
+
+      /* Perform a time step: */
+
       const auto tau = time_integrator_.step(state_vector, t);
       t += tau;
 
-      /*
-       * Print and record cycle statistics:
-       */
+      /* Print and record cycle statistics: */
       {
         const bool write_to_log_file = (t >= timer_cycle * timer_granularity_);
 
