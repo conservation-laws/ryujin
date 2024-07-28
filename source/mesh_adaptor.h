@@ -9,6 +9,8 @@
 
 #include <deal.II/base/parameter_acceptor.h>
 
+#include <random>
+
 namespace ryujin
 {
   /**
@@ -153,6 +155,7 @@ namespace ryujin
     //@{
 
     AdaptationStrategy adaptation_strategy_;
+    std::uint_fast64_t random_adaptation_mersenne_twister_seed_;
 
     MarkingStrategy marking_strategy_;
     double fixed_number_refinement_fraction_;
@@ -174,6 +177,8 @@ namespace ryujin
     dealii::SmartPointer<const ParabolicSystem> parabolic_system_;
 
     bool need_mesh_adaptation_;
+
+    mutable std::mt19937_64 mersenne_twister_;
     //@}
   };
 

@@ -44,9 +44,17 @@ namespace ryujin
                   "The chosen time point selection strategy. Possible values "
                   "are: fixed adaptation time points");
 
+    /* Options for various adaptation strategies: */
+    enter_subsection("adaptation strategies");
+    random_adaptation_mersenne_twister_seed_ = 42u;
+    add_parameter("random adaptation: mersenne_twister_seed",
+                  random_adaptation_mersenne_twister_seed_,
+                  "Seed for 64bit Mersenne Twister used for random refinement");
+    leave_subsection();
+
     /* Options for various marking strategies: */
 
-    enter_subsection("marking strategy");
+    enter_subsection("marking strategies");
     fixed_number_refinement_fraction_ = 0.3;
     add_parameter(
         "fixed number: refinement fraction",
@@ -62,13 +70,21 @@ namespace ryujin
 
     /* Options for various time point selection strategies: */
 
-    enter_subsection("time point selection strategy");
+    enter_subsection("time point selection strategies");
     adaptation_time_points_ = {};
     add_parameter("adaptation timepoints",
                   adaptation_time_points_,
                   "List of time points in (simulation) time at which we will "
                   "perform a mesh adaptation cycle.");
     leave_subsection();
+
+    const auto call_back = [this] {
+      /* Initialize Mersenne Twister with configured seed: */
+      mersenne_twister_.seed(random_adaptation_mersenne_twister_seed_);
+    };
+
+    call_back();
+    ParameterAcceptor::parse_parameters_call_back.connect(call_back);
   }
 
 
@@ -140,6 +156,12 @@ namespace ryujin
     Assert(&triangulation == &discretization.triangulation(),
            dealii::ExcInternalError());
 
+    /*
+     * Compute an indicator with the chosen adaptation strategy:
+     */
+
+    dealii::Vector<float> indicators;
+
     switch (adaptation_strategy_) {
     case AdaptationStrategy::global_refinement: {
       /* Simply mark all cells for refinement and return: */
@@ -149,7 +171,29 @@ namespace ryujin
     } break;
 
     case AdaptationStrategy::random_adaptation: {
-      return;
+      indicators.reinit(triangulation.n_active_cells());
+      std::generate(std::begin(indicators), std::end(indicators), [&]() {
+        static std::uniform_real_distribution<double> distribution(0.0, 10.0);
+        return distribution(mersenne_twister_);
+      });
+    } break;
+
+    default:
+      AssertThrow(false, dealii::ExcInternalError());
+      __builtin_trap();
+    }
+
+    /*
+     * Mark cells with chosen marking strategy:
+     */
+
+    switch (marking_strategy_) {
+    case MarkingStrategy::fixed_number: {
+      dealii::GridRefinement::refine_and_coarsen_fixed_number(
+          triangulation,
+          indicators,
+          fixed_number_refinement_fraction_,
+          fixed_number_coarsening_fraction_);
     } break;
 
     default:
