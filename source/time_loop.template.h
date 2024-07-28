@@ -301,7 +301,7 @@ namespace ryujin
         quantities_.accumulate(state_vector, t);
       }
 
-      /* Peform a adaptation: */
+      /* Peform a mesh adaptation cycle: */
 
       if (enable_mesh_adaptivity_) {
         {
@@ -607,7 +607,7 @@ namespace ryujin
      */
 
     auto &triangulation = discretization_.triangulation();
-    // mesh_adaptor_.mark_cells_for_coarsening_and_refinement(triangulation);
+    mesh_adaptor_.mark_cells_for_coarsening_and_refinement(triangulation);
 
     triangulation.prepare_coarsening_and_refinement();
 
@@ -615,7 +615,30 @@ namespace ryujin
      * Set up SolutionTransfer:
      */
 
-    // FIXME
+    const auto &dof_handler = offline_data_.dof_handler();
+    const auto &scalar_partitioner = offline_data_.scalar_partitioner();
+    auto &U = std::get<0>(state_vector);
+
+    using ScalarVector = typename Vectors::ScalarVector<Number>;
+    std::array<ScalarVector, problem_dimension> states;
+    unsigned int d = 0;
+    for (auto &it : states) {
+      it.reinit(scalar_partitioner);
+      U.extract_component(it, d++);
+    }
+
+    /* Create SolutionTransfer object, attach state vector and write out: */
+
+    dealii::parallel::distributed::SolutionTransfer<dim, ScalarVector>
+        solution_transfer(dof_handler);
+
+    std::vector<const ScalarVector *> ptr_state;
+    std::transform(states.begin(),
+                   states.end(),
+                   std::back_inserter(ptr_state),
+                   [](auto &it) { return &it; });
+
+    solution_transfer.prepare_for_coarsening_and_refinement(ptr_state);
 
     /*
      * Execute mesh adaptation and project old state to new state vector:
@@ -625,7 +648,25 @@ namespace ryujin
     prepare_compute_kernels();
 
     Vectors::reinit_state_vector<Description>(state_vector, offline_data_);
-    // FIXME
+
+    std::vector<ScalarVector> interpolated_state;
+    interpolated_state.resize(problem_dimension);
+    for (auto &it : interpolated_state) {
+      it.reinit(scalar_partitioner);
+      it.zero_out_ghost_values();
+    }
+
+    std::vector<ScalarVector *> ptr_interpolated_state;
+    std::transform(interpolated_state.begin(),
+                   interpolated_state.end(),
+                   std::back_inserter(ptr_interpolated_state),
+                   [](auto &it) { return &it; });
+    solution_transfer.interpolate(ptr_interpolated_state);
+
+    for (unsigned int k = 0; k < problem_dimension; ++k) {
+      U.insert_component(interpolated_state[k], k);
+    }
+    U.update_ghost_values();
   }
 
 
