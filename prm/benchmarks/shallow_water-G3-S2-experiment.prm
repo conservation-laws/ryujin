@@ -109,7 +109,7 @@ subsection H - TimeIntegrator
   set time stepping scheme  = erk 43
 end
 
-subsection I - VTUOutput
+subsection J - VTUOutput
   set manifolds                  = 
   set schlieren beta             = 10
   set schlieren quantities       = h
@@ -118,7 +118,7 @@ subsection I - VTUOutput
   set vtu output quantities      = h, m_1, m_2, bathymetry, alpha, v_1
 end
 
-subsection J - Quantities
+subsection K - Quantities
   set clear statistics on writeout = true
   set interior manifolds = lineout-x : x - 2.40 : instantaneous, \
                            lineout-y : y - 0.   : instantaneous  

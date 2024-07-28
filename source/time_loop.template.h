@@ -58,17 +58,17 @@ namespace ryujin
                        offline_data_,
                        hyperbolic_system_,
                        parabolic_system_,
-                       "/I - VTUOutput")
+                       "/J - VTUOutput")
       , vtu_output_(mpi_communicator_,
                     offline_data_,
                     hyperbolic_module_,
                     postprocessor_,
-                    "/I - VTUOutput")
+                    "/J - VTUOutput")
       , quantities_(mpi_communicator_,
                     offline_data_,
                     hyperbolic_system_,
                     parabolic_system_,
-                    "/J - Quantities")
+                    "/K - Quantities")
       , mpi_rank_(dealii::Utilities::MPI::this_mpi_process(mpi_communicator_))
       , n_mpi_processes_(
             dealii::Utilities::MPI::n_mpi_processes(mpi_communicator_))
