@@ -134,7 +134,6 @@ namespace ryujin
     unsigned int timer_output_full_multiplier_;
     unsigned int timer_output_levelsets_multiplier_;
     unsigned int timer_compute_quantities_multiplier_;
-    unsigned int timer_mesh_adaptivity_multiplier_;
 
     std::vector<std::string> error_quantities_;
     bool error_normalize_;

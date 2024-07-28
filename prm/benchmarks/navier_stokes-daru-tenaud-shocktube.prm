@@ -105,13 +105,13 @@ subsection H - TimeIntegrator
   set time stepping scheme  = strang erk 33 cn
 end
 
-subsection I - VTUOutput
+subsection J - VTUOutput
   set schlieren beta = 10
   set use mpi io     = true
 end
 
 
-subsection J - Quantities
+subsection K - Quantities
   set boundary manifolds = lower_boundary : y : time_averaged space_averaged
   set interior manifolds =
 end

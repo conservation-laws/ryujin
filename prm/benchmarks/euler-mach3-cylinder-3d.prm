@@ -34,7 +34,7 @@ subsection A - TimeLoop
   #
   # Output reduced vtks only containing hexahedra that intersect with the
   # cutplanes x, y, z, and x^2+y^2-0.25*0.25 (as configured down below in
-  # the "subsection I - VTUOutput").
+  # the "subsection J - VTUOutput").
   #
   set enable output levelsets           = true
 
@@ -91,7 +91,7 @@ subsection H - TimeIntegrator
 end
 
 
-subsection I - VTUOutput
+subsection J - VTUOutput
   set manifolds      = x, y, z, x^2+y^2-0.25*0.25
 
   set use mpi io     = true

@@ -37,6 +37,6 @@ subsection H - TimeIntegrator
   set time stepping scheme  = ssprk 33
 end
 
-subsection J - Quantities
+subsection K - Quantities
   set interior manifolds           = interior : 0. : space_averaged
 end
