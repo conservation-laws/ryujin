@@ -5,16 +5,17 @@
 
 #pragma once
 
-#include "checkpointing.h"
 #include "scope.h"
 #include "time_loop.h"
 #include "version_info.h"
 
 #include <deal.II/base/logstream.h>
 #include <deal.II/base/work_stream.h>
+#include <deal.II/distributed/solution_transfer.h>
 #include <deal.II/numerics/vector_tools.h>
 #include <deal.II/numerics/vector_tools.templates.h>
 
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
 
@@ -250,17 +251,10 @@ namespace ryujin
       print_info("initializing data structures");
 
       if (resume_) {
-        print_info("resuming computation: recreating mesh");
-        Checkpointing::load_mesh(discretization_, base_name_);
+        print_info("resume: reading mesh and loading state vector");
 
-        prepare_compute_kernels();
-
-        print_info("resuming computation: loading state vector");
-
-        Vectors::reinit_state_vector<Description>(state_vector, offline_data_);
-        auto &U = std::get<0>(state_vector);
-        Checkpointing::load_state_vector(
-            offline_data_, base_name_, U, t, timer_cycle, mpi_communicator_);
+        read_checkpoint(
+            state_vector, base_name_, t, timer_cycle, prepare_compute_kernels);
 
         if (resume_at_time_zero_) {
           /* Reset the current time t and the output cycle count to zero: */
@@ -269,13 +263,12 @@ namespace ryujin
         }
 
       } else {
+        print_info("creating mesh and interpolating initial values");
 
-        print_info("creating mesh");
         discretization_.prepare(base_name_);
 
         prepare_compute_kernels();
 
-        print_info("interpolating initial values");
         Vectors::reinit_state_vector<Description>(state_vector, offline_data_);
         std::get<0>(state_vector) =
             initial_values_.interpolate_hyperbolic_vector();
@@ -322,10 +315,9 @@ namespace ryujin
           Scope scope(computing_timer_, "(re)initialize data structures");
           print_info("performing mesh adaptation");
 
-          mesh_adaptor_.adapt_mesh_and_transfer_state_vector(
-              discretization_.triangulation(),
-              state_vector,
-              prepare_compute_kernels);
+          hyperbolic_module_.prepare_state_vector(state_vector, t);
+          adapt_mesh_and_transfer_state_vector(state_vector,
+                                               prepare_compute_kernels);
         }
       }
 
@@ -421,6 +413,219 @@ namespace ryujin
 #ifdef WITH_VALGRIND
     CALLGRIND_DUMP_STATS;
 #endif
+  }
+
+
+  template <typename Description, int dim, typename Number>
+  template <typename Callable>
+  void TimeLoop<Description, dim, Number>::read_checkpoint(
+      StateVector &state_vector,
+      const std::string &base_name,
+      Number &t,
+      unsigned int &output_cycle,
+      const Callable &prepare_compute_kernels)
+  {
+#ifdef DEBUG_OUTPUT
+    std::cout << "TimeLoop<dim, Number>::read_checkpoint()" << std::endl;
+#endif
+
+    AssertThrow(have_distributed_triangulation<dim>,
+                dealii::ExcMessage(
+                    "read_checkpoint() is not implemented for "
+                    "distributed::shared::Triangulation which we use in 1D"));
+
+    /*
+     * Initialize discretization, read in the mesh, and initialize everything:
+     */
+
+#if !DEAL_II_VERSION_GTE(9, 6, 0)
+    if constexpr (have_distributed_triangulation<dim>) {
+#endif
+      discretization_.refinement() = 0; /* do not refine */
+      discretization_.prepare(base_name);
+      discretization_.triangulation().load(base_name + "-checkpoint.mesh");
+#if !DEAL_II_VERSION_GTE(9, 6, 0)
+    }
+#endif
+
+    prepare_compute_kernels();
+
+    /*
+     * Read in and broadcast metadata:
+     */
+
+    std::string name = base_name + "-checkpoint";
+
+    if (mpi_rank_ == 0) {
+      std::string meta = name + ".metadata";
+
+      std::ifstream file(meta, std::ios::binary);
+      boost::archive::binary_iarchive ia(file);
+      ia >> t >> output_cycle;
+    }
+
+    int ierr;
+    if constexpr (std::is_same_v<Number, double>)
+      ierr = MPI_Bcast(&t, 1, MPI_DOUBLE, 0, mpi_communicator_);
+    else
+      ierr = MPI_Bcast(&t, 1, MPI_FLOAT, 0, mpi_communicator_);
+    AssertThrowMPI(ierr);
+
+    ierr = MPI_Bcast(&output_cycle, 1, MPI_UNSIGNED, 0, mpi_communicator_);
+    AssertThrowMPI(ierr);
+
+    /*
+     * Now read in the state vector:
+     */
+
+    Vectors::reinit_state_vector<Description>(state_vector, offline_data_);
+    auto &U = std::get<0>(state_vector);
+
+    const auto &dof_handler = offline_data_.dof_handler();
+    const auto &scalar_partitioner = offline_data_.scalar_partitioner();
+
+    /* Create temporary scalar component vectors: */
+
+    using ScalarVector = typename Vectors::ScalarVector<Number>;
+    std::array<ScalarVector, problem_dimension> states;
+    for (auto &it : states) {
+      it.reinit(scalar_partitioner);
+    }
+
+    /* Create SolutionTransfer object, attach state vector and deserialize:
+     */
+
+    dealii::parallel::distributed::SolutionTransfer<dim, ScalarVector>
+        solution_transfer(dof_handler);
+
+    std::vector<ScalarVector *> ptr_state;
+    std::transform(states.begin(),
+                   states.end(),
+                   std::back_inserter(ptr_state),
+                   [](auto &it) { return &it; });
+
+    solution_transfer.deserialize(ptr_state);
+
+    unsigned int d = 0;
+    for (auto &it : states) {
+      U.insert_component(it, d++);
+    }
+    U.update_ghost_values();
+  }
+
+
+  template <typename Description, int dim, typename Number>
+  void TimeLoop<Description, dim, Number>::write_checkpoint(
+      const StateVector &state_vector,
+      const std::string &base_name,
+      const Number &t,
+      const unsigned int &output_cycle)
+  {
+#ifdef DEBUG_OUTPUT
+    std::cout << "TimeLoop<dim, Number>::write_checkpoint()" << std::endl;
+#endif
+
+    AssertThrow(have_distributed_triangulation<dim>,
+                dealii::ExcMessage(
+                    "write_checkpoint() is not implemented for "
+                    "distributed::shared::Triangulation which we use in 1D"));
+
+    /*
+     * Create SolutionTransfer object, attach state vector and write out:
+     */
+
+    const auto &triangulation = discretization_.triangulation();
+    const auto &dof_handler = offline_data_.dof_handler();
+    const auto &scalar_partitioner = offline_data_.scalar_partitioner();
+    auto &U = std::get<0>(state_vector);
+
+    using ScalarVector = typename Vectors::ScalarVector<Number>;
+    std::array<ScalarVector, problem_dimension> states;
+    unsigned int d = 0;
+    for (auto &it : states) {
+      it.reinit(scalar_partitioner);
+      U.extract_component(it, d++);
+    }
+
+    /* Create SolutionTransfer object, attach state vector and write out: */
+
+    dealii::parallel::distributed::SolutionTransfer<dim, ScalarVector>
+        solution_transfer(dof_handler);
+
+    std::vector<const ScalarVector *> ptr_state;
+    std::transform(states.begin(),
+                   states.end(),
+                   std::back_inserter(ptr_state),
+                   [](auto &it) { return &it; });
+    solution_transfer.prepare_for_serialization(ptr_state);
+
+    std::string name = base_name + "-checkpoint";
+
+    if (mpi_rank_ == 0) {
+      for (const std::string suffix :
+           {".mesh", ".mesh_fixed.data", ".mesh.info", ".metadata"})
+        if (std::filesystem::exists(name + suffix))
+          std::filesystem::rename(name + suffix, name + suffix + "~");
+    }
+
+#if !DEAL_II_VERSION_GTE(9, 6, 0)
+    if constexpr (have_distributed_triangulation<dim>) {
+#endif
+      triangulation.save(name + ".mesh");
+#if !DEAL_II_VERSION_GTE(9, 6, 0)
+    }
+#endif
+
+    /*
+     * Now, write out metadata on rank 0:
+     */
+
+    if (mpi_rank_ == 0) {
+      std::string meta = name + ".metadata";
+      std::ofstream file(meta, std::ios::binary | std::ios::trunc);
+      boost::archive::binary_oarchive oa(file);
+      oa << t << output_cycle;
+    }
+
+    const int ierr = MPI_Barrier(mpi_communicator_);
+    AssertThrowMPI(ierr);
+  }
+
+
+  template <typename Description, int dim, typename Number>
+  template <typename Callable>
+  void TimeLoop<Description, dim, Number>::adapt_mesh_and_transfer_state_vector(
+      StateVector &state_vector, const Callable &prepare_compute_kernels)
+  {
+#ifdef DEBUG_OUTPUT
+    std::cout << "TimeLoop<dim, Number>::adapt_mesh_and_transfer_state_vector()"
+              << std::endl;
+#endif
+
+    /*
+     * Mark cells for coarsening and refinement and set up triangulation:
+     */
+
+    auto &triangulation = discretization_.triangulation();
+    // mesh_adaptor_.mark_cells_for_coarsening_and_refinement(triangulation);
+
+    triangulation.prepare_coarsening_and_refinement();
+
+    /*
+     * Set up SolutionTransfer:
+     */
+
+    // FIXME
+
+    /*
+     * Execute mesh adaptation and project old state to new state vector:
+     */
+
+    triangulation.execute_coarsening_and_refinement();
+    prepare_compute_kernels();
+
+    Vectors::reinit_state_vector<Description>(state_vector, offline_data_);
+    // FIXME
   }
 
 
@@ -614,10 +819,7 @@ namespace ryujin
     if (do_checkpointing) {
       Scope scope(computing_timer_, "time step [X]   - perform checkpointing");
       print_info("scheduling checkpointing");
-
-      const auto &U = std::get<0>(state_vector);
-      Checkpointing::write_checkpoint(
-          offline_data_, base_name_, U, t, cycle, mpi_communicator_);
+      write_checkpoint(state_vector, base_name_, t, cycle);
     }
   }
 
@@ -662,6 +864,7 @@ namespace ryujin
      * handle different data types
      */
 
+    // NOLINTBEGIN
     std::vector<double> values = {
         (double)offline_data_.n_export_indices(),
         (double)offline_data_.n_locally_internal(),
@@ -673,6 +876,7 @@ namespace ryujin
             (double)offline_data_.n_locally_relevant(),
         (double)offline_data_.n_locally_owned() /
             (double)offline_data_.n_locally_relevant()};
+    // NOLINTEND
 
     const auto data = Utilities::MPI::min_max_avg(values, mpi_communicator_);
 
@@ -686,11 +890,13 @@ namespace ryujin
     const auto print_snippet = [&output, n](const std::string &name,
                                             const auto &values) {
       output << name << ": ";
+      // NOLINTBEGIN
       output << std::setw(9) << (unsigned int)values.min          //
              << " [p" << std::setw(n) << values.min_index << "] " //
              << std::setw(9) << (unsigned int)values.avg << " "   //
              << std::setw(9) << (unsigned int)values.max          //
              << " [p" << std::setw(n) << values.max_index << "]"; //
+      // NOLINTEND
     };
 
     const auto print_percentages = [&output, n](const auto &percentages) {

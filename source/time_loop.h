@@ -82,6 +82,41 @@ namespace ryujin
      */
     //@{
 
+    /**
+     * Performs a resume operation. Given a @p base_name the function tries
+     * to locate correponding checkpoint files and will read in the saved
+     * state @p state_vector at saved time @p t with saved output cycle
+     * @p output_cycle.
+     */
+    template <typename Callable>
+    void read_checkpoint(StateVector &state_vector,
+                         const std::string &base_name,
+                         Number &t,
+                         unsigned int &output_cycle,
+                         const Callable &prepare_compute_kernels);
+
+    /**
+     * Write out a checkpoint to disk. Given a @p base_name and a current
+     * state @p U at time @p t and output cycle @p output_cycle the
+     * function writes out the state to disk using boost::archive for
+     * serialization.
+     *
+     * @pre the state_vector needs to be prepared.
+     */
+    void write_checkpoint(const StateVector &state_vector,
+                          const std::string &base_name,
+                          const Number &t,
+                          const unsigned int &output_cycle);
+
+    /**
+     * Perform a mesh adaptation cycle according to the selected strategy
+     * in the MeshAdaptor class. The state vector is transferred to the new
+     * discretization.
+     */
+    template <typename Callable>
+    void adapt_mesh_and_transfer_state_vector(
+        StateVector &state_vector, const Callable &prepare_compute_kernels);
+
     void compute_error(StateVector &state_vector, Number t);
 
     void output(StateVector &state_vector,
