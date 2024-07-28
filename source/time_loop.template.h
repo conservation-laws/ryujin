@@ -359,8 +359,7 @@ namespace ryujin
         }
 
         if (enable_compute_quantities_ &&
-            (timer_cycle % timer_compute_quantities_multiplier_ == 0) &&
-            (timer_cycle > 0)) {
+            (timer_cycle % timer_compute_quantities_multiplier_ == 0)) {
           Scope scope(computing_timer_,
                       "time step [X]   - write out quantities");
           quantities_.write_out(state_vector, t, timer_cycle);
