@@ -241,8 +241,7 @@ namespace ryujin
       mesh_adaptor_.prepare(/*needs current timepoint*/ t);
       postprocessor_.prepare();
       vtu_output_.prepare();
-      quantities_.prepare(
-          base_name_, timer_cycle, timer_compute_quantities_multiplier_);
+      quantities_.prepare(base_name_, timer_cycle);
       print_mpi_partition(logfile_);
     };
 
@@ -270,8 +269,7 @@ namespace ryujin
         }
 
         /* Workaround: Reinitialize quantities with correct output cycle: */
-        quantities_.prepare(
-            base_name_, timer_cycle, timer_compute_quantities_multiplier_);
+        quantities_.prepare(base_name_, timer_cycle);
 
       } else {
 

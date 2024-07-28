@@ -88,10 +88,8 @@ namespace ryujin
 
 
   template <typename Description, int dim, typename Number>
-  void
-  Quantities<Description, dim, Number>::prepare(const std::string &name,
-                                                unsigned int cycle,
-                                                unsigned int output_granularity)
+  void Quantities<Description, dim, Number>::prepare(const std::string &name,
+                                                     unsigned int cycle)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "Quantities<dim, Number>::prepare()" << std::endl;
@@ -208,10 +206,8 @@ namespace ryujin
 
       if (Utilities::MPI::this_mpi_process(mpi_communicator_) == 0) {
 
-        std::ofstream output(
-            base_name_ + "-" + name + "-R" +
-            Utilities::to_string(cycle + output_granularity, 4) +
-            "-points.dat");
+        std::ofstream output(base_name_ + "-" + name + "-R" +
+                             Utilities::to_string(cycle, 4) + "-points.dat");
 
         output << std::scientific << std::setprecision(14);
 
@@ -292,10 +288,8 @@ namespace ryujin
 
       if (Utilities::MPI::this_mpi_process(mpi_communicator_) == 0) {
 
-        std::ofstream output(
-            base_name_ + "-" + name + "-R" +
-            Utilities::to_string(cycle + output_granularity, 4) +
-            "-points.dat");
+        std::ofstream output(base_name_ + "-" + name + "-R" +
+                             Utilities::to_string(cycle, 4) + "-points.dat");
 
         output << std::scientific << std::setprecision(14);
 
