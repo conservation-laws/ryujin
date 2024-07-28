@@ -412,7 +412,7 @@ namespace ryujin
       compute_error(state_vector, t);
     }
 
-    if (debug_filename_ != "") {
+    if (mpi_rank_ == 0 && debug_filename_ != "") {
       std::ifstream f(debug_filename_);
       if (f.is_open())
         std::cout << f.rdbuf();
