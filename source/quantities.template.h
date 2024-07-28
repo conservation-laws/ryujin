@@ -60,8 +60,8 @@ namespace ryujin
       , hyperbolic_system_(&hyperbolic_system)
       , parabolic_system_(&parabolic_system)
       , base_name_("")
+      , mesh_files_have_been_written_(false)
   {
-
     add_parameter("interior manifolds",
                   interior_manifolds_,
                   "List of level set functions describing interior manifolds. "
@@ -88,10 +88,7 @@ namespace ryujin
 
 
   template <typename Description, int dim, typename Number>
-  void
-  Quantities<Description, dim, Number>::prepare(const std::string &name,
-                                                unsigned int cycle,
-                                                unsigned int output_granularity)
+  void Quantities<Description, dim, Number>::prepare(const std::string &name)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "Quantities<dim, Number>::prepare()" << std::endl;
@@ -188,48 +185,6 @@ namespace ryujin
           return std::make_pair(name, map);
         });
 
-    /* Output interior maps: */
-
-    for (const auto &[name, interior_map] : interior_maps_) {
-      /* Skip outputting the boundary map for spatial averages. */
-      const auto &options = get_options_from_name(interior_manifolds_, name);
-      if (options.find("instantaneous") == std::string::npos &&
-          options.find("time_averaged") == std::string::npos)
-        continue;
-
-      /*
-       * FIXME: This currently distributes boundary maps to all MPI ranks.
-       * This is unnecessarily wasteful. Ideally, we should do MPI IO with
-       * only MPI ranks participating who actually have boundary values.
-       */
-
-      const auto received =
-          Utilities::MPI::gather(mpi_communicator_, interior_map);
-
-      if (Utilities::MPI::this_mpi_process(mpi_communicator_) == 0) {
-
-        std::ofstream output(
-            base_name_ + "-" + name + "-R" +
-            Utilities::to_string(cycle + output_granularity, 4) +
-            "-points.dat");
-
-        output << std::scientific << std::setprecision(14);
-
-        output << "#\n# position\tinterior mass\n";
-
-        unsigned int rank = 0;
-        for (const auto &entries : received) {
-          output << "# rank " << rank++ << "\n";
-          for (const auto &entry : entries) {
-            const auto &[index, mass_i, x_i] = entry;
-            output << x_i << "\t" << mass_i << "\n";
-          } /*entry*/
-        }   /*entries*/
-
-        output << std::flush;
-      }
-    }
-
     /*
      * Create boundary maps and allocate statistics vector:
      *
@@ -270,6 +225,73 @@ namespace ryujin
           return std::make_pair(name, map);
         });
 
+    /* Clear statistics: */
+    clear_statistics();
+
+    /* Make sure we output new mesh files: */
+    mesh_files_have_been_written_ = false;
+
+    /* Prepare header string: */
+    const auto &names = View::primitive_component_names;
+    header_ = std::accumulate(
+                  std::begin(names),
+                  std::end(names),
+                  std::string(),
+                  [](const std::string &description, const std::string &name) {
+                    return description.empty()
+                               ? (std::string("primitive state (") + name)
+                               : (description + ", " + name);
+                  }) +
+              ")\t and 2nd moments\n";
+  }
+
+
+  template <typename Description, int dim, typename Number>
+  void
+  Quantities<Description, dim, Number>::write_mesh_files(unsigned int cycle)
+  {
+    /*
+     * Output interior maps:
+     */
+
+    for (const auto &[name, interior_map] : interior_maps_) {
+      /* Skip outputting the boundary map for spatial averages. */
+      const auto &options = get_options_from_name(interior_manifolds_, name);
+      if (options.find("instantaneous") == std::string::npos &&
+          options.find("time_averaged") == std::string::npos)
+        continue;
+
+      /*
+       * FIXME: This currently distributes boundary maps to all MPI ranks.
+       * This is unnecessarily wasteful. Ideally, we should do MPI IO with
+       * only MPI ranks participating who actually have boundary values.
+       */
+
+      const auto received =
+          Utilities::MPI::gather(mpi_communicator_, interior_map);
+
+      if (Utilities::MPI::this_mpi_process(mpi_communicator_) == 0) {
+
+        std::ofstream output(base_name_ + "-" + name + "-R" +
+                             Utilities::to_string(cycle, 4) + "-points.dat");
+
+        output << std::scientific << std::setprecision(14);
+
+        output << "#\n# position\tinterior mass\n";
+
+        unsigned int rank = 0;
+        for (const auto &entries : received) {
+          output << "# rank " << rank++ << "\n";
+          for (const auto &entry : entries) {
+            const auto &[index, mass_i, x_i] = entry;
+            output << x_i << "\t" << mass_i << "\n";
+          } /*entry*/
+        }   /*entries*/
+
+        output << std::flush;
+      }
+    }
+
     /*
      * Output boundary maps:
      */
@@ -292,10 +314,8 @@ namespace ryujin
 
       if (Utilities::MPI::this_mpi_process(mpi_communicator_) == 0) {
 
-        std::ofstream output(
-            base_name_ + "-" + name + "-R" +
-            Utilities::to_string(cycle + output_granularity, 4) +
-            "-points.dat");
+        std::ofstream output(base_name_ + "-" + name + "-R" +
+                             Utilities::to_string(cycle, 4) + "-points.dat");
 
         output << std::scientific << std::setprecision(14);
 
@@ -314,22 +334,6 @@ namespace ryujin
         output << std::flush;
       }
     }
-
-    /* Clear statistics: */
-    clear_statistics();
-
-    /* Prepare header string: */
-    const auto &names = View::primitive_component_names;
-    header_ = std::accumulate(
-                  std::begin(names),
-                  std::end(names),
-                  std::string(),
-                  [](const std::string &description, const std::string &name) {
-                    return description.empty()
-                               ? (std::string("primitive state (") + name)
-                               : (description + ", " + name);
-                  }) +
-              ")\t and 2nd moments\n";
   }
 
 
@@ -566,6 +570,19 @@ namespace ryujin
     std::cout << "Quantities<dim, Number>::write_out()" << std::endl;
 #endif
 
+    /*
+     * First, write out mesh files if this hasn't happened yet.
+     */
+    if (!mesh_files_have_been_written_) {
+      write_mesh_files(cycle);
+      mesh_files_have_been_written_ = true;
+    }
+
+    /*
+     * Next write out instantaneous and time_averaged maps, and flush the
+     * space_averaged values to the corresponding log files:
+     */
+
     const auto write_out = [&](const auto &point_maps,
                                const auto &manifolds,
                                auto &statistics,
@@ -615,13 +632,16 @@ namespace ryujin
           auto &[val_old, val_new, val_sum, t_old, t_new, t_sum] =
               statistics[name];
 
-          std::stringstream time_stamp;
-          time_stamp << std::scientific << std::setprecision(14);
-          time_stamp << "# averaged from t = " << t_new - t_sum
-                     << " to t = " << t_new << std::endl;
+          /* Check whether we have accumulated any statistics yet: */
+          if (t_sum != Number(0.)) {
+            std::stringstream time_stamp;
+            time_stamp << std::scientific << std::setprecision(14);
+            time_stamp << "# averaged from t = " << t_new - t_sum
+                       << " to t = " << t_new << std::endl;
 
-          internal_write_out(
-              file_name, time_stamp.str(), val_sum, Number(1.) / t_sum);
+            internal_write_out(
+                file_name, time_stamp.str(), val_sum, Number(1.) / t_sum);
+          }
         }
 
         /*

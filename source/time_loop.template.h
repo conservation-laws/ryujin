@@ -241,8 +241,7 @@ namespace ryujin
       mesh_adaptor_.prepare(/*needs current timepoint*/ t);
       postprocessor_.prepare();
       vtu_output_.prepare();
-      quantities_.prepare(
-          base_name_, timer_cycle, timer_compute_quantities_multiplier_);
+      quantities_.prepare(base_name_);
       print_mpi_partition(logfile_);
     };
 
@@ -268,10 +267,6 @@ namespace ryujin
           t = 0.;
           timer_cycle = 0;
         }
-
-        /* Workaround: Reinitialize quantities with correct output cycle: */
-        quantities_.prepare(
-            base_name_, timer_cycle, timer_compute_quantities_multiplier_);
 
       } else {
 
@@ -359,8 +354,7 @@ namespace ryujin
         }
 
         if (enable_compute_quantities_ &&
-            (timer_cycle % timer_compute_quantities_multiplier_ == 0) &&
-            (timer_cycle > 0)) {
+            (timer_cycle % timer_compute_quantities_multiplier_ == 0)) {
           Scope scope(computing_timer_,
                       "time step [X]   - write out quantities");
           quantities_.write_out(state_vector, t, timer_cycle);
@@ -418,7 +412,7 @@ namespace ryujin
       compute_error(state_vector, t);
     }
 
-    if (debug_filename_ != "") {
+    if (mpi_rank_ == 0 && debug_filename_ != "") {
       std::ifstream f(debug_filename_);
       if (f.is_open())
         std::cout << f.rdbuf();

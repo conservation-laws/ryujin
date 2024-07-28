@@ -68,9 +68,7 @@ namespace ryujin
      *
      * The string parameter @p name is used as base name for output files.
      */
-    void prepare(const std::string &name,
-                 unsigned int cycle,
-                 unsigned int output_granularity);
+    void prepare(const std::string &name);
 
     /**
      * Takes a state vector @p U at time t (obtained at the end of a full
@@ -211,6 +209,10 @@ namespace ryujin
      * @name Internal methods
      */
     //@{
+
+    bool mesh_files_have_been_written_;
+
+    void write_mesh_files(unsigned int cycle);
 
     void clear_statistics();
 
