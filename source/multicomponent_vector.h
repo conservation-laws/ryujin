@@ -163,6 +163,23 @@ namespace ryujin
       template <typename Number2 = Number,
                 typename Tensor = dealii::Tensor<1, n_comp, Number2>>
       void write_tensor(const Tensor &tensor, const unsigned int i);
+
+      /**
+       * Update the values of the @p n_comp component vector at index @p i
+       * by adding the values supplied by @p tensor.
+       *
+       * If the template parameter @a Number2 is a VectorizedArray then
+       * the function takes a SIMD vectorized @p tensor as argument instead
+       * and updates the values of the @p n_comp component vectors at indices
+       * i, i+1, ..., i+simd_length_1. with the values supplied by @p tensor.
+       *
+       * @note @p tensor can be an arbitrary indexable container, such as
+       * dealii::Tensor or std::array, that has an `operator[]()` returning a @p
+       * Number, and has a type trait `value_type`.
+       */
+      template <typename Number2 = Number,
+                typename Tensor = dealii::Tensor<1, n_comp, Number2>>
+      void add_tensor(const Tensor &tensor, const unsigned int i);
     };
 
 
@@ -333,7 +350,46 @@ namespace ryujin
         for (unsigned int k = 0; k < VectorizedArray::size(); ++k)
           indices[k] = k * n_comp;
 
-        dealii::vectorized_transpose_and_store(false,
+        dealii::vectorized_transpose_and_store(/*add into*/ false,
+                                               n_comp,
+                                               &tensor[0],
+                                               indices.data(),
+                                               this->begin() + i * n_comp);
+
+      } else {
+        /* not implemented */
+        __builtin_trap();
+      }
+    }
+
+
+    template <typename Number, int n_comp, int simd_length>
+    template <typename Number2, typename Tensor>
+    DEAL_II_ALWAYS_INLINE inline void
+    MultiComponentVector<Number, n_comp, simd_length>::add_tensor(
+        const Tensor &tensor, const unsigned int i)
+    {
+      static_assert(std::is_same<Number2, typename Tensor::value_type>::value,
+                    "dummy type mismatch");
+
+      /* Special case of a zero component vector */
+      if constexpr (n_comp == 0)
+        return;
+
+      if constexpr (std::is_same<Number, Number2>::value) {
+        /* Non-vectorized sequential access. */
+
+        for (unsigned int d = 0; d < n_comp; ++d)
+          this->local_element(i * n_comp + d) += tensor[d];
+
+      } else if constexpr (std::is_same<VectorizedArray, Number2>::value) {
+        /* Vectorized fast access. index must be divisible by simd_length */
+
+        std::array<unsigned int, VectorizedArray::size()> indices;
+        for (unsigned int k = 0; k < VectorizedArray::size(); ++k)
+          indices[k] = k * n_comp;
+
+        dealii::vectorized_transpose_and_store(/*add into*/ true,
                                                n_comp,
                                                &tensor[0],
                                                indices.data(),

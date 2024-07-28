@@ -49,7 +49,7 @@ namespace ryujin
     const auto new_end = std::remove_if(
         t_global_refinements_.begin(),
         t_global_refinements_.end(),
-        [&](const Number &t_refinement) { return (t >= t_refinement); });
+        [&](const Number &t_refinement) { return (t > t_refinement); });
     t_global_refinements_.erase(new_end, t_global_refinements_.end());
 
     // Do not reset state_ and solution_transfer_ objects as they are

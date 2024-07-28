@@ -189,21 +189,6 @@ namespace ryujin
 
   } // namespace
 
-#ifndef DOXYGEN
-  /* forward declaration */
-  template <int dim>
-  class Discretization;
-#endif
-
-  /**
-   * A templated constexpr boolean that is true if we use a parallel
-   * distributed triangulation (for the specified dimension).
-   */
-  template <int dim>
-  constexpr bool have_distributed_triangulation =
-      std::is_same<typename Discretization<dim>::Triangulation,
-                   dealii::parallel::distributed::Triangulation<dim>>::value;
-
 
   /**
    * This class is as a container for data related to the discretization,
@@ -232,8 +217,6 @@ namespace ryujin
      * dimensions a dealii::parallel::distributed::Triangulation.
      */
     using Triangulation = typename Proxy<dim>::Triangulation;
-
-    static_assert(dim == 1 || have_distributed_triangulation<dim>);
 
     /**
      * Constructor.
@@ -369,4 +352,14 @@ namespace ryujin
 
     //@}
   };
+
+
+  /**
+   * A templated constexpr boolean that is true if we use a parallel
+   * distributed triangulation (for the specified dimension).
+   */
+  template <int dim>
+  constexpr bool have_distributed_triangulation =
+      std::is_same<typename Discretization<dim>::Triangulation,
+                   dealii::parallel::distributed::Triangulation<dim>>::value;
 } /* namespace ryujin */
