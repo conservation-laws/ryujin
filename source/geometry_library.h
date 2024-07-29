@@ -8,6 +8,7 @@
 #include "geometry_airfoil.h"
 #include "geometry_annulus.h"
 #include "geometry_cylinder.h"
+#include "geometry_disk.h"
 #include "geometry_reader.h"
 #include "geometry_rectangular_domain.h"
 #include "geometry_step.h"
@@ -40,6 +41,7 @@ namespace ryujin
       add(std::make_unique<Airfoil<dim>>(subsection));
       add(std::make_unique<Annulus<dim>>(subsection));
       add(std::make_unique<Cylinder<dim>>(subsection));
+      add(std::make_unique<Disk<dim>>(subsection));
       add(std::make_unique<Reader<dim>>(subsection));
       add(std::make_unique<RectangularDomain<dim>>(subsection));
       add(std::make_unique<Step<dim>>(subsection));
