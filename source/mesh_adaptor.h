@@ -9,25 +9,70 @@
 
 #include <deal.II/base/parameter_acceptor.h>
 
+#include <random>
+
 namespace ryujin
 {
   /**
-   * Controls the adaptation strategy used in MeshAdaptor.
+   * Controls the spatial mesh adaptation strategy.
    *
    * @ingroup Mesh
    */
   enum class AdaptationStrategy {
     /**
-     * Performs a simple global refinement at specified timepoints.
+     * Perform a uniform global refinement.
      */
     global_refinement,
+
+    /**
+     * Perform random refinement and coarsening with a deterministic
+     * Mersenne Twister and a chosen seed. This refinement strategy is only
+     * useful for debugging and testing.
+     */
+    random_adaptation,
+  };
+
+  /**
+   * Controls the marking strategy used for mesh adaptation. This
+   * configuration option is ignored for the uniform global refinement
+   * strategy.
+   *
+   * @ingroup Mesh
+   */
+  enum class MarkingStrategy {
+    /**
+     * Refine and coarsen a configurable selected percentage of cells.
+     */
+    fixed_number,
+  };
+
+  /**
+   * Controls the time point selection strategy.
+   *
+   * @ingroup Mesh
+   */
+  enum class TimePointSelectionStrategy {
+    /**
+     * Perform a mesh adaptation cycle at preselected fixed time points.
+     */
+    fixed_adaptation_time_points,
   };
 } // namespace ryujin
 
 #ifndef DOXYGEN
 DECLARE_ENUM(ryujin::AdaptationStrategy,
              LIST({ryujin::AdaptationStrategy::global_refinement,
-                   "global refinement"}, ));
+                   "global refinement"},
+                  {ryujin::AdaptationStrategy::random_adaptation,
+                   "random adaptation"}, ));
+
+DECLARE_ENUM(ryujin::MarkingStrategy,
+             LIST({ryujin::MarkingStrategy::fixed_number, "fixed number"}, ));
+
+DECLARE_ENUM(
+    ryujin::TimePointSelectionStrategy,
+    LIST({ryujin::TimePointSelectionStrategy::fixed_adaptation_time_points,
+          "fixed adaptation time points"}, ));
 #endif
 
 namespace ryujin
@@ -110,7 +155,14 @@ namespace ryujin
     //@{
 
     AdaptationStrategy adaptation_strategy_;
-    std::vector<Number> t_global_refinements_;
+    std::uint_fast64_t random_adaptation_mersenne_twister_seed_;
+
+    MarkingStrategy marking_strategy_;
+    double fixed_number_refinement_fraction_;
+    double fixed_number_coarsening_fraction_;
+
+    TimePointSelectionStrategy time_point_selection_strategy_;
+    std::vector<Number> adaptation_time_points_;
 
     //@}
     /**
@@ -125,6 +177,8 @@ namespace ryujin
     dealii::SmartPointer<const ParabolicSystem> parabolic_system_;
 
     bool need_mesh_adaptation_;
+
+    mutable std::mt19937_64 mersenne_twister_;
     //@}
   };
 

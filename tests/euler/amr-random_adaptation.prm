@@ -50,7 +50,7 @@ subsection H - TimeIntegrator
 end
 
 subsection I - MeshAdaptor
-  set adaptation strategy           = global refinement
+  set adaptation strategy           = random adaptation
   set time point selection strategy = fixed adaptation time points
   subsection time point selection strategies
     set adaptation timepoints = 1.0, 1.5
