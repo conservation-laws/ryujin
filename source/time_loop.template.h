@@ -368,12 +368,12 @@ namespace ryujin
         const bool write_to_log_file = (t >= timer_cycle * timer_granularity_);
 
         const auto wall_time = computing_timer_["time loop"].wall_time();
-        bool update_terminal =
+        int update_terminal =
             (wall_time >= last_terminal_output + terminal_update_interval_);
 
         /* Broadcast boolean from rank 0 to all other ranks: */
         const auto ierr =
-            MPI_Bcast(&update_terminal, 1, MPIU_BOOL, 0, mpi_communicator_);
+            MPI_Bcast(&update_terminal, 1, MPI_INT, 0, mpi_communicator_);
         AssertThrowMPI(ierr);
 
         if (write_to_log_file || update_terminal) {
