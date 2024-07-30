@@ -21,14 +21,20 @@ namespace ryujin
   VTUOutput<Description, dim, Number>::VTUOutput(
       const MPI_Comm &mpi_communicator,
       const OfflineData<dim, Number> &offline_data,
-      const HyperbolicModule<Description, dim, Number> &hyperbolic_module,
+      const HyperbolicSystem &hyperbolic_system,
+      const ParabolicSystem &parabolic_system,
       const Postprocessor<Description, dim, Number> &postprocessor,
+      const InitialPrecomputedVector &initial_precomputed,
+      const ScalarVector &alpha,
       const std::string &subsection /*= "VTUOutput"*/)
       : ParameterAcceptor(subsection)
       , mpi_communicator_(mpi_communicator)
       , offline_data_(&offline_data)
-      , hyperbolic_module_(&hyperbolic_module)
+      , hyperbolic_system_(&hyperbolic_system)
+      , parabolic_system_(&parabolic_system)
       , postprocessor_(&postprocessor)
+      , initial_precomputed_(initial_precomputed)
+      , alpha_(alpha)
   {
     use_mpi_io_ = true;
     add_parameter("use mpi io",
@@ -104,8 +110,8 @@ namespace ryujin
                  */
                 const unsigned int n_owned = offline_data_->n_locally_owned();
                 for (unsigned int i = 0; i < n_owned; ++i) {
-                  const auto view = hyperbolic_module_->hyperbolic_system()
-                                        .template view<dim, Number>();
+                  const auto view =
+                      hyperbolic_system_->template view<dim, Number>();
                   result.local_element(i) =
                       view.to_primitive_state(U.get_tensor(i))[index];
                 }
@@ -123,8 +129,7 @@ namespace ryujin
           const auto index = std::distance(std::begin(names), pos);
           quantities_mapping_.push_back(std::make_tuple(
               entry, [this, index](ScalarVector &result, const StateVector &) {
-                hyperbolic_module_->initial_precomputed().extract_component(
-                    result, index);
+                initial_precomputed_.extract_component(result, index);
               }));
           continue;
         }
@@ -153,7 +158,7 @@ namespace ryujin
         if (entry == "alpha") {
           quantities_mapping_.push_back(std::make_tuple(
               entry, [this](ScalarVector &result, const StateVector &) {
-                const auto &alpha = hyperbolic_module_->alpha();
+                const auto &alpha = alpha_;
                 result = alpha;
               }));
           continue;
