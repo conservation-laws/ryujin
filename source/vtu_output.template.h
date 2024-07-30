@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "selected_components_extractor.h"
 #include "vtu_output.h"
 
 #include <deal.II/base/function_parser.h>
@@ -70,107 +71,8 @@ namespace ryujin
     std::cout << "VTUOutput<dim, Number>::prepare()" << std::endl;
 #endif
 
-    /* Populate quantities mapping: */
-
-    quantities_mapping_.clear();
-
-    for (const auto &entry : vtu_output_quantities_) {
-      {
-        /* Conserved quantities: */
-
-        constexpr auto &names = View::component_names;
-        const auto pos = std::find(std::begin(names), std::end(names), entry);
-        if (pos != std::end(names)) {
-          const auto index = std::distance(std::begin(names), pos);
-          quantities_mapping_.push_back(std::make_tuple(
-              entry,
-              [index](ScalarVector &result, const StateVector &state_vector) {
-                const auto &U = std::get<0>(state_vector);
-                U.extract_component(result, index);
-              }));
-          continue;
-        }
-      }
-
-      {
-        /* Primitive quantities: */
-
-        constexpr auto &names = View::primitive_component_names;
-        const auto pos = std::find(std::begin(names), std::end(names), entry);
-        if (pos != std::end(names)) {
-          const auto index = std::distance(std::begin(names), pos);
-          quantities_mapping_.push_back(std::make_tuple(
-              entry,
-              [this, index](ScalarVector &result,
-                            const StateVector &state_vector) {
-                const auto &U = std::get<0>(state_vector);
-                /*
-                 * FIXME: We might traverse the same vector multiple times. This
-                 * is inefficient.
-                 */
-                const unsigned int n_owned = offline_data_->n_locally_owned();
-                for (unsigned int i = 0; i < n_owned; ++i) {
-                  const auto view =
-                      hyperbolic_system_->template view<dim, Number>();
-                  result.local_element(i) =
-                      view.to_primitive_state(U.get_tensor(i))[index];
-                }
-              }));
-          continue;
-        }
-      }
-
-      {
-        /* Precomputed initial quantities: */
-
-        constexpr auto &names = View::initial_precomputed_names;
-        const auto pos = std::find(std::begin(names), std::end(names), entry);
-        if (pos != std::end(names)) {
-          const auto index = std::distance(std::begin(names), pos);
-          quantities_mapping_.push_back(std::make_tuple(
-              entry, [this, index](ScalarVector &result, const StateVector &) {
-                initial_precomputed_.extract_component(result, index);
-              }));
-          continue;
-        }
-      }
-
-      {
-        /* Precomputed quantities: */
-
-        constexpr auto &names = View::precomputed_names;
-        const auto pos = std::find(std::begin(names), std::end(names), entry);
-        if (pos != std::end(names)) {
-          const auto index = std::distance(std::begin(names), pos);
-          quantities_mapping_.push_back(std::make_tuple(
-              entry,
-              [index](ScalarVector &result, const StateVector &state_vector) {
-                const auto &precomputed = std::get<1>(state_vector);
-                precomputed.extract_component(result, index);
-              }));
-          continue;
-        }
-      }
-
-      {
-        /* Special indicator value: */
-
-        if (entry == "alpha") {
-          quantities_mapping_.push_back(std::make_tuple(
-              entry, [this](ScalarVector &result, const StateVector &) {
-                const auto &alpha = alpha_;
-                result = alpha;
-              }));
-          continue;
-        }
-      }
-
-      AssertThrow(false, ExcMessage("Invalid component name »" + entry + "«"));
-    }
-
-    quantities_.resize(quantities_mapping_.size());
-    for (auto &it : quantities_)
-      it.reinit(offline_data_->scalar_partitioner());
+    SelectedComponentsExtractor<Description, dim, Number>::check(
+        vtu_output_quantities_);
   }
 
 
@@ -188,26 +90,30 @@ namespace ryujin
 #endif
     const auto &affine_constraints = offline_data_->affine_constraints();
 
-    /* Copy quantities: */
+    /*
+     * Extract quantities and store in ScalarVectors so that we can call
+     * DataOut::add_data_vector()
+     */
 
-    Assert(quantities_.size() == quantities_mapping_.size(),
-           ExcInternalError());
-    for (unsigned int d = 0; d < quantities_.size(); ++d) {
-      const auto &lambda = std::get<1>(quantities_mapping_[d]);
-      lambda(quantities_[d], state_vector);
-      affine_constraints.distribute(quantities_[d]);
-      quantities_[d].update_ghost_values();
-    }
+    auto selected_components =
+        SelectedComponentsExtractor<Description, dim, Number>::extract(
+            *hyperbolic_system_,
+            state_vector,
+            initial_precomputed_,
+            alpha_,
+            vtu_output_quantities_);
 
     /* prepare DataOut: */
 
     auto data_out = std::make_unique<dealii::DataOut<dim>>();
     data_out->attach_dof_handler(offline_data_->dof_handler());
 
-    for (unsigned int d = 0; d < quantities_.size(); ++d) {
-      const auto &entry = std::get<0>(quantities_mapping_[d]);
-      data_out->add_data_vector(
-          quantities_[d], entry, DataOut<dim>::type_dof_data);
+    for (unsigned int d = 0; d < selected_components.size(); ++d) {
+      affine_constraints.distribute(selected_components[d]);
+      selected_components[d].update_ghost_values();
+      data_out->add_data_vector(selected_components[d],
+                                vtu_output_quantities_[d],
+                                DataOut<dim>::type_dof_data);
     }
 
     const auto n_quantities = postprocessor_->n_quantities();

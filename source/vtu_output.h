@@ -130,15 +130,6 @@ namespace ryujin
 
     const InitialPrecomputedVector &initial_precomputed_;
     const ScalarVector &alpha_;
-
-    std::vector<ScalarVector> quantities_;
-
-    std::vector<
-        std::tuple<std::string /*name*/,
-                   std::function<void(ScalarVector & /*result*/,
-                                      const StateVector & /*state_vector*/)>>>
-        quantities_mapping_;
-
     //@}
   };
 
