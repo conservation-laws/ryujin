@@ -7,8 +7,6 @@
 
 #include <compile_time_options.h>
 
-#include "convenience_macros.h"
-#include "hyperbolic_module.h"
 #include "offline_data.h"
 #include "postprocessor.h"
 
@@ -36,6 +34,7 @@ namespace ryujin
     //@{
 
     using HyperbolicSystem = typename Description::HyperbolicSystem;
+    using ParabolicSystem = typename Description::ParabolicSystem;
 
     using View =
         typename Description::template HyperbolicSystemView<dim, Number>;
@@ -49,7 +48,7 @@ namespace ryujin
     using precomputed_type = typename View::precomputed_type;
 
     using StateVector = typename View::StateVector;
-
+    using InitialPrecomputedVector = typename View::InitialPrecomputedVector;
     using ScalarVector = Vectors::ScalarVector<Number>;
 
     //@}
@@ -61,12 +60,14 @@ namespace ryujin
     /**
      * Constructor.
      */
-    VTUOutput(
-        const MPI_Comm &mpi_communicator,
-        const OfflineData<dim, Number> &offline_data,
-        const HyperbolicModule<Description, dim, Number> &hyperbolic_module,
-        const Postprocessor<Description, dim, Number> &postprocessor,
-        const std::string &subsection = "/VTUOutput");
+    VTUOutput(const MPI_Comm &mpi_communicator,
+              const OfflineData<dim, Number> &offline_data,
+              const HyperbolicSystem &hyperbolic_system,
+              const ParabolicSystem &parabolic_system,
+              const Postprocessor<Description, dim, Number> &postprocessor,
+              const InitialPrecomputedVector &initial_precomputed,
+              const ScalarVector &alpha,
+              const std::string &subsection = "/VTUOutput");
 
     /**
      * Prepare VTU output. A call to @ref prepare() allocates temporary
@@ -122,19 +123,13 @@ namespace ryujin
     const MPI_Comm &mpi_communicator_;
 
     dealii::SmartPointer<const OfflineData<dim, Number>> offline_data_;
-    dealii::SmartPointer<const HyperbolicModule<Description, dim, Number>>
-        hyperbolic_module_;
+    dealii::SmartPointer<const HyperbolicSystem> hyperbolic_system_;
+    dealii::SmartPointer<const ParabolicSystem> parabolic_system_;
     dealii::SmartPointer<const Postprocessor<Description, dim, Number>>
         postprocessor_;
 
-    std::vector<ScalarVector> quantities_;
-
-    std::vector<
-        std::tuple<std::string /*name*/,
-                   std::function<void(ScalarVector & /*result*/,
-                                      const StateVector & /*state_vector*/)>>>
-        quantities_mapping_;
-
+    const InitialPrecomputedVector &initial_precomputed_;
+    const ScalarVector &alpha_;
     //@}
   };
 
