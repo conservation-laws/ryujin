@@ -1073,7 +1073,7 @@ namespace ryujin
          */
 
         for (auto cell : coarse_triangulation.active_cell_iterators()) {
-          for (auto f : dealii::GeometryInfo<2>::face_indices()) {
+          for (auto f : cell->reference_cell().face_indices()) {
             const auto face = cell->face(f);
             if (!face->at_boundary())
               continue;
@@ -1325,7 +1325,7 @@ namespace ryujin
         /* Set boundary ids: */
 
         for (auto cell : triangulation.active_cell_iterators()) {
-          for (auto f : dealii::GeometryInfo<dim>::face_indices()) {
+          for (auto f : cell->reference_cell().face_indices()) {
             auto face = cell->face(f);
 
             /* Handle boundary faces: */

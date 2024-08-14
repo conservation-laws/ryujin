@@ -100,8 +100,7 @@ namespace ryujin
       /* Fix up position of left boundary: */
 
       for (auto cell : triangulation.active_cell_iterators())
-        for (unsigned int v = 0; v < GeometryInfo<dim>::vertices_per_cell;
-             ++v) {
+        for (unsigned int v : cell->reference_cell().vertex_indices()) {
           auto &vertex = cell->vertex(v);
           if (vertex[0] <= -cylinder_diameter + 1.e-6)
             vertex[0] = -cylinder_position;
@@ -112,7 +111,7 @@ namespace ryujin
        */
 
       for (auto cell : triangulation.active_cell_iterators()) {
-        for (auto f : GeometryInfo<2>::face_indices()) {
+        for (auto f : cell->reference_cell().face_indices()) {
           const auto face = cell->face(f);
 
           if (!face->at_boundary())
@@ -181,7 +180,7 @@ namespace ryujin
        */
 
       for (auto cell : triangulation.active_cell_iterators()) {
-        for (auto f : GeometryInfo<3>::face_indices()) {
+        for (auto f : cell->reference_cell().face_indices()) {
           const auto face = cell->face(f);
 
           if (!face->at_boundary())

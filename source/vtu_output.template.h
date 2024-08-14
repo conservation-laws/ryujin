@@ -173,8 +173,7 @@ namespace ryujin
           unsigned int above = 0;
           unsigned int below = 0;
 
-          for (unsigned int v = 0; v < GeometryInfo<dim>::vertices_per_cell;
-               ++v) {
+          for (unsigned int v : cell->reference_cell().vertex_indices()) {
             const auto vertex = cell->vertex(v);
             constexpr auto eps = std::numeric_limits<Number>::epsilon();
             if (function->value(vertex) >= 0. - 100. * eps)
