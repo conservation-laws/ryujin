@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <filesystem>
+
 #include <compile_time_options.h>
 
 #include "equation_of_state.h"
@@ -25,9 +27,10 @@ namespace ryujin
 #ifdef WITH_EOSPAC
   /**
    * A namespace with wrappers for the eospac6 library and sesame database. The
-   * eospac6 wrapper needs the SESAMEPATH variable to be defined in your
-   * environment. The SESAMEPATH should be the directory containing the sesame
-   * database.
+   * eospac6 wrapper needs the file 'sesameFilesDir.txt' to be defined in the
+   * directory where you run your simulation. The file 'sesameFilesDir.txt'
+   * should list the path pointing to the sesame database. We refer the user to
+   * the EOSPAC manual for more information.
    */
   namespace eospac
   {
@@ -436,6 +439,14 @@ namespace ryujin
       //
       void set_up_database() const
       {
+        AssertThrow(
+            std::filesystem::exists("sesameFilesDir.txt"),
+            dealii::ExcMessage(
+                "For EOSPAC to find the sesame database, we assume that there "
+                "exists a file named 'sesameFilesDir.txt' in the current "
+                "simulation directory. This file should list the path to the "
+                "sesame database. See the EOSPAC manual for more "
+                "information."));
         const std::vector<std::tuple<EOS_INTEGER, eospac::TableType>> tables{
             {material_id_, eospac::TableType::p_rho_e},
             {material_id_, eospac::TableType::e_rho_p},
