@@ -8,6 +8,7 @@
 #include <compile_time_options.h>
 
 #include "equation_of_state.h"
+#include "lazy.h"
 
 #include <deal.II/base/array_view.h>
 #include <deal.II/base/config.h>
@@ -226,22 +227,16 @@ namespace ryujin
             "material id", material_id_, "The Sesame Material ID");
 
         this->prefer_vector_interface_ = true;
-
-        const auto set_up_database = [&]() {
-          const std::vector<std::tuple<EOS_INTEGER, eospac::TableType>> tables{
-              {material_id_, eospac::TableType::p_rho_e},
-              {material_id_, eospac::TableType::e_rho_p},
-          };
-
-          eospac_interface_ = std::make_unique<eospac::Interface>(tables);
-        };
-
-        this->parse_parameters_call_back.connect(set_up_database);
       }
 
 
       double pressure(double rho, double e) const final
       {
+        eospac_guard_.ensure_initialized([&]() {
+          this->set_up_database();
+          return true;
+        });
+
         EOS_INTEGER index = 0;
 
         double p, p_drho, p_de;
@@ -266,6 +261,11 @@ namespace ryujin
       {
         Assert(p.size() == rho.size() && rho.size() == e.size(),
                dealii::ExcMessage("vectors have different size"));
+
+        eospac_guard_.ensure_initialized([&]() {
+          this->set_up_database();
+          return true;
+        });
 
         EOS_INTEGER index = 0;
 
@@ -304,6 +304,11 @@ namespace ryujin
 
       double specific_internal_energy(double rho, double p) const final
       {
+        eospac_guard_.ensure_initialized([&]() {
+          this->set_up_database();
+          return true;
+        });
+
         EOS_INTEGER index = 1;
 
         double e, e_drho, e_dp;
@@ -329,6 +334,11 @@ namespace ryujin
       {
         Assert(e.size() == rho.size() && rho.size() == p.size(),
                dealii::ExcMessage("vectors have different size"));
+
+        eospac_guard_.ensure_initialized([&]() {
+          this->set_up_database();
+          return true;
+        });
 
         EOS_INTEGER index = 1;
 
@@ -366,20 +376,41 @@ namespace ryujin
 
       /* FIXME: Implement table look up for temperature. Need to think about
        * whether it should be T(rho, e) or T(rho, p). */
+
       double temperature(double /*rho*/, double /*e*/) const final
       {
+        eospac_guard_.ensure_initialized([&]() {
+          this->set_up_database();
+          return true;
+        });
+
+        AssertThrow(false, dealii::ExcInternalError());
         __builtin_trap();
       }
+
 
       void temperature(const dealii::ArrayView<double> & /*temp*/,
                        const dealii::ArrayView<double> & /*rho*/,
                        const dealii::ArrayView<double> & /*e*/) const final
       {
+        eospac_guard_.ensure_initialized([&]() {
+          this->set_up_database();
+          return true;
+        });
+
+        AssertThrow(false, dealii::ExcInternalError());
         __builtin_trap();
       }
 
+
       double speed_of_sound(double /*rho*/, double /*e*/) const final
       {
+        eospac_guard_.ensure_initialized([&]() {
+          this->set_up_database();
+          return true;
+        });
+
+        AssertThrow(false, dealii::ExcInternalError());
         __builtin_trap();
       }
 
@@ -388,12 +419,43 @@ namespace ryujin
                           const dealii::ArrayView<double> & /*rho*/,
                           const dealii::ArrayView<double> & /*e*/) const final
       {
+        eospac_guard_.ensure_initialized([&]() {
+          this->set_up_database();
+          return true;
+        });
+
+        AssertThrow(false, dealii::ExcInternalError());
         __builtin_trap();
       }
 
     private:
+      /**
+       * Private methods and fields for initializing the eospac interface
+       */
+      //@{
+      //
+      void set_up_database() const
+      {
+        const std::vector<std::tuple<EOS_INTEGER, eospac::TableType>> tables{
+            {material_id_, eospac::TableType::p_rho_e},
+            {material_id_, eospac::TableType::e_rho_p},
+        };
+
+        eospac_interface_ = std::make_unique<eospac::Interface>(tables);
+      }
+
+      Lazy<bool> eospac_guard_;
+      mutable std::unique_ptr<eospac::Interface> eospac_interface_;
+
+      //@}
+      /**
+       * @name Run time options
+       */
+      //@{
+
       EOS_INTEGER material_id_;
-      std::unique_ptr<eospac::Interface> eospac_interface_;
+
+      //@}
 
 #else /* WITHOUT_EOSPAC */
 

@@ -315,7 +315,7 @@ namespace ryujin
       DEAL_II_ALWAYS_INLINE inline Number
       compute_bathymetry(const dealii::Point<dim> &point) const
       {
-        geotiff.ensure_initialized([&]() {
+        geotiff_guard_.ensure_initialized([&]() {
           read_in_raster();
           return true;
         });
@@ -379,7 +379,7 @@ namespace ryujin
       // We use a Lazy<t> wrapper for lazy initialization with efficient
       // Schmidt's double checking. We simply ignore the bool type here.
       //
-      Lazy<bool> geotiff;
+      Lazy<bool> geotiff_guard_;
       mutable std::string driver_name;
       mutable std::string driver_projection;
       mutable std::array<double, 6> affine_transformation;
