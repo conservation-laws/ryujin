@@ -492,12 +492,6 @@ namespace ryujin
     const unsigned int dofs_per_cell =
         discretization_->finite_element().dofs_per_cell;
 
-    const unsigned int n_q_points = discretization_->quadrature().size();
-    const unsigned int n_face_q_points =
-        discretization_->face_quadrature().size();
-    const unsigned int n_face_q_points_nodal =
-        discretization_->face_nodal_quadrature().size();
-
     /*
      * Now, assemble all matrices:
      */
@@ -563,24 +557,22 @@ namespace ryujin
       }
       cell_measure = 0.;
 
-      for (unsigned int q_point = 0; q_point < n_q_points; ++q_point) {
-        const auto JxW = fe_values.JxW(q_point);
+      for (unsigned int q : fe_values.quadrature_point_indices()) {
+        const auto JxW = fe_values.JxW(q);
 
         if (cell->is_locally_owned())
           cell_measure += Number(JxW);
 
-        for (unsigned int j = 0; j < dofs_per_cell; ++j) {
-          const auto value_JxW = fe_values.shape_value(j, q_point) * JxW;
-          const auto grad_JxW = fe_values.shape_grad(j, q_point) * JxW;
+        for (unsigned int j : fe_values.dof_indices()) {
+          const auto value_JxW = fe_values.shape_value(j, q) * JxW;
+          const auto grad_JxW = fe_values.shape_grad(j, q) * JxW;
 
-          for (unsigned int i = 0; i < dofs_per_cell; ++i) {
-
-            const auto value = fe_values.shape_value(i, q_point);
+          for (unsigned int i : fe_values.dof_indices()) {
+            const auto value = fe_values.shape_value(i, q);
 
             cell_mass_matrix(i, j) += Number(value * value_JxW);
             for (unsigned int d = 0; d < dim; ++d)
               cell_cij_matrix[d](i, j) += Number((value * grad_JxW)[d]);
-
           } /* for i */
         }   /* for j */
       }     /* for q */
@@ -619,14 +611,14 @@ namespace ryujin
 
         /* Face contribution: */
 
-        for (unsigned int q = 0; q < n_face_q_points; ++q) {
+        for (unsigned int q : fe_face_values.quadrature_point_indices()) {
           const auto JxW = fe_face_values.JxW(q);
           const auto &normal = fe_face_values.get_normal_vectors()[q];
 
-          for (unsigned int j = 0; j < dofs_per_cell; ++j) {
+          for (unsigned int j : fe_face_values.dof_indices()) {
             const auto value_JxW = fe_face_values.shape_value(j, q) * JxW;
 
-            for (unsigned int i = 0; i < dofs_per_cell; ++i) {
+            for (unsigned int i : fe_face_values.dof_indices()) {
               const auto value = fe_face_values.shape_value(i, q);
 
               for (unsigned int d = 0; d < dim; ++d)
@@ -648,16 +640,16 @@ namespace ryujin
 
         fe_neighbor_face_values.reinit(neighbor_cell, f_index_neighbor);
 
-        for (unsigned int q = 0; q < n_face_q_points; ++q) {
+        for (unsigned int q : fe_face_values.quadrature_point_indices()) {
           const auto JxW = fe_face_values.JxW(q);
           const auto &normal = fe_face_values.get_normal_vectors()[q];
 
           /* index j for neighbor, index i for current cell: */
-          for (unsigned int j = 0; j < dofs_per_cell; ++j) {
+          for (unsigned int j : fe_face_values.dof_indices()) {
             const auto value_JxW =
                 fe_neighbor_face_values.shape_value(j, q) * JxW;
 
-            for (unsigned int i = 0; i < dofs_per_cell; ++i) {
+            for (unsigned int i : fe_face_values.dof_indices()) {
               const auto value = fe_face_values.shape_value(i, q);
 
               for (unsigned int d = 0; d < dim; ++d)
@@ -894,11 +886,12 @@ namespace ryujin
 
           /* Lumped incidence matrix: */
 
-          for (unsigned int q = 0; q < n_face_q_points_nodal; ++q) {
+          for (unsigned int q :
+               fe_face_values_nodal.quadrature_point_indices()) {
             /* index j for neighbor, index i for current cell: */
-            for (unsigned int j = 0; j < dofs_per_cell; ++j) {
+            for (unsigned int j : fe_neighbor_face_values_nodal.dof_indices()) {
               const auto v_j = fe_neighbor_face_values_nodal.shape_value(j, q);
-              for (unsigned int i = 0; i < dofs_per_cell; ++i) {
+              for (unsigned int i : fe_face_values_nodal.dof_indices()) {
                 const auto v_i = fe_face_values_nodal.shape_value(i, q);
                 constexpr auto eps = std::numeric_limits<Number>::epsilon();
                 if (std::abs(v_i * v_j) > 100. * eps) {
@@ -1222,7 +1215,7 @@ namespace ryujin
       local_dof_indices.resize(dofs_per_cell);
       cell->get_active_or_mg_dof_indices(local_dof_indices);
 
-      for (auto f : GeometryInfo<dim>::face_indices()) {
+      for (auto f : cell->reference_cell().face_indices()) {
         const auto face = cell->face(f);
         const auto id = face->boundary_id();
 
@@ -1238,17 +1231,15 @@ namespace ryujin
           continue;
 
         fe_face_values.reinit(cell, f);
-        const unsigned int n_face_q_points = face_quadrature.size();
 
-        for (unsigned int j = 0; j < dofs_per_cell; ++j) {
-
+        for (unsigned int j : fe_face_values.dof_indices()) {
           if (!discretization_->finite_element().has_support_on_face(j, f))
             continue;
 
           Number boundary_mass = 0.;
           dealii::Tensor<1, dim, Number> normal;
 
-          for (unsigned int q = 0; q < n_face_q_points; ++q) {
+          for (unsigned int q : fe_face_values.quadrature_point_indices()) {
             const auto JxW = fe_face_values.JxW(q);
             const auto phi_i = fe_face_values.shape_value(j, q);
 
@@ -1389,8 +1380,9 @@ namespace ryujin
 
     std::vector<dealii::types::global_dof_index> local_dof_indices;
 
-    const unsigned int dofs_per_cell =
-        discretization_->finite_element().dofs_per_cell;
+    const auto &finite_element = discretization_->finite_element();
+    const unsigned int dofs_per_cell = finite_element.dofs_per_cell;
+    local_dof_indices.resize(dofs_per_cell);
 
     for (auto cell = begin; cell != end; ++cell) {
 
@@ -1398,10 +1390,9 @@ namespace ryujin
       if (cell->is_artificial())
         continue;
 
-      local_dof_indices.resize(dofs_per_cell);
       cell->get_active_or_mg_dof_indices(local_dof_indices);
 
-      for (auto f : GeometryInfo<dim>::face_indices()) {
+      for (auto f : cell->reference_cell().face_indices()) {
         const auto face = cell->face(f);
         const auto id = face->boundary_id();
 
@@ -1414,7 +1405,7 @@ namespace ryujin
 
         for (unsigned int j = 0; j < dofs_per_cell; ++j) {
 
-          if (!discretization_->finite_element().has_support_on_face(j, f))
+          if (!finite_element.has_support_on_face(j, f))
             continue;
 
           const auto global_index = local_dof_indices[j];
