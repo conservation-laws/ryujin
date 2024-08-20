@@ -1035,7 +1035,13 @@ namespace ryujin
         Assert(j < n_locally_relevant_, dealii::ExcInternalError());
 
         const auto m_ij = mass_matrix_.get_entry(i, col_idx);
-        Assert(std::abs(m_ij) > 1.e-12, dealii::ExcInternalError());
+        if (discretization_->have_discontinuous_ansatz()) {
+          // Interfacial coupling terms are present in the stencil but zero
+          // in the mass matrix
+          Assert(std::abs(m_ij) > -1.e-12, dealii::ExcInternalError());
+        } else {
+          Assert(std::abs(m_ij) > 1.e-12, dealii::ExcInternalError());
+        }
         sum += m_ij;
 
         const auto m_ji = mass_matrix_.get_transposed_entry(i, col_idx);
