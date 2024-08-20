@@ -1009,7 +1009,8 @@ namespace ryujin
       total_mass += lumped_mass_matrix_.local_element(i);
     total_mass = Utilities::MPI::sum(total_mass, mpi_communicator_);
 
-    Assert(std::abs(measure_of_omega_ - total_mass) < 1.e-12,
+    Assert(std::abs(measure_of_omega_ - total_mass) <
+               1.e-12 * measure_of_omega_,
            dealii::ExcMessage(
                "Total mass differs from the measure of the domain."));
 
