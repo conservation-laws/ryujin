@@ -1009,7 +1009,8 @@ namespace ryujin
       total_mass += lumped_mass_matrix_.local_element(i);
     total_mass = Utilities::MPI::sum(total_mass, mpi_communicator_);
 
-    Assert(std::abs(measure_of_omega_ - total_mass) < 1.e-12,
+    Assert(std::abs(measure_of_omega_ - total_mass) <
+               1.e-12 * measure_of_omega_,
            dealii::ExcMessage(
                "Total mass differs from the measure of the domain."));
 
@@ -1035,7 +1036,13 @@ namespace ryujin
         Assert(j < n_locally_relevant_, dealii::ExcInternalError());
 
         const auto m_ij = mass_matrix_.get_entry(i, col_idx);
-        Assert(std::abs(m_ij) > 1.e-12, dealii::ExcInternalError());
+        if (discretization_->have_discontinuous_ansatz()) {
+          // Interfacial coupling terms are present in the stencil but zero
+          // in the mass matrix
+          Assert(std::abs(m_ij) > -1.e-12, dealii::ExcInternalError());
+        } else {
+          Assert(std::abs(m_ij) > 1.e-12, dealii::ExcInternalError());
+        }
         sum += m_ij;
 
         const auto m_ji = mass_matrix_.get_transposed_entry(i, col_idx);

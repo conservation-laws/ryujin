@@ -945,6 +945,7 @@ namespace ryujin
                   bounds,
                   bounds_.template get_tensor<T, std::array<T, n_bounds>>(js));
             }
+            bounds_.template write_tensor<T>(bounds, i);
           }
 
           [[maybe_unused]] T m_i;
