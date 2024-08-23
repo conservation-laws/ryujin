@@ -1266,15 +1266,15 @@ namespace ryujin
     if (mpi_rank_ != 0)
       return;
 
-    const auto header_size = header.size();
-    const auto padded_header = std::string((34 - header_size) / 2, ' ') +
-                               header +
-                               std::string((35 - header_size) / 2, ' ');
+    const int header_size = header.size();
+    const auto padded_header =
+        std::string(std::max(0, 34 - header_size) / 2, ' ') + header +
+        std::string(std::max(0, 35 - header_size) / 2, ' ');
 
-    const auto secondary_size = secondary.size();
-    const auto padded_secondary = std::string((34 - secondary_size) / 2, ' ') +
-                                  secondary +
-                                  std::string((35 - secondary_size) / 2, ' ');
+    const int secondary_size = secondary.size();
+    const auto padded_secondary =
+        std::string(std::max(0, 34 - secondary_size) / 2, ' ') + secondary +
+        std::string(std::max(0, 35 - secondary_size) / 2, ' ');
 
     /* clang-format off */
     stream << "\n";
