@@ -48,7 +48,7 @@ end
 
 subsection F - HyperbolicModule
   subsection indicator
-    set indicator strategy = galerkin
+    set evc factor = 0.
   end
 
   subsection limiter
