@@ -1207,8 +1207,8 @@ namespace ryujin
       }
     }
 
-    /* Return tau_max: */
-    return tau_max;
+    /* Return tau, which could be tau_max unless user selects a tau: */
+    return tau;
   }
 
 } /* namespace ryujin */
