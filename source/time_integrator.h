@@ -231,7 +231,9 @@ namespace ryujin
      * adaptation and recovery strategies for invariant domain violations
      * are used.
      */
-    Number step(StateVector &state_vector, Number t);
+    Number step(StateVector &state_vector,
+                Number t,
+                Number t_final = std::numeric_limits<Number>::max());
 
     /**
      * The selected time-stepping scheme.
@@ -257,7 +259,7 @@ namespace ryujin
      * supplied value is used for time stepping instead of the computed
      * maximal time step size.
      */
-    Number step_ssprk_22(StateVector &state_vector, Number t);
+    Number step_ssprk_22(StateVector &state_vector, Number t, Number tau_max);
 
     /**
      * Given a reference to a previous state vector U performs an explicit
@@ -269,35 +271,35 @@ namespace ryujin
      * supplied value is used for time stepping instead of the computed
      * maximal time step size.
      */
-    Number step_ssprk_33(StateVector &state_vector, Number t);
+    Number step_ssprk_33(StateVector &state_vector, Number t, Number tau_max);
 
     /**
      * Given a reference to a previous state vector U performs an explicit
      * first-order Euler step ERK(1,1;1) time step (and store the result
      * in U). The function returns the chosen time step size tau.
      */
-    Number step_erk_11(StateVector &state_vector, Number t);
+    Number step_erk_11(StateVector &state_vector, Number t, Number tau_max);
 
     /**
      * Given a reference to a previous state vector U performs an explicit
      * second-order Runge-Kutta ERK(2,2;1) time step (and store the result
      * in U). The function returns the chosen time step size tau.
      */
-    Number step_erk_22(StateVector &state_vector, Number t);
+    Number step_erk_22(StateVector &state_vector, Number t, Number tau_max);
 
     /**
      * Given a reference to a previous state vector U performs an explicit
      * third-order Runge-Kutta ERK(3,3;1) time step (and store the result
      * in U). The function returns the chosen time step size tau.
      */
-    Number step_erk_33(StateVector &state_vector, Number t);
+    Number step_erk_33(StateVector &state_vector, Number t, Number tau_max);
 
     /**
      * Given a reference to a previous state vector U performs an explicit
      * 4 stage third-order Runge-Kutta ERK(4,3;1) time step (and store the
      * result in U). The function returns the chosen time step size tau.
      */
-    Number step_erk_43(StateVector &state_vector, Number t);
+    Number step_erk_43(StateVector &state_vector, Number t, Number tau_max);
 
     /**
      * Given a reference to a previous state vector U performs an explicit
@@ -305,7 +307,7 @@ namespace ryujin
      * the result in U). The function returns the chosen time step size
      * tau.
      */
-    Number step_erk_54(StateVector &state_vector, Number t);
+    Number step_erk_54(StateVector &state_vector, Number t, Number tau_max);
 
     /**
      * Given a reference to a previous state vector U performs a combined
@@ -314,7 +316,9 @@ namespace ryujin
      * store the result in U). The function returns the chosen time step
      * size tau.
      */
-    Number step_strang_ssprk_33_cn(StateVector &state_vector, Number t);
+    Number step_strang_ssprk_33_cn(StateVector &state_vector,
+                                   Number t,
+                                   Number tau_max);
 
     /**
      * Given a reference to a previous state vector U performs a combined
@@ -323,7 +327,8 @@ namespace ryujin
      * the result in U). The function returns the chosen time step size
      * tau.
      */
-    Number step_strang_erk_33_cn(StateVector &state_vector, Number t);
+    Number
+    step_strang_erk_33_cn(StateVector &state_vector, Number t, Number tau_max);
 
     /**
      * Given a reference to a previous state vector U performs a combined
@@ -332,7 +337,8 @@ namespace ryujin
      * the result in U). The function returns the chosen time step size
      * tau.
      */
-    Number step_strang_erk_43_cn(StateVector &state_vector, Number t);
+    Number
+    step_strang_erk_43_cn(StateVector &state_vector, Number t, Number tau_max);
 
   private:
     //@}

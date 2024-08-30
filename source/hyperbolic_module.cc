@@ -12,6 +12,7 @@
       std::array<std::reference_wrapper<const StateVector>, stages>,           \
       const std::array<NUMBER, stages>,                                        \
       StateVector &,                                                           \
+      NUMBER,                                                                  \
       NUMBER) const
 
 namespace ryujin

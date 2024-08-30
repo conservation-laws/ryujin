@@ -216,7 +216,8 @@ namespace ryujin
                     stage_state_vectors,
                 const std::array<Number, stages> stage_weights,
                 StateVector &new_state_vector,
-                Number tau = Number(0.)) const;
+                Number tau = Number(0.),
+                Number tau_max_0 = std::numeric_limits<Number>::max()) const;
 
     /**
      * Sets the relative CFL number used for computing an appropriate
