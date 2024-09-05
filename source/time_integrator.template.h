@@ -259,7 +259,7 @@ namespace ryujin
     /* Step 1: T0 = U_old + tau * L(U_old) at t -> t + tau */
     hyperbolic_module_->prepare_state_vector(state_vector, t);
     Number tau = hyperbolic_module_->template step<0>(
-        state_vector, {}, {}, temp_[0], Number(0.), tau_max / efficiency_);
+        state_vector, {}, {}, temp_[0], Number(0.), tau_max);
 
     /* Step 2: T1 = T0 + tau L(T0) at time t + tau -> t + 2*tau */
     hyperbolic_module_->prepare_state_vector(temp_[0], t + 1.0 * tau);
@@ -282,7 +282,7 @@ namespace ryujin
     /* Step 1: T0 = U_old + tau * L(U_old) at time t -> t + tau */
     hyperbolic_module_->prepare_state_vector(state_vector, t);
     Number tau = hyperbolic_module_->template step<0>(
-        state_vector, {}, {}, temp_[0], Number(0.), tau_max / efficiency_);
+        state_vector, {}, {}, temp_[0], Number(0.), tau_max);
 
     /* Step 2: T1 = T0 + tau L(T0) at time t + tau -> t + 2*tau */
     hyperbolic_module_->prepare_state_vector(temp_[0], t + 1.0 * tau);
@@ -314,7 +314,7 @@ namespace ryujin
     /* Step 1: T0 <- {U_old, 1} at time t -> t + tau */
     hyperbolic_module_->prepare_state_vector(state_vector, t);
     Number tau = hyperbolic_module_->template step<0>(
-        state_vector, {}, {}, temp_[0], Number(0.), tau_max / efficiency_);
+        state_vector, {}, {}, temp_[0], Number(0.), tau_max);
 
     state_vector.swap(temp_[0]);
     return tau;
@@ -332,7 +332,7 @@ namespace ryujin
     /* Step 1: T0 <- {U_old, 1} at time t -> t + tau */
     hyperbolic_module_->prepare_state_vector(state_vector, t);
     Number tau = hyperbolic_module_->template step<0>(
-        state_vector, {}, {}, temp_[0], Number(.0), tau_max / efficiency_);
+        state_vector, {}, {}, temp_[0], Number(.0), tau_max / 2.);
 
     /* Step 2: T1 <- {T0, 2} and {U_old, -1} at time t + tau -> t + 2*tau */
     hyperbolic_module_->prepare_state_vector(temp_[0], t + 1.0 * tau);
@@ -355,7 +355,7 @@ namespace ryujin
     /* Step 1: T0 <- {U_old, 1} at time t -> t + tau */
     hyperbolic_module_->prepare_state_vector(state_vector, t);
     Number tau = hyperbolic_module_->template step<0>(
-        state_vector, {}, {}, temp_[0], Number(0.), tau_max / efficiency_);
+        state_vector, {}, {}, temp_[0], Number(0.), tau_max / 3.);
 
     /* Step 2: T1 <- {T0, 2} and {U_old, -1} at time t + 1*tau -> t + 2*tau */
     hyperbolic_module_->prepare_state_vector(temp_[0], t + 1.0 * tau);
@@ -387,7 +387,7 @@ namespace ryujin
     /* Step 1: T0 <- {U_old, 1} at time t -> t + tau */
     hyperbolic_module_->prepare_state_vector(state_vector, t);
     Number tau = hyperbolic_module_->template step<0>(
-        state_vector, {}, {}, temp_[0], Number(0.), tau_max / efficiency_);
+        state_vector, {}, {}, temp_[0], Number(0.), tau_max / 4.);
 
     /* Step 2: T1 <- {T0, 2} and {U_old, -1} at time t + 1*tau -> t + 2*tau */
     hyperbolic_module_->prepare_state_vector(temp_[0], t + 1.0 * tau);
@@ -441,7 +441,7 @@ namespace ryujin
     /* Step 1: at time t -> t + 1*tau*/
     hyperbolic_module_->prepare_state_vector(state_vector, t);
     Number tau = hyperbolic_module_->template step<0>(
-        state_vector, {}, {}, temp_[0], Number(0.), tau_max / efficiency_);
+        state_vector, {}, {}, temp_[0], Number(0.), tau_max / 5.);
 
     /* Step 2: at time t -> 1*tau -> t + 2*tau*/
     hyperbolic_module_->prepare_state_vector(temp_[0], t + 1.0 * tau);
@@ -498,12 +498,7 @@ namespace ryujin
 
     hyperbolic_module_->prepare_state_vector(/*!*/ state_vector, t);
     Number tau = hyperbolic_module_->template step<0>(
-        /*!*/ state_vector,
-        {},
-        {},
-        temp_[0],
-        Number(0.0),
-        tau_max / efficiency_);
+        /*!*/ state_vector, {}, {}, temp_[0], Number(0.0), tau_max / 2.);
 
     hyperbolic_module_->prepare_state_vector(temp_[0], t + 1.0 * tau);
     hyperbolic_module_->template step<0>(temp_[0], {}, {}, temp_[1], tau);
@@ -532,7 +527,7 @@ namespace ryujin
     sadd(temp_[0], Number(2.0 / 3.0), Number(1.0 / 3.0), /*!*/ temp_[2]);
 
     state_vector.swap(temp_[0]);
-    return 2.0 * tau;
+    return 2. * tau;
   }
 
 
@@ -551,12 +546,7 @@ namespace ryujin
 
     hyperbolic_module_->prepare_state_vector(state_vector, t);
     Number tau = hyperbolic_module_->template step<0>(
-        /*!*/ state_vector,
-        {},
-        {},
-        temp_[0],
-        Number(0.),
-        tau_max / efficiency_);
+        /*!*/ state_vector, {}, {}, temp_[0], Number(0.), tau_max / 6.);
 
     hyperbolic_module_->prepare_state_vector(temp_[0], t + 1.0 * tau);
     hyperbolic_module_->template step<1>(
@@ -612,12 +602,7 @@ namespace ryujin
 
     hyperbolic_module_->prepare_state_vector(state_vector, t);
     Number tau = hyperbolic_module_->template step<0>(
-        /*!*/ state_vector,
-        {},
-        {},
-        temp_[0],
-        Number(0.),
-        tau_max / efficiency_);
+        /*!*/ state_vector, {}, {}, temp_[0], Number(0.), tau_max / 8.);
 
     hyperbolic_module_->prepare_state_vector(temp_[0], t + 1.0 * tau);
     hyperbolic_module_->template step<1>(
