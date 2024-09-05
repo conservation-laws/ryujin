@@ -29,10 +29,7 @@ namespace ryujin
    * time step tau is prescribed.
    *
    * The invariant domain violation is detected in the limiter and
-   * typically implies that the low-order update is already out of
-   * bounds. We further do a quick sanity check whether the computed
-   * step size tau_max and the prescribed step size tau are within an
-   * acceptable tolerance of about 10%.
+   * typically implies that the low-order update is already out of bounds.
    *
    * @ingroup HyperbolicModule
    */
@@ -155,13 +152,13 @@ namespace ryujin
     /**
      * Given a reference to a previous state vector @p old_U perform an
      * explicit euler step (and store the result in @p new_U). The
-     * function returns the computed maximal time step size tau_max
-     * according to the CFL condition.
+     * function returns the chosen time step size tau with which the update
+     * was performed.
      *
-     * The time step is performed with either tau_max (if @p tau is set
-     * to 0), or tau (if @p tau is nonzero). Here, tau_max is the
-     * computed maximal time step size and @p tau is the last parameter
-     * of the function.
+     * The time step is performed with either tau_max (if @p tau is set to
+     * 0), or tau (if @p tau is nonzero). Here, tau_max is the computed
+     * maximal time step size and @p tau is the last parameter of the
+     * function.
      *
      * The function takes an optional array of states @p stage_U together
      * with a an array of weights @p stage_weights to construct a

@@ -1207,7 +1207,7 @@ namespace ryujin
       }
     }
 
-    /* Return tau, which could be tau_max unless user selects a tau: */
+    /* Return the time step size tau: */
     return tau;
   }
 
