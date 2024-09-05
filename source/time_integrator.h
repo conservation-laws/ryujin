@@ -141,6 +141,66 @@ namespace ryujin
      * Crank-Nicolson for the parabolic subproblem
      */
     strang_erk_43_cn,
+
+    /**
+     * A Euler IMEX splitting. This is the low order IMEX method: it performs a
+     * forward Euler time step for the hyperbolic subproblem and then a backward
+     * Euler time step for the parabolic subproblem. */
+    imex_11,
+
+    /**
+     * An implicit-explicit method that utilizes the Heun's second order
+     * explicit Runge-Kutta
+     * scheme with Butcher tableau
+     *
+     * \f{align*}
+     * \begin{array}{c|ccc}
+     *   0            & 0 \\
+     *   1 & 0.5 & 0 \\
+     *   0.5 & 0        &  2 \\
+     *  \end{array} \f}
+     *
+     * to solve the explicit subproblem and the two-stage Crank-Nicolson scheme
+     * diagonally implicit Runge-Kutta scheme with Butcher tableau \f{align*}
+     *
+     * \begin{array}{c|ccc}
+     *   0            & 0 \\
+     *   0.5 & 0 & \tfrac{1}{2} \\
+     *   1 & 0    &  1 \\
+     *  \end{array} \f}
+     *
+     * to solve the parabolic subproblem.
+     */
+    imex_22,
+
+    /**
+     * An implicit-explicit method that utilizes the Heun's second order
+     * explicit Runge-Kutta
+     * scheme with Butcher tableau
+     *
+     * \f{align*}
+     * \begin{array}{c|cccc}
+     *   0  & 0 \\
+     *   \tfrace{1}{3} & \tfrace{1}{3} & 0 \\
+     *   \tfrace{2}{3} & 0  &  \tfrace{2}{3} & 0 \\
+          1 & \tfrace{1}{4} & 0 & \tfrace{3}{4}
+     *  \end{array} \f}
+     *
+     * to solve the explicit subproblem and the two-stage Crank-Nicolson scheme
+     * diagonally implicit Runge-Kutta scheme with Butcher tableau \f{align*}
+     *
+     * \begin{array}{c|cccc}
+     *   0   & 0 \\
+     *   \tfrace{1}{3} & \tfrace{1}{3} - \gamma & \gamma \\
+     *   \tfrace{2}{3} & \gamma   &  \tfrace{2}{3} - 2 \gamma & \gamma \\
+    *     1 & \tfrace{1}{4} & 0 & \tfrace{3}{4}
+     *  \end{array} \f}
+     *
+     * with \gamma = \tfrace{1}{2} + \tfrace{1}{2\sqrt(3)}
+     *
+     * to solve the parabolic subproblem.
+     */
+    imex_33,
   };
 } // namespace ryujin
 
@@ -161,7 +221,10 @@ DECLARE_ENUM(
          {ryujin::TimeSteppingScheme::erk_54, "erk 54"},
          {ryujin::TimeSteppingScheme::strang_ssprk_33_cn, "strang ssprk 33 cn"},
          {ryujin::TimeSteppingScheme::strang_erk_33_cn, "strang erk 33 cn"},
-         {ryujin::TimeSteppingScheme::strang_erk_43_cn, "strang erk 43 cn"}, ));
+         {ryujin::TimeSteppingScheme::strang_erk_43_cn, "strang erk 43 cn"},
+         {ryujin::TimeSteppingScheme::imex_11, "imex 11"},
+         {ryujin::TimeSteppingScheme::imex_22, "imex 22"},
+         {ryujin::TimeSteppingScheme::imex_33, "imex 33"}));
 #endif
 
 namespace ryujin
@@ -343,6 +406,28 @@ namespace ryujin
      */
     Number
     step_strang_erk_43_cn(StateVector &state_vector, Number t, Number tau_max);
+
+    /** Given a reference to a previous state vector U, performs an
+     * implicit-explicit step IMEX(1,1;1) using a forward euler scheme for the
+     * hyperbolic subproblem and backward euler scheme for the parabolic
+     * subproblem. */
+    Number step_imex_11(StateVector &state_vector, Number t, Number tau_max);
+
+    /**
+     * Given a reference to a previous state vector U performs an
+     * implicit-explicit IMEX(2,2;1) step using a two stage midpoint rule for
+     * the hyperbolic subproblem and a two stage midpoint rule for the parabolic
+     * subproblem. The function returns the chosen time step size tau.
+     */
+    Number step_imex_22(StateVector &state_vector, Number t, Number tau_max);
+
+    /**
+     * Given a reference to a previous state vector U performs an
+     * implicit-explicit IMEX(3,3;1) step using a three stage ERK tableau for
+     * the hyperbolic subproblem and a three stage DIRK tableau for the
+     * parabolic subproblem. The function returns the chosen time step size tau.
+     */
+    Number step_imex_33(StateVector &state_vector, Number t, Number tau_max);
 
   private:
     //@}
