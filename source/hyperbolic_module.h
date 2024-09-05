@@ -156,9 +156,10 @@ namespace ryujin
      * was performed.
      *
      * The time step is performed with either tau_max (if @p tau is set to
-     * 0), or tau (if @p tau is nonzero). Here, tau_max is the computed
-     * maximal time step size and @p tau is the last parameter of the
-     * function.
+     * 0), or tau (if @p tau is nonzero). Here, tau_max is the minimum of
+     * the specified parameter @p tau_max and the computed maximal time
+     * step size according to the CFL condition. @p tau is the last
+     * parameter of the function.
      *
      * The function takes an optional array of states @p stage_U together
      * with a an array of weights @p stage_weights to construct a

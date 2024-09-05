@@ -222,7 +222,8 @@ namespace ryujin
     /**
      * Given a reference to a previous state vector U performs an explicit
      * time step (and store the result in U). The function returns the
-     * chosen time step size tau.
+     * chosen time step size tau. The time step size tau is selected such
+     * that $t + tau <= t_final$.
      *
      * @note This function switches between different Runge-Kutta methods
      * depending on chosen runtime parameters.
@@ -253,11 +254,8 @@ namespace ryujin
      * Given a reference to a previous state vector U performs an explicit
      * second-order strong-stability preserving Runge-Kutta SSPRK(2,2;1/2)
      * time step (and store the result in U). The function returns the
-     * chosen time step size tau.
-     *
-     * If the parameter @p tau is set to a nonzero value then the
-     * supplied value is used for time stepping instead of the computed
-     * maximal time step size.
+     * chosen time step size tau, which is guaranteed to be less than or
+     * equal to the parameter @p tau_max.
      */
     Number step_ssprk_22(StateVector &state_vector, Number t, Number tau_max);
 
@@ -265,39 +263,41 @@ namespace ryujin
      * Given a reference to a previous state vector U performs an explicit
      * third-order strong-stability preserving Runge-Kutta SSPRK(3,3;1/3)
      * time step (and store the result in U). The function returns the
-     * chosen time step size tau.
-     *
-     * If the parameter @p tau is set to a nonzero value then the
-     * supplied value is used for time stepping instead of the computed
-     * maximal time step size.
+     * chosen time step size tau, which is guaranteed to be less than or
+     * equal to the parameter @p tau_max.
      */
     Number step_ssprk_33(StateVector &state_vector, Number t, Number tau_max);
 
     /**
      * Given a reference to a previous state vector U performs an explicit
      * first-order Euler step ERK(1,1;1) time step (and store the result
-     * in U). The function returns the chosen time step size tau.
+     * in U). The function returns the chosen time step size tau, which is
+     * guaranteed to be less than or equal to the parameter @p tau_max.
      */
     Number step_erk_11(StateVector &state_vector, Number t, Number tau_max);
 
     /**
      * Given a reference to a previous state vector U performs an explicit
      * second-order Runge-Kutta ERK(2,2;1) time step (and store the result
-     * in U). The function returns the chosen time step size tau.
+     * in U). The function returns the chosen time step size tau, which is
+     * guaranteed to be less than or equal to the parameter @p tau_max.
      */
     Number step_erk_22(StateVector &state_vector, Number t, Number tau_max);
 
     /**
      * Given a reference to a previous state vector U performs an explicit
      * third-order Runge-Kutta ERK(3,3;1) time step (and store the result
-     * in U). The function returns the chosen time step size tau.
+     * in U). The function returns the chosen time step size tau, which is
+     * guaranteed to be less than or equal to the parameter @p tau_max.
      */
     Number step_erk_33(StateVector &state_vector, Number t, Number tau_max);
 
     /**
      * Given a reference to a previous state vector U performs an explicit
      * 4 stage third-order Runge-Kutta ERK(4,3;1) time step (and store the
-     * result in U). The function returns the chosen time step size tau.
+     * result in U). The function returns the chosen time step size tau,
+     * which is guaranteed to be less than or equal to the parameter @p
+     * tau_max.
      */
     Number step_erk_43(StateVector &state_vector, Number t, Number tau_max);
 
@@ -305,7 +305,8 @@ namespace ryujin
      * Given a reference to a previous state vector U performs an explicit
      * 4 stage fourth-order Runge-Kutta ERK(5,4;1) time step (and store
      * the result in U). The function returns the chosen time step size
-     * tau.
+     * tau, which is guaranteed to be less than or equal to the parameter
+     * @p tau_max.
      */
     Number step_erk_54(StateVector &state_vector, Number t, Number tau_max);
 
@@ -314,7 +315,8 @@ namespace ryujin
      * explicit implicit Strang split using a third-order Runge-Kutta
      * ERK(3,3;1/3) time step and an implicit Crank-Nicolson step (and
      * store the result in U). The function returns the chosen time step
-     * size tau.
+     * size tau, which is guaranteed to be less than or equal to the
+     * parameter @p tau_max.
      */
     Number step_strang_ssprk_33_cn(StateVector &state_vector,
                                    Number t,
@@ -325,7 +327,8 @@ namespace ryujin
      * explicit implicit Strang split using a third-order Runge-Kutta
      * ERK(3,3;1) time step and an implicit Crank-Nicolson step (and store
      * the result in U). The function returns the chosen time step size
-     * tau.
+     * tau, which is guaranteed to be less than or equal to the parameter
+     * @p tau_max.
      */
     Number
     step_strang_erk_33_cn(StateVector &state_vector, Number t, Number tau_max);
@@ -335,7 +338,8 @@ namespace ryujin
      * explicit implicit Strang split using a third-order Runge-Kutta
      * ERK(4,3;1) time step and an implicit Crank-Nicolson step (and store
      * the result in U). The function returns the chosen time step size
-     * tau.
+     * tau, which is guaranteed to be less than or equal to the parameter
+     * @p tau_max.
      */
     Number
     step_strang_erk_43_cn(StateVector &state_vector, Number t, Number tau_max);
