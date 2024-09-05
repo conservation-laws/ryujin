@@ -1207,8 +1207,8 @@ namespace ryujin
       }
     }
 
-    /* Return tau_max: */
-    return tau_max;
+    /* Return the time step size tau: */
+    return tau;
   }
 
 } /* namespace ryujin */
