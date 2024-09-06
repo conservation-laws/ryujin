@@ -239,7 +239,8 @@ namespace ryujin
           stage_state_vectors,
       const std::array<Number, stages> stage_weights,
       StateVector &new_state_vector,
-      Number tau /*= 0.*/) const
+      Number tau /*= 0.*/,
+      std::atomic<Number> tau_max /*std::numeric_limits<Number>::max()*/) const
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "HyperbolicModule<Description, dim, Number>::step()"
@@ -427,8 +428,6 @@ namespace ryujin
      * Step 3: Compute diagonal of d_ij, and maximal time-step size.
      * -------------------------------------------------------------------------
      */
-
-    std::atomic<Number> tau_max{std::numeric_limits<Number>::max()};
 
     {
       Scope scope(computing_timer_,

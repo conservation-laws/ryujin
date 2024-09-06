@@ -156,9 +156,10 @@ namespace ryujin
      * was performed.
      *
      * The time step is performed with either tau_max (if @p tau is set to
-     * 0), or tau (if @p tau is nonzero). Here, tau_max is the computed
-     * maximal time step size and @p tau is the last parameter of the
-     * function.
+     * 0), or tau (if @p tau is nonzero). Here, tau_max is the minimum of
+     * the specified parameter @p tau_max and the computed maximal time
+     * step size according to the CFL condition. @p tau is the last
+     * parameter of the function.
      *
      * The function takes an optional array of states @p stage_U together
      * with a an array of weights @p stage_weights to construct a
@@ -211,12 +212,14 @@ namespace ryujin
      * prior to calling the step function.
      */
     template <int stages>
-    Number step(const StateVector &old_state_vector,
-                std::array<std::reference_wrapper<const StateVector>, stages>
-                    stage_state_vectors,
-                const std::array<Number, stages> stage_weights,
-                StateVector &new_state_vector,
-                Number tau = Number(0.)) const;
+    Number step(
+        const StateVector &old_state_vector,
+        std::array<std::reference_wrapper<const StateVector>, stages>
+            stage_state_vectors,
+        const std::array<Number, stages> stage_weights,
+        StateVector &new_state_vector,
+        Number tau = Number(0.),
+        std::atomic<Number> tau_max = std::numeric_limits<Number>::max()) const;
 
     /**
      * Sets the relative CFL number used for computing an appropriate

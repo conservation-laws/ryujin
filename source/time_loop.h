@@ -156,6 +156,7 @@ namespace ryujin
     std::string debug_filename_;
 
     Number t_final_;
+    bool enforce_t_final_;
     Number timer_granularity_;
 
     bool enable_checkpointing_;

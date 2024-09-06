@@ -83,6 +83,13 @@ namespace ryujin
     t_final_ = Number(5.);
     add_parameter("final time", t_final_, "Final time");
 
+    enforce_t_final_ = false;
+    add_parameter("enforce final time",
+                  enforce_t_final_,
+                  "Boolean indicating whether the final time should be "
+                  "enforced strictly. If set to true the last time step is "
+                  "shortened so that the simulation ends precisely at t_final");
+
     timer_granularity_ = Number(0.01);
     add_parameter("timer granularity",
                   timer_granularity_,
@@ -338,7 +345,16 @@ namespace ryujin
 
       /* Break if we have reached the final time. */
 
-      if (t >= t_final_)
+      /*
+       * Make sure that we do not loop forever due to roundoff errors when
+       * enforce_t_final_ is set to true.
+       */
+      const auto relax =
+          enforce_t_final_
+              ? Number(1. - 10. * std::numeric_limits<Number>::epsilon())
+              : Number(1.);
+
+      if (t >= relax * t_final_)
         break;
 
       /* Peform a mesh adaptation cycle: */
@@ -363,7 +379,11 @@ namespace ryujin
 
       /* Perform a time step: */
 
-      const auto tau = time_integrator_.step(state_vector, t);
+      const auto tau = time_integrator_.step(
+          state_vector,
+          t,
+          enforce_t_final_ ? t_final_ : std::numeric_limits<Number>::max());
+
       t += tau;
 
       /* Print and record cycle statistics: */
