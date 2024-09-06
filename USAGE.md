@@ -123,7 +123,7 @@ are best kept at their default values. For completeness we list all
 configuration options here:
   - `CMAKE_BUILD_TYPE`: build ryujin in "Release" or "Debug" mode
   - `NUMBER`: select "double" for double precision or "float" for single precision (defaults to double)
-  - `CHECK_BOUNDS`: enable additional bounds checking (defaults to OFF)
+  - `EXPENSIVE_BOUNDS_CHECK`: enable additional bounds checking (defaults to OFF)
   - `DEBUG_OUTPUT`: enable debug output (defaults to OFF)
   - `ASYNC_MPI_EXCHANGE`: enable asynchronous "communication hiding" MPI exchange (defaults to OFF)
   - `DENORMALS_ARE_ZERO`: disable floating point denormals (defaults to ON)
