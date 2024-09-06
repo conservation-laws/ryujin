@@ -69,7 +69,7 @@ project(ryujin CXX)
 set(NUMBER "double" CACHE STRING "The principal floating point type")
 
 option(ASYNC_MPI_EXCHANGE "Use synchronous MPI communication" OFF)
-option(CHECK_BOUNDS "Enable debug code paths that check limiter bounds" OFF)
+option(EXPENSIVE_BOUNDS_CHECK "Enable debug code paths that enable additional limiter bounds checks" OFF)
 option(DEBUG_OUTPUT "Enable detailed time-step output" OFF)
 option(DENORMALS_ARE_ZERO "Set the \"denormals are zero\" and \"flush to zero\" bits in the MXCSR register" ON)
 option(FORCE_DEAL_II_SPARSE_MATRIX "Always use dealii::SparseMatrix instead of TrilinosWrappers::SparseMatrix for assembly" OFF)

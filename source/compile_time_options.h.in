@@ -9,9 +9,9 @@
 
 #define NUMBER @NUMBER@
 
-#cmakedefine CHECK_BOUNDS
-#if defined(DEBUG) && !defined(CHECK_BOUNDS)
-#define CHECK_BOUNDS
+#cmakedefine EXPENSIVE_BOUNDS_CHECK
+#if defined(DEBUG) && !defined(EXPENSIVE_BOUNDS_CHECK)
+#define EXPENSIVE_BOUNDS_CHECK
 #endif
 
 #cmakedefine ASYNC_MPI_EXCHANGE

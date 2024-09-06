@@ -511,7 +511,7 @@ namespace ryujin
       const auto x = Number(1.) - interpolation_b * rho;
       const auto a = std::sqrt(gamma * p / (rho * x));
 
-#ifdef CHECK_BOUNDS
+#ifdef EXPENSIVE_BOUNDS_CHECK
       AssertThrowSIMD(
           Number(p),
           [](auto val) { return val > ScalarNumber(0.); },

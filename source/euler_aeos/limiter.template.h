@@ -105,7 +105,7 @@ namespace ryujin
         t_r = std::min(t_r, t_max);
         t_r = std::max(t_r, t_min);
 
-#ifdef CHECK_BOUNDS
+#ifdef EXPENSIVE_BOUNDS_CHECK
         /*
          * Verify that the new state is within bounds:
          */
@@ -184,7 +184,7 @@ namespace ryujin
               relax_small * rho_r * rho_e_r -
               s_min * rho_r * rho_r_gamma * ryujin::pow(covolume_r, -gm1);
 
-#ifndef CHECK_BOUNDS
+#ifndef EXPENSIVE_BOUNDS_CHECK
           /*
            * If psi_r > 0 the right state is fine, force returning t_r by
            * setting t_l = t_r:
@@ -206,7 +206,7 @@ namespace ryujin
            * This implies unfortunately that we might not accurately report
            * whether the low_order update U itself obeyed bounds because
            * U_r = U + t_r * P pushed us back into bounds. We thus skip
-           * this shortcut if `CHECK_BOUNDS` is set.
+           * this shortcut if `EXPENSIVE_BOUNDS_CHECK` is set.
            */
           if (t_l == t_r) {
 #ifdef DEBUG_OUTPUT_LIMITER
@@ -247,7 +247,7 @@ namespace ryujin
             success = false;
           }
 
-#ifdef CHECK_BOUNDS
+#ifdef EXPENSIVE_BOUNDS_CHECK
           /*
            * If psi_r > 0 the right state is fine, force returning t_r by
            * setting t_l = t_r:
@@ -304,7 +304,7 @@ namespace ryujin
 #endif
         }
 
-#ifdef CHECK_BOUNDS
+#ifdef EXPENSIVE_BOUNDS_CHECK
         /*
          * Verify that the new state is within bounds:
          */
