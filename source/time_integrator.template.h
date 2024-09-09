@@ -387,8 +387,10 @@ namespace ryujin
     hyperbolic_module_->template step<1>(
         temp_[0], {{state_vector}}, {{Number(-1.)}}, temp_[1], tau);
 
-    /* Step 3: T2 <- {T1, 9/4} and {T0, -2} and {U_old, 3/4}
-     * at time t + 2*tau -> t + 3*tau */
+    /*
+     * Step 3: T2 <- {T1, 9/4} and {T0, -2} and {U_old, 3/4}
+     * at time t + 2*tau -> t + 3*tau
+     */
     hyperbolic_module_->prepare_state_vector(temp_[1], t + 2.0 * tau);
     hyperbolic_module_->template step<2>(temp_[1],
                                          {{state_vector, temp_[0]}},
@@ -424,8 +426,10 @@ namespace ryujin
     hyperbolic_module_->template step<1>(
         temp_[1], {{temp_[0]}}, {{Number(-1.)}}, temp_[2], tau);
 
-    /* Step 4: T3 <- {T2, 8/3} and {T1,-10/3} and {T0, 5/3}
-     * at time t + 3*tau -> t + 4*tau */
+    /*
+     * Step 4: T3 <- {T2, 8/3} and {T1,-10/3} and {T0, 5/3}
+     * at time t + 3*tau -> t + 4*tau
+     */
     hyperbolic_module_->prepare_state_vector(temp_[2], t + 3.0 * tau);
     hyperbolic_module_->template step<2>(temp_[2],
                                          {{temp_[0], temp_[1]}},
@@ -463,17 +467,17 @@ namespace ryujin
     constexpr Number a_64 = +0.46213380485434047; /* aka b_4 */
     // constexpr Number a_65 = +0.35321654878641495; /* aka b_5 */
 
-    /* Step 1: at time t -> t + 1*tau*/
+    /* Step 1: at time t -> t + 1*tau */
     hyperbolic_module_->prepare_state_vector(state_vector, t);
     Number tau = hyperbolic_module_->template step<0>(
         state_vector, {}, {}, temp_[0], Number(0.), tau_max / 5.);
 
-    /* Step 2: at time t -> 1*tau -> t + 2*tau*/
+    /* Step 2: at time t + 1*tau -> t + 2*tau */
     hyperbolic_module_->prepare_state_vector(temp_[0], t + 1.0 * tau);
     hyperbolic_module_->template step<1>(
         temp_[0], {{state_vector}}, {{(a_31 - a_21) / c}}, temp_[1], tau);
 
-    /* Step 3: at time t -> 2*tau -> t + 3*tau*/
+    /* Step 3: at time t + 2*tau -> t + 3*tau */
     hyperbolic_module_->prepare_state_vector(temp_[1], t + 2.0 * tau);
     hyperbolic_module_->template step<2>(
         temp_[1],
@@ -482,7 +486,7 @@ namespace ryujin
         temp_[2],
         tau);
 
-    /* Step 4: at time t -> 3*tau -> t + 4*tau*/
+    /* Step 4: at time t + 3*tau -> t + 4*tau */
     hyperbolic_module_->prepare_state_vector(temp_[2], t + 3.0 * tau);
     hyperbolic_module_->template step<3>(
         temp_[2],
@@ -491,7 +495,7 @@ namespace ryujin
         temp_[3],
         tau);
 
-    /* Step 5: at time t -> 4*tau -> t + 5*tau*/
+    /* Step 5: at time t + 4*tau -> t + 5*tau */
     hyperbolic_module_->prepare_state_vector(temp_[3], t + 4.0 * tau);
     hyperbolic_module_->template step<4>(
         temp_[3],
@@ -712,14 +716,12 @@ namespace ryujin
     /* Implicit step 1: T1 <- {T0, 1} at time t -> t + tau */
     parabolic_module_->template step<0>(temp_[0], t, {}, {}, temp_[1], tau);
 
-    /* Explicit step 2: T2 <- {T1, 2} and {U_old, -1} at t + tau -> t + 2
-    tau */
+    /* Explicit step 2: T2 <- {T1, 2} and {U_old, -1} at t + tau -> t + 2 tau */
     hyperbolic_module_->prepare_state_vector(temp_[1], t + 1.0 * tau);
     hyperbolic_module_->template step<1>(
         temp_[1], {{state_vector}}, {{Number(-1.)}}, temp_[2], tau);
 
-    /* Implicit step 2: T3 <- {T2, 0} and {U_old, 1} at t + tau -> t + 2
-    tau */
+    /* Implicit step 2: T3 <- {T2, 0} and {U_old, 1} at t + tau -> t + 2 tau */
     parabolic_module_->template step<1>(temp_[2],
                                         t + 1.0 * tau,
                                         {{state_vector}},
@@ -756,15 +758,15 @@ namespace ryujin
                                         temp_[1],
                                         tau);
 
-    /* Explicit step 2: T2 <- {U_old, -1} and {T1, 2} at time t -> t + 2
-    tau */
+    /* Explicit step 2: T2 <- {U_old, -1} and {T1, 2} at time t -> t + 2 tau */
     hyperbolic_module_->prepare_state_vector(temp_[1], t + 1.0 * tau);
     hyperbolic_module_->template step<1>(
         temp_[1], {{state_vector}}, {{Number(-1.)}}, temp_[2], tau);
 
-    /* Implicit step 2: T3 <- {U_old, 6*gamma-1} and {T1, 2-9*gamma} at t
-    -> t +
-     * 2 tau */
+    /*
+     * Implicit step 2:
+     * T3 <- {U_old, 6*gamma-1} and {T1, 2-9*gamma} at t -> t + * 2 tau
+     */
     parabolic_module_->template step<2>(
         temp_[2],
         t + tau,
@@ -773,8 +775,7 @@ namespace ryujin
         temp_[3],
         tau);
 
-    /* Explicit step 3: T4 <- {U_old, 3 / 4} and {T1, -2} at t -> t + 3 tau
-     */
+    /* Explicit step 3: T4 <- {U_old, 3 / 4} and {T1, -2} at t -> t + 3 tau */
     hyperbolic_module_->prepare_state_vector(temp_[3], t + 2. * tau);
     hyperbolic_module_->template step<2>(temp_[3],
                                          {{state_vector, temp_[1]}},
