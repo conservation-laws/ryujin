@@ -111,7 +111,7 @@ namespace ryujin
         t_r = std::max(t_r, t_min);
 
 
-#ifdef CHECK_BOUNDS
+#ifdef EXPENSIVE_BOUNDS_CHECK
         /*
          * Verify that the new state is within bounds:
          */
@@ -262,7 +262,7 @@ namespace ryujin
 #endif
         }
 
-#ifdef CHECK_BOUNDS
+#ifdef EXPENSIVE_BOUNDS_CHECK
         /*
          * Verify that the new state is within bounds:
          */
@@ -415,7 +415,7 @@ namespace ryujin
 #endif
         }
 
-#ifdef CHECK_BOUNDS
+#ifdef EXPENSIVE_BOUNDS_CHECK
         /*
          * Verify that the new state is within bounds:
          */

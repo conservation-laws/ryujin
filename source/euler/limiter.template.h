@@ -6,6 +6,7 @@
 #pragma once
 
 #include "limiter.h"
+// #define DEBUG_OUTPUT_LIMITER
 
 namespace ryujin
 {
@@ -106,7 +107,7 @@ namespace ryujin
         t_r = std::min(t_r, t_max);
         t_r = std::max(t_r, t_min);
 
-#ifdef CHECK_BOUNDS
+#ifdef EXPENSIVE_BOUNDS_CHECK
         /*
          * Verify that the new state is within bounds:
          */
@@ -162,6 +163,13 @@ namespace ryujin
 
         const auto &s_min = std::get<2>(bounds);
 
+#ifdef DEBUG_OUTPUT_LIMITER
+        std::cout << std::endl;
+        std::cout << std::fixed << std::setprecision(16);
+        std::cout << "t_l: (start) " << t_l << std::endl;
+        std::cout << "t_r: (start) " << t_r << std::endl;
+#endif
+
         for (unsigned int n = 0; n < parameters.newton_max_iterations(); ++n) {
 
           const auto U_r = U + t_r * P;
@@ -172,7 +180,7 @@ namespace ryujin
           auto psi_r =
               relax_small * rho_r * rho_e_r - s_min * rho_r * rho_r_gamma;
 
-#ifndef CHECK_BOUNDS
+#ifndef EXPENSIVE_BOUNDS_CHECK
           /*
            * If psi_r > 0 the right state is fine, force returning t_r by
            * setting t_l = t_r:
@@ -194,18 +202,17 @@ namespace ryujin
            * This implies unfortunately that we might not accurately report
            * whether the low_order update U itself obeyed bounds because
            * U_r = U + t_r * P pushed us back into bounds. We thus skip
-           * this shortcut if `CHECK_BOUNDS` is set.
+           * this shortcut if `EXPENSIVE_BOUNDS_CHECK` is set.
            */
-          if (t_l == t_r)
-            break;
-#endif
-
+          if (t_l == t_r) {
 #ifdef DEBUG_OUTPUT_LIMITER
-          if (n == 0) {
-            std::cout << std::endl;
-            std::cout << std::fixed << std::setprecision(16);
-            std::cout << "t_l: (start) " << t_l << std::endl;
-            std::cout << "t_r: (start) " << t_r << std::endl;
+            std::cout << "shortcut: t_l == t_r" << std::endl;
+            std::cout << "psi_l:       " << psi_l << std::endl;
+            std::cout << "psi_r:       " << psi_r << std::endl;
+            std::cout << "t_l: (  " << n << "  ) " << t_l << std::endl;
+            std::cout << "t_r: (  " << n << "  ) " << t_r << std::endl;
+#endif
+            break;
           }
 #endif
 
@@ -234,7 +241,7 @@ namespace ryujin
             success = false;
           }
 
-#ifdef CHECK_BOUNDS
+#ifdef EXPENSIVE_BOUNDS_CHECK
           /*
            * If psi_r > 0 the right state is fine, force returning t_r by
            * setting t_l = t_r:
@@ -249,8 +256,16 @@ namespace ryujin
            * tolerance:
            */
           const Number tolerance(parameters.newton_tolerance());
-          if (std::max(Number(0.), t_r - t_l - tolerance) == Number(0.))
+          if (std::max(Number(0.), t_r - t_l - tolerance) == Number(0.)) {
+#ifdef DEBUG_OUTPUT_LIMITER
+            std::cout << "break: t_l and t_r within tolerance" << std::endl;
+            std::cout << "psi_l:       " << psi_l << std::endl;
+            std::cout << "psi_r:       " << psi_r << std::endl;
+            std::cout << "t_l: (  " << n << "  ) " << t_l << std::endl;
+            std::cout << "t_r: (  " << n << "  ) " << t_r << std::endl;
+#endif
             break;
+          }
 
           /* We got unlucky and have to perform a Newton step: */
 
@@ -275,7 +290,7 @@ namespace ryujin
 #endif
         }
 
-#ifdef CHECK_BOUNDS
+#ifdef EXPENSIVE_BOUNDS_CHECK
         /*
          * Verify that the new state is within bounds:
          */

@@ -201,7 +201,7 @@ namespace ryujin
        * The returned boolean is set to true if the original low-order
        * update was within bounds.
        *
-       * If the debug option `CHECK_BOUNDS` is set to true, then the
+       * If the debug option `EXPENSIVE_BOUNDS_CHECK` is set to true, then the
        * boolean is set to true if the low-order and the resulting
        * high-order update are within bounds. The latter might be violated
        * due to round-off errors when computing the limiter bounds.

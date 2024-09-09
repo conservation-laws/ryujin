@@ -848,7 +848,7 @@ namespace ryujin
             pij_matrix_.write_entry(P_ij, i, col_idx, true);
           }
 
-#ifdef CHECK_BOUNDS
+#ifdef EXPENSIVE_BOUNDS_CHECK
           if (!view.is_admissible(U_i_new)) {
             restart_needed = true;
           }
@@ -1118,7 +1118,7 @@ namespace ryujin
               lij_row[col_idx] = l_ij;
           }
 
-#ifdef CHECK_BOUNDS
+#ifdef EXPENSIVE_BOUNDS_CHECK
           const auto view = hyperbolic_system_->template view<dim, T>();
           if (!view.is_admissible(U_i_new)) {
             restart_needed = true;
@@ -1152,10 +1152,10 @@ namespace ryujin
              * for example in flat regions or in stagnation points at a
              * (slip boundary) point. The limiter should ensure that we do
              * not further manipulate the state in this case. We thus only
-             * signal a restart condition if the `CHECK_BOUNDS` debug
+             * signal a restart condition if the `EXPENSIVE_BOUNDS_CHECK` debug
              * macro is defined.
              */
-#ifdef CHECK_BOUNDS
+#ifdef EXPENSIVE_BOUNDS_CHECK
             if (!success)
               restart_needed = true;
 #endif
