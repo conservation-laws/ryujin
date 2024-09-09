@@ -69,7 +69,9 @@ namespace ryujin
 
     } else {
 
-      static_assert(stages == 0, "high order fluxes are not implemented");
+      AssertThrow(stages == 0,
+                  dealii::ExcMessage("Although IMEX schemes are implemented, "
+                                     "the high order fluxes are not. "));
 
       const bool reinit_gmg = cycle_++ % 4 == 0;
       parabolic_solver_.backward_euler_step(old_state_vector,

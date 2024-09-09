@@ -23,9 +23,18 @@ namespace ryujin
   template class ParabolicModule<Description, 3, NUMBER>;
 
   INSTANTIATE(1, 0);
+  INSTANTIATE(1, 1);
+  INSTANTIATE(1, 2);
+  INSTANTIATE(1, 3);
 
   INSTANTIATE(2, 0);
+  INSTANTIATE(2, 1);
+  INSTANTIATE(2, 2);
+  INSTANTIATE(2, 3);
 
   INSTANTIATE(3, 0);
+  INSTANTIATE(3, 1);
+  INSTANTIATE(3, 2);
+  INSTANTIATE(3, 3);
 
 } /* namespace ryujin */
