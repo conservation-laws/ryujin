@@ -12,6 +12,7 @@
 #include "initial_state_contrast.h"
 #include "initial_state_four_state_contrast.h"
 #include "initial_state_function.h"
+#include "initial_state_icf_like.h"
 #include "initial_state_isentropic_vortex.h"
 #include "initial_state_leblanc.h"
 #include "initial_state_noh.h"
@@ -43,6 +44,7 @@ namespace ryujin
       add(std::make_unique<Contrast<Description, dim, Number>>(h, s));
       add(std::make_unique<FourStateContrast<Description, dim, Number>>(h, s));
       add(std::make_unique<Function<Description, dim, Number>>(h, s));
+      add(std::make_unique<ICFLike<Description, dim, Number>>(h, s));
       add(std::make_unique<IsentropicVortex<Description, dim, Number>>(h, s));
       add(std::make_unique<LeBlanc<Description, dim, Number>>(h, s));
       add(std::make_unique<Noh<Description, dim, Number>>(h, s));
