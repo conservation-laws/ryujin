@@ -61,7 +61,7 @@ namespace ryujin
        */
 
       for (auto cell : triangulation.active_cell_iterators()) {
-        for (auto f : cell->reference_cell().face_indices()) {
+        for (auto f : cell->face_indices()) {
           const auto face = cell->face(f);
 
           if (!face->at_boundary())
@@ -94,11 +94,11 @@ namespace ryujin
       triangulation.set_manifold(1, SphericalManifold<2>(point));
 
       for (auto cell : triangulation.active_cell_iterators())
-        for (unsigned int v : cell->reference_cell().vertex_indices()) {
+        for (unsigned int v : cell->vertex_indices()) {
           double distance =
               (cell->vertex(v) - Point<2>(step_position, step_height)).norm();
           if (distance < 1.e-6) {
-            for (auto f : cell->reference_cell().face_indices()) {
+            for (auto f : cell->face_indices()) {
               const auto face = cell->face(f);
               if (face->at_boundary())
                 face->set_manifold_id(1);
@@ -113,7 +113,7 @@ namespace ryujin
 
         cell->set_manifold_id(0); // reset manifold id again
 
-        for (unsigned int v : cell->reference_cell().vertex_indices()) {
+        for (unsigned int v : cell->vertex_indices()) {
           auto &vertex = cell->vertex(v);
 
           if (std::abs(vertex[0] - step_position) < 1.e-6 &&

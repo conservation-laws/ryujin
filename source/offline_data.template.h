@@ -1222,7 +1222,7 @@ namespace ryujin
       local_dof_indices.resize(dofs_per_cell);
       cell->get_active_or_mg_dof_indices(local_dof_indices);
 
-      for (auto f : cell->reference_cell().face_indices()) {
+      for (auto f : cell->face_indices()) {
         const auto face = cell->face(f);
         const auto id = face->boundary_id();
 
@@ -1399,7 +1399,7 @@ namespace ryujin
 
       cell->get_active_or_mg_dof_indices(local_dof_indices);
 
-      for (auto f : cell->reference_cell().face_indices()) {
+      for (auto f : cell->face_indices()) {
         const auto face = cell->face(f);
         const auto id = face->boundary_id();
 
