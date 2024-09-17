@@ -90,7 +90,7 @@ namespace ryujin
         convert_states();
       };
 
-      state_type compute(const dealii::Point<dim> &point, Number t) final
+      state_type compute(const dealii::Point<dim> &point, Number) final
       {
         const auto view = hyperbolic_system_.template view<dim, Number>();
 
