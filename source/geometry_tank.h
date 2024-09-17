@@ -98,7 +98,7 @@ namespace ryujin
        */
 
       for (auto cell : triangulation.active_cell_iterators()) {
-        for (auto f : cell->reference_cell().face_indices()) {
+        for (auto f : cell->face_indices()) {
           const auto face = cell->face(f);
 
           if (!face->at_boundary())
