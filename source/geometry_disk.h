@@ -14,8 +14,8 @@ namespace ryujin
   namespace Geometries
   {
     /**
-     * A 2D/3D cylinder configuration constructed with
-     * GridGenerator::annulus().
+     * A 2D disk / 3D ball configuration constructed with
+     * GridGenerator::hyper_ball_balanced().
      *
      * @ingroup Mesh
      */
