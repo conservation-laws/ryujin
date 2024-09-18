@@ -11,6 +11,7 @@
 #include "postprocessor.h"
 
 #include <deal.II/base/parameter_acceptor.h>
+#include <deal.II/base/smartpointer.h>
 #include <deal.II/grid/intergrid_map.h>
 #include <deal.II/multigrid/mg_transfer_matrix_free.h>
 
