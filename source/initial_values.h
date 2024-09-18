@@ -11,6 +11,7 @@
 #include "offline_data.h"
 
 #include <deal.II/base/parameter_acceptor.h>
+#include <deal.II/base/smartpointer.h>
 #include <deal.II/base/tensor.h>
 
 #include <functional>

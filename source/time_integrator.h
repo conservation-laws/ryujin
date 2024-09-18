@@ -13,6 +13,8 @@
 #include "parabolic_module.h"
 #include "patterns_conversion.h"
 
+#include <deal.II/base/smartpointer.h>
+
 namespace ryujin
 {
   /**

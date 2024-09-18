@@ -14,6 +14,7 @@
 #include "state_vector.h"
 
 #include <deal.II/base/parameter_acceptor.h>
+#include <deal.II/base/smartpointer.h>
 #include <deal.II/base/timer.h>
 #include <deal.II/lac/sparse_matrix.templates.h>
 #include <deal.II/lac/vector.h>

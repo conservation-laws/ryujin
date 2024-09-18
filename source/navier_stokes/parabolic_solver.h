@@ -19,6 +19,7 @@
 
 #include <deal.II/base/mg_level_object.h>
 #include <deal.II/base/parameter_acceptor.h>
+#include <deal.II/base/smartpointer.h>
 #include <deal.II/base/timer.h>
 #include <deal.II/lac/la_parallel_block_vector.h>
 #include <deal.II/lac/precondition.h>
