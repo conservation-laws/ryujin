@@ -96,12 +96,13 @@ namespace ryujin
 
         /* Set final state */
         if constexpr (dim == 1)
-          return view.from_initial_state(state_type{{rho, vel[0], p}});
+          return view.from_initial_state(state_type{{rho, Number(vel[0]), p}});
         else if constexpr (dim == 2)
-          return view.from_initial_state(state_type{{rho, vel[0], vel[1], p}});
-        else
           return view.from_initial_state(
-              state_type{{rho, vel[0], vel[1], vel[2], p}});
+              state_type{{rho, Number(vel[0]), Number(vel[1]), p}});
+        else
+          return view.from_initial_state(state_type{
+              {rho, Number(vel[0]), Number(vel[1]), Number(vel[2]), p}});
       }
 
     private:

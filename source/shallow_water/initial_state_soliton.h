@@ -43,20 +43,21 @@ namespace ryujin
       state_type compute(const dealii::Point<dim> &point, Number t) final
       {
         const auto view = hyperbolic_system_.template view<dim, Number>();
-        const auto g = view.gravity();
+        const Number g = view.gravity();
 
         const auto &x = point[0];
 
-        const auto celerity = std::sqrt(g * (amplitude_ + depth_));
-        const auto width = std::sqrt(
+        const Number celerity = std::sqrt(g * (amplitude_ + depth_));
+        const Number width = std::sqrt(
             3. * amplitude_ / (4. * depth_ * depth_ * (amplitude_ + depth_)));
-        const auto sechSqd = 1. / std::pow(cosh(width * (x - celerity * t)), 2);
+        const Number sechSqd =
+            1. / std::pow(cosh(width * (x - celerity * t)), 2);
 
         /* If there is bathymetry, take max of profile and 0 */
-        const auto profile = depth_ + amplitude_ * sechSqd;
-        const auto h = std::max(profile, Number(0.));
+        const Number profile = depth_ + amplitude_ * sechSqd;
+        const Number h = std::max(profile, Number(0.));
 
-        const auto v = celerity * (profile - depth_) / profile;
+        const Number v = celerity * (profile - depth_) / profile;
 
         return state_type{{h, h * v}};
       }
