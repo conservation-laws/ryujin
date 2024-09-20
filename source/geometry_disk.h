@@ -26,6 +26,12 @@ namespace ryujin
       Disk(const std::string subsection)
           : Geometry<dim>("disk", subsection)
       {
+        balanced_ = true;
+        this->add_parameter("balanced",
+                            balanced_,
+                            "Use GridGenerator::hyper_ball_balanced() instead "
+                            "of the older GridGenerator::hyper_ball()");
+
         radius_ = 1.2;
         this->add_parameter("radius", radius_, "radius of disk");
 
@@ -39,8 +45,13 @@ namespace ryujin
       void create_triangulation(
           typename Geometry<dim>::Triangulation &triangulation) final
       {
-        GridGenerator::hyper_ball_balanced(
-            triangulation, dealii::Point<dim>(), radius_);
+        if (balanced_) {
+          GridGenerator::hyper_ball_balanced(
+              triangulation, dealii::Point<dim>(), radius_);
+        } else {
+          GridGenerator::hyper_ball(
+              triangulation, dealii::Point<dim>(), radius_);
+        }
 
         /*
          * Set boundary ids:
@@ -58,6 +69,7 @@ namespace ryujin
       }
 
     private:
+      bool balanced_;
       double radius_;
       Boundary boundary_;
     };
