@@ -245,7 +245,18 @@ namespace ryujin
     const auto prepare_compute_kernels = [&]() {
       print_info("preparing compute kernels");
 
-      offline_data_.prepare(problem_dimension, n_precomputed_values);
+      /*
+       * The number of values stored in the auxiliary block vector is a
+       * runtime parameter. Thus, query the hyperbolic and parabolic system
+       * about required sizes and store it in the offline_data_ object.
+       */
+      unsigned int n_auxiliary_state_vectors =
+          hyperbolic_system_.n_auxiliary_state_vectors() +
+          parabolic_system_.n_auxiliary_state_vectors();
+
+      offline_data_.prepare(
+          problem_dimension, n_precomputed_values, n_auxiliary_state_vectors);
+
       hyperbolic_module_.prepare();
       parabolic_module_.prepare();
       time_integrator_.prepare();
