@@ -62,6 +62,13 @@ namespace ryujin
         return HyperbolicSystemView<dim, Number>{*this};
       }
 
+      unsigned int n_auxiliary_state_vectors() const
+      {
+        return auxiliary_component_names_.size();
+      }
+
+      ACCESSOR_READ_ONLY(auxiliary_component_names);
+
     private:
       /**
        * @name Runtime parameters, internal fields, methods, and friends
@@ -77,6 +84,8 @@ namespace ryujin
       double gamma_minus_one_inverse_;
       double gamma_minus_one_over_gamma_plus_one_;
       double gamma_plus_one_inverse_;
+
+      const std::vector<std::string> auxiliary_component_names_;
 
       template <int dim, typename Number>
       friend class HyperbolicSystemView;

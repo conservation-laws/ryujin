@@ -70,6 +70,12 @@ namespace ryujin
       auto &[U, precomputed, V] = state_vector;
       U.reinit(offline_data.hyperbolic_vector_partitioner());
       precomputed.reinit(offline_data.precomputed_vector_partitioner());
+
+      const auto block_size = offline_data.n_auxiliary_state_vectors();
+      V.reinit(block_size);
+      for (unsigned int i = 0; i < block_size; ++i) {
+        V.block(i).reinit(offline_data.scalar_partitioner());
+      }
     }
   } // namespace Vectors
 
