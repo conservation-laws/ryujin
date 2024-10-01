@@ -48,9 +48,11 @@ namespace ryujin
 
         cv_ = R_ / (gamma_ - 1.);
 
-        /* Update the interpolation_b_ parameter on parameter read in: */
-        ParameterAcceptor::parse_parameters_call_back.connect(
-            [this] { this->interpolation_b_ = b_; });
+        /* Update the EOS interpolation parameters on parameter read in: */
+        ParameterAcceptor::parse_parameters_call_back.connect([this] {
+          this->interpolation_b_ = b_;
+          this->interpolation_pinfty_ = a_ / (b_ * b_);
+        });
       }
 
       /**

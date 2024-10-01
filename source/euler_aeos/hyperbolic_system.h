@@ -260,14 +260,26 @@ namespace ryujin
       }
 
       /**
+       * Return the interpolatory reference pressure \f$p_{\infty}\f$.
+       */
+      DEAL_II_ALWAYS_INLINE inline ScalarNumber eos_interpolation_pinfty() const
+      {
+        const auto &eos = hyperbolic_system_.selected_equation_of_state_;
+        return ScalarNumber(eos->interpolation_pinfty());
+      }
+
+
+      /**
        * constexpr boolean used in the EulerInitialStates namespace
        */
       static constexpr bool have_gamma = false;
 
       /**
-       * constexpr boolean used in the EulerInitialStates namespace
+       * constexpr booleans used in the EulerInitialStates namespace
        */
       static constexpr bool have_eos_interpolation_b = true;
+      static constexpr bool have_eos_interpolation_pinfty = false;
+
 
       //@}
       /**

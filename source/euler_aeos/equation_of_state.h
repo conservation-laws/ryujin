@@ -45,6 +45,12 @@ namespace ryujin
         interpolation_b_ = 0.;
 
         /*
+         * If necessary derived EOS can override the interpolation
+         * reference pressure that is used in the approximate Riemann solver.
+         */
+        interpolation_pinfty_ = 0.;
+
+        /*
          * If necessary derived EOS can override this boolean to indicate
          * that the dealii::ArrayView<double> variants of the pressure()
          * function (etc.) should be preferred.
@@ -183,6 +189,11 @@ namespace ryujin
       ACCESSOR_READ_ONLY(interpolation_b)
 
       /**
+       * Return the interpolation reference pressure (pinfty).
+       */
+      ACCESSOR_READ_ONLY(interpolation_pinfty)
+
+      /**
        * Return a boolean indicating whether the dealii::ArrayView<double>
        * variants for the pressure(), specific_internal_energy(), and
        * speed_of_sound() functions should be preferred.
@@ -202,6 +213,7 @@ namespace ryujin
 
     protected:
       double interpolation_b_;
+      double interpolation_pinfty_;
       bool prefer_vector_interface_;
 
     private:
