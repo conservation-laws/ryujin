@@ -194,8 +194,10 @@ namespace ryujin
 
       const auto view = hyperbolic_system.view<dim, Number>();
 
-      const auto &[p_i, gamma_min_i, s_i, new_eta_i] =
-          precomputed_values.template get_tensor<Number, precomputed_type>(i);
+      const auto gamma_min_i = std::get<2>(
+          precomputed_values.template get_tensor<Number, precomputed_type>(i));
+      const auto new_eta_i = std::get<4>(
+          precomputed_values.template get_tensor<Number, precomputed_type>(i));
 
       gamma_min = gamma_min_i;
 

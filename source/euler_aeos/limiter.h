@@ -276,8 +276,8 @@ namespace ryujin
       rho_max = Number(0.);
       s_min = Number(std::numeric_limits<ScalarNumber>::max());
 
-      const auto &[p_i, gamma_min_i, s_i, eta_i] =
-          precomputed_values.template get_tensor<Number, precomputed_type>(i);
+      const auto gamma_min_i = std::get<2>(
+          precomputed_values.template get_tensor<Number, precomputed_type>(i));
 
       gamma_min = gamma_min_i;
 
@@ -364,9 +364,9 @@ namespace ryujin
          * of the bar state. We use the s_ij_bar for computing the bounds
          * relaxation as well.
          */
-        const auto [p_j, gamma_min_j, s_j, eta_j] =
+        const auto s_j = std::get<3>(
             precomputed_values.template get_tensor<Number, precomputed_type>(
-                js);
+                js));
 
         const auto s_ij_bar =
             view.surrogate_specific_entropy(U_ij_bar, gamma_min);

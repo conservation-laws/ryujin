@@ -247,6 +247,7 @@ namespace ryujin
       primitive_type
       riemann_data_from_state(const state_type &U,
                               const Number &p,
+                              const Number &gamma,
                               const dealii::Tensor<1, dim, Number> &n_ij) const;
 
     private:

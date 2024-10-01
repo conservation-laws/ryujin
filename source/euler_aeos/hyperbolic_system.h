@@ -29,9 +29,10 @@ namespace ryujin
     class HyperbolicSystemView;
 
     /**
-     * The compressible Euler equations of gas dynamics. Generalized
-     * implementation with a modified approximative Riemann solver,
-     * indicator, and limiter suitable for arbitrary equations of state.
+     * The compressible Euler equations for gas dynamics with an arbitrary
+     * equation of state. Generalized implementation with a modified
+     * local Riemann problem wave speed, indicator, and limiter suitable for
+     * arbitrary equations of state.
      *
      * We have a (2 + dim) dimensional state space \f$[\rho, \textbf m,
      * E]\f$, where \f$\rho\f$ denotes the density, \f$\textbf m\f$ is the
@@ -339,7 +340,7 @@ namespace ryujin
       /**
        * The number of precomputed values.
        */
-      static constexpr unsigned int n_precomputed_values = 4;
+      static constexpr unsigned int n_precomputed_values = 5;
 
       /**
        * Array type used for precomputed values.
@@ -353,6 +354,7 @@ namespace ryujin
           std::array<std::string, n_precomputed_values>{
               {"p",
                "surrogate_gamma",
+               "surrogate_gamma_min",
                "surrogate_specific_entropy",
                "surrogate_harten_entropy"}};
 
@@ -695,7 +697,7 @@ namespace ryujin
       state_type expand_state(const ST &state) const;
 
       /**
-       * Given an initial state [rho, u_1, ..., u_?, p] return a
+       * Given an initial state [rho, u_1, ..., u_d, p] return a
        * conserved state [rho, m_1, ..., m_d, E]. Most notably, the
        * specific equation of state oracle is queried to convert the
        * pressure value into a specific internal energy.
@@ -716,8 +718,8 @@ namespace ryujin
       state_type from_primitive_state(const state_type &primitive_state) const;
 
       /**
-       * Given a conserved state return a primitive state [rho, u_1, ..., u_d,
-       * e]
+       * Given a conserved state [rho, m_1, ..., m_d, E] return a primitive
+       * state.
        */
       state_type to_primitive_state(const state_type &state) const;
 
@@ -882,7 +884,7 @@ namespace ryujin
             const auto U_i = U.template get_tensor<Number>(offset + i);
             const auto p_i = get_entry<Number>(p, i);
             const auto gamma_i = surrogate_gamma(U_i, p_i);
-            const PT prec_i{p_i, gamma_i, Number(0.), Number(0.)};
+            const PT prec_i{p_i, gamma_i, gamma_i, Number(0.), Number(0.)};
             precomputed.template write_tensor<Number>(prec_i, offset + i);
           }
         } else {
@@ -907,7 +909,7 @@ namespace ryujin
 
             const auto gamma_i = surrogate_gamma(U_i, p_i);
             using PT = precomputed_type;
-            const PT prec_i{p_i, gamma_i, Number(0.), Number(0.)};
+            const PT prec_i{p_i, gamma_i, gamma_i, Number(0.), Number(0.)};
             precomputed.template write_tensor<Number>(prec_i, i);
           }
         } /* prefer_vector_interface */
@@ -927,16 +929,14 @@ namespace ryujin
 
           const auto U_i = U.template get_tensor<Number>(i);
           auto prec_i = precomputed.template get_tensor<Number, PT>(i);
-          auto &[p_i, gamma_min_i, s_i, eta_i] = prec_i;
+          auto &[p_i, gamma_i, gamma_min_i, s_i, eta_i] = prec_i;
 
           const unsigned int *js = sparsity_simd.columns(i) + stride_size;
           for (unsigned int col_idx = 1; col_idx < row_length;
                ++col_idx, js += stride_size) {
 
-            const auto U_j = U.template get_tensor<Number>(js);
             const auto prec_j = precomputed.template get_tensor<Number, PT>(js);
-            auto &[p_j, gamma_min_j, s_j, eta_j] = prec_j;
-            const auto gamma_j = surrogate_gamma(U_j, p_j);
+            auto &[p_j, gamma_j, gamma_min_j, s_j, eta_j] = prec_j;
             gamma_min_i = std::min(gamma_min_i, gamma_j);
           }
 
@@ -1338,8 +1338,8 @@ namespace ryujin
         const unsigned int i,
         const state_type &U_i) const -> flux_contribution_type
     {
-      const auto &[p_i, gamma_min_i, s_i, eta_i] =
-          pv.template get_tensor<Number, precomputed_type>(i);
+      const auto p_i =
+          std::get<0>(pv.template get_tensor<Number, precomputed_type>(i));
       return f(U_i, p_i);
     }
 
@@ -1352,8 +1352,8 @@ namespace ryujin
         const unsigned int *js,
         const state_type &U_j) const -> flux_contribution_type
     {
-      const auto &[p_j, gamma_min_j, s_j, eta_j] =
-          pv.template get_tensor<Number, precomputed_type>(js);
+      const auto p_j =
+          std::get<0>(pv.template get_tensor<Number, precomputed_type>(js));
       return f(U_j, p_j);
     }
 

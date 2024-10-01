@@ -495,6 +495,7 @@ namespace ryujin
     RiemannSolver<dim, Number>::riemann_data_from_state(
         const state_type &U,
         const Number &p,
+        const Number &gamma,
         const dealii::Tensor<1, dim, Number> &n_ij) const -> primitive_type
     {
       const auto view = hyperbolic_system.view<dim, Number>();
@@ -504,8 +505,6 @@ namespace ryujin
 
       const auto m = view.momentum(U);
       const auto proj_m = n_ij * m;
-
-      const auto gamma = view.surrogate_gamma(U, p);
 
       const auto interpolation_b = view.eos_interpolation_b();
       const auto x = Number(1.) - interpolation_b * rho;
@@ -518,12 +517,12 @@ namespace ryujin
           dealii::ExcMessage("Internal error: p <= 0."));
 
       AssertThrowSIMD(
-          x,
+          Number(x),
           [](auto val) { return val > ScalarNumber(0.); },
           dealii::ExcMessage("Internal error: 1. - b * rho <= 0."));
 
       AssertThrowSIMD(
-          gamma,
+          Number(gamma),
           [](auto val) { return val > ScalarNumber(1.); },
           dealii::ExcMessage("Internal error: gamma <= 1."));
 #endif
@@ -625,14 +624,20 @@ namespace ryujin
         const unsigned int *js,
         const dealii::Tensor<1, dim, Number> &n_ij) const
     {
-      const auto &[p_i, unused_i, s_i, eta_i] =
-          precomputed_values.template get_tensor<Number, precomputed_type>(i);
+      const auto p_i = std::get<0>(
+          precomputed_values.template get_tensor<Number, precomputed_type>(i));
+      const auto gamma_i = std::get<1>(
+          precomputed_values.template get_tensor<Number, precomputed_type>(i));
 
-      const auto &[p_j, unused_j, s_j, eta_j] =
-          precomputed_values.template get_tensor<Number, precomputed_type>(js);
+      const auto p_j = std::get<0>(
+          precomputed_values.template get_tensor<Number, precomputed_type>(js));
+      const auto gamma_j = std::get<1>(
+          precomputed_values.template get_tensor<Number, precomputed_type>(js));
 
-      const auto riemann_data_i = riemann_data_from_state(U_i, p_i, n_ij);
-      const auto riemann_data_j = riemann_data_from_state(U_j, p_j, n_ij);
+      const auto riemann_data_i =
+          riemann_data_from_state(U_i, p_i, gamma_i, n_ij);
+      const auto riemann_data_j =
+          riemann_data_from_state(U_j, p_j, gamma_j, n_ij);
 
       return compute(riemann_data_i, riemann_data_j);
     }
