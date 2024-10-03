@@ -1134,7 +1134,11 @@ namespace ryujin
       const auto interpolation_b = Number(eos_interpolation_b());
       const auto covolume = Number(1.) - interpolation_b * rho;
 
-      return Number(1.) + p * covolume / rho_e;
+      const auto pinf = Number(eos_interpolation_pinfty());
+
+      const auto numerator = (p + pinf) * covolume;
+      const auto denominator = rho_e - covolume * pinf;
+      return Number(1.) + numerator / denominator;
     }
 
 
@@ -1148,7 +1152,9 @@ namespace ryujin
       const auto interpolation_b = Number(eos_interpolation_b());
       const auto covolume = Number(1.) - interpolation_b * rho;
 
-      return (gamma - Number(1.)) * rho_e / covolume;
+      const auto pinf = Number(eos_interpolation_pinfty());
+
+      return (gamma - Number(1.)) * rho_e / covolume - gamma * pinf;
     }
 
 
