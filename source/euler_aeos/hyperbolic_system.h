@@ -1051,11 +1051,15 @@ namespace ryujin
 
       const auto rho = density(U);
       const auto rho_inverse = ScalarNumber(1.) / rho;
+
       const auto interpolation_b = Number(eos_interpolation_b());
       const auto covolume = Number(1.) - interpolation_b * rho;
 
-      return internal_energy(U) *
-             ryujin::pow(rho_inverse - interpolation_b, gamma_min) / covolume;
+      const auto pinf = Number(eos_interpolation_pinfty());
+      const auto shift = internal_energy(U) - pinf * covolume;
+
+      return shift * ryujin::pow(rho_inverse - interpolation_b, gamma_min) /
+             covolume;
     }
 
 
@@ -1075,7 +1079,10 @@ namespace ryujin
       const auto covolume = Number(1.) - interpolation_b * rho;
       const auto covolume_term = ryujin::pow(covolume, gamma_min - Number(1.));
 
-      return ryujin::pow(rho_rho_e * covolume_term, exponent);
+      const auto pinf = Number(eos_interpolation_pinfty());
+      const auto pinf_term = pinf * rho * covolume;
+
+      return ryujin::pow((rho_rho_e - pinf_term) * covolume_term, exponent);
     }
 
 
@@ -1087,16 +1094,19 @@ namespace ryujin
     {
       /*
        * With
-       *   eta = (rho^2 e * (1 - interpolation_b * rho)) ^ {1 / (gamma + 1)},
+       *   eta = ((rho^2 e - p_infty * rho * (1 - b rho)) * (1 -
+       *          b * rho)^{gamma - 1})^{1 / (gamma + 1)},
        *   rho^2 e = rho * E - 1/2 |m|^2,
+       *   shift   = rho^2 e - p_infty * rho * (1 - b rho)
        *
        * we get
        *
-       *   eta' = factor * (1 - interpolation_b rho) * (E,-m,rho)^T +
-       *          factor * rho^2 e * (gamma - 1) * b * (1,0,0)^T
+       *   eta' = factor * (1 - b rho) * (shifted_E,-m,rho)^T -
+       *          factor * shift * (gamma - 1) * b * (1,0,0)^T
        *
-       *   factor = 1/(gamma+1) * (eta/(1-interpolation_b rho)^-gamma
-       *                        / (1-interpolation_b rho)^2
+       *   factor = 1/(gamma+1) * (eta/(1 - b rho)^-gamma
+       *                        / (1 - b rho)^2
+       *   shifted_E = E + p_infty * (1 - 2 (1 - b rho))
        */
 
       const auto rho = density(U);
@@ -1108,14 +1118,21 @@ namespace ryujin
       const auto covolume = Number(1.) - interpolation_b * rho;
       const auto covolume_inverse = Number(1.) / covolume;
 
+      const auto pinf = Number(eos_interpolation_pinfty());
+      const auto rho_rho_e_shift = rho_rho_e - pinf * rho * covolume;
+
       const auto factor = ryujin::pow(eta * covolume_inverse, -gamma_min) *
                           fixed_power<2>(covolume_inverse) /
                           (gamma_min + Number(1.));
 
       state_type result;
 
-      result[0] = factor * (covolume * E - (gamma_min - Number(1.)) *
-                                               rho_rho_e * interpolation_b);
+      const auto first_term =
+          E + pinf * (Number(1.) - ScalarNumber(2.) * covolume);
+      const auto second_term =
+          -(gamma_min - Number(1.)) * rho_rho_e_shift * interpolation_b;
+
+      result[0] = factor * (covolume * first_term + second_term);
       for (unsigned int i = 0; i < dim; ++i)
         result[1 + i] = -factor * covolume * m[i];
       result[dim + 1] = factor * covolume * rho;
