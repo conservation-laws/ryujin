@@ -57,6 +57,23 @@ namespace ryujin
             "A function expression for the speed of sound as a function of "
             "density, rho, and specific internal energy, e: s(rho, e)");
 
+        add_parameter(
+            "interpolatory covolume b",
+            this->interpolation_b_,
+            "The interpolatory maximum compressibility constant b used when "
+            "constructing the interpolatory equation of state");
+
+        add_parameter("interpolatory reference pressure",
+                      this->interpolation_pinfty_,
+                      "The interpolatory reference pressure p_infty used when "
+                      "constructing the interpolatory equation of state");
+
+        add_parameter(
+            "interpolatory reference specific internal energy",
+            this->interpolation_q_,
+            "The interpolatory reference specific internal energy q used when "
+            "constructing the interpolatory equation of state");
+
         /*
          * Set up the muparser object with the final equation of state
          * description from the parameter file:
