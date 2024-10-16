@@ -161,6 +161,7 @@ int main(int argc, char *argv[])
   for (unsigned int i = 0; i < n_mpi_processes; ++i) {
     if (i == mpi_rank)
       sparsity_pattern_simd.print();
+    sleep(1);
     MPI_Barrier(MPI_COMM_WORLD);
   }
 }
