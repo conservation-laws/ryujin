@@ -1218,8 +1218,8 @@ namespace ryujin
       if (!(test == Number(0.))) {
         std::cout << std::fixed << std::setprecision(16);
         std::cout << "Bounds violation: Negative state [rho, e] detected!\n";
-        std::cout << "\t\trho: " << rho << "\n";
-        std::cout << "\t\tint: " << e << "\n";
+        std::cout << "\t\trho:           " << rho << "\n";
+        std::cout << "\t\tint (shifted): " << shift << "\n";
       }
 #endif
 
