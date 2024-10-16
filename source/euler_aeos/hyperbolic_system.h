@@ -30,8 +30,9 @@ namespace ryujin
 
     /**
      * The compressible Euler equations of gas dynamics. Generalized
-     * implementation with a modified approximative Riemann solver,
-     * indicator, and limiter suitable for arbitrary equations of state.
+     * implementation with a modified approximate Riemann solver for
+     * finding max wave speed, indicator, and limiter suitable for
+     * arbitrary equations of state.
      *
      * We have a (2 + dim) dimensional state space \f$[\rho, \textbf m,
      * E]\f$, where \f$\rho\f$ denotes the density, \f$\textbf m\f$ is the
@@ -269,7 +270,8 @@ namespace ryujin
       }
 
       /**
-       * Return the interpolatory reference pressure \f$p_{\infty}\f$.
+       * Return the interpolatory reference specific internal energy
+       * \f$q\f$.
        */
       DEAL_II_ALWAYS_INLINE inline ScalarNumber eos_interpolation_q() const
       {
@@ -721,7 +723,7 @@ namespace ryujin
       state_type expand_state(const ST &state) const;
 
       /**
-       * Given an initial state [rho, u_1, ..., u_?, p] return a
+       * Given an initial state [rho, u_1, ..., u_d, p] return a
        * conserved state [rho, m_1, ..., m_d, E]. Most notably, the
        * specific equation of state oracle is queried to convert the
        * pressure value into a specific internal energy.
