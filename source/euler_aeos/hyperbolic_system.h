@@ -251,7 +251,7 @@ namespace ryujin
       }
 
       /**
-       * Return the interpolatory co-volume \f$b_{\text{interp}}\f$.
+       * Return the interpolatory covolume \f$b_{\text{interp}}\f$.
        */
       DEAL_II_ALWAYS_INLINE inline ScalarNumber eos_interpolation_b() const
       {
@@ -268,6 +268,15 @@ namespace ryujin
         return ScalarNumber(eos->interpolation_pinfty());
       }
 
+      /**
+       * Return the interpolatory reference pressure \f$p_{\infty}\f$.
+       */
+      DEAL_II_ALWAYS_INLINE inline ScalarNumber eos_interpolation_q() const
+      {
+        const auto &eos = hyperbolic_system_.selected_equation_of_state_;
+        return ScalarNumber(eos->interpolation_q());
+      }
+
 
       /**
        * constexpr boolean used in the EulerInitialStates namespace
@@ -275,10 +284,9 @@ namespace ryujin
       static constexpr bool have_gamma = false;
 
       /**
-       * constexpr booleans used in the EulerInitialStates namespace
+       * constexpr boolean used in the EulerInitialStates namespace
        */
       static constexpr bool have_eos_interpolation_b = true;
-      static constexpr bool have_eos_interpolation_pinfty = false;
 
 
       //@}
@@ -491,9 +499,9 @@ namespace ryujin
        * For a given (2+dim dimensional) state vector <code>U</code>, compute
        * and return a (scaled) surrogate specific entropy
        * \f[
-       *   e^{(\gamma_{\text{min} - 1)s} =
-       *   \frac{\rho\,e}{\rho^\gamma_{\text{min}}
-       *   (1 - b * \rho)^(\gamma_{\text{min}} -1).
+       *   e^{(\gamma_{\text{min}} - 1)s} =
+       *   \frac{\rho\,(e-q)-p_{\infty}(1-b\rho)}{\rho^\gamma_{\text{min}}}
+       *   (1 - b\,\rho)^{\gamma_{\text{min}} -1}.
        * \f]
        */
       Number surrogate_specific_entropy(const state_type &U,
@@ -503,8 +511,10 @@ namespace ryujin
        * For a given (2+dim dimensional) state vector <code>U</code>, compute
        * and return a surrogate Harten-type entropy
        * \f[
-       *   \eta = (\rho^2 e \cdot (1 - interpolation_b \rho)
-       *   ^{\gamma_{text}min} - 1})^{1 / (\gamma_{\text{min}} + 1)}.
+       *   \eta =
+       *   (1-b\,\rho)^{\frac{\gamma_{\text{min}-1}}{\gamma_{\text{min}}+1}}
+       *   \big(\rho^2 (e-q) - \rho p_{\infty}(1-b\,\rho)\big)
+       *   ^{1/(\gamma_{\text{min}}+1)}
        * \f]
        */
       Number surrogate_harten_entropy(const state_type &U,
@@ -514,8 +524,10 @@ namespace ryujin
        * For a given (2+dim dimensional) state vector <code>U</code>, compute
        * and return the derivative \f$\eta'\f$ of the Harten-type entropy
        * \f[
-       *   \eta = (\rho^2 e \cdot (1 - interpolation_b \rho)
-       *   ^{\gamma_{text}min} - 1})^{1 / (\gamma_{\text{min}} + 1)}.
+       *   \eta =
+       *   (1-b\,\rho)^{\frac{\gamma_{\text{min}-1}}{\gamma_{\text{min}}+1}}
+       *   \big(\rho^2 (e-q) - \rho p_{\infty}(1-b\,\rho)\big)
+       *   ^{1/(\gamma_{\text{min}}+1)}
        * \f]
        */
       state_type
@@ -527,7 +539,8 @@ namespace ryujin
        * For a given (2+dim dimensional) state vector <code>U</code> and
        * pressure <code>p</code>, compute a surrogate gamma:
        * \f[
-       *   \gamma(\rho, p, e) = 1 + \frac{p * (1 - b * \rho)}{\rho * e}
+       *   \gamma(\rho, e, p) = 1 + \frac{(p + p_{\infty})(1 - b \rho)}
+       *   {\rho (e-q) - p_{\infty}(1-b \rho)}
        * \f]
        *
        * This function is used in various places to create interpolations
@@ -539,7 +552,8 @@ namespace ryujin
        * For a given (2+dim dimensional) state vector <code>U</code> and
        * gamma <code>gamma</code>, compute a surrogate pressure:
        * \f[
-       *   p(\rho, \gamma, e) = \frac{(\gamma - 1) * \rho * e}{1 - b * \rho}
+       *   p(\rho, e, \gamma) = (\gamma - 1) \frac{\rho (e - q)}{1 - b \rho}
+       *   -\gamma\,p_{\infty}
        * \f]
        *
        * This function is the complementary function to surrogate_gamma(),
@@ -1047,19 +1061,18 @@ namespace ryujin
     HyperbolicSystemView<dim, Number>::surrogate_specific_entropy(
         const state_type &U, const Number &gamma_min) const
     {
-      using ScalarNumber = typename get_value_type<Number>::type;
+      const auto b = Number(eos_interpolation_b());
+      const auto pinf = Number(eos_interpolation_pinfty());
+      const auto q = Number(eos_interpolation_q());
 
       const auto rho = density(U);
       const auto rho_inverse = ScalarNumber(1.) / rho;
 
-      const auto interpolation_b = Number(eos_interpolation_b());
-      const auto covolume = Number(1.) - interpolation_b * rho;
+      const auto covolume = Number(1.) - b * rho;
 
-      const auto pinf = Number(eos_interpolation_pinfty());
-      const auto shift = internal_energy(U) - pinf * covolume;
+      const auto shift = internal_energy(U) - rho * q - pinf * covolume;
 
-      return shift * ryujin::pow(rho_inverse - interpolation_b, gamma_min) /
-             covolume;
+      return shift * ryujin::pow(rho_inverse - b, gamma_min) / covolume;
     }
 
 
@@ -1068,21 +1081,24 @@ namespace ryujin
     HyperbolicSystemView<dim, Number>::surrogate_harten_entropy(
         const state_type &U, const Number &gamma_min) const
     {
+      const auto b = Number(eos_interpolation_b());
+      const auto pinf = Number(eos_interpolation_pinfty());
+      const auto q = Number(eos_interpolation_q());
+
       const auto rho = density(U);
       const auto m = momentum(U);
       const auto E = total_energy(U);
-      const auto rho_rho_e = rho * E - ScalarNumber(0.5) * m.norm_square();
+      const auto rho_rho_e_q =
+          rho * E - ScalarNumber(0.5) * m.norm_square() - rho * rho * q;
 
       const auto exponent = ScalarNumber(1.) / (gamma_min + Number(1.));
 
-      const auto interpolation_b = Number(eos_interpolation_b());
-      const auto covolume = Number(1.) - interpolation_b * rho;
+      const auto covolume = Number(1.) - b * rho;
       const auto covolume_term = ryujin::pow(covolume, gamma_min - Number(1.));
 
-      const auto pinf = Number(eos_interpolation_pinfty());
-      const auto pinf_term = pinf * rho * covolume;
+      const auto rho_pinfcov = rho * pinf * covolume;
 
-      return ryujin::pow((rho_rho_e - pinf_term) * covolume_term, exponent);
+      return ryujin::pow((rho_rho_e_q - rho_pinfcov) * covolume_term, exponent);
     }
 
 
@@ -1094,32 +1110,31 @@ namespace ryujin
     {
       /*
        * With
-       *   eta = ((rho^2 e - p_infty * rho * (1 - b rho)) * (1 -
-       *          b * rho)^{gamma - 1})^{1 / (gamma + 1)},
-       *   rho^2 e = rho * E - 1/2 |m|^2,
-       *   shift   = rho^2 e - p_infty * rho * (1 - b rho)
+       *   eta = (shift * (1-b*rho)^{gamma-1}) ^ {1/(gamma+1)},
+       *   shift = rho * E - 1/2 |m|^2 - rho^2 * q - p_infty * rho * (1 - b rho)
+       *
+       *   shift' = [E - 2 * rho * q - p_infty * (1 - 2 b rho), -m, rho]^T
+       *   factor = 1/(gamma+1) * (eta/(1-b rho))^-gamma / (1-b rho)^2
        *
        * we get
        *
-       *   eta' = factor * (1 - b rho) * (shifted_E,-m,rho)^T -
-       *          factor * shift * (gamma - 1) * b * (1,0,0)^T
+       *   eta' = factor * (1-b*rho) * shift' -
+       *          factor * shift * (gamma - 1) * b * [1, 0, 0]^T
        *
-       *   factor = 1/(gamma+1) * (eta/(1 - b rho)^-gamma
-       *                        / (1 - b rho)^2
-       *   shifted_E = E + p_infty * (1 - 2 (1 - b rho))
        */
+      const auto b = Number(eos_interpolation_b());
+      const auto pinf = Number(eos_interpolation_pinfty());
+      const auto q = Number(eos_interpolation_q());
 
       const auto rho = density(U);
       const auto m = momentum(U);
       const auto E = total_energy(U);
-      const auto rho_rho_e = rho * E - ScalarNumber(0.5) * m.norm_square();
 
-      const auto interpolation_b = Number(eos_interpolation_b());
-      const auto covolume = Number(1.) - interpolation_b * rho;
-      const auto covolume_inverse = Number(1.) / covolume;
+      const auto covolume = Number(1.) - b * rho;
+      const auto covolume_inverse = ScalarNumber(1.) / covolume;
 
-      const auto pinf = Number(eos_interpolation_pinfty());
-      const auto rho_rho_e_shift = rho_rho_e - pinf * rho * covolume;
+      const auto shift = rho * E - ScalarNumber(0.5) * m.norm_square() -
+                         rho * rho * q - rho * pinf * covolume;
 
       const auto factor = ryujin::pow(eta * covolume_inverse, -gamma_min) *
                           fixed_power<2>(covolume_inverse) /
@@ -1127,10 +1142,9 @@ namespace ryujin
 
       state_type result;
 
-      const auto first_term =
-          E + pinf * (Number(1.) - ScalarNumber(2.) * covolume);
-      const auto second_term =
-          -(gamma_min - Number(1.)) * rho_rho_e_shift * interpolation_b;
+      const auto first_term = E - ScalarNumber(2.) * rho * q -
+                              pinf * (Number(1.) - ScalarNumber(2.) * b * rho);
+      const auto second_term = -(gamma_min - Number(1.)) * shift * b;
 
       result[0] = factor * (covolume * first_term + second_term);
       for (unsigned int i = 0; i < dim; ++i)
@@ -1146,15 +1160,16 @@ namespace ryujin
     HyperbolicSystemView<dim, Number>::surrogate_gamma(const state_type &U,
                                                        const Number &p) const
     {
+      const auto b = Number(eos_interpolation_b());
+      const auto pinf = Number(eos_interpolation_pinfty());
+      const auto q = Number(eos_interpolation_q());
+
       const auto rho = density(U);
       const auto rho_e = internal_energy(U);
-      const auto interpolation_b = Number(eos_interpolation_b());
-      const auto covolume = Number(1.) - interpolation_b * rho;
-
-      const auto pinf = Number(eos_interpolation_pinfty());
+      const auto covolume = Number(1.) - b * rho;
 
       const auto numerator = (p + pinf) * covolume;
-      const auto denominator = rho_e - covolume * pinf;
+      const auto denominator = rho_e - rho * q - covolume * pinf;
       return Number(1.) + numerator / denominator;
     }
 
@@ -1164,14 +1179,16 @@ namespace ryujin
     HyperbolicSystemView<dim, Number>::surrogate_pressure(
         const state_type &U, const Number &gamma) const
     {
+      const auto b = Number(eos_interpolation_b());
+      const auto pinf = Number(eos_interpolation_pinfty());
+      const auto q = Number(eos_interpolation_q());
+
       const auto rho = density(U);
       const auto rho_e = internal_energy(U);
-      const auto interpolation_b = Number(eos_interpolation_b());
-      const auto covolume = Number(1.) - interpolation_b * rho;
+      const auto covolume = Number(1.) - b * rho;
 
-      const auto pinf = Number(eos_interpolation_pinfty());
 
-      return (gamma - Number(1.)) * rho_e / covolume - gamma * pinf;
+      return (gamma - Number(1.)) * (rho_e - rho * q) / covolume - gamma * pinf;
     }
 
 
@@ -1179,14 +1196,21 @@ namespace ryujin
     DEAL_II_ALWAYS_INLINE inline bool
     HyperbolicSystemView<dim, Number>::is_admissible(const state_type &U) const
     {
+      const auto b = Number(eos_interpolation_b());
+      const auto pinf = Number(eos_interpolation_pinfty());
+      const auto q = Number(eos_interpolation_q());
+
       const auto rho = density(U);
-      const auto e = internal_energy(U);
+      const auto rho_e = internal_energy(U);
+      const auto covolume = Number(1.) - b * rho;
+
+      const auto shift = rho_e - rho * q - pinf * covolume;
 
       constexpr auto gt = dealii::SIMDComparison::greater_than;
       using T = Number;
       const auto test =
           dealii::compare_and_apply_mask<gt>(rho, T(0.), T(0.), T(-1.)) + //
-          dealii::compare_and_apply_mask<gt>(e, T(0.), T(0.), T(-1.));
+          dealii::compare_and_apply_mask<gt>(shift, T(0.), T(0.), T(-1.));
 
 #ifdef DEBUG_OUTPUT
       if (!(test == Number(0.))) {
@@ -1334,9 +1358,8 @@ namespace ryujin
           const auto U_dirichlet = get_dirichlet_data();
           result = prescribe_riemann_characteristic<1>(U, U_dirichlet, normal);
         }
-
-        /* Supersonic outflow: do nothing, i.e., keep U as is */
 #endif
+        /* Supersonic outflow: do nothing, i.e., keep U as is */
       }
 
       return result;
