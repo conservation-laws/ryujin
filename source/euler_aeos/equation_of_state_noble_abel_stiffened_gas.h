@@ -58,6 +58,7 @@ namespace ryujin
         ParameterAcceptor::parse_parameters_call_back.connect([this] {
           this->interpolation_b_ = b_;
           this->interpolation_pinfty_ = pinf_;
+          this->interpolation_q_ = q_;
         });
       }
 
