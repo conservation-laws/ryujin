@@ -135,7 +135,9 @@ namespace ryujin
       /*
        * Then limit the specific entropy:
        *
-       * See [Guermond, Nazarov, Popov, Thomas], Section 4.6 + Section 5.1:
+       * See [Guermond, Nazarov, Popov, Thomas],
+       * Section 4.6 + Section 5.1
+       * and @cite clayton2023robust Section 6:
        */
 
       Number t_l = t_min; // good state
@@ -143,7 +145,9 @@ namespace ryujin
       const auto &gamma = std::get<3>(bounds) /* = gamma_min*/;
       const Number gm1 = gamma - Number(1.);
 
-      const auto interpolation_b = view.eos_interpolation_b();
+      const auto b = Number(view.eos_interpolation_b());
+      const auto pinf = Number(view.eos_interpolation_pinfty());
+      const auto q = Number(view.eos_interpolation_q());
 
       {
         /*
@@ -152,15 +156,14 @@ namespace ryujin
          * Given initial limiter values t_l and t_r with psi(t_l) > 0 and
          * psi(t_r) < 0 we try to find t^\ast with psi(t^\ast) \approx 0.
          *
-         * FIXME -- Need to change comment
-         *
          * Here, psi is a 3-convex function obtained by scaling the specific
          * entropy s:
          *
          *   psi = \rho ^ {\gamma + 1} s
          *
          * (s in turn was defined as s =\varepsilon \rho ^{-\gamma}, where
-         * \varepsilon = (\rho e) is the internal energy.)
+         * \varepsilon = (\rho e - pinf * (1 - b rho)) is the shifted
+         * internal energy.)
          */
 
         const auto &s_min = std::get<2>(bounds);
@@ -177,11 +180,13 @@ namespace ryujin
           const auto U_r = U + t_r * P;
           const auto rho_r = view.density(U_r);
           const auto rho_r_gamma = ryujin::pow(rho_r, gamma);
+          const auto covolume_r = Number(1.) - b * rho_r;
+
           const auto rho_e_r = view.internal_energy(U_r);
-          const auto covolume_r = Number(1.) - interpolation_b * rho_r;
+          const auto shift_r = rho_e_r - rho_r * q - pinf * covolume_r;
 
           auto psi_r =
-              relax_small * rho_r * rho_e_r -
+              relax_small * rho_r * shift_r -
               s_min * rho_r * rho_r_gamma * ryujin::pow(covolume_r, -gm1);
 
 #ifndef EXPENSIVE_BOUNDS_CHECK
@@ -223,11 +228,12 @@ namespace ryujin
           const auto U_l = U + t_l * P;
           const auto rho_l = view.density(U_l);
           const auto rho_l_gamma = ryujin::pow(rho_l, gamma);
+          const auto covolume_l = Number(1.) - b * rho_l;
           const auto rho_e_l = view.internal_energy(U_l);
-          const auto covolume_l = Number(1.) - interpolation_b * rho_l;
+          const auto shift_l = rho_e_l - rho_l * q - pinf * covolume_l;
 
           auto psi_l =
-              relax_small * rho_l * rho_e_l -
+              relax_small * rho_l * shift_l -
               s_min * rho_l * rho_l_gamma * ryujin::pow(covolume_l, -gm1);
 
           /*
@@ -279,17 +285,24 @@ namespace ryujin
           const auto drho_e_l = view.internal_energy_derivative(U_l) * P;
           const auto drho_e_r = view.internal_energy_derivative(U_r) * P;
 
-          const auto extra_term_l =
-              s_min * ryujin::pow(rho_l / covolume_l, gamma) *
-              (covolume_l + gamma - interpolation_b * rho_l);
-          const auto extra_term_r =
-              s_min * ryujin::pow(rho_r / covolume_r, gamma) *
-              (covolume_r + gamma - interpolation_b * rho_r);
+          const auto q_pinf_term_l =
+              ScalarNumber(2.) * rho_l * q +
+              pinf * (Number(1.) - ScalarNumber(2.) * b * rho_l);
+          const auto q_pinf_term_r =
+              ScalarNumber(2.) * rho_r * q +
+              pinf * (Number(1.) - ScalarNumber(2.) * b * rho_r);
 
-          const auto dpsi_l =
-              rho_l * drho_e_l + (rho_e_l - extra_term_l) * drho;
-          const auto dpsi_r =
-              rho_r * drho_e_r + (rho_e_r - extra_term_r) * drho;
+          const auto extra_term_l = s_min *
+                                    ryujin::pow(rho_l / covolume_l, gamma) *
+                                    (covolume_l + gamma - b * rho_l);
+          const auto extra_term_r = s_min *
+                                    ryujin::pow(rho_r / covolume_r, gamma) *
+                                    (covolume_r + gamma - b * rho_r);
+
+          const auto dpsi_l = rho_l * drho_e_l +
+                              (rho_e_l - q_pinf_term_l - extra_term_l) * drho;
+          const auto dpsi_r = rho_r * drho_e_r +
+                              (rho_e_r - q_pinf_term_r - extra_term_r) * drho;
 
           quadratic_newton_step(
               t_l, t_r, psi_l, psi_r, dpsi_l, dpsi_r, Number(-1.));
@@ -312,19 +325,22 @@ namespace ryujin
           const auto U_new = U + t_l * P;
 
           const auto rho_new = view.density(U_new);
+          const auto covolume_new = Number(1.) - b * rho_new;
+
           const auto rho_new_gamma = ryujin::pow(rho_new, gamma);
           const auto rho_e_new = view.internal_energy(U_new);
-          const auto covolume_new = Number(1.) - interpolation_b * rho_new;
+
+          const auto shift_new = rho_e_new - rho_new * q - pinf * covolume_new;
 
           const auto psi_new =
-              relax_small * rho_new * rho_e_new -
+              relax_small * rho_new * shift_new -
               s_min * rho_new * rho_new_gamma * ryujin::pow(covolume_new, -gm1);
 
           const auto lower_bound = (ScalarNumber(1.) - relax) * s_min *
                                    rho_new * rho_new_gamma *
                                    ryujin::pow(covolume_new, -gm1);
 
-          const bool e_valid = std::min(Number(0.), rho_e_new) == Number(0.);
+          const bool e_valid = std::min(Number(0.), shift_new) == Number(0.);
           const bool psi_valid =
               std::min(Number(0.), psi_new - lower_bound) == Number(0.);
 

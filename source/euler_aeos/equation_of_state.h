@@ -39,10 +39,22 @@ namespace ryujin
           , name_(name)
       {
         /*
-         * If necessary derived EOS can override the interpolation
-         * co-volume b that is used in the approximate Riemann solver.
+         * If necessary derived EOS can override the covolume b that is
+         * used in the interpolatory NASG eos.
          */
         interpolation_b_ = 0.;
+
+        /*
+         * If necessary derived EOS can override the reference pressure
+         * that is used in the interpolatory NASG eos.
+         */
+        interpolation_pinfty_ = 0.;
+
+        /*
+         * If necessary derived EOS can override the reference specific
+         * internal energy q that is used in the interpolatory NASG eos.
+         */
+        interpolation_q_ = 0.;
 
         /*
          * If necessary derived EOS can override this boolean to indicate
@@ -178,9 +190,19 @@ namespace ryujin
       }
 
       /**
-       * Return the interpolation co-volume constant (b).
+       * Return the interpolation covolume constant (b).
        */
       ACCESSOR_READ_ONLY(interpolation_b)
+
+      /**
+       * Return the interpolation reference pressure (pinfty).
+       */
+      ACCESSOR_READ_ONLY(interpolation_pinfty)
+
+      /**
+       * Return the interpolation reference specific internal energy (q).
+       */
+      ACCESSOR_READ_ONLY(interpolation_q)
 
       /**
        * Return a boolean indicating whether the dealii::ArrayView<double>
@@ -202,6 +224,8 @@ namespace ryujin
 
     protected:
       double interpolation_b_;
+      double interpolation_pinfty_;
+      double interpolation_q_;
       bool prefer_vector_interface_;
 
     private:

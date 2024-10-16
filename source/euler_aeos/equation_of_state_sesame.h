@@ -130,9 +130,12 @@ namespace ryujin
 
         EOS_INTEGER n_queries = F.size();
 
-        Assert(dFx.size() == n_queries && dFy.size() == n_queries &&
-                   X.size() == n_queries && Y.size() == n_queries,
+#ifdef DEBUG
+        const decltype(dFx.size()) size = n_queries;
+        Assert(dFx.size() == size && dFy.size() == size && X.size() == size &&
+                   Y.size() == size,
                dealii::ExcMessage("vector sizes do not match"));
+#endif
 
         EOS_INTEGER error_code;
         eos_Interpolate(&table_handles_[index],
