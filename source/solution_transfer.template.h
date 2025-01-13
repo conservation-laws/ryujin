@@ -32,6 +32,7 @@
 #include <deal.II/lac/vector.h>
 #include <deal.II/matrix_free/fe_point_evaluation.h>
 
+#define EXPENSIVE_BOUNDS_CHECK
 
 namespace ryujin
 {
@@ -49,7 +50,6 @@ namespace ryujin
       , hyperbolic_system_(&hyperbolic_system)
       , parabolic_system_(&parabolic_system)
       , handle_(dealii::numbers::invalid_unsigned_int)
-
   {
   }
 
@@ -166,6 +166,8 @@ namespace ryujin
               cell->level(),
               cell->index(),
               &dof_handler);
+
+          const auto view = hyperbolic_system_->template view<dim, Number>();
 
           const auto &U = std::get<0>(old_state_vector);
 
@@ -303,7 +305,7 @@ namespace ryujin
               }
             }
 
-            /* Step 2: solve with inverse mass matrix on coarse cell: */
+            /* Step 2: construct inverse mass matrix on coarse cell: */
 
             fe_values.reinit(dof_cell);
 
@@ -322,10 +324,31 @@ namespace ryujin
 
             mij.gauss_jordan();
 
+            /* FIXME */
+
             for (unsigned int i = 0; i < n_dofs_per_cell; ++i) {
+              // high order:
+              state_type U_i;
               for (unsigned int j = 0; j < n_dofs_per_cell; ++j) {
-                state_values[i] += mij(i, j) * local_rhs[j];
+                U_i += mij(i, j) * local_rhs[j];
               }
+
+              if (view.is_admissible(U_i))
+                state_values[i] = U_i;
+              else {
+                std::cout << "DEBUG: inadmissible state encountered:\n»» "
+                          << U_i << " ««" << std::endl;
+                // low order:
+                state_values[i] = 1. / mi(i) * local_rhs[i];
+              }
+
+#ifdef EXPENSIVE_BOUNDS_CHECK
+              AssertThrow(
+                  view.is_admissible(state_values[i]),
+                  dealii::ExcMessage(
+                      "Error: inadmissible state encountered in "
+                      "register_data_attach / children_will_be_coarsened"));
+#endif
             }
           } break;
 
@@ -397,6 +420,8 @@ namespace ryujin
               cell->level(),
               cell->index(),
               &dof_handler);
+
+          const auto view = hyperbolic_system_->template view<dim, Number>();
 
           /*
            * Retrieve packed values and project onto cell:
@@ -529,6 +554,8 @@ namespace ryujin
 
               /* Step 2: solve with inverse mass matrix on child cell: */
 
+              /* FIXME */
+
               mi = 0.;
               mij = 0.;
               for (unsigned int i = 0; i < n_dofs_per_cell; ++i) {
@@ -550,11 +577,18 @@ namespace ryujin
                   U_i += mij(i, j) * local_rhs[j];
                 }
 
+#ifdef EXPENSIVE_BOUNDS_CHECK
+                AssertThrow(view.is_admissible(U_i),
+                            dealii::ExcMessage(
+                                "Error: inadmissible state encountered in "
+                                "ready_to_unpack / cell_will_be_refined"));
+#endif
                 const auto global_i = dof_indices[i];
                 add_tensor(projected_state, mi(i) * U_i, global_i);
                 projected_mass(global_i) += mi(i);
               }
             } /*child*/
+
           } break;
 
           case dealii::CellStatus::cell_invalid:
@@ -571,6 +605,7 @@ namespace ryujin
 
     auto &new_U = std::get<0>(new_state_vector);
     const auto n_locally_owned = offline_data_->n_locally_owned();
+    const auto view = hyperbolic_system_->template view<dim, Number>();
 
     // We have to perform the following operation twice, so let's create a
     // small lambda for it.
@@ -585,6 +620,14 @@ namespace ryujin
 
         const auto U_i = projected_state.get_tensor(local_i);
         const auto m_i = projected_mass.local_element(local_i);
+
+#ifdef EXPENSIVE_BOUNDS_CHECK
+        AssertThrow(
+            view.is_admissible(U_i),
+            dealii::ExcMessage("Error: inadmissible state encountered in "
+                               "update_new_state_vector()"));
+#endif
+
         new_U.write_tensor(U_i / m_i, local_i);
       }
       new_U.update_ghost_values();
