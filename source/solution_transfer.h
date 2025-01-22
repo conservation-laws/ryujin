@@ -12,6 +12,7 @@
 #include "state_vector.h"
 
 #include <deal.II/base/parameter_acceptor.h>
+#include <deal.II/base/smartpointer.h>
 
 namespace ryujin
 {
@@ -26,7 +27,7 @@ namespace ryujin
    * @ingroup Mesh
    */
   template <typename Description, int dim, typename Number = double>
-  class SolutionTransfer
+  class SolutionTransfer : public dealii::ParameterAcceptor
   {
   public:
     /**
@@ -61,12 +62,13 @@ namespace ryujin
     SolutionTransfer(const MPIEnsemble &mpi_ensemble,
                      const OfflineData<dim, Number> &offline_data,
                      const HyperbolicSystem &hyperbolic_system,
-                     const ParabolicSystem &parabolic_system);
+                     const ParabolicSystem &parabolic_system,
+                     const std::string &subsection = "/SolutionTransfer");
 
     /**
      * Destructor
      */
-    ~SolutionTransfer() = default;
+    ~SolutionTransfer() override = default;
 
     //@}
     /**
@@ -138,6 +140,15 @@ namespace ryujin
     void project(StateVector &new_state_vector);
 
   private:
+    //@}
+    /**
+     * @name Run time options
+     */
+    //@{
+
+    typename Description::template Limiter<dim, Number>::Parameters
+        limiter_parameters_;
+
     //@}
     /**
      * @name Internal data

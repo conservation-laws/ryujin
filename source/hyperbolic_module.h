@@ -359,8 +359,6 @@ namespace ryujin
         riemann_solver_parameters_;
 
     //@}
-
-    //@}
     /**
      * @name Internal data
      */
