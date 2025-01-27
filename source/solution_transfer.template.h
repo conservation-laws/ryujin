@@ -6,6 +6,7 @@
 #pragma once
 
 #include <compile_time_options.h>
+#include <deal.II/base/exceptions.h>
 
 #include "discretization.h"
 #include "solution_transfer.h"
@@ -347,50 +348,97 @@ namespace ryujin
               }
             }
 
-            /* Step 2: construct inverse mass matrix on coarse cell: */
+            /* Step 2: construct inverse mass matrices: */
 
             fe_values.reinit(dof_cell);
 
-            dealii::FullMatrix<double> mij(n_dofs_per_cell, n_dofs_per_cell);
-            dealii::Vector<double> mi(n_dofs_per_cell);
+            dealii::FullMatrix<double> mass_inverse(n_dofs_per_cell,
+                                                    n_dofs_per_cell);
+            dealii::Vector<double> lumped_mass(n_dofs_per_cell);
+            dealii::Vector<double> lumped_mass_inverse(n_dofs_per_cell);
+
             for (unsigned int i = 0; i < n_dofs_per_cell; ++i) {
               for (unsigned int j = 0; j < n_dofs_per_cell; ++j) {
                 double sum = 0;
                 for (unsigned int q = 0; q < quadrature.size(); ++q)
                   sum += fe_values.shape_value(i, q) *
                          fe_values.shape_value(j, q) * fe_values.JxW(q);
-                mij(i, j) = sum;
-                mi(i) += sum;
+                mass_inverse(i, j) = sum;
+                lumped_mass(i) += sum;
+              }
+              lumped_mass_inverse(i) = Number(1.) / lumped_mass(i);
+            }
+            mass_inverse.gauss_jordan();
+
+
+            /* Step 3: compute low-order update and P_ij matrix: */
+
+            std::vector<state_type> pij_matrix(n_dofs_per_cell *
+                                               n_dofs_per_cell);
+            dealii::FullMatrix<Number> lij_matrix(n_dofs_per_cell,
+                                                  n_dofs_per_cell);
+
+            const auto kappa_inverse = Number(n_dofs_per_cell);
+            const auto kappa = Number(1.) / kappa_inverse;
+
+            for (unsigned int i = 0; i < n_dofs_per_cell; ++i) {
+              const state_type U_i = lumped_mass_inverse(i) * local_rhs[i];
+              state_values[i] = U_i;
+
+              for (unsigned int j = 0; j < n_dofs_per_cell; ++j) {
+                const auto kronecker_ij = Number(i == j ? 1. : 0.);
+                const auto b_ij =
+                    lumped_mass(i) * mass_inverse(i, j) - kronecker_ij;
+                const auto b_ji =
+                    lumped_mass(j) * mass_inverse(i, j) - kronecker_ij;
+                const auto P_ij = kappa_inverse * lumped_mass_inverse(i) *
+                                  (b_ij * local_rhs[j] - b_ji * local_rhs[i]);
+                pij_matrix[n_dofs_per_cell * i + j] = P_ij;
               }
             }
 
-            mij.gauss_jordan();
+            /* Step 4: compute l_ij matrix and apply limited update: */
 
-            /* FIXME */
+            const auto n_iterations = limiter_parameters_.iterations();
+            for (unsigned int pass = 0; pass < n_iterations; ++pass) {
 
-            for (unsigned int i = 0; i < n_dofs_per_cell; ++i) {
-              // high order:
-              state_type U_i;
-              for (unsigned int j = 0; j < n_dofs_per_cell; ++j) {
-                U_i += mij(i, j) * local_rhs[j];
-              }
+              for (unsigned int i = 0; i < n_dofs_per_cell; ++i) {
+                const auto &U_i = state_values[i];
 
-              if (view.is_admissible(U_i))
-                state_values[i] = U_i;
-              else {
-                std::cout << "DEBUG: inadmissible state encountered:\n»» "
-                          << U_i << " ««" << std::endl;
-                // low order:
-                state_values[i] = 1. / mi(i) * local_rhs[i];
-              }
+                for (unsigned int j = 0; j < n_dofs_per_cell; ++j) {
+                  const auto &P_ij = pij_matrix[n_dofs_per_cell * i + j];
+                  const auto &[l_ij, check] = limiter.limit(bounds, U_i, P_ij);
+                  lij_matrix(i, j) = l_ij;
 
 #ifdef EXPENSIVE_BOUNDS_CHECK
-              AssertThrow(
-                  view.is_admissible(state_values[i]),
-                  dealii::ExcMessage(
-                      "Error: inadmissible state encountered in "
-                      "register_data_attach / children_will_be_coarsened"));
+                  AssertThrow(
+                      check,
+                      dealii::ExcMessage(
+                          "Error: low-order state out of bounds in "
+                          "register_data_attach / children_will_be_coarsened"));
 #endif
+                }
+              }
+
+              for (unsigned int i = 0; i < n_dofs_per_cell; ++i) {
+                auto &U_i = state_values[i];
+
+                for (unsigned int j = 0; j < n_dofs_per_cell; ++j) {
+                  const auto l_ij =
+                      std::min(lij_matrix(i, j), lij_matrix(j, i));
+                  auto &P_ij = pij_matrix[n_dofs_per_cell * i + j];
+                  U_i += kappa * l_ij * P_ij;
+                  P_ij -= l_ij * P_ij;
+                }
+
+#ifdef EXPENSIVE_BOUNDS_CHECK
+                AssertThrow(
+                    view.is_admissible(U_i),
+                    dealii::ExcMessage(
+                        "Error: inadmissible state encountered in "
+                        "register_data_attach / children_will_be_coarsened"));
+#endif
+              }
             }
           } break;
 
