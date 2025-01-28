@@ -180,12 +180,11 @@ namespace ryujin
               *hyperbolic_system_, limiter_parameters_, precomputed);
 
           /*
-           * Collect state values and merged bounds for packing:
+           * Collect state values for packing:
            */
 
           const auto n_dofs_per_cell = dof_handler.get_fe().n_dofs_per_cell();
           std::vector<state_type> state_values(n_dofs_per_cell);
-          Bounds bounds;
 
           switch (status) {
           case dealii::CellStatus::cell_will_persist:
@@ -201,28 +200,15 @@ namespace ryujin
                 n_dofs_per_cell);
             dof_cell->get_dof_indices(dof_indices);
 
-            /* We want a "left fold first" for the bounds: */
-            if (std::begin(dof_indices) != std::end(dof_indices)) {
-              const auto global_i = dof_indices[0];
-              const auto U_i = get_tensor(U, global_i);
-              const auto local_i =
-                  scalar_partitioner->global_to_local(global_i);
-              bounds = limiter.projection_bounds_from_state(local_i, U_i);
-            }
-
-            std::transform( //
-                std::begin(dof_indices),
-                std::end(dof_indices),
-                std::begin(state_values),
-                [&](const auto global_i) {
-                  const auto U_i = get_tensor(U, global_i);
-                  const auto local_i =
-                      scalar_partitioner->global_to_local(global_i);
-                  const auto bounds_i =
-                      limiter.projection_bounds_from_state(local_i, U_i);
-                  bounds = limiter.combine_bounds(bounds, bounds_i);
-                  return U_i;
-                });
+            std::transform(std::begin(dof_indices),
+                           std::end(dof_indices),
+                           std::begin(state_values),
+                           [&](const auto global_i) {
+                             const auto U_i = get_tensor(U, global_i);
+                             const auto local_i =
+                                 scalar_partitioner->global_to_local(global_i);
+                             return U_i;
+                           });
           } break;
 
           case dealii::CellStatus::children_will_be_coarsened: {
@@ -268,6 +254,8 @@ namespace ryujin
 
             std::vector<dealii::types::global_dof_index> dof_indices(
                 n_dofs_per_cell);
+
+            Bounds bounds;
 
             for (unsigned int child = 0; child < dof_cell->n_children();
                  ++child) {
@@ -357,6 +345,7 @@ namespace ryujin
             dealii::Vector<double> lumped_mass(n_dofs_per_cell);
             dealii::Vector<double> lumped_mass_inverse(n_dofs_per_cell);
 
+            auto total_mass = Number(0.);
             for (unsigned int i = 0; i < n_dofs_per_cell; ++i) {
               for (unsigned int j = 0; j < n_dofs_per_cell; ++j) {
                 double sum = 0;
@@ -367,11 +356,13 @@ namespace ryujin
                 lumped_mass(i) += sum;
               }
               lumped_mass_inverse(i) = Number(1.) / lumped_mass(i);
+              total_mass += lumped_mass(i);
             }
             mass_inverse.gauss_jordan();
 
-
             /* Step 3: compute low-order update and P_ij matrix: */
+
+            bounds = limiter.fully_relax_bounds(bounds, total_mass);
 
             std::vector<state_type> pij_matrix(n_dofs_per_cell *
                                                n_dofs_per_cell);
