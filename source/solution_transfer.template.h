@@ -33,8 +33,6 @@
 #include <deal.II/lac/vector.h>
 #include <deal.II/matrix_free/fe_point_evaluation.h>
 
-#define EXPENSIVE_BOUNDS_CHECK
-
 namespace ryujin
 {
   template <typename Description, int dim, typename Number>
@@ -155,7 +153,9 @@ namespace ryujin
                "You can only add one solution per SolutionTransfer object."));
 
     /*
-     * Add a register_data_attach callback that
+     * -----------------------------------------------------------------------
+     * Cell-level projection to parent cells and packing data:
+     * -----------------------------------------------------------------------
      */
 
     handle_ = triangulation.register_data_attach(
@@ -173,6 +173,7 @@ namespace ryujin
           const auto view = hyperbolic_system_->template view<dim, Number>();
 
           const auto &U = std::get<0>(old_state_vector);
+          /* precomputed needs to be valid for bounds computation */
           const auto &precomputed = std::get<1>(old_state_vector);
 
           using Limiter = typename Description::template Limiter<dim, Number>;
@@ -200,15 +201,11 @@ namespace ryujin
                 n_dofs_per_cell);
             dof_cell->get_dof_indices(dof_indices);
 
-            std::transform(std::begin(dof_indices),
-                           std::end(dof_indices),
-                           std::begin(state_values),
-                           [&](const auto global_i) {
-                             const auto U_i = get_tensor(U, global_i);
-                             const auto local_i =
-                                 scalar_partitioner->global_to_local(global_i);
-                             return U_i;
-                           });
+            std::transform(
+                std::begin(dof_indices),
+                std::end(dof_indices),
+                std::begin(state_values),
+                [&](const auto global_i) { return get_tensor(U, global_i); });
           } break;
 
           case dealii::CellStatus::children_will_be_coarsened: {
@@ -245,9 +242,7 @@ namespace ryujin
             std::vector<dealii::Point<dim>> unit_points_temp(
                 std::is_same_v<Number, float> ? quadrature.size() : 0);
 
-            /*
-             * Step 1: build up right hand side by iterating over children:
-             */
+            /* Step 1: build up right hand side by iterating over children: */
 
             std::vector<state_type> state_values_quad(quadrature.size());
             std::vector<state_type> local_rhs(n_dofs_per_cell);
@@ -401,7 +396,7 @@ namespace ryujin
                   const auto &[l_ij, check] = limiter.limit(bounds, U_i, P_ij);
                   lij_matrix(i, j) = l_ij;
 
-#ifdef EXPENSIVE_BOUNDS_CHECK
+#ifdef DEBUG_EXPENSIVE_BOUNDS_CHECK
                   AssertThrow(
                       check,
                       dealii::ExcMessage(
@@ -422,7 +417,7 @@ namespace ryujin
                   P_ij -= l_ij * P_ij;
                 }
 
-#ifdef EXPENSIVE_BOUNDS_CHECK
+#ifdef DEBUG_EXPENSIVE_BOUNDS_CHECK
                 AssertThrow(
                     view.is_admissible(U_i),
                     dealii::ExcMessage(
@@ -468,26 +463,42 @@ namespace ryujin
                     "The SolutionTransfer class is not implemented for a "
                     "distributed::shared::Triangulation which we use in 1D"));
 
-    const auto &scalar_partitioner = offline_data_->scalar_partitioner();
-    const auto &affine_constraints = offline_data_->affine_constraints();
-
-    const auto &discretization = offline_data_->discretization();
-    auto &triangulation = *discretization.triangulation_; /* writable */
-
     Assert(
         handle_ != dealii::numbers::invalid_unsigned_int,
         dealii::ExcMessage(
             "Cannot project() a state vector without valid handle. "
             "prepare_projection() or set_handle() have to be called first."));
 
-    /*
-     * Reconstruct and project state vector:
-     */
+    const auto &scalar_partitioner = offline_data_->scalar_partitioner();
+    const auto &affine_constraints = offline_data_->affine_constraints();
+    const auto n_locally_owned = offline_data_->n_locally_owned();
+
+    const auto &discretization = offline_data_->discretization();
+    auto &triangulation = *discretization.triangulation_; /* writable */
 
     ScalarVector projected_mass;
     projected_mass.reinit(offline_data_->scalar_partitioner());
     HyperbolicVector projected_state;
     projected_state.reinit(offline_data_->hyperbolic_vector_partitioner());
+
+    /*
+     * We only need to construct entries in a pik_matrix for a small subset
+     * of affected degrees of freedom for which we have to construct the
+     * entire pik_matrix first for the limiting process (in contrast to the
+     * entirely cell-local limiting done before). Let's simply use a map.
+     */
+    std::map<std::tuple<unsigned int /*i*/, unsigned int /*k*/>, state_type>
+        pik_matrix;
+    std::map<unsigned int /*i*/, Bounds> bounds_map;
+
+    ScalarVector kappa;
+    kappa.reinit(offline_data_->scalar_partitioner());
+
+    /*
+     * -----------------------------------------------------------------------
+     * Unpacking data and cell-level interpolation/projection to child cells:
+     * -----------------------------------------------------------------------
+     */
 
     triangulation.notify_ready_to_unpack( //
         handle_,
@@ -587,8 +598,9 @@ namespace ryujin
             std::vector<dealii::Point<dim>> unit_points_temp(
                 std::is_same_v<Number, float> ? quadrature.size() : 0);
 
-            dealii::FullMatrix<double> mij(n_dofs_per_cell, n_dofs_per_cell);
-            dealii::Vector<double> mi(n_dofs_per_cell);
+            dealii::FullMatrix<double> mass_inverse(n_dofs_per_cell,
+                                                    n_dofs_per_cell);
+            dealii::Vector<double> lumped_mass(n_dofs_per_cell);
             std::vector<state_type> local_rhs(n_dofs_per_cell);
 
             for (unsigned int child = 0; child < dof_cell->n_children();
@@ -635,38 +647,37 @@ namespace ryujin
 
               /* Step 2: solve with inverse mass matrix on child cell: */
 
-              /* FIXME */
-
-              mi = 0.;
-              mij = 0.;
+              mass_inverse = Number(0.);
+              lumped_mass = Number(0.);
               for (unsigned int i = 0; i < n_dofs_per_cell; ++i) {
                 for (unsigned int j = 0; j < n_dofs_per_cell; ++j) {
                   double sum = 0;
                   for (unsigned int q = 0; q < quadrature.size(); ++q)
                     sum += fe_values.shape_value(i, q) *
                            fe_values.shape_value(j, q) * fe_values.JxW(q);
-                  mij(i, j) = sum;
-                  mi(i) += sum;
+                  mass_inverse(i, j) = sum;
+                  lumped_mass(i) += sum;
                 }
               }
+              mass_inverse.gauss_jordan();
 
-              mij.gauss_jordan();
+              /* Step 3: compute high order update and write back: */
 
               for (unsigned int i = 0; i < n_dofs_per_cell; ++i) {
                 state_type U_i;
                 for (unsigned int j = 0; j < n_dofs_per_cell; ++j) {
-                  U_i += mij(i, j) * local_rhs[j];
+                  U_i += mass_inverse(i, j) * local_rhs[j];
                 }
 
-#ifdef EXPENSIVE_BOUNDS_CHECK
+#ifdef DEBUG_EXPENSIVE_BOUNDS_CHECK
                 AssertThrow(view.is_admissible(U_i),
                             dealii::ExcMessage(
                                 "Error: inadmissible state encountered in "
                                 "ready_to_unpack / cell_will_be_refined"));
 #endif
                 const auto global_i = dof_indices[i];
-                add_tensor(projected_state, mi(i) * U_i, global_i);
-                projected_mass(global_i) += mi(i);
+                add_tensor(projected_state, lumped_mass(i) * U_i, global_i);
+                projected_mass(global_i) += lumped_mass(i);
               }
             } /*child*/
 
@@ -679,50 +690,67 @@ namespace ryujin
           }
         });
 
+    projected_mass.compress(dealii::VectorOperation::add);
+    projected_state.compress(dealii::VectorOperation::add);
+
     /*
-     * Distribute values, take the weighted average of unconstrained
-     * degrees of freedom, and store the result in new_U:
+     * -----------------------------------------------------------------------
+     * Redistribute masses to satisfy hanging-node constraints:
+     *
+     * Now redistribute the mass defect introduced by constrained degrees
+     * of freedom. This mostly affects hanging nodes neighboring a
+     * coarsened cell. Here, cell-wise mass projection might lead to a
+     * value for a constrained degree of freedom that differs from the
+     * algebraic relationship expressed by our affine constraints. Thus, we
+     * first compute the defect and then we redistribute it to all degrees
+     * of freedom on the constraint line.
+     * -----------------------------------------------------------------------
      */
 
     auto &new_U = std::get<0>(new_state_vector);
-    const auto n_locally_owned = offline_data_->n_locally_owned();
-    const auto view = hyperbolic_system_->template view<dim, Number>();
 
-    // We have to perform the following operation twice, so let's create a
-    // small lambda for it.
+    /*
+     * A small lambda that takes the weighted average of all degrees of
+     * freedom, and stores the result in new_U:
+     */
     const auto update_new_state_vector = [&]() {
-      projected_mass.compress(dealii::VectorOperation::add);
-      projected_state.compress(dealii::VectorOperation::add);
-
       for (unsigned int local_i = 0; local_i < n_locally_owned; ++local_i) {
-        const auto global_i = scalar_partitioner->local_to_global(local_i);
-        if (affine_constraints.is_constrained(global_i))
-          continue;
 
-        const auto U_i = projected_state.get_tensor(local_i);
+        const auto mU_i = projected_state.get_tensor(local_i);
         const auto m_i = projected_mass.local_element(local_i);
 
-#ifdef EXPENSIVE_BOUNDS_CHECK
+#ifdef DEBUG_EXPENSIVE_BOUNDS_CHECK
+        const auto view = hyperbolic_system_->template view<dim, Number>();
         AssertThrow(
-            view.is_admissible(U_i),
+            view.is_admissible(mU_i / m_i),
             dealii::ExcMessage("Error: inadmissible state encountered in "
                                "update_new_state_vector()"));
 #endif
 
-        new_U.write_tensor(U_i / m_i, local_i);
+        new_U.write_tensor(mU_i / m_i, local_i);
       }
       new_U.update_ghost_values();
     };
 
     update_new_state_vector();
 
+    /* precomputed needs to be valid for bounds computation */
+    prepare_state_vector(new_state_vector);
+    const auto &precomputed = std::get<1>(new_state_vector);
+
+    using Limiter = typename Description::template Limiter<dim, Number>;
+    const Limiter limiter(
+        *hyperbolic_system_, limiter_parameters_, precomputed);
+
     /*
-     * Now redistribute the mass defect introduced by constrained degrees
-     * of freedom. This mostly affects hanging nodes neighboring a
-     * coarsened cell. Here, cell-wise mass projection might lead to a
-     * value that differs from the algebraic relationship expressed by our
-     * affine constraints. Thus, we first compute the defect and then we
-     * redistribute it to all degrees of freedom on the constraint line.
+     * Step 1: compute low-order update P_ij matrix, and bounds:
+     *
+     * We compute limiter bounds as a single value over the constraint
+     * line. This makes sense as we need to limit the update for each
+     * affected (unconstrained) degree of freedom of a constraint line with
+     * a single limiter value anyway to ensure mass conservation.
+     * (Incidentally, this avoids having to update a global, distributed
+     * bounds vector over all MPI ranks.)
      */
 
     for (const auto &line : affine_constraints.get_lines()) {
@@ -737,6 +765,9 @@ namespace ryujin
       const auto m_i_star = projected_mass.local_element(local_i);
       const auto U_i_star = projected_state.get_tensor(local_i) / m_i_star;
 
+      auto &bounds = bounds_map[local_i];
+      bounds = limiter.projection_bounds_from_state(local_i, U_i_star);
+
       /* The value obtained from the affine constraints object: */
       state_type U_i_interp;
       for (const auto &[global_k, c_k] : line.entries) {
@@ -744,18 +775,111 @@ namespace ryujin
         U_i_interp += c_k * new_U.get_tensor(local_k);
       }
 
-      /* And distribute the defect: */
-      const auto defect = U_i_star - U_i_interp;
+      /* And redistribute low order update: */
       for (const auto &[global_k, c_k] : line.entries) {
         const auto local_k = scalar_partitioner->global_to_local(global_k);
-        const auto U_j = new_U.get_tensor(local_k);
+        const auto U_k = new_U.get_tensor(local_k);
 
-        projected_state.add_tensor(c_k * m_i_star * (U_j + defect), local_k);
+        const auto bounds_k =
+            limiter.projection_bounds_from_state(local_k, U_k);
+        bounds = limiter.combine_bounds(bounds, bounds_k);
+
+        projected_state.add_tensor(c_k * m_i_star * U_i_star, local_k);
         projected_mass.local_element(local_k) += c_k * m_i_star;
+
+        kappa.local_element(local_k) += Number(1.);
+        pik_matrix[{local_i, local_k}] = c_k * m_i_star * (U_k - U_i_interp);
       }
     }
 
+    /* Compress vectors, recalculate unconstrained states: */
+    projected_mass.compress(dealii::VectorOperation::add);
+    projected_state.compress(dealii::VectorOperation::add);
+    kappa.compress(dealii::VectorOperation::add);
     update_new_state_vector();
+
+    /* Redistribute ghost layer for masses and kappa: */
+    projected_mass.update_ghost_values();
+    kappa.update_ghost_values();
+
+    /* Step 2: Scale pik_matrix elements: */
+
+    for (const auto &line : affine_constraints.get_lines()) {
+      const auto global_i = line.index;
+      const auto local_i = scalar_partitioner->global_to_local(global_i);
+
+      /* Only operate on a locally owned, constrained degree of freedom: */
+      if (local_i >= n_locally_owned)
+        continue;
+
+      auto total_mass = Number(0.);
+      for (const auto &[global_k, c_k] : line.entries) {
+        const auto local_k = scalar_partitioner->global_to_local(global_k);
+        const auto kappa_k = kappa.local_element(local_k);
+        const auto m_k = projected_mass.local_element(local_k);
+        total_mass += m_k;
+        pik_matrix[{local_i, local_k}] *= m_k / kappa_k;
+      }
+
+      auto &bounds = bounds_map[local_i];
+      bounds = limiter.fully_relax_bounds(bounds, total_mass);
+    }
+
+    /* Step 3: Apply limiter: */
+
+    const auto n_iterations = limiter_parameters_.iterations();
+    for (unsigned int pass = 0; pass < n_iterations; ++pass) {
+      std::cout << "PASS = " << pass << std::endl;
+
+      for (const auto &line : affine_constraints.get_lines()) {
+        const auto global_i = line.index;
+        const auto local_i = scalar_partitioner->global_to_local(global_i);
+
+        /* Only operate on a locally owned, constrained degree of freedom: */
+        if (local_i >= n_locally_owned)
+          continue;
+
+        const auto &bounds = bounds_map[local_i];
+        auto l = Number(1.);
+
+        for (const auto &[global_k, c_k] : line.entries) {
+          const auto local_k = scalar_partitioner->global_to_local(global_k);
+
+          const auto U_k = new_U.get_tensor(local_k);
+          const auto P_ik = pik_matrix[{local_i, local_k}];
+
+          const auto &[l_k, check] = limiter.limit(bounds, U_k, P_ik);
+#ifdef DEBUG_EXPENSIVE_BOUNDS_CHECK
+          AssertThrow(check,
+                      dealii::ExcMessage("Error: low-order state out of bounds "
+                                         "in project / state redistribution"));
+#endif
+          l = std::min(l, l_k);
+        }
+
+        for (const auto &[global_k, c_k] : line.entries) {
+          const auto local_k = scalar_partitioner->global_to_local(global_k);
+          const auto kappa_k = kappa.local_element(local_k);
+          const auto m_k = projected_mass.local_element(local_k);
+          auto &P_ik = pik_matrix[{local_i, local_k}];
+
+          projected_state.add_tensor(m_k / kappa_k * l * P_ik, local_k);
+          P_ik -= l * P_ik;
+        }
+      }
+
+      /* Compress state vector, recalculate unconstrained states: */
+      projected_state.compress(dealii::VectorOperation::add);
+      update_new_state_vector();
+    }
+
+    /* Zero out constrained degrees of freedom: */
+    for (unsigned int local_i = 0; local_i < n_locally_owned; ++local_i) {
+      const auto global_i = scalar_partitioner->local_to_global(local_i);
+      if (affine_constraints.is_constrained(global_i))
+        new_U.write_tensor(state_type{}, local_i);
+    }
+    new_U.update_ghost_values();
 
 #ifdef DEBUG
     /*
