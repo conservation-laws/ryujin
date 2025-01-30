@@ -170,8 +170,6 @@ namespace ryujin
 
           const auto &scalar_partitioner = offline_data_->scalar_partitioner();
 
-          const auto view = hyperbolic_system_->template view<dim, Number>();
-
           const auto &U = std::get<0>(old_state_vector);
           /* precomputed needs to be valid for bounds computation */
           const auto &precomputed = std::get<1>(old_state_vector);
@@ -418,6 +416,8 @@ namespace ryujin
                 }
 
 #ifdef DEBUG_EXPENSIVE_BOUNDS_CHECK
+                const auto view =
+                    hyperbolic_system_->template view<dim, Number>();
                 AssertThrow(
                     view.is_admissible(U_i),
                     dealii::ExcMessage(
@@ -512,8 +512,6 @@ namespace ryujin
               cell->level(),
               cell->index(),
               &dof_handler);
-
-          const auto view = hyperbolic_system_->template view<dim, Number>();
 
           /*
            * Retrieve packed values and project onto cell:
@@ -670,6 +668,8 @@ namespace ryujin
                 }
 
 #ifdef DEBUG_EXPENSIVE_BOUNDS_CHECK
+                const auto view =
+                    hyperbolic_system_->template view<dim, Number>();
                 AssertThrow(view.is_admissible(U_i),
                             dealii::ExcMessage(
                                 "Error: inadmissible state encountered in "
@@ -735,8 +735,62 @@ namespace ryujin
     update_new_state_vector();
 
     /* precomputed needs to be valid for bounds computation */
-    prepare_state_vector(new_state_vector);
+
     const auto &precomputed = std::get<1>(new_state_vector);
+
+    {
+      const unsigned int n_export_indices = offline_data_->n_export_indices();
+      const unsigned int n_internal = offline_data_->n_locally_internal();
+      const unsigned int n_owned = offline_data_->n_locally_owned();
+      const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
+      unsigned int channel = 10;
+      using VA = dealii::VectorizedArray<Number>;
+      static constexpr auto n_precomputation_cycles =
+          View::n_precomputation_cycles;
+
+      new_U.update_ghost_values();
+
+      if constexpr (n_precomputation_cycles != 0) {
+        for (unsigned int cycle = 0; cycle < n_precomputation_cycles; ++cycle) {
+
+          SynchronizationDispatch synchronization_dispatch([&]() {
+            precomputed.update_ghost_values_start(channel++);
+            precomputed.update_ghost_values_finish();
+          });
+
+          RYUJIN_PARALLEL_REGION_BEGIN
+
+          auto loop = [&](auto sentinel,
+                          unsigned int left,
+                          unsigned int right) {
+            using T = decltype(sentinel);
+
+            /* Stored thread locally: */
+            bool thread_ready = false;
+
+            const auto view = hyperbolic_system_->template view<dim, T>();
+            view.precomputation_loop(
+                cycle,
+                [&](const unsigned int i) {
+                  synchronization_dispatch.check(
+                      thread_ready, i >= n_export_indices && i < n_internal);
+                },
+                sparsity_simd,
+                new_state_vector,
+                left,
+                right,
+                /*skip_constrained_dofs*/ false);
+          };
+
+          /* Parallel non-vectorized loop: */
+          loop(Number(), n_internal, n_owned);
+          /* Parallel vectorized SIMD loop: */
+          loop(VA(), 0, n_internal);
+
+          RYUJIN_PARALLEL_REGION_END
+        }
+      }
+    }
 
     using Limiter = typename Description::template Limiter<dim, Number>;
     const Limiter limiter(
@@ -829,8 +883,6 @@ namespace ryujin
 
     const auto n_iterations = limiter_parameters_.iterations();
     for (unsigned int pass = 0; pass < n_iterations; ++pass) {
-      std::cout << "PASS = " << pass << std::endl;
-
       for (const auto &line : affine_constraints.get_lines()) {
         const auto global_i = line.index;
         const auto local_i = scalar_partitioner->global_to_local(global_i);

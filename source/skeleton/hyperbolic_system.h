@@ -233,12 +233,14 @@ namespace ryujin
        * within our usual loop() idiom in HyperbolicModule
        */
       template <typename DISPATCH, typename SPARSITY>
-      void precomputation_loop(unsigned int /*cycle*/,
-                               const DISPATCH &dispatch_check,
-                               const SPARSITY & /*sparsity_simd*/,
-                               StateVector & /*state_vector*/,
-                               unsigned int /*left*/,
-                               unsigned int /*right*/) const = delete;
+      void
+      precomputation_loop(unsigned int /*cycle*/,
+                          const DISPATCH &dispatch_check,
+                          const SPARSITY & /*sparsity_simd*/,
+                          StateVector & /*state_vector*/,
+                          unsigned int /*left*/,
+                          unsigned int /*right*/,
+                          const bool /*skip_constrained_dofs*/) const = delete;
 
       //@}
       /**
