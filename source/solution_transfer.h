@@ -50,6 +50,17 @@ namespace ryujin
 
     using ScalarVector = Vectors::ScalarVector<Number>;
 
+    /**
+     * The number of stored entries in the bounds array.
+     */
+    static constexpr unsigned int n_bounds =
+        Description::template Limiter<dim, Number>::n_bounds;
+
+    /**
+     * Array type used to store accumulated bounds.
+     */
+    using Bounds = Description::template Limiter<dim, Number>::Bounds;
+
     //@}
     /**
      * @name Constructor and setup

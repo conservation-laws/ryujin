@@ -167,16 +167,24 @@ namespace ryujin
               cell->index(),
               &dof_handler);
 
+          const auto &scalar_partitioner = offline_data_->scalar_partitioner();
+
           const auto view = hyperbolic_system_->template view<dim, Number>();
 
           const auto &U = std::get<0>(old_state_vector);
+          const auto &precomputed = std::get<1>(old_state_vector);
+
+          using Limiter = typename Description::template Limiter<dim, Number>;
+          const Limiter limiter(
+              *hyperbolic_system_, limiter_parameters_, precomputed);
 
           /*
-           * Collect values for packing:
+           * Collect state values and merged bounds for packing:
            */
 
           const auto n_dofs_per_cell = dof_handler.get_fe().n_dofs_per_cell();
           std::vector<state_type> state_values(n_dofs_per_cell);
+          Bounds bounds;
 
           switch (status) {
           case dealii::CellStatus::cell_will_persist:
@@ -192,13 +200,28 @@ namespace ryujin
                 n_dofs_per_cell);
             dof_cell->get_dof_indices(dof_indices);
 
-            std::transform(std::begin(dof_indices),
-                           std::end(dof_indices),
-                           std::begin(state_values),
-                           [&](const auto i) {
-                             const auto U_i = get_tensor(U, i);
-                             return U_i;
-                           });
+            /* We want a "left fold first" for the bounds: */
+            if (std::begin(dof_indices) != std::end(dof_indices)) {
+              const auto global_i = dof_indices[0];
+              const auto U_i = get_tensor(U, global_i);
+              const auto local_i =
+                  scalar_partitioner->global_to_local(global_i);
+              bounds = limiter.projection_bounds_from_state(local_i, U_i);
+            }
+
+            std::transform( //
+                std::begin(dof_indices),
+                std::end(dof_indices),
+                std::begin(state_values),
+                [&](const auto global_i) {
+                  const auto U_i = get_tensor(U, global_i);
+                  const auto local_i =
+                      scalar_partitioner->global_to_local(global_i);
+                  const auto bounds_i =
+                      limiter.projection_bounds_from_state(local_i, U_i);
+                  bounds = limiter.combine_bounds(bounds, bounds_i);
+                  return U_i;
+                });
           } break;
 
           case dealii::CellStatus::children_will_be_coarsened: {
@@ -235,7 +258,9 @@ namespace ryujin
             std::vector<dealii::Point<dim>> unit_points_temp(
                 std::is_same_v<Number, float> ? quadrature.size() : 0);
 
-            /* Step 1: build up right hand side by iterating over children: */
+            /*
+             * Step 1: build up right hand side by iterating over children:
+             */
 
             std::vector<state_type> state_values_quad(quadrature.size());
             std::vector<state_type> local_rhs(n_dofs_per_cell);
@@ -266,11 +291,28 @@ namespace ryujin
 
               child_cell->get_dof_indices(dof_indices);
 
+              /* We want a "left fold first" for the bounds: */
+              if (child == 0 &&
+                  std::begin(dof_indices) != std::end(dof_indices)) {
+                const auto global_i = dof_indices[0];
+                const auto U_i = get_tensor(U, global_i);
+                const auto local_i =
+                    scalar_partitioner->global_to_local(global_i);
+                bounds = limiter.projection_bounds_from_state(local_i, U_i);
+              }
+
               for (auto &it : state_values_quad)
                 it = state_type{};
 
               for (unsigned int i = 0; i < n_dofs_per_cell; ++i) {
-                const auto U_i = get_tensor(U, dof_indices[i]);
+                const auto global_i = dof_indices[i];
+                const auto U_i = get_tensor(U, global_i);
+                const auto local_i =
+                    scalar_partitioner->global_to_local(global_i);
+                const auto bounds_i =
+                    limiter.projection_bounds_from_state(local_i, U_i);
+                bounds = limiter.combine_bounds(bounds, bounds_i);
+
                 for (unsigned int q = 0; q < quadrature.size(); ++q) {
                   state_values_quad[q] += U_i * fe_values.shape_value(i, q);
                 }
