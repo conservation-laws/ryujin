@@ -9,7 +9,7 @@
 #include "selected_components_extractor.h"
 
 #include <deal.II/base/array_view.h>
-#include <deal.II/grid/grid_refinement.h>
+#include <deal.II/distributed/grid_refinement.h>
 #include <deal.II/numerics/error_estimator.h>
 
 namespace ryujin
@@ -94,7 +94,7 @@ namespace ryujin
     add_parameter(
         "maximal number of cells",
         max_num_cells_,
-        "Marking: maximal number of cells used for the fixed fraction "
+        "Marking: maximal number of cells used for the fixed number "
         "strategy. Note this is only an indicator and not strictly enforced.");
 
     leave_subsection();
@@ -301,12 +301,20 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   void MeshAdaptor<Description, dim, Number>::
-      mark_cells_for_coarsening_and_refinement(
-          Triangulation &triangulation) const
+      mark_cells_for_coarsening_and_refinement(Triangulation &triangulation
+                                               [[maybe_unused]]) const
   {
     auto &discretization [[maybe_unused]] = offline_data_->discretization();
     Assert(&triangulation == &discretization.triangulation(),
            dealii::ExcInternalError());
+
+#if !DEAL_II_VERSION_GTE(9, 6, 0)
+    AssertThrow(
+        false,
+        dealii::ExcMessage(
+            "The MeshAdaptor class needs deal.II version 9.6.0 or newer"));
+
+#else
 
     /*
      * Compute an indicator with the chosen adaptation strategy:
@@ -344,19 +352,19 @@ namespace ryujin
 
     switch (marking_strategy_) {
     case MarkingStrategy::fixed_number: {
-      dealii::GridRefinement::refine_and_coarsen_fixed_number(
-          triangulation,
-          indicators_,
-          refinement_fraction_,
-          coarsening_fraction_);
+      dealii::parallel::distributed::GridRefinement::
+          refine_and_coarsen_fixed_number(triangulation,
+                                          indicators_,
+                                          refinement_fraction_,
+                                          coarsening_fraction_,
+                                          max_num_cells_);
     } break;
     case MarkingStrategy::fixed_fraction: {
-      dealii::GridRefinement::refine_and_coarsen_fixed_fraction(
-          triangulation,
-          indicators_,
-          refinement_fraction_,
-          coarsening_fraction_,
-          max_num_cells_);
+      dealii::parallel::distributed::GridRefinement::
+          refine_and_coarsen_fixed_fraction(triangulation,
+                                            indicators_,
+                                            refinement_fraction_,
+                                            coarsening_fraction_);
     } break;
 
     default:
@@ -377,5 +385,6 @@ namespace ryujin
     for (const auto &cell :
          triangulation.active_cell_iterators_on_level(min_refinement_level_))
       cell->clear_coarsen_flag();
+#endif
   }
 } // namespace ryujin
