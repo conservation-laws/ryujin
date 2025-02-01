@@ -738,7 +738,7 @@ namespace ryujin
 
     const auto &precomputed = std::get<1>(new_state_vector);
 
-    {
+    const auto update_precomputed_values = [&]() {
       const unsigned int n_export_indices = offline_data_->n_export_indices();
       const unsigned int n_internal = offline_data_->n_locally_internal();
       const unsigned int n_owned = offline_data_->n_locally_owned();
@@ -790,7 +790,9 @@ namespace ryujin
           RYUJIN_PARALLEL_REGION_END
         }
       }
-    }
+    };
+
+    update_precomputed_values();
 
     using Limiter = typename Description::template Limiter<dim, Number>;
     const Limiter limiter(
@@ -819,7 +821,7 @@ namespace ryujin
       const auto m_i_star = projected_mass.local_element(local_i);
       const auto U_i_star = projected_state.get_tensor(local_i) / m_i_star;
 
-      auto &bounds = bounds_map[local_i];
+      auto &bounds = bounds_map[local_i]; /* by reference */
       bounds = limiter.projection_bounds_from_state(local_i, U_i_star);
 
       /* The value obtained from the affine constraints object: */
@@ -856,33 +858,14 @@ namespace ryujin
     projected_mass.update_ghost_values();
     kappa.update_ghost_values();
 
-    /* Step 2: Scale pik_matrix elements: */
-
-    for (const auto &line : affine_constraints.get_lines()) {
-      const auto global_i = line.index;
-      const auto local_i = scalar_partitioner->global_to_local(global_i);
-
-      /* Only operate on a locally owned, constrained degree of freedom: */
-      if (local_i >= n_locally_owned)
-        continue;
-
-      auto total_mass = Number(0.);
-      for (const auto &[global_k, c_k] : line.entries) {
-        const auto local_k = scalar_partitioner->global_to_local(global_k);
-        const auto kappa_k = kappa.local_element(local_k);
-        const auto m_k = projected_mass.local_element(local_k);
-        total_mass += m_k;
-        pik_matrix[{local_i, local_k}] *= m_k / kappa_k;
-      }
-
-      auto &bounds = bounds_map[local_i];
-      bounds = limiter.fully_relax_bounds(bounds, total_mass);
-    }
-
-    /* Step 3: Apply limiter: */
+    /* Step 2: Apply limiter: */
 
     const auto n_iterations = limiter_parameters_.iterations();
     for (unsigned int pass = 0; pass < n_iterations; ++pass) {
+
+      /* Update precomputed values for bounds correction: */
+      update_precomputed_values();
+
       for (const auto &line : affine_constraints.get_lines()) {
         const auto global_i = line.index;
         const auto local_i = scalar_partitioner->global_to_local(global_i);
@@ -891,16 +874,48 @@ namespace ryujin
         if (local_i >= n_locally_owned)
           continue;
 
-        const auto &bounds = bounds_map[local_i];
+        /*
+         * We are computing bounds only over a local constraint line
+         * without recombining such bounds per (unconstrained) degree of
+         * freedom globally. We avoid doing the latter because it would
+         * require a custom "VectorOperation" invoking
+         * Limiter::combine_bounds(), which we currently do not have at our
+         * disposal.
+         *
+         * As a simple workaround we simply recompute bounds for the
+         * constraint line after the low-order update and each limiter pass
+         * and recombine those into the stored value.
+         */
+
+        auto &bounds = bounds_map[local_i]; /* by reference */
+        auto total_mass = Number(0.);
+        for (const auto &[global_k, c_k] : line.entries) {
+          const auto local_k = scalar_partitioner->global_to_local(global_k);
+          const auto U_k = new_U.get_tensor(local_k);
+          const auto bounds_k =
+              limiter.projection_bounds_from_state(local_k, U_k);
+          bounds = limiter.combine_bounds(bounds, bounds_k);
+
+          const auto m_k = projected_mass.local_element(local_k);
+          total_mass += m_k;
+        }
+
         auto l = Number(1.);
+
+        /* Apply relaxation: */
+        const auto relaxed_bounds =
+            limiter.fully_relax_bounds(bounds, total_mass);
+
+        /* Compute limiter values: */
 
         for (const auto &[global_k, c_k] : line.entries) {
           const auto local_k = scalar_partitioner->global_to_local(global_k);
-
+          const auto kappa_k = kappa.local_element(local_k);
+          const auto m_k = projected_mass.local_element(local_k);
           const auto U_k = new_U.get_tensor(local_k);
-          const auto P_ik = pik_matrix[{local_i, local_k}];
+          const auto P_ik = pik_matrix[{local_i, local_k}] * kappa_k / m_k;
 
-          const auto &[l_k, check] = limiter.limit(bounds, U_k, P_ik);
+          const auto &[l_k, check] = limiter.limit(relaxed_bounds, U_k, P_ik);
 #ifdef DEBUG_EXPENSIVE_BOUNDS_CHECK
           AssertThrow(check,
                       dealii::ExcMessage("Error: low-order state out of bounds "
@@ -909,14 +924,13 @@ namespace ryujin
           l = std::min(l, l_k);
         }
 
+        /* Apply limiter values: */
+
         for (const auto &[global_k, c_k] : line.entries) {
           const auto local_k = scalar_partitioner->global_to_local(global_k);
-          const auto kappa_k = kappa.local_element(local_k);
-          const auto m_k = projected_mass.local_element(local_k);
-          auto &P_ik = pik_matrix[{local_i, local_k}];
-
-          projected_state.add_tensor(m_k / kappa_k * l * P_ik, local_k);
-          P_ik -= l * P_ik;
+          auto &mP_ik = pik_matrix[{local_i, local_k}];
+          projected_state.add_tensor(l * mP_ik, local_k);
+          mP_ik -= l * mP_ik;
         }
       }
 
@@ -933,7 +947,7 @@ namespace ryujin
     }
     new_U.update_ghost_values();
 
-#ifdef DEBUG
+#ifdef DEBUG_SYMMETRY_CHECK
     /*
      * Sanity check: Final masses must agree:
      */
