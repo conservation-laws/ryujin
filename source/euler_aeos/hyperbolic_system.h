@@ -1174,9 +1174,9 @@ namespace ryujin
 
       constexpr auto eps = std::numeric_limits<ScalarNumber>::epsilon();
       const auto regularization = m.norm() * eps;
-
-      auto factor = ryujin::pow(
-          std::max(regularization, eta * covolume_inverse), -gamma_min);
+      const auto max_val = ryujin::pow(
+          std::max(regularization, eta * covolume_inverse), gamma_min);
+      auto factor = safe_division(Number(1.0), max_val);
       factor *= fixed_power<2>(covolume_inverse) / (gamma_min + Number(1.));
 
       state_type result;
