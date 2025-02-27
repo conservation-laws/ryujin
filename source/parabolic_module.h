@@ -91,13 +91,27 @@ namespace ryujin
      * high-order right-hand side / flux.
      */
     template <int stages>
-    void step(const StateVector &old_state_vector,
-              const Number old_t,
-              std::array<std::reference_wrapper<const StateVector>, stages>
-                  stage_state_vectors,
-              const std::array<Number, stages> stage_weights,
-              StateVector &new_state_vector,
-              Number tau) const;
+    void
+    backward_euler_step(const StateVector &old_state_vector,
+                        const Number old_t,
+                        std::array<std::reference_wrapper<const StateVector>,
+                                   stages> stage_state_vectors,
+                        const std::array<Number, stages> stage_weights,
+                        StateVector &new_state_vector,
+                        Number tau) const;
+
+    /**
+     * Given a reference to a previous state vector @p old_U at time @p
+     * old_t and a time-step size @p tau perform an implicit Crank-Nicolson
+     * step (and store the result in @p new_U).
+     *
+     * This variant is used in the TimeIntegrator class for the Strang
+     * split variants.
+     */
+    void crank_nicolson_step(const StateVector &old_state_vector,
+                             const Number old_t,
+                             StateVector &new_state_vector,
+                             Number tau) const;
 
     /**
      * Print a status line with solver statistics. This function is used

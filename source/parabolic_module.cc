@@ -7,7 +7,8 @@
 #include <instantiate.h>
 
 #define INSTANTIATE(dim, stages)                                               \
-  template void ParabolicModule<Description, dim, NUMBER>::step<stages>(       \
+  template void                                                                \
+  ParabolicModule<Description, dim, NUMBER>::backward_euler_step<stages>(      \
       const StateVector &,                                                     \
       const NUMBER,                                                            \
       std::array<std::reference_wrapper<const StateVector>, stages>,           \

@@ -217,6 +217,47 @@ namespace ryujin
         const IDViolationStrategy id_violation_strategy,
         const bool reinitialize_gmg) const
     {
+      /* Backward Euler step to half time step, and extrapolate: */
+
+      step(old_state_vector,
+           t,
+           new_state_vector,
+           tau,
+           id_violation_strategy,
+           reinitialize_gmg,
+           /*crank_nicolson_extrapolation = */ false);
+    }
+
+
+    template <typename Description, int dim, typename Number>
+    void ParabolicSolver<Description, dim, Number>::crank_nicolson_step(
+        const StateVector &old_state_vector,
+        const Number t,
+        StateVector &new_state_vector,
+        Number tau,
+        const IDViolationStrategy id_violation_strategy,
+        const bool reinitialize_gmg) const
+    {
+      step(old_state_vector,
+           t,
+           new_state_vector,
+           tau / Number(2.),
+           id_violation_strategy,
+           reinitialize_gmg,
+           /*crank_nicolson_extrapolation = */ true);
+    }
+
+
+    template <typename Description, int dim, typename Number>
+    void ParabolicSolver<Description, dim, Number>::step(
+        const StateVector &old_state_vector,
+        const Number t,
+        StateVector &new_state_vector,
+        Number tau,
+        const IDViolationStrategy id_violation_strategy,
+        const bool reinitialize_gmg,
+        const bool crank_nicolson_extrapolation) const
+    {
 #ifdef DEBUG_OUTPUT
       std::cout << "ParabolicSolver<dim, Number>::step()" << std::endl;
 #endif
@@ -592,7 +633,10 @@ namespace ryujin
              * For backward Euler we have to add this algebraic correction
              * to ensure conservation of total energy.
              */
-            const auto correction = Number(0.5) * (V_i - V_i_new).norm_square();
+            const auto correction =
+                crank_nicolson_extrapolation
+                    ? T(0.)
+                    : Number(0.5) * (V_i - V_i_new).norm_square();
 
             /* rhs_i contains already m_i K_i^{n+1/2} */
             const auto result = m_i * rho_i * (e_i + correction) + tau * rhs_i;
@@ -756,38 +800,12 @@ namespace ryujin
               0.1 * solver_control.last_step();
         }
 
-        /*
-         * Check for local minimum principle on internal energy:
-         */
-        {
-          Scope scope(computing_timer_,
-                      "time step [P] _ - synchronization barriers");
-
-          // .begin() and .end() denote the locally owned index range:
-          auto e_min_new = *std::min_element(internal_energy_.begin(),
-                                             internal_energy_.end());
-          e_min_new = Utilities::MPI::min(
-              e_min_new, mpi_ensemble_.ensemble_communicator());
-
-          if (e_min_new < e_min_old) {
-#ifdef DEBUG_OUTPUT
-            std::cout << std::fixed << std::setprecision(16);
-            std::cout << "Bounds violation: internal energy (critical)!\n"
-                      << "\t\te_min_old:         " << e_min_old << "\n"
-                      << "\t\te_min_old (delta): "
-                      << negative_part(e_min_new - e_min_old) << "\n"
-                      << "\t\te_min_new:         " << e_min_new << "\n"
-                      << std::endl;
-#endif
-            restart_needed = true;
-          }
-        }
-
         LIKWID_MARKER_STOP("time_step_parabolic_2");
       }
 
       /*
-       * Step 3: Copy vectors
+       * Step 3: Copy vectors and check for local minimum principle on
+       * internal energy:
        *
        * FIXME: Memory access is suboptimal...
        */
@@ -813,7 +831,27 @@ namespace ryujin
               m_i_new[d] = rho_i * get_entry<T>(velocity_.block(d), i);
             }
 
-            const auto rho_e_i_new = rho_i * get_entry<T>(internal_energy_, i);
+            auto rho_e_i_new = rho_i * get_entry<T>(internal_energy_, i);
+
+            if (crank_nicolson_extrapolation) {
+              m_i_new = Number(2.0) * m_i_new - view.momentum(U_i);
+              rho_e_i_new =
+                  Number(2.0) * rho_e_i_new - view.internal_energy(U_i);
+            }
+
+            if (!(T(0.) == std::max(T(0.), rho_i * e_min_old - rho_e_i_new))) {
+#ifdef DEBUG_OUTPUT
+              std::cout << std::fixed << std::setprecision(16);
+              const auto e_i_new = rho_e_i_new / rho_i;
+              std::cout << "Bounds violation: internal energy (critical)!\n"
+                        << "\t\te_min_old:         " << e_min_old << "\n"
+                        << "\t\te_min_old (delta): "
+                        << negative_part(e_i_new - e_min_old) << "\n"
+                        << "\t\te_min_new:         " << e_i_new << "\n"
+                        << std::endl;
+#endif
+              restart_needed = true;
+            }
 
             const auto E_i_new = rho_e_i_new + 0.5 * m_i_new * m_i_new / rho_i;
 
