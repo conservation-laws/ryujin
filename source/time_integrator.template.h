@@ -539,9 +539,7 @@ namespace ryujin
 
     /* Implicit Crank-Nicolson step with final result in temp_[2]: */
 
-    parabolic_module_->template backward_euler_step<0>(
-        temp_[0], t, {}, {}, temp_[2], tau);
-    sadd(temp_[2], Number(2.), Number(-1.), temp_[0]);
+    parabolic_module_->crank_nicolson_step(temp_[0], t, temp_[2], 2.0 * tau);
 
     /* Second SSPRK 3 step with final result in temp_[0]: */
 
@@ -591,9 +589,7 @@ namespace ryujin
 
     /* Implicit Crank-Nicolson step with final result in temp_[3]: */
 
-    parabolic_module_->template backward_euler_step<0>(
-        temp_[2], t, {}, {}, temp_[3], 3.0 * tau);
-    sadd(temp_[3], Number(2.), Number(-1.), temp_[2]);
+    parabolic_module_->crank_nicolson_step(temp_[2], t, temp_[3], 6.0 * tau);
 
     /* Second explicit ERK(3,3,1) 3 step with final result in temp_[2]: */
 
@@ -651,9 +647,7 @@ namespace ryujin
 
     /* Implicit Crank-Nicolson step with final result in temp_[2]: */
 
-    parabolic_module_->template backward_euler_step<0>(
-        temp_[3], t, {}, {}, temp_[2], 4.0 * tau);
-    sadd(temp_[2], Number(2.), Number(-1.), temp_[3]);
+    parabolic_module_->crank_nicolson_step(temp_[3], t, temp_[2], 8.0 * tau);
 
     /* Second explicit ERK(4,3,1) step with final result in temp_[3]: */
 
@@ -745,7 +739,7 @@ namespace ryujin
 
     /* IMEX(3, 3; 1), see @cite ErnGuermond2023, Sec. 4.3. */
 
-    const Number gamma = 0.5 + 0.5 * (1. / std::sqrt(3.));
+    const Number gamma = 0.5 + 0.5 * std::numbers::inv_sqrt3;
 
     /* Explicit step 1: T0 <- {U_old, 1} at time t -> t + tau */
     hyperbolic_module_->prepare_state_vector(state_vector, t);
