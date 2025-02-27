@@ -91,13 +91,14 @@ namespace ryujin
      * high-order right-hand side / flux.
      */
     template <int stages>
-    void step(const StateVector &old_state_vector,
-              const Number old_t,
-              std::array<std::reference_wrapper<const StateVector>, stages>
-                  stage_state_vectors,
-              const std::array<Number, stages> stage_weights,
-              StateVector &new_state_vector,
-              Number tau) const;
+    void
+    backward_euler_step(const StateVector &old_state_vector,
+                        const Number old_t,
+                        std::array<std::reference_wrapper<const StateVector>,
+                                   stages> stage_state_vectors,
+                        const std::array<Number, stages> stage_weights,
+                        StateVector &new_state_vector,
+                        Number tau) const;
 
     /**
      * Given a reference to a previous state vector @p old_U at time @p

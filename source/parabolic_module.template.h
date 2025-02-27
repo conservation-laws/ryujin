@@ -51,7 +51,7 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   template <int stages>
-  void ParabolicModule<Description, dim, Number>::step(
+  void ParabolicModule<Description, dim, Number>::backward_euler_step(
       const StateVector &old_state_vector,
       const Number old_t,
       std::array<std::reference_wrapper<const StateVector>,
