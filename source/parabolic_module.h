@@ -126,9 +126,17 @@ namespace ryujin
      */
     //@{
     /**
-     * The number of restarts issued by the step() function.
+     * The number of restarts signalled by the step() function.
      */
     ACCESSOR_READ_ONLY(n_restarts)
+
+
+    /**
+     * The number of corrections performed by the step() function. This
+     * function exists to mirror the ParabolicModule interface and will
+     * always return 0.
+     */
+    ACCESSOR_READ_ONLY(n_corrections)
 
     /**
      * The number of ID violation warnings encounterd in the step()
@@ -151,6 +159,7 @@ namespace ryujin
     mutable unsigned int cycle_;
 
     mutable unsigned int n_restarts_;
+    mutable unsigned int n_corrections_;
     mutable unsigned int n_warnings_;
 
     //@}

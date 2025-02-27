@@ -1217,7 +1217,11 @@ namespace ryujin
            << std::setprecision(0) << std::fixed << hyperbolic_module_.n_warnings()
            << "/"
            << std::setprecision(0) << std::fixed << parabolic_module_.n_warnings()
-           << " warn) ]" << std::endl;
+           << " warn) ("
+           << std::setprecision(0) << std::fixed << hyperbolic_module_.n_corrections()
+           << "/"
+           << std::setprecision(0) << std::fixed << parabolic_module_.n_corrections()
+           << " corr) ]" << std::endl;
 
     if constexpr (!ParabolicSystem::is_identity)
       parabolic_module_.print_solver_statistics(output);
