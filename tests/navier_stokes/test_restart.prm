@@ -1,0 +1,76 @@
+#
+# Test that our admissibility test and restart logic works as intended. For
+# the following configuration we run into the issue that the first time
+# step with Crank Nicolson update for the parabolic part produces
+# inadmissible states. Check that we detect this and restart with a smaller
+# CFL number.
+#
+
+subsection A - TimeLoop
+  set basename                      = test
+  set final time                    = 0.00000000000000000000000000001
+  set timer granularity             = 0.00000000000000000000000000001
+
+  set enable compute error          = true
+  set error quantities              = rho, m_1, m_2, E
+
+  set terminal update interval      = 0
+end
+
+subsection B - Equation
+  set dimension                     = 2
+  set equation                      = navier stokes
+  set gamma                         = 1.6667
+  set reference density             = 1
+  set vacuum state relaxation small = 100
+  set vacuum state relaxation large = 10000
+  set mu                            = 0.001
+  set lambda                        = 0
+  set kappa                         = 0.0186667
+end
+
+subsection C - Discretization
+  set finite element ansatz = cG Q1
+  set geometry              = disk
+  set mesh refinement       = 6
+  set mesh writeout         = false
+
+  subsection disk
+    set radius = 1.2
+  end
+end
+
+subsection E - InitialValues
+  set configuration = icf like
+  set direction     = 1, 0
+  set position      = 0, 0
+  set perturbation  = 0
+  subsection icf like
+    set primitive state inside  = 0.05, 0, 0.1
+    set primitive state outside = 1.00, 0, 0.1
+    set interface radius        = 1
+    set number of modes         = 12
+    set amplitude               = 0.02
+    set mach number             = 5
+    set shock radius            = 1.1
+  end
+end
+
+subsection F - HyperbolicModule
+  subsection indicator
+    set evc factor         = 1
+  end
+  subsection limiter
+    set iterations            = 2
+    set newton tolerance      = 1e-10
+    set newton max iterations = 2
+    set relaxation factor     = 1
+  end
+end
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.30
+  set cfl max               = 0.90
+  set cfl recovery strategy = bang bang control
+  set time stepping scheme  = strang erk 33 cn
+end
