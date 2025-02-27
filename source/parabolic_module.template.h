@@ -84,6 +84,7 @@ namespace ryujin
 
       /* Update statistics: */
       n_restarts_ = parabolic_solver_.n_restarts();
+      n_corrections_ = parabolic_solver_.n_corrections();
       n_warnings_ = parabolic_solver_.n_warnings();
     }
   }
@@ -115,6 +116,7 @@ namespace ryujin
 
       /* Update statistics: */
       n_restarts_ = parabolic_solver_.n_restarts();
+      n_corrections_ = parabolic_solver_.n_corrections();
       n_warnings_ = parabolic_solver_.n_warnings();
     }
   }

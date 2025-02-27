@@ -207,6 +207,7 @@ namespace ryujin
       //@{
 
       ACCESSOR_READ_ONLY(n_restarts)
+      ACCESSOR_READ_ONLY(n_corrections)
       ACCESSOR_READ_ONLY(n_warnings)
 
       //@}
@@ -281,6 +282,7 @@ namespace ryujin
           initial_values_;
 
       mutable unsigned int n_restarts_;
+      mutable unsigned int n_corrections_;
       mutable unsigned int n_warnings_;
       mutable double n_iterations_velocity_;
       mutable double n_iterations_internal_energy_;

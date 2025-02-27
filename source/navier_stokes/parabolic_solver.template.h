@@ -47,6 +47,7 @@ namespace ryujin
         , offline_data_(&offline_data)
         , initial_values_(&initial_values)
         , n_restarts_(0)
+        , n_corrections_(0)
         , n_warnings_(0)
         , n_iterations_velocity_(0.)
         , n_iterations_internal_energy_(0.)
@@ -238,13 +239,33 @@ namespace ryujin
         const IDViolationStrategy id_violation_strategy,
         const bool reinitialize_gmg) const
     {
-      step(old_state_vector,
-           t,
-           new_state_vector,
-           tau / Number(2.),
-           id_violation_strategy,
-           reinitialize_gmg,
-           /*crank_nicolson_extrapolation = */ true);
+      try {
+        step(old_state_vector,
+             t,
+             new_state_vector,
+             tau / Number(2.),
+             id_violation_strategy,
+             reinitialize_gmg,
+             /*crank_nicolson_extrapolation = */ true);
+
+      } catch (Correction) {
+
+        /*
+         * Under very rare circumstances we might fail to perform a Crank
+         * Nicolson step because the extrapolation step produced
+         * inadmissible states. We could correct the update now by
+         * performing a limiting step (either convex limiting, or flux
+         * corrected transport)... but *meh*, just perform a backward Euler
+         * step:
+         */
+        step(old_state_vector,
+             t,
+             new_state_vector,
+             tau,
+             id_violation_strategy,
+             reinitialize_gmg,
+             /*crank_nicolson_extrapolation = */ false);
+      }
     }
 
 
@@ -261,6 +282,8 @@ namespace ryujin
 #ifdef DEBUG_OUTPUT
       std::cout << "ParabolicSolver<dim, Number>::step()" << std::endl;
 #endif
+
+      constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
 
       const auto &old_U = std::get<0>(old_state_vector);
       auto &new_U = std::get<0>(new_state_vector);
@@ -282,10 +305,35 @@ namespace ryujin
 
 #ifdef DEBUG_OUTPUT
       std::cout << "        perform time-step with tau = " << tau << std::endl;
+      if (crank_nicolson_extrapolation)
+        std::cout << "        and extrapolate to t + 2 * tau" << std::endl;
 #endif
 
-      /* A boolean signalling that a restart is necessary: */
+      /*
+       * A boolean indicating that a restart is required.
+       *
+       * In our current implementation we set this boolean to true if the
+       * backward Euler step produces an internal energy update that
+       * violates the minimum principle, i.e., the minimum of the new
+       * internal energy is smaller than the minimum of the old internal
+       * energy.
+       *
+       * Depending on the chosen "id_violation_strategy" we either signal a
+       * restart by throwing a "Restart" object, or we simply increase the
+       * number of warnings.
+       */
       std::atomic<bool> restart_needed = false;
+
+      /*
+       * A boolean indicating that we have to correct the high-order Crank
+       * Nicolson update. Note that this is a truly exceptional case
+       * indicating that the high-order update produced an inadmissible
+       * state, *boo*.
+       *
+       * Our current limiting strategy is to simply fall back to perform a
+       * single backward Euler step...
+       */
+      std::atomic<bool> correction_needed = false;
 
       /*
        * Step 1:
@@ -833,11 +881,10 @@ namespace ryujin
 
             auto rho_e_i_new = rho_i * get_entry<T>(internal_energy_, i);
 
-            if (crank_nicolson_extrapolation) {
-              m_i_new = Number(2.0) * m_i_new - view.momentum(U_i);
-              rho_e_i_new =
-                  Number(2.0) * rho_e_i_new - view.internal_energy(U_i);
-            }
+            /*
+             * Check that the backward Euler step itself (which is our "low
+             * order" update) satisfies bounds. If not, signal a restart.
+             */
 
             if (!(T(0.) == std::max(T(0.), rho_i * e_min_old - rho_e_i_new))) {
 #ifdef DEBUG_OUTPUT
@@ -851,6 +898,30 @@ namespace ryujin
                         << std::endl;
 #endif
               restart_needed = true;
+            }
+
+            if (crank_nicolson_extrapolation) {
+              m_i_new = Number(2.0) * m_i_new - view.momentum(U_i);
+              rho_e_i_new =
+                  Number(2.0) * rho_e_i_new - view.internal_energy(U_i);
+
+              /*
+               * If we do perform an extrapolation step for Crank Nicolson
+               * we have to check whether we maintain admissibility
+               */
+
+              if (!(T(0.) ==
+                    std::max(T(0.), eps * rho_i * e_min_old - rho_e_i_new))) {
+#ifdef DEBUG_OUTPUT
+                std::cout << std::fixed << std::setprecision(16);
+                const auto e_i_new = rho_e_i_new / rho_i;
+
+                std::cout << "Bounds violation: high-order internal energy!"
+                          << "\t\te_min_new:         " << e_i_new << "\n"
+                          << "\t\t-- correction required --" << std::endl;
+#endif
+                correction_needed = true;
+              }
             }
 
             const auto E_i_new = rho_e_i_new + 0.5 * m_i_new * m_i_new / rho_i;
@@ -881,15 +952,32 @@ namespace ryujin
                     "time step [H] _ - synchronization barriers");
 
         /*
-         * Synchronize whether we have to restart the time step. Even though
-         * the restart condition itself only affects the local ensemble we
-         * nevertheless need to synchronize the boolean in case we perform
-         * synchronized global time steps. (Otherwise different ensembles
-         * might end up with a different time step.)
+         * Synchronize whether we have to restart or correct the time step.
+         * Even though the restart/correction condition itself only affects
+         * the local ensemble we nevertheless need to synchronize the
+         * boolean in case we perform synchronized global time steps.
+         * (Otherwise different ensembles might end up with a different
+         * time step.)
          */
+
         restart_needed.store(Utilities::MPI::logical_or(
             restart_needed.load(),
             mpi_ensemble_.synchronization_communicator()));
+
+        correction_needed.store(Utilities::MPI::logical_or(
+            correction_needed.load(),
+            mpi_ensemble_.synchronization_communicator()));
+      }
+
+      if (correction_needed) {
+        /* If we can do a restart try that first: */
+        if (id_violation_strategy == IDViolationStrategy::raise_exception) {
+          n_restarts_++;
+          throw Restart();
+        } else {
+          n_corrections_++;
+          throw Correction();
+        }
       }
 
       if (restart_needed) {
