@@ -217,6 +217,47 @@ namespace ryujin
         const IDViolationStrategy id_violation_strategy,
         const bool reinitialize_gmg) const
     {
+      /* Backward Euler step to half time step, and extrapolate: */
+
+      step(old_state_vector,
+           t,
+           new_state_vector,
+           tau,
+           id_violation_strategy,
+           reinitialize_gmg,
+           /*crank_nicolson_extrapolation = */ false);
+    }
+
+
+    template <typename Description, int dim, typename Number>
+    void ParabolicSolver<Description, dim, Number>::crank_nicolson_step(
+        const StateVector &old_state_vector,
+        const Number t,
+        StateVector &new_state_vector,
+        Number tau,
+        const IDViolationStrategy id_violation_strategy,
+        const bool reinitialize_gmg) const
+    {
+      step(old_state_vector,
+           t,
+           new_state_vector,
+           tau / Number(2.),
+           id_violation_strategy,
+           reinitialize_gmg,
+           /*crank_nicolson_extrapolation = */ true);
+    }
+
+
+    template <typename Description, int dim, typename Number>
+    void ParabolicSolver<Description, dim, Number>::step(
+        const StateVector &old_state_vector,
+        const Number t,
+        StateVector &new_state_vector,
+        Number tau,
+        const IDViolationStrategy id_violation_strategy,
+        const bool reinitialize_gmg,
+        const bool crank_nicolson_extrapolation) const
+    {
 #ifdef DEBUG_OUTPUT
       std::cout << "ParabolicSolver<dim, Number>::step()" << std::endl;
 #endif
@@ -592,7 +633,10 @@ namespace ryujin
              * For backward Euler we have to add this algebraic correction
              * to ensure conservation of total energy.
              */
-            const auto correction = Number(0.5) * (V_i - V_i_new).norm_square();
+            const auto correction =
+                crank_nicolson_extrapolation
+                    ? T(0.)
+                    : Number(0.5) * (V_i - V_i_new).norm_square();
 
             /* rhs_i contains already m_i K_i^{n+1/2} */
             const auto result = m_i * rho_i * (e_i + correction) + tau * rhs_i;
@@ -813,7 +857,13 @@ namespace ryujin
               m_i_new[d] = rho_i * get_entry<T>(velocity_.block(d), i);
             }
 
-            const auto rho_e_i_new = rho_i * get_entry<T>(internal_energy_, i);
+            auto rho_e_i_new = rho_i * get_entry<T>(internal_energy_, i);
+
+            if (crank_nicolson_extrapolation) {
+              m_i_new = Number(2.0) * m_i_new - view.momentum(U_i);
+              rho_e_i_new =
+                  Number(2.0) * rho_e_i_new - view.internal_energy(U_i);
+            }
 
             const auto E_i_new = rho_e_i_new + 0.5 * m_i_new * m_i_new / rho_i;
 

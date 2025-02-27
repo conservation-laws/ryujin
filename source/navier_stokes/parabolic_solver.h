@@ -182,6 +182,18 @@ namespace ryujin
                                const bool reinitialize_gmg) const;
 
       /**
+       * Given a reference to a previous state vector @p old_state_vector
+       * at time @p old_t and a time-step size @p tau perform an implicit
+       * Crank Nicolson step (and store the result in @p new_state_vector).
+       */
+      void crank_nicolson_step(const StateVector &old_state_vector,
+                               const Number old_t,
+                               StateVector &new_state_vector,
+                               Number tau,
+                               const IDViolationStrategy id_violation_strategy,
+                               const bool reinitialize_gmg) const;
+
+      /**
        * Print a status line with solver statistics. This function is used
        * for constructing the status message displayed periodically in the
        * TimeLoop.
@@ -223,6 +235,29 @@ namespace ryujin
       unsigned int gmg_smoother_degree_;
       unsigned int gmg_smoother_n_cg_iter_;
       unsigned int gmg_min_level_;
+
+      //@}
+      /**
+       * @name Low-level implementation
+       */
+      //@{
+
+      /**
+       * Given a reference to a previous state vector @p old_state_vector
+       * at time @p old_t and a time-step size @p tau perform a backward
+       * Euler time step (and store the result in @p new_state_vector).
+       *
+       * If the boolean @crank_nicolson_extrapolation is set to true, then
+       * we perform a final extrapolation on the primitive state for time
+       * t + 2 * tau.
+       */
+      void step(const StateVector &old_state_vector,
+                const Number old_t,
+                StateVector &new_state_vector,
+                Number tau,
+                const IDViolationStrategy id_violation_strategy,
+                const bool reinitialize_gmg,
+                const bool crank_nicolson_extrapolation) const;
 
       //@}
       /**
