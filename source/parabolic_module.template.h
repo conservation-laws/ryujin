@@ -87,6 +87,35 @@ namespace ryujin
 
 
   template <typename Description, int dim, typename Number>
+  void ParabolicModule<Description, dim, Number>::crank_nicolson_step(
+      const StateVector &old_state_vector,
+      const Number old_t,
+      StateVector &new_state_vector,
+      Number tau) const
+  {
+    if constexpr (ParabolicSystem::is_identity) {
+      AssertThrow(
+          false,
+          dealii::ExcMessage("The parabolic system is the identity. This "
+                             "function should have never been called."));
+      __builtin_trap();
+
+    } else {
+
+      const bool reinit_gmg = cycle_++ % 4 == 0;
+      parabolic_solver_.crank_nicolson_step(old_state_vector,
+                                            old_t,
+                                            new_state_vector,
+                                            tau,
+                                            id_violation_strategy_,
+                                            reinit_gmg);
+      n_restarts_ = parabolic_solver_.n_restarts();
+      n_warnings_ = parabolic_solver_.n_warnings();
+    }
+  }
+
+
+  template <typename Description, int dim, typename Number>
   void ParabolicModule<Description, dim, Number>::print_solver_statistics(
       std::ostream &output) const
   {
