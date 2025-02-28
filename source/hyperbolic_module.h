@@ -57,12 +57,37 @@ namespace ryujin
 
 
   /**
-   * A class signalling a restart, thrown in HyperbolicModule::single_step and
-   * caught at various places.
+   * A class signalling a restart, thrown in HyperbolicModule::single_step
+   * and caught in the TimeIntegrator when performing a time step. We
+   * currently signal a restart whenever we encounter an invariant domain
+   * violation of the low-order update.
+   *
+   * This might happen, for example, in subsequent invocations of step() in
+   * high-order time stepping algorithms when the time step size has to be
+   * kept constant. A standard strategy implemented in TimeIntegrator is to
+   * simply fall back to a smaller relative CFL number and try again.
    *
    * @ingroup TimeLoop
    */
   class Restart final
+  {
+  };
+
+
+  /**
+   * A class signalling that a correction step is required for the update.
+   * This is meant to be a truly exceptional situation, for example where
+   * the high-order update violates an admissibility condition. With our
+   * limiting approach this must never happen, ... but we might have taken
+   * some short cuts in the parabolic update that under rare circumstances
+   * require limiting.
+   *
+   * This exception is currently only used internally in the NavierStokes
+   * solver.
+   *
+   * @ingroup TimeLoop
+   */
+  class Correction final
   {
   };
 
@@ -270,13 +295,23 @@ namespace ryujin
     ACCESSOR_READ_ONLY(alpha)
 
     /**
-     * The number of restarts issued by the step() function.
+     * The number of restarts signalled by the step() function. We signal a
+     * restart whenever we encounter an ID violation in the low order
+     * update.
      */
     ACCESSOR_READ_ONLY(n_restarts)
 
     /**
+     * The number of corrections performed by the step() function. This
+     * function exists to mirror the ParabolicModule interface and will
+     * always return 0.
+     */
+    ACCESSOR_READ_ONLY(n_corrections)
+
+    /**
      * The number of ID violation warnings encounterd in the step()
-     * function.
+     * function. We issue a warning whenever we encounter an ID violation
+     * in the low order update (and throwing a restart is disabled).
      */
     ACCESSOR_READ_ONLY(n_warnings)
 
@@ -317,7 +352,7 @@ namespace ryujin
     mutable Number cfl_;
 
     mutable unsigned int n_restarts_;
-
+    mutable unsigned int n_corrections_;
     mutable unsigned int n_warnings_;
 
     InitialPrecomputedVector initial_precomputed_;

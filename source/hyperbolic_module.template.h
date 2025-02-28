@@ -45,6 +45,7 @@ namespace ryujin
       , initial_values_(&initial_values)
       , cfl_(0.2)
       , n_restarts_(0)
+      , n_corrections_(0)
       , n_warnings_(0)
   {
   }

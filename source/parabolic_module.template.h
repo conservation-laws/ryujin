@@ -30,6 +30,7 @@ namespace ryujin
                           initial_values,
                           subsection)
       , n_restarts_(0)
+      , n_corrections_(0)
       , n_warnings_(0)
   {
   }
@@ -80,7 +81,10 @@ namespace ryujin
                                             tau,
                                             id_violation_strategy_,
                                             reinit_gmg);
+
+      /* Update statistics: */
       n_restarts_ = parabolic_solver_.n_restarts();
+      n_corrections_ = parabolic_solver_.n_corrections();
       n_warnings_ = parabolic_solver_.n_warnings();
     }
   }
@@ -109,7 +113,10 @@ namespace ryujin
                                             tau,
                                             id_violation_strategy_,
                                             reinit_gmg);
+
+      /* Update statistics: */
       n_restarts_ = parabolic_solver_.n_restarts();
+      n_corrections_ = parabolic_solver_.n_corrections();
       n_warnings_ = parabolic_solver_.n_warnings();
     }
   }
