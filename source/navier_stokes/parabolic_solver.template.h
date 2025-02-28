@@ -301,6 +301,8 @@ namespace ryujin
       const unsigned int n_owned = offline_data_->n_locally_owned();
       const unsigned int n_regular = n_owned / simd_length * simd_length;
 
+      const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
+
       DiagonalMatrix<dim, Number> diagonal_matrix;
 
 #ifdef DEBUG_OUTPUT
@@ -439,10 +441,10 @@ namespace ryujin
         }
 
         /*
-         * Zero out constrained degrees of freedom due to periodic boundary
-         * conditions. These boundary conditions are enforced by modifying
-         * the stencil - consequently we have to remove constrained dofs from
-         * the linear system.
+         * Zero out constrained degrees of freedom due to hanging nodes and
+         * periodic boundary conditions. These boundary conditions are
+         * enforced by modifying the stencil - consequently we have to
+         * remove constrained dofs from the linear system.
          */
 
         affine_constraints.set_zero(density_);
@@ -728,11 +730,12 @@ namespace ryujin
         }
 
         /*
-         * Zero out constrained degrees of freedom due to periodic boundary
-         * conditions. These boundary conditions are enforced by modifying
-         * the stencil - consequently we have to remove constrained dofs from
-         * the linear system.
+         * Zero out constrained degrees of freedom due to hanging nodes and
+         * periodic boundary conditions. These boundary conditions are
+         * enforced by modifying the stencil - consequently we have to
+         * remove constrained dofs from the linear system.
          */
+        affine_constraints.set_zero(internal_energy_);
         affine_constraints.set_zero(internal_energy_rhs_);
 
         /*
@@ -871,6 +874,12 @@ namespace ryujin
 
           RYUJIN_OMP_FOR
           for (unsigned int i = left; i < right; i += stride_size) {
+
+            /* Skip constrained degrees of freedom: */
+            const unsigned int row_length = sparsity_simd.row_length(i);
+            if (row_length == 1)
+              continue;
+
             auto U_i = old_U.template get_tensor<T>(i);
             const auto rho_i = view.density(U_i);
 
