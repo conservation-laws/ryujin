@@ -211,6 +211,8 @@ namespace ryujin
 
     mutable dealii::Vector<float> indicators_;
 
+    mutable std::vector<dealii::Vector<float>> indicators_vec_;
+
     /* random adaptation: */
 
     void compute_random_indicators() const;

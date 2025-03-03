@@ -201,7 +201,7 @@ namespace ryujin
     std::vector<dealii::Vector<float>> kelly_errors;
     std::vector<dealii::Vector<float> *> ptr_kelly_errors;
 
-    const auto size = indicators_.size();
+    const auto size = indicators_vec_[0].size();
     kelly_errors.resize(kelly_components_.size());
 
     for (auto &it : kelly_errors) {
@@ -228,9 +228,9 @@ namespace ryujin
         array_view_kelly_components,
         array_view_kelly_errors);
 
-    indicators_ = 0.;
-    for (const auto &it : kelly_errors)
-      indicators_ += it;
+    for (unsigned int entry_index = 0; entry_index < kelly_components_.size();
+         ++entry_index)
+      indicators_vec_[entry_index] = kelly_errors[entry_index];
 #endif
   }
 
@@ -337,7 +337,14 @@ namespace ryujin
     } break;
 
     case AdaptationStrategy::kelly_estimator: {
-      indicators_.reinit(triangulation.n_active_cells());
+      // indicators_.reinit(triangulation.n_active_cells());
+
+      indicators_vec_.resize(kelly_components_.size());
+      for (auto &entry : indicators_vec_) {
+        entry.reinit(triangulation.n_active_cells());
+        entry = 0;
+      }
+
       compute_kelly_indicators();
     } break;
 
@@ -353,27 +360,80 @@ namespace ryujin
     Assert(indicators_.size() == triangulation.n_active_cells(),
            dealii::ExcInternalError());
 
-    switch (marking_strategy_) {
-    case MarkingStrategy::fixed_number: {
-      dealii::parallel::distributed::GridRefinement::
-          refine_and_coarsen_fixed_number(triangulation,
-                                          indicators_,
-                                          refinement_fraction_,
-                                          coarsening_fraction_,
-                                          max_num_cells_);
-    } break;
-    case MarkingStrategy::fixed_fraction: {
-      dealii::parallel::distributed::GridRefinement::
-          refine_and_coarsen_fixed_fraction(triangulation,
+    if (adaptation_strategy_ != AdaptationStrategy::kelly_estimator)
+      switch (marking_strategy_) {
+      case MarkingStrategy::fixed_number: {
+        dealii::parallel::distributed::GridRefinement::
+            refine_and_coarsen_fixed_number(triangulation,
                                             indicators_,
                                             refinement_fraction_,
-                                            coarsening_fraction_);
-    } break;
+                                            coarsening_fraction_,
+                                            max_num_cells_);
+      } break;
+      case MarkingStrategy::fixed_fraction: {
+        dealii::parallel::distributed::GridRefinement::
+            refine_and_coarsen_fixed_fraction(triangulation,
+                                              indicators_,
+                                              refinement_fraction_,
+                                              coarsening_fraction_);
+      } break;
 
-    default:
-      AssertThrow(false, dealii::ExcInternalError());
-      __builtin_trap();
-    }
+      default:
+        AssertThrow(false, dealii::ExcInternalError());
+        __builtin_trap();
+      }
+    else
+      switch (marking_strategy_) {
+      case MarkingStrategy::fixed_number: {
+        // harmon: refinement and coarsening by consensus
+        dealii::parallel::distributed::GridRefinement::
+            refine_and_coarsen_fixed_number(triangulation,
+                                            indicators_vec_[0],
+                                            refinement_fraction_,
+                                            coarsening_fraction_,
+                                            max_num_cells_);
+
+        for (unsigned int entry_index = 1; entry_index < indicators_vec_.size();
+             ++entry_index)
+          dealii::parallel::distributed::GridRefinement::
+              refine_and_coarsen_fixed_number(triangulation,
+                                              indicators_vec_[entry_index],
+                                              refinement_fraction_,
+                                              0, // harmon: coarsen by consensus
+                                              max_num_cells_);
+
+        for (auto &cell : triangulation.active_cell_iterators())
+          if (cell->refine_flag_set())
+            cell->clear_coarsen_flag();
+      } break;
+      case MarkingStrategy::fixed_fraction: {
+        // harmon: refinement and coarsening by consensus
+        dealii::parallel::distributed::GridRefinement::
+            refine_and_coarsen_fixed_fraction(triangulation,
+                                              indicators_vec_[0],
+                                              refinement_fraction_,
+                                              coarsening_fraction_);
+
+        for (unsigned int entry_index = 1; entry_index < indicators_vec_.size();
+             ++entry_index)
+          dealii::parallel::distributed::GridRefinement::
+              refine_and_coarsen_fixed_fraction(
+                  triangulation,
+                  indicators_vec_[entry_index],
+                  refinement_fraction_,
+                  0); // harmon: coarsen by consensus
+
+
+        for (auto &cell : triangulation.active_cell_iterators())
+          if (cell->refine_flag_set())
+            cell->clear_coarsen_flag();
+
+      } break;
+
+      default:
+        AssertThrow(false, dealii::ExcInternalError());
+        __builtin_trap();
+      }
 
     /*
      * Constrain refinement and coarsening to maximum and minimum
