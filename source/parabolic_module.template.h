@@ -69,8 +69,7 @@ namespace ryujin
 
     } else {
 
-      AssertThrow(false, dealii::ExcNotImplemented());
-      __builtin_trap();
+      // TODO: hook up parabolic_solver
     }
   }
 
