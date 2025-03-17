@@ -51,6 +51,31 @@ namespace ryujin
 
 
   template <typename Description, int dim, typename Number>
+  void ParabolicModule<Description, dim, Number>::prepare_state_vector(
+      StateVector & /*state_vector*/, Number /*t*/) const
+  {
+#ifdef DEBUG_OUTPUT
+    std::cout << "ParabolicModule<Description, dim, "
+                 "Number>::prepare_state_vector()"
+              << std::endl;
+#endif
+
+    if constexpr (ParabolicSystem::is_identity) {
+      AssertThrow(
+          false,
+          dealii::ExcMessage("The parabolic system is the identity. This "
+                             "function should have never been called."));
+      __builtin_trap();
+
+    } else {
+
+      AssertThrow(false, dealii::ExcNotImplemented());
+      __builtin_trap();
+    }
+  }
+
+
+  template <typename Description, int dim, typename Number>
   template <int stages>
   void ParabolicModule<Description, dim, Number>::backward_euler_step(
       const StateVector &old_state_vector,
