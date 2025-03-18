@@ -739,7 +739,7 @@ namespace ryujin
 
     /* IMEX(3, 3; 1), see @cite ErnGuermond2023, Sec. 4.3. */
 
-    const Number gamma = 0.5 + 0.5 * std::numbers::inv_sqrt3;
+    const Number gamma = Number(0.5) + std::sqrt(Number(3.0)) / Number(6.0);
 
     /* Explicit step 1: T0 <- {U_old, 1} at time t -> t + tau */
     hyperbolic_module_->prepare_state_vector(state_vector, t);
