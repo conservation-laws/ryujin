@@ -52,7 +52,7 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   void ParabolicModule<Description, dim, Number>::prepare_state_vector(
-      StateVector & /*state_vector*/, Number /*t*/) const
+      StateVector &state_vector, Number t) const
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "ParabolicModule<Description, dim, "
@@ -68,8 +68,7 @@ namespace ryujin
       __builtin_trap();
 
     } else {
-
-      // TODO: hook up parabolic_solver
+      parabolic_solver_.prepare_state_vector(state_vector, t);
     }
   }
 
