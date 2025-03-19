@@ -409,6 +409,8 @@ namespace ryujin
           print_info("performing mesh adaptation");
 
           hyperbolic_module_.prepare_state_vector(state_vector, t);
+          if (!ParabolicSystem::is_identity)
+            parabolic_module_.prepare_state_vector(state_vector, t);
           adapt_mesh_and_transfer_state_vector(state_vector,
                                                prepare_compute_kernels);
         }
@@ -663,6 +665,8 @@ namespace ryujin
 #endif
 
     hyperbolic_module_.prepare_state_vector(state_vector, t);
+    if (!ParabolicSystem::is_identity)
+      parabolic_module_.prepare_state_vector(state_vector, t);
 
     Vector<Number> difference_per_cell(
         discretization_.triangulation().n_active_cells());
@@ -841,6 +845,8 @@ namespace ryujin
       return;
 
     hyperbolic_module_.prepare_state_vector(state_vector, t);
+    if (!ParabolicSystem::is_identity)
+      parabolic_module_.prepare_state_vector(state_vector, t);
 
     /* Data output: */
     if (do_full_output || do_levelsets) {

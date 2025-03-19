@@ -539,6 +539,7 @@ namespace ryujin
 
     /* Implicit Crank-Nicolson step with final result in temp_[2]: */
 
+    parabolic_module_->prepare_state_vector(temp_[0], t);
     parabolic_module_->crank_nicolson_step(temp_[0], t, temp_[2], 2.0 * tau);
 
     /* Second SSPRK 3 step with final result in temp_[0]: */
@@ -589,6 +590,7 @@ namespace ryujin
 
     /* Implicit Crank-Nicolson step with final result in temp_[3]: */
 
+    parabolic_module_->prepare_state_vector(temp_[2], t);
     parabolic_module_->crank_nicolson_step(temp_[2], t, temp_[3], 6.0 * tau);
 
     /* Second explicit ERK(3,3,1) 3 step with final result in temp_[2]: */
@@ -647,6 +649,7 @@ namespace ryujin
 
     /* Implicit Crank-Nicolson step with final result in temp_[2]: */
 
+    parabolic_module_->prepare_state_vector(temp_[3], t);
     parabolic_module_->crank_nicolson_step(temp_[3], t, temp_[2], 8.0 * tau);
 
     /* Second explicit ERK(4,3,1) step with final result in temp_[3]: */
@@ -688,6 +691,7 @@ namespace ryujin
         state_vector, {}, {}, temp_[0], Number(0.), tau_max);
 
     /* Implicit step 1: T1 <- {T0, 1} at time t -> t + tau */
+    parabolic_module_->prepare_state_vector(temp_[0], t);
     parabolic_module_->template backward_euler_step<0>(
         temp_[0], t, {}, {}, temp_[1], 1.0 * tau);
 
@@ -709,6 +713,7 @@ namespace ryujin
         state_vector, {}, {}, temp_[0], Number(0.), tau_max / 2.);
 
     /* Implicit step 1: T1 <- {T0, 1} at time t -> t + tau */
+    parabolic_module_->prepare_state_vector(temp_[0], t);
     parabolic_module_->template backward_euler_step<0>(
         temp_[0], t, {}, {}, temp_[1], tau);
 
@@ -718,6 +723,7 @@ namespace ryujin
         temp_[1], {{state_vector}}, {{Number(-1.)}}, temp_[2], tau);
 
     /* Implicit step 2: T3 <- {T2, 0} and {U_old, 1} at t + tau -> t + 2 tau */
+    parabolic_module_->prepare_state_vector(temp_[2], t);
     parabolic_module_->template backward_euler_step<1>(temp_[2],
                                                        t + 1.0 * tau,
                                                        {{state_vector}},
@@ -747,6 +753,7 @@ namespace ryujin
         state_vector, {}, {}, temp_[0], Number(0.), tau_max / 3.);
 
     /* Implicit step 1: T1 <- {U_old, 1 - 3*gamma} at time t -> t + tau */
+    parabolic_module_->prepare_state_vector(temp_[0], t);
     parabolic_module_->template backward_euler_step<1>(
         temp_[0],
         t,
@@ -764,6 +771,7 @@ namespace ryujin
      * Implicit step 2:
      * T3 <- {U_old, 6*gamma-1} and {T1, 2-9*gamma} at t -> t + * 2 tau
      */
+    parabolic_module_->prepare_state_vector(temp_[2], t);
     parabolic_module_->template backward_euler_step<2>(
         temp_[2],
         t + tau,
@@ -781,6 +789,7 @@ namespace ryujin
                                          tau);
 
     /* Implicit step 3: */
+    parabolic_module_->prepare_state_vector(temp_[4], t);
     parabolic_module_->template backward_euler_step<3>(
         temp_[4],
         t + 2. * tau,

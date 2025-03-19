@@ -82,6 +82,12 @@ namespace ryujin
     //@{
 
     /**
+     * This function preprocesses a given state vector @p U in preparation
+     * for an implicit backward Euler, or Crank Nicolson step.
+     */
+    void prepare_state_vector(StateVector &state_vector, Number t) const;
+
+    /**
      * Given a reference to a previous state vector @p old_U at time
      * @p old_t and a time-step size @p tau perform an implicit backward
      * euler step (and store the result in @p new_U).
