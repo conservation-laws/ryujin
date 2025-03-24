@@ -208,6 +208,16 @@ namespace ryujin
                                 level_matrix_free_);
     }
 
+    template <typename Description, int dim, typename Number>
+    void ParabolicSolver<Description, dim, Number>::prepare_state_vector(
+        StateVector & /*state_vector*/, Number /*t*/) const
+    {
+      /**
+       * There is no parabolic part of the state vector for Navier-Stokes, so we
+       * do nothing
+       */
+    }
+
 
     template <typename Description, int dim, typename Number>
     void ParabolicSolver<Description, dim, Number>::backward_euler_step(

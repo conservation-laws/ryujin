@@ -163,6 +163,12 @@ namespace ryujin
        */
       void prepare();
 
+      /**
+       * Prepare the parabolic part of the state vector prior to a backward
+       * Euler or Crank Nicolson step.
+       */
+      void prepare_state_vector(StateVector &state_vector, Number t) const;
+
       //@}
       /**
        * @name Functions for performing implicit time steps
