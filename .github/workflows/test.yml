@@ -18,17 +18,17 @@ permissions:
 
 jobs:
 
-  ################################################
-  # ubuntu-lts-22.04 with gcc-11, deal.II master #
-  ################################################
+  #############################################
+  # ubuntu-lts-24.04 with gcc, deal.II master #
+  #############################################
 
-  ubuntu-lts-2204-dealii-master:
+  ubuntu-lts-2404-dealii-master:
     name: tests-deal.II-master
-    runs-on: [ubuntu-22.04]
+    runs-on: [ubuntu-24.04]
 
     container:
       options: --user root
-      image: dealii/dealii:master-jammy
+      image: dealii/dealii:master-noble
 
     steps:
     - uses: actions/checkout@v3

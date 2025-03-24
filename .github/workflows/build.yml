@@ -18,17 +18,17 @@ permissions:
 
 jobs:
 
-  ################################################
-  # ubuntu-lts-22.04 with gcc-11, deal.II master #
-  ################################################
+  #############################################
+  # ubuntu-lts-24.04 with gcc, deal.II master #
+  #############################################
 
-  ubuntu-lts-2204-dealii-master:
-    name: lts-2204-deal.II-master
-    runs-on: [ubuntu-22.04]
+  ubuntu-lts-2404-dealii-master:
+    name: lts-2404-deal.II-master
+    runs-on: [ubuntu-24.04]
 
     container:
       options: --user root
-      image: dealii/dealii:master-jammy
+      image: dealii/dealii:master-noble
 
     steps:
     - uses: actions/checkout@v3
@@ -57,17 +57,17 @@ jobs:
         cd build-debug
         make VERBOSE=1 -j2
 
-  ################################################
-  # ubuntu-lts-22.04 with gcc-11, deal.II master #
-  ################################################
+  #############################################
+  # ubuntu-lts-24.04 with gcc, deal.II master #
+  #############################################
 
-  ubuntu-lts-2204-dealii-master-float:
-    name: lts-2204-deal.II-master-float
-    runs-on: [ubuntu-22.04]
+  ubuntu-lts-2404-dealii-master-float:
+    name: lts-2404-deal.II-master-float
+    runs-on: [ubuntu-24.04]
 
     container:
       options: --user root
-      image: dealii/dealii:master-jammy
+      image: dealii/dealii:master-noble
 
     steps:
     - uses: actions/checkout@v3
@@ -97,23 +97,22 @@ jobs:
         make VERBOSE=1 -j2
 
   ################################################
-  # ubuntu-lts-22.04 with clang, deal.II master #
+  # ubuntu-lts-24.04 with clang, deal.II master #
   ################################################
 
-  ubuntu-lts-2204-dealii-clang:
-    name: lts-2204-deal.II-master-clang-15
-    runs-on: [ubuntu-22.04]
+  ubuntu-lts-2404-dealii-clang:
+    name: lts-2404-deal.II-master-clang
+    runs-on: [ubuntu-24.04]
 
     container:
       options: --user root
-      image: dealii/dealii:master-jammy
+      image: dealii/dealii:master-noble
 
     steps:
-    - name: install clang-15
+    - name: install clang
       run: |
-        echo "deb http://archive.ubuntu.com/ubuntu/ jammy-backports main" | sudo tee /etc/apt/sources.list.d/backports.list
         sudo apt update
-        sudo apt install -y clang-15 libomp-15-dev
+        sudo apt install -y clang libomp-dev
     - uses: actions/checkout@v3
       with:
         submodules: 'true'
@@ -126,7 +125,7 @@ jobs:
         mkdir build-release
         cd build-release
         cmake \
-          -DCMAKE_CXX_COMPILER=clang++-15 -DCMAKE_CXX_FLAGS="-Werror -Wno-unknown-warning-option -Wno-ignored-optimization-argument" \
+          -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_FLAGS="-Werror -Wno-unknown-warning-option -Wno-ignored-optimization-argument" \
           -DFORCE_DEAL_II_SPARSE_MATRIX=yes \
           -DWITH_OPENMP=on ..
     - name: build release
@@ -138,7 +137,7 @@ jobs:
         mkdir build-debug
         cd build-debug
         cmake \
-          -DCMAKE_CXX_COMPILER=clang++-15 -DCMAKE_CXX_FLAGS="-Werror -Wno-unknown-warning-option -Wno-ignored-optimization-argument" \
+          -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_FLAGS="-Werror -Wno-unknown-warning-option -Wno-ignored-optimization-argument" \
           -DFORCE_DEAL_II_SPARSE_MATRIX=yes \
           -DWITH_OPENMP=on -DCMAKE_BUILD_TYPE=Debug ..
     - name: build debug
