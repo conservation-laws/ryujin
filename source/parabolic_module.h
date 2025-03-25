@@ -83,7 +83,10 @@ namespace ryujin
 
     /**
      * This function preprocesses a given state vector @p U in preparation
-     * for an implicit backward Euler, or Crank Nicolson step.
+     * for a high order IMEX time step. This function exists because some
+     * time stepping variants have to precompute quantities before we can
+     * perform an IMEX step. In addition, this function is called whenever
+     * we perform a mesh transfer or output operation.
      */
     void prepare_state_vector(StateVector &state_vector, Number t) const;
 
