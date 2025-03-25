@@ -164,14 +164,9 @@ namespace ryujin
      * for an explicit euler step performed by the step() function. The
      * function performs the following tasks:
      *
-     *  - For a continuous finite element ansatz the method updates the @p U
-     *    component of the state vector by enforcing boundary conditions
-     *    for the supplied time time @p t. It then updates ghost ranges on
-     *    @p U so that the state vector is consistent across MPI ranks.
-     *  - For a discontinuous finite element ansatz it populates a local
-     *    boundary state vector that is used for computing the boundary
-     *    jump terms in the step() function when performing a dG update. It
-     *    then updates ghost ranges on @p U so that the state vector is
+     *  - We update the @p U component of the state vector by enforcing
+     *    boundary conditions for the supplied time time @p t. We then
+     *    updates ghost ranges on @p U so that the state vector is
      *    consistent across MPI ranks.
      *
      *  - The function then runs the precomputation loop that populates the
