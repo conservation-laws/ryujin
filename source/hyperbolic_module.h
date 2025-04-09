@@ -71,10 +71,15 @@ namespace ryujin
    * kept constant. A standard strategy implemented in TimeIntegrator is to
    * simply fall back to a smaller relative CFL number and try again.
    *
+   * The field @p suggested_tau_max is set to a tau_max value with which
+   * the entire update step should be restarted.
+   *
    * @ingroup TimeLoop
    */
   class Restart final
   {
+  public:
+    const double suggested_tau_max;
   };
 
 

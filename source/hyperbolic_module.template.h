@@ -1228,7 +1228,8 @@ namespace ryujin
         break;
       case IDViolationStrategy::raise_exception:
         n_restarts_++;
-        throw Restart();
+        /* Suggest a restart with tau_max: */
+        throw Restart{tau_max};
       }
     }
 
