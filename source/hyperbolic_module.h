@@ -79,7 +79,7 @@ namespace ryujin
   class Restart final
   {
   public:
-    const double suggested_tau_max;
+    double suggested_tau_max;
   };
 
 

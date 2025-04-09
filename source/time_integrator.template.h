@@ -620,7 +620,13 @@ namespace ryujin
 
     /* Implicit Crank-Nicolson step with final result in temp_[2]: */
 
-    parabolic_module_->crank_nicolson_step(temp_[0], t, temp_[2], 2.0 * tau);
+    try {
+      parabolic_module_->crank_nicolson_step(temp_[0], t, temp_[2], 2.0 * tau);
+    } catch (Restart &restart) {
+      /* Adjust suggested_tau_max. We multiply with efficiency_ again later */
+      restart.suggested_tau_max /= efficiency_;
+      throw;
+    }
 
     /* Second SSPRK 3 step with final result in temp_[0]: */
 
@@ -674,7 +680,13 @@ namespace ryujin
 
     /* Implicit Crank-Nicolson step with final result in temp_[3]: */
 
-    parabolic_module_->crank_nicolson_step(temp_[2], t, temp_[3], 6.0 * tau);
+    try {
+      parabolic_module_->crank_nicolson_step(temp_[2], t, temp_[3], 6.0 * tau);
+    } catch (Restart &restart) {
+      /* Adjust suggested_tau_max. We multiply with efficiency_ again later */
+      restart.suggested_tau_max /= efficiency_;
+      throw;
+    }
 
     /* Second explicit ERK(3,3,1) 3 step with final result in temp_[2]: */
 
@@ -736,7 +748,13 @@ namespace ryujin
 
     /* Implicit Crank-Nicolson step with final result in temp_[2]: */
 
-    parabolic_module_->crank_nicolson_step(temp_[3], t, temp_[2], 8.0 * tau);
+    try {
+      parabolic_module_->crank_nicolson_step(temp_[3], t, temp_[2], 8.0 * tau);
+    } catch (Restart &restart) {
+      /* Adjust suggested_tau_max. We multiply with efficiency_ again later */
+      restart.suggested_tau_max /= efficiency_;
+      throw;
+    }
 
     /* Second explicit ERK(4,3,1) step with final result in temp_[3]: */
 
