@@ -444,6 +444,8 @@ namespace ryujin
 
     CFLRecoveryStrategy cfl_recovery_strategy_;
 
+    Number acceptable_tau_max_ratio_;
+
     TimeSteppingScheme time_stepping_scheme_;
     double efficiency_;
 

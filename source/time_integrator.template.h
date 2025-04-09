@@ -58,6 +58,13 @@ namespace ryujin
                   "CFL/invariant domain violation recovery strategy: none, "
                   "bang bang control");
 
+    acceptable_tau_max_ratio_ = Number(2.0);
+    add_parameter("acceptable tau_max ratio",
+                  acceptable_tau_max_ratio_,
+                  "Maximal acceptable discrepancy between computed tau_max of "
+                  "a (sub)step and enforced time-step size tau. If the ratio "
+                  "is violated then a restart will be singnalled.");
+
     if (ParabolicSystem::is_identity)
       time_stepping_scheme_ = TimeSteppingScheme::erk_33;
     else
@@ -141,13 +148,19 @@ namespace ryujin
       Vectors::reinit_state_vector<Description>(it, *offline_data_);
     }
 
-    /* Reset CFL to canonical starting value: */
+    /* Reset CFL to starting value, set maximal acceptable tau_max ratio: */
 
     AssertThrow(cfl_min_ > 0., ExcMessage("cfl min must be a positive value"));
     AssertThrow(cfl_max_ >= cfl_min_,
                 ExcMessage("cfl max must be greater than or equal to cfl min"));
 
+    AssertThrow(
+        acceptable_tau_max_ratio_ >= 1.0,
+        ExcMessage(
+            "acceptable tau_max ratio must be greater than or equal to 1."));
+
     hyperbolic_module_->cfl(cfl_max_);
+    hyperbolic_module_->acceptable_tau_max_ratio(acceptable_tau_max_ratio_);
 
     const auto check_whether_timestepping_makes_sense = [&]() {
       /*
