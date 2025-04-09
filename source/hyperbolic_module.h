@@ -30,8 +30,12 @@ namespace ryujin
    * numbers > 1, and/or later stages in the Runge Kutta scheme when the
    * time step tau is prescribed.
    *
-   * The invariant domain violation is detected in the limiter and
-   * typically implies that the low-order update is already out of bounds.
+   * The invariant domain violation is detected in the limiter and implies
+   * that the low-order update itself lies outside the invariant domain.
+   *
+   * A "CFL violation" occurs if the computed tau_max of a substep is
+   * significantly larger than the previously computed time step size tau
+   * with which we perform the update.
    *
    * @note Data structures in HyperbolicModule are initialized with the
    * ensemble subrange communicator stored in MPIEnsemble. However, the
@@ -268,6 +272,27 @@ namespace ryujin
     ACCESSOR_READ_ONLY(cfl)
 
     /**
+     * Sets the relative maximal acceptable tau_max ratio. If the ratio of
+     * the enforced time-step size tau and our computed tau_max for the
+     * hyperbolic (sub) step is above this limit we throw a Restart
+     * exception.
+     */
+    void acceptable_tau_max_ratio(Number new_acceptable_tau_max_ratio) const
+    {
+      Assert(new_acceptable_tau_max_ratio >= Number(1.),
+             dealii::ExcInternalError());
+      acceptable_tau_max_ratio_ = new_acceptable_tau_max_ratio;
+    }
+
+    /**
+     * Returns the relative maximal acceptable tau_max ratio. If the ratio
+     * of the enforced time-step size tau and our computed tau_max for the
+     * hyperbolic (sub) step is above this limit we throw a Restart
+     * exception.
+     */
+    ACCESSOR_READ_ONLY(acceptable_tau_max_ratio)
+
+    /**
      * Return a reference to the OfflineData object
      */
     ACCESSOR_READ_ONLY(offline_data)
@@ -345,6 +370,7 @@ namespace ryujin
         initial_values_;
 
     mutable Number cfl_;
+    mutable Number acceptable_tau_max_ratio_;
 
     mutable unsigned int n_restarts_;
     mutable unsigned int n_corrections_;

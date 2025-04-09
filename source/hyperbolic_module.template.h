@@ -44,6 +44,7 @@ namespace ryujin
       , hyperbolic_system_(&hyperbolic_system)
       , initial_values_(&initial_values)
       , cfl_(0.2)
+      , acceptable_tau_max_ratio_(1.e6)
       , n_restarts_(0)
       , n_corrections_(0)
       , n_warnings_(0)
@@ -580,6 +581,9 @@ namespace ryujin
           !std::isnan(tau_max) && !std::isinf(tau_max) && tau_max > 0.,
           ExcMessage(
               "I'm sorry, Dave. I'm afraid I can't do that.\nWe crashed."));
+
+      /* We need to signal a restart if the enforced tau is too wacky: */
+      restart_needed = (tau > acceptable_tau_max_ratio_ * tau_max.load());
 
       tau = (tau == Number(0.) ? tau_max.load() : tau);
 
