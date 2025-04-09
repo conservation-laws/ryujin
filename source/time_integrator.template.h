@@ -52,11 +52,11 @@ namespace ryujin
         "Maximal admissible relative CFL constant. How this parameter is used "
         "depends on the chosen CFL recovery strategy");
 
-    cfl_recovery_strategy_ = CFLRecoveryStrategy::bang_bang_control;
+    cfl_recovery_strategy_ = CFLRecoveryStrategy::cruise_control;
     add_parameter("cfl recovery strategy",
                   cfl_recovery_strategy_,
                   "CFL/invariant domain violation recovery strategy: none, "
-                  "bang bang control");
+                  "bang bang control, cruise control");
 
     acceptable_tau_max_ratio_ = Number(2.0);
     add_parameter("acceptable tau_max ratio",
@@ -222,10 +222,12 @@ namespace ryujin
       Number t,
       Number t_final /*=std::numeric_limits<Number>::max()*/)
   {
+    Number tau_max = t_final - t; /* enforces t <= t_final */
+
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeIntegrator<dim, Number>::step()" << std::endl;
+    std::cout << "        enforcing tau_max <= " << tau_max << std::endl;
 #endif
-    Number tau_max = t_final - t;
 
     const auto single_step = [&]() {
       switch (time_stepping_scheme_) {
@@ -260,7 +262,7 @@ namespace ryujin
       }
     };
 
-    if (cfl_recovery_strategy_ == CFLRecoveryStrategy::bang_bang_control) {
+    if (cfl_recovery_strategy_ != CFLRecoveryStrategy::none) {
       hyperbolic_module_->id_violation_strategy_ =
           IDViolationStrategy::raise_exception;
       parabolic_module_->id_violation_strategy_ =
@@ -271,19 +273,45 @@ namespace ryujin
     try {
       return single_step();
 
-    } catch (Restart) {
+    } catch (const Restart &restart) {
 
       AssertThrow(cfl_recovery_strategy_ != CFLRecoveryStrategy::none,
                   dealii::ExcInternalError());
 
+      hyperbolic_module_->id_violation_strategy_ = IDViolationStrategy::warn;
+      parabolic_module_->id_violation_strategy_ = IDViolationStrategy::warn;
+
       if (cfl_recovery_strategy_ == CFLRecoveryStrategy::bang_bang_control) {
-        hyperbolic_module_->id_violation_strategy_ = IDViolationStrategy::warn;
-        parabolic_module_->id_violation_strategy_ = IDViolationStrategy::warn;
+        /* Retry with cfl_min instead of cfl_max: */
+#ifdef DEBUG_OUTPUT
+        std::cout
+            << "        restart with bang bang control: setting cfl to cfl_min"
+            << std::endl;
+#endif
         hyperbolic_module_->cfl(cfl_min_);
-        return single_step();
       }
 
-      __builtin_unreachable();
+      if (cfl_recovery_strategy_ == CFLRecoveryStrategy::cruise_control) {
+        /* Retry with the suggested tau_max: */
+#ifdef DEBUG_OUTPUT
+        std::cout
+            << "        restart with cruise control: using suggested_tau_max"
+            << std::endl;
+#endif
+        //
+        // Multiply the suggested tau_max value with the efficiency.
+        //
+        // We have to account for the fact that the e Restart exception is
+        // thrown within a substep of the hyperbolic or parabolic module.
+        // This implies that the suggested_tau_max is computed for that
+        // particular substep and not for the full combined method (where
+        // tau_max can be larger). We thus multiply tau_max with the
+        // efficiency factor.
+        //
+        tau_max = std::min(tau_max, efficiency_ * restart.suggested_tau_max);
+      }
+
+      return single_step();
     }
   }
 

@@ -552,8 +552,8 @@ namespace ryujin
         dij_matrix_.write_entry(d_sum, i, 0);
 
         const Number mass = lumped_mass_matrix.local_element(i);
-        const Number tau = cfl_ * mass / (Number(-2.) * d_sum);
-        local_tau_max = std::min(local_tau_max, tau);
+        const Number local_tau = cfl_ * mass / (Number(-2.) * d_sum);
+        local_tau_max = std::min(local_tau_max, local_tau);
       }
 
       /* Synchronize tau max over all threads: */
@@ -582,15 +582,16 @@ namespace ryujin
           ExcMessage(
               "I'm sorry, Dave. I'm afraid I can't do that.\nWe crashed."));
 
-      /* We need to signal a restart if the enforced tau is too wacky: */
-      restart_needed = (tau > acceptable_tau_max_ratio_ * tau_max.load());
-
       tau = (tau == Number(0.) ? tau_max.load() : tau);
 
 #ifdef DEBUG_OUTPUT
-      std::cout << "        computed tau_max = " << tau_max << std::endl;
-      std::cout << "        perform time-step with tau = " << tau << std::endl;
+      std::cout << "        computed tau_max = " << tau_max
+                << " (CFL = " << cfl_ << ")" << std::endl;
+      std::cout << "        step with tau    = " << tau << std::endl;
 #endif
+
+      /* We need to signal a restart if the enforced tau is too wacky: */
+      restart_needed = (tau > acceptable_tau_max_ratio_ * tau_max.load());
     }
 
 #ifdef DEBUG
@@ -1225,10 +1226,18 @@ namespace ryujin
       switch (id_violation_strategy_) {
       case IDViolationStrategy::warn:
         n_warnings_++;
+#ifdef DEBUG_OUTPUT
+        std::cout << "        raised warning, CFL/IDP violation encountered "
+                  << std::endl;
+#endif
         break;
       case IDViolationStrategy::raise_exception:
         n_restarts_++;
         /* Suggest a restart with tau_max: */
+#ifdef DEBUG_OUTPUT
+        std::cout << "        signalling restart (suggested_tau_max = "
+                  << tau_max << ")" << std::endl;
+#endif
         throw Restart{tau_max};
       }
     }
