@@ -992,7 +992,8 @@ namespace ryujin
         /* If we can do a restart try that first: */
         if (id_violation_strategy == IDViolationStrategy::raise_exception) {
           n_restarts_++;
-          throw Restart();
+          /* Half step size is a good heuristic: */
+          throw Restart{Number(0.5) * tau};
         } else {
           n_corrections_++;
           throw Correction();
@@ -1006,7 +1007,8 @@ namespace ryujin
           break;
         case IDViolationStrategy::raise_exception:
           n_restarts_++;
-          throw Restart();
+          /* Half step size is a good heuristic: */
+          throw Restart{Number(0.5) * tau};
         }
       }
     }

@@ -32,11 +32,20 @@ namespace ryujin
 
     /**
      * Step with the chosen "cfl max" value and, in case an invariant
-     * domain and or CFL condition violation is detected, the time step
-     * is repeated with "cfl min". If this is unsuccessful as well, a
-     * warning is emitted.
+     * domain or "CFL condition" violation is detected, the time step is
+     * repeated with "cfl min". If this is unsuccessful as well, a warning
+     * is emitted.
      */
     bang_bang_control,
+
+    /**
+     * Adaptive strategy that similarly to "bang bang control" first steps
+     * with the chosen "cfl max" value, and, in case of an invariant domain
+     * violation or a "CFL condition" violation restarts the time step
+     * using a tau_max hint coming from the sub step where we encountered a
+     * problem. This is the default strategy.
+     */
+    cruise_control,
   };
 
 
@@ -208,10 +217,11 @@ namespace ryujin
 } // namespace ryujin
 
 #ifndef DOXYGEN
-DECLARE_ENUM(ryujin::CFLRecoveryStrategy,
-             LIST({ryujin::CFLRecoveryStrategy::none, "none"},
-                  {ryujin::CFLRecoveryStrategy::bang_bang_control,
-                   "bang bang control"}));
+DECLARE_ENUM(
+    ryujin::CFLRecoveryStrategy,
+    LIST({ryujin::CFLRecoveryStrategy::none, "none"},
+         {ryujin::CFLRecoveryStrategy::bang_bang_control, "bang bang control"},
+         {ryujin::CFLRecoveryStrategy::cruise_control, "cruise control"}, ));
 
 DECLARE_ENUM(
     ryujin::TimeSteppingScheme,
@@ -443,6 +453,8 @@ namespace ryujin
     Number cfl_max_;
 
     CFLRecoveryStrategy cfl_recovery_strategy_;
+
+    Number acceptable_tau_max_ratio_;
 
     TimeSteppingScheme time_stepping_scheme_;
     double efficiency_;
