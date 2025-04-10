@@ -315,7 +315,8 @@ namespace ryujin
         // tau_max can be larger). We thus multiply tau_max with the
         // efficiency factor.
         //
-        tau_max = std::min(tau_max, efficiency_ * restart.suggested_tau_max);
+        tau_max =
+            std::min(tau_max, efficiency_ * Number(restart.suggested_tau_max));
       }
 
       return single_step();

@@ -103,7 +103,7 @@ option(WITH_GDAL "Compile and link against the gdal library" ${GDAL_FOUND})
 # Set up compiler flags:
 #
 
-# We require at least C++17.
+# We require at C++20.
 set(CMAKE_CXX_STANDARD 20)
 
 #string(APPEND DEAL_II_CXX_FLAGS " -Wfatal-errors")
