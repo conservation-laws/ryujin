@@ -163,14 +163,12 @@ namespace ryujin
     bool enforce_t_final_;
     Number timer_granularity_;
 
-    bool enable_checkpointing_;
     bool enable_output_full_;
     bool enable_output_levelsets_;
     bool enable_compute_error_;
     bool enable_compute_quantities_;
     bool enable_mesh_adaptivity_;
 
-    unsigned int timer_checkpoint_multiplier_;
     unsigned int timer_output_full_multiplier_;
     unsigned int timer_output_levelsets_multiplier_;
     unsigned int timer_compute_quantities_multiplier_;
@@ -183,6 +181,8 @@ namespace ryujin
 
     Number terminal_update_interval_;
     bool terminal_show_rank_throughput_;
+
+    Number checkpoint_update_interval_;
 
     //@}
     /**

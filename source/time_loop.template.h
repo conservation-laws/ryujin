@@ -104,14 +104,6 @@ namespace ryujin
                   "routines are run. This \"baseline tick\" is further "
                   "modified by the corresponding \"*_multiplier\" options");
 
-    enable_checkpointing_ = false;
-    add_parameter(
-        "enable checkpointing",
-        enable_checkpointing_,
-        "Write out checkpoints to resume an interrupted computation at timer "
-        "granularity intervals. The frequency is determined by \"timer "
-        "granularity\" and \"timer checkpoint multiplier\"");
-
     enable_output_full_ = false;
     add_parameter("enable output full",
                   enable_output_full_,
@@ -148,12 +140,6 @@ namespace ryujin
         "The frequency how often we query MeshAdaptor::analyze() for deciding "
         "on adapting the mesh is determined by \"timer granularity\" and "
         "\"timer mesh refinement multiplier\"");
-
-    timer_checkpoint_multiplier_ = 1;
-    add_parameter("timer checkpoint multiplier",
-                  timer_checkpoint_multiplier_,
-                  "Multiplicative modifier applied to \"timer granularity\" "
-                  "that determines the checkpointing granularity");
 
     timer_output_full_multiplier_ = 1;
     add_parameter("timer output full multiplier",
@@ -201,7 +187,8 @@ namespace ryujin
     add_parameter("terminal update interval",
                   terminal_update_interval_,
                   "Number of seconds after which output statistics are "
-                  "recomputed and printed on the terminal");
+                  "recomputed and printed on the terminal. Setting the "
+                  "interval to zero disables terminal output.");
 
     terminal_show_rank_throughput_ = true;
     add_parameter("terminal show rank throughput",
@@ -211,6 +198,13 @@ namespace ryujin
                   "number of threads (per rank). If set to false then a plain "
                   "average per thread \"CPU\" throughput value is computed by "
                   "using the umodified total accumulated CPU time.");
+
+    checkpoint_update_interval_ = 0;
+    add_parameter(
+        "checkpoint update interval",
+        checkpoint_update_interval_,
+        "Number of seconds after which a new checkpoint is written out to "
+        "disk. Setting the interval to zero disables checkpointing.");
 
     debug_filename_ = "";
     add_parameter("debug filename",
@@ -319,10 +313,12 @@ namespace ryujin
     Vectors::debug_poison_precomputed_values<Description>(state_vector,
                                                           offline_data_);
 
-    unsigned int cycle = 1;
-    Number last_terminal_output = (terminal_update_interval_ == Number(0.)
-                                       ? std::numeric_limits<Number>::max()
-                                       : std::numeric_limits<Number>::lowest());
+    Number last_terminal_output = terminal_update_interval_ == Number(0.)
+                                      ? std::numeric_limits<Number>::max()
+                                      : Number(0.);
+    Number last_checkpoint = checkpoint_update_interval_ == Number(0.)
+                                 ? std::numeric_limits<Number>::max()
+                                 : Number(0.);
 
     /*
      * The honorable main loop:
@@ -334,6 +330,7 @@ namespace ryujin
     constexpr Number relax =
         Number(1.) - Number(10.) * std::numeric_limits<Number>::epsilon();
 
+    unsigned int cycle = 0;
     for (;; ++cycle) {
 
 #ifdef DEBUG_OUTPUT
@@ -348,17 +345,18 @@ namespace ryujin
         quantities_.accumulate(state_vector, t);
       }
 
-      /* Perform various tasks whenever we reach a timer tick: */
+      /* Perform output tasks whenever we reach a timer tick: */
 
       if (t >= relax * timer_cycle * timer_granularity_) {
         if (enable_compute_error_) {
+          /*
+           * FIXME: We interpolate the analytic solution at every timer
+           * tick. If we happen to actually not output anything then this
+           * is terribly inefficient...
+           */
+
           StateVector analytic;
           {
-            /*
-             * FIXME: We interpolate the analytic solution at every timer
-             * tick. If we happen to actually not output anything then this
-             * is terribly inefficient...
-             */
             Scope scope(computing_timer_,
                         "time step [X]   - interpolate analytic solution");
             Vectors::reinit_state_vector<Description>(analytic, offline_data_);
@@ -366,11 +364,6 @@ namespace ryujin
                 initial_values_.get().interpolate_hyperbolic_vector(t);
           }
 
-          /*
-           * FIXME: a call to output() will also write a checkpoint (if
-           * enabled). So as a workaround we simply call the output()
-           * function for the analytic solution first...
-           */
           output(analytic,
                  base_name_ensemble_ + "-analytic_solution",
                  t,
@@ -428,36 +421,50 @@ namespace ryujin
 
       t += tau;
 
+      /* Synchronize wall time: */
+
+      auto wall_time = computing_timer_["time loop"].wall_time();
+      {
+        Scope scope(computing_timer_,
+                    "time step [X] _ - synchronization barriers");
+        wall_time =
+            Utilities::MPI::max(wall_time, mpi_ensemble_.world_communicator());
+      }
+
       /* Print and record cycle statistics: */
-      if (terminal_update_interval_ != Number(0.)) {
 
-        /* Do we need to update the log file? */
-        const bool write_to_log_file =
-            (t >= relax * timer_cycle * timer_granularity_);
+      const bool write_to_log_file =
+          (terminal_update_interval_ != Number(0.)) && /* suppress output */
+          (t >= relax * timer_cycle * timer_granularity_);
 
-        /* Do we need to update the terminal? */
-        const auto wall_time = computing_timer_["time loop"].wall_time();
-        int update_terminal =
-            (wall_time >= last_terminal_output + terminal_update_interval_);
+      const bool update_terminal =
+          (wall_time >= last_terminal_output + terminal_update_interval_);
 
-        /* Broadcast boolean from rank 0 to all other ranks: */
-        const auto ierr = MPI_Bcast(&update_terminal,
-                                    1,
-                                    MPI_INT,
-                                    0,
-                                    mpi_ensemble_.world_communicator());
-        AssertThrowMPI(ierr);
+      if (write_to_log_file || update_terminal) {
+        print_cycle_statistics(
+            cycle, t, timer_cycle, /*logfile*/ write_to_log_file);
+        last_terminal_output = wall_time;
+      }
 
-        if (write_to_log_file || update_terminal) {
-          print_cycle_statistics(
-              cycle, t, timer_cycle, /*logfile*/ write_to_log_file);
-          last_terminal_output = wall_time;
-        }
+      const bool update_checkpoint =
+          (wall_time >= last_checkpoint + checkpoint_update_interval_);
+
+      if (update_checkpoint) {
+        Scope scop(computing_timer_, "time step [X]   - perform checkpointing");
+        print_info("scheduling checkpointing");
+        write_checkpoint(state_vector, base_name_ensemble_, t, cycle);
+        last_checkpoint = wall_time;
       }
     } /* end of loop */
 
     /* We have actually performed one cycle less. */
     --cycle;
+
+    if (checkpoint_update_interval_ != Number(0.)) {
+      Scope scope(computing_timer_, "time step [X]   - perform checkpointing");
+      print_info("scheduling checkpointing");
+      write_checkpoint(state_vector, base_name_ensemble_, t, cycle);
+    }
 
     computing_timer_["time loop"].stop();
 
@@ -838,41 +845,33 @@ namespace ryujin
     const bool do_levelsets =
         (cycle % timer_output_levelsets_multiplier_ == 0) &&
         enable_output_levelsets_;
-    const bool do_checkpointing =
-        (cycle % timer_checkpoint_multiplier_ == 0) && enable_checkpointing_;
 
     /* There is nothing to do: */
-    if (!(do_full_output || do_levelsets || do_checkpointing))
+    if (!(do_full_output || do_levelsets))
       return;
+
+    /* Prepare vectors for output: */
 
     if (!ParabolicSystem::is_identity)
       parabolic_module_.prepare_state_vector(state_vector, t);
     hyperbolic_module_.prepare_state_vector(state_vector, t);
 
     /* Data output: */
-    if (do_full_output || do_levelsets) {
-      Scope scope(computing_timer_, "time step [X]   - perform vtu output");
-      print_info("scheduling output");
 
-      postprocessor_.compute(state_vector);
-      /*
-       * Workaround: Manually reset bounds during the first output cycle
-       * (which is often just a uniform flow field) to obtain a better
-       * normailization:
-       */
-      if (cycle == 0)
-        postprocessor_.reset_bounds();
+    Scope scope(computing_timer_, "time step [X]   - perform vtu output");
+    print_info("scheduling output");
 
-      vtu_output_.schedule_output(
-          state_vector, name, t, cycle, do_full_output, do_levelsets);
-    }
+    postprocessor_.compute(state_vector);
+    /*
+     * Workaround: Manually reset bounds during the first output cycle
+     * (which is often just a uniform flow field) to obtain a better
+     * normailization:
+     */
+    if (cycle == 0)
+      postprocessor_.reset_bounds();
 
-    /* Checkpointing: */
-    if (do_checkpointing) {
-      Scope scope(computing_timer_, "time step [X]   - perform checkpointing");
-      print_info("scheduling checkpointing");
-      write_checkpoint(state_vector, base_name_ensemble_, t, cycle);
-    }
+    vtu_output_.schedule_output(
+        state_vector, name, t, cycle, do_full_output, do_levelsets);
   }
 
 

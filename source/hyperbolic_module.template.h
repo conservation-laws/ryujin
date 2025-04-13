@@ -568,7 +568,7 @@ namespace ryujin
 
     {
       Scope scope(computing_timer_,
-                  "time step [H] _ - synchronization barriers");
+                  "time step [X] _ - synchronization barriers");
 
       /*
        * MPI Barrier: Synchronize the maximal time-step size. This has to
@@ -1209,7 +1209,7 @@ namespace ryujin
 
     {
       Scope scope(computing_timer_,
-                  "time step [H] _ - synchronization barriers");
+                  "time step [X] _ - synchronization barriers");
 
       /*
        * Synchronize whether we have to restart the time step. Even though
