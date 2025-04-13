@@ -337,7 +337,7 @@ namespace ryujin
     constexpr Number relax =
         Number(1.) - Number(10.) * std::numeric_limits<Number>::epsilon();
 
-    unsigned int cycle = 0;
+    unsigned int cycle = 1;
     for (;; ++cycle) {
 
 #ifdef DEBUG_OUTPUT
@@ -1090,11 +1090,19 @@ namespace ryujin
 
     if (enable_compute_quantities_ || enable_output_full_ ||
         enable_output_levelsets_) {
-      stream << "             Last output cycle "                          //
-             << timer_cycle - 1                                            //
-             << " at t = " << timer_granularity_ * (timer_cycle - 1)       //
-             << " (terminal update interval " << terminal_update_interval_ //
-             << "s)\n";
+      stream << "             Last output cycle "                    //
+             << timer_cycle - 1                                      //
+             << " at t = " << timer_granularity_ * (timer_cycle - 1) //
+             << " [ ";
+
+      if (enable_output_full_)
+        stream << "full ";
+      if (enable_output_levelsets_)
+        stream << "levelsets ";
+      if (enable_compute_quantities_)
+        stream << "quantities ";
+
+      stream << "]\n";
     }
 
     if (checkpoint_update_interval_ != Number(0.)) {
@@ -1105,8 +1113,8 @@ namespace ryujin
       stream << "             Last checkpoint at wall time "          //
              << std::setprecision(2) << std::fixed << last_checkpoint //
              << "s (" << std::setprecision(0)
-             << std::max(Number(0.), wall_time.max - last_checkpoint)
-             << "s ago)\n";
+             << std::max(0., wall_time.max - last_checkpoint)
+             << "s ago, interval " << checkpoint_update_interval_ << "s)\n";
     }
   }
 
@@ -1366,7 +1374,8 @@ namespace ryujin
            << " dt/s) ]" << std::endl;
     /* clang-format on */
 
-    /* and print an ETA */
+    /* And print an ETA: */
+
     time_per_second_exp = 0.8 * time_per_second_exp + 0.2 * time_per_second;
     auto eta = static_cast<unsigned int>(std::max(t_final_ - t, Number(0.)) /
                                          time_per_second_exp);
@@ -1387,6 +1396,10 @@ namespace ryujin
 
     const unsigned int minutes = eta / 60;
     output << minutes << " min";
+
+    output << " (terminal update every " //
+           << std::setprecision(2) << std::fixed << terminal_update_interval_
+           << "s)";
 
     if (mpi_ensemble_.world_rank() != 0)
       return;
