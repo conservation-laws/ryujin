@@ -441,6 +441,8 @@ namespace ryujin
           (wall_time >= last_terminal_output + terminal_update_interval_);
 
       if (write_to_log_file || update_terminal) {
+        Scope scope(computing_timer_,
+                    "time step [X] _ - synchronization barriers");
         print_cycle_statistics(
             cycle, t, timer_cycle, /*logfile*/ write_to_log_file);
         last_terminal_output = wall_time;
