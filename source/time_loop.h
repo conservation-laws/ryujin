@@ -129,6 +129,16 @@ namespace ryujin
 
     void print_parameters(std::ostream &stream);
     void print_mpi_partition(std::ostream &stream);
+
+    void print_info(const std::string &header);
+
+    void print_head(const std::string &header,
+                    const std::string &secondary,
+                    std::ostream &stream);
+
+    void print_information(unsigned int output_cycle,
+                           Number last_checkpoint,
+                           std::ostream &stream);
     void print_memory_statistics(std::ostream &stream);
     void print_timers(std::ostream &stream);
     void print_throughput(unsigned int cycle,
@@ -136,14 +146,10 @@ namespace ryujin
                           std::ostream &stream,
                           bool final_time = false);
 
-    void print_info(const std::string &header);
-    void print_head(const std::string &header,
-                    const std::string &secondary,
-                    std::ostream &stream);
-
     void print_cycle_statistics(unsigned int cycle,
                                 Number t,
                                 unsigned int output_cycle,
+                                Number last_checkpoint,
                                 bool write_to_logfile = false,
                                 bool final_time = false);
     //@}

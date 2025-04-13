@@ -215,6 +215,13 @@ namespace ryujin
   }
 
 
+  /*
+   * ---------------------------------------------------------------------------
+   * Setup and main loop:
+   * ---------------------------------------------------------------------------
+   */
+
+
   template <typename Description, int dim, typename Number>
   void TimeLoop<Description, dim, Number>::run()
   {
@@ -443,8 +450,11 @@ namespace ryujin
       if (write_to_log_file || update_terminal) {
         Scope scope(computing_timer_,
                     "time step [X] _ - synchronization barriers");
-        print_cycle_statistics(
-            cycle, t, timer_cycle, /*logfile*/ write_to_log_file);
+        print_cycle_statistics(cycle,
+                               t,
+                               timer_cycle,
+                               last_checkpoint,
+                               /*logfile*/ write_to_log_file);
         last_terminal_output = wall_time;
       }
 
@@ -472,8 +482,12 @@ namespace ryujin
 
     if (terminal_update_interval_ != Number(0.)) {
       /* Write final timing statistics to screen and logfile: */
-      print_cycle_statistics(
-          cycle, t, timer_cycle, /*logfile*/ true, /*final*/ true);
+      print_cycle_statistics(cycle,
+                             t,
+                             timer_cycle,
+                             last_checkpoint,
+                             /*logfile*/ true,
+                             /*final*/ true);
     }
 
     if (enable_compute_error_) {
@@ -491,6 +505,13 @@ namespace ryujin
     CALLGRIND_DUMP_STATS;
 #endif
   }
+
+
+  /*
+   * ---------------------------------------------------------------------------
+   * Checkpointing, VTK output, and compute error:
+   * ---------------------------------------------------------------------------
+   */
 
 
   template <typename Description, int dim, typename Number>
@@ -878,7 +899,9 @@ namespace ryujin
 
 
   /*
+   * ---------------------------------------------------------------------------
    * Output and logging related functions:
+   * ---------------------------------------------------------------------------
    */
 
 
@@ -983,6 +1006,108 @@ namespace ryujin
     print_snippet("rel", data[3]);
 
     stream << output.str() << std::endl;
+  }
+
+
+  template <typename Description, int dim, typename Number>
+  void TimeLoop<Description, dim, Number>::print_info(const std::string &header)
+  {
+    if (mpi_ensemble_.world_rank() != 0)
+      return;
+
+    std::cout << "[INFO] " << header << std::endl;
+  }
+
+
+  template <typename Description, int dim, typename Number>
+  void
+  TimeLoop<Description, dim, Number>::print_head(const std::string &header,
+                                                 const std::string &secondary,
+                                                 std::ostream &stream)
+  {
+    if (mpi_ensemble_.world_rank() != 0)
+      return;
+
+    const int header_size = header.size();
+    const auto padded_header =
+        std::string(std::max(0, 34 - header_size) / 2, ' ') + header +
+        std::string(std::max(0, 35 - header_size) / 2, ' ');
+
+    const int secondary_size = secondary.size();
+    const auto padded_secondary =
+        std::string(std::max(0, 34 - secondary_size) / 2, ' ') + secondary +
+        std::string(std::max(0, 35 - secondary_size) / 2, ' ');
+
+    /* clang-format off */
+    stream << "\n";
+    stream << "    ####################################################\n";
+    stream << "    #########"     <<  padded_header   <<     "#########\n";
+    stream << "    #########"     << padded_secondary <<     "#########\n";
+    stream << "    ####################################################\n";
+    stream << std::endl;
+    /* clang-format on */
+  }
+
+
+  template <typename Description, int dim, typename Number>
+  void TimeLoop<Description, dim, Number>::print_information(
+      unsigned int timer_cycle, Number last_checkpoint, std::ostream &stream)
+  {
+    static const std::string vectorization_name = [] {
+      constexpr auto width = VectorizedArray<Number>::size();
+
+      std::string result;
+      if (width == 1)
+        result = "scalar ";
+      else
+        result = std::to_string(width * 8 * sizeof(Number)) + " bit packed ";
+
+      if constexpr (std::is_same_v<Number, double>)
+        return result + "double";
+      else if constexpr (std::is_same_v<Number, float>)
+        return result + "float";
+      else
+        __builtin_trap();
+    }();
+
+    stream << "Information: (HYP) " << hyperbolic_system_.get().problem_name;
+    if constexpr (!ParabolicSystem::is_identity) {
+      stream << "\n             (PAR) " << parabolic_system_.get().problem_name;
+    }
+    stream << "\n             [" << base_name_ << "] ";
+    if (mpi_ensemble_.n_ensembles() > 1) {
+      stream << mpi_ensemble_.n_ensembles() << " ensembles ";
+    }
+    stream << "with "                                      //
+           << n_global_dofs_ << " Qdofs on "               //
+           << mpi_ensemble_.n_world_ranks() << " ranks / " //
+#ifdef WITH_OPENMP
+           << MultithreadInfo::n_threads() << " threads <" //
+#else
+           << "[openmp disabled] <" //
+#endif
+           << vectorization_name << ">\n";
+
+    if (enable_compute_quantities_ || enable_output_full_ ||
+        enable_output_levelsets_) {
+      stream << "             Last output cycle "                          //
+             << timer_cycle - 1                                            //
+             << " at t = " << timer_granularity_ * (timer_cycle - 1)       //
+             << " (terminal update interval " << terminal_update_interval_ //
+             << "s)\n";
+    }
+
+    if (checkpoint_update_interval_ != Number(0.)) {
+      const auto wall_time =
+          Utilities::MPI::min_max_avg(computing_timer_["time loop"].wall_time(),
+                                      mpi_ensemble_.world_communicator());
+
+      stream << "             Last checkpoint at wall time "          //
+             << std::setprecision(2) << std::fixed << last_checkpoint //
+             << "s (" << std::setprecision(0)
+             << std::max(Number(0.), wall_time.max - last_checkpoint)
+             << "s ago)\n";
+    }
   }
 
 
@@ -1271,71 +1396,17 @@ namespace ryujin
 
 
   template <typename Description, int dim, typename Number>
-  void TimeLoop<Description, dim, Number>::print_info(const std::string &header)
-  {
-    if (mpi_ensemble_.world_rank() != 0)
-      return;
-
-    std::cout << "[INFO] " << header << std::endl;
-  }
-
-
-  template <typename Description, int dim, typename Number>
-  void
-  TimeLoop<Description, dim, Number>::print_head(const std::string &header,
-                                                 const std::string &secondary,
-                                                 std::ostream &stream)
-  {
-    if (mpi_ensemble_.world_rank() != 0)
-      return;
-
-    const int header_size = header.size();
-    const auto padded_header =
-        std::string(std::max(0, 34 - header_size) / 2, ' ') + header +
-        std::string(std::max(0, 35 - header_size) / 2, ' ');
-
-    const int secondary_size = secondary.size();
-    const auto padded_secondary =
-        std::string(std::max(0, 34 - secondary_size) / 2, ' ') + secondary +
-        std::string(std::max(0, 35 - secondary_size) / 2, ' ');
-
-    /* clang-format off */
-    stream << "\n";
-    stream << "    ####################################################\n";
-    stream << "    #########"     <<  padded_header   <<     "#########\n";
-    stream << "    #########"     << padded_secondary <<     "#########\n";
-    stream << "    ####################################################\n";
-    stream << std::endl;
-    /* clang-format on */
-  }
-
-
-  template <typename Description, int dim, typename Number>
   void TimeLoop<Description, dim, Number>::print_cycle_statistics(
       unsigned int cycle,
       Number t,
       unsigned int timer_cycle,
+      Number last_checkpoint,
       bool write_to_logfile,
       bool final_time)
   {
-    static const std::string vectorization_name = [] {
-      constexpr auto width = VectorizedArray<Number>::size();
-
-      std::string result;
-      if (width == 1)
-        result = "scalar ";
-      else
-        result = std::to_string(width * 8 * sizeof(Number)) + " bit packed ";
-
-      if constexpr (std::is_same_v<Number, double>)
-        return result + "double";
-      else if constexpr (std::is_same_v<Number, float>)
-        return result + "float";
-      else
-        __builtin_trap();
-    }();
-
     std::ostringstream output;
+
+    /* Print header: */
 
     std::ostringstream primary;
     if (final_time) {
@@ -1351,43 +1422,24 @@ namespace ryujin
 
     print_head(primary.str(), secondary.str(), output);
 
-    output << "Information: (HYP) " << hyperbolic_system_.get().problem_name;
-    if constexpr (!ParabolicSystem::is_identity) {
-      output << "\n             (PAR) " << parabolic_system_.get().problem_name;
-    }
-    output << "\n             [" << base_name_ << "] ";
-    if (mpi_ensemble_.n_ensembles() > 1) {
-      output << mpi_ensemble_.n_ensembles() << " ensembles ";
-    }
-    output << "with "                                      //
-           << n_global_dofs_ << " Qdofs on "               //
-           << mpi_ensemble_.n_world_ranks() << " ranks / " //
-#ifdef WITH_OPENMP
-           << MultithreadInfo::n_threads() << " threads <" //
-#else
-           << "[openmp disabled] <" //
-#endif
-           << vectorization_name                                         //
-           << ">\n             Last output cycle "                       //
-           << timer_cycle - 1                                            //
-           << " at t = " << timer_granularity_ * (timer_cycle - 1)       //
-           << " (terminal update interval " << terminal_update_interval_ //
-           << "s)\n";
+    /* Print information and statistics: */
 
+    print_information(timer_cycle, last_checkpoint, output);
     print_memory_statistics(output);
     print_timers(output);
     print_throughput(cycle, t, output, final_time);
 
-    if (mpi_ensemble_.world_rank() == 0) {
-#ifndef DEBUG_OUTPUT
-      std::cout << "\033[2J\033[H";
-#endif
-      std::cout << output.str() << std::flush;
+    /* Only output on rank 0: */
+    if (mpi_ensemble_.world_rank() != 0)
+      return;
 
-      if (write_to_logfile) {
-        logfile_ << "\n" << output.str() << std::flush;
-      }
+#ifndef DEBUG_OUTPUT
+    std::cout << "\033[2J\033[H";
+#endif
+    std::cout << output.str() << std::flush;
+
+    if (write_to_logfile) {
+      logfile_ << "\n" << output.str() << std::flush;
     }
   }
-
 } // namespace ryujin
