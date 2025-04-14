@@ -1101,22 +1101,19 @@ namespace ryujin
 #endif
            << vectorization_name << ">\n";
 
-    if (enable_compute_quantities_ || enable_output_full_ ||
-        enable_output_levelsets_) {
-      stream << "             Last output cycle "                    //
-             << timer_cycle - 1                                      //
-             << " at t = " << timer_granularity_ * (timer_cycle - 1) //
-             << " [ ";
+    stream << "             Last output cycle "                    //
+           << timer_cycle - 1                                      //
+           << " at t = " << timer_granularity_ * (timer_cycle - 1) //
+           << "  [ log ";
 
-      if (enable_output_full_)
-        stream << "full ";
-      if (enable_output_levelsets_)
-        stream << "levelsets ";
-      if (enable_compute_quantities_)
-        stream << "quantities ";
+    if (enable_output_full_)
+      stream << "full ";
+    if (enable_output_levelsets_)
+      stream << "levelsets ";
+    if (enable_compute_quantities_)
+      stream << "quantities ";
 
-      stream << "]\n";
-    }
+    stream << "]\n";
 
     if (checkpoint_update_interval_ != Number(0.)) {
       const auto wall_time =
@@ -1128,7 +1125,7 @@ namespace ryujin
       } else {
         stream << "             Last checkpoint at wall time "          //
                << std::setprecision(2) << std::fixed << last_checkpoint //
-               << "s (" << std::setprecision(0)
+               << "s  (" << std::setprecision(0)
                << std::max(0., wall_time.max - last_checkpoint)
                << "s ago, interval " << checkpoint_update_interval_ << "s)\n";
       }
@@ -1196,7 +1193,7 @@ namespace ryujin
       const auto skew_positive = std::min(
           100. * (wall_time.max - wall_time.avg) / wall_time.avg + eps, 99.9);
 
-      stream << std::setprecision(2) << std::fixed << std::setw(8)
+      stream << std::setprecision(2) << std::fixed << std::setw(9)
              << wall_time.avg << "s [sk: " << std::setprecision(1)
              << std::setw(5) << std::fixed << skew_negative << "%/"
              << std::setw(4) << std::fixed << skew_positive << "%]";
@@ -1216,7 +1213,7 @@ namespace ryujin
           const auto cpu_time = Utilities::MPI::min_max_avg(
               timer.cpu_time(), mpi_ensemble_.world_communicator());
 
-          stream << std::setprecision(2) << std::fixed << std::setw(9)
+          stream << std::setprecision(2) << std::fixed << std::setw(12)
                  << cpu_time.sum << "s ";
 
           if (percentage)
@@ -1414,7 +1411,7 @@ namespace ryujin
     const unsigned int minutes = eta / 60;
     output << minutes << " min";
 
-    output << " (terminal update every " //
+    output << "   (terminal update every " //
            << std::setprecision(2) << std::fixed << terminal_update_interval_
            << "s)";
 
