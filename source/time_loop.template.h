@@ -464,7 +464,7 @@ namespace ryujin
       if (update_checkpoint) {
         Scope scop(computing_timer_, "time step [X]   - perform checkpointing");
         print_info("scheduling checkpointing");
-        write_checkpoint(state_vector, base_name_ensemble_, t, cycle);
+        write_checkpoint(state_vector, base_name_ensemble_, t, timer_cycle);
         last_checkpoint = wall_time;
       }
     } /* end of loop */
@@ -475,7 +475,7 @@ namespace ryujin
     if (checkpoint_update_interval_ != Number(0.)) {
       Scope scope(computing_timer_, "time step [X]   - perform checkpointing");
       print_info("scheduling checkpointing");
-      write_checkpoint(state_vector, base_name_ensemble_, t, cycle);
+      write_checkpoint(state_vector, base_name_ensemble_, t, timer_cycle);
     }
 
     computing_timer_["time loop"].stop();
@@ -520,7 +520,7 @@ namespace ryujin
       StateVector &state_vector,
       const std::string &base_name,
       Number &t,
-      unsigned int &output_cycle,
+      unsigned int &timer_cycle,
       const Callable &prepare_compute_kernels)
   {
 #ifdef DEBUG_OUTPUT
@@ -560,7 +560,7 @@ namespace ryujin
 
       std::ifstream file(meta, std::ios::binary);
       boost::archive::binary_iarchive ia(file);
-      ia >> t >> output_cycle >> transfer_handle;
+      ia >> t >> timer_cycle >> transfer_handle;
     }
 
     int ierr;
@@ -572,7 +572,7 @@ namespace ryujin
           MPI_Bcast(&t, 1, MPI_FLOAT, 0, mpi_ensemble_.ensemble_communicator());
     AssertThrowMPI(ierr);
 
-    ierr = MPI_Bcast(&output_cycle,
+    ierr = MPI_Bcast(&timer_cycle,
                      1,
                      MPI_UNSIGNED,
                      0,
@@ -601,7 +601,7 @@ namespace ryujin
       const StateVector &state_vector,
       const std::string &base_name,
       const Number &t,
-      const unsigned int &output_cycle)
+      const unsigned int &timer_cycle)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeLoop<dim, Number>::write_checkpoint()" << std::endl;
@@ -643,7 +643,7 @@ namespace ryujin
       std::string meta = name + ".metadata";
       std::ofstream file(meta, std::ios::binary | std::ios::trunc);
       boost::archive::binary_oarchive oa(file);
-      oa << t << output_cycle << transfer_handle;
+      oa << t << timer_cycle << transfer_handle;
     }
 
     const int ierr = MPI_Barrier(mpi_ensemble_.ensemble_communicator());
