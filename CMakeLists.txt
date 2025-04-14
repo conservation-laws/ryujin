@@ -103,10 +103,10 @@ option(WITH_GDAL "Compile and link against the gdal library" ${GDAL_FOUND})
 # Set up compiler flags:
 #
 
-# We require at C++20.
+# We require at least C++20:
 set(CMAKE_CXX_STANDARD 20)
-
-#string(APPEND DEAL_II_CXX_FLAGS " -Wfatal-errors")
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
   string(APPEND DEAL_II_CXX_FLAGS " -fdiagnostics-color=always")
@@ -147,6 +147,14 @@ endif()
 
 # Respect user overrides performed via CMAKE_CXX_FLAGS/CMAKE_EXE_LINKER_FLAGS
 string(APPEND DEAL_II_CXX_FLAGS " $ENV{CXXFLAGS} ${CMAKE_CXX_FLAGS}")
+
+#
+# Workaround: Remove any unwanted -std=c++17 flags that might be set in
+# DEAL_II_CXX_FLAGS. This is unfortunately the case for some deal.II
+# versions packaged in Debian and Ubuntu.
+#
+string(REPLACE "-std=c++17" "" DEAL_II_CXX_FLAGS "${DEAL_II_CXX_FLAGS}")
+
 string(APPEND DEAL_II_CXX_FLAGS_DEBUG " ${CMAKE_CXX_FLAGS_DEBUG}")
 string(APPEND DEAL_II_CXX_FLAGS_RELEASE " ${CMAKE_CXX_FLAGS_RELEASE}")
 string(APPEND DEAL_II_LINKER_FLAGS " $ENV{LDFLAGS} ${CMAKE_EXE_LINKER_FLAGS}")
