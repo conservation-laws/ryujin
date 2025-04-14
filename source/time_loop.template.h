@@ -408,9 +408,9 @@ namespace ryujin
           Scope scope(computing_timer_, "(re)initialize data structures");
           print_info("performing mesh adaptation");
 
+          hyperbolic_module_.prepare_state_vector(state_vector, t);
           if (!ParabolicSystem::is_identity)
             parabolic_module_.prepare_state_vector(state_vector, t);
-          hyperbolic_module_.prepare_state_vector(state_vector, t);
 
           adapt_mesh_and_transfer_state_vector(state_vector,
                                                prepare_compute_kernels);
@@ -463,6 +463,11 @@ namespace ryujin
 
       if (update_checkpoint) {
         Scope scop(computing_timer_, "time step [X]   - perform checkpointing");
+
+        hyperbolic_module_.prepare_state_vector(state_vector, t);
+        if (!ParabolicSystem::is_identity)
+          parabolic_module_.prepare_state_vector(state_vector, t);
+
         print_info("scheduling checkpointing");
         write_checkpoint(state_vector, base_name_ensemble_, t, timer_cycle);
         last_checkpoint = wall_time;
@@ -474,6 +479,11 @@ namespace ryujin
 
     if (checkpoint_update_interval_ != Number(0.)) {
       Scope scope(computing_timer_, "time step [X]   - perform checkpointing");
+
+      hyperbolic_module_.prepare_state_vector(state_vector, t);
+      if (!ParabolicSystem::is_identity)
+        parabolic_module_.prepare_state_vector(state_vector, t);
+
       print_info("scheduling checkpointing");
       write_checkpoint(state_vector, base_name_ensemble_, t, timer_cycle);
     }
@@ -695,9 +705,9 @@ namespace ryujin
     std::cout << "TimeLoop<dim, Number>::compute_error()" << std::endl;
 #endif
 
+    hyperbolic_module_.prepare_state_vector(state_vector, t);
     if (!ParabolicSystem::is_identity)
       parabolic_module_.prepare_state_vector(state_vector, t);
-    hyperbolic_module_.prepare_state_vector(state_vector, t);
 
     Vector<Number> difference_per_cell(
         discretization_.triangulation().n_active_cells());
@@ -875,9 +885,9 @@ namespace ryujin
 
     /* Prepare vectors for output: */
 
+    hyperbolic_module_.prepare_state_vector(state_vector, t);
     if (!ParabolicSystem::is_identity)
       parabolic_module_.prepare_state_vector(state_vector, t);
-    hyperbolic_module_.prepare_state_vector(state_vector, t);
 
     /* Data output: */
 
