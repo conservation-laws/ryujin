@@ -138,7 +138,8 @@ namespace ryujin
 
     void print_information(unsigned int output_cycle,
                            Number last_checkpoint,
-                           std::ostream &stream);
+                           std::ostream &stream,
+                           bool final_time = false);
     void print_memory_statistics(std::ostream &stream);
     void print_timers(std::ostream &stream);
     void print_throughput(unsigned int cycle,

@@ -1061,7 +1061,10 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   void TimeLoop<Description, dim, Number>::print_information(
-      unsigned int timer_cycle, Number last_checkpoint, std::ostream &stream)
+      unsigned int timer_cycle,
+      Number last_checkpoint,
+      std::ostream &stream,
+      bool final_time)
   {
     static const std::string vectorization_name = [] {
       constexpr auto width = VectorizedArray<Number>::size();
@@ -1120,11 +1123,15 @@ namespace ryujin
           Utilities::MPI::min_max_avg(computing_timer_["time loop"].wall_time(),
                                       mpi_ensemble_.world_communicator());
 
-      stream << "             Last checkpoint at wall time "          //
-             << std::setprecision(2) << std::fixed << last_checkpoint //
-             << "s (" << std::setprecision(0)
-             << std::max(0., wall_time.max - last_checkpoint)
-             << "s ago, interval " << checkpoint_update_interval_ << "s)\n";
+      if (final_time) {
+        stream << "             Last checkpoint at FINAL TIME\n";
+      } else {
+        stream << "             Last checkpoint at wall time "          //
+               << std::setprecision(2) << std::fixed << last_checkpoint //
+               << "s (" << std::setprecision(0)
+               << std::max(0., wall_time.max - last_checkpoint)
+               << "s ago, interval " << checkpoint_update_interval_ << "s)\n";
+      }
     }
   }
 
@@ -1447,7 +1454,7 @@ namespace ryujin
 
     /* Print information and statistics: */
 
-    print_information(timer_cycle, last_checkpoint, output);
+    print_information(timer_cycle, last_checkpoint, output, final_time);
     print_memory_statistics(output);
     print_timers(output);
     print_throughput(cycle, t, output, final_time);
