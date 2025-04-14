@@ -104,14 +104,6 @@ namespace ryujin
                   "routines are run. This \"baseline tick\" is further "
                   "modified by the corresponding \"*_multiplier\" options");
 
-    enable_checkpointing_ = false;
-    add_parameter(
-        "enable checkpointing",
-        enable_checkpointing_,
-        "Write out checkpoints to resume an interrupted computation at timer "
-        "granularity intervals. The frequency is determined by \"timer "
-        "granularity\" and \"timer checkpoint multiplier\"");
-
     enable_output_full_ = false;
     add_parameter("enable output full",
                   enable_output_full_,
@@ -148,12 +140,6 @@ namespace ryujin
         "The frequency how often we query MeshAdaptor::analyze() for deciding "
         "on adapting the mesh is determined by \"timer granularity\" and "
         "\"timer mesh refinement multiplier\"");
-
-    timer_checkpoint_multiplier_ = 1;
-    add_parameter("timer checkpoint multiplier",
-                  timer_checkpoint_multiplier_,
-                  "Multiplicative modifier applied to \"timer granularity\" "
-                  "that determines the checkpointing granularity");
 
     timer_output_full_multiplier_ = 1;
     add_parameter("timer output full multiplier",
@@ -201,7 +187,8 @@ namespace ryujin
     add_parameter("terminal update interval",
                   terminal_update_interval_,
                   "Number of seconds after which output statistics are "
-                  "recomputed and printed on the terminal");
+                  "recomputed and printed on the terminal. Setting the "
+                  "interval to zero disables terminal output.");
 
     terminal_show_rank_throughput_ = true;
     add_parameter("terminal show rank throughput",
@@ -212,6 +199,13 @@ namespace ryujin
                   "average per thread \"CPU\" throughput value is computed by "
                   "using the umodified total accumulated CPU time.");
 
+    checkpoint_update_interval_ = 0;
+    add_parameter(
+        "checkpoint update interval",
+        checkpoint_update_interval_,
+        "Number of seconds after which a new checkpoint is written out to "
+        "disk. Setting the interval to zero disables checkpointing.");
+
     debug_filename_ = "";
     add_parameter("debug filename",
                   debug_filename_,
@@ -219,6 +213,13 @@ namespace ryujin
                   "this file at the end. This is mainly useful in the "
                   "testsuite to output files we wish to compare");
   }
+
+
+  /*
+   * ---------------------------------------------------------------------------
+   * Setup and main loop:
+   * ---------------------------------------------------------------------------
+   */
 
 
   template <typename Description, int dim, typename Number>
@@ -319,10 +320,12 @@ namespace ryujin
     Vectors::debug_poison_precomputed_values<Description>(state_vector,
                                                           offline_data_);
 
-    unsigned int cycle = 1;
-    Number last_terminal_output = (terminal_update_interval_ == Number(0.)
-                                       ? std::numeric_limits<Number>::max()
-                                       : std::numeric_limits<Number>::lowest());
+    Number last_terminal_output = terminal_update_interval_ == Number(0.)
+                                      ? std::numeric_limits<Number>::max()
+                                      : Number(0.);
+    Number last_checkpoint = checkpoint_update_interval_ == Number(0.)
+                                 ? std::numeric_limits<Number>::max()
+                                 : Number(0.);
 
     /*
      * The honorable main loop:
@@ -334,6 +337,7 @@ namespace ryujin
     constexpr Number relax =
         Number(1.) - Number(10.) * std::numeric_limits<Number>::epsilon();
 
+    unsigned int cycle = 1;
     for (;; ++cycle) {
 
 #ifdef DEBUG_OUTPUT
@@ -348,17 +352,18 @@ namespace ryujin
         quantities_.accumulate(state_vector, t);
       }
 
-      /* Perform various tasks whenever we reach a timer tick: */
+      /* Perform output tasks whenever we reach a timer tick: */
 
       if (t >= relax * timer_cycle * timer_granularity_) {
         if (enable_compute_error_) {
+          /*
+           * FIXME: We interpolate the analytic solution at every timer
+           * tick. If we happen to actually not output anything then this
+           * is terribly inefficient...
+           */
+
           StateVector analytic;
           {
-            /*
-             * FIXME: We interpolate the analytic solution at every timer
-             * tick. If we happen to actually not output anything then this
-             * is terribly inefficient...
-             */
             Scope scope(computing_timer_,
                         "time step [X]   - interpolate analytic solution");
             Vectors::reinit_state_vector<Description>(analytic, offline_data_);
@@ -366,11 +371,6 @@ namespace ryujin
                 initial_values_.get().interpolate_hyperbolic_vector(t);
           }
 
-          /*
-           * FIXME: a call to output() will also write a checkpoint (if
-           * enabled). So as a workaround we simply call the output()
-           * function for the analytic solution first...
-           */
           output(analytic,
                  base_name_ensemble_ + "-analytic_solution",
                  t,
@@ -408,9 +408,9 @@ namespace ryujin
           Scope scope(computing_timer_, "(re)initialize data structures");
           print_info("performing mesh adaptation");
 
+          hyperbolic_module_.prepare_state_vector(state_vector, t);
           if (!ParabolicSystem::is_identity)
             parabolic_module_.prepare_state_vector(state_vector, t);
-          hyperbolic_module_.prepare_state_vector(state_vector, t);
 
           adapt_mesh_and_transfer_state_vector(state_vector,
                                                prepare_compute_kernels);
@@ -428,43 +428,76 @@ namespace ryujin
 
       t += tau;
 
+      /* Synchronize wall time: */
+
+      auto wall_time = computing_timer_["time loop"].wall_time();
+      {
+        Scope scope(computing_timer_,
+                    "time step [X] _ - synchronization barriers");
+        wall_time =
+            Utilities::MPI::max(wall_time, mpi_ensemble_.world_communicator());
+      }
+
       /* Print and record cycle statistics: */
-      if (terminal_update_interval_ != Number(0.)) {
 
-        /* Do we need to update the log file? */
-        const bool write_to_log_file =
-            (t >= relax * timer_cycle * timer_granularity_);
+      const bool write_to_log_file =
+          (terminal_update_interval_ != Number(0.)) && /* suppress output */
+          (t >= relax * timer_cycle * timer_granularity_);
 
-        /* Do we need to update the terminal? */
-        const auto wall_time = computing_timer_["time loop"].wall_time();
-        int update_terminal =
-            (wall_time >= last_terminal_output + terminal_update_interval_);
+      const bool update_terminal =
+          (wall_time >= last_terminal_output + terminal_update_interval_);
 
-        /* Broadcast boolean from rank 0 to all other ranks: */
-        const auto ierr = MPI_Bcast(&update_terminal,
-                                    1,
-                                    MPI_INT,
-                                    0,
-                                    mpi_ensemble_.world_communicator());
-        AssertThrowMPI(ierr);
+      if (write_to_log_file || update_terminal) {
+        Scope scope(computing_timer_,
+                    "time step [X] _ - synchronization barriers");
+        print_cycle_statistics(cycle,
+                               t,
+                               timer_cycle,
+                               last_checkpoint,
+                               /*logfile*/ write_to_log_file);
+        last_terminal_output = wall_time;
+      }
 
-        if (write_to_log_file || update_terminal) {
-          print_cycle_statistics(
-              cycle, t, timer_cycle, /*logfile*/ write_to_log_file);
-          last_terminal_output = wall_time;
-        }
+      const bool update_checkpoint =
+          (wall_time >= last_checkpoint + checkpoint_update_interval_);
+
+      if (update_checkpoint) {
+        Scope scop(computing_timer_, "time step [X]   - perform checkpointing");
+
+        hyperbolic_module_.prepare_state_vector(state_vector, t);
+        if (!ParabolicSystem::is_identity)
+          parabolic_module_.prepare_state_vector(state_vector, t);
+
+        print_info("scheduling checkpointing");
+        write_checkpoint(state_vector, base_name_ensemble_, t, timer_cycle);
+        last_checkpoint = wall_time;
       }
     } /* end of loop */
 
     /* We have actually performed one cycle less. */
     --cycle;
 
+    if (checkpoint_update_interval_ != Number(0.)) {
+      Scope scope(computing_timer_, "time step [X]   - perform checkpointing");
+
+      hyperbolic_module_.prepare_state_vector(state_vector, t);
+      if (!ParabolicSystem::is_identity)
+        parabolic_module_.prepare_state_vector(state_vector, t);
+
+      print_info("scheduling checkpointing");
+      write_checkpoint(state_vector, base_name_ensemble_, t, timer_cycle);
+    }
+
     computing_timer_["time loop"].stop();
 
     if (terminal_update_interval_ != Number(0.)) {
       /* Write final timing statistics to screen and logfile: */
-      print_cycle_statistics(
-          cycle, t, timer_cycle, /*logfile*/ true, /*final*/ true);
+      print_cycle_statistics(cycle,
+                             t,
+                             timer_cycle,
+                             last_checkpoint,
+                             /*logfile*/ true,
+                             /*final*/ true);
     }
 
     if (enable_compute_error_) {
@@ -484,13 +517,20 @@ namespace ryujin
   }
 
 
+  /*
+   * ---------------------------------------------------------------------------
+   * Checkpointing, VTK output, and compute error:
+   * ---------------------------------------------------------------------------
+   */
+
+
   template <typename Description, int dim, typename Number>
   template <typename Callable>
   void TimeLoop<Description, dim, Number>::read_checkpoint(
       StateVector &state_vector,
       const std::string &base_name,
       Number &t,
-      unsigned int &output_cycle,
+      unsigned int &timer_cycle,
       const Callable &prepare_compute_kernels)
   {
 #ifdef DEBUG_OUTPUT
@@ -530,7 +570,7 @@ namespace ryujin
 
       std::ifstream file(meta, std::ios::binary);
       boost::archive::binary_iarchive ia(file);
-      ia >> t >> output_cycle >> transfer_handle;
+      ia >> t >> timer_cycle >> transfer_handle;
     }
 
     int ierr;
@@ -542,7 +582,7 @@ namespace ryujin
           MPI_Bcast(&t, 1, MPI_FLOAT, 0, mpi_ensemble_.ensemble_communicator());
     AssertThrowMPI(ierr);
 
-    ierr = MPI_Bcast(&output_cycle,
+    ierr = MPI_Bcast(&timer_cycle,
                      1,
                      MPI_UNSIGNED,
                      0,
@@ -571,7 +611,7 @@ namespace ryujin
       const StateVector &state_vector,
       const std::string &base_name,
       const Number &t,
-      const unsigned int &output_cycle)
+      const unsigned int &timer_cycle)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeLoop<dim, Number>::write_checkpoint()" << std::endl;
@@ -613,7 +653,7 @@ namespace ryujin
       std::string meta = name + ".metadata";
       std::ofstream file(meta, std::ios::binary | std::ios::trunc);
       boost::archive::binary_oarchive oa(file);
-      oa << t << output_cycle << transfer_handle;
+      oa << t << timer_cycle << transfer_handle;
     }
 
     const int ierr = MPI_Barrier(mpi_ensemble_.ensemble_communicator());
@@ -665,9 +705,9 @@ namespace ryujin
     std::cout << "TimeLoop<dim, Number>::compute_error()" << std::endl;
 #endif
 
+    hyperbolic_module_.prepare_state_vector(state_vector, t);
     if (!ParabolicSystem::is_identity)
       parabolic_module_.prepare_state_vector(state_vector, t);
-    hyperbolic_module_.prepare_state_vector(state_vector, t);
 
     Vector<Number> difference_per_cell(
         discretization_.triangulation().n_active_cells());
@@ -838,46 +878,40 @@ namespace ryujin
     const bool do_levelsets =
         (cycle % timer_output_levelsets_multiplier_ == 0) &&
         enable_output_levelsets_;
-    const bool do_checkpointing =
-        (cycle % timer_checkpoint_multiplier_ == 0) && enable_checkpointing_;
 
     /* There is nothing to do: */
-    if (!(do_full_output || do_levelsets || do_checkpointing))
+    if (!(do_full_output || do_levelsets))
       return;
 
+    /* Prepare vectors for output: */
+
+    hyperbolic_module_.prepare_state_vector(state_vector, t);
     if (!ParabolicSystem::is_identity)
       parabolic_module_.prepare_state_vector(state_vector, t);
-    hyperbolic_module_.prepare_state_vector(state_vector, t);
 
     /* Data output: */
-    if (do_full_output || do_levelsets) {
-      Scope scope(computing_timer_, "time step [X]   - perform vtu output");
-      print_info("scheduling output");
 
-      postprocessor_.compute(state_vector);
-      /*
-       * Workaround: Manually reset bounds during the first output cycle
-       * (which is often just a uniform flow field) to obtain a better
-       * normailization:
-       */
-      if (cycle == 0)
-        postprocessor_.reset_bounds();
+    Scope scope(computing_timer_, "time step [X]   - perform vtu output");
+    print_info("scheduling output");
 
-      vtu_output_.schedule_output(
-          state_vector, name, t, cycle, do_full_output, do_levelsets);
-    }
+    postprocessor_.compute(state_vector);
+    /*
+     * Workaround: Manually reset bounds during the first output cycle
+     * (which is often just a uniform flow field) to obtain a better
+     * normailization:
+     */
+    if (cycle == 0)
+      postprocessor_.reset_bounds();
 
-    /* Checkpointing: */
-    if (do_checkpointing) {
-      Scope scope(computing_timer_, "time step [X]   - perform checkpointing");
-      print_info("scheduling checkpointing");
-      write_checkpoint(state_vector, base_name_ensemble_, t, cycle);
-    }
+    vtu_output_.schedule_output(
+        state_vector, name, t, cycle, do_full_output, do_levelsets);
   }
 
 
   /*
+   * ---------------------------------------------------------------------------
    * Output and logging related functions:
+   * ---------------------------------------------------------------------------
    */
 
 
@@ -982,6 +1016,123 @@ namespace ryujin
     print_snippet("rel", data[3]);
 
     stream << output.str() << std::endl;
+  }
+
+
+  template <typename Description, int dim, typename Number>
+  void TimeLoop<Description, dim, Number>::print_info(const std::string &header)
+  {
+    if (mpi_ensemble_.world_rank() != 0)
+      return;
+
+    std::cout << "[INFO] " << header << std::endl;
+  }
+
+
+  template <typename Description, int dim, typename Number>
+  void
+  TimeLoop<Description, dim, Number>::print_head(const std::string &header,
+                                                 const std::string &secondary,
+                                                 std::ostream &stream)
+  {
+    if (mpi_ensemble_.world_rank() != 0)
+      return;
+
+    const int header_size = header.size();
+    const auto padded_header =
+        std::string(std::max(0, 34 - header_size) / 2, ' ') + header +
+        std::string(std::max(0, 35 - header_size) / 2, ' ');
+
+    const int secondary_size = secondary.size();
+    const auto padded_secondary =
+        std::string(std::max(0, 34 - secondary_size) / 2, ' ') + secondary +
+        std::string(std::max(0, 35 - secondary_size) / 2, ' ');
+
+    /* clang-format off */
+    stream << "\n";
+    stream << "    ####################################################\n";
+    stream << "    #########"     <<  padded_header   <<     "#########\n";
+    stream << "    #########"     << padded_secondary <<     "#########\n";
+    stream << "    ####################################################\n";
+    stream << std::endl;
+    /* clang-format on */
+  }
+
+
+  template <typename Description, int dim, typename Number>
+  void TimeLoop<Description, dim, Number>::print_information(
+      unsigned int timer_cycle,
+      Number last_checkpoint,
+      std::ostream &stream,
+      bool final_time)
+  {
+    static const std::string vectorization_name = [] {
+      constexpr auto width = VectorizedArray<Number>::size();
+
+      std::string result;
+      if (width == 1)
+        result = "scalar ";
+      else
+        result = std::to_string(width * 8 * sizeof(Number)) + " bit packed ";
+
+      if constexpr (std::is_same_v<Number, double>)
+        return result + "double";
+      else if constexpr (std::is_same_v<Number, float>)
+        return result + "float";
+      else
+        __builtin_trap();
+    }();
+
+    stream << "Information: (HYP) " << hyperbolic_system_.get().problem_name;
+    if constexpr (!ParabolicSystem::is_identity) {
+      stream << "\n             (PAR) " << parabolic_system_.get().problem_name;
+    }
+    stream << "\n             [" << base_name_ << "] ";
+    if (mpi_ensemble_.n_ensembles() > 1) {
+      stream << mpi_ensemble_.n_ensembles() << " ensembles ";
+    }
+    stream << "with "                                      //
+           << n_global_dofs_ << " Qdofs on "               //
+           << mpi_ensemble_.n_world_ranks() << " ranks / " //
+#ifdef WITH_OPENMP
+           << MultithreadInfo::n_threads() << " threads <" //
+#else
+           << "[openmp disabled] <" //
+#endif
+           << vectorization_name << ">\n";
+
+    if (enable_compute_quantities_ || enable_output_full_ ||
+        enable_output_levelsets_) {
+      stream << "             Last output cycle "                    //
+             << timer_cycle - 1                                      //
+             << " at t = " << timer_granularity_ * (timer_cycle - 1) //
+             << " [ ";
+
+      if (enable_output_full_)
+        stream << "full ";
+      if (enable_output_levelsets_)
+        stream << "levelsets ";
+      if (enable_compute_quantities_)
+        stream << "quantities ";
+
+      stream << "]\n";
+    }
+
+    if (checkpoint_update_interval_ != Number(0.)) {
+      const auto wall_time =
+          Utilities::MPI::min_max_avg(computing_timer_["time loop"].wall_time(),
+                                      mpi_ensemble_.world_communicator());
+
+      if (final_time) {
+        stream << "             Last checkpoint at FINAL TIME\n";
+      } else {
+        stream << "             Last checkpoint at wall time "          //
+               << std::setprecision(2) << std::fixed << last_checkpoint //
+               << "s (" << std::setprecision(0)
+               << std::max(0., wall_time.max - last_checkpoint)
+               << "s ago, interval " << checkpoint_update_interval_ << "s)\n";
+      }
+    }
   }
 
 
@@ -1240,7 +1391,8 @@ namespace ryujin
            << " dt/s) ]" << std::endl;
     /* clang-format on */
 
-    /* and print an ETA */
+    /* And print an ETA: */
+
     time_per_second_exp = 0.8 * time_per_second_exp + 0.2 * time_per_second;
     auto eta = static_cast<unsigned int>(std::max(t_final_ - t, Number(0.)) /
                                          time_per_second_exp);
@@ -1262,6 +1414,10 @@ namespace ryujin
     const unsigned int minutes = eta / 60;
     output << minutes << " min";
 
+    output << " (terminal update every " //
+           << std::setprecision(2) << std::fixed << terminal_update_interval_
+           << "s)";
+
     if (mpi_ensemble_.world_rank() != 0)
       return;
 
@@ -1270,71 +1426,17 @@ namespace ryujin
 
 
   template <typename Description, int dim, typename Number>
-  void TimeLoop<Description, dim, Number>::print_info(const std::string &header)
-  {
-    if (mpi_ensemble_.world_rank() != 0)
-      return;
-
-    std::cout << "[INFO] " << header << std::endl;
-  }
-
-
-  template <typename Description, int dim, typename Number>
-  void
-  TimeLoop<Description, dim, Number>::print_head(const std::string &header,
-                                                 const std::string &secondary,
-                                                 std::ostream &stream)
-  {
-    if (mpi_ensemble_.world_rank() != 0)
-      return;
-
-    const int header_size = header.size();
-    const auto padded_header =
-        std::string(std::max(0, 34 - header_size) / 2, ' ') + header +
-        std::string(std::max(0, 35 - header_size) / 2, ' ');
-
-    const int secondary_size = secondary.size();
-    const auto padded_secondary =
-        std::string(std::max(0, 34 - secondary_size) / 2, ' ') + secondary +
-        std::string(std::max(0, 35 - secondary_size) / 2, ' ');
-
-    /* clang-format off */
-    stream << "\n";
-    stream << "    ####################################################\n";
-    stream << "    #########"     <<  padded_header   <<     "#########\n";
-    stream << "    #########"     << padded_secondary <<     "#########\n";
-    stream << "    ####################################################\n";
-    stream << std::endl;
-    /* clang-format on */
-  }
-
-
-  template <typename Description, int dim, typename Number>
   void TimeLoop<Description, dim, Number>::print_cycle_statistics(
       unsigned int cycle,
       Number t,
       unsigned int timer_cycle,
+      Number last_checkpoint,
       bool write_to_logfile,
       bool final_time)
   {
-    static const std::string vectorization_name = [] {
-      constexpr auto width = VectorizedArray<Number>::size();
-
-      std::string result;
-      if (width == 1)
-        result = "scalar ";
-      else
-        result = std::to_string(width * 8 * sizeof(Number)) + " bit packed ";
-
-      if constexpr (std::is_same_v<Number, double>)
-        return result + "double";
-      else if constexpr (std::is_same_v<Number, float>)
-        return result + "float";
-      else
-        __builtin_trap();
-    }();
-
     std::ostringstream output;
+
+    /* Print header: */
 
     std::ostringstream primary;
     if (final_time) {
@@ -1350,43 +1452,24 @@ namespace ryujin
 
     print_head(primary.str(), secondary.str(), output);
 
-    output << "Information: (HYP) " << hyperbolic_system_.get().problem_name;
-    if constexpr (!ParabolicSystem::is_identity) {
-      output << "\n             (PAR) " << parabolic_system_.get().problem_name;
-    }
-    output << "\n             [" << base_name_ << "] ";
-    if (mpi_ensemble_.n_ensembles() > 1) {
-      output << mpi_ensemble_.n_ensembles() << " ensembles ";
-    }
-    output << "with "                                      //
-           << n_global_dofs_ << " Qdofs on "               //
-           << mpi_ensemble_.n_world_ranks() << " ranks / " //
-#ifdef WITH_OPENMP
-           << MultithreadInfo::n_threads() << " threads <" //
-#else
-           << "[openmp disabled] <" //
-#endif
-           << vectorization_name                                         //
-           << ">\n             Last output cycle "                       //
-           << timer_cycle - 1                                            //
-           << " at t = " << timer_granularity_ * (timer_cycle - 1)       //
-           << " (terminal update interval " << terminal_update_interval_ //
-           << "s)\n";
+    /* Print information and statistics: */
 
+    print_information(timer_cycle, last_checkpoint, output, final_time);
     print_memory_statistics(output);
     print_timers(output);
     print_throughput(cycle, t, output, final_time);
 
-    if (mpi_ensemble_.world_rank() == 0) {
-#ifndef DEBUG_OUTPUT
-      std::cout << "\033[2J\033[H";
-#endif
-      std::cout << output.str() << std::flush;
+    /* Only output on rank 0: */
+    if (mpi_ensemble_.world_rank() != 0)
+      return;
 
-      if (write_to_logfile) {
-        logfile_ << "\n" << output.str() << std::flush;
-      }
+#ifndef DEBUG_OUTPUT
+    std::cout << "\033[2J\033[H";
+#endif
+    std::cout << output.str() << std::flush;
+
+    if (write_to_logfile) {
+      logfile_ << "\n" << output.str() << std::flush;
     }
   }
-
 } // namespace ryujin

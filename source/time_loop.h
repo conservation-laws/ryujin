@@ -129,6 +129,17 @@ namespace ryujin
 
     void print_parameters(std::ostream &stream);
     void print_mpi_partition(std::ostream &stream);
+
+    void print_info(const std::string &header);
+
+    void print_head(const std::string &header,
+                    const std::string &secondary,
+                    std::ostream &stream);
+
+    void print_information(unsigned int output_cycle,
+                           Number last_checkpoint,
+                           std::ostream &stream,
+                           bool final_time = false);
     void print_memory_statistics(std::ostream &stream);
     void print_timers(std::ostream &stream);
     void print_throughput(unsigned int cycle,
@@ -136,14 +147,10 @@ namespace ryujin
                           std::ostream &stream,
                           bool final_time = false);
 
-    void print_info(const std::string &header);
-    void print_head(const std::string &header,
-                    const std::string &secondary,
-                    std::ostream &stream);
-
     void print_cycle_statistics(unsigned int cycle,
                                 Number t,
                                 unsigned int output_cycle,
+                                Number last_checkpoint,
                                 bool write_to_logfile = false,
                                 bool final_time = false);
     //@}
@@ -163,14 +170,12 @@ namespace ryujin
     bool enforce_t_final_;
     Number timer_granularity_;
 
-    bool enable_checkpointing_;
     bool enable_output_full_;
     bool enable_output_levelsets_;
     bool enable_compute_error_;
     bool enable_compute_quantities_;
     bool enable_mesh_adaptivity_;
 
-    unsigned int timer_checkpoint_multiplier_;
     unsigned int timer_output_full_multiplier_;
     unsigned int timer_output_levelsets_multiplier_;
     unsigned int timer_compute_quantities_multiplier_;
@@ -183,6 +188,8 @@ namespace ryujin
 
     Number terminal_update_interval_;
     bool terminal_show_rank_throughput_;
+
+    Number checkpoint_update_interval_;
 
     //@}
     /**
