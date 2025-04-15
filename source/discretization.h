@@ -13,11 +13,11 @@
 #include "patterns_conversion.h"
 
 #include <deal.II/base/parameter_acceptor.h>
-#include <deal.II/base/quadrature.h>
 #include <deal.II/distributed/shared_tria.h>
 #include <deal.II/distributed/tria.h>
-#include <deal.II/fe/fe.h>
-#include <deal.II/fe/mapping.h>
+#include <deal.II/hp/fe_collection.h>
+#include <deal.II/hp/mapping_collection.h>
+#include <deal.II/hp/q_collection.h>
 
 #include <memory>
 #include <set>
@@ -270,6 +270,30 @@ namespace ryujin
     }
 
     /**
+     * Return the polynomial degree of the chosen finite element ansatz.
+     */
+    unsigned int polynomial_degree() const
+    {
+      switch (ansatz_) {
+      case Ansatz::cg_q1:
+        [[fallthrough]];
+      case Ansatz::dg_q1:
+        return 1;
+      case Ansatz::cg_q2:
+        [[fallthrough]];
+      case Ansatz::dg_q2:
+        return 2;
+      case Ansatz::cg_q3:
+        [[fallthrough]];
+      case Ansatz::dg_q3:
+        return 3;
+      }
+
+      AssertThrow(false, dealii::ExcInternalError());
+      __builtin_trap();
+    }
+
+    /**
      * Return a mutable reference to the refinement variable.
      */
     ACCESSOR(refinement)
@@ -333,14 +357,15 @@ namespace ryujin
     const MPIEnsemble &mpi_ensemble_;
 
     std::unique_ptr<Triangulation> triangulation_;
-    std::unique_ptr<const dealii::Mapping<dim>> mapping_;
-    std::unique_ptr<const dealii::FiniteElement<dim>> finite_element_;
-    std::unique_ptr<const dealii::FiniteElement<dim>> finite_element_cg_;
-    std::unique_ptr<const dealii::Quadrature<dim>> quadrature_;
-    std::unique_ptr<const dealii::Quadrature<dim>> nodal_quadrature_;
-    std::unique_ptr<const dealii::Quadrature<1>> quadrature_1d_;
-    std::unique_ptr<const dealii::Quadrature<dim - 1>> face_quadrature_;
-    std::unique_ptr<const dealii::Quadrature<dim - 1>> face_nodal_quadrature_;
+    std::unique_ptr<const dealii::hp::MappingCollection<dim>> mapping_;
+    std::unique_ptr<const dealii::hp::FECollection<dim>> finite_element_;
+    std::unique_ptr<const dealii::hp::FECollection<dim>> finite_element_cg_;
+    std::unique_ptr<const dealii::hp::QCollection<dim>> quadrature_;
+    std::unique_ptr<const dealii::hp::QCollection<dim>> nodal_quadrature_;
+    std::unique_ptr<const dealii::hp::QCollection<1>> quadrature_1d_;
+    std::unique_ptr<const dealii::hp::QCollection<dim - 1>> face_quadrature_;
+    std::unique_ptr<const dealii::hp::QCollection<dim - 1>>
+        face_nodal_quadrature_;
 
   private:
     //@}
