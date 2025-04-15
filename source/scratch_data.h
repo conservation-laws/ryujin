@@ -8,7 +8,7 @@
 #include "discretization.h"
 
 #include <deal.II/base/quadrature_lib.h>
-#include <deal.II/fe/fe_values.h>
+#include <deal.II/hp/fe_values.h>
 #include <deal.II/lac/full_matrix.h>
 
 namespace ryujin
@@ -32,28 +32,28 @@ namespace ryujin
 
     AssemblyScratchData(const Discretization<dim> &discretization)
         : discretization_(discretization)
-        , fe_values_(discretization_.mapping(),
-                     discretization_.finite_element(),
-                     discretization_.quadrature(),
-                     dealii::update_values | dealii::update_gradients |
-                         dealii::update_quadrature_points |
-                         dealii::update_JxW_values)
-        , fe_face_values_(
+        , hp_fe_values_(discretization_.mapping(),
+                        discretization_.finite_element(),
+                        discretization_.quadrature(),
+                        dealii::update_values | dealii::update_gradients |
+                            dealii::update_quadrature_points |
+                            dealii::update_JxW_values)
+        , hp_fe_face_values_(
               discretization_.mapping(),
               discretization_.finite_element(),
               discretization_.face_quadrature(),
               dealii::update_values | dealii::update_quadrature_points |
                   dealii::update_JxW_values | dealii::update_normal_vectors)
-        , fe_face_values_nodal_(discretization_.mapping(),
-                                discretization_.finite_element(),
-                                discretization_.face_nodal_quadrature(),
-                                dealii::update_values |
-                                    dealii::update_quadrature_points)
-        , fe_neighbor_face_values_(discretization_.mapping(),
+        , hp_fe_face_values_nodal_(discretization_.mapping(),
                                    discretization_.finite_element(),
-                                   discretization_.face_quadrature(),
-                                   dealii::update_values)
-        , fe_neighbor_face_values_nodal_(
+                                   discretization_.face_nodal_quadrature(),
+                                   dealii::update_values |
+                                       dealii::update_quadrature_points)
+        , hp_fe_neighbor_face_values_(discretization_.mapping(),
+                                      discretization_.finite_element(),
+                                      discretization_.face_quadrature(),
+                                      dealii::update_values)
+        , hp_fe_neighbor_face_values_nodal_(
               discretization_.mapping(),
               discretization_.finite_element(),
               discretization_.face_nodal_quadrature(),
@@ -62,11 +62,12 @@ namespace ryujin
     }
 
     const Discretization<dim> &discretization_;
-    dealii::FEValues<dim> fe_values_;
-    dealii::FEFaceValues<dim> fe_face_values_;
-    dealii::FEFaceValues<dim> fe_face_values_nodal_;
-    dealii::FEFaceValues<dim> fe_neighbor_face_values_;
-    dealii::FEFaceValues<dim> fe_neighbor_face_values_nodal_;
+
+    dealii::hp::FEValues<dim> hp_fe_values_;
+    dealii::hp::FEFaceValues<dim> hp_fe_face_values_;
+    dealii::hp::FEFaceValues<dim> hp_fe_face_values_nodal_;
+    dealii::hp::FEFaceValues<dim> hp_fe_neighbor_face_values_;
+    dealii::hp::FEFaceValues<dim> hp_fe_neighbor_face_values_nodal_;
   };
 
   /**
