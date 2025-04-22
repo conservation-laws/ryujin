@@ -61,12 +61,12 @@
 #else
 
 /**
- * Wrapper macro initializing likwid introspection. Used in main().
+ * Wrapper macro initializing likwid instrumentation. Used in main().
  */
 #define LIKWID_INIT
 
 /**
- * Wrapper macro finalizing likwid introspection. Used in main().
+ * Wrapper macro finalizing likwid instrumentation. Used in main().
  */
 #define LIKWID_CLOSE
 

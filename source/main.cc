@@ -6,7 +6,7 @@
 #include <compile_time_options.h>
 
 #include "equation_dispatch.h"
-#include "introspection.h"
+#include "instrumentation.h"
 
 #include <deal.II/base/mpi.h>
 #include <deal.II/base/multithread_info.h>
