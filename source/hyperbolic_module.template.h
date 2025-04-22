@@ -6,7 +6,7 @@
 #pragma once
 
 #include "hyperbolic_module.h"
-#include "introspection.h"
+#include "instrumentation.h"
 #include "mpi_ensemble.h"
 #include "openmp.h"
 #include "scope.h"

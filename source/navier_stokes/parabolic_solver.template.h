@@ -7,7 +7,7 @@
 
 #include "parabolic_solver.h"
 
-#include <introspection.h>
+#include <instrumentation.h>
 #include <openmp.h>
 #include <scope.h>
 #include <simd.h>
