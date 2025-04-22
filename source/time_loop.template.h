@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "introspection.h"
 #include "scope.h"
 #include "state_vector.h"
 #include "time_loop.h"

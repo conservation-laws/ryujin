@@ -7,11 +7,19 @@
 
 #include "openmp.h"
 
+
+#ifdef WITH_VALGRIND
+
+#include <valgrind/callgrind.h>
+
+#else
+
 /**
  * @name Various macros and include for instrumentation via valgrind,
  * likwid, and clang lsan.
  */
 //@{
+
 
 /**
  * A set of macros that start and stop callgrind instrumentation (if the
@@ -36,12 +44,21 @@
   do {                                                                         \
   } while (false)
 
-#ifdef WITH_VALGRIND
-#undef CALLGRIND_START_INSTRUMENTATION
-#undef CALLGRIND_STOP_INSTRUMENTATION
-#include <valgrind/callgrind.h>
 #endif
 
+
+#ifdef WITH_LIKWID
+#include <likwid.h>
+
+#define LIKWID_INIT                                                            \
+  LIKWID_MARKER_INIT;                                                          \
+  RYUJIN_PARALLEL_REGION_BEGIN                                                 \
+  LIKWID_MARKER_THREADINIT;                                                    \
+  RYUJIN_PARALLEL_REGION_END
+
+#define LIKWID_CLOSE LIKWID_MARKER_CLOSE;
+
+#else
 
 /**
  * Wrapper macro initializing likwid introspection. Used in main().
@@ -72,20 +89,6 @@
  */
 #define LIKWID_MARKER_STOP(opt)
 
-#ifdef WITH_LIKWID
-#undef LIKWID_INIT
-#undef LIKWID_CLOSE
-#undef LIKWID_MARKER_START
-#undef LIKWID_MARKER_STOP
-#include <likwid.h>
-
-#define LIKWID_INIT                                                            \
-  LIKWID_MARKER_INIT;                                                          \
-  RYUJIN_PARALLEL_REGION_BEGIN                                                 \
-  LIKWID_MARKER_THREADINIT;                                                    \
-  RYUJIN_PARALLEL_REGION_END
-
-#define LIKWID_CLOSE LIKWID_MARKER_CLOSE;
 #endif
 
 
