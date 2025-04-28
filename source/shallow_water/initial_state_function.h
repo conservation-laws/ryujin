@@ -17,7 +17,7 @@ namespace ryujin
   {
     /**
      * Returns an initial state defined by a set of user specified functions
-     * based on the primitive variables.
+     * based on the primitive variables and the bathymetry.
      *
      * @ingroup ShallowWaterEquations
      */
@@ -37,9 +37,16 @@ namespace ryujin
       {
 
         depth_expression_ = "1.4";
-        this->add_parameter("water depth expression",
-                            depth_expression_,
-                            "A function expression describing the water depth");
+        this->add_parameter(
+            "water evelation expression",
+            depth_expression_,
+            "A function expression describing the water elevation. When "
+            "bathymetry is 0, this reduces to the water depth.");
+
+        bathymetry_expression_ = "0.";
+        this->add_parameter("bathymetry expression",
+                            bathymetry_expression_,
+                            "A function expression describing the bathymetry");
 
 
         velocity_x_expression_ = "3.0";
@@ -71,6 +78,7 @@ namespace ryujin
           velocity_x_function_ = std::make_unique<FP>(velocity_x_expression_);
           if constexpr (dim > 1)
             velocity_y_function_ = std::make_unique<FP>(velocity_y_expression_);
+          bathymetry_function_ = std::make_unique<FP>(bathymetry_expression_);
         };
 
         set_up_muparser();
@@ -82,8 +90,12 @@ namespace ryujin
         const auto view = hyperbolic_system_.template view<dim, Number>();
         state_type full_primitive;
 
+        /* Compute bathymetry */
+        const Number z = compute_bathymetry(point);
+
         depth_function_->set_time(t);
-        full_primitive[0] = depth_function_->value(point);
+        full_primitive[0] =
+            std::max(Number(depth_function_->value(point)) - z, Number(0.));
 
         velocity_x_function_->set_time(t);
         full_primitive[1] = velocity_x_function_->value(point);
@@ -94,6 +106,14 @@ namespace ryujin
         }
 
         return view.from_primitive_state(full_primitive);
+      }
+
+      auto initial_precomputations(const dealii::Point<dim> &point) ->
+          typename InitialState<Description, dim, Number>::
+              initial_precomputed_type final
+      {
+        /* Compute bathymetry: */
+        return {compute_bathymetry(point)};
       }
 
     private:
@@ -108,6 +128,13 @@ namespace ryujin
       std::unique_ptr<dealii::FunctionParser<dim>> velocity_x_function_;
       std::unique_ptr<dealii::FunctionParser<dim>> velocity_y_function_;
       std::unique_ptr<dealii::FunctionParser<dim>> bathymetry_function_;
+
+      DEAL_II_ALWAYS_INLINE inline Number
+      compute_bathymetry(const dealii::Point<dim> &point) const
+      {
+        bathymetry_function_->set_time(0.);
+        return bathymetry_function_->value(point);
+      }
     };
   } // namespace ShallowWaterInitialStates
 } // namespace ryujin
