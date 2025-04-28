@@ -10,6 +10,7 @@
 #include "initial_state_astro_jet.h"
 #include "initial_state_becker_solution.h"
 #include "initial_state_contrast.h"
+#include "initial_state_exact_riemann_solution.h"
 #include "initial_state_four_state_contrast.h"
 #include "initial_state_function.h"
 #include "initial_state_icf_like.h"
@@ -41,6 +42,8 @@ namespace ryujin
 
       add(std::make_unique<AstroJet<Description, dim, Number>>(h, s));
       add(std::make_unique<BeckerSolution<Description, dim, Number>>(h, s));
+      add(std::make_unique<ExactRiemannSolution<Description, dim, Number>>(h,
+                                                                           s));
       add(std::make_unique<Contrast<Description, dim, Number>>(h, s));
       add(std::make_unique<FourStateContrast<Description, dim, Number>>(h, s));
       add(std::make_unique<Function<Description, dim, Number>>(h, s));
