@@ -1,0 +1,63 @@
+subsection A - TimeLoop
+  set basename             = exactRP_sod-erk33
+
+  set enable compute error = true
+  set error quantities     = rho, m, E
+
+  set final time           = 0.1
+  set timer granularity    = 0.1
+
+  set terminal update interval  = 0
+end
+
+
+subsection B - Equation
+  set dimension = 1
+  set equation  = euler
+  set gamma     = 1.4
+end
+
+
+subsection C - Discretization
+  set geometry        = rectangular domain
+  set mesh refinement = 0
+
+  subsection rectangular domain
+    set boundary condition left   = dirichlet
+    set boundary condition right  = dirichlet
+
+    set position bottom left      = 0
+    set position top right        = 1
+    set subdivisions x            = 100
+  end
+end
+
+
+subsection E - InitialValues
+  set configuration = exact riemann solution
+  set direction     = 1
+  set position      = 0.5
+
+  subsection exact riemann solution
+    set primitive state left  = 1.,    0, 1
+    set primitive state right = 0.125, 0, 0.1
+  end
+end
+
+
+subsection F - HyperbolicModule
+  subsection limiter
+    set iterations            = 2
+    set newton max iterations = 2
+    set newton tolerance      = 1e-10
+    set relaxation factor     = 1
+  end
+end
+
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.50
+  set cfl max               = 0.50
+  set cfl recovery strategy = none
+  set time stepping scheme  = erk 33
+end
