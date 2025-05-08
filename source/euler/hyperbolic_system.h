@@ -616,7 +616,7 @@ namespace ryujin
       state_type expand_state(const ST &state) const;
 
       /**
-       * Given an initial state [rho, u_1, ..., u_?, p] return a
+       * Given an initial state [rho, u_1, ..., u_d, p] return a
        * conserved state [rho, m_1, ..., m_d, E].
        *
        * This function simply calls from_primitive_state() and
