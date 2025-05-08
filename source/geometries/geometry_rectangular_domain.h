@@ -22,7 +22,7 @@ namespace ryujin
      * A mesh grading can be enforced by defining an optional pull back and
      * push forward operation.
      *
-     * By convenction the rectangular domain is orient with the x-axis to
+     * By convention the rectangular domain is orient with the x-axis to
      * from "left to right", the y-axis from "bottom to top" and the z-axis
      * from "the back towards the front".
      *
