@@ -5,16 +5,16 @@
 
 #pragma once
 
-#include "geometry_airfoil.h"
-#include "geometry_annulus.h"
-#include "geometry_cylinder.h"
-#include "geometry_disk.h"
-#include "geometry_geotiff_profile.h"
-#include "geometry_reader.h"
-#include "geometry_rectangular_domain.h"
-#include "geometry_step.h"
-#include "geometry_tank.h"
-#include "geometry_wall.h"
+#include "geometries/geometry_airfoil.h"
+#include "geometries/geometry_annulus.h"
+#include "geometries/geometry_cylinder.h"
+#include "geometries/geometry_disk.h"
+#include "geometries/geometry_geotiff_profile.h"
+#include "geometries/geometry_reader.h"
+#include "geometries/geometry_rectangular_domain.h"
+#include "geometries/geometry_step.h"
+#include "geometries/geometry_tank.h"
+#include "geometries/geometry_wall.h"
 
 namespace ryujin
 {
