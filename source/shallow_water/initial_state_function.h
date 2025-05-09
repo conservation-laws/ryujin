@@ -38,7 +38,7 @@ namespace ryujin
 
         depth_expression_ = "1.4";
         this->add_parameter(
-            "water evelation expression",
+            "water elevation expression",
             depth_expression_,
             "A function expression describing the water elevation. When "
             "bathymetry is 0, this reduces to the water depth.");
