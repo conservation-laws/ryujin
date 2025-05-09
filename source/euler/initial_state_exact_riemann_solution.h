@@ -130,8 +130,7 @@ namespace ryujin
         if (t < 1.e-14 && x < 0.) {
           primitive_state = primitive_left_;
 #ifdef DEBUG_SOLUTION
-          std::cout << "Left primitive state: " << primitive_state
-                    << std::endl;
+          std::cout << "Left primitive state: " << primitive_state << std::endl;
 #endif
 
         } else if (t < 1.e-14 && x > 0.) {
@@ -145,8 +144,7 @@ namespace ryujin
           /* Left state: */
           primitive_state = primitive_left_;
 #ifdef DEBUG_SOLUTION
-          std::cout << "Left primitive state: " << primitive_state
-                    << std::endl;
+          std::cout << "Left primitive state: " << primitive_state << std::endl;
 #endif
 
         } else if (xi < lambda_left_plus_) {
@@ -154,8 +152,7 @@ namespace ryujin
               expansion_solution(p_star_, xi, primitive_left_, -1.);
           primitive_state = c_LL;
 #ifdef DEBUG_SOLUTION
-          std::cout << "Left expansion state: " << primitive_state
-                    << std::endl;
+          std::cout << "Left expansion state: " << primitive_state << std::endl;
 #endif
 
         } else if (xi < u_star_) {
@@ -166,21 +163,18 @@ namespace ryujin
             primitive_state = expansion_solution(
                 p_star_, lambda_left_plus_, primitive_left_, -1.);
 #ifdef DEBUG_SOLUTION
-          std::cout << "Left cstar state: " << primitive_state
-                    << std::endl;
+          std::cout << "Left cstar state: " << primitive_state << std::endl;
 #endif
 
         } else if (xi < lambda_right_minus_) {
-          primitive_state =
-              cstar_solution(p_star_, u_star_, primitive_right_);
+          primitive_state = cstar_solution(p_star_, u_star_, primitive_right_);
 
           const Number p_R = primitive_right_[2];
           if (p_star_ < p_R)
             primitive_state = expansion_solution(
                 p_star_, lambda_right_minus_, primitive_right_, 1.);
 #ifdef DEBUG_SOLUTION
-          std::cout << "Right cstar state: " << primitive_state
-                    << std::endl;
+          std::cout << "Right cstar state: " << primitive_state << std::endl;
 #endif
 
         } else if (xi < lambda_right_plus_) {
@@ -435,11 +429,11 @@ namespace ryujin
         }
 
 #ifdef DEBUG
-          const double phi_1 = phi(p_1, data_1, data_2);
-          const double phi_2 = phi(p_2, data_1, data_2);
-          Assert(phi_1 * phi_2 <= 0.,
-                 dealii::ExcMessage(
-                     "Euler::ExactRiemannSolver: failed to compute p_star."));
+        const double phi_1 = phi(p_1, data_1, data_2);
+        const double phi_2 = phi(p_2, data_1, data_2);
+        Assert(phi_1 * phi_2 <= 0.,
+               dealii::ExcMessage(
+                   "Euler::ExactRiemannSolver: failed to compute p_star."));
 #endif
 
         //
