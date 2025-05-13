@@ -8,7 +8,7 @@
 #include <compile_time_options.h>
 
 #include "convenience_macros.h"
-#include "geometry.h"
+#include "geometries/geometry.h"
 #include "mpi_ensemble.h"
 #include "patterns_conversion.h"
 

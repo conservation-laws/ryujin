@@ -8,7 +8,7 @@
 #include <compile_time_options.h>
 
 #include "discretization.h"
-#include "geometry_library.h"
+#include "geometries/geometry_library.h"
 
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/fe/fe_dgq.h>
