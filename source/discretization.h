@@ -13,6 +13,7 @@
 #include "patterns_conversion.h"
 
 #include <deal.II/base/parameter_acceptor.h>
+#include <deal.II/distributed/fully_distributed_tria.h>
 #include <deal.II/distributed/shared_tria.h>
 #include <deal.II/distributed/tria.h>
 #include <deal.II/hp/fe_collection.h>
@@ -151,6 +152,21 @@ namespace ryujin
     /** dG Q3: discontinuous bi- (tri-) cubic Lagrange elements */
     dg_q3
   };
+
+  /**
+   * An enum class for setting the type of Triangulation that should be
+   * constructed.
+   */
+  enum class MeshType {
+    /** Use serial dealii::Triangulation<dim> */
+    serial,
+    /** Use parallel dealii::parallel::shared::Triangulation<dim> */
+    parallel_shared,
+    /** Use parallel dealii::parallel::distributed::Triangulation<dim> */
+    parallel_distributed,
+    /** Use parallel dealii::parallel::fullydistributed::Triangulation<dim> */
+    parallel_fullydistributed
+  };
 } // namespace ryujin
 
 #ifndef DOXYGEN
@@ -171,25 +187,18 @@ DECLARE_ENUM(ryujin::Ansatz,
                   {ryujin::Ansatz::dg_q1, "dG Q1"},
                   {ryujin::Ansatz::dg_q2, "dG Q2"},
                   {ryujin::Ansatz::dg_q3, "dG Q3"}));
+
+DECLARE_ENUM(ryujin::MeshType,
+             LIST({ryujin::MeshType::serial, "serial"},
+                  {ryujin::MeshType::parallel_shared, "parallel shared"},
+                  {ryujin::MeshType::parallel_distributed,
+                   "parallel distributed"},
+                  {ryujin::MeshType::parallel_fullydistributed,
+                   "parallel fullydistributed"}));
 #endif
 
 namespace ryujin
 {
-  namespace
-  {
-    template <int dim>
-    struct Proxy {
-      using Triangulation = dealii::parallel::distributed::Triangulation<dim>;
-    };
-
-    template <>
-    struct Proxy<1> {
-      using Triangulation = dealii::parallel::shared::Triangulation<1>;
-    };
-
-  } // namespace
-
-
   /**
    * This class is as a container for data related to the discretization,
    * this includes the triangulation, finite element, mapping, and
@@ -209,15 +218,6 @@ namespace ryujin
   class Discretization : public dealii::ParameterAcceptor
   {
   public:
-    /**
-     * A type alias denoting the Triangulation we are using:
-     *
-     * In one spatial dimensions we use a
-     * dealii::parallel::shared::Triangulation and for two and three
-     * dimensions a dealii::parallel::distributed::Triangulation.
-     */
-    using Triangulation = typename Proxy<dim>::Triangulation;
-
     /**
      * Constructor.
      */
@@ -242,7 +242,7 @@ namespace ryujin
 
   public:
     /**
-     * Return a boolean indicating  whether the chosen Ansatz space is
+     * Return a boolean indicating whether the chosen Ansatz space is
      * discontinuous.
      */
     bool have_discontinuous_ansatz() const
@@ -291,6 +291,25 @@ namespace ryujin
 
       AssertThrow(false, dealii::ExcInternalError());
       __builtin_trap();
+    }
+
+
+    /**
+     * Return a boolean indicating whether the chosen mesh geometry is
+     * stored in a parallel distributed, or parallel fullydistributed
+     * triangulation.
+     */
+    bool have_distributed_triangulation() const
+    {
+      using namespace dealii::parallel;
+      const auto *p_t = triangulation_.get();
+
+      if (dynamic_cast<const distributed::Triangulation<dim> *>(p_t))
+        return true;
+      else if (dynamic_cast<const fullydistributed::Triangulation<dim> *>(p_t))
+        return true;
+      else
+        return false;
     }
 
     /**
@@ -356,7 +375,7 @@ namespace ryujin
   protected:
     const MPIEnsemble &mpi_ensemble_;
 
-    std::unique_ptr<Triangulation> triangulation_;
+    std::unique_ptr<dealii::Triangulation<dim>> triangulation_;
     std::unique_ptr<const dealii::hp::MappingCollection<dim>> mapping_;
     std::unique_ptr<const dealii::hp::FECollection<dim>> finite_element_;
     std::unique_ptr<const dealii::hp::FECollection<dim>> finite_element_cg_;
@@ -403,14 +422,4 @@ namespace ryujin
     template <typename Discretization, int dim_, typename Number_>
     friend class SolutionTransfer;
   };
-
-
-  /**
-   * A templated constexpr boolean that is true if we use a parallel
-   * distributed triangulation (for the specified dimension).
-   */
-  template <int dim>
-  constexpr bool have_distributed_triangulation =
-      std::is_same<typename Discretization<dim>::Triangulation,
-                   dealii::parallel::distributed::Triangulation<dim>>::value;
 } /* namespace ryujin */

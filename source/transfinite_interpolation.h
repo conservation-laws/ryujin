@@ -9,6 +9,7 @@
 
 #include <deal.II/base/config.h>
 #include <deal.II/grid/manifold.h>
+#include <deal.II/grid/tria.h>
 
 namespace ryujin
 {

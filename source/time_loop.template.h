@@ -541,23 +541,25 @@ namespace ryujin
     std::cout << "TimeLoop<dim, Number>::read_checkpoint()" << std::endl;
 #endif
 
-    AssertThrow(have_distributed_triangulation<dim>,
-                dealii::ExcMessage(
-                    "read_checkpoint() is not implemented for "
-                    "distributed::shared::Triangulation which we use in 1D"));
-
     /*
      * Initialize discretization, read in the mesh, and initialize everything:
      */
 
-#if !DEAL_II_VERSION_GTE(9, 6, 0)
-    if constexpr (have_distributed_triangulation<dim>) {
-#endif
-      discretization_.refinement() = 0; /* do not refine */
-      discretization_.prepare(base_name);
-      discretization_.triangulation().load(base_name + "-checkpoint.mesh");
-#if !DEAL_II_VERSION_GTE(9, 6, 0)
-    }
+#if DEAL_II_VERSION_GTE(9, 6, 0)
+    discretization_.refinement() = 0; /* do not refine */
+    discretization_.prepare(base_name);
+
+    AssertThrow(discretization_.have_distributed_triangulation(),
+                dealii::ExcMessage(
+                    "read_checkpoint() is not implemented for "
+                    "distributed::shared::Triangulation which we use in 1D"));
+
+    discretization_.triangulation().load(base_name + "-checkpoint.mesh");
+
+#else
+    AssertThrow(false,
+                dealii::ExcMessage("write_checkpoint() is not available with "
+                                   "deal.II versions prior to 9.6.0"));
 #endif
 
     prepare_compute_kernels();
@@ -630,7 +632,7 @@ namespace ryujin
     std::cout << "TimeLoop<dim, Number>::write_checkpoint()" << std::endl;
 #endif
 
-    AssertThrow(have_distributed_triangulation<dim>,
+    AssertThrow(discretization_.have_distributed_triangulation(),
                 dealii::ExcMessage(
                     "write_checkpoint() is not implemented for "
                     "distributed::shared::Triangulation which we use in 1D"));
@@ -649,13 +651,14 @@ namespace ryujin
           std::filesystem::rename(name + suffix, name + suffix + "~");
     }
 
-#if !DEAL_II_VERSION_GTE(9, 6, 0)
-    if constexpr (have_distributed_triangulation<dim>) {
-#endif
-      const auto &triangulation = discretization_.triangulation();
-      triangulation.save(name + ".mesh");
-#if !DEAL_II_VERSION_GTE(9, 6, 0)
-    }
+#if DEAL_II_VERSION_GTE(9, 6, 0)
+    const auto &triangulation = discretization_.triangulation();
+    triangulation.save(name + ".mesh");
+
+#else
+    AssertThrow(false,
+                dealii::ExcMessage("write_checkpoint() is not available with "
+                                   "deal.II versions prior to 9.6.0"));
 #endif
 
     /*

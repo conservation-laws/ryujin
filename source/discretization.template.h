@@ -71,22 +71,43 @@ namespace ryujin
     const auto smoothing =
         dealii::Triangulation<dim>::limit_level_difference_at_vertices;
 
-    if constexpr (have_distributed_triangulation<dim>) {
-      const auto settings =
-          Triangulation::Settings::construct_multigrid_hierarchy;
-      triangulation_ = std::make_unique<Triangulation>(
-          mpi_ensemble_.ensemble_communicator(), smoothing, settings);
+    // FIXME: This information will ultimately be provided by the Geometry.
+    const auto selection =
+        (dim == 1 ? MeshType::parallel_shared : MeshType::parallel_distributed);
 
-    } else {
-      const auto settings = static_cast<typename Triangulation::Settings>(
-          Triangulation::partition_auto |
-          Triangulation::construct_multigrid_hierarchy);
+    switch (selection) {
+    case MeshType::parallel_fullydistributed: {
+      triangulation_ = std::make_unique<
+          dealii::parallel::fullydistributed::Triangulation<dim>>(
+          mpi_ensemble_.ensemble_communicator());
+      triangulation_->set_mesh_smoothing(smoothing);
+    } break;
+
+    case MeshType::parallel_distributed: {
+      const auto settings = dealii::parallel::distributed::Triangulation<
+          dim>::Settings::construct_multigrid_hierarchy;
+      triangulation_ =
+          std::make_unique<dealii::parallel::distributed::Triangulation<dim>>(
+              mpi_ensemble_.ensemble_communicator(), smoothing, settings);
+    } break;
+
+    case MeshType::parallel_shared: {
+      const auto settings = static_cast<
+          typename dealii::parallel::shared::Triangulation<dim>::Settings>(
+          dealii::parallel::shared::Triangulation<dim>::partition_auto |
+          dealii::parallel::shared::Triangulation<
+              dim>::construct_multigrid_hierarchy);
       /* Beware of the boolean: */
       triangulation_ =
-          std::make_unique<Triangulation>(mpi_ensemble_.ensemble_communicator(),
-                                          smoothing,
-                                          /*artificial cells*/ true,
-                                          settings);
+          std::make_unique<dealii::parallel::shared::Triangulation<dim>>(
+              mpi_ensemble_.ensemble_communicator(),
+              smoothing,
+              /*artificial cells*/ true,
+              settings);
+    } break;
+
+    default:
+      __builtin_trap();
     }
 
     auto &triangulation = *triangulation_;

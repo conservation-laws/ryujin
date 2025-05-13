@@ -263,7 +263,7 @@ namespace ryujin
       }
 
       void create_triangulation(
-          typename Geometry<dim>::Triangulation &triangulation) final
+          typename dealii::Triangulation<dim> &triangulation) final
       {
         GridGenerator::annulus(
             triangulation, length_, inner_radius_, outer_radius_, angle_);

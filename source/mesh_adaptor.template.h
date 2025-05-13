@@ -304,8 +304,8 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   void MeshAdaptor<Description, dim, Number>::
-      mark_cells_for_coarsening_and_refinement(Triangulation &triangulation
-                                               [[maybe_unused]]) const
+      mark_cells_for_coarsening_and_refinement(
+          dealii::Triangulation<dim> &triangulation [[maybe_unused]]) const
   {
     auto &discretization [[maybe_unused]] = offline_data_->discretization();
     Assert(&triangulation == &discretization.triangulation(),

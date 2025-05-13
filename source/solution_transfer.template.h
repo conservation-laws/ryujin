@@ -140,13 +140,15 @@ namespace ryujin
             "The SolutionTransfer class needs deal.II version 9.6.0 or newer"));
 
 #else
-    AssertThrow(have_distributed_triangulation<dim>,
-                dealii::ExcMessage(
-                    "The SolutionTransfer class is not implemented for a "
-                    "distributed::shared::Triangulation which we use in 1D"));
-
     const auto &discretization = offline_data_->discretization();
     auto &triangulation = *discretization.triangulation_; /* writable */
+
+    AssertThrow(
+        discretization.have_distributed_triangulation(),
+        dealii::ExcMessage(
+            "The SolutionTransfer class is not implemented for a serial or "
+            "distributed::shared::Triangulation which we use in 1D"));
+
 
     Assert(handle_ == dealii::numbers::invalid_unsigned_int,
            dealii::ExcMessage(
@@ -464,10 +466,14 @@ namespace ryujin
 
 #else
 
-    AssertThrow(have_distributed_triangulation<dim>,
-                dealii::ExcMessage(
-                    "The SolutionTransfer class is not implemented for a "
-                    "distributed::shared::Triangulation which we use in 1D"));
+    const auto &discretization = offline_data_->discretization();
+    auto &triangulation = *discretization.triangulation_; /* writable */
+
+    AssertThrow(
+        discretization.have_distributed_triangulation(),
+        dealii::ExcMessage(
+            "The SolutionTransfer class is not implemented for a serial or "
+            "distributed::shared::Triangulation which we use in 1D"));
 
     Assert(
         handle_ != dealii::numbers::invalid_unsigned_int,
@@ -479,8 +485,6 @@ namespace ryujin
     const auto &affine_constraints = offline_data_->affine_constraints();
     const auto n_locally_owned = offline_data_->n_locally_owned();
 
-    const auto &discretization = offline_data_->discretization();
-    auto &triangulation = *discretization.triangulation_; /* writable */
 
     ScalarVector projected_mass;
     projected_mass.reinit(offline_data_->scalar_partitioner());
