@@ -217,8 +217,11 @@ namespace ryujin
     const auto array_view_kelly_components =
         dealii::make_array_view(ptr_kelly_components);
 
+    // Workaround: select the first mapping
+    const auto index = 0; // FIXME: come up with a strategy to get an
+                          // appropriate index.
     dealii::KellyErrorEstimator<dim>::estimate(
-        offline_data_->discretization().mapping(),
+        offline_data_->discretization().mapping()[index],
         offline_data_->dof_handler(),
         offline_data_->discretization().face_quadrature(),
         {},
