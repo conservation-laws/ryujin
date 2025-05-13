@@ -123,13 +123,10 @@ namespace ryujin
           const auto &discretization = offline_data_->discretization();
           const auto &dof_handler = offline_data_->dof_handler();
 
-          const unsigned int dofs_per_cell = dof_handler.get_fe().dofs_per_cell;
-
           const auto support_points =
               dof_handler.get_fe().get_unit_support_points();
 
-          std::vector<dealii::types::global_dof_index> local_dof_indices(
-              dofs_per_cell);
+          std::vector<dealii::types::global_dof_index> local_dof_indices;
 
           /* Loop over cells */
           for (auto cell : dof_handler.active_cell_iterators()) {
@@ -138,13 +135,17 @@ namespace ryujin
             if (!cell->is_locally_owned())
               continue;
 
+            const unsigned int dofs_per_cell = cell->get_fe().n_dofs_per_cell();
+            local_dof_indices.resize(dofs_per_cell);
             cell->get_active_or_mg_dof_indices(local_dof_indices);
+
+            const auto &mapping =
+                discretization.mapping()[cell->active_fe_index()];
 
             for (unsigned int j = 0; j < dofs_per_cell; ++j) {
 
               Point<dim> position =
-                  discretization.mapping().transform_unit_to_real_cell(
-                      cell, support_points[j]);
+                  mapping.transform_unit_to_real_cell(cell, support_points[j]);
 
               /*
                * Insert index, interior mass value and position into
