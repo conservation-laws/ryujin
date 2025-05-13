@@ -216,9 +216,10 @@ namespace ryujin
             Assert(dof_cell->has_children(), dealii::ExcInternalError());
 
             const auto &discretization = offline_data_->discretization();
-            const auto &finite_element = discretization.finite_element();
-            const auto &mapping = discretization.mapping();
-            const auto &quadrature = discretization.quadrature();
+            const auto index = dof_cell->active_fe_index();
+            const auto &finite_element = discretization.finite_element()[index];
+            const auto &mapping = discretization.mapping()[index];
+            const auto &quadrature = discretization.quadrature()[index];
 
             dealii::FEValues<dim> fe_values(
                 mapping,
@@ -253,7 +254,12 @@ namespace ryujin
             for (unsigned int child = 0; child < dof_cell->n_children();
                  ++child) {
               const auto child_cell = dof_cell->child(child);
+
               Assert(child_cell->is_active(), dealii::ExcInternalError());
+              Assert(dof_cell->active_fe_index() ==
+                         child_cell->active_fe_index(),
+                     dealii::ExcMessage("SolutionTransfer: projection between "
+                                        "different FE space is not set up."));
 
               fe_values.reinit(child_cell);
 
@@ -536,9 +542,10 @@ namespace ryujin
             dof_cell->get_dof_indices(dof_indices);
 
             const auto &discretization = offline_data_->discretization();
-            const auto &finite_element = discretization.finite_element();
-            const auto &mapping = discretization.mapping();
-            const auto &quadrature = discretization.quadrature();
+            const auto index = dof_cell->active_fe_index();
+            const auto &finite_element = discretization.finite_element()[index];
+            const auto &mapping = discretization.mapping()[index];
+            const auto &quadrature = discretization.quadrature()[index];
 
             dealii::FEValues<dim> fe_values(mapping,
                                             finite_element,
@@ -573,9 +580,10 @@ namespace ryujin
             Assert(dof_cell->has_children(), dealii::ExcInternalError());
 
             const auto &discretization = offline_data_->discretization();
-            const auto &finite_element = discretization.finite_element();
-            const auto &mapping = discretization.mapping();
-            const auto &quadrature = discretization.quadrature();
+            const auto index = dof_cell->active_fe_index();
+            const auto &finite_element = discretization.finite_element()[index];
+            const auto &mapping = discretization.mapping()[index];
+            const auto &quadrature = discretization.quadrature()[index];
 
             dealii::FEValues<dim> fe_values(
                 mapping,
@@ -606,6 +614,11 @@ namespace ryujin
               const auto child_cell = dof_cell->child(child);
 
               Assert(child_cell->is_active(), dealii::ExcInternalError());
+              Assert(dof_cell->active_fe_index() ==
+                         child_cell->active_fe_index(),
+                     dealii::ExcMessage("SolutionTransfer: projection between "
+                                        "different FE space is not set up."));
+
               child_cell->get_dof_indices(dof_indices);
 
               /* Step 1: build up right hand side on child cell: */
