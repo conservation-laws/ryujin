@@ -63,8 +63,11 @@ namespace ryujin
                       hyperbolic_module_.initial_precomputed(),
                       hyperbolic_module_.alpha(),
                       "/I - MeshAdaptor")
-      , solution_transfer_(
-            mpi_ensemble_, offline_data_, hyperbolic_system_, parabolic_system_)
+      , solution_transfer_(mpi_ensemble_,
+                           offline_data_,
+                           hyperbolic_system_,
+                           parabolic_system_,
+                           "/I - MeshAdaptor")
       , postprocessor_(mpi_ensemble_,
                        offline_data_,
                        hyperbolic_system_,
@@ -604,6 +607,15 @@ namespace ryujin
     solution_transfer_.set_handle(transfer_handle);
     solution_transfer_.project(state_vector);
     solution_transfer_.reset_handle();
+
+    /*
+     * In debug mode poison constrained degrees of freedom and precomputed
+     * values:
+     */
+    Vectors::debug_poison_constrained_dofs<Description>(state_vector,
+                                                        offline_data_);
+    Vectors::debug_poison_precomputed_values<Description>(state_vector,
+                                                          offline_data_);
   }
 
 
@@ -694,6 +706,15 @@ namespace ryujin
     Vectors::reinit_state_vector<Description>(state_vector, offline_data_);
     solution_transfer_.project(state_vector);
     solution_transfer_.reset_handle();
+
+    /*
+     * In debug mode poison constrained degrees of freedom and precomputed
+     * values:
+     */
+    Vectors::debug_poison_constrained_dofs<Description>(state_vector,
+                                                        offline_data_);
+    Vectors::debug_poison_precomputed_values<Description>(state_vector,
+                                                          offline_data_);
   }
 
 

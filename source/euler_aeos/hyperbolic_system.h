@@ -462,7 +462,8 @@ namespace ryujin
                                const SPARSITY &sparsity_simd,
                                StateVector &state_vector,
                                unsigned int left,
-                               unsigned int right) const;
+                               unsigned int right,
+                               const bool skip_constrained_dofs = true) const;
 
       //@}
       /**
@@ -879,7 +880,8 @@ namespace ryujin
         const SPARSITY &sparsity_simd,
         StateVector &state_vector,
         unsigned int left,
-        unsigned int right) const
+        unsigned int right,
+        const bool skip_constrained_dofs /*= true*/) const
     {
       Assert(cycle == 0 || cycle == 1, dealii::ExcInternalError());
 
@@ -934,7 +936,7 @@ namespace ryujin
           for (unsigned int i = 0; i < size; i += stride_size) {
             /* Skip constrained degrees of freedom: */
             const unsigned int row_length = sparsity_simd.row_length(i);
-            if (row_length == 1)
+            if (skip_constrained_dofs && row_length == 1)
               continue;
 
             dispatch_check(i);
@@ -956,7 +958,7 @@ namespace ryujin
           for (unsigned int i = left; i < right; i += stride_size) {
             /* Skip constrained degrees of freedom: */
             const unsigned int row_length = sparsity_simd.row_length(i);
-            if (row_length == 1)
+            if (skip_constrained_dofs && row_length == 1)
               continue;
 
             dispatch_check(i);
@@ -981,7 +983,7 @@ namespace ryujin
 
           /* Skip constrained degrees of freedom: */
           const unsigned int row_length = sparsity_simd.row_length(i);
-          if (row_length == 1)
+          if (skip_constrained_dofs && row_length == 1)
             continue;
 
           dispatch_check(i);
