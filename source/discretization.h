@@ -156,6 +156,8 @@ namespace ryujin
   /**
    * An enum class for setting the type of Triangulation that should be
    * constructed.
+   *
+   * @ingroup Mesh
    */
   enum class MeshType {
     /** Use serial dealii::Triangulation<dim> */

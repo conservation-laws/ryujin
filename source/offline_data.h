@@ -100,17 +100,14 @@ namespace ryujin
      */
     void prepare(const unsigned int problem_dimension,
                  const unsigned int n_precomputed_values,
-                 const unsigned int n_parabolic_state_vectors,
-                 bool create_matrices = true,
-                 bool create_multigrid_data = true)
+                 const unsigned int n_parabolic_state_vectors)
     {
       setup(problem_dimension, n_precomputed_values);
 
-      if (create_matrices)
-        this->create_matrices();
+      create_matrices();
 
-      if (create_multigrid_data)
-        this->create_multigrid_data();
+      if (!dof_handler_->has_hp_capabilities())
+        create_multigrid_data();
 
       n_parabolic_state_vectors_ = n_parabolic_state_vectors;
     }

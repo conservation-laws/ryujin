@@ -1138,6 +1138,8 @@ namespace ryujin
 
     auto &dof_handler = *dof_handler_;
 
+    Assert(!dof_handler.has_hp_capabilities(), dealii::ExcInternalError());
+
     dof_handler.distribute_mg_dofs();
 
     const auto n_levels = dof_handler.get_triangulation().n_global_levels();
