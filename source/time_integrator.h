@@ -296,6 +296,17 @@ namespace ryujin
     //@{
 
     /**
+     * This function preprocesses a given state vector @p U for time
+     * stepping. It has to be called prior to step() to ensure that
+     * precomputed values are in place.
+     *
+     * @note Internally, this function first calls the
+     * ParabolicModule::prepare_state_vector() and afterwards
+     * HyperbolicModule::prepare_state_vector().
+     */
+    void prepare_state_vector(StateVector &state_vector, Number t) const;
+
+    /**
      * Given a reference to a previous state vector U performs an explicit
      * time step (and store the result in U). The function returns the
      * chosen time step size tau. The time step size tau is selected such
@@ -307,6 +318,10 @@ namespace ryujin
      * @note Depending on chosen run time parameters different CFL
      * adaptation and recovery strategies for invariant domain violations
      * are used.
+     *
+     * @pre The @p state_vector has to be prepared with the
+     * prepare_state_vector() function prior to calling the step()
+     * function.
      */
     Number step(StateVector &state_vector,
                 Number t,

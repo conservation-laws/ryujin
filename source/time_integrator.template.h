@@ -218,6 +218,23 @@ namespace ryujin
 
   /*
    * -------------------------------------------------------------------------
+   * Prepare state vector:
+   * -------------------------------------------------------------------------
+   */
+
+
+  template <typename Description, int dim, typename Number>
+  void TimeIntegrator<Description, dim, Number>::prepare_state_vector(
+      StateVector &state_vector, Number t) const
+  {
+    if (!ParabolicSystem::is_identity)
+      parabolic_module_->prepare_state_vector(state_vector, t);
+    hyperbolic_module_->prepare_state_vector(state_vector, t);
+  }
+
+
+  /*
+   * -------------------------------------------------------------------------
    * High level step function implementing various CFLRecoveryStrategy
    * -------------------------------------------------------------------------
    */
