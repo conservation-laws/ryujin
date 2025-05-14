@@ -777,11 +777,12 @@ namespace ryujin
                                 mpi_ensemble_.ensemble_communicator());
 
         VectorTools::integrate_difference(
+            discretization_.mapping(),
             offline_data_.dof_handler(),
             analytic_component,
             Functions::ZeroFunction<dim, Number>(),
             difference_per_cell,
-            QGauss<dim>(3),
+            discretization_.quadrature_high_order(),
             VectorTools::L1_norm);
 
         l1_norm_analytic =
@@ -789,11 +790,12 @@ namespace ryujin
                                 mpi_ensemble_.ensemble_communicator());
 
         VectorTools::integrate_difference(
+            discretization_.mapping(),
             offline_data_.dof_handler(),
             analytic_component,
             Functions::ZeroFunction<dim, Number>(),
             difference_per_cell,
-            QGauss<dim>(3),
+            discretization_.quadrature_high_order(),
             VectorTools::L2_norm);
 
         l2_norm_analytic = Number(std::sqrt(
@@ -812,21 +814,23 @@ namespace ryujin
       const Number linf_norm_error = Utilities::MPI::max(
           error_component.linfty_norm(), mpi_ensemble_.ensemble_communicator());
 
-      VectorTools::integrate_difference(offline_data_.dof_handler(),
+      VectorTools::integrate_difference(discretization_.mapping(),
+                                        offline_data_.dof_handler(),
                                         error_component,
                                         Functions::ZeroFunction<dim, Number>(),
                                         difference_per_cell,
-                                        QGauss<dim>(3),
+                                        discretization_.quadrature_high_order(),
                                         VectorTools::L1_norm);
 
       const Number l1_norm_error = Utilities::MPI::sum(
           difference_per_cell.l1_norm(), mpi_ensemble_.ensemble_communicator());
 
-      VectorTools::integrate_difference(offline_data_.dof_handler(),
+      VectorTools::integrate_difference(discretization_.mapping(),
+                                        offline_data_.dof_handler(),
                                         error_component,
                                         Functions::ZeroFunction<dim, Number>(),
                                         difference_per_cell,
-                                        QGauss<dim>(3),
+                                        discretization_.quadrature_high_order(),
                                         VectorTools::L2_norm);
 
       const Number l2_norm_error = Number(std::sqrt(

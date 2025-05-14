@@ -168,6 +168,8 @@ namespace ryujin
 
     quadrature_ =
         std::make_unique<hp::QCollection<dim>>(QGauss<dim>(quadrature_degree));
+    quadrature_high_order_ = std::make_unique<hp::QCollection<dim>>(
+        QGauss<dim>(quadrature_degree + 1));
     nodal_quadrature_ = std::make_unique<hp::QCollection<dim>>(
         QGaussLobatto<dim>(quadrature_degree));
 

@@ -329,11 +329,15 @@ namespace ryujin
 
     /**
      * Return a read-only const reference to the mapping.
+     *
+     * @note The accessor returns an MappingCollection object.
      */
     ACCESSOR_READ_ONLY(mapping)
 
     /**
      * Return a read-only const reference to the finite element.
+     *
+     * @note The accessor returns an FECollection object.
      */
     ACCESSOR_READ_ONLY(finite_element)
 
@@ -341,34 +345,52 @@ namespace ryujin
      * Return a read-only const reference to a continuous ("cG") variant of
      * the selected discontinuous finite element space.
      *
-     * @note This object is unavailable for the dG Q0 discretization.
+     * @note The accessor returns an FECollection object.
      */
     ACCESSOR_READ_ONLY(finite_element_cg)
 
     /**
      * Return a read-only const reference to the quadrature rule.
+     *
+     * @note The accessor returns an QCollection object.
      */
     ACCESSOR_READ_ONLY(quadrature)
 
     /**
+     * Return a read-only const reference to a highe order quadrature rule
+     * used for computing errors.
+     *
+     * @note The accessor returns an QCollection object.
+     */
+    ACCESSOR_READ_ONLY(quadrature_high_order)
+
+    /**
      * Return a read-only const reference to the nodal quadrature rule
      * (Gauß Lobatto).
+     *
+     * @note The accessor returns an QCollection object.
      */
     ACCESSOR_READ_ONLY(nodal_quadrature)
 
     /**
      * Return a read-only const reference to the 1D quadrature rule.
+     *
+     * @note The accessor returns an QCollection object.
      */
     ACCESSOR_READ_ONLY(quadrature_1d)
 
     /**
      * Return a read-only const reference to the face quadrature rule.
+     *
+     * @note The accessor returns an QCollection object.
      */
     ACCESSOR_READ_ONLY(face_quadrature)
 
     /**
      * Return a read-only const reference to the nodal face quadrature rule
      * (Gauß Lobatto).
+     *
+     * @note The accessor returns an QCollection object.
      */
     ACCESSOR_READ_ONLY(face_nodal_quadrature)
 
@@ -380,6 +402,7 @@ namespace ryujin
     std::unique_ptr<const dealii::hp::FECollection<dim>> finite_element_;
     std::unique_ptr<const dealii::hp::FECollection<dim>> finite_element_cg_;
     std::unique_ptr<const dealii::hp::QCollection<dim>> quadrature_;
+    std::unique_ptr<const dealii::hp::QCollection<dim>> quadrature_high_order_;
     std::unique_ptr<const dealii::hp::QCollection<dim>> nodal_quadrature_;
     std::unique_ptr<const dealii::hp::QCollection<1>> quadrature_1d_;
     std::unique_ptr<const dealii::hp::QCollection<dim - 1>> face_quadrature_;
