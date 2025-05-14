@@ -548,12 +548,6 @@ namespace ryujin
 #if DEAL_II_VERSION_GTE(9, 6, 0)
     discretization_.refinement() = 0; /* do not refine */
     discretization_.prepare(base_name);
-
-    AssertThrow(discretization_.have_distributed_triangulation(),
-                dealii::ExcMessage(
-                    "read_checkpoint() is not implemented for "
-                    "distributed::shared::Triangulation which we use in 1D"));
-
     discretization_.triangulation().load(base_name + "-checkpoint.mesh");
 
 #else
@@ -631,11 +625,6 @@ namespace ryujin
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeLoop<dim, Number>::write_checkpoint()" << std::endl;
 #endif
-
-    AssertThrow(discretization_.have_distributed_triangulation(),
-                dealii::ExcMessage(
-                    "write_checkpoint() is not implemented for "
-                    "distributed::shared::Triangulation which we use in 1D"));
 
     /* We need hyperbolic_module.prepare_state_vector() prior to this call! */
     solution_transfer_.prepare_projection(state_vector);

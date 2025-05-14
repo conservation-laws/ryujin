@@ -8,7 +8,6 @@
 #include <compile_time_options.h>
 #include <deal.II/base/exceptions.h>
 
-#include "discretization.h"
 #include "solution_transfer.h"
 #if DEAL_II_VERSION_GTE(9, 6, 0)
 #include "tensor_product_point_kernels.h"
@@ -143,13 +142,6 @@ namespace ryujin
     const auto &discretization = offline_data_->discretization();
     auto &triangulation = *discretization.triangulation_; /* writable */
 
-    AssertThrow(
-        discretization.have_distributed_triangulation(),
-        dealii::ExcMessage(
-            "The SolutionTransfer class is not implemented for a serial or "
-            "distributed::shared::Triangulation which we use in 1D"));
-
-
     Assert(handle_ == dealii::numbers::invalid_unsigned_int,
            dealii::ExcMessage(
                "You can only add one solution per SolutionTransfer object."));
@@ -184,7 +176,7 @@ namespace ryujin
            * Collect state values for packing:
            */
 
-          const auto n_dofs_per_cell = dof_handler.get_fe().n_dofs_per_cell();
+          const auto n_dofs_per_cell = dof_cell->get_fe().n_dofs_per_cell();
           std::vector<state_type> state_values(n_dofs_per_cell);
 
           switch (status) {
@@ -469,12 +461,6 @@ namespace ryujin
     const auto &discretization = offline_data_->discretization();
     auto &triangulation = *discretization.triangulation_; /* writable */
 
-    AssertThrow(
-        discretization.have_distributed_triangulation(),
-        dealii::ExcMessage(
-            "The SolutionTransfer class is not implemented for a serial or "
-            "distributed::shared::Triangulation which we use in 1D"));
-
     Assert(
         handle_ != dealii::numbers::invalid_unsigned_int,
         dealii::ExcMessage(
@@ -527,7 +513,7 @@ namespace ryujin
            * Retrieve packed values and project onto cell:
            */
 
-          const auto n_dofs_per_cell = dof_handler.get_fe().n_dofs_per_cell();
+          const auto n_dofs_per_cell = dof_cell->get_fe().n_dofs_per_cell();
           std::vector<dealii::types::global_dof_index> dof_indices(
               n_dofs_per_cell);
 
