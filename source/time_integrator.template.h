@@ -413,7 +413,7 @@ namespace ryujin
 
   template <typename Description, int dim, typename Number>
   Number TimeIntegrator<Description, dim, Number>::step_erk_11(
-      StateVector &state_vector, Number t, Number tau_max)
+      StateVector &state_vector, Number /*t*/, Number tau_max)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeIntegrator<dim, Number>::step_erk_11()" << std::endl;
