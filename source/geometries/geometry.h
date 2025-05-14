@@ -10,6 +10,7 @@
 #include "convenience_macros.h"
 
 #include <deal.II/base/parameter_acceptor.h>
+#include <deal.II/grid/tria.h>
 
 #include <string>
 
@@ -32,12 +33,6 @@ namespace ryujin
   {
   public:
     /**
-     * A typdef for the deal.II triangulation that is used by this class.
-     * Inherited from Discretization.
-     */
-    using Triangulation = typename Discretization<dim>::Triangulation;
-
-    /**
      * Constructor taking geometry name @p name and a subsection @p
      * subsection as an argument. The dealii::ParameterAcceptor is
      * initialized with the subsubsection `subsection + "/" + name`.
@@ -52,7 +47,8 @@ namespace ryujin
      * Create the triangulation according to the appropriate geometry
      * description.
      */
-    virtual void create_triangulation(Triangulation &triangulation) = 0;
+    virtual void
+    create_triangulation(dealii::Triangulation<dim> &triangulation) = 0;
 
     /**
      * Return the name of the geometry as (const reference) std::string

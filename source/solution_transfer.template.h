@@ -8,7 +8,6 @@
 #include <compile_time_options.h>
 #include <deal.II/base/exceptions.h>
 
-#include "discretization.h"
 #include "solution_transfer.h"
 #if DEAL_II_VERSION_GTE(9, 6, 0)
 #include "tensor_product_point_kernels.h"
@@ -140,11 +139,6 @@ namespace ryujin
             "The SolutionTransfer class needs deal.II version 9.6.0 or newer"));
 
 #else
-    AssertThrow(have_distributed_triangulation<dim>,
-                dealii::ExcMessage(
-                    "The SolutionTransfer class is not implemented for a "
-                    "distributed::shared::Triangulation which we use in 1D"));
-
     const auto &discretization = offline_data_->discretization();
     auto &triangulation = *discretization.triangulation_; /* writable */
 
@@ -182,7 +176,7 @@ namespace ryujin
            * Collect state values for packing:
            */
 
-          const auto n_dofs_per_cell = dof_handler.get_fe().n_dofs_per_cell();
+          const auto n_dofs_per_cell = dof_cell->get_fe().n_dofs_per_cell();
           std::vector<state_type> state_values(n_dofs_per_cell);
 
           switch (status) {
@@ -216,9 +210,10 @@ namespace ryujin
             Assert(dof_cell->has_children(), dealii::ExcInternalError());
 
             const auto &discretization = offline_data_->discretization();
-            const auto &finite_element = discretization.finite_element();
-            const auto &mapping = discretization.mapping();
-            const auto &quadrature = discretization.quadrature();
+            const auto index = dof_cell->active_fe_index();
+            const auto &finite_element = discretization.finite_element()[index];
+            const auto &mapping = discretization.mapping()[index];
+            const auto &quadrature = discretization.quadrature()[index];
 
             dealii::FEValues<dim> fe_values(
                 mapping,
@@ -253,7 +248,12 @@ namespace ryujin
             for (unsigned int child = 0; child < dof_cell->n_children();
                  ++child) {
               const auto child_cell = dof_cell->child(child);
+
               Assert(child_cell->is_active(), dealii::ExcInternalError());
+              Assert(dof_cell->active_fe_index() ==
+                         child_cell->active_fe_index(),
+                     dealii::ExcMessage("SolutionTransfer: projection between "
+                                        "different FE space is not set up."));
 
               fe_values.reinit(child_cell);
 
@@ -458,10 +458,8 @@ namespace ryujin
 
 #else
 
-    AssertThrow(have_distributed_triangulation<dim>,
-                dealii::ExcMessage(
-                    "The SolutionTransfer class is not implemented for a "
-                    "distributed::shared::Triangulation which we use in 1D"));
+    const auto &discretization = offline_data_->discretization();
+    auto &triangulation = *discretization.triangulation_; /* writable */
 
     Assert(
         handle_ != dealii::numbers::invalid_unsigned_int,
@@ -473,8 +471,6 @@ namespace ryujin
     const auto &affine_constraints = offline_data_->affine_constraints();
     const auto n_locally_owned = offline_data_->n_locally_owned();
 
-    const auto &discretization = offline_data_->discretization();
-    auto &triangulation = *discretization.triangulation_; /* writable */
 
     ScalarVector projected_mass;
     projected_mass.reinit(offline_data_->scalar_partitioner());
@@ -517,7 +513,7 @@ namespace ryujin
            * Retrieve packed values and project onto cell:
            */
 
-          const auto n_dofs_per_cell = dof_handler.get_fe().n_dofs_per_cell();
+          const auto n_dofs_per_cell = dof_cell->get_fe().n_dofs_per_cell();
           std::vector<dealii::types::global_dof_index> dof_indices(
               n_dofs_per_cell);
 
@@ -536,9 +532,10 @@ namespace ryujin
             dof_cell->get_dof_indices(dof_indices);
 
             const auto &discretization = offline_data_->discretization();
-            const auto &finite_element = discretization.finite_element();
-            const auto &mapping = discretization.mapping();
-            const auto &quadrature = discretization.quadrature();
+            const auto index = dof_cell->active_fe_index();
+            const auto &finite_element = discretization.finite_element()[index];
+            const auto &mapping = discretization.mapping()[index];
+            const auto &quadrature = discretization.quadrature()[index];
 
             dealii::FEValues<dim> fe_values(mapping,
                                             finite_element,
@@ -573,9 +570,10 @@ namespace ryujin
             Assert(dof_cell->has_children(), dealii::ExcInternalError());
 
             const auto &discretization = offline_data_->discretization();
-            const auto &finite_element = discretization.finite_element();
-            const auto &mapping = discretization.mapping();
-            const auto &quadrature = discretization.quadrature();
+            const auto index = dof_cell->active_fe_index();
+            const auto &finite_element = discretization.finite_element()[index];
+            const auto &mapping = discretization.mapping()[index];
+            const auto &quadrature = discretization.quadrature()[index];
 
             dealii::FEValues<dim> fe_values(
                 mapping,
@@ -606,6 +604,11 @@ namespace ryujin
               const auto child_cell = dof_cell->child(child);
 
               Assert(child_cell->is_active(), dealii::ExcInternalError());
+              Assert(dof_cell->active_fe_index() ==
+                         child_cell->active_fe_index(),
+                     dealii::ExcMessage("SolutionTransfer: projection between "
+                                        "different FE space is not set up."));
+
               child_cell->get_dof_indices(dof_indices);
 
               /* Step 1: build up right hand side on child cell: */

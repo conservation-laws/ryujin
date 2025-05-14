@@ -131,8 +131,13 @@ namespace ryujin
 
       const auto &discretization = offline_data_->discretization();
       AssertThrow(discretization.ansatz() == Ansatz::cg_q1,
-                  dealii::ExcMessage("The NavierStokes module currently only "
+                  dealii::ExcMessage("The Navier-Stokes module currently only "
                                      "supports cG Q1 finite elements."));
+
+      AssertThrow(!offline_data_->dof_handler().has_hp_capabilities(),
+                  dealii::ExcMessage(
+                      "The Navier-Stokes module currently does not support "
+                      "DofHandlers set up with hp capabilities."));
 
       /* Initialize vectors: */
 

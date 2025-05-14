@@ -115,8 +115,6 @@ namespace ryujin
     using HyperbolicSystem = typename Description::HyperbolicSystem;
     using ParabolicSystem = typename Description::ParabolicSystem;
 
-    using Triangulation = typename Discretization<dim>::Triangulation;
-
     using View =
         typename Description::template HyperbolicSystemView<dim, Number>;
 
@@ -171,7 +169,7 @@ namespace ryujin
      * adaptation and marking strategies.
      */
     void mark_cells_for_coarsening_and_refinement(
-        Triangulation &triangulation) const;
+        dealii::Triangulation<dim> &triangulation) const;
 
   private:
     /**

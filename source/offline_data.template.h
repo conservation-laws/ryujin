@@ -500,9 +500,6 @@ namespace ryujin
       matrix.reinit(sparsity_pattern_assembly);
 #endif
 
-    const unsigned int dofs_per_cell =
-        discretization_->finite_element().dofs_per_cell;
-
     /*
      * Now, assemble all matrices:
      */
@@ -523,9 +520,9 @@ namespace ryujin
       auto &interface_cij_matrix = copy.interface_cij_matrix_;
       auto &cell_measure = copy.cell_measure_;
 
-      auto &fe_values = scratch.fe_values_;
-      auto &fe_face_values = scratch.fe_face_values_;
-      auto &fe_neighbor_face_values = scratch.fe_neighbor_face_values_;
+      auto &hp_fe_values = scratch.hp_fe_values_;
+      auto &hp_fe_face_values = scratch.hp_fe_face_values_;
+      auto &hp_fe_neighbor_face_values = scratch.hp_fe_neighbor_face_values_;
 
 #ifdef DEAL_II_WITH_TRILINOS
       is_locally_owned = cell->is_locally_owned();
@@ -541,6 +538,8 @@ namespace ryujin
       if (!is_locally_owned)
         return;
 
+      const unsigned int dofs_per_cell = cell->get_fe().n_dofs_per_cell();
+
       cell_mass_matrix.reinit(dofs_per_cell, dofs_per_cell);
       for (auto &matrix : cell_cij_matrix)
         matrix.reinit(dofs_per_cell, dofs_per_cell);
@@ -551,12 +550,14 @@ namespace ryujin
             matrix.reinit(dofs_per_cell, dofs_per_cell);
       }
 
-      fe_values.reinit(cell);
+      hp_fe_values.reinit(cell);
+      const auto &fe_values = hp_fe_values.get_present_fe_values();
 
       local_dof_indices.resize(dofs_per_cell);
       cell->get_dof_indices(local_dof_indices);
 
       /* clear out copy data: */
+
       cell_mass_matrix = 0.;
       for (auto &matrix : cell_cij_matrix)
         matrix = 0.;
@@ -618,7 +619,8 @@ namespace ryujin
           continue;
         }
 
-        fe_face_values.reinit(cell, f_index);
+        hp_fe_face_values.reinit(cell, f_index);
+        const auto &fe_face_values = hp_fe_face_values.get_present_fe_values();
 
         /* Face contribution: */
 
@@ -649,7 +651,9 @@ namespace ryujin
         neighbor_local_dof_indices[f_index].resize(dofs_per_cell);
         neighbor_cell->get_dof_indices(neighbor_local_dof_indices[f_index]);
 
-        fe_neighbor_face_values.reinit(neighbor_cell, f_index_neighbor);
+        hp_fe_neighbor_face_values.reinit(neighbor_cell, f_index_neighbor);
+        const auto &fe_neighbor_face_values =
+            hp_fe_neighbor_face_values.get_present_fe_values();
 
         for (unsigned int q : fe_face_values.quadrature_point_indices()) {
           const auto JxW = fe_face_values.JxW(q);
@@ -839,9 +843,9 @@ namespace ryujin
         auto &local_dof_indices = copy.local_dof_indices_;
         auto &neighbor_local_dof_indices = copy.neighbor_local_dof_indices_;
         auto &interface_incidence_matrix = copy.interface_incidence_matrix_;
-        auto &fe_face_values_nodal = scratch.fe_face_values_nodal_;
-        auto &fe_neighbor_face_values_nodal =
-            scratch.fe_neighbor_face_values_nodal_;
+        auto &hp_fe_face_values_nodal = scratch.hp_fe_face_values_nodal_;
+        auto &hp_fe_neighbor_face_values_nodal =
+            scratch.hp_fe_neighbor_face_values_nodal_;
 
 #ifdef DEAL_II_WITH_TRILINOS
         is_locally_owned = cell->is_locally_owned();
@@ -850,6 +854,8 @@ namespace ryujin
 #endif
         if (!is_locally_owned)
           return;
+
+        const unsigned int dofs_per_cell = cell->get_fe().n_dofs_per_cell();
 
         for (auto &matrix : interface_incidence_matrix)
           matrix.reinit(dofs_per_cell, dofs_per_cell);
@@ -892,8 +898,13 @@ namespace ryujin
           neighbor_local_dof_indices[f_index].resize(dofs_per_cell);
           neighbor_cell->get_dof_indices(neighbor_local_dof_indices[f_index]);
 
-          fe_face_values_nodal.reinit(cell, f_index);
-          fe_neighbor_face_values_nodal.reinit(neighbor_cell, f_index_neighbor);
+          hp_fe_face_values_nodal.reinit(cell, f_index);
+          const auto &fe_face_values_nodal =
+              hp_fe_face_values_nodal.get_present_fe_values();
+          hp_fe_neighbor_face_values_nodal.reinit(neighbor_cell,
+                                                  f_index_neighbor);
+          const auto &fe_neighbor_face_values_nodal =
+              hp_fe_neighbor_face_values_nodal.get_present_fe_values();
 
           /* Lumped incidence matrix: */
 
@@ -1127,6 +1138,8 @@ namespace ryujin
 
     auto &dof_handler = *dof_handler_;
 
+    Assert(!dof_handler.has_hp_capabilities(), dealii::ExcInternalError());
+
     dof_handler.distribute_mg_dofs();
 
     const auto n_levels = dof_handler.get_triangulation().n_global_levels();
@@ -1151,15 +1164,16 @@ namespace ryujin
       std::vector<types::global_dof_index> dof_indices(
           dof_handler.get_fe().dofs_per_cell);
       dealii::Vector<Number> mass_values(dof_handler.get_fe().dofs_per_cell);
-      FEValues<dim> fe_values(discretization_->mapping(),
-                              discretization_->finite_element(),
-                              discretization_->quadrature(),
-                              update_values | update_JxW_values);
+      dealii::hp::FEValues<dim> hp_fe_values(discretization_->mapping(),
+                                             discretization_->finite_element(),
+                                             discretization_->quadrature(),
+                                             update_values | update_JxW_values);
       for (const auto &cell : dof_handler.cell_iterators_on_level(level))
         // TODO for assembly with dealii::SparseMatrix and local
         // numbering this probably has to read !cell->is_artificial()
         if (cell->is_locally_owned_on_level()) {
-          fe_values.reinit(cell);
+          hp_fe_values.reinit(cell);
+          const auto &fe_values = hp_fe_values.get_present_fe_values();
           for (unsigned int i = 0; i < mass_values.size(); ++i) {
             double sum = 0;
             for (unsigned int q = 0; q < fe_values.n_quadrature_points; ++q)
@@ -1205,19 +1219,12 @@ namespace ryujin
 
     std::vector<dealii::types::global_dof_index> local_dof_indices;
 
-    const dealii::QGauss<dim - 1> face_quadrature(3);
-    dealii::FEFaceValues<dim> fe_face_values(discretization_->mapping(),
-                                             discretization_->finite_element(),
-                                             face_quadrature,
-                                             dealii::update_normal_vectors |
-                                                 dealii::update_values |
-                                                 dealii::update_JxW_values);
-
-    const unsigned int dofs_per_cell =
-        discretization_->finite_element().dofs_per_cell;
-
-    const auto support_points =
-        discretization_->finite_element().get_unit_support_points();
+    dealii::hp::FEFaceValues<dim> hp_fe_face_values(
+        discretization_->mapping(),
+        discretization_->finite_element(),
+        discretization_->face_quadrature(),
+        dealii::update_normal_vectors | dealii::update_values |
+            dealii::update_JxW_values);
 
     for (auto cell = begin; cell != end; ++cell) {
 
@@ -1231,12 +1238,17 @@ namespace ryujin
           (!cell->is_active() && cell->is_artificial_on_level()))
         continue;
 
+      const unsigned int dofs_per_cell = cell->get_fe().n_dofs_per_cell();
+      const auto &support_points = cell->get_fe().get_unit_support_points();
+
       local_dof_indices.resize(dofs_per_cell);
       cell->get_active_or_mg_dof_indices(local_dof_indices);
 
       for (auto f : cell->face_indices()) {
         const auto face = cell->face(f);
         const auto id = face->boundary_id();
+
+        // FIXME: support interior boundary with FE_Nothing
 
         if (!face->at_boundary())
           continue;
@@ -1249,10 +1261,13 @@ namespace ryujin
         if (id == Boundary::periodic)
           continue;
 
-        fe_face_values.reinit(cell, f);
+        hp_fe_face_values.reinit(cell, f);
+        const auto &fe_face_values = hp_fe_face_values.get_present_fe_values();
+        const auto &mapping =
+            hp_fe_face_values.get_mapping_collection()[cell->active_fe_index()];
 
         for (unsigned int j : fe_face_values.dof_indices()) {
-          if (!discretization_->finite_element().has_support_on_face(j, f))
+          if (!cell->get_fe().has_support_on_face(j, f))
             continue;
 
           Number boundary_mass = 0.;
@@ -1280,8 +1295,7 @@ namespace ryujin
             continue;
 
           Point<dim> position =
-              discretization_->mapping().transform_unit_to_real_cell(
-                  cell, support_points[j]);
+              mapping.transform_unit_to_real_cell(cell, support_points[j]);
 
           /*
            * Temporarily insert a (wrong) boundary mass value for the
@@ -1399,16 +1413,15 @@ namespace ryujin
 
     std::vector<dealii::types::global_dof_index> local_dof_indices;
 
-    const auto &finite_element = discretization_->finite_element();
-    const unsigned int dofs_per_cell = finite_element.dofs_per_cell;
-    local_dof_indices.resize(dofs_per_cell);
-
     for (auto cell = begin; cell != end; ++cell) {
 
       /* Make sure to iterate over the entire locally relevant set: */
       if (cell->is_artificial())
         continue;
 
+      const auto &finite_element = cell->get_fe();
+      const unsigned int dofs_per_cell = finite_element.dofs_per_cell;
+      local_dof_indices.resize(dofs_per_cell);
       cell->get_active_or_mg_dof_indices(local_dof_indices);
 
       for (auto f : cell->face_indices()) {
@@ -1424,7 +1437,7 @@ namespace ryujin
 
         for (unsigned int j = 0; j < dofs_per_cell; ++j) {
 
-          if (!finite_element.has_support_on_face(j, f))
+          if (!cell->get_fe().has_support_on_face(j, f))
             continue;
 
           const auto global_index = local_dof_indices[j];

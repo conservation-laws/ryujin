@@ -161,7 +161,7 @@ namespace ryujin
 
 
       void create_triangulation(
-          typename Geometry<dim>::Triangulation &triangulation) final
+          typename dealii::Triangulation<dim> &triangulation) final
       {
         /* create mesh: */
 

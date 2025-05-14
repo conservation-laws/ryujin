@@ -541,23 +541,19 @@ namespace ryujin
     std::cout << "TimeLoop<dim, Number>::read_checkpoint()" << std::endl;
 #endif
 
-    AssertThrow(have_distributed_triangulation<dim>,
-                dealii::ExcMessage(
-                    "read_checkpoint() is not implemented for "
-                    "distributed::shared::Triangulation which we use in 1D"));
-
     /*
      * Initialize discretization, read in the mesh, and initialize everything:
      */
 
-#if !DEAL_II_VERSION_GTE(9, 6, 0)
-    if constexpr (have_distributed_triangulation<dim>) {
-#endif
-      discretization_.refinement() = 0; /* do not refine */
-      discretization_.prepare(base_name);
-      discretization_.triangulation().load(base_name + "-checkpoint.mesh");
-#if !DEAL_II_VERSION_GTE(9, 6, 0)
-    }
+#if DEAL_II_VERSION_GTE(9, 6, 0)
+    discretization_.refinement() = 0; /* do not refine */
+    discretization_.prepare(base_name);
+    discretization_.triangulation().load(base_name + "-checkpoint.mesh");
+
+#else
+    AssertThrow(false,
+                dealii::ExcMessage("write_checkpoint() is not available with "
+                                   "deal.II versions prior to 9.6.0"));
 #endif
 
     prepare_compute_kernels();
@@ -630,11 +626,6 @@ namespace ryujin
     std::cout << "TimeLoop<dim, Number>::write_checkpoint()" << std::endl;
 #endif
 
-    AssertThrow(have_distributed_triangulation<dim>,
-                dealii::ExcMessage(
-                    "write_checkpoint() is not implemented for "
-                    "distributed::shared::Triangulation which we use in 1D"));
-
     /* We need hyperbolic_module.prepare_state_vector() prior to this call! */
     solution_transfer_.prepare_projection(state_vector);
     const auto transfer_handle = solution_transfer_.get_handle();
@@ -649,13 +640,14 @@ namespace ryujin
           std::filesystem::rename(name + suffix, name + suffix + "~");
     }
 
-#if !DEAL_II_VERSION_GTE(9, 6, 0)
-    if constexpr (have_distributed_triangulation<dim>) {
-#endif
-      const auto &triangulation = discretization_.triangulation();
-      triangulation.save(name + ".mesh");
-#if !DEAL_II_VERSION_GTE(9, 6, 0)
-    }
+#if DEAL_II_VERSION_GTE(9, 6, 0)
+    const auto &triangulation = discretization_.triangulation();
+    triangulation.save(name + ".mesh");
+
+#else
+    AssertThrow(false,
+                dealii::ExcMessage("write_checkpoint() is not available with "
+                                   "deal.II versions prior to 9.6.0"));
 #endif
 
     /*
@@ -774,11 +766,12 @@ namespace ryujin
                                 mpi_ensemble_.ensemble_communicator());
 
         VectorTools::integrate_difference(
+            discretization_.mapping(),
             offline_data_.dof_handler(),
             analytic_component,
             Functions::ZeroFunction<dim, Number>(),
             difference_per_cell,
-            QGauss<dim>(3),
+            discretization_.quadrature_high_order(),
             VectorTools::L1_norm);
 
         l1_norm_analytic =
@@ -786,11 +779,12 @@ namespace ryujin
                                 mpi_ensemble_.ensemble_communicator());
 
         VectorTools::integrate_difference(
+            discretization_.mapping(),
             offline_data_.dof_handler(),
             analytic_component,
             Functions::ZeroFunction<dim, Number>(),
             difference_per_cell,
-            QGauss<dim>(3),
+            discretization_.quadrature_high_order(),
             VectorTools::L2_norm);
 
         l2_norm_analytic = Number(std::sqrt(
@@ -809,21 +803,23 @@ namespace ryujin
       const Number linf_norm_error = Utilities::MPI::max(
           error_component.linfty_norm(), mpi_ensemble_.ensemble_communicator());
 
-      VectorTools::integrate_difference(offline_data_.dof_handler(),
+      VectorTools::integrate_difference(discretization_.mapping(),
+                                        offline_data_.dof_handler(),
                                         error_component,
                                         Functions::ZeroFunction<dim, Number>(),
                                         difference_per_cell,
-                                        QGauss<dim>(3),
+                                        discretization_.quadrature_high_order(),
                                         VectorTools::L1_norm);
 
       const Number l1_norm_error = Utilities::MPI::sum(
           difference_per_cell.l1_norm(), mpi_ensemble_.ensemble_communicator());
 
-      VectorTools::integrate_difference(offline_data_.dof_handler(),
+      VectorTools::integrate_difference(discretization_.mapping(),
+                                        offline_data_.dof_handler(),
                                         error_component,
                                         Functions::ZeroFunction<dim, Number>(),
                                         difference_per_cell,
-                                        QGauss<dim>(3),
+                                        discretization_.quadrature_high_order(),
                                         VectorTools::L2_norm);
 
       const Number l2_norm_error = Number(std::sqrt(

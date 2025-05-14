@@ -8,16 +8,17 @@
 #include <compile_time_options.h>
 
 #include "convenience_macros.h"
-#include "geometry.h"
+#include "geometries/geometry.h"
 #include "mpi_ensemble.h"
 #include "patterns_conversion.h"
 
 #include <deal.II/base/parameter_acceptor.h>
-#include <deal.II/base/quadrature.h>
+#include <deal.II/distributed/fully_distributed_tria.h>
 #include <deal.II/distributed/shared_tria.h>
 #include <deal.II/distributed/tria.h>
-#include <deal.II/fe/fe.h>
-#include <deal.II/fe/mapping.h>
+#include <deal.II/hp/fe_collection.h>
+#include <deal.II/hp/mapping_collection.h>
+#include <deal.II/hp/q_collection.h>
 
 #include <memory>
 #include <set>
@@ -151,6 +152,23 @@ namespace ryujin
     /** dG Q3: discontinuous bi- (tri-) cubic Lagrange elements */
     dg_q3
   };
+
+  /**
+   * An enum class for setting the type of Triangulation that should be
+   * constructed.
+   *
+   * @ingroup Mesh
+   */
+  enum class MeshType {
+    /** Use serial dealii::Triangulation<dim> */
+    serial,
+    /** Use parallel dealii::parallel::shared::Triangulation<dim> */
+    parallel_shared,
+    /** Use parallel dealii::parallel::distributed::Triangulation<dim> */
+    parallel_distributed,
+    /** Use parallel dealii::parallel::fullydistributed::Triangulation<dim> */
+    parallel_fullydistributed
+  };
 } // namespace ryujin
 
 #ifndef DOXYGEN
@@ -171,25 +189,18 @@ DECLARE_ENUM(ryujin::Ansatz,
                   {ryujin::Ansatz::dg_q1, "dG Q1"},
                   {ryujin::Ansatz::dg_q2, "dG Q2"},
                   {ryujin::Ansatz::dg_q3, "dG Q3"}));
+
+DECLARE_ENUM(ryujin::MeshType,
+             LIST({ryujin::MeshType::serial, "serial"},
+                  {ryujin::MeshType::parallel_shared, "parallel shared"},
+                  {ryujin::MeshType::parallel_distributed,
+                   "parallel distributed"},
+                  {ryujin::MeshType::parallel_fullydistributed,
+                   "parallel fullydistributed"}));
 #endif
 
 namespace ryujin
 {
-  namespace
-  {
-    template <int dim>
-    struct Proxy {
-      using Triangulation = dealii::parallel::distributed::Triangulation<dim>;
-    };
-
-    template <>
-    struct Proxy<1> {
-      using Triangulation = dealii::parallel::shared::Triangulation<1>;
-    };
-
-  } // namespace
-
-
   /**
    * This class is as a container for data related to the discretization,
    * this includes the triangulation, finite element, mapping, and
@@ -209,15 +220,6 @@ namespace ryujin
   class Discretization : public dealii::ParameterAcceptor
   {
   public:
-    /**
-     * A type alias denoting the Triangulation we are using:
-     *
-     * In one spatial dimensions we use a
-     * dealii::parallel::shared::Triangulation and for two and three
-     * dimensions a dealii::parallel::distributed::Triangulation.
-     */
-    using Triangulation = typename Proxy<dim>::Triangulation;
-
     /**
      * Constructor.
      */
@@ -242,7 +244,7 @@ namespace ryujin
 
   public:
     /**
-     * Return a boolean indicating  whether the chosen Ansatz space is
+     * Return a boolean indicating whether the chosen Ansatz space is
      * discontinuous.
      */
     bool have_discontinuous_ansatz() const
@@ -270,6 +272,49 @@ namespace ryujin
     }
 
     /**
+     * Return the polynomial degree of the chosen finite element ansatz.
+     */
+    unsigned int polynomial_degree() const
+    {
+      switch (ansatz_) {
+      case Ansatz::cg_q1:
+        [[fallthrough]];
+      case Ansatz::dg_q1:
+        return 1;
+      case Ansatz::cg_q2:
+        [[fallthrough]];
+      case Ansatz::dg_q2:
+        return 2;
+      case Ansatz::cg_q3:
+        [[fallthrough]];
+      case Ansatz::dg_q3:
+        return 3;
+      }
+
+      AssertThrow(false, dealii::ExcInternalError());
+      __builtin_trap();
+    }
+
+
+    /**
+     * Return a boolean indicating whether the chosen mesh geometry is
+     * stored in a parallel distributed, or parallel fullydistributed
+     * triangulation.
+     */
+    bool have_distributed_triangulation() const
+    {
+      using namespace dealii::parallel;
+      const auto *p_t = triangulation_.get();
+
+      if (dynamic_cast<const distributed::Triangulation<dim> *>(p_t))
+        return true;
+      else if (dynamic_cast<const fullydistributed::Triangulation<dim> *>(p_t))
+        return true;
+      else
+        return false;
+    }
+
+    /**
      * Return a mutable reference to the refinement variable.
      */
     ACCESSOR(refinement)
@@ -286,11 +331,15 @@ namespace ryujin
 
     /**
      * Return a read-only const reference to the mapping.
+     *
+     * @note The accessor returns an MappingCollection object.
      */
     ACCESSOR_READ_ONLY(mapping)
 
     /**
      * Return a read-only const reference to the finite element.
+     *
+     * @note The accessor returns an FECollection object.
      */
     ACCESSOR_READ_ONLY(finite_element)
 
@@ -298,49 +347,69 @@ namespace ryujin
      * Return a read-only const reference to a continuous ("cG") variant of
      * the selected discontinuous finite element space.
      *
-     * @note This object is unavailable for the dG Q0 discretization.
+     * @note The accessor returns an FECollection object.
      */
     ACCESSOR_READ_ONLY(finite_element_cg)
 
     /**
      * Return a read-only const reference to the quadrature rule.
+     *
+     * @note The accessor returns an QCollection object.
      */
     ACCESSOR_READ_ONLY(quadrature)
 
     /**
+     * Return a read-only const reference to a highe order quadrature rule
+     * used for computing errors.
+     *
+     * @note The accessor returns an QCollection object.
+     */
+    ACCESSOR_READ_ONLY(quadrature_high_order)
+
+    /**
      * Return a read-only const reference to the nodal quadrature rule
      * (Gauß Lobatto).
+     *
+     * @note The accessor returns an QCollection object.
      */
     ACCESSOR_READ_ONLY(nodal_quadrature)
 
     /**
      * Return a read-only const reference to the 1D quadrature rule.
+     *
+     * @note The accessor returns an QCollection object.
      */
     ACCESSOR_READ_ONLY(quadrature_1d)
 
     /**
      * Return a read-only const reference to the face quadrature rule.
+     *
+     * @note The accessor returns an QCollection object.
      */
     ACCESSOR_READ_ONLY(face_quadrature)
 
     /**
      * Return a read-only const reference to the nodal face quadrature rule
      * (Gauß Lobatto).
+     *
+     * @note The accessor returns an QCollection object.
      */
     ACCESSOR_READ_ONLY(face_nodal_quadrature)
 
   protected:
     const MPIEnsemble &mpi_ensemble_;
 
-    std::unique_ptr<Triangulation> triangulation_;
-    std::unique_ptr<const dealii::Mapping<dim>> mapping_;
-    std::unique_ptr<const dealii::FiniteElement<dim>> finite_element_;
-    std::unique_ptr<const dealii::FiniteElement<dim>> finite_element_cg_;
-    std::unique_ptr<const dealii::Quadrature<dim>> quadrature_;
-    std::unique_ptr<const dealii::Quadrature<dim>> nodal_quadrature_;
-    std::unique_ptr<const dealii::Quadrature<1>> quadrature_1d_;
-    std::unique_ptr<const dealii::Quadrature<dim - 1>> face_quadrature_;
-    std::unique_ptr<const dealii::Quadrature<dim - 1>> face_nodal_quadrature_;
+    std::unique_ptr<dealii::Triangulation<dim>> triangulation_;
+    std::unique_ptr<const dealii::hp::MappingCollection<dim>> mapping_;
+    std::unique_ptr<const dealii::hp::FECollection<dim>> finite_element_;
+    std::unique_ptr<const dealii::hp::FECollection<dim>> finite_element_cg_;
+    std::unique_ptr<const dealii::hp::QCollection<dim>> quadrature_;
+    std::unique_ptr<const dealii::hp::QCollection<dim>> quadrature_high_order_;
+    std::unique_ptr<const dealii::hp::QCollection<dim>> nodal_quadrature_;
+    std::unique_ptr<const dealii::hp::QCollection<1>> quadrature_1d_;
+    std::unique_ptr<const dealii::hp::QCollection<dim - 1>> face_quadrature_;
+    std::unique_ptr<const dealii::hp::QCollection<dim - 1>>
+        face_nodal_quadrature_;
 
   private:
     //@}
@@ -378,14 +447,4 @@ namespace ryujin
     template <typename Discretization, int dim_, typename Number_>
     friend class SolutionTransfer;
   };
-
-
-  /**
-   * A templated constexpr boolean that is true if we use a parallel
-   * distributed triangulation (for the specified dimension).
-   */
-  template <int dim>
-  constexpr bool have_distributed_triangulation =
-      std::is_same<typename Discretization<dim>::Triangulation,
-                   dealii::parallel::distributed::Triangulation<dim>>::value;
 } /* namespace ryujin */
