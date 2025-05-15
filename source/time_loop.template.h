@@ -316,13 +316,19 @@ namespace ryujin
     }
 
     /*
-     * In debug mode poison constrained degrees of freedom and precomputed
-     * values:
+     * Prepare the state vector for time stepping. In debug mode, also
+     * poison constrained degrees of freedom and precomputed values.
      */
     Vectors::debug_poison_constrained_dofs<Description>(state_vector,
                                                         offline_data_);
+
     Vectors::debug_poison_precomputed_values<Description>(state_vector,
                                                           offline_data_);
+    time_integrator_.prepare_state_vector(state_vector, t);
+
+    /*
+     * The honorable main loop:
+     */
 
     Number last_terminal_output = terminal_update_interval_ == Number(0.)
                                       ? std::numeric_limits<Number>::max()
@@ -330,10 +336,6 @@ namespace ryujin
     Number last_checkpoint = checkpoint_update_interval_ == Number(0.)
                                  ? std::numeric_limits<Number>::max()
                                  : Number(0.);
-
-    /*
-     * The honorable main loop:
-     */
 
     print_info("entering main loop");
     computing_timer_["time loop"].start();
@@ -412,10 +414,6 @@ namespace ryujin
           Scope scope(computing_timer_, "(re)initialize data structures");
           print_info("performing mesh adaptation");
 
-          hyperbolic_module_.prepare_state_vector(state_vector, t);
-          if (!ParabolicSystem::is_identity)
-            parabolic_module_.prepare_state_vector(state_vector, t);
-
           adapt_mesh_and_transfer_state_vector(state_vector,
                                                prepare_compute_kernels);
         }
@@ -431,6 +429,8 @@ namespace ryujin
               : std::numeric_limits<Number>::max());
 
       t += tau;
+
+      time_integrator_.prepare_state_vector(state_vector, t);
 
       /* Synchronize wall time: */
 
@@ -468,10 +468,6 @@ namespace ryujin
       if (update_checkpoint) {
         Scope scop(computing_timer_, "time step [X]   - perform checkpointing");
 
-        hyperbolic_module_.prepare_state_vector(state_vector, t);
-        if (!ParabolicSystem::is_identity)
-          parabolic_module_.prepare_state_vector(state_vector, t);
-
         print_info("scheduling checkpointing");
         write_checkpoint(state_vector, base_name_ensemble_, t, timer_cycle);
         last_checkpoint = wall_time;
@@ -483,10 +479,6 @@ namespace ryujin
 
     if (checkpoint_update_interval_ != Number(0.)) {
       Scope scope(computing_timer_, "time step [X]   - perform checkpointing");
-
-      hyperbolic_module_.prepare_state_vector(state_vector, t);
-      if (!ParabolicSystem::is_identity)
-        parabolic_module_.prepare_state_vector(state_vector, t);
 
       print_info("scheduling checkpointing");
       write_checkpoint(state_vector, base_name_ensemble_, t, timer_cycle);
@@ -605,13 +597,16 @@ namespace ryujin
     solution_transfer_.reset_handle();
 
     /*
-     * In debug mode poison constrained degrees of freedom and precomputed
-     * values:
+     * Poison constrained degrees of freedom and prepare the state vector
+     * for time stepping:
      */
+
     Vectors::debug_poison_constrained_dofs<Description>(state_vector,
                                                         offline_data_);
+
     Vectors::debug_poison_precomputed_values<Description>(state_vector,
                                                           offline_data_);
+    time_integrator_.prepare_state_vector(state_vector, t);
   }
 
 
@@ -626,7 +621,6 @@ namespace ryujin
     std::cout << "TimeLoop<dim, Number>::write_checkpoint()" << std::endl;
 #endif
 
-    /* We need hyperbolic_module.prepare_state_vector() prior to this call! */
     solution_transfer_.prepare_projection(state_vector);
     const auto transfer_handle = solution_transfer_.get_handle();
     solution_transfer_.reset_handle();
@@ -687,7 +681,6 @@ namespace ryujin
 
     triangulation.prepare_coarsening_and_refinement();
 
-    /* We need hyperbolic_module.prepare_state_vector() prior to this call! */
     solution_transfer_.prepare_projection(state_vector);
 
     /* Execute mesh adaptation and project old state to new state vector: */
@@ -718,10 +711,6 @@ namespace ryujin
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeLoop<dim, Number>::compute_error()" << std::endl;
 #endif
-
-    hyperbolic_module_.prepare_state_vector(state_vector, t);
-    if (!ParabolicSystem::is_identity)
-      parabolic_module_.prepare_state_vector(state_vector, t);
 
     Vector<Number> difference_per_cell(
         discretization_.triangulation().n_active_cells());
@@ -900,12 +889,6 @@ namespace ryujin
     /* There is nothing to do: */
     if (!(do_full_output || do_levelsets))
       return;
-
-    /* Prepare vectors for output: */
-
-    hyperbolic_module_.prepare_state_vector(state_vector, t);
-    if (!ParabolicSystem::is_identity)
-      parabolic_module_.prepare_state_vector(state_vector, t);
 
     /* Data output: */
 
