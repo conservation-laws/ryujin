@@ -115,8 +115,7 @@ namespace ryujin
       }
 
 
-      void create_triangulation(
-          typename dealii::Triangulation<dim> &triangulation) final
+      void create_triangulation(dealii::Triangulation<dim> &triangulation) final
       {
         /* create mesh: */
 
@@ -215,6 +214,7 @@ namespace ryujin
           directions.push_back(2);
         }
 
+#ifndef BUG_COLLECT_PERIODIC_FACES_INSTANTIATION
         if (!directions.empty()) {
           std::vector<dealii::GridTools::PeriodicFacePair<
               typename dealii::Triangulation<dim>::cell_iterator>>
@@ -229,6 +229,7 @@ namespace ryujin
 
           triangulation.add_periodicity(periodic_faces);
         }
+#endif
       }
 
     private:

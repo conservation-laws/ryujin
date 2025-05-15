@@ -28,3 +28,13 @@
 #cmakedefine WITH_LIKWID
 #cmakedefine WITH_OPENMP
 #cmakedefine WITH_VALGRIND
+
+/* Workarounds: */
+
+/*
+ * Works around an issue when compiling ryujin with clang and attempting to
+ * link against a deal.II library compiled with gcc. Both compilers seem to
+ * disagree on how to name mangle the symbol leading to an undefined
+ * reference when trying to link the final executable.
+ */
+#cmakedefine BUG_COLLECT_PERIODIC_FACES_INSTANTIATION
