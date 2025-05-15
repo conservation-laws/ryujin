@@ -127,6 +127,7 @@ jobs:
         cmake \
           -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_FLAGS="-Werror -Wno-unknown-warning-option -Wno-ignored-optimization-argument" \
           -DFORCE_DEAL_II_SPARSE_MATRIX=yes \
+          -DBUG_COLLECT_PERIODIC_FACES_INSTANTIATION=yes \
           -DWITH_OPENMP=on ..
     - name: build release
       run: |
@@ -139,6 +140,7 @@ jobs:
         cmake \
           -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_FLAGS="-Werror -Wno-unknown-warning-option -Wno-ignored-optimization-argument" \
           -DFORCE_DEAL_II_SPARSE_MATRIX=yes \
+          -DBUG_COLLECT_PERIODIC_FACES_INSTANTIATION=yes \
           -DWITH_OPENMP=on -DCMAKE_BUILD_TYPE=Debug ..
     - name: build debug
       run: |
