@@ -312,18 +312,15 @@ namespace ryujin
         Vectors::reinit_state_vector<Description>(state_vector, offline_data_);
         std::get<0>(state_vector) =
             initial_values_.get().interpolate_hyperbolic_vector();
+
+        Vectors::debug_poison_constrained_dofs<Description>(state_vector,
+                                                            offline_data_);
+        Vectors::debug_poison_precomputed_values<Description>(state_vector,
+                                                              offline_data_);
       }
     }
 
-    /*
-     * Prepare the state vector for time stepping. In debug mode, also
-     * poison constrained degrees of freedom and precomputed values.
-     */
-    Vectors::debug_poison_constrained_dofs<Description>(state_vector,
-                                                        offline_data_);
-
-    Vectors::debug_poison_precomputed_values<Description>(state_vector,
-                                                          offline_data_);
+    /* Prepare the state vector for time stepping. */
     time_integrator_.prepare_state_vector(state_vector, t);
 
     /*
@@ -416,6 +413,9 @@ namespace ryujin
 
           adapt_mesh_and_transfer_state_vector(state_vector,
                                                prepare_compute_kernels);
+
+          /* Prepare the state vector for time stepping. */
+          time_integrator_.prepare_state_vector(state_vector, t);
         }
       }
 
