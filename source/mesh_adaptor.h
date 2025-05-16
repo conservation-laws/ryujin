@@ -39,6 +39,11 @@ namespace ryujin
      * Perform local refinement and coarsening based on Kelly error estimator.
      */
     kelly_estimator,
+
+    /**
+     * Perform local refinement and coarsening based on a smoothness estimator.
+     */
+    smoothness_estimator,
   };
 
   /**
@@ -88,7 +93,9 @@ DECLARE_ENUM(
     ryujin::AdaptationStrategy,
     LIST({ryujin::AdaptationStrategy::global_refinement, "global refinement"},
          {ryujin::AdaptationStrategy::random_adaptation, "random adaptation"},
-         {ryujin::AdaptationStrategy::kelly_estimator, "kelly estimator"}, ));
+         {ryujin::AdaptationStrategy::kelly_estimator, "kelly estimator"},
+         {ryujin::AdaptationStrategy::smoothness_estimator,
+          "smoothness estimator"}, ));
 
 DECLARE_ENUM(ryujin::MarkingStrategy,
              LIST({ryujin::MarkingStrategy::fixed_number, "fixed number"},
@@ -201,6 +208,8 @@ namespace ryujin
     std::vector<Number> adaptation_time_points_;
     unsigned int adaptation_cycle_interval_;
 
+    unsigned int smoothness_widen_stencil_;
+
     std::vector<std::string> kelly_quantities_;
 
     //@}
@@ -227,15 +236,17 @@ namespace ryujin
 
     mutable std::mt19937_64 mersenne_twister_;
 
-    /* Kelly estimator: */
+    /* Kelly and smoothness estimator: */
 
-    void populate_kelly_quantities(const StateVector &state_vector) const;
+    void populate_selected_quantities(const StateVector &state_vector) const;
     void compute_kelly_indicators() const;
+    void compute_smoothness_indicators() const;
 
     const InitialPrecomputedVector &initial_precomputed_;
     const ScalarVector &alpha_;
 
-    mutable std::vector<ScalarVector> kelly_components_;
+    mutable std::vector<ScalarVector> selected_components_;
+    mutable ScalarVector smoothness_indicator_;
     //@}
   };
 
