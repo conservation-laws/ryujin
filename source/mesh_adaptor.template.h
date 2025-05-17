@@ -284,8 +284,6 @@ namespace ryujin
     RYUJIN_PARALLEL_REGION_BEGIN
 
     auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
-      constexpr Number eps = std::numeric_limits<Number>::epsilon();
-
       using T = decltype(sentinel);
       unsigned int stride_size = get_stride_size<T>;
 
@@ -293,13 +291,10 @@ namespace ryujin
 
       const unsigned int n_entries = selected_components_.size();
 
-      const Number scale =
-          0.5 / n_entries /
-          (smoothness_upper_threshold_ - smoothness_lower_threshold_);
-
-      const Number bias =
-          smoothness_lower_threshold_ /
-          (smoothness_upper_threshold_ - smoothness_lower_threshold_);
+      const T inv_denom =
+          T(1.) / T(smoothness_upper_threshold_ - smoothness_lower_threshold_);
+      const T scale = T(0.5) / T(n_entries) * inv_denom;
+      const T bias = T(smoothness_lower_threshold_) * inv_denom;
 
       RYUJIN_OMP_FOR
       for (unsigned int i = left; i < right; i += stride_size) {
@@ -338,7 +333,7 @@ namespace ryujin
 
         auto alpha_i = T(0.);
         for (unsigned int k = 0; k < n_entries; ++k) {
-          alpha_i += std::abs(numerator[k]) / (T(eps) + denominator[k]);
+          alpha_i += std::abs(numerator[k]) / (T(1.e-6) + denominator[k]);
         }
 
         // FIXME: more sophisticated activation function?
@@ -357,6 +352,10 @@ namespace ryujin
     loop(VA(), 0, n_internal);
 
     RYUJIN_PARALLEL_REGION_END
+
+    /*
+     * Widen indicators over stencil via max() operator:
+     */
 
     for (unsigned int cycle = 0; cycle < smoothness_widen_stencil_; ++cycle) {
       smoothness_indicator_.update_ghost_values();
@@ -408,6 +407,40 @@ namespace ryujin
       RYUJIN_PARALLEL_REGION_END
 
       smoothness_indicator_ = new_smoothness_indicator;
+    }
+
+    smoothness_indicator_.update_ghost_values();
+    const auto &affine_constraints = offline_data_->affine_constraints();
+    affine_constraints.distribute(smoothness_indicator_);
+
+    /*
+     * Distribute to cells by taking a cell-wise average:
+     */
+
+    std::vector<dealii::types::global_dof_index> local_dof_indices;
+    const auto &scalar_partitioner = offline_data_->scalar_partitioner();
+
+    const auto &dof_handler = offline_data_->dof_handler();
+    for (const auto &cell : dof_handler.active_cell_iterators()) {
+      if (!cell->is_locally_owned())
+        continue;
+
+      const unsigned int dofs_per_cell = cell->get_fe().n_dofs_per_cell();
+      const auto scale = Number(1. / dofs_per_cell);
+      local_dof_indices.resize(dofs_per_cell);
+      cell->get_dof_indices(local_dof_indices);
+
+      auto alpha_cell = Number(0.);
+
+      for (unsigned int i = 0; i < dofs_per_cell; ++i) {
+        const auto global_i = local_dof_indices[i];
+        const auto local_i = scalar_partitioner->global_to_local(global_i);
+        auto alpha_i = get_entry<Number>(smoothness_indicator_, local_i);
+        alpha_cell += alpha_i;
+      }
+      alpha_cell *= scale;
+
+      indicators_[cell->active_cell_index()] = static_cast<float>(alpha_cell);
     }
   }
 
