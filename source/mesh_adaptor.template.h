@@ -75,6 +75,16 @@ namespace ryujin
         "smoothness estimator: stencil size",
         smoothness_widen_stencil_,
         "Number of layers to widen the smoothness indicator stencil.");
+
+    smoothness_lower_threshold_ = 0.075;
+    add_parameter("smoothness estimator: lower threshold",
+                  smoothness_lower_threshold_,
+                  "Lower threshold of the smoothness indicator mapped to 0.");
+
+    smoothness_upper_threshold_ = 0.50;
+    add_parameter("smoothness estimator: upper threshold",
+                  smoothness_upper_threshold_,
+                  "Upper threshold of the smoothness indicator mapped to 1.");
     leave_subsection();
 
     /* Options for various marking strategies: */
@@ -274,8 +284,7 @@ namespace ryujin
     RYUJIN_PARALLEL_REGION_BEGIN
 
     auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
-      using ScalarNumber = typename get_value_type<Number>::type;
-      constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
+      constexpr Number eps = std::numeric_limits<Number>::epsilon();
 
       using T = decltype(sentinel);
       unsigned int stride_size = get_stride_size<T>;
@@ -283,6 +292,14 @@ namespace ryujin
       /* Stored thread locally: */
 
       const unsigned int n_entries = selected_components_.size();
+
+      const Number scale =
+          0.5 / n_entries /
+          (smoothness_upper_threshold_ - smoothness_lower_threshold_);
+
+      const Number bias =
+          smoothness_lower_threshold_ /
+          (smoothness_upper_threshold_ - smoothness_lower_threshold_);
 
       RYUJIN_OMP_FOR
       for (unsigned int i = left; i < right; i += stride_size) {
@@ -323,6 +340,12 @@ namespace ryujin
         for (unsigned int k = 0; k < n_entries; ++k) {
           alpha_i += std::abs(numerator[k]) / (T(eps) + denominator[k]);
         }
+
+        // FIXME: more sophisticated activation function?
+        alpha_i *= scale;
+        alpha_i -= bias;
+        alpha_i = std::max(alpha_i, T(0.));
+        alpha_i = std::min(alpha_i, T(1.));
 
         write_entry<T>(smoothness_indicator_, alpha_i, i);
       }

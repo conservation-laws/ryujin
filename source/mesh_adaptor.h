@@ -209,6 +209,8 @@ namespace ryujin
     unsigned int adaptation_cycle_interval_;
 
     unsigned int smoothness_widen_stencil_;
+    double smoothness_lower_threshold_;
+    double smoothness_upper_threshold_;
 
     std::vector<std::string> kelly_quantities_;
 
