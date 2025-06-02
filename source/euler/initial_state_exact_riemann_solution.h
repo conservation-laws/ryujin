@@ -429,11 +429,13 @@ namespace ryujin
         }
 
 #ifdef DEBUG
-        const double phi_1 = phi(p_1, data_1, data_2);
-        const double phi_2 = phi(p_2, data_1, data_2);
-        Assert(phi_1 * phi_2 <= 0.,
-               dealii::ExcMessage(
-                   "Euler::ExactRiemannSolver: failed to compute p_star."));
+        {
+          const double phi_1 = phi(p_1, data_1, data_2);
+          const double phi_2 = phi(p_2, data_1, data_2);
+          Assert(phi_1 * phi_2 <= 0.,
+                 dealii::ExcMessage(
+                     "Euler::ExactRiemannSolver: failed to compute p_star."));
+        }
 #endif
 
         //
