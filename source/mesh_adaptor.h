@@ -36,11 +36,6 @@ namespace ryujin
     random_adaptation,
 
     /**
-     * Perform local refinement and coarsening based on Kelly error estimator.
-     */
-    kelly_estimator,
-
-    /**
      * Perform local refinement and coarsening based on a smoothness estimator.
      */
     smoothness_estimator,
@@ -93,7 +88,6 @@ DECLARE_ENUM(
     ryujin::AdaptationStrategy,
     LIST({ryujin::AdaptationStrategy::global_refinement, "global refinement"},
          {ryujin::AdaptationStrategy::random_adaptation, "random adaptation"},
-         {ryujin::AdaptationStrategy::kelly_estimator, "kelly estimator"},
          {ryujin::AdaptationStrategy::smoothness_estimator,
           "smoothness estimator"}, ));
 
@@ -192,7 +186,13 @@ namespace ryujin
     ACCESSOR_READ_ONLY(indicators);
 
     /**
-     * The smoothness indicators. The vector is only valid if the
+     * Compute smoothness indicators. This function reinitializes and
+     * populates the smoothness_indicators() vector.
+     */
+    void compute_smoothness_indicators(const StateVector &state_vector) const;
+
+    /**
+     * The computed smoothness indicators. The vector is only valid if the
      * "smoothness indicator" refinement strategy has been selected.
      */
     ACCESSOR_READ_ONLY(smoothness_indicators);
@@ -219,12 +219,11 @@ namespace ryujin
     std::vector<Number> adaptation_time_points_;
     unsigned int adaptation_cycle_interval_;
 
+    std::vector<std::string> smoothness_selected_quantities_;
     double smoothness_local_global_ratio_;
     unsigned int smoothness_widen_stencil_;
     double smoothness_lower_threshold_;
     double smoothness_upper_threshold_;
-
-    std::vector<std::string> kelly_quantities_;
 
     //@}
     /**
@@ -238,28 +237,23 @@ namespace ryujin
     dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
     dealii::ObserverPointer<const ParabolicSystem> parabolic_system_;
 
+    const InitialPrecomputedVector &initial_precomputed_;
+    const ScalarVector &alpha_;
+
     bool need_mesh_adaptation_;
 
     mutable dealii::Vector<float> indicators_;
 
-    mutable std::vector<dealii::Vector<float>> indicators_vec_;
-
     /* random adaptation: */
 
-    void compute_random_indicators() const;
+    void populate_cell_indicators_with_random_values() const;
 
     mutable std::mt19937_64 mersenne_twister_;
 
-    /* Kelly and smoothness estimator: */
+    /* Smoothness estimator: */
 
-    void populate_selected_quantities(const StateVector &state_vector) const;
-    void compute_kelly_indicators() const;
-    void compute_smoothness_indicators() const;
+    void populate_cell_indicators_from_smoothness_indicators() const;
 
-    const InitialPrecomputedVector &initial_precomputed_;
-    const ScalarVector &alpha_;
-
-    mutable std::vector<ScalarVector> quantities_;
     mutable ScalarVector smoothness_indicators_;
     //@}
   };

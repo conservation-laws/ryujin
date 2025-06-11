@@ -35,15 +35,15 @@ namespace ryujin
       , offline_data_(&offline_data)
       , hyperbolic_system_(&hyperbolic_system)
       , parabolic_system_(&parabolic_system)
-      , need_mesh_adaptation_(false)
       , initial_precomputed_(initial_precomputed)
       , alpha_(alpha)
+      , need_mesh_adaptation_(false)
   {
     adaptation_strategy_ = AdaptationStrategy::global_refinement;
     add_parameter("adaptation strategy",
                   adaptation_strategy_,
                   "The chosen adaptation strategy. Possible values are: global "
-                  "refinement, random adaptation, kelly estimator");
+                  "refinement, random adaptation, smoothness estimator");
 
     marking_strategy_ = MarkingStrategy::fixed_number;
     add_parameter("marking strategy",
@@ -66,8 +66,8 @@ namespace ryujin
                   "Seed for 64bit Mersenne Twister used for random refinement");
 
     add_parameter(
-        "kelly estimator: quantities",
-        kelly_quantities_,
+        "smoothness estimator: quantities",
+        smoothness_selected_quantities_,
         "List of conserved, primitive or precomputed quantities that will be "
         "used for the Kelly error estimator for refinement and coarsening.");
 
@@ -104,7 +104,6 @@ namespace ryujin
                   refinement_fraction_,
                   "Marking: fraction of cells selected for refinement.");
 
-
     refinement_tolerance_ = 0.25;
     add_parameter(
         "refinement tolerance",
@@ -140,7 +139,6 @@ namespace ryujin
         max_num_cells_,
         "Marking: maximal number of cells used for the fixed number "
         "strategy. Note this is only an indicator and not strictly enforced.");
-
     leave_subsection();
 
     /* Options for various time point selection strategies: */
@@ -186,9 +184,9 @@ namespace ryujin
       adaptation_time_points_.erase(new_end, adaptation_time_points_.end());
     }
 
-    if (adaptation_strategy_ == AdaptationStrategy::kelly_estimator) {
+    if (adaptation_strategy_ == AdaptationStrategy::smoothness_estimator) {
       SelectedComponentsExtractor<Description, dim, Number>::check(
-          kelly_quantities_);
+          smoothness_selected_quantities_);
     }
 
     /* toggle mesh adaptation flag to off. */
@@ -197,102 +195,39 @@ namespace ryujin
 
 
   template <typename Description, int dim, typename Number>
-  void MeshAdaptor<Description, dim, Number>::compute_random_indicators() const
-  {
-    std::generate(std::begin(indicators_), std::end(indicators_), [&]() {
-      static std::uniform_real_distribution<double> distribution(0.0, 10.0);
-      return distribution(mersenne_twister_);
-    });
-  }
-
-
-  template <typename Description, int dim, typename Number>
-  void MeshAdaptor<Description, dim, Number>::populate_selected_quantities(
+  void MeshAdaptor<Description, dim, Number>::compute_smoothness_indicators(
       const StateVector &state_vector) const
   {
-    /* Populate Kelly quantities: */
     const auto &affine_constraints = offline_data_->affine_constraints();
-
-    quantities_ =
-        SelectedComponentsExtractor<Description, dim, Number>::extract(
-            *hyperbolic_system_,
-            state_vector,
-            initial_precomputed_,
-            alpha_,
-            kelly_quantities_);
-
-    for (auto &it : quantities_) {
-      it.update_ghost_values();
-      affine_constraints.distribute(it);
-      it.update_ghost_values();
-    }
-  }
-
-
-  template <typename Description, int dim, typename Number>
-  void MeshAdaptor<Description, dim, Number>::compute_kelly_indicators() const
-  {
-#if !DEAL_II_VERSION_GTE(9, 6, 0)
-    AssertThrow(
-        false,
-        dealii::ExcMessage("The MeshAdaptor::compute_kelly_indicators() method "
-                           "needs deal.II version 9.6.0 or newer"));
-#else
-
-    /*
-     * Calculate a Kelly error estimator for each configured quantitity:
-     */
-
-    std::vector<dealii::Vector<float>> kelly_errors;
-    std::vector<dealii::Vector<float> *> ptr_kelly_errors;
-
-    const auto size = indicators_vec_[0].size();
-    kelly_errors.resize(quantities_.size());
-
-    for (auto &it : kelly_errors) {
-      it.reinit(size);
-      ptr_kelly_errors.push_back(&it);
-    }
-
-    auto array_view_kelly_errors = dealii::make_array_view(ptr_kelly_errors);
-    std::vector<const dealii::ReadVector<Number> *> ptr_kelly_components;
-    for (const auto &it : quantities_)
-      ptr_kelly_components.push_back(&it);
-
-    const auto array_view_kelly_components =
-        dealii::make_array_view(ptr_kelly_components);
-
-    // Workaround: select the first mapping
-    const auto index = 0; // FIXME: come up with a strategy to get an
-                          // appropriate index.
-    dealii::KellyErrorEstimator<dim>::estimate(
-        offline_data_->discretization().mapping()[index],
-        offline_data_->dof_handler(),
-        offline_data_->discretization().face_quadrature(),
-        {},
-        array_view_kelly_components,
-        array_view_kelly_errors);
-
-    for (unsigned int entry_index = 0; entry_index < quantities_.size();
-         ++entry_index)
-      indicators_vec_[entry_index] = kelly_errors[entry_index];
-#endif
-  }
-
-
-  template <typename Description, int dim, typename Number>
-  void
-  MeshAdaptor<Description, dim, Number>::compute_smoothness_indicators() const
-  {
     const unsigned int n_internal = offline_data_->n_locally_internal();
     const unsigned int n_owned = offline_data_->n_locally_owned();
     const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
     const auto &betaij_matrix = offline_data_->betaij_matrix();
     using VA = dealii::VectorizedArray<Number>;
 
-    /* Set up temporary vectors: */
+    /*
+     * Extract selected quantities:
+     */
 
-    const unsigned int n_entries = quantities_.size();
+    auto quantities =
+        SelectedComponentsExtractor<Description, dim, Number>::extract(
+            *hyperbolic_system_,
+            state_vector,
+            initial_precomputed_,
+            alpha_,
+            smoothness_selected_quantities_);
+
+    for (auto &it : quantities) {
+      it.update_ghost_values();
+      affine_constraints.distribute(it);
+      it.update_ghost_values();
+    }
+
+    /*
+     * Set up temporary vectors:
+     */
+
+    const unsigned int n_entries = quantities.size();
     const auto &scalar_partitioner = offline_data_->scalar_partitioner();
 
     std::vector<ScalarVector> numerator(n_entries);
@@ -322,7 +257,7 @@ namespace ryujin
 
         boost::container::small_vector<T, 10> value_i(n_entries, T(0.));
         for (unsigned int k = 0; k < n_entries; ++k) {
-          value_i[k] = get_entry<T>(quantities_[k], i);
+          value_i[k] = get_entry<T>(quantities[k], i);
         }
 
         boost::container::small_vector<T, 10> numerator_i(n_entries, T(0.));
@@ -339,7 +274,7 @@ namespace ryujin
           const auto beta_ij = betaij_matrix.template get_entry<T>(i, col_idx);
 
           for (unsigned int k = 0; k < n_entries; ++k) {
-            const auto value_j_k = get_entry<T>(quantities_[k], js);
+            const auto value_j_k = get_entry<T>(quantities[k], js);
             numerator_i[k] += beta_ij * (value_j_k - value_i[k]);
             denominator_i[k] +=
                 std::abs(beta_ij) * //
@@ -362,8 +297,10 @@ namespace ryujin
     RYUJIN_PARALLEL_REGION_END
 
     /*
-     * Normalize:
+     * Normalize and populate smoothness_indicators_ vector:
      */
+
+    smoothness_indicators_.reinit(scalar_partitioner);
 
     std::vector<Number> denominator_global_maximum(n_entries);
     for (unsigned int k = 0; k < n_entries; ++k) {
@@ -478,38 +415,8 @@ namespace ryujin
     }
 
     smoothness_indicators_.update_ghost_values();
-    const auto &affine_constraints = offline_data_->affine_constraints();
     affine_constraints.distribute(smoothness_indicators_);
     smoothness_indicators_.update_ghost_values();
-
-    /*
-     * Distribute to cells by taking a cell-wise average:
-     */
-
-    std::vector<dealii::types::global_dof_index> local_dof_indices;
-
-    const auto &dof_handler = offline_data_->dof_handler();
-    for (const auto &cell : dof_handler.active_cell_iterators()) {
-      if (!cell->is_locally_owned())
-        continue;
-
-      const unsigned int dofs_per_cell = cell->get_fe().n_dofs_per_cell();
-      const auto scale = Number(1. / dofs_per_cell);
-      local_dof_indices.resize(dofs_per_cell);
-      cell->get_dof_indices(local_dof_indices);
-
-      auto alpha_cell = Number(0.);
-
-      for (unsigned int i = 0; i < dofs_per_cell; ++i) {
-        const auto global_i = local_dof_indices[i];
-        const auto local_i = scalar_partitioner->global_to_local(global_i);
-        auto alpha_i = get_entry<Number>(smoothness_indicators_, local_i);
-        alpha_cell += alpha_i;
-      }
-      alpha_cell *= scale;
-
-      indicators_[cell->active_cell_index()] = static_cast<float>(alpha_cell);
-    }
   }
 
 
@@ -569,15 +476,62 @@ namespace ryujin
       /* do nothing */
       break;
 
-    case AdaptationStrategy::kelly_estimator:
-      [[fallthrough]];
-    case AdaptationStrategy::smoothness_estimator:
-      populate_selected_quantities(state_vector);
+    case AdaptationStrategy::smoothness_estimator: {
+      compute_smoothness_indicators(state_vector);
       break;
+    }
 
     default:
       AssertThrow(false, dealii::ExcInternalError());
       __builtin_trap();
+    }
+  }
+
+
+  template <typename Description, int dim, typename Number>
+  void MeshAdaptor<Description, dim, Number>::
+      populate_cell_indicators_with_random_values() const
+  {
+    std::generate(std::begin(indicators_), std::end(indicators_), [&]() {
+      static std::uniform_real_distribution<double> distribution(0.0, 10.0);
+      return distribution(mersenne_twister_);
+    });
+  }
+
+
+  template <typename Description, int dim, typename Number>
+  void MeshAdaptor<Description, dim, Number>::
+      populate_cell_indicators_from_smoothness_indicators() const
+  {
+    const auto &scalar_partitioner = offline_data_->scalar_partitioner();
+
+    /*
+     * Distribute to cells by taking a cell-wise average:
+     */
+
+    std::vector<dealii::types::global_dof_index> local_dof_indices;
+
+    const auto &dof_handler = offline_data_->dof_handler();
+    for (const auto &cell : dof_handler.active_cell_iterators()) {
+      if (!cell->is_locally_owned())
+        continue;
+
+      const unsigned int dofs_per_cell = cell->get_fe().n_dofs_per_cell();
+      const auto scale = Number(1. / dofs_per_cell);
+      local_dof_indices.resize(dofs_per_cell);
+      cell->get_dof_indices(local_dof_indices);
+
+      auto alpha_cell = Number(0.);
+
+      for (unsigned int i = 0; i < dofs_per_cell; ++i) {
+        const auto global_i = local_dof_indices[i];
+        const auto local_i = scalar_partitioner->global_to_local(global_i);
+        auto alpha_i = get_entry<Number>(smoothness_indicators_, local_i);
+        alpha_cell += alpha_i;
+      }
+      alpha_cell *= scale;
+
+      indicators_[cell->active_cell_index()] = static_cast<float>(alpha_cell);
     }
   }
 
@@ -600,7 +554,7 @@ namespace ryujin
 #else
 
     /*
-     * Compute an indicator with the chosen adaptation strategy:
+     * Compute cell indicators with the chosen adaptation strategy:
      */
 
     switch (adaptation_strategy_) {
@@ -613,24 +567,12 @@ namespace ryujin
 
     case AdaptationStrategy::random_adaptation: {
       indicators_.reinit(triangulation.n_active_cells());
-      compute_random_indicators();
-    } break;
-
-    case AdaptationStrategy::kelly_estimator: {
-      indicators_vec_.resize(quantities_.size());
-      for (auto &entry : indicators_vec_) {
-        entry.reinit(triangulation.n_active_cells());
-        entry = 0;
-      }
-
-      compute_kelly_indicators();
+      populate_cell_indicators_with_random_values();
     } break;
 
     case AdaptationStrategy::smoothness_estimator: {
-      const auto &scalar_partitioner = offline_data_->scalar_partitioner();
-      smoothness_indicators_.reinit(scalar_partitioner);
       indicators_.reinit(triangulation.n_active_cells());
-      compute_smoothness_indicators();
+      populate_cell_indicators_from_smoothness_indicators();
     } break;
 
     default:
@@ -642,94 +584,33 @@ namespace ryujin
      * Mark cells with chosen marking strategy:
      */
 
-    if (adaptation_strategy_ != AdaptationStrategy::kelly_estimator)
-      switch (marking_strategy_) {
-      case MarkingStrategy::fixed_number: {
-        dealii::parallel::distributed::GridRefinement::
-            refine_and_coarsen_fixed_number(triangulation,
+    switch (marking_strategy_) {
+    case MarkingStrategy::fixed_number: {
+      dealii::parallel::distributed::GridRefinement::
+          refine_and_coarsen_fixed_number(triangulation,
+                                          indicators_,
+                                          refinement_fraction_,
+                                          coarsening_fraction_,
+                                          max_num_cells_);
+    } break;
+    case MarkingStrategy::fixed_fraction: {
+      dealii::parallel::distributed::GridRefinement::
+          refine_and_coarsen_fixed_fraction(triangulation,
                                             indicators_,
                                             refinement_fraction_,
-                                            coarsening_fraction_,
-                                            max_num_cells_);
-      } break;
-      case MarkingStrategy::fixed_fraction: {
-        dealii::parallel::distributed::GridRefinement::
-            refine_and_coarsen_fixed_fraction(triangulation,
-                                              indicators_,
-                                              refinement_fraction_,
-                                              coarsening_fraction_);
-      } break;
-      case MarkingStrategy::fixed_tolerance: {
-        ryujin::GridMarking::refine_and_coarsen_fixed_tolerance(
-            triangulation,
-            indicators_,
-            refinement_tolerance_,
-            coarsening_tolerance_);
-      } break;
-      default:
-        AssertThrow(false, dealii::ExcInternalError());
-        __builtin_trap();
-      }
-    else
-      switch (marking_strategy_) {
-      case MarkingStrategy::fixed_number: {
-        // harmon: refinement and coarsening by consensus
-        dealii::parallel::distributed::GridRefinement::
-            refine_and_coarsen_fixed_number(triangulation,
-                                            indicators_vec_[0],
-                                            refinement_fraction_,
-                                            coarsening_fraction_,
-                                            max_num_cells_);
-
-        for (unsigned int entry_index = 1; entry_index < indicators_vec_.size();
-             ++entry_index)
-          dealii::parallel::distributed::GridRefinement::
-              refine_and_coarsen_fixed_number(triangulation,
-                                              indicators_vec_[entry_index],
-                                              refinement_fraction_,
-                                              0, // harmon: coarsen by consensus
-                                              max_num_cells_);
-
-        for (auto &cell : triangulation.active_cell_iterators())
-          if (cell->refine_flag_set())
-            cell->clear_coarsen_flag();
-      } break;
-      case MarkingStrategy::fixed_fraction: {
-        // harmon: refinement and coarsening by consensus
-        dealii::parallel::distributed::GridRefinement::
-            refine_and_coarsen_fixed_fraction(triangulation,
-                                              indicators_vec_[0],
-                                              refinement_fraction_,
-                                              coarsening_fraction_);
-
-        for (unsigned int entry_index = 1; entry_index < indicators_vec_.size();
-             ++entry_index)
-          dealii::parallel::distributed::GridRefinement::
-              refine_and_coarsen_fixed_fraction(
-                  triangulation,
-                  indicators_vec_[entry_index],
-                  refinement_fraction_,
-                  0); // harmon: coarsen by consensus
-
-
-        for (auto &cell : triangulation.active_cell_iterators())
-          if (cell->refine_flag_set())
-            cell->clear_coarsen_flag();
-
-      } break;
-      case MarkingStrategy::fixed_tolerance: {
-        GridMarking::refine_and_coarsen_fixed_tolerance_by_consensus(
-            triangulation,
-            indicators_vec_,
-            refinement_tolerance_,
-            coarsening_tolerance_);
-        break;
-      }
-
-      default:
-        AssertThrow(false, dealii::ExcInternalError());
-        __builtin_trap();
-      }
+                                            coarsening_fraction_);
+    } break;
+    case MarkingStrategy::fixed_tolerance: {
+      ryujin::GridMarking::refine_and_coarsen_fixed_tolerance(
+          triangulation,
+          indicators_,
+          refinement_tolerance_,
+          coarsening_tolerance_);
+    } break;
+    default:
+      AssertThrow(false, dealii::ExcInternalError());
+      __builtin_trap();
+    }
 
     /*
      * Constrain refinement and coarsening to maximum and minimum
