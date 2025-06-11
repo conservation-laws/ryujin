@@ -186,6 +186,17 @@ namespace ryujin
     void mark_cells_for_coarsening_and_refinement(
         dealii::Triangulation<dim> &triangulation) const;
 
+    /**
+     * The computed cell indicators.
+     */
+    ACCESSOR_READ_ONLY(indicators);
+
+    /**
+     * The smoothness indicators. The vector is only valid if the
+     * "smoothness indicator" refinement strategy has been selected.
+     */
+    ACCESSOR_READ_ONLY(smoothness_indicators);
+
   private:
     /**
      * @name Run time options
@@ -208,6 +219,7 @@ namespace ryujin
     std::vector<Number> adaptation_time_points_;
     unsigned int adaptation_cycle_interval_;
 
+    double smoothness_local_global_ratio_;
     unsigned int smoothness_widen_stencil_;
     double smoothness_lower_threshold_;
     double smoothness_upper_threshold_;
@@ -247,8 +259,8 @@ namespace ryujin
     const InitialPrecomputedVector &initial_precomputed_;
     const ScalarVector &alpha_;
 
-    mutable std::vector<ScalarVector> selected_components_;
-    mutable ScalarVector smoothness_indicator_;
+    mutable std::vector<ScalarVector> quantities_;
+    mutable ScalarVector smoothness_indicators_;
     //@}
   };
 

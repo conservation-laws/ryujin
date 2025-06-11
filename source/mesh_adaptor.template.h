@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "grid_refinement.h"
 #include "instrumentation.h"
 #include "mesh_adaptor.h"
 #include "mpi_ensemble.h"
@@ -16,7 +17,7 @@
 #include <deal.II/distributed/grid_refinement.h>
 #include <deal.II/numerics/error_estimator.h>
 
-#include "grid_refinement.h"
+#include <boost/container/small_vector.hpp>
 
 namespace ryujin
 {
@@ -69,6 +70,14 @@ namespace ryujin
         kelly_quantities_,
         "List of conserved, primitive or precomputed quantities that will be "
         "used for the Kelly error estimator for refinement and coarsening.");
+
+    smoothness_local_global_ratio_ = 0.5;
+    add_parameter(
+        "smoothness estimator: local global ratio",
+        smoothness_local_global_ratio_,
+        "Ratio between local and global denominator value used for normalizing "
+        "the smoothness indicator. A value of 1 indicates pure global "
+        "normalization, a value of 0 indicates pure local normalization.");
 
     smoothness_widen_stencil_ = 0;
     add_parameter(
@@ -204,7 +213,7 @@ namespace ryujin
     /* Populate Kelly quantities: */
     const auto &affine_constraints = offline_data_->affine_constraints();
 
-    selected_components_ =
+    quantities_ =
         SelectedComponentsExtractor<Description, dim, Number>::extract(
             *hyperbolic_system_,
             state_vector,
@@ -212,7 +221,8 @@ namespace ryujin
             alpha_,
             kelly_quantities_);
 
-    for (auto &it : selected_components_) {
+    for (auto &it : quantities_) {
+      it.update_ghost_values();
       affine_constraints.distribute(it);
       it.update_ghost_values();
     }
@@ -237,7 +247,7 @@ namespace ryujin
     std::vector<dealii::Vector<float> *> ptr_kelly_errors;
 
     const auto size = indicators_vec_[0].size();
-    kelly_errors.resize(selected_components_.size());
+    kelly_errors.resize(quantities_.size());
 
     for (auto &it : kelly_errors) {
       it.reinit(size);
@@ -246,7 +256,7 @@ namespace ryujin
 
     auto array_view_kelly_errors = dealii::make_array_view(ptr_kelly_errors);
     std::vector<const dealii::ReadVector<Number> *> ptr_kelly_components;
-    for (const auto &it : selected_components_)
+    for (const auto &it : quantities_)
       ptr_kelly_components.push_back(&it);
 
     const auto array_view_kelly_components =
@@ -263,8 +273,7 @@ namespace ryujin
         array_view_kelly_components,
         array_view_kelly_errors);
 
-    for (unsigned int entry_index = 0;
-         entry_index < selected_components_.size();
+    for (unsigned int entry_index = 0; entry_index < quantities_.size();
          ++entry_index)
       indicators_vec_[entry_index] = kelly_errors[entry_index];
 #endif
@@ -281,6 +290,91 @@ namespace ryujin
     const auto &betaij_matrix = offline_data_->betaij_matrix();
     using VA = dealii::VectorizedArray<Number>;
 
+    /* Set up temporary vectors: */
+
+    const unsigned int n_entries = quantities_.size();
+    const auto &scalar_partitioner = offline_data_->scalar_partitioner();
+
+    std::vector<ScalarVector> numerator(n_entries);
+    std::vector<ScalarVector> denominator(std::max(1u, n_entries));
+    for (auto &it : numerator)
+      it.reinit(scalar_partitioner);
+    for (auto &it : denominator)
+      it.reinit(scalar_partitioner);
+
+    /*
+     * Commpute numerators and denominators for the smoothness indicators:
+     */
+
+    RYUJIN_PARALLEL_REGION_BEGIN
+
+    auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
+      using T = decltype(sentinel);
+      unsigned int stride_size = get_stride_size<T>;
+
+      RYUJIN_OMP_FOR
+      for (unsigned int i = left; i < right; i += stride_size) {
+
+        /* Skip constrained degrees of freedom: */
+        const unsigned int row_length = sparsity_simd.row_length(i);
+        if (row_length == 1)
+          continue;
+
+        boost::container::small_vector<T, 10> value_i(n_entries, T(0.));
+        for (unsigned int k = 0; k < n_entries; ++k) {
+          value_i[k] = get_entry<T>(quantities_[k], i);
+        }
+
+        boost::container::small_vector<T, 10> numerator_i(n_entries, T(0.));
+        boost::container::small_vector<T, 10> denominator_i(n_entries, T(0.));
+
+        const unsigned int *js = sparsity_simd.columns(i);
+        for (unsigned int col_idx = 0; col_idx < row_length;
+             ++col_idx, js += stride_size) {
+
+          /* Skip diagonal. */
+          if (col_idx == 0)
+            continue;
+
+          const auto beta_ij = betaij_matrix.template get_entry<T>(i, col_idx);
+
+          for (unsigned int k = 0; k < n_entries; ++k) {
+            const auto value_j_k = get_entry<T>(quantities_[k], js);
+            numerator_i[k] += beta_ij * (value_j_k - value_i[k]);
+            denominator_i[k] +=
+                std::abs(beta_ij) * //
+                std::max(std::abs(value_j_k), std::abs(value_i[k]));
+          }
+
+          for (unsigned int k = 0; k < n_entries; ++k) {
+            write_entry<T>(numerator[k], numerator_i[k], i);
+            write_entry<T>(denominator[k], denominator_i[k], i);
+          }
+        }
+      }
+    };
+
+    /* Parallel non-vectorized loop: */
+    loop(Number(), n_internal, n_owned);
+    /* Parallel vectorized SIMD loop: */
+    loop(VA(), 0, n_internal);
+
+    RYUJIN_PARALLEL_REGION_END
+
+    /*
+     * Normalize:
+     */
+
+    std::vector<Number> denominator_global_maximum(n_entries);
+    for (unsigned int k = 0; k < n_entries; ++k) {
+      denominator_global_maximum[k] = dealii::Utilities::MPI::max(
+          denominator[k].linfty_norm(), mpi_ensemble_.ensemble_communicator());
+
+      constexpr Number eps = std::numeric_limits<Number>::epsilon();
+      denominator_global_maximum[k] =
+          std::max(denominator_global_maximum[k], eps);
+    }
+
     RYUJIN_PARALLEL_REGION_BEGIN
 
     auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
@@ -288,8 +382,6 @@ namespace ryujin
       unsigned int stride_size = get_stride_size<T>;
 
       /* Stored thread locally: */
-
-      const unsigned int n_entries = selected_components_.size();
 
       const T inv_denom =
           T(1.) / T(smoothness_upper_threshold_ - smoothness_lower_threshold_);
@@ -304,45 +396,23 @@ namespace ryujin
         if (row_length == 1)
           continue;
 
-        std::vector<T> value_i(n_entries, T(0.));
-        std::vector<T> numerator(n_entries, T(0.));
-        std::vector<T> denominator(n_entries, T(0.));
-
-        for (unsigned int k = 0; k < n_entries; ++k) {
-          value_i[k] = get_entry<T>(selected_components_[k], i);
-        }
-
-        const unsigned int *js = sparsity_simd.columns(i);
-        for (unsigned int col_idx = 0; col_idx < row_length;
-             ++col_idx, js += stride_size) {
-
-          /* Skip diagonal. */
-          if (col_idx == 0)
-            continue;
-
-          const auto beta_ij = betaij_matrix.template get_entry<T>(i, col_idx);
-
-          for (unsigned int k = 0; k < n_entries; ++k) {
-            const auto value_j_k = get_entry<T>(selected_components_[k], js);
-            numerator[k] += beta_ij * (value_j_k - value_i[k]);
-            denominator[k] +=
-                std::abs(beta_ij) *
-                std::max(std::abs(value_j_k), std::abs(value_i[k]));
-          }
-        }
-
         auto alpha_i = T(0.);
         for (unsigned int k = 0; k < n_entries; ++k) {
-          alpha_i += std::abs(numerator[k]) / (T(1.e-6) + denominator[k]);
+          const auto num_i = get_entry<T>(numerator[k], i);
+          const auto denom_i = get_entry<T>(denominator[k], i);
+          alpha_i +=
+              std::abs(num_i) /
+              ((1. - smoothness_local_global_ratio_) * denom_i +
+               smoothness_local_global_ratio_ * denominator_global_maximum[k]);
         }
 
-        // FIXME: more sophisticated activation function?
+        // FIXME: shall we use a more sophisticated activation function?
         alpha_i *= scale;
         alpha_i -= bias;
         alpha_i = std::max(alpha_i, T(0.));
         alpha_i = std::min(alpha_i, T(1.));
 
-        write_entry<T>(smoothness_indicator_, alpha_i, i);
+        write_entry<T>(smoothness_indicators_, alpha_i, i);
       }
     };
 
@@ -358,9 +428,7 @@ namespace ryujin
      */
 
     for (unsigned int cycle = 0; cycle < smoothness_widen_stencil_; ++cycle) {
-      smoothness_indicator_.update_ghost_values();
-
-      auto new_smoothness_indicator = smoothness_indicator_;
+      smoothness_indicators_.update_ghost_values();
 
       RYUJIN_PARALLEL_REGION_BEGIN
 
@@ -380,7 +448,7 @@ namespace ryujin
           if (row_length == 1)
             continue;
 
-          auto alpha_i = get_entry<T>(smoothness_indicator_, i);
+          auto alpha_i = get_entry<T>(smoothness_indicators_, i);
 
           const unsigned int *js = sparsity_simd.columns(i);
           for (unsigned int col_idx = 0; col_idx < row_length;
@@ -390,12 +458,12 @@ namespace ryujin
             if (col_idx == 0)
               continue;
 
-            const auto alpha_j = get_entry<T>(smoothness_indicator_, js);
+            const auto alpha_j = get_entry<T>(smoothness_indicators_, js);
 
             alpha_i = std::max(alpha_i, alpha_j);
           }
 
-          write_entry<T>(new_smoothness_indicator, alpha_i, i);
+          write_entry<T>(/*SIC!*/ denominator[0], alpha_i, i);
         }
       };
 
@@ -406,19 +474,19 @@ namespace ryujin
 
       RYUJIN_PARALLEL_REGION_END
 
-      smoothness_indicator_ = new_smoothness_indicator;
+      smoothness_indicators_ = /*SIC!*/ denominator[0];
     }
 
-    smoothness_indicator_.update_ghost_values();
+    smoothness_indicators_.update_ghost_values();
     const auto &affine_constraints = offline_data_->affine_constraints();
-    affine_constraints.distribute(smoothness_indicator_);
+    affine_constraints.distribute(smoothness_indicators_);
+    smoothness_indicators_.update_ghost_values();
 
     /*
      * Distribute to cells by taking a cell-wise average:
      */
 
     std::vector<dealii::types::global_dof_index> local_dof_indices;
-    const auto &scalar_partitioner = offline_data_->scalar_partitioner();
 
     const auto &dof_handler = offline_data_->dof_handler();
     for (const auto &cell : dof_handler.active_cell_iterators()) {
@@ -435,7 +503,7 @@ namespace ryujin
       for (unsigned int i = 0; i < dofs_per_cell; ++i) {
         const auto global_i = local_dof_indices[i];
         const auto local_i = scalar_partitioner->global_to_local(global_i);
-        auto alpha_i = get_entry<Number>(smoothness_indicator_, local_i);
+        auto alpha_i = get_entry<Number>(smoothness_indicators_, local_i);
         alpha_cell += alpha_i;
       }
       alpha_cell *= scale;
@@ -549,7 +617,7 @@ namespace ryujin
     } break;
 
     case AdaptationStrategy::kelly_estimator: {
-      indicators_vec_.resize(selected_components_.size());
+      indicators_vec_.resize(quantities_.size());
       for (auto &entry : indicators_vec_) {
         entry.reinit(triangulation.n_active_cells());
         entry = 0;
@@ -560,7 +628,7 @@ namespace ryujin
 
     case AdaptationStrategy::smoothness_estimator: {
       const auto &scalar_partitioner = offline_data_->scalar_partitioner();
-      smoothness_indicator_.reinit(scalar_partitioner);
+      smoothness_indicators_.reinit(scalar_partitioner);
       indicators_.reinit(triangulation.n_active_cells());
       compute_smoothness_indicators();
     } break;
