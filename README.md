@@ -71,6 +71,10 @@ channel](https://www.youtube.com/@matthiasmaier8956).
 [<img src="https://img.youtube.com/vi/vBCRAF_c8m8/0.jpg" width="400"/>](https://www.youtube.com/watch?v=vBCRAF_c8m8)
 [<img src="https://img.youtube.com/vi/xecIZylotSE/0.jpg" width="400"/>](https://www.youtube.com/watch?v=xecIZylotSE)
 
+There original videos are available
+[here](https://tamiko.43-1.org/developer/) ([license
+details](https://tamiko.43-1.org/developer/COPYING.txt)).
+
 References
 ----------
 
