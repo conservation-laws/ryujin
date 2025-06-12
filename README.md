@@ -71,6 +71,10 @@ channel](https://www.youtube.com/@matthiasmaier8956).
 [<img src="https://img.youtube.com/vi/vBCRAF_c8m8/0.jpg" width="400"/>](https://www.youtube.com/watch?v=vBCRAF_c8m8)
 [<img src="https://img.youtube.com/vi/xecIZylotSE/0.jpg" width="400"/>](https://www.youtube.com/watch?v=xecIZylotSE)
 
+There original videos are available
+[here](https://tamiko.43-1.org/developer/) ([license
+details](https://tamiko.43-1.org/developer/COPYING.txt)).
+
 References
 ----------
 
@@ -127,11 +131,14 @@ Developers
 Contributors
 ------------
 
- - Taylor Boylan ([@tmboylan](https://github.com/tmboylan))
+ - Wolfgang Bangerth [@bangerth](https://github.com/bangerth), Colorado State University
+ - Taylor Boylan ([@tmboylan](https://github.com/tmboylan)),
  - Jerett Cherry ([@jerret-cc](https://github.com/jerett-cc)), Colorado State University
+ - Gregory Christian ([@gregorychristian](https://github.com/gregorychristian))
  - Bennett Clayton ([@bgclayto](https://github.com/bgclayto))
  - Seth Gerberding ([@Gerbeset](https://github.com/Gerbeset)), Texas A&M University, TX, USA
  - Jake Harmon ([@harmonj](https://github.com/harmonj)), Los Alamos National Laboratory, USA
+ - Jordan Hoffart ([@jordanhoffart](https://github.com/jordanhoffart)), Texas A&M University, TX, USA
  - David Pecoraro ([@ChrisPec27](https://github.com/ChrisPec27)), Texas A&M University, TX, USA
  - Madison Sheridan ([@Helblindi](https://github.com/Helblindi)), Texas A&M University, TX, USA
  - Gregory Christian ([@gregorychristian](https://github.com/gregorychristian), Imperial College London, UK
