@@ -5,7 +5,6 @@
 
 #pragma once
 
-#include "grid_refinement.h"
 #include "instrumentation.h"
 #include "mesh_adaptor.h"
 #include "mpi_ensemble.h"
@@ -601,12 +600,47 @@ namespace ryujin
                                             coarsening_fraction_);
     } break;
     case MarkingStrategy::fixed_tolerance: {
-      ryujin::GridMarking::refine_and_coarsen_fixed_tolerance(
-          triangulation,
-          indicators_,
-          refinement_tolerance_,
-          coarsening_tolerance_);
+
+      /*
+       * Normalize indicators to the interval [0., 1.]
+       */
+
+      float minimum = std::numeric_limits<float>::max();
+      float maximum = 0.f;
+      for (const auto &cell : triangulation.active_cell_iterators()) {
+        if (!cell->is_locally_owned())
+          continue;
+        const auto indicator = indicators_[cell->active_cell_index()];
+        minimum = std::min(minimum, indicator);
+        maximum = std::max(maximum, indicator);
+      }
+      minimum = dealii::Utilities::MPI::min(
+          minimum, mpi_ensemble_.ensemble_communicator());
+      maximum = dealii::Utilities::MPI::max(
+          maximum, mpi_ensemble_.ensemble_communicator());
+
+      constexpr float eps = std::numeric_limits<float>::epsilon();
+      // Ensure that if minimum == maximum we end up with 0.5 everywhere
+      const float inv_denom = 1.f / (maximum - minimum + 10.f * eps);
+      const float bias = (minimum + 5.f * eps) * inv_denom;
+
+      /*
+       * And mark all cells according to threshold:
+       */
+
+      for (const auto &cell : triangulation.active_cell_iterators()) {
+        if (!cell->is_locally_owned())
+          continue;
+
+        auto indicator = indicators_[cell->active_cell_index()];
+        indicator = indicator * inv_denom - bias;
+        if (indicator < coarsening_tolerance_)
+          cell->set_coarsen_flag();
+        else if (indicator > refinement_tolerance_)
+          cell->set_refine_flag();
+      }
     } break;
+
     default:
       AssertThrow(false, dealii::ExcInternalError());
       __builtin_trap();
