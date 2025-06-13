@@ -5,7 +5,6 @@
 
 #pragma once
 
-#include "instrumentation.h"
 #include "mesh_adaptor.h"
 #include "mpi_ensemble.h"
 #include "openmp.h"
@@ -38,20 +37,20 @@ namespace ryujin
       , alpha_(alpha)
       , need_mesh_adaptation_(false)
   {
-    adaptation_strategy_ = AdaptationStrategy::global_refinement;
+    adaptation_strategy_ = AdaptationStrategy::smoothness_estimator;
     add_parameter("adaptation strategy",
                   adaptation_strategy_,
                   "The chosen adaptation strategy. Possible values are: global "
                   "refinement, random adaptation, smoothness estimator");
 
-    marking_strategy_ = MarkingStrategy::fixed_number;
+    marking_strategy_ = MarkingStrategy::fixed_threshold;
     add_parameter("marking strategy",
                   marking_strategy_,
                   "The chosen marking strategy. Possible values are: fixed "
-                  "number, fixed fraction");
+                  "number, fixed fraction, fixed threshold.");
 
     time_point_selection_strategy_ =
-        TimePointSelectionStrategy::fixed_time_points;
+        TimePointSelectionStrategy::simulation_cycle;
     add_parameter("time point selection strategy",
                   time_point_selection_strategy_,
                   "The chosen time point selection strategy. Possible values "
@@ -68,7 +67,7 @@ namespace ryujin
         "smoothness estimator: quantities",
         smoothness_selected_quantities_,
         "List of conserved, primitive or precomputed quantities that will be "
-        "used for the Kelly error estimator for refinement and coarsening.");
+        "used for constructing the smoothness estimator.");
 
     smoothness_local_global_ratio_ = 0.5;
     add_parameter(
@@ -78,47 +77,54 @@ namespace ryujin
         "the smoothness indicator. A value of 1 indicates pure global "
         "normalization, a value of 0 indicates pure local normalization.");
 
-    smoothness_widen_stencil_ = 0;
+    smoothness_widen_stencil_ = 15;
     add_parameter(
         "smoothness estimator: stencil size",
         smoothness_widen_stencil_,
         "Number of layers to widen the smoothness indicator stencil.");
-
-    smoothness_lower_threshold_ = 0.075;
-    add_parameter("smoothness estimator: lower threshold",
-                  smoothness_lower_threshold_,
-                  "Lower threshold of the smoothness indicator mapped to 0.");
-
-    smoothness_upper_threshold_ = 0.50;
-    add_parameter("smoothness estimator: upper threshold",
-                  smoothness_upper_threshold_,
-                  "Upper threshold of the smoothness indicator mapped to 1.");
     leave_subsection();
 
     /* Options for various marking strategies: */
 
     enter_subsection("marking strategies");
-    refinement_fraction_ = 0.3;
-    add_parameter("refinement fraction",
-                  refinement_fraction_,
-                  "Marking: fraction of cells selected for refinement.");
-
-    refinement_tolerance_ = 0.25;
-    add_parameter(
-        "refinement tolerance",
-        refinement_tolerance_,
-        "Marking: normalized tolerance for selecting cells for refinement.");
-
-    coarsening_tolerance_ = 0.125;
-    add_parameter(
-        "coarsening tolerance",
-        coarsening_tolerance_,
-        "Marking normalized tolerance for selecting cells for coarsening.");
 
     coarsening_fraction_ = 0.3;
-    add_parameter("coarsening fraction",
-                  coarsening_fraction_,
-                  "Marking: fraction of cells selected for coarsening.");
+    add_parameter(
+        "coarsening fraction",
+        coarsening_fraction_,
+        "Marking: fraction of cells selected for coarsening. (used in \"fixed "
+        "number\" and \"fixed fraction\" marking strategies)");
+
+    refinement_fraction_ = 0.3;
+    add_parameter(
+        "refinement fraction",
+        refinement_fraction_,
+        "Marking: fraction of cells selected for refinement (used in \"fixed "
+        "number\" and \"fixed fraction\" marking strategies).");
+
+    coarsening_threshold_ = 0.25;
+    add_parameter(
+        "coarsening threshold",
+        coarsening_threshold_,
+        "Marking: normalized or absolute threshold for selecting cells for "
+        "coarsening (used in \"fixed threshhold\" marking strategy).");
+
+    refinement_threshold_ = 0.75;
+    add_parameter(
+        "refinement threshold",
+        refinement_threshold_,
+        "Marking: normalized or absolute threshold for selecting cells for "
+        "refinement (used in \"fixed threshold\" marking strategy).");
+
+    absolute_threshold_ = false;
+    add_parameter("absolute threshold",
+                  absolute_threshold_,
+                  "Marking: if set to true use an absolute threshold for the "
+                  "\"refinement threshold\" and \"coarsening threshold\" "
+                  "values instead of a relative one. If this parameter is set "
+                  "to false then the smoothness indicator is normalized into "
+                  "the number range of [0., 1] and the threshold parameters "
+                  "are also expected to be a value in this interval.");
 
     min_refinement_level_ = 0;
     add_parameter("minimal refinement level",
@@ -133,11 +139,11 @@ namespace ryujin
                   "maintained while refininig cells.");
 
     max_num_cells_ = 100000;
-    add_parameter(
-        "maximal number of cells",
-        max_num_cells_,
-        "Marking: maximal number of cells used for the fixed number "
-        "strategy. Note this is only an indicator and not strictly enforced.");
+    add_parameter("maximal number of cells",
+                  max_num_cells_,
+                  "Marking: maximal number of cells used for the \"fixed "
+                  "number\" marking strategy. Note this is only an indicator "
+                  "and not strictly enforced.");
     leave_subsection();
 
     /* Options for various time point selection strategies: */
@@ -149,7 +155,7 @@ namespace ryujin
                   "List of time points in (simulation) time at which we will "
                   "perform a mesh adaptation cycle.");
 
-    adaptation_cycle_interval_ = 5;
+    adaptation_cycle_interval_ = 10;
     add_parameter("simulation cycle: interval",
                   adaptation_cycle_interval_,
                   "The nth simulation cycle at which we will "
@@ -317,13 +323,6 @@ namespace ryujin
       using T = decltype(sentinel);
       unsigned int stride_size = get_stride_size<T>;
 
-      /* Stored thread locally: */
-
-      const T inv_denom =
-          T(1.) / T(smoothness_upper_threshold_ - smoothness_lower_threshold_);
-      const T scale = T(0.5) / T(n_entries) * inv_denom;
-      const T bias = T(smoothness_lower_threshold_) * inv_denom;
-
       RYUJIN_OMP_FOR
       for (unsigned int i = left; i < right; i += stride_size) {
 
@@ -341,12 +340,6 @@ namespace ryujin
               ((1. - smoothness_local_global_ratio_) * denom_i +
                smoothness_local_global_ratio_ * denominator_global_maximum[k]);
         }
-
-        // FIXME: shall we use a more sophisticated activation function?
-        alpha_i *= scale;
-        alpha_i -= bias;
-        alpha_i = std::max(alpha_i, T(0.));
-        alpha_i = std::min(alpha_i, T(1.));
 
         write_entry<T>(smoothness_indicators_, alpha_i, i);
       }
@@ -592,6 +585,7 @@ namespace ryujin
                                           coarsening_fraction_,
                                           max_num_cells_);
     } break;
+
     case MarkingStrategy::fixed_fraction: {
       dealii::parallel::distributed::GridRefinement::
           refine_and_coarsen_fixed_fraction(triangulation,
@@ -599,30 +593,36 @@ namespace ryujin
                                             refinement_fraction_,
                                             coarsening_fraction_);
     } break;
-    case MarkingStrategy::fixed_tolerance: {
 
-      /*
-       * Normalize indicators to the interval [0., 1.]
-       */
+    case MarkingStrategy::fixed_threshold: {
 
-      float minimum = std::numeric_limits<float>::max();
-      float maximum = 0.f;
-      for (const auto &cell : triangulation.active_cell_iterators()) {
-        if (!cell->is_locally_owned())
-          continue;
-        const auto indicator = indicators_[cell->active_cell_index()];
-        minimum = std::min(minimum, indicator);
-        maximum = std::max(maximum, indicator);
+      float inv_denom = 1.f;
+      float bias = 0.f;
+
+      if (!absolute_threshold_) {
+        /*
+         * Normalize indicators to the interval [0., 1.]
+         */
+
+        float minimum = std::numeric_limits<float>::max();
+        float maximum = 0.f;
+        for (const auto &cell : triangulation.active_cell_iterators()) {
+          if (!cell->is_locally_owned())
+            continue;
+          const auto indicator = indicators_[cell->active_cell_index()];
+          minimum = std::min(minimum, indicator);
+          maximum = std::max(maximum, indicator);
+        }
+        minimum = dealii::Utilities::MPI::min(
+            minimum, mpi_ensemble_.ensemble_communicator());
+        maximum = dealii::Utilities::MPI::max(
+            maximum, mpi_ensemble_.ensemble_communicator());
+
+        constexpr float eps = std::numeric_limits<float>::epsilon();
+        // Ensure that if minimum == maximum we end up with 0.5 everywhere
+        inv_denom = 1.f / (maximum - minimum + 10.f * eps);
+        bias = (minimum + 5.f * eps) * inv_denom;
       }
-      minimum = dealii::Utilities::MPI::min(
-          minimum, mpi_ensemble_.ensemble_communicator());
-      maximum = dealii::Utilities::MPI::max(
-          maximum, mpi_ensemble_.ensemble_communicator());
-
-      constexpr float eps = std::numeric_limits<float>::epsilon();
-      // Ensure that if minimum == maximum we end up with 0.5 everywhere
-      const float inv_denom = 1.f / (maximum - minimum + 10.f * eps);
-      const float bias = (minimum + 5.f * eps) * inv_denom;
 
       /*
        * And mark all cells according to threshold:
@@ -634,9 +634,9 @@ namespace ryujin
 
         auto indicator = indicators_[cell->active_cell_index()];
         indicator = indicator * inv_denom - bias;
-        if (indicator < coarsening_tolerance_)
+        if (indicator < coarsening_threshold_)
           cell->set_coarsen_flag();
-        else if (indicator > refinement_tolerance_)
+        else if (indicator > refinement_threshold_)
           cell->set_refine_flag();
       }
     } break;

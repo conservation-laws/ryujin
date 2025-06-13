@@ -62,7 +62,7 @@ namespace ryujin
      * Refine and coarsen according to a fixed tolerance normalized according
      * to the difference between the max and min attained refinement indicator
      */
-    fixed_tolerance,
+    fixed_threshold,
   };
 
   /**
@@ -94,8 +94,8 @@ DECLARE_ENUM(
 DECLARE_ENUM(ryujin::MarkingStrategy,
              LIST({ryujin::MarkingStrategy::fixed_number, "fixed number"},
                   {ryujin::MarkingStrategy::fixed_fraction, "fixed fraction"},
-                  {ryujin::MarkingStrategy::fixed_tolerance,
-                   "fixed tolerance"}));
+                  {ryujin::MarkingStrategy::fixed_threshold,
+                   "fixed threshold"}));
 
 DECLARE_ENUM(ryujin::TimePointSelectionStrategy,
              LIST({ryujin::TimePointSelectionStrategy::fixed_time_points,
@@ -207,10 +207,11 @@ namespace ryujin
     std::uint_fast64_t random_adaptation_mersenne_twister_seed_;
 
     MarkingStrategy marking_strategy_;
-    double refinement_fraction_;
     double coarsening_fraction_;
-    double refinement_tolerance_;
-    double coarsening_tolerance_;
+    double refinement_fraction_;
+    double coarsening_threshold_;
+    double refinement_threshold_;
+    bool absolute_threshold_;
     unsigned int min_refinement_level_;
     unsigned int max_refinement_level_;
     unsigned int max_num_cells_;
@@ -222,8 +223,6 @@ namespace ryujin
     std::vector<std::string> smoothness_selected_quantities_;
     double smoothness_local_global_ratio_;
     unsigned int smoothness_widen_stencil_;
-    double smoothness_lower_threshold_;
-    double smoothness_upper_threshold_;
 
     //@}
     /**
