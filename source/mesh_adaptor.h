@@ -221,7 +221,7 @@ namespace ryujin
     unsigned int adaptation_cycle_interval_;
 
     std::vector<std::string> smoothness_selected_quantities_;
-    double smoothness_local_global_ratio_;
+    Number smoothness_local_global_ratio_;
     unsigned int smoothness_widen_stencil_;
 
     //@}

@@ -307,12 +307,13 @@ namespace ryujin
 
     smoothness_indicators_.reinit(scalar_partitioner);
 
+    constexpr Number eps = std::numeric_limits<Number>::epsilon();
+
     std::vector<Number> denominator_global_maximum(n_entries);
     for (unsigned int k = 0; k < n_entries; ++k) {
       denominator_global_maximum[k] = dealii::Utilities::MPI::max(
           denominator[k].linfty_norm(), mpi_ensemble_.ensemble_communicator());
 
-      constexpr Number eps = std::numeric_limits<Number>::epsilon();
       denominator_global_maximum[k] =
           std::max(denominator_global_maximum[k], eps);
     }
@@ -333,12 +334,15 @@ namespace ryujin
 
         auto alpha_i = T(0.);
         for (unsigned int k = 0; k < n_entries; ++k) {
-          const auto num_i = get_entry<T>(numerator[k], i);
-          const auto denom_i = get_entry<T>(denominator[k], i);
-          alpha_i +=
-              std::abs(num_i) /
-              ((1. - smoothness_local_global_ratio_) * denom_i +
-               smoothness_local_global_ratio_ * denominator_global_maximum[k]);
+          const auto numerator_i = get_entry<T>(numerator[k], i);
+          const auto denominator_i = get_entry<T>(denominator[k], i);
+
+          auto denominator =
+              (Number(1.) - smoothness_local_global_ratio_) * denominator_i +
+              smoothness_local_global_ratio_ * denominator_global_maximum[k];
+          denominator = std::max(T(eps), denominator);
+
+          alpha_i += std::abs(numerator_i) / denominator;
         }
 
         write_entry<T>(smoothness_indicators_, alpha_i, i);
