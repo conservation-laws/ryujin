@@ -36,9 +36,9 @@ namespace ryujin
     random_adaptation,
 
     /**
-     * Perform local refinement and coarsening based on a smoothness estimator.
+     * Perform local refinement and coarsening based on smoothness indicators.
      */
-    smoothness_estimator,
+    smoothness_indicators,
   };
 
   /**
@@ -50,17 +50,9 @@ namespace ryujin
    */
   enum class MarkingStrategy {
     /**
-     * Refine and coarsen a configurable selected percentage of cells.
-     */
-    fixed_number,
-    /**
-     * Refine and coarsen such that the criteria of cells getting flagged for
-     * refinement make up for a certain fraction of the total "error".
-     */
-    fixed_fraction,
-    /**
-     * Refine and coarsen according to a fixed tolerance normalized according
-     * to the difference between the max and min attained refinement indicator
+     * Refine and coarsen according to a fixed tolerance normalized
+     * according to the difference between the maximal and minimal attained
+     * values for the chosen refinement indicators.
      */
     fixed_threshold,
   };
@@ -88,13 +80,11 @@ DECLARE_ENUM(
     ryujin::AdaptationStrategy,
     LIST({ryujin::AdaptationStrategy::global_refinement, "global refinement"},
          {ryujin::AdaptationStrategy::random_adaptation, "random adaptation"},
-         {ryujin::AdaptationStrategy::smoothness_estimator,
-          "smoothness estimator"}, ));
+         {ryujin::AdaptationStrategy::smoothness_indicators,
+          "smoothness indicators"}, ));
 
 DECLARE_ENUM(ryujin::MarkingStrategy,
-             LIST({ryujin::MarkingStrategy::fixed_number, "fixed number"},
-                  {ryujin::MarkingStrategy::fixed_fraction, "fixed fraction"},
-                  {ryujin::MarkingStrategy::fixed_threshold,
+             LIST({ryujin::MarkingStrategy::fixed_threshold,
                    "fixed threshold"}));
 
 DECLARE_ENUM(ryujin::TimePointSelectionStrategy,
@@ -207,14 +197,11 @@ namespace ryujin
     std::uint_fast64_t random_adaptation_mersenne_twister_seed_;
 
     MarkingStrategy marking_strategy_;
-    double coarsening_fraction_;
-    double refinement_fraction_;
     double coarsening_threshold_;
     double refinement_threshold_;
     bool absolute_threshold_;
     unsigned int min_refinement_level_;
     unsigned int max_refinement_level_;
-    unsigned int max_num_cells_;
 
     TimePointSelectionStrategy time_point_selection_strategy_;
     std::vector<Number> adaptation_time_points_;
@@ -222,6 +209,8 @@ namespace ryujin
 
     std::vector<std::string> smoothness_selected_quantities_;
     Number smoothness_local_global_ratio_;
+    Number smoothness_min_cutoff_;
+    Number smoothness_max_cutoff_;
     unsigned int smoothness_widen_stencil_;
 
     //@}
@@ -249,7 +238,7 @@ namespace ryujin
 
     mutable std::mt19937_64 mersenne_twister_;
 
-    /* Smoothness estimator: */
+    /* Smoothness indicator: */
 
     void populate_cell_indicators_from_smoothness_indicators() const;
 

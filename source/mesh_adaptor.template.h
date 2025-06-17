@@ -13,7 +13,6 @@
 
 #include <deal.II/base/array_view.h>
 #include <deal.II/distributed/grid_refinement.h>
-#include <deal.II/numerics/error_estimator.h>
 
 #include <boost/container/small_vector.hpp>
 
@@ -37,17 +36,17 @@ namespace ryujin
       , alpha_(alpha)
       , need_mesh_adaptation_(false)
   {
-    adaptation_strategy_ = AdaptationStrategy::smoothness_estimator;
+    adaptation_strategy_ = AdaptationStrategy::smoothness_indicators;
     add_parameter("adaptation strategy",
                   adaptation_strategy_,
                   "The chosen adaptation strategy. Possible values are: global "
-                  "refinement, random adaptation, smoothness estimator");
+                  "refinement, random adaptation, smoothness indicators");
 
     marking_strategy_ = MarkingStrategy::fixed_threshold;
-    add_parameter("marking strategy",
-                  marking_strategy_,
-                  "The chosen marking strategy. Possible values are: fixed "
-                  "number, fixed fraction, fixed threshold.");
+    add_parameter(
+        "marking strategy",
+        marking_strategy_,
+        "The chosen marking strategy. Possible values are: fixed threshold.");
 
     time_point_selection_strategy_ =
         TimePointSelectionStrategy::simulation_cycle;
@@ -64,22 +63,34 @@ namespace ryujin
                   "Seed for 64bit Mersenne Twister used for random refinement");
 
     add_parameter(
-        "smoothness estimator: quantities",
+        "smoothness indicators: quantities",
         smoothness_selected_quantities_,
         "List of conserved, primitive or precomputed quantities that will be "
-        "used for constructing the smoothness estimator.");
+        "used for constructing the smoothness indicator.");
 
     smoothness_local_global_ratio_ = 0.5;
     add_parameter(
-        "smoothness estimator: local global ratio",
+        "smoothness indicators: local global ratio",
         smoothness_local_global_ratio_,
         "Ratio between local and global denominator value used for normalizing "
         "the smoothness indicator. A value of 1 indicates pure global "
         "normalization, a value of 0 indicates pure local normalization.");
 
+    smoothness_min_cutoff_ = 0.0;
+    add_parameter("smoothness indicators: min cutoff",
+                  smoothness_min_cutoff_,
+                  "minimal cutoff for the smoothness indicator: values below "
+                  "this threshold will be set to the cutoff value.");
+
+    smoothness_max_cutoff_ = 1.0e16;
+    add_parameter("smoothness indicators: max cutoff",
+                  smoothness_max_cutoff_,
+                  "minimal cutoff for the smoothness indicator: values above "
+                  "this threshold will be set to the cutoff value.");
+
     smoothness_widen_stencil_ = 15;
     add_parameter(
-        "smoothness estimator: stencil size",
+        "smoothness indicators: stencil size",
         smoothness_widen_stencil_,
         "Number of layers to widen the smoothness indicator stencil.");
     leave_subsection();
@@ -87,20 +98,6 @@ namespace ryujin
     /* Options for various marking strategies: */
 
     enter_subsection("marking strategies");
-
-    coarsening_fraction_ = 0.3;
-    add_parameter(
-        "coarsening fraction",
-        coarsening_fraction_,
-        "Marking: fraction of cells selected for coarsening. (used in \"fixed "
-        "number\" and \"fixed fraction\" marking strategies)");
-
-    refinement_fraction_ = 0.3;
-    add_parameter(
-        "refinement fraction",
-        refinement_fraction_,
-        "Marking: fraction of cells selected for refinement (used in \"fixed "
-        "number\" and \"fixed fraction\" marking strategies).");
 
     coarsening_threshold_ = 0.25;
     add_parameter(
@@ -137,13 +134,6 @@ namespace ryujin
                   max_refinement_level_,
                   "Marking: maximal refinement level of cells that will be "
                   "maintained while refininig cells.");
-
-    max_num_cells_ = 100000;
-    add_parameter("maximal number of cells",
-                  max_num_cells_,
-                  "Marking: maximal number of cells used for the \"fixed "
-                  "number\" marking strategy. Note this is only an indicator "
-                  "and not strictly enforced.");
     leave_subsection();
 
     /* Options for various time point selection strategies: */
@@ -189,7 +179,7 @@ namespace ryujin
       adaptation_time_points_.erase(new_end, adaptation_time_points_.end());
     }
 
-    if (adaptation_strategy_ == AdaptationStrategy::smoothness_estimator) {
+    if (adaptation_strategy_ == AdaptationStrategy::smoothness_indicators) {
       SelectedComponentsExtractor<Description, dim, Number>::check(
           smoothness_selected_quantities_);
     }
@@ -345,6 +335,8 @@ namespace ryujin
           alpha_i += std::abs(numerator_i) / denominator;
         }
 
+        alpha_i = std::min(alpha_i, T(smoothness_max_cutoff_));
+        alpha_i = std::max(alpha_i, T(smoothness_min_cutoff_));
         write_entry<T>(smoothness_indicators_, alpha_i, i);
       }
     };
@@ -472,7 +464,7 @@ namespace ryujin
       /* do nothing */
       break;
 
-    case AdaptationStrategy::smoothness_estimator: {
+    case AdaptationStrategy::smoothness_indicators: {
       compute_smoothness_indicators(state_vector);
       break;
     }
@@ -566,7 +558,7 @@ namespace ryujin
       populate_cell_indicators_with_random_values();
     } break;
 
-    case AdaptationStrategy::smoothness_estimator: {
+    case AdaptationStrategy::smoothness_indicators: {
       indicators_.reinit(triangulation.n_active_cells());
       populate_cell_indicators_from_smoothness_indicators();
     } break;
@@ -581,26 +573,9 @@ namespace ryujin
      */
 
     switch (marking_strategy_) {
-    case MarkingStrategy::fixed_number: {
-      dealii::parallel::distributed::GridRefinement::
-          refine_and_coarsen_fixed_number(triangulation,
-                                          indicators_,
-                                          refinement_fraction_,
-                                          coarsening_fraction_,
-                                          max_num_cells_);
-    } break;
-
-    case MarkingStrategy::fixed_fraction: {
-      dealii::parallel::distributed::GridRefinement::
-          refine_and_coarsen_fixed_fraction(triangulation,
-                                            indicators_,
-                                            refinement_fraction_,
-                                            coarsening_fraction_);
-    } break;
-
     case MarkingStrategy::fixed_threshold: {
 
-      float inv_denom = 1.f;
+      float inv_denominator = 1.f;
       float bias = 0.f;
 
       if (!absolute_threshold_) {
@@ -624,8 +599,8 @@ namespace ryujin
 
         constexpr float eps = std::numeric_limits<float>::epsilon();
         // Ensure that if minimum == maximum we end up with 0.5 everywhere
-        inv_denom = 1.f / (maximum - minimum + 10.f * eps);
-        bias = (minimum + 5.f * eps) * inv_denom;
+        inv_denominator = 1.f / (maximum - minimum + 10.f * eps);
+        bias = (minimum + 5.f * eps) * inv_denominator;
       }
 
       /*
@@ -637,7 +612,7 @@ namespace ryujin
           continue;
 
         auto indicator = indicators_[cell->active_cell_index()];
-        indicator = indicator * inv_denom - bias;
+        indicator = indicator * inv_denominator - bias;
         if (indicator < coarsening_threshold_)
           cell->set_coarsen_flag();
         else if (indicator > refinement_threshold_)
