@@ -69,7 +69,7 @@ namespace ryujin
               const Postprocessor<Description, dim, Number> &postprocessor,
               const InitialPrecomputedVector &initial_precomputed,
               const ScalarVector &alpha,
-              const ScalarVector &smoothness_indicator,
+              const ScalarVector &smoothness_indicators,
               const std::string &subsection = "/VTUOutput");
 
     /**
@@ -133,7 +133,7 @@ namespace ryujin
 
     const InitialPrecomputedVector &initial_precomputed_;
     const ScalarVector &alpha_;
-    const ScalarVector &smoothness_indicator_;
+    const ScalarVector &smoothness_indicators_;
     //@}
   };
 

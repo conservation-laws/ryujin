@@ -179,10 +179,8 @@ namespace ryujin
       adaptation_time_points_.erase(new_end, adaptation_time_points_.end());
     }
 
-    if (adaptation_strategy_ == AdaptationStrategy::smoothness_indicators) {
-      SelectedComponentsExtractor<Description, dim, Number>::check(
-          smoothness_selected_quantities_);
-    }
+    SelectedComponentsExtractor<Description, dim, Number>::check(
+        {"alpha"}, smoothness_selected_quantities_);
 
     /* toggle mesh adaptation flag to off. */
     need_mesh_adaptation_ = false;
@@ -206,10 +204,12 @@ namespace ryujin
 
     auto quantities =
         SelectedComponentsExtractor<Description, dim, Number>::extract(
+            *offline_data_,
             *hyperbolic_system_,
             state_vector,
             initial_precomputed_,
-            alpha_,
+            {"alpha"},
+            {alpha_},
             smoothness_selected_quantities_);
 
     for (auto &it : quantities) {

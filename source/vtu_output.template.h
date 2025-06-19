@@ -27,7 +27,7 @@ namespace ryujin
       const Postprocessor<Description, dim, Number> &postprocessor,
       const InitialPrecomputedVector &initial_precomputed,
       const ScalarVector &alpha,
-      const ScalarVector &smoothness_indicator,
+      const ScalarVector &smoothness_indicators,
       const std::string &subsection /*= "VTUOutput"*/)
       : ParameterAcceptor(subsection)
       , mpi_ensemble_(mpi_ensemble)
@@ -37,7 +37,7 @@ namespace ryujin
       , postprocessor_(&postprocessor)
       , initial_precomputed_(initial_precomputed)
       , alpha_(alpha)
-      , smoothness_indicator_(smoothness_indicator)
+      , smoothness_indicators_(smoothness_indicators)
   {
     use_mpi_io_ = true;
     add_parameter("use mpi io",
@@ -74,7 +74,7 @@ namespace ryujin
 #endif
 
     SelectedComponentsExtractor<Description, dim, Number>::check(
-        vtu_output_quantities_);
+        {"alpha", "smoothness_indicators"}, vtu_output_quantities_);
   }
 
 
@@ -99,10 +99,12 @@ namespace ryujin
 
     auto selected_components =
         SelectedComponentsExtractor<Description, dim, Number>::extract(
+            *offline_data_,
             *hyperbolic_system_,
             state_vector,
             initial_precomputed_,
-            alpha_,
+            {"alpha", "smoothness_indicators"},
+            {alpha_, smoothness_indicators_},
             vtu_output_quantities_);
 
     /* prepare DataOut: */
@@ -117,10 +119,6 @@ namespace ryujin
                                 vtu_output_quantities_[d],
                                 DataOut<dim>::type_dof_data);
     }
-
-    data_out->add_data_vector(smoothness_indicator_,
-                              "smoothness_indicator",
-                              DataOut<dim>::type_dof_data);
 
     const auto n_quantities = postprocessor_->n_quantities();
     for (unsigned int i = 0; i < n_quantities; ++i)

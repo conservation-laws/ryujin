@@ -24,7 +24,8 @@ namespace ryujin
 
     SelectedComponentsExtractor() = delete;
 
-    static void check(const std::vector<std::string> &selected)
+    static void check(const std::vector<std::string> &additional_names,
+                      const std::vector<std::string> &selected)
     {
       const auto search = [&](const auto entry, const auto &names) {
         const auto pos = std::find(std::begin(names), std::end(names), entry);
@@ -36,7 +37,7 @@ namespace ryujin
                            search(entry, View::primitive_component_names) ||
                            search(entry, View::precomputed_names) ||
                            search(entry, View::initial_precomputed_names) ||
-                           (entry == "alpha");
+                           search(entry, additional_names);
         AssertThrow(
             found,
             dealii::ExcMessage(
@@ -47,10 +48,13 @@ namespace ryujin
     }
 
     static std::vector<ScalarVector>
-    extract(const HyperbolicSystem &hyperbolic_system,
+    extract(const OfflineData<dim, Number> &offline_data,
+            const HyperbolicSystem &hyperbolic_system,
             const StateVector &state_vector,
             const InitialPrecomputedVector &initial_precomputed,
-            const ScalarVector &alpha,
+            const std::vector<std::string> &additional_names,
+            const std::vector<std::reference_wrapper<const ScalarVector>>
+                &additional_vectors,
             const std::vector<std::string> &selected)
     {
       /*
@@ -63,7 +67,7 @@ namespace ryujin
       std::vector<std::tuple<std::size_t, std::size_t>> primitive_indices;
       std::vector<std::tuple<std::size_t, std::size_t>> precomputed_indices;
       std::vector<std::tuple<std::size_t, std::size_t>> initial_indices;
-      std::vector<std::size_t> alpha_indices;
+      std::vector<std::tuple<std::size_t, std::size_t>> additional_indices;
 
       for (std::size_t i = 0; const auto &entry : selected) {
         const auto search = [&](const auto &names, auto &indices) {
@@ -84,14 +88,14 @@ namespace ryujin
           ;
         else if (search(View::initial_precomputed_names, initial_indices))
           ;
-        else if (entry == "alpha")
-          alpha_indices.push_back(i++);
+        else if (search(additional_names, additional_indices))
+          ;
         else
           AssertThrow(false, dealii::ExcInternalError());
       }
 
       std::vector<ScalarVector> extracted_components(selected.size());
-      const auto &scalar_partitioner = alpha.get_partitioner();
+      const auto &scalar_partitioner = offline_data.scalar_partitioner();
       for (auto &it : extracted_components)
         it.reinit(scalar_partitioner);
 
@@ -121,8 +125,9 @@ namespace ryujin
         initial_precomputed.extract_component(extracted_components[i], k);
       }
 
-      for (const auto &i : alpha_indices)
-        extracted_components[i] = alpha;
+      for (const auto &[i, k] : additional_indices) {
+        extracted_components[i] = additional_vectors[k];
+      }
 
       return extracted_components;
     }
