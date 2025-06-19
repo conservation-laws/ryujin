@@ -27,6 +27,7 @@ namespace ryujin
       const Postprocessor<Description, dim, Number> &postprocessor,
       const InitialPrecomputedVector &initial_precomputed,
       const ScalarVector &alpha,
+      const ScalarVector &smoothness_indicator,
       const std::string &subsection /*= "VTUOutput"*/)
       : ParameterAcceptor(subsection)
       , mpi_ensemble_(mpi_ensemble)
@@ -36,6 +37,7 @@ namespace ryujin
       , postprocessor_(&postprocessor)
       , initial_precomputed_(initial_precomputed)
       , alpha_(alpha)
+      , smoothness_indicator_(smoothness_indicator)
   {
     use_mpi_io_ = true;
     add_parameter("use mpi io",
@@ -115,6 +117,10 @@ namespace ryujin
                                 vtu_output_quantities_[d],
                                 DataOut<dim>::type_dof_data);
     }
+
+    data_out->add_data_vector(smoothness_indicator_,
+                              "smoothness_indicator",
+                              DataOut<dim>::type_dof_data);
 
     const auto n_quantities = postprocessor_->n_quantities();
     for (unsigned int i = 0; i < n_quantities; ++i)

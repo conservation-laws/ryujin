@@ -80,6 +80,7 @@ namespace ryujin
                     postprocessor_,
                     hyperbolic_module_.initial_precomputed(),
                     hyperbolic_module_.alpha(),
+                    mesh_adaptor_.smoothness_indicators(),
                     "/J - VTUOutput")
       , quantities_(mpi_ensemble_,
                     offline_data_,
@@ -905,6 +906,9 @@ namespace ryujin
      */
     if (cycle == 0)
       postprocessor_.reset_bounds();
+
+    /* Make sure we have a valid vector of smoothness indicators. */
+    mesh_adaptor_.compute_smoothness_indicators(state_vector);
 
     vtu_output_.schedule_output(
         state_vector, name, t, cycle, do_full_output, do_levelsets);
