@@ -408,7 +408,9 @@ namespace ryujin
         }
 
         if (mesh_adaptor_.need_mesh_adaptation()) {
-          Scope scope(computing_timer_, "(re)initialize data structures");
+          Scope scope_1(computing_timer_, "(re)initialize data structures");
+          Scope scope_2(computing_timer_,
+                        "time step [X]   - perform mesh adaptation");
           print_info("performing mesh adaptation");
 
           adapt_mesh_and_transfer_state_vector(state_vector,
