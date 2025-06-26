@@ -59,7 +59,7 @@ namespace ryujin
     /**
      * Array type used to store accumulated bounds.
      */
-    using Bounds = Description::template Limiter<dim, Number>::Bounds;
+    using Bounds = typename Description::template Limiter<dim, Number>::Bounds;
 
     //@}
     /**
