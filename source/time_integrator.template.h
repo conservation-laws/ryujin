@@ -65,7 +65,7 @@ namespace ryujin
                   "a (sub)step and enforced time-step size tau. If the ratio "
                   "is violated then a restart will be singnalled.");
 
-    tau_max_ = Number(1.0);
+    tau_max_ = std::numeric_limits<Number>::max();
     add_parameter("tau_max", tau_max_, "Largest time step size allowed.");
 
     if (ParabolicSystem::is_identity)
