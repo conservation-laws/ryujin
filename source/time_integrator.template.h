@@ -65,6 +65,9 @@ namespace ryujin
                   "a (sub)step and enforced time-step size tau. If the ratio "
                   "is violated then a restart will be singnalled.");
 
+    tau_max_ = std::numeric_limits<Number>::max();
+    add_parameter("tau_max", tau_max_, "Largest time step size allowed.");
+
     if (ParabolicSystem::is_identity)
       time_stepping_scheme_ = TimeSteppingScheme::erk_33;
     else
@@ -246,7 +249,8 @@ namespace ryujin
       Number t,
       Number t_final /*=std::numeric_limits<Number>::max()*/)
   {
-    Number tau_max = t_final - t; /* enforces t <= t_final */
+    Number tau_max =
+        std::min(tau_max_, t_final - t); /* enforces t <= t_final */
 
 #ifdef DEBUG_OUTPUT
     std::cout << "TimeIntegrator<dim, Number>::step()" << std::endl;
