@@ -28,7 +28,6 @@
 subsection A - TimeLoop
   set basename                          = mach3-cylinder-3d
 
-  set enable checkpointing              = false
   set enable output full                = false
 
   #
@@ -41,7 +40,6 @@ subsection A - TimeLoop
   set final time                        = 5.00
   set timer granularity                 = 0.10
 
-  set timer checkpoint multiplier       = 1
   set timer output full multiplier      = 10
   set timer output levelsets multiplier = 1
 end
