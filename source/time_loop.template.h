@@ -1096,7 +1096,8 @@ namespace ryujin
            << n_global_dofs_ << " Qdofs on "               //
            << mpi_ensemble_.n_world_ranks() << " ranks / " //
 #ifdef WITH_OPENMP
-           << MultithreadInfo::n_threads() << " threads <" //
+
+           << omp_get_max_threads() << " threads <" //
 #else
            << "[openmp disabled] <" //
 #endif
@@ -1313,7 +1314,7 @@ namespace ryujin
                                 efficiency;
 #ifdef WITH_OPENMP
     if (terminal_show_rank_throughput_)
-      cpu_m_dofs_per_sec *= MultithreadInfo::n_threads();
+      cpu_m_dofs_per_sec *= omp_get_max_threads();
 #endif
 
     double cpu_time_skew = (current.cpu_time_max - current.cpu_time_min - //
