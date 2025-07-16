@@ -5,8 +5,6 @@
 
 #pragma once
 
-#include <filesystem>
-
 #include <compile_time_options.h>
 
 #include "equation_of_state.h"
@@ -20,6 +18,8 @@
 #ifdef WITH_EOSPAC
 #include "eos_Interface.h"
 #endif
+
+#include <filesystem>
 
 
 namespace ryujin

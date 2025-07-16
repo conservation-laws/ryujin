@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <compile_time_options.h>
+
 #include "discretization.h"
 
 #include <deal.II/base/quadrature_lib.h>

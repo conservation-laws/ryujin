@@ -7,6 +7,8 @@
 
 #pragma once
 
+#include <compile_time_options.h>
+
 #include <initial_state_library.h>
 
 #include <deal.II/base/function_parser.h>

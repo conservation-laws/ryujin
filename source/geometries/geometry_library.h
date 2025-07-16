@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <compile_time_options.h>
+
 #include "geometry_airfoil.h"
 #include "geometry_annulus.h"
 #include "geometry_cylinder.h"

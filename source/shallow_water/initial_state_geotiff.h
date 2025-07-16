@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <compile_time_options.h>
+
 #include <geotiff_reader.h>
 #include <initial_state_library.h>
 #include <lazy.h>

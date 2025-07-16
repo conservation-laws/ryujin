@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <compile_time_options.h>
+
 #include <convenience_macros.h>
 #include <discretization.h>
 #include <multicomponent_vector.h>
@@ -16,7 +18,6 @@
 #include <deal.II/base/tensor.h>
 
 #include <array>
-#include <functional>
 
 namespace ryujin
 {

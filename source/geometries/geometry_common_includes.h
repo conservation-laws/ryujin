@@ -7,6 +7,8 @@
 
 #include <compile_time_options.h>
 
+#include <compile_time_options.h>
+
 #include "discretization.h"
 #include "geometry.h"
 

@@ -5,9 +5,9 @@
 
 #pragma once
 
-#include <deal.II/base/parameter_acceptor.h>
+#include <compile_time_options.h>
 
-#include <numeric>
+#include <deal.II/base/parameter_acceptor.h>
 
 #ifndef DOXYGEN
 

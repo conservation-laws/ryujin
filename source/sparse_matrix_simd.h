@@ -5,12 +5,11 @@
 
 #pragma once
 
+#include <compile_time_options.h>
+
 #include <deal.II/base/aligned_vector.h>
 #include <deal.II/base/partitioner.h>
 #include <deal.II/lac/dynamic_sparsity_pattern.h>
-
-#include "openmp.h"
-#include "simd.h"
 
 namespace ryujin
 {

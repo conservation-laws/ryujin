@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <compile_time_options.h>
+
 #include "simd.h"
 
 #include <deal.II/base/mpi.h>

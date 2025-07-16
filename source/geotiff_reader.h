@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <compile_time_options.h>
+
 #include "convenience_macros.h"
 #include "lazy.h"
 #include "patterns_conversion.h"

@@ -5,11 +5,10 @@
 
 #pragma once
 
-#include "hyperbolic_module.h"
-
 #include <compile_time_options.h>
 
 #include "convenience_macros.h"
+#include "hyperbolic_module.h"
 #include "initial_values.h"
 #include "mpi_ensemble.h"
 #include "offline_data.h"

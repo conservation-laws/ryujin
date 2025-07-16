@@ -6,10 +6,13 @@
 
 #pragma once
 
-#include <cmath>
-#include <deal.II/base/tensor.h>
+#include <compile_time_options.h>
 
 #include <initial_state_library.h>
+
+#include <deal.II/base/tensor.h>
+
+#include <cmath>
 
 // #define DEBUG_SOLUTION
 
