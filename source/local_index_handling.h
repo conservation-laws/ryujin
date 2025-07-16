@@ -116,8 +116,13 @@ namespace ryujin
       /* Offset to translate from global to local index range */
       const auto offset = n_locally_owned != 0 ? *locally_owned.begin() : 0;
 
+#if DEAL_II_VERSION_GTE(9, 6, 0)
+      const auto locally_relevant =
+          DoFTools::extract_locally_relevant_dofs(dof_handler);
+#else
       IndexSet locally_relevant;
       DoFTools::extract_locally_relevant_dofs(dof_handler, locally_relevant);
+#endif
 
       /* Create a temporary MPI partitioner: */
 
