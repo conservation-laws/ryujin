@@ -71,10 +71,19 @@ namespace ryujin
     auto &dof_handler = *dof_handler_;
     const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
 
+#if DEAL_II_VERSION_GTE(9, 6, 0)
+    const auto locally_relevant =
+        DoFTools::extract_locally_relevant_dofs(dof_handler);
+#else
     IndexSet locally_relevant;
     DoFTools::extract_locally_relevant_dofs(dof_handler, locally_relevant);
+#endif
 
+#if DEAL_II_VERSION_GTE(9, 6, 0)
+    affine_constraints_.reinit(locally_owned, locally_relevant);
+#else
     affine_constraints_.reinit(locally_relevant);
+#endif
     DoFTools::make_hanging_node_constraints(dof_handler, affine_constraints_);
 
 #ifndef DEAL_II_WITH_TRILINOS
@@ -339,8 +348,13 @@ namespace ryujin
     Assert(n_locally_owned_ == locally_owned.n_elements(),
            dealii::ExcInternalError());
 
+#if DEAL_II_VERSION_GTE(9, 6, 0)
+    auto locally_relevant =
+        DoFTools::extract_locally_relevant_dofs(dof_handler);
+#else
     IndexSet locally_relevant;
     DoFTools::extract_locally_relevant_dofs(dof_handler, locally_relevant);
+#endif
     /* Enlarge the locally relevant set to include all additional couplings: */
     {
       IndexSet additional_dofs(dof_handler.n_dofs());
@@ -442,7 +456,12 @@ namespace ryujin
 
     AffineConstraints<double> affine_constraints_assembly;
     /* This small dance is necessary to translate from Number to double: */
+#if DEAL_II_VERSION_GTE(9, 6, 0)
+    affine_constraints_assembly.reinit(affine_constraints_.get_local_lines(),
+                                       affine_constraints_.get_local_lines());
+#else
     affine_constraints_assembly.reinit(affine_constraints_.get_local_lines());
+#endif
     for (auto line : affine_constraints_.get_lines()) {
       affine_constraints_assembly.add_line(line.index);
       for (auto entry : line.entries)
@@ -1153,9 +1172,16 @@ namespace ryujin
     for (unsigned int level = 0; level < n_levels; ++level) {
       /* Assemble lumped mass matrix vector: */
 
+#if DEAL_II_VERSION_GTE(9, 6, 0)
+      const auto relevant_dofs =
+          dealii::DoFTools::extract_locally_relevant_level_dofs(dof_handler,
+                                                                level);
+#else
       IndexSet relevant_dofs;
       dealii::DoFTools::extract_locally_relevant_level_dofs(
           dof_handler, level, relevant_dofs);
+#endif
+
       const auto partitioner = std::make_shared<Utilities::MPI::Partitioner>(
           dof_handler.locally_owned_mg_dofs(level),
           relevant_dofs,
