@@ -38,3 +38,11 @@
  * reference when trying to link the final executable.
  */
 #cmakedefine BUG_COLLECT_PERIODIC_FACES_INSTANTIATION
+
+/*
+ * This is an evil hack: We define our own
+ */
+#include <deal.II/base/config.h>
+#ifdef DEAL_II_WITH_MAGIC_ENUM
+#undef DEAL_II_WITH_MAGIC_ENUM
+#endif
