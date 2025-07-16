@@ -1,5 +1,7 @@
 #pragma once
 
+#include <compile_time_options.h>
+
 #include "geometry_common_includes.h"
 
 #include <deal.II/grid/grid_in.h>

@@ -20,7 +20,6 @@
 #include <deal.II/lac/affine_constraints.h>
 #include <deal.II/lac/la_parallel_vector.h>
 #include <deal.II/lac/sparse_matrix.h>
-
 #include <deal.II/numerics/data_out.h>
 
 namespace ryujin

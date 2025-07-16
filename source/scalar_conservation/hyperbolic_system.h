@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <compile_time_options.h>
+
 #include "flux_library.h"
 
 #include <convenience_macros.h>

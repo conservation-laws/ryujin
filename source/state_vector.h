@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <compile_time_options.h>
+
 #include "multicomponent_vector.h"
 
 #include <deal.II/lac/la_parallel_block_vector.h>

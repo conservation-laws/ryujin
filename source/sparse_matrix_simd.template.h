@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include "openmp.h"
+#include "simd.h"
 #include "sparse_matrix_simd.h"
 
 #include <deal.II/base/vectorization.h>

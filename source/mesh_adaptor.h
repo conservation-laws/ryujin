@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <compile_time_options.h>
+
 #include "mpi_ensemble.h"
 #include "offline_data.h"
 

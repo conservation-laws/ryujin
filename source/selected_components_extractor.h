@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <compile_time_options.h>
+
 #include "state_vector.h"
 
 namespace ryujin

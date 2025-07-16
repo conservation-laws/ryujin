@@ -7,6 +7,8 @@
 
 #pragma once
 
+#include <compile_time_options.h>
+
 #include <deal.II/base/config.h>
 #include <deal.II/grid/manifold.h>
 #include <deal.II/grid/tria.h>

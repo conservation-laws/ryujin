@@ -7,6 +7,8 @@
 
 #pragma once
 
+#include <compile_time_options.h>
+
 #include <convenience_macros.h>
 #include <deal.II/base/config.h>
 #include <discretization.h>

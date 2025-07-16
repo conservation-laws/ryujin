@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <compile_time_options.h>
+
 #include "equation_of_state.h"
 
 #include <deal.II/base/function_parser.h>

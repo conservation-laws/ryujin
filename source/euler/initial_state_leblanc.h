@@ -5,8 +5,11 @@
 
 #pragma once
 
-#include <cmath>
+#include <compile_time_options.h>
+
 #include <initial_state_library.h>
+
+#include <cmath>
 
 namespace ryujin
 {

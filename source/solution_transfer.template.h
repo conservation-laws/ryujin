@@ -5,15 +5,14 @@
 
 #pragma once
 
-#include <compile_time_options.h>
-#include <deal.II/base/exceptions.h>
 
+#include "openmp.h"
 #include "solution_transfer.h"
 #if DEAL_II_VERSION_GTE(9, 6, 0)
 #include "tensor_product_point_kernels.h"
 #endif
 
-#include <deal.II/base/config.h>
+#include <deal.II/base/exceptions.h>
 #include <deal.II/distributed/tria.h>
 #include <deal.II/dofs/dof_accessor.h>
 #include <deal.II/dofs/dof_tools.h>

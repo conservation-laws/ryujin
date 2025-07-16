@@ -5,8 +5,7 @@
 
 #pragma once
 
-#include "openmp.h"
-
+#include <compile_time_options.h>
 
 #ifdef WITH_VALGRIND
 

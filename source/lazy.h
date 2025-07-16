@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include <deal.II/base/config.h>
+#include <compile_time_options.h>
 
 #include <deal.II/base/exceptions.h>
 #include <deal.II/base/memory_consumption.h>

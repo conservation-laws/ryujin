@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <compile_time_options.h>
+
 #include "../stub_parabolic_system.h"
 #include "../stub_solver.h"
 #include "hyperbolic_system.h"

@@ -5,9 +5,9 @@
 
 #pragma once
 
-#include "hyperbolic_module.h"
-
 #include <compile_time_options.h>
+
+#include "hyperbolic_module.h"
 
 #include <convenience_macros.h>
 #include <initial_values.h>

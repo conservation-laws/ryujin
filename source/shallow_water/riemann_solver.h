@@ -7,6 +7,8 @@
 
 #pragma once
 
+#include <compile_time_options.h>
+
 #include "hyperbolic_system.h"
 
 #include <simd.h>

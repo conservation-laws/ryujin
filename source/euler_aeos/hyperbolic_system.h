@@ -5,9 +5,10 @@
 
 #pragma once
 
+#include <compile_time_options.h>
+
 #include "equation_of_state_library.h"
 
-#include <compile_time_options.h>
 #include <convenience_macros.h>
 #include <discretization.h>
 #include <multicomponent_vector.h>
