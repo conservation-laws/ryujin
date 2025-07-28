@@ -156,8 +156,8 @@ namespace ryujin
             "flume width", flume_width_, "width of flume [meters]");
       }
 
-      void create_triangulation(
-          typename dealii::Triangulation<dim> &triangulation) const final
+      void create_coarse_triangulation(
+          dealii::Triangulation<dim> &triangulation) const final
       {
         GridGenerator::wavetank(triangulation,
                                 reservoir_length_,

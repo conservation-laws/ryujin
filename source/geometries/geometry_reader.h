@@ -39,8 +39,8 @@ namespace ryujin
                             "*.msh files, and the *.ucd file format.");
       }
 
-      void create_triangulation(
-          typename dealii::Triangulation<dim> &triangulation) const final
+      void create_coarse_triangulation(
+          dealii::Triangulation<dim> &triangulation) const final
       {
         dealii::GridIn<dim> gridin;
         gridin.attach_triangulation(triangulation);

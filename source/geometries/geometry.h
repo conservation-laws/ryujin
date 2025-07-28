@@ -45,11 +45,11 @@ namespace ryujin
     }
 
     /**
-     * Create a triangulation representing the current Geometry. This
-     * virtual method needs to be implemented in derived classes.
+     * Create a coarse triangulation representing the current Geometry.
+     * This virtual method needs to be implemented in a derived classes.
      */
-    virtual void
-    create_triangulation(dealii::Triangulation<dim> &triangulation) const = 0;
+    virtual void create_coarse_triangulation(
+        dealii::Triangulation<dim> &triangulation) const = 0;
 
     /**
      * Set the correct active FE index for each active cell for the given

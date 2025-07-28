@@ -250,8 +250,8 @@ namespace ryujin
                             "diameter of immersed cylinder");
       }
 
-      void create_triangulation(
-          typename dealii::Triangulation<dim> &triangulation) const final
+      void create_coarse_triangulation(
+          dealii::Triangulation<dim> &triangulation) const final
       {
         GridGenerator::cylinder(triangulation,
                                 length_,
