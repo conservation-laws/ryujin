@@ -8,10 +8,10 @@
 #include <compile_time_options.h>
 
 #include "mpi_ensemble.h"
+#include "observer_pointer.h"
 #include "offline_data.h"
 
 #include <deal.II/base/parameter_acceptor.h>
-#include <deal.II/base/smartpointer.h>
 
 #include <random>
 
@@ -203,9 +203,9 @@ namespace ryujin
 
     const MPIEnsemble &mpi_ensemble_;
 
-    dealii::SmartPointer<const OfflineData<dim, Number>> offline_data_;
-    dealii::SmartPointer<const HyperbolicSystem> hyperbolic_system_;
-    dealii::SmartPointer<const ParabolicSystem> parabolic_system_;
+    dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
+    dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
+    dealii::ObserverPointer<const ParabolicSystem> parabolic_system_;
 
     bool need_mesh_adaptation_;
 

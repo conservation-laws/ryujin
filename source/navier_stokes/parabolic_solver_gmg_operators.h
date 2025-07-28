@@ -7,6 +7,7 @@
 
 #include <compile_time_options.h>
 
+#include <observer_pointer.h>
 #include <offline_data.h>
 #include <openmp.h>
 #include <simd.h>
@@ -155,7 +156,7 @@ namespace ryujin
      * @ingroup NavierStokesEquations
      */
     template <int dim, typename Number, typename Number2>
-    class VelocityMatrix : public dealii::Subscriptor
+    class VelocityMatrix : public dealii::EnableObserverPointer
     {
     public:
       // FIXME: refactor
@@ -546,7 +547,7 @@ namespace ryujin
      * @ingroup NavierStokesEquations
      */
     template <int dim, typename Number, typename Number2>
-    class EnergyMatrix : public dealii::Subscriptor
+    class EnergyMatrix : public dealii::EnableObserverPointer
     {
     public:
       // FIXME: refactor

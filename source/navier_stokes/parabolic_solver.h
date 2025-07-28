@@ -9,6 +9,7 @@
 
 #include "hyperbolic_module.h"
 
+#include "observer_pointer.h"
 #include <convenience_macros.h>
 #include <initial_values.h>
 #include <mpi_ensemble.h>
@@ -20,7 +21,6 @@
 
 #include <deal.II/base/mg_level_object.h>
 #include <deal.II/base/parameter_acceptor.h>
-#include <deal.II/base/smartpointer.h>
 #include <deal.II/base/timer.h>
 #include <deal.II/lac/la_parallel_block_vector.h>
 #include <deal.II/lac/precondition.h>
@@ -279,11 +279,11 @@ namespace ryujin
       const MPIEnsemble &mpi_ensemble_;
       std::map<std::string, dealii::Timer> &computing_timer_;
 
-      dealii::SmartPointer<const HyperbolicSystem> hyperbolic_system_;
-      dealii::SmartPointer<const ParabolicSystem> parabolic_system_;
-      dealii::SmartPointer<const ryujin::OfflineData<dim, Number>>
+      dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
+      dealii::ObserverPointer<const ParabolicSystem> parabolic_system_;
+      dealii::ObserverPointer<const ryujin::OfflineData<dim, Number>>
           offline_data_;
-      dealii::SmartPointer<
+      dealii::ObserverPointer<
           const ryujin::InitialValues<Description, dim, Number>>
           initial_values_;
 

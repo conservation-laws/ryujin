@@ -10,12 +10,12 @@
 #include "convenience_macros.h"
 #include "discretization.h"
 #include "mpi_ensemble.h"
+#include "observer_pointer.h"
 #include "sparse_matrix_simd.h"
 #include "state_vector.h"
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/partitioner.h>
-#include <deal.II/base/smartpointer.h>
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/lac/affine_constraints.h>
 #include <deal.II/lac/la_parallel_vector.h>
@@ -362,7 +362,7 @@ namespace ryujin
 
     Number measure_of_omega_;
 
-    dealii::SmartPointer<const Discretization<dim>> discretization_;
+    dealii::ObserverPointer<const Discretization<dim>> discretization_;
 
     /**
      * Construct a boundary map for a given set of DoFHandler iterators.
