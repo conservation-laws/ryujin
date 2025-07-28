@@ -80,6 +80,7 @@ namespace ryujin
                     postprocessor_,
                     hyperbolic_module_.initial_precomputed(),
                     hyperbolic_module_.alpha(),
+                    mesh_adaptor_.smoothness_indicators(),
                     "/J - VTUOutput")
       , quantities_(mpi_ensemble_,
                     offline_data_,
@@ -408,7 +409,9 @@ namespace ryujin
         }
 
         if (mesh_adaptor_.need_mesh_adaptation()) {
-          Scope scope(computing_timer_, "(re)initialize data structures");
+          Scope scope_1(computing_timer_, "(re)initialize data structures");
+          Scope scope_2(computing_timer_,
+                        "time step [X]   - perform mesh adaptation");
           print_info("performing mesh adaptation");
 
           adapt_mesh_and_transfer_state_vector(state_vector,
@@ -903,6 +906,9 @@ namespace ryujin
      */
     if (cycle == 0)
       postprocessor_.reset_bounds();
+
+    /* Make sure we have a valid vector of smoothness indicators. */
+    mesh_adaptor_.compute_smoothness_indicators(state_vector);
 
     vtu_output_.schedule_output(
         state_vector, name, t, cycle, do_full_output, do_levelsets);

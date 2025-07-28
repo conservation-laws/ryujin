@@ -1,7 +1,6 @@
 subsection A - TimeLoop
   set basename                  = check_mass
 
-  set enable output full        = true
   set enable mesh adaptivity    = true
   set enable compute quantities = true
 
@@ -61,8 +60,8 @@ subsection I - MeshAdaptor
   end
 
   subsection marking strategies
-    set coarsening fraction = 0.75
-    set refinement fraction = 0.05
+    set coarsening threshold = 0.80
+    set refinement threshold = 0.90
   end
 end
 

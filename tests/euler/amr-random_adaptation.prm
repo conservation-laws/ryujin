@@ -1,5 +1,5 @@
 subsection A - TimeLoop
-  set basename                  = check_global_refinement
+  set basename                  = check_random_refinement
 
   set enable compute error      = true
   set enable mesh adaptivity    = true
@@ -52,7 +52,13 @@ end
 subsection I - MeshAdaptor
   set adaptation strategy           = random adaptation
   set time point selection strategy = fixed time points
+
   subsection time point selection strategies
-    set fixed time points = 1.0, 1.5
+    set fixed time points = 0.5, 1.0, 1.5
+  end
+
+  subsection marking strategies
+    set coarsening threshold = 0.80
+    set refinement threshold = 0.90
   end
 end

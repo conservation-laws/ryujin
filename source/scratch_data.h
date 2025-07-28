@@ -84,6 +84,7 @@ namespace ryujin
     std::vector<dealii::types::global_dof_index> local_dof_indices_;
     dealii::FullMatrix<Number> cell_mass_matrix_;
     dealii::FullMatrix<Number> cell_mass_matrix_inverse_;
+    dealii::FullMatrix<Number> cell_betaij_matrix_;
     std::array<dealii::FullMatrix<Number>, dim> cell_cij_matrix_;
     Number cell_measure_;
 

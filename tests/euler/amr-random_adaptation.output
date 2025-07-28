@@ -8,9 +8,11 @@
 [INFO] preparing compute kernels
 [INFO] performing mesh adaptation
 [INFO] preparing compute kernels
+[INFO] performing mesh adaptation
+[INFO] preparing compute kernels
 Normalized consolidated Linf, L1, and L2 errors at final time 
-#dofs = 1400
-t     = 2.000812192868945
-Linf  = 0.4582810938659648
-L1    = 0.03177591110722442
-L2    = 0.07191530664569759
+#dofs = 800
+t     = 2.008229115565869
+Linf  = 0.5947862142865539
+L1    = 0.04457784279433662
+L2    = 0.08776597575422618
