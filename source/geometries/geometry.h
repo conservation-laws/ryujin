@@ -45,11 +45,23 @@ namespace ryujin
     }
 
     /**
-     * Create the triangulation according to the appropriate geometry
-     * description.
+     * Create a triangulation representing the current Geometry. This
+     * virtual method needs to be implemented in derived classes.
      */
     virtual void
     create_triangulation(dealii::Triangulation<dim> &triangulation) const = 0;
+
+    /**
+     * Set the correct active FE index for each active cell for the given
+     * DoFHandler. This method can be left empty for a standard geometry
+     * that only uses only one reference element. The method must be
+     * reimplemented for geometries that use hp capabilities, such as
+     * meshes with mixed finite elements, or meshes with FE_Nothing.
+     */
+    virtual void
+    set_active_fe_index(dealii::DoFHandler<dim> & /*dof_handler*/) const
+    {
+    }
 
     /**
      * Return the name of the geometry as (const reference) std::string

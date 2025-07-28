@@ -212,6 +212,16 @@ namespace ryujin
       dof_handler_ = std::make_unique<dealii::DoFHandler<dim>>(triangulation);
     auto &dof_handler = *dof_handler_;
 
+    /*
+     * Set active FE indices:
+     *
+     * This information depends on the selected geometry. Therefore, let
+     * the selected geometry object handle the setup. For a standard
+     * geometry that has only one reference element the method simply does
+     * nothing.
+     */
+    discretization_->selected_geometry().set_active_fe_index(dof_handler);
+
     dof_handler.distribute_dofs(discretization_->finite_element());
 
     n_locally_owned_ = dof_handler.locally_owned_dofs().n_elements();
