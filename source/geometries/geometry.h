@@ -64,6 +64,26 @@ namespace ryujin
     }
 
     /**
+     * Populate all hp::*Collection objects for finite elements, mappings,
+     * and quadratures. As this is a formidable zoo of different collection
+     * objects, we get a writable reference to the discretization object to
+     * set them directly.
+     */
+    virtual bool populate_hp_collections(
+        const unsigned int /*fe_degree*/,
+        const bool /*have_discontinuous_ansatz*/,
+        typename ryujin::Discretization<dim>::Collection & /*collection*/) const
+    {
+      /*
+       * Signal, that we did nothing. In this case the Discretization
+       * object will populate all collections with appropriate objects for
+       * the cG Qk, dG Qk finite element on purely quadrilateral, or
+       * hexahedral meshes.
+       */
+      return false;
+    }
+
+    /**
      * Return the name of the geometry as (const reference) std::string
      */
     ACCESSOR_READ_ONLY(name)

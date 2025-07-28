@@ -442,5 +442,15 @@ namespace ryujin
      */
     template <typename Discretization, int dim_, typename Number_>
     friend class SolutionTransfer;
+
+    /**
+     * For complex geometries with mixed finite elements (or when using
+     * FE_Nothing) we need to defer the setup of the hp::*Collection
+     * objects to the selected geometry. Thus, declare the Geometry class
+     * to be a friend so that it can set all the collection objects
+     * directly.
+     */
+    template <int dim_>
+    friend class Geometry;
   };
 } /* namespace ryujin */

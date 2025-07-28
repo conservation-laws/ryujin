@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <boost/random/detail/polynomial.hpp>
 #include <compile_time_options.h>
 
 #include "discretization.h"
@@ -170,6 +171,21 @@ namespace ryujin
     if (std::abs(mesh_distortion_) > 1.0e-10)
       GridTools::distort_random(
           mesh_distortion_, triangulation, false, std::random_device()());
+
+    /*
+     * First, let the selected geometry populate our hp::*Collection
+     * objects. If the method returns false, however, we need to do the
+     * setup ourselves.
+     */
+
+    if (selected_geometry_->populate_hp_collections(
+            polynomial_degree(), have_discontinuous_ansatz(), collection_))
+      return;
+
+    /*
+     * Populate all collections with appropriate objects for the cG Qk, dG
+     * Qk finite element on purely quadrilateral, or hexahedral meshes:
+     */
 
     const auto fe_degree = polynomial_degree();
     const auto mapping_degree = fe_degree;
