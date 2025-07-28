@@ -238,11 +238,15 @@ namespace ryujin
     //@{
 
     /**
+     * Return a read-only const reference to the selected geometry.
+     */
+    ACCESSOR_READ_ONLY(selected_geometry)
+
+    /**
      * Return a read-only const reference to the finite element ansatz.
      */
     ACCESSOR_READ_ONLY(ansatz)
 
-  public:
     /**
      * Return a boolean indicating whether the chosen Ansatz space is
      * discontinuous.
@@ -415,7 +419,8 @@ namespace ryujin
      */
     //@{
 
-    std::set<std::unique_ptr<Geometry<dim>>> geometry_list_;
+    std::set<std::shared_ptr<Geometry<dim>>> geometry_list_;
+    std::shared_ptr<Geometry<dim>> selected_geometry_;
 
     //@}
 

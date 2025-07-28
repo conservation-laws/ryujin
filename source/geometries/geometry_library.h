@@ -41,16 +41,16 @@ namespace ryujin
         geometry_list.emplace(std::move(object));
       };
 
-      add(std::make_unique<Airfoil<dim>>(subsection));
-      add(std::make_unique<Annulus<dim>>(subsection));
-      add(std::make_unique<Cylinder<dim>>(subsection));
-      add(std::make_unique<Disk<dim>>(subsection));
-      add(std::make_unique<GeoTIFFProfile<dim>>(subsection));
-      add(std::make_unique<Reader<dim>>(subsection));
-      add(std::make_unique<RectangularDomain<dim>>(subsection));
-      add(std::make_unique<Step<dim>>(subsection));
-      add(std::make_unique<Wall<dim>>(subsection));
-      add(std::make_unique<WaveTank<dim>>(subsection));
+      add(std::make_shared<Airfoil<dim>>(subsection));
+      add(std::make_shared<Annulus<dim>>(subsection));
+      add(std::make_shared<Cylinder<dim>>(subsection));
+      add(std::make_shared<Disk<dim>>(subsection));
+      add(std::make_shared<GeoTIFFProfile<dim>>(subsection));
+      add(std::make_shared<Reader<dim>>(subsection));
+      add(std::make_shared<RectangularDomain<dim>>(subsection));
+      add(std::make_shared<Step<dim>>(subsection));
+      add(std::make_shared<Wall<dim>>(subsection));
+      add(std::make_shared<WaveTank<dim>>(subsection));
     }
   } /* namespace Geometries */
 } /* namespace ryujin */

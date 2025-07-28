@@ -76,6 +76,25 @@ namespace ryujin
     std::cout << "Discretization<dim>::prepare()" << std::endl;
 #endif
 
+    /* Select geometry: */
+
+    {
+      bool initialized = false;
+      for (auto &it : geometry_list_)
+        if (it->name() == geometry_) {
+          selected_geometry_ = it;
+          initialized = true;
+          break;
+        }
+
+      AssertThrow(
+          initialized,
+          ExcMessage("Could not find a geometry description with name \"" +
+                     geometry_ + "\""));
+    }
+
+    /* Set up Triangulation object: */
+
     const auto smoothing =
         dealii::Triangulation<dim>::limit_level_difference_at_vertices;
 
@@ -127,22 +146,10 @@ namespace ryujin
       __builtin_trap();
     }
 
+    /* Create and distribute mesh: */
+
     auto &triangulation = *triangulation_;
-
-    {
-      bool initialized = false;
-      for (auto &it : geometry_list_)
-        if (it->name() == geometry_) {
-          it->create_triangulation(triangulation);
-          initialized = true;
-          break;
-        }
-
-      AssertThrow(
-          initialized,
-          ExcMessage("Could not find a geometry description with name \"" +
-                     geometry_ + "\""));
-    }
+    selected_geometry_->create_triangulation(triangulation);
 
     if (mesh_writeout_ && dealii::Utilities::MPI::this_mpi_process(
                               mpi_ensemble_.ensemble_communicator()) == 0) {
