@@ -40,7 +40,9 @@
 #cmakedefine BUG_COLLECT_PERIODIC_FACES_INSTANTIATION
 
 /*
- * This is an evil hack: We define our own
+ * This is an evil hack: enforce that we can provide our own
+ * Patterns::Tools::Convert specialization by undefining the
+ * DEAL_II_WITH_MAGIC_ENUM preprocessor definition
  */
 #include <deal.II/base/config.h>
 #ifdef DEAL_II_WITH_MAGIC_ENUM

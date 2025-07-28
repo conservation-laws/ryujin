@@ -10,11 +10,10 @@
 #include "convenience_macros.h"
 #include "hyperbolic_module.h"
 #include "mpi_ensemble.h"
+#include "observer_pointer.h"
 #include "offline_data.h"
 #include "parabolic_module.h"
 #include "patterns_conversion.h"
-
-#include <deal.II/base/smartpointer.h>
 
 namespace ryujin
 {
@@ -485,10 +484,10 @@ namespace ryujin
 
     const MPIEnsemble &mpi_ensemble_;
 
-    dealii::SmartPointer<const OfflineData<dim, Number>> offline_data_;
-    dealii::SmartPointer<const HyperbolicModule<Description, dim, Number>>
+    dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
+    dealii::ObserverPointer<const HyperbolicModule<Description, dim, Number>>
         hyperbolic_module_;
-    dealii::SmartPointer<const ParabolicModule<Description, dim, Number>>
+    dealii::ObserverPointer<const ParabolicModule<Description, dim, Number>>
         parabolic_module_;
 
     std::vector<StateVector> temp_;

@@ -10,12 +10,12 @@
 #include "convenience_macros.h"
 #include "initial_values.h"
 #include "mpi_ensemble.h"
+#include "observer_pointer.h"
 #include "offline_data.h"
 #include "sparse_matrix_simd.h"
 #include "state_vector.h"
 
 #include <deal.II/base/parameter_acceptor.h>
-#include <deal.II/base/smartpointer.h>
 #include <deal.II/base/timer.h>
 #include <deal.II/lac/sparse_matrix.templates.h>
 #include <deal.II/lac/vector.h>
@@ -367,9 +367,9 @@ namespace ryujin
     const MPIEnsemble &mpi_ensemble_;
     std::map<std::string, dealii::Timer> &computing_timer_;
 
-    dealii::SmartPointer<const OfflineData<dim, Number>> offline_data_;
-    dealii::SmartPointer<const HyperbolicSystem> hyperbolic_system_;
-    dealii::SmartPointer<const InitialValues<Description, dim, Number>>
+    dealii::ObserverPointer<const OfflineData<dim, Number>> offline_data_;
+    dealii::ObserverPointer<const HyperbolicSystem> hyperbolic_system_;
+    dealii::ObserverPointer<const InitialValues<Description, dim, Number>>
         initial_values_;
 
     mutable Number cfl_;
