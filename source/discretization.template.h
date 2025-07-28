@@ -34,8 +34,16 @@ namespace ryujin
     ansatz_ = Ansatz::cg_q1;
     add_parameter("finite element ansatz",
                   ansatz_,
-                  "The finite element ansatz used for discretization. valid "
+                  "The finite element ansatz used for discretization. Valid "
                   "choices are cG Q1, cG Q2, cG Q3.");
+
+    mesh_type_ =
+        (dim == 1 ? MeshType::parallel_shared : MeshType::parallel_distributed);
+    add_parameter("mesh type",
+                  mesh_type_,
+                  "The triangulation class used. Valid choices are \"serial\", "
+                  "\"parallel shared\", \"parallel distributed\", \"parallel "
+                  "fullydistributed\".");
 
     geometry_ = "cylinder";
     add_parameter("geometry",
@@ -71,11 +79,7 @@ namespace ryujin
     const auto smoothing =
         dealii::Triangulation<dim>::limit_level_difference_at_vertices;
 
-    // FIXME: This information will ultimately be provided by the Geometry.
-    const auto selection =
-        (dim == 1 ? MeshType::parallel_shared : MeshType::parallel_distributed);
-
-    switch (selection) {
+    switch (mesh_type_) {
     case MeshType::parallel_fullydistributed: {
       triangulation_ = std::make_unique<
           dealii::parallel::fullydistributed::Triangulation<dim>>(
@@ -104,6 +108,19 @@ namespace ryujin
               smoothing,
               /*artificial cells*/ true,
               settings);
+    } break;
+
+    case MeshType::serial: {
+      AssertThrow(
+          mpi_ensemble_.n_ensemble_ranks() == 1,
+          ExcMessage(
+              "The serial triangulation can only be used for serial "
+              "computations. If you want to run simulations with more than one "
+              "rank per ensemble, then please set \"mesh type\" to one of the "
+              "parallel triangulations supported by deal.II"));
+
+      triangulation_ = std::make_unique<dealii::Triangulation<dim>>(smoothing);
+
     } break;
 
     default:

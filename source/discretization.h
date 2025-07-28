@@ -419,6 +419,7 @@ namespace ryujin
     //@{
 
     Ansatz ansatz_;
+    MeshType mesh_type_;
 
     std::string geometry_;
 
