@@ -295,25 +295,6 @@ namespace ryujin
       __builtin_trap();
     }
 
-
-    /**
-     * Return a boolean indicating whether the chosen mesh geometry is
-     * stored in a parallel distributed, or parallel fullydistributed
-     * triangulation.
-     */
-    bool have_distributed_triangulation() const
-    {
-      using namespace dealii::parallel;
-      const auto *p_t = triangulation_.get();
-
-      if (dynamic_cast<const distributed::Triangulation<dim> *>(p_t))
-        return true;
-      else if (dynamic_cast<const fullydistributed::Triangulation<dim> *>(p_t))
-        return true;
-      else
-        return false;
-    }
-
     /**
      * Return a mutable reference to the refinement variable.
      */
