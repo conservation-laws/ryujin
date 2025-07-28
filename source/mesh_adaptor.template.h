@@ -12,6 +12,8 @@
 #include <deal.II/distributed/grid_refinement.h>
 #include <deal.II/numerics/error_estimator.h>
 
+#include "grid_refinement.h"
+
 namespace ryujin
 {
   template <typename Description, int dim, typename Number>
@@ -72,6 +74,19 @@ namespace ryujin
     add_parameter("refinement fraction",
                   refinement_fraction_,
                   "Marking: fraction of cells selected for refinement.");
+
+
+    refinement_tolerance_ = 0.25;
+    add_parameter(
+        "refinement tolerance",
+        refinement_tolerance_,
+        "Marking: normalized tolerance for selecting cells for refinement.");
+
+    coarsening_tolerance_ = 0.125;
+    add_parameter(
+        "coarsening tolerance",
+        coarsening_tolerance_,
+        "Marking normalized tolerance for selecting cells for coarsening.");
 
     coarsening_fraction_ = 0.3;
     add_parameter("coarsening fraction",
@@ -357,9 +372,6 @@ namespace ryujin
      * Mark cells with chosen marking strategy:
      */
 
-    Assert(indicators_.size() == triangulation.n_active_cells(),
-           dealii::ExcInternalError());
-
     if (adaptation_strategy_ != AdaptationStrategy::kelly_estimator)
       switch (marking_strategy_) {
       case MarkingStrategy::fixed_number: {
@@ -377,7 +389,13 @@ namespace ryujin
                                               refinement_fraction_,
                                               coarsening_fraction_);
       } break;
-
+      case MarkingStrategy::fixed_tolerance: {
+        ryujin::GridMarking::refine_and_coarsen_fixed_tolerance(
+            triangulation,
+            indicators_,
+            refinement_tolerance_,
+            coarsening_tolerance_);
+      } break;
       default:
         AssertThrow(false, dealii::ExcInternalError());
         __builtin_trap();
@@ -429,6 +447,14 @@ namespace ryujin
             cell->clear_coarsen_flag();
 
       } break;
+      case MarkingStrategy::fixed_tolerance: {
+        GridMarking::refine_and_coarsen_fixed_tolerance_by_consensus(
+            triangulation,
+            indicators_vec_,
+            refinement_tolerance_,
+            coarsening_tolerance_);
+        break;
+      }
 
       default:
         AssertThrow(false, dealii::ExcInternalError());

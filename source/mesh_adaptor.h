@@ -58,6 +58,11 @@ namespace ryujin
      * refinement make up for a certain fraction of the total "error".
      */
     fixed_fraction,
+    /**
+     * Refine and coarsen according to a fixed tolerance normalized according
+     * to the difference between the max and min attained refinement indicator
+     */
+    fixed_tolerance,
   };
 
   /**
@@ -87,8 +92,9 @@ DECLARE_ENUM(
 
 DECLARE_ENUM(ryujin::MarkingStrategy,
              LIST({ryujin::MarkingStrategy::fixed_number, "fixed number"},
-                  {ryujin::MarkingStrategy::fixed_fraction,
-                   "fixed fraction"}, ));
+                  {ryujin::MarkingStrategy::fixed_fraction, "fixed fraction"},
+                  {ryujin::MarkingStrategy::fixed_tolerance,
+                   "fixed tolerance"}));
 
 DECLARE_ENUM(ryujin::TimePointSelectionStrategy,
              LIST({ryujin::TimePointSelectionStrategy::fixed_time_points,
@@ -185,6 +191,8 @@ namespace ryujin
     MarkingStrategy marking_strategy_;
     double refinement_fraction_;
     double coarsening_fraction_;
+    double refinement_tolerance_;
+    double coarsening_tolerance_;
     unsigned int min_refinement_level_;
     unsigned int max_refinement_level_;
     unsigned int max_num_cells_;

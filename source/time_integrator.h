@@ -15,6 +15,8 @@
 #include "parabolic_module.h"
 #include "patterns_conversion.h"
 
+#include <numbers>
+
 namespace ryujin
 {
   /**
