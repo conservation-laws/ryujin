@@ -40,7 +40,7 @@ namespace ryujin
       }
 
       void create_triangulation(
-          typename dealii::Triangulation<dim> &triangulation) final
+          typename dealii::Triangulation<dim> &triangulation) const final
       {
         dealii::GridIn<dim> gridin;
         gridin.attach_triangulation(triangulation);

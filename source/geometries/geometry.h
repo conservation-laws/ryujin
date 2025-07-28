@@ -10,6 +10,7 @@
 #include "convenience_macros.h"
 
 #include <deal.II/base/parameter_acceptor.h>
+#include <deal.II/dofs/dof_handler.h>
 #include <deal.II/grid/tria.h>
 
 #include <string>
@@ -48,7 +49,7 @@ namespace ryujin
      * description.
      */
     virtual void
-    create_triangulation(dealii::Triangulation<dim> &triangulation) = 0;
+    create_triangulation(dealii::Triangulation<dim> &triangulation) const = 0;
 
     /**
      * Return the name of the geometry as (const reference) std::string

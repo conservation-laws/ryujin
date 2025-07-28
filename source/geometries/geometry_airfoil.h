@@ -905,7 +905,8 @@ namespace ryujin
                             "number of subdivisions in z direction");
       }
 
-      void create_triangulation(dealii::Triangulation<dim> &triangulation) final
+      void create_triangulation(
+          typename dealii::Triangulation<dim> &triangulation) const final
       {
         /*
          * Step 1: Create parametrization:
