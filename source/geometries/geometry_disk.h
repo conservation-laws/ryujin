@@ -25,7 +25,7 @@ namespace ryujin
     class Disk : public Geometry<dim>
     {
     public:
-      Disk(const std::string subsection)
+      Disk(const std::string &subsection)
           : Geometry<dim>("disk", subsection)
       {
         balanced_ = true;

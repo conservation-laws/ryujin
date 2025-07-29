@@ -243,7 +243,7 @@ namespace ryujin
     class Annulus : public Geometry<dim>
     {
     public:
-      Annulus(const std::string subsection)
+      Annulus(const std::string &subsection)
           : Geometry<dim>("annulus", subsection)
       {
         length_ = 2.;

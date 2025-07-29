@@ -825,7 +825,7 @@ namespace ryujin
     class Airfoil : public Geometry<dim>
     {
     public:
-      Airfoil(const std::string subsection)
+      Airfoil(const std::string &subsection)
           : Geometry<dim>("airfoil", subsection)
       {
         /* Parameters affecting parameterization: */

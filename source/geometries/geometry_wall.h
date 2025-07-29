@@ -107,7 +107,7 @@ namespace ryujin
     class Wall : public Geometry<dim>
     {
     public:
-      Wall(const std::string subsection)
+      Wall(const std::string &subsection)
           : Geometry<dim>("wall", subsection)
       {
         length_ = 3.2;

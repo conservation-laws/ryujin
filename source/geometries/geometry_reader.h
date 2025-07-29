@@ -28,7 +28,7 @@ namespace ryujin
     class Reader : public Geometry<dim>
     {
     public:
-      Reader(const std::string subsection)
+      Reader(const std::string &subsection)
           : Geometry<dim>("reader", subsection)
       {
         filename_ = "ryujin.msh";

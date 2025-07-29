@@ -134,7 +134,7 @@ namespace ryujin
     class WaveTank : public Geometry<dim>
     {
     public:
-      WaveTank(const std::string subsection)
+      WaveTank(const std::string &subsection)
           : Geometry<dim>("wave tank", subsection)
       {
         reservoir_length_ = 157. / 100.;
