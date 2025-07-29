@@ -17,6 +17,7 @@
 #include <deal.II/base/work_stream.h>
 #include <deal.II/dofs/dof_renumbering.h>
 #include <deal.II/dofs/dof_tools.h>
+#include <deal.II/fe/fe_nothing.h>
 #include <deal.II/fe/fe_values.h>
 #include <deal.II/grid/grid_tools.h>
 #include <deal.II/lac/dynamic_sparsity_pattern.h>
@@ -43,6 +44,16 @@ namespace ryujin
       , mpi_ensemble_(mpi_ensemble)
       , discretization_(&discretization)
   {
+    treat_fe_nothing_as_boundary_ = true;
+    add_parameter(
+        "treat fe_nothing as boundary",
+        treat_fe_nothing_as_boundary_,
+        "If set to true, we treat cell with where the active finite element is "
+        "set to FE_Nothing as boundary: We do not assemble an interior jump "
+        "over such elements and add vertices touching such an element in the "
+        "boundary map. In this case, the boundary id of the interior face is "
+        "set via the material id of the cell with active FE_Nothing element.");
+
     incidence_relaxation_even_ = 0.5;
     add_parameter("incidence matrix relaxation even degree",
                   incidence_relaxation_even_,
@@ -213,12 +224,10 @@ namespace ryujin
     auto &dof_handler = *dof_handler_;
 
     /*
-     * Set active FE indices:
-     *
-     * This information depends on the selected geometry. Therefore, let
-     * the selected geometry object handle the setup. For a standard
-     * geometry that has only one reference element the method simply does
-     * nothing.
+     * Set active FE indices: This information depends on the selected
+     * geometry. Therefore, let the selected geometry object handle the
+     * setup. For a standard geometry that has only one reference element
+     * the method simply does nothing.
      */
     discretization_->selected_geometry().set_active_fe_index(dof_handler);
 
@@ -658,6 +667,14 @@ namespace ryujin
           continue;
         }
 
+        /* Do not assemble jumps to neighboring cells with FE_Nothing: */
+        const bool neighbor_cell_has_fe_nothing =
+            treat_fe_nothing_as_boundary_ &&
+            (dynamic_cast<const dealii::FE_Nothing<dim> *>(
+                 &neighbor_cell->get_fe()) != nullptr);
+        if (neighbor_cell_has_fe_nothing)
+          continue;
+
         hp_fe_face_values.reinit(cell, f_index);
         const auto &fe_face_values = hp_fe_face_values.get_present_fe_values();
 
@@ -936,6 +953,14 @@ namespace ryujin
             neighbor_local_dof_indices[f_index].resize(0);
             continue;
           }
+
+          /* Do not assemble jumps to neighboring cells with FE_Nothing: */
+          const bool neighbor_cell_has_fe_nothing =
+              treat_fe_nothing_as_boundary_ &&
+              (dynamic_cast<const dealii::FE_Nothing<dim> *>(
+                   &neighbor_cell->get_fe()) != nullptr);
+          if (neighbor_cell_has_fe_nothing)
+            continue;
 
           const unsigned int f_index_neighbor =
               cell->has_periodic_neighbor(f_index)
@@ -1298,14 +1323,9 @@ namespace ryujin
       local_dof_indices.resize(dofs_per_cell);
       cell->get_active_or_mg_dof_indices(local_dof_indices);
 
-      for (auto f : cell->face_indices()) {
-        const auto face = cell->face(f);
-        const auto id = face->boundary_id();
-
-        // FIXME: support interior boundary with FE_Nothing
-
-        if (!face->at_boundary())
-          continue;
+      for (auto f_index : cell->face_indices()) {
+        const auto face = cell->face(f_index);
+        auto id = face->boundary_id();
 
         /*
          * Skip periodic boundary faces. For our algorithm these are
@@ -1315,13 +1335,36 @@ namespace ryujin
         if (id == Boundary::periodic)
           continue;
 
-        hp_fe_face_values.reinit(cell, f);
+        /*
+         * Check for interior faces neighboring a cell with FE nothing:
+         */
+        const bool neighbor_cell_has_fe_nothing =                 //
+            treat_fe_nothing_as_boundary_ &&                      //
+            !face->at_boundary() &&                               //
+            cell->neighbor(f_index)->is_active() &&               //
+            !cell->neighbor(f_index)->is_artificial() &&          //
+            (dynamic_cast<const dealii::FE_Nothing<dim> *>(       //
+                 &cell->neighbor(f_index)->get_fe()) != nullptr); //
+
+        if (neighbor_cell_has_fe_nothing) {
+          /*
+           * By convention, query boundary id from the material id of the
+           * neighboring cell and then continue:
+           */
+          id = cell->neighbor(f_index)->material_id();
+
+        } else if (!face->at_boundary()) {
+          /* Bail out if we are in the interior: */
+          continue;
+        }
+
+        hp_fe_face_values.reinit(cell, f_index);
         const auto &fe_face_values = hp_fe_face_values.get_present_fe_values();
         const auto &mapping =
             hp_fe_face_values.get_mapping_collection()[cell->active_fe_index()];
 
         for (unsigned int j : fe_face_values.dof_indices()) {
-          if (!cell->get_fe().has_support_on_face(j, f))
+          if (!cell->get_fe().has_support_on_face(j, f_index))
             continue;
 
           Number boundary_mass = 0.;
@@ -1478,20 +1521,30 @@ namespace ryujin
       local_dof_indices.resize(dofs_per_cell);
       cell->get_active_or_mg_dof_indices(local_dof_indices);
 
-      for (auto f : cell->face_indices()) {
-        const auto face = cell->face(f);
+      for (auto f_index : cell->face_indices()) {
+        const auto face = cell->face(f_index);
         const auto id = face->boundary_id();
-
-        if (!face->at_boundary())
-          continue;
 
         /* Skip periodic boundary faces; see above. */
         if (id == Boundary::periodic)
           continue;
 
+        /*
+         * Check for interior faces neighboring a cell with FE nothing:
+         */
+        const bool neighbor_cell_has_fe_nothing =                 //
+            treat_fe_nothing_as_boundary_ &&                      //
+            !face->at_boundary() &&                               //
+            !cell->neighbor(f_index)->is_artificial() &&          //
+            (dynamic_cast<const dealii::FE_Nothing<dim> *>(       //
+                 &cell->neighbor(f_index)->get_fe()) != nullptr); //
+
+        if (!neighbor_cell_has_fe_nothing && !face->at_boundary())
+          continue;
+
         for (unsigned int j = 0; j < dofs_per_cell; ++j) {
 
-          if (!cell->get_fe().has_support_on_face(j, f))
+          if (!cell->get_fe().has_support_on_face(j, f_index))
             continue;
 
           const auto global_index = local_dof_indices[j];
