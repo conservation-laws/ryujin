@@ -176,34 +176,35 @@ namespace ryujin
     const auto quadrature_degree = fe_degree + 1;
 
     if (have_discontinuous_ansatz()) {
-      finite_element_ =
+      collection_.finite_element =
           std::make_unique<hp::FECollection<dim>>(FE_DGQ<dim>(fe_degree));
-      finite_element_cg_ =
+      collection_.finite_element_cg =
           std::make_unique<hp::FECollection<dim>>(FE_Q<dim>(fe_degree));
     } else {
-      finite_element_ =
+      collection_.finite_element =
           std::make_unique<hp::FECollection<dim>>(FE_Q<dim>(fe_degree));
-      finite_element_cg_ =
+      collection_.finite_element_cg =
           std::make_unique<hp::FECollection<dim>>(FE_Q<dim>(fe_degree));
     }
 
-    mapping_ = std::make_unique<dealii::hp::MappingCollection<dim>>(
+    collection_.mapping = std::make_unique<dealii::hp::MappingCollection<dim>>(
         MappingQ<dim>(mapping_degree));
 
-    quadrature_ =
+    collection_.quadrature =
         std::make_unique<hp::QCollection<dim>>(QGauss<dim>(quadrature_degree));
-    quadrature_high_order_ = std::make_unique<hp::QCollection<dim>>(
+    collection_.quadrature_high_order = std::make_unique<hp::QCollection<dim>>(
         QGauss<dim>(quadrature_degree + 1));
-    nodal_quadrature_ = std::make_unique<hp::QCollection<dim>>(
+    collection_.nodal_quadrature = std::make_unique<hp::QCollection<dim>>(
         QGaussLobatto<dim>(quadrature_degree));
 
-    quadrature_1d_ =
+    collection_.quadrature_1d =
         std::make_unique<hp::QCollection<1>>(QGauss<1>(quadrature_degree));
 
-    face_quadrature_ = std::make_unique<hp::QCollection<dim - 1>>(
+    collection_.face_quadrature = std::make_unique<hp::QCollection<dim - 1>>(
         QGauss<dim - 1>(quadrature_degree));
-    face_nodal_quadrature_ = std::make_unique<hp::QCollection<dim - 1>>(
-        QGaussLobatto<dim - 1>(quadrature_degree));
+    collection_.face_nodal_quadrature =
+        std::make_unique<hp::QCollection<dim - 1>>(
+            QGaussLobatto<dim - 1>(quadrature_degree));
   }
 
 } /* namespace ryujin */

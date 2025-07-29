@@ -216,6 +216,24 @@ namespace
 
 
 /**
+ * Variant of the macro above that takes two arguments, container and
+ * member, and creates an accessor function.
+ * ```
+ * const Foo& member() const { return container_.member; }
+ * ```
+ * The function will dereference container and member if they are of
+ * pointer type.
+ *
+ * @ingroup Miscellaneous
+ */
+#define ACCESSOR_CONTAINER_READ_ONLY(container, member)                        \
+  inline const auto &member() const                                            \
+  {                                                                            \
+    return dereference(dereference(container).member);                         \
+  }
+
+
+/**
  * Injects a label into the generated assembly.
  *
  * @ingroup Miscellaneous

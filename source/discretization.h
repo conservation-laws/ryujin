@@ -233,6 +233,25 @@ namespace ryujin
     void prepare(const std::string &base_name);
 
     /**
+     * A collection of mappings, finite elements, and quadratures that are
+     * set up by the Discretization class. We create a dedicated struct
+     * with all unique_ptr to keep the interface to
+     * Geometry::populate_hp_collections() sane.
+     */
+    struct Collection {
+      std::unique_ptr<const dealii::hp::MappingCollection<dim>> mapping;
+      std::unique_ptr<const dealii::hp::FECollection<dim>> finite_element;
+      std::unique_ptr<const dealii::hp::FECollection<dim>> finite_element_cg;
+      std::unique_ptr<const dealii::hp::QCollection<dim>> quadrature;
+      std::unique_ptr<const dealii::hp::QCollection<dim>> quadrature_high_order;
+      std::unique_ptr<const dealii::hp::QCollection<dim>> nodal_quadrature;
+      std::unique_ptr<const dealii::hp::QCollection<1>> quadrature_1d;
+      std::unique_ptr<const dealii::hp::QCollection<dim - 1>> face_quadrature;
+      std::unique_ptr<const dealii::hp::QCollection<dim - 1>>
+          face_nodal_quadrature;
+    };
+
+    /**
      * @name Accessors to data structures managed by this class.
      */
     //@{
@@ -313,20 +332,19 @@ namespace ryujin
      * Return a read-only const reference to the triangulation.
      */
     ACCESSOR_READ_ONLY(triangulation)
-
     /**
      * Return a read-only const reference to the mapping.
      *
      * @note The accessor returns an MappingCollection object.
      */
-    ACCESSOR_READ_ONLY(mapping)
+    ACCESSOR_CONTAINER_READ_ONLY(collection_, mapping)
 
     /**
      * Return a read-only const reference to the finite element.
      *
      * @note The accessor returns an FECollection object.
      */
-    ACCESSOR_READ_ONLY(finite_element)
+    ACCESSOR_CONTAINER_READ_ONLY(collection_, finite_element)
 
     /**
      * Return a read-only const reference to a continuous ("cG") variant of
@@ -334,14 +352,14 @@ namespace ryujin
      *
      * @note The accessor returns an FECollection object.
      */
-    ACCESSOR_READ_ONLY(finite_element_cg)
+    ACCESSOR_CONTAINER_READ_ONLY(collection_, finite_element_cg)
 
     /**
      * Return a read-only const reference to the quadrature rule.
      *
      * @note The accessor returns an QCollection object.
      */
-    ACCESSOR_READ_ONLY(quadrature)
+    ACCESSOR_CONTAINER_READ_ONLY(collection_, quadrature)
 
     /**
      * Return a read-only const reference to a highe order quadrature rule
@@ -349,7 +367,7 @@ namespace ryujin
      *
      * @note The accessor returns an QCollection object.
      */
-    ACCESSOR_READ_ONLY(quadrature_high_order)
+    ACCESSOR_CONTAINER_READ_ONLY(collection_, quadrature_high_order)
 
     /**
      * Return a read-only const reference to the nodal quadrature rule
@@ -357,21 +375,21 @@ namespace ryujin
      *
      * @note The accessor returns an QCollection object.
      */
-    ACCESSOR_READ_ONLY(nodal_quadrature)
+    ACCESSOR_CONTAINER_READ_ONLY(collection_, nodal_quadrature)
 
     /**
      * Return a read-only const reference to the 1D quadrature rule.
      *
      * @note The accessor returns an QCollection object.
      */
-    ACCESSOR_READ_ONLY(quadrature_1d)
+    ACCESSOR_CONTAINER_READ_ONLY(collection_, quadrature_1d)
 
     /**
      * Return a read-only const reference to the face quadrature rule.
      *
      * @note The accessor returns an QCollection object.
      */
-    ACCESSOR_READ_ONLY(face_quadrature)
+    ACCESSOR_CONTAINER_READ_ONLY(collection_, face_quadrature)
 
     /**
      * Return a read-only const reference to the nodal face quadrature rule
@@ -379,22 +397,7 @@ namespace ryujin
      *
      * @note The accessor returns an QCollection object.
      */
-    ACCESSOR_READ_ONLY(face_nodal_quadrature)
-
-  protected:
-    const MPIEnsemble &mpi_ensemble_;
-
-    std::unique_ptr<dealii::Triangulation<dim>> triangulation_;
-    std::unique_ptr<const dealii::hp::MappingCollection<dim>> mapping_;
-    std::unique_ptr<const dealii::hp::FECollection<dim>> finite_element_;
-    std::unique_ptr<const dealii::hp::FECollection<dim>> finite_element_cg_;
-    std::unique_ptr<const dealii::hp::QCollection<dim>> quadrature_;
-    std::unique_ptr<const dealii::hp::QCollection<dim>> quadrature_high_order_;
-    std::unique_ptr<const dealii::hp::QCollection<dim>> nodal_quadrature_;
-    std::unique_ptr<const dealii::hp::QCollection<1>> quadrature_1d_;
-    std::unique_ptr<const dealii::hp::QCollection<dim - 1>> face_quadrature_;
-    std::unique_ptr<const dealii::hp::QCollection<dim - 1>>
-        face_nodal_quadrature_;
+    ACCESSOR_CONTAINER_READ_ONLY(collection_, face_nodal_quadrature)
 
   private:
     //@}
@@ -418,6 +421,12 @@ namespace ryujin
      * @name Internal data:
      */
     //@{
+    //
+    const MPIEnsemble &mpi_ensemble_;
+
+    std::unique_ptr<dealii::Triangulation<dim>> triangulation_;
+
+    Collection collection_;
 
     std::set<std::shared_ptr<Geometry<dim>>> geometry_list_;
     std::shared_ptr<Geometry<dim>> selected_geometry_;
