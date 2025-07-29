@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <boost/random/detail/polynomial.hpp>
 #include <compile_time_options.h>
 
 #include "discretization.h"
@@ -34,8 +35,16 @@ namespace ryujin
     ansatz_ = Ansatz::cg_q1;
     add_parameter("finite element ansatz",
                   ansatz_,
-                  "The finite element ansatz used for discretization. valid "
+                  "The finite element ansatz used for discretization. Valid "
                   "choices are cG Q1, cG Q2, cG Q3.");
+
+    mesh_type_ =
+        (dim == 1 ? MeshType::parallel_shared : MeshType::parallel_distributed);
+    add_parameter("mesh type",
+                  mesh_type_,
+                  "The triangulation class used. Valid choices are \"serial\", "
+                  "\"parallel shared\", \"parallel distributed\", \"parallel "
+                  "fullydistributed\".");
 
     geometry_ = "cylinder";
     add_parameter("geometry",
@@ -68,14 +77,29 @@ namespace ryujin
     std::cout << "Discretization<dim>::prepare()" << std::endl;
 #endif
 
+    /* Select geometry: */
+
+    {
+      bool initialized = false;
+      for (auto &it : geometry_list_)
+        if (it->name() == geometry_) {
+          selected_geometry_ = it;
+          initialized = true;
+          break;
+        }
+
+      AssertThrow(
+          initialized,
+          ExcMessage("Could not find a geometry description with name \"" +
+                     geometry_ + "\""));
+    }
+
+    /* Set up Triangulation object: */
+
     const auto smoothing =
         dealii::Triangulation<dim>::limit_level_difference_at_vertices;
 
-    // FIXME: This information will ultimately be provided by the Geometry.
-    const auto selection =
-        (dim == 1 ? MeshType::parallel_shared : MeshType::parallel_distributed);
-
-    switch (selection) {
+    switch (mesh_type_) {
     case MeshType::parallel_fullydistributed: {
       triangulation_ = std::make_unique<
           dealii::parallel::fullydistributed::Triangulation<dim>>(
@@ -106,26 +130,27 @@ namespace ryujin
               settings);
     } break;
 
+    case MeshType::serial: {
+      AssertThrow(
+          mpi_ensemble_.n_ensemble_ranks() == 1,
+          ExcMessage(
+              "The serial triangulation can only be used for serial "
+              "computations. If you want to run simulations with more than one "
+              "rank per ensemble, then please set \"mesh type\" to one of the "
+              "parallel triangulations supported by deal.II"));
+
+      triangulation_ = std::make_unique<dealii::Triangulation<dim>>(smoothing);
+
+    } break;
+
     default:
       __builtin_trap();
     }
 
+    /* Create and distribute mesh: */
+
     auto &triangulation = *triangulation_;
-
-    {
-      bool initialized = false;
-      for (auto &it : geometry_list_)
-        if (it->name() == geometry_) {
-          it->create_triangulation(triangulation);
-          initialized = true;
-          break;
-        }
-
-      AssertThrow(
-          initialized,
-          ExcMessage("Could not find a geometry description with name \"" +
-                     geometry_ + "\""));
-    }
+    selected_geometry_->create_triangulation(triangulation);
 
     if (mesh_writeout_ && dealii::Utilities::MPI::this_mpi_process(
                               mpi_ensemble_.ensemble_communicator()) == 0) {
@@ -147,39 +172,55 @@ namespace ryujin
       GridTools::distort_random(
           mesh_distortion_, triangulation, false, std::random_device()());
 
+    /*
+     * First, let the selected geometry populate our hp::*Collection
+     * objects. If the method returns false, however, we need to do the
+     * setup ourselves.
+     */
+
+    if (selected_geometry_->populate_hp_collections(
+            polynomial_degree(), have_discontinuous_ansatz(), collection_))
+      return;
+
+    /*
+     * Populate all collections with appropriate objects for the cG Qk, dG
+     * Qk finite element on purely quadrilateral, or hexahedral meshes:
+     */
+
     const auto fe_degree = polynomial_degree();
     const auto mapping_degree = fe_degree;
     const auto quadrature_degree = fe_degree + 1;
 
     if (have_discontinuous_ansatz()) {
-      finite_element_ =
+      collection_.finite_element =
           std::make_unique<hp::FECollection<dim>>(FE_DGQ<dim>(fe_degree));
-      finite_element_cg_ =
+      collection_.finite_element_cg =
           std::make_unique<hp::FECollection<dim>>(FE_Q<dim>(fe_degree));
     } else {
-      finite_element_ =
+      collection_.finite_element =
           std::make_unique<hp::FECollection<dim>>(FE_Q<dim>(fe_degree));
-      finite_element_cg_ =
+      collection_.finite_element_cg =
           std::make_unique<hp::FECollection<dim>>(FE_Q<dim>(fe_degree));
     }
 
-    mapping_ = std::make_unique<dealii::hp::MappingCollection<dim>>(
+    collection_.mapping = std::make_unique<dealii::hp::MappingCollection<dim>>(
         MappingQ<dim>(mapping_degree));
 
-    quadrature_ =
+    collection_.quadrature =
         std::make_unique<hp::QCollection<dim>>(QGauss<dim>(quadrature_degree));
-    quadrature_high_order_ = std::make_unique<hp::QCollection<dim>>(
+    collection_.quadrature_high_order = std::make_unique<hp::QCollection<dim>>(
         QGauss<dim>(quadrature_degree + 1));
-    nodal_quadrature_ = std::make_unique<hp::QCollection<dim>>(
+    collection_.nodal_quadrature = std::make_unique<hp::QCollection<dim>>(
         QGaussLobatto<dim>(quadrature_degree));
 
-    quadrature_1d_ =
+    collection_.quadrature_1d =
         std::make_unique<hp::QCollection<1>>(QGauss<1>(quadrature_degree));
 
-    face_quadrature_ = std::make_unique<hp::QCollection<dim - 1>>(
+    collection_.face_quadrature = std::make_unique<hp::QCollection<dim - 1>>(
         QGauss<dim - 1>(quadrature_degree));
-    face_nodal_quadrature_ = std::make_unique<hp::QCollection<dim - 1>>(
-        QGaussLobatto<dim - 1>(quadrature_degree));
+    collection_.face_nodal_quadrature =
+        std::make_unique<hp::QCollection<dim - 1>>(
+            QGaussLobatto<dim - 1>(quadrature_degree));
   }
 
 } /* namespace ryujin */

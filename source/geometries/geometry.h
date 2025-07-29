@@ -10,6 +10,7 @@
 #include "convenience_macros.h"
 
 #include <deal.II/base/parameter_acceptor.h>
+#include <deal.II/dofs/dof_handler.h>
 #include <deal.II/grid/tria.h>
 
 #include <string>
@@ -44,11 +45,43 @@ namespace ryujin
     }
 
     /**
-     * Create the triangulation according to the appropriate geometry
-     * description.
+     * Create a triangulation representing the current Geometry. This
+     * virtual method needs to be implemented in derived classes.
      */
     virtual void
-    create_triangulation(dealii::Triangulation<dim> &triangulation) = 0;
+    create_triangulation(dealii::Triangulation<dim> &triangulation) const = 0;
+
+    /**
+     * Set the correct active FE index for each active cell for the given
+     * DoFHandler. This method can be left empty for a standard geometry
+     * that only uses only one reference element. The method must be
+     * reimplemented for geometries that use hp capabilities, such as
+     * meshes with mixed finite elements, or meshes with FE_Nothing.
+     */
+    virtual void
+    set_active_fe_index(dealii::DoFHandler<dim> & /*dof_handler*/) const
+    {
+    }
+
+    /**
+     * Populate all hp::*Collection objects for finite elements, mappings,
+     * and quadratures. As this is a formidable zoo of different collection
+     * objects, we get a writable reference to the discretization object to
+     * set them directly.
+     */
+    virtual bool populate_hp_collections(
+        const unsigned int /*fe_degree*/,
+        const bool /*have_discontinuous_ansatz*/,
+        typename ryujin::Discretization<dim>::Collection & /*collection*/) const
+    {
+      /*
+       * Signal, that we did nothing. In this case the Discretization
+       * object will populate all collections with appropriate objects for
+       * the cG Qk, dG Qk finite element on purely quadrilateral, or
+       * hexahedral meshes.
+       */
+      return false;
+    }
 
     /**
      * Return the name of the geometry as (const reference) std::string

@@ -246,7 +246,8 @@ namespace ryujin
     temp.reinit(scalar_partitioner);
 
     for (unsigned int d = 0; d < problem_dimension; ++d) {
-      VectorTools::interpolate(offline_data_->dof_handler(),
+      VectorTools::interpolate(offline_data_->discretization().mapping(),
+                               offline_data_->dof_handler(),
                                to_function<dim, Number>(callable, d),
                                temp);
       U.insert_component(temp, d);

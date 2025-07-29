@@ -45,7 +45,7 @@ namespace ryujin
       }
 
       void create_triangulation(
-          typename dealii::Triangulation<dim> &triangulation) final
+          typename dealii::Triangulation<dim> &triangulation) const final
       {
         if (balanced_) {
           GridGenerator::hyper_ball_balanced(

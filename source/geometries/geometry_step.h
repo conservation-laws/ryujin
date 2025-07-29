@@ -163,7 +163,7 @@ namespace ryujin
       }
 
       void create_triangulation(
-          typename dealii::Triangulation<dim> &triangulation) final
+          typename dealii::Triangulation<dim> &triangulation) const final
       {
         GridGenerator::step(
             triangulation, length_, height_, step_position_, step_height_);
