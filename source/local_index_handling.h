@@ -414,15 +414,17 @@ namespace ryujin
         const dealii::AffineConstraints<Number> &affine_constraints,
         bool keep_constrained)
     {
-      const unsigned int dofs_per_cell = dof_handler.get_fe().dofs_per_cell;
-      std::vector<dealii::types::global_dof_index> dof_indices(dofs_per_cell);
+      std::vector<dealii::types::global_dof_index> dof_indices;
 
       for (auto cell : dof_handler.active_cell_iterators()) {
         /* iterate over locally owned cells and the ghost layer */
         if (cell->is_artificial())
           continue;
 
+        const unsigned int dofs_per_cell = cell->get_fe().n_dofs_per_cell();
+        dof_indices.resize(dofs_per_cell);
         cell->get_dof_indices(dof_indices);
+
         affine_constraints.add_entries_local_to_global(
             dof_indices, dsp, keep_constrained);
       }
@@ -447,11 +449,8 @@ namespace ryujin
       Assert(affine_constraints.n_constraints() == 0,
              dealii::ExcMessage("I don't think constraints make sense for dG"));
 
-      const auto &fe = dof_handler.get_fe();
-      const unsigned int dofs_per_cell = fe.dofs_per_cell;
-      std::vector<dealii::types::global_dof_index> dof_indices(dofs_per_cell);
-      std::vector<dealii::types::global_dof_index> neighbor_dof_indices(
-          dofs_per_cell);
+      std::vector<dealii::types::global_dof_index> dof_indices;
+      std::vector<dealii::types::global_dof_index> neighbor_dof_indices;
 
       /*
        * We collect all coupling dof indices on a face and store the result
@@ -465,6 +464,8 @@ namespace ryujin
         if (cell->is_artificial())
           continue;
 
+        const unsigned int dofs_per_cell = cell->get_fe().n_dofs_per_cell();
+        dof_indices.resize(dofs_per_cell);
         cell->get_dof_indices(dof_indices);
 
         affine_constraints.add_entries_local_to_global(
@@ -485,12 +486,15 @@ namespace ryujin
           if (neighbor_cell->is_artificial())
             continue;
 
+          const unsigned int neighbor_dofs_per_cell =
+              neighbor_cell->get_fe().n_dofs_per_cell();
+          neighbor_dof_indices.resize(neighbor_dofs_per_cell);
+          neighbor_cell->get_dof_indices(neighbor_dof_indices);
+
           const unsigned int f_index_neighbor =
               cell->has_periodic_neighbor(f_index)
                   ? cell->periodic_neighbor_of_periodic_neighbor(f_index)
                   : cell->neighbor_of_neighbor(f_index);
-
-          neighbor_cell->get_dof_indices(neighbor_dof_indices);
 
           /*
            * Construct all couplings between current and neighbor cell with
@@ -499,12 +503,13 @@ namespace ryujin
 
           coupling_indices.resize(0);
           for (unsigned int i = 0; i < dofs_per_cell; ++i)
-            if (fe.has_support_on_face(i, f_index))
+            if (cell->get_fe().has_support_on_face(i, f_index))
               coupling_indices.push_back(dof_indices[i]);
 
           neighbor_coupling_indices.resize(0);
-          for (unsigned int j = 0; j < dofs_per_cell; ++j)
-            if (fe.has_support_on_face(j, f_index_neighbor))
+          for (unsigned int j = 0; j < neighbor_dofs_per_cell; ++j)
+            if (neighbor_cell->get_fe().has_support_on_face(j,
+                                                            f_index_neighbor))
               neighbor_coupling_indices.push_back(neighbor_dof_indices[j]);
 
           affine_constraints.add_entries_local_to_global(
