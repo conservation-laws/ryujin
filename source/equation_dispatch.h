@@ -35,10 +35,10 @@ namespace ryujin
    *    dimension that have to be read from the `ryujin.prm` parameter
    *    file.
    *  - The final set of valid parameters that can be configured in the
-   *  `ryujin.prm` depend on the runtime parameters "dimension" and
-   *  "equation" themselves.
+   *    `ryujin.prm` depend on the runtime parameters "dimension" and
+   *    "equation" themselves.
    *
-   * We thus first read in three parameters from the parameter file:
+   * We thus first read in two parameters from the parameter file:
    * ```
    * subsection B - Equation
    *   set dimension           = ...
@@ -129,7 +129,7 @@ namespace ryujin
 
 
     /**
-     * Register a create_parameter_files() callback.
+     * Register a dispatch() callback.
      */
     template <typename Callable>
     static void register_dispatch(const Callable &callable)
@@ -255,7 +255,7 @@ namespace ryujin
 
   /**
    * A small Dispatch struct templated in Description that registers the
-   * call backs.
+   * callbacks.
    */
   template <typename Description, typename Number>
   struct Dispatch {
