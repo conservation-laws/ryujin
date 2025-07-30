@@ -218,6 +218,10 @@ jobs:
         mkdir build-debug
         cd build-debug
         cmake -DCMAKE_CXX_FLAGS="-Werror" -DWITH_OPENMP=on -DCMAKE_BUILD_TYPE=Debug ..
+    - name: build debug
+      run: |
+        cd build-debug
+        make VERBOSE=1 -j2
 
   ###############################################
   # ubuntu-lts-22.04 with gcc-11, deal.II 9.4.2 #
