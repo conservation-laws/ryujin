@@ -1559,6 +1559,7 @@ namespace ryujin
         const bool neighbor_cell_has_fe_nothing =                 //
             treat_fe_nothing_as_boundary_ &&                      //
             !face->at_boundary() &&                               //
+            cell->neighbor(f_index)->is_active() &&               //
             !cell->neighbor(f_index)->is_artificial() &&          //
             (dynamic_cast<const dealii::FE_Nothing<dim> *>(       //
                  &cell->neighbor(f_index)->get_fe()) != nullptr); //
