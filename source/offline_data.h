@@ -397,6 +397,7 @@ namespace ryujin
      */
     //@{
 
+    bool treat_fe_nothing_as_boundary_;
     double incidence_relaxation_even_;
     double incidence_relaxation_odd_;
 

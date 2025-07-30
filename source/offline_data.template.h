@@ -17,6 +17,7 @@
 #include <deal.II/base/work_stream.h>
 #include <deal.II/dofs/dof_renumbering.h>
 #include <deal.II/dofs/dof_tools.h>
+#include <deal.II/fe/fe_nothing.h>
 #include <deal.II/fe/fe_values.h>
 #include <deal.II/grid/grid_tools.h>
 #include <deal.II/lac/dynamic_sparsity_pattern.h>
@@ -43,6 +44,16 @@ namespace ryujin
       , mpi_ensemble_(mpi_ensemble)
       , discretization_(&discretization)
   {
+    treat_fe_nothing_as_boundary_ = true;
+    add_parameter(
+        "treat fe_nothing as boundary",
+        treat_fe_nothing_as_boundary_,
+        "If set to true, we treat cell with where the active finite element is "
+        "set to FE_Nothing as boundary: We do not assemble an interior jump "
+        "over such elements and add vertices touching such an element in the "
+        "boundary map. In this case, the boundary id of the interior face is "
+        "set via the material id of the cell with active FE_Nothing element.");
+
     incidence_relaxation_even_ = 0.5;
     add_parameter("incidence matrix relaxation even degree",
                   incidence_relaxation_even_,
@@ -213,12 +224,10 @@ namespace ryujin
     auto &dof_handler = *dof_handler_;
 
     /*
-     * Set active FE indices:
-     *
-     * This information depends on the selected geometry. Therefore, let
-     * the selected geometry object handle the setup. For a standard
-     * geometry that has only one reference element the method simply does
-     * nothing.
+     * Set active FE indices: This information depends on the selected
+     * geometry. Therefore, let the selected geometry object handle the
+     * setup. For a standard geometry that has only one reference element
+     * the method simply does nothing.
      */
     discretization_->selected_geometry().set_active_fe_index(dof_handler);
 
@@ -581,9 +590,6 @@ namespace ryujin
         matrix.reinit(dofs_per_cell, dofs_per_cell);
       if (discretization_->have_discontinuous_ansatz()) {
         cell_mass_matrix_inverse.reinit(dofs_per_cell, dofs_per_cell);
-        for (auto &it : interface_cij_matrix)
-          for (auto &matrix : it)
-            matrix.reinit(dofs_per_cell, dofs_per_cell);
       }
 
       hp_fe_values.reinit(cell);
@@ -600,16 +606,14 @@ namespace ryujin
         matrix = 0.;
       if (discretization_->have_discontinuous_ansatz()) {
         cell_mass_matrix_inverse = 0.;
-        for (auto &it : interface_cij_matrix)
-          for (auto &matrix : it)
-            matrix = 0.;
       }
       cell_measure = 0.;
 
       for (unsigned int q : fe_values.quadrature_point_indices()) {
         const auto JxW = fe_values.JxW(q);
 
-        if (cell->is_locally_owned())
+        /* skip cells that have no active cells when computing domain size: */
+        if (dofs_per_cell != 0 && cell->is_locally_owned())
           cell_measure += Number(JxW);
 
         for (unsigned int j : fe_values.dof_indices()) {
@@ -658,6 +662,18 @@ namespace ryujin
           continue;
         }
 
+        /* Do not assemble jumps to neighboring cells with FE_Nothing: */
+        const bool neighbor_cell_has_fe_nothing =
+            treat_fe_nothing_as_boundary_ &&
+            (dynamic_cast<const dealii::FE_Nothing<dim> *>(
+                 &neighbor_cell->get_fe()) != nullptr);
+        if (neighbor_cell_has_fe_nothing) {
+          // set the vector of local dof indices to 0 to indicate that
+          // there is nothing to do for this face:
+          neighbor_local_dof_indices[f_index].resize(0);
+          continue;
+        }
+
         hp_fe_face_values.reinit(cell, f_index);
         const auto &fe_face_values = hp_fe_face_values.get_present_fe_values();
 
@@ -687,8 +703,16 @@ namespace ryujin
                 ? cell->periodic_neighbor_of_periodic_neighbor(f_index)
                 : cell->neighbor_of_neighbor(f_index);
 
-        neighbor_local_dof_indices[f_index].resize(dofs_per_cell);
+        const unsigned int neighbor_dofs_per_cell =
+            neighbor_cell->get_fe().n_dofs_per_cell();
+        neighbor_local_dof_indices[f_index].resize(neighbor_dofs_per_cell);
         neighbor_cell->get_dof_indices(neighbor_local_dof_indices[f_index]);
+
+        for (unsigned int k = 0; k < dim; ++k) {
+          interface_cij_matrix[f_index][k].reinit(dofs_per_cell,
+                                                  neighbor_dofs_per_cell);
+          interface_cij_matrix[f_index][k] = 0.;
+        }
 
         hp_fe_neighbor_face_values.reinit(neighbor_cell, f_index_neighbor);
         const auto &fe_neighbor_face_values =
@@ -699,7 +723,7 @@ namespace ryujin
           const auto &normal = fe_face_values.get_normal_vectors()[q];
 
           /* index j for neighbor, index i for current cell: */
-          for (unsigned int j : fe_face_values.dof_indices()) {
+          for (unsigned int j : fe_neighbor_face_values.dof_indices()) {
             const auto value_JxW =
                 fe_neighbor_face_values.shape_value(j, q) * JxW;
 
@@ -720,7 +744,8 @@ namespace ryujin
 
       if (discretization_->have_discontinuous_ansatz()) {
         // FIXME: rewrite with CellwiseInverseMassMatrix
-        cell_mass_matrix_inverse.invert(cell_mass_matrix);
+        if (!cell_mass_matrix_inverse.empty())
+          cell_mass_matrix_inverse.invert(cell_mass_matrix);
       }
     };
 
@@ -761,13 +786,19 @@ namespace ryujin
         affine_constraints_assembly.distribute_local_to_global(
             cell_cij_matrix[k], local_dof_indices, cij_matrix_tmp[k]);
 
-        for (unsigned int f_index = 0; f_index < copy.n_faces; ++f_index) {
-          if (neighbor_local_dof_indices[f_index].size() != 0) {
-            affine_constraints_assembly.distribute_local_to_global(
-                interface_cij_matrix[f_index][k],
-                local_dof_indices,
-                neighbor_local_dof_indices[f_index],
-                cij_matrix_tmp[k]);
+        /*
+         * Workaround: We need to catch the case local_dof_incdices.size() == 0
+         * because deal.II reports the wrong size in the matrix object.
+         */
+        if (local_dof_indices.size() != 0) {
+          for (unsigned int f_index = 0; f_index < copy.n_faces; ++f_index) {
+            if (neighbor_local_dof_indices[f_index].size() != 0) {
+              affine_constraints_assembly.distribute_local_to_global(
+                  interface_cij_matrix[f_index][k],
+                  local_dof_indices,
+                  neighbor_local_dof_indices[f_index],
+                  cij_matrix_tmp[k]);
+            }
           }
         }
       }
@@ -937,13 +968,25 @@ namespace ryujin
             continue;
           }
 
+          /* Do not assemble jumps to neighboring cells with FE_Nothing: */
+          const bool neighbor_cell_has_fe_nothing =
+              treat_fe_nothing_as_boundary_ &&
+              (dynamic_cast<const dealii::FE_Nothing<dim> *>(
+                   &neighbor_cell->get_fe()) != nullptr);
+          if (neighbor_cell_has_fe_nothing) {
+            neighbor_local_dof_indices[f_index].resize(0);
+            continue;
+          }
+
+          const unsigned int neighbor_dofs_per_cell =
+              neighbor_cell->get_fe().n_dofs_per_cell();
+          neighbor_local_dof_indices[f_index].resize(neighbor_dofs_per_cell);
+          neighbor_cell->get_dof_indices(neighbor_local_dof_indices[f_index]);
+
           const unsigned int f_index_neighbor =
               cell->has_periodic_neighbor(f_index)
                   ? cell->periodic_neighbor_of_periodic_neighbor(f_index)
                   : cell->neighbor_of_neighbor(f_index);
-
-          neighbor_local_dof_indices[f_index].resize(dofs_per_cell);
-          neighbor_cell->get_dof_indices(neighbor_local_dof_indices[f_index]);
 
           hp_fe_face_values_nodal.reinit(cell, f_index);
           const auto &fe_face_values_nodal =
@@ -1027,13 +1070,19 @@ namespace ryujin
           transform_to_local_range(*scalar_partitioner_, indices);
 #endif
 
-        for (unsigned int f_index = 0; f_index < copy.n_faces; ++f_index) {
-          if (neighbor_local_dof_indices[f_index].size() != 0) {
-            affine_constraints_assembly.distribute_local_to_global(
-                interface_incidence_matrix[f_index],
-                local_dof_indices,
-                neighbor_local_dof_indices[f_index],
-                incidence_matrix_tmp);
+        /*
+         * Workaround: We need to catch the case local_dof_incdices.size() == 0
+         * because deal.II reports the wrong size in the matrix object.
+         */
+        if (local_dof_indices.size() != 0) {
+          for (unsigned int f_index = 0; f_index < copy.n_faces; ++f_index) {
+            if (neighbor_local_dof_indices[f_index].size() != 0) {
+              affine_constraints_assembly.distribute_local_to_global(
+                  interface_incidence_matrix[f_index],
+                  local_dof_indices,
+                  neighbor_local_dof_indices[f_index],
+                  incidence_matrix_tmp);
+            }
           }
         }
       };
@@ -1298,14 +1347,9 @@ namespace ryujin
       local_dof_indices.resize(dofs_per_cell);
       cell->get_active_or_mg_dof_indices(local_dof_indices);
 
-      for (auto f : cell->face_indices()) {
-        const auto face = cell->face(f);
-        const auto id = face->boundary_id();
-
-        // FIXME: support interior boundary with FE_Nothing
-
-        if (!face->at_boundary())
-          continue;
+      for (auto f_index : cell->face_indices()) {
+        const auto face = cell->face(f_index);
+        auto id = face->boundary_id();
 
         /*
          * Skip periodic boundary faces. For our algorithm these are
@@ -1315,13 +1359,36 @@ namespace ryujin
         if (id == Boundary::periodic)
           continue;
 
-        hp_fe_face_values.reinit(cell, f);
+        /*
+         * Check for interior faces neighboring a cell with FE nothing:
+         */
+        const bool neighbor_cell_has_fe_nothing =                 //
+            treat_fe_nothing_as_boundary_ &&                      //
+            !face->at_boundary() &&                               //
+            cell->neighbor(f_index)->is_active() &&               //
+            !cell->neighbor(f_index)->is_artificial() &&          //
+            (dynamic_cast<const dealii::FE_Nothing<dim> *>(       //
+                 &cell->neighbor(f_index)->get_fe()) != nullptr); //
+
+        if (neighbor_cell_has_fe_nothing) {
+          /*
+           * By convention, query boundary id from the material id of the
+           * neighboring cell and then continue:
+           */
+          id = cell->neighbor(f_index)->material_id();
+
+        } else if (!face->at_boundary()) {
+          /* Bail out if we are in the interior: */
+          continue;
+        }
+
+        hp_fe_face_values.reinit(cell, f_index);
         const auto &fe_face_values = hp_fe_face_values.get_present_fe_values();
         const auto &mapping =
             hp_fe_face_values.get_mapping_collection()[cell->active_fe_index()];
 
         for (unsigned int j : fe_face_values.dof_indices()) {
-          if (!cell->get_fe().has_support_on_face(j, f))
+          if (!cell->get_fe().has_support_on_face(j, f_index))
             continue;
 
           Number boundary_mass = 0.;
@@ -1478,20 +1545,30 @@ namespace ryujin
       local_dof_indices.resize(dofs_per_cell);
       cell->get_active_or_mg_dof_indices(local_dof_indices);
 
-      for (auto f : cell->face_indices()) {
-        const auto face = cell->face(f);
+      for (auto f_index : cell->face_indices()) {
+        const auto face = cell->face(f_index);
         const auto id = face->boundary_id();
-
-        if (!face->at_boundary())
-          continue;
 
         /* Skip periodic boundary faces; see above. */
         if (id == Boundary::periodic)
           continue;
 
+        /*
+         * Check for interior faces neighboring a cell with FE nothing:
+         */
+        const bool neighbor_cell_has_fe_nothing =                 //
+            treat_fe_nothing_as_boundary_ &&                      //
+            !face->at_boundary() &&                               //
+            !cell->neighbor(f_index)->is_artificial() &&          //
+            (dynamic_cast<const dealii::FE_Nothing<dim> *>(       //
+                 &cell->neighbor(f_index)->get_fe()) != nullptr); //
+
+        if (!neighbor_cell_has_fe_nothing && !face->at_boundary())
+          continue;
+
         for (unsigned int j = 0; j < dofs_per_cell; ++j) {
 
-          if (!cell->get_fe().has_support_on_face(j, f))
+          if (!cell->get_fe().has_support_on_face(j, f_index))
             continue;
 
           const auto global_index = local_dof_indices[j];
