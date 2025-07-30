@@ -264,8 +264,8 @@ namespace ryujin
                             "angle coverage of partial annulus above y-axis");
       }
 
-      void create_triangulation(
-          typename dealii::Triangulation<dim> &triangulation) const final
+      void create_coarse_triangulation(
+          dealii::Triangulation<dim> &triangulation) const final
       {
         GridGenerator::annulus(
             triangulation, length_, inner_radius_, outer_radius_, angle_);

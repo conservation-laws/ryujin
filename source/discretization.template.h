@@ -150,7 +150,7 @@ namespace ryujin
     /* Create and distribute mesh: */
 
     auto &triangulation = *triangulation_;
-    selected_geometry_->create_triangulation(triangulation);
+    selected_geometry_->create_coarse_triangulation(triangulation);
 
     if (mesh_writeout_ && dealii::Utilities::MPI::this_mpi_process(
                               mpi_ensemble_.ensemble_communicator()) == 0) {

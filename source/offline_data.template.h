@@ -229,7 +229,7 @@ namespace ryujin
      * setup. For a standard geometry that has only one reference element
      * the method simply does nothing.
      */
-    discretization_->selected_geometry().set_active_fe_index(dof_handler);
+    discretization_->selected_geometry().update_dof_handler(dof_handler);
 
     dof_handler.distribute_dofs(discretization_->finite_element());
 

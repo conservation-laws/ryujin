@@ -44,8 +44,8 @@ namespace ryujin
                             "boundary of the disk/ball");
       }
 
-      void create_triangulation(
-          typename dealii::Triangulation<dim> &triangulation) const final
+      void create_coarse_triangulation(
+          dealii::Triangulation<dim> &triangulation) const final
       {
         if (balanced_) {
           GridGenerator::hyper_ball_balanced(

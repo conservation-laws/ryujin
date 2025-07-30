@@ -162,8 +162,8 @@ namespace ryujin
       }
 
 
-      void create_triangulation(
-          typename dealii::Triangulation<dim> &triangulation) const final
+      void create_coarse_triangulation(
+          dealii::Triangulation<dim> &triangulation) const final
       {
         /* create mesh: */
 

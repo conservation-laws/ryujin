@@ -123,8 +123,8 @@ namespace ryujin
             "wall position", wall_position_, "x position of wall");
       }
 
-      void create_triangulation(
-          typename dealii::Triangulation<dim> &triangulation) const final
+      void create_coarse_triangulation(
+          dealii::Triangulation<dim> &triangulation) const final
       {
         GridGenerator::wall(triangulation, length_, height_, wall_position_);
       }

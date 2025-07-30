@@ -123,8 +123,8 @@ namespace ryujin
       }
 
 
-      void create_triangulation(
-          typename dealii::Triangulation<dim> &triangulation) const override
+      void create_coarse_triangulation(
+          dealii::Triangulation<dim> &triangulation) const override
       {
         /* create mesh: */
 
