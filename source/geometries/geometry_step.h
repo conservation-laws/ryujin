@@ -143,7 +143,7 @@ namespace ryujin
     class Step : public Geometry<dim>
     {
     public:
-      Step(const std::string subsection)
+      Step(const std::string &subsection)
           : Geometry<dim>("step", subsection)
       {
         length_ = 3.;

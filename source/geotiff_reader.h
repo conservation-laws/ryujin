@@ -12,7 +12,8 @@
 #include "patterns_conversion.h"
 
 #include <deal.II/base/parameter_acceptor.h>
-#include <iomanip>
+
+#include <numeric>
 
 #ifdef WITH_GDAL
 #include <cpl_conv.h>
@@ -51,7 +52,6 @@ namespace ryujin
    *
    * @ingroup ShallowWaterEquations
    */
-  template <int dim>
   class GeoTIFFReader : dealii::ParameterAcceptor
   {
   public:
@@ -127,7 +127,17 @@ namespace ryujin
       this->parse_parameters_call_back.connect(set_up);
     }
 
-
+    /*
+     * Query height information for a given position. The method is
+     * templated in dim, so that it can be called with a @p point having an
+     * arbitrary dimension. The method, however, only only uses the first
+     * two coordinates, x and y, from @p point, translates (x, y) into
+     * image coordinates (i, j) and returns an interpolated height value.
+     *
+     * @note If dim < 2, then the y coordinate is set to zero. Similarly,
+     * if dim == 0, then the tiff raster is queried at coordinate (0, 0).
+     */
+    template <int dim>
     DEAL_II_ALWAYS_INLINE inline double
     compute_height(const dealii::Point<dim> &point) const
     {
@@ -136,10 +146,14 @@ namespace ryujin
         return true;
       });
 
-      const double x = point[0];
+      double x = 0;
+      if constexpr (dim >= 1)
+        x = point[0];
+
       double y = 0;
       if constexpr (dim >= 2)
         y = point[1];
+
       const auto &[di, dj] = apply_inverse_transformation(x, y);
 
       /* Check that we are in bounds: */

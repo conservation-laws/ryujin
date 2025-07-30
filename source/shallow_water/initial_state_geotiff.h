@@ -93,7 +93,7 @@ namespace ryujin
 
     private:
       const HyperbolicSystem &hyperbolic_system_;
-      mutable GeoTIFFReader<dim> geotiff_reader_;
+      mutable GeoTIFFReader geotiff_reader_;
 
       /* Runtime parameters: */
 

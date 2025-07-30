@@ -81,7 +81,7 @@ namespace ryujin
     class GeoTIFFProfile : public Geometry<dim>
     {
     public:
-      GeoTIFFProfile(const std::string subsection)
+      GeoTIFFProfile(const std::string &subsection)
           : Geometry<dim>("geotiff profile", subsection)
           , geotiff_reader_(subsection + "/geotiff profile")
       {
@@ -281,7 +281,7 @@ namespace ryujin
       }
 
     private:
-      GeoTIFFReader<dim> geotiff_reader_;
+      GeoTIFFReader geotiff_reader_;
 
       dealii::Point<dim> point_left_;
       dealii::Point<dim> point_right_;

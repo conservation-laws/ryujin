@@ -228,7 +228,7 @@ namespace ryujin
     class Cylinder : public Geometry<dim>
     {
     public:
-      Cylinder(const std::string subsection)
+      Cylinder(const std::string &subsection)
           : Geometry<dim>("cylinder", subsection)
       {
         length_ = 4.;

@@ -37,8 +37,8 @@ namespace ryujin
     class RectangularDomain : public Geometry<dim>
     {
     public:
-      RectangularDomain(const std::string subsection)
-          : Geometry<dim>("rectangular domain", subsection)
+      RectangularDomain(const std::string &name, const std::string &subsection)
+          : Geometry<dim>(name, subsection)
       {
         this->add_parameter("position bottom left",
                             point_left_,
@@ -117,8 +117,14 @@ namespace ryujin
       }
 
 
+      RectangularDomain(const std::string subsection)
+          : RectangularDomain("rectangular domain", subsection)
+      {
+      }
+
+
       void create_triangulation(
-          typename dealii::Triangulation<dim> &triangulation) const final
+          typename dealii::Triangulation<dim> &triangulation) const override
       {
         /* create mesh: */
 
