@@ -1,0 +1,12 @@
+[INFO] initiating flux capacitor
+[INFO] dispatching to driver »euler« with dim=2
+[INFO] initializing data structures
+[INFO] creating mesh and interpolating initial values
+[INFO] preparing compute kernels
+[INFO] entering main loop
+Normalized consolidated Linf, L1, and L2 errors at final time 
+#dofs = 4225
+t     = 2.004026763597627
+Linf  = 0.004724333128386804
+L1    = 0.0003853976297088282
+L2    = 0.0008888862140224623
