@@ -7,6 +7,10 @@
 
 #include <compile_time_options.h>
 
+#include <deal.II/base/quadrature_lib.h>
+#include <deal.II/fe/fe_simplex_p.h>
+#include <deal.II/fe/mapping_fe.h>
+
 #include "geometry_common_includes.h"
 
 namespace ryujin
@@ -114,6 +118,12 @@ namespace ryujin
               "Type of boundary condition enforced on the front side of the "
               "domain (faces with normal in positive z direction)");
         }
+
+        use_simplices_ = false;
+        this->add_parameter("simplex mesh",
+                            use_simplices_,
+                            "If set to true, the triangulation uses simplices "
+                            "instead of quadrangles.");
       }
 
 
@@ -131,21 +141,46 @@ namespace ryujin
         dealii::Triangulation<dim, dim> tria1;
         tria1.set_mesh_smoothing(triangulation.get_mesh_smoothing());
 
-        if constexpr (dim == 1) {
-          dealii::GridGenerator::subdivided_hyper_rectangle<dim, dim>(
-              tria1, {subdivisions_x_}, point_left_, point_right_);
-        } else if constexpr (dim == 2) {
-          dealii::GridGenerator::subdivided_hyper_rectangle(
-              tria1,
-              {subdivisions_x_, subdivisions_y_},
-              point_left_,
-              point_right_);
-        } else if constexpr (dim == 3) {
-          dealii::GridGenerator::subdivided_hyper_rectangle(
-              tria1,
-              {subdivisions_x_, subdivisions_y_, subdivisions_z_},
-              point_left_,
-              point_right_);
+        if (use_simplices_) {
+          /* Mesh with simplices: */
+
+          if constexpr (dim == 1) {
+            dealii::GridGenerator::
+                subdivided_hyper_rectangle_with_simplices<dim, dim>(
+                    tria1, {subdivisions_x_}, point_left_, point_right_);
+          } else if constexpr (dim == 2) {
+            dealii::GridGenerator::subdivided_hyper_rectangle_with_simplices(
+                tria1,
+                {subdivisions_x_, subdivisions_y_},
+                point_left_,
+                point_right_);
+          } else if constexpr (dim == 3) {
+            dealii::GridGenerator::subdivided_hyper_rectangle_with_simplices(
+                tria1,
+                {subdivisions_x_, subdivisions_y_, subdivisions_z_},
+                point_left_,
+                point_right_);
+          }
+
+        } else {
+          /* Regular mesh with quadrilaterals/hexahedra: */
+
+          if constexpr (dim == 1) {
+            dealii::GridGenerator::subdivided_hyper_rectangle<dim, dim>(
+                tria1, {subdivisions_x_}, point_left_, point_right_);
+          } else if constexpr (dim == 2) {
+            dealii::GridGenerator::subdivided_hyper_rectangle(
+                tria1,
+                {subdivisions_x_, subdivisions_y_},
+                point_left_,
+                point_right_);
+          } else if constexpr (dim == 3) {
+            dealii::GridGenerator::subdivided_hyper_rectangle(
+                tria1,
+                {subdivisions_x_, subdivisions_y_, subdivisions_z_},
+                point_left_,
+                point_right_);
+          }
         }
 
         triangulation.copy_triangulation(tria1);
@@ -241,6 +276,72 @@ namespace ryujin
 #endif
       }
 
+      bool
+      populate_hp_collections(const unsigned int fe_degree,
+                              const bool have_discontinuous_ansatz,
+                              typename ryujin::Discretization<dim>::Collection
+                                  &collection) const override
+      {
+        using namespace dealii;
+
+        if (!use_simplices_) {
+          /*
+           * Signal, that we did nothing. In this case the Discretization
+           * object will populate all collections with appropriate objects for
+           * the cG Qk, dG Qk finite element on purely quadrilateral, or
+           * hexahedral meshes.
+           */
+          return false;
+        }
+
+        /*
+         * Set up a simplex mesh:
+         */
+
+        const auto mapping_degree = fe_degree;
+        const auto quadrature_degree = fe_degree + 1;
+
+        if (have_discontinuous_ansatz) {
+          collection.finite_element = std::make_unique<hp::FECollection<dim>>(
+              FE_SimplexDGP<dim>(fe_degree));
+          collection.finite_element_cg =
+              std::make_unique<hp::FECollection<dim>>(
+                  FE_SimplexP<dim>(fe_degree));
+        } else {
+          collection.finite_element = std::make_unique<hp::FECollection<dim>>(
+              FE_SimplexP<dim>(fe_degree));
+          collection.finite_element_cg =
+              std::make_unique<hp::FECollection<dim>>(
+                  FE_SimplexP<dim>(fe_degree));
+        }
+
+        collection.mapping =
+            std::make_unique<dealii::hp::MappingCollection<dim>>(
+                MappingFE<dim>(FE_SimplexP<dim>(mapping_degree)));
+
+        collection.quadrature = std::make_unique<hp::QCollection<dim>>(
+            QGaussSimplex<dim>(quadrature_degree));
+        collection.quadrature_high_order =
+            std::make_unique<hp::QCollection<dim>>(
+                QGaussSimplex<dim>(quadrature_degree + 1));
+        collection.nodal_quadrature = std::make_unique<hp::QCollection<dim>>(
+            QGaussSimplex<dim>(quadrature_degree)); /*FIXME*/
+
+        collection.quadrature_1d = std::make_unique<hp::QCollection<1>>(
+            QGaussSimplex<1>(quadrature_degree));
+
+        collection.face_quadrature = std::make_unique<hp::QCollection<dim - 1>>(
+            QGaussSimplex<dim - 1>(quadrature_degree));
+
+        collection.face_nodal_quadrature =
+            std::make_unique<hp::QCollection<dim - 1>>(
+                QGaussSimplex<dim - 1>(quadrature_degree)); /*FIXME*/
+
+
+        return true;
+      }
+
+
     private:
       dealii::Point<dim> point_left_;
       dealii::Point<dim> point_right_;
@@ -258,6 +359,8 @@ namespace ryujin
       Boundary boundary_left_;
       Boundary boundary_right_;
       Boundary boundary_top_;
+
+      bool use_simplices_;
     };
   } /* namespace Geometries */
 } /* namespace ryujin */
