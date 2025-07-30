@@ -9,6 +9,7 @@
 
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/fe/fe_simplex_p.h>
+#include <deal.II/fe/fe_tools.h>
 #include <deal.II/fe/mapping_fe.h>
 
 #include "geometry_common_includes.h"
@@ -325,7 +326,8 @@ namespace ryujin
             std::make_unique<hp::QCollection<dim>>(
                 QGaussSimplex<dim>(quadrature_degree + 1));
         collection.nodal_quadrature = std::make_unique<hp::QCollection<dim>>(
-            QGaussSimplex<dim>(quadrature_degree)); /*FIXME*/
+            FETools::compute_nodal_quadrature(
+                FE_SimplexP<dim>(mapping_degree)));
 
         collection.quadrature_1d = std::make_unique<hp::QCollection<1>>(
             QGaussSimplex<1>(quadrature_degree));
@@ -333,9 +335,8 @@ namespace ryujin
         collection.face_quadrature = std::make_unique<hp::QCollection<dim - 1>>(
             QGaussSimplex<dim - 1>(quadrature_degree));
 
-        collection.face_nodal_quadrature =
-            std::make_unique<hp::QCollection<dim - 1>>(
-                QGaussSimplex<dim - 1>(quadrature_degree)); /*FIXME*/
+        collection.face_nodal_quadrature = FETools::compute_nodal_quadrature(
+            FE_SimplexP<dim - 1>(mapping_degree));
 
 
         return true;
