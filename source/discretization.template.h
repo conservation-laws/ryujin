@@ -270,8 +270,15 @@ namespace ryujin
       collection_.quadrature_high_order =
           std::make_unique<hp::QCollection<dim>>(
               QGaussSimplex<dim>(quadrature_degree + 1));
+#if DEAL_II_VERSION_GTE(9, 7, 0)
       collection_.nodal_quadrature = std::make_unique<hp::QCollection<dim>>(
           FETools::compute_nodal_quadrature(FE_SimplexP<dim>(mapping_degree)));
+#else
+      AssertThrow(false,
+                  dealii::ExcMessage("Discretization: Simplex support requires "
+                                     "deal.II version 9.7.0 or newer"));
+
+#endif
       collection_.quadrature_1d = std::make_unique<hp::QCollection<1>>(
           QGaussSimplex<1>(quadrature_degree));
       collection_.face_quadrature = std::make_unique<hp::QCollection<dim - 1>>(
@@ -281,10 +288,18 @@ namespace ryujin
             std::make_unique<hp::QCollection<dim - 1>>(
                 QGaussLobatto<dim - 1>(quadrature_degree));
       } else {
+#if DEAL_II_VERSION_GTE(9, 7, 0)
         collection_.face_nodal_quadrature =
             std::make_unique<hp::QCollection<dim - 1>>(
                 FETools::compute_nodal_quadrature(
                     FE_SimplexP<dim - 1>(mapping_degree)));
+#else
+        AssertThrow(
+            false,
+            dealii::ExcMessage("Discretization: Simplex support requires "
+                               "deal.II version 9.7.0 or newer"));
+
+#endif
       }
 
       return;
