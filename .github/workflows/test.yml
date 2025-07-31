@@ -22,8 +22,8 @@ jobs:
   # ubuntu-lts-24.04 with gcc, deal.II master #
   #############################################
 
-  ubuntu-lts-2404-dealii-master:
-    name: tests-deal.II-master
+  ubuntu-lts-2404-dealii-master-release:
+    name: tests-release-deal.II-master
     runs-on: [ubuntu-24.04]
 
     container:
@@ -52,6 +52,44 @@ jobs:
         export OMPI_ALLOW_RUN_AS_ROOT=1
         export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
         cd build-release
+        # skip a number of expensive verification tests:
+        ctest --output-on-failure -j2 -VV -E \
+          "(verification-isentropic_vortex.*l7|verification-becker_solution.*l7)"
+
+  #############################################
+  # ubuntu-lts-24.04 with gcc, deal.II master #
+  #############################################
+
+  ubuntu-lts-2404-dealii-master-debug:
+    name: tests-debug-deal.II-master
+    runs-on: [ubuntu-24.04]
+
+    container:
+      options: --user root
+      image: dealii/dealii:master-noble
+
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: 'true'
+    - name: info
+      run: |
+        g++ -v
+        cmake --version
+    - name: configure debug
+      run: |
+        mkdir build-debug
+        cd build-debug
+        cmake -DWITH_OPENMP=on -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_FLAGS_DEBUG="-O2" ..
+    - name: build debug
+      run: |
+        cd build-debug
+        make VERBOSE=1 -j2
+    - name: test debug
+      run: |
+        export OMPI_ALLOW_RUN_AS_ROOT=1
+        export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
+        cd build-debug
         # skip a number of expensive verification tests:
         ctest --output-on-failure -j2 -VV -E \
           "(verification-isentropic_vortex.*l7|verification-becker_solution.*l7)"
