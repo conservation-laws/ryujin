@@ -9,7 +9,7 @@ subsection A - TimeLoop
 
   set terminal update interval  = 0
 
-  set debug filename                      = check_mass-interior-R0004-space_averaged_time_series.dat
+  set debug command             = ../../../../print_mass check_mass-interior-R0004-space_averaged_time_series.dat
 end
 
 subsection B - Equation

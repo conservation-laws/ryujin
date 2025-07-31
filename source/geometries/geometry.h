@@ -67,12 +67,33 @@ namespace ryujin
     }
 
     /**
+     * An enum class describing the hp collection
+     */
+    enum class HP_Collection {
+      /*
+       * Instruct the Discretization class to set up standard
+       * continuous/discontinuous Q_k spaces for quarilaterals/hexahedra.
+       */
+      standard_quadrilaterals,
+      /*
+       * Instruct the Discretization class to set up standard
+       * continuous/discontinuous P_k spaces for simplices.
+       */
+      standard_simplices,
+      /*
+       * Inform the Discretization class that the hp::*Collection objects
+       * have already been populated by the Geometry class.
+       */
+      populated_by_geometry
+    };
+
+    /**
      * Populate all hp::*Collection objects for finite elements, mappings,
      * and quadratures. As this is a formidable zoo of different collection
      * objects, we get a writable reference to the discretization object to
      * set them directly.
      */
-    virtual bool populate_hp_collections(
+    virtual HP_Collection populate_hp_collections(
         const unsigned int /*fe_degree*/,
         const bool /*have_discontinuous_ansatz*/,
         typename ryujin::Discretization<dim>::Collection & /*collection*/) const
@@ -83,7 +104,7 @@ namespace ryujin
        * the cG Qk, dG Qk finite element on purely quadrilateral, or
        * hexahedral meshes.
        */
-      return false;
+      return HP_Collection::standard_quadrilaterals;
     }
 
     /**

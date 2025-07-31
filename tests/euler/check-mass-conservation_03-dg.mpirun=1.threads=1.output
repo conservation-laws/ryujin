@@ -1,0 +1,11 @@
+[INFO] initiating flux capacitor
+[INFO] dispatching to driver »euler« with dim=2
+[INFO] initializing data structures
+[INFO] creating mesh and interpolating initial values
+[INFO] preparing compute kernels
+[INFO] entering main loop
+9.97535267513177e-01
+9.97535267513185e-01
+9.97535267513181e-01
+9.97535267513185e-01
+9.97535267513179e-01

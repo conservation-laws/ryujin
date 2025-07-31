@@ -16,6 +16,7 @@
 #include <deal.II/numerics/vector_tools.h>
 #include <deal.II/numerics/vector_tools.templates.h>
 
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
@@ -210,6 +211,13 @@ namespace ryujin
         checkpoint_update_interval_,
         "Number of seconds after which a new checkpoint is written out to "
         "disk. Setting the interval to zero disables checkpointing.");
+
+    debug_command_ = "";
+    add_parameter("debug command",
+                  debug_command_,
+                  "If set to a nonempty string then the host environment's "
+                  "command processor is invoked via std::system() with the "
+                  "specified string as command parameter.");
 
     debug_filename_ = "";
     add_parameter("debug filename",
@@ -504,10 +512,20 @@ namespace ryujin
       compute_error(state_vector, t);
     }
 
-    if (mpi_ensemble_.world_rank() == 0 && debug_filename_ != "") {
-      std::ifstream f(debug_filename_);
-      if (f.is_open())
-        std::cout << f.rdbuf();
+    /*
+     *
+     */
+
+    if (mpi_ensemble_.world_rank() == 0) {
+      if (debug_command_ != "") {
+        auto result [[maybe_unused]] = std::system(debug_command_.c_str());
+      }
+
+      if (debug_filename_ != "") {
+        std::ifstream f(debug_filename_);
+        if (f.is_open())
+          std::cout << f.rdbuf();
+      }
     }
 
 #ifdef WITH_VALGRIND

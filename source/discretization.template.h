@@ -15,6 +15,9 @@
 #include <deal.II/fe/fe_dgq.h>
 #include <deal.II/fe/fe_nothing.h>
 #include <deal.II/fe/fe_q.h>
+#include <deal.II/fe/fe_simplex_p.h>
+#include <deal.II/fe/fe_tools.h>
+#include <deal.II/fe/mapping_fe.h>
 #include <deal.II/fe/mapping_q.h>
 #include <deal.II/grid/grid_out.h>
 
@@ -172,55 +175,138 @@ namespace ryujin
       GridTools::distort_random(
           mesh_distortion_, triangulation, false, std::random_device()());
 
-    /*
-     * First, let the selected geometry populate our hp::*Collection
-     * objects. If the method returns false, however, we need to do the
-     * setup ourselves.
-     */
-
-    if (selected_geometry_->populate_hp_collections(
-            polynomial_degree(), have_discontinuous_ansatz(), collection_))
-      return;
-
-    /*
-     * Populate all collections with appropriate objects for the cG Qk, dG
-     * Qk finite element on purely quadrilateral, or hexahedral meshes:
-     */
-
     const auto fe_degree = polynomial_degree();
     const auto mapping_degree = fe_degree;
     const auto quadrature_degree = fe_degree + 1;
 
-    if (have_discontinuous_ansatz()) {
-      collection_.finite_element =
-          std::make_unique<hp::FECollection<dim>>(FE_DGQ<dim>(fe_degree));
-      collection_.finite_element_cg =
-          std::make_unique<hp::FECollection<dim>>(FE_Q<dim>(fe_degree));
-    } else {
-      collection_.finite_element =
-          std::make_unique<hp::FECollection<dim>>(FE_Q<dim>(fe_degree));
-      collection_.finite_element_cg =
-          std::make_unique<hp::FECollection<dim>>(FE_Q<dim>(fe_degree));
+    /*
+     * First, let the selected geometry populate our hp::*Collection
+     * objects. If the method returns standard_quarilaterls, or
+     * standard_simplices, however, we need to do the setup ourselves:
+     */
+
+    const auto collection_type = selected_geometry_->populate_hp_collections(
+        fe_degree, have_discontinuous_ansatz(), collection_);
+
+    switch (collection_type) {
+    case Geometry<dim>::HP_Collection::populated_by_geometry: {
+      /*
+       * The geometry already populated the hp::*Collections
+       */
+
+      Assert(collection_.mapping, dealii::ExcInternalError());
+      Assert(collection_.finite_element, dealii::ExcInternalError());
+      Assert(collection_.finite_element_cg, dealii::ExcInternalError());
+      Assert(collection_.quadrature, dealii::ExcInternalError());
+      Assert(collection_.quadrature_high_order, dealii::ExcInternalError());
+      Assert(collection_.nodal_quadrature, dealii::ExcInternalError());
+      Assert(collection_.quadrature_1d, dealii::ExcInternalError());
+      Assert(collection_.face_quadrature, dealii::ExcInternalError());
+      Assert(collection_.face_nodal_quadrature, dealii::ExcInternalError());
+    } break;
+
+    case Geometry<dim>::HP_Collection::standard_quadrilaterals: {
+      /*
+       * Populate all collections with appropriate objects for the cG Qk, dG
+       * Qk finite element on purely quadrilateral, or hexahedral meshes:
+       */
+
+      if (have_discontinuous_ansatz()) {
+        collection_.finite_element =
+            std::make_unique<hp::FECollection<dim>>(FE_DGQ<dim>(fe_degree));
+        collection_.finite_element_cg =
+            std::make_unique<hp::FECollection<dim>>(FE_Q<dim>(fe_degree));
+      } else {
+        collection_.finite_element =
+            std::make_unique<hp::FECollection<dim>>(FE_Q<dim>(fe_degree));
+        collection_.finite_element_cg =
+            std::make_unique<hp::FECollection<dim>>(FE_Q<dim>(fe_degree));
+      }
+
+      collection_.mapping =
+          std::make_unique<dealii::hp::MappingCollection<dim>>(
+              MappingQ<dim>(mapping_degree));
+
+      collection_.quadrature = std::make_unique<hp::QCollection<dim>>(
+          QGauss<dim>(quadrature_degree));
+      collection_.quadrature_high_order =
+          std::make_unique<hp::QCollection<dim>>(
+              QGauss<dim>(quadrature_degree + 1));
+      collection_.nodal_quadrature = std::make_unique<hp::QCollection<dim>>(
+          QGaussLobatto<dim>(quadrature_degree));
+      collection_.quadrature_1d =
+          std::make_unique<hp::QCollection<1>>(QGauss<1>(quadrature_degree));
+      collection_.face_quadrature = std::make_unique<hp::QCollection<dim - 1>>(
+          QGauss<dim - 1>(quadrature_degree));
+      collection_.face_nodal_quadrature =
+          std::make_unique<hp::QCollection<dim - 1>>(
+              QGaussLobatto<dim - 1>(quadrature_degree));
+    } break;
+
+    case Geometry<dim>::HP_Collection::standard_simplices: {
+      /*
+       * Populate all collections with appropriate objects for the cG Pk, dG
+       * Pk finite element on purely quadrilateral, or hexahedral meshes:
+       */
+
+      if (have_discontinuous_ansatz()) {
+        collection_.finite_element = std::make_unique<hp::FECollection<dim>>(
+            FE_SimplexDGP<dim>(fe_degree));
+        collection_.finite_element_cg = std::make_unique<hp::FECollection<dim>>(
+            FE_SimplexP<dim>(fe_degree));
+      } else {
+        collection_.finite_element = std::make_unique<hp::FECollection<dim>>(
+            FE_SimplexP<dim>(fe_degree));
+        collection_.finite_element_cg = std::make_unique<hp::FECollection<dim>>(
+            FE_SimplexP<dim>(fe_degree));
+      }
+
+      collection_.mapping =
+          std::make_unique<dealii::hp::MappingCollection<dim>>(
+              MappingFE<dim>(FE_SimplexP<dim>(mapping_degree)));
+
+      collection_.quadrature = std::make_unique<hp::QCollection<dim>>(
+          QGaussSimplex<dim>(quadrature_degree));
+      collection_.quadrature_high_order =
+          std::make_unique<hp::QCollection<dim>>(
+              QGaussSimplex<dim>(quadrature_degree + 1));
+#if DEAL_II_VERSION_GTE(9, 7, 0)
+      collection_.nodal_quadrature = std::make_unique<hp::QCollection<dim>>(
+          FETools::compute_nodal_quadrature(FE_SimplexP<dim>(mapping_degree)));
+#else
+      AssertThrow(false,
+                  dealii::ExcMessage("Discretization: Simplex support requires "
+                                     "deal.II version 9.7.0 or newer"));
+
+#endif
+      collection_.quadrature_1d = std::make_unique<hp::QCollection<1>>(
+          QGaussSimplex<1>(quadrature_degree));
+      collection_.face_quadrature = std::make_unique<hp::QCollection<dim - 1>>(
+          QGaussSimplex<dim - 1>(quadrature_degree));
+      if constexpr (dim == 1) {
+        collection_.face_nodal_quadrature =
+            std::make_unique<hp::QCollection<dim - 1>>(
+                QGaussLobatto<dim - 1>(quadrature_degree));
+      } else {
+#if DEAL_II_VERSION_GTE(9, 7, 0)
+        collection_.face_nodal_quadrature =
+            std::make_unique<hp::QCollection<dim - 1>>(
+                FETools::compute_nodal_quadrature(
+                    FE_SimplexP<dim - 1>(mapping_degree)));
+#else
+        AssertThrow(
+            false,
+            dealii::ExcMessage("Discretization: Simplex support requires "
+                               "deal.II version 9.7.0 or newer"));
+
+#endif
+      }
+
+      return;
+    } break;
+    default:
+      __builtin_trap();
     }
-
-    collection_.mapping = std::make_unique<dealii::hp::MappingCollection<dim>>(
-        MappingQ<dim>(mapping_degree));
-
-    collection_.quadrature =
-        std::make_unique<hp::QCollection<dim>>(QGauss<dim>(quadrature_degree));
-    collection_.quadrature_high_order = std::make_unique<hp::QCollection<dim>>(
-        QGauss<dim>(quadrature_degree + 1));
-    collection_.nodal_quadrature = std::make_unique<hp::QCollection<dim>>(
-        QGaussLobatto<dim>(quadrature_degree));
-
-    collection_.quadrature_1d =
-        std::make_unique<hp::QCollection<1>>(QGauss<1>(quadrature_degree));
-
-    collection_.face_quadrature = std::make_unique<hp::QCollection<dim - 1>>(
-        QGauss<dim - 1>(quadrature_degree));
-    collection_.face_nodal_quadrature =
-        std::make_unique<hp::QCollection<dim - 1>>(
-            QGaussLobatto<dim - 1>(quadrature_degree));
   }
 
 } /* namespace ryujin */

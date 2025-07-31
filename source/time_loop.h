@@ -164,6 +164,7 @@ namespace ryujin
     std::string base_name_;
     std::string base_name_ensemble_;
 
+    std::string debug_command_;
     std::string debug_filename_;
 
     Number t_final_;
