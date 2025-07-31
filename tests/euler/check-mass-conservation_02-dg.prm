@@ -4,8 +4,8 @@ subsection A - TimeLoop
   set enable compute quantities = true
   set enable output full        = false
 
-  set final time                = 0.5
-  set timer granularity         = 0.5
+  set final time                = 0.50
+  set timer granularity         = 0.50
 
   set terminal update interval  = 0
 
@@ -21,20 +21,15 @@ end
 subsection C - Discretization
   set finite element ansatz = dG Q1
 
-  set geometry              = rectangular domain
-  set mesh refinement       = 6
-  subsection rectangular domain
-    set boundary condition bottom = periodic
-    set boundary condition left   = periodic
-    set boundary condition right  = periodic
-    set boundary condition top    = periodic
-  end
+  set geometry        = annulus
+  set mesh refinement = 0
 end
 
 subsection E - InitialValues
-  set configuration = isentropic vortex
-  set direction     =  1,    1
-  set position      =  0.5,  0.5
+  set configuration = uniform
+  set direction     =  1,  0
+  set position      =  0,  0
+
 end
 
 subsection F - HyperbolicModule
@@ -50,7 +45,7 @@ subsection H - TimeIntegrator
   set cfl min            = 0.9
   set cfl max            = 0.9
   set cfl recovery strategy = none
-  set time stepping scheme  = erk 33
+  set time stepping scheme  = ssprk 33
 end
 
 subsection K - Quantities
