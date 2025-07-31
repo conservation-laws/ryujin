@@ -1,0 +1,8 @@
+#!/bin/bash
+
+#
+# Workaround: Only print the last 5 entries of the second column of the
+# quantities output file.
+#
+
+awk '{print $2}' "${@}" | tail -5

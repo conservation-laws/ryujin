@@ -21,3 +21,5 @@ else()
     add_subdirectory("${_directory}")
   endforeach()
 endif()
+
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/scripts/print_mass ${CMAKE_CURRENT_BINARY_DIR} COPYONLY)
