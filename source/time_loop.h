@@ -188,7 +188,7 @@ namespace ryujin
     bool resume_at_time_zero_;
 
     Number terminal_update_interval_;
-    bool terminal_show_rank_throughput_;
+    bool terminal_correct_for_hypertreadhing_;
 
     Number checkpoint_update_interval_;
 
