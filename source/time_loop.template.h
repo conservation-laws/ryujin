@@ -1098,7 +1098,7 @@ namespace ryujin
       if (width == 1)
         result = "scalar ";
       else
-        result = std::to_string(width * 8 * sizeof(Number)) + " bit packed ";
+        result = std::to_string(width * 8 * sizeof(Number)) + "bit packed ";
 
       if constexpr (std::is_same_v<Number, double>)
         return result + "double";
@@ -1120,12 +1120,14 @@ namespace ryujin
            << n_global_dofs_ << " Qdofs on "               //
            << mpi_ensemble_.n_world_ranks() << " ranks / " //
 #ifdef WITH_OPENMP
-
-           << omp_get_max_threads() << " threads <" //
+           << omp_get_max_threads() << " omp"
 #else
-           << "[openmp disabled] <" //
+           << "[openmp disabled]"
 #endif
-           << vectorization_name << ">\n";
+#ifdef WITH_DEAL_II_THREADS
+           << " (" << MultithreadInfo::n_threads() << " dealii)"
+#endif
+           << " threads <" << vectorization_name << ">\n";
 
     stream << "             Last output cycle "                    //
            << timer_cycle - 1                                      //
