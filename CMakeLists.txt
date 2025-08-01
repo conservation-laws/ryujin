@@ -76,6 +76,8 @@ option(DEBUG_SYMMETRY_CHECK "Debug: enable debug code paths that verify d_ij, c_
 option(DENORMALS_ARE_ZERO "Set the \"denormals are zero\" and \"flush to zero\" bits in the MXCSR register" ON)
 option(FORCE_DEAL_II_SPARSE_MATRIX "Always use dealii::SparseMatrix instead of TrilinosWrappers::SparseMatrix for assembly" OFF)
 
+option(WITH_DEAL_II_THREADS "Enable deal.II threading support" OFF)
+
 #
 # External packages:
 #

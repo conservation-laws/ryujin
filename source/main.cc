@@ -41,19 +41,20 @@ void flush_denormals_to_zero()
  */
 void set_thread_limit(const MPI_Comm &mpi_communicator [[maybe_unused]])
 {
+  unsigned int n_threads [[maybe_unused]] =
+      dealii::MultithreadInfo::n_threads();
+
 #ifdef WITH_OPENMP
-  /* Obey OMP_THREAD_LIMIT and DEAL_II_NUM_THREADS: */
   const unsigned int n_threads_omp = omp_get_thread_limit();
-  const unsigned int n_threads_dealii = dealii::MultithreadInfo::n_threads();
-  const unsigned int n_threads = std::min(n_threads_omp, n_threads_dealii);
+  n_threads = std::min(n_threads_omp, n_threads);
   omp_set_num_threads(n_threads);
 #endif
 
-  /*
-   * We unconditionally set the thread limit for deal.II internal data
-   * structures to 1. This avoids a number of nasty surprises...
-   */
+#ifdef WITH_DEAL_II_THREADS
+  dealii::MultithreadInfo::set_thread_limit(n_threads);
+#else
   dealii::MultithreadInfo::set_thread_limit(1);
+#endif
 }
 
 

@@ -23,6 +23,7 @@
 
 /* External packages: */
 
+#cmakedefine WITH_DEAL_II_THREADS
 #cmakedefine WITH_EOSPAC
 #cmakedefine WITH_GDAL
 #cmakedefine WITH_LIKWID
