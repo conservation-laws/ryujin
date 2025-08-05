@@ -49,7 +49,11 @@ namespace ryujin
                   "\"parallel shared\", \"parallel distributed\", \"parallel "
                   "fullydistributed\".");
 
-    geometry_ = "cylinder";
+    if constexpr (dim == 1) {
+      geometry_ = "rectangular domain";
+    } else {
+      geometry_ = "cylinder";
+    }
     add_parameter("geometry",
                   geometry_,
                   "Name of the geometry used to create the mesh. Valid names "
