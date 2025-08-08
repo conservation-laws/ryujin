@@ -46,10 +46,11 @@ namespace ryujin
    */
   //@{
   template <typename T>
-  unsigned int get_stride_size = 1;
+  constexpr unsigned int get_stride_size = 1;
 
   template <typename T, std::size_t width>
-  unsigned int get_stride_size<dealii::VectorizedArray<T, width>> = width;
+  constexpr unsigned int get_stride_size<dealii::VectorizedArray<T, width>> =
+      width;
   //@}
 
 
