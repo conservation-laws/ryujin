@@ -382,6 +382,8 @@ namespace ryujin
                 initial_values_.get().interpolate_hyperbolic_vector(t);
           }
 
+          time_integrator_.prepare_state_vector(analytic, t);
+
           output(analytic,
                  base_name_ensemble_ + "-analytic_solution",
                  t,
