@@ -34,7 +34,6 @@ namespace ryujin
           : InitialState<Description, dim, Number>("function", subsection)
           , hyperbolic_system_(hyperbolic_system)
       {
-
         density_expression_ = "1.4";
         this->add_parameter("density expression",
                             density_expression_,
@@ -62,10 +61,12 @@ namespace ryujin
                               "z-component of the velocity");
         }
 
-        pressure_expression_ = "1.0";
-        this->add_parameter("pressure expression",
-                            pressure_expression_,
-                            "A function expression describing the pressure");
+        if constexpr (View::have_energy_equation) {
+          pressure_expression_ = "1.0";
+          this->add_parameter("pressure expression",
+                              pressure_expression_,
+                              "A function expression describing the pressure");
+        }
 
         /*
          * Set up the muparser object with the final flux description from
@@ -84,7 +85,8 @@ namespace ryujin
             velocity_y_function_ = std::make_unique<FP>(velocity_y_expression_);
           if constexpr (dim > 2)
             velocity_z_function_ = std::make_unique<FP>(velocity_z_expression_);
-          pressure_function_ = std::make_unique<FP>(pressure_expression_);
+          if constexpr (View::have_energy_equation)
+            pressure_function_ = std::make_unique<FP>(pressure_expression_);
         };
 
         set_up_muparser();
@@ -111,8 +113,10 @@ namespace ryujin
           full_primitive_state[3] = velocity_z_function_->value(point);
         }
 
-        pressure_function_->set_time(t);
-        full_primitive_state[1 + dim] = pressure_function_->value(point);
+        if constexpr (View::have_energy_equation) {
+          pressure_function_->set_time(t);
+          full_primitive_state[1 + dim] = pressure_function_->value(point);
+        }
 
         return view.from_initial_state(full_primitive_state);
       }

@@ -83,9 +83,15 @@ namespace ryujin
             p / (gamma_ - Number(1.)) + Number(0.5) * rho * (u * u + v * v);
 
         if constexpr (dim == 2)
-          return state_type({rho, rho * u, rho * v, E});
+          if constexpr (View::have_energy_equation)
+            return state_type({rho, rho * u, rho * v, E});
+          else
+            return state_type({rho, rho * u, rho * v});
         else if constexpr (dim == 3)
-          return state_type({rho, rho * u, rho * v, Number(0.), E});
+          if constexpr (View::have_energy_equation)
+            return state_type({rho, rho * u, rho * v, Number(0.), E});
+          else
+            return state_type({rho, rho * u, rho * v, Number(0.)});
         else {
           AssertThrow(false, dealii::ExcNotImplemented());
           __builtin_trap();

@@ -30,18 +30,28 @@ namespace ryujin
       using View =
           typename Description::template HyperbolicSystemView<dim, Number>;
       using state_type = typename View::state_type;
+      using state_type_1d = typename Description::
+          template HyperbolicSystemView<1, Number>::state_type;
 
       Uniform(const HyperbolicSystem &hyperbolic_system,
               const std::string subsection)
           : InitialState<Description, dim, Number>("uniform", subsection)
           , hyperbolic_system_(hyperbolic_system)
       {
-        primitive_[0] = 1.4;
-        primitive_[1] = 3.;
-        primitive_[2] = 1.;
-        this->add_parameter("primitive state",
-                            primitive_,
-                            "Initial 1d primitive state (rho, u, p)");
+        if constexpr (View::have_energy_equation) {
+          primitive_[0] = 1.4;
+          primitive_[1] = 3.;
+          primitive_[2] = 1.;
+          this->add_parameter("primitive state",
+                              primitive_,
+                              "Initial 1d primitive state (rho, u, p)");
+        } else {
+          primitive_[0] = 1.4;
+          primitive_[1] = 3.;
+          this->add_parameter("primitive state",
+                              primitive_,
+                              "Initial 1d primitive state (rho, u)");
+        }
 
         const auto convert_states = [&]() {
           const auto view = hyperbolic_system_.template view<dim, Number>();
@@ -60,7 +70,7 @@ namespace ryujin
     private:
       const HyperbolicSystem &hyperbolic_system_;
 
-      dealii::Tensor<1, 3, Number> primitive_;
+      state_type_1d primitive_;
 
       state_type state_;
     };
