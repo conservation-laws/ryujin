@@ -1,0 +1,12 @@
+[INFO] initiating flux capacitor
+[INFO] dispatching to driver »euler barotropic« with dim=2
+[INFO] initializing data structures
+[INFO] creating mesh and interpolating initial values
+[INFO] preparing compute kernels
+[INFO] entering main loop
+Normalized consolidated Linf, L1, and L2 errors at final time 
+#dofs = 1089
+t     = 2.006194930255409
+Linf  = 0.04574147826603776
+L1    = 0.003514556656534476
+L2    = 0.008296719483558377
