@@ -35,6 +35,8 @@ namespace ryujin
       using View =
           typename Description::template HyperbolicSystemView<dim, Number>;
       using state_type = typename View::state_type;
+      using state_type_1d = typename Description::
+          template HyperbolicSystemView<1, Number>::state_type;
 
       RadialContrast(const HyperbolicSystem &hyperbolic_system,
                      const std::string &subsection)
@@ -44,19 +46,22 @@ namespace ryujin
       {
         primitive_inner_[0] = 1.4;
         primitive_inner_[1] = 0.0;
-        primitive_inner_[2] = 1.;
-        this->add_parameter(
-            "primitive state inner",
-            primitive_inner_,
-            "Initial 1d primitive state (rho, u, p) on the inner disk");
+        if constexpr (View::have_energy_equation)
+          primitive_inner_[2] = 1.;
+        this->add_parameter("primitive state inner",
+                            primitive_inner_,
+                            "1d primitive state [rho, u, p] on the inner disk "
+                            "(or [rho, u] for the barotropic Euler module)");
 
         primitive_outer_[0] = 1.4;
         primitive_outer_[1] = 0.0;
-        primitive_outer_[2] = 1.;
+        if constexpr (View::have_energy_equation)
+          primitive_outer_[2] = 1.;
         this->add_parameter(
             "primitive state outer",
             primitive_outer_,
-            "Initial 1d primitive state (rho, u, p) on the outer annulus");
+            "1d primitive state [rho, u, p] on the outer annulus (or [rho, u] "
+            "for the barotropic Euler module)");
 
         radius_ = 0.5;
         this->add_parameter("radius", radius_, "Radius of radial area");
@@ -79,9 +84,10 @@ namespace ryujin
     private:
       const HyperbolicSystem &hyperbolic_system_;
 
-      dealii::Tensor<1, 3, Number> primitive_inner_;
-      dealii::Tensor<1, 3, Number> primitive_outer_;
       double radius_;
+
+      state_type_1d primitive_inner_;
+      state_type_1d primitive_outer_;
 
       state_type state_inner_;
       state_type state_outer_;

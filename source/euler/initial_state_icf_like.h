@@ -34,6 +34,8 @@ namespace ryujin
       using View =
           typename Description::template HyperbolicSystemView<dim, Number>;
       using state_type = typename View::state_type;
+      using state_type_1d = typename Description::
+          template HyperbolicSystemView<1, Number>::state_type;
 
       ICFLike(const HyperbolicSystem &hyperbolic_system,
               const std::string subsection)
@@ -48,18 +50,18 @@ namespace ryujin
         primitive_inside_[0] = 0.1;
         primitive_inside_[1] = 0.0;
         primitive_inside_[2] = 1.0;
-        this->add_parameter(
-            "primitive state inside",
-            primitive_inside_,
-            "Initial primitive state (rho, u, p) inside perturbed interface");
+        this->add_parameter("primitive state inside",
+                            primitive_inside_,
+                            "1d primitive state [rho, u, p] (for the "
+                            "Noble-Abel gas EOS) inside perturbed interface");
 
         primitive_outside_[0] = 1.0;
         primitive_outside_[1] = 0.0;
         primitive_outside_[2] = 1.0;
-        this->add_parameter(
-            "primitive state outside",
-            primitive_outside_,
-            "Initial primitive state (rho, u, p) outside perturbed interface");
+        this->add_parameter("primitive state outside",
+                            primitive_outside_,
+                            "1d primitive state [rho, u, p] (for the "
+                            "Noble-Abel gas EOS) outside perturbed interface");
 
         interface_radius_ = 1.0;
         this->add_parameter(
@@ -85,8 +87,20 @@ namespace ryujin
 
         const auto convert_states = [&]() {
           const auto view = hyperbolic_system_.template view<dim, Number>();
-          state_inside_ = view.from_initial_state(primitive_inside_);
-          state_outside_ = view.from_initial_state(primitive_outside_);
+
+          using state_type_1d = typename Description::
+              template HyperbolicSystemView<1, Number>::state_type;
+          static_assert(state_type_1d::dimension <=
+                        dealii::Tensor<1, 3, Number>::dimension);
+
+          state_type_1d result_inside;
+          state_type_1d result_outside;
+          for (unsigned int i = 0; i < state_type_1d::dimension; ++i) {
+            result_inside[i] = primitive_inside_[i];
+            result_outside[i] = primitive_outside_[i];
+          }
+          state_inside_ = view.from_initial_state(result_inside);
+          state_outside_ = view.from_initial_state(result_outside);
         };
         this->parse_parameters_call_back.connect(convert_states);
         convert_states();
@@ -96,10 +110,26 @@ namespace ryujin
       {
         const auto view = hyperbolic_system_.template view<dim, Number>();
 
-        /* Compute incoming shock state */
-        state_type conserved_shock_state;
-        const auto r_hat = point / point.norm();
-        {
+        /* Compute polar (and potentially azimuthal) angle: */
+        const auto x = point[0];
+        const auto y = dim > 1 ? point[1] : 0.;
+        const double theta = std::atan2(y, x);
+        double phi = 0.;
+        if constexpr (dim == 3)
+          phi = std::atan2(point[2], std::sqrt(x * x + y * y));
+
+        /* Compute perturbation for interface */
+        const auto omega = num_modes_;
+        const double perturbation =
+            amplitude_ * std::cos(omega * theta) * std::cos(omega * phi);
+
+        if (point.norm() > shock_radius_) {
+          /*
+           * Inside the incoming shock front:
+           */
+
+          const auto r_hat = point / point.norm();
+
           auto b = Number(0.);
           if constexpr (View::have_eos_interpolation_b)
             b = view.eos_interpolation_b();
@@ -136,38 +166,25 @@ namespace ryujin
               primitive_shock_state[i + 1] = -u_L * r_hat[i];
             }
           }
-          primitive_shock_state[1 + dim] = p_L;
+          if constexpr (View::have_energy_equation)
+            primitive_shock_state[1 + dim] = p_L;
 
-          conserved_shock_state =
-              view.from_initial_state(primitive_shock_state);
+          return view.from_initial_state(primitive_shock_state);
+
+        } else if (point.norm() > interface_radius_ + perturbation) {
+          /*
+           * Outside annulus between inner disc and outer shock annulus:
+           */
+
+          return state_outside_;
+
+        } else {
+          /*
+           * Inner disc:
+           */
+
+          return state_inside_;
         }
-
-        /* Compute polar (and potentially azimuthal) angle */
-        const auto x = point[0];
-        const auto y = dim > 1 ? point[1] : 0.;
-
-        const double theta = std::atan2(y, x);
-
-        double phi = 0.;
-        if constexpr (dim == 3)
-          phi = std::atan2(point[2], std::sqrt(x * x + y * y));
-
-        /* Compute perturbation for interface */
-        const auto omega = num_modes_;
-        const double perturbation =
-            amplitude_ * std::cos(omega * theta) * std::cos(omega * phi);
-
-        /* Compute state depending on location */
-        auto full_state =
-            (point.norm() > interface_radius_ + perturbation ? state_outside_
-                                                             : state_inside_);
-
-        if (point.norm() > shock_radius_) {
-          full_state = conserved_shock_state;
-        }
-
-        /* Set final state */
-        return full_state;
       }
 
     private:

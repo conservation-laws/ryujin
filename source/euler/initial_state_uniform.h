@@ -38,20 +38,14 @@ namespace ryujin
           : InitialState<Description, dim, Number>("uniform", subsection)
           , hyperbolic_system_(hyperbolic_system)
       {
-        if constexpr (View::have_energy_equation) {
-          primitive_[0] = 1.4;
-          primitive_[1] = 3.;
+        primitive_[0] = 1.4;
+        primitive_[1] = 3.;
+        if constexpr (View::have_energy_equation)
           primitive_[2] = 1.;
-          this->add_parameter("primitive state",
-                              primitive_,
-                              "Initial 1d primitive state (rho, u, p)");
-        } else {
-          primitive_[0] = 1.4;
-          primitive_[1] = 3.;
-          this->add_parameter("primitive state",
-                              primitive_,
-                              "Initial 1d primitive state (rho, u)");
-        }
+        this->add_parameter("primitive state",
+                            primitive_,
+                            "1d primitive state [rho, u, p] (or [rho, u] for "
+                            "the barotropic Euler module)");
 
         const auto convert_states = [&]() {
           const auto view = hyperbolic_system_.template view<dim, Number>();

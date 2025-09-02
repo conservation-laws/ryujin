@@ -48,37 +48,23 @@ namespace ryujin
       using View =
           typename Description::template HyperbolicSystemView<1, double>;
 
-      /*
-       * Initial state configuration that have an implementation for all
-       * Euler modules:
-       */
-
-      add(make_unique<IsentropicVortex<Description, dim, Number>>(h, s));
+      add(make_unique<AstroJet<Description, dim, Number>>(h, s));
+      add(make_unique<BeckerSolution<Description, dim, Number>>(h, s));
+      add(make_unique<Contrast<Description, dim, Number>>(h, s));
+      add(make_unique<ExactRiemannSolution<Description, dim, Number>>(h, s));
+      add(make_unique<FourStateContrast<Description, dim, Number>>(h, s));
       add(make_unique<Function<Description, dim, Number>>(h, s));
+      add(make_unique<ICFLike<Description, dim, Number>>(h, s));
+      add(make_unique<IsentropicVortex<Description, dim, Number>>(h, s));
+      add(make_unique<LeBlanc<Description, dim, Number>>(h, s));
+      add(make_unique<Noh<Description, dim, Number>>(h, s));
+      add(make_unique<RadialContrast<Description, dim, Number>>(h, s));
+      add(make_unique<RampUp<Description, dim, Number>>(h, s));
+      add(make_unique<Rarefaction<Description, dim, Number>>(h, s));
+      add(make_unique<ShockFront<Description, dim, Number>>(h, s));
+      add(make_unique<SmoothWave<Description, dim, Number>>(h, s));
+      add(make_unique<ThreeStateContrast<Description, dim, Number>>(h, s));
       add(make_unique<Uniform<Description, dim, Number>>(h, s));
-
-      /*
-       * Initial state configuration that are only implemented for the Euler
-       * modules that implement a full Euler system with a (2+dim) dimensional
-       * state:
-       */
-
-      if constexpr (View::have_energy_equation) {
-        add(make_unique<AstroJet<Description, dim, Number>>(h, s));
-        add(make_unique<BeckerSolution<Description, dim, Number>>(h, s));
-        add(make_unique<Contrast<Description, dim, Number>>(h, s));
-        add(make_unique<ExactRiemannSolution<Description, dim, Number>>(h, s));
-        add(make_unique<FourStateContrast<Description, dim, Number>>(h, s));
-        add(make_unique<ICFLike<Description, dim, Number>>(h, s));
-        add(make_unique<LeBlanc<Description, dim, Number>>(h, s));
-        add(make_unique<Noh<Description, dim, Number>>(h, s));
-        add(make_unique<RadialContrast<Description, dim, Number>>(h, s));
-        add(make_unique<RampUp<Description, dim, Number>>(h, s));
-        add(make_unique<Rarefaction<Description, dim, Number>>(h, s));
-        add(make_unique<ShockFront<Description, dim, Number>>(h, s));
-        add(make_unique<SmoothWave<Description, dim, Number>>(h, s));
-        add(make_unique<ThreeStateContrast<Description, dim, Number>>(h, s));
-      }
     }
   } // namespace EulerInitialStates
 } // namespace ryujin

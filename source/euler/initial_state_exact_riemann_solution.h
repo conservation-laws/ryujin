@@ -60,18 +60,18 @@ namespace ryujin
         primitive_left_[0] = 1.4;
         primitive_left_[1] = 0.0;
         primitive_left_[2] = 1.0;
-        this->add_parameter(
-            "primitive state left",
-            primitive_left_,
-            "Initial 1d primitive state (rho, u, p) on the left");
+        this->add_parameter("primitive state left",
+                            primitive_left_,
+                            "1d primitive state [rho, u, p] (for the "
+                            "polytropic gas EOS) on the left");
 
         primitive_right_[0] = 1.4;
         primitive_right_[1] = 0.0;
         primitive_right_[2] = 1.0;
-        this->add_parameter(
-            "primitive state right",
-            primitive_right_,
-            "Initial 1d primitive state (rho, u, p) on the right");
+        this->add_parameter("primitive state right",
+                            primitive_right_,
+                            "1d primitive state [rho, u, p] (for the "
+                            "polytropic gas EOS) on the right");
 
         // Convert the primitive states to conserved states
         const auto prepare_riemann_data = [&]() {
@@ -197,7 +197,15 @@ namespace ryujin
 #endif
         }
 
-        return view.from_initial_state(primitive_state);
+        using state_type_1d = typename Description::
+            template HyperbolicSystemView<1, Number>::state_type;
+        static_assert(state_type_1d::dimension <=
+                      dealii::Tensor<1, 3, Number>::dimension);
+
+        state_type_1d result;
+        for (unsigned int i = 0; i < state_type_1d::dimension; ++i)
+          result[i] = primitive_state[i];
+        return view.from_initial_state(result);
       }
 
     private:

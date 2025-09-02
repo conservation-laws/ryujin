@@ -210,12 +210,15 @@ namespace ryujin
 
         using state_type_1d = typename Description::
             template HyperbolicSystemView<1, Number>::state_type;
-        const auto state_1d = state_type_1d{
-            {Number(rho),
-             Number(rho * (velocity_ + v)),
-             Number(rho * (e + 0.5 * (velocity_ + v) * (velocity_ + v)))}};
 
-        return view.expand_state(state_1d);
+        state_type_1d result;
+        result[0] = Number(rho);
+        result[1] = Number(rho * (velocity_ + v));
+        if constexpr (View::have_energy_equation)
+          result[2] =
+              Number(rho * (e + 0.5 * (velocity_ + v) * (velocity_ + v)));
+
+        return view.expand_state(result);
       }
 
     private:

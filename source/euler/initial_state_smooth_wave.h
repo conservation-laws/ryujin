@@ -33,6 +33,8 @@ namespace ryujin
       using View =
           typename Description::template HyperbolicSystemView<dim, Number>;
       using state_type = typename View::state_type;
+      using state_type_1d = typename Description::
+          template HyperbolicSystemView<1, Number>::state_type;
 
       using ScalarNumber = typename View::ScalarNumber;
 
@@ -79,12 +81,11 @@ namespace ryujin
         if (left_ <= point_bar[0] && point_bar[0] <= right_)
           rho = density_ref_ + polynomial;
 
-        state_type initial_state;
-        {
-          initial_state[0] = rho;
-          initial_state[1] = mach_number_;
-          initial_state[dim + 1] = pressure_ref_;
-        }
+        state_type_1d initial_state;
+        initial_state[0] = rho;
+        initial_state[1] = mach_number_;
+        if constexpr (View::have_energy_equation)
+          initial_state[2] = pressure_ref_;
         return view.from_initial_state(initial_state);
       }
 

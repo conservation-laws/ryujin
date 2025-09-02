@@ -33,17 +33,14 @@ namespace ryujin
       using View =
           typename Description::template HyperbolicSystemView<dim, Number>;
       using state_type = typename View::state_type;
+      using state_type_1d = typename Description::
+          template HyperbolicSystemView<1, Number>::state_type;
 
       AstroJet(const HyperbolicSystem &hyperbolic_system,
                const std::string subsection)
           : InitialState<Description, dim, Number>("astro jet", subsection)
           , hyperbolic_system_(hyperbolic_system)
       {
-        gamma_ = 5. / 3.;
-        if constexpr (!View::have_gamma) {
-          this->add_parameter("gamma", gamma_, "The ratio of specific heats");
-        }
-
         jet_width_ = 0.05;
         this->add_parameter("jet width",
                             jet_width_,
@@ -51,19 +48,23 @@ namespace ryujin
 
         jet_state_[0] = 5.0;
         jet_state_[1] = 30.0;
-        jet_state_[2] = 0.4127;
+        if constexpr (View::have_energy_equation)
+          jet_state_[2] = 0.4127;
         this->add_parameter(
             "primitive jet state",
             jet_state_,
-            "Initial primitive state (rho, u, p) for jet state");
+            "1d primitive state [rho, u, p] for jet state (or [rho, u] for "
+            "the barotropic Euler module)");
 
         ambient_state_[0] = 5.0;
         ambient_state_[1] = 0.0;
-        ambient_state_[2] = 0.4127;
+        if constexpr (View::have_energy_equation)
+          ambient_state_[2] = 0.4127;
         this->add_parameter(
             "primitive ambient right",
             ambient_state_,
-            "Initial primitive state (rho, u, p) for ambient state");
+            "1d primitive state [rho, u, p] for ambient state (or [rho, u] for "
+            "the barotropic Euler module)");
 
         const auto convert_states = [&]() {
           const auto view = hyperbolic_system_.template view<dim, Number>();
@@ -84,11 +85,10 @@ namespace ryujin
     private:
       const HyperbolicSystem &hyperbolic_system_;
 
-      Number gamma_;
       Number jet_width_;
 
-      dealii::Tensor<1, 3, Number> jet_state_;
-      dealii::Tensor<1, 3, Number> ambient_state_;
+      state_type_1d jet_state_;
+      state_type_1d ambient_state_;
 
       state_type state_left_;
       state_type state_right_;
