@@ -1,0 +1,30 @@
+//
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// Copyright (C) 2023 by the ryujin authors
+//
+
+#pragma once
+
+#include <compile_time_options.h>
+
+#include "barotropic_equation_of_state.h"
+
+namespace ryujin
+{
+  namespace BarotropicEquationOfStateLibrary
+  {
+    using equation_of_state_list_type =
+        std::set<std::shared_ptr<BarotropicEquationOfState>>;
+
+    /**
+     * Populate a given container with all equation of states defined in
+     * this namespace.
+     *
+     * @ingroup EulerEquations
+     */
+    void populate_equation_of_state_list(
+        equation_of_state_list_type &equation_of_state_list,
+        const std::string &subsection);
+
+  } // namespace BarotropicEquationOfStateLibrary
+} // namespace ryujin
