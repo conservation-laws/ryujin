@@ -187,15 +187,15 @@ namespace ryujin
             hyperbolic_system_.gamma_minus_one_over_gamma_plus_one_);
       }
 
+      //@}
       /**
-       * constexpr boolean used in the EulerInitialStates namespace
+       * constexpr booleans used in the EulerInitialStates namespace
        */
-      static constexpr bool have_gamma = true;
+      //@{
 
-      /**
-       * constexpr boolean used in the EulerInitialStates namespace
-       */
+      static constexpr bool have_gamma = true;
       static constexpr bool have_eos_interpolation_b = false;
+      static constexpr bool have_energy_equation = true;
 
       //@}
       /**
