@@ -34,6 +34,8 @@ namespace ryujin
       using View =
           typename Description::template HyperbolicSystemView<dim, Number>;
       using state_type = typename View::state_type;
+      using state_type_2d = typename Description::
+          template HyperbolicSystemView<2, Number>::state_type;
 
       FourStateContrast(const HyperbolicSystem &hyperbolic_system,
                         const std::string &subsection)
@@ -44,39 +46,42 @@ namespace ryujin
         primitive_bottom_left_[0] = 1.4;
         primitive_bottom_left_[1] = 0.;
         primitive_bottom_left_[2] = 0.;
-        primitive_bottom_left_[3] = 1.;
-        this->add_parameter(
-            "primitive state bottom left",
-            primitive_bottom_left_,
-            "Initial primitive state (rho, u, v, p) on bottom left");
+        if constexpr (View::have_energy_equation)
+          primitive_bottom_left_[3] = 1.;
+        this->add_parameter("primitive state bottom left",
+                            primitive_bottom_left_,
+                            "Primitive state [rho, u, v, p] on bottom left (or "
+                            "[rho, u] for the barotropic Euler module)");
 
         primitive_bottom_right_[0] = 1.4;
         primitive_bottom_right_[1] = 0.;
         primitive_bottom_right_[2] = 0.;
-        primitive_bottom_right_[3] = 1.;
-        this->add_parameter(
-            "primitive state bottom right",
-            primitive_bottom_right_,
-            "Initial primitive state (rho, u, v, p) on bottom right");
+        if constexpr (View::have_energy_equation)
+          primitive_bottom_right_[3] = 1.;
+        this->add_parameter("primitive state bottom right",
+                            primitive_bottom_right_,
+                            "Primitive state [rho, u, v, p] on bottom right "
+                            "(or [rho, u] for the barotropic Euler module)");
 
         primitive_top_left_[0] = 1.4;
         primitive_top_left_[1] = 0.;
         primitive_top_left_[2] = 0.;
-        primitive_top_left_[3] = 1.;
-
-        this->add_parameter(
-            "primitive state top left",
-            primitive_top_left_,
-            "Initial primitive state (rho, u, v, p) on top left");
+        if constexpr (View::have_energy_equation)
+          primitive_top_left_[3] = 1.;
+        this->add_parameter("primitive state top left",
+                            primitive_top_left_,
+                            "Primitive state [rho, u, v, p] on top left (or "
+                            "[rho, u] for the barotropic Euler module)");
 
         primitive_top_right_[0] = 1.4;
         primitive_top_right_[1] = 0.;
         primitive_top_right_[2] = 0.;
-        primitive_top_right_[3] = 1.;
-        this->add_parameter(
-            "primitive state top right",
-            primitive_top_right_,
-            "Initial primitive state (rho, u, v, p) on top right");
+        if constexpr (View::have_energy_equation)
+          primitive_top_right_[3] = 1.;
+        this->add_parameter("primitive state top right",
+                            primitive_top_right_,
+                            "Primitive state [rho, u, v, p] on top right (or "
+                            "[rho, u] for the barotropic Euler module)");
 
         const auto convert_states = [&]() {
           const auto view = hyperbolic_system_.template view<dim, Number>();
@@ -111,10 +116,10 @@ namespace ryujin
     private:
       const HyperbolicSystem &hyperbolic_system_;
 
-      dealii::Tensor<1, 4, Number> primitive_bottom_left_;
-      dealii::Tensor<1, 4, Number> primitive_bottom_right_;
-      dealii::Tensor<1, 4, Number> primitive_top_left_;
-      dealii::Tensor<1, 4, Number> primitive_top_right_;
+      state_type_2d primitive_bottom_left_;
+      state_type_2d primitive_bottom_right_;
+      state_type_2d primitive_top_left_;
+      state_type_2d primitive_top_right_;
 
       state_type state_bottom_left_;
       state_type state_bottom_right_;

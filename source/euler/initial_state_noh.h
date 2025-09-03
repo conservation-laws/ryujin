@@ -96,15 +96,18 @@ namespace ryujin
           rho = rho0_ * std::pow(1. + t / (norm + min), dim - 1);
         }
 
-        /* Set final state */
-        if constexpr (dim == 1)
-          return view.from_initial_state(state_type{{rho, Number(vel[0]), p}});
-        else if constexpr (dim == 2)
-          return view.from_initial_state(
-              state_type{{rho, Number(vel[0]), Number(vel[1]), p}});
-        else
-          return view.from_initial_state(state_type{
-              {rho, Number(vel[0]), Number(vel[1]), Number(vel[2]), p}});
+        /* Assemble final state: */
+        state_type result;
+        result[0] = rho;
+        result[1] = Number(vel[0]);
+        if constexpr (dim >= 2)
+          result[2] = Number(vel[1]);
+        if constexpr (dim >= 3)
+          result[3] = Number(vel[2]);
+        if constexpr (View::have_energy_equation)
+          result[dim + 1] = p;
+
+        return view.from_initial_state(result);
       }
 
     private:

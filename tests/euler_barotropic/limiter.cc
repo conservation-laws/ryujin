@@ -1,0 +1,116 @@
+// force distinct symbols in test
+#define EulerBarotropic EulerBarotropicTest
+
+#include <hyperbolic_system.h>
+#include <multicomponent_vector.h>
+#include <simd.h>
+
+#include <limiter.h>
+
+#define DEBUG_EXPENSIVE_BOUNDS_CHECK
+#define DEBUG_OUTPUT
+#define DEBUG_OUTPUT_LIMITER
+#include <limiter.template.h>
+
+using namespace ryujin::EulerBarotropic;
+using namespace ryujin;
+using namespace dealii;
+
+int main()
+{
+  constexpr int dim = 1;
+
+  HyperbolicSystem hyperbolic_system;
+  Limiter<dim, double>::Parameters limiter_parameters;
+
+  using state_type = HyperbolicSystemView<dim, double>::state_type;
+
+  using bounds_type = Limiter<dim, double>::Bounds;
+
+  static constexpr unsigned int n_precomputed_values =
+      HyperbolicSystemView<dim, double>::n_precomputed_values;
+
+  using precomputed_type =
+      Vectors::MultiComponentVector<double, n_precomputed_values>;
+  precomputed_type dummy;
+
+  Limiter<dim, double> limiter(hyperbolic_system, limiter_parameters, dummy);
+
+  const auto view = hyperbolic_system.template view<dim, double>();
+
+  const auto test =
+      [&](const state_type &U, const state_type &P, const bounds_type &bounds) {
+        std::cout << "State: " << U << "\nDensity: " << view.density(U)
+                  << "\nBounds: " << bounds[0] << " " << bounds[1] << std::endl;
+
+        const auto &[l, success] = limiter.limit(bounds, U, P);
+
+        std::cout << "l: " << l;
+        if (success)
+          std::cout << "\nSuccess!";
+        else
+          std::cout << "\nFailure!";
+        std::cout << std::endl;
+      };
+
+  std::cout << std::setprecision(16);
+  std::cout << std::scientific;
+
+  {
+    std::cout << "\n\nChecking exceptional cases:" << std::endl;
+
+    std::cout << "\nMinimum density violation:" << std::endl;
+    auto U = state_type{{0.8, 1.4}};
+    auto P = state_type{{-0.1, 0.1}};
+    auto bounds = bounds_type{0.9, 1.1};
+    test(U, P, bounds);
+
+    std::cout << "\nMinimum density violation (eps):" << std::endl;
+    U = state_type{{0.9 - 1.0e-10, 1.4}};
+    P = state_type{{-1.0e-20, 0.1}};
+    bounds = bounds_type{0.9, 1.1};
+    test(U, P, bounds);
+
+    std::cout << "\nMaximum density violation:" << std::endl;
+    U = state_type{{1.2, 1.4}};
+    P = state_type{{0.1, 0.1}};
+    bounds = bounds_type{0.9, 1.1};
+    test(U, P, bounds);
+
+    std::cout << "\nMaximum density violation (eps):" << std::endl;
+    U = state_type{{1.1 + 1.0e-10, 1.4}};
+    P = state_type{{1.0e-20, 0.1}};
+    bounds = bounds_type{0.9, 1.1};
+    test(U, P, bounds);
+  }
+
+  {
+    std::cout << "\n\nChecking individual limiter components:" << std::endl;
+
+    std::cout << "\nMinimum density bound" << std::endl;
+    auto U = state_type{{1.0, 1.4}};
+    auto P = state_type{{-0.2, 0.1}};
+    auto bounds = bounds_type{0.9, 1.1};
+    test(U, P, bounds);
+
+    std::cout << "\nMinimum density bound (eps):" << std::endl;
+    U = state_type{{0.9 + 1.0e-10, 1.4}};
+    P = state_type{{-5.0e-10, 0.1}};
+    bounds = bounds_type{0.9, 1.1};
+    test(U, P, bounds);
+
+    std::cout << "\nMaximum density bound" << std::endl;
+    U = state_type{{1.0, 1.4}};
+    P = state_type{{0.2, 0.1}};
+    bounds = bounds_type{0.9, 1.1};
+    test(U, P, bounds);
+
+    std::cout << "\nMaximum density bound (eps):" << std::endl;
+    U = state_type{{1.1 - 1.0e-10, 1.4}};
+    P = state_type{{5.0e-10, 0.1}};
+    bounds = bounds_type{0.9, 1.1};
+    test(U, P, bounds);
+  }
+
+  return 0;
+}

@@ -300,17 +300,15 @@ namespace ryujin
         return ScalarNumber(eos->interpolation_q());
       }
 
-
+      //@}
       /**
-       * constexpr boolean used in the EulerInitialStates namespace
+       * constexpr booleans used in the EulerInitialStates namespace
        */
+      //@{
+
       static constexpr bool have_gamma = false;
-
-      /**
-       * constexpr boolean used in the EulerInitialStates namespace
-       */
       static constexpr bool have_eos_interpolation_b = true;
-
+      static constexpr bool have_energy_equation = true;
 
       //@}
       /**

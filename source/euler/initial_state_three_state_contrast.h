@@ -34,6 +34,8 @@ namespace ryujin
       using View =
           typename Description::template HyperbolicSystemView<dim, Number>;
       using state_type = typename View::state_type;
+      using state_type_1d = typename Description::
+          template HyperbolicSystemView<1, Number>::state_type;
 
       ThreeStateContrast(const HyperbolicSystem &hyperbolic_system,
                          const std::string &subsection)
@@ -44,11 +46,12 @@ namespace ryujin
 
         primitive_left_[0] = 1.;
         primitive_left_[1] = 0.;
-        primitive_left_[2] = 1.e3;
-        this->add_parameter(
-            "primitive state left",
-            primitive_left_,
-            "Initial 1d primitive state (rho, u, p) on the left");
+        if constexpr (View::have_energy_equation)
+          primitive_left_[2] = 1.e3;
+        this->add_parameter("primitive state left",
+                            primitive_left_,
+                            "1d primitive state [rho, u, p] on the left (or "
+                            "[rho, u] for the barotropic Euler module)");
 
         left_length_ = 0.1;
         this->add_parameter("left region length",
@@ -57,11 +60,12 @@ namespace ryujin
 
         primitive_middle_[0] = 1.;
         primitive_middle_[1] = 0.;
-        primitive_middle_[2] = 1.e-2;
-        this->add_parameter(
-            "primitive state middle",
-            primitive_middle_,
-            "Initial 1d primitive state (rho, u, p) in the middle");
+        if constexpr (View::have_energy_equation)
+          primitive_middle_[2] = 1.e-2;
+        this->add_parameter("primitive state middle",
+                            primitive_middle_,
+                            "1d primitive state [rho, u, p] in the middle (or "
+                            "[rho, u] for the barotropic Euler module)");
 
         middle_length_ = 0.8;
         this->add_parameter("middle region length",
@@ -70,11 +74,12 @@ namespace ryujin
 
         primitive_right_[0] = 1.;
         primitive_right_[1] = 0.;
-        primitive_right_[2] = 1.e2;
-        this->add_parameter(
-            "primitive state right",
-            primitive_right_,
-            "Initial 1d primitive state (rho, u, p) on the right");
+        if constexpr (View::have_energy_equation)
+          primitive_right_[2] = 1.e2;
+        this->add_parameter("primitive state right",
+                            primitive_right_,
+                            "1d primitive state [rho, u, p] on the right (or "
+                            "[rho, u] for the barotropic Euler module)");
 
         const auto convert_states = [&]() {
           const auto view = hyperbolic_system_.template view<dim, Number>();
@@ -99,9 +104,9 @@ namespace ryujin
       Number left_length_;
       Number middle_length_;
 
-      dealii::Tensor<1, 3, Number> primitive_left_;
-      dealii::Tensor<1, 3, Number> primitive_middle_;
-      dealii::Tensor<1, 3, Number> primitive_right_;
+      state_type_1d primitive_left_;
+      state_type_1d primitive_middle_;
+      state_type_1d primitive_right_;
 
       state_type state_left_;
       state_type state_middle_;

@@ -149,8 +149,9 @@ namespace ryujin
           const auto &[rho, u, p, c] = primitive;
           conserved_state[0] = rho;
           conserved_state[1] = rho * u;
-          conserved_state[dim + 1] =
-              p / Number(gamma_ - 1.) + Number(0.5) * rho * u * u;
+          if constexpr (View::have_energy_equation)
+            conserved_state[dim + 1] =
+                p / Number(gamma_ - 1.) + Number(0.5) * rho * u * u;
         }
         return conserved_state;
       }

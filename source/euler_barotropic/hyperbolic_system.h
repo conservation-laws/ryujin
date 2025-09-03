@@ -7,6 +7,8 @@
 
 #include <compile_time_options.h>
 
+#include "barotropic_equation_of_state_library.h"
+
 #include <convenience_macros.h>
 #include <discretization.h>
 #include <multicomponent_vector.h>
@@ -22,18 +24,41 @@
 
 namespace ryujin
 {
-  namespace Euler
+  namespace EulerBarotropic
   {
+    /*
+     * For various divisions in the barotropic equation of state module we
+     * have a mathematical guarantee that the numerator and denominator are
+     * nonnegative and the limit (of zero numerator and denominator) must
+     * converge to zero. The following function takes care of rounding
+     * issues when computing such quotients by (a) avoiding division by
+     * zero and (b) ensuring non-negativity of the result.
+     */
+    template <typename Number>
+    DEAL_II_ALWAYS_INLINE inline Number safe_division(const Number &numerator,
+                                                      const Number &denominator)
+    {
+      using ScalarNumber = typename get_value_type<Number>::type;
+      constexpr ScalarNumber min = std::numeric_limits<ScalarNumber>::min();
+
+      return std::max(numerator, Number(0.)) /
+             std::max(denominator, Number(min));
+    }
+
+
     template <int dim, typename Number>
     class HyperbolicSystemView;
 
     /**
      * The compressible Euler equations of gas dynamics. Specialized
-     * implementation for a polytropic gas equation.
+     * implementation for a subclass of barotropic equations of state where
+     * the pressure, internal energy and entropies are a function of the
+     * density. We use a specialied Riemann solver, entropy viscosity
+     * commutator, and limiter for this class of equations.
      *
-     * We have a (2 + dim) dimensional state space \f$[\rho, \textbf m,
-     * E]\f$, where \f$\rho\f$ denotes the density, \f$\textbf m\f$ is the
-     * momentum, and \f$E\f$ is the total energy.
+     * We have a (1 + dim) dimensional state space \f$[\rho, \textbf m]\f$,
+     * where \f$\rho\f$ denotes the density, \f$\textbf m\f$ is the
+     * momentum.
      *
      * @ingroup EulerEquations
      */
@@ -43,8 +68,8 @@ namespace ryujin
       /**
        * The name of the hyperbolic system as a string.
        */
-      static inline const std::string problem_name =
-          "Compressible Euler equations (polytropic gas EOS, optimized)";
+      static inline std::string problem_name =
+          "Compressible Euler equations (barotropic EOS, optimized barotropic)";
 
       /**
        * Constructor.
@@ -68,16 +93,19 @@ namespace ryujin
        * @name Runtime parameters, internal fields, methods, and friends
        */
       //@{
-      double gamma_;
 
+      std::string barotropic_equation_of_state_;
       double reference_density_;
       double vacuum_state_relaxation_small_;
       double vacuum_state_relaxation_large_;
 
-      double gamma_inverse_;
-      double gamma_minus_one_inverse_;
-      double gamma_minus_one_over_gamma_plus_one_;
-      double gamma_plus_one_inverse_;
+      BarotropicEquationOfStateLibrary::equation_of_state_list_type
+          barotropic_equation_of_state_list_;
+
+      using BarotropicEquationOfState =
+          BarotropicEquationOfStateLibrary::BarotropicEquationOfState;
+      std::shared_ptr<BarotropicEquationOfState>
+          selected_barotropic_equation_of_state_;
 
       template <int dim, typename Number>
       friend class HyperbolicSystemView;
@@ -133,9 +161,10 @@ namespace ryujin
        */
       //@{
 
-      DEAL_II_ALWAYS_INLINE inline ScalarNumber gamma() const
+      DEAL_II_ALWAYS_INLINE inline const std::string &
+      barotropic_equation_of_state() const
       {
-        return hyperbolic_system_.gamma_;
+        return hyperbolic_system_.barotropic_equation_of_state_;
       }
 
       DEAL_II_ALWAYS_INLINE inline ScalarNumber reference_density() const
@@ -157,34 +186,69 @@ namespace ryujin
 
       //@}
       /**
-       * @name Access to cached inverses
-       *
-       * A collection of commonly used expressions with gamma that would
-       * otherwise need to be recomputed many times putting unnecessary
-       * pressure on the div/sqrt ALU unit.
+       * @name Low-level access to the selected equation of state.
        */
       //@{
 
-      DEAL_II_ALWAYS_INLINE inline ScalarNumber gamma_inverse() const
+      /**
+       * For a given density \f$\rho\f$ return the
+       * <i>specific</i> internal energy \f$e\f$.
+       */
+      DEAL_II_ALWAYS_INLINE inline Number
+      beos_specific_internal_energy(const Number &rho) const
       {
-        return ScalarNumber(hyperbolic_system_.gamma_inverse_);
+        const auto &beos =
+            hyperbolic_system_.selected_barotropic_equation_of_state_;
+
+        if constexpr (std::is_same_v<ScalarNumber, Number>) {
+          return ScalarNumber(beos->specific_internal_energy(rho));
+        } else {
+          Number e;
+          for (unsigned int k = 0; k < Number::size(); ++k) {
+            e[k] = ScalarNumber(beos->specific_internal_energy(rho[k]));
+          }
+          return e;
+        }
       }
 
-      DEAL_II_ALWAYS_INLINE inline ScalarNumber gamma_plus_one_inverse() const
+      /**
+       * For a given density \f$\rho\f$ return the pressure \f$p\f$.
+       */
+      DEAL_II_ALWAYS_INLINE inline Number beos_pressure(const Number &rho) const
       {
-        return ScalarNumber(hyperbolic_system_.gamma_plus_one_inverse_);
+        const auto &beos =
+            hyperbolic_system_.selected_barotropic_equation_of_state_;
+
+        if constexpr (std::is_same_v<ScalarNumber, Number>) {
+          return ScalarNumber(beos->pressure(rho));
+        } else {
+          Number p;
+          for (unsigned int k = 0; k < Number::size(); ++k) {
+            p[k] = ScalarNumber(beos->pressure(rho[k]));
+          }
+          return p;
+        }
       }
 
-      DEAL_II_ALWAYS_INLINE inline ScalarNumber gamma_minus_one_inverse() const
+      /**
+       * For a given density \f$\rho\f$ and <i>specific</i> internal
+       * energy \f$e\f$ return the sound speed \f$a\f$.
+       */
+      DEAL_II_ALWAYS_INLINE inline Number
+      beos_speed_of_sound(const Number &rho) const
       {
-        return ScalarNumber(hyperbolic_system_.gamma_minus_one_inverse_);
-      }
+        const auto &beos =
+            hyperbolic_system_.selected_barotropic_equation_of_state_;
 
-      DEAL_II_ALWAYS_INLINE inline ScalarNumber
-      gamma_minus_one_over_gamma_plus_one() const
-      {
-        return ScalarNumber(
-            hyperbolic_system_.gamma_minus_one_over_gamma_plus_one_);
+        if constexpr (std::is_same_v<ScalarNumber, Number>) {
+          return ScalarNumber(beos->speed_of_sound(rho));
+        } else {
+          Number a;
+          for (unsigned int k = 0; k < Number::size(); ++k) {
+            a[k] = ScalarNumber(beos->speed_of_sound(rho[k]));
+          }
+          return a;
+        }
       }
 
       //@}
@@ -193,9 +257,9 @@ namespace ryujin
        */
       //@{
 
-      static constexpr bool have_gamma = true;
+      static constexpr bool have_gamma = false;
       static constexpr bool have_eos_interpolation_b = false;
-      static constexpr bool have_energy_equation = true;
+      static constexpr bool have_energy_equation = false;
 
       //@}
       /**
@@ -216,7 +280,7 @@ namespace ryujin
       /**
        * The dimension of the state space.
        */
-      static constexpr unsigned int problem_dimension = 2 + dim;
+      static constexpr unsigned int problem_dimension = 1 + dim;
 
       /**
        * Storage type for a (conserved) state vector \f$\boldsymbol U\f$.
@@ -241,11 +305,11 @@ namespace ryujin
       static inline const auto component_names =
           []() -> std::array<std::string, problem_dimension> {
         if constexpr (dim == 1)
-          return {"rho", "m", "E"};
+          return {"rho", "m"};
         else if constexpr (dim == 2)
-          return {"rho", "m_1", "m_2", "E"};
+          return {"rho", "m_1", "m_2"};
         else if constexpr (dim == 3)
-          return {"rho", "m_1", "m_2", "m_3", "E"};
+          return {"rho", "m_1", "m_2", "m_3"};
         __builtin_trap();
       }();
 
@@ -256,18 +320,18 @@ namespace ryujin
       static inline const auto primitive_component_names =
           []() -> std::array<std::string, problem_dimension> {
         if constexpr (dim == 1)
-          return {"rho", "v", "p"};
+          return {"rho", "v"};
         else if constexpr (dim == 2)
-          return {"rho", "v_1", "v_2", "p"};
+          return {"rho", "v_1", "v_2"};
         else if constexpr (dim == 3)
-          return {"rho", "v_1", "v_2", "v_3", "p"};
+          return {"rho", "v_1", "v_2", "v_3"};
         __builtin_trap();
       }();
 
       /**
        * The number of precomputed values.
        */
-      static constexpr unsigned int n_precomputed_values = 2;
+      static constexpr unsigned int n_precomputed_values = 3;
 
       /**
        * Array type used for precomputed values.
@@ -278,7 +342,7 @@ namespace ryujin
        * An array holding all component names of the precomputed values.
        */
       static inline const auto precomputed_names =
-          std::array<std::string, n_precomputed_values>{"s", "eta_h"};
+          std::array<std::string, n_precomputed_values>{{"e", "p", "a"}};
 
       /**
        * The number of precomputed initial values.
@@ -354,13 +418,13 @@ namespace ryujin
       //@{
 
       /**
-       * For a given (2+dim dimensional) state vector <code>U</code>, return
+       * For a given (1+dim dimensional) state vector <code>U</code>, return
        * the density <code>U[0]</code>
        */
       static Number density(const state_type &U);
 
       /**
-       * Given a density @p rho this function returns 0 if the magniatude
+       * Given a density @p rho this function returns 0 if the magnitude
        * of rho is smaller or equal than relaxation_large * rho_cutoff.
        * Otherwise rho is returned unmodified. Here, rho_cutoff is the
        * reference density multiplied by eps.
@@ -368,90 +432,29 @@ namespace ryujin
       Number filter_vacuum_density(const Number &rho) const;
 
       /**
-       * For a given (2+dim dimensional) state vector <code>U</code>, return
+       * For a given (1+dim dimensional) state vector <code>U</code>, return
        * the momentum vector <code>[U[1], ..., U[1+dim]]</code>.
        */
       static dealii::Tensor<1, dim, Number> momentum(const state_type &U);
 
       /**
-       * For a given (2+dim dimensional) state vector <code>U</code>, return
-       * the total energy <code>U[1+dim]</code>
-       */
-      static Number total_energy(const state_type &U);
-
-      /**
-       * For a given (2+dim dimensional) state vector <code>U</code>, compute
-       * and return the internal energy \f$\varepsilon = (\rho e)\f$.
-       */
-      static Number internal_energy(const state_type &U);
-
-      /**
-       * For a given (2+dim dimensional) state vector <code>U</code>, compute
-       * and return the derivative of the internal energy
-       * \f$\varepsilon = (\rho e)\f$.
-       */
-      static state_type internal_energy_derivative(const state_type &U);
-
-      /**
-       * For a given (2+dim dimensional) state vector <code>U</code>, compute
-       * and return the pressure \f$p\f$.
-       *
-       * We assume that the pressure is given by a polytropic equation of
-       * state, i.e.,
+       * For a given (1+dim dimensional) barotropic state vector
+       * <code>U</code>, compute and return the total energy of the system.
        * \f[
-       *   p = (\gamma - 1)\;(\rho e)
+       *   \eta = \rho e(\rho) + \frac12\rho&{-1}|\vec m|^2
        * \f]
        */
-      Number pressure(const state_type &U) const;
+      Number total_energy(const state_type &U,
+                          const Number &specific_internal_energy) const;
 
       /**
-       * For a given (2+dim dimensional) state vector <code>U</code>, compute
-       * the (physical) speed of sound:
-       * \f[
-       *   c^2 = \frac{\gamma\,p}{\rho}
-       * \f]
+       * For a given (1+dim dimensional) barotropic state vector
+       * <code>U</code>, compute and return the derivative \f$\eta'\f$ of
+       * the total energy.
        */
-      Number speed_of_sound(const state_type &U) const;
-
-      /**
-       * For a given (2+dim dimensional) state vector <code>U</code>, compute
-       * and return the (scaled) specific entropy
-       * \f[
-       *   e^{(\gamma-1)s} = \frac{\rho\,e}{\rho^\gamma}.
-       * \f]
-       */
-      Number specific_entropy(const state_type &U) const;
-
-      /**
-       * For a given (2+dim dimensional) state vector <code>U</code>, compute
-       * and return the Harten-type entropy
-       * \f[
-       *   \eta = (\rho^2 e) ^ {1 / (\gamma + 1)}.
-       * \f]
-       */
-      Number harten_entropy(const state_type &U) const;
-
-      /**
-       * For a given (2+dim dimensional) state vector <code>U</code>, compute
-       * and return the derivative \f$\eta'\f$ of the Harten-type entropy
-       * \f[
-       *   \eta = (\rho^2 e) ^ {1 / (\gamma + 1)}.
-       * \f]
-       */
-      state_type harten_entropy_derivative(const state_type &U) const;
-
-      /**
-       * For a given (2+dim dimensional) state vector <code>U</code>, compute
-       * and return the entropy \f$\eta = p^{1/\gamma}\f$.
-       */
-      Number mathematical_entropy(const state_type &U) const;
-
-      /**
-       * For a given (2+dim dimensional) state vector <code>U</code>, compute
-       * and return the derivative \f$\eta'\f$ of the entropy \f$\eta =
-       * p^{1/\gamma}\f$.
-       */
-      state_type mathematical_entropy_derivative(const state_type &U) const;
+      state_type total_energy_derivative(const state_type &U,
+                                         const Number &specific_internal_energy,
+                                         const Number &pressure) const;
 
       /**
        * Returns whether the state @p U is admissible. If @p U is a
@@ -467,16 +470,6 @@ namespace ryujin
       //@{
 
       /**
-       * For a given state @p U and normal direction @p normal returns the
-       * n-th pair of left and right eigenvectors of the linearized normal
-       * flux.
-       */
-      template <int component>
-      std::array<state_type, 2> linearized_eigenvector(
-          const state_type &U,
-          const dealii::Tensor<1, dim, Number> &normal) const;
-
-      /**
        * Decomposes a given state @p U into Riemann invariants and then
        * replaces the first or second Riemann characteristic from the one
        * taken from @p U_bar state. Note that the @p U_bar state is just the
@@ -485,7 +478,9 @@ namespace ryujin
       template <int component>
       state_type prescribe_riemann_characteristic(
           const state_type &U,
+          const Number &p,
           const state_type &U_bar,
+          const Number &p_bar,
           const dealii::Tensor<1, dim, Number> &normal) const;
 
       /**
@@ -520,16 +515,15 @@ namespace ryujin
       //@{
 
       /**
-       * Given a state @p U compute the flux
+       * Given a state @p U and a pressure @p p compute the flux
        * \f[
        * \begin{pmatrix}
        *   \textbf m \\
-       *   \textbf v\otimes \textbf m + p\mathbb{I}_d \\
-       *   \textbf v(E+p)
+       *   \textbf v\otimes \textbf m + p\mathbb{I}_d
        * \end{pmatrix},
        * \f]
        */
-      flux_type f(const state_type &U) const;
+      flux_type f(const state_type &U, const Number &p) const;
 
       /**
        * Given a state @p U_i and an index @p i compute flux contributions.
@@ -552,13 +546,13 @@ namespace ryujin
        */
       flux_contribution_type
       flux_contribution(const PrecomputedVector &pv,
-                        const InitialPrecomputedVector &ipv,
+                        const InitialPrecomputedVector &piv,
                         const unsigned int i,
                         const state_type &U_i) const;
 
       flux_contribution_type
       flux_contribution(const PrecomputedVector &pv,
-                        const InitialPrecomputedVector &ipv,
+                        const InitialPrecomputedVector &piv,
                         const unsigned int *js,
                         const state_type &U_j) const;
 
@@ -571,7 +565,9 @@ namespace ryujin
                       const flux_contribution_type &flux_j,
                       const dealii::Tensor<1, dim, Number> &c_ij) const;
 
-      /** The low-order and high-order fluxes are the same */
+      /**
+       * The low-order and high-order fluxes are the same:
+       */
       static constexpr bool have_high_order_flux = false;
 
       state_type high_order_flux_divergence(
@@ -579,13 +575,12 @@ namespace ryujin
           const flux_contribution_type &flux_j,
           const dealii::Tensor<1, dim, Number> &c_ij) const = delete;
 
-      //@}
       /**
        * @name Computing stencil source terms
        */
       //@{
 
-      /** We do not have source terms: */
+      /** We do not have source terms */
       static constexpr bool have_source_terms = false;
 
       state_type nodal_source(const PrecomputedVector &pv,
@@ -619,34 +614,32 @@ namespace ryujin
 
       /**
        * Given an initial state [rho, u_1, ..., u_d, p] return a
-       * conserved state [rho, m_1, ..., m_d, E].
-       *
-       * This function simply calls from_primitive_state() and
-       * expand_state().
+       * conserved state [rho, m_1, ..., m_d, E]. Most notably, the
+       * specific equation of state oracle is queried to convert the
+       * pressure value into a specific internal energy.
        *
        * @note This function is used to conveniently convert (user
        * provided) primitive initial states with pressure values to a
        * conserved state in the EulerInitialStateLibrary. As such, this
        * function is implemented in the Euler::HyperbolicSystem and
-       * EulerAEOS::HyperbolicSystem classes.
+       * EulerBarotropic::HyperbolicSystem classes.
        */
       template <typename ST>
       state_type from_initial_state(const ST &initial_state) const;
 
       /**
-       * Given a primitive state [rho, u_1, ..., u_d, p] return a conserved
-       * state
+       * Given a primitive state [rho, v_1, ..., v_d] return a conserved
+       * state.
        */
       state_type from_primitive_state(const state_type &primitive_state) const;
 
       /**
-       * Given a conserved state return a primitive state [rho, u_1, ..., u_d,
-       * p]
+       * Given a conserved state return a primitive state [rho, v_1, ..., v_d]
        */
       state_type to_primitive_state(const state_type &state) const;
 
       /**
-       * Transform the current state according to a  given operator
+       * Transform the current state according to a given operator
        * @p lambda acting on a @a dim dimensional momentum (or velocity)
        * vector.
        */
@@ -664,11 +657,15 @@ namespace ryujin
      */
 
 
-    inline HyperbolicSystem::HyperbolicSystem(const std::string &subsection)
+    inline HyperbolicSystem::HyperbolicSystem(
+        const std::string &subsection /*= "HyperbolicSystem"*/)
         : ParameterAcceptor(subsection)
     {
-      gamma_ = 7. / 5.;
-      add_parameter("gamma", gamma_, "The ratio of specific heats");
+      barotropic_equation_of_state_ = "isothermal";
+      add_parameter("barotropic equation of state",
+                    barotropic_equation_of_state_,
+                    "The barotropic equation of state. Valid names are given "
+                    "by any of the subsections defined below");
 
       reference_density_ = 1.;
       add_parameter("reference density",
@@ -686,18 +683,33 @@ namespace ryujin
                     "Problem specific vacuum relaxation parameter");
 
       /*
-       * Precompute a number of derived gamma coefficients that contain
-       * divisions:
+       * And finally populate the equation of state list with all equation of
+       * state configurations defined in the EquationOfState namespace:
        */
-      const auto compute_inverses = [this] {
-        gamma_inverse_ = 1. / gamma_;
-        gamma_plus_one_inverse_ = 1. / (gamma_ + 1.);
-        gamma_minus_one_inverse_ = 1. / (gamma_ - 1.);
-        gamma_minus_one_over_gamma_plus_one_ = (gamma_ - 1.) / (gamma_ + 1.);
+      BarotropicEquationOfStateLibrary::populate_equation_of_state_list(
+          barotropic_equation_of_state_list_, subsection);
+
+      const auto populate_functions = [this]() {
+        bool initialized = false;
+        for (auto &it : barotropic_equation_of_state_list_)
+
+          /* Populate EOS-specific quantities and functions */
+          if (it->name() == barotropic_equation_of_state_) {
+            selected_barotropic_equation_of_state_ = it;
+            problem_name = "Compressible Euler equations (" + it->name() +
+                           " EOS, optimized barotropic)";
+            initialized = true;
+            break;
+          }
+
+        AssertThrow(initialized,
+                    dealii::ExcMessage("Could not find a barotropic equation "
+                                       "of state description with name \"" +
+                                       barotropic_equation_of_state_ + "\""));
       };
 
-      compute_inverses();
-      ParameterAcceptor::parse_parameters_call_back.connect(compute_inverses);
+      ParameterAcceptor::parse_parameters_call_back.connect(populate_functions);
+      populate_functions();
     }
 
 
@@ -713,7 +725,7 @@ namespace ryujin
         unsigned int right,
         const bool skip_constrained_dofs /*= true*/) const
     {
-      Assert(cycle == 0, dealii::ExcInternalError());
+      Assert(cycle == 0 || cycle == 1, dealii::ExcInternalError());
 
       const auto &U = std::get<0>(state_vector);
       auto &precomputed = std::get<1>(state_vector);
@@ -724,7 +736,6 @@ namespace ryujin
 
       RYUJIN_OMP_FOR
       for (unsigned int i = left; i < right; i += stride_size) {
-
         /* Skip constrained degrees of freedom: */
         const unsigned int row_length = sparsity_simd.row_length(i);
         if (skip_constrained_dofs && row_length == 1)
@@ -733,8 +744,13 @@ namespace ryujin
         dispatch_check(i);
 
         const auto U_i = U.template get_tensor<Number>(i);
-        const precomputed_type prec_i{specific_entropy(U_i),
-                                      harten_entropy(U_i)};
+        const auto rho_i = density(U_i);
+
+        const auto e_i = beos_specific_internal_energy(rho_i);
+        const auto p_i = beos_pressure(rho_i);
+        const auto a_i = beos_speed_of_sound(rho_i);
+
+        const precomputed_type prec_i{e_i, p_i, a_i};
         precomputed.template write_tensor<Number>(prec_i, i);
       }
     }
@@ -775,179 +791,36 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline Number
-    HyperbolicSystemView<dim, Number>::total_energy(const state_type &U)
+    HyperbolicSystemView<dim, Number>::total_energy(
+        const state_type &U, const Number &specific_internal_energy) const
     {
-      return U[1 + dim];
-    }
-
-
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    HyperbolicSystemView<dim, Number>::internal_energy(const state_type &U)
-    {
-      /*
-       * rho e = (E - 1/2*m^2/rho)
-       */
-      const Number rho_inverse = ScalarNumber(1.) / density(U);
+      const auto rho = density(U);
+      const auto rho_inverse = ScalarNumber(1.) / rho;
       const auto m = momentum(U);
-      const Number E = total_energy(U);
-      return E - ScalarNumber(0.5) * m.norm_square() * rho_inverse;
+
+      return rho * specific_internal_energy +
+             ScalarNumber(0.5) * rho_inverse * m.norm_square();
     }
 
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::internal_energy_derivative(
-        const state_type &U) -> state_type
+    HyperbolicSystemView<dim, Number>::total_energy_derivative(
+        const state_type &U,
+        const Number &specific_internal_energy,
+        const Number &pressure) const -> state_type
     {
-      /*
-       * With
-       *   rho e = E - 1/2 |m|^2 / rho
-       * we get
-       *   (rho e)' = (1/2m^2/rho^2, -m/rho , 1 )^T
-       */
-
-      const Number rho_inverse = ScalarNumber(1.) / density(U);
-      const auto u = momentum(U) * rho_inverse;
+      const auto rho = density(U);
+      const auto rho_inverse = ScalarNumber(1.) / rho;
+      const auto m = momentum(U);
 
       state_type result;
 
-      result[0] = ScalarNumber(0.5) * u.norm_square();
-      for (unsigned int i = 0; i < dim; ++i) {
-        result[1 + i] = -u[i];
-      }
-      result[dim + 1] = ScalarNumber(1.);
-
-      return result;
-    }
-
-
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    HyperbolicSystemView<dim, Number>::pressure(const state_type &U) const
-    {
-      /* p = (gamma - 1) * (rho e) */
-      return (gamma() - ScalarNumber(1.)) * internal_energy(U);
-    }
-
-
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    HyperbolicSystemView<dim, Number>::speed_of_sound(const state_type &U) const
-    {
-      /* c^2 = gamma * p / rho */
-      const Number rho_inverse = ScalarNumber(1.) / density(U);
-      const Number p = pressure(U);
-      return std::sqrt(gamma() * p * rho_inverse);
-    }
-
-
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    HyperbolicSystemView<dim, Number>::specific_entropy(
-        const state_type &U) const
-    {
-      /* exp((gamma - 1)s) = (rho e) / rho ^ gamma */
-      const auto rho_inverse = ScalarNumber(1.) / density(U);
-      return internal_energy(U) * ryujin::pow(rho_inverse, gamma());
-    }
-
-
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    HyperbolicSystemView<dim, Number>::harten_entropy(const state_type &U) const
-    {
-      /* rho^2 e = \rho E - 1/2*m^2 */
-
-      const Number rho = density(U);
-      const auto m = momentum(U);
-      const Number E = total_energy(U);
-
-      const Number rho_rho_e = rho * E - ScalarNumber(0.5) * m.norm_square();
-      return ryujin::pow(rho_rho_e, gamma_plus_one_inverse());
-    }
-
-
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::harten_entropy_derivative(
-        const state_type &U) const -> state_type
-    {
-      /*
-       * With
-       *   eta = (rho^2 e) ^ 1/(gamma+1)
-       *   rho^2 e = rho * E - 1/2 |m|^2
-       *
-       * we get
-       *
-       *   eta' = 1/(gamma+1) * (rho^2 e) ^ -gamma/(gamma+1) * (E,-m,rho)^T
-       *
-       */
-
-      const Number rho = density(U);
-      const auto m = momentum(U);
-      const Number E = total_energy(U);
-
-      const Number rho_rho_e = rho * E - ScalarNumber(0.5) * m.norm_square();
-
-      const auto factor =
-          gamma_plus_one_inverse() *
-          ryujin::pow(rho_rho_e, -gamma() * gamma_plus_one_inverse());
-
-      state_type result;
-
-      result[0] = factor * E;
+      result[0] =
+          specific_internal_energy + rho_inverse * pressure -
+          ScalarNumber(0.5) * rho_inverse * rho_inverse * m.norm_square();
       for (unsigned int i = 0; i < dim; ++i)
-        result[1 + i] = -factor * m[i];
-      result[dim + 1] = factor * rho;
-
-      return result;
-    }
-
-
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline Number
-    HyperbolicSystemView<dim, Number>::mathematical_entropy(
-        const state_type &U) const
-    {
-      using ScalarNumber = typename get_value_type<Number>::type;
-      const auto p = pressure(U);
-      return ryujin::pow(p, gamma_inverse());
-    }
-
-
-    template <int dim, typename Number>
-    DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::mathematical_entropy_derivative(
-        const state_type &U) const -> state_type
-    {
-      /*
-       * With
-       *   eta = p ^ (1/gamma)
-       *   p = (gamma - 1) * (rho e)
-       *   rho e = E - 1/2 |m|^2 / rho
-       *
-       * we get
-       *
-       *   eta' = (gamma - 1)/gamma p ^(1/gamma - 1) *
-       *
-       *     (1/2m^2/rho^2 , -m/rho , 1 )^T
-       */
-      const Number rho = density(U);
-      const Number rho_inverse = ScalarNumber(1.) / rho;
-      const auto u = momentum(U) * rho_inverse;
-      const auto p = pressure(U);
-
-      const auto factor = (gamma() - ScalarNumber(1.0)) * gamma_inverse() *
-                          ryujin::pow(p, gamma_inverse() - ScalarNumber(1.));
-
-      state_type result;
-
-      result[0] = factor * ScalarNumber(0.5) * u.norm_square();
-      result[dim + 1] = factor;
-      for (unsigned int i = 0; i < dim; ++i) {
-        result[1 + i] = -factor * u[i];
-      }
+        result[1 + i] = rho_inverse * m[i];
 
       return result;
     }
@@ -957,24 +830,17 @@ namespace ryujin
     DEAL_II_ALWAYS_INLINE inline bool
     HyperbolicSystemView<dim, Number>::is_admissible(const state_type &U) const
     {
-      const auto rho_new = density(U);
-      const auto e_new = internal_energy(U);
-      const auto s_new = specific_entropy(U);
-
+      const auto rho = density(U);
       constexpr auto gt = dealii::SIMDComparison::greater_than;
       using T = Number;
       const auto test =
-          dealii::compare_and_apply_mask<gt>(rho_new, T(0.), T(0.), T(-1.)) + //
-          dealii::compare_and_apply_mask<gt>(e_new, T(0.), T(0.), T(-1.)) +   //
-          dealii::compare_and_apply_mask<gt>(s_new, T(0.), T(0.), T(-1.));
+          dealii::compare_and_apply_mask<gt>(rho, T(0.), T(0.), T(-1.));
 
 #ifdef DEBUG_OUTPUT
       if (!(test == Number(0.))) {
         std::cout << std::fixed << std::setprecision(16);
-        std::cout << "Bounds violation: Negative state [rho, e, s] detected!\n";
-        std::cout << "\t\trho: " << rho_new << "\n";
-        std::cout << "\t\tint: " << e_new << "\n";
-        std::cout << "\t\tent: " << s_new << "\n" << std::endl;
+        std::cout << "Bounds violation: Negative state [rho, e] detected!\n";
+        std::cout << "\t\trho:           " << rho << "\n";
       }
 #endif
 
@@ -985,114 +851,17 @@ namespace ryujin
     template <int dim, typename Number>
     template <int component>
     DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::linearized_eigenvector(
-        const state_type &U, const dealii::Tensor<1, dim, Number> &normal) const
-        -> std::array<state_type, 2>
-    {
-      static_assert(component == 1 || component == problem_dimension,
-                    "Only first and last eigenvectors implemented");
-
-      const auto rho = density(U);
-      const auto m = momentum(U);
-      const auto v = m / rho;
-      const auto a = speed_of_sound(U);
-      const auto gamma = this->gamma();
-
-      state_type b;
-      state_type c;
-
-      const auto e_k = 0.5 * v.norm_square();
-
-      switch (component) {
-      case 1:
-        b[0] = (gamma - 1.) * e_k + a * v * normal;
-        for (unsigned int i = 0; i < dim; ++i)
-          b[1 + i] = (1. - gamma) * v[i] - a * normal[i];
-        b[dim + 1] = gamma - 1.;
-        b /= 2. * a * a;
-
-        c[0] = 1.;
-        for (unsigned int i = 0; i < dim; ++i)
-          c[1 + i] = v[i] - a * normal[i];
-        c[dim + 1] = a * a / (gamma - 1) + e_k - a * (v * normal);
-
-        return {b, c};
-
-      case problem_dimension:
-        b[0] = (gamma - 1.) * e_k - a * v * normal;
-        for (unsigned int i = 0; i < dim; ++i)
-          b[1 + i] = (1. - gamma) * v[i] + a * normal[i];
-        b[dim + 1] = gamma - 1.;
-        b /= 2. * a * a;
-
-        c[0] = 1.;
-        for (unsigned int i = 0; i < dim; ++i)
-          c[1 + i] = v[i] + a * normal[i];
-        c[dim + 1] = a * a / (gamma - 1) + e_k + a * (v * normal);
-
-        return {b, c};
-      }
-
-      __builtin_unreachable();
-    }
-
-
-    template <int dim, typename Number>
-    template <int component>
-    DEAL_II_ALWAYS_INLINE inline auto
     HyperbolicSystemView<dim, Number>::prescribe_riemann_characteristic(
-        const state_type &U,
-        const state_type &U_bar,
-        const dealii::Tensor<1, dim, Number> &normal) const -> state_type
+        const state_type & /*U*/,
+        const Number & /*p*/,
+        const state_type & /*U_bar*/,
+        const Number & /*p_bar*/,
+        const dealii::Tensor<1, dim, Number> & /*normal*/) const -> state_type
     {
-      static_assert(component == 1 || component == 2,
-                    "component has to be 1 or 2");
-
-      const auto m = momentum(U);
-      const auto rho = density(U);
-      const auto a = speed_of_sound(U);
-      const auto vn = m * normal / rho;
-
-      const auto m_bar = momentum(U_bar);
-      const auto rho_bar = density(U_bar);
-      const auto a_bar = speed_of_sound(U_bar);
-      const auto vn_bar = m_bar * normal / rho_bar;
-
-      /* First Riemann characteristic: v* n - 2 / (gamma - 1) * a */
-
-      const auto R_1 = component == 1
-                           ? vn_bar - 2. * a_bar / (gamma() - ScalarNumber(1.))
-                           : vn - 2. * a / (gamma() - ScalarNumber(1.));
-
-      /* Second Riemann characteristic: v* n + 2 / (gamma() - 1) * a */
-
-      const auto R_2 = component == 2
-                           ? vn_bar + 2. * a_bar / (gamma() - ScalarNumber(1.))
-                           : vn + 2. * a / (gamma() - ScalarNumber(1.));
-
-      const auto p = pressure(U);
-      const auto s = p / ryujin::pow(rho, gamma());
-
-      const auto vperp = m / rho - vn * normal;
-
-      const auto vn_new = 0.5 * (R_1 + R_2);
-
-      auto rho_new = 1. / (gamma() * s) *
-                     ryujin::fixed_power<2>(ScalarNumber((gamma() - 1.) / 4.) *
-                                            (R_2 - R_1));
-      rho_new = ryujin::pow(rho_new, 1. / (gamma() - 1.));
-
-      const auto p_new = s * std::pow(rho_new, gamma());
-
-      state_type U_new;
-      U_new[0] = rho_new;
-      for (unsigned int d = 0; d < dim; ++d) {
-        U_new[1 + d] = rho_new * (vn_new * normal + vperp)[d];
-      }
-      U_new[1 + dim] = p_new / ScalarNumber(gamma() - 1.) +
-                       0.5 * rho_new * (vn_new * vn_new + vperp.norm_square());
-
-      return U_new;
+      // FIXME
+      AssertThrow(false, dealii::ExcNotImplemented());
+      __builtin_trap();
+      return state_type{};
     }
 
 
@@ -1141,7 +910,13 @@ namespace ryujin
          */
         const auto m = momentum(U);
         const auto rho = density(U);
-        const auto a = speed_of_sound(U);
+
+        /*
+         * We do not have precomputed values available. Thus, simply query
+         * the pressure and speed of sound oracle:
+         */
+        const auto p = beos_pressure(rho);
+        const auto a = beos_speed_of_sound(rho);
         const auto vn = m * normal / rho;
 
         /* Supersonic inflow: */
@@ -1152,15 +927,22 @@ namespace ryujin
         /* Subsonic inflow: */
         if (vn >= -a && vn <= 0.) {
           const auto U_dirichlet = get_dirichlet_data();
-          result = prescribe_riemann_characteristic<2>(U_dirichlet, U, normal);
+          const auto rho_dirichlet = density(U_dirichlet);
+          const auto p_dirichlet = beos_pressure(rho_dirichlet);
+
+          result = prescribe_riemann_characteristic<2>(
+              U_dirichlet, p_dirichlet, U, p, normal);
         }
 
         /* Subsonic outflow: */
         if (vn > 0. && vn <= a) {
           const auto U_dirichlet = get_dirichlet_data();
-          result = prescribe_riemann_characteristic<1>(U, U_dirichlet, normal);
-        }
+          const auto rho_dirichlet = density(U_dirichlet);
+          const auto p_dirichlet = beos_pressure(rho_dirichlet);
 
+          result = prescribe_riemann_characteristic<1>(
+              U, p, U_dirichlet, p_dirichlet, normal);
+        }
         /* Supersonic outflow: do nothing, i.e., keep U as is */
 
       } else {
@@ -1173,12 +955,11 @@ namespace ryujin
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
-    HyperbolicSystemView<dim, Number>::f(const state_type &U) const -> flux_type
+    HyperbolicSystemView<dim, Number>::f(const state_type &U,
+                                         const Number &p) const -> flux_type
     {
       const auto rho_inverse = ScalarNumber(1.) / density(U);
       const auto m = momentum(U);
-      const auto p = pressure(U);
-      const auto E = total_energy(U);
 
       flux_type result;
 
@@ -1187,7 +968,6 @@ namespace ryujin
         result[1 + i] = m * (m[i] * rho_inverse);
         result[1 + i][i] += p;
       }
-      result[dim + 1] = m * (rho_inverse * (E + p));
 
       return result;
     }
@@ -1196,24 +976,28 @@ namespace ryujin
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
     HyperbolicSystemView<dim, Number>::flux_contribution(
-        const PrecomputedVector & /*pv*/,
-        const InitialPrecomputedVector & /*ipv*/,
-        const unsigned int /*i*/,
+        const PrecomputedVector &pv,
+        const InitialPrecomputedVector & /*piv*/,
+        const unsigned int i,
         const state_type &U_i) const -> flux_contribution_type
     {
-      return f(U_i);
+      const auto &[e_i, p_i, a_i] =
+          pv.template get_tensor<Number, precomputed_type>(i);
+      return f(U_i, p_i);
     }
 
 
     template <int dim, typename Number>
     DEAL_II_ALWAYS_INLINE inline auto
     HyperbolicSystemView<dim, Number>::flux_contribution(
-        const PrecomputedVector & /*pv*/,
-        const InitialPrecomputedVector & /*ipv*/,
-        const unsigned int * /*js*/,
+        const PrecomputedVector &pv,
+        const InitialPrecomputedVector & /*piv*/,
+        const unsigned int *js,
         const state_type &U_j) const -> flux_contribution_type
     {
-      return f(U_j);
+      const auto &[e_j, p_j, a_j] =
+          pv.template get_tensor<Number, precomputed_type>(js);
+      return f(U_j, p_j);
     }
 
 
@@ -1236,14 +1020,13 @@ namespace ryujin
       using T = typename ST::value_type;
       static_assert(std::is_same_v<Number, T>, "template mismatch");
 
-      constexpr auto dim2 = ST::dimension - 2;
+      constexpr auto dim2 = ST::dimension - 1;
       static_assert(dim >= dim2,
                     "the space dimension of the argument state must not be "
                     "larger than the one of the target state");
 
       state_type result;
       result[0] = state[0];
-      result[dim + 1] = state[dim2 + 1];
       for (unsigned int i = 1; i < dim2 + 1; ++i)
         result[i] = state[i];
 
@@ -1267,18 +1050,12 @@ namespace ryujin
     HyperbolicSystemView<dim, Number>::from_primitive_state(
         const state_type &primitive_state) const -> state_type
     {
-      const auto &rho = primitive_state[0];
-      /* extract velocity: */
-      const auto u = /*SIC!*/ momentum(primitive_state);
-      const auto &p = primitive_state[dim + 1];
+      const auto rho = density(primitive_state);
 
       auto state = primitive_state;
       /* Fix up momentum: */
       for (unsigned int i = 1; i < dim + 1; ++i)
         state[i] *= rho;
-      /* Compute total energy: */
-      state[dim + 1] =
-          p / (ScalarNumber(gamma() - 1.)) + Number(0.5) * rho * u * u;
 
       return state;
     }
@@ -1289,16 +1066,13 @@ namespace ryujin
     HyperbolicSystemView<dim, Number>::to_primitive_state(
         const state_type &state) const -> state_type
     {
-      const auto &rho = state[0];
+      const auto rho = density(state);
       const auto rho_inverse = Number(1.) / rho;
-      const auto p = pressure(state);
 
       auto primitive_state = state;
       /* Fix up velocity: */
       for (unsigned int i = 1; i < dim + 1; ++i)
         primitive_state[i] *= rho_inverse;
-      /* Set pressure: */
-      primitive_state[dim + 1] = p;
 
       return primitive_state;
     }
@@ -1315,6 +1089,5 @@ namespace ryujin
         result[1 + d] = M[d];
       return result;
     }
-
-  } // namespace Euler
+  } // namespace EulerBarotropic
 } // namespace ryujin

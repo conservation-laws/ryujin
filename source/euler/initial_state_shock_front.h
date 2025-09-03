@@ -47,10 +47,11 @@ namespace ryujin
         primitive_right_[0] = 1.4;
         primitive_right_[1] = 0.0;
         primitive_right_[2] = 1.;
-        this->add_parameter("primitive state",
-                            primitive_right_,
-                            "Initial 1d primitive state (rho, u, p) before the "
-                            "shock (to the right)");
+        this->add_parameter(
+            "primitive state",
+            primitive_right_,
+            "1d primitive state [rho, u, p] (for the Noble-Abel gas EOS) "
+            "before the shock (to the right)");
 
         mach_number_ = 2.0;
         this->add_parameter(
@@ -91,12 +92,18 @@ namespace ryujin
                               (gamma_ - Number(1.))) /
                              (gamma_ + Number(1.));
 
-          primitive_left_[0] = rho_L;
-          primitive_left_[1] = u_L;
-          primitive_left_[2] = p_L;
+          using state_type_1d = typename Description::
+              template HyperbolicSystemView<1, Number>::state_type;
 
-          state_left_ = view.from_initial_state(primitive_left_);
-          state_right_ = view.from_initial_state(primitive_right_);
+          if constexpr (View::have_energy_equation) {
+            state_left_ =
+                view.from_initial_state(state_type_1d{{rho_L, u_L, p_L}});
+            state_right_ =
+                view.from_initial_state(state_type_1d{{rho_R, u_R, p_R}});
+          } else {
+            state_left_ = view.from_initial_state(state_type_1d{{rho_L, u_L}});
+            state_right_ = view.from_initial_state(state_type_1d{{rho_R, u_R}});
+          }
         };
 
         this->parse_parameters_call_back.connect(compute_and_convert_states);

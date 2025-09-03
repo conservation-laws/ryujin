@@ -82,14 +82,17 @@ namespace ryujin
         const Number E =
             p / (gamma_ - Number(1.)) + Number(0.5) * rho * (u * u + v * v);
 
-        if constexpr (dim == 2)
-          return state_type({rho, rho * u, rho * v, E});
-        else if constexpr (dim == 3)
-          return state_type({rho, rho * u, rho * v, Number(0.), E});
-        else {
-          AssertThrow(false, dealii::ExcNotImplemented());
-          __builtin_trap();
-        }
+        AssertThrow(dim > 1, dealii::ExcNotImplemented());
+
+        state_type result;
+        result[0] = rho;
+        result[1] = rho * u;
+        if constexpr (dim >= 2)
+          result[2] = rho * v;
+        if constexpr (View::have_energy_equation)
+          result[dim + 1] = E;
+
+        return result;
       }
 
     private:

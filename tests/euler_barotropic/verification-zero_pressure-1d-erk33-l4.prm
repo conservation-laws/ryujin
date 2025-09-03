@@ -1,0 +1,64 @@
+subsection A - TimeLoop
+  set basename             = zero_pressure-erk33
+
+  set enable compute error = true
+  set error quantities     = rho, m
+
+  set enforce final time        = true
+
+  set final time           = 0.66666666666667
+  set timer granularity    = 0.66666666666667
+
+  set terminal update interval  = 0
+end
+
+
+subsection B - Equation
+  set dimension                    = 1
+  set equation                     = euler barotropic
+  set barotropic equation of state = pressureless
+end
+
+
+subsection C - Discretization
+  set geometry        = rectangular domain
+  set mesh refinement = 4
+
+  subsection rectangular domain
+    set boundary condition left   = dirichlet
+    set boundary condition right  = dirichlet
+
+    set position bottom left      = 0
+    set position top right        = 1
+    set subdivisions x            = 25
+  end
+end
+
+
+subsection E - InitialValues
+  set configuration = leblanc
+
+  set direction     = 1
+  # for cG put the discontinuity right in the center of a cell
+  set position      = 0.326732673267
+end
+
+
+subsection F - HyperbolicModule
+  subsection indicator
+    set evc factor = 0.
+  end
+
+  subsection limiter
+    set iterations            = 2
+    set relaxation factor     = 1
+  end
+end
+
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.10
+  set cfl max               = 0.10
+  set cfl recovery strategy = none
+  set time stepping scheme  = erk 33
+end

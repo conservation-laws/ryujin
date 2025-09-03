@@ -31,6 +31,8 @@ namespace ryujin
       using View =
           typename Description::template HyperbolicSystemView<dim, Number>;
       using state_type = typename View::state_type;
+      using state_type_1d = typename Description::
+          template HyperbolicSystemView<1, Number>::state_type;
 
       Contrast(const HyperbolicSystem &hyperbolic_system,
                const std::string subsection)
@@ -39,19 +41,21 @@ namespace ryujin
       {
         primitive_left_[0] = 1.4;
         primitive_left_[1] = 0.;
-        primitive_left_[2] = 1.;
-        this->add_parameter(
-            "primitive state left",
-            primitive_left_,
-            "Initial 1d primitive state (rho, u, p) on the left");
+        if constexpr (View::have_energy_equation)
+          primitive_left_[2] = 1.;
+        this->add_parameter("primitive state left",
+                            primitive_left_,
+                            "1d primitive state [rho, u, p] on the left (or "
+                            "[rho, u] for the barotropic Euler module)");
 
         primitive_right_[0] = 1.4;
         primitive_right_[1] = 0.;
-        primitive_right_[2] = 1.;
-        this->add_parameter(
-            "primitive state right",
-            primitive_right_,
-            "Initial 1d primitive state (rho, u, p) on the right");
+        if constexpr (View::have_energy_equation)
+          primitive_right_[2] = 1.;
+        this->add_parameter("primitive state right",
+                            primitive_right_,
+                            "1d primitive state [rho, u, p] on the right (or "
+                            "[rho, u] for the barotropic Euler module)");
 
         const auto convert_states = [&]() {
           const auto view = hyperbolic_system_.template view<dim, Number>();
@@ -70,8 +74,8 @@ namespace ryujin
     private:
       const HyperbolicSystem &hyperbolic_system_;
 
-      dealii::Tensor<1, 3, Number> primitive_left_;
-      dealii::Tensor<1, 3, Number> primitive_right_;
+      state_type_1d primitive_left_;
+      state_type_1d primitive_right_;
 
       state_type state_left_;
       state_type state_right_;
