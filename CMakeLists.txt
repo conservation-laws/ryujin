@@ -73,6 +73,7 @@ option(DEBUG_EXPENSIVE_BOUNDS_CHECK "Debug: enable debug code paths for addition
 option(DEBUG_OUTPUT "Debug: enable detailed time-step output" OFF)
 option(DEBUG_SANITIZER "Debug: enable address and UBSAN sanitizers for DEBUG build" OFF)
 option(DEBUG_SYMMETRY_CHECK "Debug: enable debug code paths that verify d_ij, c_ij, m_ij for (anti)symmetry" OFF)
+option(DEFAULT_ENABLE_EQUATIONS "Default enable all available equations. This parameter only sets the default value of all EQUATION_* configuration options" ON)
 option(DENORMALS_ARE_ZERO "Set the \"denormals are zero\" and \"flush to zero\" bits in the MXCSR register" ON)
 option(FORCE_DEAL_II_SPARSE_MATRIX "Always use dealii::SparseMatrix instead of TrilinosWrappers::SparseMatrix for assembly" OFF)
 
