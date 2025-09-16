@@ -83,7 +83,13 @@ endmacro()
 file(GLOB _files RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS */CMakeLists.txt)
 foreach(_file ${_files})
   get_filename_component(_directory "${_file}" DIRECTORY)
-  setup_equation("${_directory}")
+
+  string(TOUPPER "${_directory}" _directory_upper)
+  set(EQUATION_${_directory_upper} ${DEFAULT_ENABLE_EQUATIONS} CACHE BOOL "Enable the equation »${_directory}« compute module")
+
+  if(EQUATION_${_directory_upper})
+    setup_equation("${_directory}")
+  endif()
 endforeach()
 
 #
