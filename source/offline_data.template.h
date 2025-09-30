@@ -216,6 +216,7 @@ namespace ryujin
       return i / group_size * group_size;
     };
 
+#if DEAL_II_VERSION_GTE(9, 5, 0)
     /*
      * A small lambda that performs a "logical or" over all MPI ranks:
      */
@@ -236,7 +237,6 @@ namespace ryujin
      * node constraints). Therefore, the following little dance:
      */
 
-#if DEAL_II_VERSION_GTE(9, 5, 0)
     if (mpi_allreduce_logical_or(affine_constraints_.n_constraints() > 0)) {
       if (mpi_allreduce_logical_or( //
               consistent_stride_range() != n_locally_internal_)) {
