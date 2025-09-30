@@ -240,8 +240,8 @@ namespace ryujin
      */
     struct Collection {
       std::unique_ptr<const dealii::hp::MappingCollection<dim>> mapping;
-      std::unique_ptr<const dealii::hp::FECollection<dim>> finite_element;
       std::unique_ptr<const dealii::hp::FECollection<dim>> finite_element_cg;
+      std::unique_ptr<const dealii::hp::FECollection<dim>> finite_element_dg;
       std::unique_ptr<const dealii::hp::QCollection<dim>> quadrature;
       std::unique_ptr<const dealii::hp::QCollection<dim>> quadrature_high_order;
       std::unique_ptr<const dealii::hp::QCollection<dim>> nodal_quadrature;
@@ -340,19 +340,39 @@ namespace ryujin
     ACCESSOR_CONTAINER_READ_ONLY(collection_, mapping)
 
     /**
-     * Return a read-only const reference to the finite element.
-     *
-     * @note The accessor returns an FECollection object.
-     */
-    ACCESSOR_CONTAINER_READ_ONLY(collection_, finite_element)
-
-    /**
      * Return a read-only const reference to a continuous ("cG") variant of
-     * the selected discontinuous finite element space.
+     * the selected finite element space.
+     *
+     * @note If the selected finite element space is continuous then this
+     * method simply returns the same object as finite_element().
      *
      * @note The accessor returns an FECollection object.
      */
     ACCESSOR_CONTAINER_READ_ONLY(collection_, finite_element_cg)
+
+    /**
+     * Return a read-only const reference to a discontinuous ("dG") variant
+     * of the selected finite element space.
+     *
+     * @note If the selected finite element space is discontinuous then
+     * this method simply returns the same object as finite_element().
+     *
+     * @note The accessor returns an FECollection object.
+     */
+    ACCESSOR_CONTAINER_READ_ONLY(collection_, finite_element_dg)
+
+    /**
+     * Return a read-only const reference to the selected finite element.
+     *
+     * @note The accessor returns an FECollection object.
+     */
+    const dealii::hp::FECollection<dim> &finite_element() const
+    {
+      if (have_discontinuous_ansatz())
+        return *collection_.finite_element_dg;
+      else
+        return *collection_.finite_element_cg;
+    }
 
     /**
      * Return a read-only const reference to the quadrature rule.

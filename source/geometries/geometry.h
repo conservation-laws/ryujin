@@ -95,7 +95,6 @@ namespace ryujin
      */
     virtual HP_Collection populate_hp_collections(
         const unsigned int /*fe_degree*/,
-        const bool /*have_discontinuous_ansatz*/,
         typename ryujin::Discretization<dim>::Collection & /*collection*/) const
     {
       /*

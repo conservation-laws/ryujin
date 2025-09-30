@@ -71,6 +71,208 @@ namespace ryujin
 
 
   template <int dim, typename Number>
+  void OfflineData<dim, Number>::prepare(
+      const unsigned int problem_dimension,
+      const unsigned int n_precomputed_values,
+      const unsigned int n_parabolic_state_vectors)
+  {
+#ifdef DEBUG_OUTPUT
+    std::cout << "OfflineData<dim, Number>::prepare()" << std::endl;
+#endif
+
+    create_dof_handlers();
+
+    renumber_for_simd();
+
+    create_constraints_and_sparsity_pattern();
+
+    ensure_simd_stride_consistency();
+
+    create_partitioner_and_simd_sparsity(problem_dimension,
+                                         n_precomputed_values);
+
+    create_matrices();
+
+    if (!dof_handler().has_hp_capabilities())
+      create_multigrid_data();
+
+    n_parabolic_state_vectors_ = n_parabolic_state_vectors;
+  }
+
+
+  template <int dim, typename Number>
+  void OfflineData<dim, Number>::create_dof_handlers()
+  {
+    const auto &triangulation = discretization_->triangulation();
+
+    if (!dof_handler_cg_)
+      dof_handler_cg_ =
+          std::make_unique<dealii::DoFHandler<dim>>(triangulation);
+
+    if (!dof_handler_dg_)
+      dof_handler_dg_ =
+          std::make_unique<dealii::DoFHandler<dim>>(triangulation);
+
+    /*
+     * Set active FE indices: This information depends on the selected
+     * geometry. Therefore, let the selected geometry object handle the
+     * setup. For a standard geometry that has only one reference element
+     * the method simply does nothing.
+     */
+
+    discretization_->selected_geometry().update_dof_handler(*dof_handler_cg_);
+    discretization_->selected_geometry().update_dof_handler(*dof_handler_dg_);
+
+    dof_handler_cg_->distribute_dofs(discretization_->finite_element_cg());
+    dof_handler_dg_->distribute_dofs(discretization_->finite_element_dg());
+  }
+
+
+  template <int dim, typename Number>
+  void OfflineData<dim, Number>::renumber_for_simd()
+  {
+    auto &dof_handler = this->dof_handler();
+    const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
+    n_locally_owned_ = locally_owned.n_elements();
+
+    /*
+     * Initial renumbering with Cuthill McKee (because we can):
+     */
+
+    DoFRenumbering::Cuthill_McKee(dof_handler);
+
+    /*
+     * Reorder all (individual) export indices at the beginning of the
+     * locally_internal index range to achieve a better packing:
+     *
+     * Note: This function might miss export indices that come from
+     * eliminating hanging node and periodicity constraints (which we do
+     * not know at this point because they depend on the renumbering...).
+     */
+    DoFRenumbering::export_indices_first(dof_handler,
+                                         mpi_ensemble_.ensemble_communicator(),
+                                         n_locally_owned_,
+                                         1);
+
+    /*
+     * Group degrees of freedom that have the same stencil size in groups
+     * of multiples of the VectorizedArray<Number>::size().
+     *
+     * In order to determine the stencil size we have to create a first,
+     * temporary sparsity pattern:
+     */
+    create_constraints_and_sparsity_pattern();
+    n_locally_internal_ = DoFRenumbering::internal_range(
+        dof_handler, sparsity_pattern_, VectorizedArray<Number>::size());
+
+    /*
+     * Reorder all (strides of) locally internal indices that contain
+     * export indices to the start of the index range. This reordering
+     * preserves the binning introduced by
+     * DoFRenumbering::internal_range().
+     *
+     * Note: This function might miss export indices that come from
+     * eliminating hanging node and periodicity constraints (which we do
+     * not know at this point because they depend on the renumbering...).
+     * We therefore have to update n_export_indices_ later again.
+     */
+    n_export_indices_ = DoFRenumbering::export_indices_first(
+        dof_handler,
+        mpi_ensemble_.ensemble_communicator(),
+        n_locally_internal_,
+        VectorizedArray<Number>::size());
+  }
+
+
+  /*
+   * Modifies:
+   *     n_locally_internal_
+   */
+  template <int dim, typename Number>
+  void OfflineData<dim, Number>::ensure_simd_stride_consistency()
+  {
+    auto &dof_handler = this->dof_handler();
+
+    /*
+     * A small lambda to check for stride-level consistency of the internal
+     * index range:
+     */
+    const auto consistent_stride_range [[maybe_unused]] = [&]() {
+      constexpr auto group_size = VectorizedArray<Number>::size();
+      const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
+      const auto offset = n_locally_owned_ != 0 ? *locally_owned.begin() : 0;
+
+      unsigned int group_row_length = 0;
+      unsigned int i = 0;
+      for (; i < n_locally_internal_; ++i) {
+        if (i % group_size == 0) {
+          group_row_length = sparsity_pattern_.row_length(offset + i);
+        } else {
+          if (group_row_length != sparsity_pattern_.row_length(offset + i)) {
+            break;
+          }
+        }
+      }
+      return i / group_size * group_size;
+    };
+
+#if DEAL_II_VERSION_GTE(9, 5, 0)
+    /*
+     * A small lambda that performs a "logical or" over all MPI ranks:
+     */
+    const auto mpi_allreduce_logical_or = [&](const bool local_value) {
+      std::function<bool(const bool &, const bool &)> comparator =
+          [](const bool &left, const bool &right) -> bool {
+        return left || right;
+      };
+      return Utilities::MPI::all_reduce(
+          local_value, mpi_ensemble_.ensemble_communicator(), comparator);
+    };
+
+    /*
+     * We have to ensure that the locally internal numbering range is still
+     * consistent, meaning that all strides have the same stencil size.
+     * This property might not hold any more after the elimination
+     * procedure of constrained degrees of freedom (periodicity, or hanging
+     * node constraints). Therefore, the following little dance:
+     */
+
+    if (mpi_allreduce_logical_or(affine_constraints_.n_constraints() > 0)) {
+      if (mpi_allreduce_logical_or( //
+              consistent_stride_range() != n_locally_internal_)) {
+        /*
+         * In this case we try to fix up the numbering by pushing affected
+         * strides to the end and slightly lowering the n_locally_internal_
+         * marker.
+         */
+        n_locally_internal_ = DoFRenumbering::inconsistent_strides_last(
+            dof_handler,
+            sparsity_pattern_,
+            n_locally_internal_,
+            VectorizedArray<Number>::size());
+        create_constraints_and_sparsity_pattern();
+        n_locally_internal_ = consistent_stride_range();
+      }
+    }
+#endif
+
+    /*
+     * Check that after all the dof manipulation and setup we still end up
+     * with indices in [0, locally_internal) that have uniform stencil size
+     * within a stride.
+     */
+    Assert(consistent_stride_range() == n_locally_internal_,
+           dealii::ExcInternalError());
+  }
+
+
+  /*
+   * Populates:
+   *     n_locally_owned_
+   *     affine_constraints_
+   *     sparsity_pattern_
+   */
+  template <int dim, typename Number>
   void OfflineData<dim, Number>::create_constraints_and_sparsity_pattern()
   {
     /*
@@ -79,8 +281,10 @@ namespace ryujin
      * pattern:
      */
 
-    auto &dof_handler = *dof_handler_;
+    auto &dof_handler = this->dof_handler();
     const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
+    Assert(n_locally_owned_ == locally_owned.n_elements(),
+           dealii::ExcInternalError());
 
 #if DEAL_II_VERSION_GTE(9, 6, 0)
     const auto locally_relevant =
@@ -206,163 +410,20 @@ namespace ryujin
   }
 
 
+  /*
+   * Populates:
+   *     n_locally_relevant_
+   *     scalar_partitioner_
+   *     hyperbolic_vector_partitioner_
+   *     precomputed_vector_partitioner_
+   *     sparsity_pattern_simd_
+   */
   template <int dim, typename Number>
-  void OfflineData<dim, Number>::setup(const unsigned int problem_dimension,
-                                       const unsigned int n_precomputed_values)
+  void OfflineData<dim, Number>::create_partitioner_and_simd_sparsity(
+      const unsigned int problem_dimension,
+      const unsigned int n_precomputed_values)
   {
-#ifdef DEBUG_OUTPUT
-    std::cout << "OfflineData<dim, Number>::setup()" << std::endl;
-#endif
-
-    /*
-     * Initialize dof handler:
-     */
-
-    const auto &triangulation = discretization_->triangulation();
-    if (!dof_handler_)
-      dof_handler_ = std::make_unique<dealii::DoFHandler<dim>>(triangulation);
-    auto &dof_handler = *dof_handler_;
-
-    /*
-     * Set active FE indices: This information depends on the selected
-     * geometry. Therefore, let the selected geometry object handle the
-     * setup. For a standard geometry that has only one reference element
-     * the method simply does nothing.
-     */
-    discretization_->selected_geometry().update_dof_handler(dof_handler);
-
-    dof_handler.distribute_dofs(discretization_->finite_element());
-
-    n_locally_owned_ = dof_handler.locally_owned_dofs().n_elements();
-
-    /*
-     * Renumbering:
-     */
-
-    DoFRenumbering::Cuthill_McKee(dof_handler);
-
-    /*
-     * Reorder all (individual) export indices at the beginning of the
-     * locally_internal index range to achieve a better packing:
-     *
-     * Note: This function might miss export indices that come from
-     * eliminating hanging node and periodicity constraints (which we do
-     * not know at this point because they depend on the renumbering...).
-     */
-    DoFRenumbering::export_indices_first(dof_handler,
-                                         mpi_ensemble_.ensemble_communicator(),
-                                         n_locally_owned_,
-                                         1);
-
-    /*
-     * Group degrees of freedom that have the same stencil size in groups
-     * of multiples of the VectorizedArray<Number>::size().
-     *
-     * In order to determine the stencil size we have to create a first,
-     * temporary sparsity pattern:
-     */
-    create_constraints_and_sparsity_pattern();
-    n_locally_internal_ = DoFRenumbering::internal_range(
-        dof_handler, sparsity_pattern_, VectorizedArray<Number>::size());
-
-    /*
-     * Reorder all (strides of) locally internal indices that contain
-     * export indices to the start of the index range. This reordering
-     * preserves the binning introduced by
-     * DoFRenumbering::internal_range().
-     *
-     * Note: This function might miss export indices that come from
-     * eliminating hanging node and periodicity constraints (which we do
-     * not know at this point because they depend on the renumbering...).
-     * We therefore have to update n_export_indices_ later again.
-     */
-    n_export_indices_ = DoFRenumbering::export_indices_first(
-        dof_handler,
-        mpi_ensemble_.ensemble_communicator(),
-        n_locally_internal_,
-        VectorizedArray<Number>::size());
-
-    /*
-     * A small lambda to check for stride-level consistency of the internal
-     * index range:
-     */
-    const auto consistent_stride_range [[maybe_unused]] = [&]() {
-      constexpr auto group_size = VectorizedArray<Number>::size();
-      const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
-      const auto offset = n_locally_owned_ != 0 ? *locally_owned.begin() : 0;
-
-      unsigned int group_row_length = 0;
-      unsigned int i = 0;
-      for (; i < n_locally_internal_; ++i) {
-        if (i % group_size == 0) {
-          group_row_length = sparsity_pattern_.row_length(offset + i);
-        } else {
-          if (group_row_length != sparsity_pattern_.row_length(offset + i)) {
-            break;
-          }
-        }
-      }
-      return i / group_size * group_size;
-    };
-
-    /*
-     * A small lambda that performs a "logical or" over all MPI ranks:
-     */
-    const auto mpi_allreduce_logical_or = [&](const bool local_value) {
-      std::function<bool(const bool &, const bool &)> comparator =
-          [](const bool &left, const bool &right) -> bool {
-        return left || right;
-      };
-      return Utilities::MPI::all_reduce(
-          local_value, mpi_ensemble_.ensemble_communicator(), comparator);
-    };
-
-    /*
-     * Create final sparsity pattern:
-     */
-
-    create_constraints_and_sparsity_pattern();
-
-    /*
-     * We have to ensure that the locally internal numbering range is still
-     * consistent, meaning that all strides have the same stencil size.
-     * This property might not hold any more after the elimination
-     * procedure of constrained degrees of freedom (periodicity, or hanging
-     * node constraints). Therefore, the following little dance:
-     */
-
-#if DEAL_II_VERSION_GTE(9, 5, 0)
-    if (mpi_allreduce_logical_or(affine_constraints_.n_constraints() > 0)) {
-      if (mpi_allreduce_logical_or( //
-              consistent_stride_range() != n_locally_internal_)) {
-        /*
-         * In this case we try to fix up the numbering by pushing affected
-         * strides to the end and slightly lowering the n_locally_internal_
-         * marker.
-         */
-        n_locally_internal_ = DoFRenumbering::inconsistent_strides_last(
-            dof_handler,
-            sparsity_pattern_,
-            n_locally_internal_,
-            VectorizedArray<Number>::size());
-        create_constraints_and_sparsity_pattern();
-        n_locally_internal_ = consistent_stride_range();
-      }
-    }
-#endif
-
-    /*
-     * Check that after all the dof manipulation and setup we still end up
-     * with indices in [0, locally_internal) that have uniform stencil size
-     * within a stride.
-     */
-    Assert(consistent_stride_range() == n_locally_internal_,
-           dealii::ExcInternalError());
-
-    /*
-     * Set up partitioner:
-     */
-
+    auto &dof_handler = this->dof_handler();
     const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
     Assert(n_locally_owned_ == locally_owned.n_elements(),
            dealii::ExcInternalError());
@@ -399,6 +460,18 @@ namespace ryujin
         scalar_partitioner_, n_precomputed_values);
 
     /*
+     * A small lambda that performs a "logical or" over all MPI ranks:
+     */
+    const auto mpi_allreduce_logical_or = [&](const bool local_value) {
+      std::function<bool(const bool &, const bool &)> comparator =
+          [](const bool &left, const bool &right) -> bool {
+        return left || right;
+      };
+      return Utilities::MPI::all_reduce(
+          local_value, mpi_ensemble_.ensemble_communicator(), comparator);
+    };
+
+    /*
      * After eliminiating periodicity and hanging node constraints we need
      * to update n_export_indices_ again. This happens because we need to
      * call export_indices_first() with incomplete information (missing
@@ -431,8 +504,8 @@ namespace ryujin
 
     /*
      * Set up SIMD sparsity pattern in local numbering. Nota bene: The
-     * SparsityPatternSIMD::reinit() function will translates the pattern
-     * from global deal.II (typical) dof indexing to local indices.
+     * SparsityPatternSIMD::reinit() function translates the pattern from
+     * global deal.II (typical) dof indexing to local indices.
      */
 
     sparsity_pattern_simd_.reinit(
@@ -467,7 +540,7 @@ namespace ryujin
      * Then, assemble:
      */
 
-    auto &dof_handler = *dof_handler_;
+    auto &dof_handler = this->dof_handler();
 
     measure_of_omega_ = 0.;
 
@@ -1232,7 +1305,7 @@ namespace ryujin
               << std::endl;
 #endif
 
-    auto &dof_handler = *dof_handler_;
+    auto &dof_handler = this->dof_handler();
 
     Assert(!dof_handler.has_hp_capabilities(), dealii::ExcInternalError());
 
