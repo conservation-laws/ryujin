@@ -93,7 +93,7 @@ namespace ryujin
 
     create_matrices();
 
-    if (!dof_handler_->has_hp_capabilities())
+    if (!dof_handler().has_hp_capabilities())
       create_multigrid_data();
 
     n_parabolic_state_vectors_ = n_parabolic_state_vectors;
@@ -104,9 +104,14 @@ namespace ryujin
   void OfflineData<dim, Number>::create_dof_handlers()
   {
     const auto &triangulation = discretization_->triangulation();
-    if (!dof_handler_)
-      dof_handler_ = std::make_unique<dealii::DoFHandler<dim>>(triangulation);
-    auto &dof_handler = *dof_handler_;
+
+    if (!dof_handler_cg_)
+      dof_handler_cg_ =
+          std::make_unique<dealii::DoFHandler<dim>>(triangulation);
+
+    if (!dof_handler_dg_)
+      dof_handler_dg_ =
+          std::make_unique<dealii::DoFHandler<dim>>(triangulation);
 
     /*
      * Set active FE indices: This information depends on the selected
@@ -114,17 +119,19 @@ namespace ryujin
      * setup. For a standard geometry that has only one reference element
      * the method simply does nothing.
      */
-    discretization_->selected_geometry().update_dof_handler(dof_handler);
 
-    dof_handler.distribute_dofs(discretization_->finite_element());
+    discretization_->selected_geometry().update_dof_handler(*dof_handler_cg_);
+    discretization_->selected_geometry().update_dof_handler(*dof_handler_dg_);
+
+    dof_handler_cg_->distribute_dofs(discretization_->finite_element_cg());
+    dof_handler_dg_->distribute_dofs(discretization_->finite_element_dg());
   }
 
 
   template <int dim, typename Number>
   void OfflineData<dim, Number>::renumber_for_simd()
   {
-    Assert(dof_handler_, dealii::ExcInternalError());
-    auto &dof_handler = *dof_handler_;
+    auto &dof_handler = this->dof_handler();
     const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
     n_locally_owned_ = locally_owned.n_elements();
 
@@ -184,8 +191,7 @@ namespace ryujin
   template <int dim, typename Number>
   void OfflineData<dim, Number>::ensure_simd_stride_consistency()
   {
-    Assert(dof_handler_, dealii::ExcInternalError());
-    auto &dof_handler = *dof_handler_;
+    auto &dof_handler = this->dof_handler();
 
     /*
      * A small lambda to check for stride-level consistency of the internal
@@ -275,7 +281,7 @@ namespace ryujin
      * pattern:
      */
 
-    auto &dof_handler = *dof_handler_;
+    auto &dof_handler = this->dof_handler();
     const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
     Assert(n_locally_owned_ == locally_owned.n_elements(),
            dealii::ExcInternalError());
@@ -417,9 +423,7 @@ namespace ryujin
       const unsigned int problem_dimension,
       const unsigned int n_precomputed_values)
   {
-    Assert(dof_handler_, dealii::ExcInternalError());
-    auto &dof_handler = *dof_handler_;
-
+    auto &dof_handler = this->dof_handler();
     const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
     Assert(n_locally_owned_ == locally_owned.n_elements(),
            dealii::ExcInternalError());
@@ -536,7 +540,7 @@ namespace ryujin
      * Then, assemble:
      */
 
-    auto &dof_handler = *dof_handler_;
+    auto &dof_handler = this->dof_handler();
 
     measure_of_omega_ = 0.;
 
@@ -1301,7 +1305,7 @@ namespace ryujin
               << std::endl;
 #endif
 
-    auto &dof_handler = *dof_handler_;
+    auto &dof_handler = this->dof_handler();
 
     Assert(!dof_handler.has_hp_capabilities(), dealii::ExcInternalError());
 

@@ -102,13 +102,53 @@ namespace ryujin
                  const unsigned int n_parabolic_state_vectors);
 
     /**
-     * The DofHandler for our (scalar) CG ansatz space in (deal.II typical)
-     * global numbering.
+     * Return a read-only const reference to the DoFHandler for the
+     * continuous ("cG") variant of the selected finite element space.
+     *
+     * @note If the selected finite element space is continuous then this
+     * method simply returns the same object as dof_handler().
      */
-    ACCESSOR_READ_ONLY(dof_handler)
+    ACCESSOR_READ_ONLY(dof_handler_cg)
 
     /**
-     * An AffineConstraints object storing constraints in (Deal.II typical)
+     * Return a read-only const reference to the DoFHandler for the
+     * discontinuous ("dG") variant of the selected finite element space.
+     *
+     * @note If the selected finite element space is discontinuous then
+     * this method simply returns the same object as dof_handler().
+     */
+    ACCESSOR_READ_ONLY(dof_handler_dg)
+
+    /**
+     * Return a read-only const reference to the dof handler.
+     */
+    const dealii::DoFHandler<dim> &dof_handler() const
+    {
+      if (discretization_->have_discontinuous_ansatz()) {
+        Assert(dof_handler_dg_, dealii::ExcInternalError());
+        return *dof_handler_dg_;
+      } else {
+        Assert(dof_handler_cg_, dealii::ExcInternalError());
+        return *dof_handler_cg_;
+      }
+    }
+
+    /**
+     * Return a writable reference to the dof handler.
+     */
+    dealii::DoFHandler<dim> &dof_handler()
+    {
+      if (discretization_->have_discontinuous_ansatz()) {
+        Assert(dof_handler_dg_, dealii::ExcInternalError());
+        return *dof_handler_dg_;
+      } else {
+        Assert(dof_handler_cg_, dealii::ExcInternalError());
+        return *dof_handler_cg_;
+      }
+    }
+
+    /**
+     * An AffineConstraints object storing constraints in (deal.II typical)
      * global numbering.
      */
     ACCESSOR_READ_ONLY(affine_constraints)
@@ -340,7 +380,8 @@ namespace ryujin
 
     const MPIEnsemble &mpi_ensemble_;
 
-    std::unique_ptr<dealii::DoFHandler<dim>> dof_handler_;
+    std::unique_ptr<dealii::DoFHandler<dim>> dof_handler_cg_;
+    std::unique_ptr<dealii::DoFHandler<dim>> dof_handler_dg_;
 
     dealii::AffineConstraints<Number> affine_constraints_;
 

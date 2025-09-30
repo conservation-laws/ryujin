@@ -362,7 +362,7 @@ namespace ryujin
     ACCESSOR_CONTAINER_READ_ONLY(collection_, finite_element_dg)
 
     /**
-     * Return a read-only const reference to the finite element.
+     * Return a read-only const reference to the selected finite element.
      *
      * @note The accessor returns an FECollection object.
      */
