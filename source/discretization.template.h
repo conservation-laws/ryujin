@@ -189,8 +189,8 @@ namespace ryujin
      * standard_simplices, however, we need to do the setup ourselves:
      */
 
-    const auto collection_type = selected_geometry_->populate_hp_collections(
-        fe_degree, have_discontinuous_ansatz(), collection_);
+    const auto collection_type =
+        selected_geometry_->populate_hp_collections(fe_degree, collection_);
 
     switch (collection_type) {
     case Geometry<dim>::HP_Collection::populated_by_geometry: {
@@ -199,8 +199,8 @@ namespace ryujin
        */
 
       Assert(collection_.mapping, dealii::ExcInternalError());
-      Assert(collection_.finite_element, dealii::ExcInternalError());
       Assert(collection_.finite_element_cg, dealii::ExcInternalError());
+      Assert(collection_.finite_element_dg, dealii::ExcInternalError());
       Assert(collection_.quadrature, dealii::ExcInternalError());
       Assert(collection_.quadrature_high_order, dealii::ExcInternalError());
       Assert(collection_.nodal_quadrature, dealii::ExcInternalError());
@@ -215,17 +215,10 @@ namespace ryujin
        * Qk finite element on purely quadrilateral, or hexahedral meshes:
        */
 
-      if (have_discontinuous_ansatz()) {
-        collection_.finite_element =
-            std::make_unique<hp::FECollection<dim>>(FE_DGQ<dim>(fe_degree));
-        collection_.finite_element_cg =
-            std::make_unique<hp::FECollection<dim>>(FE_Q<dim>(fe_degree));
-      } else {
-        collection_.finite_element =
-            std::make_unique<hp::FECollection<dim>>(FE_Q<dim>(fe_degree));
-        collection_.finite_element_cg =
-            std::make_unique<hp::FECollection<dim>>(FE_Q<dim>(fe_degree));
-      }
+      collection_.finite_element_cg =
+          std::make_unique<hp::FECollection<dim>>(FE_Q<dim>(fe_degree));
+      collection_.finite_element_dg =
+          std::make_unique<hp::FECollection<dim>>(FE_DGQ<dim>(fe_degree));
 
       collection_.mapping =
           std::make_unique<dealii::hp::MappingCollection<dim>>(
@@ -253,17 +246,10 @@ namespace ryujin
        * Pk finite element on purely quadrilateral, or hexahedral meshes:
        */
 
-      if (have_discontinuous_ansatz()) {
-        collection_.finite_element = std::make_unique<hp::FECollection<dim>>(
-            FE_SimplexDGP<dim>(fe_degree));
-        collection_.finite_element_cg = std::make_unique<hp::FECollection<dim>>(
-            FE_SimplexP<dim>(fe_degree));
-      } else {
-        collection_.finite_element = std::make_unique<hp::FECollection<dim>>(
-            FE_SimplexP<dim>(fe_degree));
-        collection_.finite_element_cg = std::make_unique<hp::FECollection<dim>>(
-            FE_SimplexP<dim>(fe_degree));
-      }
+      collection_.finite_element_cg =
+          std::make_unique<hp::FECollection<dim>>(FE_SimplexP<dim>(fe_degree));
+      collection_.finite_element_dg = std::make_unique<hp::FECollection<dim>>(
+          FE_SimplexDGP<dim>(fe_degree));
 
       collection_.mapping =
           std::make_unique<dealii::hp::MappingCollection<dim>>(
