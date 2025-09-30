@@ -90,8 +90,8 @@ namespace ryujin
                 const std::string &subsection = "/OfflineData");
 
     /**
-     * Prepare offline data. A call to prepare() internally calls setup()
-     * and assemble().
+     * Prepare offline data. A call to prepare() sets up storage, dof
+     * handlers, sparsity patterns, and assembles all matrices.
      *
      * The problem_dimension and n_precomputed_values parameters is used to
      * set up appropriately sized vector partitioners for the state and
@@ -99,17 +99,7 @@ namespace ryujin
      */
     void prepare(const unsigned int problem_dimension,
                  const unsigned int n_precomputed_values,
-                 const unsigned int n_parabolic_state_vectors)
-    {
-      setup(problem_dimension, n_precomputed_values);
-
-      create_matrices();
-
-      if (!dof_handler_->has_hp_capabilities())
-        create_multigrid_data();
-
-      n_parabolic_state_vectors_ = n_parabolic_state_vectors;
-    }
+                 const unsigned int n_parabolic_state_vectors);
 
     /**
      * The DofHandler for our (scalar) CG ansatz space in (deal.II typical)
@@ -291,28 +281,54 @@ namespace ryujin
     //@{
 
     /**
+     * Set up DoFHandlers. Internally used in prepare().
+     *
+     * @note This method populates various OfflineData internal data structures.
+     */
+    void create_dof_handlers();
+
+    /**
+     * Renumber the hyperbolic DoFHandler for use with our SIMD sparsity
+     * pattern. Internally used in prepare().
+     *
+     * @note This method populates various OfflineData internal data structures.
+     */
+    void renumber_for_simd();
+
+    /**
      * Set up affine constraints and sparsity pattern. Internally used in
      * setup().
+     *
+     * @note This method populates various OfflineData internal data structures.
      */
     void create_constraints_and_sparsity_pattern();
 
     /**
-     * Set up DoFHandler, all IndexSet objects and the SparsityPattern.
-     * Initialize matrix storage.
      *
-     * The problem_dimension parameter is used to setup up an appropriately
-     * sized vector partitioner for the MultiComponentVector.
+     * @note This method populates various OfflineData internal data structures.
      */
-    void setup(const unsigned int problem_dimension,
-               const unsigned int n_precomputed_values);
+    void ensure_simd_stride_consistency();
 
     /**
-     * Assemble all matrices.
+     * Create partitioner. Internally used in setup().
+     *
+     * @note This method populates various OfflineData internal data structures.
+     */
+    void create_partitioner_and_simd_sparsity(
+        const unsigned int problem_dimension,
+        const unsigned int n_precomputed_values);
+
+    /**
+     * Assemble all matrices. Internally used in prepare().
+     *
+     * @note This method populates various OfflineData internal data structures.
      */
     void create_matrices();
 
     /**
-     * Create multigrid data.
+     * Create multigrid data. Internally used in prepare().
+     *
+     * @note This method populates various OfflineData internal data structures.
      */
     void create_multigrid_data();
 
