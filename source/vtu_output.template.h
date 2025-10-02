@@ -74,7 +74,9 @@ namespace ryujin
 #endif
 
     SelectedComponentsExtractor<Description, dim, Number>::check(
-        {"alpha", "smoothness_indicators"}, vtu_output_quantities_);
+        parabolic_system_->parabolic_component_names(),
+        {"alpha", "smoothness_indicators"},
+        vtu_output_quantities_);
   }
 
 
@@ -101,6 +103,7 @@ namespace ryujin
         SelectedComponentsExtractor<Description, dim, Number>::extract(
             *offline_data_,
             *hyperbolic_system_,
+            *parabolic_system_,
             state_vector,
             initial_precomputed_,
             {"alpha", "smoothness_indicators"},

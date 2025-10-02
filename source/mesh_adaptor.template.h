@@ -180,7 +180,9 @@ namespace ryujin
     }
 
     SelectedComponentsExtractor<Description, dim, Number>::check(
-        {"alpha"}, smoothness_selected_quantities_);
+        parabolic_system_->parabolic_component_names(),
+        {"alpha"},
+        smoothness_selected_quantities_);
 
     /* toggle mesh adaptation flag to off. */
     need_mesh_adaptation_ = false;
@@ -206,6 +208,7 @@ namespace ryujin
         SelectedComponentsExtractor<Description, dim, Number>::extract(
             *offline_data_,
             *hyperbolic_system_,
+            *parabolic_system_,
             state_vector,
             initial_precomputed_,
             {"alpha"},
