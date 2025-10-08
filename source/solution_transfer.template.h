@@ -755,11 +755,6 @@ namespace ryujin
       if constexpr (n_precomputation_cycles != 0) {
         for (unsigned int cycle = 0; cycle < n_precomputation_cycles; ++cycle) {
 
-          SynchronizationDispatch synchronization_dispatch([&]() {
-            precomputed.update_ghost_values_start(channel++);
-            precomputed.update_ghost_values_finish();
-          });
-
           RYUJIN_PARALLEL_REGION_BEGIN
 
           auto loop = [&](auto sentinel,
@@ -767,16 +762,10 @@ namespace ryujin
                           unsigned int right) {
             using T = decltype(sentinel);
 
-            /* Stored thread locally: */
-            bool thread_ready = false;
-
             const auto view = hyperbolic_system_->template view<dim, T>();
             view.precomputation_loop(
                 cycle,
-                [&](const unsigned int i) {
-                  synchronization_dispatch.check(
-                      thread_ready, i >= n_export_indices && i < n_internal);
-                },
+                [&](const unsigned int) {},
                 sparsity_simd,
                 new_state_vector,
                 left,
@@ -790,6 +779,9 @@ namespace ryujin
           loop(VA(), 0, n_internal);
 
           RYUJIN_PARALLEL_REGION_END
+
+          precomputed.update_ghost_values_start(channel++);
+          precomputed.update_ghost_values_finish();
         }
       }
     };

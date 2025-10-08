@@ -109,12 +109,10 @@ namespace ryujin
     auto &U = std::get<0>(state_vector);
     auto &precomputed = std::get<1>(state_vector);
 
-    const unsigned int n_export_indices = offline_data_->n_export_indices();
     const unsigned int n_internal = offline_data_->n_locally_internal();
     const unsigned int n_owned = offline_data_->n_locally_owned();
     const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
     const auto &boundary_map = offline_data_->boundary_map();
-    unsigned int channel = 10;
     using VA = VectorizedArray<Number>;
 
     Scope scope(computing_timer_,
@@ -157,27 +155,16 @@ namespace ryujin
     if constexpr (n_precomputation_cycles != 0) {
       for (unsigned int cycle = 0; cycle < n_precomputation_cycles; ++cycle) {
 
-        SynchronizationDispatch synchronization_dispatch([&]() {
-          precomputed.update_ghost_values_start(channel++);
-          precomputed.update_ghost_values_finish();
-        });
-
         RYUJIN_PARALLEL_REGION_BEGIN
         LIKWID_MARKER_START(("time_step_1b"));
 
         auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
           using T = decltype(sentinel);
 
-          /* Stored thread locally: */
-          bool thread_ready = false;
-
           const auto view = hyperbolic_system_->template view<dim, T>();
           view.precomputation_loop(
               cycle,
-              [&](const unsigned int i) {
-                synchronization_dispatch.check(
-                    thread_ready, i >= n_export_indices && i < n_internal);
-              },
+              [&](const unsigned int) {},
               sparsity_simd,
               state_vector,
               left,
@@ -191,6 +178,8 @@ namespace ryujin
 
         LIKWID_MARKER_STOP("time_step_1b");
         RYUJIN_PARALLEL_REGION_END
+
+        precomputed.update_ghost_values();
       }
     }
   }
@@ -278,7 +267,6 @@ namespace ryujin
     /* Index ranges for the iteration over the sparsity pattern : */
 
     constexpr auto simd_length = VA::size();
-    const unsigned int n_export_indices = offline_data_->n_export_indices();
     const unsigned int n_internal = offline_data_->n_locally_internal();
     const unsigned int n_owned = offline_data_->n_locally_owned();
 
@@ -300,9 +288,6 @@ namespace ryujin
 
     const Number measure_of_omega_inverse =
         Number(1.) / offline_data_->measure_of_omega();
-
-    /* A monotonically increasing "channel" variable for mpi_tags: */
-    unsigned int channel = 10;
 
     /* Lambda for creating the computing timer string: */
     int step_no = 1;
@@ -344,19 +329,12 @@ namespace ryujin
     {
       Scope scope(computing_timer_, scoped_name("compute d_ij, and alpha_i"));
 
-      SynchronizationDispatch synchronization_dispatch([&]() {
-        alpha_.update_ghost_values_start(channel++);
-        alpha_.update_ghost_values_finish();
-      });
-
       RYUJIN_PARALLEL_REGION_BEGIN
       LIKWID_MARKER_START(("time_step_" + std::to_string(step_no)).c_str());
 
       auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
         using T = decltype(sentinel);
         unsigned int stride_size = get_stride_size<T>;
-
-        /* Stored thread locally: */
 
         using RiemannSolver =
             typename Description::template RiemannSolver<dim, T>;
@@ -367,8 +345,6 @@ namespace ryujin
         Indicator indicator(
             *hyperbolic_system_, indicator_parameters_, old_precomputed);
 
-        bool thread_ready = false;
-
         RYUJIN_OMP_FOR
         for (unsigned int i = left; i < right; i += stride_size) {
 
@@ -376,9 +352,6 @@ namespace ryujin
           const unsigned int row_length = sparsity_simd.row_length(i);
           if (row_length == 1)
             continue;
-
-          synchronization_dispatch.check(
-              thread_ready, i >= n_export_indices && i < n_internal);
 
           const auto U_i = old_U.template get_tensor<T>(i);
 
@@ -424,6 +397,8 @@ namespace ryujin
 
       LIKWID_MARKER_STOP(("time_step_" + std::to_string(step_no)).c_str());
       RYUJIN_PARALLEL_REGION_END
+
+      alpha_.update_ghost_values();
     }
 
     /*
@@ -609,20 +584,6 @@ namespace ryujin
       Scope scope(computing_timer_,
                   scoped_name("l.-o. update, compute bounds, r_i, and p_ij"));
 
-      SynchronizationDispatch synchronization_dispatch([&]() {
-        r_.update_ghost_values_start(channel++);
-        r_.update_ghost_values_finish();
-        if (offline_data_->discretization().have_discontinuous_ansatz()) {
-          /*
-           * In case we extend bounds over the stencil, we have to ensure
-           * that ghost ranges are properly communicated over all MPI
-           * ranks.
-           */
-          bounds_.update_ghost_values_start(channel++);
-          bounds_.update_ghost_values_finish();
-        }
-      });
-
       const Number weight =
           -std::accumulate(stage_weights.begin(), stage_weights.end(), -1.);
 
@@ -645,10 +606,8 @@ namespace ryujin
 
         const auto view = hyperbolic_system_->template view<dim, T>();
 
-        /* Stored thread locally: */
         Limiter limiter(
             *hyperbolic_system_, limiter_parameters_, old_precomputed);
-        bool thread_ready = false;
 
         RYUJIN_OMP_FOR
         for (unsigned int i = left; i < right; i += stride_size) {
@@ -657,9 +616,6 @@ namespace ryujin
           const unsigned int row_length = sparsity_simd.row_length(i);
           if (row_length == 1)
             continue;
-
-          synchronization_dispatch.check(
-              thread_ready, i >= n_export_indices && i < n_internal);
 
           const auto U_i = old_U.template get_tensor<T>(i);
           auto U_i_new = U_i;
@@ -894,6 +850,16 @@ namespace ryujin
 
       LIKWID_MARKER_STOP(("time_step_" + std::to_string(step_no)).c_str());
       RYUJIN_PARALLEL_REGION_END
+
+      r_.update_ghost_values();
+      if (offline_data_->discretization().have_discontinuous_ansatz()) {
+        /*
+         * In case we extend bounds over the stencil, we have to ensure
+         * that ghost ranges are properly communicated over all MPI
+         * ranks.
+         */
+        bounds_.update_ghost_values();
+      }
     }
 
     /*
@@ -904,11 +870,6 @@ namespace ryujin
 
     if (limiter_parameters_.iterations() != 0) {
       Scope scope(computing_timer_, scoped_name("compute p_ij, and l_ij"));
-
-      SynchronizationDispatch synchronization_dispatch([&]() {
-        lij_matrix_.update_ghost_rows_start(channel++);
-        lij_matrix_.update_ghost_rows_finish();
-      });
 
       RYUJIN_PARALLEL_REGION_BEGIN
       LIKWID_MARKER_START(("time_step_" + std::to_string(step_no)).c_str());
@@ -924,10 +885,8 @@ namespace ryujin
 
         unsigned int stride_size = get_stride_size<T>;
 
-        /* Stored thread locally: */
         Limiter limiter(
             *hyperbolic_system_, limiter_parameters_, old_precomputed);
-        bool thread_ready = false;
 
         RYUJIN_OMP_FOR
         for (unsigned int i = left; i < right; i += stride_size) {
@@ -936,9 +895,6 @@ namespace ryujin
           const unsigned int row_length = sparsity_simd.row_length(i);
           if (row_length == 1)
             continue;
-
-          synchronization_dispatch.check(
-              thread_ready, i >= n_export_indices && i < n_internal);
 
           auto bounds =
               bounds_.template get_tensor<T, std::array<T, n_bounds>>(i);
@@ -1051,6 +1007,8 @@ namespace ryujin
 
       LIKWID_MARKER_STOP(("time_step_" + std::to_string(step_no)).c_str());
       RYUJIN_PARALLEL_REGION_END
+
+      lij_matrix_.update_ghost_rows();
     }
 
     /*
@@ -1076,13 +1034,6 @@ namespace ryujin
         std::swap(lij_matrix_, lij_matrix_next_);
       }
 
-      SynchronizationDispatch synchronization_dispatch([&]() {
-        if (!last_round) {
-          lij_matrix_next_.update_ghost_rows_start(channel++);
-          lij_matrix_next_.update_ghost_rows_finish();
-        }
-      });
-
       RYUJIN_PARALLEL_REGION_BEGIN
       LIKWID_MARKER_START(("time_step_" + std::to_string(step_no)).c_str());
 
@@ -1098,7 +1049,6 @@ namespace ryujin
         AlignedVector<T> lij_row;
         Limiter limiter(
             *hyperbolic_system_, limiter_parameters_, old_precomputed);
-        bool thread_ready = false;
 
         RYUJIN_OMP_FOR
         for (unsigned int i = left; i < right; i += stride_size) {
@@ -1107,9 +1057,6 @@ namespace ryujin
           const unsigned int row_length = sparsity_simd.row_length(i);
           if (row_length == 1)
             continue;
-
-          synchronization_dispatch.check(
-              thread_ready, i >= n_export_indices && i < n_internal);
 
           auto U_i_new = new_U.template get_tensor<T>(i);
 
@@ -1192,6 +1139,10 @@ namespace ryujin
 
       LIKWID_MARKER_STOP(("time_step_" + std::to_string(step_no)).c_str());
       RYUJIN_PARALLEL_REGION_END
+
+      if (!last_round) {
+        lij_matrix_next_.update_ghost_rows();
+      }
     } /* limiter_iter_ */
 
     CALLGRIND_STOP_INSTRUMENTATION;
