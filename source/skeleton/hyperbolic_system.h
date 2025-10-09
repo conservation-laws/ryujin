@@ -233,10 +233,9 @@ namespace ryujin
        * Precompute values for hyperbolic update. This routine is called
        * within our usual loop() idiom in HyperbolicModule
        */
-      template <typename DISPATCH, typename SPARSITY>
+      template <typename SPARSITY>
       void
       precomputation_loop(unsigned int /*cycle*/,
-                          const DISPATCH &dispatch_check,
                           const SPARSITY & /*sparsity_simd*/,
                           StateVector & /*state_vector*/,
                           unsigned int /*left*/,

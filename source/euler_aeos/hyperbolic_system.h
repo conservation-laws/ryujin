@@ -455,9 +455,8 @@ namespace ryujin
        * Step 0: precompute values for hyperbolic update. This routine is
        * called within our usual loop() idiom in HyperbolicModule
        */
-      template <typename DISPATCH, typename SPARSITY>
+      template <typename SPARSITY>
       void precomputation_loop(unsigned int cycle,
-                               const DISPATCH &dispatch_check,
                                const SPARSITY &sparsity_simd,
                                StateVector &state_vector,
                                unsigned int left,
@@ -871,11 +870,10 @@ namespace ryujin
 
 
     template <int dim, typename Number>
-    template <typename DISPATCH, typename SPARSITY>
+    template <typename SPARSITY>
     DEAL_II_ALWAYS_INLINE inline void
     HyperbolicSystemView<dim, Number>::precomputation_loop(
         unsigned int cycle [[maybe_unused]],
-        const DISPATCH &dispatch_check,
         const SPARSITY &sparsity_simd,
         StateVector &state_vector,
         unsigned int left,
@@ -938,8 +936,6 @@ namespace ryujin
             if (skip_constrained_dofs && row_length == 1)
               continue;
 
-            dispatch_check(i);
-
             using PT = precomputed_type;
             const auto U_i = U.template get_tensor<Number>(offset + i);
             const auto p_i = get_entry<Number>(p, i);
@@ -959,8 +955,6 @@ namespace ryujin
             const unsigned int row_length = sparsity_simd.row_length(i);
             if (skip_constrained_dofs && row_length == 1)
               continue;
-
-            dispatch_check(i);
 
             const auto U_i = U.template get_tensor<Number>(i);
             const auto rho_i = density(U_i);
@@ -984,8 +978,6 @@ namespace ryujin
           const unsigned int row_length = sparsity_simd.row_length(i);
           if (skip_constrained_dofs && row_length == 1)
             continue;
-
-          dispatch_check(i);
 
           const auto U_i = U.template get_tensor<Number>(i);
           auto prec_i = precomputed.template get_tensor<Number, PT>(i);

@@ -741,7 +741,6 @@ namespace ryujin
     const auto &precomputed = std::get<1>(new_state_vector);
 
     const auto update_precomputed_values = [&]() {
-      const unsigned int n_export_indices = offline_data_->n_export_indices();
       const unsigned int n_internal = offline_data_->n_locally_internal();
       const unsigned int n_owned = offline_data_->n_locally_owned();
       const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
@@ -757,21 +756,18 @@ namespace ryujin
 
           RYUJIN_PARALLEL_REGION_BEGIN
 
-          auto loop = [&](auto sentinel,
-                          unsigned int left,
-                          unsigned int right) {
-            using T = decltype(sentinel);
+          auto loop =
+              [&](auto sentinel, unsigned int left, unsigned int right) {
+                using T = decltype(sentinel);
 
-            const auto view = hyperbolic_system_->template view<dim, T>();
-            view.precomputation_loop(
-                cycle,
-                [&](const unsigned int) {},
-                sparsity_simd,
-                new_state_vector,
-                left,
-                right,
-                /*skip_constrained_dofs*/ false);
-          };
+                const auto view = hyperbolic_system_->template view<dim, T>();
+                view.precomputation_loop(cycle,
+                                         sparsity_simd,
+                                         new_state_vector,
+                                         left,
+                                         right,
+                                         /*skip_constrained_dofs*/ false);
+              };
 
           /* Parallel non-vectorized loop: */
           loop(Number(), n_internal, n_owned);

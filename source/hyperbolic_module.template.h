@@ -163,12 +163,7 @@ namespace ryujin
 
           const auto view = hyperbolic_system_->template view<dim, T>();
           view.precomputation_loop(
-              cycle,
-              [&](const unsigned int) {},
-              sparsity_simd,
-              state_vector,
-              left,
-              right);
+              cycle, sparsity_simd, state_vector, left, right);
         };
 
         /* Parallel non-vectorized loop: */
