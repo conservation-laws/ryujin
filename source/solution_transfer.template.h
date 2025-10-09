@@ -741,7 +741,6 @@ namespace ryujin
     const auto &precomputed = std::get<1>(new_state_vector);
 
     const auto update_precomputed_values = [&]() {
-      const unsigned int n_export_indices = offline_data_->n_export_indices();
       const unsigned int n_internal = offline_data_->n_locally_internal();
       const unsigned int n_owned = offline_data_->n_locally_owned();
       const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
@@ -755,34 +754,20 @@ namespace ryujin
       if constexpr (n_precomputation_cycles != 0) {
         for (unsigned int cycle = 0; cycle < n_precomputation_cycles; ++cycle) {
 
-          SynchronizationDispatch synchronization_dispatch([&]() {
-            precomputed.update_ghost_values_start(channel++);
-            precomputed.update_ghost_values_finish();
-          });
-
           RYUJIN_PARALLEL_REGION_BEGIN
 
-          auto loop = [&](auto sentinel,
-                          unsigned int left,
-                          unsigned int right) {
-            using T = decltype(sentinel);
+          auto loop =
+              [&](auto sentinel, unsigned int left, unsigned int right) {
+                using T = decltype(sentinel);
 
-            /* Stored thread locally: */
-            bool thread_ready = false;
-
-            const auto view = hyperbolic_system_->template view<dim, T>();
-            view.precomputation_loop(
-                cycle,
-                [&](const unsigned int i) {
-                  synchronization_dispatch.check(
-                      thread_ready, i >= n_export_indices && i < n_internal);
-                },
-                sparsity_simd,
-                new_state_vector,
-                left,
-                right,
-                /*skip_constrained_dofs*/ false);
-          };
+                const auto view = hyperbolic_system_->template view<dim, T>();
+                view.precomputation_loop(cycle,
+                                         sparsity_simd,
+                                         new_state_vector,
+                                         left,
+                                         right,
+                                         /*skip_constrained_dofs*/ false);
+              };
 
           /* Parallel non-vectorized loop: */
           loop(Number(), n_internal, n_owned);
@@ -790,6 +775,9 @@ namespace ryujin
           loop(VA(), 0, n_internal);
 
           RYUJIN_PARALLEL_REGION_END
+
+          precomputed.update_ghost_values_start(channel++);
+          precomputed.update_ghost_values_finish();
         }
       }
     };

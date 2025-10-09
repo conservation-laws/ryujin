@@ -68,7 +68,6 @@ project(ryujin CXX)
 
 set(NUMBER "double" CACHE STRING "The principal floating point type")
 
-option(ASYNC_MPI_EXCHANGE "Use synchronous MPI communication" OFF)
 option(DEBUG_EXPENSIVE_BOUNDS_CHECK "Debug: enable debug code paths for additional limiter bounds checks" OFF)
 option(DEBUG_OUTPUT "Debug: enable detailed time-step output" OFF)
 option(DEBUG_SANITIZER "Debug: enable address and UBSAN sanitizers for DEBUG build" OFF)
