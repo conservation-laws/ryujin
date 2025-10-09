@@ -13,9 +13,6 @@
 #include <omp.h>
 #endif
 
-#include <atomic>
-#include <future>
-
 /**
  * @name OpenMP parallel for macros
  *
@@ -130,56 +127,5 @@
  * @ingroup Miscellaneous
  */
 #define RYUJIN_UNLIKELY(x) (__builtin_expect(!!(x), 0))
-
-namespace ryujin
-{
-  /**
-   * @todo write documentation
-   *
-   * @ingroup Miscellaneous
-   */
-  class SynchronizationDispatch
-  {
-  public:
-    SynchronizationDispatch(const std::function<void()> &async_payload)
-        : async_payload_(async_payload)
-        , n_threads_ready_(0)
-    {
-    }
-
-    ~SynchronizationDispatch()
-    {
-      /* Executes in serial, non thread-parallel context: */
-
-      if (payload_status_.valid()) {
-        payload_status_.wait();
-      } else {
-        async_payload_();
-      }
-    }
-
-#ifdef ASYNC_MPI_EXCHANGE
-    DEAL_II_ALWAYS_INLINE inline void check(bool &thread_ready,
-                                            const bool condition)
-    {
-      /* Executes in concurrent, thread-parallel context: */
-      if (RYUJIN_UNLIKELY(thread_ready == false && condition)) {
-        thread_ready = true;
-#ifdef WITH_OPENMP
-        if (++n_threads_ready_ == omp_get_num_threads())
-#endif
-          payload_status_ = std::async(std::launch::async, async_payload_);
-      }
-    }
-#else
-    DEAL_II_ALWAYS_INLINE inline void check(bool &, const bool) {}
-#endif
-
-  private:
-    const std::function<void()> async_payload_;
-    std::future<void> payload_status_;
-    std::atomic_int n_threads_ready_;
-  };
-} // namespace ryujin
 
 //@}

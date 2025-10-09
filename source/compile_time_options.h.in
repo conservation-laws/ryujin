@@ -17,7 +17,6 @@
 
 /* Compile-time parameters: */
 
-#cmakedefine ASYNC_MPI_EXCHANGE
 #cmakedefine DENORMALS_ARE_ZERO
 #cmakedefine FORCE_DEAL_II_SPARSE_MATRIX
 
