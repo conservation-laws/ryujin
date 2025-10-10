@@ -394,7 +394,7 @@ namespace ryujin
 
     dealii::Tensor<1, n_components, Number2> result;
 
-    if constexpr (std::is_same<Number, Number2>::value) {
+    if constexpr (std::is_same_v<Number, Number2>) {
       /*
        * Non-vectorized slow access. Supports all row indices in
        * [0,n_owned)
@@ -417,7 +417,7 @@ namespace ryujin
                    d];
       }
 
-    } else if constexpr (std::is_same<VectorizedArray, Number2>::value) {
+    } else if constexpr (std::is_same_v<VectorizedArray, Number2>) {
       /*
        * Vectorized fast access. Indices must be in the range
        * [0,n_internal), index must be divisible by simd_length
@@ -475,7 +475,7 @@ namespace ryujin
 
     dealii::Tensor<1, n_components, Number2> result;
 
-    if constexpr (std::is_same<Number, Number2>::value) {
+    if constexpr (std::is_same_v<Number, Number2>) {
       /*
        * Non-vectorized slow access. Supports all row indices in
        * [0,n_owned)
@@ -525,7 +525,7 @@ namespace ryujin
           result[0] = data[index];
       }
 
-    } else if constexpr (std::is_same<VectorizedArray, Number2>::value &&
+    } else if constexpr (std::is_same_v<VectorizedArray, Number2> &&
                          (n_components == 1)) {
       /*
        * Vectorized fast access. Indices must be in the range
@@ -591,7 +591,7 @@ namespace ryujin
     AssertIndexRange(row, sparsity->row_starts.size() - 1);
     AssertIndexRange(position_within_column, sparsity->row_length(row));
 
-    if constexpr (std::is_same<Number, Number2>::value) {
+    if constexpr (std::is_same_v<Number, Number2>) {
       /*
        * Non-vectorized slow access. Supports all row indices in
        * [0,n_owned)
@@ -614,7 +614,7 @@ namespace ryujin
                d] = entry[d];
       }
 
-    } else if constexpr (std::is_same<VectorizedArray, Number2>::value) {
+    } else if constexpr (std::is_same_v<VectorizedArray, Number2>) {
       /*
        * Vectorized fast access. Indices must be in the range
        * [0,n_internal), index must be divisible by simd_length
