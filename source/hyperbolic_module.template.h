@@ -561,10 +561,12 @@ namespace ryujin
        */
       Number local_tau_max = std::numeric_limits<Number>::max();
       for (unsigned int i = 0; i < n_owned; ++i) {
-        const Number mass = lumped_mass_matrix.local_element(i);
-        const Number d_sum = dij_matrix_.get_entry(i, 0);
-        const Number local_tau = cfl_ * mass / (Number(-2.) * d_sum);
-        local_tau_max = std::min(local_tau_max, local_tau);
+        if (sparsity_simd.row_length(i) > 1) {
+          const Number mass = lumped_mass_matrix.local_element(i);
+          const Number d_sum = dij_matrix_.get_entry(i, 0);
+          const Number local_tau = cfl_ * mass / (Number(-2.) * d_sum);
+          local_tau_max = std::min(local_tau_max, local_tau);
+        }
       }
       tau_max.store(local_tau_max);
     }
