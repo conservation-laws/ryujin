@@ -496,7 +496,7 @@ namespace ryujin
                    coupling_boundary_pairs.size());
 
       /* Symmetrize d_ij: */
-      const auto body = [&](auto sentinel, unsigned int i) {
+      const auto body = [&](auto, unsigned int i) {
         /* Skip constrained degrees of freedom: */
         const unsigned int row_length = sparsity_simd.row_length(i);
         if (row_length == 1)

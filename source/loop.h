@@ -14,7 +14,7 @@
 namespace ryujin
 {
   template <typename Number, typename Functor>
-  inline void loop(const std::string &region_name,
+  inline void loop(const std::string &region_name [[maybe_unused]],
                    const Functor &functor,
                    unsigned int left,
                    unsigned int right)
