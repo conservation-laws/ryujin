@@ -339,11 +339,10 @@ namespace ryujin
        * called within our usual loop() idiom in HyperbolicModule
        */
       template <typename SPARSITY>
-      void precomputation_loop(unsigned int cycle,
+      void precomputation_step(unsigned int cycle,
                                const SPARSITY &sparsity_simd,
                                StateVector &state_vector,
-                               unsigned int left,
-                               unsigned int right,
+                               const unsigned int i,
                                const bool skip_constrained_dofs = true) const;
 
       //@}
@@ -703,12 +702,11 @@ namespace ryujin
     template <int dim, typename Number>
     template <typename SPARSITY>
     DEAL_II_ALWAYS_INLINE inline void
-    HyperbolicSystemView<dim, Number>::precomputation_loop(
+    HyperbolicSystemView<dim, Number>::precomputation_step(
         unsigned int cycle [[maybe_unused]],
         const SPARSITY &sparsity_simd,
         StateVector &state_vector,
-        unsigned int left,
-        unsigned int right,
+        const unsigned int i,
         const bool skip_constrained_dofs /*= true*/) const
     {
       Assert(cycle == 0, dealii::ExcInternalError());
@@ -716,23 +714,14 @@ namespace ryujin
       const auto &U = std::get<0>(state_vector);
       auto &precomputed = std::get<1>(state_vector);
 
-      /* We are inside a thread parallel context */
+      /* Skip constrained degrees of freedom: */
+      const unsigned int row_length = sparsity_simd.row_length(i);
+      if (skip_constrained_dofs && row_length == 1)
+        return;
 
-      unsigned int stride_size = get_stride_size<Number>;
-
-      RYUJIN_OMP_FOR
-      for (unsigned int i = left; i < right; i += stride_size) {
-
-        /* Skip constrained degrees of freedom: */
-        const unsigned int row_length = sparsity_simd.row_length(i);
-        if (skip_constrained_dofs && row_length == 1)
-          continue;
-
-        const auto U_i = U.template get_tensor<Number>(i);
-        const precomputed_type prec_i{specific_entropy(U_i),
-                                      harten_entropy(U_i)};
-        precomputed.template write_tensor<Number>(prec_i, i);
-      }
+      const auto U_i = U.template get_tensor<Number>(i);
+      const precomputed_type prec_i{specific_entropy(U_i), harten_entropy(U_i)};
+      precomputed.template write_tensor<Number>(prec_i, i);
     }
 
 

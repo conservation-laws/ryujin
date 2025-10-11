@@ -6,6 +6,7 @@
 #pragma once
 
 
+#include "loop.h"
 #include "openmp.h"
 #include "solution_transfer.h"
 #if DEAL_II_VERSION_GTE(9, 6, 0)
@@ -754,27 +755,21 @@ namespace ryujin
       if constexpr (n_precomputation_cycles != 0) {
         for (unsigned int cycle = 0; cycle < n_precomputation_cycles; ++cycle) {
 
-          RYUJIN_PARALLEL_REGION_BEGIN
+          auto body = [&](auto sentinel, const unsigned int i) {
+            using T = decltype(sentinel);
 
-          auto loop =
-              [&](auto sentinel, unsigned int left, unsigned int right) {
-                using T = decltype(sentinel);
-
-                const auto view = hyperbolic_system_->template view<dim, T>();
-                view.precomputation_loop(cycle,
-                                         sparsity_simd,
-                                         new_state_vector,
-                                         left,
-                                         right,
-                                         /*skip_constrained_dofs*/ false);
-              };
+            const auto view = hyperbolic_system_->template view<dim, T>();
+            view.precomputation_step(cycle,
+                                     sparsity_simd,
+                                     new_state_vector,
+                                     i,
+                                     /*skip_constrained_dofs*/ false);
+          };
 
           /* Parallel non-vectorized loop: */
-          loop(Number(), n_internal, n_owned);
+          loop<Number>("solution_transfer", body, n_internal, n_owned);
           /* Parallel vectorized SIMD loop: */
-          loop(VA(), 0, n_internal);
-
-          RYUJIN_PARALLEL_REGION_END
+          loop<VA>("solution_transfer", body, 0, n_internal);
 
           precomputed.update_ghost_values_start(channel++);
           precomputed.update_ghost_values_finish();

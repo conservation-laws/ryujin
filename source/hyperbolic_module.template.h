@@ -7,6 +7,7 @@
 
 #include "hyperbolic_module.h"
 #include "instrumentation.h"
+#include "loop.h"
 #include "mpi_ensemble.h"
 #include "openmp.h"
 #include "scope.h"
@@ -199,24 +200,25 @@ namespace ryujin
     if constexpr (n_precomputation_cycles != 0) {
       for (unsigned int cycle = 0; cycle < n_precomputation_cycles; ++cycle) {
 
-        RYUJIN_PARALLEL_REGION_BEGIN
-        LIKWID_MARKER_START(("time_step_1b"));
-
-        auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
-          using T = decltype(sentinel);
-
-          const auto view = hyperbolic_system_->template view<dim, T>();
-          view.precomputation_loop(
-              cycle, sparsity_simd, state_vector, left, right);
-        };
-
         /* Parallel non-vectorized loop: */
-        loop(Number(), n_internal, n_owned);
+        loop<Number>(
+            "time_step_1b",
+            [&](const Number &, const unsigned int i) {
+              const auto view =
+                  hyperbolic_system_->template view<dim, Number>();
+              view.precomputation_step(cycle, sparsity_simd, state_vector, i);
+            },
+            n_internal,
+            n_owned);
         /* Parallel vectorized SIMD loop: */
-        loop(VA(), 0, n_internal);
-
-        LIKWID_MARKER_STOP("time_step_1b");
-        RYUJIN_PARALLEL_REGION_END
+        loop<VA>(
+            "time_step_1b",
+            [&](const VA &, const unsigned int i) {
+              const auto view = hyperbolic_system_->template view<dim, VA>();
+              view.precomputation_step(cycle, sparsity_simd, state_vector, i);
+            },
+            0,
+            n_internal);
 
         precomputed.update_ghost_values();
       }
@@ -364,24 +366,8 @@ namespace ryujin
      *  sounds a bit too expensive...
      * -------------------------------------------------------------------------
      */
-
-    auto loop = [&](auto sentinel,
-                    const auto &functor,
-                    unsigned int left,
-                    unsigned int right) {
-      using T = decltype(sentinel);
-      constexpr unsigned int stride_size = get_stride_size<T>;
-
-      RYUJIN_OMP_FOR
-      for (unsigned int i = left; i < right; i += stride_size)
-        functor(sentinel, i);
-    };
-
     {
       Scope scope(computing_timer_, scoped_name("compute d_ij, and alpha_i"));
-
-      RYUJIN_PARALLEL_REGION_BEGIN
-      LIKWID_MARKER_START(("time_step_" + std::to_string(step_no)).c_str());
 
       auto body = [&](auto sentinel, unsigned int i) {
         using T = decltype(sentinel);
@@ -437,12 +423,10 @@ namespace ryujin
       };
 
       /* Parallel non-vectorized loop: */
-      loop(Number(), body, n_internal, n_owned);
+      loop<Number>(
+          "time_step_" + std::to_string(step_no), body, n_internal, n_owned);
       /* Parallel vectorized SIMD loop: */
-      loop(VA(), body, 0, n_internal);
-
-      LIKWID_MARKER_STOP(("time_step_" + std::to_string(step_no)).c_str());
-      RYUJIN_PARALLEL_REGION_END
+      loop<VA>("time_step_" + std::to_string(step_no), body, 0, n_internal);
 
       alpha_.update_ghost_values();
     }
@@ -457,10 +441,6 @@ namespace ryujin
       Scope scope(computing_timer_,
                   scoped_name("compute bdry d_ij, diag d_ii, and tau_max"));
 
-      /* Parallel region */
-      RYUJIN_PARALLEL_REGION_BEGIN
-      LIKWID_MARKER_START(("time_step_" + std::to_string(step_no)).c_str());
-
       /*
        * Complete d_ij at boundary:
        *
@@ -470,18 +450,18 @@ namespace ryujin
        * boundary degrees of freedom as well.
        */
 
-      using RiemannSolver =
-          typename Description::template RiemannSolver<dim, Number>;
-      RiemannSolver riemann_solver(
-          *hyperbolic_system_, riemann_solver_parameters_, old_precomputed);
-
       /*
        * Note: we need this dance of iterating over an integer and then
        * accessing the element to make Apple's OpenMP implementation
        * happy.
        */
-      const auto body_boundary = [&](auto, const unsigned int k) {
+      const auto body_boundary = [&](const auto &, const unsigned int k) {
         const auto &[i, col_idx, j] = coupling_boundary_pairs[k];
+
+        using RiemannSolver =
+            typename Description::template RiemannSolver<dim, Number>;
+        RiemannSolver riemann_solver(
+            *hyperbolic_system_, riemann_solver_parameters_, old_precomputed);
 
         /*
          * Only work on index pairs "i < j" that point to the upper
@@ -510,7 +490,10 @@ namespace ryujin
         dij_matrix_.write_entry(std::max(d_ij, d_ji), i, col_idx);
       };
 
-      loop(Number(), body_boundary, 0, coupling_boundary_pairs.size());
+      loop<Number>("time_step_" + std::to_string(step_no),
+                   body_boundary,
+                   0,
+                   coupling_boundary_pairs.size());
 
       /* Symmetrize d_ij: */
       const auto body = [&](auto sentinel, unsigned int i) {
@@ -569,10 +552,7 @@ namespace ryujin
         dij_matrix_.write_entry(d_sum, i, 0);
       };
 
-      loop(Number(), body, 0, n_owned);
-
-      LIKWID_MARKER_STOP(("time_step_" + std::to_string(step_no)).c_str());
-      RYUJIN_PARALLEL_REGION_END
+      loop<Number>("time_step_" + std::to_string(step_no), body, 0, n_owned);
 
       /*
        * This code could be transformed into a parallel reduction if it ever
@@ -646,10 +626,6 @@ namespace ryujin
 
       const Number weight =
           -std::accumulate(stage_weights.begin(), stage_weights.end(), -1.);
-
-      /* Parallel region */
-      RYUJIN_PARALLEL_REGION_BEGIN
-      LIKWID_MARKER_START(("time_step_" + std::to_string(step_no)).c_str());
 
       auto body = [&](auto sentinel,
                       auto have_discontinuous_ansatz,
@@ -894,15 +870,15 @@ namespace ryujin
        */
       if (offline_data_->discretization().have_discontinuous_ansatz()) {
         /* Parallel non-vectorized loop and vectorized SIMD loop: */
-        loop(
-            Number(),
+        loop<Number>(
+            "time_step_" + std::to_string(step_no),
             [&](auto sentinel, const unsigned int i) {
               body(sentinel, std::true_type{}, i);
             },
             n_internal,
             n_owned);
-        loop(
-            VA(),
+        loop<VA>(
+            "time_step_" + std::to_string(step_no),
             [&](auto sentinel, const unsigned int i) {
               body(sentinel, std::true_type{}, i);
             },
@@ -910,24 +886,21 @@ namespace ryujin
             n_internal);
       } else {
         /* Parallel non-vectorized loop and vectorized SIMD loop: */
-        loop(
-            Number(),
+        loop<Number>(
+            "time_step_" + std::to_string(step_no),
             [&](auto sentinel, const unsigned int i) {
               body(sentinel, std::false_type{}, i);
             },
             n_internal,
             n_owned);
-        loop(
-            VA(),
+        loop<VA>(
+            "time_step_" + std::to_string(step_no),
             [&](auto sentinel, const unsigned int i) {
               body(sentinel, std::false_type{}, i);
             },
             0,
             n_internal);
       }
-
-      LIKWID_MARKER_STOP(("time_step_" + std::to_string(step_no)).c_str());
-      RYUJIN_PARALLEL_REGION_END
 
       r_.update_ghost_values();
       if (offline_data_->discretization().have_discontinuous_ansatz()) {
@@ -948,9 +921,6 @@ namespace ryujin
 
     if (limiter_parameters_.iterations() != 0) {
       Scope scope(computing_timer_, scoped_name("compute p_ij, and l_ij"));
-
-      RYUJIN_PARALLEL_REGION_BEGIN
-      LIKWID_MARKER_START(("time_step_" + std::to_string(step_no)).c_str());
 
       auto body = [&](auto sentinel,
                       auto have_discontinuous_ansatz,
@@ -1070,15 +1040,15 @@ namespace ryujin
        */
       if (offline_data_->discretization().have_discontinuous_ansatz()) {
         /* Parallel non-vectorized loop and vectorized SIMD loop: */
-        loop(
-            Number(),
+        loop<Number>(
+            "time_step_" + std::to_string(step_no),
             [&](auto sentinel, const unsigned int i) {
               body(sentinel, std::true_type{}, i);
             },
             n_internal,
             n_owned);
-        loop(
-            VA(),
+        loop<VA>(
+            "time_step_" + std::to_string(step_no),
             [&](auto sentinel, const unsigned int i) {
               body(sentinel, std::true_type{}, i);
             },
@@ -1086,24 +1056,21 @@ namespace ryujin
             n_internal);
       } else {
         /* Parallel non-vectorized loop and vectorized SIMD loop: */
-        loop(
-            Number(),
+        loop<Number>(
+            "time_step_" + std::to_string(step_no),
             [&](auto sentinel, const unsigned int i) {
               body(sentinel, std::false_type{}, i);
             },
             n_internal,
             n_owned);
-        loop(
-            VA(),
+        loop<VA>(
+            "time_step_" + std::to_string(step_no),
             [&](auto sentinel, const unsigned int i) {
               body(sentinel, std::false_type{}, i);
             },
             0,
             n_internal);
       }
-
-      LIKWID_MARKER_STOP(("time_step_" + std::to_string(step_no)).c_str());
-      RYUJIN_PARALLEL_REGION_END
 
       lij_matrix_.update_ghost_rows();
     }
@@ -1130,9 +1097,6 @@ namespace ryujin
       if ((n_iterations == 2) && last_round) {
         std::swap(lij_matrix_, lij_matrix_next_);
       }
-
-      RYUJIN_PARALLEL_REGION_BEGIN
-      LIKWID_MARKER_START(("time_step_" + std::to_string(step_no)).c_str());
 
       auto body = [&](auto sentinel, const unsigned int i) {
         using T = decltype(sentinel);
@@ -1223,12 +1187,10 @@ namespace ryujin
       };
 
       /* Parallel non-vectorized loop: */
-      loop(Number(), body, n_internal, n_owned);
+      loop<Number>(
+          "time_step_" + std::to_string(step_no), body, n_internal, n_owned);
       /* Parallel vectorized SIMD loop: */
-      loop(VA(), body, 0, n_internal);
-
-      LIKWID_MARKER_STOP(("time_step_" + std::to_string(step_no)).c_str());
-      RYUJIN_PARALLEL_REGION_END
+      loop<VA>("time_step_" + std::to_string(step_no), body, 0, n_internal);
 
       if (!last_round) {
         lij_matrix_next_.update_ghost_rows();
