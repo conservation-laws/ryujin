@@ -264,7 +264,7 @@ namespace ryujin
      * low-order update and limiting stages guarantee invariant domain
      * preservation.
      */
-    void cfl(Number new_cfl) const
+    void set_cfl(Number new_cfl) const
     {
       Assert(cfl_ > Number(0.), dealii::ExcInternalError());
       cfl_ = new_cfl;
@@ -282,7 +282,7 @@ namespace ryujin
      * hyperbolic (sub) step is above this limit we throw a Restart
      * exception.
      */
-    void acceptable_tau_max_ratio(Number new_acceptable_tau_max_ratio) const
+    void set_acceptable_tau_max_ratio(Number new_acceptable_tau_max_ratio) const
     {
       Assert(new_acceptable_tau_max_ratio >= Number(1.),
              dealii::ExcInternalError());
@@ -296,6 +296,14 @@ namespace ryujin
      * exception.
      */
     ACCESSOR_READ_ONLY(acceptable_tau_max_ratio)
+
+    /**
+     * Sets the invariant domain violation strategy.
+     */
+    void set_id_violation_strategy(const IDViolationStrategy &strategy) const
+    {
+      id_violation_strategy_ = strategy;
+    }
 
     /**
      * Return a reference to the OfflineData object
@@ -340,9 +348,6 @@ namespace ryujin
      */
     ACCESSOR_READ_ONLY(n_warnings)
 
-    // FIXME: refactor to function
-    mutable IDViolationStrategy id_violation_strategy_;
-
   private:
     //@}
     /**
@@ -374,6 +379,8 @@ namespace ryujin
 
     mutable Number cfl_;
     mutable Number acceptable_tau_max_ratio_;
+
+    mutable IDViolationStrategy id_violation_strategy_;
 
     mutable unsigned int n_restarts_;
     mutable unsigned int n_corrections_;

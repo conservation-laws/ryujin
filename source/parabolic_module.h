@@ -5,9 +5,6 @@
 
 #pragma once
 
-#include <compile_time_options.h>
-#include <description.h>
-
 namespace ryujin
 {
   /**

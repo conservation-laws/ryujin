@@ -162,8 +162,8 @@ namespace ryujin
         ExcMessage(
             "acceptable tau_max ratio must be greater than or equal to 1."));
 
-    hyperbolic_module_->cfl(cfl_max_);
-    hyperbolic_module_->acceptable_tau_max_ratio(acceptable_tau_max_ratio_);
+    hyperbolic_module_->set_cfl(cfl_max_);
+    hyperbolic_module_->set_acceptable_tau_max_ratio(acceptable_tau_max_ratio_);
 
     const auto check_whether_timestepping_makes_sense = [&]() {
       /*
@@ -291,11 +291,11 @@ namespace ryujin
     };
 
     if (cfl_recovery_strategy_ != CFLRecoveryStrategy::none) {
-      hyperbolic_module_->id_violation_strategy_ =
-          IDViolationStrategy::raise_exception;
-      parabolic_module_->id_violation_strategy_ =
-          IDViolationStrategy::raise_exception;
-      hyperbolic_module_->cfl(cfl_max_);
+      hyperbolic_module_->set_id_violation_strategy(
+          IDViolationStrategy::raise_exception);
+      parabolic_module_->set_id_violation_strategy(
+          IDViolationStrategy::raise_exception);
+      hyperbolic_module_->set_cfl(cfl_max_);
     }
 
     try {
@@ -306,8 +306,8 @@ namespace ryujin
       AssertThrow(cfl_recovery_strategy_ != CFLRecoveryStrategy::none,
                   dealii::ExcInternalError());
 
-      hyperbolic_module_->id_violation_strategy_ = IDViolationStrategy::warn;
-      parabolic_module_->id_violation_strategy_ = IDViolationStrategy::warn;
+      hyperbolic_module_->set_id_violation_strategy(IDViolationStrategy::warn);
+      parabolic_module_->set_id_violation_strategy(IDViolationStrategy::warn);
 
       if (cfl_recovery_strategy_ == CFLRecoveryStrategy::bang_bang_control) {
         /* Retry with cfl_min instead of cfl_max: */
@@ -316,7 +316,7 @@ namespace ryujin
             << "        restart with bang bang control: setting cfl to cfl_min"
             << std::endl;
 #endif
-        hyperbolic_module_->cfl(cfl_min_);
+        hyperbolic_module_->set_cfl(cfl_min_);
       }
 
       if (cfl_recovery_strategy_ == CFLRecoveryStrategy::cruise_control) {

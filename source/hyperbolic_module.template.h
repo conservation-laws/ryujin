@@ -34,7 +34,6 @@ namespace ryujin
       const InitialValues<Description, dim, Number> &initial_values,
       const std::string &subsection /*= "HyperbolicModule"*/)
       : ParameterAcceptor(subsection)
-      , id_violation_strategy_(IDViolationStrategy::warn)
       , indicator_parameters_(subsection + "/indicator")
       , limiter_parameters_(subsection + "/limiter")
       , riemann_solver_parameters_(subsection + "/riemann solver")
@@ -45,6 +44,7 @@ namespace ryujin
       , initial_values_(&initial_values)
       , cfl_(0.2)
       , acceptable_tau_max_ratio_(1.e6)
+      , id_violation_strategy_(IDViolationStrategy::warn)
       , n_restarts_(0)
       , n_corrections_(0)
       , n_warnings_(0)
