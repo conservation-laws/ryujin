@@ -11,7 +11,7 @@
 #include "../euler/indicator.h"
 #include "../euler/limiter.h"
 #include "../euler/riemann_solver.h"
-#include "parabolic_solver.h"
+#include "parabolic_module.h"
 #include "parabolic_system.h"
 
 namespace ryujin
@@ -38,8 +38,8 @@ namespace ryujin
       using ParabolicSystem = NavierStokes::ParabolicSystem;
 
       template <int dim, typename Number = double>
-      using ParabolicSolver =
-          NavierStokes::ParabolicSolver<Description, dim, Number>;
+      using ParabolicModule =
+          NavierStokes::ParabolicModule<Description, dim, Number>;
 
       template <int dim, typename Number = double>
       using Indicator = Euler::Indicator<dim, Number>;

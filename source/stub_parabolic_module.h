@@ -77,6 +77,9 @@ namespace ryujin
      */
     //@{
 
+    /**
+     * Sets the invariant domain violation strategy.
+     */
     void set_id_violation_strategy(
         const IDViolationStrategy & /*new_strategy*/) const
     {
