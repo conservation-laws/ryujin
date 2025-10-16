@@ -49,9 +49,6 @@ namespace ryujin
 
     using ParabolicSystem = typename Description::ParabolicSystem;
 
-    using ParabolicSolver =
-        typename Description::template ParabolicSolver<dim, Number>;
-
     using ScalarNumber = typename View::ScalarNumber;
 
     static constexpr auto problem_dimension = View::problem_dimension;

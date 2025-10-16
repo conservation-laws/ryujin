@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "parabolic_solver.h"
+#include "parabolic_module.h"
 
 #include <instrumentation.h>
 #include <openmp.h>
@@ -31,14 +31,14 @@ namespace ryujin
     using namespace dealii;
 
     template <typename Description, int dim, typename Number>
-    ParabolicSolver<Description, dim, Number>::ParabolicSolver(
+    ParabolicModule<Description, dim, Number>::ParabolicModule(
         const MPIEnsemble &mpi_ensemble,
         std::map<std::string, dealii::Timer> &computing_timer,
+        const OfflineData<dim, Number> &offline_data,
         const HyperbolicSystem &hyperbolic_system,
         const ParabolicSystem &parabolic_system,
-        const OfflineData<dim, Number> &offline_data,
         const InitialValues<Description, dim, Number> &initial_values,
-        const std::string &subsection /*= "ParabolicSolver"*/)
+        const std::string &subsection /*= "ParabolicModule"*/)
         : ParameterAcceptor(subsection)
         , mpi_ensemble_(mpi_ensemble)
         , computing_timer_(computing_timer)
@@ -46,6 +46,8 @@ namespace ryujin
         , parabolic_system_(&parabolic_system)
         , offline_data_(&offline_data)
         , initial_values_(&initial_values)
+        , id_violation_strategy_(IDViolationStrategy::warn)
+        , cycle_(0)
         , n_restarts_(0)
         , n_corrections_(0)
         , n_warnings_(0)
@@ -123,11 +125,16 @@ namespace ryujin
 
 
     template <typename Description, int dim, typename Number>
-    void ParabolicSolver<Description, dim, Number>::prepare()
+    void ParabolicModule<Description, dim, Number>::prepare()
     {
 #ifdef DEBUG_OUTPUT
-      std::cout << "ParabolicSolver<dim, Number>::prepare()" << std::endl;
+      std::cout << "ParabolicModule<dim, Number>::prepare()" << std::endl;
 #endif
+      /*
+       * The cycle_ variabe is only used for gmg reinitialization, simply
+       * reset it to zero on prepare().
+       */
+      cycle_ = 0;
 
       const auto &discretization = offline_data_->discretization();
       AssertThrow(discretization.ansatz() == Ansatz::cg_q1,
@@ -224,8 +231,9 @@ namespace ryujin
                                 level_matrix_free_);
     }
 
+
     template <typename Description, int dim, typename Number>
-    void ParabolicSolver<Description, dim, Number>::prepare_state_vector(
+    void ParabolicModule<Description, dim, Number>::prepare_state_vector(
         StateVector & /*state_vector*/, Number /*t*/) const
     {
       /**
@@ -236,42 +244,38 @@ namespace ryujin
 
 
     template <typename Description, int dim, typename Number>
-    void ParabolicSolver<Description, dim, Number>::backward_euler_step(
+    template <int stages>
+    void ParabolicModule<Description, dim, Number>::backward_euler_step(
         const StateVector &old_state_vector,
-        const Number t,
+        const Number old_t,
+        std::array<std::reference_wrapper<const StateVector>,
+                   stages> /*stage_state_vectors*/,
+        const std::array<Number, stages> /*stage_weights*/,
         StateVector &new_state_vector,
-        Number tau,
-        const IDViolationStrategy id_violation_strategy,
-        const bool reinitialize_gmg) const
+        Number tau) const
     {
       /* Backward Euler step to half time step, and extrapolate: */
 
       step(old_state_vector,
-           t,
+           old_t,
            new_state_vector,
            tau,
-           id_violation_strategy,
-           reinitialize_gmg,
            /*crank_nicolson_extrapolation = */ false);
     }
 
 
     template <typename Description, int dim, typename Number>
-    void ParabolicSolver<Description, dim, Number>::crank_nicolson_step(
+    void ParabolicModule<Description, dim, Number>::crank_nicolson_step(
         const StateVector &old_state_vector,
-        const Number t,
+        const Number old_t,
         StateVector &new_state_vector,
-        Number tau,
-        const IDViolationStrategy id_violation_strategy,
-        const bool reinitialize_gmg) const
+        Number tau) const
     {
       try {
         step(old_state_vector,
-             t,
+             old_t,
              new_state_vector,
              tau / Number(2.),
-             id_violation_strategy,
-             reinitialize_gmg,
              /*crank_nicolson_extrapolation = */ true);
 
       } catch (Correction) {
@@ -285,30 +289,25 @@ namespace ryujin
          * step:
          */
         step(old_state_vector,
-             t,
+             old_t,
              new_state_vector,
              tau,
-             id_violation_strategy,
-             reinitialize_gmg,
              /*crank_nicolson_extrapolation = */ false);
       }
     }
 
 
     template <typename Description, int dim, typename Number>
-    void ParabolicSolver<Description, dim, Number>::step(
+    void ParabolicModule<Description, dim, Number>::step(
         const StateVector &old_state_vector,
         const Number t,
         StateVector &new_state_vector,
         Number tau,
-        const IDViolationStrategy id_violation_strategy,
-        const bool reinitialize_gmg,
         const bool crank_nicolson_extrapolation) const
     {
 #ifdef DEBUG_OUTPUT
-      std::cout << "ParabolicSolver<dim, Number>::step()" << std::endl;
+      std::cout << "ParabolicModule<dim, Number>::step()" << std::endl;
 #endif
-
       constexpr ScalarNumber eps = std::numeric_limits<ScalarNumber>::epsilon();
 
       const auto &old_U = std::get<0>(old_state_vector);
@@ -336,6 +335,13 @@ namespace ryujin
       if (crank_nicolson_extrapolation)
         std::cout << "        and extrapolate to t + 2 * tau" << std::endl;
 #endif
+
+      /*
+       * Update MG matrices all 4 time steps; this is a balance because more
+       * refreshes will render the approximation better, at some additional
+       * cost.
+       */
+      const bool reinitialize_gmg = (cycle_++ % 4 == 0);
 
       /*
        * A boolean indicating that a restart is required.
@@ -485,11 +491,6 @@ namespace ryujin
         diagonal_matrix.reinit(
             lumped_mass_matrix, density_, affine_constraints);
 
-        /*
-         * Update MG matrices all 4 time steps; this is a balance because more
-         * refreshes will render the approximation better, at some additional
-         * cost.
-         */
         if (use_gmg_velocity_ && reinitialize_gmg) {
           MGLevelObject<typename PreconditionChebyshev<
               VelocityMatrix<dim, float, Number>,
@@ -1006,7 +1007,7 @@ namespace ryujin
 
       if (correction_needed) {
         /* If we can do a restart try that first: */
-        if (id_violation_strategy == IDViolationStrategy::raise_exception) {
+        if (id_violation_strategy_ == IDViolationStrategy::raise_exception) {
           n_restarts_++;
           /* Half step size is a good heuristic: */
           throw Restart{Number(0.5) * tau};
@@ -1017,7 +1018,7 @@ namespace ryujin
       }
 
       if (restart_needed) {
-        switch (id_violation_strategy) {
+        switch (id_violation_strategy_) {
         case IDViolationStrategy::warn:
           n_warnings_++;
           break;
@@ -1031,7 +1032,7 @@ namespace ryujin
 
 
     template <typename Description, int dim, typename Number>
-    void ParabolicSolver<Description, dim, Number>::print_solver_statistics(
+    void ParabolicModule<Description, dim, Number>::print_solver_statistics(
         std::ostream &output) const
     {
       output << "        [ " << std::setprecision(2) << std::fixed

@@ -17,7 +17,7 @@
 #include <simd.h>
 #include <sparse_matrix_simd.h>
 
-#include "parabolic_solver_gmg_operators.h"
+#include "parabolic_module_gmg_operators.h"
 
 #include <deal.II/base/mg_level_object.h>
 #include <deal.II/base/parameter_acceptor.h>
@@ -111,7 +111,7 @@ namespace ryujin
      * @ingroup NavierStokesEquations
      */
     template <typename Description, int dim, typename Number = double>
-    class ParabolicSolver final : public dealii::ParameterAcceptor
+    class ParabolicModule final : public dealii::ParameterAcceptor
     {
     public:
       /**
@@ -147,14 +147,14 @@ namespace ryujin
       /**
        * Constructor.
        */
-      ParabolicSolver(
+      ParabolicModule(
           const MPIEnsemble &mpi_ensemble,
           std::map<std::string, dealii::Timer> &computing_timer,
+          const OfflineData<dim, Number> &offline_data,
           const HyperbolicSystem &hyperbolic_system,
           const ParabolicSystem &parabolic_system,
-          const OfflineData<dim, Number> &offline_data,
           const InitialValues<Description, dim, Number> &initial_values,
-          const std::string &subsection = "ParabolicSolver");
+          const std::string &subsection = "ParabolicModule");
 
       /**
        * Prepare time stepping. A call to @ref prepare() allocates temporary
@@ -163,29 +163,44 @@ namespace ryujin
        */
       void prepare();
 
+      //@}
+      /**
+       * @name Functons for performing explicit time steps
+       */
+      //@{
+
+      /**
+       * Sets the invariant domain violation strategy.
+       */
+      void set_id_violation_strategy(const IDViolationStrategy &strategy) const
+      {
+        id_violation_strategy_ = strategy;
+      }
+
       /**
        * Prepare the parabolic part of the state vector prior to a backward
        * Euler or Crank Nicolson step.
        */
       void prepare_state_vector(StateVector &state_vector, Number t) const;
 
-      //@}
       /**
-       * @name Functions for performing implicit time steps
+       * Given a reference to a previous state vector @p old_U at time
+       * @p old_t and a time-step size @p tau perform an implicit backward
+       * euler step (and store the result in @p new_U).
+       *
+       * The function takes an optional array of states @p stage_U together
+       * with a an array of weights @p stage_weights to construct a modified
+       * high-order right-hand side / flux.
        */
-      //@{
-
-      /**
-       * Given a reference to a previous state vector @p old_state_vector
-       * at time @p old_t and a time-step size @p tau perform an implicit
-       * backward Euler step (and store the result in @p new_state_vector).
-       */
-      void backward_euler_step(const StateVector &old_state_vector,
-                               const Number old_t,
-                               StateVector &new_state_vector,
-                               Number tau,
-                               const IDViolationStrategy id_violation_strategy,
-                               const bool reinitialize_gmg) const;
+      template <int stages>
+      void
+      backward_euler_step(const StateVector &old_state_vector,
+                          const Number old_t,
+                          std::array<std::reference_wrapper<const StateVector>,
+                                     stages> stage_state_vectors,
+                          const std::array<Number, stages> stage_weights,
+                          StateVector &new_state_vector,
+                          Number tau) const;
 
       /**
        * Given a reference to a previous state vector @p old_state_vector
@@ -195,9 +210,13 @@ namespace ryujin
       void crank_nicolson_step(const StateVector &old_state_vector,
                                const Number old_t,
                                StateVector &new_state_vector,
-                               Number tau,
-                               const IDViolationStrategy id_violation_strategy,
-                               const bool reinitialize_gmg) const;
+                               Number tau) const;
+
+      //@}
+      /**
+       * @name Information and statistics
+       */
+      //@{
 
       /**
        * Print a status line with solver statistics. This function is used
@@ -206,14 +225,22 @@ namespace ryujin
        */
       void print_solver_statistics(std::ostream &output) const;
 
-      //@}
       /**
-       * @name Accessors
+       * The number of restarts signalled by the step() function.
        */
-      //@{
-
       ACCESSOR_READ_ONLY(n_restarts)
+
+      /**
+       * The number of corrections performed by the step() function. This
+       * function exists to mirror the ParabolicModule interface and will
+       * always return 0.
+       */
       ACCESSOR_READ_ONLY(n_corrections)
+
+      /**
+       * The number of ID violation warnings encounterd in the step()
+       * function.
+       */
       ACCESSOR_READ_ONLY(n_warnings)
 
       //@}
@@ -262,8 +289,6 @@ namespace ryujin
                 const Number old_t,
                 StateVector &new_state_vector,
                 Number tau,
-                const IDViolationStrategy id_violation_strategy,
-                const bool reinitialize_gmg,
                 const bool crank_nicolson_extrapolation) const;
 
       //@}
@@ -286,6 +311,10 @@ namespace ryujin
       dealii::ObserverPointer<
           const ryujin::InitialValues<Description, dim, Number>>
           initial_values_;
+
+      mutable IDViolationStrategy id_violation_strategy_;
+
+      mutable unsigned int cycle_;
 
       mutable unsigned int n_restarts_;
       mutable unsigned int n_corrections_;

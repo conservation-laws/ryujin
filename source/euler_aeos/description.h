@@ -7,8 +7,8 @@
 
 #include <compile_time_options.h>
 
+#include "../stub_parabolic_module.h"
 #include "../stub_parabolic_system.h"
-#include "../stub_solver.h"
 #include "hyperbolic_system.h"
 #include "indicator.h"
 #include "limiter.h"
@@ -40,7 +40,8 @@ namespace ryujin
       using ParabolicSystem = ryujin::StubParabolicSystem;
 
       template <int dim, typename Number = double>
-      using ParabolicSolver = ryujin::StubSolver<Description, dim, Number>;
+      using ParabolicModule =
+          ryujin::StubParabolicModule<Description, dim, Number>;
 
       template <int dim, typename Number = double>
       using Indicator = EulerAEOS::Indicator<dim, Number>;

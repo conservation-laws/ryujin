@@ -45,7 +45,6 @@ set(DEPENDENT_SOURCE_FILES
   hyperbolic_module.cc
   initial_values.cc
   mesh_adaptor.cc
-  parabolic_module.cc
   postprocessor.cc
   quantities.cc
   solution_transfer.cc
