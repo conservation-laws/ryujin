@@ -98,8 +98,7 @@ namespace ryujin
      * precomputed MultiComponentVector.
      */
     void prepare(const unsigned int problem_dimension,
-                 const unsigned int n_precomputed_values,
-                 const unsigned int n_parabolic_state_vectors);
+                 const unsigned int n_precomputed_values);
 
     /**
      * Return a read-only const reference to the DoFHandler for the
@@ -170,11 +169,6 @@ namespace ryujin
      * vector-valued quantity of size HyperbolicSystem::problem_dimension.
      */
     ACCESSOR_READ_ONLY_NO_DEREFERENCE(precomputed_vector_partitioner)
-
-    /**
-     * The block size of the parabolic state vector.
-     */
-    ACCESSOR_READ_ONLY(n_parabolic_state_vectors);
 
     /**
      * The subinterval \f$[0,\texttt{n_export_indices()})\f$ contains all
@@ -393,8 +387,6 @@ namespace ryujin
 
     std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
         precomputed_vector_partitioner_;
-
-    unsigned int n_parabolic_state_vectors_;
 
     unsigned int n_export_indices_;
     unsigned int n_locally_internal_;

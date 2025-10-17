@@ -101,22 +101,22 @@ namespace ryujin
 
       constexpr auto nan = std::numeric_limits<Number>::signaling_NaN();
       const unsigned int n_owned = offline_data.n_locally_owned();
-      const auto block_size = offline_data.n_parabolic_state_vectors();
 
       for (unsigned int i = 0; i < n_owned; ++i) {
         precomputed.write_tensor(
             dealii::Tensor<1, prec_dimension, Number>() * nan, i);
-        for (unsigned int b = 0; b < block_size; ++b) {
-          V.block(b).local_element(i) = nan;
-        }
       }
 #endif
     }
 
 
     /**
-     * Helper function that (re)initializes all components of a StateVector
-     * to proper sizes.
+     * Helper function that (re)initializes the state and the precomputed
+     * component of a StateVector to proper sizes.
+     *
+     * @note This method does neither initialize nor resize the parabolic
+     * state vector component. The ParabolicModule itself has to ensure
+     * proper setup during prepare_state_vector() and solve().
      */
     template <
         typename Description,
@@ -134,12 +134,6 @@ namespace ryujin
       U.reinit(offline_data.hyperbolic_vector_partitioner());
       precomputed.reinit(offline_data.precomputed_vector_partitioner());
 
-      const auto block_size = offline_data.n_parabolic_state_vectors();
-      V.reinit(block_size);
-      for (unsigned int i = 0; i < block_size; ++i) {
-        V.block(i).reinit(offline_data.scalar_partitioner());
-      }
-
 #ifdef DEBUG
       /* Poison all vectors: */
       using state_type = typename View::state_type;
@@ -151,9 +145,6 @@ namespace ryujin
         U.write_tensor(state_type{} * nan, i);
         precomputed.write_tensor(
             dealii::Tensor<1, prec_dimension, Number>() * nan, i);
-        for (unsigned int b = 0; b < block_size; ++b) {
-          V.block(b).local_element(i) = nan;
-        }
       }
 #endif
     }

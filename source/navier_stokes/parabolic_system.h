@@ -50,11 +50,6 @@ namespace ryujin
       ACCESSOR_READ_ONLY(lambda)
       ACCESSOR_READ_ONLY(cv_inverse_kappa)
 
-      unsigned int n_parabolic_state_vectors() const
-      {
-        return parabolic_component_names_.size();
-      }
-
       ACCESSOR_READ_ONLY(parabolic_component_names);
 
     private:

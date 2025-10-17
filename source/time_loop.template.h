@@ -270,11 +270,7 @@ namespace ryujin
     const auto prepare_compute_kernels = [&]() {
       print_info("preparing compute kernels");
 
-      unsigned int n_parabolic_state_vectors =
-          parabolic_system_.get().n_parabolic_state_vectors();
-
-      offline_data_.prepare(
-          problem_dimension, n_precomputed_values, n_parabolic_state_vectors);
+      offline_data_.prepare(problem_dimension, n_precomputed_values);
 
       hyperbolic_module_.prepare();
       parabolic_module_.prepare();

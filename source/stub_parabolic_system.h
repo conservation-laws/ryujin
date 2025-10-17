@@ -37,11 +37,6 @@ namespace ryujin
      */
     StubParabolicSystem(const std::string &subsection = "/ParabolicSystem");
 
-    unsigned int n_parabolic_state_vectors() const
-    {
-      return parabolic_component_names_.size();
-    }
-
     ACCESSOR_READ_ONLY(parabolic_component_names);
 
   private:

@@ -71,10 +71,9 @@ namespace ryujin
 
 
   template <int dim, typename Number>
-  void OfflineData<dim, Number>::prepare(
-      const unsigned int problem_dimension,
-      const unsigned int n_precomputed_values,
-      const unsigned int n_parabolic_state_vectors)
+  void
+  OfflineData<dim, Number>::prepare(const unsigned int problem_dimension,
+                                    const unsigned int n_precomputed_values)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "OfflineData<dim, Number>::prepare()" << std::endl;
@@ -95,8 +94,6 @@ namespace ryujin
 
     if (!dof_handler().has_hp_capabilities())
       create_multigrid_data();
-
-    n_parabolic_state_vectors_ = n_parabolic_state_vectors;
   }
 
 
