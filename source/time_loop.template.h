@@ -313,7 +313,8 @@ namespace ryujin
 
         prepare_compute_kernels();
 
-        Vectors::reinit_state_vector<Description>(state_vector, offline_data_);
+        hyperbolic_module_.reinit_state_vector(state_vector);
+        parabolic_module_.reinit_state_vector(state_vector);
         std::get<0>(state_vector) =
             initial_values_.get().interpolate_hyperbolic_vector();
 
@@ -373,7 +374,8 @@ namespace ryujin
           {
             Scope scope(computing_timer_,
                         "time step [X]   - interpolate analytic solution");
-            Vectors::reinit_state_vector<Description>(analytic, offline_data_);
+            hyperbolic_module_.reinit_state_vector(analytic);
+            parabolic_module_.reinit_state_vector(analytic);
             std::get<0>(analytic) =
                 initial_values_.get().interpolate_hyperbolic_vector(t);
           }
@@ -608,7 +610,8 @@ namespace ryujin
 
     /* Now read in the state vector: */
 
-    Vectors::reinit_state_vector<Description>(state_vector, offline_data_);
+    hyperbolic_module_.reinit_state_vector(state_vector);
+    parabolic_module_.reinit_state_vector(state_vector);
 
     solution_transfer_.set_handle(transfer_handle);
     solution_transfer_.project(state_vector);
@@ -706,7 +709,9 @@ namespace ryujin
     triangulation.execute_coarsening_and_refinement();
     prepare_compute_kernels();
 
-    Vectors::reinit_state_vector<Description>(state_vector, offline_data_);
+    hyperbolic_module_.reinit_state_vector(state_vector);
+    parabolic_module_.reinit_state_vector(state_vector);
+
     solution_transfer_.project(state_vector);
     solution_transfer_.reset_handle();
 

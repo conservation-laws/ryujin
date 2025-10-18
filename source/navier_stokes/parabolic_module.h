@@ -170,11 +170,15 @@ namespace ryujin
       //@{
 
       /**
-       * Sets the invariant domain violation strategy.
+       * (Re)initialize the parabolic state vector component of the state
+       * vector.
+       *
+       * @note This routine does not modify the hyperbolic state vector or
+       * the precomputed vector component.
        */
-      void set_id_violation_strategy(const IDViolationStrategy &strategy) const
+      void reinit_state_vector(StateVector & /*state_vector*/) const
       {
-        id_violation_strategy_ = strategy;
+        // do nothing
       }
 
       /**
@@ -211,6 +215,14 @@ namespace ryujin
                                const Number old_t,
                                StateVector &new_state_vector,
                                Number tau) const;
+
+      /**
+       * Sets the invariant domain violation strategy.
+       */
+      void set_id_violation_strategy(const IDViolationStrategy &strategy) const
+      {
+        id_violation_strategy_ = strategy;
+      }
 
       //@}
       /**

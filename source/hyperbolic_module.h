@@ -127,6 +127,8 @@ namespace ryujin
 
     using state_type = typename View::state_type;
 
+    static constexpr auto n_precomputed_values = View::n_precomputed_values;
+
     using precomputed_type = typename View::precomputed_type;
 
     using initial_precomputed_type = typename View::initial_precomputed_type;
@@ -167,6 +169,14 @@ namespace ryujin
      * @name Functons for performing explicit time steps
      */
     //@{
+
+    /**
+     * (Re)initialize the hyperbolic state vector component and the
+     * precomputed vector component of the state vector.
+     *
+     * @note This routine does not modify the parabolic state vector component.
+     */
+    void reinit_state_vector(StateVector &state_vector) const;
 
     /**
      * This function preprocesses a given state vector @p U in preparation
