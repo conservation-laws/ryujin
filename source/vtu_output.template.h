@@ -84,7 +84,7 @@ namespace ryujin
   void VTUOutput<Description, dim, Number>::schedule_output(
       const StateVector &state_vector,
       std::string name,
-      Number t,
+      Number t [[maybe_unused]],
       unsigned int cycle,
       bool output_full,
       bool output_levelsets)
@@ -149,9 +149,11 @@ namespace ryujin
                                 postprocessor_->component_names()[i]);
     }
 
+#if DEAL_II_VERSION_GTE(9, 5, 0)
     DataOutBase::VtkFlags flags(
         t, cycle, true, DataOutBase::CompressionLevel::best_speed);
     data_out->set_flags(flags);
+#endif
 
     const auto &discretization = offline_data_->discretization();
     const auto &mapping = discretization.mapping();

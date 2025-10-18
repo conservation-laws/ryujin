@@ -189,7 +189,6 @@ namespace ryujin
   void OfflineData<dim, Number>::ensure_simd_stride_consistency()
   {
     auto &dof_handler = this->dof_handler();
-    auto &affine_constraints = this->affine_constraints();
 
     /*
      * A small lambda to check for stride-level consistency of the internal
@@ -235,6 +234,7 @@ namespace ryujin
      * node constraints). Therefore, the following little dance:
      */
 
+    const auto &affine_constraints = this->affine_constraints();
     if (mpi_allreduce_logical_or(affine_constraints.n_constraints() > 0)) {
       if (mpi_allreduce_logical_or( //
               consistent_stride_range() != n_locally_internal_)) {
@@ -282,8 +282,6 @@ namespace ryujin
 
     const auto populate_affine_constraints = //
         [&](const auto &dof_handler, auto &affine_constraints) {
-          const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
-
 #if DEAL_II_VERSION_GTE(9, 6, 0)
           const auto locally_relevant =
               DoFTools::extract_locally_relevant_dofs(dof_handler);
@@ -294,6 +292,7 @@ namespace ryujin
 #endif
 
 #if DEAL_II_VERSION_GTE(9, 6, 0)
+          const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
           affine_constraints.reinit(locally_owned, locally_relevant);
 #else
           affine_constraints.reinit(locally_relevant);
