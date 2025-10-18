@@ -148,7 +148,8 @@ namespace ryujin
     /* Initialize temporary vectors: */
 
     for (auto &it : temp_) {
-      Vectors::reinit_state_vector<Description>(it, *offline_data_);
+      hyperbolic_module_->reinit_state_vector(it);
+      parabolic_module_->reinit_state_vector(it);
     }
 
     /* Reset CFL to starting value, set maximal acceptable tau_max ratio: */

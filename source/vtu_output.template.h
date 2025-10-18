@@ -84,7 +84,7 @@ namespace ryujin
   void VTUOutput<Description, dim, Number>::schedule_output(
       const StateVector &state_vector,
       std::string name,
-      Number t,
+      Number t [[maybe_unused]],
       unsigned int cycle,
       bool output_full,
       bool output_levelsets)
@@ -92,7 +92,6 @@ namespace ryujin
 #ifdef DEBUG_OUTPUT
     std::cout << "VTUOutput<dim, Number>::schedule_output()" << std::endl;
 #endif
-    const auto &affine_constraints = offline_data_->affine_constraints();
 
     /*
      * Extract quantities and store in ScalarVectors so that we can call
@@ -110,34 +109,51 @@ namespace ryujin
             {alpha_, smoothness_indicators_},
             vtu_output_quantities_);
 
-    /* prepare DataOut: */
+    /*
+     * Attach data vectors to DataOut object:
+     */
 
     auto data_out = std::make_unique<dealii::DataOut<dim>>();
-    data_out->attach_dof_handler(offline_data_->dof_handler());
+
+    const auto attach_data_vector = [&](auto &data, const auto &name) {
+      const auto &dof_handler_cg = offline_data_->dof_handler_cg();
+      const auto &dof_handler_dg = offline_data_->dof_handler_dg();
+
+      if (data.size() == dof_handler_cg.n_dofs()) {
+        offline_data_->affine_constraints_cg().distribute(data);
+        data.update_ghost_values();
+        data_out->add_data_vector(dof_handler_cg, data, name);
+
+      } else if (data.size() == dof_handler_dg.n_dofs()) {
+        offline_data_->affine_constraints_dg().distribute(data);
+        data.update_ghost_values();
+        data_out->add_data_vector(dof_handler_dg, data, name);
+
+      } else {
+        Assert(
+            false,
+            dealii::ExcMessage("The selected solution component »" + name +
+                               "« is associated with an unknown dof handler"));
+      }
+    };
 
     for (unsigned int d = 0; d < selected_components.size(); ++d) {
-      affine_constraints.distribute(selected_components[d]);
-      selected_components[d].update_ghost_values();
-      data_out->add_data_vector(selected_components[d],
-                                vtu_output_quantities_[d],
-                                DataOut<dim>::type_dof_data);
+      attach_data_vector(selected_components[d], vtu_output_quantities_[d]);
     }
 
     const auto n_quantities = postprocessor_->n_quantities();
-    for (unsigned int i = 0; i < n_quantities; ++i)
-      data_out->add_data_vector(postprocessor_->quantities()[i],
-                                postprocessor_->component_names()[i],
-                                DataOut<dim>::type_dof_data);
+    for (unsigned int i = 0; i < n_quantities; ++i) {
+      // FIXME maybe also refactor to use attach_data_vector()
+      data_out->add_data_vector(offline_data_->dof_handler(),
+                                postprocessor_->quantities()[i],
+                                postprocessor_->component_names()[i]);
+    }
 
-    DataOutBase::VtkFlags flags(t,
-                                cycle,
-                                true,
 #if DEAL_II_VERSION_GTE(9, 5, 0)
-                                DataOutBase::CompressionLevel::best_speed);
-#else
-                                DataOutBase::VtkFlags::best_speed);
-#endif
+    DataOutBase::VtkFlags flags(
+        t, cycle, true, DataOutBase::CompressionLevel::best_speed);
     data_out->set_flags(flags);
+#endif
 
     const auto &discretization = offline_data_->discretization();
     const auto &mapping = discretization.mapping();

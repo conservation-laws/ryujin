@@ -98,8 +98,7 @@ namespace ryujin
      * precomputed MultiComponentVector.
      */
     void prepare(const unsigned int problem_dimension,
-                 const unsigned int n_precomputed_values,
-                 const unsigned int n_parabolic_state_vectors);
+                 const unsigned int n_precomputed_values);
 
     /**
      * Return a read-only const reference to the DoFHandler for the
@@ -148,10 +147,49 @@ namespace ryujin
     }
 
     /**
+     * An AffineConstraints object storing constraints for the continuous
+     * ("cG") variant of the selected finite element space in (deal.II
+     * typical) global numbering.
+     *
+     * @note The affine constraints object is populated with with (a)
+     * hanging node constraints, and (b) periodicity constraints, that
+     * directly affect the chosen ansatz space.
+     *
+     * @note If the selected finite element space is continuous then this
+     * method simply returns the same object as affine_constraints().
+     */
+    ACCESSOR_READ_ONLY(affine_constraints_cg)
+
+    /**
+     * An AffineConstraints object storing constraints for the
+     * discontinuous ("dG") variant of the selected finite element space in
+     * (deal.II typical) global numbering.
+     *
+     * @note The affine constraints object is populated with with (a)
+     * hanging node constraints, and (b) periodicity constraints, that
+     * directly affect the chosen ansatz space.
+     *
+     * @note If the selected finite element space is discontinuous then
+     * this method simply returns the same object as affine_constraints().
+     */
+    ACCESSOR_READ_ONLY(affine_constraints_dg)
+
+    /**
      * An AffineConstraints object storing constraints in (deal.II typical)
      * global numbering.
+     *
+     * @note The affine constraints object is populated with with (a)
+     * hanging node constraints, and (b) periodicity constraints, that
+     * directly affect the chosen ansatz space.
      */
-    ACCESSOR_READ_ONLY(affine_constraints)
+    const dealii::AffineConstraints<Number> &affine_constraints() const
+    {
+      if (discretization_->have_discontinuous_ansatz()) {
+        return affine_constraints_dg_;
+      } else {
+        return affine_constraints_cg_;
+      }
+    }
 
     /**
      * An MPI partitioner for the (scalar) Vector storing a scalar-valued
@@ -170,11 +208,6 @@ namespace ryujin
      * vector-valued quantity of size HyperbolicSystem::problem_dimension.
      */
     ACCESSOR_READ_ONLY_NO_DEREFERENCE(precomputed_vector_partitioner)
-
-    /**
-     * The block size of the parabolic state vector.
-     */
-    ACCESSOR_READ_ONLY(n_parabolic_state_vectors);
 
     /**
      * The subinterval \f$[0,\texttt{n_export_indices()})\f$ contains all
@@ -383,7 +416,8 @@ namespace ryujin
     std::unique_ptr<dealii::DoFHandler<dim>> dof_handler_cg_;
     std::unique_ptr<dealii::DoFHandler<dim>> dof_handler_dg_;
 
-    dealii::AffineConstraints<Number> affine_constraints_;
+    dealii::AffineConstraints<Number> affine_constraints_cg_;
+    dealii::AffineConstraints<Number> affine_constraints_dg_;
 
     std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
         scalar_partitioner_;
@@ -393,8 +427,6 @@ namespace ryujin
 
     std::shared_ptr<const dealii::Utilities::MPI::Partitioner>
         precomputed_vector_partitioner_;
-
-    unsigned int n_parabolic_state_vectors_;
 
     unsigned int n_export_indices_;
     unsigned int n_locally_internal_;

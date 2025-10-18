@@ -91,6 +91,45 @@ namespace ryujin
 
   /*
    * -------------------------------------------------------------------------
+   * Step 0: Reinitialize vector
+   * -------------------------------------------------------------------------
+   */
+
+
+  /**
+   * Helper function that (re)initializes the state and the precomputed
+   * component of a StateVector to proper sizes.
+   *
+   * @note This method does neither initialize nor resize the parabolic
+   * state vector component. The ParabolicModule itself has to ensure
+   * proper setup during prepare_state_vector() and solve().
+   */
+  template <typename Description, int dim, typename Number>
+  void HyperbolicModule<Description, dim, Number>::reinit_state_vector(
+      StateVector &state_vector) const
+  {
+    auto &[U, precomputed, V] = state_vector;
+    U.reinit(offline_data_->hyperbolic_vector_partitioner());
+    precomputed.reinit(offline_data_->precomputed_vector_partitioner());
+
+#ifdef DEBUG
+    /* Poison all vectors: */
+    using state_type = typename View::state_type;
+
+    constexpr auto nan = std::numeric_limits<Number>::signaling_NaN();
+
+    const unsigned int n_owned = offline_data_->n_locally_owned();
+    for (unsigned int i = 0; i < n_owned; ++i) {
+      U.write_tensor(state_type{} * nan, i);
+      precomputed.write_tensor(
+          dealii::Tensor<1, n_precomputed_values, Number>() * nan, i);
+    }
+#endif
+  }
+
+
+  /*
+   * -------------------------------------------------------------------------
    * Step 1: Apply boundary conditions and precompute values
    * -------------------------------------------------------------------------
    */
