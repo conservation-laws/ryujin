@@ -189,6 +189,7 @@ namespace ryujin
   void OfflineData<dim, Number>::ensure_simd_stride_consistency()
   {
     auto &dof_handler = this->dof_handler();
+    auto &affine_constraints = this->affine_constraints();
 
     /*
      * A small lambda to check for stride-level consistency of the internal
@@ -234,7 +235,7 @@ namespace ryujin
      * node constraints). Therefore, the following little dance:
      */
 
-    if (mpi_allreduce_logical_or(affine_constraints_.n_constraints() > 0)) {
+    if (mpi_allreduce_logical_or(affine_constraints.n_constraints() > 0)) {
       if (mpi_allreduce_logical_or( //
               consistent_stride_range() != n_locally_internal_)) {
         /*
@@ -265,20 +266,122 @@ namespace ryujin
 
   /*
    * Populates:
+   *     affine_constraints_cg_
+   *     affine_constraints_dg_
    *     n_locally_owned_
-   *     affine_constraints_
    *     sparsity_pattern_
    */
   template <int dim, typename Number>
   void OfflineData<dim, Number>::create_constraints_and_sparsity_pattern()
   {
     /*
-     * First, we set up the locally_relevant index set, determine (globally
-     * indexed) affine constraints and create a (globally indexed) sparsity
-     * pattern:
+     * First, we set up the (globally indexed) affine constraints object
+     * for the continuous dof handler. The affine constraints object solely
+     * stores (a) hanging node constraints, and (b) periodicity constraints.
      */
 
-    auto &dof_handler = this->dof_handler();
+    const auto populate_affine_constraints = //
+        [&](const auto &dof_handler, auto &affine_constraints) {
+          const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
+
+#if DEAL_II_VERSION_GTE(9, 6, 0)
+          const auto locally_relevant =
+              DoFTools::extract_locally_relevant_dofs(dof_handler);
+#else
+          IndexSet locally_relevant;
+          DoFTools::extract_locally_relevant_dofs(dof_handler,
+                                                  locally_relevant);
+#endif
+
+#if DEAL_II_VERSION_GTE(9, 6, 0)
+          affine_constraints.reinit(locally_owned, locally_relevant);
+#else
+          affine_constraints.reinit(locally_relevant);
+#endif
+          DoFTools::make_hanging_node_constraints(dof_handler,
+                                                  affine_constraints);
+
+#ifndef DEAL_II_WITH_TRILINOS
+          AssertThrow(
+              affine_constraints.n_constraints() == 0,
+              ExcMessage("ryujin was built without Trilinos support - no "
+                         "hanging node support available"));
+#endif
+
+          /*
+           * Enforce periodic boundary conditions. We assume that the mesh is in
+           * "normal configuration."
+           */
+
+          const auto &periodic_faces =
+              discretization_->triangulation().get_periodic_face_map();
+
+          for (const auto &[left, value] : periodic_faces) {
+            const auto &[right, orientation] = value;
+
+            typename DoFHandler<dim>::cell_iterator dof_cell_left(
+                &left.first->get_triangulation(),
+                left.first->level(),
+                left.first->index(),
+                &dof_handler);
+
+            typename DoFHandler<dim>::cell_iterator dof_cell_right(
+                &right.first->get_triangulation(),
+                right.first->level(),
+                right.first->index(),
+                &dof_handler);
+
+            if constexpr (std::is_same_v<Number, double>) {
+              DoFTools::make_periodicity_constraints(
+                  dof_cell_left->face(left.second),
+                  dof_cell_right->face(right.second),
+                  affine_constraints,
+                  ComponentMask(),
+#if DEAL_II_VERSION_GTE(9, 6, 0)
+                  orientation);
+#else
+                  /* orientation */ orientation[0],
+                  /* flip */ orientation[1],
+                  /* rotation */ orientation[2]);
+#endif
+            } else {
+              AssertThrow(false, dealii::ExcNotImplemented());
+              __builtin_trap();
+            }
+          }
+
+          affine_constraints.close();
+
+#ifdef DEBUG
+          {
+            /* Check that constraints are consistent in parallel: */
+            const std::vector<IndexSet> &locally_owned_dofs =
+                Utilities::MPI::all_gather(
+                    mpi_ensemble_.ensemble_communicator(),
+                    dof_handler.locally_owned_dofs());
+            const IndexSet locally_active =
+                dealii::DoFTools::extract_locally_active_dofs(dof_handler);
+            Assert(affine_constraints.is_consistent_in_parallel(
+                       locally_owned_dofs,
+                       locally_active,
+                       mpi_ensemble_.ensemble_communicator(),
+                       /*verbose*/ true),
+                   ExcInternalError());
+          }
+#endif
+        };
+
+    populate_affine_constraints(*dof_handler_cg_, affine_constraints_cg_);
+    /* FIXME for dG the affine constraints object will be empty. */
+    populate_affine_constraints(*dof_handler_dg_, affine_constraints_dg_);
+
+
+    /*
+     * Next, set up the (hyperbolic) sparsity pattern:
+     */
+
+    const auto &dof_handler = this->dof_handler();
+    const auto &affine_constraints = this->affine_constraints();
     const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
     Assert(n_locally_owned_ == locally_owned.n_elements(),
            dealii::ExcInternalError());
@@ -291,80 +394,6 @@ namespace ryujin
     DoFTools::extract_locally_relevant_dofs(dof_handler, locally_relevant);
 #endif
 
-#if DEAL_II_VERSION_GTE(9, 6, 0)
-    affine_constraints_.reinit(locally_owned, locally_relevant);
-#else
-    affine_constraints_.reinit(locally_relevant);
-#endif
-    DoFTools::make_hanging_node_constraints(dof_handler, affine_constraints_);
-
-#ifndef DEAL_II_WITH_TRILINOS
-    AssertThrow(affine_constraints_.n_constraints() == 0,
-                ExcMessage("ryujin was built without Trilinos support - no "
-                           "hanging node support available"));
-#endif
-
-    /*
-     * Enforce periodic boundary conditions. We assume that the mesh is in
-     * "normal configuration."
-     */
-
-    const auto &periodic_faces =
-        discretization_->triangulation().get_periodic_face_map();
-
-    for (const auto &[left, value] : periodic_faces) {
-      const auto &[right, orientation] = value;
-
-      typename DoFHandler<dim>::cell_iterator dof_cell_left(
-          &left.first->get_triangulation(),
-          left.first->level(),
-          left.first->index(),
-          &dof_handler);
-
-      typename DoFHandler<dim>::cell_iterator dof_cell_right(
-          &right.first->get_triangulation(),
-          right.first->level(),
-          right.first->index(),
-          &dof_handler);
-
-      if constexpr (std::is_same_v<Number, double>) {
-        DoFTools::make_periodicity_constraints(
-            dof_cell_left->face(left.second),
-            dof_cell_right->face(right.second),
-            affine_constraints_,
-            ComponentMask(),
-#if DEAL_II_VERSION_GTE(9, 6, 0)
-            orientation);
-#else
-            /* orientation */ orientation[0],
-            /* flip */ orientation[1],
-            /* rotation */ orientation[2]);
-#endif
-      } else {
-        AssertThrow(false, dealii::ExcNotImplemented());
-        __builtin_trap();
-      }
-    }
-
-    affine_constraints_.close();
-
-#ifdef DEBUG
-    {
-      /* Check that constraints are consistent in parallel: */
-      const std::vector<IndexSet> &locally_owned_dofs =
-          Utilities::MPI::all_gather(mpi_ensemble_.ensemble_communicator(),
-                                     dof_handler.locally_owned_dofs());
-      const IndexSet locally_active =
-          dealii::DoFTools::extract_locally_active_dofs(dof_handler);
-      Assert(affine_constraints_.is_consistent_in_parallel(
-                 locally_owned_dofs,
-                 locally_active,
-                 mpi_ensemble_.ensemble_communicator(),
-                 /*verbose*/ true),
-             ExcInternalError());
-    }
-#endif
-
     sparsity_pattern_.reinit(
         dof_handler.n_dofs(), dof_handler.n_dofs(), locally_relevant);
 
@@ -373,14 +402,14 @@ namespace ryujin
        * Create dG sparsity pattern:
        */
       DoFTools::make_extended_sparsity_pattern_dg(
-          dof_handler, sparsity_pattern_, affine_constraints_, false);
+          dof_handler, sparsity_pattern_, affine_constraints, false);
     } else {
       /*
        * Create cG sparsity pattern:
        */
 #ifdef DEAL_II_WITH_TRILINOS
       DoFTools::make_sparsity_pattern(
-          dof_handler, sparsity_pattern_, affine_constraints_, false);
+          dof_handler, sparsity_pattern_, affine_constraints, false);
 #else
       /*
        * In case we use dealii::SparseMatrix<Number> for assembly we need a
@@ -389,7 +418,7 @@ namespace ryujin
        * but nevertheless we have to add it.
        */
       DoFTools::make_extended_sparsity_pattern(
-          dof_handler, sparsity_pattern_, affine_constraints_, false);
+          dof_handler, sparsity_pattern_, affine_constraints, false);
 #endif
     }
 
@@ -420,7 +449,8 @@ namespace ryujin
       const unsigned int problem_dimension,
       const unsigned int n_precomputed_values)
   {
-    auto &dof_handler = this->dof_handler();
+    const auto &dof_handler = this->dof_handler();
+    const auto &affine_constraints = this->affine_constraints();
     const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
     Assert(n_locally_owned_ == locally_owned.n_elements(),
            dealii::ExcInternalError());
@@ -474,7 +504,7 @@ namespace ryujin
      * call export_indices_first() with incomplete information (missing
      * eliminated degrees of freedom).
      */
-    if (mpi_allreduce_logical_or(affine_constraints_.n_constraints() > 0)) {
+    if (mpi_allreduce_logical_or(affine_constraints.n_constraints() > 0)) {
       /*
        * Recalculate n_export_indices_:
        */
@@ -537,7 +567,8 @@ namespace ryujin
      * Then, assemble:
      */
 
-    auto &dof_handler = this->dof_handler();
+    const auto &dof_handler = this->dof_handler();
+    const auto &affine_constraints = this->affine_constraints();
 
     measure_of_omega_ = 0.;
 
@@ -547,12 +578,12 @@ namespace ryujin
     AffineConstraints<double> affine_constraints_assembly;
     /* This small dance is necessary to translate from Number to double: */
 #if DEAL_II_VERSION_GTE(9, 6, 0)
-    affine_constraints_assembly.reinit(affine_constraints_.get_local_lines(),
-                                       affine_constraints_.get_local_lines());
+    affine_constraints_assembly.reinit(affine_constraints.get_local_lines(),
+                                       affine_constraints.get_local_lines());
 #else
-    affine_constraints_assembly.reinit(affine_constraints_.get_local_lines());
+    affine_constraints_assembly.reinit(affine_constraints.get_local_lines());
 #endif
-    for (auto line : affine_constraints_.get_lines()) {
+    for (auto line : affine_constraints.get_lines()) {
       affine_constraints_assembly.add_line(line.index);
       for (auto entry : line.entries)
         affine_constraints_assembly.add_entry(
@@ -585,7 +616,7 @@ namespace ryujin
     /* Variant using deal.II SparseMatrix with local numbering */
 
     AffineConstraints<Number> affine_constraints_assembly;
-    affine_constraints_assembly.copy_from(affine_constraints_);
+    affine_constraints_assembly.copy_from(affine_constraints);
     transform_to_local_range(*scalar_partitioner_, affine_constraints_assembly);
 
     SparsityPattern sparsity_pattern_assembly;
