@@ -5,4 +5,4 @@
 
 #include "equation_dispatch.h"
 
-ryujin::EquationDispatch::Signals *ryujin::EquationDispatch::signals;
+ryujin::EquationDispatch::Signals *ryujin::EquationDispatch::signals = nullptr;
