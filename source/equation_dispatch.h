@@ -64,6 +64,15 @@ namespace ryujin
     }
 
 
+    ~EquationDispatch() override
+    {
+      if (signals) {
+        delete signals;
+        signals = nullptr;
+      }
+    }
+
+
     /**
      * Call create_parameter_files() for all registered equations.
      */
