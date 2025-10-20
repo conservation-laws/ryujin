@@ -2,6 +2,7 @@
 #include <equation_of_state_noble_abel_stiffened_gas.h>
 #include <equation_of_state_polytropic_gas.h>
 #include <equation_of_state_sesame.h>
+#include <equation_of_state_simple_macaw.h>
 #include <equation_of_state_van_der_waals.h>
 
 #include <deal.II/base/array_view.h>
@@ -18,7 +19,20 @@ using namespace ryujin::EquationOfStateLibrary;
 using namespace ryujin;
 using namespace dealii;
 
-void test(const ryujin::EquationOfStateLibrary::EquationOfState &eos)
+/*
+ * Create struct with default test values. Test values can be modified to
+ * accomodate specific EOS.
+ */
+struct testValues {
+  double rho_scalar = 1.4;
+  double e_scalar = 1.0 / 1.4 / 0.4;
+
+  std::array<double, 5> rho_array{{1.4, 1.3, 1.2, 1.1, 1.0}};
+  std::array<double, 5> e_array{{0.3, 0.2, 0.1, 0.05, 0.025}};
+};
+
+void test(const ryujin::EquationOfStateLibrary::EquationOfState &eos,
+          const testValues &tv = testValues())
 {
   const auto print_array =
       [](const std::string name, const auto array, auto &ostream) {
@@ -33,8 +47,9 @@ void test(const ryujin::EquationOfStateLibrary::EquationOfState &eos)
   std::cout << "name = " << eos.name() << std::endl;
 
   {
-    const auto rho = 1.4;
-    const auto e = 1.0 / 1.4 / 0.4;
+    auto rho = tv.rho_scalar;
+    auto e = tv.e_scalar;
+
     const auto p = eos.pressure(rho, e);
     const auto e_back = eos.specific_internal_energy(rho, p);
     const auto c = eos.speed_of_sound(rho, e);
@@ -49,8 +64,9 @@ void test(const ryujin::EquationOfStateLibrary::EquationOfState &eos)
   }
 
   {
-    std::array<double, 5> rho{{1.4, 1.3, 1.2, 1.1, 1.0}};
-    std::array<double, 5> e{{0.3, 0.2, 0.1, 0.05, 0.025}};
+    auto rho = tv.rho_array;
+    auto e = tv.e_array;
+
     std::array<double, 5> p;
     std::array<double, 5> e_back;
     std::array<double, 5> c;
@@ -131,6 +147,8 @@ int main()
   }
   test(van_der_waals);
 
+  /* jones wilkins lee */
+
   std::cout << "\nJonesWilkinsLee with omega=0.8938, A=6.3207e13, B=-4.472e9, "
                "R1=11.3, R2=1.13, rho_0=1895, q_0=0"
             << std::endl;
@@ -156,6 +174,31 @@ int main()
     ParameterAcceptor::initialize(parameters);
   }
   test(jones_wilkins_lee);
+
+  /* simple macaw */
+  testValues macaw_values;
+  macaw_values.rho_scalar = 1.86;
+  macaw_values.e_scalar = 1.49017421e2;
+  macaw_values.rho_array = {2., 2.5, 3., 3.5, 4.0};
+  macaw_values.e_array = {1.5e2, 1.4e2, 1.3e2, 1.2e2, 1.1e2};
+
+  std::cout << "\nSimple Macaw with default parameters" << std::endl;
+  SimpleMacaw simple_macaw("");
+  {
+    std::stringstream parameters;
+    parameters << "subsection simple macaw\n"
+               << "set A                           = 7.3\n"
+               << "set B                           = 3.9\n"
+               << "set Gamma                       = 0.5\n"
+               << "set cvInf                       = 0.000389\n"
+               << "set reference T0                = 150\n"
+               << "set reference rho0              = 8.952\n"
+               << "end\n"
+               << std::endl;
+
+    ParameterAcceptor::initialize(parameters);
+  }
+  test(simple_macaw, macaw_values);
 
   return 0;
 }
