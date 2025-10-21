@@ -18,6 +18,11 @@ namespace ryujin
       , n_ensembles_(1)
       , ensemble_rank_(0)
       , n_ensemble_ranks_(1)
+      , world_group_(MPI_GROUP_NULL)
+      , ensemble_leader_group_(MPI_GROUP_NULL)
+      , ensemble_communicator_(MPI_COMM_NULL)
+      , ensemble_leader_communicator_(MPI_COMM_NULL)
+      , peer_communicator_(MPI_COMM_NULL)
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "MPIEnsemble::prepare()" << std::endl;
@@ -32,6 +37,23 @@ namespace ryujin
 
     AssertThrow(n_ensembles_ > 0, dealii::ExcInternalError());
     ensemble_ = world_rank_ % n_ensembles_;
+
+    /*
+     * Special case for MPI_COMM_SELF:
+     *
+     * If the ensemble is initialized with the MPI_COMM_SELF communicator,
+     * skip setting up the communicators for the case that n_ensembles_ > 1.
+     * This only serves the purpose that we can create a TimeLoop instance
+     * long enough to query for parameters.
+     */
+
+    Assert(MPI_COMM_SELF != MPI_COMM_WORLD,
+           dealii::ExcMessage(
+               "MPIEnsemble: Internal sanity check failed. MPI_COMM_SELF and "
+               "MPI_COMM_WORLD are the same object."));
+
+    if (mpi_communicator == MPI_COMM_SELF && n_ensembles_ > 1)
+      return;
 
     AssertThrow(
         n_world_ranks_ >= n_ensembles_,
@@ -106,14 +128,19 @@ namespace ryujin
 
   MPIEnsemble::~MPIEnsemble()
   {
-    MPI_Group_free(&world_group_);
+    if (world_group_ != MPI_GROUP_NULL)
+      MPI_Group_free(&world_group_);
     for (auto &it : ensemble_groups_)
       MPI_Group_free(&it);
-    MPI_Group_free(&ensemble_leader_group_);
+    if (ensemble_leader_group_ != MPI_GROUP_NULL)
+      MPI_Group_free(&ensemble_leader_group_);
 
-    MPI_Comm_free(&ensemble_communicator_);
-    MPI_Comm_free(&ensemble_leader_communicator_);
-    MPI_Comm_free(&peer_communicator_);
+    if (ensemble_communicator_ != MPI_COMM_NULL)
+      MPI_Comm_free(&ensemble_communicator_);
+    if (ensemble_leader_communicator_ != MPI_COMM_NULL)
+      MPI_Comm_free(&ensemble_leader_communicator_);
+    if (peer_communicator_ != MPI_COMM_NULL)
+      MPI_Comm_free(&peer_communicator_);
   }
 
 } /* namespace ryujin */
