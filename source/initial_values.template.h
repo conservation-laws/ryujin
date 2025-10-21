@@ -111,6 +111,16 @@ namespace ryujin
         direction = new_direction;
       }
 
+      if constexpr (dim == 1) {
+        auto n = initial_direction[0];
+        const auto norm = std::abs(n);
+        n /= norm;
+        auto new_direction = direction;
+        if (norm > 1.0e-14)
+          new_direction[0] = n * direction[0];
+        direction = new_direction;
+      }
+
       return Point<dim>() + direction;
     }
 
@@ -123,6 +133,16 @@ namespace ryujin
     affine_transform_vector(const dealii::Tensor<1, dim> initial_direction,
                             dealii::Tensor<1, dim, Number> direction)
     {
+      if constexpr (dim == 1) {
+        auto n = initial_direction[0];
+        const auto norm = std::abs(n);
+        n /= norm;
+        auto new_direction = direction;
+        if (norm > 1.0e-14)
+          new_direction[0] = n * direction[0];
+        direction = new_direction;
+      }
+
       if constexpr (dim >= 2) {
         auto n_x = initial_direction[0];
         auto n_y = initial_direction[1];
