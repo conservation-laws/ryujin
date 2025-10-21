@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "instrumentation.h"
+#include "mpi_ensemble_container.h"
 #include "scope.h"
 #include "state_vector.h"
 #include "time_loop.h"
@@ -28,7 +28,13 @@ namespace ryujin
   template <typename Description, int dim, typename Number>
   TimeLoop<Description, dim, Number>::TimeLoop(const MPI_Comm &mpi_comm)
       : ParameterAcceptor("/A - TimeLoop")
-      , mpi_ensemble_(mpi_comm)
+      , mpi_ensemble_(mpi_comm,
+                      [] {
+                        if constexpr (has_n_mpi_ensembles_v<Description>)
+                          return Description::n_mpi_ensembles();
+                        else
+                          return 1;
+                      }())
       , hyperbolic_system_(mpi_ensemble_, "/B - Equation")
       , parabolic_system_(mpi_ensemble_, "/B - Equation")
       , discretization_(mpi_ensemble_, "/C - Discretization")
@@ -245,9 +251,11 @@ namespace ryujin
       base_name_ensemble_ = base_name_;
       if (mpi_ensemble_.n_ensembles() > 1) {
         print_info("setting up MPI ensemble");
-        base_name_ensemble_ += "-ensemble_" + dealii::Utilities::int_to_string(
-                                                  mpi_ensemble_.ensemble(),
-                                                  mpi_ensemble_.n_ensembles());
+        unsigned int digits =
+            dealii::Utilities::needed_digits(mpi_ensemble_.n_ensembles() - 1);
+        base_name_ensemble_ +=
+            "-ensemble_" +
+            dealii::Utilities::int_to_string(mpi_ensemble_.ensemble(), digits);
       }
     }
 
