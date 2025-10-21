@@ -11,6 +11,7 @@
 #include "equation_of_state_polytropic_gas.h"
 #include "equation_of_state_pressureless.h"
 #include "equation_of_state_sesame.h"
+#include "equation_of_state_simple_macaw.h"
 #include "equation_of_state_van_der_waals.h"
 
 namespace ryujin
@@ -37,6 +38,7 @@ namespace ryujin
       add(std::make_shared<NobleAbelStiffenedGas>(subsection));
       add(std::make_shared<PolytropicGas>(subsection));
       add(std::make_shared<Sesame>(subsection));
+      add(std::make_shared<SimpleMacaw>(subsection));
       add(std::make_shared<VanDerWaals>(subsection));
       add(std::make_shared<Pressureless>(subsection));
     }
