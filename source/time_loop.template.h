@@ -760,9 +760,7 @@ namespace ryujin
       Number l2_norm_analytic = 0.;
 
       if (error_normalize_) {
-        linf_norm_analytic =
-            Utilities::MPI::max(analytic_component.linfty_norm(),
-                                mpi_ensemble_.ensemble_communicator());
+        linf_norm_analytic = analytic_component.linfty_norm();
 
         VectorTools::integrate_difference(
             discretization_.mapping(),
@@ -799,8 +797,7 @@ namespace ryujin
       error_component.update_ghost_values();
       error_component -= analytic_component;
 
-      const Number linf_norm_error = Utilities::MPI::max(
-          error_component.linfty_norm(), mpi_ensemble_.ensemble_communicator());
+      const Number linf_norm_error = error_component.linfty_norm();
 
       VectorTools::integrate_difference(discretization_.mapping(),
                                         offline_data_.dof_handler(),
