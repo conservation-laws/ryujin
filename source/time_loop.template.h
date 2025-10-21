@@ -325,11 +325,7 @@ namespace ryujin
         parabolic_module_.reinit_state_vector(state_vector);
         std::get<0>(state_vector) =
             initial_values_.get().interpolate_hyperbolic_vector();
-
-        Vectors::debug_poison_constrained_dofs<Description>(state_vector,
-                                                            offline_data_);
-        Vectors::debug_poison_precomputed_values<Description>(state_vector,
-                                                              offline_data_);
+        Vectors::debug_poison_invalid_values(state_vector, offline_data_);
       }
     }
 
@@ -624,17 +620,8 @@ namespace ryujin
     solution_transfer_.set_handle(transfer_handle);
     solution_transfer_.project(state_vector);
     solution_transfer_.reset_handle();
+    Vectors::debug_poison_invalid_values(state_vector, offline_data_);
 
-    /*
-     * Poison constrained degrees of freedom and prepare the state vector
-     * for time stepping:
-     */
-
-    Vectors::debug_poison_constrained_dofs<Description>(state_vector,
-                                                        offline_data_);
-
-    Vectors::debug_poison_precomputed_values<Description>(state_vector,
-                                                          offline_data_);
     time_integrator_.prepare_state_vector(state_vector, t);
   }
 
@@ -722,15 +709,7 @@ namespace ryujin
 
     solution_transfer_.project(state_vector);
     solution_transfer_.reset_handle();
-
-    /*
-     * In debug mode poison constrained degrees of freedom and precomputed
-     * values:
-     */
-    Vectors::debug_poison_constrained_dofs<Description>(state_vector,
-                                                        offline_data_);
-    Vectors::debug_poison_precomputed_values<Description>(state_vector,
-                                                          offline_data_);
+    Vectors::debug_poison_invalid_values(state_vector, offline_data_);
   }
 
 

@@ -55,60 +55,44 @@ namespace ryujin
         BlockVector<Number> /*parabolic state vector*/>;
 
 
-    template <
-        typename Description,
-        int dim,
-        typename Number,
-        typename View =
-            typename Description::template HyperbolicSystemView<dim, Number>,
-        int problem_dimension = View::problem_dimension,
-        int prec_dimension = View::n_precomputed_values>
-    void debug_poison_constrained_dofs(
-        StateVector<Number, problem_dimension, prec_dimension> &state_vector
-        [[maybe_unused]],
-        const OfflineData<dim, Number> &offline_data [[maybe_unused]])
+    /**
+     * A small helper function that sets all values of the hyperbolic
+     * vector that are invalid after a hyperbolic substep to a NaN value.
+     * This includes:
+     *  - the entire precomputed state vector
+     *  - constrained degrees of freedom of the hyperbolic state vector
+     *  - the ghost range of the hyperbolic state vector
+     */
+    template <typename Number, int prob_dim, int prec_dim, typename O>
+    void debug_poison_invalid_values(
+        StateVector<Number, prob_dim, prec_dim> &state_vector [[maybe_unused]],
+        const O &offline_data [[maybe_unused]])
     {
 #ifdef DEBUG
-      auto &[U, precomputed, V] = state_vector;
+      auto &[U, prec, V] = state_vector;
+
+      constexpr auto nan = std::numeric_limits<Number>::signaling_NaN();
 
       const unsigned int n_owned = offline_data.n_locally_owned();
+      const unsigned int n_relevant = offline_data.n_locally_relevant();
       const auto &partitioner = offline_data.scalar_partitioner();
 
       for (unsigned int i = 0; i < n_owned; ++i) {
+        prec.write_tensor(dealii::Tensor<1, prec_dim, Number>() * nan, i);
+
         if (!offline_data.affine_constraints().is_constrained(
                 partitioner->local_to_global(i)))
           continue;
-        constexpr auto nan = std::numeric_limits<Number>::signaling_NaN();
-        U.write_tensor(dealii::Tensor<1, problem_dimension, Number>() * nan, i);
+        U.write_tensor(dealii::Tensor<1, prob_dim, Number>() * nan, i);
+      }
+
+      for (unsigned int i = n_owned; i < n_relevant; ++i) {
+        prec.write_tensor(dealii::Tensor<1, prec_dim, Number>() * nan, i);
+
+        U.write_tensor(dealii::Tensor<1, prob_dim, Number>() * nan, i);
       }
 #endif
     }
 
-
-    template <
-        typename Description,
-        int dim,
-        typename Number,
-        typename View =
-            typename Description::template HyperbolicSystemView<dim, Number>,
-        int problem_dimension = View::problem_dimension,
-        int prec_dimension = View::n_precomputed_values>
-    void debug_poison_precomputed_values(
-        StateVector<Number, problem_dimension, prec_dimension> &state_vector
-        [[maybe_unused]],
-        const OfflineData<dim, Number> &offline_data [[maybe_unused]])
-    {
-#ifdef DEBUG
-      auto &[U, precomputed, V] = state_vector;
-
-      constexpr auto nan = std::numeric_limits<Number>::signaling_NaN();
-      const unsigned int n_owned = offline_data.n_locally_owned();
-
-      for (unsigned int i = 0; i < n_owned; ++i) {
-        precomputed.write_tensor(
-            dealii::Tensor<1, prec_dimension, Number>() * nan, i);
-      }
-#endif
-    }
   } // namespace Vectors
 } // namespace ryujin

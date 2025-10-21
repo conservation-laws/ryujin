@@ -1227,9 +1227,8 @@ namespace ryujin
       }
     }
 
-    /* In debug mode poison precomputed values: */
-    Vectors::debug_poison_precomputed_values<Description>(new_state_vector,
-                                                          *offline_data_);
+    /* Poison all values that are left invalid after the update step: */
+    Vectors::debug_poison_invalid_values(new_state_vector, *offline_data_);
 
     /* Return the time step size tau: */
     return tau;
