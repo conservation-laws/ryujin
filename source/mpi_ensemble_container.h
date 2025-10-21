@@ -87,4 +87,19 @@ namespace ryujin
   };
 
 
+  /**
+   * A trait class that determines whether a given equation Description
+   * struct contains a method or field "n_mpi_ensembles".
+   */
+  namespace
+  {
+    template <typename C>
+    static auto test(...) -> std::false_type;
+
+    template <typename C>
+    static auto test(int) -> decltype(C::n_mpi_ensembles(), std::true_type());
+  } // namespace
+
+  template <typename T>
+  constexpr bool has_n_mpi_ensembles_v = decltype(test<T>(0))::value;
 } /* namespace ryujin */
