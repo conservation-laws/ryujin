@@ -47,7 +47,7 @@ namespace ryujin
     {
       const auto &ensemble = mpi_ensemble.ensemble();
       const auto &n_ensembles = mpi_ensemble.n_ensembles();
-      unsigned int digits = dealii::Utilities::needed_digits(n_ensembles);
+      unsigned int digits = dealii::Utilities::needed_digits(n_ensembles - 1);
 
       payload_.resize(n_ensembles);
       for (int n = 0; n < n_ensembles; ++n) {

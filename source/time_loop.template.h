@@ -251,9 +251,11 @@ namespace ryujin
       base_name_ensemble_ = base_name_;
       if (mpi_ensemble_.n_ensembles() > 1) {
         print_info("setting up MPI ensemble");
-        base_name_ensemble_ += "-ensemble_" + dealii::Utilities::int_to_string(
-                                                  mpi_ensemble_.ensemble(),
-                                                  mpi_ensemble_.n_ensembles());
+        unsigned int digits =
+            dealii::Utilities::needed_digits(mpi_ensemble_.n_ensembles() - 1);
+        base_name_ensemble_ +=
+            "-ensemble_" +
+            dealii::Utilities::int_to_string(mpi_ensemble_.ensemble(), digits);
       }
     }
 
