@@ -38,8 +38,7 @@ namespace ryujin
       using ParabolicSystem = NavierStokes::ParabolicSystem;
 
       template <int dim, typename Number = double>
-      using ParabolicModule =
-          NavierStokes::ParabolicModule<Description, dim, Number>;
+      using ParabolicModule = NavierStokes::ParabolicModule<dim, Number>;
 
       template <int dim, typename Number = double>
       using Indicator = Euler::Indicator<dim, Number>;
