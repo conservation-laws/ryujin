@@ -265,10 +265,7 @@ namespace ryujin
       //@{
 
       bool use_gmg_velocity_;
-      ACCESSOR_READ_ONLY(use_gmg_velocity)
-
       bool use_gmg_internal_energy_;
-      ACCESSOR_READ_ONLY(use_gmg_internal_energy)
 
       Number tolerance_;
       bool tolerance_linfty_norm_;

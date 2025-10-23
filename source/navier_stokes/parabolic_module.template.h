@@ -236,9 +236,9 @@ namespace ryujin
     void ParabolicModule<dim, Number>::prepare_state_vector(
         StateVector & /*state_vector*/, Number /*t*/) const
     {
-      /**
-       * There is no parabolic part of the state vector for Navier-Stokes, so we
-       * do nothing
+      /*
+       * There is no parabolic part of the state vector for Navier-Stokes,
+       * so we do nothing.
        */
     }
 
