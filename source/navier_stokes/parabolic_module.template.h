@@ -30,8 +30,8 @@ namespace ryujin
   {
     using namespace dealii;
 
-    template <typename Description, int dim, typename Number>
-    ParabolicModule<Description, dim, Number>::ParabolicModule(
+    template <int dim, typename Number>
+    ParabolicModule<dim, Number>::ParabolicModule(
         const MPIEnsemble &mpi_ensemble,
         std::map<std::string, dealii::Timer> &computing_timer,
         const OfflineData<dim, Number> &offline_data,
@@ -124,8 +124,8 @@ namespace ryujin
     }
 
 
-    template <typename Description, int dim, typename Number>
-    void ParabolicModule<Description, dim, Number>::prepare()
+    template <int dim, typename Number>
+    void ParabolicModule<dim, Number>::prepare()
     {
 #ifdef DEBUG_OUTPUT
       std::cout << "ParabolicModule<dim, Number>::prepare()" << std::endl;
@@ -232,8 +232,8 @@ namespace ryujin
     }
 
 
-    template <typename Description, int dim, typename Number>
-    void ParabolicModule<Description, dim, Number>::prepare_state_vector(
+    template <int dim, typename Number>
+    void ParabolicModule<dim, Number>::prepare_state_vector(
         StateVector & /*state_vector*/, Number /*t*/) const
     {
       /**
@@ -243,9 +243,9 @@ namespace ryujin
     }
 
 
-    template <typename Description, int dim, typename Number>
+    template <int dim, typename Number>
     template <int stages>
-    void ParabolicModule<Description, dim, Number>::backward_euler_step(
+    void ParabolicModule<dim, Number>::backward_euler_step(
         const StateVector &old_state_vector,
         const Number old_t,
         std::array<std::reference_wrapper<const StateVector>,
@@ -264,8 +264,8 @@ namespace ryujin
     }
 
 
-    template <typename Description, int dim, typename Number>
-    void ParabolicModule<Description, dim, Number>::crank_nicolson_step(
+    template <int dim, typename Number>
+    void ParabolicModule<dim, Number>::crank_nicolson_step(
         const StateVector &old_state_vector,
         const Number old_t,
         StateVector &new_state_vector,
@@ -297,8 +297,8 @@ namespace ryujin
     }
 
 
-    template <typename Description, int dim, typename Number>
-    void ParabolicModule<Description, dim, Number>::step(
+    template <int dim, typename Number>
+    void ParabolicModule<dim, Number>::step(
         const StateVector &old_state_vector,
         const Number t,
         StateVector &new_state_vector,
@@ -1031,8 +1031,8 @@ namespace ryujin
     }
 
 
-    template <typename Description, int dim, typename Number>
-    void ParabolicModule<Description, dim, Number>::print_solver_statistics(
+    template <int dim, typename Number>
+    void ParabolicModule<dim, Number>::print_solver_statistics(
         std::ostream &output) const
     {
       output << "        [ " << std::setprecision(2) << std::fixed

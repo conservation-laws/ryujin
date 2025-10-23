@@ -7,8 +7,7 @@
 #include "parabolic_module.template.h"
 
 #define INSTANTIATE(dim, stages)                                               \
-  template void                                                                \
-  ParabolicModule<Description, dim, NUMBER>::backward_euler_step<stages>(      \
+  template void ParabolicModule<dim, NUMBER>::backward_euler_step<stages>(     \
       const StateVector &,                                                     \
       const NUMBER,                                                            \
       std::array<std::reference_wrapper<const StateVector>, stages>,           \
@@ -20,9 +19,9 @@ namespace ryujin
 {
   namespace NavierStokes
   {
-    template class ParabolicModule<Description, 1, NUMBER>;
-    template class ParabolicModule<Description, 2, NUMBER>;
-    template class ParabolicModule<Description, 3, NUMBER>;
+    template class ParabolicModule<1, NUMBER>;
+    template class ParabolicModule<2, NUMBER>;
+    template class ParabolicModule<3, NUMBER>;
 
     INSTANTIATE(1, 0);
     INSTANTIATE(1, 1);

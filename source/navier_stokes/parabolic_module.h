@@ -38,6 +38,8 @@ namespace ryujin
     template <int, typename>
     class DiagonalMatrix;
 
+    struct Description;
+
     /**
      * Implicit backward-Euler time stepping for the parabolic limiting
      * equation @cite ryujin-2021-2, Eq. 3.3:
@@ -110,7 +112,7 @@ namespace ryujin
      *
      * @ingroup NavierStokesEquations
      */
-    template <typename Description, int dim, typename Number = double>
+    template <int dim, typename Number = double>
     class ParabolicModule final : public dealii::ParameterAcceptor
     {
     public:
@@ -119,24 +121,23 @@ namespace ryujin
        */
       //@{
 
-      using HyperbolicSystem = typename Description::HyperbolicSystem;
+      using HyperbolicSystem = Euler::HyperbolicSystem;
 
-      using View =
-          typename Description::template HyperbolicSystemView<dim, Number>;
+      using View = Euler::HyperbolicSystemView<dim, Number>;
 
-      using ParabolicSystem = typename Description::ParabolicSystem;
-
-      using ScalarNumber = typename View::ScalarNumber;
-
-      static constexpr auto problem_dimension = View::problem_dimension;
-
-      using state_type = typename View::state_type;
+      using ParabolicSystem = NavierStokes::ParabolicSystem;
 
       using StateVector = typename View::StateVector;
 
       using ScalarVector = Vectors::ScalarVector<Number>;
 
       using BlockVector = Vectors::BlockVector<Number>;
+
+      using ScalarNumber = typename View::ScalarNumber;
+
+      static constexpr auto problem_dimension = View::problem_dimension;
+
+      using state_type = typename View::state_type;
 
       //@}
       /**
