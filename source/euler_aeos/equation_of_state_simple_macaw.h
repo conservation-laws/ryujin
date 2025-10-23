@@ -1,7 +1,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 // [LANL Copyright Statement]
-// Copyright (C) 2024 by the ryujin authors
+// Copyright (C) 2025 by the ryujin authors
 // Copyright (C) 2024 - 2025 by Triad National Security, LLC
 //
 

@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception or LGPL-2.1-or-later
-// Copyright (C) 2024 - 2024 by the ryujin authors
+// Copyright (C) 2020 - 2025 by the ryujin authors
 //
 
 #pragma once

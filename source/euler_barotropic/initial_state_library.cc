@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-// Copyright (C) 2023 by the ryujin authors
+// Copyright (C) 2023 - 2025 by the ryujin authors
 //
 
 #include "initial_state_library.template.h"
