@@ -25,6 +25,104 @@ namespace ryujin
 {
   namespace EulerPoisson
   {
+    /**
+     * Controls the chosen Gauss law restart strategy.
+     *
+     * @ingroup EulerPoissonEquations
+     */
+    enum GaussLawRestartStrategy : dealii::types::boundary_id {
+      /**
+       * Initialize the potential by solving
+       * $$
+       *   -\Delta \varphi = \alpha (\rho + \rho_b)
+       * $$
+       * once at the first timestep. Then, solve
+       * $$
+       *   -\partial_t \Delta \varphi = - \alpha \nabla \cdot \boldsymbol m +
+       *   \partial_t \rho_b
+       * $$
+       * at each parabolic substep. Do not restart the Gauss law. This is
+       * the default strategy.
+       */
+      no_restart,
+
+      /**
+       * Initialize the potential by solving
+       * $$
+       *   -\Delta \varphi = \alpha (\rho + \rho_b)
+       * $$
+       * once at the first timestep. Then, solve
+       * $$
+       *   -\partial_t \Delta \varphi = - \alpha \nabla \cdot \boldsymbol m +
+       *   \partial_t \rho_b
+       * $$
+       * at each parabolic substep. Finally, at the beginning of each
+       * subsequent time step, restart the Gauss law at the beginning of
+       * each time step by solving again
+       * $$
+       *   -\Delta \varphi = \alpha (\rho + \rho_b).
+       * $$
+       *
+       */
+      full_restart,
+
+      /**
+       * Solve
+       * $$
+       *   -\partial_t \Delta \varphi = -\alpha \nabla \cdot \boldsymbol m
+       *   + \partial_t \rho_b
+       * $$
+       * at each parabolic substep. Then, correct the Gauss law violation
+       * by artificially relaxing the kinetic energy.
+       *
+       * FIXME documentation
+       */
+      correction,
+
+      /**
+       * Initialize the potential by solving
+       * $$
+       * -\Delta \varphi = \alpha (\rho + \rho_b)
+       * $$
+       * once at the first timestep. Afterwards, do not update the potential
+       * any more.
+       */
+      static_no_restart,
+
+      /**
+       * Solve
+       * $$
+       * -\Delta \varphi = \alpha (\rho + \rho_b)
+       * $$
+       * at the beginning of each timestep. Do not update the potential
+       * during a parabolic substep.
+       */
+      static_full_restart,
+
+    };
+
+  } // namespace EulerPoisson
+} // namespace ryujin
+
+#ifndef DOXYGEN
+DECLARE_ENUM(
+    ryujin::EulerPoisson::GaussLawRestartStrategy,
+    LIST({ryujin::EulerPoisson::GaussLawRestartStrategy::no_restart,
+          "no restart"},
+         {ryujin::EulerPoisson::GaussLawRestartStrategy::full_restart,
+          "full restart"},
+         {ryujin::EulerPoisson::GaussLawRestartStrategy::correction,
+          "correction"},
+         {ryujin::EulerPoisson::GaussLawRestartStrategy::static_no_restart,
+          "static no restart"},
+         {ryujin::EulerPoisson::GaussLawRestartStrategy::static_full_restart,
+          "static full restart"}));
+#endif
+
+namespace ryujin
+{
+  namespace EulerPoisson
+  {
     /* Forward declaration: */
     struct Description;
 
@@ -192,6 +290,8 @@ namespace ryujin
        */
       //@{
 
+      GaussLawRestartStrategy gauss_law_restart_strategy_;
+
       bool use_gmg_;
 
       unsigned int gmg_max_iter_;
@@ -209,6 +309,12 @@ namespace ryujin
        * @name Low-level implementation
        */
       //@{
+
+      /**
+       * Compute the potential phi (the last component of the state_vector)
+       * for a given density (the first component of the state_vector).
+       */
+      void compute_potential(const Number t, StateVector &state_vector) const;
 
       /**
        * Given a reference to a previous state vector @p old_state_vector
@@ -261,6 +367,7 @@ namespace ryujin
 
       mutable dealii::MatrixFree<dim, Number> matrix_free_;
 
+      mutable bool potential_initialized_;
       mutable ScalarVector potential_rhs_;
       mutable ScalarVector density_;
       mutable ScalarVector background_density_;

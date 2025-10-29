@@ -34,7 +34,7 @@ namespace ryujin
                             background_density_expression_,
                             "A function expression for the background density");
 
-        if constexpr (dim >= 1) {
+        if constexpr (dim >= 2) {
           magnetic_field_z_expression_ = "0.";
           this->add_parameter("magnetic field z",
                               magnetic_field_z_expression_,

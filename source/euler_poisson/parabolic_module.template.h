@@ -45,7 +45,15 @@ namespace ryujin
         , n_restarts_(0)
         , n_corrections_(0)
         , n_warnings_(0)
+        , potential_initialized_(false)
     {
+      gauss_law_restart_strategy_ = GaussLawRestartStrategy::no_restart;
+      add_parameter("gauss law restart strategy",
+                    gauss_law_restart_strategy_,
+                    "Strategy used when restarting the gauss law. Options are "
+                    "\'no restart\', \'full restart\', \'correction\', "
+                    "\'static no restart\', and \'static full restart\'.");
+
       use_gmg_ = false;
       add_parameter("multigrid", use_gmg_, "Use geometric multigrid");
 
@@ -137,6 +145,8 @@ namespace ryujin
                   dealii::ExcMessage(
                       "The Euler-Poisson module currently does not support "
                       "DoFHandlers set up with hp capabilities."));
+
+      potential_initialized_ = false;
 
       /*
        * (Re)initialize matrix free object:
@@ -241,12 +251,26 @@ namespace ryujin
 
     template <int dim, typename Number>
     void ParabolicModule<dim, Number>::prepare_state_vector(
-        StateVector & /*state_vector*/, Number /*t*/) const
+        StateVector &state_vector, Number t) const
     {
 #ifdef DEBUG_OUTPUT
       std::cout << "ParabolicModule<dim, Number>::prepare_state_vector()"
                 << std::endl;
 #endif
+
+      /*
+       * We (re)compute the potential on the first step and if the restart
+       * strategy is set to full_restart or static_full_restart.
+       */
+
+      if (potential_initialized_ ||
+          (gauss_law_restart_strategy_ ==
+           GaussLawRestartStrategy::full_restart) ||
+          (gauss_law_restart_strategy_ ==
+           GaussLawRestartStrategy::static_full_restart)) {
+        compute_potential(t, state_vector);
+        potential_initialized_ = true;
+      }
     }
 
 
@@ -261,8 +285,6 @@ namespace ryujin
         StateVector &new_state_vector,
         Number tau) const
     {
-      /* Backward Euler step to half time step, and extrapolate: */
-
       step(old_state_vector,
            old_t,
            new_state_vector,
@@ -279,6 +301,8 @@ namespace ryujin
         Number tau) const
     {
       try {
+        /* Backward Euler step to half time step, and extrapolate: */
+
         step(old_state_vector,
              old_t,
              new_state_vector,
@@ -305,6 +329,32 @@ namespace ryujin
 
 
     template <int dim, typename Number>
+    void ParabolicModule<dim, Number>::compute_potential(
+        const Number /*t*/, StateVector & /*state_vector*/) const
+    {
+#ifdef DEBUG_OUTPUT
+      std::cout << "ParabolicModule<dim, Number>::compute_potential()"
+                << std::endl;
+#endif
+      const auto &discretization = offline_data_->discretization();
+
+      if (selected_electrostatic_configuration_->is_time_dependent()) {
+        dealii::VectorTools::interpolate(
+            discretization.mapping(),
+            offline_data_->dof_handler(),
+            dealii::ScalarFunctionFromFunctionObject<dim, Number>(
+                [&](const dealii::Point<dim> &p) {
+                  return selected_electrostatic_configuration_
+                      ->background_density(p, 0);
+                }),
+            background_density_);
+      }
+
+      return;
+    }
+
+
+    template <int dim, typename Number>
     void
     ParabolicModule<dim, Number>::step(const StateVector &old_state_vector,
                                        const Number /*t*/,
@@ -316,6 +366,22 @@ namespace ryujin
 #ifdef DEBUG_OUTPUT
       std::cout << "ParabolicModule<dim, Number>::step()" << std::endl;
 #endif
+      const auto &discretization = offline_data_->discretization();
+
+      if (selected_electrostatic_configuration_->is_time_dependent()) {
+        for (unsigned int k = 0; k < (dim == 2 ? 1 : dim); ++k) {
+          dealii::VectorTools::interpolate(
+              discretization.mapping(),
+              offline_data_->dof_handler(),
+              to_function<dim, Number>(
+                  [&](const dealii::Point<dim> &p) {
+                    return selected_electrostatic_configuration_
+                        ->magnetic_field(p, 0);
+                  },
+                  k),
+              magnetic_field_.block(k));
+        }
+      }
 
 #ifdef DEBUG_OUTPUT
       std::cout << "        perform time-step with tau = " << tau << std::endl;
