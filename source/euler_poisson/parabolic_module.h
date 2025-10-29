@@ -8,6 +8,7 @@
 #include <compile_time_options.h>
 
 #include "../euler/hyperbolic_system.h"
+#include "electrostatic_configuration_library.h"
 #include "parabolic_system.h"
 
 #include <deal.II/dofs/dof_tools.h>
@@ -18,6 +19,7 @@
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/timer.h>
+#include <deal.II/matrix_free/matrix_free.h>
 
 namespace ryujin
 {
@@ -79,7 +81,7 @@ namespace ryujin
           const HyperbolicSystem &hyperbolic_system,
           const ParabolicSystem &parabolic_system,
           const InitialValues<Description, dim, Number> &initial_values,
-          const std::string &subsection = "StubParabolicModule");
+          const std::string &subsection = "/ParabolicModule");
 
       /**
        * Prepare time stepping. A call to @p prepare() allocates temporary
@@ -240,6 +242,14 @@ namespace ryujin
           const ryujin::InitialValues<Description, dim, Number>>
           initial_values_;
 
+      ElectrostaticConfigurationLibrary::
+          electrostatic_configuration_list_type<dim, Number>
+              electrostatic_configuration_list_;
+
+      std::shared_ptr<ElectrostaticConfigurationLibrary::
+                          ElectrostaticConfiguration<dim, Number>>
+          selected_electrostatic_configuration_;
+
       mutable IDViolationStrategy id_violation_strategy_;
 
       mutable unsigned int cycle_;
@@ -248,6 +258,11 @@ namespace ryujin
       mutable unsigned int n_restarts_;
       mutable unsigned int n_corrections_;
       mutable unsigned int n_warnings_;
+
+      mutable dealii::MatrixFree<dim, Number> matrix_free_;
+
+      mutable ScalarVector potential_rhs_;
+      mutable ScalarVector density_;
 
       //@}
     };

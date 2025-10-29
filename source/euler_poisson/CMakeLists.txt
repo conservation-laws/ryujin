@@ -1,9 +1,10 @@
 ##
 ## SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-## Copyright (C) 2022 - 2023 by the ryujin authors
+## Copyright (C) 2025 by the ryujin authors
 ##
 
 add_library(obj_euler_poisson OBJECT
+  electrostatic_configuration_library.cc
   equation_dispatch.cc
   initial_state_library.cc
   parabolic_module.cc

@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "electrostatic_configuration_library.h"
 #include "parabolic_module.h"
 
 #include <instrumentation.h>
@@ -26,7 +27,7 @@ namespace ryujin
         const HyperbolicSystem &hyperbolic_system,
         const ParabolicSystem &parabolic_system,
         const InitialValues<Description, dim, Number> &initial_values,
-        const std::string &subsection /*= "ParabolicModule"*/)
+        const std::string &subsection)
         : ParameterAcceptor(subsection)
         , mpi_ensemble_(mpi_ensemble)
         , computing_timer_(computing_timer)
@@ -86,6 +87,32 @@ namespace ryujin
                     tolerance_linfty_norm_,
                     "Use the l_infty norm instead of the l_2 norm for the "
                     "stopping criterion");
+
+      ElectrostaticConfigurationLibrary::
+          populate_electrostatic_configuration_list<dim, Number>(
+              electrostatic_configuration_list_,
+              parabolic_system_->subsection());
+
+      const auto populate = [this]() {
+        bool initialized = false;
+        for (auto &it : electrostatic_configuration_list_)
+
+          if (it->name() == parabolic_system_->electrostatic_configuration()) {
+            selected_electrostatic_configuration_ = it;
+            initialized = true;
+            break;
+          }
+
+        AssertThrow(initialized,
+                    dealii::ExcMessage(
+                        "Could not find an electrostatic configuration "
+                        "description with name \"" +
+                        parabolic_system_->electrostatic_configuration() +
+                        "\""));
+      };
+
+      ParameterAcceptor::parse_parameters_call_back.connect(populate);
+      populate();
     }
 
 
@@ -171,12 +198,13 @@ namespace ryujin
 
 
     template <int dim, typename Number>
-    void ParabolicModule<dim, Number>::step(
-        const StateVector &old_state_vector,
-        const Number /*t*/,
-        StateVector &new_state_vector,
-        Number tau [[maybe_unused]],
-        const bool crank_nicolson_extrapolation [[maybe_unused]]) const
+    void
+    ParabolicModule<dim, Number>::step(const StateVector &old_state_vector,
+                                       const Number /*t*/,
+                                       StateVector &new_state_vector,
+                                       Number tau [[maybe_unused]],
+                                       const bool crank_nicolson_extrapolation
+                                       [[maybe_unused]]) const
     {
 #ifdef DEBUG_OUTPUT
       std::cout << "ParabolicModule<dim, Number>::step()" << std::endl;

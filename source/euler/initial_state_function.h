@@ -68,10 +68,8 @@ namespace ryujin
                               "A function expression describing the pressure");
         }
 
-        /*
-         * Set up the muparser object with the final flux description from
-         * the parameter file:
-         */
+        /* Set up all muparser objects */
+
         const auto set_up_muparser = [this] {
           using FP = dealii::FunctionParser<dim>;
           /*
