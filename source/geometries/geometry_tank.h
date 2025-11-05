@@ -142,7 +142,7 @@ namespace ryujin
                             reservoir_length_,
                             "length of water reservoir [meters]");
 
-        reservoir_width_ = 8.1 / 100.;
+        reservoir_width_ = 81 / 100.;
         this->add_parameter("reservoir width",
                             reservoir_width_,
                             "width of water reservoir [meters]");

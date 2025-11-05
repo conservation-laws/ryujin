@@ -5,6 +5,10 @@
 
 #include "mpi_ensemble.h"
 
+#ifdef DEBUG_OUTPUT
+#include <iostream>
+#endif
+
 namespace ryujin
 {
   MPIEnsemble::MPIEnsemble(const MPI_Comm &mpi_communicator,
