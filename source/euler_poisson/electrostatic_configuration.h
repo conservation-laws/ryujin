@@ -43,6 +43,8 @@ namespace ryujin
             parabolic_boundary_,
             "Type of boundary condition enforced on the electrostatic "
             "potential. Supported values are dirichlet, neumann, periodic.");
+
+        is_time_dependent_ = false;
       }
 
       /**
@@ -59,17 +61,27 @@ namespace ryujin
                                        Number t) const = 0;
 
       /**
-       * Return the name of the configuration as a (const reference) std::string
+       * Return the name of the configuration as a (const reference)
+       * std::string.
        */
       ACCESSOR_READ_ONLY(name)
 
       /**
-       * Return the name of the configuration as a (const reference) std::string
+       * Return the selected boundary type.
        */
+      ACCESSOR_READ_ONLY(parabolic_boundary)
+
+      /**
+       * Return a boolean indicating whether the background fields are time
+       * dependent.
+       */
+      ACCESSOR_READ_ONLY(is_time_dependent)
 
     private:
       const std::string name_;
       Boundary parabolic_boundary_;
+
+      bool is_time_dependent_;
     };
   } // namespace ElectrostaticConfigurationLibrary
 } /* namespace ryujin */

@@ -8,10 +8,14 @@
 #include "electrostatic_configuration_library.h"
 #include "parabolic_module.h"
 
+#include <convenience_macros.h>
 #include <instrumentation.h>
 #include <openmp.h>
 #include <scope.h>
 #include <simd.h>
+
+#include <deal.II/numerics/vector_tools_interpolate.h>
+
 
 namespace ryujin
 {
@@ -122,13 +126,116 @@ namespace ryujin
 #ifdef DEBUG_OUTPUT
       std::cout << "ParabolicModule<dim, Number>::prepare()" << std::endl;
 #endif
+
+      const auto &discretization = offline_data_->discretization();
+      AssertThrow(discretization.ansatz() == Ansatz::dg_q1 ||
+                      discretization.ansatz() == Ansatz::cg_q1,
+                  dealii::ExcMessage("The Euler-Poisson module currently only "
+                                     "supports cG/dg Q1 finite elements."));
+
+      AssertThrow(!offline_data_->dof_handler().has_hp_capabilities(),
+                  dealii::ExcMessage(
+                      "The Euler-Poisson module currently does not support "
+                      "DoFHandlers set up with hp capabilities."));
+
+      /*
+       * (Re)initialize matrix free object:
+       */
+
+      typename MatrixFree<dim, Number>::AdditionalData additional_data;
+      additional_data.tasks_parallel_scheme =
+          MatrixFree<dim, Number>::AdditionalData::none;
+
+      // First index CG, second index hyperbolic ansatz
+      std::vector<const dealii::DoFHandler<dim> *> dof_handlers = {
+          &offline_data_->dof_handler_cg(), &offline_data_->dof_handler()};
+      std::vector<const dealii::AffineConstraints<Number> *>
+          affine_constraints = {&offline_data_->affine_constraints_cg(),
+                                &offline_data_->affine_constraints()};
+
+      // First index full quadrature, second index lumped quadrature
+      std::vector<dealii::Quadrature<1>> quadratures = {
+          discretization.quadrature_1d()[0],
+          discretization.nodal_quadrature_1d()[0]};
+
+      matrix_free_.reinit(discretization.mapping(),
+                          dof_handlers,
+                          affine_constraints,
+                          quadratures,
+                          additional_data);
+
+      /*
+       * (Re)initialize auxiliary vectors:
+       */
+
+      const auto &potential_partitioner =
+          matrix_free_.get_dof_info(0).vector_partitioner;
+      potential_rhs_.reinit(potential_partitioner);
+
+      const auto &scalar_partitioner =
+          matrix_free_.get_dof_info(1).vector_partitioner;
+      density_.reinit(scalar_partitioner);
+      background_density_.reinit(scalar_partitioner);
+
+      magnetic_field_.reinit(dim == 2 ? 1 : dim);
+      for (unsigned int i = 0; i < magnetic_field_.n_blocks(); ++i)
+        magnetic_field_.block(i).reinit(scalar_partitioner);
+
+      if (!selected_electrostatic_configuration_->is_time_dependent()) {
+        /*
+         * Interpolate auxiliary vectors for background fields:
+         */
+
+        // FIXME: maybe use a matrix-free loop
+
+        dealii::VectorTools::interpolate(
+            discretization.mapping(),
+            offline_data_->dof_handler(),
+            dealii::ScalarFunctionFromFunctionObject<dim, Number>(
+                [&](const dealii::Point<dim> &p) {
+                  return selected_electrostatic_configuration_
+                      ->background_density(p, 0);
+                }),
+            background_density_);
+
+        for (unsigned int k = 0; k < (dim == 2 ? 1 : dim); ++k) {
+          dealii::VectorTools::interpolate(
+              discretization.mapping(),
+              offline_data_->dof_handler(),
+              to_function<dim, Number>(
+                  [&](const dealii::Point<dim> &p) {
+                    return selected_electrostatic_configuration_
+                        ->magnetic_field(p, 0);
+                  },
+                  k),
+              magnetic_field_.block(k));
+        }
+      }
     }
 
 
     template <int dim, typename Number>
     void ParabolicModule<dim, Number>::reinit_state_vector(
-        StateVector & /*state_vector*/) const
+        StateVector &state_vector) const
     {
+#ifdef DEBUG_OUTPUT
+      std::cout << "ParabolicModule<dim, Number>::reinit_state_vector()"
+                << std::endl;
+#endif
+
+      auto &[U, precomputed, V] = state_vector;
+      V.reinit(1);
+
+      auto &potential = V.block(0);
+      const auto &partitioner = matrix_free_.get_dof_info(0).vector_partitioner;
+      potential.reinit(partitioner);
+
+#ifdef DEBUG
+      /* Poison potential: */
+      constexpr auto nan = std::numeric_limits<Number>::signaling_NaN();
+      for (unsigned int i = 0; i < partitioner->locally_owned_size(); ++i)
+        potential.local_element(i) = nan;
+#endif
     }
 
 
@@ -136,10 +243,10 @@ namespace ryujin
     void ParabolicModule<dim, Number>::prepare_state_vector(
         StateVector & /*state_vector*/, Number /*t*/) const
     {
-      /*
-       * There is no parabolic part of the state vector for Navier-Stokes,
-       * so we do nothing.
-       */
+#ifdef DEBUG_OUTPUT
+      std::cout << "ParabolicModule<dim, Number>::prepare_state_vector()"
+                << std::endl;
+#endif
     }
 
 

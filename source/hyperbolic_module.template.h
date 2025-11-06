@@ -108,6 +108,11 @@ namespace ryujin
   void HyperbolicModule<Description, dim, Number>::reinit_state_vector(
       StateVector &state_vector) const
   {
+#ifdef DEBUG_OUTPUT
+    std::cout << "HyperbolicModule<dim, Number>::reinit_state_vector()"
+              << std::endl;
+#endif
+
     auto &[U, precomputed, V] = state_vector;
     U.reinit(offline_data_->hyperbolic_vector_partitioner());
     precomputed.reinit(offline_data_->precomputed_vector_partitioner());

@@ -263,7 +263,8 @@ namespace ryujin
 
       mutable ScalarVector potential_rhs_;
       mutable ScalarVector density_;
-
+      mutable ScalarVector background_density_;
+      mutable BlockVector magnetic_field_;
       //@}
     };
   } // namespace EulerPoisson

@@ -144,7 +144,7 @@ namespace ryujin
       AssertThrow(!offline_data_->dof_handler().has_hp_capabilities(),
                   dealii::ExcMessage(
                       "The Navier-Stokes module currently does not support "
-                      "DofHandlers set up with hp capabilities."));
+                      "DoFHandlers set up with hp capabilities."));
 
       /* Initialize vectors: */
 
