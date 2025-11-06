@@ -22,7 +22,7 @@ namespace ryujin
      * satisfy the following relationships:
      *
      * \f{align}
-     *   p &= c^2 \,\partial_\rho e(\rho), \qquad
+     *   p &= \rho^2 \,\partial_\rho e(\rho), \qquad
      *   a &= \sqrt{\partial_\rho p(\rho)}.
      * \f}
      *
