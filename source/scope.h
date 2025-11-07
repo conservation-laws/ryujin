@@ -12,6 +12,10 @@
 #include <map>
 #include <string>
 
+#ifdef DEBUG_OUTPUT
+#include <iostream>
+#endif
+
 namespace ryujin
 {
   /**

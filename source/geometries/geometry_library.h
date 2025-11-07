@@ -16,6 +16,7 @@
 #include "geometry_rectangular_domain.h"
 #include "geometry_step.h"
 #include "geometry_tank.h"
+#include "geometry_two_tanks.h"
 #include "geometry_wall.h"
 
 namespace ryujin
@@ -49,6 +50,7 @@ namespace ryujin
       add(std::make_shared<Reader<dim>>(subsection));
       add(std::make_shared<RectangularDomain<dim>>(subsection));
       add(std::make_shared<Step<dim>>(subsection));
+      add(std::make_shared<TwoTanks<dim>>(subsection));
       add(std::make_shared<Wall<dim>>(subsection));
       add(std::make_shared<WaveTank<dim>>(subsection));
     }

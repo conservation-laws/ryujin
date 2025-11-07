@@ -126,7 +126,7 @@ Developers
  - Martin Kronbichler ([@kronbichler](https://github.com/kronbichler)), Ruhr University Bochum, Germany
  - Matthias Maier ([@tamiko](https://github.com/tamiko)), Texas A&M University, TX, USA
  - Ignacio Tomas ([@nachosaurus](https://github.com/nachosaurus)), Texas Tech University, TX, USA
- - Eric Tovar ([@ejtovar](https://github.com/ejtovar)), Los Alamos National Laboratory, USA
+ - Eric Tovar ([@ejtovar](https://github.com/ejtovar)), Xcimer Energy Corporation, USA
 
 Contributors
 ------------
