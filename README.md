@@ -79,37 +79,89 @@ References
 ----------
 
 If you use this software for an academic publication please consider citing
-the following references
-([[1](https://arxiv.org/abs/2007.00094)],
-[[3](https://arxiv.org/abs/2106.02159})]):
+some of the following references:
 
 ```
-@article {ryujin-2021-1,
-  author = {Matthias Maier and Martin Kronbichler},
-  title = {Efficient parallel 3D computation of the compressible Euler
-    equations with an invariant-domain preserving second-order
-    finite-element scheme},
-  doi = {10.1145/3470637},
-  url = {https://arxiv.org/abs/2007.00094},
+@article{ryujin-2021-1,
+  author  = {Matthias Maier and Martin Kronbichler},
+  title   = {Efficient parallel 3D computation of the compressible Euler equations with an invariant-domain preserving second-order finite-element scheme},
+  doi     = {10.1145/3470637},
+  url     = {https://arxiv.org/abs/2007.00094},
   journal = {ACM Transactions on Parallel Computing},
-  year = {2021},
-  volume = {8},
-  number = {3},
-  pages = {16:1-30},
+  year    = {2021},
+  volume  = {8},
+  number  = {3},
+  pages   = {16:1-30}
+}
+
+@article{ryujin-2021-2,
+  author  = {Jean-Luc Guermond and Matthias Maier and Bojan Popov and Ignacio Tomas},
+  title   = {Second-order invariant domain preserving approximation of the compressible Navier--Stokes equations},
+  doi     = {10.1016/j.cma.2020.113608},
+  url     = {https://arxiv.org/abs/2009.06022},
+  journal = {Computer Methods in Applied Mechanics and Engineering},
+  year    = {2021},
+  volume  = {375},
+  number  = {1},
+  pages   = {113608}
 }
 
 @article{ryujin-2021-3,
-  author = {Jean-Luc Guermond and Martin Kronbichler and Matthias Maier and
-    Bojan Popov and Ignacio Tomas},
-  title = {On the implementation of a robust and efficient finite
-    element-based parallel solver for the compressible Navier-stokes
-    equations},
-  doi = {10.1016/j.cma.2021.114250},
-  url = {https://arxiv.org/abs/2106.02159},
+  author  = {Jean-Luc~Guermond and Martin Kronbichler and Matthias Maier and Bojan Popov and Ignacio Tomas},
+  title   = {On the implementation of a robust and efficient finite element-based parallel solver for the compressible Navier-stokes equations},
+  url     = {https://arxiv.org/abs/2106.02159},
   journal = {Computer Methods in Applied Mechanics and Engineering},
-  year = {2022},
-  volume = {389},
-  pages = {114250},
+  year    = {2022},
+  volume  = {389},
+  pages   = {114250}
+}
+
+@article{ryujin-2023-4,
+  author  = {Bennett Clayton and Jean-Luc Guermond and Matthias Maier and Bojan Popov and Tovar, Eric J.},
+  title   = {Robust second-order approximation of the compressible Euler equations with an arbitrary equation of state},
+  url     = {http://arxiv.org/abs/2207.12832},
+  journal = {Journal of Computational Physics},
+  pages   = {111926},
+  year    = {2023}
+}
+
+@article{ryujin-2024-5,
+  author = {Jean-Luc Guermond and Matthias Maier and Bojan Popov and Laura Saavedra and Ignacio Tomas},
+  title = {First-Order Greedy Invariant-Domain Preserving Approximation for Hyperbolic Problems: Scalar Conservation Laws, and p-System},
+  url = {https://arxiv.org/abs/2310.01713},
+  journal = {Journal of Scientific Computing},
+  year = {2024},
+  volume = {100},
+  number = {46},
+  pages = {},
+}
+
+@article{ryujin-2025-6,
+  author = {Jean-Luc Guermond and Matthias Maier and Tovar, Eric J.},
+  title = {A high-order explicit Runge-Kutta approximation technique for the shallow water equations},
+  url = {https://arxiv.org/abs/2403.17123},
+  journal = {Computers \& Fluids},
+  year = {2025},
+  volume = {288},
+  pages = {106493},
+}
+
+@article{ryujin-2025-7,
+  author = {Martin Kronbichler and Matthias Maier and Ignacio Tomas},
+  title = {Graph-based methods for hyperbolic systems of conservation laws using discontinuous space discretizations},
+  url = {https://arxiv.org/abs/2402.04514},
+  journal = {Communications in Computational Physics},
+  year = {2025},
+  volume = {38},
+  pages = {74--108}
+}
+
+@article{ryujin-2025-8,
+  author = {Jake Harmon and Martin Kronbichler and Matthias Maier and Eric Tovar},
+  title = {A conservative invariant-domain preserving projection technique for hyperbolic systems under adaptive mesh refinement},
+  url = {https://arxiv.org/abs/2507.18717},
+  year = {2025},
+  journal = {submitted}
 }
 ```
 
@@ -134,12 +186,10 @@ Contributors
  - Wolfgang Bangerth [@bangerth](https://github.com/bangerth), Colorado State University
  - Taylor Boylan ([@tmboylan](https://github.com/tmboylan)),
  - Jerett Cherry ([@jerret-cc](https://github.com/jerett-cc)), Colorado State University
- - Gregory Christian ([@gregorychristian](https://github.com/gregorychristian))
+ - Gregory Christian ([@gregorychristian](https://github.com/gregorychristian), Imperial College London, UK
  - Bennett Clayton ([@bgclayto](https://github.com/bgclayto))
  - Seth Gerberding ([@Gerbeset](https://github.com/Gerbeset)), Texas A&M University, TX, USA
  - Jake Harmon ([@harmonj](https://github.com/harmonj)), Los Alamos National Laboratory, USA
  - Jordan Hoffart ([@jordanhoffart](https://github.com/jordanhoffart)), Texas A&M University, TX, USA
  - David Pecoraro ([@ChrisPec27](https://github.com/ChrisPec27)), Texas A&M University, TX, USA
  - Madison Sheridan ([@Helblindi](https://github.com/Helblindi)), Texas A&M University, TX, USA
- - Gregory Christian ([@gregorychristian](https://github.com/gregorychristian), Imperial College London, UK
-
