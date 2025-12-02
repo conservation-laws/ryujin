@@ -8,10 +8,10 @@
 #include <compile_time_options.h>
 
 #include "../euler/hyperbolic_system.h"
+
 #include "electrostatic_configuration_library.h"
 #include "parabolic_system.h"
 
-#include <deal.II/dofs/dof_tools.h>
 #include <hyperbolic_module.h>
 #include <initial_values.h>
 #include <mpi_ensemble.h>
@@ -19,6 +19,7 @@
 
 #include <deal.II/base/parameter_acceptor.h>
 #include <deal.II/base/timer.h>
+#include <deal.II/lac/precondition.h>
 #include <deal.II/matrix_free/matrix_free.h>
 
 namespace ryujin
@@ -292,8 +293,6 @@ namespace ryujin
 
       GaussLawRestartStrategy gauss_law_restart_strategy_;
 
-      bool use_gmg_;
-
       unsigned int gmg_max_iter_;
       double gmg_smoother_range_;
       double gmg_smoother_max_eig_;
@@ -309,6 +308,11 @@ namespace ryujin
        * @name Low-level implementation
        */
       //@{
+
+      /**
+       * Set up affine constraints. Internally used in prepare().
+       */
+      void create_constraints();
 
       /**
        * Compute the potential phi (the last component of the state_vector)
@@ -337,6 +341,10 @@ namespace ryujin
        */
       //@{
 
+      // FIXME: refactor
+      static constexpr unsigned int order_fe = 1;
+      static constexpr unsigned int order_quad = 2;
+
       const MPIEnsemble &mpi_ensemble_;
       std::map<std::string, dealii::Timer> &computing_timer_;
 
@@ -359,13 +367,16 @@ namespace ryujin
       mutable IDViolationStrategy id_violation_strategy_;
 
       mutable unsigned int cycle_;
-      mutable unsigned int n_iterations_;
+      mutable double n_iterations_gauss_;
+      mutable double n_iterations_step_;
 
       mutable unsigned int n_restarts_;
       mutable unsigned int n_corrections_;
       mutable unsigned int n_warnings_;
 
-      mutable dealii::MatrixFree<dim, Number> matrix_free_;
+      dealii::MatrixFree<dim, Number> matrix_free_;
+      dealii::AffineConstraints<Number> affine_constraints_potential_;
+      dealii::DiagonalMatrix<ScalarVector> diagonal_preconditioner_;
 
       mutable bool potential_initialized_;
       mutable ScalarVector potential_rhs_;

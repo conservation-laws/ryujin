@@ -38,11 +38,11 @@ namespace ryujin
           , name_(name)
       {
         parabolic_boundary_ = Boundary::dirichlet;
-        this->add_parameter(
-            "boundary condition",
-            parabolic_boundary_,
-            "Type of boundary condition enforced on the electrostatic "
-            "potential. Supported values are dirichlet, neumann, periodic.");
+        this->add_parameter("boundary condition",
+                            parabolic_boundary_,
+                            "Type of boundary condition enforced on the "
+                            "electrostatic potential. Supported values are "
+                            "dirichlet, do_nothing (Neumann), periodic.");
 
         is_time_dependent_ = false;
       }

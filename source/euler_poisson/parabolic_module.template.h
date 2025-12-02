@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "electrostatic_configuration_library.h"
+#include "laplace_operator.h"
 #include "parabolic_module.h"
 
 #include <convenience_macros.h>
@@ -14,6 +14,11 @@
 #include <scope.h>
 #include <simd.h>
 
+#include <deal.II/dofs/dof_tools.h>
+#include <deal.II/lac/linear_operator.h>
+#include <deal.II/lac/precondition.h>
+#include <deal.II/lac/solver_cg.h>
+#include <deal.II/matrix_free/fe_evaluation.h>
 #include <deal.II/numerics/vector_tools_interpolate.h>
 
 
@@ -41,7 +46,8 @@ namespace ryujin
         , initial_values_(&initial_values)
         , id_violation_strategy_(IDViolationStrategy::warn)
         , cycle_(0)
-        , n_iterations_(0)
+        , n_iterations_gauss_(0)
+        , n_iterations_step_(0)
         , n_restarts_(0)
         , n_corrections_(0)
         , n_warnings_(0)
@@ -53,9 +59,6 @@ namespace ryujin
                     "Strategy used when restarting the gauss law. Options are "
                     "\'no restart\', \'full restart\', \'correction\', "
                     "\'static no restart\', and \'static full restart\'.");
-
-      use_gmg_ = false;
-      add_parameter("multigrid", use_gmg_, "Use geometric multigrid");
 
       gmg_max_iter_ = 15;
       add_parameter("multigrid - max iter",
@@ -134,6 +137,11 @@ namespace ryujin
 #ifdef DEBUG_OUTPUT
       std::cout << "ParabolicModule<dim, Number>::prepare()" << std::endl;
 #endif
+      /*
+       * The cycle_ variabe is only used for gmg reinitialization, simply
+       * reset it to zero on prepare().
+       */
+      cycle_ = 0;
 
       const auto &discretization = offline_data_->discretization();
       AssertThrow(discretization.ansatz() == Ansatz::dg_q1 ||
@@ -159,8 +167,10 @@ namespace ryujin
       // First index CG, second index hyperbolic ansatz
       std::vector<const dealii::DoFHandler<dim> *> dof_handlers = {
           &offline_data_->dof_handler_cg(), &offline_data_->dof_handler()};
+
+      create_constraints();
       std::vector<const dealii::AffineConstraints<Number> *>
-          affine_constraints = {&offline_data_->affine_constraints_cg(),
+          affine_constraints = {&affine_constraints_potential_,
                                 &offline_data_->affine_constraints()};
 
       // First index full quadrature, second index lumped quadrature
@@ -173,6 +183,14 @@ namespace ryujin
                           affine_constraints,
                           quadratures,
                           additional_data);
+
+      /*
+       * (Re)initialize preconditioners:
+       */
+
+      LaplaceMatrix<dim, Number, Number> laplace_operator;
+      laplace_operator.initialize(*offline_data_, matrix_free_);
+      laplace_operator.compute_diagonal(diagonal_preconditioner_);
 
       /*
        * (Re)initialize auxiliary vectors:
@@ -207,6 +225,7 @@ namespace ryujin
                       ->background_density(p, 0);
                 }),
             background_density_);
+        background_density_.update_ghost_values();
 
         for (unsigned int k = 0; k < (dim == 2 ? 1 : dim); ++k) {
           dealii::VectorTools::interpolate(
@@ -220,6 +239,7 @@ namespace ryujin
                   k),
               magnetic_field_.block(k));
         }
+        magnetic_field_.update_ghost_values();
       }
     }
 
@@ -239,13 +259,7 @@ namespace ryujin
       auto &potential = V.block(0);
       const auto &partitioner = matrix_free_.get_dof_info(0).vector_partitioner;
       potential.reinit(partitioner);
-
-#ifdef DEBUG
-      /* Poison potential: */
-      constexpr auto nan = std::numeric_limits<Number>::signaling_NaN();
-      for (unsigned int i = 0; i < partitioner->locally_owned_size(); ++i)
-        potential.local_element(i) = nan;
-#endif
+      potential = 0.;
     }
 
 
@@ -263,7 +277,7 @@ namespace ryujin
        * strategy is set to full_restart or static_full_restart.
        */
 
-      if (potential_initialized_ ||
+      if (!potential_initialized_ ||
           (gauss_law_restart_strategy_ ==
            GaussLawRestartStrategy::full_restart) ||
           (gauss_law_restart_strategy_ ==
@@ -329,8 +343,107 @@ namespace ryujin
 
 
     template <int dim, typename Number>
+    void ParabolicModule<dim, Number>::create_constraints()
+    {
+#ifdef DEBUG_OUTPUT
+      std::cout << "ParabolicModule<dim, Number>::create_constraints()"
+                << std::endl;
+#endif
+
+      const auto &discretization = offline_data_->discretization();
+      const auto &dof_handler = offline_data_->dof_handler_cg();
+
+      affine_constraints_potential_.clear();
+
+#if DEAL_II_VERSION_GTE(9, 6, 0)
+      const auto locally_relevant =
+          DoFTools::extract_locally_relevant_dofs(dof_handler);
+#else
+      IndexSet locally_relevant;
+      DoFTools::extract_locally_relevant_dofs(dof_handler, locally_relevant);
+#endif
+
+#if DEAL_II_VERSION_GTE(9, 6, 0)
+      const IndexSet &locally_owned = dof_handler.locally_owned_dofs();
+      affine_constraints_potential_.reinit(locally_owned, locally_relevant);
+#else
+      affine_constraints_potential_.reinit(locally_relevant);
+#endif
+
+      DoFTools::make_hanging_node_constraints(offline_data_->dof_handler_cg(),
+                                              affine_constraints_potential_);
+
+      /*
+       * Enforce periodic boundary conditions. We assume that the mesh is in
+       * "normal configuration."
+       */
+
+      const auto &periodic_faces =
+          discretization.triangulation().get_periodic_face_map();
+
+      for (const auto &[left, value] : periodic_faces) {
+        const auto &[right, orientation] = value;
+
+        typename DoFHandler<dim>::cell_iterator dof_cell_left(
+            &left.first->get_triangulation(),
+            left.first->level(),
+            left.first->index(),
+            &dof_handler);
+
+        typename DoFHandler<dim>::cell_iterator dof_cell_right(
+            &right.first->get_triangulation(),
+            right.first->level(),
+            right.first->index(),
+            &dof_handler);
+
+        if constexpr (std::is_same_v<Number, double>) {
+          DoFTools::make_periodicity_constraints(
+              dof_cell_left->face(left.second),
+              dof_cell_right->face(right.second),
+              affine_constraints_potential_,
+              ComponentMask(),
+#if DEAL_II_VERSION_GTE(9, 6, 0)
+              orientation);
+#else
+              /* orientation */ orientation[0],
+              /* flip */ orientation[1],
+              /* rotation */ orientation[2]);
+#endif
+        } else {
+          AssertThrow(false, dealii::ExcNotImplemented());
+          __builtin_trap();
+        }
+      }
+
+      switch (selected_electrostatic_configuration_->parabolic_boundary()) {
+      case Boundary::dirichlet:
+        DoFTools::make_zero_boundary_constraints(
+            offline_data_->dof_handler_cg(), affine_constraints_potential_);
+        break;
+
+      case Boundary::periodic:
+        AssertThrow(false, dealii::ExcNotImplemented());
+        break;
+
+      case Boundary::do_nothing:
+        /* do nothing */
+        break;
+
+      default:
+        AssertThrow(
+            false,
+            dealii::ExcMessage(
+                "selected potential boundary type not supported. Supported "
+                "values are dirichlet, do_nothing (Neumann), periodic."));
+      }
+
+      affine_constraints_potential_.close();
+    }
+
+
+    template <int dim, typename Number>
     void ParabolicModule<dim, Number>::compute_potential(
-        const Number /*t*/, StateVector & /*state_vector*/) const
+        const Number t, StateVector &state_vector) const
     {
 #ifdef DEBUG_OUTPUT
       std::cout << "ParabolicModule<dim, Number>::compute_potential()"
@@ -345,19 +458,141 @@ namespace ryujin
             dealii::ScalarFunctionFromFunctionObject<dim, Number>(
                 [&](const dealii::Point<dim> &p) {
                   return selected_electrostatic_configuration_
-                      ->background_density(p, 0);
+                      ->background_density(p, t);
                 }),
             background_density_);
+        background_density_.update_ghost_values();
       }
 
-      return;
-    }
+      auto &U = std::get<0>(state_vector);
+      auto &V = std::get<2>(state_vector);
+      auto &potential = V.block(0);
 
+      using VA = VectorizedArray<Number>;
+      constexpr auto simd_length = VA::size();
+      const unsigned int n_owned = offline_data_->n_locally_owned();
+      const unsigned int n_regular = n_owned / simd_length * simd_length;
+
+      /*
+       * -----------------------------------------------------------------------
+       * Step 1a: build right hand side for Gauss law
+       * -----------------------------------------------------------------------
+       */
+
+      constexpr unsigned int order_fe = 1;
+      constexpr unsigned int order_quad = 2;
+
+      Scope scope(computing_timer_, "time step [P] 1 - enforce Gauss law");
+      LIKWID_MARKER_START("time_step_parabolic_1");
+
+      RYUJIN_PARALLEL_REGION_BEGIN
+
+      auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
+        using T = decltype(sentinel);
+        unsigned int stride_size = get_stride_size<T>;
+        const auto view = hyperbolic_system_->template view<dim, T>();
+
+        RYUJIN_OMP_FOR
+        for (unsigned int i = left; i < right; i += stride_size) {
+          const auto U_i = U.template get_tensor<T>(i);
+          const auto rho_i = view.density(U_i);
+          write_entry<T>(density_, rho_i, i);
+        }
+      };
+
+      /* Parallel non-vectorized loop: */
+      loop(Number(), n_regular, n_owned);
+      /* Parallel vectorized SIMD loop: */
+      loop(VA(), 0, n_regular);
+
+      RYUJIN_PARALLEL_REGION_END
+      LIKWID_MARKER_STOP("time_step_parabolic_1");
+
+      const auto body = [this](const auto &data,
+                               auto &dst,
+                               const auto &src,
+                               const auto range) {
+        FEEvaluation<dim, order_fe, order_quad, /*components*/ 1, Number>
+            fee_potential(data, /*CG*/ 0, /*lumped quadrature*/ 1);
+        FEEvaluation<dim, order_fe, order_quad, /*components*/ 1, Number>
+            fee_density(data, /*hyperbolic*/ 1, /*lumped quadrature*/ 1);
+        FEEvaluation<dim, order_fe, order_quad, /*components*/ 1, Number>
+            fee_background(data, /*hyperbolic*/ 1, /*lumped quadrature*/ 1);
+
+
+        const Number alpha = parabolic_system_->alpha();
+
+        for (unsigned int cell = range.first; cell < range.second; ++cell) {
+          fee_potential.reinit(cell);
+          fee_density.reinit(cell);
+          fee_background.reinit(cell);
+
+          fee_density.gather_evaluate(src, dealii::EvaluationFlags::values);
+          fee_background.gather_evaluate(background_density_,
+                                         dealii::EvaluationFlags::values);
+
+          for (unsigned int q = 0; q < fee_potential.n_q_points; ++q) {
+            const auto density_q = fee_density.get_value(q);
+            const auto background_q = fee_background.get_value(q);
+
+            const auto value = alpha * (density_q + background_q);
+            fee_potential.submit_value(value, q);
+          }
+          fee_potential.integrate_scatter(dealii::EvaluationFlags::values, dst);
+        }
+      };
+
+      matrix_free_.template cell_loop<ScalarVector, ScalarVector>(
+          body,
+          potential_rhs_,
+          density_,
+          /*zero destination*/ true);
+
+      /*
+       * -----------------------------------------------------------------------
+       * Step 1b: solve Poisson problem
+       * -----------------------------------------------------------------------
+       */
+
+      LaplaceMatrix<dim, Number, Number> laplace_operator;
+      laplace_operator.initialize(*offline_data_, matrix_free_);
+
+      const auto tolerance =
+          (tolerance_linfty_norm_ ? potential_rhs_.linfty_norm()
+                                  : potential_rhs_.l2_norm()) *
+          tolerance_;
+
+      try {
+        throw SolverControl::NoConvergence(0, 0.);
+
+        AssertThrow(false, dealii::ExcNotImplemented());
+
+        SolverControl solver_control(1000, gmg_max_iter_);
+
+        /* update exponential moving average */
+        n_iterations_gauss_ =
+            0.9 * n_iterations_gauss_ + 0.1 * solver_control.last_step();
+
+      } catch (SolverControl::NoConvergence &) {
+        SolverControl solver_control(1000, tolerance);
+        SolverCG<ScalarVector> solver(solver_control);
+
+        solver.solve(laplace_operator,
+                     potential,
+                     potential_rhs_,
+                     diagonal_preconditioner_);
+
+        /* update exponential moving average, counting also GMG iterations */
+        n_iterations_gauss_ *= 0.9;
+        n_iterations_gauss_ +=
+            0.1 * gmg_max_iter_ + 0.1 * solver_control.last_step();
+      }
+    }
 
     template <int dim, typename Number>
     void
     ParabolicModule<dim, Number>::step(const StateVector &old_state_vector,
-                                       const Number /*t*/,
+                                       const Number t,
                                        StateVector &new_state_vector,
                                        Number tau [[maybe_unused]],
                                        const bool crank_nicolson_extrapolation
@@ -376,7 +611,7 @@ namespace ryujin
               to_function<dim, Number>(
                   [&](const dealii::Point<dim> &p) {
                     return selected_electrostatic_configuration_
-                        ->magnetic_field(p, 0);
+                        ->magnetic_field(p, t);
                   },
                   k),
               magnetic_field_.block(k));
@@ -397,9 +632,9 @@ namespace ryujin
     void ParabolicModule<dim, Number>::print_solver_statistics(
         std::ostream &output) const
     {
-      output << "        [ " << std::setprecision(2) << std::fixed
-             << n_iterations_ << (use_gmg_ ? " GMG phi ]" : " CG phi ]")
-             << std::endl;
+      output << "        [ " << std::setprecision(2) << std::fixed //
+             << n_iterations_gauss_ << " GMG gauss -- "            //
+             << n_iterations_step_ << " GMG step ]" << std::endl;
     }
 
   } // namespace EulerPoisson
