@@ -265,6 +265,10 @@ namespace ryujin
     const auto scalar_partitioner = offline_data_->scalar_partitioner();
     temp.reinit(scalar_partitioner);
 
+    // FIXME: it is not particularly efficient to call
+    // VectorTools::interpolate for every component separately. If this
+    // gets too slow, we should consider writing out to a temporary (block)
+    // vector and then inserting into the MultiComponentVector.
     for (unsigned int d = 0; d < problem_dimension; ++d) {
       VectorTools::interpolate(offline_data_->discretization().mapping(),
                                offline_data_->dof_handler(),
@@ -303,6 +307,10 @@ namespace ryujin
     ScalarVector temp;
     temp.reinit(scalar_partitioner);
 
+    // FIXME: it is not particularly efficient to call
+    // VectorTools::interpolate for every component separately. If this
+    // gets too slow, we should consider writing out to a temporary (block)
+    // vector and then inserting into the MultiComponentVector.
     for (unsigned int d = 0; d < n_initial_precomputed_values; ++d) {
       VectorTools::interpolate(offline_data_->dof_handler(),
                                to_function<dim, Number>(callable, d),
