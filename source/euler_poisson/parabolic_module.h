@@ -10,6 +10,7 @@
 #include "../euler/hyperbolic_system.h"
 
 #include "electrostatic_configuration_library.h"
+#include "laplace_operator.h"
 #include "parabolic_system.h"
 
 #include <hyperbolic_module.h>
@@ -131,9 +132,7 @@ namespace ryujin
      * Implicit backward-Euler time stepping for the parabolic limiting
      * equation for the Euler-Poisson system
      *
-     * FIXME
-     *
-     * @ingroup EulerPoissonEquations
+     * @ingroup ParabolicModule
      */
     template <int dim, typename Number>
     class ParabolicModule final : public dealii::ParameterAcceptor
@@ -376,7 +375,10 @@ namespace ryujin
 
       dealii::MatrixFree<dim, Number> matrix_free_;
       dealii::AffineConstraints<Number> affine_constraints_potential_;
+
+      LaplaceOperator<dim, Number, Number> laplace_operator_;
       dealii::DiagonalMatrix<ScalarVector> diagonal_preconditioner_;
+      MGSmoother<dim, Number> multigrid_preconditioner_;
 
       mutable bool potential_initialized_;
       mutable ScalarVector potential_rhs_;

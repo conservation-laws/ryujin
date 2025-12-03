@@ -37,12 +37,17 @@ namespace ryujin
           : ParameterAcceptor(subsection + "/" + name)
           , name_(name)
       {
-        parabolic_boundary_ = Boundary::dirichlet;
-        this->add_parameter("boundary condition",
-                            parabolic_boundary_,
-                            "Type of boundary condition enforced on the "
-                            "electrostatic potential. Supported values are "
-                            "dirichlet, do_nothing (Neumann), periodic.");
+        dirichlet_boundaries_.insert({Boundary::do_nothing,
+                                      Boundary::slip,
+                                      Boundary::no_slip,
+                                      Boundary::dirichlet,
+                                      Boundary::dynamic,
+                                      Boundary::dirichlet_momentum});
+        this->add_parameter(
+            "dirichlet boundaries",
+            dirichlet_boundaries_,
+            "A list of hyperbolic boundary types where homogeneous boundary "
+            "conditions will be enforced on the potential.");
 
         is_time_dependent_ = false;
       }
@@ -69,7 +74,7 @@ namespace ryujin
       /**
        * Return the selected boundary type.
        */
-      ACCESSOR_READ_ONLY(parabolic_boundary)
+      ACCESSOR_READ_ONLY(dirichlet_boundaries)
 
       /**
        * Return a boolean indicating whether the background fields are time
@@ -79,7 +84,7 @@ namespace ryujin
 
     private:
       const std::string name_;
-      Boundary parabolic_boundary_;
+      std::set<dealii::types::boundary_id> dirichlet_boundaries_;
 
       bool is_time_dependent_;
     };

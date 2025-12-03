@@ -185,12 +185,25 @@ namespace ryujin
                           additional_data);
 
       /*
-       * (Re)initialize preconditioners:
+       * (Re)initialize operators and preconditioners:
        */
 
-      LaplaceMatrix<dim, Number, Number> laplace_operator;
-      laplace_operator.initialize(*offline_data_, matrix_free_);
-      laplace_operator.compute_diagonal(diagonal_preconditioner_);
+      laplace_operator_.initialize(matrix_free_);
+      laplace_operator_.compute_diagonal(diagonal_preconditioner_);
+
+      typename decltype(multigrid_preconditioner_)::MultigridParameters
+          parameters{gmg_max_iter_,
+                     gmg_smoother_range_,
+                     gmg_smoother_max_eig_,
+                     gmg_smoother_degree_,
+                     gmg_smoother_n_cg_iter_,
+                     gmg_min_level_,
+                     tolerance_};
+
+      multigrid_preconditioner_.initialize(
+          *offline_data_,
+          selected_electrostatic_configuration_->dirichlet_boundaries(),
+          parameters);
 
       /*
        * (Re)initialize auxiliary vectors:
@@ -415,27 +428,10 @@ namespace ryujin
         }
       }
 
-      switch (selected_electrostatic_configuration_->parabolic_boundary()) {
-      case Boundary::dirichlet:
+      for (const auto &it :
+           selected_electrostatic_configuration_->dirichlet_boundaries())
         DoFTools::make_zero_boundary_constraints(
-            offline_data_->dof_handler_cg(), affine_constraints_potential_);
-        break;
-
-      case Boundary::periodic:
-        AssertThrow(false, dealii::ExcNotImplemented());
-        break;
-
-      case Boundary::do_nothing:
-        /* do nothing */
-        break;
-
-      default:
-        AssertThrow(
-            false,
-            dealii::ExcMessage(
-                "selected potential boundary type not supported. Supported "
-                "values are dirichlet, do_nothing (Neumann), periodic."));
-      }
+            offline_data_->dof_handler_cg(), it, affine_constraints_potential_);
 
       affine_constraints_potential_.close();
     }
@@ -554,20 +550,18 @@ namespace ryujin
        * -----------------------------------------------------------------------
        */
 
-      LaplaceMatrix<dim, Number, Number> laplace_operator;
-      laplace_operator.initialize(*offline_data_, matrix_free_);
-
       const auto tolerance =
           (tolerance_linfty_norm_ ? potential_rhs_.linfty_norm()
                                   : potential_rhs_.l2_norm()) *
           tolerance_;
 
       try {
-        throw SolverControl::NoConvergence(0, 0.);
-
-        AssertThrow(false, dealii::ExcNotImplemented());
-
-        SolverControl solver_control(1000, gmg_max_iter_);
+        SolverControl solver_control(gmg_max_iter_, tolerance_);
+        SolverCG<ScalarVector> solver(solver_control);
+        solver.solve(laplace_operator_,
+                     potential,
+                     potential_rhs_,
+                     multigrid_preconditioner_);
 
         /* update exponential moving average */
         n_iterations_gauss_ =
@@ -577,7 +571,7 @@ namespace ryujin
         SolverControl solver_control(1000, tolerance);
         SolverCG<ScalarVector> solver(solver_control);
 
-        solver.solve(laplace_operator,
+        solver.solve(laplace_operator_,
                      potential,
                      potential_rhs_,
                      diagonal_preconditioner_);
@@ -588,6 +582,7 @@ namespace ryujin
             0.1 * gmg_max_iter_ + 0.1 * solver_control.last_step();
       }
     }
+
 
     template <int dim, typename Number>
     void
