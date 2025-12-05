@@ -413,6 +413,8 @@ namespace ryujin
 
     const MPIEnsemble &mpi_ensemble_;
 
+    dealii::ObserverPointer<const Discretization<dim>> discretization_;
+
     std::unique_ptr<dealii::DoFHandler<dim>> dof_handler_cg_;
     std::unique_ptr<dealii::DoFHandler<dim>> dof_handler_dg_;
 
@@ -458,8 +460,6 @@ namespace ryujin
     SparseMatrixSIMD<Number> incidence_matrix_;
 
     Number measure_of_omega_;
-
-    dealii::ObserverPointer<const Discretization<dim>> discretization_;
 
     /**
      * Construct a boundary map for a given set of DoFHandler iterators.
