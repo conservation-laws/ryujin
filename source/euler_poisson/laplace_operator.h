@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <deal.II/base/config.h>
 #include <observer_pointer.h>
 #include <offline_data.h>
 #include <openmp.h>
@@ -25,6 +26,51 @@
 
 namespace ryujin
 {
+  template <int dim, typename Number, typename Number2>
+  DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, dim, Number> apply_B_n(
+      const dealii::Tensor<1, (dim == 2 ? 1 : dim), Number> &magnetic_field,
+      const Number2 theta_tau,
+      const dealii::Tensor<1, dim, Number> &velocity)
+  {
+    if constexpr (dim == 1) {
+      return velocity;
+
+    } else if constexpr (dim == 2) {
+      return velocity -
+             theta_tau * magnetic_field[0] * cross_product_2d(velocity);
+
+    } else {
+      return velocity - theta_tau * cross_product_3d(velocity, magnetic_field);
+    }
+  }
+
+
+  template <int dim, typename Number, typename Number2>
+  DEAL_II_ALWAYS_INLINE inline dealii::Tensor<1, dim, Number> apply_B_n_inverse(
+      const dealii::Tensor<1, (dim == 2 ? 1 : dim), Number> &magnetic_field,
+      const Number2 &theta_tau,
+      const dealii::Tensor<1, dim, Number> &velocity)
+  {
+    const auto denominator =
+        Number(1.) + theta_tau * theta_tau * magnetic_field.norm_square();
+
+    if constexpr (dim == 1) {
+      return velocity;
+
+    } else if constexpr (dim == 2) {
+      const auto numerator =
+          velocity + theta_tau * magnetic_field[0] * cross_product_2d(velocity);
+      return numerator / denominator;
+
+    } else {
+      const auto numerator =
+          velocity + theta_tau * cross_product_3d(velocity, magnetic_field) +
+          theta_tau * theta_tau * (velocity * magnetic_field) * magnetic_field;
+      return numerator / denominator;
+    }
+  }
+
+
 #ifndef DOXYGEN
   template <typename T, typename... Args>
   void create(std::unique_ptr<T> &ptr, Args &&...args)
@@ -33,13 +79,14 @@ namespace ryujin
   }
 #endif
 
+
   /**
    * A matrix-free operator that implements the action of the Laplace
    * operator.
    *
    * @ingroup ParabolicModule
    */
-  template <int dim, typename Number, typename Number2>
+  template <int dim, typename Number>
   class LaplaceOperator : public dealii::EnableObserverPointer
   {
   public:
@@ -79,7 +126,7 @@ namespace ryujin
                            const auto &src,
                            const auto range) {
         FEEvaluation<dim, order_fe, order_quad, /*components*/ 1, Number> fee(
-            data, /*CG*/ 0, /*lumped quadrature*/ 1);
+            data, /*CG*/ 0, /*full quadrature*/ 0);
 
         for (unsigned int cell = range.first; cell < range.second; ++cell) {
           fee.reinit(cell);
@@ -156,9 +203,9 @@ namespace ryujin
       for (unsigned int i = 0; i < n_owned_cg; ++i) {
         constexpr Number eps = std::numeric_limits<Number>::epsilon();
         diagonal_vector.local_element(i) =
-            diagonal_vector.local_element(i) > eps
+            std::abs(diagonal_vector.local_element(i)) > eps
                 ? 1. / diagonal_vector.local_element(i)
-                : Number(0.);
+                : Number(1.);
       }
 
       RYUJIN_PARALLEL_REGION_END
@@ -166,6 +213,150 @@ namespace ryujin
 
   private:
     const dealii::MatrixFree<dim, Number> *matrix_free_;
+  };
+
+
+  /**
+   * A matrix-free operator that implements the action of the Laplace
+   * operator.
+   *
+   * @ingroup EulerPoissonEquations
+   */
+  template <int dim, typename Number>
+  class UpdateOperator : public dealii::EnableObserverPointer
+  {
+  public:
+    // FIXME: refactor
+    static constexpr unsigned int order_fe = 1;
+    static constexpr unsigned int order_quad = 2;
+
+    using ScalarVector = Vectors::ScalarVector<Number>;
+    using BlockVector = Vectors::BlockVector<Number>;
+
+    UpdateOperator() = default;
+
+    void initialize(const dealii::MatrixFree<dim, Number> &matrix_free,
+                    const ScalarVector &density,
+                    const BlockVector &magnetic_field)
+    {
+      matrix_free_ = &matrix_free;
+      density_ = &density;
+      magnetic_field_ = &magnetic_field;
+
+      theta_tau_ = Number(0.);
+      alpha_ = Number(0.);
+    }
+
+    dealii::types::global_dof_index m() const
+    {
+      return matrix_free_->get_vector_partitioner(0)->size();
+    }
+
+    Number el(const unsigned int, const unsigned int) const
+    {
+      Assert(false, dealii::ExcNotImplemented());
+      return Number();
+    }
+
+    void set_theta_tau(const Number theta_tau) const
+    {
+      theta_tau_ = theta_tau;
+    }
+
+    void set_alpha(const Number alpha) const
+    {
+      alpha_ = alpha;
+    }
+
+    void vmult(ScalarVector &dst, const ScalarVector &src) const
+    {
+      Assert(dst.get_partitioner() == src.get_partitioner(),
+             dealii::ExcMessage("src and dst have 2 different partitioners"));
+
+      using namespace dealii;
+
+      const auto body_laplace = [](const auto &data,
+                                   auto &dst,
+                                   const auto &src,
+                                   const auto range) {
+        FEEvaluation<dim, order_fe, order_quad, /*components*/ 1, Number> fee(
+            data, /*CG*/ 0, /*full quadrature*/ 0);
+
+        for (unsigned int cell = range.first; cell < range.second; ++cell) {
+          fee.reinit(cell);
+          fee.gather_evaluate(src, dealii::EvaluationFlags::gradients);
+          for (unsigned int q = 0; q < fee.n_q_points; ++q)
+            fee.submit_gradient(fee.get_gradient(q), q);
+          fee.integrate_scatter(dealii::EvaluationFlags::gradients, dst);
+        }
+      };
+
+      matrix_free_->template cell_loop<ScalarVector, ScalarVector>(
+          body_laplace, dst, src, /*zero destination*/ true);
+
+      const auto body_velocity = [this](const auto &data,
+                                        auto &dst,
+                                        const auto &src,
+                                        const auto range) {
+        FEEvaluation<dim, order_fe, order_quad, /*components*/ 1, Number> fee(
+            data, /*CG*/ 0, /*lumped quadrature*/ 1);
+        FEEvaluation<dim, order_fe, order_quad, /*components*/ 1, Number>
+            fee_density(data, /*hyperbolic*/ 1, /*lumped quadrature*/ 1);
+        FEEvaluation<dim,
+                     order_fe,
+                     order_quad,
+                     /*components*/ (dim == 2 ? 1 : dim),
+                     Number>
+            fee_magnetic(data, /*hyperbolic*/ 1, /*lumped quadrature*/ 1);
+
+        for (unsigned int cell = range.first; cell < range.second; ++cell) {
+          fee.reinit(cell);
+          fee_density.reinit(cell);
+          fee_magnetic.reinit(cell);
+
+          fee.gather_evaluate(src, dealii::EvaluationFlags::gradients);
+          fee_density.gather_evaluate(*density_,
+                                      dealii::EvaluationFlags::values);
+          fee_magnetic.gather_evaluate(*magnetic_field_,
+                                       dealii::EvaluationFlags::values);
+
+          for (unsigned int q = 0; q < fee.n_q_points; ++q) {
+            const auto grad_phi = fee.get_gradient(q);
+            auto density = fee_density.get_value(q);
+            dealii::Tensor<1, (dim == 2 ? 1 : dim), decltype(density)>
+                magnetic_field;
+            if constexpr (dim == 2) {
+              magnetic_field[0] = fee_magnetic.get_value(q);
+            } else if constexpr (dim == 3) {
+              magnetic_field = fee_magnetic.get_value(q);
+            }
+
+            const auto B_n_inverse_grad_phi =
+                apply_B_n_inverse(magnetic_field, theta_tau_, grad_phi);
+            const auto result = theta_tau_ * theta_tau_ * alpha_ * density *
+                                B_n_inverse_grad_phi;
+            fee.submit_gradient(result, q);
+          }
+          fee.integrate_scatter(dealii::EvaluationFlags::gradients, dst);
+        }
+      };
+
+      matrix_free_->template cell_loop<ScalarVector, ScalarVector>(
+          body_velocity, dst, src, /*zero destination*/ false);
+    }
+
+    void Tvmult(ScalarVector &dst, const ScalarVector &src) const
+    {
+      vmult(dst, src);
+    }
+
+  private:
+    const dealii::MatrixFree<dim, Number> *matrix_free_;
+    const ScalarVector *density_;
+    const BlockVector *magnetic_field_;
+
+    mutable Number theta_tau_;
+    mutable Number alpha_;
   };
 
 
@@ -216,7 +407,7 @@ namespace ryujin
     using ScalarVectorFloat = Vectors::ScalarVector<float>;
 
     using Preconditioner =
-        dealii::PreconditionChebyshev<LaplaceOperator<dim, float, Number>,
+        dealii::PreconditionChebyshev<LaplaceOperator<dim, float>,
                                       ScalarVectorFloat>;
 
     MGSmoother() = default;
@@ -403,8 +594,7 @@ namespace ryujin
     dealii::MGConstrainedDoFs mg_constrained_dofs_;
     dealii::MGLevelObject<dealii::MatrixFree<dim, float>> level_matrix_free_;
     MGTransfer<dim, float> mg_transfer_;
-    dealii::MGLevelObject<LaplaceOperator<dim, float, Number>>
-        level_laplace_matrices_;
+    dealii::MGLevelObject<LaplaceOperator<dim, float>> level_laplace_matrices_;
 
     dealii::mg::SmootherRelaxation<Preconditioner, ScalarVectorFloat>
         relaxation_;
@@ -418,7 +608,7 @@ namespace ryujin
     using MGCGIS = dealii::MGCoarseGridIterativeSolver<
         ScalarVectorFloat,
         dealii::SolverCG<ScalarVectorFloat>,
-        LaplaceOperator<dim, float, Number>,
+        LaplaceOperator<dim, float>,
         dealii::DiagonalMatrix<ScalarVectorFloat>>;
     std::unique_ptr<MGCGIS> coarse_grid_solver_;
 

@@ -376,15 +376,17 @@ namespace ryujin
       dealii::MatrixFree<dim, Number> matrix_free_;
       dealii::AffineConstraints<Number> affine_constraints_potential_;
 
-      LaplaceOperator<dim, Number, Number> laplace_operator_;
+      LaplaceOperator<dim, Number> laplace_operator_;
       dealii::DiagonalMatrix<ScalarVector> diagonal_preconditioner_;
       MGSmoother<dim, Number> multigrid_preconditioner_;
+      UpdateOperator<dim, Number> update_operator_;
 
       mutable bool potential_initialized_;
       mutable ScalarVector potential_rhs_;
       mutable ScalarVector density_;
       mutable ScalarVector background_density_;
       mutable BlockVector magnetic_field_;
+      mutable BlockVector velocity_rhs_;
       //@}
     };
   } // namespace EulerPoisson

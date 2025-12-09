@@ -190,6 +190,7 @@ namespace ryujin
 
       laplace_operator_.initialize(matrix_free_);
       laplace_operator_.compute_diagonal(diagonal_preconditioner_);
+      update_operator_.initialize(matrix_free_, density_, magnetic_field_);
 
       typename decltype(multigrid_preconditioner_)::MultigridParameters
           parameters{gmg_max_iter_,
@@ -221,6 +222,10 @@ namespace ryujin
       magnetic_field_.reinit(dim == 2 ? 1 : dim);
       for (unsigned int i = 0; i < magnetic_field_.n_blocks(); ++i)
         magnetic_field_.block(i).reinit(scalar_partitioner);
+
+      velocity_rhs_.reinit(dim);
+      for (unsigned int i = 0; i < dim; ++i)
+        velocity_rhs_.block(i).reinit(scalar_partitioner);
 
       if (!selected_electrostatic_configuration_->is_time_dependent()) {
         /*
@@ -445,6 +450,27 @@ namespace ryujin
       std::cout << "ParabolicModule<dim, Number>::compute_potential()"
                 << std::endl;
 #endif
+      auto &U = std::get<0>(state_vector);
+      auto &V = std::get<2>(state_vector);
+      auto &potential = V.block(0);
+
+      using VA = VectorizedArray<Number>;
+      constexpr auto simd_length = VA::size();
+      const unsigned int n_owned = offline_data_->n_locally_owned();
+      const unsigned int n_regular = n_owned / simd_length * simd_length;
+
+      constexpr unsigned int order_fe = 1;
+      constexpr unsigned int order_quad = 2;
+
+      /*
+       * -----------------------------------------------------------------------
+       * Step 1a: build right hand side for Gauss law
+       * -----------------------------------------------------------------------
+       */
+
+      Scope scope(computing_timer_, "time step [P] 1 - enforce Gauss law");
+      LIKWID_MARKER_START("time_step_parabolic_1a");
+
       const auto &discretization = offline_data_->discretization();
 
       if (selected_electrostatic_configuration_->is_time_dependent()) {
@@ -459,27 +485,6 @@ namespace ryujin
             background_density_);
         background_density_.update_ghost_values();
       }
-
-      auto &U = std::get<0>(state_vector);
-      auto &V = std::get<2>(state_vector);
-      auto &potential = V.block(0);
-
-      using VA = VectorizedArray<Number>;
-      constexpr auto simd_length = VA::size();
-      const unsigned int n_owned = offline_data_->n_locally_owned();
-      const unsigned int n_regular = n_owned / simd_length * simd_length;
-
-      /*
-       * -----------------------------------------------------------------------
-       * Step 1a: build right hand side for Gauss law
-       * -----------------------------------------------------------------------
-       */
-
-      constexpr unsigned int order_fe = 1;
-      constexpr unsigned int order_quad = 2;
-
-      Scope scope(computing_timer_, "time step [P] 1 - enforce Gauss law");
-      LIKWID_MARKER_START("time_step_parabolic_1");
 
       RYUJIN_PARALLEL_REGION_BEGIN
 
@@ -502,7 +507,8 @@ namespace ryujin
       loop(VA(), 0, n_regular);
 
       RYUJIN_PARALLEL_REGION_END
-      LIKWID_MARKER_STOP("time_step_parabolic_1");
+
+      density_.update_ghost_values();
 
       const auto body = [this](const auto &data,
                                auto &dst,
@@ -544,19 +550,26 @@ namespace ryujin
           density_,
           /*zero destination*/ true);
 
+      LIKWID_MARKER_STOP("time_step_parabolic_1a");
+
       /*
        * -----------------------------------------------------------------------
        * Step 1b: solve Poisson problem
        * -----------------------------------------------------------------------
        */
 
+      LIKWID_MARKER_START("time_step_parabolic_1b");
+
       const auto tolerance =
           (tolerance_linfty_norm_ ? potential_rhs_.linfty_norm()
                                   : potential_rhs_.l2_norm()) *
           tolerance_;
 
+      matrix_free_.get_affine_constraints(0).distribute(potential);
+      matrix_free_.get_affine_constraints(0).set_zero(potential_rhs_);
+
       try {
-        SolverControl solver_control(gmg_max_iter_, tolerance_);
+        SolverControl solver_control(gmg_max_iter_, tolerance);
         SolverCG<ScalarVector> solver(solver_control);
         solver.solve(laplace_operator_,
                      potential,
@@ -581,6 +594,10 @@ namespace ryujin
         n_iterations_gauss_ +=
             0.1 * gmg_max_iter_ + 0.1 * solver_control.last_step();
       }
+
+      matrix_free_.get_affine_constraints(0).distribute(potential);
+
+      LIKWID_MARKER_STOP("time_step_parabolic_1b");
     }
 
 
@@ -595,31 +612,350 @@ namespace ryujin
     {
 #ifdef DEBUG_OUTPUT
       std::cout << "ParabolicModule<dim, Number>::step()" << std::endl;
-#endif
-      const auto &discretization = offline_data_->discretization();
 
-      if (selected_electrostatic_configuration_->is_time_dependent()) {
-        for (unsigned int k = 0; k < (dim == 2 ? 1 : dim); ++k) {
-          dealii::VectorTools::interpolate(
-              discretization.mapping(),
-              offline_data_->dof_handler(),
-              to_function<dim, Number>(
-                  [&](const dealii::Point<dim> &p) {
-                    return selected_electrostatic_configuration_
-                        ->magnetic_field(p, t);
-                  },
-                  k),
-              magnetic_field_.block(k));
-        }
-      }
-
-#ifdef DEBUG_OUTPUT
       std::cout << "        perform time-step with tau = " << tau << std::endl;
       if (crank_nicolson_extrapolation)
         std::cout << "        and extrapolate to t + 2 * tau" << std::endl;
 #endif
 
-      new_state_vector = old_state_vector;
+      const Number alpha = parabolic_system_->alpha();
+
+      const auto &old_U = std::get<0>(old_state_vector);
+      const auto &old_V = std::get<2>(old_state_vector);
+      const auto &old_potential = old_V.block(0);
+
+      auto &new_U = std::get<0>(new_state_vector);
+      auto &new_V = std::get<2>(new_state_vector);
+      auto &new_potential = new_V.block(0);
+
+      using VA = VectorizedArray<Number>;
+      constexpr auto simd_length = VA::size();
+      const unsigned int n_owned = offline_data_->n_locally_owned();
+      const unsigned int n_regular = n_owned / simd_length * simd_length;
+
+      const auto &lumped_mass_matrix_inverse =
+          offline_data_->lumped_mass_matrix_inverse();
+
+      constexpr unsigned int order_fe = 1;
+      constexpr unsigned int order_quad = 2;
+
+      /*
+       * Initialize the new potential with the old one:
+       */
+
+      new_potential = old_potential;
+
+      /*
+       * If the Gauss law restart strategy is static full restart or
+       * static no restart, we skip updating the potential.
+       */
+      if ((gauss_law_restart_strategy_ !=
+           GaussLawRestartStrategy::static_no_restart) &&
+          (gauss_law_restart_strategy_ !=
+           GaussLawRestartStrategy::static_full_restart)) {
+        /*
+         * ---------------------------------------------------------------------
+         * Step 2a: build right hand side for potential update
+         *
+         * The right-hand side reads:
+         *   (\nabla \varphi^n, \nabla \chi) +
+         *   \tau \alpha \langle \rho^n B^{-1} v^n, \nabla \chi \rangle
+         *
+         * In case of a time-dependent background density, we add a term
+         *   \alpha \langle \rho_b^{n+1} - \rho_b^n, \chi \rangle
+         * to account for the time dependence. Note that in case of a
+         * Crank-Nicolson extrapolation, this is equivalent to enforcing
+         * the Gauss law at the half step and then extrapolating.
+         * ---------------------------------------------------------------------
+         */
+
+        Scope scope(computing_timer_, "time step [P] 2 - update potential");
+        LIKWID_MARKER_START("time_step_parabolic_2a");
+
+        const auto &discretization = offline_data_->discretization();
+
+        if (selected_electrostatic_configuration_->is_time_dependent()) {
+          for (unsigned int k = 0; k < (dim == 2 ? 1 : dim); ++k) {
+            dealii::VectorTools::interpolate(
+                discretization.mapping(),
+                offline_data_->dof_handler(),
+                to_function<dim, Number>(
+                    [&](const dealii::Point<dim> &p) {
+                      return selected_electrostatic_configuration_
+                          ->magnetic_field(p, t);
+                    },
+                    k),
+                magnetic_field_.block(k));
+          }
+          magnetic_field_.update_ghost_values();
+        }
+
+        /*
+         * Write out density and assemble velocity part. We need density_
+         * to be set to the correct density for UpdateOperator::vmult()
+         */
+
+        RYUJIN_PARALLEL_REGION_BEGIN
+
+        auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
+          using T = decltype(sentinel);
+          unsigned int stride_size = get_stride_size<T>;
+          const auto view = hyperbolic_system_->template view<dim, T>();
+
+          RYUJIN_OMP_FOR
+          for (unsigned int i = left; i < right; i += stride_size) {
+            const auto U_i = old_U.template get_tensor<T>(i);
+            const auto rho_i = view.density(U_i);
+            const auto m_i = view.momentum(U_i);
+
+            dealii::Tensor<1, (dim == 2 ? 1 : dim), T> magnetic_field;
+            for (unsigned int d = 0; d < (dim == 2 ? 1 : dim); ++d)
+              magnetic_field[d] = get_entry<T>(magnetic_field_.block(d), i);
+
+            const auto velocity_rhs =
+                tau * alpha * rho_i *
+                apply_B_n_inverse(magnetic_field, tau, m_i / rho_i);
+
+            write_entry<T>(density_, rho_i, i);
+            for (unsigned int d = 0; d < dim; ++d)
+              write_entry<T>(velocity_rhs_.block(d), velocity_rhs[d], i);
+          }
+        };
+
+        /* Parallel non-vectorized loop: */
+        loop(Number(), n_regular, n_owned);
+        /* Parallel vectorized SIMD loop: */
+        loop(VA(), 0, n_regular);
+
+        RYUJIN_PARALLEL_REGION_END
+
+        density_.update_ghost_values();
+
+        /* Apply Laplace operator to right hand side: */
+
+        const auto body_laplace = [](const auto &data,
+                                     auto &dst,
+                                     const auto &src,
+                                     const auto range) {
+          FEEvaluation<dim, order_fe, order_quad, /*components*/ 1, Number> fee(
+              data, /*CG*/ 0, /*full quadrature*/ 0);
+
+          for (unsigned int cell = range.first; cell < range.second; ++cell) {
+            fee.reinit(cell);
+            fee.gather_evaluate(src, dealii::EvaluationFlags::gradients);
+
+            for (unsigned int q = 0; q < fee.n_q_points; ++q) {
+              const auto grad_potential = fee.get_gradient(q);
+              fee.submit_gradient(grad_potential, q);
+            }
+            fee.integrate_scatter(dealii::EvaluationFlags::gradients, dst);
+          }
+        };
+
+        matrix_free_.template cell_loop<ScalarVector, ScalarVector>(
+            body_laplace,
+            potential_rhs_,
+            old_potential,
+            /*zero destination*/ true);
+
+        /* Apply Velocity contribution to right hand side: */
+
+        const auto body_velocity = [](const auto &data,
+                                      auto &dst,
+                                      const auto &src,
+                                      const auto range) {
+          FEEvaluation<dim, order_fe, order_quad, /*components*/ 1, Number>
+              fee_pot(data, /*CG*/ 0, /*lumped quadrature*/ 1);
+          FEEvaluation<dim, order_fe, order_quad, /*components*/ dim, Number>
+              fee_vel(data, /*hyperbolic*/ 1, /*lumped quadrature*/ 1);
+
+          for (unsigned int cell = range.first; cell < range.second; ++cell) {
+            fee_pot.reinit(cell);
+            fee_vel.reinit(cell);
+
+            fee_vel.gather_evaluate(src, dealii::EvaluationFlags::values);
+
+            for (unsigned int q = 0; q < fee_pot.n_q_points; ++q) {
+              if constexpr (dim == 1) {
+                decltype(fee_pot.get_gradient(q)) velocity_rhs;
+                velocity_rhs[0] = fee_vel.get_value(q);
+                fee_pot.submit_gradient(velocity_rhs, q);
+              } else {
+                fee_pot.submit_gradient(fee_vel.get_value(q), q);
+              }
+            }
+            fee_pot.integrate_scatter(dealii::EvaluationFlags::gradients, dst);
+          }
+        };
+
+        matrix_free_.template cell_loop<ScalarVector, BlockVector>(
+            body_velocity,
+            potential_rhs_,
+            velocity_rhs_,
+            /*zero destination*/ false);
+
+        LIKWID_MARKER_STOP("time_step_parabolic_2a");
+
+        /*
+         * ---------------------------------------------------------------------
+         * Step 2b: solve modified poisson problem
+         * ---------------------------------------------------------------------
+         */
+
+        LIKWID_MARKER_START("time_step_parabolic_2b");
+
+        update_operator_.set_alpha(alpha);
+        update_operator_.set_theta_tau(tau);
+
+        const auto tolerance =
+            (tolerance_linfty_norm_ ? potential_rhs_.linfty_norm()
+                                    : potential_rhs_.l2_norm()) *
+            tolerance_;
+
+        matrix_free_.get_affine_constraints(0).distribute(new_potential);
+        matrix_free_.get_affine_constraints(0).set_zero(potential_rhs_);
+
+        try {
+          SolverControl solver_control(gmg_max_iter_, tolerance);
+          SolverCG<ScalarVector> solver(solver_control);
+          solver.solve(update_operator_,
+                       new_potential,
+                       potential_rhs_,
+                       multigrid_preconditioner_);
+
+          /* update exponential moving average */
+          n_iterations_step_ =
+              0.9 * n_iterations_step_ + 0.1 * solver_control.last_step();
+
+        } catch (SolverControl::NoConvergence &) {
+          SolverControl solver_control(1000, tolerance);
+          SolverCG<ScalarVector> solver(solver_control);
+
+          solver.solve(update_operator_,
+                       new_potential,
+                       potential_rhs_,
+                       diagonal_preconditioner_);
+
+          /* update exponential moving average, counting also GMG iterations */
+          n_iterations_step_ *= 0.9;
+          n_iterations_step_ +=
+              0.1 * gmg_max_iter_ + 0.1 * solver_control.last_step();
+        }
+
+        matrix_free_.get_affine_constraints(0).distribute(new_potential);
+
+        LIKWID_MARKER_STOP("time_step_parabolic_2b");
+      }
+
+      /*
+       * ---------------------------------------------------------------------
+       * Step 2c: update velocity vector field; Crank-Nicolson extrapolation
+       * ---------------------------------------------------------------------
+       */
+
+      LIKWID_MARKER_START("time_step_parabolic_2c");
+
+      /* Project gradient into velocity space: */
+
+      const auto body_velocity =
+          [](const auto &data, auto &dst, const auto &src, const auto range) {
+            FEEvaluation<dim, order_fe, order_quad, /*components*/ 1, Number>
+                fee_pot(data, /*CG*/ 0, /*lumped quadrature*/ 1);
+            FEEvaluation<dim, order_fe, order_quad, /*components*/ dim, Number>
+                fee_vel(data, /*hyperbolic*/ 1, /*lumped quadrature*/ 1);
+
+            for (unsigned int cell = range.first; cell < range.second; ++cell) {
+              fee_pot.reinit(cell);
+              fee_vel.reinit(cell);
+
+              fee_pot.gather_evaluate(src, dealii::EvaluationFlags::gradients);
+              for (unsigned int q = 0; q < fee_pot.n_q_points; ++q) {
+                fee_vel.submit_value(fee_pot.get_gradient(q), q);
+              }
+              fee_vel.integrate_scatter(dealii::EvaluationFlags::values, dst);
+            }
+          };
+
+      matrix_free_.template cell_loop<BlockVector, ScalarVector>(
+          body_velocity,
+          velocity_rhs_,
+          new_potential,
+          /*zero destination*/ true);
+
+      /*
+       * Now that we have written out the gradients, copy over the old
+       * state vector and perform the Crank-Nicolson extrapolation step on
+       * the potential:
+       */
+
+      new_U = old_U;
+
+      if (crank_nicolson_extrapolation) {
+        new_potential *= Number(2.);
+        new_potential -= old_potential;
+      }
+
+      /*
+       * Update the momentum and total energy:
+       */
+
+      RYUJIN_PARALLEL_REGION_BEGIN
+
+      auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
+        using T = decltype(sentinel);
+        unsigned int stride_size = get_stride_size<T>;
+        const auto view = hyperbolic_system_->template view<dim, T>();
+
+        RYUJIN_OMP_FOR
+        for (unsigned int i = left; i < right; i += stride_size) {
+          const auto m_i_inv = get_entry<T>(lumped_mass_matrix_inverse, i);
+
+          const auto old_U_i = old_U.template get_tensor<T>(i);
+          const auto rho_i = view.density(old_U_i);
+          const auto old_m_i = view.momentum(old_U_i);
+          const auto old_v_i = old_m_i / rho_i;
+
+          dealii::Tensor<1, (dim == 2 ? 1 : dim), T> magnetic_field;
+          for (unsigned int d = 0; d < (dim == 2 ? 1 : dim); ++d)
+            magnetic_field[d] = get_entry<T>(magnetic_field_.block(d), i);
+
+          dealii::Tensor<1, dim, T> grad_phi;
+          for (unsigned int d = 0; d < dim; ++d)
+            grad_phi[d] = m_i_inv * get_entry<T>(velocity_rhs_.block(d), i);
+
+          auto new_v_i =
+              apply_B_n_inverse(magnetic_field, tau, old_v_i - tau * grad_phi);
+
+          /* Perform an extrapolation step: */
+          if (crank_nicolson_extrapolation)
+            new_v_i = Number(2.) * new_v_i - old_v_i;
+
+          auto new_U_i = old_U_i;
+          for (unsigned int d = 0; d < dim; ++d)
+            new_U_i[1 + d] = rho_i * new_v_i[d];
+
+          /*
+           * Update the total energy accordingly:
+           */
+          if constexpr (view.have_energy_equation) {
+            new_U_i[1 + dim] += Number(0.5) * rho_i *
+                                (new_v_i.norm_square() - old_v_i.norm_square());
+          }
+
+          new_U.template write_tensor<T>(new_U_i, i);
+        }
+      };
+
+      /* Parallel non-vectorized loop: */
+      loop(Number(), n_regular, n_owned);
+      /* Parallel vectorized SIMD loop: */
+      loop(VA(), 0, n_regular);
+
+      RYUJIN_PARALLEL_REGION_END
+
+      LIKWID_MARKER_STOP("time_step_parabolic_2c");
+
+      return;
     }
 
 
