@@ -1502,6 +1502,16 @@ namespace ryujin
             normal += phi_i * fe_face_values.normal_vector(q) * JxW;
           }
 
+          /*
+           * Workaround for deal.II 9.7 and older versions:
+           *
+           * For simplices, has_support_on_face() seems to return the wrong
+           * answer (always true). Thus, check whether we accumulated any
+           * boundary mass and if not, bail out.
+           */
+          if (std::abs(boundary_mass) == 0.)
+            continue;
+
           const auto global_index = local_dof_indices[j];
           const auto index = partitioner.global_to_local(global_index);
 
