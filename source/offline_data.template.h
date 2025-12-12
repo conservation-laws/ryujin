@@ -1332,11 +1332,15 @@ namespace ryujin
               << std::endl;
 #endif
 
+    Assert(!dof_handler_cg_->has_hp_capabilities(), dealii::ExcInternalError());
+    Assert(!dof_handler_dg_->has_hp_capabilities(), dealii::ExcInternalError());
+
+    dof_handler_cg_->distribute_mg_dofs();
+    dof_handler_dg_->distribute_mg_dofs();
+
+    /* Now, work on data structures for hyperbolic update: */
+
     auto &dof_handler = this->dof_handler();
-
-    Assert(!dof_handler.has_hp_capabilities(), dealii::ExcInternalError());
-
-    dof_handler.distribute_mg_dofs();
 
     const auto n_levels = dof_handler.get_triangulation().n_global_levels();
 
