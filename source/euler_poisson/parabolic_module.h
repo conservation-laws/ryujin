@@ -320,6 +320,12 @@ namespace ryujin
       void compute_potential(const Number t, StateVector &state_vector) const;
 
       /**
+       * Set the velocity field equal to the magnetic magnetic drift
+       * velocity computed from the potential.
+       */
+      void enforce_magnetic_drift_velocity(StateVector &state_vector) const;
+
+      /**
        * Given a reference to a previous state vector @p old_state_vector
        * at time @p old_t and a time-step size @p tau perform a backward
        * Euler time step (and store the result in @p new_state_vector).

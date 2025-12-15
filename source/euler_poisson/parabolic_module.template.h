@@ -301,6 +301,9 @@ namespace ryujin
           (gauss_law_restart_strategy_ ==
            GaussLawRestartStrategy::static_full_restart)) {
         compute_potential(t, state_vector);
+        if (!potential_initialized_ &&
+            parabolic_system_->magnetic_drift_limit())
+          enforce_magnetic_drift_velocity(state_vector);
         potential_initialized_ = true;
       }
     }
@@ -602,6 +605,129 @@ namespace ryujin
 
 
     template <int dim, typename Number>
+    void ParabolicModule<dim, Number>::enforce_magnetic_drift_velocity(
+        StateVector &state_vector) const
+    {
+#ifdef DEBUG_OUTPUT
+      std::cout
+          << "ParabolicModule<dim, Number>::enforce_magnetic_drift_velocity()"
+          << std::endl;
+#endif
+      auto &U = std::get<0>(state_vector);
+      auto &V = std::get<2>(state_vector);
+      auto &potential = V.block(0);
+
+      using VA = VectorizedArray<Number>;
+      constexpr auto simd_length = VA::size();
+      const unsigned int n_owned = offline_data_->n_locally_owned();
+      const unsigned int n_regular = n_owned / simd_length * simd_length;
+
+      const auto &lumped_mass_matrix_inverse =
+          offline_data_->lumped_mass_matrix_inverse();
+
+      constexpr unsigned int order_fe = 1;
+      constexpr unsigned int order_quad = 2;
+
+      /*
+       * -----------------------------------------------------------------------
+       * Step 1c: enforce magnetic drift velocity
+       * -----------------------------------------------------------------------
+       */
+
+      LIKWID_MARKER_START("time_step_parabolic_1b");
+
+      /* Project gradient of potential into velocity space: */
+
+      const auto body_velocity =
+          [](const auto &data, auto &dst, const auto &src, const auto range) {
+            FEEvaluation<dim, order_fe, order_quad, /*components*/ 1, Number>
+                fee_pot(data, /*CG*/ 0, /*lumped quadrature*/ 1);
+            FEEvaluation<dim, order_fe, order_quad, /*components*/ dim, Number>
+                fee_vel(data, /*hyperbolic*/ 1, /*lumped quadrature*/ 1);
+
+            for (unsigned int cell = range.first; cell < range.second; ++cell) {
+              fee_pot.reinit(cell);
+              fee_vel.reinit(cell);
+
+              fee_pot.gather_evaluate(src, dealii::EvaluationFlags::gradients);
+              for (unsigned int q = 0; q < fee_pot.n_q_points; ++q) {
+                fee_vel.submit_value(fee_pot.get_gradient(q), q);
+              }
+              fee_vel.integrate_scatter(dealii::EvaluationFlags::values, dst);
+            }
+          };
+
+      matrix_free_.template cell_loop<BlockVector, ScalarVector>(
+          body_velocity,
+          velocity_rhs_,
+          potential,
+          /*zero destination*/ true);
+
+      RYUJIN_PARALLEL_REGION_BEGIN
+
+      auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
+        using T = decltype(sentinel);
+        unsigned int stride_size = get_stride_size<T>;
+        const auto view = hyperbolic_system_->template view<dim, T>();
+
+        RYUJIN_OMP_FOR
+        for (unsigned int i = left; i < right; i += stride_size) {
+          const auto m_i_inv = get_entry<T>(lumped_mass_matrix_inverse, i);
+
+          auto U_i = U.template get_tensor<T>(i);
+          const auto rho_i = view.density(U_i);
+          const auto m_i = view.momentum(U_i);
+          const auto v_i = m_i / rho_i;
+
+          dealii::Tensor<1, (dim == 2 ? 1 : dim), T> magnetic_field;
+          for (unsigned int d = 0; d < (dim == 2 ? 1 : dim); ++d)
+            magnetic_field[d] = get_entry<T>(magnetic_field_.block(d), i);
+
+          dealii::Tensor<1, dim, T> grad_phi;
+          for (unsigned int d = 0; d < dim; ++d)
+            grad_phi[d] = m_i_inv * get_entry<T>(velocity_rhs_.block(d), i);
+
+          auto new_v_i = v_i;
+
+          if constexpr (dim == 2) {
+            new_v_i = -magnetic_field[0] * cross_product_2d(grad_phi) /
+                      magnetic_field.norm_square();
+
+          } else if constexpr (dim == 3) {
+            new_v_i = -cross_product_3d(grad_phi, magnetic_field) /
+                      magnetic_field.norm_square();
+          }
+
+          for (unsigned int d = 0; d < dim; ++d)
+            U_i[1 + d] = rho_i * new_v_i[d];
+
+          /*
+           * Update the total energy accordingly:
+           */
+          if constexpr (view.have_energy_equation) {
+            U_i[1 + dim] += Number(0.5) * rho_i *
+                            (new_v_i.norm_square() - v_i.norm_square());
+          }
+
+          U.template write_tensor<T>(U_i, i);
+        }
+      };
+
+      /* Parallel non-vectorized loop: */
+      loop(Number(), n_regular, n_owned);
+      /* Parallel vectorized SIMD loop: */
+      loop(VA(), 0, n_regular);
+
+      RYUJIN_PARALLEL_REGION_END
+
+
+
+
+      LIKWID_MARKER_STOP("time_step_parabolic_1c");
+    }
+
+
+    template <int dim, typename Number>
     void
     ParabolicModule<dim, Number>::step(const StateVector &old_state_vector,
                                        const Number t,
@@ -855,7 +981,7 @@ namespace ryujin
 
       LIKWID_MARKER_START("time_step_parabolic_2c");
 
-      /* Project gradient into velocity space: */
+      /* Project gradient of potential into velocity space: */
 
       const auto body_velocity =
           [](const auto &data, auto &dst, const auto &src, const auto range) {
