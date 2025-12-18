@@ -37,6 +37,13 @@ namespace ryujin
                             "The mesh file to read in via dealii::GridIn. This "
                             "class supports, among others, reading in Gmsh "
                             "*.msh files, and the *.ucd file format.");
+
+        use_simplices_ = false;
+        this->add_parameter(
+            "simplex mesh",
+            use_simplices_,
+            "If set to true, the triangulation is assumed to use simplices "
+            "instead of quadrangles.");
       }
 
       void create_coarse_triangulation(
@@ -47,8 +54,21 @@ namespace ryujin
         gridin.read(filename_);
       }
 
+      typename Geometry<dim>::HP_Collection
+      populate_hp_collections(const unsigned int /*fe_degree*/,
+                              typename ryujin::Discretization<dim>::Collection
+                                  & /*collection*/) const override
+      {
+        if (use_simplices_) {
+          return Geometry<dim>::HP_Collection::standard_simplices;
+        } else {
+          return Geometry<dim>::HP_Collection::standard_quadrilaterals;
+        }
+      }
+
     private:
       std::string filename_;
+      bool use_simplices_;
     };
   } // namespace Geometries
 } // namespace ryujin
