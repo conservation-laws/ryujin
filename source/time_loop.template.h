@@ -21,6 +21,10 @@
 #include <fstream>
 #include <iomanip>
 
+#ifdef WITH_OPENMP
+#include "omp.h"
+#endif
+
 using namespace dealii;
 
 namespace ryujin
