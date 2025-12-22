@@ -579,9 +579,14 @@ namespace ryujin
                      potential_rhs_,
                      multigrid_preconditioner_);
 
-        /* update exponential moving average */
-        n_iterations_gauss_ =
-            0.9 * n_iterations_gauss_ + 0.1 * solver_control.last_step();
+
+        if (potential_initialized_) {
+          /* update exponential moving average */
+          n_iterations_gauss_ =
+              0.9 * n_iterations_gauss_ + 0.1 * solver_control.last_step();
+        } else {
+          n_iterations_gauss_ = solver_control.last_step();
+        }
 
       } catch (SolverControl::NoConvergence &) {
         SolverControl solver_control(1000, tolerance);
@@ -592,10 +597,16 @@ namespace ryujin
                      potential_rhs_,
                      diagonal_preconditioner_);
 
+        if (potential_initialized_) {
+          /* update exponential moving average */
+          n_iterations_gauss_ *= 0.9;
+          n_iterations_gauss_ +=
+              0.1 * gmg_max_iter_ + 0.1 * solver_control.last_step();
+        } else {
+          n_iterations_gauss_ = gmg_max_iter_ + solver_control.last_step();
+        }
+
         /* update exponential moving average, counting also GMG iterations */
-        n_iterations_gauss_ *= 0.9;
-        n_iterations_gauss_ +=
-            0.1 * gmg_max_iter_ + 0.1 * solver_control.last_step();
       }
 
       matrix_free_.get_affine_constraints(0).distribute(potential);
