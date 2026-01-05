@@ -606,6 +606,18 @@ namespace ryujin
 
       /* We need to signal a restart if the enforced tau is too wacky: */
       restart_needed = (tau > acceptable_tau_max_ratio_ * tau_max.load());
+
+      /* Don't bother with computing the update step, signal a restart: */
+      if (restart_needed &&
+          id_violation_strategy_ == IDViolationStrategy::raise_exception) {
+        n_restarts_++;
+        /* Suggest a restart with tau_max: */
+#ifdef DEBUG_OUTPUT
+        std::cout << "        signalling restart (suggested_tau_max = "
+                  << tau_max << ")" << std::endl;
+#endif
+        throw Restart{tau_max};
+      }
     }
 
 #ifdef DEBUG
