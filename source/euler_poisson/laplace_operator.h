@@ -483,10 +483,12 @@ namespace ryujin
         AffineConstraints<float> level_constraints(relevant_sets[level]);
 #endif
 
-        level_constraints.add_lines(
-            mg_constrained_dofs_.get_boundary_indices(level));
-        level_constraints.merge(
-            mg_constrained_dofs_.get_level_constraints(level));
+        if (!boundary_ids.empty()) {
+          level_constraints.add_lines(
+              mg_constrained_dofs_.get_boundary_indices(level));
+          level_constraints.merge(
+              mg_constrained_dofs_.get_level_constraints(level));
+        }
         level_constraints.close();
 
         AffineConstraints<float> dummy;

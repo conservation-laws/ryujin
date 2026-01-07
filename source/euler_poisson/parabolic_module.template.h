@@ -633,17 +633,19 @@ namespace ryujin
 
       LIKWID_MARKER_START("time_step_parabolic_1b");
 
+      matrix_free_.get_affine_constraints(0).distribute(potential);
+      matrix_free_.get_affine_constraints(0).set_zero(potential_rhs_);
+
       const auto tolerance =
           (tolerance_linfty_norm_ ? potential_rhs_.linfty_norm()
                                   : potential_rhs_.l2_norm()) *
           tolerance_;
 
-      matrix_free_.get_affine_constraints(0).distribute(potential);
-      matrix_free_.get_affine_constraints(0).set_zero(potential_rhs_);
+      typename dealii::SolverCG<ScalarVector>::AdditionalData solver_data;
 
       try {
         SolverControl solver_control(gmg_max_iter_, tolerance);
-        SolverCG<ScalarVector> solver(solver_control);
+        dealii::SolverCG<ScalarVector> solver(solver_control, solver_data);
         solver.solve(laplace_operator_,
                      potential,
                      potential_rhs_,
@@ -660,7 +662,7 @@ namespace ryujin
 
       } catch (SolverControl::NoConvergence &) {
         SolverControl solver_control(1000, tolerance);
-        SolverCG<ScalarVector> solver(solver_control);
+        dealii::SolverCG<ScalarVector> solver(solver_control, solver_data);
 
         solver.solve(laplace_operator_,
                      potential,
@@ -1057,17 +1059,19 @@ namespace ryujin
         update_operator_.set_alpha(alpha);
         update_operator_.set_theta_tau(tau);
 
+        matrix_free_.get_affine_constraints(0).distribute(new_potential);
+        matrix_free_.get_affine_constraints(0).set_zero(potential_rhs_);
+
         const auto tolerance =
             (tolerance_linfty_norm_ ? potential_rhs_.linfty_norm()
                                     : potential_rhs_.l2_norm()) *
             tolerance_;
 
-        matrix_free_.get_affine_constraints(0).distribute(new_potential);
-        matrix_free_.get_affine_constraints(0).set_zero(potential_rhs_);
+        typename dealii::SolverCG<ScalarVector>::AdditionalData solver_data;
 
         try {
           SolverControl solver_control(gmg_max_iter_, tolerance);
-          SolverCG<ScalarVector> solver(solver_control);
+          dealii::SolverCG<ScalarVector> solver(solver_control, solver_data);
           solver.solve(update_operator_,
                        new_potential,
                        potential_rhs_,
@@ -1079,7 +1083,7 @@ namespace ryujin
 
         } catch (SolverControl::NoConvergence &) {
           SolverControl solver_control(1000, tolerance);
-          SolverCG<ScalarVector> solver(solver_control);
+          dealii::SolverCG<ScalarVector> solver(solver_control, solver_data);
 
           solver.solve(update_operator_,
                        new_potential,
