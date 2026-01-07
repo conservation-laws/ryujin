@@ -52,6 +52,8 @@ namespace ryujin
         , n_corrections_(0)
         , n_warnings_(0)
         , potential_initialized_(false)
+        , t_background_density_(std::numeric_limits<Number>::lowest())
+        , t_magnetic_field_(std::numeric_limits<Number>::lowest())
     {
       gauss_law_restart_strategy_ = GaussLawRestartStrategy::no_restart;
       add_parameter("gauss law restart strategy",
@@ -227,37 +229,13 @@ namespace ryujin
       for (unsigned int i = 0; i < dim; ++i)
         velocity_rhs_.block(i).reinit(scalar_partitioner);
 
+      /*
+       * Populate background fields:
+       */
+
       if (!selected_electrostatic_configuration_->is_time_dependent()) {
-        /*
-         * Interpolate auxiliary vectors for background fields:
-         */
-
-        // FIXME: maybe use a matrix-free loop
-
-        dealii::VectorTools::interpolate(
-            discretization.mapping(),
-            offline_data_->dof_handler(),
-            dealii::ScalarFunctionFromFunctionObject<dim, Number>(
-                [&](const dealii::Point<dim> &p) {
-                  return selected_electrostatic_configuration_
-                      ->background_density(p, 0);
-                }),
-            background_density_);
-        background_density_.update_ghost_values();
-
-        for (unsigned int k = 0; k < (dim == 2 ? 1 : dim); ++k) {
-          dealii::VectorTools::interpolate(
-              discretization.mapping(),
-              offline_data_->dof_handler(),
-              to_function<dim, Number>(
-                  [&](const dealii::Point<dim> &p) {
-                    return selected_electrostatic_configuration_
-                        ->magnetic_field(p, 0);
-                  },
-                  k),
-              magnetic_field_.block(k));
-        }
-        magnetic_field_.update_ghost_values();
+        update_background_density(Number(0.));
+        update_magnetic_field(Number(0.));
       }
     }
 
@@ -295,12 +273,18 @@ namespace ryujin
        * strategy is set to full_restart or static_full_restart.
        */
 
+      AssertThrow(gauss_law_restart_strategy_ !=
+                      GaussLawRestartStrategy::correction,
+                  dealii::ExcNotImplemented());
+
       if (!potential_initialized_ ||
           (gauss_law_restart_strategy_ ==
            GaussLawRestartStrategy::full_restart) ||
           (gauss_law_restart_strategy_ ==
            GaussLawRestartStrategy::static_full_restart)) {
+
         compute_potential(t, state_vector);
+
         if (!potential_initialized_ &&
             parabolic_system_->magnetic_drift_limit())
           enforce_magnetic_drift_velocity(state_vector);
@@ -446,6 +430,99 @@ namespace ryujin
 
 
     template <int dim, typename Number>
+    void ParabolicModule<dim, Number>::update_background_density(
+        const Number t) const
+    {
+#ifdef DEBUG_OUTPUT
+      std::cout << "ParabolicModule<dim, Number>::update_background_density()"
+                << std::endl;
+#endif
+
+      /*
+       * Skip updating the background density if t > 0 and if the fields
+       * are time independent:
+       */
+      if (!selected_electrostatic_configuration_->is_time_dependent() &&
+          (t > Number(0.)))
+        return;
+
+      /*
+       * Skip updating if we have already populated the background density
+       * for the chosen time t.
+       */
+      if (std::abs(t_background_density_ - t) < 1.e-12)
+        return;
+
+#ifdef DEBUG_OUTPUT
+      std::cout << "        updating to t = " << t << std::endl;
+#endif
+
+      const auto &discretization = offline_data_->discretization();
+      background_density_.zero_out_ghost_values();
+      dealii::VectorTools::interpolate(
+          discretization.mapping(),
+          offline_data_->dof_handler(),
+          dealii::ScalarFunctionFromFunctionObject<dim, Number>(
+              [&](const dealii::Point<dim> &p) {
+                return selected_electrostatic_configuration_
+                    ->background_density(p, t);
+              }),
+          background_density_);
+      background_density_.update_ghost_values();
+
+      t_background_density_ = t;
+    }
+
+
+    template <int dim, typename Number>
+    void
+    ParabolicModule<dim, Number>::update_magnetic_field(const Number t) const
+    {
+#ifdef DEBUG_OUTPUT
+      std::cout << "ParabolicModule<dim, Number>::update_magnetic_field()"
+                << std::endl;
+#endif
+
+      /*
+       * Skip updating the background density if t > 0 and if the fields
+       * are time independent:
+       */
+      if (!selected_electrostatic_configuration_->is_time_dependent() &&
+          (t > Number(0.)))
+        return;
+
+      /*
+       * Skip updating if we have already populated the background density
+       * for the chosen time t.
+       */
+      if (std::abs(t_magnetic_field_ - t) < 1.e-12)
+        return;
+
+#ifdef DEBUG_OUTPUT
+      std::cout << "        updating to t = " << t << std::endl;
+#endif
+
+      const auto &discretization = offline_data_->discretization();
+      for (unsigned int k = 0; k < (dim == 2 ? 1 : dim); ++k) {
+        magnetic_field_.block(k).zero_out_ghost_values();
+        dealii::VectorTools::interpolate(
+            discretization.mapping(),
+            offline_data_->dof_handler(),
+            to_function<dim, Number>(
+                [&](const dealii::Point<dim> &p) {
+                  return selected_electrostatic_configuration_->magnetic_field(
+                      p, t);
+                },
+                k),
+            magnetic_field_.block(k));
+      }
+      magnetic_field_.update_ghost_values();
+
+      t_magnetic_field_ = t;
+    }
+
+
+    template <int dim, typename Number>
     void ParabolicModule<dim, Number>::compute_potential(
         const Number t, StateVector &state_vector) const
     {
@@ -474,20 +551,7 @@ namespace ryujin
       Scope scope(computing_timer_, "time step [P] 1 - enforce Gauss law");
       LIKWID_MARKER_START("time_step_parabolic_1a");
 
-      const auto &discretization = offline_data_->discretization();
-
-      if (selected_electrostatic_configuration_->is_time_dependent()) {
-        dealii::VectorTools::interpolate(
-            discretization.mapping(),
-            offline_data_->dof_handler(),
-            dealii::ScalarFunctionFromFunctionObject<dim, Number>(
-                [&](const dealii::Point<dim> &p) {
-                  return selected_electrostatic_configuration_
-                      ->background_density(p, t);
-                }),
-            background_density_);
-        background_density_.update_ghost_values();
-      }
+      update_background_density(t);
 
       RYUJIN_PARALLEL_REGION_BEGIN
 
@@ -624,6 +688,7 @@ namespace ryujin
           << "ParabolicModule<dim, Number>::enforce_magnetic_drift_velocity()"
           << std::endl;
 #endif
+
       auto &U = std::get<0>(state_vector);
       auto &V = std::get<2>(state_vector);
       auto &potential = V.block(0);
@@ -749,7 +814,6 @@ namespace ryujin
     {
 #ifdef DEBUG_OUTPUT
       std::cout << "ParabolicModule<dim, Number>::step()" << std::endl;
-
       std::cout << "        perform time-step with tau = " << tau << std::endl;
       if (crank_nicolson_extrapolation)
         std::cout << "        and extrapolate to t + 2 * tau" << std::endl;
@@ -783,13 +847,14 @@ namespace ryujin
       new_potential = old_potential;
 
       /*
-       * If the Gauss law restart strategy is static full restart or
-       * static no restart, we skip updating the potential.
+       * If the Gauss law restart strategy is "static full restart" or
+       * "static no restart", we skip updating the potential.
        */
       if ((gauss_law_restart_strategy_ !=
            GaussLawRestartStrategy::static_no_restart) &&
           (gauss_law_restart_strategy_ !=
            GaussLawRestartStrategy::static_full_restart)) {
+
         /*
          * ---------------------------------------------------------------------
          * Step 2a: build right hand side for potential update
@@ -799,33 +864,19 @@ namespace ryujin
          *   \tau \alpha \langle \rho^n B^{-1} v^n, \nabla \chi \rangle
          *
          * In case of a time-dependent background density, we add a term
-         *   \alpha \langle \rho_b^{n+1} - \rho_b^n, \chi \rangle
-         * to account for the time dependence. Note that in case of a
-         * Crank-Nicolson extrapolation, this is equivalent to enforcing
-         * the Gauss law at the half step and then extrapolating.
+         * \theta \alpha \langle \rho_b^{n+1} - \rho_b^n, \chi \rangle to
+         * account for the time dependence. Here, t_{n+1} is the final time
+         * t_n + tau, or t_n + 2 * tau (in case of Crank Nicolson). This
+         * ensures that we are consistent with the Gauß law involution
+         * "-\Delta \varphi^{n+1} = \alpha \rho^{n+1}."
          * ---------------------------------------------------------------------
          */
 
         Scope scope(computing_timer_, "time step [P] 2 - update potential");
         LIKWID_MARKER_START("time_step_parabolic_2a");
 
-        const auto &discretization = offline_data_->discretization();
-
-        if (selected_electrostatic_configuration_->is_time_dependent()) {
-          for (unsigned int k = 0; k < (dim == 2 ? 1 : dim); ++k) {
-            dealii::VectorTools::interpolate(
-                discretization.mapping(),
-                offline_data_->dof_handler(),
-                to_function<dim, Number>(
-                    [&](const dealii::Point<dim> &p) {
-                      return selected_electrostatic_configuration_
-                          ->magnetic_field(p, t);
-                    },
-                    k),
-                magnetic_field_.block(k));
-          }
-          magnetic_field_.update_ghost_values();
-        }
+        /* Query the magnetic field at the time t + tau: */
+        update_magnetic_field(t + tau);
 
         /*
          * Write out density and assemble velocity part. We need density_
@@ -932,6 +983,27 @@ namespace ryujin
             /*zero destination*/ false);
 
         LIKWID_MARKER_STOP("time_step_parabolic_2a");
+
+        /* Time-dependent background density: */
+
+        if (selected_electrostatic_configuration_->is_time_dependent()) {
+          update_background_density(t);
+          if (crank_nicolson_extrapolation)
+            potential_rhs_.sadd(1.0, -0.5 * alpha, background_density_);
+          else
+            potential_rhs_.sadd(1.0, -alpha, background_density_);
+
+          /* Update background density to t_{n+1}: */
+
+          update_background_density(
+              t + (crank_nicolson_extrapolation ? 2. : 1.) * tau);
+          if (crank_nicolson_extrapolation)
+            potential_rhs_.sadd(1.0, 0.5 * alpha, background_density_);
+          else
+            potential_rhs_.sadd(1.0, alpha, background_density_);
+
+          potential_rhs_.update_ghost_values();
+        }
 
         /*
          * ---------------------------------------------------------------------

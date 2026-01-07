@@ -314,6 +314,22 @@ namespace ryujin
       void create_constraints();
 
       /**
+       * Update the background density vector to time t.
+       *
+       * @note: The vector is always updated for t = 0, but the update is
+       * skipped for t > 0 if the background fields are time independent.
+       */
+      void update_background_density(const Number t) const;
+
+      /**
+       * Update the (background) magnetic field vector to time t.
+       *
+       * @note: The vector is always updated for t = 0, but the update is
+       * skipped for t > 0 if the background fields are time independent.
+       */
+      void update_magnetic_field(const Number t) const;
+
+      /**
        * Compute the potential phi (the last component of the state_vector)
        * for a given density (the first component of the state_vector).
        */
@@ -387,12 +403,15 @@ namespace ryujin
       MGSmoother<dim, Number> multigrid_preconditioner_;
       UpdateOperator<dim, Number> update_operator_;
 
-      mutable bool potential_initialized_;
       mutable ScalarVector potential_rhs_;
       mutable ScalarVector density_;
       mutable ScalarVector background_density_;
       mutable BlockVector magnetic_field_;
       mutable BlockVector velocity_rhs_;
+
+      mutable bool potential_initialized_;
+      mutable Number t_background_density_;
+      mutable Number t_magnetic_field_;
       //@}
     };
   } // namespace EulerPoisson
