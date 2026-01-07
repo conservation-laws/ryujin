@@ -1,0 +1,122 @@
+##
+#
+# Euler Poisson (isentropic EOS) benchmark:
+#
+# The isentropic vortex is an analytic solution of the compressible Euler
+# equations (with polytropic gas equation of state). We compute the vortex
+# on the square [-5, 5]^2 initially centered at (-1,-1) with a strength of
+# beta=5, and moving in diagonal (1,1) direction with mach number 1. At
+# final time t=2 the vortex is located at (1, 1). We report the final,
+# normalized L1, L2, L\infty error norms summed up over all components.
+#
+# We add a time-dependent "neutralizing" background density that balances
+# the (charge) density of the isentropic vortex so that the resulting
+# (analytic) potential is identically zero.
+#
+# This variant uses the "no restart" update strategy and a dG finite
+# element ansatz.
+#
+# This configuration uses an explicit/implicit Strang split with ERK(3, 3,
+# 1) and Crank Nicolson. Expected results are reported in
+# euler_poisson-isentropic_vortex-strang_erk33_cn.baseline
+#
+##
+
+subsection A - TimeLoop
+  set basename             = isentropic_vortex-strang_erk_33_cn
+
+  set enable compute error = true
+  set error normalize      = true
+  set error quantities     = rho, m_1, m_2
+
+  set enable output full   = true
+
+  set final time           = 2.0
+  set timer granularity    = 2.0
+end
+
+subsection B - Equation
+  set dimension = 2
+  set equation  = euler poisson barotropic
+
+  set barotropic equation of state = isentropic
+  set alpha                        = 1
+  set set up magnetic drift limit  = false
+  set electrostatic configuration  = function
+
+  subsection isentropic
+    set k     = 1.
+    set gamma = 1.4
+  end
+
+  subsection function
+    set time dependent           = true
+    set magnetic field z         = 0.
+
+    ##
+    # rho_b     = -T^(1 / (gamma - 1))
+    # T         = 1 - (gamma - 1) / (2 * gamma) * f^2
+    # f         = beta / (2 * pi) * exp(0.5 * (1 - |r|^2))
+    # r         = (x,y) - (x_0,y_0) - Mt
+    # x_0 = y_0 = (-1, -1)
+    # M         = ( 1,  1)
+    # gamma     = 1.4
+    # beta      = 5
+    ##
+
+    set background density = -pow(1.-(1.4-1.)/(2 * 1.4) * pow(5. / (2. * 3.1415926535897932) * exp(0.5 * (1. - pow(x + 1. - 0.707106781188 * t, 2.) - pow(y + 1. - 0.707106781188 * t, 2.))), 2.), 1. / (1.4 - 1.))
+  end
+end
+
+subsection C - Discretization
+  set finite element ansatz = dG Q1
+
+  set geometry        = rectangular domain
+  set mesh refinement = 7
+
+  subsection rectangular domain
+    set boundary condition bottom = dirichlet
+    set boundary condition left   = dirichlet
+    set boundary condition right  = dirichlet
+    set boundary condition top    = dirichlet
+
+    set position bottom left      = -5, -5
+    set position top right        =  5,  5
+  end
+end
+
+subsection G - ParabolicModule
+  set gauss law restart strategy    = no restart
+
+  set multigrid - max iter          = 15
+  set multigrid - chebyshev range   = 8
+  set multigrid - chebyshev max eig = 2
+  set multigrid - chebyshev degree  = 3
+  set multigrid - chebyshev cg iter = 0
+  set multigrid - min level         = 0
+  set tolerance                     = 1e-15
+  set tolerance linfty norm         = false
+end
+
+subsection E - InitialValues
+  set configuration = isentropic vortex
+  set direction     =  1,  1
+  set position      = -1, -1
+
+  subsection isentropic vortex
+    set gamma       = 1.4
+    set mach number = 1
+    set beta        = 5
+  end
+end
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.2
+  set cfl max               = 0.2
+  set cfl recovery strategy = none
+  set time stepping scheme  = strang erk 33 cn
+end
+
+subsection J - VTUOutput
+  set vtu output quantities      = rho, m_1, m_2, phi
+end
