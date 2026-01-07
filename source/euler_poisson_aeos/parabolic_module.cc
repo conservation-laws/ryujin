@@ -3,8 +3,8 @@
 // Copyright (C) 2025 by the ryujin authors
 //
 
+#include "../euler_poisson/parabolic_module.template.h"
 #include "description.h"
-#include "parabolic_module.template.h"
 
 #define INSTANTIATE(dim, stages)                                               \
   template void                                                                \
@@ -20,6 +20,8 @@ namespace ryujin
 {
   namespace EulerPoisson
   {
+    using EulerPoissonAEOS::Description;
+
     template class ParabolicModule<Description, 1, NUMBER>;
     template class ParabolicModule<Description, 2, NUMBER>;
     template class ParabolicModule<Description, 3, NUMBER>;

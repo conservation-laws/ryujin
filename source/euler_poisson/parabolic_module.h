@@ -7,11 +7,8 @@
 
 #include <compile_time_options.h>
 
-#include "../euler/hyperbolic_system.h"
-
 #include "electrostatic_configuration_library.h"
 #include "laplace_operator.h"
-#include "parabolic_system.h"
 
 #include <hyperbolic_module.h>
 #include <initial_values.h>
@@ -125,16 +122,13 @@ namespace ryujin
 {
   namespace EulerPoisson
   {
-    /* Forward declaration: */
-    struct Description;
-
     /**
      * Implicit backward-Euler time stepping for the parabolic limiting
      * equation for the Euler-Poisson system
      *
      * @ingroup ParabolicModule
      */
-    template <int dim, typename Number>
+    template <typename Description, int dim, typename Number>
     class ParabolicModule final : public dealii::ParameterAcceptor
     {
     public:
@@ -143,11 +137,12 @@ namespace ryujin
        */
       //@{
 
-      using HyperbolicSystem = Euler::HyperbolicSystem;
+      using HyperbolicSystem = typename Description::HyperbolicSystem;
 
-      using View = Euler::HyperbolicSystemView<dim, Number>;
+      using View =
+          typename Description::template HyperbolicSystemView<dim, Number>;
 
-      using ParabolicSystem = EulerPoisson::ParabolicSystem;
+      using ParabolicSystem = typename Description::ParabolicSystem;
 
       using StateVector = typename View::StateVector;
 

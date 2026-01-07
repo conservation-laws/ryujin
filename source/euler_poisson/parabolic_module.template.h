@@ -28,8 +28,8 @@ namespace ryujin
   {
     using namespace dealii;
 
-    template <int dim, typename Number>
-    ParabolicModule<dim, Number>::ParabolicModule(
+    template <typename Description, int dim, typename Number>
+    ParabolicModule<Description, dim, Number>::ParabolicModule(
         const MPIEnsemble &mpi_ensemble,
         std::map<std::string, dealii::Timer> &computing_timer,
         const OfflineData<dim, Number> &offline_data,
@@ -133,8 +133,8 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    void ParabolicModule<dim, Number>::prepare()
+    template <typename Description, int dim, typename Number>
+    void ParabolicModule<Description, dim, Number>::prepare()
     {
 #ifdef DEBUG_OUTPUT
       std::cout << "ParabolicModule<dim, Number>::prepare()" << std::endl;
@@ -240,8 +240,8 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    void ParabolicModule<dim, Number>::reinit_state_vector(
+    template <typename Description, int dim, typename Number>
+    void ParabolicModule<Description, dim, Number>::reinit_state_vector(
         StateVector &state_vector) const
     {
 #ifdef DEBUG_OUTPUT
@@ -259,8 +259,8 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    void ParabolicModule<dim, Number>::prepare_state_vector(
+    template <typename Description, int dim, typename Number>
+    void ParabolicModule<Description, dim, Number>::prepare_state_vector(
         StateVector &state_vector, Number t) const
     {
 #ifdef DEBUG_OUTPUT
@@ -293,9 +293,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
+    template <typename Description, int dim, typename Number>
     template <int stages>
-    void ParabolicModule<dim, Number>::backward_euler_step(
+    void ParabolicModule<Description, dim, Number>::backward_euler_step(
         const StateVector &old_state_vector,
         const Number old_t,
         std::array<std::reference_wrapper<const StateVector>,
@@ -312,8 +312,8 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    void ParabolicModule<dim, Number>::crank_nicolson_step(
+    template <typename Description, int dim, typename Number>
+    void ParabolicModule<Description, dim, Number>::crank_nicolson_step(
         const StateVector &old_state_vector,
         const Number old_t,
         StateVector &new_state_vector,
@@ -347,8 +347,8 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    void ParabolicModule<dim, Number>::create_constraints()
+    template <typename Description, int dim, typename Number>
+    void ParabolicModule<Description, dim, Number>::create_constraints()
     {
 #ifdef DEBUG_OUTPUT
       std::cout << "ParabolicModule<dim, Number>::create_constraints()"
@@ -429,8 +429,8 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    void ParabolicModule<dim, Number>::update_background_density(
+    template <typename Description, int dim, typename Number>
+    void ParabolicModule<Description, dim, Number>::update_background_density(
         const Number t) const
     {
 #ifdef DEBUG_OUTPUT
@@ -477,9 +477,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    void
-    ParabolicModule<dim, Number>::update_magnetic_field(const Number t) const
+    template <typename Description, int dim, typename Number>
+    void ParabolicModule<Description, dim, Number>::update_magnetic_field(
+        const Number t) const
     {
 #ifdef DEBUG_OUTPUT
       std::cout << "ParabolicModule<dim, Number>::update_magnetic_field()"
@@ -528,8 +528,8 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    void ParabolicModule<dim, Number>::compute_potential(
+    template <typename Description, int dim, typename Number>
+    void ParabolicModule<Description, dim, Number>::compute_potential(
         const Number t, StateVector &state_vector) const
     {
 #ifdef DEBUG_OUTPUT
@@ -685,8 +685,9 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    void ParabolicModule<dim, Number>::enforce_magnetic_drift_velocity(
+    template <typename Description, int dim, typename Number>
+    void
+    ParabolicModule<Description, dim, Number>::enforce_magnetic_drift_velocity(
         StateVector &state_vector) const
     {
 #ifdef DEBUG_OUTPUT
@@ -805,20 +806,17 @@ namespace ryujin
       RYUJIN_PARALLEL_REGION_END
 
 
-
-
       LIKWID_MARKER_STOP("time_step_parabolic_1c");
     }
 
 
-    template <int dim, typename Number>
-    void
-    ParabolicModule<dim, Number>::step(const StateVector &old_state_vector,
-                                       const Number t,
-                                       StateVector &new_state_vector,
-                                       Number tau [[maybe_unused]],
-                                       const bool crank_nicolson_extrapolation
-                                       [[maybe_unused]]) const
+    template <typename Description, int dim, typename Number>
+    void ParabolicModule<Description, dim, Number>::step(
+        const StateVector &old_state_vector,
+        const Number t,
+        StateVector &new_state_vector,
+        Number tau [[maybe_unused]],
+        const bool crank_nicolson_extrapolation [[maybe_unused]]) const
     {
 #ifdef DEBUG_OUTPUT
       std::cout << "ParabolicModule<dim, Number>::step()" << std::endl;
@@ -1211,8 +1209,8 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    void ParabolicModule<dim, Number>::print_solver_statistics(
+    template <typename Description, int dim, typename Number>
+    void ParabolicModule<Description, dim, Number>::print_solver_statistics(
         std::ostream &output) const
     {
       output << "        [ " << std::setprecision(2) << std::fixed //

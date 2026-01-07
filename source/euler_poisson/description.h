@@ -25,7 +25,8 @@ namespace ryujin
       using ParabolicSystem = EulerPoisson::ParabolicSystem;
 
       template <int dim, typename Number = double>
-      using ParabolicModule = EulerPoisson::ParabolicModule<dim, Number>;
+      using ParabolicModule =
+          EulerPoisson::ParabolicModule<Description, dim, Number>;
 
       template <int dim, typename Number = double>
       using Indicator = Euler::Indicator<dim, Number>;
