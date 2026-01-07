@@ -712,6 +712,8 @@ namespace ryujin
 
       LIKWID_MARKER_START("time_step_parabolic_1b");
 
+      update_magnetic_field(Number(0.));
+
       /* Project gradient of potential into velocity space: */
 
       const auto body_velocity =
@@ -987,22 +989,57 @@ namespace ryujin
         /* Time-dependent background density: */
 
         if (selected_electrostatic_configuration_->is_time_dependent()) {
-          update_background_density(t);
-          if (crank_nicolson_extrapolation)
-            potential_rhs_.sadd(1.0, -0.5 * alpha, background_density_);
-          else
-            potential_rhs_.sadd(1.0, -alpha, background_density_);
 
-          /* Update background density to t_{n+1}: */
+          /*
+           * Subtract background density at time t_n:
+           */
+
+          update_background_density(t);
+
+          Number factor = (crank_nicolson_extrapolation ? -0.5 : -1.0) * alpha;
+
+          const auto body = [&factor](const auto &data,
+                                      auto &dst,
+                                      const auto &src,
+                                      const auto range) {
+            FEEvaluation<dim, order_fe, order_quad, /*components*/ 1, Number>
+                fee_potential(data, /*CG*/ 0, /*lumped quadrature*/ 1);
+            FEEvaluation<dim, order_fe, order_quad, /*components*/ 1, Number>
+                fee_background(data, /*hyperbolic*/ 1, /*lumped quadrature*/ 1);
+
+            for (unsigned int cell = range.first; cell < range.second; ++cell) {
+              fee_potential.reinit(cell);
+              fee_background.reinit(cell);
+              fee_background.gather_evaluate(src, EvaluationFlags::values);
+
+              for (unsigned int q = 0; q < fee_potential.n_q_points; ++q) {
+                const auto background_q = fee_background.get_value(q);
+                fee_potential.submit_value(factor * background_q, q);
+              }
+              fee_potential.integrate_scatter(EvaluationFlags::values, dst);
+            }
+          };
+
+          matrix_free_.template cell_loop<ScalarVector, ScalarVector>(
+              body,
+              potential_rhs_,
+              background_density_,
+              /*zero destination*/ false);
+
+          /*
+           * Add background density at time t_{n+1}:
+           */
 
           update_background_density(
               t + (crank_nicolson_extrapolation ? 2. : 1.) * tau);
-          if (crank_nicolson_extrapolation)
-            potential_rhs_.sadd(1.0, 0.5 * alpha, background_density_);
-          else
-            potential_rhs_.sadd(1.0, alpha, background_density_);
 
-          potential_rhs_.update_ghost_values();
+          factor *= -1.;
+
+          matrix_free_.template cell_loop<ScalarVector, ScalarVector>(
+              body,
+              potential_rhs_,
+              background_density_,
+              /*zero destination*/ false);
         }
 
         /*

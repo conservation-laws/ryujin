@@ -82,11 +82,12 @@ namespace ryujin
        */
       ACCESSOR_READ_ONLY(is_time_dependent)
 
+    protected:
+      bool is_time_dependent_;
+
     private:
       const std::string name_;
       std::set<dealii::types::boundary_id> dirichlet_boundaries_;
-
-      bool is_time_dependent_;
     };
   } // namespace ElectrostaticConfigurationLibrary
 } /* namespace ryujin */

@@ -29,6 +29,11 @@ namespace ryujin
       Function(const std::string &subsection)
           : ElectrostaticConfiguration<dim, Number>("function", subsection)
       {
+        this->add_parameter("time dependent",
+                            this->is_time_dependent_,
+                            "Controls whether the function parsers support "
+                            "time dependent function expressions");
+
         background_density_expression_ = "0.";
         this->add_parameter("background density",
                             background_density_expression_,
@@ -60,24 +65,26 @@ namespace ryujin
 
         const auto set_up_muparser = [this] {
           /*
-           * This variant of the constructor initializes the function
-           * parser with support for a time-dependent description involving
-           * a variable »t«:
+           * Add variable "t" in case of a time-dependent function:
            */
           using FP = dealii::FunctionParser<dim>;
-          background_density_ =
-              std::make_unique<FP>(background_density_expression_);
+          auto variable_names = FP::default_variable_names();
+          if (this->is_time_dependent_)
+            variable_names += ",t";
+
+          background_density_ = std::make_unique<FP>(
+              background_density_expression_, "", variable_names);
 
           if constexpr (dim >= 2) {
-            magnetic_field_z_ =
-                std::make_unique<FP>(magnetic_field_z_expression_);
+            magnetic_field_z_ = std::make_unique<FP>(
+                magnetic_field_z_expression_, "", variable_names);
           }
 
           if constexpr (dim == 3) {
-            magnetic_field_x_ =
-                std::make_unique<FP>(magnetic_field_x_expression_);
-            magnetic_field_y_ =
-                std::make_unique<FP>(magnetic_field_y_expression_);
+            magnetic_field_x_ = std::make_unique<FP>(
+                magnetic_field_x_expression_, "", variable_names);
+            magnetic_field_y_ = std::make_unique<FP>(
+                magnetic_field_y_expression_, "", variable_names);
           }
         };
 
