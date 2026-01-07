@@ -486,8 +486,10 @@ namespace ryujin
         if (!boundary_ids.empty()) {
           level_constraints.add_lines(
               mg_constrained_dofs_.get_boundary_indices(level));
+#if DEAL_II_VERSION_GTE(9, 6, 0)
           level_constraints.merge(
               mg_constrained_dofs_.get_level_constraints(level));
+#endif
         }
         level_constraints.close();
 
@@ -521,10 +523,12 @@ namespace ryujin
         level_laplace_matrices_[level].compute_diagonal(
             *smoother_data[level].preconditioner);
 
+#if DEAL_II_VERSION_GTE(9, 6, 0)
         if (boundary_ids.empty()) {
           smoother_data[level].eigenvalue_algorithm =
               dealii::internal::EigenvalueAlgorithm::power_iteration;
         }
+#endif
 
         if (level == level_matrix_free_.min_level()) {
           smoother_data[level].degree = numbers::invalid_unsigned_int;
