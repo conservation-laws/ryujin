@@ -457,6 +457,9 @@ namespace ryujin
       std::cout << "        updating to t = " << t << std::endl;
 #endif
 
+      Scope scope(computing_timer_,
+                  "time step [X]   - interpolate data vectors");
+
       const auto &discretization = offline_data_->discretization();
       background_density_.zero_out_ghost_values();
       dealii::VectorTools::interpolate(
@@ -501,6 +504,9 @@ namespace ryujin
 #ifdef DEBUG_OUTPUT
       std::cout << "        updating to t = " << t << std::endl;
 #endif
+
+      Scope scope(computing_timer_,
+                  "time step [X]   - interpolate data vectors");
 
       const auto &discretization = offline_data_->discretization();
       for (unsigned int k = 0; k < (dim == 2 ? 1 : dim); ++k) {

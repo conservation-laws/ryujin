@@ -327,8 +327,12 @@ namespace ryujin
 
         hyperbolic_module_.reinit_state_vector(state_vector);
         parabolic_module_.reinit_state_vector(state_vector);
-        std::get<0>(state_vector) =
-            initial_values_.get().interpolate_hyperbolic_vector();
+        {
+          Scope scope(computing_timer_,
+                      "time step [X]   - interpolate data vectors");
+          std::get<0>(state_vector) =
+              initial_values_.get().interpolate_hyperbolic_vector();
+        }
         Vectors::debug_poison_invalid_values(state_vector, offline_data_);
       }
     }
@@ -381,7 +385,7 @@ namespace ryujin
           StateVector analytic;
           {
             Scope scope(computing_timer_,
-                        "time step [X]   - interpolate analytic solution");
+                        "time step [X]   - interpolate data vectors");
             hyperbolic_module_.reinit_state_vector(analytic);
             parabolic_module_.reinit_state_vector(analytic);
             std::get<0>(analytic) =
