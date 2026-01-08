@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-// Copyright (C) 2020 - 2025 by the ryujin authors
+// Copyright (C) 2020 - 2026 by the ryujin authors
 //
 
 #pragma once
@@ -213,7 +213,6 @@ namespace ryujin
       return i / group_size * group_size;
     };
 
-#if DEAL_II_VERSION_GTE(9, 5, 0)
     /*
      * A small lambda that performs a "logical or" over all MPI ranks:
      */
@@ -252,7 +251,6 @@ namespace ryujin
         n_locally_internal_ = consistent_stride_range();
       }
     }
-#endif
 
     /*
      * Check that after all the dof manipulation and setup we still end up
@@ -1332,11 +1330,15 @@ namespace ryujin
               << std::endl;
 #endif
 
+    Assert(!dof_handler_cg_->has_hp_capabilities(), dealii::ExcInternalError());
+    Assert(!dof_handler_dg_->has_hp_capabilities(), dealii::ExcInternalError());
+
+    dof_handler_cg_->distribute_mg_dofs();
+    dof_handler_dg_->distribute_mg_dofs();
+
+    /* Now, work on data structures for hyperbolic update: */
+
     auto &dof_handler = this->dof_handler();
-
-    Assert(!dof_handler.has_hp_capabilities(), dealii::ExcInternalError());
-
-    dof_handler.distribute_mg_dofs();
 
     const auto n_levels = dof_handler.get_triangulation().n_global_levels();
 

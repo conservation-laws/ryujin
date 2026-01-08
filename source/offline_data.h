@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-// Copyright (C) 2020 - 2025 by the ryujin authors
+// Copyright (C) 2020 - 2026 by the ryujin authors
 //
 
 #pragma once
@@ -413,6 +413,8 @@ namespace ryujin
 
     const MPIEnsemble &mpi_ensemble_;
 
+    dealii::ObserverPointer<const Discretization<dim>> discretization_;
+
     std::unique_ptr<dealii::DoFHandler<dim>> dof_handler_cg_;
     std::unique_ptr<dealii::DoFHandler<dim>> dof_handler_dg_;
 
@@ -458,8 +460,6 @@ namespace ryujin
     SparseMatrixSIMD<Number> incidence_matrix_;
 
     Number measure_of_omega_;
-
-    dealii::ObserverPointer<const Discretization<dim>> discretization_;
 
     /**
      * Construct a boundary map for a given set of DoFHandler iterators.

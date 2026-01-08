@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-// Copyright (C) 2023 - 2025 by the ryujin authors
+// Copyright (C) 2023 - 2026 by the ryujin authors
 //
 
 #pragma once
@@ -265,10 +265,7 @@ namespace ryujin
       //@{
 
       bool use_gmg_velocity_;
-      ACCESSOR_READ_ONLY(use_gmg_velocity)
-
       bool use_gmg_internal_energy_;
-      ACCESSOR_READ_ONLY(use_gmg_internal_energy)
 
       Number tolerance_;
       bool tolerance_linfty_norm_;

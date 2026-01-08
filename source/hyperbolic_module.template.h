@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-// Copyright (C) 2020 - 2025 by the ryujin authors
+// Copyright (C) 2020 - 2026 by the ryujin authors
 //
 
 #pragma once
@@ -108,6 +108,11 @@ namespace ryujin
   void HyperbolicModule<Description, dim, Number>::reinit_state_vector(
       StateVector &state_vector) const
   {
+#ifdef DEBUG_OUTPUT
+    std::cout << "HyperbolicModule<dim, Number>::reinit_state_vector()"
+              << std::endl;
+#endif
+
     auto &[U, precomputed, V] = state_vector;
     U.reinit(offline_data_->hyperbolic_vector_partitioner());
     precomputed.reinit(offline_data_->precomputed_vector_partitioner());
@@ -601,6 +606,18 @@ namespace ryujin
 
       /* We need to signal a restart if the enforced tau is too wacky: */
       restart_needed = (tau > acceptable_tau_max_ratio_ * tau_max.load());
+
+      /* Don't bother with computing the update step, signal a restart: */
+      if (restart_needed &&
+          id_violation_strategy_ == IDViolationStrategy::raise_exception) {
+        n_restarts_++;
+        /* Suggest a restart with tau_max: */
+#ifdef DEBUG_OUTPUT
+        std::cout << "        signalling restart (suggested_tau_max = "
+                  << tau_max << ")" << std::endl;
+#endif
+        throw Restart{tau_max};
+      }
     }
 
 #ifdef DEBUG

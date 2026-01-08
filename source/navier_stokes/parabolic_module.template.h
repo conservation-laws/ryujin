@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-// Copyright (C) 2023 - 2025 by the ryujin authors
+// Copyright (C) 2023 - 2026 by the ryujin authors
 //
 
 #pragma once
@@ -144,7 +144,7 @@ namespace ryujin
       AssertThrow(!offline_data_->dof_handler().has_hp_capabilities(),
                   dealii::ExcMessage(
                       "The Navier-Stokes module currently does not support "
-                      "DofHandlers set up with hp capabilities."));
+                      "DoFHandlers set up with hp capabilities."));
 
       /* Initialize vectors: */
 
@@ -236,9 +236,9 @@ namespace ryujin
     void ParabolicModule<dim, Number>::prepare_state_vector(
         StateVector & /*state_vector*/, Number /*t*/) const
     {
-      /**
-       * There is no parabolic part of the state vector for Navier-Stokes, so we
-       * do nothing
+      /*
+       * There is no parabolic part of the state vector for Navier-Stokes,
+       * so we do nothing.
        */
     }
 

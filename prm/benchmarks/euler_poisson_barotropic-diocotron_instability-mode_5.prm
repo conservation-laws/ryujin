@@ -1,0 +1,143 @@
+##
+#
+# DIOCOTRON INSTABILITY BENCHMARK FOR THE BAROTROPIC EULER-POISSON SYSTEM
+#
+# The domain consists of a disk with outer radius 16. Refinement level 8
+# with discontinuous elements corresponds to around 3.15M scalar degrees of
+# freedom per component, which requires around for about (32h / #n_cores)
+# on a modern system.
+#
+#
+# TIME SCALES AND MODELING PARAMETERS
+#
+#   Diocotron frequency: w_d = w_p^2 / w_c
+#   Plasma frequency:    w_p = sqrt(alpha * rho_max)
+#   Cyclotron frequency: abs(B_z)
+#
+# where the coupling constant alpha and the magnetic field component B_z
+# are chosen such that
+#
+#   alpha =  4. * pi^2 / beta^2
+#   B_z   = -2. * pi / beta^2
+#
+# and beta is a free parameter set to beta = 1e-6.
+#
+# We choose an isothermal equation of state with a speed of sound set to 1e-12.
+#
+#
+# INITIAL CONDITION
+#
+# We choose an initial density profile with perturbation:
+#
+#   rho = rho_max - delta + delta * sin(mode * theta)
+#         inside an annulus with radii r_i = 6 and r_o = 8
+#   rho = rho_min outside the annulus
+#
+# Here, rho_max = 1, delta = 0.1, rho_min = 1e-6. Solve for the initial
+# potential and set up the velocity in the magnetic drift limit.
+#
+##
+
+subsection A - TimeLoop
+  set basename                            = diocotron_instability-mode_5
+
+  set enable output full                  = true
+
+  set final time                          = 10.00
+  set timer granularity                   = 00.10
+  set enforce final time                  = true
+end
+
+
+subsection B - Equation
+  set dimension                    = 2
+  set equation                     = euler poisson barotropic
+
+  set barotropic equation of state = isothermal
+
+  subsection isothermal
+    set speed of sound = 1e-12
+  end
+
+  set alpha                        = 39.4784176e12
+  set set up magnetic drift limit  = true
+
+  set electrostatic configuration  = constant
+
+  subsection constant
+    set background density   = 0
+    set magnetic field       = -6.28318531e12
+  end
+end
+
+
+subsection C - Discretization
+  set finite element ansatz = dG Q1
+
+  set mesh refinement       = 8
+  set mesh writeout         = false
+
+  set geometry              = disk
+
+  subsection disk
+    set balanced           = true
+    set radius             = 16
+    set boundary condition = do nothing
+  end
+end
+
+
+subsection E - InitialValues
+  set configuration = function
+  set position      = 0, 0
+
+  subsection function
+    # trigger fifth mode by adding a 10% perturbation:
+    set density expression    = 6 < sqrt(x*x+y*y) && sqrt(x*x+y*y) < 8 ? 1 - 0.1 + 0.1 * sin(5 * atan2(y,x)) : 1e-6
+
+    set velocity x expression = 0
+    set velocity y expression = 0
+  end
+end
+
+
+subsection F - HyperbolicModule
+  subsection indicator
+    set evc factor        = 0.125
+  end
+
+  subsection limiter
+    set relaxation factor = 4.
+  end
+end
+
+
+subsection G - ParabolicModule
+  set gauss law restart strategy    = full restart
+
+  set multigrid - max iter          = 15
+  set multigrid - chebyshev range   = 8
+  set multigrid - chebyshev max eig = 2
+  set multigrid - chebyshev degree  = 3
+  set multigrid - chebyshev cg iter = 10
+  set multigrid - min level         = 0
+  set tolerance                     = 1e-15
+  set tolerance linfty norm         = false
+end
+
+
+subsection H - TimeIntegrator
+  set time stepping scheme     = strang erk 33 cn
+
+  set cfl min                  = 0.5
+  set cfl max                  = 0.5
+  set cfl recovery strategy    = cruise control
+
+  set acceptable tau_max ratio = 2.0
+  set tau_max                  = 1.0
+end
+
+
+subsection J - VTUOutput
+  set vtu output quantities    = rho, m_1, m_2, phi
+end

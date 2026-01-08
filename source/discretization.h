@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-// Copyright (C) 2020 - 2025 by the ryujin authors
+// Copyright (C) 2020 - 2026 by the ryujin authors
 //
 
 #pragma once
@@ -246,6 +246,7 @@ namespace ryujin
       std::unique_ptr<const dealii::hp::QCollection<dim>> quadrature_high_order;
       std::unique_ptr<const dealii::hp::QCollection<dim>> nodal_quadrature;
       std::unique_ptr<const dealii::hp::QCollection<1>> quadrature_1d;
+      std::unique_ptr<const dealii::hp::QCollection<1>> nodal_quadrature_1d;
       std::unique_ptr<const dealii::hp::QCollection<dim - 1>> face_quadrature;
       std::unique_ptr<const dealii::hp::QCollection<dim - 1>>
           face_nodal_quadrature;
@@ -403,6 +404,14 @@ namespace ryujin
      * @note The accessor returns an QCollection object.
      */
     ACCESSOR_CONTAINER_READ_ONLY(collection_, quadrature_1d)
+
+    /**
+     * Return a read-only const reference to the 1D nodal quadrature rule
+     * (Gauß Lobatto).
+     *
+     * @note The accessor returns an QCollection object.
+     */
+    ACCESSOR_CONTAINER_READ_ONLY(collection_, nodal_quadrature_1d)
 
     /**
      * Return a read-only const reference to the face quadrature rule.

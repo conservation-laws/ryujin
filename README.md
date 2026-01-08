@@ -34,6 +34,11 @@ parameter flags:
    [compressible Euler
    equations](https://en.wikipedia.org/wiki/Euler_equations_(fluid_dynamics))
    with polytropic equation of state.
+ - `equation = euler barotropic`, an optimized solver module for the
+   [compressible Euler
+   equations](https://en.wikipedia.org/wiki/Euler_equations_(fluid_dynamics))
+   with a barotropic equation of state, such as the isentropic or
+   isothermal equation of state.
  - `equation = euler aeos`, a generalized solver module for the
    compressible Euler equation with an [arbitrary or tabulated equation of
    state](https://en.wikipedia.org/wiki/Equation_of_state).
@@ -42,6 +47,19 @@ parameter flags:
    equations](https://en.wikipedia.org/wiki/Navier%E2%80%93Stokes_equations)
    with polytropic equation of state,
    Newtonian fluid model, and Fourier's law for the heat flux.
+ - `equation = euler poisson`, an optimized solver module for a charged
+   (single species) fluid goverened by the compressible Euler with
+   polytropic gas equation of state, and subject to an electrostatic force
+   model with background magnetic field.
+ - `equation = euler poisson barotropic`, an optimized solver module for a charged
+   (single species) fluid goverened by the compressible Euler
+   equations](https://en.wikipedia.org/wiki/Euler_equations_(fluid_dynamics))
+   with a barotropic equation of state, and subject to an electrostatic
+   force model with background magnetic field.
+ - `equation = euler poisson aeos`, an generalized solver module for a charged
+   (single species) fluid goverened by the compressible Euler equation with
+   an arbitrary or tabulated equation of state, and subject to an
+   electrostatic force model with background magnetic field.
  - `equation = shallow water`, a module for the [shallow water
    equations](https://en.wikipedia.org/wiki/Shallow_water_equations).
  - `equation = scalar conservation`, a module for scalar conservation
@@ -160,6 +178,14 @@ some of the following references:
   author = {Jake Harmon and Martin Kronbichler and Matthias Maier and Eric Tovar},
   title = {A conservative invariant-domain preserving projection technique for hyperbolic systems under adaptive mesh refinement},
   url = {https://arxiv.org/abs/2507.18717},
+  year = {2025},
+  journal = {submitted}
+}
+
+@article{ryujin-2025-9,
+  author = {Jordan Hoffart and Matthias Maier and John Shadid and Ignacio Tomas},
+  title = {Structure-preserving finite-element approximations of the magnetic Euler-Poisson equations},
+  url = {https://arxiv.org/abs/2510.11808},
   year = {2025},
   journal = {submitted}
 }

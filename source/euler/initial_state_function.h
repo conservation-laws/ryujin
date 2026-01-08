@@ -1,6 +1,6 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-// Copyright (C) 2023 - 2025 by the ryujin authors
+// Copyright (C) 2023 - 2026 by the ryujin authors
 //
 
 #pragma once
@@ -68,10 +68,8 @@ namespace ryujin
                               "A function expression describing the pressure");
         }
 
-        /*
-         * Set up the muparser object with the final flux description from
-         * the parameter file:
-         */
+        /* Set up all muparser objects */
+
         const auto set_up_muparser = [this] {
           using FP = dealii::FunctionParser<dim>;
           /*

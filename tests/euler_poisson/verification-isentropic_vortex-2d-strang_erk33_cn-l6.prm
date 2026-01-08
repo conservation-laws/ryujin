@@ -1,0 +1,84 @@
+subsection A - TimeLoop
+  set basename                 = validation-euler_poisson-l5
+
+  set enable compute error     = true
+
+  set final time               = 2.0
+  set timer granularity        = 2.0
+
+  set terminal update interval = 0
+end
+
+subsection B - Equation
+  set dimension = 2
+  set equation  = euler poisson
+
+  set alpha                        = 1
+  set electrostatic configuration  = function
+
+  subsection function
+    set time dependent   = true
+    set magnetic field z = 0.
+
+    ##
+    # rho_b     = -T^(1 / (gamma - 1))
+    # T         = 1 - (gamma - 1) / (2 * gamma) * f^2
+    # f         = beta / (2 * pi) * exp(0.5 * (1 - |r|^2))
+    # r         = (x,y) - (x_0,y_0) - Mt
+    # x_0 = y_0 = (-1, -1)
+    # M         = ( 1,  1) / sqrt(2)
+    # gamma     = 1.4
+    # beta      = 5
+    ##
+
+    set background density = -pow(1.-(1.4-1.)/(2 * 1.4) * pow(5. / (2. * 3.1415926535897932) * exp(0.5 * (1. - pow(x + 1. - 0.707106781188 * t, 2.) - pow(y + 1. - 0.707106781188 * t, 2.))), 2.), 1. / (1.4 - 1.))
+  end
+end
+
+subsection C - Discretization
+  set finite element ansatz = dG Q1
+
+  set geometry        = rectangular domain
+  set mesh refinement = 6
+
+  subsection rectangular domain
+    set boundary condition bottom = dirichlet
+    set boundary condition left   = dirichlet
+    set boundary condition right  = dirichlet
+    set boundary condition top    = dirichlet
+
+    set position bottom left      = -5, -5
+    set position top right        =  5,  5
+  end
+end
+
+subsection G - ParabolicModule
+  set gauss law restart strategy = no restart
+
+  set multigrid - max iter          = 15
+  set multigrid - chebyshev max eig = 2
+  set multigrid - chebyshev range   = 8
+  set multigrid - chebyshev degree  = 3
+  set multigrid - chebyshev cg iter = 0
+  set multigrid - min level         = 0
+  set tolerance                     = 1e-12
+  set tolerance linfty norm         = false
+end
+
+subsection E - InitialValues
+  set configuration = isentropic vortex
+  set direction     =  1,  1
+  set position      = -1, -1
+
+  subsection isentropic vortex
+    set mach number = 1
+    set beta        = 5
+  end
+end
+
+subsection H - TimeIntegrator
+  set cfl min               = 0.2
+  set cfl max               = 0.2
+  set cfl recovery strategy = none
+  set time stepping scheme  = strang erk 33 cn
+end

@@ -1,7 +1,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 // Copyright (C) 2023 - 2024 by Matthias Maier
-// Copyright (C) 2024 - 2025 by the ryujin authors
+// Copyright (C) 2024 - 2026 by the ryujin authors
 //
 
 #pragma once
@@ -10,12 +10,7 @@
 
 #include <deal.II/base/exceptions.h>
 #include <deal.II/base/memory_consumption.h>
-
-#if DEAL_II_VERSION_GTE(9, 5, 0)
 #include <deal.II/base/mutex.h>
-#else
-#include <deal.II/base/thread_management.h>
-#endif
 
 #include <atomic>
 #include <mutex>
