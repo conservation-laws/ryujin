@@ -213,7 +213,6 @@ namespace ryujin
       return i / group_size * group_size;
     };
 
-#if DEAL_II_VERSION_GTE(9, 5, 0)
     /*
      * A small lambda that performs a "logical or" over all MPI ranks:
      */
@@ -252,7 +251,6 @@ namespace ryujin
         n_locally_internal_ = consistent_stride_range();
       }
     }
-#endif
 
     /*
      * Check that after all the dof manipulation and setup we still end up

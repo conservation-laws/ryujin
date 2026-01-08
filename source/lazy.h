@@ -10,12 +10,7 @@
 
 #include <deal.II/base/exceptions.h>
 #include <deal.II/base/memory_consumption.h>
-
-#if DEAL_II_VERSION_GTE(9, 5, 0)
 #include <deal.II/base/mutex.h>
-#else
-#include <deal.II/base/thread_management.h>
-#endif
 
 #include <atomic>
 #include <mutex>

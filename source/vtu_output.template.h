@@ -149,11 +149,9 @@ namespace ryujin
                                 postprocessor_->component_names()[i]);
     }
 
-#if DEAL_II_VERSION_GTE(9, 5, 0)
     DataOutBase::VtkFlags flags(
         t, cycle, true, DataOutBase::CompressionLevel::best_speed);
     data_out->set_flags(flags);
-#endif
 
     const auto &discretization = offline_data_->discretization();
     const auto &mapping = discretization.mapping();
