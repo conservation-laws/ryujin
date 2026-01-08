@@ -26,7 +26,7 @@ subsection B - Equation
     # f         = beta / (2 * pi) * exp(0.5 * (1 - |r|^2))
     # r         = (x,y) - (x_0,y_0) - Mt
     # x_0 = y_0 = (-1, -1)
-    # M         = ( 1,  1)
+    # M         = ( 1,  1) / sqrt(2)
     # gamma     = 1.4
     # beta      = 5
     ##

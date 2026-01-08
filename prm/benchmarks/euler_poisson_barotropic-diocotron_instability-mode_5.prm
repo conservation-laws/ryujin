@@ -12,7 +12,7 @@
 #
 #   Diocotron frequency: w_d = w_p^2 / w_c
 #   Plasma frequency:    w_p = sqrt(alpha * rho_max)
-#   Cyclotron frequency: abs(B_Z)
+#   Cyclotron frequency: abs(B_z)
 #
 # where the coupling constant alpha and the magnetic field component B_z
 # are chosen such that
@@ -33,7 +33,7 @@
 #         inside an annulus with radii r_i = 6 and r_o = 8
 #   rho = rho_min outside the annulus
 #
-# Here, rho_max = 1, delta = 0.1, rho_min = 1e-6. Solver for the initial
+# Here, rho_max = 1, delta = 0.1, rho_min = 1e-6. Solve for the initial
 # potential and set up the velocity in the magnetic drift limit.
 #
 ##
