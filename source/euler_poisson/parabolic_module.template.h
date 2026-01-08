@@ -19,7 +19,8 @@
 #include <deal.II/lac/precondition.h>
 #include <deal.II/lac/solver_cg.h>
 #include <deal.II/matrix_free/fe_evaluation.h>
-#include <deal.II/numerics/vector_tools_interpolate.h>
+#include <deal.II/numerics/vector_tools.h>
+#include <deal.II/numerics/vector_tools.templates.h>
 
 
 namespace ryujin
