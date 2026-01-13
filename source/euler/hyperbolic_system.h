@@ -1107,10 +1107,18 @@ namespace ryujin
         result = get_dirichlet_data();
 
       } else if (id == Boundary::dirichlet_momentum) {
-        /* Only enforce Dirichlet conditions on the momentum: */
-        auto m_dirichlet = momentum(get_dirichlet_data());
+        /*
+         * Only enforce Dirichlet conditions on the momentum, keep internal
+         * energy constant:
+         */
+        const auto m_dirichlet = momentum(get_dirichlet_data());
+        const auto rho = density(result);
+        const auto m = momentum(result);
+
         for (unsigned int k = 0; k < dim; ++k)
           result[k + 1] = m_dirichlet[k];
+        result[dim + 1] +=
+            Number(0.5) / rho * (m_dirichlet.norm_square() - m.norm_square());
 
       } else if (id == Boundary::slip) {
         auto m = momentum(U);
