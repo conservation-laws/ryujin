@@ -1108,8 +1108,8 @@ namespace ryujin
 
       } else if (id == Boundary::dirichlet_momentum) {
         /*
-         * Only enforce Dirichlet conditions on the momentum, keep internal
-         * energy constant:
+         * Only enforce Dirichlet conditions on the momentum, and keep the
+         * internal energy constant:
          */
         const auto m_dirichlet = momentum(get_dirichlet_data());
         const auto rho = density(result);
@@ -1119,6 +1119,22 @@ namespace ryujin
           result[k + 1] = m_dirichlet[k];
         result[dim + 1] +=
             Number(0.5) / rho * (m_dirichlet.norm_square() - m.norm_square());
+
+      } else if (id == Boundary::dirichlet_velocity) {
+        /*
+         * Only enforce Dirichlet conditions on the velocity, and keep the
+         * internal energy constant:
+         */
+        const auto U_dirichlet = get_dirichlet_data();
+        const auto rho_dirichlet = density(U_dirichlet);
+        const auto v_dirichlet = momentum(U_dirichlet) / rho_dirichlet;
+        const auto rho = density(result);
+        const auto v = momentum(result) / rho;
+
+        for (unsigned int k = 0; k < dim; ++k)
+          result[k + 1] = rho * v_dirichlet[k];
+        result[dim + 1] +=
+            Number(0.5) * rho * (v_dirichlet.norm_square() - v.norm_square());
 
       } else if (id == Boundary::slip) {
         auto m = momentum(U);

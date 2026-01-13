@@ -881,6 +881,15 @@ namespace ryujin
         for (unsigned int k = 0; k < dim; ++k)
           result[k + 1] = m_dirichlet[k];
 
+      } else if (id == Boundary::dirichlet_velocity) {
+        /* Only enforce Dirichlet conditions on the velocity: */
+        const auto U_dirichlet = get_dirichlet_data();
+        const auto rho_dirichlet = density(U_dirichlet);
+        const auto v_dirichlet = momentum(U_dirichlet) / rho_dirichlet;
+        const auto rho = density(result);
+        for (unsigned int k = 0; k < dim; ++k)
+          result[k + 1] = rho * v_dirichlet[k];
+
       } else if (id == Boundary::slip) {
         auto m = momentum(U);
         m -= 1. * (m * normal) * normal;
