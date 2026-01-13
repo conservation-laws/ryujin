@@ -118,13 +118,24 @@ namespace ryujin
     dynamic = 5,
 
     /**
-     * For the Shallow Water Equations: On degrees of freedom marked as
-     * "dirichlet momentum" boundary, we reset only the momentum of the
-     * degree of freedom to the value of InitialData::initial_state(). Such
-     * conditions are used in many steady state problems with inflow
-     * conditions.
+     * For the Euler and shallow Water equations: On degrees of freedom
+     * marked as "dirichlet momentum" boundary, we reset only the momentum
+     * of the degree of freedom to the value of
+     * InitialData::initial_state(). Where appropriate, we keep water
+     * height h, density rho, and internal energy e of the boundary state.
+     * Such conditions are used, for example, in many steady state problems
+     * for the shallow water equations with inflow conditions.
      */
-    dirichlet_momentum = 6
+    dirichlet_momentum = 6,
+
+    /**
+     * For the Euler and shallow Water equations: On degrees of freedom
+     * marked as "dirichlet velocity" boundary, we reset only the velocity
+     * of the degree of freedom to the value of
+     * InitialData::initial_state(). Where appropriate, we keep water
+     * height h, density rho, and internal energy e of the boundary state.
+     */
+    dirichlet_velocity = 7
   };
 
 
@@ -179,8 +190,9 @@ DECLARE_ENUM(ryujin::Boundary,
                   {ryujin::Boundary::no_slip, "no slip"},
                   {ryujin::Boundary::dirichlet, "dirichlet"},
                   {ryujin::Boundary::dynamic, "dynamic"},
-                  {ryujin::Boundary::dirichlet_momentum,
-                   "dirichlet momentum"}));
+                  {ryujin::Boundary::dirichlet_momentum, "dirichlet momentum"},
+                  {ryujin::Boundary::dirichlet_velocity,
+                   "dirichlet velocity"}));
 
 DECLARE_ENUM(ryujin::Ansatz,
              LIST({ryujin::Ansatz::cg_q1, "cG Q1"},

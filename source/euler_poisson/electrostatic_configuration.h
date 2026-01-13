@@ -42,7 +42,8 @@ namespace ryujin
                                       Boundary::no_slip,
                                       Boundary::dirichlet,
                                       Boundary::dynamic,
-                                      Boundary::dirichlet_momentum});
+                                      Boundary::dirichlet_momentum,
+                                      Boundary::dirichlet_velocity});
         this->add_parameter(
             "dirichlet boundaries",
             dirichlet_boundaries_,

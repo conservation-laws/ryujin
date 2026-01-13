@@ -708,6 +708,13 @@ namespace ryujin
                         "enforcing Dirichlet boundary conditions on a momentum "
                         "is not possible for scalar conservation equations."));
 
+      } else if (id == Boundary::dirichlet_velocity) {
+        AssertThrow(false,
+                    dealii::ExcMessage(
+                        "Invalid boundary ID »Boundary::dirichlet_velocity«, "
+                        "enforcing Dirichlet boundary conditions on a momentum "
+                        "is not possible for scalar conservation equations."));
+
       } else if (id == Boundary::slip) {
         AssertThrow(
             false,
