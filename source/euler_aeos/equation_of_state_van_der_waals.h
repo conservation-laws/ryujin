@@ -78,8 +78,7 @@ namespace ryujin
       /**
        * The specific internal energy is given by
        * \f{align}
-       *   \rho e = (p + a \rho^2) * (1 - b \rho) / (\rho (\gamma -1))
-       *   - a \rho^2
+       *   e = (p + a \rho^2) * (1 - b \rho) / (\rho (\gamma -1)) - a \rho
        * \f}
        */
       double specific_internal_energy(double rho, double p) const final
