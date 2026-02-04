@@ -9,6 +9,7 @@
 
 #include <convenience_macros.h>
 #include <discretization.h>
+#include <loop.h>
 #include <multicomponent_vector.h>
 #include <openmp.h>
 #include <patterns_conversion.h>
@@ -62,6 +63,20 @@ namespace ryujin
       {
         return HyperbolicSystemView<dim, Number>{*this};
       }
+
+      /**
+       * Step 0 of the hyperbolic update step: Compute "precomputed values"
+       * and fill into into the state vector.
+       *
+       * @note The method does not update the ghost range of the state vector.
+       *       The precomputed part has to be synchronized by hand.
+       */
+      template <int dim, typename ScalarNumber>
+      void fill_precomputed_values(
+          const OfflineData<dim, ScalarNumber> &offline_data,
+          typename HyperbolicSystemView<dim, ScalarNumber>::StateVector
+              &state_vector,
+          const bool skip_constrained_dofs = true) const;
 
     private:
       /**
@@ -322,28 +337,6 @@ namespace ryujin
       using InitialPrecomputedVector =
           Vectors::MultiComponentVector<ScalarNumber,
                                         n_initial_precomputed_values>;
-
-      //@}
-      /**
-       * @name Computing precomputed quantities
-       */
-      //@{
-
-      /**
-       * The number of precomputation cycles.
-       */
-      static constexpr unsigned int n_precomputation_cycles = 1;
-
-      /**
-       * Step 0: precompute values for hyperbolic update. This routine is
-       * called within our usual loop() idiom in HyperbolicModule
-       */
-      template <typename SPARSITY>
-      void precomputation_step(unsigned int cycle,
-                               const SPARSITY &sparsity_simd,
-                               StateVector &state_vector,
-                               const unsigned int i,
-                               const bool skip_constrained_dofs = true) const;
 
       //@}
       /**
@@ -661,7 +654,6 @@ namespace ryujin
      * -------------------------------------------------------------------------
      */
 
-
     inline HyperbolicSystem::HyperbolicSystem(const std::string &subsection)
         : ParameterAcceptor(subsection)
     {
@@ -699,29 +691,42 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    template <typename SPARSITY>
-    DEAL_II_ALWAYS_INLINE inline void
-    HyperbolicSystemView<dim, Number>::precomputation_step(
-        unsigned int cycle [[maybe_unused]],
-        const SPARSITY &sparsity_simd,
-        StateVector &state_vector,
-        const unsigned int i,
-        const bool skip_constrained_dofs /*= true*/) const
+    template <int dim, typename ScalarNumber>
+    inline void HyperbolicSystem::fill_precomputed_values(
+        const OfflineData<dim, ScalarNumber> &offline_data,
+        typename HyperbolicSystemView<dim, ScalarNumber>::StateVector
+            &state_vector,
+        const bool skip_constrained_dofs) const
     {
-      Assert(cycle == 0, dealii::ExcInternalError());
+      const unsigned int n_internal = offline_data.n_locally_internal();
+      const unsigned int n_owned = offline_data.n_locally_owned();
+      const auto &sparsity_simd = offline_data.sparsity_pattern_simd();
+      using VA = dealii::VectorizedArray<ScalarNumber>;
 
       const auto &U = std::get<0>(state_vector);
       auto &precomputed = std::get<1>(state_vector);
 
-      /* Skip constrained degrees of freedom: */
-      const unsigned int row_length = sparsity_simd.row_length(i);
-      if (skip_constrained_dofs && row_length == 1)
-        return;
+      const auto body = [&](auto sentinel, unsigned int i) {
+        using T = decltype(sentinel);
+        using View = HyperbolicSystemView<dim, T>;
+        using precomputed_type = typename View::precomputed_type;
 
-      const auto U_i = U.template get_tensor<Number>(i);
-      const precomputed_type prec_i{specific_entropy(U_i), harten_entropy(U_i)};
-      precomputed.template write_tensor<Number>(prec_i, i);
+        const unsigned int row_length = sparsity_simd.row_length(i);
+        if (skip_constrained_dofs && row_length == 1)
+          return;
+
+        const auto U_i = U.template get_tensor<T>(i);
+        const auto view = this->view<dim, T>();
+        const precomputed_type prec_i{view.specific_entropy(U_i),
+                                      view.harten_entropy(U_i)};
+        precomputed.template write_tensor<T>(prec_i, i);
+      };
+
+      /* Parallel non-vectorized loop: */
+      loop<ScalarNumber>("time_step_1b", body, n_internal, n_owned);
+
+      /* Parallel vectorized SIMD loop: */
+      loop<VA>("time_step_1b", body, 0, n_internal);
     }
 
 

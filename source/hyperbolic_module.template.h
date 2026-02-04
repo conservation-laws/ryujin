@@ -152,11 +152,7 @@ namespace ryujin
 #endif
 
     auto &U = std::get<0>(state_vector);
-    auto &precomputed = std::get<1>(state_vector);
 
-    const unsigned int n_internal = offline_data_->n_locally_internal();
-    const unsigned int n_owned = offline_data_->n_locally_owned();
-    const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
     const auto &boundary_map = offline_data_->boundary_map();
     using VA = VectorizedArray<Number>;
 
@@ -194,35 +190,12 @@ namespace ryujin
     U.update_ghost_values();
 
     /*
-     * Precompute values
+     * Compute and populate precomputed values.
      */
 
-    if constexpr (n_precomputation_cycles != 0) {
-      for (unsigned int cycle = 0; cycle < n_precomputation_cycles; ++cycle) {
-
-        /* Parallel non-vectorized loop: */
-        loop<Number>(
-            "time_step_1b",
-            [&](const Number &, const unsigned int i) {
-              const auto view =
-                  hyperbolic_system_->template view<dim, Number>();
-              view.precomputation_step(cycle, sparsity_simd, state_vector, i);
-            },
-            n_internal,
-            n_owned);
-        /* Parallel vectorized SIMD loop: */
-        loop<VA>(
-            "time_step_1b",
-            [&](const VA &, const unsigned int i) {
-              const auto view = hyperbolic_system_->template view<dim, VA>();
-              view.precomputation_step(cycle, sparsity_simd, state_vector, i);
-            },
-            0,
-            n_internal);
-
-        precomputed.update_ghost_values();
-      }
-    }
+    auto &precomputed = std::get<1>(state_vector);
+    hyperbolic_system_->fill_precomputed_values(*offline_data_, state_vector);
+    precomputed.update_ghost_values();
   }
 
 

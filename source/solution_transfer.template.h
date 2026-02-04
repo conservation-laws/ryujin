@@ -737,44 +737,14 @@ namespace ryujin
 
     update_new_state_vector();
 
-    /* precomputed needs to be valid for bounds computation */
-
     const auto &precomputed = std::get<1>(new_state_vector);
 
+    /* The limiter requires valid precomputed values. Therefore, update: */
     const auto update_precomputed_values = [&]() {
-      const unsigned int n_internal = offline_data_->n_locally_internal();
-      const unsigned int n_owned = offline_data_->n_locally_owned();
-      const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
-      unsigned int channel = 10;
-      using VA = dealii::VectorizedArray<Number>;
-      static constexpr auto n_precomputation_cycles =
-          View::n_precomputation_cycles;
-
       new_U.update_ghost_values();
-
-      if constexpr (n_precomputation_cycles != 0) {
-        for (unsigned int cycle = 0; cycle < n_precomputation_cycles; ++cycle) {
-
-          auto body = [&](auto sentinel, const unsigned int i) {
-            using T = decltype(sentinel);
-
-            const auto view = hyperbolic_system_->template view<dim, T>();
-            view.precomputation_step(cycle,
-                                     sparsity_simd,
-                                     new_state_vector,
-                                     i,
-                                     /*skip_constrained_dofs*/ false);
-          };
-
-          /* Parallel non-vectorized loop: */
-          loop<Number>("solution_transfer", body, n_internal, n_owned);
-          /* Parallel vectorized SIMD loop: */
-          loop<VA>("solution_transfer", body, 0, n_internal);
-
-          precomputed.update_ghost_values_start(channel++);
-          precomputed.update_ghost_values_finish();
-        }
-      }
+      hyperbolic_system_->fill_precomputed_values(
+          *offline_data_, new_state_vector, /*skip_constrainted_dofs*/ false);
+      precomputed.update_ghost_values();
     };
 
     update_precomputed_values();

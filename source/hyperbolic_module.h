@@ -137,9 +137,6 @@ namespace ryujin
 
     using InitialPrecomputedVector = typename View::InitialPrecomputedVector;
 
-    static constexpr auto n_precomputation_cycles =
-        View::n_precomputation_cycles;
-
     //@}
     /**
      * @name Constructor and setup
