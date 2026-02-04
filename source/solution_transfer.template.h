@@ -7,7 +7,6 @@
 
 
 #include "loop.h"
-#include "openmp.h"
 #include "solution_transfer.h"
 #if DEAL_II_VERSION_GTE(9, 6, 0)
 #include "tensor_product_point_kernels.h"

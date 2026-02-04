@@ -5,9 +5,9 @@
 
 #pragma once
 
+#include "loop.h"
 #include "mesh_adaptor.h"
 #include "mpi_ensemble.h"
-#include "openmp.h"
 #include "selected_components_extractor.h"
 #include "simd.h"
 
@@ -239,60 +239,49 @@ namespace ryujin
      * Commpute numerators and denominators for the smoothness indicators:
      */
 
-    RYUJIN_PARALLEL_REGION_BEGIN
-
-    auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
+    const auto body = [&](auto sentinel, unsigned int i) {
       using T = decltype(sentinel);
       unsigned int stride_size = get_stride_size<T>;
 
-      RYUJIN_OMP_FOR
-      for (unsigned int i = left; i < right; i += stride_size) {
+      /* Skip constrained degrees of freedom: */
+      const unsigned int row_length = sparsity_simd.row_length(i);
+      if (row_length == 1)
+        return;
 
-        /* Skip constrained degrees of freedom: */
-        const unsigned int row_length = sparsity_simd.row_length(i);
-        if (row_length == 1)
+      boost::container::small_vector<T, 10> value_i(n_entries, T(0.));
+      for (unsigned int k = 0; k < n_entries; ++k) {
+        value_i[k] = get_entry<T>(quantities[k], i);
+      }
+
+      boost::container::small_vector<T, 10> numerator_i(n_entries, T(0.));
+      boost::container::small_vector<T, 10> denominator_i(n_entries, T(0.));
+
+      const unsigned int *js = sparsity_simd.columns(i);
+      for (unsigned int col_idx = 0; col_idx < row_length;
+           ++col_idx, js += stride_size) {
+
+        /* Skip diagonal. */
+        if (col_idx == 0)
           continue;
 
-        boost::container::small_vector<T, 10> value_i(n_entries, T(0.));
+        const auto beta_ij = betaij_matrix.template get_entry<T>(i, col_idx);
+
         for (unsigned int k = 0; k < n_entries; ++k) {
-          value_i[k] = get_entry<T>(quantities[k], i);
+          const auto value_j_k = get_entry<T>(quantities[k], js);
+          numerator_i[k] += beta_ij * (value_j_k - value_i[k]);
+          denominator_i[k] +=
+              std::abs(beta_ij) * //
+              std::max(std::abs(value_j_k), std::abs(value_i[k]));
         }
 
-        boost::container::small_vector<T, 10> numerator_i(n_entries, T(0.));
-        boost::container::small_vector<T, 10> denominator_i(n_entries, T(0.));
-
-        const unsigned int *js = sparsity_simd.columns(i);
-        for (unsigned int col_idx = 0; col_idx < row_length;
-             ++col_idx, js += stride_size) {
-
-          /* Skip diagonal. */
-          if (col_idx == 0)
-            continue;
-
-          const auto beta_ij = betaij_matrix.template get_entry<T>(i, col_idx);
-
-          for (unsigned int k = 0; k < n_entries; ++k) {
-            const auto value_j_k = get_entry<T>(quantities[k], js);
-            numerator_i[k] += beta_ij * (value_j_k - value_i[k]);
-            denominator_i[k] +=
-                std::abs(beta_ij) * //
-                std::max(std::abs(value_j_k), std::abs(value_i[k]));
-          }
-
-          for (unsigned int k = 0; k < n_entries; ++k) {
-            write_entry<T>(numerator[k], numerator_i[k], i);
-            write_entry<T>(denominator[k], denominator_i[k], i);
-          }
+        for (unsigned int k = 0; k < n_entries; ++k) {
+          write_entry<T>(numerator[k], numerator_i[k], i);
+          write_entry<T>(denominator[k], denominator_i[k], i);
         }
       }
     };
 
-    /* Parallel non-vectorized loop: */
-    loop(Number(), n_internal, n_owned);
-    /* Parallel vectorized SIMD loop: */
-    loop(VA(), 0, n_internal);
-
-    RYUJIN_PARALLEL_REGION_END
+    cpu_simd_loop<Number>("mesh_adaptor_1", body, 0, n_internal, n_owned);
 
     /*
      * Normalize and populate smoothness_indicators_ vector:
@@ -311,97 +300,70 @@ namespace ryujin
           std::max(denominator_global_maximum[k], eps);
     }
 
-    RYUJIN_PARALLEL_REGION_BEGIN
-
-    auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
+    const auto body_normalize = [&](auto sentinel, unsigned int i) {
       using T = decltype(sentinel);
-      unsigned int stride_size = get_stride_size<T>;
 
-      RYUJIN_OMP_FOR
-      for (unsigned int i = left; i < right; i += stride_size) {
+      /* Skip constrained degrees of freedom: */
+      const unsigned int row_length = sparsity_simd.row_length(i);
+      if (row_length == 1)
+        return;
 
-        /* Skip constrained degrees of freedom: */
-        const unsigned int row_length = sparsity_simd.row_length(i);
-        if (row_length == 1)
-          continue;
+      auto alpha_i = T(0.);
+      for (unsigned int k = 0; k < n_entries; ++k) {
+        const auto numerator_i = get_entry<T>(numerator[k], i);
+        const auto denominator_i = get_entry<T>(denominator[k], i);
 
-        auto alpha_i = T(0.);
-        for (unsigned int k = 0; k < n_entries; ++k) {
-          const auto numerator_i = get_entry<T>(numerator[k], i);
-          const auto denominator_i = get_entry<T>(denominator[k], i);
+        auto denominator =
+            (Number(1.) - smoothness_local_global_ratio_) * denominator_i +
+            smoothness_local_global_ratio_ * denominator_global_maximum[k];
+        denominator = std::max(T(eps), denominator);
 
-          auto denominator =
-              (Number(1.) - smoothness_local_global_ratio_) * denominator_i +
-              smoothness_local_global_ratio_ * denominator_global_maximum[k];
-          denominator = std::max(T(eps), denominator);
-
-          alpha_i += std::abs(numerator_i) / denominator;
-        }
-
-        alpha_i = std::min(alpha_i, T(smoothness_max_cutoff_));
-        alpha_i = std::max(alpha_i, T(smoothness_min_cutoff_));
-        write_entry<T>(smoothness_indicators_, alpha_i, i);
+        alpha_i += std::abs(numerator_i) / denominator;
       }
+
+      alpha_i = std::min(alpha_i, T(smoothness_max_cutoff_));
+      alpha_i = std::max(alpha_i, T(smoothness_min_cutoff_));
+      write_entry<T>(smoothness_indicators_, alpha_i, i);
     };
 
-    /* Parallel non-vectorized loop: */
-    loop(Number(), n_internal, n_owned);
-    /* Parallel vectorized SIMD loop: */
-    loop(VA(), 0, n_internal);
-
-    RYUJIN_PARALLEL_REGION_END
+    cpu_simd_loop<Number>(
+        "mesh_adaptor_2", body_normalize, 0, n_internal, n_owned);
 
     /*
      * Widen indicators over stencil via max() operator:
      */
 
+    const auto body_widen = [&](auto sentinel, unsigned int i) {
+      using T = decltype(sentinel);
+      unsigned int stride_size = get_stride_size<T>;
+
+      /* Skip constrained degrees of freedom: */
+      const unsigned int row_length = sparsity_simd.row_length(i);
+      if (row_length == 1)
+        return;
+
+      auto alpha_i = get_entry<T>(smoothness_indicators_, i);
+
+      const unsigned int *js = sparsity_simd.columns(i);
+      for (unsigned int col_idx = 0; col_idx < row_length;
+           ++col_idx, js += stride_size) {
+
+        /* Skip diagonal. */
+        if (col_idx == 0)
+          continue;
+
+        const auto alpha_j = get_entry<T>(smoothness_indicators_, js);
+
+        alpha_i = std::max(alpha_i, alpha_j);
+      }
+
+      write_entry<T>(/*SIC!*/ denominator[0], alpha_i, i);
+    };
+
     for (unsigned int cycle = 0; cycle < smoothness_widen_stencil_; ++cycle) {
       smoothness_indicators_.update_ghost_values();
-
-      RYUJIN_PARALLEL_REGION_BEGIN
-
-      auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
-        using ScalarNumber = typename get_value_type<Number>::type;
-
-        using T = decltype(sentinel);
-        unsigned int stride_size = get_stride_size<T>;
-
-        /* Stored thread locally: */
-
-        RYUJIN_OMP_FOR
-        for (unsigned int i = left; i < right; i += stride_size) {
-
-          /* Skip constrained degrees of freedom: */
-          const unsigned int row_length = sparsity_simd.row_length(i);
-          if (row_length == 1)
-            continue;
-
-          auto alpha_i = get_entry<T>(smoothness_indicators_, i);
-
-          const unsigned int *js = sparsity_simd.columns(i);
-          for (unsigned int col_idx = 0; col_idx < row_length;
-               ++col_idx, js += stride_size) {
-
-            /* Skip diagonal. */
-            if (col_idx == 0)
-              continue;
-
-            const auto alpha_j = get_entry<T>(smoothness_indicators_, js);
-
-            alpha_i = std::max(alpha_i, alpha_j);
-          }
-
-          write_entry<T>(/*SIC!*/ denominator[0], alpha_i, i);
-        }
-      };
-
-      /* Parallel non-vectorized loop: */
-      loop(Number(), n_internal, n_owned);
-      /* Parallel vectorized SIMD loop: */
-      loop(VA(), 0, n_internal);
-
-      RYUJIN_PARALLEL_REGION_END
-
+      cpu_simd_loop<Number>(
+          "mesh_adaptor_3", body_widen, 0, n_internal, n_owned);
       smoothness_indicators_ = /*SIC!*/ denominator[0];
     }
 

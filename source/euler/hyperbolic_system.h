@@ -11,7 +11,6 @@
 #include <discretization.h>
 #include <loop.h>
 #include <multicomponent_vector.h>
-#include <openmp.h>
 #include <patterns_conversion.h>
 #include <simd.h>
 #include <state_vector.h>
@@ -722,11 +721,7 @@ namespace ryujin
         precomputed.template write_tensor<T>(prec_i, i);
       };
 
-      /* Parallel non-vectorized loop: */
-      loop<ScalarNumber>("time_step_1b", body, n_internal, n_owned);
-
-      /* Parallel vectorized SIMD loop: */
-      loop<VA>("time_step_1b", body, 0, n_internal);
+      cpu_simd_loop<ScalarNumber>("time_step_1", body, 0, n_internal, n_owned);
     }
 
 

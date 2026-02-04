@@ -12,7 +12,6 @@
 #include <convenience_macros.h>
 #include <discretization.h>
 #include <multicomponent_vector.h>
-#include <openmp.h>
 #include <patterns_conversion.h>
 #include <simd.h>
 #include <state_vector.h>

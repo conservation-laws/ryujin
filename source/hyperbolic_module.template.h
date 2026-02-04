@@ -9,7 +9,6 @@
 #include "instrumentation.h"
 #include "loop.h"
 #include "mpi_ensemble.h"
-#include "openmp.h"
 #include "scope.h"
 #include "simd.h"
 
@@ -159,7 +158,7 @@ namespace ryujin
     Scope scope(computing_timer_,
                 "time step [H] 1 - update boundary values, precompute values");
 
-    LIKWID_MARKER_START("time_step_1a");
+    LIKWID_MARKER_START("time_step_1");
 
     /* FIXME: not thread parallel... */
     for (const auto &entry : boundary_map) {
@@ -185,7 +184,7 @@ namespace ryujin
       U.write_tensor(U_i, i);
     }
 
-    LIKWID_MARKER_STOP("time_step_1a");
+    LIKWID_MARKER_STOP("time_step_1");
 
     U.update_ghost_values();
 
@@ -193,8 +192,13 @@ namespace ryujin
      * Compute and populate precomputed values.
      */
 
+    LIKWID_MARKER_START("time_step_1");
+
     auto &precomputed = std::get<1>(state_vector);
     hyperbolic_system_->fill_precomputed_values(*offline_data_, state_vector);
+
+    LIKWID_MARKER_STOP("time_step_1");
+
     precomputed.update_ghost_values();
   }
 
@@ -246,7 +250,7 @@ namespace ryujin
       const std::array<Number, stages> stage_weights,
       StateVector &new_state_vector,
       Number tau /*= 0.*/,
-      std::atomic<Number> tau_max /*std::numeric_limits<Number>::max()*/) const
+      Number tau_max /*= std::numeric_limits<Number>::max()*/) const
   {
 #ifdef DEBUG_OUTPUT
     std::cout << "HyperbolicModule<Description, dim, Number>::step()"
@@ -303,12 +307,20 @@ namespace ryujin
     const Number measure_of_omega_inverse =
         Number(1.) / offline_data_->measure_of_omega();
 
-    /* Lambda for creating the computing timer string: */
+    /*
+     * Lambdas for creating the computing timer and loop strings:
+     */
+
     int step_no = 1;
+
     const auto scoped_name = [&step_no](const auto &name,
                                         const bool advance = true) {
       advance || step_no--;
       return "time step [H] " + std::to_string(++step_no) + " - " + name;
+    };
+
+    const auto loop_name = [&step_no]() {
+      return "time_step_" + std::to_string(step_no);
     };
 
     /* A boolean signalling that a restart is necessary: */
@@ -342,7 +354,7 @@ namespace ryujin
     {
       Scope scope(computing_timer_, scoped_name("compute d_ij, and alpha_i"));
 
-      auto body = [&](auto sentinel, unsigned int i) {
+      const auto body = [&](auto sentinel, unsigned int i) {
         using T = decltype(sentinel);
         constexpr unsigned int stride_size = get_stride_size<T>;
 
@@ -395,11 +407,7 @@ namespace ryujin
         write_entry<T>(alpha_, indicator.alpha(hd_i), i);
       };
 
-      /* Parallel non-vectorized loop: */
-      loop<Number>(
-          "time_step_" + std::to_string(step_no), body, n_internal, n_owned);
-      /* Parallel vectorized SIMD loop: */
-      loop<VA>("time_step_" + std::to_string(step_no), body, 0, n_internal);
+      cpu_simd_loop<Number>(loop_name(), body, 0, n_internal, n_owned);
 
       alpha_.update_ghost_values();
     }
@@ -463,10 +471,13 @@ namespace ryujin
         dij_matrix_.write_entry(std::max(d_ij, d_ji), i, col_idx);
       };
 
-      loop<Number>("time_step_" + std::to_string(step_no),
-                   body_boundary,
-                   0,
-                   coupling_boundary_pairs.size());
+      cpu_simd_loop<Number>(loop_name(),
+                            body_boundary,
+                            0,
+                            /*no vectorization*/ 0,
+                            coupling_boundary_pairs.size());
+
+      std::atomic<Number> local_tau_max = tau_max;
 
       /* Symmetrize d_ij: */
       const auto body = [&](auto, unsigned int i) {
@@ -523,25 +534,20 @@ namespace ryujin
 
         /* write diagonal element */
         dij_matrix_.write_entry(d_sum, i, 0);
+
+        const Number mass = lumped_mass_matrix.local_element(i);
+        const Number local_tau = cfl_ * mass / (Number(-2.) * d_sum);
+
+        Number current_value = local_tau_max.load();
+        while (current_value > local_tau &&
+               !local_tau_max.compare_exchange_weak(current_value, local_tau))
+          ;
       };
 
-      loop<Number>("time_step_" + std::to_string(step_no), body, 0, n_owned);
+      cpu_simd_loop<Number>(
+          loop_name(), body, 0, /*no vectorization*/ 0, n_owned);
 
-      /*
-       * This code could be transformed into a parallel reduction if it ever
-       * takes too much time (likely not before using more than a few dozen
-       * of OpenMP threads).
-       */
-      Number local_tau_max = std::numeric_limits<Number>::max();
-      for (unsigned int i = 0; i < n_owned; ++i) {
-        if (sparsity_simd.row_length(i) > 1) {
-          const Number mass = lumped_mass_matrix.local_element(i);
-          const Number d_sum = dij_matrix_.get_entry(i, 0);
-          const Number local_tau = cfl_ * mass / (Number(-2.) * d_sum);
-          local_tau_max = std::min(local_tau_max, local_tau);
-        }
-      }
-      tau_max.store(local_tau_max);
+      tau_max = local_tau_max.load();
     }
 
     {
@@ -552,15 +558,15 @@ namespace ryujin
        * MPI Barrier: Synchronize the maximal time-step size. This has to
        * happen either over the global, or the local subrange communicator:
        */
-      tau_max.store(Utilities::MPI::min(
-          tau_max.load(), mpi_ensemble_.synchronization_communicator()));
+      tau_max = Utilities::MPI::min(
+          tau_max, mpi_ensemble_.synchronization_communicator());
 
       AssertThrow(
           !std::isnan(tau_max) && !std::isinf(tau_max) && tau_max > 0.,
           ExcMessage(
               "I'm sorry, Dave. I'm afraid I can't do that.\nWe crashed."));
 
-      tau = (tau == Number(0.) ? tau_max.load() : tau);
+      tau = (tau == Number(0.) ? tau_max : tau);
 
 #ifdef DEBUG_OUTPUT
       std::cout << "        computed tau_max = " << tau_max
@@ -569,7 +575,7 @@ namespace ryujin
 #endif
 
       /* We need to signal a restart if the enforced tau is too wacky: */
-      restart_needed = (tau > acceptable_tau_max_ratio_ * tau_max.load());
+      restart_needed = (tau > acceptable_tau_max_ratio_ * tau_max);
 
       /* Don't bother with computing the update step, signal a restart: */
       if (restart_needed &&
@@ -844,37 +850,23 @@ namespace ryujin
        * computing d_ijH.
        */
       if (offline_data_->discretization().have_discontinuous_ansatz()) {
-        /* Parallel non-vectorized loop and vectorized SIMD loop: */
-        loop<Number>(
-            "time_step_" + std::to_string(step_no),
-            [&](auto sentinel, const unsigned int i) {
-              body(sentinel, std::true_type{}, i);
-            },
-            n_internal,
-            n_owned);
-        loop<VA>(
-            "time_step_" + std::to_string(step_no),
+        cpu_simd_loop<Number>(
+            loop_name(),
             [&](auto sentinel, const unsigned int i) {
               body(sentinel, std::true_type{}, i);
             },
             0,
-            n_internal);
+            n_internal,
+            n_owned);
       } else {
-        /* Parallel non-vectorized loop and vectorized SIMD loop: */
-        loop<Number>(
-            "time_step_" + std::to_string(step_no),
-            [&](auto sentinel, const unsigned int i) {
-              body(sentinel, std::false_type{}, i);
-            },
-            n_internal,
-            n_owned);
-        loop<VA>(
-            "time_step_" + std::to_string(step_no),
+        cpu_simd_loop<Number>(
+            loop_name(),
             [&](auto sentinel, const unsigned int i) {
               body(sentinel, std::false_type{}, i);
             },
             0,
-            n_internal);
+            n_internal,
+            n_owned);
       }
 
       r_.update_ghost_values();
@@ -1014,37 +1006,23 @@ namespace ryujin
        * computing d_ijH.
        */
       if (offline_data_->discretization().have_discontinuous_ansatz()) {
-        /* Parallel non-vectorized loop and vectorized SIMD loop: */
-        loop<Number>(
-            "time_step_" + std::to_string(step_no),
-            [&](auto sentinel, const unsigned int i) {
-              body(sentinel, std::true_type{}, i);
-            },
-            n_internal,
-            n_owned);
-        loop<VA>(
-            "time_step_" + std::to_string(step_no),
+        cpu_simd_loop<Number>(
+            loop_name(),
             [&](auto sentinel, const unsigned int i) {
               body(sentinel, std::true_type{}, i);
             },
             0,
-            n_internal);
+            n_internal,
+            n_owned);
       } else {
-        /* Parallel non-vectorized loop and vectorized SIMD loop: */
-        loop<Number>(
-            "time_step_" + std::to_string(step_no),
-            [&](auto sentinel, const unsigned int i) {
-              body(sentinel, std::false_type{}, i);
-            },
-            n_internal,
-            n_owned);
-        loop<VA>(
-            "time_step_" + std::to_string(step_no),
+        cpu_simd_loop<Number>(
+            loop_name(),
             [&](auto sentinel, const unsigned int i) {
               body(sentinel, std::false_type{}, i);
             },
             0,
-            n_internal);
+            n_internal,
+            n_owned);
       }
 
       lij_matrix_.update_ghost_rows();
@@ -1161,11 +1139,7 @@ namespace ryujin
         }
       };
 
-      /* Parallel non-vectorized loop: */
-      loop<Number>(
-          "time_step_" + std::to_string(step_no), body, n_internal, n_owned);
-      /* Parallel vectorized SIMD loop: */
-      loop<VA>("time_step_" + std::to_string(step_no), body, 0, n_internal);
+      cpu_simd_loop<Number>(loop_name(), body, 0, n_internal, n_owned);
 
       if (!last_round) {
         lij_matrix_next_.update_ghost_rows();
