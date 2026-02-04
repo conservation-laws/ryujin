@@ -5,7 +5,6 @@
 
 #pragma once
 
-#include "openmp.h"
 #include "quantities.h"
 
 #include <deal.II/base/function_parser.h>

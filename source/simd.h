@@ -11,8 +11,41 @@
 #include <deal.II/base/utilities.h>
 #include <deal.II/base/vectorization.h>
 
+
+/**
+ * @name Exception handling in SIMD context
+ */
+//@{
+
+
+/**
+ * Mixed serial/SIMD variant of the dealii AssertThrow macro. If variable
+ * is just a plain double or float, then this macro defaults to a simple
+ * call to `dealii::AssertThrow(condition(variable), exception)`. Otherwise
+ * (if `decltype(variable)` has a subscript operator `operator[]`, the
+ * `dealii::AssertThrow` macro is expanded for all components of the
+ * @p variable.
+ *
+ * @ingroup Miscellaneous
+ */
+#define AssertThrowSIMD(variable, condition, exception)                        \
+  if constexpr (std::is_same<                                                  \
+                    typename std::remove_const<decltype(variable)>::type,      \
+                    double>::value ||                                          \
+                std::is_same<                                                  \
+                    typename std::remove_const<decltype(variable)>::type,      \
+                    float>::value) {                                           \
+    AssertThrow(condition(variable), exception);                               \
+  } else {                                                                     \
+    for (unsigned int k = 0; k < decltype(variable)::size(); ++k) {            \
+      AssertThrow(condition((variable)[k]), exception);                        \
+    }                                                                          \
+  }
+
+
 namespace ryujin
 {
+  //@}
   /**
    * @name Type traits and packed index handling
    */

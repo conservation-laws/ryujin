@@ -96,36 +96,4 @@
  */
 #define RYUJIN_OMP_SINGLE RYUJIN_PRAGMA(omp single)
 
-/**
- * Compiler hint annotating a boolean to be likely true.
- *
- * Intended use:
- * ```
- * if (RYUJIN_LIKELY(thread_ready == true)) {
- *   // likely branch
- * }
- * ```
- *
- * @note The performance penalty of incorrectly marking a condition as
- * likely is severe. Use only if the condition is almost always true.
- * @ingroup Miscellaneous
- */
-#define RYUJIN_LIKELY(x) (__builtin_expect(!!(x), 1))
-
-/**
- * Compiler hint annotating a boolean expression to be likely false.
- *
- * Intended use:
- * ```
- * if (RYUJIN_UNLIKELY(thread_ready == false)) {
- *   // unlikely branch
- * }
- * ```
- *
- * @note The performance penalty of incorrectly marking a condition as
- * unlikely is severe. Use only if the condition is almost always false.
- * @ingroup Miscellaneous
- */
-#define RYUJIN_UNLIKELY(x) (__builtin_expect(!!(x), 0))
-
 //@}

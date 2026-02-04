@@ -10,11 +10,6 @@
 #include <deal.II/base/function.h>
 #include <deal.II/lac/vector.h>
 
-/**
- * @name Various convenience functions and macros
- */
-//@{
-
 namespace ryujin
 {
 #ifndef DOXYGEN
@@ -74,6 +69,12 @@ namespace ryujin
     };
   } // namespace
 #endif
+
+  /**
+   * @name Various convenience wrappers for dealing with dealii::Function,
+   * dealii::Tensor:
+   */
+  //@{
 
 
   /**
@@ -166,33 +167,9 @@ namespace ryujin
     return result;
   }
 
-
+  //@}
 } // namespace ryujin
 
-
-/**
- * Mixed serial/SIMD variant of the dealii AssertThrow macro. If variable
- * is just a plain double or float, then this macro defaults to a simple
- * call to `dealii::AssertThrow(condition(variable), exception)`. Otherwise
- * (if `decltype(variable)` has a subscript operator `operator[]`, the
- * `dealii::AssertThrow` macro is expanded for all components of the
- * @p variable.
- *
- * @ingroup Miscellaneous
- */
-#define AssertThrowSIMD(variable, condition, exception)                        \
-  if constexpr (std::is_same<                                                  \
-                    typename std::remove_const<decltype(variable)>::type,      \
-                    double>::value ||                                          \
-                std::is_same<                                                  \
-                    typename std::remove_const<decltype(variable)>::type,      \
-                    float>::value) {                                           \
-    AssertThrow(condition(variable), exception);                               \
-  } else {                                                                     \
-    for (unsigned int k = 0; k < decltype(variable)::size(); ++k) {            \
-      AssertThrow(condition((variable)[k]), exception);                        \
-    }                                                                          \
-  }
 
 #ifndef DOXYGEN
 namespace
@@ -229,6 +206,11 @@ namespace
   }
 } /* anonymous namespace */
 #endif
+
+/**
+ * @name Macros for accessor definitions with automatic dereferencing
+ */
+//@{
 
 /**
  * A convenience macro that automatically writes out an accessor (or
@@ -292,6 +274,47 @@ namespace
   {                                                                            \
     return dereference(dereference(container).member);                         \
   }
+
+
+//@}
+/**
+ * @name Macros for compiler hints
+ */
+//@{
+
+
+/**
+ * Compiler hint annotating a boolean to be likely true.
+ *
+ * Intended use:
+ * ```
+ * if (RYUJIN_LIKELY(thread_ready == true)) {
+ *   // likely branch
+ * }
+ * ```
+ *
+ * @note The performance penalty of incorrectly marking a condition as
+ * likely is severe. Use only if the condition is almost always true.
+ * @ingroup Miscellaneous
+ */
+#define RYUJIN_LIKELY(x) (__builtin_expect(!!(x), 1))
+
+
+/**
+ * Compiler hint annotating a boolean expression to be likely false.
+ *
+ * Intended use:
+ * ```
+ * if (RYUJIN_UNLIKELY(thread_ready == false)) {
+ *   // unlikely branch
+ * }
+ * ```
+ *
+ * @note The performance penalty of incorrectly marking a condition as
+ * unlikely is severe. Use only if the condition is almost always false.
+ * @ingroup Miscellaneous
+ */
+#define RYUJIN_UNLIKELY(x) (__builtin_expect(!!(x), 0))
 
 
 /**
