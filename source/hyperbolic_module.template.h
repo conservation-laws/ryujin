@@ -851,22 +851,10 @@ namespace ryujin
        */
       if (offline_data_->discretization().have_discontinuous_ansatz()) {
         cpu_simd_loop<Number>(
-            loop_name(),
-            [&](auto sentinel, const unsigned int i) {
-              body(sentinel, std::true_type{}, i);
-            },
-            0,
-            n_internal,
-            n_owned);
+            loop_name(), body, 0, n_internal, n_owned, std::true_type{});
       } else {
         cpu_simd_loop<Number>(
-            loop_name(),
-            [&](auto sentinel, const unsigned int i) {
-              body(sentinel, std::false_type{}, i);
-            },
-            0,
-            n_internal,
-            n_owned);
+            loop_name(), body, 0, n_internal, n_owned, std::false_type{});
       }
 
       r_.update_ghost_values();
@@ -1007,22 +995,10 @@ namespace ryujin
        */
       if (offline_data_->discretization().have_discontinuous_ansatz()) {
         cpu_simd_loop<Number>(
-            loop_name(),
-            [&](auto sentinel, const unsigned int i) {
-              body(sentinel, std::true_type{}, i);
-            },
-            0,
-            n_internal,
-            n_owned);
+            loop_name(), body, 0, n_internal, n_owned, std::true_type{});
       } else {
         cpu_simd_loop<Number>(
-            loop_name(),
-            [&](auto sentinel, const unsigned int i) {
-              body(sentinel, std::false_type{}, i);
-            },
-            0,
-            n_internal,
-            n_owned);
+            loop_name(), body, 0, n_internal, n_owned, std::false_type{});
       }
 
       lij_matrix_.update_ghost_rows();
