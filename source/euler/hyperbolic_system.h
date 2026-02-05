@@ -554,7 +554,7 @@ namespace ryujin
 
       /**
        * Given flux contributions @p flux_i and @p flux_j compute the flux
-       * <code>(-f(U_i) - f(U_j)</code>
+       * <code>(-f(U_i) - f(U_j) * c_ij</code>
        */
       state_type
       flux_divergence(const flux_contribution_type &flux_i,
