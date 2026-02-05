@@ -7,9 +7,9 @@
 
 #include <compile_time_options.h>
 
+#include <loop.h>
 #include <observer_pointer.h>
 #include <offline_data.h>
-#include <openmp.h>
 #include <simd.h>
 
 #include "../euler/hyperbolic_system.h"
@@ -70,14 +70,16 @@ namespace ryujin
       {
         diagonal.reinit(density, true);
 
-        DEAL_II_OPENMP_SIMD_PRAGMA
-        for (unsigned int i = 0;
-             i < density.get_partitioner()->locally_owned_size();
-             ++i) {
-          diagonal.local_element(i) =
-              Number(1.0) /
-              (density.local_element(i) * lumped_mass_matrix.local_element(i));
-        }
+        const auto n_owned = density.get_partitioner()->locally_owned_size();
+
+        const auto body_invert = [&](auto sentinel, const unsigned int i) {
+          using T = decltype(sentinel);
+          const auto m_i = get_entry<T>(*lumped_mass_matrix, i);
+          const auto rho_i = get_entry<T>(density, i);
+          diagonal.local_element(i) = Number(1.0) / (rho_i * m_i);
+        };
+
+        cpu_simd_loop<Number>("", body_invert, 0, n_owned, n_owned);
 
         /*
          * Fix up diagonal entries for constrained degrees of freedom due to
@@ -194,12 +196,9 @@ namespace ryujin
       {
         /* Apply action of m_i rho_i V_i: */
 
-        using VA = dealii::VectorizedArray<Number>;
-        constexpr auto simd_length = VA::size();
-
         const vector_type *lumped_mass_matrix = nullptr;
-        if constexpr (std::is_same<Number, Number2>::value) {
-          if constexpr (std::is_same<Number, float>::value) {
+        if constexpr (std::is_same_v<Number, Number2>) {
+          if constexpr (std::is_same_v<Number, float>) {
             if (level_ == dealii::numbers::invalid_unsigned_int)
               lumped_mass_matrix = &offline_data_->lumped_mass_matrix();
             else
@@ -216,31 +215,19 @@ namespace ryujin
 
         const unsigned int n_owned =
             lumped_mass_matrix->get_partitioner()->locally_owned_size();
-        const unsigned int size_regular = n_owned / simd_length * simd_length;
 
-        RYUJIN_PARALLEL_REGION_BEGIN
+        const auto body_mass = [&](auto sentinel, unsigned int i) {
+          using T = decltype(sentinel);
 
-        RYUJIN_OMP_FOR
-        for (unsigned int i = 0; i < size_regular; i += simd_length) {
-          const auto m_i = get_entry<VA>(*lumped_mass_matrix, i);
-          const auto rho_i = get_entry<VA>(*density_, i);
+          const auto m_i = get_entry<T>(*lumped_mass_matrix, i);
+          const auto rho_i = get_entry<T>(*density_, i);
           for (unsigned int d = 0; d < dim; ++d) {
-            const auto temp = get_entry<VA>(src.block(d), i);
-            write_entry<VA>(dst.block(d), m_i * rho_i * temp, i);
+            const auto temp = get_entry<T>(src.block(d), i);
+            write_entry<T>(dst.block(d), m_i * rho_i * temp, i);
           }
-        }
+        };
 
-        RYUJIN_PARALLEL_REGION_END
-
-        for (unsigned int i = size_regular; i < n_owned; ++i) {
-          const auto m_i = lumped_mass_matrix->local_element(i);
-          const auto rho_i = density_->local_element(i);
-
-          for (unsigned int d = 0; d < dim; ++d) {
-            const auto temp = src.block(d).local_element(i);
-            dst.block(d).local_element(i) = m_i * rho_i * temp;
-          }
-        }
+        cpu_simd_loop<Number>("", body_mass, 0, n_owned, n_owned);
 
         /* Apply action of stress tensor: + theta * \sum_j B_ij V_j: */
 
@@ -349,18 +336,15 @@ namespace ryujin
         const unsigned int n_owned =
             lumped_mass_matrix.get_partitioner()->locally_owned_size();
 
-        RYUJIN_PARALLEL_REGION_BEGIN
-
-        RYUJIN_OMP_FOR
-        for (unsigned int i = 0; i < n_owned; ++i) {
+        const auto body_invert = [&](const auto &, const unsigned int i) {
           const auto m_i = lumped_mass_matrix.local_element(i);
           const auto rho_i = density_->local_element(i);
           for (unsigned int d = 0; d < dim; ++d)
             vector.block(d).local_element(i) =
-                1. / (m_i * rho_i + vector.block(d).local_element(i));
-        }
+                Number(1.) / (m_i * rho_i + vector.block(d).local_element(i));
+        };
 
-        RYUJIN_PARALLEL_REGION_END
+        cpu_simd_loop<Number>("", body_invert, 0, n_owned, n_owned);
 
         const auto &boundary_map = offline_data_->level_boundary_map()[level_];
 
@@ -592,12 +576,9 @@ namespace ryujin
       {
         /* Apply action of m_i rho_i V_i: */
 
-        using VA = dealii::VectorizedArray<Number>;
-        constexpr auto simd_length = VA::size();
-
         const vector_type *lumped_mass_matrix = nullptr;
-        if constexpr (std::is_same<Number, Number2>::value) {
-          if constexpr (std::is_same<Number, float>::value) {
+        if constexpr (std::is_same_v<Number, Number2>) {
+          if constexpr (std::is_same_v<Number, float>) {
             if (level_ == dealii::numbers::invalid_unsigned_int)
               lumped_mass_matrix = &offline_data_->lumped_mass_matrix();
             else
@@ -614,26 +595,16 @@ namespace ryujin
 
         const unsigned int n_owned =
             lumped_mass_matrix->get_partitioner()->locally_owned_size();
-        const unsigned int size_regular = n_owned / simd_length * simd_length;
 
-        RYUJIN_PARALLEL_REGION_BEGIN
+        const auto body_mass = [&](auto sentinel, unsigned int i) {
+          using T = decltype(sentinel);
+          const auto m_i = get_entry<T>(*lumped_mass_matrix, i);
+          const auto rho_i = get_entry<T>(*density_, i);
+          const auto e_i = get_entry<T>(src, i);
+          write_entry<T>(dst, m_i * rho_i * e_i, i);
+        };
 
-        RYUJIN_OMP_FOR
-        for (unsigned int i = 0; i < size_regular; i += simd_length) {
-          const auto m_i = get_entry<VA>(*lumped_mass_matrix, i);
-          const auto rho_i = get_entry<VA>(*density_, i);
-          const auto e_i = get_entry<VA>(src, i);
-          write_entry<VA>(dst, m_i * rho_i * e_i, i);
-        }
-
-        RYUJIN_PARALLEL_REGION_END
-
-        for (unsigned int i = size_regular; i < n_owned; ++i) {
-          const auto m_i = lumped_mass_matrix->local_element(i);
-          const auto rho_i = density_->local_element(i);
-          const auto e_i = src.local_element(i);
-          dst.local_element(i) = m_i * rho_i * e_i;
-        }
+        cpu_simd_loop<Number>("", body_mass, 0, n_owned, n_owned);
 
         /* Apply action of diffusion operator \sum_j beta_ij e_j: */
 
@@ -717,17 +688,15 @@ namespace ryujin
         const unsigned int n_owned =
             lumped_mass_matrix.get_partitioner()->locally_owned_size();
 
-        RYUJIN_PARALLEL_REGION_BEGIN
+        const auto body_invert = [&](auto sentinel, const unsigned int i) {
+          using T = decltype(sentinel);
 
-        RYUJIN_OMP_FOR
-        for (unsigned int i = 0; i < n_owned; ++i) {
-          const auto m_i = lumped_mass_matrix.local_element(i);
-          const auto rho_i = density_->local_element(i);
-          vector.local_element(i) =
-              1. / (m_i * rho_i + vector.local_element(i));
-        }
-
-        RYUJIN_PARALLEL_REGION_END
+          const auto m_i = get_entry<T>(*lumped_mass_matrix, i);
+          const auto rho_i = get_entry<T>(*density_, i);
+          write_entry<T>(
+              vector, Number(1.) / (m_i * rho_i + get_entry<T>(vector, i)), i);
+        };
+        cpu_simd_loop<Number>("", body_invert, 0, n_owned, n_owned);
 
         const auto &boundary_map = offline_data_->level_boundary_map()[level_];
 
