@@ -8,6 +8,7 @@
 #include <deal.II/base/config.h>
 #include <observer_pointer.h>
 #include <offline_data.h>
+#include <openmp.h>
 #include <simd.h>
 
 #include <deal.II/base/vectorization.h>

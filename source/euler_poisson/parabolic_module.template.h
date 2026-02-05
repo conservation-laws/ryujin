@@ -10,6 +10,7 @@
 
 #include <convenience_macros.h>
 #include <instrumentation.h>
+#include <openmp.h>
 #include <scope.h>
 #include <simd.h>
 

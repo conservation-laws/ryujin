@@ -9,6 +9,7 @@
 
 #include <observer_pointer.h>
 #include <offline_data.h>
+#include <openmp.h>
 #include <simd.h>
 
 #include "../euler/hyperbolic_system.h"
