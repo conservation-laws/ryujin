@@ -63,6 +63,20 @@ namespace ryujin
         return HyperbolicSystemView<dim, Number>{*this};
       }
 
+      /**
+       * Part of step 1 of the hyperbolic update step: Determine all
+       * "precomputed values" and fill them into the state vector.
+       *
+       * @note The method does not update the ghost range of the state vector.
+       *       The precomputed part has to be synchronized by hand.
+       */
+      template <int dim, typename ScalarNumber>
+      void fill_precomputed_values(
+          const OfflineData<dim, ScalarNumber> &offline_data,
+          typename HyperbolicSystemView<dim, ScalarNumber>::StateVector
+              &state_vector,
+          const bool skip_constrained_dofs = true) const;
+
     private:
       /**
        * @name Runtime parameters, internal fields, methods, and friends
@@ -282,29 +296,6 @@ namespace ryujin
       using InitialPrecomputedVector =
           Vectors::MultiComponentVector<ScalarNumber,
                                         n_initial_precomputed_values>;
-
-      //@}
-      /**
-       * @name Computing precomputed quantities
-       */
-      //@{
-
-      /**
-       * The number of precomputation cycles.
-       */
-      static constexpr unsigned int n_precomputation_cycles = 1;
-
-      /**
-       * Step 0: precompute values for hyperbolic update. This routine is
-       * called within our usual loop() idiom in HyperbolicModule
-       */
-      template <typename SPARSITY>
-      void precomputation_loop(unsigned int cycle,
-                               const SPARSITY &sparsity_simd,
-                               StateVector &state_vector,
-                               unsigned int left,
-                               unsigned int right,
-                               const bool skip_constrained_dofs = true) const;
 
       //@}
       /**
@@ -662,44 +653,42 @@ namespace ryujin
     }
 
 
-    template <int dim, typename Number>
-    template <typename SPARSITY>
-    DEAL_II_ALWAYS_INLINE inline void
-    HyperbolicSystemView<dim, Number>::precomputation_loop(
-        unsigned int cycle [[maybe_unused]],
-        const SPARSITY &sparsity_simd,
-        StateVector &state_vector,
-        unsigned int left,
-        unsigned int right,
-        const bool skip_constrained_dofs /*= true*/) const
+    template <int dim, typename ScalarNumber>
+    inline void HyperbolicSystem::fill_precomputed_values(
+        const OfflineData<dim, ScalarNumber> &offline_data,
+        typename HyperbolicSystemView<dim, ScalarNumber>::StateVector
+            &state_vector,
+        const bool skip_constrained_dofs) const
     {
-      Assert(cycle == 0, dealii::ExcInternalError());
+      const unsigned int n_internal = offline_data.n_locally_internal();
+      const unsigned int n_owned = offline_data.n_locally_owned();
+      const auto &sparsity_simd = offline_data.sparsity_pattern_simd();
+      using VA = dealii::VectorizedArray<ScalarNumber>;
 
       const auto &U = std::get<0>(state_vector);
       auto &precomputed = std::get<1>(state_vector);
 
-      /* We are inside a thread parallel context */
+      const auto body = [&](auto sentinel, unsigned int i) {
+        using T = decltype(sentinel);
+        using View = HyperbolicSystemView<dim, T>;
+        using precomputed_type = typename View::precomputed_type;
 
-      unsigned int stride_size = get_stride_size<Number>;
-
-      RYUJIN_OMP_FOR
-      for (unsigned int i = left; i < right; i += stride_size) {
-
-        /* Skip constrained degrees of freedom: */
         const unsigned int row_length = sparsity_simd.row_length(i);
         if (skip_constrained_dofs && row_length == 1)
-          continue;
+          return;
 
-        const auto U_i = U.template get_tensor<Number>(i);
-
-        const auto eta_m = mathematical_entropy(U_i);
-
-        const auto h_sharp = water_depth_sharp(U_i);
+        const auto U_i = U.template get_tensor<T>(i);
+        const auto view = this->view<dim, T>();
+        const auto eta_m = view.mathematical_entropy(U_i);
+        const auto h_sharp = view.water_depth_sharp(U_i);
         const auto h_star = ryujin::pow(h_sharp, ScalarNumber(4. / 3.));
 
         const precomputed_type prec_i{eta_m, h_star};
-        precomputed.template write_tensor<Number>(prec_i, i);
-      }
+
+        precomputed.template write_tensor<T>(prec_i, i);
+      };
+
+      cpu_simd_loop<ScalarNumber>("time_step_1", body, 0, n_internal, n_owned);
     }
 
 
