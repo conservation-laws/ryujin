@@ -10,7 +10,7 @@
 
 #include <convenience_macros.h>
 #include <instrumentation.h>
-#include <openmp.h>
+#include <loop.h>
 #include <scope.h>
 #include <simd.h>
 
@@ -560,34 +560,23 @@ namespace ryujin
 
       update_background_density(t);
 
-      RYUJIN_PARALLEL_REGION_BEGIN
-
-      auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
+      const auto body_copy = [&](auto sentinel, unsigned int i) {
         using T = decltype(sentinel);
-        unsigned int stride_size = get_stride_size<T>;
         const auto view = hyperbolic_system_->template view<dim, T>();
-
-        RYUJIN_OMP_FOR
-        for (unsigned int i = left; i < right; i += stride_size) {
-          const auto U_i = U.template get_tensor<T>(i);
-          const auto rho_i = view.density(U_i);
-          write_entry<T>(density_, rho_i, i);
-        }
+        const auto U_i = U.template get_tensor<T>(i);
+        const auto rho_i = view.density(U_i);
+        write_entry<T>(density_, rho_i, i);
       };
 
-      /* Parallel non-vectorized loop: */
-      loop(Number(), n_regular, n_owned);
-      /* Parallel vectorized SIMD loop: */
-      loop(VA(), 0, n_regular);
-
-      RYUJIN_PARALLEL_REGION_END
+      cpu_simd_loop<Number>(
+          "time_step_parabolic_1a", body_copy, 0, n_regular, n_owned);
 
       density_.update_ghost_values();
 
-      const auto body = [this](const auto &data,
-                               auto &dst,
-                               const auto &src,
-                               const auto range) {
+      const auto body_matrix_free = [this](const auto &data,
+                                           auto &dst,
+                                           const auto &src,
+                                           const auto range) {
         FEEvaluation<dim, order_fe, order_quad, /*components*/ 1, Number>
             fee_potential(data, /*CG*/ 0, /*lumped quadrature*/ 1);
         FEEvaluation<dim, order_fe, order_quad, /*components*/ 1, Number>
@@ -619,7 +608,7 @@ namespace ryujin
       };
 
       matrix_free_.template cell_loop<ScalarVector, ScalarVector>(
-          body,
+          body_matrix_free,
           potential_rhs_,
           density_,
           /*zero destination*/ true);
@@ -751,63 +740,49 @@ namespace ryujin
           potential,
           /*zero destination*/ true);
 
-      RYUJIN_PARALLEL_REGION_BEGIN
-
-      auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
+      const auto body = [&](auto sentinel, unsigned int i) {
         using T = decltype(sentinel);
-        unsigned int stride_size = get_stride_size<T>;
         const auto view = hyperbolic_system_->template view<dim, T>();
 
-        RYUJIN_OMP_FOR
-        for (unsigned int i = left; i < right; i += stride_size) {
-          const auto m_i_inv = get_entry<T>(lumped_mass_matrix_inverse, i);
+        const auto m_i_inv = get_entry<T>(lumped_mass_matrix_inverse, i);
 
-          auto U_i = U.template get_tensor<T>(i);
-          const auto rho_i = view.density(U_i);
-          const auto m_i = view.momentum(U_i);
-          const auto v_i = m_i / rho_i;
+        auto U_i = U.template get_tensor<T>(i);
+        const auto rho_i = view.density(U_i);
+        const auto m_i = view.momentum(U_i);
+        const auto v_i = m_i / rho_i;
 
-          dealii::Tensor<1, (dim == 2 ? 1 : dim), T> magnetic_field;
-          for (unsigned int d = 0; d < (dim == 2 ? 1 : dim); ++d)
-            magnetic_field[d] = get_entry<T>(magnetic_field_.block(d), i);
+        dealii::Tensor<1, (dim == 2 ? 1 : dim), T> magnetic_field;
+        for (unsigned int d = 0; d < (dim == 2 ? 1 : dim); ++d)
+          magnetic_field[d] = get_entry<T>(magnetic_field_.block(d), i);
 
-          dealii::Tensor<1, dim, T> grad_phi;
-          for (unsigned int d = 0; d < dim; ++d)
-            grad_phi[d] = m_i_inv * get_entry<T>(velocity_rhs_.block(d), i);
+        dealii::Tensor<1, dim, T> grad_phi;
+        for (unsigned int d = 0; d < dim; ++d)
+          grad_phi[d] = m_i_inv * get_entry<T>(velocity_rhs_.block(d), i);
 
-          auto new_v_i = v_i;
+        auto new_v_i = v_i;
 
-          if constexpr (dim == 2) {
-            new_v_i = -magnetic_field[0] * cross_product_2d(grad_phi) /
-                      magnetic_field.norm_square();
+        if constexpr (dim == 2) {
+          new_v_i = -magnetic_field[0] * cross_product_2d(grad_phi) /
+                    magnetic_field.norm_square();
 
-          } else if constexpr (dim == 3) {
-            new_v_i = -cross_product_3d(grad_phi, magnetic_field) /
-                      magnetic_field.norm_square();
-          }
-
-          for (unsigned int d = 0; d < dim; ++d)
-            U_i[1 + d] = rho_i * new_v_i[d];
-
-          /*
-           * Update the total energy accordingly:
-           */
-          if constexpr (view.have_energy_equation) {
-            U_i[1 + dim] += Number(0.5) * rho_i *
-                            (new_v_i.norm_square() - v_i.norm_square());
-          }
-
-          U.template write_tensor<T>(U_i, i);
+        } else if constexpr (dim == 3) {
+          new_v_i = -cross_product_3d(grad_phi, magnetic_field) /
+                    magnetic_field.norm_square();
         }
+
+        for (unsigned int d = 0; d < dim; ++d)
+          U_i[1 + d] = rho_i * new_v_i[d];
+
+        /* Update the total energy accordingly: */
+        if constexpr (view.have_energy_equation)
+          U_i[1 + dim] +=
+              Number(0.5) * rho_i * (new_v_i.norm_square() - v_i.norm_square());
+
+        U.template write_tensor<T>(U_i, i);
       };
 
-      /* Parallel non-vectorized loop: */
-      loop(Number(), n_regular, n_owned);
-      /* Parallel vectorized SIMD loop: */
-      loop(VA(), 0, n_regular);
-
-      RYUJIN_PARALLEL_REGION_END
-
+      cpu_simd_loop<Number>(
+          "time_step_parabolic_1c", body, 0, n_regular, n_owned);
 
       LIKWID_MARKER_STOP("time_step_parabolic_1c");
     }
@@ -892,39 +867,29 @@ namespace ryujin
          * to be set to the correct density for UpdateOperator::vmult()
          */
 
-        RYUJIN_PARALLEL_REGION_BEGIN
-
-        auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
+        const auto body_copy = [&](auto sentinel, unsigned int i) {
           using T = decltype(sentinel);
-          unsigned int stride_size = get_stride_size<T>;
           const auto view = hyperbolic_system_->template view<dim, T>();
 
-          RYUJIN_OMP_FOR
-          for (unsigned int i = left; i < right; i += stride_size) {
-            const auto U_i = old_U.template get_tensor<T>(i);
-            const auto rho_i = view.density(U_i);
-            const auto m_i = view.momentum(U_i);
+          const auto U_i = old_U.template get_tensor<T>(i);
+          const auto rho_i = view.density(U_i);
+          const auto m_i = view.momentum(U_i);
 
-            dealii::Tensor<1, (dim == 2 ? 1 : dim), T> magnetic_field;
-            for (unsigned int d = 0; d < (dim == 2 ? 1 : dim); ++d)
-              magnetic_field[d] = get_entry<T>(magnetic_field_.block(d), i);
+          dealii::Tensor<1, (dim == 2 ? 1 : dim), T> magnetic_field;
+          for (unsigned int d = 0; d < (dim == 2 ? 1 : dim); ++d)
+            magnetic_field[d] = get_entry<T>(magnetic_field_.block(d), i);
 
-            const auto velocity_rhs =
-                tau * alpha * rho_i *
-                apply_B_n_inverse(magnetic_field, tau, m_i / rho_i);
+          const auto velocity_rhs =
+              tau * alpha * rho_i *
+              apply_B_n_inverse(magnetic_field, tau, m_i / rho_i);
 
-            write_entry<T>(density_, rho_i, i);
-            for (unsigned int d = 0; d < dim; ++d)
-              write_entry<T>(velocity_rhs_.block(d), velocity_rhs[d], i);
-          }
+          write_entry<T>(density_, rho_i, i);
+          for (unsigned int d = 0; d < dim; ++d)
+            write_entry<T>(velocity_rhs_.block(d), velocity_rhs[d], i);
         };
 
-        /* Parallel non-vectorized loop: */
-        loop(Number(), n_regular, n_owned);
-        /* Parallel vectorized SIMD loop: */
-        loop(VA(), 0, n_regular);
-
-        RYUJIN_PARALLEL_REGION_END
+        cpu_simd_loop<Number>(
+            "time_step_parabolic_2a", body_copy, 0, n_regular, n_owned);
 
         density_.update_ghost_values();
 
@@ -1154,63 +1119,48 @@ namespace ryujin
        * Update the momentum and total energy:
        */
 
-      RYUJIN_PARALLEL_REGION_BEGIN
-
-      auto loop = [&](auto sentinel, unsigned int left, unsigned int right) {
+      const auto body = [&](auto sentinel, unsigned int i) {
         using T = decltype(sentinel);
-        unsigned int stride_size = get_stride_size<T>;
         const auto view = hyperbolic_system_->template view<dim, T>();
 
-        RYUJIN_OMP_FOR
-        for (unsigned int i = left; i < right; i += stride_size) {
-          const auto m_i_inv = get_entry<T>(lumped_mass_matrix_inverse, i);
+        const auto m_i_inv = get_entry<T>(lumped_mass_matrix_inverse, i);
 
-          const auto old_U_i = old_U.template get_tensor<T>(i);
-          const auto rho_i = view.density(old_U_i);
-          const auto old_m_i = view.momentum(old_U_i);
-          const auto old_v_i = old_m_i / rho_i;
+        const auto old_U_i = old_U.template get_tensor<T>(i);
+        const auto rho_i = view.density(old_U_i);
+        const auto old_m_i = view.momentum(old_U_i);
+        const auto old_v_i = old_m_i / rho_i;
 
-          dealii::Tensor<1, (dim == 2 ? 1 : dim), T> magnetic_field;
-          for (unsigned int d = 0; d < (dim == 2 ? 1 : dim); ++d)
-            magnetic_field[d] = get_entry<T>(magnetic_field_.block(d), i);
+        dealii::Tensor<1, (dim == 2 ? 1 : dim), T> magnetic_field;
+        for (unsigned int d = 0; d < (dim == 2 ? 1 : dim); ++d)
+          magnetic_field[d] = get_entry<T>(magnetic_field_.block(d), i);
 
-          dealii::Tensor<1, dim, T> grad_phi;
-          for (unsigned int d = 0; d < dim; ++d)
-            grad_phi[d] = m_i_inv * get_entry<T>(velocity_rhs_.block(d), i);
+        dealii::Tensor<1, dim, T> grad_phi;
+        for (unsigned int d = 0; d < dim; ++d)
+          grad_phi[d] = m_i_inv * get_entry<T>(velocity_rhs_.block(d), i);
 
-          auto new_v_i =
-              apply_B_n_inverse(magnetic_field, tau, old_v_i - tau * grad_phi);
+        auto new_v_i =
+            apply_B_n_inverse(magnetic_field, tau, old_v_i - tau * grad_phi);
 
-          /* Perform an extrapolation step: */
-          if (crank_nicolson_extrapolation)
-            new_v_i = Number(2.) * new_v_i - old_v_i;
+        /* Perform an extrapolation step: */
+        if (crank_nicolson_extrapolation)
+          new_v_i = Number(2.) * new_v_i - old_v_i;
 
-          auto new_U_i = old_U_i;
-          for (unsigned int d = 0; d < dim; ++d)
-            new_U_i[1 + d] = rho_i * new_v_i[d];
+        auto new_U_i = old_U_i;
+        for (unsigned int d = 0; d < dim; ++d)
+          new_U_i[1 + d] = rho_i * new_v_i[d];
 
-          /*
-           * Update the total energy accordingly:
-           */
-          if constexpr (view.have_energy_equation) {
-            new_U_i[1 + dim] += Number(0.5) * rho_i *
-                                (new_v_i.norm_square() - old_v_i.norm_square());
-          }
+        /* Update the total energy accordingly: */
+        if constexpr (view.have_energy_equation)
+          new_U_i[1 + dim] += Number(0.5) * rho_i *
+                              (new_v_i.norm_square() - old_v_i.norm_square());
 
-          new_U.template write_tensor<T>(new_U_i, i);
-        }
+        new_U.template write_tensor<T>(new_U_i, i);
       };
 
-      /* Parallel non-vectorized loop: */
-      loop(Number(), n_regular, n_owned);
-      /* Parallel vectorized SIMD loop: */
-      loop(VA(), 0, n_regular);
-
-      RYUJIN_PARALLEL_REGION_END
+      cpu_simd_loop<Number>(
+          "time_step_parabolic_2c", body, 0, n_regular, n_owned);
 
       LIKWID_MARKER_STOP("time_step_parabolic_2c");
-
-      return;
     }
 
 
