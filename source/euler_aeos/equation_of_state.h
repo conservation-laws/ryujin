@@ -55,13 +55,6 @@ namespace ryujin
          * internal energy q that is used in the interpolatory NASG eos.
          */
         interpolation_q_ = 0.;
-
-        /*
-         * If necessary derived EOS can override this boolean to indicate
-         * that the dealii::ArrayView<double> variants of the pressure()
-         * function (etc.) should be preferred.
-         */
-        prefer_vector_interface_ = false;
       }
 
       /**
@@ -205,19 +198,6 @@ namespace ryujin
       ACCESSOR_READ_ONLY(interpolation_q)
 
       /**
-       * Return a boolean indicating whether the dealii::ArrayView<double>
-       * variants for the pressure(), specific_internal_energy(), and
-       * speed_of_sound() functions should be preferred.
-       *
-       * Ordinarily we use the single-valued signatures for pre-computation
-       * because this leads to slightly better throughput (due to better
-       * memory locality with how we store precomputed values) and less
-       * memory consumption. On the other hand, some tabulated equation of
-       * state libraries work best with a single call and a large dataset.
-       */
-      ACCESSOR_READ_ONLY(prefer_vector_interface)
-
-      /**
        * Return the name of the EOS as (const reference) std::string
        */
       ACCESSOR_READ_ONLY(name)
@@ -226,7 +206,6 @@ namespace ryujin
       double interpolation_b_;
       double interpolation_pinfty_;
       double interpolation_q_;
-      bool prefer_vector_interface_;
 
     private:
       const std::string name_;

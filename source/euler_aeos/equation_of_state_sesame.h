@@ -231,8 +231,6 @@ namespace ryujin
         material_id_ = 5030;
         this->add_parameter(
             "material id", material_id_, "The Sesame Material ID");
-
-        this->prefer_vector_interface_ = true;
       }
 
 
