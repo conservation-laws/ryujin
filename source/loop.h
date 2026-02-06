@@ -5,10 +5,17 @@
 
 #pragma once
 
-#include <openmp.h>
+#include <compile_time_options.h>
+#include <convenience_macros.h>
 #include <simd.h>
 
+#include <deal.II/base/config.h>
+
 #include <string>
+
+#ifdef WITH_OPENMP
+#include <omp.h>
+#endif
 
 namespace ryujin
 {
@@ -43,23 +50,34 @@ namespace ryujin
 
     using VA = dealii::VectorizedArray<ScalarNumber>;
 
-    RYUJIN_PARALLEL_REGION_BEGIN
-
     constexpr unsigned int stride_size = get_stride_size<VA>;
     const unsigned int regular = internal / stride_size * stride_size;
 
-    /* SIMD vectorized loop: */
+#if defined(WITH_OPENMP)
+    /* Variant using OpenMP: */
 
-    RYUJIN_OMP_FOR
-    for (unsigned int i = left; i < regular; i += stride_size)
-      body(VA(), std::forward<Args>(args)..., i);
+    RYUJIN_PRAGMA(omp parallel default(shared))
+    {
+      /* SIMD vectorized loop: */
+      RYUJIN_PRAGMA(omp for nowait)
+      for (unsigned int i = left; i < regular; i += stride_size)
+        body(VA(), std::forward<Args>(args)..., i);
 
-    /* Serial loop: */
+      /* Serial loop: */
+      RYUJIN_PRAGMA(omp for)
+      for (unsigned int i = regular; i < right; i += 1)
+        body(ScalarNumber(), std::forward<Args>(args)..., i);
+    }
+#else
+    {
+      /* SIMD vectorized loop: */
+      for (unsigned int i = left; i < regular; i += stride_size)
+        body(VA(), std::forward<Args>(args)..., i);
 
-    RYUJIN_OMP_FOR
-    for (unsigned int i = regular; i < right; i += 1)
-      body(ScalarNumber(), std::forward<Args>(args)..., i);
-
-    RYUJIN_PARALLEL_REGION_END
+      /* Serial loop: */
+      for (unsigned int i = regular; i < right; i += 1)
+        body(ScalarNumber(), std::forward<Args>(args)..., i);
+    }
+#endif
   }
 } // namespace ryujin

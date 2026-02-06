@@ -6,30 +6,31 @@
 #pragma once
 
 #include <compile_time_options.h>
-#include <openmp.h>
+
+/**
+ * @name Likwid support
+ */
+//@{
 
 #ifdef WITH_LIKWID
 #include <likwid.h>
-
-#define LIKWID_INIT                                                            \
-  LIKWID_MARKER_INIT;                                                          \
-  RYUJIN_PARALLEL_REGION_BEGIN                                                 \
-  LIKWID_MARKER_THREADINIT;                                                    \
-  RYUJIN_PARALLEL_REGION_END
-
-#define LIKWID_CLOSE LIKWID_MARKER_CLOSE;
-
 #else
 
 /**
- * Wrapper macro initializing likwid instrumentation. Used in main().
+ * Macro initializing likwid instrumentation. Used in main().
  */
-#define LIKWID_INIT
+#define LIKWID_MARKER_INIT
+
 
 /**
- * Wrapper macro finalizing likwid instrumentation. Used in main().
+ * Macro initializing likwid instrumentation on a worker thread. Used in main().
  */
-#define LIKWID_CLOSE
+#define LIKWID_MARKER_THREAD_INIT
+
+/**
+ * Macro finalizing likwid instrumentation. Used in main().
+ */
+#define LIKWID_MARKER_CLOSE
 
 /**
  * A set of macros that start and stop likwid instrumentation (if support
@@ -52,6 +53,11 @@
 
 #endif
 
+//@}
+/**
+ * @name Clang LSAN support
+ */
+//@{
 
 /**
  * Explicitly disable/enable the LLVM/Clang LeakSanitiver
