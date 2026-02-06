@@ -21,6 +21,9 @@ namespace ryujin
    * the remainder of the index range, i.e., [internal, right) a serial
    * loop is invoked.
    *
+   * @note the index internal is rounded down to the next integer multiple
+   * of the SIMD stride size.
+   *
    * @note Here, @p body is a functor that must accept a "sentinel" type as
    * first argument and the current index i as last argument. Additional
    * `args` may be specified in the cpu_simd_loop() invocation that will be
@@ -44,21 +47,19 @@ namespace ryujin
     RYUJIN_PARALLEL_REGION_BEGIN
     LIKWID_MARKER_START(region_name.c_str());
 
-    constexpr unsigned int simd_stride_size = get_stride_size<VA>;
-    Assert(internal % simd_stride_size == 0,
-           dealii::ExcMessage("Invalid index range: internal not divisible by "
-                              "simd_stride_size."));
+    constexpr unsigned int stride_size = get_stride_size<VA>;
+    const unsigned int regular = internal / stride_size * stride_size;
 
     /* SIMD vectorized loop: */
 
     RYUJIN_OMP_FOR
-    for (unsigned int i = left; i < internal; i += simd_stride_size)
+    for (unsigned int i = left; i < regular; i += stride_size)
       body(VA(), std::forward<Args>(args)..., i);
 
     /* Serial loop: */
 
     RYUJIN_OMP_FOR
-    for (unsigned int i = internal; i < right; i += 1)
+    for (unsigned int i = regular; i < right; i += 1)
       body(ScalarNumber(), std::forward<Args>(args)..., i);
 
     LIKWID_MARKER_STOP(region_name.c_str());

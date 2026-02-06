@@ -74,9 +74,9 @@ namespace ryujin
 
         const auto body_invert = [&](auto sentinel, const unsigned int i) {
           using T = decltype(sentinel);
-          const auto m_i = get_entry<T>(*lumped_mass_matrix, i);
+          const auto m_i = get_entry<T>(lumped_mass_matrix, i);
           const auto rho_i = get_entry<T>(density, i);
-          diagonal.local_element(i) = Number(1.0) / (rho_i * m_i);
+          write_entry<T>(diagonal, Number(1.0) / (rho_i * m_i), i);
         };
 
         cpu_simd_loop<Number>("", body_invert, 0, n_owned, n_owned);
@@ -691,7 +691,7 @@ namespace ryujin
         const auto body_invert = [&](auto sentinel, const unsigned int i) {
           using T = decltype(sentinel);
 
-          const auto m_i = get_entry<T>(*lumped_mass_matrix, i);
+          const auto m_i = get_entry<T>(lumped_mass_matrix, i);
           const auto rho_i = get_entry<T>(*density_, i);
           write_entry<T>(
               vector, Number(1.) / (m_i * rho_i + get_entry<T>(vector, i)), i);

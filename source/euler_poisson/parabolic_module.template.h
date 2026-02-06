@@ -541,10 +541,7 @@ namespace ryujin
       auto &V = std::get<2>(state_vector);
       auto &potential = V.block(0);
 
-      using VA = VectorizedArray<Number>;
-      constexpr auto simd_length = VA::size();
       const unsigned int n_owned = offline_data_->n_locally_owned();
-      const unsigned int n_regular = n_owned / simd_length * simd_length;
 
       constexpr unsigned int order_fe = 1;
       constexpr unsigned int order_quad = 2;
@@ -569,7 +566,7 @@ namespace ryujin
       };
 
       cpu_simd_loop<Number>(
-          "time_step_parabolic_1a", body_copy, 0, n_regular, n_owned);
+          "time_step_parabolic_1a", body_copy, 0, n_owned, n_owned);
 
       density_.update_ghost_values();
 
@@ -692,10 +689,7 @@ namespace ryujin
       auto &V = std::get<2>(state_vector);
       auto &potential = V.block(0);
 
-      using VA = VectorizedArray<Number>;
-      constexpr auto simd_length = VA::size();
       const unsigned int n_owned = offline_data_->n_locally_owned();
-      const unsigned int n_regular = n_owned / simd_length * simd_length;
 
       const auto &lumped_mass_matrix_inverse =
           offline_data_->lumped_mass_matrix_inverse();
@@ -782,7 +776,7 @@ namespace ryujin
       };
 
       cpu_simd_loop<Number>(
-          "time_step_parabolic_1c", body, 0, n_regular, n_owned);
+          "time_step_parabolic_1c", body, 0, n_owned, n_owned);
 
       LIKWID_MARKER_STOP("time_step_parabolic_1c");
     }
@@ -813,10 +807,7 @@ namespace ryujin
       auto &new_V = std::get<2>(new_state_vector);
       auto &new_potential = new_V.block(0);
 
-      using VA = VectorizedArray<Number>;
-      constexpr auto simd_length = VA::size();
       const unsigned int n_owned = offline_data_->n_locally_owned();
-      const unsigned int n_regular = n_owned / simd_length * simd_length;
 
       const auto &lumped_mass_matrix_inverse =
           offline_data_->lumped_mass_matrix_inverse();
@@ -889,7 +880,7 @@ namespace ryujin
         };
 
         cpu_simd_loop<Number>(
-            "time_step_parabolic_2a", body_copy, 0, n_regular, n_owned);
+            "time_step_parabolic_2a", body_copy, 0, n_owned, n_owned);
 
         density_.update_ghost_values();
 
@@ -1158,7 +1149,7 @@ namespace ryujin
       };
 
       cpu_simd_loop<Number>(
-          "time_step_parabolic_2c", body, 0, n_regular, n_owned);
+          "time_step_parabolic_2c", body, 0, n_owned, n_owned);
 
       LIKWID_MARKER_STOP("time_step_parabolic_2c");
     }

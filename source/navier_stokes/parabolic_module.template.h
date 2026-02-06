@@ -313,16 +313,12 @@ namespace ryujin
       const auto &old_U = std::get<0>(old_state_vector);
       auto &new_U = std::get<0>(new_state_vector);
 
-      using VA = VectorizedArray<Number>;
-
       const auto &lumped_mass_matrix = offline_data_->lumped_mass_matrix();
       const auto &affine_constraints = offline_data_->affine_constraints();
 
       /* Index ranges for the iteration over the sparsity pattern : */
 
-      constexpr auto simd_length = VA::size();
       const unsigned int n_owned = offline_data_->n_locally_owned();
-      const unsigned int n_regular = n_owned / simd_length * simd_length;
 
       const auto &sparsity_simd = offline_data_->sparsity_pattern_simd();
 
@@ -398,7 +394,7 @@ namespace ryujin
         };
 
         cpu_simd_loop<Number>(
-            "time_step_parabolic_1", body, 0, n_regular, n_owned);
+            "time_step_parabolic_1", body, 0, n_owned, n_owned);
 
         /*
          * Set up "strongly enforced" boundary conditions that are not stored
@@ -704,7 +700,7 @@ namespace ryujin
         };
 
         cpu_simd_loop<Number>(
-            "time_step_parabolic_2", body, 0, n_regular, n_owned);
+            "time_step_parabolic_2", body, 0, n_owned, n_owned);
 
         /*
          * Set up "strongly enforced" boundary conditions that are not stored
@@ -942,7 +938,7 @@ namespace ryujin
         };
 
         cpu_simd_loop<Number>(
-            "time_step_parabolic_3", body, 0, n_regular, n_owned);
+            "time_step_parabolic_3", body, 0, n_owned, n_owned);
 
 
         LIKWID_MARKER_STOP("time_step_parabolic_3");
