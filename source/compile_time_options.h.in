@@ -27,7 +27,6 @@
 #cmakedefine WITH_GDAL
 #cmakedefine WITH_LIKWID
 #cmakedefine WITH_OPENMP
-#cmakedefine WITH_VALGRIND
 
 /* Workarounds: */
 
